@@ -349,6 +349,15 @@ launch and signature verification alone therefore do not prove resolution for
 TCC enumeration. Preserve scoped native messages and distinguish this symptom
 from a proven registration fix; the continuation record retains the receipt.
 
+Native context fixtures must use an external target process. Observing the
+consumer's own WebView returned AX `Messaging failed` despite true Accessibility
+trust and a matching foreground PID. The separate Cocoa target passed exact AX
+field/window checks and all four privacy transitions through the same consumer
+modules. Reuse `tools/diagnostics/hs274-context-target.swift` and its owned
+controller; target command acknowledgements are not substitutes for independent
+AX observations. Native acceptance and its remaining coverage limits are in the
+[external target receipt](../audits/hammerspoon/2026_09_09/native-hammerspoon.md#external-target-acceptance-on-native-macos).
+
 A hosted macOS runner can execute real Quartz taps without proving physical
 keyboard or Karabiner provenance. Native original/copy marker preservation
 does not imply binary serialization preservation; decoded user data was zero

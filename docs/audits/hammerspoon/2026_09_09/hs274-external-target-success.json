@@ -1,0 +1,137 @@
+{
+    "run_id":  "34758957794",
+    "job_id":  "103728210889",
+    "head":  "4fc8a8cfa3dc25a25820b59cde352612db2e6b4f",
+    "workflow_conclusion":  "failure",
+    "remap_step_conclusion":  "success",
+    "source_sha256":  "f5977eb7ac746233a8ca7d7f5d11186becd3d507145ccd71380ebe87d791c03b",
+    "context_target":  {
+                           "pid":  4295,
+                           "executable":  "/Users/runner/work/_temp/HS274Target.app/Contents/MacOS/HS274Target",
+                           "settled":  true,
+                           "exit":  0
+                       },
+    "hammerspoon":  {
+                        "clock":  {
+                                      "numer":  125,
+                                      "domain":  "mach_absolute_time",
+                                      "denom":  3,
+                                      "version":  1
+                                  },
+                        "stop_requested":  true,
+                        "presses":  [
+                                        {
+                                            "app":  "HS274Target",
+                                            "keycode":  53,
+                                            "device":  "4294968803",
+                                            "timestamp":  "2026-09-13 13:10:10.338",
+                                            "capture":  "bcbcafd3-8d9b-40c2-9c5e-93d1f7f0d734/2",
+                                            "action":  "physical_press"
+                                        },
+                                        {
+                                            "app":  "HS274Target",
+                                            "keycode":  49,
+                                            "device":  "4294968803",
+                                            "timestamp":  "2026-09-13 13:10:10.454",
+                                            "capture":  "bcbcafd3-8d9b-40c2-9c5e-93d1f7f0d734/2",
+                                            "action":  "physical_press"
+                                        }
+                                    ],
+                        "context_source":  "native app/window/AX",
+                        "field_focus":  {
+                                            "value":  true,
+                                            "accessibility":  true,
+                                            "focused_id":  46,
+                                            "fixture_id":  46,
+                                            "role":  "AXTextField",
+                                            "source":  "native AX"
+                                        },
+                        "opened":  {
+                                       "coverage":  "fixture_only",
+                                       "kind":  "opened",
+                                       "lease":  "2",
+                                       "incarnation":  "bcbcafd3-8d9b-40c2-9c5e-93d1f7f0d734",
+                                       "version":  1
+                                   },
+                        "coverage":  "fixture_only",
+                        "context_observations":  [
+                                                     {
+                                                         "app":  "HS274Target",
+                                                         "observed_ns":  "301410081375",
+                                                         "allowed":  true,
+                                                         "epoch":  1789305009.887961
+                                                     },
+                                                     {
+                                                         "observed_ns":  "301492624916",
+                                                         "allowed":  false
+                                                     },
+                                                     {
+                                                         "app":  "HS274Target",
+                                                         "observed_ns":  "301545733041",
+                                                         "allowed":  true,
+                                                         "epoch":  1789305010.023612
+                                                     },
+                                                     {
+                                                         "observed_ns":  "301594307916",
+                                                         "allowed":  false
+                                                     },
+                                                     {
+                                                         "app":  "HS274Target",
+                                                         "observed_ns":  "301674348500",
+                                                         "allowed":  true,
+                                                         "epoch":  1789305010.152228
+                                                     }
+                                                 ],
+                        "exit":  143,
+                        "context_probe":  [
+                                              {
+                                                  "phase":  "private",
+                                                  "observation":  2
+                                              },
+                                              {
+                                                  "phase":  "public",
+                                                  "observation":  3
+                                              },
+                                              {
+                                                  "phase":  "secure",
+                                                  "observation":  4
+                                              },
+                                              {
+                                                  "phase":  "resumed",
+                                                  "observation":  5
+                                              }
+                                          ],
+                        "capture_started_ns":  "301312802625",
+                        "runtime":  "native Hammerspoon",
+                        "context_stopped":  true,
+                        "contexts":  [
+                                         {
+                                             "device":  "4294968803",
+                                             "timestamp":  "7244659393"
+                                         },
+                                         {
+                                             "device":  "4294968803",
+                                             "timestamp":  "7247448543"
+                                         }
+                                     ],
+                        "counts":  {
+                                       "53":  1,
+                                       "49":  1
+                                   },
+                        "clock_samples":  [
+                                              {
+                                                  "observed_ns":  "301889970166",
+                                                  "original_ns":  "301860808041"
+                                              },
+                                              {
+                                                  "observed_ns":  "301983867166",
+                                                  "original_ns":  "301977022625"
+                                              }
+                                          ],
+                        "settled":  true,
+                        "error_count":  0,
+                        "errors":  [
+
+                                   ]
+                    }
+}
