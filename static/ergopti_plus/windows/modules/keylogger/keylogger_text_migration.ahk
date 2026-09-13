@@ -916,11 +916,13 @@ KL_Mig_Start(mode, schedule := true) {
 		KLMigration.converted := 0
 		KLMigration.stageBytesWritten := 0
 
-		; A staging file left by an interrupted attempt describes a ledger that has
-		; since moved on. Start clean rather than resume it.
-		FSDelete(KLMigration.stagePath)
 		KLMigration.readFh := FSOpenRead(KLMigration.sourcePath)
-		KLMigration.writeFh := FSOpenWrite(KLMigration.stagePath)
+		; Admit the source before creating output that a failed start cannot use.
+		if IsObject(KLMigration.readFh) {
+				; An interrupted stage describes an older ledger. Never resume it.
+				FSDelete(KLMigration.stagePath)
+				KLMigration.writeFh := FSOpenWrite(KLMigration.stagePath)
+		}
 		if (!IsObject(KLMigration.readFh) || !IsObject(KLMigration.writeFh)) {
 				try LoggerError("Keylogger", "At-rest migration cannot open the ledger - data.sql is unchanged.")
 				_KL_Mig_Release()
