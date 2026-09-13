@@ -22,7 +22,11 @@ def receipt():
         return datetime.fromtimestamp(math.floor(epoch)).strftime("%Y-%m-%d %H:%M:%S") + f".{math.floor((epoch % 1) * 1000):03d}"
     return capture, {"runtime": "native Hammerspoon", "coverage": "fixture_only", "settled": True,
                      "context_source": "native app/window/AX", "context_stopped": True,
-                     "context_observations": [{"observed_ns": "0", "allowed": True, "app": "Observed", "epoch": 1000}],
+                     "context_observations": [dict(observed_ns=str(index), allowed=allowed,
+                         **({"app": "Observed", "epoch": 1000 + index / 1000000000} if allowed else {}))
+                         for index, allowed in enumerate((True, False, True, False, True))],
+                     "context_probe": [{"phase": phase, "observation": index + 2}
+                         for index, phase in enumerate(("private", "public", "secure", "resumed"))],
                      "clock": {"version": 1, "domain": "mach_absolute_time", "numer": 125, "denom": 3},
                      "capture_started_ns": "0", "clock_samples": [
                          {"original_ns": str(row["timestamp"] * 125 // 3),
@@ -34,6 +38,16 @@ def receipt():
 
 
 class ConsumerTests(unittest.TestCase):
+    def test_native_consumer_requires_distinct_observed_privacy_transitions(self):
+        capture, result = receipt()
+        validate_consumer(result, capture)
+        for probe in (None, [], result["context_probe"][:-1],
+                      [dict(row, observation=2) for row in result["context_probe"]],
+                      [dict(row, phase="public") for row in result["context_probe"]],
+                      [dict(row, observation=True) for row in result["context_probe"]]):
+            with self.subTest(probe=probe), self.assertRaisesRegex(ValueError, "context probe"):
+                validate_consumer(dict(result, context_probe=probe), capture)
+
     def test_native_context_receipt_rejects_fabricated_app_and_arrival_time(self):
         capture, result = receipt()
         for field, value in (("context_source", "synthetic"), ("context_stopped", False),
