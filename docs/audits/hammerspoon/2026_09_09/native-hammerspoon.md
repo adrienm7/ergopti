@@ -99,6 +99,14 @@ flow on that assumption. The next diagnostic reads the copied bundle metadata,
 checks its signature and retains scoped TCC messages on admission failure.
 Neither experiment proves global trust or closes HS-274.
 
+[Run 34752471752](https://github.com/adrienm7/ergopti/actions/runs/34752471752)
+verified the exact copied bundle: Hammerspoon 1.1.1, identifier
+`org.hammerspoon.Hammerspoon`, strict signature verification exit zero and
+Developer ID team `VQCYSNZB89`. The scoped two-minute TCC log query exceeded
+its five-second deadline. This is a diagnostic timeout, not a TCC refusal
+reason. The collector now retains bounded partial output on timeout; older
+receipts lost that output, so its absence cannot establish a silent native log.
+
 The supervisor signals `permission_ready` only after ordinary UI approval.
 Lua then independently checks actual Accessibility trust before creating the
 input fixture. Native context tests must subsequently verify public, private,

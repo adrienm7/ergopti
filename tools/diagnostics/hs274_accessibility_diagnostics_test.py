@@ -27,7 +27,9 @@ class DiagnosticTests(unittest.TestCase):
             executable.write_bytes(b"fixture")
             (app / "Contents/Info.plist").write_bytes(plistlib.dumps({"CFBundleIdentifier": "fixture.identity"}))
             responses = [SimpleNamespace(returncode=1, stdout="", stderr="invalid signature"),
-                         subprocess.TimeoutExpired("codesign", 5),
+                         subprocess.TimeoutExpired("codesign", 5,
+                                                   output=b"x" * OUTPUT_LIMIT + b"partial identity",
+                                                   stderr=b"native refusal\xff"),
                          SimpleNamespace(returncode=0, stdout="x" * OUTPUT_LIMIT + "refusal", stderr="")]
             report = {"primary_error": "approval refused"}
             with patch("hs274_accessibility_diagnostics.subprocess.run", side_effect=responses) as run:
@@ -36,6 +38,12 @@ class DiagnosticTests(unittest.TestCase):
             self.assertEqual(evidence["bundle"]["CFBundleIdentifier"], "fixture.identity")
             self.assertEqual(evidence["signature_verify"]["exit"], 1)
             self.assertIn("TimeoutExpired", evidence["signature_identity"]["error"])
+            self.assertEqual(len(evidence["signature_identity"]["stdout"]), OUTPUT_LIMIT)
+            self.assertTrue(evidence["signature_identity"]["stdout"].endswith("partial identity"))
+            self.assertEqual(evidence["signature_identity"]["stderr"], "native refusal\ufffd")
+            self.assertTrue(evidence["signature_identity"]["truncated"])
+            self.assertTrue(evidence["signature_identity"]["timed_out"])
+            self.assertNotIn("exit", evidence["signature_identity"])
             self.assertTrue(evidence["tcc"]["truncated"])
             self.assertEqual(len(evidence["tcc"]["stdout"]), OUTPUT_LIMIT)
             self.assertTrue(evidence["tcc"]["stdout"].endswith("refusal"))
