@@ -734,6 +734,7 @@ global _AhkSubDir := ""
 #Include unit/test_klr_cache_publication_order.ahk
 #Include unit/test_klr_cache_save_cadence.ahk
 #Include unit/test_sqlite_readonly_clone.ahk
+#Include unit/test_sqlite_clone_page_size.ahk
 #Include unit/test_klr_resident_refresh.ahk
 #Include unit/test_klr_cache_encryption.ahk
 #Include unit/test_klr_cache_stages.ahk
