@@ -292,11 +292,40 @@ _DriverFuncBody(Name) {
 ; function is absent. Reserved for the handful of tests whose assertion IS the
 ; absence (e.g. "this dead helper must stay deleted").
 ; Borrow the immutable snapshot: copying it per name dominates small-body scans.
-_DriverFindFunctionDefinition(&Src, Name, SearchPos := 1) {
+; Mask only block comments, preserving offsets, line boundaries and literals.
+; Native regex skips complete strings/line comments before considering an opener.
+_DriverMaskBlockComments(&Src) {
+	if !InStr(Src, "/*")
+		return Src
+	Quote := Chr(34)
+	Pattern := "'(?:``[\s\S]|[^'``])*'|" . Quote
+		. "(?:``[\s\S]|[^" . Quote . "``])*" . Quote
+		. "|;[^`r`n]*|(?m:^[ `t]*/\*)"
+	Position := 1
+	CopiedThrough := 1
+	Out := ""
+	while RegExMatch(Src, Pattern, &Token, Position) {
+		Position := Token.Pos + Token.Len
+		if LTrim(Token[0], " `t") != "/*"
+			continue
+		EndPos := RegExMatch(Src, "m)(?:^[ `t]*\*/|\*/[ `t]*`r?$)", &Closing, Position)
+		Position := EndPos ? EndPos + Closing.Len : StrLen(Src) + 1
+		Out .= SubStr(Src, CopiedThrough, Token.Pos - CopiedThrough)
+		Out .= RegExReplace(SubStr(Src, Token.Pos, Position - Token.Pos), "[^`r`n]", " ")
+		CopiedThrough := Position
+	}
+	return CopiedThrough == 1 ? Src : Out . SubStr(Src, CopiedThrough)
+}
+
+_DriverFindFunctionDefinition(&Src, Name, SearchPos := 1, CommentsMasked := false) {
 	if !RegExMatch(Name, "^[A-Za-z_][A-Za-z0-9_]*$")
 		throw ValueError("Invalid driver function name: " . Name)
 	if !SearchPos
 		return 0
+	if !CommentsMasked {
+		Masked := _DriverMaskBlockComments(&Src)
+		return _DriverFindFunctionDefinition(&Masked, Name, SearchPos, true)
+	}
 	Pattern := "m)^[ \t]*" . Name . "\("
 	SourceLen := StrLen(Src)
 	while RegExMatch(Src, Pattern, &Match, SearchPos) {
@@ -366,8 +395,10 @@ class _DriverFunctionBodyCache {
 	Get(Name) {
 		if this.Bodies.Has(Name)
 			return this.Bodies[Name]
-		if this.Source == ""
-			this.Source := this.ReadSource.Call()
+		if this.Source == "" {
+			Snapshot := this.ReadSource.Call()
+			this.Source := _DriverMaskBlockComments(&Snapshot)
+		}
 		Body := this.Extract.Call(this.Source, Name)
 		if this.Source != ""
 			this.Bodies[Name] := Body
@@ -395,15 +426,19 @@ class _DriverIndexedBodyExtractor {
 				Position := Found.Pos + Found.Len
 			}
 		}
-		return _DriverExtractFunctionBody(&Src, Name, this.Offsets.Get(Name, 0))
+		return _DriverExtractFunctionBody(&Src, Name, this.Offsets.Get(Name, 0), true)
 	}
 }
 
-_DriverExtractFunctionBody(&Src, Name, SearchPos := 1) {
+_DriverExtractFunctionBody(&Src, Name, SearchPos := 1, CommentsMasked := false) {
+	if !CommentsMasked {
+		Masked := _DriverMaskBlockComments(&Src)
+		return _DriverExtractFunctionBody(&Masked, Name, SearchPos, true)
+	}
 	; Match a definition, not a same-named column-zero call. The scanner balances
 	; nested parameter expressions and quoted parentheses before requiring the
 	; opening brace immediately after the real outer close.
-	Definition := _DriverFindFunctionDefinition(&Src, Name, SearchPos)
+	Definition := _DriverFindFunctionDefinition(&Src, Name, SearchPos, true)
 	if !IsObject(Definition)
 		return ""
 	Idx := Definition.Idx
