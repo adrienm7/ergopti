@@ -112,20 +112,33 @@ _CrashReportWorkerQueueMappingDebt(Mapping) {
 _CrashReportWorkerDrainMappingDebt(
 		Native := _CrashReportMappingNative) {
 	global _CrashReportWorkerMappingCleanupDebt
+	static Draining := false
 	PreviousCritical := Critical("On")
+	if Draining {
+		Critical(PreviousCritical)
+		return false
+	}
+	Draining := true
 	try {
+		; Pending owns these mappings until native release is acknowledged. The
+		; global queue can be empty during this interval, so nested admission must
+		; observe the drain owner instead of mistaking that empty queue for success.
 		Pending := _CrashReportWorkerMappingCleanupDebt
 		_CrashReportWorkerMappingCleanupDebt := []
 		for Mapping in Pending
 			Mapping["cleanup_queued"] := false
-	} finally Critical(PreviousCritical)
-	for Mapping in Pending {
-		if !_CrashReportWorkerMappingRelease(Mapping, Native)
-			_CrashReportWorkerQueueMappingDebt(Mapping)
+		Critical(PreviousCritical)
+		for Mapping in Pending {
+			if !_CrashReportWorkerMappingRelease(Mapping, Native)
+				_CrashReportWorkerQueueMappingDebt(Mapping)
+		}
+		Critical("On")
+		return _CrashReportWorkerMappingCleanupDebt.Length == 0
+	} finally {
+		Critical("On")
+		Draining := false
+		Critical(PreviousCritical)
 	}
-	PreviousCritical := Critical("On")
-	try return _CrashReportWorkerMappingCleanupDebt.Length == 0
-	finally Critical(PreviousCritical)
 }
 
 _CrashReportWorkerCreateMapping(Payload, OwnerId) {
