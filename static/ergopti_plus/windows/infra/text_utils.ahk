@@ -25,6 +25,33 @@
 ; ===================================
 ; ===================================
 
+; Encode one URI component over UTF-8 bytes, preserving only unreserved ASCII.
+UriEncode(Value) {
+	Bytes := Buffer(StrPut(Value, "UTF-8"))
+	StrPut(Value, Bytes, "UTF-8")
+	Encoded := ""
+	Loop Bytes.Size - 1 {
+		Byte := NumGet(Bytes, A_Index - 1, "UChar")
+		if ((Byte >= 0x41 && Byte <= 0x5A) || (Byte >= 0x61 && Byte <= 0x7A)
+				|| (Byte >= 0x30 && Byte <= 0x39) || Byte = 0x2D || Byte = 0x2E
+				|| Byte = 0x5F || Byte = 0x7E) {
+			Encoded .= Chr(Byte)
+		} else {
+			Encoded .= "%" . Format("{:02X}", Byte)
+		}
+	}
+	return Encoded
+}
+
+; Absolute Windows paths retain their drive or UNC authority. Encode literal
+; percent signs before restoring path separators, so filenames cannot create
+; query strings, fragments or pre-existing escape sequences.
+FilePathToUrl(Path) {
+	Normalized := StrReplace(Path, "\", "/")
+	Encoded := StrReplace(StrReplace(UriEncode(Normalized), "%2F", "/"), "%3A", ":")
+	return "file:" . (SubStr(Normalized, 1, 2) = "//" ? "" : "///") . Encoded
+}
+
 ; Percent-decode a URI-encoded string. Percent-encoding is defined over BYTES,
 ; not codepoints: a non-ASCII character is encoded as several %XX octets that
 ; together form one UTF-8 multibyte sequence (e.g. "%C3%A9" is U+00E9). We must

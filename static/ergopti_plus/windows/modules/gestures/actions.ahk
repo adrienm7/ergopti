@@ -360,29 +360,10 @@ _GestureSearchWebSelectionReady(Text, EngineQuery) {
 		if (SelectedText = "")
 				return
 		SelectedText := StrReplace(SelectedText, "`r`n", " ")
-		try Run(StrReplace(EngineQuery, "%s", GestureUrlEncode(SelectedText)))
+		try Run(StrReplace(EngineQuery, "%s", UriEncode(SelectedText)))
 		catch as Err {
 				try LoggerError("gestures", "search_web launch failed: {1}", Err.Message)
 		}
-}
-
-; Encodes the selected Unicode text as an RFC 3986 query component. Partial
-; replacement (only '&', '+', …) corrupts spaces, accents and '=' in searches.
-GestureUrlEncode(Value) {
-		Bytes := Buffer(StrPut(Value, "UTF-8"))
-		StrPut(Value, Bytes, "UTF-8")
-		Encoded := ""
-		Loop Bytes.Size - 1 {
-				Byte := NumGet(Bytes, A_Index - 1, "UChar")
-				if ((Byte >= 0x41 && Byte <= 0x5A) || (Byte >= 0x61 && Byte <= 0x7A)
-						|| (Byte >= 0x30 && Byte <= 0x39) || Byte = 0x2D || Byte = 0x2E
-						|| Byte = 0x5F || Byte = 0x7E) {
-						Encoded .= Chr(Byte)
-				} else {
-						Encoded .= "%" . Format("{:02X}", Byte)
-				}
-		}
-		return Encoded
 }
 
 GestureTeleportMouse() {

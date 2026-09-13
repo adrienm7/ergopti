@@ -22,7 +22,7 @@ _MES_UrlMatchesPublication(Which) {
 		AssertEqual(2, Parts.Length, "the fallback URL must carry one explicit sidecar")
 		AssertTrue(InStr(Parts[1], "/metrics_" . Which . "/index.html") > 0,
 			"the page asset must retain its metrics-prefixed folder")
-		AssertEqual("file:///" . StrReplace(KLPF_PrefetchPath(Which, MetricsDir), "\", "/"), Parts[2],
+		AssertEqual("file:///" . StrReplace(KLPF_PrefetchPath(Which, MetricsDir), "\", "/"), UriDecode(UriDecode(Parts[2])),
 			"the URL must read the canonical sidecar published for this dashboard")
 	} finally {
 		KLUI.typing_url := SavedTyping

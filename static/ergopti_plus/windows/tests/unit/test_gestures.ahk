@@ -285,7 +285,7 @@ TestGestures_ParameterizedActionValuesAreBindingScoped() {
         AssertFalse(GestureValidateActionParameter("open_url", "not-a-url"), "invalid URL rejected")
         AssertTrue(GestureValidateActionParameter("search_web", "https://search.example/?q=%s"), "valid search template")
         AssertFalse(GestureValidateActionParameter("search_web", "https://search.example/?q=%s&again=%s"), "duplicate search placeholder rejected")
-		AssertEqual("notes%20%26%20caf%C3%A9%3D2", GestureUrlEncode("notes & café=2"), "query text must be UTF-8 percent encoded")
+		AssertEqual("notes%20%26%20caf%C3%A9%3D2", UriEncode("notes & café=2"), "query text must be UTF-8 percent encoded")
     } finally {
         GestureActionParameters := OriginalParameters
     }
