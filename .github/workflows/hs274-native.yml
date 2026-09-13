@@ -62,6 +62,7 @@ jobs:
         if: inputs.hammerspoon_consumer && (!inputs.development_build || inputs.baseline_fixture)
         run: exit 1
       - name: Verify process isolation verdicts before native setup
+        id: preflight
         run: |
           python3 tools/diagnostics/hs274_services_test.py
           python3 tools/diagnostics/hs274_capture_test.py
@@ -114,7 +115,7 @@ jobs:
         if: always() && steps.compile.outcome == 'success'
         run: sudo -n "$RUNNER_TEMP/hs274-native" "$RUNNER_TEMP/hs274-native-root.json"
       - name: Compile HID acquisition observation
-        if: always()
+        if: always() && steps.preflight.outcome == 'success'
         id: compile-hid
         run: clang -std=c11 -Wall -Wextra -Werror tools/diagnostics/hs274-hid-device.c -framework CoreFoundation -framework IOKit -o "$RUNNER_TEMP/hs274-hid-device"
       - name: Observe virtual HID acquisition without input reports
@@ -124,7 +125,7 @@ jobs:
           sudo -n "$RUNNER_TEMP/hs274-hid-device" "$RUNNER_TEMP/hs274-hid-device-root.json"
           sudo -n log show --last 1m --style compact --predicate 'eventMessage CONTAINS "hs274-hid"' > "$RUNNER_TEMP/hs274-hid-access.log"
       - name: Verify and install the official remapper and signed HID provider
-        if: always()
+        if: always() && steps.preflight.outcome == 'success'
         id: install-provider
         timeout-minutes: 3
         run: |
