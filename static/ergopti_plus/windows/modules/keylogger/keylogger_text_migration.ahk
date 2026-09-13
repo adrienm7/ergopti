@@ -603,16 +603,18 @@ _KL_Mig_Abort(reason) {
 		return false
 }
 
-_KL_Mig_WriteStage(Content) {
+_KL_Mig_WriteStage(Content, WriteFn := 0) {
 		if !IsObject(KLMigration.writeFh) || !(Content is String)
 				return false
 		ExpectedBytes := StrPut(Content, "UTF-8") - 1
-		try Written := KLMigration.writeFh.Write(Content)
+		; Buffered acceptance is not an OS receipt. Reject the first refused
+		; block instead of discovering missing bytes after the complete migration.
+		try Accepted := _FSWriteUtf8Bytes(KLMigration.writeFh, Content, WriteFn)
 		catch
 				return false
-		if (Written != ExpectedBytes)
+		if !Accepted
 				return false
-		KLMigration.stageBytesWritten += Written
+		KLMigration.stageBytesWritten += ExpectedBytes
 		return true
 }
 
