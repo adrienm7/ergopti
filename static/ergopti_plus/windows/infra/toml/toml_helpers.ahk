@@ -649,6 +649,15 @@ _TOML_ReapStaleTemps(Path, MaxAgeMs) {
 		}
 }
 
+; Retire only a stage owned and abandoned by the current save operation.
+; A refusal must remain visible without replacing the primary save failure.
+_TOML_RemoveOwnedStage(Path) {
+	if FSDelete(Path)
+		return true
+	try LoggerError("TomlWrite", "Owned staging file cleanup failed for '{1}'.", Path)
+	return false
+}
+
 ; A successful Write call is not proof that the complete canonical image
 ; reached the stage. Read it back exactly before any rename can make it live.
 _TOML_StageMatches(Path, Expected, ReadFn := 0) {
@@ -852,6 +861,8 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 		_TOML_ReapStaleTemps(Path, STALE_TEMP_MS)
 		try FileDelete(tmp)
 		f := 0
+		StageOwned := false
+		StageWritten := false
 		try {
 				f := FileOpen(tmp, "w", "UTF-8")
 				if !f {
@@ -865,11 +876,13 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 						try LoggerError("TomlWrite", "Cannot open the staging file for '{1}' — nothing was written and the change is NOT persisted.", Path)
 						return false
 				}
+				StageOwned := true
 				f.Write(body)
 				if !FSFlushFileBuffers(f)
 						throw Error("FlushFileBuffers refused the staging handle")
 				f.Close()
 				f := 0
+				StageWritten := true
 		} catch as Err {
 				global _ParseTomlCache
 				if _ParseTomlCache.Has(Path)
@@ -879,12 +892,15 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 		} finally {
 				if IsObject(f)
 						try f.Close()
+				if StageOwned && !StageWritten
+						_TOML_RemoveOwnedStage(tmp)
 		}
 		if !_TOML_StageMatches(tmp, body) {
 				global _ParseTomlCache
 				if _ParseTomlCache.Has(Path)
 						_ParseTomlCache.Delete(Path)
 				try LoggerError("TomlWrite", "The staging file for '{1}' did not match the complete canonical image. The previous contents are intact, so the change is NOT persisted.", Path)
+				_TOML_RemoveOwnedStage(tmp)
 				return false
 		}
 	; Publish only through the same-volume write-through adapter. The WAL may
@@ -896,6 +912,7 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 		if _ParseTomlCache.Has(Path)
 			_ParseTomlCache.Delete(Path)
 		try LoggerError("TomlWrite", "Write-through atomic replace of '{1}' was refused. The previous contents are intact, so the change is NOT persisted.", Path)
+		_TOML_RemoveOwnedStage(tmp)
 		return false
 	}
 
