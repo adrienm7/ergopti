@@ -177,9 +177,9 @@ def owned_capture(app, cli, output, report):
                      "batch_limit": 64, "context_limit": 64, "frame_limit": 65536, "clock": timebase}
     (scratch / "capture-config.json").write_text(json.dumps(configuration), encoding="utf-8")
     with (output / "hs274-remap-hammerspoon-launch.log").open("xb") as log:
-        launcher = subprocess.Popen(["/usr/bin/open", "-n", "-g", "-W", str(copied),
-                                     "--args", "-MJConfigFile", str(scratch / "init.lua")],
-                                    stdout=log, stderr=subprocess.STDOUT)
+        launch_command = ["/usr/bin/open", "-n", "-g", "-W", str(copied),
+                          "--args", "-MJConfigFile", str(scratch / "init.lua")]
+        launcher = subprocess.Popen(launch_command, stdout=log, stderr=subprocess.STDOUT)
         client = CaptureReceipt(result, native, executable)
         state = report.setdefault("processes", {}).setdefault("physical-stream", {"runtime": "native Hammerspoon"})
         primary_error = None
@@ -192,6 +192,15 @@ def owned_capture(app, cli, output, report):
                         raise RuntimeError("Accessibility request has no unique owned Hammerspoon process")
                     approval_attempted = True
                     approve_accessibility(report, copied)
+                    owners = native.matching(executable)
+                    if len(owners) != 1 or result.exists():
+                        raise RuntimeError("Permission restart has no unique waiting Hammerspoon owner")
+                    restart = report["hammerspoon_permission_restart"] = {"previous_pid": owners[0], "settled": False}
+                    lifecycle.cleanup(native, executable, launcher)
+                    if native.matching(executable):
+                        raise RuntimeError("Previous Hammerspoon permission owner is still running")
+                    restart["settled"] = True
+                    launcher = subprocess.Popen(launch_command, stdout=log, stderr=subprocess.STDOUT)
                     permission_ready.write_text("approved\n", encoding="utf-8")
                     deadline = time.monotonic() + 15
                 if result.exists():

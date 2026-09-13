@@ -142,6 +142,23 @@ it still allocates a unique child and keeps the same registration and trust
 checks. This tests a location hypothesis, not a proven system-wide exclusion
 rule for temporary paths. Never overwrite another Hammerspoon installation.
 
+[Run 34754991511](https://github.com/adrienm7/ergopti/actions/runs/34754991511),
+job `103717754654`, tested the new location at
+`afa7aa48b6fde3927c1a9a5a3bc89eac44f2e586`. Registration now resolved the
+exact owned copy under `/Users/runner/Applications/`. The ordinary Accessibility
+scan found Hammerspoon enabled, without the previous missing-application error.
+Actual Hammerspoon trust nevertheless stayed false through the bounded
+post-approval check. No physical capture was admitted. Keep these results
+distinct: native bundle resolution and UI state succeeded; process trust did not.
+
+The next experiment settles the exact waiting Hammerspoon process after UI
+approval, then launches the same copy and configuration once. Failure to settle
+must prevent replacement and preserve the primary failure. The new process must
+still establish actual Accessibility trust; restarting is not a permission grant.
+Pinned Hammerspoon `MJAccessibilityUtils.m` calls `AXIsProcessTrustedWithOptions`
+directly on every check, so a Lua cache is not the cause. Native validation must
+determine whether a fresh process changes the observed trust result.
+
 The supervisor signals `permission_ready` only after ordinary UI approval.
 Lua then independently checks actual Accessibility trust before creating the
 input fixture. Native context tests must subsequently verify public, private,
