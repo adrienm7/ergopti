@@ -15,6 +15,7 @@ import time
 from hs274_capture import unique_object
 from hs274_stream import decimal
 from hs274_accessibility import approve_accessibility
+import hs274_hammerspoon_registration
 
 
 def read_clock(information):
@@ -158,6 +159,7 @@ def owned_capture(app, cli, output, report):
     copied = scratch / "Hammerspoon.app"
     executable = copied / "Contents/MacOS/Hammerspoon"
     subprocess.run(["/usr/bin/ditto", str(app), str(copied)], check=True, timeout=60)
+    hs274_hammerspoon_registration.register_application(report, copied)
     here = Path(__file__).resolve().parent
     shutil.copyfile(here / "hs274-hammerspoon.lua", scratch / "init.lua")
     shutil.copyfile(here / "hs274-context.lua", scratch / "hs274-context.lua")
