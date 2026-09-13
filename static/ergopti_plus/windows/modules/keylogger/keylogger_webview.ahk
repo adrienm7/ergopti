@@ -555,8 +555,14 @@ KLWV_NormalizeRangeRequest(msg) {
 		}
 		result["request_id"] := payload["request_id"]
 
-		start_date := payload.Has("start_date") ? String(payload["start_date"]) : ""
-		end_date := payload.Has("end_date") ? String(payload["end_date"]) : ""
+		start_date := payload.Get("start_date", "")
+		end_date := payload.Get("end_date", "")
+		; JSON containers have no ToString method. Reject their shape while the
+		; request id is still available for the normal failed-response path.
+		if !(start_date is String) || !(end_date is String) {
+				try LoggerWarn("Keylogger", "Range request rejected — date bounds must be strings.")
+				return result
+		}
 		; Reject loudly: a bare 0 makes "malformed request" indistinguishable from
 		; "no request", which is why the broken date pattern above silently killed
 		; every range query with nothing in the log to point at it.
