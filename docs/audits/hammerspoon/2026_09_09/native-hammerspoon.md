@@ -329,5 +329,40 @@ universal arm64/x86_64 development binaries with ad hoc signatures; the clock
 receipt remains version 1, `mach_absolute_time`, numerator 125, denominator 3.
 The workflow selects this archive for inventory receipt version 2. Physical
 stream framing remains version 1; these are separate protocols. Native input
-execution of the cookie/capacity correction remains pending. Reuse this archive
+acceptance of the cookie/capacity correction is recorded below. Reuse this archive
 while its producer sources remain unchanged.
+
+## Complete fixture inventory acceptance
+
+[Run 34771083506](https://github.com/adrienm7/ergopti/actions/runs/34771083506)
+and [held-input run 34771337304](https://github.com/adrienm7/ergopti/actions/runs/34771337304)
+both passed the owned remapping step on
+`194524752b7267520954fb6d07a3f4b0262cdea3`, using the same verified producer.
+Both workflows remained red on the separate capability probes; the remapping
+receipts contain no observation error.
+
+Each run retained 263 fixture elements with 263 unique cookies and 255 usages,
+including both scalar and array leaves for modifier usages 224 through 231.
+Enumeration completed without exhaustion and the inventories were readable.
+A second device supplied 231 readable elements in each run; it did not provide
+the controlled input, so this is not proof of two active physical keyboards.
+
+The Hammerspoon scenario preserved one Escape credit and one Space credit,
+all four privacy transitions, true native AX focus and settled consumer/target
+lifetimes. In the held-input scenario the fixture's complete inventory contained
+exactly one down element, Space at cookie 109. The independent kernel baseline
+confirmed held Space, and the later release and fresh Space pair were preserved
+in the 15-row raw receipt. No reconstruction from Quartz output was needed.
+
+The shared `tools/diagnostics/fixtures/hs274-native-inventories.json` retains all
+four inventories, the native input receipts, relevant consumer/baseline results
+and source hashes. `hs274-stream-inventory-test.cpp` replays every native element
+through the real collector and checks the controlled held state;
+`hs274_inventory_test.py` checks complete transport retention. Query this corpus
+by device/cookie or run its tests rather than loading it wholesale into context.
+
+This establishes full enumeration for the controlled descriptor in these two
+scenarios. It does not establish atomic synchronization with pending HID values,
+lease-opening state, ordinary driver integration, all hardware descriptors or
+exclusive production physical credits. Retain those requirements from the
+producer contract; do not promote `fixture_only` based on this acceptance.

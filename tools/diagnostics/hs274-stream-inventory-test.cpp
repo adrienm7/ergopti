@@ -1,6 +1,8 @@
 // tools/diagnostics/hs274-stream-inventory-test.cpp
 // Reject incomplete, duplicated and failed initial key observations.
 #include "hs274-stream-inventory.hpp"
+#include <fstream>
+#include <nlohmann/json.hpp>
 #include <stdexcept>
 
 using inventory = hs274_stream_protocol::key_inventory<256>;
@@ -14,7 +16,52 @@ inventory::sample key(std::uint32_t usage) {
           usage + 100, 0, 0, usage * 2, usage * 2 + 1};
 }
 
-int main() {
+void replay_native(const char* path) {
+  std::ifstream input(path);
+  require(input.good());
+  nlohmann::json evidence;
+  input >> evidence;
+  require(evidence.at("scenarios").size() == 2);
+  unsigned held_scenarios = 0, observations = 0;
+  for (const auto& scenario : evidence.at("scenarios")) {
+    const bool held = scenario.at("initial_space_held").get<bool>();
+    if (held) ++held_scenarios;
+    unsigned fixture_observations = 0;
+    for (const auto& row : scenario.at("inventories")) {
+      hs274_stream_protocol::key_inventory<hs274_stream_protocol::keyboard_inventory_capacity> replay;
+      unsigned held_elements = 0;
+      const bool fixture = row.at("device") == scenario.at("fixture_device");
+      for (const auto& element : row.at("elements")) {
+        const auto& sample = element.at("sample");
+        const auto value = std::stoll(sample.at("value").get<std::string>());
+        replay.append({element.at("usage").get<std::uint32_t>(), element.at("cookie").get<std::uint32_t>(),
+            {true, element.at("relative").get<bool>(), element.at("array").get<bool>(),
+             element.at("bits").get<std::uint32_t>(), element.at("count").get<std::uint32_t>(),
+             element.at("minimum").get<std::int64_t>(), element.at("maximum").get<std::int64_t>()},
+            sample.at("status").get<std::int32_t>(), sample.at("returned_value").get<bool>(),
+            sample.at("value_cookie").get<std::uint32_t>(), value,
+            std::stoull(sample.at("timestamp").get<std::string>()),
+            std::stoull(sample.at("started").get<std::string>()), std::stoull(sample.at("finished").get<std::string>())});
+        if (fixture && value == 1) {
+          require(element.at("usage") == 44);
+          ++held_elements;
+        }
+      }
+      require(replay.finish(row.at("enumerated").get<bool>(), row.at("exhausted").get<bool>()));
+      ++observations;
+      if (fixture) {
+        require(row.at("elements").size() == 263 && held_elements == (held ? 1u : 0u));
+        ++fixture_observations;
+      }
+    }
+    require(fixture_observations == 1);
+  }
+  require(held_scenarios == 1 && observations == 4);
+}
+
+int main(int argc, char** argv) {
+  require(argc == 2);
+  replay_native(argv[1]);
   // Native run 34762554442 enumerated modifier usage 224 twice: scalar cookie
   // 24 and array cookie 289. Distinct elements must retain independent state.
   inventory modifier_elements;

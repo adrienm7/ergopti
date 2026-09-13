@@ -2,6 +2,7 @@
 """Keep absent, truncated and failed native inventories from passing admission."""
 
 import json
+from pathlib import Path
 import unittest
 
 from hs274_inventory import MARKER, read_inventories
@@ -15,6 +16,15 @@ def receipt(**changes):
 
 
 class InventoryTests(unittest.TestCase):
+    def test_retained_native_scenarios_preserve_all_observations(self):
+        evidence = json.loads((Path(__file__).parent / "fixtures" / "hs274-native-inventories.json").read_text(encoding="utf-8"))
+        self.assertEqual(len(evidence["scenarios"]), 2)
+        for scenario in evidence["scenarios"]:
+            with self.subTest(run=scenario["run"]):
+                output = "".join(MARKER + json.dumps(row) + "\n" for row in scenario["inventories"])
+                records = read_inventories(output, int(scenario["fixture_device"]))
+                self.assertEqual(records, scenario["inventories"])
+
     def test_all_devices_and_monitor_restarts_are_retained(self):
         output = receipt() + receipt(device="42", readable=False) + receipt()
         records = read_inventories(output, 41)
