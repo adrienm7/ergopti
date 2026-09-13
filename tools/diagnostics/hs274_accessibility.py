@@ -88,7 +88,8 @@ tell application "System Events"
             end if
         end repeat
         log observations
-        if (count candidates) is not 1 then return "No unique Hammerspoon checkbox" & linefeed & observations
+        if (count candidates) is 0 then return "missing_application"
+        if (count candidates) is not 1 then error "No unique Hammerspoon checkbox"
         set approvalControl to item 1 of candidates
         if (value of approvalControl as integer) is 0 then perform action "AXPress" of approvalControl
         repeat 30 times
@@ -96,6 +97,39 @@ tell application "System Events"
             delay 0.1
         end repeat
         return "Hammerspoon checkbox did not become enabled" & linefeed & observations
+    end tell
+end tell
+'''
+
+
+ADD_SCRIPT = '''
+tell application "System Events"
+    tell process "System Settings"
+        if name of window 1 is not "Accessibility" then error "Accessibility page changed before addition"
+        if exists sheet 1 of window 1 then error "Unexpected sheet before application addition"
+        set controls to entire contents of group 2 of splitter group 1 of group 1 of window 1
+        if (count controls) > 256 then error "Accessibility panel exceeds observation limit"
+        set buttons to {}
+        repeat with node in controls
+            if role of node is "AXButton" then set end of buttons to contents of node
+            if role of node is "AXCheckBox" and focused of node is true then error "A permission row is focused before addition"
+        end repeat
+        if (count buttons) is not 2 then error "Unexpected accessibility action controls"
+        if not enabled of item 1 of buttons or enabled of item 2 of buttons then error "Add/remove control state changed"
+        perform action "AXPress" of item 1 of buttons
+        repeat 30 times
+            if exists sheet 1 of window 1 then exit repeat
+            delay 0.1
+        end repeat
+        if not (exists sheet 1 of window 1) then error "Application addition did not open a sheet"
+        set nodes to entire contents of sheet 1 of window 1
+        if (count nodes) > 256 then error "Application addition sheet exceeds observation limit"
+        repeat with node in nodes
+            log (role of node as text)
+            if role of node is "AXStaticText" then log (value of attribute "AXValue" of node)
+            if role of node is "AXButton" then log (get properties of node)
+        end repeat
+        return "addition_sheet_observed"
     end tell
 end tell
 '''
@@ -117,6 +151,11 @@ def approve_accessibility(report):
                        check=True, capture_output=True, text=True, timeout=5)
         state["stage"] = "approval"
         result = subprocess.run(["/usr/bin/osascript", "-e", SCRIPT], capture_output=True, text=True, timeout=15)
+        if result.returncode == 0 and result.stdout.strip() == "missing_application":
+            report["hammerspoon_accessibility_listing"] = {
+                "exit": result.returncode, "stdout": result.stdout, "stderr": result.stderr}
+            state["stage"] = "add_application"
+            result = subprocess.run(["/usr/bin/osascript", "-e", ADD_SCRIPT], capture_output=True, text=True, timeout=10)
     except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as error:
         state.update(exit=getattr(error, "returncode", None), timed_out=isinstance(error, subprocess.TimeoutExpired))
         for name in ("stdout", "stderr"):
