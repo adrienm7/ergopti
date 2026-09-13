@@ -773,8 +773,7 @@ KLPF_WorkerMain() {
 				KLWConst.AUTO_REPEAT_MAX_DELAY_MS := Integer(A_Args[flag + 10])
 				KLWConst.HOLD_THRESHOLD_MS := Integer(A_Args[flag + 11])
 				if (which != "typing" && which != "apps") || (mode != "full" && mode != "live" && mode != "manifest" && mode != "range")
-						KLPF_WorkerRefuse("unsupported dashboard/mode pair '"
-								. which . "'/'" . mode . "'")
+						KLPF_WorkerRefuse("unsupported dashboard/mode pair")
 				if (mode = "range") {
 						phase := "range projection"
 						if (A_Args.Length < flag + 14)
