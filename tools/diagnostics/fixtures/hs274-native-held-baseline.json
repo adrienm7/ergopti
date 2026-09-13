@@ -1,0 +1,383 @@
+{
+  "provenance": {
+    "run": 34714158001,
+    "attempt": 1,
+    "head": "9d987dea16991170ade11ef1601e579e3fc6e76e",
+    "report_sha256": "37e2aac5a4c63f352d5375709c93233f72c4f71f075d2479855b1d389912fa5a",
+    "workflow_conclusion": "failure",
+    "remapping_step_conclusion": "success"
+  },
+  "probe": {
+    "coverage": "fixture_only",
+    "device": "4294968964",
+    "elements": [
+      {
+        "cached": {
+          "finished": "17267304596",
+          "returned_value": true,
+          "started": "17267303636",
+          "status": 0,
+          "timestamp": "0",
+          "value": "0",
+          "value_cookie": 106
+        },
+        "cookie": 106,
+        "page": 7,
+        "updated": {
+          "finished": "17267308303",
+          "returned_value": true,
+          "started": "17267304700",
+          "status": -536870165
+        },
+        "usage": 41
+      },
+      {
+        "cached": {
+          "finished": "17267308953",
+          "returned_value": true,
+          "started": "17267308777",
+          "status": 0,
+          "timestamp": "17223061208",
+          "value": "1",
+          "value_cookie": 109
+        },
+        "cookie": 109,
+        "page": 7,
+        "updated": {
+          "finished": "17267312646",
+          "returned_value": true,
+          "started": "17267309010",
+          "status": -536870165
+        },
+        "usage": 44
+      }
+    ],
+    "enumerated": true,
+    "exhausted": false
+  },
+  "native": {
+    "hs274_fixed": false,
+    "physical_keyboard_validated": false,
+    "virtual_keyboard_ready": true,
+    "reports_queued": 4,
+    "transport_error": false,
+    "metadata_owner_verified": true,
+    "registry_entry_id": 4294968964,
+    "metadata_write_status": 0,
+    "metadata_readback_matches": true,
+    "metadata_restore_status": 0,
+    "metadata_restored": true,
+    "metadata_work_completed": true,
+    "remap_mode": true,
+    "drain_released": false,
+    "ignored_mode": false,
+    "baseline_mode": true,
+    "baseline_down_observed": true,
+    "baseline_release_at": "17279415624",
+    "escape_as_space": false,
+    "escape_passthrough": false,
+    "space_pair_observed": true,
+    "baseline_events": [
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968967
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968967
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968967
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968967
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968967
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968967
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968967
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968967
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968967
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968967
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968967
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968967
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968967
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968967
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968967
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968967
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968967
+      },
+      {
+        "type": 11,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968967
+      }
+    ],
+    "events": [
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968990
+      },
+      {
+        "type": 11,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968990
+      }
+    ]
+  },
+  "capture": {
+    "coverage": "fixture_only",
+    "seen": 15,
+    "overflow": 0,
+    "contention": 0,
+    "records": [
+      {
+        "device": 4294968964,
+        "timestamp": 17279426111,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": -1,
+        "sequence": 1
+      },
+      {
+        "device": 4294968964,
+        "timestamp": 17279426111,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 1,
+        "sequence": 2
+      },
+      {
+        "device": 4294968964,
+        "timestamp": 17279426111,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 44,
+        "sequence": 3
+      },
+      {
+        "device": 4294968964,
+        "timestamp": 17279426111,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": -1,
+        "sequence": 4
+      },
+      {
+        "device": 4294968964,
+        "timestamp": 17279426111,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 0,
+        "usage": -1,
+        "sequence": 5
+      },
+      {
+        "device": 4294968964,
+        "timestamp": 17281664042,
+        "value": 44,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": -1,
+        "sequence": 6
+      },
+      {
+        "device": 4294968964,
+        "timestamp": 17281664042,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 1,
+        "sequence": 7
+      },
+      {
+        "device": 4294968964,
+        "timestamp": 17281664042,
+        "value": 1,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 44,
+        "sequence": 8
+      },
+      {
+        "device": 4294968964,
+        "timestamp": 17281664042,
+        "value": 44,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": -1,
+        "sequence": 9
+      },
+      {
+        "device": 4294968964,
+        "timestamp": 17281664042,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 0,
+        "usage": -1,
+        "sequence": 10
+      },
+      {
+        "device": 4294968964,
+        "timestamp": 17283931599,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": -1,
+        "sequence": 11
+      },
+      {
+        "device": 4294968964,
+        "timestamp": 17283931599,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 1,
+        "sequence": 12
+      },
+      {
+        "device": 4294968964,
+        "timestamp": 17283931599,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 44,
+        "sequence": 13
+      },
+      {
+        "device": 4294968964,
+        "timestamp": 17283931599,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": -1,
+        "sequence": 14
+      },
+      {
+        "device": 4294968964,
+        "timestamp": 17283931599,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 0,
+        "usage": -1,
+        "sequence": 15
+      }
+    ]
+  }
+}

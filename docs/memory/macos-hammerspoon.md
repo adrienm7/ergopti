@@ -385,6 +385,15 @@ before treating a scripting error as a permission denial or a click as approval.
 
 ### project-hs-native-remapping-fixture-boundary
 
+For initial held-key acquisition, replay
+`tools/diagnostics/fixtures/hs274-native-held-baseline.json` through
+`BaselineTests.test_retained_native_kernel_baseline_preserves_inherited_and_fresh_space`
+in `hs274_stream_test.py` before scheduling another native experiment. The
+controlled held Space was acquired using the explicit kernel source; forced
+reads returned failure statuses despite non-null cached pointers. Preserve those
+refusals. This receipt covers two usages and a later fresh Space pair, not a
+complete keyboard inventory or an atomic snapshot across all elements.
+
 The signed provider's keyboard can be renamed through ordinary IOKit product
 metadata after verifying an empty identifier baseline and a unique owned
 device. Karabiner then recognizes it as an input; restore and read back the
