@@ -5,6 +5,7 @@ import time
 
 from hs274_accessibility_auth import authenticate_accessibility
 from hs274_accessibility_picker import select_application
+from hs274_accessibility_diagnostics import retain_failure
 
 
 PREPARE_SCRIPT = '''
@@ -184,4 +185,5 @@ def approve_accessibility(report, app):
         raise
     state.update(exit=result.returncode, stdout=result.stdout, stderr=result.stderr)
     if result.returncode != 0 or result.stdout.strip() != "enabled":
+        retain_failure(report, app)
         raise RuntimeError("Normal Hammerspoon accessibility approval was not confirmed")
