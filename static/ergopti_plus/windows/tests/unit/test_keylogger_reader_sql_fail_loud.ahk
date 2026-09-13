@@ -153,7 +153,24 @@ _KLRSQL_CloneFailureReleasesEveryOwnedHandle() {
 Test("SQLite clone: a thrown backup call releases every owned handle (reader-sql-fail-loud)",
 	_KLRSQL_CloneFailureReleasesEveryOwnedHandle)
 
-_KLRSQL_PublishCandidateSwapsCompleteTuple() {
+_KLRSQL_ObservePublishedClose(State, EventKind, Context, Db, Unused) {
+	try {
+		State["calls"] += 1
+		State["event"] := EventKind
+		State["closed"] := Db
+		State["published"] := KLRCache.db
+		State["offset"] := KLRCache.last_sizes.Get("new-ledger", -1)
+		State["old_offset"] := KLRCache.last_sizes.Has("old-ledger")
+		State["identity"] := KLRCache.ledger_snapshots == State["expected_snapshots"]
+		State["pending"] := KLRCache.pending_snapshots.Count
+		State["critical"] := A_IsCritical
+	} catch {
+		State["failed"] := true
+	}
+	return 0
+}
+
+_KLRSQL_PublishCandidateSwapsCompleteTuple(CriticalInterval) {
 	KLR_ResetCache()
 	oldDb := _KLRSQL_OpenMemory()
 	candidate := _KLRSQL_OpenMemory()
@@ -163,13 +180,19 @@ _KLRSQL_PublishCandidateSwapsCompleteTuple() {
 		Map("snapshot", Map("ok", true), "end_offset", 24))
 	nextSizes := Map("new-ledger", 42)
 	nextSnapshots := Map("new-ledger", Map("ok", true, "size", 42))
+	State := Map("calls", 0, "failed", false, "expected_snapshots", nextSnapshots)
+	; SQLITE_TRACE_CLOSE observes retirement synchronously. Fast mode keeps the
+	; caller's AHK thread so its Critical interval remains directly observable.
+	Callback := CallbackCreate(_KLRSQL_ObservePublishedClose.Bind(State), "CF", 4)
 	published := false
 	try {
-		Critical(37)
+		AssertEqual(0, DllCall(SQLiteConst.DLL . "\sqlite3_trace_v2", "Ptr", oldDb,
+			"UInt", 8, "Ptr", Callback, "Ptr", 0, "Int"))
+		Critical(CriticalInterval ? CriticalInterval : "Off")
 		try {
 			KLR_PublishCandidate(candidate, nextSizes, nextSnapshots)
 			published := (KLRCache.db = candidate)
-			AssertEqual(37, A_IsCritical,
+			AssertEqual(CriticalInterval, A_IsCritical,
 				"publication must restore a caller's existing Critical interval")
 		} finally {
 			Critical("Off")
@@ -186,6 +209,16 @@ _KLRSQL_PublishCandidateSwapsCompleteTuple() {
 			"the complete tuple must consume all unpublished carry")
 		AssertEqual(0, A_IsCritical,
 			"the test's non-critical caller state must remain restored")
+		AssertFalse(State["failed"], "the native close observer must not swallow a fixture error")
+		AssertEqual(1, State["calls"], "publication must retire exactly one old connection")
+		AssertEqual(8, State["event"])
+		AssertEqual(oldDb, State["closed"], "the retired handle must be the previous publication")
+		AssertEqual(candidate, State["published"], "the new handle must be visible before old-handle retirement")
+		AssertEqual(42, State["offset"])
+		AssertFalse(State["old_offset"])
+		AssertTrue(State["identity"], "consumed identities must be published before retirement")
+		AssertEqual(0, State["pending"], "pending tails must be retired with the same publication")
+		AssertEqual(CriticalInterval, State["critical"], "native close must run after restoring caller Critical state")
 	} finally {
 		Critical("Off")
 		; On success candidate is owned by KLRCache and oldDb was closed. If
@@ -193,10 +226,12 @@ _KLRSQL_PublishCandidateSwapsCompleteTuple() {
 		KLR_ResetCache()
 		if !published
 			try SQLite_Close(candidate)
+		CallbackFree(Callback)
 	}
 }
-Test("Keylogger reader: candidate publication swaps one complete tuple (reader-sql-fail-loud)",
-	_KLRSQL_PublishCandidateSwapsCompleteTuple)
+for CriticalInterval in [0, 37]
+	Test("Keylogger reader: candidate publication swaps one complete tuple critical=" . CriticalInterval
+		. " (reader-sql-fail-loud) (reader-publication-close)", _KLRSQL_PublishCandidateSwapsCompleteTuple.Bind(CriticalInterval))
 
 _KLRSQL_WriteFixture(path, sql) {
 	try FileDelete(path)
