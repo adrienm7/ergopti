@@ -33,9 +33,10 @@ class PickerTests(unittest.TestCase):
                         with self.assertRaises(RuntimeError):
                             select_application(app, report)
                     command = run.call_args.args[0]
-                    self.assertEqual(command[-2], str(app.resolve()))
-                    self.assertNotIn(str(app.resolve()), command[-3])
-                    self.assertEqual(command[-1], str(Path(root) / "hs274-picker-before-open.png"))
+                    self.assertEqual(command[-3], str(app.resolve()))
+                    self.assertNotIn(str(app.resolve()), command[-4])
+                    self.assertEqual(command[-2], str(Path(root) / "hs274-picker-before-open.png"))
+                    self.assertEqual(command[-1], str(Path(root) / "hs274-picker-after-open.png"))
                     self.assertEqual(report["hammerspoon_accessibility_picker"]["stderr"], "native detail")
 
 
