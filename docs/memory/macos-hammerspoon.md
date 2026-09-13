@@ -341,6 +341,14 @@ For reusable Hammerspoon admission fixtures, retained screenshots, artifact
 identity and the distinction between Windows doubles and native virtual-HID
 proof, consult the [native continuation record](../audits/hammerspoon/2026_09_09/native-hammerspoon.md).
 
+When a correctly selected, validly signed Hammerspoon copy remains absent from
+Accessibility, inspect TCC bundle resolution before repeating UI automation.
+The native error `failed to find an Application URL for bundle ID` was observed
+even though Launch Services had launched the copied application. Successful
+launch and signature verification alone therefore do not prove resolution for
+TCC enumeration. Preserve scoped native messages and distinguish this symptom
+from a proven registration fix; the continuation record retains the receipt.
+
 A hosted macOS runner can execute real Quartz taps without proving physical
 keyboard or Karabiner provenance. Native original/copy marker preservation
 does not imply binary serialization preservation; decoded user data was zero

@@ -1,0 +1,31 @@
+{
+    "run_id":  "34753282480",
+    "job_id":  "103713317246",
+    "head":  "8ce06ada7a0e6d63ea3b350f32b016660613ab5f",
+    "source_artifact":  "hs274-remap.json",
+    "source_sha256":  "49cc77e4e14f79cdfba529ea80be8b65c82b726ac01d83cabdcb8d82c4773dec",
+    "observation_error":  "RuntimeError: Normal Hammerspoon accessibility approval was not confirmed",
+    "bundle":  {
+                   "CFBundleIdentifier":  "org.hammerspoon.Hammerspoon",
+                   "CFBundleExecutable":  "Hammerspoon",
+                   "CFBundleVersion":  "6936",
+                   "CFBundleShortVersionString":  "1.1.1"
+               },
+    "signature_verify":  {
+                             "exit":  0,
+                             "stdout":  "",
+                             "stderr":  "",
+                             "truncated":  false
+                         },
+    "tcc":  {
+                "exit":  0,
+                "source_truncated":  true,
+                "selection":  "Only retained stdout lines containing org.hammerspoon.Hammerspoon; not the complete log",
+                "lines":  [
+                              "2026-09-13 11:03:11.158 E  tccd[147:3952] [com.apple.TCC:access] handle_TCCAccessCopyInformation(): failed to find an Application URL for bundle ID: org.hammerspoon.Hammerspoon.",
+                              "2026-09-13 11:03:12.382 E  tccd[147:369d] [com.apple.TCC:access] handle_TCCAccessCopyInformation(): failed to find an Application URL for bundle ID: org.hammerspoon.Hammerspoon.",
+                              "2026-09-13 11:03:13.700 E  tccd[147:386c] [com.apple.TCC:access] handle_TCCAccessCopyInformation(): failed to find an Application URL for bundle ID: org.hammerspoon.Hammerspoon.",
+                              "2026-09-13 11:03:14.941 E  tccd[147:386c] [com.apple.TCC:access] handle_TCCAccessCopyInformation(): failed to find an Application URL for bundle ID: org.hammerspoon.Hammerspoon."
+                          ]
+            }
+}
