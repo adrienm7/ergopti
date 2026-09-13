@@ -979,6 +979,7 @@ _KLPF_ReapStaleTemps(path, MaxAgeMs) {
 		try {
 				Loop Files, Dir . "\" . Name . ".*.tmp" {
 						if (DateDiff(A_Now, A_LoopFileTimeModified, "Seconds") * 1000 >= MaxAgeMs)
+								&& FSAtomicTempOwnerIsGone(A_LoopFileName, Name)
 								try FileDelete(A_LoopFileFullPath)
 				}
 		}
@@ -1009,7 +1010,7 @@ KLPF_WriteAtomic(path, content) {
 		static MOVEFILE_WRITE_THROUGH    := 0x8
 		static FLAGS := MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH
 		static RETRY_DELAY_MS            := 50
-		; Older than this, a scratch file can only be debris from a hard kill.
+		; Age delays orphan cleanup; the producer-window check protects slow writes.
 		static STALE_TEMP_MS             := 60000
 		static WriteSeq := 0
 
