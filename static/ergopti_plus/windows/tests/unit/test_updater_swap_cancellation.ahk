@@ -18,8 +18,7 @@ _USTX_ParentExitBeforeFinalExitAbandonsWithoutMutation(BeforeCleanup := 0) {
 	CurrentExe := TestDir . "\current.cmd"
 	NewExe := TestDir . "\new.cmd"
 	SwapScriptPath := TestDir . "\swap.ps1"
-	ParentGatePath := TestDir . "\parent_gate.cmd"
-	ParentExitFlag := TestDir . "\parent_exit.flag"
+	ParentExitHandle := 0
 	OldMarker := TestDir . "\old.marker"
 	NewMarker := TestDir . "\new.marker"
 	Owner := 0
@@ -30,9 +29,8 @@ _USTX_ParentExitBeforeFinalExitAbandonsWithoutMutation(BeforeCleanup := 0) {
 	try {
 		_USTX_WriteBatchFixture(CurrentExe, OldMarker, "OLD")
 		_USTX_WriteBatchFixture(NewExe, NewMarker, "NEW")
-		_USTX_WriteParentGate(ParentGatePath, ParentExitFlag)
 		FileAppend(_Updater_BuildSwapWorkerScript(), SwapScriptPath, "UTF-8-RAW")
-		Run(A_ComSpec . ' /d /c "' . ParentGatePath . '"', , "Hide", &ParentPid)
+		ParentExitHandle := _USTX_StartParentGate(TestId, &ParentPid)
 		Assert(ParentPid > 0 and ProcessExist(ParentPid),
 			"positive control: the crash-before-FinalExit parent must be alive")
 		ParentCleanupHandle := DllCall("OpenProcess", "UInt",
@@ -60,7 +58,8 @@ _USTX_ParentExitBeforeFinalExitAbandonsWithoutMutation(BeforeCleanup := 0) {
 
 		; Simulate AHK dying while the final hotstring gate is still running:
 		; parent exits, but FinalExit is deliberately never signaled.
-		FileAppend("exit", ParentExitFlag, "UTF-8-RAW")
+		AssertEqual(0, _Updater_WaitHandleState(ParentCleanupHandle), "the parent must remain alive until signaled")
+		Assert(DllCall("SetEvent", "Ptr", ParentExitHandle, "Int"), "the parent exit must be authorized")
 		Assert(_USTX_WaitForProcessExit(Owner),
 			"parent exit before FinalExit must make the child abandon promptly")
 		AssertEqual(21, _USTX_GetExitCode(Owner),
@@ -91,6 +90,8 @@ _USTX_ParentExitBeforeFinalExitAbandonsWithoutMutation(BeforeCleanup := 0) {
 					"UInt", 1, "Int")
 			_Updater_CloseNativeSwapHandle(ParentCleanupHandle)
 		}
+		if ParentExitHandle
+			Assert(DllCall("CloseHandle", "Ptr", ParentExitHandle, "Int"))
 		; The proven abandoned path launches no replacement to outlive these
 		; handles. Earlier failures retain the existing defensive settle period.
 		if !ProcessesExited
