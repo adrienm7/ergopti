@@ -11,22 +11,22 @@ on run argv
         tell process "System Settings"
             set frontmost to true
             repeat 40 times
-                if exists sheet 1 of window 1 then
-                    if exists button "Open" of sheet 1 of window 1 then exit repeat
+                if exists window "Open" then
+                    if exists button "Open" of window "Open" then exit repeat
                 end if
                 delay 0.1
             end repeat
-            if not (exists button "Open" of sheet 1 of window 1) then
+            if not (exists button "Open" of window "Open") then
                 log (get name of every window)
                 error "Native application file picker is unavailable"
             end if
-            if not (exists button "Cancel" of sheet 1 of window 1) then error "File picker identity is incomplete"
+            if not (exists button "Cancel" of window "Open") then error "File picker identity is incomplete"
             keystroke "g" using {command down, shift down}
             repeat 30 times
-                if exists sheet 1 of sheet 1 of window 1 then exit repeat
+                if exists sheet 1 of window "Open" then exit repeat
                 delay 0.1
             end repeat
-            set pathSheet to sheet 1 of sheet 1 of window 1
+            set pathSheet to sheet 1 of window "Open"
             set pathNodes to entire contents of pathSheet
             if (count pathNodes) > 32 then error "Path entry exceeds observation limit"
             set pathFields to {}
@@ -40,14 +40,14 @@ on run argv
             if value of item 1 of pathFields is not appPath then error "Owned app path was not accepted"
             key code 36
             repeat 30 times
-                if not (exists sheet 1 of sheet 1 of window 1) then exit repeat
+                if not (exists sheet 1 of window "Open") then exit repeat
                 delay 0.1
             end repeat
-            if exists sheet 1 of sheet 1 of window 1 then error "File picker path entry did not retire"
-            if not enabled of button "Open" of sheet 1 of window 1 then error "Owned app cannot be selected"
-            perform action "AXPress" of button "Open" of sheet 1 of window 1
+            if exists sheet 1 of window "Open" then error "File picker path entry did not retire"
+            if not enabled of button "Open" of window "Open" then error "Owned app cannot be selected"
+            perform action "AXPress" of button "Open" of window "Open"
             repeat 30 times
-                if not (exists sheet 1 of window 1) then return "application_selected"
+                if not (exists window "Open") then return "application_selected"
                 delay 0.1
             end repeat
             error "Application file picker did not retire"
