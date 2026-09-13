@@ -219,6 +219,30 @@ unchanged. The target never reads or reports field text. A target failure remain
 an error even if consumer cleanup also fails. The Swift target must compile and
 the complete fixture must execute on macOS before this replacement is validated.
 
+## External target acceptance on native macOS
+
+[Run 34758957794](https://github.com/adrienm7/ergopti/actions/runs/34758957794),
+job `103728210889`, at `4fc8a8cfa3dc25a25820b59cde352612db2e6b4f`,
+compiled the Cocoa target and passed the actual Escape/Space remapping step.
+The [retained native receipt](hs274-external-target-success.json) preserves the
+complete Hammerspoon result and target settlement with the source artifact hash.
+Actual Accessibility trust was true; expected and focused AX window IDs were 46,
+and the focused role was `AXTextField`. The independent context observer recorded
+private/public/secure/resumed as false/true/false/true in observations 2 through 5.
+Denied observations retained no application or epoch metadata. Original timestamp
+conversion used the native Mach ratio 125/3; final physical credits were exactly
+one Escape (53) and one Space (49). The consumer and context settled, and target
+PID 4295 exited zero. This validates the external fixture and its two-key native
+delivery path, not physical keyboard hardware or production-wide admission.
+
+The overall workflow was red because the separate Quartz capability probes
+(ordinary and root) and installed remapper permission probe failed. The actual
+owned development remapping step was independently green; do not report the
+whole workflow as green or remove those other probes to obtain that label.
+The earlier dispatch 34758792872 unexpectedly referenced the previous revision;
+it was cancelled and confirmed terminal before this replacement was dispatched.
+Check the run's actual `head_sha` before interpreting any new native result.
+
 The supervisor signals `permission_ready` only after ordinary UI approval.
 Lua then independently checks actual Accessibility trust before creating the
 input fixture. Native context tests must subsequently verify public, private,
