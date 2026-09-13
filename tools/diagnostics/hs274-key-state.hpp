@@ -4,6 +4,7 @@
 
 #include "hs274-stream-inventory.hpp"
 #include "hs274-raw-capture.hpp"
+#include <vector>
 
 namespace hs274_stream_protocol {
 template <std::size_t Limit>
@@ -11,7 +12,7 @@ class key_state final {
   static_assert(Limit > 0);
   struct element {
     std::uint32_t usage = 0, cookie = 0;
-    std::uint64_t sampled_at = 0, query_started = 0, last_at = 0;
+    std::uint64_t sampled_at = 0, query_started = 0, query_finished = 0, last_at = 0;
     bool sampled_down = false, down = false, seen = false, last_down = false;
   };
 
@@ -19,6 +20,11 @@ public:
   using sample = typename key_inventory<Limit>::sample;
   enum class action { covered_by_snapshot, unchanged, pressed, released, auxiliary, invalid };
   enum class fault { none, initialization, device, element_identity, value, chronology, hid_error };
+  struct frozen_element {
+    std::uint32_t usage, cookie;
+    std::uint64_t timestamp;
+    bool down;
+  };
 
   explicit key_state(std::uint64_t device) : device_(device) {
     if (!device) throw std::invalid_argument("Missing keyboard state device");
@@ -36,7 +42,7 @@ public:
     if (!qualified.finish(enumerated, exhausted)) throw std::invalid_argument("Unreadable keyboard state inventory");
     for (std::size_t i = 0; i < count; ++i) {
       const auto& row = samples[i];
-      elements_[i] = {row.usage, row.cookie, row.timestamp, row.started, 0,
+      elements_[i] = {row.usage, row.cookie, row.timestamp, row.started, row.finished, 0,
                       row.value == 1, row.value == 1, false, false};
     }
     count_ = count;
@@ -45,6 +51,24 @@ public:
 
   bool healthy() const noexcept { return initialized_ && failure_ == fault::none; }
   fault failure() const noexcept { return failure_; }
+
+  // Copy the observation frontier before paging it to a consumer. Later input
+  // must not change earlier pages, and no device-wide watermark replaces these
+  // per-element frontiers. This does not drain or fence the native input queue.
+  std::vector<frozen_element> snapshot(std::uint64_t boundary) const {
+    if (!healthy()) throw std::logic_error("Keyboard state is not healthy");
+    std::vector<frozen_element> result;
+    result.reserve(count_);
+    for (std::size_t i = 0; i < count_; ++i) {
+      const auto& row = elements_[i];
+      const auto frontier = row.seen && row.last_at > row.sampled_at ? row.last_at : row.sampled_at;
+      if (row.query_finished > boundary || frontier > boundary) {
+        throw std::invalid_argument("Keyboard observation exceeds capture boundary");
+      }
+      result.push_back({row.usage, row.cookie, frontier, row.down});
+    }
+    return result;
+  }
 
   bool down(std::uint32_t cookie) const {
     if (!healthy()) throw std::logic_error("Keyboard state is not healthy");
