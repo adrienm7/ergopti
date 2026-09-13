@@ -24,7 +24,7 @@ class PickerTests(unittest.TestCase):
             executable.write_bytes(b"fixture")
             for code, receipt in ((0, "application_selected\n"), (1, "application_selected"), (0, "picker_open")):
                 report = {}
-                with self.subTest(code=code, receipt=receipt), patch(
+                with self.subTest(code=code, receipt=receipt), patch.dict("os.environ", {"RUNNER_TEMP": root}), patch(
                         "hs274_accessibility_picker.subprocess.run",
                         return_value=SimpleNamespace(returncode=code, stdout=receipt, stderr="native detail")) as run:
                     if code == 0 and receipt.strip() == "application_selected":
@@ -33,8 +33,9 @@ class PickerTests(unittest.TestCase):
                         with self.assertRaises(RuntimeError):
                             select_application(app, report)
                     command = run.call_args.args[0]
-                    self.assertEqual(command[-1], str(app.resolve()))
-                    self.assertNotIn(str(app.resolve()), command[-2])
+                    self.assertEqual(command[-2], str(app.resolve()))
+                    self.assertNotIn(str(app.resolve()), command[-3])
+                    self.assertEqual(command[-1], str(Path(root) / "hs274-picker-before-open.png"))
                     self.assertEqual(report["hammerspoon_accessibility_picker"]["stderr"], "native detail")
 
 

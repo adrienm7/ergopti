@@ -188,4 +188,5 @@ jobs:
             ${{ runner.temp }}/hs274-development-signatures.log
             ${{ runner.temp }}/hs274-remap-*.log
             ${{ runner.temp }}/hs274-provider-settings.png
+            ${{ runner.temp }}/hs274-picker-*.png
           if-no-files-found: error
