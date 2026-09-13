@@ -731,6 +731,7 @@ global _AhkSubDir := ""
 #Include unit/test_klr_cold_projection_failure.ahk
 #Include unit/test_klr_cache_date_scope.ahk
 #Include unit/test_klr_projection_paging.ahk
+#Include unit/test_klr_projection_cursor_int64.ahk
 #Include unit/test_klr_projection_page_work.ahk
 #Include unit/test_klr_projection_sql_failure.ahk
 #Include unit/test_klr_projection_late_page_failure.ahk
