@@ -179,6 +179,17 @@ pages to a stage and deleting them afterward: failed stages would still expose
 the payload. The native cache-encryption tests cover the saved file, warm scope,
 obsolete-image rejection, and failed publication recovery.
 
+### project-metrics-reserved-order-is-not-append-order
+
+`KL_AllocEventId` and `KL_AssignStableEventId` preserve reserved screen order for
+typing, accepted output and shortcuts. Wall-clock correction may move timestamps
+backward; changing logical replay or latest category selection to timestamp
+order breaks that contract. `test_keylogger_llm_accepted_metrics.ahk` covers
+cross-boundary input order; `test_klr_category_order.ahk` covers category retention
+through cold replay and resident SQL refresh. This does not make IDs a journal
+offset: delayed or imported tail rows can have IDs below the stored maximum.
+Discover affected days from consumed tail SQL, never `id > max(id)`.
+
 ### project-file-write-buffer-is-not-an-os-receipt
 
 AHK v2.0.26 buffers small `File.Write` **and `RawWrite`** calls. Their byte
