@@ -26,6 +26,7 @@
 ; ==============================================================================
 
 #Requires Autohotkey v2.0+
+#Include keylogger_webview_range_script.ahk
 
 
 
@@ -368,6 +369,7 @@ KLWV_Close(which) {
 		; resolve by ``which``; deleting this generation first makes every stale
 		; callback inert instead of allowing it to target a just-reopened dashboard.
 		KLWV.windows.Delete(which)
+		KLWV_RetireRangeStage(entry)
 		udir := entry.Has("udir") ? entry["udir"] : ""
 		; A subscription removes itself through the still-live controller. Releasing
 		; it after Close() raises against an invalid COM pointer and leaks the sink.
@@ -472,9 +474,11 @@ KLWV_OnWebMessage(which, Epoch, sender, args) {
 		; inert while paused. A range request is the exception only long enough to
 		; capture its request id and queue a canceled terminal for resume; it must
 		; never start the detached projection while suspended.
-		if A_IsSuspended && (action != "range")
+		if A_IsSuspended && (action != "range") && (action != "range_consumed")
 				return
 		switch action {
+		case "range_consumed":
+			KLWV_ConsumeRangeStage(which, Epoch, entry, msg)
 				case "ready":
 						; Page just finished loading and signals it's ready to
 						; receive pushes. Inject i18n strings first (fetch() is
@@ -612,26 +616,72 @@ KLWV_OnRangeBuildTerminal(which, Epoch, request_id, status, stage := "") {
 				return KLWV_SendRangeTerminal(which, Epoch, request_id, "failed")
 		; Native execution is observed without waiting: WebView performs the file read,
 		; JSON parse and range render in its own process, not on the keyboard thread.
-		url := FilePathToUrl(stage)
-		js := "fetch(" . KL_JsonEncode(url) . ").then(r=>r.json()).then(p=>window.receive_range_data(p," . request_id
-				. ")).catch(()=>window.complete_range_request(" . request_id . ",'failed'));"
-		entry := KLWV.windows[which]
-		if !WebView_RunScriptAsync(entry["webview"], js, "Keylogger.range." . which,
-				KLWV_RangeScriptSettled.Bind(which, Epoch, entry, request_id, stage))
+		entry := KLWV.windows.Get(which, 0)
+		Owner := Map("token", KLPF_NewOwnerId(), "stage", stage)
+		if !_KLWV_OwnsDelivery(which, entry, Epoch) {
+				KLWV_DeleteRangeStage(stage)
 				return false
-		; Give the renderer ample time to open the file, then clean the private
-		; staged result.  A late timer only removes this generation's unique path.
-		SetTimer(KLWV_DeleteRangeStage.Bind(stage), -60000)
+		}
+		Previous := entry.Get("range_stage", 0)
+		entry["range_stage"] := Owner
+		if Previous is Map
+				KLWV_RetireRangeStage(entry, Previous)
+		if !_KLWV_OwnsDelivery(which, entry, Epoch) || entry.Get("range_stage", 0) !== Owner {
+				KLWV_RetireRangeStage(entry, Owner)
+				return false
+		}
+		if A_IsSuspended {
+				KLWV_RetireRangeStage(entry, Owner)
+				return KLWV_QueueRangeTerminal(which, Epoch, request_id, "canceled")
+		}
+		url := FilePathToUrl(stage)
+		js := KLWV_BuildRangeScript(url, request_id, Owner["token"])
+		if !WebView_RunScriptAsync(entry["webview"], js, "Keylogger.range." . which,
+				KLWV_RangeScriptSettled.Bind(which, Epoch, entry, request_id, Owner))
+				return false
+		; Native completion is not fetch completion. Retain at most one active stage per
+		; window until consumption, replacement or closure, including a lost ack.
 		return true
 }
 
-KLWV_RangeScriptSettled(which, Epoch, Entry, request_id, stage, Succeeded) {
+KLWV_RangeScriptSettled(which, Epoch, Entry, request_id, Owner, Succeeded) {
 		if Succeeded
 				return
-		KLPF_DeletePrivateStage(stage)
-		if !KLWV_IsCurrent(which, Epoch) || KLWV.windows[which] !== Entry
+		OwnsStage := Entry.Get("range_stage", 0) == Owner
+		KLWV_RetireRangeStage(Entry, Owner)
+		if !OwnsStage || !_KLWV_OwnsDelivery(which, Entry, Epoch) || Entry.Has("range_stage")
 				return
 		KLWV_SendRangeTerminal(which, Epoch, request_id, "failed")
+}
+
+; Retire before filesystem work can yield. A late native callback may release
+; its own file, but must never clear the newer generation stored in the entry.
+KLWV_RetireRangeStage(Entry, Owner := 0) {
+		if !(Entry is Map)
+				return false
+		if !IsObject(Owner)
+				Owner := Entry.Get("range_stage", 0)
+		if !(Owner is Map)
+				return false
+		if Entry.Get("range_stage", 0) == Owner
+				Entry.Delete("range_stage")
+		return KLWV_DeleteRangeStage(Owner["stage"])
+}
+
+; The page supplies only a generation token, never a path to delete. Tokens
+; also fence request-id reuse after a navigation in the same native window.
+KLWV_ConsumeRangeStage(which, Epoch, Entry, Message) {
+		if !_KLWV_OwnsDelivery(which, Entry, Epoch)
+				return false
+		try Payload := KL_JsonDecode(Message)
+		catch
+				return false
+		if !(Payload is Map) || !(Payload.Get("token", 0) is String)
+				return false
+		Owner := Entry.Get("range_stage", 0)
+		if !(Owner is Map) || !(Payload["token"] == Owner["token"])
+				return false
+		return KLWV_RetireRangeStage(Entry, Owner)
 }
 
 KLWV_QueueRangeTerminal(which, Epoch, request_id, status) {
@@ -684,7 +734,7 @@ KLWV_FlushPendingRangeTerminals() {
 }
 
 KLWV_DeleteRangeStage(stage) {
-		KLPF_DeletePrivateStage(stage)
+		return KLPF_DeletePrivateStage(stage)
 }
 
 
