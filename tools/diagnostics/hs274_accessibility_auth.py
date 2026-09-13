@@ -41,20 +41,10 @@ tell application "System Events"
         set value of item 1 of passwordFields to approvalPassword
         perform action "AXPress" of item 1 of confirmButtons
         repeat 30 times
-            if not (exists button "Modify Settings" of sheet 1 of window 1) then exit repeat
+            if not (exists sheet 1 of window "Accessibility") then return "authentication_submitted"
             delay 0.1
         end repeat
-        if exists button "Modify Settings" of sheet 1 of window 1 then error "Authentication sheet did not retire"
-        if exists sheet 1 of window 1 then
-            set nextNodes to entire contents of sheet 1 of window 1
-            if (count nextNodes) > 256 then error "Post-authentication sheet exceeds observation limit"
-            repeat with node in nextNodes
-                log (role of node as text)
-                if role of node is "AXStaticText" then log (get value of attribute "AXValue" of node)
-                if role of node is "AXButton" then log (get properties of node)
-            end repeat
-        end if
-        return "authentication_submitted"
+        error "Authentication sheet did not retire"
     end tell
 end tell
 '''
