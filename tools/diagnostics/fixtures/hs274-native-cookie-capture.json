@@ -1,0 +1,427 @@
+{
+  "run": 34774654702,
+  "head": "136b3190f74051ea5e27ba536273999222997421",
+  "producer_build": 34773435230,
+  "report_sha256": "e055acc096daa213bfd926b40c2a17f50e660c26d0e00f1d6c6b1c3fa13b57f7",
+  "stream_sha256": "72de9b80048fb8b4287ab1c4491d9c3f17b59ba79191e287d58a0f12cca9a97f",
+  "workflow_conclusion": "failure",
+  "remapping_step_conclusion": "success",
+  "hs274_fixed": false,
+  "physical_keyboard_validated": false,
+  "capture": {
+    "coverage": "fixture_only",
+    "seen": 20,
+    "overflow": 0,
+    "contention": 0,
+    "records": [
+      {
+        "device": 4294969508,
+        "timestamp": 52644701777,
+        "value": 41,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": -1,
+        "sequence": 1,
+        "has_cookie": true,
+        "cookie": 33
+      },
+      {
+        "device": 4294969508,
+        "timestamp": 52644701777,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 1,
+        "sequence": 2,
+        "has_cookie": true,
+        "cookie": 66
+      },
+      {
+        "device": 4294969508,
+        "timestamp": 52644701777,
+        "value": 1,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 41,
+        "sequence": 3,
+        "has_cookie": true,
+        "cookie": 106
+      },
+      {
+        "device": 4294969508,
+        "timestamp": 52644701777,
+        "value": 41,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": -1,
+        "sequence": 4,
+        "has_cookie": true,
+        "cookie": 32
+      },
+      {
+        "device": 4294969508,
+        "timestamp": 52644701777,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 0,
+        "usage": -1,
+        "sequence": 5,
+        "has_cookie": true,
+        "cookie": 11
+      },
+      {
+        "device": 4294969508,
+        "timestamp": 52646961002,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": -1,
+        "sequence": 6,
+        "has_cookie": true,
+        "cookie": 33
+      },
+      {
+        "device": 4294969508,
+        "timestamp": 52646961002,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 1,
+        "sequence": 7,
+        "has_cookie": true,
+        "cookie": 66
+      },
+      {
+        "device": 4294969508,
+        "timestamp": 52646961002,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 41,
+        "sequence": 8,
+        "has_cookie": true,
+        "cookie": 106
+      },
+      {
+        "device": 4294969508,
+        "timestamp": 52646961002,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": -1,
+        "sequence": 9,
+        "has_cookie": true,
+        "cookie": 32
+      },
+      {
+        "device": 4294969508,
+        "timestamp": 52646961002,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 0,
+        "usage": -1,
+        "sequence": 10,
+        "has_cookie": true,
+        "cookie": 11
+      },
+      {
+        "device": 4294969508,
+        "timestamp": 52649262455,
+        "value": 44,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": -1,
+        "sequence": 11,
+        "has_cookie": true,
+        "cookie": 33
+      },
+      {
+        "device": 4294969508,
+        "timestamp": 52649262455,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 1,
+        "sequence": 12,
+        "has_cookie": true,
+        "cookie": 66
+      },
+      {
+        "device": 4294969508,
+        "timestamp": 52649262455,
+        "value": 1,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 44,
+        "sequence": 13,
+        "has_cookie": true,
+        "cookie": 109
+      },
+      {
+        "device": 4294969508,
+        "timestamp": 52649262455,
+        "value": 44,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": -1,
+        "sequence": 14,
+        "has_cookie": true,
+        "cookie": 32
+      },
+      {
+        "device": 4294969508,
+        "timestamp": 52649262455,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 0,
+        "usage": -1,
+        "sequence": 15,
+        "has_cookie": true,
+        "cookie": 11
+      },
+      {
+        "device": 4294969508,
+        "timestamp": 52651556343,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": -1,
+        "sequence": 16,
+        "has_cookie": true,
+        "cookie": 33
+      },
+      {
+        "device": 4294969508,
+        "timestamp": 52651556343,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 1,
+        "sequence": 17,
+        "has_cookie": true,
+        "cookie": 66
+      },
+      {
+        "device": 4294969508,
+        "timestamp": 52651556343,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 44,
+        "sequence": 18,
+        "has_cookie": true,
+        "cookie": 109
+      },
+      {
+        "device": 4294969508,
+        "timestamp": 52651556343,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": -1,
+        "sequence": 19,
+        "has_cookie": true,
+        "cookie": 32
+      },
+      {
+        "device": 4294969508,
+        "timestamp": 52651556343,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 0,
+        "usage": -1,
+        "sequence": 20,
+        "has_cookie": true,
+        "cookie": 11
+      }
+    ]
+  },
+  "stream_output": "{\"coverage\":\"fixture_only\",\"incarnation\":\"76eb0e5f-974c-4ca0-aa0b-4e0730a963b7\",\"kind\":\"opened\",\"lease\":\"2\",\"version\":1}\n{\"coverage\":\"fixture_only\",\"incarnation\":\"76eb0e5f-974c-4ca0-aa0b-4e0730a963b7\",\"kind\":\"batch\",\"lease\":\"2\",\"records\":[{\"cookie\":33,\"device\":\"4294969508\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"1\",\"timestamp\":\"52644701777\",\"usage\":-1,\"value\":\"41\"},{\"cookie\":66,\"device\":\"4294969508\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"2\",\"timestamp\":\"52644701777\",\"usage\":1,\"value\":\"0\"},{\"cookie\":106,\"device\":\"4294969508\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"3\",\"timestamp\":\"52644701777\",\"usage\":41,\"value\":\"1\"},{\"cookie\":32,\"device\":\"4294969508\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"4\",\"timestamp\":\"52644701777\",\"usage\":-1,\"value\":\"41\"},{\"cookie\":11,\"device\":\"4294969508\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":0,\"sequence\":\"5\",\"timestamp\":\"52644701777\",\"usage\":-1,\"value\":\"0\"}],\"version\":1}\n{\"coverage\":\"fixture_only\",\"incarnation\":\"76eb0e5f-974c-4ca0-aa0b-4e0730a963b7\",\"kind\":\"batch\",\"lease\":\"2\",\"records\":[{\"cookie\":33,\"device\":\"4294969508\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"6\",\"timestamp\":\"52646961002\",\"usage\":-1,\"value\":\"0\"},{\"cookie\":66,\"device\":\"4294969508\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"7\",\"timestamp\":\"52646961002\",\"usage\":1,\"value\":\"0\"},{\"cookie\":106,\"device\":\"4294969508\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"8\",\"timestamp\":\"52646961002\",\"usage\":41,\"value\":\"0\"},{\"cookie\":32,\"device\":\"4294969508\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"9\",\"timestamp\":\"52646961002\",\"usage\":-1,\"value\":\"0\"},{\"cookie\":11,\"device\":\"4294969508\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":0,\"sequence\":\"10\",\"timestamp\":\"52646961002\",\"usage\":-1,\"value\":\"0\"}],\"version\":1}\n{\"coverage\":\"fixture_only\",\"incarnation\":\"76eb0e5f-974c-4ca0-aa0b-4e0730a963b7\",\"kind\":\"batch\",\"lease\":\"2\",\"records\":[{\"cookie\":33,\"device\":\"4294969508\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"11\",\"timestamp\":\"52649262455\",\"usage\":-1,\"value\":\"44\"},{\"cookie\":66,\"device\":\"4294969508\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"12\",\"timestamp\":\"52649262455\",\"usage\":1,\"value\":\"0\"},{\"cookie\":109,\"device\":\"4294969508\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"13\",\"timestamp\":\"52649262455\",\"usage\":44,\"value\":\"1\"},{\"cookie\":32,\"device\":\"4294969508\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"14\",\"timestamp\":\"52649262455\",\"usage\":-1,\"value\":\"44\"},{\"cookie\":11,\"device\":\"4294969508\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":0,\"sequence\":\"15\",\"timestamp\":\"52649262455\",\"usage\":-1,\"value\":\"0\"}],\"version\":1}\n{\"coverage\":\"fixture_only\",\"incarnation\":\"76eb0e5f-974c-4ca0-aa0b-4e0730a963b7\",\"kind\":\"batch\",\"lease\":\"2\",\"records\":[{\"cookie\":33,\"device\":\"4294969508\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"16\",\"timestamp\":\"52651556343\",\"usage\":-1,\"value\":\"0\"},{\"cookie\":66,\"device\":\"4294969508\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"17\",\"timestamp\":\"52651556343\",\"usage\":1,\"value\":\"0\"},{\"cookie\":109,\"device\":\"4294969508\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"18\",\"timestamp\":\"52651556343\",\"usage\":44,\"value\":\"0\"},{\"cookie\":32,\"device\":\"4294969508\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"19\",\"timestamp\":\"52651556343\",\"usage\":-1,\"value\":\"0\"},{\"cookie\":11,\"device\":\"4294969508\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":0,\"sequence\":\"20\",\"timestamp\":\"52651556343\",\"usage\":-1,\"value\":\"0\"}],\"version\":1}\n",
+  "referenced_keyboard_elements": [
+    {
+      "array": true,
+      "bits": 1,
+      "cookie": 106,
+      "count": 32,
+      "maximum": 1,
+      "minimum": 0,
+      "relative": false,
+      "sample": {
+        "finished": "52169608481",
+        "returned_value": true,
+        "started": "52169608413",
+        "status": 0,
+        "timestamp": "0",
+        "value": "0",
+        "value_cookie": 106
+      },
+      "usage": 41
+    },
+    {
+      "array": true,
+      "bits": 1,
+      "cookie": 109,
+      "count": 32,
+      "maximum": 1,
+      "minimum": 0,
+      "relative": false,
+      "sample": {
+        "finished": "52169609009",
+        "returned_value": true,
+        "started": "52169608939",
+        "status": 0,
+        "timestamp": "0",
+        "value": "0",
+        "value_cookie": 109
+      },
+      "usage": 44
+    }
+  ],
+  "hammerspoon": {
+    "clock": {
+      "numer": 125,
+      "denom": 3,
+      "domain": "mach_absolute_time",
+      "version": 1
+    },
+    "error_count": 0,
+    "presses": [
+      {
+        "action": "physical_press",
+        "app": "HS274Target",
+        "device": "4294969508",
+        "timestamp": "2026-09-13 18:29:38.958",
+        "capture": "76eb0e5f-974c-4ca0-aa0b-4e0730a963b7/2",
+        "keycode": 53
+      },
+      {
+        "action": "physical_press",
+        "app": "HS274Target",
+        "device": "4294969508",
+        "timestamp": "2026-09-13 18:29:39.148",
+        "capture": "76eb0e5f-974c-4ca0-aa0b-4e0730a963b7/2",
+        "keycode": 49
+      }
+    ],
+    "context_source": "native app/window/AX",
+    "field_focus": {
+      "accessibility": true,
+      "value": true,
+      "source": "native AX",
+      "focused_id": 46,
+      "role": "AXTextField",
+      "fixture_id": 46
+    },
+    "opened": {
+      "coverage": "fixture_only",
+      "incarnation": "76eb0e5f-974c-4ca0-aa0b-4e0730a963b7",
+      "lease": "2",
+      "kind": "opened",
+      "version": 1
+    },
+    "coverage": "fixture_only",
+    "context_observations": [
+      {
+        "app": "HS274Target",
+        "epoch": 1789324178.408293,
+        "allowed": true,
+        "observed_ns": "2192978743333"
+      },
+      {
+        "allowed": false,
+        "observed_ns": "2193103317916"
+      },
+      {
+        "app": "HS274Target",
+        "epoch": 1789324178.59653,
+        "allowed": true,
+        "observed_ns": "2193166981333"
+      },
+      {
+        "allowed": false,
+        "observed_ns": "2193267082791"
+      },
+      {
+        "app": "HS274Target",
+        "epoch": 1789324178.801908,
+        "allowed": true,
+        "observed_ns": "2193372359625"
+      }
+    ],
+    "exit": 143,
+    "context_probe": [
+      {
+        "observation": 2,
+        "phase": "private"
+      },
+      {
+        "observation": 3,
+        "phase": "public"
+      },
+      {
+        "observation": 4,
+        "phase": "secure"
+      },
+      {
+        "observation": 5,
+        "phase": "resumed"
+      }
+    ],
+    "capture_started_ns": "2192876046125",
+    "runtime": "native Hammerspoon",
+    "context_stopped": true,
+    "contexts": [
+      {
+        "device": "4294969508",
+        "timestamp": "52644701777"
+      },
+      {
+        "device": "4294969508",
+        "timestamp": "52649262455"
+      }
+    ],
+    "counts": {
+      "53": 1,
+      "49": 1
+    },
+    "clock_samples": [
+      {
+        "observed_ns": "2193554325000",
+        "original_ns": "2193529240708"
+      },
+      {
+        "observed_ns": "2193732816708",
+        "original_ns": "2193719268958"
+      }
+    ],
+    "settled": true,
+    "stop_requested": true,
+    "errors": []
+  },
+  "context_target": {
+    "pid": 41914,
+    "executable": "/Users/runner/work/_temp/HS274Target.app/Contents/MacOS/HS274Target",
+    "settled": true,
+    "exit": 0
+  }
+}
