@@ -15,6 +15,34 @@ inventory::sample key(std::uint32_t usage) {
 }
 
 int main() {
+  // Native run 34762554442 enumerated modifier usage 224 twice: scalar cookie
+  // 24 and array cookie 289. Distinct elements must retain independent state.
+  inventory modifier_elements;
+  auto scalar = key(224);
+  scalar.cookie = scalar.value_cookie = 24;
+  scalar.element.array = false;
+  scalar.element.count = 1;
+  scalar.value = 1;
+  auto array = key(224);
+  array.cookie = array.value_cookie = 289;
+  array.element.count = 32;
+  array.started = scalar.finished + 1;
+  array.finished = array.started + 1;
+  modifier_elements.append(scalar);
+  modifier_elements.append(array);
+  require(modifier_elements.finish(true, false));
+  using expanded_inventory = hs274_stream_protocol::key_inventory<hs274_stream_protocol::keyboard_inventory_capacity>;
+  expanded_inventory expanded;
+  std::uint64_t ordinal = 0;
+  auto append = [&](std::uint32_t usage, bool is_array) {
+    ++ordinal;
+    expanded.append({usage, static_cast<std::uint32_t>(ordinal),
+        {true, false, is_array, 1, is_array ? 32u : 1u, 0, 1}, 0, true,
+        static_cast<std::uint32_t>(ordinal), 0, 0, ordinal * 2, ordinal * 2 + 1});
+  };
+  for (std::uint32_t usage = 224; usage <= 231; ++usage) append(usage, false);
+  for (std::uint32_t usage = 1; usage <= 255; ++usage) append(usage, true);
+  require(ordinal == 263 && expanded.finish(true, false));
   inventory all;
   for (std::uint32_t usage = 1; usage <= 255; ++usage) all.append(key(usage));
   require(all.finish(true, false));

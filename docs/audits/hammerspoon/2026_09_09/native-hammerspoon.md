@@ -288,3 +288,33 @@ must be reconciled with queued values before production held-state admission.
 Do not rerun the new inventory scenario against the earlier archive: its missing
 inventory marker must fail the new evidence requirement. Reuse this build for
 subsequent Python/Lua changes that leave its producer sources unchanged.
+
+## Native inventory identity refusal
+
+[Run 34762554442](https://github.com/adrienm7/ergopti/actions/runs/34762554442)
+on `7d449e1fa6084f1135fecaec1add42cb7a62a41d` preserved one physical Escape and
+one physical Space through Hammerspoon, all four privacy transitions and settled
+consumer/target lifetimes. The remapping step nevertheless failed its new
+inventory requirement: the controlled keyboard exhausted the 256-element bound.
+The [retained refusal](hs274-inventory-refusal.json) includes exact samples and
+hashes of the full source reports; do not relabel that run as successful.
+
+The native descriptor exposes usages 224 through 231 as separate scalar and
+array leaves. For usage 224, cookie 24 is a scalar bit and cookie 289 is an array
+leaf with report count 32. Both reads succeeded. The truncated inventory retained
+256 elements but only 248 distinct usages; another device returned 231 readable
+elements. Usage count is therefore not element count, and a repeated usage is
+not evidence that an element observation is a duplicate.
+
+The correction preserves all distinct cookies and still rejects duplicate
+cookies. A named diagnostic capacity bounds storage independently of the usage
+range; version 2 publishes that capacity so the reader does not duplicate it.
+Portable regressions retain independently valued scalar/array modifier elements,
+accept a controlled 263-element descriptor and preserve explicit exhaustion.
+The modifier regression fails on the previous collector. Native rebuilding and
+execution of this correction remain pending. This changes inventory readability,
+not physical credit ownership or synchronization with queued events.
+
+Dispatch 34762400048 referenced the previous revision despite a matching branch
+API response after publication. It was cancelled and confirmed terminal before
+34762554442 was dispatched on the correct revision. Always inspect the run SHA.
