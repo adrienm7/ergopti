@@ -92,7 +92,7 @@ _LLTS_ArmSafetyIsThreaded() {
 	Assert(InStr(NormalizedNow,
 		"_TooltipPresentStack(Pos, Row, ArmSafety,") > 0
 		and InStr(NormalizedNow,
-			"RenderGeneration, OwnedPresentation, RequestSerial, LifecyclePlan, CommitFn)") > 0,
+			"RenderGeneration, OwnedPresentation, RequestSerial, LifecyclePlan, CommitFn, &PresentBreakdown)") > 0,
 		"_TooltipShowNow must pass ArmSafety and the exact owned-presentation tuple through to _TooltipPresentStack")
 }
 Test("tooltip: ArmSafety is threaded across the render debounce (F-20)", _LLTS_ArmSafetyIsThreaded)

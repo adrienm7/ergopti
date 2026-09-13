@@ -62,14 +62,14 @@ _TPS_EveryStepCarriesItsOwnMark() {
 
 	BeginPos := InStr(Body, "HotPath_BreakdownBegin(")
 	Assert(BeginPos > 0,
-		"_TooltipPresentStack must clear the sub-step accumulator before it starts. Without the reset, marks left by an earlier render — or by the destack rebuild, which presents through the same function — are attributed to this one")
+		"_TooltipPresentStack must create its own sub-step accumulator before measuring work")
 
 	Steps := _TPS_StepPositions(Body)
 	Assert(Steps.Length >= 4,
 		"_TooltipPresentStack must still perform its rendering steps (found " . Steps.Length . ") — a derivation that finds none would make this guard vacuous")
 
 	Assert(BeginPos < Steps[1],
-		"the accumulator reset must come before the first step, or that step's cost is measured into whatever the previous render left behind")
+		"the owned accumulator must exist before the first measured step")
 
 	; A mark must separate each pair of consecutive steps, and one must follow the
 	; last: two steps sharing an interval means one of them is billed to the other.
@@ -149,8 +149,10 @@ _TPS_EveryPresenterIsMeasuredAndDrains() {
 			Name . " no longer presents a stack — remove it from _TPS_Presenters() rather than leaving an entry the guard cannot check")
 		Assert(InStr(Body, "HotPath_LogIfSlow(") > 0,
 			Name . " must wrap its present in a HotPath segment, or the dominant slow segment in the driver has a path that never reports")
-		Assert(InStr(Body, "HotPath_BreakdownDetail()") > 0,
-			Name . " must drain the sub-step accumulator into its own log line. A presenter that never drains loses the attribution AND leaves stale marks in the buffer, which the next segment to print would then report as its own")
+		Assert(InStr(Body, "&PresentBreakdown") > 0,
+			Name . " must receive the accumulator owned by its presentation")
+		Assert(InStr(Body, "HotPath_BreakdownDetail(PresentBreakdown)") > 0,
+			Name . " must drain its own sub-step accumulator into its log line")
 	}
 }
 
@@ -197,13 +199,13 @@ _TPS_VisibleDecisionCommitHasOneTransitiveOwner() {
 	Llm := _StripFullLineComments(_DriverFuncBody("_TooltipBuildGuiLlm"))
 	NormalizedShow := RegExReplace(Show, "\s+", " ")
 	Assert(InStr(NormalizedShow,
-		"_TooltipPresentStack(Pos, Row, ArmSafety, OwnedPresentation ? [] : Items, RenderGeneration, OwnedPresentation, RequestSerial, LifecyclePlan, CommitFn)") > 0,
+		"_TooltipPresentStack(Pos, Row, ArmSafety, OwnedPresentation ? [] : Items, RenderGeneration, OwnedPresentation, RequestSerial, LifecyclePlan, CommitFn, &PresentBreakdown)") > 0,
 		"the ordinary/owned presenter must give the common commit the exact rows and semantic tuple it reveals")
 	Assert(RegExMatch(Destack,
-		"_TooltipPresentStack\(Pos, Row, false, Items,\s*RenderGeneration, false, RebuildRequestSerial,\s*LifecyclePlan\)") > 0,
+		"_TooltipPresentStack\(Pos, Row, false, Items,\s*RenderGeneration, false, RebuildRequestSerial,\s*LifecyclePlan, 0, &PresentBreakdown\)") > 0,
 		"the destack presenter must publish only its surviving rows")
 	Assert(RegExMatch(Llm,
-		"_TooltipPresentStack\(Pos, Row, false, \[\],\s*RenderGeneration, true, RequestSerial, 0, StateCommit\)") > 0,
+		"_TooltipPresentStack\(Pos, Row, false, \[\],\s*RenderGeneration, true, RequestSerial, 0, StateCommit, &PresentBreakdown\)") > 0,
 		"the direct rich LLM presenter must fence its generation and request serial, then publish [] so replacing the shared surface retires the old hotstring decision")
 
 	Build := _StripFullLineComments(_DriverFuncBody("_TooltipBuildGui"))

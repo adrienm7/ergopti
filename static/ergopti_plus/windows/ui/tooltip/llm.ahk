@@ -1454,8 +1454,8 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 	StateCommit := _LLM_TooltipCommitSurfaceState.Bind(
 		slots, active_idx, RenderGeneration, PresentationMeta)
 	Presented := _TooltipPresentStack(Pos, Row, false, [],
-		RenderGeneration, true, RequestSerial, 0, StateCommit)
-    HotPath_LogIfSlow("Tooltip.LlmPresent", _hpLlmPresent, HotPath_BreakdownDetail())
+		RenderGeneration, true, RequestSerial, 0, StateCommit, &PresentBreakdown)
+    HotPath_LogIfSlow("Tooltip.LlmPresent", _hpLlmPresent, HotPath_BreakdownDetail(PresentBreakdown))
 	if !Presented
 		return false
     if (RenderGeneration != _TooltipGeneration)

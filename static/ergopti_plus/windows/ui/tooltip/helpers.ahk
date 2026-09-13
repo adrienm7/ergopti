@@ -332,7 +332,7 @@ _UiOracleReportError(Message) {
 ; keystroke callback.
 _TooltipPresentStack(Pos, Row, ArmSafety, Items, ExpectedGeneration,
 	ClearDequeue := false, ExpectedRequestSerial := -1,
-	LifecyclePlan := 0, CommitFn := 0) {
+	LifecyclePlan := 0, CommitFn := 0, &Breakdown := unset) {
 		global _TOOLTIP_SAFETY_SEC
 		global _TooltipActiveSurface
 		global _TooltipGeneration, _TooltipTimerGeneration
@@ -342,33 +342,33 @@ _TooltipPresentStack(Pos, Row, ArmSafety, Items, ExpectedGeneration,
 		; Every presenter carries the immutable generation it reserved. All expensive
 		; preparation below is detached: it cannot hide, destroy, round or reposition
 		; the active surface even if a newer renderer interrupts it.
-		HotPath_BreakdownBegin()
+		Breakdown := HotPath_BreakdownBegin()
 		_hpCandidate := HotPath_Now()
 		PreparedSurface := _TooltipCreateDetachedSurface(Row,
 			ExpectedGeneration, Pos)
-		HotPath_BreakdownMark("candidate", _hpCandidate)
+		HotPath_BreakdownMark("candidate", _hpCandidate, Breakdown)
 		try {
 			_hpClamp := HotPath_Now()
 			Pos := _TooltipClampToScreen(Pos.X, Pos.Y, Row.W, Row.H)
 			PreparedSurface.Pos := Pos
-			HotPath_BreakdownMark("clamp", _hpClamp)
+			HotPath_BreakdownMark("clamp", _hpClamp, Breakdown)
 
 			_hpPrepare := HotPath_Now()
 			_TooltipPositionPreparedContent(Row, Pos.X, Pos.Y)
 			if (PreparedSurface.ContentHwnds.Length == 0)
 				PreparedSurface.ContentHwnds.Push(Row.Gui.Hwnd)
-			HotPath_BreakdownMark("prepare", _hpPrepare)
+			HotPath_BreakdownMark("prepare", _hpPrepare, Breakdown)
 
 			_hpCorners := HotPath_Now()
 			_TooltipApplyStackedCorners(Row)
-			HotPath_BreakdownMark("corners", _hpCorners)
+			HotPath_BreakdownMark("corners", _hpCorners, Breakdown)
 
 			_hpBorder := HotPath_Now()
 			PreparedSurface.Border := _TooltipBuildBorder(
 				Pos.X, Pos.Y, Row.W, Row.H)
 			if PreparedSurface.Border
 				PreparedSurface.BorderHwnds := [PreparedSurface.Border.Hwnd]
-			HotPath_BreakdownMark("border", _hpBorder)
+			HotPath_BreakdownMark("border", _hpBorder, Breakdown)
 		} catch Error as Err {
 			SetTimer(_TooltipDisposeRetired.Bind(PreparedSurface), -1)
 			throw Err
@@ -391,17 +391,17 @@ _TooltipPresentStack(Pos, Row, ArmSafety, Items, ExpectedGeneration,
 			_hpRequestOwner := HotPath_Now()
 			RequestOwnerCurrent := _TooltipRequestOwnerMatches(
 				ExpectedRequestSerial, _TooltipRequestSerial)
-			HotPath_BreakdownMark("request_owner", _hpRequestOwner)
+			HotPath_BreakdownMark("request_owner", _hpRequestOwner, Breakdown)
 			_hpOwner := HotPath_Now()
 			if RequestOwnerCurrent {
 				Selection := _TooltipChoosePreparedSurface(ExpectedGeneration,
 					_TooltipGeneration, _TooltipActiveSurface, PreparedSurface)
 			}
-			HotPath_BreakdownMark("owner", _hpOwner)
+			HotPath_BreakdownMark("owner", _hpOwner, Breakdown)
 			if Selection.Committed {
 				_hpDecision := HotPath_Now()
 				DecisionCurrent := _TooltipDecisionItemsStillCurrent(PublishItems)
-				HotPath_BreakdownMark("decision", _hpDecision)
+				HotPath_BreakdownMark("decision", _hpDecision, Breakdown)
 				if DecisionCurrent {
 					; Deadline is the last predicate before commit/reveal. A row with 1 ms
 					; remaining cannot expire while a slower decision oracle runs afterward.
@@ -409,13 +409,13 @@ _TooltipPresentStack(Pos, Row, ArmSafety, Items, ExpectedGeneration,
 					DeadlinesLive := _TooltipAbsoluteDeadlinesStillLive(
 						PublishItems)
 					HotPath_BreakdownMark("absolute_deadline",
-						_hpAbsoluteDeadline)
+						_hpAbsoluteDeadline, Breakdown)
 					_hpDeadline := HotPath_Now()
 					DeadlineBounds := _TooltipLifecycleDeadlineBounds(
 						LifecyclePlan)
 					if DeadlineBounds.Expired
 						DeadlinesLive := false
-					HotPath_BreakdownMark("deadline", _hpDeadline)
+					HotPath_BreakdownMark("deadline", _hpDeadline, Breakdown)
 					if DeadlinesLive {
 						RetiredSurface := Selection.Retired
 
@@ -453,7 +453,7 @@ _TooltipPresentStack(Pos, Row, ArmSafety, Items, ExpectedGeneration,
 
 						_hpRetire := HotPath_Now()
 						_TooltipHideSurfaceObjects(RetiredSurface)
-						HotPath_BreakdownMark("retire", _hpRetire)
+						HotPath_BreakdownMark("retire", _hpRetire, Breakdown)
 
 						; One assignment publishes content, border, trackers, position and
 						; owner generation together. No callback can observe a half-swap.
@@ -511,11 +511,11 @@ _TooltipPresentStack(Pos, Row, ArmSafety, Items, ExpectedGeneration,
 
 						_hpReveal := HotPath_Now()
 						_TooltipRevealPreparedSurfaces(PreparedSurface)
-						HotPath_BreakdownMark("reveal", _hpReveal)
+						HotPath_BreakdownMark("reveal", _hpReveal, Breakdown)
 
 						_hpPublish := HotPath_Now()
 						Published := _TooltipPublishVisibleDecisions(PublishItems)
-						HotPath_BreakdownMark("publish", _hpPublish)
+						HotPath_BreakdownMark("publish", _hpPublish, Breakdown)
 						if !Published
 							throw Error("Visible-decision publication refused the revealed surface.")
 						if IsSet(_LLM_TooltipMarkSurfaceSuggested)
@@ -538,7 +538,7 @@ _TooltipPresentStack(Pos, Row, ArmSafety, Items, ExpectedGeneration,
 			_TooltipNotifySurfacePresented(PublishItems, PreparedSurface)
 		if IsSet(_LLM_TooltipScheduleMetricDrain)
 			_LLM_TooltipScheduleMetricDrain()
-		HotPath_BreakdownMark("post_present", _hpPostPresent)
+		HotPath_BreakdownMark("post_present", _hpPostPresent, Breakdown)
 
 		; Destruction stays outside Critical and owns one detached record. If an
 		; exception happened after the swap, retire the OLD record; the caller's
@@ -546,7 +546,7 @@ _TooltipPresentStack(Pos, Row, ArmSafety, Items, ExpectedGeneration,
 		DisposalSurface := SurfaceSwapped ? RetiredSurface : PreparedSurface
 		_hpDispose := HotPath_Now()
 		_TooltipQueueSurfaceDisposal(DisposalSurface)
-		HotPath_BreakdownMark("dispose_schedule", _hpDispose)
+		HotPath_BreakdownMark("dispose_schedule", _hpDispose, Breakdown)
 		if IsObject(CommitError) {
 			if CommitError is TooltipNavOwnerRetryError
 					|| CommitError is TooltipLlmTerminalOutcomeError
@@ -655,15 +655,14 @@ _TooltipDequeueRebuild(Items, ExpectedGeneration, ExpectedSurface) {
 		try {
 				Presented := _TooltipPresentStack(Pos, Row, false, Items,
 					RenderGeneration, false, RebuildRequestSerial,
-					LifecyclePlan)
+					LifecyclePlan, 0, &PresentBreakdown)
 		} catch {
 				TooltipHide("DequeuePresentFail", true, RenderGeneration,
 					unset, RebuildRequestSerial)
 				return false
 		}
-		; Drain even a refused commit so its sub-step marks cannot be attributed
-		; to the next unrelated presentation.
-		HotPath_LogIfSlow("Tooltip.DequeuePresent", _hpDqPresent, HotPath_BreakdownDetail())
+		; Attribute even a refused commit using its own sub-step marks.
+		HotPath_LogIfSlow("Tooltip.DequeuePresent", _hpDqPresent, HotPath_BreakdownDetail(PresentBreakdown))
 		if !Presented {
 			TooltipHide("DequeueStaleBeforeReveal", true, RenderGeneration,
 				unset, RebuildRequestSerial)

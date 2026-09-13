@@ -1622,6 +1622,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_fire_log_suspend_boundary.ahk
 #Include unit/test_group_config_cache_alias_invalidation.ahk
 #Include unit/test_hotpath_profiler_exclusive.ahk
+#Include unit/test_hotpath_breakdown_reentry.ahk
 #Include unit/test_hook_timing_input_privacy.ahk
 #Include unit/test_hotpath_per_segment_threshold.ahk
 #Include unit/test_keylogger_today_fh_flush.ahk
