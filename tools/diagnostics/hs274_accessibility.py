@@ -96,7 +96,11 @@ tell application "System Events"
         if (count candidates) is 0 then return "missing_application"
         if (count candidates) is not 1 then error "No unique Hammerspoon checkbox"
         set approvalControl to item 1 of candidates
-        if (value of approvalControl as integer) is 0 then perform action "AXPress" of approvalControl
+        if (value of approvalControl as integer) is 0 then
+            perform action "AXPress" of approvalControl
+            -- The displayed value can change before the authorization sheet commits.
+            return "permission_requested"
+        end if
         repeat 30 times
             if (value of approvalControl as integer) is 1 then return "enabled"
             delay 0.1
@@ -177,6 +181,13 @@ def approve_accessibility(report, app):
                             break
                         if attempt < 2:
                             time.sleep(0.1)
+        if result.returncode == 0 and result.stdout.strip() == "permission_requested":
+            report["hammerspoon_accessibility_request"] = {
+                "exit": result.returncode, "stdout": result.stdout, "stderr": result.stderr}
+            state["stage"] = "authenticate_existing"
+            with authenticate_accessibility(report):
+                state["stage"] = "verify_permission"
+                result = subprocess.run(["/usr/bin/osascript", "-e", SCRIPT], capture_output=True, text=True, timeout=15)
     except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as error:
         state.update(exit=getattr(error, "returncode", None), timed_out=isinstance(error, subprocess.TimeoutExpired))
         for name in ("stdout", "stderr"):

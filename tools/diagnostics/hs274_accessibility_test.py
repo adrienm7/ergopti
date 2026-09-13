@@ -10,6 +10,43 @@ from hs274_accessibility import approve_accessibility
 
 
 class ApprovalTests(unittest.TestCase):
+    def test_existing_row_requires_authentication_and_fresh_permission_readback(self):
+        for rejected in (False, True):
+            lifecycle, report = [], {}
+
+            @contextmanager
+            def account(output, state):
+                lifecycle.append("created")
+                try:
+                    yield "fixture-user", "fixture-secret"
+                finally:
+                    lifecycle.append("removed")
+
+            responses = iter(("no_sheet", "", "permission_requested",
+                              "authentication refused" if rejected else "authentication_submitted", "enabled"))
+
+            def native(*args, **kwargs):
+                response = next(responses)
+                if response == "enabled":
+                    self.assertEqual(lifecycle, ["created"])
+                return SimpleNamespace(returncode=0, stdout=response, stderr="UI detail")
+
+            with self.subTest(rejected=rejected), \
+                    patch.dict("os.environ", {"RUNNER_TEMP": "fixture-output"}), \
+                    patch("hs274_accessibility_auth.approval_account", account), \
+                    patch("hs274_accessibility.subprocess.run", side_effect=native), \
+                    patch("hs274_accessibility.select_application") as select:
+                if rejected:
+                    with self.assertRaisesRegex(RuntimeError, "authentication was not confirmed"):
+                        approve_accessibility(report, "owned/Hammerspoon.app")
+                    self.assertEqual(report["hammerspoon_accessibility"]["stage"], "authenticate_existing")
+                else:
+                    approve_accessibility(report, "owned/Hammerspoon.app")
+                    self.assertEqual(report["hammerspoon_accessibility"]["stdout"], "enabled")
+                    self.assertEqual(report["hammerspoon_accessibility"]["stage"], "verify_permission")
+                self.assertEqual(lifecycle, ["created", "removed"])
+                select.assert_not_called()
+
     def test_account_outlives_selection_and_admission_even_when_selection_fails(self):
         for rejected in (False, True):
             lifecycle = []

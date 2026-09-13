@@ -169,6 +169,25 @@ not only on rejected UI admission. An additional bounded query follows the
 exact currently owned PID's TCC message identifiers and Hammerspoon attribution;
 diagnostic failure must not replace the primary failure or prevent cleanup.
 
+[Run 34755981881, attempt 2](https://github.com/adrienm7/ergopti/actions/runs/34755981881/attempts/2),
+job `103720782490`, at `c2a0a87d0175154a4871cb5d34528318ca8fcc2f`,
+retained TCC decisions for exact owner PID 4066. Attribution names the owned
+Hammerspoon as accessor, requestor and responsible process; its Developer ID
+requirement matches with status zero. Accessibility nevertheless reports
+`Denied (System Set)`, `authValue=0`, `authReason=4`. The separate Apple platform
+signature mismatch does not invalidate Hammerspoon's Developer ID signature.
+Attempt 1 stopped before Hammerspoon because an unexpected remapper peer was
+running; the unchanged isolation guard stayed enabled for the fresh-run retry.
+
+The existing-row approval path previously clicked a disabled Hammerspoon row
+and accepted its displayed value of one without authenticating. Authentication
+only existed for Add application. A newly clicked row now returns a distinct
+pending result, authenticates through the verified sheet owner, then reads the
+permission again while the temporary account remains alive. Already-enabled
+rows remain separate. The local regression exercises both authentication
+success and rejection without invoking the file picker. Native execution must
+still establish that the pending sheet explains the observed TCC denial.
+
 The supervisor signals `permission_ready` only after ordinary UI approval.
 Lua then independently checks actual Accessibility trust before creating the
 input fixture. Native context tests must subsequently verify public, private,
