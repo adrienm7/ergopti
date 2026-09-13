@@ -201,6 +201,24 @@ identity when focus expires. Pinned `libwebview.m` already uses
 merely from the Lua method name. Self-AX observation limitations remain a
 hypothesis until the actual errors or an independent observation establish them.
 
+[Run 34757432296](https://github.com/adrienm7/ergopti/actions/runs/34757432296),
+job `103724131144`, at `771e3d0f91b843f00398de17175947d09107eba5`,
+reported matching expected and foreground PID 6234 (Hammerspoon), window ID 62,
+and true Accessibility and DOM focus. Both the own-application focused-element
+query and system focused-application query returned `Messaging failed`.
+This is not evidence of a different application stealing foreground focus.
+
+The replacement fixture hosts ordinary and secure Cocoa fields in a separate
+native process. Python owns its exact executable and bounded cleanup around the
+whole Hammerspoon lifetime. Sequenced, atomically published commands select only
+fixed public/private/secure/resumed states; receipts identify PID and window.
+These receipts do not admit capture: Hammerspoon must independently obtain the
+exact external AX window and text field, and the existing context observer must
+record all four privacy transitions. Native input transport and accounting are
+unchanged. The target never reads or reports field text. A target failure remains
+an error even if consumer cleanup also fails. The Swift target must compile and
+the complete fixture must execute on macOS before this replacement is validated.
+
 The supervisor signals `permission_ready` only after ordinary UI approval.
 Lua then independently checks actual Accessibility trust before creating the
 input fixture. Native context tests must subsequently verify public, private,

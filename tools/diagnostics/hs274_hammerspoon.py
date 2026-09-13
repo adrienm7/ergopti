@@ -17,6 +17,7 @@ from hs274_stream import decimal
 from hs274_accessibility import approve_accessibility
 import hs274_hammerspoon_registration
 import hs274_accessibility_diagnostics
+from hs274_target import owned_target
 
 
 def read_clock(information):
@@ -151,6 +152,14 @@ class CaptureReceipt:
 
 @contextmanager
 def owned_capture(app, cli, output, report):
+    """Own the external target until the Hammerspoon consumer has settled."""
+    with owned_target(output, report, native_lifecycle()) as target:
+        with capture_consumer(app, cli, output, report, target) as client:
+            yield client
+
+
+@contextmanager
+def capture_consumer(app, cli, output, report, target):
     """Launch one isolated app and keep both application and CLI evidence."""
     clock = subprocess.run([str(cli), "--hs274-clock"], check=True, capture_output=True, text=True, timeout=5)
     timebase = read_clock(json.loads(clock.stdout, object_pairs_hook=unique_object))
@@ -167,6 +176,7 @@ def owned_capture(app, cli, output, report):
     shutil.copyfile(here / "hs274-hammerspoon.lua", scratch / "init.lua")
     shutil.copyfile(here / "hs274-context.lua", scratch / "hs274-context.lua")
     shutil.copyfile(here / "hs274-context-probe.lua", scratch / "hs274-context-probe.lua")
+    shutil.copyfile(here / "hs274-target.lua", scratch / "hs274-target.lua")
     result = output / "hs274-remap-hammerspoon.json"
     stop = scratch / "stop"
     permission_request = scratch / "permission-request.json"
@@ -176,6 +186,7 @@ def owned_capture(app, cli, output, report):
                      "diagnostics": str(output / "hs274-remap-physical-stream-stderr.log"),
                      "stop": str(stop), "permission_request": str(permission_request), "permission_ready": str(permission_ready),
                      "batch_limit": 64, "context_limit": 64, "frame_limit": 65536, "clock": timebase}
+    configuration.update(target)
     (scratch / "capture-config.json").write_text(json.dumps(configuration), encoding="utf-8")
     with (output / "hs274-remap-hammerspoon-launch.log").open("xb") as log:
         launch_command = ["/usr/bin/open", "-n", "-g", "-W", str(copied),
@@ -244,7 +255,8 @@ def owned_capture(app, cli, output, report):
 def validate_consumer(result, capture):
     """Match real Lua credits and exact original context keys against native input."""
     focus = result.get("field_focus") if isinstance(result, dict) else None
-    if (not isinstance(focus, dict) or focus.get("accessibility") is not True or focus.get("value") is not True
+    if (not isinstance(focus, dict) or focus.get("source") != "native AX"
+            or focus.get("accessibility") is not True or focus.get("value") is not True
             or type(focus.get("fixture_id")) is not int or focus["fixture_id"] <= 0
             or type(focus.get("focused_id")) is not int or focus["focused_id"] != focus["fixture_id"]
             or focus.get("role") != "AXTextField"):
