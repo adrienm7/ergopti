@@ -3,6 +3,7 @@
 import subprocess
 
 from hs274_accessibility_auth import authenticate_accessibility
+from hs274_accessibility_picker import select_application
 
 
 PREPARE_SCRIPT = '''
@@ -137,7 +138,7 @@ end tell
 '''
 
 
-def approve_accessibility(report):
+def approve_accessibility(report, app):
     """Retain the actual UI response; native Hammerspoon separately verifies trust."""
     state = report.setdefault("hammerspoon_accessibility", {})
     state["stage"] = "prepare_settings"
@@ -163,6 +164,10 @@ def approve_accessibility(report):
                     "exit": result.returncode, "stdout": result.stdout, "stderr": result.stderr}
                 state["stage"] = "authenticate"
                 authenticate_accessibility(report)
+                state["stage"] = "select_application"
+                select_application(app, report)
+                state["stage"] = "verify_permission"
+                result = subprocess.run(["/usr/bin/osascript", "-e", SCRIPT], capture_output=True, text=True, timeout=15)
     except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as error:
         state.update(exit=getattr(error, "returncode", None), timed_out=isinstance(error, subprocess.TimeoutExpired))
         for name in ("stdout", "stderr"):

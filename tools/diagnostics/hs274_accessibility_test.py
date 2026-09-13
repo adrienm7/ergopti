@@ -11,15 +11,17 @@ from hs274_accessibility import approve_accessibility
 class ApprovalTests(unittest.TestCase):
     def test_opening_addition_sheet_does_not_claim_permission(self):
         report = {}
-        with patch("hs274_accessibility.authenticate_accessibility"), patch("hs274_accessibility.subprocess.run", side_effect=[
+        with patch("hs274_accessibility.authenticate_accessibility"), \
+                patch("hs274_accessibility.select_application"), patch("hs274_accessibility.subprocess.run", side_effect=[
                 SimpleNamespace(returncode=0, stdout="no_sheet", stderr=""),
                 SimpleNamespace(returncode=0),
                 SimpleNamespace(returncode=0, stdout="missing_application", stderr="application list"),
-                SimpleNamespace(returncode=0, stdout="addition_sheet_observed", stderr="sheet controls")]):
+                SimpleNamespace(returncode=0, stdout="addition_sheet_observed", stderr="sheet controls"),
+                SimpleNamespace(returncode=0, stdout="missing_application", stderr="still absent")]):
             with self.assertRaisesRegex(RuntimeError, "not confirmed"):
-                approve_accessibility(report)
-        self.assertEqual(report["hammerspoon_accessibility"]["stage"], "authenticate")
-        self.assertEqual(report["hammerspoon_accessibility"]["stderr"], "sheet controls")
+                approve_accessibility(report, "owned/Hammerspoon.app")
+        self.assertEqual(report["hammerspoon_accessibility"]["stage"], "verify_permission")
+        self.assertEqual(report["hammerspoon_accessibility"]["stderr"], "still absent")
         self.assertEqual(report["hammerspoon_accessibility_listing"]["stderr"], "application list")
 
     def test_unrecognized_sheet_prevents_navigation_and_permission_changes(self):
@@ -27,7 +29,7 @@ class ApprovalTests(unittest.TestCase):
         result = SimpleNamespace(returncode=0, stdout="unknown sheet", stderr="sheet detail")
         with patch("hs274_accessibility.subprocess.run", return_value=result) as run:
             with self.assertRaisesRegex(RuntimeError, "preparation was not confirmed"):
-                approve_accessibility(report)
+                approve_accessibility(report, "owned/Hammerspoon.app")
         self.assertEqual(run.call_count, 1)
         self.assertEqual(report["hammerspoon_accessibility"]["stage"], "prepare_settings")
         self.assertEqual(report["hammerspoon_settings_preparation"]["stdout"], "unknown sheet")
@@ -38,7 +40,7 @@ class ApprovalTests(unittest.TestCase):
         with patch("hs274_accessibility.subprocess.run", side_effect=[
                 SimpleNamespace(returncode=0, stdout="dismissed", stderr=""), SimpleNamespace(returncode=0), timeout]):
             with self.assertRaises(subprocess.TimeoutExpired):
-                approve_accessibility(report)
+                approve_accessibility(report, "owned/Hammerspoon.app")
         self.assertEqual(report["hammerspoon_accessibility"], {
             "stage": "approval", "exit": None, "timed_out": True, "stdout": "partial UI", "stderr": "pending"})
 
@@ -49,10 +51,10 @@ class ApprovalTests(unittest.TestCase):
                     SimpleNamespace(returncode=0, stdout="no_sheet", stderr=""),
                     SimpleNamespace(returncode=0), SimpleNamespace(returncode=code, stdout=stdout, stderr="UI detail")]):
                 if code == 0 and stdout == "enabled\n":
-                    approve_accessibility(report)
+                    approve_accessibility(report, "owned/Hammerspoon.app")
                 else:
                     with self.assertRaisesRegex(RuntimeError, "not confirmed"):
-                        approve_accessibility(report)
+                        approve_accessibility(report, "owned/Hammerspoon.app")
                 self.assertEqual(report["hammerspoon_accessibility"], {
                     "stage": "approval", "exit": code, "stdout": stdout, "stderr": "UI detail"})
 
