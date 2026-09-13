@@ -136,6 +136,11 @@ end
 local function failed(err)
 	result.errors[#result.errors + 1] = err
 	owner.boot_pending = false
+	owner.permission_pending = false
+	if owner.permission then
+		local stopped, detail = pcall(function() assert(owner.permission:stop() ~= false, "Native permission timer did not stop") end)
+		if not stopped then result.errors[#result.errors + 1] = tostring(detail) end
+	end
 	if owner.boot then
 		local stopped, detail = pcall(function() assert(owner.boot:stop() ~= false, "Native focus timer did not stop") end)
 		if not stopped then result.errors[#result.errors + 1] = tostring(detail) end
@@ -149,7 +154,7 @@ local function failed(err)
 	publish()
 end
 
-local initialized, error_detail = xpcall(function()
+local function initialize()
 	prepare_modules()
 	local WebviewResult = require("adapters.webview_result")
 	owner.window = assert(hs.webview.new({ x = 100, y = 100, w = 420, h = 160 }))
@@ -199,5 +204,32 @@ local initialized, error_detail = xpcall(function()
 	end)
 	owner.window:html("<!doctype html><meta charset='utf-8'><title>HS274 input fixture</title><input id='input' aria-label='HS274 physical input'><input id='secret' type='password' aria-label='HS274 empty protected fixture'>")
 	owner.window:show()
+end
+
+local function initialize_checked()
+	local initialized, error_detail = xpcall(initialize, debug.traceback)
+	if not initialized then failed(error_detail) end
+end
+
+local requested, request_error = xpcall(function()
+	if hs.accessibilityState() then initialize_checked(); return end
+	assert(hs.json.write({ requested = true }, config.permission_request, true, true), "Cannot publish permission request")
+	hs.accessibilityState(true)
+	local deadline = hs.timer.absoluteTime() + 30000000000
+	owner.permission_pending = true
+	owner.permission = assert(hs.timer.doEvery(0.1, function()
+		if not owner.permission_pending then return end
+		local ok, err = xpcall(function()
+			assert(not hs.fs.attributes(config.stop), "Stopped while awaiting native accessibility permission")
+			if hs.accessibilityState() then
+				owner.permission_pending = false
+				assert(owner.permission:stop() ~= false, "Native permission timer did not stop")
+				initialize_checked()
+				return
+			end
+			assert(hs.timer.absoluteTime() < deadline, "Native accessibility permission was not granted")
+		end, debug.traceback)
+		if not ok then failed(err) end
+	end), "Native permission timer was refused")
 end, debug.traceback)
-if not initialized then failed(error_detail) end
+if not requested then failed(request_error) end
