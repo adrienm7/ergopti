@@ -43,7 +43,7 @@ class ConsumerTests(unittest.TestCase):
     def test_native_start_is_released_only_after_successful_ui_approval(self):
         for rejected in (False, True):
             with self.subTest(rejected=rejected), tempfile.TemporaryDirectory(prefix="hs274-permission-") as directory:
-                root = Path(directory)
+                root = Path(directory).resolve()
                 scratch, output = root / "scratch", root / "output"
                 scratch.mkdir()
                 output.mkdir()
