@@ -49,19 +49,23 @@ function M.new(dependencies)
 	local function consume(line)
 		local frame, decode_error = dependencies.decode(line)
 		assert(decode_error == nil and type(frame) == "table", decode_error or "Invalid physical JSON frame")
-		local sequence
+		local sequence, baseline_page
 		if not identity then
 			-- Admission may invoke external code; retain the original wire identity.
 			local candidate = { incarnation = frame.incarnation, lease = frame.lease }
 			receiver.open(frame)
 			identity, sequence = candidate, "0"
+		elseif frame.kind == "baseline" or frame.kind == "baseline_ready" then
+			sequence, baseline_page = receiver.baseline(frame), true
 		else
 			sequence = receiver.deliver(frame)
 		end
 		assert(state == "running" and receiver.active(), "Physical transport was revoked")
+		if baseline_page and sequence == nil then return end
 		assert(type(sequence) == "string", "Missing committed physical sequence")
-		local receipt, encode_error = dependencies.encode({ version = 1,
-			incarnation = identity.incarnation, lease = identity.lease, ack = sequence })
+		local acknowledgement = { version = 1, incarnation = identity.incarnation, lease = identity.lease }
+		acknowledgement[baseline_page and "baseline_ack" or "ack"] = sequence
+		local receipt, encode_error = dependencies.encode(acknowledgement)
 		assert(encode_error == nil and type(receipt) == "string" and receipt ~= ""
 			and not receipt:find("[\r\n]"), encode_error or "Invalid physical acknowledgement encoding")
 		assert(state == "running" and receiver.active(), "Physical transport was revoked")

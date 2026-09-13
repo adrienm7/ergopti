@@ -251,6 +251,52 @@ def remap_module():
 
 
 class StreamTests(unittest.TestCase):
+    def test_paged_initial_state_preserves_cookies_and_empty_interfaces(self):
+        capture, frames = fixture()
+        opened = dict(frames[0], baseline={"version": 1, "boundary": "100", "rows": 4})
+        first = dict(frames[0], kind="baseline", boundary="100", offset=0, next=2, total=4,
+                     complete=False, rows=[{"kind": "device", "device": "41", "keyboard": True, "elements": 2},
+                                           {"kind": "key", "device": "41", "usage": 224, "cookie": 24,
+                                            "timestamp": "90", "down": False}])
+        last = dict(first, offset=2, next=4, complete=True,
+                    rows=[{"kind": "key", "device": "41", "usage": 224, "cookie": 289,
+                           "timestamp": "95", "down": True},
+                          {"kind": "device", "device": "42", "keyboard": False, "elements": 0}])
+        ready = dict(frames[0], kind="baseline_ready")
+        stream = [opened, first, last, ready, *frames[1:]]
+        decoded = read_stream(encode(stream))
+        self.assertEqual(decoded["records"], capture["records"])
+        self.assertTrue(decoded["baseline"]["complete"])
+        self.assertEqual(decoded["baseline"]["devices"][41]["keys"], {
+            24: {"usage": 224, "timestamp": 90, "down": False},
+            289: {"usage": 224, "timestamp": 95, "down": True}})
+        self.assertEqual(decoded["baseline"]["devices"][42]["keys"], {})
+        lost = dict(frames[0], kind="lost", reason="interrupted")
+        self.assertEqual(validate_interruption(encode([opened, first, last, ready, lost]), opened)["terminal"], lost)
+        with self.assertRaises(ValueError):
+            validate_interruption(encode([opened, first, lost]), opened)
+        with self.assertRaises(ValueError):
+            validate_interruption(encode([*stream, lost]), opened)
+        partial = read_stream(encode(stream[:2]))
+        self.assertFalse(partial["baseline"]["complete"])
+        self.assertEqual(partial["records"], [])
+        for broken in ([opened, last, ready], [opened, first, first, last, ready],
+                       [opened, first, ready], [opened, first, last, *frames[1:]],
+                       [opened, first, last, ready, last]):
+            with self.subTest(broken=broken), self.assertRaises(ValueError):
+                read_stream(encode(broken))
+        for field, value in (("cookie", 24), ("timestamp", "101"), ("device", "42"),
+                             ("usage", 1), ("down", 1)):
+            broken = copy.deepcopy(stream)
+            broken[2]["rows"][0][field] = value
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                read_stream(encode(broken))
+        for field, value in (("next", True), ("total", 5), ("complete", True), ("boundary", "99")):
+            broken = copy.deepcopy(stream)
+            broken[1][field] = value
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                read_stream(encode(broken))
+
     def test_retained_native_cookies_match_the_stream_and_inventory(self):
         path = Path(__file__).parent / "fixtures" / "hs274-native-cookie-capture.json"
         evidence = json.loads(path.read_text(encoding="utf-8"))
@@ -301,6 +347,27 @@ class StreamTests(unittest.TestCase):
             process = SimpleNamespace(poll=lambda: None)
             actual = remap.wait_stream(path, process, lambda stream: True, 1, acknowledge=False)
             self.assertEqual(actual, read_stream(encode(frames)))
+
+    def test_fixture_receiver_acknowledges_baseline_before_raw_input(self):
+        remap = remap_module()
+        capture, frames = fixture()
+        opened = dict(frames[0], baseline={"version": 1, "boundary": "100", "rows": 4})
+        stages = [{"opened": opened, "records": [],
+                   "baseline": {"received_rows": cursor, "complete": complete}}
+                  for cursor, complete in ((0, False), (2, False), (2, False), (4, False), (4, True))]
+        stages.append(dict(stages[-1], records=capture["records"]))
+        client = SimpleNamespace(poll=lambda: None, stdin=io.BytesIO(), capture_ack=None)
+        path = SimpleNamespace(read_text=lambda **kwargs: "validated by mocked reader")
+        seen = []
+        with patch.object(remap, "read_stream", side_effect=stages), patch.object(remap.time, "sleep"):
+            actual = remap.wait_stream(path, client, lambda stream: seen.append(stream) or bool(stream["records"]), 1)
+        receipts = [json.loads(line) for line in client.stdin.getvalue().splitlines()]
+        identity = {"version": 1, "incarnation": opened["incarnation"], "lease": opened["lease"]}
+        self.assertEqual(receipts, [dict(identity, ack="0"), dict(identity, baseline_ack="2"),
+                                   dict(identity, baseline_ack="4"),
+                                   dict(identity, ack=str(capture["records"][-1]["sequence"]))])
+        self.assertEqual(seen, stages[-2:])
+        self.assertEqual(actual, stages[-1])
 
     def test_receiver_acknowledges_only_validated_complete_frames_once(self):
         remap = remap_module()

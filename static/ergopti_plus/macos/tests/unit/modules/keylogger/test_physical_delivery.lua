@@ -4,6 +4,7 @@
 local helpers = require("tests.helpers")
 local Delivery = require("modules.keylogger.physical_delivery")
 local AccountingScope = require("tests.support.physical_accounting_scope")
+local Frames = require("tests.support.physical_stream_frames")
 
 local function fixture(overrides)
 	local emitted, contexts = {}, {}
@@ -26,20 +27,24 @@ local function fixture(overrides)
 end
 
 local function opened()
-	return { version = 1, kind = "opened", incarnation = "native-epoch",
-		lease = "18446744073709551615", coverage = "fixture_only" }
+	return Frames.new("native-epoch", "18446744073709551615").opened
+end
+
+local function start(receiver)
+	Frames.start(receiver, Frames.new("native-epoch", "18446744073709551615"))
 end
 
 local function batch(rows)
 	local frame = opened()
+	frame.baseline = nil
 	frame.kind, frame.records = "batch", rows
 	return frame
 end
 
 local function row(sequence, usage, value, device)
 	return { sequence = tostring(sequence), device = device or "18446744073709551614",
-		timestamp = "18446744073709550000", has_page = true, has_usage = true,
-		page = 7, usage = usage, value = tostring(value) }
+		timestamp = "1844674407370955" .. string.format("%04d", sequence - 1), has_page = true, has_usage = true,
+		page = 7, usage = usage, value = tostring(value), has_cookie = true, cookie = usage }
 end
 
 local function rejects(callback, fragment)
@@ -49,6 +54,33 @@ local function rejects(callback, fragment)
 end
 
 helpers.describe("physical delivery (hs274)", function()
+	helpers.it("requires complete initial state and never admits an old opening", function()
+		local receiver, emitted = fixture()
+		receiver.open(opened())
+		rejects(function() receiver.deliver(batch({ row(1, 44, 1) })) end, "not active")
+		helpers.assert_eq(#emitted, 0)
+		helpers.assert_eq(receiver.active(), false)
+		local old = opened()
+		old.baseline = nil
+		local legacy = fixture()
+		rejects(function() legacy.open(old) end, "physical object")
+		helpers.assert_eq(legacy.active(), false)
+	end)
+
+	helpers.it("preserves held releases and credits subsequent presses without repeated values", function()
+		local receiver, emitted, contexts = fixture()
+		local frames = Frames.new("native-epoch", "18446744073709551615")
+		for _, key in ipairs(frames.page.rows) do
+			if key.kind == "key" and key.usage == 44 then key.down = true end
+		end
+		Frames.start(receiver, frames)
+		receiver.deliver(batch({ row(1, 44, 0), row(2, 44, 1), row(3, 44, 1), row(4, 44, 0), row(5, 44, 1) }))
+		helpers.assert_eq(#emitted, 2)
+		helpers.assert_eq(#contexts, 2)
+		helpers.assert_eq(contexts[1][1], row(2, 44, 1).timestamp)
+		helpers.assert_eq(contexts[2][1], row(5, 44, 1).timestamp)
+	end)
+
 	helpers.it("resolves keycodes using the exact originating device", function()
 		local devices = { "18446744073709551613", "18446744073709551614" }
 		local calls = {}
@@ -58,7 +90,7 @@ helpers.describe("physical delivery (hs274)", function()
 			if device == devices[2] then return 50 end
 			error("Unknown physical device")
 		end })
-		receiver.open(opened())
+		start(receiver)
 		receiver.deliver(batch({ row(1, 53, 1, devices[1]), row(2, 53, 1, devices[2]) }))
 		helpers.assert_eq(calls, {
 			{ usage = 53, device = devices[1] }, { usage = 53, device = devices[2] },
@@ -73,7 +105,7 @@ helpers.describe("physical delivery (hs274)", function()
 				press.action = "physical_press"
 				events.walk_system_event(press)
 			end })
-			receiver.open(opened())
+			start(receiver)
 			receiver.deliver(batch({ row(1, 41, 1), row(2, 41, 0), row(3, 44, 1), row(4, 44, 0) }))
 			events.walk_typing({ timestamp = "2026-09-12 10:00:00.000", app = "CapturedApp",
 				events = { { " ", 100, { s = false } }, { " ", 100, { s = false } } } })
@@ -86,19 +118,19 @@ helpers.describe("physical delivery (hs274)", function()
 
 	helpers.it("retains original keys and exact capture timestamps alongside auxiliary rows", function()
 		local receiver, emitted, contexts = fixture()
-		receiver.open(opened())
+		start(receiver)
 		receiver.deliver(batch({ row(1, -1, 41), row(2, 1, 0), row(3, 41, 1),
 			row(4, 41, 0), row(5, 44, 1), row(6, 44, 0) }))
 		helpers.assert_eq(#emitted, 2)
 		helpers.assert_eq({ emitted[1].keycode, emitted[2].keycode }, { 53, 49 })
 		helpers.assert_eq(emitted[1].capture, "test-capture")
 		helpers.assert_eq(emitted[1].app, "CapturedApp")
-		helpers.assert_eq(contexts[1], { "18446744073709550000", "18446744073709551614" })
+		helpers.assert_eq(contexts[1], { "18446744073709550002", "18446744073709551614" })
 	end)
 
 	helpers.it("validates a complete batch before emitting any credit", function()
 		local receiver, emitted = fixture()
-		receiver.open(opened())
+		start(receiver)
 		rejects(function() receiver.deliver(batch({ row(1, 41, 1), row(3, 44, 1) })) end, "sequence gap")
 		helpers.assert_eq(#emitted, 0)
 		helpers.assert_eq(receiver.active(), false)
@@ -107,7 +139,7 @@ helpers.describe("physical delivery (hs274)", function()
 	helpers.it("fences a replay and a stale lease without adding credits", function()
 		for _, stale in ipairs({ false, true }) do
 			local receiver, emitted = fixture()
-			receiver.open(opened())
+			start(receiver)
 			receiver.deliver(batch({ row(1, 41, 1) }))
 			local frame = batch({ row(stale and 2 or 1, 44, 1) })
 			if stale then frame.lease = "1" end
@@ -122,7 +154,7 @@ helpers.describe("physical delivery (hs274)", function()
 			calls = calls + 1
 			if calls == 2 then error("sink refused") end
 		end })
-		receiver.open(opened())
+		start(receiver)
 		local frame = batch({ row(1, 41, 1), row(2, 44, 1) })
 		rejects(function() receiver.deliver(frame) end, "sink refused")
 		rejects(function() receiver.deliver(frame) end, "not active")
@@ -131,12 +163,12 @@ helpers.describe("physical delivery (hs274)", function()
 
 	helpers.it("honors captured privacy and refuses unavailable context", function()
 		local receiver, emitted = fixture({ context = function() return { allowed = false } end })
-		receiver.open(opened())
+		start(receiver)
 		receiver.deliver(batch({ row(1, 41, 1) }))
 		helpers.assert_eq(#emitted, 0)
 		helpers.assert_eq(receiver.active(), true)
 		local missing = fixture({ context = function() return nil end })
-		missing.open(opened())
+		start(missing)
 		rejects(function() missing.deliver(batch({ row(1, 41, 1) })) end, "context is unavailable")
 	end)
 
@@ -155,7 +187,7 @@ helpers.describe("physical delivery (hs274)", function()
 			calls = calls + 1
 			receiver.stop()
 		end })
-		receiver.open(opened())
+		start(receiver)
 		rejects(function() receiver.deliver(batch({ row(1, 41, 1), row(2, 44, 1) })) end, "delivery was revoked")
 		helpers.assert_eq(calls, 1)
 		helpers.assert_eq(receiver.active(), false)
@@ -165,7 +197,7 @@ helpers.describe("physical delivery (hs274)", function()
 		local refused = fixture({ admit = function() return nil end })
 		rejects(function() refused.open(opened()) end, "coverage was not admitted")
 		local receiver, emitted = fixture()
-		receiver.open(opened())
+		start(receiver)
 		rejects(function() receiver.deliver(batch({ row(1, 41, 1), row(2, 1, 1) })) end, "keyboard error")
 		helpers.assert_eq(#emitted, 0)
 	end)

@@ -4,6 +4,7 @@
 local helpers = require("tests.helpers")
 local Delivery = require("modules.keylogger.physical_delivery")
 local Transport = require("modules.keylogger.physical_transport")
+local Frames = require("tests.support.physical_stream_frames")
 
 local function fixture(overrides)
 	local observed = { writes = {}, presses = {}, errors = {}, stops = 0, settled = 0 }
@@ -18,14 +19,17 @@ local function fixture(overrides)
 		keycode = function(usage) return ({ [41] = 53, [44] = 49 })[usage] end,
 		emit = function(press) observed.presses[#observed.presses + 1] = press end,
 	})
-	local opening = { version = 1, kind = "opened", incarnation = "fixture", lease = "1", coverage = "fixture_only" }
+	local frames = Frames.new("fixture", "1")
+	local opening = frames.opened
 	local batch = { version = 1, kind = "batch", incarnation = "fixture", lease = "1", coverage = "fixture_only",
 		records = { { sequence = "1", device = "18446744073709551614", timestamp = "18446744073709550000",
-			has_page = true, has_usage = true, page = 7, usage = 44, value = "1" } } }
+			has_page = true, has_usage = true, page = 7, usage = 44, value = "1", has_cookie = true, cookie = 44 } } }
 	local dependencies = { receiver = receiver, frame_limit = 16,
 		spawn = function(_, _, done, chunk) observed.done, observed.chunk = done, chunk; return task end,
 		decode = function(line)
 			if line == "opened" then return opening end
+			if line == "baseline" then return frames.page end
+			if line == "ready" then return frames.ready end
 			if line == "batch" then return batch end
 			return nil, "Malformed fixture JSON"
 		end,
@@ -33,7 +37,7 @@ local function fixture(overrides)
 			helpers.assert_eq(receipt.incarnation, "fixture")
 			helpers.assert_eq(receipt.lease, "1")
 			if receipt.ack == "1" then helpers.assert_eq(#observed.presses, 1) end
-			return receipt.ack
+			return receipt.baseline_ack and "B" .. receipt.baseline_ack or receipt.ack
 		end,
 		on_error = function(reason) observed.errors[#observed.errors + 1] = reason end,
 		on_settled = function() observed.settled = observed.settled + 1 end,
@@ -89,10 +93,15 @@ helpers.describe("physical transport (hs274)", function()
 		helpers.assert_true(transport.start("/fixture/capture", {}))
 		observed.chunk(nil, "ope", "diagnostic")
 		helpers.assert_eq(observed.writes, {})
-		observed.chunk(nil, "ned\nba", "")
+		observed.chunk(nil, "ned\nbase", "")
 		helpers.assert_eq(observed.writes, { "0\n" })
+		observed.chunk(nil, "line\nrea", "")
+		helpers.assert_eq(observed.writes, { "0\n", "B10\n" })
+		helpers.assert_eq(#observed.presses, 0)
+		observed.chunk(nil, "dy\nba", "")
+		helpers.assert_eq(observed.writes, { "0\n", "B10\n" })
 		observed.chunk(nil, "tch\n", "")
-		helpers.assert_eq(observed.writes, { "0\n", "1\n" })
+		helpers.assert_eq(observed.writes, { "0\n", "B10\n", "1\n" })
 		helpers.assert_eq(observed.presses[1].keycode, 49)
 		helpers.assert_eq(observed.presses[1].device, "18446744073709551614")
 		helpers.assert_eq(observed.errors, {})
@@ -102,7 +111,7 @@ helpers.describe("physical transport (hs274)", function()
 		for _, invalid in ipairs({ "bad\n", string.rep("x", 17), "batch\nbatch\n" }) do
 			local transport, observed, receiver = fixture()
 			transport.start("/fixture/capture", {})
-			observed.chunk(nil, "opened\n", "")
+			observed.chunk(nil, "opened\nbaseline\nready\n", "")
 			observed.chunk(nil, invalid, "")
 			helpers.assert_eq(#observed.errors, 1)
 			helpers.assert_eq(observed.stops, 1)
