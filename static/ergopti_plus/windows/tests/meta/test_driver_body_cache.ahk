@@ -186,6 +186,7 @@ _DFBC_ParserBorrowsSource() {
 	; A by-value parameter copies the multi-megabyte snapshot for every name,
 	; even when the index already proves that the name is absent.
 	AssertTrue(_DriverExtractFunctionBody.IsByRef(1), "body extraction must borrow its source buffer")
+	AssertTrue(_DriverExtractDefinedBody.IsByRef(1), "indexed body extraction must borrow its literal-preserving source")
 	AssertTrue(_DriverFindFunctionDefinition.IsByRef(1), "signature lookup must borrow the same source buffer")
 }
 Test("driver body cache: parser borrows immutable source (driver-body-source-reference)", _DFBC_ParserBorrowsSource)

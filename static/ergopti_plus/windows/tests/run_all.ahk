@@ -1082,6 +1082,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_driver_body_cache.ahk
 #Include meta/test_driver_block_comment_extraction.ahk
 #Include meta/test_driver_symbol_case.ahk
+#Include meta/test_driver_quoted_definitions.ahk
 #Include meta/test_error_handler_heavy_diagnostics.ahk
 #Include meta/test_ext_builder_fn_dynamic_call_swallow.ahk
 #Include meta/test_format_toml_stale_path_deadcode.ahk
