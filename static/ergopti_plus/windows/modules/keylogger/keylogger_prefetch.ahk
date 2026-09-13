@@ -591,8 +591,11 @@ KLPF_InvokeTerminal(on_terminal, status, stage := "") {
 		try {
 				on_terminal.Call(status, stage)
 				return true
-		} catch as err {
-				try LoggerError("KLReader", "Background metrics terminal callback failed (status={1}): {2}", status, err.Message)
+		} catch Any as err {
+				; AHK permits arbitrary thrown values. Contain them so the owner can
+				; retire its job and stage; never serialize an arbitrary private value.
+				Detail := err is Error ? err.Message : "non-Error exception"
+				try LoggerError("KLReader", "Background metrics terminal callback failed (status={1}): {2}", status, Detail)
 				return false
 		}
 }

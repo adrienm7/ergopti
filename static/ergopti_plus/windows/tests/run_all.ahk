@@ -761,6 +761,7 @@ global _AhkSubDir := ""
 #Include unit/test_metrics_prefetch_history_presence.ahk
 #Include unit/test_metrics_historical_json.ahk
 #Include unit/test_metrics_history_seed.ahk
+#Include unit/test_metrics_terminal_exception_cleanup.ahk
 #Include unit/test_metrics_seed_header.ahk
 #Include unit/test_metrics_manifest_json.ahk
 #Include unit/test_metrics_delta_lifecycle.ahk
