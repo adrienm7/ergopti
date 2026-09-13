@@ -612,7 +612,7 @@ KLWV_OnRangeBuildTerminal(which, Epoch, request_id, status, stage := "") {
 				return KLWV_SendRangeTerminal(which, Epoch, request_id, "failed")
 		; Native execution is observed without waiting: WebView performs the file read,
 		; JSON parse and range render in its own process, not on the keyboard thread.
-		url := "file:///" . StrReplace(stage, "\", "/")
+		url := FilePathToUrl(stage)
 		js := "fetch(" . KL_JsonEncode(url) . ").then(r=>r.json()).then(p=>window.receive_range_data(p," . request_id
 				. ")).catch(()=>window.complete_range_request(" . request_id . ",'failed'));"
 		entry := KLWV.windows[which]
