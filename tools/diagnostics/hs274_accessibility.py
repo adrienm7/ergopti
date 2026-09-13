@@ -24,20 +24,9 @@ tell application "System Events"
                 if labelText is "Driver Extensions" then set panelVerified to true
                 if labelText is "org.pqrs.Karabiner-DriverKit-VirtualHIDDevice" then set providerVerified to true
             else if role of node is "AXButton" then
-                log (get properties of node)
-                log (get name of every attribute of node)
-                set doneVerified to false
-                if description of node is "Done" then set doneVerified to true
-                repeat with labelAttribute in {"AXTitle", "AXDescription"}
-                    if exists attribute (contents of labelAttribute) of node then
-                        set buttonLabel to value of attribute (contents of labelAttribute) of node
-                        if buttonLabel is not missing value then
-                            log "HS274 sheet button " & (contents of labelAttribute) & ": " & (buttonLabel as text)
-                            if buttonLabel is "Done" then set doneVerified to true
-                        end if
-                    end if
-                end repeat
-                if doneVerified then set end of doneButtons to contents of node
+                -- Native macOS exposes no label for this sheet's sole Done button.
+                -- Exact sheet identity and role uniqueness scope the action.
+                set end of doneButtons to contents of node
             end if
         end repeat
         if not providerVerified or not panelVerified or (count doneButtons) is not 1 then error "Existing settings sheet is not the owned provider panel: provider=" & providerVerified & ", heading=" & panelVerified & ", Done=" & (count doneButtons)
