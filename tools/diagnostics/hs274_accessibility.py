@@ -2,6 +2,8 @@
 """Use the runner's ordinary settings UI to approve its owned Hammerspoon app."""
 import subprocess
 
+from hs274_accessibility_auth import authenticate_accessibility
+
 
 PREPARE_SCRIPT = '''
 log "HS274 settings preparation started"
@@ -156,6 +158,11 @@ def approve_accessibility(report):
                 "exit": result.returncode, "stdout": result.stdout, "stderr": result.stderr}
             state["stage"] = "add_application"
             result = subprocess.run(["/usr/bin/osascript", "-e", ADD_SCRIPT], capture_output=True, text=True, timeout=10)
+            if result.returncode == 0 and result.stdout.strip() == "addition_sheet_observed":
+                report["hammerspoon_accessibility_addition"] = {
+                    "exit": result.returncode, "stdout": result.stdout, "stderr": result.stderr}
+                state["stage"] = "authenticate"
+                authenticate_accessibility(report)
     except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as error:
         state.update(exit=getattr(error, "returncode", None), timed_out=isinstance(error, subprocess.TimeoutExpired))
         for name in ("stdout", "stderr"):
