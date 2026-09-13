@@ -186,13 +186,21 @@ _USTX_WriteBatchFixture(Path, MarkerPath, Label, ExitAfterReady := false) {
 	return Script
 }
 
-_USTX_WriteParentGate(Path, ExitFlag) {
-	Script := '@echo off' . "`r`n"
-		. ':wait' . "`r`n"
-		. 'if exist "' . ExitFlag . '" exit /b 0' . "`r`n"
-		. 'ping -n 2 127.0.0.1 >nul' . "`r`n"
-		. 'goto wait' . "`r`n"
-	FileAppend(Script, Path, "UTF-8-RAW")
+_USTX_StartParentGate(TestId, &ParentPid) {
+	Name := "Local\ErgoptiUpdaterFixtureParentExit_" . TestId
+	Handle := DllCall("CreateEventW", "Ptr", 0, "Int", true, "Int", false, "Str", Name, "Ptr")
+	if !Handle
+		throw OSError()
+	try {
+		if A_LastError = 183
+			throw Error("Updater parent fixture event already exists.")
+		Run('"' . A_AhkPath . '" /ErrorStdOut "' . A_ScriptDir
+			. '\support\updater_parent_gate.ahk" "' . Name . '"', , "Hide", &ParentPid)
+		return Handle
+	} catch {
+		DllCall("CloseHandle", "Ptr", Handle, "Int")
+		throw
+	}
 }
 
 _USTX_RunSwapCase(NewExists, CurrentStartsAsBak := false, ExitAfterReady := false, BeforeCleanup := 0) {
@@ -206,8 +214,7 @@ _USTX_RunSwapCase(NewExists, CurrentStartsAsBak := false, ExitAfterReady := fals
 	NewExe := TestDir . "\new.cmd"
 	BakExe := CurrentExe . ".bak"
 	SwapScriptPath := TestDir . "\swap.ps1"
-	ParentGatePath := TestDir . "\parent_gate.cmd"
-	ParentExitFlag := TestDir . "\parent_exit.flag"
+	ParentExitHandle := 0
 	OldMarker := TestDir . "\old.marker"
 	NewMarker := TestDir . "\new.marker"
 	Owner := 0
@@ -222,10 +229,9 @@ _USTX_RunSwapCase(NewExists, CurrentStartsAsBak := false, ExitAfterReady := fals
 			FileMove(CurrentExe, BakExe)
 		if NewExists
 			_USTX_WriteBatchFixture(NewExe, NewMarker, "NEW", ExitAfterReady)
-		_USTX_WriteParentGate(ParentGatePath, ParentExitFlag)
 		FileAppend(_Updater_BuildSwapWorkerScript(), SwapScriptPath, "UTF-8-RAW")
 
-		Run(A_ComSpec . ' /d /c "' . ParentGatePath . '"', , "Hide", &ParentPid)
+		ParentExitHandle := _USTX_StartParentGate(TestId, &ParentPid)
 		Assert(ParentPid > 0 and ProcessExist(ParentPid),
 			"positive control: the exact parent-gate process must be alive")
 		; Keep a non-inheritable exact handle for failure cleanup. A PID can be
@@ -288,7 +294,8 @@ _USTX_RunSwapCase(NewExists, CurrentStartsAsBak := false, ExitAfterReady := fals
 		} else
 			AssertContains(FileRead(CurrentExe, "UTF-8-RAW"), "OLD",
 				"FinalExit must not mutate files while the exact parent HANDLE is alive")
-		FileAppend("exit", ParentExitFlag, "UTF-8-RAW")
+		AssertEqual(0, _Updater_WaitHandleState(ParentCleanupHandle), "the parent must remain alive until signaled")
+		Assert(DllCall("SetEvent", "Ptr", ParentExitHandle, "Int"), "the parent exit must be authorized")
 		Assert(_USTX_WaitForProcessExit(Owner),
 			"the real swap worker must finish after the exact parent exits")
 		ExitCode := _USTX_GetExitCode(Owner)
@@ -334,6 +341,8 @@ _USTX_RunSwapCase(NewExists, CurrentStartsAsBak := false, ExitAfterReady := fals
 					"UInt", 1, "Int")
 			_Updater_CloseNativeSwapHandle(ParentCleanupHandle)
 		}
+		if ParentExitHandle
+			Assert(DllCall("CloseHandle", "Ptr", ParentExitHandle, "Int"))
 		if TrackerJob {
 			if _USTX_CloseFixtureTree(TrackerJob, Failure)
 				_USTX_DeleteFixtureAfterCase(TestDir, Failure)
