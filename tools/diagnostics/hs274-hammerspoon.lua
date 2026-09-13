@@ -215,12 +215,15 @@ local requested, request_error = xpcall(function()
 	if hs.accessibilityState() then initialize_checked(); return end
 	assert(hs.json.write({ requested = true }, config.permission_request, true, true), "Cannot publish permission request")
 	hs.accessibilityState(true)
-	local deadline = hs.timer.absoluteTime() + 30000000000
+	local deadline
 	owner.permission_pending = true
 	owner.permission = assert(hs.timer.doEvery(0.1, function()
 		if not owner.permission_pending then return end
 		local ok, err = xpcall(function()
 			assert(not hs.fs.attributes(config.stop), "Stopped while awaiting native accessibility permission")
+			-- The supervisor owns bounded UI approval and signals completion before capture.
+			if not hs.fs.attributes(config.permission_ready) then return end
+			deadline = deadline or hs.timer.absoluteTime() + 2000000000
 			if hs.accessibilityState() then
 				owner.permission_pending = false
 				assert(owner.permission:stop() ~= false, "Native permission timer did not stop")
