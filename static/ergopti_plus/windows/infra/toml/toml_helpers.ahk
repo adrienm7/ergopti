@@ -634,9 +634,8 @@ TOML_Write(Value, Path, Section, Key) {
 ; publishing their candidate globals, so a nested full save would serialize
 ; the stale live state back over the just-committed values.
 ; Delete scratch files left next to Path by a hard kill. Per-invocation names
-; no longer overwrite each other, so nothing self-cleans any more; the age
-; threshold is what keeps this a tidy-up rather than a new race — an
-; unconditional sweep would delete a concurrent writer's live staging file.
+; no longer overwrite each other. Require both age and a recognized dead owner;
+; a slow active writer or an unrelated temporary file must never be targeted.
 _TOML_ReapStaleTemps(Path, MaxAgeMs) {
 		SplitPath(Path, &Name, &Dir)
 		if (Dir = "" or Name = "")
@@ -644,6 +643,7 @@ _TOML_ReapStaleTemps(Path, MaxAgeMs) {
 		try {
 				Loop Files, Dir . "\" . Name . ".*.tmp" {
 						if (DateDiff(A_Now, A_LoopFileTimeModified, "Seconds") * 1000 >= MaxAgeMs)
+								&& FSAtomicTempOwnerIsGone(A_LoopFileName, Name)
 								try FileDelete(A_LoopFileFullPath)
 				}
 		}
@@ -845,7 +845,7 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 		; and from timer-driven saves, so the two really can overlap. A_ScriptHwnd
 		; rather than a GetCurrentProcessId DllCall: unique per process all the
 		; same, and it keeps the OS-call purity ratchet at its baseline.
-		static STALE_TEMP_MS := 60000  ; Older than this, a scratch file is debris from a hard kill
+		static STALE_TEMP_MS := 60000  ; Minimum age; the reaper also checks producer ownership
 		static WriteSeq := 0
 		WriteSeq += 1
 		tmp := Path . "." . A_ScriptHwnd . "-" . WriteSeq . ".tmp"
