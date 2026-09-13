@@ -385,8 +385,12 @@ before treating a scripting error as a permission denial or a click as approval.
 
 ### project-hs-sampled-element-state-boundary
 
-`hs274-key-state.hpp` is a portable per-device/cookie state primitive, not an
-active producer hook or a physical-credit counter. Its ordered-clock contract
+`hs274-key-state.hpp` is a per-device/cookie state primitive, not a physical-credit
+counter. The experimental source initializes it from the typed native inventory
+and updates it before global readiness and lease-storage checks. Otherwise a
+press during preparation would leave the eventual initial state stale. The
+source still publishes unchanged raw observations rather than treating an
+element-state result as an instruction to delete them. Its ordered-clock contract
 rejects backwards or equal-time conflicting events and events newer than the
 reported sampled state but no later than the query start. A transition during
 the query interval can follow the actual read; do not suppress it merely because
@@ -394,6 +398,13 @@ it precedes query completion. The native queue cutover and lease boundary still
 need independent ownership and validation before runtime integration. Reuse
 `hs274-key-state-test.cpp` and the two native cookie fixtures for that work;
 do not infer aliases or merge distinct cookies solely from a shared usage.
+
+Selected native monitors include consumer-only interfaces. Carry the explicit
+keyboard property through attachment; require a qualified nonempty inventory for
+keyboards and successful empty keyboard enumeration for consumer-only interfaces.
+Unexpected keyboard input on the latter invalidates capture instead of inventing
+unobserved initial state. Monitor readiness and `key_down` do not constitute an
+atomic kernel snapshot or an initial-state handoff to the consumer.
 
 ### project-hs-native-remapping-fixture-boundary
 

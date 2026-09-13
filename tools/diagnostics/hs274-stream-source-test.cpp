@@ -11,6 +11,13 @@
 using hs274_stream_protocol::json;
 using source = hs274_stream_protocol::source<4, 2, 2>;
 
+bool start(source::monitor& monitor) {
+  const source::sample samples[] = {
+      {41, 41, {true, false, true, 1, 32, 0, 1}, 0, true, 41, 0, 0, 0, 0},
+      {44, 44, {true, false, true, 1, 32, 0, 1}, 0, true, 44, 0, 0, 0, 0}};
+  return monitor.started(samples, 2, true, false);
+}
+
 void require(bool condition) {
   if (!condition) throw std::runtime_error("Source assertion failed");
 }
@@ -71,10 +78,10 @@ void readiness_cases() {
   rejects([&] { owner.request(0, status); });
   rejects([&] { owner.request(7, {{"version", true}, {"action", "status"}}); });
   rejects([&] { owner.request(7, {{"version", 1u}, {"action", "status"}, {"extra", true}}); });
-  auto monitor = owner.attach(41);
+  auto monitor = owner.attach(41, true);
   auto pending = owner.request(7, status);
   require(!pending.at("ready").get<bool>());
-  monitor.started();
+  start(monitor);
   auto ready = owner.request(7, status);
   require(ready.at("ready").get<bool>());
   auto opened = owner.request(7, opening);
@@ -128,7 +135,7 @@ void readiness_cases() {
 
 void observation_policy_cases() {
   source owner("policy");
-  auto monitor = owner.attach(41);
+  auto monitor = owner.attach(41, true);
   require(!owner.observes(41, false, false));
   auto opening = prepare(owner);
   // Pending monitors must be eligible before readiness can ever become true.
@@ -142,7 +149,7 @@ void observation_policy_cases() {
   }
   owner.peer_closed(8);
   require(owner.observes(41, false, false));
-  monitor.started();
+  start(monitor);
   auto opened = owner.request(7, opening);
   require(owner.observes(41, false, false));
   auto close = pull_request(opened);
@@ -155,7 +162,7 @@ void observation_policy_cases() {
   require(owner.observes(41, false, false));
   monitor.retire();
   require(!owner.observes(41, false, false));
-  auto replacement = owner.attach(41);
+  auto replacement = owner.attach(41, true);
   require(owner.observes(41, false, false));
   auto cancel = opening;
   cancel["action"] = "cancel";
@@ -165,8 +172,8 @@ void observation_policy_cases() {
   owner.peer_closed(7);
   require(!owner.observes(41, false, false));
   prepare(owner);
-  auto second = owner.attach(42);
-  rejects([&] { owner.attach(43); });
+  auto second = owner.attach(42, true);
+  rejects([&] { owner.attach(43, true); });
   require(!owner.observes(41, false, false));
   require(!owner.observes(42, false, false));
 }
@@ -176,8 +183,8 @@ void preparation_cases() {
   const json status{{"version", 1u}, {"action", "status"}};
   owner.request(7, status);
   require(!owner.observing());
-  auto monitor = owner.attach(41);
-  monitor.started();
+  auto monitor = owner.attach(41, true);
+  start(monitor);
   rejects([&] { owner.request(7, {{"version", 1u}, {"action", "open"}}); });
   rejects([&] { owner.request(0, {{"version", 1u}, {"action", "prepare"}}); });
   rejects([&] { owner.request(7, {{"version", true}, {"action", "prepare"}}); });
@@ -190,10 +197,10 @@ void preparation_cases() {
   rejects([&] { owner.request(8, opening); });
   owner.peer_closed(8);
   require(owner.observing());
-  monitor.append({41, 1, 1, true, true, 7, 41});
+  monitor.append({41, 1, 1, true, true, 7, 41, 0, true, 41});
   auto opened = owner.request(7, opening);
   require(owner.request(7, pull_request(opened)).at("records").empty());
-  monitor.append({41, 2, 1, true, true, 7, 41});
+  monitor.append({41, 2, 1, true, true, 7, 41, 0, true, 41});
   auto cancel = opening;
   cancel["action"] = "cancel";
   auto wrong = cancel;
@@ -224,14 +231,14 @@ void preparation_cases() {
 
 void reference_routing_cases() {
   source owner("reference-routing");
-  auto first = owner.attach(41);
-  auto second = owner.attach(42);
-  first.started();
-  second.started();
+  auto first = owner.attach(41, true);
+  auto second = owner.attach(42, true);
+  start(first);
+  start(second);
   auto opened = owner.request(7, prepare(owner));
   hs274_raw_capture::capture<1> reference;
-  hs274_stream_protocol::append_input(second, reference, false, {42, 1, 1, true, true, 7, 44});
-  hs274_stream_protocol::append_input(first, reference, true, {41, 2, 1, true, true, 7, 41});
+  hs274_stream_protocol::append_input(second, reference, false, {42, 1, 1, true, true, 7, 44, 0, true, 44});
+  hs274_stream_protocol::append_input(first, reference, true, {41, 2, 1, true, true, 7, 41, 0, true, 41});
   auto records = owner.request(7, pull_request(opened)).at("records");
   require(records.size() == 2 && records[0].at("device") == "42" && records[1].at("device") == "41");
   require(records[0].at("sequence") == "1" && records[1].at("sequence") == "2");
@@ -240,7 +247,56 @@ void reference_routing_cases() {
   require(captured.records[0].device == 41 && captured.records[0].timestamp == 2 && captured.records[0].sequence == 1);
 }
 
+void sampled_state_cases() {
+  source owner("sampled-state");
+  auto first = owner.attach(41, true);
+  auto second = owner.attach(42, true);
+  const source::sample held{44, 44, {true, false, true, 1, 32, 0, 1}, 0, true, 44, 1, 0, 0, 0};
+  require(first.started(&held, 1, true, false));
+  require(first.key_down(44));
+  first.append({41, 1, 0, true, true, 7, 44, 0, true, 44});
+  require(!first.key_down(44));
+  first.append({41, 2, 1, true, true, 7, 44, 0, true, 44});
+  require(first.key_down(44));
+  require(start(second));
+  auto opened = owner.request(7, prepare(owner));
+  require(owner.request(7, pull_request(opened)).at("records").empty());
+  // State classification must not remove unchanged raw observations.
+  first.append({41, 3, 1, true, true, 7, 44, 0, true, 44});
+  first.append({41, 4, 0, true, true, 7, 44, 0, true, 44});
+  require(owner.request(7, pull_request(opened)).at("records").size() == 2);
+  owner.peer_closed(7);
+  first.append({41, 5, 1, true, true, 7, 44, 0, true, 44});
+  require(first.key_down(44));
+  opened = owner.request(7, prepare(owner));
+  require(owner.request(7, pull_request(opened)).at("records").empty());
+  first.append({41, 6, 0, true, true, 7, 44});
+  require(owner.request(7, pull_request(opened)).at("reason") == "interrupted");
+  rejects([&] { first.key_down(44); });
+  require(start(first));
+  require(!first.key_down(44));
+  require(owner.request(7, pull_request(opened)).at("reason") == "interrupted");
+
+  source mixed("consumer-state");
+  auto keyboard = mixed.attach(41, true);
+  auto consumer = mixed.attach(42, false);
+  require(!keyboard.started(nullptr, 0, true, false));
+  require(start(keyboard));
+  require(!consumer.started(nullptr, 0, false, false));
+  require(!consumer.started(nullptr, 0, true, true));
+  require(!consumer.started(&held, 1, true, false));
+  require(consumer.started(nullptr, 0, true, false));
+  rejects([&] { consumer.key_down(44); });
+  opened = mixed.request(7, prepare(mixed));
+  consumer.append({42, 1, 1, true, true, 12, 205, 0, true, 1});
+  const auto records = mixed.request(7, pull_request(opened)).at("records");
+  require(records.size() == 1 && records.at(0).at("page") == 12);
+  consumer.append({42, 2, 1, true, true, 7, 44, 0, true, 44});
+  require(mixed.request(7, pull_request(opened)).at("reason") == "interrupted");
+}
+
 int main() {
+  sampled_state_cases();
   reference_routing_cases();
   observation_policy_cases();
   preparation_cases();
@@ -248,19 +304,19 @@ int main() {
   source owner("first");
   auto opening = prepare(owner);
   rejects([&] { owner.request(7, opening); });
-  rejects([&] { owner.attach(0); });
-  auto first = owner.attach(41);
-  rejects([&] { owner.attach(41); });
+  rejects([&] { owner.attach(0, true); });
+  auto first = owner.attach(41, true);
+  rejects([&] { owner.attach(41, true); });
   rejects([&] { owner.request(7, opening); });
-  first.started();
-  rejects([&] { first.started(); });
-  auto second = owner.attach(44);
+  start(first);
+  rejects([&] { start(first); });
+  auto second = owner.attach(44, true);
   rejects([&] { owner.request(7, opening); });
-  second.started();
+  start(second);
   auto opened = owner.request(7, opening);
   auto pull = pull_request(opened);
-  first.append({41, 1, 1, true, true, 7, 41});
-  second.append({44, 2, 1, true, true, 7, 44});
+  first.append({41, 1, 1, true, true, 7, 41, 0, true, 41});
+  second.append({44, 2, 1, true, true, 7, 44, 0, true, 44});
   auto pending = owner.request(7, pull);
   require(pending.at("records").size() == 2);
   second.stopped();
@@ -269,29 +325,29 @@ int main() {
   owner.peer_closed(7);
   opening = prepare(owner);
   rejects([&] { owner.request(7, opening); });
-  second.started();
+  start(second);
   auto successor = owner.request(7, opening);
   rejects([&] { owner.request(7, pull); });
   pull = pull_request(successor);
   require(owner.request(7, pull).at("records").empty());
-  first.append({44, 3, 1, true, true, 7, 44});
+  first.append({44, 3, 1, true, true, 7, 44, 0, true, 44});
   require(owner.request(7, pull).at("reason") == "interrupted");
   owner.peer_closed(7);
   opening = prepare(owner);
   rejects([&] { owner.request(7, opening); });
-  first.started();
+  start(first);
   successor = owner.request(7, opening);
   pull = pull_request(successor);
   second.retire();
-  second.started();
-  second.append({44, 4, 1, true, true, 7, 44});
+  start(second);
+  second.append({44, 4, 1, true, true, 7, 44, 0, true, 44});
   require(owner.request(7, pull).at("reason") == "interrupted");
   owner.peer_closed(7);
   opening = prepare(owner);
   {
-    auto replacement = owner.attach(44);
+    auto replacement = owner.attach(44, true);
     rejects([&] { owner.request(7, opening); });
-    replacement.started();
+    start(replacement);
     opened = owner.request(7, opening);
     pull = pull_request(opened);
     second.stopped();
@@ -300,11 +356,11 @@ int main() {
   require(owner.request(7, pull).at("reason") == "interrupted");
   owner.peer_closed(7);
   opening = prepare(owner);
-  auto extra = owner.attach(45);
-  extra.started();
+  auto extra = owner.attach(45, true);
+  start(extra);
   opened = owner.request(7, opening);
   pull = pull_request(opened);
-  rejects([&] { owner.attach(46); });
+  rejects([&] { owner.attach(46, true); });
   require(owner.request(7, pull).at("reason") == "interrupted");
   owner.peer_closed(7);
   opening = prepare(owner);
@@ -314,21 +370,21 @@ int main() {
   std::optional<source::monitor> old;
   {
     source previous("previous");
-    old.emplace(previous.attach(41));
-    old->started();
+    old.emplace(previous.attach(41, true));
+    start(*old);
     previous.request(7, prepare(previous));
   }
   source next("next");
-  auto current = next.attach(41);
-  current.started();
+  auto current = next.attach(41, true);
+  start(current);
   opened = next.request(7, prepare(next));
   pull = pull_request(opened);
   old->stopped();
-  old->started();
-  old->append({41, 5, 1, true, true, 7, 41});
+  start(*old);
+  old->append({41, 5, 1, true, true, 7, 41, 0, true, 41});
   old.reset();
   require(next.request(7, pull).at("records").empty());
-  current.append({41, 6, 1, true, true, 7, 41});
+  current.append({41, 6, 1, true, true, 7, 41, 0, true, 41});
   require(next.request(7, pull).at("records").size() == 1);
   std::puts("Source readiness, multi-device interruption, bounded inventory and stale callbacks passed");
 }

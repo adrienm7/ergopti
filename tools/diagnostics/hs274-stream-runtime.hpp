@@ -30,9 +30,9 @@ public:
     return active_->source_.observes(device, needs_seize, temporarily_ignored);
   }
 
-  static monitor attach(std::uint64_t device) {
+  static monitor attach(std::uint64_t device, bool keyboard) {
     if (!active_) throw std::logic_error("Capture monitor has no receiver owner");
-    return active_->source_.attach(device);
+    return active_->source_.attach(device, keyboard);
   }
 
   static void append(monitor& owner, bool is_reference, const value& input) noexcept {

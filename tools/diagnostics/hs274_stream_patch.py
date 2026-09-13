@@ -89,15 +89,20 @@ def stream_monitor(source):
     source = replace_once(source, "        last_time_stamp_(0) {", """        hs274_stream_selected_(!device_properties.get_device_identifiers().get_is_virtual_device() &&
                                (device_properties.get_device_identifiers().get_is_keyboard() ||
                                 device_properties.get_device_identifiers().get_is_consumer())),
-        hs274_monitor_(hs274_stream_selected_ ? hs274_stream_protocol::runtime::attach(hs274_probe_device_id_)
+        hs274_monitor_(hs274_stream_selected_ ? hs274_stream_protocol::runtime::attach(
+                                             hs274_probe_device_id_, device_properties.get_device_identifiers().get_is_keyboard())
                                          : hs274_stream_protocol::runtime::monitor{}),
         last_time_stamp_(0) {""")
     source = replace_once(source, "device_events_monitor_->started.connect([this] {",
                           "device_events_monitor_->started.connect([this, device] {")
     source = replace_once(source, "      started();",
-                          "      if (hs274_stream_selected_) hs274_baseline_probe::capture_inventory(device, hs274_probe_device_id_);\n"
+                          "      if (hs274_stream_selected_) {\n"
+                          "        const auto inventory = hs274_baseline_probe::capture_inventory(device, hs274_probe_device_id_);\n"
+                          "        hs274_monitor_.started(inventory.samples.data(), inventory.samples.size(),\n"
+                          "                               inventory.enumerated, inventory.exhausted);\n"
+                          "      }\n"
                           "      if (hs274_probe_owned_) hs274_baseline_probe::capture(device, hs274_probe_device_id_);\n"
-                          "      hs274_monitor_.started();\n      started();")
+                          "      started();")
     source = replace_once(source, "      stopped();", "      hs274_monitor_.stopped();\n      stopped();")
     source = replace_once(source, "      error_occurred(message, result);",
                           "      hs274_monitor_.stopped();\n      error_occurred(message, result);")

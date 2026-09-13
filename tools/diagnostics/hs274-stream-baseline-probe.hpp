@@ -10,6 +10,7 @@
 #include <cstdio>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace hs274_baseline_probe {
 using json = nlohmann::json;
@@ -36,10 +37,18 @@ inline json read(IOHIDDeviceRef device, IOHIDElementRef element, std::uint32_t o
   return result;
 }
 
-inline void capture_inventory(IOHIDDeviceRef device, std::uint64_t identity) {
+using inventory_type = hs274_stream_protocol::key_inventory<hs274_stream_protocol::keyboard_inventory_capacity>;
+struct inventory_observation {
+  std::vector<inventory_type::sample> samples;
+  bool enumerated = false, exhausted = false;
+};
+
+inline inventory_observation capture_inventory(IOHIDDeviceRef device, std::uint64_t identity) {
   // Preserve every element cookie, including separate scalar/array modifiers.
   // Duplicate cookies and exhaustion revoke readability, never truncate it.
-  hs274_stream_protocol::key_inventory<hs274_stream_protocol::keyboard_inventory_capacity> inventory;
+  inventory_type inventory;
+  inventory_observation observation;
+  observation.samples.reserve(hs274_stream_protocol::keyboard_inventory_capacity);
   elements_owner elements{IOHIDDeviceCopyMatchingElements(device, nullptr, kIOHIDOptionsTypeNone)};
   json result{{"version", 2u}, {"device", std::to_string(identity)}, {"coverage", "fixture_only"},
               {"capacity", hs274_stream_protocol::keyboard_inventory_capacity},
@@ -59,11 +68,13 @@ inline void capture_inventory(IOHIDDeviceRef device, std::uint64_t identity) {
           IOHIDElementGetLogicalMin(element), IOHIDElementGetLogicalMax(element)};
       const auto sample = read(device, element, kIOHIDDeviceGetValueWithoutUpdate);
       const bool valid = sample.at("status") == 0 && sample.at("returned_value") == true;
-      inventory.append({usage, cookie, descriptor, sample.at("status").get<std::int32_t>(),
+      const inventory_type::sample initial{usage, cookie, descriptor, sample.at("status").get<std::int32_t>(),
           sample.at("returned_value").get<bool>(), valid ? sample.at("value_cookie").get<std::uint32_t>() : 0,
           valid ? std::stoll(sample.at("value").get<std::string>()) : 0,
           valid ? std::stoull(sample.at("timestamp").get<std::string>()) : 0,
-          std::stoull(sample.at("started").get<std::string>()), std::stoull(sample.at("finished").get<std::string>())});
+          std::stoull(sample.at("started").get<std::string>()), std::stoull(sample.at("finished").get<std::string>())};
+      inventory.append(initial);
+      observation.samples.push_back(initial);
       result["elements"].push_back({{"usage", usage}, {"cookie", cookie}, {"sample", sample},
           {"relative", descriptor.relative}, {"array", descriptor.array}, {"bits", descriptor.bits},
           {"count", descriptor.count}, {"minimum", descriptor.minimum}, {"maximum", descriptor.maximum}});
@@ -74,6 +85,9 @@ inline void capture_inventory(IOHIDDeviceRef device, std::uint64_t identity) {
   if (std::fprintf(stderr, "HS274_KEY_INVENTORY %s\n", encoded.c_str()) < 0 || std::fflush(stderr) != 0) {
     throw std::runtime_error("Could not retain the native keyboard inventory receipt");
   }
+  observation.enumerated = result.at("enumerated").get<bool>();
+  observation.exhausted = result.at("exhausted").get<bool>();
+  return observation;
 }
 
 inline void capture(IOHIDDeviceRef device, std::uint64_t identity) {
