@@ -786,7 +786,7 @@ KLPF_WorkerMain() {
 						if !(apps is Array)
 								KLPF_WorkerRefuse("range mode received a non-array app filter")
 						db := KLR_BuildDatabase(metrics_dir)
-						if !db || !KLPF_WriteAtomic(stage, KL_JsonEncode(KLR_ReadRangeSplitToday(db, A_Args[flag + 12], A_Args[flag + 13], apps)))
+						if !db || !KLPF_WriteAtomic(stage, KLR_BuildRangeSplitTodayJson(db, A_Args[flag + 12], A_Args[flag + 13], apps))
 								KLPF_WorkerFail(stage, phase)
 				} else {
 						phase := "projection"
