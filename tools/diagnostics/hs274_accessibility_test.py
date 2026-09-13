@@ -9,6 +9,18 @@ from hs274_accessibility import approve_accessibility
 
 
 class ApprovalTests(unittest.TestCase):
+    def test_waits_for_added_row_but_does_not_repeat_authentication(self):
+        report = {}
+        responses = [SimpleNamespace(returncode=0, stdout=value, stderr="UI detail") for value in (
+            "no_sheet", "", "missing_application", "addition_sheet_observed", "missing_application", "enabled")]
+        with patch("hs274_accessibility.authenticate_accessibility") as authenticate, \
+                patch("hs274_accessibility.select_application") as select, \
+                patch("hs274_accessibility.subprocess.run", side_effect=responses):
+            approve_accessibility(report, "owned/Hammerspoon.app")
+        authenticate.assert_called_once()
+        select.assert_called_once_with("owned/Hammerspoon.app", report)
+        self.assertEqual(report["hammerspoon_accessibility"]["stdout"], "enabled")
+
     def test_opening_addition_sheet_does_not_claim_permission(self):
         report = {}
         with patch("hs274_accessibility.authenticate_accessibility"), \
@@ -17,12 +29,15 @@ class ApprovalTests(unittest.TestCase):
                 SimpleNamespace(returncode=0),
                 SimpleNamespace(returncode=0, stdout="missing_application", stderr="application list"),
                 SimpleNamespace(returncode=0, stdout="addition_sheet_observed", stderr="sheet controls"),
+                SimpleNamespace(returncode=0, stdout="missing_application", stderr="still absent"),
+                SimpleNamespace(returncode=0, stdout="missing_application", stderr="still absent"),
                 SimpleNamespace(returncode=0, stdout="missing_application", stderr="still absent")]):
             with self.assertRaisesRegex(RuntimeError, "not confirmed"):
                 approve_accessibility(report, "owned/Hammerspoon.app")
         self.assertEqual(report["hammerspoon_accessibility"]["stage"], "verify_permission")
         self.assertEqual(report["hammerspoon_accessibility"]["stderr"], "still absent")
         self.assertEqual(report["hammerspoon_accessibility_listing"]["stderr"], "application list")
+        self.assertEqual(len(report["hammerspoon_accessibility_admission"]), 3)
 
     def test_unrecognized_sheet_prevents_navigation_and_permission_changes(self):
         report = {}
