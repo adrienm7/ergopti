@@ -295,7 +295,12 @@ _DriverFuncBody(Name) {
 ; Mask only block comments, preserving offsets, line boundaries and literals.
 ; Native regex skips complete strings/line comments before considering an opener.
 _DriverMaskBlockComments(&Src) {
-	if !InStr(Src, "/*")
+	return _DriverMaskNonCode(&Src, true)
+}
+
+; Code-only consumers also exclude quoted data and single-line comments.
+_DriverMaskNonCode(&Src, BlockCommentsOnly := false) {
+	if BlockCommentsOnly && !InStr(Src, "/*")
 		return Src
 	Quote := Chr(34)
 	Pattern := "'(?:``[\s\S]|[^'``])*'|" . Quote
@@ -306,10 +311,12 @@ _DriverMaskBlockComments(&Src) {
 	Out := ""
 	while RegExMatch(Src, Pattern, &Token, Position) {
 		Position := Token.Pos + Token.Len
-		if LTrim(Token[0], " `t") != "/*"
+		if LTrim(Token[0], " `t") == "/*" {
+			EndPos := RegExMatch(Src, "m)(?:^[ `t]*\*/|\*/[ `t]*`r?$)", &Closing, Position)
+			Position := EndPos ? EndPos + Closing.Len : StrLen(Src) + 1
+		} else if BlockCommentsOnly {
 			continue
-		EndPos := RegExMatch(Src, "m)(?:^[ `t]*\*/|\*/[ `t]*`r?$)", &Closing, Position)
-		Position := EndPos ? EndPos + Closing.Len : StrLen(Src) + 1
+		}
 		Out .= SubStr(Src, CopiedThrough, Token.Pos - CopiedThrough)
 		Out .= RegExReplace(SubStr(Src, Token.Pos, Position - Token.Pos), "[^`r`n]", " ")
 		CopiedThrough := Position
