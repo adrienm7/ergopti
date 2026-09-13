@@ -762,6 +762,7 @@ global _AhkSubDir := ""
 #Include unit/test_metrics_delivery_midnight.ahk
 #Include unit/test_metrics_prefetch_orphans.ahk
 #Include unit/test_klr_cache_failed_refresh.ahk
+#Include unit/test_klr_category_order.ahk
 #Include unit/test_sqlite_query_failure.ahk
 #Include unit/test_keylogger_reader_encrypted_rebuild.ahk
 #Include unit/test_keylogger_app_category_projection.ahk
