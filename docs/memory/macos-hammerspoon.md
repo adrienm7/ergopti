@@ -385,6 +385,14 @@ before treating a scripting error as a permission denial or a click as approval.
 
 ### project-hs-native-remapping-fixture-boundary
 
+Native HID inventories identify elements by cookie within a device, not by
+usage alone. The signed provider exposes the same modifier usages as scalar
+bits and array leaves with distinct cookies; both observations must remain
+available. A usage-range bound also truncated this descriptor. Keep diagnostic
+capacity explicit and distinguish per-element readability from atomic held state
+or physical-press ownership. Exact samples are retained in the
+[inventory refusal](../audits/hammerspoon/2026_09_09/hs274-inventory-refusal.json).
+
 For initial held-key acquisition, replay
 `tools/diagnostics/fixtures/hs274-native-held-baseline.json` through
 `BaselineTests.test_retained_native_kernel_baseline_preserves_inherited_and_fresh_space`

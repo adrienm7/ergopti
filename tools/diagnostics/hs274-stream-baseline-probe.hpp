@@ -37,11 +37,12 @@ inline json read(IOHIDDeviceRef device, IOHIDElementRef element, std::uint32_t o
 }
 
 inline void capture_inventory(IOHIDDeviceRef device, std::uint64_t identity) {
-  // One entry per keyboard usage, including inactive HID error indicators.
-  // Repeated usages/cookies and exhaustion revoke readability, never truncate it.
-  hs274_stream_protocol::key_inventory<256> inventory;
+  // Preserve every element cookie, including separate scalar/array modifiers.
+  // Duplicate cookies and exhaustion revoke readability, never truncate it.
+  hs274_stream_protocol::key_inventory<hs274_stream_protocol::keyboard_inventory_capacity> inventory;
   elements_owner elements{IOHIDDeviceCopyMatchingElements(device, nullptr, kIOHIDOptionsTypeNone)};
-  json result{{"version", 1u}, {"device", std::to_string(identity)}, {"coverage", "fixture_only"},
+  json result{{"version", 2u}, {"device", std::to_string(identity)}, {"coverage", "fixture_only"},
+              {"capacity", hs274_stream_protocol::keyboard_inventory_capacity},
               {"enumerated", elements.value != nullptr}, {"exhausted", false}, {"elements", json::array()}};
   if (elements.value) {
     for (CFIndex i = 0; i < CFArrayGetCount(elements.value); ++i) {

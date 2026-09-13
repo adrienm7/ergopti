@@ -8,7 +8,7 @@ from hs274_inventory import MARKER, read_inventories
 
 
 def receipt(**changes):
-    row = {"version": 1, "device": "41", "coverage": "fixture_only", "enumerated": True,
+    row = {"version": 2, "device": "41", "coverage": "fixture_only", "capacity": 300, "enumerated": True,
            "exhausted": False, "readable": True, "elements": [{"usage": 44}]}
     row.update(changes)
     return MARKER + json.dumps(row) + "\n"
@@ -25,9 +25,18 @@ class InventoryTests(unittest.TestCase):
         for output in ("", receipt(device="42"), receipt(readable=False), receipt().rstrip(),
                        receipt() + receipt(readable=False), receipt(elements=[]), receipt(exhausted=True),
                        receipt(enumerated=False), receipt(version=True), receipt(readable=1),
-                       receipt(elements=[{}] * 257), receipt().replace('"version": 1', '"version": 1, "version": 2')):
+                       receipt(capacity=0), receipt(capacity=True), receipt(version=1),
+                       receipt(capacity=2, elements=[{}] * 3),
+                       receipt().replace('"version": 2', '"version": 2, "version": 1')):
             with self.subTest(output=output), self.assertRaises(ValueError):
                 read_inventories(output, 41)
+
+    def test_declared_element_bound_is_not_a_usage_count_and_retains_every_leaf(self):
+        elements = [{"usage": usage, "cookie": usage} for usage in range(1, 256)]
+        elements += [{"usage": usage, "cookie": usage + 256} for usage in range(224, 232)]
+        records = read_inventories(receipt(elements=elements), 41)
+        self.assertEqual(records[0]["elements"], elements)
+        self.assertEqual(len(records[0]["elements"]), 263)
 
 
 if __name__ == "__main__":

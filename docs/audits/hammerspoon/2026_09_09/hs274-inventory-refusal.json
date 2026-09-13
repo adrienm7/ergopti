@@ -1,0 +1,117 @@
+{
+  "run": 34762554442,
+  "job": 103737812216,
+  "head": "7d449e1fa6084f1135fecaec1add42cb7a62a41d",
+  "report_sha256": "e70ed3b507ac1bc5d01c076c94a1280e0efd8b37cd989c75ffedaf216e40b90c",
+  "core_log_sha256": "7f1bc6b1acbcd7e8e01d46bb2415fb7dcc4df47844c301369b2a5b7edc46d989",
+  "observation_error": "ValueError: Controlled fixture key inventory was not readable",
+  "fixture_inventory": {
+    "coverage": "fixture_only",
+    "device": "4294968782",
+    "enumerated": true,
+    "exhausted": true,
+    "readable": false,
+    "version": 1
+  },
+  "retained_elements": 256,
+  "distinct_usages": 248,
+  "modifier_224_elements": [
+    {
+      "array": false,
+      "bits": 1,
+      "cookie": 24,
+      "count": 1,
+      "maximum": 1,
+      "minimum": 0,
+      "relative": false,
+      "sample": {
+        "finished": "4256171860",
+        "returned_value": true,
+        "started": "4256170916",
+        "status": 0,
+        "timestamp": "0",
+        "value": "0",
+        "value_cookie": 24
+      },
+      "usage": 224
+    },
+    {
+      "array": true,
+      "bits": 1,
+      "cookie": 289,
+      "count": 32,
+      "maximum": 1,
+      "minimum": 0,
+      "relative": false,
+      "sample": {
+        "finished": "4256223197",
+        "returned_value": true,
+        "started": "4256223055",
+        "status": 0,
+        "timestamp": "0",
+        "value": "0",
+        "value_cookie": 289
+      },
+      "usage": 224
+    }
+  ],
+  "last_retained_element": {
+    "array": true,
+    "bits": 1,
+    "cookie": 313,
+    "count": 32,
+    "maximum": 1,
+    "minimum": 0,
+    "relative": false,
+    "sample": {
+      "finished": "4256231233",
+      "returned_value": true,
+      "started": "4256231085",
+      "status": 0,
+      "timestamp": "0",
+      "value": "0",
+      "value_cookie": 313
+    },
+    "usage": 248
+  },
+  "other_inventories": [
+    {
+      "coverage": "fixture_only",
+      "device": "4294968013",
+      "enumerated": true,
+      "exhausted": false,
+      "readable": true,
+      "version": 1,
+      "retained_elements": 231
+    }
+  ],
+  "hammerspoon_counts": {
+    "53": 1,
+    "49": 1
+  },
+  "context_probe": [
+    {
+      "observation": 2,
+      "phase": "private"
+    },
+    {
+      "observation": 3,
+      "phase": "public"
+    },
+    {
+      "observation": 4,
+      "phase": "secure"
+    },
+    {
+      "observation": 5,
+      "phase": "resumed"
+    }
+  ],
+  "consumer_settled": true,
+  "target": {
+    "pid": 3471,
+    "executable": "/Users/runner/work/_temp/HS274Target.app/Contents/MacOS/HS274Target",
+    "settled": true,
+    "exit": 0
+  }
+}

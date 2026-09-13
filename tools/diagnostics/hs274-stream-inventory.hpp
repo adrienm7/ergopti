@@ -9,6 +9,9 @@
 #include <stdexcept>
 
 namespace hs274_stream_protocol {
+// Bound diagnostic storage independently of usage numbers: a descriptor can
+// expose the same usage in several collections with distinct element cookies.
+inline constexpr std::size_t keyboard_inventory_capacity = 1024;
 template <std::size_t Limit>
 class key_inventory final {
   static_assert(Limit > 0);
@@ -37,7 +40,7 @@ public:
                  previous_finish_ <= input.started && input.started <= input.finished;
     if (input.usage <= 3 && input.value != 0) valid = false;
     for (std::size_t i = 0; i < count_; ++i) {
-      if (entries_[i].cookie == input.cookie || entries_[i].usage == input.usage) valid = false;
+      if (entries_[i].cookie == input.cookie) valid = false;
     }
     entries_[count_++] = input;
     previous_finish_ = input.finished;
