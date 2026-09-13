@@ -235,11 +235,9 @@ _WIFocusReleaseProcessHandle(ProcessHandle) {
 	; tests, and future native providers may do the same; reentrant admission must
 	; still observe the exact handle until CloseHandle has returned success.
 	_WIFocusQueueProcessCleanupDebt(ProcessHandle)
-	if _WIFocusCloseProcessHandle(ProcessHandle) {
-		_WIFocusRemoveProcessCleanupDebt(ProcessHandle)
-		return true
-	}
-	return false
+	; Direct releases must also acquire the drain owner: publishing the handle
+	; alone lets a reentrant drain issue a second close before this one returns.
+	return _WIFocusDrainProcessCleanupDebt()
 }
 
 _WIFocusDrainProcessCleanupDebt() {
