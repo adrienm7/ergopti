@@ -24,7 +24,10 @@ tell application "System Events"
                 if labelText is "Driver Extensions" then set panelVerified to true
                 if labelText is "org.pqrs.Karabiner-DriverKit-VirtualHIDDevice" then set providerVerified to true
             else if role of node is "AXButton" then
+                log (get properties of node)
+                log (get name of every attribute of node)
                 set doneVerified to false
+                if description of node is "Done" then set doneVerified to true
                 repeat with labelAttribute in {"AXTitle", "AXDescription"}
                     if exists attribute (contents of labelAttribute) of node then
                         set buttonLabel to value of attribute (contents of labelAttribute) of node
