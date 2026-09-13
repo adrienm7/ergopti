@@ -383,6 +383,18 @@ experiment; independently verify state after UI actions. Consult the
 [approval UI evidence](../audits/hammerspoon/2026_09_09/discoveries.md#normal-approval-interface-observation)
 before treating a scripting error as a permission denial or a click as approval.
 
+### project-hs-sampled-element-state-boundary
+
+`hs274-key-state.hpp` is a portable per-device/cookie state primitive, not an
+active producer hook or a physical-credit counter. Its ordered-clock contract
+rejects backwards or equal-time conflicting events and events newer than the
+reported sampled state but no later than the query start. A transition during
+the query interval can follow the actual read; do not suppress it merely because
+it precedes query completion. The native queue cutover and lease boundary still
+need independent ownership and validation before runtime integration. Reuse
+`hs274-key-state-test.cpp` and the two native cookie fixtures for that work;
+do not infer aliases or merge distinct cookies solely from a shared usage.
+
 ### project-hs-native-remapping-fixture-boundary
 
 Native HID inventories identify elements by cookie within a device, not by

@@ -1,6 +1,7 @@
 // tools/diagnostics/hs274-stream-inventory-test.cpp
 // Reject incomplete, duplicated and failed initial key observations.
 #include "hs274-stream-inventory.hpp"
+#include "fixtures/hs274-inventory-sample.hpp"
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <stdexcept>
@@ -32,17 +33,9 @@ void replay_native(const char* path) {
       unsigned held_elements = 0;
       const bool fixture = row.at("device") == scenario.at("fixture_device");
       for (const auto& element : row.at("elements")) {
-        const auto& sample = element.at("sample");
-        const auto value = std::stoll(sample.at("value").get<std::string>());
-        replay.append({element.at("usage").get<std::uint32_t>(), element.at("cookie").get<std::uint32_t>(),
-            {true, element.at("relative").get<bool>(), element.at("array").get<bool>(),
-             element.at("bits").get<std::uint32_t>(), element.at("count").get<std::uint32_t>(),
-             element.at("minimum").get<std::int64_t>(), element.at("maximum").get<std::int64_t>()},
-            sample.at("status").get<std::int32_t>(), sample.at("returned_value").get<bool>(),
-            sample.at("value_cookie").get<std::uint32_t>(), value,
-            std::stoull(sample.at("timestamp").get<std::string>()),
-            std::stoull(sample.at("started").get<std::string>()), std::stoull(sample.at("finished").get<std::string>())});
-        if (fixture && value == 1) {
+        const auto sample = hs274_test::inventory_sample<decltype(replay)::sample>(element);
+        replay.append(sample);
+        if (fixture && sample.value == 1) {
           require(element.at("usage") == 44);
           ++held_elements;
         }
