@@ -16,6 +16,7 @@ from hs274_capture import unique_object
 from hs274_stream import decimal
 from hs274_accessibility import approve_accessibility
 import hs274_hammerspoon_registration
+import hs274_accessibility_diagnostics
 
 
 def read_clock(information):
@@ -213,6 +214,11 @@ def owned_capture(app, cli, output, report):
         except BaseException as error:
             primary_error = error
             report["hammerspoon_primary_error"] = f"{type(error).__name__}: {error}"
+            if "hammerspoon_admission_diagnostics" not in report:
+                try:
+                    hs274_accessibility_diagnostics.retain_failure(report, copied, native.matching(executable))
+                except Exception as diagnostic_error:
+                    report["hammerspoon_diagnostic_error"] = f"{type(diagnostic_error).__name__}: {diagnostic_error}"
             raise
         finally:
             cleanup_error = None

@@ -19,7 +19,7 @@ def output_receipt(stdout, stderr):
             "truncated": max(map(len, values)) > OUTPUT_LIMIT}
 
 
-def retain_failure(report, app):
+def retain_failure(report, app, pids=()):
     """Inspect only the supplied application and retain each diagnostic failure."""
     evidence = report.setdefault("hammerspoon_admission_diagnostics", {})
     try:
@@ -41,6 +41,17 @@ def retain_failure(report, app):
         "tcc": ["/usr/bin/log", "show", "--last", "2m", "--style", "compact", "--info",
                 "--predicate", TCC_PREDICATE],
     }
+    if pids:
+        if any(type(pid) is not int or pid <= 0 for pid in pids):
+            raise ValueError("Invalid native Hammerspoon diagnostic process identity")
+        evidence["owner_pids"] = list(pids)
+        matches = ['eventMessage CONTAINS[c] "hammerspoon"']
+        for pid in pids:
+            matches.extend(f'eventMessage CONTAINS "{marker}"' for marker in (
+                f"msgID={pid}.", f"pid={pid},", f"pid:{pid},"))
+        predicate = '(process == "tccd") AND (' + ' OR '.join(matches) + ')'
+        commands["tcc_owner"] = ["/usr/bin/log", "show", "--last", "2m", "--style", "compact", "--info",
+                                 "--predicate", predicate]
     for name, command in commands.items():
         try:
             result = subprocess.run(command, capture_output=True, text=True, timeout=5)
