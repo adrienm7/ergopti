@@ -126,3 +126,61 @@ read-refusal, incremental growth, cache restoration and publication tests,
 plus end-to-end cost measurements. Conversion itself has a cost and must not
 be added to every refresh. No production fix or complete-opening speedup is
 claimed by this evidence-only update.
+
+## Production manifest follow-up
+
+At `f83850e11`, run production `KLR_BuildManifestJson` against the same four
+private images. Two routes cover direct OPEN_RO reads and checked memory clone
+followed by manifest generation. Each route warms one run per geometry, then
+uses the same balanced eight-item sequence three times: six measured samples
+per geometry and route, 48 measured samples overall. Routes run sequentially,
+readonly first; host load and filesystem caching are uncontrolled. The probe
+does not contribute a live foreground interval, as in a disposable projection.
+
+QPC measures clone and manifest separately. The combined interval excludes
+database opening, candidate closure, output validation, filesystem publication,
+incremental recomputation and frontend rendering. Available-memory admission
+before each clone uses the earlier twice-baseline-size guard. This is not an
+end-to-end opening or peak-memory measurement.
+
+All eight warm outputs are structurally identical after JSON decoding, including
+every nested value, without printing private payloads. Each file is 1925898 bytes.
+Every measured repetition also matches its own warm output byte for byte.
+No projection diagnostic occurred. This measurement uses the current production
+implementation; output size differs from historical manifest experiments, and
+no equivalence to an older implementation is claimed here.
+
+| Route | Source | Manifest median (ms) | Manifest max (ms) | Combined median (ms) | Combined max (ms) |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Readonly | Baseline | 1316.183 | 1428.214 | 1316.192 | 1428.223 |
+| Readonly | Vacuumed 4096 | 1318.880 | 1443.220 | 1318.891 | 1443.231 |
+| Readonly | Vacuumed 16384 | 1421.440 | 1502.288 | 1421.454 | 1502.300 |
+| Readonly | Vacuumed 65536 | 1400.131 | 1531.311 | 1400.141 | 1531.323 |
+| Memory clone | Baseline | 1518.413 | 1569.837 | 2875.121 | 2958.532 |
+| Memory clone | Vacuumed 4096 | 1490.329 | 1567.278 | 2775.749 | 3004.192 |
+| Memory clone | Vacuumed 16384 | 1383.651 | 1487.924 | 2261.781 | 2760.758 |
+| Memory clone | Vacuumed 65536 | 1480.900 | 1542.378 | 2236.381 | 2361.146 |
+
+The combined median improves by about 22% for 65536 versus baseline in this
+series, while direct-read manifest generation is about 84 ms (6%) slower.
+The 16384 combined median is only about 25 ms above 65536. These observations
+do not establish a consistent winner across routes or explain host variation;
+do not select geometry from clone-only measurements. No samples were excluded.
+
+Reproduction uses hidden `AutoHotkey64.exe /ErrorStdOut` and campaign scratch
+`sqlite-page-manifest-probe.ahk`. The first launch exited 2 before execution
+because a harness variable used the reserved name `Round`; the corrected
+second launch exited 0 with empty stderr. Receipt:
+`sqlite-page-manifest-probe-02.out`. The Node comparator
+`compare-page-manifests.cjs` verifies all eight decoded outputs and complete
+sample counts, then records every raw duration plus median/max in
+`sqlite-page-manifest-summary-02.json`. Private output files remain in campaign
+scratch and must not enter Git or CI artifacts.
+
+Native regression coverage now includes non-default page-size read refusal,
+unlock recovery, private growth allocation, cache publication and resident/worker
+restore isolation, plus interrupted incremental refresh and exact-once recovery.
+See `5e5817c96`, `48270baf2` and `f83850e11`. The latest selected gate passed
+6363 AHK cases; these cases establish their stated contracts, not absence of all
+bugs. Keep production geometry unchanged while assessing the remaining build,
+publication and complete refresh costs and the direct-read tradeoff.
