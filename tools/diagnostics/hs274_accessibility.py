@@ -13,7 +13,7 @@ tell application "System Events"
     tell process "System Settings"
         set candidates to {}
         set observations to ""
-        repeat 40 times
+        repeat with scanIndex from 1 to 40
             set controls to entire contents of window 1
             set candidates to {}
             set observations to ""
@@ -34,6 +34,7 @@ tell application "System Events"
                     set end of candidates to contents of node
                 end if
             end repeat
+            if scanIndex is 1 then log observations
             if (count candidates) > 0 then exit repeat
             delay 0.1
         end repeat
@@ -52,9 +53,19 @@ end tell
 
 def approve_accessibility(report):
     """Retain the actual UI response; native Hammerspoon separately verifies trust."""
-    subprocess.run(["/usr/bin/open", "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"],
-                   check=True, timeout=5)
-    result = subprocess.run(["/usr/bin/osascript", "-e", SCRIPT], capture_output=True, text=True, timeout=15)
-    report["hammerspoon_accessibility"] = {"exit": result.returncode, "stdout": result.stdout, "stderr": result.stderr}
+    state = report.setdefault("hammerspoon_accessibility", {})
+    state["stage"] = "open_settings"
+    try:
+        subprocess.run(["/usr/bin/open", "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"],
+                       check=True, capture_output=True, text=True, timeout=5)
+        state["stage"] = "approval"
+        result = subprocess.run(["/usr/bin/osascript", "-e", SCRIPT], capture_output=True, text=True, timeout=15)
+    except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as error:
+        state.update(exit=getattr(error, "returncode", None), timed_out=isinstance(error, subprocess.TimeoutExpired))
+        for name in ("stdout", "stderr"):
+            value = getattr(error, name, None)
+            state[name] = value.decode("utf-8", errors="replace") if isinstance(value, bytes) else value
+        raise
+    state.update(exit=result.returncode, stdout=result.stdout, stderr=result.stderr)
     if result.returncode != 0 or result.stdout.strip() != "enabled":
         raise RuntimeError("Normal Hammerspoon accessibility approval was not confirmed")

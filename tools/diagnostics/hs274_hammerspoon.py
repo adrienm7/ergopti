@@ -177,6 +177,7 @@ def owned_capture(app, cli, output, report):
                                     stdout=log, stderr=subprocess.STDOUT)
         client = CaptureReceipt(result, native, executable)
         state = report.setdefault("processes", {}).setdefault("physical-stream", {"runtime": "native Hammerspoon"})
+        primary_error = None
         try:
             deadline = time.monotonic() + 15
             approval_attempted = False
@@ -194,15 +195,29 @@ def owned_capture(app, cli, output, report):
                 time.sleep(0.05)
             client.observed = True
             yield client
+        except BaseException as error:
+            primary_error = error
+            report["hammerspoon_primary_error"] = f"{type(error).__name__}: {error}"
+            raise
         finally:
+            cleanup_error = None
             try:
                 stop.write_text("stop\n", encoding="utf-8")
                 client.wait(timeout=10)
                 state.update(exit=client.returncode, reaped=True)
                 report["hammerspoon"] = client.result
-            finally:
+            except Exception as error:
+                cleanup_error = error
+                report["hammerspoon_settlement_error"] = f"{type(error).__name__}: {error}"
+            try:
                 lifecycle.cleanup(native, executable, launcher)
                 state["application_cleanup"] = "confirmed"
+            except Exception as error:
+                if cleanup_error is None:
+                    cleanup_error = error
+                report["hammerspoon_application_cleanup_error"] = f"{type(error).__name__}: {error}"
+            if cleanup_error is not None and primary_error is None:
+                raise cleanup_error
 
 
 def validate_consumer(result, capture):
