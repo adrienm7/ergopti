@@ -99,6 +99,7 @@ local function run()
 		encode = JsonCodec.encode,
 		on_error = function(reason) result.errors[#result.errors + 1] = reason end,
 		on_settled = function()
+			if owner.probe then owner.probe.stop() end
 			local stopped, detail = pcall(owner.context.stop)
 			if not stopped then result.errors[#result.errors + 1] = tostring(detail) end
 			result.context_stopped = stopped
@@ -120,7 +121,15 @@ local function run()
 			owner.transport.stop()
 		end
 	end))
-	assert(owner.transport.start(config.cli, { "--hs274-capture", "25" }), "Native capture did not start")
+	result.context_probe = {}
+	owner.probe = dofile(root .. "/hs274-context-probe.lua").new(owner.window, result.context_observations,
+		result.context_probe, function()
+			assert(owner.transport.start(config.cli, { "--hs274-capture", "25" }), "Native capture did not start")
+		end, function(reason)
+			result.errors[#result.errors + 1] = reason
+			owner.transport.stop()
+		end)
+	owner.probe.start()
 end
 
 local function failed(err)
@@ -163,7 +172,7 @@ local initialized, error_detail = xpcall(function()
 		end, debug.traceback)
 		if not prepared then failed(detail) end
 	end)
-	owner.window:html("<!doctype html><meta charset='utf-8'><title>HS274 input fixture</title><input id='input' aria-label='HS274 physical input'>")
+	owner.window:html("<!doctype html><meta charset='utf-8'><title>HS274 input fixture</title><input id='input' aria-label='HS274 physical input'><input id='secret' type='password' aria-label='HS274 empty protected fixture'>")
 	owner.window:show()
 end, debug.traceback)
 if not initialized then failed(error_detail) end

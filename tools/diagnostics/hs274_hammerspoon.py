@@ -78,6 +78,25 @@ def validate_context(result, downs):
         raise ValueError("Physical credits do not match retained native application/privacy context")
 
 
+def validate_context_probe(result):
+    """Require four distinct AX observations before admitting the physical pair."""
+    probe, observations = result.get("context_probe"), result["context_observations"]
+    phases = (("private", False), ("public", True), ("secure", False), ("resumed", True))
+    if not isinstance(probe, list) or len(probe) != len(phases):
+        raise ValueError("Missing native context probe transitions")
+    previous = 1
+    for row, (phase, allowed) in zip(probe, phases):
+        if (not isinstance(row, dict) or set(row) != {"phase", "observation"}
+                or row["phase"] != phase or type(row["observation"]) is not int
+                or not previous < row["observation"] <= len(observations)):
+            raise ValueError("Invalid native context probe transition")
+        previous = row["observation"]
+        if observations[previous - 1]["allowed"] is not allowed:
+            raise ValueError("Native context probe did not observe its privacy decision")
+    if int(observations[previous - 1]["observed_ns"]) >= int(result["clock_samples"][0]["original_ns"]):
+        raise ValueError("Native context probe did not settle before physical input")
+
+
 def native_lifecycle():
     """Reuse the existing exact-executable supervisor rather than PID-only cleanup."""
     path = Path(__file__).resolve().parents[1] / "bench/macos-metrics/run.py"
@@ -141,6 +160,7 @@ def owned_capture(app, cli, output, report):
     here = Path(__file__).resolve().parent
     shutil.copyfile(here / "hs274-hammerspoon.lua", scratch / "init.lua")
     shutil.copyfile(here / "hs274-context.lua", scratch / "hs274-context.lua")
+    shutil.copyfile(here / "hs274-context-probe.lua", scratch / "hs274-context-probe.lua")
     result = output / "hs274-remap-hammerspoon.json"
     stop = scratch / "stop"
     configuration = {"repo": str(here.parents[1]), "cli": str(cli), "result": str(result),
@@ -191,6 +211,7 @@ def validate_consumer(result, capture):
         raise ValueError("Independent fixture does not contain the expected physical pair")
     validate_clock(result, downs)
     validate_context(result, downs)
+    validate_context_probe(result)
     expected_contexts = [{"device": str(row["device"]), "timestamp": str(row["timestamp"])} for row in downs]
     if (result.get("contexts") != expected_contexts or not isinstance(result.get("presses"), list)
             or len(result["presses"]) != len(downs)):
