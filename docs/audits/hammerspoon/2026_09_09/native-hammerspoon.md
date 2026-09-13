@@ -382,6 +382,21 @@ The replay rejects an altered cookie even when usage, value and sequence match.
 This is controlled virtual HID input on native macOS, not physical keyboard
 hardware proof or synchronized initial-state ownership.
 
+The same producer and consumer revision also passed the baseline remapping step
+in [run 34775242687](https://github.com/adrienm7/ergopti/actions/runs/34775242687),
+with Space initially held and explicit kernel state selection. The full readable
+263-element inventory has exactly one held leaf: usage 44, cookie 109. All three
+later Space edges retain that cookie, with values 0, 1 and 0; all 15 raw records
+remain available. This baseline mode does not start the physical stream or the
+Hammerspoon consumer, so it does not prove lease cutover behavior.
+
+`tools/diagnostics/fixtures/hs274-native-cookie-held.json` retains the native
+baseline probe, held inventory element and complete capture. Its replay in
+`hs274_stream_test.py` preserves the initial release and rejects a missing fresh
+press even after repairing capture length and sequence numbers. Use these two
+cookie fixtures for subsequent state synchronization work instead of rebuilding
+the unchanged producer or repeating inventory discovery.
+
 ## Complete fixture inventory acceptance
 
 [Run 34771083506](https://github.com/adrienm7/ergopti/actions/runs/34771083506)

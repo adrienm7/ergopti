@@ -33,6 +33,29 @@ def baseline_fixture():
 
 
 class BaselineTests(unittest.TestCase):
+    def test_retained_held_cookie_keeps_release_and_fresh_press(self):
+        path = Path(__file__).parent / "fixtures" / "hs274-native-cookie-held.json"
+        evidence = json.loads(path.read_text(encoding="utf-8"))
+        device = evidence["native"]["registry_entry_id"]
+        probe = require_held_baseline(BASELINE_MARKER + json.dumps(evidence["probe"]) + "\n",
+                                      device, {41: 0, 44: 1}, source="kernel")
+        released = validate_baseline_native(evidence["native"], probe)
+        capture = evidence["capture"]
+        self.assertEqual(validate_baseline_capture(CAPTURE_MARKER + json.dumps(capture) + "\n",
+                                                   device, released), capture)
+        held = evidence["held_inventory_element"]
+        self.assertEqual((held["usage"], held["sample"]["value"]), (44, "1"))
+        keys = [row for row in capture["records"] if row["page"] == 7 and 4 <= row["usage"] <= 255]
+        self.assertEqual([row["value"] for row in keys], [0, 1, 0])
+        self.assertTrue(all(row["has_cookie"] is True and row["cookie"] == held["cookie"] for row in keys))
+        missing = copy.deepcopy(capture)
+        missing["records"] = [row for row in missing["records"] if row["sequence"] != keys[1]["sequence"]]
+        missing["seen"] = len(missing["records"])
+        for sequence, row in enumerate(missing["records"], 1):
+            row["sequence"] = sequence
+        with self.assertRaisesRegex(ValueError, "fresh physical press"):
+            validate_baseline_capture(CAPTURE_MARKER + json.dumps(missing) + "\n", device, released)
+
     def test_retained_native_kernel_baseline_preserves_inherited_and_fresh_space(self):
         path = Path(__file__).parent / "fixtures" / "hs274-native-held-baseline.json"
         evidence = json.loads(path.read_text(encoding="utf-8"))

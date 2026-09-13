@@ -1,0 +1,503 @@
+{
+  "run": 34775242687,
+  "head": "136b3190f74051ea5e27ba536273999222997421",
+  "producer_build": 34773435230,
+  "report_sha256": "d81e8b9b3b6b9aa38b85304198c233747aa788c740551426c9fb7f3eb28e8786",
+  "workflow_conclusion": "failure",
+  "remapping_step_conclusion": "success",
+  "hs274_fixed": false,
+  "physical_keyboard_validated": false,
+  "probe": {
+    "coverage": "fixture_only",
+    "device": "4294968808",
+    "elements": [
+      {
+        "cached": {
+          "finished": "8494567233",
+          "returned_value": true,
+          "started": "8494567007",
+          "status": 0,
+          "timestamp": "0",
+          "value": "0",
+          "value_cookie": 106
+        },
+        "cookie": 106,
+        "page": 7,
+        "updated": {
+          "finished": "8494605479",
+          "returned_value": true,
+          "started": "8494567280",
+          "status": -536870165
+        },
+        "usage": 41
+      },
+      {
+        "cached": {
+          "finished": "8494606652",
+          "returned_value": true,
+          "started": "8494605985",
+          "status": 0,
+          "timestamp": "8426959237",
+          "value": "1",
+          "value_cookie": 109
+        },
+        "cookie": 109,
+        "page": 7,
+        "updated": {
+          "finished": "8494612836",
+          "returned_value": true,
+          "started": "8494606785",
+          "status": -536870165
+        },
+        "usage": 44
+      }
+    ],
+    "enumerated": true,
+    "exhausted": false
+  },
+  "native": {
+    "hs274_fixed": false,
+    "physical_keyboard_validated": false,
+    "virtual_keyboard_ready": true,
+    "reports_queued": 4,
+    "transport_error": false,
+    "metadata_owner_verified": true,
+    "registry_entry_id": 4294968808,
+    "metadata_write_status": 0,
+    "metadata_readback_matches": true,
+    "metadata_restore_status": 0,
+    "metadata_restored": true,
+    "metadata_work_completed": true,
+    "remap_mode": true,
+    "drain_released": false,
+    "ignored_mode": false,
+    "baseline_mode": true,
+    "baseline_down_observed": true,
+    "baseline_release_at": "8507628989",
+    "escape_as_space": false,
+    "escape_passthrough": false,
+    "space_pair_observed": true,
+    "baseline_events": [
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968811
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968811
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968811
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968811
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968811
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968811
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968811
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968811
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968811
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968811
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968811
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968811
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968811
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968811
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968811
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968811
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968811
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968811
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968811
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968811
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968811
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968811
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968811
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968811
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968811
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968811
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968811
+      },
+      {
+        "type": 11,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968811
+      }
+    ],
+    "events": [
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968835
+      },
+      {
+        "type": 11,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294968835
+      }
+    ]
+  },
+  "capture": {
+    "coverage": "fixture_only",
+    "seen": 15,
+    "overflow": 0,
+    "contention": 0,
+    "records": [
+      {
+        "device": 4294968808,
+        "timestamp": 8507704466,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": -1,
+        "sequence": 1,
+        "has_cookie": true,
+        "cookie": 33
+      },
+      {
+        "device": 4294968808,
+        "timestamp": 8507704466,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 1,
+        "sequence": 2,
+        "has_cookie": true,
+        "cookie": 66
+      },
+      {
+        "device": 4294968808,
+        "timestamp": 8507704466,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 44,
+        "sequence": 3,
+        "has_cookie": true,
+        "cookie": 109
+      },
+      {
+        "device": 4294968808,
+        "timestamp": 8507704466,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": -1,
+        "sequence": 4,
+        "has_cookie": true,
+        "cookie": 32
+      },
+      {
+        "device": 4294968808,
+        "timestamp": 8507704466,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 0,
+        "usage": -1,
+        "sequence": 5,
+        "has_cookie": true,
+        "cookie": 11
+      },
+      {
+        "device": 4294968808,
+        "timestamp": 8509812945,
+        "value": 44,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": -1,
+        "sequence": 6,
+        "has_cookie": true,
+        "cookie": 33
+      },
+      {
+        "device": 4294968808,
+        "timestamp": 8509812945,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 1,
+        "sequence": 7,
+        "has_cookie": true,
+        "cookie": 66
+      },
+      {
+        "device": 4294968808,
+        "timestamp": 8509812945,
+        "value": 1,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 44,
+        "sequence": 8,
+        "has_cookie": true,
+        "cookie": 109
+      },
+      {
+        "device": 4294968808,
+        "timestamp": 8509812945,
+        "value": 44,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": -1,
+        "sequence": 9,
+        "has_cookie": true,
+        "cookie": 32
+      },
+      {
+        "device": 4294968808,
+        "timestamp": 8509812945,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 0,
+        "usage": -1,
+        "sequence": 10,
+        "has_cookie": true,
+        "cookie": 11
+      },
+      {
+        "device": 4294968808,
+        "timestamp": 8512088366,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": -1,
+        "sequence": 11,
+        "has_cookie": true,
+        "cookie": 33
+      },
+      {
+        "device": 4294968808,
+        "timestamp": 8512088366,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 1,
+        "sequence": 12,
+        "has_cookie": true,
+        "cookie": 66
+      },
+      {
+        "device": 4294968808,
+        "timestamp": 8512088366,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 44,
+        "sequence": 13,
+        "has_cookie": true,
+        "cookie": 109
+      },
+      {
+        "device": 4294968808,
+        "timestamp": 8512088366,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": -1,
+        "sequence": 14,
+        "has_cookie": true,
+        "cookie": 32
+      },
+      {
+        "device": 4294968808,
+        "timestamp": 8512088366,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 0,
+        "usage": -1,
+        "sequence": 15,
+        "has_cookie": true,
+        "cookie": 11
+      }
+    ]
+  },
+  "held_inventory_element": {
+    "array": true,
+    "bits": 1,
+    "cookie": 109,
+    "count": 32,
+    "maximum": 1,
+    "minimum": 0,
+    "relative": false,
+    "sample": {
+      "finished": "8494307478",
+      "returned_value": true,
+      "started": "8494307407",
+      "status": 0,
+      "timestamp": "8426959237",
+      "value": "1",
+      "value_cookie": 109
+    },
+    "usage": 44
+  },
+  "inventory_element_count": 263
+}

@@ -393,6 +393,9 @@ it. Cookie retention alone does not reconcile queued events with sampled state.
 Replay `tools/diagnostics/fixtures/hs274-native-cookie-capture.json` through
 `hs274_stream_test.py` to check actual native wire/raw equality and the Escape
 and Space identities against their retained inventory elements.
+The companion `hs274-native-cookie-held.json` retains an initially held Space
+and its later release/press/release with the same cookie. Its baseline replay
+does not exercise a lease or Hammerspoon consumer; use it as state input evidence.
 The signed provider exposes the same modifier usages as scalar
 bits and array leaves with distinct cookies; both observations must remain
 available. A usage-range bound also truncated this descriptor. Keep diagnostic
