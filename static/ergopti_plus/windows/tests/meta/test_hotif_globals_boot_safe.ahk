@@ -86,9 +86,11 @@ _HGBS_SeedsSurviveInThePrePumpBlock() {
 ; Multi-line directives are covered: `#HotIf (` continues until the closing
 ; paren, and a scanner that only reads the directive's first line is blind to
 ; everything after it — that blindness is itself a recorded finding.
-_HGBS_HotIfFunctions() {
+_HGBS_HotIfFunctions(Source := unset) {
 	global _HGBS_HOTIF_PARENTS
-	Src := _DriverSourceNoComments()
+	Src := IsSet(Source) ? Source : _DriverSourceNoComments()
+	; Only executable parentheses delimit directives; quoted examples are data.
+	Src := _DriverMaskNonCode(&Src)
 	Names := Map()
 	Parents := Map()
 	Lines := StrSplit(Src, "`n", "`r")
