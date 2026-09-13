@@ -85,8 +85,14 @@ The updated helper keeps the temporary authorizing account alive through selecti
 and permission observation. Previously it was deleted immediately after the
 authentication sheet closed. A local integration test failed on that ordering;
 the updated tests cover cleanup on both successful admission and selection failure.
-This lifetime change is a hypothesis for the native missing-row result until a
-new macOS run verifies it. It does not prove global trust or close HS-274.
+[Run 34750872746](https://github.com/adrienm7/ergopti/actions/runs/34750872746)
+tested that lifetime change at `50f89f7229a1527e89f982a0c519399047752de7`.
+Authentication succeeded and account cleanup completed, but all three admission
+scans again returned `missing_application`. Keeping the account alive did not
+resolve the native failure; do not repeat that experiment unchanged.
+The next diagnostic retains the screen, window names and Accessibility sheet
+count immediately after Open closes, to expose any secondary dialog or refusal.
+Neither experiment proves global trust or closes HS-274.
 
 The supervisor signals `permission_ready` only after ordinary UI approval.
 Lua then independently checks actual Accessibility trust before creating the

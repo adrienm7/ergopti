@@ -9,6 +9,7 @@ SCRIPT = '''
 on run argv
     set appPath to item 1 of argv
     set screenshotPath to item 2 of argv
+    set afterScreenshotPath to item 3 of argv
     tell application "System Events"
         tell process "System Settings"
             set frontmost to true
@@ -52,7 +53,14 @@ on run argv
             do shell script "/usr/sbin/screencapture -x " & quoted form of screenshotPath
             perform action "AXPress" of button "Open" of window "Open"
             repeat 30 times
-                if not (exists window "Open") then return "application_selected"
+                if not (exists window "Open") then
+                    do shell script "/usr/sbin/screencapture -x " & quoted form of afterScreenshotPath
+                    log (get name of every window)
+                    if exists window "Accessibility" then
+                        log "HS274 post-selection sheets: " & (count sheets of window "Accessibility")
+                    end if
+                    return "application_selected"
+                end if
                 delay 0.1
             end repeat
             error "Application file picker did not retire"
@@ -69,8 +77,9 @@ def select_application(app, report):
         raise ValueError("Missing owned Hammerspoon application bundle")
     state = report.setdefault("hammerspoon_accessibility_picker", {})
     screenshot = Path(os.environ["RUNNER_TEMP"]) / "hs274-picker-before-open.png"
+    after_screenshot = screenshot.with_name("hs274-picker-after-open.png")
     try:
-        result = subprocess.run(["/usr/bin/osascript", "-e", SCRIPT, str(app), str(screenshot)],
+        result = subprocess.run(["/usr/bin/osascript", "-e", SCRIPT, str(app), str(screenshot), str(after_screenshot)],
                                 capture_output=True, text=True, timeout=15)
     except subprocess.TimeoutExpired as error:
         state.update(timed_out=True, stdout=error.stdout, stderr=error.stderr)
