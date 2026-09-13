@@ -8,7 +8,7 @@
 ; coarse for a keystroke that should complete in well under a millisecond. This
 ; module uses QueryPerformanceCounter (sub-microsecond) and logs ONLY keystrokes
 ; that exceed a threshold, so normal typing produces zero log noise while any
-; real hitch surfaces with the offending character and buffer for diagnosis.
+; real hitch identifies its segment and duration without recording input content.
 ;
 ; FEATURES & RATIONALE:
 ; 1. QPC precision: the only way to see a 2 ms vs 0.2 ms keystroke difference.
