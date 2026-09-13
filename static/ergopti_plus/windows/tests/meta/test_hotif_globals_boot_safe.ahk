@@ -180,6 +180,15 @@ _HGBS_CodeOnly(Text) {
 		} else if (Ch == Chr(34) or Ch == Chr(39)) {
 			Quote := Ch
 			Out .= " "
+		} else if (Ch == "/" && SubStr(Text, i + 1, 1) == "*"
+			&& RegExMatch(SubStr(Text, 1, i - 1), "(?:^|`n)[ `t]*$")) {
+			; AHK block comments open at line start and close at line start/end.
+			; Preserve line boundaries so disabled calls cannot join live tokens.
+			EndPos := RegExMatch(Text, "m)(?:^[ `t]*\*/|\*/[ `t]*`r?$)", &Closing, i + 2)
+			NextPos := EndPos ? EndPos + Closing.Len : StrLen(Text) + 1
+			Out .= RegExReplace(SubStr(Text, i, NextPos - i), "[^`r`n]", " ")
+			i := NextPos
+			continue
 		} else if (Ch == ";") {
 			LineEnd := InStr(Text, "`n", , i)
 			if !LineEnd
@@ -283,7 +292,7 @@ _HGBS_FunctionScannerIgnoresLiteralBraces() {
 
 _HGBS_CalleeScannerIgnoresNonCodeAndMethods() {
 	Snippet := 'RealCall()`nobj.MethodCall()`n"StringCall()" ' . Chr(59)
-		. ' CommentCall()`ntry ContainedCall()'
+		. ' CommentCall()`ntry ContainedCall()`n /*`n BlockCall()`n */'
 	Calls := _HGBS_CalleesIn(Snippet)
 	AssertEqual(1, Calls.Length,
 		"the call graph must ignore method-name collisions, strings, and comments")
@@ -308,6 +317,10 @@ _HGBS_GlobalGuardUsesExecutableCall(Statement, Expected) {
 		AssertEqual("GhostState", Found[1])
 }
 for Spec in [
+	["block comment", " /*`n IsSet(GhostState)`n */`n return GhostState", 1],
+	["single-line block", " /* IsSet(GhostState) */`n return GhostState", 1],
+	["middle block terminator", " /*`n disabled */ IsSet(GhostState)`n */`n return GhostState", 1],
+	["code after block", " /* ignored`n */ if !IsSet(GhostState)`n  return`n return GhostState", 0],
 	["comment", " " . Chr(59) . " IsSet(GhostState)`n return GhostState", 1],
 	["inline comment", " return GhostState " . Chr(59) . " IsSet(GhostState)", 1],
 	["string", ' return GhostState . "IsSet(GhostState)"', 1],
