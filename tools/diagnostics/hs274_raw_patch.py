@@ -22,14 +22,18 @@ def instrument_monitor(source):
         hs274_probe_owned_(type_safe::get(device_properties.get_product()) == "HS274 CI Keyboard"),
         last_time_stamp_(0) {""")
     source = replace_once(source, "      input_values_arrived(hid_values);\n    });", """      if (hs274_probe_owned_) {
-        for (const auto& value : *hid_values) {
+        for (std::size_t index = 0; index < hid_values->size(); ++index) {
+          const auto& value = hid_values->at(index);
+          // The wrapper drops element identity; use the corresponding native value.
+          const auto cookie = IOHIDElementGetCookie(IOHIDValueGetElement(*values->at(index)));
           const auto page = value.get_usage_page();
           const auto usage = value.get_usage();
           hs274_raw_capture::fixture.append({
               hs274_probe_device_id_, type_safe::get(value.get_time_stamp()),
               value.get_integer_value(), page.has_value(), usage.has_value(),
               page ? static_cast<std::int32_t>(type_safe::get(*page)) : 0,
-              usage ? static_cast<std::int32_t>(type_safe::get(*usage)) : 0});
+              usage ? static_cast<std::int32_t>(type_safe::get(*usage)) : 0,
+              0, true, static_cast<std::uint32_t>(cookie)});
         }
       }
       input_values_arrived(hid_values);

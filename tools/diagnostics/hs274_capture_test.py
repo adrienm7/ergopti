@@ -31,6 +31,19 @@ class CaptureVerdictTests(unittest.TestCase):
         expected = fixture()
         self.assertEqual(validate_capture("startup log\n" + encode(expected), 123), expected)
 
+    def test_native_cookie_presence_and_bounds_are_validated_without_inventing_history(self):
+        for cookie in (0, 24, (1 << 32) - 1):
+            candidate = fixture()
+            candidate["records"][0].update(has_cookie=True, cookie=cookie)
+            self.assertEqual(validate_capture(encode(candidate), 123), candidate)
+        for fields in ({"cookie": 24}, {"has_cookie": True}, {"has_cookie": 1, "cookie": 24},
+                       {"has_cookie": True, "cookie": True}, {"has_cookie": True, "cookie": -1},
+                       {"has_cookie": True, "cookie": 1 << 32}, {"has_cookie": False, "cookie": 24}):
+            candidate = fixture()
+            candidate["records"][0].update(fields)
+            with self.subTest(fields=fields), self.assertRaises(ValueError):
+                validate_capture(encode(candidate), 123)
+
     def test_preserves_complete_native_capture_with_auxiliary_elements(self):
         path = Path(__file__).with_name("fixtures") / "hs274-native-capture.json"
         expected = json.loads(path.read_text(encoding="utf-8"))

@@ -19,6 +19,8 @@ struct record {
   std::int32_t page;
   std::int32_t usage;
   std::uint64_t sequence = 0;
+  bool has_cookie = false;
+  std::uint32_t cookie = 0;
 };
 
 template <std::size_t Capacity>
@@ -83,10 +85,11 @@ inline bool finish() {
     const auto& r = state.records[i];
     std::printf("%s{\"device\":%" PRIu64 ",\"timestamp\":%" PRIu64 ",\"value\":%" PRId64
                 ",\"has_page\":%s,\"has_usage\":%s,\"page\":%" PRId32
-                ",\"usage\":%" PRId32 ",\"sequence\":%" PRIu64 "}",
+                ",\"usage\":%" PRId32 ",\"sequence\":%" PRIu64
+                ",\"has_cookie\":%s,\"cookie\":%" PRIu32 "}",
                 i ? "," : "", r.device, r.timestamp, r.value,
                 r.has_page ? "true" : "false", r.has_usage ? "true" : "false",
-                r.page, r.usage, r.sequence);
+                r.page, r.usage, r.sequence, r.has_cookie ? "true" : "false", r.cookie);
   }
   std::printf("]}\n");
   return std::fflush(stdout) == 0 && !std::ferror(stdout);

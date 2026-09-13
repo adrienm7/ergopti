@@ -50,6 +50,8 @@ def read_capture(output, device):
             raise ValueError("Native physical capture contains another device")
         integer(row.get("timestamp"), "timestamp")
         integer(row.get("value"), "value", -(1 << 63), (1 << 63) - 1)
+        if "has_cookie" in row or "cookie" in row:
+            validate_cookie(row)
         for field in ("page", "usage"):
             integer(row.get(field), field, -(1 << 31), (1 << 31) - 1)
         for field in ("has_page", "has_usage"):
@@ -66,6 +68,15 @@ def read_capture(output, device):
                 continue
             keyboard.append(row)
     return capture, keyboard
+
+
+def validate_cookie(row):
+    """Keep a missing historical identity distinct from a native cookie, including zero."""
+    if type(row.get("has_cookie")) is not bool:
+        raise ValueError("Invalid native cookie presence flag")
+    cookie = integer(row.get("cookie"), "cookie", maximum=(1 << 32) - 1)
+    if not row["has_cookie"] and cookie != 0:
+        raise ValueError("Absent native cookie has a value")
 
 
 def validate_capture(output, device):

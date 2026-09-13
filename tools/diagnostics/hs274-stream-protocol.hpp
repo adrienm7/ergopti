@@ -100,6 +100,7 @@ public:
       response["records"].push_back({
           {"sequence", std::to_string(entry.sequence)}, {"device", std::to_string(r.device)},
           {"timestamp", std::to_string(r.timestamp)}, {"value", std::to_string(r.value)},
+          {"has_cookie", r.has_cookie}, {"cookie", r.cookie},
           {"has_page", r.has_page}, {"has_usage", r.has_usage}, {"page", r.page}, {"usage", r.usage}});
     }
     return response;

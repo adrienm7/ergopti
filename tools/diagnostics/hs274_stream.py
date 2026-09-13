@@ -5,7 +5,7 @@ import json
 import uuid
 from pathlib import Path
 
-from hs274_capture import integer, unique_object
+from hs274_capture import integer, unique_object, validate_cookie
 
 
 def decimal(value, minimum=0, maximum=(1 << 64) - 1):
@@ -52,7 +52,8 @@ def read_stream(output, partial=False):
         if not isinstance(frame["records"], list) or not frame["records"]:
             raise ValueError("Empty or invalid published batch")
         for row in frame["records"]:
-            expected = {"sequence", "device", "timestamp", "value", "has_page", "has_usage", "page", "usage"}
+            expected = {"sequence", "device", "timestamp", "value", "has_page", "has_usage", "page", "usage",
+                        "has_cookie", "cookie"}
             if not isinstance(row, dict) or set(row) != expected:
                 raise ValueError("Invalid stream record fields")
             decoded = dict(row)
@@ -61,6 +62,7 @@ def read_stream(output, partial=False):
             decoded["value"] = decimal(row["value"], -(1 << 63), (1 << 63) - 1)
             for field in ("page", "usage"):
                 integer(row[field], field, -(1 << 31), (1 << 31) - 1)
+            validate_cookie(row)
             for field in ("has_page", "has_usage"):
                 if type(row[field]) is not bool:
                     raise ValueError("Invalid stream usage presence flag")
@@ -104,7 +106,10 @@ def fixture_drain(device):
         if len(rows) > len(expected):
             raise ValueError("Native fixture emitted additional records before drain")
         for index, row in enumerate(rows):
-            actual = {key: value for key, value in row.items() if key not in ("timestamp", "device")}
+            # Drain checks event shape; validate_stream separately compares every
+            # cookie with the independent receipt from this exact native run.
+            actual = {key: value for key, value in row.items()
+                      if key not in ("timestamp", "device", "has_cookie", "cookie")}
             if row["device"] != device or actual != expected[index]:
                 raise ValueError("Native fixture stream differs from its drain reference")
         return len(rows) == len(expected)
