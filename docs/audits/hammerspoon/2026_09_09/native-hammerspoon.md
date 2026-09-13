@@ -22,13 +22,17 @@ Neither successful UI clicks nor `fixture_only` receipts justify production admi
 
 ## Reuse the verified producer
 
-The unchanged producer is retained by
+The workflow selects the [queued element identity producer](#queued-element-identity-producer).
+Reuse that archive while its producer sources remain unchanged. Earlier builds
+below are historical evidence, not interchangeable runtime selections.
+
+The earlier producer without full inventory or queued cookies is retained by
 [build 34723122359](https://github.com/adrienm7/ergopti/actions/runs/34723122359),
 at revision `80289309a01ae0a38d66a7687ced39120dccf30f`.
 Its archive is 12,183,253 bytes and has SHA-256
 `e1628f14a7838c07a50304a9de5346820eb9ec863868b4154b9dd0abb7fc630e`.
 The upstream source revision is `9312593e1a3bf72b94c63c524ebabe2637442e8a`.
-The workflow pins this artifact and validates it before use. Local copies remain
+Local copies of this historical artifact remain
 under `.rtk/hs274-producer-build-34723122359/`; do not delete them as cleanup.
 Do not rebuild for changes confined to Python admission or Lua consumers.
 Artifact expiry is not evidence of changed producer behavior: check the retained
@@ -331,6 +335,28 @@ The workflow selects this archive for inventory receipt version 2. Physical
 stream framing remains version 1; these are separate protocols. Native input
 acceptance of the cookie/capacity correction is recorded below. Reuse this archive
 while its producer sources remain unchanged.
+
+## Queued element identity producer
+
+Build [34773435230](https://github.com/adrienm7/ergopti/actions/runs/34773435230)
+succeeded at `fdf68904fd4dd6a7d142a863b018084899c1163a`. It preserves native
+element cookies in raw capture and stream records, before the upstream wrapper
+discards identity. The independent raw/stream comparison includes those cookies;
+historical fixtures retain explicit absence instead of fabricated identities.
+
+The downloaded archive is 12,180,759 bytes, SHA-256
+`b6dccdae1ac4d228860af07c94e5ecf69f682d1a03e7ee414c89616614b51930`.
+All 13 retained headers match the owned source byte for byte. The three products
+contain both x86_64 and arm64 slices; native strict signature verification passed
+with ad hoc development signatures. The CLI reports `mach_absolute_time`,
+numerator 125 and denominator 3. Upstream remains
+`9312593e1a3bf72b94c63c524ebabe2637442e8a`.
+
+Reuse this build for unchanged producer sources. The previous inventory build
+does not emit queued cookies and cannot satisfy the new strict stream reader.
+Compilation and portable regressions are proven; native remapping acceptance of
+this producer remains pending. This does not establish synchronized initial
+state, normal driver ownership, or production packaging.
 
 ## Complete fixture inventory acceptance
 
