@@ -329,6 +329,16 @@ function isSharedLuaSource(f) {
 }
 
 /**
+ * Performance audit prose is historical evidence, not a runtime contract.
+ * Driver docs, audit manifests, skills and routed memory stay on their existing gates.
+ * @param {string} f Repo-relative path.
+ * @returns {boolean} Whether only report conventions apply.
+ */
+function isPerformanceReport(f) {
+	return f.startsWith('docs/audits/performance/') && f.endsWith('.md');
+}
+
+/**
  * Every rule states WHY the gate is required, because the non-obvious pairings
  * are the whole point of this file.
  */
@@ -364,9 +374,15 @@ const RULES = [
 			!f.includes('/tests/'),
 	},
 	{
+		gate: 'report-style',
+		why: 'historical performance reports require conventions; driver-doc path guards do not inspect this archive',
+		match: isPerformanceReport,
+	},
+	{
 		gate: 'js',
-		why: 'port compliance, single-source and parity checks live ONLY here — and doc-paths, which validates every link a .md file carries',
+		why: 'port compliance, single-source, parity and document-consumer checks live here; doc-paths rejects obsolete roots in driver docs only',
 		match: (f) =>
+			!isPerformanceReport(f) && (
 			f.includes('/adapters/') ||
 			f.includes('_shared/') ||
 			f.startsWith('static/ergopti_plus/macos/launcher/') ||
@@ -377,7 +393,7 @@ const RULES = [
 			f.endsWith('.js') ||
 			f.endsWith('.cjs') ||
 			f.endsWith('.svelte') ||
-			f.endsWith('.md'),
+			f.endsWith('.md')),
 	},
 	{
 		gate: 'swift-launcher',
@@ -438,7 +454,20 @@ function selectGates(files) {
 		const hits = files.filter(rule.match);
 		if (hits.length > 0) selected.set(rule.gate, { why: rule.why, sample: hits.slice(0, 3) });
 	}
-	return selected;
+	return omitCoveredGates(selected);
+}
+
+/**
+ * Avoid repeating a standalone check already executed by a selected suite.
+ * @param {Map} gates Selected commands and their explanations.
+ * @returns {Map} The same selection with proven duplicate commands removed.
+ */
+function omitCoveredGates(gates) {
+	for (const gate of gates.keys()) {
+		const owner = GATE_COMMANDS[gate]?.coveredBy;
+		if (owner && gates.has(owner)) gates.delete(gate);
+	}
+	return gates;
 }
 
 // ==================================================
@@ -469,6 +498,7 @@ function runNpm(script) {
 // in the JS gate finish before any Lua driver readers execute.
 const GATE_COMMANDS = {
 	'ahk-encoding': { npm: 'test:ahk-encoding' },
+	'report-style': { npm: 'lint:conventions:strict', coveredBy: 'js' },
 	js: { npm: 'test:js' },
 	'swift-launcher': { npm: 'test:macos-swift-launcher' },
 	hs: { npm: 'test:hs' },
@@ -588,7 +618,7 @@ function main() {
 
 	const changeGates = selectGates(files);
 	const gates = all
-		? new Map(Object.keys(GATE_COMMANDS).map((gate) => [gate, {}]))
+		? omitCoveredGates(new Map(Object.keys(GATE_COMMANDS).map((gate) => [gate, {}])))
 		: changeGates;
 
 	if (gates.size === 0) {
@@ -610,7 +640,11 @@ function main() {
 	for (const [gate] of gates) {
 		console.log(`\n=== ${gate} ===`);
 		const res = runGate(gate);
-		const classification = classifyGateResult(gate, res, changeGates.has(gate));
+		// A full audit may run a selected standalone check through its parent
+		// suite. Its failure still covers this change and cannot be exonerated.
+		const coversChange = changeGates.has(gate) || [...changeGates.keys()].some(
+			(changedGate) => GATE_COMMANDS[changedGate]?.coveredBy === gate);
+		const classification = classifyGateResult(gate, res, coversChange);
 		classifications.push({ gate, ...classification });
 		if (classification.kind === 'environment-deferral') console.log(`  skipped: ${classification.detail}`);
 		else if (classification.kind !== 'pass') {
