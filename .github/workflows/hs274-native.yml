@@ -68,6 +68,7 @@ jobs:
           python3 tools/diagnostics/hs274_capture_test.py
           python3 tools/diagnostics/hs274_stream_test.py
           python3 tools/diagnostics/hs274_hammerspoon_test.py
+          python3 -m unittest discover -s tools/diagnostics -p 'hs274_accessibility*_test.py'
       - name: Acquire the repository-selected native Hammerspoon runtime
         if: inputs.hammerspoon_consumer
         run: |

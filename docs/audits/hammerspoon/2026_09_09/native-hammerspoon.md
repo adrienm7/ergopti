@@ -90,8 +90,13 @@ tested that lifetime change at `50f89f7229a1527e89f982a0c519399047752de7`.
 Authentication succeeded and account cleanup completed, but all three admission
 scans again returned `missing_application`. Keeping the account alive did not
 resolve the native failure; do not repeat that experiment unchanged.
-The next diagnostic retains the screen, window names and Accessibility sheet
-count immediately after Open closes, to expose any secondary dialog or refusal.
+[Run 34751707052](https://github.com/adrienm7/ergopti/actions/runs/34751707052)
+then captured the screen immediately after Open closed. The [retained screenshot](hs274-picker-after-open.png)
+showed the original eleven application rows without Hammerspoon; the native
+window list contained only Accessibility and reported zero sheets. There was
+no observed secondary authentication dialog. Do not add another authentication
+flow on that assumption. The next diagnostic reads the copied bundle metadata,
+checks its signature and retains scoped TCC messages on admission failure.
 Neither experiment proves global trust or closes HS-274.
 
 The supervisor signals `permission_ready` only after ordinary UI approval.
