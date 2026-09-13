@@ -21,6 +21,7 @@ def receipt():
         epoch = 1000 + (row["timestamp"] * 125 // 3) / 1000000000
         return datetime.fromtimestamp(math.floor(epoch)).strftime("%Y-%m-%d %H:%M:%S") + f".{math.floor((epoch % 1) * 1000):03d}"
     return capture, {"runtime": "native Hammerspoon", "coverage": "fixture_only", "settled": True,
+                     "field_focus": {"accessibility": True, "value": True, "fixture_id": 51, "focused_id": 51, "role": "AXTextField"},
                      "context_source": "native app/window/AX", "context_stopped": True,
                      "context_observations": [dict(observed_ns=str(index), allowed=allowed,
                          **({"app": "Observed", "epoch": 1000 + index / 1000000000} if allowed else {}))
@@ -38,6 +39,16 @@ def receipt():
 
 
 class ConsumerTests(unittest.TestCase):
+    def test_native_consumer_requires_trusted_exact_field_focus(self):
+        capture, result = receipt()
+        validate_consumer(result, capture)
+        for field, value in (("accessibility", False), ("fixture_id", True), ("focused_id", 53),
+                             ("value", False), ("role", "AXWindow")):
+            altered = copy.deepcopy(result)
+            altered["field_focus"][field] = value
+            with self.subTest(field=field), self.assertRaisesRegex(ValueError, "field focus"):
+                validate_consumer(altered, capture)
+
     def test_native_consumer_requires_distinct_observed_privacy_transitions(self):
         capture, result = receipt()
         validate_consumer(result, capture)

@@ -14,6 +14,7 @@ import time
 
 from hs274_capture import unique_object
 from hs274_stream import decimal
+from hs274_accessibility import approve_accessibility
 
 
 def read_clock(information):
@@ -163,10 +164,12 @@ def owned_capture(app, cli, output, report):
     shutil.copyfile(here / "hs274-context-probe.lua", scratch / "hs274-context-probe.lua")
     result = output / "hs274-remap-hammerspoon.json"
     stop = scratch / "stop"
+    permission_request = scratch / "permission-request.json"
     configuration = {"repo": str(here.parents[1]), "cli": str(cli), "result": str(result),
                      "stream": str(output / "hs274-remap-physical-stream.log"),
                      "diagnostics": str(output / "hs274-remap-physical-stream-stderr.log"),
-                     "stop": str(stop), "batch_limit": 64, "context_limit": 64, "frame_limit": 65536, "clock": timebase}
+                     "stop": str(stop), "permission_request": str(permission_request),
+                     "batch_limit": 64, "context_limit": 64, "frame_limit": 65536, "clock": timebase}
     (scratch / "capture-config.json").write_text(json.dumps(configuration), encoding="utf-8")
     with (output / "hs274-remap-hammerspoon-launch.log").open("xb") as log:
         launcher = subprocess.Popen(["/usr/bin/open", "-n", "-g", "-W", str(copied),
@@ -176,7 +179,14 @@ def owned_capture(app, cli, output, report):
         state = report.setdefault("processes", {}).setdefault("physical-stream", {"runtime": "native Hammerspoon"})
         try:
             deadline = time.monotonic() + 15
+            approval_attempted = False
             while not native.matching(executable) or not Path(configuration["stream"]).is_file():
+                if permission_request.exists() and not approval_attempted:
+                    if len(native.matching(executable)) != 1:
+                        raise RuntimeError("Accessibility request has no unique owned Hammerspoon process")
+                    approval_attempted = True
+                    approve_accessibility(report)
+                    deadline = time.monotonic() + 15
                 if result.exists():
                     client.poll()
                 if launcher.poll() is not None or time.monotonic() >= deadline:
@@ -197,6 +207,12 @@ def owned_capture(app, cli, output, report):
 
 def validate_consumer(result, capture):
     """Match real Lua credits and exact original context keys against native input."""
+    focus = result.get("field_focus") if isinstance(result, dict) else None
+    if (not isinstance(focus, dict) or focus.get("accessibility") is not True or focus.get("value") is not True
+            or type(focus.get("fixture_id")) is not int or focus["fixture_id"] <= 0
+            or type(focus.get("focused_id")) is not int or focus["focused_id"] != focus["fixture_id"]
+            or focus.get("role") != "AXTextField"):
+        raise ValueError("Native field focus is not trusted and exact")
     if (not isinstance(result, dict) or result.get("runtime") != "native Hammerspoon" or result.get("coverage") != "fixture_only"
             or result.get("settled") is not True or result.get("stop_requested") is not True
             or type(result.get("error_count")) is not int or result["error_count"] != 0
