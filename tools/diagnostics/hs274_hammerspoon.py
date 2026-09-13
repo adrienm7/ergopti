@@ -155,7 +155,9 @@ def owned_capture(app, cli, output, report):
     timebase = read_clock(json.loads(clock.stdout, object_pairs_hook=unique_object))
     lifecycle = native_lifecycle()
     native = lifecycle.NativeProcesses()
-    scratch = Path(tempfile.mkdtemp(prefix="hs274-hammerspoon-")).resolve()
+    applications = Path.home() / "Applications"
+    applications.mkdir(exist_ok=True)
+    scratch = Path(tempfile.mkdtemp(prefix="hs274-hammerspoon-", dir=applications)).resolve()
     copied = scratch / "Hammerspoon.app"
     executable = copied / "Contents/MacOS/Hammerspoon"
     subprocess.run(["/usr/bin/ditto", str(app), str(copied)], check=True, timeout=60)

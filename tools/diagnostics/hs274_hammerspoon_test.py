@@ -109,7 +109,8 @@ class ConsumerTests(unittest.TestCase):
                         patch("hs274_hammerspoon.subprocess.run", return_value=SimpleNamespace(stdout=clock)), \
                         patch("hs274_hammerspoon.subprocess.Popen", side_effect=launch), \
                         patch("hs274_hammerspoon_registration.register_application", side_effect=lambda report, app: registered.append(app)), \
-                        patch("hs274_hammerspoon.tempfile.mkdtemp", return_value=str(scratch)), \
+                        patch("hs274_hammerspoon.Path.home", return_value=root), \
+                        patch("hs274_hammerspoon.tempfile.mkdtemp", return_value=str(scratch)) as temporary, \
                         patch("hs274_hammerspoon.CaptureReceipt", return_value=client), \
                         patch("hs274_hammerspoon.approve_accessibility", side_effect=approve):
                     if rejected:
@@ -120,6 +121,8 @@ class ConsumerTests(unittest.TestCase):
                     else:
                         with owned_capture(root / "app", root / "cli", output, {}):
                             self.assertEqual(ready.read_text(encoding="utf-8"), "approved\n")
+                    self.assertEqual(temporary.call_args.kwargs.get("dir"), root / "Applications")
+                    self.assertTrue((root / "Applications").is_dir())
 
     def test_capture_preserves_primary_failure_when_settlement_also_fails(self):
         with tempfile.TemporaryDirectory(prefix="hs274-primary-failure-") as directory:
@@ -139,6 +142,7 @@ class ConsumerTests(unittest.TestCase):
                     patch("hs274_hammerspoon_registration.register_application"), \
                     patch("hs274_hammerspoon.subprocess.run", return_value=SimpleNamespace(stdout=clock)), \
                     patch("hs274_hammerspoon.subprocess.Popen", return_value=object()), \
+                    patch("hs274_hammerspoon.Path.home", return_value=root), \
                     patch("hs274_hammerspoon.tempfile.mkdtemp", return_value=str(scratch)), \
                     patch("hs274_hammerspoon.CaptureReceipt", return_value=client):
                 with self.assertRaisesRegex(ValueError, "primary failure"):

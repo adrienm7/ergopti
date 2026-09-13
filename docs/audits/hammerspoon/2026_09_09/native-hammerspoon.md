@@ -130,6 +130,18 @@ This changes no TCC permission and cannot substitute for the subsequent native
 Accessibility check. The local launch-order regression fails without registration;
 native execution is still required to establish whether this resolves TCC's error.
 
+[Run 34754395332](https://github.com/adrienm7/ergopti/actions/runs/34754395332),
+job `103716208790`, tested that call at
+`b83ed70abbe20c2ffbc1e19585a38f4d7b209c8b`. The native script executed
+successfully and returned `{identifier: "org.hammerspoon.Hammerspoon",
+before: null, status: 0, after: null}`. The exact-resolution guard stopped
+before launch, as required. Explicit registration under the macOS temporary
+directory did not make the bundle discoverable in this observation.
+The next experiment changes only the owned directory parent to `~/Applications`;
+it still allocates a unique child and keeps the same registration and trust
+checks. This tests a location hypothesis, not a proven system-wide exclusion
+rule for temporary paths. Never overwrite another Hammerspoon installation.
+
 The supervisor signals `permission_ready` only after ordinary UI approval.
 Lua then independently checks actual Accessibility trust before creating the
 input fixture. Native context tests must subsequently verify public, private,
