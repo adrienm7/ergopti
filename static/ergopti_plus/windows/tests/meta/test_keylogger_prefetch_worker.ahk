@@ -72,8 +72,10 @@ _KLPFW_ReadWorkerContract() {
 	; carries live-walker deltas that no cold start could rebuild.
 	Assert(InStr(Worker, "KLRCache.disposable := true") > 0,
 		"KLPF_WorkerMain must declare that it owns a disposable projection, or the reader falls back to rebuilding the whole history on every dashboard open (klr-reader-durable-cache)")
-	Assert(InStr(Worker, "KLR_ReadRangeSplitToday") > 0,
-		"selected-range SQL projection must run inside the detached worker")
+	Assert(InStr(Worker, "KLR_BuildRangeSplitTodayJson(") > 0,
+		"selected ranges must use the complete SQL JSON serializer inside the detached worker")
+	Assert(InStr(Worker, "KLR_ReadRangeSplitToday(") == 0,
+		"the worker must not rebuild every range cell as an AHK Map before encoding it again")
 
 	for _, body in [First, Full, Bridge, Edge] {
 		Assert(InStr(body, "KLPF_BuildAndWrite(") = 0,
