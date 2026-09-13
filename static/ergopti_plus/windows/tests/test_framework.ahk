@@ -318,19 +318,37 @@ _DriverMaskNonCode(&Src, BlockCommentsOnly := false) {
 			continue
 		}
 		Out .= SubStr(Src, CopiedThrough, Token.Pos - CopiedThrough)
-		Out .= RegExReplace(SubStr(Src, Token.Pos, Position - Token.Pos), "[^`r`n]", " ")
+		Out .= _DriverBlankNonNewlines(SubStr(Src, Token.Pos, Position - Token.Pos))
 		CopiedThrough := Position
 	}
 	return CopiedThrough == 1 ? Src : Out . SubStr(Src, CopiedThrough)
 }
 
-_DriverFindFunctionDefinition(&Src, Name, SearchPos := 1, CommentsMasked := false) {
+; PCRE replaces a supplementary character once, but source positions count its
+; two UTF-16 units. Blank spans by native string length to keep aligned offsets.
+_DriverBlankNonNewlines(Text) {
+	Out := ""
+	Position := 1
+	while RegExMatch(Text, "[`r`n]", &Boundary, Position) {
+		Width := Boundary.Pos - Position
+		if Width
+			Out .= Format("{:" . Width . "}", "")
+		Out .= Boundary[0]
+		Position := Boundary.Pos + Boundary.Len
+	}
+	Width := StrLen(Text) - Position + 1
+	if Width
+		Out .= Format("{:" . Width . "}", "")
+	return Out
+}
+
+_DriverFindFunctionDefinition(&Src, Name, SearchPos := 1, CodeMasked := false) {
 	if !RegExMatch(Name, "^[A-Za-z_][A-Za-z0-9_]*$")
 		throw ValueError("Invalid driver function name: " . Name)
 	if !SearchPos
 		return 0
-	if !CommentsMasked {
-		Masked := _DriverMaskBlockComments(&Src)
+	if !CodeMasked {
+		Masked := _DriverMaskNonCode(&Src)
 		return _DriverFindFunctionDefinition(&Masked, Name, SearchPos, true)
 	}
 	Pattern := "im)^[ \t]*" . Name . "\("
@@ -424,16 +442,21 @@ class _DriverIndexedBodyExtractor {
 		if Src == ""
 			return _DriverExtractFunctionBody(&Src, Name)
 		if !IsObject(this.Offsets) {
-			this.Offsets := Map()
-			this.Offsets.CaseSense := "Off"
+			Code := _DriverMaskNonCode(&Src)
+			Offsets := Map()
+			Offsets.CaseSense := "Off"
 			Position := 1
-			while RegExMatch(Src, "m)^[ \t]*([A-Za-z_][A-Za-z0-9_]*)\(", &Found, Position) {
-				if !this.Offsets.Has(Found[1])
-					this.Offsets[Found[1]] := Found.Pos
+			while RegExMatch(Code, "m)^[ \t]*([A-Za-z_][A-Za-z0-9_]*)\(", &Found, Position) {
+				if !Offsets.Has(Found[1])
+					Offsets[Found[1]] := Found.Pos
 				Position := Found.Pos + Found.Len
 			}
+			; Capture and borrow one immutable code mask, without copying it per name.
+			this.Find := (Symbol, Start) => _DriverFindFunctionDefinition(&Code, Symbol, Start, true)
+			this.Offsets := Offsets
 		}
-		return _DriverExtractFunctionBody(&Src, Name, this.Offsets.Get(Name, 0), true)
+		Definition := this.Find.Call(Name, this.Offsets.Get(Name, 0))
+		return _DriverExtractDefinedBody(&Src, Definition)
 	}
 }
 
@@ -445,7 +468,12 @@ _DriverExtractFunctionBody(&Src, Name, SearchPos := 1, CommentsMasked := false) 
 	; Match a definition, not a same-named column-zero call. The scanner balances
 	; nested parameter expressions and quoted parentheses before requiring the
 	; opening brace immediately after the real outer close.
-	Definition := _DriverFindFunctionDefinition(&Src, Name, SearchPos, true)
+	Definition := _DriverFindFunctionDefinition(&Src, Name, SearchPos)
+	return _DriverExtractDefinedBody(&Src, Definition)
+}
+
+; Definition positions come from the code mask; returned text retains literals.
+_DriverExtractDefinedBody(&Src, Definition) {
 	if !IsObject(Definition)
 		return ""
 	Idx := Definition.Idx
