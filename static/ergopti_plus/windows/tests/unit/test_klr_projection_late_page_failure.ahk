@@ -13,13 +13,18 @@ _KLPL_Authorize(State, Context, Action, NamePtr, ColumnPtr, DatabasePtr, Trigger
 		Name := NamePtr ? StrGet(NamePtr, "UTF-8") : ""
 		if Action == 18 && Name == "klr_reader_typing_counts" {
 			State["inserts"] += 1
-			if State["inserts"] == 129 {
+			if State["mode"] == "insert" && State["inserts"] == 129 {
 				State["denied"] += 1
 				return 1
 			}
 		}
-		if Action == 22 && Name == "COMMIT" && State["inserts"] > 0
+		if Action == 22 && Name == "COMMIT" && State["inserts"] > 0 {
+			if State["mode"] == "commit" && State["page_commits"] == 1 {
+				State["denied"] += 1
+				return 1
+			}
 			State["page_commits"] += 1
+		}
 	} catch {
 		State["callback_failed"] := true
 		return 1
@@ -27,7 +32,7 @@ _KLPL_Authorize(State, Context, Action, NamePtr, ColumnPtr, DatabasePtr, Trigger
 	return 0
 }
 
-_KLPL_PreserveImageAndRetry() {
+_KLPL_PreserveImageAndRetry(Mode := "insert") {
 	_KLRDC_EnsureSharedDir()
 	_KLRDC_Reset()
 	Callback := 0
@@ -43,13 +48,15 @@ _KLPL_PreserveImageAndRetry() {
 			Tail .= _KLRDC_TypingBatch(A_Index + 1, "2026-01-01 10:00:01.000",
 				"2026-01-01", "fixture.exe", ["b"])
 		_KLRDC_AppendLedger(Tail)
-		State := Map("inserts", 0, "page_commits", 0, "denied", 0, "callback_failed", false)
+		State := Map("mode", Mode, "inserts", 0, "page_commits", 0,
+			"denied", 0, "callback_failed", false)
 		Callback := CallbackCreate(_KLPL_Authorize.Bind(State), "C", 6)
 		AssertEqual(0, DllCall(SQLiteConst.DLL . "\sqlite3_set_authorizer",
 			"Ptr", Db, "Ptr", Callback, "Ptr", 0, "Int"))
 		AssertEqual(0, KLR_BuildDatabase(_KLRDC_Root()))
 		AssertFalse(State["callback_failed"])
-		AssertEqual(129, State["inserts"], "the fault must occur after a complete 128-row page")
+		AssertEqual(Mode == "insert" ? 129 : 130, State["inserts"],
+			"the fault must occur after a complete 128-row page")
 		AssertEqual(1, State["page_commits"], "one earlier projection page must have committed")
 		AssertEqual(1, State["denied"], "the native SQLite refusal must actually occur")
 		AssertEqual(0, KLRCache.db, "a partially prepared worker must be discarded")
@@ -77,3 +84,6 @@ _KLPL_PreserveImageAndRetry() {
 
 Test("KLR projection: late page refusal preserves image and retries (klr-projection-late-page)",
 	_KLRDC_CheckTeardown.Bind(_KLPL_PreserveImageAndRetry))
+
+Test("KLR projection: second page COMMIT refusal preserves image and retries (klr-projection-late-page)",
+	_KLRDC_CheckTeardown.Bind(_KLPL_PreserveImageAndRetry.Bind("commit")))
