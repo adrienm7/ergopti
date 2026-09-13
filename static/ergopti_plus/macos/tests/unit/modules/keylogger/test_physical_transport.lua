@@ -43,6 +43,47 @@ local function fixture(overrides)
 end
 
 helpers.describe("physical transport (hs274)", function()
+	helpers.it("retains acquisition ownership when stopped inside spawn", function()
+		local transport, observed
+		transport, observed = fixture(function(dependencies, task, state)
+			dependencies.spawn = function()
+				transport.stop()
+				state.settled_during_spawn = state.settled
+				return task
+			end
+			function task.start() error("Revoked acquisition must not start") end
+		end)
+		helpers.assert_eq(transport.start("/fixture/capture", {}), false)
+		helpers.assert_eq(observed.settled_during_spawn, 0, "Pending acquisition cannot settle")
+		helpers.assert_eq(observed.stops, 1, "Returned task must be retired")
+		helpers.assert_eq(transport.isSettled(), false)
+		observed.settle()
+		helpers.assert_eq(observed.settled, 1)
+	end)
+
+	helpers.it("settles acquisition failures after an early completion callback", function()
+		for _, outcome in ipairs({ "task", "nil", "throw" }) do
+			local transport, observed = fixture(function(dependencies, task, state)
+				dependencies.spawn = function(_, _, done)
+					done(1)
+					state.settled_during_spawn = state.settled
+					if outcome == "throw" then error("Injected acquisition failure") end
+					if outcome == "task" then return task end
+				end
+			end)
+			helpers.assert_eq(transport.start("/fixture/capture", {}), false)
+			helpers.assert_eq(observed.settled_during_spawn, 0)
+			helpers.assert_eq(#observed.errors, 1)
+			if outcome == "task" then
+				helpers.assert_eq(observed.stops, 1)
+				helpers.assert_eq(transport.isSettled(), false)
+				observed.settle()
+			end
+			helpers.assert_true(transport.isSettled())
+			helpers.assert_eq(observed.settled, 1)
+		end
+	end)
+
 	helpers.it("acknowledges complete frames only after the real receiver commits", function()
 		local transport, observed = fixture()
 		helpers.assert_true(transport.start("/fixture/capture", {}))
