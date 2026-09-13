@@ -732,6 +732,7 @@ global _AhkSubDir := ""
 #Include unit/test_klr_projection_paging.ahk
 #Include unit/test_klr_projection_page_work.ahk
 #Include unit/test_klr_projection_sql_failure.ahk
+#Include unit/test_klr_projection_late_page_failure.ahk
 #Include unit/test_klr_cache_publication_order.ahk
 #Include unit/test_klr_cache_save_cadence.ahk
 #Include unit/test_sqlite_readonly_clone.ahk
