@@ -4,7 +4,7 @@
 ; MODULE: Driver Function Body Cache Tests
 ; DESCRIPTION:
 ; Repeated meta-tests must reuse extraction from the immutable source snapshot
-; without changing exact-name lookup, retryable absence, or fail-loudly errors.
+; with native case-insensitive identity, retryable absence, and fail-loudly errors.
 ; Counters wrap the real parser: equal strings alone cannot prove avoided work.
 ; ==============================================================================
 
@@ -51,10 +51,10 @@ _DFBC_CaseIdentity(LowerFirst) {
 	loop 2 {
 		for Name in Names {
 			Body := State.Cache.Get(Name)
-			AssertEqual(Name == "CaseSubject", Body != "", "cache keys must preserve scanner case identity")
+			AssertContains(Body, "return 2", "native symbol aliases must resolve the same live definition")
 		}
 	}
-	AssertEqual(2, State.Extractions)
+	AssertEqual(1, State.Extractions, "case aliases must share one extraction regardless of lookup order")
 }
 
 _DFBC_EmptySourceCanRecover() {

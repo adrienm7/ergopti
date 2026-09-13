@@ -333,7 +333,7 @@ _DriverFindFunctionDefinition(&Src, Name, SearchPos := 1, CommentsMasked := fals
 		Masked := _DriverMaskBlockComments(&Src)
 		return _DriverFindFunctionDefinition(&Masked, Name, SearchPos, true)
 	}
-	Pattern := "m)^[ \t]*" . Name . "\("
+	Pattern := "im)^[ \t]*" . Name . "\("
 	SourceLen := StrLen(Src)
 	while RegExMatch(Src, Pattern, &Match, SearchPos) {
 		SignatureOpen := InStr(Src, "(", , Match.Pos)
@@ -396,7 +396,7 @@ class _DriverFunctionBodyCache {
 		this.Extract := Extract
 		this.Source := ""
 		this.Bodies := Map()
-		this.Bodies.CaseSense := "On"
+		this.Bodies.CaseSense := "Off"
 	}
 
 	Get(Name) {
@@ -425,7 +425,7 @@ class _DriverIndexedBodyExtractor {
 			return _DriverExtractFunctionBody(&Src, Name)
 		if !IsObject(this.Offsets) {
 			this.Offsets := Map()
-			this.Offsets.CaseSense := "On"
+			this.Offsets.CaseSense := "Off"
 			Position := 1
 			while RegExMatch(Src, "m)^[ \t]*([A-Za-z_][A-Za-z0-9_]*)\(", &Found, Position) {
 				if !this.Offsets.Has(Found[1])
