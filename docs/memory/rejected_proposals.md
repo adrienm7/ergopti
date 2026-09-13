@@ -43,6 +43,17 @@ opening and system-wide memory were not measured. Reconsider only with a changed
 memory-pressure workload or publication design and fresh end-to-end evidence.
 See the [private-file clone experiment](../audits/performance/ahk/2026_09_09/private_file_clone/report.md).
 
+## Mapped reader sources as an already-validated clone optimization
+
+Do not enable source mmap solely from the clone timing improvement. Six samples
+per mode on the 702390272-byte derived image gave medians of 1190 ms without
+mapping and 740 ms with mapping. However, a synthetic native last-page byte lock
+refused ordinary backup while mapped backup succeeded with correct payload.
+That is a changed refusal mechanism, not observed corruption and not established
+fault equivalence. Reconsider only with mapped-I/O fault, parent publication and
+concurrent source-replacement evidence; keep ordinary-read regression assertions.
+See the [mapped-source investigation](../audits/performance/ahk/2026_09_13/mapped_clone/report.md).
+
 ## Generated manifests at runtime
 
 Do not replace checked-in `_generated/` feature manifests with a runtime TOML
