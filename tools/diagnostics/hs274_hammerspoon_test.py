@@ -80,7 +80,7 @@ class ConsumerTests(unittest.TestCase):
                     self.assertEqual(state["stderr"], "native refusal")
 
     def test_native_start_is_released_only_after_successful_ui_approval(self):
-        for rejected in (False, True):
+        for rejected in (False, True, "restart"):
             with self.subTest(rejected=rejected), tempfile.TemporaryDirectory(prefix="hs274-permission-") as directory:
                 root = Path(directory).resolve()
                 scratch, output = root / "scratch", root / "output"
@@ -88,21 +88,30 @@ class ConsumerTests(unittest.TestCase):
                 output.mkdir()
                 (scratch / "permission-request.json").write_text("{}", encoding="utf-8")
                 ready = scratch / "permission-ready"
-                native = SimpleNamespace(matching=lambda _: [42])
-                lifecycle = SimpleNamespace(NativeProcesses=lambda: native, cleanup=lambda *args: None)
+                live, launches = [], []
+                native = SimpleNamespace(matching=lambda _: list(live))
+                def cleanup(*args):
+                    if rejected == "restart":
+                        raise RuntimeError("old permission owner did not stop")
+                    live.clear()
+                lifecycle = SimpleNamespace(NativeProcesses=lambda: native, cleanup=cleanup)
                 client = SimpleNamespace(wait=lambda **kwargs: None, returncode=143, result={})
                 clock = json.dumps({"version": 1, "domain": "mach_absolute_time", "numer": 125, "denom": 3})
 
                 def approve(report, app):
                     self.assertFalse(ready.exists())
                     self.assertEqual(app, scratch / "Hammerspoon.app")
-                    if rejected:
+                    if rejected is True:
                         raise ValueError("approval refused")
-                    (output / "hs274-remap-physical-stream.log").write_text("", encoding="utf-8")
 
                 registered = []
                 def launch(*args, **kwargs):
                     self.assertEqual(registered, [scratch / "Hammerspoon.app"])
+                    self.assertEqual(live, [])
+                    launches.append(args[0])
+                    live.append(41 + len(launches))
+                    if len(launches) == 2:
+                        (output / "hs274-remap-physical-stream.log").write_text("", encoding="utf-8")
                     return SimpleNamespace(poll=lambda: None)
 
                 with patch("hs274_hammerspoon.native_lifecycle", return_value=lifecycle), \
@@ -114,13 +123,17 @@ class ConsumerTests(unittest.TestCase):
                         patch("hs274_hammerspoon.CaptureReceipt", return_value=client), \
                         patch("hs274_hammerspoon.approve_accessibility", side_effect=approve):
                     if rejected:
-                        with self.assertRaisesRegex(ValueError, "approval refused"):
+                        kind, message = (RuntimeError, "old permission owner") if rejected == "restart" else (ValueError, "approval refused")
+                        with self.assertRaisesRegex(kind, message):
                             with owned_capture(root / "app", root / "cli", output, {}):
                                 self.fail("Rejected permission admitted capture")
                         self.assertFalse(ready.exists())
+                        self.assertEqual(len(launches), 1)
                     else:
                         with owned_capture(root / "app", root / "cli", output, {}):
                             self.assertEqual(ready.read_text(encoding="utf-8"), "approved\n")
+                            self.assertEqual(len(launches), 2)
+                            self.assertEqual(launches[0], launches[1])
                     self.assertEqual(temporary.call_args.kwargs.get("dir"), root / "Applications")
                     self.assertTrue((root / "Applications").is_dir())
 
