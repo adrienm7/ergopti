@@ -122,6 +122,14 @@ signature-corruption hypotheses without changed evidence. The unchanged
 producer archive remains reusable. The diagnostic change passed twelve local
 Python tests and the selected 225-check JS gate before this native run.
 
+The next experiment calls the documented `LSRegisterURL` for the exact owned
+copy before launch and retains `NSWorkspace` bundle resolution before and after.
+A zero registration status must be followed by the exact resolved copy path;
+command failure, timeout and foreign or missing resolution stop admission.
+This changes no TCC permission and cannot substitute for the subsequent native
+Accessibility check. The local launch-order regression fails without registration;
+native execution is still required to establish whether this resolves TCC's error.
+
 The supervisor signals `permission_ready` only after ordinary UI approval.
 Lua then independently checks actual Accessibility trust before creating the
 input fixture. Native context tests must subsequently verify public, private,

@@ -6,6 +6,7 @@ from datetime import datetime
 import json
 import math
 from pathlib import Path
+import subprocess
 import tempfile
 from types import SimpleNamespace
 import unittest
@@ -13,6 +14,7 @@ from unittest.mock import patch
 
 from hs274_hammerspoon import CaptureReceipt, owned_capture, read_clock, validate_consumer, validate_clock, validate_context
 from hs274_stream_test import fixture
+from hs274_hammerspoon_registration import register_application
 
 
 def receipt():
@@ -40,6 +42,43 @@ def receipt():
 
 
 class ConsumerTests(unittest.TestCase):
+    def test_registration_requires_success_and_exact_bundle_readback(self):
+        with tempfile.TemporaryDirectory(prefix="hs274-registration-") as directory:
+            app = Path(directory).resolve() / "Hammerspoon.app"
+            executable = app / "Contents/MacOS/Hammerspoon"
+            executable.parent.mkdir(parents=True)
+            executable.write_bytes(b"fixture")
+            good = {"identifier": "org.hammerspoon.Hammerspoon", "before": None, "status": 0, "after": str(app)}
+            for changes in ({}, {"status": -10811}, {"status": False}, {"after": str(app.parent / "Foreign.app")},
+                            {"after": None}, {"identifier": "foreign"}):
+                report = {}
+                result = dict(good, **changes)
+                with self.subTest(changes=changes), patch("hs274_hammerspoon_registration.subprocess.run",
+                        return_value=SimpleNamespace(returncode=0, stdout=json.dumps(result), stderr="")) as run:
+                    if changes:
+                        with self.assertRaisesRegex(RuntimeError, "resolution is not exact"):
+                            register_application(report, app)
+                    else:
+                        register_application(report, app)
+                    self.assertEqual(report["hammerspoon_registration"]["resolution"], result)
+                    self.assertEqual(run.call_args.args[0][-1], str(app))
+                    self.assertEqual(run.call_args.kwargs["timeout"], 10)
+            for failure in (SimpleNamespace(returncode=1, stdout="", stderr="native refusal"),
+                            subprocess.TimeoutExpired("osascript", 10, output=b"partial", stderr=b"pending")):
+                report = {}
+                with patch("hs274_hammerspoon_registration.subprocess.run", **(
+                        {"side_effect": failure} if isinstance(failure, Exception) else {"return_value": failure})):
+                    with self.assertRaises((RuntimeError, subprocess.TimeoutExpired)):
+                        register_application(report, app)
+                state = report["hammerspoon_registration"]
+                if isinstance(failure, Exception):
+                    self.assertTrue(state["timed_out"])
+                    self.assertEqual(state["stdout"], "partial")
+                    self.assertNotIn("exit", state)
+                else:
+                    self.assertEqual(state["exit"], 1)
+                    self.assertEqual(state["stderr"], "native refusal")
+
     def test_native_start_is_released_only_after_successful_ui_approval(self):
         for rejected in (False, True):
             with self.subTest(rejected=rejected), tempfile.TemporaryDirectory(prefix="hs274-permission-") as directory:
@@ -61,9 +100,15 @@ class ConsumerTests(unittest.TestCase):
                         raise ValueError("approval refused")
                     (output / "hs274-remap-physical-stream.log").write_text("", encoding="utf-8")
 
+                registered = []
+                def launch(*args, **kwargs):
+                    self.assertEqual(registered, [scratch / "Hammerspoon.app"])
+                    return SimpleNamespace(poll=lambda: None)
+
                 with patch("hs274_hammerspoon.native_lifecycle", return_value=lifecycle), \
                         patch("hs274_hammerspoon.subprocess.run", return_value=SimpleNamespace(stdout=clock)), \
-                        patch("hs274_hammerspoon.subprocess.Popen", return_value=SimpleNamespace(poll=lambda: None)), \
+                        patch("hs274_hammerspoon.subprocess.Popen", side_effect=launch), \
+                        patch("hs274_hammerspoon_registration.register_application", side_effect=lambda report, app: registered.append(app)), \
                         patch("hs274_hammerspoon.tempfile.mkdtemp", return_value=str(scratch)), \
                         patch("hs274_hammerspoon.CaptureReceipt", return_value=client), \
                         patch("hs274_hammerspoon.approve_accessibility", side_effect=approve):
@@ -91,6 +136,7 @@ class ConsumerTests(unittest.TestCase):
             client = SimpleNamespace(wait=settle)
             clock = json.dumps({"version": 1, "domain": "mach_absolute_time", "numer": 125, "denom": 3})
             with patch("hs274_hammerspoon.native_lifecycle", return_value=lifecycle), \
+                    patch("hs274_hammerspoon_registration.register_application"), \
                     patch("hs274_hammerspoon.subprocess.run", return_value=SimpleNamespace(stdout=clock)), \
                     patch("hs274_hammerspoon.subprocess.Popen", return_value=object()), \
                     patch("hs274_hammerspoon.tempfile.mkdtemp", return_value=str(scratch)), \
