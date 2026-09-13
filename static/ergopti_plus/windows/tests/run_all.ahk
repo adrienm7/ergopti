@@ -711,6 +711,7 @@ global _AhkSubDir := ""
 #Include unit/test_klr_candidate_live_retry.ahk
 #Include unit/test_metrics_cancel_retry.ahk
 #Include unit/test_metrics_native_start_cancel.ahk
+#Include unit/test_metrics_native_worker_exit.ahk
 #Include unit/test_orphan_cleanup_pid.ahk
 #Include unit/test_http_orphan_liveness.ahk
 #Include unit/test_klr_cache_admission.ahk
