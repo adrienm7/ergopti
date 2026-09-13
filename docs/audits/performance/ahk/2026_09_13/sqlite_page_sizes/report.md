@@ -184,3 +184,44 @@ See `5e5817c96`, `48270baf2` and `f83850e11`. The latest selected gate passed
 6363 AHK cases; these cases establish their stated contracts, not absence of all
 bugs. Keep production geometry unchanged while assessing the remaining build,
 publication and complete refresh costs and the direct-read tradeoff.
+
+## Native image write follow-up
+
+At `daa48e34b`, use the same private baseline/16384/65536 images. For each
+observation, open the source readonly, retain a checked memory clone, then time
+production `SQLite_BackupInto` into a newly opened private file. Source readers
+remain open across observations; each memory candidate and destination is closed
+before the next observation. Warm one write per geometry, then repeat
+baseline/16384/65536/65536/16384/baseline three times for six samples each.
+The 4096 compacted control is not repeated in this write-only follow-up.
+
+| Source | Backup median (ms) | Backup max (ms) |
+| --- | ---: | ---: |
+| Baseline | 3353.792 | 4025.339 |
+| Vacuumed 16384 | 2705.041 | 4164.763 |
+| Vacuumed 65536 | 2665.687 | 3555.048 |
+
+All six backup durations per source, in milliseconds:
+
+- Baseline: 3543.664, 3582.649, 4025.339, 3163.920, 2965.679, 2336.878.
+- 16384: 3457.259, 4164.763, 2077.218, 1963.834, 3208.619, 2201.462.
+- 65536: 3555.048, 3154.267, 2312.353, 1860.655, 3019.020, 2092.549.
+
+After each backup, verify file size against source page geometry, reopen readonly
+and verify page size and typing-event count. This is a checked native-copy
+receipt plus structural controls, not another exhaustive all-table comparison.
+No diagnostic occurred. Close and delete only the single owned stage before
+continuing; the empty owned output directory is removed on success.
+
+Receipt `sqlite-page-publication-probe-01.out`, hidden scratch harness
+`sqlite-page-publication-probe.ahk`, exit 0 and empty stderr. The receipt also
+retains backup-plus-close duration. Opening, cloning, validation, metadata
+transactions and final atomic replacement are outside the reported backup
+interval. Thus this measures the main page-writing component, not complete
+`KLR_CacheSave` or power-loss durability. TEMP/TMP remain on D:, and the same
+available-memory guard applies before each clone.
+
+The larger-page write medians are about 19-21% lower, but variation is substantial
+and 16384 has the highest observed maximum. The two larger-page medians differ
+by only about 39 ms. Retain all samples and the earlier direct-read tradeoff;
+the remaining cold-build and complete-refresh costs are still unmeasured.
