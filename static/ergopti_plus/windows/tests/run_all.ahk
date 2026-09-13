@@ -673,6 +673,7 @@ global _AhkSubDir := ""
 #Include ../modules/keylogger/keylogger_mouse.ahk
 #Include ../modules/keylogger/keylogger_window_topology.ahk
 #Include unit/test_bounded_focus_snapshot.ahk
+#Include unit/test_focus_handle_release_reentry.ahk
 #Include unit/test_keylogger_mouse_coordinates.ahk
 #Include unit/test_keylogger_window_topology.ahk
 #Include unit/test_hotstring_fire_log_privacy.ahk
