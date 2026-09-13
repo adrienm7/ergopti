@@ -60,6 +60,27 @@ _USCL_ZeroTimeoutObservesHandle() {
 Test("updater fixture: zero-timeout waits observe native state (updater-fixture-zero-wait)",
 	_USCL_ZeroTimeoutObservesHandle)
 
+_USCL_MarkerPoll(Kind, WaitFn := _USTX_WaitForFile) {
+	Root := A_Temp . "\updater_marker_poll_" . A_ScriptHwnd . "_" . A_TickCount
+	AssertTrue(DllCall("CreateDirectoryW", "Str", Root, "Ptr", 0, "Int"),
+		"the marker fixture must acquire its own directory")
+	try {
+		Path := Root . "\marker"
+		if Kind = "file"
+			FileAppend("synthetic launch receipt", Path, "UTF-8-RAW")
+		else if Kind = "directory"
+			DirCreate(Path)
+		AssertEqual(Kind = "file", WaitFn.Call(Path, Kind = "directory" ? 1 : 0),
+			"marker waits must observe existing files immediately and reject directories or absent paths")
+	} finally DirDelete(Root, true)
+}
+for Kind in ["file", "missing", "directory"]
+	Test("updater fixture: marker poll " . Kind . " (updater-fixture-marker-poll)",
+		_USCL_MarkerPoll.Bind(Kind))
+for Kind in ["file", "missing", "directory"]
+	Test("shell fixture: marker poll " . Kind . " (shell-fixture-marker-poll)",
+		_USCL_MarkerPoll.Bind(Kind, _SRTOW_WaitForFile))
+
 _USCL_TreeWaitObservesNativeState() {
 	Path := _FSWL_Path()
 	Owner := 0
