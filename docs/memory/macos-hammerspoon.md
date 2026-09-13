@@ -393,6 +393,16 @@ capacity explicit and distinguish per-element readability from atomic held state
 or physical-press ownership. Exact samples are retained in the
 [inventory refusal](../audits/hammerspoon/2026_09_09/hs274-inventory-refusal.json).
 
+For native inventory regressions, reuse the four snapshots in
+`tools/diagnostics/fixtures/hs274-native-inventories.json` through
+`hs274-stream-inventory-test.cpp` and `hs274_inventory_test.py`. They cover a
+released fixture and a fixture with Space initially held, preserving all scalar
+and array leaves. Run the replays or query individual cookies instead of loading
+the complete corpus into context. Enumeration/readability is distinct from
+synchronizing queued events at lease opening; the
+[native acceptance](../audits/hammerspoon/2026_09_09/native-hammerspoon.md#complete-fixture-inventory-acceptance)
+records that boundary.
+
 For initial held-key acquisition, replay
 `tools/diagnostics/fixtures/hs274-native-held-baseline.json` through
 `BaselineTests.test_retained_native_kernel_baseline_preserves_inherited_and_fresh_space`
