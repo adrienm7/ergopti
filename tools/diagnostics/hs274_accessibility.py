@@ -59,37 +59,35 @@ tell application "System Events"
         set frontmost to true
         set candidates to {}
         set observations to ""
-        repeat with scanIndex from 1 to 40
-            log "HS274 reading main settings content"
-            set mainContent to group 2 of splitter group 1 of group 1 of window 1
-            set controls to entire contents of mainContent
-            if (count controls) > 256 then error "Accessibility panel exceeds observation limit"
-            set candidates to {}
-            set observations to ""
-            repeat with node in controls
-                set controlRole to role of node as text
-                set controlName to ""
-                set controlDescription to ""
-                if exists attribute "AXTitle" of node then
-                    set candidateName to value of attribute "AXTitle" of node
-                    if candidateName is not missing value then set controlName to candidateName as text
+        log "HS274 reading main settings content"
+        set mainContent to group 2 of splitter group 1 of group 1 of window 1
+        set controls to entire contents of mainContent
+        if (count controls) > 256 then error "Accessibility panel exceeds observation limit"
+        repeat with node in controls
+            if role of node is "AXRow" then
+                set rowNodes to entire contents of node
+                if (count rowNodes) > 16 then error "Accessibility row exceeds observation limit"
+                set ownedRow to false
+                set rowCheckboxes to {}
+                repeat with rowNode in rowNodes
+                    if role of rowNode is "AXStaticText" then
+                        set rowLabel to value of attribute "AXValue" of rowNode as text
+                        set observations to observations & "application=" & rowLabel & linefeed
+                        if rowLabel is "Hammerspoon" then set ownedRow to true
+                    else if role of rowNode is "AXCheckBox" then
+                        set end of rowCheckboxes to contents of rowNode
+                    end if
+                end repeat
+                if ownedRow then
+                    if (count rowCheckboxes) is not 1 then error "Owned accessibility row has no unique checkbox"
+                    set end of candidates to item 1 of rowCheckboxes
                 end if
-                if exists attribute "AXDescription" of node then
-                    set candidateDescription to value of attribute "AXDescription" of node
-                    if candidateDescription is not missing value then set controlDescription to candidateDescription as text
-                end if
-                set observations to observations & controlRole & tab & controlName & tab & controlDescription & linefeed
-                if controlRole is "AXStaticText" then
-                    set observations to observations & "label=" & (value of attribute "AXValue" of node as text) & linefeed
-                end if
-                if controlRole is "AXCheckBox" and (controlName is "Hammerspoon" or controlDescription is "Hammerspoon") then
-                    set end of candidates to contents of node
-                end if
-            end repeat
-            if scanIndex is 1 then log observations
-            if (count candidates) > 0 then exit repeat
-            delay 0.1
+            else if role of node is "AXButton" then
+                log (get properties of node)
+                log (get name of every attribute of node)
+            end if
         end repeat
+        log observations
         if (count candidates) is not 1 then return "No unique Hammerspoon checkbox" & linefeed & observations
         set approvalControl to item 1 of candidates
         if (value of approvalControl as integer) is 0 then perform action "AXPress" of approvalControl
