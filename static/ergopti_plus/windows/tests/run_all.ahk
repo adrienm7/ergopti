@@ -708,6 +708,7 @@ global _AhkSubDir := ""
 #Include unit/test_keylogger_journal_read_progress.ahk
 #Include unit/test_klr_sql_operational_retry.ahk
 #Include unit/test_sqlite_read_dispatch.ahk
+#Include unit/test_sqlite_exec_progress_cleanup.ahk
 #Include unit/test_sqlite_module_owner.ahk
 #Include unit/test_klr_ledger_chunk_boundary.ahk
 #Include unit/test_klr_cache_fixture.ahk
