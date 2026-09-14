@@ -65,7 +65,8 @@ ERGOPTI_CHANNEL="${ERGOPTI_CHANNEL:-main}"
 # at build time and vendored inside Resources/Tools/ so users never need a
 # separate download; the Lua driver opens the installer on first use if KE is
 # not yet installed (a one-time system-extension approval is still required).
-KARABINER_VERSION="${KARABINER_VERSION:-16.0.0}"
+KARABINER_MANIFEST_DATA="$(python3 "$REPO_ROOT/tools/build/karabiner_manifest.py")"
+IFS=$'\t' read -r KARABINER_VERSION KARABINER_FILE_NAME KARABINER_SHA256 KARABINER_SOURCE_URL <<< "$KARABINER_MANIFEST_DATA"
 
 # Ollama CLI version bundled for local LLM inference. The universal binary is
 # downloaded at build time and stored in Resources/Tools/ so the app can run
@@ -158,10 +159,10 @@ download_hammerspoon() {
 # through the one-time system-extension approval prompt.
 download_karabiner() {
 	local cache_dir="$BUILD_DIR/cache"
-	local dmg_name="Karabiner-Elements-$KARABINER_VERSION.dmg"
+	local dmg_name="$KARABINER_FILE_NAME"
 	local dmg_path="$cache_dir/$dmg_name"
-	local ke_extracted="$BUILD_DIR/Karabiner-Elements"
-	local url="https://github.com/pqrs-org/Karabiner-Elements/releases/download/v$KARABINER_VERSION/$dmg_name"
+	local ke_extracted="$BUILD_DIR/Karabiner-Elements-$KARABINER_SHA256"
+	local url="$KARABINER_SOURCE_URL"
 	mkdir -p "$cache_dir"
 	if [ ! -f "$dmg_path" ]; then
 		log "Downloading Karabiner-Elements $KARABINER_VERSION from $url"
@@ -169,6 +170,9 @@ download_karabiner() {
 	else
 		log "Using cached $dmg_path"
 	fi
+	local actual_checksum
+	actual_checksum="$(shasum -a 256 "$dmg_path")" || fail "Karabiner checksum calculation failed."
+	[ "${actual_checksum%% *}" = "$KARABINER_SHA256" ] || fail "Karabiner package checksum mismatch."
 	if [ ! -e "$ke_extracted" ]; then
 		log "Extracting Karabiner-Elements.app from DMG"
 		local mount_point
