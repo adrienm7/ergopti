@@ -201,6 +201,18 @@ class ConsumerTests(unittest.TestCase):
                 validate_consumer(broken, capture, modifiers=True)
         with self.assertRaises(ValueError):
             validate_consumer(result, capture, held=True, modifiers=True)
+        # The additional pair overlaps both Shift sides; repeated HID reports
+        # must not turn either side's second physical press into a third credit.
+        capture["records"][8:8] = [dict(down, usage=usage) for usage in (225, 229)]
+        for field in ("presses", "contexts", "clock_samples"):
+            result[field][8:8] = [dict(result[field][index]) for index in (1, 5)]
+        result["counts"].update({"56": 2, "60": 2})
+        validate_consumer(result, capture, modifiers=True, overlap=True)
+        for code in ("56", "60"):
+            broken = copy.deepcopy(result)
+            broken["counts"][code] = 3
+            with self.subTest(repeated=code), self.assertRaises(ValueError):
+                validate_consumer(broken, capture, modifiers=True, overlap=True)
 
     def test_held_consumer_credits_only_the_fresh_space(self):
         capture, result = receipt()
