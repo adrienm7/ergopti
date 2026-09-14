@@ -12,7 +12,7 @@ import subprocess
 import unittest
 from types import SimpleNamespace
 
-from hs274_stream import decimal, read_stream, validate_stream, fixture_drain, validate_interruption
+from hs274_stream import decimal, read_stream, validate_stream, fixture_drain, validate_interruption, validate_successor
 from hs274_disconnect import disconnected_capture
 from hs274_baseline import MARKER as BASELINE_MARKER, read_baseline, read_observation_baselines, require_held_baseline, validate_baseline_native, validate_baseline_capture, wait_baseline
 from hs274_capture import MARKER as CAPTURE_MARKER
@@ -251,6 +251,25 @@ def remap_module():
 
 
 class StreamTests(unittest.TestCase):
+    def test_successor_has_independent_baseline_and_exact_session_identity(self):
+        previous = {"version": 1, "kind": "opened", "coverage": "fixture_only",
+                    "incarnation": "868caf13-2110-4244-8fc2-12d490504a09", "lease": "2",
+                    "baseline": {"version": 1, "boundary": "100", "rows": 2}}
+        opened = dict(previous, lease="3", baseline={"version": 1, "boundary": "200", "rows": 3})
+        validate_successor(previous, opened)
+        for field, value in (("lease", "2"), ("lease", "4"), ("version", True),
+                             ("incarnation", "968caf13-2110-4244-8fc2-12d490504a09"),
+                             ("coverage", "all_devices")):
+            with self.subTest(field=field, value=value), self.assertRaises(ValueError):
+                validate_successor(previous, dict(opened, **{field: value}))
+        for baseline in ({"version": 1, "boundary": "100", "rows": 3},
+                         {"version": 1, "boundary": "99", "rows": 3},
+                         {"version": 1, "boundary": "200", "rows": 0}):
+            with self.subTest(baseline=baseline), self.assertRaises(ValueError):
+                validate_successor(previous, dict(opened, baseline=baseline))
+        with self.assertRaises(ValueError):
+            validate_successor(previous, {key: value for key, value in opened.items() if key != "baseline"})
+
     def test_paged_initial_state_preserves_cookies_and_empty_interfaces(self):
         capture, frames = fixture()
         opened = dict(frames[0], baseline={"version": 1, "boundary": "100", "rows": 4})

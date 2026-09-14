@@ -16,7 +16,7 @@ from hs274_runtime import runtime_paths
 from hs274_services import check_runtime_processes, disable_installed_peers, verify_disabled
 from hs274_registration import suspended_registration, verify_registration_block
 from hs274_capture import validate_capture
-from hs274_stream import read_stream, validate_stream, fixture_drain, validate_interruption
+from hs274_stream import read_stream, validate_stream, fixture_drain, validate_interruption, validate_successor
 from hs274_disconnect import disconnected_capture
 from hs274_hammerspoon import owned_capture, validate_consumer
 from hs274_baseline import read_baseline, read_observation_baselines, wait_baseline, validate_baseline_native, validate_baseline_capture
@@ -310,8 +310,7 @@ def main():
                             [str(runtime["cli"]), "--hs274-capture", "25"], "interrupted-stream", output, report,
                             separate_stderr=True, stream_input=True))
                         opened = wait_stream(interruption_path, observer, lambda stream: True, 10)["opened"]
-                        if opened != dict(report["stream_opened"], lease="3"):
-                            raise RuntimeError("Interruption observer did not acquire the next lease in the same producer")
+                        validate_successor(report["stream_opened"], opened)
                         report["interruption_opened"] = opened
                         return observer
 
