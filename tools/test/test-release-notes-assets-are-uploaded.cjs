@@ -275,6 +275,19 @@ for (const [name, line] of linked) {
 	);
 }
 
+const releaseBody = lines.join('\n');
+// Release headings do not receive fragment IDs. GitHub prefixes explicit
+// named anchors with user-content when sanitizing the rendered Markdown.
+if (!releaseBody.includes('<a name="downloads"></a>') ||
+	!releaseBody.includes('](#user-content-downloads)')) {
+	errors.push('release downloads need an explicit anchor and its sanitized fragment');
+}
+const layoutSection = releaseBody.indexOf('### Ergopti — keyboard layout only');
+const applicationSection = releaseBody.indexOf('### Ergopti Plus — application with advanced typing tools');
+if (layoutSection < 0 || applicationSection <= layoutSection) {
+	errors.push('release notes must explain keyboard layouts before the companion application');
+}
+
 if (errors.length > 0) {
 	console.error('\x1b[31m[FAIL] the release notes link to files the release does not contain:\x1b[0m');
 	for (const e of errors) console.error('    - ' + e);
