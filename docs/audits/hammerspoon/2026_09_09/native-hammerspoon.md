@@ -484,3 +484,28 @@ scenarios. It does not establish atomic synchronization with pending HID values,
 lease-opening state, ordinary driver integration, all hardware descriptors or
 exclusive production physical credits. Retain those requirements from the
 producer contract; do not promote `fixture_only` based on this acceptance.
+
+## Paged baseline producer build
+
+Native build [34783474637](https://github.com/adrienm7/ergopti/actions/runs/34783474637)
+passed at source `79e9c73f6593fa8482030a68919e35f0812a5afd` on 2026-09-13.
+Its archive is 12,214,762 bytes with SHA-256
+`93c859dfcf29b9440acc706f3cf234558f73e17b2078f20d15d6b64a993a7d7e`.
+The downloaded archive matches the retained checksum; all 16 retained headers
+byte-match that producer source, including both new baseline transfer headers.
+The upstream revision is `9312593e1a3bf72b94c63c524ebabe2637442e8a`.
+
+All three executable archive members contain x86_64 and arm64 slices. Native
+signature verification passed with ad hoc signatures; the CLI reported version
+1, `mach_absolute_time`, numerator 125 and denominator 3. This is a reusable
+development runtime, not a signed production distribution or input acceptance.
+The native consumer workflow selects this exact archive because its Lua receiver
+requires the paged baseline protocol. Earlier sampled-state archives cannot
+serve that live receiver, although historical receipts remain replayable.
+
+The interruption fixture must compare stable producer identity and the exact
+next lease independently from its newly sampled baseline. Its new regression
+rejects the original whole-envelope comparison; all 37 Python stream tests and
+227 JS checks passed before committing that correction. Native input acceptance
+of this producer, including inherited held state with Hammerspoon connected,
+remains to be demonstrated.
