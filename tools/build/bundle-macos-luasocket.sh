@@ -7,6 +7,7 @@ app="${1:?application bundle required}"
 work="${2:?fresh dependency build directory required}"
 test "$(uname -s)" = Darwin
 test -d "$app/Contents/Frameworks/Hammerspoon.app"
+test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Frameworks/Hammerspoon.app/Contents/Info.plist")" = 1.1.1
 mkdir "$work"
 
 # Hammerspoon 1.1.1 embeds Lua 5.4.7. Compile only the extension, never a second
@@ -32,7 +33,7 @@ done
 clang -O2 -bundle -undefined dynamic_lookup -arch arm64 -arch x86_64 \
 	-mmacosx-version-min=13.0 -DLUASOCKET_NODEBUG -DUNIX_HAS_SUN_LEN \
 	-I"$work/lua-5.4.7/src" "${sources[@]}" -o "$config/socket/core.so"
-lipo -verify_arch arm64 x86_64 "$config/socket/core.so"
+lipo "$config/socket/core.so" -verify_arch arm64 x86_64
 cp "$source_dir/socket.lua" "$config/socket.lua"
 cp "$work/luasocket-3.1.0/LICENSE" "$config/socket/LICENSE"
 codesign --force --sign - "$config/socket/core.so"
