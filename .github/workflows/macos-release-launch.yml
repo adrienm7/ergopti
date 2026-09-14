@@ -7,8 +7,15 @@ on:
       - .github/workflows/macos-release-launch.yml
       - tools/diagnostics/macos-release-launch.py
       - tools/build/bundle-macos-luasocket.sh
+      - tools/build/build_macos_app.sh
   workflow_dispatch:
     inputs:
+      scenario:
+        description: Reproduce an existing release or validate a fresh package
+        required: true
+        default: current_build
+        type: choice
+        options: [current_build, published, published_with_dependency]
       tag:
         description: Existing release tag to reproduce
         required: true
@@ -22,10 +29,11 @@ concurrency:
 jobs:
   observe:
     runs-on: macos-15
-    timeout-minutes: 8
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - name: Download and verify the published application
+        if: inputs.scenario == 'published' || inputs.scenario == 'published_with_dependency'
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.tag || 'v0.0.0-dev.126' }}
@@ -49,10 +57,22 @@ jobs:
           subprocess.run(["ditto", "-x", "-k", str(archive), "/Applications"], check=True)
           PY
       - name: Add the missing production dependency to the verified release
+        if: inputs.scenario == 'published_with_dependency'
         run: |
           bash tools/build/bundle-macos-luasocket.sh /Applications/ErgoptiPlus.app "$RUNNER_TEMP/luasocket-build"
           codesign --force --sign - --preserve-metadata=identifier,entitlements,flags /Applications/ErgoptiPlus.app
           codesign --verify --strict /Applications/ErgoptiPlus.app
+      - name: Build the complete current application
+        if: inputs.scenario == 'current_build' || github.event_name == 'push'
+        env:
+          GH_OWNER: ${{ github.repository_owner }}
+          GH_REPO: ${{ github.event.repository.name }}
+          ERGOPTI_CHANNEL: dev
+        run: |
+          bash tools/build/build_macos_app.sh
+          test ! -e /Applications/ErgoptiPlus.app
+          ditto -x -k build/macos/ErgoptiPlus.app.zip /Applications
+          shasum -a 256 build/macos/ErgoptiPlus.app.zip > "$RUNNER_TEMP/release-package.sha256"
       - name: Observe the installed release without a waiting open helper
         run: |
           python3 tools/diagnostics/macos_release_launch_test.py
@@ -64,3 +84,10 @@ jobs:
           path: |
             ${{ runner.temp }}/release-launch
             ${{ runner.temp }}/release-provenance.json
+            ${{ runner.temp }}/release-package.sha256
+      - uses: actions/upload-artifact@v4
+        if: success() && (inputs.scenario == 'current_build' || github.event_name == 'push')
+        with:
+          name: ErgoptiPlus-macOS-verified-${{ github.sha }}
+          path: build/macos/ErgoptiPlus.app.zip
+          if-no-files-found: error

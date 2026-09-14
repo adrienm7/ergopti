@@ -13,6 +13,8 @@ import time
 
 def require_startup_ready(log_text):
     """Reject early log creation without a completed application startup branch."""
+    if "[ERROR]" in log_text:
+        raise RuntimeError("Application reported a Lua error during startup")
     for marker in ("Onboarding wizard opened.", "User interface initialized successfully."):
         if marker in log_text:
             return marker
