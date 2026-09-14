@@ -6,6 +6,7 @@ on:
     paths:
       - .github/workflows/macos-release-launch.yml
       - tools/diagnostics/macos-release-launch.py
+      - tools/build/bundle-macos-luasocket.sh
   workflow_dispatch:
     inputs:
       tag:
@@ -47,6 +48,11 @@ jobs:
               raise RuntimeError("Refusing to replace an existing application")
           subprocess.run(["ditto", "-x", "-k", str(archive), "/Applications"], check=True)
           PY
+      - name: Add the missing production dependency to the verified release
+        run: |
+          bash tools/build/bundle-macos-luasocket.sh /Applications/ErgoptiPlus.app "$RUNNER_TEMP/luasocket-build"
+          codesign --force --sign - --preserve-metadata=identifier,entitlements,flags /Applications/ErgoptiPlus.app
+          codesign --verify --strict /Applications/ErgoptiPlus.app
       - name: Observe the installed release without a waiting open helper
         run: python3 tools/diagnostics/macos-release-launch.py /Applications/ErgoptiPlus.app "$RUNNER_TEMP/release-launch"
       - uses: actions/upload-artifact@v4

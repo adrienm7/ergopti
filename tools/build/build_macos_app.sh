@@ -555,6 +555,7 @@ main() {
 	local ollama_bin_path
 	ollama_bin_path="$(download_ollama)"
 	assemble_app "$launcher_bin" "$ke_app_path" "$ollama_bin_path"
+	bash "$REPO_ROOT/tools/build/bundle-macos-luasocket.sh" "$APP_PATH" "$BUILD_DIR/luasocket-build"
 	build_icon
 	generate_info_plist
 	codesign_app
