@@ -25,9 +25,10 @@ local LauncherEnvironment = require("infra.launcher_environment")
 --- Removes launcher-only authority from one task and verifies native readback.
 --- The task must not have crossed start() before this function is called.
 --- @param task any Prepared native hs.task handle.
+--- @param overrides table|nil Explicit child environment values to copy before start.
 --- @return boolean committed
 --- @return string|nil detail
-function M.sanitize(task)
+function M.sanitize(task, overrides)
 	if task == nil then return false, "native task handle is missing" end
 
 	local method_ok, get_environment = xpcall(function()
@@ -49,7 +50,7 @@ function M.sanitize(task)
 	if not read_ok then
 		return false, "native task environment read raised: " .. tostring(environment_or_err)
 	end
-	local sanitized, sanitize_err = LauncherEnvironment.child_copy(environment_or_err)
+	local sanitized, sanitize_err = LauncherEnvironment.child_copy(environment_or_err, overrides)
 	if sanitized == nil then return false, sanitize_err end
 
 	local write_ok, write_result = xpcall(function()

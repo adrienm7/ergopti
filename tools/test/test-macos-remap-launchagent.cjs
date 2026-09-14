@@ -450,6 +450,12 @@ check(!helperDispatch.error && helperDispatch.status === 0
 	&& helperDispatch.stdout === 'native helper only',
 	'native helper dispatch must skip the full application download/build pipeline');
 
+const artifactVerification = spawnSync(process.platform === 'win32' ? 'python' : 'python3',
+	['tools/diagnostics/hs274_helper_environment_test.py'],
+	{ cwd: ROOT, encoding: 'utf8', timeout: 10000 });
+check(!artifactVerification.error && artifactVerification.status === 0,
+	`native helper artifact authentication must reject altered or stale inputs: ${artifactVerification.stderr || artifactVerification.error || ''}`);
+
 if (failures.length > 0) {
 	console.error('[FAIL] macOS independent remap LaunchAgent:');
 	for (const failure of failures) console.error(`  - ${failure}`);

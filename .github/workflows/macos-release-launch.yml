@@ -15,7 +15,7 @@ on:
         required: true
         default: current_build
         type: choice
-        options: [current_build, published, published_with_dependency, native_helper]
+        options: [current_build, published, published_with_dependency, native_helper, helper_environment]
       tag:
         description: Existing release tag to reproduce
         required: true
@@ -23,6 +23,7 @@ on:
         type: string
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: macos-release-launch
   cancel-in-progress: false
@@ -32,6 +33,28 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - name: Select the retained helper for native environment acceptance
+        if: inputs.scenario == 'helper_environment'
+        id: helper
+        run: |
+          python3 tools/diagnostics/hs274_helper_environment_test.py
+          python3 tools/diagnostics/hs274_helper_environment.py selection >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v4
+        if: inputs.scenario == 'helper_environment'
+        with:
+          name: ${{ steps.helper.outputs.artifact_name }}
+          run-id: ${{ steps.helper.outputs.run_id }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/helper-download
+      - name: Exercise actual Hammerspoon tasks with the retained native helper
+        if: inputs.scenario == 'helper_environment'
+        run: |
+          version=$(sed -nE 's/^HAMMERSPOON_VERSION="\$\{HAMMERSPOON_VERSION:-([^}]+)\}"$/\1/p' tools/build/build_macos_app.sh)
+          test "$version" = 1.1.1
+          curl --fail --location --max-time 120 -o "$RUNNER_TEMP/helper-hammerspoon.zip" "https://github.com/Hammerspoon/hammerspoon/releases/download/$version/Hammerspoon-$version.zip"
+          printf '%s  %s\n' 11bb1c90faf5427f37c7bd4fe7eab9774ae43e1d5cb020c5b3088dac32849efa "$RUNNER_TEMP/helper-hammerspoon.zip" | shasum -a 256 --check
+          ditto -x -k "$RUNNER_TEMP/helper-hammerspoon.zip" "$RUNNER_TEMP/helper-hammerspoon"
+          python3 tools/diagnostics/hs274_helper_environment.py "$RUNNER_TEMP/helper-download" "$RUNNER_TEMP/helper-hammerspoon/Hammerspoon.app" "$RUNNER_TEMP/helper-environment"
       - name: Download and verify the published application
         if: inputs.scenario == 'published' || inputs.scenario == 'published_with_dependency'
         env:
@@ -79,6 +102,7 @@ jobs:
           ditto -x -k build/macos/ErgoptiPlus.app.zip /Applications
           shasum -a 256 build/macos/ErgoptiPlus.app.zip > "$RUNNER_TEMP/release-package.sha256"
       - name: Observe the installed release without a waiting open helper
+        if: inputs.scenario != 'helper_environment'
         run: |
           python3 tools/diagnostics/macos_release_launch_test.py
           python3 tools/diagnostics/macos-release-launch.py /Applications/ErgoptiPlus.app "$RUNNER_TEMP/release-launch"
@@ -91,6 +115,8 @@ jobs:
             ${{ runner.temp }}/release-provenance.json
             ${{ runner.temp }}/release-package.sha256
             ${{ runner.temp }}/native-helper.json
+            ${{ runner.temp }}/helper-environment/*.json
+            ${{ runner.temp }}/helper-environment/launch.log
       - uses: actions/upload-artifact@v4
         if: success() && (inputs.scenario == 'current_build' || github.event_name == 'push')
         with:

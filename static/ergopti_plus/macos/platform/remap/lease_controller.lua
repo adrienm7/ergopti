@@ -435,11 +435,11 @@ end
 --- @return table|nil handle Unstarted task handle.
 --- @return string|nil error_message Current identity failure.
 local function spawn_current_helper(arguments, on_done, on_chunk)
-	local helper_path, helper_error = LeaseHelper.resolve()
+	local helper_path, helper_error, environment = LeaseHelper.resolve()
 	_state.helper_path = helper_path
 	_state.helper_error = helper_error
 	if not helper_path then return nil, helper_error end
-	return ShellRunner.spawn(helper_path, arguments, on_done, on_chunk), nil
+	return ShellRunner.spawn(helper_path, arguments, on_done, on_chunk, environment), nil
 end
 
 --- Settles every logical operation retained by one failed generation.
