@@ -348,6 +348,14 @@ launchd state as `disabled`, while sudo may report a non-executable file as
 The [producer contract](../audits/hammerspoon/2026_09_09/producer-contract.md)
 records the isolated runtime evidence and the pre-normalization capture boundary.
 
+The upstream agent also launches the installed Core-Service bundle directly with
+`permission-check`, independently of those registration helpers. Run 34868282852
+retained that exact command after successful overlap input; its isolation verdict
+correctly failed. The disposable suspension scope must therefore block execution
+of the installed Core-Service as well and restore its exact identity/mode afterward.
+Keep development binaries and the signed virtual HID provider executable; never
+allow an unexpected PID merely because a later arguments snapshot looks harmless.
+
 ### project-hs-native-quartz-proof-boundary
 
 For reusable Hammerspoon admission fixtures, retained screenshots, artifact
