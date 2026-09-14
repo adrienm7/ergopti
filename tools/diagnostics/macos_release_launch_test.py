@@ -29,6 +29,13 @@ class StartupReadinessTests(unittest.TestCase):
         marker = "Onboarding wizard opened."
         self.assertEqual(observer.require_startup_ready(marker), marker)
 
+    def test_later_javascript_error_invalidates_opened_wizard(self):
+        with self.assertRaisesRegex(RuntimeError, "Lua error"):
+            observer.require_startup_ready(
+                "Onboarding wizard opened.\n"
+                "[ERROR] [onboarding] Onboarding JavaScript execution failed."
+            )
+
     def test_existing_configuration_accepts_completed_runtime(self):
         marker = "User interface initialized successfully."
         self.assertEqual(observer.require_startup_ready(marker), marker)
