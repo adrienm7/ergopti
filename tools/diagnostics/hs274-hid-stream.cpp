@@ -74,8 +74,9 @@ bool pump_until(Predicate predicate, double seconds) {
 
 int main(int argc, char** argv) {
   const char* actions = std::getenv("GITHUB_ACTIONS");
+  const bool combinations = argc == 3 && std::string(argv[2]) == "--combinations-hold";
   const bool overlap = argc == 3 && std::string(argv[2]) == "--overlap-hold";
-  const bool modifiers = overlap || (argc == 3 && std::string(argv[2]) == "--modifiers-hold");
+  const bool modifiers = combinations || overlap || (argc == 3 && std::string(argv[2]) == "--modifiers-hold");
   const bool baseline_drain = argc == 3 && std::string(argv[2]) == "--baseline-held-drain";
   const bool baseline = baseline_drain || (argc == 3 && std::string(argv[2]) == "--baseline-held");
   const bool ignored = argc == 3 && std::string(argv[2]) == "--ignored-hold";
@@ -134,6 +135,7 @@ int main(int argc, char** argv) {
   bool escape_pair_observed = false;
   bool modifier_pairs_observed = false;
   bool overlap_observed = false;
+  bool combinations_observed = false;
   bool drain_released = false;
   unsigned reports_queued = 0;
   bool baseline_down_observed = false;
@@ -236,6 +238,53 @@ int main(int argc, char** argv) {
             }
           }
         }
+        if (combinations) {
+          using namespace pqrs::karabiner::driverkit::virtual_hid_device_driver;
+          bool held = false;
+          release_guard combination_guard{[&] {
+            if (!held) return;
+            hid_report::keyboard_input released;
+            client->async_post_report(released);
+            ++reports_queued;
+            pump_until([] { return false; }, 0.03);
+          }};
+          const std::array<uint16_t, 2> usages{
+            type_safe::get(pqrs::hid::usage::keyboard_or_keypad::keyboard_escape),
+            type_safe::get(pqrs::hid::usage::keyboard_or_keypad::keyboard_spacebar)};
+          for (uint16_t usage : usages) {
+            const auto begin = observations.size();
+            hid_report::keyboard_input shifted;
+            shifted.modifiers.insert(hid_report::modifier::left_shift);
+            client->async_post_report(shifted);
+            ++reports_queued;
+            held = true;
+            if (!pump_until([&] { return observations.size() > begin; }, 2)) return false;
+            auto down = shifted;
+            down.keys.insert(usage);
+            client->async_post_report(down);
+            ++reports_queued;
+            // Release the tap-only Escape while Shift remains physically held.
+            pump_until([] { return false; }, 0.03);
+            client->async_post_report(shifted);
+            ++reports_queued;
+            if (!pump_until([&] { return observations.size() >= begin + 3; }, 2)) return false;
+            hid_report::keyboard_input released;
+            client->async_post_report(released);
+            ++reports_queued;
+            held = false;
+            if (!pump_until([&] { return observations.size() >= begin + 4; }, 2)
+                || observations.size() != begin + 4) return false;
+            constexpr std::array<CGEventType, 4> types{kCGEventFlagsChanged, kCGEventKeyDown,
+                                                       kCGEventKeyUp, kCGEventFlagsChanged};
+            constexpr std::array<int64_t, 4> codes{kVK_Shift, kVK_Space, kVK_Space, kVK_Shift};
+            for (size_t edge = 0; edge < types.size(); ++edge) {
+              const auto& event = observations[begin + edge];
+              if (event.type != types[edge] || event.keycode != codes[edge]
+                  || static_cast<bool>(event.flags & kCGEventFlagMaskShift) != (edge != 3)) return false;
+            }
+          }
+          combinations_observed = true;
+        }
         if (overlap) {
           using namespace pqrs::karabiner::driverkit::virtual_hid_device_driver;
           constexpr auto left = static_cast<uint8_t>(hid_report::modifier::left_shift);
@@ -302,7 +351,7 @@ int main(int argc, char** argv) {
   CFRelease(source);
   CFRelease(tap);
 
-  const bool pair = space_pair_observed && observations.size() == (overlap ? 24 : modifiers ? 20 : remap && !baseline ? 4 : 2)
+  const bool pair = space_pair_observed && observations.size() == (combinations ? 28 : overlap ? 24 : modifiers ? 20 : remap && !baseline ? 4 : 2)
                     && (!remap || baseline || escape_pair_observed);
   std::ofstream receipt(argv[1]);
   receipt << std::boolalpha
@@ -323,6 +372,7 @@ int main(int argc, char** argv) {
           << ",\n  \"baseline_mode\": " << baseline
           << ",\n  \"modifier_pairs_observed\": " << modifier_pairs_observed
           << ",\n  \"overlap_observed\": " << overlap_observed
+          << ",\n  \"combinations_observed\": " << combinations_observed
           << ",\n  \"baseline_down_observed\": " << baseline_down_observed
           << ",\n  \"baseline_release_at\": \"" << baseline_release_at << "\""
           << ",\n  \"escape_as_space\": " << (escape_pair_observed && !ignored)

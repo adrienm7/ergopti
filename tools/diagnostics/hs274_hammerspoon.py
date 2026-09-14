@@ -254,15 +254,15 @@ def capture_consumer(app, cli, output, report, target):
                 raise cleanup_error
 
 
-def validate_consumer(result, capture, *, held=False, modifiers=False, overlap=False):
+def validate_consumer(result, capture, *, held=False, modifiers=False, overlap=False, combinations=False):
     """Match real Lua credits and exact original context keys against native input."""
-    if (held and modifiers) or (overlap and not modifiers):
+    if (held and modifiers) or ((overlap or combinations) and not modifiers) or (overlap and combinations):
         raise ValueError("Held and modifier consumer scenarios are distinct")
     mapping = {41: 53, 44: 49}
     expected_usages = [44] if held else [41, 44]
     if modifiers:
         mapping.update(MODIFIER_KEYCODES)
-        expected_usages = list(MODIFIER_KEYCODES) + ([225, 229] if overlap else []) + expected_usages
+        expected_usages = list(MODIFIER_KEYCODES) + ([225, 229] if overlap else [225, 41, 225, 44] if combinations else []) + expected_usages
     expected_counts = {}
     for usage in expected_usages:
         key = str(mapping[usage])
