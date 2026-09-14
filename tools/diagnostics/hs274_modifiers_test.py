@@ -91,30 +91,31 @@ class ModifierTests(unittest.TestCase):
             drain(repeated)
 
     def test_retained_native_modifiers_keep_every_side_and_one_credit(self):
-        for overlap in (False, True):
-            with self.subTest(overlap=overlap):
-                self.replay_native_modifiers(overlap)
+        for overlap, combinations in ((False, False), (True, False), (False, True)):
+            with self.subTest(overlap=overlap, combinations=combinations):
+                self.replay_native_modifiers(overlap, combinations)
 
-    def replay_native_modifiers(self, overlap):
+    def replay_native_modifiers(self, overlap, combinations):
         from hs274_hammerspoon import validate_consumer
-        name = "hs274-native-overlap-consumer.json" if overlap else "hs274-native-modifier-consumer.json"
+        name = ("hs274-native-combination-consumer.json" if combinations else
+                "hs274-native-overlap-consumer.json" if overlap else "hs274-native-modifier-consumer.json")
         path = Path(__file__).parent / "fixtures" / name
         evidence = json.loads(path.read_text(encoding="utf-8"))
         device = evidence["native"]["registry_entry_id"]
-        validate_modifier_output(evidence["native"], overlap=overlap)
-        capture = validate_modifier_capture(MARKER + json.dumps(evidence["capture"]) + "\n", device, overlap=overlap)
+        validate_modifier_output(evidence["native"], overlap=overlap, combinations=combinations)
+        capture = validate_modifier_capture(MARKER + json.dumps(evidence["capture"]) + "\n", device, overlap=overlap, combinations=combinations)
         stream = validate_stream(evidence["stream_output"], capture)
-        self.assertEqual(len(stream["records"]), 62 if overlap else 52)
-        drain = modifier_drain(device, overlap=overlap)
+        self.assertEqual(len(stream["records"]), 80 if combinations else 62 if overlap else 52)
+        drain = modifier_drain(device, overlap=overlap, combinations=combinations)
         self.assertTrue(drain(stream))
         modifiers = [row for row in stream["records"] if row["page"] == 7 and 224 <= row["usage"] <= 231]
         self.assertEqual([(row["cookie"], row["value"]) for row in modifiers],
                          [(cookie, value) for cookie in range(24, 32) for value in (1, 0)]
-                         + ([(25, 1), (29, 1), (25, 0), (29, 0)] if overlap else []))
+                         + ([(25, 1), (29, 1), (25, 0), (29, 0)] if overlap else [(25, 1), (25, 0)] * 2 if combinations else []))
         utc_clock = SimpleNamespace(fromtimestamp=lambda epoch: datetime.fromtimestamp(epoch, timezone.utc))
         with patch("hs274_hammerspoon.datetime", utc_clock):
-            validate_consumer(evidence["hammerspoon"], capture, modifiers=True, overlap=overlap)
-        if overlap:
+            validate_consumer(evidence["hammerspoon"], capture, modifiers=True, overlap=overlap, combinations=combinations)
+        if overlap or combinations:
             isolation = evidence["isolation"]
             self.assertIsNone(isolation["observation_error"])
             self.assertEqual(isolation["runtime_process_inventory"]["after-cleanup"], [])
