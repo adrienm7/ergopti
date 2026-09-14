@@ -16,15 +16,18 @@ _WRSO_Lifecycle(Mode, View, Lines, Unhandled, Failure) {
 		AssertTrue(FSWrite(First, "{}"))
 		AssertTrue(FSWrite(Second, "{}"))
 		AssertTrue(KLWV_OnRangeBuildTerminal("typing", 51, 42, "ok", First))
+		First := Entry["range_stage"]["stage"]
 		AssertTrue(FSExists(First))
 		if Mode = "close"
 			KLWV_Close("typing")
 		else {
 			AssertTrue(KLWV_OnRangeBuildTerminal("typing", 51, 43, "ok", Second))
+			Second := Entry["range_stage"]["stage"]
 			AssertTrue(FSExists(Second))
 		}
 		AssertFalse(FSExists(First), "the retired range must not retain its private file")
 	} finally {
+		KLWV_RetireRangeStage(Entry)
 		FSDelete(First)
 		FSDelete(Second)
 	}
@@ -42,11 +45,13 @@ _WRSO_Acknowledge(Mode, View, Lines, Unhandled, Failure) {
 		AssertTrue(FSWrite(First, "{}"))
 		AssertTrue(KLWV_OnRangeBuildTerminal("typing", 51, 42, "ok", First))
 		OldOwner := Entry["range_stage"]
+		First := OldOwner["stage"]
 		AssertContains(View.Scripts[1], "range_consumed")
 		AssertContains(View.Scripts[1], OldOwner["token"])
 		if Mode = "stale-ack" || Mode = "stale-native" {
 			AssertTrue(FSWrite(Second, "{}"))
 			AssertTrue(KLWV_OnRangeBuildTerminal("typing", 51, 42, "ok", Second))
+			Second := Entry["range_stage"]["stage"]
 			AssertFalse(OldOwner["token"] == Entry["range_stage"]["token"])
 			if Mode = "stale-native"
 				KLWV_RangeScriptSettled("typing", 51, Entry, 42, OldOwner, false)
@@ -78,6 +83,7 @@ _WRSO_Acknowledge(Mode, View, Lines, Unhandled, Failure) {
 		KLWV_OnWebMessage("typing", 51, View, Args)
 		AssertFalse(Entry.Has("range_stage"), "duplicate consumption remains inert")
 	} finally {
+		KLWV_RetireRangeStage(Entry)
 		FSDelete(First)
 		FSDelete(Second)
 	}

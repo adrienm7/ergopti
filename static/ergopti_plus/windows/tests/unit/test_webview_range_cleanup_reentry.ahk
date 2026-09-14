@@ -31,28 +31,31 @@ _WRCR_Replace(View, Lines, Unhandled, Failure) {
 		for Stage in [First, Second, Third]
 			AssertTrue(FSWrite(Stage, "{}"))
 		AssertTrue(KLWV_OnRangeBuildTerminal("typing", 51, 42, "ok", First))
-		Lock := FileOpen(First, "r-d", "UTF-8-RAW")
+		MountedFirst := Entry["range_stage"]["stage"]
+		Lock := FileOpen(MountedFirst, "r-d", "UTF-8-RAW")
 		AssertTrue(IsObject(Lock), "deny deletion through a real Windows file handle")
 		AssertFalse(KLWV_OnRangeBuildTerminal("typing", 51, 43, "ok", Second),
 			"a delivery replaced during cleanup must not submit its stale script")
-		AssertEqual(Third, Entry["range_stage"]["stage"])
+		AssertEqual(Third . ".mount\range.json", Entry["range_stage"]["stage"])
 		AssertFalse(FSExists(Second))
-		AssertTrue(FSExists(Third))
-		AssertTrue(FSExists(First))
-		AssertTrue(_KLPF_CLEANUP_DEBTS.Has(First), "a native lock keeps exact retry ownership")
+		AssertTrue(FSExists(Third . ".mount\range.json"))
+		AssertTrue(FSExists(MountedFirst))
+		AssertTrue(_KLPF_CLEANUP_DEBTS.Has(MountedFirst), "a native lock keeps exact retry ownership")
 		AssertEqual(2, View.Scripts.Length, "only the original and latest scripts may be submitted")
 		AssertEqual(1, Callbacks.Length)
 		Lock.Close()
 		Lock := 0
 		Callbacks[1].Call()
-		AssertFalse(FSExists(First))
+		AssertFalse(FSExists(MountedFirst))
+		AssertFalse(DirExist(First . ".mount"))
 		AssertEqual(0, _KLPF_CLEANUP_DEBTS.Count)
 		AssertEqual(0, _KLPF_CLEANUP_TIMER)
 		KLWV_Close("typing")
-		AssertFalse(FSExists(Third))
+		AssertFalse(DirExist(Third . ".mount"))
 	} finally {
 		if IsObject(Lock)
 			Lock.Close()
+		KLWV_RetireRangeStage(Entry)
 		for Stage in [First, Second, Third]
 			FSDelete(Stage)
 		_KLPF_CLEANUP_DEBTS := SavedDebts

@@ -163,6 +163,16 @@ _KLPF_ArmCleanupRetry() {
 	}
 }
 
+; Mount directories contain one owned file. Never recursively delete unexpected
+; contents; refusal remains in the same retry-debt protocol as a locked stage.
+_KLPF_DeleteRangeMount(Directory, Path) {
+	if !FSDelete(Path)
+		return false
+	if DirExist(Directory)
+		DirDelete(Directory)
+	return true
+}
+
 KLPF_DeletePrivateStage(Path, DeleteFn := 0) {
 	global _KLPF_CLEANUP_DEBTS
 	if (Path = "")
@@ -272,7 +282,30 @@ KLPF_ReapOrphanRangeStages(Directory := A_Temp) {
 }
 
 KLPF_InitializeCleanup() {
-	return KLPF_ReapOrphanRangeStages() && KLPF_ReapOrphanPrefetchStages()
+	return KLPF_ReapOrphanRangeStages() && KLPF_ReapOrphanRangeMounts() && KLPF_ReapOrphanPrefetchStages()
+}
+
+KLPF_ReapOrphanRangeMounts(Directory := A_Temp) {
+	Loop Files Directory . "\ergopti_metrics_range_*.stage.*.json.mount", "D" {
+		if InStr(A_LoopFileAttrib, "L")
+			continue
+		if !RegExMatch(A_LoopFileName,
+				"^ergopti_metrics_range_(?:typing|apps)\.stage\.([1-9]\d{0,9})\."
+				. "[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}\.\d+\.json\.mount$", &Match)
+			continue
+		OwnerPid := Integer(Match[1])
+		if OwnerPid > 0xFFFFFFFF
+			continue
+		try {
+			if ProcessExist(OwnerPid)
+				continue
+		} catch {
+			continue
+		}
+		Mount := A_LoopFileFullPath
+		KLPF_DeletePrivateStage(Mount . "\range.json", _KLPF_DeleteRangeMount.Bind(Mount))
+	}
+	return true
 }
 
 ; Only the new PID-bearing names prove liveness ownership. Keep canonical

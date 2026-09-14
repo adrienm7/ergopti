@@ -562,6 +562,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_webview_range_outcomes.ahk
 #Include unit/test_webview_range_stage_owner.ahk
 #Include unit/test_webview_range_cleanup_reentry.ahk
+#Include unit/test_webview_range_mount.ahk
 #Include unit/test_metrics_file_urls.ahk
 #Include unit/test_uridecode_literal_unicode.ahk
 #Include meta/test_webview_script_observer.ahk

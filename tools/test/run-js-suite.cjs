@@ -36,6 +36,7 @@ const CHECKS = [
 	{ name: 'verify-change distinguishes current regressions, historical debt, and environment failures', cmd: 'node', args: ['tools/test/test-verify-change-red-classification.cjs'], repro: 'npm run test:verify-red-classification' },
 	{ name: 'native AHK gates report parse failures without dialogs', cmd: 'node', args: ['tools/test/test-verify-change-ahk-launch.cjs'], repro: 'npm run test:verify-change-ahk-launch' },
 	{ name: 'Windows range stages acknowledge completed reads and failures', cmd: 'node', args: ['tools/test/test-windows-range-consumption.cjs'], repro: 'npm run test:windows-range-consumption' },
+	{ name: 'native WebView receives ranges through a private HTTPS mount', cmd: 'node', args: ['tools/test/test-windows-range-transport.cjs'], repro: 'npm run test:windows-range-transport' },
 	{ name: 'AHK suite manifest rejects early completion before the slow tail', cmd: 'node', args: ['tools/test/test-ahk-suite-manifest.cjs'], repro: 'npm run test:ahk-suite-manifest' },
 	{ name: 'repository text resolves to LF on every platform', cmd: 'node', args: ['tools/test/test-repository-eol-policy.cjs'], repro: 'npm run test:repository-eol-policy' },
 	{ name: 'project RTK bootstrap stays pinned and network-free in CI', cmd: 'node', args: ['tools/test/test-rtk-project-integration.cjs'], repro: 'npm run test:project-rtk' },
