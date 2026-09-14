@@ -1,0 +1,53 @@
+# .github/workflows/macos-release-launch.yml
+name: macOS published application startup
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to reproduce
+        required: true
+        default: v0.0.0-dev.126
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: macos-release-launch
+  cancel-in-progress: false
+jobs:
+  observe:
+    runs-on: macos-15
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download and verify the published application
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, subprocess
+          repository = os.environ["GITHUB_REPOSITORY"]
+          tag = os.environ["RELEASE_TAG"]
+          release = json.loads(subprocess.check_output(["gh", "release", "view", tag, "--repo", repository, "--json", "assets,tagName"]))
+          asset, = [entry for entry in release["assets"] if entry["name"] == "ErgoptiPlus.app.zip"]
+          target = pathlib.Path(os.environ["RUNNER_TEMP"], "release-download")
+          target.mkdir()
+          subprocess.run(["gh", "release", "download", tag, "--repo", repository, "--pattern", asset["name"], "--dir", str(target)], check=True)
+          archive = target / asset["name"]
+          digest = "sha256:" + hashlib.sha256(archive.read_bytes()).hexdigest()
+          if asset.get("digest") != digest:
+              raise RuntimeError("Published application digest is absent or mismatched")
+          pathlib.Path(os.environ["RUNNER_TEMP"], "release-provenance.json").write_text(json.dumps({"tag": tag, "asset": asset, "verified_digest": digest}, indent=2))
+          if pathlib.Path("/Applications/ErgoptiPlus.app").exists():
+              raise RuntimeError("Refusing to replace an existing application")
+          subprocess.run(["ditto", "-x", "-k", str(archive), "/Applications"], check=True)
+          PY
+      - name: Observe the installed release without a waiting open helper
+        run: python3 tools/diagnostics/macos-release-launch.py /Applications/ErgoptiPlus.app "$RUNNER_TEMP/release-launch"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: macos-release-launch-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/release-launch
+            ${{ runner.temp }}/release-provenance.json
