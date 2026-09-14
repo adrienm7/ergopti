@@ -2,6 +2,7 @@
 """Keep missing stream evidence and malformed frames from passing the native gate."""
 
 import copy
+from datetime import datetime, timezone
 import io
 import json
 import importlib.util
@@ -251,6 +252,38 @@ def remap_module():
 
 
 class StreamTests(unittest.TestCase):
+    def test_retained_native_paged_baseline_preserves_delivery_and_successor(self):
+        from hs274_hammerspoon import validate_consumer
+        path = Path(__file__).parent / "fixtures" / "hs274-native-paged-baseline.json"
+        evidence = json.loads(path.read_text(encoding="utf-8"))
+        stream = validate_stream(evidence["stream_output"], evidence["capture"])
+        baseline = stream["baseline"]
+        self.assertTrue(baseline["complete"])
+        self.assertEqual(baseline["received_rows"], 496)
+        self.assertEqual(sorted(device["elements"] for device in baseline["devices"].values()), [231, 263])
+        self.assertTrue(all(not key["down"] for device in baseline["devices"].values()
+                            for key in device["keys"].values()))
+        self.assertEqual(len(stream["records"]), 20)
+        # Retained Actions timestamps use UTC; replay must not use the host zone.
+        utc_clock = SimpleNamespace(fromtimestamp=lambda epoch: datetime.fromtimestamp(epoch, timezone.utc))
+        with patch("hs274_hammerspoon.datetime", utc_clock):
+            validate_consumer(evidence["hammerspoon"], evidence["capture"])
+        opened = json.loads(evidence["interruption_output"].splitlines()[0])
+        validate_successor(stream["opened"], opened)
+        validate_interruption(evidence["interruption_output"], opened)
+        frames = [json.loads(line) for line in evidence["stream_output"].splitlines()]
+        pages = [index for index, frame in enumerate(frames) if frame["kind"] == "baseline"]
+        self.assertEqual(len(pages), 8)
+        for index in pages:
+            with self.subTest(missing_page=index), self.assertRaises(ValueError):
+                read_stream(encode(frames[:index] + frames[index + 1:]))
+        with self.assertRaises(ValueError):
+            read_stream(encode([frame for frame in frames if frame["kind"] != "baseline_ready"]))
+        missing = copy.deepcopy(evidence["capture"])
+        missing["records"] = missing["records"][:-1]
+        with self.assertRaises(ValueError):
+            validate_stream(evidence["stream_output"], missing)
+
     def test_successor_has_independent_baseline_and_exact_session_identity(self):
         previous = {"version": 1, "kind": "opened", "coverage": "fixture_only",
                     "incarnation": "868caf13-2110-4244-8fc2-12d490504a09", "lease": "2",
