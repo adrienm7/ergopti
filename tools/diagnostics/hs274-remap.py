@@ -21,6 +21,7 @@ from hs274_disconnect import disconnected_capture
 from hs274_hammerspoon import owned_capture, validate_consumer
 from hs274_baseline import read_baseline, read_observation_baselines, wait_baseline, validate_baseline_native, validate_baseline_capture, require_stream_held_baseline
 from hs274_inventory import read_inventories
+from hs274_repeat import validate_repeat_output
 from hs274_modifiers import modifier_drain, validate_modifier_capture, validate_modifier_output, KEYCODES as MODIFIER_KEYCODES
 
 
@@ -170,7 +171,7 @@ def finish_fixture_stream(stream_path, client, producer, scope, drained_path, de
     return successor
 
 
-def validate_native_output(native, ignored, *, modifiers=False, overlap=False, combinations=False):
+def validate_native_output(native, ignored, *, modifiers=False, overlap=False, combinations=False, repeat=False):
     """Require both real output pairs independently of the producer success flag."""
     expected_escape = 53 if ignored else 49
     expected = [(10, expected_escape), (11, expected_escape), (10, 49), (11, 49)]
@@ -182,7 +183,9 @@ def validate_native_output(native, ignored, *, modifiers=False, overlap=False, c
         expected = [(12, keycode) for keycode in MODIFIER_KEYCODES.values() for _ in range(2)] + expected
         validate_modifier_output(native, overlap=overlap, combinations=combinations)
     actual = [(row["type"], row["keycode"]) for row in native["events"]]
-    if actual != expected or native.get("space_pair_observed") is not True:
+    if repeat:
+        validate_repeat_output(native)
+    if (not repeat and actual != expected) or native.get("space_pair_observed") is not True:
         raise ValueError("Native Escape/Space output differs from the selected fixture mode")
     if native.get("ignored_mode") is not ignored:
         raise ValueError("Native fixture did not acknowledge the ignored-device mode")
@@ -221,6 +224,11 @@ def main():
     report["overlap_fixture"] = overlap
     if modifiers and (baseline or ignored or not hammerspoon):
         raise RuntimeError("Modifier fixture requires its own managed native consumer scenario")
+    repeat_mode = os.environ.get("HS274_REPEAT_FIXTURE", "false")
+    if repeat_mode not in ("true", "false") or (repeat_mode == "true" and (modifiers or baseline or ignored or not hammerspoon)):
+        raise RuntimeError("OS autorepeat requires its own managed native consumer scenario")
+    repeat = repeat_mode == "true"
+    report["repeat_fixture"] = repeat
     report["modifier_fixture"] = modifiers
     if hammerspoon and not os.environ.get("HS274_DEVELOPMENT_ROOT"):
         raise RuntimeError("Native Hammerspoon capture requires the development stream fixture")
@@ -264,7 +272,7 @@ def main():
             stack.enter_context(owned_process(["sudo", "-n", daemon], "provider", output, report))
             producer = stack.enter_context(owned_process(
                 ["sudo", "-n", "env", "GITHUB_ACTIONS=true", str(output / "hs274-hid-stream"), str(native_path),
-                 "--combinations-hold" if combinations else "--overlap-hold" if overlap else "--modifiers-hold" if modifiers else "--baseline-held-drain" if baseline and hammerspoon else "--baseline-held" if baseline
+                 "--repeat-hold" if repeat else "--combinations-hold" if combinations else "--overlap-hold" if overlap else "--modifiers-hold" if modifiers else "--baseline-held-drain" if baseline and hammerspoon else "--baseline-held" if baseline
                  else "--ignored-hold" if ignored else "--remap-hold" if development else "--remap"],
                 "input", output, report))
             device = wait_ready(ready_path, producer, 20)
@@ -355,7 +363,7 @@ def main():
                 if baseline:
                     validate_baseline_native(report["native"], report["baseline_probe"])
                 else:
-                    validate_native_output(report["native"], ignored, modifiers=modifiers, overlap=overlap, combinations=combinations)
+                    validate_native_output(report["native"], ignored, modifiers=modifiers, overlap=overlap, combinations=combinations, repeat=repeat)
                 if stream_enabled and report["native"].get("drain_released") is not True:
                     raise RuntimeError("Native fixture did not confirm stream drain release")
                 if stream_enabled:

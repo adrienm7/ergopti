@@ -28,6 +28,7 @@ struct Observation {
   int64_t source_pid;
   int64_t numeric_field_87;
   CGEventFlags flags;
+  int64_t autorepeat;
 };
 
 struct ObservationContext {
@@ -43,7 +44,8 @@ void write_observations(std::ostream& output, const std::vector<Observation>& ob
            << ", \"keycode\": " << event.keycode << ", \"user_data\": " << event.user_data
            << ", \"source_pid\": " << event.source_pid
            << ", \"numeric_field_87\": " << event.numeric_field_87
-           << ", \"flags\": " << event.flags << "}";
+           << ", \"flags\": " << event.flags
+           << ", \"autorepeat\": " << event.autorepeat << "}";
   }
   output << "\n  ]";
 }
@@ -57,7 +59,8 @@ CGEventRef observe(CGEventTapProxy, CGEventType type, CGEventRef event, void* co
     observations.push_back({type, CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode),
                             CGEventGetIntegerValueField(event, kCGEventSourceUserData),
                             CGEventGetIntegerValueField(event, kCGEventSourceUnixProcessID),
-                            CGEventGetIntegerValueField(event, static_cast<CGEventField>(87)), CGEventGetFlags(event)});
+                            CGEventGetIntegerValueField(event, static_cast<CGEventField>(87)), CGEventGetFlags(event),
+                            CGEventGetIntegerValueField(event, kCGKeyboardEventAutorepeat)});
   }
   return event;
 }
@@ -74,13 +77,14 @@ bool pump_until(Predicate predicate, double seconds) {
 
 int main(int argc, char** argv) {
   const char* actions = std::getenv("GITHUB_ACTIONS");
+  const bool repeat = argc == 3 && std::string(argv[2]) == "--repeat-hold";
   const bool combinations = argc == 3 && std::string(argv[2]) == "--combinations-hold";
   const bool overlap = argc == 3 && std::string(argv[2]) == "--overlap-hold";
   const bool modifiers = combinations || overlap || (argc == 3 && std::string(argv[2]) == "--modifiers-hold");
   const bool baseline_drain = argc == 3 && std::string(argv[2]) == "--baseline-held-drain";
   const bool baseline = baseline_drain || (argc == 3 && std::string(argv[2]) == "--baseline-held");
   const bool ignored = argc == 3 && std::string(argv[2]) == "--ignored-hold";
-  const bool hold_for_drain = modifiers || baseline_drain || ignored || (argc == 3 && std::string(argv[2]) == "--remap-hold");
+  const bool hold_for_drain = repeat || modifiers || baseline_drain || ignored || (argc == 3 && std::string(argv[2]) == "--remap-hold");
   const bool remap = baseline || hold_for_drain || (argc == 3 && std::string(argv[2]) == "--remap");
   if ((argc != 2 && !remap) || geteuid() != 0 || !actions || std::string(actions) != "true") {
     std::cerr << "HID observation requires root on a disposable Actions runner\n";
@@ -136,6 +140,7 @@ int main(int argc, char** argv) {
   bool modifier_pairs_observed = false;
   bool overlap_observed = false;
   bool combinations_observed = false;
+  bool repeat_observed = false;
   bool drain_released = false;
   unsigned reports_queued = 0;
   bool baseline_down_observed = false;
@@ -149,14 +154,30 @@ int main(int argc, char** argv) {
     ++reports_queued;
     // A tap-only mapping emits after release; waiting for output first would
     // accidentally turn this stimulus into a hold.
-    pump_until([] { return false; }, 0.03);
+    const bool repeat_space = repeat && usage == type_safe::get(pqrs::hid::usage::keyboard_or_keypad::keyboard_spacebar);
+    if (repeat_space) {
+      pump_until([&] { return observations.size() >= begin + 3; }, 3);
+    } else {
+      pump_until([] { return false; }, 0.03);
+    }
     // Always queue release, including an unobserved key-down or transport error.
     pqrs::karabiner::driverkit::virtual_hid_device_driver::hid_report::keyboard_input release;
     client->async_post_report(release);
     ++reports_queued;
     pump_until([&observations, begin] {
-      return observations.size() >= begin + 2;
+      return observations.size() >= begin + 2 && observations.back().type == kCGEventKeyUp;
     }, 2);
+    if (repeat_space) {
+      if (observations.size() < begin + 4 || observations.back().type != kCGEventKeyUp
+          || observations.back().keycode != expected_keycode || observations.back().autorepeat != 0) return false;
+      for (size_t index = begin; index + 1 < observations.size(); ++index) {
+        const auto& event = observations[index];
+        if (event.type != kCGEventKeyDown || event.keycode != expected_keycode
+            || event.autorepeat != (index == begin ? 0 : 1)) return false;
+      }
+      repeat_observed = true;
+      return true;
+    }
     return observations.size() == begin + 2 &&
            observations[begin].type == kCGEventKeyDown && observations[begin].keycode == expected_keycode &&
            observations[begin + 1].type == kCGEventKeyUp && observations[begin + 1].keycode == expected_keycode;
@@ -351,7 +372,7 @@ int main(int argc, char** argv) {
   CFRelease(source);
   CFRelease(tap);
 
-  const bool pair = space_pair_observed && observations.size() == (combinations ? 28 : overlap ? 24 : modifiers ? 20 : remap && !baseline ? 4 : 2)
+  const bool pair = space_pair_observed && (repeat ? repeat_observed : observations.size() == (combinations ? 28 : overlap ? 24 : modifiers ? 20 : remap && !baseline ? 4 : 2))
                     && (!remap || baseline || escape_pair_observed);
   std::ofstream receipt(argv[1]);
   receipt << std::boolalpha
@@ -373,6 +394,7 @@ int main(int argc, char** argv) {
           << ",\n  \"modifier_pairs_observed\": " << modifier_pairs_observed
           << ",\n  \"overlap_observed\": " << overlap_observed
           << ",\n  \"combinations_observed\": " << combinations_observed
+          << ",\n  \"repeat_observed\": " << repeat_observed
           << ",\n  \"baseline_down_observed\": " << baseline_down_observed
           << ",\n  \"baseline_release_at\": \"" << baseline_release_at << "\""
           << ",\n  \"escape_as_space\": " << (escape_pair_observed && !ignored)
