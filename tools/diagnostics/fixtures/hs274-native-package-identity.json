@@ -1,0 +1,117 @@
+{
+  "run_id": 34891285619,
+  "producer_revision": "34820f1edf7dafb161c67df9e79cf8198b142f82",
+  "artifact_id": 10367722111,
+  "package_bytes": 42431095,
+  "identity": {
+    "kind": "ergopti-karabiner-candidate",
+    "coverage": "fixture_only",
+    "upstream_revision": "9312593e1a3bf72b94c63c524ebabe2637442e8a",
+    "products": [
+      {
+        "product": "src/apps/AppIconSwitcher/build/Release/Karabiner-AppIconSwitcher.app",
+        "executable": "src/apps/AppIconSwitcher/build/Release/Karabiner-AppIconSwitcher.app/Contents/MacOS/Karabiner-AppIconSwitcher",
+        "sha256": "b6288fdd90069794590c1144568223570972ddc4602833c6a74420535067ede0",
+        "architectures": [
+          "arm64",
+          "x86_64"
+        ],
+        "team_identifier": "not set"
+      },
+      {
+        "product": "src/apps/EventViewer/build/Release/Karabiner-EventViewer.app",
+        "executable": "src/apps/EventViewer/build/Release/Karabiner-EventViewer.app/Contents/MacOS/Karabiner-EventViewer",
+        "sha256": "254c07dcd8aceb9623fb61fa4618eed5d27e4c21e6e62a7ed0fecab70530d14c",
+        "architectures": [
+          "arm64",
+          "x86_64"
+        ],
+        "team_identifier": "not set"
+      },
+      {
+        "product": "src/apps/MultitouchExtension/build/Release/Karabiner-MultitouchExtension.app",
+        "executable": "src/apps/MultitouchExtension/build/Release/Karabiner-MultitouchExtension.app/Contents/MacOS/Karabiner-MultitouchExtension",
+        "sha256": "f9c0a442917d657b70e67cd7422506639835c74783f3aac471c68ad9a7617a45",
+        "architectures": [
+          "arm64",
+          "x86_64"
+        ],
+        "team_identifier": "not set"
+      },
+      {
+        "product": "src/apps/ServiceManager-Non-Privileged-Agents/build/Release/Karabiner-Elements Non-Privileged Agents v2.app",
+        "executable": "src/apps/ServiceManager-Non-Privileged-Agents/build/Release/Karabiner-Elements Non-Privileged Agents v2.app/Contents/MacOS/Karabiner-Elements Non-Privileged Agents v2",
+        "sha256": "81e6ce6b1b46eaa09375fc7cfa037f29187adccedaece7ced2a4fe1eb818d4bb",
+        "architectures": [
+          "arm64",
+          "x86_64"
+        ],
+        "team_identifier": "not set"
+      },
+      {
+        "product": "src/apps/ServiceManager-Privileged-Daemons/build/Release/Karabiner-Elements Privileged Daemons v2.app",
+        "executable": "src/apps/ServiceManager-Privileged-Daemons/build/Release/Karabiner-Elements Privileged Daemons v2.app/Contents/MacOS/Karabiner-Elements Privileged Daemons v2",
+        "sha256": "6fd1c1bc546f7ebbd3d1825735caec4c1f68a645d981c91f365ea7ed06bc1bf0",
+        "architectures": [
+          "arm64",
+          "x86_64"
+        ],
+        "team_identifier": "not set"
+      },
+      {
+        "product": "src/apps/SettingsWindow/build/Release/Karabiner-Elements.app",
+        "executable": "src/apps/SettingsWindow/build/Release/Karabiner-Elements.app/Contents/MacOS/Karabiner-Elements",
+        "sha256": "5be5d134d6a8c0f0623445104728b9acfb169281c5d0ebe23fd24613b0ecec44",
+        "architectures": [
+          "arm64",
+          "x86_64"
+        ],
+        "team_identifier": "not set"
+      },
+      {
+        "product": "src/apps/Updater/build/Release/Karabiner-Updater.app",
+        "executable": "src/apps/Updater/build/Release/Karabiner-Updater.app/Contents/MacOS/Karabiner-Updater",
+        "sha256": "02b3d3e74e5abeeccb1ac1723d90c8dde97fefd0b9e54f075c5dc4c431dfc81e",
+        "architectures": [
+          "arm64",
+          "x86_64"
+        ],
+        "team_identifier": "not set"
+      },
+      {
+        "product": "src/bin/cli/build/Release/karabiner_cli",
+        "executable": "src/bin/cli/build/Release/karabiner_cli",
+        "sha256": "274b094cbc91d83ed2f6fa1e3cb6715b5371b7c923091f2386b6e0b1cb93ced1",
+        "architectures": [
+          "arm64",
+          "x86_64"
+        ],
+        "team_identifier": "not set"
+      },
+      {
+        "product": "src/apps/ConsoleUserServer/build/Release/Karabiner-Console-User-Server.app",
+        "executable": "src/apps/ConsoleUserServer/build/Release/Karabiner-Console-User-Server.app/Contents/MacOS/Karabiner-Console-User-Server",
+        "sha256": "82a8c3436eab9170cbdc7ab1b4490c66acb25623f5cb8ed86f37361010d704f1",
+        "architectures": [
+          "arm64",
+          "x86_64"
+        ],
+        "team_identifier": "not set"
+      },
+      {
+        "product": "src/apps/CoreService/build/Release/Karabiner-Core-Service.app",
+        "executable": "src/apps/CoreService/build/Release/Karabiner-Core-Service.app/Contents/MacOS/Karabiner-Core-Service",
+        "sha256": "1fef2f1e690c72a6de84a20306edc1b2f754c6c242d4b43460b65df7cd601c90",
+        "architectures": [
+          "arm64",
+          "x86_64"
+        ],
+        "team_identifier": "not set"
+      }
+    ],
+    "package": {
+      "file_name": "Ergopti-Karabiner-candidate-16.3.0.dmg",
+      "sha256": "f15d3744ef624f3e393d6bac5b37d74250debc0d391b7fff79cd7d0a313cdb2d"
+    }
+  }
+}

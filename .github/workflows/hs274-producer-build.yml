@@ -15,6 +15,10 @@ on:
         description: Assemble every fork peer and the installer for disposable acceptance (requires stream_capture)
         type: boolean
         default: false
+      install_candidate:
+        description: Verify installation of the retained complete candidate over official Karabiner (no rebuild)
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -22,7 +26,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   build:
-    if: github.ref != 'refs/heads/main' && github.ref != 'refs/heads/dev'
+    if: ${{ !inputs.install_candidate && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/dev' }}
     runs-on: macos-15
     timeout-minutes: ${{ inputs.complete_package && 40 || 20 }}
     env:
@@ -132,5 +136,55 @@ jobs:
         with:
           name: hs274-producer-build-${{ github.sha }}
           path: ${{ runner.temp }}/hs274-producer-*
+          if-no-files-found: warn
+          retention-days: 7
+
+  install-candidate:
+    permissions:
+      contents: read
+      actions: read
+    if: inputs.install_candidate && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/dev'
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - name: Reject combined build and installation requests
+        if: inputs.raw_capture || inputs.stream_capture || inputs.complete_package
+        run: exit 1
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify package fixtures on the native host
+        run: python3 -m unittest discover -s tools/build -p 'karabiner_*_test.py'
+      - name: Select the retained complete native candidate
+        id: candidate
+        run: python3 tools/build/karabiner_candidate_install.py selection >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.candidate.outputs.artifact_name }}
+          run-id: ${{ steps.candidate.outputs.run_id }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/hs274-candidate-download
+      - name: Authenticate the candidate before privileged installation
+        id: image
+        run: python3 tools/build/karabiner_candidate_install.py download "$RUNNER_TEMP/hs274-candidate-download/hs274-producer-package" >> "$GITHUB_OUTPUT"
+      - name: Install the pinned official baseline first
+        run: |
+          image="$RUNNER_TEMP/hs274-official.dmg"
+          curl --fail --location --max-time 90 --output "$image" https://github.com/pqrs-org/Karabiner-Elements/releases/download/v16.3.0/Karabiner-Elements-16.3.0.dmg
+          printf '%s  %s\n' 19cce7bed3d48a722242ca683bd1bae406b6a87fed520728d1c91dee175b75e4 "$image" | shasum -a 256 --check
+          bash tools/build/karabiner_install_image.sh "$image"
+      - name: Snapshot the official installation and existing configuration
+        run: python3 tools/build/karabiner_candidate_install.py before "$RUNNER_TEMP/hs274-install-before.json"
+      - name: Install the same-version fork candidate
+        env:
+          CANDIDATE_IMAGE: ${{ steps.image.outputs.image }}
+        run: bash tools/build/karabiner_install_image.sh "$CANDIDATE_IMAGE"
+      - name: Verify every installed peer and preserved configuration
+        run: python3 tools/build/karabiner_candidate_install.py after "$RUNNER_TEMP/hs274-install-before.json" "$RUNNER_TEMP/hs274-install-after.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hs274-installed-candidate-${{ github.sha }}
+          path: ${{ runner.temp }}/hs274-install-*.json
           if-no-files-found: warn
           retention-days: 7

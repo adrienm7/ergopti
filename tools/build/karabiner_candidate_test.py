@@ -9,46 +9,15 @@ from tempfile import TemporaryDirectory
 import unittest
 
 from karabiner_candidate import BUILD_STEP, LAUNCHD_RESOURCES, PRODUCTS, SIGN_STEP, inspect_products, packaging_script
+from karabiner_test_fixture import make_products, signature_verifier
 
 
 class CandidateTests(unittest.TestCase):
-    def make_products(self, directory, resources=True):
-        root = Path(directory).resolve()
-        for component, name in PRODUCTS:
-            product = root / "src" / component / "build/Release" / name
-            executable = product
-            if name.endswith(".app"):
-                (product / "Contents").mkdir(parents=True)
-                (product / "Contents/Info.plist").write_bytes(plistlib.dumps({"CFBundleExecutable": "native-peer"}))
-                executable = product / "Contents/MacOS/native-peer"
-            executable.parent.mkdir(parents=True, exist_ok=True)
-            executable.write_bytes(component.encode("utf-8"))
-        if resources:
-            for index, (source, component, folder) in enumerate(LAUNCHD_RESOURCES):
-                original = root / source / (str(index) + ".plist")
-                copied = root / "src" / component / "build/Release" / dict(PRODUCTS)[component] / "Contents/Library" / folder / original.name
-                original.parent.mkdir(parents=True, exist_ok=True)
-                copied.parent.mkdir(parents=True, exist_ok=True)
-                contents = plistlib.dumps({"Label": "candidate-" + str(index)})
-                original.write_bytes(contents)
-                copied.write_bytes(contents)
-        return root
-
-    def verifier(self, calls, fail=None):
-        def verify(command):
-            calls.append(command)
-            if fail and fail in command[-1]:
-                raise subprocess.CalledProcessError(1, command)
-            if "--display" in command:
-                return "TeamIdentifier=not set\n"
-            return "arm64 x86_64\n" if command[0].endswith("lipo") else ""
-        return verify
-
     def test_complete_set_contains_every_cooperating_application_and_cli(self):
         with TemporaryDirectory() as directory:
-            root = self.make_products(directory)
+            root = make_products(directory)
             calls = []
-            receipt = inspect_products(root, self.verifier(calls))
+            receipt = inspect_products(root, signature_verifier(calls))
             expected = {"AppIconSwitcher", "EventViewer", "MultitouchExtension", "ServiceManager-Non-Privileged-Agents",
                         "ServiceManager-Privileged-Daemons", "SettingsWindow", "Updater", "cli", "ConsoleUserServer", "CoreService"}
             self.assertEqual({row["product"].split("/")[2] for row in receipt}, expected)
@@ -58,54 +27,54 @@ class CandidateTests(unittest.TestCase):
 
     def test_missing_core_service_cannot_be_packaged_as_a_complete_fork(self):
         with TemporaryDirectory() as directory:
-            root = self.make_products(directory)
+            root = make_products(directory)
             (root / "src/apps/CoreService/build/Release/Karabiner-Core-Service.app/Contents/MacOS/native-peer").unlink()
             with self.assertRaisesRegex(ValueError, "Missing or redirected product executable"):
-                inspect_products(root, self.verifier([]))
+                inspect_products(root, signature_verifier([]))
 
     def test_bad_signature_and_missing_architecture_refuse_the_candidate(self):
         with TemporaryDirectory() as directory:
-            root = self.make_products(directory)
+            root = make_products(directory)
             with self.assertRaises(subprocess.CalledProcessError):
-                inspect_products(root, self.verifier([], "Karabiner-Console-User-Server.app"))
+                inspect_products(root, signature_verifier([], "Karabiner-Console-User-Server.app"))
             with self.assertRaisesRegex(ValueError, "both supported architectures"):
-                inspect_products(root, lambda command: "arm64" if command[0].endswith("lipo") else self.verifier([])(command))
+                inspect_products(root, lambda command: "arm64" if command[0].endswith("lipo") else signature_verifier([])(command))
 
     def test_valid_official_client_cannot_mix_with_adhoc_fork_peers(self):
         with TemporaryDirectory() as directory:
-            root = self.make_products(directory)
+            root = make_products(directory)
             def mixed(command):
                 if "--display" in command and "Karabiner-Console-User-Server.app" in command[-1]:
                     return "TeamIdentifier=official-team\n"
-                return self.verifier([])(command)
+                return signature_verifier([])(command)
             with self.assertRaisesRegex(ValueError, "different signing teams"):
                 inspect_products(root, mixed)
 
     def test_a_signed_binary_without_its_launchd_resources_is_not_ready(self):
         with TemporaryDirectory() as directory:
-            root = self.make_products(directory, resources=False)
+            root = make_products(directory, resources=False)
             with self.assertRaisesRegex(ValueError, "launchd"):
-                inspect_products(root, self.verifier([]))
+                inspect_products(root, signature_verifier([]))
 
     def test_each_missing_or_changed_launchd_copy_refuses_the_candidate(self):
         for index, (_, component, folder) in enumerate(LAUNCHD_RESOURCES):
             with self.subTest(component=component, index=index), TemporaryDirectory() as directory:
-                root = self.make_products(directory)
+                root = make_products(directory)
                 copied = root / "src" / component / "build/Release" / dict(PRODUCTS)[component] / "Contents/Library" / folder / (str(index) + ".plist")
                 copied.write_bytes(b"changed launchd configuration")
                 with self.assertRaisesRegex(ValueError, "changed launchd"):
-                    inspect_products(root, self.verifier([]))
+                    inspect_products(root, signature_verifier([]))
                 copied.unlink()
                 with self.assertRaisesRegex(ValueError, "Missing or changed launchd"):
-                    inspect_products(root, self.verifier([]))
+                    inspect_products(root, signature_verifier([]))
 
     def test_product_metadata_cannot_redirect_the_executable(self):
         with TemporaryDirectory() as directory:
-            root = self.make_products(directory)
+            root = make_products(directory)
             info = root / "src/apps/CoreService/build/Release/Karabiner-Core-Service.app/Contents/Info.plist"
             info.write_bytes(plistlib.dumps({"CFBundleExecutable": "../../foreign"}))
             with self.assertRaisesRegex(ValueError, "Invalid product executable name"):
-                inspect_products(root, self.verifier([]))
+                inspect_products(root, signature_verifier([]))
 
     def test_assembly_reuses_upstream_without_rebuilding_or_losing_identity(self):
         source = "#!/bin/bash\n" + BUILD_STEP + "\n# copy complete package\n" + SIGN_STEP + "\npkgbuild owned\n"

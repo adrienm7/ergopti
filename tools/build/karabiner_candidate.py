@@ -99,6 +99,37 @@ def native(command):
     return subprocess.check_output(command, text=True, stderr=subprocess.STDOUT)
 
 
+def inspect_product(product, verify=native):
+    """Verify an actual build or installed product with the same native policy."""
+    product = Path(product)
+    if not product.exists() or product.resolve() != product:
+        raise ValueError("Missing or redirected Karabiner product: " + str(product))
+    executable = product
+    if product.suffix == ".app":
+        info = product / "Contents/Info.plist"
+        if info.resolve() != info or not info.is_file():
+            raise ValueError("Missing or redirected product metadata")
+        metadata = plistlib.loads(info.read_bytes())
+        name = metadata.get("CFBundleExecutable")
+        if (not isinstance(name, str) or not name or name in (".", "..")
+                or "/" in name or "\\" in name):
+            raise ValueError("Invalid product executable name")
+        executable = product / "Contents/MacOS" / name
+    if not executable.is_file() or executable.resolve() != executable:
+        raise ValueError("Missing or redirected product executable")
+    verify(["/usr/bin/codesign", "--verify", "--strict", "--deep", str(product)])
+    signature = verify(["/usr/bin/codesign", "--display", "--verbose=4", str(product)])
+    teams = re.findall(r"^TeamIdentifier=(.+)$", signature, re.MULTILINE)
+    if len(teams) != 1 or not teams[0].strip():
+        raise ValueError("Karabiner signature has no exact team identity")
+    team = teams[0].strip()
+    architectures = verify(["/usr/bin/lipo", "-archs", str(executable)]).split()
+    if sorted(architectures) != ["arm64", "x86_64"]:
+        raise ValueError("Karabiner candidate must contain both supported architectures")
+    return {"executable": executable, "sha256": hashlib.sha256(executable.read_bytes()).hexdigest(),
+            "architectures": sorted(architectures), "team_identifier": team}
+
+
 def inspect_products(root, verify=native):
     """Verify the complete peer set before allowing package assembly."""
     root = Path(root).resolve()
@@ -106,34 +137,10 @@ def inspect_products(root, verify=native):
     receipts = []
     for component, name in PRODUCTS:
         product = root / "src" / component / "build/Release" / name
-        if not product.exists() or product.resolve() != product:
-            raise ValueError("Missing or redirected Karabiner product: " + str(product))
-        executable = product
-        if product.suffix == ".app":
-            info = product / "Contents/Info.plist"
-            if info.resolve() != info or not info.is_file():
-                raise ValueError("Missing or redirected product metadata")
-            metadata = plistlib.loads(info.read_bytes())
-            name = metadata.get("CFBundleExecutable")
-            if (not isinstance(name, str) or not name or name in (".", "..")
-                    or "/" in name or "\\" in name):
-                raise ValueError("Invalid product executable name")
-            executable = product / "Contents/MacOS" / name
-        if not executable.is_file() or executable.resolve() != executable:
-            raise ValueError("Missing or redirected product executable")
-        verify(["/usr/bin/codesign", "--verify", "--strict", "--deep", str(product)])
-        signature = verify(["/usr/bin/codesign", "--display", "--verbose=4", str(product)])
-        teams = re.findall(r"^TeamIdentifier=(.+)$", signature, re.MULTILINE)
-        if len(teams) != 1 or not teams[0].strip():
-            raise ValueError("Karabiner signature has no exact team identity")
-        team = teams[0].strip()
-        architectures = verify(["/usr/bin/lipo", "-archs", str(executable)]).split()
-        if sorted(architectures) != ["arm64", "x86_64"]:
-            raise ValueError("Karabiner candidate must contain both supported architectures")
-        receipts.append({"product": product.relative_to(root).as_posix(),
-                         "executable": executable.relative_to(root).as_posix(),
-                         "sha256": hashlib.sha256(executable.read_bytes()).hexdigest(),
-                         "architectures": sorted(architectures), "team_identifier": team})
+        receipt = inspect_product(product, verify)
+        receipt["product"] = product.relative_to(root).as_posix()
+        receipt["executable"] = receipt["executable"].relative_to(root).as_posix()
+        receipts.append(receipt)
     if len({row["team_identifier"] for row in receipts}) != 1:
         raise ValueError("Karabiner candidate mixes different signing teams")
     return receipts
