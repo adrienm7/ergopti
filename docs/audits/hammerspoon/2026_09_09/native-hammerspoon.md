@@ -539,3 +539,37 @@ pass, without requiring another macOS run.
 This proves the paged protocol for the controlled released-input scenario. It
 does not yet prove inherited held-state handoff with Hammerspoon connected,
 ordinary driver integration or physical keyboard hardware.
+
+## Held baseline with native Hammerspoon
+
+Run [34814424933](https://github.com/adrienm7/ergopti/actions/runs/34814424933)
+used consumer `31479fa99bb45e376485812856a96894eb76322d` and the unchanged
+producer 34783474637. The modified HID fixture compiled on macOS and its actual
+input step passed. Separate capability probes kept the overall workflow red.
+The remap report has no observation error and SHA-256
+`01b364ca19c9390e9d193b8aa577dda3f1fc9fba867b719cb596a8c101d7bc65`.
+
+Lease 2 completed 496 baseline rows at boundary 8977339854. Device 4294968821
+had 263 elements, with exactly Space usage 44/cookie 109 held, timestamp
+8217178168. The other 231-element device had no held key. The fixture requested
+release at 8982573430, after the transferred baseline. Its retained cookie 109
+then delivered release at 8982618555, fresh press at 8984808892 and release at
+8987086379. All 15 stream records match the independent raw capture.
+
+Native Hammerspoon credited only keycode 49 once, with zero errors, trusted AX
+focus, verified privacy transitions and settled consumer/context ownership.
+The fixture confirmed drain release and metadata restoration. Lease 3 completed
+its independent baseline at 9001695049 and reported explicit interrupted loss
+when the device closed.
+
+`tools/diagnostics/fixtures/hs274-native-held-consumer.json` retains the complete
+consumer stream, raw capture, native input, kernel probe, Hammerspoon receipt and
+provenance. The stream suite replays acquisition-before-release, exact raw input,
+clock/context/privacy and the single fresh credit; missing fresh input and double
+credit are rejected. All 40 targeted stream tests pass on Windows with archived
+UTC formatting. Decode the retained raw probe through its reader: JSON object
+keys in a previously decoded `held` map become strings on serialization.
+
+This closes the controlled inherited-held-state handoff experiment. Ordinary
+driver integration, broader device/key coverage and physical hardware validation
+remain separate requirements; the producer still declares `fixture_only`.
