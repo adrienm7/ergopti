@@ -3,6 +3,7 @@
 #Requires AutoHotkey v2.0
 
 #Include webview_script.ahk
+#Include ../adapters/webview_profiles.ahk
 
 ; ==============================================================================
 ; MODULE: WebView Utils
@@ -135,13 +136,6 @@ WebView_ShouldUseNativeFallback() {
 }
 
 
-; Helper to clear stale WebView2 user-data profile directories.
-; Call immediately before DirCreate(udir) and after controller.Close()/Gui.Destroy().
-WebView_SweepStaleProfiles(prefix) {
-		loop files, A_Temp . "\" . prefix . "*", "D" {
-				try DirDelete(A_LoopFileFullPath, true)
-		}
-}
 
 
 ; ==============================================================================

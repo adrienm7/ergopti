@@ -193,11 +193,7 @@ OllamaWV_Close() {
 	if IsSet(_OllamaWV_Udir) {
 		UdirToDelete := _OllamaWV_Udir
 		_OllamaWV_Udir := unset
-		; Edge's child msedgewebview2.exe processes hold an exclusive file lock on
-		; the user-data directory for a few hundred ms after Controller.Close().
-		; Deleting synchronously here races that lock and fails silently, leaking
-		; the temp folder. A 1 s delay lets the children exit before we sweep.
-		SetTimer(_OllamaWV_DeferredDirDelete.Bind(UdirToDelete), -1000)
+		WebView_RetireProfile(UdirToDelete)
 	}
 }
 
@@ -274,14 +270,18 @@ OllamaWV_Create(kind, subtitle) {
 
 	; Spin up WebView2
 	loader := _VendorDir . "\64bit\WebView2Loader.dll"
-	global _OllamaWV_Udir := A_Temp . "\ergopti_ollama_wv_" . A_TickCount
+	global _OllamaWV_Udir := WebView_NewProfilePath("ergopti_ollama_wv_")
 	WebView_SweepStaleProfiles("ergopti_ollama_wv_")
 	try DirCreate(_OllamaWV_Udir)
 
 	try {
 		_OllamaWV_Controller := WebView2.create(g.Hwnd, , 0, _OllamaWV_Udir, "", 0, loader)
+		WebView_WatchProfile(_OllamaWV_Udir, _OllamaWV_Controller.CoreWebView2)
 	} catch as err {
 		LoggerError("LLM", "WebView2 controller creation failed: " err.Message ".")
+		if IsSet(_OllamaWV_Controller)
+			try _OllamaWV_Controller.Close()
+		WebView_AbandonProfile(_OllamaWV_Udir)
 		try g.Destroy()
 		_OllamaWV_Gui := unset
 		return
@@ -502,16 +502,6 @@ OllamaWV_OnWebMessage(sender, args) {
 ; ======= 5/ Helpers =======
 ; ==========================
 ; ==========================
-
-/**
- * Deletes a directory if it still exists. Called via SetTimer so the deletion
- * is deferred until after Edge's child processes release their file locks.
- * @param {string} dir - Absolute path of the user-data directory to remove.
- */
-_OllamaWV_DeferredDirDelete(dir) {
-	if DirExist(dir)
-		try DirDelete(dir, true)
-}
 
 /**
  * Escapes a string for safe embedding in a JS string literal.

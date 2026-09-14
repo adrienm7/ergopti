@@ -27,6 +27,7 @@ try {
 	assert.equal(result.status, 0, result.stdout + result.stderr);
 	assert.deepEqual(JSON.parse(result.stdout.trim()), {
 		same_host: true, file_refused: true, mapped_range: true, consumed: true, removed: true,
+		profile_preserved: true, profile_retired: true,
 	});
 } catch (error) {
 	errors.push(error);
@@ -35,4 +36,4 @@ try {
 	catch (error) { errors.push(error); }
 }
 if (errors.length) throw new AggregateError(errors, 'Native WebView transport or owned cleanup failed.');
-console.log('Native WebView: HTTPS range delivered, consumed and removed; file-scheme control refused.');
+console.log('Native WebView: HTTPS range consumed; file-scheme refused; active profile preserved and retired after browser exit.');

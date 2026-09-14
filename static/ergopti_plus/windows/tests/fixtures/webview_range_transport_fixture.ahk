@@ -12,6 +12,7 @@
 #Include ../../vendor/WebView2.ahk
 #Include ../../infra/json.ahk
 #Include ../../infra/text_utils.ahk
+#Include ../../adapters/webview_profiles.ahk
 #Include ../../modules/keylogger/keylogger_webview_range_script.ahk
 #Include ../../modules/keylogger/keylogger_webview_range_mount.ahk
 
@@ -20,7 +21,8 @@ global _NWRT_Root := A_Args[1]
 if FileExist(_NWRT_Root)
 	throw Error("Native range fixture destination already exists.")
 DirCreate(_NWRT_Root . "\assets")
-DirCreate(_NWRT_Root . "\profile")
+global _NWRT_Profile := WebView_NewProfilePath("ergopti_native_profile_")
+DirCreate(_NWRT_Profile)
 FileAppend('{"marker":"synthetic","historical":{},"today":{}}', _NWRT_Root . "\stage.json", "UTF-8-RAW")
 FileAppend('{"marker":"control"}', _NWRT_Root . "\assets\control.json", "UTF-8-RAW")
 global _NWRT_Gui := Gui("+ToolWindow -Caption")
@@ -30,10 +32,11 @@ global _NWRT_Owner := Map("token", "native-range-fixture", "stage", _NWRT_Root .
 global _NWRT_Ready := false, _NWRT_Result := false, _NWRT_Finished := false
 OnExit(_NWRT_Cleanup)
 SetTimer(_NWRT_Timeout, -30000)
-_NWRT_Controller := WebView2.create(_NWRT_Gui.Hwnd, , 0, _NWRT_Root . "\profile", "", 0,
+_NWRT_Controller := WebView2.create(_NWRT_Gui.Hwnd, , 0, _NWRT_Profile, "", 0,
 	A_ScriptDir . "\..\..\vendor\64bit\WebView2Loader.dll")
 _NWRT_Controller.IsVisible := false
 _NWRT_Entry := Map("webview", _NWRT_Controller.CoreWebView2)
+WebView_WatchProfile(_NWRT_Profile, _NWRT_Entry["webview"])
 ; This fresh profile belongs exclusively to the fixture. Capture a stable
 ; process handle while the controller is live; never retire a process by PID later.
 _NWRT_BrowserHandle := DllCall("OpenProcess", "UInt", 0x100001, "Int", false,
@@ -55,9 +58,25 @@ while !_NWRT_Finished
 	Sleep(10)
 FileDelete(_NWRT_Owner["stage"])
 DirDelete(_NWRT_Owner["directory"])
+FileAppend("synthetic active profile", _NWRT_Profile . "\a-owned-sentinel.txt", "UTF-8-RAW")
+WebView_SweepStaleProfiles("ergopti_native_profile_")
+if !FileExist(_NWRT_Profile . "\a-owned-sentinel.txt")
+	throw Error("An active native browser profile was modified by sweeping.")
+WebView_RetireProfile(_NWRT_Profile)
+if !DirExist(_NWRT_Profile)
+	throw Error("Profile retirement deleted a live browser profile.")
 _NWRT_CloseOwnedBrowser()
-FileAppend('{"same_host":true,"file_refused":true,"mapped_range":true,"consumed":true,"removed":true}' . "`n", "*", "UTF-8-RAW")
+_NWRT_Deadline := A_TickCount + 5000
+while DirExist(_NWRT_Profile) && A_TickCount < _NWRT_Deadline
+	Sleep(10)
+if DirExist(_NWRT_Profile) || FileExist(_NWRT_Profile . ".retired")
+	throw Error("The browser exit event did not complete private profile cleanup.")
+FileAppend('{"same_host":true,"file_refused":true,"mapped_range":true,"consumed":true,"removed":true,"profile_preserved":true,"profile_retired":true}' . "`n", "*", "UTF-8-RAW")
 ExitApp(0)
+
+LoggerWarn(*) {
+	_NWRT_Error(Error("Unexpected private profile cleanup warning."))
+}
 
 _NWRT_Message(Sender, Args) {
 	global _NWRT_Ready, _NWRT_Result, _NWRT_Finished, _NWRT_Entry, _NWRT_Owner, _NWRT_Url

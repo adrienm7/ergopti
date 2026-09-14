@@ -226,9 +226,10 @@ KLWV_Open(which, metrics_dir) {
 
 		; Spin up WebView2 inside the Gui's HWND. dataDir is unique per
 		; launch so cached state from a previous open never bleeds in.
-		udir := A_Temp . "\ergopti_webview2_" . A_TickCount
+		udir := WebView_NewProfilePath("ergopti_webview2_")
 		WebView_SweepStaleProfiles("ergopti_webview2_")
 		if !_KLWV_CreateProfileDir(udir) {
+				WebView_ConfirmProfileExit(udir)
 				try g.Destroy()
 				return false
 		}
@@ -240,10 +241,14 @@ KLWV_Open(which, metrics_dir) {
 		try LoggerDebug("Keylogger", "KLWV_Open: creating WebView2 controller.")
 		try {
 				controller := WebView2.create(g.Hwnd, , 0, udir, "", 0, loader)
+				WebView_WatchProfile(udir, controller.CoreWebView2)
 		} catch as err {
 				try LoggerError("Keylogger",
 						"KLWV_Open: WebView2 controller create failed ('{1}') at {2}:{3} — dashboard cannot open.",
 						err.Message, err.File, err.Line)
+				if IsSet(controller)
+						try controller.Close()
+				WebView_AbandonProfile(udir)
 				try g.Destroy()
 				return false
 		}
@@ -339,7 +344,7 @@ KLWV_AbortOpen(gui, controller, udir) {
 		try controller.Close()
 		try gui.Destroy()
 		if (udir != "")
-				SetTimer(KLWV_DeferredDirDelete.Bind(udir), -1000)
+				WebView_RetireProfile(udir)
 }
 
 KLWV_IsCurrent(which, Epoch := 0) {
@@ -378,26 +383,9 @@ KLWV_Close(which) {
 				entry.Delete("msg_sub")
 		try entry["controller"].Close()
 		try entry["gui"].Destroy()
-		; Edge child processes commonly retain the profile lock briefly after
-		; controller shutdown. Never synchronously sweep the profile on the UI
-		; callback; retry a bounded deferred cleanup instead.
+		; BrowserProcessExited, not a fixed delay, proves the profile is unused.
 		if (udir != "")
-				SetTimer(KLWV_DeferredDirDelete.Bind(udir), -1000)
-}
-
-KLWV_DeferredDirDelete(udir, attempts := 0) {
-		if !DirExist(udir)
-				return
-		try {
-				DirDelete(udir, true)
-				return
-		} catch as e {
-				if (attempts < 3) {
-						SetTimer(KLWV_DeferredDirDelete.Bind(udir, attempts + 1), -1000)
-						return
-				}
-				LoggerWarn("Keylogger", "Could not delete WebView profile '{1}' after retries: {2}", udir, e.Message)
-		}
+				WebView_RetireProfile(udir)
 }
 
 KLWV_CloseAll() {
