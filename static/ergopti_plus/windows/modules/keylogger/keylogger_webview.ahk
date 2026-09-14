@@ -27,6 +27,7 @@
 
 #Requires Autohotkey v2.0+
 #Include keylogger_webview_range_script.ahk
+#Include keylogger_webview_range_mount.ahk
 
 
 
@@ -634,7 +635,20 @@ KLWV_OnRangeBuildTerminal(which, Epoch, request_id, status, stage := "") {
 				KLWV_RetireRangeStage(entry, Owner)
 				return KLWV_QueueRangeTerminal(which, Epoch, request_id, "canceled")
 		}
-		url := FilePathToUrl(stage)
+		try url := KLWV_PrepareRangeMount(entry, Owner, KLWV_HOST_ACCESS_ALLOW)
+		catch {
+				try LoggerError("Keylogger", "Range mount preparation failed.")
+				KLWV_RangeScriptSettled(which, Epoch, entry, request_id, Owner, false)
+				return false
+		}
+		if !_KLWV_OwnsDelivery(which, entry, Epoch) || entry.Get("range_stage", 0) !== Owner {
+				KLWV_RetireRangeStage(entry, Owner)
+				return false
+		}
+		if A_IsSuspended {
+				KLWV_RetireRangeStage(entry, Owner)
+				return KLWV_QueueRangeTerminal(which, Epoch, request_id, "canceled")
+		}
 		js := KLWV_BuildRangeScript(url, request_id, Owner["token"])
 		if !WebView_RunScriptAsync(entry["webview"], js, "Keylogger.range." . which,
 				KLWV_RangeScriptSettled.Bind(which, Epoch, entry, request_id, Owner))
@@ -665,7 +679,10 @@ KLWV_RetireRangeStage(Entry, Owner := 0) {
 				return false
 		if Entry.Get("range_stage", 0) == Owner
 				Entry.Delete("range_stage")
-		return KLWV_DeleteRangeStage(Owner["stage"])
+		try KLWV_ReleaseRangeMount(Entry, Owner)
+		catch
+				try LoggerError("Keylogger", "Range mount release failed.")
+		return KLWV_DeleteRangeStage(Owner["stage"], Owner.Get("directory", ""))
 }
 
 ; The page supplies only a generation token, never a path to delete. Tokens
@@ -733,7 +750,9 @@ KLWV_FlushPendingRangeTerminals() {
 		}
 }
 
-KLWV_DeleteRangeStage(stage) {
+KLWV_DeleteRangeStage(stage, Directory := "") {
+		if Directory != ""
+				return KLPF_DeletePrivateStage(stage, _KLPF_DeleteRangeMount.Bind(Directory))
 		return KLPF_DeletePrivateStage(stage)
 }
 

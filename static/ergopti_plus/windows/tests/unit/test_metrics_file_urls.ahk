@@ -9,16 +9,22 @@
 
 _MFU_Range(View, Lines, Unhandled, Failure) {
 	Path := _CTU_NewPath() . " #50%25 &+ café.json"
-	KLWV.windows := Map("typing", Map("epoch", 51, "webview", View))
+	Entry := Map("epoch", 51, "webview", View)
+	KLWV.windows := Map("typing", Entry)
 	try {
 		AssertTrue(FSWrite(Path, "{}"))
 		AssertTrue(KLWV_OnRangeBuildTerminal("typing", 51, 42, "ok", Path))
 		AssertTrue(RegExMatch(View.Scripts[1], "^fetch\((.*?)\)\.then", &Match))
 		Url := KL_JsonDecode(Match[1])
-		AssertContains(Url, "%20%2350%2525%20%26%2B%20caf%C3%A9.json",
-			"reserved filename characters must not become URL syntax")
-		AssertEqual("file:///" . StrReplace(Path, "\", "/"), UriDecode(Url))
-	} finally FSDelete(Path)
+		Owner := Entry["range_stage"]
+		AssertEqual("https://" . Owner["host"] . "/range.json", Url)
+		AssertEqual(Path . ".mount", View.Mappings[Owner["host"]]["directory"],
+			"literal directory characters must remain filesystem data, outside the URL")
+		AssertEqual("{}", FileRead(Owner["stage"], "UTF-8"))
+	} finally {
+		KLWV_RetireRangeStage(Entry)
+		FSDelete(Path)
+	}
 }
 Test("metrics URLs: range stage preserves reserved path characters (metrics-file-urls)",
 	_WVSO_WithFixture.Bind(_MFU_Range))

@@ -13,6 +13,7 @@ class _WVSO_View {
 	__New() {
 		this.Scripts := []
 		this.Messages := []
+		this.Mappings := Map()
 		this.Pending := Promise(this._Capture.Bind(this))
 	}
 	_Capture(Resolve, Reject) {
@@ -27,6 +28,17 @@ class _WVSO_View {
 	}
 	PostWebMessageAsString(Message) {
 		this.Messages.Push(Message)
+	}
+	SetVirtualHostNameToFolderMapping(Host, Directory, AccessKind) {
+		this.Mappings[Host] := Map("directory", Directory, "access", AccessKind)
+		if this.HasOwnProp("MappingFailure")
+			throw this.MappingFailure
+		if this.HasOwnProp("OnMap")
+			this.OnMap.Call()
+	}
+	ClearVirtualHostNameToFolderMapping(Host) {
+		if this.Mappings.Has(Host)
+			this.Mappings.Delete(Host)
 	}
 }
 
