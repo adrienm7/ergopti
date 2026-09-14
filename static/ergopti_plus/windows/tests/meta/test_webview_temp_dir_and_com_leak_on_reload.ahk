@@ -92,13 +92,14 @@ _WVRL_CloseReleasesEverything() {
 		"KLWV_Close must Destroy() the host Gui")
 	; Deleting the udir reclaims the multi-MB temp profile dir for this launch,
 	; but must be deferred until Edge's child processes release their lock.
-	Assert(InStr(Seg, 'SetTimer(KLWV_DeferredDirDelete.Bind(udir), -1000)') > 0,
-		"KLWV_Close must defer profile deletion after Controller.Close rather than blocking/retrying inline")
+	Assert(InStr(Seg, 'WebView_RetireProfile(udir)') > 0,
+		"KLWV_Close must request profile retirement after Controller.Close")
 	Assert(InStr(Seg, 'DirDelete(entry["udir"], true)') = 0,
 		"KLWV_Close must not synchronously DirDelete a profile still locked by Edge")
-	Deferred := _DriverFuncBody("KLWV_DeferredDirDelete")
-	Assert(InStr(Deferred, "attempts < 3") > 0 && InStr(Deferred, "LoggerWarn") > 0,
-		"KLWV_DeferredDirDelete must use bounded retries and log terminal cleanup failure")
+	Deferred := _DriverFuncBody("_WebView_CleanupProfileAttempt")
+	Assert(Deferred != "", "shared profile cleanup implementation must exist")
+	Assert(InStr(Deferred, 'Owner["attempts"] < 4') > 0 && InStr(Deferred, "LoggerWarn") > 0,
+		"confirmed profile cleanup must use bounded retries and log terminal failure")
 }
 Test("keylogger: KLWV_Close releases controller, gui and udir (webview-temp-dir-and-com-leak-on-reload)", _WVRL_CloseReleasesEverything)
 
