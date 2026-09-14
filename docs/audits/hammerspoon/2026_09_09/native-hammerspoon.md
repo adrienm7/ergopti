@@ -573,3 +573,32 @@ keys in a previously decoded `held` map become strings on serialization.
 This closes the controlled inherited-held-state handoff experiment. Ordinary
 driver integration, broader device/key coverage and physical hardware validation
 remain separate requirements; the producer still declares `fixture_only`.
+
+## Eight native modifier sides
+
+Run [34816149265](https://github.com/adrienm7/ergopti/actions/runs/34816149265)
+used consumer `f1d2491eaf12bdfed39235bfcdded7b4124fff1c` and unchanged producer
+34783474637. Native fixture compilation and actual input passed; separate
+capability probes left the overall workflow red. The remap report has no
+observation error and SHA-256
+`b32f44a191b9a93e9813cd4f6b0f48197e4fb4828af7825e39dc157b9169a5eb`.
+
+The fixture sent each of the eight modifier bits down/up independently, followed
+by the unchanged Escape/Space collision pairs: 20 input reports and 20 observed
+Quartz events. Each modifier's side keycode and aggregate flag edge passed the
+native check. Baseline transfer completed 496 rows at boundary 14705213636.
+All 52 raw records matched the delivered stream; modifier usages 224 through 231
+used cookies 24 through 31, each with one down and one up. The duplicate-usage
+array elements in this descriptor did not produce duplicate modifier credits in
+this scenario. This evidence does not justify merging arbitrary cookie states.
+
+Hammerspoon credited each modifier and Escape/Space exactly once: ten credits,
+zero errors, verified clock/context/privacy, and settled consumer/context owners.
+Drain release, metadata restoration and the successor's explicit interrupted
+loss were confirmed. `tools/diagnostics/fixtures/hs274-native-modifier-consumer.json`
+retains the complete stream, raw capture, Quartz and Hammerspoon receipts with
+exact provenance. The modifier suite replays these and rejects every incomplete
+prefix through the final trailing auxiliary row; its three tests pass locally.
+
+Simultaneous modifiers, keyboard combinations, repeated reports, multiple active
+keyboards and production integration still require their own evidence.
