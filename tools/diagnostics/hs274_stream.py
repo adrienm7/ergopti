@@ -112,10 +112,13 @@ def validate_stream(output, capture):
     return stream
 
 
-def fixture_drain(device):
+def fixture_drain(device, *, held=False):
     """Require the complete recorded fixture shape, including trailing auxiliaries."""
-    reference = json.loads((Path(__file__).with_name("fixtures") / "hs274-native-capture.json").read_text(encoding="utf-8"))
-    expected = [{key: value for key, value in row.items() if key not in ("timestamp", "device")}
+    filename = "hs274-native-cookie-held.json" if held else "hs274-native-capture.json"
+    reference = json.loads((Path(__file__).with_name("fixtures") / filename).read_text(encoding="utf-8"))
+    if held:
+        reference = reference["capture"]
+    expected = [{key: value for key, value in row.items() if key not in ("timestamp", "device", "has_cookie", "cookie")}
                 for row in reference["records"]]
     if not expected:
         raise ValueError("Missing native fixture drain reference")

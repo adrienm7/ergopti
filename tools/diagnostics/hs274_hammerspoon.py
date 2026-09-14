@@ -252,7 +252,7 @@ def capture_consumer(app, cli, output, report, target):
                 raise cleanup_error
 
 
-def validate_consumer(result, capture):
+def validate_consumer(result, capture, *, held=False):
     """Match real Lua credits and exact original context keys against native input."""
     focus = result.get("field_focus") if isinstance(result, dict) else None
     if (not isinstance(focus, dict) or focus.get("source") != "native AX"
@@ -266,12 +266,12 @@ def validate_consumer(result, capture):
             or type(result.get("error_count")) is not int or result["error_count"] != 0
             or result.get("errors") not in ([], {})
             or type(result.get("exit")) is not int or result["exit"] != 143
-            or result.get("counts") != {"49": 1, "53": 1}
+            or result.get("counts") != ({"49": 1} if held else {"49": 1, "53": 1})
             or any(type(value) is not int for value in result["counts"].values())):
         raise ValueError("Native Hammerspoon did not prove complete fixture delivery")
     downs = [row for row in capture["records"] if row["has_page"] and row["has_usage"]
              and row["page"] == 7 and row["usage"] in (41, 44) and row["value"] == 1]
-    if [row["usage"] for row in downs] != [41, 44]:
+    if [row["usage"] for row in downs] != ([44] if held else [41, 44]):
         raise ValueError("Independent fixture does not contain the expected physical pair")
     validate_clock(result, downs)
     validate_context(result, downs)

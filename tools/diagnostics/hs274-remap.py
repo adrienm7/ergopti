@@ -19,7 +19,7 @@ from hs274_capture import validate_capture
 from hs274_stream import read_stream, validate_stream, fixture_drain, validate_interruption, validate_successor
 from hs274_disconnect import disconnected_capture
 from hs274_hammerspoon import owned_capture, validate_consumer
-from hs274_baseline import read_baseline, read_observation_baselines, wait_baseline, validate_baseline_native, validate_baseline_capture
+from hs274_baseline import read_baseline, read_observation_baselines, wait_baseline, validate_baseline_native, validate_baseline_capture, require_stream_held_baseline
 from hs274_inventory import read_inventories
 
 
@@ -154,9 +154,9 @@ def wait_stream(path, process, predicate, seconds, acknowledge=True):
     raise RuntimeError("Physical stream observation timed out")
 
 
-def finish_fixture_stream(stream_path, client, producer, scope, drained_path, device, before_release, acknowledge=True):
+def finish_fixture_stream(stream_path, client, producer, scope, drained_path, device, before_release, acknowledge=True, *, held=False):
     """Release the native fixture only after full delivery and owned client exit."""
-    wait_stream(stream_path, client, fixture_drain(device), 10, acknowledge=acknowledge)
+    wait_stream(stream_path, client, fixture_drain(device, held=held), 10, acknowledge=acknowledge)
     if producer.poll() is not None:
         raise RuntimeError("Input fixture exited before stream drain")
     scope.close()
@@ -196,7 +196,7 @@ def main():
         raise RuntimeError("Invalid baseline fixture mode")
     baseline = baseline_mode == "true"
     hammerspoon = os.environ.get("HS274_HAMMERSPOON_APP")
-    if hammerspoon and (baseline or not os.environ.get("HS274_DEVELOPMENT_ROOT")):
+    if hammerspoon and not os.environ.get("HS274_DEVELOPMENT_ROOT"):
         raise RuntimeError("Native Hammerspoon capture requires the development stream fixture")
     baseline_source = os.environ.get("HS274_BASELINE_SOURCE", "forced")
     if baseline_source not in ("forced", "kernel") or (not baseline and baseline_source != "forced"):
@@ -220,6 +220,7 @@ def main():
         core, console = runtime["core"], runtime["console"]
         report["runtime"] = {name: str(path) for name, path in runtime.items()}
         development = bool(os.environ.get("HS274_DEVELOPMENT_ROOT"))
+        stream_enabled = development and (not baseline or bool(hammerspoon))
         if ignored and not development:
             raise RuntimeError("Ignored fixture capture requires the development stream")
         if baseline and not development:
@@ -237,12 +238,13 @@ def main():
             stack.enter_context(owned_process(["sudo", "-n", daemon], "provider", output, report))
             producer = stack.enter_context(owned_process(
                 ["sudo", "-n", "env", "GITHUB_ACTIONS=true", str(output / "hs274-hid-stream"), str(native_path),
-                 "--baseline-held" if baseline else "--ignored-hold" if ignored else "--remap-hold" if development else "--remap"],
+                 "--baseline-held-drain" if baseline and hammerspoon else "--baseline-held" if baseline
+                 else "--ignored-hold" if ignored else "--remap-hold" if development else "--remap"],
                 "input", output, report))
             device = wait_ready(ready_path, producer, 20)
             if device.get("renamed") is not True:
                 raise RuntimeError("Input fixture metadata was not renamed")
-            if development and not baseline and device.get("hold_for_drain") is not True:
+            if stream_enabled and device.get("hold_for_drain") is not True:
                 raise RuntimeError("Input fixture did not retain its lifetime for stream drain")
             if baseline and device.get("baseline_held") is not True:
                 raise RuntimeError("Input fixture did not hold Space before core startup")
@@ -289,7 +291,7 @@ def main():
                                                                    source=baseline_source)
                         if report["baseline_probe"]["held"] != {41: 0, 44: 1}:
                             raise RuntimeError("Core could not acquire the deliberately held Space")
-                    else:
+                    if stream_enabled:
                         disconnected_capture([str(runtime["cli"]), "--hs274-capture", "25"], output, report)
                         stream_scope = stack.enter_context(ExitStack())
                         if hammerspoon:
@@ -298,13 +300,16 @@ def main():
                             stream_client = stream_scope.enter_context(owned_process(
                                 [str(runtime["cli"]), "--hs274-capture", "25"], "physical-stream", output, report,
                                 separate_stderr=True, stream_input=True))
-                        report["stream_opened"] = wait_stream(stream_path, stream_client, lambda stream: True, 10,
-                                                             acknowledge=not hammerspoon)["opened"]
+                        initial = wait_stream(stream_path, stream_client, lambda stream: True, 10,
+                                              acknowledge=not hammerspoon)
+                        report["stream_opened"] = initial["opened"]
+                        if baseline:
+                            report["held_stream_boundary"] = require_stream_held_baseline(initial, device["registry_entry_id"])
                         if report["stream_opened"]["lease"] != "2":
                             raise RuntimeError("Successor capture did not acquire the next lease in the isolated daemon")
                 with start_path.open("x", encoding="utf-8") as handle:
                     handle.write("run\n")
-                if development and not baseline:
+                if stream_enabled:
                     def open_interruption():
                         observer = stack.enter_context(owned_process(
                             [str(runtime["cli"]), "--hs274-capture", "25"], "interrupted-stream", output, report,
@@ -316,7 +321,7 @@ def main():
 
                     interruption_client = finish_fixture_stream(stream_path, stream_client, producer, stream_scope,
                                                                  drained_path, device["registry_entry_id"], open_interruption,
-                                                                 acknowledge=not hammerspoon)
+                                                                 acknowledge=not hammerspoon, held=baseline)
                 producer.wait(timeout=12)
                 report["native"] = json.loads(native_path.read_text(encoding="utf-8"))
                 if producer.returncode != 0:
@@ -325,9 +330,9 @@ def main():
                     validate_baseline_native(report["native"], report["baseline_probe"])
                 else:
                     validate_native_output(report["native"], ignored)
-                if development and not baseline and report["native"].get("drain_released") is not True:
+                if stream_enabled and report["native"].get("drain_released") is not True:
                     raise RuntimeError("Native fixture did not confirm stream drain release")
-                if development and not baseline:
+                if stream_enabled:
                     if interruption_client.wait(timeout=10) != 1:
                         raise RuntimeError("Interrupted capture did not exit with a reported failure")
                     report["physical_interruption"] = validate_interruption(
@@ -365,11 +370,14 @@ def main():
                     report["input_fixture"]["registry_entry_id"], released)
             else:
                 report["physical_capture"] = validate_capture(core_output, report["input_fixture"]["registry_entry_id"])
+                report["baseline_probes"] = read_observation_baselines(core_output, report["input_fixture"]["registry_entry_id"])
+            if stream_enabled:
+                if baseline and report["held_stream_boundary"] >= released:
+                    raise ValueError("Held fixture released Space before stream acquisition")
                 report["physical_stream"] = validate_stream(stream_path.read_text(encoding="utf-8"), report["physical_capture"])
                 if hammerspoon:
-                    validate_consumer(report["hammerspoon"], report["physical_capture"])
-                report["baseline_probes"] = read_observation_baselines(core_output, report["input_fixture"]["registry_entry_id"])
-            if not baseline and report["processes"]["physical-stream"]["exit"] != 128 + signal.SIGTERM:
+                    validate_consumer(report["hammerspoon"], report["physical_capture"], held=baseline)
+            if stream_enabled and report["processes"]["physical-stream"]["exit"] != 128 + signal.SIGTERM:
                 raise RuntimeError("Physical stream client did not stop gracefully")
     except Exception as error:
         report["observation_error"] = f"{type(error).__name__}: {error}"

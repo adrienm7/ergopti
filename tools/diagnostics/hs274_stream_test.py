@@ -15,7 +15,7 @@ from types import SimpleNamespace
 
 from hs274_stream import decimal, read_stream, validate_stream, fixture_drain, validate_interruption, validate_successor
 from hs274_disconnect import disconnected_capture
-from hs274_baseline import MARKER as BASELINE_MARKER, read_baseline, read_observation_baselines, require_held_baseline, validate_baseline_native, validate_baseline_capture, wait_baseline
+from hs274_baseline import MARKER as BASELINE_MARKER, read_baseline, read_observation_baselines, require_held_baseline, validate_baseline_native, validate_baseline_capture, wait_baseline, require_stream_held_baseline
 from hs274_capture import MARKER as CAPTURE_MARKER
 from unittest.mock import patch
 
@@ -34,6 +34,56 @@ def baseline_fixture():
 
 
 class BaselineTests(unittest.TestCase):
+    def test_stream_holds_exact_space_before_release_and_drains_all_native_rows(self):
+        state = {"keyboard": True, "keys": {109: {"usage": 44, "down": True},
+                                           106: {"usage": 41, "down": False}}}
+        initial = {"records": [], "baseline": {"complete": True, "boundary": 100,
+                                               "devices": {41: state}}}
+        self.assertEqual(require_stream_held_baseline(initial, 41), 100)
+        for change in ("incomplete", "records", "missing", "released", "extra"):
+            broken = copy.deepcopy(initial)
+            if change == "incomplete": broken["baseline"]["complete"] = False
+            elif change == "records": broken["records"] = [{}]
+            elif change == "missing": broken["baseline"]["devices"] = {}
+            elif change == "released": broken["baseline"]["devices"][41]["keys"][109]["down"] = False
+            else: broken["baseline"]["devices"][41]["keys"][106]["down"] = True
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                require_stream_held_baseline(broken, 41)
+        path = Path(__file__).parent / "fixtures" / "hs274-native-cookie-held.json"
+        evidence = json.loads(path.read_text(encoding="utf-8"))
+        records = evidence["capture"]["records"]
+        drain = fixture_drain(records[0]["device"], held=True)
+        for count in range(len(records)):
+            self.assertFalse(drain({"records": records[:count]}))
+        self.assertTrue(drain({"records": records}))
+        with self.assertRaises(ValueError):
+            drain({"records": records + [dict(records[-1], sequence=len(records) + 1)]})
+        with self.assertRaises(ValueError):
+            drain({"records": records[:7] + records[8:]})
+        remap = remap_module()
+        with tempfile.TemporaryDirectory(prefix="hs274-held-drain-") as directory:
+            drained = Path(directory) / "drained"
+            client = SimpleNamespace(returncode=None)
+            closed = []
+            def wait_stream(path, owner, predicate, seconds, acknowledge):
+                self.assertIs(owner, client)
+                self.assertFalse(acknowledge)
+                self.assertTrue(predicate({"records": records}))
+                self.assertFalse(drained.exists())
+            def close():
+                self.assertFalse(drained.exists())
+                client.returncode = 143
+                closed.append(True)
+            def successor():
+                self.assertEqual(closed, [True])
+                self.assertFalse(drained.exists())
+                return "next lease"
+            with patch.object(remap, "wait_stream", side_effect=wait_stream):
+                self.assertEqual(remap.finish_fixture_stream(Path(directory) / "stream", client,
+                    SimpleNamespace(poll=lambda: None), SimpleNamespace(close=close), drained,
+                    records[0]["device"], successor, acknowledge=False, held=True), "next lease")
+            self.assertEqual(drained.read_text(encoding="utf-8"), "drained\n")
+
     def test_retained_held_cookie_keeps_release_and_fresh_press(self):
         path = Path(__file__).parent / "fixtures" / "hs274-native-cookie-held.json"
         evidence = json.loads(path.read_text(encoding="utf-8"))

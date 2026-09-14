@@ -63,9 +63,10 @@ bool pump_until(Predicate predicate, double seconds) {
 
 int main(int argc, char** argv) {
   const char* actions = std::getenv("GITHUB_ACTIONS");
-  const bool baseline = argc == 3 && std::string(argv[2]) == "--baseline-held";
+  const bool baseline_drain = argc == 3 && std::string(argv[2]) == "--baseline-held-drain";
+  const bool baseline = baseline_drain || (argc == 3 && std::string(argv[2]) == "--baseline-held");
   const bool ignored = argc == 3 && std::string(argv[2]) == "--ignored-hold";
-  const bool hold_for_drain = ignored || (argc == 3 && std::string(argv[2]) == "--remap-hold");
+  const bool hold_for_drain = baseline_drain || ignored || (argc == 3 && std::string(argv[2]) == "--remap-hold");
   const bool remap = baseline || hold_for_drain || (argc == 3 && std::string(argv[2]) == "--remap");
   if ((argc != 2 && !remap) || geteuid() != 0 || !actions || std::string(actions) != "true") {
     std::cerr << "HID observation requires root on a disposable Actions runner\n";
@@ -194,18 +195,19 @@ int main(int argc, char** argv) {
           release_baseline();
           baseline_observations.swap(observations);
           space_pair_observed = post_pair(type_safe::get(pqrs::hid::usage::keyboard_or_keypad::keyboard_spacebar), 49);
-          return baseline_down_observed && space_pair_observed;
+        } else {
+          escape_pair_observed = post_pair(type_safe::get(pqrs::hid::usage::keyboard_or_keypad::keyboard_escape), ignored ? 53 : 49);
+          space_pair_observed = post_pair(type_safe::get(pqrs::hid::usage::keyboard_or_keypad::keyboard_spacebar), 49);
         }
-        escape_pair_observed = post_pair(type_safe::get(pqrs::hid::usage::keyboard_or_keypad::keyboard_escape), ignored ? 53 : 49);
-        space_pair_observed = post_pair(type_safe::get(pqrs::hid::usage::keyboard_or_keypad::keyboard_spacebar), 49);
-        if (hold_for_drain && escape_pair_observed && space_pair_observed) {
+        const bool input_observed = space_pair_observed && (baseline ? baseline_down_observed : escape_pair_observed);
+        if (hold_for_drain && input_observed) {
           // Keep the renamed device alive until the reader drains and stops.
           drain_released = pump_until([&] {
             return std::filesystem::exists(drained_path) || std::filesystem::exists(abort_path);
           }, 40) && !std::filesystem::exists(abort_path) && std::filesystem::exists(drained_path);
           if (!drain_released) return false;
         }
-        return escape_pair_observed && space_pair_observed;
+        return input_observed;
       });
     }
     if (!remap) {
