@@ -11,6 +11,14 @@ import sys
 import time
 
 
+def require_startup_ready(log_text):
+    """Reject early log creation without a completed application startup branch."""
+    for marker in ("Onboarding wizard opened.", "User interface initialized successfully."):
+        if marker in log_text:
+            return marker
+    raise RuntimeError("Application never completed onboarding or runtime UI startup")
+
+
 def processes(executable):
     """Resolve only the exact executable command belonging to this fixture."""
     result = subprocess.run(["ps", "-axo", "pid=,command="], capture_output=True, text=True, check=True)
@@ -52,6 +60,9 @@ def main():
             if sample["seconds"] >= 10 and (len(sample["launcher"]) != 1 or len(sample["hammerspoon"]) != 1):
                 raise RuntimeError("Published application did not retain both exact processes")
             time.sleep(1)
+        logs = Path.home() / ".config/ergopti_plus/hammerspoon/logs"
+        text = "\n".join(path.read_text(encoding="utf-8") for path in logs.glob("ErgoptiPlus_*.log"))
+        report["startup_ready"] = require_startup_ready(text)
         report["survived_observation"] = True
     except Exception as error:
         report["error"] = f"{type(error).__name__}: {error}"

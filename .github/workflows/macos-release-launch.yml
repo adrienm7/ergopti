@@ -54,7 +54,9 @@ jobs:
           codesign --force --sign - --preserve-metadata=identifier,entitlements,flags /Applications/ErgoptiPlus.app
           codesign --verify --strict /Applications/ErgoptiPlus.app
       - name: Observe the installed release without a waiting open helper
-        run: python3 tools/diagnostics/macos-release-launch.py /Applications/ErgoptiPlus.app "$RUNNER_TEMP/release-launch"
+        run: |
+          python3 tools/diagnostics/macos_release_launch_test.py
+          python3 tools/diagnostics/macos-release-launch.py /Applications/ErgoptiPlus.app "$RUNNER_TEMP/release-launch"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

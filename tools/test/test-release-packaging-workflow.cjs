@@ -8,8 +8,8 @@
  * fail when head closes the pipe early. The macOS bundle smoke test also used
  * the inner Mach-O directly, bypassing the Launch Services context that Finder
  * and `open` provide and causing AppKit to terminate its embedded GUI child.
- * A later form invoked `open` without waiting, so the launch request could end
- * while the nested runtime was still moving from early to managed logging.
+ * Early log creation subsequently masked a missing LuaSocket dependency: the
+ * published app died immediately after the smoke test had declared success.
  * These defects surfaced only after every functional CI job had passed.
  */
 
@@ -149,26 +149,13 @@ const macosSmokeStep = workflow.match(
 if (!macosSmokeStep) {
 	errors.push('the macOS release bundle smoke-test step is missing');
 } else {
-	if (!/open -n -g -W "\$APP"\s*&/.test(macosSmokeStep[1])) {
-		errors.push('the macOS smoke test must retain its Launch Services request through startup');
-	}
-	if (/"\$APP\/Contents\/MacOS\/ErgoptiPlus"\s*&/.test(macosSmokeStep[1])) {
-		errors.push('the macOS smoke test must not execute the inner Mach-O directly');
-	}
-	if (!/pgrep -f -x "\$APP\/Contents\/MacOS\/ErgoptiPlus"/.test(macosSmokeStep[1])) {
-		errors.push('the macOS smoke test must track the exact launcher PID after `open`');
-	}
-	if (!/OPEN_PID=\$!/.test(macosSmokeStep[1]) || !/wait "\$OPEN_PID"/.test(macosSmokeStep[1])) {
-		errors.push('the macOS smoke test must own and reap the waiting `open` process');
-	}
 	for (const token of [
-		'/tmp/ErgoptiPlus_boot.log',
-		'/tmp/ErgoptiPlus_errors_boot.log',
-		'cat "$LUA_BOOT_LOG"',
-		'cat "$LUA_BOOT_ERRORS_LOG"',
+		'python3 tools/diagnostics/macos_release_launch_test.py',
+		'ditto -x -k build/macos/ErgoptiPlus.app.zip /Applications',
+		'python3 tools/diagnostics/macos-release-launch.py /Applications/ErgoptiPlus.app',
 	]) {
 		if (!macosSmokeStep[1].includes(token)) {
-			errors.push(`the macOS smoke test must surface early-boot diagnostic ${token}`);
+			errors.push(`the macOS smoke test must exercise the extracted package: ${token}`);
 		}
 	}
 }
