@@ -86,11 +86,18 @@ class RuntimeInventoryTests(unittest.TestCase):
 class RegistrationScopeTests(unittest.TestCase):
     """Exercise restoration without changing any native service or real file."""
 
-    def test_restores_both_modes_after_success_and_failures(self):
-        paths = (Path("/owned/daemon"), Path("/owned/agent"))
-        for failure in (None, "body", "second-helper"):
+    def test_installed_permission_probe_is_fenced_without_touching_provider(self):
+        paths = registration.helper_paths()
+        core = Path("/Library/Application Support/org.pqrs/Karabiner-Elements/Karabiner-Core-Service.app/Contents/MacOS/Karabiner-Core-Service")
+        self.assertIn((core, "permission-check"), paths)
+        self.assertEqual(len(paths), 3)
+        self.assertFalse(any("VirtualHIDDevice" in str(path) for path, _ in paths))
+
+    def test_restores_all_modes_after_success_and_partial_setup_failures(self):
+        paths = (Path("/owned/daemon"), Path("/owned/agent"), Path("/owned/core"))
+        for failure in (None, "body", "second-helper", "third-helper"):
             with self.subTest(failure=failure):
-                modes = {str(paths[0]): 0o755, str(paths[1]): 0o751}
+                modes = {str(paths[0]): 0o755, str(paths[1]): 0o751, str(paths[2]): 0o750}
                 originals = modes.copy()
                 report = {}
                 failed = False
@@ -101,7 +108,8 @@ class RegistrationScopeTests(unittest.TestCase):
                 def chmod(arguments):
                     nonlocal failed
                     mode, path = int(arguments[3], 8), arguments[4]
-                    if failure == "second-helper" and path == str(paths[1]) and mode == 0o640 and not failed:
+                    target = paths[1] if failure == "second-helper" else paths[2] if failure == "third-helper" else None
+                    if target is not None and path == str(target) and mode == 0o640 and not failed:
                         failed = True
                         raise RuntimeError("injected chmod failure")
                     modes[path] = mode
@@ -120,7 +128,7 @@ class RegistrationScopeTests(unittest.TestCase):
                         patch.object(registration, "command", side_effect=native_refusal):
                     try:
                         with registration.suspended_registration(report):
-                            self.assertEqual(modes, {str(paths[0]): 0o644, str(paths[1]): 0o640})
+                            self.assertEqual(modes, {str(paths[0]): 0o644, str(paths[1]): 0o640, str(paths[2]): 0o640})
                             if failure == "body":
                                 raise RuntimeError("injected body failure")
                     except RuntimeError as error:
@@ -129,7 +137,8 @@ class RegistrationScopeTests(unittest.TestCase):
                     else:
                         self.assertIsNone(failure)
                 self.assertEqual(modes, originals)
-                self.assertEqual([r["restored"] for r in report["registration_helpers"]], [True, True])
+                self.assertTrue(all(r["restored"] for r in report["registration_helpers"]))
+                self.assertEqual(len(report["registration_helpers"]), 2 if failure == "second-helper" else 3)
 
     def test_replaced_helper_identity_is_rejected(self):
         record = {"path": "/owned/helper", "device": 1, "inode": 2}

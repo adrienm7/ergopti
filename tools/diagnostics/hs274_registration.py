@@ -1,5 +1,5 @@
 # tools/diagnostics/hs274_registration.py
-"""Suspend automatic service registration only inside the disposable fixture."""
+"""Suspend installed peer launch routes only inside the disposable fixture."""
 
 from contextlib import contextmanager, ExitStack
 import os
@@ -11,11 +11,15 @@ from hs274_services import command, require_success
 
 
 def helper_paths():
-    """Return only the two installed registration helpers used by pinned upstream."""
+    """Fence registration and the agent's independent installed permission probe."""
     base = Path("/Library/Application Support/org.pqrs/Karabiner-Elements")
     return tuple((base / (name + ".app/Contents/MacOS") / name, query) for name, query in (
         ("Karabiner-Elements Privileged Daemons v2", "core-daemons-enabled"),
         ("Karabiner-Elements Non-Privileged Agents v2", "core-agents-enabled"),
+        # The development agent launches this bundle directly, bypassing launchd
+        # service overrides and both registration helpers. Leave the development
+        # binaries and signed virtual HID provider executable throughout input.
+        ("Karabiner-Core-Service", "permission-check"),
     ))
 
 
