@@ -9,17 +9,18 @@ from hs274_stream import fixture_drain, fixture_records
 KEYCODES = {224: 59, 225: 56, 226: 58, 227: 55, 228: 62, 229: 60, 230: 61, 231: 54}
 
 
-def transitions():
+def transitions(*, overlap=False):
     """Each physical modifier is pressed and released before the collision pair."""
-    return [(usage, value) for usage in KEYCODES for value in (1, 0)]
+    edges = [(usage, value) for usage in KEYCODES for value in (1, 0)]
+    return edges + ([(225, 1), (229, 1), (225, 0), (229, 0)] if overlap else [])
 
 
-def validate_modifier_output(native):
+def validate_modifier_output(native, *, overlap=False):
     """Independently require each Quartz modifier press and release flag."""
-    if native.get("modifier_pairs_observed") is not True or native.get("reports_queued") != 20:
+    if native.get("modifier_pairs_observed") is not True or native.get("reports_queued") != (26 if overlap else 20):
         raise ValueError("Native modifier stimulus did not complete all reports")
     events = native.get("events", [])
-    if len(events) != 20:
+    if len(events) != (24 if overlap else 20):
         raise ValueError("Native modifier output is incomplete")
     masks = (1 << 18, 1 << 17, 1 << 19, 1 << 20)
     for index, keycode in enumerate(KEYCODES.values()):
@@ -29,18 +30,25 @@ def validate_modifier_output(native):
             flags = integer(event.get("flags"), "native modifier flags")
             if event.get("type") != 12 or event.get("keycode") != keycode or bool(flags & mask) != (edge == 0):
                 raise ValueError("Native modifier output changed side or edge")
+    if overlap:
+        if native.get("overlap_observed") is not True:
+            raise ValueError("Native overlapping modifier reports were not observed")
+        for event, (keycode, shifted) in zip(events[16:20], ((56, True), (60, True), (56, True), (60, False))):
+            flags = integer(event.get("flags"), "native overlapping flags")
+            if event.get("type") != 12 or event.get("keycode") != keycode or bool(flags & (1 << 17)) != shifted:
+                raise ValueError("Native overlapping Shift lost its remaining side")
 
 
-def validate_modifier_capture(output, device):
+def validate_modifier_capture(output, device, *, overlap=False):
     """Preserve every raw row and reject missing, duplicated or reordered edges."""
     capture, rows = read_capture(output, device)
     actual = [(row["usage"] if row["has_usage"] else None, row["value"]) for row in rows]
-    if actual != transitions() + [(41, 1), (41, 0), (44, 1), (44, 0)]:
+    if actual != transitions(overlap=overlap) + [(41, 1), (41, 0), (44, 1), (44, 0)]:
         raise ValueError(f"Unexpected physical modifier/collision transitions: {actual}")
     return capture
 
 
-def modifier_drain(device):
+def modifier_drain(device, *, overlap=False):
     """Drain the known trailing pair after validating the complete modifier prefix."""
     complete = fixture_drain(device)
 
@@ -49,7 +57,7 @@ def modifier_drain(device):
         keyboard = [(index, row) for index, row in enumerate(rows) if row["has_page"]
                     and row["has_usage"] and row["page"] == 7 and 4 <= row["usage"] <= 255]
         edges = [(row["usage"], row["value"]) for _, row in keyboard]
-        expected = transitions()
+        expected = transitions(overlap=overlap)
         prefix = edges[:len(expected)]
         if prefix != expected[:len(prefix)]:
             raise ValueError("Modifier drain prefix lost or duplicated a physical edge")

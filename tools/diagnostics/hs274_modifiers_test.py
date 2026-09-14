@@ -15,12 +15,15 @@ from hs274_stream_test import fixture
 from hs274_stream import validate_stream
 
 
-def modifier_fixture():
+def modifier_fixture(*, overlap=False):
     """Use synthetic modifier edges and the retained native trailing pair."""
     capture, _ = fixture()
     template = capture["records"][2]
     prefix = [dict(template, usage=usage, has_cookie=True, cookie=usage, value=value)
               for usage in range(224, 232) for value in (1, 0)]
+    if overlap:
+        prefix += [dict(template, usage=usage, has_cookie=True, cookie=usage, value=value)
+                   for usage, value in ((225, 1), (229, 1), (225, 0), (229, 0))]
     capture["records"] = prefix + capture["records"]
     for sequence, row in enumerate(capture["records"], 1):
         row["sequence"] = sequence
@@ -30,6 +33,29 @@ def modifier_fixture():
 
 
 class ModifierTests(unittest.TestCase):
+    def test_overlapping_shift_keeps_partial_release_and_rejects_repeat_credit(self):
+        capture = modifier_fixture(overlap=True)
+        device = capture["records"][0]["device"]
+        self.assertEqual(validate_modifier_capture(MARKER + json.dumps(capture) + "\n", device, overlap=True), capture)
+        drain = modifier_drain(device, overlap=True)
+        for count in range(len(capture["records"])):
+            self.assertFalse(drain({"records": capture["records"][:count]}))
+        self.assertTrue(drain(capture))
+        evidence = json.loads((Path(__file__).parent / "fixtures" / "hs274-native-modifier-consumer.json").read_text(encoding="utf-8"))
+        native = evidence["native"]
+        native.update(reports_queued=26, overlap_observed=True)
+        overlapping = [{"type": 12, "keycode": code, "flags": shifted * 131072}
+                       for code, shifted in ((56, 1), (60, 1), (56, 1), (60, 0))]
+        native["events"][16:16] = overlapping
+        validate_modifier_output(native, overlap=True)
+        native["events"][18]["flags"] = 0
+        with self.assertRaisesRegex(ValueError, "remaining side"):
+            validate_modifier_output(native, overlap=True)
+        repeated = copy.deepcopy(capture)
+        repeated["records"].insert(17, dict(repeated["records"][16]))
+        with self.assertRaises(ValueError):
+            drain(repeated)
+
     def test_retained_native_modifiers_keep_every_side_and_one_credit(self):
         from hs274_hammerspoon import validate_consumer
         path = Path(__file__).parent / "fixtures" / "hs274-native-modifier-consumer.json"

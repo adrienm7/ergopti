@@ -12,6 +12,7 @@
 #include <filesystem>
 #include <functional>
 #include <iostream>
+#include <optional>
 #include <mach/mach_time.h>
 #include <pqrs/karabiner/driverkit/virtual_hid_device_service.hpp>
 #include <string>
@@ -73,7 +74,8 @@ bool pump_until(Predicate predicate, double seconds) {
 
 int main(int argc, char** argv) {
   const char* actions = std::getenv("GITHUB_ACTIONS");
-  const bool modifiers = argc == 3 && std::string(argv[2]) == "--modifiers-hold";
+  const bool overlap = argc == 3 && std::string(argv[2]) == "--overlap-hold";
+  const bool modifiers = overlap || (argc == 3 && std::string(argv[2]) == "--modifiers-hold");
   const bool baseline_drain = argc == 3 && std::string(argv[2]) == "--baseline-held-drain";
   const bool baseline = baseline_drain || (argc == 3 && std::string(argv[2]) == "--baseline-held");
   const bool ignored = argc == 3 && std::string(argv[2]) == "--ignored-hold";
@@ -131,6 +133,7 @@ int main(int argc, char** argv) {
   bool space_pair_observed = false;
   bool escape_pair_observed = false;
   bool modifier_pairs_observed = false;
+  bool overlap_observed = false;
   bool drain_released = false;
   unsigned reports_queued = 0;
   bool baseline_down_observed = false;
@@ -233,6 +236,42 @@ int main(int argc, char** argv) {
             }
           }
         }
+        if (overlap) {
+          using namespace pqrs::karabiner::driverkit::virtual_hid_device_driver;
+          constexpr auto left = static_cast<uint8_t>(hid_report::modifier::left_shift);
+          constexpr auto right = static_cast<uint8_t>(hid_report::modifier::right_shift);
+          struct overlap_step { uint8_t mask; std::optional<int64_t> keycode; };
+          const std::array<overlap_step, 6> steps{{{left, kVK_Shift}, {left, std::nullopt},
+              {left | right, kVK_RightShift}, {right, kVK_Shift}, {right, std::nullopt}, {0, kVK_RightShift}}};
+          uint8_t held_modifiers = 0;
+          release_guard overlap_guard{[&] {
+            if (!held_modifiers) return;
+            hid_report::keyboard_input released;
+            client->async_post_report(released);
+            ++reports_queued;
+            pump_until([] { return false; }, 0.03);
+          }};
+          for (const auto& step : steps) {
+            const auto begin = observations.size();
+            hid_report::keyboard_input input;
+            if (step.mask & left) input.modifiers.insert(hid_report::modifier::left_shift);
+            if (step.mask & right) input.modifiers.insert(hid_report::modifier::right_shift);
+            client->async_post_report(input);
+            held_modifiers = step.mask;
+            ++reports_queued;
+            if (!step.keycode) {
+              pump_until([] { return false; }, 0.03);
+              if (observations.size() != begin) return false;
+              continue;
+            }
+            if (!pump_until([&] { return observations.size() > begin; }, 2) || observations.size() != begin + 1)
+              return false;
+            const auto& event = observations.back();
+            if (event.type != kCGEventFlagsChanged || event.keycode != *step.keycode
+                || static_cast<bool>(event.flags & kCGEventFlagMaskShift) != static_cast<bool>(step.mask)) return false;
+          }
+          overlap_observed = true;
+        }
         if (baseline) {
           release_baseline();
           baseline_observations.swap(observations);
@@ -263,7 +302,7 @@ int main(int argc, char** argv) {
   CFRelease(source);
   CFRelease(tap);
 
-  const bool pair = space_pair_observed && observations.size() == (modifiers ? 20 : remap && !baseline ? 4 : 2)
+  const bool pair = space_pair_observed && observations.size() == (overlap ? 24 : modifiers ? 20 : remap && !baseline ? 4 : 2)
                     && (!remap || baseline || escape_pair_observed);
   std::ofstream receipt(argv[1]);
   receipt << std::boolalpha
@@ -283,6 +322,7 @@ int main(int argc, char** argv) {
           << ",\n  \"ignored_mode\": " << ignored
           << ",\n  \"baseline_mode\": " << baseline
           << ",\n  \"modifier_pairs_observed\": " << modifier_pairs_observed
+          << ",\n  \"overlap_observed\": " << overlap_observed
           << ",\n  \"baseline_down_observed\": " << baseline_down_observed
           << ",\n  \"baseline_release_at\": \"" << baseline_release_at << "\""
           << ",\n  \"escape_as_space\": " << (escape_pair_observed && !ignored)
