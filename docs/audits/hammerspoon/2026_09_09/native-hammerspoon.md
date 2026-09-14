@@ -637,3 +637,32 @@ The shared modifier replay validates both native fixtures and every incomplete
 stream prefix. This proves repeated HID report handling, not OS autorepeat;
 keyboard combinations, multiple active keyboards, full mapping and production
 integration still require validation.
+## Shifted remapped and physical keys accepted on native macOS
+
+Run [34877932993](https://github.com/adrienm7/ergopti/actions/runs/34877932993)
+used consumer `aa63224a69bd9b5ff2f4d2ddd572a5184fcfd83c` and the unchanged
+producer artifact from run 34783474637. Native compilation and actual remapping
+passed; the workflow remained red from separate capability probes. The complete
+remapping report SHA-256 is
+`23e4312857da0c2cec6682059031cb7e0a8da37d94bda9e803de192afba40fd2`.
+
+After the eight independent modifier pairs, Shift remained held during an
+Escape tap remapped to Space and a physical Space tap. The final unmodified
+collision pair remained part of the same capture. All 28 Quartz events had the
+expected key, edge and Shift state. All 80 raw HID observations matched the
+delivered stream, including auxiliary observations. Hammerspoon credited 14
+physical presses: left Shift three times, Escape and Space twice each, and the
+other seven modifiers once. There were zero consumer errors.
+
+The 496-row baseline completed at boundary 14188382011. The successor completed
+its baseline at 14263785209 and then explicitly reported interrupted loss.
+Native AX context, privacy, clock conversion, stream drain and metadata
+restoration passed. All three installed executables regained their exact modes;
+the final runtime process inventory was empty.
+
+`tools/diagnostics/fixtures/hs274-native-combination-consumer.json` preserves the
+unaltered input and output receipts. The shared modifier replay checks all three
+native scenarios and rejects every incomplete stream prefix. This proves these
+two virtual-HID combinations on macOS. It does not establish OS autorepeat,
+multiple-keyboard or complete key-map behavior. Production driver integration
+and dependency distribution remain unfinished; HS-274 is not yet closed.

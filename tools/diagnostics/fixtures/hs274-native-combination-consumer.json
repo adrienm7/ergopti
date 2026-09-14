@@ -1,0 +1,1630 @@
+{
+  "run_id": 34877932993,
+  "consumer_head": "aa63224a69bd9b5ff2f4d2ddd572a5184fcfd83c",
+  "producer_run_id": 34783474637,
+  "report_sha256": "23e4312857da0c2cec6682059031cb7e0a8da37d94bda9e803de192afba40fd2",
+  "stream_output": "{\"baseline\":{\"boundary\":\"14188382011\",\"rows\":496,\"version\":1},\"coverage\":\"fixture_only\",\"incarnation\":\"7af6a70c-7243-4326-a678-6039d205039b\",\"kind\":\"opened\",\"lease\":\"2\",\"version\":1}\n{\"boundary\":\"14188382011\",\"complete\":false,\"coverage\":\"fixture_only\",\"incarnation\":\"7af6a70c-7243-4326-a678-6039d205039b\",\"kind\":\"baseline\",\"lease\":\"2\",\"next\":64,\"offset\":0,\"rows\":[{\"device\":\"4294968978\",\"elements\":263,\"keyboard\":true,\"kind\":\"device\"},{\"cookie\":24,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":224},{\"cookie\":25,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":225},{\"cookie\":26,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":226},{\"cookie\":27,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":227},{\"cookie\":28,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":228},{\"cookie\":29,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":229},{\"cookie\":30,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":230},{\"cookie\":31,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":231},{\"cookie\":66,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":1},{\"cookie\":67,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":2},{\"cookie\":68,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":3},{\"cookie\":69,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":4},{\"cookie\":70,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":5},{\"cookie\":71,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":6},{\"cookie\":72,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":7},{\"cookie\":73,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":8},{\"cookie\":74,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":9},{\"cookie\":75,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":10},{\"cookie\":76,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":11},{\"cookie\":77,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":12},{\"cookie\":78,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":13},{\"cookie\":79,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":14},{\"cookie\":80,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":15},{\"cookie\":81,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":16},{\"cookie\":82,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":17},{\"cookie\":83,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":18},{\"cookie\":84,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":19},{\"cookie\":85,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":20},{\"cookie\":86,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":21},{\"cookie\":87,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":22},{\"cookie\":88,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":23},{\"cookie\":89,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":24},{\"cookie\":90,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":25},{\"cookie\":91,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":26},{\"cookie\":92,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":27},{\"cookie\":93,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":28},{\"cookie\":94,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":29},{\"cookie\":95,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":30},{\"cookie\":96,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":31},{\"cookie\":97,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":32},{\"cookie\":98,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":33},{\"cookie\":99,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":34},{\"cookie\":100,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":35},{\"cookie\":101,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":36},{\"cookie\":102,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":37},{\"cookie\":103,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":38},{\"cookie\":104,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":39},{\"cookie\":105,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":40},{\"cookie\":106,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":41},{\"cookie\":107,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":42},{\"cookie\":108,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":43},{\"cookie\":109,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":44},{\"cookie\":110,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":45},{\"cookie\":111,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":46},{\"cookie\":112,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":47},{\"cookie\":113,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":48},{\"cookie\":114,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":49},{\"cookie\":115,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":50},{\"cookie\":116,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":51},{\"cookie\":117,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":52},{\"cookie\":118,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":53},{\"cookie\":119,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":54},{\"cookie\":120,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":55}],\"total\":496,\"version\":1}\n{\"boundary\":\"14188382011\",\"complete\":false,\"coverage\":\"fixture_only\",\"incarnation\":\"7af6a70c-7243-4326-a678-6039d205039b\",\"kind\":\"baseline\",\"lease\":\"2\",\"next\":128,\"offset\":64,\"rows\":[{\"cookie\":121,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":56},{\"cookie\":122,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":57},{\"cookie\":123,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":58},{\"cookie\":124,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":59},{\"cookie\":125,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":60},{\"cookie\":126,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":61},{\"cookie\":127,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":62},{\"cookie\":128,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":63},{\"cookie\":129,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":64},{\"cookie\":130,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":65},{\"cookie\":131,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":66},{\"cookie\":132,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":67},{\"cookie\":133,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":68},{\"cookie\":134,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":69},{\"cookie\":135,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":70},{\"cookie\":136,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":71},{\"cookie\":137,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":72},{\"cookie\":138,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":73},{\"cookie\":139,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":74},{\"cookie\":140,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":75},{\"cookie\":141,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":76},{\"cookie\":142,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":77},{\"cookie\":143,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":78},{\"cookie\":144,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":79},{\"cookie\":145,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":80},{\"cookie\":146,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":81},{\"cookie\":147,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":82},{\"cookie\":148,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":83},{\"cookie\":149,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":84},{\"cookie\":150,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":85},{\"cookie\":151,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":86},{\"cookie\":152,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":87},{\"cookie\":153,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":88},{\"cookie\":154,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":89},{\"cookie\":155,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":90},{\"cookie\":156,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":91},{\"cookie\":157,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":92},{\"cookie\":158,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":93},{\"cookie\":159,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":94},{\"cookie\":160,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":95},{\"cookie\":161,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":96},{\"cookie\":162,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":97},{\"cookie\":163,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":98},{\"cookie\":164,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":99},{\"cookie\":165,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":100},{\"cookie\":166,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":101},{\"cookie\":167,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":102},{\"cookie\":168,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":103},{\"cookie\":169,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":104},{\"cookie\":170,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":105},{\"cookie\":171,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":106},{\"cookie\":172,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":107},{\"cookie\":173,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":108},{\"cookie\":174,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":109},{\"cookie\":175,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":110},{\"cookie\":176,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":111},{\"cookie\":177,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":112},{\"cookie\":178,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":113},{\"cookie\":179,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":114},{\"cookie\":180,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":115},{\"cookie\":181,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":116},{\"cookie\":182,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":117},{\"cookie\":183,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":118},{\"cookie\":184,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":119}],\"total\":496,\"version\":1}\n{\"boundary\":\"14188382011\",\"complete\":false,\"coverage\":\"fixture_only\",\"incarnation\":\"7af6a70c-7243-4326-a678-6039d205039b\",\"kind\":\"baseline\",\"lease\":\"2\",\"next\":192,\"offset\":128,\"rows\":[{\"cookie\":185,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":120},{\"cookie\":186,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":121},{\"cookie\":187,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":122},{\"cookie\":188,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":123},{\"cookie\":189,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":124},{\"cookie\":190,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":125},{\"cookie\":191,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":126},{\"cookie\":192,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":127},{\"cookie\":193,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":128},{\"cookie\":194,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":129},{\"cookie\":195,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":130},{\"cookie\":196,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":131},{\"cookie\":197,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":132},{\"cookie\":198,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":133},{\"cookie\":199,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":134},{\"cookie\":200,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":135},{\"cookie\":201,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":136},{\"cookie\":202,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":137},{\"cookie\":203,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":138},{\"cookie\":204,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":139},{\"cookie\":205,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":140},{\"cookie\":206,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":141},{\"cookie\":207,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":142},{\"cookie\":208,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":143},{\"cookie\":209,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":144},{\"cookie\":210,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":145},{\"cookie\":211,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":146},{\"cookie\":212,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":147},{\"cookie\":213,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":148},{\"cookie\":214,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":149},{\"cookie\":215,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":150},{\"cookie\":216,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":151},{\"cookie\":217,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":152},{\"cookie\":218,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":153},{\"cookie\":219,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":154},{\"cookie\":220,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":155},{\"cookie\":221,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":156},{\"cookie\":222,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":157},{\"cookie\":223,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":158},{\"cookie\":224,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":159},{\"cookie\":225,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":160},{\"cookie\":226,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":161},{\"cookie\":227,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":162},{\"cookie\":228,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":163},{\"cookie\":229,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":164},{\"cookie\":230,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":165},{\"cookie\":231,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":166},{\"cookie\":232,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":167},{\"cookie\":233,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":168},{\"cookie\":234,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":169},{\"cookie\":235,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":170},{\"cookie\":236,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":171},{\"cookie\":237,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":172},{\"cookie\":238,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":173},{\"cookie\":239,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":174},{\"cookie\":240,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":175},{\"cookie\":241,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":176},{\"cookie\":242,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":177},{\"cookie\":243,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":178},{\"cookie\":244,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":179},{\"cookie\":245,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":180},{\"cookie\":246,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":181},{\"cookie\":247,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":182},{\"cookie\":248,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":183}],\"total\":496,\"version\":1}\n{\"boundary\":\"14188382011\",\"complete\":false,\"coverage\":\"fixture_only\",\"incarnation\":\"7af6a70c-7243-4326-a678-6039d205039b\",\"kind\":\"baseline\",\"lease\":\"2\",\"next\":256,\"offset\":192,\"rows\":[{\"cookie\":249,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":184},{\"cookie\":250,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":185},{\"cookie\":251,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":186},{\"cookie\":252,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":187},{\"cookie\":253,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":188},{\"cookie\":254,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":189},{\"cookie\":255,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":190},{\"cookie\":256,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":191},{\"cookie\":257,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":192},{\"cookie\":258,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":193},{\"cookie\":259,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":194},{\"cookie\":260,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":195},{\"cookie\":261,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":196},{\"cookie\":262,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":197},{\"cookie\":263,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":198},{\"cookie\":264,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":199},{\"cookie\":265,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":200},{\"cookie\":266,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":201},{\"cookie\":267,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":202},{\"cookie\":268,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":203},{\"cookie\":269,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":204},{\"cookie\":270,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":205},{\"cookie\":271,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":206},{\"cookie\":272,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":207},{\"cookie\":273,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":208},{\"cookie\":274,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":209},{\"cookie\":275,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":210},{\"cookie\":276,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":211},{\"cookie\":277,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":212},{\"cookie\":278,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":213},{\"cookie\":279,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":214},{\"cookie\":280,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":215},{\"cookie\":281,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":216},{\"cookie\":282,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":217},{\"cookie\":283,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":218},{\"cookie\":284,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":219},{\"cookie\":285,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":220},{\"cookie\":286,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":221},{\"cookie\":287,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":222},{\"cookie\":288,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":223},{\"cookie\":289,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":224},{\"cookie\":290,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":225},{\"cookie\":291,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":226},{\"cookie\":292,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":227},{\"cookie\":293,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":228},{\"cookie\":294,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":229},{\"cookie\":295,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":230},{\"cookie\":296,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":231},{\"cookie\":297,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":232},{\"cookie\":298,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":233},{\"cookie\":299,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":234},{\"cookie\":300,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":235},{\"cookie\":301,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":236},{\"cookie\":302,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":237},{\"cookie\":303,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":238},{\"cookie\":304,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":239},{\"cookie\":305,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":240},{\"cookie\":306,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":241},{\"cookie\":307,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":242},{\"cookie\":308,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":243},{\"cookie\":309,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":244},{\"cookie\":310,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":245},{\"cookie\":311,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":246},{\"cookie\":312,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":247}],\"total\":496,\"version\":1}\n{\"boundary\":\"14188382011\",\"complete\":false,\"coverage\":\"fixture_only\",\"incarnation\":\"7af6a70c-7243-4326-a678-6039d205039b\",\"kind\":\"baseline\",\"lease\":\"2\",\"next\":320,\"offset\":256,\"rows\":[{\"cookie\":313,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":248},{\"cookie\":314,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":249},{\"cookie\":315,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":250},{\"cookie\":316,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":251},{\"cookie\":317,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":252},{\"cookie\":318,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":253},{\"cookie\":319,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":254},{\"cookie\":320,\"device\":\"4294968978\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":255},{\"device\":\"4294968029\",\"elements\":231,\"keyboard\":true,\"kind\":\"device\"},{\"cookie\":4,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":224},{\"cookie\":5,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":225},{\"cookie\":6,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":226},{\"cookie\":7,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":227},{\"cookie\":8,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":228},{\"cookie\":9,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":229},{\"cookie\":10,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":230},{\"cookie\":11,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":231},{\"cookie\":20,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":1},{\"cookie\":21,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":2},{\"cookie\":22,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":3},{\"cookie\":23,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":4},{\"cookie\":24,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":5},{\"cookie\":25,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":6},{\"cookie\":26,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":7},{\"cookie\":27,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":8},{\"cookie\":28,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":9},{\"cookie\":29,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":10},{\"cookie\":30,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":11},{\"cookie\":31,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":12},{\"cookie\":32,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":13},{\"cookie\":33,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":14},{\"cookie\":34,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":15},{\"cookie\":35,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":16},{\"cookie\":36,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":17},{\"cookie\":37,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":18},{\"cookie\":38,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":19},{\"cookie\":39,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":20},{\"cookie\":40,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":21},{\"cookie\":41,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":22},{\"cookie\":42,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":23},{\"cookie\":43,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":24},{\"cookie\":44,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":25},{\"cookie\":45,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":26},{\"cookie\":46,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":27},{\"cookie\":47,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":28},{\"cookie\":48,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":29},{\"cookie\":49,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":30},{\"cookie\":50,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":31},{\"cookie\":51,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":32},{\"cookie\":52,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":33},{\"cookie\":53,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":34},{\"cookie\":54,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":35},{\"cookie\":55,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":36},{\"cookie\":56,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":37},{\"cookie\":57,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":38},{\"cookie\":58,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":39},{\"cookie\":59,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":40},{\"cookie\":60,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":41},{\"cookie\":61,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":42},{\"cookie\":62,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":43},{\"cookie\":63,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":44},{\"cookie\":64,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":45},{\"cookie\":65,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":46},{\"cookie\":66,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":47}],\"total\":496,\"version\":1}\n{\"boundary\":\"14188382011\",\"complete\":false,\"coverage\":\"fixture_only\",\"incarnation\":\"7af6a70c-7243-4326-a678-6039d205039b\",\"kind\":\"baseline\",\"lease\":\"2\",\"next\":384,\"offset\":320,\"rows\":[{\"cookie\":67,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":48},{\"cookie\":68,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":49},{\"cookie\":69,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":50},{\"cookie\":70,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":51},{\"cookie\":71,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":52},{\"cookie\":72,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":53},{\"cookie\":73,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":54},{\"cookie\":74,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":55},{\"cookie\":75,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":56},{\"cookie\":76,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":57},{\"cookie\":77,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":58},{\"cookie\":78,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":59},{\"cookie\":79,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":60},{\"cookie\":80,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":61},{\"cookie\":81,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":62},{\"cookie\":82,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":63},{\"cookie\":83,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":64},{\"cookie\":84,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":65},{\"cookie\":85,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":66},{\"cookie\":86,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":67},{\"cookie\":87,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":68},{\"cookie\":88,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":69},{\"cookie\":89,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":70},{\"cookie\":90,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":71},{\"cookie\":91,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":72},{\"cookie\":92,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":73},{\"cookie\":93,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":74},{\"cookie\":94,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":75},{\"cookie\":95,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":76},{\"cookie\":96,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":77},{\"cookie\":97,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":78},{\"cookie\":98,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":79},{\"cookie\":99,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":80},{\"cookie\":100,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":81},{\"cookie\":101,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":82},{\"cookie\":102,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":83},{\"cookie\":103,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":84},{\"cookie\":104,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":85},{\"cookie\":105,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":86},{\"cookie\":106,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":87},{\"cookie\":107,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":88},{\"cookie\":108,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":89},{\"cookie\":109,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":90},{\"cookie\":110,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":91},{\"cookie\":111,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":92},{\"cookie\":112,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":93},{\"cookie\":113,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":94},{\"cookie\":114,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":95},{\"cookie\":115,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":96},{\"cookie\":116,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":97},{\"cookie\":117,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":98},{\"cookie\":118,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":99},{\"cookie\":119,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":100},{\"cookie\":120,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":101},{\"cookie\":121,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":102},{\"cookie\":122,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":103},{\"cookie\":123,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":104},{\"cookie\":124,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":105},{\"cookie\":125,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":106},{\"cookie\":126,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":107},{\"cookie\":127,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":108},{\"cookie\":128,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":109},{\"cookie\":129,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":110},{\"cookie\":130,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":111}],\"total\":496,\"version\":1}\n{\"boundary\":\"14188382011\",\"complete\":false,\"coverage\":\"fixture_only\",\"incarnation\":\"7af6a70c-7243-4326-a678-6039d205039b\",\"kind\":\"baseline\",\"lease\":\"2\",\"next\":448,\"offset\":384,\"rows\":[{\"cookie\":131,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":112},{\"cookie\":132,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":113},{\"cookie\":133,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":114},{\"cookie\":134,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":115},{\"cookie\":135,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":116},{\"cookie\":136,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":117},{\"cookie\":137,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":118},{\"cookie\":138,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":119},{\"cookie\":139,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":120},{\"cookie\":140,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":121},{\"cookie\":141,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":122},{\"cookie\":142,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":123},{\"cookie\":143,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":124},{\"cookie\":144,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":125},{\"cookie\":145,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":126},{\"cookie\":146,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":127},{\"cookie\":147,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":128},{\"cookie\":148,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":129},{\"cookie\":149,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":130},{\"cookie\":150,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":131},{\"cookie\":151,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":132},{\"cookie\":152,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":133},{\"cookie\":153,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":134},{\"cookie\":154,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":135},{\"cookie\":155,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":136},{\"cookie\":156,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":137},{\"cookie\":157,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":138},{\"cookie\":158,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":139},{\"cookie\":159,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":140},{\"cookie\":160,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":141},{\"cookie\":161,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":142},{\"cookie\":162,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":143},{\"cookie\":163,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":144},{\"cookie\":164,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":145},{\"cookie\":165,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":146},{\"cookie\":166,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":147},{\"cookie\":167,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":148},{\"cookie\":168,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":149},{\"cookie\":169,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":150},{\"cookie\":170,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":151},{\"cookie\":171,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":152},{\"cookie\":172,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":153},{\"cookie\":173,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":154},{\"cookie\":174,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":155},{\"cookie\":175,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":156},{\"cookie\":176,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":157},{\"cookie\":177,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":158},{\"cookie\":178,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":159},{\"cookie\":179,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":160},{\"cookie\":180,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":161},{\"cookie\":181,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":162},{\"cookie\":182,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":163},{\"cookie\":183,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":164},{\"cookie\":184,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":165},{\"cookie\":185,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":166},{\"cookie\":186,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":167},{\"cookie\":187,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":168},{\"cookie\":188,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":169},{\"cookie\":189,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":170},{\"cookie\":190,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":171},{\"cookie\":191,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":172},{\"cookie\":192,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":173},{\"cookie\":193,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":174},{\"cookie\":194,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":175}],\"total\":496,\"version\":1}\n{\"boundary\":\"14188382011\",\"complete\":true,\"coverage\":\"fixture_only\",\"incarnation\":\"7af6a70c-7243-4326-a678-6039d205039b\",\"kind\":\"baseline\",\"lease\":\"2\",\"next\":496,\"offset\":448,\"rows\":[{\"cookie\":195,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":176},{\"cookie\":196,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":177},{\"cookie\":197,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":178},{\"cookie\":198,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":179},{\"cookie\":199,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":180},{\"cookie\":200,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":181},{\"cookie\":201,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":182},{\"cookie\":202,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":183},{\"cookie\":203,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":184},{\"cookie\":204,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":185},{\"cookie\":205,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":186},{\"cookie\":206,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":187},{\"cookie\":207,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":188},{\"cookie\":208,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":189},{\"cookie\":209,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":190},{\"cookie\":210,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":191},{\"cookie\":211,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":192},{\"cookie\":212,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":193},{\"cookie\":213,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":194},{\"cookie\":214,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":195},{\"cookie\":215,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":196},{\"cookie\":216,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":197},{\"cookie\":217,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":198},{\"cookie\":218,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":199},{\"cookie\":219,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":200},{\"cookie\":220,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":201},{\"cookie\":221,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":202},{\"cookie\":222,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":203},{\"cookie\":223,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":204},{\"cookie\":224,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":205},{\"cookie\":225,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":206},{\"cookie\":226,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":207},{\"cookie\":227,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":208},{\"cookie\":228,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":209},{\"cookie\":229,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":210},{\"cookie\":230,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":211},{\"cookie\":231,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":212},{\"cookie\":232,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":213},{\"cookie\":233,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":214},{\"cookie\":234,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":215},{\"cookie\":235,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":216},{\"cookie\":236,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":217},{\"cookie\":237,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":218},{\"cookie\":238,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":219},{\"cookie\":239,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":220},{\"cookie\":240,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":221},{\"cookie\":241,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":222},{\"cookie\":242,\"device\":\"4294968029\",\"down\":false,\"kind\":\"key\",\"timestamp\":\"0\",\"usage\":223}],\"total\":496,\"version\":1}\n{\"coverage\":\"fixture_only\",\"incarnation\":\"7af6a70c-7243-4326-a678-6039d205039b\",\"kind\":\"baseline_ready\",\"lease\":\"2\",\"version\":1}\n{\"coverage\":\"fixture_only\",\"incarnation\":\"7af6a70c-7243-4326-a678-6039d205039b\",\"kind\":\"batch\",\"lease\":\"2\",\"records\":[{\"cookie\":24,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"1\",\"timestamp\":\"14193433420\",\"usage\":224,\"value\":\"1\"},{\"cookie\":11,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":0,\"sequence\":\"2\",\"timestamp\":\"14193433420\",\"usage\":-1,\"value\":\"0\"}],\"version\":1}\n{\"coverage\":\"fixture_only\",\"incarnation\":\"7af6a70c-7243-4326-a678-6039d205039b\",\"kind\":\"batch\",\"lease\":\"2\",\"records\":[{\"cookie\":24,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"3\",\"timestamp\":\"14195451583\",\"usage\":224,\"value\":\"0\"},{\"cookie\":11,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":0,\"sequence\":\"4\",\"timestamp\":\"14195451583\",\"usage\":-1,\"value\":\"0\"}],\"version\":1}\n{\"coverage\":\"fixture_only\",\"incarnation\":\"7af6a70c-7243-4326-a678-6039d205039b\",\"kind\":\"batch\",\"lease\":\"2\",\"records\":[{\"cookie\":25,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"5\",\"timestamp\":\"14197287291\",\"usage\":225,\"value\":\"1\"},{\"cookie\":11,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":0,\"sequence\":\"6\",\"timestamp\":\"14197287291\",\"usage\":-1,\"value\":\"0\"}],\"version\":1}\n{\"coverage\":\"fixture_only\",\"incarnation\":\"7af6a70c-7243-4326-a678-6039d205039b\",\"kind\":\"batch\",\"lease\":\"2\",\"records\":[{\"cookie\":25,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"7\",\"timestamp\":\"14198682908\",\"usage\":225,\"value\":\"0\"},{\"cookie\":11,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":0,\"sequence\":\"8\",\"timestamp\":\"14198682908\",\"usage\":-1,\"value\":\"0\"}],\"version\":1}\n{\"coverage\":\"fixture_only\",\"incarnation\":\"7af6a70c-7243-4326-a678-6039d205039b\",\"kind\":\"batch\",\"lease\":\"2\",\"records\":[{\"cookie\":26,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"9\",\"timestamp\":\"14200682530\",\"usage\":226,\"value\":\"1\"},{\"cookie\":11,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":0,\"sequence\":\"10\",\"timestamp\":\"14200682530\",\"usage\":-1,\"value\":\"0\"}],\"version\":1}\n{\"coverage\":\"fixture_only\",\"incarnation\":\"7af6a70c-7243-4326-a678-6039d205039b\",\"kind\":\"batch\",\"lease\":\"2\",\"records\":[{\"cookie\":26,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"11\",\"timestamp\":\"14202977468\",\"usage\":226,\"value\":\"0\"},{\"cookie\":11,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":0,\"sequence\":\"12\",\"timestamp\":\"14202977468\",\"usage\":-1,\"value\":\"0\"}],\"version\":1}\n{\"coverage\":\"fixture_only\",\"incarnation\":\"7af6a70c-7243-4326-a678-6039d205039b\",\"kind\":\"batch\",\"lease\":\"2\",\"records\":[{\"cookie\":27,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"13\",\"timestamp\":\"14205246225\",\"usage\":227,\"value\":\"1\"},{\"cookie\":11,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":0,\"sequence\":\"14\",\"timestamp\":\"14205246225\",\"usage\":-1,\"value\":\"0\"}],\"version\":1}\n{\"coverage\":\"fixture_only\",\"incarnation\":\"7af6a70c-7243-4326-a678-6039d205039b\",\"kind\":\"batch\",\"lease\":\"2\",\"records\":[{\"cookie\":27,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"15\",\"timestamp\":\"14207474624\",\"usage\":227,\"value\":\"0\"},{\"cookie\":11,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":0,\"sequence\":\"16\",\"timestamp\":\"14207474624\",\"usage\":-1,\"value\":\"0\"}],\"version\":1}\n{\"coverage\":\"fixture_only\",\"incarnation\":\"7af6a70c-7243-4326-a678-6039d205039b\",\"kind\":\"batch\",\"lease\":\"2\",\"records\":[{\"cookie\":28,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"17\",\"timestamp\":\"14209712348\",\"usage\":228,\"value\":\"1\"},{\"cookie\":11,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":0,\"sequence\":\"18\",\"timestamp\":\"14209712348\",\"usage\":-1,\"value\":\"0\"}],\"version\":1}\n{\"coverage\":\"fixture_only\",\"incarnation\":\"7af6a70c-7243-4326-a678-6039d205039b\",\"kind\":\"batch\",\"lease\":\"2\",\"records\":[{\"cookie\":28,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"19\",\"timestamp\":\"14211818984\",\"usage\":228,\"value\":\"0\"},{\"cookie\":11,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":0,\"sequence\":\"20\",\"timestamp\":\"14211818984\",\"usage\":-1,\"value\":\"0\"}],\"version\":1}\n{\"coverage\":\"fixture_only\",\"incarnation\":\"7af6a70c-7243-4326-a678-6039d205039b\",\"kind\":\"batch\",\"lease\":\"2\",\"records\":[{\"cookie\":29,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"21\",\"timestamp\":\"14214082728\",\"usage\":229,\"value\":\"1\"},{\"cookie\":11,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":0,\"sequence\":\"22\",\"timestamp\":\"14214082728\",\"usage\":-1,\"value\":\"0\"}],\"version\":1}\n{\"coverage\":\"fixture_only\",\"incarnation\":\"7af6a70c-7243-4326-a678-6039d205039b\",\"kind\":\"batch\",\"lease\":\"2\",\"records\":[{\"cookie\":29,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"23\",\"timestamp\":\"14216237213\",\"usage\":229,\"value\":\"0\"},{\"cookie\":11,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":0,\"sequence\":\"24\",\"timestamp\":\"14216237213\",\"usage\":-1,\"value\":\"0\"}],\"version\":1}\n{\"coverage\":\"fixture_only\",\"incarnation\":\"7af6a70c-7243-4326-a678-6039d205039b\",\"kind\":\"batch\",\"lease\":\"2\",\"records\":[{\"cookie\":30,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"25\",\"timestamp\":\"14218437498\",\"usage\":230,\"value\":\"1\"},{\"cookie\":11,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":0,\"sequence\":\"26\",\"timestamp\":\"14218437498\",\"usage\":-1,\"value\":\"0\"}],\"version\":1}\n{\"coverage\":\"fixture_only\",\"incarnation\":\"7af6a70c-7243-4326-a678-6039d205039b\",\"kind\":\"batch\",\"lease\":\"2\",\"records\":[{\"cookie\":30,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"27\",\"timestamp\":\"14220644976\",\"usage\":230,\"value\":\"0\"},{\"cookie\":11,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":0,\"sequence\":\"28\",\"timestamp\":\"14220644976\",\"usage\":-1,\"value\":\"0\"}],\"version\":1}\n{\"coverage\":\"fixture_only\",\"incarnation\":\"7af6a70c-7243-4326-a678-6039d205039b\",\"kind\":\"batch\",\"lease\":\"2\",\"records\":[{\"cookie\":31,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"29\",\"timestamp\":\"14222869022\",\"usage\":231,\"value\":\"1\"},{\"cookie\":11,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":0,\"sequence\":\"30\",\"timestamp\":\"14222869022\",\"usage\":-1,\"value\":\"0\"}],\"version\":1}\n{\"coverage\":\"fixture_only\",\"incarnation\":\"7af6a70c-7243-4326-a678-6039d205039b\",\"kind\":\"batch\",\"lease\":\"2\",\"records\":[{\"cookie\":31,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"31\",\"timestamp\":\"14225050193\",\"usage\":231,\"value\":\"0\"},{\"cookie\":11,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":0,\"sequence\":\"32\",\"timestamp\":\"14225050193\",\"usage\":-1,\"value\":\"0\"}],\"version\":1}\n{\"coverage\":\"fixture_only\",\"incarnation\":\"7af6a70c-7243-4326-a678-6039d205039b\",\"kind\":\"batch\",\"lease\":\"2\",\"records\":[{\"cookie\":25,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"33\",\"timestamp\":\"14227296202\",\"usage\":225,\"value\":\"1\"},{\"cookie\":11,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":0,\"sequence\":\"34\",\"timestamp\":\"14227296202\",\"usage\":-1,\"value\":\"0\"}],\"version\":1}\n{\"coverage\":\"fixture_only\",\"incarnation\":\"7af6a70c-7243-4326-a678-6039d205039b\",\"kind\":\"batch\",\"lease\":\"2\",\"records\":[{\"cookie\":33,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"35\",\"timestamp\":\"14229501459\",\"usage\":-1,\"value\":\"41\"},{\"cookie\":66,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"36\",\"timestamp\":\"14229501459\",\"usage\":1,\"value\":\"0\"},{\"cookie\":106,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"37\",\"timestamp\":\"14229501459\",\"usage\":41,\"value\":\"1\"},{\"cookie\":32,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"38\",\"timestamp\":\"14229501459\",\"usage\":-1,\"value\":\"41\"},{\"cookie\":11,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":0,\"sequence\":\"39\",\"timestamp\":\"14229501459\",\"usage\":-1,\"value\":\"0\"}],\"version\":1}\n{\"coverage\":\"fixture_only\",\"incarnation\":\"7af6a70c-7243-4326-a678-6039d205039b\",\"kind\":\"batch\",\"lease\":\"2\",\"records\":[{\"cookie\":33,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"40\",\"timestamp\":\"14231797709\",\"usage\":-1,\"value\":\"0\"},{\"cookie\":66,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"41\",\"timestamp\":\"14231797709\",\"usage\":1,\"value\":\"0\"},{\"cookie\":106,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"42\",\"timestamp\":\"14231797709\",\"usage\":41,\"value\":\"0\"},{\"cookie\":32,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"43\",\"timestamp\":\"14231797709\",\"usage\":-1,\"value\":\"0\"},{\"cookie\":11,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":0,\"sequence\":\"44\",\"timestamp\":\"14231797709\",\"usage\":-1,\"value\":\"0\"}],\"version\":1}\n{\"coverage\":\"fixture_only\",\"incarnation\":\"7af6a70c-7243-4326-a678-6039d205039b\",\"kind\":\"batch\",\"lease\":\"2\",\"records\":[{\"cookie\":25,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"45\",\"timestamp\":\"14234015140\",\"usage\":225,\"value\":\"0\"},{\"cookie\":11,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":0,\"sequence\":\"46\",\"timestamp\":\"14234015140\",\"usage\":-1,\"value\":\"0\"}],\"version\":1}\n{\"coverage\":\"fixture_only\",\"incarnation\":\"7af6a70c-7243-4326-a678-6039d205039b\",\"kind\":\"batch\",\"lease\":\"2\",\"records\":[{\"cookie\":25,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"47\",\"timestamp\":\"14236271151\",\"usage\":225,\"value\":\"1\"},{\"cookie\":11,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":0,\"sequence\":\"48\",\"timestamp\":\"14236271151\",\"usage\":-1,\"value\":\"0\"}],\"version\":1}\n{\"coverage\":\"fixture_only\",\"incarnation\":\"7af6a70c-7243-4326-a678-6039d205039b\",\"kind\":\"batch\",\"lease\":\"2\",\"records\":[{\"cookie\":33,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"49\",\"timestamp\":\"14237060928\",\"usage\":-1,\"value\":\"44\"},{\"cookie\":66,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"50\",\"timestamp\":\"14237060928\",\"usage\":1,\"value\":\"0\"},{\"cookie\":109,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"51\",\"timestamp\":\"14237060928\",\"usage\":44,\"value\":\"1\"},{\"cookie\":32,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"52\",\"timestamp\":\"14237060928\",\"usage\":-1,\"value\":\"44\"},{\"cookie\":11,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":0,\"sequence\":\"53\",\"timestamp\":\"14237060928\",\"usage\":-1,\"value\":\"0\"}],\"version\":1}\n{\"coverage\":\"fixture_only\",\"incarnation\":\"7af6a70c-7243-4326-a678-6039d205039b\",\"kind\":\"batch\",\"lease\":\"2\",\"records\":[{\"cookie\":33,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"54\",\"timestamp\":\"14239021630\",\"usage\":-1,\"value\":\"0\"},{\"cookie\":66,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"55\",\"timestamp\":\"14239021630\",\"usage\":1,\"value\":\"0\"},{\"cookie\":109,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"56\",\"timestamp\":\"14239021630\",\"usage\":44,\"value\":\"0\"},{\"cookie\":32,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"57\",\"timestamp\":\"14239021630\",\"usage\":-1,\"value\":\"0\"},{\"cookie\":11,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":0,\"sequence\":\"58\",\"timestamp\":\"14239021630\",\"usage\":-1,\"value\":\"0\"}],\"version\":1}\n{\"coverage\":\"fixture_only\",\"incarnation\":\"7af6a70c-7243-4326-a678-6039d205039b\",\"kind\":\"batch\",\"lease\":\"2\",\"records\":[{\"cookie\":25,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"59\",\"timestamp\":\"14241013252\",\"usage\":225,\"value\":\"0\"},{\"cookie\":11,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":0,\"sequence\":\"60\",\"timestamp\":\"14241013252\",\"usage\":-1,\"value\":\"0\"}],\"version\":1}\n{\"coverage\":\"fixture_only\",\"incarnation\":\"7af6a70c-7243-4326-a678-6039d205039b\",\"kind\":\"batch\",\"lease\":\"2\",\"records\":[{\"cookie\":33,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"61\",\"timestamp\":\"14243280766\",\"usage\":-1,\"value\":\"41\"},{\"cookie\":66,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"62\",\"timestamp\":\"14243280766\",\"usage\":1,\"value\":\"0\"},{\"cookie\":106,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"63\",\"timestamp\":\"14243280766\",\"usage\":41,\"value\":\"1\"},{\"cookie\":32,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"64\",\"timestamp\":\"14243280766\",\"usage\":-1,\"value\":\"41\"},{\"cookie\":11,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":0,\"sequence\":\"65\",\"timestamp\":\"14243280766\",\"usage\":-1,\"value\":\"0\"}],\"version\":1}\n{\"coverage\":\"fixture_only\",\"incarnation\":\"7af6a70c-7243-4326-a678-6039d205039b\",\"kind\":\"batch\",\"lease\":\"2\",\"records\":[{\"cookie\":33,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"66\",\"timestamp\":\"14245294891\",\"usage\":-1,\"value\":\"0\"},{\"cookie\":66,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"67\",\"timestamp\":\"14245294891\",\"usage\":1,\"value\":\"0\"},{\"cookie\":106,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"68\",\"timestamp\":\"14245294891\",\"usage\":41,\"value\":\"0\"},{\"cookie\":32,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"69\",\"timestamp\":\"14245294891\",\"usage\":-1,\"value\":\"0\"},{\"cookie\":11,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":0,\"sequence\":\"70\",\"timestamp\":\"14245294891\",\"usage\":-1,\"value\":\"0\"}],\"version\":1}\n{\"coverage\":\"fixture_only\",\"incarnation\":\"7af6a70c-7243-4326-a678-6039d205039b\",\"kind\":\"batch\",\"lease\":\"2\",\"records\":[{\"cookie\":33,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"71\",\"timestamp\":\"14247413463\",\"usage\":-1,\"value\":\"44\"},{\"cookie\":66,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"72\",\"timestamp\":\"14247413463\",\"usage\":1,\"value\":\"0\"},{\"cookie\":109,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"73\",\"timestamp\":\"14247413463\",\"usage\":44,\"value\":\"1\"},{\"cookie\":32,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"74\",\"timestamp\":\"14247413463\",\"usage\":-1,\"value\":\"44\"},{\"cookie\":11,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":0,\"sequence\":\"75\",\"timestamp\":\"14247413463\",\"usage\":-1,\"value\":\"0\"}],\"version\":1}\n{\"coverage\":\"fixture_only\",\"incarnation\":\"7af6a70c-7243-4326-a678-6039d205039b\",\"kind\":\"batch\",\"lease\":\"2\",\"records\":[{\"cookie\":33,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"76\",\"timestamp\":\"14249329001\",\"usage\":-1,\"value\":\"0\"},{\"cookie\":66,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"77\",\"timestamp\":\"14249329001\",\"usage\":1,\"value\":\"0\"},{\"cookie\":109,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"78\",\"timestamp\":\"14249329001\",\"usage\":44,\"value\":\"0\"},{\"cookie\":32,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":7,\"sequence\":\"79\",\"timestamp\":\"14249329001\",\"usage\":-1,\"value\":\"0\"},{\"cookie\":11,\"device\":\"4294968978\",\"has_cookie\":true,\"has_page\":true,\"has_usage\":true,\"page\":0,\"sequence\":\"80\",\"timestamp\":\"14249329001\",\"usage\":-1,\"value\":\"0\"}],\"version\":1}\n",
+  "capture": {
+    "coverage": "fixture_only",
+    "seen": 80,
+    "overflow": 0,
+    "contention": 0,
+    "records": [
+      {
+        "device": 4294968978,
+        "timestamp": 14193433420,
+        "value": 1,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 224,
+        "sequence": 1,
+        "has_cookie": true,
+        "cookie": 24
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14193433420,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 0,
+        "usage": -1,
+        "sequence": 2,
+        "has_cookie": true,
+        "cookie": 11
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14195451583,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 224,
+        "sequence": 3,
+        "has_cookie": true,
+        "cookie": 24
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14195451583,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 0,
+        "usage": -1,
+        "sequence": 4,
+        "has_cookie": true,
+        "cookie": 11
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14197287291,
+        "value": 1,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 225,
+        "sequence": 5,
+        "has_cookie": true,
+        "cookie": 25
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14197287291,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 0,
+        "usage": -1,
+        "sequence": 6,
+        "has_cookie": true,
+        "cookie": 11
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14198682908,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 225,
+        "sequence": 7,
+        "has_cookie": true,
+        "cookie": 25
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14198682908,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 0,
+        "usage": -1,
+        "sequence": 8,
+        "has_cookie": true,
+        "cookie": 11
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14200682530,
+        "value": 1,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 226,
+        "sequence": 9,
+        "has_cookie": true,
+        "cookie": 26
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14200682530,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 0,
+        "usage": -1,
+        "sequence": 10,
+        "has_cookie": true,
+        "cookie": 11
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14202977468,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 226,
+        "sequence": 11,
+        "has_cookie": true,
+        "cookie": 26
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14202977468,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 0,
+        "usage": -1,
+        "sequence": 12,
+        "has_cookie": true,
+        "cookie": 11
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14205246225,
+        "value": 1,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 227,
+        "sequence": 13,
+        "has_cookie": true,
+        "cookie": 27
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14205246225,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 0,
+        "usage": -1,
+        "sequence": 14,
+        "has_cookie": true,
+        "cookie": 11
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14207474624,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 227,
+        "sequence": 15,
+        "has_cookie": true,
+        "cookie": 27
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14207474624,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 0,
+        "usage": -1,
+        "sequence": 16,
+        "has_cookie": true,
+        "cookie": 11
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14209712348,
+        "value": 1,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 228,
+        "sequence": 17,
+        "has_cookie": true,
+        "cookie": 28
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14209712348,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 0,
+        "usage": -1,
+        "sequence": 18,
+        "has_cookie": true,
+        "cookie": 11
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14211818984,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 228,
+        "sequence": 19,
+        "has_cookie": true,
+        "cookie": 28
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14211818984,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 0,
+        "usage": -1,
+        "sequence": 20,
+        "has_cookie": true,
+        "cookie": 11
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14214082728,
+        "value": 1,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 229,
+        "sequence": 21,
+        "has_cookie": true,
+        "cookie": 29
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14214082728,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 0,
+        "usage": -1,
+        "sequence": 22,
+        "has_cookie": true,
+        "cookie": 11
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14216237213,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 229,
+        "sequence": 23,
+        "has_cookie": true,
+        "cookie": 29
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14216237213,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 0,
+        "usage": -1,
+        "sequence": 24,
+        "has_cookie": true,
+        "cookie": 11
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14218437498,
+        "value": 1,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 230,
+        "sequence": 25,
+        "has_cookie": true,
+        "cookie": 30
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14218437498,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 0,
+        "usage": -1,
+        "sequence": 26,
+        "has_cookie": true,
+        "cookie": 11
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14220644976,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 230,
+        "sequence": 27,
+        "has_cookie": true,
+        "cookie": 30
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14220644976,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 0,
+        "usage": -1,
+        "sequence": 28,
+        "has_cookie": true,
+        "cookie": 11
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14222869022,
+        "value": 1,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 231,
+        "sequence": 29,
+        "has_cookie": true,
+        "cookie": 31
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14222869022,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 0,
+        "usage": -1,
+        "sequence": 30,
+        "has_cookie": true,
+        "cookie": 11
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14225050193,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 231,
+        "sequence": 31,
+        "has_cookie": true,
+        "cookie": 31
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14225050193,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 0,
+        "usage": -1,
+        "sequence": 32,
+        "has_cookie": true,
+        "cookie": 11
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14227296202,
+        "value": 1,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 225,
+        "sequence": 33,
+        "has_cookie": true,
+        "cookie": 25
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14227296202,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 0,
+        "usage": -1,
+        "sequence": 34,
+        "has_cookie": true,
+        "cookie": 11
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14229501459,
+        "value": 41,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": -1,
+        "sequence": 35,
+        "has_cookie": true,
+        "cookie": 33
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14229501459,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 1,
+        "sequence": 36,
+        "has_cookie": true,
+        "cookie": 66
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14229501459,
+        "value": 1,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 41,
+        "sequence": 37,
+        "has_cookie": true,
+        "cookie": 106
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14229501459,
+        "value": 41,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": -1,
+        "sequence": 38,
+        "has_cookie": true,
+        "cookie": 32
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14229501459,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 0,
+        "usage": -1,
+        "sequence": 39,
+        "has_cookie": true,
+        "cookie": 11
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14231797709,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": -1,
+        "sequence": 40,
+        "has_cookie": true,
+        "cookie": 33
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14231797709,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 1,
+        "sequence": 41,
+        "has_cookie": true,
+        "cookie": 66
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14231797709,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 41,
+        "sequence": 42,
+        "has_cookie": true,
+        "cookie": 106
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14231797709,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": -1,
+        "sequence": 43,
+        "has_cookie": true,
+        "cookie": 32
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14231797709,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 0,
+        "usage": -1,
+        "sequence": 44,
+        "has_cookie": true,
+        "cookie": 11
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14234015140,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 225,
+        "sequence": 45,
+        "has_cookie": true,
+        "cookie": 25
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14234015140,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 0,
+        "usage": -1,
+        "sequence": 46,
+        "has_cookie": true,
+        "cookie": 11
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14236271151,
+        "value": 1,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 225,
+        "sequence": 47,
+        "has_cookie": true,
+        "cookie": 25
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14236271151,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 0,
+        "usage": -1,
+        "sequence": 48,
+        "has_cookie": true,
+        "cookie": 11
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14237060928,
+        "value": 44,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": -1,
+        "sequence": 49,
+        "has_cookie": true,
+        "cookie": 33
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14237060928,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 1,
+        "sequence": 50,
+        "has_cookie": true,
+        "cookie": 66
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14237060928,
+        "value": 1,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 44,
+        "sequence": 51,
+        "has_cookie": true,
+        "cookie": 109
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14237060928,
+        "value": 44,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": -1,
+        "sequence": 52,
+        "has_cookie": true,
+        "cookie": 32
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14237060928,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 0,
+        "usage": -1,
+        "sequence": 53,
+        "has_cookie": true,
+        "cookie": 11
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14239021630,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": -1,
+        "sequence": 54,
+        "has_cookie": true,
+        "cookie": 33
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14239021630,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 1,
+        "sequence": 55,
+        "has_cookie": true,
+        "cookie": 66
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14239021630,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 44,
+        "sequence": 56,
+        "has_cookie": true,
+        "cookie": 109
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14239021630,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": -1,
+        "sequence": 57,
+        "has_cookie": true,
+        "cookie": 32
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14239021630,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 0,
+        "usage": -1,
+        "sequence": 58,
+        "has_cookie": true,
+        "cookie": 11
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14241013252,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 225,
+        "sequence": 59,
+        "has_cookie": true,
+        "cookie": 25
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14241013252,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 0,
+        "usage": -1,
+        "sequence": 60,
+        "has_cookie": true,
+        "cookie": 11
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14243280766,
+        "value": 41,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": -1,
+        "sequence": 61,
+        "has_cookie": true,
+        "cookie": 33
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14243280766,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 1,
+        "sequence": 62,
+        "has_cookie": true,
+        "cookie": 66
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14243280766,
+        "value": 1,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 41,
+        "sequence": 63,
+        "has_cookie": true,
+        "cookie": 106
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14243280766,
+        "value": 41,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": -1,
+        "sequence": 64,
+        "has_cookie": true,
+        "cookie": 32
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14243280766,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 0,
+        "usage": -1,
+        "sequence": 65,
+        "has_cookie": true,
+        "cookie": 11
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14245294891,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": -1,
+        "sequence": 66,
+        "has_cookie": true,
+        "cookie": 33
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14245294891,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 1,
+        "sequence": 67,
+        "has_cookie": true,
+        "cookie": 66
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14245294891,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 41,
+        "sequence": 68,
+        "has_cookie": true,
+        "cookie": 106
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14245294891,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": -1,
+        "sequence": 69,
+        "has_cookie": true,
+        "cookie": 32
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14245294891,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 0,
+        "usage": -1,
+        "sequence": 70,
+        "has_cookie": true,
+        "cookie": 11
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14247413463,
+        "value": 44,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": -1,
+        "sequence": 71,
+        "has_cookie": true,
+        "cookie": 33
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14247413463,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 1,
+        "sequence": 72,
+        "has_cookie": true,
+        "cookie": 66
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14247413463,
+        "value": 1,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 44,
+        "sequence": 73,
+        "has_cookie": true,
+        "cookie": 109
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14247413463,
+        "value": 44,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": -1,
+        "sequence": 74,
+        "has_cookie": true,
+        "cookie": 32
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14247413463,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 0,
+        "usage": -1,
+        "sequence": 75,
+        "has_cookie": true,
+        "cookie": 11
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14249329001,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": -1,
+        "sequence": 76,
+        "has_cookie": true,
+        "cookie": 33
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14249329001,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 1,
+        "sequence": 77,
+        "has_cookie": true,
+        "cookie": 66
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14249329001,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": 44,
+        "sequence": 78,
+        "has_cookie": true,
+        "cookie": 109
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14249329001,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 7,
+        "usage": -1,
+        "sequence": 79,
+        "has_cookie": true,
+        "cookie": 32
+      },
+      {
+        "device": 4294968978,
+        "timestamp": 14249329001,
+        "value": 0,
+        "has_page": true,
+        "has_usage": true,
+        "page": 0,
+        "usage": -1,
+        "sequence": 80,
+        "has_cookie": true,
+        "cookie": 11
+      }
+    ]
+  },
+  "hammerspoon": {
+    "clock": {
+      "numer": 125,
+      "denom": 3,
+      "domain": "mach_absolute_time",
+      "version": 1
+    },
+    "error_count": 0,
+    "field_focus": {
+      "fixture_id": 51,
+      "accessibility": true,
+      "source": "native AX",
+      "value": true,
+      "role": "AXTextField",
+      "focused_id": 51
+    },
+    "presses": [
+      {
+        "action": "physical_press",
+        "app": "HS274Target",
+        "timestamp": "2026-09-14 18:01:07.137",
+        "device": "4294968978",
+        "capture": "7af6a70c-7243-4326-a678-6039d205039b/2",
+        "keycode": 59
+      },
+      {
+        "action": "physical_press",
+        "app": "HS274Target",
+        "timestamp": "2026-09-14 18:01:07.298",
+        "device": "4294968978",
+        "capture": "7af6a70c-7243-4326-a678-6039d205039b/2",
+        "keycode": 56
+      },
+      {
+        "action": "physical_press",
+        "app": "HS274Target",
+        "timestamp": "2026-09-14 18:01:07.439",
+        "device": "4294968978",
+        "capture": "7af6a70c-7243-4326-a678-6039d205039b/2",
+        "keycode": 58
+      },
+      {
+        "action": "physical_press",
+        "app": "HS274Target",
+        "timestamp": "2026-09-14 18:01:07.630",
+        "device": "4294968978",
+        "capture": "7af6a70c-7243-4326-a678-6039d205039b/2",
+        "keycode": 55
+      },
+      {
+        "action": "physical_press",
+        "app": "HS274Target",
+        "timestamp": "2026-09-14 18:01:07.816",
+        "device": "4294968978",
+        "capture": "7af6a70c-7243-4326-a678-6039d205039b/2",
+        "keycode": 62
+      },
+      {
+        "action": "physical_press",
+        "app": "HS274Target",
+        "timestamp": "2026-09-14 18:01:07.998",
+        "device": "4294968978",
+        "capture": "7af6a70c-7243-4326-a678-6039d205039b/2",
+        "keycode": 60
+      },
+      {
+        "action": "physical_press",
+        "app": "HS274Target",
+        "timestamp": "2026-09-14 18:01:08.179",
+        "device": "4294968978",
+        "capture": "7af6a70c-7243-4326-a678-6039d205039b/2",
+        "keycode": 61
+      },
+      {
+        "action": "physical_press",
+        "app": "HS274Target",
+        "timestamp": "2026-09-14 18:01:08.364",
+        "device": "4294968978",
+        "capture": "7af6a70c-7243-4326-a678-6039d205039b/2",
+        "keycode": 54
+      },
+      {
+        "action": "physical_press",
+        "app": "HS274Target",
+        "timestamp": "2026-09-14 18:01:08.548",
+        "device": "4294968978",
+        "capture": "7af6a70c-7243-4326-a678-6039d205039b/2",
+        "keycode": 56
+      },
+      {
+        "action": "physical_press",
+        "app": "HS274Target",
+        "timestamp": "2026-09-14 18:01:08.640",
+        "device": "4294968978",
+        "capture": "7af6a70c-7243-4326-a678-6039d205039b/2",
+        "keycode": 53
+      },
+      {
+        "action": "physical_press",
+        "app": "HS274Target",
+        "timestamp": "2026-09-14 18:01:08.922",
+        "device": "4294968978",
+        "capture": "7af6a70c-7243-4326-a678-6039d205039b/2",
+        "keycode": 56
+      },
+      {
+        "action": "physical_press",
+        "app": "HS274Target",
+        "timestamp": "2026-09-14 18:01:08.955",
+        "device": "4294968978",
+        "capture": "7af6a70c-7243-4326-a678-6039d205039b/2",
+        "keycode": 49
+      },
+      {
+        "action": "physical_press",
+        "app": "HS274Target",
+        "timestamp": "2026-09-14 18:01:09.214",
+        "device": "4294968978",
+        "capture": "7af6a70c-7243-4326-a678-6039d205039b/2",
+        "keycode": 53
+      },
+      {
+        "action": "physical_press",
+        "app": "HS274Target",
+        "timestamp": "2026-09-14 18:01:09.387",
+        "device": "4294968978",
+        "capture": "7af6a70c-7243-4326-a678-6039d205039b/2",
+        "keycode": 49
+      }
+    ],
+    "context_source": "native app/window/AX",
+    "opened": {
+      "coverage": "fixture_only",
+      "baseline": {
+        "version": 1,
+        "boundary": "14188382011",
+        "rows": 496
+      },
+      "kind": "opened",
+      "lease": "2",
+      "incarnation": "7af6a70c-7243-4326-a678-6039d205039b",
+      "version": 1
+    },
+    "coverage": "fixture_only",
+    "context_observations": [
+      {
+        "app": "HS274Target",
+        "epoch": 1789408866.473756,
+        "observed_ns": "590729059625",
+        "allowed": true
+      },
+      {
+        "observed_ns": "590822414833",
+        "allowed": false
+      },
+      {
+        "app": "HS274Target",
+        "epoch": 1789408866.644969,
+        "observed_ns": "590900186791",
+        "allowed": true
+      },
+      {
+        "observed_ns": "590999015625",
+        "allowed": false
+      },
+      {
+        "app": "HS274Target",
+        "epoch": 1789408866.836274,
+        "observed_ns": "591091396416",
+        "allowed": true
+      }
+    ],
+    "runtime": "native Hammerspoon",
+    "context_probe": [
+      {
+        "observation": 2,
+        "phase": "private"
+      },
+      {
+        "observation": 3,
+        "phase": "public"
+      },
+      {
+        "observation": 4,
+        "phase": "secure"
+      },
+      {
+        "observation": 5,
+        "phase": "resumed"
+      }
+    ],
+    "capture_started_ns": "590638601291",
+    "exit": 143,
+    "context_stopped": true,
+    "contexts": [
+      {
+        "device": "4294968978",
+        "timestamp": "14193433420"
+      },
+      {
+        "device": "4294968978",
+        "timestamp": "14197287291"
+      },
+      {
+        "device": "4294968978",
+        "timestamp": "14200682530"
+      },
+      {
+        "device": "4294968978",
+        "timestamp": "14205246225"
+      },
+      {
+        "device": "4294968978",
+        "timestamp": "14209712348"
+      },
+      {
+        "device": "4294968978",
+        "timestamp": "14214082728"
+      },
+      {
+        "device": "4294968978",
+        "timestamp": "14218437498"
+      },
+      {
+        "device": "4294968978",
+        "timestamp": "14222869022"
+      },
+      {
+        "device": "4294968978",
+        "timestamp": "14227296202"
+      },
+      {
+        "device": "4294968978",
+        "timestamp": "14229501459"
+      },
+      {
+        "device": "4294968978",
+        "timestamp": "14236271151"
+      },
+      {
+        "device": "4294968978",
+        "timestamp": "14237060928"
+      },
+      {
+        "device": "4294968978",
+        "timestamp": "14243280766"
+      },
+      {
+        "device": "4294968978",
+        "timestamp": "14247413463"
+      }
+    ],
+    "counts": {
+      "60": 1,
+      "55": 1,
+      "58": 1,
+      "53": 2,
+      "61": 1,
+      "56": 3,
+      "59": 1,
+      "54": 1,
+      "49": 2,
+      "62": 1
+    },
+    "clock_samples": [
+      {
+        "observed_ns": "591422997125",
+        "original_ns": "591393059166"
+      },
+      {
+        "observed_ns": "591584728833",
+        "original_ns": "591553637125"
+      },
+      {
+        "observed_ns": "591709544166",
+        "original_ns": "591695105416"
+      },
+      {
+        "observed_ns": "591902654791",
+        "original_ns": "591885259375"
+      },
+      {
+        "observed_ns": "592093961416",
+        "original_ns": "592071347833"
+      },
+      {
+        "observed_ns": "592272154916",
+        "original_ns": "592253447000"
+      },
+      {
+        "observed_ns": "592453629208",
+        "original_ns": "592434895750"
+      },
+      {
+        "observed_ns": "592642577208",
+        "original_ns": "592619542583"
+      },
+      {
+        "observed_ns": "592823512833",
+        "original_ns": "592804008416"
+      },
+      {
+        "observed_ns": "592913754750",
+        "original_ns": "592895894125"
+      },
+      {
+        "observed_ns": "593196228833",
+        "original_ns": "593177964625"
+      },
+      {
+        "observed_ns": "593227622458",
+        "original_ns": "593210872000"
+      },
+      {
+        "observed_ns": "593501424916",
+        "original_ns": "593470031916"
+      },
+      {
+        "observed_ns": "593656907541",
+        "original_ns": "593642227625"
+      }
+    ],
+    "settled": true,
+    "stop_requested": true,
+    "errors": []
+  },
+  "native": {
+    "hs274_fixed": false,
+    "physical_keyboard_validated": false,
+    "virtual_keyboard_ready": true,
+    "reports_queued": 28,
+    "transport_error": false,
+    "metadata_owner_verified": true,
+    "registry_entry_id": 4294968978,
+    "metadata_write_status": 0,
+    "metadata_readback_matches": true,
+    "metadata_restore_status": 0,
+    "metadata_restored": true,
+    "metadata_work_completed": true,
+    "remap_mode": true,
+    "drain_released": true,
+    "ignored_mode": false,
+    "baseline_mode": false,
+    "modifier_pairs_observed": true,
+    "overlap_observed": false,
+    "combinations_observed": true,
+    "baseline_down_observed": false,
+    "baseline_release_at": "0",
+    "escape_as_space": true,
+    "escape_passthrough": false,
+    "space_pair_observed": true,
+    "baseline_events": [],
+    "events": [
+      {
+        "type": 12,
+        "keycode": 59,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294969006,
+        "flags": 262401
+      },
+      {
+        "type": 12,
+        "keycode": 59,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294969006,
+        "flags": 256
+      },
+      {
+        "type": 12,
+        "keycode": 56,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294969006,
+        "flags": 131330
+      },
+      {
+        "type": 12,
+        "keycode": 56,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294969006,
+        "flags": 256
+      },
+      {
+        "type": 12,
+        "keycode": 58,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294969006,
+        "flags": 524576
+      },
+      {
+        "type": 12,
+        "keycode": 58,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294969006,
+        "flags": 256
+      },
+      {
+        "type": 12,
+        "keycode": 55,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294969006,
+        "flags": 1048840
+      },
+      {
+        "type": 12,
+        "keycode": 55,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294969006,
+        "flags": 256
+      },
+      {
+        "type": 12,
+        "keycode": 62,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294969006,
+        "flags": 270592
+      },
+      {
+        "type": 12,
+        "keycode": 62,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294969006,
+        "flags": 256
+      },
+      {
+        "type": 12,
+        "keycode": 60,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294969006,
+        "flags": 131332
+      },
+      {
+        "type": 12,
+        "keycode": 60,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294969006,
+        "flags": 256
+      },
+      {
+        "type": 12,
+        "keycode": 61,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294969006,
+        "flags": 524608
+      },
+      {
+        "type": 12,
+        "keycode": 61,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294969006,
+        "flags": 256
+      },
+      {
+        "type": 12,
+        "keycode": 54,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294969006,
+        "flags": 1048848
+      },
+      {
+        "type": 12,
+        "keycode": 54,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294969006,
+        "flags": 256
+      },
+      {
+        "type": 12,
+        "keycode": 56,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294969006,
+        "flags": 131330
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294969006,
+        "flags": 131330
+      },
+      {
+        "type": 11,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294969006,
+        "flags": 131330
+      },
+      {
+        "type": 12,
+        "keycode": 56,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294969006,
+        "flags": 256
+      },
+      {
+        "type": 12,
+        "keycode": 56,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294969006,
+        "flags": 131330
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294969006,
+        "flags": 131330
+      },
+      {
+        "type": 11,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294969006,
+        "flags": 131330
+      },
+      {
+        "type": 12,
+        "keycode": 56,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294969006,
+        "flags": 256
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294969006,
+        "flags": 256
+      },
+      {
+        "type": 11,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294969006,
+        "flags": 256
+      },
+      {
+        "type": 10,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294969006,
+        "flags": 256
+      },
+      {
+        "type": 11,
+        "keycode": 49,
+        "user_data": 0,
+        "source_pid": 0,
+        "numeric_field_87": 4294969006,
+        "flags": 256
+      }
+    ]
+  },
+  "isolation": {
+    "observation_error": null,
+    "runtime_process_inventory": {
+      "before": [],
+      "ready": [
+        {
+          "pid": 12354,
+          "executable": "/Users/runner/work/_temp/hs274-development-runtime/src/apps/ConsoleUserServer/build/Release/Karabiner-Console-User-Server.app/Contents/MacOS/Karabiner-Console-User-Server"
+        },
+        {
+          "pid": 12355,
+          "executable": "/Users/runner/work/_temp/hs274-development-runtime/src/apps/CoreService/build/Release/Karabiner-Core-Service.app/Contents/MacOS/Karabiner-Core-Service"
+        },
+        {
+          "pid": 12357,
+          "executable": "/Users/runner/work/_temp/hs274-development-runtime/src/apps/CoreService/build/Release/Karabiner-Core-Service.app/Contents/MacOS/Karabiner-Core-Service"
+        }
+      ],
+      "after-input": [
+        {
+          "pid": 12354,
+          "executable": "/Users/runner/work/_temp/hs274-development-runtime/src/apps/ConsoleUserServer/build/Release/Karabiner-Console-User-Server.app/Contents/MacOS/Karabiner-Console-User-Server"
+        },
+        {
+          "pid": 12355,
+          "executable": "/Users/runner/work/_temp/hs274-development-runtime/src/apps/CoreService/build/Release/Karabiner-Core-Service.app/Contents/MacOS/Karabiner-Core-Service"
+        },
+        {
+          "pid": 12357,
+          "executable": "/Users/runner/work/_temp/hs274-development-runtime/src/apps/CoreService/build/Release/Karabiner-Core-Service.app/Contents/MacOS/Karabiner-Core-Service"
+        }
+      ],
+      "after-cleanup": []
+    },
+    "registration_helpers": [
+      {
+        "path": "/Library/Application Support/org.pqrs/Karabiner-Elements/Karabiner-Elements Privileged Daemons v2.app/Contents/MacOS/Karabiner-Elements Privileged Daemons v2",
+        "device": 16777229,
+        "inode": 3533770,
+        "original_mode": 493,
+        "blocked_mode": 420,
+        "restored": true,
+        "execution_refusal": {
+          "exit": 126,
+          "stdout": "",
+          "stderr": "env: /Library/Application Support/org.pqrs/Karabiner-Elements/Karabiner-Elements Privileged Daemons v2.app/Contents/MacOS/Karabiner-Elements Privileged Daemons v2: Permission denied\n"
+        }
+      },
+      {
+        "path": "/Library/Application Support/org.pqrs/Karabiner-Elements/Karabiner-Elements Non-Privileged Agents v2.app/Contents/MacOS/Karabiner-Elements Non-Privileged Agents v2",
+        "device": 16777229,
+        "inode": 3533816,
+        "original_mode": 493,
+        "blocked_mode": 420,
+        "restored": true,
+        "execution_refusal": {
+          "exit": 126,
+          "stdout": "",
+          "stderr": "env: /Library/Application Support/org.pqrs/Karabiner-Elements/Karabiner-Elements Non-Privileged Agents v2.app/Contents/MacOS/Karabiner-Elements Non-Privileged Agents v2: Permission denied\n"
+        }
+      },
+      {
+        "path": "/Library/Application Support/org.pqrs/Karabiner-Elements/Karabiner-Core-Service.app/Contents/MacOS/Karabiner-Core-Service",
+        "device": 16777229,
+        "inode": 3533605,
+        "original_mode": 493,
+        "blocked_mode": 420,
+        "restored": true,
+        "execution_refusal": {
+          "exit": 126,
+          "stdout": "",
+          "stderr": "env: /Library/Application Support/org.pqrs/Karabiner-Elements/Karabiner-Core-Service.app/Contents/MacOS/Karabiner-Core-Service: Permission denied\n"
+        }
+      }
+    ]
+  }
+}
