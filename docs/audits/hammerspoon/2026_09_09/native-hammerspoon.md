@@ -602,3 +602,38 @@ prefix through the final trailing auxiliary row; its three tests pass locally.
 
 Simultaneous modifiers, keyboard combinations, repeated reports, multiple active
 keyboards and production integration still require their own evidence.
+
+## Overlapping Shift and repeated HID reports
+
+Run [34869741330](https://github.com/adrienm7/ergopti/actions/runs/34869741330)
+used consumer `f9186f27f55f5e916fafef4d530343f845393188` and unchanged producer
+34783474637. The actual remapping step passed without an observation error;
+independent capability probes still leave the overall workflow red. Report SHA-256:
+`0a2ffdee6107d5c41e500ecc47c336b5110d7cf9c9add090d735fbd86244db9e`.
+
+The 26 HID reports produced 24 Quartz events. Both Shift sides were independently
+pressed, the left side was released while the right remained held, and two
+identical held-state reports introduced no extra Quartz press. All 62 raw rows,
+including the repeated reports' auxiliary observations, matched the delivered
+stream. Hammerspoon credited 12 physical presses: each Shift twice across the
+independent and overlap scenarios, the six other modifiers once, and Escape and
+Space once each. No consumer error or physical-Space loss occurred.
+
+The 496-row baseline completed at boundary 4896173457; the successor completed
+its baseline at 4961788765 before explicit interrupted loss. Clock, native AX
+context, privacy transitions, consumer drain and metadata restoration passed.
+All three suspended installed executables regained their exact permissions,
+and the final runtime inventory was empty.
+
+The first attempt, run 34868282852, preserved the same input but failed isolation
+because the development agent launched the installed bundle's permission probe.
+Its actual command was retained; it was never accepted as an isolation success.
+The disposable executable fence now covers that independent launch route as well
+as service registration, without changing the producer or signed HID provider.
+
+`tools/diagnostics/fixtures/hs274-native-overlap-consumer.json` retains the full
+raw capture, delivered stream, Quartz/Hammerspoon receipts and isolation evidence.
+The shared modifier replay validates both native fixtures and every incomplete
+stream prefix. This proves repeated HID report handling, not OS autorepeat;
+keyboard combinations, multiple active keyboards, full mapping and production
+integration still require validation.
