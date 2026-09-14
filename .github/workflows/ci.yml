@@ -2987,7 +2987,7 @@ jobs:
           1. Unzip \`ErgoptiPlus.app.zip\` and move \`ErgoptiPlus.app\` to \`/Applications\`.
           2. Remove the quarantine flag (the app is not yet Apple-notarised):
           \`\`\`bash
-          xattr -d com.apple.quarantine /Applications/ErgoptiPlus.app
+          xattr -dr com.apple.quarantine /Applications/ErgoptiPlus.app
           \`\`\`
           3. Launch the app. On first run, Karabiner-Elements will request a System Extension approval — required for key remapping.
           4. Your personal configuration is stored in \`~/.config/ergopti_plus/\`. If this folder does not exist yet (first launch), the setup wizard will open automatically.
