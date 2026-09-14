@@ -1,0 +1,34 @@
+{
+  "producer_run": 34901664863,
+  "artifact_name": "ErgoptiPlus-native-helper-8a7ffcb576e55b68dbb3b4dd0740f4b4df1c24e6",
+  "identity": {
+    "kind": "native-helper-package",
+    "revision": "8a7ffcb576e55b68dbb3b4dd0740f4b4df1c24e6",
+    "executable_sha256": "93eb7822bc742fa607bcbd74d8b3d5f0a4cadfac2b7cf18b7ce5dfde24ae2501",
+    "architectures": [
+      "arm64"
+    ],
+    "sources": {
+      "static/ergopti_plus/macos/launcher/ErgoptiPlus.entitlements": "cf524985728773d68b86dbea451272d4b62f06feec23180680c8def77ba032d2",
+      "static/ergopti_plus/macos/launcher/Package.swift": "c7eaf90b391643010effe78d3fba40926631fcb6bcd5233f308429fa0afbf505",
+      "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/CPOSIXCompatibility.c": "884d6ff39c5ff6ed70e4c0a724755aed88b6a46d3681b4f71f19c359b6fce381",
+      "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/CPOSIXCompatibility.h": "8bd1cc8845812d19892b90a0524b475f8717d328dbb778f3b1e397ff8fdfdad1",
+      "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/EmbeddedProcessExitMonitor.swift": "4f54a6bc5d1d3e3ebb5db922b0fa75b49dedd7a2b96cff418f5e3840bda78584",
+      "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/KeychainTokenWorker.swift": "99caecf494cba9387a83ff14c69a1b0a8c5e91e2d0f87a9a3f204f7ad4523ffc",
+      "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/LauncherConstants.swift": "b7e8331bba602456ce21fd3324cae990a8c60bba4b94dcffa141635c94d67b96",
+      "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/LoggerDatagramWorker.swift": "f354f5ef4b132792b78a1ad7d51846f46e8163afd8483cb874d54dc6f24457f4",
+      "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/LoggerTopics.generated.swift": "c2202a13a61a6c6bf704b5379d38dc0796229f5f694c5d9a9a97340ac9fabdb2",
+      "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/POSIXCompatibility.swift": "5ee5bc5af37117db462063f68a0bf3010e4fe3b52f75e8446bb336bf64683d4b",
+      "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/RemapLeaseGuardian.swift": "57be18d95b54d864f8993c5da57857a4f5bd00faabd0b04d4a2bb46d93854933",
+      "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/RemapLeaseWorker.swift": "a2ed17826d7aea027d5fece27e5c58d45211d023fe74d0a70ac839a1e8c5e148",
+      "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/UpdaterCommandRouter.swift": "2edb3198c00517a10988d17161ac17d4e0e1c4aace655ae317cc1e85921fca1e",
+      "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/main.swift": "b2ceee5bc90800fb8b3efad9f2c2af60a4478fecb51d73ac2b530bab2396d559",
+      "static/ergopti_plus/macos/launcher/com.ergoptiplus.remap-guardian.plist": "873f8b310db98db7882629e1d5b616335f4d3445109e9b91e0dd1041f07e9962"
+    },
+    "archive_sha256": "3468cb02bee2388e859750499d804eb64a63d977ed680dc62d3609212f06dc72",
+    "archive_bytes": 1245135,
+    "guardian_status": "unavailable",
+    "wrong_identity_exit": 64,
+    "hammerspoon_bootstrap_verified": false
+  }
+}

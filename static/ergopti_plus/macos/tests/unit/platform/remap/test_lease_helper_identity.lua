@@ -67,10 +67,10 @@ local function resolve_candidate(override, options)
 		end
 		return original_getenv(name)
 	end
-	local call_ok, resolved, resolve_err = pcall(helper.resolve, DRIVER_ROOT)
+	local call_ok, resolved, resolve_err, environment = pcall(helper.resolve, DRIVER_ROOT)
 	os.getenv = original_getenv
 	if not call_ok then error(resolved) end
-	return resolved, resolve_err
+	return resolved, resolve_err, environment
 end
 
 
@@ -87,6 +87,16 @@ helpers.describe("karabiner lease helper: bundle-owned identity", function()
 	helpers.it("accepts the exact regular executable owned by the running launcher", function()
 		local resolved = resolve_candidate(EXPECTED_HELPER)
 		helpers.assert_eq(resolved, EXPECTED_HELPER)
+	end)
+
+	helpers.it("returns the exact verified identity for this child environment", function()
+		local resolved, detail, environment = resolve_candidate(EXPECTED_HELPER)
+		helpers.assert_eq(resolved, EXPECTED_HELPER)
+		helpers.assert_nil(detail)
+		helpers.assert_not_nil(environment)
+		helpers.assert_eq(environment[HELPER_ENV], EXPECTED_HELPER)
+		helpers.assert_eq(environment[HELPER_DEVICE_ENV], EXPECTED_DEVICE)
+		helpers.assert_eq(environment[HELPER_INODE_ENV], EXPECTED_INODE)
 	end)
 
 	helpers.it("preserves a 64-bit integer inode without floating-point rounding", function()

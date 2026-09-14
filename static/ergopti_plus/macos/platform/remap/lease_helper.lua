@@ -112,6 +112,7 @@ end
 ---   callers omit it and use this module's own immutable source location.
 --- @return string|nil path Existing native helper executable.
 --- @return string|nil error_message Stable failure detail.
+--- @return table|nil environment Exact identity to copy into this helper process.
 function M.resolve(driver_root_override)
 	local driver_root = driver_root_override or source_driver_root()
 	local bundled = bundle_candidate(driver_root)
@@ -132,7 +133,13 @@ function M.resolve(driver_root_override)
 		or not is_canonical_identity_text(expected_inode) then
 		return nil, "running launcher did not export a canonical helper file identity"
 	end
-	if is_helper_executable(bundled, bundled, expected_device, expected_inode) then return bundled end
+	if is_helper_executable(bundled, bundled, expected_device, expected_inode) then
+		return bundled, nil, {
+			[HELPER_ENV] = bundled,
+			[HELPER_DEVICE_ENV] = expected_device,
+			[HELPER_INODE_ENV] = expected_inode,
+		}
+	end
 
 	return nil, "bundle-owned ErgoptiPlus helper no longer matches the running launcher"
 end

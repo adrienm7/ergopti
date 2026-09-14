@@ -125,6 +125,40 @@ helpers.describe("native task environment: launcher authority never reaches chil
 		assert_sanitized_start(state)
 	end)
 
+	helpers.it("copies explicit helper identity before start without leaking launcher authority", function()
+		local factory, state = make_task_factory(true)
+		local runner = helpers.load_with_stubs("adapters.shell_runner", { task = { new = factory } })
+		local environment = {
+			ERGOPTI_LAUNCHER_EXECUTABLE = "/cache/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus",
+			ERGOPTI_LAUNCHER_DEVICE = "17",
+			ERGOPTI_LAUNCHER_INODE = "9007199254740993",
+		}
+		local handle = runner.spawn("/usr/bin/true", {}, function() end, nil, environment)
+		environment.ERGOPTI_LAUNCHER_INODE = "changed after preparation"
+		helpers.assert_true(handle.start())
+		assert_sanitized_start(state)
+		helpers.assert_eq(state.start_environment.ERGOPTI_LAUNCHER_DEVICE, "17")
+		helpers.assert_eq(state.start_environment.ERGOPTI_LAUNCHER_INODE, "9007199254740993")
+	end)
+
+	for label, environment in pairs({
+		logger_token = { ERGOPTI_LOG_TOKEN = "must not reach child" },
+		launcher_pid = { ERGOPTI_LAUNCHER_PID = "123" },
+		numeric_value = { ERGOPTI_LAUNCHER_INODE = 123 },
+		invalid_name = { ["invalid=name"] = "value" },
+		empty_name = { [""] = "value" },
+		nul_value = { VALID = "before\0after" },
+	}) do
+		helpers.it("refuses invalid explicit child environment: " .. label, function()
+			local factory, state = make_task_factory(true)
+			local runner = helpers.load_with_stubs("adapters.shell_runner", { task = { new = factory } })
+			local handle = runner.spawn("/usr/bin/true", {}, function() end, nil, environment)
+			helpers.assert_eq(handle.start(), false)
+			helpers.assert_eq(state.starts, 0)
+			helpers.assert_eq(state.set_calls, 0)
+		end)
+	end
+
 	helpers.it("sanitizes TaskLifecycle children before native start", function()
 		local factory, state = make_task_factory(true)
 		local saved_hs = rawget(_G, "hs")

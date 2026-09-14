@@ -43,9 +43,10 @@ end
 --- string pairs and silently dropping an unrelated variable could corrupt a
 --- helper's execution context.
 --- @param environment table Native environment returned by hs.task:environment().
+--- @param overrides table|nil Explicit per-child values; launcher-only keys are forbidden.
 --- @return table|nil sanitized
 --- @return string|nil detail
-function M.child_copy(environment)
+function M.child_copy(environment, overrides)
 	if type(environment) ~= "table" then
 		return nil, "native task environment is not a table"
 	end
@@ -56,6 +57,21 @@ function M.child_copy(environment)
 			return nil, "native task environment contains a non-string entry"
 		end
 		if not MANAGED_KEY_SET[key] then sanitized[key] = value end
+	end
+	if overrides ~= nil then
+		if type(overrides) ~= "table" or getmetatable(overrides) ~= nil then
+			return nil, "explicit child environment must be a plain table"
+		end
+		for key, value in pairs(overrides) do
+			if type(key) ~= "string" or key == "" or key:find("[%z=]")
+				or type(value) ~= "string" or value:find("%z") then
+				return nil, "explicit child environment contains an invalid entry"
+			end
+			if MANAGED_KEY_SET[key] then
+				return nil, "explicit child environment contains launcher-only authority: " .. key
+			end
+			sanitized[key] = value
+		end
 	end
 	return sanitized
 end
