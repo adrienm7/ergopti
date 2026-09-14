@@ -33,6 +33,8 @@
 
 const fs = require('fs');
 const path = require('path');
+const os = require('node:os');
+const { spawnSync } = require('node:child_process');
 const { selectGates } = require('./verify-change.cjs');
 const {
 	commandPlan: swiftLauncherCommandPlan,
@@ -403,6 +405,50 @@ check(SWIFT.includes('maximumConsecutiveSpawnFailures: Int? = nil'),
 	'the shared fence transport must expose a finite worker budget while guardian retries remain unbounded');
 check(SWIFT.includes('guard recoverFenceWithinWorkerBudget() else'),
 	'the outer worker must surface exhausted recovery instead of retaining its durable record forever');
+
+// A second build directory must not cause the helper to package a stale product.
+const launcherStart = BUILD_SCRIPT.indexOf('build_launcher() {');
+const launcherEnd = BUILD_SCRIPT.indexOf('\n}\n', launcherStart);
+check(launcherStart >= 0 && launcherEnd > launcherStart, 'native launcher build function must exist');
+const launcherBody = BUILD_SCRIPT.slice(launcherStart, launcherEnd + 2);
+const temporaryBuild = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-native-product-'));
+try {
+	fs.mkdirSync(path.join(temporaryBuild, 'selected'));
+	fs.writeFileSync(path.join(temporaryBuild, 'selected', 'ErgoptiPlus'), 'current product');
+	fs.writeFileSync(path.join(temporaryBuild, 'stale'), 'stale product');
+	const buildSelection = spawnSync('bash', ['-c', `
+set -e
+LAUNCHER_DIR="$1"
+log() { :; }
+fail() { exit 1; }
+swift() { if [[ "$*" == *--show-bin-path* ]]; then printf '%s/selected\n' "$LAUNCHER_DIR"; fi; }
+find() { printf '%s/stale\n' "$LAUNCHER_DIR"; }
+${launcherBody}
+build_launcher
+`, 'fixture', temporaryBuild.replaceAll('\\', '/')], { encoding: 'utf8', timeout: 10000 });
+	check(!buildSelection.error && buildSelection.status === 0
+		&& buildSelection.stdout.trim().endsWith('/selected/ErgoptiPlus'),
+		'native helper must use the exact SwiftPM-selected product instead of the first cached executable');
+} finally {
+	fs.rmSync(temporaryBuild, { recursive: true, force: true });
+}
+
+// Running the real dispatcher with inert dependencies proves that helper mode
+// cannot fall through to downloading or rebuilding the complete application.
+const helperDispatch = spawnSync('bash', ['-c', `
+set -e
+log() { :; }
+fail() { exit 1; }
+require_cmd() { :; }
+clean_build_dir() { :; }
+download_hammerspoon() { printf 'unexpected full application download'; return 97; }
+build_native_helper() { printf 'native helper only'; }
+${mainBody}
+main --native-helper-only
+`], { encoding: 'utf8', timeout: 10000 });
+check(!helperDispatch.error && helperDispatch.status === 0
+	&& helperDispatch.stdout === 'native helper only',
+	'native helper dispatch must skip the full application download/build pipeline');
 
 if (failures.length > 0) {
 	console.error('[FAIL] macOS independent remap LaunchAgent:');

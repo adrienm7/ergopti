@@ -265,7 +265,7 @@ build_launcher() {
 		swift build -c release --product ErgoptiPlus >&2
 	)
 	local built_bin
-	built_bin="$(find "$LAUNCHER_DIR/.build" -name "ErgoptiPlus" -type f -path "*/release/ErgoptiPlus" | head -1)"
+	built_bin="$(swift build -c release --show-bin-path --package-path "$LAUNCHER_DIR")/ErgoptiPlus"
 	[ -f "$built_bin" ] || fail "Swift build did not produce ErgoptiPlus binary."
 	log "Launcher binary: $built_bin"
 	echo "$built_bin"
@@ -280,38 +280,13 @@ build_launcher() {
 # ====================================================
 # ====================================================
 
-# Assemble the Ergopti.app skeleton, copy the launcher + Hammerspoon, drop our
-# Lua config into Resources/config/, and stamp Info.plist. The embedded
-# Hammerspoon's bundle id is rewritten so its preferences land under our id.
-assemble_app() {
+# Assemble the same native executable, guardian registration and linked framework
+# for both the complete application and the Git-checkout helper distribution.
+assemble_native_runtime() {
 	local launcher_bin="$1"
-	local ke_app_path="$2"
-	local ollama_bin_path="$3"
-	log "Assembling $APP_PATH"
-	mkdir -p "$APP_PATH/Contents/MacOS"
-	mkdir -p "$APP_PATH/Contents/Resources/config"
-	mkdir -p "$APP_PATH/Contents/Frameworks"
-	mkdir -p "$APP_PATH/Contents/Library/LaunchAgents"
-
-	# Move the downloaded Hammerspoon into Frameworks/. We move (not copy) to
-	# keep the build dir small and to avoid duplicating ~250 MB.
-	mv "$BUILD_DIR/Hammerspoon.app" "$APP_PATH/Contents/Frameworks/Hammerspoon.app"
-
-	# Rewrite the embedded Hammerspoon's bundle id so its NSUserDefaults land
-	# under the dedicated child identity used by the launcher's CFPreferences.
-	# Without this rewrite a stock Hammerspoon install on the same machine
-	# would share its preferences with our embedded instance and overwrite
-	# the config-dir override on every launch.
-	local hs_plist="$APP_PATH/Contents/Frameworks/Hammerspoon.app/Contents/Info.plist"
-	[ -f "$hs_plist" ] || fail "embedded Hammerspoon Info.plist missing."
-	plutil -replace CFBundleIdentifier -string "$HAMMERSPOON_BUNDLE_ID" "$hs_plist"
-
-	# Disarm the embedded Hammerspoon's own Sparkle so it never tries to
-	# update itself behind our back. Updates are owned exclusively by the
-	# launcher's Sparkle instance, which targets the Ergopti release feed.
-	plutil -remove SUFeedURL "$hs_plist" 2>/dev/null || true
-	plutil -replace SUEnableAutomaticChecks -bool false "$hs_plist"
-
+	[ -f "$launcher_bin" ] || fail "Native launcher executable is missing."
+	mkdir -p "$APP_PATH/Contents/MacOS" "$APP_PATH/Contents/Frameworks" \
+		"$APP_PATH/Contents/Library/LaunchAgents"
 	# Copy the launcher binary into the standard host-executable location.
 	cp "$launcher_bin" "$APP_PATH/Contents/MacOS/ErgoptiPlus"
 	chmod +x "$APP_PATH/Contents/MacOS/ErgoptiPlus"
@@ -346,6 +321,42 @@ assemble_app() {
 	[ -n "$sparkle_fw" ] || fail "Sparkle.framework not found under $LAUNCHER_DIR/.build — run 'swift build' in $LAUNCHER_DIR first."
 	log "Bundling Sparkle.framework (source: $sparkle_fw)"
 	cp -R "$sparkle_fw" "$APP_PATH/Contents/Frameworks/Sparkle.framework"
+
+}
+
+# Assemble the Ergopti.app skeleton, copy the launcher + Hammerspoon, drop our
+# Lua config into Resources/config/, and stamp Info.plist. The embedded
+# Hammerspoon's bundle id is rewritten so its preferences land under our id.
+assemble_app() {
+	local launcher_bin="$1"
+	local ke_app_path="$2"
+	local ollama_bin_path="$3"
+	log "Assembling $APP_PATH"
+	mkdir -p "$APP_PATH/Contents/MacOS"
+	mkdir -p "$APP_PATH/Contents/Resources/config"
+	mkdir -p "$APP_PATH/Contents/Frameworks"
+	mkdir -p "$APP_PATH/Contents/Library/LaunchAgents"
+
+	# Move the downloaded Hammerspoon into Frameworks/. We move (not copy) to
+	# keep the build dir small and to avoid duplicating ~250 MB.
+	mv "$BUILD_DIR/Hammerspoon.app" "$APP_PATH/Contents/Frameworks/Hammerspoon.app"
+
+	# Rewrite the embedded Hammerspoon's bundle id so its NSUserDefaults land
+	# under the dedicated child identity used by the launcher's CFPreferences.
+	# Without this rewrite a stock Hammerspoon install on the same machine
+	# would share its preferences with our embedded instance and overwrite
+	# the config-dir override on every launch.
+	local hs_plist="$APP_PATH/Contents/Frameworks/Hammerspoon.app/Contents/Info.plist"
+	[ -f "$hs_plist" ] || fail "embedded Hammerspoon Info.plist missing."
+	plutil -replace CFBundleIdentifier -string "$HAMMERSPOON_BUNDLE_ID" "$hs_plist"
+
+	# Disarm the embedded Hammerspoon's own Sparkle so it never tries to
+	# update itself behind our back. Updates are owned exclusively by the
+	# launcher's Sparkle instance, which targets the Ergopti release feed.
+	plutil -remove SUFeedURL "$hs_plist" 2>/dev/null || true
+	plutil -replace SUEnableAutomaticChecks -bool false "$hs_plist"
+
+	assemble_native_runtime "$launcher_bin"
 
 	# Mirror the dev tree under Contents/Resources/ at the SAME repo-relative
 	# layout (static/ergopti_plus/...) so every Lua path resolves identically in
@@ -489,6 +500,25 @@ generate_info_plist() {
 # ===============================================
 # ===============================================
 
+# Seal the shared runtime without depending on an embedded Hammerspoon bundle.
+codesign_native_runtime() {
+	local entitlements="$LAUNCHER_DIR/ErgoptiPlus.entitlements"
+	[ -f "$entitlements" ] || fail "Entitlements file missing: $entitlements"
+	codesign --force --deep --sign - "$APP_PATH/Contents/Frameworks/Sparkle.framework"
+	# Sign the launcher binary with a stable identifier and entitlements.
+	codesign --force \
+		--sign - \
+		--identifier "$BUNDLE_ID" \
+		--entitlements "$entitlements" \
+		"$APP_PATH/Contents/MacOS/ErgoptiPlus"
+
+	# Sign the outer bundle. --identifier here pins the bundle's own identity.
+	codesign --force \
+		--sign - \
+		--identifier "$BUNDLE_ID" \
+		"$APP_PATH"
+}
+
 # Sign the app ad-hoc but with an explicit --identifier anchored to the bundle
 # ID. Without --identifier, ad-hoc signing uses the binary hash as the
 # identity — a hash that changes on every build — which causes macOS TCC to
@@ -502,27 +532,13 @@ generate_info_plist() {
 # versions pop an extra automation-permission dialog on first use.
 codesign_app() {
 	log "Codesigning ErgoptiPlus.app (ad-hoc, identifier: $BUNDLE_ID)"
-	local entitlements="$LAUNCHER_DIR/ErgoptiPlus.entitlements"
-	[ -f "$entitlements" ] || fail "Entitlements file missing: $entitlements"
-
 	# Sign nested bundles first so the host-level pass finds them already valid.
 	codesign --force --deep --sign - "$APP_PATH/Contents/Frameworks/Hammerspoon.app"
-	codesign --force --deep --sign - "$APP_PATH/Contents/Frameworks/Sparkle.framework"
 	local ke_app="$APP_PATH/Contents/Resources/Tools/Karabiner/Karabiner-Elements.app"
 	[ -d "$ke_app" ] && codesign --force --deep --sign - "$ke_app" || true
 
-	# Sign the launcher binary with a stable identifier and entitlements.
-	codesign --force \
-		--sign - \
-		--identifier "$BUNDLE_ID" \
-		--entitlements "$entitlements" \
-		"$APP_PATH/Contents/MacOS/ErgoptiPlus"
+	codesign_native_runtime
 
-	# Sign the outer bundle. --identifier here pins the bundle's own identity.
-	codesign --force \
-		--sign - \
-		--identifier "$BUNDLE_ID" \
-		"$APP_PATH"
 }
 
 # Zip the bundle as a release artefact. Sparkle expects a zip whose top-level
@@ -542,7 +558,41 @@ zip_app() {
 # ==========================================
 # ==========================================
 
+# Produce the native runtime used by a Git checkout without acquiring any of
+# the full application's bundled drivers, language runtimes or model engines.
+build_native_helper() {
+	for cmd in swift codesign plutil zip find; do require_cmd "$cmd"; done
+	BUILD_DIR="$REPO_ROOT/build/macos-native-helper"
+	APP_PATH="$BUILD_DIR/ErgoptiPlus.app"
+	ZIP_PATH="$BUILD_DIR/ErgoptiPlus.app.zip"
+	[ ! -e "$BUILD_DIR" ] && [ ! -L "$BUILD_DIR" ] \
+		|| fail "Native helper output already exists: $BUILD_DIR"
+	mkdir -p "$BUILD_DIR"
+	local launcher_bin
+	launcher_bin="$(build_launcher)"
+	assemble_native_runtime "$launcher_bin"
+	generate_info_plist
+	local plist="$APP_PATH/Contents/Info.plist"
+	# The helper is invoked only for headless roles; the Git checkout owns updates.
+	for key in CFBundleIconFile CFBundleURLTypes SUFeedURL SUPublicEDKey SUScheduledCheckInterval; do
+		plutil -remove "$key" "$plist"
+	done
+	plutil -replace LSUIElement -bool true "$plist"
+	plutil -replace SUEnableAutomaticChecks -bool false "$plist"
+	plutil -replace SUAllowsAutomaticUpdates -bool false "$plist"
+	plutil -lint "$plist"
+	codesign_native_runtime
+	codesign --verify --strict --deep "$APP_PATH"
+	zip_app
+	log "Native helper ready: $ZIP_PATH"
+}
+
 main() {
+	if [[ $# -eq 1 && "$1" == "--native-helper-only" ]]; then
+		build_native_helper
+		return
+	fi
+	[[ $# -eq 0 ]] || fail "Expected no arguments or --native-helper-only."
 	for cmd in curl unzip zip swift codesign iconutil sips plutil rsync hdiutil shasum; do
 		require_cmd "$cmd"
 	done
