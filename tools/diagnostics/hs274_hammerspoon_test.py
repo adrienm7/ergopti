@@ -183,6 +183,24 @@ class ConsumerTests(unittest.TestCase):
             diagnostic.assert_called_once()
             self.assertEqual(report["hammerspoon_diagnostic_error"], "RuntimeError: diagnostic failure")
 
+    def test_held_consumer_credits_only_the_fresh_space(self):
+        capture, result = receipt()
+        capture["records"] = [row for row in capture["records"] if row["usage"] != 41]
+        for field in ("presses", "contexts", "clock_samples"):
+            result[field] = result[field][1:]
+        result["counts"] = {"49": 1}
+        validate_consumer(result, capture, held=True)
+        with self.assertRaises(ValueError):
+            validate_consumer(result, capture)
+        for counts in ({}, {"49": 2}, {"49": 1, "53": 1}):
+            with self.subTest(counts=counts), self.assertRaises(ValueError):
+                validate_consumer(dict(result, counts=counts), capture, held=True)
+        inherited = copy.deepcopy(capture)
+        down = next(row for row in inherited["records"] if row["usage"] == 44 and row["value"] == 1)
+        inherited["records"].insert(0, dict(down))
+        with self.assertRaises(ValueError):
+            validate_consumer(result, inherited, held=True)
+
     def test_native_consumer_requires_trusted_exact_field_focus(self):
         capture, result = receipt()
         validate_consumer(result, capture)

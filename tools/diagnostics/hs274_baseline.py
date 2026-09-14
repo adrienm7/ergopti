@@ -102,6 +102,20 @@ def wait_baseline(path, process, device, seconds, *, source="forced"):
     raise RuntimeError("Native baseline probe timed out")
 
 
+def require_stream_held_baseline(stream, device):
+    """Require transferred held Space before allowing the fixture to release it."""
+    baseline = stream.get("baseline", {})
+    if baseline.get("complete") is not True or stream.get("records") != []:
+        raise ValueError("Held stream did not complete an idle initial baseline")
+    state = baseline.get("devices", {}).get(device)
+    if not state or state.get("keyboard") is not True:
+        raise ValueError("Held stream omitted the fixture keyboard")
+    held = [(cookie, key["usage"]) for cookie, key in state["keys"].items() if key["down"]]
+    if len(held) != 1 or held[0][1] != 44:
+        raise ValueError("Transferred baseline did not retain exactly the held Space")
+    return integer(baseline.get("boundary"), "held stream boundary", minimum=1)
+
+
 def validate_baseline_native(native, probe):
     """Keep inherited observations separate from the explicitly new Space pair."""
     if any(native.get(field) is not True for field in (

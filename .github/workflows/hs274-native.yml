@@ -59,7 +59,7 @@ jobs:
           print(encoded, end="")
           PY
       - name: Reject incompatible native consumer selection
-        if: inputs.hammerspoon_consumer && (!inputs.development_build || inputs.baseline_fixture)
+        if: inputs.hammerspoon_consumer && !inputs.development_build
         run: exit 1
       - name: Verify process isolation verdicts before native setup
         id: preflight
