@@ -183,6 +183,25 @@ class ConsumerTests(unittest.TestCase):
             diagnostic.assert_called_once()
             self.assertEqual(report["hammerspoon_diagnostic_error"], "RuntimeError: diagnostic failure")
 
+    def test_modifier_consumer_keeps_all_eight_sides_and_the_collision_pair(self):
+        from hs274_modifiers import KEYCODES
+        capture, result = receipt()
+        down = next(row for row in capture["records"] if row["usage"] == 41 and row["value"] == 1)
+        capture["records"] = [dict(down, usage=usage) for usage in KEYCODES] + capture["records"]
+        for field in ("presses", "contexts", "clock_samples"):
+            result[field] = [dict(result[field][0]) for _ in KEYCODES] + result[field]
+        for index, keycode in enumerate(KEYCODES.values()):
+            result["presses"][index]["keycode"] = keycode
+            result["counts"][str(keycode)] = 1
+        validate_consumer(result, capture, modifiers=True)
+        for keycode in KEYCODES.values():
+            broken = copy.deepcopy(result)
+            broken["counts"][str(keycode)] = 2
+            with self.subTest(keycode=keycode), self.assertRaises(ValueError):
+                validate_consumer(broken, capture, modifiers=True)
+        with self.assertRaises(ValueError):
+            validate_consumer(result, capture, held=True, modifiers=True)
+
     def test_held_consumer_credits_only_the_fresh_space(self):
         capture, result = receipt()
         capture["records"] = [row for row in capture["records"] if row["usage"] != 41]

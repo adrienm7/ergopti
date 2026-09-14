@@ -14,6 +14,7 @@ import time
 
 from hs274_capture import unique_object
 from hs274_stream import decimal
+from hs274_modifiers import KEYCODES as MODIFIER_KEYCODES
 from hs274_accessibility import approve_accessibility
 import hs274_hammerspoon_registration
 import hs274_accessibility_diagnostics
@@ -186,6 +187,7 @@ def capture_consumer(app, cli, output, report, target):
                      "diagnostics": str(output / "hs274-remap-physical-stream-stderr.log"),
                      "stop": str(stop), "permission_request": str(permission_request), "permission_ready": str(permission_ready),
                      "batch_limit": 64, "context_limit": 64, "frame_limit": 65536, "clock": timebase}
+    configuration["keycodes"] = {**{41: 53, 44: 49}, **MODIFIER_KEYCODES}
     configuration.update(target)
     (scratch / "capture-config.json").write_text(json.dumps(configuration), encoding="utf-8")
     with (output / "hs274-remap-hammerspoon-launch.log").open("xb") as log:
@@ -252,8 +254,16 @@ def capture_consumer(app, cli, output, report, target):
                 raise cleanup_error
 
 
-def validate_consumer(result, capture, *, held=False):
+def validate_consumer(result, capture, *, held=False, modifiers=False):
     """Match real Lua credits and exact original context keys against native input."""
+    if held and modifiers:
+        raise ValueError("Held and modifier consumer scenarios are distinct")
+    mapping = {41: 53, 44: 49}
+    expected_usages = [44] if held else [41, 44]
+    if modifiers:
+        mapping.update(MODIFIER_KEYCODES)
+        expected_usages = list(MODIFIER_KEYCODES) + expected_usages
+    expected_counts = {str(mapping[usage]): 1 for usage in expected_usages}
     focus = result.get("field_focus") if isinstance(result, dict) else None
     if (not isinstance(focus, dict) or focus.get("source") != "native AX"
             or focus.get("accessibility") is not True or focus.get("value") is not True
@@ -266,12 +276,12 @@ def validate_consumer(result, capture, *, held=False):
             or type(result.get("error_count")) is not int or result["error_count"] != 0
             or result.get("errors") not in ([], {})
             or type(result.get("exit")) is not int or result["exit"] != 143
-            or result.get("counts") != ({"49": 1} if held else {"49": 1, "53": 1})
+            or result.get("counts") != expected_counts
             or any(type(value) is not int for value in result["counts"].values())):
         raise ValueError("Native Hammerspoon did not prove complete fixture delivery")
     downs = [row for row in capture["records"] if row["has_page"] and row["has_usage"]
-             and row["page"] == 7 and row["usage"] in (41, 44) and row["value"] == 1]
-    if [row["usage"] for row in downs] != ([44] if held else [41, 44]):
+             and row["page"] == 7 and row["usage"] in mapping and row["value"] == 1]
+    if [row["usage"] for row in downs] != expected_usages:
         raise ValueError("Independent fixture does not contain the expected physical pair")
     validate_clock(result, downs)
     validate_context(result, downs)
@@ -282,5 +292,5 @@ def validate_consumer(result, capture, *, held=False):
         raise ValueError("Native Hammerspoon changed physical timestamps or device identities")
     for press, row in zip(result["presses"], downs):
         if (not isinstance(press, dict) or type(press.get("keycode")) is not int
-                or press["keycode"] != {41: 53, 44: 49}[row["usage"]] or press.get("device") != str(row["device"])):
+                or press["keycode"] != mapping[row["usage"]] or press.get("device") != str(row["device"])):
             raise ValueError("Native Hammerspoon lost or changed a physical press")

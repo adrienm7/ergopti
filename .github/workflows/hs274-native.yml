@@ -19,6 +19,10 @@ on:
         description: Probe held Space before core startup (requires development build)
         type: boolean
         default: false
+      modifier_fixture:
+        description: Exercise all eight modifiers before Escape and Space (requires native consumer)
+        type: boolean
+        default: false
       baseline_source:
         description: Explicit acquisition source for the held fixture only
         type: choice
@@ -59,12 +63,13 @@ jobs:
           print(encoded, end="")
           PY
       - name: Reject incompatible native consumer selection
-        if: inputs.hammerspoon_consumer && !inputs.development_build
+        if: (inputs.hammerspoon_consumer && !inputs.development_build) || (inputs.modifier_fixture && (!inputs.development_build || !inputs.hammerspoon_consumer || inputs.baseline_fixture || inputs.ignored_fixture))
         run: exit 1
       - name: Verify process isolation verdicts before native setup
         id: preflight
         run: |
           python3 tools/diagnostics/hs274_services_test.py
+          python3 tools/diagnostics/hs274_modifiers_test.py
           python3 tools/diagnostics/hs274_capture_test.py
           python3 tools/diagnostics/hs274_stream_test.py
           python3 tools/diagnostics/hs274_inventory_test.py
@@ -197,6 +202,7 @@ jobs:
           HS274_IGNORED_FIXTURE: ${{ inputs.ignored_fixture }}
           HS274_BASELINE_FIXTURE: ${{ inputs.baseline_fixture }}
           HS274_BASELINE_SOURCE: ${{ inputs.baseline_source }}
+          HS274_MODIFIER_FIXTURE: ${{ inputs.modifier_fixture }}
         run: python3 tools/diagnostics/hs274-remap.py
       - uses: actions/upload-artifact@v4
         if: always()

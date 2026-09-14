@@ -62,7 +62,7 @@ local function run()
 			}
 			return owner.context.history.resolve(original_ns)
 		end,
-		keycode = function(usage) return ({ [41] = 53, [44] = 49 })[usage] end,
+		keycode = function(usage) return config.keycodes[tostring(usage)] end,
 		emit = function(press)
 			result.presses[#result.presses + 1] = press
 			press.action = "physical_press"

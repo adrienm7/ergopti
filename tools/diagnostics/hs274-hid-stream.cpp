@@ -2,6 +2,8 @@
 // Observe native HID delivery from the pinned signed provider on disposable CI.
 
 #include <ApplicationServices/ApplicationServices.h>
+#include <Carbon/Carbon.h>
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -24,6 +26,12 @@ struct Observation {
   int64_t user_data;
   int64_t source_pid;
   int64_t numeric_field_87;
+  CGEventFlags flags;
+};
+
+struct ObservationContext {
+  std::vector<Observation>& events;
+  bool modifiers = false;
 };
 
 void write_observations(std::ostream& output, const std::vector<Observation>& observations) {
@@ -33,20 +41,22 @@ void write_observations(std::ostream& output, const std::vector<Observation>& ob
     output << (i ? "," : "") << "\n    {\"type\": " << event.type
            << ", \"keycode\": " << event.keycode << ", \"user_data\": " << event.user_data
            << ", \"source_pid\": " << event.source_pid
-           << ", \"numeric_field_87\": " << event.numeric_field_87 << "}";
+           << ", \"numeric_field_87\": " << event.numeric_field_87
+           << ", \"flags\": " << event.flags << "}";
   }
   output << "\n  ]";
 }
 
 CGEventRef observe(CGEventTapProxy, CGEventType type, CGEventRef event, void* context) {
-  if ((type == kCGEventKeyDown || type == kCGEventKeyUp) &&
+  auto& target = *static_cast<ObservationContext*>(context);
+  if ((target.modifiers && type == kCGEventFlagsChanged) || ((type == kCGEventKeyDown || type == kCGEventKeyUp) &&
       (CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode) == 49 ||
-       CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode) == 53)) {
-    auto& observations = *static_cast<std::vector<Observation>*>(context);
+       CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode) == 53))) {
+    auto& observations = target.events;
     observations.push_back({type, CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode),
                             CGEventGetIntegerValueField(event, kCGEventSourceUserData),
                             CGEventGetIntegerValueField(event, kCGEventSourceUnixProcessID),
-                            CGEventGetIntegerValueField(event, static_cast<CGEventField>(87))});
+                            CGEventGetIntegerValueField(event, static_cast<CGEventField>(87)), CGEventGetFlags(event)});
   }
   return event;
 }
@@ -63,10 +73,11 @@ bool pump_until(Predicate predicate, double seconds) {
 
 int main(int argc, char** argv) {
   const char* actions = std::getenv("GITHUB_ACTIONS");
+  const bool modifiers = argc == 3 && std::string(argv[2]) == "--modifiers-hold";
   const bool baseline_drain = argc == 3 && std::string(argv[2]) == "--baseline-held-drain";
   const bool baseline = baseline_drain || (argc == 3 && std::string(argv[2]) == "--baseline-held");
   const bool ignored = argc == 3 && std::string(argv[2]) == "--ignored-hold";
-  const bool hold_for_drain = baseline_drain || ignored || (argc == 3 && std::string(argv[2]) == "--remap-hold");
+  const bool hold_for_drain = modifiers || baseline_drain || ignored || (argc == 3 && std::string(argv[2]) == "--remap-hold");
   const bool remap = baseline || hold_for_drain || (argc == 3 && std::string(argv[2]) == "--remap");
   if ((argc != 2 && !remap) || geteuid() != 0 || !actions || std::string(actions) != "true") {
     std::cerr << "HID observation requires root on a disposable Actions runner\n";
@@ -78,9 +89,10 @@ int main(int argc, char** argv) {
   }
   std::vector<Observation> observations;
   std::vector<Observation> baseline_observations;
-  const CGEventMask mask = CGEventMaskBit(kCGEventKeyDown) | CGEventMaskBit(kCGEventKeyUp);
+  ObservationContext observation_context{observations};
+  const CGEventMask mask = CGEventMaskBit(kCGEventKeyDown) | CGEventMaskBit(kCGEventKeyUp) | CGEventMaskBit(kCGEventFlagsChanged);
   auto tap = CGEventTapCreate(kCGHIDEventTap, kCGHeadInsertEventTap,
-                              kCGEventTapOptionListenOnly, mask, observe, &observations);
+                              kCGEventTapOptionListenOnly, mask, observe, &observation_context);
   if (!tap) {
     std::cerr << "Native HID event tap acquisition failed\n";
     return 2;
@@ -118,6 +130,7 @@ int main(int argc, char** argv) {
   const bool acquired = pump_until([&ready] { return ready.load(); }, 15);
   bool space_pair_observed = false;
   bool escape_pair_observed = false;
+  bool modifier_pairs_observed = false;
   bool drain_released = false;
   unsigned reports_queued = 0;
   bool baseline_down_observed = false;
@@ -191,6 +204,35 @@ int main(int argc, char** argv) {
         if (!ready || !pump_until([&] {
               return std::filesystem::exists(start_path) || std::filesystem::exists(abort_path);
             }, 45) || std::filesystem::exists(abort_path)) return false;
+        if (modifiers) {
+          observation_context.modifiers = true;
+          constexpr std::array<int64_t, 8> codes{kVK_Control, kVK_Shift, kVK_Option, kVK_Command,
+                                                kVK_RightControl, kVK_RightShift, kVK_RightOption, kVK_RightCommand};
+          constexpr std::array<CGEventFlags, 4> masks{kCGEventFlagMaskControl, kCGEventFlagMaskShift,
+                                                     kCGEventFlagMaskAlternate, kCGEventFlagMaskCommand};
+          modifier_pairs_observed = true;
+          for (size_t bit = 0; bit < codes.size(); ++bit) {
+            const auto begin = observations.size();
+            using namespace pqrs::karabiner::driverkit::virtual_hid_device_driver;
+            hid_report::keyboard_input down;
+            down.modifiers.insert(static_cast<hid_report::modifier>(1u << bit));
+            client->async_post_report(down);
+            ++reports_queued;
+            const bool pressed = pump_until([&] { return observations.size() > begin; }, 2);
+            hid_report::keyboard_input release;
+            client->async_post_report(release);
+            ++reports_queued;
+            const bool released = pump_until([&] { return observations.size() >= begin + 2; }, 2);
+            if (!pressed || !released || observations.size() != begin + 2
+                || observations[begin].type != kCGEventFlagsChanged || observations[begin].keycode != codes[bit]
+                || observations[begin + 1].type != kCGEventFlagsChanged || observations[begin + 1].keycode != codes[bit]
+                || !(observations[begin].flags & masks[bit % masks.size()])
+                || (observations[begin + 1].flags & masks[bit % masks.size()])) {
+              modifier_pairs_observed = false;
+              return false;
+            }
+          }
+        }
         if (baseline) {
           release_baseline();
           baseline_observations.swap(observations);
@@ -221,7 +263,7 @@ int main(int argc, char** argv) {
   CFRelease(source);
   CFRelease(tap);
 
-  const bool pair = space_pair_observed && observations.size() == (remap && !baseline ? 4 : 2)
+  const bool pair = space_pair_observed && observations.size() == (modifiers ? 20 : remap && !baseline ? 4 : 2)
                     && (!remap || baseline || escape_pair_observed);
   std::ofstream receipt(argv[1]);
   receipt << std::boolalpha
@@ -240,6 +282,7 @@ int main(int argc, char** argv) {
           << ",\n  \"drain_released\": " << drain_released
           << ",\n  \"ignored_mode\": " << ignored
           << ",\n  \"baseline_mode\": " << baseline
+          << ",\n  \"modifier_pairs_observed\": " << modifier_pairs_observed
           << ",\n  \"baseline_down_observed\": " << baseline_down_observed
           << ",\n  \"baseline_release_at\": \"" << baseline_release_at << "\""
           << ",\n  \"escape_as_space\": " << (escape_pair_observed && !ignored)
