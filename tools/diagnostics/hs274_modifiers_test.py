@@ -33,6 +33,40 @@ def modifier_fixture(*, overlap=False):
 
 
 class ModifierTests(unittest.TestCase):
+    def test_shifted_collision_requires_each_physical_edge_and_output_flag(self):
+        capture = modifier_fixture()
+        template = capture["records"][0]
+        combinations = [(225, 1), (41, 1), (41, 0), (225, 0),
+                        (225, 1), (44, 1), (44, 0), (225, 0)]
+        capture["records"][16:16] = [dict(template, usage=usage, cookie=usage, value=value)
+                                    for usage, value in combinations]
+        for sequence, row in enumerate(capture["records"], 1):
+            row.update(sequence=sequence, timestamp=sequence)
+        capture["seen"] = len(capture["records"])
+        device = template["device"]
+        validate_modifier_capture(MARKER + json.dumps(capture) + "\n", device, combinations=True)
+        drain = modifier_drain(device, combinations=True)
+        for count in range(len(capture["records"])):
+            self.assertFalse(drain({"records": capture["records"][:count]}))
+        self.assertTrue(drain(capture))
+        evidence = json.loads((Path(__file__).parent / "fixtures" / "hs274-native-modifier-consumer.json").read_text(encoding="utf-8"))
+        native = evidence["native"]
+        native.update(reports_queued=28, combinations_observed=True)
+        events = [{"type": kind, "keycode": code, "flags": flags}
+                  for kind, code, flags in ((12, 56, 131072), (10, 49, 131072),
+                                            (11, 49, 131072), (12, 56, 0))] * 2
+        native["events"][16:16] = events
+        validate_modifier_output(native, combinations=True)
+        for index in range(16, 24):
+            broken = copy.deepcopy(native)
+            broken["events"][index]["flags"] ^= 131072
+            with self.subTest(output=index), self.assertRaises(ValueError):
+                validate_modifier_output(broken, combinations=True)
+            broken_capture = copy.deepcopy(capture)
+            broken_capture["records"].pop(index)
+            with self.subTest(input=index), self.assertRaises(ValueError):
+                drain(broken_capture)
+
     def test_overlapping_shift_keeps_partial_release_and_rejects_repeat_credit(self):
         capture = modifier_fixture(overlap=True)
         device = capture["records"][0]["device"]
