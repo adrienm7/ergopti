@@ -96,7 +96,11 @@ def verify_launchd_resources(root):
 
 def native(command):
     """Require native verification to succeed; never admit an unchecked product."""
-    return subprocess.check_output(command, text=True, stderr=subprocess.STDOUT)
+    try:
+        return subprocess.check_output(command, text=True, stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError as error:
+        sys.stderr.write(error.output or "")
+        raise
 
 
 def inspect_product(product, verify=native):

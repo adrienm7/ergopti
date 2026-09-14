@@ -2,17 +2,28 @@
 """Reject incomplete fork packages before their installer can be assembled."""
 
 from pathlib import Path
+from contextlib import redirect_stderr
+import io
+import sys
 import plistlib
 import shutil
 import subprocess
 from tempfile import TemporaryDirectory
 import unittest
 
-from karabiner_candidate import BUILD_STEP, LAUNCHD_RESOURCES, PRODUCTS, SIGN_STEP, inspect_products, packaging_script
+from karabiner_candidate import BUILD_STEP, LAUNCHD_RESOURCES, PRODUCTS, SIGN_STEP, inspect_products, native, packaging_script
 from karabiner_test_fixture import make_products, signature_verifier
 
 
 class CandidateTests(unittest.TestCase):
+    def test_native_failure_keeps_diagnostic_output_and_nonzero_status(self):
+        output = io.StringIO()
+        with redirect_stderr(output):
+            with self.assertRaises(subprocess.CalledProcessError) as raised:
+                native([sys.executable, "-c", "import sys; print('invalid resource seal', file=sys.stderr); sys.exit(7)"])
+        self.assertEqual(raised.exception.returncode, 7)
+        self.assertIn("invalid resource seal", output.getvalue())
+
     def test_complete_set_contains_every_cooperating_application_and_cli(self):
         with TemporaryDirectory() as directory:
             root = make_products(directory)
