@@ -2117,7 +2117,7 @@ jobs:
               esac
               tag="v${maj}.${min}.${pat}"
               prerelease="false"
-              title="Ergopti ${tag}"
+              title="Ergopti & Ergopti Plus ${tag}"
           else
               # dev branch — v0.0.0-dev.N series
               last_dev=$(git tag --list 'v0.0.0-dev.*' --sort=-v:refname | head -1 || true)
@@ -2155,12 +2155,12 @@ jobs:
                   [ "$n_other"    -gt 0 ] && delta="${delta}📦 ${n_other} other, "
                   delta="${delta%, }"
                   if [ -n "$delta" ]; then
-                      title="Ergopti ${tag} — ${delta} (since ${last_stable})"
+                      title="Ergopti & Ergopti Plus ${tag} — ${delta} (since ${last_stable})"
                   else
-                      title="Ergopti ${tag} (since ${last_stable})"
+                      title="Ergopti & Ergopti Plus ${tag} (since ${last_stable})"
                   fi
               else
-                  title="Ergopti ${tag}"
+                  title="Ergopti & Ergopti Plus ${tag}"
               fi
           fi
 
@@ -2933,9 +2933,13 @@ jobs:
           set -euo pipefail
           body_file="$(mktemp)"
           cat >> "$body_file" << EOF
-          ## Ergopti $VERSION
+          ## Ergopti & Ergopti Plus $VERSION
 
-          **[⬇️ Skip to downloads & installation](#downloads)**
+          **Ergopti — keyboard layout:** install the ergonomic layout without running an application.
+
+          **Ergopti Plus — advanced typing tools:** the companion application adds remapping, shortcuts and text expansion.
+
+          **[⬇️ Skip to downloads & installation](#user-content-downloads)**
           > Timestamps are in **Paris time** (Europe/Paris, CET/CEST).
           EOF
 
@@ -2954,34 +2958,43 @@ jobs:
 
           cat >> "$body_file" << EOF
 
+          <a name="downloads"></a>
+
           ## Downloads
+
+          ### Ergopti — keyboard layout only
+
+          No Ergopti Plus application is required for these keyboard layouts.
+
+          | Platform | Download | Installation |
+          |---|---|---|
+          | Windows | [Ergopti_windows.exe](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Ergopti_windows.exe) | Run as Administrator, log out and back in, then select the layout in Settings → Time & Language → Language & region. |
+          | macOS | [Ergopti_macOS.zip](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Ergopti_macOS.zip) | Unzip, copy the \`.bundle\` folder to \`/Library/Keyboard Layouts/\`, log out and back in, then add it in System Settings → Keyboard → Input Sources. |
+          | Linux | [Ergopti_xkb.zip](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Ergopti_xkb.zip) | Follow the [XKB installation guide](https://github.com/${GITHUB_REPOSITORY}/tree/main/static/ergopti/linux/xkb_installation). Includes standard, ANSI, plus and plus-ANSI variants. |
+          | Kanata users | [kanata.kbd](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/kanata.kbd) | Use this configuration with an existing Kanata installation instead of a native layout. |
+
+          ### Ergopti Plus — application with advanced typing tools
 
           Select your platform and download the corresponding file.
 
-          ### 🪟 Windows
+          #### Windows — Ergopti Plus
 
           | Asset | Description |
           |---|---|
           | [ErgoptiPlus.exe](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/ErgoptiPlus.exe) | Compiled AutoHotkey executable (AHK v2 runtime bundled) |
-          | [Ergopti_windows.exe](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Ergopti_windows.exe) | Windows keyboard layout installer — no app required |
 
           **Installation — app:**
           1. Download \`ErgoptiPlus.exe\`.
           2. Double-click to run. On first launch, resources are extracted to \`%LOCALAPPDATA%\Ergopti\`.
           3. Your personal configuration is stored in \`%USERPROFILE%\.config\ergopti_plus\`. If this folder does not exist yet (first launch), the setup wizard will open automatically.
 
-          **Installation — keyboard layout only:**
-          1. Download \`Ergopti_windows.exe\` and run it as Administrator.
-          2. Log out and back in, then select the layout in Settings → Time & Language → Language & region.
-
           ---
 
-          ### macOS
+          #### macOS — Ergopti Plus
 
           | Asset | Description |
           |---|---|
           | [ErgoptiPlus.app.zip](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/ErgoptiPlus.app.zip) | macOS application (Hammerspoon + Karabiner-Elements bundled) |
-          | [Ergopti_macOS.zip](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Ergopti_macOS.zip) | Keyboard layout bundle only — no app required |
 
           **Installation — app:**
           1. Unzip \`ErgoptiPlus.app.zip\` and move \`ErgoptiPlus.app\` to \`/Applications\`.
@@ -2992,14 +3005,9 @@ jobs:
           3. Launch the app. On first run, Karabiner-Elements will request a System Extension approval — required for key remapping.
           4. Your personal configuration is stored in \`~/.config/ergopti_plus/\`. If this folder does not exist yet (first launch), the setup wizard will open automatically.
 
-          **Installation — keyboard layout only:**
-          1. Unzip \`Ergopti_macOS.zip\`.
-          2. Copy the \`.bundle\` folder to \`/Library/Keyboard Layouts/\`.
-          3. Log out and back in, then add the layout in System Settings → Keyboard → Input Sources.
-
           ---
 
-          ### Linux
+          #### Linux — Ergopti Plus
 
           | Asset | Description |
           |---|---|
@@ -3008,8 +3016,6 @@ jobs:
           | [ErgoptiPlus-linux-x86_64.AppImage](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/ErgoptiPlus-linux-x86_64.AppImage) | Portable driver — any distribution, no root required |
           | [ErgoptiPlus-linux-x86_64.flatpak](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/ErgoptiPlus-linux-x86_64.flatpak) | Sandboxed driver, for a distribution-agnostic install |
           | [$LINUX_BUNDLE_ASSET](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/$LINUX_BUNDLE_ASSET) | Driver bundle with \`install.sh\`, installs under your home directory |
-          | [Ergopti_xkb.zip](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Ergopti_xkb.zip) | XKB layout files (standard, ANSI, plus, plus-ANSI variants) |
-          | [kanata.kbd](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/kanata.kbd) | Kanata configuration, for a Kanata-based remap |
 
           **Which file for your distribution:**
           - Debian, Ubuntu, Mint, Pop!_OS, elementary → \`ErgoptiPlus-linux-amd64.deb\`
@@ -3034,11 +3040,6 @@ jobs:
           \`\`\`
           3. Log out and back in so the new group memberships take effect. Skip this and the daemon starts, logs one line and captures nothing — the most common first experience.
           4. Start it with \`systemctl --user start ergopti-hotstrings.service\` (\`.deb\` and \`.rpm\`), or by running the AppImage directly.
-
-          **Installation — keyboard layout only:**
-          1. Unzip \`Ergopti_xkb.zip\`.
-          2. Follow the [XKB installation guide](https://github.com/${GITHUB_REPOSITORY}/tree/main/static/ergopti/linux/xkb_installation) in the repository.
-          3. On a system remapped with Kanata rather than XKB, use \`kanata.kbd\` as the Kanata configuration instead.
 
           ---
           _Generated by [CI](https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})_
