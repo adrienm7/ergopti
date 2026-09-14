@@ -203,6 +203,17 @@ The keycode-based script-control event tap survives layout changes and pause.
 Do not restart it through shortcut lifecycle or regenerate Karabiner state on a
 pause-driven layout switch.
 
+### project-hs-fork-admission-in-both-launch-modes
+
+Opening ordinary Hammerspoon with a Git checkout is a supported launch path;
+users must not need to build or start ErgoptiPlus.app to obtain its native
+remapping dependencies. App and repository onboarding must select the same
+pinned fork, even when official Karabiner is installed. Official application,
+CLI or running-service presence is not proof of fork readiness. Verify the
+cooperating peers and live stream capability, retain user configuration, and
+include a preinstalled-official case in native acceptance. The current
+bundle-bound lease helper does not yet satisfy this bootstrap requirement.
+
 ### project-hs-karabiner-exact-lease-isolation
 
 Ergopti owns only token-scoped Karabiner rules and variables. It never owns

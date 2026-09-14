@@ -227,6 +227,7 @@ const CHECKS = [
 	{ name: 'mutation-test harness passes un-mutated (Stryker precondition)', cmd: 'node', args: ['tools/test/test-mutation-targets.cjs'], repro: 'node tools/test/test-mutation-targets.cjs' },
 	{ name: 'macOS Sparkle feed, URL command, and sole-owner cadence', cmd: 'node', args: ['tools/test/test-macos-sparkle-feed.cjs'], repro: 'node tools/test/test-macos-sparkle-feed.cjs' },
 	{ name: 'hotstring editor preserves strict-case state across the shared bridge', cmd: 'node', args: ['tools/test/test-hotstring-editor-strict-case.cjs'], repro: 'npm run test:hs-editor-strict-case' },
+	{ name: 'Karabiner package identity is shared and cached bytes are verified', cmd: 'node', args: ['tools/test/test-karabiner-package-manifest.cjs'], repro: 'node tools/test/test-karabiner-package-manifest.cjs' },
 	{ name: 'input-source Python supervisor enforces one bounded process group', cmd: 'node', args: ['tools/test/test-input-source-python-supervisor.cjs'], repro: 'npm run test:input-source-python-supervisor' },
 	{ name: 'PTY process groups escalate and reap bounded descendants', cmd: 'node', args: ['tools/test/test-pty-process-group-escalation.cjs'], repro: 'npm run test:pty-process-group-escalation' },
 	{ name: 'MLX dependency bootstrap fingerprints both dependency manifests', cmd: 'node', args: ['tools/test/test-mlx-deps-lock-fingerprint.cjs'], repro: 'npm run test:mlx-deps-lock-fingerprint' },
