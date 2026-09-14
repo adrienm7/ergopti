@@ -2,12 +2,17 @@
 """Reject lost physical modifier edges before native acquisition is attempted."""
 
 import copy
+from datetime import datetime, timezone
 import json
+from pathlib import Path
+from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 from hs274_capture import MARKER
 from hs274_modifiers import KEYCODES, modifier_drain, validate_modifier_capture, validate_modifier_output
 from hs274_stream_test import fixture
+from hs274_stream import validate_stream
 
 
 def modifier_fixture():
@@ -25,6 +30,26 @@ def modifier_fixture():
 
 
 class ModifierTests(unittest.TestCase):
+    def test_retained_native_modifiers_keep_every_side_and_one_credit(self):
+        from hs274_hammerspoon import validate_consumer
+        path = Path(__file__).parent / "fixtures" / "hs274-native-modifier-consumer.json"
+        evidence = json.loads(path.read_text(encoding="utf-8"))
+        device = evidence["native"]["registry_entry_id"]
+        validate_modifier_output(evidence["native"])
+        capture = validate_modifier_capture(MARKER + json.dumps(evidence["capture"]) + "\n", device)
+        stream = validate_stream(evidence["stream_output"], capture)
+        self.assertEqual(len(stream["records"]), 52)
+        drain = modifier_drain(device)
+        self.assertTrue(drain(stream))
+        modifiers = [row for row in stream["records"] if row["page"] == 7 and 224 <= row["usage"] <= 231]
+        self.assertEqual([(row["cookie"], row["value"]) for row in modifiers],
+                         [(cookie, value) for cookie in range(24, 32) for value in (1, 0)])
+        utc_clock = SimpleNamespace(fromtimestamp=lambda epoch: datetime.fromtimestamp(epoch, timezone.utc))
+        with patch("hs274_hammerspoon.datetime", utc_clock):
+            validate_consumer(evidence["hammerspoon"], capture, modifiers=True)
+        for count in range(len(stream["records"])):
+            self.assertFalse(drain({"records": stream["records"][:count]}))
+
     def test_native_modifier_flags_require_both_edges_and_exact_sides(self):
         pairs = ((59, 262144), (56, 131072), (58, 524288), (55, 1048576),
                  (62, 262144), (60, 131072), (61, 524288), (54, 1048576))
