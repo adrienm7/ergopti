@@ -77,6 +77,20 @@ def read_stream(output, partial=False):
     return result
 
 
+def validate_successor(previous, opened):
+    """Require the next lease in one producer, with its own sampled baseline."""
+    for envelope in (previous, opened):
+        read_stream(json.dumps(envelope) + "\n")
+        if "baseline" not in envelope:
+            raise ValueError("Successor capture requires a sampled baseline")
+    stable = {field: value for field, value in previous.items() if field != "baseline"}
+    stable["lease"] = str(decimal(previous["lease"], minimum=1) + 1)
+    if {field: value for field, value in opened.items() if field != "baseline"} != stable:
+        raise ValueError("Successor capture changed producer identity or skipped a lease")
+    if decimal(opened["baseline"]["boundary"]) <= decimal(previous["baseline"]["boundary"]):
+        raise ValueError("Successor capture did not advance its acquisition boundary")
+
+
 def fixture_records(records, device):
     """Project validated global records into the reference's per-device sequence."""
     selected = []
