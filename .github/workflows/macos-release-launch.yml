@@ -1,6 +1,11 @@
 # .github/workflows/macos-release-launch.yml
 name: macOS published application startup
 on:
+  push:
+    branches: [fix/hammerspoon-audit-2026-09-07]
+    paths:
+      - .github/workflows/macos-release-launch.yml
+      - tools/diagnostics/macos-release-launch.py
   workflow_dispatch:
     inputs:
       tag:
@@ -22,7 +27,7 @@ jobs:
       - name: Download and verify the published application
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_TAG: ${{ inputs.tag || 'v0.0.0-dev.126' }}
         run: |
           python3 - <<'PY'
           import hashlib, json, os, pathlib, subprocess
