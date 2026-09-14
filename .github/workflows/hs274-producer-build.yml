@@ -167,6 +167,9 @@ jobs:
       - name: Authenticate the candidate before privileged installation
         id: image
         run: python3 tools/build/karabiner_candidate_install.py download "$RUNNER_TEMP/hs274-candidate-download/hs274-producer-package" >> "$GITHUB_OUTPUT"
+      - name: Repair installer policy without rebuilding native payloads
+        id: repaired
+        run: python3 tools/build/karabiner_candidate_repack.py "$RUNNER_TEMP/hs274-candidate-download/hs274-producer-package" "$RUNNER_TEMP/hs274-repackaged-candidate" >> "$GITHUB_OUTPUT"
       - name: Install the pinned official baseline first
         run: |
           image="$RUNNER_TEMP/hs274-official.dmg"
@@ -177,7 +180,7 @@ jobs:
         run: python3 tools/build/karabiner_candidate_install.py before "$RUNNER_TEMP/hs274-install-before.json"
       - name: Install the same-version fork candidate
         env:
-          CANDIDATE_IMAGE: ${{ steps.image.outputs.image }}
+          CANDIDATE_IMAGE: ${{ steps.repaired.outputs.image }}
         run: bash tools/build/karabiner_install_image.sh "$CANDIDATE_IMAGE"
       - name: Verify every installed peer and preserved configuration
         run: python3 tools/build/karabiner_candidate_install.py after "$RUNNER_TEMP/hs274-install-before.json" "$RUNNER_TEMP/hs274-install-after.json"
@@ -185,6 +188,8 @@ jobs:
         if: always()
         with:
           name: hs274-installed-candidate-${{ github.sha }}
-          path: ${{ runner.temp }}/hs274-install-*.json
+          path: |
+            ${{ runner.temp }}/hs274-install-*.json
+            ${{ runner.temp }}/hs274-repackaged-candidate/
           if-no-files-found: warn
           retention-days: 7

@@ -16,6 +16,7 @@ import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "diagnostics"))
 from hs274_raw_patch import REVISION
+from karabiner_package_policy import immutable_installer
 
 
 PRODUCTS = (
@@ -188,7 +189,8 @@ def assemble(root, output):
         identity.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8", newline="\n")
         script = temporary / "assemble.sh"
         script.write_text(packaging_script(source, identity), encoding="utf-8", newline="\n")
-        subprocess.run(["/bin/bash", str(script)], cwd=root, check=True)
+        with immutable_installer(root / "pkginfo/Scripts/postinstall"):
+            subprocess.run(["/bin/bash", str(script)], cwd=root, check=True)
         if not archive.is_file() or archive.is_symlink():
             raise RuntimeError("Native package assembly did not produce its image")
         output.mkdir()

@@ -1,0 +1,49 @@
+#!/bin/bash
+
+PATH=/bin:/sbin:/usr/bin:/usr/sbin
+export PATH
+
+#
+# Create karabiner_machine_identifier
+#
+
+if [ ! -f '/Library/Application Support/org.pqrs/tmp/karabiner_machine_identifier.json' ]; then
+    mkdir -p -m 0755 '/Library/Application Support/org.pqrs/tmp'
+    chmod 0755 '/Library/Application Support/org.pqrs/tmp'
+
+    echo "{\"karabiner_machine_identifier\": \"krbn-$(uuidgen | tr '[:upper:]' '[:lower:]')\"}" |
+        tee '/Library/Application Support/org.pqrs/tmp/karabiner_machine_identifier.json'
+    chmod 0644 '/Library/Application Support/org.pqrs/tmp/karabiner_machine_identifier.json'
+fi
+
+#
+# Set icon
+#
+
+'/Library/Application Support/org.pqrs/Karabiner-Elements/Karabiner-AppIconSwitcher.app/Contents/MacOS/Karabiner-AppIconSwitcher'
+
+#
+# Create a backup to allow recovery if the user manually deletes Karabiner-Elements without using the uninstaller
+#
+
+tar -C /Applications -cf '/Library/Application Support/org.pqrs/Karabiner-Elements/Karabiner-Elements.app.tar.gz' Karabiner-Elements.app
+
+#
+# Relaunch launchd-managed processes after all files have been updated
+#
+
+killall Karabiner-Core-Service
+killall Karabiner-Console-User-Server
+# Karabiner-Elements is the setting window.
+killall Karabiner-Elements
+killall Karabiner-EventViewer
+killall Karabiner-MultitouchExtension
+
+# Terminate deprecated processes as well, since they may have been running before the update.
+killall karabiner_console_user_server
+killall karabiner_grabber
+killall karabiner_session_monitor
+killall Karabiner-Menu
+killall Karabiner-NotificationWindow
+
+exit 0
