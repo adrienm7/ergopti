@@ -40,6 +40,7 @@ import ServiceManagement
 
 let kKarabinerLeaseGuardianFlag = "--karabiner-lease-guardian"
 let kRemapGuardianStatusFlag = "--remap-guardian-status"
+let kRegisterRemapGuardianFlag = "--register-remap-guardian"
 let kOpenRemapGuardianSettingsFlag = "--open-remap-guardian-settings"
 let kRemapGuardianLabel = "com.ergoptiplus.remap-guardian"
 let kRemapGuardianPlistName = "com.ergoptiplus.remap-guardian.plist"

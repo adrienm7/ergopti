@@ -15,7 +15,7 @@ on:
         required: true
         default: current_build
         type: choice
-        options: [current_build, published, published_with_dependency, native_helper, helper_environment]
+        options: [current_build, published, published_with_dependency, native_helper, helper_environment, helper_registration]
       tag:
         description: Existing release tag to reproduce
         required: true
@@ -85,11 +85,20 @@ jobs:
           bash tools/build/bundle-macos-luasocket.sh /Applications/ErgoptiPlus.app "$RUNNER_TEMP/luasocket-build"
           codesign --force --sign - --preserve-metadata=identifier,entitlements,flags /Applications/ErgoptiPlus.app
           codesign --verify --strict /Applications/ErgoptiPlus.app
+      - name: Run the serial native launcher regression suite
+        if: inputs.scenario == 'helper_registration'
+        run: |
+          set -euo pipefail
+          script -q /dev/null swift test --package-path static/ergopti_plus/macos/launcher 2>&1 | tee "$RUNNER_TEMP/helper-xctest.log"
+          grep -Fq "Test Suite 'All tests' passed" "$RUNNER_TEMP/helper-xctest.log"
       - name: Build and exercise the shared native helper first
-        if: inputs.scenario == 'native_helper'
+        if: inputs.scenario == 'native_helper' || inputs.scenario == 'helper_registration'
         run: |
           bash tools/build/build_macos_app.sh --native-helper-only
           python3 tools/diagnostics/macos_native_helper.py build/macos-native-helper/ErgoptiPlus.app "$RUNNER_TEMP/native-helper.json"
+      - name: Register the helper without launching its application UI
+        if: inputs.scenario == 'helper_registration'
+        run: python3 tools/diagnostics/macos_helper_registration.py build/macos-native-helper/ErgoptiPlus.app "$RUNNER_TEMP/helper-registration.json"
       - name: Build the complete current application
         if: inputs.scenario == 'current_build' || inputs.scenario == 'native_helper' || github.event_name == 'push'
         env:
@@ -102,7 +111,7 @@ jobs:
           ditto -x -k build/macos/ErgoptiPlus.app.zip /Applications
           shasum -a 256 build/macos/ErgoptiPlus.app.zip > "$RUNNER_TEMP/release-package.sha256"
       - name: Observe the installed release without a waiting open helper
-        if: inputs.scenario != 'helper_environment'
+        if: inputs.scenario != 'helper_environment' && inputs.scenario != 'helper_registration'
         run: |
           python3 tools/diagnostics/macos_release_launch_test.py
           python3 tools/diagnostics/macos-release-launch.py /Applications/ErgoptiPlus.app "$RUNNER_TEMP/release-launch"
@@ -115,6 +124,8 @@ jobs:
             ${{ runner.temp }}/release-provenance.json
             ${{ runner.temp }}/release-package.sha256
             ${{ runner.temp }}/native-helper.json
+            ${{ runner.temp }}/helper-xctest.log
+            ${{ runner.temp }}/helper-registration.json
             ${{ runner.temp }}/helper-environment/*.json
             ${{ runner.temp }}/helper-environment/launch.log
       - uses: actions/upload-artifact@v4
@@ -124,7 +135,7 @@ jobs:
           path: build/macos/ErgoptiPlus.app.zip
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
-        if: success() && inputs.scenario == 'native_helper'
+        if: success() && (inputs.scenario == 'native_helper' || inputs.scenario == 'helper_registration')
         with:
           name: ErgoptiPlus-native-helper-${{ github.sha }}
           path: |

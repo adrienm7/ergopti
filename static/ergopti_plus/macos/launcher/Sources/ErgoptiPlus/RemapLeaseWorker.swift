@@ -278,7 +278,7 @@ func validatedInnerLeaseIdentity(
 }
 
 /// Validates one two-argument guardian control invocation against the exact
-/// launcher vnode exported by the parent GUI process.
+/// helper vnode explicitly supplied by the owning Hammerspoon process.
 private func validatedGuardianControlInvocation(
 	arguments: [String],
 	expectedFlag: String,
@@ -332,6 +332,35 @@ func validatedGuardianSettingsInvocation(
 		environment: environment,
 		identityReader: identityReader
 	)
+}
+
+/// Registers the same guardian used by the app without entering its GUI lifecycle.
+/// Identity validation precedes every registration and output side effect.
+func runGuardianRegistration(
+	arguments: [String],
+	executablePath: String?,
+	environment: [String: String],
+	identityReader: (String) -> LeaseExecutableIdentity? = {
+		LeaseExecutableIdentity.capture(at: $0)
+	},
+	register: (String) -> RemapGuardianRegistrationStatus = {
+		remapGuardianRegistrationStatus(executablePath: $0)
+	},
+	writeResult: (Data) -> Bool = {
+		writeLauncherLogData($0, descriptor: STDOUT_FILENO)
+	}
+) -> Int32 {
+	guard validatedGuardianControlInvocation(
+		arguments: arguments,
+		expectedFlag: kRegisterRemapGuardianFlag,
+		executablePath: executablePath,
+		environment: environment,
+		identityReader: identityReader
+	), let executablePath else { return LeaseWorkerExit.invalidArguments.rawValue }
+	let status = register(executablePath)
+	guard let output = (status.rawValue + "\n").data(using: .utf8), writeResult(output)
+	else { return LeaseWorkerExit.innerFailed.rawValue }
+	return LeaseWorkerExit.success.rawValue
 }
 
 /// Builds the only JSON payload shapes the native guardian may emit.
@@ -2841,6 +2870,7 @@ enum KarabinerLeaseWorker {
 			|| arguments[1] == kKarabinerLeaseInnerFlag
 			|| arguments[1] == kKarabinerLeaseGuardianFlag
 			|| arguments[1] == kRemapGuardianStatusFlag
+			|| arguments[1] == kRegisterRemapGuardianFlag
 			|| arguments[1] == kOpenRemapGuardianSettingsFlag
 	}
 
@@ -2873,6 +2903,13 @@ enum KarabinerLeaseWorker {
 			).run()
 		}
 		#endif
+		if arguments[1] == kRegisterRemapGuardianFlag {
+			return runGuardianRegistration(
+				arguments: arguments,
+				executablePath: Bundle.main.executablePath,
+				environment: ProcessInfo.processInfo.environment
+			)
+		}
 		if arguments[1] == kRemapGuardianStatusFlag {
 			guard validatedGuardianStatusInvocation(
 				arguments: arguments,
