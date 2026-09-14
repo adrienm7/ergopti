@@ -11,6 +11,10 @@ on:
         description: Add the experimental peer-owned stream and CLI (requires raw_capture)
         type: boolean
         default: false
+      complete_package:
+        description: Assemble every fork peer and the installer for disposable acceptance (requires stream_capture)
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -20,13 +24,13 @@ jobs:
   build:
     if: github.ref != 'refs/heads/main' && github.ref != 'refs/heads/dev'
     runs-on: macos-15
-    timeout-minutes: 20
+    timeout-minutes: ${{ inputs.complete_package && 40 || 20 }}
     env:
       PQRS_ORG_CODE_SIGN_IDENTITY: dummy
       PQRS_ORG_INSTALLER_CODE_SIGN_IDENTITY: dummy
     steps:
       - name: Reject incomplete stream mode selection
-        if: inputs.stream_capture && !inputs.raw_capture
+        if: (inputs.stream_capture && !inputs.raw_capture) || (inputs.complete_package && !inputs.stream_capture)
         run: exit 1
       - name: Acquire the inspected remapper sources
         uses: actions/checkout@v4
@@ -79,24 +83,35 @@ jobs:
       - name: Install the project generator
         run: brew install xcodegen
       - name: Prepare shared build inputs once
+        if: ${{ !inputs.complete_package }}
         run: |
           bash scripts/check-env.sh
           python3 scripts/update_version.py
           make -C vendor build
-      - name: Build the core and both IPC clients sequentially
+      - name: Build the selected cooperating peers sequentially
+        env:
+          COMPLETE_PACKAGE: ${{ inputs.complete_package }}
         run: |
-          for component in apps/CoreService apps/ConsoleUserServer bin/cli; do
-            (
-              cd "src/$component"
-              xcodegen generate
-              xcodebuild -configuration Release -alltargets -jobs 2 SYMROOT="$PWD/build"
-            )
-          done
+          if [[ "$COMPLETE_PACKAGE" == "true" ]]; then
+            python3 .hs274-probe/tools/build/karabiner_candidate.py --build --root "$PWD"
+          else
+            for component in apps/CoreService apps/ConsoleUserServer bin/cli; do
+              (
+                cd "src/$component"
+                xcodegen generate
+                xcodebuild -configuration Release -alltargets -jobs 2 SYMROOT="$PWD/build"
+              )
+            done
+          fi
       - name: Verify the actual CLI clock capability
         if: inputs.stream_capture
         run: |
           src/bin/cli/build/Release/karabiner_cli --hs274-clock > "$RUNNER_TEMP/hs274-producer-clock.json"
           PYTHONPATH=.hs274-probe/tools/diagnostics python3 -c 'import json, os; from hs274_hammerspoon import read_clock; read_clock(json.load(open(os.environ["RUNNER_TEMP"] + "/hs274-producer-clock.json")))'
+      - name: Assemble the complete verified fork candidate
+        if: inputs.complete_package
+        run: |
+          python3 .hs274-probe/tools/build/karabiner_candidate.py --root "$PWD" --output "$RUNNER_TEMP/hs274-producer-package"
       - name: Verify and retain the development artifacts
         run: |
           products=(

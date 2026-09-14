@@ -11,7 +11,7 @@ const python = candidates.find(command => spawnSync(command, ['--version'], {
 	encoding: 'utf8', timeout: 10000
 }).status === 0);
 if (!python) throw new Error('Python is required to verify Karabiner package identity');
-const result = spawnSync(python, ['tools/build/karabiner_manifest_test.py'], {
+const result = spawnSync(python, ['-m', 'unittest', 'discover', '-s', 'tools/build', '-p', 'karabiner_*_test.py'], {
 	cwd: root, stdio: 'inherit', timeout: 30000
 });
 if (result.error) throw result.error;
