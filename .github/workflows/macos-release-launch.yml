@@ -15,7 +15,7 @@ on:
         required: true
         default: current_build
         type: choice
-        options: [current_build, published, published_with_dependency]
+        options: [current_build, published, published_with_dependency, native_helper]
       tag:
         description: Existing release tag to reproduce
         required: true
@@ -62,8 +62,13 @@ jobs:
           bash tools/build/bundle-macos-luasocket.sh /Applications/ErgoptiPlus.app "$RUNNER_TEMP/luasocket-build"
           codesign --force --sign - --preserve-metadata=identifier,entitlements,flags /Applications/ErgoptiPlus.app
           codesign --verify --strict /Applications/ErgoptiPlus.app
+      - name: Build and exercise the shared native helper first
+        if: inputs.scenario == 'native_helper'
+        run: |
+          bash tools/build/build_macos_app.sh --native-helper-only
+          python3 tools/diagnostics/macos_native_helper.py build/macos-native-helper/ErgoptiPlus.app "$RUNNER_TEMP/native-helper.json"
       - name: Build the complete current application
-        if: inputs.scenario == 'current_build' || github.event_name == 'push'
+        if: inputs.scenario == 'current_build' || inputs.scenario == 'native_helper' || github.event_name == 'push'
         env:
           GH_OWNER: ${{ github.repository_owner }}
           GH_REPO: ${{ github.event.repository.name }}
@@ -85,9 +90,18 @@ jobs:
             ${{ runner.temp }}/release-launch
             ${{ runner.temp }}/release-provenance.json
             ${{ runner.temp }}/release-package.sha256
+            ${{ runner.temp }}/native-helper.json
       - uses: actions/upload-artifact@v4
         if: success() && (inputs.scenario == 'current_build' || github.event_name == 'push')
         with:
           name: ErgoptiPlus-macOS-verified-${{ github.sha }}
           path: build/macos/ErgoptiPlus.app.zip
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: success() && inputs.scenario == 'native_helper'
+        with:
+          name: ErgoptiPlus-native-helper-${{ github.sha }}
+          path: |
+            build/macos-native-helper/ErgoptiPlus.app.zip
+            ${{ runner.temp }}/native-helper.json
           if-no-files-found: error
