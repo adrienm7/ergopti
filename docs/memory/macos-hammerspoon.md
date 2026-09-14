@@ -2,6 +2,19 @@
 
 # macOS and Hammerspoon memory
 
+### published-startup-needs-real-dependencies
+
+The launcher alert `Embedded Hammerspoon stopped unexpectedly with exit code 0`
+can hide a Lua startup failure; inspect the managed Lua error log as well as
+`~/Library/Logs/ErgoptiPlus/launcher.log`. The published v0.0.0-dev.126 archive
+reproduced this on macOS in run `34865561172`: `log_transport` required LuaSocket,
+but Hammerspoon 1.1.1 does not ship it. Injecting `bootstrap_socket_factory` in
+unit fixtures cannot verify that distribution dependency. Test the extracted
+archive with the real launcher and runtime, require completed onboarding or UI
+startup, and keep watching both processes after the first log appears. The old
+smoke test stopped at log creation and missed the subsequent abort; keeping an
+`open -W` helper alive did not establish startup readiness.
+
 ## Native HID element qualification
 
 ### project-hs-hid-and-host-clock-units

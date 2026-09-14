@@ -2218,103 +2218,23 @@ jobs:
         run: bash tools/build/build_macos_app.sh
 
       - name: Smoke test built ErgoptiPlus.app (crash-on-launch guard)
-        # Mirrors the Windows ErgoptiPlus.exe smoke test in build-windows: the
-        # unit suite (test-hs) runs Lua against a stubbed hs.lua fake, so real
-        # hs.fs / shell-exec bugs in the driver's early bootstrap are invisible
-        # to CI. That bootstrap runs unconditionally on every launch, before
-        # the first-launch onboarding guard: main.swift's
-        # applicationDidFinishLaunching locates the embedded Hammerspoon
-        # binary and validates init.lua exists, then init.lua itself resolves
-        # ~/.config/ergopti_plus/ (menu_paths.init) and initialises the logger
-        # (Logger.init_log_path, which shells out to mkdir -p) against the
-        # real APIs. This step launches the actual built .app (unsigned-for-
-        # Gatekeeper-purposes but ad-hoc codesigned by the build script, and
-        # never downloaded so no quarantine flag is set) and proves it survives
-        # that bootstrap instead of dying or hanging silently.
+        # Test the extracted release archive through the same Launch Services
+        # path as an installation. Early log creation is not startup readiness.
         shell: bash
         timeout-minutes: 3
         run: |
-          set -euo pipefail
-          APP="${{ github.workspace }}/build/macos/ErgoptiPlus.app"
-          LAUNCHER_LOG="$HOME/Library/Logs/ErgoptiPlus/launcher.log"
-          LUA_LOG_DIR="$HOME/.config/ergopti_plus/hammerspoon/logs"
-          LUA_BOOT_LOG="/tmp/ErgoptiPlus_boot.log"
-          LUA_BOOT_ERRORS_LOG="/tmp/ErgoptiPlus_errors_boot.log"
-          rm -f "$LAUNCHER_LOG"
-          rm -f "$LUA_BOOT_LOG" "$LUA_BOOT_ERRORS_LOG"
-          rm -rf "$LUA_LOG_DIR"
+          python3 tools/diagnostics/macos_release_launch_test.py
+          test ! -e /Applications/ErgoptiPlus.app
+          ditto -x -k build/macos/ErgoptiPlus.app.zip /Applications
+          python3 tools/diagnostics/macos-release-launch.py /Applications/ErgoptiPlus.app "$RUNNER_TEMP/release-launch"
 
-          # Exercise the bundle through Launch Services, matching Finder and
-          # normal CLI launches. Executing the inner Mach-O directly leaves
-          # AppKit without the bundle launch context and the embedded GUI child
-          # receives a clean termination request during bootstrap. Keep the
-          # Launch Services request alive until cleanup: letting `open` return
-          # immediately can revoke that context while the nested GUI runtime is
-          # still moving from its fallback boot log to the managed logger.
-          open -n -g -W "$APP" &
-          OPEN_PID=$!
-          PID=""
-          launch_deadline=$((SECONDS + 10))
-          while [ "$SECONDS" -lt "$launch_deadline" ]; do
-              PID="$(pgrep -f -x "$APP/Contents/MacOS/ErgoptiPlus" | sed -n '1p' || true)"
-              [ -n "$PID" ] && break
-              sleep 0.1
-          done
-          if [ -z "$PID" ]; then
-              echo "::error::Launch Services did not start ErgoptiPlus.app within 10s."
-              cat "$LAUNCHER_LOG" 2>/dev/null || true
-              kill "$OPEN_PID" 2>/dev/null || true
-              wait "$OPEN_PID" 2>/dev/null || true
-              exit 1
-          fi
-
-          deadline=$((SECONDS + 20))
-          lua_boot_seen=false
-          launcher_fatal=false
-          while [ "$SECONDS" -lt "$deadline" ]; do
-              if ! kill -0 "$PID" 2>/dev/null; then
-                  break
-              fi
-              if [ -f "$LAUNCHER_LOG" ] && grep -q "FATAL:" "$LAUNCHER_LOG" 2>/dev/null; then
-                  launcher_fatal=true
-                  break
-              fi
-              if [ -d "$LUA_LOG_DIR" ] && ls "$LUA_LOG_DIR"/ErgoptiPlus_*.log >/dev/null 2>&1; then
-                  lua_boot_seen=true
-                  break
-              fi
-              sleep 0.25
-          done
-
-          crashed_early=false
-          if ! kill -0 "$PID" 2>/dev/null; then
-              crashed_early=true
-          fi
-
-          # Always clean up — never leave the embedded Hammerspoon process
-          # (or its watcher/menu-bar state) resident on the runner.
-          kill "$PID" 2>/dev/null || true
-          pkill -f "Frameworks/Hammerspoon.app" 2>/dev/null || true
-          kill "$OPEN_PID" 2>/dev/null || true
-          wait "$OPEN_PID" 2>/dev/null || true
-
-          if [ "$crashed_early" = true ] || [ "$launcher_fatal" = true ] || [ "$lua_boot_seen" = false ]; then
-              echo "---- launcher.log ----"
-              cat "$LAUNCHER_LOG" 2>/dev/null || echo "(missing)"
-              echo "---- Hammerspoon early boot log ----"
-              cat "$LUA_BOOT_LOG" 2>/dev/null || echo "(missing)"
-              echo "---- Hammerspoon early boot errors ----"
-              cat "$LUA_BOOT_ERRORS_LOG" 2>/dev/null || echo "(missing)"
-              if [ "$launcher_fatal" = true ]; then
-                  echo "::error::ErgoptiPlus.app logged a FATAL launcher error — see launcher.log above."
-              elif [ "$crashed_early" = true ]; then
-                  echo "::error::ErgoptiPlus.app exited during startup — see launcher.log above."
-              else
-                  echo "::error::ErgoptiPlus.app did not initialise its Hammerspoon log within 20s (early-boot bootstrap likely failing silently)."
-              fi
-              exit 1
-          fi
-          echo "OK: ErgoptiPlus.app survived startup — Hammerspoon Lua log created under $LUA_LOG_DIR"
+      - name: Retain packaged application startup evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-package-startup-${{ github.run_id }}
+          path: ${{ runner.temp }}/release-launch
+          if-no-files-found: warn
 
       - name: Install Sparkle signing tool
         if: ${{ env.SPARKLE_ED_PRIVATE_KEY != '' }}
