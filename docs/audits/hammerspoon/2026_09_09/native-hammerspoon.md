@@ -509,3 +509,33 @@ rejects the original whole-envelope comparison; all 37 Python stream tests and
 227 JS checks passed before committing that correction. Native input acceptance
 of this producer, including inherited held state with Hammerspoon connected,
 remains to be demonstrated.
+
+## Paged baseline native acceptance
+
+Run [34813132621](https://github.com/adrienm7/ergopti/actions/runs/34813132621)
+used consumer `6021a96857298a0dee212b2802d3cc13a90ae475` and producer
+34783474637 on 2026-09-14. Its actual Escape/Space input step succeeded;
+the overall workflow failed in separate capability probes. The remap report has
+SHA-256 `f5a1d03584d0e33536e52538d00ed59f98ad391de9431dadafee4ecc413639ac`
+and no observation error.
+
+Lease 2 transferred 496 rows in eight pages at boundary 9190302605, including
+263 released elements on device 4294968848 and 231 on device 4294968018.
+The completed baseline preceded 20 raw records matching the independent capture.
+Native Hammerspoon credited Escape 53 once and Space 49 once, with zero errors,
+trusted native AX focus, all four privacy probe phases, and settled consumer
+and context ownership. Lease 3 acquired a distinct boundary, 9219332979, in the
+same producer, completed its baseline, then reported explicit `interrupted` loss
+when the fixture device closed.
+
+`tools/diagnostics/fixtures/hs274-native-paged-baseline.json` retains both complete
+wire streams, independent capture, Hammerspoon receipt and exact provenance.
+The Python stream suite replays them, rejects removal of each individual page,
+missing completion and unequal raw capture. Replay explicitly uses the archived
+runner's UTC clock formatting; using the Windows host time zone incorrectly
+rejects otherwise unchanged native application timestamps. All 38 targeted tests
+pass, without requiring another macOS run.
+
+This proves the paged protocol for the controlled released-input scenario. It
+does not yet prove inherited held-state handoff with Hammerspoon connected,
+ordinary driver integration or physical keyboard hardware.
