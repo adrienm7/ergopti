@@ -34,6 +34,33 @@ def baseline_fixture():
 
 
 class BaselineTests(unittest.TestCase):
+    def test_retained_native_held_consumer_preserves_release_and_single_credit(self):
+        from hs274_hammerspoon import validate_consumer
+        path = Path(__file__).parent / "fixtures" / "hs274-native-held-consumer.json"
+        evidence = json.loads(path.read_text(encoding="utf-8"))
+        frames = [json.loads(line) for line in evidence["stream_output"].splitlines()]
+        initial = read_stream(encode([frame for frame in frames if frame["kind"] != "batch"]))
+        device = evidence["native"]["registry_entry_id"]
+        boundary = require_stream_held_baseline(initial, device)
+        probe = require_held_baseline(BASELINE_MARKER + json.dumps(evidence["probe"]["probe"]) + "\n",
+                                      device, {41: 0, 44: 1}, source="kernel")
+        released = validate_baseline_native(evidence["native"], probe)
+        self.assertLess(boundary, released)
+        capture_output = CAPTURE_MARKER + json.dumps(evidence["capture"]) + "\n"
+        capture = validate_baseline_capture(capture_output, device, released)
+        stream = validate_stream(evidence["stream_output"], capture)
+        self.assertEqual(len(stream["records"]), 15)
+        self.assertTrue(fixture_drain(device, held=True)(stream))
+        utc_clock = SimpleNamespace(fromtimestamp=lambda epoch: datetime.fromtimestamp(epoch, timezone.utc))
+        with patch("hs274_hammerspoon.datetime", utc_clock):
+            validate_consumer(evidence["hammerspoon"], capture, held=True)
+            with self.assertRaises(ValueError):
+                validate_consumer(dict(evidence["hammerspoon"], counts={"49": 2}), capture, held=True)
+        missing = copy.deepcopy(stream)
+        missing["records"] = [row for row in missing["records"] if row["sequence"] != 8]
+        with self.assertRaises(ValueError):
+            fixture_drain(device, held=True)(missing)
+
     def test_stream_holds_exact_space_before_release_and_drains_all_native_rows(self):
         state = {"keyboard": True, "keys": {109: {"usage": 44, "down": True},
                                            106: {"usage": 41, "down": False}}}
