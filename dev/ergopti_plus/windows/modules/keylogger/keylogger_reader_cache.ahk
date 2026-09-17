@@ -122,11 +122,14 @@ _KLR_CacheLedgerStillValid(Row, logPath) {
 		return false
 	}
 	Path := Row.Get("path", "")
-	if (Path = "") || !FSExists(Path)
+	if Path = ""
+		return false
+	Attributes := _KLR_LedgerAttributes(Path)
+	if Attributes = -1 || (Attributes & 0x10)
 		return false
 	Current := KLR_LedgerSnapshot(Path)
 	if !Current.Get("ok", false)
-		return false
+		throw KLRLedgerSnapshotError("Metrics ledger identity could not be observed.")
 	if (Current.Get("volume", -1) != Row.Get("volume", -2))
 			|| (Current.Get("index_high", -1) != Row.Get("index_high", -2))
 			|| (Current.Get("index_low", -1) != Row.Get("index_low", -2)) {
@@ -148,13 +151,11 @@ _KLR_CacheLedgerStillValid(Row, logPath) {
 ; appeared since the image was written has no offset and no replayed walker
 ; state, and there is no correct partial answer for it.
 _KLR_CacheCoversEveryLedger(md, Offsets, logPath) {
+	Paths := KLR_ListLedgerPaths(md)
 	by_root := md . "by_device\"
 	if !DirExist(by_root)
 		return Offsets.Count = 0
-	loop files, by_root . "*", "D" {
-		sql_path := by_root . A_LoopFileName . "\data.sql"
-		if !FileExist(sql_path)
-			continue
+	for sql_path in Paths {
 		if !Offsets.Has(sql_path) {
 			KLR_PrefetchDebug(logPath, "KLR cache rejected: new ledger " . sql_path)
 			return false
@@ -199,6 +200,11 @@ KLR_CacheAttach(md, logPath, BeforeDiscard := 0) {
 	try {
 		Version := _KLR_CacheMetaValue(stored, "format_version")
 		SavedAt := _KLR_CacheMetaValue(stored, "saved_at")
+		if _KLR_CacheHasDurableTypingPayload(stored) {
+			KLR_PrefetchDebug(logPath, "KLR cache rejected: durable ordered typing payload")
+			rejected := true
+			return 0
+		}
 		if (Version != KLR_CACHE_FORMAT_VERSION) {
 			KLR_PrefetchDebug(logPath,
 				"KLR cache rejected: format '" . Version . "'")
@@ -246,16 +252,27 @@ KLR_CacheAttach(md, logPath, BeforeDiscard := 0) {
 				return 0
 			}
 			if !SQLite_BackupInto(restored, stored) {
-				KLR_PrefetchDebug(logPath, "KLR cache rejected: page copy failed")
+				try LoggerError("KLReader", "Metrics cache page copy failed; retaining the validated image.")
 				try SQLite_Close(restored)
 				restored := 0
-				rejected := true
+				; Read/allocation failure in a private copy does not invalidate
+				; the source metadata and identities already checked above.
 				return 0
 			}
 		}
+	} catch KLRLedgerSnapshotError as Err {
+		try LoggerError("KLReader", "Metrics cache source snapshot failed: {1} Retaining the image.", Err.Message)
+		return 0
+	} catch KLRLedgerListingError as Err {
+		try LoggerError("KLReader", "Metrics cache source discovery failed: {1} Retaining the image.", Err.Message)
+		return 0
 	} catch Error as Err {
-		rejected := true
-		try LoggerError("KLReader", "Metrics cache read failed: {1} Rebuilding the rejected image.", Err.Message)
+		; These fixed metadata queries can prove a missing/invalid schema or
+		; corrupt format. Contention, I/O and allocation errors prove neither.
+		Code := SQLite_LastErrorCode(stored) & 0xFF
+		rejected := Code = SQLiteConst.ERROR || Code = SQLiteConst.CORRUPT || Code = SQLiteConst.NOTADB
+		try LoggerError("KLReader", "Metrics cache read failed: {1} {2}", Err.Message,
+			rejected ? "Rebuilding the rejected image." : "Retaining the unadmitted image.")
 		return 0
 	} finally {
 		try SQLite_Close(stored)
@@ -401,6 +418,8 @@ _KLR_CacheMustRetainPeer(sizes, snapshots, md, logPath) {
 		if _KLR_CacheMetaValue(Peer, "format_version") != KLR_CACHE_FORMAT_VERSION
 				|| _KLR_CacheMetaValue(Peer, "walker_timings") != KL_JsonEncode(KLW_TimingValues())
 			return false
+		if _KLR_CacheHasDurableTypingPayload(Peer)
+			return false
 		Offsets := Map()
 		Regresses := false
 		Rows := SQLite_Query(Peer,
@@ -426,12 +445,18 @@ _KLR_CacheMustRetainPeer(sizes, snapshots, md, logPath) {
 	} finally SQLite_Close(Peer)
 }
 
+; SQLite identifiers ignore ASCII case even though schema name values do not.
+; Admission and publication must enforce the same temporary-only payload boundary.
+_KLR_CacheHasDurableTypingPayload(db) {
+	return SQLite_Query(db, "SELECT name FROM main.sqlite_schema WHERE name='klr_reader_typing_payload' COLLATE NOCASE;").Length > 0
+}
+
 ; Stage and replace while the caller owns the cache directory's writer guard.
 _KLR_CacheSaveGuarded(db, sizes, md, logPath, snapshots) {
 	if !db || !(sizes is Map) || !(snapshots is Map) || snapshots.Count != sizes.Count
 		return 0
 	try {
-		if SQLite_Query(db, "SELECT name FROM main.sqlite_schema WHERE name='klr_reader_typing_payload';").Length
+		if _KLR_CacheHasDurableTypingPayload(db)
 			throw Error("Ordered typing payloads must not belong to the durable main schema.")
 	} catch Error as Failure {
 		try LoggerError("KLReader", "Metrics cache publication refused: {1}.", Failure.Message)

@@ -53,6 +53,22 @@ _KLRCF_RejectClear(Warm) {
 		} else {
 			AssertFalse(FSExists(KLR_CachePath(_KLRDC_Root())))
 		}
+		; The failed source still contains its trigger. Append its retirement so
+		; recovery must replay every discarded byte before rebuilding clean totals.
+		_KLRDC_AppendLedger("DROP TRIGGER reject_ngram_clear;`n")
+		Recovered := _KLRDC_BuildAsWorker()
+		AssertTrue(Recovered != 0, "retiring the source fault must permit a fresh build")
+		Expected := Warm ? 2 : 1
+		AssertEqual(Expected, SQLite_Query(Recovered, "SELECT COUNT(*) AS n FROM events_typing;")[1]["n"],
+			"recovery must consume every original event exactly once")
+		AssertEqual(Expected, SQLite_Query(Recovered, "SELECT SUM(chars) AS n FROM agg_app_day;")[1]["n"])
+		AssertEqual(Expected, SQLite_Query(Recovered, "SELECT SUM(c) AS n FROM ngram_chars;")[1]["n"],
+			"recovery must clear old walker rows before replay, including the cold seeded row")
+		AssertEqual(FileGetSize(_KLRDC_LedgerPath()), KLRCache.last_sizes[_KLRDC_LedgerPath()],
+			"recovered offsets must include the consumed fault retirement")
+		BeforeUnchanged := _KLRDC_DerivedFingerprint(Recovered)
+		AssertEqual(BeforeUnchanged, _KLRDC_DerivedFingerprint(KLR_BuildDatabase(_KLRDC_Root())),
+			"a later unchanged refresh must not repeat the recovered contributions")
 	} finally {
 		_KLRDC_Cleanup()
 	}

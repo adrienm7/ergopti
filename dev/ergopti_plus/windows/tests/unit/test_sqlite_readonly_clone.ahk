@@ -9,7 +9,7 @@
 
 #Requires AutoHotkey v2.0
 
-_SQLRC_WithSource(Scenario) {
+_SQLRC_WithSource(Scenario, PageSize := 0) {
 	_KLRDC_Reset()
 	Writer := 0
 	Source := 0
@@ -17,10 +17,14 @@ _SQLRC_WithSource(Scenario) {
 		Path := _KLRDC_Root() . "source.sqlite"
 		Writer := SQLite_Open(Path)
 		AssertTrue(Writer != 0)
+		if PageSize
+			AssertTrue(SQLite_Exec(Writer, "PRAGMA page_size=" . PageSize . ";"))
 		AssertTrue(SQLite_Exec(Writer, "CREATE TABLE clone_probe(id INTEGER PRIMARY KEY, value TEXT, payload BLOB);"
 			. "INSERT INTO clone_probe VALUES(1,'original',zeroblob(8388608));"))
 		Source := SQLite_Open(Path, SQLiteConst.OPEN_RO)
 		AssertTrue(Source != 0)
+		if PageSize
+			AssertEqual(PageSize, SQLite_Query(Source, "PRAGMA page_size;")[1]["page_size"])
 		AssertEqual(1, DllCall(SQLiteConst.DLL . "\sqlite3_db_readonly", "Ptr", Source, "AStr", "main", "Int"))
 		Scenario.Call(Source, Writer)
 	} finally {
@@ -75,6 +79,7 @@ _SQLRC_ReadFailure(Source, Writer) {
 		AssertTrue(ProbeSource != 0)
 		Candidate := SQLite_CloneMemory(ProbeSource)
 		AssertTrue(Candidate != 0, "the same file must become cloneable after unlocking")
+		AssertEqual(PageSize, SQLite_Query(Candidate, "PRAGMA page_size;")[1]["page_size"])
 		AssertEqual("ok", SQLite_Query(Candidate, "PRAGMA integrity_check;")[1]["integrity_check"])
 		AssertEqual(8388608, SQLite_Query(Candidate, "SELECT length(payload) AS n FROM clone_probe;")[1]["n"])
 	} finally {
@@ -84,8 +89,13 @@ _SQLRC_ReadFailure(Source, Writer) {
 }
 Test("SQLite readonly clone: unreadable pages reject the complete candidate (sqlite-readonly-clone-read-failure)",
 	_KLRDC_CheckTeardown.Bind(_SQLRC_WithSource.Bind(_SQLRC_ReadFailure)))
+Test("SQLite readonly clone: 16 KiB unreadable pages reject the candidate (sqlite-readonly-clone-large-pages)",
+	_KLRDC_CheckTeardown.Bind(_SQLRC_WithSource.Bind(_SQLRC_ReadFailure, 16384)))
+Test("SQLite readonly clone: 64 KiB unreadable pages reject the candidate (sqlite-readonly-clone-large-pages)",
+	_KLRDC_CheckTeardown.Bind(_SQLRC_WithSource.Bind(_SQLRC_ReadFailure, 65536)))
 
 _SQLRC_GrowthAllocations(Source, Writer) {
+	PageSize := SQLite_Query(Source, "PRAGMA page_size;")[1]["page_size"]
 	_SQLRC_WarmSource(Source)
 	AssertTrue(_SQLRC_MemoryUsed() > 0, "native allocation accounting must be active")
 	Allocations := Map()
@@ -98,6 +108,7 @@ _SQLRC_GrowthAllocations(Source, Writer) {
 			if Mode = "legacy"
 				AssertTrue(SQLite_BackupInto(Db, Source))
 			AssertTrue(SQLite_Exec(Db, "INSERT INTO clone_probe VALUES(2,'grown',zeroblob(1048576));"))
+			AssertEqual(PageSize, SQLite_Query(Db, "PRAGMA page_size;")[1]["page_size"])
 			AssertEqual(1048576, SQLite_Query(Db, "SELECT length(payload) AS n FROM clone_probe WHERE id=2;")[1]["n"])
 			ImageBytes[Mode] := SQLite_Query(Db, "PRAGMA page_count;")[1]["page_count"]
 				* SQLite_Query(Db, "PRAGMA page_size;")[1]["page_size"]
@@ -114,3 +125,7 @@ _SQLRC_GrowthAllocations(Source, Writer) {
 }
 Test("SQLite readonly clone: small growth preserves the native allocation budget (sqlite-readonly-clone-growth-memory)",
 	_KLRDC_CheckTeardown.Bind(_SQLRC_WithSource.Bind(_SQLRC_GrowthAllocations)))
+Test("SQLite readonly clone: 16 KiB growth preserves the allocation budget (sqlite-readonly-clone-large-pages)",
+	_KLRDC_CheckTeardown.Bind(_SQLRC_WithSource.Bind(_SQLRC_GrowthAllocations, 16384)))
+Test("SQLite readonly clone: 64 KiB growth preserves the allocation budget (sqlite-readonly-clone-large-pages)",
+	_KLRDC_CheckTeardown.Bind(_SQLRC_WithSource.Bind(_SQLRC_GrowthAllocations, 65536)))

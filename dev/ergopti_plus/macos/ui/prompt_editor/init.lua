@@ -16,6 +16,7 @@
 --- ==============================================================================
 
 local M = {}
+local WebviewResult = require("adapters.webview_result")
 
 local hs         = hs
 local ui_builder = require("ui.ui_builder")
@@ -161,7 +162,7 @@ local function push_context(context)
 	local execution_failed = false
 	local ok_eval, result = pcall(function()
 		return window.webview:evaluateJavaScript("init(" .. js_data .. ")", function(_, script_error)
-			if script_error ~= nil then
+			if WebviewResult.is_error(script_error) then
 				execution_failed = true
 				report("execution failed")
 			end

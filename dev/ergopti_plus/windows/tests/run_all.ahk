@@ -322,6 +322,7 @@ InstallSendNoOps()
 #Include unit/test_manifest_menu_checked_when.ahk
 #Include unit/test_layout_tables.ahk
 #Include unit/test_uia_selection_worker_deadline.ahk
+#Include unit/test_uia_worker_cleanup_debt.ahk
 #Include unit/test_uia_worker_exit_reentry.ahk
 #Include unit/test_secure_field_worker_context.ahk
 
@@ -548,6 +549,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_toml_nested_arrays.ahk
 #Include unit/test_toml_float_roundtrip.ahk
 #Include unit/test_toml_incomplete_write.ahk
+#Include unit/test_toml_stage_cleanup.ahk
 #Include unit/test_config_typed_producers.ahk
 #Include unit/test_metrics_delivery_owner.ahk
 #Include unit/test_metrics_cached_ready.ahk
@@ -558,6 +560,12 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_metrics_store_projection.ahk
 #Include unit/test_webview_script_outcomes.ahk
 #Include unit/test_webview_range_outcomes.ahk
+#Include unit/test_webview_range_stage_owner.ahk
+#Include unit/test_webview_range_cleanup_reentry.ahk
+#Include unit/test_webview_range_mount.ahk
+#Include unit/test_webview_profile_ownership.ahk
+#Include unit/test_metrics_file_urls.ahk
+#Include unit/test_uridecode_literal_unicode.ahk
 #Include meta/test_webview_script_observer.ahk
 #Include unit/test_metrics_retry_outcomes.ahk
 #Include meta/test_config_typed_foreign_producers.ahk
@@ -629,6 +637,7 @@ global _AhkSubDir := ""
 ; builders (F19/F21: llm_*/av/network/clipboard/roi event types must not
 ; silently fall through KL_BuildInserts's switch).
 #Include ../modules/keylogger/keylogger_json.ahk
+#Include unit/test_keylogger_json_roundtrip.ahk
 #Include ../modules/keylogger/keylogger_journal.ahk
 #Include ../modules/keylogger/keylogger_shutdown.ahk
 #Include unit/test_keylogger_shutdown_timers.ahk
@@ -636,6 +645,7 @@ global _AhkSubDir := ""
 ; tail parser can be exercised without loading the OS-hooking entry module.
 #Include ../modules/keylogger/keylogger_event_id.ahk
 #Include unit/test_keylogger_event_id.ahk
+#Include unit/test_keylogger_full_id_recovery.ahk
 ; keylogger_text_cipher.ahk (KL_Enc_* at-rest encryption) is pure definitions
 ; with no top-level hotkeys, and keylogger_sql.ahk now calls it, so it must load
 ; before the SQL builders.
@@ -646,6 +656,7 @@ global _AhkSubDir := ""
 #Include ../modules/keylogger/keylogger_text_migration.ahk
 #Include ../modules/keylogger/keylogger_sql.ahk
 #Include unit/test_keylogger_ingest_encryption_retry.ahk
+#Include unit/test_keylogger_rollover_recovery.ahk
 ; keylogger_hotstring_log.ahk holds KL_LogHotstring — the one persisted row that
 ; can carry the user's personal data. It was split out of keylogger.ahk (which
 ; installs OS hooks at load and can never be included here) precisely so this
@@ -669,6 +680,7 @@ global _AhkSubDir := ""
 #Include ../modules/keylogger/keylogger_mouse.ahk
 #Include ../modules/keylogger/keylogger_window_topology.ahk
 #Include unit/test_bounded_focus_snapshot.ahk
+#Include unit/test_focus_handle_release_reentry.ahk
 #Include unit/test_keylogger_mouse_coordinates.ahk
 #Include unit/test_keylogger_window_topology.ahk
 #Include unit/test_hotstring_fire_log_privacy.ahk
@@ -680,9 +692,13 @@ global _AhkSubDir := ""
 #Include unit/test_near_miss_row_privacy.ahk
 #Include unit/test_keylogger_walker.ahk
 #Include unit/test_walker_json_flush_merge.ahk
+#Include unit/test_walker_histogram_partitions.ahk
 #Include unit/test_keylogger_sql.ahk
 #Include unit/test_keylogger_text_cipher.ahk
 #Include unit/test_keylogger_text_migration.ahk
+#Include unit/test_migration_native_write.ahk
+#Include unit/test_migration_open_refusal.ahk
+#Include unit/test_keylogger_migration_read_refusal.ahk
 #Include unit/test_build_inserts_covers_emitted_types.ahk
 #Include unit/test_metrics_and_locale_honesty.ahk
 #Include unit/test_keylogger_app_categories.ahk
@@ -695,11 +711,22 @@ global _AhkSubDir := ""
 #Include unit/test_keylogger_reader_ngram_sources.ahk
 #Include unit/test_roi_prune_bounded.ahk
 #Include unit/test_keylogger_reader_sql_fail_loud.ahk
+#Include unit/test_klr_ledger_read_refusal.ahk
+#Include unit/test_keylogger_journal_read_progress.ahk
+#Include unit/test_klr_sql_operational_retry.ahk
 #Include unit/test_sqlite_read_dispatch.ahk
+#Include unit/test_sqlite_exec_progress_cleanup.ahk
 #Include unit/test_sqlite_module_owner.ahk
 #Include unit/test_klr_ledger_chunk_boundary.ahk
 #Include unit/test_klr_cache_fixture.ahk
 #Include unit/test_klr_durable_cache.ahk
+#Include unit/test_klr_multi_ledger_retry.ahk
+#Include unit/test_klr_candidate_live_retry.ahk
+#Include unit/test_metrics_cancel_retry.ahk
+#Include unit/test_metrics_native_start_cancel.ahk
+#Include unit/test_metrics_native_worker_exit.ahk
+#Include unit/test_orphan_cleanup_pid.ahk
+#Include unit/test_http_orphan_liveness.ahk
 #Include unit/test_klr_cache_admission.ahk
 #Include unit/test_klr_cache_offsets.ahk
 #Include unit/test_hotstring_count_units.ahk
@@ -712,16 +739,23 @@ global _AhkSubDir := ""
 #Include unit/test_klr_cold_projection_failure.ahk
 #Include unit/test_klr_cache_date_scope.ahk
 #Include unit/test_klr_projection_paging.ahk
+#Include unit/test_klr_projection_cursor_int64.ahk
 #Include unit/test_klr_projection_page_work.ahk
 #Include unit/test_klr_projection_sql_failure.ahk
+#Include unit/test_klr_projection_late_page_failure.ahk
 #Include unit/test_klr_cache_publication_order.ahk
+#Include unit/test_klr_cache_save_cadence.ahk
 #Include unit/test_sqlite_readonly_clone.ahk
+#Include unit/test_sqlite_clone_page_size.ahk
 #Include unit/test_klr_resident_refresh.ahk
 #Include unit/test_klr_cache_encryption.ahk
 #Include unit/test_klr_cache_stages.ahk
 #Include unit/test_klr_cache_open_failure.ahk
 #Include unit/test_klr_cache_rejection_identity.ahk
 #Include unit/test_klr_rebuild_publication.ahk
+#Include unit/test_klr_ledger_listing_failure.ahk
+#Include unit/test_klr_cache_copy_failure.ahk
+#Include unit/test_klr_cache_sql_read_failure.ahk
 #Include unit/test_klr_cache_timings.ahk
 #Include unit/test_klr_append_compensation.ahk
 #Include unit/test_klr_stream_writer_interleaving.ahk
@@ -733,6 +767,10 @@ global _AhkSubDir := ""
 #Include unit/test_metrics_prefetch_history_presence.ahk
 #Include unit/test_metrics_historical_json.ahk
 #Include unit/test_metrics_history_seed.ahk
+#Include unit/test_metrics_terminal_exception_cleanup.ahk
+#Include unit/test_metrics_range_date_types.ahk
+#Include unit/test_metrics_range_json_equivalence.ahk
+#Include unit/test_metrics_range_json_failure.ahk
 #Include unit/test_metrics_seed_header.ahk
 #Include unit/test_metrics_manifest_json.ahk
 #Include unit/test_metrics_delta_lifecycle.ahk
@@ -740,6 +778,7 @@ global _AhkSubDir := ""
 #Include unit/test_metrics_delivery_midnight.ahk
 #Include unit/test_metrics_prefetch_orphans.ahk
 #Include unit/test_klr_cache_failed_refresh.ahk
+#Include unit/test_klr_category_order.ahk
 #Include unit/test_sqlite_query_failure.ahk
 #Include unit/test_keylogger_reader_encrypted_rebuild.ahk
 #Include unit/test_keylogger_app_category_projection.ahk
@@ -889,6 +928,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_boot_deferred_tasks.ahk
 #Include meta/test_boot_error_fatal_before_ready.ahk
 #Include meta/test_hotif_globals_boot_safe.ahk
+#Include meta/test_hotif_directive_lexical_boundaries.ahk
 #Include meta/test_error_net_prelogger_safe.ahk
 #Include meta/test_boot_paths_fail_soft.ahk
 #Include meta/test_wpm_widget_native_render.ahk
@@ -1054,6 +1094,9 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_driver_source_helpers_fail_loudly.ahk
 #Include meta/test_driver_source_partial_reads.ahk
 #Include meta/test_driver_body_cache.ahk
+#Include meta/test_driver_block_comment_extraction.ahk
+#Include meta/test_driver_symbol_case.ahk
+#Include meta/test_driver_quoted_definitions.ahk
 #Include meta/test_error_handler_heavy_diagnostics.ahk
 #Include meta/test_ext_builder_fn_dynamic_call_swallow.ahk
 #Include meta/test_format_toml_stale_path_deadcode.ahk
@@ -1167,6 +1210,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_loadexttoml_skips_meta_sections.ahk
 #Include unit/test_json_number_misleading_error.ahk
 #Include unit/test_json_string_fast_path.ahk
+#Include unit/test_json_object_key_nul.ahk
 #Include unit/test_ollama_curl_temp_pii_plaintext.ahk
 #Include unit/test_parsetomlgroupconfig_missing_file_cache_key.ahk
 #Include unit/test_parsetomlgroupconfig_missing_file_cache_key_mismatch.ahk
@@ -1244,6 +1288,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_tooltip_resolve_pos_profiled.ahk
 #Include meta/test_error_net_guarded_send.ahk
 #Include meta/test_error_net_dedup_throttle.ahk
+#Include unit/test_error_report_dedup_ownership.ahk
 #Include meta/test_error_net_uia_orphan_suppress.ahk
 #Include meta/test_deferred_crash_report_catch.ahk
 #Include meta/test_keylogger_webview_bridge_and_i18n.ahk
@@ -1370,6 +1415,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_crash_reporter_slash_precedence.ahk
 #Include meta/test_logger_flush_on_error.ahk
 #Include meta/test_atomic_write_unique_scratch.ahk
+#Include unit/test_atomic_temp_owner.ahk
 #Include meta/test_byref_call_sites.ahk
 #Include meta/test_uia_probe_bounded.ahk
 #Include meta/test_healthcheck_collectors_guarded.ahk
@@ -1588,6 +1634,8 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_fire_log_suspend_boundary.ahk
 #Include unit/test_group_config_cache_alias_invalidation.ahk
 #Include unit/test_hotpath_profiler_exclusive.ahk
+#Include unit/test_hotpath_breakdown_reentry.ahk
+#Include unit/test_hook_timing_input_privacy.ahk
 #Include unit/test_hotpath_per_segment_threshold.ahk
 #Include unit/test_keylogger_today_fh_flush.ahk
 #Include unit/test_llm_cache_hit_logs_suggested.ahk
@@ -1627,6 +1675,8 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_shell_runner_deferred_completion.ahk
 #Include unit/test_shell_runner_tree_deferred_completion.ahk
 #Include unit/test_crash_report_worker_transport.ahk
+#Include unit/test_crash_mapping_drain_reentry.ahk
+#Include unit/test_crash_mapping_payload_bounds.ahk
 #Include unit/test_crash_worker_git_exit.ahk
 #Include unit/test_crash_worker_fixture_cleanup.ahk
 #Include unit/test_crash_worker_attempt_ownership.ahk

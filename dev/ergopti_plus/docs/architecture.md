@@ -90,6 +90,7 @@ graph TD
         MACOS_tooltip_renderer["TooltipRenderer.lua"]
         MACOS_tray_menu["TrayMenu.lua"]
         MACOS_update_launcher["UpdateLauncher.lua"]
+        MACOS_webview_result["WebviewResult.lua"]
         MACOS_window_info["WindowInfo.lua"]
         MACOS_window_manager["WindowManager.lua"]
     end
@@ -118,6 +119,7 @@ graph TD
         WINDOWS_tooltip_renderer["TooltipRenderer.ahk"]
         WINDOWS_tray_menu["TrayMenu.ahk"]
         WINDOWS_uia_worker["UiaWorker.ahk"]
+        WINDOWS_webview_profiles["WebviewProfiles.ahk"]
         WINDOWS_window_info["WindowInfo.ahk"]
         WINDOWS_window_manager["WindowManager.ahk"]
     end

@@ -72,13 +72,13 @@ KLUI_ResolveAssetUrl(which, metrics_dir) {
 		; Resolve to absolute, normalised path.
 		loop files, base
 				base := A_LoopFileFullPath
-		; file:// URL: replace backslashes with forward slashes.
-		url := "file:///" . StrReplace(base, "\", "/")
+		url := FilePathToUrl(base)
 		; Embed the prefetch file path in the hash so the page bootstrap can
 		; fetch from %TEMP% instead of the repo directory. Hash fragments are
 		; safe on file:// URLs in Chromium (no request, no cache-buster issue).
-		prefetch_path := StrReplace(KLPF_PrefetchPath(which, metrics_dir), "\", "/")
-		url .= "#prefetch=file:///" . prefetch_path
+		prefetch_url := FilePathToUrl(KLPF_PrefetchPath(which, metrics_dir))
+		; URLSearchParams decodes one layer before fetch parses the nested URL.
+		url .= "#prefetch=" . UriEncode(prefetch_url)
 		return url
 }
 
@@ -178,6 +178,8 @@ _KLUI_RetireEdgeOwner(which, ExpectedOwner) {
 }
 
 _KLUI_OnEdgeTerminal(which, Owner, ExitCode, Stdout, Stderr) {
+		if Owner.Has("profile")
+				WebView_ConfirmProfileExit(Owner["profile"])
 		if !_KLUI_RetireEdgeOwner(which, Owner)
 				return
 		try LoggerInfo("Keylogger", "Edge metrics process tree for '{1}' exited with code {2}.", which, ExitCode)
@@ -202,6 +204,8 @@ _KLUI_CancelEdgeOwner(which, ExpectedOwner := 0) {
 		try Terminated := Owner["task"].terminate() == true
 		catch as Err
 				try LoggerError("Keylogger", "Exact Edge metrics termination for '{1}' threw: {2}.", which, Err.Message)
+		if Terminated && Owner.Has("profile")
+				WebView_ConfirmProfileExit(Owner["profile"])
 
 		PreviousCritical := Critical("On")
 		try {
@@ -223,13 +227,13 @@ KLUI_LaunchEdge(which, url, title) {
 		; --app=URL launches a chromeless window pinned to URL. --user-data-dir
 		; isolates from the user's main Edge session so closing this window
 		; does not nuke their tabs. --window-size starts large but resizable.
-		; Use a per-launch user-data-dir suffixed with the current tick count.
+		; Use a unique per-launch user-data-dir with explicit retirement ownership.
 		; Edge keeps every previous launch's HTML/JS in a Code Cache that even
 		; a recursive DirDelete cannot always wipe (the dir stays locked by a
 		; lingering helper process for a few seconds after the window closes).
 		; Spinning up a fresh dir guarantees the freshest page every time and
-		; the orphan ones are cleaned up below on a best-effort basis.
-		udir := A_Temp . "\ergopti_metrics_edge_" . A_TickCount
+		; Confirmed retirement receipts allow a later launch to retry refused cleanup.
+		udir := WebView_NewProfilePath("ergopti_metrics_edge_")
 		WebView_SweepStaleProfiles("ergopti_metrics_edge_")
 		DirCreate(udir)
 		; --allow-file-access-from-files: lift the same-origin restriction that
@@ -260,7 +264,7 @@ KLUI_LaunchEdge(which, url, title) {
 				"--disable-features=msEdgeTrackingPrevention,EdgeSync,MicrosoftEdgeAccountSignedIn"
 		]
 		try {
-				Owner := Map("task", 0, "state", "starting")
+				Owner := Map("task", 0, "state", "starting", "profile", udir)
 				Task := ShellRunner_SpawnTreeOwned(edge, args,
 						_KLUI_OnEdgeTerminal.Bind(which, Owner), , , 0, false)
 				Owner["task"] := Task
@@ -287,6 +291,7 @@ KLUI_LaunchEdge(which, url, title) {
 		catch as err {
 				if IsSet(Owner) && IsObject(Owner)
 						_KLUI_CancelEdgeOwner(which, Owner)
+				WebView_AbandonProfile(udir)
 				MsgBox(Format(t("keylogger_ui.launch_error"), err.Message),
 						t("common.error_title"), "Iconx")
 				return false

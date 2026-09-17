@@ -757,7 +757,7 @@ _KLMig_DurableStageBoundaryIsMandatory() {
     Assert(WriteHelper != "",
         "migration must centralize every streamed stage write in one receipt-validating helper")
     AssertContains(WriteHelper, "ExpectedBytes",
-        "the stage writer must compare File.Write's receipt with the exact UTF-8 byte count")
+        "the stage writer must count only validated UTF-8 bytes")
 
     Finish := _DriverFuncBody("_KL_Mig_Finish")
     AssertContains(Finish, "_KL_Mig_FlushStage",
@@ -773,25 +773,36 @@ Test("KL_Mig durability: counted writes and a stable validated stage precede pub
     _KLMig_DurableStageBoundaryIsMandatory)
 
 
-class _KLMig_ShortStageHandle {
-    Write(Content) {
-        return Max(0, StrPut(Content, "UTF-8") - 2)
-    }
+_KLMig_WriteShortStage(Handle, Bytes, Count, &Written) {
+    return _FSNativeWrite(Handle, Bytes, Count - 1, &Written)
 }
 
 _KLMig_ShortStageWriteDoesNotAdvanceReceipt() {
     oldFh := KLMigration.writeFh
     oldBytes := KLMigration.stageBytesWritten
+    Path := _FSWL_Path()
+    File := 0
     try {
-        KLMigration.writeFh := _KLMig_ShortStageHandle()
+        File := FSOpenWrite(Path)
+        AssertTrue(IsObject(File))
+        KLMigration.writeFh := File
         KLMigration.stageBytesWritten := 19
-        AssertFalse(_KL_Mig_WriteStage("écriture complète attendue"),
+        Content := "écriture complète attendue"
+        AssertFalse(_KL_Mig_WriteStage(Content, _KLMig_WriteShortStage),
             "a short stage write must fail the migration boundary")
         AssertEqual(19, KLMigration.stageBytesWritten,
             "an incomplete prefix must never contribute to the publishable byte receipt")
+        File.Close()
+        File := 0
+        AssertEqual(StrPut(Content, "UTF-8") - 2, FileGetSize(Path),
+            "the refusal must follow a real short native write")
     } finally {
+        if IsObject(File)
+            File.Close()
         KLMigration.writeFh := oldFh
         KLMigration.stageBytesWritten := oldBytes
+        if FileExist(Path)
+            FileDelete(Path)
     }
 }
 Test("KL_Mig durability: short stage writes never acquire publish ownership (AHK-077)",

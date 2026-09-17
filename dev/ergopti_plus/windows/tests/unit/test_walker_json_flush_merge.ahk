@@ -19,8 +19,8 @@ _WJFM_OpenMemory() {
 	return Db
 }
 
-_WJFM_Flush(Db) {
-	Sql := KLW_BuildBatchSql("'merge-device'")
+_WJFM_Flush(Db, Device := "merge-device") {
+	Sql := KLW_BuildBatchSql(SQLite_Q(Device))
 	AssertTrue(Sql != "", "the seeded batch must emit SQL")
 	AssertTrue(SQLite_Exec(Db, Sql), "the real walker SQL must execute")
 }
@@ -121,6 +121,51 @@ _WJFM_Sessions(Capped) {
 
 for Capped in [false, true]
 	Test("walker: ordered session durations survive flushes capped=" . Capped . " (walker-json-flush-merge)", _WJFM_Sessions.Bind(Capped))
+
+_WJFM_SessionPartitions() {
+	SavedBatch := KLW.batch
+	Db := _WJFM_OpenMemory()
+	Expected := Map()
+	try {
+		AssertTrue(KLR_LoadSchema(Db))
+		loop 3 {
+			BatchIndex := A_Index
+			loop 2 {
+				DeviceIndex := A_Index
+				Device := "merge-device-" . DeviceIndex
+				KLW_ResetBatch()
+				for DayIndex, Day in ["2026-09-08", "2026-09-09"] {
+					for AppIndex, App in ["first.exe", "second'quoted.exe"] {
+						Key := Device . "|" . Day . "|" . App
+						Duration := DeviceIndex * 1000 + DayIndex * 100 + AppIndex * 10 + BatchIndex
+						if !Expected.Has(Key)
+							Expected[Key] := []
+						Expected[Key].Push(Duration)
+						KLW_FinalizeSession(Day, App, Map("char_count", 1, "total_ms", Duration))
+					}
+				}
+				_WJFM_Flush(Db, Device)
+				Rows := SQLite_Query(Db, "SELECT device_id,date,app,count_total,durations_json"
+					. " FROM agg_app_day_session;")
+				AssertEqual(Expected.Count, Rows.Length)
+				for Row in Rows {
+					Key := Row["device_id"] . "|" . Row["date"] . "|" . Row["app"]
+					AssertTrue(Expected.Has(Key), "every stored partition must belong to a seeded identity")
+					AssertEqual(Expected[Key].Length, Row["count_total"])
+					Actual := KL_JsonDecode(Row["durations_json"])
+					AssertEqual(KL_JsonEncode(Expected[Key]), KL_JsonEncode(Actual),
+						"duration merges must stay inside the exact device/day/app partition")
+				}
+			}
+		}
+		AssertEqual(8, Expected.Count)
+	} finally {
+		KLW.batch := SavedBatch
+		SQLite_Close(Db)
+	}
+}
+Test("walker: session flushes isolate device day and app partitions (walker-session-partitions)",
+	_WJFM_SessionPartitions)
 
 _WJFM_EsrcControl() {
 	SavedBatch := KLW.batch

@@ -201,11 +201,31 @@ _KL_Mig_StatementEnd(s) {
 						i := nl + 1
 						continue
 				}
+				if (c = "/" && SubStr(s, i + 1, 1) = "*") {
+						closed := InStr(s, "*/", , i + 2)
+						if !closed
+								return 0
+						i := closed + 2
+						continue
+				}
 				if (c = ";")
 						return i
 				i += 1
 		}
 		return 0
+}
+
+; Locate SQL tokens without allowing comment text to impersonate an INSERT.
+; Possessive repetition prevents a long whitespace tail from backtracking.
+_KL_Mig_StatementStart(s) {
+		RegExMatch(s, "s)\A(?:[\x00\x09-\x0D\x20]++|--[^\n]*+(?:\n|\z)"
+				. "|/\*(?:[^*]++|\*(?!/))*+(?:\*/|\z))*+", &Prefix)
+		return Prefix.Len[0] + 1
+}
+
+; EOF may preserve comments and padding, but never an unconverted SQL fragment.
+_KL_Mig_TailIsTrivia(s) {
+		return _KL_Mig_StatementStart(s) > StrLen(s)
 }
 
 ; Returns the position of the `)` closing the `(` at `openPos`, or 0.
@@ -314,8 +334,8 @@ KL_Mig_ConvertStatement(sql, deviceIdLit, mode) {
 		unchanged := Map("ok", true, "sql", sql, "changed", false)
 		failed    := Map("ok", false, "sql", sql, "changed", false)
 
-		markerPos := InStr(sql, KL_MIG_INSERT_MARKER)
-		if (!markerPos)
+		markerPos := _KL_Mig_StatementStart(sql)
+		if (SubStr(sql, markerPos, StrLen(KL_MIG_INSERT_MARKER)) != KL_MIG_INSERT_MARKER)
 				return unchanged
 
 		columnsOpen := InStr(sql, "(", , markerPos)
@@ -583,16 +603,18 @@ _KL_Mig_Abort(reason) {
 		return false
 }
 
-_KL_Mig_WriteStage(Content) {
+_KL_Mig_WriteStage(Content, WriteFn := 0) {
 		if !IsObject(KLMigration.writeFh) || !(Content is String)
 				return false
 		ExpectedBytes := StrPut(Content, "UTF-8") - 1
-		try Written := KLMigration.writeFh.Write(Content)
+		; Buffered acceptance is not an OS receipt. Reject the first refused
+		; block instead of discovering missing bytes after the complete migration.
+		try Accepted := _FSWriteUtf8Bytes(KLMigration.writeFh, Content, WriteFn)
 		catch
 				return false
-		if (Written != ExpectedBytes)
+		if !Accepted
 				return false
-		KLMigration.stageBytesWritten += Written
+		KLMigration.stageBytesWritten += ExpectedBytes
 		return true
 }
 
@@ -712,8 +734,10 @@ _KL_Mig_SliceBody() {
 				endPos := _KL_Mig_StatementEnd(KLMigration.buffer)
 				if (!endPos) {
 						if (KLMigration.eof) {
-								; Whatever is left is a trailing comment or a partial line: it
-								; carries no statement, so it is copied through verbatim.
+								; An incomplete row may still contain plaintext. Publishing it
+								; would claim a completed posture without converting every row.
+								if !_KL_Mig_TailIsTrivia(KLMigration.buffer)
+										return _KL_Mig_Abort("the source ledger ended inside an incomplete SQL statement")
 								if _KL_Mig_PauseRequested()
 										return true
 				if (KLMigration.buffer != ""
@@ -728,7 +752,13 @@ _KL_Mig_SliceBody() {
 								return true
 						chunk := ""
 						try chunk := KLMigration.readFh.Read(KL_MIG_READ_CHUNK_CHARS)
-						if (chunk = "") {
+						catch
+								return _KL_Mig_Abort("the source ledger read failed")
+						if (StrLen(chunk) = 0) {
+								; File.Read may return empty on native read refusal. Only
+								; the observed EOF can authorize replacing the source ledger.
+								if KLMigration.readFh.Pos < KLMigration.readFh.Length
+										return _KL_Mig_Abort("the source ledger read stopped before EOF")
 								KLMigration.eof := true
 								continue
 						}
@@ -886,11 +916,13 @@ KL_Mig_Start(mode, schedule := true) {
 		KLMigration.converted := 0
 		KLMigration.stageBytesWritten := 0
 
-		; A staging file left by an interrupted attempt describes a ledger that has
-		; since moved on. Start clean rather than resume it.
-		FSDelete(KLMigration.stagePath)
 		KLMigration.readFh := FSOpenRead(KLMigration.sourcePath)
-		KLMigration.writeFh := FSOpenWrite(KLMigration.stagePath)
+		; Admit the source before creating output that a failed start cannot use.
+		if IsObject(KLMigration.readFh) {
+				; An interrupted stage describes an older ledger. Never resume it.
+				FSDelete(KLMigration.stagePath)
+				KLMigration.writeFh := FSOpenWrite(KLMigration.stagePath)
+		}
 		if (!IsObject(KLMigration.readFh) || !IsObject(KLMigration.writeFh)) {
 				try LoggerError("Keylogger", "At-rest migration cannot open the ledger - data.sql is unchanged.")
 				_KL_Mig_Release()

@@ -16,8 +16,6 @@
 ; compact one-line representation suitable for JSONL.
 
 KL_JsonEncode(v) {
-		if (v = "")           ; AHK distinguishes empty string from unset.
-				return '""'
 		if v is Map
 				return KL_JsonEncodeMap(v)
 		if v is Array

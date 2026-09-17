@@ -307,7 +307,7 @@ class HookDispatcher {
 		catch as _thTrackErr
 			HookDispatcher._TrackFault("TapHoldTrackOtherKeyActivityByScancode", _thTrackErr)
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_KB_DOWN, ih, vk, sc)
-		HotPath_LogIfSlow("Hook.KeyDown", _hpKeyDown, "vk" . vk . " sc" . sc)
+		HotPath_LogIfSlow("Hook.KeyDown", _hpKeyDown)
 	}
 
 	; Bound to IH.OnKeyUp — receives (ih, vk, sc) from AHK.
@@ -323,7 +323,7 @@ class HookDispatcher {
 		catch as _thTrackErr
 			HookDispatcher._TrackFault("TapHoldTrackOtherKeyActivityByScancode", _thTrackErr)
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_KB_UP, ih, vk, sc)
-		HotPath_LogIfSlow("Hook.KeyUp", _hpKeyUp, "vk" . vk . " sc" . sc)
+		HotPath_LogIfSlow("Hook.KeyUp", _hpKeyUp)
 	}
 
 

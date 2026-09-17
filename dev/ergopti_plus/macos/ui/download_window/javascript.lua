@@ -8,6 +8,7 @@
 --- ==============================================================================
 
 local M = {}
+local WebviewResult = require("adapters.webview_result")
 
 local Logger = require("infra.logger")
 local LOG = "download_window.javascript"
@@ -47,7 +48,7 @@ function M.execute(view, code, context)
 		"JavaScript execution requires an operation diagnostic context")
 	local ok, result = pcall(function()
 		return view:evaluateJavaScript(code, function(_, script_error)
-			if script_error ~= nil then report(context, "execution failed") end
+			if WebviewResult.is_error(script_error) then report(context, "execution failed") end
 		end)
 	end)
 	if not ok then

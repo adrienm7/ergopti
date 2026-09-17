@@ -141,8 +141,10 @@ end
 --- @param on_chunk    function|nil Streaming callback: fn(task, stdout_chunk, stderr_chunk).
 ---        When nil, total terminal stdout plus stderr is capped at 4 MiB before
 ---        consumer delivery. Potentially unbounded producers must use streaming.
+--- @param environment table|nil Explicit child values, copied and verified without
+---   modifying the Hammerspoon environment or admitting launcher-only authority.
 --- @return table Handle with start() (returns boolean) and terminate() methods.
-function M.spawn(executable, args, on_done, on_chunk)
+function M.spawn(executable, args, on_done, on_chunk, environment)
 	local refusal = M.validate_spawn_args(executable, args)
 	if refusal ~= "" then
 		Logger.error(LOG, "spawn(): refused for '%s' — %s.",
@@ -478,7 +480,7 @@ function M.spawn(executable, args, on_done, on_chunk)
 		Logger.error(LOG, "spawn(): hs.task.new('%s') returned no task — %s", tostring(executable), tostring(task_or_err))
 		task_or_err = nil
 	else
-		local sanitized, sanitize_err = TaskEnvironment.sanitize(task_or_err)
+		local sanitized, sanitize_err = TaskEnvironment.sanitize(task_or_err, environment)
 		if not sanitized then
 			Logger.error(LOG, "spawn(): child environment sanitization failed for '%s' — %s.",
 				tostring(executable), tostring(sanitize_err))

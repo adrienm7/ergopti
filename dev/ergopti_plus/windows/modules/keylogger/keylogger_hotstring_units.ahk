@@ -7,6 +7,9 @@
 
 #Requires AutoHotkey v2.0
 
+class KLHotstringUnitError extends Error {
+}
+
 class KLHotstringUnits {
 	static Prefix := "hotstring_count_unit:"
 	static WindowsUnit := "utf16"
@@ -24,7 +27,7 @@ class KLHotstringUnits {
 			. StrLen(this.Prefix) . ")=" . SQLite_Q(this.Prefix) . ";") {
 			Device := SubStr(Row["key"], StrLen(this.Prefix) + 1)
 			if Device = "" || Row["value"] !== this.WindowsUnit
-				throw Error("Unsupported hotstring count unit declaration.")
+				throw KLHotstringUnitError("Unsupported hotstring count unit declaration.")
 			Units[Device] := Row["value"]
 		}
 		return Units
@@ -69,13 +72,14 @@ KLR_ApplyIncrementalWithCountUnits(Db, Tails, LogPath) {
 		After := KLHotstringUnits.Read(Db)
 		for Device, Unit in Before
 			if !After.Has(Device) || After[Device] != Unit
-				throw Error("Hotstring count unit declaration changed after consumption.")
+				throw KLHotstringUnitError("Hotstring count unit declaration changed after consumption.")
 		for Device in After
 			if !Before.Has(Device) && !KLR_RebuildHotstringCounts(Db, 0, Device)
 				throw Error("Historical hotstring unit recount failed.")
 		return Result
 	} catch Error as Failure {
 		try LoggerError("KLReader", "Hotstring count unit replay failed: {1}", Failure.Message)
-		return Map("ok", false, "incomplete", false)
+		; Query/recount failures do not prove the source bytes are invalid.
+		return Map("ok", false, "incomplete", false, "retry", !(Failure is KLHotstringUnitError))
 	}
 }

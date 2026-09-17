@@ -634,9 +634,8 @@ TOML_Write(Value, Path, Section, Key) {
 ; publishing their candidate globals, so a nested full save would serialize
 ; the stale live state back over the just-committed values.
 ; Delete scratch files left next to Path by a hard kill. Per-invocation names
-; no longer overwrite each other, so nothing self-cleans any more; the age
-; threshold is what keeps this a tidy-up rather than a new race — an
-; unconditional sweep would delete a concurrent writer's live staging file.
+; no longer overwrite each other. Require both age and a recognized dead owner;
+; a slow active writer or an unrelated temporary file must never be targeted.
 _TOML_ReapStaleTemps(Path, MaxAgeMs) {
 		SplitPath(Path, &Name, &Dir)
 		if (Dir = "" or Name = "")
@@ -644,9 +643,19 @@ _TOML_ReapStaleTemps(Path, MaxAgeMs) {
 		try {
 				Loop Files, Dir . "\" . Name . ".*.tmp" {
 						if (DateDiff(A_Now, A_LoopFileTimeModified, "Seconds") * 1000 >= MaxAgeMs)
+								&& FSAtomicTempOwnerIsGone(A_LoopFileName, Name)
 								try FileDelete(A_LoopFileFullPath)
 				}
 		}
+}
+
+; Retire only a stage owned and abandoned by the current save operation.
+; A refusal must remain visible without replacing the primary save failure.
+_TOML_RemoveOwnedStage(Path) {
+	if FSDelete(Path)
+		return true
+	try LoggerError("TomlWrite", "Owned staging file cleanup failed for '{1}'.", Path)
+	return false
 }
 
 ; A successful Write call is not proof that the complete canonical image
@@ -845,13 +854,15 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 		; and from timer-driven saves, so the two really can overlap. A_ScriptHwnd
 		; rather than a GetCurrentProcessId DllCall: unique per process all the
 		; same, and it keeps the OS-call purity ratchet at its baseline.
-		static STALE_TEMP_MS := 60000  ; Older than this, a scratch file is debris from a hard kill
+		static STALE_TEMP_MS := 60000  ; Minimum age; the reaper also checks producer ownership
 		static WriteSeq := 0
 		WriteSeq += 1
 		tmp := Path . "." . A_ScriptHwnd . "-" . WriteSeq . ".tmp"
 		_TOML_ReapStaleTemps(Path, STALE_TEMP_MS)
 		try FileDelete(tmp)
 		f := 0
+		StageOwned := false
+		StageWritten := false
 		try {
 				f := FileOpen(tmp, "w", "UTF-8")
 				if !f {
@@ -865,11 +876,13 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 						try LoggerError("TomlWrite", "Cannot open the staging file for '{1}' — nothing was written and the change is NOT persisted.", Path)
 						return false
 				}
+				StageOwned := true
 				f.Write(body)
 				if !FSFlushFileBuffers(f)
 						throw Error("FlushFileBuffers refused the staging handle")
 				f.Close()
 				f := 0
+				StageWritten := true
 		} catch as Err {
 				global _ParseTomlCache
 				if _ParseTomlCache.Has(Path)
@@ -879,12 +892,15 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 		} finally {
 				if IsObject(f)
 						try f.Close()
+				if StageOwned && !StageWritten
+						_TOML_RemoveOwnedStage(tmp)
 		}
 		if !_TOML_StageMatches(tmp, body) {
 				global _ParseTomlCache
 				if _ParseTomlCache.Has(Path)
 						_ParseTomlCache.Delete(Path)
 				try LoggerError("TomlWrite", "The staging file for '{1}' did not match the complete canonical image. The previous contents are intact, so the change is NOT persisted.", Path)
+				_TOML_RemoveOwnedStage(tmp)
 				return false
 		}
 	; Publish only through the same-volume write-through adapter. The WAL may
@@ -896,6 +912,7 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 		if _ParseTomlCache.Has(Path)
 			_ParseTomlCache.Delete(Path)
 		try LoggerError("TomlWrite", "Write-through atomic replace of '{1}' was refused. The previous contents are intact, so the change is NOT persisted.", Path)
+		_TOML_RemoveOwnedStage(tmp)
 		return false
 	}
 

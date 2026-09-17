@@ -121,6 +121,25 @@ _IsBenignUiaOrphanedPatternError(Exc) {
 				and Exc.HasProp("What") and InStr(Exc.What, "UIA.IUIAutomationBase.Prototype.Release") == 1
 }
 
+; Keep the callback's cache ownership separate from desktop error handling.
+_ErgoptiRememberErrorReport(Cache, Signature, Now) {
+	Attempt := {tick: Now}
+	Cache[Signature] := Attempt
+	return _ErgoptiReleaseErrorReport.Bind(Cache, Signature, Attempt)
+}
+
+_ErgoptiReleaseErrorReport(Cache, Signature, Attempt) {
+	PreviousCritical := Critical("On")
+	try {
+		; A delayed failure can outlive the TTL or a cache clear. Equal ticks do
+		; not imply equal attempts, so only the exact retained owner may delete.
+		if !Cache.Has(Signature) || Cache[Signature] != Attempt
+			return false
+		Cache.Delete(Signature)
+		return true
+	} finally Critical(PreviousCritical)
+}
+
 ErgoptiGlobalErrorHandler(Exc, Mode) {
 		global ERROR_NET_DEDUP_TTL_MS, ERROR_NET_DEDUP_CACHE_CAP, _DriverBootPhase
 		; Before the driver owns a fully started input pipeline, an uncaught error
@@ -204,11 +223,11 @@ ErgoptiGlobalErrorHandler(Exc, Mode) {
 		Now := A_TickCount
 		if (_geh_dedup_map.Count >= ERROR_NET_DEDUP_CACHE_CAP)
 				_geh_dedup_map.Clear()
-		if (_geh_dedup_map.Has(Sig) and ((Now - _geh_dedup_map[Sig]) & 0xFFFFFFFF) <= ERROR_NET_DEDUP_TTL_MS) {
+		if (_geh_dedup_map.Has(Sig) and ((Now - _geh_dedup_map[Sig].tick) & 0xFFFFFFFF) <= ERROR_NET_DEDUP_TTL_MS) {
 				try LoggerDebug("ErgoptiPlus", "Uncaught error signature throttled (seen within {1} ms): {2}.", ERROR_NET_DEDUP_TTL_MS, Sig)
 				return true
 		}
-		_geh_dedup_map[Sig] := Now
+		ReleaseDedup := _ErgoptiRememberErrorReport(_geh_dedup_map, Sig, Now)
 
 		; Save a crash report before surfacing the generic alert. There is no
 		; opt-in prompt — CrashReport_PromptUser saves unconditionally and then
@@ -228,14 +247,9 @@ ErgoptiGlobalErrorHandler(Exc, Mode) {
 		; was written. Recording it above and never rolling it back meant one failed
 		; save silenced the next ERROR_NET_DEDUP_TTL_MS of identical crashes — which
 		; is how a repeatedly-throwing timer produces no reports at all.
-		; ReleaseDedup is a closure over the static throttle map. The throttle has to
-		; be recorded BEFORE the report is attempted — the handler must decide
-		; whether to proceed before it can know the outcome — so without a way to
-		; roll it back, one failed write silenced every recurrence of the same fault
-		; for the whole TTL. That is the mechanism behind twelve uncaught errors
-		; producing zero crash reports. A closure keeps the map a function static
-		; rather than moving driver state into a global just to reach it.
-		ReleaseDedup := (*) => _geh_dedup_map.Delete(Sig)
+		; ReleaseDedup retains the static map and exact admission. A failed write
+		; releases its own throttle, while a delayed callback cannot retire a newer
+		; report for the same signature after TTL expiry or cache-cap eviction.
 		SetTimer(_ErgoptiDeferredCrashReport.Bind(Exc, ReleaseDedup), -1)
 		; Surface the error via a NON-BLOCKING tray notification, not a modal MsgBox.
 		; A modal dialog on the input thread starves the keyboard hook — every key

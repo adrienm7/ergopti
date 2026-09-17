@@ -65,11 +65,12 @@ local function load_controller(options)
 
 	package.loaded["adapters.shell_runner"] = {
 		_active_tasks = {},
-		spawn = function(executable, args, on_done, on_chunk)
+		spawn = function(executable, args, on_done, on_chunk, environment)
 			local start_result = ctx.next_start_result
 			if start_result == nil then start_result = true end
 			local task = {
 				executable = executable,
+				environment = environment,
 				args = args,
 				on_done = on_done,
 				on_chunk = on_chunk,
@@ -172,7 +173,7 @@ local function load_controller(options)
 	package.loaded["platform.remap.lease_helper"] = {
 		resolve = function()
 			ctx.helper_resolve_calls = ctx.helper_resolve_calls + 1
-			return ctx.helper_path, ctx.helper_error
+			return ctx.helper_path, ctx.helper_error, ctx.helper_environment
 		end,
 	}
 

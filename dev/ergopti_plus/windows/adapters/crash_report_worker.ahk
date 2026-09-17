@@ -59,6 +59,10 @@ _CrashReportWorkerLogError(FormatString, Args*) {
 ; ==========================================
 
 class _CrashReportMappingNative {
+	static AllocatePayload(Bytes) {
+		return Buffer(Bytes, 0)
+	}
+
 	static MapView(MappingHandle, Access, MappingBytes) {
 		return DllCall("MapViewOfFile", "Ptr", MappingHandle,
 			"UInt", Access, "UInt", 0, "UInt", 0, "UPtr", MappingBytes,
@@ -112,20 +116,33 @@ _CrashReportWorkerQueueMappingDebt(Mapping) {
 _CrashReportWorkerDrainMappingDebt(
 		Native := _CrashReportMappingNative) {
 	global _CrashReportWorkerMappingCleanupDebt
+	static Draining := false
 	PreviousCritical := Critical("On")
+	if Draining {
+		Critical(PreviousCritical)
+		return false
+	}
+	Draining := true
 	try {
+		; Pending owns these mappings until native release is acknowledged. The
+		; global queue can be empty during this interval, so nested admission must
+		; observe the drain owner instead of mistaking that empty queue for success.
 		Pending := _CrashReportWorkerMappingCleanupDebt
 		_CrashReportWorkerMappingCleanupDebt := []
 		for Mapping in Pending
 			Mapping["cleanup_queued"] := false
-	} finally Critical(PreviousCritical)
-	for Mapping in Pending {
-		if !_CrashReportWorkerMappingRelease(Mapping, Native)
-			_CrashReportWorkerQueueMappingDebt(Mapping)
+		Critical(PreviousCritical)
+		for Mapping in Pending {
+			if !_CrashReportWorkerMappingRelease(Mapping, Native)
+				_CrashReportWorkerQueueMappingDebt(Mapping)
+		}
+		Critical("On")
+		return _CrashReportWorkerMappingCleanupDebt.Length == 0
+	} finally {
+		Critical("On")
+		Draining := false
+		Critical(PreviousCritical)
 	}
-	PreviousCritical := Critical("On")
-	try return _CrashReportWorkerMappingCleanupDebt.Length == 0
-	finally Critical(PreviousCritical)
 }
 
 _CrashReportWorkerCreateMapping(Payload, OwnerId) {
@@ -134,13 +151,15 @@ _CrashReportWorkerCreateMapping(Payload, OwnerId) {
 
 	if !(Payload is String)
 		throw TypeError("Crash-report worker payload must be a String")
-	Utf8 := Buffer(StrPut(Payload, "UTF-8"), 0)
-	StrPut(Payload, Utf8, "UTF-8")
-	PayloadBytes := Utf8.Size - 1
+	PayloadBytes := StrPut(Payload, "UTF-8") - 1
 	if (PayloadBytes <= 0 or PayloadBytes > CRASH_REPORT_WORKER_MAX_PAYLOAD_BYTES)
 		throw ValueError("Crash-report worker payload exceeds its bounded mapping")
 	if !_CrashReportWorkerDrainMappingDebt()
 		throw Error("Previous crash-report mapping cleanup is still pending")
+	; Validate the encoded size before allocating a second copy of an oversized
+	; diagnostic, particularly when the original failure is memory pressure.
+	Utf8 := _CrashReportMappingNative.AllocatePayload(PayloadBytes + 1)
+	StrPut(Payload, Utf8, "UTF-8")
 
 	MappingName := "Local\ErgoptiCrash_" . DllCall("GetCurrentProcessId", "UInt")
 		. "_" . OwnerId . "_" . (A_TickCount & 0xFFFFFFFF)

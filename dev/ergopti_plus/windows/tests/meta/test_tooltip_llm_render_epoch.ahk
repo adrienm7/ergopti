@@ -79,7 +79,7 @@ _TLRE_LlmRichRenderRetiresDeferredLoadingOwner() {
 		and CaptureSerial > BumpSerial,
 		"lifecycle admission must precede every deferred-owner mutation, then the rich result must capture one request serial before build")
 	Present := InStr(BuildFlat,
-		"_TooltipPresentStack(Pos, Row, false, [], RenderGeneration, true, RequestSerial, 0, StateCommit)")
+		"_TooltipPresentStack(Pos, Row, false, [], RenderGeneration, true, RequestSerial, 0, StateCommit, &PresentBreakdown)")
 	Assert(Present > 0
 		and InStr(BuildFlat,
 			"RenderGeneration, true, -1, 0, StateCommit") == 0,

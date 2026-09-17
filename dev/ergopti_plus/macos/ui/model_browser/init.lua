@@ -20,6 +20,7 @@
 --- ==============================================================================
 
 local M = {}
+local WebviewResult = require("adapters.webview_result")
 
 local Logger     = require("infra.logger")
 local DeferredWork = require("infra.deferred_work")
@@ -77,7 +78,7 @@ local function submit_javascript(view, code)
 	end
 	local ok, result = pcall(function()
 		return view:evaluateJavaScript(code, function(_, script_error)
-			if script_error ~= nil then report("execution failed") end
+			if WebviewResult.is_error(script_error) then report("execution failed") end
 		end)
 	end)
 	if not ok then report("submission raised"); return false end

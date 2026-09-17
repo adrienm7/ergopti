@@ -25,6 +25,33 @@
 ; ===================================
 ; ===================================
 
+; Encode one URI component over UTF-8 bytes, preserving only unreserved ASCII.
+UriEncode(Value) {
+	Bytes := Buffer(StrPut(Value, "UTF-8"))
+	StrPut(Value, Bytes, "UTF-8")
+	Encoded := ""
+	Loop Bytes.Size - 1 {
+		Byte := NumGet(Bytes, A_Index - 1, "UChar")
+		if ((Byte >= 0x41 && Byte <= 0x5A) || (Byte >= 0x61 && Byte <= 0x7A)
+				|| (Byte >= 0x30 && Byte <= 0x39) || Byte = 0x2D || Byte = 0x2E
+				|| Byte = 0x5F || Byte = 0x7E) {
+			Encoded .= Chr(Byte)
+		} else {
+			Encoded .= "%" . Format("{:02X}", Byte)
+		}
+	}
+	return Encoded
+}
+
+; Absolute Windows paths retain their drive or UNC authority. Encode literal
+; percent signs before restoring path separators, so filenames cannot create
+; query strings, fragments or pre-existing escape sequences.
+FilePathToUrl(Path) {
+	Normalized := StrReplace(Path, "\", "/")
+	Encoded := StrReplace(StrReplace(UriEncode(Normalized), "%2F", "/"), "%3A", ":")
+	return "file:" . (SubStr(Normalized, 1, 2) = "//" ? "" : "///") . Encoded
+}
+
 ; Percent-decode a URI-encoded string. Percent-encoding is defined over BYTES,
 ; not codepoints: a non-ASCII character is encoded as several %XX octets that
 ; together form one UTF-8 multibyte sequence (e.g. "%C3%A9" is U+00E9). We must
@@ -55,12 +82,15 @@ UriDecode(s) {
 			ByteLen += 1
 			Pos += 3
 		} else {
-			; Re-encode the literal character to UTF-8 bytes. StrPut writes the
-			; encoded bytes followed by a NUL terminator, so the appended length
-			; is the return value minus one byte for that terminator.
-			Written := StrPut(Ch, Buf.Ptr + ByteLen, Buf.Size - ByteLen, "UTF-8")
+			; Convert a complete literal run so UTF-16 surrogate pairs stay intact.
+			; Encoding each code unit separately replaces them and can expand past
+			; the buffer sized for the original string's valid UTF-8 representation.
+			NextEscape := InStr(s, "%", false, Pos + 1)
+			LiteralLength := NextEscape ? NextEscape - Pos : Len - Pos + 1
+			Written := StrPut(SubStr(s, Pos, LiteralLength),
+				Buf.Ptr + ByteLen, Buf.Size - ByteLen, "UTF-8")
 			ByteLen += Written - 1
-			Pos += 1
+			Pos += LiteralLength
 		}
 	}
 	return StrGet(Buf, ByteLen, "UTF-8")

@@ -10,6 +10,10 @@
 #Include keylogger_journal_owner.ahk
 #Include keylogger_sql_append.ahk
 
+_KL_RolloverPending() {
+	return IsSet(Keylogger) && Keylogger.HasOwnProp("rollover_pending") ? Keylogger.rollover_pending : 0
+}
+
 _KL_JournalOwnerFor(Port := 0) {
 	static SharedOwner := KL_JournalOwner()
 	if !(Port is Map) || !Port.Has("owner")
@@ -35,8 +39,22 @@ _KL_JournalEnter(Token := 0, Port := 0) {
 		if Owner.HasDebt()
 			return 0
 	}
-	return {Owner: Owner, Token: Token, Acquired: Acquired,
+	Scope := {Owner: Owner, Token: Token, Acquired: Acquired,
 		PreviousCritical: Critical("Off")}
+	; Only the outer resident owner resumes rotation. Borrowed close operations
+	; must not recursively start recovery, and injected fixture owners are separate.
+	if Acquired && _KL_RolloverPending() && Owner = _KL_JournalOwnerFor() {
+		try {
+			if !_KL_RolloverResume(Token) {
+				_KL_JournalLeave(Scope)
+				return 0
+			}
+		} catch {
+			_KL_JournalLeave(Scope)
+			throw
+		}
+	}
+	return Scope
 }
 
 _KL_JournalLeave(Scope) {
@@ -164,20 +182,61 @@ _KL_JournalReadLines(Path, Offset, MaxLines, DecodeFn) {
 		Fh.Seek(Position, 0)
 		if Fh.Pos != Position
 			throw Error("Cannot seek to journal checkpoint")
-		SnapshotEndsWithNewline := _KL_JournalEndsWithNewline(Path, SnapshotLength)
 		Entries := []
 		Lines := 0
 		Checkpoint := Fh.Pos
 		IncompleteTail := false
-		while (Lines < MaxLines && Fh.Pos < SnapshotLength) {
-			LineStart := Fh.Pos
-			Line := Fh.ReadLine()
-			if (Fh.Pos >= SnapshotLength && !SnapshotEndsWithNewline) {
-				Checkpoint := LineStart
+		; ReadLine splits long records at its character limit. Frame UTF-8 bytes
+		; first so neither that limit nor a split code point acknowledges a fragment.
+		Chunk := Buffer(65536)
+		Available := 0
+		Cursor := 0
+		Record := Buffer(0)
+		while (Lines < MaxLines && Checkpoint < SnapshotLength) {
+			RecordLength := 0
+			Complete := false
+			loop {
+				if Cursor = Available {
+					if Fh.Pos >= SnapshotLength
+						break
+					Available := Fh.RawRead(Chunk, Min(Chunk.Size, SnapshotLength - Fh.Pos))
+					Cursor := 0
+					if Available = 0
+						throw Error("Journal read made no forward progress")
+				}
+				Start := Chunk.Ptr + Cursor
+				Delimiter := DllCall("msvcrt\memchr", "Ptr", Start, "Int", 10,
+					"UPtr", Available - Cursor, "CDecl Ptr")
+				Span := Delimiter ? Delimiter - Start : Available - Cursor
+				if Record.Size < RecordLength + Span
+					Record.Size := Max(RecordLength + Span, Record.Size * 2)
+				if Span
+					DllCall("ntdll\RtlMoveMemory", "Ptr", Record.Ptr + RecordLength,
+						"Ptr", Start, "UPtr", Span)
+				RecordLength += Span
+				Cursor += Span
+				if Delimiter {
+					Cursor += 1
+					Complete := true
+					break
+				}
+			}
+			if !Complete {
 				IncompleteTail := true
 				break
 			}
-			Checkpoint := Fh.Pos
+			Checkpoint := Fh.Pos - Available + Cursor
+			; Every complete record costs work, including blank and malformed lines.
+			Lines += 1
+			; StrGet truncates at NUL even with an explicit byte count. Such a
+			; record is malformed JSON, not a valid prefix followed by hidden bytes.
+			if RecordLength && DllCall("msvcrt\memchr", "Ptr", Record.Ptr, "Int", 0,
+				"UPtr", RecordLength, "CDecl Ptr") {
+				continue
+			}
+			if RecordLength && NumGet(Record, RecordLength - 1, "UChar") = 13
+				RecordLength -= 1
+			Line := RecordLength ? StrGet(Record, RecordLength, "UTF-8") : ""
 			if (Line = "")
 				continue
 			try {
@@ -185,7 +244,6 @@ _KL_JournalReadLines(Path, Offset, MaxLines, DecodeFn) {
 				if (Entry is Map && Entry.Has("type"))
 					Entries.Push(Entry)
 			}
-			Lines += 1
 		}
 		return Map("ok", true, "offset", Checkpoint, "entries", Entries,
 			"eof", Checkpoint >= SnapshotLength && !IncompleteTail)

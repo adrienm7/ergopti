@@ -33,7 +33,10 @@ _MSE_LaunchRetainsResolvedStore(Replace := false, Which := "typing") {
 		KLUI_EnsureUrls(StoreB)
 		UrlB := Which = "typing" ? KLUI.typing_url : KLUI.apps_url
 		AssertFalse(UrlA == UrlB, "opening another store must refresh cached Edge URLs")
-		AssertContains(UrlB, StrReplace(KLPF_PrefetchPath(Which, StoreB), "\", "/"))
+		Parts := StrSplit(UrlB, "#prefetch=")
+		AssertEqual(2, Parts.Length)
+		AssertEqual("file:///" . StrReplace(KLPF_PrefetchPath(Which, StoreB), "\", "/"),
+			UriDecode(UriDecode(Parts[2])), "the decoded sidecar must retain the exact store")
 		_ConfigDir := StoreB . "\"
 		KLUI_LaunchWindow(UrlA, "fixture", StoreA)
 		AssertEqual(1, SpawnArgs.Length)

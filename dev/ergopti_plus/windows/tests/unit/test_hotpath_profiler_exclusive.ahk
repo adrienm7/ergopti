@@ -64,6 +64,15 @@ _HPX_Number(Line, Pattern, What) {
 	return M[1] + 0
 }
 
+; Keep clock and sink evidence numeric: a missing diagnostic must be actionable
+; without dumping unrelated captured messages or changing profiler thresholds.
+_HPX_MissingLineEvidence(Label, StartTicks, EndTicks, Lines) {
+	global _HOTPATH_QPC_FREQ, _HOTPATH_SLOW_MS, _HOTPATH_SLOW_MS_BY_SEGMENT, _LOGGER_WARN_ENABLED
+	return Format(" [pre_log_ticks={1}, frequency={2}, threshold_ms={3}, warning_enabled={4}, captured={5}]",
+		EndTicks - StartTicks, _HOTPATH_QPC_FREQ,
+		_HOTPATH_SLOW_MS_BY_SEGMENT.Get(Label, _HOTPATH_SLOW_MS), _LOGGER_WARN_ENABLED, Lines.Length)
+}
+
 
 
 
@@ -80,6 +89,7 @@ _HPX_NestedSegmentIsNotBilledToItsParent() {
 	Outer := HotPath_Now()
 	Inner := HotPath_Now()
 	_HPX_BurnTicks(25)
+	InnerEnd := HotPath_Now()
 	HotPath_LogIfSlow("HpxInner", Inner, "inner")
 	HotPath_LogIfSlow("HpxOuter", Outer, "outer")
 	LoggerClearTestSink()
@@ -87,7 +97,8 @@ _HPX_NestedSegmentIsNotBilledToItsParent() {
 	InnerLine := _HPX_FindLine(Captured, "Slow HpxInner")
 	OuterLine := _HPX_FindLine(Captured, "Slow HpxOuter")
 	Assert(InnerLine != "",
-		"the inner segment must be reported — it burned well past _HOTPATH_SLOW_MS")
+		"the inner segment must be reported — it burned well past _HOTPATH_SLOW_MS"
+		. _HPX_MissingLineEvidence("HpxInner", Inner, InnerEnd, Captured))
 	Assert(OuterLine != "",
 		"the outer segment must be reported — it fully contains the inner one")
 
@@ -111,11 +122,13 @@ _HPX_LeafSegmentKeepsThePlainLine() {
 	LoggerSetTestSink((Line) => Captured.Push(Line))
 	Leaf := HotPath_Now()
 	_HPX_BurnTicks(25)
+	LeafEnd := HotPath_Now()
 	HotPath_LogIfSlow("HpxLeaf", Leaf, "leaf")
 	LoggerClearTestSink()
 
 	LeafLine := _HPX_FindLine(Captured, "Slow HpxLeaf")
-	Assert(LeafLine != "", "the leaf segment must be reported")
+	Assert(LeafLine != "", "the leaf segment must be reported"
+		. _HPX_MissingLineEvidence("HpxLeaf", Leaf, LeafEnd, Captured))
 	Assert(InStr(LeafLine, "nested") == 0,
 		"a segment with nothing measured inside it must not grow a nested breakdown — every millisecond of it really was its own work")
 	Assert(InStr(LeafLine, "(leaf)") > 0,

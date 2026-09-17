@@ -20,10 +20,11 @@ _WVRO_RangeOutcome(Mode, View, Lines, Unhandled, Failure) {
 		if Mode == "sync"
 			View.Failure := Failure
 		Accepted := KLWV_OnRangeBuildTerminal("typing", 51, 42, "ok", Path)
+		OwnedPath := Entry.Has("range_stage") ? Entry["range_stage"]["stage"] : Path
 		AssertEqual(Mode != "sync", Accepted)
 		if Mode != "sync" {
 			AssertEqual(0, View.Messages.Length)
-			AssertTrue(FSExists(Path))
+			AssertTrue(FSExists(OwnedPath))
 			if Mode == "replace"
 				KLWV.windows["typing"] := Map("epoch", 51, "webview", View)
 			else if Mode == "close"
@@ -37,7 +38,7 @@ _WVRO_RangeOutcome(Mode, View, Lines, Unhandled, Failure) {
 			_WVSO_Drain(View)
 		}
 		AssertEqual(0, Unhandled.Length)
-		AssertEqual(Mode == "success", !!FSExists(Path),
+		AssertEqual(Mode == "success", !!FSExists(OwnedPath),
 			"only a rejected native call permits immediate stage removal")
 		if Mode == "pause" {
 			AssertEqual(0, View.Messages.Length)
@@ -57,7 +58,10 @@ _WVRO_RangeOutcome(Mode, View, Lines, Unhandled, Failure) {
 			AssertEqual("failed", Payload["status"])
 		}
 		AssertContains(Lines[1], Mode == "success" ? "[DEBUG]" : "[ERROR]")
-	} finally FSDelete(Path)
+	} finally {
+		KLWV_RetireRangeStage(Entry)
+		FSDelete(Path)
+	}
 }
 Test("WebView range: native rejection releases the current request (webview-script-outcome)",
 	_WVSO_WithFixture.Bind(_WVRO_RangeOutcome.Bind("reject")))

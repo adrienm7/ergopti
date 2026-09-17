@@ -8,11 +8,7 @@
 #Requires AutoHotkey v2.0
 #Include ../../modules/keylogger/keylogger_ingest.ahk
 
-; Rollover belongs to the resident lifecycle. These cases explicitly own the
-; current day; reaching this boundary would invalidate their fixture.
-KL_DayRollover(Token := 0) {
-	throw Error("Unexpected rollover in isolated ingestion test.")
-}
+#Include ../../modules/keylogger/keylogger_rollover.ahk
 
 _KIER_EncryptionRetry(Mode) {
 	global KL_ENC_Enabled, KL_ENC_KeyBuffer, KL_ENC_DerivationFailed
@@ -29,6 +25,7 @@ _KIER_EncryptionRetry(Mode) {
 	Windows := KLWV.windows
 	Root := _FSWL_Path() . "-ingest"
 	Db := 0
+	StateLock := 0
 	OwnsRoot := false
 	OwnsJournal := false
 	try {
@@ -59,14 +56,26 @@ _KIER_EncryptionRetry(Mode) {
 		FileAppend("-- prior`n", Keylogger.data_sql_path, "UTF-8-RAW")
 		AssertTrue(KL_SaveState())
 		StateBefore := FileRead(Keylogger.state_json_path, "UTF-8")
-		KL_Enc_SetMachineIdOverride("")
+		KL_Enc_SetMachineIdOverride(Mode = "state" ? "00000000-0000-0000-0000-000000000001" : "")
 		KL_Enc_SetEnabled(true)
+		if Mode = "state"
+			StateLock := FileOpen(Keylogger.state_json_path, "r-wd")
 		Refused := KL_IngestOnce(true, true)
-		AssertFalse(Refused["ok"], "encryption refusal must not acknowledge the consumed journal")
+		if IsObject(StateLock) {
+			StateLock.Close()
+			StateLock := 0
+		}
+		AssertFalse(Refused["ok"], "publication refusal must not acknowledge the consumed journal")
 		AssertEqual(0, Keylogger.today_log_offset)
 		AssertEqual(StateBefore, FileRead(Keylogger.state_json_path, "UTF-8"))
-		AssertEqual("-- prior`n", FileRead(Keylogger.data_sql_path, "UTF-8"),
-			"a mixed batch must not partially publish its unencrypted sibling")
+		if Mode = "state" {
+			AssertEqual("state_failed", Refused["reason"])
+			AssertContains(FileRead(Keylogger.data_sql_path, "UTF-8"), "INSERT OR IGNORE INTO events_typing",
+				"the refusal must occur after the SQL append")
+		} else {
+			AssertEqual("-- prior`n", FileRead(Keylogger.data_sql_path, "UTF-8"),
+				"a mixed batch must not partially publish its unencrypted sibling")
+		}
 		JournalBeforeRetry := FileRead(Keylogger.today_log_path, "UTF-8")
 		JournalRead := _KL_JournalReadLines(Keylogger.today_log_path, 0, 10, KL_JsonDecode)
 		AssertEqual(Mode = "mixed" ? 2 : 1, JournalRead["entries"].Length,
@@ -92,6 +101,8 @@ _KIER_EncryptionRetry(Mode) {
 		AssertTrue(KL_IngestOnce(true, true)["ok"])
 		AssertEqual(Sql, FileRead(Keylogger.data_sql_path, "UTF-8"), "a drained journal must not append again")
 	} finally {
+		if IsObject(StateLock)
+			StateLock.Close()
 		if Db
 			SQLite_Close(Db)
 		if OwnsJournal && Keylogger.HasOwnProp("_today_fh") && IsObject(Keylogger._today_fh)
@@ -116,6 +127,11 @@ _KIER_EncryptionRetry(Mode) {
 for Mode in ["disk", "mixed", "pending"]
 	Test("Keylogger ingestion: encryption retry " . Mode . " (ingest-encryption-retry)",
 		_KIER_EncryptionRetry.Bind(Mode))
+
+; The harness writes state directly. This tests ingestion's failure transaction,
+; not the production atomic rename implementation.
+Test("Keylogger ingestion: state refusal after SQL append replays exactly once (ingest-state-retry)",
+	_KIER_EncryptionRetry.Bind("state"))
 
 _KIER_RequeueOnlyUnwritten() {
 	Saved := Keylogger._pending_entries
