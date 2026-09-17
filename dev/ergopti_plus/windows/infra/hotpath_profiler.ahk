@@ -8,7 +8,7 @@
 ; coarse for a keystroke that should complete in well under a millisecond. This
 ; module uses QueryPerformanceCounter (sub-microsecond) and logs ONLY keystrokes
 ; that exceed a threshold, so normal typing produces zero log noise while any
-; real hitch surfaces with the offending character and buffer for diagnosis.
+; real hitch identifies its segment and duration without recording input content.
 ;
 ; FEATURES & RATIONALE:
 ; 1. QPC precision: the only way to see a 2 ms vs 0.2 ms keystroke difference.
@@ -199,19 +199,17 @@ HotPath_LogIfSlow(Label, StartTicks, Detail := "") {
 ; renders them into its own (already gated) line. Cost when the parent is fast:
 ; one array push per sub-step and one discarded string build — no I/O, no log.
 ;
-; Deliberately a static local rather than a module global, matching the nesting
-; ring above: this file's mutable state stays inside the functions that own it.
-; @param Op {String} "reset" | "mark" | "drain".
+; Each presentation owns its marks so reentrant work cannot reset or consume
+; an interrupted parent's measurements. Abandoned scopes die with their caller.
+; @param Marks {Array} Sub-step accumulator owned by one presentation.
+; @param Op {String} "mark" | "drain".
 ; @param Label {String} Sub-step name, for "mark".
 ; @param StartTicks {Integer} QPC value at sub-step entry, for "mark".
 ; @returns {String} For "drain", the rendered attribution; "" otherwise.
-_HotPathBreakdown(Op, Label := "", StartTicks := 0) {
+_HotPathBreakdown(Marks, Op, Label := "", StartTicks := 0) {
 	global _HOTPATH_QPC_FREQ, _HOTPATH_BREAKDOWN_CAP
-	static Marks := []
-	if (Op == "reset") {
-		Marks := []
-		return ""
-	}
+	if !(Marks is Array)
+		throw TypeError("Hot-path breakdown requires an owned marks array.")
 	if (Op == "mark") {
 		if (Marks.Length >= _HOTPATH_BREAKDOWN_CAP)
 			return ""
@@ -224,31 +222,34 @@ _HotPathBreakdown(Op, Label := "", StartTicks := 0) {
 				? ((now - StartTicks) / _HOTPATH_QPC_FREQ * 1000.0) : 0.0 })
 		return ""
 	}
-	; "drain" — render and clear, so a parent that never drains cannot leak its
-	; sub-steps into the next segment's line.
+	if Op != "drain"
+		throw ValueError("Unknown hot-path breakdown operation.")
+	; Render and clear only this caller's marks.
 	Text := ""
 	for , Mark in Marks
 		Text .= (Text == "" ? "" : " + ") . Mark.L . " " . Round(Mark.Ms, 2) . " ms"
-	Marks := []
+	Marks.Length := 0
 	return Text
 }
 
-; Discard any sub-steps left over from an earlier segment. Call at the top of the
-; composite segment, never at the top of a sub-step.
+; Create the sub-step accumulator for one composite segment.
+; @returns {Array} Caller-owned marks; pass to every mark and the final drain.
 HotPath_BreakdownBegin() {
-	_HotPathBreakdown("reset")
+	return []
 }
 
 ; Record one closed sub-step of the segment currently being measured.
 ; @param Label {String} Short sub-step name (e.g. "border").
 ; @param StartTicks {Integer} QPC value captured by HotPath_Now at sub-step entry.
-HotPath_BreakdownMark(Label, StartTicks) {
-	_HotPathBreakdown("mark", Label, StartTicks)
+; @param Marks {Array} Accumulator returned by HotPath_BreakdownBegin.
+HotPath_BreakdownMark(Label, StartTicks, Marks) {
+	_HotPathBreakdown(Marks, "mark", Label, StartTicks)
 }
 
 ; Render the accumulated sub-steps as a Detail string and clear them. Pass the
 ; result straight to HotPath_LogIfSlow as its Detail argument.
+; @param Marks {Array} Accumulator owned by the measured composite segment.
 ; @returns {String} e.g. "prepare 0.15 ms + corners 0.46 ms + border 4.33 ms".
-HotPath_BreakdownDetail() {
-	return _HotPathBreakdown("drain")
+HotPath_BreakdownDetail(Marks) {
+	return _HotPathBreakdown(Marks, "drain")
 }

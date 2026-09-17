@@ -19,6 +19,7 @@
 --- ==============================================================================
 
 local M = {}
+local WebviewResult = require("adapters.webview_result")
 
 local i18n         = require("infra.i18n")
 local toml_writer  = require("infra.toml.writer")
@@ -117,7 +118,7 @@ local function submit_data(owner, view, method, payload)
 		if not admitted then pending = pending or { error = script_error }; return end
 		settled = true
 		if not publication_is_current(owner, view) then return end
-		if script_error ~= nil then failed = true; report("execution failed"); return end
+		if WebviewResult.is_error(script_error) then failed = true; report("execution failed"); return end
 		Logger.debug(LOG, "Onboarding JavaScript completed (%s).", method)
 	end
 	local ok, candidate = pcall(function()

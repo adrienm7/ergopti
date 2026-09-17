@@ -177,8 +177,8 @@ _KLRCE_FailedPublication(Db, Entry) {
 Test("KLR cache: rejected metadata publication cleans its stage and remains retryable (klr-cache-encryption)",
 	_KLRDC_CheckTeardown.Bind(_KLRCE_PublishedCache.Bind(_KLRCE_FailedPublication)))
 
-_KLRCE_UnsafeSource(Db, Entry) {
-	AssertTrue(SQLite_Exec(Db, "CREATE TABLE main.klr_reader_typing_payload(events_json TEXT);"
+_KLRCE_UnsafeSource(Db, Entry, TableName := "klr_reader_typing_payload") {
+	AssertTrue(SQLite_Exec(Db, "CREATE TABLE main." . TableName . "(events_json TEXT);"
 		. "INSERT INTO main.klr_reader_typing_payload VALUES('[[],[]]');"))
 	AssertFalse(KLR_CacheSave(Db, KLRCache.last_sizes, _KLRDC_Root(), "", KLRCache.ledger_snapshots),
 		"a legacy main-schema payload must be refused before any backup")
@@ -186,9 +186,37 @@ _KLRCE_UnsafeSource(Db, Entry) {
 	Stored := SQLite_Open(KLR_CachePath(_KLRDC_Root()), SQLiteConst.OPEN_RO)
 	AssertTrue(Stored != 0)
 	try AssertEqual(0, SQLite_Query(Stored,
-		"SELECT COUNT(*) AS n FROM sqlite_schema WHERE name='klr_reader_typing_payload';")[1]["n"],
+		"SELECT COUNT(*) AS n FROM sqlite_schema WHERE name='klr_reader_typing_payload' COLLATE NOCASE;")[1]["n"],
 		"refusing an unsafe source must preserve the prior safe image")
 	finally SQLite_Close(Stored)
 }
 Test("KLR cache: main-schema ordered payloads cannot enter publication (klr-cache-encryption)",
 	_KLRDC_CheckTeardown.Bind(_KLRCE_PublishedCache.Bind(_KLRCE_UnsafeSource)))
+
+for TableName in ["KLR_READER_TYPING_PAYLOAD", "Klr_Reader_Typing_Payload"]
+	Test("KLR cache: unsafe table spelling=" . TableName . " refuses publication (klr-cache-payload-case)",
+		_KLRDC_CheckTeardown.Bind(_KLRCE_PublishedCache.Bind(_KLRCE_UnsafeSource.Bind(, , TableName))))
+
+_KLRCE_UnsafeStoredImage(Db, Entry, Worker) {
+	Path := KLR_CachePath(_KLRDC_Root())
+	Stored := SQLite_Open(Path)
+	AssertTrue(Stored != 0)
+	try AssertTrue(SQLite_Exec(Stored,
+		"CREATE TABLE main.KLR_READER_TYPING_PAYLOAD(events_json TEXT);"
+		. "INSERT INTO main.klr_reader_typing_payload VALUES('[[],[]]');"))
+	finally SQLite_Close(Stored)
+	KLR_ResetCache()
+	KLRCache.disposable := Worker
+	AssertEqual(0, KLR_CacheAttach(_KLRDC_Root(), ""), "an unsafe existing image must not be admitted")
+	AssertEqual(0, KLRCache.db, "neither resident copying nor readonly transfer may expose the rejected image")
+	AssertFalse(FSExists(Path), "the observed unsafe derived image must be retired after closing SQLite")
+	Recovered := KLR_BuildDatabase(_KLRDC_Root())
+	AssertTrue(Recovered != 0)
+	AssertEqual(2, SQLite_Query(Recovered, "SELECT chars FROM agg_app_day;")[1]["chars"],
+		"rejection must allow reconstruction from the encrypted synthetic ledger")
+	AssertEqual(0, SQLite_Query(Recovered,
+		"SELECT COUNT(*) AS n FROM main.sqlite_schema WHERE name='klr_reader_typing_payload' COLLATE NOCASE;")[1]["n"])
+}
+for Worker in [false, true]
+	Test("KLR cache: unsafe stored image worker=" . Worker . " is rejected (klr-cache-payload-admission)",
+		_KLRDC_CheckTeardown.Bind(_KLRCE_PublishedCache.Bind(_KLRCE_UnsafeStoredImage.Bind(, , Worker))))

@@ -721,7 +721,7 @@ _TooltipShowNow(Items, DurationSec := 0, ArmSafety := true, OriginMs?,
         Presented := _TooltipPresentStack(Pos, Row, ArmSafety,
 			OwnedPresentation ? [] : Items,
 			RenderGeneration, OwnedPresentation, RequestSerial, LifecyclePlan,
-			CommitFn)
+			CommitFn, &PresentBreakdown)
 	} catch Error as PresentError {
 		if PresentError is TooltipNavOwnerRetryError
 				|| PresentError is TooltipLlmStaleRenderError
@@ -731,8 +731,8 @@ _TooltipShowNow(Items, DurationSec := 0, ArmSafety := true, OriginMs?,
 		return false
     }
     ; Drain sub-step attribution even when the final freshness/deadline commit
-    ; refuses the reveal; otherwise its marks leak into the next render.
-    HotPath_LogIfSlow("Tooltip.Present", _hpPresent, HotPath_BreakdownDetail())
+    ; refuses the reveal, so rejected work retains its own attribution.
+    HotPath_LogIfSlow("Tooltip.Present", _hpPresent, HotPath_BreakdownDetail(PresentBreakdown))
     if !Presented {
         TooltipHide("StaleBeforeReveal", true, RenderGeneration,
             unset, RequestSerial)

@@ -56,8 +56,8 @@ _CRNS_ThrottleIsReleasedOnFailure() {
 	; to a global to work around that moves driver state for a diagnostic.
 	Assert(InStr(Handler, "ReleaseDedup") > 0,
 		"the handler must pass a releaser to the deferred crash report, so a report that fails to save can clear its own throttle entry")
-	Assert(InStr(Handler, "_geh_dedup_map.Delete(") > 0,
-		"the releaser must delete the signature from the throttle cache")
+	Assert(InStr(Handler, "_ErgoptiRememberErrorReport(") > 0,
+		"the handler must obtain the attempt-owned releaser exercised by the behavioral dedup tests")
 
 	Deferred := _DriverFuncBody("_ErgoptiDeferredCrashReport")
 	Assert(Deferred != "", "_ErgoptiDeferredCrashReport() must exist")

@@ -21,6 +21,7 @@
 --- ==============================================================================
 
 local M = {}
+local WebviewResult = require("adapters.webview_result")
 
 local hs         = hs
 local fs         = require("hs.fs")
@@ -174,7 +175,7 @@ local function submit_javascript(generation, webview, code, label, callback, exp
 		if not admitted then pending = pending or { result = result, error = script_error }; return end
 		settled = true
 		if not is_current_window(generation, webview) or _focus_owner ~= owner then return end
-		if script_error ~= nil then failed = true; report("execution failed"); return end
+		if WebviewResult.is_error(script_error) then failed = true; report("execution failed"); return end
 		if expect_boolean and type(result) ~= "boolean" then
 			failed = true
 			report("publication result invalid")

@@ -163,6 +163,16 @@ _KLPF_ArmCleanupRetry() {
 	}
 }
 
+; Mount directories contain one owned file. Never recursively delete unexpected
+; contents; refusal remains in the same retry-debt protocol as a locked stage.
+_KLPF_DeleteRangeMount(Directory, Path) {
+	if !FSDelete(Path)
+		return false
+	if DirExist(Directory)
+		DirDelete(Directory)
+	return true
+}
+
 KLPF_DeletePrivateStage(Path, DeleteFn := 0) {
 	global _KLPF_CLEANUP_DEBTS
 	if (Path = "")
@@ -204,10 +214,19 @@ KLPF_RetryPrivateStageCleanup(ExpectedToken := 0, *) {
 		}
 		_KLPF_CLEANUP_TIMER := 0
 		Snapshot := _KLPF_CLEANUP_DEBTS.Clone()
+		Jobs := KLPFWorker.jobs.Clone()
 	} finally {
 		Critical(PreviousCritical)
 	}
 
+	; terminate() suppresses process completion callbacks even when it cannot
+	; confirm quiescence. Keep retrying those producers before retiring stages,
+	; or coalesced dashboard refreshes can wait forever behind a canceled job.
+	for JobKey, Job in Jobs {
+		if Job.Get("cancel_retry_pending", false) && KLPFWorker.jobs.Has(JobKey)
+				&& KLPFWorker.jobs[JobKey] == Job
+			KLPF_CancelBuild(JobKey)
+	}
 	for Path, Record in Snapshot {
 		Deleted := false
 		try Deleted := Record["delete"].Call(Path)
@@ -224,22 +243,28 @@ KLPF_RetryPrivateStageCleanup(ExpectedToken := 0, *) {
 	}
 
 	PreviousCritical := Critical("On")
-	try Pending := _KLPF_CLEANUP_DEBTS.Count > 0
-	finally Critical(PreviousCritical)
+	try {
+		Pending := _KLPF_CLEANUP_DEBTS.Count > 0
+		for JobKey, Job in KLPFWorker.jobs
+			Pending := Pending || Job.Get("cancel_retry_pending", false)
+	} finally Critical(PreviousCritical)
 	if Pending
 		_KLPF_ArmCleanupRetry()
 	return !Pending
 }
 
-KLPF_ReapOrphanRangeStages() {
+KLPF_ReapOrphanRangeStages(Directory := A_Temp) {
 	CurrentPid := KLPFWorker.process_id
 	CurrentOwner := KLPFWorker.owner_id
-	Loop Files A_Temp . "\ergopti_metrics_range_*.stage.*.json", "F" {
+	Loop Files Directory . "\ergopti_metrics_range_*.stage.*.json", "F" {
 		Name := A_LoopFileName
 		if RegExMatch(Name,
-				"^ergopti_metrics_range_(?:typing|apps)\.stage\.(\d+)\.([0-9A-Fa-f-]+)\.\d+\.json$",
+				"^ergopti_metrics_range_(?:typing|apps)\.stage\.([1-9]\d{0,9})\.([0-9A-Fa-f-]+)\.\d+\.json$",
 				&Match) {
 			OwnerPid := Integer(Match[1])
+			; Only a representable Windows PID can establish process ownership.
+			if OwnerPid > 0xFFFFFFFF
+				continue
 			OwnerId := Match[2]
 			if (OwnerPid = CurrentPid) && (OwnerId = CurrentOwner)
 				continue
@@ -257,7 +282,30 @@ KLPF_ReapOrphanRangeStages() {
 }
 
 KLPF_InitializeCleanup() {
-	return KLPF_ReapOrphanRangeStages() && KLPF_ReapOrphanPrefetchStages()
+	return KLPF_ReapOrphanRangeStages() && KLPF_ReapOrphanRangeMounts() && KLPF_ReapOrphanPrefetchStages()
+}
+
+KLPF_ReapOrphanRangeMounts(Directory := A_Temp) {
+	Loop Files Directory . "\ergopti_metrics_range_*.stage.*.json.mount", "D" {
+		if InStr(A_LoopFileAttrib, "L")
+			continue
+		if !RegExMatch(A_LoopFileName,
+				"^ergopti_metrics_range_(?:typing|apps)\.stage\.([1-9]\d{0,9})\."
+				. "[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}\.\d+\.json\.mount$", &Match)
+			continue
+		OwnerPid := Integer(Match[1])
+		if OwnerPid > 0xFFFFFFFF
+			continue
+		try {
+			if ProcessExist(OwnerPid)
+				continue
+		} catch {
+			continue
+		}
+		Mount := A_LoopFileFullPath
+		KLPF_DeletePrivateStage(Mount . "\range.json", _KLPF_DeleteRangeMount.Bind(Mount))
+	}
+	return true
 }
 
 ; Only the new PID-bearing names prove liveness ownership. Keep canonical
@@ -519,7 +567,7 @@ KLPF_CancelBuild(which) {
 		if !KLPFWorker.jobs.Has(which)
 				return true
 		job := KLPFWorker.jobs[which]
-		if job.Get("terminal_claimed", false) {
+		if job.Get("terminal_claimed", false) && !job.Get("cancel_retry_pending", false) {
 				; Completion keeps the registry entry through atomic publish and callback.
 				; Record a suspend/replacement that interrupts that yielded region; the
 				; completing owner will downgrade its terminal before delivery. Process
@@ -534,13 +582,20 @@ KLPF_CancelBuild(which) {
 		; so OnExit can refuse and retry instead of orphaning a detached worker.
 		job["terminal_claimed"] := true
 		job["cancel_requested"] := true
+		; A previous terminate() may have returned without proving quiescence.
+		; Retry that debt, but fence synchronous callbacks and nested cancellation
+		; while this attempt owns the process handle.
+		job["cancel_retry_pending"] := false
 		HasProcessOwner := IsObject(job["handle"])
 				&& HasMethod(job["handle"], "terminate")
 		Terminated := !HasProcessOwner
 		if HasProcessOwner
 				try Terminated := job["handle"].terminate()
-		if !((Terminated is Integer) && Terminated == true)
+		if !((Terminated is Integer) && Terminated == true) {
+				job["cancel_retry_pending"] := true
+				_KLPF_ArmCleanupRetry()
 				return false
+		}
 		KLPF_DeletePrivateStage(job["stage"])
 		if job.Get("request", "") != ""
 				KLPF_DeletePrivateStage(job["request"])
@@ -569,8 +624,11 @@ KLPF_InvokeTerminal(on_terminal, status, stage := "") {
 		try {
 				on_terminal.Call(status, stage)
 				return true
-		} catch as err {
-				try LoggerError("KLReader", "Background metrics terminal callback failed (status={1}): {2}", status, err.Message)
+		} catch Any as err {
+				; AHK permits arbitrary thrown values. Contain them so the owner can
+				; retire its job and stage; never serialize an arbitrary private value.
+				Detail := err is Error ? err.Message : "non-Error exception"
+				try LoggerError("KLReader", "Background metrics terminal callback failed (status={1}): {2}", status, Detail)
 				return false
 		}
 }
@@ -751,8 +809,7 @@ KLPF_WorkerMain() {
 				KLWConst.AUTO_REPEAT_MAX_DELAY_MS := Integer(A_Args[flag + 10])
 				KLWConst.HOLD_THRESHOLD_MS := Integer(A_Args[flag + 11])
 				if (which != "typing" && which != "apps") || (mode != "full" && mode != "live" && mode != "manifest" && mode != "range")
-						KLPF_WorkerRefuse("unsupported dashboard/mode pair '"
-								. which . "'/'" . mode . "'")
+						KLPF_WorkerRefuse("unsupported dashboard/mode pair")
 				if (mode = "range") {
 						phase := "range projection"
 						if (A_Args.Length < flag + 14)
@@ -762,7 +819,7 @@ KLPF_WorkerMain() {
 						if !(apps is Array)
 								KLPF_WorkerRefuse("range mode received a non-array app filter")
 						db := KLR_BuildDatabase(metrics_dir)
-						if !db || !KLPF_WriteAtomic(stage, KL_JsonEncode(KLR_ReadRangeSplitToday(db, A_Args[flag + 12], A_Args[flag + 13], apps)))
+						if !db || !KLPF_WriteAtomic(stage, KLR_BuildRangeSplitTodayJson(db, A_Args[flag + 12], A_Args[flag + 13], apps))
 								KLPF_WorkerFail(stage, phase)
 				} else {
 						phase := "projection"
@@ -958,6 +1015,7 @@ _KLPF_ReapStaleTemps(path, MaxAgeMs) {
 		try {
 				Loop Files, Dir . "\" . Name . ".*.tmp" {
 						if (DateDiff(A_Now, A_LoopFileTimeModified, "Seconds") * 1000 >= MaxAgeMs)
+								&& FSAtomicTempOwnerIsGone(A_LoopFileName, Name)
 								try FileDelete(A_LoopFileFullPath)
 				}
 		}
@@ -988,7 +1046,7 @@ KLPF_WriteAtomic(path, content) {
 		static MOVEFILE_WRITE_THROUGH    := 0x8
 		static FLAGS := MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH
 		static RETRY_DELAY_MS            := 50
-		; Older than this, a scratch file can only be debris from a hard kill.
+		; Age delays orphan cleanup; the producer-window check protects slow writes.
 		static STALE_TEMP_MS             := 60000
 		static WriteSeq := 0
 

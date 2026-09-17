@@ -105,6 +105,43 @@ _KLRHU_RecountFailurePreservesImage() {
 	}
 }
 
+_KLRHU_RecountRetryWithoutLedgerChange() {
+	_KLRDC_EnsureSharedDir()
+	_KLRDC_Reset()
+	SavedBatch := KLW.batch
+	KLW_ResetBatch()
+	try {
+		_KLRDC_WriteLedger(_KLRDC_Header()
+			. _KLRHU_Row("dev-one", 1, "2026-01-01", "fixture", Chr(0x1F600), "abcd", 2))
+		Db := KLR_BuildDatabase(_KLRDC_Root())
+		AssertTrue(Db != 0)
+		AssertFalse(KLRCache.disposable)
+		Offset := KLRCache.last_sizes[_KLRDC_LedgerPath()]
+		AssertTrue(SQLite_Exec(Db, "CREATE TRIGGER refuse_unit_recount BEFORE UPDATE ON agg_app_day "
+			. "BEGIN SELECT RAISE(ABORT,'synthetic private recount refusal');END;"))
+		_KLRDC_AppendLedger(_KLRHU_Declare("dev-one")
+			. _KLRHU_Row("dev-one", 2, "2026-01-02", "fixture", "x", "abcd", 3))
+		Snapshot := KLR_LedgerSnapshot(_KLRDC_LedgerPath())
+		AssertEqual(Db, KLR_BuildDatabase(_KLRDC_Root()), "failed recount must retain the resident snapshot")
+		AssertEqual(Offset, KLRCache.last_sizes[_KLRDC_LedgerPath()])
+		AssertEqual(1, SQLite_Query(Db, "SELECT COUNT(*) AS n FROM events_hotstring;")[1]["n"])
+		AssertTrue(SQLite_Exec(Db, "DROP TRIGGER refuse_unit_recount;"))
+		Db := KLR_BuildDatabase(_KLRDC_Root())
+		AssertTrue(KLR_LedgerSnapshotIsSame(Snapshot, KLR_LedgerSnapshot(_KLRDC_LedgerPath())),
+			"recovery must not depend on another ledger write")
+		AssertEqual(2, SQLite_Query(Db, "SELECT COUNT(*) AS n FROM events_hotstring;")[1]["n"],
+			"a recovered internal recount must retry the unchanged valid tail")
+		AssertEqual(Snapshot["size"], KLRCache.last_sizes[_KLRDC_LedgerPath()])
+		AssertEqual(2, SQLite_Query(Db, "SELECT hs_input_chars FROM agg_app_day WHERE date='2026-01-01';")[1]["hs_input_chars"])
+	} finally {
+		_KLRDC_Cleanup()
+		KLW.batch := SavedBatch
+	}
+}
+
+Test("hotstring units: recovered recount retries an unchanged ledger (hotstring-recount-retry)",
+	_KLRDC_CheckTeardown.Bind(_KLRHU_RecountRetryWithoutLedgerChange))
+
 _KLRHU_WriterRoundTrip(Db) {
 	_KLRDC_EnsureSharedDir()
 	AssertTrue(KLR_LoadSchema(Db))

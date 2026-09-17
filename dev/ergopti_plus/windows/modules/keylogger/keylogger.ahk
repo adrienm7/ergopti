@@ -98,6 +98,7 @@ class Keylogger {
     static next_event_id    := 1
     static today_log_offset := 0
     static today_log_date   := ""
+    static rollover_pending := 0
     ; Ownership latch for the multi-batch midnight transaction. It prevents
     ; an ingest timer from starting a second rollover while the first one is
     ; still draining/rotating yesterday's durable JSONL file.
@@ -278,6 +279,7 @@ _KL_ReapStaleTemps(path, MaxAgeMs) {
     try {
         Loop Files, Dir . "\" . Name . ".*.tmp" {
             if (DateDiff(A_Now, A_LoopFileTimeModified, "Seconds") * 1000 >= MaxAgeMs)
+                && FSAtomicTempOwnerIsGone(A_LoopFileName, Name)
                 try FileDelete(A_LoopFileFullPath)
         }
     }
@@ -317,9 +319,7 @@ KL_WriteAtomic(path, content) {
     static MOVEFILE_REPLACE_EXISTING := 0x1
     static MOVEFILE_WRITE_THROUGH    := 0x8
     static FLAGS := MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH
-    ; A scratch file older than this can only be debris from a hard kill — a
-    ; live write completes in milliseconds — so it is safe to reap. Deliberately
-    ; generous so a genuinely slow AV-throttled write is never targeted.
+    ; Age delays orphan cleanup; the producer-window check protects slow writes.
     static STALE_TEMP_MS := 60000
     static WriteSeq := 0
 
@@ -431,27 +431,6 @@ KL_EnsureGitignore() {
 ; ====================================
 ; ====================================
 
-KL_LoadState() {
-    if !FileExist(Keylogger.state_json_path)
-        return
-    try {
-        raw := FileRead(Keylogger.state_json_path, "UTF-8")
-        s   := KL_JsonDecode(raw)
-        if !(s is Map)
-            return
-        if s.Has("next_event_id")    && IsNumber(s["next_event_id"])
-            Keylogger.next_event_id    := Integer(s["next_event_id"])
-        if s.Has("today_log_offset") && IsNumber(s["today_log_offset"])
-            Keylogger.today_log_offset := Integer(s["today_log_offset"])
-        if s.Has("today_log_date")
-            Keylogger.today_log_date   := String(s["today_log_date"])
-        ; Restore the walker context if present. A missing key is fine:
-        ; the walker rebuilds context on the next typing entry.
-        if s.Has("ngram_ctx") {
-            try KLW_RestoreCtx(s["ngram_ctx"])
-        }
-    }
-}
 
 
 
@@ -972,93 +951,7 @@ KL_LogLlmAccepted(prediction_text, app_name, all_predictions, chosen_index) {
 
 #Include keylogger_ingest.ahk
 
-KL_DayRollover(Token := 0) {
-	if !Keylogger.initialized
-		return Map("ok", false, "reason", "not_initialized")
-	if Keylogger.rollover_in_progress
-		return Map("ok", false, "reason", "already_running")
-	if A_IsSuspended && !Keylogger._shutting_down
-		return Map("ok", false, "reason", "suspended")
-	Scope := _KL_JournalEnter(Token)
-	if !IsObject(Scope)
-		return Map("ok", false, "eof", false, "reason", "journal_unavailable")
-	try {
-	    if !Keylogger.initialized
-	        return Map("ok", false, "reason", "not_initialized")
-	    if Keylogger.rollover_in_progress
-	        return Map("ok", false, "reason", "already_running")
-	    if A_IsSuspended && !Keylogger._shutting_down
-	        return Map("ok", false, "reason", "suspended")
-
-	    Keylogger.rollover_in_progress := true
-	    try {
-	        old_date := Keylogger.today_log_date
-	        new_date := KL_Today()
-	        if (old_date = "") {
-	            Keylogger.today_log_date := new_date
-	            if !KL_SaveState()
-	                return Map("ok", false, "reason", "state_failed")
-	            return Map("ok", true, "reason", "initialised")
-	        }
-	        if (old_date = new_date)
-	            return Map("ok", true, "reason", "already_current")
-
-	        ; Force every bounded batch through the durable SQL + state commit.
-	        ; The delete is unreachable until the reader reports EOF from a
-	        ; successful ingest; a failed append/read/save leaves today.log intact.
-	        loop {
-	            ingest_result := KL_IngestOnce(true, true, Scope.Token)
-	            if !ingest_result["ok"]
-	                return Map("ok", false, "reason", ingest_result["reason"])
-	            if ingest_result["eof"]
-	                break
-	        }
-
-	        try FileAppend(
-	            "`n-- === day rollover " . old_date . " -> " . new_date . " ===`n",
-	            Keylogger.data_sql_path, "UTF-8")
-	        catch as err {
-	            try LoggerError("Keylogger", "Cannot write day rollover marker: {1}.",
-					err.Message)
-	            return Map("ok", false, "reason", "marker_failed")
-	        }
-
-	        if !KL_CloseTodayFh(Scope.Token)
-	            return Map("ok", false, "reason", "close_failed")
-	        if FileExist(Keylogger.today_log_path) {
-	            try FileDelete(Keylogger.today_log_path)
-	            catch as err {
-	                try LoggerError("Keylogger", "Cannot delete rolled today.log: {1}.",
-						err.Message)
-	                return Map("ok", false, "reason", "delete_failed")
-	            }
-	        }
-	        if FileExist(Keylogger.today_log_path)
-	            return Map("ok", false, "reason", "delete_failed")
-
-	        ; Publish the new date only after durable data and deletion succeeded.
-	        old_offset := Keylogger.today_log_offset
-	        Keylogger.today_log_offset := 0
-	        Keylogger.today_log_date   := new_date
-	        if !KL_SaveState() {
-	            ; The file is already rotated. Keep the old persisted epoch so a
-	            ; later retry is conservative (no data loss), rather than claiming
-	            ; a new day whose state was never durable.
-	            Keylogger.today_log_offset := old_offset
-	            Keylogger.today_log_date   := old_date
-	            return Map("ok", false, "reason", "state_failed")
-	        }
-	        ; A new day starts every walker context fresh. Yesterday's partial
-	        ; word / streak / current_burst is meaningless at midnight.
-	        try KLW_DayRolloverReset()
-	        return Map("ok", true, "reason", "rotated")
-	    } finally {
-	        Keylogger.rollover_in_progress := false
-	    }
-	} finally {
-		_KL_JournalLeave(Scope)
-	}
-}
+#Include keylogger_rollover.ahk
 
 KL_MidnightCheck() {
     if A_IsSuspended
@@ -1139,46 +1032,48 @@ KL_Init(metrics_dir) {
     KL_MkdirP(KL_ResolveTmpdir() . "ergopti_metrics\" . Keylogger.device_id)
     KL_EnsureGitignore()
     KL_WriteDeviceJson(obj)
-    KL_LoadState()
+    state_loaded := KL_LoadState()
+	; A prepared rotation must finish before an old offset is read against the
+	; deleted journal. Admission also keeps new producers behind this recovery.
+	if _KL_RolloverPending() {
+		RecoveryScope := _KL_JournalEnter()
+		if !IsObject(RecoveryScope) {
+			try LoggerError("Keylogger", "Initialization refused: pending journal rotation could not finish.")
+			return false
+		}
+		_KL_JournalLeave(RecoveryScope)
+	}
 
     ; Harden next_event_id against id reuse: never trust state.json alone. A
     ; Reload mid-burst can leave the persisted counter lagging the true max id
     ; already in data.sql; re-minting those ids would be silently dropped by
     ; the schema's INSERT OR IGNORE. Resolve to one past the highest persisted
     ; id so a new event can never collide with an existing one.
-    ; Read only the TAIL of data.sql — it is append-only and per-device, so the
-    ; highest id is always near the end. 64 KB covers thousands of recent INSERTs
-    ; and keeps startup I/O O(1) on 100+ MB files (keylogger-scan-max-id-performance).
-    sql_text := ""
+    ; A valid persisted counter plus the unconsumed journal protects ordinary
+    ; recovery. Without that counter, out-of-order historical rows require a
+    ; bounded-memory scan of the complete SQL source, not just its last bytes.
     try {
-        if FileExist(Keylogger.data_sql_path) {
-            fh := FileOpen(Keylogger.data_sql_path, "r", "UTF-8")
-            if IsObject(fh) {
-                fh.Seek(Max(0, fh.Length - KeylogConst.DATA_SQL_SCAN_TAIL_BYTES), 0)
-                sql_text := fh.Read()
-                fh.Close()
-            }
+        if state_loaded {
+            sql_text := _KL_ReadRecoveryText(Keylogger.data_sql_path, 0,
+                KeylogConst.DATA_SQL_SCAN_TAIL_BYTES)
+            sql_max_id := KL_ScanMaxEventId(sql_text, Keylogger._device_id_lit)
+        } else {
+            if FileExist(Keylogger.data_sql_path)
+                try LoggerWarn("Keylogger", "Allocation state unavailable; recovering identities from complete SQL history.")
+            sql_max_id := KL_RecoverSqlEventId(Keylogger.data_sql_path, Keylogger._device_id_lit)
         }
-    }
     ; Entries receive their id before JSONL publication. If the process died
     ; before advancing the journal offset, reserve past those durable ids too;
     ; otherwise a producer firing early in the next boot could collide with an
     ; uncommitted line before the ingest timer replays it.
-    journal_text := ""
-    try {
-        if FileExist(Keylogger.today_log_path) {
-            journal_fh := FileOpen(Keylogger.today_log_path, "r", "UTF-8")
-            if IsObject(journal_fh) {
-                journal_fh.Seek(Min(Max(0, Keylogger.today_log_offset),
-                    journal_fh.Length), 0)
-                journal_text := journal_fh.Read()
-                journal_fh.Close()
-            }
-        }
+        journal_max_id := _KL_RecoverJournalEventId(Keylogger.today_log_path, Keylogger.today_log_offset)
+    } catch as Err {
+        try LoggerError("Keylogger", "Initialization refused: event identity recovery failed ({1}).", Type(Err))
+        return false
     }
     max_id := Max(
-        KL_ScanMaxEventId(sql_text, Keylogger._device_id_lit),
-        KL_ScanMaxJournalEventId(journal_text))
+        sql_max_id,
+        journal_max_id)
     Keylogger.next_event_id := KL_ResolveStartId(Keylogger.next_event_id, max_id)
 
     if (Keylogger.today_log_date = "")

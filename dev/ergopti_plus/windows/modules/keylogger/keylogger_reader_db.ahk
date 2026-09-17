@@ -238,11 +238,12 @@ KLR_BuildDatabase(metrics_dir) {
 				}
 				applied := KLR_ApplyIncrementalWithCountUnits(candidate, update["tails"], logPath)
 				if !applied.Get("ok", false) {
-						; Retain only bounded identity/size/mtime metadata. Whether the tail
-						; is incomplete or invalid, a stable file cannot become valid; after
+						; Only source failures may suppress a retry; internal recount failures
+						; can recover without a write. For incomplete/invalid tails, after
 						; any append or in-place repair, all discarded sibling tails are read
 						; again from their unchanged published offsets.
-						KLRCache.pending_snapshots := KLR_TailSnapshots(update["tails"])
+						KLRCache.pending_snapshots := applied.Get("retry", false)
+								? Map() : KLR_TailSnapshots(update["tails"])
 						return KLR_ReleaseCandidate(candidate)
 				}
 
@@ -417,6 +418,11 @@ KLR_PublishCandidate(candidate, sizes, snapshots) {
 KLR_BuildColdCandidate(md, logPath) {
 		global KLRLastReplayFailure, KLRReplayDiagnosticFn
 		cold_tick := A_TickCount
+		try LedgerPaths := KLR_ListLedgerPaths(md)
+		catch Error as Failure {
+				try LoggerError("KLReader", "Metrics ledger discovery failed: {1}", Failure.Message)
+				return Map("ok", false, "db", 0, "sizes", Map())
+		}
 		db := SQLite_Open(":memory:")
 		KLR_PrefetchDebug(logPath, "KLR open returned db=" . db)
 		if !db {
@@ -434,26 +440,18 @@ KLR_BuildColdCandidate(md, logPath) {
 
 		loaded_sizes := Map()
 		loaded_snapshots := Map()
-		by_root := md . "by_device\"
-		if DirExist(by_root) {
-				; Fan out every device ledger into the private handle.  The offset
-				; comes from the FileObject position actually read, never a later
-				; FileGetSize that could include a concurrent append not yet executed.
-				loop files, by_root . "*", "D" {
-						; FullPath rewrites case and 8.3 prefixes, breaking store-scoped receipts.
-						sql_path := by_root . A_LoopFileName . "\data.sql"
-						if !FileExist(sql_path)
-								continue
-						loaded_offset := 0
-						if !KLR_ExecLargeFile(db, sql_path, &loaded_offset, &loaded_snapshot) {
-								KLR_PrefetchDebug(logPath, "KLR ledger load FAILED: " . sql_path)
-								try LoggerError("KLReader", "Metrics DB build failed while loading a device ledger. Dashboard retains its last-good data.")
-								try SQLite_Close(db)
-								return Map("ok", false, "db", 0, "sizes", Map())
-						}
-						loaded_sizes[sql_path] := loaded_offset
-						loaded_snapshots[sql_path] := loaded_snapshot
+		; Offsets come from the FileObject position actually read, never a later
+		; FileGetSize that could include a concurrent append not yet executed.
+		for sql_path in LedgerPaths {
+				loaded_offset := 0
+				if !KLR_ExecLargeFile(db, sql_path, &loaded_offset, &loaded_snapshot) {
+						KLR_PrefetchDebug(logPath, "KLR ledger load FAILED: " . sql_path)
+						try LoggerError("KLReader", "Metrics DB build failed while loading a device ledger. Dashboard retains its last-good data.")
+						try SQLite_Close(db)
+						return Map("ok", false, "db", 0, "sizes", Map())
 				}
+				loaded_sizes[sql_path] := loaded_offset
+				loaded_snapshots[sql_path] := loaded_snapshot
 		}
 		; The cold build is the dashboard's entire latency budget and it grows with
 		; the ledger, so every phase reports how long it took. Without these a build
@@ -556,7 +554,9 @@ KLR_ExecLargeFile(db, path, &loaded_offset, &loaded_snapshot := unset) {
 						}
 						chunk := read["text"]
 						loaded_snapshot := Snapshot
-						if (chunk = "")
+						; A leading NUL compares equal to empty despite retained text.
+						; Let the SQL parser count the hole and replay the following bytes.
+						if (StrLen(chunk) = 0)
 								break
 						; Append the previous incomplete tail and execute every complete
 						; statement. A complete invalid statement fails immediately.
@@ -661,12 +661,14 @@ SQLite_ExecReturnCarry(db, sql) {
 								? StrGet(cur, remaining_bytes, "UTF-8") : ""
 						complete := DllCall(SQLiteConst.DLL . "\sqlite3_complete",
 								"Ptr", cur, "Int")
-						if !complete
+						; Only a syntax failure can describe a split statement. Resource
+						; and connection failures remain failures regardless of punctuation.
+						if !complete && (rc & 0xFF) = SQLiteConst.ERROR
 								return Map("ok", true, "carry", remaining, "error", "",
 										"nul_bytes", nul_bytes)
 						try LoggerError("KLReader", "Metrics SQL prepare failed (rc={1}): {2}", rc, SQLite_LastError(db))
 						return Map("ok", false, "carry", "", "error", SQLite_LastError(db),
-								"nul_bytes", nul_bytes)
+								"nul_bytes", nul_bytes, "retry", (rc & 0xFF) != SQLiteConst.ERROR)
 				}
 				if !pstmt {
 						; prepare_v2 found no statement: what is left is whitespace, a
@@ -692,16 +694,18 @@ SQLite_ExecReturnCarry(db, sql) {
 								break
 				}
 				if (step_rc != SQLiteConst.DONE) {
+						; A prepared statement can fail because of mutable database state,
+						; including constraints or triggers, without invalid source bytes.
 						try LoggerError("KLReader", "Metrics SQL step failed (rc={1}): {2}", step_rc, SQLite_LastError(db))
 						SQLite_FinalizeStatement(pstmt)
 						return Map("ok", false, "carry", "", "error", SQLite_LastError(db),
-								"nul_bytes", nul_bytes)
+								"nul_bytes", nul_bytes, "retry", true)
 				}
 				finalize_rc := SQLite_FinalizeStatement(pstmt)
 				if (finalize_rc != SQLiteConst.OK) {
 						try LoggerError("KLReader", "Metrics SQL finalize failed (rc={1}): {2}", finalize_rc, SQLite_LastError(db))
 						return Map("ok", false, "carry", "", "error", SQLite_LastError(db),
-								"nul_bytes", nul_bytes)
+								"nul_bytes", nul_bytes, "retry", true)
 				}
 				if (!ptail || ptail <= cur) {
 						try LoggerError("KLReader", "Metrics SQL parser made no forward progress.")
@@ -776,6 +780,12 @@ KLR_ReadStableLedgerChunk(Reader, Path, Count := -1) {
 		if !KLR_LedgerFileIsSame(Snapshot, KLR_LedgerSnapshotFromHandle(Guard.Handle))
 			return Map("ok", false)
 		Text := Count = -1 ? Reader.Read() : Reader.Read(Count)
+		; File.Read may return empty/partial text on a native byte-lock refusal.
+		; The sharing guard fixes the observed EOF for the duration of this read.
+		EndOffset := Reader.Pos
+		if (Count = -1 && EndOffset != Snapshot["size"])
+				|| (StrLen(Text) = 0 && EndOffset < Snapshot["size"])
+			throw Error("Metrics ledger read stopped before its observed end.")
 		return Map("ok", true, "text", Text, "snapshot", Snapshot)
 	} catch Error as Failure {
 		try LoggerError("KLReader", "Stable ledger read failed; retaining the last-good projection: {1}.",
@@ -823,6 +833,11 @@ KLR_ReadLedgerTail(path, start_offset) {
 ; every tail is reread from its unchanged published offset so multiple devices
 ; still participate in one all-or-nothing publication.
 KLR_PrepareIncremental(md, logPath) {
+		try LedgerPaths := KLR_ListLedgerPaths(md)
+		catch Error as Failure {
+				try LoggerError("KLReader", "Incremental ledger discovery failed: {1}", Failure.Message)
+				return Map("ok", false, "rebuild", false, "changed", false, "tails", Map())
+		}
 		by_root := md . "by_device\"
 		if !DirExist(by_root) {
 				if KLRCache.last_sizes.Count {
@@ -839,10 +854,7 @@ KLR_PrepareIncremental(md, logPath) {
 		current_snapshots := Map()
 		seen_paths := Map()
 		changed := false
-		loop files, by_root . "*", "D" {
-				sql_path := by_root . A_LoopFileName . "\data.sql"
-				if !FileExist(sql_path)
-						continue
+		for sql_path in LedgerPaths {
 				seen_paths[sql_path] := true
 				snapshot := KLR_LedgerSnapshot(sql_path)
 				if !snapshot.Get("ok", false) {
@@ -931,7 +943,7 @@ KLR_PrepareIncremental(md, logPath) {
 				if !KLR_LedgerFileIsSame(snapshot, tail.Get("snapshot", 0))
 						return Map("ok", false, "rebuild", true, "changed", true, "tails", Map())
 				if (tail.Get("end_offset", published) <= published
-								|| tail.Get("sql", "") = "") {
+								|| StrLen(tail.Get("sql", "")) = 0) {
 						try LoggerError("KLReader", "Incremental ledger grew but produced no readable SQL bytes.")
 						return Map("ok", false, "rebuild", false, "changed", changed,
 								"tails", tails)
@@ -950,8 +962,8 @@ KLR_ApplyIncremental(db, tails, logPath) {
 		for sql_path, tail in tails {
 				result := SQLite_ExecReturnCarry(db, tail["sql"])
 				if !result.Get("ok", false) {
-						try LoggerError("KLReader", "Incremental metrics SQL is invalid; retaining the last-good dashboard projection.")
-						return Map("ok", false, "incomplete", false)
+						try LoggerError("KLReader", "Incremental metrics SQL execution failed; retaining the last-good dashboard projection.")
+						return Map("ok", false, "incomplete", false, "retry", result.Get("retry", false))
 				}
 				if result.Get("nul_bytes", 0) {
 						KLR_PrefetchDebug(logPath, "KLR incremental skipped "

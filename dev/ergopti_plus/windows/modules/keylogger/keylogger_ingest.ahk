@@ -9,6 +9,46 @@
 
 #Include keylogger_constants.ahk
 
+; Reject malformed allocation/checkpoint fields before publishing any of them.
+; Startup then recovers historical identities without trusting a partial state.
+KL_LoadState() {
+	if !FileExist(Keylogger.state_json_path)
+		return false
+	try {
+		State := KL_JsonDecode(FileRead(Keylogger.state_json_path, "UTF-8"))
+		if !(State is Map)
+			return false
+		; Even an invalid surrounding state cannot erase a pending rotation.
+		; The negative sentinel fences admission until a valid receipt is loaded.
+		if State.Has("rollover_pending")
+			Keylogger.rollover_pending := -1
+		CounterValid := State.Has("next_event_id") && State["next_event_id"] is Integer
+			&& State["next_event_id"] > 0
+		if !CounterValid
+			return false
+		if State.Has("today_log_offset")
+			&& (!(State["today_log_offset"] is Integer) || State["today_log_offset"] < 0)
+			return false
+		if State.Has("today_log_date") && !_KL_JournalDateValid(State["today_log_date"], true)
+			return false
+		if State.Has("rollover_pending")
+			&& (!State.Has("today_log_date") || !_KL_RolloverReceiptValid(
+				State["rollover_pending"], State.Get("today_log_offset", -1)))
+			return false
+		Keylogger.next_event_id := State["next_event_id"]
+		if State.Has("today_log_offset")
+			Keylogger.today_log_offset := State["today_log_offset"]
+		if State.Has("today_log_date")
+			Keylogger.today_log_date := State["today_log_date"]
+		Keylogger.rollover_pending := State.Get("rollover_pending", 0)
+		if State.Has("ngram_ctx") {
+			try KLW_RestoreCtx(State["ngram_ctx"])
+		}
+		return CounterValid
+	}
+	return false
+}
+
 KL_SaveState() {
     ngram_ctx := Map()
     try ngram_ctx := KLW_SerializeCtx()
@@ -22,6 +62,12 @@ KL_SaveState() {
     ; not propagate up the timer stack and kill the ingest tick. The next
     ; KL_SaveState a few seconds later will retry on a fresh write.
     try {
+        Pending := _KL_RolloverPending()
+        if Pending {
+            if !_KL_RolloverReceiptValid(Pending, Keylogger.today_log_offset)
+                throw Error("Cannot persist an invalid pending rollover receipt.")
+            s["rollover_pending"] := Pending
+        }
         KL_WriteAtomic(Keylogger.state_json_path, KL_JsonEncode(s))
         return true
     } catch as e {

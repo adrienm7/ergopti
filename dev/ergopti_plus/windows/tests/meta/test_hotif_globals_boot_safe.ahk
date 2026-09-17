@@ -68,7 +68,7 @@ _HGBS_SeedsSurviveInThePrePumpBlock() {
 		"the entry must still call Bundle_Init() and be readable — without that boundary this whole guard silently measures nothing")
 
 	for Name in _HGBS_PRE_PUMP_SEEDED
-		Assert(RegExMatch(PrePump, "m)^global\s+" . Name . "\s*:="),
+		Assert(RegExMatch(PrePump, "im)^global\s+" . Name . "\s*:="),
 			"'" . Name . "' is read by a parse-time #HotIf helper, so it must be assigned in the pre-pump block, above Bundle_Init's message-pumping RunWait. Moving it below that call re-opens the boot crash: a key pressed during the extraction evaluates the #HotIf and reads it unset")
 }
 
@@ -86,17 +86,21 @@ _HGBS_SeedsSurviveInThePrePumpBlock() {
 ; Multi-line directives are covered: `#HotIf (` continues until the closing
 ; paren, and a scanner that only reads the directive's first line is blind to
 ; everything after it — that blindness is itself a recorded finding.
-_HGBS_HotIfFunctions() {
+_HGBS_HotIfFunctions(Source := unset, ReadBody := _DriverFuncBodyOrEmpty) {
 	global _HGBS_HOTIF_PARENTS
-	Src := _DriverSourceNoComments()
+	Src := IsSet(Source) ? Source : _DriverSourceNoComments()
+	; Only executable parentheses delimit directives; quoted examples are data.
+	Src := _DriverMaskNonCode(&Src)
 	Names := Map()
+	Names.CaseSense := "Off"
 	Parents := Map()
+	Parents.CaseSense := "Off"
 	Lines := StrSplit(Src, "`n", "`r")
 	InDirective := false
 	Depth := 0
 	for Line in Lines {
 		Text := ""
-		if RegExMatch(Line, "^\s*#HotIf\s*(.*)$", &M) {
+		if RegExMatch(Line, "i)^\s*#HotIf\s*(.*)$", &M) {
 			Text := M[1]
 			; A directive that opens more parens than it closes continues below.
 			Depth := 0
@@ -131,7 +135,7 @@ _HGBS_HotIfFunctions() {
 		; A callee harvested from source can be a built-in or a method (Has, Map…),
 		; so absence is expected here and must not throw — this is one of the rare
 		; legitimate uses of the tolerant variant.
-		Body := _DriverFuncBodyOrEmpty(Fn)
+		Body := ReadBody.Call(Fn)
 		if (Body == "")
 			continue
 		for Callee in _HGBS_CalleesIn(Body) {
@@ -149,7 +153,9 @@ _HGBS_HotIfFunctions() {
 _HGBS_PathTo(Fn) {
 	global _HGBS_HOTIF_PARENTS
 	Path := Fn
-	Seen := Map(Fn, true)
+	Seen := Map()
+	Seen.CaseSense := "Off"
+	Seen[Fn] := true
 	while _HGBS_HOTIF_PARENTS.Has(Fn) {
 		Fn := _HGBS_HOTIF_PARENTS[Fn]
 		Path := Fn . " -> " . Path
@@ -163,6 +169,7 @@ _HGBS_PathTo(Fn) {
 ; Function names called in a snippet, minus the language constructs and the
 ; control-flow keywords AHK spells with parentheses.
 _HGBS_CodeOnly(Text) {
+	Text := _DriverMaskBlockComments(&Text)
 	Out := ""
 	Quote := ""
 	i := 1
@@ -196,9 +203,9 @@ _HGBS_CodeOnly(Text) {
 }
 
 _HGBS_CalleesIn(Text) {
-	static Skip := Map("IsSet", true, "not", true, "and", true, "or", true,
+	static Skip := Map("isset", true, "not", true, "and", true, "or", true,
 		"if", true, "while", true, "for", true, "return", true, "loop", true,
-		"catch", true, "switch", true, "case", true, "Critical", true)
+		"catch", true, "switch", true, "case", true, "critical", true)
 	Text := _HGBS_CodeOnly(Text)
 	Found := []
 	Pos := 1
@@ -211,7 +218,7 @@ _HGBS_CalleesIn(Text) {
 		Prefix := SubStr(Text, Max(1, FoundPos - 12), Min(12, FoundPos - 1))
 		if RegExMatch(Prefix, "i)\btry\s*$")
 			continue
-		if Skip.Has(C[1])
+		if Skip.Has(StrLower(C[1]))
 			continue
 		Found.Push(C[1])
 	}
@@ -222,19 +229,20 @@ _HGBS_CalleesIn(Text) {
 ; global. A `global a, b` declaration line only imports names; what matters is
 ; whether each is READ bare afterwards.
 _HGBS_UnguardedGlobalsOf(Body) {
+	; Prose and literals cannot protect an unset read in the executable body.
+	Body := _HGBS_CodeOnly(Body)
 	Unguarded := []
 	Declared := []
 	for Line in StrSplit(Body, "`n", "`r") {
-		if RegExMatch(Line, "^\s*global\s+([^\r\n:=]+)$", &G) {
+		if RegExMatch(Line, "i)^\s*global\s+([^\r\n:=]+)$", &G) {
 			for Name in StrSplit(G[1], ",", " `t")
 				if (Name != "")
 					Declared.Push(Name)
 		}
 	}
 	for Name in Declared {
-		; Guarded anywhere in the body is enough: these functions are small and
-		; the guard is always an early return.
-		if InStr(Body, "IsSet(" . Name . ")")
+		; This structural check recognizes free calls, not control-flow dominance.
+		if RegExMatch(Body, "i)(?<![.\w])IsSet\s*\(\s*" . Name . "\s*\)")
 			continue
 		Unguarded.Push(Name)
 	}
@@ -263,7 +271,7 @@ _HGBS_EveryHotIfHelperIsBootSafe() {
 		for Name in _HGBS_UnguardedGlobalsOf(Body) {
 			Seeded := false
 			for S in _HGBS_PRE_PUMP_SEEDED
-				if (S == Name)
+				if (S = Name)
 					Seeded := true
 			Assert(Seeded,
 				"'" . Fn . "' is reachable from a parse-time #HotIf via " . _HGBS_PathTo(Fn)
@@ -282,7 +290,7 @@ _HGBS_FunctionScannerIgnoresLiteralBraces() {
 
 _HGBS_CalleeScannerIgnoresNonCodeAndMethods() {
 	Snippet := 'RealCall()`nobj.MethodCall()`n"StringCall()" ' . Chr(59)
-		. ' CommentCall()`ntry ContainedCall()'
+		. ' CommentCall()`ntry ContainedCall()`n /*`n BlockCall()`n */'
 	Calls := _HGBS_CalleesIn(Snippet)
 	AssertEqual(1, Calls.Length,
 		"the call graph must ignore method-name collisions, strings, and comments")
@@ -298,3 +306,26 @@ Test("meta hotif-globals-boot-safe: function scan stops at the real closing brac
 	_HGBS_FunctionScannerIgnoresLiteralBraces)
 Test("meta hotif-globals-boot-safe: call scan follows executable free functions only",
 	_HGBS_CalleeScannerIgnoresNonCodeAndMethods)
+
+_HGBS_GlobalGuardUsesExecutableCall(Statement, Expected) {
+	Body := "Probe() {`n global GhostState`n" . Statement . "`n}"
+	Found := _HGBS_UnguardedGlobalsOf(Body)
+	AssertEqual(Expected, Found.Length, "only an executable free IsSet call may guard a global")
+	if Expected
+		AssertEqual("GhostState", Found[1])
+}
+for Spec in [
+	["block comment", " /*`n IsSet(GhostState)`n */`n return GhostState", 1],
+	["single-line block", " /* IsSet(GhostState) */`n return GhostState", 1],
+	["middle block terminator", " /*`n disabled */ IsSet(GhostState)`n */`n return GhostState", 1],
+	["code after block", " /* ignored`n */ if !IsSet(GhostState)`n  return`n return GhostState", 0],
+	["comment", " " . Chr(59) . " IsSet(GhostState)`n return GhostState", 1],
+	["inline comment", " return GhostState " . Chr(59) . " IsSet(GhostState)", 1],
+	["string", ' return GhostState . "IsSet(GhostState)"', 1],
+	["method", " return Object.IsSet(GhostState) && GhostState", 1],
+	["suffix", " return FakeIsSet(GhostState) && GhostState", 1],
+	["actual guard", " if !IsSet(GhostState)`n  return`n return GhostState", 0],
+	["spaced guard", " if !isset( GhostState )`n  return`n return GhostState", 0]
+]
+	Test("meta boot globals: " . Spec[1] . " guard classification (hotif-global-guard-code)",
+		_HGBS_GlobalGuardUsesExecutableCall.Bind(Spec[2], Spec[3]))

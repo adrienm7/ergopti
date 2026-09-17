@@ -36,20 +36,10 @@
 #Requires AutoHotkey v2.0
 
 _A0720B2_IsoDatePatternMatchesARealDate() {
-	Src := _DriverSourceNoComments()
-	Assert(RegExMatch(Src, 'KLWV_ISO_DATE_PATTERN\s*:=\s*"([^"]+)"', &M) > 0,
-		"the ISO-date pattern must be a named constant so this test can exercise the literal the driver actually compiles, not a copy of it")
-	Pattern := M[1]
-
-	Assert(RegExMatch("2026-07-20", Pattern) > 0,
-		"KLWV_ISO_DATE_PATTERN must match a real ISO date — a backslash-escaped digit class reaches PCRE as a LITERAL backslash in AHK v2, which silently kills every dashboard range request")
-	Assert(RegExMatch("2026-7-20", Pattern) = 0 and RegExMatch("not-a-date", Pattern) = 0,
-		"KLWV_ISO_DATE_PATTERN must still reject malformed dates")
-
-	Body := _DriverFuncBody("KLWV_IsIsoDate")
-	Assert(Body != "", "KLWV_IsIsoDate must exist in modules/keylogger/keylogger_webview.ahk")
-	Assert(InStr(Body, "KLWV_ISO_DATE_PATTERN") > 0,
-		"KLWV_IsIsoDate must use the named pattern constant rather than an inline literal")
+	AssertTrue(KLWV_IsIsoDate("2026-07-20"),
+		"the production guard must accept a real date; an incorrectly escaped pattern rejects every request")
+	AssertFalse(KLWV_IsIsoDate("2026-7-20"), "month width remains canonical")
+	AssertFalse(KLWV_IsIsoDate("not-a-date"), "malformed dates remain rejected")
 }
 Test("keylogger-webview: the ISO-date guard actually matches an ISO date (F-09)",
 	_A0720B2_IsoDatePatternMatchesARealDate)

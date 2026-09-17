@@ -771,7 +771,15 @@ global _BFS_AcquireRejectCleanupState := 0
 _BFS_AcquireRejectCleanupClose(ProcessHandle) {
 	global _BFS_AcquireRejectCleanupState
 	_BFS_AcquireRejectCleanupState["attempts"] += 1
-	return _BFS_AcquireRejectCleanupState["accept"]
+	_BFS_AcquireRejectCleanupState["owned_handle"] := ProcessHandle
+	if !_BFS_AcquireRejectCleanupState["accept"]
+		return false
+	; Acquisition is native in this fixture, so a successful receipt must also
+	; release the real kernel resource instead of only clearing the debt array.
+	if !DllCall("Kernel32\CloseHandle", "Ptr", ProcessHandle, "Int")
+		return false
+	_BFS_AcquireRejectCleanupState["owned_handle"] := 0
+	return true
 }
 
 _BFS_RejectedNativeAcquisitionRetainsCloseDebt() {
@@ -782,7 +790,8 @@ _BFS_RejectedNativeAcquisitionRetainsCloseDebt() {
 	SavedDraining := WIFocusProcessCache.cleanup_draining
 	SavedClose := WIFocusProcessCache.close_fn
 	try {
-		_BFS_AcquireRejectCleanupState := Map("attempts", 0, "accept", false)
+		_BFS_AcquireRejectCleanupState := Map(
+			"attempts", 0, "accept", false, "owned_handle", 0)
 		WIFocusProcessCache.cleanup_debt := []
 		WIFocusProcessCache.cleanup_draining := false
 		WIFocusProcessCache.close_fn := _BFS_AcquireRejectCleanupClose
@@ -797,14 +806,29 @@ _BFS_RejectedNativeAcquisitionRetainsCloseDebt() {
 			"the rejected native handle must use the receipt-aware close owner")
 		AssertEqual(1, WIFocusProcessCache.cleanup_debt.Length,
 			"a refused close of the rejected native handle must remain reachable")
+		RetainedHandle := WIFocusProcessCache.cleanup_debt[1]
+		Flags := 0
+		AssertTrue(DllCall("Kernel32\GetHandleInformation", "Ptr", RetainedHandle,
+			"UInt*", &Flags, "Int"),
+			"the refused receipt must retain a real open native handle")
 		_BFS_AcquireRejectCleanupState["accept"] := true
 		AssertTrue(_WIFocusDrainProcessCleanupDebt())
 		AssertEqual(0, WIFocusProcessCache.cleanup_debt.Length)
+		AssertFalse(DllCall("Kernel32\GetHandleInformation", "Ptr", RetainedHandle,
+			"UInt*", &Flags, "Int"),
+			"a successful retry must close the native handle, not only clear debt")
 	} finally {
-		WI_FOCUS_PROCESS_PATH_MAX_CHARS := SavedMaxChars
-		WIFocusProcessCache.cleanup_debt := SavedDebt
-		WIFocusProcessCache.cleanup_draining := SavedDraining
-		WIFocusProcessCache.close_fn := SavedClose
+		try {
+			if _BFS_AcquireRejectCleanupState["owned_handle"]
+				AssertTrue(DllCall("Kernel32\CloseHandle", "Ptr",
+					_BFS_AcquireRejectCleanupState["owned_handle"], "Int"),
+					"fixture teardown must release its retained native handle")
+		} finally {
+			WI_FOCUS_PROCESS_PATH_MAX_CHARS := SavedMaxChars
+			WIFocusProcessCache.cleanup_debt := SavedDebt
+			WIFocusProcessCache.cleanup_draining := SavedDraining
+			WIFocusProcessCache.close_fn := SavedClose
+		}
 	}
 }
 

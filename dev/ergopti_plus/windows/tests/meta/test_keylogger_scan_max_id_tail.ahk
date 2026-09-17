@@ -68,8 +68,12 @@ _KLSM_InitUsesTailRead() {
 		"KL_Init must NOT call FileRead(data_sql_path) for scanning — use tail-read (keylogger-scan-max-id-performance)")
 
 	; The new O(1) pattern must be present: FileOpen + Seek
-	Assert(InStr(Body, "FileOpen") > 0 && InStr(Body, "fh.Seek") > 0,
-		"KL_Init must use FileOpen + fh.Seek for the tail-read (keylogger-scan-max-id-performance)")
+	Reader := _DriverFuncBody("_KL_ReadRecoveryText")
+	Assert(Reader != "", "the production recovery reader must exist")
+	Assert(InStr(Body, "_KL_ReadRecoveryText(Keylogger.data_sql_path, 0,") > 0
+		&& InStr(Reader, "FileOpen") > 0 && InStr(Reader, "Fh.Seek") > 0
+		&& InStr(Reader, "Length - TailBytes") > 0,
+		"KL_Init must delegate its bounded seek to the recovery reader (keylogger-scan-max-id-performance)")
 
 	; DATA_SQL_SCAN_TAIL_BYTES must be referenced in the tail-read
 	Assert(InStr(Body, "DATA_SQL_SCAN_TAIL_BYTES") > 0,
@@ -80,6 +84,16 @@ _KLSM_InitUsesTailRead() {
 		"KL_Init must still call KL_ScanMaxEventId after the tail-read (keylogger-scan-max-id-performance)")
 }
 Test("keylogger: KL_Init uses FileOpen+Seek tail-read, not full FileRead (keylogger-scan-max-id-performance)", _KLSM_InitUsesTailRead)
+
+_KLSM_MissingStateSelectsFullRecovery() {
+	Body := _DriverFuncBody("KL_Init")
+	AssertTrue(Body != "", "the startup routing owner must be present")
+	AssertContains(Body, "state_loaded := KL_LoadState()")
+	AssertTrue(RegExMatch(Body, "s)if state_loaded\s*\{.*?_KL_ReadRecoveryText.*?\}\s*else\s*\{.*?KL_RecoverSqlEventId"),
+		"only a usable persisted counter may select bounded SQL-tail recovery")
+}
+Test("keylogger: missing allocation state selects historical recovery (full-id-recovery)",
+	_KLSM_MissingStateSelectsFullRecovery)
 
 
 

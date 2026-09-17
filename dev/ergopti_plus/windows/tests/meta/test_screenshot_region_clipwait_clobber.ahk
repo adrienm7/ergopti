@@ -66,7 +66,7 @@ _TSC_SharedSourceGuard() {
 	; Inspect this test's own body, not a pinned production path. Keep the
 	; assertion outside that body so it cannot satisfy its own search.
 	Source := FileRead(A_LineFile, "UTF-8")
-	Body := _DriverExtractFunctionBody(Source, "_TSC_Check")
+	Body := _DriverExtractFunctionBody(&Source, "_TSC_Check")
 	Assert(Body != "", "the clipboard guard must remain extractable")
 	Body := _StripFullLineComments(Body)
 	Assert(!InStr(Body, "_TSC_DriverFuncBody("),

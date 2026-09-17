@@ -295,6 +295,19 @@ helpers.describe("karabiner lease controller: activation identity", function()
 		end)
 	end)
 
+	helpers.it("passes the freshly resolved identity to the worker environment", function()
+		with_fixture(function(load_controller)
+			local controller, ctx = load_controller()
+			ctx.helper_environment = { ERGOPTI_LAUNCHER_INODE = "11" }
+			controller.init()
+			ctx.helper_environment = { ERGOPTI_LAUNCHER_INODE = "12" }
+			controller.start()
+			helpers.assert_eq(#ctx.spawns, 1)
+			helpers.assert_not_nil(ctx.spawns[1].environment)
+			helpers.assert_eq(ctx.spawns[1].environment.ERGOPTI_LAUNCHER_INODE, "12")
+		end)
+	end)
+
 	helpers.it("revalidates helper identity before each generation spawn", function()
 		with_fixture(function(load_controller)
 			local controller, ctx = load_controller()

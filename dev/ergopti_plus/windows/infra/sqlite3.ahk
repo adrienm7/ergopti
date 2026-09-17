@@ -36,6 +36,9 @@
 
 class SQLiteConst {
 		static OK         := 0
+		static ERROR      := 1
+		static CORRUPT    := 11
+		static NOTADB     := 26
 		static ROW        := 100
 		static DONE       := 101
 		static OPEN_RO    := 0x01
@@ -356,6 +359,14 @@ SQLite_IsAutocommit(db) {
 				"Ptr", db, "Int") != 0
 }
 
+; @param db {Integer} Open database handle.
+; @returns {Integer} SQLite's extended result code, before another operation changes it.
+SQLite_LastErrorCode(db) {
+		if !db
+				throw ValueError("A database error code requires an open handle.")
+		return DllCall(SQLiteConst.DLL . "\sqlite3_extended_errcode", "Ptr", db, "Int")
+}
+
 ; Native errmsg text can echo SQL literals, identifiers, and trigger payloads.
 ; Every logging/exception caller shares this code-only diagnostic boundary.
 ; @param db {Integer} Open database handle, or zero when unavailable.
@@ -363,8 +374,7 @@ SQLite_IsAutocommit(db) {
 SQLite_LastError(db) {
 		if !db
 				return ""
-		Code := DllCall(SQLiteConst.DLL . "\sqlite3_extended_errcode",
-				"Ptr", db, "Int")
+		Code := SQLite_LastErrorCode(db)
 		p := DllCall(SQLiteConst.DLL . "\sqlite3_errstr",
 				"Int", Code, "Ptr")
 		return SQLite_Utf8ToStr(p) . " (rc=" . Code . ")"
@@ -390,74 +400,73 @@ SQLite_Exec(db, sql, YieldOps := 0) {
 		if !db
 				return false
 
-		if (YieldOps > 0)
-				DllCall(SQLiteConst.DLL . "\sqlite3_progress_handler", "Ptr", db, "Int", YieldOps, "Ptr", _SQLite_ProgressCb, "Ptr", 0)
+		try {
+				if (YieldOps > 0)
+						DllCall(SQLiteConst.DLL . "\sqlite3_progress_handler", "Ptr", db, "Int", YieldOps, "Ptr", _SQLite_ProgressCb, "Ptr", 0)
 
-		n := StrPut(sql, "UTF-8")
-		sql_buf := Buffer(n, 0)
-		StrPut(sql, sql_buf, "UTF-8")
+				n := StrPut(sql, "UTF-8")
+				sql_buf := Buffer(n, 0)
+				StrPut(sql, sql_buf, "UTF-8")
 
-		cur  := sql_buf.Ptr
-		end_ := cur + n - 1   ; exclude the trailing NUL.
-		pstmt_buf := Buffer(8, 0)
-		ptail_buf := Buffer(8, 0)
-		while (cur < end_) {
-				NumPut("Ptr", 0, pstmt_buf, 0)
-				NumPut("Ptr", 0, ptail_buf, 0)
-				rc := DllCall(SQLiteConst.DLL . "\sqlite3_prepare_v2",
-						"Ptr",  db,
-						"Ptr",  cur,
-						"Int",  -1,
-						"Ptr",  pstmt_buf.Ptr,
-						"Ptr",  ptail_buf.Ptr,
-						"Int")
-				pstmt := NumGet(pstmt_buf, 0, "Ptr")
-				ptail := NumGet(ptail_buf, 0, "Ptr")
-				if (rc != SQLiteConst.OK) {
-						; Surface the SQLite error so callers can diagnose schema mismatches
-						; rather than silently receiving an empty result set.
-						try LoggerError("sqlite3", "sqlite3_prepare_v2 failed (rc={1}): {2}", rc, SQLite_LastError(db))
-						SQLite_ClearProgressHandler(db, YieldOps)
-						return false
-				}
-				if pstmt {
-						; Drive the statement to completion. Most schema/INSERT
-						; statements step once and return DONE; SELECTs would loop.
-						Loop {
-								step_rc := DllCall(SQLiteConst.DLL . "\sqlite3_step",
-										"Ptr", pstmt, "Int")
-								if (step_rc != SQLiteConst.ROW)
-										break
-						}
-						; A terminal code other than DONE (e.g. CONSTRAINT on a CHECK/
-						; UNIQUE violation) means the row was rejected. The loop above only
-						; ever checked "!= ROW", so a CONSTRAINT/ERROR code was previously
-						; treated identically to a clean DONE — the row silently vanished
-						; with zero trace (F20).
-						if (step_rc != SQLiteConst.DONE) {
-								try LoggerError("sqlite3", "sqlite3_step failed (rc={1}): {2}", step_rc, SQLite_LastError(db))
-								SQLite_FinalizeStatement(pstmt)
-								SQLite_ClearProgressHandler(db, YieldOps)
+				cur  := sql_buf.Ptr
+				end_ := cur + n - 1   ; exclude the trailing NUL.
+				pstmt_buf := Buffer(8, 0)
+				ptail_buf := Buffer(8, 0)
+				while (cur < end_) {
+						NumPut("Ptr", 0, pstmt_buf, 0)
+						NumPut("Ptr", 0, ptail_buf, 0)
+						rc := DllCall(SQLiteConst.DLL . "\sqlite3_prepare_v2",
+								"Ptr",  db,
+								"Ptr",  cur,
+								"Int",  -1,
+								"Ptr",  pstmt_buf.Ptr,
+								"Ptr",  ptail_buf.Ptr,
+								"Int")
+						pstmt := NumGet(pstmt_buf, 0, "Ptr")
+						ptail := NumGet(ptail_buf, 0, "Ptr")
+						if (rc != SQLiteConst.OK) {
+								; Surface the SQLite error so callers can diagnose schema mismatches
+								; rather than silently receiving an empty result set.
+								try LoggerError("sqlite3", "sqlite3_prepare_v2 failed (rc={1}): {2}", rc, SQLite_LastError(db))
 								return false
 						}
-						finalize_rc := SQLite_FinalizeStatement(pstmt)
-						if (finalize_rc != SQLiteConst.OK) {
-								try LoggerError("sqlite3", "sqlite3_finalize failed (rc={1}): {2}", finalize_rc, SQLite_LastError(db))
-								SQLite_ClearProgressHandler(db, YieldOps)
+						if pstmt {
+								; Drive the statement to completion. Most schema/INSERT
+								; statements step once and return DONE; SELECTs would loop.
+								Loop {
+										step_rc := DllCall(SQLiteConst.DLL . "\sqlite3_step",
+												"Ptr", pstmt, "Int")
+										if (step_rc != SQLiteConst.ROW)
+												break
+								}
+								; A terminal code other than DONE (e.g. CONSTRAINT on a CHECK/
+								; UNIQUE violation) means the row was rejected. The loop above only
+								; ever checked "!= ROW", so a CONSTRAINT/ERROR code was previously
+								; treated identically to a clean DONE — the row silently vanished
+								; with zero trace (F20).
+								if (step_rc != SQLiteConst.DONE) {
+										try LoggerError("sqlite3", "sqlite3_step failed (rc={1}): {2}", step_rc, SQLite_LastError(db))
+										SQLite_FinalizeStatement(pstmt)
+										return false
+								}
+								finalize_rc := SQLite_FinalizeStatement(pstmt)
+								if (finalize_rc != SQLiteConst.OK) {
+										try LoggerError("sqlite3", "sqlite3_finalize failed (rc={1}): {2}", finalize_rc, SQLite_LastError(db))
+										return false
+								}
+						}
+						if (!ptail || ptail = cur) {
+								try LoggerError("sqlite3", "sqlite3_prepare_v2 made no forward progress.")
 								return false
 						}
+						cur := ptail
 				}
-				if (!ptail || ptail = cur) {
-						try LoggerError("sqlite3", "sqlite3_prepare_v2 made no forward progress.")
-						SQLite_ClearProgressHandler(db, YieldOps)
-						return false
-				}
-				cur := ptail
+
+
+				return true
+		} finally {
+				SQLite_ClearProgressHandler(db, YieldOps)
 		}
-
-		SQLite_ClearProgressHandler(db, YieldOps)
-
-		return true
 }
 
 

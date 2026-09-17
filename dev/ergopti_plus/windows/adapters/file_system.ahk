@@ -541,6 +541,21 @@ _FSReadUtf8ExactImpl(Path, MaxBytes, Bounded) {
 	}
 }
 
+; Admit only the target's HWND-sequence scratch format after its owner exits.
+; A reused HWND conservatively retains debris instead of risking an active write.
+; @param FileName {String} Candidate basename from the directory enumeration.
+; @param TargetName {String} Exact basename of the writer's destination.
+; @returns {Boolean} Whether the recognized producer window no longer exists.
+FSAtomicTempOwnerIsGone(FileName, TargetName) {
+	if TargetName = "" || StrCompare(SubStr(FileName, 1, StrLen(TargetName)), TargetName, true) != 0
+		return false
+	Suffix := SubStr(FileName, StrLen(TargetName) + 1)
+	if !RegExMatch(Suffix, "^\.([1-9]\d{0,9})-[1-9]\d{0,18}\.tmp$", &Owner)
+		return false
+	Hwnd := Integer(Owner[1])
+	return Hwnd <= 0xFFFFFFFF && !DllCall("User32\IsWindow", "Ptr", Hwnd, "Int")
+}
+
 ; Publishes a complete same-directory stage with one write-through Win32 rename.
 ; Failure retains Source and leaves Destination untouched.
 FSAtomicMoveReplace(Source, Destination) {

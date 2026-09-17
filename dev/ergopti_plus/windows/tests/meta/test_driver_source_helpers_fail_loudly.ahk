@@ -106,7 +106,7 @@ _DSHFL_BalancedSignatureFixtureResolves() {
 		. ") {`n"
 		. "`treturn Options`n"
 		. "}`n"
-	Definition := _DriverFindFunctionDefinition(Src, "SyntheticDefinition")
+	Definition := _DriverFindFunctionDefinition(&Src, "SyntheticDefinition")
 	Assert(IsObject(Definition) and Definition.OpenPos > Definition.Idx,
 		"the definition scanner must balance multiline parameters and nested default calls")
 }

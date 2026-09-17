@@ -14,6 +14,7 @@
 --- ==============================================================================
 
 local M = {}
+local WebviewResult = require("adapters.webview_result")
 
 local hs            = hs
 local toml_reader   = require("infra.toml.reader")
@@ -385,7 +386,7 @@ local function submit_data(owner, webview, method, data)
 	local executed = true
 	local submitted, result = pcall(function()
 		return webview:evaluateJavaScript("if(window." .. method .. ") window." .. method .. "(" .. json .. ")", function(_, script_error)
-			if script_error ~= nil then executed = false; report("execution failed") end
+			if WebviewResult.is_error(script_error) then executed = false; report("execution failed") end
 		end)
 	end)
 	if not submitted then report("submission raised"); return false end

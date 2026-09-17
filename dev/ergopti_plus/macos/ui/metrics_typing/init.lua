@@ -21,6 +21,7 @@
 --- ==============================================================================
 
 local M = {}
+local WebviewResult = require("adapters.webview_result")
 
 local hs         = hs
 local fs         = require("hs.fs")
@@ -114,7 +115,7 @@ local function submit_javascript(generation, webview, site, code, callback, on_f
 		if admitted == nil then pending = pending or { result, execution_error }; return end
 		completed = true
 		if not admitted then return end
-		if execution_error ~= nil then
+		if WebviewResult.is_error(execution_error) then
 			failed = true
 			if on_failure then on_failure() end
 			delivery_failure(generation, webview, site, "execution")

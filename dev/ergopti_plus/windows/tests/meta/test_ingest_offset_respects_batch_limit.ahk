@@ -115,7 +115,14 @@ _IOBL_RolloverStillDeletesAfterDraining() {
 	Assert(Body != "", "KL_DayRollover must exist")
 	Assert(InStr(Body, "KL_IngestOnce(true, true, Scope.Token)") > 0,
 		"prerequisite: the rollover still forces the ingest to drain today.log to EOF")
-	Assert(InStr(Body, "FileDelete(Keylogger.today_log_path)") > 0,
+	Resume := _DriverFuncBody("_KL_RolloverResume")
+	Assert(Resume != "", "the recoverable deletion helper must exist")
+	Assert(InStr(Body, "_KL_RolloverPrepare(Scope.Token, new_date)")
+		> InStr(Body, 'if ingest_result["eof"]')
+		&& InStr(Body, "_KL_RolloverResume(Scope.Token)")
+		> InStr(Body, "_KL_RolloverPrepare(Scope.Token, new_date)"),
+		"the consumed EOF must precede durable preparation and deletion")
+	Assert(InStr(Resume, "FileDelete(Keylogger.today_log_path)") > 0,
 		"prerequisite: the rollover still deletes today.log afterwards -- that is what turns "
 		. "a skipped batch into unrecoverable loss rather than a delayed read")
 }

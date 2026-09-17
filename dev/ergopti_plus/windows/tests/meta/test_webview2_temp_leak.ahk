@@ -10,7 +10,7 @@
 ;    WebView_SharedEnvironment and create NO per-open user-data folder, so they
 ;    cannot leak by construction. Guarded by _TWTL_CheckSharedHost.
 ;  - LEGACY hosts (interactive/long-lived: keylogger, ollama) still create a
-;    per-launch folder; they must sweep stale profiles and DirDelete on close.
+;    per-launch folder; they must retain browser-exit ownership for cleanup.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -45,15 +45,17 @@ _TWTL_CheckSharedUpdaterModule() {
 		"modules/updater must NOT create a per-open ergopti_update_wv_<tick> folder (replaced by the shared env)")
 }
 
-; LEGACY host: still creates a per-launch folder, so it must sweep stale profiles
-; before DirCreate and DirDelete on close.
+; Per-launch hosts recover only certified retirement receipts and explicitly
+; hand their current profile to the shared browser-exit owner.
 _TWTL_CheckLegacyHost(Path, CreatePrefix) {
 	Src := _TWTL_ReadSource(Path)
 	Assert(Src != "", "Source file must exist: " . Path)
 	Assert(InStr(Src, 'WebView_SweepStaleProfiles("' . CreatePrefix . '")') > 0,
 		Path . " must call WebView_SweepStaleProfiles before DirCreate")
-	Assert(InStr(Src, "DirDelete") > 0,
-		Path . " must delete the per-launch udir in its Close path")
+	Assert(InStr(Src, 'WebView_NewProfilePath("' . CreatePrefix . '")') > 0,
+		Path . " must allocate an independently owned profile identity")
+	Assert(InStr(Src, "WebView_RetireProfile(") > 0 || InStr(Src, "WebView_ConfirmProfileExit(") > 0,
+		Path . " must retire its per-launch profile through confirmed exit ownership")
 }
 
 ; The single shared user-data folder must be a FIXED path (no A_TickCount), so it
@@ -79,28 +81,29 @@ _TWTL_AllHosts() {
 	_TWTL_CheckLegacyHost("modules/llm/ollama_webview.ahk", "ergopti_ollama_wv_")
 }
 
-; Regression guard: OllamaWV_Close() used to call DirDelete synchronously right
-; after Controller.Close() (which is async). Edge's child processes still held a
-; file lock for a few hundred ms, so DirDelete failed silently and the temp folder
-; leaked. The fix defers deletion via SetTimer. This test verifies the deferred
-; pattern is present so the synchronous race cannot be reintroduced.
+; Fixed delays cannot establish browser termination. Keep the environment-exit
+; subscription paired with retirement in both WebView hosts.
 _TWTL_OllamaWVDeferredDelete() {
 	Src := _TWTL_ReadSource("modules/llm/ollama_webview.ahk")
-	Assert(InStr(Src, "SetTimer") > 0,
-		"OllamaWV_Close must use SetTimer to defer udir deletion (async Edge lock race)")
-	Assert(InStr(Src, "_OllamaWV_DeferredDirDelete") > 0,
-		"OllamaWV_Close must call _OllamaWV_DeferredDirDelete via SetTimer (not DirDelete inline)")
+	Close := _DriverFuncBody("OllamaWV_Close")
+	Assert(Close != "", "OllamaWV_Close must exist")
+	Assert(InStr(Close, "WebView_RetireProfile(UdirToDelete)") > 0,
+		"Ollama close must request cleanup through browser-exit ownership")
+	Assert(InStr(Src, "WebView_WatchProfile(_OllamaWV_Udir, _OllamaWV_Controller.CoreWebView2)") > 0,
+		"Ollama must retain the environment exit subscription before publishing the browser")
+	Assert(InStr(Close, "DirDelete(") = 0, "Ollama close must not erase a live profile")
 }
 
 _TWTL_KeyloggerWVDeferredDelete() {
 	Src := _TWTL_ReadSource("modules/keylogger/keylogger_webview.ahk")
 	Close := _DriverFuncBody("KLWV_Close")
-	Assert(InStr(Close, "KLWV_DeferredDirDelete") > 0,
-		"KLWV_Close must defer user-data cleanup until Edge releases its profile lock")
+	Assert(Close != "", "KLWV_Close must exist")
+	Assert(InStr(Close, "WebView_RetireProfile(udir)") > 0,
+		"KLWV_Close must defer user-data cleanup until the browser exit event")
 	Assert(InStr(Close, 'DirDelete(entry["udir"], true)') = 0,
 		"KLWV_Close must not recursively delete the profile inline on the UI callback")
-	Assert(InStr(Src, "KLWV_DeferredDirDelete(udir, attempts := 0)") > 0,
-		"Keylogger WebView cleanup must expose a bounded deferred deletion helper")
+	Assert(InStr(Src, "WebView_WatchProfile(udir, controller.CoreWebView2)") > 0,
+		"Keylogger must retain the browser exit subscription before publishing the controller")
 }
 
 Test("WebView2 hosts: sweep stale profiles and delete on close", _TWTL_AllHosts)

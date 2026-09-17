@@ -35,6 +35,7 @@ local LogManager     = require("modules.keylogger.log_manager")
 local ContextTracker = require("modules.keylogger.context_tracker")
 local KcBridge       = require("modules.keylogger.kc_bridge")
 local Timestamp      = require("modules.keylogger.timestamp")
+local PrivacyContext = require("modules.keylogger.privacy_context")
 -- The WPM formula lives once, in the shared metrics module. This file used to
 -- divide by a literal 5 in two places while _shared/lua/keylogger/metrics.lua
 -- already defined DEFAULT_CHARS_PER_WORD and the exact batch formula its own
@@ -132,15 +133,6 @@ local NAV_KEY_CODES = {
 	[123] = "LEFT",  [124] = "RIGHT",  [125] = "DOWN",  [126] = "UP",
 	[117] = "DELETE",  [115] = "HOME",  [119] = "END",
 	[116] = "PAGEUP",  [121] = "PAGEDOWN",
-}
-
--- System processes that handle OS-level authentication prompts.
--- Keystrokes in these processes must never be logged regardless of any other setting —
--- the secure_field filter is a belt-and-suspenders complement (AX observer may attach too
--- slowly to catch the very first keystrokes in a short-lived SecurityAgent window).
-local SYSTEM_AUTH_BUNDLE_IDS = {
-	["com.apple.SecurityAgent"] = true,  -- Admin/sudo password dialog
-	["com.apple.CoreAuthUI"]    = true,  -- Touch ID and biometric auth UI
 }
 
 
@@ -545,22 +537,7 @@ end
 --- second copy is how these four answers drift apart again.
 --- @return boolean True when the context is loggable.
 function M.context_allows_logging()
-	if CoreState.private_filter_enabled and CoreState.is_private_window then return false end
-	if CoreState.secure_field_filter_enabled and CoreState.is_secure_field then return false end
-	-- System auth dialogs: belt-and-suspenders in case the AX observer attaches late.
-	if CoreState.system_auth_filter_enabled and CoreState.active_app_bundle
-		and SYSTEM_AUTH_BUNDLE_IDS[CoreState.active_app_bundle] then
-		return false
-	end
-	if CoreState.disabled_apps and #CoreState.disabled_apps > 0 then
-		for _, disabled in ipairs(CoreState.disabled_apps) do
-			if (disabled.bundleID and disabled.bundleID == CoreState.active_app_bundle)
-				or (disabled.appPath and disabled.appPath == CoreState.active_app_path) then
-				return false
-			end
-		end
-	end
-	return true
+	return PrivacyContext.allows_logging(CoreState)
 end
 
 --- Reports whether any public keylogger sink may persist data right now.
