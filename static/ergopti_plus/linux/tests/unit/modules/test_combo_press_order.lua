@@ -122,6 +122,36 @@ helpers.describe("combo press: when it must not write", function()
 				.. "code that closes it")
 	end)
 
+	helpers.it("releases partial chord presses after a false return or exception", function()
+		for _, throws in ipairs({ false, true }) do
+			for fail_at = 1, 4 do
+				local events, held = {}, {}
+				local previous_writer = package.loaded["adapters.uinput_writer"]
+				package.loaded["adapters.uinput_writer"] = {
+					is_open = function() return true end,
+					emit = function(code, value)
+						events[#events + 1] = { code = code, value = value }
+						held[code] = value == 1 or nil
+						if #events == fail_at then
+							if throws then error("synchronization failed after key write") end
+							return false
+						end
+						return true
+					end,
+				}
+				local Emitter = helpers.load_module("modules.gestures.combo_emitter")
+				local ok = Emitter.press("ctrl+Right")
+				package.loaded["adapters.uinput_writer"] = previous_writer
+				helpers.assert_true(not ok)
+				helpers.assert_eq(held, {}, "partial chord writes must leave no key held")
+				if fail_at == 2 then
+					helpers.assert_eq(events[3], { code = KEY_RIGHT, value = 0 })
+					helpers.assert_eq(events[4], { code = KEY_LEFTCTRL, value = 0 })
+				end
+			end
+		end
+	end)
+
 	helpers.it("releases every held key when an event write fails", function()
 		for fail_at = 1, 4 do
 			local calls, held = 0, {}

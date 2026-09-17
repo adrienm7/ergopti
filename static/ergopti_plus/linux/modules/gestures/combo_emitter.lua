@@ -172,9 +172,9 @@ function M.press(combo)
 
 	local held = {}
 	local function emit(code, value)
+		if value == PRESS then held[#held + 1] = code end
 		local ok, result = pcall(Writer.emit, code, value)
 		if not ok or result ~= true then return false end
-		if value == PRESS then held[#held + 1] = code end
 		if value == RELEASE then
 			for i = #held, 1, -1 do
 				if held[i] == code then table.remove(held, i); break end
