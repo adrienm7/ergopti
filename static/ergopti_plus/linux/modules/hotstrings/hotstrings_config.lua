@@ -561,7 +561,8 @@ end
 --- @param field string|nil nil clears every field of that scope.
 --- @return boolean
 function M.clear_override(category, section, field)
-	local entry = _overrides[category]
+	local candidate = copy_overrides(_overrides)
+	local entry = candidate[category]
 	if not entry then return true end
 
 	if field ~= nil then
