@@ -90,10 +90,11 @@ function M.new(channel)
 			mark_failed("invalid synthetic key transition", phase)
 			return false
 		end
-		if not wire(code, value, phase or "synthetic key", false) then return false end
 		if value == VALUE_DOWN then
 			down_stack[#down_stack + 1] = code
-		else
+		end
+		if not wire(code, value, phase or "synthetic key", false) then return false end
+		if value == VALUE_UP then
 			remove_down(code)
 		end
 		return true

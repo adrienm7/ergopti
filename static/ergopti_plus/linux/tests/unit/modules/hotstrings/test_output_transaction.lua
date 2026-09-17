@@ -113,6 +113,38 @@ helpers.describe("output transaction: every emission can fail", function()
 		end
 	end)
 
+	helpers.it("releases partial synthetic presses after a false return or exception", function()
+		local Transaction = helpers.load_module("modules.hotstrings.output_transaction")
+		for _, throws in ipairs({ false, true }) do
+			local state = { [KEY_RIGHTSHIFT] = true }
+			local calls = {}
+			local tx = Transaction.new({
+				is_open = function() return true end,
+				emit = function(code, value)
+					calls[#calls + 1] = { code = code, value = value }
+					state[code] = value == VALUE_DOWN or nil
+					if code == KEY_A and value == VALUE_DOWN then
+						if throws then error("synchronization failed after key write") end
+						return false
+					end
+					return true
+				end,
+			})
+			helpers.assert_true(tx.neutralize({ KEY_RIGHTSHIFT }))
+			helpers.assert_true(tx.emit(KEY_LEFTSHIFT, VALUE_DOWN))
+			helpers.assert_true(not tx.emit(KEY_A, VALUE_DOWN))
+			local result = tx.finish()
+			helpers.assert_true(not result.ok)
+			helpers.assert_true(result.cleanup_ok)
+			helpers.assert_eq(state, { [KEY_RIGHTSHIFT] = true },
+				"an ambiguous key-down must not survive cleanup")
+			helpers.assert_eq(calls[4], { code = KEY_A, value = VALUE_UP },
+				"release the partial press before earlier synthetic modifiers")
+			helpers.assert_eq(calls[5], { code = KEY_LEFTSHIFT, value = VALUE_UP })
+			helpers.assert_eq(calls[6], { code = KEY_RIGHTSHIFT, value = VALUE_DOWN })
+		end
+	end)
+
 	helpers.it("reports cleanup failure instead of claiming a balanced state", function()
 		local Transaction = helpers.load_module("modules.hotstrings.output_transaction")
 		local calls = 0
