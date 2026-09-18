@@ -175,10 +175,13 @@ LLM_Menu_Build() {
 	_LLM_Menu_InTray := true
 	Published := true
 
-	; Check the parent tray entry only when enabled and the active backend is ready.
+	; Check the parent tray entry from user intent alone, like the toggle row
+	; above. Backend readiness already owns the health dot and the install
+	; warning row: folding it into this checkbox left the entry visually OFF
+	; while Ollama was missing although the feature was on.
 	; Both branches are guarded with try: the item may not exist yet if the updater
 	; build request fires before initMenu has had a chance to register it.
-	if (_LLM_Menu["enabled"] && _backend_ready) {
+	if (_LLM_Menu["enabled"]) {
 		try A_TrayMenu.Check(t("menu.llm.title"))
 	} else {
 		try A_TrayMenu.Uncheck(t("menu.llm.title"))
