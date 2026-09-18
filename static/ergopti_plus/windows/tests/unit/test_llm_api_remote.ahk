@@ -788,6 +788,32 @@ _RemoteCancelAllAsync_FlagsAll() {
 Test("LLM_RemoteCancelAllAsync: cancels every in-flight entry", _RemoteCancelAllAsync_FlagsAll)
 
 
+; The per-keystroke cancel must spare the explicit user probe: typing while a
+; Test-selected-API probe is in flight kills it silently (no on_fail, no log,
+; no popup) because the poll tick just sees a missing reservation. Ordinary
+; prediction work still cancels, and a bare call keeps blanket semantics.
+_RemoteCancelAllAsync_SparesOwnedProbe() {
+	global _LLM_Remote_Async, LLM_REMOTE_KIND_API_TEST
+	_LLM_Remote_Async[88804] := Map("kind", LLM_REMOTE_KIND_API_TEST, "cancelled", false)
+	_LLM_Remote_Async[88805] := Map("kind", "", "cancelled", false)
+	try {
+		LLM_RemoteCancelAllAsync(LLM_REMOTE_KIND_API_TEST)
+		AssertFalse(_LLM_Remote_Async[88804]["cancelled"],
+			"an explicit user probe must survive the keystroke cancel")
+		AssertTrue(_LLM_Remote_Async[88805]["cancelled"],
+			"ordinary prediction work must still cancel")
+		LLM_RemoteCancelAllAsync()
+		AssertTrue(_LLM_Remote_Async[88804]["cancelled"],
+			"a bare cancel-all keeps its blanket semantics")
+	} finally {
+		_LLM_Remote_Async.Delete(88804)
+		_LLM_Remote_Async.Delete(88805)
+	}
+}
+Test("LLM_RemoteCancelAllAsync: spares the owned user probe (api-test-entry-survives-typing)",
+	_RemoteCancelAllAsync_SparesOwnedProbe)
+
+
 _RemoteCancelPublication_Run(State, Command, WorkingDir, Options, &Pid, &ProcessOwner) {
 	State["runs"] += 1
 	LLM_RemoteCancelAllAsync()
