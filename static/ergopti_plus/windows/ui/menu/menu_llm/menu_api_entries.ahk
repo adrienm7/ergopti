@@ -434,14 +434,28 @@ _LLM_Menu_NewApiId() {
 ; ======================================
 ; ======================================
 
+; Surfaces one probe verdict through the injectable seam in tests and through
+; a blocking MsgBox in production. A TrayTip proved too easy to miss — a
+; clicked Test action must always end in a visible verdict, success or not.
+; @return boolean True once the verdict was handed to the seam or MsgBox.
+_LLM_Menu_ApiTestSurface(Title, Body, Icon, Ok, NotifyFn := 0) {
+	if HasMethod(NotifyFn, "Call") {
+		try NotifyFn.Call(Ok, Map("title", Title, "body", Body))
+		return true
+	}
+	try MsgBox(Body, Title, Icon)
+	return true
+}
+
 ; Sends the shared minimal probe (api_providers.json test_request, verbatim)
 ; to the active entry and surfaces the verdict. Unlike the save-time /models
 ; ping this proves the full path: credentials, model id and body format.
-; Token never reaches a log or a tip — only the entry name, latency and a
+; Token never reaches a log or a popup — only the entry name, latency and a
 ; short reply excerpt travel.
 ;
 ; @param NotifyFn function|nil Optional test seam receiving (ok, detail-map).
-;   When absent the verdict goes to a TrayTip like the validation flow.
+;   When absent every outcome (refusal, dispatch failure, completion) goes to
+;   a blocking MsgBox, never a TrayTip.
 ; @return boolean True when a probe was dispatched.
 _LLM_Menu_TestActiveApiEntry(NotifyFn := 0) {
 	global _LLM_Menu, LLM_REMOTE_TEST_REQUEST
@@ -457,12 +471,14 @@ _LLM_Menu_TestActiveApiEntry(NotifyFn := 0) {
 		}
 	}
 	if (entry == "") {
-		try TrayTip(t("menu.llm.api_dialog_title"), t("menu.llm.api_no_entry"))
+		_LLM_Menu_ApiTestSurface(t("menu.llm.api_dialog_title"),
+			t("menu.llm.api_no_entry"), "Iconx", false, NotifyFn)
 		try LoggerWarn("LLM", "API test refused: no active entry selected.")
 		return false
 	}
 	if !(LLM_REMOTE_TEST_REQUEST is Map) || (LLM_REMOTE_TEST_REQUEST.Count == 0) {
-		try TrayTip(t("menu.llm.api_dialog_title"), t("menu.llm.api_providers_unavailable"))
+		_LLM_Menu_ApiTestSurface(t("menu.llm.api_dialog_title"),
+			t("menu.llm.api_providers_unavailable"), "Iconx", false, NotifyFn)
 		try LoggerError("LLM", "API test refused: shared test-request spec unavailable.")
 		return false
 	}
@@ -471,7 +487,8 @@ _LLM_Menu_TestActiveApiEntry(NotifyFn := 0) {
 	for Field in ["Id", "Name", "Provider", "BaseUrl", "Token", "Model"]
 		snapshot[Field] := _LLM_MenuApiEntryGet(entry, Field, "")
 	if !_LLM_Menu_ApiEntryFieldsAreSafe(snapshot) {
-		try TrayTip(t("menu.llm.api_dialog_title"), t("menu.llm.api_no_entry"))
+		_LLM_Menu_ApiTestSurface(t("menu.llm.api_dialog_title"),
+			t("menu.llm.api_no_entry"), "Iconx", false, NotifyFn)
 		try LoggerError("LLM", "API test refused: active entry failed field validation.")
 		return false
 	}
@@ -504,6 +521,8 @@ _LLM_Menu_TestActiveApiEntry(NotifyFn := 0) {
 	} catch as Err {
 		try LLM_AuxFinish(Owner)
 		try LoggerError("LLM", "API test dispatch failed: {1}.", Err.Message)
+		Tip := _LLM_Menu_ApiTestTip(false, Name, 0, "")
+		_LLM_Menu_ApiTestSurface(Tip["title"], Tip["body"], "Icon!", false, NotifyFn)
 		return false
 	}
 	return true
@@ -545,13 +564,8 @@ _LLM_Menu_OnApiTestDone(Ok, Text, EntryId, Name, StartedTick, Owner,
 		return false
 	Ms := Max(0, A_TickCount - StartedTick)
 	Tip := _LLM_Menu_ApiTestTip(Ok, Name, Ms, Text)
-	if HasMethod(NotifyFn, "Call") {
-		try NotifyFn.Call(Tip["ok"], Tip)
-	} else if (Tip["ok"]) {
-		try TrayTip(Tip["title"], Tip["body"], "Iconi")
-	} else {
-		try TrayTip(Tip["title"], Tip["body"], "Icon!")
-	}
+	_LLM_Menu_ApiTestSurface(Tip["title"], Tip["body"],
+		Tip["ok"] ? "Iconi" : "Icon!", Tip["ok"], NotifyFn)
 	if (Tip["ok"]) {
 		try LoggerInfo("LLM", "API test for '{1}' succeeded in {2} ms ({3} reply chars).",
 			Name, Ms, StrLen(Text))
