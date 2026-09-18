@@ -70,19 +70,27 @@ Test("llm api test: entries menu exposes a Test-selected-API row (api-test-entry
 	_LAT_RowsExposeTestAction)
 
 ; No active entry, or an entry id pointing nowhere: refuse before any owner,
-; request or notification. The dispatch itself is never reached, so this also
-; proves the refusal path needs no network.
+; request or network. The refusal still surfaces through the seam (MsgBox in
+; production) — a clicked Test action must never end in silence.
 _LAT_RefusesWithNoActiveEntry() {
 	SavedMenu := _LAT_FixtureMenu()
+	Notices := []
+	NotifyFn := (Ok, Tip) => Notices.Push(Map("ok", Ok, "tip", Tip))
 	try {
 		_LLM_Menu["api_entries"] := []
 		_LLM_Menu["api_entry_id"] := ""
-		AssertFalse(_LLM_Menu_TestActiveApiEntry(),
+		AssertFalse(_LLM_Menu_TestActiveApiEntry(NotifyFn),
 			"an empty entry list must refuse the probe")
 		_LLM_Menu["api_entries"] := [_LAT_FixtureEntry()]
 		_LLM_Menu["api_entry_id"] := "ghost"
-		AssertFalse(_LLM_Menu_TestActiveApiEntry(),
+		AssertFalse(_LLM_Menu_TestActiveApiEntry(NotifyFn),
 			"an entry id pointing nowhere must refuse the probe")
+		AssertEqual(2, Notices.Length, "each refusal must surface, not vanish")
+		for Notice in Notices {
+			AssertFalse(Notice["ok"])
+			AssertEqual(t("menu.llm.api_dialog_title"), Notice["tip"]["title"])
+			AssertEqual(t("menu.llm.api_no_entry"), Notice["tip"]["body"])
+		}
 	} finally _LAT_RestoreMenu(SavedMenu)
 }
 Test("llm api test: refuses with no active entry, without dispatching (api-test-entry-no-active)",
@@ -94,10 +102,15 @@ _LAT_RefusesWithMissingSpec() {
 	global LLM_REMOTE_TEST_REQUEST
 	SavedMenu := _LAT_FixtureMenu()
 	SavedSpec := LLM_REMOTE_TEST_REQUEST
+	Notices := []
+	NotifyFn := (Ok, Tip) => Notices.Push(Map("ok", Ok, "tip", Tip))
 	try {
 		LLM_REMOTE_TEST_REQUEST := Map()
-		AssertFalse(_LLM_Menu_TestActiveApiEntry(),
+		AssertFalse(_LLM_Menu_TestActiveApiEntry(NotifyFn),
 			"a missing shared probe spec must refuse the probe")
+		AssertEqual(1, Notices.Length, "the refusal must surface, not vanish")
+		AssertFalse(Notices[1]["ok"])
+		AssertEqual(t("menu.llm.api_providers_unavailable"), Notices[1]["tip"]["body"])
 	} finally {
 		LLM_REMOTE_TEST_REQUEST := SavedSpec
 		_LAT_RestoreMenu(SavedMenu)
@@ -165,3 +178,49 @@ _LAT_CompletionOwnership() {
 }
 Test("llm api test: completion ownership silences stale and deleted entries (api-test-entry-ownership)",
 	_LAT_CompletionOwnership)
+
+; A failed probe notifies through the seam exactly like a success: the
+; unreachable title, never silence. (Production shows it in a MsgBox; the
+; 23:26 timeout proved a TrayTip-only verdict is invisible in practice.)
+_LAT_FailureCompletionNotifies() {
+	SavedMenu := _LAT_FixtureMenu()
+	Notices := []
+	NotifyFn := (Ok, Tip) => Notices.Push(Map("ok", Ok, "tip", Tip))
+	try {
+		_LAT_ResetOwners()
+		Owner := _LAT_TestOwner()
+		AssertTrue(_LLM_Menu_OnApiTestDone(false, "", "prod", "Prod",
+			A_TickCount - 30031, Owner, NotifyFn),
+			"a failed completion must publish like a success")
+		AssertEqual(1, Notices.Length, "exactly one notification may survive")
+		AssertFalse(Notices[1]["ok"])
+		AssertEqual(t("menu.llm.api_unreachable_title"), Notices[1]["tip"]["title"])
+	} finally _LAT_RestoreMenu(SavedMenu)
+}
+Test("llm api test: failed probe notifies through the seam (api-test-entry-failure)",
+	_LAT_FailureCompletionNotifies)
+
+; Contract: every Test-action outcome ends in _LLM_Menu_ApiTestSurface (MsgBox
+; in production), never a bare TrayTip. Scanned comment-stripped so prose can
+; never satisfy the assertions.
+_LAT_MsgBoxContract() {
+	for FnName in ["_LLM_Menu_ApiTestSurface", "_LLM_Menu_TestActiveApiEntry",
+			"_LLM_Menu_OnApiTestDone"] {
+		Code := _StripFullLineComments(_DriverFuncBody(FnName))
+		Assert(Code != "", FnName . " must remain source-visible")
+	}
+	Surface := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_ApiTestSurface"))
+	Assert(InStr(Surface, "MsgBox(") > 0,
+		"the surface seam must pop a MsgBox in production")
+	Assert(InStr(Surface, "TrayTip(") == 0,
+		"the surface seam must never fall back to a TrayTip")
+	for FnName in ["_LLM_Menu_TestActiveApiEntry", "_LLM_Menu_OnApiTestDone"] {
+		Code := _StripFullLineComments(_DriverFuncBody(FnName))
+		Assert(InStr(Code, "_LLM_Menu_ApiTestSurface(") > 0,
+			FnName . " must route its verdict through the surface seam")
+		Assert(InStr(Code, "TrayTip(") == 0,
+			FnName . " must not show a bare TrayTip for a Test verdict")
+	}
+}
+Test("llm api test: verdicts surface through MsgBox, never TrayTip (api-test-entry-msgbox)",
+	_LAT_MsgBoxContract)
