@@ -67,6 +67,12 @@ global LLM_REMOTE_TIMEOUT_MS := 0   ; sentinel — sourced at boot by LLMApiLoad
 ; Registry of in-flight async remote requests (parallel to _LLM_Ollama_Async).
 global _LLM_Remote_Async := Map()
 global _LLM_Remote_AsyncCounter := 0
+; Single source for the owned-probe kind: the Test-selected-API action tags its
+; reservation with this, and the engine cancel paths spare it. Without the tag
+; every keystroke during the probe (ResetPredictions, per-keystroke
+; CancelInflight) silently kills it — the poller sees a missing reservation
+; and fires neither callback, so the click ends with no log and no popup.
+global LLM_REMOTE_KIND_API_TEST := "api_test"
 global LLM_REMOTE_POLL_MS := 0   ; sentinel — sourced at boot by LLMApiLoadTimings ([llm] poll_interval_ms)
 global LLM_REMOTE_MAX_INFLIGHT := 16
 ; WinHttpRequest does the DNS resolve + TCP connect SYNCHRONOUSLY on the message-loop
@@ -89,9 +95,11 @@ global LLM_REMOTE_CONNECT_TIMEOUT_MS := 5000
  * @param {number}     Temperature  - Sampling temperature.
  * @param {function}   on_success   - Called with the generated text.
  * @param {function}   on_fail      - Called on HTTP / parse failure.
+ * @param {string}     Kind         - Reservation kind; LLM_REMOTE_KIND_API_TEST
+ *   exempts the request from the engine's keystroke cancels.
  * @returns {Integer}  Request id, usable with LLM_RemoteCancelAsync.
  */
-LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success, on_fail, TailText := "", max_tokens := "") {
+LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success, on_fail, TailText := "", max_tokens := "", Kind := "") {
     global _LLM_Remote_Async, _LLM_Remote_AsyncCounter, LLM_REMOTE_TIMEOUT_MS
 
     _LLM_Remote_AsyncCounter += 1
@@ -99,6 +107,7 @@ LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success,
     timeout_ms := (LLM_REMOTE_TIMEOUT_MS > 0) ? LLM_REMOTE_TIMEOUT_MS : 30000
     reservation := _LLMRemote_ReserveRequest(req_id, on_success, on_fail,
         timeout_ms, A_TickCount)
+    reservation["kind"] := Kind
 
     resolved := _LLMRemoteResolveEntry(Entry)
     if (resolved == "") {
@@ -530,7 +539,10 @@ LLM_RemoteCancelAsync(req_id) {
     LLM_DeferCancelKills(Kills)
 }
 
-LLM_RemoteCancelAllAsync() {
+; @param {string} SpareKind - Reservation kind to leave running (the engine
+;   passes LLM_REMOTE_KIND_API_TEST so typing never kills an explicit user
+;   probe). Empty keeps the historical blanket semantics.
+LLM_RemoteCancelAllAsync(SpareKind := "") {
     global _LLM_Remote_Async
     ; Flip the flags inline — the per-request poll ticks read them — but snapshot
     ; the transports and release them off-thread. This is reached from the
@@ -540,6 +552,8 @@ LLM_RemoteCancelAllAsync() {
     ; cleanup on its next iteration, exactly as before.
     Kills := []
     for _id, entry in _LLM_Remote_Async {
+        if (SpareKind != "" && entry.Has("kind") && entry["kind"] == SpareKind)
+            continue
         entry["cancelled"] := true
         if (entry.Has("transport") and entry["transport"] == "curl") {
             if entry.Has("process_owner")

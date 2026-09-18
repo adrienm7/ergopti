@@ -224,3 +224,23 @@ _LAT_MsgBoxContract() {
 }
 Test("llm api test: verdicts surface through MsgBox, never TrayTip (api-test-entry-msgbox)",
 	_LAT_MsgBoxContract)
+
+; Contract: the probe tags its reservation with the owned-probe kind, and both
+; engine cancel paths spare that kind. Otherwise every keystroke during the
+; probe (ResetPredictions, per-keystroke CancelInflight) silently kills it:
+; the poller sees a missing reservation and fires neither callback. Scanned
+; comment-stripped so prose can never satisfy the assertions.
+_LAT_SurvivesTypingCancels() {
+	Handler := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_TestActiveApiEntry"))
+	Assert(Handler != "", "_LLM_Menu_TestActiveApiEntry must remain source-visible")
+	Assert(InStr(Handler, "LLM_REMOTE_KIND_API_TEST") > 0,
+		"the probe must tag its reservation with the owned-probe kind")
+	for FnName in ["LLM_Engine_StopGeneration", "LLM_Engine_CancelInflight"] {
+		Code := _StripFullLineComments(_DriverFuncBody(FnName))
+		Assert(Code != "", FnName . " must remain source-visible")
+		Assert(InStr(Code, "LLM_RemoteCancelAllAsync(LLM_REMOTE_KIND_API_TEST)") > 0,
+			FnName . " must spare the owned probe when cancelling prediction work")
+	}
+}
+Test("llm api test: typing never cancels the probe (api-test-entry-survives-typing)",
+	_LAT_SurvivesTypingCancels)

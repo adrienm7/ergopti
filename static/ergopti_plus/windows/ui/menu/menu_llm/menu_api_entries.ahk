@@ -458,7 +458,7 @@ _LLM_Menu_ApiTestSurface(Title, Body, Icon, Ok, NotifyFn := 0) {
 ;   a blocking MsgBox, never a TrayTip.
 ; @return boolean True when a probe was dispatched.
 _LLM_Menu_TestActiveApiEntry(NotifyFn := 0) {
-	global _LLM_Menu, LLM_REMOTE_TEST_REQUEST
+	global _LLM_Menu, LLM_REMOTE_TEST_REQUEST, LLM_REMOTE_KIND_API_TEST
 	active_id := _LLM_Menu.Has("api_entry_id") ? _LLM_Menu["api_entry_id"] : ""
 	entry := ""
 	if (active_id != "" && _LLM_Menu.Has("api_entries")
@@ -515,9 +515,11 @@ _LLM_Menu_TestActiveApiEntry(NotifyFn := 0) {
 	try LoggerInfo("LLM", "API test dispatched for '{1}' (model {2}).",
 		Name, snapshot["Model"])
 	try {
+		; Tag the reservation with the owned-probe kind so the engine's
+		; keystroke cancels (ResetPredictions, CancelInflight) spare it.
 		LLM_RemoteGenerate_Async(snapshot, spec["system_prompt"],
 			spec["user_text"], spec["temperature"], OnSucc, OnFail, "",
-			spec["max_tokens"])
+			spec["max_tokens"], LLM_REMOTE_KIND_API_TEST)
 	} catch as Err {
 		try LLM_AuxFinish(Owner)
 		try LoggerError("LLM", "API test dispatch failed: {1}.", Err.Message)
