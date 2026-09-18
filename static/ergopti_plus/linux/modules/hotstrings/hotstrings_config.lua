@@ -31,6 +31,7 @@ local Extensions = require("hotstrings.extensions")
 local ConfigPaths = require("infra.config_paths")
 local Paths = require("infra.paths")
 local TomlReader = require("toml_codec.reader")
+local TomlCodec = require("toml_codec")
 
 local LOG = "modules.hotstrings.hotstrings_config"
 
@@ -252,10 +253,12 @@ local function load_overrides()
 	local path = overrides_path()
 	local fh = io.open(path, "r")
 	if not fh then return end
-	fh:close()
-
-	local ok, parsed = pcall(TomlReader.parse, path)
-	if not ok or type(parsed) ~= "table" or type(parsed.sections) ~= "table" then
+	local read_ok, content = pcall(fh.read, fh, "*a")
+	local close_ok, closed = pcall(fh.close, fh)
+	local ok, parsed = pcall(TomlCodec.decode, content)
+	if not read_ok or type(content) ~= "string" or not close_ok or closed ~= true
+		or not ok or type(parsed) ~= "table"
+	then
 		-- Loud, not silent: a malformed override file means the user's delays are
 		-- being ignored, and the only symptom otherwise is "my settings did
 		-- nothing".
@@ -263,24 +266,26 @@ local function load_overrides()
 		return
 	end
 
-	-- A section is named either "category" or "category.section". Flat in the
-	-- file because that is what a user editing it by hand can read, and it is the
-	-- shape macOS writes.
-	for name, values in pairs(parsed.sections) do
-		local category, section = name:match("^([^%.]+)%.(.+)$")
-		category = category or name
-		local entry = _overrides[category] or { sections = {} }
-		entry.sections = entry.sections or {}
-		local target = entry
-		if section then
-			entry.sections[section] = entry.sections[section] or {}
-			target = entry.sections[section]
+	local function override_fields(values)
+		return {
+			delay = tonumber(values.delay),
+			color = values.color,
+			show_tooltip = values.show_tooltip,
+			priority = tonumber(values.priority),
+		}
+	end
+
+	for category, values in pairs(parsed) do
+		if type(values) == "table" then
+			local entry = override_fields(values)
+			entry.sections = {}
+			for section, section_values in pairs(values) do
+				if type(section_values) == "table" then
+					entry.sections[section] = override_fields(section_values)
+				end
+			end
+			_overrides[category] = entry
 		end
-		if values.delay ~= nil then target.delay = tonumber(values.delay) end
-		if values.color ~= nil then target.color = values.color end
-		if values.show_tooltip ~= nil then target.show_tooltip = values.show_tooltip end
-		if values.priority ~= nil then target.priority = tonumber(values.priority) end
-		_overrides[category] = entry
 	end
 end
 
