@@ -1032,10 +1032,16 @@ function M.pump()
 	local ok_reader, Reader = pcall(require, "adapters.evdev_reader")
 	if not ok_reader then return 0 end
 
-	return Reader.drain(function(event)
+	local drained, status = Reader.drain(function(event)
 		local gesture = _decoder:feed(event)
 		if gesture then M.dispatch_gesture(gesture) end
 	end, Reader.TOUCHPAD)
+	if status == "fatal" or status == "closed" then
+		Logger.error(LOG, "Touchpad drain %s — stopping gesture reading; re-enable gestures to retry.",
+			tostring(status))
+		M.stop_reading()
+	end
+	return drained or 0
 end
 
 --- Stops reading the touchpad.
