@@ -276,6 +276,63 @@ helpers.describe("keyboard_hook: re-acquires when the preferred device changes",
 		os.remove(node_a) ; os.remove(node_b)
 	end)
 
+	helpers.it("keeps modifier state when a new source cannot be opened", function()
+		local node_a, node_b = fake_node("keep-a"), fake_node("keep-b")
+		local InputEvent = require("infra.input_event")
+		local devices = { { node_a }, {} }
+		package.loaded["modules.hotstrings.device_finder"] = {
+			find_devices = function() return devices[1], devices[2] end,
+			is_key_device = function() return true, nil end,
+		}
+		local queues = {
+			[node_a] = { InputEvent.encode(InputEvent.EV_KEY, 42, InputEvent.VALUE_DOWN, nil, 1) },
+			[node_b] = {},
+		}
+		local reader = helpers.load_module("adapters.evdev_reader")
+		reader._set_backend({
+			open = function(path)
+				if path == node_b then return nil, "permission denied" end
+				return path
+			end,
+			ioctl = function() return true end,
+			read = function(fd)
+				local queue = queues[fd] or {}
+				local next_value = table.remove(queue, 1)
+				if type(next_value) == "table" and next_value.fatal then
+					return nil, "fatal", next_value.fatal
+				end
+				return next_value
+			end,
+			poll = function() return false end,
+			close = function() end,
+		})
+
+		local kh = load_hook()
+		kh.start({ intercept = false })
+		helpers.assert_true(kh.isRunning(), "the hook must start on the readable keyboard")
+		kh.pump()
+		helpers.assert_true(kh.held_modifiers().shift == true,
+			"the pumped Shift press must be visible as held")
+
+		-- A second keyboard appears, but this user cannot read its node.
+		-- Acquisition fails and the old source stays live.
+		devices = { { node_a, node_b }, {} }
+		tick_until_check(kh, 1)
+
+		local ok, failure = xpcall(function()
+			helpers.assert_true(kh.isRunning(), "the previous source set must keep running")
+			helpers.assert_true(kh.held_modifiers().shift == true,
+				"a failed acquisition must not discard the live modifier state — "
+					.. "the user is still holding Shift and the next keys would "
+					.. "resolve unshifted")
+		end, debug.traceback)
+
+		kh.stop()
+		reader._reset_backend()
+		os.remove(node_a) ; os.remove(node_b)
+		if not ok then error(failure, 0) end
+	end)
+
 	helpers.it("does nothing while the answer is unchanged", function()
 		local node = fake_node("a")
 		stub_device_finder(node)

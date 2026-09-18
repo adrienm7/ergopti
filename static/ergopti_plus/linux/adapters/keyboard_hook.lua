@@ -984,11 +984,11 @@ function M.check_device()
 			tostring(reset_err))
 		return
 	end
-	_reset_modifier_state()
-	_physical_down = {}
-	_sync_dropped = {}
 	local acquired, acquire_err = _acquire(keyboards, force_path)
 	if acquired then
+		_reset_modifier_state()
+		_physical_down = {}
+		_sync_dropped = {}
 		_acquire_pointers(pointers)
 		_running = true
 		_reacquiring = false
