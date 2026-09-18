@@ -1028,6 +1028,12 @@ _TrayRootBuildBoot(PublishAuthorizeFn) {
 			"Deferred root published; arming boot IA submenu build in {1} ms.",
 			LLM_MENU_BUILD_DEFER_MS)
 	}
+	; The api backend never reaches Ollama readiness, so unlike the ollama
+	; case nothing else populates the IA submenu after boot. Arm the same
+	; deferred population whenever the api backend is enabled (predicate owned
+	; by menu_rebuild.ahk, next to the IfDisabled gate).
+	if _TrayRootApiBootProjectionNeeded()
+		SetTimer(LLM_Menu_RequestBuild.Bind("boot"), -LLM_MENU_BUILD_DEFER_MS)
 	return true
 }
 

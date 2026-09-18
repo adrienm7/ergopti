@@ -45,6 +45,13 @@
 ;   worker, discarded the staged root, and forced a second InitSubMenus scan.
 ;   The boot finalizer never ran and 354-604 ms of filesystem/menu work was
 ;   repeated. The LLM request must be armed only after the boot root publishes.
+;
+; FIFTH REGRESSION (empty IA submenu with the api backend at boot):
+;   The ON-case build owner is Ollama readiness (OnDepsReady) and the OFF case
+;   has the boot projection above — but the api backend reaches neither, so an
+;   enabled api backend boots to an empty IA submenu until some incidental
+;   click rebuilds it. The boot worker arms the same deferred population
+;   whenever the api backend is enabled.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -99,5 +106,23 @@ _MetaCheckLlmTrayDeferredBuild() {
 	Assert(EnabledPos > ArmPos && RequestPos > EnabledPos,
 		"_TrayRootBuildBoot must pass restored LLM enabled state and the owned boot request to the scheduler gate")
 }
-
 Test("meta llm: LLM_Menu_Init defers the IA submenu build", _MetaCheckLlmTrayDeferredBuild)
+
+; Fifth regression: with the api backend neither the OFF projection (skipped
+; when enabled) nor Ollama readiness (ollama-only) ever builds the menu, so
+; the boot worker must arm the deferred population for enabled+api itself.
+; Scanned comment-stripped so prose can never satisfy the assertions.
+_MetaCheckLlmTrayApiBootProjection() {
+	BootWorkerBody := _DriverFuncBody("_TrayRootBuildBoot")
+	Assert(BootWorkerBody != "", "_TrayRootBuildBoot must remain source-visible")
+	Code := _StripFullLineComments(BootWorkerBody)
+	PredicatePos := InStr(Code, "_TrayRootApiBootProjectionNeeded()")
+	Assert(PredicatePos > 0,
+		"_TrayRootBuildBoot must consult the api boot-projection predicate")
+	RequestPos := InStr(Code, 'LLM_Menu_RequestBuild.Bind("boot")', false,
+		PredicatePos)
+	Assert(RequestPos > PredicatePos,
+		"_TrayRootBuildBoot must arm the deferred boot population when the api backend is enabled")
+}
+Test("meta llm: boot worker arms the deferred IA population for enabled api backend (llm-api-boot-population)",
+	_MetaCheckLlmTrayApiBootProjection)
