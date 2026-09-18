@@ -149,6 +149,16 @@ key-shaped event appeared in a hook.
 An unreadable config is not an empty config. Propagate read failure and suppress
 saves; otherwise defaults can overwrite a temporarily locked user file.
 
+### project-ahk-strict-toml-validation-needs-a-legacy-migration
+
+Strict manifest literal validation without a migration path for the writer's
+own legacy spellings bricks the installed base: every legacy key is skipped
+AND the rejected-override latch then blocks all later saves, including the
+toggle that would have canonicalized the file. Accept exact legacy spellings
+with user intent, count them as migrated (never as rejected), and let the next
+typed save canonicalize them. The 2026-09 legacy 0/1 boolean migration in
+ApplyConfigToml is the reference case.
+
 ### project-windows-at-rest-store-is-data-sql
 
 Windows persists metrics in `data.sql`; `db.sqlite` is a rebuilt cache, not the
