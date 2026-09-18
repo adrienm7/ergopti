@@ -168,6 +168,48 @@ helpers.describe("hotstring priority overrides", function()
 			helpers.assert_eq(winner(restarted_engine), "FIRST",
 				"clearing priority must restore the registration-order tiebreak")
 
+			helpers.assert_eq(restarted.set_override("first", nil, "priority", 100), true)
+			local extension_category = require("hotstrings.extensions").category_key("sample-pack", "second")
+			local category_values = { delay = 1.25, color = "#123456", show_tooltip = true, priority = 90 }
+			local section_values = { delay = 2.5, color = "#abcdef", show_tooltip = false, priority = 120 }
+			for _, category in ipairs({ "second", extension_category }) do
+				for field, value in pairs(category_values) do
+					helpers.assert_eq(restarted.set_override(category, nil, field, value), true)
+				end
+				for field, value in pairs(section_values) do
+					helpers.assert_eq(restarted.set_override(category, "main", field, value), true)
+				end
+			end
+			helpers.assert_eq(winner(restarted_engine), "SECOND")
+			helpers.assert_contains(persisted, "[second.main]")
+			helpers.assert_contains(persisted, "[" .. extension_category .. ".main]")
+
+			package.loaded["modules.hotstrings.hotstrings_config"] = nil
+			restarted = require("modules.hotstrings.hotstrings_config")
+			restarted_engine = Engine.new()
+			restarted.init(restarted_engine, "/virtual/catalogue.toml")
+			restarted.load_all()
+			for _, category in ipairs({ "second", extension_category }) do
+				helpers.assert_eq(restarted.get_user_override(category), category_values,
+					category .. " category fields must survive restart")
+				helpers.assert_eq(restarted.get_user_override(category, "main"), section_values,
+					category .. " section fields must survive restart")
+				for field, value in pairs(category_values) do
+					helpers.assert_eq(restarted.resolve(category)[field], value)
+				end
+				for field, value in pairs(section_values) do
+					helpers.assert_eq(restarted.resolve(category, "main")[field], value)
+				end
+			end
+			helpers.assert_eq(winner(restarted_engine), "SECOND",
+				"persisted section priority must beat the competing category priority")
+			helpers.assert_eq(restarted.clear_override("second", "main", "priority"), true)
+			helpers.assert_eq(winner(restarted_engine), "FIRST",
+				"clearing section priority must restore the lower category priority")
+			helpers.assert_eq(restarted.clear_override("first", nil), true)
+			helpers.assert_eq(restarted.clear_override("second", nil), true)
+			helpers.assert_eq(restarted.clear_override(extension_category, nil), true)
+
 			for _, scope in ipairs({ "category", "section", "category field", "section field" }) do
 				local section = scope:find("section", 1, true) and "main" or nil
 				local field = scope:find("field", 1, true) and "delay" or nil
@@ -216,6 +258,8 @@ helpers.describe("hotstring priority overrides", function()
 					"cleared delay must stay cleared after restart")
 				helpers.assert_eq(restarted.resolve("second", section).delay, restarted.get_global_delay())
 				helpers.assert_eq(restarted.get_user_override("second").color, remaining_color)
+				helpers.assert_eq(restarted.get_user_override("second", "other").delay, remaining_sibling,
+					"surviving sibling override must remain after clear and restart")
 				helpers.assert_eq(restarted.get_user_override("first").delay, 3.5)
 			end
 		end, debug.traceback)
