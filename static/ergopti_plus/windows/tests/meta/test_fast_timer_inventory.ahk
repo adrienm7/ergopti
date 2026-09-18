@@ -77,6 +77,7 @@ _FTI_Inventory() {
 		"_SpotlightTick",               "100",   ; only armed while spotlight is open
 		"_TooltipDequeuePollFn",        "100",   ; only armed during a dequeue cycle
 		"AwakeCheckMouseMoved",         "150",   ; only armed in awake mode
+		"_LLM_Menu_ApiTestProgressTick", "150",  ; only armed while the API test progress is showing
 		"KLHook.flush_timer",           "200",   ; keylogger buffer flush
 		"PLC_Poll",                     "250",   ; process lifecycle watch
 		"_Updater_MonitorStagingWorker", "250",  ; only armed while staging an update

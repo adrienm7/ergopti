@@ -428,6 +428,108 @@ _LLM_Menu_NewApiId() {
 
 
 
+; The probe gets its own longer budget: a 30 s prediction timeout cannot
+; survive a cold model load, and with a cancellable progress the user — not
+; the clock — decides when to give up.
+global LLM_API_TEST_TIMEOUT_MS := 120000
+; At most one probe progress; a Map without "entry" means nothing is showing.
+global _LLM_Menu_ApiTestProgress := Map()
+
+; Pure label for the probe progress: entry name plus elapsed whole seconds.
+_LLM_Menu_ApiTestProgressText(Name, ElapsedMs) {
+	return Name . " — " . (ElapsedMs // 1000) . " s"
+}
+
+; Shows the cancellable probe progress immediately at click time. The window
+; is modeless (the request runs on timers) with a pulse bar, a live elapsed
+; label and a Cancel button. Everything UI is try-wrapped: headless or not,
+; the state map is always set so Hide/Cancel stay consistent.
+_LLM_Menu_ApiTestProgressShow(EntryId, Name) {
+	global _LLM_Menu_ApiTestProgress
+	_LLM_Menu_ApiTestProgressHide()
+	State := Map("entry", EntryId, "name", Name, "req_id", 0,
+		"owner", "", "start", A_TickCount, "pos", 0)
+	_LLM_Menu_ApiTestProgress := State
+	try {
+		Worker := Gui("+AlwaysOnTop +ToolWindow",
+			t("menu.llm.api_dialog_title"))
+		State["label"] := Worker.Add("Text", "w300",
+			_LLM_Menu_ApiTestProgressText(Name, 0))
+		State["bar"] := Worker.Add("Progress", "w300 h16 Range0-100", 0)
+		CancelBtn := Worker.Add("Button", "w300", t("common.cancel"))
+		CancelBtn.OnEvent("Click",
+			(*) => _LLM_Menu_ApiTestProgressCancel())
+		Worker.Show("AutoSize Center")
+		State["gui"] := Worker
+		; Named callback (not a closure) so the fast-timer inventory can pin
+		; this 150 ms pulse by name; the tick itself reads the global state.
+		SetTimer(_LLM_Menu_ApiTestProgressTick, 150)
+	} catch as Err {
+		try LoggerWarn("LLM", "API test progress unavailable: {1}.",
+			Err.Message)
+	}
+	return true
+}
+
+; Pulse tick: advances the bar and refreshes the elapsed label. Never throws
+; into the timer thread; a missing state just stops meaning anything.
+_LLM_Menu_ApiTestProgressTick() {
+	global _LLM_Menu_ApiTestProgress
+	if !(_LLM_Menu_ApiTestProgress is Map)
+		|| !_LLM_Menu_ApiTestProgress.Has("entry")
+		return
+	State := _LLM_Menu_ApiTestProgress
+	Pos := (State.Has("pos") ? State["pos"] : 0) + 7
+	State["pos"] := (Pos > 100) ? 0 : Pos
+	if State.Has("label")
+		try State["label"].Text := _LLM_Menu_ApiTestProgressText(State["name"],
+			Max(0, A_TickCount - State["start"]))
+	if State.Has("bar")
+		try State["bar"].Value := State["pos"]
+}
+
+; Hides the probe progress if one is showing. Silent and total: timer off,
+; window destroyed, state cleared.
+; @return boolean True when something was showing.
+_LLM_Menu_ApiTestProgressHide() {
+	global _LLM_Menu_ApiTestProgress
+	if !(_LLM_Menu_ApiTestProgress is Map)
+		|| !_LLM_Menu_ApiTestProgress.Has("entry")
+		return false
+	State := _LLM_Menu_ApiTestProgress
+	try SetTimer(_LLM_Menu_ApiTestProgressTick, 0)
+	if State.Has("gui")
+		try State["gui"].Destroy()
+	_LLM_Menu_ApiTestProgress := Map()
+	return true
+}
+
+; User Cancel: aborts the in-flight request, finishes the owner so a late
+; completion stays silent, hides the progress. Closing the window IS the
+; feedback — no popup for an action the user just chose.
+; @return boolean True when a probe was showing.
+_LLM_Menu_ApiTestProgressCancel() {
+	global _LLM_Menu_ApiTestProgress
+	if !(_LLM_Menu_ApiTestProgress is Map)
+		|| !_LLM_Menu_ApiTestProgress.Has("entry")
+		return false
+	State := _LLM_Menu_ApiTestProgress
+	ReqId := State.Get("req_id", 0)
+	if IsInteger(ReqId) && ReqId > 0
+		try LLM_RemoteCancelAsync(ReqId)
+	Owner := State.Get("owner", "")
+	if Owner != ""
+		try LLM_AuxFinish(Owner)
+	Name := State.Get("name", "")
+	_LLM_Menu_ApiTestProgressHide()
+	try LoggerInfo("LLM", "API test for '{1}' cancelled by the user.", Name)
+	return true
+}
+
+
+
+
+
 ; ======================================
 ; ======================================
 ; ======= 2.5/ Test active entry =======
@@ -458,7 +560,8 @@ _LLM_Menu_ApiTestSurface(Title, Body, Icon, Ok, NotifyFn := 0) {
 ;   a blocking MsgBox, never a TrayTip.
 ; @return boolean True when a probe was dispatched.
 _LLM_Menu_TestActiveApiEntry(NotifyFn := 0) {
-	global _LLM_Menu, LLM_REMOTE_TEST_REQUEST, LLM_REMOTE_KIND_API_TEST
+	global _LLM_Menu, LLM_REMOTE_TEST_REQUEST, LLM_REMOTE_KIND_API_TEST,
+		LLM_API_TEST_TIMEOUT_MS
 	active_id := _LLM_Menu.Has("api_entry_id") ? _LLM_Menu["api_entry_id"] : ""
 	entry := ""
 	if (active_id != "" && _LLM_Menu.Has("api_entries")
@@ -505,6 +608,10 @@ _LLM_Menu_TestActiveApiEntry(NotifyFn := 0) {
 		return false
 	}
 	StartedTick := A_TickCount
+	; Immediate visible feedback at click time; the Cancel button and the
+	; request id are attached below once dispatch owns them.
+	_LLM_Menu_ApiTestProgressShow(EntryId, Name)
+	_LLM_Menu_ApiTestProgress["owner"] := Owner
 	OnSucc := (Text, Usage) => _LLM_Menu_OnApiTestDone(true, Text,
 		EntryId, Name, StartedTick, Owner, NotifyFn)
 	OnFail := () => _LLM_Menu_OnApiTestDone(false, "",
@@ -516,17 +623,25 @@ _LLM_Menu_TestActiveApiEntry(NotifyFn := 0) {
 		Name, snapshot["Model"])
 	try {
 		; Tag the reservation with the owned-probe kind so the engine's
-		; keystroke cancels (ResetPredictions, CancelInflight) spare it.
-		LLM_RemoteGenerate_Async(snapshot, spec["system_prompt"],
+		; keystroke cancels (ResetPredictions, CancelInflight) spare it, and
+		; give the probe its own longer budget for cold models.
+		ReqId := LLM_RemoteGenerate_Async(snapshot, spec["system_prompt"],
 			spec["user_text"], spec["temperature"], OnSucc, OnFail, "",
-			spec["max_tokens"], LLM_REMOTE_KIND_API_TEST)
+			spec["max_tokens"], LLM_REMOTE_KIND_API_TEST,
+			LLM_API_TEST_TIMEOUT_MS)
+		_LLM_Menu_ApiTestProgress["req_id"] := ReqId
 	} catch as Err {
 		try LLM_AuxFinish(Owner)
 		try LoggerError("LLM", "API test dispatch failed: {1}.", Err.Message)
+		_LLM_Menu_ApiTestProgressHide()
 		Tip := _LLM_Menu_ApiTestTip(false, Name, 0, "")
 		_LLM_Menu_ApiTestSurface(Tip["title"], Tip["body"], "Icon!", false, NotifyFn)
 		return false
 	}
+	; A synchronously failed dispatch already ran the completion above: never
+	; leave a progress behind it.
+	if !LLM_AuxIsCurrent(Owner)
+		_LLM_Menu_ApiTestProgressHide()
 	return true
 }
 
@@ -551,7 +666,14 @@ _LLM_Menu_ApiTestTip(Ok, Name, Ms, Text) {
 ; @return boolean True when the verdict was surfaced.
 _LLM_Menu_OnApiTestDone(Ok, Text, EntryId, Name, StartedTick, Owner,
 		NotifyFn := 0) {
-	global _LLM_Menu
+	global _LLM_Menu, _LLM_Menu_ApiTestProgress
+	; The progress belongs to this Owner reference: hide it before every
+	; exit, including stale and suspended ones, so no window ever lingers.
+	; A newer probe owns its own progress and is never touched here.
+	if ((_LLM_Menu_ApiTestProgress is Map)
+		&& _LLM_Menu_ApiTestProgress.Has("owner")
+		&& _LLM_Menu_ApiTestProgress["owner"] == Owner)
+		_LLM_Menu_ApiTestProgressHide()
 	if !LLM_AuxIsCurrent(Owner) || A_IsSuspended
 		return false
 	Matches := 0

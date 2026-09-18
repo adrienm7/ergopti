@@ -244,3 +244,61 @@ _LAT_SurvivesTypingCancels() {
 }
 Test("llm api test: typing never cancels the probe (api-test-entry-survives-typing)",
 	_LAT_SurvivesTypingCancels)
+
+; Contract: the click shows a cancellable progress immediately, the completion
+; hides it, Cancel aborts the request, and the probe gets a longer timeout
+; than predictions (cold models need more than 30 s). Scanned
+; comment-stripped so prose can never satisfy the assertions.
+_LAT_ProgressContract() {
+	Handler := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_TestActiveApiEntry"))
+	Assert(Handler != "", "_LLM_Menu_TestActiveApiEntry must remain source-visible")
+	Assert(InStr(Handler, "_LLM_Menu_ApiTestProgressShow(") > 0,
+		"the click must show a cancellable progress immediately")
+	Assert(InStr(Handler, "LLM_API_TEST_TIMEOUT_MS") > 0,
+		"the probe must use its own longer timeout, not the prediction one")
+	Done := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_OnApiTestDone"))
+	Assert(Done != "", "_LLM_Menu_OnApiTestDone must remain source-visible")
+	Assert(InStr(Done, "_LLM_Menu_ApiTestProgressHide(") > 0,
+		"the completion must hide the progress before popping the verdict")
+	Cancel := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_ApiTestProgressCancel"))
+	Assert(Cancel != "", "_LLM_Menu_ApiTestProgressCancel must remain source-visible")
+	Assert(InStr(Cancel, "LLM_RemoteCancelAsync(") > 0,
+		"Cancel must abort the in-flight request")
+	Gen := _DriverFuncBody("LLM_RemoteGenerate_Async")
+	Assert(InStr(Gen, "TimeoutMs := 0") > 0,
+		"the generator must accept a timeout override")
+	Assert(InStr(Gen, "TimeoutMs > 0") > 0,
+		"the generator must honor the timeout override")
+}
+Test("llm api test: progress, cancel and longer timeout are wired (api-test-entry-progress)",
+	_LAT_ProgressContract)
+
+; The progress label is pure: entry name plus elapsed whole seconds.
+_LAT_ProgressText() {
+	Label := _LLM_Menu_ApiTestProgressText("Cerebras", 12000)
+	Assert(InStr(Label, "Cerebras") > 0, "the label must name the entry")
+	Assert(InStr(Label, "12") > 0, "the label must carry elapsed seconds")
+}
+Test("llm api test: progress label names entry and elapsed time (api-test-entry-progress-text)",
+	_LAT_ProgressText)
+
+; Cancelling with no window open is headless-safe: it aborts the request id,
+; finishes the owner so a late completion stays silent, clears the state, and
+; never touches UI.
+_LAT_ProgressCancel() {
+	global _LLM_Menu_ApiTestProgress
+	_LAT_ResetOwners()
+	Owner := _LAT_TestOwner()
+	_LLM_Menu_ApiTestProgress := Map("entry", "prod", "name", "Prod",
+		"req_id", 999888, "owner", Owner, "start", A_TickCount)
+	AssertTrue(_LLM_Menu_ApiTestProgressCancel(),
+		"cancel must succeed when a probe is showing")
+	AssertFalse(_LLM_Menu_ApiTestProgress.Has("entry"),
+		"cancel must clear the progress state")
+	AssertFalse(LLM_AuxIsCurrent(Owner),
+		"cancel must finish the owner so a late completion stays silent")
+	AssertFalse(_LLM_Menu_ApiTestProgressCancel(),
+		"cancel with nothing showing must report false, not throw")
+}
+Test("llm api test: cancel aborts headlessly and stays silent (api-test-entry-progress-cancel)",
+	_LAT_ProgressCancel)
