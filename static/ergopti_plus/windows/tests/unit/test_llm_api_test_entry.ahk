@@ -273,11 +273,13 @@ _LAT_ProgressContract() {
 Test("llm api test: progress, cancel and longer timeout are wired (api-test-entry-progress)",
 	_LAT_ProgressContract)
 
-; The progress label is pure: entry name plus elapsed whole seconds.
+; The progress label is pure: entry name, elapsed whole seconds, and the
+; budget so the user sees the limit (no open-ended wait).
 _LAT_ProgressText() {
-	Label := _LLM_Menu_ApiTestProgressText("Cerebras", 12000)
+	Label := _LLM_Menu_ApiTestProgressText("Cerebras", 62000, 120000)
 	Assert(InStr(Label, "Cerebras") > 0, "the label must name the entry")
-	Assert(InStr(Label, "12") > 0, "the label must carry elapsed seconds")
+	Assert(InStr(Label, "62") > 0, "the label must carry elapsed seconds")
+	Assert(InStr(Label, "120") > 0, "the label must show the budget")
 }
 Test("llm api test: progress label names entry and elapsed time (api-test-entry-progress-text)",
 	_LAT_ProgressText)

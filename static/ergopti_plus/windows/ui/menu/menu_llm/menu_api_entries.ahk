@@ -435,9 +435,11 @@ global LLM_API_TEST_TIMEOUT_MS := 120000
 ; At most one probe progress; a Map without "entry" means nothing is showing.
 global _LLM_Menu_ApiTestProgress := Map()
 
-; Pure label for the probe progress: entry name plus elapsed whole seconds.
-_LLM_Menu_ApiTestProgressText(Name, ElapsedMs) {
-	return Name . " — " . (ElapsedMs // 1000) . " s"
+; Pure label for the probe progress: entry name, elapsed whole seconds, and
+; the budget — the user sees the limit, never an open-ended wait.
+_LLM_Menu_ApiTestProgressText(Name, ElapsedMs, BudgetMs) {
+	return Name . " — " . (ElapsedMs // 1000) . " s / "
+		. (BudgetMs // 1000) . " s"
 }
 
 ; Shows the cancellable probe progress immediately at click time. The window
@@ -445,16 +447,16 @@ _LLM_Menu_ApiTestProgressText(Name, ElapsedMs) {
 ; label and a Cancel button. Everything UI is try-wrapped: headless or not,
 ; the state map is always set so Hide/Cancel stay consistent.
 _LLM_Menu_ApiTestProgressShow(EntryId, Name) {
-	global _LLM_Menu_ApiTestProgress
+	global _LLM_Menu_ApiTestProgress, LLM_API_TEST_TIMEOUT_MS
 	_LLM_Menu_ApiTestProgressHide()
 	State := Map("entry", EntryId, "name", Name, "req_id", 0,
-		"owner", "", "start", A_TickCount, "pos", 0)
+		"owner", "", "start", A_TickCount, "budget", LLM_API_TEST_TIMEOUT_MS)
 	_LLM_Menu_ApiTestProgress := State
 	try {
 		Worker := Gui("+AlwaysOnTop +ToolWindow",
 			t("menu.llm.api_dialog_title"))
 		State["label"] := Worker.Add("Text", "w300",
-			_LLM_Menu_ApiTestProgressText(Name, 0))
+			_LLM_Menu_ApiTestProgressText(Name, 0, State["budget"]))
 		State["bar"] := Worker.Add("Progress", "w300 h16 Range0-100", 0)
 		CancelBtn := Worker.Add("Button", "w300", t("common.cancel"))
 		CancelBtn.OnEvent("Click",
@@ -471,21 +473,24 @@ _LLM_Menu_ApiTestProgressShow(EntryId, Name) {
 	return true
 }
 
-; Pulse tick: advances the bar and refreshes the elapsed label. Never throws
-; into the timer thread; a missing state just stops meaning anything.
+; Progress tick: fills the bar with the elapsed share of the budget and
+; refreshes the label. Never throws into the timer thread; a missing state
+; just stops meaning anything.
 _LLM_Menu_ApiTestProgressTick() {
 	global _LLM_Menu_ApiTestProgress
 	if !(_LLM_Menu_ApiTestProgress is Map)
 		|| !_LLM_Menu_ApiTestProgress.Has("entry")
 		return
 	State := _LLM_Menu_ApiTestProgress
-	Pos := (State.Has("pos") ? State["pos"] : 0) + 7
-	State["pos"] := (Pos > 100) ? 0 : Pos
+	Elapsed := Max(0, A_TickCount - State["start"])
+	Budget := State.Get("budget", 0)
 	if State.Has("label")
-		try State["label"].Text := _LLM_Menu_ApiTestProgressText(State["name"],
-			Max(0, A_TickCount - State["start"]))
+		try State["label"].Text := _LLM_Menu_ApiTestProgressText(
+			State["name"], Elapsed, Budget)
+	; Determinate bar: elapsed share of the budget, pinned at full.
 	if State.Has("bar")
-		try State["bar"].Value := State["pos"]
+		try State["bar"].Value := (Budget > 0)
+			? Min(100, (Elapsed * 100) // Budget) : 0
 }
 
 ; Hides the probe progress if one is showing. Silent and total: timer off,
