@@ -201,6 +201,40 @@ _TRC_BootProjectionArmsOnlyForDisabledLlm() {
 Test("tray root: boot LLM projection arms once only when disabled (tray-root-boot-llm-arm)",
 	_TRC_BootProjectionArmsOnlyForDisabledLlm)
 
+; The api backend has no async readiness gate that builds the menu (Ollama
+; has OnDepsReady; the OFF case has the projection above). Without an
+; explicit arming, an enabled api backend boots to an empty IA submenu until
+; some incidental click rebuilds it.
+_TRC_ApiBootProjectionNeededMatrix() {
+	global _LLM_Menu
+	HadMenu := IsSet(_LLM_Menu)
+	SavedMenu := HadMenu ? _LLM_Menu : 0
+	try {
+		_LLM_Menu := Map("enabled", true, "backend", "api")
+		AssertTrue(_TrayRootApiBootProjectionNeeded(),
+			"enabled api backend must arm the deferred boot population")
+		_LLM_Menu := Map("enabled", true, "backend", "ollama")
+		AssertFalse(_TrayRootApiBootProjectionNeeded(),
+			"enabled ollama backend stays owned by async dependency readiness")
+		_LLM_Menu := Map("enabled", false, "backend", "api")
+		AssertFalse(_TrayRootApiBootProjectionNeeded(),
+			"disabled backend is covered by the IfDisabled projection, never this one")
+		_LLM_Menu := Map("enabled", true)
+		AssertFalse(_TrayRootApiBootProjectionNeeded(),
+			"a missing backend key must not arm a population for an unknown backend")
+		_LLM_Menu := unset
+		AssertFalse(_TrayRootApiBootProjectionNeeded(),
+			"an uninitialised menu state must not arm anything")
+	} finally {
+		if HadMenu
+			_LLM_Menu := SavedMenu
+		else if IsSet(_LLM_Menu)
+			_LLM_Menu := unset
+	}
+}
+Test("tray root: api boot projection arms exactly for enabled api backend (tray-root-boot-api-arm)",
+	_TRC_ApiBootProjectionNeededMatrix)
+
 _TRC_FailingWorker(PublishAuthorizeFn) {
 	global _TRC_Builds, _TRC_FailureMode, _TRC_ExpectedError
 	BuildNumber := _TRC_Builds.Length + 1
