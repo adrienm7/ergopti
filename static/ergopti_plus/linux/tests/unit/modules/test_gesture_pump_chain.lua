@@ -146,3 +146,57 @@ helpers.describe("gesture pump: reader to decoder to action", function()
 	end)
 
 end)
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 2/ A dead descriptor stops the reader ===================
+-- =================================================================
+-- =================================================================
+
+helpers.describe("gesture pump: a dead touchpad descriptor", function()
+
+	helpers.it("stops reading when the drain reports fatal", function()
+		local reader = Fakes.evdev_reader({ events = {}, drain_status = "fatal", drain_reason = "ENODEV" })
+		package.loaded["adapters.evdev_reader"] = reader
+
+		local M = helpers.load_module("modules.gestures.manager")
+		M.init({ enabled = false, persist = false })
+		reader.open("/dev/input/event-fake", reader.TOUCHPAD)
+		M._test_begin_reading(Decoder.new())
+		helpers.assert_true(M.enable(), "a live reader must enable dispatch before the pump runs")
+		helpers.assert_true(M.is_reading())
+
+		local ok, failure = xpcall(function()
+			helpers.assert_eq(M.pump(), 0, "a fatal drain consumes no gesture")
+			helpers.assert_true(not M.is_reading(),
+				"the fatal read closed the descriptor; staying 'reading' is a live "
+					.. "reader that will never deliver another event, with no log")
+			helpers.assert_eq(M.pump(), 0, "a stopped reader costs one call per tick, nothing else")
+		end, debug.traceback)
+
+		package.loaded["adapters.evdev_reader"] = nil
+		if not ok then error(failure, 0) end
+	end)
+
+	helpers.it("keeps reading when the drain reports only an empty queue", function()
+		local reader = Fakes.evdev_reader({ events = {} })
+		package.loaded["adapters.evdev_reader"] = reader
+
+		local M = helpers.load_module("modules.gestures.manager")
+		M.init({ enabled = false, persist = false })
+		reader.open("/dev/input/event-fake", reader.TOUCHPAD)
+		M._test_begin_reading(Decoder.new())
+		helpers.assert_true(M.enable())
+
+		local ok, failure = xpcall(function()
+			helpers.assert_eq(M.pump(), 0)
+			helpers.assert_true(M.is_reading(),
+				"an empty queue is a quiet tick, not a dead descriptor")
+		end, debug.traceback)
+
+		package.loaded["adapters.evdev_reader"] = nil
+		if not ok then error(failure, 0) end
+	end)
+
+end)

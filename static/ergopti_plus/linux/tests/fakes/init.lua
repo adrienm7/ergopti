@@ -81,7 +81,7 @@ function M.uinput_writer(opts)
 end
 
 --- An in-memory evdev reader that replays a scripted event list.
---- @param opts table|nil { events?, open_fails?, pressed_keys?, active_leds? }
+--- @param opts table|nil { events?, open_fails?, pressed_keys?, active_leds?, drain_status?, drain_reason? }
 --- @return table
 function M.evdev_reader(opts)
 	opts = opts or {}
@@ -129,6 +129,7 @@ function M.evdev_reader(opts)
 			count = count + 1
 			handler(event)
 		end
+		if opts.drain_status then return count, opts.drain_status, opts.drain_reason end
 		return count
 	end
 	function fake.use_ffi_backend() return true end
