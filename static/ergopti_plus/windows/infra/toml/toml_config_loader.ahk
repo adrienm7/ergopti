@@ -214,8 +214,18 @@ TomlConfigValueMatchesManifest(CurrentSection, Key, Value, &ExpectedType,
 	LiteralKind := IsSet(RawValue) ? TOML_LiteralKind(RawValue) : ""
 	switch ExpectedType {
 		case "boolean":
-			return (!IsSet(RawValue) || LiteralKind == "boolean")
-				&& Value is Integer && (Value == 0 || Value == 1)
+			if !(Value is Integer && (Value == 0 || Value == 1))
+				return false
+			if !IsSet(RawValue) || LiteralKind == "boolean"
+				return true
+			; Legacy integer literals from the pre-canonical writer: the installed
+			; base carries bare 0/1 on boolean keys. The value domain is exact, so
+			; intent is unambiguous - accept and let the caller count the
+			; migration; the next typed save canonicalizes the spelling.
+			; Quoted strings ("true"), out-of-range integers (2) and floats stay
+			; rejected. Only the bare 0/1 spellings the old writer produced migrate.
+			Stripped := Trim(RawValue, " `t")
+			return LiteralKind == "number" && (Stripped == "0" || Stripped == "1")
 		case "number":
 			return (!IsSet(RawValue) || LiteralKind == "number")
 				&& (Value is Integer || Value is Float)
@@ -281,8 +291,10 @@ ApplyBootConfigToml(Features, FilePath) {
 	return Applied
 }
 
-ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0) {
+ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
+		&MigratedOverrides := 0) {
 	RejectedOverrides := 0
+	MigratedOverrides := 0
 	Applied := 0
 	if !FileExist(FilePath) {
 		try LoggerDebug("TomlConfigLoader", "v2 config.toml not found at '{1}' — skipping.", FilePath)
@@ -467,9 +479,15 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0) {
 				RejectedOverrides += 1
 				continue
 			}
-			Applied++
-			try LoggerDebug("TomlConfigLoader", "[{1}].{2} = {3}.",
+		Applied++
+		if ExpectedType == "boolean" && TOML_LiteralKind(RawValue) == "number" {
+			MigratedOverrides += 1
+			try LoggerInfo("TomlConfigLoader",
+				"migrated legacy boolean [{1}].{2} = {3}; the next save persists it as canonical true/false.",
 				CurrentSection, Key, TomlConfigLogValue(Value))
+		}
+		try LoggerDebug("TomlConfigLoader", "[{1}].{2} = {3}.",
+			CurrentSection, Key, TomlConfigLogValue(Value))
 		} catch as e {
 			RejectedOverrides += 1
 			try LoggerWarn("TomlConfigLoader",
@@ -488,6 +506,11 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0) {
 			Applied, RejectedOverrides)
 	} else {
 		try LoggerSuccess("TomlConfigLoader", "v2 config applied ({1} value(s)).", Applied)
+	}
+	if MigratedOverrides {
+		try LoggerInfo("TomlConfigLoader",
+			"applied {1} legacy 0/1 boolean(s) with user intent; the next save persists them as canonical true/false.",
+			MigratedOverrides)
 	}
 	return Applied
 }
