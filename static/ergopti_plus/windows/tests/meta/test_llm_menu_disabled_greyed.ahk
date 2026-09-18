@@ -87,3 +87,19 @@ _LMDG_AddRowHelperDisables() {
 		"_LLM_Menu_AddRow must Disable() the row when disabled is true (grey it — macOS is_disabled parity)")
 }
 Test("menu_main: _LLM_Menu_AddRow greys a row when disabled (llm-menu-disabled-greyed)", _LMDG_AddRowHelperDisables)
+
+; Guard 4 — the parent IA tray check follows user intent alone. Backend
+; readiness already owns the health dot and the install warning row; folding
+; it into this checkbox repeated the fixed inner-toggle bug one level up:
+; enabled with Ollama missing rendered unchecked, reading as "IA is off".
+; Scanned comment-stripped so prose can never satisfy the assertions.
+_LMDG_ParentCheckFollowsIntent() {
+	Seg := _DriverFuncBody("LLM_Menu_Build")
+	Assert(Seg != "", "LLM_Menu_Build() declaration must exist in menu_main.ahk")
+	Code := _StripFullLineComments(Seg)
+	Assert(InStr(Code, 'if (_LLM_Menu["enabled"]) {') > 0,
+		"the parent IA tray check must follow the enabled flag alone so intent, not backend reachability, drives the checkbox")
+	Assert(InStr(Code, 'if (_LLM_Menu["enabled"] && _backend_ready) {') == 0,
+		"the parent IA tray check must not require backend readiness - that left the entry visually OFF while Ollama was missing")
+}
+Test("menu_main: parent IA check follows intent, not backend readiness (llm-parent-check-intent)", _LMDG_ParentCheckFollowsIntent)
