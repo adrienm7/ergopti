@@ -1127,10 +1127,11 @@ Test("api_providers.json: catalogue loaded at module init", _RemoteCatalog_Loade
 
 
 _RemoteCatalog_InvalidScalarsNeverPublish() {
-	global LLM_API_PROVIDERS, LLM_API_PROVIDER_ORDER, LLM_REMOTE_MODEL_PRICES, _SharedDir
+	global LLM_API_PROVIDERS, LLM_API_PROVIDER_ORDER, LLM_REMOTE_MODEL_PRICES, LLM_REMOTE_TEST_REQUEST, _SharedDir
 	oldProviders := LLM_API_PROVIDERS
 	oldOrder := LLM_API_PROVIDER_ORDER
 	oldPrices := LLM_REMOTE_MODEL_PRICES
+	oldTestRequest := LLM_REMOTE_TEST_REQUEST
 	oldSharedDir := _SharedDir
 	testRoot := A_Temp . "\ergopti-ahk013-" . DllCall("GetCurrentProcessId") . "-" . A_TickCount
 	fixture := FileRead(A_ScriptDir . "\..\..\_shared\tests\corpus\api_provider_catalog_validation.json", "UTF-8")
@@ -1166,6 +1167,7 @@ _RemoteCatalog_InvalidScalarsNeverPublish() {
 		LLM_API_PROVIDERS := oldProviders
 		LLM_API_PROVIDER_ORDER := oldOrder
 		LLM_REMOTE_MODEL_PRICES := oldPrices
+		LLM_REMOTE_TEST_REQUEST := oldTestRequest
 		try DirDelete(testRoot, true)
 	}
 }

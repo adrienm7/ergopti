@@ -78,6 +78,9 @@ _LLM_Menu_ApiEntriesRows() {
 		Rows.Push(Map(
 			"label",  t("menu.llm.api_remove_entry"),
 			"action", (*) => _LLM_Menu_RemoveActiveApiEntry()))
+		Rows.Push(Map(
+			"label",  t("menu.llm.api_test_entry"),
+			"action", (*) => _LLM_Menu_TestActiveApiEntry()))
 	}
 	return Rows
 }
@@ -419,6 +422,144 @@ _LLM_Menu_NewApiId() {
 	static Sequence := 0
 	Sequence += 1
 	return "api_" . A_TickCount . "_" . Sequence
+}
+
+
+
+
+
+; ======================================
+; ======================================
+; ======= 2.5/ Test active entry =======
+; ======================================
+; ======================================
+
+; Sends the shared minimal probe (api_providers.json test_request, verbatim)
+; to the active entry and surfaces the verdict. Unlike the save-time /models
+; ping this proves the full path: credentials, model id and body format.
+; Token never reaches a log or a tip — only the entry name, latency and a
+; short reply excerpt travel.
+;
+; @param NotifyFn function|nil Optional test seam receiving (ok, detail-map).
+;   When absent the verdict goes to a TrayTip like the validation flow.
+; @return boolean True when a probe was dispatched.
+_LLM_Menu_TestActiveApiEntry(NotifyFn := 0) {
+	global _LLM_Menu, LLM_REMOTE_TEST_REQUEST
+	active_id := _LLM_Menu.Has("api_entry_id") ? _LLM_Menu["api_entry_id"] : ""
+	entry := ""
+	if (active_id != "" && _LLM_Menu.Has("api_entries")
+			&& (_LLM_Menu["api_entries"] is Array)) {
+		for e in _LLM_Menu["api_entries"] {
+			if (_LLM_MenuApiEntryGet(e, "Id", "") == active_id) {
+				entry := e
+				break
+			}
+		}
+	}
+	if (entry == "") {
+		try TrayTip(t("menu.llm.api_dialog_title"), t("menu.llm.api_no_entry"))
+		try LoggerWarn("LLM", "API test refused: no active entry selected.")
+		return false
+	}
+	if !(LLM_REMOTE_TEST_REQUEST is Map) || (LLM_REMOTE_TEST_REQUEST.Count == 0) {
+		try TrayTip(t("menu.llm.api_dialog_title"), t("menu.llm.api_providers_unavailable"))
+		try LoggerError("LLM", "API test refused: shared test-request spec unavailable.")
+		return false
+	}
+	; Snapshot plain strings so a mid-flight edit cannot relabel this result.
+	snapshot := Map()
+	for Field in ["Id", "Name", "Provider", "BaseUrl", "Token", "Model"]
+		snapshot[Field] := _LLM_MenuApiEntryGet(entry, Field, "")
+	if !_LLM_Menu_ApiEntryFieldsAreSafe(snapshot) {
+		try TrayTip(t("menu.llm.api_dialog_title"), t("menu.llm.api_no_entry"))
+		try LoggerError("LLM", "API test refused: active entry failed field validation.")
+		return false
+	}
+	spec := LLM_REMOTE_TEST_REQUEST
+	EntryId := snapshot["Id"]
+	Name := snapshot["Name"]
+	Owner := ""
+	try Owner := LLM_AuxBegin("api_test:" . EntryId, Map(
+		"backend", "api",
+		"endpoint", snapshot["BaseUrl"],
+		"identity", EntryId))
+	catch as Err {
+		try LoggerError("LLM", "API test owner acquisition failed: {1}.", Err.Message)
+		return false
+	}
+	StartedTick := A_TickCount
+	OnSucc := (Text, Usage) => _LLM_Menu_OnApiTestDone(true, Text,
+		EntryId, Name, StartedTick, Owner, NotifyFn)
+	OnFail := () => _LLM_Menu_OnApiTestDone(false, "",
+		EntryId, Name, StartedTick, Owner, NotifyFn)
+	; Logged before dispatch, not after: if the click reaches this function
+	; there is always exactly one line proving it, so a silent menu click can
+	; be told apart from a handler failure. No token, no prompt content.
+	try LoggerInfo("LLM", "API test dispatched for '{1}' (model {2}).",
+		Name, snapshot["Model"])
+	try {
+		LLM_RemoteGenerate_Async(snapshot, spec["system_prompt"],
+			spec["user_text"], spec["temperature"], OnSucc, OnFail, "",
+			spec["max_tokens"])
+	} catch as Err {
+		try LLM_AuxFinish(Owner)
+		try LoggerError("LLM", "API test dispatch failed: {1}.", Err.Message)
+		return false
+	}
+	return true
+}
+
+; Builds the user-visible verdict triple without touching UI or logs, so the
+; mapping is unit-testable headlessly. Mirrors the validation flow wording.
+; @return Map { ok, title, body }
+_LLM_Menu_ApiTestTip(Ok, Name, Ms, Text) {
+	if (Ok && Text is String && Text != "") {
+		Excerpt := StrLen(Text) > 120 ? SubStr(Text, 1, 120) . "..." : Text
+		return Map("ok", true,
+			"title", t("menu.llm.api_test_ok_title"),
+			"body", Format(t("menu.llm.api_test_ok_body"), Name, Ms, Excerpt))
+	}
+	return Map("ok", false,
+		"title", t("menu.llm.api_unreachable_title"),
+		"body", StrReplace(t("menu.llm.api_unreachable_body"), "%s", Name))
+}
+
+; Publishes one probe completion. Stale results (entry changed or deleted
+; mid-flight, driver suspended) are discarded silently like the validation
+; flow — a late verdict must never relabel another entry.
+; @return boolean True when the verdict was surfaced.
+_LLM_Menu_OnApiTestDone(Ok, Text, EntryId, Name, StartedTick, Owner,
+		NotifyFn := 0) {
+	global _LLM_Menu
+	if !LLM_AuxIsCurrent(Owner) || A_IsSuspended
+		return false
+	Matches := 0
+	if (_LLM_Menu is Map) && _LLM_Menu.Has("api_entries")
+			&& (_LLM_Menu["api_entries"] is Array) {
+		for e in _LLM_Menu["api_entries"] {
+			if (_LLM_MenuApiEntryGet(e, "Id", "") == EntryId)
+				Matches += 1
+		}
+	}
+	if (Matches != 1 || !LLM_AuxFinish(Owner))
+		return false
+	Ms := Max(0, A_TickCount - StartedTick)
+	Tip := _LLM_Menu_ApiTestTip(Ok, Name, Ms, Text)
+	if HasMethod(NotifyFn, "Call") {
+		try NotifyFn.Call(Tip["ok"], Tip)
+	} else if (Tip["ok"]) {
+		try TrayTip(Tip["title"], Tip["body"], "Iconi")
+	} else {
+		try TrayTip(Tip["title"], Tip["body"], "Icon!")
+	}
+	if (Tip["ok"]) {
+		try LoggerInfo("LLM", "API test for '{1}' succeeded in {2} ms ({3} reply chars).",
+			Name, Ms, StrLen(Text))
+	} else {
+		try LoggerError("LLM", "API test for '{1}' failed after {2} ms — check the token, URL and model.",
+			Name, Ms)
+	}
+	return true
 }
 
 

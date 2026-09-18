@@ -421,6 +421,7 @@ _LogBootProgress("loading LLM modules")
 #Include meta/test_keylogger_journal_lifecycle_owner.ahk
 #Include unit/test_keylogger_journal_repair_debt.ahk
 #Include unit/test_llm_aux_request_ownership.ahk
+#Include unit/test_llm_api_test_entry.ahk
 #Include unit/test_llm_curl_terminal_classification.ahk
 #Include unit/test_llm_curl_literal_paths.ahk
 #Include unit/test_ollama_http_terminal_classification.ahk

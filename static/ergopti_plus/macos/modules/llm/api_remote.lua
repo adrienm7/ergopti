@@ -94,6 +94,33 @@ local function catalog_price_is_valid(value)
 		and value ~= math.huge and value ~= -math.huge
 end
 
+--- Validates the shared Test-API probe section (api_providers.json
+--- test_request): the exact minimal completion both drivers send verbatim.
+--- Fail-soft like the rest of the catalogue: a malformed section degrades to
+--- nil and the panel refuses loudly, instead of aborting the require chain.
+--- @param node any root.test_request value.
+--- @return table|nil { system_prompt, user_text, temperature, max_tokens } or nil.
+local function parse_test_request(node)
+	if type(node) ~= "table" then
+		Logger.error("llm.api_remote", "api_providers.json: test_request must be an object with system_prompt/user_text/temperature/max_tokens.")
+		return nil
+	end
+	local sys, user, temp, toks = node.system_prompt, node.user_text, node.temperature, node.max_tokens
+	if type(sys) ~= "string" or sys == "" or type(user) ~= "string" or user == "" then
+		Logger.error("llm.api_remote", "api_providers.json: test_request needs non-empty system_prompt and user_text.")
+		return nil
+	end
+	if type(temp) ~= "number" or temp ~= temp or temp < 0 or temp > 2 then
+		Logger.error("llm.api_remote", "api_providers.json: test_request temperature must be a number in 0..2.")
+		return nil
+	end
+	if type(toks) ~= "number" or toks % 1 ~= 0 or toks < 1 or toks > 64 then
+		Logger.error("llm.api_remote", "api_providers.json: test_request max_tokens must be an integer in 1..64.")
+		return nil
+	end
+	return { system_prompt = sys, user_text = user, temperature = temp, max_tokens = toks }
+end
+
 local function load_api_providers()
 	local path = Paths.shared_llm_path("api_providers.json")
 	if not path then
@@ -107,7 +134,7 @@ local function load_api_providers()
 	-- Wrap the entire parse/validate phase in pcall so a corrupted or schema-
 	-- mismatched file degrades to an empty catalogue instead of raising at require
 	-- time, which would abort the full keymap → llm → api_remote require chain.
-	local ok, providers, order, prices = pcall(function()
+	local ok, providers, order, prices, test_request = pcall(function()
 		local fh = io.open(path, "r")
 		if not fh then
 			Logger.error("llm.api_remote", "api_providers.json unreadable at %s — empty catalogue.", tostring(path))
@@ -165,20 +192,21 @@ local function load_api_providers()
 				Logger.warn("llm.api_remote", "api_providers.json: model_prices.%s skipped (missing in/out).", tostring(model))
 			end
 		end
+		local out_test = parse_test_request(root.test_request)
 		Logger.info("llm.api_remote", "Loaded API provider catalogue (%d providers) from %s", #out_order, path)
-		return out_providers, out_order, out_prices
+		return out_providers, out_order, out_prices, out_test
 	end)
 
 	if not ok then
 		-- pcall itself failed (should never happen given the guards above, but be safe)
 		Logger.error("llm.api_remote", "api_providers.json: unexpected error during load — empty catalogue: %s", tostring(providers))
-		return {}, {}, {}
+		return {}, {}, {}, nil
 	end
-	return providers or {}, order or {}, prices or {}
+	return providers or {}, order or {}, prices or {}, test_request
 end
 
 local MODEL_PRICES
-M.PROVIDERS, M.PROVIDER_ORDER, MODEL_PRICES = load_api_providers()
+M.PROVIDERS, M.PROVIDER_ORDER, MODEL_PRICES, M.TEST_REQUEST = load_api_providers()
 
 local DEDUPLICATION_ENABLED      = ApiCommon.DEFAULT_DEDUPLICATION_ENABLED
 -- Retry policy from _shared/modules/llm/inference.json (api_common.lua) so the
@@ -622,6 +650,15 @@ end
 
 function M.get_entries()
 	return _entries
+end
+
+--- The shared Test-API probe spec (api_providers.json test_request), or nil
+--- when the catalogue carries none. The panel refuses loudly on nil instead
+--- of probing with invented values.
+--- @return table|nil { system_prompt, user_text, temperature, max_tokens }.
+function M.get_test_request_spec()
+	if type(M.TEST_REQUEST) ~= "table" then return nil end
+	return M.TEST_REQUEST
 end
 
 --- Pick the active API entry by id. Empty and unknown ids deliberately select
@@ -1702,6 +1739,57 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 			temperature, max_tokens, num_predictions, is_batch,
 			on_success, on_fail, dedup_stats)
 	end)
+end
+
+--- Sends the shared minimal probe (api_providers.json test_request, verbatim)
+--- to one explicit entry and reports the verdict. Unlike check_availability
+--- (credential reachability via /models), this proves the full inference path:
+--- credentials, model id and body format. An empty reply counts as failure on
+--- both drivers — a 200 with no text proves nothing about the model.
+--- The entry travels explicitly (never "active at callback time"); identity
+--- drift mid-flight is still enforced downstream and reported as no verdict,
+--- exactly like a superseded availability probe.
+--- @param entry table API entry record with decrypted token.
+--- @param spec table { system_prompt, user_text, temperature, max_tokens }.
+--- @param on_ok function Called with (reply_text, elapsed_ms).
+--- @param on_fail function Called with (reason_string).
+--- @return boolean True when a probe was dispatched.
+function M.test_request(entry, spec, on_ok, on_fail)
+	local function fail(reason)
+		Logger.error(LOG, "API test probe refused: %s", tostring(reason))
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "test_request_fail", tostring(reason)) end
+		return false
+	end
+	if type(entry) ~= "table" then return fail("no entry") end
+	if type(spec) ~= "table" then return fail("no shared probe spec") end
+	for _, key in ipairs({ "system_prompt", "user_text" }) do
+		if type(spec[key]) ~= "string" or spec[key] == "" then return fail("invalid probe text") end
+	end
+	if type(spec.temperature) ~= "number" or type(spec.max_tokens) ~= "number" then
+		return fail("invalid probe sampling")
+	end
+	local t0 = TimerScheduler.now()
+	local ok_send, send_err = xpcall(function()
+		post_and_parse_resolved(entry,
+			(type(entry.model) == "string" and entry.model ~= "") and entry.model or nil,
+			spec.system_prompt, spec.user_text, "",
+			spec.temperature, spec.max_tokens, 1, false,
+			function(results)
+				local text = results and results[1] and tostring(results[1].to_type or "") or ""
+				if text == "" then
+					if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "test_request_fail", "empty_reply") end
+					return
+				end
+				local ms = math.max(0, math.floor((TimerScheduler.now() - t0) * 1000))
+				if type(on_ok) == "function" then ApiCommon.protected_call(on_ok, "test_request_ok", text, ms) end
+			end,
+			function()
+				if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "test_request_fail", "request_failed") end
+			end,
+			ApiCommon.new_dedup_stats())
+	end, debug.traceback)
+	if not ok_send then return fail("dispatch_raised: " .. tostring(send_err)) end
+	return true
 end
 
 
