@@ -66,6 +66,18 @@ local function pcall_log(name, fn, ...)
 	return ok, err
 end
 
+--- Fills ``{1}``-style placeholders shared with the Windows driver (whose
+--- formatter cannot do positional ``%s``). Translators may reorder the
+--- placeholders; only the set matters.
+--- @param template string Locale template.
+--- @param args table Positional values.
+--- @return string
+local function fill_placeholders(template, args)
+	return (tostring(template or ""):gsub("{(%d+)}", function(index)
+		return tostring(args[tonumber(index)] or "")
+	end))
+end
+
 --- Starts the callback-based persistence transaction and converts an immediate
 --- throw into the same explicit failure result as an async rejection.
 --- @param label string Diagnostic label.
@@ -416,7 +428,82 @@ function M.build(ctx)
 
 
 	-- =====================================================
-	-- ===== 1.4) Build parent row title =====
+	-- ===== 1.4) Test active entry =====
+	-- =====================================================
+
+	-- Sends the shared minimal probe to the active entry and surfaces the
+	-- verdict. Unlike the add-time availability ping this proves the full
+	-- path: credentials, model id and body format. No entry state is mutated,
+	-- so no mutation lease is taken; a mid-flight entry change or delete
+	-- discards the verdict instead of relabelling it.
+	if active_entry then
+		table.insert(rows, { separator = true })
+	end
+	table.insert(rows, {
+		label    = i18n.get("menu.llm.api_test_entry"),
+		disabled = (paused or mutation_busy or (active_entry == nil)) or nil,
+		action       = (not paused and not mutation_busy and active_entry) and function()
+			local probed_id = active_entry.id
+			local probed_label = tostring(active_entry.label or active_entry.id or "?")
+			local probed_entry = {
+				id       = active_entry.id,
+				provider = active_entry.provider,
+				base_url = active_entry.base_url,
+				token    = active_entry.token,
+				model    = active_entry.model,
+			}
+			local spec = api_remote.get_test_request_spec and api_remote.get_test_request_spec() or nil
+			if type(spec) ~= "table" then
+				Logger.error(LOG, "API test refused: shared test-request spec unavailable.")
+				pcall_log("notify(api_test_no_spec)", notifications.notify,
+					i18n.get("menu.llm.api_test_entry"),
+					i18n.get("menu.llm.api_providers_unavailable"), "error")
+				return false
+			end
+			local function excerpt(text)
+				local s = tostring(text or "")
+				if #s > 120 then return s:sub(1, 120) .. "..." end
+				return s
+			end
+			-- Logged before dispatch, not after: if the click reaches this
+			-- action there is always exactly one line proving it, so a silent
+			-- menu click can be told apart from a handler failure.
+			Logger.info(LOG, "API test dispatched for '%s' (model %s).",
+				probed_label, tostring(probed_entry.model or ""))
+			local call_ok, dispatched = xpcall(function()
+				return api_remote.test_request(probed_entry, spec,
+					function(reply, ms)
+						if api_remote.get_active_entry_id() ~= probed_id then return end
+						local still_there = false
+						for _, e in ipairs(api_remote.get_entries() or {}) do
+							if e.id == probed_id then still_there = true; break end
+						end
+						if not still_there then return end
+						pcall_log("notify(api_test_ok)", notifications.notify,
+							i18n.get("menu.llm.api_test_ok_title"),
+							fill_placeholders(i18n.get("menu.llm.api_test_ok_body"),
+								{ probed_label, tostring(ms), excerpt(reply) }),
+							"success")
+					end,
+					function(_reason)
+						if api_remote.get_active_entry_id() ~= probed_id then return end
+						pcall_log("notify(api_test_fail)", notifications.notify,
+							i18n.get("menu.llm.api_unreachable_title"),
+							string.format(i18n.get("menu.llm.api_unreachable_body"), probed_label),
+							"error")
+					end)
+			end, debug.traceback)
+			if not call_ok or dispatched ~= true then
+				Logger.error(LOG, "API test dispatch failed: %s", tostring(dispatched))
+				return false
+			end
+			return true
+		end or nil,
+	})
+
+
+	-- =====================================================
+	-- ===== 1.5) Build parent row title =====
 	-- =====================================================
 
 	local api_title = active_entry

@@ -40,6 +40,13 @@
 global LLM_API_PROVIDERS := Map()
 global LLM_API_PROVIDER_ORDER := []
 
+; Shared Test-API probe (system/user prompt, temperature, token budget) from
+; api_providers.json test_request — the exact request both drivers send
+; verbatim for the Test-active-entry action. Empty until _LLMRemote_LoadCatalog
+; validates the section; the menu refuses loudly while it is empty instead of
+; inventing probe values (single-source contract, see test-llm-test-request).
+global LLM_REMOTE_TEST_REQUEST := Map()
+
 global LLM_REMOTE_TIMEOUT_MS := 0   ; sentinel — sourced at boot by LLMApiLoadTimings ([llm] request_timeout_ms)
 
 
@@ -1150,8 +1157,31 @@ _LLMRemote_CatalogPriceIsValid(value) {
  * Loads provider descriptors + model prices from _shared/modules/llm/api_providers.json.
  * Fail-fast when the file is missing or malformed — same contract as the HS twin.
  */
+; Validates the shared Test-API probe section. Soft-degrade like the HS twin:
+; a malformed section disables only the Test-API action (loud refusal at
+; click time), never the remote backend and its predictions.
+_LLMRemote_CatalogTestRequestIsValid(req) {
+    if !(req is Map)
+        return false
+    if !(req.Has("system_prompt") and req["system_prompt"] is String)
+        return false
+    if !(req.Has("user_text") and req["user_text"] is String)
+        return false
+    if (req["system_prompt"] == "" or req["user_text"] == "")
+        return false
+    if !(req.Has("temperature") and (req["temperature"] is Integer or req["temperature"] is Float))
+        return false
+    if (req["temperature"] < 0 or req["temperature"] > 2)
+        return false
+    if !(req.Has("max_tokens") and (req["max_tokens"] is Integer))
+        return false
+    if (req["max_tokens"] < 1 or req["max_tokens"] > 64)
+        return false
+    return true
+}
+
 _LLMRemote_LoadCatalog() {
-    global LLM_API_PROVIDERS, LLM_API_PROVIDER_ORDER, LLM_REMOTE_MODEL_PRICES, _SharedDir
+    global LLM_API_PROVIDERS, LLM_API_PROVIDER_ORDER, LLM_REMOTE_MODEL_PRICES, LLM_REMOTE_TEST_REQUEST, _SharedDir
     path := _SharedDir . "\modules\llm\api_providers.json"
     if !FileExist(path)
         throw Error("api_providers.json not found at " . path)
@@ -1214,11 +1244,28 @@ _LLMRemote_LoadCatalog() {
         candidatePrices[model] := Map("in", row["in"], "out", row["out"])
     }
 
+    ; The probe section degrades soft, unlike the provider catalogue above:
+    ; a missing or malformed test_request must disable only the Test-API
+    ; action (which refuses loudly at click time), never the whole remote
+    ; backend and its predictions.
+    testReq := root.Has("test_request") ? root["test_request"] : ""
+    candidateTestRequest := Map()
+    if _LLMRemote_CatalogTestRequestIsValid(testReq) {
+        candidateTestRequest := Map(
+            "system_prompt", testReq["system_prompt"],
+            "user_text", testReq["user_text"],
+            "temperature", testReq["temperature"],
+            "max_tokens", Integer(testReq["max_tokens"]))
+    } else {
+        try LoggerWarn("LLM.remote", "api_providers.json: test_request section missing or invalid — Test-API action disabled.")
+    }
+
     ; Publish only the completely validated candidates. A failed/partial parse
     ; can never leak raw catalogue scalars to the menu or inference path.
     LLM_API_PROVIDERS := candidateProviders
     LLM_API_PROVIDER_ORDER := candidateOrder
     LLM_REMOTE_MODEL_PRICES := candidatePrices
+    LLM_REMOTE_TEST_REQUEST := candidateTestRequest
 }
 
 ; AHK-05: a corrupt or user-edited api_providers.json must disable only the remote
@@ -1229,5 +1276,6 @@ catch as _e {
 	LLM_API_PROVIDERS := Map()
 	LLM_API_PROVIDER_ORDER := []
 	LLM_REMOTE_MODEL_PRICES := Map()
+	LLM_REMOTE_TEST_REQUEST := Map()
 	try LoggerError("LLM.remote", "api_providers.json load failed — remote API backend disabled: {1}.", _e.Message)
 }
