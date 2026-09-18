@@ -97,14 +97,18 @@ global LLM_REMOTE_CONNECT_TIMEOUT_MS := 5000
  * @param {function}   on_fail      - Called on HTTP / parse failure.
  * @param {string}     Kind         - Reservation kind; LLM_REMOTE_KIND_API_TEST
  *   exempts the request from the engine's keystroke cancels.
+ * @param {number}     TimeoutMs    - Override for this request only (0 keeps
+ *   the shared prediction timeout). The API test passes its own longer
+ *   budget: cold models need more than 30 s.
  * @returns {Integer}  Request id, usable with LLM_RemoteCancelAsync.
  */
-LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success, on_fail, TailText := "", max_tokens := "", Kind := "") {
+LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success, on_fail, TailText := "", max_tokens := "", Kind := "", TimeoutMs := 0) {
     global _LLM_Remote_Async, _LLM_Remote_AsyncCounter, LLM_REMOTE_TIMEOUT_MS
 
     _LLM_Remote_AsyncCounter += 1
     req_id := _LLM_Remote_AsyncCounter
-    timeout_ms := (LLM_REMOTE_TIMEOUT_MS > 0) ? LLM_REMOTE_TIMEOUT_MS : 30000
+    timeout_ms := (TimeoutMs > 0) ? TimeoutMs
+        : ((LLM_REMOTE_TIMEOUT_MS > 0) ? LLM_REMOTE_TIMEOUT_MS : 30000)
     reservation := _LLMRemote_ReserveRequest(req_id, on_success, on_fail,
         timeout_ms, A_TickCount)
     reservation["kind"] := Kind
