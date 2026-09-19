@@ -312,7 +312,8 @@ _LLM_Menu_EmitRow(id, disabled, llm_is_operational, has_health_dot := false) {
 	global _LLM_Menu, _LLM_Menu_Handle
 	switch id {
 	case "llm_backend":
-		_LLM_Menu_AddRow(StrReplace(t("menu.llm.model_backend"), "%s", _LLM_Menu["backend"]), LLM_Menu_BuildBackendMenu(), disabled)
+		_LLM_Menu_AddRow(StrReplace(t("menu.llm.model_backend"), "%s",
+			_LLM_Menu_BackendDisplayName(_LLM_Menu["backend"])), LLM_Menu_BuildBackendMenu(), disabled)
 	case "llm_model":
 		; Build the submenu, fire the async probes (backend health + installed-tags
 		; list), then prefix the label with the cached backend-health dot (🟢
@@ -335,9 +336,13 @@ _LLM_Menu_EmitRow(id, disabled, llm_is_operational, has_health_dot := false) {
 		health_dot := (has_health_dot && llm_is_operational)
 			? ((last_status == "ok") ? "🟢 " : (last_status == "ko") ? "🔴 " : "")
 			: ""
-		_LLM_Menu_AddRow(health_dot . StrReplace(t("menu.llm.model_label"), "%s", _LLM_Menu["model"]), model_menu, disabled)
+		; The shown model follows the active backend (an API entry's model
+		; with backend api, never the preserved Ollama slot) — the
+		; thinking-model row below must agree with the same text.
+		model_shown := _LLM_Menu_ModelDisplayText()
+		_LLM_Menu_AddRow(health_dot . StrReplace(t("menu.llm.model_label"), "%s", model_shown), model_menu, disabled)
 		; Thinking-model info row — conditional, native-only (mirrors HS thinking-info).
-		if _LLM_Menu_IsThinkingModel(_LLM_Menu["model"]) {
+		if _LLM_Menu_IsThinkingModel(model_shown) {
 			warning_label := t("menu.llm.thinking_model_info")
 			_LLM_Menu_Handle.Add(warning_label, (*) => 0)
 			try _LLM_Menu_Handle.Disable(warning_label)

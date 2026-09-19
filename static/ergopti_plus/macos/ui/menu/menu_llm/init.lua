@@ -969,7 +969,16 @@ local function create_menu(deps)
 				end
 
 				local rich_model_title = health_dot .. i18n.get("menu.llm.active_model_label")
-				if not state.llm_model or state.llm_model == "" then
+				if state.llm_backend == "api" then
+						-- The local llm_model slot is stale on this backend: show the
+						-- active API entry instead, without local-model badges.
+						local entry_model = nil
+						if type(ApiPanel.active_entry_display_model) == "function" then
+							entry_model = ApiPanel.active_entry_display_model()
+						end
+						rich_model_title = rich_model_title
+							.. (entry_model or i18n.get("menu.llm.no_model_none"))
+				elseif not state.llm_model or state.llm_model == "" then
 						rich_model_title = rich_model_title .. i18n.get("menu.llm.no_model_none")
 				else
 						rich_model_title = rich_model_title .. string.format("%s%s%s", active_display_model, type_str, params_ram_str)

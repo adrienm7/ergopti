@@ -131,6 +131,34 @@ end
 -- =============================
 -- =============================
 
+--- Display model for the active API entry: its model, else the provider
+--- default (what requests resolve), else nil. Used by the model parent row
+--- so backend api never shows the stale local-model slot.
+--- @return string|nil Model id or nil.
+function M.active_entry_display_model()
+	local remote = llm_mod and llm_mod.api_remote
+	if type(remote) ~= "table" then return nil end
+	if type(remote.get_active_entry_id) ~= "function"
+		or type(remote.get_entries) ~= "function" then
+		return nil
+	end
+	local active_id = remote.get_active_entry_id()
+	if type(active_id) ~= "string" or active_id == "" then return nil end
+	for _, e in ipairs(remote.get_entries() or {}) do
+		if type(e) == "table" and e.id == active_id then
+			if type(e.model) == "string" and e.model ~= "" then return e.model end
+			local providers = remote.PROVIDERS
+			local prov = type(providers) == "table" and providers[e.provider] or nil
+			if type(prov) == "table" and type(prov.default_model) == "string"
+				and prov.default_model ~= "" then
+				return prov.default_model
+			end
+			return nil
+		end
+	end
+	return nil
+end
+
 --- Builds the API entries submenu and returns the title string and menu table.
 --- Only call when state.llm_backend == "api" — returns nil, nil otherwise.
 --- @param ctx table Context with fields: state, paused, keymap, update_menu, WarmupCtrl.
