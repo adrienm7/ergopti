@@ -70,23 +70,31 @@ Test("llm api test: entries menu exposes a Test-selected-API row (api-test-entry
 	_LAT_RowsExposeTestAction)
 
 ; Row order: entries, then Add, then the separator with the management
-; rows (Edit/Remove/Test). Add must sit before the separator so creating
-; an entry is one glance away; with no entries there is no dangling
-; separator at all.
+; rows (Test/Edit/Remove — most frequent first, destructive delete last).
+; Add must sit before the separator so creating an entry is one glance
+; away; with no entries there is no dangling separator at all.
 _LAT_RowsOrder() {
 	SavedMenu := _LAT_FixtureMenu()
 	try {
 		Rows := _LLM_Menu_ApiEntriesRows()
-		AddAt := 0
-		SepAt := 0
+		Pos := Map()
 		for i, Row in Rows {
-			if (Row.Has("label") && Row["label"] == t("menu.llm.api_add_entry"))
-				AddAt := i
-			if (Row.Has("separator") && SepAt == 0)
-				SepAt := i
+			if Row.Has("separator") {
+				if !Pos.Has("sep")
+					Pos["sep"] := i
+			} else if Row.Has("label") {
+				for Key in ["api_add_entry", "api_edit_entry",
+					"api_test_entry", "api_remove_entry"] {
+					if (Row["label"] == t("menu.llm." . Key) && !Pos.Has(Key))
+						Pos[Key] := i
+				}
+			}
 		}
-		AssertTrue(AddAt > 0, "the Add row must exist with entries present")
-		AssertTrue(SepAt > AddAt, "the Add row must sit before the separator")
+		AssertTrue(Pos.Has("api_add_entry"), "the Add row must exist with entries present")
+		AssertTrue(Pos["sep"] > Pos["api_add_entry"], "the Add row must sit before the separator")
+		AssertTrue(Pos["api_test_entry"] > Pos["sep"], "Test must come after the separator")
+		AssertTrue(Pos["api_edit_entry"] > Pos["api_test_entry"], "Edit must come after Test")
+		AssertTrue(Pos["api_remove_entry"] > Pos["api_edit_entry"], "Delete must come last")
 		_LLM_Menu["api_entries"] := []
 		Rows := _LLM_Menu_ApiEntriesRows()
 		for Row in Rows {
@@ -97,6 +105,87 @@ _LAT_RowsOrder() {
 }
 Test("llm api test: Add sits before the separator, none when empty (api-test-entry-row-order)",
 	_LAT_RowsOrder)
+
+; Entry rows show the defined name only: the provider/model suffix is
+; folded into the default name at creation, so the list never repeats it.
+_LAT_EntryRowsShowNameOnly() {
+	SavedMenu := _LAT_FixtureMenu()
+	try {
+		Rows := _LLM_Menu_ApiEntriesRows()
+		Found := false
+		for Row in Rows {
+			if (Row.Has("label") && InStr(Row["label"], "Prod") == 1) {
+				Found := true
+				AssertEqual("Prod", Row["label"])
+			}
+		}
+		AssertTrue(Found, "the entry row must list the defined name")
+	} finally _LAT_RestoreMenu(SavedMenu)
+}
+Test("llm api test: entry rows show the defined name only (api-test-entry-row-name)",
+	_LAT_EntryRowsShowNameOnly)
+
+; A default name collides safely: creation appends a counter, editing
+; keeps its own name untouched.
+_LAT_UniqueEntryName() {
+	Entries := [Map("Id", "a", "Name", "cerebras/qwen"),
+		Map("Id", "b", "Name", "cerebras/qwen (2)")]
+	AssertEqual("cerebras/qwen (3)",
+		_LLM_Menu_UniqueApiEntryName("cerebras/qwen", Entries, ""),
+		"a taken default name must count up")
+	AssertEqual("mine", _LLM_Menu_UniqueApiEntryName("mine", Entries, ""),
+		"a free name must pass through")
+	AssertEqual("cerebras/qwen",
+		_LLM_Menu_UniqueApiEntryName("cerebras/qwen", Entries, "a"),
+		"editing must keep its own name without suffix")
+}
+Test("llm api test: default names dedupe, edits keep theirs (api-test-entry-unique-name)",
+	_LAT_UniqueEntryName)
+
+; The creation dialog asks the name LAST (provider, URL, token, model
+; first) so the default can be provider/model. Scanned comment-stripped.
+_LAT_PromptOrder() {
+	Code := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_PromptApiEntry"))
+	Assert(Code != "", "_LLM_Menu_PromptApiEntry must remain source-visible")
+	Pos := Map()
+	for Key in ["api_prompt_provider", "api_prompt_url", "api_prompt_token",
+		"api_prompt_model", "api_prompt_name"] {
+		At := InStr(Code, Key)
+		Assert(At > 0, "the dialog must prompt " . Key)
+		Pos[Key] := At
+	}
+	AssertTrue(Pos["api_prompt_provider"] < Pos["api_prompt_url"],
+		"provider comes first")
+	AssertTrue(Pos["api_prompt_url"] < Pos["api_prompt_token"],
+		"URL comes before the token")
+	AssertTrue(Pos["api_prompt_token"] < Pos["api_prompt_model"],
+		"token comes before the model")
+	AssertTrue(Pos["api_prompt_model"] < Pos["api_prompt_name"],
+		"name comes last so its default is provider/model")
+	Assert(InStr(Code, 'provider_id . "/" . new_model') > 0,
+		"the name default must be provider/model")
+}
+Test("llm api test: creation asks the name last with provider/model default (api-test-entry-prompt-order)",
+	_LAT_PromptOrder)
+
+; After a creation persist the flow offers the end-to-end probe on the new
+; (now active) entry; edits never ask. The stubbed MsgBox declines, so the
+; helper documents its headless default. Scanned comment-stripped.
+_LAT_AskDefaultsDecline() {
+	AssertFalse(_LLM_Menu_AskTestNewApiEntry(),
+		"without a user answer the offer must decline, never probe")
+	Code := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_PromptApiEntry"))
+	Assert(Code != "", "_LLM_Menu_PromptApiEntry must remain source-visible")
+	PersistAt := InStr(Code, "LLM_Menu_CommitApiEntriesMutation")
+	AskAt := InStr(Code, "_LLM_Menu_AskTestNewApiEntry(")
+	TestAt := InStr(Code, "_LLM_Menu_TestActiveApiEntry(")
+	Assert(PersistAt > 0 && AskAt > PersistAt,
+		"the offer must come after the persist, never before")
+	Assert(TestAt > AskAt,
+		"a confirmed offer must dispatch the probe on the new entry")
+}
+Test("llm api test: creation offers the probe after persist (api-test-entry-add-offers-probe)",
+	_LAT_AskDefaultsDecline)
 
 ; No active entry, or an entry id pointing nowhere: refuse before any owner,
 ; request or network. The refusal still surfaces through the seam (MsgBox in

@@ -249,7 +249,7 @@ helpers.describe("API panel test request", function()
 		end)
 	end)
 
-	helpers.it("reports the active API entry display model", function()
+	helpers.it("reports the active API entry display name", function()
 		helpers.with_fresh_modules({
 			"modules.llm",
 			"infra.i18n",
@@ -272,15 +272,18 @@ helpers.describe("API panel test request", function()
 				entries = { entry }, active_id = "prod", spec = spec,
 			})
 			local panel = require("ui.menu.menu_llm.api_panel")
-			helpers.assert_true(type(panel.active_entry_display_model) == "function",
-				"the panel must expose the entry display model")
-			helpers.assert_eq(panel.active_entry_display_model(), "probe-model",
-				"the row shows the entry model, never the local slot")
+			helpers.assert_true(type(panel.active_entry_display_name) == "function",
+				"the panel must expose the entry display name")
+			helpers.assert_eq(panel.active_entry_display_name(), "Prod",
+				"the row shows the configured entry name, never the model id")
+			entry.label = ""
+			helpers.assert_eq(panel.active_entry_display_name(), "probe-model",
+				"an unnamed entry falls back to its model")
 			entry.model = ""
-			helpers.assert_eq(panel.active_entry_display_model(), "openai-default",
-				"an entry without model falls back to the provider default")
+			helpers.assert_eq(panel.active_entry_display_name(), "openai-default",
+				"an entry without name or model falls back to the provider default")
 			entry.id = "ghost"
-			helpers.assert_true(panel.active_entry_display_model() == nil,
+			helpers.assert_true(panel.active_entry_display_name() == nil,
 				"an unknown entry never resurrects a stale model")
 		end)
 	end)
@@ -321,6 +324,47 @@ helpers.describe("API panel test request", function()
 			helpers.assert_true(add_at > 0, "the Add row must exist with entries present")
 			helpers.assert_true(sep_at > add_at,
 				"the Add row must sit before the separator")
+		end)
+	end)
+
+	helpers.it("lists Test before Remove, Delete last", function()
+		helpers.with_fresh_modules({
+			"modules.llm",
+			"infra.i18n",
+			"infra.logger",
+			"infra.dialog_util",
+			"infra.notifications",
+			"infra.manifest_menu",
+			"ui.menu.menu_llm.api_panel",
+		}, function()
+			local entry = {
+				id = "prod", provider = "openai", token = "live-secret",
+				model = "probe-model", label = "Prod",
+				base_url = "https://api.example.invalid/v1",
+			}
+			local spec = {
+				system_prompt = "probe sys", user_text = "ping",
+				temperature = 0, max_tokens = 16,
+			}
+			install_doubles({
+				entries = { entry }, active_id = "prod", spec = spec,
+			})
+			local panel = require("ui.menu.menu_llm.api_panel")
+			local _, rows = panel.build(fixture_context())
+			local pos = {}
+			for i, row in ipairs(rows) do
+				if type(row.label) == "string" then
+					for _, key in ipairs({ "api_test_entry", "api_remove_entry" }) do
+						if row.label:find(key, 1, true) ~= nil and pos[key] == nil then
+							pos[key] = i
+						end
+					end
+				end
+			end
+			helpers.assert_true(pos.api_test_entry ~= nil, "the Test row must exist")
+			helpers.assert_true(pos.api_remove_entry ~= nil, "the Remove row must exist")
+			helpers.assert_true(pos.api_test_entry < pos.api_remove_entry,
+				"Test must come before Delete (destructive last)")
 		end)
 	end)
 

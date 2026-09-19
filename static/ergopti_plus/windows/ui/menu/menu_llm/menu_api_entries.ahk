@@ -55,16 +55,10 @@ _LLM_Menu_ApiEntriesRows() {
 	} else {
 		active_id := _LLM_Menu.Has("api_entry_id") ? _LLM_Menu["api_entry_id"] : ""
 		for entry in entries {
-			id    := _LLM_MenuApiEntryGet(entry, "Id",       "")
-			name  := _LLM_MenuApiEntryGet(entry, "Name",     "(unnamed)")
-			prov  := _LLM_MenuApiEntryGet(entry, "Provider", "")
-			model := _LLM_MenuApiEntryGet(entry, "Model",    "")
-			suffix := (model != "" and prov != "") ? "  —  " . prov . " / " . model
-				: (model != "") ? "  —  " . model
-				: (prov  != "") ? "  —  " . prov
-				: ""
+			id   := _LLM_MenuApiEntryGet(entry, "Id",   "")
+			name := _LLM_MenuApiEntryGet(entry, "Name", "(unnamed)")
 			Rows.Push(Map(
-				"label",   name . suffix,
+				"label",   name,
 				"checked", (id == active_id),
 				"action",  _LLM_Menu_MakeSelectApiEntryHandler(entry)))
 		}
@@ -74,18 +68,42 @@ _LLM_Menu_ApiEntriesRows() {
 	; dangling when no entry exists.
 	Rows.Push(Map("label", t("menu.llm.api_add_entry"), "action", (*) => _LLM_Menu_PromptApiEntry("")))
 	if (Type(entries) == "Array" and entries.Length > 0) {
+		; Management rows: most frequent first, destructive delete last.
 		Rows.Push(Map("separator", true))
+		Rows.Push(Map(
+			"label",  t("menu.llm.api_test_entry"),
+			"action", (*) => _LLM_Menu_TestActiveApiEntry()))
 		Rows.Push(Map(
 			"label",  t("menu.llm.api_edit_entry"),
 			"action", (*) => _LLM_Menu_PromptApiEntry(_LLM_Menu["api_entry_id"])))
 		Rows.Push(Map(
 			"label",  t("menu.llm.api_remove_entry"),
 			"action", (*) => _LLM_Menu_RemoveActiveApiEntry()))
-		Rows.Push(Map(
-			"label",  t("menu.llm.api_test_entry"),
-			"action", (*) => _LLM_Menu_TestActiveApiEntry()))
 	}
 	return Rows
+}
+
+; Returns a name unused by the entries: the base, then base (2), ... The
+; entry being edited keeps its own name without suffix via ExcludeId.
+_LLM_Menu_UniqueApiEntryName(Base, Entries, ExcludeId := "") {
+	if (Base == "")
+		return Base
+	Taken := Map()
+	if (Entries is Array) {
+		for Entry in Entries {
+			if (_LLM_MenuApiEntryGet(Entry, "Id", "") == ExcludeId)
+				continue
+			Name := _LLM_MenuApiEntryGet(Entry, "Name", "")
+			if (Name != "")
+				Taken[Name] := true
+		}
+	}
+	if !Taken.Has(Base)
+		return Base
+	Counter := 2
+	while Taken.Has(Base . " (" . Counter . ")")
+		Counter += 1
+	return Base . " (" . Counter . ")"
 }
 
 _LLM_MenuApiEntryGet(Entry, Key, Default := "") {
@@ -155,6 +173,17 @@ _LLM_Menu_ApiEntryIdsAreUnique(Entries) {
 ; ==========================================
 ; ==========================================
 
+; Asks whether to probe a just-created entry end to end. Existing locale
+; strings only (no new keys): the action label as question, Yes/No buttons.
+; Headless-safe: the stubbed MsgBox declines.
+; @returns {Boolean} True when the user confirmed.
+_LLM_Menu_AskTestNewApiEntry() {
+	try return MsgBox(t("menu.llm.api_test_entry"),
+		t("menu.llm.api_dialog_title"), "YesNo Icon?") == "Yes"
+	catch
+		return false
+}
+
 ; Open the create/edit dialog for an API entry. When ``EditId`` is empty, the
 ; dialog creates a new entry; otherwise it loads the matching record and
 ; updates it in place. The dialog stays InputBox-driven (one field per call)
@@ -189,14 +218,7 @@ _LLM_Menu_PromptApiEntry(EditId) {
 		}
 	}
 
-	; Step 1 — friendly name.
-	def_name := existing != "" ? _LLM_MenuApiEntryGet(existing, "Name", "") : ""
-	ib := InputBox(t("menu.llm.api_prompt_name"), t("menu.llm.api_dialog_title"),
-		"w420 h130", def_name)
-	if !_LLM_Menu_TryRequiredPrompt(ib.Result, ib.Value, &new_name)
-		return
-
-	; Step 2 — provider id.
+	; Step 1 — provider id.
 	provider_choices := _LLM_Menu_BuildApiProviderChoices(LLM_API_PROVIDERS)
 	def_provider := existing != "" ? _LLM_MenuApiEntryGet(existing, "Provider", "openai") : "openai"
 	ib := InputBox(
@@ -215,7 +237,7 @@ _LLM_Menu_PromptApiEntry(EditId) {
 		return
 	provider := LLM_API_PROVIDERS[provider_id]
 
-	; Step 3 — base URL (prefilled with the provider default).
+	; Step 2 — base URL (prefilled with the provider default).
 	def_url := existing != "" ? _LLM_MenuApiEntryGet(existing, "BaseUrl", "") : provider["BaseUrl"]
 	ib := InputBox(t("menu.llm.api_prompt_url"), t("menu.llm.api_dialog_title"),
 		"w520 h130", def_url)
@@ -223,7 +245,7 @@ _LLM_Menu_PromptApiEntry(EditId) {
 		return
 	new_url := Trim(ib.Value)
 
-	; Step 4 — token. InputBox does not natively mask, so we use the Hide
+	; Step 3 — token. InputBox does not natively mask, so we use the Hide
 	; flag (HIDE) so the cleartext doesn't sit on screen / clipboard.
 	def_token := existing != "" ? _LLM_MenuApiEntryGet(existing, "Token", "") : ""
 	ib := InputBox(t("menu.llm.api_prompt_token"), t("menu.llm.api_dialog_title"),
@@ -232,12 +254,28 @@ _LLM_Menu_PromptApiEntry(EditId) {
 		return
 	new_token := ib.Value   ; do NOT Trim — leading/trailing chars are part of the secret
 
-	; Step 5 — model.
+	; Step 4 — model.
 	def_model := existing != "" ? _LLM_MenuApiEntryGet(existing, "Model", "") : provider["DefaultModel"]
 	ib := InputBox(t("menu.llm.api_prompt_model"), t("menu.llm.api_dialog_title"),
 		"w420 h130", def_model)
 	if !_LLM_Menu_TryRequiredPrompt(ib.Result, ib.Value, &new_model)
 		return
+
+	; Step 5 — friendly name, LAST so its default is provider/model. The
+	; default is deduped against the other entries so rows stay distinct.
+	if (existing != "") {
+		def_name := _LLM_MenuApiEntryGet(existing, "Name", "")
+		name_exclude := _LLM_MenuApiEntryGet(existing, "Id", "")
+	} else {
+		def_name := provider_id . "/" . new_model
+		name_exclude := ""
+	}
+	ib := InputBox(t("menu.llm.api_prompt_name"), t("menu.llm.api_dialog_title"),
+		"w420 h130", def_name)
+	if !_LLM_Menu_TryRequiredPrompt(ib.Result, ib.Value, &typed_name)
+		return
+	new_name := _LLM_Menu_UniqueApiEntryName(typed_name,
+		_LLM_Menu["api_entries"], name_exclude)
 
 	; Persist.
 	new_entry := Map(
@@ -255,6 +293,20 @@ _LLM_Menu_PromptApiEntry(EditId) {
 			new_entry, EditId), _LLM_Menu_ApplyApiEntriesCommitted)
 	if !Committed
 		return false
+
+	; Creation only: offer the full end-to-end probe on the just-saved
+	; entry (committing made it active), so a bad token or model surfaces
+	; here with its server message instead of mid-typing. A declined
+	; offer keeps the save.
+	if ((EditId == "") && _LLM_Menu["api_entry_id"] == new_entry["Id"]) {
+		try {
+			if _LLM_Menu_AskTestNewApiEntry()
+				_LLM_Menu_TestActiveApiEntry()
+		} catch as AskErr {
+			try LoggerWarn("LLM", "Post-creation API test skipped: {1}.",
+				AskErr.Message)
+		}
+	}
 
 	; Token validation: hit the provider's /models endpoint once with the
 	; freshly-saved credentials so the user finds out NOW (with an explicit
