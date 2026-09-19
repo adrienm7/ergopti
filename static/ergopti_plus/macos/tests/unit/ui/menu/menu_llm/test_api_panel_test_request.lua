@@ -28,10 +28,10 @@ local function install_doubles(args)
 	local active_id = args.active_id
 	local spec = args.spec
 	local calls = {}
-	local api_remote = {
+	local 	api_remote = {
 		PROVIDER_ORDER = { "openai" },
 		PROVIDERS = {
-			openai = { label = "OpenAI" },
+			openai = { label = "OpenAI", default_model = "openai-default" },
 		},
 		get_entries = function() return entries end,
 		set_entries = function(value) entries = value end,
@@ -246,6 +246,42 @@ helpers.describe("API panel test request", function()
 				"the failure body must carry the server message")
 			helpers.assert_true(notifications[1].body:find("live-secret", 1, true) == nil,
 				"the token must never reach a notification")
+		end)
+	end)
+
+	helpers.it("reports the active API entry display model", function()
+		helpers.with_fresh_modules({
+			"modules.llm",
+			"infra.i18n",
+			"infra.logger",
+			"infra.dialog_util",
+			"infra.notifications",
+			"infra.manifest_menu",
+			"ui.menu.menu_llm.api_panel",
+		}, function()
+			local entry = {
+				id = "prod", provider = "openai", token = "live-secret",
+				model = "probe-model", label = "Prod",
+				base_url = "https://api.example.invalid/v1",
+			}
+			local spec = {
+				system_prompt = "probe sys", user_text = "ping",
+				temperature = 0, max_tokens = 16,
+			}
+			install_doubles({
+				entries = { entry }, active_id = "prod", spec = spec,
+			})
+			local panel = require("ui.menu.menu_llm.api_panel")
+			helpers.assert_true(type(panel.active_entry_display_model) == "function",
+				"the panel must expose the entry display model")
+			helpers.assert_eq(panel.active_entry_display_model(), "probe-model",
+				"the row shows the entry model, never the local slot")
+			entry.model = ""
+			helpers.assert_eq(panel.active_entry_display_model(), "openai-default",
+				"an entry without model falls back to the provider default")
+			entry.id = "ghost"
+			helpers.assert_true(panel.active_entry_display_model() == nil,
+				"an unknown entry never resurrects a stale model")
 		end)
 	end)
 

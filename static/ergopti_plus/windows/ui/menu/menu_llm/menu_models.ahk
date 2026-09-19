@@ -55,6 +55,20 @@ LLM_Menu_BuildBackendMenu() {
 }
 
 /**
+ * Display brand for a backend id. Brand names are not translated (same in
+ * every language, matching the submenu prefixes below); an unknown id falls
+ * back to itself so a future backend never blanks the parent row.
+ * @param {String} BackendId Storage id ("ollama", "api", …).
+ * @returns {String} "Ollama", "API", or the id itself.
+ */
+_LLM_Menu_BackendDisplayName(BackendId) {
+	static Brands := Map("ollama", "Ollama", "api", "API")
+	if ((BackendId is String) && Brands.Has(BackendId))
+		return Brands[BackendId]
+	return (BackendId is String) ? BackendId : ""
+}
+
+/**
  * Row data for the backend submenu.
  * @returns {Array} One row per backend, then the Ollama port and its reset row.
  */
@@ -101,6 +115,51 @@ _LLM_Menu_BackendRows() {
 ; ======= 2/ Model Submenu =======
 ; ================================
 ; ================================
+
+/**
+ * Display model for one API entry: its own model, else the provider default
+ * (exactly what requests resolve), else "".
+ * @param {Map} Entry API entry record.
+ * @returns {String} Model id or "".
+ */
+_LLM_Menu_ApiEntryDisplayModel(Entry) {
+	global LLM_API_PROVIDERS
+	Model := _LLM_MenuApiEntryGet(Entry, "Model", "")
+	if (Model != "")
+		return Model
+	Provider := _LLM_MenuApiEntryGet(Entry, "Provider", "")
+	if ((Provider != "") && (LLM_API_PROVIDERS is Map)
+		&& LLM_API_PROVIDERS.Has(Provider)) {
+		Desc := LLM_API_PROVIDERS[Provider]
+		if ((Desc is Map) && Desc.Has("DefaultModel"))
+			return Desc["DefaultModel"]
+	}
+	return ""
+}
+
+/**
+ * Text for the model parent row. With backend api the Ollama slot is stale
+ * by design — it is preserved so switching back restores it — so the row
+ * shows the selected entry instead, never the leftover tag.
+ * @returns {String} Model id, provider default, or "".
+ */
+_LLM_Menu_ModelDisplayText() {
+	global _LLM_Menu
+	if !(_LLM_Menu is Map)
+		return ""
+	if (_LLM_Menu.Get("backend", "") == "api") {
+		ActiveId := _LLM_Menu.Has("api_entry_id") ? _LLM_Menu["api_entry_id"] : ""
+		if ((ActiveId != "") && _LLM_Menu.Has("api_entries")
+			&& (_LLM_Menu["api_entries"] is Array)) {
+			for E in _LLM_Menu["api_entries"] {
+				if (_LLM_MenuApiEntryGet(E, "Id", "") == ActiveId)
+					return _LLM_Menu_ApiEntryDisplayModel(E)
+			}
+		}
+		return ""
+	}
+	return _LLM_Menu.Get("model", "")
+}
 
 /**
  * Builds the model selection submenu. Mirrors the Hammerspoon driver's
