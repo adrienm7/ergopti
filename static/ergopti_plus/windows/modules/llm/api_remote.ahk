@@ -123,7 +123,8 @@ LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success,
 
     req := _LLMRemote_BuildRequestContext(SystemPrompt, FullText, TailText)
     Url     := _LLMRemoteBuildUrl(resolved["BaseUrl"], resolved["Format"], resolved["Token"], resolved["Model"])
-    Payload := _LLMRemoteBuildPayload(resolved["Format"], resolved["Model"], req["system"], req["user"], Temperature, max_tokens)
+    Payload := _LLMRemoteBuildPayload(resolved["Format"], resolved["Model"], req["system"], req["user"], Temperature, max_tokens,
+        resolved.Has("Extras") ? resolved["Extras"] : Map())
 
     ; The curl child is the only production transport. Falling back to WinHTTP
     ; would put DNS/connect/Send back on the cooperative AHK thread.
@@ -758,7 +759,9 @@ _LLMRemoteResolveEntry(Entry) {
         if !_LLMRemote_ConfigScalarIsSafe(Scalar)
             return ""
     }
-    return Map("Provider", ProviderId, "Format", ProvFmt, "BaseUrl", BaseUrl, "Token", Token, "Model", Model)
+    ModelExtras := Provider.Has("ModelExtras") ? Provider["ModelExtras"] : Map()
+    Extras := (ModelExtras is Map && ModelExtras.Has(Model)) ? ModelExtras[Model] : Map()
+    return Map("Provider", ProviderId, "Format", ProvFmt, "BaseUrl", BaseUrl, "Token", Token, "Model", Model, "Extras", Extras)
 }
 
 ; Per-phase timeout (ms) for the readiness ping. Same value the sync path
@@ -985,7 +988,11 @@ _LLMRemoteSetAuthHeaders(Http, Format, Token) {
 ; ``Format`` as a parameter would silently break every API request — the
 ; call ``Format("{:.2f}", ...)`` would try to invoke the parameter (a
 ; string, e.g. "openai") as a function and throw at runtime.
-_LLMRemoteBuildPayload(Fmt, Model, SystemPrompt, UserText, Temperature, max_tokens := "") {
+; @param {Map} Extras - Per-model body fields from the catalogue
+;   (model_extras), merged into OpenAI-shape payloads only. Anthropic and
+;   Gemini branches never receive them: an unknown field can fail those
+;   endpoints, and each extra is documented for one provider model.
+_LLMRemoteBuildPayload(Fmt, Model, SystemPrompt, UserText, Temperature, max_tokens := "", Extras := Map()) {
     SysEsc  := _LLMRemoteJsonEscape(SystemPrompt)
     UserEsc := _LLMRemoteJsonEscape(UserText)
     ModelEsc := _LLMRemoteJsonEscape(Model)
@@ -1010,8 +1017,21 @@ _LLMRemoteBuildPayload(Fmt, Model, SystemPrompt, UserText, Temperature, max_toke
     }
     ; OpenAI Chat Completions shape — covers OpenAI itself plus every
     ; OpenAI-compatible endpoint (Groq, OpenRouter, LM Studio, vLLM, …).
-    return Format('{"model":"{1}","messages":[{"role":"system","content":"{2}"},{"role":"user","content":"{3}"}],"temperature":{4},"max_tokens":{5},"stream":false}',
-        ModelEsc, SysEsc, UserEsc, Temp, MaxTok)
+    ; Catalogue extras render generically from data: no per-model literal may
+    ; ever be restated here (single-sourced in api_providers.json).
+    ExtraFrag := ""
+    if (Extras is Map) {
+        for Field, Val in Extras {
+            if (Type(Field) != "String" || !RegExMatch(Field, "^[A-Za-z_][A-Za-z0-9_]*$"))
+                continue
+            if (Val is String)
+                ExtraFrag .= Format(',"{1}":"{2}"', Field, _LLMRemoteJsonEscape(Val))
+            else if (Val is Number)
+                ExtraFrag .= Format(',"{1}":{2}', Field, Val)
+        }
+    }
+    return Format('{"model":"{1}","messages":[{"role":"system","content":"{2}"},{"role":"user","content":"{3}"}],"temperature":{4},"max_tokens":{5},"stream":false{6}}',
+        ModelEsc, SysEsc, UserEsc, Temp, MaxTok, ExtraFrag)
 }
 
 ; Parse one immutable provider root and classify both the completion and usage
@@ -1171,6 +1191,34 @@ _LLMRemote_CatalogPriceIsValid(value) {
     return value is Number and value >= 0 and value <= 1.7976931348623157e308
 }
 
+; Normalizes the optional per-provider model_extras section (Map model id ->
+; Map field -> value) into publishable tables. Fail-closed per piece: doc
+; keys, non-map models, non-scalar values and field names that would break
+; JSON are dropped with the provider still loading — a bad extra must never
+; disable a whole provider. Values are strings or numbers (JsonParse decodes
+; JSON booleans as 0/1, which travel as numbers).
+_LLMRemote_NormalizeModelExtras(Raw) {
+    Norm := Map()
+    if !(Raw is Map)
+        return Norm
+    for Model, Fields in Raw {
+        if (Type(Model) != "String" || Model == "" || SubStr(Model, 1, 1) == "_")
+            continue
+        if !(Fields is Map)
+            continue
+        Kept := Map()
+        for Field, Val in Fields {
+            if (Type(Field) != "String" || !RegExMatch(Field, "^[A-Za-z_][A-Za-z0-9_]*$"))
+                continue
+            if (Val is String || Val is Number)
+                Kept[Field] := Val
+        }
+        if (Kept.Count > 0)
+            Norm[Model] := Kept
+    }
+    return Norm
+}
+
 /**
  * Loads provider descriptors + model prices from _shared/modules/llm/api_providers.json.
  * Fail-fast when the file is missing or malformed — same contract as the HS twin.
@@ -1244,7 +1292,9 @@ _LLMRemote_LoadCatalog() {
             "Label", desc["label"],
             "BaseUrl", desc["base_url"],
             "DefaultModel", desc["default_model"],
-            "Format", desc["format"])
+            "Format", desc["format"],
+            "ModelExtras", _LLMRemote_NormalizeModelExtras(
+                desc.Has("model_extras") ? desc["model_extras"] : Map()))
         candidateOrder.Push(pid)
     }
 

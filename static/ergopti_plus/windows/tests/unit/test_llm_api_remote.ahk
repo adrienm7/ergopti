@@ -373,6 +373,71 @@ _RemotePayload_OpenAI_StreamFalse() {
 Test("_LLMRemoteBuildPayload: openai payload has stream:false", _RemotePayload_OpenAI_StreamFalse)
 
 
+; qwen-3.8-27b reasons at xhigh effort by default and stalls tiny probes, so
+; the catalogue carries reasoning_effort:none for it and the openai branch
+; merges those extras. A provider without extras keeps a bare payload.
+_RemotePayload_OpenAI_MergesModelExtras() {
+	global LLM_API_PROVIDERS
+	Extras := LLM_API_PROVIDERS["cerebras"]["ModelExtras"]["qwen-3.8-27b"]
+	p := _LLMRemoteBuildPayload("openai", "qwen-3.8-27b", "s", "u", 0, 16, Extras)
+	AssertContains(p, '"reasoning_effort":"none"')
+	AssertContains(p, '"stream":false')
+}
+Test("_LLMRemoteBuildPayload: openai payload merges model extras (api-test-entry-reasoning)",
+	_RemotePayload_OpenAI_MergesModelExtras)
+
+
+_RemotePayload_OpenAI_NoExtrasUnchanged() {
+	p := _LLMRemoteBuildPayload("openai", "gpt-4o-mini", "s", "u", 0.1)
+	Assert(InStr(p, "reasoning_effort") == 0,
+		"a model without extras must keep a bare payload")
+}
+Test("_LLMRemoteBuildPayload: payload without extras stays bare (api-test-entry-reasoning)",
+	_RemotePayload_OpenAI_NoExtrasUnchanged)
+
+
+; The normalizer keeps per-model string/number fields, drops documentation
+; keys, non-map models and non-scalar values. Values come from JsonParse, so
+; strings and numbers are the whole contract (JSON booleans arrive as 0/1).
+_RemotePayload_NormalizeModelExtras() {
+	Norm := _LLMRemote_NormalizeModelExtras(Map(
+		"qwen-3.8-27b", Map("reasoning_effort", "none", "top_k", 40,
+			'br"oken', "x"),
+		"_comment", "docs",
+		"flat", "not-a-map",
+		"nested", Map("a", Map("b", "c"))))
+	AssertTrue(Norm.Has("qwen-3.8-27b"))
+	AssertEqual("none", Norm["qwen-3.8-27b"]["reasoning_effort"])
+	AssertEqual(40, Norm["qwen-3.8-27b"]["top_k"])
+	AssertFalse(Norm["qwen-3.8-27b"].Has('br"oken'),
+		"a field name that would break JSON is dropped")
+	AssertFalse(Norm.Has("_comment"), "documentation keys are not models")
+	AssertFalse(Norm.Has("flat"), "a model must map to a field table")
+	AssertFalse(Norm.Has("nested"),
+		"a model with no scalar fields is dropped whole")
+}
+Test("_LLMRemoteBuildPayload: model extras normalize fail-closed (api-test-entry-reasoning)",
+	_RemotePayload_NormalizeModelExtras)
+
+
+_RemoteResolve_ExposesModelExtras() {
+	Entry := Map("Provider", "cerebras", "BaseUrl", "https://api.cerebras.ai/v1",
+		"Token", "sekret", "Model", "qwen-3.8-27b")
+	R := _LLMRemoteResolveEntry(Entry)
+	AssertTrue(R is Map, "the cerebras entry must resolve")
+	AssertTrue(R["Extras"].Has("reasoning_effort"),
+		"the resolved entry must carry its model extras")
+	Plain := Map("Provider", "openai", "BaseUrl", "https://api.openai.com/v1",
+		"Token", "sekret", "Model", "gpt-4o-mini")
+	R2 := _LLMRemoteResolveEntry(Plain)
+	AssertTrue(R2 is Map, "the openai entry must resolve")
+	AssertTrue(R2["Extras"].Count == 0,
+		"a model without extras resolves to an empty table")
+}
+Test("_LLMRemoteResolveEntry: resolved entry carries model extras (api-test-entry-reasoning)",
+	_RemoteResolve_ExposesModelExtras)
+
+
 _RemotePayload_Anthropic_TopLevelSystem() {
 	p := _LLMRemoteBuildPayload("anthropic", "claude-haiku-4-5", "Be concise.", "Tell me", 0.2)
 	; Anthropic puts system at the top level, not inside messages

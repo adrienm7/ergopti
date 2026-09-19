@@ -94,6 +94,36 @@ local function catalog_price_is_valid(value)
 		and value ~= math.huge and value ~= -math.huge
 end
 
+--- Normalizes the optional per-provider model_extras section (table model id
+--- -> table field -> value) into publishable tables. Fail-closed per piece:
+--- doc keys, non-table models, non-scalar values and field names that would
+--- break JSON are dropped with the provider still loading. Values are
+--- strings or numbers, mirroring the AHK twin.
+--- @param raw any providers.<id>.model_extras value.
+--- @return table model id -> table field -> value (possibly empty).
+local function normalize_model_extras(raw)
+	local norm = {}
+	if type(raw) ~= "table" then return norm end
+	for model, fields in pairs(raw) do
+		local usable_model = type(model) == "string" and model ~= ""
+			and model:sub(1, 1) ~= "_" and type(fields) == "table"
+		if usable_model then
+			local kept = {}
+			for field, value in pairs(fields) do
+				local usable_field = type(field) == "string"
+					and field:match("^[A-Za-z_][A-Za-z0-9_]*$") ~= nil
+				local vtype = type(value)
+				if usable_field and (vtype == "string" or vtype == "number") then
+					kept[field] = value
+				end
+			end
+			if next(kept) ~= nil then norm[model] = kept end
+		end
+	end
+	return norm
+end
+M.__normalize_model_extras_for_test = normalize_model_extras
+
 --- Validates the shared Test-API probe section (api_providers.json
 --- test_request): the exact minimal completion both drivers send verbatim.
 --- Fail-soft like the rest of the catalogue: a malformed section degrades to
@@ -175,6 +205,7 @@ local function load_api_providers()
 						base_url      = desc.base_url,
 						default_model = desc.default_model,
 						format        = desc.format,
+						model_extras  = normalize_model_extras(desc.model_extras),
 					}
 					out_order[#out_order + 1] = pid
 				end
@@ -1124,7 +1155,11 @@ end
 --- minimal but correct: one system message + one user message + temperature.
 --- Streaming is OFF — the engine-level pacing already protects paid quotas,
 --- and the single-shot path keeps error handling trivial.
-local function build_payload(format, model, system_prompt, user_prompt, temperature, max_tokens)
+--- @param extras table|nil Per-model body fields from the catalogue
+--- (model_extras), merged into OpenAI-shape payloads only. Anthropic and
+--- Gemini branches never receive them. No per-model literal may ever be
+--- restated here (single-sourced in api_providers.json).
+local function build_payload(format, model, system_prompt, user_prompt, temperature, max_tokens, extras)
 	temperature = tonumber(temperature) or ApiCommon.DEFAULT_TEMPERATURE
 	-- No literal: an unset cap resolves to the one shared default
 	-- (DEFAULT_MAX_TOKENS), the same constant the engine threads from the budget.
@@ -1147,7 +1182,7 @@ local function build_payload(format, model, system_prompt, user_prompt, temperat
 		}
 	end
 	-- OpenAI Chat Completions
-	return {
+	local payload = {
 		model       = model,
 		messages    = {
 			{ role = "system", content = system_prompt or "" },
@@ -1157,7 +1192,20 @@ local function build_payload(format, model, system_prompt, user_prompt, temperat
 		max_tokens  = max_tokens,
 		stream      = false,
 	}
+	if type(extras) == "table" then
+		for field, value in pairs(extras) do
+			local vtype = type(value)
+			if type(field) == "string"
+				and field:match("^[A-Za-z_][A-Za-z0-9_]*$") ~= nil
+				and (vtype == "string" or vtype == "number")
+			then
+				payload[field] = value
+			end
+		end
+	end
+	return payload
 end
+M.__build_payload_for_test = build_payload
 
 local function estimate_cost(model, in_tokens, out_tokens)
 	if not model or model == "" or not MODEL_PRICES[model] then return 0.0 end
@@ -1600,7 +1648,9 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 		return
 	end
 
-	local payload = build_payload(provider.format, model, final_sys or "", user_prompt, temperature, max_tokens)
+	local provider_extras = type(provider.model_extras) == "table" and provider.model_extras[model] or nil
+	local payload = build_payload(provider.format, model, final_sys or "", user_prompt, temperature, max_tokens,
+		provider_extras)
 	local encoded, enc_err = JsonCodec.encode(payload)
 	if not encoded then
 		Logger.error(LOG, "[%s] #%d Payload encode failed — %s", model, req_id, tostring(enc_err))
