@@ -485,11 +485,24 @@ function M.build(ctx)
 								{ probed_label, tostring(ms), excerpt(reply) }),
 							"success")
 					end,
-					function(_reason)
+					function(_reason, detail)
 						if api_remote.get_active_entry_id() ~= probed_id then return end
+						-- The provider's own verdict rides along as a
+						-- language-neutral bracketed line (status + server
+						-- English), so no locale key is needed for it.
+						local fail_body = string.format(i18n.get("menu.llm.api_unreachable_body"), probed_label)
+						if type(detail) == "table" then
+							local status = tonumber(detail.status) or 0
+							local message = type(detail.message) == "string"
+								and detail.message:match("^%s*(.-)%s*$") or ""
+							if message ~= "" then
+								fail_body = fail_body .. "\n"
+									.. (status > 0 and string.format("[%d] %s", status, message) or message)
+							end
+						end
 						pcall_log("notify(api_test_fail)", notifications.notify,
 							i18n.get("menu.llm.api_unreachable_title"),
-							string.format(i18n.get("menu.llm.api_unreachable_body"), probed_label),
+							fail_body,
 							"error")
 					end)
 			end, debug.traceback)

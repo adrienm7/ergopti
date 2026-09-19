@@ -211,6 +211,44 @@ helpers.describe("API panel test request", function()
 		end)
 	end)
 
+	helpers.it("appends the server verdict to the failure notification", function()
+		helpers.with_fresh_modules({
+			"modules.llm",
+			"infra.i18n",
+			"infra.logger",
+			"infra.dialog_util",
+			"infra.notifications",
+			"infra.manifest_menu",
+			"ui.menu.menu_llm.api_panel",
+		}, function()
+			local entry = {
+				id = "prod", provider = "openai", token = "live-secret",
+				model = "probe-model", label = "Prod",
+				base_url = "https://api.example.invalid/v1",
+			}
+			local spec = {
+				system_prompt = "probe sys", user_text = "ping",
+				temperature = 0, max_tokens = 16,
+			}
+			local _, calls, notifications = install_doubles({
+				entries = { entry }, active_id = "prod", spec = spec,
+			})
+			local panel = require("ui.menu.menu_llm.api_panel")
+			local _, rows = panel.build(fixture_context())
+			test_row(rows).action()
+			calls[1].on_fail("request_failed",
+				{ status = 402, message = "Payment required to access this resource." })
+			helpers.assert_eq(#notifications, 1, "one failure notification must surface")
+			helpers.assert_eq(notifications[1].level, "error")
+			helpers.assert_true(notifications[1].body:find("402", 1, true) ~= nil,
+				"the failure body must carry the server status")
+			helpers.assert_true(notifications[1].body:find("Payment required", 1, true) ~= nil,
+				"the failure body must carry the server message")
+			helpers.assert_true(notifications[1].body:find("live-secret", 1, true) == nil,
+				"the token must never reach a notification")
+		end)
+	end)
+
 	helpers.it("discards a stale completion after entry switch", function()
 		helpers.with_fresh_modules({
 			"modules.llm",

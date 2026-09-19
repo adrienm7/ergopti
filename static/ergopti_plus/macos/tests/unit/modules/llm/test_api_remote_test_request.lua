@@ -130,6 +130,46 @@ helpers.describe("api_remote.test_request", function()
 		if not ok then error(err, 0) end
 	end)
 
+	helpers.it("exposes the provider error text for notifications", function()
+		local api = helpers.load_with_stubs("modules.llm.api_remote")
+		local extract = api.__extract_server_message_for_test
+		helpers.assert_true(type(extract) == "function",
+			"server message extractor must be exposed for tests")
+		helpers.assert_true((extract('{"message":"Payment required to access this resource. Visit your billing tab.","type":"payment_required_error"}') or ""):find("Payment required", 1, true) ~= nil,
+			"top-level message (Cerebras error shape) must surface")
+		helpers.assert_true((extract('{"error":{"message":"Wrong API Key"}}') or ""):find("Wrong API Key", 1, true) ~= nil,
+			"error.message (OpenAI shape) must surface")
+		helpers.assert_true(extract('{"error":{"content":"world"}}') == nil,
+			"a content decoy is not a message")
+		helpers.assert_true(extract('{"choices":[{"message":{"content":"OK"}}]}') == nil,
+			"success carries no server message")
+	end)
+
+	helpers.it("forwards status and server message on HTTP failure", function()
+		local api, inference = fresh_backend()
+		local original_post = inference.post
+		local reasons = {}
+		inference.post = function(_, _, _, callback)
+			callback({ ok = false, status = 402,
+				body = [[{"message":"Payment required to access this resource. Visit your billing tab.","type":"payment_required_error"}]] })
+			return true
+		end
+		local ok, err = xpcall(function()
+			api.test_request(entry(), SPEC,
+				function() end,
+				function(reason, detail) reasons[#reasons + 1] = { reason = reason, detail = detail } end)
+			helpers.assert_eq(#reasons, 1)
+			helpers.assert_eq(reasons[1].reason, "request_failed")
+			helpers.assert_true(type(reasons[1].detail) == "table",
+				"failure must carry the server detail")
+			helpers.assert_eq(reasons[1].detail.status, 402)
+			helpers.assert_true((reasons[1].detail.message or ""):find("Payment required", 1, true) ~= nil,
+				"failure must carry the server message")
+		end, debug.traceback)
+		inference.post = original_post
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("reports HTTP failure without leaking the token", function()
 		local api, inference = fresh_backend()
 		local restore_parser = stub_parser(api)
