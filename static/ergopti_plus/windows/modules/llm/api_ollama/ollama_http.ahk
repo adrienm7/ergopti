@@ -460,8 +460,13 @@ _LLM_CurlReadTerminal(StatusPath, ExitPath, BodyPath, MaxBodyBytes := 0,
 		MaxBodyBytes := HTTP_CURL_MAX_RESPONSE_BYTES
 	Result := Map("complete", false, "exit", -1,
 		"status", 0, "body_read", false, "oversize", false, "body", "")
+	; Trim must strip CR/LF explicitly: AHK omits spaces/tabs only by
+	; default, and the exit sidecar always ends with CRLF (cmd echo). With
+	; a bare Trim the strict integer match below never fires, so no curl
+	; child ever counts as finished and every request dies at its deadline.
+	CRLF := " `t`r`n"
 	try {
-		ExitText := Trim(ReadFn.Call(ExitPath, "UTF-8-RAW"))
+		ExitText := Trim(ReadFn.Call(ExitPath, "UTF-8-RAW"), CRLF)
 		if RegExMatch(ExitText, "^-?\d+$") {
 			Result["exit"] := Integer(ExitText)
 			; _LLM_CurlOwnedCommand writes this file last. A valid integer is the
@@ -472,7 +477,7 @@ _LLM_CurlReadTerminal(StatusPath, ExitPath, BodyPath, MaxBodyBytes := 0,
 	if !Result["complete"]
 		return Result
 	try {
-		StatusText := Trim(ReadFn.Call(StatusPath, "UTF-8-RAW"))
+		StatusText := Trim(ReadFn.Call(StatusPath, "UTF-8-RAW"), CRLF)
 		if RegExMatch(StatusText, "^\d{3}$")
 			Result["status"] := Integer(StatusText)
 	}
