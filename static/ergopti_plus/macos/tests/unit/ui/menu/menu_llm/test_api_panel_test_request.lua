@@ -285,6 +285,45 @@ helpers.describe("API panel test request", function()
 		end)
 	end)
 
+	helpers.it("lists Add before the separator", function()
+		helpers.with_fresh_modules({
+			"modules.llm",
+			"infra.i18n",
+			"infra.logger",
+			"infra.dialog_util",
+			"infra.notifications",
+			"infra.manifest_menu",
+			"ui.menu.menu_llm.api_panel",
+		}, function()
+			local entry = {
+				id = "prod", provider = "openai", token = "live-secret",
+				model = "probe-model", label = "Prod",
+				base_url = "https://api.example.invalid/v1",
+			}
+			local spec = {
+				system_prompt = "probe sys", user_text = "ping",
+				temperature = 0, max_tokens = 16,
+			}
+			install_doubles({
+				entries = { entry }, active_id = "prod", spec = spec,
+			})
+			local panel = require("ui.menu.menu_llm.api_panel")
+			local _, rows = panel.build(fixture_context())
+			local add_at, sep_at = 0, 0
+			for i, row in ipairs(rows) do
+				if type(row.label) == "string"
+					and row.label:find("menu.llm.api_add_entry", 1, true) ~= nil
+					and add_at == 0 then
+					add_at = i
+				end
+				if row.separator and sep_at == 0 then sep_at = i end
+			end
+			helpers.assert_true(add_at > 0, "the Add row must exist with entries present")
+			helpers.assert_true(sep_at > add_at,
+				"the Add row must sit before the separator")
+		end)
+	end)
+
 	helpers.it("discards a stale completion after entry switch", function()
 		helpers.with_fresh_modules({
 			"modules.llm",

@@ -229,11 +229,6 @@ function M.build(ctx)
 		})
 	end
 
-	if #entries > 0 then
-		table.insert(rows, { separator = true })
-	end
-
-
 	-- =====================================================
 	-- ===== 1.2) Add entry =====
 	-- =====================================================
@@ -390,6 +385,13 @@ function M.build(ctx)
 		disabled = (paused or mutation_busy) or nil,
 		items    = add_rows,
 	})
+
+	-- Add sits before the separator so creating an entry is one glance
+	-- away; the separator only appears with the management rows below,
+	-- never dangling when no entry exists.
+	if #entries > 0 then
+		table.insert(rows, { separator = true })
+	end
 
 
 	-- =====================================================
