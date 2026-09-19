@@ -156,3 +156,27 @@ _RCTC_RealCurlPollUsesTypedTerminalClassifier() {
 }
 Test("AHK-007 remote terminal: real curl poll consumes the typed classifier (ahk-007-remote-terminal-classification)",
 	_RCTC_RealCurlPollUsesTypedTerminalClassifier)
+
+; The exit sidecar always ends with CRLF (cmd echo) and AHK's Trim omits
+; spaces/tabs only. A bare Trim left "0\r\n" unmatchable, so no curl child
+; ever counted as finished and every request died at its deadline. Real
+; files, default readers: the exact production path, byte for byte.
+_RCTC_CrlfSidecarsComplete() {
+	Dir := A_Temp . "\ergopti_rctc_" . A_TickCount
+	DirCreate(Dir)
+	try {
+		Base := Dir . "\t"
+		FileAppend('{"message":"Payment required."}', Base . ".out", "UTF-8")
+		FileAppend("402", Base . ".out.status", "UTF-8")
+		FileAppend("0 `r`n", Base . ".out.exit", "UTF-8")
+		Result := _LLM_CurlReadTerminal(Base . ".out.status", Base . ".out.exit", Base . ".out")
+		AssertTrue(Result["complete"], "a CRLF-terminated exit sidecar must complete")
+		AssertEqual(0, Result["exit"])
+		AssertEqual(402, Result["status"])
+		AssertTrue(Result["body_read"], "the error body must be readable for the user message")
+	} finally {
+		try DirDelete(Dir, true)
+	}
+}
+Test("remote terminal: CRLF sidecars complete via default readers (api-test-entry-server-message)",
+	_RCTC_CrlfSidecarsComplete)

@@ -1100,6 +1100,11 @@ _LLMRemoteClassifyResponse(Format, Body, Model := "") {
     Result["ok"] := Result["text"] != ""
     Result["reason"] := Result["ok"] ? "completion"
         : (State["recognized"] ? State["reason"] : "unsupported_shape")
+    ; A body carrying a provider message is a provider verdict, not an
+    ; unknown shape — even without an "error" envelope (Cerebras 4xx).
+    if (!Result["ok"] && Result["reason"] == "unsupported_shape"
+        && Result["server_message"] != "")
+        Result["reason"] := "provider_error"
     return Result
 }
 
