@@ -619,8 +619,8 @@ _LLM_Menu_TestActiveApiEntry(NotifyFn := 0) {
 	_LLM_Menu_ApiTestProgress["owner"] := Owner
 	OnSucc := (Text, Usage) => _LLM_Menu_OnApiTestDone(true, Text,
 		EntryId, Name, StartedTick, Owner, NotifyFn)
-	OnFail := () => _LLM_Menu_OnApiTestDone(false, "",
-		EntryId, Name, StartedTick, Owner, NotifyFn)
+	OnFail := (Info := "") => _LLM_Menu_OnApiTestDone(false, "",
+		EntryId, Name, StartedTick, Owner, NotifyFn, Info)
 	; Logged before dispatch, not after: if the click reaches this function
 	; there is always exactly one line proving it, so a silent menu click can
 	; be told apart from a handler failure. No token, no prompt content.
@@ -652,17 +652,39 @@ _LLM_Menu_TestActiveApiEntry(NotifyFn := 0) {
 
 ; Builds the user-visible verdict triple without touching UI or logs, so the
 ; mapping is unit-testable headlessly. Mirrors the validation flow wording.
+; @param Info Map|nil Optional failure info (reason/status/message): the
+;   provider's own verdict is appended so a 402 quota refusal never reads as
+;   a generic unreachable.
 ; @return Map { ok, title, body }
-_LLM_Menu_ApiTestTip(Ok, Name, Ms, Text) {
+_LLM_Menu_ApiTestTip(Ok, Name, Ms, Text, Info := "") {
 	if (Ok && Text is String && Text != "") {
 		Excerpt := StrLen(Text) > 120 ? SubStr(Text, 1, 120) . "..." : Text
 		return Map("ok", true,
 			"title", t("menu.llm.api_test_ok_title"),
 			"body", Format(t("menu.llm.api_test_ok_body"), Name, Ms, Excerpt))
 	}
+	Body := StrReplace(t("menu.llm.api_unreachable_body"), "%s", Name)
+	ServerLine := _LLM_Menu_ApiTestServerLine(Info)
+	if (ServerLine != "")
+		Body .= "`n" . ServerLine
 	return Map("ok", false,
 		"title", t("menu.llm.api_unreachable_title"),
-		"body", StrReplace(t("menu.llm.api_unreachable_body"), "%s", Name))
+		"body", Body)
+}
+
+; Renders the provider's own verdict as a language-neutral bracketed line, so
+; no locale key is needed for server English plus a status code.
+; @return string "" when there is nothing to show.
+_LLM_Menu_ApiTestServerLine(Info) {
+	if !(Info is Map)
+		return ""
+	Status := (Info.Has("status") && Info["status"] is Number)
+		? Integer(Info["status"]) : 0
+	Msg := (Info.Has("message") && Info["message"] is String)
+		? Trim(Info["message"]) : ""
+	if (Msg == "")
+		return ""
+	return (Status > 0) ? Format("[{1}] {2}", Status, Msg) : Msg
 }
 
 ; Publishes one probe completion. Stale results (entry changed or deleted
@@ -670,7 +692,7 @@ _LLM_Menu_ApiTestTip(Ok, Name, Ms, Text) {
 ; flow — a late verdict must never relabel another entry.
 ; @return boolean True when the verdict was surfaced.
 _LLM_Menu_OnApiTestDone(Ok, Text, EntryId, Name, StartedTick, Owner,
-		NotifyFn := 0) {
+		NotifyFn := 0, Info := "") {
 	global _LLM_Menu, _LLM_Menu_ApiTestProgress
 	; The progress belongs to this Owner reference: hide it before every
 	; exit, including stale and suspended ones, so no window ever lingers.
@@ -692,15 +714,16 @@ _LLM_Menu_OnApiTestDone(Ok, Text, EntryId, Name, StartedTick, Owner,
 	if (Matches != 1 || !LLM_AuxFinish(Owner))
 		return false
 	Ms := Max(0, A_TickCount - StartedTick)
-	Tip := _LLM_Menu_ApiTestTip(Ok, Name, Ms, Text)
+	Tip := _LLM_Menu_ApiTestTip(Ok, Name, Ms, Text, Info)
 	_LLM_Menu_ApiTestSurface(Tip["title"], Tip["body"],
 		Tip["ok"] ? "Iconi" : "Icon!", Tip["ok"], NotifyFn)
 	if (Tip["ok"]) {
 		try LoggerInfo("LLM", "API test for '{1}' succeeded in {2} ms ({3} reply chars).",
 			Name, Ms, StrLen(Text))
 	} else {
-		try LoggerError("LLM", "API test for '{1}' failed after {2} ms — check the token, URL and model.",
-			Name, Ms)
+		ServerLine := _LLM_Menu_ApiTestServerLine(Info)
+		try LoggerError("LLM", "API test for '{1}' failed after {2} ms — check the token, URL and model.{3}",
+			Name, Ms, ServerLine == "" ? "" : " Server said: " . ServerLine)
 	}
 	return true
 }

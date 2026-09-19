@@ -200,6 +200,51 @@ _LAT_FailureCompletionNotifies() {
 Test("llm api test: failed probe notifies through the seam (api-test-entry-failure)",
 	_LAT_FailureCompletionNotifies)
 
+; The failure verdict carries the server's own words (status + message):
+; a 402 quota refusal must read as quota, never as a generic unreachable.
+_LAT_FailureServerMessageNotifies() {
+	SavedMenu := _LAT_FixtureMenu()
+	Notices := []
+	NotifyFn := (Ok, Tip) => Notices.Push(Map("ok", Ok, "tip", Tip))
+	try {
+		_LAT_ResetOwners()
+		Owner := _LAT_TestOwner()
+		Info := Map("reason", "no_completion", "status", 402,
+			"message", "Payment required to access this resource. Visit your billing tab.")
+		AssertTrue(_LLM_Menu_OnApiTestDone(false, "", "prod", "Prod",
+			A_TickCount - 120032, Owner, NotifyFn, Info),
+			"a failed completion with server info must publish")
+		AssertEqual(1, Notices.Length)
+		AssertFalse(Notices[1]["ok"])
+		AssertContains(Notices[1]["tip"]["body"], "402")
+		AssertContains(Notices[1]["tip"]["body"], "Payment required")
+	} finally _LAT_RestoreMenu(SavedMenu)
+}
+Test("llm api test: failure verdict carries the server message (api-test-entry-server-message)",
+	_LAT_FailureServerMessageNotifies)
+
+; Contract: every remote on_fail hand-off carries a failure Info map, and
+; both user-facing closures accept it (optional, so zero-arg callers keep
+; working). Scanned comment-stripped so prose can never satisfy it.
+_LAT_FailureInfoContract() {
+	Poll := _StripFullLineComments(_DriverFuncBody("_LLMRemote_PollCurl"))
+	Assert(Poll != "", "_LLMRemote_PollCurl must remain source-visible")
+	Assert(InStr(Poll, "_LLMRemote_FailInfo(") > 0,
+		"the curl poller must build failure info for on_fail")
+	Assert(InStr(Poll, '"on_fail", _LLMRemote_FailInfo(') > 0,
+		"the curl poller must hand the info to on_fail")
+	Handler := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_TestActiveApiEntry"))
+	Assert(InStr(Handler, "(Info := ") > 0,
+		"the test on_fail closure must accept the failure info")
+	Assert(InStr(Handler, "OnApiTestDone(false") > 0,
+		"the test on_fail closure must forward to the verdict")
+	Batch := _StripFullLineComments(_DriverFuncBody("_LLM_Engine_DispatchBatch"))
+	Assert(InStr(Batch, "(failure := ") > 0,
+		"the batch on_fail closure must accept the failure info")
+}
+Test("llm api test: failure info reaches every on_fail (api-test-entry-server-message)",
+	_LAT_FailureInfoContract)
+
 ; Contract: every Test-action outcome ends in _LLM_Menu_ApiTestSurface (MsgBox
 ; in production), never a bare TrayTip. Scanned comment-stripped so prose can
 ; never satisfy the assertions.

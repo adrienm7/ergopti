@@ -181,11 +181,19 @@ _LLMRemote_DeleteOwned(req_id, reservation) {
     return Deleted
 }
 
-_LLMRemote_FailReserved(req_id, reservation, on_fail) {
+; Builds the failure payload every remote on_fail receives: a machine reason,
+; the HTTP status (0 when no response arrived) and the provider's own error
+; text ("" when none). Callers accept it as an optional trailing argument,
+; so zero-arg closures keep working where the info is not threaded yet.
+_LLMRemote_FailInfo(Reason, Status := 0, Message := "") {
+    return Map("reason", Reason, "status", Status, "message", Message)
+}
+
+_LLMRemote_FailReserved(req_id, reservation, on_fail, Reason := "dispatch") {
     if !_LLMRemote_DeleteOwned(req_id, reservation)
         return false
     if !reservation["cancelled"]
-        _LLM_InvokeCallback(on_fail, "on_fail")
+        _LLM_InvokeCallback(on_fail, "on_fail", _LLMRemote_FailInfo(Reason))
     return true
 }
 
@@ -444,9 +452,17 @@ _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail,
 ; Polls the curl child WITHOUT blocking the message loop. Mirrors _LLM_Ollama_PollCurl.
 _LLMRemoteClassifyTerminal(Format, Terminal, Model := "") {
     if !_LLM_CurlTerminalOk(Terminal) {
-        Result := _LLMRemoteClassifyResponse(Format, "", Model)
+        ; The readable body still goes through classification (never promotion:
+        ; error content cannot become completion text) so a 4xx provider
+        ; verdict reaches the user instead of a bare transport failure. The
+        ; transport reason stays for curl-level failures and unread bodies;
+        ; an answered non-2xx keeps the classifier's own reason.
+        ReadBody := (Terminal.Has("body_read") && Terminal["body_read"]
+            && Terminal.Has("body")) ? Terminal["body"] : ""
+        Result := _LLMRemoteClassifyResponse(Format, ReadBody, Model)
         Result["terminal_ok"] := false
-        Result["reason"] := "transport"
+        if (Terminal["exit"] != 0 || !Terminal["body_read"])
+            Result["reason"] := "transport"
         return Result
     }
     Result := _LLMRemoteClassifyResponse(Format, Terminal["body"], Model)
@@ -479,19 +495,21 @@ _LLMRemote_PollCurl(req_id, Port := 0) {
         body := terminal["body"]
         Classified := _LLMRemoteClassifyTerminal(fmt, terminal, model_id)
         if !Classified["terminal_ok"] {
-            try LoggerWarn("LLM.remote", "curl terminal failure req_id={1} exit={2} status={3} body_chars={4}.",
-                req_id, terminal["exit"], terminal["status"], StrLen(body))
+            try LoggerWarn("LLM.remote", "curl terminal failure req_id={1} exit={2} status={3} body_chars={4} reason={5} server_msg={6}.",
+                req_id, terminal["exit"], terminal["status"], StrLen(body), Classified["reason"], Classified["server_message"])
             CleanupFn.Call(entry)
             _LLM_Remote_Async.Delete(req_id)
-            _LLM_InvokeCallback(on_fail, "on_fail")
+            _LLM_InvokeCallback(on_fail, "on_fail",
+                _LLMRemote_FailInfo(Classified["reason"], terminal["status"], Classified["server_message"]))
             return
         }
         if !Classified["ok"] {
-            try LoggerWarn("LLM.remote", "curl response for req_id={1} carried no completion (reason={2}, body_chars={3}).",
-                req_id, Classified["reason"], StrLen(body))
+            try LoggerWarn("LLM.remote", "curl response for req_id={1} carried no completion (reason={2}, status={3}, body_chars={4}, server_msg={5}).",
+                req_id, Classified["reason"], terminal["status"], StrLen(body), Classified["server_message"])
             CleanupFn.Call(entry)
             _LLM_Remote_Async.Delete(req_id)
-            _LLM_InvokeCallback(on_fail, "on_fail")
+            _LLM_InvokeCallback(on_fail, "on_fail",
+                _LLMRemote_FailInfo(Classified["reason"], terminal["status"], Classified["server_message"]))
             return
         }
         CleanupFn.Call(entry)
@@ -513,7 +531,7 @@ _LLMRemote_PollCurl(req_id, Port := 0) {
         CleanupFn.Call(entry)
         _LLM_Remote_Async.Delete(req_id)
         try LoggerWarn("LLM.remote", "curl poll deadline exceeded for req_id={1} - aborting.", req_id)
-        _LLM_InvokeCallback(on_fail, "on_fail")
+        _LLM_InvokeCallback(on_fail, "on_fail", _LLMRemote_FailInfo("timeout"))
         return
     }
     ; No terminal receipt yet. Poll the receipt itself until its bounded deadline;
@@ -598,7 +616,7 @@ _LLMRemote_PollRequest(req_id) {
             try entry["http"].Abort()
         _LLM_Remote_Async.Delete(req_id)
         try LoggerWarn("LLM.remote", "Poll deadline exceeded for req_id={1} — aborting.", req_id)
-        _LLM_InvokeCallback(on_fail, "on_fail")
+        _LLM_InvokeCallback(on_fail, "on_fail", _LLMRemote_FailInfo("timeout"))
         return
     }
     http := entry["http"]
@@ -615,7 +633,8 @@ _LLMRemote_PollRequest(req_id) {
         try http.Abort()
         _LLM_Remote_Async.Delete(req_id)
         try LoggerWarn("LLM.remote", "WaitForResponse COM error for req_id={1}: {2} — aborting.", req_id, com_err.Message)
-        _LLM_InvokeCallback(on_fail, "on_fail")
+        ComMsg := SubStr(com_err.Message, 1, 120)
+        _LLM_InvokeCallback(on_fail, "on_fail", _LLMRemote_FailInfo("transport", 0, ComMsg))
         return
     }
     if !ready {
@@ -630,18 +649,20 @@ _LLMRemote_PollRequest(req_id) {
         status := http.Status
         body   := http.ResponseText
     } catch {
-        _LLM_InvokeCallback(on_fail, "on_fail")
+        _LLM_InvokeCallback(on_fail, "on_fail", _LLMRemote_FailInfo("transport"))
         return
     }
     Classified := _LLMRemoteClassifyTerminal(entryFormat,
         Map("exit", 0, "status", status, "body_read", true, "body", body),
         entry.Has("model_id_at_dispatch") ? entry["model_id_at_dispatch"] : "")
     if !Classified["terminal_ok"] {
-        _LLM_InvokeCallback(on_fail, "on_fail")
+        _LLM_InvokeCallback(on_fail, "on_fail",
+            _LLMRemote_FailInfo("transport", status))
         return
     }
     if !Classified["ok"] {
-        _LLM_InvokeCallback(on_fail, "on_fail")
+        _LLM_InvokeCallback(on_fail, "on_fail",
+            _LLMRemote_FailInfo(Classified["reason"], status, Classified["server_message"]))
         return
     }
     _LLM_InvokeCallback(on_success, "on_success", Classified["text"], Classified["usage"])
@@ -729,7 +750,8 @@ _LLMRemote_TrimAsyncRegistry() {
         ; fire. Without this the caller (e.g. the prediction engine slot state
         ; machine) hangs forever waiting for a callback that will never arrive.
         if oldest_entry.Has("on_fail") and oldest_entry["on_fail"] is Func
-            _LLM_InvokeCallback(oldest_entry["on_fail"], "on_fail")
+            _LLM_InvokeCallback(oldest_entry["on_fail"], "on_fail",
+                _LLMRemote_FailInfo("trimmed"))
         return
 }
 
@@ -1042,7 +1064,8 @@ _LLMRemoteBuildPayload(Fmt, Model, SystemPrompt, UserText, Temperature, max_toke
 _LLMRemoteClassifyResponse(Format, Body, Model := "") {
     Result := Map(
         "ok", false, "valid_json", false, "recognized", false,
-        "text", "", "usage", _LLMRemoteEmptyUsage(), "reason", "empty_body")
+        "text", "", "usage", _LLMRemoteEmptyUsage(), "reason", "empty_body",
+        "server_message", "")
     if (Body == "")
         return Result
     try Root := JsonParse(Body)
@@ -1055,6 +1078,18 @@ _LLMRemoteClassifyResponse(Format, Body, Model := "") {
         Result["reason"] := "unsupported_json_root"
         return Result
     }
+    ; Provider error text for the user: error.message (OpenAI / Anthropic /
+    ; Gemini shape), else a top-level message (Cerebras error shape). Content
+    ; decoys are never messages. Trimmed: a popup is not a log viewer.
+    ServerMsg := ""
+    if (Root.Has("error") && Root["error"] is Map && Root["error"].Has("message")
+        && Root["error"]["message"] is String)
+        ServerMsg := Root["error"]["message"]
+    else if (Root.Has("message") && Root["message"] is String)
+        ServerMsg := Root["message"]
+    if (StrLen(ServerMsg) > 200)
+        ServerMsg := SubStr(ServerMsg, 1, 200) . "..."
+    Result["server_message"] := ServerMsg
     State := _LLMRemoteParseStructuredRootState(Format, Root)
     Result["recognized"] := State["recognized"]
     Result["usage"] := _LLMRemoteExtractUsageRoot(Format, Root, Model)

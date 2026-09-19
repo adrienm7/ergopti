@@ -191,8 +191,9 @@ _RemotePidReceipt_RecordSuccess(State, Text, Usage) {
 	State["usage"] := Usage
 }
 
-_RemotePidReceipt_RecordFailure(State) {
+_RemotePidReceipt_RecordFailure(State, Info := "") {
 	State["fail_calls"] += 1
+	State["fail_info"] := Info
 }
 
 _RemotePidReceipt_RecordCleanup(State, Entry) {
@@ -318,6 +319,9 @@ _RemotePidReceipt_RunIncompleteBoundary(Mode) {
 			Mode . " without a terminal receipt must never publish success")
 		AssertEqual(Mode == "timeout" ? 1 : 0, State["fail_calls"],
 			"timeout reports failure, while cancellation remains callback-silent")
+		if (Mode == "timeout")
+			AssertEqual("timeout", State["fail_info"]["reason"],
+				"the timeout failure must carry its machine reason")
 		AssertFalse(_LLM_Remote_Async.Has(ReqId),
 			Mode . " must retire the exact registry entry")
 	} finally {
