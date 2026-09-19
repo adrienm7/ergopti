@@ -69,9 +69,12 @@ _LLM_Menu_ApiEntriesRows() {
 				"action",  _LLM_Menu_MakeSelectApiEntryHandler(entry)))
 		}
 	}
-	Rows.Push(Map("separator", true))
+	; Add sits before the separator so creating an entry is one glance
+	; away; the separator only appears with the management rows, never
+	; dangling when no entry exists.
 	Rows.Push(Map("label", t("menu.llm.api_add_entry"), "action", (*) => _LLM_Menu_PromptApiEntry("")))
 	if (Type(entries) == "Array" and entries.Length > 0) {
+		Rows.Push(Map("separator", true))
 		Rows.Push(Map(
 			"label",  t("menu.llm.api_edit_entry"),
 			"action", (*) => _LLM_Menu_PromptApiEntry(_LLM_Menu["api_entry_id"])))

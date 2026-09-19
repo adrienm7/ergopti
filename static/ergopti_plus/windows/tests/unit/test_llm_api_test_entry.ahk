@@ -69,6 +69,35 @@ _LAT_RowsExposeTestAction() {
 Test("llm api test: entries menu exposes a Test-selected-API row (api-test-entry-row)",
 	_LAT_RowsExposeTestAction)
 
+; Row order: entries, then Add, then the separator with the management
+; rows (Edit/Remove/Test). Add must sit before the separator so creating
+; an entry is one glance away; with no entries there is no dangling
+; separator at all.
+_LAT_RowsOrder() {
+	SavedMenu := _LAT_FixtureMenu()
+	try {
+		Rows := _LLM_Menu_ApiEntriesRows()
+		AddAt := 0
+		SepAt := 0
+		for i, Row in Rows {
+			if (Row.Has("label") && Row["label"] == t("menu.llm.api_add_entry"))
+				AddAt := i
+			if (Row.Has("separator") && SepAt == 0)
+				SepAt := i
+		}
+		AssertTrue(AddAt > 0, "the Add row must exist with entries present")
+		AssertTrue(SepAt > AddAt, "the Add row must sit before the separator")
+		_LLM_Menu["api_entries"] := []
+		Rows := _LLM_Menu_ApiEntriesRows()
+		for Row in Rows {
+			AssertFalse(Row.Has("separator"),
+				"with no entries there must be no dangling separator")
+		}
+	} finally _LAT_RestoreMenu(SavedMenu)
+}
+Test("llm api test: Add sits before the separator, none when empty (api-test-entry-row-order)",
+	_LAT_RowsOrder)
+
 ; No active entry, or an entry id pointing nowhere: refuse before any owner,
 ; request or network. The refusal still surfaces through the seam (MsgBox in
 ; production) — a clicked Test action must never end in silence.
