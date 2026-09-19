@@ -28,6 +28,8 @@ _LBMD_ModelDisplayText() {
 	global _LLM_Menu, LLM_API_PROVIDERS
 	Assert(_DriverFuncBody("_LLM_Menu_ModelDisplayText") != "",
 		"_LLM_Menu_ModelDisplayText must exist in menu_models.ahk")
+	Assert(_DriverFuncBody("_LLM_Menu_ApiEntryDisplayName") != "",
+		"_LLM_Menu_ApiEntryDisplayName must exist in menu_models.ahk")
 	SavedMenu := _LLM_Menu
 	try {
 		_LLM_Menu := Map("backend", "api", "model", "stale-ollama-tag",
@@ -35,12 +37,17 @@ _LBMD_ModelDisplayText() {
 			"api_entries", [Map("Id", "e1", "Name", "Cerebras",
 				"Provider", "cerebras", "BaseUrl", "https://b.invalid/v1",
 				"Token", "sekret", "Model", "qwen-3.8-27b")])
+		AssertEqual("Cerebras", _LLM_Menu_ModelDisplayText(),
+			"with backend api the row shows the configured entry name")
+		AssertEqual("Cerebras",
+			_LLM_Menu_ApiEntryDisplayName(_LLM_Menu["api_entries"][1]))
+		_LLM_Menu["api_entries"][1]["Name"] := ""
 		AssertEqual("qwen-3.8-27b", _LLM_Menu_ModelDisplayText(),
-			"with backend api the row shows the entry model, not the ollama tag")
+			"an unnamed entry falls back to its model")
 		_LLM_Menu["api_entries"][1]["Model"] := ""
 		AssertEqual(LLM_API_PROVIDERS["cerebras"]["DefaultModel"],
 			_LLM_Menu_ModelDisplayText(),
-			"an entry without model falls back to the provider default")
+			"an entry without name or model falls back to the provider default")
 		_LLM_Menu["api_entry_id"] := "ghost"
 		AssertEqual("", _LLM_Menu_ModelDisplayText(),
 			"an unknown entry never resurrects the stale ollama tag")

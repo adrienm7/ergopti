@@ -117,13 +117,16 @@ _LLM_Menu_BackendRows() {
 ; ================================
 
 /**
- * Display model for one API entry: its own model, else the provider default
- * (exactly what requests resolve), else "".
+ * Display name for one API entry: its configured name, else its model,
+ * else the provider default (exactly what requests resolve), else "".
  * @param {Map} Entry API entry record.
- * @returns {String} Model id or "".
+ * @returns {String} Display name or "".
  */
-_LLM_Menu_ApiEntryDisplayModel(Entry) {
+_LLM_Menu_ApiEntryDisplayName(Entry) {
 	global LLM_API_PROVIDERS
+	Name := _LLM_MenuApiEntryGet(Entry, "Name", "")
+	if (Name != "")
+		return Name
 	Model := _LLM_MenuApiEntryGet(Entry, "Model", "")
 	if (Model != "")
 		return Model
@@ -151,10 +154,10 @@ _LLM_Menu_ModelDisplayText() {
 		ActiveId := _LLM_Menu.Has("api_entry_id") ? _LLM_Menu["api_entry_id"] : ""
 		if ((ActiveId != "") && _LLM_Menu.Has("api_entries")
 			&& (_LLM_Menu["api_entries"] is Array)) {
-			for E in _LLM_Menu["api_entries"] {
-				if (_LLM_MenuApiEntryGet(E, "Id", "") == ActiveId)
-					return _LLM_Menu_ApiEntryDisplayModel(E)
-			}
+		for E in _LLM_Menu["api_entries"] {
+			if (_LLM_MenuApiEntryGet(E, "Id", "") == ActiveId)
+				return _LLM_Menu_ApiEntryDisplayName(E)
+		}
 		}
 		return ""
 	}
