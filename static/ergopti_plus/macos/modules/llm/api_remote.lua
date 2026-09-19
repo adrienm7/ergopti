@@ -1591,6 +1591,26 @@ local _req_counter = 0
 --- ``Parser.split_blocks``. The signature mirrors api_ollama's
 --- ``post_and_parse`` so the higher-level fetch_* strategies can keep their
 --- structure unchanged.
+--- Extracts the provider's own error text (error.message, else a top-level
+--- message as in the Cerebras error shape) without promoting content
+--- decoys. Trimmed for notifications; nil when there is nothing to show.
+--- @param body any Response body.
+--- @return string|nil Message or nil.
+local function extract_server_message(body)
+	if type(body) ~= "string" or body == "" then return nil end
+	local ok, root = pcall(JsonCodec.decode, body)
+	if not ok or type(root) ~= "table" then return nil end
+	local err = root.error
+	if type(err) == "table" and type(err.message) == "string" and err.message ~= "" then
+		return err.message:sub(1, 200)
+	end
+	if type(root.message) == "string" and root.message ~= "" then
+		return root.message:sub(1, 200)
+	end
+	return nil
+end
+M.__extract_server_message_for_test = extract_server_message
+
 local function post_and_parse_resolved(entry, model_name, system_prompt, full_text, tail_text,
                                         temperature, max_tokens, num_predictions, is_batch,
                                         on_success, on_fail, dedup_stats)
@@ -1696,7 +1716,15 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 						elapsed_ms     = ms,
 					})
 				end
-				if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
+				-- The provider's own verdict travels as an optional second
+				-- argument: engine callbacks ignore extra args, while the
+				-- Test-API action surfaces status + message to the user.
+				local detail = {
+					reason = "http_" .. tostring(status or "unknown"),
+					status = tonumber(status) or 0,
+					message = extract_server_message(body) or "",
+				}
+				if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail", detail) end
 				return
 			end
 
@@ -1802,7 +1830,9 @@ end
 --- @param entry table API entry record with decrypted token.
 --- @param spec table { system_prompt, user_text, temperature, max_tokens }.
 --- @param on_ok function Called with (reply_text, elapsed_ms).
---- @param on_fail function Called with (reason_string).
+--- @param on_fail function Called with (reason_string, detail_table_or_nil).
+---   detail carries status + the provider's own message when the server
+---   answered with an error body.
 --- @return boolean True when a probe was dispatched.
 function M.test_request(entry, spec, on_ok, on_fail)
 	local function fail(reason)
@@ -1833,8 +1863,8 @@ function M.test_request(entry, spec, on_ok, on_fail)
 				local ms = math.max(0, math.floor((TimerScheduler.now() - t0) * 1000))
 				if type(on_ok) == "function" then ApiCommon.protected_call(on_ok, "test_request_ok", text, ms) end
 			end,
-			function()
-				if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "test_request_fail", "request_failed") end
+			function(detail)
+				if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "test_request_fail", "request_failed", detail) end
 			end,
 			ApiCommon.new_dedup_stats())
 	end, debug.traceback)
