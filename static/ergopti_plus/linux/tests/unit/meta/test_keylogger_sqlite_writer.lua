@@ -73,6 +73,88 @@ helpers.describe("sqlite_writer", function()
         "Linux must write canonical events_app_switch rows")
     end)
 
+    helpers.it("events_typing insert supplies every column it names (typing-arity)", function()
+      -- Regression: the VALUES tuple carried 20 entries for a 22-column list,
+      -- so every flush with a manual keystroke failed in SQLite and aborted
+      -- before hotstrings, n-grams and titles. The layout binding was computed
+      -- and then dropped, shifting wpm/text/events_json into the wrong columns.
+      local cmd_mod = helpers.load_module("modules.keylogger.sqlite_command")
+      local real_build = cmd_mod.build
+      local captured = {}
+      cmd_mod.build = function(db_path, sql, opts)
+        captured[#captured + 1] = sql
+        return real_build(db_path, sql, opts)
+      end
+      local sw2 = helpers.load_module("modules.keylogger.sqlite_writer")
+
+      local real_execute, real_popen = os.execute, io.popen
+      local tmp = os.tmpname()
+      local seed = io.open(tmp, "w")
+      if seed then seed:write("x") seed:close() end
+      os.execute = function() return 0 end
+      io.popen = function()
+        return {
+          read = function(_, mode)
+            if mode == "*l" then
+              return "CREATE TABLE devices (os CHECK (os IN ('darwin','windows','linux')))"
+            end
+            return ""
+          end,
+          close = function() return true end,
+        }
+      end
+
+      local ok_run, err_run = pcall(function()
+        helpers.assert_true(sw2.open_db(tmp) == true, "sandbox database must open")
+        sw2.insert_typing_events("dev-unit", {
+          { ts = "2026-01-01 12:00:00", date = "2026-01-01", app = "code",
+            title = "t", text = "hi", wpm = 60, layout = "us", events_json = "[]" },
+        })
+      end)
+
+      os.execute, io.popen = real_execute, real_popen
+      cmd_mod.build = real_build
+      sw2.close_db()
+      os.remove(tmp)
+      if not ok_run then error(err_run, 0) end
+
+      helpers.assert_true(#captured >= 1, "the typing insert must compose SQL")
+      local sql = captured[#captured]
+      local cols_part = sql:match("INSERT OR IGNORE INTO events_typing%s*%((.-)%)%s*VALUES")
+      helpers.assert_true(cols_part ~= nil, "typing INSERT must list its columns")
+      local cols = {}
+      for c in (cols_part .. ","):gmatch("([^,]+),") do
+        cols[#cols + 1] = c:match("^%s*(.-)%s*$")
+      end
+      local outer = sql:match("VALUES%s*(%b())")
+      helpers.assert_true(outer ~= nil, "typing INSERT must carry a VALUES tuple")
+      local inner = outer:sub(2, -2)
+      local vals, cur, in_q, i = {}, {}, false, 1
+      while i <= #inner do
+        local ch = inner:sub(i, i)
+        if ch == "'" then
+          if in_q and inner:sub(i + 1, i + 1) == "'" then
+            cur[#cur + 1] = "''"; i = i + 2
+          else
+            in_q = not in_q; cur[#cur + 1] = ch; i = i + 1
+          end
+        elseif ch == "," and not in_q then
+          vals[#vals + 1] = table.concat(cur); cur = {}; i = i + 1
+        else
+          cur[#cur + 1] = ch; i = i + 1
+        end
+      end
+      vals[#vals + 1] = table.concat(cur)
+      helpers.assert_eq(#cols, #vals, "columns and values arity must match")
+      helpers.assert_eq(cols[9], "layout", "column 9 carries the layout")
+      helpers.assert_eq(vals[9], "'us'", "the layout binding must reach the row")
+      helpers.assert_eq(cols[19], "wpm", "column 19 carries wpm")
+      helpers.assert_eq(vals[19], "60", "wpm must land in its own column")
+      helpers.assert_eq(cols[20], "text", "column 20 carries text")
+      helpers.assert_eq(vals[20], "'hi'", "text must land in its own column")
+      helpers.assert_eq(cols[22], "events_json", "column 22 carries events_json")
+    end)
+
     helpers.it("migrates the former device OS constraint to include Linux", function()
       local path = helpers.driver_root() .. "/modules/keylogger/sqlite_writer.lua"
       local fh = assert(io.open(path, "r"))
