@@ -310,6 +310,30 @@ local function save_all(state, data)
 		sections       = {},
 	}
 
+	-- Preserve the file-level tuning the UI model does not carry (priority,
+	-- delay, color, tooltip, per-section delays). The editor owns the
+	-- sections and their entries — deletions must still take effect — but
+	-- the tuning lives outside that model and rebuilding the file without it
+	-- would silently reset it to the shipped defaults.
+	local reader = get_reader()
+	if path and reader then
+		local ok_current, current = pcall(reader.parse, path)
+		if ok_current and type(current) == "table" and type(current.meta) == "table" then
+			local file_meta = current.meta
+			if type(file_meta.delay) == "number" then toml.meta.delay = file_meta.delay end
+			if type(file_meta.color) == "string" then toml.meta.color = file_meta.color end
+			if type(file_meta.show_tooltip) == "boolean" then toml.meta.show_tooltip = file_meta.show_tooltip end
+			if type(file_meta.priority) == "number" then toml.meta.priority = file_meta.priority end
+			if type(file_meta.section_delays) == "table" then
+				local delays = {}
+				for name, value in pairs(file_meta.section_delays) do
+					if type(value) == "number" then delays[name] = value end
+				end
+				if next(delays) ~= nil then toml.meta.section_delays = delays end
+			end
+		end
+	end
+
 	for _, name in ipairs(order) do
 		local sec = data.sections[name]
 		if type(sec) == "table" then

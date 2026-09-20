@@ -295,6 +295,25 @@ function M.write(path, data, file_adapter, create_only, expected_source)
 	w("[_meta]")
 	w(string.format("description = \"%s\"", esc(meta_desc)))
 
+	-- File-level tuning the loader consumes (delay, color, show_tooltip,
+	-- priority). Emitted only when the caller carries it, so writers that
+	-- never set tuning get byte-identical output to before.
+	local meta_tuning = type(data.meta) == "table" and data.meta or nil
+	if meta_tuning then
+		if type(meta_tuning.delay) == "number" then
+			w("delay = " .. tostring(meta_tuning.delay))
+		end
+		if type(meta_tuning.color) == "string" then
+			w(string.format("color = \"%s\"", esc(meta_tuning.color)))
+		end
+		if type(meta_tuning.show_tooltip) == "boolean" then
+			w("show_tooltip = " .. (meta_tuning.show_tooltip and "true" or "false"))
+		end
+		if type(meta_tuning.priority) == "number" then
+			w("priority = " .. tostring(math.floor(meta_tuning.priority)))
+		end
+	end
+
 	if #order > 0 then
 		local parts = {}
 		for _, name in ipairs(order) do
@@ -322,6 +341,25 @@ function M.write(path, data, file_adapter, create_only, expected_source)
 			if name ~= "-" and type(sections[name]) == "table" then
 				local desc = type(sections[name].description) == "string" and sections[name].description or name
 				w(string.format("%s = \"%s\"", name, esc(desc)))
+			end
+		end
+	end
+
+	-- [_meta.section_delays]: per-section delay overrides the reader parses
+	-- and the loader resolves. Sorted for a deterministic file; emitted only
+	-- when at least one numeric override is present.
+	if meta_tuning and type(meta_tuning.section_delays) == "table" then
+		local delay_names = {}
+		for name, value in pairs(meta_tuning.section_delays) do
+			if type(name) == "string" and type(value) == "number" then
+				delay_names[#delay_names + 1] = name
+			end
+		end
+		table.sort(delay_names)
+		if #delay_names > 0 then
+			w("[_meta.section_delays]")
+			for _, name in ipairs(delay_names) do
+				w(name .. " = " .. tostring(meta_tuning.section_delays[name]))
 			end
 		end
 	end
