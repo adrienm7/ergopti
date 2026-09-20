@@ -75,10 +75,13 @@ local UI_DEV_SETUP   = 0x405C5503
 local UI_DEV_CREATE  = 0x5501
 local UI_DEV_DESTROY = 0x5502
 
--- Highest keycode registered on the virtual device. KEY_MAX is 0x2FF, but the
--- daemon only ever re-emits keyboard keys, and registering the full range costs
--- 768 ioctls at startup for codes no keyboard reports.
-local KEY_CODE_MAX = 255
+-- Highest keycode registered on the virtual device: the kernel's KEY_MAX
+-- (0x2FF) from linux/input-event-codes.h, the same bound the keyboard hook
+-- forwards. Registering fewer bits saves a few hundred one-time ioctls and
+-- costs every higher key: UI_DEV_CREATE freezes the capability bits, so a
+-- grabbed high key is swallowed and then "re-emitted" to a device that
+-- cannot emit it — the write succeeds while the application sees nothing.
+local KEY_CODE_MAX = 0x2FF
 
 -- struct input_event is 24 bytes on 64-bit: timeval (2 × 8) + type/code (2 × 2)
 -- + value (4).
