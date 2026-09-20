@@ -1850,3 +1850,134 @@ helpers.describe("ui.bridge_handlers", function()
   end)
 
 end)
+
+-- ============================================================================
+-- personal_toml_editor save: validate before truncating, stage atomically.
+-- ============================================================================
+--
+-- Regression: the save handler truncated personal_info.toml with io.open(path,
+-- "w") and then wrote whatever the editor sent — unchecked write/close, no
+-- tmp staging, no TOML validation. One malformed save disabled every @-tag
+-- shortcut on the next load, a crash mid-write left a truncated file, and a
+-- fresh home with no file could never save at all (toml_path == "").
+--
+-- These tests sandbox the bridge (fake home, fake dynamic manager path, fake
+-- shell) and drive the real on_message() save path.
+
+--- Reads a whole file, or "" when absent.
+local function read_sandbox_file(path)
+  local fh = io.open(path, "r")
+  if not fh then return "" end
+  local content = fh:read("*a") or ""
+  fh:close()
+  return content
+end
+
+--- Installs sandbox doubles and returns a freshly loaded bridge plus restore info.
+local function sandboxed_toml_bridge(toml_path)
+  local previous = {
+    config_paths = package.loaded["infra.config_paths"],
+    manager = package.loaded["modules.dynamic_hotstrings.manager"],
+    shell = package.loaded["adapters.shell_runner"],
+  }
+  package.loaded["infra.config_paths"] = {
+    home = function() return "/nonexistent-test-home" end,
+  }
+  package.loaded["modules.dynamic_hotstrings.manager"] = {
+    get_config_path = function() return toml_path end,
+    reload = function() end,
+  }
+  package.loaded["adapters.shell_runner"] = {
+    run = function() return true end,
+    quote = function(s) return "'" .. tostring(s) .. "'" end,
+  }
+  local handler = helpers.load_module("ui.personal_info_editor.bridge_toml")
+  return handler, previous
+end
+
+local function restore_sandbox(previous)
+  package.loaded["infra.config_paths"] = previous.config_paths
+  package.loaded["modules.dynamic_hotstrings.manager"] = previous.manager
+  package.loaded["adapters.shell_runner"] = previous.shell
+end
+
+helpers.describe("personal_toml_editor save (toml-save)", function()
+
+  helpers.it("toml-save: refuses malformed TOML and keeps the previous file", function()
+    local path = os.tmpname()
+    local seed = io.open(path, "w")
+    seed:write('[info]\nfirst_name = "Ada"\n')
+    seed:close()
+    local handler, previous = sandboxed_toml_bridge(path)
+    local ok, err = pcall(function()
+      local result = handler.on_message({ action = "save", content = "[info\nbroken" }, {})
+      helpers.assert_true(type(result) == "table" and result.saved == false,
+        "a malformed save must be refused loudly, not stored")
+      helpers.assert_eq(read_sandbox_file(path), '[info]\nfirst_name = "Ada"\n',
+        "the previous file must survive the refused save byte for byte")
+    end)
+    restore_sandbox(previous)
+    os.remove(path)
+    if not ok then error(err, 0) end
+  end)
+
+  helpers.it("toml-save: saves valid TOML exactly and stages atomically", function()
+    local path = os.tmpname()
+    os.remove(path)
+    local seed = io.open(path, "w")
+    seed:write('[info]\nfirst_name = "Ada"\n')
+    seed:close()
+    local handler, previous = sandboxed_toml_bridge(path)
+    local ok, err = pcall(function()
+      local sent = '[info]\nfirst_name = "Grace"\n'
+      local result = handler.on_message({ action = "save", content = sent }, {})
+      helpers.assert_true(type(result) == "table" and result.saved == true,
+        "a valid save must succeed")
+      helpers.assert_eq(result.path, path, "…at the resolved personal_info.toml path")
+      helpers.assert_eq(read_sandbox_file(path), sent,
+        "the file must carry exactly what was sent")
+      helpers.assert_true(io.open(path .. ".tmp", "r") == nil,
+        "no staging litter may survive a published save")
+    end)
+    restore_sandbox(previous)
+    os.remove(path)
+    os.remove(path .. ".tmp")
+    if not ok then error(err, 0) end
+  end)
+
+  helpers.it("toml-save: creates the file on first save", function()
+    local path = os.tmpname()
+    os.remove(path)
+    local handler, previous = sandboxed_toml_bridge(path)
+    local ok, err = pcall(function()
+      local result = handler.on_message({ action = "save", content = '[info]\nfirst_name = "New"\n' }, {})
+      helpers.assert_true(type(result) == "table" and result.saved == true,
+        "a fresh home with no file must still be able to save — the editor is the only writer some users have")
+      helpers.assert_eq(read_sandbox_file(path), '[info]\nfirst_name = "New"\n',
+        "the created file must carry what was sent")
+    end)
+    restore_sandbox(previous)
+    os.remove(path)
+    os.remove(path .. ".tmp")
+    if not ok then error(err, 0) end
+  end)
+
+  helpers.it("toml-save: refuses blank content loudly", function()
+    local path = os.tmpname()
+    local seed = io.open(path, "w")
+    seed:write('[info]\nfirst_name = "Ada"\n')
+    seed:close()
+    local handler, previous = sandboxed_toml_bridge(path)
+    local ok, err = pcall(function()
+      local result = handler.on_message({ action = "save", content = "" }, {})
+      helpers.assert_true(type(result) == "table" and result.saved == false,
+        "blank content must be refused with an answer, not dropped silently")
+      helpers.assert_eq(read_sandbox_file(path), '[info]\nfirst_name = "Ada"\n',
+        "and the previous file must be untouched")
+    end)
+    restore_sandbox(previous)
+    os.remove(path)
+    if not ok then error(err, 0) end
+  end)
+
+end)
