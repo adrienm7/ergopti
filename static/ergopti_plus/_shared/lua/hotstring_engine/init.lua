@@ -704,7 +704,12 @@ function M.new()
 		-- An end-char match always ERASES the terminator because it sits between
 		-- the trigger and the caret. Whether it stays erased is a separate policy:
 		-- consume=false replays the exact carrier after the replacement.
-		local erase_terminator = via_end_char or terminator_consumed
+		-- On the auto path there is no terminator beyond the trigger — the
+		-- consumed flag rides on the trigger's own last character — so only
+		-- an end-char match extends the erase past the trigger. macOS states
+		-- the same rule ("no terminator to consume on the auto path") and
+		-- Windows counts Spec.Length plus the endchar only when one fired.
+		local erase_terminator = via_end_char
 		-- +1 for the terminator, +1 more for a stripped no-break space: both sit
 		-- between the trigger and the caret, so both are replaced. Mirrors
 		-- hotstring_dispatch.ahk (Spec.Length + endchar + HSE_TypoNbspStripped).
