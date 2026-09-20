@@ -64,6 +64,19 @@ _TrayRootApiBootProjectionNeeded() {
 	return _LLM_Menu.Get("enabled", false) && _LLM_Menu.Get("backend", "") == "api"
 }
 
+; Whether the boot worker must arm the deferred IA population at all: the
+; initMenu LLM phase already builds IA inline, so a populated handle means
+; the second full pass would only re-render an unchanged tree. An absent or
+; empty handle (inline build failed or never ran) still needs recovery.
+_TrayRootBootIaPopulationNeeded() {
+	global _LLM_Menu_Handle
+	if !IsSet(_LLM_Menu_Handle) || !IsObject(_LLM_Menu_Handle)
+		return true
+	try return DllCall("GetMenuItemCount", "ptr", _LLM_Menu_Handle.Handle, "int") <= 0
+	catch
+		return true
+}
+
 _TrayRootErrorIsSilent(Err) {
 	return (Err is TrayRootRetryPendingError)
 		or (Err is TrayRootFatalContextError)

@@ -124,4 +124,55 @@ helpers.describe("API panel runtime identity transaction", function()
 		for _, name in ipairs(module_names) do package.loaded[name] = saved_modules[name] end
 		if not ok then error(err) end
 	end)
+
+	helpers.it("lists entries by their defined name only", function()
+		local module_names = {
+			"modules.llm", "infra.i18n", "infra.logger", "infra.dialog_util",
+			"infra.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel",
+		}
+		local saved_modules = {}
+		for _, name in ipairs(module_names) do saved_modules[name] = package.loaded[name] end
+		local entries = {
+			{ id = "entry-a", provider = "openai", model = "model-a", label = "Entry A" },
+		}
+		package.loaded["modules.llm"] = {
+			api_remote = {
+				PROVIDERS = { openai = { label = "OpenAI" } },
+				get_entries = function() return entries end,
+				get_active_entry_id = function() return "entry-a" end,
+			},
+		}
+		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["infra.logger"] = {
+			debug = function() end, info = function() end,
+			warn = function() end, error = function() end,
+		}
+		package.loaded["infra.dialog_util"] = {}
+		package.loaded["infra.notifications"] = {}
+		package.loaded["infra.manifest_menu"] = {
+			render_rows = function(rows) return rows end,
+		}
+		package.loaded["ui.menu.menu_llm.api_panel"] = nil
+		local ok, err = xpcall(function()
+			local ApiPanel = require("ui.menu.menu_llm.api_panel")
+			local rows = ApiPanel.build_model_picker({
+				state = { llm_backend = "api", llm_model = "model-a" },
+				paused = false,
+				keymap = { reset_predictions = function() return true end },
+				WarmupCtrl = { warmup = function() end },
+				update_menu = function() end,
+			})
+			local found = false
+			for _, row in ipairs(rows) do
+				if type(row.label) == "string" and row.label:find("Entry A", 1, true) then
+					found = true
+					helpers.assert_eq(row.label, "Entry A",
+						"the picker row shows the defined name only, never provider/model")
+				end
+			end
+			helpers.assert_true(found, "the entry row must list the defined name")
+		end, debug.traceback)
+		for _, name in ipairs(module_names) do package.loaded[name] = saved_modules[name] end
+		if not ok then error(err) end
+	end)
 end)
