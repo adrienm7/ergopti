@@ -299,6 +299,33 @@ helpers.describe("keyboard_hook: evdev queue-loss recovery", function()
 			"a consumed selection key must stay suppressed across queue recovery")
 	end)
 
+	helpers.it("forgets a consumed key the queue loss already released", function()
+		local kh = helpers.load_module("adapters.keyboard_hook")
+		local emitted = {}
+		local consumes = 0
+		local drained = kh._test_drive({
+			ev(EV_KEY, 2, 1),
+			ev(EV_SYN, 3, 0),
+			ev(EV_SYN, 0, 0),
+			ev(EV_KEY, 2, 1),
+			ev(EV_KEY, 2, 0),
+		}, {
+			onConsume = function()
+				consumes = consumes + 1
+				return consumes == 1
+			end,
+			onEmitRaw = function(code, value)
+				emitted[#emitted + 1] = string.format("%d:%d", code, value)
+				return true
+			end,
+		}, true)
+
+		helpers.assert_eq(drained, 5, "the fresh press after recovery must be observed")
+		helpers.assert_eq(emitted, { "2:1", "2:0" },
+			"a consumed mark must not survive the release the queue loss swallowed:"
+				.. " the next press belongs to the application once consumption declines it")
+	end)
+
 	helpers.it("restores the CapsLock state reported by the keyboard LEDs", function()
 		local kh = helpers.load_module("adapters.keyboard_hook")
 		local captured = {}
