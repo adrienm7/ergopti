@@ -1702,7 +1702,19 @@ _to_json = function(val)
 		return tostring(val)
 	end
 	if type(val) == "string" then
-		return '"' .. val:gsub('\\', '\\\\'):gsub('"', '\\"'):gsub('\n', '\\n') .. '"'
+		-- Every U+0000-U+001F byte must travel escaped: a raw control inside
+		-- the quotes is not JSON, and a strict decoder on another driver
+		-- rejects the whole events_json row carrying it.
+		return '"' .. val:gsub('[%z\1-\31\\"]', function(ch)
+			if ch == '\\' then return '\\\\' end
+			if ch == '"' then return '\\"' end
+			if ch == '\n' then return '\\n' end
+			if ch == '\r' then return '\\r' end
+			if ch == '\t' then return '\\t' end
+			if ch == '\b' then return '\\b' end
+			if ch == '\f' then return '\\f' end
+			return string.format('\\u%04x', string.byte(ch))
+		end) .. '"'
 	end
 	if type(val) == "table" then
 		local is_array = #val > 0 or next(val) == nil
