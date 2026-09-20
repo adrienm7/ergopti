@@ -504,3 +504,44 @@ helpers.describe("keylogger", function()
   end)
 
 end)
+
+helpers.describe("keylogger events_json controls are escaped (json-controls)", function()
+  helpers.it("json-controls: tab and CR travel escaped, never raw", function()
+    -- Regression: the minimal encoder escaped only backslash, quote and
+    -- newline, so a tab or carriage return typed or pasted into any app
+    -- landed RAW inside the events_json string the flush persists — and a
+    -- strict decoder on another driver rejects the row as not-JSON.
+    local previous_writer = package.loaded["modules.keylogger.sqlite_writer"]
+    local captured = {}
+    package.loaded["modules.keylogger.sqlite_writer"] = setmetatable({
+      insert_typing_events = function(_, events)
+        captured[#captured + 1] = events
+        return true
+      end,
+    }, { __index = function() return function() return true end end })
+    local ok, err = pcall(function()
+      package.loaded["adapters.storage"] = Fakes.storage()
+      package.loaded["modules.keylogger.keylogger"] = nil
+      local kl = require("modules.keylogger.keylogger")
+      kl.init({})
+      kl.on_keydown("\t", 1000, "code")
+      kl.on_keydown("a\rb", 1100, "code")
+      kl.flush()
+      helpers.assert_true(#captured >= 1 and #(captured[1] or {}) >= 1,
+        "the typed events must reach the writer")
+      local payload = captured[1][1].events_json
+      helpers.assert_true(type(payload) == "string" and #payload > 0,
+        "each row must carry its encoded keystroke stream")
+      helpers.assert_true(payload:find("\t", 1, true) == nil,
+        "no raw tab may reach the persisted stream")
+      helpers.assert_true(payload:find("\r", 1, true) == nil,
+        "no raw carriage return may reach the persisted stream")
+      helpers.assert_true(payload:find("\\t", 1, true) ~= nil,
+        "a tab must travel as an escape")
+      helpers.assert_true(payload:find("\\r", 1, true) ~= nil,
+        "a carriage return must travel as an escape")
+    end)
+    package.loaded["modules.keylogger.sqlite_writer"] = previous_writer
+    if not ok then error(err, 0) end
+  end)
+end)
