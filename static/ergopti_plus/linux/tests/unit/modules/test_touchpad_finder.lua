@@ -107,6 +107,22 @@ helpers.describe("touchpad finder: the bitmap reader", function()
 		helpers.assert_true(not Finder.bit_set(nil, 0))
 	end)
 
+	helpers.it("reads a low bit in a word that also sets high bits (bit-precision)", function()
+		-- Regression: the bit was tested by dividing the WHOLE word, and Lua
+		-- numbers are doubles, exact only to 2^53. A full 64-bit /proc word
+		-- with high bits set rounds, and a low-bit test on the rounded value
+		-- answers wrongly — under-reporting the finger count, which hides
+		-- working gestures. This box runs Lua 5.4, whose tonumber wraps to an
+		-- integer and masks the defect; production and CI run LuaJIT, where
+		-- numbers are doubles and this case answers false before the fix.
+		helpers.assert_true(Finder.bit_set("8000000000000001", 0),
+			"bit 0 is set whatever bit 63 carries")
+		helpers.assert_true(Finder.bit_set("8000000000000001", 63),
+			"and the high bit itself still reads")
+		helpers.assert_true(not Finder.bit_set("8000000000000000", 0),
+			"while an unset low bit stays unset beside a high one")
+	end)
+
 end)
 
 
@@ -234,6 +250,42 @@ helpers.describe("touchpad finder: what an unknown capability must do", function
 	helpers.it("leaves a slot it cannot parse alone", function()
 		helpers.assert_true(Finder.slot_is_reachable("something_else", 3),
 			"a slot whose name carries no finger count is not this module's to judge")
+	end)
+
+	helpers.it("orders equal pads deterministically, not by discovery luck (tie-order)", function()
+		-- Regression: the sort comment promised "/proc order" for ties, but
+		-- Lua's table.sort is not stable, so two pads counting the same
+		-- fingers came out in whatever order the implementation walks them —
+		-- which differs between interpreters. The boot then flips between
+		-- pads and their gesture sets with it.
+		local two_pads = [[
+I: Bus=0018 Vendor=06cb Product=ce2d Version=0100
+N: Name="Second Pad"
+H: Handlers=mouse1 event9
+B: PROP=5
+B: EV=b
+B: KEY=e520 10000 0 0 0 0
+B: ABS=661800011000003
+
+I: Bus=0018 Vendor=06cb Product=ce2d Version=0100
+N: Name="First Pad"
+H: Handlers=mouse1 event5
+B: PROP=5
+B: EV=b
+B: KEY=e520 10000 0 0 0 0
+B: ABS=661800011000003
+]]
+		local first = Finder.list(two_pads)
+		helpers.assert_eq(#first, 2, "both pads must be found")
+		helpers.assert_eq(first[1].max_fingers, first[2].max_fingers,
+			"the fixture needs its tie: equal counts, or this proves nothing")
+		helpers.assert_eq(first[1].path, "/dev/input/event5",
+			"ties break by device path, whatever order /proc enumerated")
+		helpers.assert_eq(first[2].path, "/dev/input/event9")
+		local second = Finder.list(two_pads)
+		helpers.assert_eq(second[1].path, first[1].path,
+			"and the answer must not wander between boots")
+		helpers.assert_eq(second[2].path, first[2].path)
 	end)
 
 end)
