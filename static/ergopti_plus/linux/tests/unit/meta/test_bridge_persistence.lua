@@ -156,8 +156,148 @@ helpers.describe("bridge handler TOML persistence", function()
 		helpers.assert_eq(captured.path, "/home/user/.config/ergopti/hotstrings/personal.toml")
 		helpers.assert_eq(captured.data.sections_order, { "english" })
 		local entry = captured.data.sections.english.entries[1]
-		helpers.assert_eq(entry.trigger, "btw")
-		helpers.assert_eq(entry.output, "by the way")
-	end)
+    helpers.assert_eq(entry.trigger, "btw")
+    helpers.assert_eq(entry.output, "by the way")
+  end)
+
+  helpers.it("hotstring_editor_bridge.save preserves the file-level tuning the UI does not carry", function()
+    -- Regression: save_all() rebuilt the file from the UI model alone, so a
+    -- hand-tuned [_meta] (priority, delay, color, tooltip, section delays)
+    -- was wiped by adding one hotstring from the editor.
+    local dir = os.tmpname()
+    os.remove(dir)
+    -- os.tmpname() names a file; the bridge needs a directory.
+    local ok_mkdir = os.execute('mkdir "' .. dir .. '"')
+    helpers.assert_true(ok_mkdir == true or ok_mkdir == 0, "sandbox directory must exist")
+    local path = dir .. "/personal.toml"
+    local seed = assert(io.open(path, "w"))
+    seed:write('[_meta]\n'
+      .. 'description = "Personal"\n'
+      .. 'priority = 80\n'
+      .. 'delay = 0.5\n'
+      .. 'show_tooltip = false\n'
+      .. 'color = "red"\n'
+      .. 'sections_order = ["english"]\n'
+      .. '\n'
+      .. '[_meta.section_delays]\n'
+      .. 'english = 0.3\n'
+      .. '\n'
+      .. '[[english]]\n'
+      .. '"btw" = { output = "by the way", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }\n')
+    seed:close()
+    local state = { config = { get_config_dir = function() return dir end } }
+    local captured = with_writer_spy(
+      "ui.hotstring_editor.bridge",
+      function(handler)
+        handler.on_message({
+          action = "save",
+          data = {
+            sections_order = { "english" },
+            sections = { english = { description = "English", entries = {
+              { trigger = "btw", output = "by the way" },
+              { trigger = "hi", output = "hello" },
+            } } } },
+        }, state)
+      end)
+    os.remove(path)
+    os.execute('rmdir "' .. dir .. '"')
+    helpers.assert_not_nil(captured, "save must reach the writer")
+    local meta = captured.data.meta or {}
+    helpers.assert_eq(meta.priority, 80,
+      "the file-level priority must survive an editor save")
+    helpers.assert_eq(meta.delay, 0.5,
+      "and the file-level delay")
+    helpers.assert_eq(meta.show_tooltip, false,
+      "and the tooltip setting")
+    helpers.assert_eq(meta.color, "red",
+      "and the color")
+    helpers.assert_eq(type(meta.section_delays) == "table" and meta.section_delays.english, 0.3,
+      "and the per-section delays")
+    helpers.assert_eq(#captured.data.sections.english.entries, 2,
+      "while the UI edit itself still lands")
+  end)
+
+end)
+
+
+
+
+-- ============================================================================
+-- ============================================================================
+-- ======= 3/ Shared writer file-level tuning round-trip =====================
+-- ============================================================================
+-- ============================================================================
+
+helpers.describe("shared toml writer preserves file-level tuning (meta-tuning)", function()
+
+  --- Reads a whole file, or "" when absent.
+  local function read_written(path)
+    local fh = io.open(path, "r")
+    if not fh then return "" end
+    local content = fh:read("*a") or ""
+    fh:close()
+    return content
+  end
+
+  helpers.it("meta-tuning: write then parse round-trips the tuning the loader consumes", function()
+    -- The Linux loader resolves meta.delay/color/show_tooltip/priority and
+    -- meta.section_delays, but the shared writer never emitted them: any
+    -- write through it silently reset that tuning to the shipped defaults.
+    local writer = helpers.load_module("toml_codec.writer")
+    local reader = helpers.load_module("toml_codec.reader")
+    local path = os.tmpname()
+    local data = {
+      meta = {
+        description = "Personal",
+        delay = 0.5,
+        color = "red",
+        show_tooltip = false,
+        priority = 80,
+        section_delays = { english = 0.3 },
+      },
+      sections_order = { "english" },
+      sections = { english = { description = "English", entries = {
+        { trigger = "btw", output = "by the way" },
+      } } },
+    }
+    local ok, err = writer.write(path, data)
+    helpers.assert_true(ok == true, "write must succeed: " .. tostring(err))
+    local parse_ok, parsed = pcall(reader.parse, path)
+    os.remove(path)
+    helpers.assert_true(parse_ok and type(parsed) == "table",
+      "the written file must parse back")
+    local meta = parsed.meta or {}
+    helpers.assert_eq(meta.delay, 0.5, "delay must round-trip")
+    helpers.assert_eq(meta.color, "red", "color must round-trip")
+    helpers.assert_eq(meta.show_tooltip, false, "show_tooltip = false must round-trip as false, not vanish")
+    helpers.assert_eq(meta.priority, 80, "priority must round-trip")
+    helpers.assert_eq(type(meta.section_delays) == "table" and meta.section_delays.english, 0.3,
+      "section delays must round-trip")
+    helpers.assert_eq(parsed.sections.english.entries[1].trigger, "btw",
+      "entries must survive alongside the tuning")
+  end)
+
+  helpers.it("meta-tuning: callers without tuning get byte-identical output", function()
+    -- Additive emission only: the onboarding/config-window bridges never set
+    -- tuning, so their files must not gain lines they never had.
+    local writer = helpers.load_module("toml_codec.writer")
+    local path = os.tmpname()
+    local ok = writer.write(path, {
+      meta = { description = "Personal" },
+      sections_order = { "english" },
+      sections = { english = { description = "English", entries = {
+        { trigger = "btw", output = "by the way" },
+      } } },
+    })
+    local content = read_written(path)
+    os.remove(path)
+    helpers.assert_true(ok == true, "write must succeed")
+    helpers.assert_true(content:find("delay", 1, true) == nil,
+      "no delay line without a delay value")
+    helpers.assert_true(content:find("priority", 1, true) == nil,
+      "no priority line without a priority value")
+    helpers.assert_true(content:find("section_delays", 1, true) == nil,
+      "no section_delays block without section delays")
+  end)
 
 end)
