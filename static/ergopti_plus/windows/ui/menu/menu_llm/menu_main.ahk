@@ -73,22 +73,21 @@ _LLM_Menu_PublishRoot(PublishAuthorizeFn) {
 }
 
 /**
- * Builds one detached LLM submenu candidate and submits it to the complete-root
- * coordinator. Production callers request work through LLM_Menu_RequestBuild;
- * the generation owner is the only caller of this raw build step.
+ * Builds the IA submenu rows (toggle, warning, settings, about) into a new
+ * detached Menu and returns it — no publish, no root rebuild, no tray touch.
+ * initMenu builds IA inline at boot through this; LLM_Menu_Build uses it for
+ * staged replacements. One row-construction site: the two must never drift.
+ * The global handle is pointed at the staged menu during construction (row
+ * builders write through it) and restored before return, so the call has no
+ * publish side effects.
+ * @returns {Menu} Staged submenu with all rows.
  */
-LLM_Menu_Build() {
-	global _LLM_Menu, _LLM_Menu_Handle, _LLM_Menu_InTray
-	; Never clear the published submenu before its replacement is complete. A menu
-	; build can be preempted by timers and callbacks; an in-place Delete() exposed
-	; an empty or partial LLM tree and silently dropped the user's next click.
-	OldHandle := _LLM_Menu_Handle
+LLM_Menu_BuildSubmenu() {
+	global _LLM_Menu, _LLM_Menu_Handle
+	SavedHandle := (IsSet(_LLM_Menu_Handle) && IsObject(_LLM_Menu_Handle)) ? _LLM_Menu_Handle : ""
 	StagedHandle := Menu()
 	_LLM_Menu_Handle := StagedHandle
-	Published := false
 	try {
-	_t0 := A_TickCount
-	try LoggerInfo("LLM", "LLM_Menu_Build: building IA submenu (enabled={1}, inTray={2}).", _LLM_Menu["enabled"] ? "true" : "false", _LLM_Menu_InTray ? "true" : "false")
 	_tStaged := A_TickCount
 
 	; Enable / Disable toggle. The checked state MUST reflect
@@ -165,6 +164,35 @@ LLM_Menu_Build() {
 		Map("separator", true),
 		Map("label", t("menu.llm.about"), "action", LLM_Menu_OnAbout)
 	])
+	} catch as e {
+		if IsObject(SavedHandle)
+			_LLM_Menu_Handle := SavedHandle
+		try StagedHandle.Delete()
+		throw e
+	}
+	if IsObject(SavedHandle)
+		_LLM_Menu_Handle := SavedHandle
+	return StagedHandle
+}
+
+/**
+ * Builds one detached LLM submenu candidate and submits it to the complete-root
+ * coordinator. Production callers request work through LLM_Menu_RequestBuild;
+ * the generation owner is the only caller of this raw build step.
+ */
+LLM_Menu_Build() {
+	global _LLM_Menu, _LLM_Menu_Handle, _LLM_Menu_InTray
+	; Never clear the published submenu before its replacement is complete. A menu
+	; build can be preempted by timers and callbacks; an in-place Delete() exposed
+	; an empty or partial LLM tree and silently dropped the user's next click.
+	OldHandle := _LLM_Menu_Handle
+	StagedHandle := ""
+	Published := false
+	try {
+	_t0 := A_TickCount
+	try LoggerInfo("LLM", "LLM_Menu_Build: building IA submenu (enabled={1}, inTray={2}).", _LLM_Menu["enabled"] ? "true" : "false", _LLM_Menu_InTray ? "true" : "false")
+	StagedHandle := LLM_Menu_BuildSubmenu()
+	_LLM_Menu_Handle := StagedHandle
 
 	; The LLM builder owns only a detached child. The root coordinator attaches
 	; it while publishing a complete root, so an asynchronous LLM rebuild can

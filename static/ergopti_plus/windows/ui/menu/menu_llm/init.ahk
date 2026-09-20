@@ -258,23 +258,33 @@ LLM_Menu_Init(saved_opts := Map()) {
 	; who already know what the tray menu offers. Discovery now lives
 	; purely in the menu's "IA" submenu; no opt-in nag at startup.
 
-	; Place the IA entry in the tray NOW (empty submenu, in its canonical position)
-	; so the top-level menu is complete the instant initMenu returns, then defer the
-	; expensive population (8 submenus + i18n lookups) to the post-"ready" boot tail.
-	; A synchronous build here blocks initMenu mid-way — measured at ~1.6 s under
-	; load — and a tray opened during that window shows only the items registered
-	; before this point (the "menu shows only the first items" bug). Re-populating
-	; _LLM_Menu_Handle in place later keeps the entry's position (see the persistent-
-	; Menu note at its declaration), so menu order is preserved. The population is
-	; armed UNCONDITIONALLY at the boot tail (SetTimer LLM_Menu_RequestBuild) — NOT signalled
-	; from here via a flag: initMenu() itself runs inside the deferred tray-build pass,
-	; so any flag set here would be read by the boot tail long before this line runs.
+	; Build the IA submenu inline so the first tray already carries it: the
+	; deferred boot population then finds a populated handle and stands down
+	; instead of re-running this whole menu. Row construction itself measures
+	; ~0 ms; the old ~1.6 s stall came from the then-synchronous model-tags
+	; probe, since moved off the hot path (async installed-tags probe), so
+	; the deferral's original reason is gone. On failure the empty parent
+	; stays staged exactly as before and the boot projections recover it —
+	; a failed inline build must never fail the boot.
 	if !_LLM_Menu_InTray {
 		; initMenu may be constructing a detached replacement tree. Record the
 		; root insertion in that transaction instead of exposing a half-built
 		; tray while the rest of the menu is rendered.
-		TrayMenuStage_Add(t("menu.llm.title"), _LLM_Menu_Handle)
-		_LLM_Menu_InTray := true
+		try {
+			_IaSub := LLM_Menu_BuildSubmenu()
+			_LLM_Menu_Handle := _IaSub
+			TrayMenuStage_Add(t("menu.llm.title"), _IaSub)
+			MenuDispatcher_PruneMenu(_IaSub)
+			if _LLM_Menu["enabled"]
+				TrayMenuStage_Check(t("menu.llm.title"))
+			_LLM_Menu_InTray := true
+			BootProfile_Mark("MENU/initMenu: LLM IA submenu built inline")
+		} catch as _IaErr {
+			try LoggerError("LLM",
+				"Inline IA submenu build failed, deferred population will recover: {1}.",
+				_IaErr.Message)
+			TrayMenuStage_Add(t("menu.llm.title"), _LLM_Menu_Handle)
+		}
 	} else if IsObject(_TrayMenuStage) {
 		; A full root replacement removed the previous IA parent entry. The
 		; persistent submenu remains valid, but it must be attached to this new
