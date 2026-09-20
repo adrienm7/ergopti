@@ -224,3 +224,53 @@ helpers.describe("linux actions: screenshots", function()
 	end)
 
 end)
+
+
+
+
+-- =========================================================
+-- =========================================================
+-- ======= 4/ Click toggles, which must let go =============
+-- =========================================================
+-- =========================================================
+
+helpers.describe("linux actions: click toggles", function()
+
+	helpers.it("click-toggle: the second fire releases what the first held", function()
+		-- Regression: both branches ran `xdotool mousedown` with no state and
+		-- no mouseup, so firing twice held the button twice and never let go —
+		-- a stuck drag selecting everything until a manual mouseup.
+		local G = helpers.load_module("modules.gestures.manager")
+		with_recorded_shell(function(commands)
+			G.execute_action("left_click_toggle", "test__slot")
+			G.execute_action("left_click_toggle", "test__slot")
+			helpers.assert_eq(#commands, 2,
+				"two fires must run exactly two commands")
+			helpers.assert_true(commands[1]:find("mousedown 1", 1, true) ~= nil,
+				"the first fire holds the left button down")
+			helpers.assert_true(commands[2]:find("mouseup 1", 1, true) ~= nil,
+				"the second fire must release it — repeating mousedown sticks the button down in a drag")
+		end)
+	end)
+
+	helpers.it("click-toggle: left and right buttons toggle independently", function()
+		local G = helpers.load_module("modules.gestures.manager")
+		with_recorded_shell(function(commands)
+			G.execute_action("left_click_toggle", "test__slot")
+			G.execute_action("right_click_toggle", "test__slot")
+			G.execute_action("left_click_toggle", "test__slot")
+			G.execute_action("right_click_toggle", "test__slot")
+			helpers.assert_eq(#commands, 4,
+				"four fires must run exactly four commands")
+			helpers.assert_true(commands[1]:find("mousedown 1", 1, true) ~= nil,
+				"left goes down first")
+			helpers.assert_true(commands[2]:find("mousedown 3", 1, true) ~= nil,
+				"right goes down independently of left")
+			helpers.assert_true(commands[3]:find("mouseup 1", 1, true) ~= nil,
+				"left goes back up on its own second fire")
+			helpers.assert_true(commands[4]:find("mouseup 3", 1, true) ~= nil,
+				"and so does right")
+		end)
+	end)
+
+end)

@@ -73,6 +73,23 @@ if not _writer_ok then TomlWriter = nil end
 -- held for seconds would report elapsed ~= 0 and be misclassified as a tap.
 local _now_sec = Monotonic.now_sec
 
+-- Which mouse buttons the click-toggle actions currently hold down ("1" for
+-- left, "3" for right). Without this the toggle fires mousedown on every
+-- invocation and the button sticks down in a drag until a manual mouseup.
+local _click_toggle_down = { ["1"] = false, ["3"] = false }
+
+--- Returns the xdotool command toggling one button hold, flipping the
+--- remembered state: odd fires press, even fires release.
+--- @param button string "1" for left, "3" for right.
+--- @return string The xdotool command to run.
+local function _click_toggle_command(button)
+	_click_toggle_down[button] = not _click_toggle_down[button]
+	if _click_toggle_down[button] then
+		return "xdotool mousedown " .. button
+	end
+	return "xdotool mouseup " .. button
+end
+
 -- =========================================
 -- =========================================
 -- ======= 1/ Gesture Slot Registry ========
@@ -595,9 +612,9 @@ local function _execute_action(action_name, go_next, binding)
 
 	if action_name == "left_click_toggle" then
 		-- Toggle mouse button hold via xdotool.
-		_run("xdotool mousedown 1")
+		_run(_click_toggle_command("1"))
 	elseif action_name == "right_click_toggle" then
-		_run("xdotool mousedown 3")
+		_run(_click_toggle_command("3"))
 	elseif action_name == "ws_prev" then
 		_run(workspace_switch_command(-1, "ctrl+alt+Left"))
 	elseif action_name == "ws_next" then
