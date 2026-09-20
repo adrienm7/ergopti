@@ -82,6 +82,19 @@ local function shell_quote(value)
 	return "'" .. tostring(value or ""):gsub("'", "'\\''") .. "'"
 end
 
+--- Normalises a child-process exit status across interpreters.
+---
+--- Production runs LuaJIT (Lua 5.1 semantics): os.execute and pipe:close
+--- return a NUMBER, 0 for success. From Lua 5.2 the same success reads as
+--- `true`. A bare `if not status` is therefore never true on LuaJIT — not
+--- even for a failure — so Cancel and "binary absent" both read as success.
+--- Every zenity site below goes through this helper.
+--- @param status any
+--- @return boolean
+local function succeeded(status)
+	return status == true or status == 0
+end
+
 --- Asks the user for a line of text.
 ---
 --- Declared here, above every closure that calls it: a `local` declared after a
@@ -106,7 +119,7 @@ local function prompt_text(title, prompt, initial)
 	-- empty entry, which exits zero: the first must change nothing, the second is
 	-- a value the caller gets to refuse with its own message.
 	local ok = pipe:close()
-	if not ok then return nil end
+	if not succeeded(ok) then return nil end
 	return (value:gsub("[\r\n]+$", ""))
 end
 
@@ -114,7 +127,7 @@ end
 --- @param message string Already-localised text.
 local function show_error(message)
 	local command = "zenity --error --text=" .. shell_quote(message) .. " 2>/dev/null"
-	if not os.execute(command) then
+	if not succeeded(os.execute(command)) then
 		-- Zenity absent: the refusal still has to reach someone, and a silent
 		-- rejection reads as a menu row that does nothing when clicked.
 		Logger.error(LOG, "%s", tostring(message))
@@ -195,17 +208,13 @@ end
 --- @param cancel_label string Already-translated.
 --- @return boolean|nil
 local function ask_yes_no(title, text, ok_label, cancel_label)
+	-- os.execute returns a number on LuaJIT (5.1) and true on 5.2+: the
+	-- module-level succeeded() above normalises both spellings.
 	local command = "zenity --question --title=" .. shell_quote(title)
 		.. " --text=" .. shell_quote(text)
 		.. " --ok-label=" .. shell_quote(ok_label)
 		.. " --cancel-label=" .. shell_quote(cancel_label)
 		.. " 2>/dev/null"
-	-- os.execute returns a number on LuaJIT (5.1) and true on 5.2+.
-	--- @param status any
-	--- @return boolean
-	local function succeeded(status)
-		return status == true or status == 0
-	end
 
 	-- Probed rather than assumed, because the exit code alone cannot distinguish
 	-- "the user pressed Cancel" from "no such binary" — both are non-zero, and
