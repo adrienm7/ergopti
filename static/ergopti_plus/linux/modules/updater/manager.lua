@@ -710,15 +710,24 @@ function M.download_update(url, callback)
 end
 
 --- Cancels any in-flight updater transport or digest and removes partial files.
+---
+--- A verified archive is cancelled too: set_channel() and
+--- clear_cached_release() both delete it, and a cancel that left it on disk
+--- with state "available" would keep install_update() working after the user
+--- — or the shutdown coordinator — asked for cancellation. An install already
+--- in flight owns the archive and its own state, so cancelling transports
+--- must not pull either out from under it.
 --- @return boolean
 function M.cancel_update()
 	local http_cancelled = M._http_client.cancel(HTTP_OWNER)
 	local digest_cancelled = M._file_digest.cancel()
 	if not http_cancelled or not digest_cancelled then return false end
+	if _state == "installing" then return true end
 	remove_partial_download()
 	_download_part = nil
 	_download_dest = nil
-	if _state == "checking" or _state == "downloading" then _state = "idle" end
+	if _verified_archive then Fs.delete(_verified_archive); _verified_archive = nil end
+	_state = "idle"
 	return true
 end
 
