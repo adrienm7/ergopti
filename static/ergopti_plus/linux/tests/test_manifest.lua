@@ -17,6 +17,7 @@ return {
 	"tests.unit.adapters.test_keyboard_hook_safety",
 	"tests.unit.adapters.test_keyboard_hook_xkb_capture",
 	"tests.unit.adapters.test_keyboard_layout",
+	"tests.unit.adapters.test_process_lifecycle",
 	"tests.unit.adapters.test_secure_field_detector",
 	"tests.unit.adapters.test_spawn_args_are_strings",
 	"tests.unit.adapters.test_tray_indicator",
