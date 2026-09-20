@@ -767,6 +767,15 @@ end
 --- @param timestamp_ms number|nil Monotonic transition timestamp in milliseconds.
 function M.on_app_focus(app_id, timestamp_ms)
 	if type(app_id) ~= "string" or app_id == "" then return end
+	-- Gated like every other recording entry point: focus time and app
+	-- switches are records too, and tracking them while recording is
+	-- forbidden would persist them on the next flush. The in-flight interval
+	-- is forgotten rather than closed — time that must not be recorded
+	-- cannot be credited later without backfilling the forbidden gap.
+	if not may_record() then
+		_focused_app_id, _focused_app_started_at = nil, nil
+		return
+	end
 	local now = type(timestamp_ms) == "number" and timestamp_ms or math.floor(Monotonic.now_ms())
 	if _focused_app_id == app_id then return end
 	if _focused_app_id and type(_focused_app_started_at) == "number" then
@@ -1077,9 +1086,15 @@ end
 function M.set_window_title(app_id, title, timestamp_ms)
 	local now = type(timestamp_ms) == "number" and timestamp_ms or math.floor(Monotonic.now_ms())
 
-	-- Close the previous title's interval first, whatever happens next: the time
-	-- already spent under it was earned before whatever is being switched to.
-	if _current_title and type(_title_since) == "number" and type(app_id) == "string" then
+	if not may_record() or type(app_id) ~= "string" or app_id == "" then
+		_current_title, _title_since = nil, nil
+		return
+	end
+
+	-- Close the previous title's interval now that recording is confirmed:
+	-- the time already spent under it was earned while it was allowed. It
+	-- used to run before the gate above, crediting forbidden time on flush.
+	if _current_title and type(_title_since) == "number" then
 		local app = _app_stats[app_id]
 		if app then
 			local row = app.titles[_current_title]
@@ -1087,10 +1102,6 @@ function M.set_window_title(app_id, title, timestamp_ms)
 		end
 	end
 
-	if not may_record() or type(app_id) ~= "string" or app_id == "" then
-		_current_title, _title_since = nil, nil
-		return
-	end
 	if type(title) ~= "string" or title == "" then
 		_current_title, _title_since = nil, nil
 		return
