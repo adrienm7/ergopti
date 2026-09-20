@@ -145,6 +145,11 @@ local _pending_app_switch_events = {}
 -- been fixed in this driver.
 local _current_title = nil
 local _title_since = nil
+-- Which application owned _current_title when it was reported. The title is
+-- global while applications are not: closing the interval against the
+-- incoming application credits nothing (its titles table has no such row)
+-- and every later keystroke misses its count the same way. Declared here in
+-- the state section, beside the two locals it belongs with.
 
 local _flushed_app_titles = {}
 local _flushed_app_holds = {}
@@ -774,10 +779,27 @@ function M.on_app_focus(app_id, timestamp_ms)
 	-- cannot be credited later without backfilling the forbidden gap.
 	if not may_record() then
 		_focused_app_id, _focused_app_started_at = nil, nil
+		_current_title, _title_since, _current_title_app = nil, nil, nil
 		return
 	end
 	local now = type(timestamp_ms) == "number" and timestamp_ms or math.floor(Monotonic.now_ms())
 	if _focused_app_id == app_id then return end
+	-- A switch orphans the previous window: close its interval under the
+	-- application that owned it. Left open, the next title change would
+	-- close it against the incoming application and credit nothing — and
+	-- every keystroke until then would miss its count the same way. Kept
+	-- when the title was just reported for this same application: the daemon
+	-- always sends title-then-focus together, and clearing there would
+	-- orphan the window it just named.
+	if _current_title and type(_title_since) == "number"
+		and _current_title_app ~= nil and _current_title_app ~= app_id then
+		local owner = _app_stats[_current_title_app]
+		if owner then
+			local row = owner.titles[_current_title]
+			if row then row.ms = row.ms + math.max(0, now - _title_since) end
+		end
+		_current_title, _title_since, _current_title_app = nil, nil, nil
+	end
 	if _focused_app_id and type(_focused_app_started_at) == "number" then
 		local elapsed = math.max(0, now - _focused_app_started_at)
 		local previous = ensure_app_stats(_focused_app_id, _focused_app_started_at)
@@ -1087,23 +1109,25 @@ function M.set_window_title(app_id, title, timestamp_ms)
 	local now = type(timestamp_ms) == "number" and timestamp_ms or math.floor(Monotonic.now_ms())
 
 	if not may_record() or type(app_id) ~= "string" or app_id == "" then
-		_current_title, _title_since = nil, nil
+		_current_title, _title_since, _current_title_app = nil, nil, nil
 		return
 	end
 
-	-- Close the previous title's interval now that recording is confirmed:
-	-- the time already spent under it was earned while it was allowed. It
-	-- used to run before the gate above, crediting forbidden time on flush.
+	-- Close the previous title's interval under the application that owned
+	-- it, never the incoming one: the time already spent under it was earned
+	-- while recording was allowed, and the incoming application's titles
+	-- table has no such row, so closing there credits nothing. It used to
+	-- run before the gate above, crediting forbidden time on flush.
 	if _current_title and type(_title_since) == "number" then
-		local app = _app_stats[app_id]
-		if app then
-			local row = app.titles[_current_title]
+		local owner = _app_stats[_current_title_app or app_id]
+		if owner then
+			local row = owner.titles[_current_title]
 			if row then row.ms = row.ms + math.max(0, now - _title_since) end
 		end
 	end
 
 	if type(title) ~= "string" or title == "" then
-		_current_title, _title_since = nil, nil
+		_current_title, _title_since, _current_title_app = nil, nil, nil
 		return
 	end
 
@@ -1111,6 +1135,7 @@ function M.set_window_title(app_id, title, timestamp_ms)
 	app.titles[title] = app.titles[title] or { c = 0, ms = 0 }
 	_current_title = title
 	_title_since = now
+	_current_title_app = app_id
 end
 
 --- Reports whether a window title marks a private/incognito browser session.
@@ -1639,6 +1664,9 @@ function M.reset_session()
 	_app_stats = {}
 	_focused_app_id         = nil
 	_focused_app_started_at = nil
+	_current_title      = nil
+	_title_since        = nil
+	_current_title_app  = nil
 	_flushed_app_totals     = {}
 	_flushed_app_titles     = {}
 	_flushed_app_holds      = {}
