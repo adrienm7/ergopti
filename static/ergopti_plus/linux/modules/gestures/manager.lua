@@ -1145,9 +1145,17 @@ local function load_user_config(path)
 	local function apply_actions(section)
 		if type(section) ~= "table" then return end
 		for slot, action in pairs(section) do
-			if M.DEFAULT_GESTURES[slot]
+			if M.DEFAULT_GESTURES[slot] and type(action) == "string"
 				and (action == "none" or ACTION_I18N_KEYS[action] or ACTION_COMPUTED_LABELS[action])
 			then
+				_actions[slot] = action
+			elseif M.DEFAULT_GESTURES[slot] and type(action) == "string" then
+				-- Kept, not dropped: set_action() persisted it and reported
+				-- success, so dropping it here would silently revert a save.
+				-- An action no catalogue knows (removed, or written by a newer
+				-- version) stays bound and dispatches as a no-op until rebound.
+				Logger.warn(LOG, "Unknown action '%s' for slot '%s' — kept, dispatches as a no-op.",
+					tostring(action), tostring(slot))
 				_actions[slot] = action
 			end
 		end
