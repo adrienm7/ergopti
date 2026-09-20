@@ -964,6 +964,23 @@ function M.check_device()
 			end
 			return
 		end
+		-- Readable is not the same as "can produce key events", and the kernel
+		-- reuses eventN numbers across hotplug: the exact path may now name a
+		-- mouse or another non-keyboard node. start() refuses those, so the
+		-- watchdog must not adopt one behind its back and grab it as a keyboard.
+		local ok_finder, Finder = pcall(require, "modules.hotstrings.device_finder")
+		if ok_finder and type(Finder.is_key_device) == "function" then
+			local is_key, key_why = Finder.is_key_device(_pinned_device)
+			if not is_key then
+				_pinned_missing = true
+				if not _reported_missing then
+					Logger.warn(LOG, "Pinned input device %s no longer produces key events (%s) — waiting for that exact path.",
+						_pinned_device, tostring(key_why))
+					_reported_missing = true
+				end
+				return
+			end
+		end
 		keyboards = { _pinned_device }
 	else
 		keyboards, pointers = _best_devices()

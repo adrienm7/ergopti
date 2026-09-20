@@ -438,6 +438,65 @@ helpers.describe("keyboard_hook: an explicit device owns its watchdog policy", f
 			"the adapter cannot distinguish CLI ownership after auto-detection unless the daemon carries it")
 	end)
 
+	helpers.it("pinned-watchdog: a reappearing path that lost EV_KEY is not adopted", function()
+		-- Regression: the pinned branch trusted readability alone, but the
+		-- kernel reuses eventN numbers across hotplug. A keyboard unplugged
+		-- and a mouse plugged back at the same path was re-acquired and
+		-- grabbed as a keyboard: hotstrings stopped and mouse buttons were
+		-- swallowed into a keyboard-only uinput device.
+		local pinned, preferred = fake_node("pinned"), fake_node("preferred")
+		local pinned_is_key = true
+		package.loaded["modules.hotstrings.device_finder"] = {
+			find_keyboard = function()
+				error("auto-detection must not participate in a pinned watchdog decision")
+			end,
+			is_key_device = function(path)
+				if path == pinned then
+					return pinned_is_key, pinned_is_key and nil or "reports no EV_KEY capability"
+				end
+				return true, nil
+			end,
+		}
+		local reader = helpers.load_module("adapters.evdev_reader")
+		local backend, log = recorder()
+		reader._set_backend(backend)
+
+		local kh = load_hook()
+		kh.start({
+			device = pinned,
+			pinned = true,
+			intercept = true,
+			onEmitRaw = function() return true end,
+		})
+		tick_until_check(kh, 1)
+		helpers.assert_eq(#log.opens, 1, "a healthy pinned path must not be reopened")
+
+		-- The keyboard is unplugged, then a mouse enumerates at the same path.
+		os.remove(pinned)
+		tick_until_check(kh, 1)
+		helpers.assert_eq(#log.opens, 1, "a missing pinned path waits, it is not replaced")
+		local fh = assert(io.open(pinned, "w"))
+		fh:write("impostor")
+		fh:close()
+		pinned_is_key = false
+		tick_until_check(kh, 1)
+		helpers.assert_eq(#log.opens, 1,
+			"a readable path that cannot produce key events must not be re-acquired, "
+				.. "let alone grabbed as the keyboard")
+		helpers.assert_true(kh.isRunning(),
+			"waiting must not stop the hook: the previous source set stays live")
+
+		-- The real keyboard returns at the same path: recovery works as before.
+		pinned_is_key = true
+		tick_until_check(kh, 1)
+		helpers.assert_eq(#log.opens, 2, "the recovered keyboard must be reopened")
+		helpers.assert_eq(log.opens[2], pinned, "only the exact CLI-selected path may be reacquired")
+
+		kh.stop()
+		reader._reset_backend()
+		os.remove(pinned) ; os.remove(preferred)
+	end)
+
 end)
 
 
