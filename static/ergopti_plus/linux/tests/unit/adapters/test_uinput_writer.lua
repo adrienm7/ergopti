@@ -157,8 +157,7 @@ helpers.describe("uinput_writer: device creation", function()
 		U._reset_backend()
 	end)
 
-	helpers.it("registers EV_KEY and the full keycode range it claims", function()
-		local U = helpers.load_module("adapters.uinput_writer")
+	helpers.it("registers EV_KEY and the full keycode range it claims", function()		local U = helpers.load_module("adapters.uinput_writer")
 		local rec = recorder()
 		U._set_backend(rec.backend)
 		U.open()
@@ -177,6 +176,36 @@ helpers.describe("uinput_writer: device creation", function()
 				"keycode " .. code .. " was never registered — an unregistered code is dropped "
 				.. "silently by the kernel, so that one key would simply stop working under a grab")
 		end
+
+		U._reset_backend()
+	end)
+
+	helpers.it("key-range: covers the whole EV_KEY space up to KEY_MAX", function()
+		-- Regression: the device registered only 1..255, so any physical key
+		-- with a code above 255 (KEY_OK at 352 and the other extended keys a
+		-- keyboard reports) was swallowed by the grab and then "re-emitted"
+		-- to a device that cannot emit it — the write succeeds while the
+		-- application never sees the key. Looping to U.KEY_CODE_MAX cannot
+		-- catch a truncation, so the bound itself is pinned to the kernel's
+		-- KEY_MAX from linux/input-event-codes.h, the same 0x2FF the
+		-- keyboard hook forwards.
+		local U = helpers.load_module("adapters.uinput_writer")
+		helpers.assert_eq(U.KEY_CODE_MAX, 0x2FF,
+			"the virtual keyboard must span every evdev keycode the hook can forward, "
+			.. "not just the low 255: 512 ioctls saved once at startup cost every high key")
+		local rec = recorder()
+		U._set_backend(rec.backend)
+		U.open()
+
+		local keybits = {}
+		for _, call in ipairs(rec.ioctls) do
+			if call.request == U.UI_SET_KEYBIT then keybits[call.arg] = true end
+		end
+		helpers.assert_true(keybits[352] == true,
+			"KEY_OK (352) must be registered: a grabbed extended key re-emitted to an "
+			.. "unregistered code is dropped silently after UI_DEV_CREATE freezes the bits")
+		helpers.assert_true(keybits[0x2FF] == true,
+			"KEY_MAX itself must be registered — the top of the range is the point of the range")
 
 		U._reset_backend()
 	end)
