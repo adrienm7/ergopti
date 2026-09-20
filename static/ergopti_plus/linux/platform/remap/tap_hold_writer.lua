@@ -138,8 +138,15 @@ local function read_overrides(path)
 				-- exactly as written: the user put it there and nothing here has an
 				-- opinion about it.
 				overrides[current][field] = value
+			else
+				-- Comments and blank lines inside an owned section are not fields
+				-- this module may drop: they travel with the foreign lines below.
+				foreign[#foreign + 1] = line
 			end
-		elseif line:match("%S") and not line:match("^%s*#") then
+		else
+			-- Outside any owned section every line is foreign — other sections,
+			-- their content, comments and blank lines — and is re-emitted
+			-- verbatim by write_overrides().
 			foreign[#foreign + 1] = line
 		end
 	end
@@ -157,10 +164,15 @@ end
 -- ==========================================
 
 --- Serialises the overrides and replaces the file.
+---
+--- Lines this module does not own (other sections, their content, comments and
+--- blank lines) are re-emitted verbatim after the owned sections: TOML order
+--- is insignificant, but deleting them is data loss.
 --- @param path string
 --- @param overrides table
+--- @param foreign table|nil Verbatim lines collected by read_overrides().
 --- @return boolean
-local function write_overrides(path, overrides)
+local function write_overrides(path, overrides, foreign)
 	local ids = {}
 	for id in pairs(overrides) do ids[#ids + 1] = id end
 	table.sort(ids)
@@ -191,6 +203,10 @@ local function write_overrides(path, overrides)
 			end
 			lines[#lines + 1] = ""
 		end
+	end
+	if type(foreign) == "table" and #foreign > 0 then
+		if lines[#lines] ~= "" then lines[#lines + 1] = "" end
+		for _, line in ipairs(foreign) do lines[#lines + 1] = line end
 	end
 
 	-- Temp file then rename: a crash mid-write would otherwise leave a file that
@@ -259,7 +275,7 @@ function M.set_field(key_id, field, value)
 	local path = user_toml_path()
 	if not path then return false end
 
-	local overrides = read_overrides(path)
+	local overrides, foreign = read_overrides(path)
 	overrides[key_id] = overrides[key_id] or {}
 	-- A hold is either a modifier or a layer, never both: the loader treats them
 	-- as mutually exclusive, and leaving the other behind would make which one
@@ -268,7 +284,7 @@ function M.set_field(key_id, field, value)
 	if field == "hold_layer" then overrides[key_id].hold_modifier = nil end
 	overrides[key_id][field] = value
 
-	if not write_overrides(path, overrides) then return false end
+	if not write_overrides(path, overrides, foreign) then return false end
 	return apply()
 end
 
@@ -279,9 +295,9 @@ function M.clear_key(key_id)
 	if not require_state("clear_key") then return false end
 	local path = user_toml_path()
 	if not path then return false end
-	local overrides = read_overrides(path)
+	local overrides, foreign = read_overrides(path)
 	overrides[key_id] = nil
-	if not write_overrides(path, overrides) then return false end
+	if not write_overrides(path, overrides, foreign) then return false end
 	return apply()
 end
 
