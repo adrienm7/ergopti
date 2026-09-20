@@ -605,7 +605,16 @@ local function _execute_action(action_name, go_next, binding)
 	elseif action_name == "search_web" then
 		local template = M.get_action_parameter(binding, action_name)
 		if M.validate_action_parameter(action_name, template) then
-			_run("xdg-open " .. shell_quote((template:gsub("%%s", url_encode_query(primary_selection())))))
+			local query = primary_selection()
+			if query == "" then
+				Logger.warn(LOG, "search_web: no primary selection to search for ÔÇö nothing opened.")
+				return
+			end
+			-- Function replacement: the encoded query carries %XX sequences
+			-- and a string replacement would read them as capture references
+			-- ("invalid capture index" on the first space).
+			local encoded = url_encode_query(query)
+			_run("xdg-open " .. shell_quote((template:gsub("%%s", function() return encoded end))))
 		end
 		return
 	end
