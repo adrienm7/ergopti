@@ -464,7 +464,12 @@ local function _dispatch_event(ev, source)
 	-- not a new physical transition. This includes modifiers and CapsLock.
 	if _on_physical and ev.value ~= InputEvent.VALUE_REPEAT and ev.code > 0 then
 		if not _call_callback("physical-key callback", _on_physical,
-			ev.code, EvdevCodes.key_name(ev.code), char, ev.value) then return end
+			ev.code, EvdevCodes.key_name(ev.code), char, ev.value) then
+			-- The callback already triggered the emergency stop; the grabbed
+			-- event must still reach the application before giving up on it.
+			_forward_raw(ev, source)
+			return
+		end
 	end
 
 	-- XKB has already consumed the transition above. Modifiers still produce no
@@ -499,7 +504,13 @@ local function _dispatch_event(ev, source)
 			-- descriptor or a lid close, and one such reading would dominate every
 			-- average it entered for the rest of the day.
 			local held_ms = math.min(math.max(0, Monotonic.now_ms() - down_at), MAX_PLAUSIBLE_HOLD_MS)
-			if not _call_callback("key-hold callback", _on_hold, ev.code, held_ms) then return end
+			if not _call_callback("key-hold callback", _on_hold, ev.code, held_ms) then
+				-- A release owns the application's key state: it must go back
+				-- even when the metrics consumer just died, or the key sticks
+				-- down over there while nothing is held here.
+				_forward_raw(ev, source)
+				return
+			end
 		end
 	end
 
@@ -520,7 +531,11 @@ local function _dispatch_event(ev, source)
 			value = ev.value,
 			mods = M.held_modifiers(),
 		})
-		if not ok_consume then return
+		if not ok_consume then
+			-- A missing verdict is not a suppression: the event still belongs
+			-- to the application.
+			_forward_raw(ev, source)
+			return
 		elseif consume == true then
 			_consumed_down[consumed_key] = true
 			return
@@ -1309,7 +1324,7 @@ end
 --- the reader would have kept passing through the entire period in which capture
 --- produced nothing at all.
 --- @param events table Array of { type, code, value } tables, in arrival order.
---- @param callbacks table { onChar?, onKey?, onPhysical?, onConsume?, onDesync?, onEmitRaw?, captureEvent?, keyState?, ledState? }.
+--- @param callbacks table { onChar?, onKey?, onPhysical?, onHold?, onConsume?, onDesync?, onEmitRaw?, captureEvent?, keyState?, ledState? }.
 -- Exposed so the watchdog test can advance exactly as many ticks as the check
 -- needs, instead of hardcoding a number that silently stops matching.
 M.DEVICE_CHECK_TICKS = DEVICE_CHECK_TICKS
@@ -1345,6 +1360,7 @@ function M._test_drive(events, callbacks, intercept)
 	_on_char     = cb.onChar
 	_on_key      = cb.onKey
 	_on_physical = cb.onPhysical
+	_on_hold     = cb.onHold
 	_on_consume  = cb.onConsume
 	_on_desync   = cb.onDesync
 	_emit_raw    = cb.onEmitRaw
