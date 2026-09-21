@@ -37,8 +37,9 @@
 ; ==================================================================
 ; ==================================================================
 
-; Mac modifier glyphs, by code point: cmd U+2318, ctrl U+2303, alt U+2325,
-; shift U+21E7. These are exactly what the production formatter emits.
+; Windows names its modifiers in words. The macOS glyphs (U+2318 cmd, U+2303
+; ctrl, U+2325 option, U+21E7 shift) are meaningless on a Windows keyboard and
+; made "Alt+1" read as a Mac Cmd shortcut (llm-val-mods-windows-labels).
 _TestRender_ValModsDoesNotThrow() {
 	threw := false
 	r := ""
@@ -49,29 +50,49 @@ _TestRender_ValModsDoesNotThrow() {
 	}
 	AssertFalse(threw,
 		"_LLM_FormatValModifiers must not throw on a normal modifier (regression: misplaced StrReplace arg)")
-	AssertEqual(Chr(0x2325), r, "'alt' must format to the option symbol U+2325")
+	AssertEqual("Alt", r, "'alt' must format to the Windows key name")
 }
 Test("render: _LLM_FormatValModifiers does not throw and maps 'alt'",
 	_TestRender_ValModsDoesNotThrow)
 
 
 _TestRender_ValModsAllSymbols() {
-	AssertEqual(Chr(0x2318), _LLM_FormatValModifiers("cmd"),   "'cmd' -> U+2318")
-	AssertEqual(Chr(0x2303), _LLM_FormatValModifiers("ctrl"),  "'ctrl' -> U+2303")
-	AssertEqual(Chr(0x21E7), _LLM_FormatValModifiers("shift"), "'shift' -> U+21E7")
+	AssertEqual("Win",   _LLM_FormatValModifiers("cmd"),   "'cmd' -> Win")
+	AssertEqual("Ctrl",  _LLM_FormatValModifiers("ctrl"),  "'ctrl' -> Ctrl")
+	AssertEqual("Shift", _LLM_FormatValModifiers("shift"), "'shift' -> Shift")
+	for Name in ["cmd", "ctrl", "alt", "shift", "alt+shift"] {
+		Label := _LLM_FormatValModifiers(Name)
+		for Glyph in [0x2318, 0x2303, 0x2325, 0x21E7]
+			AssertEqual(0, InStr(Label, Chr(Glyph)),
+				"'" . Name . "' must not render a macOS glyph on Windows (llm-val-mods-windows-labels)")
+	}
 }
-Test("render: each modifier name maps to its glyph", _TestRender_ValModsAllSymbols)
+Test("render: each modifier name maps to its Windows label (llm-val-mods-windows-labels)",
+	_TestRender_ValModsAllSymbols)
 
 
 _TestRender_ValModsEmptyAndCombined() {
 	AssertEqual("", _LLM_FormatValModifiers(""),     "empty input formats to empty")
 	AssertEqual("", _LLM_FormatValModifiers("none"), "'none' formats to empty")
-	; "alt+shift" -> option + shift, with the "+" stripped.
-	AssertEqual(Chr(0x2325) . Chr(0x21E7), _LLM_FormatValModifiers("alt+shift"),
-		"combined modifiers concatenate their glyphs and drop the '+'")
+	AssertEqual("Alt+Shift", _LLM_FormatValModifiers("alt+shift"),
+		"combined modifiers keep the Windows '+' separator")
 }
 Test("render: empty/none/combined modifiers format correctly",
 	_TestRender_ValModsEmptyAndCombined)
+
+
+_TestRender_ShortcutSuffixReadsAsWindowsChord() {
+	global UI_LLM_SHORTCUT_LABEL_GAP
+	Gap := UI_LLM_SHORTCUT_LABEL_GAP
+	AssertEqual(Gap . "Alt+1", _LLM_BuildShortcutSuffix(1, 3, "alt"),
+		"the slot hint must read as the Windows chord Alt+1")
+	AssertEqual(Gap . "Ctrl+Shift+0", _LLM_BuildShortcutSuffix(10, 10, "ctrl+shift"),
+		"slot 10 maps to digit 0")
+	AssertEqual("", _LLM_BuildShortcutSuffix(1, 1, "alt"),
+		"a single slot has no numbered shortcut")
+}
+Test("render: slot shortcut suffix reads Alt+1 (llm-val-mods-windows-labels)",
+	_TestRender_ShortcutSuffixReadsAsWindowsChord)
 
 
 
