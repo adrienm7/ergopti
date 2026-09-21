@@ -411,6 +411,12 @@ const launcherStart = BUILD_SCRIPT.indexOf('build_launcher() {');
 const launcherEnd = BUILD_SCRIPT.indexOf('\n}\n', launcherStart);
 check(launcherStart >= 0 && launcherEnd > launcherStart, 'native launcher build function must exist');
 const launcherBody = BUILD_SCRIPT.slice(launcherStart, launcherEnd + 2);
+// The function consumes the script-level architecture declaration; replay it
+// verbatim so the fixture exercises the real flags instead of an empty list.
+const archStart = BUILD_SCRIPT.indexOf('LAUNCHER_ARCHS=(');
+const archEnd = BUILD_SCRIPT.indexOf('\ndone\n', archStart);
+check(archStart >= 0 && archEnd > archStart, 'native launcher architecture declaration must exist');
+const archDeclaration = BUILD_SCRIPT.slice(archStart, archEnd + 6);
 const temporaryBuild = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-native-product-'));
 try {
 	fs.mkdirSync(path.join(temporaryBuild, 'selected'));
@@ -423,6 +429,8 @@ log() { :; }
 fail() { exit 1; }
 swift() { if [[ "$*" == *--show-bin-path* ]]; then printf '%s/selected\n' "$LAUNCHER_DIR"; fi; }
 find() { printf '%s/stale\n' "$LAUNCHER_DIR"; }
+lipo() { printf 'x86_64 arm64\n'; }
+${archDeclaration}
 ${launcherBody}
 build_launcher
 `, 'fixture', temporaryBuild.replaceAll('\\', '/')], { encoding: 'utf8', timeout: 10000 });
