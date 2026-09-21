@@ -33,12 +33,13 @@ _LAY_LayoutFeatureBaseRows() {
 	return Rows
 }
 
-; List provider: AltGr / digit-shift features (direct_access_digits,
-; ergopti_alt_gr, ergopti_plus) — usable without the Ergopti base layer.
-; ctrl_magic_save is excluded here: it is placed explicitly at the bottom of
-; the layout menu, after the magic-key replace option it depends on.
+; List provider: the Ergopti AltGr features (ergopti_alt_gr, ergopti_plus).
+; The rows that work on any layout are declared on their own in the manifest's
+; « any layout » section: direct_access_digits, and ctrl_magic_save after the
+; magic-key replace option it depends on.
 _LAY_LayoutFeatureAltGrRows() {
-	static STANDALONE_IDS := Map("ergopti_base", true, "ctrl_magic_save", true)
+	static STANDALONE_IDS := Map("ergopti_base", true, "ctrl_magic_save", true,
+		"direct_access_digits", true)
 	Rows := []
 	for _, LayoutEntry in ManifestFeaturesForSection("layout") {
 		if !STANDALONE_IDS.Has(LayoutEntry["id"]) {
