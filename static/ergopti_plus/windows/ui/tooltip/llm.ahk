@@ -952,16 +952,27 @@ _LLM_GetInactivePrefix(slotCount) {
 _LLM_FormatValModifiers(valMods) {
 	if (valMods = "" or valMods = "none")
 		return ""
-	sym := valMods
-	; NOTE: a 4th positional value here lands on StrReplace's &OutputVarCount param,
-	; which must be a VariableRef — passing an Integer (e.g. ``true``) throws
-	; "Parameter #5 of StrReplace requires a variable reference". The replacement is
-	; case-insensitive by default, which also tolerates "Alt"/"ALT" from config.
-	sym := StrReplace(sym, "cmd", "⌘")
-	sym := StrReplace(sym, "ctrl", "⌃")
-	sym := StrReplace(sym, "alt", "⌥")
-	sym := StrReplace(sym, "shift", "⇧")
-	return StrReplace(sym, "+", "")
+	; Windows spells modifiers out ("Alt+1"); the macOS glyphs this used to emit
+	; read as Cmd/Option shortcuts on a PC keyboard (llm-val-mods-windows-labels).
+	; Map keys are case-insensitive, which tolerates "Alt"/"ALT" from config.
+	static Labels := _LLM_ValModifierLabels()
+	out := ""
+	for part in StrSplit(valMods, "+", " `t") {
+		if (part = "")
+			continue
+		out .= (out = "" ? "" : "+") . Labels.Get(part, part)
+	}
+	return out
+}
+
+_LLM_ValModifierLabels() {
+	Labels := Map()
+	Labels.CaseSense := false
+	Labels["cmd"] := "Win"
+	Labels["ctrl"] := "Ctrl"
+	Labels["alt"] := "Alt"
+	Labels["shift"] := "Shift"
+	return Labels
 }
 
 _LLM_BuildShortcutSuffix(idx, slotCount, valMods := "") {
@@ -973,9 +984,9 @@ _LLM_BuildShortcutSuffix(idx, slotCount, valMods := "") {
 		return ""
 	gap := UI_LLM_SHORTCUT_LABEL_GAP
 	if (idx <= 9)
-		return gap . sym . idx
+		return gap . sym . "+" . idx
 	if (idx = 10)
-		return gap . sym . "0"
+		return gap . sym . "+0"
 	return ""
 }
 
