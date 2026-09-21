@@ -497,9 +497,6 @@
 			"i18n": "menu.global.disable_all"
 		},
 		{
-			"type": "---"
-		},
-		{
 			"type": "command",
 			"id": "reset_defaults",
 			"i18n": "menu.global.reset_defaults"

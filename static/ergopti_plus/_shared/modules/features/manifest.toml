@@ -3234,9 +3234,6 @@ id = "disable_all"
 i18n = "menu.global.disable_all"
 
 [[menu.global_actions]]
-type = "---"
-
-[[menu.global_actions]]
 type = "command"
 id = "reset_defaults"
 i18n = "menu.global.reset_defaults"
