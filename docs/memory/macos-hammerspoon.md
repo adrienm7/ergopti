@@ -15,6 +15,33 @@ startup, and keep watching both processes after the first log appears. The old
 smoke test stopped at log creation and missed the subsequent abort; keeping an
 `open -W` helper alive did not establish startup readiness.
 
+### project-packaged-launch-gate-user-states
+
+Three packaged-app launch failures escaped a green CI because every smoke
+test started from a pristine runner: an arm64-only launcher, a legacy
+`ConfigDirPath = "~/..."` in paths.toml (dev.108 to dev.117), and a
+`hammerspoon/logs` folder that is a symbolic link (users version their config
+in Git). The last one was an `O_NOFOLLOW` open of the final component in the
+native log sink; Hammerspoon reports exit code 0 even after Lua `os.exit(1)`,
+so the launcher could only say "stopped unexpectedly with exit code 0".
+`.github/workflows/macos-launch-gate.yml` with
+`tools/diagnostics/macos_launch_gate.py` now launches the installed archive
+over those user states on every push/PR (`launch-gate-macos`, gating
+`macos-ok`) and on the exact release archive on Apple silicon and Intel
+(`release-gate-macos`, gating `finalize-release`). Add a scenario there for
+every new launch failure that depends on existing user state. Hosted runners
+cannot grant Accessibility without interactive approval, so scenarios omit
+config.toml and complete at the first-run wizard; post-onboarding boot and the
+menu Quit row remain outside the gate. Log folders are resolved once with
+realpath and opened with `O_NOFOLLOW_ANY` (`OwnedLogDirectory.swift`); never
+reintroduce a final-component-only no-follow check on a user folder.
+A package built without `SPARKLE_PUBLIC_KEY` (empty `SUPublicEDKey`) opens a
+Sparkle updater error at launch; while it is up, the launcher's blocks
+dispatched to the main queue from its worker and exit-monitor queues did not
+run in CI, so logger readiness, refusals and even child death went unobserved
+(run 35661113100: the keyless package red, the keyed one green). Every package
+the gate judges must embed the public key.
+
 ## Native HID element qualification
 
 ### project-hs-hid-and-host-clock-units

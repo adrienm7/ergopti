@@ -1,0 +1,120 @@
+# .github/workflows/macos-launch-gate.yml
+#
+# Launches one packaged ErgoptiPlus.app over a matrix of realistic user states.
+# The CI pipeline calls it twice: on every push/PR with an unreleased package,
+# and again on the exact release archive before finalize-release may publish it.
+# See tools/diagnostics/macos_launch_gate.py for the scenarios and the verdict.
+name: macOS packaged launch gate
+
+on:
+  workflow_call:
+    inputs:
+      label:
+        description: Unique evidence prefix inside the calling run
+        required: true
+        type: string
+      artifact:
+        description: Artifact of the calling run holding ErgoptiPlus.app.zip
+        required: false
+        type: string
+        default: ''
+      release_tag:
+        description: Published release to judge instead of an artifact
+        required: false
+        type: string
+        default: ''
+      runners:
+        description: JSON list of runner labels
+        required: false
+        type: string
+        default: '["macos-15"]'
+      scenarios:
+        description: JSON list of macos_launch_gate.py scenarios
+        required: false
+        type: string
+        default: '["clean","upgraded","source_logs","symlink_config","symlink_config_documents","symlink_hammerspoon","symlink_logs","tilde_paths","dangling_logs"]'
+      seed_tag:
+        description: Older release whose shipped personal files seed upgraded states
+        required: false
+        type: string
+        default: v0.0.0-dev.24
+
+permissions:
+  contents: read
+
+jobs:
+  launch:
+    name: 'launch · ${{ matrix.scenario }} · ${{ matrix.runner }}'
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: ${{ fromJSON(inputs.runners) }}
+        scenario: ${{ fromJSON(inputs.scenarios) }}
+    env:
+      SEED_TAG: ${{ inputs.seed_tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch the older release whose files seed the user state
+        run: git fetch --no-tags --depth=1 origin "+refs/tags/$SEED_TAG:refs/tags/$SEED_TAG"
+
+      - name: Download the package built by this run
+        if: inputs.artifact != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}
+          path: ${{ runner.temp }}/package
+
+      - name: Download and verify the published package
+        if: inputs.artifact == ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          test -n "$RELEASE_TAG"
+          mkdir -p "$RUNNER_TEMP/package"
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern ErgoptiPlus.app.zip --dir "$RUNNER_TEMP/package"
+          expected=$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets \
+              --jq '.assets[] | select(.name == "ErgoptiPlus.app.zip") | .digest')
+          actual="sha256:$(shasum -a 256 "$RUNNER_TEMP/package/ErgoptiPlus.app.zip" | cut -d' ' -f1)"
+          test "$expected" = "$actual"
+
+      # Reproduce a browser download: the archive and everything unpacked from
+      # it carry com.apple.quarantine until the user runs the documented xattr
+      # command from the release notes.
+      - name: Install the package the way a user does
+        run: |
+          set -euo pipefail
+          zip="$RUNNER_TEMP/package/ErgoptiPlus.app.zip"
+          test -f "$zip"
+          test ! -e /Applications/ErgoptiPlus.app
+          stamp="0083;$(printf '%x' "$(date +%s)");Safari;$(uuidgen)"
+          xattr -w com.apple.quarantine "$stamp" "$zip"
+          ditto -x -k "$zip" /Applications
+          xattr -r -w com.apple.quarantine "$stamp" /Applications/ErgoptiPlus.app
+          xattr -dr com.apple.quarantine /Applications/ErgoptiPlus.app
+          if xattr -r /Applications/ErgoptiPlus.app | grep -q com.apple.quarantine; then
+              echo "::error::the documented quarantine removal left an attribute behind"
+              exit 1
+          fi
+          lipo -archs /Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus
+          echo "runner machine: $(uname -m)"
+
+      - name: Self-test the launch verdict
+        run: python3 tools/diagnostics/macos_launch_gate_test.py
+
+      - name: Launch over the user state and judge it
+        run: >
+          python3 tools/diagnostics/macos_launch_gate.py /Applications/ErgoptiPlus.app
+          "$RUNNER_TEMP/launch-gate" "${{ matrix.scenario }}" --seed-tag "$SEED_TAG"
+
+      - name: Retain launch evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: launch-gate-${{ inputs.label }}-${{ matrix.runner }}-${{ matrix.scenario }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/launch-gate
+          if-no-files-found: warn
