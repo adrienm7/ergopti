@@ -102,6 +102,22 @@ helpers.describe("LogTransport startup transaction", function()
 		end)
 	end)
 
+	helpers.it("names the refused log folder from the native NACK detail (symlinked-config-dir)", function()
+		Fixture.with_fixture(function()
+			local context = new_context()
+			context.state.preflight_mode = "nack"
+			context.state.preflight_detail =
+				"log folder /u/.config/ergopti_plus/hammerspoon/logs cannot be used: "
+				.. "/u/.config/ergopti_plus/hammerspoon/logs is a symbolic link whose target does not exist"
+			local started, start_err = context:start()
+			helpers.assert_eq(started, false)
+			helpers.assert_contains(start_err, "configure_failed")
+			helpers.assert_contains(start_err, context.state.preflight_detail,
+				"the boot abort must carry the launcher's folder and cause, not a bare reason code")
+			helpers.assert_eq(context.state.bootstrap_close_calls, 1)
+		end)
+	end)
+
 	helpers.it("retains a bootstrap socket whose rollback close refuses", function()
 		Fixture.with_fixture(function()
 			local context = new_context()
