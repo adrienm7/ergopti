@@ -110,14 +110,16 @@ local CANONICAL_HOTSTRINGS_MENU = {
 -- it and the next one.
 local CANONICAL_LAYOUT_MENU = {
 	"toggle:layout_toggle",
+	-- UPDATED 2026-09-21: two sections, so the rows that only matter with the
+	-- Ergopti layout (its .bundle, the active variants, the menubar icon) are
+	-- told apart from those that work on any layout (pause/resume switching, the
+	-- key turned into a star key). Same rows as before, regrouped under headers.
+	"---",
+	"section_header:menu.layout.header_ergopti",
 	-- The two blocks macOS alone has, declared 2026-08-07. It installs a .bundle
 	-- keyboard layout through the OS's input-source mechanism and draws a
-	-- menubar icon; neither concept exists on the other two drivers. Ten rows
-	-- were built by hand here and described nowhere until now.
+	-- menubar icon; neither concept exists on the other two drivers.
 	"list:layout_bundle",
-	"---",
-	"list:layout_logo",
-	"---",
 	"---",
 	-- `list`, not `dynamic`, since 2026-08-07. This driver has always supplied
 	-- active_layout_rows() as a LIST PROVIDER, and the manifest said `dynamic`,
@@ -125,7 +127,10 @@ local CANONICAL_LAYOUT_MENU = {
 	-- skipped the row — the layout list did not render at all.
 	"list:active_layouts",
 	"---",
-	-- The pause/resume layout pickers, declared 2026-08-07 with the two blocks
+	"list:layout_logo",
+	"---",
+	"section_header:menu.layout.header_any",
+	-- The pause/resume layout pickers, declared 2026-08-07 with the blocks
 	-- above and for the same reason: their choices are macOS input sources.
 	"list:layout_switching",
 	"feature:hotstrings.magic_key.replace",

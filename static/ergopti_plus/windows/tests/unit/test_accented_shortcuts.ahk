@@ -131,3 +131,46 @@ Test("accented shortcuts: Ergopti emulation honours Disabled (accented-shortcut-
 		AssertEqual("v", _ErgoptiLetterOr("a_grave", _ACS_AGrave()))
 	)))
 
+; The Layout menu separates what needs the Ergopti layout from what works on any
+; layout. The rows are read from the generated manifest the renderer draws, so a
+; row moved back across the headers fails here (layout-menu-sections).
+_ACS_LayoutMenuTokens() {
+	Tokens := []
+	for Row in _MR_GetMenuDef("layout_menu") {
+		Type := _MR_Get(Row, "type")
+		if (Type == "section_header")
+			Tokens.Push(_MR_Get(Row, "i18n"))
+		else if (Type == "feature")
+			Tokens.Push(_MR_Get(Row, "path"))
+		else if (Type != "---")
+			Tokens.Push(_MR_Get(Row, "id"))
+	}
+	return Tokens
+}
+
+_ACS_TokenIndex(Tokens, Token) {
+	for Index, Value in Tokens
+		if (Value == Token)
+			return Index
+	throw Error("Layout menu row '" . Token . "' is not declared.")
+}
+
+Test("layout menu: Ergopti-only rows precede the any-layout section (layout-menu-sections)", () => _ACS_LayoutSectionsCase())
+
+_ACS_LayoutSectionsCase() {
+	Tokens := _ACS_LayoutMenuTokens()
+	Ergopti := _ACS_TokenIndex(Tokens, "menu.layout.header_ergopti")
+	AnyLayout := _ACS_TokenIndex(Tokens, "menu.layout.header_any")
+	Assert(Ergopti < AnyLayout, "the Ergopti section must come first")
+	for Row in ["layout_features_base", "layout_features_altgr"]
+		Assert(_ACS_TokenIndex(Tokens, Row) > Ergopti && _ACS_TokenIndex(Tokens, Row) < AnyLayout,
+			Row . " only applies to the Ergopti layout")
+	for Row in ["layout.direct_access_digits", "accented_letters",
+			"hotstrings.magic_key.replace", "layout.ctrl_magic_save"]
+		Assert(_ACS_TokenIndex(Tokens, Row) > AnyLayout, Row . " works on any layout")
+	AltGrRows := _DriverFuncBody("_LAY_LayoutFeatureAltGrRows")
+	Assert(InStr(AltGrRows, '"direct_access_digits", true') > 0,
+		"the Ergopti AltGr list must not repeat the any-layout digit row")
+	Assert(InStr(_DriverFuncBody("initMenu"), "group_accented") == 0,
+		"the accented-letter group must stay enabled without the Ergopti emulation")
+}

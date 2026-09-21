@@ -974,16 +974,34 @@
 			"category": "Layout"
 		},
 		{
-			"type": "list",
-			"id": "base_layouts",
+			"type": "---"
+		},
+		{
+			"type": "section_header",
+			"i18n": "menu.layout.header_ergopti",
 			"platforms": [
-				"linux"
+				"ahk",
+				"hs"
 			],
-			"reason_key": "platform_reason.base_layout_is_the_linux_decode_table"
+			"reason_key": "platform_reason.ergopti_section_has_no_linux_row"
 		},
 		{
 			"type": "list",
 			"id": "layout_bundle",
+			"platforms": [
+				"hs"
+			],
+			"reason_key": "platform_reason.layout_bundle_and_menubar_are_macos"
+		},
+		{
+			"type": "---",
+			"platforms": [
+				"hs"
+			]
+		},
+		{
+			"type": "list",
+			"id": "active_layouts",
 			"platforms": [
 				"hs"
 			],
@@ -1004,14 +1022,39 @@
 			"reason_key": "platform_reason.layout_bundle_and_menubar_are_macos"
 		},
 		{
-			"type": "---",
+			"type": "list",
+			"id": "layout_features_base",
 			"platforms": [
-				"hs"
-			]
+				"ahk"
+			],
+			"reason_key": "platform_reason.lists_windows_only_settings"
 		},
 		{
 			"type": "list",
-			"id": "layout_features_base",
+			"id": "layout_features_altgr",
+			"platforms": [
+				"ahk"
+			],
+			"reason_key": "platform_reason.lists_windows_only_settings"
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "section_header",
+			"i18n": "menu.layout.header_any"
+		},
+		{
+			"type": "list",
+			"id": "base_layouts",
+			"platforms": [
+				"linux"
+			],
+			"reason_key": "platform_reason.base_layout_is_the_linux_decode_table"
+		},
+		{
+			"type": "feature",
+			"path": "layout.direct_access_digits",
 			"platforms": [
 				"ahk"
 			],
@@ -1025,28 +1068,6 @@
 				"ahk"
 			],
 			"reason_key": "platform_reason.lists_windows_only_settings"
-		},
-		{
-			"type": "---"
-		},
-		{
-			"type": "list",
-			"id": "layout_features_altgr",
-			"platforms": [
-				"ahk"
-			],
-			"reason_key": "platform_reason.lists_windows_only_settings"
-		},
-		{
-			"type": "list",
-			"id": "active_layouts",
-			"platforms": [
-				"hs"
-			],
-			"reason_key": "platform_reason.layout_bundle_and_menubar_are_macos"
-		},
-		{
-			"type": "---"
 		},
 		{
 			"type": "list",
