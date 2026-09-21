@@ -181,4 +181,31 @@ helpers.describe("managed ConfigPaths bootstrap lives outside the app bundle", f
 			helpers.assert_true(files[MANAGED_FILE]:find(CUSTOM_DIR, 1, true) ~= nil)
 		end)
 	end)
+
+	-- dev.108 to dev.117 wrote "~/..." here; the stricter validator then made
+	-- M.init() refuse and the launcher died with a bare exit code (legacy-tilde).
+	helpers.it("managed bootstrap: expands and persists a legacy tilde override (legacy-tilde)", function()
+		with_memory_files({
+			[MANAGED_FILE] = 'ConfigDirPath = "~/gitcfg/ergopti_plus/"\n',
+		}, function(files)
+			local ConfigPaths = load_managed()
+			helpers.assert_true(ConfigPaths.init(BUNDLE_DIR),
+				"a legacy tilde value must not abort the boot")
+			helpers.assert_eq(ConfigPaths.get_config_dir(), "/Users/test/gitcfg/ergopti_plus/")
+			helpers.assert_contains(files[MANAGED_FILE],
+				'ConfigDirPath = "/Users/test/gitcfg/ergopti_plus/"',
+				"the expansion must be persisted once as an absolute path")
+			helpers.assert_true(files[MANAGED_FILE]:find("~/", 1, true) == nil,
+				"no tilde value may remain: " .. files[MANAGED_FILE])
+		end)
+	end)
+
+	helpers.it("managed bootstrap: still refuses a relative override", function()
+		with_memory_files({
+			[MANAGED_FILE] = 'ConfigDirPath = "gitcfg/ergopti_plus/"\n',
+		}, function()
+			local ConfigPaths = load_managed()
+			helpers.assert_eq(ConfigPaths.init(BUNDLE_DIR), false)
+		end)
+	end)
 end)

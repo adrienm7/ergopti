@@ -87,8 +87,9 @@ local _base_dir = (_src:match("^(.*[/\\])") or "./"):gsub("infra[/\\]$", "")
 -- Computed at module load, not in init(), for the same reason: anything written
 -- under the config dir must land outside the source tree by construction, even
 -- for a consumer that required this module before init() ran.
+local _home = os.getenv("HOME")
 local _default_config_dir = (function()
-	local home = os.getenv("HOME")
+	local home = _home
 	if type(home) == "string" and home ~= "" then
 		return home .. "/.config/ergopti_plus/"
 	end
@@ -139,8 +140,29 @@ local function legacy_paths_file()
 	return (_base_dir or "") .. PATHS_FILENAME
 end
 
---- Validates and normalizes one config-directory override.
---- @param value string|nil Empty/nil clears the override.
+--- True for the home-relative spelling dev.108 to dev.117 persisted.
+--- @param value any Raw ConfigDirPath value.
+--- @return boolean
+local function is_home_relative(value)
+	return type(value) == "string" and (value == "~" or value:sub(1, 2) == "~/")
+end
+
+--- Expands the home-relative value releases dev.108 to dev.117 persisted.
+--- Only the paths.toml reader calls this: M.init() then rewrites the file once,
+--- instead of aborting a boot the user cannot repair from inside the app. New
+--- input (path editor, wizard) must still be absolute and is never expanded.
+--- @param value any Raw ConfigDirPath value read from paths.toml.
+--- @return string|nil expanded Unchanged unless home-relative.
+--- @return string|nil error_detail
+local function expand_legacy_home(value)
+	if not is_home_relative(value) then return value end
+	if type(_home) ~= "string" or _home:sub(1, 1) ~= "/" then
+		return nil, "ConfigDirPath starts with ~ but HOME is not an absolute path"
+	end
+	return (_home:gsub("/+$", "")) .. value:sub(2)
+end
+
+--- Validates and normalizes one config-directory override. @param value string|nil Empty/nil clears the override.
 --- @return string|nil normalized Absolute path with a trailing slash.
 --- @return string|nil error_detail
 local function normalize_config_dir_override(value)
@@ -185,7 +207,9 @@ local function read_bootstrap(path)
 	if status ~= "ok" then return nil, status, detail end
 	local parsed = parse_toml(raw)
 	if parsed[CONFIG_DIR_KEY] ~= nil then
-		local normalized, validation_error = normalize_config_dir_override(parsed[CONFIG_DIR_KEY])
+		local expanded, expand_error = expand_legacy_home(parsed[CONFIG_DIR_KEY])
+		if expanded == nil then return nil, "error", expand_error end
+		local normalized, validation_error = normalize_config_dir_override(expanded)
 		if normalized == nil then return nil, "error", validation_error end
 		parsed[CONFIG_DIR_KEY] = normalized
 	end
@@ -552,6 +576,15 @@ function M.init(base_dir)
 				return false
 			else
 				_bootstrap_snapshot = { status = "ok", content = migrated_content }
+			end
+		elseif is_home_relative(parse_toml(source_snapshot.content)[CONFIG_DIR_KEY]) then
+			-- Persist the expansion once so the file shows the folder actually used.
+			local saved, save_err = save_bootstrap()
+			if saved then
+				Logger.info(LOG, "Expanded the legacy ~ ConfigDirPath to '%s'.", config_dir())
+			else
+				Logger.warn(LOG, "Legacy ~ ConfigDirPath expanded for this session only; "
+					.. "rewriting '%s' failed (%s).", source_path, tostring(save_err))
 			end
 		else
 			Logger.debug(LOG, "Paths loaded from '%s'.", source_path)
