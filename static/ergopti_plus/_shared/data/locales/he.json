@@ -1378,6 +1378,7 @@
 	"notify.llm_mlx_failures_title": "ניבויי LLM — כשלים חוזרים",
 	"notify.llm_suggestions": "הצעות AI",
 	"notify.personal_info": "מידע אישי",
+	"notify.quit_refused": "לא ניתן לצאת כעת, פעולה אחרת עדיין מתבצעת. נסו שוב בעוד רגע.",
 	"notify.screenshot_copied": "צילום מסך הועתק",
 	"notify.screenshot_saved": "צילום מסך נשמר",
 	"notify.screenshot_saved_path": "נשמר: %s",

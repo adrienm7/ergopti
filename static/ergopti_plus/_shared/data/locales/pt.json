@@ -1378,6 +1378,7 @@
 	"notify.llm_mlx_failures_title": "Previsões LLM — Falhas repetidas",
 	"notify.llm_suggestions": "Sugestões de IA",
 	"notify.personal_info": "Informações pessoais",
+	"notify.quit_refused": "Não é possível sair agora, outra operação ainda está em andamento. Tente novamente em instantes.",
 	"notify.screenshot_copied": "Captura de tela copiada",
 	"notify.screenshot_saved": "Captura de tela salva",
 	"notify.screenshot_saved_path": "Salvo: %s",

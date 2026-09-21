@@ -1378,6 +1378,7 @@
 	"notify.llm_mlx_failures_title": "LLM Predictions — Repeated Failures",
 	"notify.llm_suggestions": "AI Suggestions",
 	"notify.personal_info": "Personal information",
+	"notify.quit_refused": "Cannot quit right now: another operation is still in progress. Try again in a moment.",
 	"notify.screenshot_copied": "Screenshot copied",
 	"notify.screenshot_saved": "Screenshot saved",
 	"notify.screenshot_saved_path": "Saved: %s",

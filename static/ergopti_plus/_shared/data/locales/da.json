@@ -1378,6 +1378,7 @@
 	"notify.llm_mlx_failures_title": "LLM-forudsigelser — Gentagne fejl",
 	"notify.llm_suggestions": "AI-forslag",
 	"notify.personal_info": "Personlige oplysninger",
+	"notify.quit_refused": "Kan ikke afslutte lige nu, en anden handling er stadig i gang. Prøv igen om et øjeblik.",
 	"notify.screenshot_copied": "Skærmbillede kopieret",
 	"notify.screenshot_saved": "Skærmbillede gemt",
 	"notify.screenshot_saved_path": "Gemt: %s",

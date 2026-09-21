@@ -269,6 +269,8 @@ helpers.describe("terminator replay: real transaction ordering", function()
 						exit = function() return true end,
 						fatal_exit = function() error("unexpected fatal termination") end,
 						fatal_exit_code = 70,
+						schedule = function() error("unexpected user-exit watchdog") end,
+						user_exit_deadline_seconds = 12,
 						mark_reload = function() return true end,
 						clear_reload = function() return true end,
 					}))

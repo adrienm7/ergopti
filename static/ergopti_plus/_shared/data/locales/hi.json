@@ -1378,6 +1378,7 @@
 	"notify.llm_mlx_failures_title": "LLM पूर्वानुमान — बार-बार विफलताएँ",
 	"notify.llm_suggestions": "AI सुझाव",
 	"notify.personal_info": "व्यक्तिगत जानकारी",
+	"notify.quit_refused": "अभी बंद नहीं किया जा सकता, एक अन्य प्रक्रिया अभी चल रही है। कुछ क्षण बाद फिर से प्रयास करें।",
 	"notify.screenshot_copied": "स्क्रीनशॉट कॉपी किया गया",
 	"notify.screenshot_saved": "स्क्रीनशॉट सहेजा गया",
 	"notify.screenshot_saved_path": "सहेजा गया: %s",

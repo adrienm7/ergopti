@@ -382,7 +382,7 @@ local function with_menu_fixture(options, callback)
 		unbind = function() return true end,
 	}
 	package.loaded["infra.termination_coordinator"] = {
-		request_exit = function()
+		request_user_exit = function()
 			observations.calls.exit = (observations.calls.exit or 0) + 1
 			local descriptor = observations.armed and observations.failures.exit or nil
 			local mode = descriptor and descriptor.remaining > 0 and descriptor.mode or "pending"

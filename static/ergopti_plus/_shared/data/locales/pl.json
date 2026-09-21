@@ -1378,6 +1378,7 @@
 	"notify.llm_mlx_failures_title": "Predykcje LLM — Powtarzające się błędy",
 	"notify.llm_suggestions": "Sugestie SI",
 	"notify.personal_info": "Dane osobowe",
+	"notify.quit_refused": "Nie można teraz zakończyć, inna operacja jest wciąż w toku. Spróbuj ponownie za chwilę.",
 	"notify.screenshot_copied": "Zrzut ekranu skopiowany",
 	"notify.screenshot_saved": "Zrzut ekranu zapisany",
 	"notify.screenshot_saved_path": "Zapisano: %s",

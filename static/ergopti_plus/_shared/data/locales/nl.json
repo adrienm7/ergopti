@@ -1378,6 +1378,7 @@
 	"notify.llm_mlx_failures_title": "LLM-voorspellingen — Herhaalde fouten",
 	"notify.llm_suggestions": "KI-suggesties",
 	"notify.personal_info": "Persoonlijke gegevens",
+	"notify.quit_refused": "Afsluiten is nu niet mogelijk, er loopt nog een andere bewerking. Probeer het zo opnieuw.",
 	"notify.screenshot_copied": "Schermafbeelding gekopieerd",
 	"notify.screenshot_saved": "Schermafbeelding opgeslagen",
 	"notify.screenshot_saved_path": "Opgeslagen: %s",

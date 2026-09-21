@@ -1100,12 +1100,20 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			return do_reload("menu")
 		end,
 		quit                      = function()
-			return run_global_exclusive("Quit", function()
-				local request_ok, accepted = xpcall(function()
-					return TerminationCoordinator.request_exit("menu_quit", 0)
+			-- request_user_exit arms the bounded quit watchdog: once accepted, a stuck
+			-- fence, input drain, or teardown force-exits instead of hanging the app.
+			local accepted = run_global_exclusive("Quit", function()
+				local request_ok, request_accepted = xpcall(function()
+					return TerminationCoordinator.request_user_exit("menu_quit")
 				end, debug.traceback)
-				return request_ok and accepted == true
+				return request_ok and request_accepted == true
 			end)
+			if accepted ~= true then
+				-- A refusal used to reach only the log, so the user saw Quit do nothing
+				Logger.warn(LOG, "Menubar Quit was refused; the user is notified.")
+				pcall(notifications.notify, i18n.get("notify.quit_refused"), nil, "error")
+			end
+			return accepted
 		end,
 		open_logs                 = function()
 			local dir = logs_dir()

@@ -1378,6 +1378,7 @@
 	"notify.llm_mlx_failures_title": "LLM-spådommer — Gjentatte feil",
 	"notify.llm_suggestions": "AI-forslag",
 	"notify.personal_info": "Personlig informasjon",
+	"notify.quit_refused": "Kan ikke avslutte akkurat nå, en annen operasjon pågår fortsatt. Prøv igjen om et øyeblikk.",
 	"notify.screenshot_copied": "Skjermbilde kopiert",
 	"notify.screenshot_saved": "Skjermbilde lagret",
 	"notify.screenshot_saved_path": "Lagret: %s",

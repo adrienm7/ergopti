@@ -1378,6 +1378,7 @@
 	"notify.llm_mlx_failures_title": "Previsioni LLM — Errori ripetuti",
 	"notify.llm_suggestions": "Suggerimenti IA",
 	"notify.personal_info": "Informazioni personali",
+	"notify.quit_refused": "Impossibile uscire ora, un’altra operazione è ancora in corso. Riprova tra un momento.",
 	"notify.screenshot_copied": "Screenshot copiato",
 	"notify.screenshot_saved": "Screenshot salvato",
 	"notify.screenshot_saved_path": "Salvato: %s",

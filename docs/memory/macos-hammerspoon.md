@@ -272,6 +272,20 @@ Event-tap callbacks perform only bounded in-memory work. `doAfter(0)` leaves the
 callback but is not a thread hop; shell, filesystem, and log sinks need an owned
 asynchronous worker and completion protocol.
 
+### project-hs-quit-never-blocks
+
+Controlled quit/reload teardown runs on the Hammerspoon main thread, so a
+synchronous shell-out there (`hs.execute(cmd, true)` is a login and interactive
+shell with no timeout) freezes the app as "not responding", and no timer can
+fire to rescue it. Teardown steps dispatch absolute-binary `ShellRunner.spawn`
+tasks and never wait. The keylogger process-exit stop skips the final ingest,
+and the MLX shutdown skips the listener proof when this Lua generation owns no
+server. User quits go through `TerminationCoordinator.request_user_exit`. It
+arms `user_quit_deadline_ms` before the lease fence, so a stuck async stage or a
+failed fence force-exits with status 70 and logs the pending stage.
+`tests/meta/test_quit_teardown_never_blocks.lua` scans every teardown step's
+callee. Map each new step receiver there.
+
 ### project-swift-sdk-posix-imports
 
 Swift SDK imports can shadow libc functions with same-named structures and can

@@ -1562,8 +1562,9 @@ local function invoke_runtime_callback(generation, label, callback, ...)
 end
 
 --- Runs every keylogger cleanup owner independently and retains failed steps.
+--- @param opts table|nil Forwarded to LogManager.stop (`process_exit`).
 --- @return boolean complete True only when every runtime owner is released.
-local function teardown_runtime()
+local function teardown_runtime(opts)
 	_runtime_generation = _runtime_generation + 1
 	CoreState.is_enabled = false
 	CoreState.is_secure_field = true
@@ -1689,7 +1690,7 @@ local function teardown_runtime()
 			name = "log-manager",
 			run = function()
 				if not _log_manager_cleanup_required then return true end
-				if type(LogManager.stop) ~= "function" or LogManager.stop() ~= true then
+				if type(LogManager.stop) ~= "function" or LogManager.stop(opts) ~= true then
 					return false
 				end
 				_log_manager_cleanup_required = false
@@ -2021,7 +2022,8 @@ end
 --- file cursor; only process teardown may call this terminal lifecycle method.
 --- @return boolean complete True only when feature and bridge cleanup both commit.
 function M.shutdown()
-	local feature_complete = teardown_runtime()
+	-- Process exit/reload: skip the heavy final ingest (see LogManager.stop)
+	local feature_complete = teardown_runtime({ process_exit = true })
 	if not _kc_bridge_shutdown_complete then
 		local stopped, result = xpcall(KcBridge.stop, debug.traceback)
 		if stopped and result == true then
