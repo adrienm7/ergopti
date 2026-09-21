@@ -217,8 +217,19 @@ check(/NEEDS:\s*\$\{\{\s*toJSON\(needs\)\s*\}\}/.test(macosGate),
 	'`macos-ok` must derive its verdict from `toJSON(needs)`, not a second hardcoded job list');
 check(/to_entries\[\]/.test(macosGate),
 	'`macos-ok` must iterate every entry in the GitHub `needs` object');
-check(/if \[ "\$total" -lt 3 \]/.test(macosGate),
-	'`macos-ok` must fail closed if fewer than its three current dependencies are visible');
+check(/\bneeds\s*:[\s\S]*?\blaunch-gate-macos\b/.test(macosGate),
+	'(symlinked-config-dir) `macos-ok.needs` must include the packaged launch gate');
+check(/if \[ "\$total" -lt 4 \]/.test(macosGate),
+	'`macos-ok` must fail closed if fewer than its four current dependencies are visible');
+const launchGate = withoutFullLineComments(jobBody('launch-gate-macos'));
+check(/uses:\s*\.\/\.github\/workflows\/macos-launch-gate\.yml/.test(launchGate),
+	'(symlinked-config-dir) every push/PR must launch the packaged app over user states');
+const finalizeRelease = withoutFullLineComments(jobBody('finalize-release'));
+check(/\bneeds\s*:[^\n]*\brelease-gate-macos\b/.test(finalizeRelease),
+	'(symlinked-config-dir) finalize-release must wait for the launch gate on the exact release archive');
+const releaseGate = withoutFullLineComments(jobBody('release-gate-macos'));
+check(/artifact:\s*assets-macos/.test(releaseGate) && /macos-15-intel/.test(releaseGate),
+	'(symlinked-config-dir) the release gate must launch the published asset on Apple silicon and Intel');
 check(
 	/case\s+"\$result"\s+in[\s\S]*?success\)\s*;;[\s\S]*?\*\)\s*failed=1\s*;;[\s\S]*?esac/.test(macosGate),
 	'`macos-ok` must accept only success; failure, cancelled, skipped, and unknown results must fail'

@@ -304,12 +304,57 @@ jobs:
         timeout-minutes: 10
 
   # ─────────────────────────────────────────────────
-  # 2.4) Gate: macOS driver fully green
+  # 2.4) Packaged application launch over real user states
+  # ─────────────────────────────────────────────────
+  # Unit suites never start the packaged app, and a pristine runner hides every
+  # failure that depends on what a user already has on disk (a symlinked config
+  # folder, a legacy paths.toml, logs left by a source run). Build the complete
+  # unreleased package once and launch it over those states on every push/PR.
+  package-macos:
+    name: 'macOS · package unreleased app'
+    runs-on: macos-latest
+    needs: [validate-hotstrings, validate-domain, validate-js, validate-translations]
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # The public EdDSA key must be embedded: without SUPublicEDKey, Sparkle
+      # opens an updater error at launch, and the launcher then never observes
+      # its child's logger readiness or exit, so every launch verdict is void.
+      - name: Build ErgoptiPlus.app
+        env:
+          ERGOPTI_CHANNEL: dev
+          SPARKLE_PUBLIC_KEY: ${{ secrets.SPARKLE_PUBLIC_KEY }}
+          GH_OWNER: ${{ github.repository_owner }}
+          GH_REPO: ${{ github.event.repository.name }}
+        run: bash tools/build/build_macos_app.sh
+
+      - name: Retain the package for the launch gate
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-package-unreleased
+          retention-days: 1
+          path: build/macos/ErgoptiPlus.app.zip
+          if-no-files-found: error
+
+  launch-gate-macos:
+    name: 'macOS · packaged launch gate'
+    needs: [package-macos]
+    uses: ./.github/workflows/macos-launch-gate.yml
+    with:
+      label: unreleased
+      artifact: macos-package-unreleased
+      runners: '["macos-15"]'
+      scenarios: '["clean","upgraded","symlink_config","symlink_hammerspoon","symlink_logs","tilde_paths","dangling_logs"]'
+
+  # ─────────────────────────────────────────────────
+  # 2.5) Gate: macOS driver fully green
   # ─────────────────────────────────────────────────
   macos-ok:
     name: 'macOS · ✅ all green'
     runs-on: ubuntu-latest
-    needs: [test-hs, e2e-hs, test-swift-launcher]
+    needs: [test-hs, e2e-hs, test-swift-launcher, launch-gate-macos]
     if: always()
 
     steps:
@@ -319,7 +364,7 @@ jobs:
         run: |
           set -euo pipefail
           total=$(echo "$NEEDS" | jq -r 'length')
-          if [ "$total" -lt 3 ]; then
+          if [ "$total" -lt 4 ]; then
               echo "::error::macos-ok read $total dependency result(s) — this gate is asserting too little."
               exit 1
           fi
@@ -2705,9 +2750,18 @@ jobs:
   # ============================================================
   # ============================================================
 
+  release-gate-macos:
+    name: 'Release · macOS launch gate'
+    needs: [build-macos]
+    uses: ./.github/workflows/macos-launch-gate.yml
+    with:
+      label: release
+      artifact: assets-macos
+      runners: '["macos-15","macos-15-intel"]'
+
   finalize-release:
     name: 'Release · finalize'
-    needs: [resolve-release-meta, build-macos, build-windows, build-linux]
+    needs: [resolve-release-meta, build-macos, build-windows, build-linux, release-gate-macos]
     if: needs.resolve-release-meta.outputs.skip == 'false'
     runs-on: ubuntu-latest
     permissions:
