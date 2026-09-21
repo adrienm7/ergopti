@@ -231,9 +231,15 @@ _TLTSH_EveryDirectAcceptCallIsCanonical() {
 	Assert(InStr(InjectCompleteBody, "if !HideQueued") > 0,
 		"sender failure must also defer claim release when no tooltip hide is queued")
 
+	TabPressBody := _DriverFuncBody("_TabAcceptVisiblePrediction")
+	Assert(TabPressBody != "",
+		"the physical Tab tap-hold press acceptance must be scanned")
+	Assert(InStr(TabPressBody, "LLM_Tooltip_TryAcceptTab(true, [])") > 0,
+		"the physical SC00F press is a real bare Tab event and must use canonical acceptance")
+
 	DirectRefs := _TLTSH_Count(DriverSrc, "LLM_Tooltip_TryAcceptTab(")
-	AssertEqual(3, DirectRefs,
-		"LLM_Tooltip_TryAcceptTab must have exactly one definition plus the two enumerated production callers; inspect every new occurrence before updating this count")
+	AssertEqual(4, DirectRefs,
+		"LLM_Tooltip_TryAcceptTab must have exactly one definition plus the three enumerated production callers (bridge feed, Tab-accept wrapper, physical Tab tap-hold press); inspect every new occurrence before updating this count")
 	OnAcceptRefs := _TLTSH_Count(DriverSrc, "LLM_Bridge_OnAccept(")
 	AssertEqual(2, OnAcceptRefs,
 		"LLM_Bridge_OnAccept must have exactly one definition and one call from the canonical primitive; any extra call bypasses policy")
@@ -268,3 +274,31 @@ _TLTSH_EveryTabProducerUsesTheGuardedWrapper() {
 
 Test("LLM accept meta: every menu, gesture and tap-hold Tab producer is enumerated (AHK-05)",
 	_TLTSH_EveryTabProducerUsesTheGuardedWrapper)
+
+; A scan-code hotkey on SC00F shadows the `Tab::` acceptance HotIf, so a
+; tap-hold on the physical Tab key used to run its tap action (alt_tab_monitor,
+; a layer...) over a visible prediction. Acceptance also needs Tab physically
+; down, so it must happen on the press, before any tap/hold resolution
+; (llm-tab-taphold-accept).
+_TLTSH_EveryPhysicalTabTapHoldAcceptsFirst() {
+	SplitPath(A_ScriptDir, , &Root)
+	; FileRead throws if the module moves, so the scan can never go vacuous.
+	Src := _StripFullLineComments(FileRead(Root . "\platform\remap\tab.ahk", "UTF-8"))
+	Assert(Src != "", "platform/remap/tab.ahk must be scanned")
+	Handlers := 0
+	Pos := 1
+	while (Pos := RegExMatch(Src, "m)^\$?SC00F::\s*(\{|_TabDispatch)", &Match, Pos)) {
+		Handlers += 1
+		Assert(Match[1] == "{",
+			"every physical Tab handler must be a block that can accept first (line: " . Match[0] . ")")
+		Body := SubStr(Src, Pos + StrLen(Match[0]), 200)
+		Assert(RegExMatch(Body, "^\s*if _TabAcceptVisiblePrediction\(\)\s*return") > 0,
+			"physical Tab handler #" . Handlers . " must accept a visible prediction before any tap-hold logic")
+		Pos += StrLen(Match[0])
+	}
+	AssertEqual(4, Handlers,
+		"the four tap-hold variants of SC00F (alt_tab_monitor, hold-modifier, hold-layer, tap-only) must all be covered")
+}
+
+Test("LLM accept meta: physical Tab tap-holds accept a visible prediction on press (llm-tab-taphold-accept)",
+	_TLTSH_EveryPhysicalTabTapHoldAcceptsFirst)

@@ -32,6 +32,25 @@
 
 ; Helper predicates -------------------------------------------------------
 
+; A scan-code hotkey on SC00F shadows the `Tab::` acceptance HotIf, and the
+; canonical policy only accepts while Tab is physically down. So every tap-hold
+; variant offers the press itself to acceptance before any tap/hold resolution;
+; otherwise a visible prediction lost to the tap action (llm-tab-taphold-accept).
+; @returns {Boolean} True when the press accepted the prediction and is consumed.
+_TabAcceptVisiblePrediction() {
+	; Cheap gate first, like the `Tab::` HotIf: the policy probes focus, which
+	; every ordinary Tab press must not pay for.
+	if LLM_Tooltip_GetText() == ""
+		return false
+	if !LLM_Tooltip_TryAcceptTab(true, [])
+		return false
+	; Same as the bridge's Tab path: a stale debounce must not re-show a tooltip.
+	LLM_Engine_CancelTimer()
+	; Swallow auto-repeat: once the tooltip hides, a repeat would fire the tap.
+	KeyWait("SC00F", "T" . STUCK_MODIFIER_RELEASE_TIMEOUT_SEC)
+	return true
+}
+
 ; Return the AHK key name for the configured hold modifier.
 _TabHoldModKey() {
 	return ResolveHoldModifierKey(TapHoldHoldModifier(TapHold, "tab"), "tab")
@@ -54,6 +73,8 @@ _TabHoldModKey() {
 SC00F::LAlt
 SC00F::
 {
+	if _TabAcceptVisiblePrediction()
+		return
 	if !TapHoldSyntheticKeyDown("LAlt")
 		return
 	tap := KeyWait("SC00F", "T" . TapHoldDuration(TapHold, "tab"))
@@ -108,6 +129,8 @@ SC00F Up:: TapHoldSyntheticKeyUp("LAlt")
 ; configured, so the tap keeps working too.
 #HotIf TapHoldHoldModifier(TapHold, "tab") != "" and not LayerEnabled
 $SC00F:: {
+	if _TabAcceptVisiblePrediction()
+		return
 	Result := TapHoldOwnImmediateModifier("tab", "SC00F",
 		_TabHoldModKey(), TapHoldDuration(TapHold, "tab"))
 	if Result["tap"]
@@ -131,6 +154,8 @@ $SC00F:: {
 ; the hold alone or the picker offers a choice the driver silently ignores.
 #HotIf TapHoldHoldLayer(TapHold, "tab") != "" and TapHoldHoldModifier(TapHold, "tab") == "" and not LayerEnabled
 $SC00F:: {
+	if _TabAcceptVisiblePrediction()
+		return
 	Result := TapHoldOwnImmediateLayer("SC00F", TapHoldDuration(TapHold, "tab"))
 	if (Result["tap"] and A_PriorKey == "Tab")
 		_TabDispatch()
@@ -150,7 +175,11 @@ $SC00F:: {
 ; ===================================================
 
 #HotIf TapHoldTapAction(TapHold, "tab") != "alt_tab_monitor" and TapHoldHoldModifier(TapHold, "tab") == "" and TapHoldHoldLayer(TapHold, "tab") == "" and TapHoldTapAction(TapHold, "tab") != "" and not LayerEnabled
-SC00F:: _TabDispatch()
+SC00F:: {
+	if _TabAcceptVisiblePrediction()
+		return
+	_TabDispatch()
+}
 #HotIf
 
 
