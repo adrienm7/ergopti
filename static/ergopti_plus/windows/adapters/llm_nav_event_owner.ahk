@@ -1326,11 +1326,15 @@ LLM_NavEventOwner_BeginProfileSwap(Plan, Order, Enabled, CandidateIds,
 					&& !AllowLifecycleResume)
 			return 0
 	} finally Critical(PreviousCritical)
+	; A disable publishes the empty owner: token 0 carries no profile count. The
+	; order still lists the defined profiles, and passing its length with token 0
+	; made the adapter refuse every disable (llm-profile-disable-count).
+	ProfileCount := NewToken > 0 ? NormalizedOrder.Length : 0
 	Fn := _LLM_NavEventOwnerPortFn("begin_profile_swap", Port)
 	try Result := HasMethod(Fn, "Call")
-		? Fn.Call(ExpectedToken, Plan, NewToken, NormalizedOrder.Length)
+		? Fn.Call(ExpectedToken, Plan, NewToken, ProfileCount)
 		: _LLM_NavEventOwnerNativeBeginProfileSwap(
-			ExpectedToken, Plan, NewToken, NormalizedOrder.Length)
+			ExpectedToken, Plan, NewToken, ProfileCount)
 	catch as Err
 		return _LLM_NavEventOwnerQuarantine(
 			"Profile hotkey owner preparation raised an ambiguous error: "
@@ -2378,8 +2382,16 @@ _LLM_NavEventOwnerNativeBeginProfileSwap(ExpectedToken, Plan, NewToken,
 			|| !(ExpectedToken is Integer) || ExpectedToken < 0
 			|| !(NewToken is Integer) || NewToken < 0
 			|| !(ProfileCount is Integer) || ProfileCount < 0
-			|| ProfileCount > 9 || (NewToken == 0) != (ProfileCount == 0)
+			|| ProfileCount > 9 || (NewToken == 0) != (ProfileCount == 0) {
+		; A caller bug, not a native refusal: name it, or the log blames the DLL
+		; (llm-profile-disable-count).
+		_LLM_NavEventOwnerReport("Profile hotkey owner preparation received "
+			. "an invalid argument set (new_token="
+			. (NewToken is Integer ? NewToken : Type(NewToken))
+			. ", profile_count="
+			. (ProfileCount is Integer ? ProfileCount : Type(ProfileCount)) . ").")
 		return 0
+	}
 	Bindings := Buffer(9 * 12, 0)
 	Loop 9 {
 		Entry := Plan[A_Index]
