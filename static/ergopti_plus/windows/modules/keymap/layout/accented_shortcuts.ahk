@@ -56,14 +56,7 @@ global _AccentedShortcutRegistered := false
 ; @param Hkl {Integer} Keyboard layout handle.
 ; @returns {Integer} Scancode, or 0.
 AccentedShortcutDirectScanCode(Char, Hkl) {
-	Result := DllCall("VkKeyScanExW", "UShort", Ord(Char), "Ptr", Hkl, "Short")
-	if (Result == -1)
-		return 0
-	; High byte: 1 = Shift, 2 = Ctrl, 4 = Alt (6 = AltGr). Direct access is 0.
-	if ((Result >> 8) & 0xFF) != 0
-		return 0
-	Vk := Result & 0xFF
-	return DllCall("MapVirtualKeyExW", "UInt", Vk, "UInt", 0, "Ptr", Hkl, "UInt")
+	return KS_DirectScanCodeForChar(Hkl, Char)
 }
 
 ; Maps each directly-typed accented letter of one layout to its scancode.
@@ -102,22 +95,10 @@ _AccentedShortcutKeysCached(Hkl) {
 	return _AccentedShortcutLayoutCache[Hkl]
 }
 
-_AccentedShortcutInstalledLayouts() {
-	Count := DllCall("GetKeyboardLayoutList", "Int", 0, "Ptr", 0, "Int")
-	Layouts := []
-	if (Count <= 0)
-		return Layouts
-	Buf := Buffer(Count * A_PtrSize, 0)
-	Count := DllCall("GetKeyboardLayoutList", "Int", Count, "Ptr", Buf, "Int")
-	Loop Count
-		Layouts.Push(NumGet(Buf, (A_Index - 1) * A_PtrSize, "Ptr"))
-	return Layouts
-}
-
 _AccentedShortcutForegroundLayout() {
-	Hwnd := DllCall("GetForegroundWindow", "Ptr")
-	ThreadId := Hwnd ? DllCall("GetWindowThreadProcessId", "Ptr", Hwnd, "Ptr", 0, "UInt") : 0
-	return DllCall("GetKeyboardLayout", "UInt", ThreadId, "Ptr")
+	; 0 without a foreground window; the layout probes then fall back to the
+	; calling thread's own layout.
+	return GetForegroundKeyboardLayout()
 }
 
 
@@ -188,7 +169,7 @@ AccentedShortcuts_Register(Layouts := unset, HotkeyFn := Hotkey, HotIfFn := HotI
 	if _AccentedShortcutRegistered
 		throw Error("Accented-letter shortcuts are already registered.")
 	if !IsSet(Layouts)
-		Layouts := _AccentedShortcutInstalledLayouts()
+		Layouts := KS_InstalledKeyboardLayouts()
 	ScanCodes := Map()
 	for Hkl in Layouts
 		for Sc, Id in KeysFn.Call(Hkl)

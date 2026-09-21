@@ -235,6 +235,43 @@ KS_ScanScancodeForChar(Hkl, TargetChar) {
 	return Map("scan", foundScan, "vk", foundVK)
 }
 
+; Returns the scancode of the key that types Char with no Shift, Ctrl or Alt in
+; Hkl (VkKeyScanExW high byte 0), or 0 when the character needs a modifier or is
+; absent from the layout.
+; @param Hkl {Integer} The keyboard layout handle to probe.
+; @param Char {String} One character.
+; @return {Integer} The scancode, or 0.
+KS_DirectScanCodeForChar(Hkl, Char) {
+	try {
+		local result := DllCall("VkKeyScanExW", "UShort", Ord(Char), "Ptr", Hkl, "Short")
+		if result == -1 || ((result >> 8) & 0xFF) != 0
+			return 0
+		; MAPVK_VK_TO_VSC = 0.
+		return DllCall("MapVirtualKeyExW", "UInt", result & 0xFF, "UInt", 0, "Ptr", Hkl, "UInt")
+	} catch as e {
+		try LoggerError("KeyState", "KS_DirectScanCodeForChar failed: {1}.", e.Message)
+		return 0
+	}
+}
+
+; Lists the keyboard layouts installed for the user (GetKeyboardLayoutList).
+; @return {Array} HKL handles; empty when the list cannot be read.
+KS_InstalledKeyboardLayouts() {
+	local layouts := []
+	try {
+		local count := DllCall("GetKeyboardLayoutList", "Int", 0, "Ptr", 0, "Int")
+		if count <= 0
+			return layouts
+		local buf := Buffer(count * A_PtrSize, 0)
+		count := DllCall("GetKeyboardLayoutList", "Int", count, "Ptr", buf, "Int")
+		Loop count
+			layouts.Push(NumGet(buf, (A_Index - 1) * A_PtrSize, "Ptr"))
+	} catch as e {
+		try LoggerError("KeyState", "KS_InstalledKeyboardLayouts failed: {1}.", e.Message)
+	}
+	return layouts
+}
+
 ; Machine-readable contract map - consumed by the generic adapter compliance test
 ; (tests/test_adapter_compliance_new.ahk) to verify every required method exists
 ; and is callable without manually listing functions per-adapter.
