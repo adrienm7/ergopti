@@ -1378,6 +1378,7 @@
 	"notify.llm_mlx_failures_title": "LLM Tahminleri — Yinelenen Hatalar",
 	"notify.llm_suggestions": "YZ Önerileri",
 	"notify.personal_info": "Kişisel bilgiler",
+	"notify.quit_refused": "Şu anda çıkılamıyor, başka bir işlem hâlâ sürüyor. Birazdan tekrar deneyin.",
 	"notify.screenshot_copied": "Ekran görüntüsü kopyalandı",
 	"notify.screenshot_saved": "Ekran görüntüsü kaydedildi",
 	"notify.screenshot_saved_path": "Kaydedildi: %s",

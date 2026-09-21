@@ -1378,6 +1378,7 @@
 	"notify.llm_mlx_failures_title": "LLM 预测 — 重复失败",
 	"notify.llm_suggestions": "AI 建议",
 	"notify.personal_info": "个人信息",
+	"notify.quit_refused": "暂时无法退出，另一项操作仍在进行中。请稍后再试。",
 	"notify.screenshot_copied": "截图已复制",
 	"notify.screenshot_saved": "截图已保存",
 	"notify.screenshot_saved_path": "已保存：%s",

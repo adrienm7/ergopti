@@ -1378,6 +1378,7 @@
 	"notify.llm_mlx_failures_title": "LLM予測 — 繰り返し失敗",
 	"notify.llm_suggestions": "AI提案",
 	"notify.personal_info": "個人情報",
+	"notify.quit_refused": "現在は終了できません。別の処理がまだ実行中です。しばらくしてからもう一度お試しください。",
 	"notify.screenshot_copied": "スクリーンショットをコピーしました",
 	"notify.screenshot_saved": "スクリーンショットを保存しました",
 	"notify.screenshot_saved_path": "保存先: %s",

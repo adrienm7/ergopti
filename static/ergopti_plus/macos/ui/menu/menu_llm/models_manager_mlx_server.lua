@@ -32,6 +32,7 @@ local ConfigPaths   = require("infra.config_paths")
 local text_utils    = require("infra.text_utils")
 local ApiCommon     = require("modules.llm.api_common")
 local TaskLifecycle = require("adapters.task_lifecycle")
+local ShellRunner   = require("adapters.shell_runner")
 local TimerScheduler = require("adapters.timer_scheduler")
 
 -- Required to inform the discovery poller of the active server PID so it can
@@ -426,6 +427,26 @@ function M.install(ctx)
 			return false
 		end
 		local port_text = tostring(math.floor(port))
+		local intent = owner.intent
+		if type(intent) == "table" and intent.kind == "shutdown" then
+			-- Process exit or reload: the proof below is two synchronous lsof runs
+			-- on the Hammerspoon main thread while Quit waits. No successor in this
+			-- Lua generation can reuse the port, so dispatch the hard kill as an
+			-- async task (non-login /bin/sh, validated integer port) and settle.
+			local handle = ShellRunner.spawn("/bin/sh", {
+				"-c",
+				"/usr/sbin/lsof -nP -tiTCP:" .. port_text
+					.. " -sTCP:LISTEN | /usr/bin/xargs /bin/kill -9 2>/dev/null",
+			}, nil)
+			local start_ok, started = xpcall(handle.start, debug.traceback)
+			if not start_ok or started ~= true then
+				Logger.error(LOG, "Cannot dispatch MLX listener shutdown kill on port %s: %s.",
+					port_text, tostring(started))
+				return false
+			end
+			Logger.debug(LOG, "MLX listener shutdown kill dispatched on port %s.", port_text)
+			return true
+		end
 		-- Apple's bundled /usr/sbin/lsof is still 4.91 and has no `-Q`. Its
 		-- documented no-match shape is exit 1 with empty stdout/stderr, whereas a
 		-- malformed query or operational failure writes a diagnostic. Capture that
@@ -579,6 +600,19 @@ function M.install(ctx)
 	--- @return boolean accepted
 	function obj.stop_server_if_needed(on_stopped, opts)
 		local owner = obj._server_lifecycle_owner
+		local kind = type(opts) == "table" and opts.kind or "stop"
+		if kind == "shutdown" and (type(owner) ~= "table" or owner.settled)
+			and not (deps.active_tasks and deps.active_tasks["mlx_server"] ~= nil) then
+			-- No server was started or adopted by this Lua generation, so there is no
+			-- exact listener to prove absent. The legacy sweep below is a synchronous
+			-- lsof pair; running it on every Quit blocked the main thread for nothing.
+			-- Previous-session orphans belong to the async orphan sweep at exit.
+			Logger.debug(LOG, "MLX shutdown: no server owned this session; listener proof skipped.")
+			if type(on_stopped) ~= "function" then return true end
+			local ok_settled, settled_result = ApiCommon.protected_call(
+				on_stopped, "MLX server shutdown settlement")
+			return ok_settled == true and settled_result ~= false
+		end
 		if type(owner) ~= "table" or owner.settled then
 			owner = create_legacy_cleanup_owner()
 			if not owner then return false end

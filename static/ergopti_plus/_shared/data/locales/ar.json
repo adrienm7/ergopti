@@ -1378,6 +1378,7 @@
 	"notify.llm_mlx_failures_title": "تنبؤات LLM — فشل متكرر",
 	"notify.llm_suggestions": "اقتراحات الذكاء الاصطناعي",
 	"notify.personal_info": "معلومات شخصية",
+	"notify.quit_refused": "تعذّر الإنهاء الآن، لا تزال عملية أخرى قيد التنفيذ. حاول مرة أخرى بعد لحظة.",
 	"notify.screenshot_copied": "تم نسخ لقطة الشاشة",
 	"notify.screenshot_saved": "تم حفظ لقطة الشاشة",
 	"notify.screenshot_saved_path": "محفوظ: %s",

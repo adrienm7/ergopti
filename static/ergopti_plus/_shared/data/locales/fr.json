@@ -1378,6 +1378,7 @@
 	"notify.llm_mlx_failures_title": "Prédictions LLM — Échecs répétés",
 	"notify.llm_suggestions": "Suggestions IA",
 	"notify.personal_info": "Informations personnelles",
+	"notify.quit_refused": "Impossible de quitter pour l’instant, une autre opération est en cours. Réessayez dans un instant.",
 	"notify.screenshot_copied": "Capture copiée",
 	"notify.screenshot_saved": "Capture sauvegardée",
 	"notify.screenshot_saved_path": "Sauvegardé : %s",

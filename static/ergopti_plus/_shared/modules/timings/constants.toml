@@ -588,6 +588,14 @@ onboarding_startup_delay_ms = 2000
 # AHK: ollama_deps_checker.ahk 3000 ms SetTimer.
 ollama_deps_poll_ms = 3000
 
+# Hard deadline for a user-requested quit (menubar Quit, script_quit gesture).
+# Once accepted, the controlled exit (Karabiner lease fence, synthetic-input
+# drain, local teardown, logger drain) must finish within this bound; otherwise
+# the process force-exits and native stdin EOF revokes the exact lease. It
+# exceeds the 7 s lease STOPPED timeout so the exact fence gets its full chance.
+# HS: infra/termination_coordinator.lua request_user_exit deadline.
+user_quit_deadline_ms = 12000
+
 
 # ──────────────────────────────────────────────────────────────────────
 # Logger

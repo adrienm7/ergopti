@@ -1378,6 +1378,7 @@
 	"notify.llm_mlx_failures_title": "Předpovědi LLM — Opakující se selhání",
 	"notify.llm_suggestions": "Návrhy AI",
 	"notify.personal_info": "Osobní informace",
+	"notify.quit_refused": "Nyní nelze ukončit, jiná operace stále probíhá. Zkuste to znovu za chvíli.",
 	"notify.screenshot_copied": "Snímek zkopírován",
 	"notify.screenshot_saved": "Snímek uložen",
 	"notify.screenshot_saved_path": "Uloženo: %s",

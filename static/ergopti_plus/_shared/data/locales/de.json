@@ -1378,6 +1378,7 @@
 	"notify.llm_mlx_failures_title": "LLM-Vorhersagen — Wiederholte Fehler",
 	"notify.llm_suggestions": "KI-Vorschläge",
 	"notify.personal_info": "Persönliche Informationen",
+	"notify.quit_refused": "Beenden ist gerade nicht möglich, ein anderer Vorgang läuft noch. Versuchen Sie es gleich erneut.",
 	"notify.screenshot_copied": "Screenshot kopiert",
 	"notify.screenshot_saved": "Screenshot gespeichert",
 	"notify.screenshot_saved_path": "Gespeichert: %s",

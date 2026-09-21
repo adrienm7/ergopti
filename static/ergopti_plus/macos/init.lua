@@ -831,6 +831,12 @@ do
 			exit = function(code) return os.exit(code) end,
 			fatal_exit = function(code) return os.exit(code) end,
 			fatal_exit_code = RUNTIME_FAILURE_EXIT_CODE,
+			-- A raw hs.timer, not TimerScheduler: finalize_teardown_resources cancels
+			-- every scheduler-owned timer, and the user-quit watchdog must outlive it.
+			schedule = function(delay, callback)
+				return hs.timer.doAfter(delay, callback)
+			end,
+			user_exit_deadline_seconds = require("infra.timings").sec("ui", "user_quit_deadline_ms"),
 			mark_reload = function()
 				reload_guard.mark_reload()
 				return reload_guard.is_reloading() == true

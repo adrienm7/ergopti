@@ -1378,6 +1378,7 @@
 	"notify.llm_mlx_failures_title": "Передбачення LLM — Повторні збої",
 	"notify.llm_suggestions": "Пропозиції ШІ",
 	"notify.personal_info": "Особиста інформація",
+	"notify.quit_refused": "Зараз неможливо вийти: інша операція ще виконується. Спробуйте ще раз за мить.",
 	"notify.screenshot_copied": "Знімок скопійовано",
 	"notify.screenshot_saved": "Знімок збережено",
 	"notify.screenshot_saved_path": "Збережено: %s",

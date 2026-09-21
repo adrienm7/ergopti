@@ -1378,6 +1378,7 @@
 	"notify.llm_mlx_failures_title": "LLM-förutsägelser — Upprepade fel",
 	"notify.llm_suggestions": "AI-förslag",
 	"notify.personal_info": "Personlig information",
+	"notify.quit_refused": "Det går inte att avsluta just nu, en annan åtgärd pågår fortfarande. Försök igen om en stund.",
 	"notify.screenshot_copied": "Skärmbild kopierad",
 	"notify.screenshot_saved": "Skärmbild sparad",
 	"notify.screenshot_saved_path": "Sparad: %s",

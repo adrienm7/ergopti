@@ -19,10 +19,9 @@ local _ = helpers.load_with_stubs("infra.logger")
 
 local quit_spy = { count = 0, result = true }
 package.loaded["infra.termination_coordinator"] = {
-	request_exit = function(reason, code)
+	request_user_exit = function(reason)
 		quit_spy.count = quit_spy.count + 1
 		quit_spy.reason = reason
-		quit_spy.code = code
 		return quit_spy.result
 	end,
 }
@@ -50,7 +49,6 @@ helpers.describe("gestures.actions: script_quit exact-fence transaction", functi
 		_G.hs.timer.doAfter = saved_do_after
 		helpers.assert_eq(quit_spy.count, 1)
 		helpers.assert_eq(quit_spy.reason, "script_quit")
-		helpers.assert_eq(quit_spy.code, 0)
 	end)
 
 	helpers.it("does not bypass a rejected fence with a direct exit", function()
@@ -97,7 +95,6 @@ helpers.describe("gestures.actions: script_quit exact-fence transaction", functi
 				dispatched = dispatched,
 				count = quit_spy.count,
 				reason = quit_spy.reason,
-				code = quit_spy.code,
 			}
 		end
 
@@ -110,7 +107,6 @@ helpers.describe("gestures.actions: script_quit exact-fence transaction", functi
 			helpers.assert_eq(result.count, 1,
 				result.label .. " scheduling failure must request the controlled exit directly")
 			helpers.assert_eq(result.reason, "script_quit")
-			helpers.assert_eq(result.code, 0)
 		end
 		helpers.assert_eq(direct_exits, 0,
 			"timer scheduling failure must never bypass the coordinator with os.exit")
@@ -123,11 +119,12 @@ helpers.describe("menu_llm.terminate_orphan_mlx_server reaps the detached server
 		helpers.assert_true(src ~= nil, "ui/menu/menu_llm/init.lua source must be locatable")
 		local idx = src:find("function M.terminate_orphan_mlx_server", 1, true)
 		helpers.assert_true(idx ~= nil, "menu_llm must define terminate_orphan_mlx_server")
-		local body = src:sub(idx, idx + 600)
-		helpers.assert_true(body:find("pgrep -f 'mlx_lm.*server'", 1, true) ~= nil,
-			"must pgrep-kill the detached mlx_lm.server")
-		helpers.assert_true(body:find("lsof -tiTCP:", 1, true) ~= nil,
-			"must free the MLX listening port via lsof")
+		local body = src:sub(idx, idx + 1200)
+		helpers.assert_true(body:find('"mlx_lm.*server"', 1, true) ~= nil
+			and body:find("PKILL_BIN", 1, true) ~= nil,
+			"must pkill the detached mlx_lm.server through the absolute binary")
+		helpers.assert_true(body:find("-nP -tiTCP:", 1, true) ~= nil,
+			"must free the MLX listening port via lsof without name resolution")
 		helpers.assert_true(body:find("get_port", 1, true) ~= nil,
 			"must read the port from the single source api_mlx.get_port()")
 	end)

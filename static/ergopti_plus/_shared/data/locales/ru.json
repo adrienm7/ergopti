@@ -1378,6 +1378,7 @@
 	"notify.llm_mlx_failures_title": "Предсказания LLM — Повторные сбои",
 	"notify.llm_suggestions": "Предложения ИИ",
 	"notify.personal_info": "Личная информация",
+	"notify.quit_refused": "Сейчас невозможно выйти: другая операция ещё выполняется. Повторите попытку через мгновение.",
 	"notify.screenshot_copied": "Скриншот скопирован",
 	"notify.screenshot_saved": "Скриншот сохранён",
 	"notify.screenshot_saved_path": "Сохранено: %s",

@@ -127,6 +127,13 @@ local function load_coordinator(options)
 			return true
 		end,
 		fatal_exit_code = 70,
+		schedule = function(delay, callback)
+			calls.watchdog_delay = delay
+			calls.watchdog_callback = callback
+			append("arm-watchdog")
+			return { stop = function() calls.watchdog_stopped = true; return true end }
+		end,
+		user_exit_deadline_seconds = 12,
 		mark_reload = function()
 			calls.marks = calls.marks + 1
 			append("mark-reload")
