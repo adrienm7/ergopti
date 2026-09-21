@@ -456,9 +456,13 @@ end
 --- rejected or throwing asynchronous purge boundary is logged explicitly.
 --- @param config_dir string Absolute path to the user config directory (trailing slash optional).
 --- @param max_age_days integer Days to keep before purging (default 14).
+--- @return boolean usable False when a log-folder component could not be created.
+--- @return string|nil folder_error Exact unusable component and cause.
 function M.init_log_path(config_dir, max_age_days)
 	max_age_days = max_age_days or DEFAULT_LOG_RETENTION_DAYS
-	if type(config_dir) ~= "string" or config_dir == "" then return end
+	if type(config_dir) ~= "string" or config_dir == "" then
+		return false, "config_dir must be a non-empty string"
+	end
 	if not config_dir:match("[/\\]$") then config_dir = config_dir .. "/" end
 
 	local log_dir = config_dir .. "hammerspoon/logs/"
@@ -469,17 +473,41 @@ function M.init_log_path(config_dir, max_age_days)
 	-- synchronous ShellRunner is a fork+exec paid on every launch for a directory
 	-- that already exists on all but the first. Four other modules in this driver
 	-- create directories in-process already. hs.fs.mkdir creates ONE level, so the
-	-- components are walked; every call is best-effort, because a permission
-	-- problem must not block boot — exactly as the shell version's discarded exit
-	-- status did not.
+	-- components are walked. An existing component (including a symbolic link to
+	-- a folder, which is how users version their configuration) is not an error.
+	-- A component that stays absent is: it is recorded in the still-active boot
+	-- log before re-pointing, because every later line would target the missing
+	-- folder and vanish. Boot continues so the native logger configure, the
+	-- single owner of the folder policy, refuses it with its exact cause.
 	local hs_ref = rawget(_G, "hs")
 	local fs_ref = (type(hs_ref) == "table") and hs_ref.fs or nil
+	local folder_error = nil
 	if type(fs_ref) == "table" and type(fs_ref.mkdir) == "function" then
 		local built = (log_dir:sub(1, 1) == "/") and "/" or ""
 		for part in log_dir:gmatch("[^/]+") do
 			built = built .. part .. "/"
-			pcall(fs_ref.mkdir, built)
+			local ok_mk, created, mk_err = pcall(fs_ref.mkdir, built)
+			if not (ok_mk and created) then
+				local ok_attr, attrs = pcall(fs_ref.attributes, built)
+				if not (ok_attr and attrs) then
+					local link_ok, link = false, nil
+					if type(fs_ref.symlinkAttributes) == "function" then
+						link_ok, link = pcall(fs_ref.symlinkAttributes, built:sub(1, -2))
+					end
+					if link_ok and type(link) == "table" and link.mode == "link" then
+						folder_error = string.format(
+							"%s is a symbolic link whose target does not exist", built)
+					else
+						folder_error = string.format("cannot create %s: %s",
+							built, tostring(ok_mk and mk_err or created))
+					end
+					break
+				end
+			end
 		end
+	end
+	if folder_error then
+		_log("ERROR", "logger", "Log folder %s is unusable (%s).", log_dir, folder_error)
 	end
 	_log_dir = log_dir
 	_log_retention_days = max_age_days
@@ -510,6 +538,7 @@ function M.init_log_path(config_dir, max_age_days)
 	-- The dated log file resolved just above is already writable, so nothing
 	-- downstream waits on the purge.
 	_schedule_log_purge(log_dir, max_age_days, true)
+	return folder_error == nil, folder_error
 end
 
 --- Removes one stale log and records any OS refusal without fabricating success.
