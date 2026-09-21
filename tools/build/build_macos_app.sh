@@ -92,6 +92,16 @@ APP_PATH="$BUILD_DIR/ErgoptiPlus.app"
 ZIP_PATH="$BUILD_DIR/ErgoptiPlus.app.zip"
 LAUNCHER_DIR="$REPO_ROOT/static/ergopti_plus/macos/launcher"
 
+# Architectures of the host executable. They must match the universal slices of
+# the embedded Hammerspoon, Sparkle and LuaSocket binaries: a host-only
+# `swift build` on the Apple-silicon release runner produced an arm64-only
+# launcher that Intel Macs refused to open before any log could be written.
+LAUNCHER_ARCHS=(arm64 x86_64)
+LAUNCHER_ARCH_FLAGS=()
+for arch in "${LAUNCHER_ARCHS[@]}"; do
+	LAUNCHER_ARCH_FLAGS+=(--arch "$arch")
+done
+
 
 
 
@@ -258,16 +268,25 @@ download_ollama() {
 
 # Build the launcher with the official Swift toolchain. We compile in release
 # mode for size + speed; the binary then gets relocated into Contents/MacOS.
+# Every architecture in LAUNCHER_ARCHS is required and verified: a missing slice
+# makes macOS reject the whole app on that CPU before the launcher can log.
 build_launcher() {
-	log "Building Swift launcher (release)"
+	log "Building Swift launcher (release, ${LAUNCHER_ARCHS[*]})"
 	(
 		cd "$LAUNCHER_DIR"
-		swift build -c release --product ErgoptiPlus >&2
+		swift build -c release "${LAUNCHER_ARCH_FLAGS[@]}" --product ErgoptiPlus >&2
 	)
 	local built_bin
-	built_bin="$(swift build -c release --show-bin-path --package-path "$LAUNCHER_DIR")/ErgoptiPlus"
+	built_bin="$(swift build -c release "${LAUNCHER_ARCH_FLAGS[@]}" --show-bin-path --package-path "$LAUNCHER_DIR")/ErgoptiPlus"
 	[ -f "$built_bin" ] || fail "Swift build did not produce ErgoptiPlus binary."
-	log "Launcher binary: $built_bin"
+	local built_archs
+	built_archs=" $(lipo -archs "$built_bin") " || fail "lipo could not read launcher architectures."
+	local arch
+	for arch in "${LAUNCHER_ARCHS[@]}"; do
+		[[ "$built_archs" == *" $arch "* ]] \
+			|| fail "Launcher binary lacks the $arch slice (has:$built_archs)."
+	done
+	log "Launcher binary: $built_bin (archs:$built_archs)"
 	echo "$built_bin"
 }
 
@@ -561,7 +580,7 @@ zip_app() {
 # Produce the native runtime used by a Git checkout without acquiring any of
 # the full application's bundled drivers, language runtimes or model engines.
 build_native_helper() {
-	for cmd in swift codesign plutil zip find; do require_cmd "$cmd"; done
+	for cmd in swift lipo codesign plutil zip find; do require_cmd "$cmd"; done
 	BUILD_DIR="$REPO_ROOT/build/macos-native-helper"
 	APP_PATH="$BUILD_DIR/ErgoptiPlus.app"
 	ZIP_PATH="$BUILD_DIR/ErgoptiPlus.app.zip"
@@ -593,7 +612,7 @@ main() {
 		return
 	fi
 	[[ $# -eq 0 ]] || fail "Expected no arguments or --native-helper-only."
-	for cmd in curl unzip zip swift codesign iconutil sips plutil rsync hdiutil shasum; do
+	for cmd in curl unzip zip swift lipo codesign iconutil sips plutil rsync hdiutil shasum; do
 		require_cmd "$cmd"
 	done
 
