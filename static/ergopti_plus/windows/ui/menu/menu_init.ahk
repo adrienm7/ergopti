@@ -109,12 +109,9 @@ initMenu(PublishAuthorizeFn := 0) {
 		"layout_features_base",   (*) => _LAY_LayoutFeatureBaseRows(),
 		"layout_features_altgr",  (*) => _LAY_LayoutFeatureAltGrRows(),
 	)
+	; The accented-letter group stays enabled without the Ergopti emulation: the
+	; shortcuts then follow the user's own layout (accented_shortcuts.ahk).
 	LayoutMenu  := MenuRenderer_Build("layout_menu", "Layout", "", "", LayoutListProviders)
-	; Grey out accented-letter shortcuts when Ergopti keyboard emulation is off —
-	; the shortcuts depend on Ergopti key positions and are unusable without it.
-	if !Features["layout"]["ergopti_base"] {
-		LayoutMenu.Disable(t("menu.shortcuts.group_accented"))
-	}
 	LayoutGated := IsCategoryGated("Layout")
 	LayoutMenuTitle := t("menu.layout.title")
 	TrayMenuStage_Add(LayoutMenuTitle, LayoutMenu)
