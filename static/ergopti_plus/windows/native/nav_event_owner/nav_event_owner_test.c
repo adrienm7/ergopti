@@ -2779,6 +2779,139 @@ static bool TestUnmatchedDownLatchesPassAcrossModifiers(void)
 
 
 /**
+ * Presses and releases one physical digit through the hook tracker.
+ *
+ * @param test_name Stable test name for assertions.
+ * @param expected Expected disposition of the down edge.
+ * @return True when the down edge has the expected disposition.
+ */
+static bool TestStaleModifierDigit(
+	const char *test_name,
+	uint8_t expected)
+{
+	ErgoptiNav_DispatchResult result;
+	TEST_ASSERT(test_name, TestHookDispatch(
+		test_name, (uint16_t)'1', 0x02, ERGOPTI_NAV_EVENT_DOWN,
+		ERGOPTI_NAV_INJECTION_PHYSICAL, 0, &result));
+	TEST_ASSERT(test_name, result.disposition == expected);
+	TEST_ASSERT(test_name, result.receipt_created
+		== (expected == ERGOPTI_NAV_DISPOSITION_SUPPRESS ? 1 : 0));
+	TEST_ASSERT(test_name, TestHookDispatch(
+		test_name, (uint16_t)'1', 0x02, ERGOPTI_NAV_EVENT_UP,
+		ERGOPTI_NAV_INJECTION_PHYSICAL, 0, &result));
+	TEST_ASSERT(test_name, result.disposition == expected);
+	return true;
+}
+
+
+
+/**
+ * Presses physical modifiers through the hook tracker without releasing them.
+ *
+ * @param test_name Stable test name for assertions.
+ * @param vks Left/right modifier virtual keys.
+ * @param scs Matching scan codes.
+ * @param count Number of modifiers.
+ * @return True when every down edge passed.
+ */
+static bool TestPressPhysicalModifiers(
+	const char *test_name,
+	const uint16_t *vks,
+	const uint16_t *scs,
+	uint32_t count)
+{
+	ErgoptiNav_DispatchResult result;
+	uint32_t index;
+	for (index = 0; index < count; ++index) {
+		TEST_ASSERT(test_name, TestHookDispatch(
+			test_name, vks[index], scs[index], ERGOPTI_NAV_EVENT_DOWN,
+			ERGOPTI_NAV_INJECTION_PHYSICAL, 0, &result));
+		TEST_ASSERT(test_name,
+			result.disposition == ERGOPTI_NAV_DISPOSITION_PASS);
+	}
+	return true;
+}
+
+
+
+/**
+ * Proves a modifier whose release the hook never saw cannot keep a route armed
+ * (nav-stale-physical-modifier). A secure desktop, an AltGr fake Ctrl or an
+ * upstream hook can swallow the up edge; the OS then reports the key up while
+ * the tracked bit stays set, and every digit became a swallowed chord.
+ *
+ * @return True when stale bits pass the digit and real holds still route.
+ */
+static bool TestStalePhysicalModifierCannotArmRoutes(void)
+{
+	const char *name = "nav-stale-physical-modifier";
+	const uint16_t ctrl_vk[] = {VK_LCONTROL};
+	const uint16_t ctrl_sc[] = {0x1D};
+	const uint16_t alt_vk[] = {VK_LMENU};
+	const uint16_t alt_sc[] = {0x38};
+	const uint16_t chord_vk[] = {VK_LCONTROL, VK_LSHIFT};
+	const uint16_t chord_sc[] = {0x1D, 0x2A};
+	ErgoptiNav_ProfileOwner profile_owner = TestProfileOwner(TEST_OWNER_B, 4);
+	ErgoptiNav_Owner owner = TestOwner(TEST_OWNER_A, 3, 1);
+	uint64_t generation = 0;
+
+	/* Ctrl+digit profile routes. */
+	TEST_ASSERT(name, TestResetWithPlan(name, &generation));
+	TEST_ASSERT(name,
+		ErgoptiNav_TestSetRunning(1) == ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name,
+		TestPublishProfileOwner(name, 0, &profile_owner, NULL));
+	TEST_ASSERT(name, TestPressPhysicalModifiers(name, ctrl_vk, ctrl_sc, 1));
+	TEST_ASSERT(name, ErgoptiNav_TestSetOsModifierKeys(1, NULL, 0)
+		== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name,
+		TestStaleModifierDigit(name, ERGOPTI_NAV_DISPOSITION_PASS));
+	TEST_ASSERT(name, TestPressPhysicalModifiers(name, ctrl_vk, ctrl_sc, 1));
+	TEST_ASSERT(name, ErgoptiNav_TestSetOsModifierKeys(1, ctrl_vk, 1)
+		== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name,
+		TestStaleModifierDigit(name, ERGOPTI_NAV_DISPOSITION_SUPPRESS));
+	TEST_ASSERT(name, TestDrainReceipts(name, 1));
+
+	/* Alt+digit prediction jumps, the default validation chord. */
+	TEST_ASSERT(name, TestSetupOwner(name, &owner, &generation));
+	TEST_ASSERT(name, TestPressPhysicalModifiers(name, alt_vk, alt_sc, 1));
+	TEST_ASSERT(name, ErgoptiNav_TestSetOsModifierKeys(1, NULL, 0)
+		== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name,
+		TestStaleModifierDigit(name, ERGOPTI_NAV_DISPOSITION_PASS));
+	TEST_ASSERT(name, TestPressPhysicalModifiers(name, alt_vk, alt_sc, 1));
+	TEST_ASSERT(name, ErgoptiNav_TestSetOsModifierKeys(1, alt_vk, 1)
+		== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name,
+		TestStaleModifierDigit(name, ERGOPTI_NAV_DISPOSITION_SUPPRESS));
+	TEST_ASSERT(name, TestDrainReceipts(name, 1));
+
+	/* A configured Ctrl+Shift chord with only Shift stale. */
+	TEST_ASSERT(name, TestSetupOwner(name, &owner, &generation));
+	TEST_ASSERT(name, TestCommitPlanAtModifiers(name, 0,
+		(uint8_t)(ERGOPTI_NAV_MOD_CONTROL | ERGOPTI_NAV_MOD_SHIFT)));
+	TEST_ASSERT(name,
+		TestPressPhysicalModifiers(name, chord_vk, chord_sc, 2));
+	TEST_ASSERT(name, ErgoptiNav_TestSetOsModifierKeys(1, ctrl_vk, 1)
+		== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name,
+		TestStaleModifierDigit(name, ERGOPTI_NAV_DISPOSITION_PASS));
+	TEST_ASSERT(name,
+		TestPressPhysicalModifiers(name, chord_vk, chord_sc, 2));
+	TEST_ASSERT(name, ErgoptiNav_TestSetOsModifierKeys(1, chord_vk, 2)
+		== ERGOPTI_NAV_STATUS_OK);
+	TEST_ASSERT(name,
+		TestStaleModifierDigit(name, ERGOPTI_NAV_DISPOSITION_SUPPRESS));
+	TEST_ASSERT(name, TestDrainReceipts(name, 1));
+	TEST_ASSERT(name, ErgoptiNav_TestSetOsModifierKeys(0, NULL, 0)
+		== ERGOPTI_NAV_STATUS_OK);
+	return true;
+}
+
+
+
+/**
  * Proves an admitted profile target keeps its event-time owner across reorder.
  *
  * @return True when the old receipt remains exact and the new owner is isolated.
@@ -3153,7 +3286,9 @@ int main(void)
 			TestProfileTransitionFreezesPendingTargets},
 		{"navigation precedes profile selection",
 			TestNavigationPrecedesProfileSelection},
-		{"plan validation is atomic", TestPlanValidationIsAtomic}
+		{"plan validation is atomic", TestPlanValidationIsAtomic},
+		{"nav-stale-physical-modifier",
+			TestStalePhysicalModifierCannotArmRoutes}
 	};
 	uint32_t test_count = (uint32_t)(sizeof(tests) / sizeof(tests[0]));
 
