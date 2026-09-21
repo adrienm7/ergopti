@@ -170,6 +170,8 @@ OnError(_FatalErrorHandler)
 ; functions instead of scanning their source.
 #Include ../infra/wrap_symbols_config.ahk
 #Include ../modules/keymap/layout/layout_altgr.ahk
+#Include ../modules/keymap/layout/layout_ergopti.ahk
+#Include ../modules/keymap/layout/accented_shortcuts.ahk
 #Include ../modules/keymap/layout/layout_shift_caps.ahk
 ; Pure layout-poll quiescence decision (no OS deps, no top-level hotkeys) —
 ; exercised by meta/test_layout_quiescence.ahk and consumed by ErgoptiPlus.ahk.
@@ -442,6 +444,7 @@ _LogBootProgress("loading LLM modules")
 #Include unit/test_llm_bridge_buffer_cap.ahk
 #Include unit/test_llm_pointer_watch_transaction.ahk
 #Include unit/test_llm_tab_accept_policy.ahk
+#Include unit/test_accented_shortcuts.ahk
 ; parser.ahk (the AHK semantic-diff parser) was previously exercised by no suite,
 ; which let a crash in its Levenshtein helper survive — include it + its tests.
 #Include ../modules/llm/parser.ahk

@@ -57,7 +57,10 @@ _ErgoptiLetterOr(Key, Fallback) {
 	if !IsObject(Entry) {
 		return Fallback
 	}
-	if !Entry.Has("letter") {
+	; « Désactivé » in the tray only writes enabled=false and keeps the last
+	; letter, so ignoring the flag left the shortcut active after the user turned
+	; it off (accented-shortcut-disable-ignored).
+	if !Entry.Get("enabled", true) || !Entry.Has("letter") {
 		return Fallback
 	}
 	return Entry["letter"]

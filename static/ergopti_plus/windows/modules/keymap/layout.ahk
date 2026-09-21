@@ -1068,6 +1068,11 @@ if Features["layout"]["ergopti_base"] {
 	; ErgoptiBaseLabels() so the heatmap can label them.
 	Hotkey("SC01B", _DeadKeyDispatch.Bind("¨", DeadkeyMappingDiaresis), "I2")
 	Hotkey("SC02B", _DeadKeyDispatch.Bind("^", DeadkeyMappingCircumflex), "I2")
+} else {
+	; Without the emulation, the accented-letter shortcuts follow the user's own
+	; layout (AZERTY, BÉPO, the installed Ergopti driver…) instead of Ergopti's
+	; fixed positions (layout/accented_shortcuts.ahk).
+	AccentedShortcuts_Register()
 }
 
 ; Base-layer dead-key entry point. The chained-sequence branch emits, so it has

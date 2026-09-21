@@ -367,6 +367,7 @@ if UIASW_IsWorkerInvocation()
 ; ParseTomlFile (above); consumed by the reassign-at-boot loaders below.
 #Include infra/timings/timings_config.ahk
 #Include modules/keymap/layout/layout_ergopti.ahk
+#Include modules/keymap/layout/accented_shortcuts.ahk
 
 ; Active-app cache must come before hotstring_engine.ahk because both
 ; ``HotstringHandler`` and ``MicrosoftApps``.
