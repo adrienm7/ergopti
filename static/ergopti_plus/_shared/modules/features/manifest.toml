@@ -1871,14 +1871,14 @@ description_key = "menu.gestures.swipe_3_down"
 [[features.gestures]]
 id = "swipe_3_left"
 platforms = ["ahk", "hs", "linux"]
-default_per_platform = { ahk = "tab_prev", hs = "word_prev", linux = "none" }
+default_per_platform = { ahk = "tab_prev", hs = "sel_word_prev", linux = "none" }
 type = "action"
 description_key = "menu.gestures.swipe_3_left"
 
 [[features.gestures]]
 id = "swipe_3_right"
 platforms = ["ahk", "hs", "linux"]
-default_per_platform = { ahk = "tab_next", hs = "word_next", linux = "none" }
+default_per_platform = { ahk = "tab_next", hs = "sel_word_next", linux = "none" }
 type = "action"
 description_key = "menu.gestures.swipe_3_right"
 
@@ -2457,7 +2457,9 @@ description_key = "menu.gestures.modes.swipe_5_right_up"
 
 # Activation threshold per direction (travel distance in centimetres).
 
-# All directions default to 3.5 cm of trackpad travel before firing.
+# Directions default to 3.5 cm of trackpad travel before firing, except the
+# three-finger vertical swipe (previous/next tab): at 3.5 cm it switched tabs
+# on almost any vertical drift, so it waits for 5 cm.
 [[features.gestures.sensitivities]]
 id = "swipe_2_left"
 platforms = ["hs"]
@@ -2531,14 +2533,14 @@ description_key = "menu.gestures.sensitivities.swipe_3_right"
 [[features.gestures.sensitivities]]
 id = "swipe_3_up"
 platforms = ["hs"]
-default = 3.5
+default = 5
 type = "number"
 description_key = "menu.gestures.sensitivities.swipe_3_up"
 
 [[features.gestures.sensitivities]]
 id = "swipe_3_down"
 platforms = ["hs"]
-default = 3.5
+default = 5
 type = "number"
 description_key = "menu.gestures.sensitivities.swipe_3_down"
 
