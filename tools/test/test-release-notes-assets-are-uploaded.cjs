@@ -278,9 +278,14 @@ for (const [name, line] of linked) {
 const releaseBody = lines.join('\n');
 // Release headings do not receive fragment IDs. GitHub prefixes explicit
 // named anchors with user-content when sanitizing the rendered Markdown.
-if (!releaseBody.includes('<a name="downloads"></a>') ||
-	!releaseBody.includes('](#user-content-downloads)')) {
+if (!releaseBody.includes('<a name="${DOWNLOADS_ANCHOR}"></a>') ||
+	!releaseBody.includes('](#user-content-${DOWNLOADS_ANCHOR})')) {
 	errors.push('release downloads need an explicit anchor and its sanitized fragment');
+}
+// The releases page shows several releases on one scrolling page, and a fixed
+// anchor name made every release's jump link land on the first release shown.
+if (!/DOWNLOADS_ANCHOR="downloads-\$\(printf '%s' "\$TAG"/.test(releaseBody)) {
+	errors.push('the downloads anchor must be derived from the release tag so each release on the page has its own');
 }
 const layoutSection = releaseBody.indexOf('### Ergopti — keyboard layout only');
 const applicationSection = releaseBody.indexOf('### Ergopti Plus — application with advanced typing tools');

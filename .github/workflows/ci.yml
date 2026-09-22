@@ -2917,6 +2917,10 @@ jobs:
         run: |
           set -euo pipefail
           body_file="$(mktemp)"
+          # The releases page lists several releases on one scrolling page, so a
+          # fixed anchor name is shared by all of them and the jump link lands on
+          # whichever release comes first. The tag makes it unique per release.
+          DOWNLOADS_ANCHOR="downloads-$(printf '%s' "$TAG" | tr -c 'A-Za-z0-9' '-')"
           cat >> "$body_file" << EOF
           ## Ergopti & Ergopti Plus $VERSION
 
@@ -2924,7 +2928,7 @@ jobs:
 
           **Ergopti Plus — advanced typing tools:** the companion application adds remapping, shortcuts and text expansion.
 
-          **[⬇️ Skip to downloads & installation](#user-content-downloads)**
+          **[⬇️ Skip to downloads & installation](#user-content-${DOWNLOADS_ANCHOR})**
           > Timestamps are in **Paris time** (Europe/Paris, CET/CEST).
           EOF
 
@@ -2943,7 +2947,7 @@ jobs:
 
           cat >> "$body_file" << EOF
 
-          <a name="downloads"></a>
+          <a name="${DOWNLOADS_ANCHOR}"></a>
 
           ## Downloads
 
