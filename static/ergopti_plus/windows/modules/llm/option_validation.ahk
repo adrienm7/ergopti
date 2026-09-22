@@ -117,8 +117,21 @@ LLM_Option_IsBuiltinProfileId(Id) {
 
 /** Returns a detached, schema-safe custom-profile array or false. */
 LLM_Option_NormalizeUserProfiles(Value) {
+	return LLM_Option_NormalizeProfileRecords(Value, false)
+}
+
+/**
+ * Returns a detached, schema-safe profile array or false when any record is
+ * malformed. One bad record rejects the whole set: admitting the valid rest
+ * would silently change which profile an id resolves to.
+ * @param {Array} Value - Parsed profile records.
+ * @param {Integer} AllowBuiltinIds - True for the shipped registry, which
+ *     defines the built-ins; false for user records, which must not shadow them.
+ * @returns {Array|Integer} Detached records, or false.
+ */
+LLM_Option_NormalizeProfileRecords(Value, AllowBuiltinIds) {
 	global LLM_OPTION_MAX_PROFILE_ITEMS, LLM_OPTION_MAX_RECORD_FIELDS,
-		LLM_OPTION_MAX_STOP_SEQUENCES
+		LLM_OPTION_MAX_STOP_SEQUENCES, JSON_NULL
 	if !(Value is Array)
 		return false
 	if Value.Length > LLM_OPTION_MAX_PROFILE_ITEMS
@@ -129,7 +142,7 @@ LLM_Option_NormalizeUserProfiles(Value) {
 	for Profile in Value {
 		if !(Profile is Map) || !Profile.Has("id")
 				|| !(Profile["id"] is String) || Profile["id"] == ""
-				|| LLM_Option_IsBuiltinProfileId(Profile["id"])
+				|| (!AllowBuiltinIds && LLM_Option_IsBuiltinProfileId(Profile["id"]))
 				|| SeenIds.Has(Profile["id"])
 			return false
 		if Profile.Count > LLM_OPTION_MAX_RECORD_FIELDS
@@ -138,6 +151,11 @@ LLM_Option_NormalizeUserProfiles(Value) {
 		for Key, Item in Profile {
 			if !_LLM_Option_TryConsumeString(Key, &AggregateChars, false)
 				return false
+			; The shipped registry spells an unused prompt as null; it means
+			; "absent", and keeping the sentinel would hand an object to
+			; consumers that expect a string.
+			if IsObject(Item) && ObjPtr(Item) == ObjPtr(JSON_NULL)
+				continue
 			if (Key == "stop_sequences") {
 				if !(Item is Array)
 						|| Item.Length > LLM_OPTION_MAX_STOP_SEQUENCES
