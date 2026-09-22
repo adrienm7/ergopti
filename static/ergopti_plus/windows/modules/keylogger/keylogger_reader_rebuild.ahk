@@ -56,6 +56,13 @@ class KLRRebuildConst {
 	; Rollup rounds after the first one are batched: each round rescans the
 	; date-scoped sources, so rolling up after every read would dominate.
 	static ROUND_INTERVAL_MS := 15000
+	; A checkpoint copies the whole partial image to disk; once a minute bounds
+	; both that write volume and the work a killed worker can lose.
+	static CHECKPOINT_INTERVAL_MS := 60000
+	; Bump when the checkpoint tables or the meaning of their columns change.
+	static CHECKPOINT_FORMAT := "1"
+	; A peer rebuilding the same store is polled at this cadence.
+	static PEER_POLL_MS := 1000
 	static BATCH_MARKER := "`n-- === ingest batch "
 	; Days sort as text; this sentinel sorts after every real day.
 	static NO_DAY_COMPLETE := "9999-99-99"
@@ -69,11 +76,22 @@ class KLRRebuild {
 	static min_ledger_bytes := KLRRebuildConst.MIN_LEDGER_BYTES
 	static chunk_bytes := KLRRebuildConst.CHUNK_BYTES
 	static round_interval_ms := KLRRebuildConst.ROUND_INTERVAL_MS
+	static checkpoint_interval_ms := KLRRebuildConst.CHECKPOINT_INTERVAL_MS
+	; Test seam: stop after this many rounds, as a killed worker would.
+	static stop_after_rounds := 0
 	; Called after each rollup round with a progress Map; see _KLR_RebuildNotify.
 	static observer := 0
 }
 
 class KLRRebuildRefusal extends Error {
+}
+
+KLR_RebuildCheckpointPath(md) {
+	return KLR_CacheDir(md) . "rebuild.sqlite"
+}
+
+KLR_RebuildLockPath(md) {
+	return KLR_CacheDir(md) . "rebuild.lock"
 }
 
 
@@ -137,21 +155,36 @@ KLR_BuildColdCandidateAuto(md, logPath) {
 KLR_BuildColdSegmented(md, logPath, LedgerPaths) {
 	Failed := Map("ok", false, "db", 0, "sizes", Map())
 	StartTick := A_TickCount
+	; One rebuild per store: two dashboards opening together would otherwise
+	; each spend the whole rebuild and overwrite each other's checkpoint.
+	Guard := _KLR_RebuildAcquire(md, logPath, &Waited)
+	if !Guard
+		return Failed
+	if Waited && FSExists(KLR_CachePath(md)) {
+		; The peer that held the lock published a finished image meanwhile.
+		FSCloseExclusiveGuard(Guard)
+		return Map("ok", false, "db", 0, "sizes", Map(), "peer_published", true)
+	}
 	db := SQLite_Open(":memory:")
 	if !db {
+		FSCloseExclusiveGuard(Guard)
 		try LoggerError("KLReader", "Newest-first metrics rebuild could not open its memory database.")
 		return Failed
 	}
 	Owned := true
 	try {
 		State := _KLR_RebuildNewState(db, LedgerPaths)
-		if !KLR_LoadSchema(db)
+		State["md"] := md
+		State["log"] := logPath
+		Resumed := _KLR_RebuildResume(State)
+		if !Resumed && !KLR_LoadSchema(db)
 			throw KLRRebuildRefusal("schema.sql missing or invalid")
 		if !KLR_EnsureTypingProjectionTable(db) || !_KLR_RebuildInstallFirstWins(db)
 			throw KLRRebuildRefusal("temporary rebuild storage could not be prepared")
-		try LoggerStart("KLReader", "Newest-first metrics rebuild of {1} byte(s) in {2} ledger(s).",
-			State["total_bytes"], LedgerPaths.Length)
+		try LoggerStart("KLReader", "Newest-first metrics rebuild of {1} byte(s) in {2} ledger(s), {3} byte(s) resumed.",
+			State["total_bytes"], LedgerPaths.Length, State["resumed_bytes"])
 		LastRound := 0
+		LastCheckpoint := A_TickCount
 		loop {
 			Ledger := _KLR_RebuildNextLedger(State)
 			if !IsObject(Ledger)
@@ -160,9 +193,20 @@ KLR_BuildColdSegmented(md, logPath, LedgerPaths) {
 			if !LastRound || (A_TickCount - LastRound) >= KLRRebuild.round_interval_ms {
 				_KLR_RebuildRound(State, false)
 				LastRound := A_TickCount
+				; Checkpoint only right after a round: every completed day is then
+				; rolled up, so the stored boundary is exact.
+				if (A_TickCount - LastCheckpoint) >= KLRRebuild.checkpoint_interval_ms {
+					_KLR_RebuildCheckpoint(State)
+					LastCheckpoint := A_TickCount
+				}
+				if KLRRebuild.stop_after_rounds && State["rounds"] >= KLRRebuild.stop_after_rounds
+					throw KLRRebuildRefusal("stopped by the test seam")
 			}
 		}
 		_KLR_RebuildRound(State, true)
+		if State["nul_bytes"]
+			try LoggerWarn("KLReader", "Metrics ledgers contain {1} NUL byte(s) from interrupted appends; the holes were skipped.",
+				State["nul_bytes"])
 		if !SQLite_Exec(db, _KLR_RebuildDropFirstWinsSql(db))
 			throw KLRRebuildRefusal("temporary first-wins triggers could not be removed")
 		Sizes := Map()
@@ -175,7 +219,8 @@ KLR_BuildColdSegmented(md, logPath, LedgerPaths) {
 		KLR_PrefetchDebug(logPath, "KLR newest-first rebuild in " . (A_TickCount - StartTick) . "ms")
 		try LoggerSuccess("KLReader", "Newest-first metrics rebuild finished in {1} ms.", A_TickCount - StartTick)
 		Owned := false
-		return Map("ok", true, "db", db, "sizes", Sizes, "snapshots", Snapshots)
+		return Map("ok", true, "db", db, "sizes", Sizes, "snapshots", Snapshots,
+			"checkpoint", KLR_RebuildCheckpointPath(md))
 	} catch Error as Failure {
 		; SQLite and file errors carry no typed text; refusals name their step.
 		try LoggerError("KLReader", "Newest-first metrics rebuild failed: {1}. Dashboard retains its last-good data.",
@@ -184,7 +229,34 @@ KLR_BuildColdSegmented(md, logPath, LedgerPaths) {
 	} finally {
 		if Owned
 			try SQLite_Close(db)
+		FSCloseExclusiveGuard(Guard)
 	}
+}
+
+; Wait while a peer worker rebuilds the same store: its lock is a live handle,
+; released by the OS even when that worker is killed.
+_KLR_RebuildAcquire(md, logPath, &Waited) {
+	try DirCreate(KLR_CacheDir(md))
+	catch as Err {
+		try LoggerError("KLReader", "Metrics cache directory could not be created: {1}", Err.Message)
+		return 0
+	}
+	Waited := false
+	loop {
+		Guard := FSOpenExclusiveGuard(KLR_RebuildLockPath(md))
+		if Guard
+			break
+		if !Waited
+			KLR_PrefetchDebug(logPath, "KLR rebuild waits for a peer worker")
+		Waited := true
+		if HasMethod(KLRRebuild.observer, "Call")
+			KLRRebuild.observer.Call(Map("waiting", true))
+		Sleep(KLRRebuildConst.PEER_POLL_MS)
+	}
+	; Under the lock no other producer can own a checkpoint stage.
+	Loop Files KLR_RebuildCheckpointPath(md) . ".stage.*", "F"
+		FSDelete(A_LoopFileFullPath)
+	return Guard
 }
 
 _KLR_RebuildNewState(db, LedgerPaths) {
@@ -520,4 +592,157 @@ _KLR_RebuildNotify(State, Final) {
 		"elapsed_ms", A_TickCount - State["run_start"],
 		"oldest_complete", State["oldest_complete"],
 		"newest_complete", State["newest_complete"]))
+}
+
+
+
+
+
+; ======================================================
+; ======================================================
+; ======= 7/ Checkpoints survive a killed worker =======
+; ======================================================
+; ======================================================
+
+; Persist the partial image and where each ledger stopped. A worker killed by a
+; driver reload loses at most one checkpoint interval instead of the rebuild.
+; A failed checkpoint only costs resumability, never the rebuild itself.
+_KLR_RebuildCheckpoint(State) {
+	md := State["md"]
+	Path := KLR_RebuildCheckpointPath(md)
+	Stage := Path . ".stage." . A_ScriptHwnd . "." . A_TickCount
+	Tick := A_TickCount
+	Dest := SQLite_Open(Stage)
+	if !Dest {
+		try FSDelete(Stage)
+		try LoggerWarn("KLReader", "Metrics rebuild checkpoint could not open its stage.")
+		return false
+	}
+	Written := false
+	try {
+		Sql := "BEGIN;CREATE TABLE klr_rebuild_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL) WITHOUT ROWID;"
+			. "CREATE TABLE klr_rebuild_ledger (path TEXT PRIMARY KEY, end_offset INTEGER NOT NULL, "
+			. "resume_offset INTEGER NOT NULL, frontier TEXT NOT NULL, trimmed INTEGER NOT NULL, "
+			. "volume INTEGER NOT NULL, index_high INTEGER NOT NULL, index_low INTEGER NOT NULL, "
+			. "size INTEGER NOT NULL, write_high INTEGER NOT NULL, write_low INTEGER NOT NULL) WITHOUT ROWID;"
+		for Key, Value in _KLR_RebuildIdentity(State)
+			Sql .= "INSERT INTO klr_rebuild_meta VALUES (" . SQLite_Q(Key) . "," . SQLite_Q(Value) . ");"
+		for Ledger in State["ledgers"] {
+			; The carry was read but never executed; resume before it.
+			Resume := Ledger["cursor"] + (Ledger["carry"] = "" ? 0 : StrPut(Ledger["carry"], "UTF-8") - 1)
+			Snapshot := Ledger["snapshot"]
+			Sql .= "INSERT INTO klr_rebuild_ledger VALUES (" . SQLite_Q(Ledger["path"]) . ","
+				. Ledger["end"] . "," . Resume . "," . SQLite_Q(Ledger["frontier"]) . ","
+				. (Ledger["trimmed"] ? 1 : 0) . "," . Snapshot["volume"] . "," . Snapshot["index_high"] . ","
+				. Snapshot["index_low"] . "," . Snapshot["size"] . "," . Snapshot["write_high"] . ","
+				. Snapshot["write_low"] . ");"
+		}
+		Written := SQLite_BackupInto(Dest, State["db"]) && SQLite_Exec(Dest, Sql . "COMMIT;")
+	} finally {
+		SQLite_Close(Dest)
+	}
+	if !Written || !FSAtomicMoveReplace(Stage, Path) {
+		try FSDelete(Stage)
+		try LoggerWarn("KLReader", "Metrics rebuild checkpoint could not be written; the rebuild continues.")
+		return false
+	}
+	KLR_PrefetchDebug(State["log"], "KLR rebuild checkpoint in " . (A_TickCount - Tick) . "ms at "
+		. _KLR_RebuildDoneBytes(State) . " byte(s)")
+	return true
+}
+
+; Everything a checkpoint depends on besides the ledgers themselves.
+_KLR_RebuildIdentity(State) {
+	return Map("checkpoint_format", KLRRebuildConst.CHECKPOINT_FORMAT,
+		"cache_format", KLR_CACHE_FORMAT_VERSION,
+		"walker_timings", KL_JsonEncode(KLW_TimingValues()),
+		"done_boundary", State["done_boundary"],
+		"oldest_complete", State["oldest_complete"],
+		"newest_complete", State["newest_complete"])
+}
+
+; Restore a checkpoint into the fresh candidate when it still describes these
+; exact ledgers. Anything else is deleted: the rebuild then starts over, which
+; is always correct.
+; @returns {Boolean} Whether State now continues the checkpointed rebuild.
+_KLR_RebuildResume(State) {
+	Path := KLR_RebuildCheckpointPath(State["md"])
+	if !FSExists(Path)
+		return false
+	Stored := SQLite_Open(Path, SQLiteConst.OPEN_RO)
+	Reason := ""
+	try {
+		if !Stored
+			Reason := "unreadable"
+		else
+			Reason := _KLR_RebuildAdoptCheckpoint(State, Stored)
+	} catch Error as Failure {
+		Reason := "unreadable (" . Type(Failure) . ")"
+	} finally {
+		SQLite_Close(Stored)
+	}
+	if Reason = "" {
+		try LoggerInfo("KLReader", "Metrics rebuild resumed from its checkpoint at {1} of {2} byte(s).",
+			State["resumed_bytes"], _KLR_RebuildTotalBytes(State))
+		return true
+	}
+	KLR_PrefetchDebug(State["log"], "KLR rebuild checkpoint discarded: " . Reason)
+	if !FSDelete(Path)
+		try LoggerWarn("KLReader", "Metrics rebuild checkpoint could not be deleted.")
+	return false
+}
+
+; @returns {String} Empty when adopted, otherwise why the checkpoint is stale.
+_KLR_RebuildAdoptCheckpoint(State, Stored) {
+	Meta := Map()
+	for Row in SQLite_Query(Stored, "SELECT key, value FROM klr_rebuild_meta;")
+		Meta[Row["key"]] := Row["value"]
+	for Key, Value in _KLR_RebuildIdentity(State) {
+		if (Key = "done_boundary" || Key = "oldest_complete" || Key = "newest_complete")
+			continue
+		if !Meta.Has(Key) || !(Meta[Key] == Value)
+			return "different " . Key
+	}
+	Rows := SQLite_Query(Stored, "SELECT * FROM klr_rebuild_ledger;")
+	if Rows.Length != State["ledgers"].Length
+		return "different ledger set"
+	ByPath := Map()
+	for Ledger in State["ledgers"]
+		ByPath[Ledger["path"]] := Ledger
+	for Row in Rows {
+		if !ByPath.Has(Row["path"])
+			return "different ledger set"
+		Current := ByPath[Row["path"]]["snapshot"]
+		Row["ok"] := true
+		if !KLR_LedgerFileIsSame(Row, Current) || Current["size"] < Row["end_offset"]
+				|| (Current["size"] = Row["size"] && !KLR_LedgerWriteTimeIsSame(Current, Row))
+				|| Row["resume_offset"] < 0 || Row["resume_offset"] > Row["end_offset"]
+			return "ledger replaced or rewritten"
+	}
+	if !SQLite_BackupInto(State["db"], Stored)
+		return "page copy failed"
+	Resumed := 0
+	for Row in Rows {
+		Ledger := ByPath[Row["path"]]
+		Ledger["end"] := Row["end_offset"]
+		Ledger["cursor"] := Row["resume_offset"]
+		Ledger["carry"] := ""
+		Ledger["frontier"] := Row["frontier"]
+		Ledger["trimmed"] := Row["trimmed"] = 1
+		Ledger["finished"] := Row["resume_offset"] = 0
+		Resumed += Row["end_offset"] - Row["resume_offset"]
+	}
+	State["resumed_bytes"] := Resumed
+	State["done_boundary"] := Meta.Get("done_boundary", KLRRebuildConst.NO_DAY_COMPLETE)
+	State["oldest_complete"] := Meta.Get("oldest_complete", "")
+	State["newest_complete"] := Meta.Get("newest_complete", "")
+	return ""
+}
+
+; A published image supersedes the checkpoint it was finished from.
+; @param md {String} Metrics directory, trailing separator included.
+KLR_RebuildDiscardCheckpoint(md) {
+	Path := KLR_RebuildCheckpointPath(md)
+	if FSExists(Path) && !FSDelete(Path)
+		try LoggerWarn("KLReader", "Finished metrics rebuild checkpoint could not be deleted.")
 }
