@@ -536,6 +536,25 @@ function M.mark_config_reads(decoded, mark)
 	flatten_from_disk(decoded, mark)
 end
 
+--- Moves the save baseline past an unused-key cleanup. The cleanup removes
+--- only paths load() never reads, so the in-memory state still describes the
+--- new bytes; without this the next save would find the file "changed
+--- externally" and refuse the user's change. The baseline moves only when it
+--- still holds exactly the bytes the cleanup replaced.
+--- @param prefs_file string Path to config.toml.
+--- @param previous string Bytes the cleanup replaced.
+--- @param content string Bytes the cleanup published.
+--- @return boolean adopted
+function M.adopt_cleanup(prefs_file, previous, content)
+	local baseline = _source_snapshots[prefs_file]
+	if type(baseline) ~= "table" or baseline.status ~= "ok" or baseline.content ~= previous
+		or type(content) ~= "string" then
+		return false
+	end
+	_source_snapshots[prefs_file] = { status = "ok", content = content }
+	return true
+end
+
 --- Clones persisted values so nested menu tables cannot mutate an acknowledged
 --- rollback snapshot after it has been captured.
 --- @param value any Value to clone.

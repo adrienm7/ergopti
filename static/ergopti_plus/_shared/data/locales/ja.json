@@ -2483,7 +2483,6 @@
 	"platform_reason.layout_bundle_and_menubar_are_macos": "macOS のみ：これらの項目は、システム自身の入力ソース機構を通じて .bundle のキーボードレイアウトをユーザー範囲とシステム範囲で導入し、メニューバーのアイコンを選びます。Windows は独自のインストーラーで .klc を導入し、Linux は kanata のレイアウトを生成します。どちらにもメニューバーはありません。",
 	"platform_reason.remap_engine_is_per_driver": "各ドライバーは異なるエンジンでキーボードを再割り当てします——Windows は自前のタップホール層、macOS は Karabiner-Elements、Linux は kanata。ですから各自が動かしているエンジンのメニューだけを持ち、他のエンジンを設定することはできません。",
 	"platform_reason.debug_surface_is_each_drivers_own": "各ドライバーは自身の実行環境で診断します。AutoHotkey は Window Spy、変数一覧、キー履歴を備え、Hammerspoon は Lua コンソールを備えます。他の実行環境には開くべき同等物がありません。",
-	"platform_reason.only_windows_reports_unknown_config_keys": "Windows のみ：このドライバーは起動時に config.toml のすべてのキーをマニフェストと照合し、知らないキーを報告します。macOS と Linux のドライバーは使うキーだけを読み、それ以外を一覧にすることはないため、そこではこの項目に表示するものがありません。",
 	"platform_reason.chord_families_are_each_platforms": "ドライバーが割り当てる組み合わせの系統は、そのプラットフォームのものです。Windows は AltGr と CapsLock の組み合わせをまとめ、個人用ショートカットのファイルを持ちます。macOS は Ctrl と Cmd のショートカットをまとめます。各ドライバーは自分が割り当てる系統だけを並べます。",
 	"platform_reason.metrics_extras_are_not_on_linux": "Linux では非対応：このドライバーは WPM 表示の位置を保存せず、アプリケーションごとの除外一覧も持たず、このメニューから計測ウィンドウにキーボードショートカットを割り当てることもできません。",
 	"platform_reason.wpm_readout_is_a_macos_menubar_item": "macOS のみ：これらの項目は macOS がメニューバーに描く WPM 表示を制御します。Windows と Linux は独立したウィンドウに表示を描くため、メニューバーの場所も色もありません。",
