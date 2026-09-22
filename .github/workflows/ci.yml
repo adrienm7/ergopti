@@ -2173,7 +2173,7 @@ jobs:
               esac
               tag="v${maj}.${min}.${pat}"
               prerelease="false"
-              title="Ergopti & Ergopti Plus ${tag}"
+              title="Ergopti ${tag}"
           else
               # dev branch — v0.0.0-dev.N series
               last_dev=$(git tag --list 'v0.0.0-dev.*' --sort=-v:refname | head -1 || true)
@@ -2186,38 +2186,9 @@ jobs:
               tag="v0.0.0-dev.${next_n}"
               prerelease="true"
 
-              # Human-readable delta since the last stable tag
-              last_stable=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname \
-                  | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)
-              if [ -n "$last_stable" ]; then
-                  range="${last_stable}..HEAD"
-                  n_feat=0; n_fix=0; n_other=0; n_breaking=0
-                  while IFS= read -r subject; do
-                      [ -z "$subject" ] && continue
-                      if echo "$subject" | grep -qE '(BREAKING|!):'; then
-                          n_breaking=$((n_breaking+1))
-                      elif echo "$subject" | grep -qE '^feat(\([^)]+\))?!?:'; then
-                          n_feat=$((n_feat+1))
-                      elif echo "$subject" | grep -qE '^fix(\([^)]+\))?:'; then
-                          n_fix=$((n_fix+1))
-                      else
-                          n_other=$((n_other+1))
-                      fi
-                  done < <(git log "$range" --no-merges --pretty=format:"%s")
-                  delta=""
-                  [ "$n_breaking" -gt 0 ] && delta="${delta}!! ${n_breaking} breaking, "
-                  [ "$n_feat"     -gt 0 ] && delta="${delta}✨ ${n_feat} feat, "
-                  [ "$n_fix"      -gt 0 ] && delta="${delta}🔧 ${n_fix} fix, "
-                  [ "$n_other"    -gt 0 ] && delta="${delta}📦 ${n_other} other, "
-                  delta="${delta%, }"
-                  if [ -n "$delta" ]; then
-                      title="Ergopti & Ergopti Plus ${tag} — ${delta} (since ${last_stable})"
-                  else
-                      title="Ergopti & Ergopti Plus ${tag} (since ${last_stable})"
-                  fi
-              else
-                  title="Ergopti & Ergopti Plus ${tag}"
-              fi
+              # The sidebar of the repository home truncates long titles, and the
+              # version is what a reader needs from it.
+              title="Ergopti ${tag}"
           fi
 
           # Skip if the tag already exists (duplicate push guard)
@@ -2922,15 +2893,18 @@ jobs:
           # The releases page lists several releases on one scrolling page, so a
           # fixed anchor name is shared by all of them and the jump link lands on
           # whichever release comes first. The tag makes it unique per release.
+          # That list page also truncates long notes, and the downloads sit after
+          # the changelog, so the anchor is not there at all: the link targets the
+          # release's own page, which always renders the whole body.
           DOWNLOADS_ANCHOR="downloads-$(printf '%s' "$TAG" | tr -c 'A-Za-z0-9' '-')"
           cat >> "$body_file" << EOF
-          ## Ergopti & Ergopti Plus $VERSION
+          ## Ergopti $VERSION
 
           **Ergopti — keyboard layout:** install the ergonomic layout without running an application.
 
           **Ergopti Plus — advanced typing tools:** the companion application adds remapping, shortcuts and text expansion.
 
-          **[⬇️ Skip to downloads & installation](#user-content-${DOWNLOADS_ANCHOR})**
+          **[⬇️ Skip to downloads & installation](https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}#user-content-${DOWNLOADS_ANCHOR})**
           > Timestamps are in **Paris time** (Europe/Paris, CET/CEST).
           EOF
 

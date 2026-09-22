@@ -278,9 +278,19 @@ for (const [name, line] of linked) {
 const releaseBody = lines.join('\n');
 // Release headings do not receive fragment IDs. GitHub prefixes explicit
 // named anchors with user-content when sanitizing the rendered Markdown.
+// The releases list page truncates long notes, and the downloads follow the
+// changelog, so a bare fragment finds no anchor there: the jump link must open
+// the release's own page, which renders the whole body.
 if (!releaseBody.includes('<a name="${DOWNLOADS_ANCHOR}"></a>') ||
-	!releaseBody.includes('](#user-content-${DOWNLOADS_ANCHOR})')) {
-	errors.push('release downloads need an explicit anchor and its sanitized fragment');
+	!releaseBody.includes(
+		'](https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}#user-content-${DOWNLOADS_ANCHOR})')) {
+	errors.push('release downloads need an explicit anchor and a link to it on the release\'s own page');
+}
+// The repository sidebar truncates long release titles, which hid the version.
+// The title is computed in shell once; later steps only forward it via ${{ }}.
+const titles = releaseBody.match(/^\s*title="(?!\$\{\{)[^"\n]*"/gm) || [];
+if (titles.length === 0 || titles.some(line => line.trim() !== 'title="Ergopti ${tag}"')) {
+	errors.push(`every release title must be exactly "Ergopti \${tag}", got: ${titles.map(t => t.trim()).join(' | ')}`);
 }
 // The releases page shows several releases on one scrolling page, and a fixed
 // anchor name made every release's jump link land on the first release shown.
