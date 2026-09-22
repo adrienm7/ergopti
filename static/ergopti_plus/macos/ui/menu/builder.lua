@@ -581,6 +581,22 @@ function M.generate(ctx, menu_mods, actions)
 		push("apps.build", menu_mods.apps.build, ctx)
 	end
 
+	-- « Pause = tout éteint »: every feature row above is greyed and stripped of
+	-- its handler in one place. Each builder used to decide this for itself, so
+	-- Shortcuts and Gestures greyed while Hotstrings, AI, Metrics and Tap-Holds
+	-- stayed live (Metrics could even be toggled mid-pause). The tail below —
+	-- global actions, language, config, about, reload, quit, debug — and the
+	-- title row that resumes the script are added afterwards and stay enabled.
+	if ctx.paused == true then
+		for _, row in ipairs(items) do
+			if type(row) == "table" and row.separator ~= true then
+				row.disabled = true
+				row.action = nil
+				row.fn = nil
+			end
+		end
+	end
+
 
 	-- ── Tail: order driven by the shared manifest top_level (MENU-1/MENU-2).
 	-- Build log-level items first (needed only when "debug" id is dispatched).
