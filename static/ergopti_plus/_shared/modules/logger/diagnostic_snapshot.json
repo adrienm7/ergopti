@@ -1,0 +1,100 @@
+{
+	"_comment": "Cross-driver diagnostic snapshot contract (SPEC.md section 12). Every driver logs exactly one INFO line built from these fields, in this order, once boot completes. Replayed by windows/tests/unit/test_diagnostic_snapshot.ahk, macos/tests/unit/lib/test_diagnostic_snapshot.lua, linux/tests/unit/infra/test_diagnostic_snapshot.lua and tools/test/test-diagnostic-snapshot-parity.cjs.",
+	"_format": "'Diagnostic snapshot (' + fields joined by one space + ').'. Each field renders as name=value. A missing or empty value renders as the unknown token. CR, LF and TAB become one space, a double quote becomes a single quote, and a value that then contains a space is wrapped in double quotes.",
+
+	"module": "Diagnostics",
+	"unknown": "unknown",
+	"fields": [
+		"driver",
+		"version",
+		"commit",
+		"os",
+		"os_version",
+		"arch",
+		"runtime",
+		"elevated",
+		"locale",
+		"keyboard_layout",
+		"monitors",
+		"dpi",
+		"display",
+		"config_dir",
+		"log_level",
+		"features_enabled",
+		"boot_ms"
+	],
+
+	"vectors": [
+		{
+			"id": "complete",
+			"description": "Every field present; spaces force quoting.",
+			"values": {
+				"driver": "windows",
+				"version": "3.1.0",
+				"commit": "3b924cd46",
+				"os": "Windows 11 Home",
+				"os_version": "26100.4652",
+				"arch": "x64",
+				"runtime": "AutoHotkey 2.0.19",
+				"elevated": "false",
+				"locale": "fr",
+				"keyboard_layout": "0x040C040C",
+				"monitors": "2",
+				"dpi": "144",
+				"display": "win32",
+				"config_dir": "~/config/ergopti_plus",
+				"log_level": "DEBUG",
+				"features_enabled": "42/97",
+				"boot_ms": "812"
+			},
+			"expected": "Diagnostic snapshot (driver=windows version=3.1.0 commit=3b924cd46 os=\"Windows 11 Home\" os_version=26100.4652 arch=x64 runtime=\"AutoHotkey 2.0.19\" elevated=false locale=fr keyboard_layout=0x040C040C monitors=2 dpi=144 display=win32 config_dir=~/config/ergopti_plus log_level=DEBUG features_enabled=42/97 boot_ms=812)."
+		},
+		{
+			"id": "missing_values",
+			"description": "Absent and empty values render as the unknown token, never as an empty field.",
+			"values": {
+				"driver": "linux",
+				"version": "3.0.0",
+				"commit": "",
+				"os": "Ubuntu",
+				"os_version": "24.04",
+				"arch": "x86_64",
+				"runtime": "LuaJIT 2.1",
+				"elevated": "false",
+				"locale": "en",
+				"monitors": "1",
+				"dpi": "",
+				"display": "wayland GNOME",
+				"config_dir": "~/.config/ergopti",
+				"log_level": "INFO",
+				"features_enabled": "3/5",
+				"boot_ms": "120"
+			},
+			"expected": "Diagnostic snapshot (driver=linux version=3.0.0 commit=unknown os=Ubuntu os_version=24.04 arch=x86_64 runtime=\"LuaJIT 2.1\" elevated=false locale=en keyboard_layout=unknown monitors=1 dpi=unknown display=\"wayland GNOME\" config_dir=~/.config/ergopti log_level=INFO features_enabled=3/5 boot_ms=120)."
+		},
+		{
+			"id": "sanitised",
+			"description": "Line breaks, tabs and double quotes cannot break the one-line shape.",
+			"values": {
+				"driver": "macos",
+				"version": "3.1.0",
+				"commit": "abc1234",
+				"os": "macOS\n15.5",
+				"os_version": "15.5",
+				"arch": "arm64",
+				"runtime": "Hammerspoon \"1.0.0\"",
+				"elevated": "false",
+				"locale": "fr",
+				"keyboard_layout": "com.apple.keylayout.French",
+				"monitors": "1",
+				"dpi": "2",
+				"display": "quartz",
+				"config_dir": "~/Library/Ergopti\tPlus",
+				"log_level": "DEBUG",
+				"features_enabled": "10/12",
+				"boot_ms": "950"
+			},
+			"expected": "Diagnostic snapshot (driver=macos version=3.1.0 commit=abc1234 os=\"macOS 15.5\" os_version=15.5 arch=arm64 runtime=\"Hammerspoon '1.0.0'\" elevated=false locale=fr keyboard_layout=com.apple.keylayout.French monitors=1 dpi=2 display=quartz config_dir=\"~/Library/Ergopti Plus\" log_level=DEBUG features_enabled=10/12 boot_ms=950)."
+		}
+	]
+}
