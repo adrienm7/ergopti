@@ -1824,6 +1824,7 @@
 	"shortcuts.titlecase": "Win + W = In Titelschreibweise umwandeln (erster Buchstabe jedes Wortes groß)",
 	"shortcuts.uppercase": "Win + U(ppercase) = Auswahl in Groß-/Kleinbuchstaben umwandeln",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
+	"startup.accessibility_required": "ErgoptiPlus benötigt die Berechtigung „Bedienungshilfen“, um die Tastatur zu lesen. Aktiviere unter Systemeinstellungen > Datenschutz & Sicherheit > Bedienungshilfen den Hammerspoon-Eintrag, der zu ErgoptiPlus gehört, und öffne ErgoptiPlus dann erneut. Ein separat gestartetes Hammerspoon hat einen eigenen Eintrag.",
 	"startup.manifest_missing": "Startfehler: die Datei _generated/features_manifest.ahk fehlt oder ist beschädigt.\n\nFühre `npm run build:manifest` im Projektverzeichnis aus und starte das Skript neu.",
 	"startup.manifest_title": "ErgoptiPlus — Manifest fehlt",
 	"startup.native_logger_unavailable": "ErgoptiPlus kann nicht gestartet werden, da der native Protokollierungsdienst nicht verfügbar ist. Starten Sie ErgoptiPlus über den Launcher.",

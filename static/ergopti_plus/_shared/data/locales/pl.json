@@ -1824,6 +1824,7 @@
 	"shortcuts.titlecase": "Win + W = Konwertuj na tytuł (pierwsza litera każdego słowa wielką literą)",
 	"shortcuts.uppercase": "Win + U(ppercase) = Przełącz zaznaczenie wielkie/małe litery",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
+	"startup.accessibility_required": "ErgoptiPlus potrzebuje uprawnienia Dostępność, aby odczytywać klawiaturę. W Ustawieniach systemowych > Prywatność i ochrona > Dostępność włącz pozycję Hammerspoon należącą do ErgoptiPlus, a następnie ponownie otwórz ErgoptiPlus. Aplikacja Hammerspoon uruchamiana osobno ma własną pozycję.",
 	"startup.manifest_missing": "Błąd uruchomienia: plik _generated/features_manifest.ahk jest nieobecny lub uszkodzony.\n\nUruchom `npm run build:manifest` z katalogu projektu i zrestartuj skrypt.",
 	"startup.manifest_title": "ErgoptiPlus — brak manifestu",
 	"startup.native_logger_unavailable": "Nie można uruchomić ErgoptiPlus, ponieważ natywna usługa rejestrowania jest niedostępna. Uruchom ErgoptiPlus za pomocą jego programu uruchamiającego.",

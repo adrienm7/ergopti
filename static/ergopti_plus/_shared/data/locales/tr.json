@@ -1824,6 +1824,7 @@
 	"shortcuts.titlecase": "Win + W = Başlık durumuna dönüştür (her kelimenin ilk harfi büyük)",
 	"shortcuts.uppercase": "Win + U(ppercase) = Seçimde büyük/küçük harf arasında geçiş yap",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
+	"startup.accessibility_required": "ErgoptiPlus’ın klavyeyi okuyabilmesi için Erişilebilirlik izni gerekir. Sistem Ayarları > Gizlilik ve Güvenlik > Erişilebilirlik bölümünde ErgoptiPlus’a ait Hammerspoon girişini açın, ardından ErgoptiPlus’ı yeniden açın. Ayrı olarak çalıştırdığınız bir Hammerspoon uygulamasının kendi girişi vardır.",
 	"startup.manifest_missing": "Başlangıç hatası: _generated/features_manifest.ahk dosyası eksik veya bozuk.\n\nProje dizininden `npm run build:manifest` komutunu çalıştırın ve betiği yeniden başlatın.",
 	"startup.manifest_title": "ErgoptiPlus — manifest eksik",
 	"startup.native_logger_unavailable": "Yerel günlük hizmeti kullanılamadığı için ErgoptiPlus başlatılamıyor. ErgoptiPlus'ı kendi başlatıcısı üzerinden başlatın.",

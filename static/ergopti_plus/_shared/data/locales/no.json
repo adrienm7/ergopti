@@ -1824,6 +1824,7 @@
 	"shortcuts.titlecase": "Win + W = Konverter til tittelformat (stavelse med stor bokstav i begynnelsen av hvert ord)",
 	"shortcuts.uppercase": "Win + U(ppercase) = Veksle merkingen mellom store/små bokstaver",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
+	"startup.accessibility_required": "ErgoptiPlus trenger tillatelsen Tilgjengelighet for å lese tastaturet. Slå på Hammerspoon-elementet som hører til ErgoptiPlus under Systeminnstillinger > Personvern og sikkerhet > Tilgjengelighet, og åpne deretter ErgoptiPlus igjen. En Hammerspoon-app du kjører separat, har sitt eget element.",
 	"startup.manifest_missing": "Oppstartsfeil: filen _generated/features_manifest.ahk mangler eller er skadet.\n\nKjør `npm run build:manifest` fra prosjektmappen og start skriptet på nytt.",
 	"startup.manifest_title": "ErgoptiPlus — manifest mangler",
 	"startup.native_logger_unavailable": "ErgoptiPlus kan ikke starte fordi den innebygde loggtjenesten ikke er tilgjengelig. Start ErgoptiPlus via programstarteren.",

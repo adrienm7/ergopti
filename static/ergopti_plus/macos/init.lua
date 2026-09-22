@@ -83,6 +83,7 @@ if Storage.migrate_legacy_namespace() ~= true then
 	Logger.error("init", "Legacy settings namespace migration did not commit; only namespaced values will be used.")
 end
 local SyntheticInput     = require("adapters.synthetic_input")
+local AccessibilityPermission = require("adapters.accessibility_permission")
 local LOG                = "init"
 
 -- Single source of truth (F-LOW-11): ke_lifecycle.lua owns and exports this
@@ -969,6 +970,26 @@ end
 -- after MLX cleanup, LLM bootstrap, TOML loading and the keymap engine startup
 -- have all completed (F-MED-19).
 local function finish_boot_after_onboarding()
+-- Every input owner below is an eventtap, and an untrusted process gets taps
+-- that never enable. The packaged runtime is its own app identity, so a user
+-- whose onboarding was skipped (config.toml already present) may never have
+-- been asked; v0.0.0-dev.128 then died here with a generic pre-start refusal.
+-- Ask macOS for the prompt and name the one action that fixes it.
+local accessibility_trusted, accessibility_err = AccessibilityPermission.is_trusted()
+if accessibility_trusted ~= true then
+	local prompted, prompt_err = AccessibilityPermission.request_prompt()
+	if not prompted then
+		Logger.error(LOG, "Accessibility prompt could not be requested: %s.", tostring(prompt_err))
+	end
+	emergency_exit_after_runtime_failure("accessibility",
+		accessibility_trusted == nil
+			and ("Accessibility state query failed: " .. tostring(accessibility_err))
+			or "Accessibility permission is not granted to the embedded ErgoptiPlus runtime",
+		"startup.accessibility_required")
+	return
+end
+Logger.info(LOG, "Accessibility permission is granted; arming input owners.")
+
 local prestart_committed = StartupTransaction.run({
 	{
 		name = "gestures",
