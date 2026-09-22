@@ -143,10 +143,16 @@ _SuspendMarkerPath() {
 ; silently resuming a driver the user paused is exactly the failure this exists
 ; to remove.
 ReloadPreservingSuspend(SuccessFn := 0, ExistingBundle := 0) {
+	; Twenty-five call sites reload through here and none said why. The caller's
+	; name is read from the call stack (-2 = whoever called this function), so the
+	; log answers "who asked" without threading a reason through every caller.
+	try LoggerInfo("Lifecycle", "Reload requested by {1} (suspended={2}).",
+		DiagCallerName(-2), A_IsSuspended ? "true" : "false")
 	PreviousCritical := Critical("Off")
 	try return _ReloadPreservingSuspendNonCritical(SuccessFn, ExistingBundle)
 	finally Critical(PreviousCritical)
 }
+
 
 _ReloadPreservingSuspendNonCritical(SuccessFn, ExistingBundle) {
 	global ConfigurationFile
@@ -259,6 +265,10 @@ _LifecycleSetNavEventOwnerSuspended(Suspended) {
 
 ToggleSuspend(*) {
 		global _SuspendPending, _SuspendPendingSince
+		; The reactors log the transition itself; this line records who asked,
+		; which is what separates a user pause from a restored or scripted one.
+		try LoggerInfo("Lifecycle", "Suspend toggle requested by {1} (currently {2}).",
+			DiagCallerName(-2), A_IsSuspended ? "suspended" : "active")
 		; A second press while a suspend is PENDING must cancel it. Without this
 		; branch the press fell through and simply re-armed the deferral, so the
 		; control the user reaches for to escape a wedged gate was the one control
@@ -1005,15 +1015,22 @@ _TrayRootBuildBoot(PublishAuthorizeFn) {
 	global _LLM_Menu, LLM_MENU_BUILD_DEFER_MS
 	_SavedReady := _DriverReady
 	_DriverReady := false
+	BootProfile_StageBegin("tray menu")
 	try {
 		InitSubMenus()
 		Published := initMenu(PublishAuthorizeFn)
 	} finally {
 		_DriverReady := _SavedReady
 	}
-	if !((Published is Integer) and Published == 1)
+	if !((Published is Integer) and Published == 1) {
+		; Closes the stage explicitly: a refused publication retries later, and an
+		; open stage in the log would otherwise read as a hang.
+		BootProfile_StageAbort("tray menu", "publication refused (status "
+			. (IsSet(Published) ? String(Published) : "unset") . "); the build will be retried")
 		return false
+	}
 	UpdateTrayIcon()
+	BootProfile_StageEnd("tray menu", "published")
 	if _LangMenuBuildPending
 		SetTimer(BuildLanguageMenuDeferred, -LANG_MENU_DEFER_MS)
 	BootProfile_Mark("Tray menu built (deferred, off time-to-ready)")

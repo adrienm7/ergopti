@@ -399,12 +399,18 @@ ToggleFeatureV2(V2Path) {
 	if LiveResult.handled {
 		if !LiveResult.ok
 			return ConfigReportPersistenceFailure("the live feature toggle '" . V2Path . "'")
+		; Every menu toggle is logged with its id and outcome: until now the only
+		; trace of a click was a failure, so "I turned it off" could not be checked.
+		try LoggerInfo("Menu", "Feature '{1}' toggled live to {2}.", V2Path,
+			ReadFeatureStateV2(V2Path).Get("enabled", false) ? "enabled" : "disabled")
 		return true
 	}
 
 	CurrentState := ReadFeatureStateV2(V2Path)
 	CurrentEnabled := CurrentState.Has("enabled") and CurrentState["enabled"]
 	NewValue := !CurrentEnabled
+	try LoggerInfo("Menu", "Feature '{1}' toggled to {2}; reloading to apply.", V2Path,
+		NewValue ? "enabled" : "disabled")
 
 	; Force every mutex sibling false in the same write so the persisted state
 	; reflects the picked variant alone (empty for independent toggles).

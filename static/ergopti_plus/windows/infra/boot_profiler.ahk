@@ -132,6 +132,67 @@ BootProfile_Mark(PhaseName) {
 	try LoggerInfo("BootProfile", "{1}: +{2} ms (total {3} ms).", PhaseName, Delta, Total)
 }
 
+; Opens a named boot stage: one START line now, and a SUCCESS line with the
+; stage's own duration when BootProfile_StageEnd closes it. The marks above say
+; how long each slice took; a stage says which step a boot that stopped logging
+; was inside — a START with no SUCCESS names it.
+; @param Name {String} Stage label, reused verbatim by BootProfile_StageEnd.
+BootProfile_StageBegin(Name) {
+	_BootProfileOpenStages()[Name] := A_TickCount
+	try LoggerStart("BootProfile", "Boot stage '{1}'…", Name)
+}
+
+; Closes a stage opened by BootProfile_StageBegin with its duration and an
+; optional one-line detail of what it produced.
+; @param Name {String}
+; @param Detail {String} Optional summary, e.g. "42 feature(s) enabled".
+BootProfile_StageEnd(Name, Detail := "") {
+	Open := _BootProfileOpenStages()
+	if !Open.Has(Name) {
+		try LoggerError("BootProfile", "Boot stage '{1}' closed without being opened.", Name)
+		return
+	}
+	Started := Open.Delete(Name)
+	try LoggerSuccess("BootProfile", "Boot stage '{1}' done in {2} ms{3}.",
+		Name, TickElapsed(Started, A_TickCount), Detail != "" ? ": " . Detail : "")
+}
+
+; Closes a stage that did not complete, as a WARNING rather than a SUCCESS.
+; @param Name {String}
+; @param Reason {String}
+BootProfile_StageAbort(Name, Reason) {
+	Open := _BootProfileOpenStages()
+	Started := Open.Has(Name) ? Open.Delete(Name) : A_TickCount
+	try LoggerWarn("BootProfile", "Boot stage '{1}' did not complete after {2} ms: {3}.",
+		Name, TickElapsed(Started, A_TickCount), Reason)
+}
+
+; Milliseconds from process creation to now: the figure a user perceives as the
+; boot, including the parse window before the first executable line.
+; @returns {Integer}
+BootProfile_TotalBootMs() {
+	global _BOOT_PROFILE_START
+	Uptime := BootProfile_ProcessUptimeMs()
+	return (Uptime >= 0) ? Uptime : TickElapsed(_BOOT_PROFILE_START, A_TickCount)
+}
+
+; Names of the stages still open, for the boot-complete line.
+; @returns {String} Comma-separated names, or "" when every stage closed.
+BootProfile_OpenStageNames() {
+	Names := ""
+	for Name, _ in _BootProfileOpenStages()
+		Names .= (Names == "" ? "" : ", ") . Name
+	return Names
+}
+
+; Open-stage registry. A function static for the same include-order reason as
+; _BootProfileStampStore: a stage can open above this file's include position.
+; @returns {Map}
+_BootProfileOpenStages() {
+	static Open := Map()
+	return Open
+}
+
 ; Milliseconds elapsed since the OS spawned this process, measured against the
 ; process creation FILETIME from GetProcessTimes. Unlike A_TickCount (which we can
 ; only read once our own code runs), this captures the entire pre-script window —

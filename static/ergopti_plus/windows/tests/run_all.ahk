@@ -104,6 +104,10 @@ OnError(_FatalErrorHandler)
 #Include ../infra/ui_style.ahk
 #Include ../_generated/logger_sub_files.ahk
 #Include ../infra/logger.ahk
+; Boot stage profiler and the cross-driver diagnostic snapshot: definitions and
+; two counters only, exercised by unit/test_diagnostic_logging.ahk.
+#Include ../infra/boot_profiler.ahk
+#Include ../infra/diagnostic_snapshot.ahk
 #Include ../infra/toml/toml_helpers.ahk
 ; Shared timing registry reader (TimingsLoadShared / TimingsGet) — needs
 ; ParseTomlFile above; exercised by test_timings_config.ahk.
@@ -263,6 +267,7 @@ InstallSendNoOps()
 #Include unit/test_promise_timeout_budget.ahk
 #Include unit/test_logger_format_failure_is_visible.ahk
 #Include unit/test_logger_contract.ahk
+#Include unit/test_diagnostic_logging.ahk
 #Include unit/test_logger_daily_rotation.ahk
 #Include unit/test_healthcheck_core.ahk
 #Include unit/test_healthcheck_owner_snapshots.ahk

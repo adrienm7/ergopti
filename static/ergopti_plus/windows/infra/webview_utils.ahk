@@ -62,7 +62,15 @@ WebView_SharedEnvironment(loader, CreateEnvironmentFn := 0) {
 	}
 
 	_WebView_SharedEnvCreating := true
+	; A missing profile directory makes the environment boot fail later with an
+	; opaque COM error; the cause is logged here, where it is still readable.
 	try DirCreate(WEBVIEW_SHARED_UDIR)
+	catch as DirErr
+		try LoggerWarn("WebView", "Shared WebView2 profile directory could not be created: {1}.", DirErr.Message)
+	; The first WebView of a session pays the WebView2 browser-process boot, the
+	; usual cause of a "slow first window"; its duration is logged either way.
+	BootStarted := A_TickCount
+	try LoggerTrace("WebView", "Booting the shared WebView2 environment…")
 	try {
 		; The finite await pumps messages until the environment is ready, then
 		; throws to the caller's native fallback if WebView2 never completes.
@@ -84,8 +92,14 @@ WebView_SharedEnvironment(loader, CreateEnvironmentFn := 0) {
 				_WebView_SharedEnvBootPromise := 0
 			throw
 		}
-		Environment := BootPromise.await(WEBVIEW_SHARED_ENV_BOOT_TIMEOUT_MS)
+		try Environment := BootPromise.await(WEBVIEW_SHARED_ENV_BOOT_TIMEOUT_MS)
+		catch as BootErr {
+			try LoggerError("WebView", "Shared WebView2 environment boot failed after {1} ms: {2}.",
+				A_TickCount - BootStarted, BootErr.Message)
+			throw
+		}
 		_WebView_SharedEnvironmentSettled(BootPromise, true, Environment)
+		try LoggerDone("WebView", "Shared WebView2 environment booted in {1} ms.", A_TickCount - BootStarted)
 	} finally {
 		; Synchronous setup failures publish no promise. A timed-out promise stays
 		; owned until _WebView_SharedEnvironmentSettled receives its real terminal.

@@ -39,6 +39,8 @@ TrayMenuSetIcon(Opts) {
 		return
 	if Opts.Has("image") and Opts["image"] != "" {
 		try TraySetIcon(Opts["image"])
+		catch as Err
+			try LoggerError("TrayMenu", "Tray icon '{1}' could not be applied: {2}.", Opts["image"], Err.Message)
 	}
 	if Opts.Has("title") and Opts["title"] != "" {
 		TrayMenuSetTooltip(Opts["title"])
@@ -76,11 +78,16 @@ TrayMenuSetMenu(Items) {
 		; Route actionable items through RegisterMenuItem so they participate in
 		; the menu_dispatcher WM_COMMAND retry path. Raw Menu.Add does not, so AHK
 		; 2.0's intermittent dispatch drop would silently lose ~1 click in 3.
-		try RegisterMenuItem(A_TrayMenu, ItemTitle, ItemFn)
-		if Item.Has("checked") and Item["checked"]
-			try A_TrayMenu.Check(ItemTitle)
-		if Item.Has("disabled") and Item["disabled"]
-			try A_TrayMenu.Disable(ItemTitle)
+		; A refused row used to vanish from the menu with nothing in the log.
+		try {
+			RegisterMenuItem(A_TrayMenu, ItemTitle, ItemFn)
+			if Item.Has("checked") and Item["checked"]
+				A_TrayMenu.Check(ItemTitle)
+			if Item.Has("disabled") and Item["disabled"]
+				A_TrayMenu.Disable(ItemTitle)
+		} catch as Err {
+			try LoggerError("TrayMenu", "Tray menu row '{1}' could not be published: {2}.", ItemTitle, Err.Message)
+		}
 	}
 }
 
