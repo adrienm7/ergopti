@@ -89,7 +89,8 @@ end)
 helpers.describe("the AppleScript call sites escape through the shared helper", function()
 	helpers.it("no site escapes the quote without also escaping the backslash", function()
 		local sources = {
-			{ symbol = "pickConfigDir",  what = "the onboarding folder picker" },
+			-- The onboarding wizard reuses this picker instead of keeping a copy.
+			{ symbol = "function M.pick_config_dir", what = "the shared config folder picker" },
 			{ symbol = "_terminal_cmd",  what = "the download window's Terminal bridge" },
 		}
 
