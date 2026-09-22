@@ -230,6 +230,12 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.screen_capture",
+		contract = { "permission_state", "request_permission", "open_permission_settings",
+			"clipboard_change_count", "clipboard_has_image", "copy_image_file_to_clipboard" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.app_launcher",
 		contract = { "launch", "launchWithArgs", "isRunning" },
 		wired    = true,

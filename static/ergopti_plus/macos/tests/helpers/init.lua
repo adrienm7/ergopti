@@ -247,6 +247,14 @@ function M.load_with_stubs(module_name, hs_overrides)
 		loaded["modules.shortcuts.actions.system_mouse"] = nil
 		loaded["modules.shortcuts.actions.screenshot_save"] = nil
 	end
+	-- Every screen-capture owner shares the flow's once-per-process permission
+	-- prompt. A fresh owner must not inherit the previous fixture's prompt.
+	if module_name == "modules.shortcuts.actions.system"
+		or module_name == "modules.shortcuts.actions.system_pixel"
+		or module_name == "modules.shortcuts.actions.screenshot_save"
+		or module_name == "modules.gestures.actions" then
+		loaded["modules.shortcuts.actions.screen_capture_flow"] = nil
+	end
 	-- Dependency checkers and their backend-local pause controller form one
 	-- stateful ownership unit. A fresh checker must never inherit the previous
 	-- fixture's registered owner, epoch token, or resume-stage timer.

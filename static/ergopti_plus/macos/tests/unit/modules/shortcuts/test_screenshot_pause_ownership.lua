@@ -17,6 +17,8 @@ local function fresh_screenshot()
 		"modules.shortcuts.actions.screenshot_save",
 		"adapters.shell_runner",
 		"adapters.file_system",
+		"adapters.screen_capture",
+		"modules.shortcuts.actions.screen_capture_flow",
 		"infra.logger",
 		"infra.notifications",
 		"infra.i18n",
@@ -99,8 +101,25 @@ local function fresh_screenshot()
 			return task
 		end,
 	}
+	-- Every capture produced its image and the clipboard accepted it: this file
+	-- exercises lifecycle ownership, not the capture verdict.
+	local temp_files = 0
 	package.loaded["adapters.file_system"] = {
 		expand_path = function() return "/tmp/hs012-home" end,
+		create_secure_temp_file = function()
+			temp_files = temp_files + 1
+			return "/tmp/hs012-capture-" .. temp_files
+		end,
+		remove_exact = function() return true end,
+		classify_no_follow = function() return { mode = "file", size = 64 }, "ok" end,
+	}
+	package.loaded["adapters.screen_capture"] = {
+		permission_state = function() return true end,
+		request_permission = function() return true end,
+		open_permission_settings = function() return true end,
+		clipboard_change_count = function() return 1 end,
+		clipboard_has_image = function() return true end,
+		copy_image_file_to_clipboard = function() return true end,
 	}
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.notifications"] = {
@@ -148,14 +167,17 @@ helpers.describe("shared screenshot owner: positive controls", function()
 		helpers.assert_eq(#f.notifications, 1)
 		helpers.assert_eq(f.subject.has_pending_screenshot_action(), false)
 
-		helpers.assert_eq(f.subject.capture({ "-ci" }), true)
-		helpers.assert_eq(f.tasks[3].args, { "-ci" })
+		helpers.assert_eq(f.subject.capture({ "-i" }), true)
+		helpers.assert_eq(f.tasks[3].args, { "-i", "-t", "png", "/tmp/hs012-capture-1" })
 		helpers.assert_eq(f.subject.resume_screenshot_actions("shortcut_bindings"), true)
 		helpers.assert_eq(f.tasks[3].terminate_calls, 0,
 			"a duplicate parent RESUME without a claim must not revoke active work")
 		f.tasks[3]:deliver(0, "", "")
-		helpers.assert_eq(#f.notifications, 1,
-			"clipboard capture success deliberately has no save notification")
+		f.tasks[3]:deliver(0, "", "")
+		helpers.assert_eq(#f.notifications, 2,
+			"a verified clipboard capture is announced exactly once")
+		helpers.assert_eq(f.notifications[2].message, "shortcuts.screenshot_copied")
+		helpers.assert_eq(f.notifications[2].kind, "success")
 	end)
 
 	helpers.it("replays synchronous directory and capture terminals exactly once", function()
@@ -185,7 +207,7 @@ helpers.describe("shared screenshot owner: parent isolation", function()
 		local f = fresh_screenshot()
 		f.queue({ terminate_mode = "false" })
 		helpers.assert_eq(
-			f.subject.capture({ "-ci" }, "gestures"), true)
+			f.subject.capture({ "-i" }, "gestures"), true)
 		local gesture_task = f.tasks[1]
 
 		helpers.assert_eq(
@@ -233,7 +255,7 @@ helpers.describe("shared screenshot owner: phase settlement and claims", functio
 				helpers.assert_eq(target.terminate_calls, 1)
 				helpers.assert_eq(target.terminate_identities[1] == target, true)
 				helpers.assert_eq(f.subject.save({}, "blocked"), false)
-				helpers.assert_eq(f.subject.capture({ "-c" }), false)
+				helpers.assert_eq(f.subject.capture({}), false)
 				helpers.assert_eq(#f.tasks, task_count)
 
 				target.terminate_mode = "pending"
@@ -257,11 +279,11 @@ helpers.describe("shared screenshot owner: phase settlement and claims", functio
 				helpers.assert_eq(
 					f.subject.is_screenshot_actions_paused("gestures"), true)
 				helpers.assert_eq(
-					f.subject.capture({ "-c" }, "shortcut_bindings"), true)
+					f.subject.capture({}, "shortcut_bindings"), true)
 				local sibling_task = f.tasks[#f.tasks]
 				sibling_task:deliver(0, "", "")
 				helpers.assert_eq(
-					f.subject.capture({ "-c" }, "gestures"), false)
+					f.subject.capture({}, "gestures"), false)
 				helpers.assert_eq(f.subject.resume_screenshot_actions("gestures"), true)
 				helpers.assert_eq(
 					f.subject.is_screenshot_actions_paused("gestures"), false)
@@ -284,7 +306,7 @@ helpers.describe("shared screenshot owner: reentrant construction pause", functi
 			end,
 		})
 
-		helpers.assert_eq(f.subject.capture({ "-ci" }, "gestures"), false)
+		helpers.assert_eq(f.subject.capture({ "-i" }, "gestures"), false)
 		local target = f.tasks[1]
 		helpers.assert_eq(reentrant_pause, false,
 			"PAUSE must retain the in-progress construction acquisition")
@@ -294,7 +316,7 @@ helpers.describe("shared screenshot owner: reentrant construction pause", functi
 		helpers.assert_eq(target.terminate_calls, 1)
 		helpers.assert_eq(target.terminate_identities[1] == target, true)
 		helpers.assert_eq(f.subject.has_pending_screenshot_action("gestures"), true)
-		helpers.assert_eq(f.subject.capture({ "-c" }, "gestures"), false)
+		helpers.assert_eq(f.subject.capture({}, "gestures"), false)
 
 		target.terminate_mode = "pending"
 		helpers.assert_eq(f.subject.pause_screenshot_actions("gestures"), false)
@@ -315,7 +337,7 @@ helpers.describe("shared screenshot owner: start rollback debt", function()
 		helpers.it("retains a mutate-then-" .. start_mode .. " task", function()
 			local f = fresh_screenshot()
 			f.queue({ start_mode = start_mode, terminate_mode = "false" })
-			helpers.assert_eq(f.subject.capture({ "-c" }, "gestures"), false)
+			helpers.assert_eq(f.subject.capture({}, "gestures"), false)
 			local target = f.tasks[1]
 			helpers.assert_eq(target.terminate_calls, 1)
 			helpers.assert_eq(f.subject.has_pending_screenshot_action("gestures"), true)
