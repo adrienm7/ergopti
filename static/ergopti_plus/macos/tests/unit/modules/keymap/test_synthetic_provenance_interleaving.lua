@@ -19,6 +19,7 @@ local KEYCODE_A = 0
 local KEYCODE_V = 9
 local KEYCODE_BACKSPACE = 51
 local KEYCODE_F16 = 106
+local KEYCODE_F20 = 90
 
 
 --- Converts the modifier list accepted by newKeyEvent into keymap flags.
@@ -119,19 +120,23 @@ local function load_fixture()
 	Utils.is_secure_field = function() return false, 1 end
 	local hs_stub = require("hs")
 	local synthetic = require("adapters.synthetic_input")
-	local keydown_tap = nil
+	local keydown_tap, keyup_tap = nil, nil
 	for _, tap in ipairs(taps) do
 		if #tap.types == 1 and tap.types[1] == hs_stub.eventtap.event.types.keyDown then
-			keydown_tap = tap
-			break
+			keydown_tap = keydown_tap or tap
+		elseif #tap.types == 1 and tap.types[1] == hs_stub.eventtap.event.types.keyUp then
+			keyup_tap = keyup_tap or tap
 		end
 	end
 	helpers.assert_not_nil(keydown_tap,
 		"the production keymap keyDown eventtap must be created")
+	helpers.assert_not_nil(keyup_tap,
+		"the production keymap keyUp eventtap must be created")
 	return {
 		keymap = keymap,
 		synthetic = synthetic,
 		handle = keydown_tap.callback,
+		handle_up = keyup_tap.callback,
 		hs = hs_stub,
 	}
 end
@@ -277,6 +282,48 @@ helpers.describe("keymap synthetic provenance: explicit transactions under inter
 		helpers.assert_nil(returned_events)
 		helpers.assert_true(fixture.synthetic.current_action_epoch() == epoch_before,
 			"a stale internal loopback is not an observable user action")
+	end)
+
+	helpers.it("(sentinel-never-reaches-app) production keymap taps delete both Karabiner F20 phases", function()
+		local fixture = load_fixture()
+		local key_up = fixture.hs.eventtap.event.types.keyUp
+		local function release(keycode)
+			local event = physical_event(fixture, "", keycode)
+			event.getType = function() return key_up end
+			return event
+		end
+
+		local signals = 0
+		require("modules.keymap.control_sentinels").set_listener("test.observer",
+			function() signals = signals + 1 end)
+
+		helpers.assert_true(fixture.handle(physical_event(fixture, "", KEYCODE_F20)),
+			"the F20 layer sentinel key-down must not reach the frontmost application")
+		helpers.assert_true(fixture.handle_up(release(KEYCODE_F20)),
+			"the F20 layer sentinel key-up must not reach the frontmost application")
+		helpers.assert_eq(signals, 1, "the layer signal must be published once per press")
+		helpers.assert_true(not fixture.handle(physical_event(fixture, "a", KEYCODE_A)),
+			"an ordinary key-down must still reach the application")
+		helpers.assert_true(not fixture.handle_up(release(KEYCODE_A)),
+			"an ordinary key-up must still pass through the keymap keyUp tap")
+		helpers.assert_eq(signals, 1, "an ordinary key must not publish the layer signal")
+
+		-- Ignored windows are a pass-through boundary for text features only; the
+		-- reported QSpace rename field must still never receive the sentinel.
+		local Utils = require("modules.keymap.utils")
+		Utils.is_ignored_window = function() return true, 2 end
+		helpers.assert_true(fixture.handle(physical_event(fixture, "", KEYCODE_F20)),
+			"an ignored window must not receive the F20 layer sentinel")
+		Utils.is_ignored_window = function() return false, 3 end
+
+		-- The sibling internal signal: the F16 LLM loopback is deleted in both
+		-- phases by its exact tag, so it has never needed the sentinel owner.
+		local tx = fixture.synthetic.begin("test.f16-loopback-phases", "action")
+		local batch = fixture.synthetic.begin_callback(tx)
+		fixture.synthetic.loopbackKeyStroke(batch, {}, "f16")
+		helpers.assert_true(fixture.handle_up(batch.events[2]),
+			"the F16 loopback key-up must not reach the frontmost application")
+		fixture.synthetic.cancel(tx)
 	end)
 
 	helpers.it("does not let a physical Cmd+V consume a tagged paste event", function()
