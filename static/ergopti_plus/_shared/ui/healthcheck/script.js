@@ -75,7 +75,11 @@ window.renderHealthcheck = function (s) {
 	html += '<table><tr><th>Field</th><th>Value</th></tr>';
 
 	html += row('ErgoptiPlus version', escapeHtml(String(s.version || '')));
-	html += row('Last git commit', escapeHtml(String(sys.git_hash || 'unknown')));
+	// commit_source says whether the id comes from a package's build stamp or a
+	// source checkout, so a release build and a dev run of it are told apart.
+	var commit = String(sys.git_hash || 'unknown');
+	if (sys.commit_source) commit += ' (' + String(sys.commit_source) + ')';
+	html += row('Last git commit', escapeHtml(commit));
 	html += row('Uptime', escapeHtml(formatUptime(s.uptime_sec)));
 
 	// OS-specific rows: detect the driver by the presence of ahk_version vs hs_version
@@ -129,6 +133,11 @@ window.renderHealthcheck = function (s) {
 
 	if (sys.config_dir) {
 		html += row('Config dir', '<code>' + escapeHtml(String(sys.config_dir)) + '</code>');
+	}
+	// Where the driver's scripts run from: inside a packaged app this is the
+	// bundle, which is why it must never be presented as the config dir.
+	if (sys.script_dir) {
+		html += row('Script dir', '<code>' + escapeHtml(String(sys.script_dir)) + '</code>');
 	}
 
 	html += '</table>';

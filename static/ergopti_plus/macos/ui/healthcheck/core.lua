@@ -844,7 +844,8 @@ function M.format_plain(snapshot)
 	table.insert(lines, "=== System diagnostic ===")
 	table.insert(lines, "")
 	table.insert(lines, string.format("Version          : %s", s.version))
-	table.insert(lines, string.format("Last git commit  : %s", tostring(sys.git_hash or "unknown")))
+	table.insert(lines, string.format("Last git commit  : %s%s", tostring(sys.git_hash or "unknown"),
+		sys.commit_source and (" (" .. tostring(sys.commit_source) .. ")") or ""))
 	table.insert(lines, string.format("Uptime           : %s", H.format_uptime(s.uptime_sec)))
 	table.insert(lines, string.format("Hammerspoon      : %s", tostring(sys.hs_version or "?")))
 	table.insert(lines, string.format("macOS            : %s", tostring(sys.os_version or "?")))
@@ -864,6 +865,9 @@ function M.format_plain(snapshot)
 	end
 	if sys.config_dir and sys.config_dir ~= "" then
 		table.insert(lines, string.format("Config dir       : %s", sys.config_dir))
+	end
+	if sys.script_dir and sys.script_dir ~= "" then
+		table.insert(lines, string.format("Script dir       : %s", sys.script_dir))
 	end
 	table.insert(lines, "")
 	table.insert(lines, string.format("Warnings         : %d", s.warn_count or 0))

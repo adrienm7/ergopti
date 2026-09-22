@@ -66,6 +66,27 @@ end
 -- =========================================
 -- =========================================
 
+--- The build commit and the configuration directory, rendered for the dump.
+--- Which build crashed is the first question of every report, so both are read
+--- on the crash path itself (a few file reads, no subprocess), before the dump
+--- file is opened, and a resolver failure is written as its own reason rather
+--- than costing the dump.
+--- @return string commit_line "<commit> (<source>)" or the failure reason.
+--- @return string config_line The configuration directory or the failure reason.
+local function _build_facts()
+	local ok_commit, commit, source = pcall(function()
+		return require("infra.diagnostic_snapshot").resolve_commit()
+	end)
+	local commit_line = ok_commit and string.format("%s (%s)", tostring(commit), tostring(source))
+		or ("unknown (resolution failed: " .. tostring(commit) .. ")")
+	local ok_config, config_dir = pcall(function()
+		return require("infra.config_paths").get_config_dir()
+	end)
+	local config_line = ok_config and tostring(config_dir)
+		or ("unknown (resolution failed: " .. tostring(config_dir) .. ")")
+	return commit_line, config_line
+end
+
 --- Writes a crash dump to the crash directory.
 --- Safe to call from pcall error handlers — never throws.
 ---
@@ -81,6 +102,7 @@ function M.dump(module_name, error_msg, context)
 	local ts = os.date("!%Y-%m-%dT%H-%M-%S")
 	local safe_name = module_name:gsub("[^%w_.-]", "_")
 	local path = CRASH_DIR .. "/crash_" .. ts .. "_" .. safe_name .. ".txt"
+	local commit_line, config_line = _build_facts()
 
 	local fh = io.open(path, "w")
 	if not fh then
@@ -93,6 +115,8 @@ function M.dump(module_name, error_msg, context)
 	fh:write(string.format("Timestamp: %s\n", os.date()))
 	fh:write(string.format("Module:    %s\n", module_name))
 	fh:write(string.format("Error:     %s\n", error_msg))
+	fh:write(string.format("Commit:    %s\n", commit_line))
+	fh:write(string.format("Config:    %s\n", config_line))
 
 	if type(context) == "table" then
 		if type(context.stack_trace) == "string" then
