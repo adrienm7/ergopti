@@ -468,6 +468,33 @@ function H.collect_platform_coverage()
 	}
 end
 
+--- Formats one permission query result for the report.
+--- @param granted boolean|nil Native state; nil when the query failed.
+--- @param detail string|nil Query failure detail.
+--- @return string label `granted`, `missing`, or `unknown (<detail>)`.
+local function permission_label(granted, detail)
+	if granted == true then return "granted" end
+	if granted == false then return "missing" end
+	return "unknown (" .. tostring(detail or "query failed") .. ")"
+end
+
+--- Reports the macOS privacy permissions of this runtime, without prompting.
+--- The packaged runtime has its own identity, so a grant held by a stock
+--- Hammerspoon never applies to it: a missing Screen Recording grant is why a
+--- screenshot or a picked color comes back empty or wrong.
+--- @return table { accessibility, screen_recording } labels.
+function H.collect_permissions()
+	local Accessibility = require("adapters.accessibility_permission")
+	local ScreenCapture = require("adapters.screen_capture")
+	local permissions = {
+		accessibility = permission_label(Accessibility.is_trusted()),
+		screen_recording = permission_label(ScreenCapture.permission_state()),
+	}
+	Logger.debug(LOG, "Permissions: accessibility=%s screen_recording=%s.",
+		permissions.accessibility, permissions.screen_recording)
+	return permissions
+end
+
 
 
 
