@@ -2503,5 +2503,10 @@
 	"numeric_prompt.not_a_number": "数値を入力してください。",
 	"numeric_prompt.out_of_range": "値が許容範囲外です。",
 	"menu.llm.generation.custom_value": "その他の値…",
-	"ui_metrics_rebuild.partial": "部分的な統計：{date} までのデータを再構築済み。"
+	"ui_metrics_rebuild.partial": "部分的な統計：{date} までのデータを再構築済み。",
+	"ui_metrics_rebuild.progress": "統計を再構築中：{percent}% — {remaining}",
+	"ui_metrics_rebuild.eta": "残り約 {eta}",
+	"ui_metrics_rebuild.eta_unknown": "残り時間を推定中…",
+	"ui_metrics_rebuild.finalizing": "再構築した統計を保存中…",
+	"ui_metrics_rebuild.failed": "統計の再構築が予期せず停止しました。次回の試行は停止した箇所から再開します。"
 }

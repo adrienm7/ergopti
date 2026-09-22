@@ -2503,5 +2503,10 @@
 	"numeric_prompt.not_a_number": "Wprowadź liczbę.",
 	"numeric_prompt.out_of_range": "Wartość jest poza dozwolonym zakresem.",
 	"menu.llm.generation.custom_value": "Inna wartość…",
-	"ui_metrics_rebuild.partial": "Częściowe statystyki: dane odbudowane wstecz do {date}."
+	"ui_metrics_rebuild.partial": "Częściowe statystyki: dane odbudowane wstecz do {date}.",
+	"ui_metrics_rebuild.progress": "Odbudowa statystyk: {percent}% — {remaining}",
+	"ui_metrics_rebuild.eta": "pozostało około {eta}",
+	"ui_metrics_rebuild.eta_unknown": "szacowanie pozostałego czasu…",
+	"ui_metrics_rebuild.finalizing": "Zapisywanie odbudowanych statystyk…",
+	"ui_metrics_rebuild.failed": "Odbudowa statystyk nieoczekiwanie się zatrzymała. Następna próba wznowi ją od miejsca przerwania."
 }

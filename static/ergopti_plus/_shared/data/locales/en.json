@@ -2503,5 +2503,10 @@
 	"numeric_prompt.not_a_number": "Enter a number.",
 	"numeric_prompt.out_of_range": "The value is outside the accepted range.",
 	"menu.llm.generation.custom_value": "Other value…",
-	"ui_metrics_rebuild.partial": "Partial statistics: data rebuilt back to {date}."
+	"ui_metrics_rebuild.partial": "Partial statistics: data rebuilt back to {date}.",
+	"ui_metrics_rebuild.progress": "Rebuilding statistics: {percent}% — {remaining}",
+	"ui_metrics_rebuild.eta": "about {eta} left",
+	"ui_metrics_rebuild.eta_unknown": "estimating remaining time…",
+	"ui_metrics_rebuild.finalizing": "Saving the rebuilt statistics…",
+	"ui_metrics_rebuild.failed": "The statistics rebuild stopped unexpectedly. The next attempt resumes where it stopped."
 }

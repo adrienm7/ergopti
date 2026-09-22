@@ -2503,5 +2503,10 @@
 	"numeric_prompt.not_a_number": "Ange ett tal.",
 	"numeric_prompt.out_of_range": "Värdet ligger utanför det tillåtna intervallet.",
 	"menu.llm.generation.custom_value": "Annat värde…",
-	"ui_metrics_rebuild.partial": "Delvis statistik: data återuppbyggd tillbaka till {date}."
+	"ui_metrics_rebuild.partial": "Delvis statistik: data återuppbyggd tillbaka till {date}.",
+	"ui_metrics_rebuild.progress": "Återuppbygger statistik: {percent} % — {remaining}",
+	"ui_metrics_rebuild.eta": "cirka {eta} kvar",
+	"ui_metrics_rebuild.eta_unknown": "uppskattar återstående tid…",
+	"ui_metrics_rebuild.finalizing": "Sparar den återuppbyggda statistiken…",
+	"ui_metrics_rebuild.failed": "Återuppbyggnaden av statistiken stoppades oväntat. Nästa försök fortsätter där den stannade."
 }

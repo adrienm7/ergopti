@@ -2503,5 +2503,10 @@
 	"numeric_prompt.not_a_number": "Indtast et tal.",
 	"numeric_prompt.out_of_range": "Værdien er uden for det tilladte interval.",
 	"menu.llm.generation.custom_value": "Anden værdi…",
-	"ui_metrics_rebuild.partial": "Delvise statistikker: data genopbygget tilbage til {date}."
+	"ui_metrics_rebuild.partial": "Delvise statistikker: data genopbygget tilbage til {date}.",
+	"ui_metrics_rebuild.progress": "Genopbygger statistikker: {percent} % — {remaining}",
+	"ui_metrics_rebuild.eta": "cirka {eta} tilbage",
+	"ui_metrics_rebuild.eta_unknown": "beregner resterende tid…",
+	"ui_metrics_rebuild.finalizing": "Gemmer de genopbyggede statistikker…",
+	"ui_metrics_rebuild.failed": "Genopbygningen af statistikker stoppede uventet. Næste forsøg fortsætter, hvor den slap."
 }

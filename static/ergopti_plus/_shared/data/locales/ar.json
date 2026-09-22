@@ -2503,5 +2503,10 @@
 	"numeric_prompt.not_a_number": "أدخل رقمًا.",
 	"numeric_prompt.out_of_range": "القيمة خارج النطاق المسموح.",
 	"menu.llm.generation.custom_value": "قيمة أخرى…",
-	"ui_metrics_rebuild.partial": "إحصائيات جزئية: أُعيد بناء البيانات حتى {date}."
+	"ui_metrics_rebuild.partial": "إحصائيات جزئية: أُعيد بناء البيانات حتى {date}.",
+	"ui_metrics_rebuild.progress": "إعادة بناء الإحصائيات: {percent}٪ — {remaining}",
+	"ui_metrics_rebuild.eta": "يتبقى نحو {eta}",
+	"ui_metrics_rebuild.eta_unknown": "جارٍ تقدير الوقت المتبقي…",
+	"ui_metrics_rebuild.finalizing": "جارٍ حفظ الإحصائيات المعاد بناؤها…",
+	"ui_metrics_rebuild.failed": "توقفت إعادة بناء الإحصائيات بشكل غير متوقع. ستستأنف المحاولة التالية من حيث توقفت."
 }

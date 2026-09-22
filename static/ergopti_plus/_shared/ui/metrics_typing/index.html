@@ -1430,6 +1430,10 @@
 							}
 							return;
 						}
+						if (payload.type === 'rebuild_progress') {
+							if (window.metrics_rebuild) window.metrics_rebuild.show_progress(payload.progress);
+							return;
+						}
 						if (payload.type !== 'prefetch') return;
 						push_count++;
 						processed_count++;

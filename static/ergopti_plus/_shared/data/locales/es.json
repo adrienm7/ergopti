@@ -2503,5 +2503,10 @@
 	"numeric_prompt.not_a_number": "Introduzca un número.",
 	"numeric_prompt.out_of_range": "El valor está fuera del intervalo aceptado.",
 	"menu.llm.generation.custom_value": "Otro valor…",
-	"ui_metrics_rebuild.partial": "Estadísticas parciales: datos reconstruidos hasta el {date}."
+	"ui_metrics_rebuild.partial": "Estadísticas parciales: datos reconstruidos hasta el {date}.",
+	"ui_metrics_rebuild.progress": "Reconstruyendo estadísticas: {percent} % — {remaining}",
+	"ui_metrics_rebuild.eta": "quedan unos {eta}",
+	"ui_metrics_rebuild.eta_unknown": "calculando el tiempo restante…",
+	"ui_metrics_rebuild.finalizing": "Guardando las estadísticas reconstruidas…",
+	"ui_metrics_rebuild.failed": "La reconstrucción de estadísticas se detuvo inesperadamente. El próximo intento continuará donde se detuvo."
 }

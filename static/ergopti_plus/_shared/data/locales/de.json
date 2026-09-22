@@ -2503,5 +2503,10 @@
 	"numeric_prompt.not_a_number": "Bitte eine Zahl eingeben.",
 	"numeric_prompt.out_of_range": "Der Wert liegt außerhalb des zulässigen Bereichs.",
 	"menu.llm.generation.custom_value": "Anderer Wert…",
-	"ui_metrics_rebuild.partial": "Teilstatistik: Daten bis zum {date} zurück neu aufgebaut."
+	"ui_metrics_rebuild.partial": "Teilstatistik: Daten bis zum {date} zurück neu aufgebaut.",
+	"ui_metrics_rebuild.progress": "Statistik wird neu aufgebaut: {percent} % — {remaining}",
+	"ui_metrics_rebuild.eta": "noch etwa {eta}",
+	"ui_metrics_rebuild.eta_unknown": "verbleibende Zeit wird geschätzt…",
+	"ui_metrics_rebuild.finalizing": "Neu aufgebaute Statistik wird gespeichert…",
+	"ui_metrics_rebuild.failed": "Der Statistikaufbau wurde unerwartet beendet. Der nächste Versuch setzt dort fort, wo er aufgehört hat."
 }

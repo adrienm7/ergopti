@@ -1391,8 +1391,36 @@ KLPF_BuildPartialJson(which, db, Partial) {
 		return KLPF_SerializeBlob(Blob)
 }
 
+; Progress of the store's running rebuild, shared by every dashboard of it.
+; @param metrics_dir {String} Absolute metrics store directory.
+; @returns {String} Path of the small progress document.
+KLPF_RebuildProgressPath(metrics_dir) {
+		return RegExReplace(KLPF_PrefetchPath("typing", metrics_dir), "_typing\.json$", "_rebuild.json")
+}
+
+; Turn one rebuild report into the progress document the page displays. The
+; remaining time comes from the throughput this worker measured itself, so
+; bytes a killed predecessor already rebuilt never inflate the estimate.
+; @param Info {Map} Report from _KLR_RebuildNotify.
+; @returns {Map} state, percent, eta_s (-1 while unknown), oldest_complete.
+KLPF_RebuildProgress(Info) {
+		Total := Info["total_bytes"]
+		Done := Info["done_bytes"]
+		Percent := Total > 0 ? Min(100, Floor(Done * 100 / Total)) : 100
+		Eta := -1
+		if !Info["final"] && Info["run_bytes"] >= KLPFRebuildPublisher.MIN_ETA_BYTES && Info["elapsed_ms"] > 0
+				Eta := Round((Total - Done) * Info["elapsed_ms"] / Info["run_bytes"] / 1000)
+		return Map("state", Info["final"] ? "finalizing" : "running", "percent", Percent, "eta_s", Eta,
+				"oldest_complete", Info.Get("oldest_complete", ""))
+}
+
 ; Rebuild observer owned by the projection worker (see KLRRebuild.observer).
 class KLPFRebuildPublisher {
+		; The bar moves at most this often; each write is a tiny atomic file.
+		static MIN_PROGRESS_INTERVAL_MS := 1000
+		; Below this much measured work the throughput is noise, not an estimate.
+		static MIN_ETA_BYTES := 1048576
+
 		; A partial snapshot re-reads the whole rebuilt range; keep its cost
 		; below a fifth of the rebuild's time and never more often than this.
 		static MIN_PARTIAL_INTERVAL_MS := 10000
@@ -1403,11 +1431,29 @@ class KLPFRebuildPublisher {
 				this.last_partial := 0
 				this.partial_cost := 0
 				this.published_oldest := ""
+				this.last_progress := 0
+				this.progress_written := false
 		}
 
 		Call(Info) {
+				this.PublishProgress(Info)
 				if Info.Has("db") && !Info["final"]
 						this.PublishPartial(Info)
+		}
+
+		PublishProgress(Info) {
+				Final := Info.Get("final", false)
+				if !Final && this.last_progress
+								&& (A_TickCount - this.last_progress) < KLPFRebuildPublisher.MIN_PROGRESS_INTERVAL_MS
+						return false
+				Progress := KLPF_RebuildProgress(Info)
+				Progress["pid"] := DllCall("Kernel32\GetCurrentProcessId", "UInt")
+				; A missed update only delays the bar; the next report rewrites it.
+				if !KLPF_WriteAtomic(KLPF_RebuildProgressPath(this.metrics_dir), KL_JsonEncode(Progress))
+						return false
+				this.last_progress := A_TickCount
+				this.progress_written := true
+				return true
 		}
 
 		PublishPartial(Info) {
@@ -1432,11 +1478,13 @@ class KLPFRebuildPublisher {
 				return true
 		}
 
-		; Remove the partial snapshots once a complete one is published.
+		; Remove the progress and partial snapshots once a complete one is published.
 		Retire() {
-				if this.published_oldest = ""
-						return true
 				Retired := true
+				if this.progress_written
+						Retired := FSDelete(KLPF_RebuildProgressPath(this.metrics_dir))
+				if this.published_oldest = ""
+						return Retired
 				for which in ["typing", "apps"]
 						Retired := FSDelete(KLPF_PartialSnapshotPath(which, this.metrics_dir)) && Retired
 				return Retired

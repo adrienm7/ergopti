@@ -2503,5 +2503,10 @@
 	"numeric_prompt.not_a_number": "Введите число.",
 	"numeric_prompt.out_of_range": "Значение вне допустимого диапазона.",
 	"menu.llm.generation.custom_value": "Другое значение…",
-	"ui_metrics_rebuild.partial": "Частичная статистика: данные восстановлены до {date}."
+	"ui_metrics_rebuild.partial": "Частичная статистика: данные восстановлены до {date}.",
+	"ui_metrics_rebuild.progress": "Восстановление статистики: {percent} % — {remaining}",
+	"ui_metrics_rebuild.eta": "осталось около {eta}",
+	"ui_metrics_rebuild.eta_unknown": "оценка оставшегося времени…",
+	"ui_metrics_rebuild.finalizing": "Сохранение восстановленной статистики…",
+	"ui_metrics_rebuild.failed": "Восстановление статистики неожиданно остановилось. Следующая попытка продолжит с места остановки."
 }
