@@ -175,7 +175,7 @@ KLR_BuildDatabase(metrics_dir) {
 				update := KLR_PrepareIncremental(md, logPath)
 				if !update.Get("ok", false) {
 						if update.Get("rebuild", false) {
-								cold := KLR_BuildColdCandidate(md, logPath)
+								cold := KLR_BuildColdCandidateAuto(md, logPath)
 								if cold.Get("ok", false) {
 										KLR_PublishCandidate(cold["db"], cold["sizes"], cold["snapshots"])
 										; The previous disk image no longer describes the source. Its
@@ -302,7 +302,7 @@ KLR_BuildDatabase(metrics_dir) {
 				return KLRCache.db
 		}
 
-		cold := KLR_BuildColdCandidate(md, logPath)
+		cold := KLR_BuildColdCandidateAuto(md, logPath)
 		if !cold.Get("ok", false)
 				return 0
 		KLR_PublishCandidate(cold["db"], cold["sizes"], cold["snapshots"])
