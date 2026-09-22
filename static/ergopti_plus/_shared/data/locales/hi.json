@@ -1264,6 +1264,7 @@
 	"menu.shortcuts.right_opt_back": "दायां Opt + ⌫ → %s",
 	"menu.shortcuts.right_opt_escape": "दायां Opt + Esc → %s",
 	"menu.shortcuts.right_opt_return": "दायां Opt + Return → %s",
+	"menu.shortcuts.screen_instant": "1 के बाईं ओर की कुंजी (AZERTY में ², Ergopti में $): तुरंत स्क्रीनशॉट",
 	"menu.shortcuts.script_shortcuts": "स्क्रिप्ट प्रबंधन शॉर्टकट",
 	"menu.shortcuts.submenu_cmd": "Cmd शॉर्टकट",
 	"menu.shortcuts.submenu_ctrl": "Ctrl शॉर्टकट",

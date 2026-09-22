@@ -1264,6 +1264,7 @@
 	"menu.shortcuts.right_opt_back": "Prawy Opt + ⌫ → %s",
 	"menu.shortcuts.right_opt_escape": "Prawy Opt + Esc → %s",
 	"menu.shortcuts.right_opt_return": "Prawy Opt + Return → %s",
+	"menu.shortcuts.screen_instant": "Klawisz na lewo od 1 (² w AZERTY, $ w Ergopti): natychmiastowy zrzut ekranu",
 	"menu.shortcuts.script_shortcuts": "Skróty zarządzania skryptem",
 	"menu.shortcuts.submenu_cmd": "Skróty Cmd",
 	"menu.shortcuts.submenu_ctrl": "Skróty Ctrl",

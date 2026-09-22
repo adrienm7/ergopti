@@ -1264,6 +1264,7 @@
 	"menu.shortcuts.right_opt_back": "Правий Opt + ⌫ → %s",
 	"menu.shortcuts.right_opt_escape": "Правий Opt + Esc → %s",
 	"menu.shortcuts.right_opt_return": "Правий Opt + Return → %s",
+	"menu.shortcuts.screen_instant": "Клавіша ліворуч від 1 (² в AZERTY, $ в Ergopti): миттєвий знімок екрана",
 	"menu.shortcuts.script_shortcuts": "Скорочення для керування скриптом",
 	"menu.shortcuts.submenu_cmd": "Скорочення Cmd",
 	"menu.shortcuts.submenu_ctrl": "Скорочення Ctrl",

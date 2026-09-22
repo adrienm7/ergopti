@@ -1264,6 +1264,7 @@
 	"menu.shortcuts.right_opt_back": "Høyre Opt + ⌫ → %s",
 	"menu.shortcuts.right_opt_escape": "Høyre Opt + Esc → %s",
 	"menu.shortcuts.right_opt_return": "Høyre Opt + Enter → %s",
+	"menu.shortcuts.screen_instant": "Tasten til venstre for 1 (² på AZERTY, $ på Ergopti): øyeblikkelig skjermbilde",
 	"menu.shortcuts.script_shortcuts": "Skriptbehandlingssnarveier",
 	"menu.shortcuts.submenu_cmd": "Cmd-snarveier",
 	"menu.shortcuts.submenu_ctrl": "Ctrl-snarveier",

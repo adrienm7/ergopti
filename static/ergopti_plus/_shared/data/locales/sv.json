@@ -1264,6 +1264,7 @@
 	"menu.shortcuts.right_opt_back": "Höger Opt + ⌫ → %s",
 	"menu.shortcuts.right_opt_escape": "Höger Opt + Esc → %s",
 	"menu.shortcuts.right_opt_return": "Höger Opt + Retur → %s",
+	"menu.shortcuts.screen_instant": "Tangenten till vänster om 1 (² på AZERTY, $ på Ergopti): omedelbar skärmbild",
 	"menu.shortcuts.script_shortcuts": "Genvägar för skripthantering",
 	"menu.shortcuts.submenu_cmd": "Cmd-genvägar",
 	"menu.shortcuts.submenu_ctrl": "Ctrl-genvägar",

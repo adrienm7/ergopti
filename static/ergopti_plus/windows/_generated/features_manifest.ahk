@@ -170,7 +170,7 @@ global FEATURES_MANIFEST := Map(
         Map("path", "shortcuts.open_downloads", "id", "open_downloads", "section", "shortcuts", "default", true, "type", "boolean", "description_key", "menu.shortcuts.open_downloads", "platforms", ["ahk"]),
         Map("path", "shortcuts.move", "id", "move", "section", "shortcuts", "default", true, "type", "boolean", "description_key", "menu.shortcuts.move", "platforms", ["ahk"]),
         Map("path", "shortcuts.screen", "id", "screen", "section", "shortcuts", "default", true, "type", "boolean", "description_key", "menu.shortcuts.screen", "platforms", ["ahk"]),
-        Map("path", "shortcuts.screen_instant", "id", "screen_instant", "section", "shortcuts", "default", true, "type", "boolean", "description_key", "shortcuts.label_at_hash", "platforms", ["ahk"]),
+        Map("path", "shortcuts.screen_instant", "id", "screen_instant", "section", "shortcuts", "default", true, "type", "boolean", "description_key", "menu.shortcuts.screen_instant", "platforms", ["ahk"]),
         Map("path", "shortcuts.win_caps_lock", "id", "win_caps_lock", "section", "shortcuts", "default", true, "type", "boolean", "description_key", "menu.shortcuts.win_caps_lock", "platforms", ["ahk"]),
         Map("path", "shortcuts.a_grave.enabled", "id", "enabled", "section", "shortcuts.a_grave", "default", true, "type", "boolean", "description_key", "menu.shortcuts.a_grave", "platforms", ["ahk"]),
         Map("path", "shortcuts.a_grave.letter", "id", "letter", "section", "shortcuts.a_grave", "default", "v", "type", "string", "description_key", "menu.shortcuts.a_grave.letter", "platforms", ["ahk"]),

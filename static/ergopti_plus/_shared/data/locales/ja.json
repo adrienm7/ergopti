@@ -1264,6 +1264,7 @@
 	"menu.shortcuts.right_opt_back": "右Opt + ⌫ → %s",
 	"menu.shortcuts.right_opt_escape": "右Opt + Esc → %s",
 	"menu.shortcuts.right_opt_return": "右Opt + Return → %s",
+	"menu.shortcuts.screen_instant": "1 の左のキー（AZERTY では ²、Ergopti では $）：即時スクリーンショット",
 	"menu.shortcuts.script_shortcuts": "スクリプト管理ショートカット",
 	"menu.shortcuts.submenu_cmd": "Cmdショートカット",
 	"menu.shortcuts.submenu_ctrl": "Ctrlショートカット",

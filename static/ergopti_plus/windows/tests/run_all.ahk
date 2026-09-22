@@ -1005,6 +1005,8 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_menu_gestures_actions_separator.ahk
 ; Regression: a category toggle's own separator absorbs the manifest "---" after it.
 #Include unit/test_manifest_menu_no_double_separator.ahk
+; Regression: Shortcuts submenu block separator and screenshot key label.
+#Include unit/test_shortcuts_menu_blocks.ahk
 ; Contract gate: metrics_menu disabled_when predicate == AHK handler resolver calls (MG-1/MG-2).
 #Include meta/test_list_providers_touch_no_menu.ahk
 #Include meta/test_menu_metrics_disabled_when.ahk

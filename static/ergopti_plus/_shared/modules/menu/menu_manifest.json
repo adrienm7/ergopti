@@ -625,10 +625,7 @@
 			"reason_key": "platform_reason.selection_operations_are_a_block_on_linux"
 		},
 		{
-			"type": "---",
-			"platforms": [
-				"linux"
-			]
+			"type": "---"
 		},
 		{
 			"type": "list",

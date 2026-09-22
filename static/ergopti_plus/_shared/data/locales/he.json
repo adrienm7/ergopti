@@ -1264,6 +1264,7 @@
 	"menu.shortcuts.right_opt_back": "Opt ימני + ⌫ → %s",
 	"menu.shortcuts.right_opt_escape": "Opt ימני + Esc → %s",
 	"menu.shortcuts.right_opt_return": "Opt ימני + Return → %s",
+	"menu.shortcuts.screen_instant": "המקש משמאל ל־1 (² ב־AZERTY, $ ב־Ergopti): צילום מסך מיידי",
 	"menu.shortcuts.script_shortcuts": "קיצורי ניהול סקריפט",
 	"menu.shortcuts.submenu_cmd": "קיצורי Cmd",
 	"menu.shortcuts.submenu_ctrl": "קיצורי Ctrl",

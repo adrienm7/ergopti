@@ -1264,6 +1264,7 @@
 	"menu.shortcuts.right_opt_back": "Правый Opt + ⌫ → %s",
 	"menu.shortcuts.right_opt_escape": "Правый Opt + Esc → %s",
 	"menu.shortcuts.right_opt_return": "Правый Opt + Return → %s",
+	"menu.shortcuts.screen_instant": "Клавиша слева от 1 (² в AZERTY, $ в Ergopti): мгновенный снимок экрана",
 	"menu.shortcuts.script_shortcuts": "Сочетания для управления скриптом",
 	"menu.shortcuts.submenu_cmd": "Сочетания Cmd",
 	"menu.shortcuts.submenu_ctrl": "Сочетания Ctrl",
