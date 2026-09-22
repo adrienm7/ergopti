@@ -381,7 +381,9 @@ local function _process_release_response(body, channel)
 	end
 
 	if not Version.is_newer_version(latest_tag, current) then
-		Logger.debug(LOG, "Up to date: current %s, latest %s.", current, latest_tag)
+		-- Info, not debug: "the check ran and found nothing" is the answer a user
+		-- asking "why did it not update" needs, and it happens a few times a day.
+		Logger.info(LOG, "Update check result: up to date (current %s, latest %s).", current, latest_tag)
 		_state = "idle"
 		return false
 	end
@@ -430,9 +432,11 @@ end
 function M.check_for_updates(channel, callback)
 	channel = channel or _channel
 	if _state == "checking" or _state == "downloading" or _state == "installing" then
+		Logger.info(LOG, "Update check skipped: updater busy (%s).", _state)
 		publish_check(callback, false, nil, "updater busy")
 		return false
 	end
+	Logger.info(LOG, "Update check requested on channel '%s'.", tostring(channel))
 	_state = "checking"
 	_cached_release = nil
 	local published = false
@@ -538,7 +542,10 @@ function M.start_background_checks(channel, interval_sec, on_available)
 				end
 				Logger.info(LOG, "New release available: %s.", tag)
 				if type(on_available) == "function" then
-					pcall(on_available, release)
+					local ok_notify, notify_error = pcall(on_available, release)
+					if not ok_notify then
+						Logger.error(LOG, "Update-available handler raised: %s.", tostring(notify_error))
+					end
 				end
 			end
 		end)

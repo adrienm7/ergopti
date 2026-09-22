@@ -141,6 +141,8 @@ local ScriptActions     = require("modules.shortcuts.script_actions")
 local CrashReporter     = require("modules.diagnostics.crash_reporter")
 local FocusGuard        = require("modules.keylogger.focus_guard")
 local InputCaptureGate  = require("infra.input_capture_gate")
+local BootProfiler      = require("infra.boot_profiler")
+local DiagnosticSnapshot = require("infra.diagnostic_snapshot")
 
 -- Optional adapters (may fail to load if deps missing — daemon still runs).
 local tray_menu = RuntimeGuard.optional_require("adapters.tray_menu")
@@ -440,6 +442,36 @@ local function perform_reload(trigger)
 end
 
 
+--- Logs the cross-driver diagnostic snapshot once the daemon is ready.
+---
+--- A probe failure is reported and does not stop the daemon: the snapshot
+--- describes a running driver, it is not a precondition of one.
+--- @param boot_ms number Total boot duration.
+--- @param opts table Parsed CLI options.
+--- @param i18n_mod table|nil Loaded i18n module, for the UI locale.
+local function emit_diagnostic_snapshot(boot_ms, opts, i18n_mod)
+	local ok, err = pcall(function()
+		local enabled, total = 0, 0
+		for id in pairs(hotstrings_config.get_categories() or {}) do
+			total = total + 1
+			if hotstrings_config.is_group_enabled(id) then enabled = enabled + 1 end
+		end
+		DiagnosticSnapshot.emit({
+			script_dir       = SCRIPT_DIR,
+			boot_ms          = boot_ms,
+			locale           = i18n_mod and i18n_mod.get_locale() or nil,
+			keyboard_layout  = opts.layout,
+			log_level        = ScriptSettings.current(),
+			features_enabled = enabled,
+			features_total   = total,
+		})
+	end)
+	if not ok then
+		Logger.error(LOG, "Diagnostic snapshot could not be collected: %s.", tostring(err))
+	end
+end
+
+
 -- =========================================
 -- =========================================
 -- ======= 7/ Signal Handler Setup =========
@@ -466,13 +498,24 @@ local function install_signal_handlers()
 		injector.close_fast_channel()
 	end
 
-	pcall(signal.signal, signal.SIGINT,  on_term)
-	pcall(signal.signal, signal.SIGTERM, on_term)
+	-- Each installation is checked: a handler that silently failed to install
+	-- turns a clean systemd stop into a lost metrics batch with nothing in the log.
+	local installed = {}
+	local function install(name, number, handler)
+		local ok, err = pcall(signal.signal, number, handler)
+		if ok then
+			installed[#installed + 1] = name
+		else
+			Logger.error(LOG, "Signal handler for %s could not be installed: %s.", name, tostring(err))
+		end
+	end
+	install("INT",  signal.SIGINT,  on_term)
+	install("TERM", signal.SIGTERM, on_term)
 
 	-- SIGHUP → hot reload.
-	pcall(signal.signal, signal.SIGHUP,  function(_) perform_reload("SIGHUP") end)
+	install("HUP",  signal.SIGHUP,  function(_) perform_reload("SIGHUP") end)
 
-	Logger.debug(LOG, "Signal handlers installed (INT, TERM, HUP).")
+	Logger.debug(LOG, "Signal handlers installed (%s).", table.concat(installed, ", "))
 end
 
 
@@ -494,12 +537,21 @@ local function main()
 	-- one-run override: diagnostic output must not rewrite that preference.
 	ScriptSettings.apply(opts.verbose and "DEBUG" or nil)
 
-	Logger.start(LOG, "Ergopti hotstrings daemon starting…")
+	Logger.start(LOG, "Ergopti hotstrings daemon starting (version %s, pid %s)…",
+		Version.VERSION, DiagnosticSnapshot.pid() or "unknown")
+	BootProfiler.begin()
+	-- The options decide half of what follows (grab, tray, device pinning), and a
+	-- user log has no other record of how the unit was launched.
+	Logger.info(LOG, "Launch options: grab=%s tray=%s dry_run=%s verbose=%s device=%s layout=%s keymap=%s config=%s.",
+		tostring(opts.grab), tostring(opts.tray), tostring(opts.dry_run), tostring(opts.verbose),
+		opts.device and "pinned" or "auto", tostring(opts.layout),
+		opts.keymap and "override" or "server", opts.config and "custom" or "default")
 
 	if opts.dry_run then
 		Logger.info(LOG, "Dry-run mode: matches will be logged but not injected.")
 	end
 
+	BootProfiler.stage("config")
 	-- 8.1) Initialise the hotstring engine.
 	local engine = engine_mod.new()
 
@@ -549,11 +601,16 @@ local function main()
 	local mapping_count = hotstrings_config.load_all()
 	Logger.info(LOG, "%d hotstring mapping(s) loaded (%d parse error(s)).",
 		mapping_count, hotstrings_config.parse_error_count())
+	BootProfiler.stage_done("config", string.format("%d mapping(s), %d parse error(s), log level %s",
+		mapping_count, hotstrings_config.parse_error_count(), ScriptSettings.current()))
 
 	-- 8.3) Initialise the full keylogger.
+	BootProfiler.stage("keylogger")
 	keylogger.init({})
+	BootProfiler.stage_done("keylogger")
 
 	-- 8.4) Resolve the input device.
+	BootProfiler.stage("input device")
 	local device = opts.device
 	if not device then
 		device = dev_finder.find_keyboard()
@@ -564,6 +621,7 @@ local function main()
 		os.exit(1)
 	end
 	Logger.info(LOG, "Using device: %s.", device)
+	BootProfiler.stage_done("input device", opts.device and "pinned by --device" or "auto-detected")
 
 	-- Focused app id, cached off the input path by the process_lifecycle
 	-- onFocusChange callback (see 8.12). Declared BEFORE on_char so on_char
@@ -752,18 +810,16 @@ local function main()
 			-- so neither half of this line may be printed. The driver's default
 			-- level is DEBUG and this log is kept for 14 days, which makes it the
 			-- same sink as the database as far as a leak is concerned.
-			if result.is_private then
-				Logger.info(LOG, "Match: private mapping fired (content withheld, bc=%d).",
-					result.backspace_count)
-			else
-				Logger.info(
-					LOG,
-					"Match: trigger='%s' → '%s' (bc=%d).",
-					result.trigger,
-					result.replacement,
-					result.backspace_count
-				)
-			end
+			--
+			-- An ordinary trigger is still text the user typed, and its replacement
+			-- is often their own prose, so no fire prints either: only lengths, which
+			-- is all a timing or erase-count bug needs. Debug, not info, because this
+			-- runs on the keystroke that fired.
+			Logger.debug(LOG, "Match fired (%s, trigger %d char(s), replacement %d char(s), bc=%d).",
+				result.is_private and "private" or "ordinary",
+				utf8.len(result.trigger or "") or #(result.trigger or ""),
+				utf8.len(result.replacement or "") or #(result.replacement or ""),
+				result.backspace_count)
 			local expansion_committed = opts.dry_run
 			if not opts.dry_run then
 				injector._begin_injection()
@@ -799,8 +855,8 @@ local function main()
 						local queued_scancode = type(queued) == "table" and queued.scancode or nil
 						local ok, err = pcall(on_char, queued_ch, queued_scancode)
 						if not ok then
-							Logger.error(LOG, "Error replaying queued char '%s': %s",
-								queued_ch, tostring(err))
+							-- The character itself is typed text and stays out of the log.
+							Logger.error(LOG, "Error replaying a queued character: %s", tostring(err))
 						end
 					end
 				else
@@ -880,7 +936,7 @@ local function main()
 				end
 			end)
 			if not ok_preview then
-				Logger.error(LOG, "Preview failed for '%s': %s", tostring(ch), tostring(err_preview))
+				Logger.error(LOG, "Preview failed: %s", tostring(err_preview))
 			end
 		end
 
@@ -1036,7 +1092,9 @@ local function main()
 				remaining = remaining + 1
 			end
 			if remaining >= 1 then
-				Logger.info(LOG, "Undo: restoring trigger '%s'.", _undoable.trigger)
+				-- The trigger is typed text: its length is the diagnostic, not its content.
+				Logger.info(LOG, "Undo: restoring the trigger (%d char(s)).",
+					utf8.len(_undoable.trigger) or #_undoable.trigger)
 				injector.inject(remaining - 1, _undoable.trigger)
 				engine:reset()
 				_undoable = nil
@@ -1197,7 +1255,11 @@ local function main()
 	-- ordering is the whole point: between a grab and an open channel the daemon
 	-- owns the keyboard and can only give keys back one fork at a time, which is
 	-- the state the grab was held back for in the first place.
-	if not injector.open_fast_channel() and opts.grab then
+	BootProfiler.stage("input hooks")
+	local fast_channel_ready = injector.open_fast_channel()
+	Logger.info(LOG, "Output channel: /dev/uinput %s (keystrokes are injected directly, not through ydotool).",
+		fast_channel_ready and "open" or "unavailable")
+	if not fast_channel_ready and opts.grab then
 		-- Fail here, loudly, rather than three layers down as "no hotstrings
 		-- happen". A grab with no way to put keys back is a dead keyboard, and the
 		-- reason is almost always one the user can act on: /dev/uinput needs the
@@ -1265,6 +1327,19 @@ local function main()
 		print("Error: could not start the keyboard hook.")
 		os.exit(1)
 	end
+	BootProfiler.stage_done("input hooks", string.format("mode %s, layout %s",
+		tostring(keyboard_hook.get_mode and keyboard_hook.get_mode() or "unknown"),
+		keyboard_layout.is_ready() and "resolved" or "unresolved"))
+
+	-- The remap daemon is independent of this process but decides which keycodes
+	-- the grab sees; its state at boot is the first thing a remap bug report needs.
+	if kanata then
+		Logger.info(LOG, "Remap daemon: kanata running=%s owned=%s.",
+			tostring(kanata.is_running and kanata.is_running() or false),
+			tostring(kanata.owns_process and kanata.owns_process() or false))
+	else
+		Logger.info(LOG, "Remap daemon: kanata manager not loaded.")
+	end
 
 	-- 8.8b) Initialise i18n (loads persisted locale, enables ★ substitution).
 	--
@@ -1290,6 +1365,7 @@ local function main()
 
 
 	-- 8.9) Start the tray menu if requested.
+	BootProfiler.stage("tray")
 	if opts.tray and tray_menu then
 		Logger.info(LOG, "Tray icon requested — starting.")
 		tray_menu.setIcon({ title = "Ergopti" })
@@ -1502,8 +1578,10 @@ local function main()
 		-- looks identical in the log to one where the adapter failed to load.
 		Logger.info(LOG, "Tray icon disabled (no --tray) — running headless.")
 	end
+	BootProfiler.stage_done("tray", (opts.tray and tray_menu) and "tray icon shown" or "headless")
 
 	-- 8.10) Install signal handlers.
+	BootProfiler.stage("services")
 	install_signal_handlers()
 
 	-- 8.9b) Initialise the preview tooltip.
@@ -1584,7 +1662,10 @@ local function main()
 	-- reads as a control that does not work rather than one whose answer is not
 	-- kept.
 	if wpm_widget and type(wpm_widget.restore) == "function" then
-		pcall(wpm_widget.restore)
+		local ok_restore, err_restore = pcall(wpm_widget.restore)
+		if not ok_restore then
+			Logger.error(LOG, "WPM widget state could not be restored: %s.", tostring(err_restore))
+		end
 	end
 
 	-- 8.10c) Initialise the gestures manager (trackpad/mouse gesture recognition).
@@ -1657,9 +1738,12 @@ local function main()
 		end
 		updater.init({ on_available = on_available })
 	end
+	BootProfiler.stage_done("services")
 
 	Logger.success(LOG, "Daemon ready (device=%s layout=%s mappings=%d dry_run=%s tray=%s).",
 		device, opts.layout, mapping_count, tostring(opts.dry_run), tostring(opts.tray and tray_menu ~= nil))
+	local boot_ms = BootProfiler.complete()
+	emit_diagnostic_snapshot(boot_ms, opts, ok_i18n and i18n_mod or nil)
 
 	-- 8.11) Start file watchers (inotify-based TOML/.lua hot reload).
 	-- Watches the hotstrings config directory and the project .lua files.
