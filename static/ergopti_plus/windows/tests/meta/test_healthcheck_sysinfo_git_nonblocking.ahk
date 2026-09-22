@@ -14,10 +14,11 @@
 ; git (unavailable, network drive, credential prompt) freezes input for up to
 ; 30 seconds.
 ;
-; The fix mirrors the pattern already used in modules/diagnostics/crash_reporter.ahk: replace
-; RunWait with a non-blocking Run + 500 ms poll so the stall budget is bounded.
-; These tests assert the blocking form is gone and the deadline pattern is in
-; place.
+; The first fix bounded the wait with a non-blocking Run + 500 ms poll. The
+; commit now comes from DiagSnapshot_ResolveCommit — the compiled build's
+; BUNDLE_COMMIT stamp, else the checkout's HEAD read straight from .git — so
+; there is no subprocess left to stall, and a compiled release (which has no
+; checkout) no longer reports an empty commit. These tests assert both.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -43,18 +44,16 @@
 ; ====================================================
 
 _HCSNB_SysInfoIsNonBlocking() {
-	Body := _DriverFuncBody("_HealthCheck_SysInfo")
-	Assert(Body != "", "_HealthCheck_SysInfo must exist in the ui/healthcheck module")
-	Assert(InStr(Body, "RunWait(") == 0,
-		"_HealthCheck_SysInfo must not use blocking RunWait for git — can freeze the crash handler path")
-	Assert(InStr(Body, "Run(") > 0,
-		"_HealthCheck_SysInfo must use non-blocking Run() for git")
-	; A bounded poll can be written either as a deadline (`A_TickCount + budget`)
-	; or as an elapsed check (`A_TickCount - StartTick < budget`); both cap the
-	; stall budget. The implementation uses the elapsed form, so accept either.
-	HasBound := (InStr(Body, "A_TickCount + ") > 0) || (InStr(Body, "A_TickCount - ") > 0)
-	Assert(HasBound,
-		"_HealthCheck_SysInfo must bound the git poll by elapsed time — either a deadline "
-		. "(A_TickCount + budget) or an elapsed check (A_TickCount - start < budget)")
+	for _, Name in ["_HealthCheck_SysInfo", "_CrashReport_SysInfo"] {
+		Body := _DriverFuncBody(Name)
+		Assert(Body != "", Name . " must exist in the driver")
+		Assert(InStr(Body, "RunWait(") == 0,
+			Name . " must not use blocking RunWait — can freeze the crash handler path")
+		Assert(InStr(Body, "rev-parse") == 0,
+			Name . " must not spawn git: the commit is read from the build stamp or .git, "
+			. "and a compiled release has no checkout for git to answer from")
+		Assert(InStr(Body, "DiagSnapshot_ResolveCommit(") > 0,
+			Name . " must take the commit from the shared resolver the boot snapshot uses")
+	}
 }
-Test("healthcheck: _HealthCheck_SysInfo uses non-blocking Run + bounded deadline for git (healthcheck-sysinfo-git-runwait-freeze)", _HCSNB_SysInfoIsNonBlocking)
+Test("healthcheck: _HealthCheck_SysInfo reads the commit without a git subprocess (healthcheck-sysinfo-git-runwait-freeze)", _HCSNB_SysInfoIsNonBlocking)
