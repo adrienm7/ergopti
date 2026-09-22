@@ -82,6 +82,8 @@ _MRS_ResidentForwardsPartials() {
 	} finally {
 		KLWV.windows := OldWindows
 		KLPFWorker.jobs := OldJobs
+		; Snapshot and progress files live in %TEMP%, outside the fixture root.
+		_MRS_RetireFiles(Root)
 		DirDelete(RTrim(Root, "\"), true)
 	}
 }
@@ -181,6 +183,7 @@ _MRS_ResidentSettlesProgress(Status, Expected) {
 		KLWV.first_paint_timer_fn := OldSeams[2]
 		KLWV.full_build_timer_fn := OldSeams[3]
 		KLWV.ingest_drain_timer_fn := OldSeams[4]
+		_MRS_RetireFiles(Root)
 		DirDelete(RTrim(Root, "\"), true)
 	}
 }
