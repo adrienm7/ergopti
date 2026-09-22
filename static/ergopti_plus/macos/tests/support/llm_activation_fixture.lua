@@ -289,7 +289,11 @@ local function build_fixture(backend, save_results, options)
 	}
 	package.loaded["infra.manifest_menu"] = {
 		render_rows = function(rows) return rows end,
-		build = function() return {} end,
+		-- The render context is kept so a test can hand it to the real renderer.
+		build = function(_key, _category, _handlers, _groups, render_ctx)
+			calls.render_ctx = render_ctx
+			return {}
+		end,
 	}
 	package.loaded["modules.llm.mlx_deps_checker"] = {
 		check_and_install_deps = function(callback)
