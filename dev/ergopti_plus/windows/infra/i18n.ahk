@@ -276,7 +276,27 @@ _I18nSortedLocales() {
 ; 2026-08-07: three drivers listed the same twenty-one locales from the same
 ; shared catalogue into a menu nothing declared.
 I18n_LocaleRows() {
-	global _I18nLocale, _StaticDir, _I18nFlagExistsCache
+	global _I18nLocale
+
+	Rows := []
+	for Loc in _I18nSortedLocales() {
+		; _MakeLocaleSetter wraps the code in a named function so the value is
+		; captured at call time rather than sharing the loop variable.
+		Rows.Push(Map(
+			"label",   Loc.Name,
+			"checked", (Loc.Code == _I18nLocale) ? true : false,
+			"icon",    I18nFlagIconPath(Loc.Code),
+			"action",  _MakeLocaleSetter(Loc.Code)))
+	}
+	return Rows
+}
+
+; Path of a locale's flag icon for a Win32 menu row, or "" when none ships.
+; Win32 menus cannot render flag emoji, so this driver draws the PNG the site
+; ships for the locale; every menu row that shows a language (the selector and
+; the hotstring language packs) takes its flag from here.
+I18nFlagIconPath(Code) {
+	global _StaticDir, _I18nFlagExistsCache
 
 	try {
 		if !IsSet(_I18nFlagExistsCache) || !(_I18nFlagExistsCache is Map)
@@ -285,29 +305,19 @@ I18n_LocaleRows() {
 		_I18nFlagExistsCache := Map()
 	}
 
-	Rows := []
-	FlagsDir := _StaticDir . "\img\flags\"
-	for Loc in _I18nSortedLocales() {
-		HasFlag := false
-		try {
-			if _I18nFlagExistsCache.Has(Loc.Code) {
-				HasFlag := _I18nFlagExistsCache[Loc.Code]
-			} else {
-				HasFlag := FileExist(FlagsDir . Loc.Code . ".png")
-				_I18nFlagExistsCache[Loc.Code] := HasFlag
-			}
-		} catch {
-			HasFlag := FileExist(FlagsDir . Loc.Code . ".png")
+	Path := _StaticDir . "\img\flags\" . Code . ".png"
+	HasFlag := false
+	try {
+		if _I18nFlagExistsCache.Has(Code) {
+			HasFlag := _I18nFlagExistsCache[Code]
+		} else {
+			HasFlag := FileExist(Path)
+			_I18nFlagExistsCache[Code] := HasFlag
 		}
-		; _MakeLocaleSetter wraps the code in a named function so the value is
-		; captured at call time rather than sharing the loop variable.
-		Rows.Push(Map(
-			"label",   Loc.Name,
-			"checked", (Loc.Code == _I18nLocale) ? true : false,
-			"icon",    HasFlag ? (FlagsDir . Loc.Code . ".png") : "",
-			"action",  _MakeLocaleSetter(Loc.Code)))
+	} catch {
+		HasFlag := FileExist(Path)
 	}
-	return Rows
+	return HasFlag ? Path : ""
 }
 
 ; Populates ``LangMenu`` from the manifest's language_menu/locales row. The menu

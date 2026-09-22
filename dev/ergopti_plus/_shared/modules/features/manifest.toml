@@ -1871,14 +1871,14 @@ description_key = "menu.gestures.swipe_3_down"
 [[features.gestures]]
 id = "swipe_3_left"
 platforms = ["ahk", "hs", "linux"]
-default_per_platform = { ahk = "tab_prev", hs = "word_prev", linux = "none" }
+default_per_platform = { ahk = "tab_prev", hs = "sel_word_prev", linux = "none" }
 type = "action"
 description_key = "menu.gestures.swipe_3_left"
 
 [[features.gestures]]
 id = "swipe_3_right"
 platforms = ["ahk", "hs", "linux"]
-default_per_platform = { ahk = "tab_next", hs = "word_next", linux = "none" }
+default_per_platform = { ahk = "tab_next", hs = "sel_word_next", linux = "none" }
 type = "action"
 description_key = "menu.gestures.swipe_3_right"
 
@@ -2457,7 +2457,9 @@ description_key = "menu.gestures.modes.swipe_5_right_up"
 
 # Activation threshold per direction (travel distance in centimetres).
 
-# All directions default to 3.5 cm of trackpad travel before firing.
+# Directions default to 3.5 cm of trackpad travel before firing, except the
+# three-finger vertical swipe (previous/next tab): at 3.5 cm it switched tabs
+# on almost any vertical drift, so it waits for 5 cm.
 [[features.gestures.sensitivities]]
 id = "swipe_2_left"
 platforms = ["hs"]
@@ -2531,14 +2533,14 @@ description_key = "menu.gestures.sensitivities.swipe_3_right"
 [[features.gestures.sensitivities]]
 id = "swipe_3_up"
 platforms = ["hs"]
-default = 3.5
+default = 5
 type = "number"
 description_key = "menu.gestures.sensitivities.swipe_3_up"
 
 [[features.gestures.sensitivities]]
 id = "swipe_3_down"
 platforms = ["hs"]
-default = 3.5
+default = 5
 type = "number"
 description_key = "menu.gestures.sensitivities.swipe_3_down"
 
@@ -3198,6 +3200,11 @@ i18n = "menu.global.reset_defaults"
 # after a backup. Each driver applies its own reader's rule: Windows the boot
 # loader's unknown-key check against the manifest, macOS and Linux the keys
 # their config readers never consume (the shared config_unused_keys engine).
+# Set apart by a separator: the three rows above change which features run,
+# this one edits the configuration file itself.
+[[menu.global_actions]]
+type = "---"
+
 [[menu.global_actions]]
 type = "command"
 id = "clean_unused_keys"
@@ -3317,7 +3324,7 @@ id = "wrap_symbols_menu"
 #
 # Restricted to linux, with the reason attached, because the same operations are
 # reached differently elsewhere: macOS binds them to ctrl chords and lists them
-# under `ctrl_shortcuts`, and Windows exposes its own combinations under
+# in the Ctrl group of `keyboard_slots`, and Windows exposes its own combinations under
 # `modifier_combos`. Declaring one shared row would put a second copy of these
 # operations in two menus that already have them.
 [[menu.shortcuts_menu]]
@@ -3370,18 +3377,6 @@ type = "group"
 id = "modifier_combos"
 i18n = "menu.shortcuts.group_modifiers"
 platforms = ["ahk"]
-reason_key = "platform_reason.chord_families_are_each_platforms"
-[[menu.shortcuts_menu]]
-type = "group"
-id = "ctrl_shortcuts"
-i18n = "menu.shortcuts.submenu_ctrl"
-platforms = ["hs"]
-reason_key = "platform_reason.chord_families_are_each_platforms"
-[[menu.shortcuts_menu]]
-type = "group"
-id = "cmd_shortcuts"
-i18n = "menu.shortcuts.submenu_cmd"
-platforms = ["hs"]
 reason_key = "platform_reason.chord_families_are_each_platforms"
 # `list` since 2026-08-08: the handler's whole body was one row with a static
 # label whose submenu another subsystem builds, which is what a provider
@@ -3891,10 +3886,20 @@ type = "list"
 id = "hotstring_categories_dynamic"
 
 # One row per language pack declared in _shared/modules/hotstrings/_index.toml
-# [languages], labelled with the language's native name from
-# _shared/data/locale_names.json. Each opens a submenu with « tout activer » /
-# « tout désactiver » for the whole language, then that language's categories
-# built exactly like the neutral ones above.
+# [languages], labelled with the language's flag and native name from
+# _shared/data/locale_names.json (Windows draws that locale's flag icon, since
+# Win32 menus cannot render flag emoji). Each opens a submenu with « tout
+# activer » / « tout désactiver » for the whole language, then that language's
+# categories built exactly like the neutral ones above. Under a header of their
+# own: a lone language row among the neutral categories did not read as the
+# entry point to that language's hotstrings.
+[[menu.hotstrings_menu]]
+type = "---"
+
+[[menu.hotstrings_menu]]
+type = "section_header"
+i18n = "menu.hotstrings.header_languages"
+
 [[menu.hotstrings_menu]]
 type = "list"
 id = "hotstring_languages"
@@ -4166,8 +4171,9 @@ i18n_on = "menu.tapholds.on"
 i18n_off = "menu.tapholds.off"
 checked_when = ["tapholds_enabled"]
 category = "TapHolds"
-# macOS has no switch: its remap engine is always on.
-platforms = ["ahk"]
+# macOS switches the feature, not its remap engine (always on): off stops
+# generating the per-key rules while keeping every assignment, like a pause.
+platforms = ["ahk", "hs"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
 
 # `command` since 2026-08-07, not `action`. Both were handlers whose whole body

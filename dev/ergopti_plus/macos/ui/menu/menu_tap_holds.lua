@@ -860,8 +860,9 @@ end
 --- timings, the per-key tap/hold bindings, and the modifier chords. This module
 --- supplies only the provider rows and the command capabilities.
 ---
---- There is no enable toggle and no process-control row: the remap engine is an
---- implementation detail the driver keeps running on its own.
+--- The manifest's `tapholds_toggle` row is the Tap-Holds feature switch. It
+--- never touches the remap engine itself, which the driver keeps running on
+--- its own: off only stops generating the per-key rules, like a pause.
 --- @param ctx table Global UI context (must contain ctx.karabiner).
 --- @return table|nil A provider row carrying the rendered submenu, or nil.
 function M.build(ctx)
@@ -891,7 +892,13 @@ function M.build(ctx)
 
 	-- The two bulk commands are the ids Windows declares for its own tap-holds:
 	-- the same row, the same label, this engine's implementation behind it.
+	local tap_holds_on = type(karabiner.get_tap_holds_enabled) == "function"
+		and karabiner.get_tap_holds_enabled() == true
+
 	local commands = {
+		["tapholds_toggle"] = function()
+			return M.set_feature_enabled(karabiner, not tap_holds_on, update_menu)
+		end,
 		["disable_all"] = function()
 			return run_bulk_menu_command(
 				karabiner,
@@ -927,14 +934,50 @@ function M.build(ctx)
 	local render_ctx = {}
 	for key, value in pairs(ctx or {}) do render_ctx[key] = value end
 	render_ctx.commands = commands
+	render_ctx.state_getters = {}
+	for key, value in pairs(ctx.state_getters or {}) do render_ctx.state_getters[key] = value end
+	render_ctx.state_getters["tapholds_enabled"] = function() return tap_holds_on end
 
 	-- `submenu`, not `items`: ManifestMenu.build returns rows it has ALREADY
 	-- materialised. Handed over as `items`, the tray render dropped every one of
 	-- them and the submenu opened empty on the real menu bar.
 	return {
 		label   = i18n.get("menu.tapholds.title"),
+		checked = tap_holds_on or nil,
 		submenu = ManifestMenu.build("tap_holds_menu", "TapHolds", nil, nil, render_ctx, providers),
 	}
+end
+
+--- Switches the Tap-Holds feature, persists it, then redeploys the rules.
+--- The switch is committed before deployment: without a live lease the next
+--- provisioned generation is built from it, so a refused deploy is logged and
+--- does not undo the user's choice.
+--- @param karabiner table Remap module.
+--- @param enabled boolean Desired switch state.
+--- @param update_menu function|nil Menu refresh callback.
+--- @return boolean committed
+function M.set_feature_enabled(karabiner, enabled, update_menu)
+	if type(karabiner) ~= "table" or type(karabiner.set_tap_holds_enabled) ~= "function" then
+		Logger.error(LOG, "Tap-Holds switch is unavailable.")
+		return false
+	end
+	if karabiner.set_tap_holds_enabled(enabled == true) ~= true then
+		Logger.error(LOG, "Tap-Holds switch did not persist.")
+		return false
+	end
+	_picker_cache = nil
+	if type(karabiner.regenerate) == "function" then
+		local ok_call, accepted = pcall(karabiner.regenerate, function(ok, reason)
+			if ok ~= true then
+				Logger.warn(LOG, "Tap-Holds rules not redeployed yet: %s.", tostring(reason))
+			end
+		end)
+		if not ok_call then
+			Logger.error(LOG, "Tap-Holds redeploy raised: %s.", tostring(accepted))
+		end
+	end
+	if type(update_menu) == "function" then update_menu() end
+	return true
 end
 
 --- Warms the picker-tree cache off the menu-open path so the first click renders

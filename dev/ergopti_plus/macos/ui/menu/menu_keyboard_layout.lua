@@ -317,12 +317,12 @@ function M.build(ctx)
 	--
 	-- Five possible states:
 	--   1. ALL variants active in list     → greyed-out success label
-	--   2. older active, latest installed  → in-place TIS swap (programmatic)
+	--   2. older active, bundle installed  → in-place TIS swap (programmatic)
 	--   3. older active, latest NOT installed → greyed: install latest first
 	--   4. some/no variants present, latest installed → submenu (added ones greyed)
 	--   5. absent, latest NOT installed    → greyed: install latest first
 	local latest_ver = latest and parse_version(latest) or nil
-	local latest_str = latest_ver and version_str(latest_ver) or "?"
+	local latest_str = latest_ver and version_str(latest_ver)
 	local all_variants_active = true
 	local active_variant_count = 0
 	for _, var in ipairs(ERGOPTI_VARIANTS) do
@@ -348,20 +348,24 @@ function M.build(ctx)
 		}
 	elseif #legacy_active > 0 and latest ~= nil and not latest_installed_anywhere then
 		-- 3. Legacy entry active but latest bundle missing — block the upgrade
-		-- Extract version from the first legacy KeyboardLayout Name (e.g. "Ergopti_v2_1_0" → "2.1.0")
-		local _m = (legacy_active[1] or ""):match("_v(%d+_%d+_%d+)")
-		local old_str = _m and _m:gsub("_", ".") or "?"
 		bundle_rows[#bundle_rows + 1] = {
 			label    = string.format(i18n.get("menu.layout.update_list_install_first"),
-				latest_str, old_str),
+				latest_str, latest_str),
 			disabled = true,
 		}
-	elseif #legacy_active > 0 then
-		-- 2. Legacy entry active and latest installed — programmatic swap via TIS
-		local _m = (legacy_active[1] or ""):match("_v(%d+_%d+_%d+)")
-		local old_str = _m and _m:gsub("_", ".") or "?"
+	elseif #legacy_active > 0 and installed_ver then
+		-- 2. Legacy entry active and a bundle installed — programmatic swap via TIS
+		-- onto the INSTALLED bundle, so its version is the target. The legacy
+		-- version comes from its name or, for an unversioned name, from the
+		-- Info.plist of the bundle that still ships it; when neither exists the
+		-- label drops it instead of printing a placeholder.
+		local legacy_ver = install.layout_version(legacy_active[1])
+		local target_str = version_str(installed_ver)
+		local list_label = legacy_ver
+			and string.format(i18n.get("menu.layout.update_list"), version_str(legacy_ver), target_str)
+			or  string.format(i18n.get("menu.layout.update_list_to"), target_str)
 		bundle_rows[#bundle_rows + 1] = {
-			label = string.format(i18n.get("menu.layout.update_list"), old_str, latest_str),
+			label = list_label,
 			action    = function()
 				defer_tis_call(function()
 					upgrade_active_list_async(legacy_active, function(ok)

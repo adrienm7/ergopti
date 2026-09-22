@@ -63,10 +63,14 @@ function M.is_local_source()
 end
 
 --- Returns the outer launcher version injected into the nested process.
+--- The launcher sends "<CFBundleShortVersionString>+<CFBundleVersion>", and the
+--- second part is the CI run number Sparkle orders builds by. Shown to the user
+--- it read as a second release id ("0.0.0-dev.131+543"), so it is dropped here.
 --- @return string version
 function M.current_version()
 	if M.is_local_source() then return "local" end
-	return launcher_version or "local"
+	if not launcher_version then return "local" end
+	return (launcher_version:gsub("%+.*$", ""))
 end
 
 --- Returns the immutable channel stamped into the packaged launcher version.

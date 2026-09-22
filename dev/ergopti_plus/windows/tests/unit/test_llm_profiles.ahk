@@ -360,3 +360,5 @@ _LLMP_LoadProfilesMissingFileReturnsEmpty() {
 	AssertEqual(0, profiles.Length)
 }
 Test("LLM_LoadProfilesJSON: missing file degrades to empty array (no throw)", _LLMP_LoadProfilesMissingFileReturnsEmpty)
+
+#Include llm_profiles/test_registry_admission.ahk

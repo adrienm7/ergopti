@@ -176,8 +176,10 @@ function H.sys_info()
 	info.arch = arch
 	Logger.debug(LOG, "arch: %s.", arch)
 
-	-- Screen DPI (points per inch from Hammerspoon screen info)
-	local dpi = "?"
+	-- Screen DPI (points per inch from Hammerspoon screen info). Left nil when
+	-- the physical size is unknown, so the report shows the backing scale alone
+	-- instead of a "?" in front of it.
+	local dpi = nil
 	local ok_dpi, scr_d = pcall(function() return hs.screen.mainScreen() end)
 	if ok_dpi and scr_d and type(scr_d.currentMode) == "function" then
 		local ok_md, md = pcall(function() return scr_d:currentMode() end)
@@ -197,7 +199,7 @@ function H.sys_info()
 		end
 	end
 	info.dpi = dpi
-	Logger.debug(LOG, "dpi: %s.", dpi)
+	Logger.debug(LOG, "dpi: %s.", tostring(dpi))
 
 	-- Commit: the packaged app has no .git, so `git rev-parse` answered
 	-- "unknown" for every release build. The shared resolver reads the build

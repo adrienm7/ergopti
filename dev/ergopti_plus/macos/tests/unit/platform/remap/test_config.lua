@@ -118,6 +118,39 @@ helpers.describe("Config: the remap integration is not a user setting", function
 	end)
 end)
 
+helpers.describe("Config: the Tap-Holds feature switch", function()
+	helpers.it("persists the switch and reads it back, absent meaning on", function()
+		local codec = package.loaded["infra.toml.codec"]
+		local encoded = nil
+		local original_encode = codec.encode
+		codec.encode = function(value)
+			encoded = value
+			error("stop before the disk write")
+		end
+		local state = Config.build_default_state({}, {})
+		helpers.assert_eq(state.tap_holds_enabled, true, "a fresh install starts with Tap-Holds on")
+		state.tap_holds_enabled = false
+		pcall(Config.save_user_config, state, "/tmp/config_karabiner.toml", true)
+		codec.encode = original_encode
+		helpers.assert_eq(encoded.tap_holds.enabled, false)
+
+		local original_load = Config._load_toml_file
+		for _, case in ipairs({ { stored = false, expected = false }, { stored = nil, expected = true } }) do
+			Config._load_toml_file = function()
+				return {
+					tap_holds = { enabled = case.stored, config = { escape = { tap = "escape", hold = "ctrl" } } },
+					mod_combos = { config = {} },
+				}
+			end
+			local loaded = Config.load_user_config({}, {}, "/tmp/config_karabiner.toml")
+			helpers.assert_eq(loaded.tap_holds_enabled, case.expected)
+			helpers.assert_eq(loaded.tap_hold_config.escape.hold, "ctrl",
+				"the assignments load unchanged whatever the switch")
+		end
+		Config._load_toml_file = original_load
+	end)
+end)
+
 helpers.describe("Config pause and suspend invariant", function()
 	helpers.it("pause must prevent combo/tap_hold activation (regression for project_suspend_pause_invariant)", function()
 		-- Guard lives in dispatch (shortcuts/gestures); config build must remain safe under pause

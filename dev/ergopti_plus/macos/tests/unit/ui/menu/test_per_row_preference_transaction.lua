@@ -76,14 +76,16 @@ local function exercise_shortcut_transaction(save_mode, mutation_mode)
 			decorate_section = function(value) return value end,
 		}
 		package.loaded["ui.menu.menu_utils"] = {}
+		-- The built-in Ctrl rows reach the tray inside the keyboard-slot Ctrl
+		-- group; hand them straight back as the Shortcuts submenu.
 		package.loaded["infra.manifest_menu"] = {
-			build = function(_, _, _, groups)
-				return groups.ctrl_shortcuts().items
+			build = function(_, _, _, _, _, lists)
+				return lists.keyboard_slots()
 			end,
 		}
 		package.loaded["ui.menu.shortcut_utils"] = {}
 		package.loaded["ui.menu.menu_keyboard_slots"] = {
-			provide_rows = function() return {} end,
+			provide_rows = function(_, _, fixed_by_prefix) return fixed_by_prefix.hs_ctrl_ end,
 		}
 		package.loaded["infra.manifest_reader"] = { default_for = function() return "star" end }
 

@@ -392,10 +392,10 @@ M.features = {
 		path = "gestures.swipe_3_down", id = "swipe_3_down", section = "gestures", default = "tab_next", type = "action", description_key = "menu.gestures.swipe_3_down", platforms = { "ahk", "hs", "linux" },
 	},
 	{
-		path = "gestures.swipe_3_left", id = "swipe_3_left", section = "gestures", default = "word_prev", type = "action", description_key = "menu.gestures.swipe_3_left", platforms = { "ahk", "hs", "linux" },
+		path = "gestures.swipe_3_left", id = "swipe_3_left", section = "gestures", default = "sel_word_prev", type = "action", description_key = "menu.gestures.swipe_3_left", platforms = { "ahk", "hs", "linux" },
 	},
 	{
-		path = "gestures.swipe_3_right", id = "swipe_3_right", section = "gestures", default = "word_next", type = "action", description_key = "menu.gestures.swipe_3_right", platforms = { "ahk", "hs", "linux" },
+		path = "gestures.swipe_3_right", id = "swipe_3_right", section = "gestures", default = "sel_word_next", type = "action", description_key = "menu.gestures.swipe_3_right", platforms = { "ahk", "hs", "linux" },
 	},
 	{
 		path = "gestures.swipe_3_up", id = "swipe_3_up", section = "gestures", default = "tab_prev", type = "action", description_key = "menu.gestures.swipe_3_up", platforms = { "ahk", "hs", "linux" },
@@ -647,10 +647,10 @@ M.features = {
 		path = "gestures.sensitivities.swipe_3_right", id = "swipe_3_right", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_3_right", platforms = { "hs" },
 	},
 	{
-		path = "gestures.sensitivities.swipe_3_up", id = "swipe_3_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_3_up", platforms = { "hs" },
+		path = "gestures.sensitivities.swipe_3_up", id = "swipe_3_up", section = "gestures.sensitivities", default = 5, type = "number", description_key = "menu.gestures.sensitivities.swipe_3_up", platforms = { "hs" },
 	},
 	{
-		path = "gestures.sensitivities.swipe_3_down", id = "swipe_3_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_3_down", platforms = { "hs" },
+		path = "gestures.sensitivities.swipe_3_down", id = "swipe_3_down", section = "gestures.sensitivities", default = 5, type = "number", description_key = "menu.gestures.sensitivities.swipe_3_down", platforms = { "hs" },
 	},
 	{
 		path = "gestures.sensitivities.swipe_3_left_down", id = "swipe_3_left_down", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_3_left_down", platforms = { "hs" },

@@ -93,14 +93,11 @@ local function load_language_packs()
 	return _language_packs_cache
 end
 
---- Native name of a locale code, from the generated locale table.
+--- Flag and native name of a locale code, from the generated locale table.
 --- @param code string
 --- @return string
-local function language_name(code)
-	for _, row in ipairs(LocaleTable) do
-		if row.code == code then return row.name end
-	end
-	error("[builder] hotstring language pack names unknown locale '" .. tostring(code) .. "'")
+local function language_label(code)
+	return Languages.label(code, LocaleTable)
 end
 
 --- Loads the top_level tail (including the separator immediately before
@@ -380,7 +377,7 @@ function M.generate(ctx, menu_mods, actions)
 				total = total + ((counts and counts.group_counts and counts.group_counts[name]) or 0)
 			end
 			language_rows[#language_rows + 1] = {
-				label = language_name(pack.locale) .. " (" .. fmt_grand(total) .. ")",
+				label = language_label(pack.locale) .. " (" .. fmt_grand(total) .. ")",
 				items = items,
 			}
 		end
@@ -579,6 +576,22 @@ function M.generate(ctx, menu_mods, actions)
 	end
 	if type(menu_mods.apps) == "table" then
 		push("apps.build", menu_mods.apps.build, ctx)
+	end
+
+	-- « Pause = tout éteint »: every feature row above is greyed and stripped of
+	-- its handler in one place. Each builder used to decide this for itself, so
+	-- Shortcuts and Gestures greyed while Hotstrings, AI, Metrics and Tap-Holds
+	-- stayed live (Metrics could even be toggled mid-pause). The tail below —
+	-- global actions, language, config, about, reload, quit, debug — and the
+	-- title row that resumes the script are added afterwards and stay enabled.
+	if ctx.paused == true then
+		for _, row in ipairs(items) do
+			if type(row) == "table" and row.separator ~= true then
+				row.disabled = true
+				row.action = nil
+				row.fn = nil
+			end
+		end
 	end
 
 

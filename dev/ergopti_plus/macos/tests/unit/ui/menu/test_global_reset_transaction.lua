@@ -254,6 +254,7 @@ local function with_menu_fixture(options, callback)
 		termination_pending = false,
 		post_reload_effects = 0,
 		gesture_enabled = true,
+		tap_holds_enabled = true,
 		enable_preflight_calls = 0,
 		config_watcher_callback = nil,
 		builder_ctx = nil,
@@ -622,6 +623,17 @@ local function with_menu_fixture(options, callback)
 				observations.karabiner_state = clone(snapshot)
 			end, on_done)
 		end,
+		get_tap_holds_enabled = function() return observations.tap_holds_enabled end,
+		set_tap_holds_enabled = function(enabled)
+			return perform(observations, "tap-holds-switch", function()
+				observations.tap_holds_enabled = enabled
+			end)
+		end,
+		regenerate = function(on_done)
+			observations.calls.regenerate = (observations.calls.regenerate or 0) + 1
+			if on_done then on_done(true, "ready") end
+			return true
+		end,
 	}
 
 	local original_get = hs_stub.settings.get
@@ -686,6 +698,7 @@ local function assert_fully_restored(observations)
 	helpers.assert_eq(observations.files, observations.initial_files)
 	helpers.assert_eq(observations.karabiner_state, observations.initial_karabiner)
 	helpers.assert_eq(observations.gesture_enabled, true)
+	helpers.assert_eq(observations.tap_holds_enabled, true)
 	helpers.assert_eq(observations.persisted, observations.initial_state)
 	helpers.assert_eq(observations.named_shortcut, true)
 	helpers.assert_eq(count_notification(observations, "notify.all_features_disabled"), 0)
@@ -736,63 +749,69 @@ helpers.describe("HS-022 disable-all is one exact global transaction", function(
 		end)
 	end)
 
-	helpers.it("compensates false, nil, and throw from every configurable sibling", function()
+	helpers.it("compensates false, nil, and throw from every feature switch", function()
 		for _, boundary in ipairs({
 			"runtime-sync",
 			"gesture-master",
-			"gesture:swipe_left",
-			"gesture:swipe_right",
-			"script:return_key",
-			"script:backspace",
-			"script:escape",
-			"named-shortcut:alpha",
+			"tap-holds-switch",
 			"preferences",
-			"keyboard:alt_v",
-			"keyboard:cmd_x",
 		}) do
 			for _, mode in ipairs({ "false", "nil", "throw" }) do
 				with_menu_fixture({ failures = { [boundary] = fail(mode) } }, function(observations)
 					helpers.assert_eq(observations.actions.disable_all(), false,
 						boundary .. " " .. mode .. " must refuse the real action")
 					assert_fully_restored(observations)
-					helpers.assert_eq(observations.calls["karabiner-clear"] or 0, 0,
-						"a synchronous refusal must stop before Karabiner")
 				end)
 			end
 		end
 	end)
 
-	helpers.it("rejects every Karabiner request shape and compensates exact old stores", function()
-		for _, mode in ipairs({ "false", "nil", "throw", "sync-success-false", "sync-success-nil" }) do
-			with_menu_fixture({ failures = { ["karabiner-clear"] = fail(mode) } }, function(observations)
-				helpers.assert_eq(observations.actions.disable_all(), false)
-				assert_fully_restored(observations)
-				helpers.assert_eq(observations.calls["karabiner-restore"], 1)
-			end)
-		end
-	end)
-
-	helpers.it("waits for one terminal, gates siblings, and ignores duplicate callbacks", function()
-		with_menu_fixture({ failures = { ["karabiner-clear"] = fail("pending") } }, function(observations)
+	helpers.it("switches every feature off and keeps every assignment", function()
+		-- Disable All used to clear every tap-hold binding through Karabiner and
+		-- rewrite gesture, script-control, named and keyboard shortcuts to
+		-- `none`. It then waited on a Karabiner deployment that never settled
+		-- without a live lease, so every feature stayed checked.
+		with_menu_fixture({}, function(observations)
 			helpers.assert_eq(observations.actions.disable_all(), true)
-			helpers.assert_eq(observations.actions.disable_all(), false,
-				"a pending global owner must gate a second action")
-			helpers.assert_eq(count_notification(observations, "notify.all_features_disabled"), 0)
-			local terminal = observations.terminals["karabiner-clear"]
-			helpers.assert_type(terminal, "function")
-			terminal(true, "ready")
-			terminal(false, "duplicate")
 			helpers.assert_eq(count_notification(observations, "notify.all_features_disabled"), 1)
-			helpers.assert_eq(observations.karabiner_state.profile, "disabled")
+			for _, key in ipairs({ "keymap", "gestures", "shortcuts", "llm_enabled",
+				"keylogger_enabled", "personal_info" }) do
+				helpers.assert_eq(observations.state[key], false, key .. " must be switched off")
+				helpers.assert_eq(observations.persisted[key], false, key .. " must be persisted off")
+			end
+			for name, enabled in pairs(observations.state.hotstrings) do
+				helpers.assert_eq(enabled, false, "hotstring group '" .. name .. "' must be off")
+			end
+			helpers.assert_eq(observations.gesture_enabled, false)
+			helpers.assert_eq(observations.tap_holds_enabled, false,
+				"the Tap-Holds feature must be switched off like the others")
+			helpers.assert_true((observations.calls.regenerate or 0) >= 1,
+				"the switched-off Tap-Holds rules must be redeployed")
+
+			helpers.assert_eq(observations.karabiner_state, observations.initial_karabiner,
+				"tap-hold bindings must survive Disable All")
+			helpers.assert_eq(observations.calls["karabiner-clear"] or 0, 0)
+			helpers.assert_eq(observations.gestures, observations.initial_gestures)
+			helpers.assert_eq(observations.script, observations.initial_script)
+			helpers.assert_eq(observations.state.script_control_shortcuts,
+				observations.initial_state.script_control_shortcuts)
+			helpers.assert_eq(observations.state.script_control_enabled, true,
+				"the pause shortcut must stay available")
+			helpers.assert_eq(observations.keyboard, observations.initial_keyboard)
+			helpers.assert_eq(observations.state.terminator_states,
+				observations.initial_state.terminator_states)
+			helpers.assert_eq(observations.named_shortcut ~= false, true)
 		end)
 	end)
 
-	helpers.it("compensates a negative terminal before publishing success", function()
-		with_menu_fixture({ failures = { ["karabiner-clear"] = fail("pending") } }, function(observations)
+	helpers.it("Enable All switches Tap-Holds back on after Disable All", function()
+		with_menu_fixture({}, function(observations)
 			helpers.assert_eq(observations.actions.disable_all(), true)
-			observations.terminals["karabiner-clear"](false, "deployment-refused")
-			assert_fully_restored(observations)
-			helpers.assert_eq(observations.calls["karabiner-restore"], 1)
+			helpers.assert_eq(observations.tap_holds_enabled, false)
+			helpers.assert_eq(observations.actions.enable_all(), true)
+			helpers.assert_eq(observations.tap_holds_enabled, true)
+			helpers.assert_eq(observations.karabiner_state, observations.initial_karabiner,
+				"re-enabling must find every tap-hold binding where it was")
 		end)
 	end)
 end)

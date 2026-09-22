@@ -414,6 +414,9 @@
 			"i18n": "menu.global.reset_defaults"
 		},
 		{
+			"type": "---"
+		},
+		{
 			"type": "command",
 			"id": "clean_unused_keys",
 			"i18n": "menu.global.clean_unused_keys"
@@ -559,24 +562,6 @@
 			"i18n": "menu.shortcuts.group_modifiers",
 			"platforms": [
 				"ahk"
-			],
-			"reason_key": "platform_reason.chord_families_are_each_platforms"
-		},
-		{
-			"type": "group",
-			"id": "ctrl_shortcuts",
-			"i18n": "menu.shortcuts.submenu_ctrl",
-			"platforms": [
-				"hs"
-			],
-			"reason_key": "platform_reason.chord_families_are_each_platforms"
-		},
-		{
-			"type": "group",
-			"id": "cmd_shortcuts",
-			"i18n": "menu.shortcuts.submenu_cmd",
-			"platforms": [
-				"hs"
 			],
 			"reason_key": "platform_reason.chord_families_are_each_platforms"
 		},
@@ -1077,6 +1062,13 @@
 			"id": "hotstring_categories_dynamic"
 		},
 		{
+			"type": "---"
+		},
+		{
+			"type": "section_header",
+			"i18n": "menu.hotstrings.header_languages"
+		},
+		{
 			"type": "list",
 			"id": "hotstring_languages"
 		},
@@ -1341,7 +1333,8 @@
 			],
 			"category": "TapHolds",
 			"platforms": [
-				"ahk"
+				"ahk",
+				"hs"
 			],
 			"reason_key": "platform_reason.remap_engine_is_per_driver"
 		},

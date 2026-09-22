@@ -1241,6 +1241,316 @@ local function create_menu(deps)
 				-- it. A row the manifest declares and this table does not answer is
 				-- logged and dropped by the renderer, which is what makes the
 				-- handler-bijection gate able to see it.
+				-- The on/off gate. A macOS menu item that opens a submenu never sends its
+				-- action, so the checked parent row alone left no way to switch the
+				-- suggestions on: the manifest's `llm_toggle` row is registered below and
+				-- drawn inside the submenu, as on Windows and Linux.
+				local toggle_action = not paused
+					and activation_requirement_owner ~= nil
+					and type(models_mgr.pause_requirements) == "function"
+					and activation_controller.is_registered() and function()
+						activation_generation = activation_generation + 1
+						local my_generation = activation_generation
+						local activation_backend = state.llm_backend
+						local target_enabled = not state.llm_enabled
+						local activation_terminal = false
+						local activation_published = false
+						local attempt = { phase = nil, bootstrap_result = nil }
+						local token
+
+						local function commit_enabled(enabled)
+								local previous_enabled = state.llm_enabled
+								local function restore_previous_preference(reason)
+										state.llm_enabled = previous_enabled
+										local rollback_ok, rollback_settled = pcall_log(
+											"prediction preference rollback after " .. reason,
+											prediction_locks.apply_preference,
+											previous_enabled)
+										if rollback_ok ~= true or rollback_settled ~= true then
+												Logger.error(LOG,
+													"Prediction preference rollback after %s did not commit.",
+													reason)
+												return false
+										end
+										return true
+								end
+								Logger.info(LOG, string.format("Toggling LLM: %s -> %s",
+										tostring(state.llm_enabled), tostring(enabled)))
+								state.llm_enabled = enabled
+								if type(prediction_locks.apply_preference) == "function" then
+										local ok, settled = pcall_log(
+											"prediction preference settlement",
+											prediction_locks.apply_preference,
+											state.llm_enabled)
+										Logger.debug(LOG, string.format(
+												"Prediction preference %s settlement -> %s",
+												tostring(state.llm_enabled), tostring(ok and settled == true)))
+										if not ok or settled ~= true then
+												restore_previous_preference("runtime settlement refusal")
+												return false
+										end
+								else
+										Logger.warn(LOG, "Prediction preference settlement is unavailable.")
+										state.llm_enabled = previous_enabled
+										return false
+								end
+								local save_ok, prefs_saved = pcall_log(
+									"save_prefs during LLM preference commit", save_prefs)
+								if save_ok ~= true or prefs_saved ~= true then
+										local restored = restore_previous_preference("persistence refusal")
+										if restored then
+												Logger.error(LOG,
+													"LLM preference persistence was refused; previous state restored.")
+										end
+										pcall_log("update_menu after LLM preference rollback", update_menu)
+										return false
+								end
+								if enabled ~= true then M.reset_llm_health_status() end
+								return true
+						end
+
+						local function publish_toggle()
+								pcall_log("update_menu", update_menu)
+								pcall_log("notifications.notify", function()
+									notifications.notify(
+										state.llm_enabled and i18n.get("notify.llm_enabled")
+											or i18n.get("notify.llm_disabled"),
+										i18n.get("notify.llm_suggestions"))
+								end)
+						end
+
+						local function compensate_activation(reason)
+								if activation_terminal then return false end
+								activation_terminal = true
+								if token ~= nil then activation_controller.complete(token) end
+								Logger.error(LOG, "LLM activation failed (%s); restoring disabled state.",
+									tostring(reason))
+								if commit_enabled(false) ~= true then
+										Logger.error(LOG,
+											"Could not persist the compensating LLM disable after activation failure.")
+										return false
+								end
+								pcall_log("update_menu after activation compensation", update_menu)
+								return false
+						end
+
+						local function activation_is_current(authorization)
+								return activation_terminal ~= true
+									and my_generation == activation_generation
+									and state.llm_backend == activation_backend
+									and state.llm_enabled == true
+									and activation_controller.is_current(token, authorization)
+						end
+
+						local function publish_activation_once()
+								if activation_published then return true end
+								activation_published = true
+								publish_toggle()
+								return true
+						end
+
+						local function dispatch_requirements()
+								local authorization = activation_controller.capture(token)
+								if authorization == nil or not activation_is_current(authorization) then
+										return false
+								end
+								attempt.phase = "requirements"
+								attempt.requirements_stale = false
+								attempt.requirements_generation =
+										(attempt.requirements_generation or 0) + 1
+								local requirements_generation = attempt.requirements_generation
+								attempt.requirements_terminal = nil
+								local terminal = false
+								local terminal_success = false
+								local terminal_cancel_reason = nil
+								local dispatching = true
+								local function on_success()
+										if terminal or attempt.requirements_generation ~= requirements_generation then
+												return false
+										end
+										terminal = true
+										terminal_success = true
+										attempt.requirements_terminal = {
+												generation = requirements_generation,
+												success = true,
+										}
+										if dispatching then return true end
+										if not activation_is_current(authorization) then return true end
+										activation_terminal = true
+										activation_controller.complete(token)
+										publish_activation_once()
+										return true
+								end
+								local function on_cancel(reason)
+										if terminal or attempt.requirements_generation ~= requirements_generation then
+												return false
+										end
+										terminal = true
+										terminal_cancel_reason = reason
+										attempt.requirements_terminal = {
+												generation = requirements_generation,
+												success = false,
+												reason = reason,
+										}
+										if dispatching then return true end
+										if reason == "stale" or not activation_is_current(authorization) then
+												attempt.requirements_stale = true
+												return true
+										end
+										activation_terminal = true
+										activation_controller.complete(token)
+										return true
+								end
+								local requirements_ok, accepted = pcall_log(
+									"models_mgr.check_requirements",
+									models_mgr.check_requirements, state.llm_model,
+									on_success, on_cancel, {
+										requirement_owner = activation_requirement_owner,
+										is_current = function()
+											return activation_is_current(authorization)
+										end,
+									})
+								dispatching = false
+								if requirements_ok ~= true or accepted ~= true then
+										-- A synchronous terminal from a dispatch that subsequently
+										-- refuses is not authoritative.  Nothing may be published
+										-- until the acquisition itself returns literal true.
+										attempt.requirements_terminal = nil
+										if not activation_is_current(authorization) then
+												attempt.requirements_stale = true
+												return true
+										end
+										return compensate_activation("requirements dispatch refused")
+								end
+								if terminal_success then
+										activation_terminal = true
+										activation_controller.complete(token)
+										return publish_activation_once()
+								end
+								if terminal then
+										if terminal_cancel_reason == "stale"
+											or not activation_is_current(authorization) then
+												attempt.requirements_stale = true
+												return true
+										end
+										activation_terminal = true
+										activation_controller.complete(token)
+										return true
+								end
+								return publish_activation_once()
+						end
+
+						local function finish_activation(skip_deps_check)
+								local authorization = activation_controller.capture(token)
+								if authorization == nil or not activation_is_current(authorization) then
+										Logger.debug(LOG, "Discarding stale LLM activation completion.")
+										return false
+								end
+								if not skip_deps_check
+									and check_backend_deps(state.llm_backend) ~= true then
+										return compensate_activation("dependency bootstrap refused")
+								end
+								if state.llm_model and state.llm_model ~= "" then
+										return dispatch_requirements()
+								end
+								activation_terminal = true
+								activation_controller.complete(token)
+								return publish_activation_once()
+						end
+
+						local function resume_attempt(_, resumed_from_pause)
+								if activation_terminal then return true end
+								if my_generation ~= activation_generation
+									or state.llm_backend ~= activation_backend
+									or state.llm_enabled ~= true then
+										-- A shared preference action (notably Disable All) may
+										-- supersede this activation without going through this
+										-- menu closure.  Settle the stale token so it cannot block
+										-- a later explicit enable or a pause rollback.
+										activation_terminal = true
+										return activation_controller.complete(token) == true
+								end
+								if attempt.phase == "bootstrap" then
+										if attempt.bootstrap_result == nil then return true end
+										if attempt.bootstrap_result ~= true then
+												return compensate_activation("MLX bootstrap reported failure")
+										end
+										attempt.phase = "requirements"
+										return finish_activation(true)
+								end
+								if attempt.phase == "requirements" then
+										local requirements_terminal = attempt.requirements_terminal
+										if type(requirements_terminal) == "table" then
+												attempt.requirements_terminal = nil
+												if requirements_terminal.success == true then
+														activation_terminal = true
+														if activation_controller.complete(token) ~= true then return false end
+														return publish_activation_once()
+												end
+												if requirements_terminal.reason ~= "stale" then
+														activation_terminal = true
+														return activation_controller.complete(token) == true
+												end
+												attempt.requirements_stale = true
+										end
+										if resumed_from_pause == true or attempt.requirements_stale == true then
+												attempt.requirements_stale = false
+												return dispatch_requirements()
+										end
+								end
+								return true
+						end
+
+						if target_enabled then
+								-- Global Disable All mutates the shared preference outside
+								-- this closure.  Its old token is already fenced by state,
+								-- but must settle exactly before a new enable can own work.
+								if activation_controller.cancel() ~= true then return false end
+								token = activation_controller.begin(resume_attempt)
+								if token == nil then return false end
+								-- No backend process starts until the candidate is durable.
+								if commit_enabled(true) ~= true then
+										activation_controller.cancel()
+										return false
+								end
+
+								if state.llm_backend == "mlx" then
+										attempt.phase = "bootstrap"
+										Logger.info(LOG, "Activating LLM — running MLX bootstrap check first.")
+										local bootstrap_dispatching = true
+										local bootstrap_terminal = false
+										local bootstrap_ok, bootstrap_accepted = pcall_log(
+											"mlx_deps_checker.check_and_install_deps",
+											mlx_deps_checker.check_and_install_deps, function(ok)
+													if bootstrap_terminal then return false end
+													bootstrap_terminal = true
+													attempt.bootstrap_result = ok == true
+													if bootstrap_dispatching then return true end
+													local authorization = activation_controller.capture(token)
+													if authorization ~= nil and activation_is_current(authorization) then
+															return resume_attempt(token, false)
+													end
+													return true
+											end)
+										bootstrap_dispatching = false
+										if bootstrap_ok ~= true or bootstrap_accepted ~= true then
+												return compensate_activation("MLX bootstrap dispatch refused")
+										end
+										if bootstrap_terminal then
+												return resume_attempt(token, false)
+										end
+										return true
+								else
+										return finish_activation(false)
+								end
+						end
+
+						if activation_controller.cancel() ~= true then return false end
+						if commit_enabled(false) ~= true then return false end
+						publish_toggle()
+						return true
+				end or nil
+
 				local main_menu = {}
 				do
 						local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
@@ -1260,7 +1570,13 @@ local function create_menu(deps)
 												end
 										end
 								end
-								main_menu = ManifestMenu.build("llm_menu", "LLM", handlers, nil, ctx, {}) or {}
+								-- No command while paused or before the activation owner exists:
+								-- the renderer then draws no gate rather than one that does nothing.
+								local render_ctx = {
+										commands      = { llm_toggle = toggle_action },
+										state_getters = { llm_enabled = function() return state.llm_enabled == true end },
+								}
+								main_menu = ManifestMenu.build("llm_menu", "LLM", handlers, nil, render_ctx, {}) or {}
 						else
 								Logger.error(LOG, "Manifest renderer unavailable — the IA submenu has no settings row.")
 						end
@@ -1269,311 +1585,7 @@ local function create_menu(deps)
 				return {
 						label   = i18n.get("menu.llm.title"),
 						checked = state.llm_enabled or nil,
-						action  = not paused
-							and activation_requirement_owner ~= nil
-							and type(models_mgr.pause_requirements) == "function"
-							and activation_controller.is_registered() and function()
-								activation_generation = activation_generation + 1
-								local my_generation = activation_generation
-								local activation_backend = state.llm_backend
-								local target_enabled = not state.llm_enabled
-								local activation_terminal = false
-								local activation_published = false
-								local attempt = { phase = nil, bootstrap_result = nil }
-								local token
-
-								local function commit_enabled(enabled)
-										local previous_enabled = state.llm_enabled
-										local function restore_previous_preference(reason)
-												state.llm_enabled = previous_enabled
-												local rollback_ok, rollback_settled = pcall_log(
-													"prediction preference rollback after " .. reason,
-													prediction_locks.apply_preference,
-													previous_enabled)
-												if rollback_ok ~= true or rollback_settled ~= true then
-														Logger.error(LOG,
-															"Prediction preference rollback after %s did not commit.",
-															reason)
-														return false
-												end
-												return true
-										end
-										Logger.info(LOG, string.format("Toggling LLM: %s -> %s",
-												tostring(state.llm_enabled), tostring(enabled)))
-										state.llm_enabled = enabled
-										if type(prediction_locks.apply_preference) == "function" then
-												local ok, settled = pcall_log(
-													"prediction preference settlement",
-													prediction_locks.apply_preference,
-													state.llm_enabled)
-												Logger.debug(LOG, string.format(
-														"Prediction preference %s settlement -> %s",
-														tostring(state.llm_enabled), tostring(ok and settled == true)))
-												if not ok or settled ~= true then
-														restore_previous_preference("runtime settlement refusal")
-														return false
-												end
-										else
-												Logger.warn(LOG, "Prediction preference settlement is unavailable.")
-												state.llm_enabled = previous_enabled
-												return false
-										end
-										local save_ok, prefs_saved = pcall_log(
-											"save_prefs during LLM preference commit", save_prefs)
-										if save_ok ~= true or prefs_saved ~= true then
-												local restored = restore_previous_preference("persistence refusal")
-												if restored then
-														Logger.error(LOG,
-															"LLM preference persistence was refused; previous state restored.")
-												end
-												pcall_log("update_menu after LLM preference rollback", update_menu)
-												return false
-										end
-										if enabled ~= true then M.reset_llm_health_status() end
-										return true
-								end
-
-								local function publish_toggle()
-										pcall_log("update_menu", update_menu)
-										pcall_log("notifications.notify", function()
-											notifications.notify(
-												state.llm_enabled and i18n.get("notify.llm_enabled")
-													or i18n.get("notify.llm_disabled"),
-												i18n.get("notify.llm_suggestions"))
-										end)
-								end
-
-								local function compensate_activation(reason)
-										if activation_terminal then return false end
-										activation_terminal = true
-										if token ~= nil then activation_controller.complete(token) end
-										Logger.error(LOG, "LLM activation failed (%s); restoring disabled state.",
-											tostring(reason))
-										if commit_enabled(false) ~= true then
-												Logger.error(LOG,
-													"Could not persist the compensating LLM disable after activation failure.")
-												return false
-										end
-										pcall_log("update_menu after activation compensation", update_menu)
-										return false
-								end
-
-								local function activation_is_current(authorization)
-										return activation_terminal ~= true
-											and my_generation == activation_generation
-											and state.llm_backend == activation_backend
-											and state.llm_enabled == true
-											and activation_controller.is_current(token, authorization)
-								end
-
-								local function publish_activation_once()
-										if activation_published then return true end
-										activation_published = true
-										publish_toggle()
-										return true
-								end
-
-								local function dispatch_requirements()
-										local authorization = activation_controller.capture(token)
-										if authorization == nil or not activation_is_current(authorization) then
-												return false
-										end
-										attempt.phase = "requirements"
-										attempt.requirements_stale = false
-										attempt.requirements_generation =
-												(attempt.requirements_generation or 0) + 1
-										local requirements_generation = attempt.requirements_generation
-										attempt.requirements_terminal = nil
-										local terminal = false
-										local terminal_success = false
-										local terminal_cancel_reason = nil
-										local dispatching = true
-										local function on_success()
-												if terminal or attempt.requirements_generation ~= requirements_generation then
-														return false
-												end
-												terminal = true
-												terminal_success = true
-												attempt.requirements_terminal = {
-														generation = requirements_generation,
-														success = true,
-												}
-												if dispatching then return true end
-												if not activation_is_current(authorization) then return true end
-												activation_terminal = true
-												activation_controller.complete(token)
-												publish_activation_once()
-												return true
-										end
-										local function on_cancel(reason)
-												if terminal or attempt.requirements_generation ~= requirements_generation then
-														return false
-												end
-												terminal = true
-												terminal_cancel_reason = reason
-												attempt.requirements_terminal = {
-														generation = requirements_generation,
-														success = false,
-														reason = reason,
-												}
-												if dispatching then return true end
-												if reason == "stale" or not activation_is_current(authorization) then
-														attempt.requirements_stale = true
-														return true
-												end
-												activation_terminal = true
-												activation_controller.complete(token)
-												return true
-										end
-										local requirements_ok, accepted = pcall_log(
-											"models_mgr.check_requirements",
-											models_mgr.check_requirements, state.llm_model,
-											on_success, on_cancel, {
-												requirement_owner = activation_requirement_owner,
-												is_current = function()
-													return activation_is_current(authorization)
-												end,
-											})
-										dispatching = false
-										if requirements_ok ~= true or accepted ~= true then
-												-- A synchronous terminal from a dispatch that subsequently
-												-- refuses is not authoritative.  Nothing may be published
-												-- until the acquisition itself returns literal true.
-												attempt.requirements_terminal = nil
-												if not activation_is_current(authorization) then
-														attempt.requirements_stale = true
-														return true
-												end
-												return compensate_activation("requirements dispatch refused")
-										end
-										if terminal_success then
-												activation_terminal = true
-												activation_controller.complete(token)
-												return publish_activation_once()
-										end
-										if terminal then
-												if terminal_cancel_reason == "stale"
-													or not activation_is_current(authorization) then
-														attempt.requirements_stale = true
-														return true
-												end
-												activation_terminal = true
-												activation_controller.complete(token)
-												return true
-										end
-										return publish_activation_once()
-								end
-
-								local function finish_activation(skip_deps_check)
-										local authorization = activation_controller.capture(token)
-										if authorization == nil or not activation_is_current(authorization) then
-												Logger.debug(LOG, "Discarding stale LLM activation completion.")
-												return false
-										end
-										if not skip_deps_check
-											and check_backend_deps(state.llm_backend) ~= true then
-												return compensate_activation("dependency bootstrap refused")
-										end
-										if state.llm_model and state.llm_model ~= "" then
-												return dispatch_requirements()
-										end
-										activation_terminal = true
-										activation_controller.complete(token)
-										return publish_activation_once()
-								end
-
-								local function resume_attempt(_, resumed_from_pause)
-										if activation_terminal then return true end
-										if my_generation ~= activation_generation
-											or state.llm_backend ~= activation_backend
-											or state.llm_enabled ~= true then
-												-- A shared preference action (notably Disable All) may
-												-- supersede this activation without going through this
-												-- menu closure.  Settle the stale token so it cannot block
-												-- a later explicit enable or a pause rollback.
-												activation_terminal = true
-												return activation_controller.complete(token) == true
-										end
-										if attempt.phase == "bootstrap" then
-												if attempt.bootstrap_result == nil then return true end
-												if attempt.bootstrap_result ~= true then
-														return compensate_activation("MLX bootstrap reported failure")
-												end
-												attempt.phase = "requirements"
-												return finish_activation(true)
-										end
-										if attempt.phase == "requirements" then
-												local requirements_terminal = attempt.requirements_terminal
-												if type(requirements_terminal) == "table" then
-														attempt.requirements_terminal = nil
-														if requirements_terminal.success == true then
-																activation_terminal = true
-																if activation_controller.complete(token) ~= true then return false end
-																return publish_activation_once()
-														end
-														if requirements_terminal.reason ~= "stale" then
-																activation_terminal = true
-																return activation_controller.complete(token) == true
-														end
-														attempt.requirements_stale = true
-												end
-												if resumed_from_pause == true or attempt.requirements_stale == true then
-														attempt.requirements_stale = false
-														return dispatch_requirements()
-												end
-										end
-										return true
-								end
-
-								if target_enabled then
-										-- Global Disable All mutates the shared preference outside
-										-- this closure.  Its old token is already fenced by state,
-										-- but must settle exactly before a new enable can own work.
-										if activation_controller.cancel() ~= true then return false end
-										token = activation_controller.begin(resume_attempt)
-										if token == nil then return false end
-										-- No backend process starts until the candidate is durable.
-										if commit_enabled(true) ~= true then
-												activation_controller.cancel()
-												return false
-										end
-
-										if state.llm_backend == "mlx" then
-												attempt.phase = "bootstrap"
-												Logger.info(LOG, "Activating LLM — running MLX bootstrap check first.")
-												local bootstrap_dispatching = true
-												local bootstrap_terminal = false
-												local bootstrap_ok, bootstrap_accepted = pcall_log(
-													"mlx_deps_checker.check_and_install_deps",
-													mlx_deps_checker.check_and_install_deps, function(ok)
-															if bootstrap_terminal then return false end
-															bootstrap_terminal = true
-															attempt.bootstrap_result = ok == true
-															if bootstrap_dispatching then return true end
-															local authorization = activation_controller.capture(token)
-															if authorization ~= nil and activation_is_current(authorization) then
-																	return resume_attempt(token, false)
-															end
-															return true
-													end)
-												bootstrap_dispatching = false
-												if bootstrap_ok ~= true or bootstrap_accepted ~= true then
-														return compensate_activation("MLX bootstrap dispatch refused")
-												end
-												if bootstrap_terminal then
-														return resume_attempt(token, false)
-												end
-												return true
-										else
-												return finish_activation(false)
-										end
-								end
-
-								if activation_controller.cancel() ~= true then return false end
-								if commit_enabled(false) ~= true then return false end
-								publish_toggle()
-								return true
-						end or nil,
+						action  = toggle_action,
 						submenu = main_menu
 				}
 		end
