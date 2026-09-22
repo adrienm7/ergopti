@@ -166,4 +166,44 @@ helpers.describe("linux: every production Lua file compiles", function()
 		helpers.assert_eq(#broken, 0,
 			"production Lua file(s) failed to compile:\n  " .. table.concat(broken, "\n  "))
 	end)
+
+	helpers.it("no function exceeds LuaJIT's upvalue limit", function()
+		-- LuaJIT refuses to compile a function with more than 60 upvalues, which
+		-- PUC Lua accepts up to 255: four file-scope requires pushed main() of the
+		-- entry point to 62, the local suite stayed green and only CI's LuaJIT
+		-- failed. Under LuaJIT loadfile above already enforces the limit; under
+		-- PUC Lua the compiler's own listing gives every function's count.
+		if jit then return end
+		local LIMIT = 60
+		local BATCH = 30
+		local luac_probe = io.popen("luac -v 2>&1", "r")
+		local banner = luac_probe and luac_probe:read("*a") or ""
+		if luac_probe then luac_probe:close() end
+		helpers.assert_true(banner:find("Lua", 1, true) ~= nil,
+			"luac must be on PATH next to lua: without it this gate cannot see LuaJIT's upvalue limit")
+		local over = {}
+		for first = 1, #files, BATCH do
+			local quoted = {}
+			for i = first, math.min(first + BATCH - 1, #files) do
+				quoted[#quoted + 1] = '"' .. files[i] .. '"'
+			end
+			local pipe = io.popen("luac -l -p " .. table.concat(quoted, " ") .. " 2>&1", "r")
+			local listing = pipe and pipe:read("*a") or ""
+			if pipe then pipe:close() end
+			local header
+			for line in listing:gmatch("[^\n]+") do
+				if line:match("^main <") or line:match("^function <") then
+					header = line:match("<(.-)>")
+				else
+					local count = tonumber(line:match("(%d+) upvalues?,"))
+					if count and count > LIMIT then
+						over[#over + 1] = string.format("%s: %d upvalues", tostring(header), count)
+					end
+				end
+			end
+		end
+		helpers.assert_eq(#over, 0, "function(s) over LuaJIT's " .. LIMIT
+			.. "-upvalue limit (move file-scope requires into the function that uses them):\n  "
+			.. table.concat(over, "\n  "))
+	end)
 end)

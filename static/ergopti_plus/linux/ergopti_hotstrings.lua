@@ -138,10 +138,6 @@ local ManifestReader    = require("infra.manifest_reader")
 local ScriptSettings    = require("infra.script_settings")
 local Timings           = require("infra.timings")
 local ScriptActions     = require("modules.shortcuts.script_actions")
-local GlobalFeatureSwitch = require("ui.menu.global_feature_switch")
-local WrapOnType        = require("modules.shortcuts.wrap_on_type")
-local Clipboard         = require("adapters.clipboard")
-local Storage           = require("adapters.storage")
 local CrashReporter     = require("modules.diagnostics.crash_reporter")
 local FocusGuard        = require("modules.keylogger.focus_guard")
 local InputCaptureGate  = require("infra.input_capture_gate")
@@ -718,7 +714,11 @@ local function main()
 		global_features[#global_features + 1] = switch_feature("tap_holds", kanata.tap_holds_enabled,
 			kanata.set_tap_holds_enabled, false)
 	end
-	local global_switch = GlobalFeatureSwitch.new({ features = global_features, storage = Storage })
+	-- Required here, not at file scope: main() is at LuaJIT's 60-upvalue limit
+	-- and a file-scope module would be one more upvalue of it.
+	local GlobalFeatureSwitch = require("ui.menu.global_feature_switch")
+	local global_switch = GlobalFeatureSwitch.new({ features = global_features,
+		storage = require("adapters.storage") })
 
 	-- A control can change while app ID and window title stay identical. Raw Tab
 	-- and pointer events therefore invalidate the AT-SPI verdict synchronously;
@@ -1192,7 +1192,7 @@ local function main()
 	-- Wrap the selection when a wrap symbol is typed over it. Decided in the
 	-- consumption callback below, so the symbol never reaches the application
 	-- when it wraps; see modules/shortcuts/wrap_on_type.lua for the probe.
-	local wrap_on_type = WrapOnType.new({
+	local wrap_on_type = require("modules.shortcuts.wrap_on_type").new({
 		is_active = function()
 			return shortcuts ~= nil and shortcuts.is_enabled()
 				and shortcuts.is_wrap_on_type_enabled()
@@ -1200,7 +1200,7 @@ local function main()
 				and not secure_focus_guard.blocks_text()
 		end,
 		get_pair = function(char) return shortcuts and shortcuts.get_wrap_pair(char) or nil end,
-		read_primary = Clipboard.read_primary,
+		read_primary = require("adapters.clipboard").read_primary,
 		type_text = function(text)
 			if opts.dry_run then return false end
 			local result = injector.inject(0, text, false)
