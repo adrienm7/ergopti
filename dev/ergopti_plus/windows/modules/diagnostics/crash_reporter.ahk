@@ -386,22 +386,11 @@ _CrashReport_SysInfo() {
 	Info["ahk_bitness"] := (A_PtrSize = 8) ? "64-bit" : "32-bit"
 	Info["locale"]      := A_Language
 
-	GitHash := ""
-	try {
-		TmpFile := A_Temp . "\ergopti_cr_hash_" . A_TickCount . "_" . A_PtrSize . ".txt"
-		; Use Run (non-blocking) instead of RunWait to avoid a 30-second hang when
-		; git is unavailable or the repo is on a disconnected network drive.
-		Run(A_ComSpec . " /c git -C " . Chr(34) . A_ScriptDir . Chr(34)
-			. " rev-parse --short HEAD > " . Chr(34) . TmpFile . Chr(34), , "Hide")
-		StartedTick := A_TickCount
-		while (!FileExist(TmpFile) and !TickExpired(StartedTick, 500))
-			Sleep(50)
-		if FileExist(TmpFile) {
-			GitHash := Trim(FileRead(TmpFile, "UTF-8"))
-			try FileDelete(TmpFile)
-		}
-	}
-	Info["git_hash"] := GitHash
+	; Same resolver as the healthcheck and the boot snapshot: the compiled
+	; build's stamp, else the checkout's HEAD, without spawning git.
+	Commit := DiagSnapshot_ResolveCommit(A_ScriptDir)
+	Info["git_hash"] := Commit["commit"]
+	Info["commit_source"] := Commit["source"]
 
 	return Info
 }

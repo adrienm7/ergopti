@@ -327,7 +327,9 @@ function M.generate(ctx, menu_mods, actions)
 			if type(built) == "table" then
 				if built[1] ~= nil then
 					for _, it in ipairs(built) do table.insert(result, it) end
-				else
+				elseif next(built) ~= nil then
+					-- An empty list (no group matched the filter) is no row at all;
+					-- inserting it handed the renderer a row with no label.
 					table.insert(result, built)
 				end
 			end
@@ -568,9 +570,9 @@ function M.generate(ctx, menu_mods, actions)
 		push("shortcuts.build", menu_mods.shortcuts.build, shortcuts_ctx)
 	end
 
-	-- Karabiner then Gestures — keyboard first, then trackpad
-	if type(menu_mods.karabiner) == "table" and type(menu_mods.karabiner.build) == "function" then
-		push("karabiner.build", menu_mods.karabiner.build, ctx)
+	-- Tap-holds then Gestures — keyboard first, then trackpad
+	if type(menu_mods.tap_holds) == "table" and type(menu_mods.tap_holds.build) == "function" then
+		push("tap_holds.build", menu_mods.tap_holds.build, ctx)
 	end
 	if type(menu_mods.gestures) == "table" then
 		push("gestures.build", menu_mods.gestures.build, ctx)
@@ -626,6 +628,7 @@ function M.generate(ctx, menu_mods, actions)
 					["enable_all"]      = actions.enable_all,
 					["disable_all"]     = actions.disable_all,
 					["reset_defaults"]  = actions.reset_defaults,
+					["clean_unused_keys"] = actions.clean_unused_keys,
 				}
 				for _, row in ipairs(ManifestMenu.build("global_actions", "Global", nil, nil, ga_ctx) or {}) do
 					if ctx.paused then

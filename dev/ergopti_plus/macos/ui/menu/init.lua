@@ -89,7 +89,7 @@ local menu_mods = {
 	hotstrings      = safe_require("ui.menu.menu_hotstrings",      "hotstrings menu"),
 	llm             = safe_require("ui.menu.menu_llm",             "AI menu"),
 	keylogger       = safe_require("ui.menu.menu_metrics",         "metrics menu"),
-	karabiner       = safe_require("ui.menu.menu_remap",       "Karabiner menu"),
+	tap_holds       = safe_require("ui.menu.menu_tap_holds",    "tap-holds menu"),
 	apps            = safe_require("ui.menu.menu_apps",            "apps menu"),
 	about           = safe_require("ui.menu.menu_about",           "about/update menu"),
 }
@@ -286,7 +286,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local _suppress_watcher_until = 0
 
 	-- Menu-cache state. Builder.generate() is expensive (counts every hotstring
-	-- group, builds the layout/apps/karabiner submenus, renders the badge), and
+	-- group, builds the layout/apps/tap-holds submenus, renders the badge), and
 	-- Hammerspoon evaluates the setMenu callback on EVERY click — so rebuilding it
 	-- per click was the ~1 s menu-open latency. We cache the generated tree and
 	-- only rebuild when a state change marks it dirty (or the pause state flips),
@@ -1110,6 +1110,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		enable_all                = function() return set_all_enabled(true) end,
 		disable_all               = function() return set_all_enabled(false) end,
 		reset_defaults            = function() return reset_all_defaults() end,
+		clean_unused_keys         = function()
+			return require("ui.menu.unused_keys_cleanup").run_from_menu()
+		end,
 		open_paths                = function()
 			return DeferredWork.after(0.05, MenuPaths.open_editor, "menu.open_paths")
 		end,
@@ -1353,7 +1356,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		function()
 			-- A failed prime only costs a slower first open, but it used to cost it
 			-- silently; the submenu then looked empty with nothing in the log.
-			for _prime_index, name in ipairs({ "keyboard_layout", "apps", "karabiner" }) do
+			for _prime_index, name in ipairs({ "keyboard_layout", "apps", "tap_holds" }) do
 				local mod = menu_mods[name]
 				if mod and type(mod.prime) == "function" then
 					local primed, prime_err = pcall(mod.prime, ctx)

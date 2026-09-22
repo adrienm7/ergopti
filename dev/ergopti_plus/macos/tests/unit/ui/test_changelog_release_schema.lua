@@ -20,8 +20,6 @@ local invalid = {
 	{ name = "boolean entry", body = "[true]" },
 	{ name = "numeric entry", body = "[42]" },
 	{ name = "string entry", body = '["private-release-data"]' },
-	{ name = "object envelope", body = '{"message":"private-release-data"}' },
-	{ name = "empty object envelope", body = "{}" },
 	{ name = "nested array entry", body = '[["private-release-data"]]' },
 	{ name = "numeric notes", body = '[{"tag_name":"v1","body":42}]' },
 	{ name = "boolean notes", body = '[{"tag_name":"v1","body":true}]' },
@@ -81,6 +79,32 @@ helpers.describe("changelog release response schema", function()
 					helpers.assert_true(state.evaluations[1]:find("changelog_window.error_parse", 1, true) ~= nil)
 					helpers.assert_eq(#warnings, 1)
 					helpers.assert_eq(warnings[1]:find("private-release-data", 1, true), nil)
+				end)
+			end)
+		end
+		-- An object is what a rate-limited API or a proxy returns instead of the
+		-- release array: it is a failed source, so the Atom feed is tried next.
+		for _, envelope in ipairs({ '{"message":"private-release-data"}', "{}" }) do
+			helpers.it("(changelog-release-schema) treats envelope " .. envelope .. " as a failed API on " .. channel, function()
+				with_changelog(function(window, state, post)
+					hs.json.decode = json.decode
+					hs.json.encode = native_encode
+					local warnings = {}
+					package.loaded["infra.logger"].warn = function(_, message, ...)
+						warnings[#warnings + 1] = string.format(message, ...)
+					end
+					helpers.assert_true(window.open({ channel = channel }))
+					post("ready")
+					post({ action = "fetch", channel = channel })
+					state.callbacks[1](200, envelope, {})
+					helpers.assert_eq(#state.evaluations, 0, "a failed API must not publish before the feed answers")
+					helpers.assert_eq(#state.callbacks, 2)
+					state.callbacks[2](404, "", {})
+					helpers.assert_eq(#state.evaluations, 1)
+					helpers.assert_true(state.evaluations[1]:find("changelog_window.error_network", 1, true) ~= nil)
+					for _, line in ipairs(warnings) do
+						helpers.assert_eq(line:find("private-release-data", 1, true), nil, "response content must not be logged")
+					end
 				end)
 			end)
 		end

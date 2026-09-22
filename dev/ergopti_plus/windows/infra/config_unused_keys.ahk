@@ -156,8 +156,10 @@ ConfigUnusedKeysRemove(FilePath, Keys, Stamp := "", BackupFn := 0, WriterFn := 0
 	; Unknown sections whose every key is removed go away with their header
 	; instead of lingering as empty ``[section]`` lines.
 	DropSections := []
-	Writer := HasMethod(WriterFn, "Call") ? WriterFn
-		: (Path, Updates) => TOML_BatchWrite(Path, Updates, DropSections)
+	WriteUpdates(Path, Updates) {
+		return TOML_BatchWrite(Path, Updates, DropSections)
+	}
+	Writer := HasMethod(WriterFn, "Call") ? WriterFn : WriteUpdates
 	Outcome := "write_failed"
 	try LoggerStart("ConfigUnusedKeys", "Removing {1} unused key(s) from '{2}'…",
 		Keys.Length, FilePath)

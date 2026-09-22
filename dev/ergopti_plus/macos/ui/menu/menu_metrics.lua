@@ -723,7 +723,10 @@ function M.build(ctx)
 			updateMenu()
 			return true
 		end,
-		menu = menu,
+		-- `submenu`: the rows are already materialised by ManifestMenu.build. The
+		-- tray reads provider rows, where a `menu` field is never read, so the
+		-- Metrics entry reached the menu bar with nothing under it.
+		submenu = menu,
 	}
 end
 

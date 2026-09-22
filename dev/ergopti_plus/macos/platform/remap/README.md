@@ -8,8 +8,10 @@ Karabiner-Elements itself is shared, multi-process infrastructure. Its UI and
 menubar process, root Core Service (called `karabiner_grabber` before v15.7),
 console user server, user/session agents, observers, watchers, extensions and
 `Karabiner-VirtualHIDDevice-Daemon`/DriverKit helpers are never owned, killed,
-unloaded, launched or restarted by ErgoptiPlus. The user may hide or disable the
-ErgoptiPlus Karabiner menu while keeping stock Karabiner and personal rules active.
+unloaded, launched or restarted by ErgoptiPlus. The integration is always on and
+the tray never names Karabiner: its tap-holds and chords are configured under the
+same "Tap-Holds" menu Windows uses, while stock Karabiner and the user's personal
+rules stay active alongside it.
 
 ## Exact-lease lifecycle
 

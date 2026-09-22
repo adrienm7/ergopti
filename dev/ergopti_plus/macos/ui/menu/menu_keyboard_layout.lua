@@ -222,7 +222,6 @@ function M.build(ctx)
 	local base_dir     = ctx and ctx.base_dir or ""
 	local bundles_dir  = base_dir .. BUNDLES_RELDIR
 
-	local submenu = {}
 	-- The two blocks this driver alone has — installing the .bundle layout macOS
 	-- needs, and choosing the menubar logo — are collected for the manifest slots
 	-- that declare them rather than appended here. They were eight and two rows
@@ -531,28 +530,6 @@ function M.build(ctx)
 		return rows
 	end
 
-	-- The manifest's own rows for this menu, rendered here rather than repeated:
-	-- the section header above the layout list, the separators around it, and the
-	-- `active_layouts` slot this driver had never answered. Everything this file
-	-- still appends by hand — the install/update block above and the pause/resume
-	-- pickers below — is macOS's own and stays until it is declared too.
-	do
-		local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
-		if ok_mm and type(ManifestMenu.build) == "function" then
-			local rendered = ManifestMenu.build("layout_menu", "Layout", nil, nil, ctx, {
-				["active_layouts"] = active_layout_rows,
-				["layout_bundle"]  = function() return bundle_rows end,
-				["layout_logo"]    = function() return logo_rows end,
-				["layout_switching"] = function() return switching_rows end,
-			})
-			for _, row in ipairs(rendered or {}) do submenu[#submenu + 1] = row end
-		else
-			-- Loud: the rows would simply be absent, and a layout list that
-			-- silently disappears reads as "macOS has no layouts installed".
-			Logger.error(LOG, "Manifest renderer unavailable — the layout list is not rendered.")
-		end
-	end
-
 	-- Pause / resume layout switching — two dropdowns that let the user pick which
 	-- keyboard layout to activate automatically when the script is paused or resumed.
 	-- Nil / "auto" means "do nothing" (default). Stored in state.layout_on_pause and
@@ -660,9 +637,13 @@ function M.build(ctx)
 			end
 		end
 	end
+	-- The manifest declares this row as the `hotstrings.magic_key.replace`
+	-- feature right after `layout_switching`, and the renderer draws no `feature`
+	-- row itself. Appending it to that list keeps the declared order and lets the
+	-- renderer materialise it like every other row of this menu.
 	if replace_label then
-		submenu[#submenu + 1] = { separator = true }
-		submenu[#submenu + 1] = {
+		switching_rows[#switching_rows + 1] = { separator = true }
+		switching_rows[#switching_rows + 1] = {
 			label    = replace_label,
 			checked  = replace_enabled or nil,
 			disabled = not replace_group_on or hs_paused or nil,
@@ -686,9 +667,29 @@ function M.build(ctx)
 		}
 	end
 
+	-- Rendered LAST, once every provider list is filled. The providers are read
+	-- when the renderer reaches their row, so a build issued before the
+	-- pause/resume pickers were collected drew an empty `layout_switching`.
+	local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
+	if not ok_mm or type(ManifestMenu.build) ~= "function" then
+		-- Loud: the rows would simply be absent, and a layout list that
+		-- silently disappears reads as "macOS has no layouts installed".
+		Logger.error(LOG, "Manifest renderer unavailable — the layout list is not rendered.")
+		return nil
+	end
+	local submenu = ManifestMenu.build("layout_menu", "Layout", nil, nil, ctx, {
+		["active_layouts"]   = active_layout_rows,
+		["layout_bundle"]    = function() return bundle_rows end,
+		["layout_logo"]      = function() return logo_rows end,
+		["layout_switching"] = function() return switching_rows end,
+	})
+
+	-- `submenu`, not `items`: these rows are already materialised. The tray
+	-- renders `items` as provider data, where every `title`/`fn` row is dropped,
+	-- which left this submenu empty on the real menu bar.
 	return {
-		label = i18n.get("menu.layout.title"),
-		items  = submenu,
+		label   = i18n.get("menu.layout.title"),
+		submenu = submenu,
 	}
 end
 

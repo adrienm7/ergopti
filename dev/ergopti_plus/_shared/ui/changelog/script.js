@@ -6,17 +6,22 @@
  * DESCRIPTION:
  * Manages the release list sidebar and markdown content pane for the changelog
  * window. Fetches release data from the GitHub API via a native bridge (AHK
- * WebView2 or Hammerspoon usercontent), renders release notes as sanitized
- * Markdown through the shared renderer (../markdown.js), and supports stable /
- * pre-release channel switching.
+ * WebView2, Hammerspoon usercontent or the Linux WebKit host), renders release
+ * notes as sanitized Markdown through the shared renderer (../markdown.js), and
+ * supports stable / pre-release channel switching.
  *
  * FEATURES & RATIONALE:
- * 1. Bridge-agnostic: postBridgeMessage() works on both WebView2 (Windows/AHK)
- *    and WKWebView (macOS/Hammerspoon) with automatic detection.
- * 2. Client-side fetch fallback: if the native bridge does not inject releases,
- *    the script fetches directly from the GitHub API so a browser preview works.
- * 3. Remote-content boundary: release body text never becomes active HTML; it
- *    reaches the DOM through createElement/createTextNode only.
+ * 1. Bridge-agnostic: postBridgeMessage() works on WebView2 (Windows/AHK),
+ *    WKWebView (macOS/Hammerspoon) and WebKitGTK (Linux).
+ * 2. Native hosts own the network: they try the GitHub API, then the public
+ *    releases Atom feed (./atom_feed.js converts it), honouring the system
+ *    proxy. A browser preview without a host fetches the API directly.
+ * 3. Bounded loading: every load arms a watchdog, so a host or network that
+ *    never answers ends in a visible error with Retry and a link to the
+ *    releases page instead of an endless spinner.
+ * 4. Remote-content boundary: release body text never becomes active HTML; it
+ *    reaches the DOM through createElement/createTextNode only, and host JSON
+ *    arrives as a string that is parsed, never evaluated.
  * ==============================================================================
  */
 
@@ -30,10 +35,39 @@ var _ghOwner = window.__changelog_gh_owner || 'adrienm7';
 var _ghRepo = window.__changelog_gh_repo || 'ergopti';
 var _bridgeSession =
 	typeof window.__changelog_session === 'string' ? window.__changelog_session : '';
-// Set to true once the native backend has responded for the current channel;
-// prevents the client-side fallback from overwriting native data.
-var _nativeResponded = false;
-var _fallbackTimer = null;
+// Upper bound for one load, from request to data or error. Mirrors
+// release_sources.ui_watchdog_sec in _shared/modules/updater/defaults.json and
+// exceeds the hosts' proxy-resolution plus API plus feed budgets (pinned by
+// tools/test/test-changelog-network-resilience.cjs).
+var CHANGELOG_WATCHDOG_MS = 45000;
+// Per-request budget of the browser-preview fetch. Mirrors
+// release_sources.source_timeout_sec in the same defaults file.
+var CLIENT_FETCH_TIMEOUT_MS = 15000;
+// Identifies the active load; a late timer or fetch of a superseded load is
+// ignored instead of overwriting the current state.
+var _loadToken = 0;
+var _watchdogTimer = null;
+var _hasNativeHost = _detectNativeHost();
+
+/**
+ * Reports whether a native host owns this page's network access.
+ * @return {boolean}
+ */
+function _detectNativeHost() {
+	if (window.__ergopti_host === 'linux') return true;
+	if (
+		window.chrome &&
+		window.chrome.webview &&
+		typeof window.chrome.webview.postMessage === 'function'
+	) {
+		return true;
+	}
+	return !!(
+		window.webkit &&
+		window.webkit.messageHandlers &&
+		window.webkit.messageHandlers.changelog_bridge
+	);
+}
 
 // =========================================
 // =========================================
@@ -54,8 +88,18 @@ if (window.__ergopti_host === 'linux') {
 			}
 			return;
 		}
+		if (response.action === 'releases_error') {
+			// Only changelog keys are looked up; anything else shows the network error.
+			var key = /^changelog_window\.error_[a-z_]+$/.test(response.error_key || '')
+				? response.error_key
+				: 'changelog_window.error_network';
+			injectError(_t(key));
+			return;
+		}
 		if (response.action !== 'releases' || response.cache_miss) return;
-		injectReleases(response.releases, response.channel);
+		if (typeof response.feed === 'string') injectReleasesFeed(response.feed, response.channel);
+		else if (typeof response.json === 'string') injectReleasesJson(response.json, response.channel);
+		else injectReleases(response.releases, response.channel);
 	};
 }
 
@@ -88,7 +132,14 @@ function _postChangelogMessage(payload) {
  * @param {string} channel - "main" or "dev".
  */
 function injectReleases(releases, channel) {
-	if (!Array.isArray(releases)) return;
+	if (!Array.isArray(releases)) {
+		injectError(_t('changelog_window.error_parse'));
+		return;
+	}
+	// Remote records are data of unknown shape; only objects are listed.
+	releases = releases.filter(function (r) {
+		return r !== null && typeof r === 'object';
+	});
 	// Filter pre-releases on the JS side for the stable channel — avoids
 	// fragile server-side JSON parsing (AHK brace-depth tracker was unreliable).
 	if (channel === 'main') {
@@ -96,12 +147,8 @@ function injectReleases(releases, channel) {
 			return !r.prerelease;
 		});
 	}
-	// Cancel the client-side fallback — native backend responded first.
-	_nativeResponded = true;
-	if (_fallbackTimer) {
-		clearTimeout(_fallbackTimer);
-		_fallbackTimer = null;
-	}
+	_endLoad();
+	hideError();
 	if (channel) {
 		_currentChannel = channel;
 		// Sync channel buttons to match what the native backend actually served.
@@ -126,9 +173,47 @@ function injectReleases(releases, channel) {
  * @param {string} message - Localised error message.
  */
 function injectError(message) {
+	_endLoad();
 	showError(
 		message || _t('changelog_window.error_network') || 'Impossible de charger les versions.'
 	);
+}
+
+/**
+ * Called by a native host with the GitHub API response text. The text is
+ * parsed as data (never evaluated as script) and must be a release array.
+ * @param {string} text - Raw API response body.
+ * @param {string} channel - "main" or "dev".
+ */
+function injectReleasesJson(text, channel) {
+	var releases;
+	try {
+		releases = JSON.parse(text);
+	} catch (error) {
+		releases = null;
+	}
+	if (!Array.isArray(releases)) {
+		injectError(_t('changelog_window.error_parse'));
+		return;
+	}
+	injectReleases(releases, channel);
+}
+
+/**
+ * Called by a native host with the releases Atom feed text, the alternate
+ * source used when the GitHub API is unreachable.
+ * @param {string} xml - Raw feed document.
+ * @param {string} channel - "main" or "dev".
+ */
+function injectReleasesFeed(xml, channel) {
+	var releases;
+	try {
+		releases = parseReleasesAtom(xml, _ghOwner, _ghRepo);
+	} catch (error) {
+		injectError(_t('changelog_window.error_parse'));
+		return;
+	}
+	injectReleases(releases, channel);
 }
 
 // Signal readiness so the native backend can flush queued calls.
@@ -137,6 +222,7 @@ function _initializePage() {
 	var dev = document.getElementById('btn-dev');
 	var github = document.getElementById('btn-github');
 	var retryButton = document.getElementById('btn-retry');
+	var releasesPage = document.getElementById('btn-releases-page');
 	if (stable)
 		stable.addEventListener('click', function () {
 			setChannel('main');
@@ -147,6 +233,7 @@ function _initializePage() {
 		});
 	if (github) github.addEventListener('click', openOnGitHub);
 	if (retryButton) retryButton.addEventListener('click', retry);
+	if (releasesPage) releasesPage.addEventListener('click', openReleasesPage);
 	_postChangelogMessage('ready');
 }
 if (document.readyState === 'loading')
@@ -181,6 +268,10 @@ function applyLabels() {
 
 	var btnRetry = document.getElementById('btn-retry');
 	if (btnRetry) btnRetry.textContent = _t('changelog_window.retry') || 'Réessayer';
+
+	var btnPage = document.getElementById('btn-releases-page');
+	var pageLabel = _t('changelog_window.open_releases_page');
+	if (btnPage && pageLabel) btnPage.textContent = pageLabel;
 }
 
 // Apply labels once i18n strings arrive (either from fetch or direct injection).
@@ -205,74 +296,107 @@ if (window._i18n_strings) applyLabels();
  */
 function setChannel(channel) {
 	if (channel === _currentChannel && _releases.length > 0) return;
+	_requestReleases(channel);
+}
+
+/**
+ * Starts one bounded load of a channel, replacing any load in flight.
+ * @param {string} channel - "main" or "dev".
+ */
+function _requestReleases(channel) {
 	_currentChannel = channel;
 	var btnStable = document.getElementById('btn-stable');
 	var btnDev = document.getElementById('btn-dev');
 	if (btnStable) btnStable.classList.toggle('active', channel === 'main');
 	if (btnDev) btnDev.classList.toggle('active', channel === 'dev');
 
-	// Ask the native backend to re-fetch; fall back to direct API call after 800 ms
-	// only if the native backend has not responded (browser preview or no bridge).
+	_releases = [];
+	_selectedIndex = -1;
+	var list = document.getElementById('release-list');
+	if (list) list.replaceChildren();
+	clearContent();
+	var token = _beginLoad();
+
 	// Raw object, not JSON.stringify()-ed: makeHostBridge() (host_bridge.js)
 	// already stringifies for WebView2 and posts the object as-is for WKWebView,
 	// matching the openOnGitHub() call below and the Lua bridge's read-as-table
 	// convention (action_picker / hotstring_editor / metrics_apps).
-	_postChangelogMessage({ action: 'fetch', channel: channel });
-	showLoading();
-	_nativeResponded = false;
-	_releases = [];
-	_selectedIndex = -1;
-	document.getElementById('release-list').replaceChildren();
-	clearContent();
-
-	// Cancel any existing fallback timer before arming a new one.
-	if (_fallbackTimer) {
-		clearTimeout(_fallbackTimer);
-		_fallbackTimer = null;
-	}
-	_fallbackTimer = setTimeout(function () {
-		if (!_nativeResponded) _clientFetch(channel);
-	}, 800);
+	if (_hasNativeHost) _postChangelogMessage({ action: 'fetch', channel: channel });
+	else _clientFetch(channel, token);
 }
 
 /**
- * Retries the current channel fetch after an error.
+ * Retries the current channel after an error, even when a previous load had
+ * already listed releases.
  */
 function retry() {
-	setChannel(_currentChannel);
+	_requestReleases(_currentChannel);
 }
 
 /**
- * Direct GitHub API fetch — used as a fallback when the native backend
- * is unavailable or does not intercept the message.
- * @param {string} channel
+ * Starts the watchdog of a new load and shows the spinner.
+ * @return {number} Token identifying the load.
  */
-function _clientFetch(channel) {
-	var url =
-		channel === 'dev'
-			? 'https://api.github.com/repos/' + _ghOwner + '/' + _ghRepo + '/releases?per_page=20'
-			: 'https://api.github.com/repos/' + _ghOwner + '/' + _ghRepo + '/releases?per_page=20';
+function _beginLoad() {
+	_loadToken += 1;
+	var token = _loadToken;
+	if (_watchdogTimer) clearTimeout(_watchdogTimer);
+	showLoading();
+	_watchdogTimer = setTimeout(function () {
+		if (token !== _loadToken) return;
+		_watchdogTimer = null;
+		showError(_t('changelog_window.error_timeout') || _t('changelog_window.error_network') || '');
+	}, CHANGELOG_WATCHDOG_MS);
+	return token;
+}
 
-	fetch(url, { headers: { 'User-Agent': 'ErgoptiPlus-Changelog/1.0' } })
+/** Disarms the watchdog once the active load has produced data or an error. */
+function _endLoad() {
+	if (_watchdogTimer) {
+		clearTimeout(_watchdogTimer);
+		_watchdogTimer = null;
+	}
+}
+
+/**
+ * Direct GitHub API fetch for a browser preview, where no native host owns the
+ * network. Bounded by CLIENT_FETCH_TIMEOUT_MS.
+ * @param {string} channel
+ * @param {number} token - Load that owns this request.
+ */
+function _clientFetch(channel, token) {
+	var url = 'https://api.github.com/repos/' + _ghOwner + '/' + _ghRepo + '/releases?per_page=20';
+	if (typeof fetch !== 'function') {
+		injectError(_t('changelog_window.error_network'));
+		return;
+	}
+	var controller = typeof AbortController === 'function' ? new AbortController() : null;
+	var timer = setTimeout(function () {
+		if (controller) controller.abort();
+	}, CLIENT_FETCH_TIMEOUT_MS);
+
+	fetch(url, controller ? { signal: controller.signal } : {})
 		.then(function (r) {
-			return r.ok ? r.json() : Promise.reject(r.status);
+			return r.ok ? r.json() : Promise.reject({ status: r.status });
 		})
 		.then(function (data) {
-			if (!Array.isArray(data)) return;
-			var filtered =
-				channel === 'main'
-					? data.filter(function (r) {
-							return !r.prerelease;
-						})
-					: data;
-			// If no stable releases exist, show all releases as a courtesy.
-			if (channel === 'main' && filtered.length === 0) filtered = data;
-			injectReleases(filtered, channel);
+			clearTimeout(timer);
+			if (token !== _loadToken) return;
+			if (!Array.isArray(data)) {
+				injectError(_t('changelog_window.error_parse'));
+				return;
+			}
+			injectReleases(data, channel);
 		})
 		.catch(function (err) {
-			injectError(
-				_t('changelog_window.error_network') || 'Impossible de charger les versions. (' + err + ')'
-			);
+			clearTimeout(timer);
+			if (token !== _loadToken) return;
+			var status = err && typeof err.status === 'number' ? err.status : 0;
+			var key =
+				status === 403 || status === 429
+					? 'changelog_window.error_rate_limited'
+					: 'changelog_window.error_network';
+			injectError(_t(key));
 		});
 }
 
@@ -413,7 +537,7 @@ function selectRelease(idx) {
 		allow: _isAllowedRepositoryUrl,
 		open: function (url) {
 			_postChangelogMessage({ action: 'open_url', url: url });
-		},
+		}
 	});
 }
 
@@ -446,6 +570,14 @@ function openOnGitHub() {
 	_postChangelogMessage({ action: 'open_url', url: url });
 }
 
+/** Opens the repository releases index, the manual route when loading fails. */
+function openReleasesPage() {
+	_postChangelogMessage({
+		action: 'open_url',
+		url: 'https://github.com/' + _ghOwner + '/' + _ghRepo + '/releases'
+	});
+}
+
 // ======================================
 // ======================================
 // ======= 6/ Loading & Error State =====
@@ -472,6 +604,11 @@ function showError(message) {
 	if (errOverlay) errOverlay.style.display = 'flex';
 }
 
+function hideError() {
+	var errOverlay = document.getElementById('error-overlay');
+	if (errOverlay) errOverlay.style.display = 'none';
+}
+
 // ======================================
 // ======================================
 // ======= 7/ Initialisation ===========
@@ -486,13 +623,13 @@ function showError(message) {
 	if (btnDev) btnDev.classList.toggle('active', _currentChannel === 'dev');
 
 	applyLabels();
-	showLoading();
 
-	// Give the native backend 800 ms to inject data; if it does not respond,
-	// fall back to a direct API fetch so the UI is never stuck on a spinner.
-	_nativeResponded = false;
-	_fallbackTimer = setTimeout(function () {
-		_fallbackTimer = null;
-		if (!_nativeResponded) _clientFetch(_currentChannel);
-	}, 800);
+	// A native host starts the first fetch itself once the page is ready; the
+	// watchdog bounds that wait. A browser preview fetches directly.
+	var token = _beginLoad();
+	if (!_hasNativeHost) {
+		setTimeout(function () {
+			if (token === _loadToken) _clientFetch(_currentChannel, token);
+		}, 0);
+	}
 })();

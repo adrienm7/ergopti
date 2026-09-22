@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/" xml:lang="en-US">
+  <id>tag:github.com,2008:https://github.com/adrienm7/ergopti/releases</id>
+  <link type="text/html" rel="alternate" href="https://github.com/adrienm7/ergopti/releases"/>
+  <link type="application/atom+xml" rel="self" href="https://github.com/adrienm7/ergopti/releases.atom"/>
+  <title>Release notes from ergopti</title>
+  <updated>2026-09-22T14:18:09Z</updated>
+  <entry>
+    <id>tag:github.com,2008:Repository/572675710/v0.0.0-dev.130</id>
+    <updated>2026-09-22T14:35:46Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/adrienm7/ergopti/releases/tag/v0.0.0-dev.130"/>
+    <title>Ergopti v0.0.0-dev.130</title>
+    <content type="html">&lt;h2&gt;Ergopti 0.0.0-dev.130&lt;/h2&gt;
+&lt;p&gt;&lt;strong&gt;Ergopti Plus — advanced typing tools:&lt;/strong&gt; the companion application.&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;Timestamps are in &lt;strong&gt;Paris time&lt;/strong&gt; (Europe/Paris).&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;h3&gt;Fix&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Release: Link downloads through the release page&lt;/strong&gt;&lt;br&gt;
+The link now opens the release&#39;s own page, see &lt;a href=&quot;https://github.com/adrienm7/ergopti/releases/tag/v0.0.0-dev.129&quot;&gt;&lt;code&gt;v0.0.0-dev.129&lt;/code&gt;&lt;/a&gt;.&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;Second item with &lt;em&gt;emphasis&lt;/em&gt;
+&lt;ul&gt;
+&lt;li&gt;Nested item&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;Platform&lt;/th&gt;
+&lt;th&gt;Download&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;Windows&lt;/td&gt;
+&lt;td&gt;&lt;a href=&quot;https://github.com/adrienm7/ergopti/releases/download/v0.0.0-dev.130/ErgoptiPlus.exe&quot;&gt;ErgoptiPlus.exe&lt;/a&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;pre&gt;&lt;code&gt;winget install ergopti &amp;amp;&amp;amp; echo *done*
+&lt;/code&gt;&lt;/pre&gt;</content>
+    <author>
+      <name>adrienm7</name>
+    </author>
+    <media:thumbnail height="30" width="30" url="https://avatars.githubusercontent.com/u/1?s=60&amp;v=4"/>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/572675710/v2.4.0</id>
+    <updated>2026-09-01T08:00:00Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/adrienm7/ergopti/releases/tag/v2.4.0"/>
+    <title>Ergopti v2.4.0</title>
+    <content type="html">&lt;h2&gt;Stable marker&lt;/h2&gt;
+&lt;p&gt;Hostile &lt;img src=&quot;x&quot; onerror=&quot;alert(1)&quot; alt=&quot;image alt&quot;&gt; text &lt;script&gt;alert(&#39;script body&#39;)&lt;/script&gt; and &lt;a href=&quot;javascript:alert(1)&quot;&gt;script link&lt;/a&gt; and &lt;a href=&quot;https://evil.example/x&quot;&gt;foreign link&lt;/a&gt; and literal *stars* &amp;lt;b&amp;gt;.&lt;/p&gt;</content>
+    <author>
+      <name>adrienm7</name>
+    </author>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/1/v9.9.9</id>
+    <updated>2026-08-01T08:00:00Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/someone-else/ergopti/releases/tag/v9.9.9"/>
+    <title>Foreign entry that must be dropped</title>
+    <content type="html">&lt;p&gt;Foreign marker&lt;/p&gt;</content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/572675710/v0.0.0-dev.129</id>
+    <updated>2026-09-21T10:00:00Z</updated>
+    <link rel="alternate" type="text/html" href="https://github.com/adrienm7/ergopti/releases/tag/v0.0.0-dev.129"/>
+    <title>Ergopti v0.0.0-dev.129</title>
+    <content type="html"></content>
+  </entry>
+</feed>

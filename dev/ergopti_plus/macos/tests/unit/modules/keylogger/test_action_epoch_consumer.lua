@@ -268,6 +268,7 @@ package.loaded["adapters.file_system"] = {
 	}
 	package.loaded["infra.config_paths"] = {
 		get_config_dir = function() return "/tmp/ergopti_timer_failure" end,
+		metrics_dir = function() return "/tmp/ergopti_timer_failure/metrics" end,
 	}
 	package.loaded["infra.manifest_reader"] = { default_for = function() return false end }
 	package.loaded["infra.i18n"] = { get = function(key) return key end }

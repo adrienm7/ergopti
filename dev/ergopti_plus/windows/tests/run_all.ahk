@@ -268,6 +268,7 @@ InstallSendNoOps()
 #Include unit/test_logger_format_failure_is_visible.ahk
 #Include unit/test_logger_contract.ahk
 #Include unit/test_diagnostic_logging.ahk
+#Include unit/test_build_commit.ahk
 #Include unit/test_logger_daily_rotation.ahk
 #Include unit/test_healthcheck_core.ahk
 #Include unit/test_healthcheck_owner_snapshots.ahk
@@ -551,6 +552,7 @@ _LogBootProgress("loading gestures modules")
 #Include ../ui/onboarding/webview.ahk
 #Include unit/test_screenshot_worker_ownership.ahk
 #Include unit/test_onboarding_finish_payload.ahk
+#Include unit/test_onboarding_metrics_path.ahk
 #Include unit/test_gestures.ahk
 #Include unit/test_gesture_cycle_candidates.ahk
 #Include unit/test_config_persistence_transactions.ahk
@@ -1652,6 +1654,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_bundle_skip_validation.ahk
 #Include unit/test_clipboard_history_paste.ahk
 #Include unit/test_changelog_request_epoch.ahk
+#Include unit/test_changelog_network_resilience.ahk
 #Include unit/test_config_toml_single_writer.ahk
 #Include unit/test_derived_toml_caches_not_memoised_on_failed_read.ahk
 #Include unit/test_fire_log_callable_replacement.ahk

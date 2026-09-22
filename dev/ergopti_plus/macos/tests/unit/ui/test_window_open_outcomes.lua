@@ -153,6 +153,7 @@ local function with_healthcheck(controls, callback)
 		}
 		package.loaded["ui.ui_builder"] = {
 			build_injected_html = function() return "<html></html>" end,
+			window_chrome_steps = function() return {} end,
 			get_app_geometry = function() return { width = 740, height = 560 } end,
 			force_focus = function() state.focus_calls = state.focus_calls + 1; return true end,
 		}
@@ -160,7 +161,7 @@ local function with_healthcheck(controls, callback)
 		local webview = {}
 		for _, method in ipairs({
 			"windowStyle", "windowTitle", "allowTextEntry", "allowNewWindows",
-			"allowGestures", "level", "windowCallback", "navigationCallback",
+			"allowGestures", "level", "windowCallback", "navigationCallback", "shadow",
 		}) do webview[method] = function(self) return self end end
 		webview.html = function(self)
 			if controls.reject_html == true then error("fixture page load refusal") end

@@ -276,7 +276,10 @@ _CUK_MenuDeclaresTheAction() {
 		Found := true
 		AssertEqual("command", Entry["type"])
 		AssertEqual("menu.global.clean_unused_keys", Entry["i18n"])
-		AssertEqual("ahk", _CUK_Join(Entry["platforms"]))
+		; macOS and Linux run the same cleanup through their own readers' rule, so
+		; the row is declared once for every platform.
+		AssertFalse(Entry.Has("platforms"), "the cleanup row must not be restricted to one platform")
+		AssertFalse(Entry.Has("reason_key"), "an unrestricted row has no platform reason")
 	}
 	AssertTrue(Found, "global_actions must declare clean_unused_keys")
 	Body := _DriverFuncBody("_MI_BuildGlobalActionsMenu")

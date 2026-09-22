@@ -34,6 +34,9 @@ local Generator   = require("platform.remap.generator")
 local KeLifecycle = require("platform.remap.ke_lifecycle")
 local KeVariables = require("platform.remap.ke_variables")
 local LeaseController = require("platform.remap.lease_controller")
+local GuardianNotice = require("platform.remap.guardian_notice")
+local Notifications = require("infra.notifications")
+local i18n        = require("infra.i18n")
 local Watchers    = require("platform.remap.watchers")
 local Registrar   = require("adapters.hotkey_registrar")
 local TimerScheduler = require("adapters.timer_scheduler")
@@ -169,6 +172,7 @@ local _lease_inputs_tainted    = false -- Retained disabled handles are not proo
 local _lease_recovery          = nil   -- One bounded retry series across replacement tokens
 local _lease_recovery_timer_cleanup_backlog = {} -- Native timers whose stop must be retried
 local _lease_recovery_probe_cleanup_backlog = {} -- Exact status tasks whose terminate must be retried
+local _guardian_notice          = nil   -- Login Items approval notice, owned per lifecycle.
 local _guardian_regeneration_wait = nil -- Bundled rebuilds retained behind exact native readiness
 local _last_failed_lease_token = nil   -- Replays a FAILED hidden by an enabled-state transaction
 local _lease_user_intent_revision = 0  -- Fences late recovery callbacks after an explicit lease Stop
@@ -1818,6 +1822,7 @@ start_guardian_regeneration_probe = function(wait, reason)
 			return
 		end
 
+		if _guardian_notice then _guardian_notice.observe(status) end
 		local wait_status = status or "probe-failed"
 		local log_wait = wait.last_wait_status == wait_status
 			and Logger.debug or Logger.warn
@@ -2012,6 +2017,7 @@ probe_guardian_for_recovery = function(recovery, continuation, refund_attempt, r
 		if refund_attempt then
 			recovery.attempt = math.max(0, recovery.attempt - 1)
 		end
+		if _guardian_notice then _guardian_notice.observe(status) end
 		local wait_status = status or "probe-failed"
 		local log_wait = recovery.last_guardian_wait_status == wait_status
 			and Logger.debug or Logger.warn
@@ -5008,6 +5014,15 @@ function M.init(file_system)
 		return false
 	end
 	_ke_variables_recovery_observer = recovery_observer
+	-- Karabiner has no tray row, so the one state that needs the user — its
+	-- helper held until approved in Login Items — reaches them as a notice.
+	_guardian_notice = GuardianNotice.new({
+		notify        = Notifications.notify,
+		text          = i18n.get,
+		open_settings = function(on_done) return M.open_guardian_settings(on_done) end,
+		logger        = Logger,
+		log           = LOG,
+	})
 	_running = true
 	_shutdown_requested = false
 

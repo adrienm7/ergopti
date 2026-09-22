@@ -31,7 +31,6 @@ local H = {}
 
 local hs       = hs
 local Logger   = require("infra.logger")
-local text_utils = require("infra.text_utils")
 local i18n     = require("infra.i18n")
 local Snapshot = require("healthcheck.snapshot")
 local NetworkInfo = require("adapters.network_info")
@@ -116,14 +115,13 @@ function H.sys_info()
 	info.locale = locale
 	Logger.debug(LOG, "locale: %s.", locale)
 
-	-- Config directory
-	local config_dir = ""
-	if hs and type(hs.configdir) == "string" then
-		config_dir = hs.configdir
-	else
-		Logger.warn(LOG, "hs.configdir is not a string.")
-	end
-	info.config_dir = config_dir
+	-- The configuration directory is the one config.toml is read from, owned by
+	-- config_paths (paths.toml / ERGOPTI_CONFIG_DIR). hs.configdir is where the
+	-- driver's Lua sources live: inside the packaged app it is
+	-- ErgoptiPlus.app/Contents/Resources/..., which the report used to present
+	-- as the configuration folder even when setup had chosen another one.
+	info.config_dir = H.config_dir()
+	info.script_dir = H.script_dir()
 
 	-- CPU model + core count via sysctl
 	local cpu_model = "?"
@@ -201,27 +199,39 @@ function H.sys_info()
 	info.dpi = dpi
 	Logger.debug(LOG, "dpi: %s.", dpi)
 
-	-- Short git commit hash — run git from this file's directory so it reaches
-	-- the actual repo root even when hs.configdir is ~/.hammerspoon (not a repo).
-	local _this_dir = (function()
-		local src = (debug.getinfo(1, "S") or {}).source or ""
-		src = src:gsub("^@", "")
-		return src:match("^(.*)[/\\][^/\\]+$") or hs.configdir
-	end)()
-	local git_hash = "unknown"
-	-- Quoted: an install path containing a space split the command and made
-	-- "Last git commit" read "unknown" on every such machine.
-	local ok_git, out = pcall(hs.execute,
-		"git -C " .. text_utils.shell_quote(_this_dir) .. " rev-parse --short HEAD 2>/dev/null")
-	if ok_git and type(out) == "string" and out ~= "" then
-		git_hash = out:match("^%s*(.-)%s*$")
-	else
-		Logger.warn(LOG, "git rev-parse failed (not a git repo or git not on PATH): %s.", tostring(out))
-	end
-	info.git_hash = git_hash
-	Logger.debug(LOG, "git_hash: %s.", git_hash)
+	-- Commit: the packaged app has no .git, so `git rev-parse` answered
+	-- "unknown" for every release build. The shared resolver reads the build
+	-- stamp first and the source checkout second, without a subprocess.
+	info.git_hash, info.commit_source = H.build_commit()
+	Logger.debug(LOG, "git_hash: %s (%s).", info.git_hash, info.commit_source)
 
 	return info
+end
+
+--- The configuration directory the driver reads config.toml from.
+--- @return string Absolute path, or "" when config_paths is not initialised.
+function H.config_dir()
+	local ConfigPaths = require("infra.config_paths")
+	if not ConfigPaths.is_initialized() then
+		Logger.warn(LOG, "config_paths is not initialised — the configuration directory is unknown.")
+		return ""
+	end
+	return ConfigPaths.get_config_dir()
+end
+
+--- The directory the driver's Lua sources run from (hs.configdir).
+--- @return string Absolute path, or "" when Hammerspoon exposes none.
+function H.script_dir()
+	if hs and type(hs.configdir) == "string" and hs.configdir ~= "" then return hs.configdir end
+	Logger.warn(LOG, "hs.configdir is not a string — the script directory is unknown.")
+	return ""
+end
+
+--- The commit this driver was built from, and where that answer came from.
+--- @return string commit Abbreviated commit id or "unknown".
+--- @return string source "build", "git" or "unknown".
+function H.build_commit()
+	return require("infra.diagnostic_snapshot").resolve_commit()
 end
 
 
@@ -327,6 +337,31 @@ function H.collect_layout_state()
 	return st
 end
 
+--- Reads the remap engine's exact lease phase and Login Items approval state.
+--- Karabiner has no tray row, so this is where a support request can see that
+--- the engine is held waiting for approval; the lease is read in memory only.
+--- @return table { phase, guardian_status, approval_required }
+function H.collect_remap_state()
+	local st = { phase = "unknown", guardian_status = "unknown", approval_required = false }
+	local ok_lc, LeaseController = pcall(require, "platform.remap.lease_controller")
+	if not ok_lc or type(LeaseController) ~= "table" or type(LeaseController.status) ~= "function" then
+		Logger.warn(LOG, "platform.remap.lease_controller unavailable: %s.", tostring(LeaseController))
+		return st
+	end
+	local ok_status, phase, snapshot = pcall(LeaseController.status)
+	if not ok_status then
+		Logger.warn(LOG, "Remap lease status could not be read: %s.", tostring(phase))
+		return st
+	end
+	st.phase = tostring(phase)
+	if type(snapshot) == "table" and type(snapshot.guardian_status) == "string" then
+		st.guardian_status = snapshot.guardian_status
+		st.approval_required = snapshot.guardian_status == "requires_approval"
+	end
+	Logger.debug(LOG, "Remap: phase=%s guardian=%s.", st.phase, st.guardian_status)
+	return st
+end
+
 function H.collect_hotstrings_state()
 	local st = { terminators = 0, magic_key = "", personal_count = 0, dynamic_count = 0, default_delay = "n/a" }
 	local ok_t, term = pcall(require, "modules.keymap.terminators")
@@ -380,14 +415,16 @@ end
 
 function H.collect_config_summary()
 	local sum = { overrides = 0, enabled_hotstrings = "n/a", enabled_gestures = "n/a", enabled_llm = "n/a", config_files = {} }
-	local cfgdir = hs and hs.configdir or ""
-	if cfgdir == "" then
-		Logger.warn(LOG, "hs.configdir is empty — cannot locate config files.")
+	-- The files config_paths actually resolves, not hs.configdir-relative guesses:
+	-- the old list named <app bundle>/config.toml and a tap_hold.toml this driver
+	-- never reads.
+	local ConfigPaths = require("infra.config_paths")
+	if not ConfigPaths.is_initialized() then
+		Logger.warn(LOG, "config_paths is not initialised — cannot locate config files.")
 	else
-		table.insert(sum.config_files, cfgdir .. "/config.toml")
-		table.insert(sum.config_files, cfgdir .. "/tap_hold.toml")
+		table.insert(sum.config_files, ConfigPaths.get("ConfigTomlPath"))
 	end
-	Logger.debug(LOG, "Config summary: cfgdir='%s' files=%d.", cfgdir, #sum.config_files)
+	Logger.debug(LOG, "Config summary: files=%d.", #sum.config_files)
 	return sum
 end
 
@@ -429,6 +466,33 @@ function H.collect_platform_coverage()
 		silent    = #silent,
 		entries   = entries,
 	}
+end
+
+--- Formats one permission query result for the report.
+--- @param granted boolean|nil Native state; nil when the query failed.
+--- @param detail string|nil Query failure detail.
+--- @return string label `granted`, `missing`, or `unknown (<detail>)`.
+local function permission_label(granted, detail)
+	if granted == true then return "granted" end
+	if granted == false then return "missing" end
+	return "unknown (" .. tostring(detail or "query failed") .. ")"
+end
+
+--- Reports the macOS privacy permissions of this runtime, without prompting.
+--- The packaged runtime has its own identity, so a grant held by a stock
+--- Hammerspoon never applies to it: a missing Screen Recording grant is why a
+--- screenshot or a picked color comes back empty or wrong.
+--- @return table { accessibility, screen_recording } labels.
+function H.collect_permissions()
+	local Accessibility = require("adapters.accessibility_permission")
+	local ScreenCapture = require("adapters.screen_capture")
+	local permissions = {
+		accessibility = permission_label(Accessibility.is_trusted()),
+		screen_recording = permission_label(ScreenCapture.permission_state()),
+	}
+	Logger.debug(LOG, "Permissions: accessibility=%s screen_recording=%s.",
+		permissions.accessibility, permissions.screen_recording)
+	return permissions
 end
 
 

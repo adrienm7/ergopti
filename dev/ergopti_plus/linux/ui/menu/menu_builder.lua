@@ -137,13 +137,36 @@ end
 
 --- Shows a message the user must acknowledge.
 --- @param message string Already-localised text.
-local function show_error(message)
-	local command = "zenity --error --text=" .. shell_quote(message) .. " 2>/dev/null"
+--- @param title string|nil Already-localised window title.
+local function show_error(message, title)
+	local command = "zenity --error"
+		.. (title and (" --title=" .. shell_quote(title)) or "")
+		.. " --text=" .. shell_quote(message) .. " 2>/dev/null"
 	if not succeeded(os.execute(command)) then
 		-- Zenity absent: the refusal still has to reach someone, and a silent
 		-- rejection reads as a menu row that does nothing when clicked.
 		Logger.error(LOG, "%s", tostring(message))
 	end
+end
+
+--- Shows an informational message the user must acknowledge.
+--- @param title string Already-localised window title.
+--- @param message string Already-localised text.
+local function show_info(title, message)
+	local command = "zenity --info --title=" .. shell_quote(title)
+		.. " --text=" .. shell_quote(message) .. " 2>/dev/null"
+	if not succeeded(os.execute(command)) then
+		-- Zenity absent: the outcome is still recorded where a user can find it.
+		Logger.info(LOG, "%s", tostring(message))
+	end
+end
+
+--- Escapes text for zenity's --text, which is Pango markup: a config value
+--- holding "<" or "&" would otherwise blank the dialog.
+--- @param text string
+--- @return string
+local function zenity_plain(text)
+	return (tostring(text):gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;"))
 end
 
 --- Prompts and persists the parameter required by one action before binding it.
@@ -3105,6 +3128,26 @@ local function _build_global_actions(ctx)
 		["enable_all"]     = call_ctx("on_enable_all"),
 		["disable_all"]    = call_ctx("on_disable_all"),
 		["reset_defaults"] = call_ctx("on_reset_defaults"),
+		-- The cleanup needs no daemon state: it reads config.toml itself and
+		-- asks through this tray's own zenity dialogs.
+		["clean_unused_keys"] = function()
+			local ok_cleanup, Cleanup = pcall(require, "ui.menu.unused_keys_cleanup")
+			if not ok_cleanup or type(Cleanup) ~= "table" then
+				Logger.error(LOG, "Unused-settings cleanup is unavailable: %s.", tostring(Cleanup))
+				show_error(_fill(i18n_safe("dialog.unused_keys.failed"), "{1}",
+					i18n_safe("dialog.unused_keys.reason.unreadable")),
+					i18n_safe("dialog.unused_keys.title"))
+				return
+			end
+			Cleanup.run_from_menu({ dialogs = {
+				confirm = function(title, text)
+					return ask_yes_no(title, zenity_plain(text),
+						i18n_safe("button.remove"), i18n_safe("button.cancel"))
+				end,
+				inform = function(title, text) show_info(title, zenity_plain(text)) end,
+				fail = function(title, text) show_error(zenity_plain(text), title) end,
+			} })
+		end,
 	}
 
 	return {

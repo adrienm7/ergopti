@@ -12,6 +12,7 @@
 		<script src="../i18n.js"></script>
 		<script src="../host_bridge.js"></script>
 		<script src="../markdown.js"></script>
+		<script src="atom_feed.js"></script>
 	</head>
 	<body>
 		<div id="sidebar">
@@ -41,7 +42,10 @@
 		<div id="error-overlay" style="display: none">
 			<div id="error-icon">⚠️</div>
 			<div id="error-text"></div>
-			<button id="btn-retry"></button>
+			<div id="error-actions">
+				<button id="btn-retry"></button>
+				<button id="btn-releases-page"></button>
+			</div>
 		</div>
 
 		<script src="script.js"></script>

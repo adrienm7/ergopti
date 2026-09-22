@@ -30,6 +30,10 @@ local Logger = require("logger.shim")
 local Monotonic = require("infra.monotonic")
 local LOG = "ui.webview_manager"
 
+-- Product name and separator of every window title (see M.window_title).
+local WINDOW_TITLE_PRODUCT = "Ergopti"
+local WINDOW_TITLE_SEPARATOR = " — "
+
 -- webkit_host provides HTML building and bridge name registry.
 local webkit_host = require("ui.webkit_host")
 
@@ -315,6 +319,34 @@ function M.is_visible(app_name)
 	return _windows[app_name] ~= nil and _windows[app_name].visible == true
 end
 
+--- Composes a native window title. The product name is added here only, so
+--- callers pass a brand-less, already-translated label.
+--- @param label string|nil Brand-less title.
+--- @return string
+function M.window_title(label)
+	if type(label) ~= "string" or label == "" then return WINDOW_TITLE_PRODUCT end
+	return WINDOW_TITLE_PRODUCT .. WINDOW_TITLE_SEPARATOR .. label
+end
+
+--- Retitles an open window, e.g. after a live language switch. WebKitGTK does
+--- not mirror document.title onto the GtkWindow.
+--- @param app_name string The app name.
+--- @param label string Brand-less, already-translated title.
+--- @return boolean true when the live window was retitled.
+function M.set_title(app_name, label)
+	local wref = _gtk_windows[app_name]
+	if not wref or not wref.window then
+		Logger.debug(LOG, "set_title: no live window for '%s'.", tostring(app_name))
+		return false
+	end
+	local ok, err = pcall(function() wref.window:set_title(M.window_title(label)) end)
+	if not ok then
+		Logger.error(LOG, "set_title failed for '%s': %s.", tostring(app_name), tostring(err))
+		return false
+	end
+	return true
+end
+
 
 
 
@@ -588,7 +620,7 @@ function M._create_gtk_window(app_name, html, handler)
 
 	-- ── Create the GTK window ──
 	local window = Gtk.Window({
-		title            = "Ergopti — " .. _app_title(app_name),
+		title            = M.window_title(_app_title(app_name)),
 		default_width    = geometry.width,
 		default_height   = geometry.height,
 		window_position  = Gtk.WindowPosition.CENTER,

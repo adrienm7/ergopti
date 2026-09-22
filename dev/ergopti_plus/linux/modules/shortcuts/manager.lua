@@ -378,6 +378,22 @@ end
 -- =========================================
 -- =========================================
 
+--- The master state init() reads from a decoded config.toml: any value, even
+--- a malformed one, because a malformed one fails closed.
+--- @param config table Decoded config.toml.
+--- @return any value `[shortcuts].enabled`, nil when absent.
+local function configured_enabled(config)
+	if type(config[CONFIG_SECTION]) ~= "table" then return nil end
+	return config[CONFIG_SECTION].enabled
+end
+
+--- Marks every config.toml path init() reads.
+--- @param config table Decoded config.toml.
+--- @param mark function mark(...segments) from config_unused_keys.
+function M.mark_config_reads(config, mark)
+	if configured_enabled(config) ~= nil then mark(CONFIG_SECTION, "enabled") end
+end
+
 --- Initialises the shortcuts module.
 --- @param opts table|nil { enabled?, persist?, config_path? }
 function M.init(opts)
@@ -401,12 +417,11 @@ function M.init(opts)
 			if not ok or type(config) ~= "table" then
 				Logger.error(LOG, "Shortcut configuration is invalid — failing closed.")
 				enabled = false
-			elseif type(config[CONFIG_SECTION]) == "table"
-				and config[CONFIG_SECTION].enabled ~= nil
-			then
-				if type(config[CONFIG_SECTION].enabled) == "boolean" then
-					enabled = config[CONFIG_SECTION].enabled
-				else
+			else
+				local configured = configured_enabled(config)
+				if type(configured) == "boolean" then
+					enabled = configured
+				elseif configured ~= nil then
 					Logger.error(LOG, "Shortcut enabled state is invalid — failing closed.")
 					enabled = false
 				end

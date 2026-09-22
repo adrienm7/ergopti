@@ -376,7 +376,9 @@ function M.build_default_state(tap_hold_keys, mod_combos)
 	end
 
 	return {
-		enabled                   = false,
+		-- Always on: the remap integration is an implementation detail of this
+		-- driver, not a user setting. There is no persisted flag to seed.
+		enabled                   = true,
 		tap_hold_config           = tap_hold_config,
 		mod_combos_config         = mod_combos_config,
 		tap_hold_timeout_ms       = TAP_HOLD_TIMEOUT_MS_DEFAULT,
@@ -498,10 +500,11 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 	end
 
 	Logger.info(LOG, "User config loaded.")
-	-- Support both formats: new [karabiner] section and legacy root-level key
-	local karabiner_section = type(data.karabiner) == "table" and data.karabiner or data
+	-- A `[karabiner] enabled` written by an earlier version is ignored on
+	-- purpose, `false` included: the integration is always on and is no longer
+	-- a user setting.
 	return {
-		enabled                   = karabiner_section.enabled == true,
+		enabled                   = true,
 		tap_hold_config           = tap_holds.config,
 		mod_combos_config         = combos.config,
 		tap_hold_timeout_ms       = timeout_ms,
@@ -547,9 +550,6 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt)
 	end
 
 	local ok, payload = pcall(TomlCodec.encode, {
-		karabiner = {
-			enabled = state.enabled == true,
-		},
 		tap_holds = {
 			config = state.tap_hold_config or {},
 			timeout_ms = state.tap_hold_timeout_ms,

@@ -28,6 +28,10 @@ local function now_ms()
 end
 local LOG = "ui_builder"
 
+-- Product name and separator of every webview window title (see M.window_title).
+local WINDOW_TITLE_PRODUCT = "ErgoptiPlus"
+local WINDOW_TITLE_SEPARATOR = " — "
+
 -- Per-process cache of assembled HTML strings.  Avoids re-reading the local
 -- CSS/JS files (and re-running the gsub inlining pass) on every UI open —
 -- assets only change when the user edits source so a single assembly per
@@ -536,6 +540,30 @@ function M.force_focus(wv, is_new, lifecycle)
 	return try_focus()
 end
 
+--- Composes a native window title. The product name is added here and only
+--- here, so callers pass a brand-less *.window_title string: passing a string
+--- that already carried the brand produced "ErgoptiPlus — ErgoptiPlus — Setup".
+--- @param title string|nil Brand-less, already-translated title.
+--- @return string
+function M.window_title(title)
+	if type(title) ~= "string" or title == "" then return WINDOW_TITLE_PRODUCT end
+	return WINDOW_TITLE_PRODUCT .. WINDOW_TITLE_SEPARATOR .. title
+end
+
+--- Retitles an open webview, e.g. after a live language switch.
+--- @param view userdata|table The native webview.
+--- @param title string|nil Brand-less, already-translated title.
+--- @return boolean applied
+function M.set_window_title(view, title)
+	if view == nil or type(view.windowTitle) ~= "function" then return false end
+	local ok, err = pcall(function() view:windowTitle(M.window_title(title)) end)
+	if not ok then
+		Logger.error(LOG, "Webview retitle failed: %s.", tostring(err))
+		return false
+	end
+	return true
+end
+
 --- Centralized factory to create a webview window with consistent properties.
 --- @param opts table The configuration options for the webview.
 --- @return userdata|nil The configured webview instance.
@@ -628,28 +656,16 @@ function M.show_webview(opts)
 		return DeferredWork.after(delay, callback, label or "ui_builder.webview")
 	end
 
-	local prefix = "ErgoptiPlus"
-	local win_title = (opts.title and opts.title ~= "") and (prefix .. " — " .. opts.title) or prefix
+	local win_title = M.window_title(opts.title)
 	if not apply_webview_mutation(function() wv:windowTitle(win_title) end) then
 		return abandon_required_mutation()
 	end
 	
-	if opts.style_masks then 
-		if not apply_webview_mutation(function() wv:windowStyle(opts.style_masks) end) then
-			return abandon_required_mutation()
-		end
-	else
-		local masks = hs.webview.windowMasks
-		if not apply_webview_mutation(function()
-			wv:windowStyle((masks["titled"] or 1) + (masks["closable"] or 2)
-				+ (masks["utility"] or 16))
-		end) then return abandon_required_mutation() end
+	-- The chrome every Ergopti window shares comes from one function, so no
+	-- window can be built with only part of it.
+	for _, step in ipairs(M.window_chrome_steps(wv, opts)) do
+		if not apply_webview_mutation(step.apply) then return abandon_required_mutation() end
 	end
-	
-	-- DEFAULT TO FLOATING: Ensures Ergopti UIs appear on top of other apps.
-	if not apply_webview_mutation(function()
-		wv:level(opts.level or hs.drawing.windowLevels.floating)
-	end) then return abandon_required_mutation() end
 	if not apply_webview_mutation(function()
 		wv:allowTextEntry(opts.allow_text_entry ~= false)
 	end) then return abandon_required_mutation() end
@@ -760,6 +776,27 @@ function M.show_webview(opts)
 	Logger.info(LOG, "Webview '%s' opened in %.0f ms.", view_label,
 		now_ms() - opened_ms)
 	return wv
+end
+
+--- The window chrome every Ergopti webview window gets: a native title bar and
+--- close button, the drop shadow that gives it a visible edge over a white page
+--- (Hammerspoon webviews have none by default), and the floating level that keeps
+--- it above other apps. Every window applies these steps, in this order, and a
+--- window that skips this function is caught by test_window_chrome_everywhere.
+--- @param wv table The hs.webview window.
+--- @param opts table|nil { style_masks?, level? } overrides for the mask and level.
+--- @return table Array of { name = string, apply = function } mutation steps.
+function M.window_chrome_steps(wv, opts)
+	opts = opts or {}
+	local masks = hs.webview.windowMasks
+	local style = opts.style_masks
+		or ((masks["titled"] or 1) + (masks["closable"] or 2) + (masks["utility"] or 16))
+	local level = opts.level or hs.drawing.windowLevels.floating
+	return {
+		{ name = "windowStyle", apply = function() wv:windowStyle(style) end },
+		{ name = "shadow",      apply = function() wv:shadow(true) end },
+		{ name = "level",       apply = function() wv:level(level) end },
+	}
 end
 
 return M

@@ -20,9 +20,12 @@ local M = {}
 
 local Logger      = require("infra.logger")
 local Snapshot    = require("diagnostics.snapshot")
-local FileSystem  = require("adapters.file_system")
 
 M.DRIVER = "macos"
+
+-- Log tag of the unknown-commit warning. Not Snapshot.MODULE: that tag is the
+-- cross-driver grep key for the single snapshot line.
+local COMMIT_LOG = "BuildCommit"
 
 -- Whether this Lua state already logged its snapshot.
 local _emitted = false
@@ -39,16 +42,37 @@ local SOURCE_DIR = (debug.getinfo(1, "S").source:match("^@(.*)[/\\][^/\\]+$")) o
 -- ====================================
 -- ====================================
 
---- Filesystem view used by the commit lookup. read_with_status keeps absent
---- git files silent instead of logging one debug line per probe.
+--- Filesystem view used by the commit lookup. read_with_status keeps an absent
+--- build stamp or git file silent instead of logging one debug line per probe.
+--- The adapter is looked up per call: the crash reporter reaches this module
+--- late, and a reference bound at first load would outlive the adapter it named.
 local GIT_FS = {
-	exists = function(path) return FileSystem.exists(path) == true end,
+	exists = function(path) return require("adapters.file_system").exists(path) == true end,
 	read = function(path)
-		local content, status = FileSystem.read_with_status(path)
+		local content, status = require("adapters.file_system").read_with_status(path)
 		if status == "ok" then return content end
 		return nil
 	end,
 }
+
+--- Resolves the commit this driver was built from: the package build stamp in
+--- the shared tree, else the git checkout a source run lives in, else "unknown"
+--- with the reason logged. The single resolver behind the snapshot, the
+--- healthcheck and the crash report, so the three can never disagree.
+--- @param opts table|nil { fs, shared_root, source_dir } overrides for tests.
+--- @return string commit Abbreviated commit id or Snapshot.UNKNOWN.
+--- @return string source One of the Snapshot.COMMIT_SOURCE_* values.
+function M.resolve_commit(opts)
+	opts = opts or {}
+	local shared_root = opts.shared_root
+	if shared_root == nil then shared_root = require("infra.paths").shared_root() end
+	local commit, source, detail = Snapshot.resolve_commit(opts.fs or GIT_FS, shared_root,
+		opts.source_dir or SOURCE_DIR)
+	if source == Snapshot.COMMIT_SOURCE_UNKNOWN then
+		Logger.warn(COMMIT_LOG, "Build commit unknown: %s.", tostring(detail))
+	end
+	return commit, source
+end
 
 --- Name of the logger's active level.
 --- @return string|nil
@@ -79,7 +103,7 @@ local function count_features(state)
 end
 
 --- Builds the snapshot values.
---- @param ctx table { boot_ms, locale, config_dir, state }
+--- @param ctx table { boot_ms, locale, config_dir, state, git_fs, shared_root, source_dir }
 --- @param system table|nil Probe table (defaults to adapters/system_info).
 --- @return table Field name to raw value.
 function M.collect(ctx, system)
@@ -87,10 +111,13 @@ function M.collect(ctx, system)
 	system = system or require("adapters.system_info")
 	local scale = system.main_screen_scale()
 	local enabled, total = count_features(ctx.state)
+	local commit = M.resolve_commit({
+		fs = ctx.git_fs, shared_root = ctx.shared_root, source_dir = ctx.source_dir,
+	})
 	return {
 		driver           = M.DRIVER,
 		version          = ctx.version,
-		commit           = Snapshot.git_commit(ctx.git_fs or GIT_FS, ctx.source_dir or SOURCE_DIR),
+		commit           = commit,
 		os               = "macOS",
 		os_version       = system.os_version(),
 		arch             = system.arch(),

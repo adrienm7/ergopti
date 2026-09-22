@@ -82,9 +82,39 @@ helpers.describe("Config.build_default_state", function()
 		helpers.assert_eq(type(state.combo_symmetric), "boolean")
 	end)
 
-	helpers.it("starts disabled", function()
+	helpers.it("starts enabled: the remap integration is always on", function()
 		local state = Config.build_default_state({}, {})
-		helpers.assert_eq(state.enabled, false)
+		helpers.assert_eq(state.enabled, true)
+	end)
+end)
+
+helpers.describe("Config: the remap integration is not a user setting", function()
+	helpers.it("ignores a persisted enabled = false written by an earlier version", function()
+		local original_load = Config._load_toml_file
+		Config._load_toml_file = function(_path)
+			return { karabiner = { enabled = false }, tap_holds = { config = {} }, mod_combos = { config = {} } }
+		end
+		local state = Config.load_user_config({}, {}, "/tmp/config_karabiner.toml")
+		Config._load_toml_file = original_load
+		helpers.assert_true(type(state) == "table", "a readable config must load")
+		helpers.assert_eq(state.enabled, true)
+	end)
+
+	helpers.it("never writes an enabled flag back", function()
+		-- The codec table config.lua captured at load time; stubs installed later
+		-- replace the package entry, not that table.
+		local codec = package.loaded["infra.toml.codec"]
+		local encoded = nil
+		local original_encode = codec.encode
+		codec.encode = function(value)
+			encoded = value
+			error("stop before the disk write")
+		end
+		pcall(Config.save_user_config, Config.build_default_state({}, {}), "/tmp/config_karabiner.toml", true)
+		codec.encode = original_encode
+		helpers.assert_true(type(encoded) == "table", "save_user_config must encode the state")
+		helpers.assert_nil(encoded.karabiner, "no [karabiner] section: enabled is not persisted any more")
+		helpers.assert_true(type(encoded.tap_holds) == "table", "the tap-hold settings are still persisted")
 	end)
 end)
 
@@ -93,7 +123,6 @@ helpers.describe("Config pause and suspend invariant", function()
 		-- Guard lives in dispatch (shortcuts/gestures); config build must remain safe under pause
 		local state = Config.build_default_state({}, {})
 		helpers.assert_true(state ~= nil)
-		helpers.assert_eq(state.enabled, false)
 	end)
 end)
 

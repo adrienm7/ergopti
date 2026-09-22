@@ -70,6 +70,15 @@ var _answers = {
 	use_gestures: false
 };
 
+// Metrics store path shown in the step-4 consent warning. The host resolves it
+// from the driver's own path authority for the folder chosen on the config
+// step (initData for the initial folder, setMetricsPath after each change), so
+// the warning never names a folder keystrokes will not be written to.
+var _metricsPath = '';
+// Sequence number of the latest resolveMetricsPath request; replies carrying an
+// older one belong to a folder the user has since changed and are dropped.
+var _metricsRequest = 0;
+
 // ======================================
 // ======================================
 // ======= 4/ Step navigation ===========
@@ -321,7 +330,10 @@ function renderStep3() {
 function renderStep4() {
 	document.getElementById('s4-title').textContent = _t('onboarding.metrics.title');
 	document.getElementById('s4-desc').textContent = _t('onboarding.metrics.desc');
-	document.getElementById('s4-warning').textContent = _t('dialog.metrics.enable_warning_formatted');
+	// split/join, not replace: a path containing "$&" must stay literal.
+	document.getElementById('s4-warning').textContent = _t('dialog.metrics.enable_warning')
+		.split('{1}')
+		.join(_metricsPath);
 	document.getElementById('s4-yes-label').textContent = _t('onboarding.yes');
 	document.getElementById('s4-no-label').textContent = _t('onboarding.no');
 	document.getElementById('s4-back').textContent = _t('onboarding.back');
@@ -468,6 +480,8 @@ window.initData = function (data) {
 	// Host platform ("windows" / "macos") — drives the gestures step 5 split
 	// (Windows registration buttons vs macOS warning). Absent ⇒ treated as macOS.
 	if (data && data.platform) window.PLATFORM_OS = data.platform;
+	// Metrics store path for the initial folder, resolved by the host.
+	if (data && typeof data.metrics_path === 'string') _metricsPath = data.metrics_path;
 	window.applyStrings(data && data.strings ? data.strings : {});
 	renderStep1();
 	showStep(1);
@@ -480,6 +494,18 @@ window.setConfigDir = function (path) {
 	var inp = document.getElementById('sc-input');
 	if (inp) inp.value = path;
 	_answers.config_dir = path;
+};
+
+/**
+ * Called by the host in reply to resolveMetricsPath. The host echoes the
+ * request number so a reply for a folder the user has since changed is dropped.
+ * @param {{request: number, path: string}} payload
+ */
+window.setMetricsPath = function (payload) {
+	if (!payload || typeof payload.path !== 'string') return;
+	if (payload.request !== _metricsRequest) return;
+	_metricsPath = payload.path;
+	if (_currentStep === 4) renderStep4();
 };
 
 // Called by Lua after parsing an existing config.toml at the chosen folder.
@@ -525,6 +551,10 @@ document.getElementById('sc-next').addEventListener('click', function () {
 	// arrives asynchronously via window.applyExistingAnswers(), which
 	// re-renders the active step in place — so showing step 2 first is fine.
 	_post({ action: 'loadExistingConfig', config_dir: val });
+	// The step-4 consent warning names the metrics store of THIS folder; the
+	// host answers through window.setMetricsPath().
+	_metricsRequest += 1;
+	_post({ action: 'resolveMetricsPath', config_dir: val, request: _metricsRequest });
 	renderStep2();
 	showStep(2);
 });

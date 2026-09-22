@@ -92,32 +92,32 @@ _OEC_PublishStillFollowsPersistence() {
 ; ===========================================================
 ; ===========================================================
 
-; Policed across both hosts: the native step and the WebView2 payload build the
-; same warning from the same pair of globals, and only one of them was wrong at
-; a time. Reading _ConfigDir here is the bug; reading the effective directory is
-; the fix.
+; Policed across every site that names the metrics folder to the user in the
+; wizard: the native step, the WebView2 initData and its setMetricsPath reply.
+; Reading _ConfigDir here is the bug; resolving the chosen field value is the fix.
+; The WebView2 host once pre-formatted the warning while injecting the locale
+; strings — before the config step — so it kept naming the boot folder.
 _OEC_MetricsWarningUsesTheChosenDir() {
-	Checked := 0
-	for Name in ["_Onboarding_Step4", "_OnbWeb_LocaleStringsExpr"] {
+	for Name in ["_Onboarding_Step4", "_OnbWeb_InjectInitData", "_OnbWeb_MetricsPathJs"] {
 		Body := _DriverFuncBody(Name)
-		if (InStr(Body, "enable_warning") == 0)
-			continue
-		Checked += 1
-		Assert(InStr(Body, "_Onboarding_EffectiveConfigDir()") > 0,
-			Name . " builds the keystroke-logging consent text but does not resolve the EFFECTIVE config dir — _ConfigDir still holds the boot value at this point, so the user consents to logging while being shown a folder that keystrokes will never be written to")
+		Assert(Body != "", Name . "() must exist")
+		Assert(InStr(Body, "_Onboarding_MetricsPathFor(") > 0,
+			Name . " names the metrics folder but does not resolve it from the wizard's chosen folder — _ConfigDir still holds the boot value at this point, so the user consents to logging while being shown a folder that keystrokes will never be written to")
 	}
-	Assert(Checked >= 2,
-		"expected BOTH wizard hosts to build the metrics consent warning (found " . Checked . ") — the native step and the WebView2 payload each build it from the same globals, and only one of them was wrong at a time")
 }
 
-; One resolver, so the two hosts cannot drift apart again.
+; One resolver, through the keylogger's own rule, so the consent text cannot
+; drift from the folder KL_Init writes to.
 _OEC_ResolverIsSharedAndHonoursTheChoice() {
-	Body := _DriverFuncBody("_Onboarding_EffectiveConfigDir")
-	Assert(Body != "", "_Onboarding_EffectiveConfigDir() must exist as the single resolver")
-	Assert(InStr(Body, "_ob_config_dir") > 0,
-		"the resolver must prefer the folder chosen in the wizard")
-	Assert(InStr(Body, "_ConfigDir") > 0,
-		"the resolver must fall back to the current directory when nothing was chosen")
+	Body := _DriverFuncBody("_Onboarding_MetricsPathFor")
+	Assert(Body != "", "_Onboarding_MetricsPathFor() must exist as the single resolver")
+	Assert(InStr(Body, "KL_MetricsDirFor(") > 0,
+		"the consent path must come from the keylogger's rule, not a local concatenation")
+	Assert(InStr(Body, "_Onboarding_ConfigDirFor(") > 0,
+		"the consent path must resolve the field value the way the commit does")
+	Boot := _DriverFuncBody("_Onboarding_ConfigDirFor")
+	Assert(InStr(Boot, "_DefaultConfigDir") > 0,
+		"an empty field must resolve to the OS default, as _Onboarding_Commit does")
 }
 
 

@@ -443,11 +443,18 @@ body {
 	color: #aaa;
 	font-size: 13px;
 	line-height: 1.6;
-	max-width: 300px;
+	max-width: 360px;
 	text-align: center;
+	white-space: pre-line;
 }
 
-#btn-retry {
+#error-actions {
+	display: flex;
+	gap: 10px;
+}
+
+#btn-retry,
+#btn-releases-page {
 	background: rgba(10, 132, 255, 0.12);
 	border: 1px solid rgba(10, 132, 255, 0.45);
 	border-radius: 7px;
@@ -458,6 +465,7 @@ body {
 	padding: 6px 16px;
 }
 
-#btn-retry:hover {
+#btn-retry:hover,
+#btn-releases-page:hover {
 	background: rgba(10, 132, 255, 0.22);
 }

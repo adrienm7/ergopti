@@ -119,18 +119,32 @@ _TtLayout_TestClampNegative() {
 }
 Test("[corpus:tooltip-layout] _TooltipClampToScreen clamps negative coordinates", _TtLayout_TestClampNegative)
 
+; A point past the whole virtual screen lies on no monitor, so the clamp falls
+; back to the primary work area; sizes and the margin are layout units scaled
+; to physical pixels. A_ScreenWidth is the full primary monitor, which is not
+; the frame the clamp uses on a runner whose work area differs from it.
+_TtLayout_PrimaryWorkArea() {
+	MonitorGetWorkArea(MonitorGetPrimary(), &L, &Top, &R, &B)
+	return { L: L, T: Top, R: R, B: B }
+}
+
 _TtLayout_TestClampFarRight() {
-	; Feed coordinates far to the right — should be clamped
-	Result := _TooltipClampToScreen(A_ScreenWidth + 1000, 100, 300, 80)
-	MaxX := A_ScreenWidth - 300 - 5  ; width - canvasW - margin
-	AssertTrue(Result.X <= MaxX, "far-right X clamped to <= screen width - canvasW - margin")
+	global _TOOLTIP_SCREEN_MARGIN
+	Beyond := SysGet(76) + SysGet(78) + 1000   ; virtual screen left + width
+	Result := _TooltipClampToScreen(Beyond, 100, 300, 80)
+	Scale := _TooltipDpiScale()
+	MaxX := _TtLayout_PrimaryWorkArea().R - Round(300 * Scale) - Round(_TOOLTIP_SCREEN_MARGIN * Scale)
+	AssertEqual(MaxX, Result.X, "far-right X clamped to the work area right - canvasW - margin")
 }
 Test("[corpus:tooltip-layout] _TooltipClampToScreen clamps far-right coordinates", _TtLayout_TestClampFarRight)
 
 _TtLayout_TestClampFarBottom() {
-	Result := _TooltipClampToScreen(100, A_ScreenHeight + 1000, 300, 80)
-	MaxY := A_ScreenHeight - 80 - 5  ; height - canvasH - margin
-	AssertTrue(Result.Y <= MaxY, "far-bottom Y clamped to <= screen height - canvasH - margin")
+	global _TOOLTIP_SCREEN_MARGIN
+	Beyond := SysGet(77) + SysGet(79) + 1000   ; virtual screen top + height
+	Result := _TooltipClampToScreen(100, Beyond, 300, 80)
+	Scale := _TooltipDpiScale()
+	MaxY := _TtLayout_PrimaryWorkArea().B - Round(80 * Scale) - Round(_TOOLTIP_SCREEN_MARGIN * Scale)
+	AssertEqual(MaxY, Result.Y, "far-bottom Y clamped to the work area bottom - canvasH - margin")
 }
 Test("[corpus:tooltip-layout] _TooltipClampToScreen clamps far-bottom coordinates", _TtLayout_TestClampFarBottom)
 

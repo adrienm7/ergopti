@@ -32,13 +32,33 @@ local function fresh_pixel_owner()
 		next_remove_modes = {},
 	}
 
+	-- A granted runtime whose screencapture writes a real image into its file
+	-- target: this file exercises ownership, not the capture verdict.
+	fixture.temp_sizes = {}
+	local change_count = 0
+	local clipboard_image = nil
 	local hs_stub = {
+		screenRecordingState = function() return true end,
 		mouse = {
 			absolutePosition = function() return { x = 10, y = 20 } end,
+		},
+		image = {
+			imageFromPath = function(path)
+				if (fixture.temp_sizes[path] or 0) > 0 then return { path = path } end
+				return nil
+			end,
 		},
 		pasteboard = {
 			setContents = function(value)
 				fixture.clipboard_writes[#fixture.clipboard_writes + 1] = value
+				return true
+			end,
+			changeCount = function() return change_count end,
+			readImage = function() return clipboard_image end,
+			writeObjects = function(image)
+				change_count = change_count + 1
+				clipboard_image = image
+				fixture.clipboard_writes[#fixture.clipboard_writes + 1] = image
 				return true
 			end,
 		},
@@ -71,6 +91,9 @@ local function fresh_pixel_owner()
 		}
 		function task:deliver(exit_code, stdout, stderr)
 			self.running_state = false
+			if exit_code == 0 and executable == "/usr/sbin/screencapture" then
+				fixture.temp_sizes[args[#args]] = 64
+			end
 			return self.callback(exit_code, stdout, stderr)
 		end
 		function task:start()
@@ -151,12 +174,14 @@ local function fresh_pixel_owner()
 		end,
 		classify_no_follow = function(path)
 			if fixture.existing_temp_paths[path] == true then
-				return { mode = "file" }, "ok"
+				return { mode = "file", size = fixture.temp_sizes[path] or 0 }, "ok"
 			end
 			return nil, "absent"
 		end,
 	}
 	package.loaded["adapters.task_lifecycle"] = nil
+	package.loaded["adapters.screen_capture"] = nil
+	package.loaded["modules.shortcuts.actions.screen_capture_flow"] = nil
 	package.loaded["modules.shortcuts.actions.system_pixel"] = nil
 	subject = require("modules.shortcuts.actions.system_pixel")
 	return subject, fixture
@@ -259,6 +284,8 @@ helpers.describe("system_pixel exact async owner: positive controls", function()
 		fixture.tasks[3]:deliver(0, "", "")
 		helpers.assert_eq(#fixture.notifications, 2,
 			"interactive screenshot completion must publish exactly once")
+		helpers.assert_eq(fixture.notifications[2].level, "success")
+		helpers.assert_eq(fixture.notifications[2].message, "shortcuts.screenshot_copied")
 	end)
 
 	helpers.it("buffers a synchronous terminal until start commits", function()

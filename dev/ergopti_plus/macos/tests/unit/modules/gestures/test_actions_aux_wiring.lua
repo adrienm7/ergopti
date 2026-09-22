@@ -31,7 +31,9 @@ helpers.describe("gesture Actions exact-owner wiring", function()
 
 		helpers.assert_eq(actions.execute_single("screenshot_region_clipboard"), true)
 		helpers.assert_eq(actions.execute_single("screenshot_window_save"), true)
-		helpers.assert_eq(calls.capture[1], { "-ci" })
+		-- The shared owner writes to a file and fills the clipboard itself; `-c`
+		-- would hand the image to screencapture and leave nothing to verify.
+		helpers.assert_eq(calls.capture[1], { "-i" })
 		helpers.assert_eq(calls.save[1].prefix, "win")
 
 		helpers.assert_eq(actions.force_cleanup(), true)

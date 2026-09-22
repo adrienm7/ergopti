@@ -81,6 +81,7 @@ graph TD
         MACOS_network_info["NetworkInfo.lua"]
         MACOS_notifier["Notifier.lua"]
         MACOS_process_lifecycle["ProcessLifecycle.lua"]
+        MACOS_screen_capture["ScreenCapture.lua"]
         MACOS_secure_field_detector["SecureFieldDetector.lua"]
         MACOS_shell_runner["ShellRunner.lua"]
         MACOS_storage["Storage.lua"]
