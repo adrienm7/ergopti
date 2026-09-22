@@ -138,7 +138,7 @@ BootProfile_Mark(PhaseName) {
 ; was inside — a START with no SUCCESS names it.
 ; @param Name {String} Stage label, reused verbatim by BootProfile_StageEnd.
 BootProfile_StageBegin(Name) {
-	_BootProfileOpenStages()[Name] := A_TickCount
+	_BootStagesInFlight()[Name] := A_TickCount
 	try LoggerStart("BootProfile", "Boot stage '{1}'…", Name)
 }
 
@@ -147,7 +147,7 @@ BootProfile_StageBegin(Name) {
 ; @param Name {String}
 ; @param Detail {String} Optional summary, e.g. "42 feature(s) enabled".
 BootProfile_StageEnd(Name, Detail := "") {
-	Open := _BootProfileOpenStages()
+	Open := _BootStagesInFlight()
 	if !Open.Has(Name) {
 		try LoggerError("BootProfile", "Boot stage '{1}' closed without being opened.", Name)
 		return
@@ -161,7 +161,7 @@ BootProfile_StageEnd(Name, Detail := "") {
 ; @param Name {String}
 ; @param Reason {String}
 BootProfile_StageAbort(Name, Reason) {
-	Open := _BootProfileOpenStages()
+	Open := _BootStagesInFlight()
 	Started := Open.Has(Name) ? Open.Delete(Name) : A_TickCount
 	try LoggerWarn("BootProfile", "Boot stage '{1}' did not complete after {2} ms: {3}.",
 		Name, TickElapsed(Started, A_TickCount), Reason)
@@ -180,7 +180,7 @@ BootProfile_TotalBootMs() {
 ; @returns {String} Comma-separated names, or "" when every stage closed.
 BootProfile_OpenStageNames() {
 	Names := ""
-	for Name, _ in _BootProfileOpenStages()
+	for Name, _ in _BootStagesInFlight()
 		Names .= (Names == "" ? "" : ", ") . Name
 	return Names
 }
@@ -188,7 +188,7 @@ BootProfile_OpenStageNames() {
 ; Open-stage registry. A function static for the same include-order reason as
 ; _BootProfileStampStore: a stage can open above this file's include position.
 ; @returns {Map}
-_BootProfileOpenStages() {
+_BootStagesInFlight() {
 	static Open := Map()
 	return Open
 }
