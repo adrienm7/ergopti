@@ -11,7 +11,12 @@ local with_window = require("tests.support.dashboard_window_fixture")
 
 local function with_delivery(callback)
 	helpers.with_fresh_modules({ "ui.menu.menu_paths", "infra.toml.codec", "infra.toml.writer",
-		"adapters.file_system" }, function()
+		"adapters.file_system", "infra.config_paths" }, function()
+		-- Distinctive rule: a wizard that derived the path itself cannot match it.
+		package.loaded["infra.config_paths"] = {
+			get_config_dir = function() return "/virtual/current/" end,
+			metrics_dir = function(dir) return "<metrics of " .. dir .. ">" end,
+		}
 		local picker = {}
 		package.loaded["ui.menu.menu_paths"] = {
 			get_config_dir = function() return "/virtual/current" end,

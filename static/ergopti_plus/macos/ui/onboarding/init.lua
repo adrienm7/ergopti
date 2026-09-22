@@ -42,6 +42,35 @@ local CONFIG_TOML_PATH_KEY   = "ConfigTomlPath"
 -- onboarding.welcome.title already carries it (it is the page heading).
 local WINDOW_TITLE_KEY       = "onboarding.window_title"
 
+-- Every locale string the shared wizard page reads. One list for both initData
+-- and the live preview, so a locale switch cannot drop a key the first render had.
+local STRING_KEYS = {
+	"onboarding.welcome.title", "onboarding.welcome.heading",
+	"onboarding.language.placeholder",
+	"onboarding.layout.title", "onboarding.layout.desc",
+	"onboarding.layout.yes",  "onboarding.layout.no",
+	"onboarding.magic_key.title", "onboarding.magic_key.desc",
+	"onboarding.magic_key.option_blackstar", "onboarding.magic_key.option_star",
+	"onboarding.magic_key.option_ugrave", "onboarding.magic_key.option_semicolon",
+	"onboarding.magic_key.option_custom", "onboarding.magic_key.choose_freely",
+	"onboarding.metrics.title", "onboarding.metrics.desc",
+	-- Raw {1} template: the page fills it with the metrics path of the folder
+	-- chosen on the config step (window.setMetricsPath).
+	"dialog.metrics.enable_warning",
+	"onboarding.gestures.title", "onboarding.gestures.desc",
+	-- Same macOS-gestures-conflict warning shown by the tray "Enable
+	-- gestures" toggle — surfaced on step 5 in an orange box so the
+	-- user knows about the system-setting conflict before committing.
+	"dialog.gestures.warning_msg",
+	"onboarding.yes", "onboarding.no",
+	"onboarding.back", "onboarding.next", "onboarding.finish",
+	-- Inserted config-folder step reuses the same labels as the
+	-- tray-menu folder editor so we don't duplicate translations.
+	"dialog.config_folder.title", "dialog.config_folder.label",
+	"dialog.config_folder.hint", "dialog.config_folder.select_title",
+	"common.browse",
+}
+
 -- Path to config.toml — set by M.run() before the wizard opens
 local _config_path  = nil
 
@@ -159,6 +188,18 @@ local function retitle(owner, view, title)
 	return ui_builder.set_window_title(view, title)
 end
 
+--- Metrics store path for the folder typed on the config step, from the same
+--- rule the keylogger uses to place the store. An empty field keeps the current
+--- folder, because commit() persists no override for it.
+--- @param config_dir string|nil Folder from the wizard field.
+--- @return string Absolute metrics directory.
+function M._metrics_path_for(config_dir)
+	local ConfigPaths = require("infra.config_paths")
+	local dir = (type(config_dir) == "string" and config_dir ~= "") and config_dir
+		or ConfigPaths.get_config_dir()
+	return ConfigPaths.metrics_dir(dir)
+end
+
 --- Loads the strings for a given locale code and injects them into the webview
 --- via window.applyStrings().  Used both for the initial render and for the
 --- live-preview when the user hovers over a language row.
@@ -173,42 +214,9 @@ local function inject_strings(code, owner, view)
 	-- the requested locale, then restoring the previous locale.
 	local prev_code = i18n.get_locale()
 	i18n.set_locale_no_reload(code)
-
-	-- Collect all onboarding keys the JS wizard needs
-	local keys = {
-		"onboarding.welcome.title", "onboarding.welcome.heading",
-		"onboarding.language.placeholder",
-		"onboarding.layout.title", "onboarding.layout.desc",
-		"onboarding.layout.yes",  "onboarding.layout.no",
-		"onboarding.magic_key.title", "onboarding.magic_key.desc",
-		"onboarding.magic_key.option_blackstar", "onboarding.magic_key.option_star",
-		"onboarding.magic_key.option_ugrave", "onboarding.magic_key.option_semicolon",
-		"onboarding.magic_key.option_custom", "onboarding.magic_key.choose_freely",
-		"onboarding.metrics.title", "onboarding.metrics.desc",
-		"onboarding.gestures.title", "onboarding.gestures.desc",
-		-- Same macOS-gestures-conflict warning shown by the tray "Enable
-		-- gestures" toggle — surfaced on step 5 in an orange box so the
-		-- user knows about the system-setting conflict before committing.
-		"dialog.gestures.warning_msg",
-		"onboarding.yes", "onboarding.no",
-		"onboarding.back", "onboarding.next", "onboarding.finish",
-		-- Inserted config-folder step reuses the same labels as the
-		-- tray-menu folder editor so we don't duplicate translations.
-		"dialog.config_folder.title", "dialog.config_folder.label",
-		"dialog.config_folder.hint", "dialog.config_folder.select_title",
-		"common.browse",
-	}
-	for _, k in ipairs(keys) do
+	for _, k in ipairs(STRING_KEYS) do
 		strings[k] = i18n.get(k)
 	end
-
-	-- Inject the privacy warning pre-formatted with the actual metrics path so
-	-- the user sees exactly the same text as the tray-menu toggle dialog
-	local metrics_dir = (_config_path or ""):match("^(.*[/\\])") or ""
-	-- i18n.format, not string.format: the shared locale strings use {1}, and
-	-- string.format looks for %s — it left the placeholder on screen verbatim.
-	strings["dialog.metrics.enable_warning_formatted"] =
-		i18n.format("dialog.metrics.enable_warning", metrics_dir .. "metrics")
 	local window_title = i18n.get(WINDOW_TITLE_KEY)
 
 	i18n.set_locale_no_reload(prev_code)
@@ -229,43 +237,8 @@ local function inject_init_data()
 
 	local current_locale = i18n.get_locale()
 	local strings = {}
-	local keys = {
-		"onboarding.welcome.title", "onboarding.welcome.heading",
-		"onboarding.language.placeholder",
-		"onboarding.layout.title", "onboarding.layout.desc",
-		"onboarding.layout.yes",  "onboarding.layout.no",
-		"onboarding.magic_key.title", "onboarding.magic_key.desc",
-		"onboarding.magic_key.option_blackstar", "onboarding.magic_key.option_star",
-		"onboarding.magic_key.option_ugrave", "onboarding.magic_key.option_semicolon",
-		"onboarding.magic_key.option_custom", "onboarding.magic_key.choose_freely",
-		"onboarding.metrics.title", "onboarding.metrics.desc",
-		"onboarding.gestures.title", "onboarding.gestures.desc",
-		-- Same macOS-gestures-conflict warning shown by the tray "Enable
-		-- gestures" toggle — surfaced on step 5 in an orange box so the
-		-- user knows about the system-setting conflict before committing.
-		"dialog.gestures.warning_msg",
-		"onboarding.yes", "onboarding.no",
-		"onboarding.back", "onboarding.next", "onboarding.finish",
-	}
-	for _, k in ipairs(keys) do
+	for _, k in ipairs(STRING_KEYS) do
 		strings[k] = i18n.get(k)
-	end
-
-	-- Same privacy warning as inject_strings — pre-formatted with the metrics path
-	local metrics_dir = (_config_path or ""):match("^(.*[/\\])") or ""
-	-- i18n.format, not string.format: the shared locale strings use {1}, and
-	-- string.format looks for %s — it left the placeholder on screen verbatim.
-	strings["dialog.metrics.enable_warning_formatted"] =
-		i18n.format("dialog.metrics.enable_warning", metrics_dir .. "metrics")
-
-	-- Also include the labels needed by the inserted config-folder step.
-	local config_step_keys = {
-		"dialog.config_folder.title", "dialog.config_folder.label",
-		"dialog.config_folder.hint", "dialog.config_folder.select_title",
-		"common.browse",
-	}
-	for _, k in ipairs(config_step_keys) do
-		if strings[k] == nil then strings[k] = i18n.get(k) end
 	end
 
 	-- Resolve the current + default config directories so the wizard can
@@ -320,6 +293,12 @@ local function inject_init_data()
 			use_gestures = false,
 		},
 	}
+	local resolved, metrics_path = pcall(M._metrics_path_for, payload.answers.config_dir)
+	if not resolved then
+		Logger.error(LOG, "Onboarding metrics path unresolved: %s.", tostring(metrics_path))
+		return
+	end
+	payload.metrics_path = metrics_path
 
 	Logger.debug(LOG, "Injecting initData into onboarding webview…")
 	submit_data(owner, view, "initData", payload)
@@ -688,6 +667,21 @@ local function handle_message(body)
 		if type(chosen) == "string" and chosen ~= "" then
 			submit_data(owner, view, "setConfigDir", chosen)
 		end
+
+	elseif action == "resolveMetricsPath" then
+		-- The config step was confirmed: name the metrics store of THAT folder in
+		-- the step-4 consent warning. The request number is echoed so the page can
+		-- drop a reply for a folder the user has since changed.
+		if type(body.request) ~= "number" then
+			Logger.error(LOG, "resolveMetricsPath: request number missing.")
+			return
+		end
+		local resolved, path = pcall(M._metrics_path_for, body.config_dir)
+		if not resolved then
+			Logger.error(LOG, "resolveMetricsPath: metrics path unresolved: %s.", tostring(path))
+			return
+		end
+		submit_data(owner, view, "setMetricsPath", { request = body.request, path = path })
 
 	elseif action == "loadExistingConfig" then
 		-- User confirmed a config directory on the config step. Check whether

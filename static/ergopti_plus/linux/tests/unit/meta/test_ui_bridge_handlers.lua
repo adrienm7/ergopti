@@ -896,6 +896,7 @@ helpers.describe("ui.bridge_handlers", function()
 					get_config_dir = function() return values.config_dir end,
 					set_config_dir = function(value) values.config_dir = value; return true end,
 					data = function(rel) return "/tmp/data/" .. rel end,
+					metrics_path = function() return "/tmp/data/metrics.sqlite" end,
 				},
 				writer = {
 					batch_write = function(path, updates)
@@ -980,6 +981,38 @@ helpers.describe("ui.bridge_handlers", function()
 			local result = handler.on_message({ action = "previewLocale", locale = "xx" }, state)
 			helpers.assert_eq(result.pushed, false)
 			helpers.assert_eq(#captured.titles, 0)
+		end)
+
+		helpers.it("(onboarding-metrics-path) initData carries the keylogger's metrics store", function()
+			local state = onboarding_state()
+			local result = handler.on_message({ action = "ready" }, state)
+			helpers.assert_eq(result.data.metrics_path, "/tmp/data/metrics.sqlite")
+			helpers.assert_type(result.data.strings["dialog.metrics.enable_warning"], "string")
+			helpers.assert_nil(result.data.strings["dialog.metrics.enable_warning_formatted"],
+				"a pre-formatted warning freezes the path at open time")
+		end)
+
+		helpers.it("(onboarding-metrics-path) a chosen folder answers with the same store", function()
+			local state, _, captured = onboarding_state()
+			local result = handler.on_message({ action = "resolveMetricsPath",
+				config_dir = "/tmp/elsewhere/", request = 4 }, state)
+			helpers.assert_true(result.pushed)
+			helpers.assert_eq(result.path, "/tmp/data/metrics.sqlite",
+				"the Linux store lives in the data dir and must not follow the config folder")
+			helpers.assert_contains(captured.pushes[1].code, "window.setMetricsPath")
+			helpers.assert_contains(captured.pushes[1].code, '"request":4')
+		end)
+
+		helpers.it("(onboarding-metrics-path) a request without its number is refused", function()
+			local state, _, captured = onboarding_state()
+			local result = handler.on_message({ action = "resolveMetricsPath", config_dir = "/x" }, state)
+			helpers.assert_eq(result.pushed, false)
+			helpers.assert_eq(#captured.pushes, 0)
+		end)
+
+		helpers.it("(onboarding-metrics-path) the real resolver names the keylogger store", function()
+			local ConfigPaths = helpers.load_module("infra.config_paths")
+			helpers.assert_eq(ConfigPaths.metrics_path(), ConfigPaths.data("metrics.sqlite"))
 		end)
 
 		helpers.it("(onboarding-window-title) the product name appears once in the window title", function()

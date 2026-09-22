@@ -551,6 +551,7 @@ _LogBootProgress("loading gestures modules")
 #Include ../ui/onboarding/webview.ahk
 #Include unit/test_screenshot_worker_ownership.ahk
 #Include unit/test_onboarding_finish_payload.ahk
+#Include unit/test_onboarding_metrics_path.ahk
 #Include unit/test_gestures.ahk
 #Include unit/test_gesture_cycle_candidates.ahk
 #Include unit/test_config_persistence_transactions.ahk

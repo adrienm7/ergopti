@@ -262,6 +262,7 @@ const CHECKS = [
 	{ name: 'changelog release notes render as sanitized Markdown (DOM-only, repository links only)', cmd: 'node', args: ['tools/test/test-changelog-markdown.cjs'], repro: 'npm run test:changelog-markdown' },
 	{ name: 'download actions retain their operation session across native reuse', cmd: 'node', args: ['tools/test/test-download-window-session.cjs'], repro: 'npm run test:download-window-session' },
 	{ name: 'model browser actions retain their operation session across native reuse', cmd: 'node', args: ['tools/test/test-model-browser-session.cjs'], repro: 'npm run test:model-browser-session' },
+	{ name: 'onboarding page title, folder picker and metrics consent path follow the host', cmd: 'node', args: ['tools/test/test-onboarding-wizard-page.cjs'], repro: 'npm run test:onboarding-wizard-page' },
 	{ name: 'metrics manifest payload contract (reader vocabulary reaches real consumers)', cmd: 'node', args: ['tools/test/test-metrics-manifest-contract.cjs'], repro: 'node tools/test/test-metrics-manifest-contract.cjs' },
 	{ name: 'typing-speed source toggles (net expansion gain and filter semantics)', cmd: 'node', args: ['tools/test/test-metrics-speed-source-filters.cjs'], repro: 'node tools/test/test-metrics-speed-source-filters.cjs' },
 	{ name: 'Linux metrics SQLite bridge (persistent manifest + selected-range refresh)', cmd: 'node', args: ['tools/test/test-linux-metrics-sqlite-bridge.cjs'], repro: 'node tools/test/test-linux-metrics-sqlite-bridge.cjs' },

@@ -26,21 +26,6 @@
 ; the FilePathsEditor dialog (infra/onboarding-independent helper in
 ; ErgoptiPlus.ahk) so a wizard pass and a later edit-via-tray produce
 ; structurally identical files.
-; The config folder the wizard's answers will actually land in. _ConfigDir is
-; deliberately NOT updated until the commit succeeds, so any page rendered
-; after the folder step must resolve through here — reading _ConfigDir shows
-; the boot folder, which is how the keystroke-logging consent text ended up
-; naming a path that keystrokes were never going to be written to.
-_Onboarding_EffectiveConfigDir() {
-	global _ob_config_dir, _ConfigDir
-	Dir := (IsSet(_ob_config_dir) and _ob_config_dir != "")
-		? _ob_config_dir
-		: (IsSet(_ConfigDir) ? _ConfigDir : "")
-	if (Dir != "" and !RegExMatch(Dir, "\\$"))
-		Dir .= "\"
-	return Dir
-}
-
 _Onboarding_Commit(BeforeReloadFn := 0) {
 	; If the user picked a custom config directory in the StepConfigDir
 	; wizard step, persist its candidate config before pointing paths.toml at it.

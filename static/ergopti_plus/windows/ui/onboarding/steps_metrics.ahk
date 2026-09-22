@@ -35,8 +35,34 @@ global GESTURE_AUTO_SUCCESS_TOKEN := "0"
 ; ===== 4.4) Step 4 — Typing metrics =====
 ; ========================================
 
+; The config folder a wizard field value commits to. _ConfigDir is deliberately
+; NOT updated until the commit succeeds, so any page rendered after the folder
+; step must resolve through here — reading _ConfigDir shows the boot folder,
+; which is how the keystroke-logging consent text ended up naming a path that
+; keystrokes were never going to be written to. An empty field means "use the
+; OS default" exactly as _Onboarding_Commit resolves it.
+; @param Chosen string Wizard field value.
+; @return string Folder with a trailing backslash.
+_Onboarding_ConfigDirFor(Chosen) {
+	global _DefaultConfigDir
+	Dir := (Chosen != "") ? Chosen : _DefaultConfigDir
+	if (Dir != "" and !RegExMatch(Dir, "[/\\]$"))
+		Dir .= "\"
+	return Dir
+}
+
+; Metrics store shown in the keystroke-logging consent text for a wizard field
+; value, through the keylogger's own rule (KL_MetricsDirFor). Shared by this
+; native step and the WebView2 host. Forward slashes match the cross-driver
+; locale text.
+; @param Chosen string Wizard field value.
+; @return string
+_Onboarding_MetricsPathFor(Chosen) {
+	return StrReplace(KL_MetricsDirFor(_Onboarding_ConfigDirFor(Chosen)), "\", "/")
+}
+
 _Onboarding_Step4() {
-	global _ConfigDir
+	global _ConfigDir, _ob_config_dir
 	g := Gui("+AlwaysOnTop", t("onboarding.welcome.title"))
 	g.SetFont("s10", "Segoe UI")
 	g.MarginX := 20
@@ -62,7 +88,7 @@ _Onboarding_Step4() {
 	; Resolve the folder the user actually chose: _ConfigDir still holds the
 	; boot value here, so consent would otherwise be given against a path the
 	; keystrokes are never written to.
-	metrics_path := StrReplace(_Onboarding_EffectiveConfigDir() . "metrics", "\", "/")
+	metrics_path := _Onboarding_MetricsPathFor(_ob_config_dir)
 	warning := Format(t("dialog.metrics.enable_warning"), metrics_path)
 	; Warning: plain orange text between two horizontal rules — simpler and reliable.
 	g.AddText("xm y+10 w" ONBOARDING_WIN_W - 40 " 0x10")  ; SS_ETCHEDHORZ — top separator

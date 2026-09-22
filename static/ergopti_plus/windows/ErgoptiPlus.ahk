@@ -1095,7 +1095,7 @@ if MetricsShortcuts.enabled {
 		; queue, painting a tray click queued during boot against a half-built menu.
 		; See the deferred-task block after LoggerSuccess("…ready").)
 		KeyloggerReady := false
-		try KeyloggerReady := KL_Init(_ConfigDir . "metrics")
+		try KeyloggerReady := KL_Init(KL_MetricsDirFor(_ConfigDir))
 		catch as Err
 			try LoggerError("Keylogger", "Initialization failed: {1}.", Err.Message)
 		if !KeyloggerReady {
