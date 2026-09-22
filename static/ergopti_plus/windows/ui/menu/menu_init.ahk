@@ -364,7 +364,8 @@ _MI_BuildGlobalActionsMenu() {
 	Commands := Map(
 		"enable_all",     ToggleAllFeaturesOn,
 		"disable_all",    ToggleAllFeaturesOff,
-		"reset_defaults", ReloadWithDefaultConfig
+		"reset_defaults", ReloadWithDefaultConfig,
+		"clean_unused_keys", ShowUnusedConfigKeysCleanup
 	)
 	return MenuRenderer_Build("global_actions", "Global", "", "", "", Commands)
 }

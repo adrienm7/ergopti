@@ -500,6 +500,15 @@
 			"type": "command",
 			"id": "reset_defaults",
 			"i18n": "menu.global.reset_defaults"
+		},
+		{
+			"type": "command",
+			"id": "clean_unused_keys",
+			"i18n": "menu.global.clean_unused_keys",
+			"platforms": [
+				"ahk"
+			],
+			"reason_key": "platform_reason.only_windows_reports_unknown_config_keys"
 		}
 	],
 	"debug_menu": [
