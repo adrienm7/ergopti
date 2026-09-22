@@ -92,6 +92,20 @@ local EXPRESSION_OVERRIDES = {
 	},
 }
 
+--- Maps kanata alias name → the physical key it stands on. Emitted instead of the
+--- tap-hold directive when the tap-hold feature is switched off: the layer still
+--- references every alias (kanata refuses a configuration with one dangling
+--- `@name`), and the key then types exactly what it would without Ergopti.
+local NATIVE_KEY_MAP = {
+	cap    = "caps",
+	lsft   = "lsft",
+	lctl   = "lctl",
+	lalt   = "lalt",
+	ralt   = "ralt",
+	alttab = "tab",
+	ossft  = "rctl",
+}
+
 --- Default one-shot shift timeout in ms (kanata uses integer ms).
 --- Fallback only; callers SHOULD pass the canonical value from
 --- _shared/modules/timings/constants.toml [tap_hold] one_shot_shift_timeout_ms.
@@ -159,12 +173,14 @@ end
 --- directives.
 ---
 --- @param keys_config table  Map of key_id → {time_activation_seconds, tap_action, hold_modifier, hold_layer}
---- @param opts      table|nil  { one_shot_shift_timeout_ms = number }
+--- @param opts      table|nil  { one_shot_shift_timeout_ms = number,
+---   tap_holds_enabled = boolean (false emits every configured alias as its native key) }
 --- @return string  The complete (defalias ...) block as a string.
 function M.generate(keys_config, opts)
 	opts = opts or {}
 	local one_shot_ms = tonumber(opts.one_shot_shift_timeout_ms)
 		or DEFAULT_ONE_SHOT_MS
+	local tap_holds_off = opts.tap_holds_enabled == false
 
 	local lines = { "(defalias" }
 
@@ -181,7 +197,11 @@ function M.generate(keys_config, opts)
 		local alias = KEY_ALIAS_MAP[key_id]
 		if not alias then goto continue end
 
-		if is_one_shot_shift(kc) then
+		if tap_holds_off then
+			-- The feature switch, not the assignment: the key's configuration is
+			-- kept and only its directive is replaced by the native key.
+			lines[#lines + 1] = string.format("    %-10s %s", alias, NATIVE_KEY_MAP[alias])
+		elseif is_one_shot_shift(kc) then
 			-- One-shot shift: emits (one-shot <ms> lsft) instead of tap-hold-press
 			lines[#lines + 1] = string.format(
 				"    %-10s (one-shot %d lsft)",

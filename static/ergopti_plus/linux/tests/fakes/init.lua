@@ -288,6 +288,11 @@ function M.clipboard(opts)
 		return true, fake.contents, nil
 	end
 	function fake.write(text) fake.contents = tostring(text) ; return true end
+	-- The PRIMARY selection: what the application published, never written here.
+	function fake.read_primary()
+		if opts.available == false then return false, "", "clipboard unavailable" end
+		return true, opts.primary or "", nil
+	end
 	function fake.paste_text(text)
 		-- The real one saves, sets, pastes and restores. What a caller can assert
 		-- is that the previous contents came back, so the fake preserves them.

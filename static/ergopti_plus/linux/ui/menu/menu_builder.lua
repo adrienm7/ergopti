@@ -281,11 +281,67 @@ end
 -- =========================================
 -- =========================================
 
+--- The version as the header shows it: "v0.0.0-dev.12" for a release, the bare
+--- token for a source run or an unknown build ("local", "unknown").
+--- @param version string
+--- @return string
+local function _version_text(version)
+	local v = tostring(version)
+	if v:match("^%d") then return "v" .. v end
+	return v
+end
+
 --- Builds the top-level header with version.
 --- Returns a single item (not an array) — callers insert it directly.
+---
+--- While the script is paused the header is the way back, as on macOS, where the
+--- title row resumes: it used to stay a disabled label, so a paused script could
+--- only be resumed by a gesture or a shortcut the user had to remember.
 local function _build_header(ctx)
-	local v = ctx._version or Version.VERSION
-	return { label = "Ergopti — v" .. v, disabled = true }
+	local version = _version_text(ctx._version or Version.VERSION)
+	if ctx.paused == true then
+		return {
+			label = i18n_safe("menu.builder.title_paused") .. " — " .. version,
+			action = function()
+				if type(ctx.on_toggle_pause) ~= "function" then
+					Logger.error(LOG, "Paused title row: ctx.on_toggle_pause is absent — the script stays paused.")
+					return
+				end
+				ctx.on_toggle_pause()
+			end,
+		}
+	end
+	return { label = "Ergopti — " .. version, disabled = true }
+end
+
+-- The top-level rows a pause greys: every feature the pause switches off. The
+-- tail (updates, global actions, language, config folder, setup wizard, about,
+-- reload, quit, debug) stays live, as on macOS — it is how the user inspects,
+-- resumes or leaves a paused script.
+local PAUSE_GREYED_ROWS = {
+	keyboard_layout = true,
+	hotstrings      = true,
+	llm             = true,
+	metrics         = true,
+	shortcuts       = true,
+	kanata          = true,
+	gestures        = true,
+	apps            = true,
+}
+
+--- Greys one feature row for a pause, and strips what would let it act.
+---
+--- Stripped, not merely greyed: a disabled row whose submenu or handler survives
+--- still acts the moment a tray backend renders the greying differently.
+--- @param row table Row data from a section builder.
+--- @return table The same row, greyed.
+local function _grey_for_pause(row)
+	if type(row) ~= "table" or row.separator then return row end
+	row.disabled = true
+	row.submenu = nil
+	row.items = nil
+	row.action = nil
+	return row
 end
 
 --- Whether a manifest row is visible on this driver. A row with no ``platforms``
@@ -2462,6 +2518,7 @@ local function _build_shortcuts(ctx)
 		local action_names = Gestures.get_action_names and Gestures.get_action_names() or { "none" }
 
 		local out = {}
+		local skipped = {}
 		local function assign_slot(slot, option)
 			local assigned = assign_parameterized_action(
 				ctx,
@@ -2508,7 +2565,17 @@ local function _build_shortcuts(ctx)
 					items = choices,
 				}
 			end
-			out[#out + 1] = { label = i18n_safe(group.group_key), items = rows }
+			-- A group with no slot is the key catalogue failing to load: drawing it
+			-- anyway put three submenus that open onto nothing in the tray.
+			if #rows > 0 then
+				out[#out + 1] = { label = i18n_safe(group.group_key), items = rows }
+			else
+				skipped[#skipped + 1] = group.prefix
+			end
+		end
+		if #skipped > 0 then
+			Logger.error(LOG, "Keyboard slot group(s) %s not drawn: the key catalogue offered no slot.",
+				table.concat(skipped, ", "))
 		end
 		return out
 	end
@@ -2572,6 +2639,25 @@ local function _build_shortcuts(ctx)
 	sc_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do sc_ctx.state_getters[key] = value end
 	sc_ctx.state_getters["shortcuts_enabled"] = function() return enabled end
+	-- The manifest's `feature` row for wrap-on-type, drawn where the manifest
+	-- hangs it (just above the wrap-symbol picker). Its label is the feature's
+	-- own description key, as on Windows.
+	sc_ctx.feature_rows = {}
+	for key, value in pairs(ctx.feature_rows or {}) do sc_ctx.feature_rows[key] = value end
+	if type(sc.is_wrap_on_type_enabled) == "function" then
+		sc_ctx.feature_rows["shortcuts.wrap_text_if_selected"] = function()
+			local on = sc.is_wrap_on_type_enabled()
+			return {
+				label = i18n_safe("shortcuts.label_wrap_text"),
+				checked = on,
+				disabled = not enabled,
+				action = function()
+					sc.set_wrap_on_type_enabled(not on)
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				end,
+			}
+		end
+	end
 
 	local manifest_rows = ManifestMenu
 		and ManifestMenu.build("shortcuts_menu", "Shortcuts", handlers, nil, sc_ctx, providers)
@@ -3509,6 +3595,8 @@ end
 --- Builds the full tray menu item list from the daemon's current state.
 --- @param ctx table {
 ---   _version       string   Driver version string.
+---   paused         boolean  Whether the script is paused (greys the feature rows).
+---   on_toggle_pause function Resumes from the paused title row.
 ---   config         table    Hotstrings_config module.
 ---   layout         string   Current keyboard layout.
 ---   on_layout_change function Called with new layout name.
@@ -3602,6 +3690,8 @@ function M.build(ctx)
 					Logger.error(LOG, "No builder for top-level row '%s' — the entry is missing.", tostring(id))
 				elseif id == "quit" then
 					quit_row = build(ctx)
+				elseif ctx.paused == true and PAUSE_GREYED_ROWS[id] then
+					rows[#rows + 1] = _grey_for_pause(build(ctx))
 				else
 					rows[#rows + 1] = build(ctx)
 				end

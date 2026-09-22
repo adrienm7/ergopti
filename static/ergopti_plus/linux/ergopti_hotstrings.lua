@@ -138,6 +138,10 @@ local ManifestReader    = require("infra.manifest_reader")
 local ScriptSettings    = require("infra.script_settings")
 local Timings           = require("infra.timings")
 local ScriptActions     = require("modules.shortcuts.script_actions")
+local GlobalFeatureSwitch = require("ui.menu.global_feature_switch")
+local WrapOnType        = require("modules.shortcuts.wrap_on_type")
+local Clipboard         = require("adapters.clipboard")
+local Storage           = require("adapters.storage")
 local CrashReporter     = require("modules.diagnostics.crash_reporter")
 local FocusGuard        = require("modules.keylogger.focus_guard")
 local InputCaptureGate  = require("infra.input_capture_gate")
@@ -653,7 +657,68 @@ local function main()
 		hide_prediction = llm_overlay and function() llm_overlay.hide() end or nil,
 		cancel_prediction = prediction_engine and type(prediction_engine.cancel) == "function"
 			and function() prediction_engine.cancel() end or nil,
+		-- The tray greys every feature row while paused and its title row
+		-- resumes; without a rebuild here the menu kept showing the old state.
+		on_pause_change = function()
+			if rebuild_tray_menu then rebuild_tray_menu() end
+		end,
 	})
+
+	-- « Disable all » / « Enable all »: every feature switch, not only the
+	-- hotstrings, and Enable all restores what was on rather than everything.
+	-- The closures read the module handles at call time, so features initialised
+	-- later in the boot (gestures, shortcuts) are covered.
+	--- A feature whose on/off state is one boolean.
+	--- @param id string
+	--- @param is_on function
+	--- @param set function Receives the wanted boolean, returns whether it holds.
+	--- @param persistent boolean|nil false for a switch with no persisted state.
+	local function switch_feature(id, is_on, set, persistent)
+		return {
+			id = id,
+			persistent = persistent,
+			capture = function() return is_on() == true end,
+			disable = function() return set(false) end,
+			restore = function(value) return set(value == true) end,
+			enable = function() return set(true) end,
+		}
+	end
+	local global_features = {
+		{
+			id = "hotstrings",
+			capture = function() return hotstrings_config.closed_category_gates() end,
+			disable = function() return hotstrings_config.disable_all() ~= false end,
+			restore = function(closed) return hotstrings_config.restore_category_gates(closed or {}) end,
+			enable = function() return hotstrings_config.restore_category_gates({}) end,
+		},
+	}
+	if shortcuts then
+		global_features[#global_features + 1] = switch_feature("shortcuts", shortcuts.is_enabled,
+			function(want) return want == shortcuts.is_enabled() or shortcuts.set_enabled(want) end)
+	end
+	if gestures then
+		global_features[#global_features + 1] = switch_feature("gestures", gestures.is_enabled,
+			function(want) return want == gestures.is_enabled() or gestures.set_enabled(want) end)
+	end
+	if prediction_engine then
+		global_features[#global_features + 1] = switch_feature("llm", prediction_engine.is_enabled,
+			function(want)
+				if want == prediction_engine.is_enabled() then return true end
+				if want then return prediction_engine.enable() end
+				return prediction_engine.disable()
+			end)
+	end
+	global_features[#global_features + 1] = switch_feature("metrics", keylogger.is_enabled,
+		function(want) return want == keylogger.is_enabled() or keylogger.set_enabled(want) end)
+	if dyn_hotstrings then
+		global_features[#global_features + 1] = switch_feature("dynamic_hotstrings", dyn_hotstrings.is_enabled,
+			function(want) dyn_hotstrings.set_enabled(want) return dyn_hotstrings.is_enabled() == want end, false)
+	end
+	if kanata then
+		global_features[#global_features + 1] = switch_feature("tap_holds", kanata.tap_holds_enabled,
+			kanata.set_tap_holds_enabled, false)
+	end
+	local global_switch = GlobalFeatureSwitch.new({ features = global_features, storage = Storage })
 
 	-- A control can change while app ID and window title stay identical. Raw Tab
 	-- and pointer events therefore invalidate the AT-SPI verdict synchronously;
@@ -1066,9 +1131,13 @@ local function main()
 			-- The same master switch gates CapsWord and every menu operation. It must
 			-- also gate modifier chords; otherwise "Shortcuts off" still opens ChatGPT
 			-- and runs the user's assignments while claiming the feature is disabled.
-			if shortcuts and shortcuts.is_enabled() then
-				pcall(keyboard_shortcuts.dispatch, detail)
-			end
+			-- A pause gates them the same way. The script-control actions pass
+			-- both gates: they are how the user resumes, including after « Disable
+			-- all », which switches the shortcuts feature off.
+			local shortcuts_on = shortcuts ~= nil and shortcuts.is_enabled()
+			pcall(keyboard_shortcuts.dispatch, detail, {
+				only_script = script_actions.is_paused() or not shortcuts_on,
+			})
 		end
 		if script_actions.is_paused() then return end
 		-- Modified Tab (Alt+Tab, Ctrl+Tab) reaches the control callback rather
@@ -1120,8 +1189,33 @@ local function main()
 	-- just left, so an expansion after a click would fire against a line that is
 	-- no longer under the cursor — and erase characters belonging to whatever is
 	-- there now. The pointer is watched, never grabbed.
+	-- Wrap the selection when a wrap symbol is typed over it. Decided in the
+	-- consumption callback below, so the symbol never reaches the application
+	-- when it wraps; see modules/shortcuts/wrap_on_type.lua for the probe.
+	local wrap_on_type = WrapOnType.new({
+		is_active = function()
+			return shortcuts ~= nil and shortcuts.is_enabled()
+				and shortcuts.is_wrap_on_type_enabled()
+				and not script_actions.is_paused()
+				and not secure_focus_guard.blocks_text()
+		end,
+		get_pair = function(char) return shortcuts and shortcuts.get_wrap_pair(char) or nil end,
+		read_primary = Clipboard.read_primary,
+		type_text = function(text)
+			if opts.dry_run then return false end
+			local result = injector.inject(0, text, false)
+			if type(result) ~= "table" or result.ok ~= true then return false end
+			-- The caret moved over replaced text: what the engine buffered no longer
+			-- describes the line.
+			_undoable = nil
+			engine:reset()
+			return true
+		end,
+	})
+
 	local function on_click()
 		secure_focus_guard.invalidate()
+		wrap_on_type.on_pointer_down()
 		Logger.debug(LOG, "Pointer click — text privacy state invalidated.")
 	end
 
@@ -1282,6 +1376,7 @@ local function main()
 		Logger.warn(LOG, "Layout unresolved — replacements will not be typed as keystrokes.")
 	end
 	local on_consume = input_capture_gate.guard(function(detail)
+		if wrap_on_type.on_key(detail) then return true end
 		return prediction_engine
 			and type(prediction_engine.handle_shortcut) == "function"
 			and prediction_engine.handle_shortcut(detail) == true
@@ -1379,6 +1474,10 @@ local function main()
 		local function _build_menu_ctx()
 			return {
 				_version      = Version.VERSION,
+				-- Read at every rebuild: the pause toggle rebuilds the menu, which
+				-- greys the feature rows and turns the title row into « resume ».
+				paused        = script_actions.is_paused(),
+				on_toggle_pause = script_actions.toggle_pause,
 				config        = hotstrings_config,
 				engine        = engine,
 				-- The dynamic-hotstrings manager, so its category can be a real row
@@ -1520,8 +1619,18 @@ local function main()
 			-- hotstrings_config.enable_all then`, and the functions did not exist —
 			-- so the guard was false, the row did nothing, and a click that did
 			-- nothing is indistinguishable from a click that missed.
-			on_enable_all  = function() hotstrings_config.enable_all() end,
-			on_disable_all = function() hotstrings_config.disable_all() end,
+			--
+			-- They moved the hotstrings only, and Enable all switched every bundled
+			-- section on instead of restoring. They now go through the global
+			-- feature switch, which works like a pause (see global_feature_switch).
+			on_enable_all  = function()
+				global_switch.enable_all()
+				if rebuild_tray_menu then rebuild_tray_menu() end
+			end,
+			on_disable_all = function()
+				global_switch.disable_all()
+				if rebuild_tray_menu then rebuild_tray_menu() end
+			end,
 			on_reset_defaults = function() hotstrings_config.reset_defaults() end,
 			on_set_log_level = function(lvl)
 				if not ScriptSettings.set(lvl) then return end
@@ -1673,6 +1782,7 @@ local function main()
 		gestures.init({
 			persist = true,
 			action_handlers = script_actions.handlers,
+			is_paused = script_actions.is_paused,
 		})
 		Logger.info(LOG, "Gestures manager initialised.")
 	end
@@ -1682,6 +1792,10 @@ local function main()
 		shortcuts.init({ persist = true })
 		Logger.info(LOG, "Shortcuts manager initialised.")
 	end
+
+	-- 8.10d') « Disable all » survives a restart: the persisted switches already
+	-- read back off, and the runtime-only ones are switched off again here.
+	global_switch.reapply_after_boot()
 
 	-- 8.10e) Wire daemon state into the webview manager so bridge handlers
 	-- can query/control daemon modules (keylogger, LLM, config, engine).

@@ -253,6 +253,61 @@ function checkLinuxHealthcheckBridge() {
 
 checkLinuxHealthcheckBridge();
 
+/**
+ * Renders a Linux snapshot and checks its system rows. The Linux payload once
+ * had no CPU, RAM, screen or locale fields, so the page printed "?" in each of
+ * those rows and had no row naming the distribution or the kernel.
+ */
+function checkLinuxSystemRows() {
+	const content = { innerHTML: '' };
+	const sandbox = {
+		window: {},
+		document: { getElementById: () => content },
+		escapeHtml: value => String(value),
+	};
+	const script = fs.readFileSync(path.join(REPO_ROOT, SHARED_SCRIPT), 'utf8');
+	vm.runInNewContext(script, sandbox, { filename: SHARED_SCRIPT });
+	sandbox.window.renderHealthcheck({
+		version: 'test',
+		uptime_sec: 0,
+		sys: {
+			os: 'linux',
+			os_name: 'Fedora Linux 41',
+			kernel: '6.11.4',
+			arch: 'x64',
+			display_server: 'wayland',
+			desktop: 'GNOME',
+			runtime: 'LuaJIT 2.1',
+			cpu_model: 'AMD Ryzen 7',
+			cpu_cores: 16,
+			ram_total: '31.0 GB',
+			ram_free: '15.5 GB',
+		},
+	});
+	const html = content.innerHTML;
+	const expected = [
+		'<td>Linux</td><td>Fedora Linux 41</td>',
+		'<td>Kernel</td><td>6.11.4</td>',
+		'<td>Architecture</td><td>x64</td>',
+		'<td>Display server</td><td>wayland (GNOME)</td>',
+		'<td>CPU</td><td>AMD Ryzen 7</td>',
+		'<td>Total RAM</td><td>31.0 GB</td>',
+	];
+	const missing = expected.filter(fragment => !html.includes(fragment));
+	const questionRows = (html.match(/<td>\?<\/td>/g) || []).length;
+	const omitted = !html.includes('<td>Screen resolution</td>') && !html.includes('<td>Locale</td>');
+	if (missing.length === 0 && questionRows === 0 && omitted) {
+		total_pass++;
+		console.log(`  ${PASS_SYMBOL}  Shared: a Linux snapshot renders its OS rows and omits unknown ones`);
+		return;
+	}
+	total_fail++;
+	console.log(`  ${FAIL_SYMBOL}  Shared: a Linux snapshot renders its OS rows and omits unknown ones`);
+	console.log(`       Violation: missing=${JSON.stringify(missing)}, "?" rows=${questionRows}, omitted=${omitted}`);
+}
+
+checkLinuxSystemRows();
+
 // --- Hammerspoon (macOS) Checks ---
 // The HTML rendering now lives in _shared/ui/healthcheck/; helpers.lua
 // has only the state-gathering probes + format_uptime. core.lua loads the

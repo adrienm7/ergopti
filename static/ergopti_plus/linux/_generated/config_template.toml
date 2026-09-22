@@ -306,6 +306,7 @@ wpm_widget_colors = true
 [shortcuts]
 enabled = true
 chatgpt_url = "https://chat.openai.com"
+wrap_text_if_selected = true
 
 [gestures]
 enabled = true

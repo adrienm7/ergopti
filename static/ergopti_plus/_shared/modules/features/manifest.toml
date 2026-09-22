@@ -1312,7 +1312,9 @@ id = "wrap_text_if_selected"
 default = true
 type = "boolean"
 description_key = "shortcuts.label_wrap_text"
-platforms = ["ahk"]
+# Linux decides in its keyboard hook's consumption callback, from the PRIMARY
+# selection (modules/shortcuts/wrap_on_type.lua).
+platforms = ["ahk", "linux"]
 
 [[features.shortcuts]]
 id = "open_downloads"

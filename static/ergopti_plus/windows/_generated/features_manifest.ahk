@@ -169,7 +169,7 @@ global FEATURES_MANIFEST := Map(
         Map("path", "shortcuts.spotlight_mouse", "id", "spotlight_mouse", "section", "shortcuts", "default", true, "type", "boolean", "description_key", "menu.shortcuts.spotlight_mouse", "platforms", ["ahk"]),
         Map("path", "shortcuts.surround_with_parentheses", "id", "surround_with_parentheses", "section", "shortcuts", "default", true, "type", "boolean", "description_key", "menu.shortcuts.surround_with_parentheses", "platforms", ["ahk"]),
         Map("path", "shortcuts.teleport_mouse", "id", "teleport_mouse", "section", "shortcuts", "default", true, "type", "boolean", "description_key", "menu.shortcuts.teleport_mouse", "platforms", ["ahk"]),
-        Map("path", "shortcuts.wrap_text_if_selected", "id", "wrap_text_if_selected", "section", "shortcuts", "default", true, "type", "boolean", "description_key", "shortcuts.label_wrap_text", "platforms", ["ahk"]),
+        Map("path", "shortcuts.wrap_text_if_selected", "id", "wrap_text_if_selected", "section", "shortcuts", "default", true, "type", "boolean", "description_key", "shortcuts.label_wrap_text", "platforms", ["ahk", "linux"]),
         Map("path", "shortcuts.open_downloads", "id", "open_downloads", "section", "shortcuts", "default", true, "type", "boolean", "description_key", "menu.shortcuts.open_downloads", "platforms", ["ahk"]),
         Map("path", "shortcuts.move", "id", "move", "section", "shortcuts", "default", true, "type", "boolean", "description_key", "menu.shortcuts.move", "platforms", ["ahk"]),
         Map("path", "shortcuts.screen", "id", "screen", "section", "shortcuts", "default", true, "type", "boolean", "description_key", "menu.shortcuts.screen", "platforms", ["ahk"]),
