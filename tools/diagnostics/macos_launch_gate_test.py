@@ -134,7 +134,7 @@ class StateTests(unittest.TestCase):
                 self.skipTest(f"symbolic links unavailable here: {error}")
             default = home / ".config/ergopti_plus"
             self.assertTrue(default.is_symlink())
-            self.assertTrue((default / "config.toml").is_file())
+            self.assertTrue((default / "hammerspoon/config.toml").is_file())
             self.assertEqual(state["symlinks"], [str(default)])
 
     def test_replaced_symlink_and_unpersisted_tilde_are_reported(self):
