@@ -39,6 +39,7 @@ helpers.describe("healthcheck copy button: native refusal is not success", funct
 		local poll_stops = 0
 		package.loaded["ui.ui_builder"] = {
 			build_injected_html = function() return "<html></html>" end,
+			window_chrome_steps = function() return {} end,
 			get_app_geometry = function() return { width = 740, height = 560 } end,
 			force_focus = function() end,
 		}
@@ -54,7 +55,7 @@ helpers.describe("healthcheck copy button: native refusal is not success", funct
 		local wv = {}
 		for _, method in ipairs({
 			"windowStyle", "windowTitle", "allowTextEntry", "allowNewWindows",
-			"allowGestures", "level", "html", "show",
+			"allowGestures", "level", "html", "show", "shadow",
 		}) do wv[method] = function(self) return self end end
 		wv.windowCallback = function(self, callback) self.window_callback = callback; return self end
 		wv.navigationCallback = function(self, callback)

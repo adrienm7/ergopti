@@ -172,6 +172,7 @@
 		"test:prompt-builder-constants-parity": "node ./tools/test/test-prompt-builder-constants-parity.cjs",
 		"test:corpus-fields-are-read": "node ./tools/test/test-corpus-fields-are-read.cjs",
 		"test:packaging-paths-exist": "node ./tools/test/test-packaging-paths-exist.cjs",
+		"test:app-windows-keep-their-frame": "node ./tools/test/test-app-windows-keep-their-frame.cjs",
 		"test:release-notes-assets-are-uploaded": "node ./tools/test/test-release-notes-assets-are-uploaded.cjs",
 		"test:action-labels-have-locale-keys": "node ./tools/test/test-action-labels-have-locale-keys.cjs",
 		"test:linux-shared-path-resolver": "node ./tools/test/test-linux-shared-path-resolver.cjs",

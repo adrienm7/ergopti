@@ -634,22 +634,11 @@ function M.show_webview(opts)
 		return abandon_required_mutation()
 	end
 	
-	if opts.style_masks then 
-		if not apply_webview_mutation(function() wv:windowStyle(opts.style_masks) end) then
-			return abandon_required_mutation()
-		end
-	else
-		local masks = hs.webview.windowMasks
-		if not apply_webview_mutation(function()
-			wv:windowStyle((masks["titled"] or 1) + (masks["closable"] or 2)
-				+ (masks["utility"] or 16))
-		end) then return abandon_required_mutation() end
+	-- The chrome every Ergopti window shares comes from one function, so no
+	-- window can be built with only part of it.
+	for _, step in ipairs(M.window_chrome_steps(wv, opts)) do
+		if not apply_webview_mutation(step.apply) then return abandon_required_mutation() end
 	end
-	
-	-- DEFAULT TO FLOATING: Ensures Ergopti UIs appear on top of other apps.
-	if not apply_webview_mutation(function()
-		wv:level(opts.level or hs.drawing.windowLevels.floating)
-	end) then return abandon_required_mutation() end
 	if not apply_webview_mutation(function()
 		wv:allowTextEntry(opts.allow_text_entry ~= false)
 	end) then return abandon_required_mutation() end
@@ -760,6 +749,27 @@ function M.show_webview(opts)
 	Logger.info(LOG, "Webview '%s' opened in %.0f ms.", view_label,
 		now_ms() - opened_ms)
 	return wv
+end
+
+--- The window chrome every Ergopti webview window gets: a native title bar and
+--- close button, the drop shadow that gives it a visible edge over a white page
+--- (Hammerspoon webviews have none by default), and the floating level that keeps
+--- it above other apps. Every window applies these steps, in this order, and a
+--- window that skips this function is caught by test_window_chrome_everywhere.
+--- @param wv table The hs.webview window.
+--- @param opts table|nil { style_masks?, level? } overrides for the mask and level.
+--- @return table Array of { name = string, apply = function } mutation steps.
+function M.window_chrome_steps(wv, opts)
+	opts = opts or {}
+	local masks = hs.webview.windowMasks
+	local style = opts.style_masks
+		or ((masks["titled"] or 1) + (masks["closable"] or 2) + (masks["utility"] or 16))
+	local level = opts.level or hs.drawing.windowLevels.floating
+	return {
+		{ name = "windowStyle", apply = function() wv:windowStyle(style) end },
+		{ name = "shadow",      apply = function() wv:shadow(true) end },
+		{ name = "level",       apply = function() wv:level(level) end },
+	}
 end
 
 return M

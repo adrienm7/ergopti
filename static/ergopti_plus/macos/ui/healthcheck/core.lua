@@ -664,20 +664,21 @@ function M.show_window()
 		return false
 	end
 
+	-- The same chrome as every other Ergopti window (title bar, drop shadow,
+	-- floating level), from the one function that defines it.
 	local masks = hs.webview.windowMasks
-	local ok_style, style_err = pcall(function()
-		wv:windowStyle((masks["titled"] or 1) + (masks["closable"] or 2) + (masks["miniaturizable"] or 4))
-	end)
-	if not ok_style then Logger.warn(LOG, "windowStyle() failed: %s.", tostring(style_err)) end
+	for _, step in ipairs(ui_builder.window_chrome_steps(wv, {
+		style_masks = (masks["titled"] or 1) + (masks["closable"] or 2) + (masks["miniaturizable"] or 4),
+	})) do
+		local ok_step, step_err = pcall(step.apply)
+		if not ok_step then Logger.warn(LOG, "%s() failed: %s.", step.name, tostring(step_err)) end
+	end
 
 	pcall(function() wv:windowTitle(title) end)
 	pcall(function() wv:allowTextEntry(true) end)
 	pcall(function() wv:allowNewWindows(false) end)
 	pcall(function() wv:allowGestures(false) end)
 
-	-- floating ensures the window appears on top of the menu bar and other apps
-	local ok_lvl, lvl_err = pcall(function() wv:level(hs.drawing.windowLevels.floating) end)
-	if not ok_lvl then Logger.warn(LOG, "wv:level(floating) failed: %s.", tostring(lvl_err)) end
 
 	-- Wire up the copy-and-close button using a flag polled from Lua.
 	-- WKWebView rejects custom URL schemes (ergopti://) with NSURLErrorDomain -1002
