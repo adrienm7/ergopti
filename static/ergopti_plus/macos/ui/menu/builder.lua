@@ -327,7 +327,9 @@ function M.generate(ctx, menu_mods, actions)
 			if type(built) == "table" then
 				if built[1] ~= nil then
 					for _, it in ipairs(built) do table.insert(result, it) end
-				else
+				elseif next(built) ~= nil then
+					-- An empty list (no group matched the filter) is no row at all;
+					-- inserting it handed the renderer a row with no label.
 					table.insert(result, built)
 				end
 			end
