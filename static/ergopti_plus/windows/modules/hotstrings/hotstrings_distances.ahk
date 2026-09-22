@@ -201,7 +201,7 @@ _HS_RegisterDistancesAndRolls() {
 	; ===== 1.8) SFBs reduction with À =====
 	; ======================================
 
-	if Features["hotstrings"]["sfbs_reduction"]["bu"]["enabled"] and Features["hotstrings"]["magic_key"]["text_expansion"]["enabled"] {
+	if Features["hotstrings"]["sfbs_reduction"]["bu"]["enabled"] and Features["hotstrings"]["french_magickey"]["text_expansion"]["enabled"] {
 		; Those hotstrings must be defined before bu, otherwise they won't get activated
 		CreateCaseSensitiveHotstrings("*", "il a mà" . ScriptInformation["MagicKey"], "il a mis à jour")
 		CreateCaseSensitiveHotstrings("*", "la mà" . ScriptInformation["MagicKey"], "la mise à jour")

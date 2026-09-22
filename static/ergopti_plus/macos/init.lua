@@ -1270,6 +1270,27 @@ if not has_common_hotstring_groups(configured_hotstrings_dir) and has_common_hot
 		configured_hotstrings_dir, hotstrings_dir)
 end
 
+-- Language packs declared by the shared index ([languages]); each category file
+-- lives at <language>/<stem>.toml and loads as the group "<language>_<stem>".
+-- Declared here, above the resolver closure below that reads them.
+local HotstringLanguages = require("hotstrings.languages")
+local language_packs  = {}
+
+--- Absolute path of one language pack's category file. The configured directory
+--- wins when it carries the pack, the bundled tree otherwise, so a user who
+--- copied the neutral packs into their own folder still gets every language.
+--- @param language string
+--- @param stem string
+--- @return string|nil
+local function language_pack_path(language, stem)
+	for _, root in ipairs({ hotstrings_dir, bundled_hotstrings_dir }) do
+		local candidate = root .. language .. "/" .. stem .. ".toml"
+		local ok_attr, attr = pcall(hs.fs.attributes, candidate)
+		if ok_attr and type(attr) == "table" and attr.mode == "file" then return candidate end
+	end
+	return nil
+end
+
 -- Initialise the hotstrings_config module so per-group delays and tooltip
 -- colors can be resolved from the TOML metadata + the shared user override
 -- file. The resolver routes the personal category through the (possibly
@@ -1290,6 +1311,14 @@ do
 			if ext_stem then
 				return config_paths.get("PersonalHotstringsDir") .. ext_stem:gsub("__", "/") .. ".toml"
 			end
+			-- Language pack groups: "<language>_<stem>" → <language>/<stem>.toml.
+			for _, pack in ipairs(language_packs) do
+				for _, stem in ipairs(pack.categories) do
+					if category == HotstringLanguages.group_id(pack.id, stem) then
+						return language_pack_path(pack.id, stem)
+					end
+				end
+			end
 			return hotstrings_dir .. category .. ".toml"
 		end,
 	})
@@ -1301,6 +1330,8 @@ do
 		cw.setup({
 			personal_dir   = config_paths.get("PersonalHotstringsDir"),
 			extensions_dir = extensions_dir,
+			-- A getter: the index is parsed further down, after this setup.
+			language_packs = function() return language_packs end,
 		})
 	end
 end
@@ -1358,9 +1389,11 @@ do
 			if type(data.modules) == "table" then
 				module_sections = data.modules
 			end
+			language_packs = HotstringLanguages.packs(data)
 		end
 	end
 end
+
 
 local toml_set = {}
 for _, fname in ipairs(safe_dir_entries(hotstrings_dir)) do
@@ -1478,8 +1511,27 @@ for _, fname in ipairs(toml_fnames) do
 	table.insert(hotfiles, name)
 	hotfile_paths[name] = hotstrings_dir .. fname
 end
-Logger.info(LOG, string.format("Loaded %d TOML hotstring file(s) in %.1fms.",
-	#toml_fnames, (hs.timer.secondsSinceEpoch() - _toml_load_t0) * 1000))
+-- Language packs after the neutral files. A declared pack whose file is missing
+-- is a broken install: it is logged as an error rather than silently absent from
+-- the menu.
+local language_file_count = 0
+for _, pack in ipairs(language_packs) do
+	for _, stem in ipairs(pack.categories) do
+		local name = HotstringLanguages.group_id(pack.id, stem)
+		local path = language_pack_path(pack.id, stem)
+		if path then
+			Logger.debug(LOG, string.format("Loading language TOML file: %s…", name))
+			keymap.load_toml(name, path)
+			table.insert(hotfiles, name)
+			hotfile_paths[name] = path
+			language_file_count = language_file_count + 1
+		else
+			Logger.error(LOG, string.format("Language pack file %s/%s.toml is missing.", pack.id, stem))
+		end
+	end
+end
+Logger.info(LOG, string.format("Loaded %d TOML hotstring file(s) and %d language file(s) in %.1fms.",
+	#toml_fnames, language_file_count, (hs.timer.secondsSinceEpoch() - _toml_load_t0) * 1000))
 -- Surface the snapshot-cache hit rate at INFO so the boot log shows whether the
 -- hotstring load took the fast (cached) path. A miss-heavy boot (e.g. right after
 -- an edit, or a stale cache dir) explains a slower "Hotstring groups registered".

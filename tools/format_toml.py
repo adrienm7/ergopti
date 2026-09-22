@@ -41,6 +41,10 @@ HOTSTRING_FILES = [
     shared("modules/hotstrings", "rolls.toml"),
     shared("modules/hotstrings", "autocorrection.toml"),
     shared("modules/hotstrings", "magickey.toml"),
+    # Language packs (declared in _index.toml [languages]).
+    shared("modules/hotstrings", "french/distancesreduction.toml"),
+    shared("modules/hotstrings", "french/autocorrection.toml"),
+    shared("modules/hotstrings", "french/magickey.toml"),
 ]
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]

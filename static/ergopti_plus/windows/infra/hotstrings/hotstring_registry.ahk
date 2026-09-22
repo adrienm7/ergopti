@@ -42,7 +42,7 @@ _PrefixWatcherTomlPath(Category) {
 			and ScriptInformation.Has("PersonalTomlPath")) {
 		return ScriptInformation["PersonalTomlPath"]
 	}
-	return _SharedDir . "\modules\hotstrings\" . LowerCat . ".toml"
+	return HotstringsBundledTomlPath(LowerCat)
 }
 
 ; Scan a category TOML and add every (trigger, output) pair to the auxiliary
@@ -301,7 +301,7 @@ _PrefixWatcherCategoryIsCached(Category) {
 	if (!IsSet(_HS_CACHE_LOADED) or !_HS_CACHE_LOADED or !IsSet(HS_BUNDLED_CATEGORIES))
 		return false
 	LowerCat := StrLower(Category)
-	for Cat in HS_BUNDLED_CATEGORIES {
+	for Cat in HotstringsBundledCategories() {
 		if (StrLower(Cat) == LowerCat)
 			return true
 	}

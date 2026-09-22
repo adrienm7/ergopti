@@ -68,7 +68,10 @@
 		"magic_key": "MagicKey",
 		"sfbs_reduction": "SFBsReduction",
 		"rolls": "Rolls",
-		"dynamic_hotstrings": "DynamicHotstrings"
+		"dynamic_hotstrings": "DynamicHotstrings",
+		"french_distancesreduction": "FrenchDistancesReduction",
+		"french_autocorrection": "FrenchAutocorrection",
+		"french_magickey": "FrenchMagicKey"
 	},
 	"top_level": [
 		{
@@ -1167,6 +1170,10 @@
 		{
 			"type": "list",
 			"id": "hotstring_categories_dynamic"
+		},
+		{
+			"type": "list",
+			"id": "hotstring_languages"
 		},
 		{
 			"type": "---"

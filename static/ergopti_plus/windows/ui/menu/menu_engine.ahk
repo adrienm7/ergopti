@@ -374,6 +374,13 @@ _ApplyMenuLabelDynamicSubstitutions(Label, V2Path) {
 				N := CountDynamicSection(V2SecId)
 				if (N > 0)
 					Label := Label . " (" . N . ")"
+			default:
+				; Language-pack categories resolve their file through the same helper.
+				if HotstringsIsLanguageGroup(V2Cat) {
+					N := CountTomlSection(V2Cat, V2SecId)
+					if (N > 0)
+						Label := Label . " (" . N . ")"
+				}
 		}
 	}
 	return Label
@@ -471,9 +478,22 @@ GetCategoryTitle(Category) {
 			return t("menu.tapholds.title")
 		case "Gestures":
 			return t("menu.gestures.title")
-		default:
-			return ""
 	}
+	; A language-pack category carries the title of the neutral category its file
+	; is named after: French « autocorrection.toml » is still « Autocorrection »,
+	; shown inside the language's own submenu.
+	for _, Pack in HotstringsLanguageCategories() {
+		for _, Cat in Pack["categories"] {
+			if (Cat["v1"] != Category)
+				continue
+			Stem := SubStr(Cat["v2"], StrLen(Pack["id"]) + 2)
+			for NeutralV1, NeutralV2 in _V1CatToV2CatMap {
+				if (StrReplace(NeutralV2, "_") == Stem)
+					return GetCategoryTitle(NeutralV1)
+			}
+		}
+	}
+	return ""
 }
 
 ; ===================================

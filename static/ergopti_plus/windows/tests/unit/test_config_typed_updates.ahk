@@ -39,7 +39,7 @@ _CTU_Roundtrip(BooleanValue, EnumValue, Duration) {
 		ConfigurationFile := Path
 		Source := Map("layout", Map("ergopti_base", BooleanValue),
 			"script", Map("alt_gr_is_kana_remap", EnumValue),
-			"hotstrings", Map("autocorrection", Map("accents",
+			"hotstrings", Map("french_autocorrection", Map("accents",
 				Map("enabled", BooleanValue, "time_activation_seconds", Duration))))
 		Updates := []
 		_CollectFeatureUpdates(Updates, "", Source)
@@ -48,7 +48,7 @@ _CTU_Roundtrip(BooleanValue, EnumValue, Duration) {
 		Target := ManifestBuildFeaturesMap()
 		Target["layout"]["ergopti_base"] := !BooleanValue
 		Target["script"]["alt_gr_is_kana_remap"] := EnumValue is String ? false : "auto"
-		Accents := Target["hotstrings"]["autocorrection"]["accents"]
+		Accents := Target["hotstrings"]["french_autocorrection"]["accents"]
 		Accents["enabled"] := !BooleanValue
 		Accents["time_activation_seconds"] := 2
 		AssertEqual(4, ApplyConfigToml(Target, Path),

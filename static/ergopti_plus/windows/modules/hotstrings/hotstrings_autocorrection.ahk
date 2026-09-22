@@ -42,15 +42,15 @@ _HS_RegisterAutocorrection() {
 	; ===== 3.1) Automatic conversion of apostrophe into a typographic one =====
 	; ==========================================================================
 
-	if Features["hotstrings"]["autocorrection"]["typographic_apostrophe"]["enabled"] {
-		LoadHotstringsSection("autocorrection", "typographic_apostrophe", Features["hotstrings"]["autocorrection"]["typographic_apostrophe"])
+	if Features["hotstrings"]["french_autocorrection"]["typographic_apostrophe"]["enabled"] {
+		LoadHotstringsSection("french_autocorrection", "typographic_apostrophe", Features["hotstrings"]["french_autocorrection"]["typographic_apostrophe"])
 
 		; Create all hotstrings y'a → y'a, y'b → y'b, etc.
 		; This prevents false positives like writing ['key'] ➜ ['key']
 		for _, Letter in StrSplit("abcdefghijklmnopqrstuvwxyz") {
 			CreateCaseSensitiveHotstrings(
 				"*?", "y'" . Letter, "y'" . Letter,
-				Map("TimeActivationSeconds", HotstringsResolve("autocorrection", "typographic_apostrophe").Delay)
+				Map("TimeActivationSeconds", HotstringsResolve("french_autocorrection", "typographic_apostrophe").Delay)
 			)
 		}
 	}
@@ -62,27 +62,27 @@ _HS_RegisterAutocorrection() {
 	; ===== 3.2) Errors autocorrection =====
 	; ======================================
 
-	if Features["hotstrings"]["autocorrection"]["errors"]["enabled"] {
-		LoadHotstringsSection("autocorrection", "errors", Features["hotstrings"]["autocorrection"]["errors"])
+	if Features["hotstrings"]["french_autocorrection"]["errors"]["enabled"] {
+		LoadHotstringsSection("french_autocorrection", "errors", Features["hotstrings"]["french_autocorrection"]["errors"])
 	}
 
-	if Features["hotstrings"]["autocorrection"]["ou"]["enabled"] {
-		LoadHotstringsSection("autocorrection", "ou", Features["hotstrings"]["autocorrection"]["ou"])
+	if Features["hotstrings"]["french_autocorrection"]["ou"]["enabled"] {
+		LoadHotstringsSection("french_autocorrection", "ou", Features["hotstrings"]["french_autocorrection"]["ou"])
 	}
 
-	if Features["hotstrings"]["autocorrection"]["multiple_punctuation_marks"]["enabled"] {
-		LoadHotstringsSection("autocorrection", "multiple_punctuation_marks", Features["hotstrings"]["autocorrection"]["multiple_punctuation_marks"])
+	if Features["hotstrings"]["french_autocorrection"]["multiple_punctuation_marks"]["enabled"] {
+		LoadHotstringsSection("french_autocorrection", "multiple_punctuation_marks", Features["hotstrings"]["french_autocorrection"]["multiple_punctuation_marks"])
 
 		; We can't use the TimeActivationSeconds here, as previous character = current character = ".".
 		; Now an HSE raw-callback hotstring (no native Hotstring()): _EllipsisRawCallback
 		; expands "..." → "…" only after a letter (otherwise it breaks code like the JS
 		; spread « [...a, ...b] ») and returns a { Bs, Ins } effect for buffer resync.
 		CreateRawCallbackHotstring("*?", "...", _EllipsisRawCallback,
-			Map("Category", "autocorrection", "Section", "multiple_punctuation_marks"))
+			Map("Category", "french_autocorrection", "Section", "multiple_punctuation_marks"))
 	}
 
-	if Features["hotstrings"]["autocorrection"]["suffixes_a_chaining"]["enabled"] {
-		LoadHotstringsSection("autocorrection", "suffixes_a_chaining", Features["hotstrings"]["autocorrection"]["suffixes_a_chaining"])
+	if Features["hotstrings"]["french_autocorrection"]["suffixes_a_chaining"]["enabled"] {
+		LoadHotstringsSection("french_autocorrection", "suffixes_a_chaining", Features["hotstrings"]["french_autocorrection"]["suffixes_a_chaining"])
 	}
 
 
@@ -92,12 +92,12 @@ _HS_RegisterAutocorrection() {
 	; ===== 3.3) Add minus sign automatically =====
 	; =============================================
 
-	if Features["hotstrings"]["autocorrection"]["minus"]["enabled"] {
-		LoadHotstringsSection("autocorrection", "minus", Features["hotstrings"]["autocorrection"]["minus"])
+	if Features["hotstrings"]["french_autocorrection"]["minus"]["enabled"] {
+		LoadHotstringsSection("french_autocorrection", "minus", Features["hotstrings"]["french_autocorrection"]["minus"])
 	}
 
-	if Features["hotstrings"]["autocorrection"]["minus_apostrophe"]["enabled"] {
-		LoadHotstringsSection("autocorrection", "minus_apostrophe", Features["hotstrings"]["autocorrection"]["minus_apostrophe"])
+	if Features["hotstrings"]["french_autocorrection"]["minus_apostrophe"]["enabled"] {
+		LoadHotstringsSection("french_autocorrection", "minus_apostrophe", Features["hotstrings"]["french_autocorrection"]["minus_apostrophe"])
 	}
 
 
@@ -134,13 +134,13 @@ _HS_RegisterAutocorrection() {
 		}
 	}
 
-	if Features["hotstrings"]["autocorrection"]["names"]["enabled"] {
-		LoadHotstringsSection("autocorrection", "names", Features["hotstrings"]["autocorrection"]["names"])
+	if Features["hotstrings"]["french_autocorrection"]["names"]["enabled"] {
+		LoadHotstringsSection("french_autocorrection", "names", Features["hotstrings"]["french_autocorrection"]["names"])
 	}
 	try BootProfile_Mark("HS sub: autocorrection registered (excl. accents)")
 
-	if Features["hotstrings"]["autocorrection"]["accents"]["enabled"] {
-		LoadHotstringsSection("autocorrection", "accents", Features["hotstrings"]["autocorrection"]["accents"])
+	if Features["hotstrings"]["french_autocorrection"]["accents"]["enabled"] {
+		LoadHotstringsSection("french_autocorrection", "accents", Features["hotstrings"]["french_autocorrection"]["accents"])
 	}
 	try BootProfile_Mark("HS sub: autocorrection.accents registered")
 }

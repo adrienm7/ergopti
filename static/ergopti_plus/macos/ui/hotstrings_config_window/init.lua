@@ -85,6 +85,7 @@ end
 local _config = {
 	personal_dir   = nil,
 	extensions_dir = nil,
+	language_packs = nil,  -- function returning the loaded language packs
 }
 
 -- Window geometry is resolved at open time from the shared manifest
@@ -130,6 +131,34 @@ local CATEGORY_LABELS = {
 	distancesreduction = i18n.get("hs_config.cat_distances"),
 	personal           = i18n.get("hs_config.cat_personal"),
 }
+
+--- The built-in categories followed by every language pack's categories, with
+--- their labels. A language category ("french_autocorrection") is labelled with
+--- the neutral category's name and the language's native name, the same row the
+--- Windows window shows. Read per window build so the list follows the index.
+--- @return table order Array of category keys.
+--- @return table labels Map of category key to label.
+local function common_categories()
+	local order, labels = {}, {}
+	for _, cat in ipairs(CATEGORY_ORDER) do
+		order[#order + 1] = cat
+		labels[cat] = CATEGORY_LABELS[cat]
+	end
+	-- The packs the driver loaded, handed over by M.setup(); a window set up
+	-- without them (the unit harness) shows the built-in categories only.
+	local packs = type(_config.language_packs) == "function" and _config.language_packs() or {}
+	local Languages = require("hotstrings.languages")
+	local names = {}
+	for _, row in ipairs(require("_generated.locale_table")) do names[row.code] = row.name end
+	for _, pack in ipairs(packs) do
+		for _, stem in ipairs(pack.categories) do
+			local key = Languages.group_id(pack.id, stem)
+			order[#order + 1] = key
+			labels[key] = (CATEGORY_LABELS[stem] or stem) .. " — " .. (names[pack.locale] or pack.locale)
+		end
+	end
+	return order, labels
+end
 
 -- Color palette offered in the "couleur" dropdown. The first six values
 -- mirror the bootstrap defaults shipped in the category TOMLs so a user
@@ -407,8 +436,9 @@ local function build_state()
 	})
 
 
-	-- 3.1) Common built-in categories
-	for _, cat in ipairs(CATEGORY_ORDER) do
+	-- 3.1) Common built-in categories, then the language packs
+	local common_order, common_labels = common_categories()
+	for _, cat in ipairs(common_order) do
 		local effective    = hotstrings_config.resolve(cat, nil)
 		local default_meta = hotstrings_config.get_toml_defaults(cat, nil)
 		local override     = hotstrings_config.get_user_override(cat, nil) or {}
@@ -416,7 +446,7 @@ local function build_state()
 
 		local entry = build_cat_entry(
 			cat,
-			CATEGORY_LABELS[cat] or cat,
+			common_labels[cat] or cat,
 			"common",
 			effective,
 			default_meta,
@@ -730,7 +760,7 @@ local function on_message(msg, owner)
 
 	-- Global bulk operations affect all common categories only
 	if action == "reset_all" then
-		for _, c in ipairs(CATEGORY_ORDER) do
+		for _, c in ipairs((common_categories())) do
 			if owner and not owner_is_current(owner) then return false end
 			if hotstrings_config.clear_override(c, nil, nil) ~= true then return false end
 			for _, s in ipairs(hotstrings_config.get_sections(c)) do
@@ -739,7 +769,7 @@ local function on_message(msg, owner)
 			end
 		end
 		if owner and not owner_is_current(owner) then return false end
-		for _, c in ipairs(CATEGORY_ORDER) do push_delay_to_engine(c) end
+		for _, c in ipairs((common_categories())) do push_delay_to_engine(c) end
 		commit_and_push(owner)
 		return true
 	end
@@ -748,7 +778,7 @@ local function on_message(msg, owner)
 		-- Set every common category's file-level colour to grey and wipe any
 		-- per-section colour override so the grey cascades down. Delays untouched.
 		local grey = "#6e6e73"
-		for _, c in ipairs(CATEGORY_ORDER) do
+		for _, c in ipairs((common_categories())) do
 			if owner and not owner_is_current(owner) then return false end
 			if hotstrings_config.set_override(c, nil, "color", grey) ~= true then return false end
 			for _, s in ipairs(hotstrings_config.get_sections(c)) do
@@ -880,6 +910,9 @@ function M.setup(opts)
 	if type(opts.extensions_dir) == "string" and opts.extensions_dir ~= "" then
 		_config.extensions_dir = opts.extensions_dir
 		Logger.debug(LOG, "Extensions dir configured: '%s'.", _config.extensions_dir)
+	end
+	if type(opts.language_packs) == "function" then
+		_config.language_packs = opts.language_packs
 	end
 end
 
