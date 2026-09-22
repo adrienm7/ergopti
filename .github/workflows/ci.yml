@@ -2911,7 +2911,11 @@ jobs:
           # whichever release comes first. The tag makes it unique per release.
           # That list page also truncates long notes, and the downloads sit after
           # the changelog, so the anchor is not there at all: the link targets the
-          # release's own page, which always renders the whole body.
+          # release's own page, which always renders the whole body. Coming from
+          # the list, GitHub opens that page client-side, and the browser never
+          # scrolls to a `name` anchor then: the first click landed at the top.
+          # GitHub's own fragment handler does scroll to an `id` (sanitized to
+          # `user-content-<id>`) when the link uses the unprefixed fragment.
           DOWNLOADS_ANCHOR="downloads-$(printf '%s' "$TAG" | tr -c 'A-Za-z0-9' '-')"
           cat >> "$body_file" << EOF
           ## Ergopti $VERSION
@@ -2920,7 +2924,7 @@ jobs:
 
           **Ergopti Plus — advanced typing tools:** the companion application adds remapping, shortcuts and text expansion.
 
-          **[⬇️ Skip to downloads & installation](https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}#user-content-${DOWNLOADS_ANCHOR})**
+          **[⬇️ Skip to downloads & installation](https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}#${DOWNLOADS_ANCHOR})**
           > Timestamps are in **Paris time** (Europe/Paris, CET/CEST).
           EOF
 
@@ -2939,7 +2943,7 @@ jobs:
 
           cat >> "$body_file" << EOF
 
-          <a name="${DOWNLOADS_ANCHOR}"></a>
+          <a id="${DOWNLOADS_ANCHOR}"></a>
 
           ## Downloads
 
