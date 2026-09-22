@@ -55,16 +55,27 @@ const host = fs.readFileSync(
 	path.join(ROOT, 'static', 'ergopti_plus', 'linux', 'ui', 'webkit_host.lua'),
 	'utf8',
 );
+// The document policy is shared with macOS; Linux must publish it, not its own.
+const documentCsp = fs.readFileSync(
+	path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'lua', 'webview', 'document_csp.lua'),
+	'utf8',
+);
 for (const required of [
 	"default-src 'none'",
-	'local connect_sources = "\'self\' file:"',
+	"connect-src 'self' file:;",
 	"object-src 'none'",
 	"frame-src 'none'",
+]) {
+	if (!documentCsp.includes(required)) fail(`document_csp.lua is missing security invariant: ${required}`);
+}
+for (const required of [
+	'require("webview.document_csp")',
+	'DocumentCsp.apply(html, nonce)',
 	'function M.bridge_for_app(app_name)',
 ]) {
 	if (!host.includes(required)) fail(`webkit_host.lua is missing security invariant: ${required}`);
 }
-if (/connect_sources\s*=\s*connect_sources\s*\.\.|https:\/\/api\.github\.com/.test(host)) {
+if (/https:\/\/api\.github\.com/.test(host) || /connect-src[^;]*https?:/.test(documentCsp)) {
 	fail('no Linux page may connect to a remote origin; the changelog bridge fetches natively');
 }
 

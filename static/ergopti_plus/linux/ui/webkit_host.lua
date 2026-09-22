@@ -253,46 +253,37 @@ end
 ---
 --- Inline script/style remain temporarily necessary because the host builds one
 --- self-contained document. Remote execution and connections are denied. The
---- separate CSP hardening finding owns migration away from unsafe-inline.
+--- policy itself is shared with macOS (_shared/lua/webview/document_csp.lua);
+--- the separate CSP hardening finding owns migration away from unsafe-inline.
 --- @param html string
 --- @param app_name string|nil Shared UI application name.
 --- @return string
 function M.inject_no_remote_csp(html, app_name)
 	if type(html) ~= "string" then return html or "" end
-	-- The source page can carry a browser-host CSP for external same-origin
-	-- assets. Linux has already inlined those assets, so retaining both policies
-	-- makes their intersection reject every script. Publish exactly one policy
-	-- for the generated document instead.
-	html = html:gsub(
-		'<meta%s+[^>]-http%-equiv%s*=%s*["\']Content%-Security%-Policy["\'][^>]*>%s*', "")
-	-- No page connects to the network: the changelog's release sources are
-	-- fetched natively by its bridge (ui/changelog/bridge.lua).
-	local connect_sources = "'self' file:"
-	local script_sources = "'unsafe-inline'"
+	-- The shared policy replaces the page's browser-host CSP (which would block
+	-- every inlined script) and denies network access: the changelog's release
+	-- sources are fetched natively by its bridge (ui/changelog/bridge.lua).
+	local nonce = nil
 	if app_name == "changelog" then
 		local handle = io.open("/dev/urandom", "rb")
 		local random = handle and handle:read(18) or nil
 		if handle then handle:close() end
 		local ok_base64, Base64 = pcall(require, "compat.base64")
-		local nonce = ok_base64 and type(random) == "string" and #random == 18
+		nonce = ok_base64 and type(random) == "string" and #random == 18
 			and Base64.encode(random) or nil
 		if type(nonce) ~= "string" or nonce == "" then
 			Logger.error(LOG, "Cannot build changelog: CSP nonce generation failed.")
 			return "<html><body><h1>Build error: CSP nonce unavailable</h1></body></html>"
 		end
-		html = html:gsub("<script([^>]*)>", function(attributes)
-			return '<script nonce="' .. nonce .. '"' .. attributes .. ">"
-		end)
-		script_sources = "'nonce-" .. nonce .. "'"
 	end
-	local policy = "default-src 'none'; base-uri 'none'; connect-src " .. connect_sources .. "; "
-		.. "font-src 'self' data:; form-action 'none'; frame-src 'none'; "
-		.. "img-src 'self' data: blob: file:; media-src 'none'; object-src 'none'; "
-		.. "script-src " .. script_sources .. "; style-src 'unsafe-inline'; worker-src 'none'"
-	local meta = '<meta http-equiv="Content-Security-Policy" content="' .. policy .. '" />'
-	return html:gsub("(<head[^>]*>)", function(tag)
-		return tag .. meta
-	end, 1)
+	-- Required here: tooling loads this module before _shared/lua is on the path.
+	local DocumentCsp = require("webview.document_csp")
+	local secured, csp_err = DocumentCsp.apply(html, nonce)
+	if not secured then
+		Logger.error(LOG, "Cannot secure the generated document: %s.", tostring(csp_err))
+		return "<html><body><h1>Build error: document policy unavailable</h1></body></html>"
+	end
+	return secured
 end
 
 -- ============================================================================
