@@ -453,17 +453,11 @@ _MR_RenderFeature(ResultMenu, Item, CategoryName) {
 ; return separator rows. One landing beside a manifest "---" drew two lines in a
 ; row under « Disposition ». The shared Lua renderer applies the same rule.
 _MR_NormalizeSeparators(TargetMenu) {
-	static MF_BYPOSITION := 0x400, MF_SEPARATOR := 0x800
-	HMENU := TargetMenu.Handle
-	Count := DllCall("GetMenuItemCount", "ptr", HMENU, "int")
-	if (Count < 0) {
-		throw OSError(A_LastError, -1, "GetMenuItemCount failed")
-	}
-	Position := 0            ; zero-based, as GetMenuState takes it
+	Count := TrayMenuItemCount(TargetMenu)
+	Position := 0            ; zero-based, as TrayMenuIsSeparatorAt takes it
 	PreviousWasSep := true   ; a leading separator counts as doubled
 	while (Position < Count) {
-		State := DllCall("GetMenuState", "ptr", HMENU, "uint", Position, "uint", MF_BYPOSITION, "uint")
-		IsSep := (State != 0xFFFFFFFF) and (State & MF_SEPARATOR) != 0
+		IsSep := TrayMenuIsSeparatorAt(TargetMenu, Position)
 		if (IsSep and PreviousWasSep) {
 			TargetMenu.Delete((Position + 1) . "&")
 			Count--
