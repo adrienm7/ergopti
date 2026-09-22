@@ -153,7 +153,7 @@ _CRE_StaleErrorCannotOverwriteNewerSuccess() {
 
 		AssertEqual(1, _CLW_Queue.Length,
 			"a stale HTTP error must not add an error paint after newer success")
-		AssertContains(_CLW_Queue[1].Js, "injectReleases(",
+		AssertContains(_CLW_Queue[1].Js, "injectReleasesJson(",
 			"the current success must remain the only terminal page mutation")
 		AssertFalse(InStr(_CLW_Queue[1].Js, "injectError(") > 0,
 			"the stale error must not overwrite a newer successful response")
@@ -166,9 +166,11 @@ Test("changelog: stale error cannot overwrite newer success (AHK-30)",
 	_CRE_StaleErrorCannotOverwriteNewerSuccess)
 
 _CRE_CurrentPollFailureAbortsAndReportsOnce() {
-	global _CLW_Queue, _CLW_ActiveRequest, _CLW_ActiveRequestEpoch
+	global _CLW_Queue, _CLW_ActiveRequest, _CLW_ActiveRequestEpoch, _CLW_FeedStarter
 
 	Previous := _CRE_InstallFixture()
+	Started := []
+	_CLW_FeedStarter := (Feed) => Started.Push(Feed)
 	try {
 		_CLW_BeginWindowSession()
 		Context := _CLW_BeginFetchRequest("dev")
@@ -178,16 +180,28 @@ _CRE_CurrentPollFailureAbortsAndReportsOnce() {
 
 		_CLW_PollFetch(Request, Context, 0)
 		AssertEqual(1, Request.AbortCount,
-			"a WinHTTP poll exception must explicitly abort the owned request")
+			"a transport poll exception must explicitly abort the owned request")
 		AssertEqual(0, _CLW_ActiveRequest,
-			"the terminal failure must release the active request object")
+			"the failure must release the active request object")
 		AssertEqual(0, _CLW_ActiveRequestEpoch,
-			"the terminal failure must release the active request epoch")
+			"the failure must release the active request epoch")
+		AssertEqual(1, Started.Length,
+			"a failed API request must start exactly one Atom feed request")
+		AssertEqual(0, _CLW_Queue.Length,
+			"the page keeps loading while the alternate source runs")
+
+		FeedRequest := _CRE_Request(0, "", false, true)
+		AssertTrue(_CLW_RegisterActiveRequest(Started[1], FeedRequest),
+			"the feed request must own the active slot under the same epoch")
+		_CLW_PollFetch(FeedRequest, Started[1], 0)
+		AssertEqual(1, FeedRequest.AbortCount,
+			"a failing feed transport must be aborted too")
 		AssertEqual(1, _CLW_Queue.Length,
-			"the current failure must report exactly one visible terminal result")
+			"the exhausted load must report exactly one visible terminal result")
 		AssertContains(_CLW_Queue[1].Js, "injectError(",
-			"the current failure must still reach the page after ownership cleanup")
+			"the exhausted load must reach the page after ownership cleanup")
 	} finally {
+		_CLW_FeedStarter := 0
 		_CRE_RestoreFixture(Previous)
 	}
 }

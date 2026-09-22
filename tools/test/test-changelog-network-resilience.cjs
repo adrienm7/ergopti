@@ -263,6 +263,36 @@ function checkSharedBudgets() {
 		sources.atom_feed_url === 'https://github.com/{owner}/{repo}/releases.atom',
 		'the alternate source must be the github.com Atom feed, reachable when only the API is blocked'
 	);
+	// AHK cannot read JSON at include time; its literals are pinned here.
+	const ahkChangelog = fs.readFileSync(
+		path.join(PLUS, 'windows', 'ui', 'changelog', 'init.ahk'),
+		'utf8'
+	);
+	const ahkHttp = fs.readFileSync(path.join(PLUS, 'windows', 'adapters', 'http_client.ahk'), 'utf8');
+	const ahkLiteral = (source, name) => {
+		const match = new RegExp(`global ${name}\\s*:=\\s*("([^"]*)"|(\\d+))`).exec(source);
+		return match ? (match[2] !== undefined ? match[2] : Number(match[3])) : undefined;
+	};
+	expect(
+		ahkLiteral(ahkChangelog, 'CHANGELOG_API_URL_TEMPLATE') === sources.api_releases_url,
+		'the Windows API URL template must mirror release_sources.api_releases_url'
+	);
+	expect(
+		ahkLiteral(ahkChangelog, 'CHANGELOG_FEED_URL_TEMPLATE') === sources.atom_feed_url,
+		'the Windows feed URL template must mirror release_sources.atom_feed_url'
+	);
+	expect(
+		ahkLiteral(ahkChangelog, 'CHANGELOG_SOURCE_TIMEOUT_MS') === sources.source_timeout_sec * 1000,
+		'the Windows per-source budget must mirror release_sources.source_timeout_sec'
+	);
+	expect(
+		ahkLiteral(ahkChangelog, 'CHANGELOG_CONNECT_TIMEOUT_MS') < sources.source_timeout_sec * 1000,
+		'the Windows connect budget must leave time for the transfer'
+	);
+	expect(
+		ahkLiteral(ahkHttp, 'SYSTEM_PROXY_RESOLVE_TIMEOUT_MS') === sources.proxy_resolve_timeout_sec * 1000,
+		'the Windows PAC budget must mirror release_sources.proxy_resolve_timeout_sec'
+	);
 	const index = fs.readFileSync(path.join(CHANGELOG, 'index.html'), 'utf8');
 	expect(
 		index.indexOf('src="../markdown.js"') < index.indexOf('src="atom_feed.js"') &&

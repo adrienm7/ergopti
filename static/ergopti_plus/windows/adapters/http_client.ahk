@@ -60,6 +60,15 @@ global _HTTP_CURL_CLEANUP_TIMER := 0
 ; ShellRunner handle must survive callers that drop their local reference.
 global _HTTP_CURL_ABORT_DEBTS := Map()
 global _HTTP_CURL_ABORT_TIMER := 0
+; curl.exe ignores the Windows (WinINet) proxy that browsers and WebView2 use,
+; so a proxy-only corporate network saw every curl request fail while GitHub
+; worked in the browser. Mirrors release_sources.proxy_resolve_timeout_sec in
+; _shared/modules/updater/defaults.json (pinned by the JS drift gate).
+global SYSTEM_PROXY_RESOLVE_TIMEOUT_MS := 10000
+; PAC answers resolved this session, keyed by lower-case host ("" = direct).
+global _SYSTEM_PROXY_PAC_CACHE := Map()
+; Every waiter of the in-flight PAC resolution (0 = none running).
+global _SYSTEM_PROXY_PAC_PENDING := 0
 
 
 
@@ -244,6 +253,7 @@ class CurlAsyncRequest {
 		this.Method := ""
 		this.Url := ""
 		this.Headers := Map()
+		this.Proxy := ""
 		this.ConnectTimeoutMs := 5000
 		this.TotalTimeoutMs := 30000
 		this.Handle := 0
@@ -276,6 +286,14 @@ class CurlAsyncRequest {
 		if !_HTTP_CurlScalarIsSafe(Name) || !_HTTP_CurlScalarIsSafe(Value)
 			throw ValueError("HTTP header contains a control character.")
 		this.Headers[String(Name)] := String(Value)
+	}
+
+	; Routes the request through an explicit proxy URL ("" = direct). Proxy
+	; authentication uses the signed-in Windows account (SSPI), like a browser.
+	SetProxy(Proxy) {
+		if !(Proxy is String) || (Proxy != "" && !SystemProxy_IsValidProxyUrl(Proxy))
+			throw ValueError("HTTP proxy must be an http, https or socks URL.")
+		this.Proxy := Proxy
 	}
 
 	SetTimeouts(ResolveMs, ConnectMs, SendMs, ReceiveMs) {
@@ -311,6 +329,15 @@ class CurlAsyncRequest {
 		Config .= "max-filesize = " . HTTP_CURL_MAX_RESPONSE_BYTES . "`n"
 		Config .= "dump-header = " . _HTTP_CurlConfigQuote(this.HeaderPath) . "`n"
 		Config .= "output = " . _HTTP_CurlConfigQuote("-") . "`n"
+		; Schannel treats an unreachable revocation server as a TLS failure. A
+		; corporate TLS-inspection CA often publishes none reachable from the
+		; client, so check revocation best-effort, as browsers do.
+		Config .= "ssl-revoke-best-effort`n"
+		if (this.Proxy != "") {
+			Config .= "proxy = " . _HTTP_CurlConfigQuote(this.Proxy) . "`n"
+			Config .= "proxy-anyauth`n"
+			Config .= "proxy-user = " . _HTTP_CurlConfigQuote(":") . "`n"
+		}
 		for Name, Value in this.Headers
 			Config .= "header = "
 				. _HTTP_CurlConfigQuote(Name . ": " . Value) . "`n"
@@ -513,7 +540,260 @@ class CurlAsyncRequest {
 
 ; =======================================================
 ; =======================================================
-; ======= 2/ Adapter Methods ============================
+; ======= 2/ System Proxy ===============================
+; =======================================================
+; =======================================================
+
+; Returns whether a proxy URL is one curl accepts in its config file.
+SystemProxy_IsValidProxyUrl(Url) {
+	return (Url is String)
+		&& RegExMatch(Url, "i)^(https?|socks4a?|socks5h?)://[A-Za-z0-9._-]+(:\d{1,5})?$") > 0
+}
+
+; Reads the signed-in user's Windows proxy settings (the WinINet settings that
+; Edge, WebView2 and Internet Options share). Returns a Map with auto_detect,
+; pac_url, proxy and bypass. A user without saved settings has none.
+SystemProxy_ReadIEConfig() {
+	Buf := Buffer(A_PtrSize * 4, 0)
+	if !DllCall("winhttp\WinHttpGetIEProxyConfigForCurrentUser", "Ptr", Buf, "Int") {
+		LastError := A_LastError
+		if (LastError == 2)
+			return Map("auto_detect", false, "pac_url", "", "proxy", "", "bypass", "")
+		throw OSError(LastError, -1, "WinHttpGetIEProxyConfigForCurrentUser")
+	}
+	Config := Map("auto_detect", NumGet(Buf, 0, "Int") != 0)
+	; BOOL is padded to pointer alignment, so the strings follow at pointer strides.
+	for Index, Name in ["pac_url", "proxy", "bypass"] {
+		Ptr := NumGet(Buf, A_PtrSize * Index, "Ptr")
+		Config[Name] := Ptr ? StrGet(Ptr, "UTF-16") : ""
+		if Ptr
+			DllCall("GlobalFree", "Ptr", Ptr, "Ptr")
+	}
+	return Config
+}
+
+; Returns the scheme and lower-case host of an absolute http(s) URL.
+_SystemProxy_UrlParts(Url) {
+	if !(Url is String) || !RegExMatch(Url, "i)^(https?)://([A-Za-z0-9.-]+)(?::\d+)?(?:[/?#]|$)", &M)
+		throw ValueError("System proxy selection requires an absolute http(s) URL.", -1, Url)
+	return Map("scheme", StrLower(M[1]), "host", StrLower(M[2]))
+}
+
+; Adds the scheme WinINet omits ("host:port" means an HTTP proxy) and
+; validates the result. Returns "" for an entry curl could not use.
+_SystemProxy_NormalizeEndpoint(Endpoint, DefaultScheme) {
+	Endpoint := RegExReplace(Trim(Endpoint), "/+$")
+	if !RegExMatch(Endpoint, "i)^[a-z0-9]+://")
+		Endpoint := DefaultScheme . "://" . Endpoint
+	if SystemProxy_IsValidProxyUrl(Endpoint)
+		return Endpoint
+	try LoggerWarn("HttpClient", "Ignoring a system proxy entry curl cannot use.")
+	return ""
+}
+
+; Selects the proxy for one scheme from a WinINet proxy list: either one
+; "host:port" for every scheme or "http=h:p;https=h:p;socks=h:p".
+SystemProxy_ParseProxyList(List, Scheme) {
+	Generic := ""
+	Specific := ""
+	Socks := ""
+	for Entry in StrSplit(Trim(List), [";", " "]) {
+		Entry := Trim(Entry)
+		if (Entry == "")
+			continue
+		if RegExMatch(Entry, "^([A-Za-z]+)=(.+)$", &M) {
+			Key := StrLower(M[1])
+			if (Key == Scheme)
+				Specific := M[2]
+			else if (Key == "socks")
+				Socks := M[2]
+		} else if (Generic == "") {
+			Generic := Entry
+		}
+	}
+	Chosen := (Specific != "") ? Specific : Generic
+	if (Chosen != "")
+		return _SystemProxy_NormalizeEndpoint(Chosen, "http")
+	if (Socks != "")
+		return _SystemProxy_NormalizeEndpoint(Socks, "socks4a")
+	return ""
+}
+
+; Applies the WinINet bypass list: "<local>" matches dot-less hosts and "*"
+; is a wildcard, both case-insensitive.
+SystemProxy_IsBypassed(Bypass, Host) {
+	Host := StrLower(Host)
+	for Pattern in StrSplit(Bypass, [";", " ", ","]) {
+		Pattern := StrLower(Trim(Pattern))
+		if (Pattern == "")
+			continue
+		if (Pattern == "<local>") {
+			if !InStr(Host, ".")
+				return true
+			continue
+		}
+		Pattern := RegExReplace(Pattern, "^[a-z]+://")
+		Rx := "^" . StrReplace(RegExReplace(Pattern, "[.+?^$(){}\[\]|\\]", "\$0"), "*", ".*") . "$"
+		if RegExMatch(Host, Rx)
+			return true
+	}
+	return false
+}
+
+; Static selection for one URL. "pac" reports that a PAC script governs the
+; URL; its answer then overrides the static proxy once resolved.
+SystemProxy_SelectStatic(Config, Url) {
+	Parts := _SystemProxy_UrlParts(Url)
+	Proxy := ""
+	if (Config["proxy"] != "" && !SystemProxy_IsBypassed(Config["bypass"], Parts["host"]))
+		Proxy := SystemProxy_ParseProxyList(Config["proxy"], Parts["scheme"])
+	return Map("proxy", Proxy, "pac", Config["pac_url"] != "")
+}
+
+; Reads the settings, logging and degrading to a direct connection when the
+; OS refuses them.
+_SystemProxy_Config(ReaderFn := 0) {
+	try return IsObject(ReaderFn) ? ReaderFn.Call() : SystemProxy_ReadIEConfig()
+	catch as Err {
+		try LoggerWarn("HttpClient", "Windows proxy settings unreadable ({1}); connecting directly.", Err.Message)
+		return Map("auto_detect", false, "pac_url", "", "proxy", "", "bypass", "")
+	}
+}
+
+; Best proxy known now for Url without waiting: a PAC answer already resolved
+; this session, otherwise the static setting. A PAC script not yet evaluated
+; for the host is resolved in the background for the next request.
+SystemProxy_ForUrl(Url, ReaderFn := 0, SpawnFn := 0) {
+	global _SYSTEM_PROXY_PAC_CACHE
+	; WinINet proxies only govern http(s); any other scheme connects as given.
+	if !(Url is String) || !RegExMatch(Url, "i)^https?://")
+		return ""
+	Selection := SystemProxy_SelectStatic(_SystemProxy_Config(ReaderFn), Url)
+	Host := _SystemProxy_UrlParts(Url)["host"]
+	if !Selection["pac"]
+		return Selection["proxy"]
+	if _SYSTEM_PROXY_PAC_CACHE.Has(Host)
+		return _SYSTEM_PROXY_PAC_CACHE[Host]
+	SystemProxy_ResolveAsync([Url], (*) => 0, ReaderFn, SpawnFn)
+	return Selection["proxy"]
+}
+
+; Resolves the proxy of every URL, running the configured PAC script when one
+; governs them, then calls Callback(Map url -> proxy) exactly once. PAC is
+; evaluated by .NET in a tree-owned PowerShell child bounded by
+; SYSTEM_PROXY_RESOLVE_TIMEOUT_MS, so the keyboard thread never waits on the
+; PAC download. A failed resolution is logged and keeps the static selection.
+; Automatic detection (WPAD) alone is not probed: it is Windows' default on
+; home machines, where it would cost a child process for a direct answer.
+SystemProxy_ResolveAsync(Urls, Callback, ReaderFn := 0, SpawnFn := 0) {
+	global _SYSTEM_PROXY_PAC_CACHE, _SYSTEM_PROXY_PAC_PENDING
+	Config := _SystemProxy_Config(ReaderFn)
+	Result := Map()
+	Missing := []
+	for Url in Urls {
+		Selection := SystemProxy_SelectStatic(Config, Url)
+		Result[Url] := Selection["proxy"]
+		if !Selection["pac"]
+			continue
+		Host := _SystemProxy_UrlParts(Url)["host"]
+		if _SYSTEM_PROXY_PAC_CACHE.Has(Host)
+			Result[Url] := _SYSTEM_PROXY_PAC_CACHE[Host]
+		else
+			Missing.Push(Url)
+	}
+	if (Missing.Length == 0) {
+		Callback.Call(Result)
+		return true
+	}
+	Waiter := { Urls: Urls, Result: Result, Callback: Callback }
+	if IsObject(_SYSTEM_PROXY_PAC_PENDING) {
+		_SYSTEM_PROXY_PAC_PENDING.Waiters.Push(Waiter)
+		return true
+	}
+	Origins := []
+	for Url in Missing
+		Origins.Push("https://" . _SystemProxy_UrlParts(Url)["host"] . "/")
+	PacRun := { Origins: Origins, Waiters: [Waiter], Handle: 0, Done: false }
+	_SYSTEM_PROXY_PAC_PENDING := PacRun
+	try LoggerStart("HttpClient", "Resolving the Windows PAC proxy for {1} host(s)…", Origins.Length)
+	Script := "$w=[System.Net.WebRequest]::GetSystemWebProxy();"
+	for Origin in Origins
+		Script .= "[Console]::Out.WriteLine($w.GetProxy([Uri]'" . Origin . "').AbsoluteUri);"
+	Exe := A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe"
+	Args := ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", Script]
+	OnDone := _SystemProxy_FinishPac.Bind(PacRun)
+	try {
+		PacRun.Handle := IsObject(SpawnFn)
+			? SpawnFn.Call(Exe, Args, OnDone)
+			: ShellRunner_SpawnTreeOwned(Exe, Args, OnDone, 0, 0, 65536)
+		if !(IsObject(PacRun.Handle) && PacRun.Handle.start())
+			throw Error("the PowerShell child did not start")
+	} catch as Err {
+		_SystemProxy_FinishPac(PacRun, -1, "", "spawn failed: " . Err.Message)
+		return true
+	}
+	SetTimer(_SystemProxy_PacDeadline.Bind(PacRun), -SYSTEM_PROXY_RESOLVE_TIMEOUT_MS)
+	return true
+}
+
+_SystemProxy_PacDeadline(PacRun) {
+	if PacRun.Done
+		return
+	try PacRun.Handle.terminate()
+	catch as Err
+		try LoggerWarn("HttpClient", "The timed-out PAC resolver could not be terminated: {1}.", Err.Message)
+	_SystemProxy_FinishPac(PacRun, -1, "", "timed out after " . SYSTEM_PROXY_RESOLVE_TIMEOUT_MS . " ms")
+}
+
+; Completes one PAC run: caches every usable answer and releases all waiters.
+_SystemProxy_FinishPac(PacRun, ExitCode, Stdout, Stderr) {
+	global _SYSTEM_PROXY_PAC_CACHE, _SYSTEM_PROXY_PAC_PENDING
+	if PacRun.Done
+		return
+	PacRun.Done := true
+	if (_SYSTEM_PROXY_PAC_PENDING == PacRun)
+		_SYSTEM_PROXY_PAC_PENDING := 0
+	Lines := StrSplit(Trim(StrReplace(Stdout, "`r", ""), "`n"), "`n")
+	Resolved := (ExitCode == 0 && Lines.Length == PacRun.Origins.Length)
+	if Resolved {
+		for Index, Origin in PacRun.Origins {
+			Answer := RegExReplace(Trim(Lines[Index]), "/+$")
+			if (Answer == RegExReplace(Origin, "/+$")) {
+				Proxy := ""
+			} else {
+				Proxy := _SystemProxy_NormalizeEndpoint(Answer, "http")
+				if (Proxy == "") {
+					Resolved := false
+					break
+				}
+			}
+			_SYSTEM_PROXY_PAC_CACHE[_SystemProxy_UrlParts(Origin)["host"]] := Proxy
+		}
+	}
+	if Resolved {
+		try LoggerSuccess("HttpClient", "Windows PAC proxy resolved for {1} host(s).", PacRun.Origins.Length)
+	} else {
+		try LoggerDone("HttpClient", "Windows PAC proxy resolution failed (exit {1}: {2}); using the static proxy settings.",
+			ExitCode, SubStr(Trim(Stderr), 1, 200))
+	}
+	for Waiter in PacRun.Waiters {
+		for Url in Waiter.Urls {
+			Host := _SystemProxy_UrlParts(Url)["host"]
+			if _SYSTEM_PROXY_PAC_CACHE.Has(Host)
+				Waiter.Result[Url] := _SYSTEM_PROXY_PAC_CACHE[Host]
+		}
+		try Waiter.Callback.Call(Waiter.Result)
+		catch as Err
+			LoggerError("HttpClient", "System proxy callback threw: {1}.", Err.Message)
+	}
+}
+
+
+
+
+; =======================================================
+; =======================================================
+; ======= 3/ Adapter Methods ============================
 ; =======================================================
 ; =======================================================
 

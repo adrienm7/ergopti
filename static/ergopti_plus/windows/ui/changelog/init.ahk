@@ -10,9 +10,11 @@
 ;
 ; FEATURES & RATIONALE:
 ; 1. Shared assets: no duplicated UI code between Windows and macOS.
-; 2. Native fetch bridge: AHK fetches GitHub releases via WinHTTP and injects
-;    them with ExecuteScript("injectReleases(...)") so the page never makes
-;    its own network call (corporate-proxy safe).
+; 2. Native fetch bridge: AHK fetches GitHub releases in a curl child routed
+;    through the Windows proxy (static or PAC), trying the API and then the
+;    public Atom feed, and hands the text to the page as a JS string
+;    (injectReleasesJson / injectReleasesFeed) so the page never makes its own
+;    network call and never evaluates a response.
 ; 3. JS bridge: chrome.webview.postMessage is used by the page to request
 ;    channel changes and to open URLs in the default browser.
 ; 4. Singleton: a second call while the window is already open brings it to
@@ -63,6 +65,19 @@ global _CLW_ResetDone  := false
 global CHANGELOG_VHOST := "ergopti.changelog"   ; -> _SharedDir
 ; COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_ALLOW.
 global CHANGELOG_HOST_ACCESS_ALLOW := 1
+
+; Release sources, tried in order: the REST API, then the public Atom feed on
+; github.com, which corporate proxies usually leave reachable when they block
+; or throttle api.github.com. Mirrors release_sources in
+; _shared/modules/updater/defaults.json (pinned by
+; tools/test/test-changelog-network-resilience.cjs).
+global CHANGELOG_API_URL_TEMPLATE  := "https://api.github.com/repos/{owner}/{repo}/releases?per_page=20"
+global CHANGELOG_FEED_URL_TEMPLATE := "https://github.com/{owner}/{repo}/releases.atom"
+global CHANGELOG_SOURCE_TIMEOUT_MS := 15000
+; Share of the source budget allowed for DNS, proxy and TCP/TLS connection.
+global CHANGELOG_CONNECT_TIMEOUT_MS := 10000
+; Test seam: replaces the deferred start of the Atom feed request (0 = SetTimer).
+global _CLW_FeedStarter := 0
 
 
 
@@ -547,30 +562,41 @@ _CLW_FetchAndInject(Channel, Request := unset, ExpectedWindowEpoch := 0) {
 	return true
 }
 
-_CLW_DoFetch(Context) {
+_CLW_DoFetch(Context, Proxy := unset) {
 	global UPDATER_GH_OWNER, UPDATER_GH_REPO
-	global UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS
-	global UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS
+	global CHANGELOG_SOURCE_TIMEOUT_MS, CHANGELOG_CONNECT_TIMEOUT_MS
+	global UPDATER_HTTP_RESOLVE_TIMEOUT_MS
 	if !_CLW_RequestIsCurrent(Context)
 		return
 	Channel := Context.Channel
+	Url := _CLW_SourceUrl(Context.Stage)
 
-	try LoggerTrace("Changelog", "Fetching releases (channel={1})…", Channel)
+	; curl ignores the Windows proxy; resolve it first (static settings answer at
+	; once, a PAC script in a bounded child) and re-enter with the answer.
+	if !IsSet(Proxy) {
+		SystemProxy_ResolveAsync([Url],
+			(Resolved) => _CLW_DoFetch(Context, Resolved[Url]))
+		return
+	}
 
-	Url := "https://api.github.com/repos/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO . "/releases?per_page=20"
+	try LoggerTrace("Changelog", "Fetching releases from {1} (channel={2}, proxy={3})…",
+		Context.Stage, Channel, Proxy == "" ? "direct" : "system")
 
 	try {
 		Req := CurlAsyncRequest()
 		; The child owns DNS, connect, Send and response wait. Completion is
 		; harvested via the existing non-blocking SetTimer poll.
 		Req.Open("GET", Url, true)
-		Req.SetRequestHeader("Accept", "application/vnd.github+json")
+		Req.SetRequestHeader("Accept", Context.Stage == "feed"
+			? "application/atom+xml" : "application/vnd.github+json")
 		Req.SetRequestHeader("User-Agent", "ErgoptiPlus-Changelog/1.0")
-		; Resolve timeout was 0 (infinite) — on a captive network this would stall
-		; the timer thread indefinitely, blocking all subsequent timer callbacks.
-		; Reuse the shared updater constants so all network calls have the same budget.
-		Req.SetTimeouts(UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS,
-			UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS)
+		Req.SetProxy(Proxy)
+		; One bounded budget per source: connection within
+		; CHANGELOG_CONNECT_TIMEOUT_MS, the whole transfer within
+		; CHANGELOG_SOURCE_TIMEOUT_MS, so the page watchdog outlasts both sources.
+		Req.SetTimeouts(UPDATER_HTTP_RESOLVE_TIMEOUT_MS,
+			CHANGELOG_CONNECT_TIMEOUT_MS - UPDATER_HTTP_RESOLVE_TIMEOUT_MS, 0,
+			CHANGELOG_SOURCE_TIMEOUT_MS - CHANGELOG_CONNECT_TIMEOUT_MS)
 		; Publish ownership immediately before Send.  A superseding fetch or a
 		; close can now abort this exact request even if Send pumps messages.
 		if !_CLW_RegisterActiveRequest(Context, Req) {
@@ -582,9 +608,7 @@ _CLW_DoFetch(Context) {
 		_CLW_ReleaseActiveRequest(Context)
 		if !_CLW_RequestIsCurrent(Context)
 			return
-		try LoggerWarn("Changelog", "GitHub API request failed: {1}.", Err.Message)
-		ErrMsg := _CLW_JsStr(t("changelog_window.error_network"))
-		_CLW_Eval("injectError(" . ErrMsg . ")", Context)
+		_CLW_SourceFailed(Context, 0, "dispatch failed: " . Err.Message)
 		return
 	}
 	if !_CLW_RequestIsCurrent(Context) {
@@ -597,13 +621,75 @@ _CLW_DoFetch(Context) {
 	_CLW_PollFetch(Req, Context, 0)
 }
 
+/**
+ * Expands the URL of one release source from the repository identity.
+ * @param {string} Stage - "api" or "feed".
+ * @returns {string}
+ */
+_CLW_SourceUrl(Stage) {
+	global UPDATER_GH_OWNER, UPDATER_GH_REPO
+	global CHANGELOG_API_URL_TEMPLATE, CHANGELOG_FEED_URL_TEMPLATE
+	Template := (Stage == "feed") ? CHANGELOG_FEED_URL_TEMPLATE : CHANGELOG_API_URL_TEMPLATE
+	return StrReplace(StrReplace(Template, "{owner}", UPDATER_GH_OWNER), "{repo}", UPDATER_GH_REPO)
+}
+
+/**
+ * Validates one completed response. A proxy block page served with HTTP 200
+ * is a failure, not data.
+ * @returns {string} "" when usable, otherwise the failure reason.
+ */
+_CLW_ClassifySource(Stage, Status, Body) {
+	if (Status != 200)
+		return (Status == 0) ? "no HTTP response (network, proxy or timeout)" : "HTTP " . Status
+	if !(Body is String)
+		return "HTTP 200 without a body"
+	if (Stage == "feed")
+		return RegExMatch(Body, "<feed[\s>]") ? "" : "HTTP 200 without an Atom feed"
+	return RegExMatch(Body, "^\x{FEFF}?\s*\[[\s\S]*\]\s*$") ? "" : "HTTP 200 without a JSON release array"
+}
+
+/**
+ * Routes a failed source: the API falls back to the Atom feed, the feed ends
+ * the load with a visible, translated error.
+ */
+_CLW_SourceFailed(Context, Status, Reason) {
+	global _CLW_FeedStarter
+	Channel := Context.Channel
+	if (Context.Stage == "api") {
+		try LoggerWarn("Changelog", "GitHub API release list failed ({1}); trying the Atom feed (channel={2}).",
+			Reason, Channel)
+		Feed := {
+			WindowEpoch: Context.WindowEpoch,
+			RequestEpoch: Context.RequestEpoch,
+			Channel: Channel,
+			Request: Context.Request,
+			Stage: "feed",
+			ApiFailure: Reason,
+			ApiStatus: Status
+		}
+		if IsObject(_CLW_FeedStarter)
+			_CLW_FeedStarter.Call(Feed)
+		else
+			SetTimer(_CLW_DoFetch.Bind(Feed), -1)
+		return
+	}
+	try LoggerWarn("Changelog", "Release sources exhausted: API failed ({1}), Atom feed failed ({2}) (channel={3}).",
+		Context.ApiFailure, Reason, Channel)
+	; A rate-limit is not an outage, and telling the user to check their
+	; connection sends them after the wrong problem.
+	ErrKey := (Context.ApiStatus == 403 or Context.ApiStatus == 429)
+		? "changelog_window.error_rate_limited"
+		: "changelog_window.error_network"
+	_CLW_Eval("injectError(" . _CLW_JsStr(t(ErrKey)) . ")", Context)
+}
+
 ; Non-blocking completion poll for one in-flight async changelog fetch. Asks
-; WinHTTP "is the response ready?" via WaitForResponse(0) (0 = do not wait) and
-; re-arms itself until ready, then harvests ResponseText and injects it. The
-; poll budget mirrors the updater's so a wedged request can never leave a timer
-; running forever.
+; the curl transport "is the response ready?" via WaitForResponse(0) (0 = do
+; not wait) and re-arms itself until ready, then harvests ResponseText and
+; either injects it or routes the failure. The poll budget follows the source
+; budget so a wedged request can never leave a timer running forever.
 _CLW_PollFetch(Req, Context, Polls) {
-	global UPDATER_ASYNC_POLL_MS, UPDATER_ASYNC_MAX_POLLS
+	global UPDATER_ASYNC_POLL_MS, CHANGELOG_SOURCE_TIMEOUT_MS
 	if !_CLW_RequestIsCurrent(Context) {
 		_CLW_AbortRequest(Req)
 		_CLW_ReleaseActiveRequest(Context)
@@ -613,12 +699,12 @@ _CLW_PollFetch(Req, Context, Polls) {
 
 	ready  := false
 	failed := false
+	Reason := ""
 	try {
 		ready := Req.WaitForResponse(0)
 	} catch as Err {
 		failed := true
-		if _CLW_RequestIsCurrent(Context)
-			try LoggerWarn("Changelog", "GitHub API request failed: {1}.", Err.Message)
+		Reason := "transport failed: " . Err.Message
 	}
 	if !_CLW_RequestIsCurrent(Context) {
 		_CLW_AbortRequest(Req)
@@ -630,9 +716,9 @@ _CLW_PollFetch(Req, Context, Polls) {
 
 	if (!failed and !ready) {
 		Polls += 1
-		if (Polls > UPDATER_ASYNC_MAX_POLLS) {
+		if (Polls > Ceil(CHANGELOG_SOURCE_TIMEOUT_MS / UPDATER_ASYNC_POLL_MS) + 20) {
 			failed := true
-			try LoggerWarn("Changelog", "GitHub API request exceeded its poll budget — aborting.")
+			Reason := "poll budget exceeded"
 			_CLW_AbortRequest(Req)
 		} else {
 			SetTimer(_CLW_PollFetch.Bind(Req, Context, Polls), -UPDATER_ASYNC_POLL_MS)
@@ -645,11 +731,12 @@ _CLW_PollFetch(Req, Context, Polls) {
 	if !failed {
 		try {
 			Status := Req.Status
-			if (Status == 200)
-				Json := Req.ResponseText
+			Body := Req.ResponseText
+			Reason := _CLW_ClassifySource(Context.Stage, Status, Body)
+			if (Reason == "")
+				Json := Body
 		} catch as Err {
-			if _CLW_RequestIsCurrent(Context)
-				try LoggerWarn("Changelog", "GitHub API response read failed: {1}.", Err.Message)
+			Reason := "response read failed: " . Err.Message
 		}
 	}
 	_CLW_ReleaseActiveRequest(Context)
@@ -657,27 +744,25 @@ _CLW_PollFetch(Req, Context, Polls) {
 		return
 
 	if (Json == "") {
-		; Every non-200 used to leave through here in complete silence: the
-		; request had succeeded, so none of the catches above fired, and the
-		; status was tested but never captured. The user was shown a network
-		; error for what is most often a 403 rate-limit, and the log — which had
-		; opened a lifecycle line for this fetch — recorded nothing at all.
-		try LoggerWarn("Changelog", "GitHub API returned HTTP {1} — no releases injected (channel={2}).",
-			Status, Channel)
-		; A rate-limit is not an outage, and telling the user to check their
-		; connection sends them after the wrong problem.
-		ErrKey := (Status == 403 or Status == 429)
-			? "changelog_window.error_rate_limited"
-			: "changelog_window.error_network"
-		ErrMsg := _CLW_JsStr(t(ErrKey))
-		_CLW_Eval("injectError(" . ErrMsg . ")", Context)
+		; A non-200 used to leave in silence; the HTTP status is what separates a
+		; 403 rate-limit from a proxy refusal or an outage, so it is always logged.
+		try LoggerWarn("Changelog", "Release source {1} returned HTTP {2}: {3} (channel={4}).",
+			Context.Stage, Status, Reason, Channel)
+		_CLW_SourceFailed(Context, Status, Reason)
 		return
 	}
 
-	; Pass the raw JSON array to the JS side; injectReleases filters pre-releases
-	; for the "main" channel. Doing it in JS avoids a fragile AHK JSON parser.
-	try LoggerDone("Changelog", "Injecting releases (channel={1})…", Channel)
-	_CLW_Eval("injectReleases(" . Json . "," . _CLW_JsStr(Channel) . ")", Context)
+	; The text crosses into the page as a JS string literal and is parsed there
+	; (JSON.parse or the Atom reader); a response is never evaluated as script.
+	; injectReleases* filters pre-releases for the "main" channel.
+	if (Context.Stage == "feed") {
+		try LoggerDone("Changelog", "Injecting releases from the Atom feed (channel={1}; API failed: {2})…",
+			Channel, Context.ApiFailure)
+		_CLW_Eval("injectReleasesFeed(" . _CLW_JsStr(Json) . "," . _CLW_JsStr(Channel) . ")", Context)
+		return
+	}
+	try LoggerDone("Changelog", "Injecting releases from the GitHub API (channel={1})…", Channel)
+	_CLW_Eval("injectReleasesJson(" . _CLW_JsStr(Json) . "," . _CLW_JsStr(Channel) . ")", Context)
 }
 
 
@@ -803,7 +888,10 @@ _CLW_BeginFetchRequest(Channel, Request := unset, ExpectedWindowEpoch := 0) {
 			WindowEpoch: _CLW_WindowEpoch,
 			RequestEpoch: _CLW_RequestEpoch,
 			Channel: Channel,
-			Request: Request
+			Request: Request,
+			Stage: "api",
+			ApiFailure: "",
+			ApiStatus: 0
 		}
 	} finally {
 		Critical(PreviousCritical)
