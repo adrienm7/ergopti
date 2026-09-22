@@ -1056,6 +1056,52 @@ function M.disable_all()
 	return changed
 end
 
+--- The categories whose gate is closed, as a sorted list.
+---
+--- For the global « Disable all », which closes every gate and must give the
+--- user back exactly the gates they had open. Section choices are not part of
+--- it: disable_all never touches them.
+--- @return table Sorted array of category ids.
+function M.closed_category_gates()
+	local closed = {}
+	for id in pairs(_categories) do
+		if _disabled_groups[id] then closed[#closed + 1] = id end
+	end
+	table.sort(closed)
+	return closed
+end
+
+--- Opens every category gate except the listed ones, in one commit and one
+--- reload. Section choices are left exactly as they are, unlike enable_all,
+--- which also switches every bundled section on.
+--- @param closed table Array of category ids whose gate stays closed.
+--- @return boolean True when the gates were committed.
+function M.restore_category_gates(closed)
+	if type(closed) ~= "table" then
+		Logger.error(LOG, "Category gates to restore must be a list — nothing changed.")
+		return false
+	end
+	local keep = {}
+	for _, id in ipairs(closed) do
+		if type(id) == "string" then keep[id] = true end
+	end
+	local candidate = copy_disabled(_disabled_groups)
+	local changed = 0
+	for id in pairs(_categories) do
+		local want = keep[id] or nil
+		if candidate[id] ~= want then
+			candidate[id] = want
+			changed = changed + 1
+		end
+	end
+	if changed == 0 then return true end
+	if not commit_disabled(candidate) then return false end
+	M.load_all()
+	notify_change()
+	Logger.info(LOG, "Category gates restored (%d changed, %d kept closed).", changed, #closed)
+	return true
+end
+
 --- Restores the shipped state: every gate open and every section back to the
 --- manifest's default, which is disabled for the bundled packs.
 --- @return integer Number of entries cleared.

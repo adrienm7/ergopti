@@ -800,7 +800,7 @@ M.unavailable = {
 		path = "shortcuts.teleport_mouse", section = "shortcuts", reason_key = "", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.wrap_text_if_selected", section = "shortcuts", reason_key = "", platforms = { "ahk" },
+		path = "shortcuts.wrap_text_if_selected", section = "shortcuts", reason_key = "", platforms = { "ahk", "linux" },
 	},
 	{
 		path = "shortcuts.open_downloads", section = "shortcuts", reason_key = "", platforms = { "ahk" },

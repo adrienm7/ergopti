@@ -52,6 +52,10 @@ local _kbd_path      = nil    -- ~/.config/kanata/ergopti.kbd
 local _template_path = nil    -- Path to the static kanata.kbd template.
 local _shared_dir    = nil    -- Path to the _shared tree (sibling of the driver).
 local _user_toml     = nil    -- Path to the user's tap_hold.toml override.
+-- The tap-hold feature switch. Off keeps every configured key and only makes
+-- the generated aliases type their native key. Runtime state owned by the
+-- global « Disable all », which re-applies it after a restart.
+local _tap_holds_enabled = true
 
 local function _command_succeeded(status)
 	return status == true or status == 0
@@ -549,6 +553,7 @@ function M.generate_kbd()
 
 	local defalias = gen.generate(keys_config, {
 		one_shot_shift_timeout_ms = one_shot_ms,
+		tap_holds_enabled = _tap_holds_enabled,
 	})
 
 	-- Assemble.
@@ -636,6 +641,44 @@ end
 function M.get_kbd_path()
 	_resolve_paths()
 	return _kbd_path
+end
+
+--- Whether the tap-hold feature is switched on.
+--- @return boolean
+function M.tap_holds_enabled()
+	return _tap_holds_enabled
+end
+
+--- Switches the tap-hold feature on or off and puts the change in force: a
+--- running kanata is restarted on the regenerated configuration, an existing
+--- configuration is rewritten, and a missing one is generated from this state
+--- by the next start(). The previous state is restored when that fails.
+--- @param enabled boolean
+--- @return boolean True when the requested state is in force.
+function M.set_tap_holds_enabled(enabled)
+	if type(enabled) ~= "boolean" then
+		Logger.error(LOG, "Tap-hold state must be a boolean — nothing changed.")
+		return false
+	end
+	if enabled == _tap_holds_enabled then return true end
+	_resolve_paths()
+	Logger.start(LOG, "Switching tap-holds %s…", enabled and "on" or "off")
+	local previous = _tap_holds_enabled
+	_tap_holds_enabled = enabled
+	local applied = true
+	if M.is_running() then
+		applied = M.restart()
+	elseif _config_exists(_kbd_path) then
+		applied = M.write_kbd()
+	end
+	if not applied then
+		_tap_holds_enabled = previous
+		Logger.error(LOG, "Tap-holds stay %s: the new configuration could not be put in force.",
+			previous and "on" or "off")
+		return false
+	end
+	Logger.success(LOG, "Tap-holds switched %s.", enabled and "on" or "off")
+	return true
 end
 
 

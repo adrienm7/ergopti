@@ -152,3 +152,111 @@ helpers.describe("dashboard bridges: no call to a function that is not there", f
 	end
 
 end)
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 3/ The typing window paints before the history ==========
+-- =================================================================
+-- =================================================================
+
+helpers.describe("dashboard bridges: the typing window answers from its cache", function()
+
+	--- A keylogger double counting the full-history reads.
+	--- @return table keylogger, table counts
+	local function counting_keylogger()
+		local counts = { full = 0, manifest_only = 0 }
+		local keylogger = {
+			get_dashboard_payload = function(opts)
+				if opts.include_prefetch then
+					counts.full = counts.full + 1
+					return { metrics_manifest = {}, _prefetch_data = { read = counts.full } }
+				end
+				counts.manifest_only = counts.manifest_only + 1
+				return { metrics_manifest = {} }
+			end,
+			clear_cache = function() return true end,
+		}
+		return keylogger, counts
+	end
+
+	--- The bridge with recording deferral and push channels.
+	--- @return table bridge, table deferred, table pushed
+	local function bridge_with_seams()
+		local Bridge = helpers.load_module("ui.metrics_typing.bridge")
+		Bridge._reset()
+		local deferred, pushed = {}, {}
+		Bridge._defer = function(fn, delay_ms)
+			deferred[#deferred + 1] = { fn = fn, delay_ms = delay_ms }
+			return true
+		end
+		Bridge._push = function(payload) pushed[#pushed + 1] = payload return true end
+		return Bridge, deferred, pushed
+	end
+
+	helpers.it("reopening answers the cached payload without reading the history", function()
+		local Bridge, deferred, pushed = bridge_with_seams()
+		local keylogger, counts = counting_keylogger()
+		local state = { keylogger = keylogger }
+		local first = Bridge.on_message("ready", state)
+		helpers.assert_eq(counts.full, 1, "the first opening of a session must read once")
+		helpers.assert_eq(#deferred, 0, "nothing to refresh after a fresh read")
+
+		local second = Bridge.on_message({ action = "ready" }, state)
+		helpers.assert_eq(counts.full, 1,
+			"reopening read the whole history synchronously before the first paint")
+		helpers.assert_true(second == first, "the reopened window gets the cached payload at once")
+		helpers.assert_eq(#deferred, 1, "and a refresh is scheduled for after the paint")
+		helpers.assert_true(deferred[1].delay_ms > 0, "the refresh waits for the page to draw")
+
+		deferred[1].fn()
+		helpers.assert_eq(counts.full, 2, "the deferred refresh reads the history")
+		helpers.assert_eq(#pushed, 1, "and pushes the fresh payload to the page")
+		helpers.assert_eq(pushed[1]._prefetch_data.read, 2)
+		helpers.assert_true(Bridge.on_message("ready", state) == pushed[1],
+			"the next opening answers with the refreshed payload")
+		Bridge._reset()
+	end)
+
+	helpers.it("a superseded refresh does not read or push", function()
+		local Bridge, deferred, pushed = bridge_with_seams()
+		local keylogger, counts = counting_keylogger()
+		local state = { keylogger = keylogger }
+		Bridge.on_message("ready", state)
+		Bridge.on_message("ready", state)
+		Bridge.on_message("ready", state)
+		deferred[1].fn()
+		helpers.assert_eq(counts.full, 1, "only the latest refresh may read")
+		deferred[2].fn()
+		helpers.assert_eq(counts.full, 2)
+		helpers.assert_eq(#pushed, 1)
+		Bridge._reset()
+	end)
+
+	helpers.it("a reset drops the cached payload so the next opening rebuilds", function()
+		local Bridge, deferred = bridge_with_seams()
+		local keylogger, counts = counting_keylogger()
+		local state = { keylogger = keylogger }
+		Bridge.on_message("ready", state)
+		Bridge.on_message({ action = "clear_cache" }, state)
+		Bridge.on_message("ready", state)
+		helpers.assert_eq(counts.full, 2, "after a reset the page must not see the old cache")
+		helpers.assert_eq(#deferred, 0)
+		Bridge._reset()
+	end)
+
+	helpers.it("the event loop runs a deferred callback only once it is due", function()
+		local EventLoop = helpers.load_module("adapters.event_loop")
+		local ran = 0
+		helpers.assert_true(EventLoop.defer(function() ran = ran + 1 end, 0))
+		helpers.assert_true(EventLoop.defer(function() ran = ran + 10 end, 60000))
+		EventLoop._run_idle_tick()
+		helpers.assert_eq(ran, 1, "a due callback runs on the next tick, a future one waits")
+		EventLoop._run_idle_tick()
+		helpers.assert_eq(ran, 1, "and a callback runs once")
+		helpers.assert_true(not EventLoop.defer("nope"), "a non-function is refused")
+	end)
+
+end)

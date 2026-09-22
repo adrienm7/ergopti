@@ -5,9 +5,10 @@
 // DESCRIPTION:
 // Receives a diagnostic snapshot as JSON and renders the full report
 // client-side.  All labels are in English (developer-facing diagnostic —
-// not i18n'd).  Handles both Windows (AHK) and macOS snapshot shapes;
+// not i18n'd).  Handles the Windows (AHK), macOS and Linux snapshot shapes;
 // the OS-specific system rows are rendered conditionally based on which
-// fields are present in the snapshot.
+// fields are present in the snapshot, and a generic row with no value is
+// omitted rather than shown as "?".
 //
 // Entry point:
 //   window.renderHealthcheck(snapshot)
@@ -50,6 +51,19 @@ function formatUptime(sec) {
  */
 function row(field, value) {
 	return '<tr><td>' + field + '</td><td>' + value + '</td></tr>';
+}
+
+/**
+ * Renders a row only when its value is known. A "?" told the reader nothing a
+ * missing row does not, and on Linux, whose snapshot has no screen probe, it
+ * filled the table with question marks.
+ * @param {string} field
+ * @param {*} value Raw value; undefined, null and "" omit the row.
+ * @returns {string}
+ */
+function optionalRow(field, value) {
+	if (value === undefined || value === null || value === '') return '';
+	return row(field, escapeHtml(String(value)));
 }
 
 /**
@@ -118,22 +132,32 @@ window.renderHealthcheck = function (s) {
 			html += row('Accessibility', permissionValue(s.permissions.accessibility));
 			html += row('Screen Recording', permissionValue(s.permissions.screen_recording));
 		}
+	} else if (sys.os === 'linux') {
+		// Linux driver: the distribution, the kernel and the display stack are
+		// what a Linux report is triaged by.
+		html += optionalRow('Linux', sys.os_name);
+		html += optionalRow('Kernel', sys.kernel);
+		html += optionalRow('Architecture', sys.arch);
+		var display = sys.display_server;
+		if (display && sys.desktop) display += ' (' + sys.desktop + ')';
+		html += optionalRow('Display server', display);
+		html += optionalRow('Lua runtime', sys.runtime);
 	}
 
-	html += row('CPU', escapeHtml(String(sys.cpu_name || sys.cpu_model || '?')));
-	html += row('Logical cores', escapeHtml(String(sys.cpu_cores || '?')));
+	html += optionalRow('CPU', sys.cpu_name || sys.cpu_model);
+	html += optionalRow('Logical cores', sys.cpu_cores);
 
 	if (sys.ram_total_gb !== undefined) {
 		// Windows format
 		html += row('Total RAM', escapeHtml(String(sys.ram_total_gb) + ' GB'));
 		html += row('Available RAM', escapeHtml(String(sys.ram_free_gb) + ' GB'));
 	} else {
-		// macOS format
-		html += row('Total RAM', escapeHtml(String(sys.ram_total || '?')));
-		html += row('Available RAM', escapeHtml(String(sys.ram_free || '?')));
+		// macOS and Linux format
+		html += optionalRow('Total RAM', sys.ram_total);
+		html += optionalRow('Available RAM', sys.ram_free);
 	}
 
-	html += row('Screen resolution', escapeHtml(String(sys.screen_res || '?')));
+	html += optionalRow('Screen resolution', sys.screen_res);
 
 	if (sys.dpi_scale !== undefined) {
 		// Windows DPI
@@ -147,7 +171,7 @@ window.renderHealthcheck = function (s) {
 		html += row('DPI', dpiParts.join(' &nbsp;'));
 	}
 
-	html += row('Locale', escapeHtml(String(sys.locale || '?')));
+	html += optionalRow('Locale', sys.locale);
 
 	if (sys.config_dir) {
 		html += row('Config dir', '<code>' + escapeHtml(String(sys.config_dir)) + '</code>');

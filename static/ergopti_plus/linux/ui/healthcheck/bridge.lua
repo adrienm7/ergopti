@@ -276,16 +276,19 @@ end
 --- Host information.
 --- @return table
 local function collect_sys()
-	local sys = { os = "linux", arch = NOT_AVAILABLE, display_server = NOT_AVAILABLE }
-	local ok, DisplayServer = pcall(require, "infra.display_server")
-	if ok and type(DisplayServer.kind) == "function" then
-		sys.display_server = DisplayServer.kind() or NOT_AVAILABLE
-	end
-	local pipe = io.popen("uname -m 2>/dev/null")
-	if pipe then
-		local arch = pipe:read("*l")
-		pipe:close()
-		if arch and arch ~= "" then sys.arch = arch end
+	-- The same probes as the boot snapshot line (infra/diagnostic_snapshot), so
+	-- the window and the log describe one machine. The page's Linux branch reads
+	-- these names, and a fact that could not be read stays absent: the page
+	-- omits its row instead of printing "?". The sys table used to carry only
+	-- os, arch and the display kind, so every CPU, RAM, screen and locale row
+	-- read "?" and no row said which distribution or kernel it was.
+	local facts = require("infra.diagnostic_snapshot").system_facts()
+	local sys = { os = "linux" }
+	for _, name in ipairs({
+		"os_name", "kernel", "arch", "runtime", "display_server", "desktop",
+		"cpu_model", "cpu_cores", "ram_total", "ram_free", "locale",
+	}) do
+		sys[name] = facts[name]
 	end
 	-- The page's "Last git commit" row read "unknown" on every Linux build:
 	-- this collector never sent one. The shared resolver answers from the

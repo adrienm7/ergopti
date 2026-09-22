@@ -189,6 +189,49 @@ function M.read_checked()
 	return read_backend_checked(selected_backend)
 end
 
+--- The command that prints the PRIMARY selection, or nil when no tool can.
+---
+--- PRIMARY is what the application publishes as soon as text is selected, with
+--- no keystroke sent to it — the only probe that cannot type into the focused
+--- window. Ctrl+C would copy in an editor and interrupt the running program in a
+--- terminal.
+--- @return string|nil
+local function primary_read_command()
+	if DisplayServer.is_wayland() then
+		if Shell.has_command("wl-paste") then
+			return string.format("timeout %d wl-paste --primary --no-newline 2>/dev/null", READ_TIMEOUT_S)
+		end
+		return nil
+	end
+	if DisplayServer.is_x11() then
+		if Shell.has_command("xclip") then
+			return string.format("timeout %d xclip -selection primary -o 2>/dev/null", READ_TIMEOUT_S)
+		end
+		if Shell.has_command("xsel") then
+			return string.format("timeout %d xsel --primary --output 2>/dev/null", READ_TIMEOUT_S)
+		end
+	end
+	return nil
+end
+
+--- Reads the PRIMARY selection.
+--- @return boolean ok False when no tool can read it or the read failed.
+--- @return string text The selection; "" when nothing is published.
+--- @return string|nil reason Why the read failed.
+function M.read_primary()
+	local command = primary_read_command()
+	if not command then
+		return false, "", "no PRIMARY selection reader on this session"
+	end
+	local ok, text, err = Shell.exec_checked(command)
+	if not ok then
+		-- An empty PRIMARY makes wl-paste and xclip exit non-zero: that is "no
+		-- selection", which the caller treats exactly like a failed read.
+		return false, "", err
+	end
+	return true, text or "", nil
+end
+
 --- Writes the clipboard.
 ---
 --- Through a heredoc rather than an argument: a replacement can contain

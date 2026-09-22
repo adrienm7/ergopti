@@ -43,6 +43,7 @@ local Monotonic = require("infra.monotonic")
 local Manifest = require("infra.manifest_reader")
 local TomlCodec = require("toml_codec")
 local i18n = require("infra.i18n")
+local ScriptActions = require("modules.shortcuts.script_actions")
 local LOG = "modules.gestures.manager"
 local ENABLED_PATH = "gestures.enabled"
 local DEFAULT_ENABLED = Manifest.default_for(ENABLED_PATH)
@@ -481,6 +482,10 @@ local SCREENSHOT_KIND = {
 -- operations out of this module prevents the gesture layer from owning reload
 -- and shutdown state while still giving every catalogue action one executor.
 local _action_handlers = {}
+
+-- The daemon's pause state, injected by init(). Declared above every reader.
+local function NEVER_PAUSED() return false end
+local _is_paused = NEVER_PAUSED
 
 local function _execute_action(action_name, go_next, binding)
 	if not action_name or action_name == "none" then return end
@@ -996,6 +1001,13 @@ function M.dispatch_gesture(gesture)
 		return false
 	end
 
+	-- A pause stops every gesture but the script-control ones, which are how the
+	-- user resumes; the reader keeps running so those still arrive.
+	if _is_paused() and not ScriptActions.is_script_action(action) then
+		Logger.debug(LOG, "Gesture %s → %s held back: the script is paused.", slot, action)
+		return false
+	end
+
 	Logger.info(LOG, "GESTURE FIRE: slot=%s action=%s", slot, action)
 	_execute_action(action, nil, slot)
 	return true
@@ -1257,6 +1269,10 @@ function M.init(opts)
 	if opts.action_handlers ~= nil and type(opts.action_handlers) ~= "table" then
 		error("gestures action_handlers must be a table")
 	end
+	if opts.is_paused ~= nil and type(opts.is_paused) ~= "function" then
+		error("gestures is_paused must be a function")
+	end
+	_is_paused = opts.is_paused or NEVER_PAUSED
 	_action_handlers = {}
 	for action_name, handler in pairs(opts.action_handlers or {}) do
 		if type(action_name) ~= "string" or type(handler) ~= "function" then

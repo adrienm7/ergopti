@@ -14,8 +14,10 @@
 --- FEATURES & RATIONALE:
 --- 1. Wrap symbols: when the user types a bracket/quote while text is selected,
 ---    the selection is wrapped (e.g. "hello" → "(hello)"). If nothing is
----    selected, the symbol types normally. Deferred to a future keyboard-grab
----    implementation; the wrap-pairs catalogue and wrapping logic are ready.
+---    selected, the symbol types normally. The decision lives in
+---    modules/shortcuts/wrap_on_type.lua, run from the keyboard hook's
+---    consumption callback; this module owns its switch
+---    (shortcuts.wrap_text_if_selected) and the wrap-pair catalogue.
 --- 2. CapsWord: toggled via menu or shortcut. When active, the next word's
 ---    first letter is capitalized and CapsWord auto-disengages. Hooked into
 ---    the daemon's on_char for per-keystroke processing.
@@ -163,7 +165,9 @@ local WRAP_PAIRS = load_wrap_pairs()
 --- @param ch string Single character.
 --- @return table|nil { left, right } or nil if not a wrap character.
 function M.get_wrap_pair(ch)
-	if type(ch) ~= "string" or #ch ~= 1 then return nil end
+	-- One CHARACTER, not one byte: « », “ ” and the CJK brackets are pairs of
+	-- the catalogue too, and a byte test made every one of them unmatched.
+	if not UnicodeCase.is_single_character(ch) then return nil end
 	return WRAP_PAIRS[ch]
 end
 
@@ -372,6 +376,46 @@ function M.toggle()
 	return _enabled
 end
 
+-- The wrap-on-type switch (shortcuts.wrap_text_if_selected).
+local WRAP_ON_TYPE_KEY = "wrap_text_if_selected"
+local DEFAULT_WRAP_ON_TYPE = Manifest.default_for(CONFIG_SECTION .. "." .. WRAP_ON_TYPE_KEY)
+if type(DEFAULT_WRAP_ON_TYPE) ~= "boolean" then
+	error("The manifest default for shortcuts." .. WRAP_ON_TYPE_KEY .. " must be a boolean.")
+end
+local _wrap_on_type = DEFAULT_WRAP_ON_TYPE
+
+--- Whether typing a wrap symbol over a selection wraps it.
+--- @return boolean
+function M.is_wrap_on_type_enabled()
+	return _wrap_on_type
+end
+
+--- Persists and applies the wrap-on-type switch.
+--- @param enabled boolean
+--- @return boolean True when the state was committed.
+function M.set_wrap_on_type_enabled(enabled)
+	if type(enabled) ~= "boolean" then
+		Logger.error(LOG, "Wrap-on-type state must be a boolean — nothing changed.")
+		return false
+	end
+	if _persist then
+		if not TomlWriter or not _config_path then
+			Logger.error(LOG, "Wrap-on-type state cannot be persisted — nothing changed.")
+			return false
+		end
+		local ok, err = TomlWriter.batch_write(_config_path, {
+			{ section = CONFIG_SECTION, key = WRAP_ON_TYPE_KEY, value = enabled },
+		})
+		if not ok then
+			Logger.error(LOG, "Could not persist the wrap-on-type state: %s.", tostring(err))
+			return false
+		end
+	end
+	_wrap_on_type = enabled
+	Logger.info(LOG, "Wrap selection on typed symbol %s.", enabled and "enabled" or "disabled")
+	return true
+end
+
 -- =========================================
 -- =========================================
 -- ======= 5/ Init =========================
@@ -392,6 +436,9 @@ end
 --- @param mark function mark(...segments) from config_unused_keys.
 function M.mark_config_reads(config, mark)
 	if configured_enabled(config) ~= nil then mark(CONFIG_SECTION, "enabled") end
+	if type(config[CONFIG_SECTION]) == "table" and config[CONFIG_SECTION][WRAP_ON_TYPE_KEY] ~= nil then
+		mark(CONFIG_SECTION, WRAP_ON_TYPE_KEY)
+	end
 end
 
 --- Initialises the shortcuts module.
@@ -408,6 +455,7 @@ function M.init(opts)
 	_persist = opts.persist == true
 
 	local enabled = DEFAULT_ENABLED
+	local wrap_on_type = DEFAULT_WRAP_ON_TYPE
 	if _persist then
 		local fh = io.open(_config_path, "r")
 		if fh then
@@ -417,6 +465,7 @@ function M.init(opts)
 			if not ok or type(config) ~= "table" then
 				Logger.error(LOG, "Shortcut configuration is invalid — failing closed.")
 				enabled = false
+				wrap_on_type = false
 			else
 				local configured = configured_enabled(config)
 				if type(configured) == "boolean" then
@@ -425,12 +474,22 @@ function M.init(opts)
 					Logger.error(LOG, "Shortcut enabled state is invalid — failing closed.")
 					enabled = false
 				end
+				local section = type(config[CONFIG_SECTION]) == "table" and config[CONFIG_SECTION] or {}
+				local wrap = section[WRAP_ON_TYPE_KEY]
+				if type(wrap) == "boolean" then
+					wrap_on_type = wrap
+				elseif wrap ~= nil then
+					Logger.error(LOG, "Wrap-on-type state is invalid — failing closed.")
+					wrap_on_type = false
+				end
 			end
 		end
 	end
 	if type(opts.enabled) == "boolean" then enabled = opts.enabled end
 	_enabled = enabled
-	Logger.info(LOG, "Shortcuts manager initialised (enabled=%s).", tostring(_enabled))
+	_wrap_on_type = wrap_on_type
+	Logger.info(LOG, "Shortcuts manager initialised (enabled=%s, wrap_on_type=%s).",
+		tostring(_enabled), tostring(_wrap_on_type))
 end
 
 return M
