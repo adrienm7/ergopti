@@ -190,15 +190,9 @@ const JUDGED = [
 	},
 	{
 		file: 'infra/hotstrings/hotstring_dispatch.ahk',
-		match: 'FIRE private mapping',
+		match: 'FIRE trigger={1} char(s)',
 		verdict: 'not-personal',
-		why: 'the private branch itself: prints counts and says in the message that the trigger and the content are withheld. It matched only because the prose contains the word "trigger".'
-	},
-	{
-		file: 'infra/hotstrings/hotstring_dispatch.ahk',
-		match: 'FIRE trig=',
-		verdict: 'withheld-by-caller',
-		why: 'the private branch is the sibling call ~5 lines above ("FIRE private mapping … trigger and content withheld"), which returns; this one is the else.'
+		why: 'prints lengths only: the trigger, the end character and the burst each reach the log through StrLen(), for public and private mappings alike.'
 	},
 	{
 		file: 'infra/hotstrings/hotstring_inputhook.ahk',
