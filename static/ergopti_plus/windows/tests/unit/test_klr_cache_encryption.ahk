@@ -197,26 +197,56 @@ for TableName in ["KLR_READER_TYPING_PAYLOAD", "Klr_Reader_Typing_Payload"]
 	Test("KLR cache: unsafe table spelling=" . TableName . " refuses publication (klr-cache-payload-case)",
 		_KLRDC_CheckTeardown.Bind(_KLRCE_PublishedCache.Bind(_KLRCE_UnsafeSource.Bind(, , TableName))))
 
+_KLRCE_PayloadTableCount(Db) {
+	return SQLite_Query(Db, "SELECT COUNT(*) AS n FROM main.sqlite_schema "
+		. "WHERE name='klr_reader_typing_payload' COLLATE NOCASE;")[1]["n"]
+}
+
+; A leftover main-schema payload table is the only defect of this image. Its
+; rollups are exact, so the image is upgraded in a private copy instead of being
+; thrown away: on a large store the rebuild it used to force left the dashboard
+; blank for tens of minutes. The clear payload itself must still never be
+; admitted, and the unsafe file must stop being the image a later worker opens.
 _KLRCE_UnsafeStoredImage(Db, Entry, Worker) {
 	Path := KLR_CachePath(_KLRDC_Root())
 	Stored := SQLite_Open(Path)
 	AssertTrue(Stored != 0)
+	; Only a restored image can report 7: the ledger itself proves 2 characters.
 	try AssertTrue(SQLite_Exec(Stored,
 		"CREATE TABLE main.KLR_READER_TYPING_PAYLOAD(events_json TEXT);"
-		. "INSERT INTO main.klr_reader_typing_payload VALUES('[[],[]]');"))
+		. "INSERT INTO main.klr_reader_typing_payload VALUES('[[],[]]');"
+		. "UPDATE agg_app_day SET chars=7;"))
 	finally SQLite_Close(Stored)
 	KLR_ResetCache()
 	KLRCache.disposable := Worker
-	AssertEqual(0, KLR_CacheAttach(_KLRDC_Root(), ""), "an unsafe existing image must not be admitted")
-	AssertEqual(0, KLRCache.db, "neither resident copying nor readonly transfer may expose the rejected image")
-	AssertFalse(FSExists(Path), "the observed unsafe derived image must be retired after closing SQLite")
+	AssertEqual(1, KLR_CacheAttach(_KLRDC_Root(), ""),
+		"an image whose only defect is the payload table must be upgraded, not rebuilt")
+	AssertTrue(KLRCache.db != 0)
+	AssertFalse(KLRCache.readonly, "the upgraded image is a private writable copy")
+	AssertEqual(0, _KLRCE_PayloadTableCount(KLRCache.db),
+		"the clear payload table must never be admitted into the reader")
+	AssertEqual(7, SQLite_Query(KLRCache.db, "SELECT chars FROM agg_app_day;")[1]["chars"],
+		"the upgrade must keep the stored rollups instead of rebuilding them")
+	if Worker {
+		AssertTrue(FSExists(Path), "a worker republishes the cleaned image at once")
+		Republished := SQLite_Open(Path, SQLiteConst.OPEN_RO)
+		AssertTrue(Republished != 0)
+		try {
+			AssertEqual(0, _KLRCE_PayloadTableCount(Republished),
+				"the republished image must no longer carry the clear payload")
+			AssertEqual(7, SQLite_Query(Republished, "SELECT chars FROM agg_app_day;")[1]["chars"])
+		} finally SQLite_Close(Republished)
+	} else {
+		AssertFalse(FSExists(Path),
+			"the resident never writes the image, so it retires the unsafe file instead")
+	}
 	Recovered := KLR_BuildDatabase(_KLRDC_Root())
 	AssertTrue(Recovered != 0)
-	AssertEqual(2, SQLite_Query(Recovered, "SELECT chars FROM agg_app_day;")[1]["chars"],
-		"rejection must allow reconstruction from the encrypted synthetic ledger")
-	AssertEqual(0, SQLite_Query(Recovered,
-		"SELECT COUNT(*) AS n FROM main.sqlite_schema WHERE name='klr_reader_typing_payload' COLLATE NOCASE;")[1]["n"])
+	; The resident refreshes SQL rollups from raw rows on every unchanged tick.
+	AssertEqual(Worker ? 7 : 2, SQLite_Query(Recovered, "SELECT chars FROM agg_app_day;")[1]["chars"],
+		"an unchanged ledger must be served from the upgraded image")
+	AssertEqual(0, _KLRCE_PayloadTableCount(Recovered))
 }
 for Worker in [false, true]
-	Test("KLR cache: unsafe stored image worker=" . Worker . " is rejected (klr-cache-payload-admission)",
+	Test("KLR cache: unsafe stored image worker=" . Worker . " is upgraded (klr-cache-payload-upgrade)",
 		_KLRDC_CheckTeardown.Bind(_KLRCE_PublishedCache.Bind(_KLRCE_UnsafeStoredImage.Bind(, , Worker))))
