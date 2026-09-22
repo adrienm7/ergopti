@@ -1447,7 +1447,7 @@ class KLPFRebuildPublisher {
 								&& (A_TickCount - this.last_progress) < KLPFRebuildPublisher.MIN_PROGRESS_INTERVAL_MS
 						return false
 				Progress := KLPF_RebuildProgress(Info)
-				Progress["pid"] := DllCall("Kernel32\GetCurrentProcessId", "UInt")
+				Progress["pid"] := KLPFWorker.process_id
 				; A missed update only delays the bar; the next report rewrites it.
 				if !KLPF_WriteAtomic(KLPF_RebuildProgressPath(this.metrics_dir), KL_JsonEncode(Progress))
 						return false

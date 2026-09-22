@@ -332,7 +332,9 @@ _KLR_RebuildStep(State, Ledger) {
 	Cursor := Ledger["cursor"]
 	Start := Max(0, Cursor - KLRRebuild.chunk_bytes)
 	Count := Cursor - Start
-	Buf := _KLR_RebuildReadBytes(Ledger, Start, Count)
+	Read := _KLR_RebuildReadBytes(Ledger, Start, Count)
+	Buf := Read["buffer"]
+	State["nul_bytes"] += Read["nul_bytes"]
 	Skip := 0
 	; A read that starts inside a multi-byte character begins at the next one;
 	; the skipped bytes belong to the following read.
@@ -340,7 +342,6 @@ _KLR_RebuildStep(State, Ledger) {
 		while Skip < Count && (NumGet(Buf, Skip, "UChar") & 0xC0) = 0x80
 			Skip += 1
 	}
-	State["nul_bytes"] += _KLR_RebuildBlankNuls(Buf, Skip, Count - Skip)
 	Text := Count - Skip > 0 ? StrGet(Buf.Ptr + Skip, Count - Skip, "UTF-8") : ""
 	Combined := Text . Ledger["carry"]
 	NewCursor := Start + Skip
@@ -390,40 +391,19 @@ _KLR_RebuildStep(State, Ledger) {
 }
 
 _KLR_RebuildReadBytes(Ledger, Start, Count) {
-	Buf := Buffer(Max(Count, 1), 0)
-	try File := FileOpen(Ledger["path"], "r")
-	catch as Err
-		throw KLRRebuildRefusal("a ledger could not be opened (" . Err.Message . ")")
-	try {
-		; Every read must observe the file the rebuild started from, still
-		; holding at least the bytes it planned to consume.
-		Current := FSHandleSnapshot(File.Handle)
-		Consumed := Ledger["snapshot"]
-		if !KLR_LedgerFileIsSame(Current, Consumed) || Current["size"] < Ledger["end"]
-				|| (Current["size"] = Consumed["size"] && !KLR_LedgerWriteTimeIsSame(Current, Consumed))
-			throw KLRRebuildRefusal("a ledger was replaced or rewritten during the rebuild")
-		File.Pos := Start
-		if Count > 0 && File.RawRead(Buf, Count) != Count
-			throw KLRRebuildRefusal("a ledger read stopped before its observed end")
-	} finally File.Close()
-	return Buf
-}
-
-; An interrupted append leaves NUL bytes between two complete transactions. The
-; one-pass build skips them; blanking them keeps the same bytes as whitespace.
-_KLR_RebuildBlankNuls(Buf, Offset, Count) {
-	Blanked := 0
-	Cursor := Buf.Ptr + Offset
-	Stop := Cursor + Count
-	while Cursor < Stop {
-		Hit := DllCall("msvcrt\memchr", "Ptr", Cursor, "Int", 0, "UPtr", Stop - Cursor, "Cdecl Ptr")
-		if !Hit
-			break
-		NumPut("UChar", 0x20, Hit)
-		Blanked += 1
-		Cursor := Hit + 1
-	}
-	return Blanked
+	; An interrupted append leaves NUL bytes between two complete transactions.
+	; The one-pass build skips them; blanking keeps them as whitespace.
+	Read := FSReadRange(Ledger["path"], Start, Count, true)
+	if !Read["ok"]
+		throw KLRRebuildRefusal("a ledger range could not be read")
+	; Every read must observe the file the rebuild started from, still holding
+	; at least the bytes it planned to consume.
+	Current := Read["snapshot"]
+	Consumed := Ledger["snapshot"]
+	if !KLR_LedgerFileIsSame(Current, Consumed) || Current["size"] < Ledger["end"]
+			|| (Current["size"] = Consumed["size"] && !KLR_LedgerWriteTimeIsSame(Current, Consumed))
+		throw KLRRebuildRefusal("a ledger was replaced or rewritten during the rebuild")
+	return Read
 }
 
 _KLR_RebuildExecute(db, Sql) {

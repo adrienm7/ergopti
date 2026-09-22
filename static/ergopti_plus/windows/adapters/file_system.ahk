@@ -664,6 +664,42 @@ FSHandleSnapshot(FileHandle) {
 	}
 }
 
+; Reads an exact byte range together with the identity of the handle it came
+; from, so a caller can prove the bytes belong to the file it expects. NUL bytes
+; (an interrupted append's hole) are optionally blanked to spaces: UTF-8
+; conversion stops at the first NUL. Windows-specific, outside the port map.
+; @param Path {String} Absolute path to the file.
+; @param Start {Integer} First byte offset.
+; @param Count {Integer} Exact number of bytes to read.
+; @param BlankNul {Boolean} Whether to replace every NUL byte with a space.
+; @return {Map} ok, buffer, snapshot (FSHandleSnapshot), nul_bytes.
+FSReadRange(Path, Start, Count, BlankNul := false) {
+	local Buf := Buffer(Max(Count, 1), 0)
+	local FH := FileOpen(Path, "r")
+	if !IsObject(FH)
+		return Map("ok", false)
+	try {
+		local Snapshot := FSHandleSnapshot(FH.Handle)
+		FH.Pos := Start
+		if Count > 0 && FH.RawRead(Buf, Count) != Count
+			return Map("ok", false, "snapshot", Snapshot)
+	} finally FH.Close()
+	local Blanked := 0
+	if BlankNul {
+		local Cursor := Buf.Ptr
+		local Stop := Buf.Ptr + Count
+		while Cursor < Stop {
+			local Hit := DllCall("msvcrt\memchr", "Ptr", Cursor, "Int", 0, "UPtr", Stop - Cursor, "Cdecl Ptr")
+			if !Hit
+				break
+			NumPut("UChar", 0x20, Hit)
+			Blanked += 1
+			Cursor := Hit + 1
+		}
+	}
+	return Map("ok", true, "buffer", Buf, "snapshot", Snapshot, "nul_bytes", Blanked)
+}
+
 ; Machine-readable contract map - consumed by the generic adapter compliance test
 ; (tests/test_adapter_compliance_new.ahk) to verify every required method exists
 ; and is callable without manually listing functions per-adapter.
