@@ -156,7 +156,7 @@ function checkCommitAndDirectoriesRender() {
 	const html = content.innerHTML;
 	const ok = html.includes('<td>Last git commit</td><td>f58d15798 (build)</td>')
 		&& html.includes('<td>Config dir</td><td><code>/Volumes/Fixture/alice/Chosen/ergopti_plus/</code></td>')
-		&& html.includes('<td>Script dir</td><td><code>/Applications/ErgoptiPlus.app/Contents/Resources/static/ergopti_plus/macos</code></td>');
+		&& html.includes('<td>App dir</td><td><code>/Applications/ErgoptiPlus.app/Contents/Resources/static/ergopti_plus/macos</code></td>');
 	if (ok) {
 		total_pass++;
 		console.log(`  ${PASS_SYMBOL}  Shared: commit origin, config dir and script dir render under their own labels`);

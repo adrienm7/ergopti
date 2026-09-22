@@ -442,13 +442,21 @@ end
 function M.run()
 	Logger.start(LOG, "Running healthcheck…")
 
-	-- Resolve the driver version (mirrors menu_about.lua logic).
-	local version = "local"
-	if hs and hs.processInfo then
-		local info = hs.processInfo
-		if type(info) == "table" and type(info.version) == "string" and info.version ~= "" then
-			version = info.version
+	-- The ErgoptiPlus version, from the same owner as the About menu.
+	-- hs.processInfo.version is the nested Hammerspoon's own version, already
+	-- reported on the Hammerspoon line; reading it here showed 1.1.1 as the
+	-- ErgoptiPlus version. Required lazily, and never allowed to fail the report.
+	local version = "unknown"
+	local ok_updater, Updater = pcall(require, "modules.updater")
+	if ok_updater and type(Updater) == "table" and type(Updater.current_version) == "function" then
+		local ok_version, value = pcall(Updater.current_version)
+		if ok_version and type(value) == "string" and value ~= "" then
+			version = value
+		else
+			Logger.warn(LOG, "ErgoptiPlus version unavailable: %s.", tostring(value))
 		end
+	else
+		Logger.warn(LOG, "ErgoptiPlus version unavailable: %s.", tostring(Updater))
 	end
 	Logger.debug(LOG, "Driver version: %s.", version)
 
@@ -863,7 +871,11 @@ function M.format_plain(snapshot)
 	table.insert(lines, string.format("Total RAM        : %s", tostring(sys.ram_total or "?")))
 	table.insert(lines, string.format("Available RAM    : %s", tostring(sys.ram_free or "?")))
 	table.insert(lines, string.format("Screen           : %s", tostring(sys.screen_res or "?")))
-	table.insert(lines, string.format("DPI              : %s%s", tostring(sys.dpi or "?"), sys.retina_scale and (" (" .. sys.retina_scale .. " Retina)") or ""))
+	if sys.dpi or sys.retina_scale then
+		local retina = sys.retina_scale and (sys.retina_scale .. " Retina") or nil
+		local dpi_text = sys.dpi and (tostring(sys.dpi) .. (retina and (" (" .. retina .. ")") or "")) or retina
+		table.insert(lines, string.format("DPI              : %s", dpi_text))
+	end
 	table.insert(lines, string.format("Locale           : %s", tostring(sys.locale or "?")))
 	if sys.wifi_ssid_hash then
 		table.insert(lines, string.format("Wi-Fi SSID hash  : %s", tostring(sys.wifi_ssid_hash)))
@@ -875,7 +887,7 @@ function M.format_plain(snapshot)
 		table.insert(lines, string.format("Config dir       : %s", sys.config_dir))
 	end
 	if sys.script_dir and sys.script_dir ~= "" then
-		table.insert(lines, string.format("Script dir       : %s", sys.script_dir))
+		table.insert(lines, string.format("App dir          : %s", sys.script_dir))
 	end
 	table.insert(lines, "")
 	table.insert(lines, string.format("Warnings         : %d", s.warn_count or 0))
