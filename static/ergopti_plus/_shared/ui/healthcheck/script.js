@@ -20,6 +20,7 @@
 //       last_error, recent_issues,
 //       pause_state, keylogger, llm, layout, hotstrings, logs, config,
 //       remap                                           (macOS only)
+//       permissions                                     (macOS only)
 // ===========================================================================
 
 /**
@@ -49,6 +50,18 @@ function formatUptime(sec) {
  */
 function row(field, value) {
 	return '<tr><td>' + field + '</td><td>' + value + '</td></tr>';
+}
+
+/**
+ * Renders one macOS privacy permission state; anything but "granted" is a
+ * failure because the matching feature cannot work without it.
+ * @param {string} state "granted", "missing", or "unknown (...)"
+ * @returns {string} HTML-safe value
+ */
+function permissionValue(state) {
+	var text = escapeHtml(String(state || 'unknown'));
+	var cls = state === 'granted' ? 'ok' : 'fail';
+	return '<span class="' + cls + '">' + text + '</span>';
 }
 
 /**
@@ -101,6 +114,10 @@ window.renderHealthcheck = function (s) {
 		}
 		html += row('macOS', escapeHtml(String(sys.os_version || '?')));
 		html += row('Architecture', escapeHtml(String(sys.arch || '?')));
+		if (s.permissions) {
+			html += row('Accessibility', permissionValue(s.permissions.accessibility));
+			html += row('Screen Recording', permissionValue(s.permissions.screen_recording));
+		}
 	}
 
 	html += row('CPU', escapeHtml(String(sys.cpu_name || sys.cpu_model || '?')));

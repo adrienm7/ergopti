@@ -170,6 +170,44 @@ function checkCommitAndDirectoriesRender() {
 checkCommitAndDirectoriesRender();
 
 /**
+ * Executes the shared renderer against a macOS snapshot whose runtime lacks
+ * Screen Recording. A packaged app in that state left Ctrl+H screenshots off
+ * the clipboard with no diagnostic saying why, so the state must reach the page
+ * and a missing grant must be marked as a failure.
+ */
+function checkPermissionsRender() {
+	const content = { innerHTML: '' };
+	const sandbox = {
+		window: {},
+		document: {
+			getElementById: () => content,
+		},
+		escapeHtml: value => String(value),
+	};
+	const script = fs.readFileSync(path.join(REPO_ROOT, SHARED_SCRIPT), 'utf8');
+	vm.runInNewContext(script, sandbox, { filename: SHARED_SCRIPT });
+	sandbox.window.renderHealthcheck({
+		version: 'test',
+		uptime_sec: 0,
+		sys: { hs_version: '1.1.1' },
+		permissions: { accessibility: 'granted', screen_recording: 'missing' },
+	});
+	const html = content.innerHTML;
+	const ok = html.includes('<td>Screen Recording</td><td><span class="fail">missing</span></td>')
+		&& html.includes('<td>Accessibility</td><td><span class="ok">granted</span></td>');
+	if (ok) {
+		total_pass++;
+		console.log(`  ${PASS_SYMBOL}  Shared: macOS permission states render, a missing grant as a failure`);
+		return;
+	}
+	total_fail++;
+	console.log(`  ${FAIL_SYMBOL}  Shared: macOS permission states render, a missing grant as a failure`);
+	console.log('       Violation: rendered HTML lacks the permission rows or their status class');
+}
+
+checkPermissionsRender();
+
+/**
  * Executes the Linux bridge bootstrap and feeds its native callback a snapshot.
  * This catches the original empty-window failure: a passive renderer can pass
  * every shape assertion while never requesting or receiving production data.

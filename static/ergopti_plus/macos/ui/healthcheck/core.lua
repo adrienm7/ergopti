@@ -538,6 +538,7 @@ function M.run()
 		logs             = safe_collect("logs_info",           H.collect_logs_info),
 		config           = safe_collect("config_summary",      H.collect_config_summary),
 		coverage         = safe_collect("platform_coverage",   H.collect_platform_coverage),
+		permissions      = safe_collect("permissions",         H.collect_permissions),
 	}
 
 	Logger.success(LOG, "Healthcheck complete — %d/%d adapter(s) wired, %d contract-healthy, %d failed, uptime %ds.",
@@ -882,6 +883,10 @@ function M.format_plain(snapshot)
 	table.insert(lines, "")
 
 	-- Enriched sections (maximum diagnostic value)
+	if s.permissions then
+		table.insert(lines, string.format("Accessibility    : %s", tostring(s.permissions.accessibility)))
+		table.insert(lines, string.format("Screen Recording : %s", tostring(s.permissions.screen_recording)))
+	end
 	if s.pause_state then
 		local ps = s.pause_state
 		table.insert(lines, string.format("Pause / Suspend  : %s (%s)", ps.is_paused and "PAUSED" or "running", ps.source or "unknown"))
