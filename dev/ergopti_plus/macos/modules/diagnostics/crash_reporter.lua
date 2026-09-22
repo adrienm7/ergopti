@@ -97,12 +97,22 @@ local function _reports_dir()
 	return base .. CRASH_REPORTS_SUBDIR .. "/"
 end
 
---- Returns the driver version string from hs.processInfo when available.
---- @return string Version string or "unknown".
+--- Returns the ErgoptiPlus version the About menu shows. hs.processInfo.version
+--- is the nested Hammerspoon's own version, which the report already carries as
+--- hs_version; reporting it here made every crash look like the same release.
+--- @return string Launcher version, "local" outside the packaged app, or "unknown".
 local function _driver_version()
-	local ok, info = pcall(function() return hs.processInfo end)
-	if ok and type(info) == "table" and type(info.version) == "string" and info.version ~= "" then
-		return info.version
+	-- Required lazily: crash_reporter loads early in init.lua, before the
+	-- updater, and a report must never fail to build over its version field.
+	local ok, Updater = pcall(require, "modules.updater")
+	if ok and type(Updater) == "table" and type(Updater.current_version) == "function" then
+		local ok_version, version = pcall(Updater.current_version)
+		if ok_version and type(version) == "string" and version ~= "" then
+			return version
+		end
+		Logger.warn(LOG, "Crash report version unavailable: %s.", tostring(version))
+	else
+		Logger.warn(LOG, "Crash report version unavailable: %s.", tostring(Updater))
 	end
 	return "unknown"
 end

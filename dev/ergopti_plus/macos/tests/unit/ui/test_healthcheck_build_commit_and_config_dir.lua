@@ -32,6 +32,7 @@ local FIXTURE_MODULES = {
 	"infra.diagnostic_snapshot",
 	"modules.diagnostics.crash_reporter",
 	"infra.logger",
+	"modules.updater",
 }
 
 
@@ -234,6 +235,24 @@ helpers.describe("build-commit: the crash report of a packaged app", function()
 			helpers.assert_eq(Snapshot.COMMIT_SOURCE_BUILD, report.commit_source)
 			helpers.assert_eq(CHOSEN_DIR, report.config_dir)
 			helpers.assert_eq(APP_SCRIPTS, report.script_dir)
+		end)
+	end)
+
+	helpers.it("build-commit: the version is the launcher's, not Hammerspoon's", function()
+		helpers.with_stub_scope(FIXTURE_MODULES, function()
+			helpers.load_with_stubs("infra.logger", { configdir = APP_SCRIPTS })
+			package.loaded["infra.config_paths"] = chosen_config_paths()
+			package.loaded["infra.diagnostic_snapshot"] = stamped_snapshot()
+			package.loaded["modules.updater"] = { current_version = function() return "2.4.0" end }
+			local saved_info = hs.processInfo
+			hs.processInfo = { version = "1.0.3", bundleID = "com.ergoptiplus.app.hammerspoon" }
+			package.loaded["modules.diagnostics.crash_reporter"] = nil
+			local ok, report = pcall(function()
+				return require("modules.diagnostics.crash_reporter").report("boom")
+			end)
+			hs.processInfo = saved_info
+			helpers.assert_true(ok, tostring(report))
+			helpers.assert_eq("2.4.0", report.version)
 		end)
 	end)
 

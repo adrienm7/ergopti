@@ -174,6 +174,7 @@ local _lease_recovery_timer_cleanup_backlog = {} -- Native timers whose stop mus
 local _lease_recovery_probe_cleanup_backlog = {} -- Exact status tasks whose terminate must be retried
 local _guardian_notice          = nil   -- Login Items approval notice, owned per lifecycle.
 local _guardian_regeneration_wait = nil -- Bundled rebuilds retained behind exact native readiness
+local _lease_less_resume_waiters = {} -- Resume terminals released by a non-ready guardian status
 local _last_failed_lease_token = nil   -- Replays a FAILED hidden by an enabled-state transaction
 local _lease_user_intent_revision = 0  -- Fences late recovery callbacks after an explicit lease Stop
 local _ke_variables_recovery_observer = nil -- Exact callback owned by this remap lifecycle
@@ -190,6 +191,15 @@ local PAUSED_RESUME_REGENERATION = {}
 local LEASE_FAILURE_RECOVERY_CAPABILITY = {}
 local ACTIVE_LAYOUT_FAILURE_RECOVERY = {}
 local GUARDIAN_READY_REGENERATION = {}
+-- A resume cancelled by a newer user or lifecycle intent stays refused even when
+-- no lease was live: that intent, not lease provisioning, decides the outcome.
+local RESUME_SUPERSEDING_REASONS = {
+	["script-pause-requested"] = true,
+	["explicit-lease-stop-requested"] = true,
+	["shutdown-in-progress"] = true,
+	["disable-in-progress"] = true,
+	["enabled-transition-in-progress"] = true,
+}
 
 --- Invokes a public async callback without letting its error vanish in a task callback.
 --- @param label string Operation label for diagnostics.
@@ -1597,6 +1607,21 @@ end
 local schedule_guardian_regeneration_poll
 local start_guardian_regeneration_probe
 
+--- Settles every lease-less Resume retained by one guardian wait. The retained
+--- regeneration itself stays queued, so approval still provisions the lease.
+--- @param wait table Exact bundled regeneration wait.
+--- @param wait_status string Non-ready guardian status or probe failure.
+local function release_lease_less_resume_waiters(wait, wait_status)
+	for _, context in ipairs(wait.contexts or {}) do
+		for _, callback in ipairs(context.callbacks or {}) do
+			if _lease_less_resume_waiters[callback] then
+				invoke_public_callback("lease-less resume", callback, false,
+					"guardian-" .. tostring(wait_status))
+			end
+		end
+	end
+end
+
 --- Returns whether one retained preflight still owns the current lifecycle.
 --- @param wait table Exact bundled regeneration wait.
 --- @return boolean current
@@ -1831,6 +1856,7 @@ start_guardian_regeneration_probe = function(wait, reason)
 			"Karabiner regeneration remains fail-closed after guardian status '%s' (%s).",
 			tostring(status), tostring(probe_error or reason))
 		schedule_guardian_regeneration_poll(wait, status or probe_error or reason)
+		release_lease_less_resume_waiters(wait, wait_status)
 	end
 
 	local call_ok, handle_or_err, launch_error = xpcall(function()
@@ -1923,7 +1949,6 @@ local function queue_guardian_regeneration(context)
 	if wait.probe ~= nil or wait.timer ~= nil then return true end
 	return start_guardian_regeneration_probe(wait, "regeneration-preflight")
 end
-
 --- Runs one side-effect-free native status observation for this exact launcher.
 --- Only `ready` advances the retained recovery. Every other result polls without
 --- charging the bounded build/deploy retry budget. The probe record is installed
@@ -3328,6 +3353,7 @@ end
 --- Publishes only persisted settings, preserving live lifecycle capabilities.
 --- @param candidate table Persisted settings candidate.
 local function publish_settings_state(candidate)
+	_state.tap_holds_enabled = candidate.tap_holds_enabled ~= false
 	_state.tap_hold_config = candidate.tap_hold_config
 	_state.mod_combos_config = candidate.mod_combos_config
 	_state.tap_hold_timeout_ms = candidate.tap_hold_timeout_ms
@@ -3929,6 +3955,32 @@ function M.set_combo_symmetric(value)
 	return committed
 end
 
+--- Returns whether the Tap-Holds feature is switched on.
+--- @return boolean enabled
+function M.get_tap_holds_enabled()
+	if not require_state("get_tap_holds_enabled") then return false end
+	return _state.tap_holds_enabled ~= false
+end
+
+--- Switches the Tap-Holds feature and persists it. Off stops generating every
+--- tap-hold and modifier-combo rule except the right-Command one that carries
+--- AltGr and the script-control trigger; every per-key assignment is kept.
+--- Does NOT regenerate — call M.regenerate() explicitly when ready.
+--- @param value boolean Desired switch state.
+--- @return boolean committed
+function M.set_tap_holds_enabled(value)
+	if not require_state("set_tap_holds_enabled") then return false end
+	if type(value) ~= "boolean" then
+		Logger.error(LOG, "set_tap_holds_enabled(): value must be a boolean.")
+		return false
+	end
+	local committed = commit_state_mutation(function(candidate)
+		candidate.tap_holds_enabled = value
+	end)
+	if committed then Logger.info(LOG, "Tap-Holds feature: %s.", value and "on" or "off") end
+	return committed
+end
+
 --- Copies exactly the settings persisted in config_karabiner.toml.
 --- Runtime handles and watcher capabilities from `_state` are deliberately
 --- excluded, so the snapshot can be retained by a parent transaction.
@@ -3948,6 +4000,7 @@ local function clone_persisted_settings(source)
 	local detached = clone_settings_state(source)
 	return {
 		enabled = detached.enabled == true,
+		tap_holds_enabled = detached.tap_holds_enabled ~= false,
 		tap_hold_config = detached.tap_hold_config,
 		mod_combos_config = detached.mod_combos_config,
 		tap_hold_timeout_ms = detached.tap_hold_timeout_ms,
@@ -4000,6 +4053,7 @@ function M.restore_settings(snapshot, on_done)
 	end
 	return apply_bulk_settings_transaction("Restore captured settings", function(candidate)
 		local restored = clone_persisted_settings(desired)
+		candidate.tap_holds_enabled = restored.tap_holds_enabled
 		candidate.tap_hold_config = restored.tap_hold_config
 		candidate.mod_combos_config = restored.mod_combos_config
 		candidate.tap_hold_timeout_ms = restored.tap_hold_timeout_ms
@@ -4093,6 +4147,7 @@ function M.reset_to_defaults(on_done)
 	Logger.debug(LOG, "Reset-to-defaults transaction requested.")
 	return apply_bulk_settings_transaction("Reset-to-defaults", function(candidate)
 		local defaults = Config.build_default_state(M.TAP_HOLD_KEYS, M.MOD_COMBOS)
+		candidate.tap_holds_enabled         = defaults.tap_holds_enabled
 		candidate.tap_hold_config           = defaults.tap_hold_config
 		candidate.mod_combos_config         = defaults.mod_combos_config
 		candidate.tap_hold_timeout_ms       = defaults.tap_hold_timeout_ms
@@ -4763,11 +4818,27 @@ function M.resume(on_done)
 		invoke_public_callback("resume", on_done, false, "disable-in-progress")
 		return false
 	end
+	-- Mirror M.pause: when no generation emits, no Ergopti rule can fire, so the
+	-- script's RESUME must not be held hostage to provisioning one. Otherwise a
+	-- helper awaiting Login Items approval (or a Karabiner that cannot start)
+	-- left the script PAUSED forever: pause committed as already-fail-closed, but
+	-- resume never settled. The lease is still provisioned by the same attempt.
+	local status_ok, phase = pcall(LeaseController.status)
+	local no_live_lease = status_ok
+		and (phase == "failed" or phase == "idle" or phase == "prepared")
 	Logger.start(LOG, "Resuming ErgoptiPlus Karabiner remapping…")
 	local callback_fired = false
-	local function finish_resume(ok, reason)
+	local finish_resume
+	finish_resume = function(ok, reason)
 		if callback_fired then return end
 		callback_fired = true
+		_lease_less_resume_waiters[finish_resume] = nil
+		if ok ~= true and no_live_lease and RESUME_SUPERSEDING_REASONS[reason] ~= true then
+			Logger.warn(LOG,
+				"Karabiner lease could not be provisioned on resume (%s); resuming without a live lease.",
+				tostring(reason))
+			ok, reason = true, "no-live-lease"
+		end
 		if ok == true then
 			Logger.success(LOG, "ErgoptiPlus Karabiner remapping resumed after paused preparation.")
 		else
@@ -4777,6 +4848,10 @@ function M.resume(on_done)
 		invoke_public_callback("resume", on_done, ok == true, reason)
 		replay_pending_layout_refresh()
 	end
+	-- Released by the guardian wait once the helper reports a non-ready status:
+	-- the retained regeneration keeps polling and still provisions the lease on
+	-- approval, but the script's RESUME stops waiting for it.
+	if no_live_lease then _lease_less_resume_waiters[finish_resume] = true end
 
 	local call_ok, requested_or_err = xpcall(function()
 		return M.regenerate(finish_resume, PAUSED_RESUME_REGENERATION)
@@ -4959,6 +5034,7 @@ function M.init(file_system)
 
 	_state = {
 		enabled                   = user_cfg.enabled,
+		tap_holds_enabled         = user_cfg.tap_holds_enabled ~= false,
 		tap_hold_config           = user_cfg.tap_hold_config,
 		mod_combos_config         = user_cfg.mod_combos_config,
 		tap_hold_timeout_ms       = user_cfg.tap_hold_timeout_ms,

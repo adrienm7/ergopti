@@ -45,6 +45,7 @@ local Reader = require("toml_codec.reader")
 local Priority = require("hotstring_priority")
 local Paths  = require("infra.paths")
 local Shell  = require("adapters.shell_runner")
+local CatalogueFiles = require("hotstrings.catalogue_files")
 
 local LOG = "modules.hotstrings.loader"
 
@@ -319,7 +320,9 @@ end
 --- Underscore-prefixed files in that directory are not categories: _index.toml
 --- is the menu index for the directory and defaults.toml holds the resolver's
 --- fallback values. Loading either as a pack produced an empty group sitting in
---- the menu beside the real ones.
+--- the menu beside the real ones. The rule itself is shared with macOS
+--- (_shared/lua/hotstrings/catalogue_files.lua), whose own copy lacked the
+--- defaults.toml half.
 ---
 --- A pure predicate rather than an inline condition inside the scan, because the
 --- scan shells out to `find` and cannot run on the interpreter this repo is
@@ -327,10 +330,7 @@ end
 --- @param path string A file path.
 --- @return boolean
 function M.is_pack_file(path)
-	if type(path) ~= "string" or path == "" then return false end
-	local name = path:match("([^/\\]+)$")
-	if not name or not name:match("%.toml$") then return false end
-	return name:sub(1, 1) ~= "_" and name ~= "defaults.toml"
+	return CatalogueFiles.is_category_file(path)
 end
 
 --- Scans a directory tree and returns every hotstring pack in it.

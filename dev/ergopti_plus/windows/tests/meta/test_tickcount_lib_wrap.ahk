@@ -138,14 +138,13 @@ _TCLW_NoFirstPartyAbsoluteDeadlines() {
 		["GestureRegionCapturePoll", 'A_TickCount >= State["save_deadline"]', "TickExpired("],
 		["_TakeNoteQueueFinalize", '"deadline", A_TickCount +', '"started_tick"'],
 		["_TakeNoteAbortIfUnavailable", 'A_TickCount >= Job["deadline"]', "TickExpired("],
-		["_CrashReport_SysInfo", "Deadline := A_TickCount +", "TickExpired("],
 		["LLM_RemoteGenerate_Async", '"deadline_tick", A_TickCount +', "_LLMRemote_ReserveRequest("],
 		["_LLMRemote_ReserveRequest", '"deadline_tick", A_TickCount +', '"start_tick"'],
 		["_LLMRemote_PollRequest", 'entry.Has("deadline_tick")', "_LLM_DeadlineExpired("],
 		["SpotlightMouseAt", '_Spotlight_State["Deadline"] := A_TickCount +', '"StartedTick"'],
 		["_SpotlightTick", 'A_TickCount >= _Spotlight_State["Deadline"]', "TickExpired("]
 	]
-	Assert(Cases.Length >= 16,
+	Assert(Cases.Length >= 15,
 		"tickcount absolute-deadline ratchet must enumerate the complete audited sibling class")
 	for Spec in Cases {
 		Body := _DriverFuncBody(Spec[1])
@@ -155,6 +154,12 @@ _TCLW_NoFirstPartyAbsoluteDeadlines() {
 		Assert(InStr(Body, Spec[3]) > 0,
 			Spec[1] . " must route deadline arithmetic through the wrap-safe tick primitive")
 	}
+	; The crash report no longer waits on git: the commit comes from the build
+	; stamp, so its system-info collector holds no deadline at all.
+	SysInfo := _DriverFuncBody("_CrashReport_SysInfo")
+	Assert(SysInfo != "", "_CrashReport_SysInfo must be discoverable in the driver source")
+	Assert(!InStr(SysInfo, "A_TickCount +") && !InStr(SysInfo, "RunWait"),
+		"_CrashReport_SysInfo must not wait on a child process or hold a tick deadline")
 	TakeNotePoll := _DriverFuncBody("_TakeNotePoll")
 	Assert(TakeNotePoll != "" && InStr(TakeNotePoll, "_TakeNoteAbortIfUnavailable(JobId, Job)") > 0,
 		"_TakeNotePoll must reach its wrap-safe terminal-state guard before every later side effect")

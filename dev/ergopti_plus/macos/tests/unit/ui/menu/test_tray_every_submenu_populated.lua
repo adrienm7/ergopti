@@ -266,4 +266,44 @@ helpers.describe("the real macOS tray: every submenu reaches the menu bar popula
 		end
 		helpers.assert_eq(#duplicated, 0, "rows drawn in two submenus: " .. table.concat(duplicated, ", "))
 	end)
+
+	--- The submenu of the top-level row whose title starts with `key`'s text.
+	--- @param key string i18n key of the top-level row.
+	--- @return table|nil
+	local function top_submenu(key)
+		local text = require("infra.i18n").get(key)
+		for _, row in ipairs(MENU or {}) do
+			if type(row.title) == "string" and row.title:sub(1, #text) == text then return row.menu end
+		end
+		return nil
+	end
+
+	helpers.it("hotstrings: the language packs sit under their own header, flag first", function()
+		-- The language row was a bare « Français (n) » among the neutral
+		-- categories, which users read as one more category and overlooked.
+		local rows = top_submenu("menu.hotstrings.title")
+		helpers.assert_true(type(rows) == "table", "the tray must carry the hotstrings submenu")
+		local at
+		for index, row in ipairs(rows) do
+			if type(row.title) == "string" and row.title:find("Français", 1, true) then at = index end
+		end
+		helpers.assert_true(at ~= nil, "the French language pack row must be drawn")
+		helpers.assert_eq(rows[at].title:sub(1, #"🇫🇷 Français"), "🇫🇷 Français",
+			"the language row starts with the locale's flag, from the shared locale table")
+		helpers.assert_eq(rows[at - 1].title, require("infra.i18n").section("menu.hotstrings.header_languages"),
+			"a « Hotstrings par langue » header must precede the language rows")
+		helpers.assert_eq(rows[at - 2].title, "-", "and a separator must precede that header")
+	end)
+
+	helpers.it("global actions: a separator sets the unused-settings cleanup apart", function()
+		local rows = top_submenu("menu.global.title")
+		helpers.assert_true(type(rows) == "table", "the tray must carry the global actions submenu")
+		local label = require("infra.i18n").get("menu.global.clean_unused_keys")
+		local at
+		for index, row in ipairs(rows) do
+			if row.title == label then at = index end
+		end
+		helpers.assert_true(at ~= nil and at > 1, "the cleanup row must be drawn after the other actions")
+		helpers.assert_eq(rows[at - 1].title, "-", "a separator must precede « Nettoyer les réglages inutilisés »")
+	end)
 end)

@@ -22,6 +22,11 @@
 ---    visible brings it to the front instead of opening a duplicate.
 --- 3. Channel routing: the caller passes a default channel ("main" or "dev");
 ---    the user can switch channels interactively inside the UI.
+--- 4. One document policy: the page's browser-host CSP only allows external
+---    same-origin scripts, which blocks every script once inlined, so the page
+---    never left its loading state. The generated document instead carries the
+---    shared driver policy (_shared/lua/webview/document_csp.lua) with a
+---    per-document nonce on every script.
 --- ==============================================================================
 
 local M = {}
@@ -35,6 +40,7 @@ local i18n       = require("infra.i18n")
 local FileSystem = require("adapters.file_system")
 local Json       = require("json")
 local ReleaseSources = require("updater.release_sources")
+local DocumentCsp = require("webview.document_csp")
 
 local LOG = "changelog_window"
 
@@ -69,7 +75,15 @@ local function http_get(url, headers, timeout_ms, callback)
 		settled = true
 		callback(status, body, err)
 	end
-	hs.http.asyncGet(url, headers, function(status, body, _)
+	-- The deadline is armed before the request so a request that raises or never
+	-- answers still ends; an unarmed deadline is itself a terminal failure.
+	if not DeferredWork.after(timeout_ms / 1000, function() settle(0, "", "timeout") end,
+		"changelog.fetch_deadline")
+	then
+		settle(0, "", "deadline unavailable")
+		return
+	end
+	local ok = pcall(hs.http.asyncGet, url, headers, function(status, body, _)
 		status = tonumber(status) or 0
 		if status < 0 then
 			settle(0, "", "network error " .. tostring(status))
@@ -77,8 +91,7 @@ local function http_get(url, headers, timeout_ms, callback)
 			settle(status, body, nil)
 		end
 	end)
-	DeferredWork.after(timeout_ms / 1000, function() settle(0, "", "timeout") end,
-		"changelog.fetch_deadline")
+	if not ok then settle(0, "", "request refused") end
 end
 
 M._http_get = http_get
@@ -407,9 +420,20 @@ local function build_window(channel, opening_generation, focus_owner)
 	-- are set before script.js's init() fires.
 	local raw_html = ui_builder.build_injected_html(ASSETS_DIR)
 	if _focus_owner ~= focus_owner or type(raw_html) ~= "string" then return false end
-	local final_html = raw_html:gsub("(<head[^>]*>)", function(tag)
+	local configured_html = raw_html:gsub("(<head[^>]*>)", function(tag)
 		return tag .. config_script
 	end, 1)
+	local ok_uuid, uuid = pcall(hs.host.uuid)
+	local nonce = ok_uuid and type(uuid) == "string" and uuid:gsub("[^%w]", "") or ""
+	if nonce == "" then
+		Logger.error(LOG, "Cannot build changelog: CSP nonce generation failed.")
+		return false
+	end
+	local final_html, csp_err = DocumentCsp.apply(configured_html, nonce)
+	if not final_html then
+		Logger.error(LOG, "Cannot build changelog: %s.", tostring(csp_err))
+		return false
+	end
 
 	local geo = ui_builder.get_app_geometry("changelog")
 	if not geo or _focus_owner ~= focus_owner then return false end

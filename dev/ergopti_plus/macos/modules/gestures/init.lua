@@ -73,8 +73,8 @@ M.DEFAULT_GESTURES = {
 	swipe_2_left_down    = "none",
 	swipe_2_right_down   = "none",
 
-	swipe_3_left         = "word_prev",
-	swipe_3_right        = "word_next",
+	swipe_3_left         = "sel_word_prev",
+	swipe_3_right        = "sel_word_next",
 	swipe_3_up           = "tab_prev",
 	swipe_3_down         = "tab_next",
 	swipe_3_left_up      = "none",
@@ -111,8 +111,8 @@ M.DEFAULT_SENSITIVITY = 3.5
 local FRAME_HEARTBEAT_EVERY = 120
 
 -- space_wrap is the one cross-driver gesture default in the shared manifest, so
--- it is sourced from there; the `gestures` enabled flag has no manifest path, and
--- modes/sensitivities are computed per swipe slot below (not simple defaults).
+-- it is sourced from there; the `gestures` enabled flag has no manifest path,
+-- modes are computed per swipe slot below and sensitivities read per slot.
 M.DEFAULT_STATE = {
 	gestures = false,
 	modes = {},
@@ -127,7 +127,13 @@ for k, v in pairs(M.DEFAULT_GESTURES) do
 		local isIncremental = k:match("swipe_3_left") or k:match("swipe_3_right") or k:match("swipe_3_up") or k:match("swipe_3_down")
 			or k:match("swipe_5_left") or k:match("swipe_5_right")
 		if isIncremental then M.DEFAULT_STATE.modes[k] = "incremental" end
-		M.DEFAULT_STATE.sensitivities[k] = M.DEFAULT_SENSITIVITY
+		-- Per-direction defaults live in the shared manifest; only the axis slots
+		-- (swipe_N_horiz), which it does not declare, take the generic step.
+		if k:match("_horiz$") then
+			M.DEFAULT_STATE.sensitivities[k] = M.DEFAULT_SENSITIVITY
+		else
+			M.DEFAULT_STATE.sensitivities[k] = Manifest.default_for("gestures.sensitivities." .. k)
+		end
 	end
 end
 

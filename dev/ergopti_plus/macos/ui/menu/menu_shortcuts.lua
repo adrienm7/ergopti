@@ -573,19 +573,6 @@ function M.build(ctx)
 
 	-- Each handler appends its items into the ``items`` list it receives.
 
-	-- group_builders return { items = rows } (or nil to skip) — the renderer wraps
-	-- them with the i18n label from the manifest entry and materialises the rows,
-	-- so what a group hands over is DATA rather than a finished tree.
-	local function build_ctrl_shortcuts(_ctx)
-		if #ctrl_items == 0 then return nil end
-		return { disabled = not state.shortcuts or paused or nil, items = ctrl_items }
-	end
-
-	local function build_cmd_shortcuts(_ctx)
-		if #cmd_items == 0 then return nil end
-		return { disabled = not state.shortcuts or paused or nil, items = cmd_items }
-	end
-
 	--- The script-control shortcuts, as the one row a `list` provider returns.
 	--- @return table Provider rows (empty when the module is absent).
 	local function dyn_script_control()
@@ -794,14 +781,17 @@ function M.build(ctx)
 		end
 	end
 
-	-- Top-level items (at_hash, layer_scroll) are not in the manifest list yet;
-	-- prepend them before the manifest-driven items for backward compatibility.
+	-- The feature toggles (at_hash, layer_scroll, the wrap-text toggle) open the
+	-- submenu. They are row DATA handed over by the wrap-symbols list provider,
+	-- which the manifest places first, so the renderer draws them like every
+	-- other row: prepended after rendering, the wrap-text toggle reached the tray
+	-- with no title and hs.menubar drew nothing.
 	local top_items = {}
 	for _, id in ipairs(TOP_ORDER) do
 		if top_map[id] then table.insert(top_items, top_map[id]) end
 	end
 	if wrap_item then
-		if #top_items > 0 then table.insert(top_items, { title = "-" }) end
+		if #top_items > 0 then table.insert(top_items, { separator = true }) end
 		-- The symbols submenu USED to hang off this toggle. It is a manifest row of
 		-- its own now (`list:wrap_symbols_menu`), which is where Windows and Linux
 		-- have always shown it — the same feature was sitting in two different
@@ -817,10 +807,7 @@ function M.build(ctx)
 	local dyn_handlers = {
 	}
 
-	local group_builders = {
-		ctrl_shortcuts = build_ctrl_shortcuts,
-		cmd_shortcuts  = build_cmd_shortcuts,
-	}
+	local group_builders = {}
 
 	-- The keyboard slots are a list, not a group: their rows are the user's own
 	-- assignments, so the manifest can name the section but not enumerate it. The
@@ -830,12 +817,22 @@ function M.build(ctx)
 		-- enumerate them — and the manifest called this Windows-only until
 		-- 2026-08-06 while this driver had been building it all along.
 		["wrap_symbols_menu"] = function()
-			return { { label = i18n.get("menu.shortcuts.wrap_symbols"),
-			           disabled = not state.shortcuts or paused or nil,
-			           items = build_wrap_symbols_submenu(ctx, state, paused, shortcuts) } }
+			local rows = {}
+			for _, row in ipairs(top_items) do rows[#rows + 1] = row end
+			if #rows > 0 then rows[#rows + 1] = { separator = true } end
+			rows[#rows + 1] = { label = i18n.get("menu.shortcuts.wrap_symbols"),
+			                    disabled = not state.shortcuts or paused or nil,
+			                    items = build_wrap_symbols_submenu(ctx, state, paused, shortcuts) }
+			return rows
 		end,
 		keyboard_slots = function(_ctx)
-			return KeyboardSlots.provide_rows(ctx, (not state.shortcuts) or paused or nil)
+			-- The built-in Ctrl and Cmd shortcuts open the group of their own
+			-- modifier: as groups of their own they drew a second "Ctrl" and
+			-- "Cmd" submenu beside the configurable one.
+			return KeyboardSlots.provide_rows(ctx, (not state.shortcuts) or paused or nil, {
+				hs_ctrl_ = ctrl_items,
+				cmd_     = cmd_items,
+			})
 		end,
 		["script_control_shortcuts"] = dyn_script_control,
 		["extensions_shortcuts"] = extension_shortcut_rows,
@@ -857,14 +854,6 @@ function M.build(ctx)
 	sc_ctx.state_getters["shortcuts_enabled"] = function() return state.shortcuts and true or false end
 
 	local s_menu = ManifestMenu.build("shortcuts_menu", "Shortcuts", dyn_handlers, group_builders, sc_ctx, list_providers)
-
-	-- Prepend the top-level feature items before the manifest section
-	for i, it in ipairs(top_items) do
-		table.insert(s_menu, i, it)
-	end
-	if #top_items > 0 and #s_menu > #top_items then
-		table.insert(s_menu, #top_items + 1, { title = "-" })
-	end
 
 	item.submenu = s_menu
 	return item

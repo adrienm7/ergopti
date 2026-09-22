@@ -33,6 +33,12 @@ SetWorkingDir(A_ScriptDir)
 ;   --only <substr>  run only tests whose name contains <substr> (case-insensitive),
 ;                    e.g. AutoHotkey64.exe run_all.ahk --only "(my-slug)" to replay
 ;                    a single failing test without the whole suite.
+; Reject malformed options before includes can initialize tests or input hooks.
+_RejectRunnerArguments(Message) {
+	FileAppend("Invalid test runner arguments: " . Message . "`n", "**")
+	ExitApp(2)
+}
+
 global _AHK_DRY_RUN := false
 global _AHK_ONLY_FILTER := ""
 global _AHK_INTERACTIVE := false
@@ -43,11 +49,22 @@ while (_riArgIndex <= A_Args.Length) {
 		_AHK_DRY_RUN := true
 	else if (_riArg == "--interactive")
 		_AHK_INTERACTIVE := true
-	else if (_riArg == "--only" && _riArgIndex < A_Args.Length) {
-		_riArgIndex += 1
-		_AHK_ONLY_FILTER := A_Args[_riArgIndex]
-	} else if (SubStr(_riArg, 1, 7) == "--only=")
-		_AHK_ONLY_FILTER := SubStr(_riArg, 8)
+	else if (_riArg == "--only" || SubStr(_riArg, 1, 7) == "--only=") {
+		if StrLen(_AHK_ONLY_FILTER) > 0
+			_RejectRunnerArguments("--only may be supplied only once")
+		if (_riArg == "--only") {
+			if (_riArgIndex >= A_Args.Length)
+				_RejectRunnerArguments("--only requires a non-empty filter")
+			_riArgIndex += 1
+			_AHK_ONLY_FILTER := A_Args[_riArgIndex]
+			if (SubStr(_AHK_ONLY_FILTER, 1, 2) == "--")
+				_RejectRunnerArguments("a filter starting with -- requires the --only= form")
+		} else
+			_AHK_ONLY_FILTER := SubStr(_riArg, 8)
+		if (Trim(_AHK_ONLY_FILTER, " `t`r`n") == "")
+			_RejectRunnerArguments("--only requires a non-empty filter")
+	} else
+		_RejectRunnerArguments("unknown option or unexpected positional argument")
 	_riArgIndex += 1
 }
 
@@ -320,6 +337,7 @@ InstallSendNoOps()
 #Include unit/test_toml_helpers_roundtrip.ahk
 #Include unit/test_hotstrings_cache.ahk
 #Include unit/test_hotstring_language_packs.ahk
+#Include unit/test_menu_languages_and_global_separator.ahk
 #Include unit/test_dynamic_hotstrings_module.ahk
 #Include unit/test_hotstrings_config.ahk
 #Include unit/test_hotstring_delimiter_global_transaction_20260813.ahk

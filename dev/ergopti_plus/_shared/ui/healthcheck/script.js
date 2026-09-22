@@ -138,13 +138,13 @@ window.renderHealthcheck = function (s) {
 	if (sys.dpi_scale !== undefined) {
 		// Windows DPI
 		html += row('DPI', escapeHtml(String(sys.dpi || '') + ' (' + String(sys.dpi_scale) + '%)'));
-	} else if (sys.dpi !== undefined) {
-		// macOS DPI (may have retina_scale)
-		var dpiVal = escapeHtml(String(sys.dpi || '?'));
-		if (sys.retina_scale) {
-			dpiVal += ' &nbsp;<em>' + escapeHtml(String(sys.retina_scale)) + ' Retina</em>';
-		}
-		html += row('DPI', dpiVal);
+	} else if (sys.dpi !== undefined || sys.retina_scale) {
+		// macOS: the DPI is absent when the physical size is unknown, and the
+		// backing scale then stands alone rather than behind a "?".
+		var dpiParts = [];
+		if (sys.dpi !== undefined) dpiParts.push(escapeHtml(String(sys.dpi)));
+		if (sys.retina_scale) dpiParts.push('<em>' + escapeHtml(String(sys.retina_scale)) + ' Retina</em>');
+		html += row('DPI', dpiParts.join(' &nbsp;'));
 	}
 
 	html += row('Locale', escapeHtml(String(sys.locale || '?')));
@@ -152,10 +152,10 @@ window.renderHealthcheck = function (s) {
 	if (sys.config_dir) {
 		html += row('Config dir', '<code>' + escapeHtml(String(sys.config_dir)) + '</code>');
 	}
-	// Where the driver's scripts run from: inside a packaged app this is the
+	// Where the application runs from: inside a packaged app this is the
 	// bundle, which is why it must never be presented as the config dir.
 	if (sys.script_dir) {
-		html += row('Script dir', '<code>' + escapeHtml(String(sys.script_dir)) + '</code>');
+		html += row('App dir', '<code>' + escapeHtml(String(sys.script_dir)) + '</code>');
 	}
 
 	html += '</table>';
