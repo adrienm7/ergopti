@@ -14,6 +14,7 @@ M.ACTIONS = {
 	previewLocale = true,
 	localeSelected = true,
 	pickConfigDir = true,
+	resolveMetricsPath = true,
 	loadExistingConfig = true,
 	finish = true,
 	registerGesturesAuto = true,
@@ -79,7 +80,7 @@ local function locale_available(i18n, code)
 	return false
 end
 
-local function locale_strings(code, config_paths)
+local function locale_strings(code)
 	local locale_path = Paths.shared("data/locales/" .. code .. ".json")
 	local fh = locale_path and io.open(locale_path, "r") or nil
 	if not fh then
@@ -92,13 +93,6 @@ local function locale_strings(code, config_paths)
 	if not ok or type(strings) ~= "table" then
 		Logger.error(LOG, "Onboarding locale '%s' is invalid.", tostring(code))
 		return nil
-	end
-	local warning = strings["dialog.metrics.enable_warning"]
-	if type(warning) == "string" then
-		local metrics_path = config_paths.data("metrics.sqlite")
-		strings["dialog.metrics.enable_warning_formatted"] = warning:gsub("{1}", function()
-			return metrics_path
-		end)
 	end
 	return strings
 end
@@ -125,8 +119,10 @@ local function build_init_data(state)
 	local gestures = state.gestures
 	return {
 		locale = current_locale,
-		strings = locale_strings(current_locale, config_paths) or {},
+		strings = locale_strings(current_locale) or {},
 		default_config_dir = default_dir,
+		-- The page fills the step-4 consent warning with this path.
+		metrics_path = config_paths.metrics_path(),
 		system_layout = type(state.layout) == "string" and state.layout or "",
 		platform = "linux",
 		locales = require("_generated.locale_table"),
@@ -348,9 +344,8 @@ function M.on_message(payload, state)
 			titled = retitle(state, data.strings) }
 	elseif action == "previewLocale" then
 		local i18n = dependency(state, "i18n", "infra.i18n")
-		local config_paths = dependency(state, "config_paths", "infra.config_paths")
 		if not locale_available(i18n, payload.locale) then return { pushed = false } end
-		local strings = locale_strings(payload.locale, config_paths)
+		local strings = locale_strings(payload.locale)
 		if not strings then return { pushed = false } end
 		return { pushed = push(state, "applyStrings", {
 			locale = payload.locale, strings = strings,
@@ -360,6 +355,17 @@ function M.on_message(payload, state)
 		return { accepted = locale_available(i18n, payload.locale) }
 	elseif action == "pickConfigDir" then
 		return pick_config_dir(state, payload.current)
+	elseif action == "resolveMetricsPath" then
+		-- The store lives in the data directory and does not follow the chosen
+		-- configuration folder; answering keeps the page on the keylogger's path.
+		local config_paths = dependency(state, "config_paths", "infra.config_paths")
+		if type(payload.request) ~= "number" or not config_paths then
+			Logger.error(LOG, "resolveMetricsPath refused — request number or path authority missing.")
+			return { pushed = false }
+		end
+		local path = config_paths.metrics_path()
+		return { pushed = push(state, "setMetricsPath", { request = payload.request, path = path }),
+			path = path }
 	elseif action == "loadExistingConfig" then
 		local config_paths = dependency(state, "config_paths", "infra.config_paths")
 		local chosen = config_paths and normalize_config_dir(config_paths, payload.config_dir) or nil

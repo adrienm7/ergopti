@@ -180,12 +180,7 @@ M.DEFAULT_STATE = {
 local CoreState = {
 	-- Paths — keystroke / metrics data goes under <config_dir>/metrics/.
 	-- Resolved at module-load time via the central menu_paths module
-	LOG_DIR = (function()
-		local mp = require("infra.config_paths")
-		local d  = mp.get_config_dir()
-		if not d:match("[/\\]$") then d = d .. "/" end
-		return d .. "metrics"
-	end)(),
+	LOG_DIR = require("infra.config_paths").metrics_dir(),
 
 	-- Enablement
 	options    = { encrypt = false },

@@ -72,6 +72,7 @@ local function load_keylogger(options)
 	}
 	package.loaded["infra.config_paths"] = {
 		get_config_dir = function() return "/tmp/ergopti-test" end,
+		metrics_dir = function() return "/tmp/ergopti-test/metrics" end,
 	}
 	package.loaded["infra.dialog_util"] = { alert = function() end }
 

@@ -71,7 +71,7 @@ local function load_fixture()
 	}
 	package.loaded["modules.keymap"] = { get_shift_side = function() return nil end }
 	package.loaded["infra.manifest_reader"] = { default_for = function() return true end }
-	package.loaded["infra.config_paths"] = { get_config_dir = function() return "/tmp" end }
+	package.loaded["infra.config_paths"] = { get_config_dir = function() return "/tmp" end, metrics_dir = function() return "/tmp/metrics" end }
 
 	package.loaded["tests.stubs.hs"] = nil
 	local base = require("tests.stubs.hs")

@@ -213,7 +213,7 @@ ToggleMetricsEnabled() {
 	; honoured) so the displayed path matches reality, even when the user
 	; has relocated their config.
 	global _ConfigDir
-	metrics_path := _ConfigDir . "metrics"
+	metrics_path := KL_MetricsDirFor(_ConfigDir)
 	warn := Format(t("dialog.metrics.enable_warning"), metrics_path)
 	; Icon! = exclamation triangle (warning). Iconx is the red error stop
 	; sign and was the wrong choice for a "you are about to enable a
