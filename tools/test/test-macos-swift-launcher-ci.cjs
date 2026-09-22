@@ -224,6 +224,13 @@ check(/if \[ "\$total" -lt 4 \]/.test(macosGate),
 const launchGate = withoutFullLineComments(jobBody('launch-gate-macos'));
 check(/uses:\s*\.\/\.github\/workflows\/macos-launch-gate\.yml/.test(launchGate),
 	'(symlinked-config-dir) every push/PR must launch the packaged app over user states');
+// Forks receive no secrets: without a stand-in key their package opens a
+// Sparkle error and the launch gate fails every outside contribution.
+const packageBuild = withoutFullLineComments(stepBody(jobBody('package-macos'), 'Build ErgoptiPlus.app'));
+check(/if \[ -z "\$SPARKLE_PUBLIC_KEY" \]; then[\s\S]*?\/dev\/urandom[\s\S]*?fi[\s\S]*?build_macos_app\.sh/.test(packageBuild),
+	'(fork-sparkle-key) the unreleased package must substitute a throwaway Sparkle key when the secret is absent');
+check(!/\/dev\/urandom/.test(WORKFLOW.replace(jobBody('package-macos'), '')),
+	'(fork-sparkle-key) only the never-published launch-gate package may use a throwaway Sparkle key');
 const finalizeRelease = withoutFullLineComments(jobBody('finalize-release'));
 check(/\bneeds\s*:[^\n]*\brelease-gate-macos\b/.test(finalizeRelease),
 	'(symlinked-config-dir) finalize-release must wait for the launch gate on the exact release archive');

@@ -322,13 +322,24 @@ jobs:
       # The public EdDSA key must be embedded: without SUPublicEDKey, Sparkle
       # opens an updater error at launch, and the launcher then never observes
       # its child's logger readiness or exit, so every launch verdict is void.
+      # Pull requests from forks receive no secrets. This package is never
+      # published or offered as an update, so a throwaway key of the right
+      # shape keeps the launch gate meaningful for outside contributors
+      # instead of failing them for a secret they cannot have.
       - name: Build ErgoptiPlus.app
         env:
           ERGOPTI_CHANNEL: dev
           SPARKLE_PUBLIC_KEY: ${{ secrets.SPARKLE_PUBLIC_KEY }}
           GH_OWNER: ${{ github.repository_owner }}
           GH_REPO: ${{ github.event.repository.name }}
-        run: bash tools/build/build_macos_app.sh
+        run: |
+          set -euo pipefail
+          if [ -z "$SPARKLE_PUBLIC_KEY" ]; then
+              echo "::notice title=Sparkle key::No SPARKLE_PUBLIC_KEY secret (pull request from a fork). Using a throwaway key: this package only feeds the launch gate and is never published."
+              SPARKLE_PUBLIC_KEY="$(head -c 32 /dev/urandom | base64)"
+              export SPARKLE_PUBLIC_KEY
+          fi
+          bash tools/build/build_macos_app.sh
 
       - name: Retain the package for the launch gate
         uses: actions/upload-artifact@v4
