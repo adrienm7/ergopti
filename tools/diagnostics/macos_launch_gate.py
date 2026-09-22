@@ -37,6 +37,7 @@ import json
 import os
 from pathlib import Path
 import plistlib
+import re
 import shutil
 import signal
 import subprocess
@@ -47,6 +48,9 @@ READY_MARKER = "Onboarding wizard opened."
 # The launcher's own fatal line; the Lua runtime writes "... FATAL at boot stage".
 LAUNCHER_FATAL = "FATAL:"
 LUA_FATAL = "FATAL at boot stage"
+# FATAL as a word, not inside an identifier such as ERGOPTI_FATAL_REPORT_FILE,
+# which the boot log names when it lists the launcher environment.
+FATAL_WORD = re.compile(r"(?<![A-Za-z0-9_])FATAL(?![A-Za-z0-9_])")
 FALLBACK_BOOT_LOG = Path("/tmp/ErgoptiPlus_boot.log")
 CONFIG_TEMPLATE = Path(__file__).resolve().parents[2] / "static/ergopti_plus/macos/_generated/config_template.toml"
 CONFIGURED_MARKER = "embedded Hammerspoon bootstrap logger configured"
@@ -214,7 +218,7 @@ def evaluate(scenario, observation):
     """Return every failed criterion for one scenario; an empty list is a pass."""
     failures = []
     launcher = observation.get("launcher_log", "")
-    fatal = [line for line in launcher.splitlines() if "FATAL" in line]
+    fatal = [line for line in launcher.splitlines() if FATAL_WORD.search(line)]
     expected = EXPECTED_REFUSALS.get(scenario)
     if expected is not None:
         launcher_fatal = [line for line in fatal if LAUNCHER_FATAL in line]
