@@ -181,7 +181,8 @@ KLR_BuildDatabase(metrics_dir) {
 										; The previous disk image no longer describes the source. Its
 										; save age cannot defer handing this recovery to the next worker.
 										KLRCache.saved_at := ""
-										KLR_CacheSaveIfOwned(md, logPath)
+										if KLR_CacheSaveIfOwned(md, logPath) && cold.Has("checkpoint")
+												KLR_RebuildDiscardCheckpoint(md)
 										return KLRCache.db
 								}
 						}
@@ -303,12 +304,17 @@ KLR_BuildDatabase(metrics_dir) {
 		}
 
 		cold := KLR_BuildColdCandidateAuto(md, logPath)
-		if !cold.Get("ok", false)
+		if !cold.Get("ok", false) {
+				; A peer worker finished the same rebuild while this one waited.
+				if cold.Get("peer_published", false) && KLR_CacheAttach(md, logPath)
+						return KLR_BuildDatabase(metrics_dir)
 				return 0
+		}
 		KLR_PublishCandidate(cold["db"], cold["sizes"], cold["snapshots"])
 		; Hand the finished image to the next worker. Everything above cost
 		; minutes and none of it has to be paid twice for the same bytes.
-		KLR_CacheSaveIfOwned(md, logPath)
+		if KLR_CacheSaveIfOwned(md, logPath) && cold.Has("checkpoint")
+				KLR_RebuildDiscardCheckpoint(md)
 		return KLRCache.db
 }
 

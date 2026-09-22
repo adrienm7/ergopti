@@ -20,22 +20,31 @@ _KLRNF_ThreeDayLedger() {
 }
 
 ; Run one worker build with the given rebuild seams, restoring them after.
-_KLRNF_Build(Segmented, Observer := 0) {
+_KLRNF_Build(Segmented, Observer := 0, StopAfterRounds := 0) {
 	Saved := [KLRRebuild.min_ledger_bytes, KLRRebuild.chunk_bytes,
-		KLRRebuild.round_interval_ms, KLRRebuild.observer]
+		KLRRebuild.round_interval_ms, KLRRebuild.observer,
+		KLRRebuild.checkpoint_interval_ms, KLRRebuild.stop_after_rounds]
 	try {
 		KLRRebuild.min_ledger_bytes := Segmented ? 0 : 0x7FFFFFFF
-		; One fixture batch per read, and a rollup round after every read.
+		; One fixture batch per read, a rollup round and a checkpoint after each.
 		KLRRebuild.chunk_bytes := 700
 		KLRRebuild.round_interval_ms := 0
+		KLRRebuild.checkpoint_interval_ms := 0
+		KLRRebuild.stop_after_rounds := StopAfterRounds
 		KLRRebuild.observer := Observer
 		try FileDelete(KLR_CachePath(_KLRDC_Root()))
-		return _KLRDC_BuildAsWorker()
+		if !StopAfterRounds
+			return _KLRDC_BuildAsWorker()
+		KLR_ResetCache()
+		KLRCache.disposable := true
+		return KLR_BuildDatabase(_KLRDC_Root())
 	} finally {
 		KLRRebuild.min_ledger_bytes := Saved[1]
 		KLRRebuild.chunk_bytes := Saved[2]
 		KLRRebuild.round_interval_ms := Saved[3]
 		KLRRebuild.observer := Saved[4]
+		KLRRebuild.checkpoint_interval_ms := Saved[5]
+		KLRRebuild.stop_after_rounds := Saved[6]
 	}
 }
 
@@ -133,3 +142,62 @@ _KLRNF_TornTailIsLeftForLater() {
 }
 Test("KLR rebuild: a torn tail is left to the next refresh (klr-newest-first-torn-tail)",
 	_KLRDC_CheckTeardown.Bind(_KLRNF_TornTailIsLeftForLater))
+
+; A driver reload kills the worker mid-rebuild. The next worker must continue
+; from the last checkpoint instead of starting over, and still end exact.
+_KLRNF_KilledWorkerResumes() {
+	_KLRDC_EnsureSharedDir()
+	_KLRDC_Reset()
+	try {
+		_KLRDC_WriteLedger(_KLRNF_ThreeDayLedger())
+		Reference := _KLRDC_DerivedFingerprint(_KLRNF_Build(false))
+		Checkpoint := KLR_RebuildCheckpointPath(_KLRDC_Root())
+		AssertEqual(0, _KLRNF_Build(true, 0, 3), "the interrupted worker must not publish anything")
+		AssertTrue(FSExists(Checkpoint), "an interrupted rebuild must leave its checkpoint (klr-rebuild-resume)")
+		AssertFalse(FSExists(KLR_CachePath(_KLRDC_Root())), "an interrupted rebuild must not publish an image")
+
+		First := 0
+		Observe(Info) {
+			if !IsObject(First) && Info.Has("done_bytes")
+				First := Info.Clone()
+		}
+		Resumed := _KLRNF_Build(true, Observe)
+		AssertTrue(IsObject(First))
+		AssertTrue(First["done_bytes"] > First["run_bytes"],
+			"the next worker must continue from the checkpoint, not from zero (klr-rebuild-resume)")
+		AssertEqual(Reference, _KLRDC_DerivedFingerprint(Resumed),
+			"a resumed rebuild must end exactly where an uninterrupted one ends (klr-rebuild-resume)")
+		AssertFalse(FSExists(Checkpoint), "a published image supersedes its checkpoint")
+	} finally {
+		_KLRDC_Cleanup()
+	}
+}
+Test("KLR rebuild: a killed worker resumes from its checkpoint (klr-rebuild-resume)",
+	_KLRDC_CheckTeardown.Bind(_KLRNF_KilledWorkerResumes))
+
+; A checkpoint only describes the exact ledger bytes it consumed.
+_KLRNF_ReplacedLedgerDiscardsCheckpoint() {
+	_KLRDC_EnsureSharedDir()
+	_KLRDC_Reset()
+	try {
+		_KLRDC_WriteLedger(_KLRNF_ThreeDayLedger())
+		AssertEqual(0, _KLRNF_Build(true, 0, 3))
+		AssertTrue(FSExists(KLR_RebuildCheckpointPath(_KLRDC_Root())))
+		; A compaction replaces the file: its identity changes.
+		_KLRDC_WriteLedger(_KLRDC_Header()
+			. _KLRDC_TypingBatch(1, "2026-03-05 09:00:00.000", "2026-03-05", "five.exe", ["q"]))
+		First := 0
+		Observe(Info) {
+			if !IsObject(First) && Info.Has("done_bytes")
+				First := Info.Clone()
+		}
+		Db := _KLRNF_Build(true, Observe)
+		AssertEqual(First["done_bytes"], First["run_bytes"], "a stale checkpoint must not be resumed")
+		AssertEqual("2026-03-05", _KLRNF_Days(Db),
+			"no day from the replaced ledger may survive in the rebuilt image (klr-rebuild-resume)")
+	} finally {
+		_KLRDC_Cleanup()
+	}
+}
+Test("KLR rebuild: a replaced ledger discards the checkpoint (klr-rebuild-resume)",
+	_KLRDC_CheckTeardown.Bind(_KLRNF_ReplacedLedgerDiscardsCheckpoint))
