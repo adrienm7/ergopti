@@ -73,6 +73,23 @@ if not _writer_ok then TomlWriter = nil end
 -- held for seconds would report elapsed ~= 0 and be misclassified as a tap.
 local _now_sec = Monotonic.now_sec
 
+-- Which mouse buttons the click-toggle actions currently hold down ("1" for
+-- left, "3" for right). Without this the toggle fires mousedown on every
+-- invocation and the button sticks down in a drag until a manual mouseup.
+local _click_toggle_down = { ["1"] = false, ["3"] = false }
+
+--- Returns the xdotool command toggling one button hold, flipping the
+--- remembered state: odd fires press, even fires release.
+--- @param button string "1" for left, "3" for right.
+--- @return string The xdotool command to run.
+local function _click_toggle_command(button)
+	_click_toggle_down[button] = not _click_toggle_down[button]
+	if _click_toggle_down[button] then
+		return "xdotool mousedown " .. button
+	end
+	return "xdotool mouseup " .. button
+end
+
 -- =========================================
 -- =========================================
 -- ======= 1/ Gesture Slot Registry ========
@@ -588,16 +605,25 @@ local function _execute_action(action_name, go_next, binding)
 	elseif action_name == "search_web" then
 		local template = M.get_action_parameter(binding, action_name)
 		if M.validate_action_parameter(action_name, template) then
-			_run("xdg-open " .. shell_quote((template:gsub("%%s", url_encode_query(primary_selection())))))
+			local query = primary_selection()
+			if query == "" then
+				Logger.warn(LOG, "search_web: no primary selection to search for ÔÇö nothing opened.")
+				return
+			end
+			-- Function replacement: the encoded query carries %XX sequences
+			-- and a string replacement would read them as capture references
+			-- ("invalid capture index" on the first space).
+			local encoded = url_encode_query(query)
+			_run("xdg-open " .. shell_quote((template:gsub("%%s", function() return encoded end))))
 		end
 		return
 	end
 
 	if action_name == "left_click_toggle" then
 		-- Toggle mouse button hold via xdotool.
-		_run("xdotool mousedown 1")
+		_run(_click_toggle_command("1"))
 	elseif action_name == "right_click_toggle" then
-		_run("xdotool mousedown 3")
+		_run(_click_toggle_command("3"))
 	elseif action_name == "ws_prev" then
 		_run(workspace_switch_command(-1, "ctrl+alt+Left"))
 	elseif action_name == "ws_next" then
@@ -1032,10 +1058,16 @@ function M.pump()
 	local ok_reader, Reader = pcall(require, "adapters.evdev_reader")
 	if not ok_reader then return 0 end
 
-	return Reader.drain(function(event)
+	local drained, status = Reader.drain(function(event)
 		local gesture = _decoder:feed(event)
 		if gesture then M.dispatch_gesture(gesture) end
 	end, Reader.TOUCHPAD)
+	if status == "fatal" or status == "closed" then
+		Logger.error(LOG, "Touchpad drain %s — stopping gesture reading; re-enable gestures to retry.",
+			tostring(status))
+		M.stop_reading()
+	end
+	return drained or 0
 end
 
 --- Stops reading the touchpad.
@@ -1122,9 +1154,17 @@ local function load_user_config(path)
 	local function apply_actions(section)
 		if type(section) ~= "table" then return end
 		for slot, action in pairs(section) do
-			if M.DEFAULT_GESTURES[slot]
+			if M.DEFAULT_GESTURES[slot] and type(action) == "string"
 				and (action == "none" or ACTION_I18N_KEYS[action] or ACTION_COMPUTED_LABELS[action])
 			then
+				_actions[slot] = action
+			elseif M.DEFAULT_GESTURES[slot] and type(action) == "string" then
+				-- Kept, not dropped: set_action() persisted it and reported
+				-- success, so dropping it here would silently revert a save.
+				-- An action no catalogue knows (removed, or written by a newer
+				-- version) stays bound and dispatches as a no-op until rebound.
+				Logger.warn(LOG, "Unknown action '%s' for slot '%s' — kept, dispatches as a no-op.",
+					tostring(action), tostring(slot))
 				_actions[slot] = action
 			end
 		end

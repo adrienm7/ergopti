@@ -203,6 +203,14 @@ helpers.describe("storage adapter publishes only durable mutations", function()
 
 	helpers.it("reports failure under an unwritable config root without a memory-only success", function()
 		local blocker = os.tmpname()
+		-- Establish the precondition for real: a file where the directory
+		-- must be makes the root genuinely unwritable on every platform. A
+		-- bare tmpname only reserves a name, and a working mkdir -p would
+		-- simply create the directories and let the mutation succeed.
+		do
+			local guard = assert(io.open(blocker, "w"))
+			guard:close()
+		end
 		local real_getenv = os.getenv
 		os.getenv = function(name)
 			if name == "XDG_CONFIG_HOME" then return blocker end

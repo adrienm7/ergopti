@@ -307,7 +307,13 @@ function M.new(opts)
 		-- is fingers resting on the pad, which travels no distance either. Without
 		-- this, putting a hand down and lifting it later fires whatever tap_N is
 		-- bound to.
-		if tap_max_sec and elapsed > tap_max_sec then
+		if not tap_max_sec then
+			-- Fail closed: without a ceiling a rest is indistinguishable from a
+			-- tap, so nothing may fire. Reporting tap=true here would fire
+			-- tap_N for fingers merely resting on the pad.
+			return nil
+		end
+		if elapsed > tap_max_sec then
 			return nil
 		end
 

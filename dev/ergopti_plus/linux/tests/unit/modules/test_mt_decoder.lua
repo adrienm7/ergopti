@@ -281,6 +281,45 @@ helpers.describe("mt decoder: taps", function()
 			"a slow swipe is still a swipe")
 	end)
 
+	helpers.it("tap-fail-closed: fires nothing when the tap ceiling is unreadable", function()
+		-- If [gestures].tap_max_ms cannot be read, taps cannot be
+		-- time-bounded and every stationary touch — including fingers merely
+		-- resting — would report tap=true. Fail closed instead: no ceiling,
+		-- no tap. The ceiling is a module field, so it is stubbed and
+		-- restored around the case.
+		local saved_ceiling = Decoder.TAP_MAX_SEC
+		Decoder.TAP_MAX_SEC = nil
+		local ok, err = pcall(function()
+			local clock = 100.0
+			local decoder = Decoder.new({ now_sec = function() return clock end })
+			local out = nil
+			for _, e in ipairs(gesture_events(3, 0, 0)) do
+				local result = decoder:feed({ type = e[1], code = e[2], value = e[3] })
+				if result then out = result end
+			end
+			helpers.assert_nil(out,
+				"without a ceiling a rest is indistinguishable from a tap, so nothing may fire")
+		end)
+		Decoder.TAP_MAX_SEC = saved_ceiling
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("tap-fail-closed: swipes do not need the ceiling", function()
+		-- Lock-in against over-correction: a swipe is a swipe however long it
+		-- took, so the fail-closed tap path must not take swipes down with it.
+		local saved_ceiling = Decoder.TAP_MAX_SEC
+		Decoder.TAP_MAX_SEC = nil
+		local ok, err = pcall(function()
+			local clock = 100.0
+			local decoder = Decoder.new({ now_sec = function() return clock end })
+			local out = feed_all(decoder, gesture_events(3, 0, -400))
+			helpers.assert_true(out ~= nil and out.direction == "up",
+				"a swipe with no readable ceiling must still fire")
+		end)
+		Decoder.TAP_MAX_SEC = saved_ceiling
+		if not ok then error(err, 0) end
+	end)
+
 end)
 
 

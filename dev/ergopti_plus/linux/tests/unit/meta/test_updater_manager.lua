@@ -534,6 +534,36 @@ helpers.describe("modules/updater/manager.lua", function()
 		M.clear_cached_release()
 	end)
 
+	helpers.it("cancel-update: a verified archive does not survive cancellation", function()
+		-- Regression: cancel_update() cleared partial downloads but left a
+		-- verified archive on disk with state "available", so install_update()
+		-- still succeeded after the user — or the shutdown coordinator —
+		-- requested cancellation.
+		local real_http = M._http_client
+		local real_digest = M._file_digest
+		M._http_client = { cancel = function() return true end }
+		M._file_digest = { cancel = function() return true end }
+		local archive = os.tmpname()
+		write_file(archive, "verified fixture archive")
+		local ok, err = pcall(function()
+			M._test_set_verified_archive(archive)
+			helpers.assert_eq(M.get_state(), "available",
+				"precondition: the archive is verified and installable")
+			helpers.assert_true(M.cancel_update(), "cancel must succeed")
+			helpers.assert_eq(M.get_state(), "idle",
+				"cancel must leave no available update behind")
+			helpers.assert_true(not Fs.exists(archive),
+				"the verified archive must be deleted with the cancellation")
+			helpers.assert_eq(M.install_update(archive), false,
+				"a cancelled archive must no longer install")
+		end)
+		M._http_client = real_http
+		M._file_digest = real_digest
+		Fs.delete(archive)
+		M.clear_cached_release()
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("normalises LuaJIT numeric process failures", function()
 		helpers.assert_eq(Installer._status_ok(0), true)
 		helpers.assert_eq(Installer._status_ok(256), false,

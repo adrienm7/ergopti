@@ -48,8 +48,20 @@ local ManifestMenu     = require("infra.manifest_menu")
 -- nothing needs doing, so the menu opens instantly in the nominal case.
 local mlx_deps_checker    = require("modules.llm.mlx_deps_checker")
 local ollama_deps_checker = require("modules.llm.ollama_deps_checker")
+local ShellRunner         = require("adapters.shell_runner")
 
 local LOG = "menu_llm"
+
+-- Absolute binaries for the quit-time helper sweeps. Each sweep is an async task
+-- with an explicit argument vector: the former hs.execute(cmd, true) ran a login
+-- AND interactive shell on the Hammerspoon main thread, so a slow or prompting
+-- shell profile could hang Quit ("not responding") with no timeout at all.
+local PKILL_BIN = "/usr/bin/pkill"
+local SH_BIN = "/bin/sh"
+local LSOF_BIN = "/usr/sbin/lsof"
+local XARGS_BIN = "/usr/bin/xargs"
+local KILL_BIN = "/bin/kill"
+local MAX_TCP_PORT = 65535
 
 --- Wraps pcall and logs Logger.error when the wrapped call fails, so we
 --- never swallow exceptions silently (violates project rule 5.3). Pass
@@ -289,45 +301,80 @@ function M.stop_mlx_server(on_settled)
 	return type(on_settled) == "function"
 end
 
+--- Starts one process sweep and returns without waiting for it. The task is
+--- pinned by ShellRunner until its native completion; at process exit the child
+--- simply outlives Hammerspoon and finishes on its own. No completion callback
+--- is installed: it could run after the logger sink was finalized for exit.
+--- @param label string Diagnostic sweep name.
+--- @param executable string Absolute binary path.
+--- @param args string[] Exact argument vector (no shell expansion).
+--- @return boolean started
+local function start_detached_sweep(label, executable, args)
+	local spawn_ok, handle = xpcall(function()
+		return ShellRunner.spawn(executable, args, nil)
+	end, debug.traceback)
+	if not spawn_ok or type(handle) ~= "table" or type(handle.start) ~= "function" then
+		Logger.error(LOG, "Helper sweep '%s' could not be created: %s.", label, tostring(handle))
+		return false
+	end
+	local start_ok, started = xpcall(handle.start, debug.traceback)
+	if not start_ok or started ~= true then
+		Logger.error(LOG, "Helper sweep '%s' could not be started: %s.", label, tostring(started))
+		return false
+	end
+	Logger.debug(LOG, "Helper sweep '%s' dispatched.", label)
+	return true
+end
+
 --- Kills the orphan helper processes spawned for the local LLM backends (the
---- expander + http server). Shared by the genuine-quit shutdown callback AND the
---- script_quit action: script_quit exits via os.exit(0), which bypasses
---- hs.shutdownCallback, so it must perform the identical teardown. Centralising it
---- here means the two quit paths can never drift (the bug was that script_quit
---- revoked the exact remap lease + flushed the keylogger but left the MLX server
---- + helpers alive). Stock Karabiner processes are never owned by Ergopti.
+--- expander + http server + the `ollama serve` wrapper). Called by the root
+--- teardown shared by every controlled reload and quit path, so the quit entry
+--- points can never drift. Stock Karabiner processes are never owned by Ergopti.
+--- The sweeps are asynchronous: this runs on the Hammerspoon main thread during
+--- Quit and must never wait for a subprocess.
+--- @return boolean started True when every sweep was dispatched.
 function M.terminate_helper_processes()
 	M.reset_llm_health_status()
-	pcall(hs.execute, "pkill -f 'ergopti_plus_expander'", true)
-	pcall(hs.execute, "pkill -f 'ergopti_plus_http_server'", true)
-	-- The `ollama serve` wrapper this driver launches is a third helper and was
-	-- not on this list. It is spawned through a /bin/sh pipeline, so terminating
-	-- the hs.task only reaps the shell — the server itself survived every quit
-	-- path and kept appending to the Ergopti log after Hammerspoon was gone.
-	-- Matched on the same shape api_ollama uses to kill a stale one at launch, so
-	-- the two agree on what "our ollama serve" means.
-	pcall(hs.execute, "pkill -f '[o]llama serve'", true)
+	local all_started = true
+	for _, sweep in ipairs({
+		{ label = "expander", pattern = "ergopti_plus_expander" },
+		{ label = "http-server", pattern = "ergopti_plus_http_server" },
+		-- The `ollama serve` wrapper is spawned through a /bin/sh pipeline, so
+		-- terminating its hs.task only reaps the shell; the server itself must be
+		-- matched here. Same shape api_ollama uses to kill a stale one at launch.
+		{ label = "ollama-serve", pattern = "[o]llama serve" },
+	}) do
+		if not start_detached_sweep(sweep.label, PKILL_BIN, { "-f", sweep.pattern }) then
+			all_started = false
+		end
+	end
+	return all_started
 end
 
 --- Kills any orphan mlx_lm.server and frees its listening port when no current
---- lifecycle owner can be reached. The exact stop primitive already proves its
---- captured port absent; this remains the previous-session/crash fallback shared
---- by BOTH the hs.shutdownCallback genuine-quit branch and
---- the script_quit (os.exit) action so the two quit paths can never drift — without
---- this, script_quit left the GPU-resident server holding the port (F-M7). The port
---- is read from the single source api_mlx.get_port().
+--- lifecycle owner can be reached (previous-session or crash leftover). The exact
+--- stop primitive already proves its captured port absent. Quit-only step of the
+--- root teardown; both sweeps are dispatched asynchronously and never awaited.
+--- The port is read from the single source api_mlx.get_port().
+--- @return boolean started True when both sweeps were dispatched.
 function M.terminate_orphan_mlx_server()
 	M.reset_llm_health_status()
-	pcall(function()
-		local ok_m, am = pcall(require, "modules.llm.api_mlx")
-		local raw_port = (ok_m and type(am.get_port) == "function" and am.get_port())
-		             or  (ok_m and am.DEFAULT_PORT)
-		             or  3460
-		local p = tostring(raw_port)
-		hs.execute(
-			"pgrep -f 'mlx_lm.*server' | xargs kill -9 2>/dev/null; " ..
-			"lsof -tiTCP:" .. p .. " -sTCP:LISTEN | xargs kill -9 2>/dev/null", true)
-	end)
+	local port_ok, raw_port = xpcall(ApiMlx.get_port, debug.traceback)
+	local port = port_ok and tonumber(raw_port) or nil
+	if not port or port % 1 ~= 0 or port < 1 or port > MAX_TCP_PORT then
+		Logger.error(LOG, "Orphan MLX sweep refused: invalid MLX port %s.", tostring(raw_port))
+		return false
+	end
+	local processes_started = start_detached_sweep("mlx-server-processes", PKILL_BIN,
+		{ "-9", "-f", "mlx_lm.*server" })
+	-- A pipeline needs /bin/sh, but a plain non-login one: no user profile runs.
+	-- The port is a validated integer, so the command text contains no user data.
+	local listener_started = start_detached_sweep("mlx-port-listener", SH_BIN, {
+		"-c",
+		string.format("%s -nP -tiTCP:%d -sTCP:LISTEN | %s %s -9 2>/dev/null",
+			LSOF_BIN, port, XARGS_BIN, KILL_BIN),
+	})
+	return processes_started and listener_started
 end
 
 
@@ -969,7 +1016,17 @@ local function create_menu(deps)
 				end
 
 				local rich_model_title = health_dot .. i18n.get("menu.llm.active_model_label")
-				if not state.llm_model or state.llm_model == "" then
+				if state.llm_backend == "api" then
+						-- The local llm_model slot is stale on this backend: show the
+						-- active API entry's configured name instead, without
+						-- local-model badges.
+						local entry_name = nil
+						if type(ApiPanel.active_entry_display_name) == "function" then
+							entry_name = ApiPanel.active_entry_display_name()
+						end
+						rich_model_title = rich_model_title
+							.. (entry_name or i18n.get("menu.llm.no_model_none"))
+				elseif not state.llm_model or state.llm_model == "" then
 						rich_model_title = rich_model_title .. i18n.get("menu.llm.no_model_none")
 				else
 						rich_model_title = rich_model_title .. string.format("%s%s%s", active_display_model, type_str, params_ram_str)

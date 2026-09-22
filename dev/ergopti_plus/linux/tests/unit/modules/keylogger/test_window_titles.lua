@@ -180,3 +180,72 @@ helpers.describe("window titles: the gate", function()
 	end)
 
 end)
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 3/ The title belongs to an application ==================
+-- =================================================================
+-- =================================================================
+
+helpers.describe("window titles: the owner of the interval (title-owner)", function()
+
+	helpers.it("title-owner: a cross-app title change credits the owning application", function()
+		-- Regression: the interval closed against the INCOMING application,
+		-- whose titles table has no such row, so the time vanished — and every
+		-- later keystroke missed its count the same way.
+		local writer = with_writer(function(keylogger)
+			keylogger.on_app_focus("code", 1000)
+			keylogger.set_window_title("code", "Doc", 1000)
+			keylogger.on_app_focus("shell", 2000)
+			keylogger.set_window_title("shell", "Terminal", 2000)
+			keylogger.flush()
+		end)
+
+		local titles = written_titles(writer)
+		helpers.assert_not_nil(titles["Doc"],
+			"the Doc interval must be credited to code when focus moves to shell")
+		helpers.assert_true(titles["Doc"].ms >= 1000,
+			"the full interval earned under Doc must survive the switch")
+	end)
+
+	helpers.it("title-owner: the daemon title-then-focus order keeps attribution", function()
+		-- The daemon sends set_window_title and on_app_focus together, title
+		-- first. Closing the title on every focus change would orphan the
+		-- window it just named and unattributed the keystrokes after it.
+		local writer = with_writer(function(keylogger)
+			keylogger.on_app_focus("code", 1000)
+			keylogger.set_window_title("code", "Doc", 1000)
+			keylogger.on_keydown("a", 1100, "code")
+			keylogger.set_window_title("shell", "Terminal", 2000)
+			keylogger.on_app_focus("shell", 2000)
+			keylogger.on_keydown("b", 2100, "shell")
+			keylogger.flush()
+		end)
+
+		local titles = written_titles(writer)
+		helpers.assert_eq(titles["Doc"].c, 1,
+			"keystrokes before the switch stay with the old window")
+		helpers.assert_eq(titles["Terminal"].c, 1,
+			"keystrokes after the title-then-focus pair belong to the new window, "
+				.. "not to no window at all")
+	end)
+
+	helpers.it("title-owner: a switch with no new title still credits the owner at switch time", function()
+		local writer = with_writer(function(keylogger)
+			keylogger.on_app_focus("code", 1000)
+			keylogger.set_window_title("code", "Doc", 1000)
+			keylogger.on_app_focus("shell", 2000)
+			keylogger.flush()
+		end)
+
+		local titles = written_titles(writer)
+		helpers.assert_not_nil(titles["Doc"],
+			"the Doc interval must close at the switch even when no new title follows")
+		helpers.assert_true(titles["Doc"].ms >= 1000,
+			"and it must be credited to code, the application that owned it")
+	end)
+
+end)

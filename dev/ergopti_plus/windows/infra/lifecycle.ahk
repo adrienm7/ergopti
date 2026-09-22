@@ -1021,13 +1021,22 @@ _TrayRootBuildBoot(PublishAuthorizeFn) {
 	; its generation, and force a second full InitSubMenus scan. Arm the cheap
 	; OFF-state population only after this root and its boot finalizer publish.
 	; A retained/retried boot worker reaches the same ownership seam.
-	if _TrayRootScheduleBootProjectionIfDisabled(
+	; Either projection stands down when initMenu already populated the IA
+	; handle inline: re-running the whole menu then only re-renders an
+	; unchanged tree (~109-156 ms wall on real boots for 13 free rows).
+	if _TrayRootBootIaPopulationNeeded() && _TrayRootScheduleBootProjectionIfDisabled(
 			_LLM_Menu["enabled"], LLM_Menu_RequestBuild.Bind("boot"),
 			SetTimer, LLM_MENU_BUILD_DEFER_MS) {
 		try LoggerDebug("TrayMenu",
 			"Deferred root published; arming boot IA submenu build in {1} ms.",
 			LLM_MENU_BUILD_DEFER_MS)
 	}
+	; The api backend never reaches Ollama readiness, so unlike the ollama
+	; case nothing else populates the IA submenu after boot. Arm the same
+	; deferred population whenever the api backend is enabled (predicates owned
+	; by menu_rebuild.ahk, next to the IfDisabled gate).
+	if _TrayRootApiBootProjectionNeeded() && _TrayRootBootIaPopulationNeeded()
+		SetTimer(LLM_Menu_RequestBuild.Bind("boot"), -LLM_MENU_BUILD_DEFER_MS)
 	return true
 }
 

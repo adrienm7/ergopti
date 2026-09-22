@@ -20,16 +20,17 @@ local MODULES = {
 	"ui.menu.menu_llm.api_panel",
 }
 
-local function run_add_fixture(prompt_result)
+local function run_add_fixture(prompt_result, confirm_choice, seed_entries)
 	local observations = nil
 	helpers.with_fresh_modules(MODULES, function()
-		local entries = {}
+		local entries = seed_entries or {}
 		local active_id = ""
 		local prompt_calls = 0
 		local validation_calls = 0
 		local persistence_calls = 0
 		local reset_calls = 0
 		local staged_entry = nil
+		local probe_calls = {}
 		local api_remote = {
 			PROVIDER_ORDER = { "openai" },
 			PROVIDERS = {
@@ -44,16 +45,30 @@ local function run_add_fixture(prompt_result)
 			get_active_entry_id = function() return active_id end,
 			set_active_entry_id = function(value) active_id = value end,
 			get_active_entry = function() return nil end,
-			check_availability = function(model)
+			get_test_request_spec = function()
+				return {
+					system_prompt = "probe sys", user_text = "ping",
+					temperature = 0, max_tokens = 16,
+				}
+			end,
+			check_availability = function(model, on_ok)
 				validation_calls = validation_calls + 1
 				staged_entry = entries[1]
-				return false, model
+				if type(on_ok) == "function" then on_ok() end
+				return true, model
+			end,
+			test_request = function(entry, spec, on_ok, on_fail)
+				probe_calls[#probe_calls + 1] = {
+					entry = entry, on_ok = on_ok, on_fail = on_fail,
+				}
+				return true
 			end,
 		}
 		package.loaded["modules.llm"] = {
 			api_remote = api_remote,
-			persist_api_entries = function()
+			persist_api_entries = function(callback)
 				persistence_calls = persistence_calls + 1
+				if type(callback) == "function" then callback(true, nil, true) end
 			end,
 		}
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
@@ -67,6 +82,9 @@ local function run_add_fixture(prompt_result)
 			text_prompt = function()
 				prompt_calls = prompt_calls + 1
 				return prompt_result(prompt_calls)
+			end,
+			block_alert = function()
+				return confirm_choice
 			end,
 		}
 		package.loaded["infra.notifications"] = { notify = function() return true end }
@@ -107,6 +125,7 @@ local function run_add_fixture(prompt_result)
 			active_id = active_id,
 			model = state.llm_model,
 			staged_entry = staged_entry,
+			probe_calls = probe_calls,
 		}
 	end)
 	return observations
@@ -151,6 +170,44 @@ helpers.describe("API panel prompt cancellation", function()
 		helpers.assert_type(got.staged_entry, "table")
 		helpers.assert_eq(got.staged_entry.base_url, "")
 		helpers.assert_eq(got.staged_entry.model, "default-model")
-		helpers.assert_eq(got.staged_entry.label, "OpenAI")
+		helpers.assert_eq(got.staged_entry.label, "openai/default-model",
+			"an empty label defaults to provider/model, never the bare provider")
+	end)
+
+	helpers.it("dedupes a taken default label", function()
+		local values = { "", "secret", "", "" }
+		local got = run_add_fixture(function(index)
+			return "OK", values[index]
+		end, "button.cancel", {
+			{ id = "old", provider = "openai", model = "default-model", label = "openai/default-model" },
+		})
+
+		helpers.assert_eq(#got.entries, 2, "the new entry must be staged")
+		helpers.assert_eq(got.entries[#got.entries].label, "openai/default-model (2)",
+			"a taken default label must count up so rows stay distinct")
+	end)
+
+	helpers.it("offers a probe after add when confirmed", function()
+		local values = { "", "secret", "", "" }
+		local got = run_add_fixture(function(index)
+			return "OK", values[index]
+		end, "button.ok")
+
+		helpers.assert_eq(#got.probe_calls, 1,
+			"a confirmed offer must dispatch the probe on the new entry")
+		helpers.assert_eq(got.probe_calls[1].entry.id, got.active_id,
+			"the probe must target the just-created entry")
+	end)
+
+	helpers.it("skips the probe after add when declined", function()
+		local values = { "", "secret", "", "" }
+		local got = run_add_fixture(function(index)
+			return "OK", values[index]
+		end, "button.cancel")
+
+		helpers.assert_eq(#got.probe_calls, 0,
+			"a declined offer must persist without probing")
+		helpers.assert_eq(#got.entries, 1,
+			"declining the probe must not cancel the creation")
 	end)
 end)

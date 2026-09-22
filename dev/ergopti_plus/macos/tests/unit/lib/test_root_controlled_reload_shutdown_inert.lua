@@ -39,6 +39,7 @@ local MODULE_NAMES = {
 	"modules.dynamic_hotstrings",
 	"adapters.toml_cache",
 	"infra.toml.reader",
+	"infra.timings",
 	"infra.launcher_guard",
 	"adapters.file_system",
 	"platform.remap",
@@ -263,6 +264,14 @@ local function run_isolated(options, assertions)
 			["modules.dynamic_hotstrings"] = {},
 			["adapters.toml_cache"] = { init = function() return true end },
 			["infra.toml.reader"] = { set_cache_provider = function() end },
+			-- The fake TOML reader cannot parse the shared registry; the root
+			-- coordinator only reads the user-quit deadline from it
+			["infra.timings"] = {
+				sec = function(section, key)
+					helpers.assert_eq(section .. "." .. key, "ui.user_quit_deadline_ms")
+					return 12
+				end,
+			},
 			["infra.launcher_guard"] = {
 				init = function() return true end,
 				stop = function() return true end,

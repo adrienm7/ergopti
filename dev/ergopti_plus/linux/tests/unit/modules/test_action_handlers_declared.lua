@@ -224,3 +224,124 @@ helpers.describe("linux actions: screenshots", function()
 	end)
 
 end)
+
+
+
+
+-- =========================================================
+-- =========================================================
+-- ======= 4/ Click toggles, which must let go =============
+-- =========================================================
+-- =========================================================
+
+helpers.describe("linux actions: click toggles", function()
+
+	helpers.it("click-toggle: the second fire releases what the first held", function()
+		-- Regression: both branches ran `xdotool mousedown` with no state and
+		-- no mouseup, so firing twice held the button twice and never let go —
+		-- a stuck drag selecting everything until a manual mouseup.
+		local G = helpers.load_module("modules.gestures.manager")
+		with_recorded_shell(function(commands)
+			G.execute_action("left_click_toggle", "test__slot")
+			G.execute_action("left_click_toggle", "test__slot")
+			helpers.assert_eq(#commands, 2,
+				"two fires must run exactly two commands")
+			helpers.assert_true(commands[1]:find("mousedown 1", 1, true) ~= nil,
+				"the first fire holds the left button down")
+			helpers.assert_true(commands[2]:find("mouseup 1", 1, true) ~= nil,
+				"the second fire must release it — repeating mousedown sticks the button down in a drag")
+		end)
+	end)
+
+	helpers.it("click-toggle: left and right buttons toggle independently", function()
+		local G = helpers.load_module("modules.gestures.manager")
+		with_recorded_shell(function(commands)
+			G.execute_action("left_click_toggle", "test__slot")
+			G.execute_action("right_click_toggle", "test__slot")
+			G.execute_action("left_click_toggle", "test__slot")
+			G.execute_action("right_click_toggle", "test__slot")
+			helpers.assert_eq(#commands, 4,
+				"four fires must run exactly four commands")
+			helpers.assert_true(commands[1]:find("mousedown 1", 1, true) ~= nil,
+				"left goes down first")
+			helpers.assert_true(commands[2]:find("mousedown 3", 1, true) ~= nil,
+				"right goes down independently of left")
+			helpers.assert_true(commands[3]:find("mouseup 1", 1, true) ~= nil,
+				"left goes back up on its own second fire")
+			helpers.assert_true(commands[4]:find("mouseup 3", 1, true) ~= nil,
+				"and so does right")
+		end)
+	end)
+
+end)
+
+
+
+
+-- =========================================================
+-- =========================================================
+-- ======= 5/ Search needs something to search =============
+-- =========================================================
+-- =========================================================
+
+helpers.describe("linux actions: web search", function()
+
+	--- Runs body with xclip absent (io.popen returns nil).
+	local function without_xclip(body)
+		local real_popen = io.popen
+		io.popen = function() return nil end
+		local ok, err = pcall(body)
+		io.popen = real_popen
+		if not ok then error(err, 0) end
+	end
+
+	--- Runs body with xclip returning `selection`.
+	local function with_selection(selection, body)
+		local real_popen = io.popen
+		io.popen = function()
+			return {
+				read = function() return selection end,
+				close = function() return true end,
+			}
+		end
+		local ok, err = pcall(body)
+		io.popen = real_popen
+		if not ok then error(err, 0) end
+	end
+
+	helpers.it("search-web: refuses an empty selection instead of opening a blank search", function()
+		-- Regression: with xclip missing (notably every Wayland session
+		-- without it), primary_selection() answered "" and the gesture opened
+		-- the engine with an empty query ÔÇö a wasted tab that answers nothing.
+		local G = helpers.load_module("modules.gestures.manager")
+		G.init({ enabled = false })
+		helpers.assert_true(
+			G.set_action_parameter("tap_3", "search_web", "https://duckduckgo.com/?q=%s"),
+			"the parameter must store before the gesture can run")
+		without_xclip(function()
+			with_recorded_shell(function(commands)
+				G.execute_action("search_web", "tap_3")
+				helpers.assert_eq(#commands, 0,
+					"with no selection there is no query ÔÇö opening the engine on "
+						.. "an empty q= wastes a tab and answers nothing")
+			end)
+		end)
+	end)
+
+	helpers.it("search-web: searches the selected text when there is some", function()
+		-- Lock-in against over-correction: refusing everything would also make
+		-- this green, while breaking the action's entire purpose.
+		local G = helpers.load_module("modules.gestures.manager")
+		G.init({ enabled = false })
+		G.set_action_parameter("tap_3", "search_web", "https://duckduckgo.com/?q=%s")
+		with_selection("hello world", function()
+			with_recorded_shell(function(commands)
+				G.execute_action("search_web", "tap_3")
+				helpers.assert_eq(#commands, 1, "a real selection must open exactly one search")
+				helpers.assert_true(commands[1]:find("q=hello%20world", 1, true) ~= nil,
+					"the selection must reach the engine URL-encoded")
+			end)
+		end)
+	end)
+
+end)

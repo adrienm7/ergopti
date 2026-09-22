@@ -66,6 +66,18 @@ local function pcall_log(name, fn, ...)
 	return ok, err
 end
 
+--- Fills ``{1}``-style placeholders shared with the Windows driver (whose
+--- formatter cannot do positional ``%s``). Translators may reorder the
+--- placeholders; only the set matters.
+--- @param template string Locale template.
+--- @param args table Positional values.
+--- @return string
+local function fill_placeholders(template, args)
+	return (tostring(template or ""):gsub("{(%d+)}", function(index)
+		return tostring(args[tonumber(index)] or "")
+	end))
+end
+
 --- Starts the callback-based persistence transaction and converts an immediate
 --- throw into the same explicit failure result as an async rejection.
 --- @param label string Diagnostic label.
@@ -119,6 +131,64 @@ end
 -- =============================
 -- =============================
 
+--- Display name for the active API entry: its configured label, else its
+--- model, else the provider default (what requests resolve), else nil.
+--- Used by the model parent row so backend api never shows the stale
+--- local-model slot.
+--- @return string|nil Display name or nil.
+function M.active_entry_display_name()
+	local remote = llm_mod and llm_mod.api_remote
+	if type(remote) ~= "table" then return nil end
+	if type(remote.get_active_entry_id) ~= "function"
+		or type(remote.get_entries) ~= "function" then
+		return nil
+	end
+	local active_id = remote.get_active_entry_id()
+	if type(active_id) ~= "string" or active_id == "" then return nil end
+	for _, e in ipairs(remote.get_entries() or {}) do
+		if type(e) == "table" and e.id == active_id then
+			if type(e.label) == "string" and e.label ~= "" then return e.label end
+			if type(e.model) == "string" and e.model ~= "" then return e.model end
+			local providers = remote.PROVIDERS
+			local prov = type(providers) == "table" and providers[e.provider] or nil
+			if type(prov) == "table" and type(prov.default_model) == "string"
+				and prov.default_model ~= "" then
+				return prov.default_model
+			end
+			return nil
+		end
+	end
+	return nil
+end
+
+--- Asks whether to probe a just-created entry end to end. Existing
+--- locale strings only (no new keys): the action label as question,
+--- OK/Cancel buttons. A declined answer is any non-OK choice.
+--- @return boolean True when the user confirmed.
+local function probe_offer_accepted()
+	local ok_c, choice = pcall(dialog.block_alert,
+		i18n.get("menu.llm.api_dialog_title"),
+		i18n.get("menu.llm.api_test_entry"),
+		i18n.get("button.ok"), i18n.get("button.cancel"), "informational")
+	return ok_c and choice == i18n.get("button.ok")
+end
+
+--- Returns a label unused by entries: the base, then base (2), ... so
+--- default provider/model names stay distinct row by row.
+--- @param base string Desired label.
+--- @param entries table|nil Entry list.
+--- @return string Unique label.
+local function unique_entry_label(base, entries)
+	local taken = {}
+	for _, e in ipairs(entries or {}) do
+		if type(e) == "table" and type(e.label) == "string" then taken[e.label] = true end
+	end
+	if not taken[base] then return base end
+	local n = 2
+	while taken[string.format("%s (%d)", base, n)] do n = n + 1 end
+	return string.format("%s (%d)", base, n)
+end
+
 --- Builds the API entries submenu and returns the title string and menu table.
 --- Only call when state.llm_backend == "api" — returns nil, nil otherwise.
 --- @param ctx table Context with fields: state, paused, keymap, update_menu, WarmupCtrl.
@@ -146,16 +216,13 @@ function M.build(ctx)
 	-- ===== 1.1) Entry list =====
 	-- =====================================================
 
-	-- One row per configured entry — clicking sets it as active and triggers a
-	-- warmup so the next prediction uses the new entry immediately.
+	-- One row per configured entry, showing the defined name only (the
+	-- provider/model pair is folded into the default name at creation) —
+	-- clicking sets it as active and triggers a warmup so the next
+	-- prediction uses the new entry immediately.
 	for _, e in ipairs(entries) do
-		local provider_label = (api_remote.PROVIDERS[e.provider] and api_remote.PROVIDERS[e.provider].label) or e.provider
-		local entry_title = string.format("%s — %s (%s)",
-			tostring(e.label or e.id or "?"),
-			tostring(e.model or "?"),
-			provider_label)
 		table.insert(rows, {
-			label    = entry_title,
+			label    = tostring(e.label or e.id or "?"),
 			checked  = (e.id == active_id),
 			disabled = (paused or mutation_busy) or nil,
 			action       = (not paused and not mutation_busy) and function()
@@ -188,11 +255,6 @@ function M.build(ctx)
 			end or nil
 		})
 	end
-
-	if #entries > 0 then
-		table.insert(rows, { separator = true })
-	end
-
 
 	-- =====================================================
 	-- ===== 1.2) Add entry =====
@@ -243,9 +305,13 @@ function M.build(ctx)
 						p.default_model,
 						i18n.get("menu.llm.api_prompt_model"))
 					if not model_ok then return false end
+					-- Label comes LAST so its default is provider/model. An
+					-- accepted empty label keeps that default; Cancel aborts.
+					local default_label = string.format("%s/%s", pid,
+						(model ~= "" and model) or p.default_model)
 					local label_ok, label = prompt_field(
 						string.format("API %s — Label", p.label),
-						"",
+						default_label,
 						i18n.get("menu.llm.api_prompt_name"))
 					if not label_ok then return false end
 
@@ -253,17 +319,18 @@ function M.build(ctx)
 					-- created within the same second (os.time() resolution = 1s).
 					_entry_seq = _entry_seq + 1
 					local id = string.format("%s-%d-%d", pid, os.time(), _entry_seq)
+					local list = api_remote.get_entries() or {}
 					local new_entry = {
 						id       = id,
 						provider = pid,
 						base_url = (base_url ~= "" and base_url ~= p.base_url) and base_url or "",
 						token    = token,
 						model    = (model ~= "" and model) or p.default_model,
-						label    = (label ~= "" and label) or p.label,
+						label    = unique_entry_label(
+							(label ~= "" and label) or default_label, list),
 					}
 					local previous_active_id = api_remote.get_active_entry_id and api_remote.get_active_entry_id() or ""
 					local previous_model = state.llm_model
-					local list = api_remote.get_entries() or {}
 					local previous_entries = {}
 					local clone = {}
 					for _, x in ipairs(list) do
@@ -320,6 +387,27 @@ function M.build(ctx)
 										Logger.error(LOG, "Remote API entry committed with cleanup debt: %s",
 											tostring(reason))
 									end
+									-- Offer the full end-to-end probe on the
+									-- just-saved entry (now active), so a bad
+									-- token or model surfaces here with its
+									-- server message instead of mid-typing. A
+									-- declined offer keeps the save.
+									if probe_offer_accepted() then
+										local spec = api_remote.get_test_request_spec and api_remote.get_test_request_spec() or nil
+										if type(spec) ~= "table" then
+											Logger.error(LOG, "API test refused: shared test-request spec unavailable.")
+										else
+											Logger.info(LOG, "API test dispatched for '%s' (model %s).",
+												tostring(new_entry.label or ""), tostring(new_entry.model or ""))
+											api_remote.test_request(new_entry, spec,
+												function(reply, ms)
+													notify_probe_verdict(true, tostring(new_entry.label or ""), reply, ms, nil)
+												end,
+												function(_, detail)
+													notify_probe_verdict(false, tostring(new_entry.label or ""), "", 0, detail)
+												end)
+										end
+									end
 									return
 								end
 								api_remote.set_entries(previous_entries)
@@ -351,16 +439,127 @@ function M.build(ctx)
 		items    = add_rows,
 	})
 
+	-- Add sits before the separator so creating an entry is one glance
+	-- away; the separator only appears with the management rows below,
+	-- never dangling when no entry exists.
+	if #entries > 0 then
+		table.insert(rows, { separator = true })
+	end
+
+
+	-- The active entry is shared by the management rows below (Test,
+	-- Remove): resolve it once so the two cannot disagree mid-build.
+	local active_entry = api_remote and api_remote.get_active_entry() or nil
+	local active_label = active_entry and (active_entry.label or active_entry.id or "") or ""
+
+	-- Shared probe-verdict rendering for the Test action and the post-add
+	-- probe below: success carries excerpt + latency, failure appends the
+	-- provider's own "[status] message" line (no locale key needed for it).
+	local function excerpt_reply(text)
+		local s = tostring(text or "")
+		if #s > 120 then return s:sub(1, 120) .. "..." end
+		return s
+	end
+	local function probe_fail_body(label, detail)
+		local fail_body = string.format(i18n.get("menu.llm.api_unreachable_body"), label)
+		if type(detail) == "table" then
+			local status = tonumber(detail.status) or 0
+			local message = type(detail.message) == "string"
+				and detail.message:match("^%s*(.-)%s*$") or ""
+			if message ~= "" then
+				fail_body = fail_body .. "\n"
+					.. (status > 0 and string.format("[%d] %s", status, message) or message)
+			end
+		end
+		return fail_body
+	end
+	local function notify_probe_verdict(ok, label, reply, ms, detail)
+		if ok then
+			pcall_log("notify(api_test_ok)", notifications.notify,
+				i18n.get("menu.llm.api_test_ok_title"),
+				fill_placeholders(i18n.get("menu.llm.api_test_ok_body"),
+					{ label, tostring(ms), excerpt_reply(reply) }),
+				"success")
+		else
+			pcall_log("notify(api_test_fail)", notifications.notify,
+				i18n.get("menu.llm.api_unreachable_title"),
+				probe_fail_body(label, detail),
+				"error")
+		end
+	end
+
 
 	-- =====================================================
-	-- ===== 1.3) Remove active entry =====
+	-- ===== 1.3) Test active entry =====
+	-- =====================================================
+
+	-- Sends the shared minimal probe to the active entry and surfaces the
+	-- verdict. Unlike the add-time availability ping this proves the full
+	-- path: credentials, model id and body format. No entry state is mutated,
+	-- so no mutation lease is taken; a mid-flight entry change or delete
+	-- discards the verdict instead of relabelling it.
+	if active_entry then
+		table.insert(rows, { separator = true })
+	end
+	table.insert(rows, {
+		label    = i18n.get("menu.llm.api_test_entry"),
+		disabled = (paused or mutation_busy or (active_entry == nil)) or nil,
+		action       = (not paused and not mutation_busy and active_entry) and function()
+			local probed_id = active_entry.id
+			local probed_label = tostring(active_entry.label or active_entry.id or "?")
+			local probed_entry = {
+				id       = active_entry.id,
+				provider = active_entry.provider,
+				base_url = active_entry.base_url,
+				token    = active_entry.token,
+				model    = active_entry.model,
+			}
+			local spec = api_remote.get_test_request_spec and api_remote.get_test_request_spec() or nil
+			if type(spec) ~= "table" then
+				Logger.error(LOG, "API test refused: shared test-request spec unavailable.")
+				pcall_log("notify(api_test_no_spec)", notifications.notify,
+					i18n.get("menu.llm.api_test_entry"),
+					i18n.get("menu.llm.api_providers_unavailable"), "error")
+				return false
+			end
+			-- Logged before dispatch, not after: if the click reaches this
+			-- action there is always exactly one line proving it, so a silent
+			-- menu click can be told apart from a handler failure.
+			Logger.info(LOG, "API test dispatched for '%s' (model %s).",
+				probed_label, tostring(probed_entry.model or ""))
+			local call_ok, dispatched = xpcall(function()
+				return api_remote.test_request(probed_entry, spec,
+					function(reply, ms)
+						if api_remote.get_active_entry_id() ~= probed_id then return end
+						local still_there = false
+						for _, e in ipairs(api_remote.get_entries() or {}) do
+							if e.id == probed_id then still_there = true; break end
+						end
+						if not still_there then return end
+						notify_probe_verdict(true, probed_label, reply, ms, nil)
+					end,
+					function(_reason, detail)
+						if api_remote.get_active_entry_id() ~= probed_id then return end
+						notify_probe_verdict(false, probed_label, "", 0, detail)
+					end)
+			end, debug.traceback)
+			if not call_ok or dispatched ~= true then
+				Logger.error(LOG, "API test dispatch failed: %s", tostring(dispatched))
+				return false
+			end
+			return true
+		end or nil,
+	})
+
+
+	-- =====================================================
+	-- ===== 1.4) Remove active entry =====
 	-- =====================================================
 
 	-- Remove only the active entry — keeps the action unambiguous and mirrors
 	-- the AHK tray's "remove active" semantics. Disabled when nothing is
-	-- configured so the user does not chase a no-op click.
-	local active_entry = api_remote and api_remote.get_active_entry() or nil
-	local active_label = active_entry and (active_entry.label or active_entry.id or "") or ""
+	-- configured so the user does not chase a no-op click. Test sits above
+	-- it: the destructive action stays last.
 	table.insert(rows, {
 		label    = active_entry
 			and string.format("🗑️ %s (%s)", i18n.get("menu.llm.api_remove_entry"), active_label)
@@ -416,7 +615,7 @@ function M.build(ctx)
 
 
 	-- =====================================================
-	-- ===== 1.4) Build parent row title =====
+	-- ===== 1.5) Build parent row title =====
 	-- =====================================================
 
 	local api_title = active_entry
@@ -486,13 +685,8 @@ function M.build_model_picker(ctx)
 	end
 
 	for _, e in ipairs(entries) do
-		local provider_label = (api_remote.PROVIDERS[e.provider] and api_remote.PROVIDERS[e.provider].label) or e.provider
-		local entry_title = string.format("%s — %s (%s)",
-			tostring(e.label or e.id or "?"),
-			tostring(e.model or "?"),
-			provider_label)
 		table.insert(rows, {
-			label    = entry_title,
+			label    = tostring(e.label or e.id or "?"),
 			checked  = (e.id == active_id),
 			disabled = (paused or mutation_busy) or nil,
 			action       = (not paused and not mutation_busy) and function()

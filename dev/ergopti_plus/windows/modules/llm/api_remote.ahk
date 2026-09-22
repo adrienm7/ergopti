@@ -40,6 +40,13 @@
 global LLM_API_PROVIDERS := Map()
 global LLM_API_PROVIDER_ORDER := []
 
+; Shared Test-API probe (system/user prompt, temperature, token budget) from
+; api_providers.json test_request — the exact request both drivers send
+; verbatim for the Test-active-entry action. Empty until _LLMRemote_LoadCatalog
+; validates the section; the menu refuses loudly while it is empty instead of
+; inventing probe values (single-source contract, see test-llm-test-request).
+global LLM_REMOTE_TEST_REQUEST := Map()
+
 global LLM_REMOTE_TIMEOUT_MS := 0   ; sentinel — sourced at boot by LLMApiLoadTimings ([llm] request_timeout_ms)
 
 
@@ -60,6 +67,12 @@ global LLM_REMOTE_TIMEOUT_MS := 0   ; sentinel — sourced at boot by LLMApiLoad
 ; Registry of in-flight async remote requests (parallel to _LLM_Ollama_Async).
 global _LLM_Remote_Async := Map()
 global _LLM_Remote_AsyncCounter := 0
+; Single source for the owned-probe kind: the Test-selected-API action tags its
+; reservation with this, and the engine cancel paths spare it. Without the tag
+; every keystroke during the probe (ResetPredictions, per-keystroke
+; CancelInflight) silently kills it — the poller sees a missing reservation
+; and fires neither callback, so the click ends with no log and no popup.
+global LLM_REMOTE_KIND_API_TEST := "api_test"
 global LLM_REMOTE_POLL_MS := 0   ; sentinel — sourced at boot by LLMApiLoadTimings ([llm] poll_interval_ms)
 global LLM_REMOTE_MAX_INFLIGHT := 16
 ; WinHttpRequest does the DNS resolve + TCP connect SYNCHRONOUSLY on the message-loop
@@ -82,16 +95,23 @@ global LLM_REMOTE_CONNECT_TIMEOUT_MS := 5000
  * @param {number}     Temperature  - Sampling temperature.
  * @param {function}   on_success   - Called with the generated text.
  * @param {function}   on_fail      - Called on HTTP / parse failure.
+ * @param {string}     Kind         - Reservation kind; LLM_REMOTE_KIND_API_TEST
+ *   exempts the request from the engine's keystroke cancels.
+ * @param {number}     TimeoutMs    - Override for this request only (0 keeps
+ *   the shared prediction timeout). The API test passes its own longer
+ *   budget: cold models need more than 30 s.
  * @returns {Integer}  Request id, usable with LLM_RemoteCancelAsync.
  */
-LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success, on_fail, TailText := "", max_tokens := "") {
+LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success, on_fail, TailText := "", max_tokens := "", Kind := "", TimeoutMs := 0) {
     global _LLM_Remote_Async, _LLM_Remote_AsyncCounter, LLM_REMOTE_TIMEOUT_MS
 
     _LLM_Remote_AsyncCounter += 1
     req_id := _LLM_Remote_AsyncCounter
-    timeout_ms := (LLM_REMOTE_TIMEOUT_MS > 0) ? LLM_REMOTE_TIMEOUT_MS : 30000
+    timeout_ms := (TimeoutMs > 0) ? TimeoutMs
+        : ((LLM_REMOTE_TIMEOUT_MS > 0) ? LLM_REMOTE_TIMEOUT_MS : 30000)
     reservation := _LLMRemote_ReserveRequest(req_id, on_success, on_fail,
         timeout_ms, A_TickCount)
+    reservation["kind"] := Kind
 
     resolved := _LLMRemoteResolveEntry(Entry)
     if (resolved == "") {
@@ -103,7 +123,8 @@ LLM_RemoteGenerate_Async(Entry, SystemPrompt, FullText, Temperature, on_success,
 
     req := _LLMRemote_BuildRequestContext(SystemPrompt, FullText, TailText)
     Url     := _LLMRemoteBuildUrl(resolved["BaseUrl"], resolved["Format"], resolved["Token"], resolved["Model"])
-    Payload := _LLMRemoteBuildPayload(resolved["Format"], resolved["Model"], req["system"], req["user"], Temperature, max_tokens)
+    Payload := _LLMRemoteBuildPayload(resolved["Format"], resolved["Model"], req["system"], req["user"], Temperature, max_tokens,
+        resolved.Has("Extras") ? resolved["Extras"] : Map())
 
     ; The curl child is the only production transport. Falling back to WinHTTP
     ; would put DNS/connect/Send back on the cooperative AHK thread.
@@ -160,11 +181,19 @@ _LLMRemote_DeleteOwned(req_id, reservation) {
     return Deleted
 }
 
-_LLMRemote_FailReserved(req_id, reservation, on_fail) {
+; Builds the failure payload every remote on_fail receives: a machine reason,
+; the HTTP status (0 when no response arrived) and the provider's own error
+; text ("" when none). Callers accept it as an optional trailing argument,
+; so zero-arg closures keep working where the info is not threaded yet.
+_LLMRemote_FailInfo(Reason, Status := 0, Message := "") {
+    return Map("reason", Reason, "status", Status, "message", Message)
+}
+
+_LLMRemote_FailReserved(req_id, reservation, on_fail, Reason := "dispatch") {
     if !_LLMRemote_DeleteOwned(req_id, reservation)
         return false
     if !reservation["cancelled"]
-        _LLM_InvokeCallback(on_fail, "on_fail")
+        _LLM_InvokeCallback(on_fail, "on_fail", _LLMRemote_FailInfo(Reason))
     return true
 }
 
@@ -423,9 +452,17 @@ _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail,
 ; Polls the curl child WITHOUT blocking the message loop. Mirrors _LLM_Ollama_PollCurl.
 _LLMRemoteClassifyTerminal(Format, Terminal, Model := "") {
     if !_LLM_CurlTerminalOk(Terminal) {
-        Result := _LLMRemoteClassifyResponse(Format, "", Model)
+        ; The readable body still goes through classification (never promotion:
+        ; error content cannot become completion text) so a 4xx provider
+        ; verdict reaches the user instead of a bare transport failure. The
+        ; transport reason stays for curl-level failures and unread bodies;
+        ; an answered non-2xx keeps the classifier's own reason.
+        ReadBody := (Terminal.Has("body_read") && Terminal["body_read"]
+            && Terminal.Has("body")) ? Terminal["body"] : ""
+        Result := _LLMRemoteClassifyResponse(Format, ReadBody, Model)
         Result["terminal_ok"] := false
-        Result["reason"] := "transport"
+        if (Terminal["exit"] != 0 || !Terminal["body_read"])
+            Result["reason"] := "transport"
         return Result
     }
     Result := _LLMRemoteClassifyResponse(Format, Terminal["body"], Model)
@@ -458,19 +495,21 @@ _LLMRemote_PollCurl(req_id, Port := 0) {
         body := terminal["body"]
         Classified := _LLMRemoteClassifyTerminal(fmt, terminal, model_id)
         if !Classified["terminal_ok"] {
-            try LoggerWarn("LLM.remote", "curl terminal failure req_id={1} exit={2} status={3} body_chars={4}.",
-                req_id, terminal["exit"], terminal["status"], StrLen(body))
+            try LoggerWarn("LLM.remote", "curl terminal failure req_id={1} exit={2} status={3} body_chars={4} reason={5} server_msg={6}.",
+                req_id, terminal["exit"], terminal["status"], StrLen(body), Classified["reason"], Classified["server_message"])
             CleanupFn.Call(entry)
             _LLM_Remote_Async.Delete(req_id)
-            _LLM_InvokeCallback(on_fail, "on_fail")
+            _LLM_InvokeCallback(on_fail, "on_fail",
+                _LLMRemote_FailInfo(Classified["reason"], terminal["status"], Classified["server_message"]))
             return
         }
         if !Classified["ok"] {
-            try LoggerWarn("LLM.remote", "curl response for req_id={1} carried no completion (reason={2}, body_chars={3}).",
-                req_id, Classified["reason"], StrLen(body))
+            try LoggerWarn("LLM.remote", "curl response for req_id={1} carried no completion (reason={2}, status={3}, body_chars={4}, server_msg={5}).",
+                req_id, Classified["reason"], terminal["status"], StrLen(body), Classified["server_message"])
             CleanupFn.Call(entry)
             _LLM_Remote_Async.Delete(req_id)
-            _LLM_InvokeCallback(on_fail, "on_fail")
+            _LLM_InvokeCallback(on_fail, "on_fail",
+                _LLMRemote_FailInfo(Classified["reason"], terminal["status"], Classified["server_message"]))
             return
         }
         CleanupFn.Call(entry)
@@ -492,7 +531,7 @@ _LLMRemote_PollCurl(req_id, Port := 0) {
         CleanupFn.Call(entry)
         _LLM_Remote_Async.Delete(req_id)
         try LoggerWarn("LLM.remote", "curl poll deadline exceeded for req_id={1} - aborting.", req_id)
-        _LLM_InvokeCallback(on_fail, "on_fail")
+        _LLM_InvokeCallback(on_fail, "on_fail", _LLMRemote_FailInfo("timeout"))
         return
     }
     ; No terminal receipt yet. Poll the receipt itself until its bounded deadline;
@@ -523,7 +562,10 @@ LLM_RemoteCancelAsync(req_id) {
     LLM_DeferCancelKills(Kills)
 }
 
-LLM_RemoteCancelAllAsync() {
+; @param {string} SpareKind - Reservation kind to leave running (the engine
+;   passes LLM_REMOTE_KIND_API_TEST so typing never kills an explicit user
+;   probe). Empty keeps the historical blanket semantics.
+LLM_RemoteCancelAllAsync(SpareKind := "") {
     global _LLM_Remote_Async
     ; Flip the flags inline — the per-request poll ticks read them — but snapshot
     ; the transports and release them off-thread. This is reached from the
@@ -533,6 +575,8 @@ LLM_RemoteCancelAllAsync() {
     ; cleanup on its next iteration, exactly as before.
     Kills := []
     for _id, entry in _LLM_Remote_Async {
+        if (SpareKind != "" && entry.Has("kind") && entry["kind"] == SpareKind)
+            continue
         entry["cancelled"] := true
         if (entry.Has("transport") and entry["transport"] == "curl") {
             if entry.Has("process_owner")
@@ -572,7 +616,7 @@ _LLMRemote_PollRequest(req_id) {
             try entry["http"].Abort()
         _LLM_Remote_Async.Delete(req_id)
         try LoggerWarn("LLM.remote", "Poll deadline exceeded for req_id={1} — aborting.", req_id)
-        _LLM_InvokeCallback(on_fail, "on_fail")
+        _LLM_InvokeCallback(on_fail, "on_fail", _LLMRemote_FailInfo("timeout"))
         return
     }
     http := entry["http"]
@@ -589,7 +633,8 @@ _LLMRemote_PollRequest(req_id) {
         try http.Abort()
         _LLM_Remote_Async.Delete(req_id)
         try LoggerWarn("LLM.remote", "WaitForResponse COM error for req_id={1}: {2} — aborting.", req_id, com_err.Message)
-        _LLM_InvokeCallback(on_fail, "on_fail")
+        ComMsg := SubStr(com_err.Message, 1, 120)
+        _LLM_InvokeCallback(on_fail, "on_fail", _LLMRemote_FailInfo("transport", 0, ComMsg))
         return
     }
     if !ready {
@@ -604,18 +649,20 @@ _LLMRemote_PollRequest(req_id) {
         status := http.Status
         body   := http.ResponseText
     } catch {
-        _LLM_InvokeCallback(on_fail, "on_fail")
+        _LLM_InvokeCallback(on_fail, "on_fail", _LLMRemote_FailInfo("transport"))
         return
     }
     Classified := _LLMRemoteClassifyTerminal(entryFormat,
         Map("exit", 0, "status", status, "body_read", true, "body", body),
         entry.Has("model_id_at_dispatch") ? entry["model_id_at_dispatch"] : "")
     if !Classified["terminal_ok"] {
-        _LLM_InvokeCallback(on_fail, "on_fail")
+        _LLM_InvokeCallback(on_fail, "on_fail",
+            _LLMRemote_FailInfo("transport", status))
         return
     }
     if !Classified["ok"] {
-        _LLM_InvokeCallback(on_fail, "on_fail")
+        _LLM_InvokeCallback(on_fail, "on_fail",
+            _LLMRemote_FailInfo(Classified["reason"], status, Classified["server_message"]))
         return
     }
     _LLM_InvokeCallback(on_success, "on_success", Classified["text"], Classified["usage"])
@@ -703,7 +750,8 @@ _LLMRemote_TrimAsyncRegistry() {
         ; fire. Without this the caller (e.g. the prediction engine slot state
         ; machine) hangs forever waiting for a callback that will never arrive.
         if oldest_entry.Has("on_fail") and oldest_entry["on_fail"] is Func
-            _LLM_InvokeCallback(oldest_entry["on_fail"], "on_fail")
+            _LLM_InvokeCallback(oldest_entry["on_fail"], "on_fail",
+                _LLMRemote_FailInfo("trimmed"))
         return
 }
 
@@ -733,7 +781,9 @@ _LLMRemoteResolveEntry(Entry) {
         if !_LLMRemote_ConfigScalarIsSafe(Scalar)
             return ""
     }
-    return Map("Provider", ProviderId, "Format", ProvFmt, "BaseUrl", BaseUrl, "Token", Token, "Model", Model)
+    ModelExtras := Provider.Has("ModelExtras") ? Provider["ModelExtras"] : Map()
+    Extras := (ModelExtras is Map && ModelExtras.Has(Model)) ? ModelExtras[Model] : Map()
+    return Map("Provider", ProviderId, "Format", ProvFmt, "BaseUrl", BaseUrl, "Token", Token, "Model", Model, "Extras", Extras)
 }
 
 ; Per-phase timeout (ms) for the readiness ping. Same value the sync path
@@ -960,7 +1010,11 @@ _LLMRemoteSetAuthHeaders(Http, Format, Token) {
 ; ``Format`` as a parameter would silently break every API request — the
 ; call ``Format("{:.2f}", ...)`` would try to invoke the parameter (a
 ; string, e.g. "openai") as a function and throw at runtime.
-_LLMRemoteBuildPayload(Fmt, Model, SystemPrompt, UserText, Temperature, max_tokens := "") {
+; @param {Map} Extras - Per-model body fields from the catalogue
+;   (model_extras), merged into OpenAI-shape payloads only. Anthropic and
+;   Gemini branches never receive them: an unknown field can fail those
+;   endpoints, and each extra is documented for one provider model.
+_LLMRemoteBuildPayload(Fmt, Model, SystemPrompt, UserText, Temperature, max_tokens := "", Extras := Map()) {
     SysEsc  := _LLMRemoteJsonEscape(SystemPrompt)
     UserEsc := _LLMRemoteJsonEscape(UserText)
     ModelEsc := _LLMRemoteJsonEscape(Model)
@@ -985,8 +1039,21 @@ _LLMRemoteBuildPayload(Fmt, Model, SystemPrompt, UserText, Temperature, max_toke
     }
     ; OpenAI Chat Completions shape — covers OpenAI itself plus every
     ; OpenAI-compatible endpoint (Groq, OpenRouter, LM Studio, vLLM, …).
-    return Format('{"model":"{1}","messages":[{"role":"system","content":"{2}"},{"role":"user","content":"{3}"}],"temperature":{4},"max_tokens":{5},"stream":false}',
-        ModelEsc, SysEsc, UserEsc, Temp, MaxTok)
+    ; Catalogue extras render generically from data: no per-model literal may
+    ; ever be restated here (single-sourced in api_providers.json).
+    ExtraFrag := ""
+    if (Extras is Map) {
+        for Field, Val in Extras {
+            if (Type(Field) != "String" || !RegExMatch(Field, "^[A-Za-z_][A-Za-z0-9_]*$"))
+                continue
+            if (Val is String)
+                ExtraFrag .= Format(',"{1}":"{2}"', Field, _LLMRemoteJsonEscape(Val))
+            else if (Val is Number)
+                ExtraFrag .= Format(',"{1}":{2}', Field, Val)
+        }
+    }
+    return Format('{"model":"{1}","messages":[{"role":"system","content":"{2}"},{"role":"user","content":"{3}"}],"temperature":{4},"max_tokens":{5},"stream":false{6}}',
+        ModelEsc, SysEsc, UserEsc, Temp, MaxTok, ExtraFrag)
 }
 
 ; Parse one immutable provider root and classify both the completion and usage
@@ -997,7 +1064,8 @@ _LLMRemoteBuildPayload(Fmt, Model, SystemPrompt, UserText, Temperature, max_toke
 _LLMRemoteClassifyResponse(Format, Body, Model := "") {
     Result := Map(
         "ok", false, "valid_json", false, "recognized", false,
-        "text", "", "usage", _LLMRemoteEmptyUsage(), "reason", "empty_body")
+        "text", "", "usage", _LLMRemoteEmptyUsage(), "reason", "empty_body",
+        "server_message", "")
     if (Body == "")
         return Result
     try Root := JsonParse(Body)
@@ -1010,6 +1078,18 @@ _LLMRemoteClassifyResponse(Format, Body, Model := "") {
         Result["reason"] := "unsupported_json_root"
         return Result
     }
+    ; Provider error text for the user: error.message (OpenAI / Anthropic /
+    ; Gemini shape), else a top-level message (Cerebras error shape). Content
+    ; decoys are never messages. Trimmed: a popup is not a log viewer.
+    ServerMsg := ""
+    if (Root.Has("error") && Root["error"] is Map && Root["error"].Has("message")
+        && Root["error"]["message"] is String)
+        ServerMsg := Root["error"]["message"]
+    else if (Root.Has("message") && Root["message"] is String)
+        ServerMsg := Root["message"]
+    if (StrLen(ServerMsg) > 200)
+        ServerMsg := SubStr(ServerMsg, 1, 200) . "..."
+    Result["server_message"] := ServerMsg
     State := _LLMRemoteParseStructuredRootState(Format, Root)
     Result["recognized"] := State["recognized"]
     Result["usage"] := _LLMRemoteExtractUsageRoot(Format, Root, Model)
@@ -1020,6 +1100,11 @@ _LLMRemoteClassifyResponse(Format, Body, Model := "") {
     Result["ok"] := Result["text"] != ""
     Result["reason"] := Result["ok"] ? "completion"
         : (State["recognized"] ? State["reason"] : "unsupported_shape")
+    ; A body carrying a provider message is a provider verdict, not an
+    ; unknown shape — even without an "error" envelope (Cerebras 4xx).
+    if (!Result["ok"] && Result["reason"] == "unsupported_shape"
+        && Result["server_message"] != "")
+        Result["reason"] := "provider_error"
     return Result
 }
 
@@ -1146,12 +1231,63 @@ _LLMRemote_CatalogPriceIsValid(value) {
     return value is Number and value >= 0 and value <= 1.7976931348623157e308
 }
 
+; Normalizes the optional per-provider model_extras section (Map model id ->
+; Map field -> value) into publishable tables. Fail-closed per piece: doc
+; keys, non-map models, non-scalar values and field names that would break
+; JSON are dropped with the provider still loading — a bad extra must never
+; disable a whole provider. Values are strings or numbers (JsonParse decodes
+; JSON booleans as 0/1, which travel as numbers).
+_LLMRemote_NormalizeModelExtras(Raw) {
+    Norm := Map()
+    if !(Raw is Map)
+        return Norm
+    for Model, Fields in Raw {
+        if (Type(Model) != "String" || Model == "" || SubStr(Model, 1, 1) == "_")
+            continue
+        if !(Fields is Map)
+            continue
+        Kept := Map()
+        for Field, Val in Fields {
+            if (Type(Field) != "String" || !RegExMatch(Field, "^[A-Za-z_][A-Za-z0-9_]*$"))
+                continue
+            if (Val is String || Val is Number)
+                Kept[Field] := Val
+        }
+        if (Kept.Count > 0)
+            Norm[Model] := Kept
+    }
+    return Norm
+}
+
 /**
  * Loads provider descriptors + model prices from _shared/modules/llm/api_providers.json.
  * Fail-fast when the file is missing or malformed — same contract as the HS twin.
  */
+; Validates the shared Test-API probe section. Soft-degrade like the HS twin:
+; a malformed section disables only the Test-API action (loud refusal at
+; click time), never the remote backend and its predictions.
+_LLMRemote_CatalogTestRequestIsValid(req) {
+    if !(req is Map)
+        return false
+    if !(req.Has("system_prompt") and req["system_prompt"] is String)
+        return false
+    if !(req.Has("user_text") and req["user_text"] is String)
+        return false
+    if (req["system_prompt"] == "" or req["user_text"] == "")
+        return false
+    if !(req.Has("temperature") and (req["temperature"] is Integer or req["temperature"] is Float))
+        return false
+    if (req["temperature"] < 0 or req["temperature"] > 2)
+        return false
+    if !(req.Has("max_tokens") and (req["max_tokens"] is Integer))
+        return false
+    if (req["max_tokens"] < 1 or req["max_tokens"] > 64)
+        return false
+    return true
+}
+
 _LLMRemote_LoadCatalog() {
-    global LLM_API_PROVIDERS, LLM_API_PROVIDER_ORDER, LLM_REMOTE_MODEL_PRICES, _SharedDir
+    global LLM_API_PROVIDERS, LLM_API_PROVIDER_ORDER, LLM_REMOTE_MODEL_PRICES, LLM_REMOTE_TEST_REQUEST, _SharedDir
     path := _SharedDir . "\modules\llm\api_providers.json"
     if !FileExist(path)
         throw Error("api_providers.json not found at " . path)
@@ -1196,7 +1332,9 @@ _LLMRemote_LoadCatalog() {
             "Label", desc["label"],
             "BaseUrl", desc["base_url"],
             "DefaultModel", desc["default_model"],
-            "Format", desc["format"])
+            "Format", desc["format"],
+            "ModelExtras", _LLMRemote_NormalizeModelExtras(
+                desc.Has("model_extras") ? desc["model_extras"] : Map()))
         candidateOrder.Push(pid)
     }
 
@@ -1214,11 +1352,28 @@ _LLMRemote_LoadCatalog() {
         candidatePrices[model] := Map("in", row["in"], "out", row["out"])
     }
 
+    ; The probe section degrades soft, unlike the provider catalogue above:
+    ; a missing or malformed test_request must disable only the Test-API
+    ; action (which refuses loudly at click time), never the whole remote
+    ; backend and its predictions.
+    testReq := root.Has("test_request") ? root["test_request"] : ""
+    candidateTestRequest := Map()
+    if _LLMRemote_CatalogTestRequestIsValid(testReq) {
+        candidateTestRequest := Map(
+            "system_prompt", testReq["system_prompt"],
+            "user_text", testReq["user_text"],
+            "temperature", testReq["temperature"],
+            "max_tokens", Integer(testReq["max_tokens"]))
+    } else {
+        try LoggerWarn("LLM.remote", "api_providers.json: test_request section missing or invalid — Test-API action disabled.")
+    }
+
     ; Publish only the completely validated candidates. A failed/partial parse
     ; can never leak raw catalogue scalars to the menu or inference path.
     LLM_API_PROVIDERS := candidateProviders
     LLM_API_PROVIDER_ORDER := candidateOrder
     LLM_REMOTE_MODEL_PRICES := candidatePrices
+    LLM_REMOTE_TEST_REQUEST := candidateTestRequest
 }
 
 ; AHK-05: a corrupt or user-edited api_providers.json must disable only the remote
@@ -1229,5 +1384,6 @@ catch as _e {
 	LLM_API_PROVIDERS := Map()
 	LLM_API_PROVIDER_ORDER := []
 	LLM_REMOTE_MODEL_PRICES := Map()
+	LLM_REMOTE_TEST_REQUEST := Map()
 	try LoggerError("LLM.remote", "api_providers.json load failed — remote API backend disabled: {1}.", _e.Message)
 }

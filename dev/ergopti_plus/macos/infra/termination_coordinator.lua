@@ -25,13 +25,22 @@
 ---    action is protected so Hammerspoon cannot hide a callback exception.
 --- 7. Awaitable Teardown: a retained native completion pauses final drain and
 ---    authorizes exactly one stateful retry with the latest reload/exit intent.
+--- 8. Bounded User Quit: a user-requested exit arms a hard deadline before the
+---    request. A stage that never settles (lease fence, input drain, teardown,
+---    logger drain) or a fence failure force-exits non-zero, naming the stuck
+---    stage; native stdin EOF then lets the guardian revoke the exact lease.
 --- ==============================================================================
 
 local M = {}
 
 local Logger = require("infra.logger")
+local EmergencyExit = require("infra.emergency_exit")
 
 local LOG = "infra.termination_coordinator"
+
+-- Status of a user quit whose request was accepted. Fallbacks use the injected
+-- non-zero fatal code instead.
+local USER_EXIT_CODE = 0
 
 local _deps = nil
 local _transaction = nil
@@ -561,7 +570,7 @@ function M.init(deps)
 	end
 	for _, name in ipairs({
 		"request_lease", "drain_input", "teardown", "begin_drain", "finalize_teardown",
-		"reload", "exit", "fatal_exit", "mark_reload", "clear_reload",
+		"reload", "exit", "fatal_exit", "mark_reload", "clear_reload", "schedule",
 	}) do
 		if type(deps[name]) ~= "function" then
 			Logger.error(LOG, "M.init(): dependency '%s' must be a function.", name)
@@ -571,6 +580,10 @@ function M.init(deps)
 	if type(deps.fatal_exit_code) ~= "number" or deps.fatal_exit_code % 1 ~= 0
 		or deps.fatal_exit_code < 1 or deps.fatal_exit_code > 255 then
 		Logger.error(LOG, "M.init(): fatal_exit_code must be an integer from 1 to 255.")
+		return false
+	end
+	if type(deps.user_exit_deadline_seconds) ~= "number" or deps.user_exit_deadline_seconds <= 0 then
+		Logger.error(LOG, "M.init(): user_exit_deadline_seconds must be a positive number.")
 		return false
 	end
 	_deps = deps
@@ -633,6 +646,48 @@ end
 function M.is_pending()
 	if not require_state("is_pending") then return false end
 	return _transaction ~= nil and not _transaction.settled
+end
+
+--- Names the stage the active terminal transaction is waiting on. It never logs,
+--- so the quit watchdog may call it after the logger sink was finalized.
+--- @return string stage
+function M.pending_stage()
+	local transaction = _transaction
+	if transaction == nil or transaction.settled then return "none" end
+	if transaction.fenced ~= true then return "karabiner-lease-fence" end
+	if transaction.input_drained ~= true then return "synthetic-input-drain" end
+	if transaction.teardown_pending == true then
+		return "local-teardown (awaiting MLX server completion)"
+	end
+	if transaction.teardown_settled ~= true then return "local-teardown" end
+	if transaction.drain_started == true then return "logger-drain" end
+	return "terminal-action"
+end
+
+--- Requests a user-initiated exit that can never leave the process running.
+--- The deadline is armed before the exact-fence request; a fence failure, a
+--- rejection, or any stage still pending at the deadline force-exits with the
+--- non-zero fatal code, and native stdin EOF lets the guardian revoke the lease.
+--- @param reason string Stable diagnostic reason.
+--- @return boolean accepted True when the controlled exit is under way.
+function M.request_user_exit(reason)
+	if not require_state("request_user_exit") then return false end
+	if type(reason) ~= "string" or reason == "" then
+		Logger.error(LOG, "Controlled user exit requires a non-empty reason.")
+		return false
+	end
+	Logger.info(LOG, "User exit '%s' requested; hard deadline %.1f s.",
+		reason, _deps.user_exit_deadline_seconds)
+	return EmergencyExit.request({
+		reason = reason,
+		deadline_seconds = _deps.user_exit_deadline_seconds,
+		exit_code = USER_EXIT_CODE,
+		forced_exit_code = _deps.fatal_exit_code,
+		schedule = _deps.schedule,
+		request_exit = M.request_exit,
+		exit = _deps.fatal_exit,
+		describe = M.pending_stage,
+	})
 end
 
 return M

@@ -207,6 +207,7 @@ local function new_context(config)
 			response.kind = "nack"
 			response.ack = nil
 			response.reason = "configure_failed"
+			response.detail = state.preflight_detail
 		end
 		local address = state.preflight_address or LOOPBACK
 		return hs_stub.json.encode(response), address.host, address.port

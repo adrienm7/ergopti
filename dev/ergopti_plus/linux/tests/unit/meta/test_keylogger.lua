@@ -8,6 +8,16 @@ local helpers   = require("tests.helpers")
 local Fakes     = helpers.load_module("tests.fakes")
 local keylogger = helpers.load_module("modules.keylogger.keylogger")
 
+-- The default path is the real user's metrics store, and every case in this
+-- file used it. Once flushes started succeeding, rows written by one case were
+-- read back by the next: a dashboard projection counted a keystroke that an
+-- earlier case had typed. Each init now starts from an empty database.
+local TEST_SQLITE_PATH = (os.getenv("TMPDIR") or "/tmp") .. "/ergopti_test_keylogger.sqlite"
+local function fresh_db()
+  os.remove(TEST_SQLITE_PATH)
+  return TEST_SQLITE_PATH
+end
+
 helpers.describe("keylogger", function()
 
   -- ==========================================================================
@@ -68,7 +78,7 @@ helpers.describe("keylogger", function()
     end
 
     helpers.it("init with no opts leaves the collector usable", function()
-      keylogger.init({})
+      keylogger.init({ sqlite_path = fresh_db() })
       helpers.assert_true(keystrokes_for("probe-empty-opts") > 0,
         "after init({}) a keystroke must be counted — init leaving the collector dead is the failure this covers")
     end)
@@ -78,12 +88,12 @@ helpers.describe("keylogger", function()
         "init(nil) must behave like init({}), not disable collection")
     end)
     helpers.it("init with a custom log_dir leaves the collector usable", function()
-      keylogger.init({ log_dir = "/tmp/ergopti_test_logs" })
+      keylogger.init({ sqlite_path = fresh_db(), log_dir = "/tmp/ergopti_test_logs" })
       helpers.assert_true(keystrokes_for("probe-log-dir") > 0,
         "a custom log_dir must not stop keystrokes being counted")
     end)
     helpers.it("init with custom password_apps applies them", function()
-      keylogger.init({ password_apps = { "custom-vault" } })
+      keylogger.init({ sqlite_path = fresh_db(), password_apps = { "custom-vault" } })
       helpers.assert_true(keylogger.is_password_app("custom-vault"),
         "a password app passed to init must be recognised — accepting the option and dropping it is the failure this covers")
     end)
@@ -97,7 +107,7 @@ helpers.describe("keylogger", function()
   -- what it recorded, so a no-op on_keydown passed all three.
   helpers.describe("on_keydown()", function()
     helpers.it("a keystroke is counted against its app", function()
-      keylogger.init({})
+      keylogger.init({ sqlite_path = fresh_db() })
       local before = (keylogger.get_app_stats()["kd-firefox"] or {}).keystrokes or 0
       keylogger.on_keydown("a", 1000, "kd-firefox")
       local after = (keylogger.get_app_stats()["kd-firefox"] or {}).keystrokes or 0
@@ -105,7 +115,7 @@ helpers.describe("keylogger", function()
     end)
 
     helpers.it("a keystroke with no app_id is still counted somewhere", function()
-      keylogger.init({})
+      keylogger.init({ sqlite_path = fresh_db() })
       local function total()
         local n = 0
         for _, s in pairs(keylogger.get_app_stats()) do n = n + (s.keystrokes or 0) end
@@ -118,7 +128,7 @@ helpers.describe("keylogger", function()
     end)
 
     helpers.it("500 keystrokes across five apps are all counted", function()
-      keylogger.init({})
+      keylogger.init({ sqlite_path = fresh_db() })
       local before = {}
       for i = 0, 4 do
         before["vol-app" .. i] = (keylogger.get_app_stats()["vol-app" .. i] or {}).keystrokes or 0
@@ -142,7 +152,7 @@ helpers.describe("keylogger", function()
 
   helpers.describe("password detection", function()
     helpers.it("detects known password apps", function()
-      keylogger.init({})
+      keylogger.init({ sqlite_path = fresh_db() })
       helpers.assert_true(keylogger.is_password_app("1password"))
       helpers.assert_true(keylogger.is_password_app("Bitwarden"))
       helpers.assert_true(keylogger.is_password_app("org.keepass.KeePass"))
@@ -154,7 +164,7 @@ helpers.describe("keylogger", function()
       -- qualify. A future refactor that delegates to an exact-match
       -- secure_field_detector would silently stop matching these and leak
       -- keystrokes — this guard makes that regression a hard test failure.
-      keylogger.init({})
+      keylogger.init({ sqlite_path = fresh_db() })
       local must_match = {
         "1password", "1Password.exe", "bitwarden", "Bitwarden",
         "keepass", "keepassxc", "keepass2", "org.keepassxc.KeePassXC",
@@ -167,26 +177,26 @@ helpers.describe("keylogger", function()
       end
     end)
     helpers.it("matches case-insensitively so casing cannot leak keystrokes", function()
-      keylogger.init({})
+      keylogger.init({ sqlite_path = fresh_db() })
       helpers.assert_true(keylogger.is_password_app("KEEPASSXC"), "upper-case must still match")
       helpers.assert_true(keylogger.is_password_app("KeePassXC"), "mixed-case must still match")
     end)
     helpers.it("returns false for normal apps", function()
-      keylogger.init({})
+      keylogger.init({ sqlite_path = fresh_db() })
       helpers.assert_eq(keylogger.is_password_app("firefox"), false)
       helpers.assert_eq(keylogger.is_password_app("code"), false)
       helpers.assert_eq(keylogger.is_password_app(""), false)
       helpers.assert_eq(keylogger.is_password_app(nil), false)
     end)
     helpers.it("suppress/unsuppress cycle works", function()
-      keylogger.init({})
+      keylogger.init({ sqlite_path = fresh_db() })
       keylogger.suppress()
       helpers.assert_true(keylogger.is_suppressed())
       keylogger.unsuppress()
       helpers.assert_eq(keylogger.is_suppressed(), false)
     end)
     helpers.it("on_keydown is suppressed when password mode active", function()
-      keylogger.init({})
+      keylogger.init({ sqlite_path = fresh_db() })
       keylogger.on_keydown("x", 5000, "firefox")
       local before = keylogger.get_session_stats().keystrokes
       keylogger.suppress()
@@ -203,7 +213,7 @@ helpers.describe("keylogger", function()
 
   helpers.describe("export", function()
     helpers.it("export_session returns expected fields", function()
-      keylogger.init({})
+      keylogger.init({ sqlite_path = fresh_db() })
       keylogger.on_keydown("t", 100, "test-app")
       local data = keylogger.export_session()
       helpers.assert_true(type(data) == "table")
@@ -213,7 +223,7 @@ helpers.describe("keylogger", function()
       helpers.assert_true(data.session_started_ms ~= nil)
     end)
     helpers.it("export_json returns valid JSON string", function()
-      keylogger.init({})
+      keylogger.init({ sqlite_path = fresh_db() })
       local json = keylogger.export_json()
       helpers.assert_true(type(json) == "string")
       helpers.assert_true(#json > 10)
@@ -227,7 +237,7 @@ helpers.describe("keylogger", function()
 
   helpers.describe("flush()", function()
     helpers.it("flush with configured log_dir does not crash", function()
-      keylogger.init({ log_dir = os.getenv("TEMP") or "/tmp" })
+      keylogger.init({ sqlite_path = fresh_db(), log_dir = os.getenv("TEMP") or "/tmp" })
       keylogger.on_keydown("f", 1234, "flush-test")
       -- Called directly. flush answers what it wrote, and the caller advances on it.
       local flushed = keylogger.flush()
@@ -330,13 +340,13 @@ helpers.describe("keylogger", function()
 
   helpers.describe("session lifecycle", function()
     helpers.it("reset_session clears data", function()
-      keylogger.init({})
+      keylogger.init({ sqlite_path = fresh_db() })
       keylogger.on_keydown("r", 100, "test")
       keylogger.reset_session()
       helpers.assert_eq(keylogger.get_session_stats().keystrokes, 0)
     end)
     helpers.it("full lifecycle does not crash", function()
-      keylogger.init({ log_dir = os.getenv("TEMP") or "/tmp" })
+      keylogger.init({ sqlite_path = fresh_db(), log_dir = os.getenv("TEMP") or "/tmp" })
       keylogger.on_keydown("a", 100, "app1")
       keylogger.on_keydown("b", 200, "app2")
       keylogger.suppress()
@@ -355,7 +365,7 @@ helpers.describe("keylogger", function()
 
   helpers.describe("per-app tracking", function()
     helpers.it("record_app_key accumulates per-app counts", function()
-      keylogger.init({})
+      keylogger.init({ sqlite_path = fresh_db() })
       keylogger.record_app_key("firefox", "a", 100)
       keylogger.record_app_key("firefox", "b", 200)
       keylogger.record_app_key("vscode", "c", 300)
@@ -366,13 +376,13 @@ helpers.describe("keylogger", function()
       helpers.assert_eq(apps["vscode"].keystrokes, 1)
     end)
     helpers.it("get_app_stats returns table when empty", function()
-      keylogger.init({})
+      keylogger.init({ sqlite_path = fresh_db() })
       keylogger.reset_session()
       helpers.assert_true(type(keylogger.get_app_stats()) == "table")
     end)
 
     helpers.it("credits a completed foreground interval without requiring a keystroke", function()
-      keylogger.init({})
+      keylogger.init({ sqlite_path = fresh_db() })
       keylogger.reset_session()
       keylogger.on_app_focus("firefox", 1000)
       keylogger.on_app_focus("code", 5000)
@@ -383,7 +393,7 @@ helpers.describe("keylogger", function()
     end)
 
     helpers.it("projects per-app foreground and typing time in the shared dashboard contract", function()
-      keylogger.init({})
+      keylogger.init({ sqlite_path = fresh_db() })
       keylogger.reset_session()
       keylogger.on_app_focus("firefox", 1000)
       keylogger.record_app_key("firefox", "a", 1100)
@@ -400,7 +410,7 @@ helpers.describe("keylogger", function()
     end)
 
     helpers.it("records hotstring output and its physical trigger separately", function()
-      keylogger.init({})
+      keylogger.init({ sqlite_path = fresh_db() })
       keylogger.reset_session()
       keylogger.record_hotstring("firefox", "btw", "by the way", 1000)
 
@@ -411,7 +421,7 @@ helpers.describe("keylogger", function()
     end)
 
 	helpers.it("projects physical scancodes and generated output into separate UI fields", function()
-		keylogger.init({})
+		keylogger.init({ sqlite_path = fresh_db() })
 		keylogger.reset_session()
 		keylogger.record_physical_key("firefox", 30, 1000)
 		keylogger.on_keydown("a", 1000, "firefox", 30)
@@ -427,7 +437,7 @@ helpers.describe("keylogger", function()
 	end)
 
     helpers.it("counts Unicode hotstrings by character rather than UTF-8 byte", function()
-      keylogger.init({})
+      keylogger.init({ sqlite_path = fresh_db() })
       keylogger.reset_session()
       keylogger.record_hotstring("firefox", "é", "éclair", 1000)
 
@@ -438,7 +448,7 @@ helpers.describe("keylogger", function()
     end)
 
     helpers.it("does not retain hotstring contents while password suppression is active", function()
-      keylogger.init({})
+      keylogger.init({ sqlite_path = fresh_db() })
       keylogger.reset_session()
       keylogger.suppress()
       keylogger.record_hotstring("firefox", "secret", "sensitive replacement", 1000)
@@ -465,7 +475,7 @@ helpers.describe("keylogger", function()
 
   helpers.describe("edge cases", function()
     helpers.it("on_keydown with nil app_id still records the keystroke", function()
-      keylogger.init({})
+      keylogger.init({ sqlite_path = fresh_db() })
       local function total()
         local n = 0
         for _, s in pairs(keylogger.get_app_stats()) do n = n + (s.keystrokes or 0) end
@@ -481,7 +491,7 @@ helpers.describe("keylogger", function()
     -- pair that leaves the module suppressed silently stops all collection,
     -- which is exactly what "does not crash" could never notice.
     helpers.it("balanced suppress/unsuppress leaves collection on", function()
-      keylogger.init({})
+      keylogger.init({ sqlite_path = fresh_db() })
       for _ = 1, 20 do keylogger.suppress(); keylogger.unsuppress() end
       helpers.assert_true(not keylogger.is_suppressed(),
         "20 balanced suppress/unsuppress pairs must leave the keylogger collecting")
@@ -493,7 +503,7 @@ helpers.describe("keylogger", function()
     end)
 
     helpers.it("suppress actually stops collection until unsuppressed", function()
-      keylogger.init({})
+      keylogger.init({ sqlite_path = fresh_db() })
       keylogger.suppress()
       local before = (keylogger.get_app_stats()["suppressed-probe"] or {}).keystrokes or 0
       keylogger.on_keydown("z", 5252, "suppressed-probe")
@@ -503,4 +513,45 @@ helpers.describe("keylogger", function()
     end)
   end)
 
+end)
+
+helpers.describe("keylogger events_json controls are escaped (json-controls)", function()
+  helpers.it("json-controls: tab and CR travel escaped, never raw", function()
+    -- Regression: the minimal encoder escaped only backslash, quote and
+    -- newline, so a tab or carriage return typed or pasted into any app
+    -- landed RAW inside the events_json string the flush persists — and a
+    -- strict decoder on another driver rejects the row as not-JSON.
+    local previous_writer = package.loaded["modules.keylogger.sqlite_writer"]
+    local captured = {}
+    package.loaded["modules.keylogger.sqlite_writer"] = setmetatable({
+      insert_typing_events = function(_, events)
+        captured[#captured + 1] = events
+        return true
+      end,
+    }, { __index = function() return function() return true end end })
+    local ok, err = pcall(function()
+      package.loaded["adapters.storage"] = Fakes.storage()
+      package.loaded["modules.keylogger.keylogger"] = nil
+      local kl = require("modules.keylogger.keylogger")
+      kl.init({})
+      kl.on_keydown("\t", 1000, "code")
+      kl.on_keydown("a\rb", 1100, "code")
+      kl.flush()
+      helpers.assert_true(#captured >= 1 and #(captured[1] or {}) >= 1,
+        "the typed events must reach the writer")
+      local payload = captured[1][1].events_json
+      helpers.assert_true(type(payload) == "string" and #payload > 0,
+        "each row must carry its encoded keystroke stream")
+      helpers.assert_true(payload:find("\t", 1, true) == nil,
+        "no raw tab may reach the persisted stream")
+      helpers.assert_true(payload:find("\r", 1, true) == nil,
+        "no raw carriage return may reach the persisted stream")
+      helpers.assert_true(payload:find("\\t", 1, true) ~= nil,
+        "a tab must travel as an escape")
+      helpers.assert_true(payload:find("\\r", 1, true) ~= nil,
+        "a carriage return must travel as an escape")
+    end)
+    package.loaded["modules.keylogger.sqlite_writer"] = previous_writer
+    if not ok then error(err, 0) end
+  end)
 end)

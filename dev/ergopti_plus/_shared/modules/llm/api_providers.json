@@ -57,8 +57,12 @@
 		"cerebras": {
 			"label": "Cerebras",
 			"base_url": "https://api.cerebras.ai/v1",
-			"default_model": "llama-3.1-8b",
-			"format": "openai"
+			"default_model": "qwen-3.8-27b",
+			"format": "openai",
+			"model_extras": {
+				"_comment": "Per-model body fields merged into OpenAI-shape payloads by both drivers. qwen-3.8-27b reasons at xhigh effort by default and stalls tiny probes — reasoning stays disabled. Keys starting with _ are documentation, not models.",
+				"qwen-3.8-27b": { "reasoning_effort": "none" }
+			}
 		},
 		"openai_compat": {
 			"label": "OpenAI-compatible",
@@ -66,6 +70,13 @@
 			"default_model": "",
 			"format": "openai"
 		}
+	},
+	"test_request": {
+		"_comment": "Minimal end-to-end probe both drivers send verbatim for the Test-API action: tiny fixed prompt, deterministic sampling, small completion budget. Change it here, never per driver.",
+		"system_prompt": "You are a connectivity probe. Reply with exactly: OK",
+		"user_text": "ping",
+		"temperature": 0,
+		"max_tokens": 16
 	},
 	"model_prices": {
 		"gpt-4o-mini": { "in": 0.15, "out": 0.6 },

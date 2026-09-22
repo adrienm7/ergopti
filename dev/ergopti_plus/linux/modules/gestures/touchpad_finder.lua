@@ -122,23 +122,20 @@ function M.bit_set(bitmap, bit)
 	local position = #words - word_index
 	if position < 1 then return false end
 
-	local value = tonumber(words[position], 16)
-	if not value then return false end
-
-	-- Lua numbers are doubles, exact to 2^53, so a bit above 52 cannot be tested
-	-- by division on the whole word. Those are reached by trimming hex digits
-	-- instead, which is exact for any width.
-	if bit_index >= 52 then
-		local digits = words[position]
-		local nibble = math.floor(bit_index / 4)
-		local from_end = #digits - nibble
-		if from_end < 1 then return false end
-		local digit = tonumber(digits:sub(from_end, from_end), 16)
-		if not digit then return false end
-		return math.floor(digit / (2 ^ (bit_index % 4))) % 2 == 1
-	end
-
-	return math.floor(value / (2 ^ bit_index)) % 2 == 1
+	-- Exact for any width: test the single hex digit holding the bit rather
+	-- than dividing the whole word. Lua numbers are doubles, exact only to
+	-- 2^53, so a full 64-bit /proc word with high bits set rounds, and a
+	-- low-bit test on the rounded value answers wrongly — under-reporting
+	-- the finger count, which hides working gestures. (LuaJIT has no `&` to
+	-- do better with; trimming to the one digit that holds the bit is exact
+	-- everywhere, on every interpreter.)
+	local digits = words[position]
+	local nibble = math.floor(bit_index / 4)
+	local from_end = #digits - nibble
+	if from_end < 1 then return false end
+	local digit = tonumber(digits:sub(from_end, from_end), 16)
+	if not digit then return false end
+	return math.floor(digit / (2 ^ (bit_index % 4))) % 2 == 1
 end
 
 
@@ -248,8 +245,11 @@ end
 --- Every touchpad the machine has, best first.
 ---
 --- "Best" is the one that can count the most fingers, because that is the only
---- ranking that matters to this feature; ties keep /proc order, which is stable
---- across boots for built-in hardware.
+--- ranking that matters to this feature; ties break by device path, which is
+--- stable across boots for built-in hardware. (table.sort is not stable, so a
+--- bare max_fingers comparison lets equal pads come out in whatever order the
+--- implementation walks them — which differs between interpreters — and the
+--- boot then flips between pads and their gesture sets with it.)
 --- @param text string|nil Contents of /proc/bus/input/devices; read when nil.
 --- @return table Array of describe() results.
 function M.list(text)
@@ -269,7 +269,11 @@ function M.list(text)
 		if described.is_touchpad then found[#found + 1] = described end
 	end
 
-	table.sort(found, function(a, b) return a.max_fingers > b.max_fingers end)
+	table.sort(found, function(a, b)
+		if a.max_fingers ~= b.max_fingers then return a.max_fingers > b.max_fingers end
+		if a.path ~= b.path then return (a.path or "") < (b.path or "") end
+		return (a.name or "") < (b.name or "")
+	end)
 	return found
 end
 

@@ -208,7 +208,9 @@ LLM_Engine_StopGeneration() {
 		}
 		try LLM_OllamaCancelStreams()
 		try LLM_OllamaCancelAllAsync()
-		try LLM_RemoteCancelAllAsync()
+		; Spare the explicit user probe: typing during a Test-selected-API run
+		; must not silently kill it (the poller would fire neither callback).
+		try LLM_RemoteCancelAllAsync(LLM_REMOTE_KIND_API_TEST)
 	} finally {
 		Critical(_c)
 	}
@@ -233,7 +235,9 @@ LLM_Engine_CancelInflight() {
 		}
 		try LLM_OllamaCancelStreams()
 		try LLM_OllamaCancelAllAsync()
-		try LLM_RemoteCancelAllAsync()
+		; Same owned-probe spare as StopGeneration: a per-keystroke cancel must
+		; never silently kill an explicit Test-selected-API run.
+		try LLM_RemoteCancelAllAsync(LLM_REMOTE_KIND_API_TEST)
 	} finally {
 		Critical(_c)
 	}

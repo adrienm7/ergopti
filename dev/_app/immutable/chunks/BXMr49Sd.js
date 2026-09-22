@@ -1,0 +1,1 @@
+import{t as C}from"./C7YJlRmi.js";import{n as a,h}from"./DA2ya1dg.js";function S(i,b,t,l,f,r){var g=i[a];if(h||g!==t||g===void 0){var o=C(t,l,r);(!h||o!==i.getAttribute("class"))&&(o==null?i.removeAttribute("class"):i.className=o),i[a]=t}else if(r&&f!==r)for(var u in r){var A=!!r[u];(f==null||A!==!!f[u])&&i.classList.toggle(u,A)}return r}export{S as s};

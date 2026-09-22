@@ -597,6 +597,16 @@ int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestBeginDrain(void);
 int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestDrainComplete(
 	uint8_t *out_complete);
 
+/**
+ * Replaces the OS async modifier snapshot with the listed left/right keys
+ * reported down. enabled=0 restores the default test snapshot, which reports
+ * every modifier down so tracked physical state is never reconciled away.
+ */
+int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestSetOsModifierKeys(
+	uint8_t enabled,
+	const uint16_t *down_vks,
+	uint32_t count);
+
 /** Enables public terminal-capture APIs without installing a hook. */
 int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestSetRunning(uint8_t running);
 

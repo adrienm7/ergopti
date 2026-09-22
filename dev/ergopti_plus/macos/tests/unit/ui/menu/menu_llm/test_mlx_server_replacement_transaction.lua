@@ -30,6 +30,7 @@ local MODULE_NAMES = {
 	"infra.config_paths",
 	"modules.llm.api_common",
 	"adapters.task_lifecycle",
+	"adapters.shell_runner",
 	"modules.llm.api_mlx",
 	"ui.menu.menu_llm.models_manager_mlx_server",
 }
@@ -123,6 +124,22 @@ local function with_server_fixture(options, assertions)
 			return true, "exit", 0
 		end
 
+		-- Quit/reload ("shutdown") dispatches the listener kill as an async task
+		-- instead of the synchronous os.execute proof (hs-quit-never-blocks).
+		package.loaded["adapters.shell_runner"] = {
+			spawn = function(executable, arguments)
+				cleanup_commands[#cleanup_commands + 1] = executable .. " " .. table.concat(arguments, " ")
+				events[#events + 1] = "cleanup"
+				return {
+					start = function()
+						if cleanup_mode == "throw" then error("fixture async cleanup failure") end
+						if cleanup_mode == "false" then return false end
+						if cleanup_mode == "nil" then return nil end
+						return true
+					end,
+				}
+			end,
+		}
 		package.loaded["infra.notifications"] = { notify = noop }
 		package.loaded["infra.logger"] = {
 			UNIFIED_LOG_FILE = "/tmp/ergopti-test.log",
@@ -267,6 +284,8 @@ local function with_server_fixture(options, assertions)
 	os.execute = saved_os_execute
 	_G.hs = saved_hs
 	for _, name in ipairs(MODULE_NAMES) do package.loaded[name] = saved_modules[name] end
+	-- Explicit for the suite-wide shell_runner stub-restore ratchet
+	package.loaded["adapters.shell_runner"] = saved_modules["adapters.shell_runner"]
 	if not ok then error(err, 0) end
 end
 
@@ -672,7 +691,7 @@ helpers.describe("HS-008: exact MLX server replacement ownership", function()
 				helpers.assert_eq(fixture.obj.stop_server_if_needed(function()
 					settlements = settlements + 1
 					return true
-				end, { kind = "shutdown" }), false, cleanup_mode)
+				end, { kind = "stop" }), false, cleanup_mode)
 				helpers.assert_eq(settlements, 0)
 				helpers.assert_eq(fixture.obj._server_lifecycle_owner.phase, "cleanup")
 				helpers.assert_not_nil(fixture.obj._server_identity)
@@ -686,7 +705,7 @@ helpers.describe("HS-008: exact MLX server replacement ownership", function()
 				helpers.assert_eq(fixture.obj.stop_server_if_needed(function()
 					settlements = settlements + 1
 					return true
-				end, { kind = "shutdown" }), true)
+				end, { kind = "stop" }), true)
 				helpers.assert_eq(settlements, 1)
 				helpers.assert_eq(fixture.obj._server_lifecycle_owner, nil)
 				helpers.assert_eq(fixture.obj._server_identity, nil)
@@ -704,9 +723,24 @@ helpers.describe("HS-008: exact MLX server replacement ownership", function()
 					"legacy cleanup must complete before publication")
 				settlements = settlements + 1
 				return true
-			end, { kind = "shutdown" }), true)
+			end, { kind = "stop" }), true)
 			helpers.assert_eq(settlements, 1)
 			helpers.assert_true(fixture.cleanup_commands[1]:find("TCP:5678", 1, true) ~= nil)
+			helpers.assert_eq(fixture.obj._server_lifecycle_owner, nil)
+		end)
+	end)
+
+	helpers.it("(hs-quit-never-blocks) shutdown without a session server runs no listener command", function()
+		with_server_fixture("self", function(fixture)
+			fixture.set_port(5678)
+			local settlements = 0
+			helpers.assert_eq(fixture.obj.stop_server_if_needed(function()
+				settlements = settlements + 1
+				return true
+			end, { kind = "shutdown" }), true)
+			helpers.assert_eq(settlements, 1, "shutdown must still settle its exact waiter once")
+			helpers.assert_eq(#fixture.cleanup_commands, 0,
+				"Quit must not run the synchronous lsof proof when no MLX server was started")
 			helpers.assert_eq(fixture.obj._server_lifecycle_owner, nil)
 		end)
 	end)
@@ -718,7 +752,7 @@ helpers.describe("HS-008: exact MLX server replacement ownership", function()
 			helpers.assert_eq(fixture.obj.stop_server_if_needed(function()
 				settlements = settlements + 1
 				return true
-			end, { kind = "shutdown" }), false,
+			end, { kind = "stop" }), false,
 				"empty stdout from an operational lsof error is not absence proof")
 			helpers.assert_eq(settlements, 0)
 			helpers.assert_not_nil(fixture.obj._server_lifecycle_owner,
@@ -736,7 +770,7 @@ helpers.describe("HS-008: exact MLX server replacement ownership", function()
 			helpers.assert_eq(fixture.obj.stop_server_if_needed(function()
 				settlements = settlements + 1
 				return true
-			end, { kind = "shutdown" }), true,
+			end, { kind = "stop" }), true,
 				"Apple lsof status 1 with empty stdout/stderr must prove listener absence")
 			helpers.assert_eq(settlements, 1)
 			helpers.assert_eq(fixture.obj._server_lifecycle_owner, nil)

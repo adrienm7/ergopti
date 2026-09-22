@@ -1326,11 +1326,15 @@ LLM_NavEventOwner_BeginProfileSwap(Plan, Order, Enabled, CandidateIds,
 					&& !AllowLifecycleResume)
 			return 0
 	} finally Critical(PreviousCritical)
+	; A disable publishes the empty owner: token 0 carries no profile count. The
+	; order still lists the defined profiles, and passing its length with token 0
+	; made the adapter refuse every disable (llm-profile-disable-count).
+	ProfileCount := NewToken > 0 ? NormalizedOrder.Length : 0
 	Fn := _LLM_NavEventOwnerPortFn("begin_profile_swap", Port)
 	try Result := HasMethod(Fn, "Call")
-		? Fn.Call(ExpectedToken, Plan, NewToken, NormalizedOrder.Length)
+		? Fn.Call(ExpectedToken, Plan, NewToken, ProfileCount)
 		: _LLM_NavEventOwnerNativeBeginProfileSwap(
-			ExpectedToken, Plan, NewToken, NormalizedOrder.Length)
+			ExpectedToken, Plan, NewToken, ProfileCount)
 	catch as Err
 		return _LLM_NavEventOwnerQuarantine(
 			"Profile hotkey owner preparation raised an ambiguous error: "
@@ -1834,7 +1838,8 @@ _LLM_NavEventOwnerPollReceipt() {
 		return 0
 }
 
-_LLM_NavEventOwnerDrain(RenderFn := 0, DegradeFn := 0, ProfileSelectFn := 0) {
+_LLM_NavEventOwnerDrain(RenderFn := 0, DegradeFn := 0, ProfileSelectFn := 0,
+		SlotAcceptFn := 0) {
 	global _LLM_NavEventOwnerDrainActive
 	global _LLM_NavEventOwnerPendingStopRecovery
 	global _LLM_NavEventOwnerClaimedReceipt
@@ -1858,6 +1863,13 @@ _LLM_NavEventOwnerDrain(RenderFn := 0, DegradeFn := 0, ProfileSelectFn := 0) {
 	Degrader := HasMethod(DegradeFn, "Call") ? DegradeFn : 0
 	if !HasMethod(Degrader, "Call") && IsSet(LLM_Tooltip_HideExact)
 		Degrader := LLM_Tooltip_HideExact
+	; A consumed validation chord (a jump receipt) also inserts its slot once the
+	; modifiers are released; Up/Down cycle receipts only move the active slot
+	; (llm-val-chord-inserts).
+	SlotAccepter := HasMethod(SlotAcceptFn, "Call") ? SlotAcceptFn : 0
+	if !HasMethod(SlotAccepter, "Call")
+			&& IsSet(LLM_Tooltip_ScheduleSlotAcceptance)
+		SlotAccepter := LLM_Tooltip_ScheduleSlotAcceptance
 	_LLM_NavEventOwnerDrainActive := true
 	try {
 		Loop 64 {
@@ -1877,6 +1889,7 @@ _LLM_NavEventOwnerDrain(RenderFn := 0, DegradeFn := 0, ProfileSelectFn := 0) {
 			}
 			BreakDrain := false
 			FailureDetail := ""
+			SlotAcceptEntry := 0
 			PreviousCritical := Critical("On")
 			try {
 				; Poll irrevocably changes QUEUED to CLAIMED. Publish that exact
@@ -1904,6 +1917,8 @@ _LLM_NavEventOwnerDrain(RenderFn := 0, DegradeFn := 0, ProfileSelectFn := 0) {
 							_LLM_NavEventOwnerPendingRepaints[Token] := Entry
 							if !_LLM_NavEventOwnerRepaintFailures.Has(Token)
 								_LLM_NavEventOwnerRepaintFailures[Token] := 0
+							if Receipt.Get("action", 0) == 2
+								SlotAcceptEntry := Entry
 						}
 						_LLM_NavEventOwnerCollectToken(Token)
 					}
@@ -1911,6 +1926,14 @@ _LLM_NavEventOwnerDrain(RenderFn := 0, DegradeFn := 0, ProfileSelectFn := 0) {
 			} finally Critical(PreviousCritical)
 			if FailureDetail != ""
 				_LLM_NavEventOwnerReport(FailureDetail)
+			if IsObject(SlotAcceptEntry) && HasMethod(SlotAccepter, "Call") {
+				try SlotAccepter.Call(SlotAcceptEntry.Record,
+					SlotAcceptEntry.Surface, TargetIdx)
+				catch as Err
+					_LLM_NavEventOwnerReport(
+						"Validation chord insertion could not be armed: "
+						. Err.Message . ".")
+			}
 			if BreakDrain
 				break
 		}
@@ -2012,8 +2035,9 @@ _LLM_NavEventOwnerDrain(RenderFn := 0, DegradeFn := 0, ProfileSelectFn := 0) {
 }
 
 LLM_NavEventOwner_Drain(RenderFn := 0, DegradeFn := 0,
-		ProfileSelectFn := 0) {
-	return _LLM_NavEventOwnerDrain(RenderFn, DegradeFn, ProfileSelectFn)
+		ProfileSelectFn := 0, SlotAcceptFn := 0) {
+	return _LLM_NavEventOwnerDrain(RenderFn, DegradeFn, ProfileSelectFn,
+		SlotAcceptFn)
 }
 
 _LLM_NavEventOwnerRecoverNativeHealth(NativeErrorCode, RuntimeEpoch) {
@@ -2378,8 +2402,16 @@ _LLM_NavEventOwnerNativeBeginProfileSwap(ExpectedToken, Plan, NewToken,
 			|| !(ExpectedToken is Integer) || ExpectedToken < 0
 			|| !(NewToken is Integer) || NewToken < 0
 			|| !(ProfileCount is Integer) || ProfileCount < 0
-			|| ProfileCount > 9 || (NewToken == 0) != (ProfileCount == 0)
+			|| ProfileCount > 9 || (NewToken == 0) != (ProfileCount == 0) {
+		; A caller bug, not a native refusal: name it, or the log blames the DLL
+		; (llm-profile-disable-count).
+		_LLM_NavEventOwnerReport("Profile hotkey owner preparation received "
+			. "an invalid argument set (new_token="
+			. (NewToken is Integer ? NewToken : Type(NewToken))
+			. ", profile_count="
+			. (ProfileCount is Integer ? ProfileCount : Type(ProfileCount)) . ").")
 		return 0
+	}
 	Bindings := Buffer(9 * 12, 0)
 	Loop 9 {
 		Entry := Plan[A_Index]

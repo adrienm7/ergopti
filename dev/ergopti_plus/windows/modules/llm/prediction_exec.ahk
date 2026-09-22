@@ -621,7 +621,7 @@ _LLM_Engine_DispatchBatch(state) {
 	; at the call boundary, so the same signature works for both backends.
 	dispatch_fn.Call(state["base_temp"],
 		(text, meta := "") => _LLM_Engine_OnBatchSuccess(state_ref, text, meta),
-		() => _LLM_Engine_OnBatchFail(state_ref))
+		(failure := "") => _LLM_Engine_OnBatchFail(state_ref, failure))
 }
 
 _LLM_Engine_OnBatchSuccess(state, text, meta := "") {
@@ -642,7 +642,7 @@ _LLM_Engine_OnBatchSuccess(state, text, meta := "") {
 	_LLM_Engine_FinalizeRequest(state)
 }
 
-_LLM_Engine_OnBatchFail(state) {
+_LLM_Engine_OnBatchFail(state, failure := "") {
 	; Batch failures don't retry — the cost of a re-request is much higher
 	; than for a single variant, and the user has already paid the latency
 	; of the first attempt. Let the tooltip fade via its auto-dismiss
@@ -650,6 +650,19 @@ _LLM_Engine_OnBatchFail(state) {
 	global _LLM_Engine
 	if !_LLM_Engine_IsCurrent(state)
 		return
+	; The provider's own verdict is logged like the variant path — a 402
+	; quota refusal must be diagnosable from the log, not just a bare fail.
+	if (failure is Map) {
+		Msg := (failure.Has("message") && failure["message"] is String)
+			? failure["message"] : ""
+		Status := (failure.Has("status") && failure["status"] is Number)
+			? Integer(failure["status"]) : 0
+		Reason := (failure.Has("reason") && failure["reason"] is String)
+			? failure["reason"] : "request_failed"
+		if (Msg != "" || Status > 0)
+			try LoggerWarn("LLM", "Batch prediction failed (reason={1}, status={2}): {3}.",
+				Reason, Status, Msg)
+	}
 	; Keep slots empty + finalize so any subsequent cache hit is consistent.
 	state["slots"]       := []
 	state["dedup_stats"] := LLM_ApiCommon_NewDedupStats()

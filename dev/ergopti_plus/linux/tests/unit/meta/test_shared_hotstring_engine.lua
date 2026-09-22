@@ -175,15 +175,24 @@ helpers.describe("shared hotstring engine — backspace count", function()
 		helpers.assert_eq(3, result.backspace_count, "tlen = 3")
 	end)
 
-	helpers.it("backspace_count = tlen + 1 with terminator consumed", function()
+	helpers.it("backspace_count = tlen when the consumed terminator ends an auto trigger", function()
 		local e = engine_mod.new()
 		e:load_mappings({ { auto_expand = true, trigger = "btw", replacement = "by the way" } })
-		-- Simulate trigger typed, then terminator typed but consumed.
+		-- The consumed flag rides on the trigger's own last character here:
+		-- there is no terminator beyond the trigger, so nothing beyond it
+		-- may be erased. (The end-char path, where a separate terminator
+		-- follows the trigger, is what adds one — see the corpus vector
+		-- backspace_count_with_consumed_terminator.)
 		e:on_char("b")
 		e:on_char("t")
-		local result = e:on_char("w", { terminator_consumed = true })
+		local result = e:on_char("w", { is_terminator = true, terminator_consumed = true })
 		helpers.assert_true(result ~= nil, "match required")
-		helpers.assert_eq(4, result.backspace_count, "tlen + 1 = 4")
+		helpers.assert_eq(result.backspace_count, 3,
+			"tlen = 3: a consumed flag on the auto path erases the trigger, not a neighbour")
+		helpers.assert_eq(result.consume_terminator, true,
+			"consumption is still reported so the injector replays nothing")
+		helpers.assert_nil(result.terminator,
+			"no carrier exists to replay on the auto path")
 	end)
 
 	helpers.it("carries a non-consumed terminator through expansion state (lnx-001)", function()

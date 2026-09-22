@@ -27,8 +27,14 @@
 _LMBC_BuildIsStaged() {
 	Body := _DriverFuncBody("LLM_Menu_Build")
 	Assert(Body != "", "menu_main.ahk must define LLM_Menu_Build()")
-	Assert(InStr(Body, "StagedHandle := Menu()") > 0 and InStr(Body, "OldHandle := _LLM_Menu_Handle") > 0,
-		"LLM_Menu_Build must construct a detached staged Menu while retaining the old published handle")
+	Sub := _StripFullLineComments(_DriverFuncBody("LLM_Menu_BuildSubmenu"))
+	Assert(Sub != "", "menu_main.ahk must define LLM_Menu_BuildSubmenu()")
+	Assert(InStr(Body, "OldHandle := _LLM_Menu_Handle") > 0,
+		"LLM_Menu_Build must retain the old published handle")
+	Assert(InStr(Body, "StagedHandle := LLM_Menu_BuildSubmenu()") > 0,
+		"LLM_Menu_Build must stage through the shared row extractor")
+	Assert(InStr(Sub, "StagedHandle := Menu()") > 0,
+		"the extractor must construct a detached staged Menu")
 	Assert(InStr(Body, "_LLM_Menu_Handle.Delete()") == 0,
 		"LLM_Menu_Build must not delete the live submenu before the staged replacement is complete")
 	Assert(InStr(Body,

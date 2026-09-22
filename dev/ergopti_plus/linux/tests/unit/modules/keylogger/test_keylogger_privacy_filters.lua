@@ -223,6 +223,75 @@ end)
 
 
 
+-- =========================================
+-- =========================================
+-- ======= 2b/ Focus And Titles Too ========
+-- =========================================
+-- =========================================
+
+helpers.describe("keylogger privacy — focus and titles obey the same gate", function()
+	helpers.it("focus-gate: focus changes while disabled record nothing", function()
+		-- Regression: on_app_focus() never asked may_record(), so app switches
+		-- and focus time were persisted while metrics were disabled, private,
+		-- or suppressed — the off-switch test only ever counted keystrokes.
+		local kl = fresh_keylogger()
+		kl.set_enabled(false)
+		kl.on_app_focus("firefox", 1000)
+		kl.on_app_focus("code", 2000)
+		local stats = kl.get_app_stats()
+		helpers.assert_true(stats["firefox"] == nil and stats["code"] == nil,
+			"a disabled keylogger must not learn which applications were focused")
+		-- Re-enabling starts fresh: the disabled interval is not backfilled.
+		kl.set_enabled(true)
+		kl.on_app_focus("code", 3000)
+		kl.on_app_focus("firefox", 4000)
+		stats = kl.get_app_stats()
+		helpers.assert_eq(stats["code"] and stats["code"].focus_time_ms or -1, 1000,
+			"only the interval recorded while enabled may be credited")
+	end)
+
+	helpers.it("focus-gate: a switch made while private records no transition", function()
+		local kl = fresh_keylogger()
+		kl.on_app_focus("firefox", 1000)
+		kl.set_private_window(true)
+		kl.on_app_focus("code", 2000)
+		local stats = kl.get_app_stats()
+		helpers.assert_true(stats["code"] == nil,
+			"the application opened under a private window must not be recorded")
+		helpers.assert_eq(stats["firefox"] and stats["firefox"].focus_time_ms or -1, 0,
+			"the interval closed while private must not be credited either")
+	end)
+
+	helpers.it("focus-gate: the title interval closes only while recording is allowed", function()
+		-- The interval-close preamble ran before the may_record() gate, so the
+		-- time spent under a title leaked into the database on the next flush
+		-- even when recording was forbidden — and a title names the page.
+		local previous_writer = package.loaded["modules.keylogger.sqlite_writer"]
+		local captured = { titles = {} }
+		package.loaded["modules.keylogger.sqlite_writer"] = setmetatable({
+			upsert_title = function(_, row)
+				captured.titles[#captured.titles + 1] = row
+				return true
+			end,
+		}, { __index = function() return function() return true end end })
+		local ok, err = pcall(function()
+			local kl = fresh_keylogger()
+			kl.on_app_focus("code", 1000)
+			kl.set_window_title("code", "Doc", 1000)
+			kl.set_enabled(false)
+			kl.set_window_title("code", "Other", 2000)
+			kl.flush()
+			helpers.assert_eq(#captured.titles, 0,
+				"no title time may reach the database once recording is forbidden")
+		end)
+		package.loaded["modules.keylogger.sqlite_writer"] = previous_writer
+		if not ok then error(err, 0) end
+	end)
+end)
+
+
+
+
 
 -- =========================================
 -- =========================================

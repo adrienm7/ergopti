@@ -13,8 +13,9 @@
 //    so a missing worker fails launch rather than degrading after taps are live.
 // 2. Session + sequence idempotence: retries are ACKed without duplicate writes,
 //    gaps are rejected, and hs.reload may restart sequence 1 safely.
-// 3. Descriptor-relative sinks: configured directories and files are validated
-//    without following their final path components; all writes happen off AppKit.
+// 3. Descriptor-relative sinks: the configured directory is resolved once to a
+//    user-owned folder (OwnedLogDirectory), files are validated without
+//    following their final path components, and all writes happen off AppKit.
 // 4. Native rotation/purge: daily and topical maintenance cannot block a Lua
 //    timer or eventtap callback.
 // ==============================================================================
@@ -45,6 +46,8 @@ struct LoggerDatagramEndpoint: Equatable {
 protocol LoggerDatagramServing: AnyObject {
 	var endpoint: LoggerDatagramEndpoint { get }
 	func setBootstrapReadyHandler(_ handler: @escaping () -> Void)
+	/// Observes every log folder the Lua configure asked for and was refused.
+	func setConfigureRefusalHandler(_ handler: @escaping (LogDirectoryFailure) -> Void)
 	func stop()
 }
 
@@ -122,11 +125,20 @@ final class LoggerRecordSink {
 		if directoryDescriptor >= 0 { Darwin.close(directoryDescriptor) }
 	}
 
-	/// Installs one owned, no-follow log directory and performs retention there.
+	/// The exact log-folder refusal of the latest configure, nil after success.
+	private(set) var lastDirectoryFailure: LogDirectoryFailure?
+
+	/// Installs one owned log directory and schedules retention there. The
+	/// user's own symbolic links are resolved once; OwnedLogDirectoryResolver
+	/// then refuses any link that appears after that resolution.
 	func configure(directoryPath: String, retentionDays: Int) -> Bool {
 		guard (1...3_650).contains(retentionDays),
-			let normalizedPath = Self.normalizedAbsoluteDirectoryPath(directoryPath)
-		else { return false }
+			let normalizedPath = OwnedLogDirectoryResolver.normalizedAbsoluteDirectoryPath(directoryPath)
+		else {
+			lastDirectoryFailure = LogDirectoryFailure(path: directoryPath, refusal: .invalidPath)
+			return false
+		}
+		lastDirectoryFailure = nil
 		if let pendingRecord {
 			guard append(
 				line: pendingRecord.line,
@@ -137,22 +149,20 @@ final class LoggerRecordSink {
 			) else { return false }
 		}
 
-		try? FileManager.default.createDirectory(
-			atPath: normalizedPath,
-			withIntermediateDirectories: true,
-			attributes: [.posixPermissions: 0o700]
-		)
-		let descriptor = Darwin.open(
-			normalizedPath,
-			O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW
-		)
-		guard descriptor >= 0 else { return false }
+		let descriptor: Int32
+		switch OwnedLogDirectoryResolver.open(normalizedPath) {
+		case let .success(directory):
+			descriptor = directory.descriptor
+		case let .failure(failure):
+			lastDirectoryFailure = failure
+			return false
+		}
 		var attributes = stat()
-		guard Darwin.fstat(descriptor, &attributes) == 0,
-			(attributes.st_mode & S_IFMT) == S_IFDIR,
-			attributes.st_uid == geteuid(),
-			Darwin.fchmod(descriptor, S_IRWXU) == 0
-		else {
+		guard Darwin.fstat(descriptor, &attributes) == 0 else {
+			lastDirectoryFailure = LogDirectoryFailure(
+				path: normalizedPath,
+				refusal: .unavailable(errorCode: errno)
+			)
 			Darwin.close(descriptor)
 			return false
 		}
@@ -277,16 +287,6 @@ final class LoggerRecordSink {
 		}
 		pendingRecord = nil
 		return true
-	}
-
-	/// Normalizes one absolute directory without admitting a NUL or parent escape.
-	private static func normalizedAbsoluteDirectoryPath(_ path: String) -> String? {
-		guard path.hasPrefix("/"), !path.contains("\0"), path.utf8.count < Int(PATH_MAX)
-		else { return nil }
-		let normalized = URL(fileURLWithPath: path, isDirectory: true)
-			.standardizedFileURL.path
-		guard normalized.hasPrefix("/"), normalized != "/" else { return nil }
-		return normalized
 	}
 
 	/// Keeps native log files textual without rejecting an otherwise valid Lua
@@ -600,6 +600,8 @@ final class LoggerDatagramProcessor {
 	private var configuredRetention: Int?
 	private var lastSequence = 0
 	var hasConfiguredSession: Bool { session != nil }
+	/// Receives every refused log folder on the processor queue.
+	var configureRefusalHandler: ((LogDirectoryFailure) -> Void)?
 
 	init(token: String, sink: LoggerRecordSink = LoggerRecordSink()) {
 		self.token = token
@@ -668,12 +670,7 @@ final class LoggerDatagramProcessor {
 				)
 			}
 			guard sink.configure(directoryPath: directory, retentionDays: retention) else {
-				return response(
-					kind: "nack",
-					ack: nil,
-					reason: "configure_failed",
-					responseSession: requestSession
-				)
+				return configureRefusal(session: requestSession)
 			}
 			return response(
 				kind: "ack",
@@ -694,12 +691,7 @@ final class LoggerDatagramProcessor {
 		}
 
 		guard sink.configure(directoryPath: directory, retentionDays: retention) else {
-			return response(
-				kind: "nack",
-				ack: nil,
-				reason: "configure_failed",
-				responseSession: requestSession
-			)
+			return configureRefusal(session: requestSession)
 		}
 		session = requestSession
 		configuredDirectory = directory
@@ -709,6 +701,20 @@ final class LoggerDatagramProcessor {
 			kind: "ack",
 			ack: 0,
 			reason: nil,
+			responseSession: requestSession
+		)
+	}
+
+	/// Reports a refused log folder to the launcher and names it in the NACK, so
+	/// both the user alert and the Lua boot log carry the exact cause.
+	private func configureRefusal(session requestSession: String) -> Data? {
+		let failure = sink.lastDirectoryFailure
+		if let failure { configureRefusalHandler?(failure) }
+		return response(
+			kind: "nack",
+			ack: nil,
+			reason: "configure_failed",
+			detail: failure?.diagnostic,
 			responseSession: requestSession
 		)
 	}
@@ -910,6 +916,7 @@ final class LoggerDatagramProcessor {
 		kind: String,
 		ack: Int?,
 		reason: String?,
+		detail: String? = nil,
 		expected: Int? = nil,
 		responseSession: String? = nil
 	) -> Data? {
@@ -923,6 +930,7 @@ final class LoggerDatagramProcessor {
 		}
 		if let ack { body["ack"] = ack }
 		if let reason { body["reason"] = reason }
+		if let detail { body["detail"] = detail }
 		if let expected { body["expected"] = expected }
 		return try? JSONSerialization.data(withJSONObject: body, options: [.sortedKeys])
 	}
@@ -1049,6 +1057,10 @@ final class LoggerDatagramWorker: LoggerDatagramServing {
 			bootstrapReadyHandler = handler
 			if processor.hasConfiguredSession { reportBootstrapReadyIfNeeded() }
 		}
+	}
+
+	func setConfigureRefusalHandler(_ handler: @escaping (LogDirectoryFailure) -> Void) {
+		queue.sync { processor.configureRefusalHandler = handler }
 	}
 
 	func stop() {

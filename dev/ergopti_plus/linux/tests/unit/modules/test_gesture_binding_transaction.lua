@@ -155,4 +155,36 @@ helpers.describe("gestures: durable binding transactions", function()
 		if not ok then error(err, 0) end
 	end)
 
+	helpers.it("unknown-action: a persisted unknown action survives a restart", function()
+		-- Regression: set_action() warned but committed an unknown action,
+		-- while the load silently dropped it — so the binding reverted on
+		-- every restart and the save looked intermittently broken.
+		local path = os.tmpname()
+		os.remove(path)
+		local saved = {
+			[MANAGER] = package.loaded[MANAGER],
+			[LOGGER] = package.loaded[LOGGER],
+		}
+		package.loaded[MANAGER] = nil
+		package.loaded[LOGGER] = helpers.make_logger_stub()
+
+		local ok, err = pcall(function()
+			local manager = require(MANAGER)
+			manager.init({ enabled = false, persist = true, config_path = path })
+			helpers.assert_true(manager.set_action("tap_3", "future_action_xyz"),
+				"set_action reports success for the unknown action")
+
+			package.loaded[MANAGER] = nil
+			local restarted = require(MANAGER)
+			restarted.init({ enabled = false, persist = true, config_path = path })
+			helpers.assert_eq(restarted.get_action("tap_3"), "future_action_xyz",
+				"a save that reported success must still be there after a restart — "
+					.. "not silently reverted to the default")
+		end)
+
+		for name, module in pairs(saved) do package.loaded[name] = module end
+		os.remove(path)
+		if not ok then error(err, 0) end
+	end)
+
 end)

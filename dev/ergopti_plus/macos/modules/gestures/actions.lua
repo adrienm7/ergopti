@@ -1655,8 +1655,9 @@ sg("script_quit",                         function()
 	local function request_controlled_exit()
 		if exit_requested then return end
 		exit_requested = true
+		-- request_user_exit arms the bounded quit watchdog shared with menubar Quit
 		local request_ok, accepted_or_err = xpcall(function()
-			return TerminationCoordinator.request_exit("script_quit", 0)
+			return TerminationCoordinator.request_user_exit("script_quit")
 		end, debug.traceback)
 		if not request_ok or accepted_or_err ~= true then
 			Logger.error(LOG, "script_quit controlled exit was rejected: %s",
