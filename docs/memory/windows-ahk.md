@@ -179,6 +179,18 @@ no longer chain across a day boundary. JSON distributions must accumulate across
 flushes even during cold replay: cold/warm equality alone can compare two equally
 truncated distributions, so pin conservation across batch boundaries as well.
 
+When the cold build is unavoidable on a store above 32 MB, a worker rebuilds
+newest day first (`keylogger_reader_rebuild.ahk`): it reads ledgers backward
+from `-- === ingest batch` boundaries, keeps first-copy-wins for reused keys
+with temporary BEFORE INSERT triggers, and rolls up a day once every batch
+ingested on or after it has run. Rounds use the warm-refresh date-scoped
+rollups, so the result has warm semantics (no n-gram chain across rounds).
+Progress, partial snapshots (`<prefetch>.partial`) and a once-a-minute
+checkpoint (`cache/rebuild.sqlite`) let the page show recent days within
+seconds and let a worker killed by a driver reload resume. A leftover
+main-schema payload table is dropped from a private copy (upgrade), never a
+reason to rebuild.
+
 Clear ordered typing events belong only to the reader's MEMORY-only TEMP table,
 which main-database backup excludes. Cache format 4 persists per-event numeric
 character counts instead; SQL rollups can reuse them without decrypting old
