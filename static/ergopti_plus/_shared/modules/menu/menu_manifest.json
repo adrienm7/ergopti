@@ -1333,7 +1333,8 @@
 			],
 			"category": "TapHolds",
 			"platforms": [
-				"ahk"
+				"ahk",
+				"hs"
 			],
 			"reason_key": "platform_reason.remap_engine_is_per_driver"
 		},

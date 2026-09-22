@@ -93,8 +93,10 @@ function M.create(deps)
 		or type(deps.shortcuts.get_keyboard_assignments) ~= "function"
 		or type(deps.karabiner) ~= "table"
 		or type(deps.karabiner.snapshot_settings) ~= "function"
-		or type(deps.karabiner.clear_all_bindings) ~= "function"
 		or type(deps.karabiner.reset_to_defaults) ~= "function"
+		or type(deps.karabiner.get_tap_holds_enabled) ~= "function"
+		or type(deps.karabiner.set_tap_holds_enabled) ~= "function"
+		or type(deps.karabiner.regenerate) ~= "function"
 		or type(deps.karabiner.restore_settings) ~= "function"
 		or type(deps.request_reload) ~= "function"
 		or type(deps.terminal_pending) ~= "function" then
@@ -219,7 +221,7 @@ function M.create(deps)
 			return nil
 		end
 		local karabiner_snapshot = {}
-		if kind ~= "enable" then
+		if kind == "reset" then
 			local karabiner_ok
 			karabiner_ok, karabiner_snapshot = xpcall(
 				deps.karabiner.snapshot_settings,
@@ -230,6 +232,16 @@ function M.create(deps)
 					kind, tostring(karabiner_snapshot))
 				return nil
 			end
+		end
+
+		local tap_holds_ok, tap_holds_enabled = xpcall(
+			deps.karabiner.get_tap_holds_enabled,
+			debug.traceback
+		)
+		if not tap_holds_ok or type(tap_holds_enabled) ~= "boolean" then
+			Logger.error(LOG, "Global %s Tap-Holds snapshot failed: %s.",
+				kind, tostring(tap_holds_enabled))
+			return nil
 		end
 
 		local gesture_snapshot = {}
@@ -243,7 +255,7 @@ function M.create(deps)
 		end
 
 		local shortcut_snapshot = {}
-		if kind == "disable" or kind == "enable" then
+		if kind == "enable" then
 			local list_ok, listed = xpcall(shortcuts.list_shortcuts, debug.traceback)
 			if not list_ok or type(listed) ~= "table" then
 				Logger.error(LOG, "Named shortcut snapshot failed: %s.", tostring(listed))
@@ -261,7 +273,7 @@ function M.create(deps)
 		end
 
 		local keyboard_snapshot = {}
-		if kind ~= "enable" then
+		if kind == "reset" then
 			keyboard_snapshot = capture_keyboard_slots()
 			if not keyboard_snapshot then return nil end
 		end
@@ -310,6 +322,7 @@ function M.create(deps)
 			enable_terminators = enable_terminators,
 			reset_paths = clone_value(deps.reset_paths or {}),
 			karabiner_snapshot = clone_value(karabiner_snapshot),
+			tap_holds_enabled = tap_holds_enabled,
 			journal = {},
 			rollback_index = 0,
 			karabiner_attempted = false,
@@ -360,6 +373,11 @@ function M.create(deps)
 	end
 
 	--- Mutates the shared state table to the Disable All candidate.
+	--- Only the feature switches move, exactly like a pause: every per-slot
+	--- assignment (gesture actions, script-control keys, named and keyboard
+	--- shortcuts, terminators, tap-hold bindings) stays as configured, so Enable
+	--- All or a per-feature toggle brings the user's own configuration back. The
+	--- script-control keys are left alone because they are how a user resumes.
 	--- @param transaction table Active transaction.
 	local function mutate_disable_state(transaction)
 		state.keymap = false
@@ -367,24 +385,22 @@ function M.create(deps)
 		state.shortcuts = false
 		state.llm_enabled = false
 		state.keylogger_enabled = false
-		state.script_control_enabled = false
 		if state.personal_info ~= nil then state.personal_info = false end
 		for name in pairs(state.hotstrings or {}) do state.hotstrings[name] = false end
-		for key in pairs(state.terminator_states or {}) do state.terminator_states[key] = false end
 		state.preview_star_enabled = false
 		state.preview_autocorrect_enabled = false
 		state.preview_ai_enabled = false
-		if type(state.script_control_shortcuts) ~= "table" then state.script_control_shortcuts = {} end
-		for _, slot in ipairs(SCRIPT_SLOTS) do state.script_control_shortcuts[slot] = DISABLED_ACTION end
-		transaction.candidate_preferences = clone_value(transaction.preference_snapshot)
-		transaction.candidate_preferences.gesture_actions = {}
-		for _, slot in ipairs(gesture_slots) do
-			transaction.candidate_preferences.gesture_actions[slot] = DISABLED_ACTION
+
+		local candidate = clone_value(transaction.preference_snapshot)
+		for _, key in ipairs({
+			"keymap", "gestures", "shortcuts", "llm_enabled", "keylogger_enabled",
+			"personal_info", "preview_star_enabled", "preview_autocorrect_enabled",
+			"preview_ai_enabled",
+		}) do
+			if state[key] ~= nil then candidate[key] = state[key] end
 		end
-		transaction.candidate_preferences.shortcut_keys = {}
-		for _, shortcut in ipairs(transaction.shortcut_snapshot) do
-			transaction.candidate_preferences.shortcut_keys[shortcut.id] = false
-		end
+		candidate.hotstrings = clone_value(state.hotstrings or {})
+		transaction.candidate_preferences = candidate
 	end
 
 	--- Mutates only reset-time binding state while config files remain recoverable.
@@ -429,9 +445,8 @@ function M.create(deps)
 			return false
 		end
 
-		for _, slot in ipairs(transaction.kind ~= "enable" and gesture_slots or {}) do
-			local target = transaction.kind == "disable"
-				and DISABLED_ACTION or gesture_defaults[slot]
+		for _, slot in ipairs(transaction.kind == "reset" and gesture_slots or {}) do
+			local target = gesture_defaults[slot]
 			if type(target) ~= "string" or call_exact(
 				"Gesture setter '" .. tostring(slot) .. "'",
 				gestures.set_action,
@@ -439,24 +454,14 @@ function M.create(deps)
 				target
 			) ~= true then return false end
 		end
-		for _, slot in ipairs(transaction.kind ~= "enable" and SCRIPT_SLOTS or {}) do
-			local target = transaction.kind == "disable"
-				and DISABLED_ACTION or script_defaults[slot]
+		for _, slot in ipairs(transaction.kind == "reset" and SCRIPT_SLOTS or {}) do
+			local target = script_defaults[slot]
 			if type(target) ~= "string" or call_exact(
 				"Script-control setter '" .. slot .. "'",
 				shortcuts.set_shortcut_action,
 				slot,
 				target
 			) ~= true then return false end
-		end
-		if transaction.kind == "disable" then
-			for _, shortcut in ipairs(transaction.shortcut_snapshot) do
-				if call_exact(
-					"Named shortcut disable '" .. shortcut.id .. "'",
-					shortcuts.disable,
-					shortcut.id
-				) ~= true then return false end
-			end
 		end
 		return true
 	end
@@ -480,7 +485,7 @@ function M.create(deps)
 				shortcut.id
 			) ~= true then return false end
 		end
-		for _, slot in ipairs(transaction.kind ~= "enable" and gesture_slots or {}) do
+		for _, slot in ipairs(transaction.kind == "reset" and gesture_slots or {}) do
 			if call_exact(
 				"Gesture inverse '" .. tostring(slot) .. "'",
 				gestures.set_action,
@@ -488,7 +493,7 @@ function M.create(deps)
 				transaction.gesture_snapshot[slot]
 			) ~= true then return false end
 		end
-		for _, slot in ipairs(transaction.kind ~= "enable" and SCRIPT_SLOTS or {}) do
+		for _, slot in ipairs(transaction.kind == "reset" and SCRIPT_SLOTS or {}) do
 			if call_exact(
 				"Script-control inverse '" .. slot .. "'",
 				shortcuts.set_shortcut_action,
@@ -527,6 +532,20 @@ function M.create(deps)
 			function() return apply_state_runtime(transaction) end,
 			function() return restore_state_runtime(transaction) end
 		) ~= true then return false end
+
+		-- The Tap-Holds switch, not its per-key assignments: off keeps every
+		-- binding stored and only stops generating them, exactly like a pause.
+		if transaction.kind ~= "reset" then
+			local target = transaction.kind == "enable"
+			if run_step(
+				transaction,
+				"Tap-Holds feature switch",
+				function() return deps.karabiner.set_tap_holds_enabled(target) end,
+				function()
+					return deps.karabiner.set_tap_holds_enabled(transaction.tap_holds_enabled)
+				end
+			) ~= true then return false end
+		end
 
 		if transaction.kind == "enable" then
 			if run_step(
@@ -795,9 +814,7 @@ function M.create(deps)
 		transaction.karabiner_attempted = true
 		transaction.karabiner_journal_index = transaction.rollback_index
 		transaction.phase = "karabiner-candidate"
-		local method = transaction.kind == "disable"
-			and deps.karabiner.clear_all_bindings
-			or deps.karabiner.reset_to_defaults
+		local method = deps.karabiner.reset_to_defaults
 		local accepted = dispatch_async(
 			transaction,
 			"Global " .. transaction.kind .. " Karabiner deployment",
@@ -932,8 +949,24 @@ function M.create(deps)
 		if apply_synchronous_steps(transaction) ~= true then
 			return reject_transaction(transaction, "synchronous candidate refused")
 		end
-		if kind == "enable" then
+		-- Disable All no longer rewrites tap-hold bindings, so it has no Karabiner
+		-- deployment to wait for: gating it on one left every feature checked
+		-- whenever the remap lease could not deploy (helper awaiting approval).
+		if kind == "enable" or kind == "disable" then
 			publish_success(transaction)
+			-- The committed Tap-Holds switch is redeployed afterwards, best-effort:
+			-- without a live lease the next provisioned generation is built from it.
+			local deploy_ok, deploy_err = xpcall(function()
+				return deps.karabiner.regenerate(function(ok, reason)
+					if ok ~= true then
+						Logger.warn(LOG, "Global %s Tap-Holds rules not redeployed yet: %s.",
+							kind, tostring(reason))
+					end
+				end)
+			end, debug.traceback)
+			if not deploy_ok then
+				Logger.error(LOG, "Global %s Tap-Holds redeploy raised: %s.", kind, tostring(deploy_err))
+			end
 			return true
 		end
 		return dispatch_candidate(transaction)

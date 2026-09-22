@@ -4171,8 +4171,9 @@ i18n_on = "menu.tapholds.on"
 i18n_off = "menu.tapholds.off"
 checked_when = ["tapholds_enabled"]
 category = "TapHolds"
-# macOS has no switch: its remap engine is always on.
-platforms = ["ahk"]
+# macOS switches the feature, not its remap engine (always on): off stops
+# generating the per-key rules while keeping every assignment, like a pause.
+platforms = ["ahk", "hs"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
 
 # `command` since 2026-08-07, not `action`. Both were handlers whose whole body
