@@ -3239,6 +3239,17 @@ type = "command"
 id = "reset_defaults"
 i18n = "menu.global.reset_defaults"
 
+# Lists the config.toml keys the boot loader reports as unknown and offers to
+# remove them after a backup. Only the Windows loader checks every key against
+# the manifest; macOS and Linux skip unknown keys without recording them, so
+# they have no list to offer.
+[[menu.global_actions]]
+type = "command"
+id = "clean_unused_keys"
+i18n = "menu.global.clean_unused_keys"
+platforms = ["ahk"]
+reason_key = "platform_reason.only_windows_reports_unknown_config_keys"
+
 # These four carried an id and nothing else until 2026-08-07 — no type, no label
 # key — so every driver that drew one spelled its label out in its own source.
 # They are `command` now, like the four rows below them, and the label is the

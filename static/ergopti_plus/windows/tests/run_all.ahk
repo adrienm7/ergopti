@@ -551,6 +551,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_config_commit_gateway.ahk
 #Include unit/test_config_typed_updates.ahk
 #Include unit/test_config_typed_transactions.ahk
+#Include unit/test_config_unused_keys.ahk
 #Include unit/test_config_partial_load_persistence.ahk
 #Include unit/test_config_partial_load_llm.ahk
 #Include unit/test_toml_numeric_strings.ahk

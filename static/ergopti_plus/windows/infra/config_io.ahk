@@ -12,6 +12,7 @@
 ; ==============================================================================
 
 #Include config_write_lease.ahk
+#Include config_unused_keys.ahk
 
 ; Reports one user-visible error for a configuration mutation that did not
 ; reach disk. The TOML writer already logs its low-level failure; this adds the
