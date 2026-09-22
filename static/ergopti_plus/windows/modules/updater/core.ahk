@@ -1550,11 +1550,24 @@ Updater_IsLocalSource() {
 ; In local-source mode: the placeholder stays as-is → shown as "local".
 Updater_CurrentVersion() {
 	global BUNDLE_VERSION
-	if Updater_IsLocalSource()
+	return Updater_DisplayVersion(BUNDLE_VERSION, Updater_IsLocalSource())
+}
+
+; The version every surface shows (About row, diagnostics, crash reports) from a
+; build stamp. Semver "+build" metadata (a commit or CI run id) is dropped here,
+; at the single owner: it is not part of the release's identity, it made the
+; About row and the diagnostics read like a different version than the release
+; page, and the commit already has its own diagnostics row.
+; @param Stamp {String} BUNDLE_VERSION as stamped at build time.
+; @param IsLocal {Boolean} True when running from the source tree.
+; @returns {String} The version, or "local" for a source run or unstamped build.
+Updater_DisplayVersion(Stamp, IsLocal) {
+	if IsLocal
 		return "local"
-	if (BUNDLE_VERSION == "__BUNDLE_VERSION__" or BUNDLE_VERSION == "")
+	if (Stamp == "__BUNDLE_VERSION__" or Stamp == "")
 		return "local"
-	return BUNDLE_VERSION
+	Version := RegExReplace(Stamp, "\+.*$")
+	return (Version == "") ? "local" : Version
 }
 
 ; Strips a leading "v" so "v2.1.2" and "2.1.2" compare equal.

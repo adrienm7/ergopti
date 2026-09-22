@@ -398,6 +398,12 @@ KL_IngestOnce(force := false, rollover_owned := false, Token := 0) {
 	    } else {
 	        try KLWV_RecordCommittedIngest()
 	    }
+	    ; Every committed batch pushes the background sidecar refresh back, so it
+	    ; runs once ingest has gone idle and the next dashboard open paints current
+	    ; data at once instead of waiting for a cold projection.
+	    try KLWV_WarmOnIngestCommitted()
+	    catch as err
+	        try LoggerError("Keylogger", "Metrics sidecar warm-up could not be re-armed: {1}.", err.Message)
 
 	    return Map("ok", true, "eof", source_eof,
 	        "committed_offset", Keylogger.today_log_offset)
