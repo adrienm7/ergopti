@@ -328,6 +328,7 @@ jobs:
       # instead of failing them for a secret they cannot have.
       - name: Build ErgoptiPlus.app
         env:
+          ERGOPTI_BUILD_COMMIT: ${{ github.sha }}
           ERGOPTI_CHANNEL: dev
           SPARKLE_PUBLIC_KEY: ${{ secrets.SPARKLE_PUBLIC_KEY }}
           GH_OWNER: ${{ github.repository_owner }}
@@ -1310,6 +1311,8 @@ jobs:
           cache: 'npm'
 
       - name: Assemble Linux driver bundle
+        env:
+          ERGOPTI_BUILD_COMMIT: ${{ github.sha }}
         run: bash tools/build/build-linux-driver.sh --skip-smoke
 
       - name: Build the .deb
@@ -1384,6 +1387,8 @@ jobs:
           rpmbuild --version
 
       - name: Assemble Linux driver bundle
+        env:
+          ERGOPTI_BUILD_COMMIT: ${{ github.sha }}
         run: bash tools/build/build-linux-driver.sh --skip-smoke
 
       - name: Build the .rpm
@@ -1469,6 +1474,8 @@ jobs:
           test -x /usr/local/bin/appimagetool
 
       - name: Assemble Linux driver bundle
+        env:
+          ERGOPTI_BUILD_COMMIT: ${{ github.sha }}
         run: bash tools/build/build-linux-driver.sh --skip-smoke
 
       - name: Build the AppImage
@@ -1562,6 +1569,8 @@ jobs:
           flatpak list --user
 
       - name: Assemble Linux driver bundle
+        env:
+          ERGOPTI_BUILD_COMMIT: ${{ github.sha }}
         run: bash tools/build/build-linux-driver.sh --skip-smoke
 
       - name: Build the Flatpak
@@ -1991,9 +2000,12 @@ jobs:
           sudo apt-get install -y luajit
 
       - name: Assemble and pack the bundle exactly as the release does
+        env:
+          ERGOPTI_BUILD_COMMIT: ${{ github.sha }}
         run: |
           set -euo pipefail
           bash tools/build/build-linux-driver.sh --skip-smoke
+          bash tools/build/write_build_stamp.sh verify build/linux/_shared
           bundle_asset=$(node -p "require('./static/ergopti_plus/_shared/modules/updater/defaults.json').release_assets.linux_bundle")
           if [[ ! "$bundle_asset" =~ ^[A-Za-z0-9._+-]+\.tar\.gz$ ]]; then
               echo "::error::unsafe Linux bundle asset name: $bundle_asset"
@@ -2236,6 +2248,7 @@ jobs:
       - name: Build ErgoptiPlus.app
         shell: bash
         env:
+          ERGOPTI_BUILD_COMMIT: ${{ github.sha }}
           ERGOPTI_VERSION: ${{ needs.resolve-release-meta.outputs.version }}
           ERGOPTI_BUILD: ${{ github.run_number }}
           ERGOPTI_CHANNEL: ${{ needs.resolve-release-meta.outputs.prerelease == 'true' && 'dev' || 'main' }}
@@ -2613,6 +2626,8 @@ jobs:
 
       - name: Assemble Linux driver bundle
         shell: bash
+        env:
+          ERGOPTI_BUILD_COMMIT: ${{ github.sha }}
         run: bash tools/build/build-linux-driver.sh
 
       - name: Package latest XKB files
@@ -2634,6 +2649,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          bash tools/build/write_build_stamp.sh verify build/linux/_shared
           tar -czf "build/linux/$LINUX_BUNDLE_ASSET" -C build/linux linux _shared bin install.sh kanata.kbd
           (cd build/linux && sha256sum "$LINUX_BUNDLE_ASSET" > "$LINUX_BUNDLE_ASSET.sha256")
           (cd build/linux && sha256sum --check "$LINUX_BUNDLE_ASSET.sha256")

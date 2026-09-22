@@ -68,6 +68,9 @@ rm -rf "$INSTALL_ROOT/usr/lib/ergopti/tests" "$INSTALL_ROOT/usr/lib/ergopti/__py
 # roots such as tap_hold/ cannot disappear from only the system packages.
 mkdir -p "$INSTALL_ROOT/usr/lib/ergopti/_shared"
 cp -r "$BUILD_DIR/_shared/." "$INSTALL_ROOT/usr/lib/ergopti/_shared/"
+# The stamp build-linux-driver.sh wrote is how the installed daemon names its
+# commit; a package without it would report "unknown".
+bash "$SCRIPT_DIR/write_build_stamp.sh" verify "$INSTALL_ROOT/usr/lib/ergopti/_shared"
 
 chmod -R 755 "$INSTALL_ROOT/usr/lib/ergopti"
 echo "  $(find "$INSTALL_ROOT/usr/lib/ergopti" -type f | wc -l) files"

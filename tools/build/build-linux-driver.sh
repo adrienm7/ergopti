@@ -90,6 +90,11 @@ echo "--- Copying _shared tree ---"
 # corpus fixtures remain development-only.
 copy_tree "${SHARED_SRC}/" "${BUILD_DIR}/_shared/" --exclude corpus
 
+# Every Linux package (.deb, .rpm, AppImage, Flatpak, tarball) is made from this
+# shared tree, and none of them carries a .git: without the stamp the daemon's
+# diagnostics cannot name the commit it was built from.
+bash "${SCRIPT_DIR}/write_build_stamp.sh" write "${BUILD_DIR}/_shared"
+
 # ============================================================================
 # 4. Copy kanata config and install script
 # ============================================================================

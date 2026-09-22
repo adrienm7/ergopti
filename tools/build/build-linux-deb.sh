@@ -64,6 +64,9 @@ rm -rf "$DEB_ROOT/usr/lib/ergopti/tests" "$DEB_ROOT/usr/lib/ergopti/__pycache__"
 # roots such as tap_hold/ cannot disappear from only the system packages.
 mkdir -p "$DEB_ROOT/usr/lib/ergopti/_shared"
 cp -r "$BUILD_DIR/_shared/." "$DEB_ROOT/usr/lib/ergopti/_shared/"
+# The stamp build-linux-driver.sh wrote is how the installed daemon names its
+# commit; a package without it would report "unknown".
+bash "$SCRIPT_DIR/write_build_stamp.sh" verify "$DEB_ROOT/usr/lib/ergopti/_shared"
 
 file_count=$(find "$DEB_ROOT/usr/lib/ergopti" -type f | wc -l)
 echo "  $file_count files copied to /usr/lib/ergopti/"

@@ -241,6 +241,9 @@ cp -r "$BUILD_DIR/linux/." "$PAYLOAD_DIR/lib/ergopti/"
 # _shared/data and _shared/modules.
 mkdir -p "$PAYLOAD_DIR/lib/ergopti/_shared"
 cp -r "$BUILD_DIR/_shared/." "$PAYLOAD_DIR/lib/ergopti/_shared/"
+# The stamp build-linux-driver.sh wrote is how the sandboxed daemon names its
+# commit; a bundle without it would report "unknown".
+bash "$SCRIPT_DIR/write_build_stamp.sh" verify "$PAYLOAD_DIR/lib/ergopti/_shared"
 
 echo "  $(find "$PAYLOAD_DIR/lib/ergopti" -type f | wc -l) files staged for /app/lib/ergopti/"
 

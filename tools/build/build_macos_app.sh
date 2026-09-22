@@ -400,6 +400,9 @@ assemble_app() {
 
 	# Shared tree (WebView HTML/CSS/JS, LLM defaults, DB schema, locales, hotstrings).
 	cp -R "$REPO_ROOT/static/ergopti_plus/_shared"      "$static_root/ergopti_plus/_shared"
+	# The bundle has no .git: the stamp is how the driver's diagnostics name the
+	# commit this app was built from. Written before codesign seals the resources.
+	bash "$REPO_ROOT/tools/build/write_build_stamp.sh" write "$static_root/ergopti_plus/_shared"
 
 	# Static assets.
 	cp -R "$REPO_ROOT/static/ergopti_plus/_shared/modules/menu/menu_manifest.json" "$static_root/"
