@@ -20,6 +20,27 @@ local MANAGED_KEYS = {
 local MANAGED_KEY_SET = {}
 for _, name in ipairs(MANAGED_KEYS) do MANAGED_KEY_SET[name] = true end
 
+-- The other keys the Swift launcher exports. With MANAGED_KEYS they form the
+-- boot trail's presence report; only names are ever logged, because the
+-- logger token is a credential.
+local INFORMATIONAL_KEYS = {
+	"ERGOPTI_LAUNCHER_VERSION",
+	"ERGOPTI_CONFIG_DIR",
+	"ERGOPTI_PATHS_FILE",
+	"ERGOPTI_KARABINER_INSTALLER",
+	"ERGOPTI_OLLAMA_BIN",
+	"ERGOPTI_LAUNCHER_EXECUTABLE",
+	"ERGOPTI_REMAP_GUARDIAN_STATUS",
+	"ERGOPTI_LAUNCHER_DEVICE",
+	"ERGOPTI_LAUNCHER_INODE",
+	"ERGOPTI_FATAL_REPORT_FILE",
+	"ERGOPTI_LAUNCHER_LOG_FILE",
+}
+
+local EXPORTED_KEYS = {}
+for _, name in ipairs(MANAGED_KEYS) do EXPORTED_KEYS[#EXPORTED_KEYS + 1] = name end
+for _, name in ipairs(INFORMATIONAL_KEYS) do EXPORTED_KEYS[#EXPORTED_KEYS + 1] = name end
+
 
 
 
@@ -36,6 +57,24 @@ function M.managed_keys()
 	local copy = {}
 	for index, name in ipairs(MANAGED_KEYS) do copy[index] = name end
 	return copy
+end
+
+--- Lists which launcher-exported keys are present, by name only.
+--- @param getenv function|nil Injectable environment reader.
+--- @return table present Names with a non-empty value.
+--- @return table missing Names without one.
+function M.presence(getenv)
+	local reader = type(getenv) == "function" and getenv or os.getenv
+	local present, missing = {}, {}
+	for _, name in ipairs(EXPORTED_KEYS) do
+		local ok, value = pcall(reader, name)
+		if ok and type(value) == "string" and value ~= "" then
+			present[#present + 1] = name
+		else
+			missing[#missing + 1] = name
+		end
+	end
+	return present, missing
 end
 
 --- Copies a native process environment while removing launcher-only authority.

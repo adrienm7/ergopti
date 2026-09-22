@@ -63,6 +63,7 @@ graph TD
         MACOS_accessibility_permission["AccessibilityPermission.lua"]
         MACOS_app_launcher["AppLauncher.lua"]
         MACOS_boot_fatal["BootFatal.lua"]
+        MACOS_boot_journal["BootJournal.lua"]
         MACOS_clipboard["Clipboard.lua"]
         MACOS_crypto["Crypto.lua"]
         MACOS_event_provenance["EventProvenance.lua"]

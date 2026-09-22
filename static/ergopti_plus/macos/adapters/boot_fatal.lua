@@ -24,6 +24,10 @@
 local M = {}
 
 local Logger = require("infra.logger")
+local BootJournal = require("adapters.boot_journal")
+
+-- One flushed-and-closed writer for every durable boot channel.
+local write_now = BootJournal.write_now
 
 -- Tagged like the boot sequence so the [init] topical fan-out selects the line.
 local LOG = "init"
@@ -32,7 +36,7 @@ local LOG = "init"
 M.REPORT_FILE_ENV = "ERGOPTI_FATAL_REPORT_FILE"
 
 --- Environment variable naming the launcher's own log file.
-M.LAUNCHER_LOG_ENV = "ERGOPTI_LAUNCHER_LOG_FILE"
+M.LAUNCHER_LOG_ENV = BootJournal.LAUNCHER_LOG_ENV
 
 
 
@@ -50,28 +54,6 @@ M.LAUNCHER_LOG_ENV = "ERGOPTI_LAUNCHER_LOG_FILE"
 local function single_line(value)
 	local text = tostring(value == nil and "" or value)
 	return (text:gsub("\r?\n", " | "))
-end
-
---- Appends or writes one complete text and closes the handle before returning.
---- @param open function io.open-compatible opener.
---- @param path string Absolute destination.
---- @param mode string "ab" or "wb"; binary mode keeps LF on every host.
---- @param text string Complete content.
---- @return boolean written
---- @return string|nil detail
-local function write_now(open, path, mode, text)
-	local ok, handle, open_err = pcall(open, path, mode)
-	if not ok or not handle then
-		return false, tostring(ok and open_err or handle)
-	end
-	local write_ok, write_err = pcall(function()
-		assert(handle:write(text))
-		assert(handle:flush())
-	end)
-	local close_ok, closed = pcall(function() return handle:close() end)
-	if not write_ok then return false, tostring(write_err) end
-	if not close_ok or not closed then return false, "close refused" end
-	return true
 end
 
 
