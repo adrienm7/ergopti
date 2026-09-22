@@ -84,6 +84,7 @@
 		"test:vector-traceability": "node ./tools/test/test-port-vector-traceability.cjs",
 		"test:gsub-single-return": "node ./tools/test/test-lua-gsub-single-return.cjs",
 		"test:tooltip-positioning": "node ./tools/test/test-tooltip-positioning-reach.cjs",
+		"test:tooltip-style-single-source": "node ./tools/test/test-tooltip-style-single-source.cjs",
 		"test:shared-js-loadable": "node ./tools/test/test-shared-js-is-loadable.cjs",
 		"test:tap-hold-lifecycle": "node ./tools/test/test-tap-hold-defaults-lifecycle.cjs",
 		"test:linux-version-single-source": "node ./tools/test/test-linux-version-single-source.cjs",
