@@ -2588,20 +2588,23 @@ jobs:
   # ─────────────────────────────────────────────────
   # 6.3) Linux — assemble driver, packages and XKB layouts
   # ─────────────────────────────────────────────────
-  # This job does not read resolve-release-meta.outputs.version, unlike
-  # build-windows and build-macos. The packagers take their version from
-  # package.json, so the .deb "Version:" and the .rpm "Version:" can lag the
-  # release tag. Threading the resolved version in is NOT a one-liner and is
-  # deliberately not attempted here: on dev the version is 0.0.0-dev.N, and rpm
-  # rejects a hyphen in Version:, so the same value that a .deb accepts would
-  # abort rpmbuild. What IS handled is the visible half — every published package
-  # is renamed below to a name that carries no version at all, so no asset can be
-  # misnamed and the website's exact-name lookup keeps working across releases.
+  # The driver's own version comes from resolve-release-meta.outputs.version:
+  # ERGOPTI_BUILD_VERSION is stamped into build/linux/_shared/build_stamp.txt by
+  # build-linux-driver.sh, and every later verify in this job requires that same
+  # value, so the tray, the healthcheck and the updater report the published
+  # release. The package METADATA still takes its version from package.json, so
+  # the .deb "Version:" and the .rpm "Version:" can lag the release tag: on dev
+  # the version is 0.0.0-dev.N, and rpm rejects a hyphen in Version:, so the same
+  # value that a .deb accepts would abort rpmbuild. Every published package is
+  # therefore renamed below to a name that carries no version at all, so no asset
+  # can be misnamed and the website's exact-name lookup keeps working.
   build-linux:
     name: 'Release · Linux build'
     needs: resolve-release-meta
     if: needs.resolve-release-meta.outputs.skip == 'false'
     runs-on: ubuntu-latest
+    env:
+      ERGOPTI_BUILD_VERSION: ${{ needs.resolve-release-meta.outputs.version }}
 
     steps:
       - uses: actions/checkout@v4

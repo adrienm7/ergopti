@@ -209,6 +209,10 @@ end
 -- pins its file name and key to these constants.
 M.BUILD_STAMP_FILE = "build_stamp.txt"
 M.BUILD_STAMP_COMMIT_KEY = "commit"
+-- Release version a release build stamps next to the commit (ERGOPTI_BUILD_VERSION
+-- in the workflow). Only release packages carry it; the Linux driver shows it
+-- as its version, because its sources hold no version a build could rewrite.
+M.BUILD_STAMP_VERSION_KEY = "version"
 
 -- Where a resolved commit came from, reported next to it so a reader can tell
 -- a release build from a source run of the same commit.
@@ -270,6 +274,45 @@ function M.resolve_commit(fs, shared_root, source_dir)
 	return M.UNKNOWN, M.COMMIT_SOURCE_UNKNOWN, string.format(
 		"no %s in the shared tree '%s' and '%s' is not inside a git checkout",
 		M.BUILD_STAMP_FILE, tostring(shared_root), tostring(source_dir))
+end
+
+--- Parses the release version out of a build stamp. Semver build metadata
+--- ("+<build>") is dropped: it identifies a build, not a release, and is never
+--- shown to a user or compared by the updater.
+--- @param text string Raw file content, one `key=value` per line.
+--- @return string|nil Release version such as "0.0.0-dev.12", nil when absent or invalid.
+--- @return string|nil Why the entry is invalid; nil when it is valid or absent.
+function M.parse_build_version(text)
+	if type(text) ~= "string" then return nil, "the build stamp is not text" end
+	for line in text:gmatch("[^\r\n]+") do
+		local key, value = line:match("^%s*([%w_]+)%s*=%s*(.-)%s*$")
+		if key == M.BUILD_STAMP_VERSION_KEY then
+			local release = value:gsub("%+.*$", "")
+			local core, pre = release:match("^(%d+%.%d+%.%d+)(.*)$")
+			if not core or (pre ~= "" and not pre:match("^%-[%w%.%-]+$")) then
+				return nil, string.format("the build stamp version '%s' is not a release version", value)
+			end
+			return release
+		end
+	end
+	return nil
+end
+
+--- Reads the release version a release build stamped into the shared tree.
+--- @param fs table { read = fun(path):string|nil }
+--- @param shared_root string|nil Absolute path of the shared tree.
+--- @return string|nil Release version, nil when there is none.
+--- @return string|nil Why it is missing from a stamp or invalid; nil when there is no stamp at all.
+--- @return boolean Whether a stamp file exists.
+function M.build_version(fs, shared_root)
+	if type(fs) ~= "table" or type(fs.read) ~= "function" then return nil, "no file reader", false end
+	if type(shared_root) ~= "string" or shared_root == "" then return nil, nil, false end
+	local text = fs.read(shared_root:gsub("[/\\]+$", "") .. "/" .. M.BUILD_STAMP_FILE)
+	if text == nil then return nil, nil, false end
+	local version, reason = M.parse_build_version(text)
+	if version then return version, nil, true end
+	return nil, reason or ("the build stamp has no " .. M.BUILD_STAMP_VERSION_KEY
+		.. " entry: the package was not built by a release job"), true
 end
 
 return M

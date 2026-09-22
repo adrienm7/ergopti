@@ -27,6 +27,11 @@
  *    reader; they are compared here so they cannot drift apart.
  * 4. The guard proves it can fail: it is re-run on a copy of the workflow with
  *    one stamp removed and must report it.
+ * 5. The release Linux build also stamps the release version: the Linux driver
+ *    has no other version source (linux/infra/version.lua reads the stamp), and
+ *    a fixed literal there once made every install report a release that never
+ *    existed. Every release job that assembles the Linux tree must therefore hand
+ *    ERGOPTI_BUILD_VERSION the version resolve-release-meta computed.
  * ==============================================================================
  */
 
@@ -52,12 +57,16 @@ const PACKAGERS = ['deb', 'rpm', 'appimage', 'flatpak'].map((kind) => `tools/bui
 const PKGBUILD_REL = 'tools/build/PKGBUILD';
 
 const COMMIT_ENV = /^ERGOPTI_BUILD_COMMIT:\s*\$\{\{\s*github\.sha\s*\}\}\s*$/;
+const RELEASE_META_JOB = 'resolve-release-meta';
+const VERSION_ENV = /^ERGOPTI_BUILD_VERSION:\s*\$\{\{\s*needs\.resolve-release-meta\.outputs\.version\s*\}\}\s*$/;
 
 // Floors — today: 2 macOS builds and 6 Linux assemblies, 8 packager runs,
 // 2 tarballs. A parse that found fewer stopped reading the workflow.
 const MIN_STAMPING_STEPS = 8;
 const MIN_PACKAGER_STEPS = 8;
 const MIN_TARBALL_STEPS = 2;
+// Today: one release job assembles the Linux tree.
+const MIN_RELEASE_LINUX_STEPS = 1;
 
 /** Returns the column of the first non-space character, or -1 for a blank line. */
 function indentOf(line) {
@@ -100,7 +109,7 @@ function childLines(lines, start) {
 /**
  * Splits a workflow into jobs and their steps.
  * @param {string} text Workflow YAML.
- * @returns {Array<{name: string, env: string[], steps: Array<{line: number, name: string, run: string, env: string[]}>}>}
+ * @returns {Array<{name: string, needs: string, env: string[], steps: Array<{line: number, name: string, run: string, env: string[]}>}>}
  */
 function parseJobs(text) {
 	const lines = text.split(/\r?\n/);
@@ -114,12 +123,14 @@ function parseJobs(text) {
 		if (ind === 0) break;
 		const jobMatch = line.match(/^ {2}([A-Za-z0-9_-]+):\s*$/);
 		if (jobMatch) {
-			job = { name: jobMatch[1], env: [], steps: [] };
+			job = { name: jobMatch[1], needs: '', env: [], steps: [] };
 			jobs.push(job);
 			continue;
 		}
 		if (!job) continue;
 		if (/^ {4}env:\s*$/.test(line)) job.env = childLines(lines, i);
+		const needsMatch = line.match(/^ {4}needs:\s*(.*)$/);
+		if (needsMatch) job.needs = needsMatch[1];
 		const stepMatch = line.match(/^( {6})- /);
 		if (!stepMatch) continue;
 		const stepIndent = 6;
@@ -173,14 +184,16 @@ function parseJobs(text) {
 /**
  * Checks that every package build in a workflow stamps the commit.
  * @param {string} text Workflow YAML.
- * @returns {{errors: string[], stamping: number, packagers: number, tarballs: number}}
+ * @returns {{errors: string[], stamping: number, packagers: number, tarballs: number, releaseLinux: number}}
  */
 function checkWorkflow(text) {
 	const errors = [];
 	let stamping = 0;
 	let packagers = 0;
 	let tarballs = 0;
+	let releaseLinux = 0;
 	for (const job of parseJobs(text)) {
+		const isRelease = job.needs.includes(RELEASE_META_JOB);
 		let assembledLinux = false;
 		for (const step of job.steps) {
 			const where = `${WORKFLOW_REL}:${step.line} (job ${job.name}, step "${step.name}")`;
@@ -192,7 +205,17 @@ function checkWorkflow(text) {
 					errors.push(`${where} runs ${script} without ERGOPTI_BUILD_COMMIT: \${{ github.sha }} — ` +
 						'the package it builds could not name the commit it was built from');
 				}
-				if (script.endsWith('build-linux-driver.sh')) assembledLinux = true;
+				if (script.endsWith('build-linux-driver.sh')) {
+					assembledLinux = true;
+					if (isRelease) {
+						releaseLinux++;
+						const hasVersion = step.env.concat(job.env).some((entry) => VERSION_ENV.test(entry));
+						if (!hasVersion) {
+							errors.push(`${where} assembles a release Linux tree without ERGOPTI_BUILD_VERSION ` +
+								'from resolve-release-meta — the driver would report no release version');
+						}
+					}
+				}
 			}
 			for (const packager of PACKAGERS) {
 				if (!step.run.includes(`bash ${packager}`)) continue;
@@ -214,7 +237,7 @@ function checkWorkflow(text) {
 			}
 		}
 	}
-	return { errors, stamping, packagers, tarballs };
+	return { errors, stamping, packagers, tarballs, releaseLinux };
 }
 
 
@@ -237,6 +260,10 @@ if (result.stamping < MIN_STAMPING_STEPS) {
 if (result.packagers < MIN_PACKAGER_STEPS) {
 	errors.push(`found only ${result.packagers} packager run(s) (floor ${MIN_PACKAGER_STEPS}) — the step parse drifted`);
 }
+if (result.releaseLinux < MIN_RELEASE_LINUX_STEPS) {
+	errors.push(`found only ${result.releaseLinux} release Linux assembly step(s) ` +
+		`(floor ${MIN_RELEASE_LINUX_STEPS}) — the job parse drifted`);
+}
 if (result.tarballs < MIN_TARBALL_STEPS) {
 	errors.push(`found only ${result.tarballs} tarball step(s) (floor ${MIN_TARBALL_STEPS}) — the step parse drifted`);
 }
@@ -250,6 +277,14 @@ if (firstStamp < 0) {
 	if (checkWorkflow(mutated).errors.length === 0) {
 		errors.push('self-check: removing an ERGOPTI_BUILD_COMMIT entry went unnoticed — this guard cannot fail');
 	}
+}
+
+// The same for the release version: dropping it from the release job must be reported.
+const versionMutated = workflow.replace(/^\s*ERGOPTI_BUILD_VERSION:.*\r?\n/m, '');
+if (versionMutated === workflow) {
+	errors.push('no ERGOPTI_BUILD_VERSION entry in the workflow at all');
+} else if (checkWorkflow(versionMutated).errors.length === 0) {
+	errors.push('self-check: removing the ERGOPTI_BUILD_VERSION entry went unnoticed — this guard cannot fail');
 }
 
 // Each build entry point writes the stamp; each packager verifies its copy.
@@ -278,7 +313,11 @@ if (!/write_build_stamp\.sh\s+verify\s+"\$pkgdir\/usr\/lib\/ergopti\/_shared"/.t
 // One stamp format: what the writer writes is what the Lua drivers read.
 const writer = read(WRITER_REL);
 const reader = read(READER_REL);
-for (const [shellName, luaName] of [['BUILD_STAMP_FILE', 'BUILD_STAMP_FILE'], ['BUILD_STAMP_COMMIT_KEY', 'BUILD_STAMP_COMMIT_KEY']]) {
+for (const [shellName, luaName] of [
+	['BUILD_STAMP_FILE', 'BUILD_STAMP_FILE'],
+	['BUILD_STAMP_COMMIT_KEY', 'BUILD_STAMP_COMMIT_KEY'],
+	['BUILD_STAMP_VERSION_KEY', 'BUILD_STAMP_VERSION_KEY'],
+]) {
 	const shell = writer.match(new RegExp(`^${shellName}="([^"]+)"$`, 'm'));
 	const lua = reader.match(new RegExp(`^M\\.${luaName} = "([^"]+)"$`, 'm'));
 	if (!shell || !lua) {

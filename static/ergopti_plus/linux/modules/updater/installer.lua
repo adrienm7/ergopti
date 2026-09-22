@@ -14,6 +14,7 @@ local M = {}
 local Fs = require("adapters.file_system")
 local Paths = require("infra.paths")
 local Version = require("updater.version")
+local Snapshot = require("diagnostics.snapshot")
 
 local WORK_PREFIX = ".ergopti-update."
 
@@ -293,8 +294,11 @@ local function validate_candidate(work_dir, expected_version, ops)
 		return false, "staged archive is missing the shared Lua tree"
 	end
 
-	local version_source = ops.read(work_dir .. "/linux/infra/version.lua")
-	local staged_version = version_source and version_source:match('M%.VERSION%s*=%s*"([^"]+)"') or nil
+	-- The driver version is the release version the release build stamped into
+	-- the shared tree (infra/version.lua reads the same entry at runtime), so the
+	-- staged tree's stamp is what the running daemon will report after the swap.
+	local stamp = ops.read(shared_root .. "/" .. Snapshot.BUILD_STAMP_FILE)
+	local staged_version = stamp and Snapshot.parse_build_version(stamp) or nil
 	if not staged_version
 		or Version.normalize_tag(staged_version) ~= Version.normalize_tag(expected_version) then
 		return false, "staged driver version does not match the selected release"
