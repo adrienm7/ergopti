@@ -122,14 +122,22 @@ try {
 	Set-CrashField $snapshot "cpu_cores" ([string]$processor.NumberOfLogicalProcessors)
 } catch { $enrichmentErrors.Add("cpu: " + $_.Exception.Message) }
 
-try {
-	if (Test-CrashFault "git") { throw "Injected git fault" }
-	$gitHash = & git -C $transportScriptDir rev-parse --short HEAD 2>$null
-	if ($LASTEXITCODE -ne 0) {
-		throw "Git enrichment exited with code $LASTEXITCODE."
+# A compiled build already named its commit from the BUNDLE_COMMIT stamp; a
+# release has no checkout, so asking git would only replace that answer with a
+# failure. Only a source run arrives without one.
+if ([string]::IsNullOrWhiteSpace([string]$snapshot.git_hash)) {
+	try {
+		if (Test-CrashFault "git") { throw "Injected git fault" }
+		$gitHash = & git -C $transportScriptDir rev-parse --short HEAD 2>$null
+		if ($LASTEXITCODE -ne 0) {
+			throw "Git enrichment exited with code $LASTEXITCODE."
+		}
+		Set-CrashField $snapshot "git_hash" ([string]$gitHash).Trim()
+	} catch {
+		$enrichmentErrors.Add("git: " + $_.Exception.Message)
+		Set-CrashField $snapshot "git_hash" "unknown"
 	}
-	Set-CrashField $snapshot "git_hash" ([string]$gitHash).Trim()
-} catch { $enrichmentErrors.Add("git: " + $_.Exception.Message) }
+}
 
 Set-CrashField $snapshot "enrichment_errors" $enrichmentErrors.ToArray()
 

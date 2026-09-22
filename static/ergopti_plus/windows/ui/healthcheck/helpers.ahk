@@ -92,25 +92,17 @@ _HealthCheck_SysInfo() {
 		ConfigDir := _ConfigDir
 	}
 	Info["config_dir"] := ConfigDir
+	; Where the scripts run from, under its own label: in a compiled build it is
+	; the extracted bundle, never the configuration folder.
+	Info["script_dir"] := A_ScriptDir
 
-	; Short git commit hash of the running source tree.
-	; Use non-blocking Run + bounded poll so a stalled git (unavailable, network
-	; drive, credential prompt) cannot freeze the main pseudo-thread — this path
-	; also runs on the crash handler where the keyboard is already degraded.
-	GitHash := ""
-	try {
-		TmpFile := A_Temp . "\ergopti_githash_" . A_TickCount . "_" . A_PtrSize . ".txt"
-		Run(A_ComSpec . " /c git -C " . Chr(34) . A_ScriptDir . Chr(34)
-			. " rev-parse --short HEAD > " . Chr(34) . TmpFile . Chr(34), , "Hide")
-		StartTick := A_TickCount
-		while (!FileExist(TmpFile) and ((A_TickCount - StartTick) & 0xFFFFFFFF) < 500)
-			Sleep(50)
-		if FileExist(TmpFile) {
-			GitHash := Trim(FileRead(TmpFile, "UTF-8"))
-			try FileDelete(TmpFile)
-		}
-	}
-	Info["git_hash"] := GitHash
+	; Commit: the compiled build's BUNDLE_COMMIT stamp, else the source
+	; checkout's HEAD read from .git. `git rev-parse` answered nothing for every
+	; compiled release (no checkout) and, being a subprocess, had to be polled
+	; with a bounded Sleep on the crash-handler path; file reads need neither.
+	Commit := DiagSnapshot_ResolveCommit(A_ScriptDir)
+	Info["git_hash"] := Commit["commit"]
+	Info["commit_source"] := Commit["source"]
 
 	return Info
 }

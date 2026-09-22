@@ -308,6 +308,9 @@ _CrashReport_CheapSnapshot(Exc) {
 	AdapterState := _CrashReport_CheapAdapterState()
 	LogTail := ""
 	try LogTail := _CrashReport_JoinNewlines(LoggerRingBufferSnapshot())
+	; A compiled build names its commit from the in-memory BUNDLE_COMMIT stamp;
+	; only a source run leaves it empty for the worker to read from the checkout.
+	BuiltCommit := DiagSnapshot_BuildCommit()["commit"]
 
 	Snapshot := Map(
 		"version", Version, "driver", "autohotkey",
@@ -328,7 +331,7 @@ _CrashReport_CheapSnapshot(Exc) {
 		"screen_resolution", A_ScreenWidth . "x" . A_ScreenHeight,
 		"dpi", String(A_ScreenDPI),
 		"dpi_scale", String(Round(A_ScreenDPI / 96 * 100)),
-		"locale", A_Language, "script_dir", A_ScriptDir, "git_hash", "",
+		"locale", A_Language, "script_dir", A_ScriptDir, "git_hash", BuiltCommit,
 		"username_hash", _CrashReport_FoldHash(A_UserName),
 		"uptime_sec", String(UptimeSec),
 		"active_window_title", ActiveWindowTitle,
