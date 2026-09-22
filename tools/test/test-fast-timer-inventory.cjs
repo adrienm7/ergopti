@@ -68,6 +68,11 @@ const INVENTORY = {
 		'Armed only while keep-awake is active, to cancel it the instant the user moves the ' +
 		'mouse. 150 ms because a cancel the user has to wait for reads as the feature ignoring ' +
 		'them. Disarmed with the feature.',
+	'ui/menu/menu_llm/menu_api_entries.ahk:_LLM_Menu_ApiTestProgressTick':
+		'Armed only while an API test probe shows its progress window, and stopped by ' +
+		'_LLM_Menu_ApiTestProgressHide when the probe answers, times out or is cancelled. ' +
+		'150 ms keeps the elapsed-time label and bar moving smoothly; a slower pulse makes ' +
+		'the probe look frozen while it waits on the provider.',
 	'modules/keymap/layout.ahk:_UIA_SelectionPollTimer':
 		'Polls the UIA selection so a layout remap knows whether text is selected. 500 ms, and ' +
 		'armed only in the apps that need it — the AX call is the expensive part, which is why ' +
