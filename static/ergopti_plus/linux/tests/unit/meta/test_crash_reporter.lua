@@ -183,7 +183,6 @@ helpers.describe("linux: crash_reporter diagnostics", function()
 		local cap = with_sandbox(nil, function()
 			cr.dump("prediction_engine", "segfault", {
 				stack_trace = "stack-frame-A",
-				version     = "9.9.9",
 				layout      = "ergopti",
 				locale      = "fr",
 			})
@@ -198,7 +197,8 @@ helpers.describe("linux: crash_reporter diagnostics", function()
 		helpers.assert_contains(cap.content, "prediction_engine", "module name in body")
 		helpers.assert_contains(cap.content, "segfault", "error message in body")
 		helpers.assert_contains(cap.content, "stack-frame-A", "stack trace in body")
-		helpers.assert_contains(cap.content, "9.9.9", "version in body")
+		helpers.assert_contains(cap.content, "Version:   ", "version line in body without any context version")
+		helpers.assert_contains(cap.content, "App dir:   ", "application directory line in body")
 		helpers.assert_contains(cap.content, "ergopti", "layout in body")
 	end)
 

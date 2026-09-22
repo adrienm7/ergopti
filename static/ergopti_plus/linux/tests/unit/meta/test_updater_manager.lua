@@ -608,17 +608,19 @@ helpers.describe("modules/updater/manager.lua", function()
 			.. " " .. shell_quote(payload .. "/bin")))
 
 		write_file(install_root .. "/linux/ergopti_hotstrings.lua", "print('old-driver')\n")
-		write_file(install_root .. "/linux/infra/version.lua", 'local M = {}\nM.VERSION = "3.0.0"\nreturn M\n')
+		write_file(install_root .. "/linux/infra/version.lua", "return {}\n")
+		write_file(install_root .. "/_shared/build_stamp.txt", "commit=" .. string.rep("a", 40) .. "\nversion=3.0.0\n")
 		write_file(install_root .. "/_shared/lua/sentinel.lua", "return 'old-shared'\n")
 		write_file(payload .. "/linux/ergopti_hotstrings.lua", "print('new-driver')\n")
-		write_file(payload .. "/linux/infra/version.lua", 'local M = {}\nM.VERSION = "4.0.0"\nreturn M\n')
+		write_file(payload .. "/linux/infra/version.lua", "return {}\n")
+		write_file(payload .. "/_shared/build_stamp.txt", "commit=" .. string.rep("b", 40) .. "\nversion=4.0.0\n")
 		write_file(payload .. "/_shared/lua/sentinel.lua", "return 'new-shared'\n")
 		write_file(payload .. "/_shared/data/locales/en.json", "{}\n")
 		write_file(payload .. "/bin/ergopti-hotstrings", "#!/usr/bin/env bash\nexit 0\n")
 		write_file(payload .. "/install.sh", "#!/usr/bin/env bash\nexit 0\n")
 		write_file(payload .. "/kanata.kbd", "(defcfg)\n")
 		write_file(wrapper, "#!/usr/bin/env bash\nset -euo pipefail\n"
-			.. "grep -q '\"4.0.0\"' " .. shell_quote(install_root .. "/linux/infra/version.lua") .. "\n"
+			.. "grep -q 'version=4.0.0' " .. shell_quote(install_root .. "/_shared/build_stamp.txt") .. "\n"
 			.. "grep -q 'new-shared' " .. shell_quote(install_root .. "/_shared/lua/sentinel.lua") .. "\n"
 			.. "test ! -e " .. shell_quote(install_root .. "/linux/linux") .. "\n")
 		helpers.assert_true(command_ok("chmod +x " .. shell_quote(wrapper)
@@ -649,9 +651,9 @@ helpers.describe("modules/updater/manager.lua", function()
 		M._resolve_installation = real_resolver
 		logger.error = real_error
 
-		local new_version = read_file(install_root .. "/linux/infra/version.lua")
+		local new_version = read_file(install_root .. "/_shared/build_stamp.txt")
 		local new_shared = read_file(install_root .. "/_shared/lua/sentinel.lua")
-		local old_version = read_file(install_root .. ".old/linux/infra/version.lua")
+		local old_version = read_file(install_root .. ".old/_shared/build_stamp.txt")
 		local nested = read_file(install_root .. "/linux/linux/ergopti_hotstrings.lua")
 		local archive_left = read_file(archive)
 		M.clear_cached_release()
@@ -659,9 +661,9 @@ helpers.describe("modules/updater/manager.lua", function()
 
 		helpers.assert_true(call_ok, "real update transaction raised: " .. tostring(installed))
 		helpers.assert_eq(installed, true, table.concat(errors, " | "))
-		helpers.assert_contains(new_version or "", 'M.VERSION = "4.0.0"')
+		helpers.assert_contains(new_version or "", "version=4.0.0")
 		helpers.assert_contains(new_shared or "", "new-shared")
-		helpers.assert_contains(old_version or "", 'M.VERSION = "3.0.0"')
+		helpers.assert_contains(old_version or "", "version=3.0.0")
 		helpers.assert_nil(nested, "the archive linux/ root must not become linux/linux")
 		helpers.assert_nil(archive_left, "a committed update retires its downloaded archive")
 	end)
@@ -692,8 +694,8 @@ helpers.describe("modules/updater/manager.lua", function()
 			function ops.is_file() return failed_stage ~= "validate_layout" end
 			function ops.is_dir() return true end
 			function ops.read()
-				if failed_stage == "validate_version" then return 'M.VERSION = "9.9.9"' end
-				return 'M.VERSION = "4.0.0"'
+				if failed_stage == "validate_version" then return "version=9.9.9\n" end
+				return "version=4.0.0\n"
 			end
 			function ops.mkdir() return failed_stage ~= "mkdir_candidate" end
 			function ops.exists(path) return path == backup end

@@ -4,9 +4,10 @@
  * ==============================================================================
  * MODULE: Linux Version Single-Source Guard
  * DESCRIPTION:
- * The Linux driver version lives exactly once, in linux/infra/version.lua
- * (M.VERSION) — the counterpart to the macOS/Windows BUNDLE_VERSION stamp. Every
- * surface that shows a version reads it from there.
+ * The Linux driver version has exactly one owner, linux/infra/version.lua
+ * (M.VERSION), which resolves the `version=` entry a release build stamps into
+ * the shared tree — the counterpart to the macOS/Windows BUNDLE_VERSION stamp.
+ * Every surface that shows a version reads it from there.
  *
  * ROOT CAUSE ENCODED:
  * The version "3.0.0" was hardcoded in three places (tray menu header,
@@ -41,13 +42,22 @@ function stripLua(src) {
 
 const errors = [];
 
-// ── Single source: version.lua must define M.VERSION as a version string ──
-const versionSrc = read('infra/version.lua');
-const m = versionSrc.match(/M\.VERSION\s*=\s*"(\d+\.\d+\.\d+)"/);
-if (!m) {
-	errors.push('infra/version.lua: must define M.VERSION = "<x.y.z>" (the single source)');
+// ── Single owner: version.lua resolves the release build stamp ────────────
+// A literal here is what shipped "3.0.0" to every install while the releases
+// were 0.0.0-dev.N: no build rewrote it. The version now comes from the
+// `version=` entry tools/build/write_build_stamp.sh writes in release builds.
+const versionSrc = stripLua(read('infra/version.lua'));
+if (/M\.VERSION\s*=\s*"/.test(versionSrc)) {
+	errors.push('infra/version.lua: M.VERSION must be resolved from the build stamp, not typed as a literal');
 }
-const VERSION = m ? m[1] : null;
+if (!/Snapshot\.build_version\(/.test(versionSrc) || !/M\.VERSION\s*,\s*M\.SOURCE\s*=\s*M\.resolve\(\)/.test(versionSrc)) {
+	errors.push('infra/version.lua: must resolve M.VERSION through Snapshot.build_version (the build stamp)');
+}
+// The updater validates a staged release against the same stamp entry.
+const installerSrc = stripLua(read('modules/updater/installer.lua'));
+if (!/Snapshot\.parse_build_version\(/.test(installerSrc) || /M%\.VERSION/.test(installerSrc)) {
+	errors.push('modules/updater/installer.lua: must read the staged version from the build stamp');
+}
 
 // ── Consumers must read Version.VERSION, never re-type the literal ────────
 const CONSUMERS = [
@@ -66,8 +76,9 @@ for (const rel of CONSUMERS) {
 	if (!code.includes('Version.VERSION')) {
 		errors.push(`${rel}: must read the version from Version.VERSION`);
 	}
-	if (VERSION && new RegExp(`"${VERSION.replace(/\./g, '\\.')}"`).test(code)) {
-		errors.push(`${rel}: re-typed version literal "${VERSION}" — read Version.VERSION instead`);
+	const literal = code.match(/["']\d+\.\d+\.\d+["']/);
+	if (literal) {
+		errors.push(`${rel}: typed version literal ${literal[0]} — read Version.VERSION instead`);
 	}
 	if (/\b_VERSION\b/.test(code)) {
 		errors.push(`${rel}: uses Lua's built-in _VERSION (interpreter version) — use Version.VERSION`);
@@ -81,5 +92,5 @@ if (errors.length > 0) {
 }
 
 console.log(
-	`\x1b[32m[OK] Linux version single-sourced — infra/version.lua (${VERSION}) read by ${CONSUMERS.length} consumers; no re-typed literals.\x1b[0m`
+	`\x1b[32m[OK] Linux version single-sourced — infra/version.lua (build stamp) read by ${CONSUMERS.length} consumers; no re-typed literals.\x1b[0m`
 );
