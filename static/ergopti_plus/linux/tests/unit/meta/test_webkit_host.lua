@@ -337,8 +337,8 @@ helpers.describe("ui.webkit_host", function()
       local _, policy_count = html:gsub("Content%-Security%-Policy", "")
       helpers.assert_eq(policy_count, 1,
         "the source CSP and generated CSP must not intersect and reject inlined scripts")
-      helpers.assert_true(html:find("connect-src 'self' file: https://api.github.com", 1, true) ~= nil,
-        "only the changelog may reach its reviewed GitHub API fallback")
+      helpers.assert_true(html:find("connect-src 'self' file:;", 1, true) ~= nil,
+        "the changelog page must not reach the network; its bridge fetches natively")
       helpers.assert_true(html:find("function _initializePage()", 1, true) ~= nil,
         "the executable generated page must retain the changelog initializer")
       local nonce = html:match('<script nonce="([^"]+)">')

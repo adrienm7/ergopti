@@ -41,6 +41,7 @@ return {
 	"tests.unit.meta.test_api_ollama_payload",
 	"tests.unit.meta.test_api_ollama_stream_parse",
 	"tests.unit.meta.test_bridge_persistence",
+	"tests.unit.meta.test_changelog_release_sources",
 	"tests.unit.meta.test_config_window_overrides",
 	"tests.unit.meta.test_corpus_cross_driver",
 	"tests.unit.meta.test_corpus_hotstring_engine",

@@ -4,6 +4,12 @@
 --- BRIDGE HANDLER: Changelog / Release Notes Viewer
 --- Handles JS->Lua messages from _shared/ui/changelog/.
 --- Bridge name: "changelog_bridge"
+---
+--- The page never reaches the network on Linux: this handler fetches the
+--- release list through the shared curl adapter (bounded, proxy variables
+--- honoured by curl), trying the GitHub API first and the public Atom feed
+--- second (_shared/lua/updater/release_sources.lua), then pushes the result or
+--- a translated error key back through window.__hostBridgeResponse.
 --- ==============================================================================
 
 local M = {}
@@ -15,8 +21,18 @@ local LOG = "bridge.changelog"
 -- Read canonical version from the single-source module (SSoT).
 local Version = require("infra.version")
 local Shell = require("adapters.shell_runner")
+local Json = require("json")
+local Base64 = require("compat.base64")
+local ReleaseSources = require("updater.release_sources")
 
 local REPOSITORY_URL = "https://github.com/adrienm7/ergopti"
+local APP_NAME = "changelog"
+local HTTP_OWNER = "changelog"
+-- Feeds carry the rendered notes of ten releases (about 0.5 MB today).
+local MAX_SOURCE_BYTES = 4 * 1024 * 1024
+
+local _fetch_generation = 0
+local _sources = nil
 
 --- Returns whether a URL belongs to the repository's HTTPS surface.
 --- @param value any
@@ -76,6 +92,125 @@ local function _build_initial_payload(state, channel)
 	}
 end
 
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 1/ Native Release Fetch =========
+-- =========================================
+-- =========================================
+
+--- Loads and validates the release sources once from the shared defaults.
+--- @return table|nil sources
+--- @return string|nil error
+local function load_sources()
+	if _sources then return _sources, nil end
+	local ok_paths, Paths = pcall(require, "infra.paths")
+	local path = ok_paths and Paths.shared("modules/updater/defaults.json") or nil
+	if not path then return nil, "shared updater defaults path is unavailable" end
+	local handle = io.open(path, "rb")
+	if not handle then return nil, "shared updater defaults are unreadable" end
+	local raw = handle:read("*a")
+	handle:close()
+	local ok_json, decoded = pcall(Json.decode, raw)
+	if not ok_json then return nil, "shared updater defaults are not valid JSON" end
+	local sources, err = ReleaseSources.resolve(decoded)
+	if not sources then return nil, err end
+	_sources = sources
+	return sources, nil
+end
+
+--- Default transport: the shared asynchronous curl adapter. curl itself honours
+--- https_proxy/all_proxy/no_proxy from the daemon environment.
+--- @param url string
+--- @param headers table
+--- @param timeout_ms number
+--- @param callback function Receives status, body, err.
+local function default_http_get(url, headers, timeout_ms, callback)
+	local HttpClient = require("adapters.http_client")
+	HttpClient.get(url, headers, {
+		owner = HTTP_OWNER,
+		timeout_ms = timeout_ms,
+		max_body_bytes = MAX_SOURCE_BYTES,
+		follow_redirects = true,
+		https_only = true,
+	}, function(result)
+		result = type(result) == "table" and result or {}
+		callback(result.status, result.body, result.ok == true and nil or result.error)
+	end)
+end
+
+--- Default page channel: the host->page response hook of the shared UI.
+--- @param payload table
+--- @return boolean pushed
+local function default_push(payload)
+	local ok_manager, Manager = pcall(require, "ui.webview_manager")
+	if not ok_manager or type(Manager.eval_js) ~= "function" then
+		Logger.error(LOG, "Cannot push releases: webview_manager.eval_js is unavailable.")
+		return false
+	end
+	local encoded = Base64.encode(Json.encode(payload))
+	return Manager.eval_js(APP_NAME, string.format(
+		"if(window.__hostBridgeResponse)window.__hostBridgeResponse('%s',true,'%s')",
+		M.bridge_name, encoded)) == true
+end
+
+-- Injectable seams for tests; production uses the curl adapter and WebKit.
+M._http_get = default_http_get
+M._push = default_push
+
+--- Starts one native fetch; a newer request supersedes every older result.
+--- @param channel string "main" or "dev".
+--- @return number generation
+function M.start_fetch(channel)
+	channel = channel == "dev" and "dev" or "main"
+	_fetch_generation = _fetch_generation + 1
+	local generation = _fetch_generation
+	local sources, err = load_sources()
+	if not sources then
+		Logger.error(LOG, "Release sources unavailable: %s.", tostring(err))
+		M._push({ action = "releases_error", channel = channel, error_key = "changelog_window.error_network" })
+		return generation
+	end
+	Logger.start(LOG, "Fetching releases (channel=%s)…", channel)
+	ReleaseSources.fetch(sources, M._http_get, Logger, LOG, function(result)
+		if generation ~= _fetch_generation then
+			Logger.debug(LOG, "Discarded a superseded release fetch (generation %d).", generation)
+			return
+		end
+		if result.error then
+			Logger.done(LOG, "Release fetch ended with an error (channel=%s).", channel)
+			M._push({ action = "releases_error", channel = channel, error_key = result.error_key })
+			return
+		end
+		Logger.success(LOG, "Releases fetched from %s (channel=%s).", result.source, channel)
+		local payload = { action = "releases", channel = channel }
+		if result.kind == "feed" then payload.feed = result.body else payload.json = result.body end
+		M._push(payload)
+	end)
+	return generation
+end
+
+--- Clears cached state; used by tests.
+function M._reset()
+	_fetch_generation = 0
+	_sources = nil
+	M._http_get = default_http_get
+	M._push = default_push
+end
+
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 2/ Message Handler ==============
+-- =========================================
+-- =========================================
+
 --- Handles an incoming JS message.
 --- @param payload any  String or table from host_bridge.js.
 --- @param state  table Daemon state.
@@ -84,9 +219,11 @@ function M.on_message(payload, state)
 	if type(payload) == "string" then
 		if payload == "ready" then
 			Logger.info(LOG, "Changelog UI ready.")
+			M.start_fetch("main")
 			return _build_initial_payload(state, "main")
 		end
 		if payload == "refresh" then
+			M.start_fetch("main")
 			return _build_initial_payload(state, "main")
 		end
 		if payload == "close" then
@@ -101,6 +238,7 @@ function M.on_message(payload, state)
 	local action = payload.action
 
 	if action == "fetch" then
+		M.start_fetch(payload.channel)
 		return _build_initial_payload(state, payload.channel)
 	end
 

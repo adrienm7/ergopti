@@ -265,10 +265,9 @@ function M.inject_no_remote_csp(html, app_name)
 	-- for the generated document instead.
 	html = html:gsub(
 		'<meta%s+[^>]-http%-equiv%s*=%s*["\']Content%-Security%-Policy["\'][^>]*>%s*', "")
+	-- No page connects to the network: the changelog's release sources are
+	-- fetched natively by its bridge (ui/changelog/bridge.lua).
 	local connect_sources = "'self' file:"
-	if app_name == "changelog" then
-		connect_sources = connect_sources .. " https://api.github.com"
-	end
 	local script_sources = "'unsafe-inline'"
 	if app_name == "changelog" then
 		local handle = io.open("/dev/urandom", "rb")

@@ -182,6 +182,8 @@ REQUIRED_FILES=(
 	"_shared/lua/keymap/terminators_catalogue.lua"
 	"_shared/lua/keycodes/evdev.lua"
 	"_shared/lua/updater/version.lua"
+	"_shared/lua/updater/release_sources.lua"
+	"_shared/modules/updater/defaults.json"
 	"_shared/lua/json.lua"
 	"_shared/data/keycodes/evdev.json"
 	"_shared/data/locales/fr.json"
@@ -337,6 +339,7 @@ else
 			"keymap.terminators"
 			"keycodes.evdev"
 			"updater.version"
+			"updater.release_sources"
 		)
 		SHARED_OK=true
 		for mod in "${SHARED_MODS[@]}"; do

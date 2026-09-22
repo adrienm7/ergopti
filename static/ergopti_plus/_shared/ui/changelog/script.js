@@ -89,11 +89,16 @@ if (window.__ergopti_host === 'linux') {
 			return;
 		}
 		if (response.action === 'releases_error') {
-			injectError(response.message);
+			// Only changelog keys are looked up; anything else shows the network error.
+			var key = /^changelog_window\.error_[a-z_]+$/.test(response.error_key || '')
+				? response.error_key
+				: 'changelog_window.error_network';
+			injectError(_t(key));
 			return;
 		}
 		if (response.action !== 'releases' || response.cache_miss) return;
 		if (typeof response.feed === 'string') injectReleasesFeed(response.feed, response.channel);
+		else if (typeof response.json === 'string') injectReleasesJson(response.json, response.channel);
 		else injectReleases(response.releases, response.channel);
 	};
 }
