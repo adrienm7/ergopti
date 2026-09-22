@@ -518,6 +518,122 @@ end)
 
 
 
+-- =============================================================================
+-- =============================================================================
+-- ======= 2c/ navigation-layer sentinel (sentinel-never-reaches-app) ==========
+-- =============================================================================
+-- =============================================================================
+
+-- Karabiner announces navigation-layer entry with the F20 sentinel, which
+-- Hammerspoon consumes before any application sees it. The generator must keep
+-- emitting it first on every layer activation, and only inside the ACTIVE lease
+-- graph: the PAUSED graph and a revoked lease (driver not running) emit none.
+helpers.describe("Generator.build_karabiner_json: navigation-layer sentinel", function()
+	local F20_NAME = "key_90"
+	local LAYER_ACTION = {
+		id = "layer",
+		label = "Layer",
+		karabiner_to = { { set_variable = { name = "layer_active", value = 1 } } },
+		karabiner_to_after_key_up = { { set_variable = { name = "layer_active", value = 0 } } },
+	}
+	local BACKSPACE_ACTION = {
+		id = "backspace",
+		label = "Backspace",
+		karabiner_to = { { key_code = "delete_or_backspace" } },
+	}
+	local LCMD_KEY_DEF = {
+		id = "left_command",
+		label = "Left Command",
+		from = { key_code = "left_command" },
+	}
+
+	--- Returns whether any nested event emits the given key code.
+	local function emits_key(node, key_code)
+		if type(node) ~= "table" then return false end
+		if node.key_code == key_code then return true end
+		for _, child in pairs(node) do
+			if emits_key(child, key_code) then return true end
+		end
+		return false
+	end
+
+	--- Collects every output list that switches the navigation layer on.
+	local function layer_activations(node, found)
+		if type(node) ~= "table" then return found end
+		for _, event in ipairs(node) do
+			local variable = type(event) == "table" and event.set_variable or nil
+			if type(variable) == "table" and variable.value == 1
+				and tostring(variable.name):find("layer_active", 1, true) then
+				found[#found + 1] = node
+				break
+			end
+		end
+		for _, child in pairs(node) do layer_activations(child, found) end
+		return found
+	end
+
+	-- Mirrors the reported configuration: left Command taps Backspace and holds
+	-- the navigation layer (_shared/tap_hold/defaults.toml).
+	local function build()
+		local state = make_state({
+			tap_hold_config = { left_command = { tap = "backspace", hold = "layer" } },
+		})
+		return Generator.build_karabiner_json(state,
+			{ NONE_ACTION, BACKSPACE_ACTION, LAYER_ACTION }, { LCMD_KEY_DEF }, {}, nil, "/fake/data_dir/")
+	end
+
+	helpers.it("emits F20 as the first key of every navigation-layer activation", function()
+		local activations = layer_activations(build().profiles[1].complex_modifications.rules, {})
+		helpers.assert_true(#activations > 0, "the hold output must activate the navigation layer")
+		for _, events in ipairs(activations) do
+			-- Holder-state and physical-key logging entries are prepended by other
+			-- builders; they emit no key. The sentinel is the first key event and
+			-- precedes the variable that switches the layer on.
+			local first_key, activation = nil, nil
+			for index, event in ipairs(events) do
+				if first_key == nil and event.key_code ~= nil then first_key = index end
+				local variable = event.set_variable
+				if activation == nil and type(variable) == "table" and variable.value == 1
+					and tostring(variable.name):find("layer_active", 1, true) then
+					activation = index
+				end
+			end
+			helpers.assert_not_nil(first_key, "a layer activation must emit the sentinel key")
+			helpers.assert_eq(events[first_key].key_code, F20_NAME,
+				"the sentinel must be the first key the activation emits")
+			helpers.assert_true(first_key < activation,
+				"Hammerspoon must receive the sentinel before any layer key is remapped")
+		end
+	end)
+
+	helpers.it("confines F20 to the ACTIVE lease graph", function()
+		local mode_name = "ergopti_mode_" .. TEST_LEASE_TOKEN
+		local revoked_name = "ergopti_revoked_" .. TEST_LEASE_TOKEN
+		local gated = 0
+		for _, rule in ipairs(build().profiles[1].complex_modifications.rules) do
+			for _, manipulator in ipairs(rule.manipulators) do
+				if emits_key(manipulator, F20_NAME) then
+					local values = {}
+					for _, condition in ipairs(manipulator.conditions or {}) do
+						if condition.type == "variable_if" then values[condition.name] = condition.value end
+					end
+					helpers.assert_eq(values[mode_name], 1,
+						"a sentinel manipulator must require the ACTIVE mode of this lease")
+					helpers.assert_eq(values[revoked_name], 0,
+						"the lease guardian's revocation must silence the sentinel with the driver")
+					gated = gated + 1
+				end
+			end
+		end
+		helpers.assert_true(gated > 0, "the configured layer hold must emit the sentinel")
+		helpers.assert_true(not emits_key(Generator.build_paused_script_control_rules(), F20_NAME),
+			"the PAUSED graph must never emit the navigation-layer sentinel")
+	end)
+end)
+
+
+
+
 -- ==============================================================
 -- ==============================================================
 -- ======= 3/ merge_into_existing_config: snapshot tests ========
