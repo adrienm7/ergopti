@@ -135,6 +135,21 @@ new distribution family is added as a matrix entry, not as a manual checklist.
 Release notes and uploaded binaries are separate publication steps. Verify the
 tag, notes, and every expected asset explicitly.
 
+### project-packages-name-their-commit-through-a-build-stamp
+
+An installed package has no .git, so `git rev-parse` or a HEAD read reports
+"unknown" in every release. macOS and Linux package builds write
+`_shared/build_stamp.txt` (`commit=<sha>`) through
+`tools/build/write_build_stamp.sh` (the Linux packagers `verify` their copy);
+Windows stamps `BUNDLE_COMMIT` in `infra/bundle.ahk`. Every diagnostic surface
+resolves the commit through one resolver per driver
+(`diagnostic_snapshot.resolve_commit` / `DiagSnapshot_ResolveCommit`): stamp,
+then checkout, then a logged "unknown". Relatedly, macOS `hs.configdir` is the
+script directory (inside the app bundle when packaged), never the configuration
+directory; report `config_paths.get_config_dir()` for the latter. Action: a new
+package format or diagnostic field goes through these owners, and
+`test-package-builds-stamp-commit.cjs` must stay green.
+
 ### project-the-drift-guard-crashes-on-this-windows-box
 
 When a cross-platform drift tool fails on Windows path/process semantics, use

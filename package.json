@@ -174,6 +174,7 @@
 		"test:packaging-paths-exist": "node ./tools/test/test-packaging-paths-exist.cjs",
 		"test:app-windows-keep-their-frame": "node ./tools/test/test-app-windows-keep-their-frame.cjs",
 		"test:release-notes-assets-are-uploaded": "node ./tools/test/test-release-notes-assets-are-uploaded.cjs",
+		"test:package-builds-stamp-commit": "node ./tools/test/test-package-builds-stamp-commit.cjs",
 		"test:action-labels-have-locale-keys": "node ./tools/test/test-action-labels-have-locale-keys.cjs",
 		"test:linux-shared-path-resolver": "node ./tools/test/test-linux-shared-path-resolver.cjs",
 		"test:shared-root-resolvers": "node ./tools/test/test-shared-root-resolvers.cjs",

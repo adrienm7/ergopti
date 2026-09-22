@@ -102,6 +102,9 @@ echo "Copying driver files..."
 # platform/, which carries the kanata remap config. One copy, allowed to fail.
 cp -r "$BUILD_DIR/linux/." "$APPDIR_LIB/"
 cp -r "$BUILD_DIR/_shared/." "$APPDIR_LIB/_shared/"
+# The stamp build-linux-driver.sh wrote is how the mounted daemon names its
+# commit; an image without it would report "unknown".
+bash "$SCRIPT_DIR/write_build_stamp.sh" verify "$APPDIR_LIB/_shared"
 
 # Proof the payload actually landed, rather than the assumption that it did.
 # An AppImage that packages cleanly around a missing driver is the worst
