@@ -229,6 +229,21 @@ that poll native enabled state and restart persistent taps.
 F13/F14/F15 can be physical macOS keys. Karabiner sentinels must also require the
 owned AltGr state; never trigger script control from the bare keycode.
 
+### project-hs-control-sentinel-single-owner
+
+A Karabiner signal key that only Hammerspoon should see is application input
+unless a tap deletes it: the pass-through F20 layer sentinel replaced a selected
+QSpace file name whenever the navigation layer was held. Quartz tap order
+follows start order and taps restart, so "a swallow tap that runs last" cannot
+be guaranteed. The keymap keyDown/keyUp taps (installed for the whole process,
+PAUSE included) delete such keycodes through
+`modules/keymap/control_sentinels.lua`, before ignored-window pass-through;
+every other tap passes them through untouched, and consumers subscribe with
+`set_listener`. Do not claim in `EventProvenance.classify_with_fence`: an extra
+keycode read there breaks the per-tap read budgets pinned by the tooltip and
+ignored-window tests. The generator emits F20 only inside the ACTIVE lease
+graph, so a paused or revoked driver never produces it.
+
 ### project-hs-input-source-single-owner
 
 `hs.keycodes.inputSourceChanged` is a setter, so one broker owns it and
