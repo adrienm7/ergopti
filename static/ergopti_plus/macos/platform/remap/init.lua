@@ -3353,6 +3353,7 @@ end
 --- Publishes only persisted settings, preserving live lifecycle capabilities.
 --- @param candidate table Persisted settings candidate.
 local function publish_settings_state(candidate)
+	_state.tap_holds_enabled = candidate.tap_holds_enabled ~= false
 	_state.tap_hold_config = candidate.tap_hold_config
 	_state.mod_combos_config = candidate.mod_combos_config
 	_state.tap_hold_timeout_ms = candidate.tap_hold_timeout_ms
@@ -3954,6 +3955,32 @@ function M.set_combo_symmetric(value)
 	return committed
 end
 
+--- Returns whether the Tap-Holds feature is switched on.
+--- @return boolean enabled
+function M.get_tap_holds_enabled()
+	if not require_state("get_tap_holds_enabled") then return false end
+	return _state.tap_holds_enabled ~= false
+end
+
+--- Switches the Tap-Holds feature and persists it. Off stops generating every
+--- tap-hold and modifier-combo rule except the right-Command one that carries
+--- AltGr and the script-control trigger; every per-key assignment is kept.
+--- Does NOT regenerate — call M.regenerate() explicitly when ready.
+--- @param value boolean Desired switch state.
+--- @return boolean committed
+function M.set_tap_holds_enabled(value)
+	if not require_state("set_tap_holds_enabled") then return false end
+	if type(value) ~= "boolean" then
+		Logger.error(LOG, "set_tap_holds_enabled(): value must be a boolean.")
+		return false
+	end
+	local committed = commit_state_mutation(function(candidate)
+		candidate.tap_holds_enabled = value
+	end)
+	if committed then Logger.info(LOG, "Tap-Holds feature: %s.", value and "on" or "off") end
+	return committed
+end
+
 --- Copies exactly the settings persisted in config_karabiner.toml.
 --- Runtime handles and watcher capabilities from `_state` are deliberately
 --- excluded, so the snapshot can be retained by a parent transaction.
@@ -3973,6 +4000,7 @@ local function clone_persisted_settings(source)
 	local detached = clone_settings_state(source)
 	return {
 		enabled = detached.enabled == true,
+		tap_holds_enabled = detached.tap_holds_enabled ~= false,
 		tap_hold_config = detached.tap_hold_config,
 		mod_combos_config = detached.mod_combos_config,
 		tap_hold_timeout_ms = detached.tap_hold_timeout_ms,
@@ -4025,6 +4053,7 @@ function M.restore_settings(snapshot, on_done)
 	end
 	return apply_bulk_settings_transaction("Restore captured settings", function(candidate)
 		local restored = clone_persisted_settings(desired)
+		candidate.tap_holds_enabled = restored.tap_holds_enabled
 		candidate.tap_hold_config = restored.tap_hold_config
 		candidate.mod_combos_config = restored.mod_combos_config
 		candidate.tap_hold_timeout_ms = restored.tap_hold_timeout_ms
@@ -4118,6 +4147,7 @@ function M.reset_to_defaults(on_done)
 	Logger.debug(LOG, "Reset-to-defaults transaction requested.")
 	return apply_bulk_settings_transaction("Reset-to-defaults", function(candidate)
 		local defaults = Config.build_default_state(M.TAP_HOLD_KEYS, M.MOD_COMBOS)
+		candidate.tap_holds_enabled         = defaults.tap_holds_enabled
 		candidate.tap_hold_config           = defaults.tap_hold_config
 		candidate.mod_combos_config         = defaults.mod_combos_config
 		candidate.tap_hold_timeout_ms       = defaults.tap_hold_timeout_ms
@@ -4818,6 +4848,10 @@ function M.resume(on_done)
 		invoke_public_callback("resume", on_done, ok == true, reason)
 		replay_pending_layout_refresh()
 	end
+	-- Released by the guardian wait once the helper reports a non-ready status:
+	-- the retained regeneration keeps polling and still provisions the lease on
+	-- approval, but the script's RESUME stops waiting for it.
+	if no_live_lease then _lease_less_resume_waiters[finish_resume] = true end
 
 	local call_ok, requested_or_err = xpcall(function()
 		return M.regenerate(finish_resume, PAUSED_RESUME_REGENERATION)
@@ -4844,10 +4878,6 @@ local function cleanup_disabled_legacy_rules(file_system)
 		Logger.error(LOG, "Disabled legacy cleanup unavailable — filesystem adapter has no read method.")
 		return false
 	end
-	-- Released by the guardian wait once the helper reports a non-ready status:
-	-- the retained regeneration keeps polling and still provisions the lease on
-	-- approval, but the script's RESUME stops waiting for it.
-	if no_live_lease then _lease_less_resume_waiters[finish_resume] = true end
 
 	local read_ok, raw = pcall(file_system.read, KARABINER_OUT)
 	if not read_ok then
@@ -5004,6 +5034,7 @@ function M.init(file_system)
 
 	_state = {
 		enabled                   = user_cfg.enabled,
+		tap_holds_enabled         = user_cfg.tap_holds_enabled ~= false,
 		tap_hold_config           = user_cfg.tap_hold_config,
 		mod_combos_config         = user_cfg.mod_combos_config,
 		tap_hold_timeout_ms       = user_cfg.tap_hold_timeout_ms,

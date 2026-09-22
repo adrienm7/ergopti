@@ -1223,6 +1223,11 @@ function M.build_karabiner_json(
 	local all_rules    = {}
 	local none_action  = action_index["none"] or { label = "none", karabiner_to = {} }
 	local legacy_static_anchors = {}
+	-- Rules owned by the Tap-Holds feature switch. The right-Command tap/hold
+	-- is deliberately not one: it carries AltGr and the held variable the
+	-- script-control sentinels need, so switching Tap-Holds off (like a pause)
+	-- must never cost the user the way back.
+	local tap_hold_feature_rules = {}
 
 
 	-- CapsWord must be first — it must match before any modifier combo or
@@ -1296,6 +1301,7 @@ function M.build_karabiner_json(
 		)
 		for _, rule in ipairs(generated) do
 			all_rules[#all_rules + 1] = rule
+			tap_hold_feature_rules[rule] = true
 			Logger.debug(LOG, "  → rule: %s", rule.description)
 		end
 
@@ -1358,7 +1364,12 @@ function M.build_karabiner_json(
 			return nil, err
 		end
 		local rule = build_tap_hold_rule(key_def, tap_action, hold_action, action_index, per_key_ms)
-		if rule then all_rules[#all_rules + 1] = rule end
+		if rule then
+			all_rules[#all_rules + 1] = rule
+			if key_def.from.key_code ~= SCRIPT_CONTROL_HOLDER_KEY then
+				tap_hold_feature_rules[rule] = true
+			end
+		end
 	end
 
 	-- Capture the exact historical rule graph before the new manipulator-local
@@ -1369,6 +1380,19 @@ function M.build_karabiner_json(
 	local legacy_rules = deep_copy(all_rules)
 	for _, paused_rule in ipairs(build_raw_paused_script_control_rules()) do
 		legacy_rules[#legacy_rules + 1] = deep_copy(paused_rule)
+	end
+
+	-- Tap-Holds switched off: drop the feature's rules after the legacy capture
+	-- above, which must keep describing the complete historical graph. Keys then
+	-- behave natively while every stored assignment stays untouched.
+	if state.tap_holds_enabled == false then
+		local kept = {}
+		for _, rule in ipairs(all_rules) do
+			if not tap_hold_feature_rules[rule] then kept[#kept + 1] = rule end
+		end
+		Logger.info(LOG, "Tap-Holds switched off: %d feature rule(s) not generated.",
+			#all_rules - #kept)
+		all_rules = kept
 	end
 
 	-- A single deployed config contains both pause states. Pause and resume only
