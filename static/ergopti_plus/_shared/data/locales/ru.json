@@ -142,6 +142,7 @@
 	"common.error_title": "Ошибка",
 	"common.key_enter": "Ввод",
 	"common.key_space": "Пробел",
+	"launcher.fatal.stage_detail": "Шаг: {1}\nПричина: {2}\nПодробности сохранены в {3}.",
 	"menu.llm.deps_download_page_failed": "Не удалось открыть страницу загрузки Ollama.",
 	"menu.llm.model_specs_params": " ({1}B параметров, ~{2} ГБ ОЗУ)",
 	"menu.llm.model_specs_ram": " (~{1} ГБ ОЗУ)",

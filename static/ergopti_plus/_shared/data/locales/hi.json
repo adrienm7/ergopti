@@ -142,6 +142,7 @@
 	"common.error_title": "त्रुटि",
 	"common.key_enter": "एंटर",
 	"common.key_space": "स्पेस",
+	"launcher.fatal.stage_detail": "चरण: {1}\nकारण: {2}\nविवरण {3} में सहेजे गए हैं।",
 	"menu.llm.deps_download_page_failed": "Ollama डाउनलोड पृष्ठ नहीं खोला जा सका।",
 	"menu.llm.model_specs_params": " ({1}B पैरामीटर, ~{2} GB RAM)",
 	"menu.llm.model_specs_ram": " (~{1} GB RAM)",

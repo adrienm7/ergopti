@@ -61,6 +61,7 @@ graph TD
 
     subgraph MACOS_Adapters["macOS (Hammerspoon) Adapters — macos/adapters/"]
         MACOS_app_launcher["AppLauncher.lua"]
+        MACOS_boot_fatal["BootFatal.lua"]
         MACOS_clipboard["Clipboard.lua"]
         MACOS_crypto["Crypto.lua"]
         MACOS_event_provenance["EventProvenance.lua"]

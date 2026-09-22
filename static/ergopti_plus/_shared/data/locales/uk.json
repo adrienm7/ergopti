@@ -142,6 +142,7 @@
 	"common.error_title": "Помилка",
 	"common.key_enter": "Enter",
 	"common.key_space": "Пробіл",
+	"launcher.fatal.stage_detail": "Крок: {1}\nПричина: {2}\nПодробиці збережено в {3}.",
 	"menu.llm.deps_download_page_failed": "Не вдалося відкрити сторінку завантаження Ollama.",
 	"menu.llm.model_specs_params": " ({1}B параметрів, ~{2} ГБ ОЗП)",
 	"menu.llm.model_specs_ram": " (~{1} ГБ ОЗП)",

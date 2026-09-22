@@ -230,6 +230,11 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.boot_fatal",
+		contract = { "report" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.clipboard",
 		contract = { "read", "write" },
 		wired    = true,
