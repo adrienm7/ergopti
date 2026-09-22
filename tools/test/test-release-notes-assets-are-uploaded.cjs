@@ -276,15 +276,18 @@ for (const [name, line] of linked) {
 }
 
 const releaseBody = lines.join('\n');
-// Release headings do not receive fragment IDs. GitHub prefixes explicit
-// named anchors with user-content when sanitizing the rendered Markdown.
-// The releases list page truncates long notes, and the downloads follow the
-// changelog, so a bare fragment finds no anchor there: the jump link must open
-// the release's own page, which renders the whole body.
-if (!releaseBody.includes('<a name="${DOWNLOADS_ANCHOR}"></a>') ||
+// Release headings do not receive fragment IDs, so the downloads carry an
+// explicit anchor. The releases list page truncates long notes, and the
+// downloads follow the changelog, so a bare fragment finds no anchor there: the
+// jump link must open the release's own page, which renders the whole body.
+// GitHub opens that page client-side from the list, where the browser does not
+// scroll to a `name` anchor (the first click landed at the top); GitHub's
+// fragment handler scrolls to an `id`, sanitized to user-content-<id>, only
+// when the link carries the unprefixed fragment.
+if (!releaseBody.includes('<a id="${DOWNLOADS_ANCHOR}"></a>') ||
 	!releaseBody.includes(
-		'](https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}#user-content-${DOWNLOADS_ANCHOR})')) {
-	errors.push('release downloads need an explicit anchor and a link to it on the release\'s own page');
+		'](https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}#${DOWNLOADS_ANCHOR})')) {
+	errors.push('release downloads need an explicit id anchor and an unprefixed link to it on the release\'s own page');
 }
 // The repository sidebar truncates long release titles, which hid the version.
 // The title is computed in shell once; later steps only forward it via ${{ }}.
