@@ -1307,6 +1307,10 @@ helpers.describe("ui.bridge_handlers", function()
   helpers.describe("changelog_bridge", function()
     local handler = helpers.load_module("ui.changelog.bridge")
     local state = build_mock_state()
+    -- The native fetch is covered by test_changelog_release_sources; keep these
+    -- protocol cases off the network.
+    handler._http_get = function() end
+    handler._push = function() return true end
 
     helpers.it("has correct bridge_name", function()
       helpers.assert_eq(handler.bridge_name, "changelog_bridge")

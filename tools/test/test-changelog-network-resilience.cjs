@@ -529,11 +529,33 @@ function checkLinuxPushProtocol() {
 	page.sandbox.__hostBridgeResponse(
 		'changelog_bridge',
 		false,
-		JSON.stringify({ action: 'releases_error', message: 'Linux native failure' })
+		JSON.stringify({ action: 'releases_error', error_key: 'changelog_window.error_rate_limited' })
 	);
 	expect(
-		page.errorShown() && page.errorText() === 'Linux native failure',
-		'a Linux error push must be visible'
+		page.errorShown() && page.errorText() === EN['changelog_window.error_rate_limited'],
+		'a Linux error push must show its translated key'
+	);
+	page.sandbox.__hostBridgeResponse(
+		'changelog_bridge',
+		false,
+		JSON.stringify({ action: 'releases_error', error_key: 'menu.anything_else' })
+	);
+	expect(
+		page.errorText() === EN['changelog_window.error_network'],
+		'a foreign error key must degrade to the network error'
+	);
+	page.sandbox.__hostBridgeResponse(
+		'changelog_bridge',
+		false,
+		JSON.stringify({
+			action: 'releases',
+			channel: 'main',
+			json: JSON.stringify([{ tag_name: 'v2.4.0', body: 'api', prerelease: false }])
+		})
+	);
+	expect(
+		!page.errorShown() && page.el('release-tag').textContent === 'v2.4.0',
+		'a Linux API push must render through the JSON parser'
 	);
 	page.sandbox.__hostBridgeResponse(
 		'changelog_bridge',

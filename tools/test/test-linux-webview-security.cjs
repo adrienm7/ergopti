@@ -64,9 +64,8 @@ for (const required of [
 ]) {
 	if (!host.includes(required)) fail(`webkit_host.lua is missing security invariant: ${required}`);
 }
-if (!host.includes('if app_name == "changelog" then')
-	|| !host.includes('https://api.github.com')) {
-	fail('only the changelog may receive the reviewed GitHub API connection capability');
+if (/connect_sources\s*=\s*connect_sources\s*\.\.|https:\/\/api\.github\.com/.test(host)) {
+	fail('no Linux page may connect to a remote origin; the changelog bridge fetches natively');
 }
 
 const manager = fs.readFileSync(
