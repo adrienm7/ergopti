@@ -85,6 +85,7 @@ graph TD
         MACOS_shell_runner["ShellRunner.lua"]
         MACOS_storage["Storage.lua"]
         MACOS_synthetic_input["SyntheticInput.lua"]
+        MACOS_system_info["SystemInfo.lua"]
         MACOS_task_environment["TaskEnvironment.lua"]
         MACOS_task_lifecycle["TaskLifecycle.lua"]
         MACOS_text_sender["TextSender.lua"]
