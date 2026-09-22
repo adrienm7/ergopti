@@ -17,224 +17,224 @@ preview_autocorrect_enabled = true
 preview_colored_tooltips = true
 preview_star_enabled = true
 
-[hotstrings.autocorrection.accents]
-enabled = true
-time_activation_seconds = 0.5
-
 [hotstrings.autocorrection.caps]
-enabled = true
-time_activation_seconds = 0.5
-
-[hotstrings.autocorrection.errors]
-enabled = true
-time_activation_seconds = 0.5
-
-[hotstrings.autocorrection.minus]
-enabled = true
-time_activation_seconds = 0.5
-
-[hotstrings.autocorrection.minus_apostrophe]
-enabled = true
-time_activation_seconds = 0.5
-
-[hotstrings.autocorrection.multiple_punctuation_marks]
-enabled = true
-time_activation_seconds = 0.5
-
-[hotstrings.autocorrection.names]
-enabled = true
-time_activation_seconds = 0.5
-
-[hotstrings.autocorrection.ou]
-enabled = true
-time_activation_seconds = 0.5
-
-[hotstrings.autocorrection.suffixes_a_chaining]
-enabled = true
-time_activation_seconds = 0.5
-
-[hotstrings.autocorrection.typographic_apostrophe]
-enabled = true
+enabled = false
 time_activation_seconds = 0.5
 
 [hotstrings.distances_reduction.qu]
-enabled = true
-time_activation_seconds = 0.5
-
-[hotstrings.distances_reduction.suffixes_a]
-enabled = true
+enabled = false
 time_activation_seconds = 0.5
 
 [hotstrings.distances_reduction.comma_j]
-enabled = true
+enabled = false
 
 [hotstrings.distances_reduction.comma_far_letters]
-enabled = true
+enabled = false
 
 [hotstrings.distances_reduction.dead_key_e_circumflex]
-enabled = true
+enabled = false
 
 [hotstrings.distances_reduction.e_circumflex_e]
-enabled = true
+enabled = false
 time_activation_seconds = 0.5
 
 [hotstrings.distances_reduction.space_around_symbols]
-enabled = true
+enabled = false
 
 [hotstrings.sfbs_reduction.comma]
-enabled = true
+enabled = false
 time_activation_seconds = 0.5
 
 [hotstrings.sfbs_reduction.e_circ]
-enabled = true
+enabled = false
 time_activation_seconds = 0.5
 
 [hotstrings.sfbs_reduction.e_grave]
-enabled = true
+enabled = false
 time_activation_seconds = 0.5
 
 [hotstrings.sfbs_reduction.bu]
-enabled = true
+enabled = false
 
 [hotstrings.sfbs_reduction.i_e_acute]
-enabled = true
+enabled = false
 
 [hotstrings.rolls.hc]
-enabled = true
+enabled = false
 time_activation_seconds = 0.5
 
 [hotstrings.rolls.sx]
-enabled = true
+enabled = false
 time_activation_seconds = 0.5
 
 [hotstrings.rolls.cx]
-enabled = true
+enabled = false
 time_activation_seconds = 0.5
 
 [hotstrings.rolls.ct]
-enabled = true
+enabled = false
 time_activation_seconds = 0.5
 
 [hotstrings.rolls.ez]
-enabled = true
+enabled = false
 time_activation_seconds = 0.5
 
 [hotstrings.rolls.assign]
-enabled = true
+enabled = false
 
 [hotstrings.rolls.assign_arrow_equal_left]
-enabled = true
+enabled = false
 
 [hotstrings.rolls.assign_arrow_equal_right]
-enabled = true
+enabled = false
 
 [hotstrings.rolls.assign_arrow_minus_left]
-enabled = true
+enabled = false
 
 [hotstrings.rolls.assign_arrow_minus_right]
-enabled = true
+enabled = false
 
 [hotstrings.rolls.bracket_quote]
-enabled = true
+enabled = false
 
 [hotstrings.rolls.chevron_equal]
-enabled = true
+enabled = false
 
 [hotstrings.rolls.chevron_greater]
-enabled = true
+enabled = false
 
 [hotstrings.rolls.chevron_less]
-enabled = true
+enabled = false
 
 [hotstrings.rolls.close_chevron_tag]
-enabled = true
+enabled = false
 time_activation_seconds = 0.5
 
 [hotstrings.rolls.comment_close]
-enabled = true
+enabled = false
 time_activation_seconds = 0.5
 
 [hotstrings.rolls.comment_open]
-enabled = true
+enabled = false
 time_activation_seconds = 0.5
 
 [hotstrings.rolls.english_negation]
-enabled = true
+enabled = false
 
 [hotstrings.rolls.equal_string]
-enabled = true
+enabled = false
 
 [hotstrings.rolls.hashtag_close_bracket]
-enabled = true
+enabled = false
 time_activation_seconds = 0.5
 
 [hotstrings.rolls.hashtag_open_bracket]
-enabled = true
+enabled = false
 time_activation_seconds = 0.5
 
 [hotstrings.rolls.hashtag_parenthesis]
-enabled = true
+enabled = false
 time_activation_seconds = 0.5
 
 [hotstrings.rolls.hashtag_quote]
-enabled = true
+enabled = false
 
 [hotstrings.rolls.left_arrow]
-enabled = true
+enabled = false
 
 [hotstrings.rolls.not_equal]
-enabled = true
+enabled = false
 
 [hotstrings.rolls.paren_quote]
-enabled = true
+enabled = false
 
 [hotstrings.magic_key.replace]
 enabled = true
 
 [hotstrings.magic_key.repeat_corrections]
-enabled = true
-time_activation_seconds = 2
-
-[hotstrings.magic_key.text_expansion]
-enabled = true
-time_activation_seconds = 2
-
-[hotstrings.magic_key.text_expansion_auto]
-enabled = true
-time_activation_seconds = 2
-
-[hotstrings.magic_key.text_expansion_emojis]
-enabled = true
+enabled = false
 time_activation_seconds = 2
 
 [hotstrings.magic_key.text_expansion_symbols]
-enabled = true
+enabled = false
 time_activation_seconds = 2
 
 [hotstrings.magic_key.text_expansion_symbols_typst]
-enabled = true
+enabled = false
+time_activation_seconds = 2
+
+[hotstrings.french_distancesreduction.suffixes_a]
+enabled = false
+time_activation_seconds = 0.5
+
+[hotstrings.french_autocorrection.accents]
+enabled = false
+time_activation_seconds = 0.5
+
+[hotstrings.french_autocorrection.names]
+enabled = false
+time_activation_seconds = 0.5
+
+[hotstrings.french_autocorrection.typographic_apostrophe]
+enabled = false
+time_activation_seconds = 0.5
+
+[hotstrings.french_autocorrection.errors]
+enabled = false
+time_activation_seconds = 0.5
+
+[hotstrings.french_autocorrection.ou]
+enabled = false
+time_activation_seconds = 0.5
+
+[hotstrings.french_autocorrection.multiple_punctuation_marks]
+enabled = false
+time_activation_seconds = 0.5
+
+[hotstrings.french_autocorrection.suffixes_a_chaining]
+enabled = false
+time_activation_seconds = 0.5
+
+[hotstrings.french_autocorrection.minus]
+enabled = false
+time_activation_seconds = 0.5
+
+[hotstrings.french_autocorrection.minus_apostrophe]
+enabled = false
+time_activation_seconds = 0.5
+
+[hotstrings.french_magickey.text_expansion]
+enabled = false
+time_activation_seconds = 2
+
+[hotstrings.french_magickey.text_expansion_auto]
+enabled = false
+time_activation_seconds = 2
+
+[hotstrings.french_magickey.text_expansion_emojis]
+enabled = false
 time_activation_seconds = 2
 
 [hotstrings.dynamic.date]
-enabled = true
+enabled = false
 
 [hotstrings.dynamic.date_fr]
-enabled = true
+enabled = false
 
 [hotstrings.dynamic.date_long_fr]
-enabled = true
+enabled = false
 
 [hotstrings.dynamic.iban_prefixes]
-enabled = true
+enabled = false
 
 [hotstrings.dynamic.phone_prefixes]
-enabled = true
+enabled = false
 
 [hotstrings.dynamic.ssn_prefixes]
-enabled = true
+enabled = false
 
 [hotstrings.dynamic.text_expansion_personal_information]
-enabled = true
+enabled = false
 pattern_max_length = 1
 
 [hotstrings.personal.autocorrection]

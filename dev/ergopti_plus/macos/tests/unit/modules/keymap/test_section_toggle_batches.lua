@@ -125,7 +125,7 @@ helpers.describe("registry_index: a batched section toggle rebuilds the group on
 			"an empty batch must not rebuild the corpus for nothing")
 	end)
 
-	helpers.it("single-section enable clears the explicit disabled setting", function()
+	helpers.it("single-section enable persists an explicit true over the disabled setting", function()
 		local RI, counts = load_with_counters()
 		RI.is_group_enabled = function() return false end
 		local key = "ergopti.hotstrings_section_" .. GROUP .. "_section_1"
@@ -135,14 +135,14 @@ helpers.describe("registry_index: a batched section toggle rebuilds the group on
 		RI.enable_section(GROUP, "section_1")
 		counts.restore()
 
-		helpers.assert_nil(hs.settings.get(key),
-			"enabling must remove the explicit false instead of persisting false again")
+		helpers.assert_eq(hs.settings.get(key), true,
+			"enabling must persist an explicit true: an absent key means the shipped (disabled) default")
 		helpers.assert_true(RI.is_section_enabled(GROUP, "section_1"),
 			"the public reader must observe the section as enabled immediately")
 		helpers.assert_eq(counts.settings, 1)
 	end)
 
-	helpers.it("batch enable clears every explicit disabled setting", function()
+	helpers.it("batch enable persists an explicit true for every section", function()
 		local RI, counts = load_with_counters()
 		RI.is_group_enabled = function() return false end
 		local names = section_names()
@@ -156,8 +156,8 @@ helpers.describe("registry_index: a batched section toggle rebuilds the group on
 
 		for _, section_name in ipairs(names) do
 			local key = "ergopti.hotstrings_section_" .. GROUP .. "_" .. section_name
-			helpers.assert_nil(hs.settings.get(key),
-				"batch enable must clear every explicit false setting")
+			helpers.assert_eq(hs.settings.get(key), true,
+				"batch enable must persist an explicit true for every section")
 			helpers.assert_true(RI.is_section_enabled(GROUP, section_name))
 		end
 		helpers.assert_eq(counts.settings, SECTION_COUNT)

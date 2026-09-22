@@ -155,7 +155,7 @@ _TTHRT_FloatOverflowRemainsInvalid() {
 			"config coercer must preserve overflowing float lexeme")
 		ExpectedType := ""
 		AssertFalse(TomlConfigValueMatchesManifest(
-			"hotstrings.autocorrection.accents", "time_activation_seconds",
+			"hotstrings.french_autocorrection.accents", "time_activation_seconds",
 			ConfigValue, &ExpectedType),
 			"manifest boundary must reject an overflowing float lexeme")
 	}
@@ -190,7 +190,7 @@ Test("toml numeric boundary: integers and floats share overflow rejection",
 _TTHRT_HotstringDurationMustFitTickDomain() {
 	ExpectedType := ""
 	AssertFalse(TomlConfigValueMatchesManifest(
-		"hotstrings.autocorrection.accents", "time_activation_seconds",
+		"hotstrings.french_autocorrection.accents", "time_activation_seconds",
 		4294968, &ExpectedType),
 		"a hotstring duration beyond the 32-bit elapsed-tick domain must be rejected")
 }

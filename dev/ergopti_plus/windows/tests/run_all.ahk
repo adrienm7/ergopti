@@ -104,6 +104,10 @@ OnError(_FatalErrorHandler)
 #Include ../infra/ui_style.ahk
 #Include ../_generated/logger_sub_files.ahk
 #Include ../infra/logger.ahk
+; Boot stage profiler and the cross-driver diagnostic snapshot: definitions and
+; two counters only, exercised by unit/test_diagnostic_logging.ahk.
+#Include ../infra/boot_profiler.ahk
+#Include ../infra/diagnostic_snapshot.ahk
 #Include ../infra/toml/toml_helpers.ahk
 ; Shared timing registry reader (TimingsLoadShared / TimingsGet) — needs
 ; ParseTomlFile above; exercised by test_timings_config.ahk.
@@ -263,6 +267,7 @@ InstallSendNoOps()
 #Include unit/test_promise_timeout_budget.ahk
 #Include unit/test_logger_format_failure_is_visible.ahk
 #Include unit/test_logger_contract.ahk
+#Include unit/test_diagnostic_logging.ahk
 #Include unit/test_logger_daily_rotation.ahk
 #Include unit/test_healthcheck_core.ahk
 #Include unit/test_healthcheck_owner_snapshots.ahk
@@ -277,6 +282,7 @@ InstallSendNoOps()
 #Include unit/test_tooltip_position_cache_receipt.ahk
 #Include unit/test_llm_tooltip_grace.ahk
 #Include unit/test_llm_tooltip_render.ahk
+#Include unit/test_llm_tooltip_layout.ahk
 #Include unit/test_hotstring_engine.ahk
 #Include unit/test_hotstring_engine_main.ahk
 #Include unit/test_hotstring_buffer_boundaries.ahk
@@ -312,6 +318,7 @@ InstallSendNoOps()
 #Include unit/test_toml_loader.ahk
 #Include unit/test_toml_helpers_roundtrip.ahk
 #Include unit/test_hotstrings_cache.ahk
+#Include unit/test_hotstring_language_packs.ahk
 #Include unit/test_dynamic_hotstrings_module.ahk
 #Include unit/test_hotstrings_config.ahk
 #Include unit/test_hotstring_delimiter_global_transaction_20260813.ahk
@@ -551,6 +558,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_config_commit_gateway.ahk
 #Include unit/test_config_typed_updates.ahk
 #Include unit/test_config_typed_transactions.ahk
+#Include unit/test_config_unused_keys.ahk
 #Include unit/test_config_partial_load_persistence.ahk
 #Include unit/test_config_partial_load_llm.ahk
 #Include unit/test_toml_numeric_strings.ahk
@@ -759,6 +767,8 @@ global _AhkSubDir := ""
 #Include unit/test_sqlite_clone_page_size.ahk
 #Include unit/test_klr_resident_refresh.ahk
 #Include unit/test_klr_cache_encryption.ahk
+#Include unit/test_klr_newest_first_rebuild.ahk
+#Include unit/test_metrics_rebuild_snapshots.ahk
 #Include unit/test_klr_cache_stages.ahk
 #Include unit/test_klr_cache_open_failure.ahk
 #Include unit/test_klr_cache_rejection_identity.ahk
@@ -1003,6 +1013,10 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_menu_top_level_drift_gate.ahk
 ; Regression: the separator between Gestures and "Actions globales" must survive the tail loader.
 #Include meta/test_menu_gestures_actions_separator.ahk
+; Regression: a category toggle's own separator absorbs the manifest "---" after it.
+#Include unit/test_manifest_menu_no_double_separator.ahk
+; Regression: Shortcuts submenu block separator and screenshot key label.
+#Include unit/test_shortcuts_menu_blocks.ahk
 ; Contract gate: metrics_menu disabled_when predicate == AHK handler resolver calls (MG-1/MG-2).
 #Include meta/test_list_providers_touch_no_menu.ahk
 #Include meta/test_menu_metrics_disabled_when.ahk

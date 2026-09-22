@@ -1190,6 +1190,7 @@
 		</div>
 
 		<script src="../i18n.js"></script>
+		<script src="../metrics_rebuild_banner.js"></script>
 		<!-- Load order: helpers (colors/format) → state → main (init+render) → charts → modal -->
 		<script src="helpers.js"></script>
 		<script src="state.js"></script>
@@ -1208,6 +1209,8 @@
 			(function () {
 				function apply_prefetch(blob) {
 					if (!blob) return;
+					// A partial rebuild snapshot is labelled until a complete one lands.
+					if (window.metrics_rebuild) window.metrics_rebuild.mark_snapshot(blob);
 					const manifest = blob.metrics_manifest || {};
 					const categories = blob.user_categories || {};
 					const icons = blob.app_icons || {};
@@ -1243,6 +1246,10 @@
 							} catch (_) {
 								return;
 							}
+						}
+						if (payload && payload.type === 'rebuild_progress') {
+							if (window.metrics_rebuild) window.metrics_rebuild.show_progress(payload.progress);
+							return;
 						}
 						if (!payload || payload.type !== 'prefetch') return;
 						apply_prefetch(payload.blob);

@@ -29,8 +29,26 @@ local hs     = hs
 local Logger = require("infra.logger")
 local DeferredWork = require("infra.deferred_work")
 local TaskEnvironment = require("adapters.task_environment")
+local RuntimeLog = require("diagnostics.runtime_log")
 
 local LOG = "adapters.shell_runner"
+
+--- Monotonic milliseconds for process durations. A host without the monotonic
+--- clock (a narrow test double) degrades to whole-second wall time: the value
+--- only feeds a diagnostic duration, never a decision.
+--- @return number
+local function now_ms()
+	local timer = hs and hs.timer
+	if timer and type(timer.absoluteTime) == "function" then
+		return timer.absoluteTime() / 1e6
+	end
+	return os.time() * 1000
+end
+
+-- Every exit is reported by program name, status and duration through one
+-- throttled recorder; the command line is never logged because it can carry
+-- user text. Successful spawns and their exit codes used to leave no trace.
+local _record_exit = RuntimeLog.new_process_log(Logger, LOG, now_ms)
 local CAPTURED_OUTPUT_MAX_BYTES = 4 * 1024 * 1024
 local CAPTURED_OUTPUT_LIMIT_EXIT_CODE = -1
 local CAPTURED_OUTPUT_LIMIT_DETAIL = "ShellRunner output limit exceeded."
@@ -55,11 +73,13 @@ M._active_tasks = {}
 --- @return string stdout output, or "" on any error.
 function M.exec(cmd)
 	if type(cmd) ~= "string" or cmd == "" then return "" end
-	local ok, result = pcall(hs.execute, cmd)
+	local started_ms = now_ms()
+	local ok, result, _, _, rc = pcall(hs.execute, cmd)
 	if not ok then
-		Logger.error(LOG, "exec() failed: %s", tostring(result))
+		Logger.error(LOG, "exec() failed for '%s': %s", RuntimeLog.program_name(cmd), tostring(result))
 		return ""
 	end
+	_record_exit(RuntimeLog.program_name(cmd), rc, now_ms() - started_ms)
 	return type(result) == "string" and result or ""
 end
 
@@ -162,6 +182,7 @@ function M.spawn(executable, args, on_done, on_chunk, environment)
 	local _business_stream_closed = false
 	local _business_terminal_sent = false
 	local _settlement_observers = {}
+	local _started_ms = nil
 	local _deliver_business_completion
 	local _deliver_business_chunk
 
@@ -249,6 +270,7 @@ function M.spawn(executable, args, on_done, on_chunk, environment)
 		local ok, started = pcall(function() return task:start() end)
 		_start_dispatching = false
 		if ok and started then
+			_started_ms = now_ms()
 			_start_committed = true
 			if _lifecycle == "starting" then _lifecycle = "started" end
 			local pending_chunks = _pending_chunks
@@ -406,6 +428,8 @@ function M.spawn(executable, args, on_done, on_chunk, environment)
 		_task = nil
 		_input_closed = true
 		_lifecycle = "completed"
+		_record_exit(RuntimeLog.program_name(executable), exit_code,
+			_started_ms and (now_ms() - _started_ms) or 0)
 		if _start_dispatching then
 			if _pending_completion == nil then
 				_pending_completion = table.pack(exit_code, stdout, stderr)

@@ -36,8 +36,8 @@ global HS_PREFIX_INDEX_WARM_DELAY_MS := 300
 ; the boot deferred pass and the live rebuild so the two code paths never diverge.
 _RegisterEmojisSymbolsSections() {
 	global Features
-	if Features["hotstrings"]["magic_key"]["text_expansion_emojis"]["enabled"] {
-		LoadHotstringsSection("magickey", "text_expansion_emojis", Features["hotstrings"]["magic_key"]["text_expansion_emojis"])
+	if Features["hotstrings"]["french_magickey"]["text_expansion_emojis"]["enabled"] {
+		LoadHotstringsSection("french_magickey", "text_expansion_emojis", Features["hotstrings"]["french_magickey"]["text_expansion_emojis"])
 	}
 	if Features["hotstrings"]["magic_key"]["text_expansion_symbols"]["enabled"] {
 		LoadHotstringsSection("magickey", "text_expansion_symbols", Features["hotstrings"]["magic_key"]["text_expansion_symbols"])
@@ -52,7 +52,7 @@ _RegisterEmojisSymbolsSections() {
 ; Boot registers these sections synchronously before ready.
 RegisterEmojisSymbolsDeferred() {
 	global HSE_RegistryByGroup
-	if (IsSet(HSE_RegistryByGroup) and (HSE_RegistryByGroup.Has("emojis.emojis") or HSE_RegistryByGroup.Has("magickey.text_expansion_emojis")))
+	if (IsSet(HSE_RegistryByGroup) and (HSE_RegistryByGroup.Has("emojis.emojis") or HSE_RegistryByGroup.Has("french_magickey.text_expansion_emojis")))
 		return
 	try {
 		; Isolated wall-clock for the HSE registration alone. The BootProfile delta
@@ -82,11 +82,11 @@ RegisterEmojisSymbolsDeferred() {
 ; _RegisterEmojisSymbolsSections for the emoji/symbol categories).
 _RegisterTextExpansionSections() {
 	global Features
-	if Features["hotstrings"]["magic_key"]["text_expansion"]["enabled"] {
-		LoadHotstringsSection("magickey", "text_expansion", Features["hotstrings"]["magic_key"]["text_expansion"])
+	if Features["hotstrings"]["french_magickey"]["text_expansion"]["enabled"] {
+		LoadHotstringsSection("french_magickey", "text_expansion", Features["hotstrings"]["french_magickey"]["text_expansion"])
 	}
-	if Features["hotstrings"]["magic_key"]["text_expansion_auto"]["enabled"] {
-		LoadHotstringsSection("magickey", "text_expansion_auto", Features["hotstrings"]["magic_key"]["text_expansion_auto"])
+	if Features["hotstrings"]["french_magickey"]["text_expansion_auto"]["enabled"] {
+		LoadHotstringsSection("french_magickey", "text_expansion_auto", Features["hotstrings"]["french_magickey"]["text_expansion_auto"])
 	}
 }
 

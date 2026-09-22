@@ -54,8 +54,8 @@ _HS_RegisterTextExpansionAndDynamic(DeferHeavy := false) {
 	; ===== 4.1) Suffixes with À =====
 	; ================================
 
-	if Features["hotstrings"]["distances_reduction"]["suffixes_a"]["enabled"] {
-		LoadHotstringsSection("distancesreduction", "suffixes_a", Features["hotstrings"]["distances_reduction"]["suffixes_a"])
+	if Features["hotstrings"]["french_distancesreduction"]["suffixes_a"]["enabled"] {
+		LoadHotstringsSection("french_distancesreduction", "suffixes_a", Features["hotstrings"]["french_distancesreduction"]["suffixes_a"])
 	}
 
 

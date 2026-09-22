@@ -494,6 +494,11 @@ local function request(kind, reason, arguments, exit_code, on_aborted, require_f
 		on_aborted = on_aborted,
 	}
 	_transaction = transaction
+	-- Who asked is the first question about any reload or quit in a user log, and
+	-- the reason was stored on the transaction without ever being written out.
+	-- Protected: a failing logger has no other sink to report to, and must never
+	-- turn a quit into a refusal.
+	pcall(Logger.info, LOG, "Controlled %s requested (reason: %s).", kind, reason)
 
 	local callback_fired = false
 	local function on_fenced(ok, detail)

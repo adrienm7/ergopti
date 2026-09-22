@@ -1052,28 +1052,20 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 				}
 
 				; ── Diagnostic fire-trace (debug only) ──────────────────────────────────
-				; One line per expansion capturing the exact injected burst, branch and
-				; context, so a reproduction of an interleave/drop ("outpubct",
-				; "abcd"->"acd") can be read straight off the log. Debug-gated so normal
+				; One line per expansion capturing the shape of the injected burst, its
+				; branch and context, so a reproduction of an interleave/drop can be
+				; read straight off the log. Debug-gated so normal
 				; typing stays silent; enable via tray Debug -> Log level -> DEBUG.
 				if LoggerIsDebugEnabled() {
-						; The burst IS the replacement (plus the erase sequence), and the
-						; trigger is a fragment of the same secret, so a private mapping
-						; withholds both. DEBUG is exactly the level a user is asked to
-						; switch on when reporting a bug, and this log rotates alongside
-						; the metrics store the redaction exists to protect — so the shape
-						; of the fire is traced and none of its content is.
-						if (Spec.HasOwnProp("IsPrivate") and Spec.IsPrivate) {
-								try LoggerDebug("HSEFire",
-										"FIRE private mapping bs={1} branch={2} conform={3} burst={4} char(s) (trigger and content withheld).",
-										BSCount, IsNotepadApp ? "notepad-clip" : (IsTerminalApp ? "terminal-paced" : "atomic"),
-										IsConform ? 1 : 0, StrLen(SentBurst))
-						} else {
-								try LoggerDebug("HSEFire",
-										"FIRE trig='{1}' end='{2}' bs={3} branch={4} conform={5} burst='{6}'.",
-										Spec.Trigger, EndChar, BSCount, IsNotepadApp ? "notepad-clip" : (IsTerminalApp ? "terminal-paced" : "atomic"),
-										IsConform ? 1 : 0, SentBurst)
-						}
+						; The burst IS the replacement (plus the erase sequence) and the
+						; trigger is what the user typed, so neither is ever logged: DEBUG is
+						; exactly the level a user is asked to switch on when reporting a bug.
+						; The shape of the fire is enough to read an interleave or a drop.
+						try LoggerDebug("HSEFire",
+								"FIRE trigger={1} char(s) end={2} char(s) bs={3} branch={4} conform={5} burst={6} char(s).",
+								StrLen(Spec.Trigger), StrLen(EndChar), BSCount,
+								IsNotepadApp ? "notepad-clip" : (IsTerminalApp ? "terminal-paced" : "atomic"),
+								IsConform ? 1 : 0, StrLen(SentBurst))
 				}
 
 					; The engine computes the one canonical screen edit, including consumed

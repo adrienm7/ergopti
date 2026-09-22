@@ -308,6 +308,43 @@ Test-runner integration:
 
 ---
 
+## 12. Boot Diagnostics and Runtime Events
+
+### 12.1 Diagnostic snapshot
+
+Once boot completes, every driver logs exactly one `INFO` line tagged
+`[Diagnostics]` that summarises its environment. The field list, its order and
+the rendering rules are data in
+[`diagnostic_snapshot.json`](./diagnostic_snapshot.json), replayed by each
+driver suite and pinned by `tools/test/test-diagnostic-snapshot-parity.cjs`:
+
+```
+… [INFO] [Diagnostics] Diagnostic snapshot (driver=windows version=local commit=3b924cd46 os="Windows 11 Home" … boot_ms=812).
+```
+
+- A missing value renders as `unknown`; a field is never dropped.
+- Paths under the user's home render relative to `~`.
+- The snapshot carries environment facts only: no typed text, trigger,
+  replacement, clipboard content, window title, token or personal field.
+
+### 12.2 Boot stages
+
+Each driver splits its boot into named stages logged as a `start`/`success`
+pair with the stage duration, then logs `Boot complete in N ms`. A stage whose
+`success` never appears names the step a silent boot death stopped in.
+
+### 12.3 Runtime events
+
+State changes that used to be invisible are logged at `info` unless they recur
+per keystroke: feature toggles (identifier and new state), reload requests
+(requester), suspend/resume, configuration-file reloads (file base names),
+update-check results, webview open/close/load with durations. External process
+exits are logged at `debug` with program name, status and duration, throttled
+per program; the command line is never logged because it can carry user text.
+Errors caught by `try`/`pcall` on non-hot paths are logged, never discarded.
+
+---
+
 ## References
 
 - AHK implementation: [`static/ergopti_plus/windows/lib/logger.ahk`](../../windows/lib/logger.ahk)

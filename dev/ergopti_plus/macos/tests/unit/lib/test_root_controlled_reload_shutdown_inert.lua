@@ -22,6 +22,7 @@ local MODULE_NAMES = {
 	"platform.remap.ke_lifecycle",
 	"platform.remap.lease_controller",
 	"infra.boot_profiler",
+	"adapters.boot_journal",
 	"infra.i18n",
 	"infra.locale",
 	"modules.diagnostics.crash_reporter",
@@ -211,7 +212,19 @@ local function run_isolated(options, assertions)
 			},
 			["platform.remap.ke_lifecycle"] = { HS_BOOT_READY_SETTING_KEY = "test.boot.ready" },
 			["platform.remap.lease_controller"] = LeaseController,
-			["infra.boot_profiler"] = { begin = function() end, mark = function() end },
+			["infra.boot_profiler"] = {
+				begin = function() end,
+				stage = function() end,
+				mark = function() end,
+				complete = function() end,
+				current_stage = function() return "fixture stage" end,
+				is_complete = function() return false end,
+			},
+			["adapters.boot_journal"] = {
+				append = function() return true end,
+				set_user_log_ready = function() end,
+				describe_path = function() return "folder" end,
+			},
 			["infra.i18n"] = {
 				set_locale_injector = function() end,
 				init = function() return true end,

@@ -51,6 +51,10 @@
 ; placeholder stays as-is and we treat it as ``dev`` to disable any skip.
 global BUNDLE_VERSION := "__BUNDLE_VERSION__"
 
+; Commit the release was built from, stamped by the same CI step. The boot
+; diagnostic snapshot reports it; a source checkout reads .git/HEAD instead.
+global BUNDLE_COMMIT := "__BUNDLE_COMMIT__"
+
 ; GitHub release URL frozen at build time so the tray menu's first item can
 ; deep-link to *this exact release* without an extra API call. The release
 ; workflow rewrites the placeholder right after stamping BUNDLE_VERSION,

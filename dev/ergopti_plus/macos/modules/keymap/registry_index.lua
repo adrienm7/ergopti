@@ -16,6 +16,8 @@ local Logger = require("infra.logger")
 local Storage = require("adapters.storage")
 local Groups = require("modules.keymap.registry_groups")
 local i18n   = require("infra.i18n")
+local ManifestReader = require("infra.manifest_reader")
+local Languages = require("hotstrings.languages")
 local LOG    = "keymap.registry"
 
 local _state = nil
@@ -159,13 +161,20 @@ end
 -- =====================================
 -- =====================================
 
---- Returns true when the section is not explicitly disabled.
---- hs.settings stores `false` when the user disables it; nil means enabled.
+--- Returns the section's effective enable state.
+--- hs.settings stores the user's explicit choice (`true` or `false`). A section
+--- the user never touched takes the feature manifest's shipped default — every
+--- bundled section ships disabled — and a section the manifest does not declare
+--- (personal and extension packs) is the user's own and stays enabled.
 --- @param group_name string
 --- @param section_name string
 --- @return boolean
 function M.is_section_enabled(group_name, section_name)
-	return Storage.get("hotstrings_section_" .. tostring(group_name) .. "_" .. tostring(section_name)) ~= false
+	local stored = Storage.get("hotstrings_section_" .. tostring(group_name) .. "_" .. tostring(section_name))
+	if stored ~= nil then return stored ~= false end
+	local shipped = Languages.section_default(ManifestReader.features(), group_name, section_name)
+	if shipped == nil then return true end
+	return shipped
 end
 
 --- Returns true when the magic-key repeat engine is enabled.
@@ -273,10 +282,11 @@ function M.set_groups_sections_enabled(changes, enabled)
 	Logger.debug(LOG, "%s %d section setting(s) across %d group(s).",
 		enabled and "Enabling" or "Disabling", #keys, #changes)
 	local ok, committed = xpcall(function()
+		-- Both choices are written explicitly: an absent key means "the manifest's
+		-- shipped default", which is disabled for every bundled section, so clearing
+		-- the key would switch the section straight back off.
 		for _, key in ipairs(keys) do
-			local desired
-			if enabled then desired = nil else desired = false end
-			if write_section_setting(key, desired) ~= true then return false end
+			if write_section_setting(key, enabled) ~= true then return false end
 		end
 
 		return Groups.transaction("set_groups_sections_enabled", function()
@@ -312,7 +322,7 @@ end
 --- the global sort and the two index rebuilds are paid in full every time.
 --- @param gn string Group name.
 --- @param section_names table Array of section names.
---- @param enabled boolean True to enable (clears the explicit false), false to disable.
+--- @param enabled boolean The explicit choice persisted for every listed section.
 function M.set_sections_enabled(gn, section_names, enabled)
 	if type(section_names) ~= "table" then return false end
 	if #section_names == 0 then return true end
@@ -330,8 +340,8 @@ function M.disable_section(gn, sn)
 	return M.set_sections_enabled(gn, { sn }, false)
 end
 
---- Enables a section (removes the explicit false, restoring the default-enabled state)
---- and reloads its group so the mapping database reflects the change.
+--- Enables a section (persists an explicit true over the shipped default) and
+--- reloads its group so the mapping database reflects the change.
 --- @param gn string Group name.
 --- @param sn string Section name.
 function M.enable_section(gn, sn)

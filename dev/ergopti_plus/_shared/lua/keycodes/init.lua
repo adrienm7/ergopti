@@ -76,8 +76,9 @@ M.F19_VOLUME_SCROLL_MODIFIER = 80
 --- (regardless of which physical key the user binds — space, left_command,
 --- caps_lock, etc.) so Hammerspoon can distinguish "user is entering the nav
 --- layer" from "user pressed a real key that should dismiss the tooltip".
---- The keymap dispatcher and the tooltip eventtaps ignore this keycode AND
---- reset the tooltip auto-dismiss timer when they see it.
+--- On macOS the keymap eventtaps delete both phases through
+--- modules/keymap/control_sentinels.lua so no application ever receives it,
+--- then publish the signal in-process (the LLM tooltip renews its deadline).
 M.F20_LAYER_NAV_ENTERED = 90
 
 -- NOTE: M.to_name() is Hammerspoon-specific (requires hs.keycodes.map) and

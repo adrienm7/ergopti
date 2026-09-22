@@ -28,6 +28,7 @@ InitSubMenus() {
 	_HS_PreScanPersonal()
 	BootProfile_Mark("MENU/InitSub: prescan personal")
 	SubMenus := Map()
+	_HS_RegisterLanguageMenuCategories()
 
 	; Flat hotstring categories — order = sections_order from the TOML (which
 	; includes "-" separators); falls back to manifest declaration order when
@@ -62,7 +63,7 @@ InitSubMenus() {
 				: t("menu.hotstrings.category_off"),
 			"action", ((c) => (*) => ToggleCategoryAllFeatures(c, !IsCategoryGated(c)))(V1Cat)))
 
-		TomlPath := _SharedDir . "\modules\hotstrings\" . StrLower(V1Cat) . ".toml"
+		TomlPath := HotstringsBundledTomlPath(V1Cat)
 		if FileExist(TomlPath) {
 			Rows.Push(Map("label", t("menu.hotstrings.open_file"), "action", _MakeOpenFileFn(TomlPath)))
 		}
@@ -153,6 +154,59 @@ InitSubMenus() {
 	; TapHolds — built from the v2 variant tables in tap_hold_writer.ahk.
 	SubMenus["TapHolds"] := _BuildTapHoldsSubmenu()
 	BootProfile_Mark("MENU/InitSub: tapholds submenu")
+}
+
+; Add every language-pack category to the flat category tables the submenu
+; builder, the counters and the bulk actions walk. The neutral five are listed in
+; tray_menu.ahk; the language ones come from the shared hotstring index, so a new
+; language needs no entry here. Idempotent: a tray rebuild calls it again.
+_HS_RegisterLanguageMenuCategories() {
+	global _FLAT_HOTSTRING_V1_CATS, _V1CatToV2CatMap, _LegacyTopCategoryMap
+	for _, Pack in HotstringsLanguageCategories() {
+		for _, Cat in Pack["categories"] {
+			if _V1CatToV2CatMap.Has(Cat["v1"])
+				continue
+			_FLAT_HOTSTRING_V1_CATS.Push(Cat["v1"])
+			_V1CatToV2CatMap[Cat["v1"]] := Cat["v2"]
+			_LegacyTopCategoryMap[Cat["v1"]] := "hotstrings." . Cat["v2"]
+		}
+	}
+}
+
+; List provider: one row per language pack, labelled with the language's native
+; name, opening a submenu with « tout activer » / « tout désactiver » for the whole
+; language followed by that language's category submenus (built by InitSubMenus
+; exactly like the neutral categories).
+_HS_LanguageRows() {
+	global SubMenus
+	Rows := []
+	IsGated := IsCategoryGated("Hotstrings")
+	for _, Pack in HotstringsLanguageCategories() {
+		Items := []
+		Items.Push(Map(
+			"label",  t("menu.hotstrings.enable_all"),
+			"action", ((p) => (*) => ToggleLanguageAllSections(p, true))(Pack)))
+		Items.Push(Map(
+			"label",  t("menu.hotstrings.disable_all"),
+			"action", ((p) => (*) => ToggleLanguageAllSections(p, false))(Pack)))
+		Items.Push(Map("separator", true))
+		LanguageTotal := 0
+		for _, Cat in Pack["categories"] {
+			V1Cat := Cat["v1"]
+			if !SubMenus.Has(V1Cat)
+				continue
+			Total := _HS_GatedCount(IsGated and IsCategoryGated(V1Cat), _CountEnabledForCategory(V1Cat))
+			LanguageTotal += Total
+			Items.Push(Map(
+				"label",   GetCategoryTitle(V1Cat) . " (" . FmtCount(Total) . ")",
+				"checked", (IsGated and IsCategoryGated(V1Cat)) ? true : false,
+				"submenu", SubMenus[V1Cat]))
+		}
+		Rows.Push(Map(
+			"label", HotstringsLanguageName(Pack["locale"]) . " (" . FmtCount(LanguageTotal) . ")",
+			"items", Items))
+	}
+	return Rows
 }
 
 ; Build the DynamicHotstrings submenu directly from the manifest, honouring

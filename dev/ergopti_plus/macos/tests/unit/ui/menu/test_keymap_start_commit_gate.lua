@@ -71,7 +71,8 @@ helpers.describe("menu keymap lifecycle: strict start commitment", function()
 
 	helpers.it("routes every menu-side keymap start through the shared gate", function()
 		local units = {
-			{ marker = "function M.build_bulk_actions", expected = 4, label = "common hotstrings" },
+			-- 5 since the language submenus: their « tout activer » starts the keymap too.
+			{ marker = "function M.build_bulk_actions", expected = 5, label = "common hotstrings" },
 			{ marker = "function M.build_custom", expected = 3, label = "custom hotstrings" },
 			{ marker = "function M.schedule_pause_layout_switch", expected = 1, label = "layout menu" },
 			{ marker = "function M.sync_state_to_modules", expected = 1, label = "state synchronization" },

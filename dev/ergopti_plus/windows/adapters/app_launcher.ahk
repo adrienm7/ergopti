@@ -20,7 +20,8 @@
 ; contract's fire-and-forget semantics.
 ;
 ; FAIL-SAFE:
-; All OS calls are wrapped in try/catch. AL_IsRunning returns false on any error
+; All OS calls are wrapped in try/catch. A failed launch is logged with the
+; program name (never its arguments); AL_IsRunning returns false on any error
 ; rather than propagating an exception to the caller.
 ; ==============================================================================
 
@@ -38,10 +39,27 @@
 ; @param AppPath {String} Absolute/relative path to the executable or a URI.
 AL_Launch(AppPath) {
 	try {
-		Run(AppPath)
-	} catch {
-		; OS-level failure — caller can check AL_IsRunning if confirmation is needed
+		Pid := 0
+		Run(AppPath, , , &Pid)
+		try LoggerInfo("AppLauncher", "Launched '{1}' (pid {2}).", AL_ProgramName(AppPath), Pid)
+	} catch as Err {
+		; The launch used to fail in silence: a shortcut that "does nothing" had no
+		; trace at all. Only the program name is logged, never a full target that
+		; could be a user document.
+		try LoggerError("AppLauncher", "Launch of '{1}' failed (Win32 error {2}).", AL_ProgramName(AppPath), A_LastError)
 	}
+}
+
+; Names what is being launched without exposing its arguments or directory.
+; @param AppPath {String}
+; @returns {String} The base name of the executable or the URI scheme.
+AL_ProgramName(AppPath) {
+	Target := Trim(AppPath, ' "')
+	; A URI (https:, ms-settings:) is named by its scheme: the rest can be a query.
+	if !RegExMatch(Target, "^[A-Za-z]:[\\/]") && RegExMatch(Target, "^([A-Za-z][A-Za-z0-9+.-]+):", &Scheme)
+		return Scheme[1] . ":"
+	SplitPath(Target, &Name)
+	return Name != "" ? Name : "unknown"
 }
 
 ; Launches an application with command-line arguments.
@@ -51,9 +69,15 @@ AL_Launch(AppPath) {
 ; @param Args    {String} Command-line argument string to append.
 AL_LaunchWithArgs(AppPath, Args) {
 	try {
-		Run(AppPath . " " . Args)
-	} catch {
-		; OS-level failure — caller can check AL_IsRunning if confirmation is needed
+		Pid := 0
+		Run(AppPath . " " . Args, , , &Pid)
+		; Arguments can carry user text (a search, a path), so they are never logged.
+		try LoggerInfo("AppLauncher", "Launched '{1}' with arguments (pid {2}).", AL_ProgramName(AppPath), Pid)
+	} catch as Err {
+		; Err.Message quotes the whole command line, arguments included, so only
+		; the Win32 code is logged.
+		try LoggerError("AppLauncher", "Launch of '{1}' with arguments failed (Win32 error {2}).",
+			AL_ProgramName(AppPath), A_LastError)
 	}
 }
 

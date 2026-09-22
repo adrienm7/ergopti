@@ -35,6 +35,7 @@
 ---   [positioning] max_caret_height       → M.layout.max_caret_height
 ---   [colors]      bg_white / bg_alpha    → M.colors.bg / M.colors.bg_alpha
 ---   [colors]      sep_white / sep_alpha_hs → M.colors.sep
+---   [colors]      loading_text_white     → M.colors.loading_text
 ---   [tint]        lightness              → lightness constant in apply_tint()
 ---   [tint]        saturation             → saturation constant in apply_tint()
 ---   [timing]      hotstring_timeout_sec  → DEFAULT_TIMEOUT_SEC
@@ -299,6 +300,7 @@ local function load_from_shared()
 	M.colors.hint     = { white = require_key("colors", "hint_white"), alpha = require_key("colors", "hint_alpha") }
 	M.colors.info_bar = { white = require_key("colors", "info_white"), alpha = require_key("colors", "info_alpha") }
 	M.colors.invis    = { white = require_key("colors", "invis_white"), alpha = require_key("colors", "invis_alpha") }
+	M.colors.loading_text = { white = require_key("colors", "loading_text_white"), alpha = require_key("colors", "loading_text_alpha") }
 
 	-- [llm_colors]
 	M.colors.corr_sel   = rgba_from_table(require_key("llm_colors", "corr_sel"),   "llm_colors", "corr_sel")

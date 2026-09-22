@@ -196,15 +196,16 @@ KLR_CacheAttach(md, logPath, BeforeDiscard := 0) {
 	; the try block silently failed and left every later worker re-reading and
 	; re-rejecting the same dead image.
 	rejected := false
+	; An image whose only defect is a leftover main-schema payload table is
+	; upgraded rather than rebuilt: every rollup in it is still exact, while a
+	; cold rebuild of a large store costs tens of minutes of blank dashboard.
+	; The table is dropped in a private memory copy, never in the shared file.
+	Upgraded := false
 	SavedAt := ""
 	try {
 		Version := _KLR_CacheMetaValue(stored, "format_version")
 		SavedAt := _KLR_CacheMetaValue(stored, "saved_at")
-		if _KLR_CacheHasDurableTypingPayload(stored) {
-			KLR_PrefetchDebug(logPath, "KLR cache rejected: durable ordered typing payload")
-			rejected := true
-			return 0
-		}
+		HasPayload := _KLR_CacheHasDurableTypingPayload(stored)
 		if (Version != KLR_CACHE_FORMAT_VERSION) {
 			KLR_PrefetchDebug(logPath,
 				"KLR cache rejected: format '" . Version . "'")
@@ -241,7 +242,7 @@ KLR_CacheAttach(md, logPath, BeforeDiscard := 0) {
 			return 0
 		}
 
-		if KLRCache.disposable {
+		if KLRCache.disposable && !HasPayload {
 			; Transfer ownership before finally: unchanged projections only SELECT.
 			restored := stored
 			stored := 0
@@ -258,6 +259,17 @@ KLR_CacheAttach(md, logPath, BeforeDiscard := 0) {
 				; Read/allocation failure in a private copy does not invalidate
 				; the source metadata and identities already checked above.
 				return 0
+			}
+			if HasPayload {
+				if !SQLite_Exec(restored, "DROP TABLE main.klr_reader_typing_payload;")
+						|| _KLR_CacheHasDurableTypingPayload(restored) {
+					try LoggerError("KLReader", "Metrics cache upgrade could not drop the durable typing payload; rebuilding.")
+					try SQLite_Close(restored)
+					restored := 0
+					rejected := true
+					return 0
+				}
+				Upgraded := true
 			}
 		}
 	} catch KLRLedgerSnapshotError as Err {
@@ -284,14 +296,49 @@ KLR_CacheAttach(md, logPath, BeforeDiscard := 0) {
 	}
 
 	KLRCache.db := restored
-	KLRCache.readonly := KLRCache.disposable
+	; Only a file-backed transfer is read-only; every copy is private memory.
+	KLRCache.readonly := KLRCache.disposable && !Upgraded
 	KLRCache.last_sizes := Offsets
 	KLRCache.ledger_snapshots := Snapshots
 	KLRCache.pending_snapshots := Map()
 	KLRCache.saved_at := SavedAt
+	if Upgraded
+		_KLR_CacheRetireUpgradedImage(md, logPath, Observed, BeforeDiscard)
 	KLR_PrefetchDebug(logPath, "KLR cache attached with " . Offsets.Count
 		. " ledger(s), readonly=" . KLRCache.readonly . " in " . (A_TickCount - AttachTick) . "ms.")
 	return 1
+}
+
+; The file an upgrade read still holds the clear payload it was upgraded from.
+; A worker owns publication, so it republishes the cleaned copy over it at once
+; instead of waiting for the save cadence; the resident driver never writes the
+; image and only retires it. Either way the unsafe bytes stop being the image
+; any later worker could open.
+; @param md {String} Metrics directory, trailing separator included.
+; @param logPath {String} Diagnostic sink shared with the rest of the reader.
+; @param Observed {Map} Identity of the upgraded file captured before opening it.
+; @param BeforeDiscard {Integer|Object} Optional deterministic peer-publication seam.
+; @returns {Boolean} Whether the unsafe image no longer exists at the cache path.
+_KLR_CacheRetireUpgradedImage(md, logPath, Observed, BeforeDiscard := 0) {
+	KLR_PrefetchDebug(logPath, "KLR cache upgraded: durable ordered typing payload dropped")
+	try LoggerInfo("KLReader", "Metrics cache upgraded in place: a leftover typing payload table was dropped.")
+	if KLRCache.disposable {
+		if KLR_CacheSave(KLRCache.db, KLRCache.last_sizes, md, logPath, KLRCache.ledger_snapshots) = 1 {
+			KLRCache.saved_at := A_Now
+			return true
+		}
+		try LoggerWarn("KLReader", "Metrics cache upgrade could not republish the cleaned image; retiring the old one.")
+	}
+	if BeforeDiscard
+		BeforeDiscard.Call()
+	if KLR_CacheDiscard(md, logPath, Observed)
+		return true
+	; A peer that published in between already replaced the unsafe file.
+	Path := KLR_CachePath(md)
+	if !FSExists(Path) || !KLR_LedgerSnapshotIsSame(Observed, KLR_LedgerSnapshot(Path))
+		return true
+	try LoggerError("KLReader", "Metrics cache upgrade could not retire the image that still holds typing payloads.")
+	return false
 }
 
 KLR_CacheDiscard(md, logPath, Observed) {

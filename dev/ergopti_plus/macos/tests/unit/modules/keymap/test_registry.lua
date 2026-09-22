@@ -241,9 +241,24 @@ end)
 -- =====================================
 
 helpers.describe("Registry section enable/disable", function()
-	helpers.it("default-enabled (settings entry absent)", function()
+	helpers.it("a section the manifest does not declare stays enabled (settings entry absent)", function()
 		fresh_registry()
-		helpers.assert_eq(Registry.is_section_enabled("g", "s"), true)
+		helpers.assert_eq(Registry.is_section_enabled("g", "s"), true,
+			"personal and extension packs have no manifest row and are the user's own")
+	end)
+
+	helpers.it("(hs-opt-in-default) an untouched bundled section takes the manifest's disabled default", function()
+		fresh_registry()
+		helpers.assert_eq(Registry.is_section_enabled("french_autocorrection", "accents"), false,
+			"every bundled hotstring section ships disabled; the user opts in")
+		helpers.assert_eq(Registry.is_section_enabled("distancesreduction", "qu"), false,
+			"the file-stem spelling of a manifest category must find its row")
+	end)
+
+	helpers.it("(hs-opt-in-default) an explicit true survives the disabled default", function()
+		fresh_registry()
+		_G.hs.settings.set("ergopti.hotstrings_section_french_autocorrection_accents", true)
+		helpers.assert_eq(Registry.is_section_enabled("french_autocorrection", "accents"), true)
 	end)
 
 	helpers.it("returns false when settings store has explicit false", function()

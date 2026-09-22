@@ -419,7 +419,7 @@ _WPMWidget_ReadTomlColor(CategoryName) {
         return _color_cache[CategoryName]
 
     global _SharedDir, GLOBAL_DEFAULT_COLOR
-    FilePath := _SharedDir . "\modules\hotstrings\" . StrLower(CategoryName) . ".toml"
+    FilePath := HotstringsBundledTomlPath(CategoryName)
     if !FileExist(FilePath) {
         LoggerDebug("WPMWidget", "ReadTomlColor: file not found for '{1}': {2}", CategoryName, FilePath)
         _color_cache[CategoryName] := ""

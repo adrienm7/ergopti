@@ -36,6 +36,8 @@ local M = {}
 
 local Logger = require("logger.shim")
 local Heredoc = require("shell.heredoc")
+local Monotonic = require("infra.monotonic")
+local RuntimeLog = require("diagnostics.runtime_log")
 
 local LOG = "adapters.shell_runner"
 
@@ -56,6 +58,11 @@ local HEREDOC_BASE_TOKEN = "ERGOPTI_STDIN"
 -- never be captured as a nil global: in Lua the scope of a local starts AFTER
 -- the statement that declares it.
 local _test_runner = nil
+
+-- Every real exit is reported through one throttled recorder: the program name,
+-- the status and the duration, never the command line, which can carry user
+-- text in a heredoc. A child that hung or failed used to leave no trace at all.
+local _record_exit = RuntimeLog.new_process_log(Logger, LOG, Monotonic.now_ms)
 
 
 
@@ -143,11 +150,16 @@ function M.run(cmd)
 		if type(simulated) == "boolean" then return simulated end
 		return true
 	end
-	local ok, code = pcall(os.execute, cmd)
+	local started_ms = Monotonic.now_ms()
+	local ok, code, _, exit_code = pcall(os.execute, cmd)
 	if not ok then
-		Logger.error(LOG, "run(): os.execute failed — %s", tostring(code))
+		Logger.error(LOG, "run(): os.execute failed for '%s' — %s",
+			RuntimeLog.program_name(cmd), tostring(code))
 		return false
 	end
+	-- Lua 5.2+ reports (true|nil, "exit", code); LuaJIT reports the raw status.
+	_record_exit(RuntimeLog.program_name(cmd), exit_code or code,
+		Monotonic.now_ms() - started_ms)
 	return code == true or code == EXIT_SUCCESS
 end
 
@@ -164,17 +176,22 @@ function M.exec(cmd)
 		local captured = _test_runner(cmd)
 		return type(captured) == "string" and captured or ""
 	end
+	local started_ms = Monotonic.now_ms()
+	local status = nil
 	local ok, out = pcall(function()
 		local pipe = io.popen(cmd, "r")
 		if not pipe then return "" end
 		local content = pipe:read("*a")
-		pipe:close()
+		local closed, _, code = pipe:close()
+		status = code or closed
 		return content
 	end)
 	if not ok then
-		Logger.error(LOG, "exec(): io.popen failed — %s", tostring(out))
+		Logger.error(LOG, "exec(): io.popen failed for '%s' — %s",
+			RuntimeLog.program_name(cmd), tostring(out))
 		return ""
 	end
+	_record_exit(RuntimeLog.program_name(cmd), status, Monotonic.now_ms() - started_ms)
 	return type(out) == "string" and out or ""
 end
 
@@ -201,6 +218,7 @@ function M.exec_checked(cmd)
 		return result == true, "", result == true and nil or "simulated command failure"
 	end
 
+	local started_ms = Monotonic.now_ms()
 	local call_ok, command_ok, output, error_message = pcall(function()
 		-- LuaJIT's io.popen handle does not preserve a child's non-zero status on
 		-- every libc/runtime combination. Run the caller's command in a nested
@@ -238,9 +256,12 @@ function M.exec_checked(cmd)
 		return true, content, nil
 	end)
 	if not call_ok then
-		Logger.error(LOG, "exec_checked(): io.popen failed — %s", tostring(command_ok))
+		Logger.error(LOG, "exec_checked(): io.popen failed for '%s' — %s",
+			RuntimeLog.program_name(cmd), tostring(command_ok))
 		return false, "", tostring(command_ok)
 	end
+	_record_exit(RuntimeLog.program_name(cmd), command_ok and 0 or tostring(error_message),
+		Monotonic.now_ms() - started_ms)
 	return command_ok, output, error_message
 end
 

@@ -34,6 +34,7 @@ local Logger = require("logger.shim")
 local Monotonic = require("infra.monotonic")
 local reload_gate = require("reload_gate")
 local FileSystem = require("adapters.file_system")
+local RuntimeLog = require("diagnostics.runtime_log")
 local LOG = "file_watchers"
 
 
@@ -255,8 +256,11 @@ local function _check_deadline()
 	end
 
 	_reload_deadline = nil
+	-- Name what changed. The paths were gathered for the settle heuristic and then
+	-- thrown away, so a reload in the log could never be traced back to a file.
+	local changed = RuntimeLog.describe_paths(_burst_paths)
 	_burst_paths, _burst_count, _defer_count = {}, 0, 0
-	Logger.info(LOG, "Debounced reload firing.")
+	Logger.info(LOG, "Debounced reload firing (%s).", changed)
 	if _on_reload then
 		local ok, err = pcall(_on_reload)
 		if not ok then Logger.error(LOG, "on_reload callback raised: %s", tostring(err)) end

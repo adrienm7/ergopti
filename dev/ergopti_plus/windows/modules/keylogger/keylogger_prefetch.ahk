@@ -390,7 +390,9 @@ KLPF_RequestBuild(which, metrics_dir, mode := "full", epoch := 0, on_terminal :=
 				"handle", 0,
 				"kind", (which = "typing" && mode != "full") ? "delta" : "prefetch",
 				"mode", mode,
-				"on_terminal", terminal
+				"on_terminal", terminal,
+				; Rebuild files older than this job belong to a previous worker.
+				"started_at", A_Now
 		)
 		KLPFWorker.jobs[which] := job
 		try FileDelete(stage)
@@ -823,6 +825,9 @@ KLPF_WorkerMain() {
 								KLPF_WorkerFail(stage, phase)
 				} else {
 						phase := "projection"
+						; A cold rebuild of a large store publishes what it rebuilt so far.
+						Publisher := KLPFRebuildPublisher(metrics_dir)
+						KLRRebuild.observer := Publisher
 						if A_Args.Length >= flag + 12 {
 								RequestFile := FileOpen(A_Args[flag + 12], "r", "UTF-8")
 								if !IsObject(RequestFile)
@@ -840,6 +845,8 @@ KLPF_WorkerMain() {
 								ExitApp(KLPFWorker.FULL_REQUIRED_EXIT_CODE)
 						if !Outcome
 								KLPF_WorkerFail(stage, phase)
+						; The complete snapshot supersedes every partial one.
+						Publisher.Retire()
 				}
 		} catch as Err {
 				KLPF_WorkerFail(stage, phase, Err)
@@ -908,41 +915,10 @@ KLPF_BuildAndWriteToPath(which, metrics_dir, path, dbg := "", mode := "full", Hi
 		} else if (which = "apps") {
 				blob := KLPF_BuildApps(db, true)
 		}
-		; Extract trusted SQL JSON before encoding metadata. Attach it only at
-		; the encoder-owned object boundary, never by searching user-controlled keys.
-		today_json_raw := ""
-		prefetch_json_raw := ""
-		manifest_json_raw := ""
-		if blob.Has("__klpf_manifest_json") {
-				manifest_json_raw := blob["__klpf_manifest_json"]
-				blob.Delete("__klpf_manifest_json")
-		}
-		if blob.Has("__klpf_prefetch_json") {
-				prefetch_json_raw := blob["__klpf_prefetch_json"]
-				blob.Delete("__klpf_prefetch_json")
-		}
-		if blob.Has("__klpf_today_json") {
-				today_json_raw := blob["__klpf_today_json"]
-				blob.Delete("__klpf_today_json")
-				blob.Delete("_prefetch_data")
-		}
 		t_proj := A_TickCount
 		KLPF_DbgWrite(dbg, "PERF projection=" . (t_proj - t_db) . "ms")
 
-		json := KL_JsonEncode(blob)
-		if (manifest_json_raw != "")
-				json := SubStr(json, 1, StrLen(json) - 1)
-						. ',"metrics_manifest":' . manifest_json_raw . "}"
-		if (prefetch_json_raw != "") {
-				; Append the owned property at our encoder's object boundary. Searching
-				; for a sentinel would also replace matching application names or keys.
-				json := SubStr(json, 1, StrLen(json) - 1)
-						. ',"_prefetch_data":' . prefetch_json_raw . "}"
-		}
-		if (today_json_raw != "") {
-				json := SubStr(json, 1, StrLen(json) - 1)
-						. ',"_prefetch_data":{"today":' . today_json_raw . "}}"
-		}
+		json := KLPF_SerializeBlob(blob)
 		if seed is Map {
 				; The receipt and payload share one atomic publication. A bounded
 				; first-line read avoids decoding the entire historical dictionary.
@@ -967,6 +943,45 @@ KLPF_BuildAndWriteToPath(which, metrics_dir, path, dbg := "", mode := "full", Hi
 		t_write := A_TickCount
 		KLPF_DbgWrite(dbg, "PERF write=" . (t_write - t_json) . "ms total=" . (t_write - t0) . "ms")
 		return written
+}
+
+; Encode a dashboard blob, splicing the SQL-built JSON members it carries.
+; @param blob {Map} Output of KLPF_BuildTyping or KLPF_BuildApps; consumed.
+; @returns {String} The dashboard JSON document.
+KLPF_SerializeBlob(blob) {
+		; Extract trusted SQL JSON before encoding metadata. Attach it only at
+		; the encoder-owned object boundary, never by searching user-controlled keys.
+		today_json_raw := ""
+		prefetch_json_raw := ""
+		manifest_json_raw := ""
+		if blob.Has("__klpf_manifest_json") {
+				manifest_json_raw := blob["__klpf_manifest_json"]
+				blob.Delete("__klpf_manifest_json")
+		}
+		if blob.Has("__klpf_prefetch_json") {
+				prefetch_json_raw := blob["__klpf_prefetch_json"]
+				blob.Delete("__klpf_prefetch_json")
+		}
+		if blob.Has("__klpf_today_json") {
+				today_json_raw := blob["__klpf_today_json"]
+				blob.Delete("__klpf_today_json")
+				blob.Delete("_prefetch_data")
+		}
+		json := KL_JsonEncode(blob)
+		if (manifest_json_raw != "")
+				json := SubStr(json, 1, StrLen(json) - 1)
+						. ',"metrics_manifest":' . manifest_json_raw . "}"
+		if (prefetch_json_raw != "") {
+				; Append the owned property at our encoder's object boundary. Searching
+				; for a sentinel would also replace matching application names or keys.
+				json := SubStr(json, 1, StrLen(json) - 1)
+						. ',"_prefetch_data":' . prefetch_json_raw . "}"
+		}
+		if (today_json_raw != "") {
+				json := SubStr(json, 1, StrLen(json) - 1)
+						. ',"_prefetch_data":{"today":' . today_json_raw . "}}"
+		}
+		return json
 }
 
 ; Read only the small provenance header; legacy snapshots have no trusted seed.
@@ -1340,5 +1355,138 @@ KLPF_SortInPlace(arr) {
 						arr[j - 1] := tmp
 						j -= 1
 				}
+		}
+}
+
+
+
+
+
+; ============================================
+; ============================================
+; ======= 7/ Partial rebuild snapshots =======
+; ============================================
+; ============================================
+
+; Snapshot of what a newest-first rebuild has rolled up so far, per dashboard.
+; It lives next to the complete snapshot and carries the same kind of data.
+; @param which {String} "typing" or "apps".
+; @param metrics_dir {String} Absolute metrics store directory.
+; @returns {String} Path the resident watches while a projection runs.
+KLPF_PartialSnapshotPath(which, metrics_dir) {
+		return KLPF_PrefetchPath(which, metrics_dir) . ".partial"
+}
+
+; Build one dashboard blob over the partial rebuild, marked with the day range
+; it covers so the page can say its numbers are not complete yet.
+; @param which {String} "typing" or "apps".
+; @param db {Integer} The rebuild's private candidate, borrowed for this call.
+; @param Partial {Map} oldest / newest rolled-up day.
+; @returns {String} Dashboard JSON.
+KLPF_BuildPartialJson(which, db, Partial) {
+		Blob := (which = "typing")
+				? KLPF_BuildTyping(db, "full", true, FormatTime(A_Now, "yyyy-MM-dd"), true)
+				: KLPF_BuildApps(db, true)
+		Blob["_partial"] := Partial
+		return KLPF_SerializeBlob(Blob)
+}
+
+; Progress of the store's running rebuild, shared by every dashboard of it.
+; @param metrics_dir {String} Absolute metrics store directory.
+; @returns {String} Path of the small progress document.
+KLPF_RebuildProgressPath(metrics_dir) {
+		return RegExReplace(KLPF_PrefetchPath("typing", metrics_dir), "_typing\.json$", "_rebuild.json")
+}
+
+; Turn one rebuild report into the progress document the page displays. The
+; remaining time comes from the throughput this worker measured itself, so
+; bytes a killed predecessor already rebuilt never inflate the estimate.
+; @param Info {Map} Report from _KLR_RebuildNotify.
+; @returns {Map} state, percent, eta_s (-1 while unknown), oldest_complete.
+KLPF_RebuildProgress(Info) {
+		Total := Info["total_bytes"]
+		Done := Info["done_bytes"]
+		Percent := Total > 0 ? Min(100, Floor(Done * 100 / Total)) : 100
+		Eta := -1
+		if !Info["final"] && Info["run_bytes"] >= KLPFRebuildPublisher.MIN_ETA_BYTES && Info["elapsed_ms"] > 0
+				Eta := Round((Total - Done) * Info["elapsed_ms"] / Info["run_bytes"] / 1000)
+		return Map("state", Info["final"] ? "finalizing" : "running", "percent", Percent, "eta_s", Eta,
+				"oldest_complete", Info.Get("oldest_complete", ""))
+}
+
+; Rebuild observer owned by the projection worker (see KLRRebuild.observer).
+class KLPFRebuildPublisher {
+		; The bar moves at most this often; each write is a tiny atomic file.
+		static MIN_PROGRESS_INTERVAL_MS := 1000
+		; Below this much measured work the throughput is noise, not an estimate.
+		static MIN_ETA_BYTES := 1048576
+
+		; A partial snapshot re-reads the whole rebuilt range; keep its cost
+		; below a fifth of the rebuild's time and never more often than this.
+		static MIN_PARTIAL_INTERVAL_MS := 10000
+		static PARTIAL_COST_FACTOR := 4
+
+		__New(metrics_dir) {
+				this.metrics_dir := metrics_dir
+				this.last_partial := 0
+				this.partial_cost := 0
+				this.published_oldest := ""
+				this.last_progress := 0
+				this.progress_written := false
+		}
+
+		Call(Info) {
+				this.PublishProgress(Info)
+				if Info.Has("db") && !Info["final"]
+						this.PublishPartial(Info)
+		}
+
+		PublishProgress(Info) {
+				Final := Info.Get("final", false)
+				if !Final && this.last_progress
+								&& (A_TickCount - this.last_progress) < KLPFRebuildPublisher.MIN_PROGRESS_INTERVAL_MS
+						return false
+				Progress := KLPF_RebuildProgress(Info)
+				Progress["pid"] := KLPFWorker.process_id
+				; A missed update only delays the bar; the next report rewrites it.
+				if !KLPF_WriteAtomic(KLPF_RebuildProgressPath(this.metrics_dir), KL_JsonEncode(Progress))
+						return false
+				this.last_progress := A_TickCount
+				this.progress_written := true
+				return true
+		}
+
+		PublishPartial(Info) {
+				Oldest := Info["oldest_complete"]
+				if (Oldest = "") || (Oldest = this.published_oldest)
+						return false
+				if this.last_partial && (A_TickCount - this.last_partial)
+								< Max(KLPFRebuildPublisher.MIN_PARTIAL_INTERVAL_MS,
+										KLPFRebuildPublisher.PARTIAL_COST_FACTOR * this.partial_cost)
+						return false
+				Tick := A_TickCount
+				Partial := Map("oldest", Oldest, "newest", Info["newest_complete"])
+				for which in ["typing", "apps"] {
+						; A missed partial only delays the preview; the rebuild goes on.
+						if !KLPF_WriteAtomic(KLPF_PartialSnapshotPath(which, this.metrics_dir),
+										KLPF_BuildPartialJson(which, Info["db"], Partial))
+								return false
+				}
+				this.partial_cost := A_TickCount - Tick
+				this.last_partial := A_TickCount
+				this.published_oldest := Oldest
+				return true
+		}
+
+		; Remove the progress and partial snapshots once a complete one is published.
+		Retire() {
+				Retired := true
+				if this.progress_written
+						Retired := FSDelete(KLPF_RebuildProgressPath(this.metrics_dir))
+				if this.published_oldest = ""
+						return Retired
+				for which in ["typing", "apps"]
+						Retired := FSDelete(KLPF_PartialSnapshotPath(which, this.metrics_dir)) && Retired
+				return Retired
 		}
 }

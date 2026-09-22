@@ -982,6 +982,12 @@ local function complete_pause_transition(transaction, ok, reason)
 	end
 	if ok ~= true then
 		report_pause_transition_failure(transaction.target, reason)
+	else
+		-- The request and each step were logged, never the settled outcome, so a
+		-- log could not tell "paused" from "pause still in flight".
+		Logger.info(LOG, "Script %s transaction settled (driver is now %s).",
+			transaction.target and "pause" or "resume",
+			transaction.target and "paused" or "active")
 	end
 
 	local queued = _queued_pause_target

@@ -225,13 +225,28 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.accessibility_permission",
+		contract = { "is_trusted", "request_prompt" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.app_launcher",
 		contract = { "launch", "launchWithArgs", "isRunning" },
 		wired    = true,
 	},
 	{
+		id       = "adapters.boot_fatal",
+		contract = { "report" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.clipboard",
 		contract = { "read", "write" },
+		wired    = true,
+	},
+	{
+		id       = "adapters.boot_journal",
+		contract = { "append", "write_now", "set_user_log_ready", "describe_path" },
 		wired    = true,
 	},
 	{
@@ -252,6 +267,12 @@ local ADAPTER_SPECS = {
 	{
 		id       = "adapters.graphics_renderer",
 		contract = { "createWindow", "destroyWindow", "drawBitmap", "show", "hide" },
+		wired    = true,
+	},
+	{
+		id       = "adapters.system_info",
+		contract = { "os_version", "runtime_version", "arch", "monitor_count",
+			"main_screen_scale", "keyboard_layout", "elevated", "home" },
 		wired    = true,
 	},
 	{

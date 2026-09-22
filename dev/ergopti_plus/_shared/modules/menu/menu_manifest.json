@@ -68,7 +68,10 @@
 		"magic_key": "MagicKey",
 		"sfbs_reduction": "SFBsReduction",
 		"rolls": "Rolls",
-		"dynamic_hotstrings": "DynamicHotstrings"
+		"dynamic_hotstrings": "DynamicHotstrings",
+		"french_distancesreduction": "FrenchDistancesReduction",
+		"french_autocorrection": "FrenchAutocorrection",
+		"french_magickey": "FrenchMagicKey"
 	},
 	"top_level": [
 		{
@@ -500,6 +503,15 @@
 			"type": "command",
 			"id": "reset_defaults",
 			"i18n": "menu.global.reset_defaults"
+		},
+		{
+			"type": "command",
+			"id": "clean_unused_keys",
+			"i18n": "menu.global.clean_unused_keys",
+			"platforms": [
+				"ahk"
+			],
+			"reason_key": "platform_reason.only_windows_reports_unknown_config_keys"
 		}
 	],
 	"debug_menu": [
@@ -625,10 +637,7 @@
 			"reason_key": "platform_reason.selection_operations_are_a_block_on_linux"
 		},
 		{
-			"type": "---",
-			"platforms": [
-				"linux"
-			]
+			"type": "---"
 		},
 		{
 			"type": "list",
@@ -1161,6 +1170,10 @@
 		{
 			"type": "list",
 			"id": "hotstring_categories_dynamic"
+		},
+		{
+			"type": "list",
+			"id": "hotstring_languages"
 		},
 		{
 			"type": "---"

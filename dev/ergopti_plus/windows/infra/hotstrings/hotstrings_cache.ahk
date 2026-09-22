@@ -40,6 +40,11 @@
 ; can live outside the repo and always loads through the runtime TOML parser.
 global HS_BUNDLED_CATEGORIES := ["distancesreduction", "sfbsreduction", "rolls", "autocorrection", "magickey"]
 
+; Language-pack gate name (PascalCase, e.g. "FrenchAutocorrection") → the
+; category_enabled key it persists under (its group id). Filled by
+; HotstringsSeedLanguageCategoryGates at boot; empty until then.
+global HS_LANGUAGE_GATE_KEYS := Map()
+
 ; Literal magic-key marker stored in cached triggers; substituted with the user's
 ; ScriptInformation["MagicKey"] at register time so the cache is MagicKey-agnostic.
 global HS_CACHE_MARKER := "★"
@@ -77,8 +82,170 @@ _HotstringsCacheTsvPath() {
 
 ; Absolute path to one bundled category's source TOML.
 _HotstringsCacheTomlPath(Category) {
+	return HotstringsBundledTomlPath(Category)
+}
+
+; Language packs declared by _shared/modules/hotstrings/_index.toml [languages],
+; in declared order. Each item is Map("id", folder, "locale", locale code,
+; "categories", Array of file stems). The index is the only place a language is
+; declared, so adding one is data: its folder, its [languages.<id>] table and its
+; manifest rows. Parsed once per process; an index that declares a language
+; without a locale or categories is a broken install and throws.
+HotstringsLanguagePacks() {
 	global _SharedDir
-	return _SharedDir . "\modules\hotstrings\" . Category . ".toml"
+	static Packs := ""
+	if (Packs is Array)
+		return Packs
+	IndexPath := _SharedDir . "\modules\hotstrings\_index.toml"
+	; Through the shared TOML file reader, which owns the read; an empty answer
+	; is an unreadable index, and loading on without it would drop every language.
+	Content := ReadTomlFile(IndexPath)
+	if (Content == "")
+		throw Error("Hotstring index is unreadable: " . IndexPath)
+	Order := []
+	ById := Map()
+	Table := ""
+	loop parse, Content, "`n", "`r" {
+		Line := Trim(TOML_StripInlineComment(Trim(A_LoopField, " `t")), " `t")
+		if (Line == "" or SubStr(Line, 1, 1) == "#")
+			continue
+		if RegExMatch(Line, "^\[([A-Za-z0-9_.]+)\]$", &Head) {
+			Table := Head[1]
+			continue
+		}
+		if (Table == "languages" and RegExMatch(Line, "^order\s*=\s*\[(.*)\]$", &M)) {
+			Order := _HotstringsIndexStringArray(M[1])
+			continue
+		}
+		if !RegExMatch(Table, "^languages\.([A-Za-z0-9_]+)$", &LangM)
+			continue
+		Id := LangM[1]
+		if !ById.Has(Id)
+			ById[Id] := Map("id", Id, "locale", "", "categories", [])
+		if RegExMatch(Line, '^locale\s*=\s*"([^"]+)"$', &Loc)
+			ById[Id]["locale"] := Loc[1]
+		else if RegExMatch(Line, "^categories_order\s*=\s*\[(.*)\]$", &Cats)
+			ById[Id]["categories"] := _HotstringsIndexStringArray(Cats[1])
+	}
+	Result := []
+	for _, Id in Order {
+		if !ById.Has(Id) or ById[Id]["locale"] == "" or ById[Id]["categories"].Length == 0
+			throw Error("Hotstring index declares language '" . Id . "' without a locale or categories: " . IndexPath)
+		Result.Push(ById[Id])
+	}
+	Packs := Result
+	return Packs
+}
+
+; Split the inside of a one-line TOML string array ("a", "b") into an Array.
+_HotstringsIndexStringArray(Inner) {
+	Out := []
+	loop parse, Inner, "," {
+		Token := Trim(A_LoopField, " `t" . Chr(34))
+		if (Token != "")
+			Out.Push(Token)
+	}
+	return Out
+}
+
+; The group id of one language pack's category file: "<language>_<stem>", the
+; same key the feature manifest, config.toml and the cache use.
+HotstringsLanguageGroupId(Language, Stem) {
+	return Language . "_" . Stem
+}
+
+; True when ``Group`` is the id of a language pack's category file.
+HotstringsIsLanguageGroup(Group) {
+	for _, Pack in HotstringsLanguagePacks() {
+		for _, Stem in Pack["categories"] {
+			if (Group == HotstringsLanguageGroupId(Pack["id"], Stem))
+				return true
+		}
+	}
+	return false
+}
+
+; Every bundled category a cache or catalogue must cover: the neutral root files
+; followed by each language pack's categories, as group ids.
+HotstringsBundledCategories() {
+	global HS_BUNDLED_CATEGORIES
+	All := HS_BUNDLED_CATEGORIES.Clone()
+	for _, Pack in HotstringsLanguagePacks() {
+		for _, Stem in Pack["categories"]
+			All.Push(HotstringsLanguageGroupId(Pack["id"], Stem))
+	}
+	return All
+}
+
+; The language packs as the tray menu and the category gates see them: each
+; pack's categories carry their v2 group id and the PascalCase gate name the
+; manifest's hotstring_category_keys assigns to it. A language category the
+; manifest does not name has no gate, no config rows and no menu entry, so it is
+; refused at the first read instead of rendering as a dead row.
+HotstringsLanguageCategories() {
+	static Cache := ""
+	if (Cache is Array)
+		return Cache
+	GateByGroup := Map()
+	for GateName, FeatureGroup in _MG_LoadSubCategories()
+		GateByGroup[FeatureGroup] := GateName
+	Result := []
+	for _, Pack in HotstringsLanguagePacks() {
+		Cats := []
+		for _, Stem in Pack["categories"] {
+			Group := HotstringsLanguageGroupId(Pack["id"], Stem)
+			if !GateByGroup.Has(Group)
+				throw Error("Language category '" . Group . "' has no hotstring_category_keys entry in the menu manifest.")
+			Cats.Push(Map("v1", GateByGroup[Group], "v2", Group))
+		}
+		Result.Push(Map("id", Pack["id"], "locale", Pack["locale"], "categories", Cats))
+	}
+	Cache := Result
+	return Cache
+}
+
+; Give every language-pack category its own gate in ``GateTarget`` (the
+; CategoryEnabled Map), defaulting open like the neutral five. Called once at boot
+; before the gates are read from config.toml; a gate already present is kept.
+HotstringsSeedLanguageCategoryGates(GateTarget) {
+	global HS_LANGUAGE_GATE_KEYS
+	if !(GateTarget is Map)
+		throw Error("HotstringsSeedLanguageCategoryGates requires the category gate Map.")
+	for _, Pack in HotstringsLanguageCategories() {
+		for _, Cat in Pack["categories"] {
+			HS_LANGUAGE_GATE_KEYS[Cat["v1"]] := Cat["v2"]
+			if !GateTarget.Has(Cat["v1"])
+				GateTarget[Cat["v1"]] := true
+		}
+	}
+}
+
+; Native display name of a language pack's locale, from the generated locale
+; table (itself built from _shared/data/locale_names.json). A pack naming a
+; locale the table lacks is a broken index, not a row to label with a raw code.
+HotstringsLanguageName(Locale) {
+	for _, Row in LocaleTableData() {
+		if (Row.Code == Locale)
+			return Row.Name
+	}
+	throw Error("Hotstring language pack names unknown locale '" . Locale . "'.")
+}
+
+; Absolute path to the TOML that backs a bundled category. A language group
+; ("french_autocorrection", or the menu's "FrenchAutocorrection") lives in its
+; language folder; every other category is a root file named by its lowercased
+; id. Underscores and case are ignored when matching so the file-stem, config and
+; menu spellings of one group resolve to the same file.
+HotstringsBundledTomlPath(Category) {
+	global _SharedDir
+	Wanted := StrLower(StrReplace(Category, "_"))
+	for _, Pack in HotstringsLanguagePacks() {
+		for _, Stem in Pack["categories"] {
+			if (Wanted == StrLower(Pack["id"] . StrReplace(Stem, "_")))
+				return _SharedDir . "\modules\hotstrings\" . Pack["id"] . "\" . Stem . ".toml"
+		}
+	}
+	return _SharedDir . "\modules\hotstrings\" . StrLower(Category) . ".toml"
 }
 
 ; True when the .tsv is STRICTLY newer than EVERY bundled TOML — i.e. not stale
@@ -94,7 +261,7 @@ _HotstringsCacheIsFresh(TsvPath) {
 	global HS_BUNDLED_CATEGORIES
 	try {
 		TsvTime := FileGetTime(TsvPath, "M")
-		for Category in HS_BUNDLED_CATEGORIES {
+		for Category in HotstringsBundledCategories() {
 			TomlPath := _HotstringsCacheTomlPath(Category)
 			if FileExist(TomlPath) and FileGetTime(TomlPath, "M") >= TsvTime
 				return false
@@ -190,7 +357,7 @@ _HsCacheUnescape(Value) {
 _HotstringsCacheBuildRows() {
 	global HS_BUNDLED_CATEGORIES, HS_CACHE_MARKER, _HOTSTRING_ENTRY_PATTERN
 	Rows := Map()
-	for Category in HS_BUNDLED_CATEGORIES {
+	for Category in HotstringsBundledCategories() {
 		TomlPath := _HotstringsCacheTomlPath(Category)
 		if !FileExist(TomlPath)
 			continue

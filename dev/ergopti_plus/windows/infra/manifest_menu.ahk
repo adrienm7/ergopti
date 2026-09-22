@@ -272,6 +272,7 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 		}
 	}
 
+	_MR_NormalizeSeparators(Result)
 	return Result
 }
 
@@ -363,6 +364,7 @@ _MR_RenderRows(TargetMenu, Rows, ListId, Depth) {
 		if (Row.Has("items") and Row["items"] is Array) {
 			SubMenu := Menu()
 			_MR_RenderRows(SubMenu, Row["items"], ListId, Depth + 1)
+			_MR_NormalizeSeparators(SubMenu)
 			TargetMenu.Add(Label, SubMenu)
 		} else if (Row.Has("submenu") and Row["submenu"] is Menu) {
 			; A submenu this driver has ALREADY built as a native Menu.
@@ -439,6 +441,34 @@ _MR_RenderFeature(ResultMenu, Item, CategoryName) {
 		return
 	}
 	MenuAddItemFromManifest(ResultMenu, Entry, CategoryName)
+}
+
+; Deletes every separator of ``TargetMenu`` that does not sit between two real
+; items: a leading one, a trailing one, or the second of two in a row.
+;
+; The deferred "---" in MenuRenderer_Build only sees the manifest's own
+; separators. Rows the driver supplies bring their own: AddCategoryToggleItem
+; inserts one after every category toggle (the Lua renderer adds none, so the
+; manifest declares a "---" there for the Lua drivers), and list providers
+; return separator rows. One landing beside a manifest "---" drew two lines in a
+; row under « Disposition ». The shared Lua renderer applies the same rule.
+_MR_NormalizeSeparators(TargetMenu) {
+	Count := TrayMenuItemCount(TargetMenu)
+	Position := 0            ; zero-based, as TrayMenuIsSeparatorAt takes it
+	PreviousWasSep := true   ; a leading separator counts as doubled
+	while (Position < Count) {
+		IsSep := TrayMenuIsSeparatorAt(TargetMenu, Position)
+		if (IsSep and PreviousWasSep) {
+			TargetMenu.Delete((Position + 1) . "&")
+			Count--
+			continue
+		}
+		PreviousWasSep := IsSep
+		Position++
+	}
+	if (Count > 0 and PreviousWasSep) {
+		TargetMenu.Delete(Count . "&")
+	}
 }
 
 ; Render a disabled section header label (visual grouping, not clickable).

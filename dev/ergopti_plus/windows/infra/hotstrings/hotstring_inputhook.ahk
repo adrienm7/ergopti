@@ -874,7 +874,14 @@ HotstringPrefixWatcherRebuildIndex() {
 	_cachedCats := 0
 	_tomlCats := 0
 	_buildStart := A_TickCount
-	for _, Category in _PREFIX_WATCHER_CATEGORIES {
+	; The language packs are bundled categories too; they are declared in the
+	; shared index rather than listed here, so a new language needs no code.
+	_WatchedCategories := _PREFIX_WATCHER_CATEGORIES.Clone()
+	for _, Pack in HotstringsLanguagePacks() {
+		for _, Stem in Pack["categories"]
+			_WatchedCategories.Push(HotstringsLanguageGroupId(Pack["id"], Stem))
+	}
+	for _, Category in _WatchedCategories {
 		if _PrefixWatcherCategoryIsCached(Category) {
 			_RegisterCategoryTriggersFromCache(Category, NewIndex, NewSet)
 			_cachedCats += 1

@@ -185,4 +185,15 @@ function M.git_operation_in_progress(fs, start_dir)
 	return false
 end
 
+--- Exposes the git-directory resolution to the diagnostic snapshot, which reads
+--- HEAD from the same place. One resolver keeps the linked-worktree pointer
+--- handling identical for both callers.
+--- @param fs table { exists = fun(path):boolean, read = fun(path):string|nil }
+--- @param start_dir string
+--- @return string|nil Absolute git-directory path, or nil when not in a repo.
+function M.git_dir(fs, start_dir)
+	if type(fs) ~= "table" or type(fs.exists) ~= "function" then return nil end
+	return resolve_git_dir(fs, start_dir)
+end
+
 return M

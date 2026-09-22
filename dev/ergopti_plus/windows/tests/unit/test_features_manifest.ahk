@@ -203,12 +203,15 @@ Test("ManifestBuildFeaturesMap: hotstrings.trigger_char default is the magic key
 
 TestFMv2_HotstringsAutocorrectionAccents() {
 	Built := ManifestBuildFeaturesMap()
-	AssertTrue(Built["hotstrings"]["autocorrection"].Has("accents"))
-	Entry := Built["hotstrings"]["autocorrection"]["accents"]
+	AssertTrue(Built["hotstrings"]["french_autocorrection"].Has("accents"))
+	AssertFalse(Built["hotstrings"]["autocorrection"].Has("accents"),
+		"accents moved to the French pack; the neutral category must not keep a copy")
+	Entry := Built["hotstrings"]["french_autocorrection"]["accents"]
 	AssertEqual("Map", Type(Entry))
 	AssertTrue(Entry.Has("enabled"))
 	AssertTrue(Entry.Has("time_activation_seconds"))
-	AssertEqual(true, Entry["enabled"])
+	; Every bundled section ships disabled; the user opts in.
+	AssertEqual(false, Entry["enabled"])
 	AssertEqual(0.5, Entry["time_activation_seconds"])
 }
 Test("ManifestBuildFeaturesMap: modelisation alpha keeps enabled + time_activation_seconds sub-keys",
@@ -218,7 +221,7 @@ TestFMv2_HotstringsDistancesCommaJ() {
 	Built := ManifestBuildFeaturesMap()
 	Entry := Built["hotstrings"]["distances_reduction"]["comma_j"]
 	AssertEqual("Map", Type(Entry))
-	AssertEqual(true, Entry["enabled"])
+	AssertEqual(false, Entry["enabled"])
 	AssertFalse(Entry.Has("time_activation_seconds"))
 }
 Test("ManifestBuildFeaturesMap: features without delay have no time_activation_seconds key",
@@ -414,7 +417,7 @@ TestFMv2_RejectsScalarTypeConfusion() {
 			. "[llm.generation]`r`ncontext_length = " . '"500"' . "`r`n"
 			. "[shortcuts.keyboard]`r`nctrl_b = 7`r`n"
 			. "[llm.navigation]`r`nval_modifiers = " . '"alt"' . "`r`n"
-			. "[hotstrings.autocorrection.accents]`r`nenabled = "
+			. "[hotstrings.french_autocorrection.accents]`r`nenabled = "
 			. '"false"' . "`r`ntime_activation_seconds = " . '"0.5"' . "`r`n")
 		Applied := ApplyConfigToml(Features, Path)
 		AssertEqual(0, Applied,
@@ -426,8 +429,9 @@ TestFMv2_RejectsScalarTypeConfusion() {
 		Assert(Features["llm"]["generation"]["context_length"] is Integer)
 		Assert(Features["shortcuts"]["keyboard"]["ctrl_b"] is String)
 		Assert(Features["llm"]["navigation"]["val_modifiers"] is Array)
-		Accents := Features["hotstrings"]["autocorrection"]["accents"]
-		AssertEqual(true, Accents["enabled"])
+		Accents := Features["hotstrings"]["french_autocorrection"]["accents"]
+		AssertEqual(false, Accents["enabled"],
+			"the string 'false' must leave the shipped (disabled) default in place")
 		Assert(Accents["time_activation_seconds"] is Float)
 	} finally {
 		if IsSet(Path) && FileExist(Path)
@@ -446,13 +450,13 @@ TestFMv2_RejectsBooleanIntegerTypeAliasing() {
 	try {
 		LayoutDefault := Features["layout"]["ergopti_base"]
 		ContextDefault := Features["llm"]["generation"]["context_length"]
-		DelayDefault := (Features["hotstrings"]["autocorrection"]["accents"]
+		DelayDefault := (Features["hotstrings"]["french_autocorrection"]["accents"]
 			["time_activation_seconds"])
 		Path := _FM_WriteFixture("boolean_integer_aliasing",
 			"[layout]`r`nergopti_base = 2`r`n"
 			. "[script]`r`nalt_gr_is_kana_remap = 1`r`n"
 			. "[llm.generation]`r`ncontext_length = true`r`n"
-			. "[hotstrings.autocorrection.accents]`r`n"
+			. "[hotstrings.french_autocorrection.accents]`r`n"
 			. "time_activation_seconds = true`r`n"
 			. "[hotstrings.personal.audit_alias]`r`n"
 			. "enabled = 2`r`ntime_activation_seconds = true`r`n")
@@ -464,7 +468,7 @@ TestFMv2_RejectsBooleanIntegerTypeAliasing() {
 		AssertEqual(ContextDefault,
 			Features["llm"]["generation"]["context_length"])
 		AssertEqual(DelayDefault,
-			Features["hotstrings"]["autocorrection"]["accents"]
+			Features["hotstrings"]["french_autocorrection"]["accents"]
 				["time_activation_seconds"])
 		AssertFalse(Features["hotstrings"]["personal"].Has("audit_alias"),
 			"rejected dynamic values must not create an empty feature section")
@@ -500,8 +504,8 @@ TestFMv2_LegacyZeroOneBooleansMigrate() {
 			"[llm]`r`n"
 			. "enabled = 1`r`n"
 			. "onboarding_seen = 1`r`n"
-			. "[hotstrings.autocorrection.accents]`r`n"
-			. "enabled = 0`r`n"
+			. "[hotstrings.french_autocorrection.accents]`r`n"
+			. "enabled = 1`r`n"
 			. "[hotstrings.personal.legacy_alias]`r`n"
 			. "enabled = 0`r`n"
 			. "[llm.generation]`r`n"
@@ -518,9 +522,9 @@ TestFMv2_LegacyZeroOneBooleansMigrate() {
 		AssertEqual(true, Features["llm"]["enabled"],
 			"legacy enabled = 1 must switch the feature on, not fall back to default")
 		AssertEqual(true, Features["llm"]["onboarding_seen"])
-		AssertEqual(false,
-			Features["hotstrings"]["autocorrection"]["accents"]["enabled"],
-			"legacy enabled = 0 must switch the feature off (default is on)")
+		AssertEqual(true,
+			Features["hotstrings"]["french_autocorrection"]["accents"]["enabled"],
+			"legacy enabled = 1 must switch the feature on (default is off)")
 		AssertTrue(Features["hotstrings"]["personal"].Has("legacy_alias"),
 			"a migrated dynamic value must create its section like any valid one")
 		AssertEqual(false,
@@ -567,7 +571,7 @@ TestFMv2_RejectsFeatureValuesOutsideSchemaDomain() {
 	OldFeatures := _FM_BeginIsolated()
 	try {
 		Path := _FM_WriteFixture("feature_domain",
-			"[hotstrings.autocorrection.accents]`r`n"
+			"[hotstrings.french_autocorrection.accents]`r`n"
 			. "time_activation_seconds = -0.5`r`n"
 			. "[hotstrings.dynamic.text_expansion_personal_information]`r`n"
 			. "pattern_max_length = 17`r`n")
@@ -575,7 +579,7 @@ TestFMv2_RejectsFeatureValuesOutsideSchemaDomain() {
 		AssertEqual(0, Applied,
 			"out-of-domain feature values must never replace manifest defaults")
 		AssertEqual(0.5,
-			Features["hotstrings"]["autocorrection"]["accents"]
+			Features["hotstrings"]["french_autocorrection"]["accents"]
 				["time_activation_seconds"])
 		AssertEqual(1,
 			Features["hotstrings"]["dynamic"]
@@ -590,7 +594,7 @@ TestFMv2_RejectsFeatureValuesOutsideSchemaDomain() {
 
 		FileDelete(Path)
 		Path := _FM_WriteFixture("feature_domain_boundaries",
-			"[hotstrings.autocorrection.accents]`r`n"
+			"[hotstrings.french_autocorrection.accents]`r`n"
 			. "time_activation_seconds = 0`r`n"
 			. "[hotstrings.dynamic.text_expansion_personal_information]`r`n"
 			. "pattern_max_length = 16`r`n")
@@ -644,13 +648,13 @@ TestFMv2_ApplyNestedSubSection() {
 	OldFeatures := _FM_BeginIsolated()
 	try {
 		Path := _FM_WriteFixture("autocorrection_accents",
-			"[hotstrings.autocorrection.accents]`r`n"
-			. "enabled = false`r`n"
+			"[hotstrings.french_autocorrection.accents]`r`n"
+			. "enabled = true`r`n"
 			. "time_activation_seconds = 1.25`r`n")
 		Applied := ApplyConfigToml(Features, Path)
 		AssertEqual(2, Applied)
-		Entry := Features["hotstrings"]["autocorrection"]["accents"]
-		AssertEqual(false, Entry["enabled"])
+		Entry := Features["hotstrings"]["french_autocorrection"]["accents"]
+		AssertEqual(true, Entry["enabled"])
 		AssertEqual(1.25, Entry["time_activation_seconds"])
 		FileDelete(Path)
 	}

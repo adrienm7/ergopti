@@ -28,6 +28,11 @@ local CanvasBadge = require("ui.menu.canvas_badge")
 local Labels      = require("menu.labels")
 
 
+local Languages   = require("hotstrings.languages")
+local TomlCodec   = require("toml_codec.codec")
+local LocaleTable = require("_generated.locale_table")
+
+local _language_packs_cache    = nil
 local _ergopti_groups_cache    = nil
 local _top_level_tail_cache    = nil
 local _global_actions_cache    = nil
@@ -72,6 +77,31 @@ local function load_ergopti_groups()
 	return groups
 end
 
+
+--- Language packs declared by the shared hotstring index, read once per session.
+--- An unreadable index raises: the language submenus cannot be drawn without it
+--- and an empty list would hide every language without a word.
+--- @return table Array of { id, locale, categories }.
+local function load_language_packs()
+	if _language_packs_cache then return _language_packs_cache end
+	local path = Paths.shared("modules/hotstrings/_index.toml")
+	local fh = io.open(path, "r")
+	if not fh then error("[builder] hotstring index is unreadable: " .. tostring(path)) end
+	local raw = fh:read("*a")
+	fh:close()
+	_language_packs_cache = Languages.packs(TomlCodec.decode(raw))
+	return _language_packs_cache
+end
+
+--- Native name of a locale code, from the generated locale table.
+--- @param code string
+--- @return string
+local function language_name(code)
+	for _, row in ipairs(LocaleTable) do
+		if row.code == code then return row.name end
+	end
+	error("[builder] hotstring language pack names unknown locale '" .. tostring(code) .. "'")
+end
 
 --- Loads the top_level tail (including the separator immediately before
 --- "global_actions", when declared) from menu_manifest.json,
@@ -304,12 +334,18 @@ function M.generate(ctx, menu_mods, actions)
 			return result
 		end
 
+		-- Language-pack groups render under their language's own submenu, never
+		-- among the neutral categories.
+		local LANGUAGE_PACKS = load_language_packs()
+		local LANGUAGE_GROUPS = Languages.groups(LANGUAGE_PACKS)
+
 		local non_ergopti_filter = {}
 		if ctx and ctx.hotfiles and type(ctx.hotfiles) == "table" then
 			for _, f in ipairs(ctx.hotfiles) do
 				local name = ctx.get_group_name and ctx.get_group_name(f) or f
 				local flattened_name = name:gsub("_", "")
 				if name ~= "custom" and name ~= "personal" and name:sub(1, 13) ~= "personal_ext_"
+				and not LANGUAGE_GROUPS[name]
 				and not (ERGOPTI_GROUPS[name] or ERGOPTI_GROUPS[flattened_name]) then
 					non_ergopti_filter[name] = true
 				end
@@ -318,6 +354,34 @@ function M.generate(ctx, menu_mods, actions)
 
 		local std_groups = collect_groups(non_ergopti_filter, counts)
 		local ergopti_groups_built = collect_groups(ERGOPTI_GROUPS, counts)
+
+		-- One row per language: its native name, then « tout activer » /
+		-- « tout désactiver » for every category of that language, then the
+		-- language's category submenus built exactly like the neutral ones.
+		local language_rows = {}
+		for _, pack in ipairs(LANGUAGE_PACKS) do
+			local only = {}
+			local names = {}
+			for _, stem in ipairs(pack.categories) do
+				local name = Languages.group_id(pack.id, stem)
+				only[name] = true
+				names[#names + 1] = name
+			end
+			local items = {}
+			local bulk = type(menu_mods.hotstrings.build_language_bulk_actions) == "function"
+				and menu_mods.hotstrings.build_language_bulk_actions(ctx, names) or {}
+			for _, row in ipairs(bulk) do items[#items + 1] = row end
+			items[#items + 1] = { separator = true }
+			local total = 0
+			for _, row in ipairs(collect_groups(only, counts)) do items[#items + 1] = row end
+			for _, name in ipairs(names) do
+				total = total + ((counts and counts.group_counts and counts.group_counts[name]) or 0)
+			end
+			language_rows[#language_rows + 1] = {
+				label = language_name(pack.locale) .. " (" .. fmt_grand(total) .. ")",
+				items = items,
+			}
+		end
 		local custom_item = type(menu_mods.hotstrings.build_custom) == "function"
 			and Logger.build(LOG, "hotstrings.build_custom", function(c) return menu_mods.hotstrings.build_custom(c, counts) end, ctx)
 
@@ -418,6 +482,7 @@ function M.generate(ctx, menu_mods, actions)
 		local providers = {
 			["hotstring_categories_standard"] = function() return std_groups end,
 			["hotstring_categories_ergopti"]  = function() return ergopti_groups_built end,
+			["hotstring_languages"]           = function() return language_rows end,
 			-- Provider data straight from menu_hotstrings_custom since 2026-08-07:
 			-- that builder emits `label`/`action`/`items` itself, so there is no
 			-- translation step and the renderer materialises the tree.
