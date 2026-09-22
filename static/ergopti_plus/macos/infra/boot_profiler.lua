@@ -50,6 +50,13 @@ local _complete       = false
 -- duration is scaled here in exactly one place.
 local NS_PER_MS = 1e6
 
+-- Label prefix of the mark init.lua records at the end of boot. Pinned against
+-- init.lua by tests/unit/lib/test_diagnostic_snapshot.lua.
+M.BOOT_COMPLETE_LABEL = "Boot complete"
+
+-- Total boot duration captured at the BOOT_COMPLETE_LABEL mark.
+local _boot_complete_ms = nil
+
 
 
 
@@ -73,6 +80,7 @@ function M.begin()
 	_start_ns = now_ns()
 	_last_ns  = _start_ns
 	_open_stage, _stage_start_ns, _last_completed, _complete = nil, nil, nil, false
+	_boot_complete_ms = nil
 	pcall(Logger.info, LOG, "Boot timing started.")
 	pcall(BootJournal.append, "INFO", "Boot timing started.")
 end
@@ -136,6 +144,19 @@ function M.mark(phase_name)
 	local format = "Boot stage completed: %s in %.1f ms (+%.1f ms, total %.1f ms)."
 	pcall(Logger.success, LOG, format, name, stage_ms, delta, total)
 	pcall(BootJournal.append, "SUCCESS", string.format(format, name, stage_ms, delta, total))
+	-- The boot sequence closes with a mark whose label starts with BOOT_COMPLETE_LABEL.
+	-- Freezing the total there lets the post-boot diagnostic snapshot report the
+	-- real boot duration without the boot sequence having to hand it over.
+	if _boot_complete_ms == nil and name:sub(1, #M.BOOT_COMPLETE_LABEL)
+		== M.BOOT_COMPLETE_LABEL then
+		_boot_complete_ms = total
+	end
+end
+
+--- Total boot milliseconds frozen by the "Boot complete" mark, or nil before it.
+--- @return number|nil
+function M.boot_complete_ms()
+	return _boot_complete_ms
 end
 
 --- Returns the milliseconds elapsed since M.begin() without emitting a log.

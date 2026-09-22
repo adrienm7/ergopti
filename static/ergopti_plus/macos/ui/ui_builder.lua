@@ -19,6 +19,13 @@ local hs = hs
 local Logger = require("infra.logger")
 local Paths = require("infra.paths")
 local DeferredWork = require("infra.deferred_work")
+local TimerScheduler = require("adapters.timer_scheduler")
+
+--- Monotonic milliseconds for webview open, load and close durations.
+--- @return number
+local function now_ms()
+	return TimerScheduler.now_ns() / 1e6
+end
 local LOG = "ui_builder"
 
 -- Per-process cache of assembled HTML strings.  Avoids re-reading the local
@@ -539,7 +546,12 @@ function M.show_webview(opts)
 		return nil
 	end
 	if settle_factory_cleanup() ~= true then return nil end
-	Logger.debug(LOG, "Creating new webview window…")
+	-- Open, first load and close are timed: a blank or slow window is otherwise
+	-- indistinguishable in the log from a window that was never requested.
+	local view_label = (type(opts.title) == "string" and opts.title ~= "") and opts.title or "untitled"
+	local opened_ms = now_ms()
+	local load_logged = false
+	Logger.debug(LOG, "Creating webview window '%s'…", view_label)
 
 	-- Prevent LuaSkin crash by not passing explicit nil for the third argument
 	local wv
@@ -653,7 +665,13 @@ function M.show_webview(opts)
 	if type(opts.on_close) == "function" then
 		if not apply_webview_mutation(function()
 			wv:windowCallback(function(action)
-				if action == "closing" or action == "closed" then opts.on_close() end
+				if action == "closing" or action == "closed" then
+					if action == "closing" then
+						Logger.info(LOG, "Webview '%s' closed after %.1f s open.", view_label,
+							(now_ms() - opened_ms) / 1000)
+					end
+					opts.on_close()
+				end
 			end)
 		end) then return abandon_required_mutation() end
 	end
@@ -669,6 +687,13 @@ function M.show_webview(opts)
 			if type(caller_nav) == "function" then
 				result = caller_nav(action, wv2, nav)
 			end
+			if action == "didFinishNavigation" and not load_logged then
+				load_logged = true
+				Logger.info(LOG, "Webview '%s' page loaded in %.0f ms.", view_label,
+					now_ms() - opened_ms)
+			elseif action == "didFailNavigation" or action == "didFailProvisionalNavigation" then
+				Logger.warn(LOG, "Webview '%s' navigation failed (%s).", view_label, tostring(action))
+			end
 			-- After the page finishes loading, inject locale strings so that
 			-- data-i18n elements are populated even when fetch() fails (inline HTML,
 			-- about:blank origin, no file:// CORS access).
@@ -680,12 +705,20 @@ function M.show_webview(opts)
 					local all_strings = locale_mod.all()
 					if type(all_strings) ~= "table" then return end
 					local ok_enc, json = pcall(hs.json.encode, all_strings)
-					if not ok_enc or not json then return end
-					pcall(function()
+					if not ok_enc or not json then
+						Logger.warn(LOG, "Webview '%s' i18n strings could not be encoded: %s.",
+							view_label, tostring(json))
+						return
+					end
+					local injected, inject_err = pcall(function()
 						wv:evaluateJavaScript(
 							"if(window.i18n_apply){window.i18n_apply(" .. json .. ");}"
 						)
 					end)
+					if not injected then
+						Logger.warn(LOG, "Webview '%s' i18n injection failed: %s.",
+							view_label, tostring(inject_err))
+					end
 				end, "webview i18n injection")
 			end
 			return result
@@ -724,7 +757,8 @@ function M.show_webview(opts)
 	if strict_lifecycle and focused ~= true then return abandon_required_mutation() end
 	if not webview_current() then return abandon_required_mutation() end
 	if _factory_build_owner == wv then _factory_build_owner = nil end
-	Logger.info(LOG, "Webview window created successfully.")
+	Logger.info(LOG, "Webview '%s' opened in %.0f ms.", view_label,
+		now_ms() - opened_ms)
 	return wv
 end
 
