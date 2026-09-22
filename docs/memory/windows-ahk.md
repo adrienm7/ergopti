@@ -226,6 +226,14 @@ bridge is alive.
 Do not move WebView2 creation or cold native window construction onto the typing
 path. Reuse only resources whose lifecycle and stale-state behavior are proven.
 
+### project-tooltip-units-and-coordmode
+
+AHK `CoordMode` is per thread and defaults to `Client`, so every
+`CaretGetPos`/`MouseGetPos` feeding a screen placement must set `Screen` in the
+same function. Tooltip Guis are DPI-scaled: measure text in layout units
+(`_TooltipMeasureTextSize` divides by DPI/96) and convert sizes and shared offsets
+to physical pixels only at placement (`_TooltipPlaceOnScreen`).
+
 ### project-metrics-ui-live-foreground-contract
 
 Metrics UI snapshots must project the currently open foreground interval; disk
