@@ -32,7 +32,7 @@ on:
         description: JSON list of macos_launch_gate.py scenarios
         required: false
         type: string
-        default: '["clean","upgraded","source_logs","symlink_config","symlink_config_documents","symlink_hammerspoon","symlink_logs","tilde_paths","dangling_logs"]'
+        default: '["clean","upgraded","source_logs","symlink_config","symlink_config_documents","symlink_hammerspoon","symlink_logs","tilde_paths","dangling_logs","configured_symlink","plain_open"]'
       seed_tag:
         description: Older release whose shipped personal files seed upgraded states
         required: false

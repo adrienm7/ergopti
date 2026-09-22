@@ -30,9 +30,16 @@ over those user states on every push/PR (`launch-gate-macos`, gating
 `macos-ok`) and on the exact release archive on Apple silicon and Intel
 (`release-gate-macos`, gating `finalize-release`). Add a scenario there for
 every new launch failure that depends on existing user state. Hosted runners
-cannot grant Accessibility without interactive approval, so scenarios omit
-config.toml and complete at the first-run wizard; post-onboarding boot and the
-menu Quit row remain outside the gate. Log folders are resolved once with
+cannot grant Accessibility without interactive approval, so healthy scenarios
+omit config.toml and complete at the first-run wizard; post-onboarding success
+and the menu Quit row remain outside the gate. v0.0.0-dev.128 passed them all
+and still vanished for a user with config.toml: the untrusted packaged runtime
+(its own identity, never asked because onboarding was skipped) died at the
+first eventtap, and the launcher took the exit status 0 after logger readiness
+for a Quit. Never infer a clean exit from Hammerspoon's status: every fatal Lua
+path writes `adapters/boot_fatal.lua`'s report, which the launcher turns into
+a modal alert. `configured_symlink` now requires that named refusal, and
+`plain_open` launches without `open -n`. Log folders are resolved once with
 realpath and opened with `O_NOFOLLOW_ANY` (`OwnedLogDirectory.swift`); never
 reintroduce a final-component-only no-follow check on a user folder.
 A package built without `SPARKLE_PUBLIC_KEY` (empty `SUPublicEDKey`) opens a
