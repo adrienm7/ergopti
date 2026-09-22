@@ -88,6 +88,7 @@
 		"test:shared-js-loadable": "node ./tools/test/test-shared-js-is-loadable.cjs",
 		"test:tap-hold-lifecycle": "node ./tools/test/test-tap-hold-defaults-lifecycle.cjs",
 		"test:linux-version-single-source": "node ./tools/test/test-linux-version-single-source.cjs",
+		"test:diagnostic-snapshot-parity": "node ./tools/test/test-diagnostic-snapshot-parity.cjs",
 		"test:hotstring-buffer-cap-parity": "node ./tools/test/test-hotstring-buffer-cap-parity.cjs",
 		"test:macos-bundle-layout": "node ./tools/test/test-macos-bundle-layout.cjs",
 		"test:macos-launcher-universal": "node ./tools/test/test-macos-launcher-universal.cjs",
