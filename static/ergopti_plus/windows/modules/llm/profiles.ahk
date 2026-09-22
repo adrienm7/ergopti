@@ -152,12 +152,11 @@ LLM_LoadProfilesJSON(path := "") {
 		parsed := JsonParse(raw)
 		if Type(parsed) != "Array"
 			return []
-		profiles := []
-		for item in parsed {
-			if Type(item) == "Map"
-				profiles.Push(item)
-		}
-		return profiles
+		profiles := LLM_Option_NormalizeProfileRecords(parsed, true)
+		if (profiles is Array)
+			return profiles
+		LoggerError("LLM.profiles", "Profile registry {1} rejected: a record is malformed or duplicated.", path)
+		return []
 	} catch as Err {
 		try LoggerError("LLM.profiles", "profiles.json parse failed — using raw fallback: {1}.", Err.Message)
 		return []
