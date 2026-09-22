@@ -73,6 +73,9 @@ local CANONICAL_HOTSTRINGS_MENU = {
 	"section_header:menu.hotstrings.header_common",
 	"list:hotstring_categories_standard",
 	"list:hotstring_categories_dynamic",
+	-- One row per hotstring language pack (_index.toml [languages]), each a
+	-- submenu labelled with the language's native name.
+	"list:hotstring_languages",
 	"---",
 	"section_header:menu.hotstrings.header_ergopti",
 	"list:hotstring_categories_ergopti",
@@ -225,6 +228,7 @@ helpers.describe("menu drift gate (macOS): hotstrings_menu/layout_menu manifest 
 		for _, id in ipairs({
 			"hotstring_categories_standard",
 			"hotstring_categories_ergopti",
+			"hotstring_languages",
 			"hotstring_personal",
 			"hotstring_extensions",
 		}) do

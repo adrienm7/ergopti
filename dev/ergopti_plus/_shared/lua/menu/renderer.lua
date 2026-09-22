@@ -311,6 +311,38 @@ function M.new(deps)
 		end
 	end
 
+	--- Returns true when a menu item table is a separator.
+	--- @param entry any
+	--- @return boolean
+	local function is_separator(entry)
+		return type(entry) == "table" and entry.title == "-"
+	end
+
+	--- Drops every separator that would not sit between two real rows, in place.
+	---
+	--- The deferred `---` in R.build only sees the manifest's own separators. A
+	--- list provider or a dynamic handler brings separators of its own, and one
+	--- landing next to a manifest `---`, or at either end of a menu, drew two lines
+	--- in a row. Submenus are normalised too, since a provider nests rows freely.
+	--- @param items table Array of menu item tables; `{ title = "-" }` is a separator.
+	--- @return table The same array.
+	local function normalize_separators(items)
+		local kept = {}
+		for _, entry in ipairs(items) do
+			if is_separator(entry) then
+				if #kept > 0 and not is_separator(kept[#kept]) then kept[#kept + 1] = entry end
+			else
+				if type(entry) == "table" and type(entry.menu) == "table" then
+					normalize_separators(entry.menu)
+				end
+				kept[#kept + 1] = entry
+			end
+		end
+		while is_separator(kept[#kept]) do kept[#kept] = nil end
+		for i = 1, math.max(#items, #kept) do items[i] = kept[i] end
+		return items
+	end
+
 	--- Turns a list provider's row DATA into menu item tables.
 	---
 	--- This is the only place a provider's rows become menu rows, which is the
@@ -388,7 +420,7 @@ function M.new(deps)
 			Logger.warn(LOG, "List '%s' got no row array to render — nothing built.", tostring(list_id))
 			return {}
 		end
-		return render_rows(rows, list_id, 1)
+		return normalize_separators(render_rows(rows, list_id, 1))
 	end
 
 	--- Builds a built-in named group that is always rendered the same way.
@@ -682,7 +714,7 @@ function M.new(deps)
 			::continue::
 		end
 
-		return result
+		return normalize_separators(result)
 	end
 
 

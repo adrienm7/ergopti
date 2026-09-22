@@ -251,6 +251,39 @@ local function setAllSectionsFn(ctx, enable)
 	end
 end
 
+--- Force every section of a SET of groups on or off — one language pack's
+--- « tout activer » / « tout désactiver ». One batch, so the whole language
+--- commits or rolls back together; enabling lifts each group gate as the
+--- per-category action does.
+--- @param ctx table Context.
+--- @param group_names table Array of group names.
+--- @param enable boolean
+--- @return function
+local function setGroupListSectionsFn(ctx, group_names, enable)
+	return function()
+		local km = ctx.keymap
+		if enable and not KeymapLifecycle.ensure_started(ctx, "enable language sections") then return end
+		local changes = {}
+		for _, name in ipairs(group_names) do
+			changes[#changes + 1] = {
+				name = name,
+				sections = section_names_for(km, name),
+				enable_group = enable,
+			}
+		end
+		KeymapLifecycle.commit_mutation(ctx, "set language hotstring sections", function()
+			if not km or type(km.set_groups_sections_enabled) ~= "function" then return false end
+			return km.set_groups_sections_enabled(changes, enable)
+		end, function()
+			if enable then
+				for _, change in ipairs(changes) do ctx.state.hotstrings[change.name] = true end
+			end
+			if ctx.save_prefs() ~= true then return false end
+			ctx.updateMenu()
+		end)
+	end
+end
+
 --- Builds menu items for personal information.
 --- @param ctx table Context.
 --- @param description string Description of the item.
@@ -452,6 +485,25 @@ function M.build_bulk_actions(ctx)
 			label    = i18n.get("menu.hotstrings.disable_all"),
 			disabled = ctx.paused or nil,
 			action       = not ctx.paused and setAllSectionsFn(ctx, false) or nil,
+		},
+	}
+end
+
+--- The bulk rows at the top of one language submenu.
+--- @param ctx table Context.
+--- @param group_names table The language's group names.
+--- @return table List of menu items.
+function M.build_language_bulk_actions(ctx, group_names)
+	return {
+		{
+			label    = i18n.get("menu.hotstrings.enable_all"),
+			disabled = ctx.paused or nil,
+			action   = not ctx.paused and setGroupListSectionsFn(ctx, group_names, true) or nil,
+		},
+		{
+			label    = i18n.get("menu.hotstrings.disable_all"),
+			disabled = ctx.paused or nil,
+			action   = not ctx.paused and setGroupListSectionsFn(ctx, group_names, false) or nil,
 		},
 	}
 end

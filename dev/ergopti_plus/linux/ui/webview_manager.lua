@@ -27,6 +27,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local Monotonic = require("infra.monotonic")
 local LOG = "ui.webview_manager"
 
 -- webkit_host provides HTML building and bridge name registry.
@@ -243,6 +244,7 @@ function M.show(app_name, active_locale)
 		handler = handler,
 		visible = false,
 		epoch   = _next_window_epoch,
+		opened_ms = Monotonic.now_ms(),
 	}
 
 	-- A logical page context is only provisional until the native owner exists.
@@ -261,6 +263,8 @@ function M.show(app_name, active_locale)
 	end
 
 	_windows[app_name].visible = true
+	Logger.info(LOG, "Webview '%s' opened in %.0f ms.", app_name,
+		Monotonic.now_ms() - _windows[app_name].opened_ms)
 	return true
 end
 
@@ -276,7 +280,8 @@ function M.hide(app_name, expected_epoch)
 	if _gtk_available then
 		M._destroy_gtk_window(app_name, owned.epoch)
 	end
-	Logger.debug(LOG, "Window '%s' closed.", app_name)
+	Logger.info(LOG, "Webview '%s' closed after %.1f s open.", app_name,
+		(Monotonic.now_ms() - (owned.opened_ms or Monotonic.now_ms())) / 1000)
 	return true
 end
 
@@ -591,9 +596,12 @@ function M._create_gtk_window(app_name, html, handler)
 	})
 
 	-- Set minimum size if supported.
-	pcall(function()
+	local ok_size, size_err = pcall(function()
 		window:set_size_request(geometry.min_width, geometry.min_height)
 	end)
+	if not ok_size then
+		Logger.warn(LOG, "Minimum size not applied to '%s': %s.", app_name, tostring(size_err))
+	end
 
 	-- Register only the capability owned by this page. A UserContentManager is
 	-- page-local, so there is no reason to expose any foreign handler name.
@@ -659,6 +667,21 @@ function M._create_gtk_window(app_name, html, handler)
 	-- Everything is inlined by build_injected_html, so nothing is ever fetched
 	-- relative to this URI. It exists to give the document an ordinary origin
 	-- rather than an opaque one.
+	-- The page load is the slow half of opening a window and the half a blank
+	-- window points at, so its completion is logged with its duration.
+	local load_started_ms = Monotonic.now_ms()
+	local ok_load_signal, load_signal_err = pcall(function()
+		webview.on_load_changed = function(_view, event)
+			if event == "FINISHED" or event == WebKit2.LoadEvent.FINISHED then
+				Logger.info(LOG, "Webview '%s' page loaded in %.0f ms.", app_name,
+					Monotonic.now_ms() - load_started_ms)
+			end
+		end
+	end)
+	if not ok_load_signal then
+		Logger.warn(LOG, "Load-completion signal unavailable for '%s': %s.", app_name,
+			tostring(load_signal_err))
+	end
 	webview:load_html(html, "file:///")
 
 	-- ── Window lifecycle: close → destroy the page context ──
@@ -699,7 +722,7 @@ function M._create_gtk_window(app_name, html, handler)
 	Logger.success(LOG, "GTK window '%s' created (%dx%d).", app_name, geometry.width, geometry.height)
 
 	-- Pump GTK events: if the daemon has a luv event loop, integrate.
-	pcall(function()
+	local ok_pump, pump_err = pcall(function()
 		local event_loop = require("adapters.event_loop")
 		if event_loop and event_loop.add_idle_handler then
 			event_loop.add_idle_handler(function()
@@ -710,6 +733,11 @@ function M._create_gtk_window(app_name, html, handler)
 			end)
 		end
 	end)
+	if not ok_pump then
+		-- Without this integration the window paints once and then freezes.
+		Logger.error(LOG, "GTK event pump could not be attached for '%s': %s.", app_name,
+			tostring(pump_err))
+	end
 	return true
 end
 

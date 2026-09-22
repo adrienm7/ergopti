@@ -144,6 +144,14 @@ TOML_ParseFreshFile(Path) {
 		return _ParseTomlFileImpl(Path, false, false)
 }
 
+; Fresh, uncached parse that keeps ``true``/``false`` literals as TOML_Bool so
+; a caller can render every value with its source type, exactly as the batch
+; writer sees it. DiscardedArrays counts unterminated arrays the parse dropped;
+; TOML_ReadFailed(Path) reports an unreadable file afterwards.
+TOML_ParseFreshFileTyped(Path, &DiscardedArrays := 0) {
+	return _ParseTomlFileImpl(Path, false, false, , true, &DiscardedArrays)
+}
+
 _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 		PreserveBooleanLiterals := false, &DiscardedArrays := 0) {
 		global _ParseTomlCache, _TomlReadFailures, _TomlUnreadableFiles

@@ -37,7 +37,9 @@ _Updater_FindAsset(Json, AssetName, Tag) {
 	if (AssetName == "" || Tag == "")
 		return 0
 	try Release := JsonParse(Json)
-	catch {
+	catch as ParseErr {
+		try LoggerWarn("Updater", "Release asset lookup for '{1}' could not parse the release JSON: {2}.",
+			AssetName, ParseErr.Message)
 		return 0
 	}
 	if !(Release is Map) || !Release.Has("assets")
@@ -425,14 +427,22 @@ _Updater_HandleBackgroundResult(Json, Current, Request, Terminal := 0) {
 		try LoggerDebug("Updater", "Background check cancelled ({1}).", Terminal.Reason)
 		return
 	}
+	; Every outcome is INFO: a check runs a few times a day, and "did it check,
+	; and what did it find" is the first question when an update never arrives.
 	if _Updater_JsonPayloadIsFailure(Json) {
-		try LoggerDebug("Updater", "Background check: network unreachable.")
+		try LoggerInfo("Updater", "Background check result: network unreachable.")
 		return
 	}
 	Latest := Updater_ParseTagName(Json)
-	if (Latest == "" or !_Updater_ShouldOfferCandidate(
-		Latest, Current, Request.Channel, _Updater_InstalledChannel())) {
-		try LoggerDebug("Updater", "Background check: up to date ({1}).", Current)
+	if (Latest == "") {
+		; This used to be reported as "up to date", hiding a malformed response.
+		try LoggerWarn("Updater", "Background check result: the release response carried no tag (current {1}).", Current)
+		return
+	}
+	if !_Updater_ShouldOfferCandidate(
+		Latest, Current, Request.Channel, _Updater_InstalledChannel()) {
+		try LoggerInfo("Updater", "Background check result: up to date (current {1}, latest {2}, channel {3}).",
+			Current, Latest, Request.Channel)
 		return
 	}
 	Release := {
@@ -448,8 +458,10 @@ _Updater_HandleBackgroundResult(Json, Current, Request, Terminal := 0) {
 	if !_Updater_TryPublishRelease(Request, Release)
 		return
 	Reservation := _Updater_TryReserveReleaseNotification(Request, Latest)
-	if !IsObject(Reservation)
+	if !IsObject(Reservation) {
+		try LoggerInfo("Updater", "Background check result: {1} available, already notified.", Latest)
 		return
+	}
 	try LoggerInfo("Updater", "New release available: {1} (current: {2}).", Latest, Current)
 	; Rebuild the tray menu so the one-click item label changes to
 	; "Mettre à jour vers vX.Y.Z" without requiring a manual open.

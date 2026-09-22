@@ -69,7 +69,12 @@ global _ConfigDir := (_PathsOverrides.Has("ConfigDirPath") and _PathsOverrides["
 if !(_ConfigDir ~= "[/\\]$")
 		_ConfigDir .= "\"
 if !DirExist(_ConfigDir) {
+		; Logged before LoggerInit on purpose: the logger queues pre-init lines and
+		; flushes them once the log path is known, and a config directory that cannot
+		; be created explains every later "cannot read/write" error.
 		try DirCreate(_ConfigDir)
+		catch as _CfgDirErr
+				LoggerError("Boot", "Configuration directory '{1}' could not be created: {2}.", _ConfigDir, _CfgDirErr.Message)
 }
 
 ; Subfolder name for AHK-specific user files under _ConfigDir. Centralised so
@@ -138,9 +143,15 @@ if FileExist(IconPath)
 ; autohotkey/ holds driver-specific files; hotstrings/ holds the shared TOML
 ; files so a Mac+PC setup can keep both side by side without name collision.
 try DirCreate(_ConfigDir . _AhkSubDir)
+catch as _SubDirErr
+	LoggerError("Boot", "Configuration subfolder '{1}' could not be created: {2}.", _ConfigDir . _AhkSubDir, _SubDirErr.Message)
 try DirCreate(_ConfigDir . "hotstrings")
+catch as _SubDirErr
+	LoggerError("Boot", "Configuration subfolder '{1}' could not be created: {2}.", _ConfigDir . "hotstrings", _SubDirErr.Message)
 ; Bootstrap an empty personal_hotstrings.toml if it does not exist yet so the
 ; user always has a file to open rather than a confusing error.
 _PersonalTomlBootstrap := _ConfigDir . "hotstrings\personal_hotstrings.toml"
 if !FileExist(_PersonalTomlBootstrap)
 		try FileAppend("", _PersonalTomlBootstrap)
+		catch as _PersonalTomlErr
+				LoggerError("Boot", "Personal hotstrings file '{1}' could not be created: {2}.", _PersonalTomlBootstrap, _PersonalTomlErr.Message)

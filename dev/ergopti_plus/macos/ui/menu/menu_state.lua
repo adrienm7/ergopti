@@ -101,8 +101,12 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 			if type(secs) == "table" then
 				for sec_name, sec_enabled in pairs(secs) do
 					local key = "hotstrings_section_" .. tostring(group_name) .. "_" .. tostring(sec_name)
+					-- Stored explicitly both ways: an absent key means the manifest's
+					-- shipped default (disabled for every bundled section).
 					if sec_enabled == false then
 						try("Storage.set " .. key, Storage.set, key, false)
+					elseif sec_enabled == true then
+						try("Storage.set " .. key, Storage.set, key, true)
 					else
 						try("Storage.delete " .. key, Storage.delete, key)
 					end

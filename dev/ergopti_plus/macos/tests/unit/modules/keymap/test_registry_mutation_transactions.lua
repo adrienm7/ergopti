@@ -213,7 +213,9 @@ helpers.describe("registry mutations: exact commitment and rollback", function()
 	end)
 
 	helpers.it("rolls back a throwing or ineffective settings write by read-back", function()
-		for _, operation in ipairs({ "set", "clear" }) do
+		-- Enabling writes an explicit true (an absent key means the manifest's
+		-- shipped default), so both directions go through `set`.
+		for _, operation in ipairs({ "set_false", "set_true" }) do
 			for _, mode in ipairs({ "throw_after_write", "nil_noop", "false_noop" }) do
 				local state, registry = fresh_registry()
 				registry.register_lua_group("settings", "Settings", { { name = "one" } })
@@ -222,10 +224,10 @@ helpers.describe("registry mutations: exact commitment and rollback", function()
 				local key = "ergopti.hotstrings_section_settings_one"
 				local real_set, real_clear = hs.settings.set, hs.settings.clear
 				local previous
-				if operation == "clear" then previous = false end
+				if operation == "set_true" then previous = false end
 				if previous == false then real_set(key, false) else real_clear(key) end
-				local real_operation = operation == "clear" and real_clear or real_set
-				hs.settings[operation] = function(write_key, value)
+				local real_operation = real_set
+				hs.settings.set = function(write_key, value)
 					if mode == "throw_after_write" then
 						real_operation(write_key, value)
 						error("injected settings failure after write")
@@ -237,7 +239,7 @@ helpers.describe("registry mutations: exact commitment and rollback", function()
 					return nil
 				end
 
-				local action = operation == "clear" and registry.enable_section or registry.disable_section
+				local action = operation == "set_true" and registry.enable_section or registry.disable_section
 				local ok, committed = pcall(action, "settings", "one")
 				hs.settings.set, hs.settings.clear = real_set, real_clear
 				local label = operation .. "/" .. mode

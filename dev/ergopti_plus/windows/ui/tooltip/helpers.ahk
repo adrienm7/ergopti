@@ -66,7 +66,7 @@ _TooltipHideSurfaceObjects(Surface) {
 ; HWND reads are best-effort because a concurrently destroyed detached Gui can
 ; already have lost its native window; Gui.Destroy remains the second backstop.
 _TooltipCreateDetachedSurface(Row, Generation, Pos := 0) {
-		Surface := { Gui: Row.Gui, Rows: [Row], Border: 0, Pos: Pos,
+		Surface := { Gui: Row.Gui, Rows: [Row], Border: 0, Pos: Pos, Anchor: 0,
 			ContentHwnds: [], BorderHwnds: [], Generation: Generation,
 			LlmPresented: 0 }
 		try Surface.ContentHwnds.Push(Row.Gui.Hwnd)
@@ -112,26 +112,83 @@ _TooltipClampRect(X, Y, W, H, L, Top, R, B, Margin) {
 		}
 }
 
-_TooltipClampToScreen(X, Y, W, H) {
-		; Margin kept clear of every screen edge — mirrors the shared positioning spec
-		; (constants.toml [positioning].screen_margin = 5) that HS clamps with, so the
-		; Windows tooltip lands at the same on-screen position as Hammerspoon.
-		static MARGIN := 5
-		L := 0, Top := 0, R := A_ScreenWidth, B := A_ScreenHeight
-		try {
-				found := false
-				Loop MonitorGetCount() {
-						MonitorGet(A_Index, &ml, &mt, &mr, &mb)
-						if (X >= ml and X < mr and Y >= mt and Y < mb) {
-								MonitorGetWorkArea(A_Index, &L, &Top, &R, &B)
-								found := true
-								break
-						}
+; Physical pixels per layout unit. Tooltip sizes are layout units (the Gui is
+; DPI-scaled) while caret, UIA, window and monitor coordinates are physical, so
+; every size or offset crossing that boundary goes through this one factor.
+_TooltipDpiScale() {
+		return A_ScreenDPI / 96
+}
+
+; Work area of the monitor holding (X, Y), in physical pixels; the primary
+; monitor when the point lies on none (a stale anchor after a monitor unplug).
+_TooltipWorkAreaAt(X, Y) {
+		Loop MonitorGetCount() {
+				MonitorGet(A_Index, &ml, &mt, &mr, &mb)
+				if (X >= ml and X < mr and Y >= mt and Y < mb) {
+						MonitorGetWorkArea(A_Index, &L, &Top, &R, &B)
+						return { L: L, T: Top, R: R, B: B }
 				}
-				if !found
-						MonitorGetWorkArea(MonitorGetPrimary(), &L, &Top, &R, &B)
 		}
-		return _TooltipClampRect(X, Y, W, H, L, Top, R, B, MARGIN)
+		MonitorGetWorkArea(MonitorGetPrimary(), &L, &Top, &R, &B)
+		return { L: L, T: Top, R: R, B: B }
+}
+
+; Clamps a W×H (layout units) tooltip whose top-left is (X, Y) (physical) into
+; the work area under it. Margin is the shared [layout].screen_margin.
+_TooltipClampToScreen(X, Y, W, H) {
+		global _TOOLTIP_SCREEN_MARGIN
+		Scale := _TooltipDpiScale()
+		Area := _TooltipWorkAreaAt(X, Y)
+		return _TooltipClampRect(X, Y, Round(W * Scale), Round(H * Scale),
+				Area.L, Area.T, Area.R, Area.B, Round(_TOOLTIP_SCREEN_MARGIN * Scale))
+}
+
+; Where the tooltip goes, given an anchor and the frame it must stay inside —
+; the Windows port of _shared/lua/tooltip/layout.lua compute_position (macOS),
+; replayed against _shared/tests/corpus/tooltip/layout_vectors.json. Pure: all
+; values share one unit system (the caller converts).
+;   caret     — below-right of the insertion point: x + CaretOffsetX,
+;               y + h + CaretOffsetY (a centred tooltip hides the typed word).
+;   input_box / window — centred under the anchor, flipped above on overflow.
+;   no anchor — centre-bottom of the frame.
+; @param Anchor  { Type, X, Y, H } or 0.
+; @param Opts    { CaretOffsetX, CaretOffsetY, WindowOffsetY, Margin }.
+; @returns { X, Y } clamped top-left corner.
+_TooltipPlaceAnchor(Anchor, W, H, L, Top, R, B, Opts) {
+		if IsObject(Anchor) {
+				if (Anchor.Type = "caret") {
+						X := Anchor.X + Opts.CaretOffsetX
+						Y := Anchor.Y + Anchor.H + Opts.CaretOffsetY
+				} else {
+						X := Anchor.X - W / 2
+						Y := Anchor.Y + Opts.WindowOffsetY
+						; Flip above rather than let the clamp shove the tooltip back
+						; over the element it annotates.
+						if (Y + H > B)
+								Y := Anchor.Y - H - Opts.WindowOffsetY
+				}
+		} else {
+				X := L + (R - L - W) / 2
+				Y := B - H - Opts.WindowOffsetY
+		}
+		return _TooltipClampRect(X, Y, W, H, L, Top, R, B, Opts.Margin)
+}
+
+; OS wrapper: places a W×H (layout units) tooltip for a physical-pixel anchor on
+; the monitor holding that anchor. Offsets and margin are shared layout units,
+; so they are scaled to physical pixels here, once.
+_TooltipPlaceOnScreen(Anchor, W, H) {
+		global _TOOLTIP_OFFSET_RIGHT, _TOOLTIP_OFFSET_BELOW
+		global _TOOLTIP_WINDOW_OFFSET_Y, _TOOLTIP_SCREEN_MARGIN
+		Scale := _TooltipDpiScale()
+		Area := _TooltipWorkAreaAt(Anchor.X, Anchor.Y)
+		Placed := _TooltipPlaceAnchor(Anchor, Round(W * Scale), Round(H * Scale),
+				Area.L, Area.T, Area.R, Area.B, {
+						CaretOffsetX: Round(_TOOLTIP_OFFSET_RIGHT * Scale),
+						CaretOffsetY: Round(_TOOLTIP_OFFSET_BELOW * Scale),
+						WindowOffsetY: Round(_TOOLTIP_WINDOW_OFFSET_Y * Scale),
+						Margin: Round(_TOOLTIP_SCREEN_MARGIN * Scale) })
+		return { X: Round(Placed.X), Y: Round(Placed.Y) }
 }
 
 _TooltipItemHasAbsoluteDeadline(Item) {
@@ -349,7 +406,8 @@ _TooltipPresentStack(Pos, Row, ArmSafety, Items, ExpectedGeneration,
 		HotPath_BreakdownMark("candidate", _hpCandidate, Breakdown)
 		try {
 			_hpClamp := HotPath_Now()
-			Pos := _TooltipClampToScreen(Pos.X, Pos.Y, Row.W, Row.H)
+			PreparedSurface.Anchor := Pos
+			Pos := _TooltipPlaceOnScreen(Pos, Row.W, Row.H)
 			PreparedSurface.Pos := Pos
 			HotPath_BreakdownMark("clamp", _hpClamp, Breakdown)
 
@@ -613,8 +671,11 @@ _TooltipDequeueRebuild(Items, ExpectedGeneration, ExpectedSurface) {
 			RebuildRequestSerial := _TooltipRequestSerial
 			_TooltipTimerGeneration := RenderGeneration
 			SetTimer(_TooltipTimerFn, 0)
-			Pos := IsObject(ExpectedSurface.Pos)
-				? ExpectedSurface.Pos : 0
+			; Re-place from the same anchor: the destacked panel is smaller, and
+			; a centred anchor must stay centred on it.
+			Pos := (ExpectedSurface.HasOwnProp("Anchor")
+				and IsObject(ExpectedSurface.Anchor))
+				? ExpectedSurface.Anchor : 0
 		} finally {
 			Critical(PreviousCritical)
 		}
@@ -783,6 +844,10 @@ _TooltipBuildGui(Items) {
 				; resets any prior Strike/Bold/Italic before applying this row's style.
 				if IsDimmed {
 						G.SetFont("norm c" . _TOOLTIP_DIM_COLOR_HEX . " strike s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
+				} else if Item.HasOwnProp("TextColorHex") {
+						; The LLM loading panel: macOS draws its label italic in the
+						; shared loading_text colour.
+						G.SetFont("norm italic c" . Item.TextColorHex . " s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
 				} else {
 						G.SetFont("norm cFFFFFF s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
 				}
@@ -857,7 +922,7 @@ _TooltipMeasureText(Text) {
 }
 
 ; Measure ``Text`` width and height in pixels using a transient GDI font
-; at the specified FontSize. Returns { W, H } with sensible fallbacks.
+; at the specified FontSize. Returns { W, H } in layout units (logical pixels).
 _TooltipMeasureTextSize(Text, FontSize, Native := _TooltipMeasureGdiNative,
 		FontCache := 0) {
 		global _TOOLTIP_FONT_NAME, _TooltipMeasureFontCache
@@ -896,7 +961,10 @@ _TooltipMeasureTextSize(Text, FontSize, Native := _TooltipMeasureGdiNative,
 				Height := Ok ? NumGet(Size, 4, "Int") : Fallback.H
 				if (Width <= 0 or Height <= 0)
 						return Fallback
-				return { W: Width, H: Height }
+				; GDI measured device pixels, but every consumer lays out a DPI-scaled
+				; Gui in layout units: returning device pixels made each control, and
+				; the whole tooltip, DPI/96 times too wide (1.25x at 125 %).
+				return { W: Ceil(Width * 96 / DPI), H: Ceil(Height * 96 / DPI) }
 		} finally {
 				_TooltipMeasureSettleGdiReceipt(Receipt, Native)
 		}
@@ -1576,13 +1644,13 @@ _TooltipPositionFromUiaBounds(Rect) {
 		global _TOOLTIP_MAX_CARET_HEIGHT_PX
 		W := Rect.r - Rect.l
 		H := Rect.b - Rect.t
-		if (H < _TOOLTIP_MAX_CARET_HEIGHT_PX) {
+		; UIA rects are physical pixels; the shared threshold is layout units.
+		if (H < _TOOLTIP_MAX_CARET_HEIGHT_PX * _TooltipDpiScale()) {
 				_TooltipCountResolveExit("uia_caret")
-				return { X: Rect.l + _TOOLTIP_OFFSET_RIGHT,
-						Y: Rect.b + _TOOLTIP_OFFSET_BELOW }
+				return { Type: "caret", X: Rect.l, Y: Rect.t, H: H }
 		}
 		_TooltipCountResolveExit("uia_box")
-		return { X: Rect.l + W // 2, Y: Rect.b + _TOOLTIP_OFFSET_BELOW }
+		return { Type: "input_box", X: Rect.l + W // 2, Y: Rect.b, H: 0 }
 }
 
 _TooltipOnUiaBoundsTerminal(Status, Context, Result,
@@ -1636,6 +1704,27 @@ _TooltipScheduleUiaBounds(Context,
 		}
 }
 
+; Height of the text caret, physical pixels. CaretGetPos reports only the
+; top-left corner, but the shared placement goes below the caret's BOTTOM
+; (macOS reads it from AXBoundsForRange). GetGUIThreadInfo carries the Win32
+; caret rectangle; apps that draw their own caret (browsers, Electron) expose
+; none, and the main tooltip line height stands in for their text line.
+_TooltipCaretHeightPx() {
+		static InfoSize := A_PtrSize == 8 ? 72 : 48
+		static CaretHwndOffset := 8 + 5 * A_PtrSize
+		static RectOffset := 8 + 6 * A_PtrSize
+		Info := Buffer(InfoSize, 0)
+		NumPut("UInt", InfoSize, Info, 0)
+		if DllCall("User32\GetGUIThreadInfo", "UInt", 0, "Ptr", Info, "Int")
+				and NumGet(Info, CaretHwndOffset, "Ptr") {
+				Height := NumGet(Info, RectOffset + 12, "Int")
+						- NumGet(Info, RectOffset + 4, "Int")
+				if (Height > 0)
+						return Height
+		}
+		return Round(_TooltipMeasureText("Ag").H * _TooltipDpiScale())
+}
+
 _TooltipResolvePosition() {
 		global _TOOLTIP_OFFSET_BELOW, _TOOLTIP_OFFSET_RIGHT
 		global _TOOLTIP_MAX_CARET_HEIGHT_PX, _TOOLTIP_WINDOW_BOTTOM_INSET_PX
@@ -1643,6 +1732,9 @@ _TooltipResolvePosition() {
 		global TOOLTIP_UIA_IDLE_REQUIRED_MS
 
 		; ----- 1. Native caret -----------------------------------------------
+		; CoordMode is per-thread and defaults to "Client": without this line the
+		; caret of any window not at the screen origin lands the tooltip far away.
+		CoordMode("Caret", "Screen")
 		Cx := 0
 		Cy := 0
 		GotCaret := false
@@ -1650,7 +1742,7 @@ _TooltipResolvePosition() {
 		if (GotCaret and (Cx != 0 or Cy != 0)) {
 				_TooltipCountResolveExit("caret")
 				return _TooltipCachePosition(WinExist("A"),
-						{ X: Cx + _TOOLTIP_OFFSET_RIGHT, Y: Cy + _TOOLTIP_OFFSET_BELOW })
+						{ Type: "caret", X: Cx, Y: Cy, H: _TooltipCaretHeightPx() })
 		}
 
 		ActiveHwnd := WinExist("A")
@@ -1658,7 +1750,9 @@ _TooltipResolvePosition() {
 		if _TooltipPositionCacheCanReuse(_TooltipPositionCache, ActiveHwnd,
 				CurrentEnvironment, A_TickCount, TOOLTIP_POSITION_CACHE_MS) {
 				_TooltipCountResolveExit("cache")
-				return { X: _TooltipPositionCache["x"], Y: _TooltipPositionCache["y"] }
+				return { Type: _TooltipPositionCache["type"],
+						X: _TooltipPositionCache["x"], Y: _TooltipPositionCache["y"],
+						H: _TooltipPositionCache["h"] }
 		}
 
 		; ----- 2. Disposable UIA bounds worker -------------------------------
@@ -1686,19 +1780,21 @@ _TooltipResolvePosition() {
 				if (Ww > 0 and Wh > 0) {
 						_TooltipCountResolveExit("window")
 						return _TooltipCacheUnlessProbePending(ActiveHwnd,
-								{ X: Wx + Ww // 2,
-										Y: Wy + Wh - _TOOLTIP_WINDOW_BOTTOM_INSET_PX },
+								{ Type: "window", X: Wx + Ww // 2, H: 0,
+										Y: Wy + Wh - Round(_TOOLTIP_WINDOW_BOTTOM_INSET_PX
+											* _TooltipDpiScale()) },
 								UiaProbeDeferred)
 				}
 		}
 
 		; ----- 4. Mouse cursor -----------------------------------------------
+		CoordMode("Mouse", "Screen")
 		Mx := 0
 		My := 0
 		try MouseGetPos(&Mx, &My)
 		_TooltipCountResolveExit("mouse")
 		return _TooltipCacheUnlessProbePending(ActiveHwnd,
-				{ X: Mx, Y: My + _TOOLTIP_OFFSET_BELOW },
+				{ Type: "caret", X: Mx, Y: My, H: 0 },
 				UiaProbeDeferred)
 }
 
@@ -1728,8 +1824,10 @@ _TooltipCachePosition(Hwnd, Pos) {
 		global _TooltipPositionCache
 		_TooltipPositionCache := Map(
 				"hwnd", Hwnd,
+				"type", Pos.Type,
 				"x", Pos.X,
 				"y", Pos.Y,
+				"h", Pos.H,
 				"tick", A_TickCount,
 				"environment", _TooltipReadPositionReceipt(Hwnd)
 		)

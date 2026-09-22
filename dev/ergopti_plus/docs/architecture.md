@@ -60,7 +60,10 @@ graph TD
     end
 
     subgraph MACOS_Adapters["macOS (Hammerspoon) Adapters — macos/adapters/"]
+        MACOS_accessibility_permission["AccessibilityPermission.lua"]
         MACOS_app_launcher["AppLauncher.lua"]
+        MACOS_boot_fatal["BootFatal.lua"]
+        MACOS_boot_journal["BootJournal.lua"]
         MACOS_clipboard["Clipboard.lua"]
         MACOS_crypto["Crypto.lua"]
         MACOS_event_provenance["EventProvenance.lua"]
@@ -82,6 +85,7 @@ graph TD
         MACOS_shell_runner["ShellRunner.lua"]
         MACOS_storage["Storage.lua"]
         MACOS_synthetic_input["SyntheticInput.lua"]
+        MACOS_system_info["SystemInfo.lua"]
         MACOS_task_environment["TaskEnvironment.lua"]
         MACOS_task_lifecycle["TaskLifecycle.lua"]
         MACOS_text_sender["TextSender.lua"]

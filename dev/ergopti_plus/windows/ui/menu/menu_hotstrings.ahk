@@ -32,6 +32,10 @@ for _, Cat in HotstringCategoriesStd
 	Total += _CountEnabledForCategory(Cat)
 for _, Cat in HotstringCategoriesErgopti
 	Total += _CountEnabledForCategory(Cat)
+for _, Pack in HotstringsLanguageCategories() {
+	for _, LangCat in Pack["categories"]
+		Total += _CountEnabledForCategory(LangCat["v1"])
+}
 if Features.Has("hotstrings") and Features["hotstrings"].Has("dynamic") {
 	for DKey, DCfg in Features["hotstrings"]["dynamic"] {
 		if (IsObject(DCfg) and DCfg.Has("enabled") and DCfg["enabled"])

@@ -49,7 +49,7 @@ important ones — refer to the TOML file for the full list.
 
 | Parameter          | Value                               | Notes                            |
 | ------------------ | ----------------------------------- | -------------------------------- |
-| Background         | `#1A1A1A` (dark near-black)         | Tinted per group via HSL mixing  |
+| Background         | `#242424` (dark near-black)         | Tinted per group via HSL mixing  |
 | Corner radius      | 7 layout units                      | GDI diameter = 14 on AHK         |
 | Horizontal padding | 14 lu                               | Each side                        |
 | Vertical padding   | 7 lu                                | Above and below each content row |
@@ -90,10 +90,10 @@ the reference vectors live in `tint.js:tintTestVectors()`.
 Given an accent color `{r, g, b}` in [0.0, 1.0]:
 
 1. Extract the **hue** from the accent color (discard lightness and saturation).
-2. Reconstruct an HSL color at fixed `lightness = 0.10`, `saturation = 0.40`.
+2. Reconstruct an HSL color at fixed `lightness = 0.13`, `saturation = 0.85`.
 3. Convert back to RGB — this is the tinted background color.
 4. If the accent is achromatic (max − min < 0.0001), return the default background
-   (`#1A1A1A`) without any tint.
+   (`#242424`) without any tint.
 
 ### Driver Implementations
 
@@ -262,9 +262,15 @@ canvas_h = pad_y + preds_h + line_spacing
          + pad_y
 ```
 
-When hint and info fit on a single combined row (`combined_w ≤ max_w`), both
-are rendered as one element and `hint_h + hint_spacing + info_h` is replaced
-by `combined_h`.
+Prediction lines stack as one text block: no per-line padding and no rule
+between them. `preds_w` is the widest line over every highlighted row, so
+navigating never resizes the panel. The footer never widens the panel while its
+combined row fits (`combined_w ≤ preds_w`); otherwise it wraps into a hint row
+and an info row, and only the wider of those may widen it. Width is sized with
+the worst-case timing line so a later TTLT never clips.
+
+On Windows every size above is in layout units (the tooltip Gui is DPI-scaled);
+caret, monitor and offsets are converted to physical pixels only at placement.
 
 ---
 

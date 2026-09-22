@@ -4,18 +4,18 @@
 ; MODULE: text_expansion_auto TOML-Backing Meta Test
 ; DESCRIPTION:
 ; Static source guard for finding F49 (AUDIT_AHK_2026-07-01.md): the
-; hotstrings.magic_key.text_expansion_auto feature is enabled by default in
+; hotstrings.french_magickey.text_expansion_auto feature is enabled by default in
 ; manifest.toml but historically had no [[text_expansion_auto]] table in
 ; magickey.toml, so LoadHotstringsSection silently loaded 0 entries for it -
 ; a harmless-looking but completely dead toggle, distinguished from the "file
 ; not found" WARN path only by a DEBUG line nobody watches.
 ;
 ; Pins three invariants so the category can never silently go dead again:
-;   1. magickey.toml declares a [[text_expansion_auto]] table with at least
+;   1. french/magickey.toml (the section moved to the French pack) declares a [[text_expansion_auto]] table with at least
 ;      one real entry.
 ;   2. [_meta.sections] carries a text_expansion_auto description, so the
 ;      hotstrings config window shows a real label instead of the raw key.
-;   3. The manifest entry (hotstrings.magic_key.text_expansion_auto) still
+;   3. The manifest entry (hotstrings.french_magickey.text_expansion_auto) still
 ;      exists - proving the fix authored the missing content rather than
 ;      silently dropping the feature.
 ;
@@ -54,7 +54,7 @@ _TEA_ReadSharedSource(RelPath) {
 ; ==================================================
 
 _TEA_SectionTableExists() {
-	Toml := _TEA_ReadSharedSource("modules/hotstrings/magickey.toml")
+	Toml := _TEA_ReadSharedSource("modules/hotstrings/french/magickey.toml")
 	Assert(InStr(Toml, "[[text_expansion_auto]]") > 0,
 		"magickey.toml must declare a [[text_expansion_auto]] table - F49: the category was enabled by default with zero TOML-backed entries")
 
@@ -74,7 +74,7 @@ _TEA_SectionTableExists() {
 Test("magickey toml: text_expansion_auto table exists with real entries (F49)", _TEA_SectionTableExists)
 
 _TEA_MetaSectionsDescribesIt() {
-	Toml := _TEA_ReadSharedSource("modules/hotstrings/magickey.toml")
+	Toml := _TEA_ReadSharedSource("modules/hotstrings/french/magickey.toml")
 	MetaPos := InStr(Toml, "[_meta.sections]")
 	Assert(MetaPos > 0, "magickey.toml must declare a [_meta.sections] block")
 	NextTablePos := InStr(Toml, "[[", , MetaPos)

@@ -20,6 +20,7 @@ local hs         = hs
 local eventtap   = hs.eventtap
 local text_utils = require("infra.text_utils")
 local EventProvenance = require("adapters.event_provenance")
+local ControlSentinels = require("modules.keymap.control_sentinels")
 local SyntheticInput = require("adapters.synthetic_input")
 local TimerScheduler = require("adapters.timer_scheduler")
 local km_utils   = require("modules.keymap.utils")
@@ -1031,7 +1032,7 @@ end
 -- top of onKeyDownRaw, eliminating the old 12-branch `or` chain.
 local FAST_EXIT_KEYCODES = {
 	[80]  = true,  -- F19 volume-scroll modifier
-	[90]  = true,  -- F20 Karabiner nav-layer sentinel
+	-- F20 (keycode 90) is absent: ControlSentinels consumes it just above.
 	[105] = true,  -- F13 Karabiner Return sentinel
 	[107] = true,  -- F14 Karabiner Backspace sentinel
 	[113] = true,  -- F15 Karabiner Escape sentinel
@@ -1076,6 +1077,9 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- adapter's fail-fast admission assertion.
 	if not SyntheticInput.admission_open()
 		or CoreState.processing_paused == true then
+		-- No key decode here: the audited gate order keeps it after provenance.
+		-- PAUSE needs no sentinel claim because the PAUSED Karabiner graph emits
+		-- no F20 (pinned by the generator suite).
 		return internal_loopback == true
 	end
 
@@ -1111,6 +1115,11 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- A loopback tag is an explicit control signal (currently F16 for chained
 	-- LLM completion). It is still synthetic for every other consumer, but this
 	-- keymap callback must deliberately route it through handle_llm_keys below.
+
+	-- The keymap taps own the Karabiner control sentinels (F20 layer entry):
+	-- delete them here, before ignored-window and secure-field pass-through, so
+	-- no application ever receives one, and publish the signal in-process.
+	if ControlSentinels.claim_key(keyCode, true) then return true end
 
 	-- O(1) fast-exit for synthetic signals and Karabiner/layer sentinels.
 	-- This replaces both the old SYNTHETIC_SIGNAL_KEYCODES check and the
@@ -1511,12 +1520,18 @@ tap = eventtap.new({ eventtap.event.types.keyDown }, onKeyDown)
 -- consumes the down phase; this minimal sibling consumes the exact tagged up
 -- phase so an application/hotkey cannot observe an orphan F16 release.
 loopback_keyup_tap = eventtap.new({ eventtap.event.types.keyUp }, function(e)
-	local provenance, _, fence = EventProvenance.classify_with_fence(
+	local provenance, status, fence = EventProvenance.classify_with_fence(
 		e, "keymap.loopback_keyup")
 	local fence_events = fence and fence.events or nil
 	if fence and fence.consume_original == true then return true, fence_events end
 	if provenance and (provenance.loopback or provenance.stale_loopback) then
 		return true, fence_events
+	end
+	-- Release phase of a Karabiner control sentinel: its key-down was deleted by
+	-- the keyDown tap, so an orphan release must not reach the application.
+	if provenance == nil and status == EventProvenance.STATUS_FOREIGN then
+		local ok, keycode = pcall(e.getKeyCode, e)
+		if ok and ControlSentinels.claim_key(keycode, false) then return true, fence_events end
 	end
 	return false, fence_events
 end)

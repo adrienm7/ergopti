@@ -27,8 +27,10 @@
 ;   [layout]      corner_radius × 2      → UI_CORNER_RADIUS (GDI diameter)
 ;   [colors]      bg_hex                 → UI_BG_HEX
 ;   [colors]      border_white/alpha_ahk → UI_BORDER_COLOR_HEX / UI_BORDER_ALPHA
-;   [colors]      border_width           → UI_BORDER_THICKNESS
 ;   [colors]      label_hex              → UI_LABEL_COLOR_HEX
+;   [colors]      loading_text_hex       → UI_LOADING_TEXT_HEX
+;   [layout]      screen_margin          → UI_SCREEN_MARGIN
+;   [positioning] window_offset_y        → UI_WINDOW_OFFSET_Y
 ;   [tint]        lightness              → UI_TINT_LIGHTNESS
 ;   [tint]        saturation             → UI_TINT_SATURATION
 ;   [llm_colors]  cursor_hex             → UI_LLM_CURSOR_HEX
@@ -50,7 +52,7 @@
 ; immediately (fail fast — no compile-time fallback values).
 
 ; ── Typography ──────────────────────────────────────────────────────────────
-global UI_FONT_NAME       := "Segoe UI"   ; AHK-only constant, not in TOML
+global UI_FONT_NAME       := ""
 global UI_FONT_SIZE_MAIN  := 0
 global UI_FONT_SIZE_HINT  := 0
 global UI_FONT_SIZE_INFO  := 0
@@ -73,15 +75,19 @@ global UI_BORDER_THICKNESS := 1          ; AHK-only constant, not in TOML
 global UI_LABEL_COLOR_HEX  := ""
 global UI_HINT_COLOR_HEX   := ""
 global UI_INFO_COLOR_HEX   := ""
+global UI_LOADING_TEXT_HEX := ""
 
 ; ── Tint mixing ─────────────────────────────────────────────────────────────
 global UI_TINT_LIGHTNESS   := 0
 global UI_TINT_SATURATION  := 0
 
 ; ── Positioning offsets ──────────────────────────────────────────────────────
-; UI_OFFSET_RIGHT is AHK-only (Windows GDI vs macOS canvas coordinate systems).
+; Layout units: callers scale them by the DPI factor before adding them to
+; physical screen coordinates.
 global UI_OFFSET_BELOW           := 0
-global UI_OFFSET_RIGHT           := 15
+global UI_OFFSET_RIGHT           := 0
+global UI_WINDOW_OFFSET_Y        := 0
+global UI_SCREEN_MARGIN          := 0
 global UI_MAX_CARET_HEIGHT_PX    := 0
 global UI_WINDOW_BOTTOM_INSET_PX := 0
 
@@ -153,8 +159,31 @@ _UiStyleRequireHex(c, section, key) {
 	return val
 }
 
-/**
- * Reads _shared/modules/tooltip/constants.toml at startup and assigns every tooltip
+; Reads one numeric member of an inline RGBA table (e.g. cmd_sel.alpha).
+_UiStyleRequireInlineNumber(c, section, key, member) {
+	val := _UiStyleRequire(c, section, key)
+	if (val is Map) {
+		if !val.Has(member)
+			_UiStyleFatal(section, key . "." . member)
+		return Float(val[member])
+	}
+	if !RegExMatch(String(val), "\b" . member . "\s*=\s*([0-9.]+)", &m)
+		_UiStyleFatal(section, key . "." . member)
+	return Float(m[1])
+}
+
+; Blends Hex over BgHex at Alpha (0..1), both "RRGGBB"; returns "RRGGBB".
+_UiStyleBlendHex(Hex, BgHex, Alpha) {
+	out := ""
+	loop 3 {
+		fg := Integer("0x" . SubStr(Hex, A_Index * 2 - 1, 2))
+		bg := Integer("0x" . SubStr(BgHex, A_Index * 2 - 1, 2))
+		out .= Format("{1:02X}", Round(bg * (1 - Alpha) + fg * Alpha))
+	}
+	return out
+}
+
+/** * Reads _shared/modules/tooltip/constants.toml at startup and assigns every tooltip
  * global from the TOML single source of truth. Uses _SharedDir (set by the
  * main entry point) + ParseTomlFile + IniCacheGet.
  * Missing file or missing key → MsgBox + ExitApp (fail fast).
@@ -170,7 +199,8 @@ UiStyle_LoadSharedConst() {
 		ExitApp()
 	}
 
-	; [typography] — platform-specific keys only (font names are AHK-specific)
+	; [typography] — the *_ahk keys; macOS reads the *_hs siblings.
+	global UI_FONT_NAME            := _UiStyleRequire(c, "typography", "font_main_ahk")
 	global UI_FONT_SIZE_MAIN       := Integer(_UiStyleRequire(c, "typography", "font_size_main_ahk"))
 	global UI_FONT_SIZE_HINT       := Integer(_UiStyleRequire(c, "typography", "font_size_hint_ahk"))
 	global UI_FONT_SIZE_INFO       := Integer(_UiStyleRequire(c, "typography", "font_size_info_ahk"))
@@ -190,6 +220,7 @@ UiStyle_LoadSharedConst() {
 	global UI_HINT_COLOR_HEX       := _UiStyleRequireHex(c, "colors", "hint_hex")
 	global UI_INFO_COLOR_HEX       := _UiStyleRequireHex(c, "colors", "info_hex")
 	global UI_DIM_COLOR_HEX        := _UiStyleRequireHex(c, "colors", "dim_hex")
+	global UI_LOADING_TEXT_HEX     := _UiStyleRequireHex(c, "colors", "loading_text_hex")
 	global UI_BORDER_ALPHA         := Float(_UiStyleRequire(c, "colors", "border_alpha_ahk"))
 
 	; Separator blending: TOML gives sep_alpha_ahk. AHK cannot do per-control
@@ -205,6 +236,9 @@ UiStyle_LoadSharedConst() {
 
 	; [positioning]
 	global UI_OFFSET_BELOW           := Integer(_UiStyleRequire(c, "positioning", "caret_offset_y"))
+	global UI_OFFSET_RIGHT           := Integer(_UiStyleRequire(c, "positioning", "caret_offset_x"))
+	global UI_WINDOW_OFFSET_Y        := Integer(_UiStyleRequire(c, "positioning", "window_offset_y"))
+	global UI_SCREEN_MARGIN          := Integer(_UiStyleRequire(c, "layout", "screen_margin"))
 	global UI_MAX_CARET_HEIGHT_PX    := Integer(_UiStyleRequire(c, "positioning", "max_caret_height"))
 	global UI_WINDOW_BOTTOM_INSET_PX := Integer(_UiStyleRequire(c, "positioning", "window_bottom_inset_ahk"))
 
@@ -220,7 +254,11 @@ UiStyle_LoadSharedConst() {
 	global UI_LLM_UNSEL_GRAY_HEX := _UiStyleRequireHex(c, "llm_colors", "unsel_gray_hex")
 	global UI_LLM_LOADING_HEX    := _UiStyleRequireHex(c, "llm_colors", "loading_hex")
 	global UI_LLM_CURSOR_HEX     := _UiStyleRequireHex(c, "llm_colors", "cursor_hex")
-	global UI_LLM_CMD_SEL_HEX    := _UiStyleRequireHex(c, "llm_colors", "cmd_sel_hex")
+	; macOS draws cmd_sel at its RGBA alpha; AHK text has no alpha, so the same
+	; colour is pre-blended onto the panel background here.
+	global UI_LLM_CMD_SEL_HEX    := _UiStyleBlendHex(
+		_UiStyleRequireHex(c, "llm_colors", "cmd_sel_hex"), UI_BG_HEX,
+		_UiStyleRequireInlineNumber(c, "llm_colors", "cmd_sel", "alpha"))
 	global UI_LLM_CMD_DIM_HEX    := _UiStyleRequireHex(c, "llm_colors", "cmd_dim_hex")
 	global UI_AI_LOADING_HEX     := _UiStyleRequireHex(c, "accent_colors", "ai_loading_hex")
 

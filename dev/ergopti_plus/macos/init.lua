@@ -83,6 +83,7 @@ if Storage.migrate_legacy_namespace() ~= true then
 	Logger.error("init", "Legacy settings namespace migration did not commit; only namespaced values will be used.")
 end
 local SyntheticInput     = require("adapters.synthetic_input")
+local AccessibilityPermission = require("adapters.accessibility_permission")
 local LOG                = "init"
 
 -- Single source of truth (F-LOW-11): ke_lifecycle.lua owns and exports this
@@ -141,7 +142,27 @@ end
 -- logger is ready so every subsequent Boot.mark() reports its delta + running
 -- total in the boot log, making a slow startup self-diagnosing (no profiler attach).
 local Boot               = require("infra.boot_profiler")
+local BootJournal        = require("adapters.boot_journal")
 Boot.begin()
+
+--- Records one boot fact in the log and in the synchronous boot journal, which
+--- reaches launcher.log until the configured log folder is committed. Callers
+--- pass names, paths and states only, never typed text or credentials.
+--- @param fmt string Format string.
+--- @param ... any Format arguments.
+local function boot_note(fmt, ...)
+	local message = string.format(fmt, ...)
+	Logger.info(LOG, "%s", message)
+	BootJournal.append("INFO", message)
+end
+
+do
+	local present, missing = require("infra.launcher_environment").presence()
+	boot_note("Launcher environment keys present: %s; missing: %s.",
+		#present > 0 and table.concat(present, ", ") or "none",
+		#missing > 0 and table.concat(missing, ", ") or "none")
+end
+Boot.stage("Core module requires")
 
 local i18n               = require("infra.i18n")
 local locale_mod         = require("infra.locale")
@@ -151,6 +172,7 @@ local EmergencyExit      = require("infra.emergency_exit")
 local TerminationCoordinator = require("infra.termination_coordinator")
 local TeardownTransaction = require("infra.teardown_transaction")
 local StartupTransaction = require("infra.startup_transaction")
+local BootFatal          = require("adapters.boot_fatal")
 
 -- Tell a reload apart from a real quit. The coordinator marks the sentinel only
 -- after the old exact Karabiner token is fenced and immediately before the real
@@ -173,18 +195,37 @@ end
 i18n.set_locale_injector(function(code) locale_mod.set_locale(code) end)
 i18n.init()
 
-local BOOT_FAILURE_ALERT_SECONDS = 5
 local CONFIG_PATH_BOOT_FAILURE =
 	"Config-path initialization did not commit — startup aborted before input or remap activation."
 
+--- Shows a modal fatal dialog that stays until dismissed. Used only when no
+--- launcher report channel exists; under the launcher, its own modal alert owns
+--- the presentation because this process is about to exit.
+--- @param message string Localized user-facing explanation.
+--- @param stage string Stable boot stage name.
+local function show_blocking_fatal_dialog(message, stage)
+	local shown_ok, shown_err = pcall(function()
+		hs.dialog.blockAlert(
+			i18n.get("launcher.fatal.title"),
+			string.format("%s\n\n%s", tostring(message), tostring(stage)),
+			i18n.get("launcher.fatal.quit"))
+	end)
+	if not shown_ok then
+		Logger.error(LOG, "Standalone fatal dialog could not be shown: %s.", tostring(shown_err))
+	end
+end
+
 --- Reports a pre-runtime boot failure, releases an optional early capability,
---- and terminates the embedded Hammerspoon process. This boundary deliberately
---- owns the only UI available before menus and notifications are initialized.
+--- and terminates the embedded Hammerspoon process. The report is made durable
+--- and handed to the launcher's modal alert BEFORE os.exit(): a Logger line
+--- queued for the native worker, or a transient alert, dies with the process.
+--- @param stage string Stable boot stage name shown to the user and in logs.
 --- @param detail string Developer-facing diagnostic.
 --- @param alert_key string|nil Localized user-facing alert key.
 --- @param before_exit function|nil Optional exact early-owner cleanup.
-local function abort_pre_runtime_boot(detail, alert_key, before_exit)
-	Logger.error(LOG, "%s", tostring(detail))
+local function abort_pre_runtime_boot(stage, detail, alert_key, before_exit)
+	local message = i18n.get(alert_key or "dialog.fatal_error.cannot_start")
+	local launcher_notified = BootFatal.report(stage, detail, message)
 	if before_exit ~= nil then
 		local cleanup_ok, cleanup_result = xpcall(before_exit, debug.traceback)
 		if not cleanup_ok or cleanup_result ~= true then
@@ -192,14 +233,7 @@ local function abort_pre_runtime_boot(detail, alert_key, before_exit)
 				tostring(cleanup_result))
 		end
 	end
-	pcall(function()
-		local alert = hs.alert
-		if type(alert) == "table" and type(alert.show) == "function" then
-			alert.show(
-				i18n.get(alert_key or "dialog.fatal_error.cannot_start"),
-				BOOT_FAILURE_ALERT_SECONDS)
-		end
-	end)
+	if not launcher_notified then show_blocking_fatal_dialog(message, stage) end
 	os.exit(1)
 end
 
@@ -223,6 +257,7 @@ _G.keymap = keymap
 local shortcuts          = require("modules.shortcuts")
 local dynamic_hotstrings = require("modules.dynamic_hotstrings")
 Boot.mark("Core module requires")
+Boot.stage("Path: config dir + paths.toml (config_paths.init)")
 
 -- ===================================
 -- ===================================
@@ -244,23 +279,33 @@ if not base_dir:match("[/\\]$") then base_dir = base_dir .. "/" end
 -- can act on it.
 local config_paths_ready = config_paths.init(base_dir)
 if config_paths_ready ~= true then
-	abort_pre_runtime_boot(CONFIG_PATH_BOOT_FAILURE, "dialog.fatal_error.cannot_start")
+	abort_pre_runtime_boot("config_paths", CONFIG_PATH_BOOT_FAILURE, "dialog.fatal_error.cannot_start")
 	return
 end
+boot_note("Config dir resolved: %s (%s).", tostring(config_paths.get_config_dir()),
+	BootJournal.describe_path(config_paths.get_config_dir()))
 Boot.mark("Path: config dir + paths.toml (config_paths.init)")
+Boot.stage("Path: log file open (retention purge deferred)")
 
 -- Re-point the logger to <config_dir>/logs/ErgoptiPlus_YYYY-MM-DD.log now that
 -- the user config dir is known. Earlier boot lines went to the fallback file.
 -- (The old-log retention purge is scheduled off the boot path inside this call.)
-Logger.init_log_path(config_paths.get_config_dir(), 14)
+do
+	local log_folder_usable, log_folder_err = Logger.init_log_path(config_paths.get_config_dir(), 14)
+	local log_folder = config_paths.get_config_dir():gsub("/*$", "/") .. "hammerspoon/logs"
+	boot_note("Log folder chosen: %s (%s; usable: %s%s).", log_folder, BootJournal.describe_path(log_folder),
+		tostring(log_folder_usable == true), log_folder_err and (", " .. tostring(log_folder_err)) or "")
+end
 Boot.mark("Path: log file open (retention purge deferred)")
+Boot.stage("Path: native asynchronous logger transport committed")
 
 -- The launcher exports one indivisible identity+logger authority. Complete
 -- absence and every partial/stale subset fail closed: the full driver may never
 -- arm an input owner while its logger can still perform synchronous I/O on the
 -- Hammerspoon callback loop. Developer runs must therefore use the launcher too.
-local function abort_logger_boot(detail)
+local function abort_logger_boot(stage, detail)
 	abort_pre_runtime_boot(
+		stage,
 		string.format(
 			"Native asynchronous logger transport unavailable — startup aborted before input: %s.",
 			tostring(detail)),
@@ -274,7 +319,7 @@ if logger_boot_mode ~= "managed" then
 	if logger_boot_mode == "standalone" then
 		refusal_detail = "native logger authority absent; launch the full driver through the ErgoptiPlus launcher"
 	end
-	abort_logger_boot(refusal_detail)
+	abort_logger_boot("native_logger_environment", refusal_detail)
 	return
 end
 
@@ -283,10 +328,15 @@ end
 -- without exposing an eventtap. Runtime producers then only enqueue memory.
 local async_log_ready, async_log_err = Logger.start_async_sink(TimerScheduler)
 if async_log_ready ~= true then
-	abort_logger_boot(async_log_err)
+	abort_logger_boot("native_logger_transport", async_log_err)
 	return
 end
+-- The native worker accepted the configured folder: the daily log there is now
+-- the readable trail, so launcher.log keeps only fatal lines from here on.
+BootJournal.set_user_log_ready(true)
+boot_note("Native logger handshake committed: the launcher worker owns %s.", tostring(Logger.UNIFIED_LOG_FILE))
 Boot.mark("Path: native asynchronous logger transport committed")
+Boot.stage("Path: runtime error capture installed")
 
 -- Make the file log self-sufficient: capture errors that Hammerspoon would
 -- otherwise only print to its (unexportable, far-too-noisy) Console. Wraps
@@ -296,6 +346,7 @@ Boot.mark("Path: native asynchronous logger transport committed")
 -- after the log path is known so every capture lands in today's dated file.
 Logger.install_runtime_error_capture()
 Boot.mark("Path: runtime error capture installed")
+Boot.stage("Factory-reset recovery reconciled")
 
 -- A factory-reset transaction moves user configuration immediately before its
 -- controlled reload handoff. Reconcile its durable decision before onboarding,
@@ -311,6 +362,7 @@ local reset_recovery_ok, reset_recovery_result = xpcall(function()
 end, debug.traceback)
 if not reset_recovery_ok or reset_recovery_result ~= true then
 	abort_pre_runtime_boot(
+		"factory_reset_recovery",
 		"Factory-reset recovery did not settle before configuration load: "
 			.. tostring(reset_recovery_result),
 		"dialog.fatal_error.cannot_start",
@@ -319,6 +371,7 @@ if not reset_recovery_ok or reset_recovery_result ~= true then
 	return
 end
 Boot.mark("Factory-reset recovery reconciled")
+Boot.stage("TOML hotstring cache wired")
 
 -- TOML hotstring snapshot cache. The shared parser walks every source byte by
 -- hand, which dominates the "Hotstring groups registered" boot phase; caching the
@@ -347,6 +400,7 @@ do
 	end
 end
 Boot.mark("TOML hotstring cache wired")
+Boot.stage("Config-dependent module requires")
 
 -- Forward-declared so the shutdown callback below can capture it as an upvalue.
 -- A reference written above the `local` would bind the nil global of the same
@@ -734,7 +788,7 @@ local function managed_launcher_expected()
 	return ok and type(raw_pid) == "string" and raw_pid ~= ""
 end
 
-local function emergency_exit_after_runtime_failure(owner, reason)
+local function emergency_exit_after_runtime_failure(owner, reason, message_key)
 	if _runtime_emergency_exit_requested then return end
 	_runtime_emergency_exit_requested = true
 	local exact_owner = tostring(owner or "runtime_dependency")
@@ -742,6 +796,16 @@ local function emergency_exit_after_runtime_failure(owner, reason)
 	Logger.error(LOG,
 		"ErgoptiPlus runtime dependency failed (%s: %s) — shutting down embedded Hammerspoon.",
 		exact_owner, exact_reason)
+	-- Every path below ends in os.exit(), which Hammerspoon reports as status 0
+	-- and which discards Logger lines still queued for the native worker. Make
+	-- the cause durable and hand it to the launcher's modal alert first. No
+	-- local modal here: input owners may be armed, and a blocking dialog would
+	-- delay the bounded exit that lets the guardian revoke the exact lease.
+	-- The generic post-onboarding owner names the boot stage that was running.
+	local report_stage = exact_owner
+	if exact_owner == "boot" and not Boot.is_complete() then report_stage = Boot.current_stage() end
+	BootFatal.report(report_stage, exact_reason,
+		i18n.get(message_key or "dialog.fatal_error.cannot_start"))
 
 	-- Arm the deadline BEFORE starting a request that may never settle. If exact
 	-- STOPPED arrives in time, the normal coordinator fences, tears down, and exits.
@@ -882,6 +946,7 @@ Logger.set_error_notification_handler(function(module_name, message)
 	)
 end)
 Boot.mark("Config-dependent module requires")
+Boot.stage("First-launch guard (onboarding check)")
 
 -- Global uncaught-error handler: offer the user an opt-in crash report.
 -- Hammerspoon surfaces unhandled errors via hs.crash.crashLog, but there is no
@@ -920,10 +985,15 @@ do
 	end
 	local cfg_path = config_paths.get("ConfigTomlPath")
 	if onboarding_mod.should_run(cfg_path) then
+		boot_note("config.toml is absent at %s: opening the first-run wizard; the full boot follows it.",
+			tostring(cfg_path))
 		onboarding_mod.run(cfg_path)
+		Boot.mark("First-launch guard (onboarding check)")
 		return
 	end
+	boot_note("config.toml is present at %s: the full boot continues.", tostring(cfg_path))
 end
+Boot.mark("First-launch guard (onboarding check)")
 
 
 -- ===================================
@@ -947,6 +1017,29 @@ end
 -- after MLX cleanup, LLM bootstrap, TOML loading and the keymap engine startup
 -- have all completed (F-MED-19).
 local function finish_boot_after_onboarding()
+Boot.stage("Accessibility permission")
+-- Every input owner below is an eventtap, and an untrusted process gets taps
+-- that never enable. The packaged runtime is its own app identity, so a user
+-- whose onboarding was skipped (config.toml already present) may never have
+-- been asked; v0.0.0-dev.128 then died here with a generic pre-start refusal.
+-- Ask macOS for the prompt and name the one action that fixes it.
+local accessibility_trusted, accessibility_err = AccessibilityPermission.is_trusted()
+if accessibility_trusted ~= true then
+	local prompted, prompt_err = AccessibilityPermission.request_prompt()
+	if not prompted then
+		Logger.error(LOG, "Accessibility prompt could not be requested: %s.", tostring(prompt_err))
+	end
+	emergency_exit_after_runtime_failure("accessibility",
+		accessibility_trusted == nil
+			and ("Accessibility state query failed: " .. tostring(accessibility_err))
+			or "Accessibility permission is not granted to the embedded ErgoptiPlus runtime",
+		"startup.accessibility_required")
+	return
+end
+Logger.info(LOG, "Accessibility permission is granted; arming input owners.")
+Boot.mark("Accessibility permission")
+Boot.stage("Gestures + shortcuts pre-start")
+
 local prestart_committed = StartupTransaction.run({
 	{
 		name = "gestures",
@@ -969,6 +1062,7 @@ local prestart_committed = StartupTransaction.run({
 		name = "script_control",
 		start = function()
 			Boot.mark("Gestures + shortcuts pre-start")
+			Boot.stage("Script control engine started (panic-button eventtap)")
 			Logger.debug(LOG, "Starting script control engine…")
 			return shortcuts.start_script_control(keymap, shortcuts, gestures, karabiner)
 		end,
@@ -979,7 +1073,9 @@ if prestart_committed ~= true then
 	error("input subsystem pre-start did not commit")
 end
 Logger.info(LOG, "Main modules initialized successfully.")
+boot_note("First eventtap armed: the script-control panic-button tap is enabled.")
 Boot.mark("Script control engine started (panic-button eventtap)")
+Boot.stage("MLX server cleanup started asynchronously")
 
 -- Register both backend-local dependency owners before any menu or boot caller
 -- can admit bootstrap work. Each checker retains only its own timers/tasks.
@@ -1048,6 +1144,7 @@ if mlx_cleanup_enabled then
 	end
 end -- if mlx_cleanup_enabled
 Boot.mark("MLX server cleanup started asynchronously")
+Boot.stage("LLM backend bootstrap")
 
 -- Background deps check for the active LLM backend. The detector picks
 -- MLX on Apple Silicon (≥ macOS 13) and Ollama everywhere else; a
@@ -1131,6 +1228,7 @@ else
 end
 
 Boot.mark("LLM backend bootstrap")
+Boot.stage("TOML discovery + ordering")
 
 local configured_hotstrings_dir = config_paths.get("HotstringsDirPath")
 local bundled_hotstrings_dir    = base_dir .. "../_shared/modules/hotstrings/"
@@ -1172,6 +1270,27 @@ if not has_common_hotstring_groups(configured_hotstrings_dir) and has_common_hot
 		configured_hotstrings_dir, hotstrings_dir)
 end
 
+-- Language packs declared by the shared index ([languages]); each category file
+-- lives at <language>/<stem>.toml and loads as the group "<language>_<stem>".
+-- Declared here, above the resolver closure below that reads them.
+local HotstringLanguages = require("hotstrings.languages")
+local language_packs  = {}
+
+--- Absolute path of one language pack's category file. The configured directory
+--- wins when it carries the pack, the bundled tree otherwise, so a user who
+--- copied the neutral packs into their own folder still gets every language.
+--- @param language string
+--- @param stem string
+--- @return string|nil
+local function language_pack_path(language, stem)
+	for _, root in ipairs({ hotstrings_dir, bundled_hotstrings_dir }) do
+		local candidate = root .. language .. "/" .. stem .. ".toml"
+		local ok_attr, attr = pcall(hs.fs.attributes, candidate)
+		if ok_attr and type(attr) == "table" and attr.mode == "file" then return candidate end
+	end
+	return nil
+end
+
 -- Initialise the hotstrings_config module so per-group delays and tooltip
 -- colors can be resolved from the TOML metadata + the shared user override
 -- file. The resolver routes the personal category through the (possibly
@@ -1192,6 +1311,14 @@ do
 			if ext_stem then
 				return config_paths.get("PersonalHotstringsDir") .. ext_stem:gsub("__", "/") .. ".toml"
 			end
+			-- Language pack groups: "<language>_<stem>" → <language>/<stem>.toml.
+			for _, pack in ipairs(language_packs) do
+				for _, stem in ipairs(pack.categories) do
+					if category == HotstringLanguages.group_id(pack.id, stem) then
+						return language_pack_path(pack.id, stem)
+					end
+				end
+			end
 			return hotstrings_dir .. category .. ".toml"
 		end,
 	})
@@ -1203,6 +1330,8 @@ do
 		cw.setup({
 			personal_dir   = config_paths.get("PersonalHotstringsDir"),
 			extensions_dir = extensions_dir,
+			-- A getter: the index is parsed further down, after this setup.
+			language_packs = function() return language_packs end,
 		})
 	end
 end
@@ -1260,9 +1389,11 @@ do
 			if type(data.modules) == "table" then
 				module_sections = data.modules
 			end
+			language_packs = HotstringLanguages.packs(data)
 		end
 	end
 end
+
 
 local toml_set = {}
 for _, fname in ipairs(safe_dir_entries(hotstrings_dir)) do
@@ -1329,6 +1460,7 @@ local hotfile_paths = {}
 -- hotstrings must be registered FIRST to beat same-length common hotstrings.
 keymap.defer_sort()
 Boot.mark("TOML discovery + ordering")
+Boot.stage("Hotstring groups registered (personal + dynamic + common)")
 
 
 
@@ -1379,8 +1511,27 @@ for _, fname in ipairs(toml_fnames) do
 	table.insert(hotfiles, name)
 	hotfile_paths[name] = hotstrings_dir .. fname
 end
-Logger.info(LOG, string.format("Loaded %d TOML hotstring file(s) in %.1fms.",
-	#toml_fnames, (hs.timer.secondsSinceEpoch() - _toml_load_t0) * 1000))
+-- Language packs after the neutral files. A declared pack whose file is missing
+-- is a broken install: it is logged as an error rather than silently absent from
+-- the menu.
+local language_file_count = 0
+for _, pack in ipairs(language_packs) do
+	for _, stem in ipairs(pack.categories) do
+		local name = HotstringLanguages.group_id(pack.id, stem)
+		local path = language_pack_path(pack.id, stem)
+		if path then
+			Logger.debug(LOG, string.format("Loading language TOML file: %s…", name))
+			keymap.load_toml(name, path)
+			table.insert(hotfiles, name)
+			hotfile_paths[name] = path
+			language_file_count = language_file_count + 1
+		else
+			Logger.error(LOG, string.format("Language pack file %s/%s.toml is missing.", pack.id, stem))
+		end
+	end
+end
+Logger.info(LOG, string.format("Loaded %d TOML hotstring file(s) and %d language file(s) in %.1fms.",
+	#toml_fnames, language_file_count, (hs.timer.secondsSinceEpoch() - _toml_load_t0) * 1000))
 -- Surface the snapshot-cache hit rate at INFO so the boot log shows whether the
 -- hotstring load took the fast (cached) path. A miss-heavy boot (e.g. right after
 -- an edit, or a stale cache dir) explains a slower "Hotstring groups registered".
@@ -1393,6 +1544,7 @@ do
 	end
 end
 Boot.mark("Hotstring groups registered (personal + dynamic + common)")
+Boot.stage("Final mapping sort + tail-index rebuild")
 
 -- Single final sort covering personal + dynamic + common TOML groups.
 local _sort_t0 = hs.timer.secondsSinceEpoch()
@@ -1400,6 +1552,7 @@ keymap.flush_sort()
 Logger.info(LOG, string.format("Final mapping sort completed in %.1fms.",
 	(hs.timer.secondsSinceEpoch() - _sort_t0) * 1000))
 Boot.mark("Final mapping sort + tail-index rebuild")
+Boot.stage("Keymap engine started")
 
 -- Start the keymap eventtap engine after all TOML groups are loaded and sorted.
 -- This call was previously auto-invoked at the end of modules/keymap/init.lua
@@ -1409,6 +1562,7 @@ if keymap_started ~= true then
 	error("keymap.start did not commit")
 end
 Boot.mark("Keymap engine started")
+Boot.stage("UI: karabiner.init")
 
 
 
@@ -1423,10 +1577,13 @@ Boot.mark("Keymap engine started")
 -- Initialize the Karabiner bridge (starts trackpad watcher + loads feature flags)
 -- The FileSystem adapter is injected so KE config path resolution goes through
 -- the port boundary (hs.fs.pathToAbsolute) instead of raw os.getenv("HOME").
+boot_note("Remap guardian status reported by the launcher: %s.",
+	tostring(os.getenv("ERGOPTI_REMAP_GUARDIAN_STATUS") or "absent"))
 if type(karabiner) ~= "table" or karabiner.init(file_system) ~= true then
 	error("karabiner.init did not commit")
 end
 Boot.mark("UI: karabiner.init")
+Boot.stage("UI: menu.start (menubar + state sync + engines + LLM handler)")
 
 Logger.debug(LOG, "Starting user interface components…")
 menu.start(
@@ -1435,6 +1592,7 @@ menu.start(
 	karabiner, hotfile_paths
 )
 Boot.mark("UI: menu.start (menubar + state sync + engines + LLM handler)")
+Boot.stage("UI: menu + vscode bridge ready")
 
 -- Wire the VS Code caret bridge now that the tooltip subsystem is up.
 -- install_extension() is idempotent; start_server() is safe to call every boot.
@@ -1468,6 +1626,7 @@ end
 -- boot, not only after the LLM/TOML/keymap steps have completed (F-MED-19).
 Logger.info(LOG, "User interface initialized successfully.")
 Boot.mark("UI: menu + vscode bridge ready")
+Boot.stage("File watchers armed")
 
 
 
@@ -1534,6 +1693,7 @@ end
 -- ===================================
 
 Boot.mark("File watchers armed")
+Boot.stage("Boot complete (post-init deferrals scheduled)")
 
 
 -- Warm up macOS WebKit in the background so the first dashboard open is
@@ -1544,6 +1704,7 @@ hs.timer.doAfter(2, function()
 end)
 
 Boot.mark("Boot complete (post-init deferrals scheduled)")
+Boot.complete()
 Logger.info(LOG, "════════════════════════════════════════════════════════════")
 Logger.info(LOG, "✅ Hammerspoon boot SUCCESSFUL.")
 Logger.info(LOG, "════════════════════════════════════════════════════════════")

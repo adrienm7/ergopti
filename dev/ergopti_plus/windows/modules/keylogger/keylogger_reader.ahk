@@ -39,5 +39,6 @@
 #Include keylogger_reader_ledger_catalog.ahk
 #Include keylogger_reader_db.ahk
 #Include keylogger_reader_cache.ahk
+#Include keylogger_reader_rebuild.ahk
 #Include keylogger_reader_manifest.ahk
 #Include keylogger_reader_ngrams.ahk

@@ -159,7 +159,8 @@ initMenu(PublishAuthorizeFn := 0) {
 		"hotstring_categories_standard", (*) => _HS_CategoryRowsStandard(),
 		"hotstring_categories_dynamic",  (*) => _HS_CategoryRowsDynamic(),
 		"hotstring_categories_ergopti",  (*) => _HS_CategoryRowsErgopti(),
-		"hotstring_personal",            (*) => _HS_PersonalRows(),
+		"hotstring_languages",           (*) => _HS_LanguageRows(),
+		"hotstring_personal",           (*) => _HS_PersonalRows(),
 		"hotstring_extensions",          (*) => _HS_ExtensionRows(),
 	)
 
@@ -364,7 +365,8 @@ _MI_BuildGlobalActionsMenu() {
 	Commands := Map(
 		"enable_all",     ToggleAllFeaturesOn,
 		"disable_all",    ToggleAllFeaturesOff,
-		"reset_defaults", ReloadWithDefaultConfig
+		"reset_defaults", ReloadWithDefaultConfig,
+		"clean_unused_keys", ShowUnusedConfigKeysCleanup
 	)
 	return MenuRenderer_Build("global_actions", "Global", "", "", "", Commands)
 }

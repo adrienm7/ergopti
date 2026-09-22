@@ -47,9 +47,19 @@ class _TooltipMeasureGdiNative {
 			"Ptr", ObjectHandle, "Ptr")
 	}
 
+	; DrawText, not GetTextExtentPoint32: the Text controls paint through
+	; DrawText, which substitutes a fallback font for glyphs Segoe UI lacks
+	; (⇧ ◀ ⏱). The raw extent measured those at the wrong width, so a footer
+	; sized by it wrapped its last word out of view.
 	static MeasureText(DeviceContext, Text, Size) {
-		return DllCall("Gdi32\GetTextExtentPoint32W", "Ptr", DeviceContext,
-			"WStr", Text, "Int", StrLen(Text), "Ptr", Size)
+		static DT_CALCRECT_SINGLELINE_NOPREFIX := 0x400 | 0x20 | 0x800
+		Rect := Buffer(16, 0)
+		if !DllCall("User32\DrawTextW", "Ptr", DeviceContext, "WStr", Text,
+				"Int", StrLen(Text), "Ptr", Rect, "UInt", DT_CALCRECT_SINGLELINE_NOPREFIX, "Int")
+			return false
+		NumPut("Int", NumGet(Rect, 8, "Int") - NumGet(Rect, 0, "Int"), Size, 0)
+		NumPut("Int", NumGet(Rect, 12, "Int") - NumGet(Rect, 4, "Int"), Size, 4)
+		return true
 	}
 }
 

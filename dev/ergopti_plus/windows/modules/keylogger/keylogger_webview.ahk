@@ -74,6 +74,11 @@ class KLWV {
 		static ingest_drain_timer_fn := 0
 		; Deterministic midnight seam; production always uses the local calendar.
 		static history_day_fn := 0
+		; A running projection's partial rebuild snapshots are polled at this
+		; cadence: a timestamp probe per tick, a read only when one changed.
+		static REBUILD_WATCH_MS := 1000
+		; Test seam; production arms the watch with SetTimer.
+		static rebuild_watch_timer_fn := 0
 }
 
 
@@ -333,6 +338,7 @@ KLWV_Open(which, metrics_dir) {
 				"ingest_drain_armed", false
 		)
 		SetTimer(KLWV_DelayedFirstPush.Bind(which, Epoch), -1500)
+		KLWV_ArmRebuildWatch(which, Epoch)
 		KLWV_FitWebView(which)
 		return true
 }
@@ -375,6 +381,7 @@ KLWV_Close(which) {
 		; resolve by ``which``; deleting this generation first makes every stale
 		; callback inert instead of allowing it to target a just-reopened dashboard.
 		KLWV.windows.Delete(which)
+		KLWV_DisarmRebuildWatch(entry)
 		KLWV_RetireRangeStage(entry)
 		udir := entry.Has("udir") ? entry["udir"] : ""
 		; A subscription removes itself through the still-live controller. Releasing
@@ -1033,6 +1040,7 @@ KLWV_DelayedFullBuild(which, Epoch, attempt := 0, RetryOwner := 0) {
 }
 
 KLWV_OnFirstBuildTerminal(which, Epoch, attempt, status, SnapshotPath := "", *) {
+		KLWV_SettleRebuildProgress(which, Epoch, status)
 		try {
 				if !KLWV_IsCurrent(which, Epoch)
 						return false
@@ -1053,6 +1061,7 @@ KLWV_OnFirstBuildTerminal(which, Epoch, attempt, status, SnapshotPath := "", *) 
 }
 
 KLWV_OnFullBuildTerminal(which, Epoch, attempt, status, *) {
+		KLWV_SettleRebuildProgress(which, Epoch, status)
 		try {
 				if !KLWV_IsCurrent(which, Epoch)
 						return false
@@ -1067,6 +1076,7 @@ KLWV_OnFullBuildTerminal(which, Epoch, attempt, status, *) {
 }
 
 KLWV_OnBuildTerminal(which, Epoch, status, SnapshotPath := "", *) {
+		KLWV_SettleRebuildProgress(which, Epoch, status)
 		try {
 				if !KLWV_IsCurrent(which, Epoch)
 						return false
@@ -1460,4 +1470,109 @@ KLWV_NotifyIngest(mode := "live") {
 		if n
 				try LoggerDebug("Keylogger",
 						"KLWV_NotifyIngest: mode={1}, coalesced_windows={2}.", mode, n)
+}
+
+
+
+
+
+; ===========================================
+; ===========================================
+; ======= 8/ Rebuild watch (AHK → JS) =======
+; ===========================================
+; ===========================================
+
+KLWV_ArmRebuildWatch(which, Epoch) {
+		if !KLWV_IsCurrent(which, Epoch)
+				return false
+		Tick := KLWV_RebuildWatchTick.Bind(which, Epoch)
+		KLWV.windows[which]["rebuild_watch"] := Tick
+		if IsObject(KLWV.rebuild_watch_timer_fn)
+				return KLWV.rebuild_watch_timer_fn.Call(Tick, KLWV.REBUILD_WATCH_MS)
+		SetTimer(Tick, KLWV.REBUILD_WATCH_MS)
+		return true
+}
+
+KLWV_DisarmRebuildWatch(Entry) {
+		if !(Entry is Map) || !Entry.Has("rebuild_watch")
+				return false
+		Tick := Entry["rebuild_watch"]
+		Entry.Delete("rebuild_watch")
+		if IsObject(KLWV.rebuild_watch_timer_fn)
+				return KLWV.rebuild_watch_timer_fn.Call(Tick, 0)
+		SetTimer(Tick, 0)
+		return true
+}
+
+; While this dashboard's projection worker runs, deliver the store's rebuild
+; progress and every new partial snapshot. Files older than the job belong to a
+; dead worker.
+; @returns {Boolean} Whether anything was delivered.
+KLWV_RebuildWatchTick(which, Epoch) {
+		if !KLWV_IsCurrent(which, Epoch) || A_IsSuspended
+				return false
+		Entry := KLWV.windows[which]
+		Job := KLPFWorker.jobs.Get(which, 0)
+		if !(Job is Map) || !Job.Has("started_at")
+				return false
+		Progressed := KLWV_DeliverRebuildFile(which, Entry, Epoch, Job,
+				KLPF_RebuildProgressPath(Entry["metrics_dir"]), "progress_stamp",
+				'{"type":"rebuild_progress","progress":', "}")
+		if Progressed
+				Entry["rebuild_shown"] := true
+		return KLWV_DeliverRebuildFile(which, Entry, Epoch, Job,
+				KLPF_PartialSnapshotPath(which, Entry["metrics_dir"]), "partial_stamp",
+				'{"type":"prefetch","blob":', "}") || Progressed
+}
+
+; End the progress display with the projection that drove it. A worker that
+; exits with a failure is shown as failed at once instead of leaving a bar that
+; never moves again; the retry that follows resumes from its checkpoint.
+; @param status {String} Terminal status of the projection job.
+; @returns {Boolean} Whether a final state was delivered.
+KLWV_SettleRebuildProgress(which, Epoch, status) {
+		if !KLWV_IsCurrent(which, Epoch)
+				return false
+		Entry := KLWV.windows[which]
+		if !Entry.Get("rebuild_shown", false) || status = "canceled" || status = "full_required"
+				return false
+		Entry["rebuild_shown"] := false
+		for Slot in ["progress_stamp", "partial_stamp"]
+				if Entry.Has(Slot)
+						Entry.Delete(Slot)
+		State := (status = "ok") ? "done" : "failed"
+		if State = "failed"
+				try LoggerWarn("Keylogger", "Metrics rebuild worker for '{1}' ended with '{2}'; the dashboard shows the failure.",
+						which, status)
+		try Entry["webview"].PostWebMessageAsString('{"type":"rebuild_progress","progress":{"state":"'
+				. State . '"}}')
+		catch as Err {
+				try LoggerError("Keylogger", "Rebuild state delivery failed for '{1}': {2}", which, Err.Message)
+				return false
+		}
+		return true
+}
+
+KLWV_DeliverRebuildFile(which, Entry, Epoch, Job, Path, Slot, Prefix, Suffix) {
+		if !FileExist(Path)
+				return false
+		try {
+				Modified := FileGetTime(Path, "M")
+				Stamp := Modified . ":" . FileGetSize(Path)
+				if StrCompare(Modified, Job["started_at"]) < 0 || Entry.Get(Slot, "") == Stamp
+						return false
+		} catch {
+				; The worker replaces the file atomically; the next tick sees it whole.
+				return false
+		}
+		Body := FSRead(Path)
+		if !(Body is String) || (Body = "") || !_KLWV_OwnsDelivery(which, Entry, Epoch)
+				return false
+		Entry[Slot] := Stamp
+		try Entry["webview"].PostWebMessageAsString(Prefix . Body . Suffix)
+		catch as Err {
+				try LoggerError("Keylogger", "Rebuild snapshot delivery failed for '{1}': {2}", which, Err.Message)
+				return false
+		}
+		return true
 }

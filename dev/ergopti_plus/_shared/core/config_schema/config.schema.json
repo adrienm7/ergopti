@@ -58,6 +58,10 @@
 		"hotstrings": {
 			"type": "object",
 			"additionalProperties": false,
+			"_comment_patternProperties": "Language-pack groups (_shared/modules/hotstrings/<language>/<stem>.toml) are keyed '<language>_<stem>'. Matched by pattern so adding a language needs no schema edit.",
+			"patternProperties": {
+				"^[a-z]+_(distancesreduction|sfbsreduction|rolls|autocorrection|magickey)$": { "$ref": "#/$defs/feature_group" }
+			},
 			"properties": {
 				"trigger_char": { "type": "string", "minLength": 1, "maxLength": 1 },
 				"magic_key_source_scan": { "type": "string", "pattern": "^[Ss][Cc](?!000$)[0-9A-Fa-f]{3}$" },

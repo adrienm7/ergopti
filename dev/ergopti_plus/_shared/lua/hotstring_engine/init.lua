@@ -632,7 +632,9 @@ function M.new()
 			_start_is_boundary = false
 		end
 
-		Logger.debug(LOG, "on_char('%s'): buffer %d codepoint(s).", ch, #_buf_cps)
+		-- The character is typed text and is never logged; the buffer length is
+		-- enough to follow the matcher.
+		Logger.debug(LOG, "on_char: buffer %d codepoint(s).", #_buf_cps)
 
 		local buf_len = #_buf_cps
 
@@ -715,8 +717,10 @@ function M.new()
 		-- hotstring_dispatch.ahk (Spec.Length + endchar + HSE_TypoNbspStripped).
 		local bc = tlen + (erase_terminator and 1 or 0)
 			+ ((via_end_char and nbsp_stripped) and 1 or 0)
-		Logger.debug(LOG, "Match: trigger='%s' backspaces=%d end_char=%s.",
-			mapping.trigger, bc, tostring(via_end_char))
+		-- Length, never the trigger: it is text the user typed, and the shared
+		-- logger's default level makes a debug line an always-on one.
+		Logger.debug(LOG, "Match: trigger of %d char(s), backspaces=%d end_char=%s.",
+			tlen, bc, tostring(via_end_char))
 		return {
 			trigger            = mapping.trigger,
 			-- The EFFECTIVE replacement, which in conform mode carries the casing the

@@ -108,6 +108,55 @@ TomlConfigForeignOwner(SectionPath, Key) {
 	return ""
 }
 
+; Classifies a section header the loader deliberately does not apply.
+; ``[_*]`` metadata and ``[updater]`` belong to other readers ("foreign");
+; the dissolved ``[ahk.*]`` silo is "obsolete" and the next canonical full save
+; removes it. Returns "" for a section the manifest tree must account for.
+TomlConfigSectionSkipKind(Header) {
+	if (Header == "ahk" or InStr(Header, "ahk.") == 1)
+		return "obsolete"
+	if (SubStr(Header, 1, 1) == "_" or Header == "updater")
+		return "foreign"
+	return ""
+}
+
+; The single rule deciding whether a ``[SectionPath].Key`` pair belongs to
+; nothing: not the manifest-built Features tree, not a dynamic personal
+; namespace, and not a registered foreign owner. Returns "section" when a
+; segment of SectionPath is missing, "leaf" when only Key is missing, and ""
+; otherwise. ForeignOwner receives the registered owner of a key the tree does
+; not hold. The boot loader and the unused-key cleanup both call this, so the
+; keys the cleanup offers to remove are exactly the ones boot reports as unknown.
+; The walk never mutates Features.
+TomlConfigUnknownKind(Features, SectionPath, Key, &ForeignOwner := "") {
+	ForeignOwner := ""
+	if TomlSectionIsDynamicPersonalNamespace(SectionPath)
+		return ""
+	Node := Features
+	for _, Part in StrSplit(SectionPath, ".") {
+		if (Part == "")
+			continue
+		if (Type(Node) == "Map" and Node.Has(Part))
+			Node := Node[Part]
+		else if (IsObject(Node) and Node.HasOwnProp(Part))
+			Node := Node.%Part%
+		else
+			return "section"
+	}
+	if (Type(Node) == "Map")
+		Known := Node.Has(Key)
+	else if IsObject(Node)
+		Known := Node.HasOwnProp(Key)
+	else
+		; A scalar where a table was expected is a shape violation that the
+		; loader rejects on its own; the key is not "unknown".
+		return ""
+	if Known
+		return ""
+	ForeignOwner := TomlConfigForeignOwner(SectionPath, Key)
+	return ForeignOwner != "" ? "" : "leaf"
+}
+
 ; Logger.Format cannot coerce Array/Map values. Emit a bounded structural
 ; description instead of producing a secondary "log format failed" diagnostic.
 TomlConfigLogValue(Value) {
@@ -320,6 +369,11 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 	CurrentSection := ""
 	SkippingForeign := false
 	ObsoleteDriverSections := 0
+	; Counted for the summary line: each is logged where it happens, but a boot
+	; log with twenty scattered errors never said how much of the file was ignored.
+	UnknownKeys := 0
+	ForeignOwnedKeys := 0
+	IgnoredSectionKeys := 0
 
 	loop parse, Content, "`n", "`r" {
 		Line := Trim(A_LoopField, " `t")
@@ -346,15 +400,12 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 			; the next canonical full save removes the obsolete subtree. Do not
 			; strip the prefix and apply it: a file carrying both spellings would
 			; otherwise become order-dependent.
-			if (Header == "ahk" or InStr(Header, "ahk.") == 1) {
+			SkipKind := TomlConfigSectionSkipKind(Header)
+			if (SkipKind != "") {
 				CurrentSection := ""
 				SkippingForeign := true
-				ObsoleteDriverSections += 1
-				continue
-			}
-			if (SubStr(Header, 1, 1) == "_" or Header == "updater") {
-				CurrentSection := ""
-				SkippingForeign := true
+				if (SkipKind == "obsolete")
+					ObsoleteDriverSections += 1
 				continue
 			}
 
@@ -367,6 +418,7 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 			continue
 		}
 		if SkippingForeign {
+			IgnoredSectionKeys += 1
 			continue
 		}
 
@@ -390,14 +442,40 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 			continue
 		}
 
-		; Walk the section path. Each segment must already exist in Features —
-		; the manifest defines the universe of valid paths. Unknown paths
-		; trigger a WARN and are skipped.
-		;
-		; Exception: hotstrings.personal.<user-chosen-name> and personal_editor
-		; are dynamic, per-user namespaces that structurally cannot appear in the
-		; static manifest (see TomlSectionIsDynamicPersonalNamespace) — missing
-		; segments are auto-vivified as empty Maps instead of being rejected.
+		; The manifest defines the universe of valid paths. An unknown section
+		; path or leaf is a typo or a stale key left over from an older schema
+		; version: surface it as an error so it is impossible to miss in the
+		; logs, but do not abort the driver (the remaining valid keys are still
+		; applied). TomlConfigUnknownKind owns that rule; the menu's unused-key
+		; cleanup offers to remove exactly these keys.
+		UnknownKind := TomlConfigUnknownKind(Features, CurrentSection, Key,
+			&ForeignOwner)
+		if (UnknownKind == "section") {
+			UnknownKeys += 1
+			try LoggerError("TomlConfigLoader",
+				"v2 override skipped — unknown section path '[{1}]' not found in the manifest.", CurrentSection)
+			continue
+		}
+		if (UnknownKind == "leaf") {
+			UnknownKeys += 1
+			try LoggerError("TomlConfigLoader",
+				"v2 override skipped — unknown leaf '[{1}].{2}' not found in the manifest.",
+				CurrentSection, Key)
+			continue
+		}
+		if (ForeignOwner != "") {
+			ForeignOwnedKeys += 1
+			try LoggerDebug("TomlConfigLoader",
+				"[{1}].{2} is owned by {3}; Features apply skipped ({4}).",
+				CurrentSection, Key, ForeignOwner, TomlConfigLogValue(Value))
+			continue
+		}
+
+		; Resolve the node. hotstrings.personal.<user-chosen-name> and
+		; personal_editor are dynamic, per-user namespaces that structurally
+		; cannot appear in the static manifest (see
+		; TomlSectionIsDynamicPersonalNamespace): missing segments are
+		; auto-vivified as empty Maps instead of being rejected.
 		IsDynamicPersonalNamespace := TomlSectionIsDynamicPersonalNamespace(CurrentSection)
 		Parts := StrSplit(CurrentSection, ".")
 		Node := Features
@@ -419,13 +497,11 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 			}
 		}
 		if Failed {
-			; An unknown section path means the user config contains a key that
-			; does not exist in the manifest — likely a typo or a stale key left
-			; over from an older schema version. Surface it as an error so it is
-			; impossible to miss in the logs, but do not abort the driver (the
-			; remaining valid keys are still applied).
+			; Only a dynamic personal path can get here: the classifier above
+			; already rejected every other missing segment. It crossed a manifest
+			; node that is not a table, so there is nowhere to vivify it.
 			try LoggerError("TomlConfigLoader",
-				"v2 override skipped — unknown section path '[{1}]' not found in the manifest.", CurrentSection)
+				"v2 override skipped — dynamic section '[{1}]' crosses a manifest node that is not a table.", CurrentSection)
 			continue
 		}
 
@@ -433,20 +509,6 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 		; properties are both accepted to match the legacy Features shape.
 		try {
 			if (Type(Node) == "Map") {
-				if (!IsDynamicPersonalNamespace and !Node.Has(Key)) {
-					ForeignOwner := TomlConfigForeignOwner(CurrentSection, Key)
-					if (ForeignOwner != "") {
-						try LoggerDebug("TomlConfigLoader",
-							"[{1}].{2} is owned by {3}; Features apply skipped ({4}).",
-							CurrentSection, Key, ForeignOwner,
-							TomlConfigLogValue(Value))
-						continue
-					}
-					try LoggerError("TomlConfigLoader",
-						"v2 override skipped — unknown leaf '[{1}].{2}' not found in the manifest.",
-						CurrentSection, Key)
-					continue
-				}
 				; Refuse to flatten a seeded Map node (e.g. {enabled:...}) into a scalar via a
 				; colliding flat-form [section] key (or vice versa) — that clobbers the shape and
 				; crashes a later [...]["enabled"] access (toml-loader-shape-mismatch).
@@ -458,20 +520,6 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 				}
 				Node[Key] := Value
 			} else if IsObject(Node) {
-				if (!IsDynamicPersonalNamespace and !Node.HasOwnProp(Key)) {
-					ForeignOwner := TomlConfigForeignOwner(CurrentSection, Key)
-					if (ForeignOwner != "") {
-						try LoggerDebug("TomlConfigLoader",
-							"[{1}].{2} is owned by {3}; Features apply skipped ({4}).",
-							CurrentSection, Key, ForeignOwner,
-							TomlConfigLogValue(Value))
-						continue
-					}
-					try LoggerError("TomlConfigLoader",
-						"v2 override skipped — unknown leaf '[{1}].{2}' not found in the manifest.",
-						CurrentSection, Key)
-					continue
-				}
 				Node.%Key% := Value
 			} else {
 				try LoggerError("TomlConfigLoader",
@@ -512,5 +560,9 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 			"applied {1} legacy 0/1 boolean(s) with user intent; the next save persists them as canonical true/false.",
 			MigratedOverrides)
 	}
+	try LoggerInfo("TomlConfigLoader",
+		"Config summary for '{1}': {2} applied, {3} rejected, {4} unknown key(s) ignored, {5} owned by another module, {6} key(s) in skipped sections, {7} obsolete section(s).",
+		FilePath, Applied, RejectedOverrides, UnknownKeys, ForeignOwnedKeys,
+		IgnoredSectionKeys, ObsoleteDriverSections)
 	return Applied
 }

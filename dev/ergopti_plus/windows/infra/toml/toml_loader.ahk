@@ -187,7 +187,7 @@ CountTomlSection(CategoryName, SectionName, FilePath := "") {
 				and ScriptInformation.Has("PersonalTomlPath")) {
 						FilePath := ScriptInformation["PersonalTomlPath"]
 				} else {
-						FilePath := _SharedDir . "\modules\hotstrings\" . StrLower(CategoryName) . ".toml"
+						FilePath := HotstringsBundledTomlPath(CategoryName)
 				}
 		}
 		
@@ -206,7 +206,7 @@ CountTomlHotstrings(CategoryName, FilePath := "") {
 				and ScriptInformation.Has("PersonalTomlPath")) {
 						FilePath := ScriptInformation["PersonalTomlPath"]
 				} else {
-						FilePath := _SharedDir . "\modules\hotstrings\" . StrLower(CategoryName) . ".toml"
+						FilePath := HotstringsBundledTomlPath(CategoryName)
 				}
 		}
 		
@@ -234,7 +234,7 @@ _ParseTomlGroupConfig_ResolveFile(CategoryName, FilePath := "") {
 				and ScriptInformation.Has("PersonalTomlPath")) {
 				return ScriptInformation["PersonalTomlPath"]
 		}
-		return (IsSet(_SharedDir) ? _SharedDir : "") . "\modules\hotstrings\" . LowerCat . ".toml"
+		return HotstringsBundledTomlPath(LowerCat)
 }
 
 ; Evict all cache entries for a given file path so that the next call to
@@ -361,7 +361,7 @@ LoadHotstringsSection(CategoryName, SectionName, FeatureConfig, ExtraOptions := 
 		and ScriptInformation.Has("PersonalTomlPath")) {
 				FilePath := ScriptInformation["PersonalTomlPath"]
 		} else {
-				FilePath := _SharedDir . "\modules\hotstrings\" . CategoryName . ".toml"
+				FilePath := HotstringsBundledTomlPath(CategoryName)
 		}
 		if !FileExist(FilePath) {
 				try LoggerWarn("TomlLoader", "Section [{1}.{2}]: file {3} not found.",
@@ -664,7 +664,7 @@ ParseTomlGroupConfig(CategoryName, FilePath := "") {
 ReadTomlSectionsOrder(CategoryName, FilePath := "") {
 		global _SharedDir
 		if (FilePath == "") {
-				FilePath := _SharedDir . "\modules\hotstrings\" . StrLower(CategoryName) . ".toml"
+				FilePath := HotstringsBundledTomlPath(CategoryName)
 		}
 		if !FileExist(FilePath) {
 				return []

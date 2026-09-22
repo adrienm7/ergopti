@@ -39,6 +39,8 @@ TrayMenuSetIcon(Opts) {
 		return
 	if Opts.Has("image") and Opts["image"] != "" {
 		try TraySetIcon(Opts["image"])
+		catch as Err
+			try LoggerError("TrayMenu", "Tray icon '{1}' could not be applied: {2}.", Opts["image"], Err.Message)
 	}
 	if Opts.Has("title") and Opts["title"] != "" {
 		TrayMenuSetTooltip(Opts["title"])
@@ -76,11 +78,16 @@ TrayMenuSetMenu(Items) {
 		; Route actionable items through RegisterMenuItem so they participate in
 		; the menu_dispatcher WM_COMMAND retry path. Raw Menu.Add does not, so AHK
 		; 2.0's intermittent dispatch drop would silently lose ~1 click in 3.
-		try RegisterMenuItem(A_TrayMenu, ItemTitle, ItemFn)
-		if Item.Has("checked") and Item["checked"]
-			try A_TrayMenu.Check(ItemTitle)
-		if Item.Has("disabled") and Item["disabled"]
-			try A_TrayMenu.Disable(ItemTitle)
+		; A refused row used to vanish from the menu with nothing in the log.
+		try {
+			RegisterMenuItem(A_TrayMenu, ItemTitle, ItemFn)
+			if Item.Has("checked") and Item["checked"]
+				A_TrayMenu.Check(ItemTitle)
+			if Item.Has("disabled") and Item["disabled"]
+				A_TrayMenu.Disable(ItemTitle)
+		} catch as Err {
+			try LoggerError("TrayMenu", "Tray menu row '{1}' could not be published: {2}.", ItemTitle, Err.Message)
+		}
 	}
 }
 
@@ -92,6 +99,28 @@ TrayMenuSetTooltip(Text) {
 	} catch as Err {
 		try LoggerWarn("TrayMenu", "TrayMenuSetTooltip failed: {1}.", Err.Message)
 	}
+}
+
+; Returns how many rows a native menu holds, separators included.
+; AHK v2 exposes no row count, so callers that walk a rendered menu read it here.
+; @param TargetMenu {Menu} A rendered AHK menu.
+; @returns {Integer} The row count.
+TrayMenuItemCount(TargetMenu) {
+	Count := DllCall("GetMenuItemCount", "ptr", TargetMenu.Handle, "int")
+	if (Count < 0) {
+		throw OSError(A_LastError, -1, "GetMenuItemCount failed")
+	}
+	return Count
+}
+
+; Tells whether the row at a zero-based position of a native menu is a separator.
+; @param TargetMenu {Menu} A rendered AHK menu.
+; @param Position {Integer} Zero-based row position.
+; @returns {Boolean} True for a separator row.
+TrayMenuIsSeparatorAt(TargetMenu, Position) {
+	static MF_BYPOSITION := 0x400, MF_SEPARATOR := 0x800
+	State := DllCall("GetMenuState", "ptr", TargetMenu.Handle, "uint", Position, "uint", MF_BYPOSITION, "uint")
+	return (State != 0xFFFFFFFF) and (State & MF_SEPARATOR) != 0
 }
 
 ; Resets the tray icon and menu to AHK defaults.

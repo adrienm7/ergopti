@@ -595,4 +595,127 @@ final class LauncherEnvironmentTests: XCTestCase {
 		release.signal()
 		wait(for: [completed], timeout: 2)
 	}
+
+
+
+
+
+	// ============================================
+	// ============================================
+	// ======= 2/ Fatal Lua Aborts ================
+	// ============================================
+	// ============================================
+
+	/// Creates a private report path whose folder is removed after the test.
+	private func temporaryFatalReportStore() throws -> EmbeddedFatalReportStore {
+		let folder = FileManager.default.temporaryDirectory
+			.appendingPathComponent("ergopti-fatal-report-\(UUID().uuidString)")
+		try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+		addTeardownBlock { try? FileManager.default.removeItem(at: folder) }
+		return EmbeddedFatalReportStore(path: folder.appendingPathComponent("hammerspoon-fatal.txt").path)
+	}
+
+	/// Hammerspoon reports status 0 after Lua os.exit(n). Once the logger was
+	/// configured, v0.0.0-dev.128 took that for a Quit and vanished silently
+	/// (silent-boot-abort): a report left by the child must win.
+	func testFatalReportAfterLoggerReadinessIsShownInsteadOfQuitting() throws {
+		let store = try temporaryFatalReportStore()
+		var fatalMessages: [String] = []
+		var cleanTerminationCount = 0
+		let loggerWorker = TestLoggerDatagramServer()
+		let delegate = AppDelegate(
+			launcherIdentityReader: { _ in (device: "11", inode: "22") },
+			applicationLauncher: { _, _, _ in },
+			fatalReporter: { fatalMessages.append($0) },
+			applicationTerminator: { _ in cleanTerminationCount += 1 },
+			loggerWorkerFactory: { loggerWorker },
+			fatalReportStore: store
+		)
+
+		delegate.launchHammerspoon(at: testEmbeddedHammerspoonBinary)
+		loggerWorker.reportBootstrapReady()
+		try "stage=accessibility\nmessage=Allow it.\ndetail=event tap refused\n"
+			.write(toFile: store.path, atomically: true, encoding: .utf8)
+		delegate.handleEmbeddedHammerspoonExit(.exited(code: 0), guardianStatus: .ready)
+
+		XCTAssertEqual(cleanTerminationCount, 0)
+		XCTAssertEqual(fatalMessages, [
+			"Embedded Hammerspoon stopped at boot stage 'accessibility': event tap refused",
+		])
+	}
+
+	/// A report from an earlier launch is removed before the child starts, and
+	/// the child learns where to write its own report and launcher.log line.
+	func testLaunchClearsStaleFatalReportAndExportsBothChannels() throws {
+		let store = try temporaryFatalReportStore()
+		try "stage=old\n".write(toFile: store.path, atomically: true, encoding: .utf8)
+		var childEnvironment: [String: String] = [:]
+		let loggerWorker = TestLoggerDatagramServer()
+		let delegate = AppDelegate(
+			launcherIdentityReader: { _ in (device: "11", inode: "22") },
+			applicationLauncher: { _, configuration, _ in
+				childEnvironment = configuration.environment
+			},
+			loggerWorkerFactory: { loggerWorker },
+			fatalReportStore: store
+		)
+
+		delegate.launchHammerspoon(at: testEmbeddedHammerspoonBinary)
+
+		XCTAssertFalse(FileManager.default.fileExists(atPath: store.path))
+		XCTAssertEqual(childEnvironment[kFatalReportEnvironment], store.path)
+		XCTAssertEqual(childEnvironment[kLauncherLogEnvironment], LauncherLog.filePath)
+		XCTAssertTrue(LauncherLog.filePath.hasSuffix("/Library/Logs/ErgoptiPlus/launcher.log"))
+	}
+
+	/// The startup trail names every exported key but never logs the token value.
+	func testStartupTrailListsExportedKeyNamesWithoutValues() {
+		let environment = launcherChildEnvironment(
+			base: ["PATH": "/usr/bin"],
+			launcherPid: 42,
+			launcherBundleId: "com.ergoptiplus.app",
+			loggerEndpoint: LoggerDatagramEndpoint(port: 4242, token: "secret-token-value")
+		)
+		let summary = launcherEnvironmentKeySummary(environment)
+		XCTAssertEqual(summary, [
+			"ERGOPTI_LAUNCHER_BUNDLE_ID", "ERGOPTI_LAUNCHER_PID",
+			kLoggerDatagramPortEnvironment, kLoggerDatagramTokenEnvironment,
+		].sorted().joined(separator: ", "))
+		XCTAssertFalse(summary.contains("secret-token-value"))
+		XCTAssertFalse(summary.contains("PATH"))
+		XCTAssertEqual(launcherEnvironmentKeySummary([:]), "none")
+	}
+
+	/// Exit descriptions stay identical in the trail and in the fatal alert.
+	func testExitDescriptionsNameCodeSignalAndErrno() {
+		XCTAssertEqual(embeddedProcessExitDescription(.exited(code: 0)), "with exit code 0")
+		XCTAssertEqual(embeddedProcessExitDescription(.signaled(signal: 9)), "after signal 9")
+		XCTAssertEqual(
+			embeddedProcessExitDescription(.unavailable(errorCode: 3)),
+			"with unavailable exit status (errno 3)"
+		)
+	}
+
+	/// Without a report, a clean exit after readiness is still the user's Quit.
+	func testCleanExitWithoutFatalReportStillQuits() throws {
+		let store = try temporaryFatalReportStore()
+		var fatalMessages: [String] = []
+		var cleanTerminationCount = 0
+		let loggerWorker = TestLoggerDatagramServer()
+		let delegate = AppDelegate(
+			launcherIdentityReader: { _ in (device: "11", inode: "22") },
+			applicationLauncher: { _, _, _ in },
+			fatalReporter: { fatalMessages.append($0) },
+			applicationTerminator: { _ in cleanTerminationCount += 1 },
+			loggerWorkerFactory: { loggerWorker },
+			fatalReportStore: store
+		)
+
+		delegate.launchHammerspoon(at: testEmbeddedHammerspoonBinary)
+		loggerWorker.reportBootstrapReady()
+		delegate.handleEmbeddedHammerspoonExit(.exited(code: 0), guardianStatus: .ready)
+
+		XCTAssertEqual(cleanTerminationCount, 1)
+		XCTAssertEqual(fatalMessages, [])
+	}
 }

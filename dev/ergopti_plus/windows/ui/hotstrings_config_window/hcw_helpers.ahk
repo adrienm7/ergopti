@@ -118,6 +118,25 @@ _HCW_BuildCategoryList() {
 			Group:       "common",
 		})
 	}
+	; Language packs: one entry per category file, labelled with the neutral
+	; category's name and the language's native name ("Autocorrection — Français").
+	for _, Pack in HotstringsLanguagePacks() {
+		for _, Stem in Pack["categories"] {
+			Cat := HotstringsLanguageGroupId(Pack["id"], Stem)
+			Base := _HCW_CATEGORY_LABELS.Has(Stem) ? _HCW_CATEGORY_LABELS[Stem] : Stem
+			List.Push({
+				Key:         Cat,
+				Label:       Base . " — " . HotstringsLanguageName(Pack["locale"]),
+				Path:        "",
+				IsPersonal:  false,
+				IsExtension: false,
+				IsVirtual:   false,
+				ExtId:       "",
+				ExtName:     "",
+				Group:       "common",
+			})
+		}
+	}
 	for _, Cat in _HCW_VIRTUAL_CATS {
 		Label := _HCW_CATEGORY_LABELS.Has(Cat) ? _HCW_CATEGORY_LABELS[Cat] : Cat
 		List.Push({
@@ -809,7 +828,7 @@ _HCW_GetSections(Entry) {
 				and ScriptInformation.Has("PersonalTomlPath")) {
 			Path := ScriptInformation["PersonalTomlPath"]
 		} else {
-			Path := _SharedDir . "\modules\hotstrings\" . StrLower(Cat) . ".toml"
+			Path := HotstringsBundledTomlPath(Cat)
 		}
 	}
 	Sections := []

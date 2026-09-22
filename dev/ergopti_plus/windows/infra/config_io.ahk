@@ -12,6 +12,7 @@
 ; ==============================================================================
 
 #Include config_write_lease.ahk
+#Include config_unused_keys.ahk
 
 ; Reports one user-visible error for a configuration mutation that did not
 ; reach disk. The TOML writer already logs its low-level failure; this adds the
@@ -1104,6 +1105,50 @@ ToggleCategoryAllSections(V1Cat, Enable) {
 		return ReloadPreservingSuspend()
 }
 
+; Force every section of every category of one language pack on/off — the
+; « tout activer » / « tout désactiver » rows of a language submenu. Same
+; contract as ToggleCategoryAllSections, applied to all of the language's
+; categories in ONE persisted transaction: enabling also lifts the Hotstrings
+; master and each category gate so the activation is immediately effective.
+; ``Pack`` is one entry of HotstringsLanguageCategories().
+ToggleLanguageAllSections(Pack, Enable) {
+		global CategoryEnabled, ConfigurationFile, Features
+		Bool := (Enable = true or Enable = 1)
+		CandidateCategories := CategoryEnabled.Clone()
+		CandidateFeatures := _HSDeepCloneMap(Features)
+		Updates := []
+		if (Bool and (!CandidateCategories.Has("Hotstrings") or !CandidateCategories["Hotstrings"])) {
+				CandidateCategories["Hotstrings"] := true
+				Updates.Push({ Section: "category_enabled", Key: "hotstrings", Value: TOML_Bool(true) })
+		}
+		Entries := []
+		for _, Cat in Pack["categories"] {
+				if (Bool and CandidateCategories.Has(Cat["v1"]) and !CandidateCategories[Cat["v1"]]) {
+						CandidateCategories[Cat["v1"]] := true
+						Updates.Push({ Section: "category_enabled", Key: Cat["v2"], Value: TOML_Bool(true) })
+				}
+				for _, Entry in ManifestFeaturesForSection("hotstrings." . Cat["v2"])
+						Entries.Push(Map("path", Entry["path"], "value", Bool))
+		}
+		Label := "the '" . Pack["id"] . "' language toggle"
+		if (Entries.Length == 0)
+				throw Error("Language pack '" . Pack["id"] . "' has no manifest feature rows.")
+		Applied := _ConfigStageFeatureEntries(CandidateFeatures, Entries, Updates)
+		if (Applied != Entries.Length)
+				return ConfigReportPersistenceFailure(Label, 0,
+					"one or more feature paths could not be resolved")
+		if !ConfigCommitUpdates(ConfigurationFile, Updates, Label)
+				return false
+		PreviousCritical := Critical("On")
+		try {
+				CategoryEnabled := CandidateCategories
+				Features := CandidateFeatures
+		} finally {
+				Critical(PreviousCritical)
+		}
+		return ReloadPreservingSuspend()
+}
+
 ; Force every personal hotstring section (from personal_hotstrings.toml) on/off.
 ; Personal sections are runtime-discovered, so their v2 paths are built from the
 ; TOML section names (hotstrings.personal.<lower(section)>). Enabling lifts the
@@ -1160,8 +1205,12 @@ _CategoryEnabledKey(Category) {
 				case "DistancesReduction": return "distances_reduction"
 				case "SFBsReduction":      return "sfbs_reduction"
 				case "MagicKey":           return "magic_key"
-				default: return StrLower(Category)
 		}
+		; Language-pack gates are keyed by their group id ("french_autocorrection");
+		; the table is filled when the boot seeds those gates.
+		if IsSet(HS_LANGUAGE_GATE_KEYS) and HS_LANGUAGE_GATE_KEYS.Has(Category)
+				return HS_LANGUAGE_GATE_KEYS[Category]
+		return StrLower(Category)
 }
 
 _ConfigCollectFullSaveUpdates(FeaturesSource := unset, MenuSource := unset) {
