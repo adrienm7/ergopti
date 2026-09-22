@@ -1824,6 +1824,7 @@
 	"shortcuts.titlecase": "Win + W = המר ל-title case (אות גדולה בתחילת כל מילה)",
 	"shortcuts.uppercase": "Win + U(ppercase) = החלף בחירה אותיות גדולות/קטנות",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
+	"startup.accessibility_required": "ErgoptiPlus זקוק להרשאת נגישות כדי לקרוא את המקלדת. בהגדרות המערכת > פרטיות ואבטחה > נגישות, הפעל את הפריט Hammerspoon השייך ל־ErgoptiPlus, ואז פתח שוב את ErgoptiPlus. ליישום Hammerspoon שאתה מפעיל בנפרד יש פריט משלו.",
 	"startup.manifest_missing": "שגיאת הפעלה: הקובץ _generated/features_manifest.ahk חסר או פגום.\n\nהפעל `npm run build:manifest` מתיקיית הפרויקט ולאחר מכן הפעל מחדש את הסקריפט.",
 	"startup.manifest_title": "ErgoptiPlus — manifest חסר",
 	"startup.native_logger_unavailable": "לא ניתן להפעיל את ErgoptiPlus מכיוון ששירות הרישום המקורי שלו אינו זמין. יש להפעיל את ErgoptiPlus דרך המשגר שלו.",

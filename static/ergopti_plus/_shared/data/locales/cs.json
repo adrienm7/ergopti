@@ -1824,6 +1824,7 @@
 	"shortcuts.titlecase": "Win + W = Převést na formát názvu (velké první písmeno každého slova)",
 	"shortcuts.uppercase": "Win + U(ppercase) = Přepnout výběr velká/malá písmena",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
+	"startup.accessibility_required": "ErgoptiPlus potřebuje oprávnění Zpřístupnění, aby mohl číst klávesnici. V Nastavení systému > Soukromí a zabezpečení > Zpřístupnění zapněte položku Hammerspoon, která patří k ErgoptiPlus, a poté ErgoptiPlus znovu otevřete. Samostatně spouštěná aplikace Hammerspoon má vlastní položku.",
 	"startup.manifest_missing": "Chyba při spuštění: soubor _generated/features_manifest.ahk chybí nebo je poškozen.\n\nSpusťte `npm run build:manifest` z adresáře projektu a skript restartujte.",
 	"startup.manifest_title": "ErgoptiPlus — manifest chybí",
 	"startup.native_logger_unavailable": "ErgoptiPlus nelze spustit, protože nativní služba protokolování není dostupná. Spusťte ErgoptiPlus prostřednictvím jeho spouštěče.",

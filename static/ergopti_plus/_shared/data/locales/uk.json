@@ -1824,6 +1824,7 @@
 	"shortcuts.titlecase": "Win + W = Перетворити на заголовний регістр (велика перша літера кожного слова)",
 	"shortcuts.uppercase": "Win + U(ppercase) = Перемикати регістр виділення",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
+	"startup.accessibility_required": "ErgoptiPlus потрібен дозвіл «Доступність», щоб зчитувати клавіатуру. У розділі Системні параметри > Приватність і безпека > Доступність увімкніть пункт Hammerspoon, що належить ErgoptiPlus, а потім знову відкрийте ErgoptiPlus. Окремо запущений застосунок Hammerspoon має власний пункт.",
 	"startup.manifest_missing": "Помилка запуску: файл _generated/features_manifest.ahk відсутній або пошкоджений.\n\nЗапустіть `npm run build:manifest` з каталогу проекту та перезапустіть скрипт.",
 	"startup.manifest_title": "ErgoptiPlus — manifest відсутній",
 	"startup.native_logger_unavailable": "ErgoptiPlus не може запуститися, оскільки нативна служба журналювання недоступна. Запустіть ErgoptiPlus через його засіб запуску.",

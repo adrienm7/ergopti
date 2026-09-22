@@ -1824,6 +1824,7 @@
 	"shortcuts.titlecase": "Win + W = التحويل إلى حالة العنوان (رسملة أول حرف من كل كلمة)",
 	"shortcuts.uppercase": "Win + U(ppercase) = تبديل التحديد بين الأحرف الكبيرة والصغيرة",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
+	"startup.accessibility_required": "يحتاج ErgoptiPlus إلى إذن تسهيلات الاستخدام لقراءة لوحة المفاتيح. في إعدادات النظام > الخصوصية والأمان > تسهيلات الاستخدام، فعّل عنصر Hammerspoon التابع لـ ErgoptiPlus، ثم افتح ErgoptiPlus مرة أخرى. تطبيق Hammerspoon الذي تشغّله بشكل منفصل له عنصر خاص به.",
 	"startup.manifest_missing": "خطأ في بدء التشغيل: الملف _generated/features_manifest.ahk مفقود أو تالف.\n\nشغّل `npm run build:manifest` من مجلد المشروع، ثم أعد تشغيل السكريبت.",
 	"startup.manifest_title": "ErgoptiPlus — ملف manifest مفقود",
 	"startup.native_logger_unavailable": "لا يمكن بدء ErgoptiPlus لأن خدمة التسجيل الأصلية غير متاحة. شغّل ErgoptiPlus عبر المشغّل الخاص به.",

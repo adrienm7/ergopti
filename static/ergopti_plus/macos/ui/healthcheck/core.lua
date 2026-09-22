@@ -225,6 +225,11 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.accessibility_permission",
+		contract = { "is_trusted", "request_prompt" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.app_launcher",
 		contract = { "launch", "launchWithArgs", "isRunning" },
 		wired    = true,

@@ -1824,6 +1824,7 @@
 	"shortcuts.titlecase": "Win + W = 타이틀 케이스로 변환 (각 단어의 첫 글자 대문자)",
 	"shortcuts.uppercase": "Win + U(ppercase) = 선택 대문자/소문자 토글",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
+	"startup.accessibility_required": "ErgoptiPlus가 키보드를 읽으려면 손쉬운 사용 권한이 필요합니다. 시스템 설정 > 개인정보 보호 및 보안 > 손쉬운 사용에서 ErgoptiPlus에 속한 Hammerspoon 항목을 켠 다음 ErgoptiPlus를 다시 여세요. 별도로 실행하는 Hammerspoon 앱에는 자체 항목이 있습니다.",
 	"startup.manifest_missing": "시작 오류: _generated/features_manifest.ahk 파일이 없거나 손상되었습니다.\n\n프로젝트 디렉터리에서 `npm run build:manifest`를 실행한 후 스크립트를 다시 시작하세요.",
 	"startup.manifest_title": "ErgoptiPlus — manifest 누락",
 	"startup.native_logger_unavailable": "네이티브 로깅 서비스를 사용할 수 없어 ErgoptiPlus를 시작할 수 없습니다. 전용 런처를 통해 ErgoptiPlus를 시작하세요.",
