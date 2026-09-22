@@ -781,8 +781,11 @@ function M.build(ctx)
 		end
 	end
 
-	-- Top-level items (at_hash, layer_scroll) are not in the manifest list yet;
-	-- prepend them before the manifest-driven items for backward compatibility.
+	-- The feature toggles (at_hash, layer_scroll, the wrap-text toggle) open the
+	-- submenu. They are row DATA handed over by the wrap-symbols list provider,
+	-- which the manifest places first, so the renderer draws them like every
+	-- other row: prepended after rendering, the wrap-text toggle reached the tray
+	-- with no title and hs.menubar drew nothing.
 	local top_items = {}
 	for _, id in ipairs(TOP_ORDER) do
 		if top_map[id] then table.insert(top_items, top_map[id]) end
@@ -814,9 +817,13 @@ function M.build(ctx)
 		-- enumerate them — and the manifest called this Windows-only until
 		-- 2026-08-06 while this driver had been building it all along.
 		["wrap_symbols_menu"] = function()
-			return { { label = i18n.get("menu.shortcuts.wrap_symbols"),
-			           disabled = not state.shortcuts or paused or nil,
-			           items = build_wrap_symbols_submenu(ctx, state, paused, shortcuts) } }
+			local rows = {}
+			for _, row in ipairs(top_items) do rows[#rows + 1] = row end
+			if #rows > 0 then rows[#rows + 1] = { separator = true } end
+			rows[#rows + 1] = { label = i18n.get("menu.shortcuts.wrap_symbols"),
+			                    disabled = not state.shortcuts or paused or nil,
+			                    items = build_wrap_symbols_submenu(ctx, state, paused, shortcuts) }
+			return rows
 		end,
 		keyboard_slots = function(_ctx)
 			-- The built-in Ctrl and Cmd shortcuts open the group of their own
@@ -847,18 +854,6 @@ function M.build(ctx)
 	sc_ctx.state_getters["shortcuts_enabled"] = function() return state.shortcuts and true or false end
 
 	local s_menu = ManifestMenu.build("shortcuts_menu", "Shortcuts", dyn_handlers, group_builders, sc_ctx, list_providers)
-
-	-- Prepend the top-level feature items before the manifest section. They are
-	-- row DATA (`label`, `action`) and the manifest section is already rendered,
-	-- so they go through the same renderer first: inserted raw, the wrap-text
-	-- toggle reached the tray with no title and hs.menubar drew nothing.
-	top_items = ManifestMenu.render_rows(top_items, "shortcuts_top_items")
-	for i, it in ipairs(top_items) do
-		table.insert(s_menu, i, it)
-	end
-	if #top_items > 0 and #s_menu > #top_items then
-		table.insert(s_menu, #top_items + 1, { title = "-" })
-	end
 
 	item.submenu = s_menu
 	return item
