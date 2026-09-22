@@ -26,6 +26,7 @@ local function build_fixture(options)
 	function webview:level() return mutation("level") end
 	function webview:allowTextEntry() return mutation("allowTextEntry") end
 	function webview:allowGestures() return mutation("allowGestures") end
+	function webview:shadow() return mutation("shadow") end
 	function webview:allowNewWindows() return mutation("allowNewWindows") end
 	function webview:windowCallback(callback)
 		state.window_callback = callback
