@@ -1561,12 +1561,12 @@ KLWV_DeliverRebuildFile(which, Entry, Epoch, Job, Path, Slot, Prefix, Suffix) {
 				Stamp := Modified . ":" . FileGetSize(Path)
 				if StrCompare(Modified, Job["started_at"]) < 0 || Entry.Get(Slot, "") == Stamp
 						return false
-				Body := FileRead(Path, "UTF-8")
 		} catch {
 				; The worker replaces the file atomically; the next tick sees it whole.
 				return false
 		}
-		if (Body = "") || !_KLWV_OwnsDelivery(which, Entry, Epoch)
+		Body := FSRead(Path)
+		if !(Body is String) || (Body = "") || !_KLWV_OwnsDelivery(which, Entry, Epoch)
 				return false
 		Entry[Slot] := Stamp
 		try Entry["webview"].PostWebMessageAsString(Prefix . Body . Suffix)
