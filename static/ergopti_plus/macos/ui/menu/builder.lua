@@ -568,9 +568,9 @@ function M.generate(ctx, menu_mods, actions)
 		push("shortcuts.build", menu_mods.shortcuts.build, shortcuts_ctx)
 	end
 
-	-- Karabiner then Gestures — keyboard first, then trackpad
-	if type(menu_mods.karabiner) == "table" and type(menu_mods.karabiner.build) == "function" then
-		push("karabiner.build", menu_mods.karabiner.build, ctx)
+	-- Tap-holds then Gestures — keyboard first, then trackpad
+	if type(menu_mods.tap_holds) == "table" and type(menu_mods.tap_holds.build) == "function" then
+		push("tap_holds.build", menu_mods.tap_holds.build, ctx)
 	end
 	if type(menu_mods.gestures) == "table" then
 		push("gestures.build", menu_mods.gestures.build, ctx)

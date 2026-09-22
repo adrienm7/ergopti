@@ -106,11 +106,6 @@ const OPENS_SUBMENU = {
 	// The About submenu, declared 2026-08-07. Visible on all three; the updater
 	// rows inside are narrower and say why.
 	about: 'about_menu',
-	// macOS's tap-hold and chord engine, as kanata is Linux's. Mapped for the
-	// same reason: its rows inherit `top_level/karabiner`'s own macOS-only
-	// visibility instead of each of the twelve repeating "macOS only", which
-	// would turn a real signal into noise nobody reads.
-	karabiner: 'karabiner_menu',
 	updates: 'updates_menu',
 	// The LLM submenu, which had no manifest tree at all until 2026-08-06: the
 	// top-level row has existed on all three drivers since the feature shipped

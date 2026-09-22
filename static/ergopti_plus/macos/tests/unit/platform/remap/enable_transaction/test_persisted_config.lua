@@ -33,7 +33,7 @@ helpers.describe("HS-019 malformed TOML keeps the real Clear All command inert",
 			logger.success = function() observations.successes = observations.successes + 1 end
 			local saved_logger = package.loaded["infra.logger"]
 			package.loaded["infra.logger"] = logger
-			local MenuRemap = helpers.load_with_stubs("ui.menu.menu_remap", {})
+			local MenuRemap = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
 			package.loaded["infra.logger"] = saved_logger
 
 			local built = MenuRemap.build({
@@ -44,7 +44,7 @@ helpers.describe("HS-019 malformed TOML keeps the real Clear All command inert",
 			})
 			local function children(row)
 				if type(row) ~= "table" then return {} end
-				return row.items or row.menu or {}
+				return row.submenu or row.items or row.menu or {}
 			end
 			local function find_row(row, label)
 				if type(row) ~= "table" then return nil end
@@ -55,7 +55,7 @@ helpers.describe("HS-019 malformed TOML keeps the real Clear All command inert",
 				end
 				return nil
 			end
-			local row = find_row(built, "menu.karabiner.clear_all")
+			local row = find_row(built, "tap_hold.disable_all")
 			helpers.assert_not_nil(row,
 				"the real manifest must expose the Clear All command")
 			local action = row and (row.action or row.fn)

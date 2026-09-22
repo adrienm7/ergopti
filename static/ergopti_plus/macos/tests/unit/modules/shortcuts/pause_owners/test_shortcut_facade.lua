@@ -210,7 +210,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			"ui.menu.menu_keyboard_layout",
 			"ui.menu.menu_hotstrings",
 			"ui.menu.menu_metrics",
-			"ui.menu.menu_remap",
+			"ui.menu.menu_tap_holds",
 			"ui.menu.menu_apps",
 			"ui.menu.menu_about",
 		}) do

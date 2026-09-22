@@ -1,27 +1,27 @@
---- ui/menu/menu_remap.lua
+--- ui/menu/menu_tap_holds.lua
 
 --- ==============================================================================
---- MODULE: Karabiner Menu
+--- MODULE: Tap-Holds Menu
 --- DESCRIPTION:
---- Provides the "Karabiner" submenu in the Hammerspoon menu bar.
+--- Provides the "Tap-Holds" submenu in the Hammerspoon menu bar: the same row,
+--- name and manifest declaration Windows uses for its tap-holds. The remap
+--- engine behind it (Karabiner-Elements) is an implementation detail the user
+--- never sees, so no label here names it.
 ---
 --- FEATURES & RATIONALE:
---- 1. Status item: 🟢/🟡/🔴 reflects only Ergopti's exact lease state.
---- 2. Tap/Hold section: each key shows "Label : tap / hold" inline. Items are
----    grayed out when the integration is disabled.
---- 3. Raccourcis section: modifier combos grouped by key, also grayed when off.
---- 4. Delay pickers: configure tap/hold and sticky modifier timeouts globally.
---- 5. Explicit regeneration: changes are saved immediately, applied via "Régénérer".
+--- 1. Tap/Hold section: each key shows "Label : tap / hold" inline. Items are
+---    grayed out while the remap engine is not initialised.
+--- 2. Chords section: modifier combos grouped by key, also grayed then.
+--- 3. Delay pickers: configure tap/hold and sticky modifier timeouts globally.
+--- 4. Changes are saved immediately and applied by an exact regeneration.
 --- ==============================================================================
 
 local M = {}
 
 local Logger      = require("infra.logger")
-local Notifications = require("infra.notifications")
-local LeaseController = require("platform.remap.lease_controller")
 local MenuUtils   = require("ui.menu.menu_utils")
 local ManifestMenu = require("infra.manifest_menu")
-local LOG         = "menu.karabiner"
+local LOG         = "menu.tap_holds"
 local i18n        = require("infra.i18n")
 local text_utils  = require("infra.text_utils")
 
@@ -63,15 +63,6 @@ local NONE_DISPLAY = "—"
 -- ======= 1/ Helper Utilities =========
 -- =====================================
 -- =====================================
-
---- Reads exact Ergopti lease state without probing any stock process.
---- @return string phase Controller lifecycle phase.
---- @return table snapshot Controller status snapshot.
-local function read_lease_status()
-	local ok, phase, snapshot = pcall(LeaseController.status)
-	if not ok or type(phase) ~= "string" then return "failed", {} end
-	return phase, type(snapshot) == "table" and snapshot or {}
-end
 
 --- Requests an exact-lease regeneration without letting a menu callback throw.
 --- @param karabiner table Remap facade.
@@ -411,7 +402,7 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 
 	local key_submenu = {
 		{
-			label    = i18n.get("menu.karabiner.nothing_tap_hold"),
+			label    = i18n.get("menu.tapholds.nothing_tap_hold"),
 			disabled = (current_tap == "none" and current_hold == "none"),
 			action       = function()
 				return run_bulk_menu_command(
@@ -427,7 +418,7 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 		},
 		{ separator = true },
 		{
-			label = string.format(i18n.get("menu.karabiner.tap_arrow"), tap_slbl),
+			label = string.format(i18n.get("menu.tapholds.tap_arrow"), tap_slbl),
 			items  = build_action_picker(
 				karabiner,
 				function(action_id) return karabiner.set_tap_action(kid, action_id) end,
@@ -437,7 +428,7 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 			),
 		},
 		{
-			label = string.format(i18n.get("menu.karabiner.hold_arrow"), hold_slbl),
+			label = string.format(i18n.get("menu.tapholds.hold_arrow"), hold_slbl),
 			items  = build_action_picker(
 				karabiner,
 				function(action_id) return karabiner.set_hold_action(kid, action_id) end,
@@ -450,15 +441,15 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 		-- Per-key tap/hold delay: open a free-text dialog to set a custom value, or
 		-- revert to the single global delay. The title shows the effective value.
 		{
-			label = string.format(i18n.get("menu.karabiner.key_tap_delay"), fmt_delay(effective_ms)),
+			label = string.format(i18n.get("menu.tapholds.key_tap_delay"), fmt_delay(effective_ms)),
 			items  = {
 				{
-					label = i18n.get("menu.karabiner.key_tap_delay_set"),
+					label = i18n.get("menu.tapholds.key_tap_delay_set"),
 					action    = function()
 						hs.focus()
 						local prompt = string.format(
-							i18n.get("menu.karabiner.key_tap_delay_dialog_prompt"), global_ms)
-						local title_d    = i18n.get("menu.karabiner.key_tap_delay_dialog_title")
+							i18n.get("menu.tapholds.key_tap_delay_dialog_prompt"), global_ms)
+						local title_d    = i18n.get("menu.tapholds.key_tap_delay_dialog_title")
 						local btn_ok     = i18n.get("button.ok")
 						local btn_cancel = i18n.get("button.cancel")
 						local script = delay_dialog_script(prompt, effective_ms, title_d, btn_cancel, btn_ok)
@@ -475,7 +466,7 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 					end,
 				},
 				{
-					label   = string.format(i18n.get("menu.karabiner.key_tap_delay_use_global"), fmt_delay(global_ms)),
+					label   = string.format(i18n.get("menu.tapholds.key_tap_delay_use_global"), fmt_delay(global_ms)),
 					checked = (per_key_ms == nil),
 					disabled = (per_key_ms == nil),
 					action      = function()
@@ -507,11 +498,11 @@ end
 local function build_tap_hold_items(karabiner, action_index, update_menu, enabled)
 	local items = {}
 
-	-- `label`, not `title`: these three go into the `karabiner_tap_holds` provider
+	-- `label`, not `title`: these three go into the `tap_hold_keys` provider
 	-- array, and a row the renderer finds no label on is dropped — so all three
 	-- headers were missing and the two hands ran together in one undivided list.
-	items[#items + 1] = { label = i18n.section("menu.karabiner.header_taps_holds"), disabled = true }
-	items[#items + 1] = { label = i18n.section("menu.karabiner.left_hand"),         disabled = true }
+	items[#items + 1] = { label = i18n.section("menu.tapholds.header_taps_holds"), disabled = true }
+	items[#items + 1] = { label = i18n.section("menu.tapholds.left_hand"),         disabled = true }
 	for _, key_def in ipairs(karabiner.TAP_HOLD_KEYS) do
 		if LEFT_HAND_IDS[key_def.id] then
 			items[#items + 1] = build_one_tap_hold_item(
@@ -519,7 +510,7 @@ local function build_tap_hold_items(karabiner, action_index, update_menu, enable
 		end
 	end
 
-	items[#items + 1] = { label = i18n.section("menu.karabiner.right_hand"), disabled = true }
+	items[#items + 1] = { label = i18n.section("menu.tapholds.right_hand"), disabled = true }
 	for _, key_def in ipairs(karabiner.TAP_HOLD_KEYS) do
 		if not LEFT_HAND_IDS[key_def.id] then
 			items[#items + 1] = build_one_tap_hold_item(
@@ -569,7 +560,7 @@ local function build_one_combo_item(karabiner, action_index, update_menu, enable
 
 	local combo_submenu = {
 		{
-			label    = i18n.get("menu.karabiner.nothing_combo"),
+			label    = i18n.get("menu.tapholds.nothing_combo"),
 			disabled = is_empty,
 			action       = function()
 				return run_bulk_menu_command(
@@ -585,7 +576,7 @@ local function build_one_combo_item(karabiner, action_index, update_menu, enable
 		},
 		{ separator = true },
 		{
-			label = string.format(i18n.get("menu.karabiner.combo_arrow"), combo_slbl),
+			label = string.format(i18n.get("menu.tapholds.combo_arrow"), combo_slbl),
 			items  = build_action_picker(
 				karabiner,
 				function(action_id) return karabiner.set_combo_combo_action(cid, action_id) end,
@@ -595,7 +586,7 @@ local function build_one_combo_item(karabiner, action_index, update_menu, enable
 			),
 		},
 		{
-			label = string.format(i18n.get("menu.karabiner.tap_colon"), tap_slbl),
+			label = string.format(i18n.get("menu.tapholds.tap_colon"), tap_slbl),
 			items  = build_action_picker(
 				karabiner,
 				function(action_id) return karabiner.set_combo_tap_action(cid, action_id) end,
@@ -605,7 +596,7 @@ local function build_one_combo_item(karabiner, action_index, update_menu, enable
 			),
 		},
 		{
-			label = string.format(i18n.get("menu.karabiner.hold_colon"), hold_slbl),
+			label = string.format(i18n.get("menu.tapholds.hold_colon"), hold_slbl),
 			items  = build_action_picker(
 				karabiner,
 				function(action_id) return karabiner.set_combo_hold_action(cid, action_id) end,
@@ -681,12 +672,12 @@ local function build_delay_item(karabiner, update_menu)
 	local timeout_ms = karabiner.get_tap_hold_timeout()
 
 	return {
-		label = string.format(i18n.get("menu.karabiner.tap_hold_title"), fmt_delay(timeout_ms)),
+		label = string.format(i18n.get("menu.tapholds.tap_hold_title"), fmt_delay(timeout_ms)),
 		action    = function()
 			-- Bring Hammerspoon to front so the dialog appears above other windows
 			hs.focus()
-			local prompt = string.format(i18n.get("menu.karabiner.tap_hold_dialog_prompt"), karabiner.DEFAULT_TAP_HOLD_TIMEOUT_MS)
-			local title_d = i18n.get("menu.karabiner.tap_hold_dialog_title")
+			local prompt = string.format(i18n.get("menu.tapholds.tap_hold_dialog_prompt"), karabiner.DEFAULT_TAP_HOLD_TIMEOUT_MS)
+			local title_d = i18n.get("menu.tapholds.tap_hold_dialog_title")
 			local btn_ok = i18n.get("button.ok")
 			local btn_cancel = i18n.get("button.cancel")
 			local script = delay_dialog_script(prompt,
@@ -715,11 +706,11 @@ local function build_sticky_delay_item(karabiner, update_menu)
 	local timeout_ms = karabiner.get_sticky_timeout()
 
 	return {
-		label = string.format(i18n.get("menu.karabiner.sticky_title"), fmt_delay(timeout_ms)),
+		label = string.format(i18n.get("menu.tapholds.sticky_title"), fmt_delay(timeout_ms)),
 		action    = function()
 			hs.focus()
-			local prompt = i18n.get("menu.karabiner.sticky_dialog_prompt")
-			local title_d = i18n.get("menu.karabiner.sticky_dialog_title")
+			local prompt = i18n.get("menu.tapholds.sticky_dialog_prompt")
+			local title_d = i18n.get("menu.tapholds.sticky_dialog_title")
 			local btn_ok = i18n.get("button.ok")
 			local btn_cancel = i18n.get("button.cancel")
 			local script = delay_dialog_script(prompt,
@@ -749,11 +740,11 @@ local function build_simultaneous_threshold_item(karabiner, update_menu)
 	local threshold_ms = karabiner.get_simultaneous_threshold()
 
 	return {
-		label = string.format(i18n.get("menu.karabiner.simultaneous_title"), fmt_delay(threshold_ms)),
+		label = string.format(i18n.get("menu.tapholds.simultaneous_title"), fmt_delay(threshold_ms)),
 		action    = function()
 			hs.focus()
-			local prompt = string.format(i18n.get("menu.karabiner.simultaneous_dialog_prompt"), karabiner.DEFAULT_SIMULTANEOUS_THRESHOLD_MS)
-			local title_d = i18n.get("menu.karabiner.simultaneous_dialog_title")
+			local prompt = string.format(i18n.get("menu.tapholds.simultaneous_dialog_prompt"), karabiner.DEFAULT_SIMULTANEOUS_THRESHOLD_MS)
+			local title_d = i18n.get("menu.tapholds.simultaneous_dialog_title")
 			local btn_ok = i18n.get("button.ok")
 			local btn_cancel = i18n.get("button.cancel")
 			local script = delay_dialog_script(prompt,
@@ -783,7 +774,7 @@ local function build_combo_symmetric_item(karabiner, update_menu)
 	local is_symmetric = karabiner.get_combo_symmetric()
 
 	return {
-		label   = i18n.get("menu.karabiner.symmetric"),
+		label   = i18n.get("menu.tapholds.symmetric"),
 		checked = is_symmetric,
 		action      = function()
 			commit_menu_setting(karabiner, "Combo symmetry", function()
@@ -803,9 +794,6 @@ end
 -- ======================================
 -- ======================================
 
---- Builds the complete Karabiner menu item with its submenu.
---- @param ctx table Global UI context (must contain ctx.karabiner).
---- @return table|nil A hs.menubar menu item with a submenu, or nil on failure.
 -- Cached tap/hold + raccourcis picker trees. Building them is the dominant cost
 -- of opening the menubar (~300-380 ms measured): 182 modifier combos × a 73-action
 -- picker each is ~40k menu tables + closures, and the old code rebuilt the whole
@@ -816,7 +804,6 @@ end
 -- rebuilds with fresh checkmarks. update_menu is a stable upvalue (set once in
 -- ui.menu.init), so the cached closures stay valid across opens.
 local _picker_cache = nil
-local _toggle_in_flight = false
 
 --- Cheap fingerprint of every input that affects the picker trees. Reads in-memory
 --- config accessors only (no I/O), so it is far cheaper than a rebuild.
@@ -866,159 +853,46 @@ local function build_picker_trees(karabiner, update_menu, enabled)
 	return tap_hold, raccourcis
 end
 
---- Builds the complete Karabiner menu item with its submenu.
+--- Builds the Tap-holds row and its submenu.
 ---
---- `karabiner_menu` in the shared manifest owns the structural sequence:
---- status/lifecycle rows, destructive Ergopti configuration commands, timings,
---- tap/hold bindings, then modifier shortcuts. This module supplies only the
---- dynamic provider rows and command capabilities consumed by that manifest.
+--- `tap_holds_menu` in the shared manifest owns the structural sequence, the
+--- same declaration Windows renders: the bulk commands, then this engine's
+--- timings, the per-key tap/hold bindings, and the modifier chords. This module
+--- supplies only the provider rows and the command capabilities.
+---
+--- There is no enable toggle and no process-control row: the remap engine is an
+--- implementation detail the driver keeps running on its own.
 --- @param ctx table Global UI context (must contain ctx.karabiner).
---- @return table|nil A hs.menubar menu item with a submenu, or nil on failure.
+--- @return table|nil A provider row carrying the rendered submenu, or nil.
 function M.build(ctx)
 	local karabiner   = ctx and ctx.karabiner
 	local update_menu = ctx and ctx.updateMenu
 
 	if not karabiner then
-		Logger.warn(LOG, "Karabiner module absent from context — submenu skipped.")
+		Logger.warn(LOG, "Remap module absent from context — tap-holds submenu skipped.")
 		return nil
 	end
 
 	local enabled = karabiner.get_enabled()
-	-- Status is an in-memory lease-controller read. Opening this submenu while
-	-- disabled never probes, launches or otherwise touches stock Karabiner.
-	local phase, snapshot = read_lease_status()
-	local active        = enabled and phase == "active"
-	local transitioning = enabled and (phase == "starting" or phase == "pausing"
-		or phase == "resuming" or phase == "stopping")
-	local lease_attached = phase == "starting" or phase == "active" or phase == "paused"
-		or phase == "pausing" or phase == "resuming" or phase == "stopping"
-	local guardian_approval_required = enabled
-		and snapshot.guardian_status == "requires_approval"
-	local tap_hold, raccourcis = build_picker_trees(karabiner, update_menu, enabled)
+	local tap_hold, chords = build_picker_trees(karabiner, update_menu, enabled)
 
-	-- The icon reports only facts Ergopti owns: exact lease active, transitioning,
-	-- enabled-but-inactive, or disabled. It never infers ownership from a shared PID.
-	local status_title
-	if guardian_approval_required then
-		status_title = i18n.get("menu.karabiner.status_guardian_approval_required")
-	elseif active then
-		status_title = i18n.get("menu.karabiner.status_active")
-	elseif transitioning then
-		status_title = i18n.get("menu.karabiner.status_priming")
-	elseif enabled then
-		status_title = i18n.get("menu.karabiner.status_not_primed")
-	else
-		status_title = i18n.get("menu.karabiner.status_inactive")
-	end
-
-	local status_rows = {}
-
-	local status_action = nil
-	if guardian_approval_required then
-		status_action = function()
-			-- Menu closures can outlive the state they rendered. Re-read the facade
-			-- before any native launch so disabling the integration makes this inert.
-			local enabled_ok, still_enabled = pcall(karabiner.get_enabled)
-			if not enabled_ok or still_enabled ~= true then
-				Logger.debug(LOG,
-					"Ignoring stale guardian approval action after Karabiner integration disable.")
-				return
-			end
-
-			local callback_fired = false
-			local function finish(ok, reason)
-				if callback_fired then return end
-				callback_fired = true
-				if ok ~= true then
-					Logger.error(LOG, "Could not open Login Items settings: %s.", tostring(reason))
-					Notifications.notify(
-						i18n.get("karabiner.guardian_settings_open_failed"), nil, "error")
-				end
-				if update_menu then pcall(update_menu) end
-			end
-			local call_ok, accepted_or_err = xpcall(function()
-				return karabiner.open_guardian_settings(finish)
-			end, debug.traceback)
-			if not call_ok then
-				finish(false, "settings-action-raised: " .. tostring(accepted_or_err))
-			elseif accepted_or_err ~= true and not callback_fired then
-				finish(false, "settings-action-rejected")
-			end
-		end
-	elseif enabled then
-		status_action = function()
-			Logger.info(LOG, "Status clicked — rebuilding inert rules and requesting exact lease activation.")
-			request_regeneration(karabiner, "Status rebuild")
-			if update_menu then pcall(update_menu) end
-		end
-	end
-	status_rows[#status_rows + 1] = {
-		label    = status_title,
-		disabled = not enabled,
-		action   = status_action,
-	}
-	status_rows[#status_rows + 1] = {
-		label  = i18n.get("menu.karabiner.open_gui"),
-		action = function() karabiner.open_gui() end,
-	}
-	status_rows[#status_rows + 1] = {
-		label    = i18n.get("menu.karabiner.start"),
-		disabled = not enabled or lease_attached,
-		action   = function()
-			Logger.start(LOG, "User requested exact Ergopti Karabiner lease start…")
-			request_regeneration(karabiner, "Menu Start")
-			if update_menu then pcall(update_menu) end
-		end,
-	}
-	status_rows[#status_rows + 1] = {
-		label    = i18n.get("menu.karabiner.stop"),
-		disabled = not enabled or not lease_attached,
-		action   = function()
-			local stop_ok, requested_or_err = xpcall(function()
-				return karabiner.stop_lease(function()
-					if update_menu then pcall(update_menu) end
-				end)
-			end, debug.traceback)
-			if not stop_ok or requested_or_err ~= true then
-				Logger.error(LOG, "Exact lease stop request was not accepted: %s.",
-					tostring(requested_or_err))
-			end
-		end,
-	}
-
-
-	-- The rows this driver still assembles, handed to the SHARED renderer as
-	-- provider data. The manifest describes the menu's shape — process control,
-	-- the destructive resets, the timings, then tap-holds and chords under their
-	-- own headers — and this file answers with the rows for each slot.
 	local providers = {
-		["karabiner_status"] = function() return status_rows end,
-		["karabiner_delays"] = function()
-			local rows = {}
-			for _, item in ipairs({
+		["tap_hold_timings"] = function()
+			return {
 				build_delay_item(karabiner, update_menu),
 				build_simultaneous_threshold_item(karabiner, update_menu),
 				build_combo_symmetric_item(karabiner, update_menu),
 				build_sticky_delay_item(karabiner, update_menu),
-			}) do
-				rows[#rows + 1] = item
-			end
-			return rows
+			}
 		end,
-		["karabiner_tap_holds"] = function()
-			local rows = {}
-			for _, item in ipairs(tap_hold) do rows[#rows + 1] = item end
-			return rows
-		end,
-		["karabiner_shortcuts"] = function()
-			local rows = {}
-			for _, item in ipairs(raccourcis) do rows[#rows + 1] = item end
-			return rows
-		end,
+		["tap_hold_keys"]   = function() return tap_hold end,
+		["tap_hold_chords"] = function() return chords end,
 	}
 
+	-- The two bulk commands are the ids Windows declares for its own tap-holds:
+	-- the same row, the same label, this engine's implementation behind it.
 	local commands = {
-		["karabiner_clear_all"] = function()
+		["disable_all"] = function()
 			return run_bulk_menu_command(
 				karabiner,
 				"clear_all_bindings",
@@ -1028,17 +902,17 @@ function M.build(ctx)
 				update_menu
 			)
 		end,
-		["karabiner_restore_defaults"] = function()
+		["reset_defaults"] = function()
 			return run_bulk_menu_command(
 				karabiner,
 				"reset_to_defaults",
-				"Restoring every Karabiner setting to defaults…",
-				"All Karabiner settings restored to defaults.",
+				"Restoring every tap-hold setting to defaults…",
+				"All tap-hold settings restored to defaults.",
 				false,
 				update_menu
 			)
 		end,
-		["karabiner_copy_tap_to_combo"] = function()
+		["copy_tap_to_combo"] = function()
 			return run_bulk_menu_command(
 				karabiner,
 				"copy_tap_actions_to_combos",
@@ -1054,43 +928,12 @@ function M.build(ctx)
 	for key, value in pairs(ctx or {}) do render_ctx[key] = value end
 	render_ctx.commands = commands
 
-	local submenu = ManifestMenu.build("karabiner_menu", "Karabiner", nil, nil, render_ctx, providers)
-
+	-- `submenu`, not `items`: ManifestMenu.build returns rows it has ALREADY
+	-- materialised. Handed over as `items`, the tray render dropped every one of
+	-- them and the submenu opened empty on the real menu bar.
 	return {
-		label   = "⌨️ Karabiner",
-		checked = enabled,
-		-- Clicking the item title toggles enabled state
-		action      = function()
-			if _toggle_in_flight then return end
-			local read_ok, live_enabled = xpcall(karabiner.get_enabled, debug.traceback)
-			if not read_ok or type(live_enabled) ~= "boolean" then
-				Logger.error(LOG, "Karabiner integration toggle could not read live state: %s.",
-					tostring(live_enabled))
-				return false
-			end
-			_toggle_in_flight = true
-			local target_enabled = not live_enabled
-			local callback_fired = false
-			local ok_request, accepted_or_err = pcall(karabiner.set_enabled, target_enabled, function(ok)
-				callback_fired = true
-				_toggle_in_flight = false
-				if ok ~= true then
-					local key = target_enabled and "karabiner.enable_failed" or "karabiner.disable_failed"
-					Notifications.notify(i18n.get(key), nil, "error")
-				end
-				if update_menu then update_menu() end
-			end)
-			if not ok_request or accepted_or_err ~= true then
-				if not callback_fired then
-					_toggle_in_flight = false
-					Logger.error(LOG, "Karabiner integration toggle request failed: %s.", tostring(accepted_or_err))
-					local key = target_enabled and "karabiner.enable_failed" or "karabiner.disable_failed"
-					Notifications.notify(i18n.get(key), nil, "error")
-				end
-			end
-			if update_menu then update_menu() end
-		end,
-		items    = submenu,
+		label   = i18n.get("menu.tapholds.title"),
+		submenu = ManifestMenu.build("tap_holds_menu", "TapHolds", nil, nil, render_ctx, providers),
 	}
 end
 

@@ -13,18 +13,18 @@ local helpers = require("tests.helpers")
 
 local COMMAND_CASES = {
 	{
-		id = "karabiner_clear_all",
-		label = "menu.karabiner.clear_all",
+		id = "disable_all",
+		label = "tap_hold.disable_all",
 		method = "clear_all_bindings",
 	},
 	{
-		id = "karabiner_restore_defaults",
-		label = "menu.karabiner.restore_defaults",
+		id = "reset_defaults",
+		label = "tap_hold.reset_defaults",
 		method = "reset_to_defaults",
 	},
 	{
-		id = "karabiner_copy_tap_to_combo",
-		label = "menu.karabiner.copy_tap_to_combo",
+		id = "copy_tap_to_combo",
+		label = "menu.tapholds.copy_tap_to_combo",
 		method = "copy_tap_actions_to_combos",
 	},
 }
@@ -33,31 +33,31 @@ local PICKER_ROUTE_CASES = {
 	{
 		setter = "set_tap_action",
 		parent_prefix = "Left Shift  :",
-		picker_label = "menu.karabiner.tap_arrow",
+		picker_label = "menu.tapholds.tap_arrow",
 		expected_id = "left_shift",
 	},
 	{
 		setter = "set_hold_action",
 		parent_prefix = "Left Shift  :",
-		picker_label = "menu.karabiner.hold_arrow",
+		picker_label = "menu.tapholds.hold_arrow",
 		expected_id = "left_shift",
 	},
 	{
 		setter = "set_combo_combo_action",
 		parent_prefix = "Shift pair  :",
-		picker_label = "menu.karabiner.combo_arrow",
+		picker_label = "menu.tapholds.combo_arrow",
 		expected_id = "shift_pair",
 	},
 	{
 		setter = "set_combo_tap_action",
 		parent_prefix = "Shift pair  :",
-		picker_label = "menu.karabiner.tap_colon",
+		picker_label = "menu.tapholds.tap_colon",
 		expected_id = "shift_pair",
 	},
 	{
 		setter = "set_combo_hold_action",
 		parent_prefix = "Shift pair  :",
-		picker_label = "menu.karabiner.hold_colon",
+		picker_label = "menu.tapholds.hold_colon",
 		expected_id = "shift_pair",
 	},
 }
@@ -76,7 +76,7 @@ local PICKER_ACTION_CASES = { SPECIAL_PICKER_ACTION, GROUPED_PICKER_ACTION }
 --- @param label string Exact i18n-key label.
 --- @return table|nil row
 local function find_item(item, label)
-	for _, row in ipairs(item.menu or item.items or {}) do
+	for _, row in ipairs(item.submenu or item.menu or item.items or {}) do
 		if row.title == label or row.label == label then return row end
 	end
 	return nil
@@ -95,7 +95,7 @@ end
 --- @return table children
 local function row_children(row)
 	if type(row) ~= "table" then return {} end
-	return row.menu or row.items or {}
+	return row.submenu or row.menu or row.items or {}
 end
 
 --- Finds a rendered descendant by exact title or label.
@@ -302,7 +302,7 @@ local function build_menu(mode, configure)
 		stop = function() return true end,
 	}
 	package.loaded["infra.manifest_menu"] = nil
-	local menu = helpers.load_with_stubs("ui.menu.menu_remap", {})
+	local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
 	local remap = make_remap(observations, mode)
 	if type(configure) == "function" then configure(remap, observations) end
 	local built = menu.build({
@@ -461,7 +461,7 @@ helpers.describe("karabiner local clear rows use one bulk transaction", function
 	helpers.it("HS-019 routes tap/hold and combo clears without sequential setters", function()
 		local cases = {
 			{
-				label = "menu.karabiner.nothing_tap_hold",
+				label = "menu.tapholds.nothing_tap_hold",
 				method = "clear_tap_hold_binding",
 				expected_id = "left_shift",
 				configure = function(remap)
@@ -470,7 +470,7 @@ helpers.describe("karabiner local clear rows use one bulk transaction", function
 				end,
 			},
 			{
-				label = "menu.karabiner.nothing_combo",
+				label = "menu.tapholds.nothing_combo",
 				method = "clear_combo_binding",
 				expected_id = "shift_pair",
 				configure = function(remap)
