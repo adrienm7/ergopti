@@ -100,6 +100,15 @@ intentional because native compositors blend differently.
 Daily `ErgoptiPlus_errors_YYYY-MM-DD.log` files contain WARNING and ERROR events.
 `crash_reports/` is reserved for uncaught fatal failures.
 
+### project-diagnostic-snapshot-contract
+
+Each driver logs one post-boot `[Diagnostics] Diagnostic snapshot (...)` line
+whose fields come from `_shared/modules/logger/diagnostic_snapshot.json`. Add a
+field there, in both formatters and in every collector; the parity test and the
+three driver suites fail otherwise. macOS emits it from the menu prime, not from
+`init.lua`, and freezes `boot_ms` at the `Boot complete` mark; renaming that
+mark turns `boot_ms` into `unknown`.
+
 ### project-instrumentation-absence-is-invisible
 
 Missing profiling instrumentation produces deceptively clean output. Assert the

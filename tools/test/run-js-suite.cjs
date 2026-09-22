@@ -129,6 +129,7 @@ const CHECKS = [
 	{ name: 'webview i18n browser-fallback path (bridge-less locale fetch resolves)', cmd: 'node', args: ['tools/test/test-i18n-fallback-path.cjs'], repro: 'node tools/test/test-i18n-fallback-path.cjs' },
 	{ name: 'webview i18n fallback cascade (a failed locale fetch must not blank the page)', cmd: 'node', args: ['tools/test/test-webview-i18n-cascade.cjs'], repro: 'node tools/test/test-webview-i18n-cascade.cjs' },
 	{ name: 'menu labels single source (shared labels.lua consumed by macOS)', cmd: 'node', args: ['tools/test/test-menu-labels-single-source.cjs'], repro: 'node tools/test/test-menu-labels-single-source.cjs' },
+	{ name: 'diagnostic snapshot fields, vectors and boot emission agree across the three drivers', cmd: 'node', args: ['tools/test/test-diagnostic-snapshot-parity.cjs'], repro: 'npm run test:diagnostic-snapshot-parity' },
 	{ name: 'Linux version single source (one BUNDLE_VERSION-style source, no re-typed 3.0.0; P0-E)', cmd: 'node', args: ['tools/test/test-linux-version-single-source.cjs'], repro: 'node tools/test/test-linux-version-single-source.cjs' },
 	{ name: 'hotstring buffer-cap parity (shared BUFFER_MAX_CHARS == both Windows mirrors; P0-F)', cmd: 'node', args: ['tools/test/test-hotstring-buffer-cap-parity.cjs'], repro: 'node tools/test/test-hotstring-buffer-cap-parity.cjs' },
 	{ name: 'LLM model + GPT link single source (no re-typed default literals in AHK)', cmd: 'node', args: ['tools/test/test-llm-model-single-source.cjs'], repro: 'node tools/test/test-llm-model-single-source.cjs' },
