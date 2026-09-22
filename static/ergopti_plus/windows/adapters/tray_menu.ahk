@@ -101,6 +101,28 @@ TrayMenuSetTooltip(Text) {
 	}
 }
 
+; Returns how many rows a native menu holds, separators included.
+; AHK v2 exposes no row count, so callers that walk a rendered menu read it here.
+; @param TargetMenu {Menu} A rendered AHK menu.
+; @returns {Integer} The row count.
+TrayMenuItemCount(TargetMenu) {
+	Count := DllCall("GetMenuItemCount", "ptr", TargetMenu.Handle, "int")
+	if (Count < 0) {
+		throw OSError(A_LastError, -1, "GetMenuItemCount failed")
+	}
+	return Count
+}
+
+; Tells whether the row at a zero-based position of a native menu is a separator.
+; @param TargetMenu {Menu} A rendered AHK menu.
+; @param Position {Integer} Zero-based row position.
+; @returns {Boolean} True for a separator row.
+TrayMenuIsSeparatorAt(TargetMenu, Position) {
+	static MF_BYPOSITION := 0x400, MF_SEPARATOR := 0x800
+	State := DllCall("GetMenuState", "ptr", TargetMenu.Handle, "uint", Position, "uint", MF_BYPOSITION, "uint")
+	return (State != 0xFFFFFFFF) and (State & MF_SEPARATOR) != 0
+}
+
 ; Resets the tray icon and menu to AHK defaults.
 ; Calling this before ExitApp prevents orphaned tray icons.
 TrayMenuDestroy() {
