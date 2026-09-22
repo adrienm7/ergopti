@@ -29,6 +29,11 @@ local function with_delivery(callback)
 			i18n.format = function(key) return key end
 			i18n.get_sorted_locales = function() return {} end
 			state.picker = picker
+			state.titles = {}
+			package.loaded["ui.ui_builder"].set_window_title = function(view, title)
+				state.titles[#state.titles + 1] = { view = view, title = title }
+				return true
+			end
 			local stub_encode = hs.json.encode
 			-- Native hs.json.encode checks for a top-level table and raises on
 			-- anything else. A permissive stub hid the wizard's bare string payload.

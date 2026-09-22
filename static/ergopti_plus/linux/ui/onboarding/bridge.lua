@@ -27,6 +27,8 @@ local TomlCodec = require("toml_codec")
 local ConfigDirPicker = require("ui.config_dir_picker")
 local LOG = "bridge.onboarding"
 local APP_NAME = "onboarding"
+-- Brand-less window title; webview_manager prefixes the product name.
+local WINDOW_TITLE_KEY = "onboarding.window_title"
 
 local function dependency(state, field, module_name)
 	if type(state[field]) == "table" then return state[field] end
@@ -49,6 +51,22 @@ local function push(state, function_name, payload)
 	local pushed, accepted = pcall(manager.eval_js, APP_NAME,
 		"if(window." .. function_name .. ") window." .. function_name .. "(" .. encoded .. ")")
 	return pushed and accepted == true
+end
+
+--- Retitles the wizard window from a locale's strings. WebKitGTK never mirrors
+--- document.title onto the GtkWindow, so the title stayed in the static English
+--- label whatever language the user picked.
+--- @param state table Daemon state and optional test-injected authorities.
+--- @param strings table|nil Locale strings.
+--- @return boolean true when the live window was retitled.
+local function retitle(state, strings)
+	local manager = webview(state)
+	local label = type(strings) == "table" and strings[WINDOW_TITLE_KEY] or nil
+	if not manager or type(manager.set_title) ~= "function" or type(label) ~= "string" then
+		return false
+	end
+	local ok, applied = pcall(manager.set_title, APP_NAME, label)
+	return ok and applied == true
 end
 
 local function locale_available(i18n, code)
@@ -326,15 +344,17 @@ function M.on_message(payload, state)
 	if action == "ready" then
 		local data = build_init_data(state)
 		if not data then return { pushed = false } end
-		return { pushed = push(state, "initData", data), data = data }
+		return { pushed = push(state, "initData", data), data = data,
+			titled = retitle(state, data.strings) }
 	elseif action == "previewLocale" then
 		local i18n = dependency(state, "i18n", "infra.i18n")
 		local config_paths = dependency(state, "config_paths", "infra.config_paths")
 		if not locale_available(i18n, payload.locale) then return { pushed = false } end
 		local strings = locale_strings(payload.locale, config_paths)
-		return { pushed = strings ~= nil and push(state, "applyStrings", {
+		if not strings then return { pushed = false } end
+		return { pushed = push(state, "applyStrings", {
 			locale = payload.locale, strings = strings,
-		}) }
+		}), titled = retitle(state, strings) }
 	elseif action == "localeSelected" then
 		local i18n = dependency(state, "i18n", "infra.i18n")
 		return { accepted = locale_available(i18n, payload.locale) }

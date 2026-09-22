@@ -38,6 +38,10 @@ local SETTINGS_COMPLETED_KEY = "onboarding.completed"
 -- MenuPaths.get() key that resolves <config_dir>/hammerspoon/config.toml.
 local CONFIG_TOML_PATH_KEY   = "ConfigTomlPath"
 
+-- Brand-less window title. ui_builder prefixes the product name, and
+-- onboarding.welcome.title already carries it (it is the page heading).
+local WINDOW_TITLE_KEY       = "onboarding.window_title"
+
 -- Path to config.toml — set by M.run() before the wizard opens
 local _config_path  = nil
 
@@ -139,6 +143,22 @@ local function submit_data(owner, view, method, payload)
 	return not failed and publication_is_current(owner, view)
 end
 
+--- Retitles the native window. WKWebView never mirrors document.title onto the
+--- NSWindow, so a live language switch left the title in the opening locale.
+--- @param owner table Captured wizard owner.
+--- @param view userdata|table Captured native window.
+--- @param title string Brand-less, already-translated title.
+--- @return boolean applied
+local function retitle(owner, view, title)
+	if not publication_is_current(owner, view) then return false end
+	local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
+	if not ok_ui or type(ui_builder) ~= "table" or type(ui_builder.set_window_title) ~= "function" then
+		Logger.error(LOG, "Onboarding window title cannot follow the locale; ui_builder is unavailable.")
+		return false
+	end
+	return ui_builder.set_window_title(view, title)
+end
+
 --- Loads the strings for a given locale code and injects them into the webview
 --- via window.applyStrings().  Used both for the initial render and for the
 --- live-preview when the user hovers over a language row.
@@ -189,6 +209,7 @@ local function inject_strings(code, owner, view)
 	-- string.format looks for %s — it left the placeholder on screen verbatim.
 	strings["dialog.metrics.enable_warning_formatted"] =
 		i18n.format("dialog.metrics.enable_warning", metrics_dir .. "metrics")
+	local window_title = i18n.get(WINDOW_TITLE_KEY)
 
 	i18n.set_locale_no_reload(prev_code)
 
@@ -197,6 +218,7 @@ local function inject_strings(code, owner, view)
 	local payload = { locale = code, strings = strings }
 	Logger.debug(LOG, "Injecting strings for locale '%s'…", code)
 	submit_data(owner, view, "applyStrings", payload)
+	retitle(owner, view, window_title)
 end
 
 --- Sends the full initData payload (locale + strings + default answers) to the
@@ -301,6 +323,8 @@ local function inject_init_data()
 
 	Logger.debug(LOG, "Injecting initData into onboarding webview…")
 	submit_data(owner, view, "initData", payload)
+	-- initData resets the page to the current locale; keep the window in step.
+	retitle(owner, view, i18n.get(WINDOW_TITLE_KEY))
 end
 
 
@@ -839,7 +863,7 @@ function M.run(config_path)
 	local show_ok, candidate = xpcall(function()
 		return ui_builder.show_webview({
 			frame       = ui_builder.get_centered_frame(win_w, win_h),
-			title       = i18n.get("onboarding.welcome.title"),
+			title       = i18n.get(WINDOW_TITLE_KEY),
 			style_masks = style_masks,
 			usercontent = uc,
 			assets_dir    = ASSETS_DIR,

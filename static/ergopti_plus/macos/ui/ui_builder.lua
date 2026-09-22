@@ -28,6 +28,10 @@ local function now_ms()
 end
 local LOG = "ui_builder"
 
+-- Product name and separator of every webview window title (see M.window_title).
+local WINDOW_TITLE_PRODUCT = "ErgoptiPlus"
+local WINDOW_TITLE_SEPARATOR = " — "
+
 -- Per-process cache of assembled HTML strings.  Avoids re-reading the local
 -- CSS/JS files (and re-running the gsub inlining pass) on every UI open —
 -- assets only change when the user edits source so a single assembly per
@@ -536,6 +540,30 @@ function M.force_focus(wv, is_new, lifecycle)
 	return try_focus()
 end
 
+--- Composes a native window title. The product name is added here and only
+--- here, so callers pass a brand-less *.window_title string: passing a string
+--- that already carried the brand produced "ErgoptiPlus — ErgoptiPlus — Setup".
+--- @param title string|nil Brand-less, already-translated title.
+--- @return string
+function M.window_title(title)
+	if type(title) ~= "string" or title == "" then return WINDOW_TITLE_PRODUCT end
+	return WINDOW_TITLE_PRODUCT .. WINDOW_TITLE_SEPARATOR .. title
+end
+
+--- Retitles an open webview, e.g. after a live language switch.
+--- @param view userdata|table The native webview.
+--- @param title string|nil Brand-less, already-translated title.
+--- @return boolean applied
+function M.set_window_title(view, title)
+	if view == nil or type(view.windowTitle) ~= "function" then return false end
+	local ok, err = pcall(function() view:windowTitle(M.window_title(title)) end)
+	if not ok then
+		Logger.error(LOG, "Webview retitle failed: %s.", tostring(err))
+		return false
+	end
+	return true
+end
+
 --- Centralized factory to create a webview window with consistent properties.
 --- @param opts table The configuration options for the webview.
 --- @return userdata|nil The configured webview instance.
@@ -628,8 +656,7 @@ function M.show_webview(opts)
 		return DeferredWork.after(delay, callback, label or "ui_builder.webview")
 	end
 
-	local prefix = "ErgoptiPlus"
-	local win_title = (opts.title and opts.title ~= "") and (prefix .. " — " .. opts.title) or prefix
+	local win_title = M.window_title(opts.title)
 	if not apply_webview_mutation(function() wv:windowTitle(win_title) end) then
 		return abandon_required_mutation()
 	end

@@ -851,7 +851,7 @@ helpers.describe("ui.bridge_handlers", function()
 				metrics = false, gestures = false, locale = "en",
 				config_dir = "/tmp/ergopti-default",
 			}
-			local captured = { pushes = {}, writes = {}, hidden = 0, changed = 0 }
+			local captured = { pushes = {}, writes = {}, hidden = 0, changed = 0, titles = {} }
 			local state = {
 				layout = "qwerty",
 				config = {
@@ -912,6 +912,10 @@ helpers.describe("ui.bridge_handlers", function()
 						helpers.assert_eq(app, "onboarding")
 						captured.hidden = captured.hidden + 1
 					end,
+					set_title = function(app, label)
+						captured.titles[#captured.titles + 1] = { app = app, label = label }
+						return true
+					end,
 				},
 				on_config_changed = function() captured.changed = captured.changed + 1 end,
 			}
@@ -955,6 +959,38 @@ helpers.describe("ui.bridge_handlers", function()
 			helpers.assert_eq(handler.on_message({
 				action = "localeSelected", locale = "xx",
 			}, state).accepted, false)
+		end)
+
+		helpers.it("(onboarding-window-title) retitles the window in the previewed locale", function()
+			local state, _, captured = onboarding_state()
+			local result = handler.on_message({ action = "previewLocale", locale = "fr" }, state)
+			helpers.assert_true(result.titled)
+			helpers.assert_eq(captured.titles[1], { app = "onboarding", label = "Configuration" })
+		end)
+
+		helpers.it("(onboarding-window-title) titles the window in the current locale on ready", function()
+			local state, _, captured = onboarding_state()
+			local result = handler.on_message({ action = "ready" }, state)
+			helpers.assert_true(result.titled)
+			helpers.assert_eq(captured.titles[1], { app = "onboarding", label = "Setup" })
+		end)
+
+		helpers.it("(onboarding-window-title) an unshipped locale leaves the title alone", function()
+			local state, _, captured = onboarding_state()
+			local result = handler.on_message({ action = "previewLocale", locale = "xx" }, state)
+			helpers.assert_eq(result.pushed, false)
+			helpers.assert_eq(#captured.titles, 0)
+		end)
+
+		helpers.it("(onboarding-window-title) the product name appears once in the window title", function()
+			local manager = helpers.load_module("ui.webview_manager")
+			local title = manager.window_title("Setup")
+			helpers.assert_eq(title, "Ergopti — Setup")
+			local _, count = title:gsub("Ergopti", "")
+			helpers.assert_eq(count, 1)
+			helpers.assert_eq(manager.window_title(""), "Ergopti")
+			helpers.assert_eq(manager.set_title("onboarding", "Setup"), false,
+				"retitling a window that is not open must report failure")
 		end)
 
 		helpers.it("preserves explicit false values while loading an existing config", function()
