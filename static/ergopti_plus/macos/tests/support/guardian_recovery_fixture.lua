@@ -35,6 +35,7 @@ local STUB_MODULES = {
 	"platform.remap.watchers",
 	"adapters.hotkey_registrar",
 	"adapters.timer_scheduler",
+	"infra.notifications",
 	"modules.keylogger.kc_bridge",
 	"modules.gestures.engine",
 	"modules.shortcuts",
@@ -102,6 +103,7 @@ local function with_remap(options, body)
 		order = {},
 		logs = {},
 		recovery_timers = {},
+		notices = {},
 		guardian_probe_timers = {},
 		recovery_timer_arm_attempts = 0,
 		recovery_timer_arm_failures_remaining = 0,
@@ -604,6 +606,16 @@ local function with_remap(options, body)
 		return true
 	end
 	package.loaded["adapters.timer_scheduler"] = timer_scheduler
+	-- Recorded, never sent: a real notice would arm its own retention timer on
+	-- the scheduler above and read as a recovery delay.
+	package.loaded["infra.notifications"] = {
+		notify = function(message, detail, kind, on_click)
+			calls.notices[#calls.notices + 1] = {
+				message = message, detail = detail, kind = kind, on_click = on_click,
+			}
+			return true
+		end,
+	}
 
 	os.getenv = function(name)
 		if name == "ERGOPTI_REMAP_GUARDIAN_STATUS" then

@@ -337,6 +337,31 @@ function H.collect_layout_state()
 	return st
 end
 
+--- Reads the remap engine's exact lease phase and Login Items approval state.
+--- Karabiner has no tray row, so this is where a support request can see that
+--- the engine is held waiting for approval; the lease is read in memory only.
+--- @return table { phase, guardian_status, approval_required }
+function H.collect_remap_state()
+	local st = { phase = "unknown", guardian_status = "unknown", approval_required = false }
+	local ok_lc, LeaseController = pcall(require, "platform.remap.lease_controller")
+	if not ok_lc or type(LeaseController) ~= "table" or type(LeaseController.status) ~= "function" then
+		Logger.warn(LOG, "platform.remap.lease_controller unavailable: %s.", tostring(LeaseController))
+		return st
+	end
+	local ok_status, phase, snapshot = pcall(LeaseController.status)
+	if not ok_status then
+		Logger.warn(LOG, "Remap lease status could not be read: %s.", tostring(phase))
+		return st
+	end
+	st.phase = tostring(phase)
+	if type(snapshot) == "table" and type(snapshot.guardian_status) == "string" then
+		st.guardian_status = snapshot.guardian_status
+		st.approval_required = snapshot.guardian_status == "requires_approval"
+	end
+	Logger.debug(LOG, "Remap: phase=%s guardian=%s.", st.phase, st.guardian_status)
+	return st
+end
+
 function H.collect_hotstrings_state()
 	local st = { terminators = 0, magic_key = "", personal_count = 0, dynamic_count = 0, default_delay = "n/a" }
 	local ok_t, term = pcall(require, "modules.keymap.terminators")

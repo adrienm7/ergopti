@@ -18,7 +18,8 @@
 //       wired_count, adapter_count, unwired_adapters,  (macOS only)
 //       event_tap_timeout_telemetry,                    (macOS only)
 //       last_error, recent_issues,
-//       pause_state, keylogger, llm, layout, hotstrings, logs, config
+//       pause_state, keylogger, llm, layout, hotstrings, logs, config,
+//       remap                                           (macOS only)
 // ===========================================================================
 
 /**
@@ -157,7 +158,7 @@ window.renderHealthcheck = function (s) {
 	html += '</table>';
 
 	// ── Runtime state ────────────────────────────────────────────────────
-	if (s.pause_state || s.layout || s.llm || s.keylogger || s.hotstrings || s.logs) {
+	if (s.pause_state || s.layout || s.remap || s.llm || s.keylogger || s.hotstrings || s.logs) {
 		html += '<h2>Runtime state</h2>';
 		html += '<table><tr><th>Field</th><th>Value</th></tr>';
 
@@ -176,6 +177,17 @@ window.renderHealthcheck = function (s) {
 			html += row('Shift', escapeHtml(String(ly.shift)));
 			html += row('Caps', escapeHtml(String(ly.caps)));
 			html += row('Prefix latch', escapeHtml(String(ly.prefix_latch)));
+		}
+
+		// macOS only: the remap engine has no tray row, so a helper held until
+		// Login Items approval is reported here as well as by a notification.
+		if (s.remap) {
+			var rm = s.remap;
+			html += row('Remap engine', escapeHtml(String(rm.phase)));
+			var approvalVal = rm.approval_required
+				? '<span class="fail">required: System Settings &gt; General &gt; Login Items</span>'
+				: '<span class="ok">' + escapeHtml(String(rm.guardian_status)) + '</span>';
+			html += row('Login Items approval', approvalVal);
 		}
 
 		if (s.llm) {

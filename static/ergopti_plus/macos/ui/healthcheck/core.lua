@@ -527,6 +527,7 @@ function M.run()
 		keylogger        = safe_collect("keylogger_summary",   H.collect_keylogger_summary),
 		llm              = safe_collect("llm_state",           H.collect_llm_state),
 		layout           = safe_collect("layout_state",        H.collect_layout_state),
+		remap            = safe_collect("remap_state",         H.collect_remap_state),
 		hotstrings       = safe_collect("hotstrings_state",    H.collect_hotstrings_state),
 		logs             = safe_collect("logs_info",           H.collect_logs_info),
 		config           = safe_collect("config_summary",      H.collect_config_summary),
@@ -895,6 +896,13 @@ function M.format_plain(snapshot)
 	if s.layout then
 		local ly = s.layout
 		table.insert(lines, string.format("Layout           : base=%s altgr=%s shift=%s caps=%s prefix_latch=%s", tostring(ly.ergopti_base), tostring(ly.altgr), tostring(ly.shift), tostring(ly.caps), tostring(ly.prefix_latch)))
+	end
+	if s.remap then
+		local rm = s.remap
+		table.insert(lines, string.format("Remap engine     : phase=%s guardian=%s", tostring(rm.phase), tostring(rm.guardian_status)))
+		if rm.approval_required then
+			table.insert(lines, "ACTION REQUIRED  : approve ErgoptiPlus in System Settings > General > Login Items")
+		end
 	end
 	if s.hotstrings then
 		local hs = s.hotstrings
