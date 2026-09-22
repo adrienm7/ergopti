@@ -216,6 +216,7 @@ body {
 
 #release-body {
 	flex: 1;
+	overflow-wrap: anywhere;
 	overflow-y: auto;
 	padding: 24px 28px;
 	scrollbar-color: #3a3a3c transparent;
@@ -233,16 +234,6 @@ body {
 /* ================================= */
 /* ===== 3.1) Release Notes ========= */
 /* ================================= */
-
-#release-body .release-notes-plain {
-	color: #c8c8cc;
-	font-family: 'SF Mono', 'Fira Mono', monospace;
-	font-size: 12px;
-	line-height: 1.7;
-	margin: 0;
-	overflow-wrap: anywhere;
-	white-space: pre-wrap;
-}
 
 #release-body h1,
 #release-body h2,
@@ -333,7 +324,22 @@ body {
 
 #release-body a {
 	color: #4da6ff;
+	cursor: pointer;
 	text-decoration: none;
+}
+
+#release-body li > ul,
+#release-body li > ol {
+	margin-bottom: 4px;
+	margin-top: 4px;
+}
+
+#release-body .task-list-item {
+	list-style: none;
+}
+
+#release-body del {
+	color: #888;
 }
 
 #release-body a:hover {
