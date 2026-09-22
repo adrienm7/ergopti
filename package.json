@@ -193,6 +193,7 @@
 		"test:generator-output-ownership": "node ./tools/test/test-generator-output-ownership.cjs",
 		"test:ahk-runners-are-invoked": "node ./tools/test/test-ahk-runners-are-invoked.cjs",
 		"test:ahk-runner-scan-streaming": "node ./tools/test/test-ahk-runner-scan-streaming.cjs",
+		"test:ahk-runner-arguments": "node ./tools/test/test-ahk-runner-arguments.cjs",
 		"test:ahk-loop-capture": "node ./tools/test/test-ahk-loop-capture.cjs",
 		"test:lua-closure-before-local": "node ./tools/test/test-lua-closure-before-local.cjs",
 		"test:glossary-matches-code": "node ./tools/test/test-glossary-matches-code.cjs",
