@@ -276,29 +276,25 @@ for (const [name, line] of linked) {
 }
 
 const releaseBody = lines.join('\n');
-// Release headings do not receive fragment IDs, so the downloads carry an
-// explicit anchor. The releases list page truncates long notes, and the
-// downloads follow the changelog, so a bare fragment finds no anchor there: the
-// jump link must open the release's own page, which renders the whole body.
-// GitHub opens that page client-side from the list, where the browser does not
-// scroll to a `name` anchor (the first click landed at the top); GitHub's
-// fragment handler scrolls to an `id`, sanitized to user-content-<id>, only
-// when the link carries the unprefixed fragment.
-if (!releaseBody.includes('<a id="${DOWNLOADS_ANCHOR}"></a>') ||
-	!releaseBody.includes(
-		'](https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}#${DOWNLOADS_ANCHOR})')) {
-	errors.push('release downloads need an explicit id anchor and an unprefixed link to it on the release\'s own page');
+// The downloads must be in view without a jump. A "skip to downloads" link
+// failed twice: the releases list page truncates long notes, which cut the
+// anchor placed after the changelog, and from the list GitHub opens a release
+// page client-side without scrolling to the fragment, so the first click landed
+// at the top. The downloads now come before the changelog, which is folded.
+const downloadsAt = releaseBody.indexOf('## Downloads');
+const foldAt = releaseBody.indexOf('<details>');
+const changelogAt = releaseBody.search(/sed [^\n]*\$RUNNER_TEMP\/changelog\.md/);
+if (downloadsAt < 0 || foldAt < 0 || changelogAt < 0 || !(downloadsAt < foldAt && foldAt < changelogAt)) {
+	errors.push('the release downloads must come before the changelog, and the changelog must be folded in <details>');
+}
+if (/Skip to downloads|DOWNLOADS_ANCHOR/.test(releaseBody)) {
+	errors.push('release notes must not rely on a jump link to the downloads (it cannot scroll on the first click)');
 }
 // The repository sidebar truncates long release titles, which hid the version.
 // The title is computed in shell once; later steps only forward it via ${{ }}.
 const titles = releaseBody.match(/^\s*title="(?!\$\{\{)[^"\n]*"/gm) || [];
 if (titles.length === 0 || titles.some(line => line.trim() !== 'title="Ergopti ${tag}"')) {
 	errors.push(`every release title must be exactly "Ergopti \${tag}", got: ${titles.map(t => t.trim()).join(' | ')}`);
-}
-// The releases page shows several releases on one scrolling page, and a fixed
-// anchor name made every release's jump link land on the first release shown.
-if (!/DOWNLOADS_ANCHOR="downloads-\$\(printf '%s' "\$TAG"/.test(releaseBody)) {
-	errors.push('the downloads anchor must be derived from the release tag so each release on the page has its own');
 }
 const layoutSection = releaseBody.indexOf('### Ergopti — keyboard layout only');
 const applicationSection = releaseBody.indexOf('### Ergopti Plus — application with advanced typing tools');
