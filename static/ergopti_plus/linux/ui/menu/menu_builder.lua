@@ -58,14 +58,11 @@ local PERSONAL_CATEGORY = "personal"
 -- Single source of the driver version.
 local Version = require("infra.version")
 
---- Native name of a locale code, from the generated locale table.
+--- Flag and native name of a locale code, from the generated locale table.
 --- @param code string
 --- @return string
-local function language_name(code)
-	for _, row in ipairs(LocaleTable) do
-		if row.code == code then return row.name end
-	end
-	error("[menu_builder] hotstring language pack names unknown locale '" .. tostring(code) .. "'")
+local function language_label(code)
+	return Languages.label(code, LocaleTable)
 end
 
 -- The shared manifest menu renderer, bound for this driver (infra/manifest_menu).
@@ -637,7 +634,7 @@ local function _manifest_hotstring_rows(ctx, config)
 				end
 			end
 			rows[#rows + 1] = {
-				label = string.format("%s (%d)", language_name(pack.locale), total),
+				label = string.format("%s (%d)", language_label(pack.locale), total),
 				items = items,
 			}
 		end

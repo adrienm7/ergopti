@@ -93,14 +93,11 @@ local function load_language_packs()
 	return _language_packs_cache
 end
 
---- Native name of a locale code, from the generated locale table.
+--- Flag and native name of a locale code, from the generated locale table.
 --- @param code string
 --- @return string
-local function language_name(code)
-	for _, row in ipairs(LocaleTable) do
-		if row.code == code then return row.name end
-	end
-	error("[builder] hotstring language pack names unknown locale '" .. tostring(code) .. "'")
+local function language_label(code)
+	return Languages.label(code, LocaleTable)
 end
 
 --- Loads the top_level tail (including the separator immediately before
@@ -380,7 +377,7 @@ function M.generate(ctx, menu_mods, actions)
 				total = total + ((counts and counts.group_counts and counts.group_counts[name]) or 0)
 			end
 			language_rows[#language_rows + 1] = {
-				label = language_name(pack.locale) .. " (" .. fmt_grand(total) .. ")",
+				label = language_label(pack.locale) .. " (" .. fmt_grand(total) .. ")",
 				items = items,
 			}
 		end

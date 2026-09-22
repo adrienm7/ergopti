@@ -816,6 +816,7 @@
 	"menu.hotstrings.header_common_count": "공통 핫스트링 (%s)",
 	"menu.hotstrings.header_ergopti": "Ergopti 레이아웃",
 	"menu.hotstrings.header_ergopti_count": "Ergopti 레이아웃 (%s)",
+	"menu.hotstrings.header_languages": "언어별 핫스트링",
 	"menu.hotstrings.header_personal_count": "내 hotstrings (%s)",
 	"menu.hotstrings.infinite": "∞",
 	"menu.hotstrings.magic_key_prefix": "매직 키: ",

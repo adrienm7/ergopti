@@ -816,6 +816,7 @@
 	"menu.hotstrings.header_common_count": "سلاسل نصية شائعة (%s)",
 	"menu.hotstrings.header_ergopti": "تخطيط Ergopti",
 	"menu.hotstrings.header_ergopti_count": "تخطيط Ergopti (%s)",
+	"menu.hotstrings.header_languages": "سلاسل نصية حسب اللغة",
 	"menu.hotstrings.header_personal_count": "hotstrings الخاصة بي (%s)",
 	"menu.hotstrings.infinite": "∞",
 	"menu.hotstrings.magic_key_prefix": "مفتاح السحر: ",

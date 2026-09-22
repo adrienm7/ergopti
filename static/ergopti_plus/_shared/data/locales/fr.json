@@ -811,6 +811,7 @@
 	"menu.hotstrings.header_common_count": "Hotstrings communs (%s)",
 	"menu.hotstrings.header_ergopti": "Disposition Ergopti",
 	"menu.hotstrings.header_ergopti_count": "Disposition Ergopti (%s)",
+	"menu.hotstrings.header_languages": "Hotstrings par langue",
 	"menu.hotstrings.header_personal_count": "Mes hotstrings (%s)",
 	"menu.hotstrings.infinite": "∞",
 	"menu.hotstrings.magic_key_prefix": "Touche magique : ",

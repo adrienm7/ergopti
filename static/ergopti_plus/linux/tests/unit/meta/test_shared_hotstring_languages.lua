@@ -64,6 +64,16 @@ helpers.describe("hotstring languages: the index declares the packs", function()
 		helpers.assert_eq(packs[1].id, "french")
 		helpers.assert_eq(packs[1].locale, "fr")
 	end)
+
+	helpers.it("(language-packs) the menu label is the locale's flag then its native name", function()
+		local table_rows = { { code = "fr", flag = "🇫🇷", name = "Français" } }
+		helpers.assert_eq(Languages.label("fr", table_rows), "🇫🇷 Français")
+		helpers.assert_eq(Languages.label("fr", require("_generated.locale_table")), "🇫🇷 Français",
+			"the flag comes from the generated locale table, the language selector's source")
+		local _, err = pcall(Languages.label, "xx", table_rows)
+		helpers.assert_true(tostring(err):find("unknown locale 'xx'", 1, true) ~= nil,
+			"an unknown locale is a broken index, not a row labelled with a raw code: " .. tostring(err))
+	end)
 end)
 
 

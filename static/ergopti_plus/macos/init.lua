@@ -1242,6 +1242,22 @@ local HOTSTRINGS_EXCLUDED_STEMS = {
 	paths = true,
 }
 
+-- Which files in a hotstrings directory are categories at all: the rule Linux
+-- applies too. This scan kept its own copy that skipped only "_"-prefixed files,
+-- so defaults.toml (the resolver's fallback delays and colours) loaded as an
+-- empty group and the common hotstrings menu showed « defaults (0) ».
+local HotstringCatalogueFiles = require("hotstrings.catalogue_files")
+
+--- Stem of a hotstring category file, or nil for anything else in the directory.
+--- @param fname string File name.
+--- @return string|nil
+local function hotstring_category_stem(fname)
+	if not HotstringCatalogueFiles.is_category_file(fname) then return nil end
+	local stem = fname:match("^(.-)%.toml$")
+	if not stem or HOTSTRINGS_EXCLUDED_STEMS[stem] then return nil end
+	return stem
+end
+
 -- Blessed hs.fs.dir wrapper (throw- and state-safe) now lives in infra/fs_dir so
 -- the contract is honoured in exactly one place across the driver; see
 -- init-fsdir-drops-state. Aliased locally so every call site below is unchanged.
@@ -1254,12 +1270,7 @@ local function has_common_hotstring_groups(dir)
 		return false
 	end
 	for _, fname in ipairs(safe_dir_entries(dir)) do
-		if fname:match("%.toml$") and not fname:match("^_") then
-			local stem = fname:match("^(.-)%.toml$")
-			if stem and not HOTSTRINGS_EXCLUDED_STEMS[stem] then
-				return true
-			end
-		end
+		if hotstring_category_stem(fname) then return true end
 	end
 	return false
 end
@@ -1397,13 +1408,9 @@ end
 
 local toml_set = {}
 for _, fname in ipairs(safe_dir_entries(hotstrings_dir)) do
-	-- Skip manifest/index files (prefixed with _) — they are metadata, not hotstring groups
-	if fname:match("%.toml$") and not fname:match("^_") then
-		local stem = fname:match("^(.-)%.toml$")
-		if stem and not HOTSTRINGS_EXCLUDED_STEMS[stem] then
-			toml_set[stem] = fname
-		end
-	end
+	-- Metadata files (_index.toml, defaults.toml) are not hotstring groups.
+	local stem = hotstring_category_stem(fname)
+	if stem then toml_set[stem] = fname end
 end
 
 local toml_fnames = {}

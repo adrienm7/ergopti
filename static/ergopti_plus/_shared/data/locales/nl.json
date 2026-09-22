@@ -816,6 +816,7 @@
 	"menu.hotstrings.header_common_count": "Veelgebruikte hotstrings (%s)",
 	"menu.hotstrings.header_ergopti": "Ergopti-indeling",
 	"menu.hotstrings.header_ergopti_count": "Ergopti-indeling (%s)",
+	"menu.hotstrings.header_languages": "Hotstrings per taal",
 	"menu.hotstrings.header_personal_count": "Mijn hotstrings (%s)",
 	"menu.hotstrings.infinite": "∞",
 	"menu.hotstrings.magic_key_prefix": "Magische toets: ",
