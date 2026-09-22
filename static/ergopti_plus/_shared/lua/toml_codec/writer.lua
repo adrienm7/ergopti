@@ -571,4 +571,38 @@ function M.batch_write(path, updates, file_adapter)
 	return true
 end
 
+
+
+-- ========================================
+-- ===== 3.3) Exact Byte Transactions =====
+-- ========================================
+
+--- Reads a file and classifies the outcome without confusing an I/O failure
+--- with absence, through the platform adapter when one is supplied.
+--- @param path string Source path.
+--- @param file_adapter table|nil Platform file adapter.
+--- @return string|nil content Exact bytes when the status is `ok`.
+--- @return string status `ok`, `absent`, or `error`.
+--- @return string|nil detail Failure detail.
+function M.read_classified(path, file_adapter)
+	return read_existing(path, file_adapter)
+end
+
+--- Publishes exact bytes only while the destination still matches
+--- expected_source. `{ status = "absent" }` creates a file that must not exist,
+--- and `{ status = "ok", content = … }` replaces exactly the bytes a caller read.
+--- @param path string Destination path.
+--- @param content string Complete payload.
+--- @param file_adapter table|nil Platform file adapter.
+--- @param expected_source table `{ status, content }` precondition.
+--- @return boolean committed
+--- @return string|nil error_message
+function M.publish_if_unchanged(path, content, file_adapter, expected_source)
+	if type(path) ~= "string" or path == "" or type(content) ~= "string"
+		or type(expected_source) ~= "table" then
+		return false, "publish_if_unchanged needs a path, a string payload and a source precondition"
+	end
+	return publish_content(path, content, file_adapter, expected_source)
+end
+
 return M
