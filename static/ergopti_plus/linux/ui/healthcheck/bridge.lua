@@ -287,6 +287,15 @@ local function collect_sys()
 		pipe:close()
 		if arch and arch ~= "" then sys.arch = arch end
 	end
+	-- The page's "Last git commit" row read "unknown" on every Linux build:
+	-- this collector never sent one. The shared resolver answers from the
+	-- package's build stamp, then the source checkout.
+	sys.git_hash, sys.commit_source = require("infra.diagnostic_snapshot").resolve_commit()
+	-- The folder config.toml and the hotstrings are read from, and separately
+	-- the one the daemon's scripts run from (/usr/lib/ergopti, the AppImage
+	-- mount, ...): the two are never the same place in a package.
+	sys.config_dir = require("infra.config_paths").get_config_dir()
+	sys.script_dir = require("infra.paths").driver_root()
 	return sys
 end
 

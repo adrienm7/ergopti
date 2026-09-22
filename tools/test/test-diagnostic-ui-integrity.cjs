@@ -126,6 +126,50 @@ function checkNativeTapTelemetryRender() {
 checkNativeTapTelemetryRender();
 
 /**
+ * Executes the shared renderer against a packaged-build snapshot. The report
+ * used to label the app bundle "Config dir" and to show a bare "unknown"
+ * commit; the configuration folder, the script folder and the commit's origin
+ * must each reach the page under their own label.
+ */
+function checkCommitAndDirectoriesRender() {
+	const content = { innerHTML: '' };
+	const sandbox = {
+		window: {},
+		document: {
+			getElementById: () => content,
+		},
+		escapeHtml: value => String(value),
+	};
+	const script = fs.readFileSync(path.join(REPO_ROOT, SHARED_SCRIPT), 'utf8');
+	vm.runInNewContext(script, sandbox, { filename: SHARED_SCRIPT });
+	sandbox.window.renderHealthcheck({
+		version: 'test',
+		uptime_sec: 0,
+		sys: {
+			hs_version: '1.1.1',
+			git_hash: 'f58d15798',
+			commit_source: 'build',
+			config_dir: '/Users/alice/Chosen/ergopti_plus/',
+			script_dir: '/Applications/ErgoptiPlus.app/Contents/Resources/static/ergopti_plus/macos',
+		},
+	});
+	const html = content.innerHTML;
+	const ok = html.includes('<td>Last git commit</td><td>f58d15798 (build)</td>')
+		&& html.includes('<td>Config dir</td><td><code>/Users/alice/Chosen/ergopti_plus/</code></td>')
+		&& html.includes('<td>Script dir</td><td><code>/Applications/ErgoptiPlus.app/Contents/Resources/static/ergopti_plus/macos</code></td>');
+	if (ok) {
+		total_pass++;
+		console.log(`  ${PASS_SYMBOL}  Shared: commit origin, config dir and script dir render under their own labels`);
+		return;
+	}
+	total_fail++;
+	console.log(`  ${FAIL_SYMBOL}  Shared: commit origin, config dir and script dir render under their own labels`);
+	console.log('       Violation: rendered HTML lacks one of the three rows');
+}
+
+checkCommitAndDirectoriesRender();
+
+/**
  * Executes the Linux bridge bootstrap and feeds its native callback a snapshot.
  * This catches the original empty-window failure: a passive renderer can pass
  * every shape assertion while never requesting or receiving production data.
