@@ -84,7 +84,8 @@ check(
 check(
     'UI Builder: default level is floating',
     'static/ergopti_plus/macos/ui/ui_builder.lua',
-    /wv:level\(opts\.level or hs\.drawing\.windowLevels\.floating\)/
+    // The level is one of the shared window chrome steps every window applies.
+    /local level = opts\.level or hs\.drawing\.windowLevels\.floating[\s\S]*wv:level\(level\)/
 );
 
 // Check Changelog Fix

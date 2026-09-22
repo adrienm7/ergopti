@@ -107,6 +107,9 @@ helpers.describe("config_paths metrics directory", function()
 
 	helpers.it("(onboarding-metrics-path) an empty folder fails fast", function()
 		local ConfigPaths = real_config_paths()
-		helpers.assert_eq(pcall(ConfigPaths.metrics_dir, ""), false)
+		local ok, err = pcall(ConfigPaths.metrics_dir, "")
+		helpers.assert_eq(ok, false, "an empty folder must be refused, never turned into /metrics")
+		helpers.assert_true(tostring(err):find("a configuration directory is required", 1, true) ~= nil,
+			"the refusal must name the missing folder, got: " .. tostring(err))
 	end)
 end)

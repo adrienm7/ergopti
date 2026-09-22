@@ -13,9 +13,9 @@
 
 local helpers = require("tests.helpers")
 
--- Subtrees that ship in the driver, plus the entry point.
+-- Subtrees that ship in the driver. The entry point creates no window; the
+-- cross-driver tools/test/test-app-windows-keep-their-frame.cjs scans it too.
 local SOURCE_DIRS = { "adapters", "infra", "modules", "platform", "ui" }
-local ROOT_FILES  = { "init.lua" }
 
 -- The driver builds at least the ui_builder windows and the health check window.
 local MIN_WEBVIEW_FILES = 2
@@ -147,7 +147,6 @@ helpers.describe("window chrome: every webview of the driver goes through it", f
 		local root = helpers.driver_root()
 		local files = {}
 		for _, dir in ipairs(SOURCE_DIRS) do collect(root .. dir, files) end
-		for _, name in ipairs(ROOT_FILES) do files[#files + 1] = root .. name end
 
 		local creators, offenders = 0, {}
 		for _, path in ipairs(files) do
