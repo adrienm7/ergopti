@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 local PRE_RUNTIME_ABORT = "local function abort_pre_runtime_boot"
 local CONFIG_INIT = "local config_paths_ready = config_paths.init(base_dir)"
 local CONFIG_FAILURE_CALL =
-	"abort_pre_runtime_boot(CONFIG_PATH_BOOT_FAILURE, \"dialog.fatal_error.cannot_start\")"
+	"abort_pre_runtime_boot(\"config_paths\", CONFIG_PATH_BOOT_FAILURE, \"dialog.fatal_error.cannot_start\")"
 
 
 --- Removes Lua line and long-bracket comments before executable assertions.
@@ -108,18 +108,19 @@ local function config_path_failure_is_terminal(source)
 		return false, "abort authority is not available before path initialization"
 	end
 
+	-- A transient alert and a queued Logger line both die with os.exit(), so the
+	-- visible surface is the durable report handed to the launcher's modal alert,
+	-- with a blocking local dialog only when no launcher channel exists.
 	local abort_body = source:sub(abort_at, config_require_at - 1)
-	local log_at = abort_body:find("Logger.error", 1, true)
-	local protected_at = abort_body:find("pcall(function()", 1, true)
-	local alert_at = abort_body:find("alert.show(", 1, true)
 	local localized_at = abort_body:find(
 		'i18n.get(alert_key or "dialog.fatal_error.cannot_start")', 1, true)
+	local report_at = abort_body:find("BootFatal.report(stage, detail, message)", 1, true)
+	local modal_at = abort_body:find("show_blocking_fatal_dialog(message, stage)", 1, true)
 	local exit_at = abort_body:find("os.exit(1)", 1, true)
-	if not log_at or not protected_at or not alert_at or not localized_at or not exit_at then
-		return false, "pre-runtime abort is not logged, visible, localized, and terminal"
+	if not localized_at or not report_at or not modal_at or not exit_at then
+		return false, "pre-runtime abort is not durable, visible, localized, and terminal"
 	end
-	if not (log_at < protected_at and protected_at < alert_at
-		and alert_at < localized_at and localized_at < exit_at) then
+	if not (localized_at < report_at and report_at < modal_at and modal_at < exit_at) then
 		return false, "pre-runtime abort operations are out of order"
 	end
 
@@ -151,8 +152,7 @@ helpers.describe("root boot: config-path initialization is fail-fast", function(
 		local log_only = replace_plain(source, CONFIG_FAILURE_CALL,
 			"Logger.error(LOG, CONFIG_PATH_BOOT_FAILURE)")
 		local invisible = replace_plain(source,
-			"alert.show(\n\t\t\t\ti18n.get(alert_key or \"dialog.fatal_error.cannot_start\"),",
-			"do_not_alert(\n\t\t\t\ti18n.get(alert_key or \"dialog.fatal_error.cannot_start\"),")
+			"BootFatal.report(stage, detail, message)", "false")
 		local non_terminal = replace_plain(source, "os.exit(1)", "return")
 		local commented_call = replace_plain(source, CONFIG_FAILURE_CALL,
 			"-- " .. CONFIG_FAILURE_CALL)
@@ -177,12 +177,12 @@ helpers.describe("root boot: config-path initialization is fail-fast", function(
 		local refusal_at = code:find('if logger_boot_mode ~= "managed" then', policy_at or 1, true)
 		local standalone_diagnostic_at = code:find(
 			'if logger_boot_mode == "standalone" then', refusal_at or 1, true)
-		local policy_abort_at = code:find("abort_logger_boot(refusal_detail)",
+		local policy_abort_at = code:find("abort_logger_boot(\"native_logger_environment\", refusal_detail)",
 			standalone_diagnostic_at or 1, true)
 		local start_at = code:find(
 			"local async_log_ready, async_log_err = Logger.start_async_sink(TimerScheduler)",
 			policy_abort_at or 1, true)
-		local managed_abort_at = code:find("abort_logger_boot(async_log_err)", start_at or 1, true)
+		local managed_abort_at = code:find("abort_logger_boot(\"native_logger_transport\", async_log_err)", start_at or 1, true)
 		local capture_at = code:find("Logger.install_runtime_error_capture()", 1, true)
 		local first_input_at = code:find("local prestart_committed = StartupTransaction.run", 1, true)
 		helpers.assert_true(abort_at ~= nil and policy_at ~= nil and refusal_at ~= nil
@@ -200,20 +200,20 @@ helpers.describe("root boot: config-path initialization is fail-fast", function(
 		local non_managed_body = code:sub(refusal_at, start_at - 1)
 		local managed_body = code:sub(start_at, capture_at - 1)
 		helpers.assert_true(non_managed_body:find("Logger.start_async_sink", 1, true) == nil
-			and non_managed_body:find("abort_logger_boot(refusal_detail)", 1, true) ~= nil
+			and non_managed_body:find("abort_logger_boot(\"native_logger_environment\", refusal_detail)", 1, true) ~= nil
 			and non_managed_body:find("return", 1, true) ~= nil,
 			"every absent or partial native authority must abort before transport/input startup")
 		helpers.assert_true(non_managed_body:find("native logger authority absent", 1, true) ~= nil,
 			"complete authority absence must explain that the full driver requires its launcher")
 		helpers.assert_true(managed_body:find("async_log_ready ~= true", 1, true) ~= nil,
 			"false and nil transport outcomes must both fail closed")
-		helpers.assert_true(managed_body:find("abort_logger_boot(async_log_err)", 1, true) ~= nil,
+		helpers.assert_true(managed_body:find("abort_logger_boot(\"native_logger_transport\", async_log_err)", 1, true) ~= nil,
 			"a managed native refusal must never downgrade to the standalone sink")
 		helpers.assert_true(logger_abort_route_is_executable(source),
 			"logger refusal must route its localized alert and exact cleanup through the canonical abort")
 
 		local commented_route = block_comment_range(source,
-			"\tabort_pre_runtime_boot(\n\t\tstring.format(", "Logger.stop_async_sink)")
+			"\tabort_pre_runtime_boot(\n\t\tstage,\n\t\tstring.format(", "Logger.stop_async_sink)")
 		helpers.assert_true(commented_route:find(PRE_RUNTIME_ABORT, 1, true) ~= nil
 			and commented_route:find(CONFIG_FAILURE_CALL, 1, true) ~= nil,
 			"the logger mutant must preserve the canonical helper and config-path caller")

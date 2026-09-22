@@ -201,6 +201,14 @@ enum LauncherLog {
 	private static let lockTimeoutSeconds: TimeInterval = 0.25
 	private static let lockRetryMicroseconds: useconds_t = 1_000
 
+	/// Absolute launcher.log path, exported so the Lua runtime can append its
+	/// own fatal line and named in every fatal alert.
+	static var filePath: String { return logDirectory + "/" + logFileName }
+
+	/// Per-launch fatal report written by Lua before it exits (see
+	/// EmbeddedFatalReport.swift); kept beside launcher.log for the user.
+	static var fatalReportPath: String { return logDirectory + "/hammerspoon-fatal.txt" }
+
 	private static let dateFormatter: DateFormatter = {
 		let f = DateFormatter()
 		f.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
@@ -422,6 +430,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	private let guardianRegistrar: (String) -> RemapGuardianRegistrationStatus
 	private let loggerWorkerFactory: () -> LoggerDatagramServing?
 	private let processExitMonitorFactory: EmbeddedProcessExitMonitorFactory
+	private let fatalReportStore: EmbeddedFatalReportStore
 	private let guardianRegistrationQueue = DispatchQueue(
 		label: "com.ergoptiplus.remap-guardian.registration",
 		qos: .userInitiated
@@ -437,6 +446,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	///   - guardianRegistrar: Resolves the independent service off the AppKit thread.
 	///   - loggerWorkerFactory: Binds the native loopback logger before child start.
 	///   - processExitMonitorFactory: Acquires the child's kernel exit-status owner.
+	///   - fatalReportStore: Per-launch report the Lua runtime writes before a fatal exit.
 	init(
 		launcherIdentityReader: @escaping (String?) -> (device: String, inode: String)? =
 			launcherExecutableFileIdentity,
@@ -459,7 +469,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			LoggerDatagramWorker()
 		},
 		processExitMonitorFactory: @escaping EmbeddedProcessExitMonitorFactory =
-			makeEmbeddedProcessExitMonitor
+			makeEmbeddedProcessExitMonitor,
+		fatalReportStore: EmbeddedFatalReportStore =
+			EmbeddedFatalReportStore(path: LauncherLog.fatalReportPath)
 	) {
 		self.launcherIdentityReader = launcherIdentityReader
 		self.applicationLauncher = applicationLauncher
@@ -468,6 +480,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		self.guardianRegistrar = guardianRegistrar
 		self.loggerWorkerFactory = loggerWorkerFactory
 		self.processExitMonitorFactory = processExitMonitorFactory
+		self.fatalReportStore = fatalReportStore
 		super.init()
 	}
 
@@ -672,6 +685,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			fail("Running launcher executable identity is unavailable.")
 			return
 		}
+		// A report left by an earlier launch would be misattributed to this one.
+		guard fatalReportStore.clear() else {
+			fail("Stale embedded fatal report \(fatalReportStore.path) could not be removed.")
+			return
+		}
 		guard let activeLoggerWorker = loggerWorker ?? loggerWorkerFactory() else {
 			fail("Native Hammerspoon logger transport could not be started.")
 			return
@@ -713,6 +731,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		env["ERGOPTI_OLLAMA_BIN"]             = bundledOllamaBinPath()
 		env["ERGOPTI_LAUNCHER_EXECUTABLE"]     = launcherPath
 		env["ERGOPTI_REMAP_GUARDIAN_STATUS"]  = remapGuardianStatus.rawValue
+		env[kFatalReportEnvironment]          = fatalReportStore.path
+		env[kLauncherLogEnvironment]          = LauncherLog.filePath
 		env.removeValue(forKey: "ERGOPTI_LAUNCHER_DEVICE")
 		env.removeValue(forKey: "ERGOPTI_LAUNCHER_INODE")
 		env["ERGOPTI_LAUNCHER_DEVICE"] = launcherIdentity.device
@@ -838,10 +858,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			applicationTerminator(self)
 			return
 		}
-		if case .exited(code: 0) = exit, hsBootstrapReady {
-			applicationTerminator(self)
-			return
-		}
 		// A refused log folder is deterministic: a retry would fail identically,
 		// and the child exit status cannot say why (Hammerspoon reports 0 even
 		// after Lua calls os.exit(1)). Name the folder and the cause instead.
@@ -850,6 +866,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 				"Log folder refused: \(refusal.diagnostic).",
 				alertText: logFolderRefusalAlertText(refusal, localization: LauncherLocalization.load())
 			)
+			return
+		}
+		// Checked before the clean-exit branch: exit status 0 after the logger
+		// handshake is also what a fatal Lua abort looks like, and treating it as
+		// a Quit made v0.0.0-dev.128 vanish with no dialog and no log.
+		if let report = fatalReportStore.read() {
+			fail(
+				report.diagnostic,
+				alertText: embeddedFatalAlertText(
+					report,
+					logPath: LauncherLog.filePath,
+					localization: LauncherLocalization.load()
+				)
+			)
+			return
+		}
+		if case .exited(code: 0) = exit, hsBootstrapReady {
+			applicationTerminator(self)
 			return
 		}
 		if case .exited(code: 0) = exit,
@@ -931,6 +965,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		alert.informativeText = alertText ?? message
 		alert.alertStyle = .critical
 		alert.addButton(withTitle: localization?.text("launcher.fatal.quit") ?? "Quit")
+		// The launcher runs as an accessory app that was never activated after
+		// launch; without this the modal can open behind the frontmost window,
+		// which to the user is indistinguishable from no dialog at all.
+		NSApp.activate(ignoringOtherApps: true)
+		alert.window.level = .modalPanel
 		alert.runModal()
 		NSApp.terminate(nil)
 	}

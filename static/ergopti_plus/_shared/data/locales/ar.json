@@ -142,6 +142,7 @@
 	"common.error_title": "خطأ",
 	"common.key_enter": "إدخال",
 	"common.key_space": "مسافة",
+	"launcher.fatal.stage_detail": "الخطوة: {1}\nالسبب: {2}\nالتفاصيل محفوظة في {3}.",
 	"menu.llm.deps_download_page_failed": "تعذّر فتح صفحة تنزيل Ollama.",
 	"menu.llm.model_specs_params": " ({1}B معامل، ~{2} غيغابايت ذاكرة)",
 	"menu.llm.model_specs_ram": " (~{1} غيغابايت ذاكرة)",

@@ -151,6 +151,7 @@ local EmergencyExit      = require("infra.emergency_exit")
 local TerminationCoordinator = require("infra.termination_coordinator")
 local TeardownTransaction = require("infra.teardown_transaction")
 local StartupTransaction = require("infra.startup_transaction")
+local BootFatal          = require("adapters.boot_fatal")
 
 -- Tell a reload apart from a real quit. The coordinator marks the sentinel only
 -- after the old exact Karabiner token is fenced and immediately before the real
@@ -173,18 +174,37 @@ end
 i18n.set_locale_injector(function(code) locale_mod.set_locale(code) end)
 i18n.init()
 
-local BOOT_FAILURE_ALERT_SECONDS = 5
 local CONFIG_PATH_BOOT_FAILURE =
 	"Config-path initialization did not commit — startup aborted before input or remap activation."
 
+--- Shows a modal fatal dialog that stays until dismissed. Used only when no
+--- launcher report channel exists; under the launcher, its own modal alert owns
+--- the presentation because this process is about to exit.
+--- @param message string Localized user-facing explanation.
+--- @param stage string Stable boot stage name.
+local function show_blocking_fatal_dialog(message, stage)
+	local shown_ok, shown_err = pcall(function()
+		hs.dialog.blockAlert(
+			i18n.get("launcher.fatal.title"),
+			string.format("%s\n\n%s", tostring(message), tostring(stage)),
+			i18n.get("launcher.fatal.quit"))
+	end)
+	if not shown_ok then
+		Logger.error(LOG, "Standalone fatal dialog could not be shown: %s.", tostring(shown_err))
+	end
+end
+
 --- Reports a pre-runtime boot failure, releases an optional early capability,
---- and terminates the embedded Hammerspoon process. This boundary deliberately
---- owns the only UI available before menus and notifications are initialized.
+--- and terminates the embedded Hammerspoon process. The report is made durable
+--- and handed to the launcher's modal alert BEFORE os.exit(): a Logger line
+--- queued for the native worker, or a transient alert, dies with the process.
+--- @param stage string Stable boot stage name shown to the user and in logs.
 --- @param detail string Developer-facing diagnostic.
 --- @param alert_key string|nil Localized user-facing alert key.
 --- @param before_exit function|nil Optional exact early-owner cleanup.
-local function abort_pre_runtime_boot(detail, alert_key, before_exit)
-	Logger.error(LOG, "%s", tostring(detail))
+local function abort_pre_runtime_boot(stage, detail, alert_key, before_exit)
+	local message = i18n.get(alert_key or "dialog.fatal_error.cannot_start")
+	local launcher_notified = BootFatal.report(stage, detail, message)
 	if before_exit ~= nil then
 		local cleanup_ok, cleanup_result = xpcall(before_exit, debug.traceback)
 		if not cleanup_ok or cleanup_result ~= true then
@@ -192,14 +212,7 @@ local function abort_pre_runtime_boot(detail, alert_key, before_exit)
 				tostring(cleanup_result))
 		end
 	end
-	pcall(function()
-		local alert = hs.alert
-		if type(alert) == "table" and type(alert.show) == "function" then
-			alert.show(
-				i18n.get(alert_key or "dialog.fatal_error.cannot_start"),
-				BOOT_FAILURE_ALERT_SECONDS)
-		end
-	end)
+	if not launcher_notified then show_blocking_fatal_dialog(message, stage) end
 	os.exit(1)
 end
 
@@ -244,7 +257,7 @@ if not base_dir:match("[/\\]$") then base_dir = base_dir .. "/" end
 -- can act on it.
 local config_paths_ready = config_paths.init(base_dir)
 if config_paths_ready ~= true then
-	abort_pre_runtime_boot(CONFIG_PATH_BOOT_FAILURE, "dialog.fatal_error.cannot_start")
+	abort_pre_runtime_boot("config_paths", CONFIG_PATH_BOOT_FAILURE, "dialog.fatal_error.cannot_start")
 	return
 end
 Boot.mark("Path: config dir + paths.toml (config_paths.init)")
@@ -259,8 +272,9 @@ Boot.mark("Path: log file open (retention purge deferred)")
 -- absence and every partial/stale subset fail closed: the full driver may never
 -- arm an input owner while its logger can still perform synchronous I/O on the
 -- Hammerspoon callback loop. Developer runs must therefore use the launcher too.
-local function abort_logger_boot(detail)
+local function abort_logger_boot(stage, detail)
 	abort_pre_runtime_boot(
+		stage,
 		string.format(
 			"Native asynchronous logger transport unavailable — startup aborted before input: %s.",
 			tostring(detail)),
@@ -274,7 +288,7 @@ if logger_boot_mode ~= "managed" then
 	if logger_boot_mode == "standalone" then
 		refusal_detail = "native logger authority absent; launch the full driver through the ErgoptiPlus launcher"
 	end
-	abort_logger_boot(refusal_detail)
+	abort_logger_boot("native_logger_environment", refusal_detail)
 	return
 end
 
@@ -283,7 +297,7 @@ end
 -- without exposing an eventtap. Runtime producers then only enqueue memory.
 local async_log_ready, async_log_err = Logger.start_async_sink(TimerScheduler)
 if async_log_ready ~= true then
-	abort_logger_boot(async_log_err)
+	abort_logger_boot("native_logger_transport", async_log_err)
 	return
 end
 Boot.mark("Path: native asynchronous logger transport committed")
@@ -311,6 +325,7 @@ local reset_recovery_ok, reset_recovery_result = xpcall(function()
 end, debug.traceback)
 if not reset_recovery_ok or reset_recovery_result ~= true then
 	abort_pre_runtime_boot(
+		"factory_reset_recovery",
 		"Factory-reset recovery did not settle before configuration load: "
 			.. tostring(reset_recovery_result),
 		"dialog.fatal_error.cannot_start",
@@ -734,7 +749,7 @@ local function managed_launcher_expected()
 	return ok and type(raw_pid) == "string" and raw_pid ~= ""
 end
 
-local function emergency_exit_after_runtime_failure(owner, reason)
+local function emergency_exit_after_runtime_failure(owner, reason, message_key)
 	if _runtime_emergency_exit_requested then return end
 	_runtime_emergency_exit_requested = true
 	local exact_owner = tostring(owner or "runtime_dependency")
@@ -742,6 +757,13 @@ local function emergency_exit_after_runtime_failure(owner, reason)
 	Logger.error(LOG,
 		"ErgoptiPlus runtime dependency failed (%s: %s) — shutting down embedded Hammerspoon.",
 		exact_owner, exact_reason)
+	-- Every path below ends in os.exit(), which Hammerspoon reports as status 0
+	-- and which discards Logger lines still queued for the native worker. Make
+	-- the cause durable and hand it to the launcher's modal alert first. No
+	-- local modal here: input owners may be armed, and a blocking dialog would
+	-- delay the bounded exit that lets the guardian revoke the exact lease.
+	BootFatal.report(exact_owner, exact_reason,
+		i18n.get(message_key or "dialog.fatal_error.cannot_start"))
 
 	-- Arm the deadline BEFORE starting a request that may never settle. If exact
 	-- STOPPED arrives in time, the normal coordinator fences, tears down, and exits.

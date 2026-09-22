@@ -52,17 +52,27 @@ local M = {}
 local _ok_socket, _socket = pcall(require, "socket")
 local _gettime = (_ok_socket and _socket and _socket.gettime) or os.time
 
+-- Early-boot fallback folder, used until M.init_log_path() re-points the sink.
+-- It exists whatever the user configured, so fatal reports that must survive an
+-- unusable configured folder are also written here.
+M.FALLBACK_LOG_DIR = "/tmp/"
+
+-- The fallback boot log users are directed to when startup fails. The [init]
+-- topical fan-out writes the same file name, so every boot-stage line of an
+-- early run is already there.
+M.FALLBACK_BOOT_LOG_FILE = M.FALLBACK_LOG_DIR .. "ErgoptiPlus_boot.log"
+
 -- Main unified log file. Set to a safe early-boot fallback; overridden by
 -- M.init_log_path() once the user config directory is known.
-M.UNIFIED_LOG_FILE = "/tmp/ErgoptiPlus_boot.log"
+M.UNIFIED_LOG_FILE = M.FALLBACK_BOOT_LOG_FILE
 
 -- Dedicated errors-only log (WARNING + ERROR levels). Daily file under the
 -- driver logs directory. Purpose: quick triage of problems without the volume
 -- of the full unified daily log.
-M.ERRORS_LOG_FILE = "/tmp/ErgoptiPlus_errors_boot.log"
+M.ERRORS_LOG_FILE = M.FALLBACK_LOG_DIR .. "ErgoptiPlus_errors_boot.log"
 
 -- Log directory resolved after M.init_log_path(); used by sub-file fan-out.
-local _log_dir = "/tmp/"
+local _log_dir = M.FALLBACK_LOG_DIR
 
 -- Delay (seconds) after which the daily old-log purge runs. The purge is pure
 -- housekeeping (deleting stale files) and nothing downstream waits on it, so it

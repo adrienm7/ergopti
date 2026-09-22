@@ -142,6 +142,7 @@
 	"common.error_title": "שגיאה",
 	"common.key_enter": "Enter",
 	"common.key_space": "רווח",
+	"launcher.fatal.stage_detail": "שלב: {1}\nסיבה: {2}\nהפרטים נשמרו ב־{3}.",
 	"menu.llm.deps_download_page_failed": "לא ניתן לפתוח את עמוד ההורדה של Ollama.",
 	"menu.llm.model_specs_params": " ({1}B פרמטרים, ~{2} GB זיכרון)",
 	"menu.llm.model_specs_ram": " (~{1} GB זיכרון)",

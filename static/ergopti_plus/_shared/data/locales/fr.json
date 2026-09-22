@@ -142,6 +142,7 @@
 	"common.error_title": "Erreur",
 	"common.key_enter": "Entrée",
 	"common.key_space": "Espace",
+	"launcher.fatal.stage_detail": "Étape : {1}\nCause : {2}\nLes détails sont enregistrés dans {3}.",
 	"menu.llm.deps_download_page_failed": "Impossible d'ouvrir la page de téléchargement Ollama.",
 	"menu.llm.model_specs_params": " ({1}B params, ~{2} Go RAM)",
 	"menu.llm.model_specs_ram": " (~{1} Go RAM)",

@@ -142,6 +142,7 @@
 	"common.error_title": "Fehler",
 	"common.key_enter": "Eingabe",
 	"common.key_space": "Leertaste",
+	"launcher.fatal.stage_detail": "Schritt: {1}\nUrsache: {2}\nDie Details wurden in {3} gespeichert.",
 	"menu.llm.deps_download_page_failed": "Die Ollama-Downloadseite konnte nicht geöffnet werden.",
 	"menu.llm.model_specs_params": " ({1}B Parameter, ~{2} GB RAM)",
 	"menu.llm.model_specs_ram": " (~{1} GB RAM)",
