@@ -344,9 +344,11 @@ local function build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
 				and i18n.get(group.i18n)
 				or i18n.get("menu.shortcuts.wrap_symbols_title")
 		-- Check the parent group item when all of its symbols are enabled.
+		-- `items`: the renderer never reads `menu` on a provider row, so the
+		-- group used to open empty.
 		sub[#sub + 1] = {
 			label   = group_title,
-			menu    = group_items,
+			items   = group_items,
 			checked = group_all_on or nil,
 		}
 	end
