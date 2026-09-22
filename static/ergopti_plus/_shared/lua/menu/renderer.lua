@@ -390,8 +390,8 @@ function M.new(deps)
 	--- @param ctx table
 	--- @return table|nil
 	function R.build_builtin_group(group_id, ctx)  -- luacheck: ignore 212
-		-- Nothing is built-in today: ctrl_shortcuts and cmd_shortcuts are rendered
-		-- by the caller, which has full access to ctx.
+		-- Nothing is built-in today: every group is rendered by the caller, which
+		-- has full access to ctx.
 		Logger.warn(LOG, "Unknown built-in group '%s' — skipped.", group_id)
 		return nil
 	end

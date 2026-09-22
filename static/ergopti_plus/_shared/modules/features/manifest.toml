@@ -3317,7 +3317,7 @@ id = "wrap_symbols_menu"
 #
 # Restricted to linux, with the reason attached, because the same operations are
 # reached differently elsewhere: macOS binds them to ctrl chords and lists them
-# under `ctrl_shortcuts`, and Windows exposes its own combinations under
+# in the Ctrl group of `keyboard_slots`, and Windows exposes its own combinations under
 # `modifier_combos`. Declaring one shared row would put a second copy of these
 # operations in two menus that already have them.
 [[menu.shortcuts_menu]]
@@ -3370,18 +3370,6 @@ type = "group"
 id = "modifier_combos"
 i18n = "menu.shortcuts.group_modifiers"
 platforms = ["ahk"]
-reason_key = "platform_reason.chord_families_are_each_platforms"
-[[menu.shortcuts_menu]]
-type = "group"
-id = "ctrl_shortcuts"
-i18n = "menu.shortcuts.submenu_ctrl"
-platforms = ["hs"]
-reason_key = "platform_reason.chord_families_are_each_platforms"
-[[menu.shortcuts_menu]]
-type = "group"
-id = "cmd_shortcuts"
-i18n = "menu.shortcuts.submenu_cmd"
-platforms = ["hs"]
 reason_key = "platform_reason.chord_families_are_each_platforms"
 # `list` since 2026-08-08: the handler's whole body was one row with a static
 # label whose submenu another subsystem builds, which is what a provider

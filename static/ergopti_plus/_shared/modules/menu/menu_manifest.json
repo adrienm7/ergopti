@@ -563,24 +563,6 @@
 			"reason_key": "platform_reason.chord_families_are_each_platforms"
 		},
 		{
-			"type": "group",
-			"id": "ctrl_shortcuts",
-			"i18n": "menu.shortcuts.submenu_ctrl",
-			"platforms": [
-				"hs"
-			],
-			"reason_key": "platform_reason.chord_families_are_each_platforms"
-		},
-		{
-			"type": "group",
-			"id": "cmd_shortcuts",
-			"i18n": "menu.shortcuts.submenu_cmd",
-			"platforms": [
-				"hs"
-			],
-			"reason_key": "platform_reason.chord_families_are_each_platforms"
-		},
-		{
 			"type": "list",
 			"id": "script_control_shortcuts",
 			"platforms": [

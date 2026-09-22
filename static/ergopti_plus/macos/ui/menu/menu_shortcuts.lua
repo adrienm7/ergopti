@@ -573,19 +573,6 @@ function M.build(ctx)
 
 	-- Each handler appends its items into the ``items`` list it receives.
 
-	-- group_builders return { items = rows } (or nil to skip) — the renderer wraps
-	-- them with the i18n label from the manifest entry and materialises the rows,
-	-- so what a group hands over is DATA rather than a finished tree.
-	local function build_ctrl_shortcuts(_ctx)
-		if #ctrl_items == 0 then return nil end
-		return { disabled = not state.shortcuts or paused or nil, items = ctrl_items }
-	end
-
-	local function build_cmd_shortcuts(_ctx)
-		if #cmd_items == 0 then return nil end
-		return { disabled = not state.shortcuts or paused or nil, items = cmd_items }
-	end
-
 	--- The script-control shortcuts, as the one row a `list` provider returns.
 	--- @return table Provider rows (empty when the module is absent).
 	local function dyn_script_control()
@@ -801,7 +788,7 @@ function M.build(ctx)
 		if top_map[id] then table.insert(top_items, top_map[id]) end
 	end
 	if wrap_item then
-		if #top_items > 0 then table.insert(top_items, { title = "-" }) end
+		if #top_items > 0 then table.insert(top_items, { separator = true }) end
 		-- The symbols submenu USED to hang off this toggle. It is a manifest row of
 		-- its own now (`list:wrap_symbols_menu`), which is where Windows and Linux
 		-- have always shown it — the same feature was sitting in two different
@@ -817,10 +804,7 @@ function M.build(ctx)
 	local dyn_handlers = {
 	}
 
-	local group_builders = {
-		ctrl_shortcuts = build_ctrl_shortcuts,
-		cmd_shortcuts  = build_cmd_shortcuts,
-	}
+	local group_builders = {}
 
 	-- The keyboard slots are a list, not a group: their rows are the user's own
 	-- assignments, so the manifest can name the section but not enumerate it. The
@@ -835,7 +819,13 @@ function M.build(ctx)
 			           items = build_wrap_symbols_submenu(ctx, state, paused, shortcuts) } }
 		end,
 		keyboard_slots = function(_ctx)
-			return KeyboardSlots.provide_rows(ctx, (not state.shortcuts) or paused or nil)
+			-- The built-in Ctrl and Cmd shortcuts open the group of their own
+			-- modifier: as groups of their own they drew a second "Ctrl" and
+			-- "Cmd" submenu beside the configurable one.
+			return KeyboardSlots.provide_rows(ctx, (not state.shortcuts) or paused or nil, {
+				hs_ctrl_ = ctrl_items,
+				cmd_     = cmd_items,
+			})
 		end,
 		["script_control_shortcuts"] = dyn_script_control,
 		["extensions_shortcuts"] = extension_shortcut_rows,
@@ -858,7 +848,11 @@ function M.build(ctx)
 
 	local s_menu = ManifestMenu.build("shortcuts_menu", "Shortcuts", dyn_handlers, group_builders, sc_ctx, list_providers)
 
-	-- Prepend the top-level feature items before the manifest section
+	-- Prepend the top-level feature items before the manifest section. They are
+	-- row DATA (`label`, `action`) and the manifest section is already rendered,
+	-- so they go through the same renderer first: inserted raw, the wrap-text
+	-- toggle reached the tray with no title and hs.menubar drew nothing.
+	top_items = ManifestMenu.render_rows(top_items, "shortcuts_top_items")
 	for i, it in ipairs(top_items) do
 		table.insert(s_menu, i, it)
 	end
