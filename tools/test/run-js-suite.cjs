@@ -148,6 +148,7 @@ const CHECKS = [
 	{ name: 'Hammerspoon integrity (no global leaks, M.stop present, shutdown wired)', cmd: 'node', args: ['tools/test/test-hammerspoon-integrity.cjs'], repro: 'node tools/test/test-hammerspoon-integrity.cjs' },
 	{ name: 'section-title decoration parity (single "— … —" source per driver, no re-inlining)', cmd: 'node', args: ['tools/test/test-section-decoration-parity.cjs'], repro: 'node tools/test/test-section-decoration-parity.cjs' },
 	{ name: 'macOS bundle layout (build script + launcher mirror the repo)', cmd: 'node', args: ['tools/test/test-macos-bundle-layout.cjs'], repro: 'node tools/test/test-macos-bundle-layout.cjs' },
+	{ name: 'macOS app ships the keyboard layout bundle its menu resolves (no "No Ergopti bundle found")', cmd: 'node', args: ['tools/test/test-macos-keyboard-layout-bundle.cjs'], repro: 'npm run test:macos-keyboard-layout-bundle' },
 	{ name: 'macOS launcher universal binary (arm64 + x86_64 verified)', cmd: 'node', args: ['tools/test/test-macos-launcher-universal.cjs'], repro: 'node tools/test/test-macos-launcher-universal.cjs' },
 	{ name: 'macOS native launcher CI (release build + XCTest + success-only aggregate)', cmd: 'node', args: ['tools/test/test-macos-swift-launcher-ci.cjs'], repro: 'npm run test:macos-swift-launcher-ci' },
 	{ name: 'macOS native launcher local gate (plist + release build + XCTest, deferred off macOS)', cmd: 'node', args: ['tools/test/run-macos-swift-launcher.cjs'], repro: 'npm run test:macos-swift-launcher' },

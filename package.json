@@ -91,6 +91,7 @@
 		"test:diagnostic-snapshot-parity": "node ./tools/test/test-diagnostic-snapshot-parity.cjs",
 		"test:hotstring-buffer-cap-parity": "node ./tools/test/test-hotstring-buffer-cap-parity.cjs",
 		"test:macos-bundle-layout": "node ./tools/test/test-macos-bundle-layout.cjs",
+		"test:macos-keyboard-layout-bundle": "node ./tools/test/test-macos-keyboard-layout-bundle.cjs",
 		"test:macos-launcher-universal": "node ./tools/test/test-macos-launcher-universal.cjs",
 		"test:macos-swift-launcher-ci": "node ./tools/test/test-macos-swift-launcher-ci.cjs",
 		"test:macos-swift-launcher": "node ./tools/test/run-macos-swift-launcher.cjs",
