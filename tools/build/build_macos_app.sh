@@ -343,6 +343,35 @@ assemble_native_runtime() {
 
 }
 
+# The "Keyboard layout" menu installs the Ergopti keyboard layout from
+# static/ergopti/macos/bundles/, resolved relative to the driver root
+# (BUNDLES_RELDIR in ui/menu/menu_keyboard_layout.lua). Ship the newest bundle
+# at that same repo-relative path: the menu only ever offers the highest
+# version, so older bundles would add weight and nothing else. A build without
+# a bundle would ship a menu that can only say "no bundle found", so it fails.
+bundle_keyboard_layout() {
+	local static_root="$1"
+	local src_dir="$REPO_ROOT/static/ergopti/macos/bundles"
+	[ -d "$src_dir" ] || fail "Keyboard layout bundles directory missing: $src_dir"
+	local latest_version
+	latest_version="$(
+		find "$src_dir" -mindepth 1 -maxdepth 1 -type d -name 'Ergopti_v*.bundle' \
+			| sed -n 's|^.*/Ergopti_v\([0-9][0-9.]*\)\.bundle$|\1|p' \
+			| sort -t. -k1,1n -k2,2n -k3,3n \
+			| tail -n 1
+	)"
+	[ -n "$latest_version" ] || fail "No Ergopti_v*.bundle found in $src_dir."
+	local latest="Ergopti_v${latest_version}.bundle"
+	[ -f "$src_dir/$latest/Contents/Info.plist" ] \
+		|| fail "Keyboard layout bundle has no Info.plist: $src_dir/$latest"
+	local dest_dir="$static_root/ergopti/macos/bundles"
+	log "Bundling keyboard layout $latest"
+	mkdir -p "$dest_dir"
+	cp -R "$src_dir/$latest" "$dest_dir/"
+	[ -f "$dest_dir/$latest/Contents/Info.plist" ] \
+		|| fail "Keyboard layout bundle was not packaged at $dest_dir/$latest"
+}
+
 # Assemble the Ergopti.app skeleton, copy the launcher + Hammerspoon, drop our
 # Lua config into Resources/config/, and stamp Info.plist. The embedded
 # Hammerspoon's bundle id is rewritten so its preferences land under our id.
@@ -410,6 +439,8 @@ assemble_app() {
 	cp -R "$REPO_ROOT/static/ergopti_plus/_shared/data/locales"            "$static_root/"
 	cp -R "$REPO_ROOT/static/ergopti_plus/_shared/modules/hotstrings"         "$static_root/"
 	cp -R "$REPO_ROOT/static/img"                 "$static_root/"
+
+	bundle_keyboard_layout "$static_root"
 
 	# Bundle third-party tools so they are available on first launch with no
 	# runtime download. KE remains an installer app (a one-time system-extension

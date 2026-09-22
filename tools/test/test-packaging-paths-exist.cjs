@@ -35,6 +35,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
+const LAYOUT_ROOT = path.join(ROOT, 'static', 'ergopti');
 const BUILD_DIR = path.join(ROOT, 'tools', 'build');
 
 // Floors: five build scripts today, naming dozens of source paths between them.
@@ -88,10 +89,15 @@ for (const name of scripts) {
 			seen.add(key);
 			checked++;
 
-			if (!fs.existsSync(path.join(SP, rel))) {
+			// The keyboard layout tree (static/ergopti/) sits beside the driver tree
+			// and shares its top-level names, so a path under it resolves there.
+			const start = m.index + m[0].length - rel.length;
+			const layoutTree = /(?:^|[^A-Za-z0-9_])ergopti\/$/.test(line.slice(0, start));
+			const base = layoutTree ? LAYOUT_ROOT : SP;
+			if (!fs.existsSync(path.join(base, rel))) {
 				errors.push(
 					`tools/build/${name}:${i + 1}: copies "${rel}", which does not exist under ` +
-						'static/ergopti_plus/. Most of these copies are written "|| true", so the package ' +
+						`${path.relative(ROOT, base).split(path.sep).join('/')}/. Most of these copies are written "|| true", so the package ` +
 						'ships without it and no suite notices — every test here runs against the source ' +
 						'tree, not a build.'
 				);

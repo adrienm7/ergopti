@@ -16,7 +16,8 @@
 --- 3. Resilient, SIP-aware filesystem probes: shells out to /bin/test and osascript
 ---    for privileged copies; every failure path is logged, never silent.
 ---
---- Owns the bundle-discovery memo (_installed_cache / _latest_bundle_cache); the
+--- Owns the bundle-discovery memo (_installed_cache / _latest_bundle_cache /
+--- _keylayout_index_cache); the
 --- input-source layer (input_sources.lua) and the menu builder consume this
 --- module's public functions, never its private caches.
 --- ==============================================================================
@@ -26,6 +27,7 @@ local Logger        = require("infra.logger")
 local text_utils = require("infra.text_utils")
 local i18n          = require("infra.i18n")
 local notifications = require("infra.notifications")
+local FileSystem    = require("adapters.file_system")
 local LOG           = "menu.keyboard_layout"
 
 -- Target install paths on macOS
@@ -36,6 +38,8 @@ local SYSTEM_LAYOUTS_DIR = "/Library/Keyboard Layouts/"
 local _installed_cache = {}
 -- pick_latest_bundle(dir) result and directory revision, keyed by directory.
 local _latest_bundle_cache = {}
+-- keylayout_index(dir) result and directory revision, keyed by directory.
+local _keylayout_index_cache = {}
 -- User and system installs rewrite both layout directories. One module-owned
 -- admission bit keeps a reentrant menu callback from interleaving those writes.
 local _install_in_flight = false
@@ -91,8 +95,9 @@ end
 --- Clears the bundle-discovery memo. Called after an install / upgrade changes
 --- the on-disk layout set. Exposed for unit tests.
 local function invalidate_bundle_caches()
-	_installed_cache     = {}
-	_latest_bundle_cache = {}
+	_installed_cache       = {}
+	_latest_bundle_cache   = {}
+	_keylayout_index_cache = {}
 end
 
 
@@ -278,6 +283,83 @@ local function version_str(v)
 	local parts = {}
 	for _, n in ipairs(v) do parts[#parts + 1] = tostring(n) end
 	return table.concat(parts, ".")
+end
+
+--- Reads the version an installed bundle declares in its Info.plist
+--- (CFBundleShortVersionString). The plist, not the folder name, is the
+--- authority: bundles installed by hand or by an old installer can sit under a
+--- folder name that carries no version at all.
+--- @param bundle_path string Absolute path of the .bundle directory.
+--- @return table|nil Numeric version components, or nil when unreadable.
+local function read_bundle_version(bundle_path)
+	if type(bundle_path) ~= "string" or bundle_path == "" then return nil end
+	local plist_path = bundle_path:gsub("[/\\]$", "") .. "/Contents/Info.plist"
+	local content, status, detail = FileSystem.read_with_status(plist_path)
+	if status ~= "ok" or type(content) ~= "string" then
+		Logger.warn(LOG, "Bundle version unreadable — %s (%s: %s).",
+			plist_path, tostring(status), tostring(detail))
+		return nil
+	end
+	local raw = content:match("<key>%s*CFBundleShortVersionString%s*</key>%s*<string>%s*([%d%.]+)%s*</string>")
+	if not raw then
+		Logger.warn(LOG, "Bundle version missing — %s declares no numeric CFBundleShortVersionString.", plist_path)
+		return nil
+	end
+	local parts = {}
+	for n in raw:gmatch("(%d+)") do parts[#parts + 1] = tonumber(n) end
+	if #parts == 0 then return nil end
+	return parts
+end
+
+--- Maps every keylayout installed in `dir` to the bundle that ships it, so an
+--- active input source can be traced back to its bundle whatever the bundle's
+--- folder name. One `find` per directory revision, memoised like the other
+--- discovery scans.
+--- @param dir string Keyboard Layouts directory.
+--- @return table Map { [keylayout basename without extension] = bundle basename }.
+local function keylayout_index(dir)
+	if type(dir) ~= "string" or dir == "" then return {} end
+	local revision = directory_revision(dir)
+	local hit, cached = read_revision_cache(_keylayout_index_cache, dir, revision)
+	if hit then return cached or {} end
+	local index = {}
+	local cmd = string.format(
+		"find %s -maxdepth 4 -path '*.bundle/Contents/Resources/*.keylayout' 2>/dev/null",
+		text_utils.shell_quote(dir))
+	local p = io.popen(cmd)
+	if not p then
+		Logger.warn(LOG, "Keylayout scan could not start in %s.", dir)
+		return index
+	end
+	for raw_line in p:lines() do
+		local line = raw_line:gsub("[\r\n]+$", "")
+		local bundle, layout = line:match("([^/]+%.bundle)/Contents/Resources/([^/]+)%.keylayout$")
+		if bundle and index[layout] == nil then index[layout] = bundle end
+	end
+	p:close()
+	publish_revision_cache(_keylayout_index_cache, dir, revision, index)
+	return index
+end
+
+--- Resolves the version of an active KeyboardLayout Name. A versioned name
+--- ("Ergopti_v2_1_0_plus") carries it; an unversioned one is traced to the
+--- installed bundle shipping that keylayout and read from its Info.plist.
+--- @param kl_name string KeyboardLayout Name from HIToolbox.
+--- @return table|nil Numeric version components, or nil when truly unknown.
+local function layout_version(kl_name)
+	if type(kl_name) ~= "string" or kl_name == "" then return nil end
+	local maj, min, pat = kl_name:match("_v(%d+)[_.](%d+)[_.](%d+)")
+	if maj then return { tonumber(maj), tonumber(min), tonumber(pat) } end
+	-- A name is matched against file basenames only; a separator could never match.
+	if kl_name:find("[/\\]") then return nil end
+	for _, dir in ipairs({ SYSTEM_LAYOUTS_DIR, USER_LAYOUTS_DIR }) do
+		local bundle = keylayout_index(dir)[kl_name]
+		if bundle then
+			local layouts_dir = dir:gsub("[/\\]$", "")
+			return read_bundle_version(layouts_dir .. "/" .. bundle)
+		end
+	end
+	return nil
 end
 
 --- Builds a same-filesystem replacement transaction for one bundle scope.
@@ -486,7 +568,9 @@ return {
 	pick_latest_bundle     = pick_latest_bundle,
 	path_exists            = path_exists,
 	highest_installed      = highest_installed,
-	install_user           = install_user,
+	read_bundle_version    = read_bundle_version,
+	layout_version         = layout_version,
+	install_user          = install_user,
 	install_system         = install_system,
 	invalidate_bundle_caches = invalidate_bundle_caches,
 }
