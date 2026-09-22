@@ -15,16 +15,19 @@ local helpers = require("tests.helpers")
 local START_OUTCOMES = { "false", "nil", "throw" }
 
 
---- Recursively finds a provider callback by its exact label.
---- @param rows table|nil Provider rows.
+--- Recursively finds a row callback by its exact label, in either dialect:
+--- provider rows (`label`/`action`/`items`) or rows the renderer has already
+--- materialised (`title`/`fn`/`menu`), which is what the layout menu returns.
+--- @param rows table|nil Menu rows.
 --- @param label string Exact row label.
 --- @return function|nil action
 local function find_action(rows, label)
 	for _, row in ipairs(type(rows) == "table" and rows or {}) do
-		if row.label == label and type(row.action) == "function" then
-			return row.action
+		local callback = row.action or row.fn
+		if (row.label == label or row.title == label) and type(callback) == "function" then
+			return callback
 		end
-		local nested = find_action(row.items, label)
+		local nested = find_action(row.items or row.menu, label)
 		if nested then return nested end
 	end
 	return nil
@@ -215,7 +218,7 @@ local function layout_fixture(outcome)
 
 	local built = Layout.build(ctx)
 	helpers.assert_type(built, "table", "the real layout builder must return provider rows")
-	local action = find_action(built.items, "TARGET_REPLACE_SECTION")
+	local action = find_action(built.submenu, "TARGET_REPLACE_SECTION")
 	helpers.assert_type(action, "function",
 		"the real layout builder must expose the replacement-section callback")
 
