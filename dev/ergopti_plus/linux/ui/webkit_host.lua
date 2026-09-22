@@ -206,7 +206,21 @@ function M.build_injected_html(assets_dir, html_name)
 
 	-- Inline local stylesheets. Privileged webviews must not execute mutable
 	-- network content, so remote references fail the complete page build.
-	html = html:gsub('<link%s+rel="stylesheet"%s+href="([^"]+)"%s*/>', function(href)
+	--
+	-- Matched as a whole tag: attribute order, quote style and the
+	-- self-closing slash are author spellings, not semantics. A stylesheet
+	-- link in any other spelling used to survive silently, loading the page
+	-- with its CSS absent and no diagnostic anywhere.
+	html = html:gsub('<link([^>]-)>', function(attrs)
+		local rel = attrs:match('[Rr][Ee][Ll]%s*=%s*"([^"]*)"')
+			or attrs:match("[Rr][Ee][Ll]%s*=%s*'([^']*)'")
+			or attrs:match('[Rr][Ee][Ll]%s*=%s*([^%s>]+)')
+		if not rel or rel:lower() ~= "stylesheet" then
+			return "<link" .. attrs .. ">"
+		end
+		local href = attrs:match('href%s*=%s*"([^"]+)"')
+			or attrs:match("href%s*=%s*'([^']+)'")
+		if not href then return reject_asset("Stylesheet", attrs:match("^%s*(.-)%s*$")) end
 		if is_remote(href) then return reject_asset("Stylesheet", href) end
 		local css = read_file(assets_dir .. "/" .. strip_asset_query(href))
 		if css == "" then return reject_asset("Stylesheet", href) end
@@ -214,8 +228,15 @@ function M.build_injected_html(assets_dir, html_name)
 	end)
 
 	-- Attribute-bearing tags (notably `defer`) are accepted because inlining
-	-- preserves their source order in the self-contained document.
-	html = html:gsub('<script([^>]*)%s+src="([^"]+)"([^>]*)></script>', function(_before, src, _after)
+	-- preserves their source order in the self-contained document. Only
+	-- empty-body tags carry src here; an inline script has no src and passes
+	-- through untouched.
+	html = html:gsub('<script([^>]-)%s*></script>', function(attrs)
+		local src = attrs:match('[Ss][Rr][Cc]%s*=%s*"([^"]+)"')
+			or attrs:match("[Ss][Rr][Cc]%s*=%s*'([^']+)'")
+		if not src then
+			return "<script" .. attrs .. "></script>"
+		end
 		if is_remote(src) then return reject_asset("Script", src) end
 		local js = read_file(assets_dir .. "/" .. strip_asset_query(src))
 		if js == "" then return reject_asset("Script", src) end

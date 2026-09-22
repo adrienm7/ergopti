@@ -46,20 +46,42 @@ _TLTSH_Count(Haystack, Needle) {
 _TLTSH_CanonicalPrimitiveOwnsWholePolicy() {
 	AcceptBody := _DriverFuncBody("LLM_Tooltip_TryAcceptTab")
 	PolicyBody := _DriverFuncBody("_LLM_Accept_IsAllowed")
+	; The claim and the single injection call live in one helper shared by the
+	; Tab and validation-chord primitives, so the two cannot drift apart
+	; (llm-val-chord-inserts).
+	ClaimBody := _DriverFuncBody("_LLM_Accept_ClaimAndDispatch")
+	FocusBody := _DriverFuncBody("_LLM_Accept_FocusMatchesSource")
+	SlotBody := _DriverFuncBody("LLM_Tooltip_TryAcceptSlot")
+	SlotPolicyBody := _DriverFuncBody("_LLM_Accept_SlotIsAllowed")
 	BarePolicyBody := _DriverFuncBody("_LLM_Accept_IsBarePhysicalTabEvent")
 	ProbeBody := _DriverFuncBody("_LLM_Accept_ReadInputSnapshot")
 
 	Assert(InStr(AcceptBody, "LLM_Tooltip_GetAcceptSnapshot()") > 0
 		and InStr(AcceptBody, "Presented.AcceptSource") > 0,
 		"canonical acceptance must consume the source from one presented-record snapshot")
-	NormalizedAccept := RegExReplace(AcceptBody, "\s+", " ")
-	Assert(InStr(NormalizedAccept,
+	NormalizedClaim := RegExReplace(ClaimBody, "\s+", " ")
+	Assert(InStr(NormalizedClaim,
 		"LLM_Tooltip_ClaimAcceptance( Presented.Record, Presented.Surface, Presented.ActiveIdx)") > 0,
 		"canonical acceptance must atomically claim the exact record, surface, and immutable index it validated")
+	Assert(InStr(ClaimBody, "if _LLM_AcceptInProgress") > 0,
+		"the shared claim must refuse while another acceptance owns the latch")
 	Assert(InStr(AcceptBody, "_LLM_Accept_IsAllowed(") > 0,
 		"canonical acceptance must delegate its complete decision to one policy predicate")
-	Assert(InStr(AcceptBody, "LLM_Bridge_OnAccept(") > 0,
-		"the canonical primitive must be the sole gateway to prediction injection")
+	Assert(InStr(AcceptBody, "_LLM_Accept_ClaimAndDispatch(Presented") > 0,
+		"Tab acceptance must claim and inject only through the shared helper")
+	Assert(InStr(ClaimBody, "LLM_Bridge_OnAccept(") > 0,
+		"the shared claim helper must be the sole gateway to prediction injection")
+	Assert(InStr(SlotBody, "_LLM_Accept_SlotIsAllowed(") > 0
+		and InStr(SlotBody, "_LLM_Accept_ClaimAndDispatch(Presented") > 0,
+		"the validation-chord primitive must apply its own policy, then the shared claim")
+	for Needle in ["ObjPtr(Presented.Record) != ObjPtr(ExpectedRecord)",
+			"ObjPtr(Presented.Surface) != ObjPtr(ExpectedSurface)",
+			"Presented.ActiveIdx != SlotIdx",
+			"_LLM_Accept_AnyModifierDown(InputSnapshot)",
+			"_LLM_Accept_FocusMatchesSource(InputSnapshot, Presented.AcceptSource)"] {
+		Assert(InStr(SlotPolicyBody, Needle) > 0,
+			"validation-chord policy is missing required term: " . Needle)
+	}
 	Assert(InStr(AcceptBody, "if _LLM_AcceptInProgress") > 0
 		and InStr(AcceptBody, "_LLM_Accept_IsBarePhysicalTabEvent(") > 0,
 		"HotIf/InputHook callbacks may share a claim only after repeating bare-physical-Tab validation")
@@ -68,8 +90,10 @@ _TLTSH_CanonicalPrimitiveOwnsWholePolicy() {
 		Assert(InStr(BarePolicyBody, Needle) > 0,
 			"canonical bare-Tab event policy is missing required term: " . Needle)
 	}
+	Assert(InStr(PolicyBody, "_LLM_Accept_FocusMatchesSource(") > 0,
+		"the Tab policy must use the shared rendered-focus predicate")
 	for Needle in ["SourceHwnd == CurrentHwnd", "SourceControl == CurrentControl"] {
-		Assert(InStr(PolicyBody, Needle) > 0,
+		Assert(InStr(FocusBody, Needle) > 0,
 			"canonical rendered-focus policy is missing required term: " . Needle)
 	}
 	for Needle in ['GetKeyState("Tab", "P")', 'GetKeyState("Ctrl", "P")',
@@ -231,12 +255,30 @@ _TLTSH_EveryDirectAcceptCallIsCanonical() {
 	Assert(InStr(InjectCompleteBody, "if !HideQueued") > 0,
 		"sender failure must also defer claim release when no tooltip hide is queued")
 
+	TabPressBody := _DriverFuncBody("_TabAcceptVisiblePrediction")
+	Assert(TabPressBody != "",
+		"the physical Tab tap-hold press acceptance must be scanned")
+	Assert(InStr(TabPressBody, "LLM_Tooltip_TryAcceptTab(true, [])") > 0,
+		"the physical SC00F press is a real bare Tab event and must use canonical acceptance")
+
 	DirectRefs := _TLTSH_Count(DriverSrc, "LLM_Tooltip_TryAcceptTab(")
-	AssertEqual(3, DirectRefs,
-		"LLM_Tooltip_TryAcceptTab must have exactly one definition plus the two enumerated production callers; inspect every new occurrence before updating this count")
+	AssertEqual(4, DirectRefs,
+		"LLM_Tooltip_TryAcceptTab must have exactly one definition plus the three enumerated production callers (bridge feed, Tab-accept wrapper, physical Tab tap-hold press); inspect every new occurrence before updating this count")
 	OnAcceptRefs := _TLTSH_Count(DriverSrc, "LLM_Bridge_OnAccept(")
 	AssertEqual(2, OnAcceptRefs,
-		"LLM_Bridge_OnAccept must have exactly one definition and one call from the canonical primitive; any extra call bypasses policy")
+		"LLM_Bridge_OnAccept must have exactly one definition and one call from the shared claim helper; any extra call bypasses policy")
+	AssertEqual(3, _TLTSH_Count(DriverSrc, "_LLM_Accept_ClaimAndDispatch("),
+		"the shared claim helper must have one definition plus exactly the Tab and validation-chord primitives as callers")
+	; Second canonical primitive (llm-val-chord-inserts): defined once and driven
+	; only by the release wait armed from the native jump-receipt drain.
+	AssertEqual(2, _TLTSH_Count(DriverSrc, "LLM_Tooltip_TryAcceptSlot("),
+		"LLM_Tooltip_TryAcceptSlot must have one definition plus the single release-wait caller")
+	Assert(InStr(_DriverFuncBody("_LLM_SlotAccept_Insert"),
+		"LLM_Tooltip_TryAcceptSlot(") > 0,
+		"the release wait must insert through the canonical slot primitive")
+	Assert(InStr(_DriverFuncBody("_LLM_NavEventOwnerDrain"),
+		"LLM_Tooltip_ScheduleSlotAcceptance") > 0,
+		"the native jump-receipt drain must arm the validation-chord insertion")
 }
 
 Test("LLM accept meta: every direct injection/accept call site is enumerated (AHK-05)",
@@ -268,3 +310,31 @@ _TLTSH_EveryTabProducerUsesTheGuardedWrapper() {
 
 Test("LLM accept meta: every menu, gesture and tap-hold Tab producer is enumerated (AHK-05)",
 	_TLTSH_EveryTabProducerUsesTheGuardedWrapper)
+
+; A scan-code hotkey on SC00F shadows the `Tab::` acceptance HotIf, so a
+; tap-hold on the physical Tab key used to run its tap action (alt_tab_monitor,
+; a layer...) over a visible prediction. Acceptance also needs Tab physically
+; down, so it must happen on the press, before any tap/hold resolution
+; (llm-tab-taphold-accept).
+_TLTSH_EveryPhysicalTabTapHoldAcceptsFirst() {
+	SplitPath(A_ScriptDir, , &Root)
+	; FileRead throws if the module moves, so the scan can never go vacuous.
+	Src := _StripFullLineComments(FileRead(Root . "\platform\remap\tab.ahk", "UTF-8"))
+	Assert(Src != "", "platform/remap/tab.ahk must be scanned")
+	Handlers := 0
+	Pos := 1
+	while (Pos := RegExMatch(Src, "m)^\$?SC00F::\s*(\{|_TabDispatch)", &Match, Pos)) {
+		Handlers += 1
+		Assert(Match[1] == "{",
+			"every physical Tab handler must be a block that can accept first (line: " . Match[0] . ")")
+		Body := SubStr(Src, Pos + StrLen(Match[0]), 200)
+		Assert(RegExMatch(Body, "^\s*if _TabAcceptVisiblePrediction\(\)\s*return") > 0,
+			"physical Tab handler #" . Handlers . " must accept a visible prediction before any tap-hold logic")
+		Pos += StrLen(Match[0])
+	}
+	AssertEqual(4, Handlers,
+		"the four tap-hold variants of SC00F (alt_tab_monitor, hold-modifier, hold-layer, tap-only) must all be covered")
+}
+
+Test("LLM accept meta: physical Tab tap-holds accept a visible prediction on press (llm-tab-taphold-accept)",
+	_TLTSH_EveryPhysicalTabTapHoldAcceptsFirst)

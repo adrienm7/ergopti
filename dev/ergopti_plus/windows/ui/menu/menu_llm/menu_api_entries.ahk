@@ -55,23 +55,24 @@ _LLM_Menu_ApiEntriesRows() {
 	} else {
 		active_id := _LLM_Menu.Has("api_entry_id") ? _LLM_Menu["api_entry_id"] : ""
 		for entry in entries {
-			id    := _LLM_MenuApiEntryGet(entry, "Id",       "")
-			name  := _LLM_MenuApiEntryGet(entry, "Name",     "(unnamed)")
-			prov  := _LLM_MenuApiEntryGet(entry, "Provider", "")
-			model := _LLM_MenuApiEntryGet(entry, "Model",    "")
-			suffix := (model != "" and prov != "") ? "  —  " . prov . " / " . model
-				: (model != "") ? "  —  " . model
-				: (prov  != "") ? "  —  " . prov
-				: ""
+			id   := _LLM_MenuApiEntryGet(entry, "Id",   "")
+			name := _LLM_MenuApiEntryGet(entry, "Name", "(unnamed)")
 			Rows.Push(Map(
-				"label",   name . suffix,
+				"label",   name,
 				"checked", (id == active_id),
 				"action",  _LLM_Menu_MakeSelectApiEntryHandler(entry)))
 		}
 	}
-	Rows.Push(Map("separator", true))
+	; Add sits before the separator so creating an entry is one glance
+	; away; the separator only appears with the management rows, never
+	; dangling when no entry exists.
 	Rows.Push(Map("label", t("menu.llm.api_add_entry"), "action", (*) => _LLM_Menu_PromptApiEntry("")))
 	if (Type(entries) == "Array" and entries.Length > 0) {
+		; Management rows: most frequent first, destructive delete last.
+		Rows.Push(Map("separator", true))
+		Rows.Push(Map(
+			"label",  t("menu.llm.api_test_entry"),
+			"action", (*) => _LLM_Menu_TestActiveApiEntry()))
 		Rows.Push(Map(
 			"label",  t("menu.llm.api_edit_entry"),
 			"action", (*) => _LLM_Menu_PromptApiEntry(_LLM_Menu["api_entry_id"])))
@@ -80,6 +81,29 @@ _LLM_Menu_ApiEntriesRows() {
 			"action", (*) => _LLM_Menu_RemoveActiveApiEntry()))
 	}
 	return Rows
+}
+
+; Returns a name unused by the entries: the base, then base (2), ... The
+; entry being edited keeps its own name without suffix via ExcludeId.
+_LLM_Menu_UniqueApiEntryName(Base, Entries, ExcludeId := "") {
+	if (Base == "")
+		return Base
+	Taken := Map()
+	if (Entries is Array) {
+		for Entry in Entries {
+			if (_LLM_MenuApiEntryGet(Entry, "Id", "") == ExcludeId)
+				continue
+			Name := _LLM_MenuApiEntryGet(Entry, "Name", "")
+			if (Name != "")
+				Taken[Name] := true
+		}
+	}
+	if !Taken.Has(Base)
+		return Base
+	Counter := 2
+	while Taken.Has(Base . " (" . Counter . ")")
+		Counter += 1
+	return Base . " (" . Counter . ")"
 }
 
 _LLM_MenuApiEntryGet(Entry, Key, Default := "") {
@@ -149,6 +173,17 @@ _LLM_Menu_ApiEntryIdsAreUnique(Entries) {
 ; ==========================================
 ; ==========================================
 
+; Asks whether to probe a just-created entry end to end. Existing locale
+; strings only (no new keys): the action label as question, Yes/No buttons.
+; Headless-safe: the stubbed MsgBox declines.
+; @returns {Boolean} True when the user confirmed.
+_LLM_Menu_AskTestNewApiEntry() {
+	try return MsgBox(t("menu.llm.api_test_entry"),
+		t("menu.llm.api_dialog_title"), "YesNo Icon?") == "Yes"
+	catch
+		return false
+}
+
 ; Open the create/edit dialog for an API entry. When ``EditId`` is empty, the
 ; dialog creates a new entry; otherwise it loads the matching record and
 ; updates it in place. The dialog stays InputBox-driven (one field per call)
@@ -183,14 +218,7 @@ _LLM_Menu_PromptApiEntry(EditId) {
 		}
 	}
 
-	; Step 1 — friendly name.
-	def_name := existing != "" ? _LLM_MenuApiEntryGet(existing, "Name", "") : ""
-	ib := InputBox(t("menu.llm.api_prompt_name"), t("menu.llm.api_dialog_title"),
-		"w420 h130", def_name)
-	if !_LLM_Menu_TryRequiredPrompt(ib.Result, ib.Value, &new_name)
-		return
-
-	; Step 2 — provider id.
+	; Step 1 — provider id.
 	provider_choices := _LLM_Menu_BuildApiProviderChoices(LLM_API_PROVIDERS)
 	def_provider := existing != "" ? _LLM_MenuApiEntryGet(existing, "Provider", "openai") : "openai"
 	ib := InputBox(
@@ -209,7 +237,7 @@ _LLM_Menu_PromptApiEntry(EditId) {
 		return
 	provider := LLM_API_PROVIDERS[provider_id]
 
-	; Step 3 — base URL (prefilled with the provider default).
+	; Step 2 — base URL (prefilled with the provider default).
 	def_url := existing != "" ? _LLM_MenuApiEntryGet(existing, "BaseUrl", "") : provider["BaseUrl"]
 	ib := InputBox(t("menu.llm.api_prompt_url"), t("menu.llm.api_dialog_title"),
 		"w520 h130", def_url)
@@ -217,7 +245,7 @@ _LLM_Menu_PromptApiEntry(EditId) {
 		return
 	new_url := Trim(ib.Value)
 
-	; Step 4 — token. InputBox does not natively mask, so we use the Hide
+	; Step 3 — token. InputBox does not natively mask, so we use the Hide
 	; flag (HIDE) so the cleartext doesn't sit on screen / clipboard.
 	def_token := existing != "" ? _LLM_MenuApiEntryGet(existing, "Token", "") : ""
 	ib := InputBox(t("menu.llm.api_prompt_token"), t("menu.llm.api_dialog_title"),
@@ -226,12 +254,28 @@ _LLM_Menu_PromptApiEntry(EditId) {
 		return
 	new_token := ib.Value   ; do NOT Trim — leading/trailing chars are part of the secret
 
-	; Step 5 — model.
+	; Step 4 — model.
 	def_model := existing != "" ? _LLM_MenuApiEntryGet(existing, "Model", "") : provider["DefaultModel"]
 	ib := InputBox(t("menu.llm.api_prompt_model"), t("menu.llm.api_dialog_title"),
 		"w420 h130", def_model)
 	if !_LLM_Menu_TryRequiredPrompt(ib.Result, ib.Value, &new_model)
 		return
+
+	; Step 5 — friendly name, LAST so its default is provider/model. The
+	; default is deduped against the other entries so rows stay distinct.
+	if (existing != "") {
+		def_name := _LLM_MenuApiEntryGet(existing, "Name", "")
+		name_exclude := _LLM_MenuApiEntryGet(existing, "Id", "")
+	} else {
+		def_name := provider_id . "/" . new_model
+		name_exclude := ""
+	}
+	ib := InputBox(t("menu.llm.api_prompt_name"), t("menu.llm.api_dialog_title"),
+		"w420 h130", def_name)
+	if !_LLM_Menu_TryRequiredPrompt(ib.Result, ib.Value, &typed_name)
+		return
+	new_name := _LLM_Menu_UniqueApiEntryName(typed_name,
+		_LLM_Menu["api_entries"], name_exclude)
 
 	; Persist.
 	new_entry := Map(
@@ -249,6 +293,20 @@ _LLM_Menu_PromptApiEntry(EditId) {
 			new_entry, EditId), _LLM_Menu_ApplyApiEntriesCommitted)
 	if !Committed
 		return false
+
+	; Creation only: offer the full end-to-end probe on the just-saved
+	; entry (committing made it active), so a bad token or model surfaces
+	; here with its server message instead of mid-typing. A declined
+	; offer keeps the save.
+	if ((EditId == "") && _LLM_Menu["api_entry_id"] == new_entry["Id"]) {
+		try {
+			if _LLM_Menu_AskTestNewApiEntry()
+				_LLM_Menu_TestActiveApiEntry()
+		} catch as AskErr {
+			try LoggerWarn("LLM", "Post-creation API test skipped: {1}.",
+				AskErr.Message)
+		}
+	}
 
 	; Token validation: hit the provider's /models endpoint once with the
 	; freshly-saved credentials so the user finds out NOW (with an explicit
@@ -419,6 +477,310 @@ _LLM_Menu_NewApiId() {
 	static Sequence := 0
 	Sequence += 1
 	return "api_" . A_TickCount . "_" . Sequence
+}
+
+
+
+
+
+; The probe gets its own longer budget: a 30 s prediction timeout cannot
+; survive a cold model load, and with a cancellable progress the user — not
+; the clock — decides when to give up.
+global LLM_API_TEST_TIMEOUT_MS := 120000
+; At most one probe progress; a Map without "entry" means nothing is showing.
+global _LLM_Menu_ApiTestProgress := Map()
+
+; Pure label for the probe progress: entry name, elapsed whole seconds, and
+; the budget — the user sees the limit, never an open-ended wait.
+_LLM_Menu_ApiTestProgressText(Name, ElapsedMs, BudgetMs) {
+	return Name . " — " . (ElapsedMs // 1000) . " s / "
+		. (BudgetMs // 1000) . " s"
+}
+
+; Shows the cancellable probe progress immediately at click time. The window
+; is modeless (the request runs on timers) with a pulse bar, a live elapsed
+; label and a Cancel button. Everything UI is try-wrapped: headless or not,
+; the state map is always set so Hide/Cancel stay consistent.
+_LLM_Menu_ApiTestProgressShow(EntryId, Name) {
+	global _LLM_Menu_ApiTestProgress, LLM_API_TEST_TIMEOUT_MS
+	_LLM_Menu_ApiTestProgressHide()
+	State := Map("entry", EntryId, "name", Name, "req_id", 0,
+		"owner", "", "start", A_TickCount, "budget", LLM_API_TEST_TIMEOUT_MS)
+	_LLM_Menu_ApiTestProgress := State
+	try {
+		Worker := Gui("+AlwaysOnTop +ToolWindow",
+			t("menu.llm.api_dialog_title"))
+		State["label"] := Worker.Add("Text", "w300",
+			_LLM_Menu_ApiTestProgressText(Name, 0, State["budget"]))
+		State["bar"] := Worker.Add("Progress", "w300 h16 Range0-100", 0)
+		CancelBtn := Worker.Add("Button", "w300", t("common.cancel"))
+		CancelBtn.OnEvent("Click",
+			(*) => _LLM_Menu_ApiTestProgressCancel())
+		Worker.Show("AutoSize Center")
+		State["gui"] := Worker
+		; Named callback (not a closure) so the fast-timer inventory can pin
+		; this 150 ms pulse by name; the tick itself reads the global state.
+		SetTimer(_LLM_Menu_ApiTestProgressTick, 150)
+	} catch as Err {
+		try LoggerWarn("LLM", "API test progress unavailable: {1}.",
+			Err.Message)
+	}
+	return true
+}
+
+; Progress tick: fills the bar with the elapsed share of the budget and
+; refreshes the label. Never throws into the timer thread; a missing state
+; just stops meaning anything.
+_LLM_Menu_ApiTestProgressTick() {
+	global _LLM_Menu_ApiTestProgress
+	if !(_LLM_Menu_ApiTestProgress is Map)
+		|| !_LLM_Menu_ApiTestProgress.Has("entry")
+		return
+	State := _LLM_Menu_ApiTestProgress
+	Elapsed := Max(0, A_TickCount - State["start"])
+	Budget := State.Get("budget", 0)
+	if State.Has("label")
+		try State["label"].Text := _LLM_Menu_ApiTestProgressText(
+			State["name"], Elapsed, Budget)
+	; Determinate bar: elapsed share of the budget, pinned at full.
+	if State.Has("bar")
+		try State["bar"].Value := (Budget > 0)
+			? Min(100, (Elapsed * 100) // Budget) : 0
+}
+
+; Hides the probe progress if one is showing. Silent and total: timer off,
+; window destroyed, state cleared.
+; @return boolean True when something was showing.
+_LLM_Menu_ApiTestProgressHide() {
+	global _LLM_Menu_ApiTestProgress
+	if !(_LLM_Menu_ApiTestProgress is Map)
+		|| !_LLM_Menu_ApiTestProgress.Has("entry")
+		return false
+	State := _LLM_Menu_ApiTestProgress
+	try SetTimer(_LLM_Menu_ApiTestProgressTick, 0)
+	if State.Has("gui")
+		try State["gui"].Destroy()
+	_LLM_Menu_ApiTestProgress := Map()
+	return true
+}
+
+; User Cancel: aborts the in-flight request, finishes the owner so a late
+; completion stays silent, hides the progress. Closing the window IS the
+; feedback — no popup for an action the user just chose.
+; @return boolean True when a probe was showing.
+_LLM_Menu_ApiTestProgressCancel() {
+	global _LLM_Menu_ApiTestProgress
+	if !(_LLM_Menu_ApiTestProgress is Map)
+		|| !_LLM_Menu_ApiTestProgress.Has("entry")
+		return false
+	State := _LLM_Menu_ApiTestProgress
+	ReqId := State.Get("req_id", 0)
+	if IsInteger(ReqId) && ReqId > 0
+		try LLM_RemoteCancelAsync(ReqId)
+	Owner := State.Get("owner", "")
+	if Owner != ""
+		try LLM_AuxFinish(Owner)
+	Name := State.Get("name", "")
+	_LLM_Menu_ApiTestProgressHide()
+	try LoggerInfo("LLM", "API test for '{1}' cancelled by the user.", Name)
+	return true
+}
+
+
+
+
+
+; ======================================
+; ======================================
+; ======= 2.5/ Test active entry =======
+; ======================================
+; ======================================
+
+; Surfaces one probe verdict through the injectable seam in tests and through
+; a blocking MsgBox in production. A TrayTip proved too easy to miss — a
+; clicked Test action must always end in a visible verdict, success or not.
+; @return boolean True once the verdict was handed to the seam or MsgBox.
+_LLM_Menu_ApiTestSurface(Title, Body, Icon, Ok, NotifyFn := 0) {
+	if HasMethod(NotifyFn, "Call") {
+		try NotifyFn.Call(Ok, Map("title", Title, "body", Body))
+		return true
+	}
+	try MsgBox(Body, Title, Icon)
+	return true
+}
+
+; Sends the shared minimal probe (api_providers.json test_request, verbatim)
+; to the active entry and surfaces the verdict. Unlike the save-time /models
+; ping this proves the full path: credentials, model id and body format.
+; Token never reaches a log or a popup — only the entry name, latency and a
+; short reply excerpt travel.
+;
+; @param NotifyFn function|nil Optional test seam receiving (ok, detail-map).
+;   When absent every outcome (refusal, dispatch failure, completion) goes to
+;   a blocking MsgBox, never a TrayTip.
+; @return boolean True when a probe was dispatched.
+_LLM_Menu_TestActiveApiEntry(NotifyFn := 0) {
+	global _LLM_Menu, LLM_REMOTE_TEST_REQUEST, LLM_REMOTE_KIND_API_TEST,
+		LLM_API_TEST_TIMEOUT_MS
+	active_id := _LLM_Menu.Has("api_entry_id") ? _LLM_Menu["api_entry_id"] : ""
+	entry := ""
+	if (active_id != "" && _LLM_Menu.Has("api_entries")
+			&& (_LLM_Menu["api_entries"] is Array)) {
+		for e in _LLM_Menu["api_entries"] {
+			if (_LLM_MenuApiEntryGet(e, "Id", "") == active_id) {
+				entry := e
+				break
+			}
+		}
+	}
+	if (entry == "") {
+		_LLM_Menu_ApiTestSurface(t("menu.llm.api_dialog_title"),
+			t("menu.llm.api_no_entry"), "Iconx", false, NotifyFn)
+		try LoggerWarn("LLM", "API test refused: no active entry selected.")
+		return false
+	}
+	if !(LLM_REMOTE_TEST_REQUEST is Map) || (LLM_REMOTE_TEST_REQUEST.Count == 0) {
+		_LLM_Menu_ApiTestSurface(t("menu.llm.api_dialog_title"),
+			t("menu.llm.api_providers_unavailable"), "Iconx", false, NotifyFn)
+		try LoggerError("LLM", "API test refused: shared test-request spec unavailable.")
+		return false
+	}
+	; Snapshot plain strings so a mid-flight edit cannot relabel this result.
+	snapshot := Map()
+	for Field in ["Id", "Name", "Provider", "BaseUrl", "Token", "Model"]
+		snapshot[Field] := _LLM_MenuApiEntryGet(entry, Field, "")
+	if !_LLM_Menu_ApiEntryFieldsAreSafe(snapshot) {
+		_LLM_Menu_ApiTestSurface(t("menu.llm.api_dialog_title"),
+			t("menu.llm.api_no_entry"), "Iconx", false, NotifyFn)
+		try LoggerError("LLM", "API test refused: active entry failed field validation.")
+		return false
+	}
+	spec := LLM_REMOTE_TEST_REQUEST
+	EntryId := snapshot["Id"]
+	Name := snapshot["Name"]
+	Owner := ""
+	try Owner := LLM_AuxBegin("api_test:" . EntryId, Map(
+		"backend", "api",
+		"endpoint", snapshot["BaseUrl"],
+		"identity", EntryId))
+	catch as Err {
+		try LoggerError("LLM", "API test owner acquisition failed: {1}.", Err.Message)
+		return false
+	}
+	StartedTick := A_TickCount
+	; Immediate visible feedback at click time; the Cancel button and the
+	; request id are attached below once dispatch owns them.
+	_LLM_Menu_ApiTestProgressShow(EntryId, Name)
+	_LLM_Menu_ApiTestProgress["owner"] := Owner
+	OnSucc := (Text, Usage) => _LLM_Menu_OnApiTestDone(true, Text,
+		EntryId, Name, StartedTick, Owner, NotifyFn)
+	OnFail := (Info := "") => _LLM_Menu_OnApiTestDone(false, "",
+		EntryId, Name, StartedTick, Owner, NotifyFn, Info)
+	; Logged before dispatch, not after: if the click reaches this function
+	; there is always exactly one line proving it, so a silent menu click can
+	; be told apart from a handler failure. No token, no prompt content.
+	try LoggerInfo("LLM", "API test dispatched for '{1}' (model {2}).",
+		Name, snapshot["Model"])
+	try {
+		; Tag the reservation with the owned-probe kind so the engine's
+		; keystroke cancels (ResetPredictions, CancelInflight) spare it, and
+		; give the probe its own longer budget for cold models.
+		ReqId := LLM_RemoteGenerate_Async(snapshot, spec["system_prompt"],
+			spec["user_text"], spec["temperature"], OnSucc, OnFail, "",
+			spec["max_tokens"], LLM_REMOTE_KIND_API_TEST,
+			LLM_API_TEST_TIMEOUT_MS)
+		_LLM_Menu_ApiTestProgress["req_id"] := ReqId
+	} catch as Err {
+		try LLM_AuxFinish(Owner)
+		try LoggerError("LLM", "API test dispatch failed: {1}.", Err.Message)
+		_LLM_Menu_ApiTestProgressHide()
+		Tip := _LLM_Menu_ApiTestTip(false, Name, 0, "")
+		_LLM_Menu_ApiTestSurface(Tip["title"], Tip["body"], "Icon!", false, NotifyFn)
+		return false
+	}
+	; A synchronously failed dispatch already ran the completion above: never
+	; leave a progress behind it.
+	if !LLM_AuxIsCurrent(Owner)
+		_LLM_Menu_ApiTestProgressHide()
+	return true
+}
+
+; Builds the user-visible verdict triple without touching UI or logs, so the
+; mapping is unit-testable headlessly. Mirrors the validation flow wording.
+; @param Info Map|nil Optional failure info (reason/status/message): the
+;   provider's own verdict is appended so a 402 quota refusal never reads as
+;   a generic unreachable.
+; @return Map { ok, title, body }
+_LLM_Menu_ApiTestTip(Ok, Name, Ms, Text, Info := "") {
+	if (Ok && Text is String && Text != "") {
+		Excerpt := StrLen(Text) > 120 ? SubStr(Text, 1, 120) . "..." : Text
+		return Map("ok", true,
+			"title", t("menu.llm.api_test_ok_title"),
+			"body", Format(t("menu.llm.api_test_ok_body"), Name, Ms, Excerpt))
+	}
+	Body := StrReplace(t("menu.llm.api_unreachable_body"), "%s", Name)
+	ServerLine := _LLM_Menu_ApiTestServerLine(Info)
+	if (ServerLine != "")
+		Body .= "`n" . ServerLine
+	return Map("ok", false,
+		"title", t("menu.llm.api_unreachable_title"),
+		"body", Body)
+}
+
+; Renders the provider's own verdict as a language-neutral bracketed line, so
+; no locale key is needed for server English plus a status code.
+; @return string "" when there is nothing to show.
+_LLM_Menu_ApiTestServerLine(Info) {
+	if !(Info is Map)
+		return ""
+	Status := (Info.Has("status") && Info["status"] is Number)
+		? Integer(Info["status"]) : 0
+	Msg := (Info.Has("message") && Info["message"] is String)
+		? Trim(Info["message"]) : ""
+	if (Msg == "")
+		return ""
+	return (Status > 0) ? Format("[{1}] {2}", Status, Msg) : Msg
+}
+
+; Publishes one probe completion. Stale results (entry changed or deleted
+; mid-flight, driver suspended) are discarded silently like the validation
+; flow — a late verdict must never relabel another entry.
+; @return boolean True when the verdict was surfaced.
+_LLM_Menu_OnApiTestDone(Ok, Text, EntryId, Name, StartedTick, Owner,
+		NotifyFn := 0, Info := "") {
+	global _LLM_Menu, _LLM_Menu_ApiTestProgress
+	; The progress belongs to this Owner reference: hide it before every
+	; exit, including stale and suspended ones, so no window ever lingers.
+	; A newer probe owns its own progress and is never touched here.
+	if ((_LLM_Menu_ApiTestProgress is Map)
+		&& _LLM_Menu_ApiTestProgress.Has("owner")
+		&& _LLM_Menu_ApiTestProgress["owner"] == Owner)
+		_LLM_Menu_ApiTestProgressHide()
+	if !LLM_AuxIsCurrent(Owner) || A_IsSuspended
+		return false
+	Matches := 0
+	if (_LLM_Menu is Map) && _LLM_Menu.Has("api_entries")
+			&& (_LLM_Menu["api_entries"] is Array) {
+		for e in _LLM_Menu["api_entries"] {
+			if (_LLM_MenuApiEntryGet(e, "Id", "") == EntryId)
+				Matches += 1
+		}
+	}
+	if (Matches != 1 || !LLM_AuxFinish(Owner))
+		return false
+	Ms := Max(0, A_TickCount - StartedTick)
+	Tip := _LLM_Menu_ApiTestTip(Ok, Name, Ms, Text, Info)
+	_LLM_Menu_ApiTestSurface(Tip["title"], Tip["body"],
+		Tip["ok"] ? "Iconi" : "Icon!", Tip["ok"], NotifyFn)
+	if (Tip["ok"]) {
+		try LoggerInfo("LLM", "API test for '{1}' succeeded in {2} ms ({3} reply chars).",
+			Name, Ms, StrLen(Text))
+	} else {
+		ServerLine := _LLM_Menu_ApiTestServerLine(Info)
+		try LoggerError("LLM", "API test for '{1}' failed after {2} ms — check the token, URL and model.{3}",
+			Name, Ms, ServerLine == "" ? "" : " Server said: " . ServerLine)
+	}
+	return true
 }
 
 

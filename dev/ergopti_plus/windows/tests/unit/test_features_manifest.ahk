@@ -438,6 +438,9 @@ TestFMv2_RejectsScalarTypeConfusion() {
 Test("ApplyConfigToml: manifest scalar types cannot be confused (AHK-094)",
 	TestFMv2_RejectsScalarTypeConfusion)
 
+; Out-of-domain integers stay rejected for booleans even though legacy 0/1
+; migrates (see the llm-toggle-deadlock test above): 2 is not a spelling the
+; old writer produced, so it carries no user intent to preserve.
 TestFMv2_RejectsBooleanIntegerTypeAliasing() {
 	OldFeatures := _FM_BeginIsolated()
 	try {
@@ -446,13 +449,13 @@ TestFMv2_RejectsBooleanIntegerTypeAliasing() {
 		DelayDefault := (Features["hotstrings"]["autocorrection"]["accents"]
 			["time_activation_seconds"])
 		Path := _FM_WriteFixture("boolean_integer_aliasing",
-			"[layout]`r`nergopti_base = 1`r`n"
+			"[layout]`r`nergopti_base = 2`r`n"
 			. "[script]`r`nalt_gr_is_kana_remap = 1`r`n"
 			. "[llm.generation]`r`ncontext_length = true`r`n"
 			. "[hotstrings.autocorrection.accents]`r`n"
 			. "time_activation_seconds = true`r`n"
 			. "[hotstrings.personal.audit_alias]`r`n"
-			. "enabled = 1`r`ntime_activation_seconds = true`r`n")
+			. "enabled = 2`r`ntime_activation_seconds = true`r`n")
 		Applied := ApplyConfigToml(Features, Path)
 		AssertEqual(0, Applied,
 			"TOML booleans and integers must retain their source types")
@@ -480,6 +483,85 @@ TestFMv2_RejectsBooleanIntegerTypeAliasing() {
 }
 Test("ApplyConfigToml: TOML booleans and integers cannot alias (AHK-131)",
 	TestFMv2_RejectsBooleanIntegerTypeAliasing)
+
+; The driver's own writer emitted 0/1 for booleans for years, so the installed
+; base carries them on every manifest-boolean key. Strict literal-kind
+; rejection skipped each one AND latched the boot authority, which refused
+; every later save - including the toggle that would have canonicalized the
+; file. The menu toggle could never stick (llm-toggle-deadlock). Legacy 0/1
+; for a boolean key must therefore apply with user intent and count as
+; migrated, while every other confusion direction stays rejected.
+TestFMv2_LegacyZeroOneBooleansMigrate() {
+	OldFeatures := _FM_BeginIsolated()
+	Captured := []
+	LoggerSetTestSink((Line) => Captured.Push(Line))
+	try {
+		Path := _FM_WriteFixture("legacy_boolean_migration",
+			"[llm]`r`n"
+			. "enabled = 1`r`n"
+			. "onboarding_seen = 1`r`n"
+			. "[hotstrings.autocorrection.accents]`r`n"
+			. "enabled = 0`r`n"
+			. "[hotstrings.personal.legacy_alias]`r`n"
+			. "enabled = 0`r`n"
+			. "[llm.generation]`r`n"
+			. "context_length = 0`r`n"
+			. "[script]`r`n"
+			. "locale = " . '"' . "es" . '"' . "`r`n"
+			. "[hotstrings.autocorrection.caps]`r`n"
+			. "time_activation_seconds = true`r`n")
+		Applied := ApplyConfigToml(Features, Path, &Rejected)
+		AssertEqual(6, Applied,
+			"four legacy 0/1 booleans plus two valid controls must apply")
+		AssertEqual(1, Rejected,
+			"only the boolean-for-number confusion must still reject")
+		AssertEqual(true, Features["llm"]["enabled"],
+			"legacy enabled = 1 must switch the feature on, not fall back to default")
+		AssertEqual(true, Features["llm"]["onboarding_seen"])
+		AssertEqual(false,
+			Features["hotstrings"]["autocorrection"]["accents"]["enabled"],
+			"legacy enabled = 0 must switch the feature off (default is on)")
+		AssertTrue(Features["hotstrings"]["personal"].Has("legacy_alias"),
+			"a migrated dynamic value must create its section like any valid one")
+		AssertEqual(false,
+			Features["hotstrings"]["personal"]["legacy_alias"]["enabled"])
+		AssertEqual(0, Features["llm"]["generation"]["context_length"],
+			"a numeric zero for a number key applies as a number, not as migrated")
+		Assert(Features["llm"]["generation"]["context_length"] is Integer,
+			"a numeric zero must keep its source type through migration")
+		AssertEqual("es", Features["script"]["locale"])
+		Errors := []
+		Migrated := []
+		for Line in Captured {
+			if InStr(Line, "[ERROR]", true)
+				Errors.Push(Line)
+			if InStr(Line, "legacy", true)
+				Migrated.Push(Line)
+		}
+		AssertEqual(2, Errors.Length,
+			"the confused leaf plus the partial-apply summary must log errors")
+		LeafNamed := false
+		SummaryLogged := false
+		for Line in Errors {
+			LeafNamed := LeafNamed
+				|| InStr(Line, "time_activation_seconds", true) > 0
+			SummaryLogged := SummaryLogged
+				|| InStr(Line, "partially applied", true) > 0
+		}
+		AssertTrue(LeafNamed, "the error must name the confused leaf")
+		AssertTrue(SummaryLogged,
+			"one genuine rejection must still latch the partial-apply summary")
+		AssertTrue(Migrated.Length >= 1,
+			"legacy migration must say so in the log, or the next save looks unexplained")
+	} finally {
+		LoggerClearTestSink()
+		if IsSet(Path) && FileExist(Path)
+			FileDelete(Path)
+		_FM_EndIsolated(OldFeatures)
+	}
+}
+Test("ApplyConfigToml: legacy 0/1 booleans migrate with user intent (llm-toggle-deadlock)",
+	TestFMv2_LegacyZeroOneBooleansMigrate)
 
 TestFMv2_RejectsFeatureValuesOutsideSchemaDomain() {
 	OldFeatures := _FM_BeginIsolated()

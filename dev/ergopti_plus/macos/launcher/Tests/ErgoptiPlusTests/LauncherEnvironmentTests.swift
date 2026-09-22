@@ -37,6 +37,7 @@ private final class TestLoggerDatagramServer: LoggerDatagramServing {
 	let endpoint: LoggerDatagramEndpoint
 	private(set) var stopCount = 0
 	private var bootstrapReadyHandler: (() -> Void)?
+	private var configureRefusalHandler: ((LogDirectoryFailure) -> Void)?
 
 	init(port: UInt16 = 31_337, token: String = "test-logger-token") {
 		endpoint = LoggerDatagramEndpoint(port: port, token: token)
@@ -47,6 +48,12 @@ private final class TestLoggerDatagramServer: LoggerDatagramServing {
 	}
 
 	func reportBootstrapReady() { bootstrapReadyHandler?() }
+
+	func setConfigureRefusalHandler(_ handler: @escaping (LogDirectoryFailure) -> Void) {
+		configureRefusalHandler = handler
+	}
+
+	func reportConfigureRefusal(_ failure: LogDirectoryFailure) { configureRefusalHandler?(failure) }
 
 	func stop() { stopCount += 1 }
 }
@@ -482,6 +489,33 @@ final class LauncherEnvironmentTests: XCTestCase {
 			"Embedded Hammerspoon stopped unexpectedly with exit code 0. "
 				+ "The independent remap guardian is enforcing ErgoptiPlus remap revocation.",
 		])
+	}
+
+	/// A refused log folder is named instead of a bare exit code, without the
+	/// bootstrap retry that could only fail the same way (symlinked-config-dir).
+	func testRefusedLogFolderIsNamedAndNotRetried() {
+		var childStartCount = 0
+		var fatalMessages: [String] = []
+		let loggerWorker = TestLoggerDatagramServer()
+		let delegate = AppDelegate(
+			launcherIdentityReader: { _ in (device: "11", inode: "22") },
+			applicationLauncher: { _, _, _ in childStartCount += 1 },
+			fatalReporter: { fatalMessages.append($0) },
+			applicationTerminator: { _ in },
+			loggerWorkerFactory: { loggerWorker }
+		)
+		let failure = LogDirectoryFailure(
+			path: "/Users/u/.config/ergopti_plus/hammerspoon/logs",
+			refusal: .danglingSymlink(link: "/Users/u/.config/ergopti_plus/hammerspoon/logs")
+		)
+
+		delegate.launchHammerspoon(at: testEmbeddedHammerspoonBinary)
+		loggerWorker.reportConfigureRefusal(failure)
+		delegate.handleEmbeddedHammerspoonExit(.exited(code: 0), guardianStatus: .unavailable)
+
+		XCTAssertEqual(childStartCount, 1)
+		XCTAssertEqual(fatalMessages, ["Log folder refused: \(failure.diagnostic)."])
+		XCTAssertTrue(fatalMessages[0].contains("symbolic link whose target does not exist"))
 	}
 
 	/// Refusing the kernel status owner cannot silently downgrade to a clean exit.

@@ -55,6 +55,9 @@ local _quit_callbacks   = {}
 local _running          = false
 local _last_focus_key   = nil
 local _last_processes   = {}   -- set: process_name -> true
+-- Whether _last_processes came from a real snapshot. Without a baseline the
+-- first successful read would report every running process as launched.
+local _have_proc_baseline = false
 
 -- Timer handles (LuaJIT/luaposix compatible; we use a simple background thread
 -- via coroutine + os.time for portability across LuaJIT versions)
@@ -103,18 +106,27 @@ local function _focus_key(app_id, title)
 	return app_id .. FOCUS_KEY_SEPARATOR .. title
 end
 
---- Returns a set (name -> true) of currently running process names via ps.
+--- Returns a set (name -> true) of currently running process names via ps,
+--- or nil when the snapshot could not be taken. A failed snapshot must never
+--- read as an empty machine: diffing one would fire a quit event for every
+--- known process, then a launch event for every one of them when ps recovers.
 local function _snapshot_processes()
 	local fh = io.popen("ps -eo comm 2>/dev/null", "r")
-	if not fh then return {} end
+	if not fh then return nil end
 	local snapshot = {}
-	for line in fh:lines() do
-		local name = line:match("^%s*(.-)%s*$")
-		if name and name ~= "" and name ~= "COMMAND" then
-			snapshot[name] = true
+	local read_ok = pcall(function()
+		for line in fh:lines() do
+			local name = line:match("^%s*(.-)%s*$")
+			if name and name ~= "" and name ~= "COMMAND" then
+				snapshot[name] = true
+			end
 		end
-	end
-	fh:close()
+	end)
+	-- os.execute and pipe:close() return a NUMBER on LuaJIT (5.1) and true
+	-- on 5.2+: accept both spellings of success, like every other call site.
+	local close_status = fh:close()
+	local close_ok = close_status == true or close_status == 0
+	if not read_ok or not close_ok or next(snapshot) == nil then return nil end
 	return snapshot
 end
 
@@ -178,7 +190,9 @@ function M.start()
 	if _running then return end
 	_running = true
 	_last_focus_key = _focus_key(_focused_identity())
-	_last_processes = _snapshot_processes()
+	local seed = _snapshot_processes()
+	_last_processes = seed or {}
+	_have_proc_baseline = seed ~= nil
 
 	-- Focus polling loop: runs as a background coroutine ticked by the caller.
 	-- For environments without an event loop, we spawn a shell background poll
@@ -199,6 +213,7 @@ function M.stop()
 	_running = false
 	_last_focus_key = nil
 	_last_processes = {}
+	_have_proc_baseline = false
 	Logger.debug(LOG, "stop(): polling adapters stopped.")
 end
 
@@ -230,6 +245,18 @@ function M.tick(tick_count)
 	if tick_count % process_every == 0 then
 		local ok_p = pcall(function()
 			local current = _snapshot_processes()
+			-- A failed snapshot keeps the last known set: there is nothing to
+			-- diff it against, and diffing an empty set would report the whole
+			-- desktop as quit.
+			if not current then return end
+			if not _have_proc_baseline then
+				-- ps failed at start: adopt the first successful read silently.
+				-- Diffing it against nothing would report every running process
+				-- as launched.
+				_last_processes = current
+				_have_proc_baseline = true
+				return
+			end
 			-- Launched: in current but not in last
 			for name in pairs(current) do
 				if not _last_processes[name] then

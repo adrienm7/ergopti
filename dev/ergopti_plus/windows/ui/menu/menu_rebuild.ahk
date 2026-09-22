@@ -52,6 +52,31 @@ _TrayRootScheduleBootProjectionIfDisabled(IsEnabled, RequestFn,
 	return true
 }
 
+; Whether the boot worker must arm the deferred IA population for the api
+; backend: enabled, with api selected. Lives next to the IfDisabled gate so
+; both arming rules stay in one testable place. Ollama stays owned by async
+; dependency readiness, disabled by the projection above — this answers only
+; the case neither covers, which otherwise boots to an empty IA submenu.
+_TrayRootApiBootProjectionNeeded() {
+	global _LLM_Menu
+	if !IsSet(_LLM_Menu) || !(_LLM_Menu is Map)
+		return false
+	return _LLM_Menu.Get("enabled", false) && _LLM_Menu.Get("backend", "") == "api"
+}
+
+; Whether the boot worker must arm the deferred IA population at all: the
+; initMenu LLM phase already builds IA inline, so a populated handle means
+; the second full pass would only re-render an unchanged tree. An absent or
+; empty handle (inline build failed or never ran) still needs recovery.
+_TrayRootBootIaPopulationNeeded() {
+	global _LLM_Menu_Handle
+	if !IsSet(_LLM_Menu_Handle) || !IsObject(_LLM_Menu_Handle)
+		return true
+	try return DllCall("GetMenuItemCount", "ptr", _LLM_Menu_Handle.Handle, "int") <= 0
+	catch
+		return true
+}
+
 _TrayRootErrorIsSilent(Err) {
 	return (Err is TrayRootRetryPendingError)
 		or (Err is TrayRootFatalContextError)

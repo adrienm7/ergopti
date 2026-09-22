@@ -148,3 +148,89 @@ helpers.describe("asset inlining: a versioned reference", function()
 	end)
 
 end)
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 3/ Author spellings are not semantics ===================
+-- =================================================================
+-- =================================================================
+
+helpers.describe("asset inlining: every spelling of the same tag (tag-spellings)", function()
+
+	--- Writes a probe asset and returns its remover.
+	local function probe_asset(dir, filename, content)
+		local asset = assert(io.open(dir .. "/" .. filename, "w"))
+		asset:write(content)
+		asset:close()
+		return function() os.remove(dir .. "/" .. filename) end
+	end
+
+	helpers.it("tag-spellings: an href-first stylesheet link is inlined", function()
+		local dir, name = fixture(
+			"<html><head><link href=\"probe.css\" rel=\"stylesheet\" /></head><body></body></html>")
+		local unwrite = probe_asset(dir, "probe.css", ".probe{color:red;}\n")
+		local html, errors = build(dir, name)
+		os.remove(dir .. "/" .. name)
+		unwrite()
+
+		helpers.assert_eq(#errors, 0, "the file exists, so there is nothing to report")
+		helpers.assert_contains(html, ".probe{color:red;}",
+			"attribute ORDER must not decide whether the CSS reaches the page")
+		helpers.assert_true(html:find("probe.css", 1, true) == nil,
+			"and the tag must not survive: the inlined page cannot resolve it")
+	end)
+
+	helpers.it("tag-spellings: a non-self-closed stylesheet link is inlined", function()
+		local dir, name = fixture(
+			"<html><head><link rel=\"stylesheet\" href=\"probe.css\"></head><body></body></html>")
+		local unwrite = probe_asset(dir, "probe.css", ".probe{color:red;}\n")
+		local html, errors = build(dir, name)
+		os.remove(dir .. "/" .. name)
+		unwrite()
+
+		helpers.assert_eq(#errors, 0, "the file exists, so there is nothing to report")
+		helpers.assert_contains(html, ".probe{color:red;}",
+			"the self-closing slash must not decide whether the CSS reaches the page")
+	end)
+
+	helpers.it("tag-spellings: a single-quoted script is inlined", function()
+		local dir, name = fixture(
+			"<html><head></head><body><script src='probe_asset.js'></script></body></html>")
+		local unwrite = probe_asset(dir, "probe_asset.js", "window.probeMarker = 1;\n")
+		local html, errors = build(dir, name)
+		os.remove(dir .. "/" .. name)
+		unwrite()
+
+		helpers.assert_eq(#errors, 0, "the file exists, so there is nothing to report")
+		helpers.assert_contains(html, "window.probeMarker",
+			"the quote STYLE must not decide whether the script reaches the page")
+	end)
+
+	helpers.it("tag-spellings: a non-stylesheet link is left alone, silently", function()
+		local dir, name = fixture(
+			"<html><head><link rel=\"icon\" href=\"favicon.ico\" /></head><body></body></html>")
+		local html, errors = build(dir, name)
+		os.remove(dir .. "/" .. name)
+
+		helpers.assert_eq(#errors, 0,
+			"an icon link is not this inliner's business — failing the page over "
+				.. "it would be the noise this file exists to prevent")
+		helpers.assert_contains(html, "favicon.ico",
+			"and the tag must survive untouched for the webview to resolve")
+	end)
+
+	helpers.it("tag-spellings: an inline script without src is left alone", function()
+		local dir, name = fixture(
+			"<html><head></head><body><script>window.inlineMarker = 2;</script></body></html>")
+		local html, errors = build(dir, name)
+		os.remove(dir .. "/" .. name)
+
+		helpers.assert_eq(#errors, 0, "there is no asset to resolve, so nothing to report")
+		helpers.assert_contains(html, "window.inlineMarker",
+			"an inline script must pass through byte for byte")
+	end)
+
+end)

@@ -170,6 +170,8 @@ OnError(_FatalErrorHandler)
 ; functions instead of scanning their source.
 #Include ../infra/wrap_symbols_config.ahk
 #Include ../modules/keymap/layout/layout_altgr.ahk
+#Include ../modules/keymap/layout/layout_ergopti.ahk
+#Include ../modules/keymap/layout/accented_shortcuts.ahk
 #Include ../modules/keymap/layout/layout_shift_caps.ahk
 ; Pure layout-poll quiescence decision (no OS deps, no top-level hotkeys) —
 ; exercised by meta/test_layout_quiescence.ahk and consumed by ErgoptiPlus.ahk.
@@ -421,6 +423,9 @@ _LogBootProgress("loading LLM modules")
 #Include meta/test_keylogger_journal_lifecycle_owner.ahk
 #Include unit/test_keylogger_journal_repair_debt.ahk
 #Include unit/test_llm_aux_request_ownership.ahk
+#Include unit/test_llm_api_test_entry.ahk
+#Include unit/test_llm_menu_backend_model_labels.ahk
+#Include unit/test_llm_menu_build_submenu.ahk
 #Include unit/test_llm_curl_terminal_classification.ahk
 #Include unit/test_llm_curl_literal_paths.ahk
 #Include unit/test_ollama_http_terminal_classification.ahk
@@ -439,6 +444,7 @@ _LogBootProgress("loading LLM modules")
 #Include unit/test_llm_bridge_buffer_cap.ahk
 #Include unit/test_llm_pointer_watch_transaction.ahk
 #Include unit/test_llm_tab_accept_policy.ahk
+#Include unit/test_accented_shortcuts.ahk
 ; parser.ahk (the AHK semantic-diff parser) was previously exercised by no suite,
 ; which let a crash in its Levenshtein helper survive — include it + its tests.
 #Include ../modules/llm/parser.ahk
@@ -490,6 +496,10 @@ _LogBootProgress("loading menu_llm/persist")
 #Include ../ui/menu/menu_llm/backend_lifecycle.ahk
 #Include ../ui/menu/menu_llm/aux_ownership.ahk
 #Include ../ui/menu/menu_llm/menu_api_entries.ahk
+#Include ../ui/menu/menu_llm/menu_main.ahk
+#Include ../ui/menu/menu_llm/actions.ahk
+#Include ../ui/menu/menu_gestures.ahk
+#Include ../infra/menu_dispatcher.ahk
 #Include ../ui/menu/menu_llm/menu_settings.ahk
 #Include unit/test_llm_backend_lifecycle_dispatch.ahk
 #Include unit/test_llm_menu_persistence.ahk

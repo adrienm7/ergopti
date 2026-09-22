@@ -34,13 +34,15 @@
 
 ; Guard 1 — the deps probe must be wrapped so it can never abort the build
 ; before the enable toggle is added (the empty-IA-submenu regression).
+; Row construction lives in LLM_Menu_BuildSubmenu (LLM_Menu_Build only
+; publishes), so the guard scans the extractor.
 _LMDG_BuildGuardsDepsProbe() {
-	Seg := _DriverFuncBody("LLM_Menu_Build")
-	Assert(Seg != "", "LLM_Menu_Build() declaration must exist in menu_main.ahk")
+	Seg := _DriverFuncBody("LLM_Menu_BuildSubmenu")
+	Assert(Seg != "", "LLM_Menu_BuildSubmenu() declaration must exist in menu_main.ahk")
 	Assert(InStr(Seg, "try _deps_ready := LLM_Deps_IsReady()") > 0,
-		"LLM_Menu_Build must probe LLM_Deps_IsReady() inside a try (guarded) so a throw cannot abort the build before the enable toggle is added")
+		"LLM_Menu_BuildSubmenu must probe LLM_Deps_IsReady() inside a try (guarded) so a throw cannot abort the build before the enable toggle is added")
 	Assert(InStr(Seg, '_llm_is_operational := (_LLM_Menu["enabled"] && LLM_Deps_IsReady())') == 0,
-		"LLM_Menu_Build must NOT call LLM_Deps_IsReady() unguarded inline — that throw left the IA submenu empty when the feature was off")
+		"LLM_Menu_BuildSubmenu must NOT call LLM_Deps_IsReady() unguarded inline — that throw left the IA submenu empty when the feature was off")
 }
 Test("menu_main: LLM_Menu_Build guards the deps probe so the toggle always renders (llm-menu-disabled-greyed)", _LMDG_BuildGuardsDepsProbe)
 
@@ -51,14 +53,14 @@ Test("menu_main: LLM_Menu_Build guards the deps probe so the toggle always rende
 ; The per-row policy itself (backend/model stay usable, the rest grey) lives in
 ; the menu manifest's llm_menu key and is asserted by test_llm_menu_layout_shared.
 _LMDG_BuildGreysRowsWhenOff() {
-	Seg := _DriverFuncBody("LLM_Menu_Build")
-	Assert(Seg != "", "LLM_Menu_Build() declaration must exist in menu_main.ahk")
+	Seg := _DriverFuncBody("LLM_Menu_BuildSubmenu")
+	Assert(Seg != "", "LLM_Menu_BuildSubmenu() declaration must exist in menu_main.ahk")
 	Assert(InStr(Seg, '_disabled := !_LLM_Menu["enabled"]') > 0,
-		"LLM_Menu_Build must compute _disabled from the enabled flag to grey settings rows when off")
+		"LLM_Menu_BuildSubmenu must compute _disabled from the enabled flag to grey settings rows when off")
 	Assert(InStr(Seg, '_row["disabled_when_off"] ? _disabled : false') > 0,
-		"LLM_Menu_Build must resolve each row's greying against the shared spec policy (disabled_when_off ? _disabled : false) — so backend/model stay usable while the rest grey out")
+		"LLM_Menu_BuildSubmenu must resolve each row's greying against the shared spec policy (disabled_when_off ? _disabled : false) — so backend/model stay usable while the rest grey out")
 	Assert(InStr(Seg, "AddCategoryToggleItem(_LLM_Menu_Handle,") > 0,
-		"LLM_Menu_Build must always add the enable toggle (AddCategoryToggleItem)")
+		"LLM_Menu_BuildSubmenu must always add the enable toggle (AddCategoryToggleItem)")
 }
 Test("menu_main: LLM_Menu_Build greys the settings rows when the feature is off (llm-menu-disabled-greyed)", _LMDG_BuildGreysRowsWhenOff)
 
@@ -87,3 +89,19 @@ _LMDG_AddRowHelperDisables() {
 		"_LLM_Menu_AddRow must Disable() the row when disabled is true (grey it — macOS is_disabled parity)")
 }
 Test("menu_main: _LLM_Menu_AddRow greys a row when disabled (llm-menu-disabled-greyed)", _LMDG_AddRowHelperDisables)
+
+; Guard 4 — the parent IA tray check follows user intent alone. Backend
+; readiness already owns the health dot and the install warning row; folding
+; it into this checkbox repeated the fixed inner-toggle bug one level up:
+; enabled with Ollama missing rendered unchecked, reading as "IA is off".
+; Scanned comment-stripped so prose can never satisfy the assertions.
+_LMDG_ParentCheckFollowsIntent() {
+	Seg := _DriverFuncBody("LLM_Menu_Build")
+	Assert(Seg != "", "LLM_Menu_Build() declaration must exist in menu_main.ahk")
+	Code := _StripFullLineComments(Seg)
+	Assert(InStr(Code, 'if (_LLM_Menu["enabled"]) {') > 0,
+		"the parent IA tray check must follow the enabled flag alone so intent, not backend reachability, drives the checkbox")
+	Assert(InStr(Code, 'if (_LLM_Menu["enabled"] && _backend_ready) {') == 0,
+		"the parent IA tray check must not require backend readiness - that left the entry visually OFF while Ollama was missing")
+}
+Test("menu_main: parent IA check follows intent, not backend readiness (llm-parent-check-intent)", _LMDG_ParentCheckFollowsIntent)

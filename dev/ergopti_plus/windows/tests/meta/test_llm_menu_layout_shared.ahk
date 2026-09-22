@@ -139,15 +139,16 @@ _LMLS_FallbackMirrorsManifest() {
 }
 Test("llm-menu-layout-shared: Windows fallback mirrors the manifest", _LMLS_FallbackMirrorsManifest)
 
-; LLM_Menu_Build must be spec-DRIVEN: it loops the shared rows and dispatches each
-; via _LLM_Menu_EmitRow, rather than hardcoding the settings-row list inline.
+; Row construction must be spec-DRIVEN: it loops the shared rows and dispatches
+; each via _LLM_Menu_EmitRow, rather than hardcoding the settings-row list
+; inline. Rows live in LLM_Menu_BuildSubmenu (LLM_Menu_Build only publishes).
 _LMLS_BuildIsSpecDriven() {
-	Seg := _DriverFuncBody("LLM_Menu_Build")
-	Assert(Seg != "", "LLM_Menu_Build() must exist in menu_main.ahk")
+	Seg := _DriverFuncBody("LLM_Menu_BuildSubmenu")
+	Assert(Seg != "", "LLM_Menu_BuildSubmenu() must exist in menu_main.ahk")
 	Assert(InStr(Seg, "_LLM_MenuLayout_Rows()") > 0,
-		"LLM_Menu_Build must read the row list from _LLM_MenuLayout_Rows() (the shared spec) — not hardcode it")
+		"LLM_Menu_BuildSubmenu must read the row list from _LLM_MenuLayout_Rows() (the shared spec) — not hardcode it")
 	Assert(InStr(Seg, "_LLM_Menu_EmitRow(") > 0,
-		"LLM_Menu_Build must dispatch each row via _LLM_Menu_EmitRow so order + greying come from the shared spec")
+		"LLM_Menu_BuildSubmenu must dispatch each row via _LLM_Menu_EmitRow so order + greying come from the shared spec")
 }
 Test("llm-menu-layout-shared: LLM_Menu_Build is driven by the shared layout spec", _LMLS_BuildIsSpecDriven)
 
@@ -170,9 +171,9 @@ Test("llm-menu-layout-shared: the dispatch answers every declared row", _LMLS_Di
 ; no driver reads is worse than no field: editing it moves nothing and there is
 ; nothing to read that says so.
 _LMLS_HealthDotIsRead() {
-	Build := _DriverFuncBody("LLM_Menu_Build")
+	Build := _DriverFuncBody("LLM_Menu_BuildSubmenu")
 	Assert(InStr(Build, '_MR_Get(_row, "health_dot"') > 0,
-		"LLM_Menu_Build must pass each row's declared health_dot into _LLM_Menu_EmitRow")
+		"LLM_Menu_BuildSubmenu must pass each row's declared health_dot into _LLM_Menu_EmitRow")
 	Emit := _DriverFuncBody("_LLM_Menu_EmitRow")
 	Assert(InStr(Emit, "has_health_dot && llm_is_operational") > 0,
 		"_LLM_Menu_EmitRow must gate the dot on the declared flag, not on the row id alone")

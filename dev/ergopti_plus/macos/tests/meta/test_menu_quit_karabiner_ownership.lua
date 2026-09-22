@@ -29,7 +29,7 @@ local function load_menu_quit_action()
 	helpers.load_with_stubs("infra.logger")
 	local exit_calls = {}
 	local exit_mode = { value = "true" }
-	local stock_calls = { execute = 0, launch = 0 }
+	local stock_calls = { execute = 0, launch = 0, notifications = {} }
 	_G.hs.execute = function()
 		stock_calls.execute = stock_calls.execute + 1
 		return "", true
@@ -39,7 +39,11 @@ local function load_menu_quit_action()
 		return true
 	end
 
-	package.loaded["infra.notifications"] = { notify = function() end }
+	package.loaded["infra.notifications"] = {
+		notify = function(message)
+			stock_calls.notifications[#stock_calls.notifications + 1] = message
+		end,
+	}
 	-- Menu startup loads optional user code; the quit contract must never acquire
 	-- a real personal configuration file or its persistent cooperative lock.
 	package.loaded["infra.personal_shortcuts"] = { load = function() return true end }
@@ -117,8 +121,8 @@ local function load_menu_quit_action()
 	}
 	package.loaded["infra.termination_coordinator"] = {
 		is_pending = function() return false end,
-		request_exit = function(reason, code)
-			exit_calls[#exit_calls + 1] = { reason = reason, code = code }
+		request_user_exit = function(reason)
+			exit_calls[#exit_calls + 1] = { reason = reason }
 			if exit_mode.value == "throw" then error("coordinated exit fault") end
 			if exit_mode.value == "nil" then return nil end
 			if exit_mode.value == "false" then return false end
@@ -173,7 +177,8 @@ helpers.describe("menu Quit uses exact lease revocation", function()
 
 	helpers.it("requests one coordinated menu_quit exit", function()
 		local body = quit_action_body()
-		helpers.assert_true(body:find('TerminationCoordinator.request_exit("menu_quit", 0)', 1, true) ~= nil)
+		helpers.assert_true(body:find('TerminationCoordinator.request_user_exit("menu_quit")', 1, true) ~= nil,
+			"menu Quit must arm the bounded user-exit watchdog (hs-quit-never-blocks)")
 		helpers.assert_true(body:find("os.exit", 1, true) == nil,
 			"only the root coordinator may exit after STOPPED")
 		helpers.assert_true(body:find("karabiner.shutdown", 1, true) == nil,
@@ -216,7 +221,7 @@ helpers.describe("menu Quit uses exact lease revocation", function()
 				before = before,
 				after = #exit_calls,
 				reason = call and call.reason,
-				code = call and call.code,
+				notified = stock_calls.notifications[#stock_calls.notifications],
 			}
 		end
 
@@ -227,9 +232,10 @@ helpers.describe("menu Quit uses exact lease revocation", function()
 			helpers.assert_eq(result.after, result.before + 1,
 				result.label .. " must attempt the coordinated exit exactly once")
 			helpers.assert_eq(result.reason, "menu_quit")
-			helpers.assert_eq(result.code, 0)
 			helpers.assert_eq(result.accepted, false,
 				result.label .. " must not acknowledge an uncommitted exit")
+			helpers.assert_eq(result.notified, "notify.quit_refused",
+				result.label .. " refusal must be visible to the user (hs-quit-never-blocks)")
 		end
 		helpers.assert_eq(direct_exits, 0)
 		helpers.assert_eq(stock_calls.execute, stock_execute_before,

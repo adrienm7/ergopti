@@ -9,7 +9,10 @@
 
 #Requires AutoHotkey v2.0
 
-_CPL_FullSavePreservesRejectedPreference(Invalid := true, Literal := "0") {
+; The invalid exemplar is an out-of-domain integer: bare 0/1 for a boolean key
+; is the legacy writer spelling and migrates with user intent instead (see the
+; llm-toggle-deadlock test), so it can no longer play the invalid role here.
+_CPL_FullSavePreservesRejectedPreference(Invalid := true, Literal := "2") {
 	global _ConfigBootRejectedOverrides
 	OldRejected := _ConfigBootRejectedOverrides
 	Runtime := _CFGFS_CaptureRuntime()
@@ -73,7 +76,7 @@ _CPL_LocalDiagnosticsCannotChangeBootAuthority() {
 	ValidPath := Path . ".valid.toml"
 	try {
 		_ConfigBootRejectedOverrides := 0
-		AssertTrue(FSWrite(Path, "[shortcuts]`nscreen = 0`n"))
+		AssertTrue(FSWrite(Path, "[shortcuts]`nscreen = 2`n"))
 		AssertEqual(0, ApplyConfigToml(ManifestBuildFeaturesMap(), Path, &Rejected))
 		AssertEqual(1, Rejected)
 		AssertEqual(0, _ConfigBootRejectedOverrides,

@@ -1861,8 +1861,15 @@ end
 --- Native stop/close methods may explicitly refuse or raise after leaving their
 --- resource live. Retain the exact handle in that case so the lifecycle owner can
 --- retry instead of publishing a successor beside an orphan.
+--- At process exit or reload the final ingest is skipped: it syncs foreign
+--- ledgers, rebuilds aggregates and may encrypt every typing row through a
+--- subprocess, all on the main thread while Quit waits. Nothing is lost: today.log
+--- is appended durably before this point, the committed offset lives in the
+--- cache's meta table, and the next boot's initial ingest reads the tail.
+--- @param opts table|nil `{ process_exit = true }` for the process-lifecycle stop.
 --- @return boolean complete True only when every owned resource was released.
-function M.stop()
+function M.stop(opts)
+	local process_exit = type(opts) == "table" and opts.process_exit == true
 	local complete = true
 	local ingest_timer = _ingest_timer
 	if ingest_timer then
@@ -1894,11 +1901,27 @@ function M.stop()
 				"Deferred log cleanup remains pending: %s.", tostring(drained_or_err))
 		end
 	end
-	local ingest_ok, ingest_err = xpcall(M.ingest_once, debug.traceback)
-	if not ingest_ok then
-		complete = false
-		pcall(Logger.error, LOG,
-			"Final ingest cleanup remains pending: %s.", tostring(ingest_err))
+	if process_exit then
+		-- Only publish an already-committed data.sql outbox batch: one bounded append.
+		-- A refusal keeps it in the cache, where the next boot's ingest retries it.
+		local db = SqliteWriter.get_db()
+		if db then
+			local flush_ok, flushed_or_err = xpcall(function()
+				return _flush_local_data_sql_outbox(db)
+			end, debug.traceback)
+			if not flush_ok or flushed_or_err ~= true then
+				pcall(Logger.warn, LOG,
+					"Pending data.sql outbox kept in the cache for the next boot: %s.",
+					tostring(flushed_or_err))
+			end
+		end
+	else
+		local ingest_ok, ingest_err = xpcall(M.ingest_once, debug.traceback)
+		if not ingest_ok then
+			complete = false
+			pcall(Logger.error, LOG,
+				"Final ingest cleanup remains pending: %s.", tostring(ingest_err))
+		end
 	end
 	local db_ok, db_result_or_err = xpcall(function() return SqliteWriter.close_db() end,
 		debug.traceback)

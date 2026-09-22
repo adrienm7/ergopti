@@ -13,6 +13,7 @@ helpers.describe("hotstring priority overrides", function()
 		local previous_config = package.loaded["modules.hotstrings.hotstrings_config"]
 		local previous_paths = package.loaded["infra.config_paths"]
 		local previous_shell = package.loaded["adapters.shell_runner"]
+		local previous_storage = package.loaded["adapters.storage"]
 		local previous_load_catalogue = Loader.load_catalogue
 		local previous_open = io.open
 		local previous_rename = os.rename
@@ -22,6 +23,7 @@ helpers.describe("hotstring priority overrides", function()
 		local persisted = nil
 		local staged = nil
 		local fail_writes = false
+		local fail_rename = false
 		local created_config_dir = false
 
 		local function memory_handle(mode, commit)
@@ -89,6 +91,7 @@ helpers.describe("hotstring priority overrides", function()
 		end
 
 		local ok, failure = xpcall(function()
+			package.loaded["adapters.storage"] = require("tests.fakes").storage()
 			package.loaded["infra.config_paths"] = {
 				config = function() return "/virtual-home/.config/ergopti" end,
 			}
@@ -113,6 +116,7 @@ helpers.describe("hotstring priority overrides", function()
 			end
 			os.rename = function(from, to)
 				if from == temporary_path and to == override_path then
+					if fail_rename then return nil, "injected rename failure" end
 					persisted = staged
 					staged = nil
 					return true
@@ -160,15 +164,111 @@ helpers.describe("hotstring priority overrides", function()
 			helpers.assert_eq(winner(restarted_engine), "SECOND",
 				"the persisted priority must elect the same winner after restart")
 
-			helpers.assert_eq(restarted.set_override("second", nil, "priority", nil), true)
+			helpers.assert_eq(restarted.clear_override("second", nil, "priority"), true)
 			helpers.assert_eq(winner(restarted_engine), "FIRST",
 				"clearing priority must restore the registration-order tiebreak")
+
+			helpers.assert_eq(restarted.set_override("first", nil, "priority", 100), true)
+			local extension_category = require("hotstrings.extensions").category_key("sample-pack", "second")
+			local category_values = { delay = 1.25, color = "#123456", show_tooltip = true, priority = 90 }
+			local section_values = { delay = 2.5, color = "#abcdef", show_tooltip = false, priority = 120 }
+			for _, category in ipairs({ "second", extension_category }) do
+				for field, value in pairs(category_values) do
+					helpers.assert_eq(restarted.set_override(category, nil, field, value), true)
+				end
+				for field, value in pairs(section_values) do
+					helpers.assert_eq(restarted.set_override(category, "main", field, value), true)
+				end
+			end
+			helpers.assert_eq(winner(restarted_engine), "SECOND")
+			helpers.assert_contains(persisted, "[second.main]")
+			helpers.assert_contains(persisted, "[" .. extension_category .. ".main]")
+
+			package.loaded["modules.hotstrings.hotstrings_config"] = nil
+			restarted = require("modules.hotstrings.hotstrings_config")
+			restarted_engine = Engine.new()
+			restarted.init(restarted_engine, "/virtual/catalogue.toml")
+			restarted.load_all()
+			for _, category in ipairs({ "second", extension_category }) do
+				helpers.assert_eq(restarted.get_user_override(category), category_values,
+					category .. " category fields must survive restart")
+				helpers.assert_eq(restarted.get_user_override(category, "main"), section_values,
+					category .. " section fields must survive restart")
+				for field, value in pairs(category_values) do
+					helpers.assert_eq(restarted.resolve(category)[field], value)
+				end
+				for field, value in pairs(section_values) do
+					helpers.assert_eq(restarted.resolve(category, "main")[field], value)
+				end
+			end
+			helpers.assert_eq(winner(restarted_engine), "SECOND",
+				"persisted section priority must beat the competing category priority")
+			helpers.assert_eq(restarted.clear_override("second", "main", "priority"), true)
+			helpers.assert_eq(winner(restarted_engine), "FIRST",
+				"clearing section priority must restore the lower category priority")
+			helpers.assert_eq(restarted.clear_override("first", nil), true)
+			helpers.assert_eq(restarted.clear_override("second", nil), true)
+			helpers.assert_eq(restarted.clear_override(extension_category, nil), true)
+
+			for _, scope in ipairs({ "category", "section", "category field", "section field" }) do
+				local section = scope:find("section", 1, true) and "main" or nil
+				local field = scope:find("field", 1, true) and "delay" or nil
+				helpers.assert_eq(restarted.set_override("second", nil, "color", "#123456"), true)
+				helpers.assert_eq(restarted.set_override("second", section, "delay", 1.5), true)
+				helpers.assert_eq(restarted.set_override("second", "other", "delay", 2.5), true)
+				helpers.assert_eq(restarted.set_override("first", nil, "delay", 3.5), true)
+				local before = restarted.get_user_override("second", section)
+				local cached = restarted.resolve("second", section)
+				local durable = persisted
+				helpers.assert_eq(cached.delay, 1.5)
+
+				for _, failure_mode in ipairs({ "open", "rename" }) do
+					fail_writes = failure_mode == "open"
+					fail_rename = failure_mode == "rename"
+					helpers.assert_eq(restarted.clear_override("second", section, field), false,
+						scope .. " must report " .. failure_mode .. " failure")
+					helpers.assert_eq(restarted.get_user_override("second", section), before,
+						"failed clears must retain live overrides")
+					helpers.assert_true(restarted.resolve("second", section) == cached,
+						"failed clears must retain the resolver cache")
+					helpers.assert_eq(persisted, durable, "failed clears must retain durable TOML")
+				end
+				fail_writes = false
+				fail_rename = false
+				helpers.assert_eq(restarted.clear_override("second", section, field), true, scope)
+				helpers.assert_nil(restarted.get_user_override("second", section).delay)
+				helpers.assert_eq(restarted.resolve("second", section).delay, restarted.get_global_delay())
+				helpers.assert_true(persisted ~= durable, "successful clears must change durable TOML")
+				local remaining_color = scope ~= "category" and "#123456" or nil
+				local remaining_sibling = scope ~= "category" and 2.5 or nil
+				helpers.assert_eq(restarted.get_user_override("second").color, remaining_color)
+				helpers.assert_eq(restarted.get_user_override("second", "other").delay, remaining_sibling)
+				helpers.assert_eq(restarted.get_user_override("first").delay, 3.5)
+				if remaining_sibling then
+					helpers.assert_contains(persisted, "[second.other]\ndelay = 2.5",
+						"clearing another scope must preserve the serialized sibling")
+				end
+
+				package.loaded["modules.hotstrings.hotstrings_config"] = nil
+				restarted = require("modules.hotstrings.hotstrings_config")
+				restarted_engine = Engine.new()
+				restarted.init(restarted_engine, "/virtual/catalogue.toml")
+				restarted.load_all()
+				helpers.assert_nil(restarted.get_user_override("second", section).delay,
+					"cleared delay must stay cleared after restart")
+				helpers.assert_eq(restarted.resolve("second", section).delay, restarted.get_global_delay())
+				helpers.assert_eq(restarted.get_user_override("second").color, remaining_color)
+				helpers.assert_eq(restarted.get_user_override("second", "other").delay, remaining_sibling,
+					"surviving sibling override must remain after clear and restart")
+				helpers.assert_eq(restarted.get_user_override("first").delay, 3.5)
+			end
 		end, debug.traceback)
 
 		io.open = previous_open
 		os.rename = previous_rename
 		os.remove = previous_remove
 		Loader.load_catalogue = previous_load_catalogue
+		package.loaded["adapters.storage"] = previous_storage
 		package.loaded["adapters.shell_runner"] = previous_shell
 		package.loaded["infra.config_paths"] = previous_paths
 		package.loaded["modules.hotstrings.hotstrings_config"] = previous_config

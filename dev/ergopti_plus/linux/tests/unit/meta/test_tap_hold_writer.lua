@@ -177,4 +177,72 @@ helpers.describe("tap-hold writer: the Linux menu can change a tap-hold", functi
 			"an unknown field must be refused: it would be written into a file all three drivers read")
 		os.remove(path)
 	end)
+
+	helpers.it("keeps foreign sections and comments when a change lands (foreign-preservation)", function()
+		-- Regression: every menu edit rewrote only [tap_hold.keys.*] and
+		-- deleted [tap_hold], [tap_hold.hold_picker] and user comments, even
+		-- though read_overrides() collected them as `foreign` for verbatim
+		-- re-emission. A user tuning the hold picker lost it by changing one key.
+		local path = os.tmpname()
+		os.remove(path)
+		local seed = assert(io.open(path, "w"))
+		seed:write("# my threshold\n"
+			.. "[tap_hold]\n"
+			.. 'note = "keep me"\n'
+			.. "\n"
+			.. "[tap_hold.hold_picker]\n"
+			.. 'style = "grid"\n'
+			.. "\n"
+			.. "[tap_hold.keys.caps_lock]\n"
+			.. 'hold_modifier = "shift"\n')
+		seed:close()
+		local manager = make_manager(path)
+		local writer = helpers.load_module("platform.remap.tap_hold_writer")
+		writer.init({ manager = manager })
+
+		helpers.assert_true(writer.set_field("left_shift", "tap_action", "copy"),
+			"set_field must report success")
+		local content = read_file(path)
+		helpers.assert_true(content:find('tap_action = "copy"', 1, true) ~= nil,
+			"the change itself must land")
+		helpers.assert_true(content:find("[tap_hold.hold_picker]", 1, true) ~= nil,
+			"the hold-picker section must survive a key edit")
+		helpers.assert_true(content:find('style = "grid"', 1, true) ~= nil,
+			"and so must its content")
+		helpers.assert_true(content:find("[tap_hold]", 1, true) ~= nil,
+			"and the top-level section")
+		helpers.assert_true(content:find("# my threshold", 1, true) ~= nil,
+			"and the user's comment")
+		helpers.assert_true(content:find('hold_modifier = "shift"', 1, true) ~= nil,
+			"and the earlier key change")
+		os.remove(path)
+	end)
+
+	helpers.it("keeps foreign sections when a key is cleared (foreign-preservation)", function()
+		local path = os.tmpname()
+		os.remove(path)
+		local seed = assert(io.open(path, "w"))
+		seed:write("[tap_hold.hold_picker]\n"
+			.. 'style = "grid"\n'
+			.. "\n"
+			.. "[tap_hold.keys.caps_lock]\n"
+			.. 'hold_modifier = "shift"\n'
+			.. "\n"
+			.. "[tap_hold.keys.left_shift]\n"
+			.. 'tap_action = "copy"\n')
+		seed:close()
+		local manager = make_manager(path)
+		local writer = helpers.load_module("platform.remap.tap_hold_writer")
+		writer.init({ manager = manager })
+
+		writer.clear_key("caps_lock")
+		local content = read_file(path)
+		helpers.assert_true(content:find("caps_lock", 1, true) == nil,
+			"the cleared key must be gone")
+		helpers.assert_true(content:find("[tap_hold.hold_picker]", 1, true) ~= nil,
+			"clearing a key must not take the foreign sections with it")
+		helpers.assert_true(content:find('tap_action = "copy"', 1, true) ~= nil,
+			"nor the other key")
+		os.remove(path)
+	end)
 end)

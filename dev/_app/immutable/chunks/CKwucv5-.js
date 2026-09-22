@@ -1,0 +1,1 @@
+import{k as r,h as n,b as o}from"./DA2ya1dg.js";import{b as d}from"./DIAkB6Jv.js";function _(a,f,t,i,u){if(n&&o(),f.$$host?.$$shadowRoot){const l=r("slot");t!=="default"&&(l.name=t),d(a,l);return}var e=f.$$slots?.[t],s=!1;e===!0&&(e=f[t==="default"?"children":t],s=!0),e===void 0||e(a,s?()=>i:i)}export{_ as s};

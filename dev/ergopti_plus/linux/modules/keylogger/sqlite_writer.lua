@@ -372,9 +372,9 @@ function M.insert_typing_events(device_id, events)
 		local events_json = _sql_escape(enc_json)
 
 		parts[#parts + 1] = string.format(
-			"('%s',%d,'%s','%s','%s','%s','','',0,0,0,0,0,%d,0,0,0.0,'%s','','%s')",
+			"('%s',%d,'%s','%s','%s','%s','','','%s','',0,0,0,0,0,0,0,0.0,%d,'%s','','%s')",
 			_sql_escape(device_id), event_id, ts, date, app, title,
-			wpm, text, events_json
+			layout, wpm, text, events_json
 		)
 	end
 

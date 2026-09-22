@@ -173,6 +173,60 @@ _LNEO_ProfileTargetDeletionIsRefusedWhilePending() {
 Test("LLM nav event owner: pending profile target blocks its deletion (ahk-029)",
 	_LNEO_ProfileTargetDeletionIsRefusedWhilePending)
 
+_LNEO_DisablingLlmRetiresTheProfileOwner() {
+	global _LLM_Menu, _LLM_Menu_ProfileHotkeyOwner
+	global LLM_PROFILE_BUILTIN_ORDER, LLM_PROFILE_HOTKEY_LIMIT
+	global _LLM_NavEventOwnerActiveProfileToken
+	SavedMenu := _LLM_Menu
+	SavedOwner := _LLM_Menu_ProfileHotkeyOwner
+	HadBuiltinOrder := IsSet(LLM_PROFILE_BUILTIN_ORDER)
+	HadLimit := IsSet(LLM_PROFILE_HOTKEY_LIMIT)
+	if HadBuiltinOrder
+		SavedBuiltinOrder := LLM_PROFILE_BUILTIN_ORDER
+	if HadLimit
+		SavedLimit := LLM_PROFILE_HOTKEY_LIMIT
+	_LLM_Menu_ProfileHotkeyOwner := 0
+	State := _LNEO_Setup()
+	try {
+		Plan := _LNEO_ProfilePlan()
+		LLM_PROFILE_BUILTIN_ORDER := []
+		LLM_PROFILE_HOTKEY_LIMIT := 9
+		_LLM_Menu := Map(
+			"enabled", true,
+			"profile_id", "a",
+			"app_profile_overrides", Map(),
+			"user_profiles", [Map("id", "a"), Map("id", "b")])
+		First := LLM_NavEventOwner_BeginProfileSwap(
+			Plan, ["a", "b"], 1, ["a", "b"], State.Port)
+		AssertTrue(First is Map
+			&& LLM_NavEventOwner_CommitProfileSwap(First),
+			"the enabled profile owner must publish first")
+		_LLM_Menu_ProfileHotkeyOwner := Map(
+			"ready", true, "degraded", false,
+			"native", true, "plan", Plan)
+		Candidate := LLM_Menu_DeepClone(_LLM_Menu)
+		Candidate["enabled"] := false
+		Transaction := _LLM_Menu_PrepareProfileOwnerCandidate(Candidate)
+		AssertTrue(Transaction is Map,
+			"disabling the LLM must be able to retire its profile owner")
+		AssertEqual(0, State.ProfileBeginCalls[-1]["profile_count"],
+			"a disable must not announce a profile count for a zero token")
+		AssertTrue(_LLM_Menu_CommitProfileOwnerCandidate(Transaction))
+		AssertEqual(0, _LLM_NavEventOwnerActiveProfileToken,
+			"the committed disable must leave no active profile owner")
+		AssertEqual(0, State.CurrentProfileToken)
+	} finally {
+		_LLM_Menu := SavedMenu
+		_LLM_Menu_ProfileHotkeyOwner := SavedOwner
+		LLM_PROFILE_BUILTIN_ORDER := HadBuiltinOrder ? SavedBuiltinOrder : unset
+		LLM_PROFILE_HOTKEY_LIMIT := HadLimit ? SavedLimit : unset
+		_LNEO_Teardown()
+	}
+}
+
+Test("LLM nav event owner: disabling the LLM retires the profile owner (llm-profile-disable-count)",
+	_LNEO_DisablingLlmRetiresTheProfileOwner)
+
 _LNEO_DeleteProfileB(Candidate) {
 	return _LLM_Menu_DeleteProfileCandidate(Candidate, "b")
 }

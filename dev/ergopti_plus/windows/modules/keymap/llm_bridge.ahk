@@ -408,10 +408,34 @@ _LLM_Accept_IsBarePhysicalTabEvent(IsPhysicalTabEvent, Modifiers, InputSnapshot)
 	}
 	if !InputSnapshot["known"] or !InputSnapshot["tab_down"]
 		return false
-	if (InputSnapshot["ctrl_down"] or InputSnapshot["alt_down"]
-			or InputSnapshot["shift_down"] or InputSnapshot["win_down"])
+	if _LLM_Accept_AnyModifierDown(InputSnapshot)
 		return false
 	return true
+}
+
+_LLM_Accept_AnyModifierDown(InputSnapshot) {
+	return (InputSnapshot["ctrl_down"] or InputSnapshot["alt_down"]
+		or InputSnapshot["shift_down"] or InputSnapshot["win_down"])
+		? true : false
+}
+
+; True when the snapshot's verified focus is the exact HWND/control that owns
+; the rendered prediction. Shared by the Tab and slot-chord policies.
+_LLM_Accept_FocusMatchesSource(InputSnapshot, RenderedSource) {
+	if !(InputSnapshot is Map) or !(RenderedSource is Map)
+		return false
+	if !InputSnapshot.Get("known", false)
+		return false
+	SourceHwnd := RenderedSource.Get("hwnd", 0)
+	SourceControl := RenderedSource.Get("control", 0)
+	CurrentHwnd := InputSnapshot.Get("current_hwnd", 0)
+	CurrentControl := InputSnapshot.Get("current_control", 0)
+	if !(SourceHwnd is Integer and SourceHwnd > 0
+			and SourceControl is Integer and SourceControl > 0
+			and CurrentHwnd is Integer and CurrentHwnd > 0
+			and CurrentControl is Integer and CurrentControl > 0)
+		return false
+	return (SourceHwnd == CurrentHwnd and SourceControl == CurrentControl)
 }
 
 ; Pure policy predicate used by the canonical acceptance primitive. The source
@@ -421,18 +445,7 @@ _LLM_Accept_IsBarePhysicalTabEvent(IsPhysicalTabEvent, Modifiers, InputSnapshot)
 _LLM_Accept_IsAllowed(IsPhysicalTabEvent, Modifiers, InputSnapshot, RenderedSource) {
 	if !_LLM_Accept_IsBarePhysicalTabEvent(IsPhysicalTabEvent, Modifiers, InputSnapshot)
 		return false
-	if !(RenderedSource is Map)
-		return false
-	SourceHwnd := RenderedSource.Get("hwnd", 0)
-	SourceControl := RenderedSource.Get("control", 0)
-	CurrentHwnd := InputSnapshot["current_hwnd"]
-	CurrentControl := InputSnapshot["current_control"]
-	if !(SourceHwnd is Integer and SourceHwnd > 0
-			and SourceControl is Integer and SourceControl > 0
-			and CurrentHwnd is Integer and CurrentHwnd > 0
-			and CurrentControl is Integer and CurrentControl > 0)
-		return false
-	return (SourceHwnd == CurrentHwnd and SourceControl == CurrentControl)
+	return _LLM_Accept_FocusMatchesSource(InputSnapshot, RenderedSource)
 }
 
 /**
@@ -468,6 +481,27 @@ LLM_Tooltip_TryAcceptTab(IsPhysicalTabEvent := false, Modifiers := [], InputSnap
 		if !_LLM_Accept_IsAllowed(
 			IsPhysicalTabEvent, Modifiers, InputSnapshot,
 			Presented.AcceptSource)
+			return false
+	} finally {
+		Critical(PreviousCritical)
+	}
+	return _LLM_Accept_ClaimAndDispatch(Presented, AcceptFn?)
+}
+
+/**
+ * Claims one policy-approved presented prediction and injects its text. Both
+ * canonical primitives (Tab and the slot chord) end here, so the claim, the
+ * shared in-progress latch and the single LLM_Bridge_OnAccept call site cannot
+ * diverge between them. The caller has already applied its own policy.
+ * @param {Object} Presented - Snapshot from LLM_Tooltip_GetAcceptSnapshot.
+ * @param {Func} AcceptFn - Optional deterministic injection callback.
+ * @returns {boolean} True when this call claimed and dispatched the prediction.
+ */
+_LLM_Accept_ClaimAndDispatch(Presented, AcceptFn := unset) {
+	global _LLM_AcceptInProgress
+	PreviousCritical := Critical("On")
+	try {
+		if _LLM_AcceptInProgress || !IsObject(Presented)
 			return false
 		if !IsSet(AcceptFn) {
 			AdmissionSeed := _LLM_Bridge_CaptureAdmissionSeed(
@@ -509,6 +543,124 @@ LLM_Tooltip_TryAcceptTab(IsPhysicalTabEvent := false, Modifiers := [], InputSnap
 		}
 	}
 	return true
+}
+
+/**
+ * Second canonical acceptance primitive: inserts slot SlotIdx of the exact
+ * prediction whose validation chord (val_modifiers + digit) the native owner
+ * consumed. It runs after the chord's modifiers were released, so it demands
+ * the same record and surface, the chosen slot still active and painted, no
+ * modifier held (it would alter the injected text), and verified focus in the
+ * control that owns the render (llm-val-chord-inserts).
+ * @param {Object} ExpectedRecord - Record named by the consumed jump receipt.
+ * @param {Object} ExpectedSurface - Surface named by the same receipt.
+ * @param {Integer} SlotIdx - One-based slot the chord selected.
+ * @param {Map} InputSnapshot - Optional current physical/focus snapshot.
+ * @param {Func} AcceptFn - Optional injection callback.
+ * @returns {boolean} True when the prediction was claimed and dispatched.
+ */
+LLM_Tooltip_TryAcceptSlot(ExpectedRecord, ExpectedSurface, SlotIdx,
+		InputSnapshot := unset, AcceptFn := unset) {
+	Presented := LLM_Tooltip_GetAcceptSnapshot()
+	if !IsSet(InputSnapshot)
+		InputSnapshot := _LLM_Accept_ReadInputSnapshot()
+	if !_LLM_Accept_SlotIsAllowed(Presented, ExpectedRecord, ExpectedSurface,
+			SlotIdx, InputSnapshot)
+		return false
+	return _LLM_Accept_ClaimAndDispatch(Presented, AcceptFn?)
+}
+
+_LLM_Accept_SlotIsAllowed(Presented, ExpectedRecord, ExpectedSurface, SlotIdx,
+		InputSnapshot) {
+	if !IsObject(Presented) || !IsObject(ExpectedRecord)
+			|| !IsObject(ExpectedSurface)
+		return false
+	if ObjPtr(Presented.Record) != ObjPtr(ExpectedRecord)
+			|| ObjPtr(Presented.Surface) != ObjPtr(ExpectedSurface)
+		return false
+	if !(SlotIdx is Integer) || SlotIdx < 1
+			|| !(Presented.Slots is Array) || SlotIdx > Presented.Slots.Length
+			|| Presented.ActiveIdx != SlotIdx
+		return false
+	if !(InputSnapshot is Map)
+		return false
+	for Key in ["ctrl_down", "alt_down", "shift_down", "win_down"] {
+		if !InputSnapshot.Has(Key) || !(InputSnapshot[Key] is Integer)
+			return false
+	}
+	if _LLM_Accept_AnyModifierDown(InputSnapshot)
+		return false
+	return _LLM_Accept_FocusMatchesSource(InputSnapshot, Presented.AcceptSource)
+}
+
+; Only the newest chord may insert: a second Alt+N while Alt is still held
+; retargets the pending insertion instead of queueing a second one.
+global _LLM_SlotAccept_Generation := 0
+
+/**
+ * Arms insertion of the slot a consumed validation chord selected, once every
+ * modifier is physically released. Driven by the native owner's jump-receipt
+ * completion; the wait is bounded so a lost key-up can never leave it armed.
+ * @returns {boolean} True when the wait was armed.
+ */
+LLM_Tooltip_ScheduleSlotAcceptance(Record, Surface, SlotIdx) {
+	global _LLM_SlotAccept_Generation
+	if !IsObject(Record) || !IsObject(Surface)
+			|| !(SlotIdx is Integer) || SlotIdx < 1
+		return false
+	PreviousCritical := Critical("On")
+	try {
+		_LLM_SlotAccept_Generation += 1
+		State := Map(
+			"generation", _LLM_SlotAccept_Generation,
+			"record", Record, "surface", Surface, "slot", SlotIdx,
+			"poll_ms", TimingsGet("llm", "val_chord_release_poll_ms"),
+			"delay_ms", TimingsGet("llm", "val_chord_insert_delay_ms"),
+			"deadline", A_TickCount
+				+ TimingsGet("llm", "val_chord_release_timeout_ms"))
+	} finally Critical(PreviousCritical)
+	SetTimer(_LLM_SlotAccept_Tick.Bind(State), -State["poll_ms"])
+	return true
+}
+
+; Pure decision for one wait step: "wait", "insert" or "drop".
+_LLM_SlotAccept_Step(State, CurrentGeneration, ModifierDown, Now) {
+	if !(State is Map) || State["generation"] != CurrentGeneration
+		return "drop"
+	if !ModifierDown
+		return "insert"
+	return (Now - State["deadline"]) >= 0 ? "drop" : "wait"
+}
+
+_LLM_SlotAccept_Tick(State) {
+	global _LLM_SlotAccept_Generation
+	ModifierDown := true
+	try ModifierDown := _LLM_Accept_AnyModifierDown(
+		_LLM_Accept_ReadInputSnapshot())
+	Step := _LLM_SlotAccept_Step(State, _LLM_SlotAccept_Generation,
+		ModifierDown, A_TickCount)
+	if Step == "wait" {
+		SetTimer(_LLM_SlotAccept_Tick.Bind(State), -State["poll_ms"])
+		return
+	}
+	if Step == "drop" {
+		if State is Map && State["generation"] == _LLM_SlotAccept_Generation
+			try LoggerDebug("LLM", "Validation chord insertion dropped: modifiers still held at the deadline.")
+		return
+	}
+	SetTimer(_LLM_SlotAccept_Insert.Bind(State), -State["delay_ms"])
+}
+
+_LLM_SlotAccept_Insert(State) {
+	global _LLM_SlotAccept_Generation
+	if State["generation"] != _LLM_SlotAccept_Generation
+		return
+	if LLM_Tooltip_TryAcceptSlot(State["record"], State["surface"],
+			State["slot"]) {
+		LLM_Engine_CancelTimer()
+		return
+	}
+	try LoggerDebug("LLM", "Validation chord insertion refused: the prediction, slot or focus changed.")
 }
 
 ; Emit Tab normally whenever canonical acceptance rejects it. This is used by

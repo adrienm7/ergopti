@@ -300,3 +300,57 @@ _LTAP_DeferredAdmissionRejectsEveryStaleDimension() {
 
 Test("LLM accept: deferred output rechecks target and every ABA epoch (llm-output-atomicity)",
 	_LTAP_DeferredAdmissionRejectsEveryStaleDimension)
+
+
+
+
+
+; ===========================================================
+; ===========================================================
+; ======= 6/ Validation chord inserts its chosen slot =======
+; ===========================================================
+; ===========================================================
+
+; The slot primitive runs after the chord's modifiers were released: it must
+; demand the exact presented record/surface, the chosen slot still active, no
+; modifier held and the rendering control focused (llm-val-chord-inserts).
+_LTAP_SlotAcceptPolicyTable() {
+	global _Stub_LlmPresentedRecord, _LTAP_AcceptCount, _LTAP_LastAcceptedText
+	Vectors := [
+		Map("label", "released chord, same record and control", "accept", true),
+		Map("label", "Alt still held", "accept", false,
+			"input", _LTAP_Input(false, false, true)),
+		Map("label", "Ctrl+Shift still held", "accept", false,
+			"input", _LTAP_Input(false, true, false, true)),
+		Map("label", "focus moved to another control", "accept", false,
+			"input", _LTAP_Input(false, false, false, false, false, 100, 1002)),
+		Map("label", "unverifiable focus", "accept", false,
+			"input", _LTAP_Input(false, false, false, false, false, 0, 0, false)),
+		Map("label", "slot beyond the prediction", "accept", false, "slot", 2),
+		Map("label", "prediction replaced", "accept", false, "replaced", true)
+	]
+	for TestVector in Vectors {
+		_LTAP_Setup()
+		try {
+			Record := _Stub_LlmPresentedRecord
+			if TestVector.Get("replaced", false)
+				Record := {Kind: "prediction"}
+			Accepted := LLM_Tooltip_TryAcceptSlot(Record, Record,
+				TestVector.Get("slot", 1),
+				TestVector.Get("input", _LTAP_Input(false)),
+				_LTAP_RecordAccept)
+			AssertEqual(TestVector["accept"], Accepted,
+				TestVector["label"] . ": slot acceptance must follow its canonical policy")
+			AssertEqual(TestVector["accept"] ? 1 : 0, _LTAP_AcceptCount,
+				TestVector["label"] . ": injection count")
+			if TestVector["accept"]
+				AssertEqual("predicted text", _LTAP_LastAcceptedText,
+					"the chosen slot text must be injected exactly once")
+		} finally {
+			_LTAP_Teardown()
+		}
+	}
+}
+
+Test("LLM accept: released validation chord inserts only its exact slot (llm-val-chord-inserts)",
+	_LTAP_SlotAcceptPolicyTable)

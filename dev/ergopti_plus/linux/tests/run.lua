@@ -51,6 +51,23 @@ package.path = table.concat({
 	package.path,
 }, ";")
 
+-- Windows test mode: on a Windows checkout the POSIX layer the Linux driver
+-- targets is absent (no HOME, no /tmp, rename cannot replace, no
+-- /dev/urandom, no sh). tests/win_compat.lua emulates that layer for the
+-- test process only; install() is a no-op anywhere else, so Linux CI is
+-- untouched. Loaded BEFORE any test module so every shell-out and every
+-- fixture path goes through it.
+do
+	local ok_mode, mode = pcall(require, "tests.win_compat")
+	if ok_mode and mode and type(mode.install) == "function" then
+		local ok_install, install_error = pcall(mode.install)
+		if not ok_install then
+			io.stderr:write("tests/run.lua: windows test mode failed: "
+				.. tostring(install_error) .. "\n")
+		end
+	end
+end
+
 -- Install the pure-Lua UTF-8 compatibility shim BEFORE any test module is
 -- loaded. LuaJIT 2.x does not bundle Lua 5.3's built-in utf8 library, and
 -- several shared modules (keylogger/utils.lua, toml_codec, terminators) use

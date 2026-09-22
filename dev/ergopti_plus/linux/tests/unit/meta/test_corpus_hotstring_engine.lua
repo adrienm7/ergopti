@@ -190,6 +190,16 @@ describe("Corpus replay: hotstrings/vectors.json — shared engine", function()
 
 		for _, v in ipairs(vectors) do
 			local mapping = build_mapping(v)
+			if v.terminator_consumed == true then
+				-- An explicit consumption verdict describes the end-character
+				-- path. An auto rule would otherwise fire on its own final
+				-- character before the terminator exists, making that field
+				-- impossible to observe. (A declared NOT-consumed verdict
+				-- stays on the auto path: this harness compares physical
+				-- counts, and an end-char replay would add the erased-then-
+				-- replayed terminator the corpus does not count.)
+				mapping.auto_expand = false
+			end
 
 			local e = engine_mod.new()
 			e:load_mappings({ mapping })
@@ -208,13 +218,28 @@ describe("Corpus replay: hotstrings/vectors.json — shared engine", function()
 				end
 
 				-- Feed the final codepoint with the terminator_consumed flag.
-				-- Per the engine API: {terminator_consumed = true} adds 1 to
-				-- backspace_count so the injector erases the terminator too.
+				-- Per the engine API: on the end-char path the flag extends the
+				-- erase past the trigger so the injector erases the terminator
+				-- too. On the auto path there is no terminator beyond the
+				-- trigger, so the flag changes nothing about the count.
 				local opts = {
 					terminator_consumed = v.terminator_consumed == true,
 					is_terminator       = v.terminator_consumed == true,
 				}
 				result = e:on_char(cps[#cps], opts)
+
+				-- A declared consumed terminator is a real keystroke the
+				-- end-char path requires, not a flag on the buffer's last
+				-- character: feed it. Without this the terminator never
+				-- exists, and only an over-erasing auto match could satisfy
+				-- the vector.
+				if result == nil and v.terminator_consumed == true
+					and type(v.terminator) == "string" and v.terminator ~= "" then
+					result = e:on_char(v.terminator, {
+						terminator_consumed = true,
+						is_terminator       = true,
+					})
+				end
 			end
 
 			local expected = v.expected

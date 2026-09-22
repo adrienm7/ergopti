@@ -23,7 +23,7 @@ end
 helpers.describe("app-time interval lifecycle boundaries", function()
 	helpers.it("closes the current foreground interval before keylogger shutdown", function()
 		local src = source("local function ensure_browser_window_filter") -- modules/keylogger/init.lua
-		local teardown_pos = assert(src:find("local function teardown_runtime()", 1, true))
+		local teardown_pos = assert(src:find("local function teardown_runtime(", 1, true))
 		local interval_step_pos = assert(src:find(
 			"name = \"active-app-interval\"", teardown_pos, true))
 		local close_pos = assert(src:find(

@@ -212,7 +212,11 @@ enum LauncherLog {
 	/// proceeding, so every step here is wrapped defensively.
 	static func write(_ message: String) {
 		queue.sync {
-			_ = writeUnlocked(message, directoryPath: logDirectory)
+			// A lost launcher.log line must still reach the unified log, or a
+			// refused directory or a lock timeout erases the only diagnostic.
+			_ = writeUnlocked(message, directoryPath: logDirectory, onFailure: { step, errorCode in
+				NSLog("ErgoptiPlus launcher.log %@ failed (errno %d): %@", step, errorCode, message)
+			})
 		}
 	}
 
@@ -263,46 +267,28 @@ enum LauncherLog {
 	}
 	#endif
 
-	/// Opens one exact user-owned directory without following its final component.
+	/// Opens the user-owned log directory through the same resolver as the Lua
+	/// log sink, so a symlinked ~/Library/Logs layout is honoured identically.
 	private static func openLogDirectory(
 		_ directoryPath: String,
 		onFailure: ((String, Int32) -> Void)?
 	) -> Int32 {
-		// Another launcher role may win the create race. The descriptor-based
-		// validation below is authoritative, so an EEXIST-style error is harmless.
-		try? FileManager.default.createDirectory(
-			atPath: directoryPath,
-			withIntermediateDirectories: true,
-			attributes: [.posixPermissions: 0o700]
-		)
-
-		let descriptor = Darwin.open(
-			directoryPath,
-			O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW
-		)
-		guard descriptor >= 0 else {
-			onFailure?("open-directory", errno)
+		switch OwnedLogDirectoryResolver.open(directoryPath) {
+		case let .success(directory):
+			return directory.descriptor
+		case let .failure(failure):
+			switch failure.refusal {
+			case .notDirectory, .notOwned:
+				onFailure?("validate-directory", EINVAL)
+			case let .cannotSetPermissions(errorCode):
+				onFailure?("chmod-directory", errorCode)
+			case let .accessDenied(errorCode), let .cannotCreate(errorCode), let .unavailable(errorCode):
+				onFailure?("open-directory", errorCode)
+			case .invalidPath, .danglingSymlink:
+				onFailure?("open-directory", ENOENT)
+			}
 			return -1
 		}
-		var attributes = stat()
-		guard Darwin.fstat(descriptor, &attributes) == 0 else {
-			onFailure?("stat-directory", errno)
-			Darwin.close(descriptor)
-			return -1
-		}
-		guard (attributes.st_mode & S_IFMT) == S_IFDIR,
-			attributes.st_uid == geteuid()
-		else {
-			onFailure?("validate-directory", EINVAL)
-			Darwin.close(descriptor)
-			return -1
-		}
-		guard Darwin.fchmod(descriptor, S_IRWXU) == 0 else {
-			onFailure?("chmod-directory", errno)
-			Darwin.close(descriptor)
-			return -1
-		}
-		return descriptor
 	}
 
 	/// Opens only `launcher.log` relative to the already-validated directory.
@@ -421,6 +407,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	)?
 	private var hsBootstrapReady = false
 	private var hsBootstrapRecoveryUsed = false
+	private var hsLogFolderRefusal: LogDirectoryFailure?
 	private var loggerWorker: LoggerDatagramServing?
 	private var updaterController: SPUStandardUpdaterController?
 	private let updaterCommandRouter = UpdaterCommandRouter()
@@ -691,6 +678,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		}
 		loggerWorker = activeLoggerWorker
 		hsLaunchContext = (binaryPath, remapGuardianStatus)
+		hsLogFolderRefusal = nil
+		activeLoggerWorker.setConfigureRefusalHandler { [weak self] failure in
+			let record = {
+				guard let self else { return }
+				self.hsLogFolderRefusal = failure
+				LauncherLog.write("embedded Hammerspoon log folder refused: \(failure.diagnostic)")
+			}
+			if Thread.isMainThread { record() }
+			else { DispatchQueue.main.async(execute: record) }
+		}
 		activeLoggerWorker.setBootstrapReadyHandler { [weak self] in
 			let markReady = {
 				guard let self else { return }
@@ -845,6 +842,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			applicationTerminator(self)
 			return
 		}
+		// A refused log folder is deterministic: a retry would fail identically,
+		// and the child exit status cannot say why (Hammerspoon reports 0 even
+		// after Lua calls os.exit(1)). Name the folder and the cause instead.
+		if !hsBootstrapReady, let refusal = hsLogFolderRefusal {
+			fail(
+				"Log folder refused: \(refusal.diagnostic).",
+				alertText: logFolderRefusalAlertText(refusal, localization: LauncherLocalization.load())
+			)
+			return
+		}
 		if case .exited(code: 0) = exit,
 			!hsBootstrapRecoveryUsed,
 			let launchContext = hsLaunchContext
@@ -905,7 +912,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	// launch (Sparkle's silent-update relaunch, a CI smoke test, a script
 	// wrapping the app) never sees it. Without a durable artifact a failure in
 	// that context left literally nothing to investigate after the fact.
-	private func fail(_ message: String) {
+	//
+	// The alert chrome and any cause-specific text come from the bundled locale
+	// catalog. When that catalog is itself unreadable (a damaged bundle), the
+	// English developer diagnostic is shown instead: the documented pre-i18n
+	// fatal-modal exception.
+	private func fail(_ message: String, alertText: String? = nil) {
 		if let fatalReporter {
 			fatalReporter(message)
 			return
@@ -913,11 +925,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 		LauncherLog.write("FATAL: \(message)")
 
+		let localization = LauncherLocalization.load()
 		let alert = NSAlert()
-		alert.messageText = "Ergopti n'a pas pu démarrer"
-		alert.informativeText = message
+		alert.messageText = localization?.text("launcher.fatal.title") ?? "ErgoptiPlus could not start"
+		alert.informativeText = alertText ?? message
 		alert.alertStyle = .critical
-		alert.addButton(withTitle: "Quitter")
+		alert.addButton(withTitle: localization?.text("launcher.fatal.quit") ?? "Quit")
 		alert.runModal()
 		NSApp.terminate(nil)
 	}

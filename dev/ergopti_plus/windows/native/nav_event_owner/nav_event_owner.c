@@ -155,6 +155,11 @@ typedef struct NavState {
 
 static INIT_ONCE g_nav_init_once = INIT_ONCE_STATIC_INIT;
 static NavState g_nav_state;
+#if defined(ERGOPTI_NAV_TESTING)
+/* Deterministic OS modifier snapshot; disabled means "every key reported down". */
+static uint8_t g_nav_test_os_modifiers_enabled;
+static uint8_t g_nav_test_os_modifiers;
+#endif
 static HINSTANCE g_nav_module;
 static DWORD g_nav_initialization_error;
 
@@ -1476,6 +1481,52 @@ static bool NavModifierInputIsEligibleLocked(
 
 
 /**
+ * Returns the OS view of which left/right modifiers are currently down.
+ *
+ * @return Internal left/right modifier mask.
+ */
+static uint8_t NavOsModifierStateLocked(void)
+{
+#if defined(ERGOPTI_NAV_TESTING)
+	return g_nav_test_os_modifiers_enabled
+		? g_nav_test_os_modifiers
+		: (uint8_t)0xFFu;
+#else
+	return NavReadModifierState();
+#endif
+}
+
+
+
+/**
+ * Drops tracked physical modifiers that the OS reports released.
+ *
+ * The hook can miss an up edge: a secure desktop (Win+L, Ctrl+Alt+Del, UAC)
+ * receives it, an upstream hook swallows it, or Windows skips a slow hook. The
+ * bit then stayed set until the next real press of that key, and every digit
+ * matched a Ctrl/Alt/Shift/Win route and was swallowed as a chord
+ * (nav-stale-physical-modifier). Intersecting can only REMOVE provenance, so
+ * GetAsyncKeyState still never enters route matching (see the startup
+ * snapshot note above). It runs before the current edge is applied because the
+ * async state does not include the event being hooked yet. Menu-guard bits are
+ * kept: this hook suppressed those downs, so the OS never saw them.
+ *
+ * @param state Locked native state.
+ */
+static void NavReconcileStalePhysicalModifiersLocked(NavState *state)
+{
+	uint8_t retained;
+	if (state->physical_modifiers_lr == 0)
+		return;
+	retained = (uint8_t)(NavOsModifierStateLocked()
+		| state->menu_guard_suppressed_lr);
+	state->physical_modifiers_lr = (uint8_t)(
+		state->physical_modifiers_lr & retained);
+}
+
+
+
+/**
  * Converts one KBDLLHOOKSTRUCT into the deterministic event ABI.
  *
  * @param message Low-level keyboard message identifier.
@@ -1517,6 +1568,7 @@ static bool NavBuildHookEventLocked(
 	}
 	out_event->extra_info = (uint64_t)native_event->dwExtraInfo;
 
+	NavReconcileStalePhysicalModifiersLocked(state);
 	modifier_bit = NavModifierBit(out_event->vk, out_event->sc);
 	if (modifier_bit != 0) {
 		if (out_event->injected == ERGOPTI_NAV_INJECTION_PHYSICAL) {
@@ -3437,6 +3489,34 @@ int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestDrainComplete(
 		return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
 	EnterCriticalSection(&g_nav_state.lock);
 	*out_complete = NavDrainCompleteLocked(&g_nav_state) ? 1 : 0;
+	LeaveCriticalSection(&g_nav_state.lock);
+	return ERGOPTI_NAV_STATUS_OK;
+}
+
+
+
+/** Implements the deterministic OS modifier snapshot seam. */
+int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestSetOsModifierKeys(
+	uint8_t enabled,
+	const uint16_t *down_vks,
+	uint32_t count)
+{
+	uint8_t modifiers = 0;
+	uint8_t modifier_bit;
+	uint32_t index;
+	if (!NavEnsureInitialized())
+		return ERGOPTI_NAV_STATUS_OS_ERROR;
+	if (enabled > 1 || count > 8 || (count > 0 && down_vks == NULL))
+		return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
+	for (index = 0; index < count; ++index) {
+		modifier_bit = NavModifierBit(down_vks[index], 0);
+		if (modifier_bit == 0)
+			return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
+		modifiers = (uint8_t)(modifiers | modifier_bit);
+	}
+	EnterCriticalSection(&g_nav_state.lock);
+	g_nav_test_os_modifiers_enabled = enabled;
+	g_nav_test_os_modifiers = modifiers;
 	LeaveCriticalSection(&g_nav_state.lock);
 	return ERGOPTI_NAV_STATUS_OK;
 }

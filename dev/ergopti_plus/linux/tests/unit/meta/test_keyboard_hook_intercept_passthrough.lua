@@ -299,6 +299,33 @@ helpers.describe("keyboard_hook: evdev queue-loss recovery", function()
 			"a consumed selection key must stay suppressed across queue recovery")
 	end)
 
+	helpers.it("forgets a consumed key the queue loss already released", function()
+		local kh = helpers.load_module("adapters.keyboard_hook")
+		local emitted = {}
+		local consumes = 0
+		local drained = kh._test_drive({
+			ev(EV_KEY, 2, 1),
+			ev(EV_SYN, 3, 0),
+			ev(EV_SYN, 0, 0),
+			ev(EV_KEY, 2, 1),
+			ev(EV_KEY, 2, 0),
+		}, {
+			onConsume = function()
+				consumes = consumes + 1
+				return consumes == 1
+			end,
+			onEmitRaw = function(code, value)
+				emitted[#emitted + 1] = string.format("%d:%d", code, value)
+				return true
+			end,
+		}, true)
+
+		helpers.assert_eq(drained, 5, "the fresh press after recovery must be observed")
+		helpers.assert_eq(emitted, { "2:1", "2:0" },
+			"a consumed mark must not survive the release the queue loss swallowed:"
+				.. " the next press belongs to the application once consumption declines it")
+	end)
+
 	helpers.it("restores the CapsLock state reported by the keyboard LEDs", function()
 		local kh = helpers.load_module("adapters.keyboard_hook")
 		local captured = {}
@@ -535,6 +562,74 @@ helpers.describe("injector: emit_key puts a raw event back on the wire", functio
 		injector._set_uinput(nil)
 		helpers.assert_eq(#emitted, 0,
 			"a malformed event must be rejected before it reaches the device")
+	end)
+
+end)
+
+
+
+
+-- ================================================
+-- ================================================
+-- ======= 5/ A Dying Callback Still Forwards ====
+-- ================================================
+-- ================================================
+
+helpers.describe("keyboard_hook: a failing callback still forwards the grabbed event", function()
+
+	helpers.it("forward-on-fail: a raising onPhysical still delivers the press", function()
+		-- Regression: _on_physical ran before _forward_raw, so a throwing
+		-- metrics consumer emergency-stopped the hook AND ate the grabbed
+		-- keystroke — the application never saw a key the kernel took away.
+		local kh = helpers.load_module("adapters.keyboard_hook")
+		local emitted = {}
+		kh._test_drive({ ev(EV_KEY, 30, 1) }, {
+			onPhysical = function() error("metrics consumer died") end,
+			onEmitRaw = function(code, value)
+				emitted[#emitted + 1] = string.format("%d:%d", code, value)
+				return true
+			end,
+		}, true)
+		helpers.assert_eq(emitted, { "30:1" },
+			"the grabbed press must reach the application even as capture stops")
+		helpers.assert_true(not kh.isRunning(),
+			"the failure must still release capture ownership")
+	end)
+
+	helpers.it("forward-on-fail: a raising onConsume still delivers the press", function()
+		-- Same shape one branch down: the consumption verdict never arrives,
+		-- so the event belongs to the application by default.
+		local kh = helpers.load_module("adapters.keyboard_hook")
+		local emitted = {}
+		kh._test_drive({ ev(EV_KEY, 30, 1) }, {
+			onConsume = function() error("consumer died") end,
+			onEmitRaw = function(code, value)
+				emitted[#emitted + 1] = string.format("%d:%d", code, value)
+				return true
+			end,
+		}, true)
+		helpers.assert_eq(emitted, { "30:1" },
+			"a missing verdict is not a suppression — the press must be forwarded")
+		helpers.assert_true(not kh.isRunning(),
+			"the failure must still release capture ownership")
+	end)
+
+	helpers.it("forward-on-fail: a raising onHold still delivers the release", function()
+		-- The release owns the application's key state: losing it sticks the
+		-- key down over there while nothing is held here.
+		local kh = helpers.load_module("adapters.keyboard_hook")
+		local emitted = {}
+		kh._test_drive({ ev(EV_KEY, 30, 1), ev(EV_KEY, 30, 0) }, {
+			onHold = function() error("hold consumer died") end,
+			onEmitRaw = function(code, value)
+				emitted[#emitted + 1] = string.format("%d:%d", code, value)
+				return true
+			end,
+		}, true)
+		helpers.assert_eq(emitted, { "30:1", "30:0" },
+			"the release must reach the application even as capture stops")
+		helpers.assert_true(not kh.isRunning(),
+			"the failure must still release capture ownership")
 	end)
 
 end)

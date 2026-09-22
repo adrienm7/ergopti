@@ -111,6 +111,16 @@ stream_watchdog_ms = 12000
 # AHK: models.ahk LLM_INSTALLED_CACHE_TTL_MS.
 installed_cache_ttl_ms = 2000
 
+# Validation chord (val_modifiers + digit N): the prediction is inserted only
+# once every modifier is released, or a held Alt/Ctrl would alter the text.
+# AHK: keymap/llm_bridge.ahk LLM_Tooltip_ScheduleSlotAcceptance.
+# Re-check cadence of the one-shot release wait; runs only while a chord waits.
+val_chord_release_poll_ms = 20
+# Settle delay after the release, so the OS has processed the key-up.
+val_chord_insert_delay_ms = 50
+# Bound on the wait: a key-up the hook never saw cannot leave it armed.
+val_chord_release_timeout_ms = 5000
+
 
 # ──────────────────────────────────────────────────────────────────────
 # Tooltip / UI overlays
@@ -577,6 +587,14 @@ onboarding_startup_delay_ms = 2000
 # LLM deps checker: Ollama poll interval (readiness probe loop).
 # AHK: ollama_deps_checker.ahk 3000 ms SetTimer.
 ollama_deps_poll_ms = 3000
+
+# Hard deadline for a user-requested quit (menubar Quit, script_quit gesture).
+# Once accepted, the controlled exit (Karabiner lease fence, synthetic-input
+# drain, local teardown, logger drain) must finish within this bound; otherwise
+# the process force-exits and native stdin EOF revokes the exact lease. It
+# exceeds the 7 s lease STOPPED timeout so the exact fence gets its full chance.
+# HS: infra/termination_coordinator.lua request_user_exit deadline.
+user_quit_deadline_ms = 12000
 
 
 # ──────────────────────────────────────────────────────────────────────

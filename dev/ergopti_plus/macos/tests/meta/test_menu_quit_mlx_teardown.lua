@@ -19,7 +19,7 @@ helpers.describe("menu/init.lua: Quit delegates full teardown after the fence", 
 		local next_pos = menu_src:find("open_logs%s*=", quit_pos or 1)
 		helpers.assert_true(quit_pos ~= nil and next_pos ~= nil)
 		local quit_body = menu_src:sub(quit_pos, next_pos - 1)
-		helpers.assert_true(quit_body:find("TerminationCoordinator.request_exit", 1, true) ~= nil)
+		helpers.assert_true(quit_body:find("TerminationCoordinator.request_user_exit", 1, true) ~= nil)
 		helpers.assert_true(quit_body:find("terminate_helper_processes", 1, true) == nil)
 		helpers.assert_true(quit_body:find("terminate_orphan_mlx_server", 1, true) == nil)
 

@@ -253,6 +253,8 @@ local function decode_response(data, token, session)
 		return {
 			kind = "nack",
 			reason = tostring(decoded.reason or "native logger rejected the datagram"),
+			-- The launcher names a refused log folder and its cause here.
+			detail = type(decoded.detail) == "string" and decoded.detail or nil,
 			expected = tonumber(decoded.expected),
 		}
 	end
@@ -976,6 +978,9 @@ local function bootstrap_configure(options, payload, token, session, port)
 	local response = decode_response(data, token, session)
 	if response == nil or response.kind ~= "ack" or response.sequence ~= 0 then
 		local detail = response and response.reason or "invalid authenticated ACK"
+		if response and response.detail then
+			detail = tostring(detail) .. " (" .. response.detail .. ")"
+		end
 		return refuse("bootstrap configure was refused: " .. tostring(detail))
 	end
 	if not close_bootstrap_socket() then return false, _diagnostics.last_error end

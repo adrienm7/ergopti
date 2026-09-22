@@ -312,6 +312,13 @@ _LNEO_PortBeginProfileSwap(State, ExpectedToken, Plan, NewToken,
 		"new_token", NewToken, "profile_count", ProfileCount))
 	if State.ProfileBeginMode == "throw"
 		throw Error("injected profile-owner preparation failure")
+	; Mirror the real adapter's argument contract: a disable (token 0) must carry
+	; no profile count. A lenient fake hid a disable that the DLL adapter refused
+	; (llm-profile-disable-count).
+	if !(NewToken is Integer) || NewToken < 0
+			|| !(ProfileCount is Integer) || ProfileCount < 0
+			|| ProfileCount > 9 || (NewToken == 0) != (ProfileCount == 0)
+		return 0
 	if State.ProfileBeginMode != "accept"
 			&& State.ProfileBeginMode != "malformed_mask"
 			&& State.ProfileBeginMode != "malformed_ticket"
