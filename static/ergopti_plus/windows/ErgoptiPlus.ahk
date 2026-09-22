@@ -310,6 +310,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include infra/wall_clock.ahk
 #Include infra/logger.ahk
 #Include infra/boot_profiler.ahk
+#Include infra/diagnostic_snapshot.ahk
 #Include infra/hotpath_profiler.ahk
 #Include infra/registry.ahk
 #Include infra/app_state.ahk
@@ -615,6 +616,12 @@ LoggerStart("ErgoptiPlus", "Booting ErgoptiPlus driver (pid={1}, script='{2}')�
 ; Boot phase profiling — emits one INFO line per phase so a slow start can be
 ; diagnosed from the log alone (see infra/boot_profiler.ahk).
 BootProfile_Begin()
+; The environment is logged FIRST, not only in the post-ready snapshot: a boot
+; that dies half-way never reaches the snapshot, and then these facts are the
+; only description of the machine it died on.
+try LoggerInfo("ErgoptiPlus", "{1}", DiagSnapshot_EarlyLine())
+catch as _EnvErr
+	LoggerError("ErgoptiPlus", "Boot environment could not be described: {1}.", _EnvErr.Message)
 
 ; Eager-load the ACTIVE i18n locale now. It is otherwise lazy on the first t()
 ; call, which lands mid-config and buries its JSON parse inside a later, unrelated
@@ -622,7 +629,9 @@ BootProfile_Begin()
 ; is parsed here; the EN/FR fallbacks (consulted solely on a missing key) are
 ; warmed off the critical path by I18nWarmFallbacks() armed after "ready" — which
 ; halves the boot i18n cost on a complete locale (one parse instead of two).
+BootProfile_StageBegin("i18n")
 I18nPreload()
+BootProfile_StageEnd("i18n", "locale " . I18nGetLocale())
 BootProfile_Mark("i18n locale preloaded")
 
 ; Load tooltip visual constants from _shared/modules/tooltip/constants.toml so the
@@ -702,6 +711,7 @@ global PersonalInformationLetters := Map(
 ; Materialise personal_info.toml from defaults if missing, so renaming or
 ; deleting the file simply triggers a fresh re-creation on the next launch
 ; (same guarantee EnsurePersonalShortcutsFile gives for personal_shortcuts.ahk).
+BootProfile_StageBegin("configuration")
 EnsurePersonalInfoTomlFile(ScriptInformation["PersonalInfoTomlPath"])
 ReadPersonalInfoToml(ScriptInformation["PersonalInfoTomlPath"])
 
@@ -729,9 +739,11 @@ try {
 		}
 	}
 }
-ApplyBootConfigToml(Features, _ConfigDir . _AhkSubDir . "config.toml")
+_BootConfigApplied := ApplyBootConfigToml(Features, _ConfigDir . _AhkSubDir . "config.toml")
 global TapHold := LoadTapHoldToml(_ConfigDir . _AhkSubDir . "tap_hold.toml",
 	_SharedDir . "\tap_hold\defaults.toml")
+BootProfile_StageEnd("configuration", Format("{1} config.toml value(s) applied, {2} tap-hold key(s)",
+	_BootConfigApplied, (TapHold is Map && TapHold.Has("keys")) ? TapHold["keys"].Count : 0))
 
 ; When Ergopti keyboard emulation is off, MagicKeySourceScan must point to
 ; the physical key that produces MagicKeySourceChar ("j" by default) on the
@@ -970,8 +982,18 @@ try {
 ; re-enable. Declared + populated here, before gating, so the auto-execute thread
 ; never re-inits the Map after filling it.
 global _HSCategorySnapshot := Map()
+BootProfile_StageBegin("feature gates")
 try _HSSnapshotAllCategories()
+catch as _SnapErr
+	LoggerError("ErgoptiPlus", "Hotstring category snapshot failed; a live category re-enable may not restore its sections: {1}.", _SnapErr.Message)
+_GateCountsBefore := DiagSnapshot_CountFeatures(Features)
 ApplyMasterGatesToFeatures(Features, TapHold, IsCategoryGated, LoggerDebug)
+_GateCountsAfter := DiagSnapshot_CountFeatures(Features)
+; The master gates silently zero whole categories. Without the counts a user log
+; cannot tell "the feature is off" from "its category is off".
+BootProfile_StageEnd("feature gates", Format("{1}/{2} feature switch(es) enabled, {3} forced off by a disabled category",
+	_GateCountsAfter["enabled"], _GateCountsAfter["total"],
+	_GateCountsBefore["enabled"] - _GateCountsAfter["enabled"]))
 
 #Include modules/take_note.ahk
 #Include modules/gestures/init.ahk
@@ -979,6 +1001,7 @@ ApplyMasterGatesToFeatures(Features, TapHold, IsCategoryGated, LoggerDebug)
 #Include modules/gestures/screenshots.ahk
 #Include modules/gestures/window_cycle.ahk
 #Include modules/gestures/config.ahk
+BootProfile_StageBegin("shortcuts")
 ReadScriptShortcutsConfig()
 ReadKeyboardShortcutsConfig()
 
@@ -1013,6 +1036,7 @@ global _ParseExtTomlSectionsCache := Map()
 if MetricsShortcuts.enabled
 		WPMWidget_LoadConfig(_IniCache)
 
+BootProfile_StageEnd("shortcuts", _KbBoundCount . " configurable hotkey(s) bound")
 BootProfile_Mark("Config, features & shortcuts loaded")
 ; The tray menu build (~157 ms: per-category TOML submenus + manifest items) was the
 ; single largest remaining time-to-ready chunk, and the menu is only needed once the
@@ -1042,6 +1066,7 @@ if ConfigFullStateCanPersist() {
 ; HookDispatcher.Stop() is called by Ergopti_OnShutdown (registered below via
 ; OnExit) — do NOT register a second anonymous OnExit lambda here; double-Stop
 ; can trigger a "hook already released" error on some AHK builds.
+BootProfile_StageBegin("keyboard hook")
 if !HookDispatcher.Start() {
 		; The shared hook is the driver’s keyboard ownership boundary. Publishing
 		; readiness without it would create a half-boot where menu/UI state looks
@@ -1049,6 +1074,9 @@ if !HookDispatcher.Start() {
 		LoggerError("ErgoptiPlus", "Startup aborted: unified keyboard hook could not start.")
 		ExitApp(1)
 }
+BootProfile_StageEnd("keyboard hook", "unified hook armed")
+
+BootProfile_StageBegin("metrics")
 
 if MetricsShortcuts.enabled {
 		LoggerDebug("Startup", "Metrics enabled — WPMWidget.visible={1}, show_graph={2}.",
@@ -1091,6 +1119,7 @@ if MetricsShortcuts.enabled {
 		KL_Roi_Start()
 }
 
+BootProfile_StageEnd("metrics", MetricsShortcuts.enabled ? "keylogger and sensors started" : "metrics disabled")
 BootProfile_Mark("Metrics/keylogger started")
 ; Register the global shutdown handler now that the keylogger is up — Reload()/
 ; ExitApp() run only OnExit callbacks, so this is the single seam that flushes the
@@ -1101,7 +1130,9 @@ BootProfile_Mark("Metrics/keylogger started")
 ; Returning nonzero must stop every later callback before any teardown occurs;
 ; on acceptance the logger remains last and persists terminal cleanup logs.
 OnExit(Ergopti_OnShutdown, -1)
-LoggerInfo("ErgoptiPlus", "Tray menu built and icon set.")
+; The full tray menu is built after "ready" (BuildTrayMenuDeferred); this line
+; used to claim it was already built, which misdated every tray bug report.
+LoggerInfo("ErgoptiPlus", "Shutdown handler registered; the tray menu is built after ready.")
 
 
 
@@ -1125,6 +1156,7 @@ global _FmtCountCache := Map()
 #Include infra/lifecycle.ahk
 
 #Include infra/script_altgr_hotkeys.ahk
+BootProfile_StageBegin("layout and remaps")
 _RegisterScriptAltGrHotkeys()
 
 ; Personal hotstrings are loaded exactly once, inside RegisterAllHotstrings()
@@ -1149,6 +1181,7 @@ _RegisterScriptAltGrHotkeys()
 ; the ~5400-hotstring HSE registration, then the prefix-watcher index build. A
 ; micro-bench (tests/bench_boot_hotstrings.ahk) shows magic-key text expansion is
 ; the heaviest registration category by a wide margin.
+BootProfile_StageEnd("layout and remaps")
 BootProfile_Mark("Layout/shortcuts/tap-holds + AltGr registered")
 ; Clear any phantom modifier carried across a Reload BEFORE the input hook starts
 ; observing keystrokes, so a Reload that landed mid-AltGr cannot leave this fresh
@@ -1159,8 +1192,11 @@ _ReleasePhantomModifiers()
 ; sections and its preview index, must exist before the driver publishes ready.
 ; Deferring these ~3000 registrations after ready made a first emoji/symbol trigger
 ; literal for seconds and allowed the timer to stall the first typing burst.
+BootProfile_StageBegin("hotstrings")
 RegisterAllHotstrings(false)
+BootProfile_StageEnd("hotstrings")
 BootProfile_Mark("Hotstrings registered (HSE complete)")
+BootProfile_StageBegin("prefix watcher")
 HotstringPrefixWatcherInit()
 ; Install the shared low-level keyboard arbiter after the prefix InputHook. Its
 ; terminal capture then runs first in the hook chain and can hold physical edges
@@ -1168,11 +1204,22 @@ HotstringPrefixWatcherInit()
 ; by the adapter and terminal expansions remain fail-open.
 LLM_NavEventOwner_EnsureStarted()
 HotstringPrefixWatcherRebuildIndex()
+BootProfile_StageEnd("prefix watcher")
 BootProfile_Mark("Prefix watcher index complete")
 SuspendWatchdogStart()
 _DriverReady := true
 _DriverBootPhase := "ready"
 LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")
+_BootTotalMs := BootProfile_TotalBootMs()
+_BootOpenStages := BootProfile_OpenStageNames()
+if (_BootOpenStages != "")
+	LoggerWarn("BootProfile", "Boot completed with unclosed stage(s): {1}.", _BootOpenStages)
+LoggerInfo("BootProfile", "Boot complete in {1} ms (since process start).", _BootTotalMs)
+; One environment summary with the same field names on every driver. A probe
+; failure is reported and never allowed to turn a ready driver into a dead one.
+try DiagSnapshot_Emit(_BootTotalMs)
+catch as _SnapshotErr
+	LoggerError("Diagnostics", "Diagnostic snapshot could not be collected: {1}.", _SnapshotErr.Message)
 if (_DriverStartupSmokeDir != "") {
 		_StartupSmokeExpectedSuspend :=
 				EnvGet("ERGOPTI_STARTUP_SMOKE_EXPECT_SUSPENDED") == "1"
@@ -1289,6 +1336,9 @@ CheckKeyboardLayoutChange() {
 		or GetKeyState("SC039", "P") or GetKeyState("SC038", "P") or GetKeyState("SC138", "P")
 		
 		if _ShouldReloadForHkl(curHkl, &_LAST_KEYBOARD_HKL, &_PENDING_KEYBOARD_HKL, suspended, isBlacklisted, hseSup, pwSup, A_TimeIdlePhysical, inputBusy) {
+				; The one reload nobody clicks: without this line a layout switch
+				; looked like a spontaneous restart in the log.
+				try LoggerInfo("ErgoptiPlus", "Keyboard layout changed to HKL 0x{1:X}; reloading to re-probe the layout.", curHkl)
 				Reload()
 		}
 }

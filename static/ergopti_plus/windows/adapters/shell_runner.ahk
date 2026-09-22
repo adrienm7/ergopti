@@ -128,6 +128,50 @@ _SR_LogError(FormatString, Args*) {
 	}
 }
 
+; Names the program a composed command runs, never its arguments: a command line
+; can carry user text (a path under the profile, a clipboard value, a query).
+; @param Cmd {String}
+; @returns {String}
+_SR_ProgramName(Cmd) {
+	if !(Cmd is String) || !RegExMatch(Cmd, '^\s*(?:"([^"]+)"|(\S+))', &M)
+		return "unknown"
+	SplitPath(M[1] != "" ? M[1] : M[2], &Name)
+	return (Name != "" && RegExMatch(Name, "^[\w.+-]+$")) ? Name : "unknown"
+}
+
+; Reports a process exit with its status and duration. The first exit of each
+; program is logged, then at most one line per program per window (carrying the
+; number of runs it summarises), unless a run is slow — a slow child is exactly
+; what a user-visible stall has to be traced to. Debug level through the dynamic
+; logger lookup, for the same standalone-validity reason as _SR_LogError.
+; @param Program {String}
+; @param Status {Any} Exit code.
+; @param DurationMs {Integer}
+; @returns {Boolean} Whether a line was written.
+_SR_RecordExit(Program, Status, DurationMs) {
+	static WINDOW_MS := 60000
+	static SLOW_MS := 1000
+	static LastLogged := Map()
+	static Suppressed := Map()
+	Now := A_TickCount
+	if (LastLogged.Has(Program) && (Now - LastLogged[Program]) < WINDOW_MS && DurationMs < SLOW_MS) {
+		Suppressed[Program] := Suppressed.Get(Program, 0) + 1
+		return false
+	}
+	Skipped := Suppressed.Get(Program, 0)
+	LastLogged[Program] := Now
+	Suppressed[Program] := 0
+	try {
+		LoggerFn := %"LoggerDebug"%
+		LoggerFn.Call("adapters.shell_runner",
+			"Process '{1}' exited (status={2}, {3} ms, {4} similar run(s) since the last line).",
+			Program, String(Status), DurationMs, Skipped)
+	} catch as Err {
+		try OutputDebug("[adapters.shell_runner] exit record failed: " . Err.Message)
+	}
+	return true
+}
+
 ; LoggerError force-flushes to disk. A failed fire-and-forget tree-kill launch
 ; must still be diagnosed, but never by putting FileOpen/FileAppend back on the
 ; latency-sensitive terminateAsync() stack. SetTimer's negative period queues a
@@ -184,9 +228,12 @@ ShellRunner_Exec(Cmd) {
 		; silently never applied and TmpFile is never created (reproduced with
 		; a standalone probe: identical RunWait call, only the extra outer
 		; quote pair differs between a silent no-op and a working capture).
-		RunWait('cmd.exe /c "' . Cmd . ' > "' . TmpFile . '" 2>&1"', , "Hide")
+		Started := A_TickCount
+		ExitCode := RunWait('cmd.exe /c "' . Cmd . ' > "' . TmpFile . '" 2>&1"', , "Hide")
+		_SR_RecordExit(_SR_ProgramName(Cmd), ExitCode, A_TickCount - Started)
 	} catch as Err {
-		_SR_LogError("exec() failed for '{1}': {2}", Cmd, Err.Message)
+		; The program name only: the command line can carry user text.
+		_SR_LogError("exec() failed for '{1}': {2}", _SR_ProgramName(Cmd), Err.Message)
 	} finally {
 		if FileExist(TmpFile) {
 			try Result := FileRead(TmpFile)

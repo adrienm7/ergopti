@@ -369,6 +369,11 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 	CurrentSection := ""
 	SkippingForeign := false
 	ObsoleteDriverSections := 0
+	; Counted for the summary line: each is logged where it happens, but a boot
+	; log with twenty scattered errors never said how much of the file was ignored.
+	UnknownKeys := 0
+	ForeignOwnedKeys := 0
+	IgnoredSectionKeys := 0
 
 	loop parse, Content, "`n", "`r" {
 		Line := Trim(A_LoopField, " `t")
@@ -413,6 +418,7 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 			continue
 		}
 		if SkippingForeign {
+			IgnoredSectionKeys += 1
 			continue
 		}
 
@@ -445,17 +451,20 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 		UnknownKind := TomlConfigUnknownKind(Features, CurrentSection, Key,
 			&ForeignOwner)
 		if (UnknownKind == "section") {
+			UnknownKeys += 1
 			try LoggerError("TomlConfigLoader",
 				"v2 override skipped — unknown section path '[{1}]' not found in the manifest.", CurrentSection)
 			continue
 		}
 		if (UnknownKind == "leaf") {
+			UnknownKeys += 1
 			try LoggerError("TomlConfigLoader",
 				"v2 override skipped — unknown leaf '[{1}].{2}' not found in the manifest.",
 				CurrentSection, Key)
 			continue
 		}
 		if (ForeignOwner != "") {
+			ForeignOwnedKeys += 1
 			try LoggerDebug("TomlConfigLoader",
 				"[{1}].{2} is owned by {3}; Features apply skipped ({4}).",
 				CurrentSection, Key, ForeignOwner, TomlConfigLogValue(Value))
@@ -551,5 +560,9 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 			"applied {1} legacy 0/1 boolean(s) with user intent; the next save persists them as canonical true/false.",
 			MigratedOverrides)
 	}
+	try LoggerInfo("TomlConfigLoader",
+		"Config summary for '{1}': {2} applied, {3} rejected, {4} unknown key(s) ignored, {5} owned by another module, {6} key(s) in skipped sections, {7} obsolete section(s).",
+		FilePath, Applied, RejectedOverrides, UnknownKeys, ForeignOwnedKeys,
+		IgnoredSectionKeys, ObsoleteDriverSections)
 	return Applied
 }

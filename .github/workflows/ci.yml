@@ -2408,7 +2408,9 @@ jobs:
           $text = $text.Replace("__BUNDLE_VERSION__",     $version)
           $text = $text.Replace("__BUNDLE_RELEASE_URL__", $releaseUrl)
           $text = $text.Replace("__BUNDLE_CHANNEL__",     $channel)
+          $text = $text.Replace("__BUNDLE_COMMIT__",      "${{ github.sha }}")
           Set-Content -Path $bundlePath -Value $text -Encoding UTF8 -NoNewline
+          Write-Host "BUNDLE_COMMIT      stamped: ${{ github.sha }}"
           Write-Host "BUNDLE_VERSION     stamped: $version"
           Write-Host "BUNDLE_RELEASE_URL stamped: $releaseUrl"
           Write-Host "BUNDLE_CHANNEL     stamped: $channel"
