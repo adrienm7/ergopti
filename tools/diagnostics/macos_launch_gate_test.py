@@ -45,6 +45,14 @@ class VerdictTests(unittest.TestCase):
         self.assertTrue(any("FATAL" in failure for failure in failures))
         self.assertTrue(any("no driver log" in failure for failure in failures))
 
+    def test_environment_key_named_fatal_is_not_a_fatal_line(self):
+        # The boot log lists the launcher environment, which has ERGOPTI_FATAL_REPORT_FILE.
+        healthy = observe()
+        failures = gate.evaluate("clean", observe(launcher_log=healthy["launcher_log"]
+            + "[t] embedded Hammerspoon boot INFO: Launcher environment keys present: "
+            "ERGOPTI_CONFIG_DIR, ERGOPTI_FATAL_REPORT_FILE.\n"))
+        self.assertEqual(failures, [])
+
     def test_early_log_without_marker_is_not_startup(self):
         failures = gate.evaluate("clean", observe(driver_log="Path: log file open\n"))
         self.assertEqual(failures, ["the driver log has no completed startup marker"])
