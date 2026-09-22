@@ -1181,6 +1181,7 @@ function M.toggle_section(category, section)
 	local candidate = copy_disabled(_disabled_groups)
 	set_section_choice(candidate, category, section, not M.is_section_checked(category, section))
 	if not commit_disabled(candidate) then return false end
+	Logger.info(LOG, "Section '%s' %s.", key, candidate[key] and "disabled" or "enabled")
 	M.load_all()
 	notify_change()
 	return true
