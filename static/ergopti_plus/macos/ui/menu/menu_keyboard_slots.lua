@@ -167,10 +167,17 @@ end
 --- @param group table An entry of KbShortcuts.SLOT_GROUPS.
 --- @param ctx table
 --- @param disabled boolean|nil Whether the rows should render greyed out.
+--- @param fixed_rows table|nil The driver's built-in shortcuts on this modifier,
+---     drawn first so one submenu holds every shortcut of that modifier.
 --- @return table rows
-local function build_group_rows(group, ctx, disabled)
+local function build_group_rows(group, ctx, disabled, fixed_rows)
 	local rows = {}
 	local gestures = ctx.gestures
+
+	if type(fixed_rows) == "table" and #fixed_rows > 0 then
+		for _, row in ipairs(fixed_rows) do rows[#rows + 1] = row end
+		rows[#rows + 1] = { separator = true }
+	end
 
 	for _, slot in ipairs(KbShortcuts.assigned_keyboard_slots(group.prefix)) do
 		local action_label = slot.action
@@ -196,14 +203,18 @@ end
 --- One row per group, each carrying its own rows as nested data.
 --- @param ctx table The menu context.
 --- @param disabled boolean|nil
+--- @param fixed_by_prefix table|nil Built-in shortcut rows keyed by slot prefix.
+---     They join the group of the same modifier instead of a second submenu of
+---     the same name, which left the slot group looking empty beside it.
 --- @return table rows
-function M.provide_rows(ctx, disabled)
+function M.provide_rows(ctx, disabled, fixed_by_prefix)
 	local rows = {}
 	for _, group in ipairs(KbShortcuts.get_keyboard_slot_groups()) do
+		local fixed = type(fixed_by_prefix) == "table" and fixed_by_prefix[group.prefix] or nil
 		rows[#rows + 1] = {
 			label    = i18n.get(group.group_key),
 			disabled = disabled or nil,
-			items    = build_group_rows(group, ctx, disabled),
+			items    = build_group_rows(group, ctx, disabled, fixed),
 		}
 	end
 	return rows
