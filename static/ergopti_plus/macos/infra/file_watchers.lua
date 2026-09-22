@@ -32,6 +32,7 @@ local ui_restore    = require("infra.ui_restore")
 local fs_dir        = require("infra.fs_dir")
 local git_status    = require("infra.git_status")
 local reload_gate   = require("reload_gate")
+local RuntimeLog    = require("diagnostics.runtime_log")
 
 local LOG = "file_watchers"
 
@@ -444,14 +445,21 @@ function M.start(ctx)
 					arm_timer(msg)
 					return
 				end
+				-- Name the files: every file-triggered reload reached the coordinator
+				-- under one generic reason, so the log could not say what changed.
+				Logger.info(LOG, "Source change reload requested (%s).",
+					RuntimeLog.describe_paths(burst_paths))
 				local request_ok, accepted = xpcall(function()
 					-- snapshot() is a safety net for any UI still open at reload time;
 					-- under normal deferral they are already closed so it saves nothing.
 					ui_restore.snapshot()
-					pcall(function()
+					local notified, notify_err = pcall(function()
 						notifications.notify(i18n.get("init.reload_title"),
 							msg or i18n.get("init.reload_files"), "info")
 					end)
+					if not notified then
+						Logger.warn(LOG, "Reload notification failed: %s.", tostring(notify_err))
+					end
 					return hs.reload()
 				end, debug.traceback)
 				if not request_ok or accepted ~= true then

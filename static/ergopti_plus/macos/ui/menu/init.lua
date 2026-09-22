@@ -39,6 +39,9 @@ local PreferencesTransaction = require("ui.menu.preferences_transaction")
 local GlobalActionsTransaction = require("ui.menu.global_actions_transaction")
 local RecoverableFileMoves = require("ui.menu.recoverable_file_moves")
 local FactoryResetJournal = require("infra.factory_reset_journal")
+local DiagnosticSnapshot = require("infra.diagnostic_snapshot")
+local BootProfiler = require("infra.boot_profiler")
+local ConfigPaths = require("infra.config_paths")
 
 local LOG = "menu"
 local load_errors = {}
@@ -427,16 +430,30 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				local msg = source == "watcher"
 					and i18n.get("menu.reloading_files")
 					or  i18n.get("menu.reloading")
-				pcall(notifications.notify, msg, nil, "info")
+				local notified, notify_err = pcall(notifications.notify, msg, nil, "info")
+				if not notified then
+					Logger.warn(LOG, "Reload notification failed: %s.", tostring(notify_err))
+				end
 				local request_ok, accepted = xpcall(function()
 					return TerminationCoordinator.request_reload(source)
 				end, debug.traceback)
+				if not request_ok then
+					Logger.error(LOG, "Reload request from '%s' raised: %s.", tostring(source), tostring(accepted))
+				end
 				return request_ok and accepted == true
 			end)
 	end
 
 	local function notify_feature(label, is_enabled)
-		pcall(notifications.notify, tostring(label), nil, is_enabled and "success" or "error")
+		-- Every menu feature toggle funnels through here; the toast was its only
+		-- trace, so a user log could never say what had been switched and when.
+		Logger.info(LOG, "Feature toggled from the menu: '%s' → %s.", tostring(label),
+			is_enabled and "enabled" or "disabled")
+		local notified, notify_err = pcall(notifications.notify, tostring(label), nil,
+			is_enabled and "success" or "error")
+		if not notified then
+			Logger.warn(LOG, "Feature toggle notification failed: %s.", tostring(notify_err))
+		end
 	end
 
 	-- Preference callbacks mutate shared tables and runtime engines before they
@@ -1334,15 +1351,16 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local _, cache_prime_timer_committed = TimerScheduler.after(
 		MENU_CACHE_PRIME_DELAY_SEC,
 		function()
-			if menu_mods.keyboard_layout
-				and type(menu_mods.keyboard_layout.prime) == "function" then
-				pcall(menu_mods.keyboard_layout.prime, ctx)
-			end
-			if menu_mods.apps and type(menu_mods.apps.prime) == "function" then
-				pcall(menu_mods.apps.prime, ctx)
-			end
-			if menu_mods.karabiner and type(menu_mods.karabiner.prime) == "function" then
-				pcall(menu_mods.karabiner.prime, ctx)
+			-- A failed prime only costs a slower first open, but it used to cost it
+			-- silently; the submenu then looked empty with nothing in the log.
+			for _prime_index, name in ipairs({ "keyboard_layout", "apps", "karabiner" }) do
+				local mod = menu_mods[name]
+				if mod and type(mod.prime) == "function" then
+					local primed, prime_err = pcall(mod.prime, ctx)
+					if not primed then
+						Logger.warn(LOG, "Menu cache prime '%s' failed: %s.", name, tostring(prime_err))
+					end
+				end
 			end
 			-- Now that the expensive submenu caches are warm, build the menu tree once
 			-- off the boot path and PRIME the static menu: rebuild_menu_cache() pushes
@@ -1353,6 +1371,23 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				and core_mods.shortcuts_mod.is_paused() or false
 			_menu_primed = true
 			rebuild_menu_cache()
+			-- The boot sequence is complete by now, and this runs once per session:
+			-- the natural point for the one-line environment summary every driver
+			-- logs after boot. A probe failure is reported, never allowed to unwind
+			-- the menu prime that precedes it.
+			local snapshot_ok, snapshot_err = pcall(function()
+				local Updater = require("modules.updater")
+				DiagnosticSnapshot.emit_once({
+					version    = Updater.current_version(),
+					boot_ms    = BootProfiler.boot_complete_ms(),
+					locale     = i18n.get_locale(),
+					config_dir = ConfigPaths.get_config_dir(),
+					state      = state,
+				})
+			end)
+			if not snapshot_ok then
+				Logger.error(LOG, "Diagnostic snapshot could not be collected: %s.", tostring(snapshot_err))
+			end
 		end)
 	if cache_prime_timer_committed ~= true then
 		Logger.error(LOG, "Menu cache-prime timer did not commit.")

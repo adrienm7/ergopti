@@ -270,6 +270,12 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.system_info",
+		contract = { "os_version", "runtime_version", "arch", "monitor_count",
+			"main_screen_scale", "keyboard_layout", "elevated", "home" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.hotkey_registrar",
 		contract = { "bind", "unbind", "setEnabled" },
 		wired    = true,
