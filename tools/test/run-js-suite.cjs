@@ -254,6 +254,7 @@ const CHECKS = [
 	{ name: 'git-mv resilience (every path pin in the three suites resolves — macOS + Linux files, AHK dirs)', cmd: 'node', args: ['tools/test/test-git-mv-resilience.cjs'], repro: 'node tools/test/test-git-mv-resilience.cjs' },
 	{ name: 'shared UI JavaScript syntax (every browser script parses before WebView injection)', cmd: 'node', args: ['tools/test/test-shared-ui-js-syntax.cjs'], repro: 'node tools/test/test-shared-ui-js-syntax.cjs' },
 	{ name: 'changelog remote content and native bridge stay inside their authenticated boundary', cmd: 'node', args: ['tools/test/test-changelog-security.cjs'], repro: 'npm run test:changelog-security' },
+	{ name: 'changelog release notes render as sanitized Markdown (DOM-only, repository links only)', cmd: 'node', args: ['tools/test/test-changelog-markdown.cjs'], repro: 'npm run test:changelog-markdown' },
 	{ name: 'download actions retain their operation session across native reuse', cmd: 'node', args: ['tools/test/test-download-window-session.cjs'], repro: 'npm run test:download-window-session' },
 	{ name: 'model browser actions retain their operation session across native reuse', cmd: 'node', args: ['tools/test/test-model-browser-session.cjs'], repro: 'npm run test:model-browser-session' },
 	{ name: 'metrics manifest payload contract (reader vocabulary reaches real consumers)', cmd: 'node', args: ['tools/test/test-metrics-manifest-contract.cjs'], repro: 'node tools/test/test-metrics-manifest-contract.cjs' },

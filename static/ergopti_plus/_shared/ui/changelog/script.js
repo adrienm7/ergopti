@@ -6,15 +6,17 @@
  * DESCRIPTION:
  * Manages the release list sidebar and markdown content pane for the changelog
  * window. Fetches release data from the GitHub API via a native bridge (AHK
- * WebView2 or Hammerspoon usercontent), renders release notes as inert text, and
- * supports stable / pre-release channel switching.
+ * WebView2 or Hammerspoon usercontent), renders release notes as sanitized
+ * Markdown through the shared renderer (../markdown.js), and supports stable /
+ * pre-release channel switching.
  *
  * FEATURES & RATIONALE:
  * 1. Bridge-agnostic: postBridgeMessage() works on both WebView2 (Windows/AHK)
  *    and WKWebView (macOS/Hammerspoon) with automatic detection.
  * 2. Client-side fetch fallback: if the native bridge does not inject releases,
  *    the script fetches directly from the GitHub API so a browser preview works.
- * 3. Remote-content boundary: release body text never becomes active HTML.
+ * 3. Remote-content boundary: release body text never becomes active HTML; it
+ *    reaches the DOM through createElement/createTextNode only.
  * ==============================================================================
  */
 
@@ -404,10 +406,15 @@ function selectRelease(idx) {
 		bodyEl.appendChild(empty);
 		return;
 	}
-	var notes = document.createElement('pre');
-	notes.className = 'release-notes-plain';
-	notes.textContent = raw;
-	bodyEl.appendChild(notes);
+	// Remote Markdown becomes DOM nodes only (never parsed HTML). Links stay
+	// href-less; a click reaches the native open_url action, and only for URLs
+	// on this repository's HTTPS surface — the same allowlist the hosts enforce.
+	renderMarkdownInto(bodyEl, raw, {
+		allow: _isAllowedRepositoryUrl,
+		open: function (url) {
+			_postChangelogMessage({ action: 'open_url', url: url });
+		},
+	});
 }
 
 /** Returns whether a URL belongs to this repository's HTTPS surface. */

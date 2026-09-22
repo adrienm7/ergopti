@@ -23,6 +23,7 @@ const WINDOWS_ROOT = path.join(ROOT, 'static', 'ergopti_plus', 'windows');
 
 const index = fs.readFileSync(path.join(SHARED_CHANGELOG, 'index.html'), 'utf8');
 const script = fs.readFileSync(path.join(SHARED_CHANGELOG, 'script.js'), 'utf8');
+const markdown = fs.readFileSync(path.join(SHARED_CHANGELOG, '..', 'markdown.js'), 'utf8');
 const bridge = fs.readFileSync(path.join(WINDOWS_ROOT, 'ui', 'changelog', 'init.ahk'), 'utf8');
 const updater = fs.readFileSync(path.join(WINDOWS_ROOT, 'modules', 'updater', 'core.ahk'), 'utf8');
 
@@ -41,13 +42,23 @@ expect(
 	'the changelog must not execute a remotely mutable Markdown renderer'
 );
 expect(
-	!script.includes('marked.parse') && script.includes('notes.textContent = raw'),
-	'remote release notes must reach the document only through textContent'
+	!script.includes('marked.parse') && script.includes('renderMarkdownInto(bodyEl, raw'),
+	'remote release notes must reach the document only through the shared DOM-only renderer'
 );
+const markdownPos = index.indexOf('src="../markdown.js"');
+const scriptPos = index.indexOf('src="script.js"');
 expect(
-	!script.includes('bodyEl.innerHTML = marked.parse'),
-	'active Markdown must never be assigned to a live element as HTML'
+	markdownPos >= 0 && scriptPos > markdownPos,
+	'the local Markdown renderer must load before the page script that calls it'
 );
+// Behavioural coverage of the renderer lives in test-changelog-markdown.cjs;
+// this pins the absence of every HTML-parsing sink in both scripts.
+for (const [name, source] of [['script.js', script], ['markdown.js', markdown]]) {
+	expect(
+		!/\binnerHTML\b|\bouterHTML\b|insertAdjacentHTML|DOMParser|document\.write|\beval\s*\(|new Function/.test(source),
+		`${name} must never hand remote release text to an HTML parser or evaluator`
+	);
+}
 
 expect(
 	script.includes('window.__changelog_session'),
@@ -79,6 +90,11 @@ expect(
 	allowPos >= 0 && runPos > allowPos,
 	'the HTTPS repository allowlist must run before any injected/native runner'
 );
+
+/** Concatenates the text of a recorded node and all of its descendants. */
+function renderedText(node) {
+	return node.textContent + node.children.map(renderedText).join('');
+}
 
 /** Executes the shared page against the Linux response protocol. */
 function checkLinuxProtocol() {
@@ -113,6 +129,7 @@ function checkLinuxProtocol() {
 			getElementById: id => element(id),
 			querySelectorAll: () => [],
 			createElement: tag => element(`created-${tag}-${elements.size}`),
+			createTextNode: text => ({ textContent: String(text), children: [] }),
 		},
 		makeHostBridge: name => payload => posted.push({ name, payload }),
 		decodeHostBridgeResponse: (_isBase64, payload) => JSON.parse(payload),
@@ -121,7 +138,9 @@ function checkLinuxProtocol() {
 	};
 	sandbox.window = sandbox;
 	sandbox.__ergopti_host = 'linux';
-	vm.runInNewContext(script, sandbox, { filename: 'changelog/script.js' });
+	vm.createContext(sandbox);
+	vm.runInContext(markdown, sandbox, { filename: 'markdown.js' });
+	vm.runInContext(script, sandbox, { filename: 'changelog/script.js' });
 
 	expect(
 		posted.length === 1 && posted[0].name === 'changelog_bridge' && posted[0].payload === 'ready',
@@ -139,7 +158,7 @@ function checkLinuxProtocol() {
 	}));
 	expect(
 		element('release-tag').textContent === 'v9.8.7'
-			&& element('release-body').children[0].textContent === 'Native cache marker',
+			&& renderedText(element('release-body')) === 'Native cache marker',
 		'the Linux native response must render the canonical release schema into the DOM'
 	);
 

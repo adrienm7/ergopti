@@ -244,6 +244,7 @@
 		"test:name-parity": "node ./tools/test/test-name-parity.cjs",
 		"test:shared-ui-js-syntax": "node ./tools/test/test-shared-ui-js-syntax.cjs",
 		"test:changelog-security": "node ./tools/test/test-changelog-security.cjs",
+		"test:changelog-markdown": "node ./tools/test/test-changelog-markdown.cjs",
 		"test:download-window-session": "node ./tools/test/test-download-window-session.cjs",
 		"test:model-browser-session": "node ./tools/test/test-model-browser-session.cjs",
 		"test:metrics-manifest-contract": "node ./tools/test/test-metrics-manifest-contract.cjs",
