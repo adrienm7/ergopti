@@ -16,10 +16,19 @@ starts, then applies the same machine-checked verdict:
 5. a normal application Quit ends both processes within a bounded time.
 
 Hosted runners cannot grant Accessibility without interactive approval, so a
-state that contains config.toml would stop at the first event tap. Every
+state that contains config.toml stops at the first event tap. Every healthy
 scenario therefore omits config.toml and completes at the first-run wizard,
 which sits after config-path resolution, the logger handshake, and the
 factory-reset recovery that all of these user states exercise.
+
+v0.0.0-dev.128 passed every such scenario and still vanished on a real Mac
+with a completed config.toml: the post-onboarding boot died after the logger
+handshake, and the launcher took Hammerspoon's exit status 0 for a Quit. The
+configured_symlink scenario rebuilds that user (completed config.toml in a
+symlinked, Git-versioned folder) and requires the refusal the runner's missing
+Accessibility must now produce: a named launcher FATAL line and the fatal line
+in the fallback boot log, never a silent exit. plain_open launches the way a
+double-click does, without `open -n`.
 """
 
 import argparse
@@ -35,6 +44,11 @@ import sys
 import time
 
 READY_MARKER = "Onboarding wizard opened."
+# The launcher's own fatal line; the Lua runtime writes "... FATAL at boot stage".
+LAUNCHER_FATAL = "FATAL:"
+LUA_FATAL = "FATAL at boot stage"
+FALLBACK_BOOT_LOG = Path("/tmp/ErgoptiPlus_boot.log")
+CONFIG_TEMPLATE = Path(__file__).resolve().parents[2] / "static/ergopti_plus/macos/_generated/config_template.toml"
 CONFIGURED_MARKER = "embedded Hammerspoon bootstrap logger configured"
 STARTUP_TIMEOUT_SECONDS = 90
 ALIVE_WINDOW_SECONDS = 15
@@ -61,11 +75,16 @@ SCENARIOS = (
     "symlink_logs",
     "tilde_paths",
     "dangling_logs",
+    "configured_symlink",
+    "plain_open",
 )
+# Scenarios launched like a Finder double-click instead of `open -n`.
+PLAIN_OPEN_SCENARIOS = {"plain_open"}
 # A state that must be refused, and the launcher text that proves the refusal
 # names the folder and its reason instead of a bare child exit code.
 EXPECTED_REFUSALS = {
     "dangling_logs": ("hammerspoon/logs", "symbolic link"),
+    "configured_symlink": ("boot stage 'accessibility'",),
 }
 
 
@@ -136,7 +155,7 @@ def seed(scenario, home, seed_tag, today):
         path.symlink_to(target, target_is_directory=True)
         state["symlinks"].append(str(path))
 
-    if scenario == "clean":
+    if scenario in ("clean", "plain_open"):
         return state
     if scenario == "upgraded":
         seed_personal_files(default, seed_tag)
@@ -167,6 +186,13 @@ def seed(scenario, home, seed_tag, today):
         seed_personal_files(repo / "ergopti_plus", seed_tag)
         state["config_dir"] = repo / "ergopti_plus"
         state["paths_toml"] = write_paths_toml(home, "~/gitcfg/ergopti_plus/")
+    elif scenario == "configured_symlink":
+        # The reporting user: a Git-versioned folder that already holds a
+        # completed config.toml, so the wizard is skipped and boot continues.
+        target = home / "Documents/GitHub/config/ergopti_plus"
+        seed_personal_files(target, seed_tag)
+        shutil.copyfile(CONFIG_TEMPLATE, target / "config.toml")
+        link(default, target)
     elif scenario == "dangling_logs":
         seed_personal_files(default, seed_tag)
         link(default / "hammerspoon/logs", repo / "missing-logs")
@@ -191,12 +217,15 @@ def evaluate(scenario, observation):
     fatal = [line for line in launcher.splitlines() if "FATAL" in line]
     expected = EXPECTED_REFUSALS.get(scenario)
     if expected is not None:
-        if not fatal:
+        launcher_fatal = [line for line in fatal if LAUNCHER_FATAL in line]
+        if not launcher_fatal:
             failures.append("the refused state produced no FATAL launcher diagnostic")
-        elif not all(part in fatal[-1] for part in expected):
-            failures.append(f"the FATAL diagnostic does not name {expected!r}: {fatal[-1]}")
+        elif not all(part in launcher_fatal[-1] for part in expected):
+            failures.append(f"the FATAL diagnostic does not name {expected!r}: {launcher_fatal[-1]}")
+        if LUA_FATAL not in observation.get("boot_log", ""):
+            failures.append("the fatal abort never reached the fallback boot log")
         if observation.get("alive_after_window"):
-            failures.append("the application kept running over a refused log folder")
+            failures.append("the application kept running over a refused state")
         return failures
 
     if CONFIGURED_MARKER not in launcher:
@@ -337,6 +366,13 @@ def print_tails(output):
         print("\n".join(read_text(path).splitlines()[-25:]))
 
 
+def launch_command(scenario, app):
+    """Return how a scenario opens the application."""
+    if scenario in PLAIN_OPEN_SCENARIOS:
+        return ["open", str(app)]
+    return ["open", "-n", str(app)]
+
+
 def run(app, output, scenario, seed_tag):
     """Seed one state, launch the application, and return the complete report."""
     home = Path.home()
@@ -355,7 +391,7 @@ def run(app, output, scenario, seed_tag):
     started = time.monotonic()
     observation = {}
     try:
-        result = subprocess.run(["open", "-n", str(app)], capture_output=True, text=True, timeout=15)
+        result = subprocess.run(launch_command(scenario, app), capture_output=True, text=True, timeout=15)
         report["open"] = {"code": result.returncode, "stderr": result.stderr}
         ready_at = None
         while time.monotonic() - started < STARTUP_TIMEOUT_SECONDS:
@@ -367,9 +403,8 @@ def run(app, output, scenario, seed_tag):
                 break
             if not processes(launcher) and time.monotonic() - started > 5:
                 break
-            if "FATAL" in read_text(launcher_log):
-                break
-            if "FATAL" in read_text(launcher_log):
+            # Wait for the launcher's own verdict, which follows the Lua line.
+            if LAUNCHER_FATAL in read_text(launcher_log):
                 break
             time.sleep(1)
         observation["alive_after_window"] = bool(processes(launcher)) and bool(processes(child))
@@ -377,6 +412,7 @@ def run(app, output, scenario, seed_tag):
             if observation["alive_after_window"] else None)
     finally:
         observation["launcher_log"] = read_text(launcher_log)
+        observation["boot_log"] = read_text(FALLBACK_BOOT_LOG)
         observation["driver_log"] = driver_logs(state)
         observation["state_problems"] = check_state(scenario, state, home)
         collect(output, state, home)

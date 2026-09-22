@@ -357,7 +357,7 @@ jobs:
       label: unreleased
       artifact: macos-package-unreleased
       runners: '["macos-15"]'
-      scenarios: '["clean","upgraded","symlink_config","symlink_hammerspoon","symlink_logs","tilde_paths","dangling_logs"]'
+      scenarios: '["clean","upgraded","symlink_config","symlink_hammerspoon","symlink_logs","tilde_paths","dangling_logs","configured_symlink","plain_open"]'
 
   # ─────────────────────────────────────────────────
   # 2.5) Gate: macOS driver fully green
