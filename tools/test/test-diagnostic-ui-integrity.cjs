@@ -149,13 +149,13 @@ function checkCommitAndDirectoriesRender() {
 			hs_version: '1.1.1',
 			git_hash: 'f58d15798',
 			commit_source: 'build',
-			config_dir: '/Users/alice/Chosen/ergopti_plus/',
+			config_dir: '/Volumes/Fixture/alice/Chosen/ergopti_plus/',
 			script_dir: '/Applications/ErgoptiPlus.app/Contents/Resources/static/ergopti_plus/macos',
 		},
 	});
 	const html = content.innerHTML;
 	const ok = html.includes('<td>Last git commit</td><td>f58d15798 (build)</td>')
-		&& html.includes('<td>Config dir</td><td><code>/Users/alice/Chosen/ergopti_plus/</code></td>')
+		&& html.includes('<td>Config dir</td><td><code>/Volumes/Fixture/alice/Chosen/ergopti_plus/</code></td>')
 		&& html.includes('<td>Script dir</td><td><code>/Applications/ErgoptiPlus.app/Contents/Resources/static/ergopti_plus/macos</code></td>');
 	if (ok) {
 		total_pass++;

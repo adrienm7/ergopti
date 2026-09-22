@@ -201,13 +201,13 @@ function openWizard(extra) {
 			{
 				locale: 'en',
 				strings: locale('en'),
-				default_config_dir: '/Users/me/.config/ergopti_plus/',
+				default_config_dir: '/Volumes/Fixture/me/.config/ergopti_plus/',
 				locales: [
 					{ code: 'en', flag: '', name: 'English' },
 					{ code: 'fr', flag: '', name: 'Français' }
 				],
 				answers: { locale: 'en', config_dir: '' },
-				metrics_path: '/Users/me/.config/ergopti_plus/metrics',
+				metrics_path: '/Volumes/Fixture/me/.config/ergopti_plus/metrics',
 				platform: 'macos'
 			},
 			extra || {}
@@ -304,22 +304,22 @@ function advanceToMetrics(page) {
 	page.click('s1-next');
 	const input = page.elements.get('sc-input');
 	assert.equal(input.value, '', 'the field starts empty over the default');
-	assert.equal(input.placeholder, '/Users/me/.config/ergopti_plus/');
+	assert.equal(input.placeholder, '/Volumes/Fixture/me/.config/ergopti_plus/');
 	page.messages.splice(0);
 
 	page.click('sc-browse');
 	assert.deepEqual(page.messages.splice(0), [{ action: 'pickConfigDir', current: '' }]);
 
-	page.window.setConfigDir('/Users/me/Ergopti Data/');
+	page.window.setConfigDir('/Volumes/Fixture/me/Ergopti Data/');
 	assert.equal(
 		input.value,
-		'/Users/me/Ergopti Data/',
+		'/Volumes/Fixture/me/Ergopti Data/',
 		'the chosen folder is written into the field'
 	);
 
 	// A locale switch re-renders the step from the answers, not from the DOM.
 	page.window.applyStrings({ locale: 'en', strings: locale('en') });
-	assert.equal(input.value, '/Users/me/Ergopti Data/', 'the chosen folder survives a re-render');
+	assert.equal(input.value, '/Volumes/Fixture/me/Ergopti Data/', 'the chosen folder survives a re-render');
 
 	advanceToMetrics(page);
 	page.click('s4-next');
@@ -329,7 +329,7 @@ function advanceToMetrics(page) {
 	assert.equal(finish.action, 'finish');
 	assert.equal(
 		finish.answers.config_dir,
-		'/Users/me/Ergopti Data/',
+		'/Volumes/Fixture/me/Ergopti Data/',
 		'the finish payload uses the chosen folder'
 	);
 })();
@@ -362,7 +362,7 @@ function advanceToMetrics(page) {
 	page.click('s1-next');
 	advanceToMetrics(page);
 	const warning = page.elements.get('s4-warning').textContent;
-	assert.ok(warning.includes('/Users/me/.config/ergopti_plus/metrics'), warning);
+	assert.ok(warning.includes('/Volumes/Fixture/me/.config/ergopti_plus/metrics'), warning);
 	assert.ok(!warning.includes('{1}'), 'the placeholder is filled');
 })();
 
@@ -384,7 +384,7 @@ function advanceToMetrics(page) {
 	const warning = page.elements.get('s4-warning').textContent;
 	assert.ok(warning.includes('/Volumes/Data/Ergopti/metrics'), warning);
 	assert.ok(
-		!warning.includes('/Users/me/.config/ergopti_plus/metrics'),
+		!warning.includes('/Volumes/Fixture/me/.config/ergopti_plus/metrics'),
 		'the default store is no longer named'
 	);
 })();
