@@ -1654,6 +1654,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_bundle_skip_validation.ahk
 #Include unit/test_clipboard_history_paste.ahk
 #Include unit/test_changelog_request_epoch.ahk
+#Include unit/test_changelog_network_resilience.ahk
 #Include unit/test_config_toml_single_writer.ahk
 #Include unit/test_derived_toml_caches_not_memoised_on_failed_read.ahk
 #Include unit/test_fire_log_callable_replacement.ahk

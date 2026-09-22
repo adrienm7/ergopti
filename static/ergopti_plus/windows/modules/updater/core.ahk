@@ -2735,6 +2735,10 @@ _Updater_PrepareLatestAsyncTransport(Owner, FactoryFn := 0) {
 	Req.SetRequestHeader("User-Agent", "ErgoptiPlus-Updater/1.0")
 	if !_Updater_AsyncRequestOwned(Owner)
 		return 0
+	; curl ignores the Windows proxy that browsers use; route through it.
+	Proxy := SystemProxy_ForUrl(Record["url"])
+	if (Proxy != "")
+		Req.SetProxy(Proxy)
 	Req.SetTimeouts(UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS,
 		UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS)
 	if !_Updater_AsyncRequestOwned(Owner)
@@ -2768,6 +2772,10 @@ _Updater_PrepareReleasesListAsyncTransport(Owner, FactoryFn := 0) {
 	Req.SetRequestHeader("User-Agent", "ErgoptiPlus-Updater/1.0")
 	if !_Updater_AsyncRequestOwned(Owner)
 		return 0
+	; curl ignores the Windows proxy that browsers use; route through it.
+	Proxy := SystemProxy_ForUrl(Record["url"])
+	if (Proxy != "")
+		Req.SetProxy(Proxy)
 	Req.SetTimeouts(UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS,
 		UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS)
 	return _Updater_AsyncRequestOwned(Owner) ? Req : 0
