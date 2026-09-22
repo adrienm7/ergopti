@@ -627,7 +627,7 @@ function M.show_loading(content, is_enabled, background_color)
 
 		local styled_content = type(content) == "userdata" and content or hs.styledtext.new(tostring(content), {
 			font  = { name = Config.fonts.main, size = Config.sizes.main, traits = { italic = true } },
-			color = { white = 0.80, alpha = 1.0 },
+			color = Config.colors.loading_text,
 		})
 
 		-- Loading owns no interaction watcher; this callback is only a synchronous

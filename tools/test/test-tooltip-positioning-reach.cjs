@@ -12,10 +12,9 @@
  *   caret_offset_x / caret_offset_y / max_caret_height  windows + macos
  *   window_bottom_inset_ahk                             windows only (by name)
  *   window_bottom_inset_hs                              macos only  (by name)
- *   window_offset_y                                     macos ONLY — Windows
- *       never reads it, though nothing in its comment says so. It is described
- *       as "the vertical gap between the bottom of an input-box or window anchor
- *       and the tooltip top edge", which reads as a shared layout rule.
+ *   window_offset_y                                     windows + macos + linux
+ *       (Windows adopted it when its placement became a port of the shared
+ *       compute_position; before that it placed window anchors unoffset).
  *   anchor_cascade                                      DELETED — see below.
  *   Linux reads none of them: its tooltip renderer shares no positioning maths.
  *
@@ -28,11 +27,9 @@
  * the AHK step in it, and the check below asserts it does not come back.
  *
  * WHY A RECORD RATHER THAN A FIX:
- * Making Windows read window_offset_y would change where tooltips appear, and
- * the two drivers have separate bottom-inset constants precisely because their
- * anchors differ. That is a product decision about tooltip placement, not a
- * cleanup. What is safe and useful today is that the asymmetry stops being
- * invisible.
+ * The drivers keep separate bottom-inset constants precisely because their
+ * window anchors differ. What this gate guarantees is that any remaining
+ * asymmetry is recorded rather than invisible.
  * ==============================================================================
  */
 
@@ -98,7 +95,7 @@ const RECORD = {
 	window_bottom_inset_ahk: ['windows'],
 	window_bottom_inset_hs: ['macos'],
 	window_bottom_inset_linux: ['linux'],
-	window_offset_y: ['macos', 'linux']
+	window_offset_y: ['windows', 'macos', 'linux']
 };
 
 for (const key of keys) {
@@ -159,5 +156,5 @@ if (errors.length > 0) {
 const shared = keys.filter((k) => RECORD[k] && RECORD[k].length > 1).length;
 console.log(
 	`\x1b[32m[OK] all ${keys.length} [positioning] constant(s) are read by the drivers recorded ` +
-		`(${shared} genuinely shared; window_offset_y macOS-only; anchor_cascade deleted).\x1b[0m`
+		`(${shared} genuinely shared; anchor_cascade deleted).\x1b[0m`
 );

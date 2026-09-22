@@ -213,6 +213,11 @@ info_white = 0.30
 info_alpha = 1.0
 info_hex = "#4D4D4D"
 
+# "Generation in progress" label on the violet loading panel.
+loading_text_white = 0.80
+loading_text_alpha = 1.0
+loading_text_hex = "#CCCCCC"
+
 # Invisible / fully transparent (used to hide canvas elements without removal).
 invis_white = 0.0
 invis_alpha = 0.0
