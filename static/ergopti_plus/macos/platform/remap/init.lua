@@ -174,6 +174,7 @@ local _lease_recovery_timer_cleanup_backlog = {} -- Native timers whose stop mus
 local _lease_recovery_probe_cleanup_backlog = {} -- Exact status tasks whose terminate must be retried
 local _guardian_notice          = nil   -- Login Items approval notice, owned per lifecycle.
 local _guardian_regeneration_wait = nil -- Bundled rebuilds retained behind exact native readiness
+local _lease_less_resume_waiters = {} -- Resume terminals released by a non-ready guardian status
 local _last_failed_lease_token = nil   -- Replays a FAILED hidden by an enabled-state transaction
 local _lease_user_intent_revision = 0  -- Fences late recovery callbacks after an explicit lease Stop
 local _ke_variables_recovery_observer = nil -- Exact callback owned by this remap lifecycle
@@ -190,6 +191,15 @@ local PAUSED_RESUME_REGENERATION = {}
 local LEASE_FAILURE_RECOVERY_CAPABILITY = {}
 local ACTIVE_LAYOUT_FAILURE_RECOVERY = {}
 local GUARDIAN_READY_REGENERATION = {}
+-- A resume cancelled by a newer user or lifecycle intent stays refused even when
+-- no lease was live: that intent, not lease provisioning, decides the outcome.
+local RESUME_SUPERSEDING_REASONS = {
+	["script-pause-requested"] = true,
+	["explicit-lease-stop-requested"] = true,
+	["shutdown-in-progress"] = true,
+	["disable-in-progress"] = true,
+	["enabled-transition-in-progress"] = true,
+}
 
 --- Invokes a public async callback without letting its error vanish in a task callback.
 --- @param label string Operation label for diagnostics.
@@ -1597,6 +1607,21 @@ end
 local schedule_guardian_regeneration_poll
 local start_guardian_regeneration_probe
 
+--- Settles every lease-less Resume retained by one guardian wait. The retained
+--- regeneration itself stays queued, so approval still provisions the lease.
+--- @param wait table Exact bundled regeneration wait.
+--- @param wait_status string Non-ready guardian status or probe failure.
+local function release_lease_less_resume_waiters(wait, wait_status)
+	for _, context in ipairs(wait.contexts or {}) do
+		for _, callback in ipairs(context.callbacks or {}) do
+			if _lease_less_resume_waiters[callback] then
+				invoke_public_callback("lease-less resume", callback, false,
+					"guardian-" .. tostring(wait_status))
+			end
+		end
+	end
+end
+
 --- Returns whether one retained preflight still owns the current lifecycle.
 --- @param wait table Exact bundled regeneration wait.
 --- @return boolean current
@@ -1831,6 +1856,7 @@ start_guardian_regeneration_probe = function(wait, reason)
 			"Karabiner regeneration remains fail-closed after guardian status '%s' (%s).",
 			tostring(status), tostring(probe_error or reason))
 		schedule_guardian_regeneration_poll(wait, status or probe_error or reason)
+		release_lease_less_resume_waiters(wait, wait_status)
 	end
 
 	local call_ok, handle_or_err, launch_error = xpcall(function()
@@ -1923,7 +1949,6 @@ local function queue_guardian_regeneration(context)
 	if wait.probe ~= nil or wait.timer ~= nil then return true end
 	return start_guardian_regeneration_probe(wait, "regeneration-preflight")
 end
-
 --- Runs one side-effect-free native status observation for this exact launcher.
 --- Only `ready` advances the retained recovery. Every other result polls without
 --- charging the bounded build/deploy retry budget. The probe record is installed
@@ -4763,11 +4788,27 @@ function M.resume(on_done)
 		invoke_public_callback("resume", on_done, false, "disable-in-progress")
 		return false
 	end
+	-- Mirror M.pause: when no generation emits, no Ergopti rule can fire, so the
+	-- script's RESUME must not be held hostage to provisioning one. Otherwise a
+	-- helper awaiting Login Items approval (or a Karabiner that cannot start)
+	-- left the script PAUSED forever: pause committed as already-fail-closed, but
+	-- resume never settled. The lease is still provisioned by the same attempt.
+	local status_ok, phase = pcall(LeaseController.status)
+	local no_live_lease = status_ok
+		and (phase == "failed" or phase == "idle" or phase == "prepared")
 	Logger.start(LOG, "Resuming ErgoptiPlus Karabiner remapping…")
 	local callback_fired = false
-	local function finish_resume(ok, reason)
+	local finish_resume
+	finish_resume = function(ok, reason)
 		if callback_fired then return end
 		callback_fired = true
+		_lease_less_resume_waiters[finish_resume] = nil
+		if ok ~= true and no_live_lease and RESUME_SUPERSEDING_REASONS[reason] ~= true then
+			Logger.warn(LOG,
+				"Karabiner lease could not be provisioned on resume (%s); resuming without a live lease.",
+				tostring(reason))
+			ok, reason = true, "no-live-lease"
+		end
 		if ok == true then
 			Logger.success(LOG, "ErgoptiPlus Karabiner remapping resumed after paused preparation.")
 		else
@@ -4803,6 +4844,10 @@ local function cleanup_disabled_legacy_rules(file_system)
 		Logger.error(LOG, "Disabled legacy cleanup unavailable — filesystem adapter has no read method.")
 		return false
 	end
+	-- Released by the guardian wait once the helper reports a non-ready status:
+	-- the retained regeneration keeps polling and still provisions the lease on
+	-- approval, but the script's RESUME stops waiting for it.
+	if no_live_lease then _lease_less_resume_waiters[finish_resume] = true end
 
 	local read_ok, raw = pcall(file_system.read, KARABINER_OUT)
 	if not read_ok then
