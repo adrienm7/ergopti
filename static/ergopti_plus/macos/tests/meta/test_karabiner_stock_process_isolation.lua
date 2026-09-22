@@ -104,13 +104,26 @@ helpers.describe("Karabiner isolation: runtime", function()
 			"the runtime unit scan must include ke_lifecycle exactly once")
 		helpers.assert_eq(exact_owned_task_terminations, 1,
 			"the onboarding lifecycle must cancel exactly one private active-task class")
-		local menu_source, menu_err = helpers.read_driver_unit('i18n.get("menu.karabiner.open_gui")')
-		helpers.assert_true(menu_source ~= nil,
-			"the explicit Karabiner menu action must be uniquely readable: " .. tostring(menu_err))
-		helpers.assert_true(
-			without_comments(menu_source):find(
-				"action%s*=%s*function%s*%(%s*%)%s*karabiner%.open_gui%s*%(%s*%)") ~= nil,
-			"the only stock-GUI capability must remain behind the explicit Karabiner menu action")
+		-- The stock GUI opens only on an explicit user request, and the tray no
+		-- longer has a row that makes one: Karabiner is an implementation detail.
+		-- So the facade's own delegation is the one call site; anything else
+		-- would open Karabiner unasked.
+		local gui_callers = {}
+		for _, unit in ipairs(units) do
+			local body = without_comments(unit.body)
+			for at, call in body:gmatch("()([%w_]+%.open_gui)%s*%(") do
+				-- A definition is not a call.
+				if not body:sub(math.max(1, at - 16), at - 1):find("function%s+$") then
+					gui_callers[#gui_callers + 1] = unit.path .. ": " .. call
+				end
+			end
+		end
+		helpers.assert_eq(#gui_callers, 1,
+			"only the remap facade may delegate to the stock-GUI capability; found: "
+				.. table.concat(gui_callers, ", "))
+		helpers.assert_true(gui_callers[1]:find("KeLifecycle.open_gui", 1, true) ~= nil,
+			"the one stock-GUI call must be the facade's delegation to ke_lifecycle: "
+				.. tostring(gui_callers[1]))
 
 		helpers.assert_eq(#offenders, 0,
 			"Ergopti may revoke only its exact lease/watchdog; official Karabiner "

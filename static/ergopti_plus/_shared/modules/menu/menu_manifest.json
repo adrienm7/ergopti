@@ -92,13 +92,7 @@
 		{
 			"id": "tap_holds",
 			"platforms": [
-				"ahk"
-			],
-			"reason_key": "platform_reason.remap_engine_is_per_driver"
-		},
-		{
-			"id": "karabiner",
-			"platforms": [
+				"ahk",
 				"hs"
 			],
 			"reason_key": "platform_reason.remap_engine_is_per_driver"
@@ -204,91 +198,6 @@
 				"linux"
 			],
 			"reason_key": "platform_reason.tap_holds_live_under_the_remap_daemon"
-		}
-	],
-	"karabiner_menu": [
-		{
-			"type": "list",
-			"id": "karabiner_status",
-			"platforms": [
-				"hs"
-			]
-		},
-		{
-			"type": "---",
-			"platforms": [
-				"hs"
-			]
-		},
-		{
-			"type": "command",
-			"id": "karabiner_clear_all",
-			"i18n": "menu.karabiner.clear_all",
-			"platforms": [
-				"hs"
-			]
-		},
-		{
-			"type": "command",
-			"id": "karabiner_restore_defaults",
-			"i18n": "menu.karabiner.restore_defaults",
-			"platforms": [
-				"hs"
-			]
-		},
-		{
-			"type": "command",
-			"id": "karabiner_copy_tap_to_combo",
-			"i18n": "menu.karabiner.copy_tap_to_combo",
-			"platforms": [
-				"hs"
-			]
-		},
-		{
-			"type": "---",
-			"platforms": [
-				"hs"
-			]
-		},
-		{
-			"type": "list",
-			"id": "karabiner_delays",
-			"platforms": [
-				"hs"
-			]
-		},
-		{
-			"type": "---",
-			"platforms": [
-				"hs"
-			]
-		},
-		{
-			"type": "list",
-			"id": "karabiner_tap_holds",
-			"platforms": [
-				"hs"
-			]
-		},
-		{
-			"type": "---",
-			"platforms": [
-				"hs"
-			]
-		},
-		{
-			"type": "section_header",
-			"i18n": "menu.karabiner.header_shortcuts",
-			"platforms": [
-				"hs"
-			]
-		},
-		{
-			"type": "list",
-			"id": "karabiner_shortcuts",
-			"platforms": [
-				"hs"
-			]
 		}
 	],
 	"llm_menu": [
@@ -1433,14 +1342,16 @@
 			"category": "TapHolds",
 			"platforms": [
 				"ahk"
-			]
+			],
+			"reason_key": "platform_reason.remap_engine_is_per_driver"
 		},
 		{
 			"type": "command",
 			"id": "reset_defaults",
 			"i18n": "tap_hold.reset_defaults",
 			"platforms": [
-				"ahk"
+				"ahk",
+				"hs"
 			]
 		},
 		{
@@ -1448,21 +1359,69 @@
 			"id": "disable_all",
 			"i18n": "tap_hold.disable_all",
 			"platforms": [
-				"ahk"
+				"ahk",
+				"hs"
 			]
+		},
+		{
+			"type": "command",
+			"id": "copy_tap_to_combo",
+			"i18n": "menu.tapholds.copy_tap_to_combo",
+			"platforms": [
+				"hs"
+			],
+			"reason_key": "platform_reason.remap_engine_is_per_driver"
 		},
 		{
 			"type": "---",
 			"platforms": [
-				"ahk"
+				"ahk",
+				"hs"
+			]
+		},
+		{
+			"type": "list",
+			"id": "tap_hold_timings",
+			"platforms": [
+				"hs"
+			],
+			"reason_key": "platform_reason.remap_engine_is_per_driver"
+		},
+		{
+			"type": "---",
+			"platforms": [
+				"hs"
 			]
 		},
 		{
 			"type": "list",
 			"id": "tap_hold_keys",
 			"platforms": [
-				"ahk"
+				"ahk",
+				"hs"
 			]
+		},
+		{
+			"type": "---",
+			"platforms": [
+				"hs"
+			]
+		},
+		{
+			"type": "section_header",
+			"i18n": "menu.tapholds.header_shortcuts",
+			"platforms": [
+				"hs"
+			],
+			"reason_key": "platform_reason.remap_engine_is_per_driver"
+		},
+		{
+			"type": "list",
+			"id": "tap_hold_chords",
+			"platforms": [
+				"hs"
+			],
+			"reason_key": "platform_reason.remap_engine_is_per_driver"
 		}
 	]
 }

@@ -27,8 +27,8 @@ package.loaded["platform.remap.lease_controller"] = {
 -- Menu titles are produced by string.format(i18n.get(key), delay); the test i18n
 -- stub echoes the key back and neither key carries a format specifier, so the
 -- rendered title is the bare key — that is how the two items are located below.
-local TAP_HOLD_ITEM_TITLE = "menu.karabiner.tap_hold_title"
-local STICKY_ITEM_TITLE   = "menu.karabiner.sticky_title"
+local TAP_HOLD_ITEM_TITLE = "menu.tapholds.tap_hold_title"
+local STICKY_ITEM_TITLE   = "menu.tapholds.sticky_title"
 
 -- Value typed into the AppleScript prompt. Any positive integer differing from
 -- the stubbed current timeouts works; the setters are spies, not validators.
@@ -117,7 +117,7 @@ end
 --- @param label string The row label to find.
 --- @return table|nil
 local function find_item(item, label)
-	for _, entry in ipairs(item.menu or item.items or {}) do
+	for _, entry in ipairs(item.submenu or item.menu or item.items or {}) do
 		if entry.title == label or entry.label == label then return entry end
 	end
 	return nil
@@ -136,7 +136,7 @@ end
 --- @return table menu_item, table karabiner_double
 local function build_menu()
 	local karabiner = make_karabiner()
-	local menu_karabiner = helpers.load_with_stubs("ui.menu.menu_remap", {
+	local menu_karabiner = helpers.load_with_stubs("ui.menu.menu_tap_holds", {
 		osascript = {
 			applescript = function(_script)
 				return true, { ["text returned"] = TYPED_DELAY_MS }
@@ -196,7 +196,7 @@ helpers.describe("karabiner delay pickers push the new value to the keyboard", f
 	-- a no-op write would rewrite the file on every dismissed prompt.
 	helpers.it("does not regenerate when the user cancels the dialog", function()
 		local karabiner = make_karabiner()
-		local menu_karabiner = helpers.load_with_stubs("ui.menu.menu_remap", {
+		local menu_karabiner = helpers.load_with_stubs("ui.menu.menu_tap_holds", {
 			osascript = { applescript = function(_script) return false, nil end },
 		})
 		local item = menu_karabiner.build({ karabiner = karabiner, updateMenu = function() end })
@@ -212,7 +212,7 @@ helpers.describe("karabiner delay pickers push the new value to the keyboard", f
 		local karabiner = make_karabiner()
 		karabiner.get_tap_hold_timeout = function() return 250.5 end
 		local captured_script = nil
-		local menu_karabiner = helpers.load_with_stubs("ui.menu.menu_remap", {
+		local menu_karabiner = helpers.load_with_stubs("ui.menu.menu_tap_holds", {
 			osascript = {
 				applescript = function(script)
 					captured_script = script

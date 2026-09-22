@@ -2836,20 +2836,13 @@ id = "metrics"
 [[menu.top_level]]
 id = "shortcuts"
 
-# Windows only. The "hs" value was measured false on 2026-08-04: no macOS file
-# builds a tap-holds menu, and every row of menu.tap_holds_menu below is already
-# restricted to "ahk" — so macOS declared a top-level entry that opened an empty
-# submenu. Tap-holds on macOS are configured through Karabiner, which has its own
-# top-level row. Nothing could see this before: the top-level parity gate reads
-# the macOS dispatch chain only from `global_actions` onward, and this row sits
-# above that boundary.
+# Windows and macOS. macOS configures the same tap-holds under the same row and
+# the same name as Windows: Karabiner-Elements runs them, but that engine is an
+# implementation detail the user never has to know about, so macOS no longer has
+# a "Karabiner" row of its own. Linux reads its tap-holds under kanata instead.
 [[menu.top_level]]
 id = "tap_holds"
-platforms = ["ahk"]
-reason_key = "platform_reason.remap_engine_is_per_driver"
-[[menu.top_level]]
-id = "karabiner"
-platforms = ["hs"]
+platforms = ["ahk", "hs"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
 
 # Le pendant Linux de Karabiner. Absent du manifeste jusqu'au 2026-08-03 alors
@@ -2965,80 +2958,6 @@ i18n = "menu.kanata.edit_tap_holds"
 platforms = ["linux"]
 reason_key = "platform_reason.tap_holds_live_under_the_remap_daemon"
 
-
-# The Karabiner submenu.
-#
-# It did not exist either, and it is the largest hand-built menu in the project:
-# thirty-six rows assembled in macos/ui/menu/menu_remap.lua with nothing
-# describing them. Karabiner is macOS's own tap-hold and chord engine — the
-# maintainer's decision, as the best answer found for that platform — so every
-# row here is platforms = ["hs"]. What is shared is the SHAPE: process control,
-# then the destructive resets, then the timings, then two clearly separated
-# sections for tap-holds and for chords.
-#
-# That split is the point. The menu used to run the two families together under
-# one heading, and the request was to tell them apart the way Windows does: a
-# section header each, with the Karabiner-wide controls above both rather than
-# buried among them.
-
-[[menu.karabiner_menu]]
-type = "list"
-id = "karabiner_status"
-platforms = ["hs"]
-
-[[menu.karabiner_menu]]
-type = "---"
-platforms = ["hs"]
-
-[[menu.karabiner_menu]]
-type = "command"
-id = "karabiner_clear_all"
-i18n = "menu.karabiner.clear_all"
-platforms = ["hs"]
-
-[[menu.karabiner_menu]]
-type = "command"
-id = "karabiner_restore_defaults"
-i18n = "menu.karabiner.restore_defaults"
-platforms = ["hs"]
-
-[[menu.karabiner_menu]]
-type = "command"
-id = "karabiner_copy_tap_to_combo"
-i18n = "menu.karabiner.copy_tap_to_combo"
-platforms = ["hs"]
-
-[[menu.karabiner_menu]]
-type = "---"
-platforms = ["hs"]
-
-[[menu.karabiner_menu]]
-type = "list"
-id = "karabiner_delays"
-platforms = ["hs"]
-
-[[menu.karabiner_menu]]
-type = "---"
-platforms = ["hs"]
-
-[[menu.karabiner_menu]]
-type = "list"
-id = "karabiner_tap_holds"
-platforms = ["hs"]
-
-[[menu.karabiner_menu]]
-type = "---"
-platforms = ["hs"]
-
-[[menu.karabiner_menu]]
-type = "section_header"
-i18n = "menu.karabiner.header_shortcuts"
-platforms = ["hs"]
-
-[[menu.karabiner_menu]]
-type = "list"
-id = "karabiner_shortcuts"
-platforms = ["hs"]
 
 # The LLM submenu.
 #
@@ -4247,7 +4166,9 @@ i18n_on = "menu.tapholds.on"
 i18n_off = "menu.tapholds.off"
 checked_when = ["tapholds_enabled"]
 category = "TapHolds"
+# macOS has no switch: its remap engine is always on.
 platforms = ["ahk"]
+reason_key = "platform_reason.remap_engine_is_per_driver"
 
 # `command` since 2026-08-07, not `action`. Both were handlers whose whole body
 # was "add a button, and log that the action just happened" — at MENU BUILD time,
@@ -4258,17 +4179,38 @@ platforms = ["ahk"]
 type = "command"
 id = "reset_defaults"
 i18n = "tap_hold.reset_defaults"
-platforms = ["ahk"]
+platforms = ["ahk", "hs"]
 
 [[menu.tap_holds_menu]]
 type = "command"
 id = "disable_all"
 i18n = "tap_hold.disable_all"
-platforms = ["ahk"]
+platforms = ["ahk", "hs"]
+
+# macOS rows below: its engine also runs chords (two modifiers pressed
+# together), which have their own tap / hold / combo slots and timings.
+# Everything the Karabiner submenu held now lives here, under the name Windows
+# uses, and nothing says "Karabiner": the engine is an implementation detail.
+[[menu.tap_holds_menu]]
+type = "command"
+id = "copy_tap_to_combo"
+i18n = "menu.tapholds.copy_tap_to_combo"
+platforms = ["hs"]
+reason_key = "platform_reason.remap_engine_is_per_driver"
 
 [[menu.tap_holds_menu]]
 type = "---"
-platforms = ["ahk"]
+platforms = ["ahk", "hs"]
+
+[[menu.tap_holds_menu]]
+type = "list"
+id = "tap_hold_timings"
+platforms = ["hs"]
+reason_key = "platform_reason.remap_engine_is_per_driver"
+
+[[menu.tap_holds_menu]]
+type = "---"
+platforms = ["hs"]
 
 # `list` since 2026-08-07: one row per configurable key, each holding its
 # disable / tap-picker / hold-picker rows, and the hold picker holding its
@@ -4276,7 +4218,23 @@ platforms = ["ahk"]
 [[menu.tap_holds_menu]]
 type = "list"
 id = "tap_hold_keys"
-platforms = ["ahk"]
+platforms = ["ahk", "hs"]
+
+[[menu.tap_holds_menu]]
+type = "---"
+platforms = ["hs"]
+
+[[menu.tap_holds_menu]]
+type = "section_header"
+i18n = "menu.tapholds.header_shortcuts"
+platforms = ["hs"]
+reason_key = "platform_reason.remap_engine_is_per_driver"
+
+[[menu.tap_holds_menu]]
+type = "list"
+id = "tap_hold_chords"
+platforms = ["hs"]
+reason_key = "platform_reason.remap_engine_is_per_driver"
 
 # word_delimiter_defs (20 entries) lived here and was read by nobody on any
 # driver — not a duplicate, simply unreferenced. Its i18n keys are still in the
