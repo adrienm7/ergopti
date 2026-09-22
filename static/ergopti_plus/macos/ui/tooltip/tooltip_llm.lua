@@ -14,6 +14,7 @@ local M = {}
 local hs = hs
 local Logger = require("infra.logger")
 local EventProvenance = require("adapters.event_provenance")
+local ControlSentinels = require("modules.keymap.control_sentinels")
 local KeyState = require("adapters.key_state")
 local SyntheticInput = require("adapters.synthetic_input")
 local Keycodes = require("infra.keycodes")
@@ -506,6 +507,15 @@ local function defer_runtime_action(label, fn, ...)
 	end)
 end
 
+-- Entering the navigation layer means the user is working with the visible
+-- tooltip, so it restarts the auto-dismiss deadline instead of dismissing it.
+-- The keymap tap owns and deletes the F20 sentinel; it may run before this
+-- watcher, so the signal arrives from the owner rather than from our own tap.
+ControlSentinels.set_listener("tooltip.llm", function(signal)
+	if signal ~= ControlSentinels.NAV_LAYER_ENTERED or not _watcher_session_active then return end
+	defer_runtime_action("LLM tooltip navigation-layer activity", reset_idle_timer)
+end)
+
 
 --- Schedules a consumed-key mutation and preserves its ordering against every
 --- later physical event. A context invalidation that does not cross the shared
@@ -831,15 +841,8 @@ local function start_watchers()
 			end
 		end
 		
-		-- F20 ("nav layer entered") signals that the user just engaged the
-		-- navigation layer — this is a strong "user is actively using the
-		-- tooltip" signal, so reset the auto-dismiss timer before letting the
-		-- event flow through. F20 must NOT be treated as a real keystroke that
-		-- dismisses the tooltip.
-		if keycode == Keycodes.F20_LAYER_NAV_ENTERED then
-			defer_runtime_action("LLM tooltip navigation-layer activity", reset_idle_timer)
-			return finish(false)
-		end
+		-- The F20 navigation-layer sentinel is listed below: the keymap tap owns
+		-- and deletes it, and publishes it to the listener registered at load.
 
 		-- Ignored system modifier keys (preventing unintended dismissals).
 		-- 54-60 are physical modifiers; the rest are owned by lib.keycodes.
@@ -858,6 +861,7 @@ local function start_watchers()
 			Keycodes.F15_KARABINER_ESCAPE,
 			Keycodes.F16_LLM_CHAIN_SIGNAL,
 			Keycodes.F17_CYCLE_WINDOWS,
+			Keycodes.F20_LAYER_NAV_ENTERED,
 			Keycodes.LAYER_SYN_1,
 			Keycodes.LAYER_SYN_2,
 			Keycodes.LAYER_SYN_3,
