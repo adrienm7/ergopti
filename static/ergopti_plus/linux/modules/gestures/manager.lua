@@ -1140,6 +1140,78 @@ function M._persist_updates(updates)
 	return true
 end
 
+--- Walks a decoded config.toml exactly as the loader applies it: the legacy
+--- `[linux.gestures]` section FIRST, then the canonical one over it, each slot
+--- and parameter through the same acceptance test. The loader and the
+--- unused-key cleanup both walk through here, so a key the cleanup offers to
+--- remove is exactly one the loader never takes.
+--- @param config table Decoded config.toml.
+--- @param visit table `{ action(section, slot, action), param(section, key, value),
+---   enabled(value) }`; every field is optional.
+local function walk_user_config(config, visit)
+	--- Visits one section's slot→action pairs the loader binds.
+	--- @param section_name string
+	--- @param section table|nil
+	local function walk_actions(section_name, section)
+		if type(section) ~= "table" or not visit.action then return end
+		for slot, action in pairs(section) do
+			if M.DEFAULT_GESTURES[slot] and type(action) == "string" then
+				visit.action(section_name, slot, action)
+			end
+		end
+	end
+
+	--- Visits one section's parameter overrides the loader keeps.
+	--- @param section_name string
+	--- @param section table|nil
+	local function walk_params(section_name, section)
+		if type(section) ~= "table" or not visit.param then return end
+		for key, value in pairs(section) do
+			local binding, action = M.split_action_parameter_key(key)
+			if binding and action and M.validate_action_parameter(action, value) then
+				visit.param(section_name, key, value)
+			end
+		end
+	end
+
+	-- Order matters: a user who has already written a binding under the new
+	-- name after the migration must not have it overwritten by whatever the old
+	-- section still says. A rename that silently drops a user's bindings is
+	-- worse than the divergence it fixes.
+	local legacy = type(config.linux) == "table" and config.linux or nil
+	if legacy then
+		walk_actions(LEGACY_SECTION, legacy.gestures)
+		walk_params(LEGACY_SECTION_PARAMS, legacy.action_parameters)
+	end
+	walk_actions(CONFIG_SECTION, config[CONFIG_SECTION])
+	walk_params(CONFIG_SECTION_PARAMS, config[CONFIG_SECTION_PARAMS])
+	if visit.enabled and type(config[CONFIG_SECTION]) == "table"
+		and type(config[CONFIG_SECTION].enabled) == "boolean" then
+		visit.enabled(config[CONFIG_SECTION].enabled)
+	end
+end
+
+--- Marks every config.toml path the gesture loader takes.
+--- @param config table Decoded config.toml.
+--- @param mark function mark(...segments) from config_unused_keys.
+function M.mark_config_reads(config, mark)
+	local unpack_segments = table.unpack or unpack
+	--- Marks `key` under a dotted section path such as "linux.gestures".
+	--- @param section_name string
+	--- @param key string
+	local function mark_at(section_name, key)
+		local segments = {}
+		for segment in section_name:gmatch("[^%.]+") do segments[#segments + 1] = segment end
+		segments[#segments + 1] = key
+		mark(unpack_segments(segments))
+	end
+	walk_user_config(config, {
+		action = function(section_name, slot) mark_at(section_name, slot) end,
+		param = function(section_name, key) mark_at(section_name, key) end,
+		enabled = function() mark(CONFIG_SECTION, "enabled") end,
+	})
+end
+
 local function load_user_config(path)
 	if type(path) ~= "string" or path == "" then return nil end
 	local fh = io.open(path, "r")
@@ -1149,63 +1221,31 @@ local function load_user_config(path)
 	local ok, config = pcall(TomlCodec.decode, content)
 	if not ok or type(config) ~= "table" then return nil end
 
-	--- Applies one section's slot→action pairs.
-	--- @param section table|nil
-	local function apply_actions(section)
-		if type(section) ~= "table" then return end
-		for slot, action in pairs(section) do
-			if M.DEFAULT_GESTURES[slot] and type(action) == "string"
-				and (action == "none" or ACTION_I18N_KEYS[action] or ACTION_COMPUTED_LABELS[action])
-			then
-				_actions[slot] = action
-			elseif M.DEFAULT_GESTURES[slot] and type(action) == "string" then
+	local configured = nil
+	walk_user_config(config, {
+		action = function(_section_name, slot, action)
+			if not (action == "none" or ACTION_I18N_KEYS[action] or ACTION_COMPUTED_LABELS[action]) then
 				-- Kept, not dropped: set_action() persisted it and reported
 				-- success, so dropping it here would silently revert a save.
 				-- An action no catalogue knows (removed, or written by a newer
 				-- version) stays bound and dispatches as a no-op until rebound.
 				Logger.warn(LOG, "Unknown action '%s' for slot '%s' — kept, dispatches as a no-op.",
 					tostring(action), tostring(slot))
-				_actions[slot] = action
 			end
-		end
-	end
-
-	--- Applies one section's parameter overrides.
-	--- @param section table|nil
-	local function apply_params(section)
-		if type(section) ~= "table" then return end
-		for key, value in pairs(section) do
-			local binding, action = M.split_action_parameter_key(key)
-			if binding and action and M.validate_action_parameter(action, value) then
-				_action_params[key] = value
-			end
-		end
-	end
-
-	-- The legacy `[linux.gestures]` section FIRST, then the canonical one over
-	-- it. Order matters: a user who has already written a binding under the new
-	-- name after the migration must not have it overwritten by whatever the old
-	-- section still says. A rename that silently drops a user's bindings is worse
-	-- than the divergence it fixes.
+			_actions[slot] = action
+		end,
+		param = function(_section_name, key, value)
+			_action_params[key] = value
+		end,
+		enabled = function(value) configured = value end,
+	})
 	local legacy = type(config.linux) == "table" and config.linux or nil
-	if legacy then
-		apply_actions(legacy.gestures)
-		apply_params(legacy.action_parameters)
-		if type(legacy.gestures) == "table" and next(legacy.gestures) ~= nil then
-			Logger.info(LOG,
-				"Gestures read from the legacy [%s] section — they will be rewritten under [%s] on the next change.",
-				LEGACY_SECTION, CONFIG_SECTION)
-		end
+	if legacy and type(legacy.gestures) == "table" and next(legacy.gestures) ~= nil then
+		Logger.info(LOG,
+			"Gestures read from the legacy [%s] section — they will be rewritten under [%s] on the next change.",
+			LEGACY_SECTION, CONFIG_SECTION)
 	end
-
-	apply_actions(config[CONFIG_SECTION])
-	apply_params(config[CONFIG_SECTION_PARAMS])
-	local configured = nil
-	if type(config[CONFIG_SECTION]) == "table" then
-		configured = config[CONFIG_SECTION].enabled
-	end
-	if type(configured) == "boolean" then return configured end
-	return nil
+	return configured
 end
 
 --- Initialises the gestures module.

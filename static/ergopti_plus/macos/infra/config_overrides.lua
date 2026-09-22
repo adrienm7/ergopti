@@ -81,6 +81,34 @@ local function is_scalar(value)
 	return value_type == "string" or value_type == "number" or value_type == "boolean"
 end
 
+--- The sections this loader owns, in application order.
+local OWNED_SECTIONS = { "script", "features" }
+
+--- Walks the override candidates of a decoded config.toml. The loader and the
+--- unused-key cleanup both call this, so a key the cleanup offers to remove is
+--- exactly one the loader ignores.
+--- @param decoded table Decoded config.toml.
+--- @param visit function visit(section_name, key, value, accepted).
+local function each_override(decoded, visit)
+	for _, section_name in ipairs(OWNED_SECTIONS) do
+		local values = decoded[section_name]
+		if type(values) == "table" then
+			for key, value in pairs(values) do
+				visit(section_name, key, value, type(key) == "string" and is_scalar(value))
+			end
+		end
+	end
+end
+
+--- Marks every [script] / [features] key the loader applies.
+--- @param decoded table Decoded config.toml.
+--- @param mark function mark(...segments) from config_unused_keys.
+function M.mark_config_reads(decoded, mark)
+	each_override(decoded, function(section_name, key, _value, accepted)
+		if accepted then mark(section_name, key) end
+	end)
+end
+
 --- Reads file_path and applies scalar [script] / [features] values.
 --- @param file_path string Absolute path to config.toml.
 --- @return integer applied Number of settings committed.
@@ -105,33 +133,27 @@ function M.apply(file_path)
 
 	Logger.start(LOG, "Applying user overrides from '%s'…", file_path)
 	local applied = 0
-	local function apply_section(section_name, values)
-		if type(values) ~= "table" then return end
-		for key, value in pairs(values) do
-			if type(key) ~= "string" or not is_scalar(value) then
-				Logger.warn(LOG, "Ignoring non-scalar override in [%s].", section_name)
-			else
-				local setting_key = key
-				if section_name == "script" then
-					local lower_key = key:lower()
-					if lower_key == "log_level" or lower_key == "loglevel" then
-						setting_key = "log_level"
-					end
-				end
-				if Storage.set(setting_key, value) == true then
-					applied = applied + 1
-					Logger.debug(LOG, "Override [%s].%s = %s.",
-						section_name, key, tostring(value))
-				else
-					Logger.error(LOG, "Override [%s].%s could not be persisted.",
-						section_name, key)
-				end
+	each_override(decoded, function(section_name, key, value, accepted)
+		if not accepted then
+			Logger.warn(LOG, "Ignoring non-scalar override in [%s].", section_name)
+			return
+		end
+		local setting_key = key
+		if section_name == "script" then
+			local lower_key = key:lower()
+			if lower_key == "log_level" or lower_key == "loglevel" then
+				setting_key = "log_level"
 			end
 		end
-	end
-
-	apply_section("script", decoded.script)
-	apply_section("features", decoded.features)
+		if Storage.set(setting_key, value) == true then
+			applied = applied + 1
+			Logger.debug(LOG, "Override [%s].%s = %s.",
+				section_name, key, tostring(value))
+		else
+			Logger.error(LOG, "Override [%s].%s could not be persisted.",
+				section_name, key)
+		end
+	end)
 	Logger.success(LOG, "User overrides applied (%d value(s)).", applied)
 	return applied
 end
