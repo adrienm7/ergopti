@@ -46,6 +46,10 @@ package() {
   install -d "$pkgdir/usr/lib/ergopti/_shared"
   cp -r build/linux/_shared/. "$pkgdir/usr/lib/ergopti/_shared/"
 
+  # An installed package has no .git: without the stamp the driver builder
+  # wrote, every diagnostic reports the commit as "unknown".
+  bash tools/build/write_build_stamp.sh verify "$pkgdir/usr/lib/ergopti/_shared"
+
   # Wrapper script. LUA_PATH is what makes `require("logger.shim")` resolve;
   # without it the daemon dies on its first require, which is the second half of
   # why the previous package could not start.

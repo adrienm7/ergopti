@@ -49,6 +49,7 @@ const STAMPING_BUILDS = {
 
 // The Linux packagers, which package build/linux/_shared and must verify it.
 const PACKAGERS = ['deb', 'rpm', 'appimage', 'flatpak'].map((kind) => `tools/build/build-linux-${kind}.sh`);
+const PKGBUILD_REL = 'tools/build/PKGBUILD';
 
 const COMMIT_ENV = /^ERGOPTI_BUILD_COMMIT:\s*\$\{\{\s*github\.sha\s*\}\}\s*$/;
 
@@ -261,6 +262,17 @@ for (const packager of PACKAGERS) {
 	if (!/write_build_stamp\.sh"?\s+verify\s/.test(read(packager))) {
 		errors.push(`${packager} no longer verifies the build stamp in the tree it packages`);
 	}
+}
+
+// The Arch package is built by makepkg, outside the workflow, so the workflow
+// parse above never sees it: it must assemble through the stamping driver
+// builder and verify the tree it installs.
+const pkgbuild = read(PKGBUILD_REL);
+if (!STAMPING_BUILDS['tools/build/build-linux-driver.sh'].test(pkgbuild)) {
+	errors.push(`${PKGBUILD_REL} no longer assembles through build-linux-driver.sh, which writes the stamp`);
+}
+if (!/write_build_stamp\.sh\s+verify\s+"\$pkgdir\/usr\/lib\/ergopti\/_shared"/.test(pkgbuild)) {
+	errors.push(`${PKGBUILD_REL} no longer verifies the build stamp in the tree it installs`);
 }
 
 // One stamp format: what the writer writes is what the Lua drivers read.
