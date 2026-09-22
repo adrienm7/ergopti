@@ -114,7 +114,7 @@ initMenu(PublishAuthorizeFn := 0) {
 	LayoutMenu  := MenuRenderer_Build("layout_menu", "Layout", "", "", LayoutListProviders)
 	LayoutGated := IsCategoryGated("Layout")
 	LayoutMenuTitle := t("menu.layout.title")
-	TrayMenuStage_Add(LayoutMenuTitle, LayoutMenu)
+	TrayMenuStage_AddFeature(LayoutMenuTitle, LayoutMenu)
 	if LayoutGated {
 		TrayMenuStage_Check(LayoutMenuTitle)
 	}
@@ -180,7 +180,7 @@ initMenu(PublishAuthorizeFn := 0) {
 	BootProfile_Mark("MENU/initMenu: hotstrings menu rendered")
 
 	HotstringsMenuTitle := t("menu.hotstrings.title") . " (" . FmtCount(_HS_ComputeGrandTotal()) . ")"
-	TrayMenuStage_Add(HotstringsMenuTitle, HotstringsMenu)
+	TrayMenuStage_AddFeature(HotstringsMenuTitle, HotstringsMenu)
 	if HotstringsAllEnabled {
 		TrayMenuStage_Check(HotstringsMenuTitle)
 	}
@@ -194,27 +194,27 @@ initMenu(PublishAuthorizeFn := 0) {
 	BootProfile_Mark("MENU/initMenu: LLM tray init")
 
 	MetricsMenu := BuildMetricsMenu()
-	TrayMenuStage_Add(t("menu.metrics.title"), MetricsMenu)
+	TrayMenuStage_AddFeature(t("menu.metrics.title"), MetricsMenu)
 	if MetricsShortcuts.enabled {
 		TrayMenuStage_Check(t("menu.metrics.title"))
 	}
 	BootProfile_Mark("MENU/initMenu: metrics menu")
 
 	if SubMenus.Has("Shortcuts") {
-		TrayMenuStage_Add(GetCategoryTitle("Shortcuts"), SubMenus["Shortcuts"])
+		TrayMenuStage_AddFeature(GetCategoryTitle("Shortcuts"), SubMenus["Shortcuts"])
 		if ShortcutsGated {
 			TrayMenuStage_Check(GetCategoryTitle("Shortcuts"))
 		}
 	}
 	if SubMenus.Has("TapHolds") {
-		TrayMenuStage_Add(GetCategoryTitle("TapHolds"), SubMenus["TapHolds"])
+		TrayMenuStage_AddFeature(GetCategoryTitle("TapHolds"), SubMenus["TapHolds"])
 		if IsCategoryGated("TapHolds") {
 			TrayMenuStage_Check(GetCategoryTitle("TapHolds"))
 		}
 	}
 
 	GesturesMenu := BuildGesturesMenu()
-	TrayMenuStage_Add(GetCategoryTitle("Gestures"), GesturesMenu)
+	TrayMenuStage_AddFeature(GetCategoryTitle("Gestures"), GesturesMenu)
 	if Features["gestures"]["enabled"] {
 		TrayMenuStage_Check(GetCategoryTitle("Gestures"))
 	}

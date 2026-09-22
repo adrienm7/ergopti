@@ -212,6 +212,18 @@ HealthCheck_Run() {
 	return Result
 }
 
+; The "Last git commit" value shared by every copy format, matching the HTML
+; view: the commit id, then where it came from (a build stamp or a checkout) so
+; a release and a source run of the same commit are told apart.
+; @param Sys {Map} The snapshot's "sys" section.
+; @return {String}
+_HealthCheck_CommitText(Sys) {
+	Commit := Sys.Get("git_hash", "")
+	Text := (Commit != "") ? Commit : "unknown"
+	Source := Sys.Get("commit_source", "")
+	return (Source != "") ? Text . " (" . Source . ")" : Text
+}
+
 ; Formats a healthcheck snapshot as a Markdown string suitable for WebView2 rendering.
 ; @param Snapshot {Map|0} Result from HealthCheck_Run(), or 0 to run fresh.
 ; @return {String}
@@ -231,6 +243,7 @@ HealthCheck_FormatMarkdown(Snapshot := 0) {
 	Lines.Push("| Field | Value |")
 	Lines.Push("|---|---|")
 	Lines.Push("| ErgoptiPlus version | " . '``' . Snapshot["version"] . '``' . " |")
+	Lines.Push("| Last git commit | " . _HealthCheck_CommitText(Sys) . " |")
 	Lines.Push("| Uptime | " . _HealthCheck_FormatUptime(Snapshot["uptime_sec"]) . " |")
 	Lines.Push("| AutoHotkey | " . Sys["ahk_version"] . " " . Sys["ahk_bitness"] . " |")
 	Lines.Push("| Windows | " . Sys["os_name"] . " |")
@@ -245,6 +258,8 @@ HealthCheck_FormatMarkdown(Snapshot := 0) {
 	Lines.Push("| Locale | " . Sys["locale"] . " |")
 	if Sys["config_dir"] != ""
 		Lines.Push("| Config dir | " . '``' . Sys["config_dir"] . '``' . " |")
+	if Sys.Get("script_dir", "") != ""
+		Lines.Push("| App dir | " . '``' . Sys["script_dir"] . '``' . " |")
 	Lines.Push("")
 
 	; ── Session counters ──────────────────────────────────────────────────────
@@ -572,6 +587,7 @@ HealthCheck_FormatPlain(Snapshot) {
 	Lines.Push("=== System diagnostic ===")
 	Lines.Push("")
 	Lines.Push("Version         : " . Snapshot["version"])
+	Lines.Push("Last git commit : " . _HealthCheck_CommitText(Sys))
 	Lines.Push("Uptime          : " . _HealthCheck_FormatUptime(Snapshot["uptime_sec"]))
 	Lines.Push("AutoHotkey      : " . Sys["ahk_version"] . " " . Sys["ahk_bitness"])
 	Lines.Push("Windows         : " . Sys["os_name"])
@@ -586,6 +602,8 @@ HealthCheck_FormatPlain(Snapshot) {
 	Lines.Push("Locale          : " . Sys["locale"])
 	if Sys["config_dir"] != ""
 		Lines.Push("Config dir      : " . Sys["config_dir"])
+	if Sys.Get("script_dir", "") != ""
+		Lines.Push("App dir         : " . Sys["script_dir"])
 	Lines.Push("")
 	Lines.Push("Warnings        : " . Snapshot["warn_count"])
 	Lines.Push("Errors          : " . Snapshot["err_count"])
