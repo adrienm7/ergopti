@@ -244,6 +244,21 @@ keycode read there breaks the per-tap read budgets pinned by the tooltip and
 ignored-window tests. The generator emits F20 only inside the ACTIVE lease
 graph, so a paused or revoked driver never produces it.
 
+### project-hs-screen-capture-needs-own-grant
+
+`/usr/sbin/screencapture` launched by the packaged runtime is attributed to
+`com.ergoptiplus.app.hammerspoon`, so a Screen Recording grant held by a stock
+Hammerspoon never applies; macOS lists the runtime as "Hammerspoon" and applies
+a new grant only after a restart. Without it the selector still appears, then
+the capture fails or omits every window. Every capture entry point goes
+through `modules/shortcuts/actions/screen_capture_flow.lua`: check
+`adapters/screen_capture.lua` before launch, capture into an owned file (never
+`-c`, which leaves nothing to verify), then read the image back from the
+pasteboard before announcing success. screencapture's own help says Control
+held during an interactive capture sends it to the clipboard; Ctrl+H is still
+held when the selector opens, so an advanced pasteboard change count with an
+image also counts as a copy.
+
 ### project-hs-input-source-single-owner
 
 `hs.keycodes.inputSourceChanged` is a setter, so one broker owns it and

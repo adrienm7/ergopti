@@ -1123,6 +1123,9 @@ M.spaces = {
 }
 M.openConsole = function() end
 M.focus = function() end
+-- Screen capture entry points refuse to launch without Screen Recording. The
+-- default fixture is a granted runtime; permission tests override it.
+M.screenRecordingState = function(_) return true end
 -- A hotkey stub that returned a bare {delete = noop} could not tell a test
 -- whether the binding was ever enabled, disabled, or released — every lifecycle
 -- assertion against it was vacuously true. This one records what it was asked to
