@@ -95,7 +95,7 @@ return {
 	"tests.unit.meta.test_menu_matches_manifest",
 	"tests.unit.meta.test_menu_prompt_cancel",
 	"tests.unit.meta.test_menu_no_double_separator",
-	"tests.unit.meta.test_menu_reason_key_renders",
+	"tests.unit.meta.test_menu_off_platform_rows_hidden",
 	"tests.unit.meta.test_menu_reload_reaches_the_daemon",
 	"tests.unit.meta.test_menu_row_dialect",
 	"tests.unit.meta.test_metrics_persist_before_shutdown",

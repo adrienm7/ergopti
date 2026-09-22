@@ -92,14 +92,16 @@ end
 
 --- Renders every menu array in the manifest with worst-case probes.
 --- @param Renderer table The shared renderer module (menu.renderer).
---- @param opts table { platform, manifest_path, json_decode, logger }.
+--- @param opts table { platform, manifest_path, json_decode, logger, i18n?, on_rendered? }.
+---   i18n         optional { get, section }; defaults to returning the key itself.
+---   on_rendered  optional function(key, rendered) called with each built menu.
 --- @return table defects, number menus_rendered
 function M.render_every_menu(Renderer, opts)
 	local R = Renderer.new({
 		platform      = opts.platform,
 		manifest_path = function() return opts.manifest_path end,
 		json_decode   = opts.json_decode,
-		i18n          = {
+		i18n          = opts.i18n or {
 			get     = function(key) return key end,
 			section = function(key) return key end,
 		},
@@ -129,6 +131,7 @@ function M.render_every_menu(Renderer, opts)
 			ctx,
 			answer_every_id(probe_rows))
 		M.find_defects(rendered, opts.platform .. " " .. key, defects)
+		if opts.on_rendered then opts.on_rendered(key, rendered) end
 		menu_count = menu_count + 1
 	end
 	return defects, menu_count
