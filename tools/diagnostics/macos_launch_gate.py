@@ -195,7 +195,8 @@ def seed(scenario, home, seed_tag, today):
         # completed config.toml, so the wizard is skipped and boot continues.
         target = home / "Documents/GitHub/config/ergopti_plus"
         seed_personal_files(target, seed_tag)
-        shutil.copyfile(CONFIG_TEMPLATE, target / "config.toml")
+        # The driver reads <config dir>/hammerspoon/config.toml, not the root.
+        shutil.copyfile(CONFIG_TEMPLATE, target / "hammerspoon/config.toml")
         link(default, target)
     elif scenario == "dangling_logs":
         seed_personal_files(default, seed_tag)
