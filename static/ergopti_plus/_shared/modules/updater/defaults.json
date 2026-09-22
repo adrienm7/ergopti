@@ -1,5 +1,5 @@
 {
-    "_comment": "Cross-driver updater scalars and release artifact names. Single source replacing per-file literals in lib/updater/core.ahk, lib/updater.lua, the Linux updater, and release CI. AHK keeps inline scalars guarded by the JS drift gate; macOS and Linux read this file at require-time via Paths.shared. Interval presets stay driver-specific (identical values, complex TOML array-of-tables not worth a custom parser).",
+    "_comment": "Cross-driver updater scalars and release artifact names. Single source replacing per-file literals in lib/updater/core.ahk, lib/updater.lua, the Linux updater, and release CI. AHK keeps inline scalars guarded by the JS drift gate; macOS and Linux read this file at require-time via Paths.shared. Interval presets stay driver-specific (identical values, complex TOML array-of-tables not worth a custom parser). release_sources: URL templates ({owner}/{repo}) and budgets of the changelog window, which tries the REST API first and the public Atom feed when the API is blocked or slow; ui_watchdog_sec must exceed proxy_resolve_timeout_sec + 2 * source_timeout_sec.",
     "github": {
         "owner": "adrienm7",
         "repo": "ergopti"
@@ -10,5 +10,13 @@
     },
     "release_assets": {
         "linux_bundle": "ergopti-plus-linux.tar.gz"
+    },
+    "release_sources": {
+        "api_releases_url": "https://api.github.com/repos/{owner}/{repo}/releases?per_page=20",
+        "atom_feed_url": "https://github.com/{owner}/{repo}/releases.atom",
+        "releases_page_url": "https://github.com/{owner}/{repo}/releases",
+        "source_timeout_sec": 15,
+        "proxy_resolve_timeout_sec": 10,
+        "ui_watchdog_sec": 45
     }
 }
