@@ -2502,5 +2502,6 @@
 	"numeric_prompt.cancel": "キャンセル",
 	"numeric_prompt.not_a_number": "数値を入力してください。",
 	"numeric_prompt.out_of_range": "値が許容範囲外です。",
-	"menu.llm.generation.custom_value": "その他の値…"
+	"menu.llm.generation.custom_value": "その他の値…",
+	"ui_metrics_rebuild.partial": "部分的な統計：{date} までのデータを再構築済み。"
 }

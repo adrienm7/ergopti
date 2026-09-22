@@ -2502,5 +2502,6 @@
 	"numeric_prompt.cancel": "Скасувати",
 	"numeric_prompt.not_a_number": "Введіть число.",
 	"numeric_prompt.out_of_range": "Значення поза допустимим діапазоном.",
-	"menu.llm.generation.custom_value": "Інше значення…"
+	"menu.llm.generation.custom_value": "Інше значення…",
+	"ui_metrics_rebuild.partial": "Часткова статистика: дані відновлено до {date}."
 }

@@ -2502,5 +2502,6 @@
 	"numeric_prompt.cancel": "إلغاء",
 	"numeric_prompt.not_a_number": "أدخل رقمًا.",
 	"numeric_prompt.out_of_range": "القيمة خارج النطاق المسموح.",
-	"menu.llm.generation.custom_value": "قيمة أخرى…"
+	"menu.llm.generation.custom_value": "قيمة أخرى…",
+	"ui_metrics_rebuild.partial": "إحصائيات جزئية: أُعيد بناء البيانات حتى {date}."
 }

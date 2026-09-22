@@ -2502,5 +2502,6 @@
 	"numeric_prompt.cancel": "रद्द करें",
 	"numeric_prompt.not_a_number": "एक संख्या दर्ज करें।",
 	"numeric_prompt.out_of_range": "मान स्वीकृत सीमा से बाहर है।",
-	"menu.llm.generation.custom_value": "अन्य मान…"
+	"menu.llm.generation.custom_value": "अन्य मान…",
+	"ui_metrics_rebuild.partial": "आंशिक आँकड़े: डेटा {date} तक पुनर्निर्मित किया गया।"
 }

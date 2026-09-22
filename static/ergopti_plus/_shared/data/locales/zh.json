@@ -2502,5 +2502,6 @@
 	"numeric_prompt.cancel": "取消",
 	"numeric_prompt.not_a_number": "请输入数字。",
 	"numeric_prompt.out_of_range": "数值超出允许范围。",
-	"menu.llm.generation.custom_value": "其他数值…"
+	"menu.llm.generation.custom_value": "其他数值…",
+	"ui_metrics_rebuild.partial": "部分统计：数据已重建至 {date}。"
 }

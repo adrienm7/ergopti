@@ -2502,5 +2502,6 @@
 	"numeric_prompt.cancel": "취소",
 	"numeric_prompt.not_a_number": "숫자를 입력하세요.",
 	"numeric_prompt.out_of_range": "값이 허용 범위를 벗어났습니다.",
-	"menu.llm.generation.custom_value": "다른 값…"
+	"menu.llm.generation.custom_value": "다른 값…",
+	"ui_metrics_rebuild.partial": "부분 통계: {date}까지의 데이터가 재구성되었습니다."
 }

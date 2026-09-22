@@ -2502,5 +2502,6 @@
 	"numeric_prompt.cancel": "Cancel",
 	"numeric_prompt.not_a_number": "Enter a number.",
 	"numeric_prompt.out_of_range": "The value is outside the accepted range.",
-	"menu.llm.generation.custom_value": "Other value…"
+	"menu.llm.generation.custom_value": "Other value…",
+	"ui_metrics_rebuild.partial": "Partial statistics: data rebuilt back to {date}."
 }
