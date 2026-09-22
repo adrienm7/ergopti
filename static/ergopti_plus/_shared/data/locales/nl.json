@@ -1264,6 +1264,7 @@
 	"menu.shortcuts.right_opt_back": "Rechter Opt + ⌫ → %s",
 	"menu.shortcuts.right_opt_escape": "Rechter Opt + Esc → %s",
 	"menu.shortcuts.right_opt_return": "Rechter Opt + Return → %s",
+	"menu.shortcuts.screen_instant": "Toets links van 1 (² op AZERTY, $ op Ergopti): directe schermafbeelding",
 	"menu.shortcuts.script_shortcuts": "Scriptbeheer-sneltoetsen",
 	"menu.shortcuts.submenu_cmd": "Cmd-sneltoetsen",
 	"menu.shortcuts.submenu_ctrl": "Ctrl-sneltoetsen",

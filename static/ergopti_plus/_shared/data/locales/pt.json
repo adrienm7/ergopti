@@ -1264,6 +1264,7 @@
 	"menu.shortcuts.right_opt_back": "Opt direito + ⌫ → %s",
 	"menu.shortcuts.right_opt_escape": "Opt direito + Esc → %s",
 	"menu.shortcuts.right_opt_return": "Opt direito + Return → %s",
+	"menu.shortcuts.screen_instant": "Tecla à esquerda do 1 (² no AZERTY, $ no Ergopti): captura de tela instantânea",
 	"menu.shortcuts.script_shortcuts": "Atalhos de gerenciamento de script",
 	"menu.shortcuts.submenu_cmd": "Atalhos Cmd",
 	"menu.shortcuts.submenu_ctrl": "Atalhos Ctrl",

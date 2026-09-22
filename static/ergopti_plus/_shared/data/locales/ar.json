@@ -1264,6 +1264,7 @@
 	"menu.shortcuts.right_opt_back": "Right Opt + ⌫ → %s",
 	"menu.shortcuts.right_opt_escape": "Right Opt + Esc → %s",
 	"menu.shortcuts.right_opt_return": "Right Opt + Return → %s",
+	"menu.shortcuts.screen_instant": "المفتاح على يسار 1 (² في AZERTY، $ في Ergopti): لقطة شاشة فورية",
 	"menu.shortcuts.script_shortcuts": "اختصارات إدارة النص البرمجي",
 	"menu.shortcuts.submenu_cmd": "اختصارات Cmd",
 	"menu.shortcuts.submenu_ctrl": "اختصارات Ctrl",

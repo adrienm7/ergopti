@@ -1264,6 +1264,7 @@
 	"menu.shortcuts.right_opt_back": "우측 Opt + ⌫ → %s",
 	"menu.shortcuts.right_opt_escape": "우측 Opt + Esc → %s",
 	"menu.shortcuts.right_opt_return": "우측 Opt + Return → %s",
+	"menu.shortcuts.screen_instant": "1 왼쪽 키 (AZERTY에서는 ², Ergopti에서는 $): 즉시 스크린샷",
 	"menu.shortcuts.script_shortcuts": "스크립트 관리 단축키",
 	"menu.shortcuts.submenu_cmd": "Cmd 단축키",
 	"menu.shortcuts.submenu_ctrl": "Ctrl 단축키",

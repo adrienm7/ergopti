@@ -1264,6 +1264,7 @@
 	"menu.shortcuts.right_opt_back": "Opt destro + ⌫ → %s",
 	"menu.shortcuts.right_opt_escape": "Opt destro + Esc → %s",
 	"menu.shortcuts.right_opt_return": "Opt destro + Return → %s",
+	"menu.shortcuts.screen_instant": "Tasto a sinistra dell’1 (² su AZERTY, $ su Ergopti): screenshot istantaneo",
 	"menu.shortcuts.script_shortcuts": "Scorciatoie gestione script",
 	"menu.shortcuts.submenu_cmd": "Scorciatoie Cmd",
 	"menu.shortcuts.submenu_ctrl": "Scorciatoie Ctrl",

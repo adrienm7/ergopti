@@ -1264,6 +1264,7 @@
 	"menu.shortcuts.right_opt_back": "Pravý Opt + ⌫ → %s",
 	"menu.shortcuts.right_opt_escape": "Pravý Opt + Esc → %s",
 	"menu.shortcuts.right_opt_return": "Pravý Opt + Return → %s",
+	"menu.shortcuts.screen_instant": "Klávesa vlevo od 1 (² v AZERTY, $ v Ergopti): okamžitý snímek obrazovky",
 	"menu.shortcuts.script_shortcuts": "Zkratky správy skriptu",
 	"menu.shortcuts.submenu_cmd": "Zkratky Cmd",
 	"menu.shortcuts.submenu_ctrl": "Zkratky Ctrl",

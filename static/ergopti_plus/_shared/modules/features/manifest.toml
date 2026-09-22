@@ -1307,7 +1307,8 @@ id = "screen_instant"
 platforms = ["ahk"]
 default = true
 type = "boolean"
-description_key = "shortcuts.label_at_hash"
+# Names the key: its legend differs per layout, so it is described by position.
+description_key = "menu.shortcuts.screen_instant"
 
 [[features.shortcuts]]
 id = "win_caps_lock"
@@ -3367,9 +3368,10 @@ id = "selection_operations"
 platforms = ["linux"]
 reason_key = "platform_reason.selection_operations_are_a_block_on_linux"
 
+# On every platform: the rows above act on typed or selected text, the groups
+# below are the user's own modifier shortcuts, two distinct blocks.
 [[menu.shortcuts_menu]]
 type = "---"
-platforms = ["linux"]
 
 [[menu.shortcuts_menu]]
 type = "list"

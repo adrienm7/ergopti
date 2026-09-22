@@ -1264,6 +1264,7 @@
 	"menu.shortcuts.right_opt_back": "Sağ Opt + ⌫ → %s",
 	"menu.shortcuts.right_opt_escape": "Sağ Opt + Esc → %s",
 	"menu.shortcuts.right_opt_return": "Sağ Opt + Return → %s",
+	"menu.shortcuts.screen_instant": "1’in solundaki tuş (AZERTY’de ², Ergopti’de $): anında ekran görüntüsü",
 	"menu.shortcuts.script_shortcuts": "Betik yönetim kısayolları",
 	"menu.shortcuts.submenu_cmd": "Cmd kısayolları",
 	"menu.shortcuts.submenu_ctrl": "Ctrl kısayolları",
