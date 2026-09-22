@@ -2502,5 +2502,6 @@
 	"numeric_prompt.cancel": "Avbryt",
 	"numeric_prompt.not_a_number": "Ange ett tal.",
 	"numeric_prompt.out_of_range": "Värdet ligger utanför det tillåtna intervallet.",
-	"menu.llm.generation.custom_value": "Annat värde…"
+	"menu.llm.generation.custom_value": "Annat värde…",
+	"ui_metrics_rebuild.partial": "Delvis statistik: data återuppbyggd tillbaka till {date}."
 }

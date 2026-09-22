@@ -2502,5 +2502,6 @@
 	"numeric_prompt.cancel": "Zrušit",
 	"numeric_prompt.not_a_number": "Zadejte číslo.",
 	"numeric_prompt.out_of_range": "Hodnota je mimo povolený rozsah.",
-	"menu.llm.generation.custom_value": "Jiná hodnota…"
+	"menu.llm.generation.custom_value": "Jiná hodnota…",
+	"ui_metrics_rebuild.partial": "Částečné statistiky: data obnovena zpětně do {date}."
 }

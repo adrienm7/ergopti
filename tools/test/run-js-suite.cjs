@@ -224,6 +224,7 @@ const CHECKS = [
 	{ name: 'driver config surface is declared in the manifest (ratchet)', cmd: 'node', args: ['tools/test/test-driver-config-surface-is-declared.cjs'], repro: 'node tools/test/test-driver-config-surface-is-declared.cjs' },
 	{ name: 'config schema (v2 TOML shape)', cmd: 'node', args: ['tools/test/test-config-schema.cjs'], repro: 'node tools/test/test-config-schema.cjs' },
 	{ name: 'metrics heatmap translation coverage', cmd: 'node', args: ['tools/test/test-metrics-heatmap-translation.cjs'], repro: 'node tools/test/test-metrics-heatmap-translation.cjs' },
+	{ name: 'metrics rebuild banner (partial snapshots are labelled)', cmd: 'node', args: ['tools/test/test-metrics-rebuild-banner.cjs'], repro: 'npm run test:metrics-rebuild-banner' },
 	// CI verifies AHK encoding with an inline PowerShell step rather than this
 	// script, so the script itself never ran anywhere: a divergence between the
 	// two implementations was invisible. Run the real one here too.

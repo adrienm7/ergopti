@@ -2502,5 +2502,6 @@
 	"numeric_prompt.cancel": "Cancelar",
 	"numeric_prompt.not_a_number": "Introduza um número.",
 	"numeric_prompt.out_of_range": "O valor está fora do intervalo aceite.",
-	"menu.llm.generation.custom_value": "Outro valor…"
+	"menu.llm.generation.custom_value": "Outro valor…",
+	"ui_metrics_rebuild.partial": "Estatísticas parciais: dados reconstruídos até {date}."
 }

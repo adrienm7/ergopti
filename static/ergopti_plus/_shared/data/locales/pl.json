@@ -2502,5 +2502,6 @@
 	"numeric_prompt.cancel": "Anuluj",
 	"numeric_prompt.not_a_number": "Wprowadź liczbę.",
 	"numeric_prompt.out_of_range": "Wartość jest poza dozwolonym zakresem.",
-	"menu.llm.generation.custom_value": "Inna wartość…"
+	"menu.llm.generation.custom_value": "Inna wartość…",
+	"ui_metrics_rebuild.partial": "Częściowe statystyki: dane odbudowane wstecz do {date}."
 }

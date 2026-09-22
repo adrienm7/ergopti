@@ -2502,5 +2502,6 @@
 	"numeric_prompt.cancel": "Annuleren",
 	"numeric_prompt.not_a_number": "Voer een getal in.",
 	"numeric_prompt.out_of_range": "De waarde valt buiten het toegestane bereik.",
-	"menu.llm.generation.custom_value": "Andere waarde…"
+	"menu.llm.generation.custom_value": "Andere waarde…",
+	"ui_metrics_rebuild.partial": "Gedeeltelijke statistieken: gegevens opnieuw opgebouwd tot {date}."
 }

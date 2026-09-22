@@ -2502,5 +2502,6 @@
 	"numeric_prompt.cancel": "İptal",
 	"numeric_prompt.not_a_number": "Bir sayı girin.",
 	"numeric_prompt.out_of_range": "Değer kabul edilen aralığın dışında.",
-	"menu.llm.generation.custom_value": "Başka değer…"
+	"menu.llm.generation.custom_value": "Başka değer…",
+	"ui_metrics_rebuild.partial": "Kısmi istatistikler: veriler {date} tarihine kadar yeniden oluşturuldu."
 }
