@@ -174,9 +174,12 @@ end
 
 --- Opens a native AppleScript-based dialog to pick a folder.
 --- Returns the selected path (with trailing slash), or nil if cancelled.
---- @param current string Currently configured directory shown as default location.
+--- @param current string|nil Directory shown as default location; nil or "" means
+---   the current config directory.
+--- @param prompt string|nil Already-translated prompt; defaults to the editor's.
 --- @return string|nil
-local function pick_dir(current)
+local function pick_dir(current, prompt)
+	if type(current) ~= "string" or current == "" then current = nil end
 	local default_dir = current or ConfigPaths.get_config_dir() or "/"
 	if not default_dir:match("[/\\]$") then
 		default_dir = default_dir:match("^(.+[/\\])") or default_dir
@@ -200,7 +203,7 @@ local function pick_dir(current)
 		on error
 			return ""
 		end try
-	]], i18n.get("menu.paths.pick_prompt") or "", default_dir)
+	]], prompt or i18n.get("menu.paths.pick_prompt") or "", default_dir)
 
 	local ok, r2, raw = hs.osascript.applescript(script)
 	Logger.debug(LOG, "Folder picker completed (ok=%s, result_type=%s).", tostring(ok), type(r2))
@@ -218,6 +221,16 @@ local function pick_dir(current)
 		end
 	end
 	return nil
+end
+
+--- Opens the native folder picker shared by the path editor and the onboarding
+--- wizard. The wizard kept its own copy of the script and read only the raw
+--- AppleEvent descriptor, so the two pickers could disagree on the same answer.
+--- @param current string|nil Directory shown as default location.
+--- @param prompt string|nil Already-translated prompt.
+--- @return string|nil Chosen directory with a trailing slash, or nil if cancelled.
+function M.pick_config_dir(current, prompt)
+	return pick_dir(current, prompt)
 end
 
 

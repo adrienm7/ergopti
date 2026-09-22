@@ -11,6 +11,8 @@
 ---    via screencapture, since Hammerspoon exposes no native pixel color API.
 --- 2. Screenshot Wrapper: Spawns the native screencapture tool asynchronously
 ---    so the main thread is never blocked during a user-driven screenshot.
+---    It captures to an owned file and announces success only after the image
+---    is read back from the clipboard (see screen_capture_flow).
 --- ==============================================================================
 
 local M = {}
@@ -22,6 +24,7 @@ local Logger        = require("infra.logger")
 local i18n          = require("infra.i18n")
 local FileSystem    = require("adapters.file_system")
 local TaskLifecycle = require("adapters.task_lifecycle")
+local CaptureFlow   = require("modules.shortcuts.actions.screen_capture_flow")
 
 local LOG = "shortcuts.actions.system"
 
@@ -485,6 +488,9 @@ end
 
 --- Reads the color of the pixel currently under the mouse cursor and copies it to the clipboard.
 function M.copy_pixel_color()
+	-- Without Screen Recording the capture omits every window, so the color of
+	-- the desktop behind them would be copied as if it were the real pixel.
+	if not CaptureFlow.ensure_permission("Pixel color read") then return false end
 	local operation = begin_operation("Pixel color read")
 	if not operation then return false end
 	Logger.trace(LOG, "Pixel color read started…")
@@ -523,18 +529,49 @@ end
 -- =========================================
 
 --- Launches the native macOS interactive screenshot tool and copies the result to the clipboard.
+--- The capture goes to an owned temporary file rather than `-c`: the file is
+--- the proof that an image exists, and the clipboard is filled from it and read
+--- back before success is announced.
+--- @return boolean accepted True when the capture process was started.
 function M.interactive_screenshot()
+	if not CaptureFlow.ensure_permission("Interactive screenshot") then return false end
 	local operation = begin_operation("Interactive screenshot")
 	if not operation then return false end
 	Logger.trace(LOG, "Interactive screenshot started…")
+	local allocation_ok, tmpfile, allocation_detail = xpcall(
+		FileSystem.create_secure_temp_file, debug.traceback)
+	if allocation_ok ~= true or type(tmpfile) ~= "string" or tmpfile == "" then
+		operation.authorized = false
+		finish_operation(operation)
+		Logger.error(LOG, "Interactive screenshot temporary-file allocation failed: %s.",
+			tostring(allocation_ok == true and allocation_detail or tmpfile))
+		notifications.notify(i18n.get("shortcuts.screenshot_failed"), nil, "error")
+		return false
+	end
+	operation.temp_path = tmpfile
+	local mark = CaptureFlow.clipboard_mark()
 	return start_task_phase(operation, "Interactive screenshot", SCREENCAPTURE_BIN,
-		{"-i", "-c"},
-		function(exit_code, _, _)
-			if exit_code == 0 then
+		-- -t png: the temp file has no extension and the user's screenshot
+		-- format preference may name one the clipboard image cannot load.
+		{ "-i", "-t", "png", tmpfile },
+		function(exit_code, _, stderr)
+			local outcome, detail = CaptureFlow.settle({
+				path = tmpfile,
+				mark = mark,
+				exit_code = exit_code,
+				stderr = stderr,
+				interactive = true,
+				destination = "clipboard",
+			})
+			if outcome == CaptureFlow.OUTCOME_COPIED then
 				notifications.notify(i18n.get("shortcuts.screenshot_copied"), nil, "success")
-				Logger.done(LOG, "Interactive screenshot completed.")
+				Logger.done(LOG, "Interactive screenshot copied to the clipboard.")
+			elseif outcome == CaptureFlow.OUTCOME_CANCELLED then
+				Logger.info(LOG, "Interactive screenshot cancelled (exit code %s).",
+					tostring(exit_code))
 			else
-				Logger.warn(LOG, "Interactive screenshot failed or was cancelled.")
+				Logger.error(LOG, "Interactive screenshot failed: %s.", tostring(detail))
+				notifications.notify(i18n.get("shortcuts.screenshot_clipboard_failed"), nil, "error")
 			end
 			return true
 		end)

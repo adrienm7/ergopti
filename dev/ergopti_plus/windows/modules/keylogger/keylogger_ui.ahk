@@ -342,7 +342,7 @@ KLUI_ToggleApps(*) {
 ; not work on object properties.
 KLUI_ToggleDashboard(which, title) {
 		global _ConfigDir
-		metrics_dir := _ConfigDir . "metrics"
+		metrics_dir := KL_MetricsDirFor(_ConfigDir)
 		KLUI_EnsureUrls(metrics_dir)
 
 		if KLWV_IsAvailable() {

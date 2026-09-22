@@ -259,8 +259,7 @@ helpers.describe("tray indicator: the widget tree", function()
 		ind.create("id", "icon", "title")
 		ind.set_menu({ { title = "Unavailable", disabled = true } })
 		helpers.assert_eq(widget_named(log, "Unavailable").sensitive, 0,
-			"a feature absent on this platform is shown greyed with a reason; "
-				.. "hiding it makes the menus differ between drivers silently")
+			"a disabled row must stay visible and greyed, not vanish from the menu")
 		ind._set_binding_for_test(nil)
 	end)
 

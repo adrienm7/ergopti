@@ -6,6 +6,9 @@
 --- Owns the asynchronous mkdir -> screencapture lifecycle shared by configurable
 --- shortcuts and gestures. Every accepted action gets a process-unique target;
 --- native construction, start, and exit failures are logged and notified.
+--- Screen Recording is checked before any process starts, and a result is
+--- announced only after screen_capture_flow has verified the file or the
+--- clipboard image; an interactive cancel stays silent.
 --- ==============================================================================
 
 local M = {}
@@ -16,6 +19,7 @@ local FileSystem    = require("adapters.file_system")
 local Logger        = require("infra.logger")
 local notifications = require("infra.notifications")
 local i18n          = require("infra.i18n")
+local CaptureFlow   = require("modules.shortcuts.actions.screen_capture_flow")
 
 local LOG = "shortcuts.actions.screenshot_save"
 
@@ -49,16 +53,26 @@ local _operations = {}
 --- Emits one user-visible failure without allowing notification code to escape.
 --- @param context string Failure context.
 --- @param detail any Failure detail.
-local function report_failure(context, detail)
+--- @param message_key string|nil Locale key; defaults to the generic failure.
+local function report_failure(context, detail, message_key)
 	Logger.error(LOG, "Screenshot %s failed: %s.", context, tostring(detail))
 	local notified, notify_error = pcall(
 		notifications.notify,
-		i18n.get("shortcuts.screenshot_failed"),
+		i18n.get(message_key or "shortcuts.screenshot_failed"),
 		nil,
 		"error"
 	)
 	if not notified then
 		Logger.error(LOG, "Screenshot failure notification failed: %s.", tostring(notify_error))
+	end
+end
+
+--- Emits one success notification without allowing notification code to escape.
+--- @param message string Translated message.
+local function report_success(message)
+	local notified, notify_error = pcall(notifications.notify, message, nil, "success")
+	if not notified then
+		Logger.error(LOG, "Screenshot success notification failed: %s.", tostring(notify_error))
 	end
 end
 
@@ -101,11 +115,26 @@ local function screenshot_admission_open(parent)
 	return _pause_claims[scope_id] ~= true and not screenshot_cleanup_debt(scope_id)
 end
 
+--- Removes the temporary capture file owned by a finished clipboard operation.
+--- @param operation table Screenshot operation.
+local function release_capture_file(operation)
+	local path = operation.temp_path
+	if path == nil then return end
+	operation.temp_path = nil
+	local removed_ok, removed, detail = pcall(FileSystem.remove_exact, path)
+	if removed_ok and removed == true then return end
+	local classify_ok, _, status = pcall(FileSystem.classify_no_follow, path)
+	if classify_ok and status == "absent" then return end
+	Logger.error(LOG, "Screenshot capture file '%s' could not be removed: %s.",
+		path, tostring(removed_ok and detail or removed))
+end
+
 local function finish_operation(operation)
 	if operation_is_current(operation) and operation.phase == nil
 		and operation.acquisitions == 0 then
 		_operations[operation.id] = nil
 		operation.finished = true
+		release_capture_file(operation)
 	end
 end
 
@@ -127,8 +156,32 @@ local function create_operation(label, parent)
 	return operation
 end
 
-local function report_operation_failure(operation, context, detail)
-	if operation_is_authorized(operation) then report_failure(context, detail) end
+local function report_operation_failure(operation, context, detail, message_key)
+	if operation_is_authorized(operation) then report_failure(context, detail, message_key) end
+end
+
+--- Announces the verified outcome of one finished capture.
+--- @param operation table Screenshot operation.
+--- @param outcome string CaptureFlow outcome.
+--- @param detail string|nil Failure detail.
+--- @param target string Capture file path.
+--- @param failure_key string Locale key of the failure notification.
+--- @return boolean succeeded
+local function report_capture_outcome(operation, outcome, detail, target, failure_key)
+	if outcome == CaptureFlow.OUTCOME_SAVED then
+		report_success(string.format(i18n.get("shortcuts.saved"), target))
+		return true
+	end
+	if outcome == CaptureFlow.OUTCOME_COPIED then
+		report_success(i18n.get("shortcuts.screenshot_copied"))
+		return true
+	end
+	if outcome == CaptureFlow.OUTCOME_CANCELLED then
+		Logger.info(LOG, "Screenshot %s cancelled by the user.", tostring(operation.label))
+		return true
+	end
+	report_operation_failure(operation, "capture", detail, failure_key)
+	return false
 end
 
 local function release_phase(operation, phase)
@@ -349,6 +402,11 @@ function M.save(flags, prefix, parent)
 		report_failure("request validation", "flags table and non-empty prefix are required")
 		return false
 	end
+	if CaptureFlow.targets_clipboard(flags) then
+		report_failure("request validation", "a saved screenshot cannot target the clipboard")
+		return false
+	end
+	if not CaptureFlow.ensure_permission("Saved screenshot") then return false end
 
 	local target, target_error = next_target(prefix)
 	if not target then
@@ -373,45 +431,70 @@ function M.save(flags, prefix, parent)
 		local args = {}
 		for _, flag in ipairs(flags) do args[#args + 1] = tostring(flag) end
 		args[#args + 1] = target
-		return start_task(operation, SCREENCAPTURE_BIN, args, function(capture_exit_code)
-			if capture_exit_code ~= 0 then
-				report_operation_failure(operation,
-					"capture", "exit code " .. tostring(capture_exit_code))
-				return false
-			end
-			local notified, notify_error = pcall(
-				notifications.notify,
-				string.format(i18n.get("shortcuts.saved"), target),
-				nil,
-				"success"
-			)
-			if not notified then
-				Logger.error(LOG, "Screenshot success notification failed: %s.",
-					tostring(notify_error))
-			end
-			return true
-		end, "capture")
+		local mark = CaptureFlow.clipboard_mark()
+		return start_task(operation, SCREENCAPTURE_BIN, args,
+			function(capture_exit_code, _, capture_stderr)
+				local outcome, detail = CaptureFlow.settle({
+					path = target,
+					mark = mark,
+					exit_code = capture_exit_code,
+					stderr = capture_stderr,
+					interactive = CaptureFlow.is_interactive(flags),
+					destination = "file",
+				})
+				return report_capture_outcome(operation, outcome, detail, target,
+					"shortcuts.screenshot_failed")
+			end, "capture")
 	end, "directory")
 end
 
---- Runs a clipboard/interactive screencapture under the same exact owner without
---- allocating a save target. Used by gesture entry points.
---- @param flags table Complete screencapture argument vector.
+--- Copies one screenshot to the clipboard under the same exact owner. Used by
+--- gesture entry points. The capture goes to an owned temporary file, never to
+--- `-c`, so the clipboard is filled from a proven image and read back.
+--- @param flags table screencapture flags selecting the area, without `-c`.
+--- @param parent string|nil Stable parent ID.
 --- @return boolean accepted
 function M.capture(flags, parent)
 	local scope_id = action_parent(parent)
-	if not screenshot_admission_open(scope_id) or type(flags) ~= "table" then return false end
+	if not screenshot_admission_open(scope_id) then return false end
+	if type(flags) ~= "table" or CaptureFlow.targets_clipboard(flags) then
+		report_failure("request validation",
+			"clipboard capture flags must be a table without -c",
+			"shortcuts.screenshot_clipboard_failed")
+		return false
+	end
+	if not CaptureFlow.ensure_permission("Clipboard screenshot") then return false end
 	local operation = create_operation("clipboard screenshot", scope_id)
 	if not operation then return false end
+
+	local allocated, target, allocation_detail = pcall(FileSystem.create_secure_temp_file)
+	if not allocated or type(target) ~= "string" or target == "" then
+		report_operation_failure(operation, "temporary file allocation",
+			allocated and allocation_detail or target, "shortcuts.screenshot_clipboard_failed")
+		operation.authorized = false
+		finish_operation(operation)
+		return false
+	end
+	operation.temp_path = target
+
 	local args = {}
 	for _, flag in ipairs(flags) do args[#args + 1] = tostring(flag) end
-	return start_task(operation, SCREENCAPTURE_BIN, args, function(exit_code)
-		if exit_code ~= 0 then
-			report_operation_failure(operation,
-				"capture", "exit code " .. tostring(exit_code))
-			return false
-		end
-		return true
+	-- The temp file has no extension; pin a format the clipboard can load.
+	args[#args + 1] = "-t"
+	args[#args + 1] = "png"
+	args[#args + 1] = target
+	local mark = CaptureFlow.clipboard_mark()
+	return start_task(operation, SCREENCAPTURE_BIN, args, function(exit_code, _, stderr)
+		local outcome, detail = CaptureFlow.settle({
+			path = target,
+			mark = mark,
+			exit_code = exit_code,
+			stderr = stderr,
+			interactive = CaptureFlow.is_interactive(flags),
+			destination = "clipboard",
+		})
+		return report_capture_outcome(operation, outcome, detail, target,
+			"shortcuts.screenshot_clipboard_failed")
 	end, "capture")
 end
 

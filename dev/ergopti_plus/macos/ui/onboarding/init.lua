@@ -28,7 +28,6 @@ local notifications = require("infra.notifications")
 local Paths        = require("infra.paths")
 local Logger       = require("infra.logger")
 local DeferredWork = require("infra.deferred_work")
-local text_utils   = require("infra.text_utils")
 local ManifestReader = require("infra.manifest_reader")
 local FileSystem    = require("adapters.file_system")
 local Storage       = require("adapters.storage")
@@ -38,6 +37,39 @@ local SETTINGS_COMPLETED_KEY = "onboarding.completed"
 
 -- MenuPaths.get() key that resolves <config_dir>/hammerspoon/config.toml.
 local CONFIG_TOML_PATH_KEY   = "ConfigTomlPath"
+
+-- Brand-less window title. ui_builder prefixes the product name, and
+-- onboarding.welcome.title already carries it (it is the page heading).
+local WINDOW_TITLE_KEY       = "onboarding.window_title"
+
+-- Every locale string the shared wizard page reads. One list for both initData
+-- and the live preview, so a locale switch cannot drop a key the first render had.
+local STRING_KEYS = {
+	"onboarding.welcome.title", "onboarding.welcome.heading",
+	"onboarding.language.placeholder",
+	"onboarding.layout.title", "onboarding.layout.desc",
+	"onboarding.layout.yes",  "onboarding.layout.no",
+	"onboarding.magic_key.title", "onboarding.magic_key.desc",
+	"onboarding.magic_key.option_blackstar", "onboarding.magic_key.option_star",
+	"onboarding.magic_key.option_ugrave", "onboarding.magic_key.option_semicolon",
+	"onboarding.magic_key.option_custom", "onboarding.magic_key.choose_freely",
+	"onboarding.metrics.title", "onboarding.metrics.desc",
+	-- Raw {1} template: the page fills it with the metrics path of the folder
+	-- chosen on the config step (window.setMetricsPath).
+	"dialog.metrics.enable_warning",
+	"onboarding.gestures.title", "onboarding.gestures.desc",
+	-- Same macOS-gestures-conflict warning shown by the tray "Enable
+	-- gestures" toggle — surfaced on step 5 in an orange box so the
+	-- user knows about the system-setting conflict before committing.
+	"dialog.gestures.warning_msg",
+	"onboarding.yes", "onboarding.no",
+	"onboarding.back", "onboarding.next", "onboarding.finish",
+	-- Inserted config-folder step reuses the same labels as the
+	-- tray-menu folder editor so we don't duplicate translations.
+	"dialog.config_folder.title", "dialog.config_folder.label",
+	"dialog.config_folder.hint", "dialog.config_folder.select_title",
+	"common.browse",
+}
 
 -- Path to config.toml — set by M.run() before the wizard opens
 local _config_path  = nil
@@ -109,8 +141,14 @@ local function submit_data(owner, view, method, payload)
 		owner.javascript_failures[key] = true
 		Logger.error(LOG, "Onboarding JavaScript %s (%s; content withheld; repeats suppressed).", category, method)
 	end
-	local encoded, json = pcall(hs.json.encode, payload)
-	if not encoded or type(json) ~= "string" or json == "" then report("encoding failed"); return false end
+	-- hs.json.encode accepts only a table at the top level and RAISES on a bare
+	-- string. setConfigDir takes the chosen path as a plain string, so encoding
+	-- it directly failed every time and the picked folder never reached the
+	-- field. Encoding the argument list as a one-element array serializes any
+	-- JSON value; stripping the brackets yields the call's argument list.
+	local encoded, json = pcall(hs.json.encode, { payload })
+	local arguments = encoded and type(json) == "string" and json:match("^%s*%[(.*)%]%s*$") or nil
+	if not arguments or arguments:match("^%s*$") then report("encoding failed"); return false end
 	if not publication_is_current(owner, view) then return false end
 	local admitted, settled, pending, failed = false, false, nil, false
 	local function complete(_, script_error)
@@ -122,7 +160,7 @@ local function submit_data(owner, view, method, payload)
 		Logger.debug(LOG, "Onboarding JavaScript completed (%s).", method)
 	end
 	local ok, candidate = pcall(function()
-		return view:evaluateJavaScript("window." .. method .. "(" .. json .. ")", complete)
+		return view:evaluateJavaScript("window." .. method .. "(" .. arguments .. ")", complete)
 	end)
 	if not ok or candidate ~= view then
 		settled = true
@@ -132,6 +170,34 @@ local function submit_data(owner, view, method, payload)
 	admitted = true
 	if pending then complete(nil, pending.error) end
 	return not failed and publication_is_current(owner, view)
+end
+
+--- Retitles the native window. WKWebView never mirrors document.title onto the
+--- NSWindow, so a live language switch left the title in the opening locale.
+--- @param owner table Captured wizard owner.
+--- @param view userdata|table Captured native window.
+--- @param title string Brand-less, already-translated title.
+--- @return boolean applied
+local function retitle(owner, view, title)
+	if not publication_is_current(owner, view) then return false end
+	local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
+	if not ok_ui or type(ui_builder) ~= "table" or type(ui_builder.set_window_title) ~= "function" then
+		Logger.error(LOG, "Onboarding window title cannot follow the locale; ui_builder is unavailable.")
+		return false
+	end
+	return ui_builder.set_window_title(view, title)
+end
+
+--- Metrics store path for the folder typed on the config step, from the same
+--- rule the keylogger uses to place the store. An empty field keeps the current
+--- folder, because commit() persists no override for it.
+--- @param config_dir string|nil Folder from the wizard field.
+--- @return string Absolute metrics directory.
+function M._metrics_path_for(config_dir)
+	local ConfigPaths = require("infra.config_paths")
+	local dir = (type(config_dir) == "string" and config_dir ~= "") and config_dir
+		or ConfigPaths.get_config_dir()
+	return ConfigPaths.metrics_dir(dir)
 end
 
 --- Loads the strings for a given locale code and injects them into the webview
@@ -148,42 +214,10 @@ local function inject_strings(code, owner, view)
 	-- the requested locale, then restoring the previous locale.
 	local prev_code = i18n.get_locale()
 	i18n.set_locale_no_reload(code)
-
-	-- Collect all onboarding keys the JS wizard needs
-	local keys = {
-		"onboarding.welcome.title", "onboarding.welcome.heading",
-		"onboarding.language.placeholder",
-		"onboarding.layout.title", "onboarding.layout.desc",
-		"onboarding.layout.yes",  "onboarding.layout.no",
-		"onboarding.magic_key.title", "onboarding.magic_key.desc",
-		"onboarding.magic_key.option_blackstar", "onboarding.magic_key.option_star",
-		"onboarding.magic_key.option_ugrave", "onboarding.magic_key.option_semicolon",
-		"onboarding.magic_key.option_custom", "onboarding.magic_key.choose_freely",
-		"onboarding.metrics.title", "onboarding.metrics.desc",
-		"onboarding.gestures.title", "onboarding.gestures.desc",
-		-- Same macOS-gestures-conflict warning shown by the tray "Enable
-		-- gestures" toggle — surfaced on step 5 in an orange box so the
-		-- user knows about the system-setting conflict before committing.
-		"dialog.gestures.warning_msg",
-		"onboarding.yes", "onboarding.no",
-		"onboarding.back", "onboarding.next", "onboarding.finish",
-		-- Inserted config-folder step reuses the same labels as the
-		-- tray-menu folder editor so we don't duplicate translations.
-		"dialog.config_folder.title", "dialog.config_folder.label",
-		"dialog.config_folder.hint", "dialog.config_folder.select_title",
-		"common.browse",
-	}
-	for _, k in ipairs(keys) do
+	for _, k in ipairs(STRING_KEYS) do
 		strings[k] = i18n.get(k)
 	end
-
-	-- Inject the privacy warning pre-formatted with the actual metrics path so
-	-- the user sees exactly the same text as the tray-menu toggle dialog
-	local metrics_dir = (_config_path or ""):match("^(.*[/\\])") or ""
-	-- i18n.format, not string.format: the shared locale strings use {1}, and
-	-- string.format looks for %s — it left the placeholder on screen verbatim.
-	strings["dialog.metrics.enable_warning_formatted"] =
-		i18n.format("dialog.metrics.enable_warning", metrics_dir .. "metrics")
+	local window_title = i18n.get(WINDOW_TITLE_KEY)
 
 	i18n.set_locale_no_reload(prev_code)
 
@@ -192,6 +226,7 @@ local function inject_strings(code, owner, view)
 	local payload = { locale = code, strings = strings }
 	Logger.debug(LOG, "Injecting strings for locale '%s'…", code)
 	submit_data(owner, view, "applyStrings", payload)
+	retitle(owner, view, window_title)
 end
 
 --- Sends the full initData payload (locale + strings + default answers) to the
@@ -202,43 +237,8 @@ local function inject_init_data()
 
 	local current_locale = i18n.get_locale()
 	local strings = {}
-	local keys = {
-		"onboarding.welcome.title", "onboarding.welcome.heading",
-		"onboarding.language.placeholder",
-		"onboarding.layout.title", "onboarding.layout.desc",
-		"onboarding.layout.yes",  "onboarding.layout.no",
-		"onboarding.magic_key.title", "onboarding.magic_key.desc",
-		"onboarding.magic_key.option_blackstar", "onboarding.magic_key.option_star",
-		"onboarding.magic_key.option_ugrave", "onboarding.magic_key.option_semicolon",
-		"onboarding.magic_key.option_custom", "onboarding.magic_key.choose_freely",
-		"onboarding.metrics.title", "onboarding.metrics.desc",
-		"onboarding.gestures.title", "onboarding.gestures.desc",
-		-- Same macOS-gestures-conflict warning shown by the tray "Enable
-		-- gestures" toggle — surfaced on step 5 in an orange box so the
-		-- user knows about the system-setting conflict before committing.
-		"dialog.gestures.warning_msg",
-		"onboarding.yes", "onboarding.no",
-		"onboarding.back", "onboarding.next", "onboarding.finish",
-	}
-	for _, k in ipairs(keys) do
+	for _, k in ipairs(STRING_KEYS) do
 		strings[k] = i18n.get(k)
-	end
-
-	-- Same privacy warning as inject_strings — pre-formatted with the metrics path
-	local metrics_dir = (_config_path or ""):match("^(.*[/\\])") or ""
-	-- i18n.format, not string.format: the shared locale strings use {1}, and
-	-- string.format looks for %s — it left the placeholder on screen verbatim.
-	strings["dialog.metrics.enable_warning_formatted"] =
-		i18n.format("dialog.metrics.enable_warning", metrics_dir .. "metrics")
-
-	-- Also include the labels needed by the inserted config-folder step.
-	local config_step_keys = {
-		"dialog.config_folder.title", "dialog.config_folder.label",
-		"dialog.config_folder.hint", "dialog.config_folder.select_title",
-		"common.browse",
-	}
-	for _, k in ipairs(config_step_keys) do
-		if strings[k] == nil then strings[k] = i18n.get(k) end
 	end
 
 	-- Resolve the current + default config directories so the wizard can
@@ -293,9 +293,17 @@ local function inject_init_data()
 			use_gestures = false,
 		},
 	}
+	local resolved, metrics_path = pcall(M._metrics_path_for, payload.answers.config_dir)
+	if not resolved then
+		Logger.error(LOG, "Onboarding metrics path unresolved: %s.", tostring(metrics_path))
+		return
+	end
+	payload.metrics_path = metrics_path
 
 	Logger.debug(LOG, "Injecting initData into onboarding webview…")
 	submit_data(owner, view, "initData", payload)
+	-- initData resets the page to the current locale; keep the window in step.
+	retitle(owner, view, i18n.get(WINDOW_TITLE_KEY))
 end
 
 
@@ -336,13 +344,12 @@ function M._build_config_updates(answers)
 	}
 end
 
---- Resolves a canonical boolean without letting false trigger legacy fallback.
---- @param section table Canonical config section.
---- @param key string Canonical key.
+--- Resolves a canonical boolean, falling back to the legacy migration value
+--- only when the canonical key is absent.
+--- @param canonical any Canonical value, nil when absent.
 --- @param legacy_enabled boolean Legacy migration value.
 --- @return boolean enabled
-local function canonical_boolean_or_legacy(section, key, legacy_enabled)
-	local canonical = section[key]
+local function canonical_boolean_or_legacy(canonical, legacy_enabled)
 	if canonical ~= nil then
 		return canonical == true or canonical == "true"
 	end
@@ -354,32 +361,45 @@ end
 --- [hotstrings].trigger_char, [metrics].enabled, [gestures].enabled) so a
 --- config written by commit() round-trips correctly. Falls back to the AHK
 --- PascalCase schema (Layout.ErgoptiBase, Hotstrings.MagicKey, …) for users
---- migrating a Windows config file.
+--- migrating a Windows config file. Every key is read unconditionally, so the
+--- keys marked for the unused-key cleanup never depend on another key's value.
 --- @param parsed table Decoded TOML as a Lua table.
+--- @param mark function|nil mark(...segments) for each key present and read.
 --- @return table { use_ergopti, magic_key, use_metrics, use_gestures }
-function M._answers_from_config(parsed)
+function M._answers_from_config(parsed, mark)
 	if type(parsed) ~= "table" then return {} end
+	local function section(name)
+		local values = type(parsed[name]) == "table" and parsed[name] or {}
+		return function(key)
+			local value = values[key]
+			if value ~= nil and mark then mark(name, key) end
+			return value
+		end
+	end
 	-- Canonical lowercase sections (written by commit / _build_config_updates)
-	local hs_sec  = type(parsed.hotstrings) == "table" and parsed.hotstrings or {}
-	local met_sec = type(parsed.metrics)    == "table" and parsed.metrics    or {}
-	local ges_sec = type(parsed.gestures)   == "table" and parsed.gestures   or {}
+	local hs_sec  = section("hotstrings")
+	local met_sec = section("metrics")
+	local ges_sec = section("gestures")
 	-- AHK PascalCase fallback (Windows config import)
-	local layout_ahk     = type(parsed.Layout)     == "table" and parsed.Layout     or {}
-	local hotstr_ahk     = type(parsed.Hotstrings)  == "table" and parsed.Hotstrings or {}
-	local metrics_ahk    = type(parsed.Metrics)     == "table" and parsed.Metrics    or {}
-	local gestures_ahk   = type(parsed.Gestures)    == "table" and parsed.Gestures   or {}
+	local layout_ahk   = section("Layout")
+	local hotstr_ahk   = section("Hotstrings")
+	local metrics_ahk  = section("Metrics")
+	local gestures_ahk = section("Gestures")
+	local legacy_base  = layout_ahk("ErgoptiBase") == true
+	local legacy_altgr = layout_ahk("ErgoptiAltGr") == true
+	local legacy_plus  = layout_ahk("ErgoptiPlus") == true
+	local trigger_char = hs_sec("trigger_char")
+	local legacy_magic = hotstr_ahk("MagicKey")
 	-- Prefer canonical schema; fall back to AHK keys only when canonical absent
-	local use_ergopti = canonical_boolean_or_legacy(hs_sec, "enabled",
-		layout_ahk.ErgoptiBase == true
-		or layout_ahk.ErgoptiAltGr == true
-		or layout_ahk.ErgoptiPlus == true)
-	local magic_key = (type(hs_sec.trigger_char) == "string" and hs_sec.trigger_char ~= "" and hs_sec.trigger_char)
-		or (type(hotstr_ahk.MagicKey) == "string" and hotstr_ahk.MagicKey ~= "" and hotstr_ahk.MagicKey)
+	local use_ergopti = canonical_boolean_or_legacy(hs_sec("enabled"),
+		legacy_base or legacy_altgr or legacy_plus)
+	local magic_key = (type(trigger_char) == "string" and trigger_char ~= "" and trigger_char)
+		or (type(legacy_magic) == "string" and legacy_magic ~= "" and legacy_magic)
 		or nil
-	local use_metrics = canonical_boolean_or_legacy(met_sec, "enabled",
-		metrics_ahk.metrics_enabled == true)
-	local use_gestures = canonical_boolean_or_legacy(ges_sec, "enabled",
-		gestures_ahk.Enabled == true)
+	local use_metrics = canonical_boolean_or_legacy(met_sec("enabled"),
+		metrics_ahk("metrics_enabled") == true)
+	local use_gestures = canonical_boolean_or_legacy(ges_sec("enabled"),
+		gestures_ahk("Enabled") == true)
 	return {
 		use_ergopti  = use_ergopti  or false,
 		magic_key    = magic_key,
@@ -628,41 +648,40 @@ local function handle_message(body)
 		Logger.info(LOG, "Onboarding locale set to '%s'.", code)
 
 	elseif action == "pickConfigDir" then
-		-- Open the macOS native folder picker via osascript and ship the
-		-- chosen path back to JS so the input box fills in.
-		local seed = type(body.current) == "string" and body.current or ""
-		if seed == "" then
-			-- Default seed = the current config dir resolved by menu_paths,
-			-- so the picker opens somewhere meaningful even on first run.
-			local ok_mp, menu_paths = pcall(require, "ui.menu.menu_paths")
-			if ok_mp and menu_paths then
-				local ok_v, v = pcall(menu_paths.get_config_dir)
-				if ok_v and type(v) == "string" then seed = v end
-			end
+		-- The path editor's picker is the single native folder dialog: the
+		-- wizard's former copy read the raw AppleEvent descriptor instead of the
+		-- parsed result, so the two could disagree on the very same answer.
+		local ok_mp, menu_paths = pcall(require, "ui.menu.menu_paths")
+		if not ok_mp or type(menu_paths) ~= "table" or type(menu_paths.pick_config_dir) ~= "function" then
+			Logger.error(LOG, "pickConfigDir: the native folder picker is unavailable.")
+			return
 		end
-		-- Both values land inside AppleScript string literals, where the
-		-- backslash is itself an escape character. Escaping only the double
-		-- quote left a seed path containing a backslash producing a literal the
-		-- picker could not parse — and the seed is the user-configurable config
-		-- directory, so it is exactly the value most likely to carry one.
-		local script = text_utils.applescript_format([[
-			try
-				set r to choose folder with prompt "%s" default location ((POSIX file "%s") as alias)
-				return POSIX path of r
-			on error
-				return ""
-			end try
-		]], i18n.get("dialog.config_folder.select_title") or "", seed)
-		local ok_as, _r2, raw = hs.osascript.applescript(script)
-		Logger.debug(LOG, "pickConfigDir: ok=%s raw=%s.", tostring(ok_as), tostring(raw))
-		local chosen = type(raw) == "string" and raw or ""
-		chosen = chosen:gsub("^%s+", ""):gsub("%s+$", "")
-		if chosen ~= "" then
-			if not chosen:match("[/\\]$") then chosen = chosen .. "/" end
-			-- Encode the path as a JSON string so AppleScript paths with
-			-- spaces / accents survive the JS eval.
+		local seed = type(body.current) == "string" and body.current or ""
+		local picked, chosen = pcall(menu_paths.pick_config_dir, seed,
+			i18n.get("dialog.config_folder.select_title"))
+		if not picked then
+			Logger.error(LOG, "pickConfigDir: the native folder picker failed: %s.", tostring(chosen))
+			return
+		end
+		Logger.debug(LOG, "pickConfigDir: %s.", type(chosen) == "string" and "folder chosen" or "cancelled")
+		if type(chosen) == "string" and chosen ~= "" then
 			submit_data(owner, view, "setConfigDir", chosen)
 		end
+
+	elseif action == "resolveMetricsPath" then
+		-- The config step was confirmed: name the metrics store of THAT folder in
+		-- the step-4 consent warning. The request number is echoed so the page can
+		-- drop a reply for a folder the user has since changed.
+		if type(body.request) ~= "number" then
+			Logger.error(LOG, "resolveMetricsPath: request number missing.")
+			return
+		end
+		local resolved, path = pcall(M._metrics_path_for, body.config_dir)
+		if not resolved then
+			Logger.error(LOG, "resolveMetricsPath: metrics path unresolved: %s.", tostring(path))
+			return
+		end
+		submit_data(owner, view, "setMetricsPath", { request = body.request, path = path })
 
 	elseif action == "loadExistingConfig" then
 		-- User confirmed a config directory on the config step. Check whether
@@ -838,7 +857,7 @@ function M.run(config_path)
 	local show_ok, candidate = xpcall(function()
 		return ui_builder.show_webview({
 			frame       = ui_builder.get_centered_frame(win_w, win_h),
-			title       = i18n.get("onboarding.welcome.title"),
+			title       = i18n.get(WINDOW_TITLE_KEY),
 			style_masks = style_masks,
 			usercontent = uc,
 			assets_dir    = ASSETS_DIR,

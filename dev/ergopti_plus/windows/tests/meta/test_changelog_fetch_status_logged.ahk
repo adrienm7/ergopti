@@ -66,11 +66,13 @@ _CFSL_EmptyResponseIsLogged() {
 ; A 403/429 is not a network failure, and telling the user to check their
 ; connection is actively misleading.
 _CFSL_RateLimitIsDistinguished() {
-	Body := _DriverFuncBody("_CLW_PollFetch")
-	Assert(Body != "", "_CLW_PollFetch() must exist")
+	; The terminal error is chosen where the last release source fails, after
+	; the API failure (and its status) has been carried through the Atom feed.
+	Body := _DriverFuncBody("_CLW_SourceFailed")
+	Assert(Body != "", "_CLW_SourceFailed() must exist")
 
 	Assert(InStr(Body, "403") > 0,
-		"_CLW_PollFetch must recognise HTTP 403 — GitHub's unauthenticated rate limit is the most common non-200 here")
+		"_CLW_SourceFailed must recognise HTTP 403 — GitHub's unauthenticated rate limit is the most common non-200 here")
 	Assert(InStr(Body, "changelog_window.error_rate_limited") > 0,
 		"a rate-limited fetch must use its own user-facing message rather than the network-error string")
 

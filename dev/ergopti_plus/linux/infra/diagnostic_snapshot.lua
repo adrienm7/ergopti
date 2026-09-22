@@ -23,9 +23,14 @@ local Logger        = require("logger.shim")
 local Snapshot      = require("diagnostics.snapshot")
 local Version       = require("infra.version")
 local ConfigPaths   = require("infra.config_paths")
+local Paths         = require("infra.paths")
 local DisplayServer = require("infra.display_server")
 
 M.DRIVER = "linux"
+
+-- Log tag of the unknown-commit warning. Not Snapshot.MODULE: that tag is the
+-- cross-driver grep key for the single snapshot line.
+local COMMIT_LOG = "BuildCommit"
 
 
 
@@ -93,6 +98,25 @@ end
 -- ====================================
 -- ====================================
 
+--- Resolves the commit this daemon was built from: the package build stamp in
+--- the shared tree (.deb, .rpm, AppImage, Flatpak, tarball), else the git
+--- checkout a source run lives in, else "unknown" with the reason logged. The
+--- single resolver behind the snapshot, the healthcheck and the crash dump.
+--- @param opts table|nil { env, shared_root, source_dir } overrides for tests.
+--- @return string commit Abbreviated commit id or Snapshot.UNKNOWN.
+--- @return string source One of the Snapshot.COMMIT_SOURCE_* values.
+function M.resolve_commit(opts)
+	opts = opts or {}
+	local shared_root = opts.shared_root
+	if shared_root == nil then shared_root = Paths.shared_root() end
+	local commit, source, detail = Snapshot.resolve_commit(opts.env or default_env(), shared_root,
+		opts.source_dir or Paths.driver_root())
+	if source == Snapshot.COMMIT_SOURCE_UNKNOWN then
+		Logger.warn(COMMIT_LOG, "Build commit unknown: %s.", tostring(detail))
+	end
+	return commit, source
+end
+
 --- The daemon's process id, read from /proc so no subprocess is needed.
 --- @param env table|nil Probe override.
 --- @return string|nil
@@ -102,8 +126,8 @@ function M.pid(env)
 end
 
 --- Builds the snapshot values.
---- @param ctx table { script_dir, boot_ms, locale, keyboard_layout, log_level,
----   features_enabled, features_total }
+--- @param ctx table { script_dir, shared_root, boot_ms, locale, keyboard_layout,
+---   log_level, features_enabled, features_total }
 --- @param env table|nil { read = fn(path), exists = fn(path) } probe override.
 --- @return table Field name to raw value.
 function M.collect(ctx, env)
@@ -127,7 +151,9 @@ function M.collect(ctx, env)
 	return {
 		driver           = M.DRIVER,
 		version          = Version.VERSION,
-		commit           = Snapshot.git_commit(env, ctx.script_dir),
+		commit           = (M.resolve_commit({
+			env = env, shared_root = ctx.shared_root, source_dir = ctx.script_dir,
+		})),
 		os               = os_release_value(os_release, "NAME"),
 		os_version       = os_version,
 		arch             = arch,

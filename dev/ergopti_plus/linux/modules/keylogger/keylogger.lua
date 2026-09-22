@@ -410,7 +410,7 @@ function M.init(opts)
 	-- database into a literal directory named "~" beside the process.
 	local ConfigPaths = require("infra.config_paths")
 	_log_dir = options.log_dir or ConfigPaths.config("logs")
-	_sqlite_path = options.sqlite_path or ConfigPaths.data("metrics.sqlite")
+	_sqlite_path = options.sqlite_path or ConfigPaths.metrics_path()
 
 	-- Derive device ID from hostname.
 	local hostname = "linux"

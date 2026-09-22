@@ -14,6 +14,7 @@ M.ACTIONS = {
 	previewLocale = true,
 	localeSelected = true,
 	pickConfigDir = true,
+	resolveMetricsPath = true,
 	loadExistingConfig = true,
 	finish = true,
 	registerGesturesAuto = true,
@@ -27,6 +28,8 @@ local TomlCodec = require("toml_codec")
 local ConfigDirPicker = require("ui.config_dir_picker")
 local LOG = "bridge.onboarding"
 local APP_NAME = "onboarding"
+-- Brand-less window title; webview_manager prefixes the product name.
+local WINDOW_TITLE_KEY = "onboarding.window_title"
 
 local function dependency(state, field, module_name)
 	if type(state[field]) == "table" then return state[field] end
@@ -51,6 +54,22 @@ local function push(state, function_name, payload)
 	return pushed and accepted == true
 end
 
+--- Retitles the wizard window from a locale's strings. WebKitGTK never mirrors
+--- document.title onto the GtkWindow, so the title stayed in the static English
+--- label whatever language the user picked.
+--- @param state table Daemon state and optional test-injected authorities.
+--- @param strings table|nil Locale strings.
+--- @return boolean true when the live window was retitled.
+local function retitle(state, strings)
+	local manager = webview(state)
+	local label = type(strings) == "table" and strings[WINDOW_TITLE_KEY] or nil
+	if not manager or type(manager.set_title) ~= "function" or type(label) ~= "string" then
+		return false
+	end
+	local ok, applied = pcall(manager.set_title, APP_NAME, label)
+	return ok and applied == true
+end
+
 local function locale_available(i18n, code)
 	if not i18n or type(i18n.list_locales) ~= "function" or type(code) ~= "string" then
 		return false
@@ -61,7 +80,7 @@ local function locale_available(i18n, code)
 	return false
 end
 
-local function locale_strings(code, config_paths)
+local function locale_strings(code)
 	local locale_path = Paths.shared("data/locales/" .. code .. ".json")
 	local fh = locale_path and io.open(locale_path, "r") or nil
 	if not fh then
@@ -74,13 +93,6 @@ local function locale_strings(code, config_paths)
 	if not ok or type(strings) ~= "table" then
 		Logger.error(LOG, "Onboarding locale '%s' is invalid.", tostring(code))
 		return nil
-	end
-	local warning = strings["dialog.metrics.enable_warning"]
-	if type(warning) == "string" then
-		local metrics_path = config_paths.data("metrics.sqlite")
-		strings["dialog.metrics.enable_warning_formatted"] = warning:gsub("{1}", function()
-			return metrics_path
-		end)
 	end
 	return strings
 end
@@ -107,8 +119,10 @@ local function build_init_data(state)
 	local gestures = state.gestures
 	return {
 		locale = current_locale,
-		strings = locale_strings(current_locale, config_paths) or {},
+		strings = locale_strings(current_locale) or {},
 		default_config_dir = default_dir,
+		-- The page fills the step-4 consent warning with this path.
+		metrics_path = config_paths.metrics_path(),
 		system_layout = type(state.layout) == "string" and state.layout or "",
 		platform = "linux",
 		locales = require("_generated.locale_table"),
@@ -127,22 +141,37 @@ end
 
 local normalize_config_dir = ConfigDirPicker.normalize
 
-local function canonical_bool(section, key, fallback)
-	if type(section) ~= "table" or section[key] == nil then return fallback end
-	return section[key] == true or section[key] == "true"
+local function canonical_bool(value, fallback)
+	if value == nil then return fallback end
+	return value == true or value == "true"
 end
 
-local function answers_from_config(parsed, config_dir)
+--- Extracts wizard answers from a decoded config.toml table.
+--- @param parsed table Decoded config.toml.
+--- @param config_dir string Directory shown to the wizard.
+--- @param mark function|nil mark(...segments) for each key present and read;
+---   the unused-key cleanup never offers a key this import reads.
+--- @return table answers
+local function answers_from_config(parsed, config_dir, mark)
 	if type(parsed) ~= "table" then return { config_dir = config_dir } end
-	local hotstrings = type(parsed.hotstrings) == "table" and parsed.hotstrings or {}
-	local metrics = type(parsed.metrics) == "table" and parsed.metrics or {}
-	local gestures = type(parsed.gestures) == "table" and parsed.gestures or {}
+	local function section(name)
+		local values = type(parsed[name]) == "table" and parsed[name] or {}
+		return function(key)
+			local value = values[key]
+			if value ~= nil and mark then mark(name, key) end
+			return value
+		end
+	end
+	local hotstrings = section("hotstrings")
+	local metrics = section("metrics")
+	local gestures = section("gestures")
+	local trigger_char = hotstrings("trigger_char")
 	return {
 		config_dir = config_dir,
-		use_ergopti = canonical_bool(hotstrings, "enabled", true),
-		magic_key = type(hotstrings.trigger_char) == "string" and hotstrings.trigger_char or nil,
-		use_metrics = canonical_bool(metrics, "enabled", false),
-		use_gestures = canonical_bool(gestures, "enabled", false),
+		use_ergopti = canonical_bool(hotstrings("enabled"), true),
+		magic_key = type(trigger_char) == "string" and trigger_char or nil,
+		use_metrics = canonical_bool(metrics("enabled"), false),
+		use_gestures = canonical_bool(gestures("enabled"), false),
 	}
 end
 
@@ -311,20 +340,32 @@ function M.on_message(payload, state)
 	if action == "ready" then
 		local data = build_init_data(state)
 		if not data then return { pushed = false } end
-		return { pushed = push(state, "initData", data), data = data }
+		return { pushed = push(state, "initData", data), data = data,
+			titled = retitle(state, data.strings) }
 	elseif action == "previewLocale" then
 		local i18n = dependency(state, "i18n", "infra.i18n")
-		local config_paths = dependency(state, "config_paths", "infra.config_paths")
 		if not locale_available(i18n, payload.locale) then return { pushed = false } end
-		local strings = locale_strings(payload.locale, config_paths)
-		return { pushed = strings ~= nil and push(state, "applyStrings", {
+		local strings = locale_strings(payload.locale)
+		if not strings then return { pushed = false } end
+		return { pushed = push(state, "applyStrings", {
 			locale = payload.locale, strings = strings,
-		}) }
+		}), titled = retitle(state, strings) }
 	elseif action == "localeSelected" then
 		local i18n = dependency(state, "i18n", "infra.i18n")
 		return { accepted = locale_available(i18n, payload.locale) }
 	elseif action == "pickConfigDir" then
 		return pick_config_dir(state, payload.current)
+	elseif action == "resolveMetricsPath" then
+		-- The store lives in the data directory and does not follow the chosen
+		-- configuration folder; answering keeps the page on the keylogger's path.
+		local config_paths = dependency(state, "config_paths", "infra.config_paths")
+		if type(payload.request) ~= "number" or not config_paths then
+			Logger.error(LOG, "resolveMetricsPath refused — request number or path authority missing.")
+			return { pushed = false }
+		end
+		local path = config_paths.metrics_path()
+		return { pushed = push(state, "setMetricsPath", { request = payload.request, path = path }),
+			path = path }
 	elseif action == "loadExistingConfig" then
 		local config_paths = dependency(state, "config_paths", "infra.config_paths")
 		local chosen = config_paths and normalize_config_dir(config_paths, payload.config_dir) or nil

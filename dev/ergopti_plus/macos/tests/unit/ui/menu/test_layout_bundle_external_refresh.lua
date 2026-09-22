@@ -162,7 +162,7 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 						updateMenu = function() end,
 					})
 					local labels_seen = {}
-					for _, item in ipairs(built.items) do
+					for _, item in ipairs(built.submenu) do
 						labels_seen[#labels_seen + 1] = tostring(item.label)
 						if type(item.label) == "string"
 							and item.label:find("user", 1, true) ~= nil then

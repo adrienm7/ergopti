@@ -275,7 +275,7 @@ helpers.describe("Config.save_user_config — normal saves are untouched", funct
 			"the writer must revalidate the exact classified bytes before publication")
 		helpers.assert_true(payload ~= nil,
 			"a valid config must still be re-encoded and written — the guard must not block healthy saves")
-		helpers.assert_true(payload:find("enabled = true", 1, true) ~= nil,
+		helpers.assert_true(payload:find("sticky_timeout_ms = 1000", 1, true) ~= nil,
 			"the produced payload must carry the new state: got " .. helpers.inspect(payload))
 		helpers.assert_true(logged:find("Refusing to overwrite") == nil,
 			"a decodable config must never trigger the corruption refusal")
@@ -305,7 +305,7 @@ helpers.describe("Config.save_user_config — normal saves are untouched", funct
 			"the explicit reset intentionally discards the corrupt source snapshot")
 		helpers.assert_true(payload ~= nil,
 			"the explicit reset must be allowed to overwrite an unparseable config")
-		helpers.assert_true(payload:find("enabled = true", 1, true) ~= nil,
+		helpers.assert_true(payload:find("sticky_timeout_ms = 1000", 1, true) ~= nil,
 			"the reset must publish the supplied state, not the corrupt bytes")
 	end)
 

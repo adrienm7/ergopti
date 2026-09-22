@@ -680,6 +680,20 @@ function M.set_config_dir(new_dir)
 	return config_dir() ~= old_dir
 end
 
+--- Metrics store directory of a configuration directory. The single rule shared
+--- by the keylogger (where keystrokes are written) and the onboarding consent
+--- text (where the user is told they will be written).
+--- @param dir string|nil Configuration directory; nil means the current one.
+--- @return string <dir>/metrics, without trailing slash.
+function M.metrics_dir(dir)
+	if dir == nil then dir = config_dir() end
+	if type(dir) ~= "string" or dir == "" then
+		error("config_paths.metrics_dir: a configuration directory is required", 2)
+	end
+	if not dir:match("[/\\]$") then dir = dir .. "/" end
+	return dir .. "metrics"
+end
+
 --- Ensures a directory exists. Exposed because the path editor creates the
 --- directory the user typed before it is stored.
 --- @param path string Absolute path with trailing slash.

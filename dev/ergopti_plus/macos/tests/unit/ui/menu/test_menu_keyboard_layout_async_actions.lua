@@ -61,10 +61,10 @@ helpers.describe("menu_keyboard_layout: async layout selection", function()
 				base_dir = "/tmp/ergopti/",
 				updateMenu = function() refreshes = refreshes + 1 end,
 			})
-			helpers.assert_eq(#built.items, 1, "the manifest provider must expose the active row")
-			helpers.assert_true(type(built.items[1].action) == "function")
+			helpers.assert_eq(#built.submenu, 1, "the manifest provider must expose the active row")
+			helpers.assert_true(type(built.submenu[1].action) == "function")
 
-			built.items[1].action()
+			built.submenu[1].action()
 			helpers.assert_eq(dispatches, 0, "the TIS dispatch remains outside the menu callback frame")
 			helpers.assert_eq(#scheduled, 1)
 			scheduled[1].callback()
@@ -157,11 +157,11 @@ local function exercise_bundle_action(operation, business_ok)
 		})
 		local action = nil
 		if operation == "upgrade" then
-			for _, row in ipairs(built.items) do
+			for _, row in ipairs(built.submenu) do
 				if row.label == "menu.layout.update_list" then action = row.action end
 			end
 		else
-			for _, row in ipairs(built.items) do
+			for _, row in ipairs(built.submenu) do
 				if type(row.items) == "table" and row.items[1] then
 					action = row.items[1].action
 				end
@@ -247,7 +247,7 @@ helpers.describe("menu_keyboard_layout: mixed stable and legacy state", function
 
 			local cleanup_row = nil
 			local installed_row = nil
-			for _, row in ipairs(built.items) do
+			for _, row in ipairs(built.submenu) do
 				if row.label == "menu.layout.update_list" then cleanup_row = row end
 				if row.label == "menu.layout.in_list" then installed_row = row end
 			end

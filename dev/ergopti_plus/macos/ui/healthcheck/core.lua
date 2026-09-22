@@ -230,6 +230,12 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.screen_capture",
+		contract = { "permission_state", "request_permission", "open_permission_settings",
+			"clipboard_change_count", "clipboard_has_image", "copy_image_file_to_clipboard" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.app_launcher",
 		contract = { "launch", "launchWithArgs", "isRunning" },
 		wired    = true,
@@ -527,10 +533,12 @@ function M.run()
 		keylogger        = safe_collect("keylogger_summary",   H.collect_keylogger_summary),
 		llm              = safe_collect("llm_state",           H.collect_llm_state),
 		layout           = safe_collect("layout_state",        H.collect_layout_state),
+		remap            = safe_collect("remap_state",         H.collect_remap_state),
 		hotstrings       = safe_collect("hotstrings_state",    H.collect_hotstrings_state),
 		logs             = safe_collect("logs_info",           H.collect_logs_info),
 		config           = safe_collect("config_summary",      H.collect_config_summary),
 		coverage         = safe_collect("platform_coverage",   H.collect_platform_coverage),
+		permissions      = safe_collect("permissions",         H.collect_permissions),
 	}
 
 	Logger.success(LOG, "Healthcheck complete — %d/%d adapter(s) wired, %d contract-healthy, %d failed, uptime %ds.",
@@ -664,20 +672,21 @@ function M.show_window()
 		return false
 	end
 
+	-- The same chrome as every other Ergopti window (title bar, drop shadow,
+	-- floating level), from the one function that defines it.
 	local masks = hs.webview.windowMasks
-	local ok_style, style_err = pcall(function()
-		wv:windowStyle((masks["titled"] or 1) + (masks["closable"] or 2) + (masks["miniaturizable"] or 4))
-	end)
-	if not ok_style then Logger.warn(LOG, "windowStyle() failed: %s.", tostring(style_err)) end
+	for _, step in ipairs(ui_builder.window_chrome_steps(wv, {
+		style_masks = (masks["titled"] or 1) + (masks["closable"] or 2) + (masks["miniaturizable"] or 4),
+	})) do
+		local ok_step, step_err = pcall(step.apply)
+		if not ok_step then Logger.warn(LOG, "%s() failed: %s.", step.name, tostring(step_err)) end
+	end
 
 	pcall(function() wv:windowTitle(title) end)
 	pcall(function() wv:allowTextEntry(true) end)
 	pcall(function() wv:allowNewWindows(false) end)
 	pcall(function() wv:allowGestures(false) end)
 
-	-- floating ensures the window appears on top of the menu bar and other apps
-	local ok_lvl, lvl_err = pcall(function() wv:level(hs.drawing.windowLevels.floating) end)
-	if not ok_lvl then Logger.warn(LOG, "wv:level(floating) failed: %s.", tostring(lvl_err)) end
 
 	-- Wire up the copy-and-close button using a flag polled from Lua.
 	-- WKWebView rejects custom URL schemes (ergopti://) with NSURLErrorDomain -1002
@@ -843,7 +852,8 @@ function M.format_plain(snapshot)
 	table.insert(lines, "=== System diagnostic ===")
 	table.insert(lines, "")
 	table.insert(lines, string.format("Version          : %s", s.version))
-	table.insert(lines, string.format("Last git commit  : %s", tostring(sys.git_hash or "unknown")))
+	table.insert(lines, string.format("Last git commit  : %s%s", tostring(sys.git_hash or "unknown"),
+		sys.commit_source and (" (" .. tostring(sys.commit_source) .. ")") or ""))
 	table.insert(lines, string.format("Uptime           : %s", H.format_uptime(s.uptime_sec)))
 	table.insert(lines, string.format("Hammerspoon      : %s", tostring(sys.hs_version or "?")))
 	table.insert(lines, string.format("macOS            : %s", tostring(sys.os_version or "?")))
@@ -864,12 +874,19 @@ function M.format_plain(snapshot)
 	if sys.config_dir and sys.config_dir ~= "" then
 		table.insert(lines, string.format("Config dir       : %s", sys.config_dir))
 	end
+	if sys.script_dir and sys.script_dir ~= "" then
+		table.insert(lines, string.format("Script dir       : %s", sys.script_dir))
+	end
 	table.insert(lines, "")
 	table.insert(lines, string.format("Warnings         : %d", s.warn_count or 0))
 	table.insert(lines, string.format("Errors           : %d", s.err_count  or 0))
 	table.insert(lines, "")
 
 	-- Enriched sections (maximum diagnostic value)
+	if s.permissions then
+		table.insert(lines, string.format("Accessibility    : %s", tostring(s.permissions.accessibility)))
+		table.insert(lines, string.format("Screen Recording : %s", tostring(s.permissions.screen_recording)))
+	end
 	if s.pause_state then
 		local ps = s.pause_state
 		table.insert(lines, string.format("Pause / Suspend  : %s (%s)", ps.is_paused and "PAUSED" or "running", ps.source or "unknown"))
@@ -890,6 +907,13 @@ function M.format_plain(snapshot)
 	if s.layout then
 		local ly = s.layout
 		table.insert(lines, string.format("Layout           : base=%s altgr=%s shift=%s caps=%s prefix_latch=%s", tostring(ly.ergopti_base), tostring(ly.altgr), tostring(ly.shift), tostring(ly.caps), tostring(ly.prefix_latch)))
+	end
+	if s.remap then
+		local rm = s.remap
+		table.insert(lines, string.format("Remap engine     : phase=%s guardian=%s", tostring(rm.phase), tostring(rm.guardian_status)))
+		if rm.approval_required then
+			table.insert(lines, "ACTION REQUIRED  : approve ErgoptiPlus in System Settings > General > Login Items")
+		end
 	end
 	if s.hotstrings then
 		local hs = s.hotstrings

@@ -13,7 +13,9 @@ local helpers = require("tests.helpers")
 
 local SUBJECT_MODULES = {
 	"adapters.file_system",
+	"adapters.screen_capture",
 	"adapters.shell_runner",
+	"modules.shortcuts.actions.screen_capture_flow",
 	"infra.i18n",
 	"infra.logger",
 	"infra.notifications",
@@ -43,7 +45,19 @@ local function with_subject(options, scenario)
 			if path == "~" then return modes.home or "/tmp/hs015-home" end
 			return path
 		end,
+		-- Every finished capture wrote its image; the verdict itself is covered
+		-- by test_screen_capture_verdicts.lua.
+		classify_no_follow = function() return { mode = "file", size = 64 }, "ok" end,
 	}
+	package.loaded["adapters.screen_capture"] = {
+		permission_state = function() return true end,
+		request_permission = function() return true end,
+		open_permission_settings = function() return true end,
+		clipboard_change_count = function() return 1 end,
+		clipboard_has_image = function() return true end,
+		copy_image_file_to_clipboard = function() return true end,
+	}
+	package.loaded["modules.shortcuts.actions.screen_capture_flow"] = nil
 	package.loaded["infra.i18n"] = {
 		get = function(key)
 			if key == "shortcuts.saved" then return "Saved %s" end

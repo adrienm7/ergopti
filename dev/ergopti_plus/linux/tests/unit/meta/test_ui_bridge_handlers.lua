@@ -851,7 +851,7 @@ helpers.describe("ui.bridge_handlers", function()
 				metrics = false, gestures = false, locale = "en",
 				config_dir = "/tmp/ergopti-default",
 			}
-			local captured = { pushes = {}, writes = {}, hidden = 0, changed = 0 }
+			local captured = { pushes = {}, writes = {}, hidden = 0, changed = 0, titles = {} }
 			local state = {
 				layout = "qwerty",
 				config = {
@@ -896,6 +896,7 @@ helpers.describe("ui.bridge_handlers", function()
 					get_config_dir = function() return values.config_dir end,
 					set_config_dir = function(value) values.config_dir = value; return true end,
 					data = function(rel) return "/tmp/data/" .. rel end,
+					metrics_path = function() return "/tmp/data/metrics.sqlite" end,
 				},
 				writer = {
 					batch_write = function(path, updates)
@@ -911,6 +912,10 @@ helpers.describe("ui.bridge_handlers", function()
 					hide = function(app)
 						helpers.assert_eq(app, "onboarding")
 						captured.hidden = captured.hidden + 1
+					end,
+					set_title = function(app, label)
+						captured.titles[#captured.titles + 1] = { app = app, label = label }
+						return true
 					end,
 				},
 				on_config_changed = function() captured.changed = captured.changed + 1 end,
@@ -955,6 +960,70 @@ helpers.describe("ui.bridge_handlers", function()
 			helpers.assert_eq(handler.on_message({
 				action = "localeSelected", locale = "xx",
 			}, state).accepted, false)
+		end)
+
+		helpers.it("(onboarding-window-title) retitles the window in the previewed locale", function()
+			local state, _, captured = onboarding_state()
+			local result = handler.on_message({ action = "previewLocale", locale = "fr" }, state)
+			helpers.assert_true(result.titled)
+			helpers.assert_eq(captured.titles[1], { app = "onboarding", label = "Configuration" })
+		end)
+
+		helpers.it("(onboarding-window-title) titles the window in the current locale on ready", function()
+			local state, _, captured = onboarding_state()
+			local result = handler.on_message({ action = "ready" }, state)
+			helpers.assert_true(result.titled)
+			helpers.assert_eq(captured.titles[1], { app = "onboarding", label = "Setup" })
+		end)
+
+		helpers.it("(onboarding-window-title) an unshipped locale leaves the title alone", function()
+			local state, _, captured = onboarding_state()
+			local result = handler.on_message({ action = "previewLocale", locale = "xx" }, state)
+			helpers.assert_eq(result.pushed, false)
+			helpers.assert_eq(#captured.titles, 0)
+		end)
+
+		helpers.it("(onboarding-metrics-path) initData carries the keylogger's metrics store", function()
+			local state = onboarding_state()
+			local result = handler.on_message({ action = "ready" }, state)
+			helpers.assert_eq(result.data.metrics_path, "/tmp/data/metrics.sqlite")
+			helpers.assert_type(result.data.strings["dialog.metrics.enable_warning"], "string")
+			helpers.assert_nil(result.data.strings["dialog.metrics.enable_warning_formatted"],
+				"a pre-formatted warning freezes the path at open time")
+		end)
+
+		helpers.it("(onboarding-metrics-path) a chosen folder answers with the same store", function()
+			local state, _, captured = onboarding_state()
+			local result = handler.on_message({ action = "resolveMetricsPath",
+				config_dir = "/tmp/elsewhere/", request = 4 }, state)
+			helpers.assert_true(result.pushed)
+			helpers.assert_eq(result.path, "/tmp/data/metrics.sqlite",
+				"the Linux store lives in the data dir and must not follow the config folder")
+			helpers.assert_contains(captured.pushes[1].code, "window.setMetricsPath")
+			helpers.assert_contains(captured.pushes[1].code, '"request":4')
+		end)
+
+		helpers.it("(onboarding-metrics-path) a request without its number is refused", function()
+			local state, _, captured = onboarding_state()
+			local result = handler.on_message({ action = "resolveMetricsPath", config_dir = "/x" }, state)
+			helpers.assert_eq(result.pushed, false)
+			helpers.assert_eq(#captured.pushes, 0)
+		end)
+
+		helpers.it("(onboarding-metrics-path) the real resolver names the keylogger store", function()
+			local ConfigPaths = helpers.load_module("infra.config_paths")
+			helpers.assert_eq(ConfigPaths.metrics_path(), ConfigPaths.data("metrics.sqlite"))
+		end)
+
+		helpers.it("(onboarding-window-title) the product name appears once in the window title", function()
+			local manager = helpers.load_module("ui.webview_manager")
+			local title = manager.window_title("Setup")
+			helpers.assert_eq(title, "Ergopti — Setup")
+			local _, count = title:gsub("Ergopti", "")
+			helpers.assert_eq(count, 1)
+			helpers.assert_eq(manager.window_title(""), "Ergopti")
+			helpers.assert_eq(manager.set_title("onboarding", "Setup"), false,
+				"retitling a window that is not open must report failure")
 		end)
 
 		helpers.it("preserves explicit false values while loading an existing config", function()
@@ -1238,6 +1307,10 @@ helpers.describe("ui.bridge_handlers", function()
   helpers.describe("changelog_bridge", function()
     local handler = helpers.load_module("ui.changelog.bridge")
     local state = build_mock_state()
+    -- The native fetch is covered by test_changelog_release_sources; keep these
+    -- protocol cases off the network.
+    handler._http_get = function() end
+    handler._push = function() return true end
 
     helpers.it("has correct bridge_name", function()
       helpers.assert_eq(handler.bridge_name, "changelog_bridge")

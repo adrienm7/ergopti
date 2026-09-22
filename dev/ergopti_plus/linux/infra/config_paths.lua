@@ -157,4 +157,12 @@ function M.data(rel)
 	return (base .. "/" .. (rel:gsub("^/+", "")))
 end
 
+--- The keylogger's metrics store. It lives in the data directory, so it does not
+--- move with the configuration directory; the onboarding consent text and the
+--- keylogger both read it here so they cannot name different files.
+--- @return string Absolute path of metrics.sqlite.
+function M.metrics_path()
+	return M.data("metrics.sqlite")
+end
+
 return M

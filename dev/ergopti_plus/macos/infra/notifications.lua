@@ -122,10 +122,15 @@ end
 --- @param title_or_msg string Main title when body is provided, or message when body is omitted.
 --- @param body string|nil Optional detail body.
 --- @param kind string|nil Optional type: "success" | "error" | "warning" | "info".
+--- @param on_click function|nil What a click does instead of bringing the app to
+---        the front, for a notice that asks the user to act somewhere else.
 --- @return boolean dispatched True only when the native notification accepted send().
 --- @return string|nil error_message Exact native refusal detail.
-function M.notify(title_or_msg, body, kind)
+function M.notify(title_or_msg, body, kind, on_click)
 	if title_or_msg == nil then return false, "notification title is required" end
+	if on_click ~= nil and type(on_click) ~= "function" then
+		return false, "notification click action must be a function"
+	end
 	local title_text = "Ergopti+"
 	local info_text = tostring(title_or_msg)
 
@@ -141,6 +146,10 @@ function M.notify(title_or_msg, body, kind)
 	local created, notification_or_err = xpcall(function()
 		return hs.notify.new(function()
 			if owner_id then release_notification(owner_id) end
+			if type(on_click) == "function" then
+				run_click_step("action", on_click)
+				return
+			end
 			if type(hs.focus) == "function" then
 				run_click_step("global focus", hs.focus)
 			end

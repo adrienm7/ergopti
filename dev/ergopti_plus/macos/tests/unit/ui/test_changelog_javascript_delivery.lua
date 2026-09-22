@@ -44,6 +44,8 @@ helpers.describe("changelog JavaScript delivery", function()
 				if ready then post("ready") end
 				post({ action = "fetch", channel = "main" })
 				state.callbacks[1](503, "", {})
+				-- A failed API request tries the Atom feed before the error state.
+				state.callbacks[2](503, "", {})
 				if not ready then post("ready") end
 				helpers.assert_true(state.evaluations[1]:find("injectError", 1, true) ~= nil)
 				state.javascript_callbacks[1](nil, { message = "PRIVATE_SCRIPT" })

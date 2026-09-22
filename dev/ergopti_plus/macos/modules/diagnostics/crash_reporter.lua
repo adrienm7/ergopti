@@ -107,6 +107,33 @@ local function _driver_version()
 	return "unknown"
 end
 
+--- The commit the driver was built from and where that answer came from. Read
+--- on every report, not only with system probes: it costs a few file reads, and
+--- "which build crashed" is the first question a report has to answer.
+--- @return string commit Abbreviated commit id or "unknown".
+--- @return string source "build", "git" or "unknown".
+local function _build_commit()
+	local ok, commit, source = pcall(function()
+		return require("infra.diagnostic_snapshot").resolve_commit()
+	end)
+	if ok then return commit, source end
+	Logger.error(LOG, "Build commit resolution raised: %s.", tostring(commit))
+	return "unknown", "unknown"
+end
+
+--- The configuration directory the driver reads config.toml from — never
+--- hs.configdir, which inside the packaged app is the bundle's resources.
+--- @return string Absolute path, or "" when config_paths is not initialised.
+local function _config_dir()
+	local ok, ConfigPaths = pcall(require, "infra.config_paths")
+	if ok and type(ConfigPaths) == "table" and type(ConfigPaths.is_initialized) == "function"
+		and ConfigPaths.is_initialized() then
+		return ConfigPaths.get_config_dir()
+	end
+	Logger.warn(LOG, "config_paths is not initialised — the report carries no configuration directory.")
+	return ""
+end
+
 --- Serialises a report table to a compact JSON string.
 --- Uses hs.json.encode when available; falls back to a hand-built serialiser.
 --- @param report table The report produced by M.report().
@@ -122,7 +149,7 @@ local function _to_json(report)
 		"version", "driver", "timestamp",
 		"error_msg", "stack_trace",
 		"os_version", "hs_version", "screen_res", "locale",
-		"config_dir", "git_hash",
+		"config_dir", "script_dir", "git_hash", "commit_source",
 		"active_app", "active_title",
 		"uptime_sec",
 		"adapters_ok", "adapters_failed",
@@ -254,6 +281,10 @@ function M.report(err, context)
 		log_tail = table.concat(all_lines, "\n")
 	end
 
+	local git_hash, commit_source = _build_commit()
+	local script_dir = ""
+	if type(hs) == "table" and type(hs.configdir) == "string" then script_dir = hs.configdir end
+
 	local result = {
 		-- Identification
 		version     = _driver_version(),
@@ -267,8 +298,10 @@ function M.report(err, context)
 		hs_version  = sys.hs_version  or "unknown",
 		screen_res  = sys.screen_res  or "unknown",
 		locale      = sys.locale      or "unknown",
-		config_dir  = sys.config_dir  or "",
-		git_hash    = sys.git_hash    or "unknown",
+		config_dir  = _config_dir(),
+		script_dir  = script_dir,
+		git_hash    = git_hash,
+		commit_source = commit_source,
 		-- Runtime context
 		uptime_sec   = tostring(uptime_sec),
 		-- Adapter / session health

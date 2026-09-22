@@ -18,7 +18,9 @@
 //       wired_count, adapter_count, unwired_adapters,  (macOS only)
 //       event_tap_timeout_telemetry,                    (macOS only)
 //       last_error, recent_issues,
-//       pause_state, keylogger, llm, layout, hotstrings, logs, config
+//       pause_state, keylogger, llm, layout, hotstrings, logs, config,
+//       remap                                           (macOS only)
+//       permissions                                     (macOS only)
 // ===========================================================================
 
 /**
@@ -51,6 +53,18 @@ function row(field, value) {
 }
 
 /**
+ * Renders one macOS privacy permission state; anything but "granted" is a
+ * failure because the matching feature cannot work without it.
+ * @param {string} state "granted", "missing", or "unknown (...)"
+ * @returns {string} HTML-safe value
+ */
+function permissionValue(state) {
+	var text = escapeHtml(String(state || 'unknown'));
+	var cls = state === 'granted' ? 'ok' : 'fail';
+	return '<span class="' + cls + '">' + text + '</span>';
+}
+
+/**
  * Renders the complete healthcheck report into #content.
  * @param {object} s - Snapshot from HealthCheck_Run() / M.run()
  */
@@ -75,7 +89,11 @@ window.renderHealthcheck = function (s) {
 	html += '<table><tr><th>Field</th><th>Value</th></tr>';
 
 	html += row('ErgoptiPlus version', escapeHtml(String(s.version || '')));
-	html += row('Last git commit', escapeHtml(String(sys.git_hash || 'unknown')));
+	// commit_source says whether the id comes from a package's build stamp or a
+	// source checkout, so a release build and a dev run of it are told apart.
+	var commit = String(sys.git_hash || 'unknown');
+	if (sys.commit_source) commit += ' (' + String(sys.commit_source) + ')';
+	html += row('Last git commit', escapeHtml(commit));
 	html += row('Uptime', escapeHtml(formatUptime(s.uptime_sec)));
 
 	// OS-specific rows: detect the driver by the presence of ahk_version vs hs_version
@@ -96,6 +114,10 @@ window.renderHealthcheck = function (s) {
 		}
 		html += row('macOS', escapeHtml(String(sys.os_version || '?')));
 		html += row('Architecture', escapeHtml(String(sys.arch || '?')));
+		if (s.permissions) {
+			html += row('Accessibility', permissionValue(s.permissions.accessibility));
+			html += row('Screen Recording', permissionValue(s.permissions.screen_recording));
+		}
 	}
 
 	html += row('CPU', escapeHtml(String(sys.cpu_name || sys.cpu_model || '?')));
@@ -130,6 +152,11 @@ window.renderHealthcheck = function (s) {
 	if (sys.config_dir) {
 		html += row('Config dir', '<code>' + escapeHtml(String(sys.config_dir)) + '</code>');
 	}
+	// Where the driver's scripts run from: inside a packaged app this is the
+	// bundle, which is why it must never be presented as the config dir.
+	if (sys.script_dir) {
+		html += row('Script dir', '<code>' + escapeHtml(String(sys.script_dir)) + '</code>');
+	}
 
 	html += '</table>';
 
@@ -148,7 +175,7 @@ window.renderHealthcheck = function (s) {
 	html += '</table>';
 
 	// ── Runtime state ────────────────────────────────────────────────────
-	if (s.pause_state || s.layout || s.llm || s.keylogger || s.hotstrings || s.logs) {
+	if (s.pause_state || s.layout || s.remap || s.llm || s.keylogger || s.hotstrings || s.logs) {
 		html += '<h2>Runtime state</h2>';
 		html += '<table><tr><th>Field</th><th>Value</th></tr>';
 
@@ -167,6 +194,17 @@ window.renderHealthcheck = function (s) {
 			html += row('Shift', escapeHtml(String(ly.shift)));
 			html += row('Caps', escapeHtml(String(ly.caps)));
 			html += row('Prefix latch', escapeHtml(String(ly.prefix_latch)));
+		}
+
+		// macOS only: the remap engine has no tray row, so a helper held until
+		// Login Items approval is reported here as well as by a notification.
+		if (s.remap) {
+			var rm = s.remap;
+			html += row('Remap engine', escapeHtml(String(rm.phase)));
+			var approvalVal = rm.approval_required
+				? '<span class="fail">required: System Settings &gt; General &gt; Login Items</span>'
+				: '<span class="ok">' + escapeHtml(String(rm.guardian_status)) + '</span>';
+			html += row('Login Items approval', approvalVal);
 		}
 
 		if (s.llm) {

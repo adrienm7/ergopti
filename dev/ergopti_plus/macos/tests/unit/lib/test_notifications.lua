@@ -127,6 +127,33 @@ helpers.describe("notifications.notify", function()
 		helpers.assert_contains(rendered, "Notification click global focus failed")
 		helpers.assert_contains(rendered, "Notification click application activation failed")
 	end)
+
+	-- A notice that asks the user to act elsewhere (Login Items approval) opens
+	-- that place on click instead of bringing the app to the front.
+	helpers.it("runs a supplied click action instead of focusing the app", function()
+		local click = nil
+		_G.hs.notify.new = function(callback)
+			click = callback
+			local native = {}
+			native.send = function() return native end
+			return native
+		end
+		local focused, acted = 0, 0
+		local original_focus = _G.hs.focus
+		_G.hs.focus = function() focused = focused + 1 end
+		local dispatched = notifications.notify("approve", nil, "warning", function() acted = acted + 1 end)
+		helpers.assert_true(dispatched)
+		click()
+		_G.hs.focus = original_focus
+		helpers.assert_eq(acted, 1, "the click action must run")
+		helpers.assert_eq(focused, 0, "the app must not steal focus from the place the notice opens")
+	end)
+
+	helpers.it("refuses a click action that is not a function", function()
+		local dispatched, detail = notifications.notify("approve", nil, "warning", "open")
+		helpers.assert_eq(dispatched, false)
+		helpers.assert_contains(detail, "click action")
+	end)
 end)
 
 

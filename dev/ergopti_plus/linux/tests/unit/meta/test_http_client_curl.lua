@@ -236,6 +236,21 @@ helpers.describe("http_client: asynchronous curl ownership", function()
 		helpers.assert_true(not client.isActive(), "ownership clears after completion")
 	end)
 
+	helpers.it("inherits the proxy environment that curl reads itself", function()
+		-- Behind a corporate proxy curl only reaches GitHub through
+		-- https_proxy/all_proxy/no_proxy. A replaced environment or an explicit
+		-- proxy override would silently route around the user's configuration.
+		local client, state = fresh_client()
+		client.get("https://github.com/adrienm7/ergopti/releases.atom", {}, {
+			timeout_ms = 1000, https_only = true, follow_redirects = true,
+		}, function() end)
+		helpers.assert_eq(state.options.env, nil, "curl must inherit the daemon environment")
+		for _, arg in ipairs(state.options.args) do
+			helpers.assert_true(arg ~= "--noproxy" and arg ~= "--proxy" and arg ~= "-x",
+				"curl must keep its environment proxy selection")
+		end
+	end)
+
 	helpers.it("preserves an HTTP error status", function()
 		local client, state = fresh_client()
 		local result = nil

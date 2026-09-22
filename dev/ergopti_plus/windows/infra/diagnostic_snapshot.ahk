@@ -173,6 +173,48 @@ DiagSnapshot_GitCommit(StartDir) {
 	return RegExMatch(Sha, "^[0-9a-f]{40}$") ? SubStr(Sha, 1, SHORT_SHA_LENGTH) : ""
 }
 
+; The commit a compiled release was stamped with (CI replaces the placeholder in
+; infra/bundle.ahk), abbreviated like every other commit in the diagnostics.
+; @param Stamp {String} Raw BUNDLE_COMMIT value; defaults to the global.
+; @returns {Map} { commit, error }: commit is "" when there is no valid stamp,
+;   error explains a present stamp that is not a full commit id.
+DiagSnapshot_BuildCommit(Stamp?) {
+	global BUNDLE_COMMIT
+	static SHORT_SHA_LENGTH := 9
+	if !IsSet(Stamp)
+		Stamp := IsSet(BUNDLE_COMMIT) ? BUNDLE_COMMIT : ""
+	if (Stamp == "" || Stamp == "__BUNDLE_COMMIT__")
+		return Map("commit", "", "error", "")
+	if !RegExMatch(Stamp, "i)^[0-9a-f]{40}$")
+		return Map("commit", "", "error", "BUNDLE_COMMIT '" . Stamp . "' is not a full commit id")
+	return Map("commit", SubStr(StrLower(Stamp), 1, SHORT_SHA_LENGTH), "error", "")
+}
+
+; Resolves the commit the running driver was built from: the build stamp of a
+; compiled release, else the git checkout a source run lives in, else
+; "unknown" with the reason logged. The single resolver behind the snapshot,
+; the healthcheck and the crash report, so the three can never disagree.
+; @param StartDir {String} Directory the git lookup starts from.
+; @param Stamp {String} Raw BUNDLE_COMMIT override, for tests.
+; @returns {Map} { commit, source }: source is "build", "git" or "unknown".
+DiagSnapshot_ResolveCommit(StartDir := A_ScriptDir, Stamp?) {
+	Built := IsSet(Stamp) ? DiagSnapshot_BuildCommit(Stamp) : DiagSnapshot_BuildCommit()
+	if (Built["commit"] != "")
+		return Map("commit", Built["commit"], "source", "build")
+	; A stamp that is present but malformed is a broken build, not a source run:
+	; answering from git would hide the defect behind a plausible id.
+	Reason := Built["error"]
+	if (Reason == "") {
+		Sha := DiagSnapshot_GitCommit(StartDir)
+		if (Sha != "")
+			return Map("commit", Sha, "source", "git")
+		Reason := "no build stamp and '" . StartDir . "' is not inside a git checkout"
+	}
+	; Not the Diagnostics tag: that one is the grep key of the snapshot line.
+	try LoggerWarn("BuildCommit", "Build commit unknown: {1}.", Reason)
+	return Map("commit", "unknown", "source", "unknown")
+}
+
 ; The Windows product name and build. ProductName still says "Windows 10" on
 ; Windows 11, whose builds start at 22000, so the name is corrected from the
 ; build number instead of being reported wrong.
@@ -250,11 +292,10 @@ _DiagSnapshot_CountLeaves(Node, Counts) {
 ; @param BootMs {Integer} Total boot duration.
 ; @returns {Map}
 DiagSnapshot_Collect(BootMs) {
-	global BUNDLE_COMMIT, LOGGER_MIN_LEVEL, _ConfigDir, Features
+	global LOGGER_MIN_LEVEL, _ConfigDir, Features
 	Values := Map("driver", "windows", "display", "win32", "boot_ms", BootMs)
 	Values["version"] := IsSet(Updater_CurrentVersion) ? Updater_CurrentVersion() : ""
-	Values["commit"] := (IsSet(BUNDLE_COMMIT) && BUNDLE_COMMIT != "__BUNDLE_COMMIT__")
-		? SubStr(BUNDLE_COMMIT, 1, 9) : DiagSnapshot_GitCommit(A_ScriptDir)
+	Values["commit"] := DiagSnapshot_ResolveCommit(A_ScriptDir)["commit"]
 	OsInfo := DiagSnapshot_OsInfo()
 	Values["os"] := OsInfo["os"]
 	Values["os_version"] := OsInfo["os_version"]

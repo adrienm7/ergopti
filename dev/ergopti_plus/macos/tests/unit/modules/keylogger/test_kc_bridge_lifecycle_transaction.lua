@@ -16,7 +16,7 @@ local helpers = require("tests.helpers")
 --- @return table module Fresh bridge module.
 local function load_bridge(scheduler, pathwatcher)
 	package.loaded["adapters.timer_scheduler"] = scheduler
-	package.loaded["infra.config_paths"] = { get_config_dir = function() return "." end }
+	package.loaded["infra.config_paths"] = { get_config_dir = function() return "." end, metrics_dir = function() return "./metrics" end }
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	return helpers.load_with_stubs("modules.keylogger.kc_bridge", {
 		pathwatcher = pathwatcher,
@@ -196,7 +196,7 @@ helpers.describe("keylogger parent requires KC bridge commitment", function()
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.dialog_util"] = {}
 		package.loaded["infra.teardown_transaction"] = {}
-		package.loaded["infra.config_paths"] = { get_config_dir = function() return "." end }
+		package.loaded["infra.config_paths"] = { get_config_dir = function() return "." end, metrics_dir = function() return "./metrics" end }
 		for _, name in ipairs({
 			"adapters.input_source_broker", "modules.keylogger.log_manager",
 			"modules.keylogger.context_tracker", "keylogger.metrics",

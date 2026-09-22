@@ -13,8 +13,9 @@
 --- 1. One line, identical field names everywhere: a user log from any of the
 ---    three drivers can be triaged with the same grep, and a missing field is a
 ---    visible "unknown" instead of an absent column.
---- 2. Pure Lua: every OS read is injected by the driver, so the formatter and the
----    git HEAD resolution run unchanged under Hammerspoon, LuaJIT and the tests.
+--- 2. Pure Lua: every OS read is injected by the driver, so the formatter, the
+---    build-stamp read and the git HEAD resolution run unchanged under
+---    Hammerspoon, LuaJIT and the tests.
 --- 3. Privacy: the snapshot carries environment facts only. Paths under the
 ---    user's home are rendered relative to "~" so the account name stays out of
 ---    shared logs.
@@ -190,6 +191,85 @@ function M.git_commit(fs, start_dir)
 		or packed_ref(fs, common_dir, ref)
 	if not sha or not sha:match("^%x+$") then return nil end
 	return sha:sub(1, SHORT_SHA_LENGTH)
+end
+
+
+
+
+-- =================================
+-- =================================
+-- ======= 4/ Build stamp ==========
+-- =================================
+-- =================================
+
+-- File a package build writes at the root of the shared tree it ships. A
+-- packaged macOS app or Linux package carries no .git, so without it every
+-- report from an installed build read "unknown". tools/build/write_build_stamp.sh
+-- is the only writer; the JS guard tools/test/test-package-builds-stamp-commit.cjs
+-- pins its file name and key to these constants.
+M.BUILD_STAMP_FILE = "build_stamp.txt"
+M.BUILD_STAMP_COMMIT_KEY = "commit"
+
+-- Where a resolved commit came from, reported next to it so a reader can tell
+-- a release build from a source run of the same commit.
+M.COMMIT_SOURCE_BUILD = "build"
+M.COMMIT_SOURCE_GIT = "git"
+M.COMMIT_SOURCE_UNKNOWN = "unknown"
+
+-- Length of a full commit id, the only form the writer stamps.
+local FULL_SHA_LENGTH = 40
+
+--- Parses the content of a build stamp.
+--- @param text string Raw file content, one `key=value` per line.
+--- @return string|nil Abbreviated commit id.
+--- @return string|nil Why the stamp is invalid, when it is.
+function M.parse_build_stamp(text)
+	if type(text) ~= "string" then return nil, "the build stamp is not text" end
+	for line in text:gmatch("[^\r\n]+") do
+		local key, value = line:match("^%s*([%w_]+)%s*=%s*(.-)%s*$")
+		if key == M.BUILD_STAMP_COMMIT_KEY then
+			if #value ~= FULL_SHA_LENGTH or not value:match("^%x+$") then
+				return nil, string.format("the build stamp commit '%s' is not a full commit id", value)
+			end
+			return value:lower():sub(1, SHORT_SHA_LENGTH)
+		end
+	end
+	return nil, "the build stamp has no " .. M.BUILD_STAMP_COMMIT_KEY .. " entry"
+end
+
+--- Reads the commit a package build stamped into the shared tree.
+--- @param fs table { read = fun(path):string|nil }
+--- @param shared_root string|nil Absolute path of the shared tree.
+--- @return string|nil Abbreviated commit id, nil when there is no valid stamp.
+--- @return string|nil Why a present stamp was rejected; nil when it is absent.
+function M.build_commit(fs, shared_root)
+	if type(fs) ~= "table" or type(fs.read) ~= "function" then return nil, "no file reader" end
+	if type(shared_root) ~= "string" or shared_root == "" then return nil end
+	local text = fs.read(shared_root:gsub("[/\\]+$", "") .. "/" .. M.BUILD_STAMP_FILE)
+	if text == nil then return nil end
+	return M.parse_build_stamp(text)
+end
+
+--- Resolves the commit the running driver was built from. A package build is
+--- identified by its stamp, a source run by its git checkout; anything else is
+--- reported as unknown with the reason, never guessed.
+--- @param fs table { exists = fun(path):boolean, read = fun(path):string|nil }
+--- @param shared_root string|nil Absolute path of the shared tree.
+--- @param source_dir string|nil Directory the git lookup starts from.
+--- @return string Abbreviated commit id, or M.UNKNOWN.
+--- @return string One of the M.COMMIT_SOURCE_* values.
+--- @return string|nil Why the commit is unknown, when it is.
+function M.resolve_commit(fs, shared_root, source_dir)
+	local stamped, stamp_error = M.build_commit(fs, shared_root)
+	if stamped then return stamped, M.COMMIT_SOURCE_BUILD end
+	-- A stamp that exists but cannot be read is a broken package, not a source
+	-- run: falling through to git would hide the defect behind a plausible id.
+	if stamp_error then return M.UNKNOWN, M.COMMIT_SOURCE_UNKNOWN, stamp_error end
+	local checked_out = M.git_commit(fs, source_dir)
+	if checked_out then return checked_out, M.COMMIT_SOURCE_GIT end
+	return M.UNKNOWN, M.COMMIT_SOURCE_UNKNOWN, string.format(
+		"no %s in the shared tree '%s' and '%s' is not inside a git checkout",
+		M.BUILD_STAMP_FILE, tostring(shared_root), tostring(source_dir))
 end
 
 return M

@@ -30,7 +30,7 @@ local function load_healthcheck(scheduler)
 	local webview = {}
 	for _, method in ipairs({
 		"windowStyle", "windowTitle", "allowTextEntry", "allowNewWindows",
-		"allowGestures", "level", "html", "show",
+		"allowGestures", "level", "html", "show", "shadow",
 	}) do webview[method] = function(self) return self end end
 	webview.windowCallback = function(self, callback)
 		context.window_callback = callback
@@ -64,6 +64,7 @@ local function load_healthcheck(scheduler)
 	package.loaded["infra.i18n"] = { get = function(key) return key end }
 	package.loaded["ui.ui_builder"] = {
 		build_injected_html = function() return "<html></html>" end,
+		window_chrome_steps = function() return {} end,
 		get_app_geometry = function() return { width = 740, height = 560 } end,
 		force_focus = function() end,
 	}

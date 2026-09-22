@@ -228,7 +228,7 @@ _OnbWeb_UnavailableReason() {
 ; Receives messages from the page. The frontend JSON-encodes every payload for
 ; the WebView2 (chrome.webview) channel, so each message is an object with an
 ; "action" field. Handled actions: ready, previewLocale, localeSelected,
-; pickConfigDir, loadExistingConfig, finish.
+; pickConfigDir, resolveMetricsPath, loadExistingConfig, finish.
 _OnbWeb_OnWebMessage(SessionEpoch, Handler, Args) {
 	if !_OnbWeb_SessionCurrent(SessionEpoch)
 		return
@@ -258,6 +258,12 @@ _OnbWeb_OnWebMessage(SessionEpoch, Handler, Args) {
 			_ob_locale := Payload["locale"]
 	} else if (Action == "pickConfigDir") {
 		_OnbWeb_PickConfigDir(Payload.Has("current") ? Payload["current"] : "")
+	} else if (Action == "resolveMetricsPath") {
+		if (!Payload.Has("request") || !(Payload["request"] is Number)) {
+			try LoggerError("Onboarding", "resolveMetricsPath refused: request number missing.")
+			return
+		}
+		_OnbWeb_ResolveMetricsPath(Payload.Has("config_dir") ? Payload["config_dir"] : "", Payload["request"])
 	} else if (Action == "loadExistingConfig") {
 		_OnbWeb_LoadExistingConfig(Payload.Has("config_dir") ? Payload["config_dir"] : "")
 	} else if (Action == "registerGesturesAuto") {
@@ -372,7 +378,10 @@ _OnbWeb_InjectInitData() {
 		; Platform hint: the gestures step (5) renders Windows-only auto/manual
 		; registration buttons, whereas macOS shows only the system-gesture warning.
 		. ",platform:" . _OnbWeb_JsStr("windows")
-		. ",strings:" . _OnbWeb_LocaleStringsExpr(_ob_locale)
+		; The page fills the step-4 consent warning with this path; later folder
+		; changes arrive through resolveMetricsPath -> window.setMetricsPath.
+		. ",metrics_path:" . _OnbWeb_JsStr(_Onboarding_MetricsPathFor(IsSet(_ob_config_dir) ? _ob_config_dir : ""))
+		. ",strings:" . _OnbWeb_LocaleStringsJson(_ob_locale)
 		. "})"
 	_OnbWeb_Eval(js)
 }
@@ -384,7 +393,7 @@ _OnbWeb_PreviewLocale(Code) {
 	if (Code == "")
 		return
 	js := "window.applyStrings({locale:" . _OnbWeb_JsStr(Code)
-		. ",strings:" . _OnbWeb_LocaleStringsExpr(Code) . "})"
+		. ",strings:" . _OnbWeb_LocaleStringsJson(Code) . "})"
 	try LoggerDebug("Onboarding", "Previewing locale '{1}'.", Code)
 	_OnbWeb_Eval(js)
 	; Sync the host window caption too: a WebView2 page's document.title does NOT
@@ -405,6 +414,23 @@ _OnbWeb_PickConfigDir(Current) {
 		global _ob_config_dir := chosen
 		_OnbWeb_Eval("window.setConfigDir(" . _OnbWeb_JsStr(chosen) . ")")
 	}
+}
+
+; Answers the page with the metrics store of the folder confirmed on the config
+; step, so the step-4 consent warning names where keystrokes will really go.
+; The request number is echoed so the page drops replies for a stale folder.
+_OnbWeb_ResolveMetricsPath(Dir, Request) {
+	_OnbWeb_Eval(_OnbWeb_MetricsPathJs(Dir, Request))
+}
+
+; Builds the window.setMetricsPath(...) call; split out so it is testable
+; without a live WebView2.
+; @param Dir string Wizard field value.
+; @param Request number Page request number.
+; @return string JavaScript source.
+_OnbWeb_MetricsPathJs(Dir, Request) {
+	return "window.setMetricsPath({request:" . Request
+		. ",path:" . _OnbWeb_JsStr(_Onboarding_MetricsPathFor(Dir)) . "})"
 }
 
 ; Reads an existing config.toml at the chosen directory (if present) and pushes
@@ -574,26 +600,6 @@ _OnbWeb_LocaleStringsJson(Code) {
 		try return FileRead(path, "UTF-8")
 	}
 	return "{}"
-}
-
-; Returns a JS object EXPRESSION (not just a literal) for ``Code``: the raw
-; locale map merged with host-derived keys the frontend expects but that do NOT
-; exist verbatim on disk. Currently that is dialog.metrics.enable_warning_formatted,
-; whose {1} placeholder is filled with the metrics log path — mirroring the native
-; metrics step (steps.ahk) and the macOS webview path (init.lua). Object.assign
-; layers the derived keys onto the parsed locale map at injection time.
-_OnbWeb_LocaleStringsExpr(Code) {
-	global _ConfigDir
-	base := _OnbWeb_LocaleStringsJson(Code)
-	; Forward-slash the path to match the cross-platform locale text (macOS uses
-	; "/"), keeping the red warning block visually identical across drivers.
-	metricsPath := StrReplace(_Onboarding_EffectiveConfigDir() . "metrics", "\", "/")
-	tpl := _Onboarding_Translate(Code, "dialog.metrics.enable_warning")
-	warn := ""
-	if (tpl != "" && tpl != "dialog.metrics.enable_warning")
-		try warn := Format(tpl, metricsPath)
-	derived := "{" . _OnbWeb_JsStr("dialog.metrics.enable_warning_formatted") . ":" . _OnbWeb_JsStr(warn) . "}"
-	return "Object.assign(" . base . "," . derived . ")"
 }
 
 ; Maps the active OS keyboard layout to the substring the frontend's

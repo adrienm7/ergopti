@@ -43,6 +43,19 @@ KL_Today() {
 		return FormatTime(A_Now, "yyyy-MM-dd")
 }
 
+; Metrics store directory of a configuration folder. The single rule shared by
+; boot (KL_Init), the metrics menu, the dashboards and the onboarding consent
+; text, so the folder the user consents to is the folder keystrokes go to.
+; @param ConfigDir string Configuration folder, trailing separator optional.
+; @return string <ConfigDir>\metrics
+KL_MetricsDirFor(ConfigDir) {
+		if !(ConfigDir is String) || ConfigDir == ""
+				throw ValueError("KL_MetricsDirFor requires a configuration folder.")
+		if !(ConfigDir ~= "[/\\]$")
+				ConfigDir .= "\"
+		return ConfigDir . "metrics"
+}
+
 KL_ResolveDevice(metrics_dir) {
 		md := metrics_dir
 		if !RegExMatch(md, "[\\/]$")
