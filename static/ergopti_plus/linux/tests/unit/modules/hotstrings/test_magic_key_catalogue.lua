@@ -22,7 +22,8 @@ helpers.describe("magic key: static catalogue ownership", function()
 
 	helpers.it("moves every shipped magic-key trigger and leaves every other trigger intact", function()
 		local Loader = helpers.load_module("modules.hotstrings.loader")
-		local paths = { pack("magickey.toml"), pack("sfbsreduction.toml") }
+		-- The French pack carries most of the ★ abbreviations since the language split.
+		local paths = { pack("magickey.toml"), pack("french/magickey.toml"), pack("sfbsreduction.toml") }
 		local canonical = Loader.load_catalogue(paths).mappings
 		local custom = Loader.load_catalogue(paths, {
 			magic_key = "§",

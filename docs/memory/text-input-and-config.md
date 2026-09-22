@@ -52,6 +52,16 @@ Section and category toggles rebuild the custom hotstring registry in-process.
 Native-engine and layout-backed features under `hotstrings.*` remain explicit
 reload-only exceptions.
 
+### project-hotstring-language-packs-and-opt-in
+
+Language-specific hotstrings live in `_shared/modules/hotstrings/<language>/`
+and are declared in `_index.toml [languages]`; each file loads as the group
+`<language>_<stem>` (config, manifest and menu key). Resolve bundled TOML paths
+through the driver's single helper, never by concatenating `<cat>.toml`. Every
+bundled section ships disabled, so an absent per-section state means "manifest
+default": macOS and Linux persist an explicit `true` on enable rather than
+clearing the key.
+
 ### project-hotstrings-self-healing-cache
 
 Grouped hotstrings are canonical TOML plus a gitignored TSV runtime cache, not

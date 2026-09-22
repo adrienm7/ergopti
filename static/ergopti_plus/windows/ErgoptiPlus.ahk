@@ -580,6 +580,9 @@ if TOML_UnreadableFile(ConfigurationFile) {
 		try LoggerError("ErgoptiPlus", "Cannot read '{1}' at boot: every setting below stays at its compiled-in default, so persistence is blocked for this session. Restart the driver once the file is readable.", ConfigurationFile)
 }
 ReadScriptConfig(_IniCache)
+; Language-pack category gates come from the shared hotstring index, so they are
+; added before the gates are read from config.toml.
+HotstringsSeedLanguageCategoryGates(CategoryEnabled)
 ReadCategoryEnabled(_IniCache)
 I18nInit(_IniCache)
 BootProfile_Stamp("Config parsed (TOML + i18n)")

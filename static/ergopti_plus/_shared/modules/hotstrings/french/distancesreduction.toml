@@ -1,0 +1,57 @@
+# _shared/modules/hotstrings/french/distancesreduction.toml
+# ====================
+# ====================
+# ======= Meta =======
+# ====================
+# ====================
+
+[_meta]
+delay = 0.5
+show_tooltip = false
+description = { fr = "Réduction des distances", en = "Distance reduction", de = "Distanzreduktion", es = "Reducción de distancias", zh = "距离减少", ar = "تقليل المسافات", cs = "Snížení vzdáleností", da = "Afstandsreduktion", he = "הפחתת מרחקים", hi = "दूरी में कमी", it = "Riduzione delle distanze", ja = "距離削減", ko = "거리 감소", nl = "Afstandsreductie", no = "Avstandsreduksjon", pl = "Redukcja odległości", pt = "Redução de distâncias", ru = "Уменьшение расстояний", sv = "Avståndsminskning", tr = "Mesafe azaltma", uk = "Зменшення відстаней" }
+sections_order = ["suffixes_a"]
+
+
+
+# =========================
+# ===== Meta.Sections =====
+# =========================
+
+[_meta.sections]
+suffixes_a ={ fr = "À + lettre donne un suffixe : às = ement, àn = ation, àh = ight, …", en = "À + letter gives a suffix: às = ement, àn = ation, àh = ight, …", de = "À + Buchstabe ergibt ein Suffix: às = ement, àn = ation, àh = ight, …", es = "À + letra da un sufijo: às = ement, àn = ation, àh = ight, …", zh = "À + 字母 = 后缀：às = ement，àn = ation，àh = ight，…", ar = "À + حرف يعطي لاحقة: às = ement, àn = ation, àh = ight, …", cs = "À + písmeno dává příponu: às = ement, àn = ation, àh = ight, …", da = "À + bogstav giver et suffiks: às = ement, àn = ation, àh = ight, …", he = "À + אות נותן סיומת: às = ement, àn = ation, àh = ight, …", hi = "À + अक्षर एक प्रत्यय देता है: às = ement, àn = ation, àh = ight, …", it = "À + lettera dà un suffisso: às = ement, àn = ation, àh = ight, …", ja = "À + 文字がサフィックスを生成：às = ement, àn = ation, àh = ight, …", ko = "À + 문자가 접미사를 만듦: às = ement, àn = ation, àh = ight, …", nl = "À + letter geeft een achtervoegsel: às = ement, àn = ation, àh = ight, …", no = "À + bokstav gir et suffiks: às = ement, àn = ation, àh = ight, …", pl = "À + litera daje sufiks: às = ement, àn = ation, àh = ight, …", pt = "À + letra dá um sufixo: às = ement, àn = ation, àh = ight, …", ru = "À + буква даёт суффикс: às = ement, àn = ation, àh = ight, …", sv = "À + bokstav ger ett suffix: às = ement, àn = ation, àh = ight, …", tr = "À + harf bir son ek verir: às = ement, àn = ation, àh = ight, …", uk = "À + літера дає суфікс: às = ement, àn = ation, àh = ight, …" }
+
+
+
+
+
+# ==========================
+# ==========================
+# ======= Suffixes_a =======
+# ==========================
+# ==========================
+
+[[suffixes_a]]
+"à'" = { output = "ance", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"àa" = { output = "aire", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"àc" = { output = "ction", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"àd" = { output = "would", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"àê" = { output = "able", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"àf" = { output = "iste", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"àg" = { output = "ought", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"àh" = { output = "ight", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"ài" = { output = "ying", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"àk" = { output = "ique", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"àl" = { output = "elle", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"àm" = { output = "isme", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"àn" = { output = "ation", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"àp" = { output = "ence", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"àq" = { output = "ique", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"àr" = { output = "erre", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"às" = { output = "ement", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"àt" = { output = "ettre", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"àv" = { output = "ment", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"àx" = { output = "ieux", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"àz" = { output = "ez-vous", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"à’" = { output = "ance", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"càd" = { output = "could", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"shàd" = { output = "should", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }

@@ -313,6 +313,7 @@ InstallSendNoOps()
 #Include unit/test_toml_loader.ahk
 #Include unit/test_toml_helpers_roundtrip.ahk
 #Include unit/test_hotstrings_cache.ahk
+#Include unit/test_hotstring_language_packs.ahk
 #Include unit/test_dynamic_hotstrings_module.ahk
 #Include unit/test_hotstrings_config.ahk
 #Include unit/test_hotstring_delimiter_global_transaction_20260813.ahk

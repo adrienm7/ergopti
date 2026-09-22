@@ -28,6 +28,8 @@ local M = {}
 
 local Logger = require("logger.shim")
 local Extensions = require("hotstrings.extensions")
+local Languages = require("hotstrings.languages")
+local LocaleTable = require("_generated.locale_table")
 local MagicKey = require("modules.hotstrings.magic_key")
 local PreviewSettings = require("modules.hotstrings.preview_settings")
 local RepeatKey = require("modules.hotstrings.repeat_key")
@@ -55,6 +57,16 @@ local PERSONAL_CATEGORY = "personal"
 
 -- Single source of the driver version.
 local Version = require("infra.version")
+
+--- Native name of a locale code, from the generated locale table.
+--- @param code string
+--- @return string
+local function language_name(code)
+	for _, row in ipairs(LocaleTable) do
+		if row.code == code then return row.name end
+	end
+	error("[menu_builder] hotstring language pack names unknown locale '" .. tostring(code) .. "'")
+end
 
 -- The shared manifest menu renderer, bound for this driver (infra/manifest_menu).
 -- pcall for the same reason i18n_safe exists: the tray menu must still build when
@@ -569,6 +581,44 @@ local function _manifest_hotstring_rows(ctx, config)
 	local classified = {}
 	for _, class in ipairs({ "standard", "dynamic", "ergopti" }) do
 		for id in pairs(members_of(class)) do classified[id] = true end
+	end
+	-- Language-pack groups are classified by the shared index, not the manifest's
+	-- group classes: they render under their language's own submenu.
+	local language_packs = type(config.language_packs) == "function" and config.language_packs() or {}
+	for id in pairs(Languages.groups(language_packs)) do classified[id] = true end
+
+	--- One row per language: its native name, « tout activer » / « tout
+	--- désactiver » for all of its categories, then each category's submenu.
+	--- @return table
+	local function language_rows()
+		local rows = {}
+		for _, pack in ipairs(language_packs) do
+			local ids = {}
+			for _, stem in ipairs(pack.categories) do ids[#ids + 1] = Languages.group_id(pack.id, stem) end
+			local items = {}
+			for _, bulk in ipairs({ { key = "enable_all", on = true }, { key = "disable_all", on = false } }) do
+				items[#items + 1] = {
+					label  = i18n_safe("menu.hotstrings." .. bulk.key),
+					action = function()
+						if config.set_categories_sections then config.set_categories_sections(ids, bulk.on) end
+					end,
+				}
+			end
+			items[#items + 1] = { separator = true }
+			local total = 0
+			for _, id in ipairs(ids) do
+				local category = type(config.get_category) == "function" and config.get_category(id) or nil
+				if category then
+					items[#items + 1] = group_row(id)
+					total = total + active_count(id, category)
+				end
+			end
+			rows[#rows + 1] = {
+				label = string.format("%s (%d)", language_name(pack.locale), total),
+				items = items,
+			}
+		end
+		return rows
 	end
 
 	--- Flips everything on or off, in one write.
@@ -1097,6 +1147,7 @@ local function _manifest_hotstring_rows(ctx, config)
 			append_class(rows, "ergopti")
 			return rows
 		end,
+		["hotstring_languages"] = language_rows,
 		["hotstring_personal"] = function()
 			local rows = {}
 			-- The editor comes first, and until 2026-08-05 it was not here at all:

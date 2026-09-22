@@ -110,8 +110,19 @@ const offenders = [];
 /** @type {Map<string, {file: string, line: number, isWord: boolean}>} */
 const byTrigger = new Map();
 
-for (const file of fs.readdirSync(HOTSTRINGS_DIR).sort()) {
-	if (!file.endsWith('.toml')) continue;
+// The root packs plus every language pack folder (french/autocorrection.toml…),
+// named relative to HOTSTRINGS_DIR.
+const packFiles = [];
+for (const entry of fs.readdirSync(HOTSTRINGS_DIR, { withFileTypes: true })) {
+	if (entry.isFile() && entry.name.endsWith('.toml')) packFiles.push(entry.name);
+	if (entry.isDirectory()) {
+		for (const inner of fs.readdirSync(path.join(HOTSTRINGS_DIR, entry.name))) {
+			if (inner.endsWith('.toml')) packFiles.push(`${entry.name}/${inner}`);
+		}
+	}
+}
+
+for (const file of packFiles.sort()) {
 	const text = fs.readFileSync(path.join(HOTSTRINGS_DIR, file), 'utf8');
 	let lineNo = 0;
 	for (const line of text.split('\n')) {

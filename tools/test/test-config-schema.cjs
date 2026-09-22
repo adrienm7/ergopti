@@ -23,7 +23,8 @@
  * 1. No external validator: there is no ajv in node_modules, so this hand-rolls a
  *    minimal JSON-Schema (draft 2020-12 subset) validator covering exactly the
  *    constructs config.schema.json uses — $ref/$defs, type (incl. unions),
- *    properties, required, additionalProperties (false|true|schema), enum, const,
+ *    properties, patternProperties, required, additionalProperties
+ *    (false|true|schema), enum, const,
  *    oneOf, allOf, minimum/maximum, minLength/maxLength, pattern, items.
  * 2. TOML via smol-toml: the same parser the rest of the toolchain already uses.
  * 3. Reports every violation (not fail-fast) so the full schema/template gap is
@@ -209,8 +210,11 @@ function validate(value, sch, p, errors) {
 		}
 		for (const [key, sub] of Object.entries(value)) {
 			const kp = p ? `${p}.${key}` : key;
+			const patternMatch = Object.entries(sch.patternProperties || {}).find(([re]) => new RegExp(re).test(key));
 			if (props[key]) {
 				validate(sub, props[key], kp, errors);
+			} else if (patternMatch) {
+				validate(sub, patternMatch[1], kp, errors);
 			} else if (sch.additionalProperties === false) {
 				errors.push(`${kp}: additional property not permitted by schema`);
 			} else if (sch.additionalProperties && typeof sch.additionalProperties === 'object') {

@@ -135,14 +135,16 @@ helpers.describe("manifest_reader: extended module wiring parity", function()
 		helpers.assert_eq(Manifest.default_for("metrics.encrypt"), false, "encrypt default")
 	end)
 
-	helpers.it("dynamic-hotstring category toggles default to enabled", function()
+	-- Every hotstring section ships disabled and the user opts in; the dynamic
+	-- families are hotstrings too.
+	helpers.it("dynamic-hotstring category toggles default to disabled", function()
 		local paths = {
 			"hotstrings.dynamic.date", "hotstrings.dynamic.date_fr", "hotstrings.dynamic.date_long_fr",
 			"hotstrings.dynamic.phone_prefixes", "hotstrings.dynamic.ssn_prefixes",
 			"hotstrings.dynamic.iban_prefixes", "hotstrings.dynamic.text_expansion_personal_information",
 		}
 		for _, path in ipairs(paths) do
-			helpers.assert_eq(Manifest.default_for(path).enabled, true, path .. ".enabled")
+			helpers.assert_eq(Manifest.default_for(path).enabled, false, path .. ".enabled")
 		end
 	end)
 

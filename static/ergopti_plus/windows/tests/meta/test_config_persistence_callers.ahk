@@ -87,12 +87,13 @@ _CPC_EveryDirectTomlWriterConsumesItsBoolean() {
 		Assert(_CPC_LineConsumesResult(Lines, Index),
 			"direct TOML writer result is discarded: '" . Trim(Line) . "'. TOML failures return false rather than throwing, so every production caller must test, assign or return that boolean")
 	}
-	; Audited inventory: config_shortcuts (1), config_io (9), gestures (4),
+	; Audited inventory: config_shortcuts (1), config_io (10, the language-pack
+	; bulk toggle included), gestures (4),
 	; i18n (1), TOML_Write (1), personal editor (1), trigger journal (1),
 	; and menu rebuild (1). Pin the exact census so deleting a caller cannot make
 	; this class guard progressively vacuous, while every future sibling is still
 	; inspected by the loop above before the inventory assertion is reached.
-	AssertEqual(19, Calls,
+	AssertEqual(20, Calls,
 		"the production TOML writer/transaction-gateway inventory changed; audit every added or removed caller before updating the expected census")
 }
 Test("AHK-15-persistence: every TOML writer and transaction gateway consumes its boolean",

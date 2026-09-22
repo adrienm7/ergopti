@@ -32,6 +32,8 @@ local ConfigPaths = require("infra.config_paths")
 local Paths = require("infra.paths")
 local TomlReader = require("toml_codec.reader")
 local TomlCodec = require("toml_codec")
+local Languages = require("hotstrings.languages")
+local ManifestReader = require("infra.manifest_reader")
 
 local LOG = "modules.hotstrings.hotstrings_config"
 
@@ -39,6 +41,12 @@ local LOG = "modules.hotstrings.hotstrings_config"
 -- list rather than one key per category: the set is read and written whole, and
 -- a per-key layout leaves orphans behind when a category is renamed.
 local DISABLED_KEY = "hotstrings.disabled_categories"
+
+-- Prefix marking a SECTION the user explicitly switched on, stored in the same
+-- set. Every bundled section ships disabled (the feature manifest says so), so a
+-- section key absent from the set means "the shipped default" and the user's
+-- opt-in has to be recorded as positively as an opt-out.
+local ENABLED_MARK = "+"
 
 -- Where per-category and per-section overrides are persisted. A TOML beside the
 -- packs rather than a storage key, because it is a file the user is expected to
@@ -751,6 +759,33 @@ function M.extension_packs()
 	return entries
 end
 
+--- The language packs declared by the shared hotstring index, read once.
+--- An unreadable index raises: loading without it would drop every language.
+--- @return table Array of { id, locale, categories }.
+local _language_packs = nil
+function M.language_packs()
+	if _language_packs then return _language_packs end
+	local path = Paths.shared("modules/hotstrings/_index.toml")
+	local fh = io.open(path, "r")
+	if not fh then error("[hotstrings_config] hotstring index is unreadable: " .. tostring(path)) end
+	local raw = fh:read("*a")
+	fh:close()
+	_language_packs = Languages.packs(TomlCodec.decode(raw))
+	return _language_packs
+end
+
+--- Whether a scanned path sits inside a declared language folder of `root`.
+--- @param path string
+--- @param root string
+--- @return boolean
+local function in_language_folder(path, root)
+	for _, pack in ipairs(M.language_packs()) do
+		local prefix = root .. "/" .. pack.id .. "/"
+		if path:sub(1, #prefix) == prefix then return true end
+	end
+	return false
+end
+
 --- The TOML files to load: the bundled packs, overlaid with the user's.
 ---
 --- Merged rather than exclusive. Choosing ONE directory meant that creating a
@@ -780,17 +815,39 @@ local function resolve_paths()
 
 	local ok_paths, Paths = pcall(require, "infra.paths")
 	local bundled = ok_paths and Paths.shared("modules/hotstrings") or nil
+	-- Language folders are not overlaid by stem: french/autocorrection.toml is
+	-- its own group, not a second copy of the neutral autocorrection.toml.
 	if bundled then
-		for _, path in ipairs(Loader.find_toml_files(bundled)) do add(path) end
+		for _, path in ipairs(Loader.find_toml_files(bundled)) do
+			if not in_language_folder(path, bundled) then add(path) end
+		end
 	end
 
 	-- Second, so the user's copy of a category replaces the bundled one.
 	if _config_dir then
-		for _, path in ipairs(Loader.find_toml_files(_config_dir)) do add(path) end
+		for _, path in ipairs(Loader.find_toml_files(_config_dir)) do
+			if not in_language_folder(path, _config_dir) then add(path) end
+		end
 	end
 
 	local paths = {}
 	for _, stem in ipairs(order) do paths[#paths + 1] = by_stem[stem] end
+
+	-- Language packs, each under its group id "<language>_<stem>". The user's copy
+	-- in the same sub-folder replaces the bundled one, as for the neutral packs.
+	if bundled then
+		for _, pack in ipairs(M.language_packs()) do
+			for _, stem in ipairs(pack.categories) do
+				local rel = "/" .. pack.id .. "/" .. stem .. ".toml"
+				local path = bundled .. rel
+				if _config_dir then
+					local fh = io.open(_config_dir .. rel, "r")
+					if fh then fh:close(); path = _config_dir .. rel end
+				end
+				paths[#paths + 1] = { path = path, category = Languages.group_id(pack.id, stem) }
+			end
+		end
+	end
 
 	-- Extension packs come last and are NOT keyed by stem: they carry their own
 	-- namespaced category key so a third party shipping `rolls.toml` cannot
@@ -877,7 +934,7 @@ function M.load_all()
 	local filtered = {}
 	for _, m in ipairs(staged_mappings) do
 		local off = _disabled_groups[m.group]
-			or (m.section and _disabled_groups[m.group .. "." .. m.section])
+			or (m.section and not M.is_section_checked(m.group, m.section))
 		if not off then
 			filtered[#filtered + 1] = m
 		end
@@ -950,9 +1007,22 @@ end
 function M.enable_all()
 	local candidate = copy_disabled(_disabled_groups)
 	local changed = 0
-	for id in pairs(candidate) do
-		candidate[id] = nil
-		changed = changed + 1
+	-- Every gate lifted and every known section switched on explicitly: bundled
+	-- sections ship disabled, so clearing the set alone would leave them off.
+	for id in pairs(_disabled_groups) do
+		if id:sub(1, #ENABLED_MARK) ~= ENABLED_MARK then
+			candidate[id] = nil
+			changed = changed + 1
+		end
+	end
+	for category, cat in pairs(_categories) do
+		for name in pairs(cat.sections or {}) do
+			local mark = ENABLED_MARK .. category .. "." .. name
+			if not candidate[mark] then
+				candidate[mark] = true
+				changed = changed + 1
+			end
+		end
 	end
 	if changed == 0 then return 0 end
 	if not commit_disabled(candidate) then return false end
@@ -986,10 +1056,18 @@ function M.disable_all()
 	return changed
 end
 
---- Restores the shipped state: everything enabled.
---- @return integer Number of categories affected.
+--- Restores the shipped state: every gate open and every section back to the
+--- manifest's default, which is disabled for the bundled packs.
+--- @return integer Number of entries cleared.
 function M.reset_defaults()
-	return M.enable_all()
+	local changed = 0
+	for _ in pairs(_disabled_groups) do changed = changed + 1 end
+	if changed == 0 then return 0 end
+	if not commit_disabled({}) then return false end
+	M.load_all()
+	notify_change()
+	Logger.info(LOG, "Hotstring state reset to the shipped defaults (%d entries cleared).", changed)
+	return changed
 end
 
 function M.is_group_enabled(group_name)
@@ -1023,7 +1101,7 @@ end
 --- @return boolean
 function M.is_section_enabled(category, section)
 	if _disabled_groups[category] then return false end
-	return not _disabled_groups[section_key(category, section)]
+	return M.is_section_checked(category, section)
 end
 
 --- Whether the user has this section TICKED, regardless of its category's gate.
@@ -1042,7 +1120,25 @@ end
 --- @param section string
 --- @return boolean
 function M.is_section_checked(category, section)
-	return not _disabled_groups[section_key(category, section)]
+	local key = section_key(category, section)
+	if _disabled_groups[key] then return false end
+	if _disabled_groups[ENABLED_MARK .. key] then return true end
+	-- Untouched: the feature manifest's shipped default. A section it does not
+	-- declare belongs to a personal or extension pack, which is the user's own.
+	local shipped = Languages.section_default(ManifestReader.features(), category, section)
+	if shipped == nil then return true end
+	return shipped
+end
+
+--- Records an explicit choice for one section in a candidate set.
+--- @param candidate table
+--- @param category string
+--- @param section string
+--- @param enabled boolean
+local function set_section_choice(candidate, category, section, enabled)
+	local key = section_key(category, section)
+	candidate[key] = (not enabled) or nil
+	candidate[ENABLED_MARK .. key] = enabled or nil
 end
 
 --- How many hotstrings a category is ACTUALLY firing right now.
@@ -1082,13 +1178,8 @@ end
 --- @param section string
 function M.toggle_section(category, section)
 	if type(category) ~= "string" or type(section) ~= "string" then return false end
-	local key = section_key(category, section)
 	local candidate = copy_disabled(_disabled_groups)
-	if candidate[key] then
-		candidate[key] = nil
-	else
-		candidate[key] = true
-	end
+	set_section_choice(candidate, category, section, not M.is_section_checked(category, section))
 	if not commit_disabled(candidate) then return false end
 	M.load_all()
 	notify_change()
@@ -1108,11 +1199,32 @@ function M.set_all_sections(category, enabled)
 	-- the first one mean anything. Both reference drivers lift it here.
 	if enabled then candidate[category] = nil end
 	for name in pairs(cat.sections or {}) do
-		local key = section_key(category, name)
-		if enabled then
-			candidate[key] = nil
-		else
-			candidate[key] = true
+		set_section_choice(candidate, category, name, enabled)
+	end
+	if not commit_disabled(candidate) then return false end
+	M.load_all()
+	notify_change()
+	return true
+end
+
+--- Sets every section of several categories at once — one language pack's
+--- « tout activer » / « tout désactiver ». One persisted candidate, so the whole
+--- language commits or none of it does; enabling lifts each category gate.
+--- @param categories table Array of category ids.
+--- @param enabled boolean
+--- @return boolean
+function M.set_categories_sections(categories, enabled)
+	if type(categories) ~= "table" or type(enabled) ~= "boolean" then return false end
+	local candidate = copy_disabled(_disabled_groups)
+	for _, category in ipairs(categories) do
+		local cat = _categories[category]
+		if not cat then
+			Logger.error(LOG, "set_categories_sections(): unknown category '%s'.", tostring(category))
+			return false
+		end
+		if enabled then candidate[category] = nil end
+		for name in pairs(cat.sections or {}) do
+			set_section_choice(candidate, category, name, enabled)
 		end
 	end
 	if not commit_disabled(candidate) then return false end

@@ -198,16 +198,28 @@ function loadHotstringCategories() {
 	const fallbackColor = defaults.colors?.global_default ?? '#1e88e5';
 	const order = index.menu?.categories_order ?? [];
 
-	const categories = order.map((id) => {
-		const doc = parseToml(readFileSync(resolve(HOTSTRINGS_ROOT, `${id}.toml`), 'utf-8'));
-		let count = 0;
+	// Language packs (e.g. french/autocorrection.toml) extend the category their
+	// file is named after, so the page counts them with it.
+	const languages = index.languages?.order ?? [];
+	const countEntries = (doc) => {
+		let n = 0;
 		for (const [key, value] of Object.entries(doc)) {
 			if (key === '_meta' || !Array.isArray(value)) continue;
 			for (const table of value) {
 				for (const entry of Object.values(table)) {
-					if (entry && typeof entry === 'object' && 'output' in entry) count++;
+					if (entry && typeof entry === 'object' && 'output' in entry) n++;
 				}
 			}
+		}
+		return n;
+	};
+
+	const categories = order.map((id) => {
+		const doc = parseToml(readFileSync(resolve(HOTSTRINGS_ROOT, `${id}.toml`), 'utf-8'));
+		let count = countEntries(doc);
+		for (const lang of languages) {
+			if (!(index.languages[lang]?.categories_order ?? []).includes(id)) continue;
+			count += countEntries(parseToml(readFileSync(resolve(HOTSTRINGS_ROOT, lang, `${id}.toml`), 'utf-8')));
 		}
 		const meta = doc._meta ?? {};
 		return {

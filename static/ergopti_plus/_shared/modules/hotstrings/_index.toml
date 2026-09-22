@@ -10,6 +10,28 @@ categories_order = ["distancesreduction", "sfbsreduction", "rolls", "autocorrect
 
 
 
+# =========================
+# =========================
+# ======= Languages =======
+# =========================
+# =========================
+
+# Language packs: every sub-folder of this directory that holds hotstrings
+# written for one natural language. The categories at the root are
+# language-neutral (layout rolls, symbols, brand capitalisation); a category
+# declared here lives at <folder>/<stem>.toml and is loaded as its own group
+# whose id is "<folder>_<stem>". `locale` is the key into
+# _shared/data/locale_names.json that names the menu row, so adding a language
+# is data only: its folder, one entry here, and its feature rows in the manifest.
+[languages]
+order = ["french"]
+
+[languages.french]
+locale = "fr"
+categories_order = ["distancesreduction", "autocorrection", "magickey"]
+
+
+
 # ======================================================================
 # ===== Modules.Dynamichotstrings.Textexpansionpersonalinformation =====
 # ======================================================================

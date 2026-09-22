@@ -51,10 +51,10 @@
 #
 #   [[features.hotstrings.autocorrection]]
 #   id = "accents"
-#   default = { enabled = true, time_activation_seconds = 0.5 }
+#   default = { enabled = false, time_activation_seconds = 0.5 }
 #   type = "feature"
 #   description_key = "menu.hotstrings.autocorrection.accents"
-#   → generates: ``[hotstrings.autocorrection.accents] enabled = true; time_activation_seconds = 0.5``
+#   → generates: ``[hotstrings.autocorrection.accents] enabled = false; time_activation_seconds = 0.5``
 
 
 
@@ -98,7 +98,7 @@ platforms = ["ahk", "hs", "linux"]
 [sections.hotstrings]
 description_key = "menu.hotstrings"
 platforms = ["ahk", "hs", "linux"]
-subsections = ["autocorrection", "distances_reduction", "sfbs_reduction", "rolls", "magic_key", "dynamic", "personal"]
+subsections = ["autocorrection", "distances_reduction", "sfbs_reduction", "rolls", "magic_key", "french_distancesreduction", "french_autocorrection", "french_magickey", "dynamic", "personal"]
 
 [sections.hotstrings.autocorrection]
 description_key = "menu.hotstrings.autocorrection"
@@ -117,6 +117,21 @@ description_key = "menu.hotstrings.rolls"
 platforms = ["ahk", "hs", "linux"]
 
 [sections.hotstrings.magic_key]
+description_key = "menu.hotstrings.magic_key"
+platforms = ["ahk", "hs", "linux"]
+
+# French language pack: _shared/modules/hotstrings/french/distancesreduction.toml.
+[sections.hotstrings.french_distancesreduction]
+description_key = "menu.hotstrings.distances_reduction"
+platforms = ["ahk", "hs", "linux"]
+
+# French language pack: _shared/modules/hotstrings/french/autocorrection.toml.
+[sections.hotstrings.french_autocorrection]
+description_key = "menu.hotstrings.autocorrection"
+platforms = ["ahk", "hs", "linux"]
+
+# French language pack: _shared/modules/hotstrings/french/magickey.toml.
+[sections.hotstrings.french_magickey]
 description_key = "menu.hotstrings.magic_key"
 platforms = ["ahk", "hs", "linux"]
 
@@ -382,64 +397,10 @@ platforms = ["hs", "linux"]
 # ===========================================
 
 [[features.hotstrings.autocorrection]]
-id = "accents"
-default = { enabled = true, time_activation_seconds = 0.5 }
-type = "feature"
-description_key = "menu.hotstrings.autocorrection.accents"
-
-[[features.hotstrings.autocorrection]]
 id = "caps"
-default = { enabled = true, time_activation_seconds = 0.5 }
+default = { enabled = false, time_activation_seconds = 0.5 }
 type = "feature"
 description_key = "menu.hotstrings.autocorrection.caps"
-
-[[features.hotstrings.autocorrection]]
-id = "errors"
-default = { enabled = true, time_activation_seconds = 0.5 }
-type = "feature"
-description_key = "menu.hotstrings.autocorrection.errors"
-
-[[features.hotstrings.autocorrection]]
-id = "minus"
-default = { enabled = true, time_activation_seconds = 0.5 }
-type = "feature"
-description_key = "menu.hotstrings.autocorrection.minus"
-
-[[features.hotstrings.autocorrection]]
-id = "minus_apostrophe"
-default = { enabled = true, time_activation_seconds = 0.5 }
-type = "feature"
-description_key = "menu.hotstrings.autocorrection.minus_apostrophe"
-
-[[features.hotstrings.autocorrection]]
-id = "multiple_punctuation_marks"
-default = { enabled = true, time_activation_seconds = 0.5 }
-type = "feature"
-description_key = "menu.hotstrings.autocorrection.multiple_punctuation_marks"
-
-[[features.hotstrings.autocorrection]]
-id = "names"
-default = { enabled = true, time_activation_seconds = 0.5 }
-type = "feature"
-description_key = "menu.hotstrings.autocorrection.names"
-
-[[features.hotstrings.autocorrection]]
-id = "ou"
-default = { enabled = true, time_activation_seconds = 0.5 }
-type = "feature"
-description_key = "menu.hotstrings.autocorrection.ou"
-
-[[features.hotstrings.autocorrection]]
-id = "suffixes_a_chaining"
-default = { enabled = true, time_activation_seconds = 0.5 }
-type = "feature"
-description_key = "menu.hotstrings.autocorrection.suffixes_a_chaining"
-
-[[features.hotstrings.autocorrection]]
-id = "typographic_apostrophe"
-default = { enabled = true, time_activation_seconds = 0.5 }
-type = "feature"
-description_key = "menu.hotstrings.autocorrection.typographic_apostrophe"
 
 
 
@@ -449,43 +410,37 @@ description_key = "menu.hotstrings.autocorrection.typographic_apostrophe"
 
 [[features.hotstrings.distances_reduction]]
 id = "qu"
-default = { enabled = true, time_activation_seconds = 0.5 }
+default = { enabled = false, time_activation_seconds = 0.5 }
 type = "feature"
 description_key = "menu.hotstrings.distances_reduction.qu"
 
 [[features.hotstrings.distances_reduction]]
-id = "suffixes_a"
-default = { enabled = true, time_activation_seconds = 0.5 }
-type = "feature"
-description_key = "menu.hotstrings.distances_reduction.suffixes_a"
-
-[[features.hotstrings.distances_reduction]]
 id = "comma_j"
-default = { enabled = true }
+default = { enabled = false }
 type = "feature"
 description_key = "menu.hotstrings.distances_reduction.comma_j"
 
 [[features.hotstrings.distances_reduction]]
 id = "comma_far_letters"
-default = { enabled = true }
+default = { enabled = false }
 type = "feature"
 description_key = "menu.hotstrings.distances_reduction.comma_far_letters"
 
 [[features.hotstrings.distances_reduction]]
 id = "dead_key_e_circumflex"
-default = { enabled = true }
+default = { enabled = false }
 type = "feature"
 description_key = "menu.hotstrings.distances_reduction.dead_key_e_circumflex"
 
 [[features.hotstrings.distances_reduction]]
 id = "e_circumflex_e"
-default = { enabled = true, time_activation_seconds = 0.5 }
+default = { enabled = false, time_activation_seconds = 0.5 }
 type = "feature"
 description_key = "menu.hotstrings.distances_reduction.e_circumflex_e"
 
 [[features.hotstrings.distances_reduction]]
 id = "space_around_symbols"
-default = { enabled = true }
+default = { enabled = false }
 type = "feature"
 description_key = "menu.hotstrings.distances_reduction.space_around_symbols"
 
@@ -497,31 +452,31 @@ description_key = "menu.hotstrings.distances_reduction.space_around_symbols"
 
 [[features.hotstrings.sfbs_reduction]]
 id = "comma"
-default = { enabled = true, time_activation_seconds = 0.5 }
+default = { enabled = false, time_activation_seconds = 0.5 }
 type = "feature"
 description_key = "menu.hotstrings.sfbs_reduction.comma"
 
 [[features.hotstrings.sfbs_reduction]]
 id = "e_circ"
-default = { enabled = true, time_activation_seconds = 0.5 }
+default = { enabled = false, time_activation_seconds = 0.5 }
 type = "feature"
 description_key = "menu.hotstrings.sfbs_reduction.e_circ"
 
 [[features.hotstrings.sfbs_reduction]]
 id = "e_grave"
-default = { enabled = true, time_activation_seconds = 0.5 }
+default = { enabled = false, time_activation_seconds = 0.5 }
 type = "feature"
 description_key = "menu.hotstrings.sfbs_reduction.e_grave"
 
 [[features.hotstrings.sfbs_reduction]]
 id = "bu"
-default = { enabled = true }
+default = { enabled = false }
 type = "feature"
 description_key = "menu.hotstrings.sfbs_reduction.bu"
 
 [[features.hotstrings.sfbs_reduction]]
 id = "i_e_acute"
-default = { enabled = true }
+default = { enabled = false }
 type = "feature"
 description_key = "menu.hotstrings.sfbs_reduction.i_e_acute"
 
@@ -533,157 +488,157 @@ description_key = "menu.hotstrings.sfbs_reduction.i_e_acute"
 
 [[features.hotstrings.rolls]]
 id = "hc"
-default = { enabled = true, time_activation_seconds = 0.5 }
+default = { enabled = false, time_activation_seconds = 0.5 }
 type = "feature"
 description_key = "menu.hotstrings.rolls.hc"
 
 [[features.hotstrings.rolls]]
 id = "sx"
-default = { enabled = true, time_activation_seconds = 0.5 }
+default = { enabled = false, time_activation_seconds = 0.5 }
 type = "feature"
 description_key = "menu.hotstrings.rolls.sx"
 
 [[features.hotstrings.rolls]]
 id = "cx"
-default = { enabled = true, time_activation_seconds = 0.5 }
+default = { enabled = false, time_activation_seconds = 0.5 }
 type = "feature"
 description_key = "menu.hotstrings.rolls.cx"
 
 [[features.hotstrings.rolls]]
 id = "ct"
-default = { enabled = true, time_activation_seconds = 0.5 }
+default = { enabled = false, time_activation_seconds = 0.5 }
 type = "feature"
 description_key = "menu.hotstrings.rolls.ct"
 
 [[features.hotstrings.rolls]]
 id = "ez"
-default = { enabled = true, time_activation_seconds = 0.5 }
+default = { enabled = false, time_activation_seconds = 0.5 }
 type = "feature"
 description_key = "menu.hotstrings.rolls.ez"
 
 [[features.hotstrings.rolls]]
 id = "assign"
-default = { enabled = true }
+default = { enabled = false }
 type = "feature"
 description_key = "menu.hotstrings.rolls.assign"
 
 [[features.hotstrings.rolls]]
 id = "assign_arrow_equal_left"
-default = { enabled = true }
+default = { enabled = false }
 type = "feature"
 description_key = "menu.hotstrings.rolls.assign_arrow_equal_left"
 
 [[features.hotstrings.rolls]]
 id = "assign_arrow_equal_right"
-default = { enabled = true }
+default = { enabled = false }
 type = "feature"
 description_key = "menu.hotstrings.rolls.assign_arrow_equal_right"
 
 [[features.hotstrings.rolls]]
 id = "assign_arrow_minus_left"
-default = { enabled = true }
+default = { enabled = false }
 type = "feature"
 description_key = "menu.hotstrings.rolls.assign_arrow_minus_left"
 
 [[features.hotstrings.rolls]]
 id = "assign_arrow_minus_right"
-default = { enabled = true }
+default = { enabled = false }
 type = "feature"
 description_key = "menu.hotstrings.rolls.assign_arrow_minus_right"
 
 [[features.hotstrings.rolls]]
 id = "bracket_quote"
-default = { enabled = true }
+default = { enabled = false }
 type = "feature"
 description_key = "menu.hotstrings.rolls.bracket_quote"
 
 [[features.hotstrings.rolls]]
 id = "chevron_equal"
-default = { enabled = true }
+default = { enabled = false }
 type = "feature"
 description_key = "menu.hotstrings.rolls.chevron_equal"
 
 [[features.hotstrings.rolls]]
 id = "chevron_greater"
-default = { enabled = true }
+default = { enabled = false }
 type = "feature"
 description_key = "menu.hotstrings.rolls.chevron_greater"
 
 [[features.hotstrings.rolls]]
 id = "chevron_less"
-default = { enabled = true }
+default = { enabled = false }
 type = "feature"
 description_key = "menu.hotstrings.rolls.chevron_less"
 
 [[features.hotstrings.rolls]]
 id = "close_chevron_tag"
-default = { enabled = true, time_activation_seconds = 0.5 }
+default = { enabled = false, time_activation_seconds = 0.5 }
 type = "feature"
 description_key = "menu.hotstrings.rolls.close_chevron_tag"
 
 [[features.hotstrings.rolls]]
 id = "comment_close"
-default = { enabled = true, time_activation_seconds = 0.5 }
+default = { enabled = false, time_activation_seconds = 0.5 }
 type = "feature"
 description_key = "menu.hotstrings.rolls.comment_close"
 
 [[features.hotstrings.rolls]]
 id = "comment_open"
-default = { enabled = true, time_activation_seconds = 0.5 }
+default = { enabled = false, time_activation_seconds = 0.5 }
 type = "feature"
 description_key = "menu.hotstrings.rolls.comment_open"
 
 [[features.hotstrings.rolls]]
 id = "english_negation"
-default = { enabled = true }
+default = { enabled = false }
 type = "feature"
 description_key = "menu.hotstrings.rolls.english_negation"
 
 [[features.hotstrings.rolls]]
 id = "equal_string"
-default = { enabled = true }
+default = { enabled = false }
 type = "feature"
 description_key = "menu.hotstrings.rolls.equal_string"
 
 [[features.hotstrings.rolls]]
 id = "hashtag_close_bracket"
-default = { enabled = true, time_activation_seconds = 0.5 }
+default = { enabled = false, time_activation_seconds = 0.5 }
 type = "feature"
 description_key = "menu.hotstrings.rolls.hashtag_close_bracket"
 
 [[features.hotstrings.rolls]]
 id = "hashtag_open_bracket"
-default = { enabled = true, time_activation_seconds = 0.5 }
+default = { enabled = false, time_activation_seconds = 0.5 }
 type = "feature"
 description_key = "menu.hotstrings.rolls.hashtag_open_bracket"
 
 [[features.hotstrings.rolls]]
 id = "hashtag_parenthesis"
-default = { enabled = true, time_activation_seconds = 0.5 }
+default = { enabled = false, time_activation_seconds = 0.5 }
 type = "feature"
 description_key = "menu.hotstrings.rolls.hashtag_parenthesis"
 
 [[features.hotstrings.rolls]]
 id = "hashtag_quote"
-default = { enabled = true }
+default = { enabled = false }
 type = "feature"
 description_key = "menu.hotstrings.rolls.hashtag_quote"
 
 [[features.hotstrings.rolls]]
 id = "left_arrow"
-default = { enabled = true }
+default = { enabled = false }
 type = "feature"
 description_key = "menu.hotstrings.rolls.left_arrow"
 
 [[features.hotstrings.rolls]]
 id = "not_equal"
-default = { enabled = true }
+default = { enabled = false }
 type = "feature"
 description_key = "menu.hotstrings.rolls.not_equal"
 
 [[features.hotstrings.rolls]]
 id = "paren_quote"
-default = { enabled = true }
+default = { enabled = false }
 type = "feature"
 description_key = "menu.hotstrings.rolls.paren_quote"
 
@@ -701,39 +656,117 @@ description_key = "menu.hotstrings.magic_key.replace"
 
 [[features.hotstrings.magic_key]]
 id = "repeat_corrections"
-default = { enabled = true, time_activation_seconds = 2.0 }
+default = { enabled = false, time_activation_seconds = 2.0 }
 type = "feature"
 description_key = "menu.hotstrings.magic_key.repeat_corrections"
 
 [[features.hotstrings.magic_key]]
-id = "text_expansion"
-default = { enabled = true, time_activation_seconds = 2.0 }
-type = "feature"
-description_key = "menu.hotstrings.magic_key.text_expansion"
-
-[[features.hotstrings.magic_key]]
-id = "text_expansion_auto"
-default = { enabled = true, time_activation_seconds = 2.0 }
-type = "feature"
-description_key = "menu.hotstrings.magic_key.text_expansion_auto"
-
-[[features.hotstrings.magic_key]]
-id = "text_expansion_emojis"
-default = { enabled = true, time_activation_seconds = 2.0 }
-type = "feature"
-description_key = "menu.hotstrings.magic_key.text_expansion_emojis"
-
-[[features.hotstrings.magic_key]]
 id = "text_expansion_symbols"
-default = { enabled = true, time_activation_seconds = 2.0 }
+default = { enabled = false, time_activation_seconds = 2.0 }
 type = "feature"
 description_key = "menu.hotstrings.magic_key.text_expansion_symbols"
 
 [[features.hotstrings.magic_key]]
 id = "text_expansion_symbols_typst"
-default = { enabled = true, time_activation_seconds = 2.0 }
+default = { enabled = false, time_activation_seconds = 2.0 }
 type = "feature"
 description_key = "menu.hotstrings.magic_key.text_expansion_symbols_typst"
+
+
+
+# ========================================================
+# ===== 3.2.5.1 hotstrings.french_distancesreduction =====
+# ========================================================
+
+[[features.hotstrings.french_distancesreduction]]
+id = "suffixes_a"
+default = { enabled = false, time_activation_seconds = 0.5 }
+type = "feature"
+description_key = "menu.hotstrings.distances_reduction.suffixes_a"
+
+
+
+# ====================================================
+# ===== 3.2.5.2 hotstrings.french_autocorrection =====
+# ====================================================
+
+[[features.hotstrings.french_autocorrection]]
+id = "accents"
+default = { enabled = false, time_activation_seconds = 0.5 }
+type = "feature"
+description_key = "menu.hotstrings.autocorrection.accents"
+
+[[features.hotstrings.french_autocorrection]]
+id = "names"
+default = { enabled = false, time_activation_seconds = 0.5 }
+type = "feature"
+description_key = "menu.hotstrings.autocorrection.names"
+
+[[features.hotstrings.french_autocorrection]]
+id = "typographic_apostrophe"
+default = { enabled = false, time_activation_seconds = 0.5 }
+type = "feature"
+description_key = "menu.hotstrings.autocorrection.typographic_apostrophe"
+
+[[features.hotstrings.french_autocorrection]]
+id = "errors"
+default = { enabled = false, time_activation_seconds = 0.5 }
+type = "feature"
+description_key = "menu.hotstrings.autocorrection.errors"
+
+[[features.hotstrings.french_autocorrection]]
+id = "ou"
+default = { enabled = false, time_activation_seconds = 0.5 }
+type = "feature"
+description_key = "menu.hotstrings.autocorrection.ou"
+
+[[features.hotstrings.french_autocorrection]]
+id = "multiple_punctuation_marks"
+default = { enabled = false, time_activation_seconds = 0.5 }
+type = "feature"
+description_key = "menu.hotstrings.autocorrection.multiple_punctuation_marks"
+
+[[features.hotstrings.french_autocorrection]]
+id = "suffixes_a_chaining"
+default = { enabled = false, time_activation_seconds = 0.5 }
+type = "feature"
+description_key = "menu.hotstrings.autocorrection.suffixes_a_chaining"
+
+[[features.hotstrings.french_autocorrection]]
+id = "minus"
+default = { enabled = false, time_activation_seconds = 0.5 }
+type = "feature"
+description_key = "menu.hotstrings.autocorrection.minus"
+
+[[features.hotstrings.french_autocorrection]]
+id = "minus_apostrophe"
+default = { enabled = false, time_activation_seconds = 0.5 }
+type = "feature"
+description_key = "menu.hotstrings.autocorrection.minus_apostrophe"
+
+
+
+# ==============================================
+# ===== 3.2.5.3 hotstrings.french_magickey =====
+# ==============================================
+
+[[features.hotstrings.french_magickey]]
+id = "text_expansion"
+default = { enabled = false, time_activation_seconds = 2.0 }
+type = "feature"
+description_key = "menu.hotstrings.magic_key.text_expansion"
+
+[[features.hotstrings.french_magickey]]
+id = "text_expansion_auto"
+default = { enabled = false, time_activation_seconds = 2.0 }
+type = "feature"
+description_key = "menu.hotstrings.magic_key.text_expansion_auto"
+
+[[features.hotstrings.french_magickey]]
+id = "text_expansion_emojis"
+default = { enabled = false, time_activation_seconds = 2.0 }
+type = "feature"
+description_key = "menu.hotstrings.magic_key.text_expansion_emojis"
 
 
 
@@ -743,43 +776,43 @@ description_key = "menu.hotstrings.magic_key.text_expansion_symbols_typst"
 
 [[features.hotstrings.dynamic]]
 id = "date"
-default = { enabled = true }
+default = { enabled = false }
 type = "feature"
 description_key = "menu.hotstrings.dynamic.date"
 
 [[features.hotstrings.dynamic]]
 id = "date_fr"
-default = { enabled = true }
+default = { enabled = false }
 type = "feature"
 description_key = "menu.hotstrings.dynamic.date_fr"
 
 [[features.hotstrings.dynamic]]
 id = "date_long_fr"
-default = { enabled = true }
+default = { enabled = false }
 type = "feature"
 description_key = "menu.hotstrings.dynamic.date_long_fr"
 
 [[features.hotstrings.dynamic]]
 id = "iban_prefixes"
-default = { enabled = true }
+default = { enabled = false }
 type = "feature"
 description_key = "menu.hotstrings.dynamic.iban_prefixes"
 
 [[features.hotstrings.dynamic]]
 id = "phone_prefixes"
-default = { enabled = true }
+default = { enabled = false }
 type = "feature"
 description_key = "menu.hotstrings.dynamic.phone_prefixes"
 
 [[features.hotstrings.dynamic]]
 id = "ssn_prefixes"
-default = { enabled = true }
+default = { enabled = false }
 type = "feature"
 description_key = "menu.hotstrings.dynamic.ssn_prefixes"
 
 [[features.hotstrings.dynamic]]
 id = "text_expansion_personal_information"
-default = { enabled = true, pattern_max_length = 1 }
+default = { enabled = false, pattern_max_length = 1 }
 type = "feature"
 description_key = "menu.hotstrings.dynamic.text_expansion_personal_information"
 
@@ -2784,6 +2817,9 @@ magic_key = "MagicKey"
 sfbs_reduction = "SFBsReduction"
 rolls = "Rolls"
 dynamic_hotstrings = "DynamicHotstrings"
+french_distancesreduction = "FrenchDistancesReduction"
+french_autocorrection = "FrenchAutocorrection"
+french_magickey = "FrenchMagicKey"
 
 [[menu.top_level]]
 id = "keyboard_layout"
@@ -3936,6 +3972,15 @@ id = "hotstring_categories_standard"
 [[menu.hotstrings_menu]]
 type = "list"
 id = "hotstring_categories_dynamic"
+
+# One row per language pack declared in _shared/modules/hotstrings/_index.toml
+# [languages], labelled with the language's native name from
+# _shared/data/locale_names.json. Each opens a submenu with « tout activer » /
+# « tout désactiver » for the whole language, then that language's categories
+# built exactly like the neutral ones above.
+[[menu.hotstrings_menu]]
+type = "list"
+id = "hotstring_languages"
 
 [[menu.hotstrings_menu]]
 type = "---"

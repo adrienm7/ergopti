@@ -50,11 +50,11 @@ _MetaCheckTextExpansionOnCriticalPath() {
 	; see the same source the running driver actually loads.
 	Body .= _DriverDirConcat("modules/hotstrings")
 
-	; The shared section loader must exist and load the magickey.text_expansion section.
+	; The shared section loader must exist and load the french_magickey.text_expansion section.
 	Assert(InStr(Body, "_RegisterTextExpansionSections("),
 		"hotstrings.ahk must define _RegisterTextExpansionSections() shared by boot + live rebuild")
-	Assert(InStr(Body, 'LoadHotstringsSection("magickey", "text_expansion"') > 0,
-		"the text-expansion loader must load the magickey.text_expansion section")
+	Assert(InStr(Body, 'LoadHotstringsSection("french_magickey", "text_expansion"') > 0,
+		"the text-expansion loader must load the french_magickey.text_expansion section")
 
 	; The deferred orchestrator must be GONE (text_expansion is no longer deferred).
 	Assert(!InStr(Body, "RegisterTextExpansionDeferred"),
