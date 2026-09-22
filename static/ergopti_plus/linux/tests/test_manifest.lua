@@ -197,5 +197,6 @@ return {
 	"tests.unit.modules.test_mt_decoder",
 	"tests.unit.modules.test_touchpad_finder",
 	"tests.unit.ui.test_asset_inlining_is_loud",
+	"tests.unit.ui.test_unused_keys_cleanup",
 	"tests.unit.ui.test_wpm_widget_frame",
 }

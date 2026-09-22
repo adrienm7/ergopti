@@ -1110,6 +1110,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		enable_all                = function() return set_all_enabled(true) end,
 		disable_all               = function() return set_all_enabled(false) end,
 		reset_defaults            = function() return reset_all_defaults() end,
+		clean_unused_keys         = function()
+			return require("ui.menu.unused_keys_cleanup").run_from_menu()
+		end,
 		open_paths                = function()
 			return DeferredWork.after(0.05, MenuPaths.open_editor, "menu.open_paths")
 		end,

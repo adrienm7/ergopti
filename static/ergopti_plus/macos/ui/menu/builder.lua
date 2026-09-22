@@ -626,6 +626,7 @@ function M.generate(ctx, menu_mods, actions)
 					["enable_all"]      = actions.enable_all,
 					["disable_all"]     = actions.disable_all,
 					["reset_defaults"]  = actions.reset_defaults,
+					["clean_unused_keys"] = actions.clean_unused_keys,
 				}
 				for _, row in ipairs(ManifestMenu.build("global_actions", "Global", nil, nil, ga_ctx) or {}) do
 					if ctx.paused then
