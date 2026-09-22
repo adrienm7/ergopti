@@ -10,11 +10,14 @@
 --- duplication.
 ---
 --- FEATURES & RATIONALE:
---- 1. Native fetch proxy: hs.http.asyncGet is used instead of relying on the
----    WebKit fetch() API, which may be blocked by corporate proxies that only
----    whitelist browser user-agents. The Lua backend injects the result via
----    evaluateJavaScript("injectReleases(…)") so the JS never touches the network
----    directly.
+--- 1. Native fetch proxy: hs.http.asyncGet (NSURLSession, which applies the
+---    system proxy and PAC settings) is used instead of the WebKit fetch() API.
+---    The Lua backend injects the result via evaluateJavaScript("injectReleases(…)")
+---    so the JS never touches the network directly.
+--- 1b. Bounded sources: every request carries a deadline, and a failed GitHub
+---    API request falls back to the public releases Atom feed through the
+---    shared order in _shared/lua/updater/release_sources.lua. The outcome, or
+---    a translated error, always reaches the page.
 --- 2. Singleton window: a second call to M.open() while the window is already
 ---    visible brings it to the front instead of opening a duplicate.
 --- 3. Channel routing: the caller passes a default channel ("main" or "dev");
@@ -29,13 +32,56 @@ local DeferredWork = require("infra.deferred_work")
 local Paths      = require("infra.paths")
 local ui_builder = require("ui.ui_builder")
 local i18n       = require("infra.i18n")
+local FileSystem = require("adapters.file_system")
+local Json       = require("json")
+local ReleaseSources = require("updater.release_sources")
 
 local LOG = "changelog_window"
 
-local GH_OWNER   = "adrienm7"
-local GH_REPO    = "ergopti"
-local GH_BASE    = string.format("https://api.github.com/repos/%s/%s/releases", GH_OWNER, GH_REPO)
-local UA_HEADER  = { ["User-Agent"] = "ErgoptiPlus-Changelog/1.0" }
+local _sources = nil
+
+--- Loads the release sources once from the shared updater defaults.
+--- @return table|nil sources
+--- @return string|nil error
+local function load_sources()
+	if _sources then return _sources, nil end
+	local path = Paths.shared("modules/updater/defaults.json")
+	local raw = type(path) == "string" and FileSystem.read(path) or nil
+	if type(raw) ~= "string" then return nil, "shared updater defaults are unreadable" end
+	local ok, decoded = pcall(Json.decode, raw)
+	if not ok then return nil, "shared updater defaults are not valid JSON" end
+	local sources, err = ReleaseSources.resolve(decoded)
+	if not sources then return nil, err end
+	_sources = sources
+	return sources, nil
+end
+
+--- Bounded GET over hs.http. NSURLSession honours the system proxy; the
+--- deadline guarantees one terminal answer even when a proxy holds the socket.
+--- @param url string
+--- @param headers table
+--- @param timeout_ms number
+--- @param callback function Receives status, body, err exactly once.
+local function http_get(url, headers, timeout_ms, callback)
+	local settled = false
+	local function settle(status, body, err)
+		if settled then return end
+		settled = true
+		callback(status, body, err)
+	end
+	hs.http.asyncGet(url, headers, function(status, body, _)
+		status = tonumber(status) or 0
+		if status < 0 then
+			settle(0, "", "network error " .. tostring(status))
+		else
+			settle(status, body, nil)
+		end
+	end)
+	DeferredWork.after(timeout_ms / 1000, function() settle(0, "", "timeout") end,
+		"changelog.fetch_deadline")
+end
+
+M._http_get = http_get
 
 -- Window geometry is resolved at open time from the shared manifest
 -- (ui_builder.get_app_geometry → _shared/ui/apps.manifest.json, SSoT). No local
@@ -198,23 +244,32 @@ local function fetch_and_inject(channel)
 	local owner, view, controller = _focus_owner, _wv, _ucc
 	if not session_is_current(owner, view, controller) then return end
 	local request_generation = next_fetch_generation()
-	local url = channel == "dev"
-		and (GH_BASE .. "?per_page=20")
-		or  (GH_BASE .. "?per_page=20")
 
 	Logger.trace(LOG, "Fetching releases (channel=%s)…", channel)
 	if not session_is_current(owner, view, controller) or request_generation ~= _fetch_generation then return end
 
-	hs.http.asyncGet(url, UA_HEADER, function(status, body, _)
-		if not session_is_current(owner, view, controller) or request_generation ~= _fetch_generation then return end
-		Logger.debug(LOG, "GitHub API: HTTP %s, body_len=%s.", tostring(status), tostring(body and #body or "nil"))
+	local sources, sources_err = load_sources()
+	if not sources then
+		Logger.error(LOG, "Release sources unavailable: %s.", tostring(sources_err))
+		eval(string.format("injectError(%s)", js_str(i18n.get("changelog_window.error_network"))),
+			request_generation)
+		return
+	end
 
-		if status ~= 200 or not body or body == "" then
-			Logger.warn(LOG, "GitHub API returned %s — injecting error.", tostring(status))
-			eval(string.format("injectError(%s)", js_str(i18n.get("changelog_window.error_network"))),
+	ReleaseSources.fetch(sources, M._http_get, Logger, LOG, function(result)
+		if not session_is_current(owner, view, controller) or request_generation ~= _fetch_generation then return end
+
+		if result.error then
+			eval(string.format("injectError(%s)", js_str(i18n.get(result.error_key))), request_generation)
+			return
+		end
+		if result.kind == "feed" then
+			-- The shared page converts the feed; the text travels as a JS string.
+			eval(string.format("injectReleasesFeed(%s,%s)", js_str(result.body), js_str(channel)),
 				request_generation)
 			return
 		end
+		local body = result.body
 
 		-- Parse JSON via hs.json.
 		local ok, data = pcall(hs.json.decode, body)
@@ -337,10 +392,14 @@ local function build_window(channel, opening_generation, focus_owner)
 
 	-- Inject repo config and default channel before i18n boot so script.js
 	-- reads the correct values during its init() IIFE.
+	-- Unusable defaults are reported by the first fetch; the page then keeps its
+	-- own repository identity for links.
+	local sources = load_sources()
+	local repository = sources and string.format(
+		"window.__changelog_gh_owner=%s;window.__changelog_gh_repo=%s;",
+		js_str(sources.owner), js_str(sources.repo)) or ""
 	local config_script = string.format(
-		'<script>window.__changelog_gh_owner=%s;window.__changelog_gh_repo=%s;window.__changelog_channel=%s;</script>',
-		js_str(GH_OWNER), js_str(GH_REPO), js_str(channel)
-	)
+		"<script>%swindow.__changelog_channel=%s;</script>", repository, js_str(channel))
 
 	-- Build HTML with repo config injected before script.js IIFE runs.
 	-- ui_builder.build_injected_html inlines CSS/JS; we then patch the result
