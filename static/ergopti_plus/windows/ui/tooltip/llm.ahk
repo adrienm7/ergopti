@@ -558,6 +558,7 @@ LLM_TooltipRenderGenerationIsCurrent(RenderGeneration) {
 ; Purple in-flight indicator — macOS ``show_loading`` parity (ai_loading tint).
 ; Stays visible until replaced by ``LLM_TooltipShow`` or ``LLM_TooltipHide``.
 LLM_TooltipShowLoading(PresentationMeta := 0) {
+	global _TOOLTIP_LOADING_TEXT_HEX
 	if A_IsSuspended
 		return false
 	label := (IsSet(t)) ? t("llm.generating") : _LLM_TOOLTIP_LOADING_FALLBACK
@@ -584,7 +585,8 @@ LLM_TooltipShowLoading(PresentationMeta := 0) {
 				|| LLM_TooltipOwnsSurface()
 			return false
 		Shown := TooltipShow([{
-			Text: label, ColorHex: accent, IsDimmed: false, DurationSec: 0
+			Text: label, ColorHex: accent, IsDimmed: false, DurationSec: 0,
+			TextColorHex: _TOOLTIP_LOADING_TEXT_HEX
 		}], 0, false, CommitFn)
 	} finally Critical(PreviousCritical)
 	if !Shown
@@ -1142,83 +1144,173 @@ _LLM_BuildNavHint(slotCount, navMods := "") {
 	return hintLeft . spaceDiv . sepL . spaceDiv . acceptCenter . spaceDiv . sepR . spaceDiv . hintRight
 }
 
-_LLM_TooltipAppendFooter(G, &TotalH, TotalW, bgHex) {
+; The footer strings, shared by the sizing and the drawing pass. InfoSizing is
+; the worst-case timing line, so a later TTLT never outgrows the frame.
+_LLM_TooltipFooterTexts() {
 	global _LLM_Tooltip_ShowInfoBar, _LLM_Tooltip_InfoModel, _LLM_Tooltip_FooterSlots
 	global _LLM_Tooltip_NavMods, _LLM_Tooltip_Chain
-	global _TOOLTIP_FONT_NAME, _TOOLTIP_HINT_COLOR_HEX, _TOOLTIP_INFO_COLOR_HEX
-	global _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_INFO_FONT_SIZE, _TOOLTIP_PADDING_Y
-	global _TOOLTIP_PADDING_X, _TOOLTIP_LINE_SPACING, _TOOLTIP_HINT_SPACING, _TOOLTIP_SEP_COLOR_HEX
-
-	hintText := _LLM_BuildNavHint(_LLM_Tooltip_FooterSlots, _LLM_Tooltip_NavMods)
-	infoText := ""
+	Texts := { Hint: _LLM_BuildNavHint(_LLM_Tooltip_FooterSlots, _LLM_Tooltip_NavMods),
+		Info: "", InfoSizing: "" }
 	if _LLM_Tooltip_ShowInfoBar {
-		ttft := _LLM_Tooltip_Chain.TtftMs
-		ttlt := _LLM_Tooltip_Chain.TtltMs
-		infoText := _LLM_FormatInfoLine(_LLM_Tooltip_InfoModel, ttft, ttlt, false)
+		Texts.Info := _LLM_FormatInfoLine(_LLM_Tooltip_InfoModel,
+			_LLM_Tooltip_Chain.TtftMs, _LLM_Tooltip_Chain.TtltMs, false)
+		Texts.InfoSizing := _LLM_FormatInfoLine(_LLM_Tooltip_InfoModel, 9999, 9999, true)
 	}
-	if (hintText == "" and infoText == "")
-		return
+	return Texts
+}
 
+; Footer metrics in layout units. The combined row is hint + divider + info
+; side by side, each at its own size, exactly as macOS concatenates them.
+_LLM_TooltipMeasureFooter(Texts) {
+	global _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_INFO_FONT_SIZE
 	global UI_LLM_FOOTER_SPACE_DIV, UI_LLM_FOOTER_COMBINED_SEP
-	spaceDiv := UI_LLM_FOOTER_SPACE_DIV
-	combinedSep := UI_LLM_FOOTER_COMBINED_SEP
-	isCombined := false
-	combinedText := ""
-	combinedSz := { W: 0, H: 0 }
-	if (hintText != "" and infoText != "") {
-		combinedText := hintText . spaceDiv . combinedSep . spaceDiv . infoText
-		combinedSz := _TooltipMeasureTextSize(combinedText, _TOOLTIP_LABEL_FONT_SIZE)
-		if (combinedSz.W <= TotalW - 2 * _TOOLTIP_PADDING_X)
-			isCombined := true
+	Footer := {
+		Hint: _LLM_TooltipMeasureOptional(Texts.Hint, _TOOLTIP_LABEL_FONT_SIZE),
+		Info: _LLM_TooltipMeasureOptional(Texts.Info, _TOOLTIP_INFO_FONT_SIZE),
+		InfoSizing: _LLM_TooltipMeasureOptional(Texts.InfoSizing, _TOOLTIP_INFO_FONT_SIZE),
+		Sep: _TooltipMeasureTextSize(UI_LLM_FOOTER_SPACE_DIV . UI_LLM_FOOTER_COMBINED_SEP
+			. UI_LLM_FOOTER_SPACE_DIV, _TOOLTIP_LABEL_FONT_SIZE),
+		Combined: 0, CombinedSizing: 0 }
+	if IsObject(Footer.Hint) and IsObject(Footer.Info)
+		Footer.Combined := _LLM_TooltipJoinFooter(Footer, Footer.Info)
+	if IsObject(Footer.Hint) and IsObject(Footer.InfoSizing)
+		Footer.CombinedSizing := _LLM_TooltipJoinFooter(Footer, Footer.InfoSizing)
+	return Footer
+}
+
+_LLM_TooltipMeasureOptional(Text, FontSize) {
+	return (Text = "") ? 0 : _TooltipMeasureTextSize(Text, FontSize)
+}
+
+_LLM_TooltipJoinFooter(Footer, Info) {
+	return { W: Footer.Hint.W + Footer.Sep.W + Info.W,
+		H: Max(Footer.Hint.H, Footer.Sep.H, Info.H) }
+}
+
+; Geometry of the prediction panel — the Windows port of the macOS layout in
+; tooltip_llm.lua show_predictions (width) and renderer.lua render (height).
+; Pure, layout units, so it is tested without GDI.
+;
+; Width: the widest prediction line. The footer never widens the panel while
+; its combined row would fit — otherwise it WRAPS into a hint row and an info
+; row, and only then may the wider of those two widen the panel. (The previous
+; Windows rule always widened the panel to the combined footer, which is what
+; made the tooltip far wider than its suggestions.)
+; Height: lines stacked with no gap or separator between them, then
+; line_spacing, a 1 px rule, line_spacing and the footer rows.
+;
+; @param PredRows  Array of { W, H } — each line's widest rendering.
+; @param Footer    _LLM_TooltipMeasureFooter() result (0 members when absent).
+; @param Style     { PadX, PadY, LineSpacing, HintSpacing }.
+; @returns { W, H, ContentW, RowY[], SepY, Mode, CombinedY, HintY, InfoY }
+_LLM_TooltipLayout(PredRows, Footer, Style) {
+	PredsW := 0
+	PredsH := 0
+	for , Row in PredRows {
+		PredsW := Max(PredsW, Row.W)
+		PredsH += Row.H
+	}
+	HintW := IsObject(Footer.Hint) ? Footer.Hint.W : 0
+	InfoSizingW := IsObject(Footer.InfoSizing) ? Footer.InfoSizing.W : 0
+	ContentW := PredsW
+	if IsObject(Footer.Hint) and IsObject(Footer.InfoSizing) {
+		if (Footer.CombinedSizing.W > PredsW)
+			ContentW := Max(PredsW, HintW, InfoSizingW)
+	} else {
+		ContentW := Max(PredsW, HintW, InfoSizingW)
 	}
 
-	; HS layout: preds → line_spacing → sep → line_spacing → hint/info.
-	if _TOOLTIP_LINE_SPACING > 0
-		TotalH += _TOOLTIP_LINE_SPACING
-	sepY := TotalH
-	G.SetFont("s1", _TOOLTIP_FONT_NAME)
-	G.Add("Text", Format("Background{1} x0 y{2} w{3} h1", _TOOLTIP_SEP_COLOR_HEX, sepY, TotalW), "")
-	TotalH += 1
-	if _TOOLTIP_LINE_SPACING > 0
-		TotalH += _TOOLTIP_LINE_SPACING
+	L := { W: ContentW + 2 * Style.PadX, H: 0, ContentW: ContentW, RowY: [],
+		SepY: 0, Mode: "none", CombinedY: 0, HintY: 0, InfoY: 0 }
+	Y := Style.PadY
+	for , Row in PredRows {
+		L.RowY.Push(Y)
+		Y += Row.H
+	}
+	Y += Style.LineSpacing
+	HasHint := IsObject(Footer.Hint)
+	HasInfo := IsObject(Footer.Info)
+	if (HasHint or HasInfo) {
+		L.SepY := Y
+		Y += Style.LineSpacing
+		if (HasHint and HasInfo and Footer.Combined.W <= ContentW) {
+			L.Mode := "combined"
+			L.CombinedY := Y
+			Y += Footer.Combined.H + Style.LineSpacing
+		} else {
+			L.Mode := "stacked"
+			if HasHint {
+				L.HintY := Y
+				Y += Footer.Hint.H + (HasInfo ? Style.HintSpacing : Style.LineSpacing)
+			}
+			if HasInfo {
+				L.InfoY := Y
+				Y += Footer.Info.H + Style.LineSpacing
+			}
+		}
+	}
+	L.H := Y - Style.LineSpacing + Style.PadY
+	return L
+}
 
-	if isCombined {
-		rowH := _TOOLTIP_PADDING_Y + combinedSz.H + _TOOLTIP_PADDING_Y
-		textY := TotalH + _TOOLTIP_PADDING_Y
-		G.Add("Text", Format("Background{1} x0 y{2} w{3} h{4}", bgHex, TotalH, TotalW, rowH), "")
-		G.SetFont("norm c" . _TOOLTIP_HINT_COLOR_HEX . " s" . _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_FONT_NAME)
-		textX := Max(_TOOLTIP_PADDING_X, (TotalW - combinedSz.W) // 2)
-		G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
-			textX, textY, combinedSz.W + 4, combinedSz.H), combinedText)
-		TotalH += rowH
+; What a slot row reads, without its prefix or shortcut: the diff chunks plus
+; the next words the renderer appends, or the plain text of a streaming slot.
+_LLM_SlotBodyText(slot) {
+	if !(IsObject(slot) and slot.HasOwnProp("Chunks") and slot.Chunks.Length > 0)
+		return _LLM_SlotGetText(slot)
+	Body := ""
+	HasInsert := false
+	for , chunk in slot.Chunks {
+		Body .= chunk.HasOwnProp("text") ? chunk.text : ""
+		if (chunk.HasOwnProp("type") and chunk.type == "insert")
+			HasInsert := true
+	}
+	NextWords := slot.HasOwnProp("NextWords") ? slot.NextWords : ""
+	return HasInsert ? Body : Body . NextWords
+}
+
+; One transparent text span; the Gui background shows through.
+_LLM_TooltipDrawText(G, X, Y, H, ColorHex, FontSize, Text, Style := "norm") {
+	global _TOOLTIP_FONT_NAME
+	if (Text = "")
+		return 0
+	Size := _TooltipMeasureTextSize(Text, FontSize)
+	G.SetFont(Style . " c" . ColorHex . " s" . FontSize, _TOOLTIP_FONT_NAME)
+	; +2: a GDI extent rounded to layout units can clip the last glyph's overhang.
+	G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
+		X, Y + Max(0, H - Size.H), Size.W + 2, Size.H), Text)
+	return Size.W
+}
+
+; Draws the 1 px rule and the footer rows at the positions _LLM_TooltipLayout
+; chose. Hint and info are centred across the whole panel, as on macOS.
+_LLM_TooltipDrawFooter(G, Layout, Texts, Footer) {
+	global _TOOLTIP_FONT_NAME, _TOOLTIP_SEP_COLOR_HEX, _TOOLTIP_HINT_COLOR_HEX
+	global _TOOLTIP_INFO_COLOR_HEX, _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_INFO_FONT_SIZE
+	global UI_LLM_FOOTER_SPACE_DIV, UI_LLM_FOOTER_COMBINED_SEP
+	if (Layout.Mode == "none")
+		return
+	G.SetFont("s1", _TOOLTIP_FONT_NAME)
+	G.Add("Text", Format("Background{1} x0 y{2} w{3} h1",
+		_TOOLTIP_SEP_COLOR_HEX, Layout.SepY, Layout.W), "")
+	if (Layout.Mode == "combined") {
+		X := (Layout.W - Footer.Combined.W) // 2
+		H := Footer.Combined.H
+		X += _LLM_TooltipDrawText(G, X, Layout.CombinedY, H, _TOOLTIP_HINT_COLOR_HEX,
+			_TOOLTIP_LABEL_FONT_SIZE, Texts.Hint)
+		X += _LLM_TooltipDrawText(G, X, Layout.CombinedY, H, _TOOLTIP_SEP_COLOR_HEX,
+			_TOOLTIP_LABEL_FONT_SIZE, UI_LLM_FOOTER_SPACE_DIV . UI_LLM_FOOTER_COMBINED_SEP
+				. UI_LLM_FOOTER_SPACE_DIV)
+		_LLM_TooltipDrawText(G, X, Layout.CombinedY, H, _TOOLTIP_INFO_COLOR_HEX,
+			_TOOLTIP_INFO_FONT_SIZE, Texts.Info)
 		return
 	}
-
-	if (hintText != "") {
-		hintSz := _TooltipMeasureTextSize(hintText, _TOOLTIP_LABEL_FONT_SIZE)
-		hintY := TotalH + _TOOLTIP_PADDING_Y
-		hintRowH := _TOOLTIP_PADDING_Y + hintSz.H + _TOOLTIP_PADDING_Y
-		G.Add("Text", Format("Background{1} x0 y{2} w{3} h{4}", bgHex, TotalH, TotalW, hintRowH), "")
-		G.SetFont("norm c" . _TOOLTIP_HINT_COLOR_HEX . " s" . _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_FONT_NAME)
-		hintX := Max(_TOOLTIP_PADDING_X, (TotalW - hintSz.W) // 2)
-		G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
-			hintX, hintY, hintSz.W + 4, hintSz.H), hintText)
-		TotalH += hintRowH
-	}
-
-	if (infoText != "") {
-		if (hintText != "")
-			TotalH += _TOOLTIP_HINT_SPACING
-		infoSz := _TooltipMeasureTextSize(infoText, _TOOLTIP_INFO_FONT_SIZE)
-		infoY := TotalH + _TOOLTIP_PADDING_Y
-		infoRowH := _TOOLTIP_PADDING_Y + infoSz.H + _TOOLTIP_PADDING_Y
-		G.Add("Text", Format("Background{1} x0 y{2} w{3} h{4}", bgHex, TotalH, TotalW, infoRowH), "")
-		G.SetFont("norm c" . _TOOLTIP_INFO_COLOR_HEX . " s" . _TOOLTIP_INFO_FONT_SIZE, _TOOLTIP_FONT_NAME)
-		infoX := Max(_TOOLTIP_PADDING_X, (TotalW - infoSz.W) // 2)
-		G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
-			infoX, infoY, infoSz.W + 4, infoSz.H), infoText)
-		TotalH += infoRowH
-	}
+	if IsObject(Footer.Hint)
+		_LLM_TooltipDrawText(G, (Layout.W - Footer.Hint.W) // 2, Layout.HintY,
+			Footer.Hint.H, _TOOLTIP_HINT_COLOR_HEX, _TOOLTIP_LABEL_FONT_SIZE, Texts.Hint)
+	if IsObject(Footer.Info)
+		_LLM_TooltipDrawText(G, (Layout.W - Footer.Info.W) // 2, Layout.InfoY,
+			Footer.Info.H, _TOOLTIP_INFO_COLOR_HEX, _TOOLTIP_INFO_FONT_SIZE, Texts.Info)
 }
 
 
@@ -1227,207 +1319,125 @@ _LLM_TooltipAppendFooter(G, &TotalH, TotalW, bgHex) {
 ; ===== 3.2) Rich Gui LLM renderer =====
 ; ======================================
 
-; Build a single Gui that renders all LLM slots with per-chunk coloring.
-; Active slot: equal chunks in corr_sel (green), insert/NextWords in nw_sel
-; (orange). Inactive slots: full text in unsel_gray. Each slot is one row;
-; within a row, segment coloring is achieved by multiple Text controls placed
-; side-by-side (same Y, X incremented by measured segment width).
+; Build a single Gui that renders all LLM slots with per-chunk coloring, laid
+; out like the macOS canvas: one plain panel, the lines stacked as one block,
+; the shortcut label inline after each line. Active slot: equal chunks gray,
+; insert chunks corr_sel (green), next words nw_sel (orange). Inactive slots:
+; unsel_gray. Placeholder slots: italic slot placeholder in the loading color.
 _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 		PresentationMeta, RequestSerial) {
-	global _TOOLTIP_FONT_NAME, _TOOLTIP_FONT_SIZE, _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y
-	global _TOOLTIP_DEFAULT_BG_HEX, _TOOLTIP_SEP_COLOR_HEX, _TOOLTIP_LABEL_FONT_SIZE
-	global _TOOLTIP_INFO_FONT_SIZE, _LLM_Tooltip_FooterSlots, _LLM_Tooltip_NavMods
-	global _LLM_Tooltip_ShowInfoBar, _LLM_Tooltip_InfoModel, _LLM_Tooltip_ValMods
-	global LLM_TOOLTIP_PLACEHOLDER, LLM_TOOLTIP_TAB_SUFFIX
+	global _TOOLTIP_FONT_SIZE, _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y
+	global _TOOLTIP_DEFAULT_BG_HEX, _TOOLTIP_LABEL_FONT_SIZE
+	global _TOOLTIP_LINE_SPACING, _TOOLTIP_HINT_SPACING, _TOOLTIP_LOADING_TEXT_HEX
+	global _LLM_Tooltip_ValMods, LLM_TOOLTIP_PLACEHOLDER, LLM_TOOLTIP_TAB_SUFFIX
 	global UI_LLM_CORR_SEL_HEX, UI_LLM_NW_SEL_HEX, UI_LLM_UNSEL_GRAY_HEX, UI_LLM_LOADING_HEX
 	global UI_LLM_CURSOR_HEX, UI_LLM_CMD_SEL_HEX, UI_LLM_CMD_DIM_HEX
-	global UI_LLM_FOOTER_SPACE_DIV, UI_LLM_FOOTER_COMBINED_SEP
 
 	G := 0
 	CandidateHandedOff := false
 	try {
-	DpiScale := A_ScreenDPI / 96
-	SEP_H    := 1
-	Count    := slots.Length
-
-	; ── Measure all row texts to find max width ──────────────────────────────
-	; Each row's text = prefix + full slot text + suffix (for width budget).
-	Sizes := []
-	MaxW  := 0
 	slotCount := slots.Length
 	all_placeholder := _LLM_AllSlotsPlaceholder(slots)
 	loading_label := (IsSet(t)) ? t("llm.generating") : _LLM_TOOLTIP_LOADING_FALLBACK
+	activePrefix := _LLM_GetActivePrefix(slotCount)
+	inactivePrefix := _LLM_GetInactivePrefix(slotCount)
+
+	; ── Measure every line at its widest rendering ───────────────────────────
+	; macOS sizes the frame over every possible highlighted row so the panel
+	; does not jump while the user navigates; a line's width depends only on its
+	; own prefix, so the widest of its active and inactive renderings suffices.
+	PredRows := []
+	Bodies := []
+	Shortcuts := []
 	for i, slot in slots {
-		is_active := (i == active_idx)
-		display := all_placeholder ? loading_label : _LLM_SlotBuildText(slot, is_active, i, slotCount)
-		S := _TooltipMeasureText(display)
-		Sizes.Push(S)
-		if (S.W > MaxW)
-			MaxW := S.W
-	}
-	hintText := _LLM_BuildNavHint(_LLM_Tooltip_FooterSlots, _LLM_Tooltip_NavMods)
-	infoSizing := ""
-	if _LLM_Tooltip_ShowInfoBar
-		infoSizing := _LLM_FormatInfoLine(_LLM_Tooltip_InfoModel, 9999, 9999, true)
-	spaceDiv := UI_LLM_FOOTER_SPACE_DIV
-	combinedSep := UI_LLM_FOOTER_COMBINED_SEP
-	if (hintText != "" and infoSizing != "") {
-		combinedW := _TooltipMeasureTextSize(
-			hintText . spaceDiv . combinedSep . spaceDiv . infoSizing, _TOOLTIP_LABEL_FONT_SIZE).W
-		if (combinedW > MaxW)
-			MaxW := combinedW
-	} else {
-		if (hintText != "") {
-			hintW := _TooltipMeasureTextSize(hintText, _TOOLTIP_LABEL_FONT_SIZE).W
-			if (hintW > MaxW)
-				MaxW := hintW
+		if all_placeholder {
+			Body := (i == 1) ? loading_label : ""
+			Shortcut := ""
+		} else {
+			Body := _LLM_SlotIsEmpty(slot) ? LLM_TOOLTIP_PLACEHOLDER
+				: _LLM_SlotBodyText(slot) . LLM_TOOLTIP_TAB_SUFFIX
+			Shortcut := _LLM_BuildShortcutSuffix(i, slotCount, _LLM_Tooltip_ValMods)
 		}
-		if (infoSizing != "") {
-			infoW := _TooltipMeasureTextSize(infoSizing, _TOOLTIP_INFO_FONT_SIZE).W
-			if (infoW > MaxW)
-				MaxW := infoW
+		Bodies.Push(Body)
+		Shortcuts.Push(Shortcut)
+		if (all_placeholder and i > 1) {
+			PredRows.Push({ W: 0, H: 0 })
+			continue
 		}
+		Active := _TooltipMeasureText(activePrefix . Body)
+		Inactive := _TooltipMeasureText(inactivePrefix . Body)
+		ShortcutW := (Shortcut != "")
+			? _TooltipMeasureTextSize(Shortcut, _TOOLTIP_LABEL_FONT_SIZE).W : 0
+		PredRows.Push({ W: Max(Active.W, Inactive.W) + ShortcutW,
+			H: Max(Active.H, Inactive.H) })
 	}
+	; The all-placeholder panel is the macOS loading panel: label only, no footer.
+	Texts := all_placeholder ? { Hint: "", Info: "", InfoSizing: "" }
+		: _LLM_TooltipFooterTexts()
+	Footer := _LLM_TooltipMeasureFooter(Texts)
+	Layout := _LLM_TooltipLayout(PredRows, Footer, {
+		PadX: _TOOLTIP_PADDING_X, PadY: _TOOLTIP_PADDING_Y,
+		LineSpacing: _TOOLTIP_LINE_SPACING, HintSpacing: _TOOLTIP_HINT_SPACING })
 
-	TotalW := _TOOLTIP_PADDING_X + MaxW + _TOOLTIP_PADDING_X
-	RowMeta := []
-	TotalH  := 0
-	for Idx, slot in slots {
-		RowH := _TOOLTIP_PADDING_Y + Sizes[Idx].H + _TOOLTIP_PADDING_Y
-		RowMeta.Push({ H: RowH, Y: TotalH })
-		TotalH += RowH
-		if (Idx < Count)
-			TotalH += SEP_H
-	}
-
-	inflight_bg := _TooltipMixTintHex(_TooltipResolveAccent("ai_loading"))
-	has_loading := false
-	for , slot in slots {
-		if _LLM_SlotIsPlaceholder(slot) {
-			has_loading := true
-			break
-		}
-	}
-	cursorHex := UI_LLM_CURSOR_HEX
-	cmdSelHex := UI_LLM_CMD_SEL_HEX
-	cmdDimHex := UI_LLM_CMD_DIM_HEX
 	G := Gui("+AlwaysOnTop -Caption +E0x20 +E0x80 +LastFound")
-	G.BackColor := has_loading ? inflight_bg : _TOOLTIP_DEFAULT_BG_HEX
+	G.BackColor := all_placeholder
+		? _TooltipMixTintHex(_TooltipResolveAccent("ai_loading"))
+		: _TOOLTIP_DEFAULT_BG_HEX
 	G.MarginX := 0
 	G.MarginY := 0
 
 	for Idx, slot in slots {
+		RowY := Layout.RowY[Idx]
+		RowH := PredRows[Idx].H
+		X := _TOOLTIP_PADDING_X
+		if all_placeholder {
+			if (Idx == 1)
+				_LLM_TooltipDrawText(G, X, RowY, RowH, _TOOLTIP_LOADING_TEXT_HEX,
+					_TOOLTIP_FONT_SIZE, Bodies[1], "norm italic")
+			continue
+		}
 		is_active := (Idx == active_idx)
-		Meta := RowMeta[Idx]
-		RowY := Meta.Y
-		RowH := Meta.H
-		S    := Sizes[Idx]
-		TextY := RowY + _TOOLTIP_PADDING_Y
-		row_bg := _LLM_SlotIsPlaceholder(slot) ? inflight_bg : _TOOLTIP_DEFAULT_BG_HEX
-		activePrefix := _LLM_GetActivePrefix(slotCount)
-		inactivePrefix := _LLM_GetInactivePrefix(slotCount)
-		shortcut := _LLM_BuildShortcutSuffix(Idx, slotCount, _LLM_Tooltip_ValMods)
-
-		; Full-width background band.
-		G.SetFont("norm s1", _TOOLTIP_FONT_NAME)
-		G.Add("Text", Format("Background{1} x0 y{2} w{3} h{4}", row_bg, RowY, TotalW, RowH), "")
-
 		if _LLM_SlotIsEmpty(slot) {
-			; In-flight slot — full « Génération en cours… » copy when the whole
-			; stack is still waiting; otherwise sparkle + ellipsis per slot (HS).
-			color := UI_LLM_LOADING_HEX
-			prefix := is_active ? activePrefix : inactivePrefix
-			loading_label := (IsSet(t)) ? t("llm.generating") : _LLM_TOOLTIP_LOADING_FALLBACK
-			display := _LLM_AllSlotsPlaceholder(slots) ? loading_label : (prefix . LLM_TOOLTIP_PLACEHOLDER)
-			G.SetFont("italic c" . color . " s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
-			G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
-				_TOOLTIP_PADDING_X, TextY, MaxW, S.H), display)
-			if (shortcut != "") {
-				scSz := _TooltipMeasureTextSize(shortcut, _TOOLTIP_LABEL_FONT_SIZE)
-				scColor := is_active ? cmdSelHex : cmdDimHex
-				G.SetFont("norm c" . scColor . " s" . _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_FONT_NAME)
-				G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
-					TotalW - _TOOLTIP_PADDING_X - scSz.W, TextY, scSz.W + 2, S.H), shortcut)
-			}
+			X += _TooltipMeasureText(inactivePrefix).W
+			X += _LLM_TooltipDrawText(G, X, RowY, RowH, UI_LLM_LOADING_HEX,
+				_TOOLTIP_FONT_SIZE, Bodies[Idx], "norm italic")
 		} else if !is_active {
-			; Inactive slot: plain gray.
-			G.SetFont("norm c" . UI_LLM_UNSEL_GRAY_HEX . " s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
-			display := inactivePrefix . _LLM_SlotGetText(slot)
-			G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
-				_TOOLTIP_PADDING_X, TextY, MaxW, S.H), display)
-			if (shortcut != "") {
-				scSz := _TooltipMeasureTextSize(shortcut, _TOOLTIP_LABEL_FONT_SIZE)
-				G.SetFont("norm c" . cmdDimHex . " s" . _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_FONT_NAME)
-				G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
-					TotalW - _TOOLTIP_PADDING_X - scSz.W, TextY, scSz.W + 2, S.H), shortcut)
-			}
+			X += _TooltipMeasureText(inactivePrefix).W
+			X += _LLM_TooltipDrawText(G, X, RowY, RowH, UI_LLM_UNSEL_GRAY_HEX,
+				_TOOLTIP_FONT_SIZE, Bodies[Idx])
 		} else {
-			; Active slot with per-chunk coloring.
-			CurX := _TOOLTIP_PADDING_X
-			PrefixSz := _TooltipMeasureText(activePrefix)
-			G.SetFont("norm c" . cursorHex . " s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
-			G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
-				CurX, TextY, PrefixSz.W + 2, S.H), activePrefix)
-			CurX += PrefixSz.W
-
+			X += _LLM_TooltipDrawText(G, X, RowY, RowH, UI_LLM_CURSOR_HEX,
+				_TOOLTIP_FONT_SIZE, activePrefix)
 			has_chunks := IsObject(slot) and slot.HasOwnProp("Chunks") and slot.Chunks.Length > 0
 			if has_chunks {
-				for , chunk in slot.Chunks {
-					chunk_txt := chunk.HasOwnProp("text") ? chunk.text : ""
-					if (chunk_txt == "")
-						continue
-					chunk_color := (chunk.HasOwnProp("type") and chunk.type == "insert") ? UI_LLM_CORR_SEL_HEX : UI_LLM_UNSEL_GRAY_HEX
-					CSz := _TooltipMeasureText(chunk_txt)
-					G.SetFont("norm c" . chunk_color . " s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
-					G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
-						CurX, TextY, CSz.W + 4, S.H), chunk_txt)
-					CurX += CSz.W
-				}
-				nw := slot.HasOwnProp("NextWords") ? slot.NextWords : ""
 				has_insert := false
 				for , chunk in slot.Chunks {
-					if (chunk.HasOwnProp("type") and chunk.type == "insert")
-						has_insert := true
+					is_insert := chunk.HasOwnProp("type") and chunk.type == "insert"
+					has_insert := has_insert or is_insert
+					X += _LLM_TooltipDrawText(G, X, RowY, RowH,
+						is_insert ? UI_LLM_CORR_SEL_HEX : UI_LLM_UNSEL_GRAY_HEX,
+						_TOOLTIP_FONT_SIZE, chunk.HasOwnProp("text") ? chunk.text : "")
 				}
-				if (nw != "" and !has_insert) {
-					CSz := _TooltipMeasureText(nw)
-					G.SetFont("norm c" . UI_LLM_NW_SEL_HEX . " s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
-					G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
-						CurX, TextY, CSz.W + 4, S.H), nw)
-					CurX += CSz.W
-				}
+				nw := slot.HasOwnProp("NextWords") ? slot.NextWords : ""
+				if !has_insert
+					X += _LLM_TooltipDrawText(G, X, RowY, RowH, UI_LLM_NW_SEL_HEX,
+						_TOOLTIP_FONT_SIZE, nw)
 			} else {
-				; Plain text active slot (streaming).
-				plain := _LLM_SlotGetText(slot)
-				G.SetFont("norm cFFFFFF s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
-				G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
-					CurX, TextY, MaxW, S.H), plain)
-				CurX += _TooltipMeasureText(plain).W
+				; A streaming slot is words still to come: macOS colours them as
+				; next words.
+				X += _LLM_TooltipDrawText(G, X, RowY, RowH, UI_LLM_NW_SEL_HEX,
+					_TOOLTIP_FONT_SIZE, _LLM_SlotGetText(slot))
 			}
-
-			if (LLM_TOOLTIP_TAB_SUFFIX != "") {
-				G.SetFont("norm c" . _TOOLTIP_LABEL_COLOR_HEX . " s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
-				G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
-					CurX, TextY, _TooltipMeasureText(LLM_TOOLTIP_TAB_SUFFIX).W + 4, S.H), LLM_TOOLTIP_TAB_SUFFIX)
-			}
-			if (shortcut != "") {
-				scSz := _TooltipMeasureTextSize(shortcut, _TOOLTIP_LABEL_FONT_SIZE)
-				G.SetFont("norm c" . cmdSelHex . " s" . _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_FONT_NAME)
-				G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
-					TotalW - _TOOLTIP_PADDING_X - scSz.W, TextY, scSz.W + 2, S.H), shortcut)
-			}
+			X += _LLM_TooltipDrawText(G, X, RowY, RowH, UI_LLM_NW_SEL_HEX,
+				_TOOLTIP_FONT_SIZE, LLM_TOOLTIP_TAB_SUFFIX)
 		}
-
-		; Separator.
-		if (Idx < Count) {
-			SepY := RowY + RowH
-			G.SetFont("s1", _TOOLTIP_FONT_NAME)
-			G.Add("Text", Format("Background{1} x0 y{2} w{3} h{4}", _TOOLTIP_SEP_COLOR_HEX, SepY, TotalW, SEP_H), "")
-		}
+		; Inline after the line, bottom-aligned at the smaller hint size.
+		_LLM_TooltipDrawText(G, X, RowY, RowH, is_active ? UI_LLM_CMD_SEL_HEX : UI_LLM_CMD_DIM_HEX,
+			_TOOLTIP_LABEL_FONT_SIZE, Shortcuts[Idx])
 	}
-
-	row_bg_final := _TOOLTIP_DEFAULT_BG_HEX
-	_LLM_TooltipAppendFooter(G, &TotalH, TotalW, row_bg_final)
+	_LLM_TooltipDrawFooter(G, Layout, Texts, Footer)
+	TotalW := Layout.W
+	TotalH := Layout.H
 
 	; Detached candidate: shared surface globals remain untouched until the final
 	; generation-fenced commit in _TooltipPresentStack.

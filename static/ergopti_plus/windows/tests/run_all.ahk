@@ -277,6 +277,7 @@ InstallSendNoOps()
 #Include unit/test_tooltip_position_cache_receipt.ahk
 #Include unit/test_llm_tooltip_grace.ahk
 #Include unit/test_llm_tooltip_render.ahk
+#Include unit/test_llm_tooltip_layout.ahk
 #Include unit/test_hotstring_engine.ahk
 #Include unit/test_hotstring_engine_main.ahk
 #Include unit/test_hotstring_buffer_boundaries.ahk
