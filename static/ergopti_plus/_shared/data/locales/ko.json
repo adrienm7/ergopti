@@ -2503,5 +2503,10 @@
 	"numeric_prompt.not_a_number": "숫자를 입력하세요.",
 	"numeric_prompt.out_of_range": "값이 허용 범위를 벗어났습니다.",
 	"menu.llm.generation.custom_value": "다른 값…",
-	"ui_metrics_rebuild.partial": "부분 통계: {date}까지의 데이터가 재구성되었습니다."
+	"ui_metrics_rebuild.partial": "부분 통계: {date}까지의 데이터가 재구성되었습니다.",
+	"ui_metrics_rebuild.progress": "통계 재구성 중: {percent}% — {remaining}",
+	"ui_metrics_rebuild.eta": "약 {eta} 남음",
+	"ui_metrics_rebuild.eta_unknown": "남은 시간 계산 중…",
+	"ui_metrics_rebuild.finalizing": "재구성된 통계를 저장하는 중…",
+	"ui_metrics_rebuild.failed": "통계 재구성이 예기치 않게 중단되었습니다. 다음 시도는 중단된 지점부터 다시 시작합니다."
 }

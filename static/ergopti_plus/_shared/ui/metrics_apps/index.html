@@ -1247,6 +1247,10 @@
 								return;
 							}
 						}
+						if (payload && payload.type === 'rebuild_progress') {
+							if (window.metrics_rebuild) window.metrics_rebuild.show_progress(payload.progress);
+							return;
+						}
 						if (!payload || payload.type !== 'prefetch') return;
 						apply_prefetch(payload.blob);
 					});

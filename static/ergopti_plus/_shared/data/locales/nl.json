@@ -2503,5 +2503,10 @@
 	"numeric_prompt.not_a_number": "Voer een getal in.",
 	"numeric_prompt.out_of_range": "De waarde valt buiten het toegestane bereik.",
 	"menu.llm.generation.custom_value": "Andere waarde…",
-	"ui_metrics_rebuild.partial": "Gedeeltelijke statistieken: gegevens opnieuw opgebouwd tot {date}."
+	"ui_metrics_rebuild.partial": "Gedeeltelijke statistieken: gegevens opnieuw opgebouwd tot {date}.",
+	"ui_metrics_rebuild.progress": "Statistieken worden opnieuw opgebouwd: {percent}% — {remaining}",
+	"ui_metrics_rebuild.eta": "nog ongeveer {eta}",
+	"ui_metrics_rebuild.eta_unknown": "resterende tijd wordt geschat…",
+	"ui_metrics_rebuild.finalizing": "Opnieuw opgebouwde statistieken worden opgeslagen…",
+	"ui_metrics_rebuild.failed": "Het opnieuw opbouwen van de statistieken is onverwacht gestopt. De volgende poging gaat verder waar deze stopte."
 }

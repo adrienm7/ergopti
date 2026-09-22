@@ -2503,5 +2503,10 @@
 	"numeric_prompt.not_a_number": "请输入数字。",
 	"numeric_prompt.out_of_range": "数值超出允许范围。",
 	"menu.llm.generation.custom_value": "其他数值…",
-	"ui_metrics_rebuild.partial": "部分统计：数据已重建至 {date}。"
+	"ui_metrics_rebuild.partial": "部分统计：数据已重建至 {date}。",
+	"ui_metrics_rebuild.progress": "正在重建统计：{percent}% — {remaining}",
+	"ui_metrics_rebuild.eta": "剩余约 {eta}",
+	"ui_metrics_rebuild.eta_unknown": "正在估算剩余时间…",
+	"ui_metrics_rebuild.finalizing": "正在保存重建的统计…",
+	"ui_metrics_rebuild.failed": "统计重建意外停止。下次尝试将从停止处继续。"
 }

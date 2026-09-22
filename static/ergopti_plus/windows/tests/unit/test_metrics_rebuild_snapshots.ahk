@@ -10,6 +10,7 @@
 _MRS_RetireFiles(Root) {
 	for Which in ["typing", "apps"]
 		try FileDelete(KLPF_PartialSnapshotPath(Which, Root))
+	try FileDelete(KLPF_RebuildProgressPath(Root))
 }
 
 ; The worker's observer must turn the first rolled-up day into a dashboard
@@ -86,3 +87,103 @@ _MRS_ResidentForwardsPartials() {
 }
 Test("metrics rebuild: the resident forwards partial snapshots (metrics-rebuild-partial)",
 	_MRS_ResidentForwardsPartials)
+
+; The percentage is exact consumed work; the remaining time is the measured
+; throughput of this worker, never a timer and never inflated by resumed bytes.
+_MRS_ProgressFromThroughput() {
+	Info := Map("final", false, "total_bytes", 100000000, "done_bytes", 60000000,
+		"run_bytes", 20000000, "elapsed_ms", 40000, "oldest_complete", "2026-03-01")
+	Progress := KLPF_RebuildProgress(Info)
+	AssertEqual("running", Progress["state"])
+	AssertEqual(60, Progress["percent"], "the percentage is consumed bytes over total bytes (metrics-rebuild-progress)")
+	AssertEqual(80, Progress["eta_s"],
+		"40 MB left at 20 MB per 40 s this run is 80 s, resumed bytes excluded (metrics-rebuild-progress)")
+	Info["run_bytes"] := KLPFRebuildPublisher.MIN_ETA_BYTES - 1
+	AssertEqual(-1, KLPF_RebuildProgress(Info)["eta_s"], "too little measured work gives no estimate yet")
+	Info["final"] := true
+	Info["done_bytes"] := Info["total_bytes"]
+	Final := KLPF_RebuildProgress(Info)
+	AssertEqual("finalizing", Final["state"])
+	AssertEqual(100, Final["percent"])
+}
+Test("metrics rebuild: progress and ETA come from measured work (metrics-rebuild-progress)",
+	_MRS_ProgressFromThroughput)
+
+; The worker writes the store's progress while it rebuilds, and retires it with
+; the partial snapshots once the complete one is published.
+_MRS_WorkerWritesProgress() {
+	_KLRDC_EnsureSharedDir()
+	_KLRDC_Reset()
+	Root := _KLRDC_Root()
+	try {
+		_KLRDC_WriteLedger(_KLRNF_ThreeDayLedger())
+		Publisher := KLPFRebuildPublisher(Root)
+		States := []
+		Observe(Info) {
+			Publisher.last_progress := 0
+			Publisher.Call(Info)
+			States.Push(JsonParse(FileRead(KLPF_RebuildProgressPath(Root), "UTF-8")))
+		}
+		_KLRNF_Build(true, Observe)
+		AssertTrue(States.Length > 2, "every report must reach the progress file")
+		AssertEqual("running", States[1]["state"])
+		AssertTrue(States[1]["percent"] < 100, "the first report must show unfinished work (metrics-rebuild-progress)")
+		AssertEqual("finalizing", States[States.Length]["state"])
+		AssertEqual(100, States[States.Length]["percent"])
+		AssertTrue(Publisher.Retire())
+		AssertFalse(FileExist(KLPF_RebuildProgressPath(Root)), "a complete snapshot retires the progress file")
+	} finally {
+		_MRS_RetireFiles(Root)
+		_KLRDC_Cleanup()
+	}
+}
+Test("metrics rebuild: the worker publishes its progress (metrics-rebuild-progress)",
+	_KLRDC_CheckTeardown.Bind(_MRS_WorkerWritesProgress))
+
+; A worker that dies must turn the bar into an error at once; a finished one
+; must remove it. A replaced (canceled) job leaves the display to its successor.
+_MRS_ResidentSettlesProgress(Status, Expected) {
+	Root := A_Temp . "\ergopti_rebuild_settle_" . A_TickCount . "\"
+	DirCreate(Root)
+	OldWindows := KLWV.windows
+	OldJobs := KLPFWorker.jobs
+	OldSeams := [KLWV.first_paint_push_fn, KLWV.first_paint_timer_fn, KLWV.full_build_timer_fn,
+		KLWV.ingest_drain_timer_fn]
+	Sent := []
+	Fake := {}
+	Fake.DefineProp("PostWebMessageAsString", {Call: (Self, Message) => Sent.Push(Message)})
+	try {
+		; The real terminal runs; only its push and timers are seams.
+		KLWV.first_paint_push_fn := (*) => true
+		KLWV.first_paint_timer_fn := (*) => true
+		KLWV.full_build_timer_fn := (*) => true
+		KLWV.ingest_drain_timer_fn := (*) => true
+		KLWV.windows := Map("typing", Map("which", "typing", "epoch", 72, "metrics_dir", Root, "webview", Fake))
+		KLPFWorker.jobs := Map("typing", Map("generation", 1, "started_at", DateAdd(A_Now, -5, "Seconds")))
+		FileAppend('{"state":"running","percent":12,"eta_s":300}', KLPF_RebuildProgressPath(Root), "UTF-8-RAW")
+		AssertTrue(KLWV_RebuildWatchTick("typing", 72))
+		AssertEqual('{"type":"rebuild_progress","progress":{"state":"running","percent":12,"eta_s":300}}', Sent[1],
+			"the worker's progress must reach the page (metrics-rebuild-progress)")
+		KLPFWorker.jobs := Map()
+		KLWV_OnBuildTerminal("typing", 72, Status)
+		if Expected = "" {
+			AssertEqual(1, Sent.Length, "a canceled job leaves the display to its successor")
+		} else {
+			AssertEqual(2, Sent.Length, "the projection terminal must settle the display (metrics-rebuild-progress)")
+			AssertEqual('{"type":"rebuild_progress","progress":{"state":"' . Expected . '"}}', Sent[2],
+				"the terminal status must end the progress display (metrics-rebuild-progress)")
+			AssertFalse(KLWV_SettleRebuildProgress("typing", 72, Status), "a settled display is not settled twice")
+		}
+	} finally {
+		KLWV.windows := OldWindows
+		KLPFWorker.jobs := OldJobs
+		KLWV.first_paint_push_fn := OldSeams[1]
+		KLWV.first_paint_timer_fn := OldSeams[2]
+		KLWV.full_build_timer_fn := OldSeams[3]
+		KLWV.ingest_drain_timer_fn := OldSeams[4]
+		DirDelete(RTrim(Root, "\"), true)
+	}
+}
+for Outcome in [["failed", "failed"], ["ok", "done"], ["canceled", ""]]
+	Test("metrics rebuild: a " . Outcome[1] . " worker settles the progress bar (metrics-rebuild-progress)",
+		_MRS_ResidentSettlesProgress.Bind(Outcome[1], Outcome[2]))

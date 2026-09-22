@@ -2503,5 +2503,10 @@
 	"numeric_prompt.not_a_number": "Bir sayı girin.",
 	"numeric_prompt.out_of_range": "Değer kabul edilen aralığın dışında.",
 	"menu.llm.generation.custom_value": "Başka değer…",
-	"ui_metrics_rebuild.partial": "Kısmi istatistikler: veriler {date} tarihine kadar yeniden oluşturuldu."
+	"ui_metrics_rebuild.partial": "Kısmi istatistikler: veriler {date} tarihine kadar yeniden oluşturuldu.",
+	"ui_metrics_rebuild.progress": "İstatistikler yeniden oluşturuluyor: %{percent} — {remaining}",
+	"ui_metrics_rebuild.eta": "yaklaşık {eta} kaldı",
+	"ui_metrics_rebuild.eta_unknown": "kalan süre hesaplanıyor…",
+	"ui_metrics_rebuild.finalizing": "Yeniden oluşturulan istatistikler kaydediliyor…",
+	"ui_metrics_rebuild.failed": "İstatistiklerin yeniden oluşturulması beklenmedik şekilde durdu. Bir sonraki deneme kaldığı yerden devam edecek."
 }

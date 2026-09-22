@@ -1040,6 +1040,7 @@ KLWV_DelayedFullBuild(which, Epoch, attempt := 0, RetryOwner := 0) {
 }
 
 KLWV_OnFirstBuildTerminal(which, Epoch, attempt, status, SnapshotPath := "", *) {
+		KLWV_SettleRebuildProgress(which, Epoch, status)
 		try {
 				if !KLWV_IsCurrent(which, Epoch)
 						return false
@@ -1060,6 +1061,7 @@ KLWV_OnFirstBuildTerminal(which, Epoch, attempt, status, SnapshotPath := "", *) 
 }
 
 KLWV_OnFullBuildTerminal(which, Epoch, attempt, status, *) {
+		KLWV_SettleRebuildProgress(which, Epoch, status)
 		try {
 				if !KLWV_IsCurrent(which, Epoch)
 						return false
@@ -1074,6 +1076,7 @@ KLWV_OnFullBuildTerminal(which, Epoch, attempt, status, *) {
 }
 
 KLWV_OnBuildTerminal(which, Epoch, status, SnapshotPath := "", *) {
+		KLWV_SettleRebuildProgress(which, Epoch, status)
 		try {
 				if !KLWV_IsCurrent(which, Epoch)
 						return false
@@ -1501,9 +1504,10 @@ KLWV_DisarmRebuildWatch(Entry) {
 		return true
 }
 
-; While this dashboard's projection worker runs, deliver every new partial
-; snapshot it publishes. Files older than the job belong to a dead worker.
-; @returns {Boolean} Whether a snapshot was delivered.
+; While this dashboard's projection worker runs, deliver the store's rebuild
+; progress and every new partial snapshot. Files older than the job belong to a
+; dead worker.
+; @returns {Boolean} Whether anything was delivered.
 KLWV_RebuildWatchTick(which, Epoch) {
 		if !KLWV_IsCurrent(which, Epoch) || A_IsSuspended
 				return false
@@ -1511,9 +1515,42 @@ KLWV_RebuildWatchTick(which, Epoch) {
 		Job := KLPFWorker.jobs.Get(which, 0)
 		if !(Job is Map) || !Job.Has("started_at")
 				return false
+		Progressed := KLWV_DeliverRebuildFile(which, Entry, Epoch, Job,
+				KLPF_RebuildProgressPath(Entry["metrics_dir"]), "progress_stamp",
+				'{"type":"rebuild_progress","progress":', "}")
+		if Progressed
+				Entry["rebuild_shown"] := true
 		return KLWV_DeliverRebuildFile(which, Entry, Epoch, Job,
 				KLPF_PartialSnapshotPath(which, Entry["metrics_dir"]), "partial_stamp",
-				'{"type":"prefetch","blob":', "}")
+				'{"type":"prefetch","blob":', "}") || Progressed
+}
+
+; End the progress display with the projection that drove it. A worker that
+; exits with a failure is shown as failed at once instead of leaving a bar that
+; never moves again; the retry that follows resumes from its checkpoint.
+; @param status {String} Terminal status of the projection job.
+; @returns {Boolean} Whether a final state was delivered.
+KLWV_SettleRebuildProgress(which, Epoch, status) {
+		if !KLWV_IsCurrent(which, Epoch)
+				return false
+		Entry := KLWV.windows[which]
+		if !Entry.Get("rebuild_shown", false) || status = "canceled" || status = "full_required"
+				return false
+		Entry["rebuild_shown"] := false
+		for Slot in ["progress_stamp", "partial_stamp"]
+				if Entry.Has(Slot)
+						Entry.Delete(Slot)
+		State := (status = "ok") ? "done" : "failed"
+		if State = "failed"
+				try LoggerWarn("Keylogger", "Metrics rebuild worker for '{1}' ended with '{2}'; the dashboard shows the failure.",
+						which, status)
+		try Entry["webview"].PostWebMessageAsString('{"type":"rebuild_progress","progress":{"state":"'
+				. State . '"}}')
+		catch as Err {
+				try LoggerError("Keylogger", "Rebuild state delivery failed for '{1}': {2}", which, Err.Message)
+				return false
+		}
+		return true
 }
 
 KLWV_DeliverRebuildFile(which, Entry, Epoch, Job, Path, Slot, Prefix, Suffix) {

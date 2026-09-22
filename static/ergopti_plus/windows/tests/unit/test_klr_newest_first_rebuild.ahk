@@ -64,6 +64,8 @@ _KLRNF_NewestDayComesFirst() {
 
 		Rounds := []
 		Observe(Info) {
+			if !Info.Has("db")
+				return
 			Rounds.Push(Map("days", _KLRNF_Days(Info["db"]), "oldest", Info["oldest_complete"],
 				"done", Info["done_bytes"], "total", Info["total_bytes"], "final", Info["final"]))
 		}

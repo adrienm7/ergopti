@@ -2503,5 +2503,10 @@
 	"numeric_prompt.not_a_number": "Zadejte číslo.",
 	"numeric_prompt.out_of_range": "Hodnota je mimo povolený rozsah.",
 	"menu.llm.generation.custom_value": "Jiná hodnota…",
-	"ui_metrics_rebuild.partial": "Částečné statistiky: data obnovena zpětně do {date}."
+	"ui_metrics_rebuild.partial": "Částečné statistiky: data obnovena zpětně do {date}.",
+	"ui_metrics_rebuild.progress": "Obnova statistik: {percent} % — {remaining}",
+	"ui_metrics_rebuild.eta": "zbývá asi {eta}",
+	"ui_metrics_rebuild.eta_unknown": "odhaduje se zbývající čas…",
+	"ui_metrics_rebuild.finalizing": "Ukládají se obnovené statistiky…",
+	"ui_metrics_rebuild.failed": "Obnova statistik se neočekávaně zastavila. Další pokus naváže tam, kde skončila."
 }

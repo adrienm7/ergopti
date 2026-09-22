@@ -201,6 +201,9 @@ KLR_BuildColdSegmented(md, logPath, LedgerPaths) {
 				}
 				if KLRRebuild.stop_after_rounds && State["rounds"] >= KLRRebuild.stop_after_rounds
 					throw KLRRebuildRefusal("stopped by the test seam")
+			} else {
+				; Progress between rounds keeps the bar moving without a rollup.
+				_KLR_RebuildNotify(State, false, false)
 			}
 		}
 		_KLR_RebuildRound(State, true)
@@ -248,9 +251,8 @@ _KLR_RebuildAcquire(md, logPath, &Waited) {
 			break
 		if !Waited
 			KLR_PrefetchDebug(logPath, "KLR rebuild waits for a peer worker")
+		; The peer publishes the store's progress; this worker adds nothing to it.
 		Waited := true
-		if HasMethod(KLRRebuild.observer, "Call")
-			KLRRebuild.observer.Call(Map("waiting", true))
 		Sleep(KLRRebuildConst.PEER_POLL_MS)
 	}
 	; Under the lock no other producer can own a checkpoint stage.
@@ -576,14 +578,13 @@ _KLR_RebuildRollUp(db, Days) {
 		throw KLRRebuildRefusal("replayed typing payloads could not be released")
 }
 
-; Report one round. The observer receives the private candidate handle for the
-; duration of the call only; it may read it but never keep or publish it.
-_KLR_RebuildNotify(State, Final) {
+; Report progress, and after a rollup round the private candidate handle. The
+; observer may read that handle during the call only, never keep or publish it.
+_KLR_RebuildNotify(State, Final, AfterRound := true) {
 	if !HasMethod(KLRRebuild.observer, "Call")
 		return
 	Done := _KLR_RebuildDoneBytes(State)
-	KLRRebuild.observer.Call(Map(
-		"db", State["db"],
+	Info := Map(
 		"final", Final,
 		"round", State["rounds"],
 		"total_bytes", _KLR_RebuildTotalBytes(State),
@@ -591,7 +592,10 @@ _KLR_RebuildNotify(State, Final) {
 		"run_bytes", Done - State["resumed_bytes"],
 		"elapsed_ms", A_TickCount - State["run_start"],
 		"oldest_complete", State["oldest_complete"],
-		"newest_complete", State["newest_complete"]))
+		"newest_complete", State["newest_complete"])
+	if AfterRound
+		Info["db"] := State["db"]
+	KLRRebuild.observer.Call(Info)
 }
 
 

@@ -2503,5 +2503,10 @@
 	"numeric_prompt.not_a_number": "הזינו מספר.",
 	"numeric_prompt.out_of_range": "הערך מחוץ לטווח המותר.",
 	"menu.llm.generation.custom_value": "ערך אחר…",
-	"ui_metrics_rebuild.partial": "סטטיסטיקה חלקית: הנתונים נבנו מחדש עד {date}."
+	"ui_metrics_rebuild.partial": "סטטיסטיקה חלקית: הנתונים נבנו מחדש עד {date}.",
+	"ui_metrics_rebuild.progress": "בונה מחדש סטטיסטיקה: {percent}% — {remaining}",
+	"ui_metrics_rebuild.eta": "נותרו כ-{eta}",
+	"ui_metrics_rebuild.eta_unknown": "מעריך את הזמן שנותר…",
+	"ui_metrics_rebuild.finalizing": "שומר את הסטטיסטיקה שנבנתה מחדש…",
+	"ui_metrics_rebuild.failed": "הבנייה מחדש של הסטטיסטיקה נעצרה באופן בלתי צפוי. הניסיון הבא ימשיך מהמקום שבו נעצרה."
 }
