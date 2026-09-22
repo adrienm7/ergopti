@@ -336,13 +336,12 @@ function M._build_config_updates(answers)
 	}
 end
 
---- Resolves a canonical boolean without letting false trigger legacy fallback.
---- @param section table Canonical config section.
---- @param key string Canonical key.
+--- Resolves a canonical boolean, falling back to the legacy migration value
+--- only when the canonical key is absent.
+--- @param canonical any Canonical value, nil when absent.
 --- @param legacy_enabled boolean Legacy migration value.
 --- @return boolean enabled
-local function canonical_boolean_or_legacy(section, key, legacy_enabled)
-	local canonical = section[key]
+local function canonical_boolean_or_legacy(canonical, legacy_enabled)
 	if canonical ~= nil then
 		return canonical == true or canonical == "true"
 	end
@@ -354,32 +353,45 @@ end
 --- [hotstrings].trigger_char, [metrics].enabled, [gestures].enabled) so a
 --- config written by commit() round-trips correctly. Falls back to the AHK
 --- PascalCase schema (Layout.ErgoptiBase, Hotstrings.MagicKey, …) for users
---- migrating a Windows config file.
+--- migrating a Windows config file. Every key is read unconditionally, so the
+--- keys marked for the unused-key cleanup never depend on another key's value.
 --- @param parsed table Decoded TOML as a Lua table.
+--- @param mark function|nil mark(...segments) for each key present and read.
 --- @return table { use_ergopti, magic_key, use_metrics, use_gestures }
-function M._answers_from_config(parsed)
+function M._answers_from_config(parsed, mark)
 	if type(parsed) ~= "table" then return {} end
+	local function section(name)
+		local values = type(parsed[name]) == "table" and parsed[name] or {}
+		return function(key)
+			local value = values[key]
+			if value ~= nil and mark then mark(name, key) end
+			return value
+		end
+	end
 	-- Canonical lowercase sections (written by commit / _build_config_updates)
-	local hs_sec  = type(parsed.hotstrings) == "table" and parsed.hotstrings or {}
-	local met_sec = type(parsed.metrics)    == "table" and parsed.metrics    or {}
-	local ges_sec = type(parsed.gestures)   == "table" and parsed.gestures   or {}
+	local hs_sec  = section("hotstrings")
+	local met_sec = section("metrics")
+	local ges_sec = section("gestures")
 	-- AHK PascalCase fallback (Windows config import)
-	local layout_ahk     = type(parsed.Layout)     == "table" and parsed.Layout     or {}
-	local hotstr_ahk     = type(parsed.Hotstrings)  == "table" and parsed.Hotstrings or {}
-	local metrics_ahk    = type(parsed.Metrics)     == "table" and parsed.Metrics    or {}
-	local gestures_ahk   = type(parsed.Gestures)    == "table" and parsed.Gestures   or {}
+	local layout_ahk   = section("Layout")
+	local hotstr_ahk   = section("Hotstrings")
+	local metrics_ahk  = section("Metrics")
+	local gestures_ahk = section("Gestures")
+	local legacy_base  = layout_ahk("ErgoptiBase") == true
+	local legacy_altgr = layout_ahk("ErgoptiAltGr") == true
+	local legacy_plus  = layout_ahk("ErgoptiPlus") == true
+	local trigger_char = hs_sec("trigger_char")
+	local legacy_magic = hotstr_ahk("MagicKey")
 	-- Prefer canonical schema; fall back to AHK keys only when canonical absent
-	local use_ergopti = canonical_boolean_or_legacy(hs_sec, "enabled",
-		layout_ahk.ErgoptiBase == true
-		or layout_ahk.ErgoptiAltGr == true
-		or layout_ahk.ErgoptiPlus == true)
-	local magic_key = (type(hs_sec.trigger_char) == "string" and hs_sec.trigger_char ~= "" and hs_sec.trigger_char)
-		or (type(hotstr_ahk.MagicKey) == "string" and hotstr_ahk.MagicKey ~= "" and hotstr_ahk.MagicKey)
+	local use_ergopti = canonical_boolean_or_legacy(hs_sec("enabled"),
+		legacy_base or legacy_altgr or legacy_plus)
+	local magic_key = (type(trigger_char) == "string" and trigger_char ~= "" and trigger_char)
+		or (type(legacy_magic) == "string" and legacy_magic ~= "" and legacy_magic)
 		or nil
-	local use_metrics = canonical_boolean_or_legacy(met_sec, "enabled",
-		metrics_ahk.metrics_enabled == true)
-	local use_gestures = canonical_boolean_or_legacy(ges_sec, "enabled",
-		gestures_ahk.Enabled == true)
+	local use_metrics = canonical_boolean_or_legacy(met_sec("enabled"),
+		metrics_ahk("metrics_enabled") == true)
+	local use_gestures = canonical_boolean_or_legacy(ges_sec("enabled"),
+		gestures_ahk("Enabled") == true)
 	return {
 		use_ergopti  = use_ergopti  or false,
 		magic_key    = magic_key,

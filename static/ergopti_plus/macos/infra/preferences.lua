@@ -267,10 +267,15 @@ end
 --- in-memory state expects. Translates all disk keys back to flat state
 --- keys via the reverse maps.
 --- @param grouped table The dict decoded from disk.
+--- @param mark function|nil mark(...segments), called for every disk path the
+---   flat state takes; the unused-key cleanup offers only the paths never marked.
 --- @return table A flat state dictionary.
-local function flatten_from_disk(grouped)
+local function flatten_from_disk(grouped, mark)
 	if type(grouped) ~= "table" then return {} end
 	local flat = {}
+	local function take(...)
+		if mark then mark(...) end
+	end
 
 	for sec_name, sec_val in pairs(grouped) do
 		if _known_sections[sec_name] and type(sec_val) == "table" then
@@ -285,10 +290,12 @@ local function flatten_from_disk(grouped)
 					local top_scalar_fk = _reverse_scalar[sec_name .. ":" .. disk_key]
 					if top_scalar_fk then
 						flat[top_scalar_fk] = disk_val
+						take(sec_name, disk_key)
 					end
 					local nested_fk = _reverse_nested[sec_name .. ":" .. disk_key]
 					if nested_fk then
 						flat[nested_fk] = disk_val
+						take(sec_name, disk_key)
 					elseif top_scalar_fk then
 						-- Already handled above — skip sub-path processing
 					elseif sec_name == "gestures" then
@@ -297,6 +304,7 @@ local function flatten_from_disk(grouped)
 						for slot, action in pairs(disk_val) do
 							flat.gesture_actions[slot] = action
 						end
+						take(sec_name, disk_key)
 					else
 						-- Sub-path table (e.g. hotstrings.dynamic, hotstrings.editor):
 						-- walk each inner key through the reverse scalar and nested maps.
@@ -307,7 +315,10 @@ local function flatten_from_disk(grouped)
 								if #inner_val > 0 then
 									local lookup = sec_name .. ":" .. disk_key .. "." .. inner_key
 									local fk     = _reverse_scalar[lookup] or _reverse_nested[lookup]
-									if fk then flat[fk] = inner_val end
+									if fk then
+										flat[fk] = inner_val
+										take(sec_name, disk_key, inner_key)
+									end
 								else
 									-- Structured scalar (e.g. llm.trigger.shortcut = {mods,key})
 									-- or depth-3 nested maps (hotstrings.editor.*).
@@ -315,15 +326,22 @@ local function flatten_from_disk(grouped)
 									local fk     = _reverse_scalar[lookup]
 									if fk then
 										flat[fk] = inner_val
+										take(sec_name, disk_key, inner_key)
 									else
 										local nfk = _reverse_nested[lookup]
-										if nfk then flat[nfk] = inner_val end
+										if nfk then
+											flat[nfk] = inner_val
+											take(sec_name, disk_key, inner_key)
+										end
 									end
 								end
 							else
 								local lookup = sec_name .. ":" .. disk_key .. "." .. inner_key
 								local fk     = _reverse_scalar[lookup]
-								if fk then flat[fk] = inner_val end
+								if fk then
+									flat[fk] = inner_val
+									take(sec_name, disk_key, inner_key)
+								end
 							end
 						end
 					end
@@ -343,10 +361,14 @@ local function flatten_from_disk(grouped)
 							if not flat.gesture_actions then flat.gesture_actions = {} end
 							flat.gesture_actions[disk_key] = disk_val
 						end
+						take(sec_name, disk_key)
 					else
 						local lookup = sec_name .. ":" .. disk_key
 						local fk     = _reverse_scalar[lookup]
-						if fk then flat[fk] = disk_val end
+						if fk then
+							flat[fk] = disk_val
+							take(sec_name, disk_key)
+						end
 					end
 				end
 			end
@@ -503,6 +525,15 @@ function M.load(prefs_file)
 
 	_source_snapshots[prefs_file] = { status = "ok", content = content }
 	return flatten_from_disk(tbl), "ok"
+end
+
+--- Marks every config.toml path load() takes into the flat state, through the
+--- very walk load() uses.
+--- @param decoded table Decoded config.toml.
+--- @param mark function mark(...segments) from config_unused_keys.
+function M.mark_config_reads(decoded, mark)
+	if type(mark) ~= "function" then error("Preferences.mark_config_reads needs a mark function", 2) end
+	flatten_from_disk(decoded, mark)
 end
 
 --- Clones persisted values so nested menu tables cannot mutate an acknowledged

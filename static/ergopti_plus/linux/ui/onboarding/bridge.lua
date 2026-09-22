@@ -127,22 +127,37 @@ end
 
 local normalize_config_dir = ConfigDirPicker.normalize
 
-local function canonical_bool(section, key, fallback)
-	if type(section) ~= "table" or section[key] == nil then return fallback end
-	return section[key] == true or section[key] == "true"
+local function canonical_bool(value, fallback)
+	if value == nil then return fallback end
+	return value == true or value == "true"
 end
 
-local function answers_from_config(parsed, config_dir)
+--- Extracts wizard answers from a decoded config.toml table.
+--- @param parsed table Decoded config.toml.
+--- @param config_dir string Directory shown to the wizard.
+--- @param mark function|nil mark(...segments) for each key present and read;
+---   the unused-key cleanup never offers a key this import reads.
+--- @return table answers
+local function answers_from_config(parsed, config_dir, mark)
 	if type(parsed) ~= "table" then return { config_dir = config_dir } end
-	local hotstrings = type(parsed.hotstrings) == "table" and parsed.hotstrings or {}
-	local metrics = type(parsed.metrics) == "table" and parsed.metrics or {}
-	local gestures = type(parsed.gestures) == "table" and parsed.gestures or {}
+	local function section(name)
+		local values = type(parsed[name]) == "table" and parsed[name] or {}
+		return function(key)
+			local value = values[key]
+			if value ~= nil and mark then mark(name, key) end
+			return value
+		end
+	end
+	local hotstrings = section("hotstrings")
+	local metrics = section("metrics")
+	local gestures = section("gestures")
+	local trigger_char = hotstrings("trigger_char")
 	return {
 		config_dir = config_dir,
-		use_ergopti = canonical_bool(hotstrings, "enabled", true),
-		magic_key = type(hotstrings.trigger_char) == "string" and hotstrings.trigger_char or nil,
-		use_metrics = canonical_bool(metrics, "enabled", false),
-		use_gestures = canonical_bool(gestures, "enabled", false),
+		use_ergopti = canonical_bool(hotstrings("enabled"), true),
+		magic_key = type(trigger_char) == "string" and trigger_char or nil,
+		use_metrics = canonical_bool(metrics("enabled"), false),
+		use_gestures = canonical_bool(gestures("enabled"), false),
 	}
 end
 
