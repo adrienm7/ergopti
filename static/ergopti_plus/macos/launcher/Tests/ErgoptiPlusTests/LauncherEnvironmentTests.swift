@@ -668,6 +668,34 @@ final class LauncherEnvironmentTests: XCTestCase {
 		XCTAssertTrue(LauncherLog.filePath.hasSuffix("/Library/Logs/ErgoptiPlus/launcher.log"))
 	}
 
+	/// The startup trail names every exported key but never logs the token value.
+	func testStartupTrailListsExportedKeyNamesWithoutValues() {
+		let environment = launcherChildEnvironment(
+			base: ["PATH": "/usr/bin"],
+			launcherPid: 42,
+			launcherBundleId: "com.ergoptiplus.app",
+			loggerEndpoint: LoggerDatagramEndpoint(port: 4242, token: "secret-token-value")
+		)
+		let summary = launcherEnvironmentKeySummary(environment)
+		XCTAssertEqual(summary, [
+			"ERGOPTI_LAUNCHER_BUNDLE_ID", "ERGOPTI_LAUNCHER_PID",
+			kLoggerDatagramPortEnvironment, kLoggerDatagramTokenEnvironment,
+		].sorted().joined(separator: ", "))
+		XCTAssertFalse(summary.contains("secret-token-value"))
+		XCTAssertFalse(summary.contains("PATH"))
+		XCTAssertEqual(launcherEnvironmentKeySummary([:]), "none")
+	}
+
+	/// Exit descriptions stay identical in the trail and in the fatal alert.
+	func testExitDescriptionsNameCodeSignalAndErrno() {
+		XCTAssertEqual(embeddedProcessExitDescription(.exited(code: 0)), "with exit code 0")
+		XCTAssertEqual(embeddedProcessExitDescription(.signaled(signal: 9)), "after signal 9")
+		XCTAssertEqual(
+			embeddedProcessExitDescription(.unavailable(errorCode: 3)),
+			"with unavailable exit status (errno 3)"
+		)
+	}
+
 	/// Without a report, a clean exit after readiness is still the user's Quit.
 	func testCleanExitWithoutFatalReportStillQuits() throws {
 		let store = try temporaryFatalReportStore()

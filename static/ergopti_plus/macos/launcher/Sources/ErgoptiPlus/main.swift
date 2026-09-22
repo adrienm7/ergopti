@@ -102,6 +102,29 @@ func launcherChildEnvironment(
 	return environment
 }
 
+/// Lists the launcher-owned keys of a child environment by name only, so the
+/// startup trail shows what Hammerspoon received without logging a credential.
+/// - Parameter environment: Environment assigned to the embedded child.
+/// - Returns: Sorted comma-separated `ERGOPTI_*` names, or "none".
+func launcherEnvironmentKeySummary(_ environment: [String: String]) -> String {
+	let names = environment.keys.filter { $0.hasPrefix("ERGOPTI_") }.sorted()
+	return names.isEmpty ? "none" : names.joined(separator: ", ")
+}
+
+/// Describes one embedded-process exit for logs and alerts.
+/// - Parameter exit: Kernel exit observation.
+/// - Returns: "with exit code N", "after signal N" or the unavailable errno.
+func embeddedProcessExitDescription(_ exit: EmbeddedProcessExit) -> String {
+	switch exit {
+	case let .exited(code):
+		return "with exit code \(code)"
+	case let .signaled(signal):
+		return "after signal \(signal)"
+	case let .unavailable(errorCode):
+		return "with unavailable exit status (errno \(errorCode))"
+	}
+}
+
 /// Resolves the application bundle that owns an embedded GUI executable.
 func embeddedApplicationBundleURL(binaryPath: String) -> URL? {
 	let executableURL = URL(fileURLWithPath: binaryPath).standardizedFileURL
@@ -436,6 +459,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		qos: .userInitiated
 	)
 	private var applicationIsTerminating = false
+	// Monotonic origin of this launcher's startup trail.
+	private let launcherStartUptime = ProcessInfo.processInfo.systemUptime
+
+	/// Milliseconds since the launcher process started its delegate.
+	private func elapsedMilliseconds() -> Int {
+		return Int((ProcessInfo.processInfo.systemUptime - launcherStartUptime) * 1000)
+	}
 
 	/// Creates the production delegate or an injected launcher boundary for tests.
 	/// - Parameters:
@@ -492,7 +522,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	// =====================================
 
 	func applicationDidFinishLaunching(_ notification: Notification) {
-		LauncherLog.write("applicationDidFinishLaunching — version \(bundleVersionString())")
+		LauncherLog.write("launcher startup started — version \(bundleVersionString())")
 
 		// Hide the launcher from the Dock — Hammerspoon's own menubar item
 		// is the only UI affordance the user should see.
@@ -507,9 +537,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		)
 		updaterController = controller
 		updaterCommandRouter.bind(controller)
+		LauncherLog.write("launcher stage: Sparkle updater wired (+\(elapsedMilliseconds()) ms)")
 
 		// Tell the embedded Hammerspoon where to read its Lua config from.
 		seedConfigDirDefault()
+		LauncherLog.write("launcher stage: \(kHammerspoonConfigKey) seeded to \(bundledInitLuaPath())")
 
 		// Spawn the embedded Hammerspoon binary; if it cannot be located we
 		// surface a hard error rather than silently degrading.
@@ -527,6 +559,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			fail("Bundled configuration (init.lua) not found inside the .app bundle.")
 			return
 		}
+		LauncherLog.write("launcher stage: embedded Hammerspoon and bundled init.lua found at \(hsBinary)")
 
 		// Service registration can execute bounded launchctl children on macOS
 		// 11/12. Keep that work off AppKit's main thread, but do not launch
@@ -547,8 +580,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 	/// Starts Hammerspoon only after the independent guardian result is known.
 	func startManagedHammerspoon(at hsBinary: String, launcherPath: String) {
+		LauncherLog.write("launcher stage: remap guardian registration started")
 		beginRemapGuardianRegistration(executablePath: launcherPath) { [weak self] status in
 			guard let self, !self.applicationIsTerminating else { return }
+			LauncherLog.write(
+				"launcher stage: remap guardian registration finished: \(status.rawValue) "
+					+ "(+\(self.elapsedMilliseconds()) ms)"
+			)
 			if status != .ready {
 				LauncherLog.write(
 					"remap guardian \(status.rawValue); ErgoptiPlus rules remain inert"
@@ -695,6 +733,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			return
 		}
 		loggerWorker = activeLoggerWorker
+		LauncherLog.write(
+			"launcher stage: native logger worker bound on loopback port \(activeLoggerWorker.endpoint.port)"
+		)
 		hsLaunchContext = (binaryPath, remapGuardianStatus)
 		hsLogFolderRefusal = nil
 		activeLoggerWorker.setConfigureRefusalHandler { [weak self] failure in
@@ -710,7 +751,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			let markReady = {
 				guard let self else { return }
 				self.hsBootstrapReady = true
-				LauncherLog.write("embedded Hammerspoon bootstrap logger configured")
+				LauncherLog.write(
+					"embedded Hammerspoon bootstrap logger configured (+\(self.elapsedMilliseconds()) ms)"
+				)
 			}
 			if Thread.isMainThread { markReady() }
 			else { DispatchQueue.main.async(execute: markReady) }
@@ -744,7 +787,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			return
 		}
 
+		LauncherLog.write("launcher stage: child environment exports \(launcherEnvironmentKeySummary(env))")
 		let configuration = embeddedApplicationOpenConfiguration(environment: env)
+		LauncherLog.write("launcher stage: launch requested for \(applicationURL.path)")
 		applicationLauncher(applicationURL, configuration) { [weak self] application, error in
 			let finishLaunch = {
 				guard let self else { return }
@@ -774,7 +819,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		guardianStatus: RemapGuardianRegistrationStatus
 	) {
 		hsApplication = application
-		LauncherLog.write("embedded Hammerspoon launched at \(applicationURL.path)")
+		LauncherLog.write(
+			"embedded Hammerspoon launched at \(applicationURL.path) "
+				+ "(pid \(application.processIdentifier), +\(elapsedMilliseconds()) ms)"
+		)
 		guard !application.isTerminated else {
 			hsApplication = nil
 			handleEmbeddedHammerspoonExit(
@@ -787,6 +835,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			processIdentifier: application.processIdentifier,
 			guardianStatus: guardianStatus
 		) else { return }
+		LauncherLog.write(
+			"launcher startup complete: exit monitoring attached to pid \(application.processIdentifier) "
+				+ "(+\(elapsedMilliseconds()) ms)"
+		)
 		// Close the launch-completion-to-kqueue race without fabricating success.
 		// Once the monitor is attached, every later exit edge carries a real status.
 		guard !application.isTerminated else {
@@ -838,7 +890,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		hsExitMonitor = nil
 		monitor?.cancel()
 		hsApplication = nil
-		LauncherLog.write("embedded Hammerspoon terminated")
+		LauncherLog.write(
+			"embedded Hammerspoon terminated \(embeddedProcessExitDescription(exit)) "
+				+ "(bootstrap logger configured: \(hsBootstrapReady), +\(elapsedMilliseconds()) ms)"
+		)
 		handleEmbeddedHammerspoonExit(exit, guardianStatus: guardianStatus)
 	}
 
@@ -902,17 +957,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			return
 		}
 
-		let exitDescription: String
-		switch exit {
-		case let .exited(code):
-			exitDescription = "with exit code \(code)"
-		case let .signaled(signal):
-			exitDescription = "after signal \(signal)"
-		case let .unavailable(errorCode):
-			exitDescription = "with unavailable exit status (errno \(errorCode))"
-		}
 		fail(
-			"Embedded Hammerspoon stopped unexpectedly \(exitDescription). "
+			"Embedded Hammerspoon stopped unexpectedly \(embeddedProcessExitDescription(exit)). "
 				+ remapGuardianExitDiagnostic(guardianStatus)
 		)
 	}

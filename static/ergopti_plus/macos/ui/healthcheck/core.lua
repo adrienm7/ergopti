@@ -245,6 +245,11 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.boot_journal",
+		contract = { "append", "write_now", "set_user_log_ready", "describe_path" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.crypto",
 		contract = { "sha256" },
 		wired    = true,
