@@ -84,6 +84,27 @@ function M.groups(packs)
 	return set
 end
 
+--- The menu label of one language pack: its locale's flag, then its native name.
+---
+--- Both come from the generated locale table (itself built from
+--- _shared/data/locale_names.json), so the language submenus and the language
+--- selector cannot show two different flags for one locale. A locale the table
+--- lacks is a broken index and raises rather than rendering a raw code.
+--- @param locale string Locale code, e.g. "fr".
+--- @param locale_table table The driver's _generated.locale_table rows.
+--- @return string E.g. "🇫🇷 Français".
+function M.label(locale, locale_table)
+	for _, row in ipairs(locale_table or {}) do
+		if row.code == locale then
+			if type(row.flag) ~= "string" or row.flag == "" or type(row.name) ~= "string" then
+				error(string.format("[hotstrings.languages] locale '%s' has no flag or name", tostring(locale)))
+			end
+			return row.flag .. " " .. row.name
+		end
+	end
+	error(string.format("[hotstrings.languages] language pack names unknown locale '%s'", tostring(locale)))
+end
+
 
 
 

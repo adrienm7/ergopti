@@ -816,6 +816,7 @@
 	"menu.hotstrings.header_common_count": "Wspólne hotstring'i (%s)",
 	"menu.hotstrings.header_ergopti": "Układ Ergopti",
 	"menu.hotstrings.header_ergopti_count": "Układ Ergopti (%s)",
+	"menu.hotstrings.header_languages": "Hotstring'i według języka",
 	"menu.hotstrings.header_personal_count": "Moje hotstrings (%s)",
 	"menu.hotstrings.infinite": "∞",
 	"menu.hotstrings.magic_key_prefix": "Magiczny klawisz: ",

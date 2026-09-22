@@ -816,6 +816,7 @@
 	"menu.hotstrings.header_common_count": "सामान्य hotstrings (%s)",
 	"menu.hotstrings.header_ergopti": "Ergopti लेआउट",
 	"menu.hotstrings.header_ergopti_count": "Ergopti लेआउट (%s)",
+	"menu.hotstrings.header_languages": "भाषा के अनुसार hotstrings",
 	"menu.hotstrings.header_personal_count": "मेरे hotstrings (%s)",
 	"menu.hotstrings.infinite": "∞",
 	"menu.hotstrings.magic_key_prefix": "जादू कुंजी: ",

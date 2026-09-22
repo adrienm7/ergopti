@@ -3200,6 +3200,11 @@ i18n = "menu.global.reset_defaults"
 # after a backup. Each driver applies its own reader's rule: Windows the boot
 # loader's unknown-key check against the manifest, macOS and Linux the keys
 # their config readers never consume (the shared config_unused_keys engine).
+# Set apart by a separator: the three rows above change which features run,
+# this one edits the configuration file itself.
+[[menu.global_actions]]
+type = "---"
+
 [[menu.global_actions]]
 type = "command"
 id = "clean_unused_keys"
@@ -3881,10 +3886,20 @@ type = "list"
 id = "hotstring_categories_dynamic"
 
 # One row per language pack declared in _shared/modules/hotstrings/_index.toml
-# [languages], labelled with the language's native name from
-# _shared/data/locale_names.json. Each opens a submenu with « tout activer » /
-# « tout désactiver » for the whole language, then that language's categories
-# built exactly like the neutral ones above.
+# [languages], labelled with the language's flag and native name from
+# _shared/data/locale_names.json (Windows draws that locale's flag icon, since
+# Win32 menus cannot render flag emoji). Each opens a submenu with « tout
+# activer » / « tout désactiver » for the whole language, then that language's
+# categories built exactly like the neutral ones above. Under a header of their
+# own: a lone language row among the neutral categories did not read as the
+# entry point to that language's hotstrings.
+[[menu.hotstrings_menu]]
+type = "---"
+
+[[menu.hotstrings_menu]]
+type = "section_header"
+i18n = "menu.hotstrings.header_languages"
+
 [[menu.hotstrings_menu]]
 type = "list"
 id = "hotstring_languages"

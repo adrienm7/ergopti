@@ -74,7 +74,11 @@ local CANONICAL_HOTSTRINGS_MENU = {
 	"list:hotstring_categories_standard",
 	"list:hotstring_categories_dynamic",
 	-- One row per hotstring language pack (_index.toml [languages]), each a
-	-- submenu labelled with the language's native name.
+	-- submenu labelled with the language's flag and native name, under a header
+	-- of their own since 2026-09-22: a lone « Français » row among the neutral
+	-- categories did not read as the entry point to the French hotstrings.
+	"---",
+	"section_header:menu.hotstrings.header_languages",
 	"list:hotstring_languages",
 	"---",
 	"section_header:menu.hotstrings.header_ergopti",

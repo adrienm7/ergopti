@@ -816,6 +816,7 @@
 	"menu.hotstrings.header_common_count": "Allgemeine Hotstrings (%s)",
 	"menu.hotstrings.header_ergopti": "Ergopti-Belegung",
 	"menu.hotstrings.header_ergopti_count": "Ergopti-Belegung (%s)",
+	"menu.hotstrings.header_languages": "Hotstrings nach Sprache",
 	"menu.hotstrings.header_personal_count": "Meine hotstrings (%s)",
 	"menu.hotstrings.infinite": "∞",
 	"menu.hotstrings.magic_key_prefix": "Zaubertaste: ",

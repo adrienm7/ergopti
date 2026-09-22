@@ -816,6 +816,7 @@
 	"menu.hotstrings.header_common_count": "Yaygın kısaltmalar (%s)",
 	"menu.hotstrings.header_ergopti": "Ergopti düzeni",
 	"menu.hotstrings.header_ergopti_count": "Ergopti düzeni (%s)",
+	"menu.hotstrings.header_languages": "Dile göre kısaltmalar",
 	"menu.hotstrings.header_personal_count": "Hotstrings'lerim (%s)",
 	"menu.hotstrings.infinite": "∞",
 	"menu.hotstrings.magic_key_prefix": "Sihirli tuş: ",

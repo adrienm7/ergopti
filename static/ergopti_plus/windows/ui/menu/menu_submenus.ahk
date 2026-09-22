@@ -202,8 +202,11 @@ _HS_LanguageRows() {
 				"checked", (IsGated and IsCategoryGated(V1Cat)) ? true : false,
 				"submenu", SubMenus[V1Cat]))
 		}
+		; The flag is an icon here, as in the language selector: Win32 menus
+		; cannot render the flag emoji the Lua drivers put in the label.
 		Rows.Push(Map(
 			"label", HotstringsLanguageName(Pack["locale"]) . " (" . FmtCount(LanguageTotal) . ")",
+			"icon",  I18nFlagIconPath(Pack["locale"]),
 			"items", Items))
 	}
 	return Rows

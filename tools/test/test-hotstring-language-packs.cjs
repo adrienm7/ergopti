@@ -71,6 +71,10 @@ for (const lang of languages) {
 		errors.push(`language '${lang}': locale '${pack?.locale}' is not in locale_names.json`);
 		continue;
 	}
+	// The Lua drivers put this flag before the language's name in the menu.
+	if (typeof locales[pack.locale].flag !== 'string' || locales[pack.locale].flag === '') {
+		errors.push(`language '${lang}': locale '${pack.locale}' has no flag in locale_names.json`);
+	}
 	for (const stem of pack.categories_order ?? []) {
 		const group = `${lang}_${stem}`;
 		const file = path.join(HS, lang, `${stem}.toml`);

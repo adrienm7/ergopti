@@ -414,6 +414,9 @@
 			"i18n": "menu.global.reset_defaults"
 		},
 		{
+			"type": "---"
+		},
+		{
 			"type": "command",
 			"id": "clean_unused_keys",
 			"i18n": "menu.global.clean_unused_keys"
@@ -1057,6 +1060,13 @@
 		{
 			"type": "list",
 			"id": "hotstring_categories_dynamic"
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "section_header",
+			"i18n": "menu.hotstrings.header_languages"
 		},
 		{
 			"type": "list",

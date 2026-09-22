@@ -816,6 +816,7 @@
 	"menu.hotstrings.header_common_count": "共通ホットストリング (%s)",
 	"menu.hotstrings.header_ergopti": "Ergoptiレイアウト",
 	"menu.hotstrings.header_ergopti_count": "Ergoptiレイアウト (%s)",
+	"menu.hotstrings.header_languages": "言語別ホットストリング",
 	"menu.hotstrings.header_personal_count": "マイ hotstrings (%s)",
 	"menu.hotstrings.infinite": "∞",
 	"menu.hotstrings.magic_key_prefix": "マジックキー: ",

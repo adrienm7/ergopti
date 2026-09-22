@@ -816,6 +816,7 @@
 	"menu.hotstrings.header_common_count": "通用热字符串 (%s)",
 	"menu.hotstrings.header_ergopti": "Ergopti 布局",
 	"menu.hotstrings.header_ergopti_count": "Ergopti 布局 (%s)",
+	"menu.hotstrings.header_languages": "按语言分类的热字符串",
 	"menu.hotstrings.header_personal_count": "我的 hotstrings (%s)",
 	"menu.hotstrings.infinite": "∞",
 	"menu.hotstrings.magic_key_prefix": "魔法键：",
