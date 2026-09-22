@@ -28,7 +28,6 @@ local notifications = require("infra.notifications")
 local Paths        = require("infra.paths")
 local Logger       = require("infra.logger")
 local DeferredWork = require("infra.deferred_work")
-local text_utils   = require("infra.text_utils")
 local ManifestReader = require("infra.manifest_reader")
 local FileSystem    = require("adapters.file_system")
 local Storage       = require("adapters.storage")
@@ -109,8 +108,14 @@ local function submit_data(owner, view, method, payload)
 		owner.javascript_failures[key] = true
 		Logger.error(LOG, "Onboarding JavaScript %s (%s; content withheld; repeats suppressed).", category, method)
 	end
-	local encoded, json = pcall(hs.json.encode, payload)
-	if not encoded or type(json) ~= "string" or json == "" then report("encoding failed"); return false end
+	-- hs.json.encode accepts only a table at the top level and RAISES on a bare
+	-- string. setConfigDir takes the chosen path as a plain string, so encoding
+	-- it directly failed every time and the picked folder never reached the
+	-- field. Encoding the argument list as a one-element array serializes any
+	-- JSON value; stripping the brackets yields the call's argument list.
+	local encoded, json = pcall(hs.json.encode, { payload })
+	local arguments = encoded and type(json) == "string" and json:match("^%s*%[(.*)%]%s*$") or nil
+	if not arguments or arguments:match("^%s*$") then report("encoding failed"); return false end
 	if not publication_is_current(owner, view) then return false end
 	local admitted, settled, pending, failed = false, false, nil, false
 	local function complete(_, script_error)
@@ -122,7 +127,7 @@ local function submit_data(owner, view, method, payload)
 		Logger.debug(LOG, "Onboarding JavaScript completed (%s).", method)
 	end
 	local ok, candidate = pcall(function()
-		return view:evaluateJavaScript("window." .. method .. "(" .. json .. ")", complete)
+		return view:evaluateJavaScript("window." .. method .. "(" .. arguments .. ")", complete)
 	end)
 	if not ok or candidate ~= view then
 		settled = true
@@ -640,39 +645,23 @@ local function handle_message(body)
 		Logger.info(LOG, "Onboarding locale set to '%s'.", code)
 
 	elseif action == "pickConfigDir" then
-		-- Open the macOS native folder picker via osascript and ship the
-		-- chosen path back to JS so the input box fills in.
-		local seed = type(body.current) == "string" and body.current or ""
-		if seed == "" then
-			-- Default seed = the current config dir resolved by menu_paths,
-			-- so the picker opens somewhere meaningful even on first run.
-			local ok_mp, menu_paths = pcall(require, "ui.menu.menu_paths")
-			if ok_mp and menu_paths then
-				local ok_v, v = pcall(menu_paths.get_config_dir)
-				if ok_v and type(v) == "string" then seed = v end
-			end
+		-- The path editor's picker is the single native folder dialog: the
+		-- wizard's former copy read the raw AppleEvent descriptor instead of the
+		-- parsed result, so the two could disagree on the very same answer.
+		local ok_mp, menu_paths = pcall(require, "ui.menu.menu_paths")
+		if not ok_mp or type(menu_paths) ~= "table" or type(menu_paths.pick_config_dir) ~= "function" then
+			Logger.error(LOG, "pickConfigDir: the native folder picker is unavailable.")
+			return
 		end
-		-- Both values land inside AppleScript string literals, where the
-		-- backslash is itself an escape character. Escaping only the double
-		-- quote left a seed path containing a backslash producing a literal the
-		-- picker could not parse — and the seed is the user-configurable config
-		-- directory, so it is exactly the value most likely to carry one.
-		local script = text_utils.applescript_format([[
-			try
-				set r to choose folder with prompt "%s" default location ((POSIX file "%s") as alias)
-				return POSIX path of r
-			on error
-				return ""
-			end try
-		]], i18n.get("dialog.config_folder.select_title") or "", seed)
-		local ok_as, _r2, raw = hs.osascript.applescript(script)
-		Logger.debug(LOG, "pickConfigDir: ok=%s raw=%s.", tostring(ok_as), tostring(raw))
-		local chosen = type(raw) == "string" and raw or ""
-		chosen = chosen:gsub("^%s+", ""):gsub("%s+$", "")
-		if chosen ~= "" then
-			if not chosen:match("[/\\]$") then chosen = chosen .. "/" end
-			-- Encode the path as a JSON string so AppleScript paths with
-			-- spaces / accents survive the JS eval.
+		local seed = type(body.current) == "string" and body.current or ""
+		local picked, chosen = pcall(menu_paths.pick_config_dir, seed,
+			i18n.get("dialog.config_folder.select_title"))
+		if not picked then
+			Logger.error(LOG, "pickConfigDir: the native folder picker failed: %s.", tostring(chosen))
+			return
+		end
+		Logger.debug(LOG, "pickConfigDir: %s.", type(chosen) == "string" and "folder chosen" or "cancelled")
+		if type(chosen) == "string" and chosen ~= "" then
 			submit_data(owner, view, "setConfigDir", chosen)
 		end
 

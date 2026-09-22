@@ -12,9 +12,14 @@ local with_window = require("tests.support.dashboard_window_fixture")
 local function with_delivery(callback)
 	helpers.with_fresh_modules({ "ui.menu.menu_paths", "infra.toml.codec", "infra.toml.writer",
 		"adapters.file_system" }, function()
+		local picker = {}
 		package.loaded["ui.menu.menu_paths"] = {
 			get_config_dir = function() return "/virtual/current" end,
 			get_default_config_dir = function() return "/virtual/default" end,
+			pick_config_dir = function(current, prompt)
+				picker.current, picker.prompt = current, prompt
+				return "/virtual/chosen/"
+			end,
 		}
 		package.loaded["infra.toml.codec"] = { decode = function() return {} end }
 		with_window("ui.onboarding", function(onboarding, state)
@@ -23,10 +28,15 @@ local function with_delivery(callback)
 			i18n.get_locale = function() return "en" end
 			i18n.format = function(key) return key end
 			i18n.get_sorted_locales = function() return {} end
-			hs.json.encode = function(payload)
-				state.payload = payload
-				if state.encode then return state.encode(payload) end
-				return "{}"
+			state.picker = picker
+			local stub_encode = hs.json.encode
+			-- Native hs.json.encode checks for a top-level table and raises on
+			-- anything else. A permissive stub hid the wizard's bare string payload.
+			hs.json.encode = function(value)
+				if type(value) ~= "table" then error("hs.json.encode requires a table", 2) end
+				state.payload = value[1]
+				if state.encode then return state.encode(value) end
+				return stub_encode(value)
 			end
 			hs.fs.attributes = function() return {} end
 			hs.fs.symlinkAttributes = function(path)
@@ -36,7 +46,6 @@ local function with_delivery(callback)
 				return { mode = "directory", dev = 1, ino = 1 }
 			end
 			hs.fs.pathToAbsolute = function(path) return path end
-			hs.osascript.applescript = function() return true, "/virtual/chosen", "/virtual/chosen" end
 			package.loaded["infra.deferred_work"].after = function(_, fn)
 				pending[#pending + 1] = fn
 				return true
