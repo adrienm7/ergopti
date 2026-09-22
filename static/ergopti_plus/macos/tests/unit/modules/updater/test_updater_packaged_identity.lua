@@ -39,6 +39,27 @@ helpers.describe("updater: packaged launcher identity", function()
 		if not ok then error(failure, 0) end
 	end)
 
+	helpers.it("shows the release version without the launcher's build number", function()
+		local real_getenv = os.getenv
+		os.getenv = function(name)
+			if name == "ERGOPTI_LAUNCHER_VERSION" then return OUTER_VERSION .. "+543" end
+			return real_getenv(name)
+		end
+
+		local ok, failure = xpcall(function()
+			package.loaded["modules.updater"] = nil
+			local updater = helpers.load_with_stubs("modules.updater", {
+				processInfo = { bundleID = INNER_BUNDLE_ID, version = "1.1.1" },
+			})
+			helpers.assert_eq(updater.current_version(), OUTER_VERSION,
+				"the CI run number is Sparkle's build order, not part of the release id")
+			helpers.assert_eq(updater.default_channel(), "dev")
+		end, debug.traceback)
+
+		os.getenv = real_getenv
+		if not ok then error(failure, 0) end
+	end)
+
 	helpers.it("keeps stable launcher versions on the stable channel", function()
 		local real_getenv = os.getenv
 		os.getenv = function(name)
