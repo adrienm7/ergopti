@@ -660,7 +660,9 @@ helpers.describe("shortcut bindings: raw owner release identity", function()
 			helpers.assert_eq(ctx.reentrant_pause_result, false)
 			helpers.assert_eq(ctx.reentrant_callback_result, false)
 			helpers.assert_eq(ctx.raw_handles[id].delete_calls, 1)
-			helpers.assert_eq(subject.is_enabled(id), false)
+			helpers.assert_eq(subject.is_bound(id), false)
+			helpers.assert_eq(subject.is_enabled(id), false,
+				"a superseded enable must leave the prior disabled preference")
 			helpers.assert_eq(subject.pause(), true)
 		end)
 	end
@@ -689,12 +691,15 @@ helpers.describe("shortcut bindings: raw owner release identity", function()
 				helpers.assert_eq(subject.start(), true)
 				local exact_handle = ctx.raw_handles[id]
 				helpers.assert_eq(subject.disable(id), false)
-				helpers.assert_eq(subject.is_enabled(id), true,
+				helpers.assert_eq(subject.is_bound(id), true,
 					"an ambiguous raw release must retain the exact owner")
+				helpers.assert_eq(subject.is_enabled(id), true,
+					"a refused disable must not record the preference")
 				helpers.assert_eq(exact_handle.delete_calls, 1)
 				options.raw_release_modes[id] = "true"
 				helpers.assert_eq(subject.disable(id), true)
 				helpers.assert_eq(exact_handle.delete_calls, 2)
+				helpers.assert_eq(subject.is_bound(id), false)
 				helpers.assert_eq(subject.is_enabled(id), false)
 			end)
 		end

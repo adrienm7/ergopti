@@ -119,8 +119,10 @@ helpers.describe("shortcut bindings: startup transaction", function()
 		helpers.assert_eq(counters.deleted, counters.created,
 			"every handle acquired before the refusal must be released")
 		for _, entry in ipairs(subject.list_shortcuts()) do
-			helpers.assert_eq(entry.enabled, false,
+			helpers.assert_eq(entry.bound, false,
 				"failed startup must roll back every published binding: " .. entry.id)
+			helpers.assert_eq(entry.enabled, true,
+				"a refused startup must not rewrite the preference: " .. entry.id)
 		end
 
 		controls.refuse_special = false

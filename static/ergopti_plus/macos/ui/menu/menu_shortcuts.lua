@@ -100,7 +100,9 @@ local function exact_unicode_scalar(value)
 	return value
 end
 
---- Reads one shortcut's live posture without trusting the menu snapshot.
+--- Reads one shortcut's current preference without trusting the menu snapshot.
+--- `is_enabled` is the preference, not the native binding, so a row toggle
+--- flips what the user chose even while the layer holds no hotkey.
 --- @param shortcuts table Shortcut lifecycle owner.
 --- @param id string Shortcut identifier.
 --- @param fallback boolean|nil Descriptor posture for legacy providers.
@@ -164,14 +166,16 @@ local function rollback_shortcut_row(shortcuts, id, enabled)
 end
 
 --- Builds a toggle menu item for a named shortcut.
---- @param s table Shortcut descriptor {id, label, enabled}.
+--- @param s table Shortcut descriptor {id, label, enabled, bound}.
 --- @param shortcuts table The shortcuts module reference.
 --- @param ctx table The menu context.
 --- @return table hs.menubar-compatible item table.
 local function make_shortcut_item(s, shortcuts, ctx)
 	local state  = ctx.state
 	local paused = ctx.paused
-	local is_on  = type(shortcuts.is_enabled) == "function" and shortcuts.is_enabled(s.id) or s.enabled
+	-- The checkmark is the preference: with the layer off or paused no hotkey is
+	-- bound, and a binding-based mark hid which shortcuts will come back.
+	local is_on  = s.enabled == true
 	local desc   = ctx.applyTriggerChar((s.label or ""):gsub("^%s*(.-)%s*$", "%1"))
 	local pk     = pretty_key(s.id, state)
 	-- Provider data since 2026-08-07: the shared renderer's `group` branch
