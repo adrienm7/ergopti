@@ -139,6 +139,9 @@ function M.with_configurable(callback)
 			unbind = function() return true end,
 		}
 		package.loaded["modules.gestures.actions"] = {
+			-- The stored action must be one the catalogue offers, or the loader
+			-- leaves the slot unbound and no callback exists to throw.
+			is_assignable = function(action_id) return action_id == "throwing_action" end,
 			execute_single = function() error("gesture exploded") end,
 		}
 		package.loaded["adapters.storage"] = nil

@@ -45,7 +45,12 @@ local function load_subject()
 	}
 	package.loaded["infra.paths"] = {shared = function() return "catalogue.json" end}
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["modules.gestures.actions"] = {execute_single = function() end}
+	-- The start transaction is independent of which ids exist; the load-time
+	-- catalogue check has its own test (test_keyboard_shortcuts_unknown_action.lua).
+	package.loaded["modules.gestures.actions"] = {
+		is_assignable = function(action_id) return type(action_id) == "string" end,
+		execute_single = function() end,
+	}
 	package.loaded["adapters.storage"] = nil
 	package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
 
