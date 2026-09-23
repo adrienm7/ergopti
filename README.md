@@ -243,8 +243,11 @@ machine still gets working hotstrings — but each is re-probed after its packag
 is installed and reported when it stays unavailable. Every Lua library is loaded
 through `pcall(require, …)`, so a bare box starts and silently does less rather
 than failing. The Lua modules are installed as LuaJIT (Lua 5.1 ABI) builds —
-`lua51-*` on Arch and openSUSE, `lua5.1-*` on Alpine — because the generic
-`lua-*` packages there are Lua 5.4 builds LuaJIT cannot load.
+`lua51-*` on Arch, `luajit-*` on openSUSE, `lua5.1-*` on Alpine and Fedora —
+because the generic `lua-*` packages there are Lua 5.4 builds LuaJIT cannot
+load. **Known limitation:** Fedora packages `lgi` for Lua 5.4 only, so there the
+tray icon and hotstrings work but the tray's WebKit windows (settings, editor,
+metrics) cannot open.
 
 **2. Permissions** — this is where people get stuck
 
