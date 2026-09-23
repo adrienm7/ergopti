@@ -33,7 +33,7 @@ local function load_healthcheck(runtime_version)
 	package.loaded["healthcheck.snapshot"] = {
 		extract_recent_issues = function() return {} end,
 		load_recent_issue_limits = function() return { tail_max_bytes = 1, max_entries = 1 } end,
-		collect_recent_issues = function() return {}, "ring", nil end,
+		collect_recent_issues = function() return {}, "ring" end,
 	}
 	package.loaded["ui.healthcheck.core"] = nil
 	return require("ui.healthcheck.core")

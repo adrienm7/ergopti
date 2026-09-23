@@ -448,9 +448,9 @@ end
 --- @param ring_lines table The logger's ring buffer snapshot.
 --- @return table entries Oldest first.
 --- @return string source "errors_file", "ring", or "unavailable" when the
----   bounds could not be read (logged).
+---   bounds or an existing errors file could not be read (logged).
 local function collect_recent_issues(ring_lines)
-	local ok, entries, source, problem = pcall(function()
+	local ok, entries, source = pcall(function()
 		local limits = Snapshot.load_recent_issue_limits(
 			Paths.shared("modules/diagnostics/recent_issues.json"))
 		return Snapshot.collect_recent_issues(errors_log_path(), ring_lines, limits)
@@ -458,10 +458,6 @@ local function collect_recent_issues(ring_lines)
 	if not ok then
 		Logger.error(LOG, "Recent issues could not be collected: %s.", tostring(entries))
 		return {}, "unavailable"
-	end
-	if problem then
-		Logger.warn(LOG, "Today's errors file could not be read (%s); recent issues come from the ring.",
-			tostring(problem))
 	end
 	Logger.debug(LOG, "Recent issues: %d entry(ies) from %s.", #entries, source)
 	return entries, source
