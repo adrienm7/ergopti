@@ -15,6 +15,9 @@
 ---    on single lines, so a traceback cannot corrupt the record.
 --- 3. Without a launcher channel, report() says so, so the caller can fall back
 ---    to a blocking local dialog instead of dying silently.
+--- 4. A component that fails after boot completed is a runtime stop: the report
+---    says kind=runtime and lists the day's logs, so the launcher no longer
+---    tells a user whose app ran for days that it "could not start".
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -73,9 +76,67 @@ helpers.describe("boot fatal reporter (silent-boot-abort)", function()
 			helpers.assert_contains(read_all(paths.launcher) or "",
 				"embedded Hammerspoon FATAL at boot stage 'accessibility': event tap refused")
 			helpers.assert_eq(read_all(paths.report),
-				"stage=accessibility\nmessage=Allow ErgoptiPlus in Accessibility.\n"
+				"kind=boot\nstage=accessibility\nmessage=Allow ErgoptiPlus in Accessibility.\n"
 					.. "detail=event tap refused\n")
 		end)
+	end)
+
+	helpers.it("(fatal-runtime-kind) reports a runtime stop with its component and logs", function()
+		with_destinations(function(paths)
+			local notified = BootFatal.report_runtime("native_logger",
+				"native logger did not ACK retained sequence 9 within the 30000 ms stall budget",
+				"An internal error stopped Ergopti+.",
+				{ "/L/ErgoptiPlus_2026-09-22.log", "/L/ErgoptiPlus_errors_2026-09-22.log" }, {
+					getenv = env_with(paths),
+					fallback_path = paths.fallback,
+					clock = function() return "2026-09-22 10:00:00" end,
+				})
+			helpers.assert_eq(notified, true)
+			local fallback = read_all(paths.fallback) or ""
+			helpers.assert_contains(fallback, "FATAL in runtime component 'native_logger'")
+			helpers.assert_true(fallback:find("boot stage", 1, true) == nil,
+				"a runtime stop must not be written as a boot failure")
+			helpers.assert_contains(read_all(paths.launcher) or "",
+				"embedded Hammerspoon FATAL in runtime component 'native_logger'")
+			helpers.assert_eq(read_all(paths.report),
+				"kind=runtime\nstage=native_logger\nmessage=An internal error stopped Ergopti+.\n"
+					.. "detail=native logger did not ACK retained sequence 9 within the 30000 ms stall budget\n"
+					.. "log=/L/ErgoptiPlus_2026-09-22.log\nlog=/L/ErgoptiPlus_errors_2026-09-22.log\n")
+		end)
+	end)
+
+	helpers.it("(fatal-runtime-kind) a component failing after boot completed is a runtime stop", function()
+		local kind, stage, key = BootFatal.presentation("native_logger", true, "Menu built")
+		helpers.assert_eq(kind, BootFatal.KIND_RUNTIME)
+		helpers.assert_eq(stage, "native_logger", "a runtime stop names the component, not a boot stage")
+		helpers.assert_eq(key, "dialog.fatal_error.runtime_stopped")
+
+		kind, stage, key = BootFatal.presentation("native_logger", false, "Menu built")
+		helpers.assert_eq(kind, BootFatal.KIND_BOOT)
+		helpers.assert_eq(stage, "native_logger")
+		helpers.assert_eq(key, "dialog.fatal_error.cannot_start")
+
+		kind, stage = BootFatal.presentation("boot", false, "Menu built")
+		helpers.assert_eq(kind, BootFatal.KIND_BOOT)
+		helpers.assert_eq(stage, "Menu built", "the generic boot owner names the running stage")
+
+		kind, stage, key = BootFatal.presentation("boot", true, "after Boot complete")
+		helpers.assert_eq(kind, BootFatal.KIND_RUNTIME)
+		helpers.assert_eq(stage, "boot")
+		helpers.assert_eq(key, "dialog.fatal_error.runtime_stopped")
+	end)
+
+	helpers.it("(fatal-runtime-kind) every default message key exists in the canonical catalogue", function()
+		local catalogue = read_all(helpers.shared("data/locales/en.json"))
+		helpers.assert_true(type(catalogue) == "string" and #catalogue > 1000,
+			"en.json must be readable")
+		local keys = 0
+		for _, complete in ipairs({ true, false }) do
+			local _, _, key = BootFatal.presentation("native_logger", complete, "stage")
+			keys = keys + 1
+			helpers.assert_contains(catalogue, '"' .. key .. '":')
+		end
+		helpers.assert_eq(keys, 2)
 	end)
 
 	helpers.it("appends to existing logs and keeps multi-line causes on one line", function()
@@ -92,7 +153,7 @@ helpers.describe("boot fatal reporter (silent-boot-abort)", function()
 			local report = read_all(paths.report) or ""
 			helpers.assert_contains(report, "detail=first | stack traceback: | \tsecond\n")
 			local _, line_count = report:gsub("\n", "")
-			helpers.assert_eq(line_count, 3)
+			helpers.assert_eq(line_count, 4)
 		end)
 	end)
 

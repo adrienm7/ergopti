@@ -634,13 +634,39 @@ final class LauncherEnvironmentTests: XCTestCase {
 
 		delegate.launchHammerspoon(at: testEmbeddedHammerspoonBinary)
 		loggerWorker.reportBootstrapReady()
-		try "stage=accessibility\nmessage=Allow it.\ndetail=event tap refused\n"
+		try "kind=boot\nstage=accessibility\nmessage=Allow it.\ndetail=event tap refused\n"
 			.write(toFile: store.path, atomically: true, encoding: .utf8)
 		delegate.handleEmbeddedHammerspoonExit(.exited(code: 0), guardianStatus: .ready)
 
 		XCTAssertEqual(cleanTerminationCount, 0)
 		XCTAssertEqual(fatalMessages, [
 			"Embedded Hammerspoon stopped at boot stage 'accessibility': event tap refused",
+		])
+	}
+
+	/// A component that stops after boot is a runtime failure, not a failed start.
+	func testRuntimeFatalReportIsNotPresentedAsABootFailure() throws {
+		let store = try temporaryFatalReportStore()
+		var fatalMessages: [String] = []
+		let loggerWorker = TestLoggerDatagramServer()
+		let delegate = AppDelegate(
+			launcherIdentityReader: { _ in (device: "11", inode: "22") },
+			applicationLauncher: { _, _, _ in },
+			fatalReporter: { fatalMessages.append($0) },
+			applicationTerminator: { _ in XCTFail("a runtime fatal report is not a Quit") },
+			loggerWorkerFactory: { loggerWorker },
+			fatalReportStore: store
+		)
+
+		delegate.launchHammerspoon(at: testEmbeddedHammerspoonBinary)
+		loggerWorker.reportBootstrapReady()
+		try ("kind=runtime\nstage=native_logger\nmessage=Stopped.\ndetail=no ACK\n"
+			+ "log=/L/today.log\n")
+			.write(toFile: store.path, atomically: true, encoding: .utf8)
+		delegate.handleEmbeddedHammerspoonExit(.exited(code: 0), guardianStatus: .ready)
+
+		XCTAssertEqual(fatalMessages, [
+			"Embedded Hammerspoon stopped at runtime in component 'native_logger': no ACK",
 		])
 	}
 
