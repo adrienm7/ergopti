@@ -39,6 +39,13 @@ _THNS_ReadSource() {
 	return _DriverDirConcat("platform/remap")
 }
 
+; The hold options are built by one function. Scanning its body, not the whole
+; platform/remap folder, keeps another module's own "kind", "none" Map (the
+; layer loader has one) from being taken for the hold sentinel.
+_THNS_ReadHoldOptionsBuilder() {
+	return _DriverFuncBody("_TH_BuildHoldOptions")
+}
+
 
 ; ===================================================
 ; ===================================================
@@ -47,8 +54,8 @@ _THNS_ReadSource() {
 ; ===================================================
 
 _THNS_HoldOptionsHasNoneSentinel() {
-	Src := _THNS_ReadSource()
-	Assert(Src != "", "platform/remap/ source must be readable")
+	Src := _THNS_ReadHoldOptionsBuilder()
+	Assert(Src != "", "_TH_BuildHoldOptions must be readable")
 
 	Q := Chr(34)
 	; _TH_HoldOptions must contain an entry with id="" and kind="none"
@@ -62,8 +69,8 @@ Test("tap_hold_writer: _TH_HoldOptions contains a none-sentinel entry (tap-hold-
 
 
 _THNS_NoneHoldIdIsEmptyString() {
-	Src := _THNS_ReadSource()
-	Assert(Src != "", "platform/remap/ source must be readable")
+	Src := _THNS_ReadHoldOptionsBuilder()
+	Assert(Src != "", "_TH_BuildHoldOptions must be readable")
 
 	; The sentinel is Map("id", "", "kind", "none", ...) — id must be the empty string
 	; that the TOML serialiser writes as hold_modifier = ""

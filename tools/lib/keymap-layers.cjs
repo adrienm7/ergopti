@@ -272,6 +272,15 @@ function formatResolution(r) {
 	return 'keystroke:' + r.chords.map((c) => [...c.mods, c.key].join('+')).join(',') + suffix;
 }
 
+/**
+ * The comparable identity of one error, shared with the Lua and AHK loaders:
+ * code|layer|section|key|reason_key with absent parts empty. The detail text is
+ * for humans and is not compared.
+ */
+function errorSignature(e) {
+	return [e.code, e.layer, e.section, e.key, e.reason_key].map((part) => (part === null || part === undefined ? '' : String(part))).join('|');
+}
+
 module.exports = {
 	REGISTRY_PATH,
 	VOCABULARY_PATH,
@@ -280,5 +289,6 @@ module.exports = {
 	loadLayers,
 	parseChords,
 	parseResolution,
-	formatResolution
+	formatResolution,
+	errorSignature
 };

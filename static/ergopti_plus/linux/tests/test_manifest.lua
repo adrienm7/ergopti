@@ -59,6 +59,7 @@ return {
 	"tests.unit.meta.test_corpus_diagnostics",
 	"tests.unit.meta.test_corpus_hotstring_engine",
 	"tests.unit.meta.test_corpus_hotstrings_config_resolve",
+	"tests.unit.meta.test_corpus_keymap_layers",
 	"tests.unit.meta.test_corpus_locale_resolution",
 	"tests.unit.meta.test_corpus_logger_behaviour",
 	"tests.unit.meta.test_corpus_updater_release_parser",

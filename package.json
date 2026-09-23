@@ -31,6 +31,7 @@
 		"test:physical-keys-registry": "node ./tools/test/test-physical-keys-registry.cjs",
 		"test:layer-actions-vocabulary": "node ./tools/test/test-layer-actions-vocabulary.cjs",
 		"test:nav-layer-recommended-golden": "node ./tools/test/test-nav-layer-recommended-golden.cjs",
+		"test:keymap-layers-corpus": "node ./tools/test/test-keymap-layers-corpus.cjs",
 		"test:config-schema": "node ./tools/test/test-config-schema.cjs",
 		"test:config-migrations": "node ./tools/test/test-config-migrations.cjs",
 		"test:locale-order": "node ./tools/test/test-locale-order-single-source.cjs",

@@ -166,6 +166,9 @@ global _DefaultLogsDir := _LogsDir
 #Include ../infra/config_migrate.ahk
 #Include ../platform/remap/tap_hold_loader.ahk
 #Include ../platform/remap/tap_hold_writer.ahk
+; The layer-file loader reads _shared/keymap and the physical-key registry at run
+; time; meta/test_corpus_keymap_layers.ahk replays the cross-driver corpus through it.
+#Include ../platform/remap/layers_loader.ahk
 #Include ../ui/menu/menu_taphold.ahk
 ; The hotstring gate and « all sections » rows, built over the live Features.
 #Include ../ui/menu/menu_hotstring_switches.ahk
@@ -1139,6 +1142,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_corpus_dynamic_hotstrings_prefix.ahk
 #Include meta/test_corpus_hotstrings_config_resolve.ahk
 #Include meta/test_corpus_tap_hold.ahk
+#Include meta/test_corpus_keymap_layers.ahk
 #Include meta/test_corpus_hotstring_matcher.ahk
 ; LLM parser corpus -- tests LLM_ParseOllamaResponse and _LLMRemoteParseResponse
 ; against the shared cross-driver vectors (already included above via api_ollama/api_remote).
