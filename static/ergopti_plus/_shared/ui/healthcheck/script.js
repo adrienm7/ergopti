@@ -4,18 +4,20 @@
 // MODULE: Healthcheck Shared Renderer
 // DESCRIPTION:
 // Receives a diagnostic snapshot as JSON and renders the full report
-// client-side.  All labels are in English (developer-facing diagnostic —
-// not i18n'd).  Handles the Windows (AHK), macOS and Linux snapshot shapes;
-// the OS-specific system rows are rendered conditionally based on which
-// fields are present in the snapshot, and a generic row with no value is
-// omitted rather than shown as "?".
+// client-side.  Labels are in English: the report is read by whoever triages
+// a problem, whatever the user's language.  Handles the Windows (AHK), macOS
+// and Linux snapshot shapes; the OS-specific system rows are rendered
+// conditionally based on which fields are present in the snapshot, and a
+// generic row with no value is omitted rather than shown as "?".  The
+// structural module check is a collapsed developer section at the end.
 //
 // Entry point:
 //   window.renderHealthcheck(snapshot)
 //     snapshot — the raw snapshot object produced by HealthCheck_Run()
-//     on Windows or M.run() on macOS.  The top-level keys are:
+//     on Windows, M.run() on macOS or the Linux bridge.  The top-level keys are:
 //       version, sys, uptime_sec, warn_count, err_count,
 //       ports_validated, failed_adapters,
+//       disabled_adapters,                              (Linux only)
 //       wired_count, adapter_count, unwired_adapters,  (macOS only)
 //       event_tap_timeout_telemetry,                    (macOS only)
 //       last_error, recent_issues, recent_issues_source,
@@ -76,6 +78,73 @@ function permissionValue(state) {
 	var text = escapeHtml(String(state || 'unknown'));
 	var cls = state === 'granted' ? 'ok' : 'fail';
 	return '<span class="' + cls + '">' + text + '</span>';
+}
+
+/**
+ * Renders the structural self-test as a collapsed developer section.
+ *
+ * It used to be an "Adapters (x/y OK — w/n wired)" heading listing every
+ * module: three different checks on three drivers under one name, meaningless
+ * to a user, and on Linux an AI feature that is simply off showed as a red
+ * failure. The summary line still counts failures, so a collapsed section says
+ * when something is wrong; failures are listed, passing modules sit behind a
+ * nested disclosure, and optional modules that are off are neutral.
+ * @param {object} s Snapshot.
+ * @param {string[]} okList Modules that passed the contract check.
+ * @param {string[]} failList Modules that failed it.
+ * @param {number} total Modules checked.
+ * @returns {string} HTML.
+ */
+function renderDeveloperDetails(s, okList, failList, total) {
+	var disabledList = s.disabled_adapters || [];
+	var summary = 'Developer details';
+	if (failList.length > 0) {
+		summary += ' &#x2014; <span class="fail">' + failList.length + ' module check failure(s)</span>';
+	}
+	var html = '<details class="developer"><summary>' + summary + '</summary>';
+
+	html += '<h3>Module contract check (loaded + required functions present): '
+		+ okList.length + '/' + total + ' OK</h3>';
+	if (failList.length === 0) {
+		html += '<p><span class="ok">&#x2713;</span> No failure.</p>';
+	} else {
+		html += '<ul>';
+		failList.forEach(function (name) {
+			html += '<li><span class="fail">&#x2717;</span> <code>' + escapeHtml(String(name)) + '</code></li>';
+		});
+		html += '</ul>';
+	}
+	if (disabledList.length > 0) {
+		html += '<p>Optional modules that are not running (not a failure):</p><ul>';
+		disabledList.forEach(function (name) {
+			html += '<li><span class="disabled">&#x2013;</span> <code>' + escapeHtml(String(name))
+				+ '</code> <em>(disabled)</em></li>';
+		});
+		html += '</ul>';
+	}
+	if (okList.length > 0) {
+		html += '<details><summary>Show the ' + okList.length + ' passing module(s)</summary><ul>';
+		okList.forEach(function (name) {
+			html += '<li><span class="ok">&#x2713;</span> <code>' + escapeHtml(String(name)) + '</code></li>';
+		});
+		html += '</ul></details>';
+	}
+
+	// macOS only: a build-time fact kept honest by a meta test, not a probe
+	if (s.wired_count !== undefined && s.adapter_count !== undefined) {
+		var unwiredList = s.unwired_adapters || [];
+		html += '<h3>Used by production code (verified at build time): '
+			+ s.wired_count + '/' + s.adapter_count + '</h3>';
+		if (unwiredList.length > 0) {
+			html += '<ul>';
+			unwiredList.forEach(function (name) {
+				html += '<li><span class="unwired">~</span> <code>' + escapeHtml(String(name))
+					+ '</code> <em>(no production caller)</em></li>';
+			});
+			html += '</ul>';
+		}
+	}
+	return html + '</details>';
 }
 
 /**
@@ -286,33 +355,6 @@ window.renderHealthcheck = function (s) {
 		html += '</table>';
 	}
 
-	// ── Adapters ─────────────────────────────────────────────────────────
-	var wiredCount = s.wired_count;
-	var adapterCount = s.adapter_count;
-	var unwiredList = s.unwired_adapters || [];
-
-	var adaptersLabel = 'Adapters (' + okList.length + '/' + total + ' OK';
-	if (wiredCount !== undefined && adapterCount !== undefined) {
-		adaptersLabel += ' — ' + wiredCount + '/' + adapterCount + ' wired';
-	}
-	adaptersLabel += ')';
-	html += '<h2>' + adaptersLabel + '</h2>';
-
-	var unwiredSet = {};
-	unwiredList.forEach(function (name) { unwiredSet[name] = true; });
-
-	html += '<ul>';
-	okList.forEach(function (name) {
-		if (unwiredSet[name]) {
-			html += '<li><span class="unwired">~</span> <code>' + escapeHtml(String(name)) + '</code> <em>(contract-healthy, not wired into any feature)</em></li>';
-		} else {
-			html += '<li><span class="ok">&#x2713;</span> <code>' + escapeHtml(String(name)) + '</code></li>';
-		}
-	});
-	failList.forEach(function (name) {
-		html += '<li><span class="fail">&#x2717;</span> <code>' + escapeHtml(String(name)) + '</code></li>';
-	});
-	html += '</ul>';
 
 	// ── Last error ───────────────────────────────────────────────────────
 	html += '<h2>Last recorded error</h2>';
@@ -343,6 +385,9 @@ window.renderHealthcheck = function (s) {
 		var lines = issues.map(function (l) { return escapeHtml(String(l)); }).join('\n');
 		html += '<pre>' + lines + '</pre>';
 	}
+
+	// ── Developer details (collapsed, last) ──────────────────────────────
+	html += renderDeveloperDetails(s, okList, failList, total);
 
 	document.getElementById('content').innerHTML = html;
 };

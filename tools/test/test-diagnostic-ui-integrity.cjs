@@ -358,6 +358,62 @@ function checkRecentIssuesSource() {
 
 checkRecentIssuesSource();
 
+/**
+ * The structural self-test lives in a collapsed developer section with labels
+ * that say what was checked. It used to be an "Adapters (x/y OK)" heading that
+ * listed every module to every user; failures must still be visible from the
+ * collapsed summary, passing modules sit behind a nested disclosure, and an
+ * optional module that is off (the Linux LLM) is neutral, never a red cross.
+ */
+function checkDeveloperDetailsSection() {
+	const html = renderSnapshot({
+		version: 'test',
+		uptime_sec: 0,
+		sys: {},
+		ports_validated: ['engine', 'config'],
+		failed_adapters: ['keylogger (not wired)'],
+		disabled_adapters: ['llm'],
+		wired_count: 37,
+		adapter_count: 38,
+		unwired_adapters: [],
+	});
+	const developerAt = html.indexOf('<details class="developer">');
+	const developer = developerAt >= 0 ? html.slice(developerAt) : '';
+	const problems = [];
+	if (developerAt < 0) problems.push('no collapsed developer section');
+	if (/<details class="developer" open/.test(html)) problems.push('the developer section is open by default');
+	if (!/<summary>Developer details[^<]*<span class="fail">1 module check failure/.test(developer)) {
+		problems.push('the collapsed summary does not count the failure');
+	}
+	if (!developer.includes('Module contract check (loaded + required functions present): 2/3 OK')) {
+		problems.push('the contract check is not labelled for what it checks');
+	}
+	if (!developer.includes('Used by production code (verified at build time): 37/38')) {
+		problems.push('the wiring count is not labelled as a build-time fact');
+	}
+	if (!developer.includes('<span class="fail">&#x2717;</span> <code>keylogger (not wired)</code>')) {
+		problems.push('the failure is not listed');
+	}
+	if (!/<details><summary>Show the 2 passing module\(s\)<\/summary><ul><li><span class="ok">/.test(developer)) {
+		problems.push('passing modules are not behind their own disclosure');
+	}
+	if (!developer.includes('<span class="disabled">&#x2013;</span> <code>llm</code>')) {
+		problems.push('the disabled optional module is not neutral');
+	}
+	if (/<span class="fail">[^<]*<\/span> <code>llm/.test(html)) problems.push('the disabled LLM is shown as a failure');
+	if (/<h2>Adapters/.test(html)) problems.push('the old Adapters heading is still rendered');
+	if (problems.length === 0) {
+		total_pass++;
+		console.log(`  ${PASS_SYMBOL}  Shared: module checks sit in collapsed developer details (developer-details)`);
+		return;
+	}
+	total_fail++;
+	console.log(`  ${FAIL_SYMBOL}  Shared: module checks sit in collapsed developer details (developer-details)`);
+	console.log(`       Violation: ${problems.join('; ')}`);
+}
+
+checkDeveloperDetailsSection();
+
 // --- Hammerspoon (macOS) Checks ---
 // The HTML rendering now lives in _shared/ui/healthcheck/; helpers.lua
 // has only the state-gathering probes + format_uptime. core.lua loads the
