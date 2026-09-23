@@ -114,23 +114,33 @@ check('no driver source spells the registry host or folder', () => {
 	assert.deepStrictEqual(offenders, [], 'these files retype the registry location');
 });
 
+// The Lua drivers share one registry client, which receives the decoded
+// defaults; each driver module that uses it reads the two files itself.
+const SHARED_LUA_CLIENT = path.join(SP, '_shared', 'lua', 'layouts', 'registry.lua');
+
 check('every registry client reads the URL template and owner/repo from the shared defaults', () => {
-	const files = [
-		...driverSources(path.join(SP, 'windows'), ['.ahk']),
-		...driverSources(path.join(SP, 'macos'), ['.lua']),
-		...driverSources(path.join(SP, 'linux'), ['.lua']),
-		...driverSources(path.join(SP, '_shared', 'lua'), ['.lua'])
-	];
-	const clients = files.filter((file) =>
-		stripComments(fs.readFileSync(file, 'utf8'), path.extname(file)).includes('raw_url_template')
-	);
-	assert.ok(clients.length >= 1, 'no driver builds a registry URL');
-	for (const file of clients) {
-		const code = stripComments(fs.readFileSync(file, 'utf8'), path.extname(file)).replace(/\\\\?/g, '/');
-		const rel = path.relative(ROOT, file);
-		assert.ok(code.includes('modules/layouts/defaults.json'), `${rel} does not read the layouts defaults`);
-		assert.ok(code.includes('modules/updater/defaults.json'), `${rel} does not read owner/repo from the updater defaults`);
+	const platforms = {
+		windows: driverSources(path.join(SP, 'windows'), ['.ahk']),
+		macos: driverSources(path.join(SP, 'macos'), ['.lua'])
+	};
+	const shared = driverSources(path.join(SP, '_shared', 'lua'), ['.lua']);
+	const code = (file) => stripComments(fs.readFileSync(file, 'utf8'), path.extname(file)).replace(/\\\\?/g, '/');
+	const templateUsers = [...Object.values(platforms).flat(), ...shared]
+		.filter((file) => file !== SHARED_LUA_CLIENT && code(file).includes('raw_url_template'));
+	for (const [platform, files] of Object.entries(platforms)) {
+		const clients = files.filter((file) => /require\(\s*"layouts\.registry"\s*\)/.test(code(file))
+			|| templateUsers.includes(file));
+		assert.ok(clients.length >= 1, `the ${platform} driver has no registry client`);
+		for (const file of clients) {
+			const rel = path.relative(ROOT, file);
+			assert.ok(code(file).includes('modules/layouts/defaults.json'), `${rel} does not read the layouts defaults`);
+			assert.ok(code(file).includes('modules/updater/defaults.json'),
+				`${rel} does not read owner/repo from the updater defaults`);
+		}
 	}
+	const strays = templateUsers.filter((file) => !Object.values(platforms).flat().includes(file));
+	assert.deepStrictEqual(strays.map((file) => path.relative(ROOT, file)), [],
+		'only the shared client and the driver clients may expand the URL template');
 });
 
 if (failures > 0) process.exit(1);
