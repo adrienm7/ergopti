@@ -27,7 +27,8 @@
  * the LAlt key-up fix, the swallowed Space); they are listed by name here, so a
  * new condition cannot slip past as "not layer content". The recommended file
  * must also resolve with zero errors on every OS, and its layer ids must be
- * exactly the layers the tap-hold hold picker offers.
+ * exactly the layers the tap-hold hold picker offers — while the tap-hold
+ * defaults bind no layer key of their own.
  * ==============================================================================
  */
 
@@ -35,6 +36,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const TOML = require('smol-toml');
 const { loadContext, loadLayers, formatResolution, RECOMMENDED_PATH } = require('../lib/keymap-layers.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
@@ -305,14 +307,13 @@ for (const [code, behaviour] of recommended) {
 	if (!windowsLayer.has(code)) fail(`${code}: the recommended layer does ${behaviour} on Windows, nav_layer.ahk does not bind it`);
 }
 
-// The hold picker offers exactly the layers the preset defines.
-const defaults = fs.readFileSync(TAP_HOLD_DEFAULTS, 'utf8');
-const picker = defaults.split(/^\[/m).find((s) => s.startsWith('tap_hold.hold_picker]')) || '';
-const pickerLayers = ((picker.match(/^layers\s*=\s*\[(.*)\]/m) || [])[1] || '')
-	.split(',')
-	.map((s) => s.trim().replace(/^"|"$/g, ''))
-	.filter(Boolean)
-	.sort();
+// The hold picker offers exactly the layers the preset defines, and the
+// tap-hold defaults bind no layer key themselves: a second table of layer
+// bindings is how [tap_hold.layers.nav.mappings] came to match no driver.
+const tapHold = TOML.parse(fs.readFileSync(TAP_HOLD_DEFAULTS, 'utf8')).tap_hold || {};
+const pickerLayers = [...((tapHold.hold_picker || {}).layers || [])].sort();
+if (tapHold.layers !== undefined)
+	fail('_shared/tap_hold/defaults.toml declares [tap_hold.layers.*]: layer bindings live in _shared/keymap/layers.recommended.toml, and a second copy matches no driver');
 const presetLayers = Object.keys(perOs.windows.layers || {}).sort();
 if (pickerLayers.length === 0) fail('[tap_hold.hold_picker].layers could not be read from _shared/tap_hold/defaults.toml');
 if (JSON.stringify(pickerLayers) !== JSON.stringify(presetLayers))

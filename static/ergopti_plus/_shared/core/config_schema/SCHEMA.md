@@ -222,7 +222,7 @@ Each `[tap_hold.keys.<name>]` entry may declare:
 | ------------------------- | ------ | -------- | --------------------------------------------------------------------- |
 | `time_activation_seconds` | number | yes      | Tap vs hold threshold                                                 |
 | `tap_action`              | string | no       | Action emitted on short tap (ref `_shared/actions.toml`)              |
-| `hold_layer`              | string | no       | Layer activated on hold (ref `tap_hold.layers.<name>`)                |
+| `hold_layer`              | string | no       | Layer activated on hold (an id from `[tap_hold.hold_picker].layers`)  |
 | `hold_modifier`           | enum   | no       | Modifier emitted on hold (mutex with `hold_layer`)                    |
 | `enabled`                 | bool   | no       | Default `true`. Set `false` to disable this entry without deleting it |
 

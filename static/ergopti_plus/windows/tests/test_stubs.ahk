@@ -328,7 +328,7 @@ global Features := Map(
 ; user's tap_hold.toml. Tests don't exercise tap-hold logic but the symbol
 ; must exist so the per-key TapHoldIsConfigured(KeyId) lookups return
 ; cleanly.
-global TapHold := Map("keys", Map(), "layers", Map())
+global TapHold := Map("keys", Map())
 
 ; Master category gating state. Production initialises this in
 ; ErgoptiPlus.ahk and reloads it from the [category_enabled] TOML

@@ -43,7 +43,9 @@
 # Each key may declare:
 #   - ``time_activation_seconds`` : tap (short) vs hold (long) threshold.
 #   - ``tap_action``   : action emitted on tap (string or null = native key).
-#   - ``hold_layer``   : layer activated on hold (ref to [tap_hold.layers.<name>]).
+#   - ``hold_layer``   : layer activated on hold, one of [tap_hold.hold_picker].layers.
+#                        Its key bindings live in _shared/keymap/layers.recommended.toml
+#                        and the user's layers.toml, not in this file.
 #   - ``hold_modifier``: modifier emitted on hold (mutex with hold_layer).
 #
 # tap_action and hold_* are independent — a key may declare only one of them.
@@ -161,66 +163,11 @@ hold_modifier = "alt"
 
 
 
-# =================================
-# =================================
-# ======= 2. Layer mappings =======
-# =================================
-# =================================
-
-# A layer is a local key remapping that is active as long as its triggering key
-# is held. Each mapping is source-key → action OR source-key → destination-key.
-
-
-
-# =============================
-# ===== 2.1 Layer ``nav`` =====
-# =============================
-
-# Primary navigation layer: arrows on HJKL plus quick editing actions.
-
-[tap_hold.layers.nav]
-description_key = "tap_hold.layer.nav"
-
-[tap_hold.layers.nav.mappings]
-h = "arrow_left"
-j = "arrow_down"
-k = "arrow_up"
-l = "arrow_right"
-backspace = "ctrl_backspace"
-delete = "ctrl_delete"
-u = "page_up"
-d = "page_down"
-g = "home"
-shift_g = "end"
-
-
-
-# =======================================
-# ===== 2.2 Layer ``nav_secondary`` =====
-# =======================================
-
-# Secondary layer: word navigation and window management.
-
-[tap_hold.layers.nav_secondary]
-description_key = "tap_hold.layer.nav_secondary"
-
-[tap_hold.layers.nav_secondary.mappings]
-h = "word_prev"
-l = "word_next"
-j = "line_down"
-k = "line_up"
-backspace = "delete_word_back"
-delete = "delete_word_forward"
-
-
-
-
-
-# =================================================
-# =================================================
-# ======= 3. macOS Karabiner defaults (hs_*) =======
-# =================================================
-# =================================================
+# ==================================================
+# ==================================================
+# ======= 2. macOS Karabiner defaults (hs_*) =======
+# ==================================================
+# ==================================================
 
 # Read by macos/platform/remap/defaults.lua via lib.toml_reader. These keep
 # the macOS-specific paradigm (Karabiner key codes, the N*N modifier-combo

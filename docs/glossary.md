@@ -106,7 +106,7 @@
 
 ## N
 
-**Navigation layer** — Couche virtuelle activée par le maintien d'une touche tap-hold (ex. LAlt), mappant les touches de lettres/chiffres à des actions de navigation (flèches, mot/ligne/document, gestion de fenêtres, volume).
+**Navigation layer** — Couche virtuelle activée par le maintien d'une touche tap-hold (ex. LAlt), mappant les touches de lettres/chiffres à des actions de navigation (flèches, mot/ligne/document, gestion de fenêtres, volume). Ses touches sont des données : le préréglage d'Ergopti dans `_shared/keymap/layers.recommended.toml` et le `layers.toml` de l'utilisateur dans le dossier de configuration, écrits dans le vocabulaire `_shared/keymap/layer_actions.toml` et identifiés par `KeyboardEvent.code` (`_shared/data/keycodes/physical_keys.json`). Il n'existe plus de table `[tap_hold.layers.*]` : `defaults.toml` ne fait que nommer la couche qu'une touche active.
 
 **N-gram** — Séquence de N frappes consécutives analysée par le keylogger pour les statistiques ergonomiques (fréquence de bigrammes, SFBs, vitesse par finger).
 
