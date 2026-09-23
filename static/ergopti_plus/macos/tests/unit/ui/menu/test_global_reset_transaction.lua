@@ -255,6 +255,13 @@ local function with_menu_fixture(options, callback)
 		post_reload_effects = 0,
 		gesture_enabled = true,
 		tap_holds_enabled = true,
+		-- Named shortcut 'alpha' keeps Bindings' two axes apart: named_shortcut is
+		-- the user preference, named_bound the native hotkey, bindings_paused the
+		-- admission fence menu_state closes whenever Shortcuts is off.
+		named_shortcut = true,
+		named_bound = true,
+		bindings_paused = false,
+		persisted_shortcut_keys = nil,
 		enable_preflight_calls = 0,
 		config_watcher_callback = nil,
 		builder_ctx = nil,
@@ -279,6 +286,21 @@ local function with_menu_fixture(options, callback)
 			end
 		end
 		return logger
+	end
+
+	-- Assigned with the other runtime doubles below. Preferences.snapshot reads
+	-- [shortcuts.keys] from list_shortcuts(), so the doubles must too: deriving
+	-- them from the Shortcuts master switch encoded the very bug under test.
+	local shortcuts
+
+	--- Mirrors Preferences.snapshot's [shortcuts.keys] collection.
+	--- @return table keys Preference per named shortcut id.
+	local function listed_shortcut_keys()
+		local keys = {}
+		for _, shortcut in ipairs(shortcuts.list_shortcuts()) do
+			keys[shortcut.id] = shortcut.enabled
+		end
+		return keys
 	end
 
 	package.loaded["infra.logger"] = logger_stub()
@@ -310,17 +332,18 @@ local function with_menu_fixture(options, callback)
 			local snapshot = clone(candidate)
 			run_hook(observations, "preferences-snapshot", "after-clone")
 			snapshot.gesture_actions = clone(observations.gestures)
-			snapshot.shortcut_keys = { alpha = candidate.shortcuts == true }
+			snapshot.shortcut_keys = listed_shortcut_keys()
 			return snapshot
 		end,
 		save = function(_, candidate)
 			local result = perform(observations, "preferences", function()
 				observations.persisted = clone(candidate)
+				observations.persisted_shortcut_keys = listed_shortcut_keys()
 			end)
 			if result ~= true then return result end
 			local snapshot = clone(candidate)
 			snapshot.gesture_actions = clone(observations.gestures)
-			snapshot.shortcut_keys = { alpha = candidate.shortcuts == true }
+			snapshot.shortcut_keys = listed_shortcut_keys()
 			return true, snapshot
 		end,
 	}
@@ -343,11 +366,16 @@ local function with_menu_fixture(options, callback)
 		open_editor = noop,
 	}
 	package.loaded["ui.menu.menu_state"] = {
-		sync_state_to_modules = function(_, saved)
+		-- Same order as menu_state: the Shortcuts switch opens or closes the
+		-- admission fence first, then every saved key is replayed behind it.
+		sync_state_to_modules = function(live_state, saved)
 			return perform(observations, "runtime-sync", function()
+				observations.bindings_paused = live_state.shortcuts ~= true
 				if type(saved) == "table" and type(saved.shortcut_keys) == "table" then
 					observations.named_shortcut = saved.shortcut_keys.alpha == true
 				end
+				observations.named_bound = not observations.bindings_paused
+					and observations.named_shortcut
 			end)
 		end,
 	}
@@ -519,7 +547,7 @@ local function with_menu_fixture(options, callback)
 		DEFAULT_GESTURES = { swipe_left = "desktop_left", swipe_right = "desktop_right" },
 	}
 
-	local shortcuts = {
+	shortcuts = {
 		DEFAULT_STATE = {
 			script_control_shortcuts = {
 				return_key = "script_pause_toggle",
@@ -536,16 +564,24 @@ local function with_menu_fixture(options, callback)
 			return true
 		end,
 		list_shortcuts = function()
-			return { { id = "alpha", enabled = observations.named_shortcut ~= false } }
+			return { {
+				id = "alpha",
+				enabled = observations.named_shortcut == true,
+				bound = observations.named_bound == true,
+			} }
 		end,
 		disable = function()
 			return perform(observations, "named-shortcut:alpha", function()
 				observations.named_shortcut = false
+				observations.named_bound = false
 			end)
 		end,
+		-- Like Bindings.enable: behind the admission fence only the preference is
+		-- recorded; the native hotkey appears when the layer resumes.
 		enable = function()
 			return perform(observations, "named-shortcut:alpha", function()
 				observations.named_shortcut = true
+				observations.named_bound = not observations.bindings_paused
 			end)
 		end,
 		set_shortcut_action = function(slot, action)
@@ -701,6 +737,7 @@ local function assert_fully_restored(observations)
 	helpers.assert_eq(observations.tap_holds_enabled, true)
 	helpers.assert_eq(observations.persisted, observations.initial_state)
 	helpers.assert_eq(observations.named_shortcut, true)
+	helpers.assert_eq(observations.named_bound, true)
 	helpers.assert_eq(count_notification(observations, "notify.all_features_disabled"), 0)
 	helpers.assert_eq(count_notification(observations, "notify.defaults_reset"), 0)
 end
@@ -800,7 +837,51 @@ helpers.describe("HS-022 disable-all is one exact global transaction", function(
 			helpers.assert_eq(observations.keyboard, observations.initial_keyboard)
 			helpers.assert_eq(observations.state.terminator_states,
 				observations.initial_state.terminator_states)
-			helpers.assert_eq(observations.named_shortcut ~= false, true)
+			helpers.assert_eq(observations.named_shortcut, true)
+		end)
+	end)
+
+	helpers.it("publishes every named shortcut preference while the layer is fenced", function()
+		-- Disable All saves right after the Shortcuts fence released every
+		-- hotkey. A snapshot of the live binding wrote every key false there.
+		with_menu_fixture({}, function(observations)
+			helpers.assert_eq(observations.actions.disable_all(), true)
+			helpers.assert_eq(observations.bindings_paused, true)
+			helpers.assert_eq(observations.named_bound, false,
+				"Disable All must release the named hotkey")
+			helpers.assert_eq(observations.named_shortcut, true,
+				"Disable All must keep the named preference")
+			helpers.assert_eq(observations.persisted_shortcut_keys, { alpha = true },
+				"[shortcuts.keys] must be published from the preference")
+		end)
+	end)
+
+	helpers.it("Enable All after Disable All binds every named shortcut", function()
+		-- The named enables run before the runtime sync reopens the fence.
+		-- They must record the preference behind it, and the sync must then
+		-- bind it; a rollback here used to switch every shortcut off.
+		with_menu_fixture({}, function(observations)
+			helpers.assert_eq(observations.actions.disable_all(), true)
+			helpers.assert_eq(observations.actions.enable_all(), true)
+			helpers.assert_eq(observations.bindings_paused, false)
+			helpers.assert_eq(observations.named_shortcut, true)
+			helpers.assert_eq(observations.named_bound, true,
+				"Enable All must leave the named hotkey bound")
+			helpers.assert_eq(observations.persisted_shortcut_keys, { alpha = true })
+		end)
+	end)
+
+	helpers.it("a refused Enable All after Disable All keeps the named preference", function()
+		with_menu_fixture({}, function(observations)
+			helpers.assert_eq(observations.actions.disable_all(), true)
+			observations.failures.preferences = fail("false")
+			helpers.assert_eq(observations.actions.enable_all(), false)
+			helpers.assert_eq(observations.bindings_paused, true,
+				"the rollback must close the fence again")
+			helpers.assert_eq(observations.named_bound, false)
+			helpers.assert_eq(observations.named_shortcut, true,
+				"the rollback must restore the preference, not the unbound state")
+			helpers.assert_eq(observations.persisted_shortcut_keys, { alpha = true })
 		end)
 	end)
 
