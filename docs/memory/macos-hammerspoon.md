@@ -103,6 +103,14 @@ device coverage and production consumer ownership.
 
 ## Lua and test isolation
 
+### project-hs-unit-tests-echo-i18n-keys
+
+`helpers.load_with_stubs` injects an `infra.i18n` stub whose `get` returns the
+key, and a module captures that table when it loads. Comparing a label with
+`i18n.get(key)` then compares two echoed keys. A test that must see real
+translations points the captured stub's `get`/`format` at `infra.locale`
+for its duration and restores them.
+
 ### project-lua-closure-before-local-nil-global
 
 A closure only captures locals declared before its definition. A later `local`

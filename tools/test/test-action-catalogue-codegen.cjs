@@ -20,6 +20,12 @@
  *    real value, in all 21 locales, and the group key must carry its {1}.
  * 3. Headings with nothing under them on a platform ("Navigation" holds two
  *    Windows-only rows) read as a list that failed to load; they are dropped.
+ * 4. The declaration-vs-driver gate was a literal scan: an id counted as
+ *    handled whenever it appeared as a quoted string anywhere in the driver
+ *    tree, so Linux "select_line" and "tab" passed while doing nothing. The
+ *    real comparison — generated catalogue against the set each driver can
+ *    run, both ways — lives in each driver's own suite, where the registry
+ *    exists; this file checks those three tests are still there.
  * ==============================================================================
  */
 
@@ -159,6 +165,29 @@ for (const f of localeFiles) {
 		`${code}: ${CHORD_GROUP_KEY} must place the modifier label with {1}`);
 }
 check(!/"#+Raccourcis/.test(SOURCE), 'actions.toml must not carry a literal French heading');
+
+// 5. The per-driver runtime parity tests exist and are wired. Windows lists
+//    its tests one #Include at a time; the Lua runners discover test_*.lua.
+const PARITY_SLUG = '(action-catalogue-parity)';
+const PARITY_TESTS = [
+	'windows/tests/unit/test_gestures.ahk',
+	'macos/tests/unit/modules/gestures/test_action_catalogue_parity.lua',
+	'linux/tests/unit/modules/test_action_catalogue_parity.lua'
+];
+for (const rel of PARITY_TESTS) {
+	const abs = path.join(SP, rel);
+	check(fs.existsSync(abs) && fs.readFileSync(abs, 'utf8').includes(PARITY_SLUG),
+		`${rel} must carry the runtime catalogue parity test ${PARITY_SLUG}`);
+}
+const runAll = fs.readFileSync(path.join(SP, 'windows', 'tests', 'run_all.ahk'), 'utf8');
+check(/^#Include unit\/test_gestures\.ahk$/m.test(runAll), 'run_all.ahk must include unit/test_gestures.ahk');
+
+// 6. The website reads the same canonical registry.
+const SITE_LOADER = fs.readFileSync(path.join(ROOT, 'src', 'routes', 'ergopti-plus', '+page.server.js'), 'utf8');
+check(/ACTIONS_ROOT[\s\S]*?modules[/\\]actions/.test(SITE_LOADER)
+	&& /resolve\(ACTIONS_ROOT,\s*'actions\.toml'\)/.test(SITE_LOADER),
+	'the Ergopti+ site must read the canonical modules/actions/actions.toml registry');
+check(!/modules[/\\]gestures/.test(SITE_LOADER), 'the Ergopti+ site still reads the retired shared modules/gestures path');
 
 if (errors.length > 0) {
 	console.error('\x1b[31m[ERROR] action catalogue codegen:\x1b[0m');

@@ -1,15 +1,34 @@
-# gestures (shared data)
+# actions (shared data)
 
 ## Purpose
 
-Catalogue of all gesture action identifiers (`actions.toml`) that can be assigned to gesture slots. Both drivers consume this file to populate the action picker UI and to validate slot assignments. The `sg_order` array in `actions.toml` defines the display order and group headings shown in the picker.
+The single source of truth for every bindable action: gestures, keyboard
+slots and tap-holds all offer the same catalogue. No driver reads it at
+runtime. `tools/codegen/codegen-action-catalogue.cjs` turns `actions.toml`
+into one catalogue per driver, already filtered to that driver's platform,
+with the picker order, heading levels and locale keys resolved.
 
 ## Key files
 
-| File          | Description                                                                |
-| ------------- | -------------------------------------------------------------------------- |
-| `actions.toml`| Ordered list of action entries with id, label key, and group parent keys    |
+| File                   | Description                                                                  |
+| ---------------------- | ---------------------------------------------------------------------------- |
+| `actions.toml`         | Every action with its platform, keystrokes, parameter kind and requirements  |
+| `modifier_chords.json` | The modifier + key matrix each driver registers as chord actions             |
+
+## Generated outputs
+
+| Driver  | File                                      |
+| ------- | ----------------------------------------- |
+| macOS   | `macos/_generated/action_catalogue.lua`   |
+| Linux   | `linux/_generated/action_catalogue.lua`   |
+| Windows | `windows/_generated/action_catalogue.ahk` |
 
 ## Usage
 
-The file is read at boot by both drivers; changes require a driver reload to take effect. To add a new action: add an entry to `actions.toml` **and** implement the corresponding handler in `windows/modules/gestures/init.ahk` and `macos/modules/gestures/actions.lua`.
+To add an action: declare it in `actions.toml`, order it in `[sg_order]`,
+add its `sg_actions.<id>` label to all 21 locales, implement it in every
+driver its `platform` claims, then run `npm run codegen:action-catalogue`
+(or `npm run gen`). Each driver's suite compares its generated catalogue with
+the set of actions it can actually run, in both directions (tests tagged
+`(action-catalogue-parity)`), so a declaration without a handler, or a
+handler hidden by its declaration, fails the build.
