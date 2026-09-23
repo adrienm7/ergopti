@@ -52,8 +52,10 @@ prepare_test_tooling() {
 		pacman -Sy --noconfirm --needed sudo curl python python-gobject dbus \
 			xorg-server-xvfb procps-ng which >/dev/null
 	elif command -v apk >/dev/null 2>&1; then
+		# No shadow package: BusyBox's addgroup is what an Alpine user has, and
+		# pre-installing usermod would hide an installer that needs it.
 		apk add --no-cache bash sudo curl python3 py3-gobject3 dbus dbus-x11 \
-			xvfb procps shadow coreutils >/dev/null
+			xvfb procps coreutils >/dev/null
 	else
 		echo "ENVIRONMENT: no supported package manager in this image" >&2
 		exit 2
@@ -92,7 +94,9 @@ if [ -r /etc/os-release ]; then
 fi
 
 # An ordinary user with passwordless sudo: the installer's documented audience.
-id "${E2E_USER}" >/dev/null 2>&1 || useradd -m -s /bin/bash "${E2E_USER}"
+if ! id "${E2E_USER}" >/dev/null 2>&1; then
+	useradd -m -s /bin/bash "${E2E_USER}" 2>/dev/null || adduser -D -s /bin/bash "${E2E_USER}"
+fi
 echo "${E2E_USER} ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/${E2E_USER}"
 chmod 0440 "/etc/sudoers.d/${E2E_USER}"
 E2E_HOME="$(getent passwd "${E2E_USER}" | cut -d: -f6)"

@@ -32,6 +32,11 @@
  * manager failed under `set -e` and the script died before copying the driver.
  * The names were also Lua 5.4 builds there, invisible to LuaJIT. An optional
  * module that cannot be installed must be reported and skipped.
+ *
+ * ROOT CAUSE 5 — ALPINE WAS REFUSED OUTRIGHT.
+ * apk lives in /sbin, absent from an ordinary Alpine user's PATH, so the
+ * manager was detected as "unknown" and every dependency refused; and the
+ * group setup called usermod, which BusyBox does not ship, under set -e.
  * ==============================================================================
  */
 
@@ -87,7 +92,15 @@ function runInstaller(scenario) {
 
 	// Privilege is recorded and never performed — except the package manager,
 	// which is itself a stub, so its markers are what the probes read back.
-	stub(stubs, 'sudo', `${log}\n[ "$1" = apt-get ] && exec "$@"\nexit 0`);
+	// scenario.busybox: no shadow-utils, as on Alpine — usermod and groupadd
+	// do not exist, BusyBox's addgroup does.
+	stub(
+		stubs,
+		'sudo',
+		`${log}\n[ "$1" = apt-get ] && exec "$@"\n` +
+			(scenario.busybox ? 'case "$1" in usermod|groupadd) exit 127 ;; esac\n' : '') +
+			'exit 0'
+	);
 	stub(stubs, 'systemctl', `${log}\nexit 1`);
 	// The package manager "installs" by dropping a marker the probes read.
 	// A package named in scenario.absentPackages is not in the archive: the
@@ -198,6 +211,59 @@ const errors = [];
 		}
 	} finally {
 		run.cleanup();
+	}
+}
+
+// ── A BusyBox system with no usermod (Alpine) ───────────────────────────────
+{
+	const run = runInstaller({ distroKanata: true, desktopProvided: true, busybox: true });
+	try {
+		if (run.status !== 0) {
+			errors.push(
+				`install.sh exited ${run.status} on a system without usermod (Alpine):\n` +
+					run.output.split('\n').slice(-6).join('\n')
+			);
+		}
+		for (const group of ['input', 'uinput']) {
+			if (!run.calls.some((call) => new RegExp(`^sudo addgroup \\S+ ${group}$`).test(call))) {
+				errors.push(`the user was not added to ${group} through BusyBox's addgroup`);
+			}
+		}
+	} finally {
+		run.cleanup();
+	}
+}
+
+// ── The package manager lives in /sbin (Alpine's apk) ───────────────────────
+{
+	// Extracted and run on its own: the real /sbin cannot be staged, so the two
+	// system directories are pointed at fixtures. PATH is empty, as an ordinary
+	// Alpine user's PATH is for /sbin.
+	const source = fs.readFileSync(INSTALLER, 'utf8');
+	const functions = (source.match(/_has_manager\(\) \{[\s\S]*?\n\}\n\n_detect_pkg_manager\(\) \{[\s\S]*?\n\}/) || [])[0];
+	if (!functions) {
+		errors.push('_has_manager/_detect_pkg_manager not found — the detection fixture did not run');
+	} else {
+		const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-sbin-'));
+		try {
+			fs.mkdirSync(path.join(fixture, 'sbin'));
+			fs.mkdirSync(path.join(fixture, 'usr-sbin'));
+			stub(path.join(fixture, 'sbin'), 'apk', 'exit 0');
+			const harness = functions
+				.replaceAll('"/sbin/$1"', `"${bashPath(fixture)}/sbin/$1"`)
+				.replaceAll('"/usr/sbin/$1"', `"${bashPath(fixture)}/usr-sbin/$1"`) + '\n_detect_pkg_manager\n';
+			// The interpreter is resolved with the caller's PATH; the script then
+			// runs with an empty one, which is the point.
+			const detected = spawnSync(bashExecutable(), ['-c', `PATH=\n${harness}`], { encoding: 'utf8' });
+			if ((detected.stdout || '').trim() !== 'apk') {
+				errors.push(
+					`with apk only in /sbin, the installer detected '${(detected.stdout || '').trim()}' — ` +
+						'an Alpine user was refused every dependency'
+				);
+			}
+		} finally {
+			fs.rmSync(fixture, { recursive: true, force: true });
+		}
 	}
 }
 
