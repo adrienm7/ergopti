@@ -156,6 +156,9 @@
 			"checked_when": [
 				"llm_enabled"
 			],
+			"disabled_when": [
+				"llm_toggle_ready"
+			],
 			"category": "LLM"
 		},
 		{
@@ -826,7 +829,11 @@
 			"checked_when": [
 				"layout_enabled"
 			],
-			"category": "Layout"
+			"category": "Layout",
+			"platforms": [
+				"ahk"
+			],
+			"reason_key": "platform_reason.layout_emulation_is_windows_only"
 		},
 		{
 			"type": "---"

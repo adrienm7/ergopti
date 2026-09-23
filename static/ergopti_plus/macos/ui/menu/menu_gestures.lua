@@ -159,43 +159,53 @@ function M.build(ctx)
 		return true
 	end
 
+	--- The category switch: the gestures submenu's first row (the manifest's
+	--- gestures_toggle). It used to be the parent row's action, which AppKit
+	--- never sends for an item that opens a submenu, so Gestures could not be
+	--- switched on from the menu bar at all.
+	---
+	--- Refused while the script is paused. The gesture engine's only gate is the
+	--- shared CoreState.enabled flag, which pause_all() drives via disable_all().
+	--- Toggling the feature during pause would write that SAME flag: enabling it
+	--- makes gestures fire while « tout est éteint », and disabling it desyncs the
+	--- pre-pause snapshot so resume_all() re-enables against the user's intent.
+	--- Pause owns the gesture state until resume restores it.
+	--- @return boolean|nil committed
+	local function toggle_gestures()
+		if paused then
+			Logger.warn(LOG, "Gestures switch refused: the script is paused.")
+			return false
+		end
+		if settle_gesture_toggle_debt() ~= true then return false end
+		local previous = state.gestures == true
+		local desired = not previous
+		if desired then
+			-- Show warning when activating gestures
+			local warnMsg = i18n.get("dialog.gestures.warning_msg")
+			local res = dialog.block_alert(i18n.get("dialog.gestures.warning_title"), warnMsg, i18n.get("button.activate"), i18n.get("button.cancel"), "warning")
+			if res ~= i18n.get("button.activate") then return end
+		end
+		if commit_gestures_runtime(desired, previous) ~= true then return false end
+		state.gestures = desired
+		local save_ok, save_result = xpcall(ctx.save_prefs, debug.traceback)
+		if not save_ok or save_result ~= true then
+			state.gestures = previous
+			if apply_gesture_posture(previous, "preference rollback") ~= true then
+				gesture_toggle_debt = { restore_enabled = previous }
+			end
+			Logger.error(LOG, "Gesture preference publication did not commit: %s.",
+				tostring(save_result))
+			return false
+		end
+		ctx.notify_feature(i18n.get("menu.gestures.notify_title"), state.gestures)
+		ctx.updateMenu()
+		return true
+	end
+
 	local item = {
-		label   = i18n.get("menu.gestures.title"),
-		checked = state.gestures or nil,
-		-- Disabled while the script is paused. The gesture engine's only gate is the
-		-- shared CoreState.enabled flag, which pause_all() drives via disable_all().
-		-- Toggling the feature during pause would write that SAME flag: enabling it
-		-- makes gestures fire while « tout est éteint », and disabling it desyncs the
-		-- pre-pause snapshot so resume_all() re-enables against the user's intent.
-		-- Pause owns the gesture state until resume restores it — mirror the
-		-- hotstrings master toggle, which is likewise pause-gated.
+		label    = i18n.get("menu.gestures.title"),
+		checked  = state.gestures or nil,
 		disabled = paused or nil,
-		action  = (not paused) and function()
-			if settle_gesture_toggle_debt() ~= true then return false end
-			local previous = state.gestures == true
-			local desired = not previous
-			if desired then
-				-- Show warning when activating gestures
-				local warnMsg = i18n.get("dialog.gestures.warning_msg")
-				local res = dialog.block_alert(i18n.get("dialog.gestures.warning_title"), warnMsg, i18n.get("button.activate"), i18n.get("button.cancel"), "warning")
-				if res ~= i18n.get("button.activate") then return end
-			end
-			if commit_gestures_runtime(desired, previous) ~= true then return false end
-			state.gestures = desired
-			local save_ok, save_result = xpcall(ctx.save_prefs, debug.traceback)
-			if not save_ok or save_result ~= true then
-				state.gestures = previous
-				if apply_gesture_posture(previous, "preference rollback") ~= true then
-					gesture_toggle_debt = { restore_enabled = previous }
-				end
-				Logger.error(LOG, "Gesture preference publication did not commit: %s.",
-					tostring(save_result))
-				return false
-			end
-			ctx.notify_feature(i18n.get("menu.gestures.notify_title"), state.gestures)
-			ctx.updateMenu()
-			return true
-		end or nil,
 	}
 
 
@@ -468,14 +478,16 @@ function M.build(ctx)
 		gesture_space_wrap = function()
 			return type(gestures.get_space_wrap) == "function" and gestures.get_space_wrap() or false
 		end,
-		-- disabled_when is an AND of things that must be TRUE for the row to be
-		-- live, so this answers "are gestures usable", not "are they off".
-		gestures_enabled = function() return (state.gestures and not paused) and true or false end,
+		-- The switch's tick and the circular-Spaces greying read the same key, so
+		-- it answers the stored preference. The pause greys the whole submenu
+		-- from its parent row, and the switch refuses while paused.
+		gestures_enabled = function() return state.gestures == true end,
 	}
 
 	-- The two whole-tree actions are `command` rows: the renderer builds them from
 	-- the declaration and this driver registers only the behaviour.
 	render_ctx.commands = render_ctx.commands or {}
+	render_ctx.commands["gestures_toggle"] = toggle_gestures
 	render_ctx.commands["disable_all"] = cmd_disable_all
 	render_ctx.commands["restore_defaults"] = cmd_restore_defaults
 

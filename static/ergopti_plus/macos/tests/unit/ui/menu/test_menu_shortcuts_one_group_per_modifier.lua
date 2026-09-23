@@ -85,8 +85,12 @@ helpers.describe("the Shortcuts submenu has one group per modifier", function()
 
 	helpers.it("draws the wrap-text toggle with a title", function()
 		local rows = render_shortcuts_submenu()
-		helpers.assert_true(type(rows[1].title) == "string" and rows[1].title:find("Wrap", 1, true) ~= nil,
-			"the wrap-text toggle must be the first, titled row, got " .. tostring(rows[1].title))
-		helpers.assert_true(type(rows[1].fn) == "function", "the wrap-text toggle must be clickable")
+		-- The category switch opens the submenu and a separator sets it apart, so
+		-- the wrap-text toggle is the first row after them.
+		helpers.assert_eq(rows[1].title, "menu.shortcuts.enable", "the submenu opens with its category switch")
+		helpers.assert_eq(rows[2].title, "-", "a separator sets the switch apart")
+		helpers.assert_true(type(rows[3].title) == "string" and rows[3].title:find("Wrap", 1, true) ~= nil,
+			"the wrap-text toggle must be the first, titled row after the switch, got " .. tostring(rows[3].title))
+		helpers.assert_true(type(rows[3].fn) == "function", "the wrap-text toggle must be clickable")
 	end)
 end)

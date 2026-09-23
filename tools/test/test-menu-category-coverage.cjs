@@ -14,17 +14,19 @@
  * only ids the manifest names. A row a driver draws from nothing would not be
  * declared; a row declared and unanswered renders one item short, permanently.
  *
- * TWO MECHANISMS ARE NOT FAILURES, and both are why this file exists rather than
- * a simple "every id appears in every driver":
+ * ONE MECHANISM IS NOT A FAILURE, and it is why this file exists rather than a
+ * simple "every id appears in every driver": `platforms` restricts a row to the
+ * drivers that have the capability, which is what makes "one menu with
+ * driver-specific items" expressible at all. A restricted row carries a
+ * `reason_key`; test-menu-parity.cjs holds that.
  *
- *   - `platforms` restricts a row to the drivers that have the capability, which
- *     is what makes "one menu with driver-specific items" expressible at all.
- *     A restricted row carries a `reason_key`; test-menu-parity.cjs holds that.
- *   - a `toggle` is OPT-IN per driver: registering its command is what asks the
- *     renderer for the row. A tray whose parent can be clicked (hs.menubar)
- *     registers none and draws the toggle on the parent; one that cannot
- *     (appindicator, and AutoHotkey's submenu parents) registers it and gets a
- *     row. One declaration, two shapes, no second description.
+ * A `toggle` is NOT exempt. This gate used to treat it as opt-in per driver, on
+ * the premise that an hs.menubar parent can be clicked and so carries the switch
+ * itself. It cannot — AppKit never sends the action of an item that opens a
+ * submenu — and that premise left Gestures, Shortcuts, Metrics and the Hotstrings
+ * master impossible to switch on from the macOS menu bar. A switch shown on a
+ * driver is answered like any other row; test-menu-toggle-registered.cjs checks
+ * the registration itself.
  *
  * The table is printed on success too: "which categories does each driver draw,
  * and how many rows" is the question this was written to answer, and an
@@ -68,10 +70,7 @@ for (const [key, list] of Object.entries(manifest)) {
 	for (const p of PLATFORMS) {
 		const shown = list.filter((r) => visible(r, p));
 		// Rows that need the driver to name something: an id it dispatches on.
-		// A `toggle` is opt-in per driver: registering the command is what asks the
-		// renderer for the row, and a tray whose parent can be clicked registers
-		// none. So it is never "unanswered" — it is answered by not being needed.
-		const needing = shown.filter((r) => typeof r.id === 'string' && r.id !== '---' && r.type !== 'toggle');
+		const needing = shown.filter((r) => typeof r.id === 'string' && r.id !== '---');
 		const missing = needing.filter((r) => !src[p].includes(r.id));
 		cell[p] = { shown: shown.length, missing: missing.map((r) => r.id) };
 	}

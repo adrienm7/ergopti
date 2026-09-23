@@ -162,7 +162,8 @@ helpers.describe("menu_metrics WPM lifecycle reaches persisted checkmarks", func
 		local context = load_menu({
 			keylogger_module = { start = function() return true end },
 		})
-		local committed = context.menu.action()
+		helpers.assert_nil(context.menu.action, "the Metrics parent must carry no action")
+		local committed = context.commands["metrics_toggle"]()
 
 		helpers.assert_eq(committed, false)
 		helpers.assert_eq(context.state.keylogger_enabled, true,

@@ -36,8 +36,13 @@ local function load_menu(start_result)
 		block_alert = function() return "button.activate" end,
 	}
 	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	-- The switch is the command registered for the manifest's metrics_toggle
+	-- row, captured where the menu hands it to the renderer.
 	package.loaded["infra.manifest_menu"] = {
-		build = function() return {} end,
+		build = function(_, _, _, _, render_ctx)
+			ctx.commands = render_ctx.commands
+			return {}
+		end,
 		resolve_disabled_when = function() return false end,
 	}
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
@@ -60,13 +65,16 @@ local function load_menu(start_result)
 		updateMenu = function() ctx.updates = ctx.updates + 1 end,
 		script_control = { is_paused = function() return false end },
 	})
+	helpers.assert_nil(ctx.item.action, "the Metrics parent opens a submenu and must carry no action")
+	ctx.toggle = ctx.commands and ctx.commands["metrics_toggle"]
+	helpers.assert_type(ctx.toggle, "function")
 	return ctx
 end
 
 helpers.describe("menu_metrics: strict keylogger lifecycle reaches the checkmark", function()
 	helpers.it("compensates a rejected activation before reporting Metrics enabled", function()
 		local ctx = load_menu(false)
-		local result = ctx.item.action()
+		local result = ctx.toggle()
 
 		helpers.assert_eq(false, result,
 			"the click must report that runtime activation did not commit")

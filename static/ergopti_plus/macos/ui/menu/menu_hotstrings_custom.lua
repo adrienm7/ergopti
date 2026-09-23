@@ -583,40 +583,48 @@ function M.build_custom(ctx, counts)
 		for _, row in ipairs(custom_rows) do table.insert(menu_items, row) end
 	end
 
-	-- All groups toggle together when the user clicks the top-level item
+	-- The personal groups and the custom group switch together, from the gate
+	-- row that opens the submenu. It was the parent row's action, which AppKit
+	-- never sends for an item that opens a submenu, so it could not be reached.
 	local all_personal_enabled = true
 	for _, gname in ipairs(personal_group_names) do
 		if not groupEnabled(ctx, gname) then all_personal_enabled = false; break end
 	end
 	local both_enabled = all_personal_enabled and custom_enabled
+	local function toggle_personal()
+		local will_enable = not both_enabled
+		if will_enable and not KeymapLifecycle.ensure_started(ctx,
+			"enable personal and custom hotstrings") then return end
+		-- Toggle all personal groups
+		for _, gname in ipairs(personal_group_names) do
+			state.hotstrings[gname] = will_enable
+			if will_enable then
+				if ctx.keymap and type(ctx.keymap.enable_group) == "function" then pcall(ctx.keymap.enable_group, gname) end
+			else
+				if ctx.keymap and type(ctx.keymap.disable_group) == "function" then pcall(ctx.keymap.disable_group, gname) end
+			end
+		end
+		-- Toggle custom group
+		state.hotstrings["custom"] = will_enable
+		if will_enable then
+			if ctx.keymap and type(ctx.keymap.enable_group) == "function" then pcall(ctx.keymap.enable_group, "custom") end
+		else
+			if ctx.keymap and type(ctx.keymap.disable_group) == "function" then pcall(ctx.keymap.disable_group, "custom") end
+		end
+		if ctx.save_prefs() ~= true then return false end
+		ctx.notify_feature(base_title, will_enable)
+		ctx.updateMenu()
+	end
+	table.insert(menu_items, 1, {
+		label    = i18n.get(both_enabled and "menu.hotstrings.category_on" or "menu.hotstrings.category_off"),
+		disabled = paused or nil,
+		action   = not paused and toggle_personal or nil,
+	})
+	table.insert(menu_items, 2, { separator = true })
 	return {
 		label   = title_str,
 		checked = both_enabled or nil,
-		action      = function()
-			local will_enable = not both_enabled
-			if will_enable and not KeymapLifecycle.ensure_started(ctx,
-				"enable personal and custom hotstrings") then return end
-			-- Toggle all personal groups
-			for _, gname in ipairs(personal_group_names) do
-				state.hotstrings[gname] = will_enable
-				if will_enable then
-					if ctx.keymap and type(ctx.keymap.enable_group) == "function" then pcall(ctx.keymap.enable_group, gname) end
-				else
-					if ctx.keymap and type(ctx.keymap.disable_group) == "function" then pcall(ctx.keymap.disable_group, gname) end
-				end
-			end
-			-- Toggle custom group
-			state.hotstrings["custom"] = will_enable
-			if will_enable then
-				if ctx.keymap and type(ctx.keymap.enable_group) == "function" then pcall(ctx.keymap.enable_group, "custom") end
-			else
-				if ctx.keymap and type(ctx.keymap.disable_group) == "function" then pcall(ctx.keymap.disable_group, "custom") end
-			end
-			if ctx.save_prefs() ~= true then return false end
-			ctx.notify_feature(base_title, will_enable)
-			ctx.updateMenu()
-		end,
-		items = menu_items,
+		items   = menu_items,
 	}
 end
 

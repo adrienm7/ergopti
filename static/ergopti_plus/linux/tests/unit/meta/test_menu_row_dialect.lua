@@ -209,3 +209,99 @@ helpers.describe("renderer: nesting is bounded by recursion safety, not by menu 
 			.. "not remove the guard")
 	end)
 end)
+
+
+
+
+
+-- =====================================================================
+-- =====================================================================
+-- ======= 4/ A click on a row that opens a submenu goes nowhere =======
+-- =====================================================================
+-- =====================================================================
+
+helpers.describe("renderer: a provider row carrying both an action and a subtree", function()
+
+	helpers.it("reports it as an ERROR naming the row, for items and for a built submenu", function()
+		local R, logs = make_renderer()
+		local rows = R.render_rows({
+			{ label = "Gestes", action = function() end, items = { { label = "Balayer" } } },
+			{ label = "Raccourcis", action = function() end, submenu = { { title = "Ctrl" } } },
+		}, "top_level")
+
+		helpers.assert_eq(#rows, 2, "both rows still render")
+		helpers.assert_true(rows[1].fn == nil and rows[2].fn == nil,
+			"the subtree wins: no tray fires the action of a row that opens a submenu")
+		helpers.assert_true(logged(logs.error, "Gestes", "action"),
+			"a click that can never happen must be reported — it is how Gestures, Shortcuts, Metrics and "
+			.. "the Hotstrings master became impossible to switch on from the macOS menu bar")
+		helpers.assert_true(logged(logs.error, "Raccourcis", "action"), "a built submenu counts as a subtree")
+	end)
+
+	helpers.it("stays quiet for a clickable leaf and for a parent without an action", function()
+		local R, logs = make_renderer()
+		R.render_rows({
+			{ label = "Recharger", action = function() end },
+			{ label = "Gestes", checked = true, items = { { label = "Activer les gestes", action = function() end } } },
+		}, "top_level")
+		helpers.assert_true(#logs.error == 0, "correct data must not be reported as drift")
+	end)
+end)
+
+
+
+
+
+-- ================================================================
+-- ================================================================
+-- ======= 5/ A category switch the driver never registered =======
+-- ================================================================
+-- ================================================================
+
+--- Writes a one-menu fixture manifest holding a single toggle row.
+--- @return string Absolute path of the manifest file.
+local function write_toggle_manifest()
+	local path = os.tmpname()
+	local fh = assert(io.open(path, "w"))
+	fh:write([[
+{
+	"fixture_menu": [
+		{ "type": "toggle", "id": "fixture_toggle", "i18n": "menu.fixture.enable",
+		  "checked_when": ["fixture_enabled"], "category": "Fixture" },
+		{ "type": "---" },
+		{ "type": "list", "id": "fixture_rows" }
+	]
+}
+]])
+	fh:close()
+	return path
+end
+
+helpers.describe("renderer: a category switch with no registered command", function()
+
+	helpers.it("is not drawn, and the renderer says so as an ERROR", function()
+		local path = write_toggle_manifest()
+		local Renderer = helpers.load_module("menu.renderer")
+		local logs = { error = {} }
+		local logger = helpers.make_logger_stub()
+		logger.error = function(_, fmt, ...)
+			local ok, formatted = pcall(string.format, fmt, ...)
+			logs.error[#logs.error + 1] = ok and formatted or tostring(fmt)
+		end
+		local R = Renderer.new({
+			platform      = "linux",
+			manifest_path = function() return path end,
+			json_decode   = require("json").decode,
+			i18n          = { get = function(key) return key end, section = function(key) return key end },
+			logger        = logger,
+		})
+		local rows = R.build("fixture_menu", "Fixture", nil, nil,
+			{ commands = {}, state_getters = { fixture_enabled = function() return true end } },
+			{ fixture_rows = function() return { { label = "Réglage" } } end })
+		os.remove(path)
+
+		helpers.assert_eq(rows[1] and rows[1].title, "Réglage", "only the rows under the switch are drawn")
+		helpers.assert_true(logged(logs.error, "fixture_toggle"),
+			"a submenu shown without its switch cannot be turned on from the tray; a DEBUG line hid exactly that")
+	end)
+end)

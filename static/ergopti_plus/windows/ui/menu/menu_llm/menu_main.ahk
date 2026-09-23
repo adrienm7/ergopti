@@ -118,7 +118,8 @@ LLM_Menu_BuildSubmenu() {
 	; renderer code like every other category's: one label, ticked from intent.
 	MenuRenderer_AppendToggle(_LLM_Menu_Handle, "llm_menu", "llm_toggle",
 		Map("llm_toggle", LLM_Menu_OnToggle),
-		Map("llm_enabled", () => _LLM_Menu["enabled"]))
+		Map("llm_enabled", () => _LLM_Menu["enabled"],
+			"llm_toggle_ready", () => !A_IsSuspended))
 	_LLM_Menu_Handle.Add()  ; separator after the switch, as the manifest declares
 
 	; Warning row — surfaces when the feature is ON but the active backend

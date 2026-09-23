@@ -2982,6 +2982,10 @@ type = "toggle"
 id = "llm_toggle"
 i18n = "menu.llm.enable"
 checked_when = ["llm_enabled"]
+# Greyed, never absent, while the switch cannot run its activation transaction:
+# during a pause on every driver, and on macOS before the activation owner exists.
+# The row used to vanish in those states, leaving the IA submenu without a switch.
+disabled_when = ["llm_toggle_ready"]
 category = "LLM"
 
 [[menu.llm_menu]]
@@ -3658,6 +3662,12 @@ id = "layout_toggle"
 i18n = "menu.layout.enable"
 checked_when = ["layout_enabled"]
 category = "Layout"
+# Only Windows emulates the Ergopti layout itself, so only Windows has an
+# emulation to switch off. macOS installs the layout as a system input source and
+# Linux remaps through kanata; declared for them, this row had no command and was
+# skipped in silence, which is the failure the renderer now reports.
+platforms = ["ahk"]
+reason_key = "platform_reason.layout_emulation_is_windows_only"
 
 # Two sections, so a user reads at a glance which rows only matter with the
 # Ergopti layout (its emulation on Windows, its installed bundle and menubar

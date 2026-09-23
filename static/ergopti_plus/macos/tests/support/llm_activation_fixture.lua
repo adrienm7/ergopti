@@ -494,9 +494,12 @@ local function build_fixture(backend, save_results, options)
 		return nil, state, calls
 	end
 	local item = handler.build_item()
-	helpers.assert_type(item.action, "function")
+	helpers.assert_nil(item.action, "the IA parent row opens a submenu and must carry no action")
+	local toggle = calls.render_ctx and calls.render_ctx.commands
+		and calls.render_ctx.commands["llm_toggle"]
+	helpers.assert_type(toggle, "function")
 	calls.last_attempted_enabled = function() return last_attempted_enabled end
-	return item.action, state, calls
+	return toggle, state, calls
 end
 
 --- Runs all fixture work before restoring the exact predecessor module cache.

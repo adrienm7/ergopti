@@ -390,17 +390,10 @@ local function _build_layouts(ctx)
 	local current = ctx.layout or "qwerty"
 	local on_change = ctx.on_layout_change
 
+	-- Layout selection controls character interpretation here; the manifest
+	-- restricts the layout emulation switch to Windows with its reason.
 	local render_ctx = {}
 	for key, value in pairs(ctx) do render_ctx[key] = value end
-	-- The category gate's state key. This driver registers no command for that
-	-- row — the layout has no on/off of its own here — so the
-	-- renderer builds nothing and this getter is never read. It is named anyway,
-	-- because the declaration promises the key to every platform the row is
-	-- visible on, and a key with no getter is an ERROR at render time rather than
-	-- a silently wrong row.
-	render_ctx.state_getters = {}
-	for key, value in pairs(ctx.state_getters or {}) do render_ctx.state_getters[key] = value end
-	render_ctx.state_getters["layout_enabled"] = function() return true end
 
 	local providers = {
 		["base_layouts"] = function()
@@ -1487,8 +1480,8 @@ local function _manifest_hotstring_rows(ctx, config)
 	hs_ctx.commands = {
 		["hotstrings_enable_all"]  = set_all(true),
 		["hotstrings_disable_all"] = set_all(false),
-		-- The category gate. Registering it is what tells the renderer this tray
-		-- needs the row; a driver whose parent can be clicked registers nothing.
+		-- The category switch, the submenu's first row. Every driver registers it:
+		-- no tray can switch a category from the row that opens its submenu.
 		["hotstrings_toggle"]      = function()
 			-- The batched writers, not a loop of toggle_group: each toggle_group
 			-- ends in a full load_all(), which re-parses every pack — magickey.toml
@@ -1533,11 +1526,9 @@ local function _build_hotstrings(ctx)
 	-- built by the shared renderer from their declaration — see the `commands`
 	-- and `state_getters` registered in _manifest_hotstring_rows.
 	--
-	-- The gate sits inside the submenu rather than on the parent, which is where
-	-- macOS puts it: platform/tray/appindicator.lua binds item.fn only when the row
-	-- has NO submenu (`if item.menu … elseif item.fn …`), so a clickable parent is
-	-- not representable on this backend. That is a driver answer, and it is
-	-- expressed by registering the command rather than by a second declaration.
+	-- The gate sits inside the submenu, as on every driver: appindicator binds
+	-- item.fn only when the row has NO submenu (`if item.menu … elseif item.fn …`),
+	-- and AppKit and Win32 never send a click for such a row either.
 
 	-- The grand total, which macOS and Windows both put on this entry and Linux
 	-- did not. On a driver that re-scans its catalogue from disk it is the fastest
@@ -2040,9 +2031,8 @@ local function _build_llm(ctx)
 		return rows
 	end
 
-	-- Registering the command is what tells the renderer this tray needs a gate
-	-- ROW: appindicator binds item.fn only on a row with no submenu, so a
-	-- clickable parent is not representable here.
+	-- The category switch, the submenu's first row: appindicator binds item.fn
+	-- only on a row with no submenu, so the parent cannot carry it.
 	local llm_ctx = {}
 	for key, value in pairs(ctx) do llm_ctx[key] = value end
 	llm_ctx.commands = {}
@@ -2054,6 +2044,9 @@ local function _build_llm(ctx)
 	llm_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do llm_ctx.state_getters[key] = value end
 	llm_ctx.state_getters["llm_enabled"] = function() return enabled end
+	-- The switch has no precondition here beyond the pause, which greys the whole
+	-- IA row from the top level anyway.
+	llm_ctx.state_getters["llm_toggle_ready"] = function() return ctx.paused ~= true end
 
 	local rendered = ManifestMenu
 		and ManifestMenu.build("llm_menu", "LLM", dynamic_handlers, nil, llm_ctx, providers)
@@ -2257,10 +2250,8 @@ local function _manifest_metrics_rows(ctx, k)
 	-- handle the row" by looking for the quoted id, and a bare key is invisible
 	-- to it — which would report three declared rows as unhandled while they work.
 	render_ctx.commands = {
-		-- The category gate. Registering the command is what tells the renderer
-		-- this tray needs the ROW: appindicator binds item.fn only on a row with
-		-- no submenu, so the clickable parent macOS uses for the same toggle is
-		-- not representable on this backend.
+		-- The category switch, the submenu's first row: appindicator binds
+		-- item.fn only on a row with no submenu, so the parent cannot carry it.
 		["metrics_toggle"] = function()
 			if type(k.set_enabled) ~= "function" then
 				Logger.error(LOG, "The keylogger exposes no set_enabled — the gate does nothing.")
@@ -2702,10 +2693,8 @@ local function _build_shortcuts(ctx)
 		return _extension_shortcut_rows()
 	end
 
-	-- Registering `shortcuts_toggle` is what tells the renderer this tray needs a
-	-- gate ROW: appindicator binds item.fn only on a row with no submenu, so a
-	-- clickable parent — how macOS carries the same toggle — cannot be expressed
-	-- on this backend.
+	-- `shortcuts_toggle` is the submenu's first row: appindicator binds item.fn
+	-- only on a row with no submenu, so the parent cannot carry the switch.
 	local sc_ctx = {}
 	for key, value in pairs(ctx) do sc_ctx[key] = value end
 	sc_ctx.commands = {}

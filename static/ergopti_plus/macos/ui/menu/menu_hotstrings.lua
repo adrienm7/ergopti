@@ -345,7 +345,10 @@ function M.build_groups(ctx, only, counts)
 			-- Always show count (even 0) — only enabled sections contribute
 			label   = base_label .. " (" .. fmt_count(total) .. ")",
 			checked = enabled or nil,
-			action      = toggleGroupFn(ctx, name),
+			-- Clickable only as a leaf. A category with sections opens a submenu,
+			-- and a row that opens a submenu is never clicked: its gate is the
+			-- submenu's first row instead.
+			action  = (not has_secs) and toggleGroupFn(ctx, name) or nil,
 		}
 
 		if has_secs then
@@ -383,11 +386,10 @@ function M.build_groups(ctx, only, counts)
 			--   6. ─────────
 			--   7. the sections
 			--
-			-- The gate row is NEW here. Windows and Linux have shown it since they
-			-- were written; this driver relied on the parent row toggling the group
-			-- when clicked, which works and which nobody discovers — the parent of a
-			-- submenu reads as something you open, not something you switch off. The
-			-- parent keeps its behaviour; this row makes it visible.
+			-- The gate row is the only way to switch the group from its submenu.
+			-- This driver relied on the parent row toggling the group when clicked,
+			-- which never happens: AppKit sends no action for an item that opens a
+			-- submenu, and the renderer drops it.
 			local sec_menu = {}
 			sec_menu[#sec_menu + 1] = {
 				label  = i18n.get(enabled and "menu.hotstrings.category_on" or "menu.hotstrings.category_off"),

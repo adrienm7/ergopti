@@ -48,6 +48,9 @@ local CONFIG_FOLDER = "Config folder"
 local LOSS_MARKERS = {
 	"uses `title`", "hangs its subtree on `menu`", "carries `fn`",
 	"produced a row with no label", "Build error for", "missing or in error",
+	-- A control no click can reach: an action on a row that opens a submenu, or a
+	-- category shown without its switch.
+	"carries both an `action`", "category switch",
 }
 
 --- A platform.remap double: every getter answers, every engine call raises.

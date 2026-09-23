@@ -120,7 +120,9 @@ local CANONICAL_HOTSTRINGS_MENU = {
 -- signature, and the renderer is what collapses a separator with nothing between
 -- it and the next one.
 local CANONICAL_LAYOUT_MENU = {
-	"toggle:layout_toggle",
+	-- No `toggle:layout_toggle`: only Windows emulates the Ergopti layout, so
+	-- the switch is declared for it alone. On this driver the row had no command
+	-- and was skipped in silence, which the renderer now reports as an error.
 	-- UPDATED 2026-09-21: two sections, so the rows that only matter with the
 	-- Ergopti layout (its .bundle, the active variants, the menubar icon) are
 	-- told apart from those that work on any layout (pause/resume switching, the
