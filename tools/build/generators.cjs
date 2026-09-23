@@ -117,6 +117,14 @@ const GENERATORS = [
 		outputs: ['static/ergopti_plus/linux/_generated/gesture_emit_actions.lua']
 	},
 	{
+		script: 'codegen/codegen-action-catalogue.cjs',
+		outputs: [
+			'static/ergopti_plus/macos/_generated/action_catalogue.lua',
+			'static/ergopti_plus/linux/_generated/action_catalogue.lua',
+			'static/ergopti_plus/windows/_generated/action_catalogue.ahk'
+		]
+	},
+	{
 		script: 'codegen/codegen-unicode-case-linux.cjs',
 		outputs: ['static/ergopti_plus/_shared/lua/unicode_case/data.lua']
 	},
