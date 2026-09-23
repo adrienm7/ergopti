@@ -91,6 +91,16 @@ expect(
 	'the HTTPS repository allowlist must run before any injected/native runner'
 );
 
+// Scripts the Linux sandbox replaces with stubs (native bridge, locale fetch).
+const STUBBED_SCRIPTS = new Set(['host_bridge.js', 'i18n.js']);
+
+/** Returns the local scripts index.html loads, in document order. */
+function pageScripts() {
+	const scripts = [...index.matchAll(/<script\s+src="([^"]+)"/g)].map((match) => match[1]);
+	if (scripts.length < 5) throw new Error(`index.html loads ${scripts.length} script(s); the scan is broken`);
+	return scripts;
+}
+
 /** Concatenates the text of a recorded node and all of its descendants. */
 function renderedText(node) {
 	return node.textContent + node.children.map(renderedText).join('');
@@ -139,8 +149,12 @@ function checkLinuxProtocol() {
 	sandbox.window = sandbox;
 	sandbox.__ergopti_host = 'linux';
 	vm.createContext(sandbox);
-	vm.runInContext(markdown, sandbox, { filename: 'markdown.js' });
-	vm.runInContext(script, sandbox, { filename: 'changelog/script.js' });
+	// Every local script, in document order: a page module the harness forgot
+	// to load would otherwise surface as a ReferenceError unrelated to Linux.
+	for (const src of pageScripts()) {
+		if (STUBBED_SCRIPTS.has(path.basename(src))) continue;
+		vm.runInContext(fs.readFileSync(path.resolve(SHARED_CHANGELOG, src), 'utf8'), sandbox, { filename: src });
+	}
 
 	expect(
 		posted.length === 1 && posted[0].name === 'changelog_bridge' && posted[0].payload === 'ready',

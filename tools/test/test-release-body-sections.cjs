@@ -27,6 +27,9 @@
  *    file through its port.
  * 3. Atom path: GitHub strips comments from rendered notes, so a feed body has
  *    no markers and must split on the fold and headings.
+ * 4. Versions page: every fixture goes through the real page (recording DOM):
+ *    the changelog section comes first and expanded, the downloads follow
+ *    collapsed, and no fold, summary, anchor or marker line survives as text.
  * ==============================================================================
  */
 
@@ -35,6 +38,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { runPage, textNodes } = require('./support/changelog-page-dom.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SHARED = path.join(ROOT, 'static', 'ergopti_plus', '_shared');
@@ -43,6 +47,17 @@ const CORPUS = path.join(SHARED, 'tests', 'corpus', 'updater');
 const WORKFLOW = path.join(ROOT, '.github', 'workflows', 'ci.yml');
 const BODY_STEP = 'Write release body with platform sections';
 const MIN_VECTORS = 8;
+const EN = JSON.parse(fs.readFileSync(path.join(SHARED, 'data', 'locales', 'en.json'), 'utf8'));
+const CI_ENV = {
+	VERSION: '1.2.3',
+	TAG: 'v1.2.3',
+	GITHUB_REPOSITORY: 'adrienm7/ergopti',
+	GITHUB_RUN_ID: '4242',
+	LINUX_BUNDLE_ASSET: JSON.parse(
+		fs.readFileSync(path.join(SHARED, 'modules', 'updater', 'defaults.json'), 'utf8')
+	).release_assets.linux_bundle,
+	RUNNER_TEMP: '/tmp/runner'
+};
 
 const failures = [];
 
@@ -207,15 +222,7 @@ function buildCiBody(env, changelog) {
 }
 
 function checkCiBody(modules) {
-	const defaults = JSON.parse(fs.readFileSync(path.join(SHARED, 'modules', 'updater', 'defaults.json'), 'utf8'));
-	const env = {
-		VERSION: '1.2.3',
-		TAG: 'v1.2.3',
-		GITHUB_REPOSITORY: 'adrienm7/ergopti',
-		GITHUB_RUN_ID: '4242',
-		LINUX_BUNDLE_ASSET: defaults.release_assets.linux_bundle,
-		RUNNER_TEMP: '/tmp/runner'
-	};
+	const env = CI_ENV;
 	const body = buildCiBody(env, CHANGELOG_MD);
 	const parts = modules.splitReleaseBody(body);
 
@@ -332,10 +339,109 @@ function checkAtomBodies(modules) {
 	}
 }
 
+// ==========================================
+// ==========================================
+// ======= 5/ Versions Page ================
+// ==========================================
+// ==========================================
+
+// A text node that IS a structural line means the fold or anchor leaked as text.
+const STRUCTURAL_TEXT = /^(?:<details( open)?>|<\/details>|<summary>.*|<a (?:id|name)=.*|<!-- \/?ergopti:section.*)$/;
+
+/** Renders one release through the real page and returns its body element. */
+function renderInPage(body) {
+	const { sandbox, document } = runPage({ _i18n_strings: EN });
+	sandbox.injectReleases(
+		[
+			{
+				tag_name: 'v1.2.3',
+				body,
+				html_url: 'https://github.com/adrienm7/ergopti/releases/tag/v1.2.3',
+				published_at: '2026-09-23T00:00:00Z',
+				prerelease: true
+			}
+		],
+		'dev'
+	);
+	return document.getElementById('release-body');
+}
+
+/** Section element of the rendered page carrying a class, or undefined. */
+function section(root, className) {
+	return root.children.find((child) => (child.className || '').split(/\s+/).includes(className));
+}
+
+function checkPageOrder(label, body, entry) {
+	const root = renderInPage(body);
+	const changelog = section(root, 'release-section-changelog');
+	const downloads = section(root, 'release-section-downloads');
+	expect(Boolean(changelog) && changelog.tagName === 'details', `[${label}] the changelog must be a page section`);
+	expect(Boolean(downloads) && downloads.tagName === 'details', `[${label}] the downloads must be a page section`);
+	if (!changelog || !downloads) return;
+	expect(
+		root.children.indexOf(changelog) === 0 && root.children.indexOf(downloads) > 0,
+		`[${label}] the changelog must come first and the downloads after it`
+	);
+	expect(
+		changelog.getAttribute('open') === '' && downloads.getAttribute('open') === null,
+		`[${label}] the changelog must be expanded and the downloads collapsed`
+	);
+	expect(
+		changelog.children[0].tagName === 'summary' &&
+			changelog.children[0].textContent === EN['changelog_window.section_changelog'] &&
+			downloads.children[0].textContent === EN['changelog_window.section_downloads'],
+		`[${label}] each section must be titled from its locale key`
+	);
+	expect(
+		changelog.textContent.includes(entry) && !changelog.textContent.includes('keyboard layout only'),
+		`[${label}] the changelog section must hold the entries and nothing of the downloads`
+	);
+	expect(
+		downloads.textContent.includes('keyboard layout only') && !downloads.textContent.includes(entry),
+		`[${label}] the downloads section must hold the download tables`
+	);
+	const leaked = textNodes(root)
+		.map((node) => node.textContent.trim())
+		.filter((text) => STRUCTURAL_TEXT.test(text));
+	expect(leaked.length === 0, `[${label}] structural lines leaked as text: ${leaked.join(' | ')}`);
+}
+
+function checkVersionsPage(modules) {
+	const ciBody = buildCiBody(CI_ENV, CHANGELOG_MD);
+	checkPageOrder('CI body', ciBody, 'Ci: Mark the release body sections');
+	const vectors = JSON.parse(fs.readFileSync(path.join(CORPUS, 'release_body_vectors.json'), 'utf8')).vectors;
+	const byId = (id) => vectors.find((v) => v.id === id).body.join('\n');
+	checkPageOrder('legacy body', byId('changelog-first-with-jump-link'), 'Make Disable All switch features off');
+	checkPageOrder('folded body', byId('folded-after-downloads'), 'Keep the daemon');
+	const feed = modules.parseReleasesAtom(
+		fs.readFileSync(path.join(CORPUS, 'release_body_feed.atom'), 'utf8'),
+		'adrienm7',
+		'ergopti'
+	);
+	checkPageOrder('Atom folded body', feed[0].body, 'Keep the daemon');
+	checkPageOrder('Atom legacy body', feed[1].body, 'Make Disable All switch features off');
+
+	// Without a changelog the section still leads, saying so.
+	const bare = renderInPage(buildCiBody(CI_ENV, ''));
+	const bareChangelog = section(bare, 'release-section-changelog');
+	expect(
+		Boolean(bareChangelog) && bareChangelog.textContent.includes(EN['changelog_window.no_notes']),
+		'a release without a changelog must say so in the leading changelog section'
+	);
+
+	// A body with no recognisable section renders verbatim, without section chrome.
+	const unknown = renderInPage(byId('unknown-body-is-its-own-changelog'));
+	expect(
+		!section(unknown, 'release-section-changelog') && unknown.textContent.includes('Hand-written notes'),
+		'an unrecognised body must render as written'
+	);
+}
+
 for (const [name, check] of [
 	['vectors', checkVectors],
 	['CI body', checkCiBody],
-	['Atom bodies', checkAtomBodies]
+	['Atom bodies', checkAtomBodies],
+	['Versions page', checkVersionsPage]
 ]) {
 	try {
 		check(loadModules());

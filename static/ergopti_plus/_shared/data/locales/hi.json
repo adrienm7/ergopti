@@ -133,6 +133,8 @@
 	"changelog_window.open_github": "View on GitHub ↗",
 	"changelog_window.open_releases_page": "रिलीज़ पेज खोलें ↗",
 	"changelog_window.retry": "Retry",
+	"changelog_window.section_changelog": "परिवर्तन लॉग",
+	"changelog_window.section_downloads": "डाउनलोड और इंस्टॉलेशन",
 	"changelog_window.window_title": "रिलीज़",
 	"common.browse": "ब्राउज़ करें…",
 	"common.cancel": "रद्द करें",

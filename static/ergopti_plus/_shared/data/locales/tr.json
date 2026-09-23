@@ -133,6 +133,8 @@
 	"changelog_window.open_github": "View on GitHub ↗",
 	"changelog_window.open_releases_page": "Sürümler sayfasını aç ↗",
 	"changelog_window.retry": "Retry",
+	"changelog_window.section_changelog": "Değişiklik günlüğü",
+	"changelog_window.section_downloads": "İndirmeler ve kurulum",
 	"changelog_window.window_title": "Sürümler",
 	"common.browse": "Gözat…",
 	"common.cancel": "İptal",

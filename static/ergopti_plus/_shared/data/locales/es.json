@@ -133,6 +133,8 @@
 	"changelog_window.open_github": "View on GitHub ↗",
 	"changelog_window.open_releases_page": "Abrir la página de versiones ↗",
 	"changelog_window.retry": "Retry",
+	"changelog_window.section_changelog": "Registro de cambios",
+	"changelog_window.section_downloads": "Descargas e instalación",
 	"changelog_window.window_title": "Versiones",
 	"common.browse": "Examinar…",
 	"common.cancel": "Cancelar",

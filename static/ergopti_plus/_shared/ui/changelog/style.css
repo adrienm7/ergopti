@@ -386,6 +386,50 @@ body {
 	margin-top: 8px;
 }
 
+/* ================================= */
+/* ===== 3.2) Release Sections ====== */
+/* ================================= */
+
+#release-body .release-section {
+	margin-bottom: 18px;
+}
+
+#release-body .release-section > summary {
+	border-bottom: 1px solid #2c2c2e;
+	color: #fff;
+	cursor: pointer;
+	font-size: 16px;
+	font-weight: 600;
+	margin-bottom: 12px;
+	padding-bottom: 6px;
+}
+
+#release-body .release-section-body > :first-child {
+	margin-top: 0;
+}
+
+#release-body .release-footer {
+	color: #666;
+	font-size: 12px;
+}
+
+#release-body .release-footer p {
+	color: #666;
+	font-size: 12px;
+}
+
+#release-body details:not(.release-section) {
+	margin: 10px 0;
+}
+
+#release-body details:not(.release-section) > summary {
+	color: #d0d0d4;
+	cursor: pointer;
+	font-size: 13px;
+	font-weight: 600;
+	margin-bottom: 6px;
+}
+
 /* ========================================= */
 /* ========================================= */
 /* ======= 4/ Loading & Error Overlays ===== */

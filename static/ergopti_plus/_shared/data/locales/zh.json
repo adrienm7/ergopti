@@ -133,6 +133,8 @@
 	"changelog_window.open_github": "View on GitHub ↗",
 	"changelog_window.open_releases_page": "打开发布页面 ↗",
 	"changelog_window.retry": "Retry",
+	"changelog_window.section_changelog": "更新日志",
+	"changelog_window.section_downloads": "下载与安装",
 	"changelog_window.window_title": "版本",
 	"common.browse": "浏览…",
 	"common.cancel": "取消",

@@ -133,6 +133,8 @@
 	"changelog_window.open_github": "View on GitHub ↗",
 	"changelog_window.open_releases_page": "릴리스 페이지 열기 ↗",
 	"changelog_window.retry": "Retry",
+	"changelog_window.section_changelog": "변경 내역",
+	"changelog_window.section_downloads": "다운로드 및 설치",
 	"changelog_window.window_title": "릴리스",
 	"common.browse": "찾아보기…",
 	"common.cancel": "취소",

@@ -133,6 +133,8 @@
 	"changelog_window.open_github": "View on GitHub ↗",
 	"changelog_window.open_releases_page": "فتح صفحة الإصدارات ↗",
 	"changelog_window.retry": "Retry",
+	"changelog_window.section_changelog": "سجل التغييرات",
+	"changelog_window.section_downloads": "التنزيلات والتثبيت",
 	"changelog_window.window_title": "الإصدارات",
 	"common.browse": "استعراض…",
 	"common.cancel": "إلغاء",

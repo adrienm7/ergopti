@@ -133,6 +133,8 @@
 	"changelog_window.open_github": "View on GitHub ↗",
 	"changelog_window.open_releases_page": "Открыть страницу версий ↗",
 	"changelog_window.retry": "Retry",
+	"changelog_window.section_changelog": "Список изменений",
+	"changelog_window.section_downloads": "Загрузки и установка",
 	"changelog_window.window_title": "Версии",
 	"common.browse": "Обзор…",
 	"common.cancel": "Отмена",

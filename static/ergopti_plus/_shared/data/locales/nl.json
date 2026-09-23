@@ -133,6 +133,8 @@
 	"changelog_window.open_github": "View on GitHub ↗",
 	"changelog_window.open_releases_page": "Releasepagina openen ↗",
 	"changelog_window.retry": "Retry",
+	"changelog_window.section_changelog": "Wijzigingslogboek",
+	"changelog_window.section_downloads": "Downloads en installatie",
 	"changelog_window.window_title": "Versies",
 	"common.browse": "Bladeren…",
 	"common.cancel": "Annuleren",
