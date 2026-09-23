@@ -870,12 +870,6 @@ ToggleAllFeatures(Value) {
 		return ReloadPreservingSuspend()
 }
 
-ToggleAllHotstringsOn(*) {
-		ToggleAllHotstrings(1)
-}
-ToggleAllHotstringsOff(*) {
-		ToggleAllHotstrings(0)
-}
 ToggleAllHotstrings(Value) {
 		global CategoryEnabled, ConfigurationFile, Features
 		Bool := (Value = true or Value = 1)

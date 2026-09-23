@@ -166,15 +166,19 @@ initMenu(PublishAuthorizeFn := 0) {
 		"hotstring_extensions",          (*) => _HS_ExtensionRows(),
 	)
 
-	; The two bulk rows were ONE `dynamic` row that expanded to two, so the
-	; manifest described neither. They are two `command` rows now — which is
-	; also how macOS got them: it had no handler for the old id at all.
+	; The bulk rows were ONE `dynamic` row that expanded to two, then two
+	; `command` rows « tout activer » / « tout désactiver ». They are one `check`
+	; row now: ticked when every section is on, and a click switches the whole
+	; tree to the other side. Read once per build, like every tick here.
+	HotstringsAllSectionsOn := _HS_AllHotstringsOn()
 	_HotCommands := Map(
-		"hotstrings_toggle",      MenuRenderer_CategoryGateCommand("Hotstrings"),
-		"hotstrings_enable_all",  ToggleAllHotstringsOn,
-		"hotstrings_disable_all", ToggleAllHotstringsOff,
+		"hotstrings_toggle",       MenuRenderer_CategoryGateCommand("Hotstrings"),
+		"hotstrings_all_sections", (*) => ToggleAllHotstrings(!HotstringsAllSectionsOn),
 	)
-	_HotGetters := Map("hotstrings_enabled", () => IsCategoryGated("Hotstrings"))
+	_HotGetters := Map(
+		"hotstrings_enabled",              () => IsCategoryGated("Hotstrings"),
+		"hotstrings_all_sections_enabled", () => HotstringsAllSectionsOn,
+	)
 
 	_HotGroupBuilders := Map(
 		"hotstrings_params", (*) => MenuRenderer_Build("hotstrings_params_group", "Hotstrings", _HotDynHandlers, "", _HotListProviders, _HotParamCommands, _HotParamGetters),

@@ -130,7 +130,7 @@ local function custom_fixture(outcome, action_kind)
 		helpers.assert_nil(built.action, "the personal parent row must carry no action")
 		action = built.items and built.items[1] and built.items[1].action
 	elseif action_kind == "bulk" then
-		action = find_action(built.items, "menu.hotstrings.enable_all")
+		action = find_action(built.items, "menu.hotstrings.enable_all_sections")
 	else
 		action = find_action(built.items, "TARGET_CUSTOM_SECTION")
 	end

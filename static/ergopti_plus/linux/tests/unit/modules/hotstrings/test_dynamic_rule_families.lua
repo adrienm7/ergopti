@@ -335,9 +335,17 @@ helpers.describe("dynamic rule families: the rows", function()
 		local sub = dynamic_submenu(dh)
 		dh.set_enabled(true)
 
+		-- The first row is the category's own switch, a checkbox since it stopped
+		-- alternating « Activée / Désactivée (cliquer pour …) »: it is the one row
+		-- that must stay clickable, or the category could never come back on.
+		local gate = (sub or {})[1]
+		helpers.assert_true(gate ~= nil and gate.checked == false and not gate.disabled
+			and type(gate.fn) == "function",
+			"the switched-off category's own switch is an unticked, clickable checkbox")
+
 		local seen = 0
-		for _, row in ipairs(sub or {}) do
-			if row.checked ~= nil then
+		for i, row in ipairs(sub or {}) do
+			if i > 1 and row.checked ~= nil then
 				seen = seen + 1
 				helpers.assert_true(row.disabled,
 					"a row that can be clicked under a switched-off category writes a "

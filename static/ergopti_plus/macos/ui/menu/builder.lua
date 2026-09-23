@@ -354,9 +354,9 @@ function M.generate(ctx, menu_mods, actions)
 		local std_groups = collect_groups(non_ergopti_filter, counts)
 		local ergopti_groups_built = collect_groups(ERGOPTI_GROUPS, counts)
 
-		-- One row per language: its native name, then « tout activer » /
-		-- « tout désactiver » for every category of that language, then the
-		-- language's category submenus built exactly like the neutral ones.
+		-- One row per language: its native name, then one « all sections »
+		-- checkbox for every category of that language, then the language's
+		-- category submenus built exactly like the neutral ones.
 		local language_rows = {}
 		for _, pack in ipairs(LANGUAGE_PACKS) do
 			local only = {}
@@ -466,13 +466,13 @@ function M.generate(ctx, menu_mods, actions)
 		local hs_ctx = {}
 		for key, value in pairs(ctx) do hs_ctx[key] = value end
 		hs_ctx.section_label = function(key) return section_labels[key] end
-		-- The two bulk rows are `command` declarations, so the renderer builds the
-		-- row and this driver supplies only the behaviour. Taken from the existing
-		-- builder rather than reimplemented: it owns the section-walk both rows
-		-- perform, and a second copy of that walk is exactly the kind of duplicate
-		-- this migration exists to remove.
-		local bulk_rows = type(menu_mods.hotstrings.build_bulk_actions) == "function"
-			and menu_mods.hotstrings.build_bulk_actions(ctx) or {}
+		-- The « all sections » checkbox is a `check` declaration, so the renderer
+		-- builds the row and this driver supplies only its tick and behaviour.
+		-- Taken from the hotstrings module rather than reimplemented: it owns the
+		-- section walk, and a second copy of that walk is exactly the kind of
+		-- duplicate this migration exists to remove.
+		local all_sections = type(menu_mods.hotstrings.all_sections_switch) == "function"
+			and menu_mods.hotstrings.all_sections_switch(ctx) or nil
 		hs_ctx.commands = {
 			-- The category switch, first row of the submenu. It used to be the
 			-- parent row's `action`, which AppKit never sends for an item that
@@ -485,12 +485,25 @@ function M.generate(ctx, menu_mods, actions)
 				end
 				return toggle_all_hotstrings()
 			end,
-			["hotstrings_enable_all"]  = bulk_rows[1] and bulk_rows[1].action or function() end,
-			["hotstrings_disable_all"] = bulk_rows[2] and bulk_rows[2].action or function() end,
 		}
+		-- Registered only when the module provides it: an unregistered command is
+		-- reported by the renderer and its row is not drawn, where an empty stand-in
+		-- drew a row that did nothing when clicked.
+		if all_sections then
+			hs_ctx.commands["hotstrings_all_sections"] = function()
+				if type(all_sections.action) ~= "function" then
+					Logger.warn(LOG, "All-sections switch refused: the script is paused.")
+					return false
+				end
+				return all_sections.action()
+			end
+		end
 		hs_ctx.state_getters = {}
 		for key, value in pairs(ctx.state_getters or {}) do hs_ctx.state_getters[key] = value end
 		hs_ctx.state_getters["hotstrings_enabled"] = function() return all_enabled end
+		hs_ctx.state_getters["hotstrings_all_sections_enabled"] = function()
+			return all_sections ~= nil and all_sections.checked == true
+		end
 
 		local providers = {
 			["hotstring_categories_standard"] = function() return std_groups end,

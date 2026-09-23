@@ -68,11 +68,12 @@ local CANONICAL_HOTSTRINGS_MENU = {
 	"group:hotstrings_params",
 	-- One `dynamic:hotstring_bulk_actions` row until 2026-08-06, which expanded
 	-- to TWO rows inside each driver — so the manifest described neither, and
-	-- macOS had no handler for the id at all and rendered nothing. Two `command`
-	-- rows now: the renderer builds them, and what this list pins is what the
-	-- user sees rather than a slot whose contents only the drivers knew.
-	"command:hotstrings_enable_all",
-	"command:hotstrings_disable_all",
+	-- macOS had no handler for the id at all and rendered nothing. Then two
+	-- `command` rows, « tout activer » and « tout désactiver »; one `check` row
+	-- since, ticked when every section is on. The renderer builds it, and what
+	-- this list pins is what the user sees rather than a slot whose contents only
+	-- the drivers knew.
+	"check:hotstrings_all_sections",
 	"---",
 	"section_header:menu.hotstrings.header_common",
 	"list:hotstring_categories_standard",
