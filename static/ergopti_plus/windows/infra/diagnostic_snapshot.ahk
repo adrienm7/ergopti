@@ -215,13 +215,25 @@ DiagSnapshot_ResolveCommit(StartDir := A_ScriptDir, Stamp?) {
 	return Map("commit", "unknown", "source", "unknown")
 }
 
-; The Windows product name and build. ProductName still says "Windows 10" on
-; Windows 11, whose builds start at 22000, so the name is corrected from the
-; build number instead of being reported wrong.
+; Corrects the registry product name from the build number. ProductName still
+; says "Windows 10" on Windows 11, whose builds start at 22000. Pure, so every
+; diagnostic surface (boot line, healthcheck, crash report) answers alike.
+; @param Name {String} Raw ProductName registry value.
+; @param Build {String} Raw CurrentBuildNumber registry value.
+; @returns {String} The product name a user recognises.
+DiagSnapshot_WindowsProductName(Name, Build) {
+	static WINDOWS_11_FIRST_BUILD := 22000
+	if (IsInteger(Build) && Integer(Build) >= WINDOWS_11_FIRST_BUILD)
+		return StrReplace(Name, "Windows 10", "Windows 11")
+	return Name
+}
+
+; The Windows product name and build: the single probe behind the snapshot
+; line, the healthcheck window and the crash report, so the three can never
+; name the same machine differently.
 ; @returns {Map} { os, os_version }
 DiagSnapshot_OsInfo() {
 	static KEY := "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion"
-	static WINDOWS_11_FIRST_BUILD := 22000
 	Info := Map("os", "Windows", "os_version", A_OSVersion)
 	try {
 		Name := RegRead(KEY, "ProductName")
@@ -230,8 +242,7 @@ DiagSnapshot_OsInfo() {
 		try Ubr := RegRead(KEY, "UBR")
 		catch as UbrErr
 			try LoggerDebug("Diagnostics", "Windows update build revision unavailable: {1}.", UbrErr.Message)
-		if (IsInteger(Build) && Integer(Build) >= WINDOWS_11_FIRST_BUILD)
-			Name := StrReplace(Name, "Windows 10", "Windows 11")
+		Name := DiagSnapshot_WindowsProductName(Name, Build)
 		Info["os"] := Name
 		Info["os_version"] := Build . (Ubr != "" ? "." . Ubr : "")
 	} catch as Err {
