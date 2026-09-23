@@ -81,6 +81,7 @@ local KEYSYM_TO_CODE = {
 	-- ctrl+w to close one. Added as the catalogue gained an emit_linux column for
 	-- the two tab actions — the parity test caught them the same commit, which is
 	-- what a table checked against the generated rows is for.
+	-- US positions: parse() moves each letter to where the live layout has it.
 	c         = 46,  -- KEY_C
 	t         = 20,  -- KEY_T
 	v         = 47,  -- KEY_V
@@ -115,8 +116,14 @@ function M.parse(combo)
 	if type(combo) ~= "string" or combo == "" then return nil, "empty combo" end
 
 	local mods, keys = {}, {}
+	local ok_layout, KeyboardLayout = pcall(require, "adapters.keyboard_layout")
 	for part in combo:gmatch("[^+%s]+") do
 		local code = KEYSYM_TO_CODE[part]
+		-- A letter is pressed where the live layout puts it, not where US does:
+		-- ctrl+w as KEY_W is Ctrl+Z (undo) on AZERTY.
+		if code and part:match("^%l$") and ok_layout then
+			code = KeyboardLayout.shortcut_keycode(part, code)
+		end
 		if not code then
 			-- Named, not swallowed. An unmapped key name means the action
 			-- catalogue grew and this table did not, and the symptom would

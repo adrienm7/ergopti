@@ -20,6 +20,7 @@ return {
 	"tests.unit.adapters.test_keyboard_layout_sources",
 	"tests.unit.adapters.test_process_lifecycle",
 	"tests.unit.adapters.test_secure_field_detector",
+	"tests.unit.adapters.test_shortcut_keys_follow_layout",
 	"tests.unit.adapters.test_spawn_args_are_strings",
 	"tests.unit.adapters.test_tray_indicator",
 	"tests.unit.adapters.test_tray_menu_adapter",
