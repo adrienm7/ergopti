@@ -39,20 +39,17 @@ local function resolve_json_decoder()
 	end
 end
 
--- Resolves the absolute path to _shared/data/locales/<code>.json by walking
--- up from this file's location (linux/infra/ → repo root → _shared/).
+-- Resolves _shared/data/locales/<code>.json through infra/paths.lua, the one
+-- resolver that knows both shipped layouts. This used to cut three levels off
+-- this file's own chunk name, which is right only in the checkout and the
+-- tarball: on the .deb and .rpm (/usr/lib/ergopti/infra/locale.lua) it named
+-- /usr/lib/_shared, and from a relative launch ("./infra/locale.lua") it named
+-- nothing. Either way every lookup returned its raw key, so the tray menu and
+-- every notification read "menu.global.reload" instead of text.
 local function resolve_locale_path(code)
-	local src = debug and debug.getinfo and debug.getinfo(1, "S")
-	if src and src.source then
-		local s = src.source
-		if s:sub(1, 1) == "@" or s:sub(1, 1) == "=" then s = s:sub(2) end
-		s = s:gsub("\\", "/")
-		local root = s:match("^(.*)/[^/]+/[^/]+/[^/]+$")
-		if root then
-			return root .. "/_shared/data/locales/" .. code .. ".json"
-		end
-	end
-	return ""
+	local ok, Paths = pcall(require, "infra.paths")
+	if not ok or type(Paths.shared) ~= "function" then return "" end
+	return Paths.shared("data/locales/" .. code .. ".json") or ""
 end
 
 -- Wire the shared module at require-time.
