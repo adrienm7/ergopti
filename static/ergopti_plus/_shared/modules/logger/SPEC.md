@@ -204,6 +204,10 @@ in between, or one whose arguments change. Repeat collapsing does.
   the **formatted body** for `warn` and `error`, so every distinct failure is
   still recorded once. `trace`, `done`, `start` and `success` are never
   collapsed: both halves of a lifecycle pair (§ 1.2) always stay visible.
+- **Transitions.** Lines sharing a template share one streak whatever their
+  arguments. A `debug` or `info` line whose arguments are the news (a state
+  change, a recovery) is therefore passed already formatted, so its text is its
+  key and each distinct change is written when it happens.
 - **Order.** Only lines that § 4.1 let through reach this layer, so a burst is
   reported once, by the dedup summary.
 - **Streaks.** The first occurrence is emitted and opens a streak. Later
