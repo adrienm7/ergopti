@@ -1003,6 +1003,9 @@ _driver_sink = function(line, variant)
 		-- filesystem operation happen after the native worker's exact ACK.
 		local ok, record_or_err, enqueue_err, rejected_record = pcall(
 			LogTransport.enqueue, line, variant)
+		-- A stalled worker sheds DEBUG/TRACE/DONE lines by policy; the transport
+		-- counts them and the recovery WARN reports them, so this is no failure.
+		if ok and record_or_err == false then return end
 		if not ok or type(record_or_err) ~= "table" then
 			_async_sink_state.last_error = tostring(ok and enqueue_err or record_or_err)
 			local pending = _pending_error_notification
@@ -1123,6 +1126,12 @@ function M.start_async_sink(scheduler, transport_overrides)
 		on_delivered = _deliver_async_record,
 		on_rejected = _deliver_async_record,
 		on_failed = function(detail) _on_async_sink_failed(detail, owner) end,
+		-- A stall the worker recovered from is not fatal any more, so it has to
+		-- stay visible in the log it delayed.
+		on_stall_recovered = function(stalled_ms, shed)
+			_log("WARNING", "logger", "Native logger stalled %d ms before acknowledging; "
+				.. "%d DEBUG/TRACE/DONE line(s) were shed meanwhile.", stalled_ms, shed)
+		end,
 	}
 	-- Production supplies none of these. Tests inject only native boundaries that
 	-- cannot exist in the headless Lua process; routing and delivery stay owned by

@@ -13,9 +13,13 @@
 --- 1. enqueue() performs no socket, timer, console, notification, file, or routing call.
 --- 2. start() succeeds only after an authenticated native configure ACK.
 --- 3. At most one bounded batch is in flight; an ACK can never reorder the retained deque.
---- 4. A missing ACK retries the byte-identical batch and never retires the deque head.
+--- 4. A missing ACK retries the byte-identical batch with a bounded backoff and
+---    never retires the deque head.
 --- 5. Every acquired native capability is either released exactly or retained as debt.
 --- 6. No producer line can retain more than one preparation tick's byte budget.
+--- 7. A slow native worker is not a failure: only a whole stall budget without
+---    an exact ACK is. While stalled, DEBUG/TRACE/DONE records beyond a small
+---    backlog are shed and counted, and the recovery is reported once.
 --- ==============================================================================
 
 local M = {}
@@ -25,12 +29,19 @@ local hs = hs
 local PROTOCOL_VERSION = 1
 local LOOPBACK_HOST = "127.0.0.1"
 local PUMP_INTERVAL_SEC = 0.01
-local ACK_RETRY_SEC = 0.50
--- Silence from the worker for this long, retransmitting every ACK_RETRY_SEC,
--- is a dead logger. It was four sends — 1.5 s, the fourth never waited for —
--- and a macOS Intel runner opening the onboarding webview at boot went that
--- long without an ACK from a live worker: the fatal verdict stopped the app.
-local ACK_FAILURE_SEC = 5.0
+-- Native ACK policy. The first resend of an unacknowledged batch keeps the short
+-- retry that recovers a merely lost datagram; each later resend doubles the wait
+-- up to the cap, so a busy worker is not also made to decode a duplicate batch
+-- every half second. Only a batch left unacknowledged for the whole stall
+-- budget is a failure: a Finder copy, a sync tool or App Nap can hold the
+-- worker for seconds, and a four-send limit (about 1.5 s) turned each of those
+-- into a fatal exit. Registry: _shared/modules/timings/constants.toml [logger]
+-- ack_retry_ms, ack_retry_cap_ms and stall_fatal_ms. The logger cannot read the
+-- registry at runtime (infra.timings logs through this transport), so
+-- tools/test/test-logger-scalars-single-source.cjs pins these copies instead.
+local ACK_RETRY_SEC = 0.5
+local ACK_RETRY_CAP_SEC = 4
+local STALL_FATAL_SEC = 30
 local BOOT_CONFIGURE_TIMEOUT_SEC = 0.25
 local DEFAULT_DRAIN_TIMEOUT_SEC = 2.0
 local MAX_DATAGRAM_BYTES = 60000
@@ -47,6 +58,13 @@ local MAX_QUEUED_RECORDS = 8192
 -- TRACE traffic can consume every slot and the first WARNING/ERROR is then the
 -- one record the fail-safe cannot retain.
 local MAX_NONCRITICAL_QUEUED_RECORDS = 7168
+-- While the worker is stalled, DEBUG, TRACE and DONE records are admitted only
+-- while fewer than this many non-critical records are retained; later ones are
+-- counted and dropped. A short stall stays lossless, and a long one at DEBUG
+-- level cannot fill the queue until an INFO line meets the admission ceiling,
+-- whose refusal is a transport failure.
+local MAX_STALLED_SHEDDABLE_QUEUED_RECORDS = 1024
+local SHEDDABLE_VARIANTS = { debug = true, trace = true, done = true }
 local MAX_REJECTED_ERROR_RECORDS = 64
 local MAX_REJECTED_DELIVERIES_PER_TICK = 8
 local MIN_TOKEN_BYTES = 32
@@ -84,6 +102,7 @@ local _batch_record_limit = MAX_BATCH_RECORDS
 local _on_delivered = nil
 local _on_rejected = nil
 local _on_ready = nil
+local _on_stall_recovered = nil
 local _clock = nil
 local _queue = {}
 local _queue_head = 1
@@ -104,6 +123,16 @@ local _drain_error = nil
 local _delivery_active = false
 local _diagnostics = { generation = 0 }
 local _retired_failure = nil
+-- First send time of the batch that missed its first ACK deadline, nil while
+-- the worker keeps up. enqueue() reads it to shed; only the pump sets it.
+local _stalled_since = nil
+local _stall_shed = 0
+local _stall_shed_total = 0
+local _stalls_recovered = 0
+local _pending_recovery = nil
+-- Monotonic time of the previous pump tick, to recognise a tick that follows a
+-- frozen run loop (see report_exhausted_stall_budget).
+local _last_pump_at = nil
 
 local function queue_count()
 	if _queue_tail < _queue_head then return 0 end
@@ -356,6 +385,17 @@ local function handle_response(data, sockaddr)
 	local batch = _inflight
 	for _ = 1, #(batch.completed_items or {}) do queue_pop() end
 	_inflight = nil
+	if _stalled_since ~= nil then
+		-- The worker answered after a stall. Its report is user code, so it is
+		-- handed to the pump like every other callback rather than run here.
+		local pending = _pending_recovery or { stalled_sec = 0, shed = 0 }
+		pending.stalled_sec = pending.stalled_sec + math.max(0, now() - _stalled_since)
+		pending.shed = pending.shed + _stall_shed
+		_pending_recovery = pending
+		_stalled_since = nil
+		_stall_shed = 0
+		_stalls_recovered = _stalls_recovered + 1
+	end
 	if type(_on_delivered) == "function" then
 		with_delivery_lease(function()
 			for _, delivery_record in ipairs(batch.deliveries or {}) do
@@ -778,20 +818,78 @@ local function build_next_batch()
 	}
 end
 
+--- Returns how long to wait for an ACK after the given number of sends.
+--- @param sends integer|nil Accepted sends of the retained batch so far.
+--- @return number seconds
+local function resend_interval(sends)
+	local doublings = math.max(0, (tonumber(sends) or 0) - 1)
+	return math.min(ACK_RETRY_SEC * (2 ^ doublings), ACK_RETRY_CAP_SEC)
+end
+
+--- Reports, once, a retained batch that stayed unacknowledged for the whole
+--- stall budget. Measured from its first send: resends are not progress.
+--- @param at number Monotonic time of this pump tick.
+--- @param run_loop_live boolean Whether the previous tick ran shortly before.
+local function report_exhausted_stall_budget(at, run_loop_live)
+	local batch = _inflight
+	if type(batch) ~= "table" or batch.failure_reported == true
+		or type(batch.first_sent_at) ~= "number" then return end
+	if at - batch.first_sent_at < STALL_FATAL_SEC then return end
+	-- After a frozen run loop this timer can fire before the socket callback
+	-- that holds the awaited ACK; the next live tick gives the verdict.
+	if not run_loop_live then return end
+	batch.failure_reported = true
+	set_error(string.format(
+		"native logger did not ACK retained sequence %d within the %d ms stall budget (%d sends)",
+		batch.sequence,
+		math.floor(STALL_FATAL_SEC * 1000 + 0.5),
+		batch.attempts or 0
+	), true)
+end
+
+--- Hands a finished stall to its observer from the pump, never from the socket
+--- callback, so the report (a WARN line) is ordinary timer-owned producer work.
+local function deliver_stall_recovery()
+	local recovery = _pending_recovery
+	if recovery == nil then return end
+	_pending_recovery = nil
+	if type(_on_stall_recovered) ~= "function" then return end
+	with_delivery_lease(function()
+		local ok, callback_err = xpcall(
+			_on_stall_recovered,
+			debug.traceback,
+			math.floor(recovery.stalled_sec * 1000 + 0.5),
+			recovery.shed
+		)
+		if not ok then set_error("stall recovery callback failed: " .. error_text(callback_err)) end
+	end)
+end
+
 local function pump(owner)
 	if owner ~= _diagnostics then return end
 	if _delivery_active then return end
 	if not _active or _socket == nil then return end
+	local tick_at = now()
+	local run_loop_live = _last_pump_at ~= nil and (tick_at - _last_pump_at) <= ACK_RETRY_SEC
+	_last_pump_at = tick_at
 	invoke_failure_callback(owner)
 	if owner ~= _diagnostics or not _active then return end
 	deliver_rejected_errors()
+	deliver_stall_recovery()
 	finish_drain_if_ready()
 	if owner ~= _diagnostics then return end
 	if not _active or type(_drain_callback) ~= "function"
 		and queue_count() == 0 and rejected_error_count() == 0 then return end
 
 	if _inflight ~= nil then
-		if _inflight.sent_at ~= nil and (now() - _inflight.sent_at) < ACK_RETRY_SEC then return end
+		local sent_at = _inflight.sent_at
+		if sent_at ~= nil and (tick_at - sent_at) < resend_interval(_inflight.attempts) then
+			report_exhausted_stall_budget(tick_at, run_loop_live)
+			return
+		end
+		-- The retained batch missed its ACK deadline: the worker is stalled
+		-- until an exact ACK arrives, and low-importance producers shed.
+		if _stalled_since == nil then _stalled_since = _inflight.first_sent_at or tick_at end
 	else
 		if queue_peek() == nil then
 			finish_drain_if_ready()
@@ -811,22 +909,13 @@ local function pump(owner)
 		_inflight.sequence
 	)
 	_inflight.sent_at = now()
+	if _inflight.first_sent_at == nil then _inflight.first_sent_at = _inflight.sent_at end
 	if not ok or sent_or_err == nil or sent_or_err == false then
 		set_error("UDP send was refused: " .. tostring(sent_or_err), true)
 		return
 	end
 	_inflight.attempts = (_inflight.attempts or 0) + 1
-	_inflight.first_sent_at = _inflight.first_sent_at or _inflight.sent_at
-	local silent_sec = _inflight.sent_at - _inflight.first_sent_at
-	if silent_sec >= ACK_FAILURE_SEC and _inflight.failure_reported ~= true then
-		_inflight.failure_reported = true
-		set_error(string.format(
-			"native logger did not ACK retained sequence %d in %.1f s (%d sends)",
-			_inflight.sequence,
-			silent_sec,
-			_inflight.attempts
-		), true)
-	end
+	report_exhausted_stall_budget(_inflight.sent_at, run_loop_live)
 end
 
 local function pump_boundary(owner)
@@ -1105,6 +1194,7 @@ function M.start(options)
 	_on_delivered = options.on_delivered
 	_on_rejected = options.on_rejected
 	_on_ready = options.on_ready
+	_on_stall_recovered = options.on_stall_recovered
 	if type(options.clock) == "function" then
 		_clock = options.clock
 	elseif type(options.scheduler.now_ns) == "function" then
@@ -1182,6 +1272,12 @@ function M.start(options)
 	_dropped_critical = 0
 	_dropped_by_variant = {}
 	_rejected_error_overflow = 0
+	_stalled_since = nil
+	_stall_shed = 0
+	_stall_shed_total = 0
+	_stalls_recovered = 0
+	_pending_recovery = nil
+	_last_pump_at = nil
 	_active = true
 	_accepting = true
 	_configured = true
@@ -1197,7 +1293,9 @@ end
 --- Enqueues one immutable producer record without crossing an async boundary.
 --- @param line string Fully formatted canonical line.
 --- @param variant string Shared-core variant name.
---- @return table|nil record Retained producer, used for post-delivery metadata.
+--- @return table|false|nil record Retained producer, used for post-delivery
+---   metadata; false when a stall shed this low-importance record by policy;
+---   nil on refusal.
 --- @return string|nil error_message
 --- @return table|nil rejected_record Bounded ERROR fallback retained for timer delivery.
 function M.enqueue(line, variant)
@@ -1207,6 +1305,14 @@ function M.enqueue(line, variant)
 	variant = variant:lower()
 	if ACCEPTED_VARIANTS[variant] ~= true then return nil, "variant is not canonical" end
 	local critical = variant == "warn" or variant == "error"
+	if _stalled_since ~= nil and SHEDDABLE_VARIANTS[variant] == true
+		and _queued_noncritical >= MAX_STALLED_SHEDDABLE_QUEUED_RECORDS then
+		-- A policy decision, not a failure: counted, reported on recovery, and
+		-- never recorded as the transport's error.
+		_stall_shed = _stall_shed + 1
+		_stall_shed_total = _stall_shed_total + 1
+		return false, "native logger is stalled; low-importance record shed"
+	end
 	if #line > MAX_ENQUEUED_LINE_BYTES then
 		_dropped_total = _dropped_total + 1
 		if critical then _dropped_critical = _dropped_critical + 1 end
@@ -1313,6 +1419,10 @@ function M.stop()
 	_scheduler = nil
 	_inflight = nil
 	_drain_error = nil
+	_stalled_since = nil
+	_stall_shed = 0
+	_pending_recovery = nil
+	_last_pump_at = nil
 	return true
 end
 
@@ -1332,6 +1442,13 @@ function M.status()
 		rejected_error_fallback_queued = rejected_error_count(),
 		rejected_error_fallback_overflow = _rejected_error_overflow,
 		inflight_sequence = _inflight and _inflight.sequence or nil,
+		inflight_sends = _inflight and _inflight.attempts or nil,
+		stalled = _stalled_since ~= nil,
+		stall_budget_sec = STALL_FATAL_SEC,
+		stalled_sheddable_limit = MAX_STALLED_SHEDDABLE_QUEUED_RECORDS,
+		stall_shed = _stall_shed,
+		stall_shed_total = _stall_shed_total,
+		stalls_recovered = _stalls_recovered,
 		draining = _drain_callback ~= nil,
 		last_error = _diagnostics.last_error,
 		failure_callback_error = _diagnostics.failure_callback_error,

@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Logger Scalars Single-Source Guard
  * DESCRIPTION:
- * Six logger scalars are declared once per driver rather than once. This gate
+ * Nine logger scalars are declared once per driver rather than once. This gate
  * pins every copy to _shared/modules/timings/constants.toml [logger]:
  *
  *   retention_days         14      AHK LOGGER_RETENTION_DAYS · HS max_age_days (×2)
@@ -16,6 +16,9 @@
  *                                  REPEAT_WINDOW_SEC (seconds)
  *   repeat_streak_capacity 64      AHK LOGGER_REPEAT_CAPACITY · shared core
  *                                  REPEAT_CAPACITY
+ *   ack_retry_ms           500     HS log_transport ACK_RETRY_SEC (seconds)
+ *   ack_retry_cap_ms       4000    HS log_transport ACK_RETRY_CAP_SEC (seconds)
+ *   stall_fatal_ms         30000   HS log_transport STALL_FATAL_SEC (seconds)
  *
  * ROOT CAUSE ENCODED — THE DEDUP WINDOW WAS THE BAD ONE:
  * It was not merely duplicated. It existed only as a BARE LITERAL on both
@@ -308,6 +311,55 @@ check(
 	'LOGGER_FLUSH_INTERVAL_MS',
 	/LOGGER_FLUSH_INTERVAL_MS\s*:=\s*(\d+)/g,
 	registry.logger.flush_interval_ms
+);
+
+// ── native transport ACK policy (macOS only) ────────────────────────────────
+//
+// The Windows and Linux sinks write synchronously, so only the macOS transport
+// waits for an acknowledgement. It cannot read the registry at runtime (the
+// registry reader logs through it), so its three copies are pinned here, in
+// seconds. The stall budget is the value that decides whether a slow disk is a
+// crash, so it must also stay above the backoff cap it is measured against.
+
+const transportSeconds = /\s*=\s*(\d+(?:\.\d+)?)/.source;
+check(
+	'macos/adapters/log_transport.lua',
+	'ACK_RETRY_SEC',
+	new RegExp('\\bACK_RETRY_SEC' + transportSeconds, 'g'),
+	registry.logger.ack_retry_ms / 1000,
+	'the transport holds this in SECONDS — the registry value is milliseconds'
+);
+check(
+	'macos/adapters/log_transport.lua',
+	'ACK_RETRY_CAP_SEC',
+	new RegExp('\\bACK_RETRY_CAP_SEC' + transportSeconds, 'g'),
+	registry.logger.ack_retry_cap_ms / 1000,
+	'the transport holds this in SECONDS — the registry value is milliseconds'
+);
+check(
+	'macos/adapters/log_transport.lua',
+	'STALL_FATAL_SEC',
+	new RegExp('\\bSTALL_FATAL_SEC' + transportSeconds, 'g'),
+	registry.logger.stall_fatal_ms / 1000,
+	'the transport holds this in SECONDS — the registry value is milliseconds'
+);
+if (
+	!(registry.logger.ack_retry_ms > 0) ||
+	!(registry.logger.ack_retry_cap_ms >= registry.logger.ack_retry_ms) ||
+	!(registry.logger.stall_fatal_ms > registry.logger.ack_retry_cap_ms)
+) {
+	errors.push(
+		'[logger] ack_retry_ms, ack_retry_cap_ms and stall_fatal_ms must be positive and ordered ' +
+			`(got ${registry.logger.ack_retry_ms}, ${registry.logger.ack_retry_cap_ms}, ` +
+			`${registry.logger.stall_fatal_ms}): a budget shorter than one resend interval ` +
+			'would declare the worker dead before it was ever asked twice.'
+	);
+}
+mustNotDeclare(
+	'macos/adapters/log_transport.lua',
+	'MAX_ACK_ATTEMPTS_BEFORE_FAILURE',
+	/\bMAX_ACK_ATTEMPTS_BEFORE_FAILURE\s*=\s*\d+/g,
+	'a send count made a 1.5 s disk pause fatal; the stall budget is a duration'
 );
 
 // ── No bare literal may creep back in ───────────────────────────────────────
