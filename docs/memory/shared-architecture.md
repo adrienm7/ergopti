@@ -63,6 +63,15 @@ A shared setting is not automatically supported by every driver. Add explicit
 capability wiring and parity tests rather than inferring support from schema
 presence.
 
+### project-a-row-that-opens-a-submenu-is-never-clicked
+
+No tray fires the action of a row that opens a submenu: AppKit never sends it,
+appindicator binds `fn` only on leaves, and Win32 sends no command. A category
+switch is therefore the manifest `toggle` row, the first row of its submenu,
+and every driver that shows it registers its command. Both renderers report a
+missing toggle command and a provider row carrying `action` plus a subtree as
+errors; `test-menu-toggle-registered.cjs` pins the registrations.
+
 ### project-two-keys-for-one-row-is-two-menus
 
 Two manifest keys that describe one visible row create two sources of truth.

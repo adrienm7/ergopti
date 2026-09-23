@@ -320,6 +320,12 @@ _MR_ReportDriverDialect(Row, ListId) {
 	if (Row.Has("fn") and !Row.Has("action")) {
 		try LoggerError("MenuRenderer", "List '{1}' row '{2}' carries 'fn' — a provider row says 'action', so the row does nothing when clicked.", ListId, Named)
 	}
+	; A Win32 item that opens a submenu sends no command, so the subtree wins
+	; below and this action is dropped. Mirrors the shared Lua renderer, where the
+	; same shape left four macOS categories impossible to switch on.
+	if (Row.Has("action") and (Row.Has("items") or Row.Has("submenu"))) {
+		try LoggerError("MenuRenderer", "List '{1}' row '{2}' carries both an 'action' and a subtree — a row that opens a submenu is never clicked, so the action can never run.", ListId, Named)
+	}
 }
 
 ; Turn a list provider's row DATA into AHK menu items.

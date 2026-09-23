@@ -103,6 +103,8 @@ _CTC_EveryToggleRendersAsCheckbox() {
 		Assert(Keys is Array and Keys.Length > 0, Key . " toggle must declare checked_when")
 		for State in [true, false] {
 			Getters := Map()
+			for StateKey in _MR_Get(Item, "disabled_when", [])
+				Getters[StateKey] := () => true
 			for StateKey in Keys
 				Getters[StateKey] := ((S) => () => S)(State)
 			Root[PROBE_KEY] := [Item]
@@ -224,6 +226,30 @@ _CTC_LlmFixture(Enabled) {
 			"Token", "sekret", "Model", "qwen-3.8-27b")])
 }
 
+; A row that opens a submenu never sends a command, so an action on it is dead:
+; the renderer reports it, as the shared Lua renderer does.
+_CTC_ActionOnSubtreeIsReported() {
+	Lines := []
+	LoggerSetTestSink((Line) => Lines.Push(Line))
+	try {
+		Target := Menu()
+		Added := _MR_RenderRows(Target, [
+			Map("label", "Probe parent", "action", (*) => 0, "items", [Map("label", "Probe child")]),
+			Map("label", "Probe leaf", "action", (*) => 0)
+		], "probe_list", 1)
+	} finally {
+		LoggerClearTestSink()
+	}
+	AssertEqual(2, Added, "both rows still render")
+	Found := 0
+	for Line in Lines {
+		if (InStr(Line, "Probe parent") and InStr(Line, "both an 'action' and a subtree"))
+			Found++
+		Assert(!InStr(Line, "Probe leaf"), "a clickable leaf must not be reported: " . Line)
+	}
+	AssertEqual(1, Found, "an action on a row that opens a submenu must be reported as an error")
+}
+
 ; No builder inserts a category switch by hand any more.
 _CTC_NoHandBuiltCategorySwitch() {
 	Src := _StripFullLineComments(_DriverSourceConcat())
@@ -244,3 +270,5 @@ Test("category toggle: IA submenu opens with its checkbox (category-toggle-check
 	_CTC_LlmMenuFirstRowIsCheckbox)
 Test("category toggle: no builder inserts a switch by hand (category-toggle-checkbox)",
 	_CTC_NoHandBuiltCategorySwitch)
+Test("category toggle: an action on a row that opens a submenu is reported (category-toggle-checkbox)",
+	_CTC_ActionOnSubtreeIsReported)

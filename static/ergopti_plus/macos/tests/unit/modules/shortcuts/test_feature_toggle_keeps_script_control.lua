@@ -300,7 +300,13 @@ helpers.describe("menu_shortcuts feature toggle is wired to the binding-only pai
 			decorate_section = function(value) return value end,
 		}
 		package.loaded["ui.menu.menu_utils"] = {}
-		package.loaded["infra.manifest_menu"] = { build = function() return {} end }
+		-- The switch is the command registered for the manifest's shortcuts_toggle
+		-- row, captured where the menu hands it to the renderer.
+		local render_ctx = nil
+		package.loaded["infra.manifest_menu"] = { build = function(_, _, _, _, ctx)
+			render_ctx = ctx
+			return {}
+		end }
 		package.loaded["ui.menu.shortcut_utils"] = {}
 		package.loaded["ui.menu.menu_keyboard_slots"] = { provide_rows = function() return {} end }
 		package.loaded["infra.manifest_reader"] = { default_for = function() return "★" end }
@@ -324,9 +330,12 @@ helpers.describe("menu_shortcuts feature toggle is wired to the binding-only pai
 			state_getters = {},
 		})
 
-		helpers.assert_eq(item.action(), true)
+		helpers.assert_nil(item.action, "the Shortcuts parent opens a submenu and must carry no action")
+		local toggle = render_ctx and render_ctx.commands and render_ctx.commands["shortcuts_toggle"]
+		helpers.assert_type(toggle, "function")
+		helpers.assert_eq(toggle(), true)
 		helpers.assert_eq(state.shortcuts, false)
-		helpers.assert_eq(item.action(), true)
+		helpers.assert_eq(toggle(), true)
 		helpers.assert_eq(state.shortcuts, true)
 		helpers.assert_eq(calls.pause, 1)
 		helpers.assert_eq(calls.resume, 1)

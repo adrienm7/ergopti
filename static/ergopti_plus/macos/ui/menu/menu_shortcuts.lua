@@ -479,42 +479,54 @@ function M.build(ctx)
 		return true
 	end
 
-	local item = {
-		label   = i18n.get("menu.shortcuts.title"),
-		checked = state.shortcuts or nil,
-		-- Pause owns the bindings axis until resume: pause_all() snapshots
-		-- is_bindings_started() and resume_all() restores from that snapshot, so a
-		-- toggle made mid-pause is silently discarded at resume — and enabling would
-		-- bind every hotkey while « tout est éteint ». Gate it like the wrap-symbols
-		-- submenu above, which is pause-gated for exactly this reason. `checked` is
-		-- deliberately left alone: it must keep reporting the stored preference.
-		disabled = paused or nil,
-		action   = (not paused) and function()
-			if settle_shortcut_toggle_debt() ~= true then return false end
-			local previous = state.shortcuts == true
-			local desired = not previous
-			-- Toggle ONLY the user-facing bindings + keyboard shortcuts. We must NOT
-			-- call shortcuts.start/stop here: stop() also tears down the script-control
-			-- eventtap (AltGr+Enter/Backspace/Escape pause/reload/quit) and start() is a
-			-- Bindings-only proxy that never revives it, so the feature toggle would
-			-- permanently kill the panic shortcuts. resume_bindings/pause_bindings are
-			-- the symmetric pair that leave the script-control tap untouched.
-			if commit_shortcuts_runtime(desired, previous) ~= true then return false end
-			state.shortcuts = desired
-			local save_ok, save_result = xpcall(ctx.save_prefs, debug.traceback)
-			if not save_ok or save_result ~= true then
-				state.shortcuts = previous
-				if apply_shortcut_posture(previous, "preference rollback") ~= true then
-					shortcut_toggle_debt = { restore_enabled = previous }
-				end
-				Logger.error(LOG, "Shortcut preference publication did not commit: %s.",
-					tostring(save_result))
-				return false
+	--- The category switch: the shortcuts submenu's first row (the manifest's
+	--- shortcuts_toggle). It used to be the parent row's action, which AppKit
+	--- never sends for an item that opens a submenu, so Shortcuts could not be
+	--- switched on from the menu bar at all.
+	---
+	--- Refused while the script is paused. Pause owns the bindings axis until
+	--- resume: pause_all() snapshots is_bindings_started() and resume_all()
+	--- restores from that snapshot, so a toggle made mid-pause is silently
+	--- discarded at resume — and enabling would bind every hotkey while « tout est
+	--- éteint ».
+	--- @return boolean committed
+	local function toggle_shortcuts()
+		if paused then
+			Logger.warn(LOG, "Shortcuts switch refused: the script is paused.")
+			return false
+		end
+		if settle_shortcut_toggle_debt() ~= true then return false end
+		local previous = state.shortcuts == true
+		local desired = not previous
+		-- Toggle ONLY the user-facing bindings + keyboard shortcuts. We must NOT
+		-- call shortcuts.start/stop here: stop() also tears down the script-control
+		-- eventtap (AltGr+Enter/Backspace/Escape pause/reload/quit) and start() is a
+		-- Bindings-only proxy that never revives it, so the feature toggle would
+		-- permanently kill the panic shortcuts. resume_bindings/pause_bindings are
+		-- the symmetric pair that leave the script-control tap untouched.
+		if commit_shortcuts_runtime(desired, previous) ~= true then return false end
+		state.shortcuts = desired
+		local save_ok, save_result = xpcall(ctx.save_prefs, debug.traceback)
+		if not save_ok or save_result ~= true then
+			state.shortcuts = previous
+			if apply_shortcut_posture(previous, "preference rollback") ~= true then
+				shortcut_toggle_debt = { restore_enabled = previous }
 			end
-			ctx.notify_feature(i18n.get("menu.shortcuts.title"), state.shortcuts)
-			ctx.updateMenu()
-			return true
-		end,
+			Logger.error(LOG, "Shortcut preference publication did not commit: %s.",
+				tostring(save_result))
+			return false
+		end
+		ctx.notify_feature(i18n.get("menu.shortcuts.title"), state.shortcuts)
+		ctx.updateMenu()
+		return true
+	end
+
+	-- The parent carries the stored preference as its tick and is greyed while
+	-- paused; it has no action, since a row that opens a submenu is never clicked.
+	local item = {
+		label    = i18n.get("menu.shortcuts.title"),
+		checked  = state.shortcuts or nil,
+		disabled = paused or nil,
 	}
 
 
@@ -842,16 +854,14 @@ function M.build(ctx)
 		["extensions_shortcuts"] = extension_shortcut_rows,
 	}
 
-	-- The category gate's state key. This driver registers no command for that
-	-- row — its tray PARENT carries the toggle, which hs.menubar can bind and the
-	-- Linux tray cannot — so the renderer builds nothing here and this getter is
-	-- never read. It is named anyway: the declaration promises the key to every
-	-- platform the row is visible on, and a key with no getter is an ERROR at
-	-- render time rather than a silently wrong row.
+	-- The category switch is the manifest's first row, drawn by the renderer from
+	-- this command and the state getter below. A tray parent cannot carry it:
+	-- AppKit never sends the action of an item that opens a submenu.
 	local sc_ctx = {}
 	for key, value in pairs(ctx) do sc_ctx[key] = value end
 	sc_ctx.commands = {}
 	for key, value in pairs(ctx.commands or {}) do sc_ctx.commands[key] = value end
+	sc_ctx.commands["shortcuts_toggle"] = toggle_shortcuts
 	sc_ctx.commands["edit_shortcuts"] = cmd_edit_shortcuts
 	sc_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do sc_ctx.state_getters[key] = value end

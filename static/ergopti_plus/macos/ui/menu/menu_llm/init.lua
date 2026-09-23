@@ -1245,10 +1245,21 @@ local function create_menu(deps)
 				-- action, so the checked parent row alone left no way to switch the
 				-- suggestions on: the manifest's `llm_toggle` row is registered below and
 				-- drawn inside the submenu, as on Windows and Linux.
-				local toggle_action = not paused
+				--
+				-- Always registered. While paused, or before the activation owner
+				-- exists, the switch cannot run its transaction: the row is greyed
+				-- through the declared `llm_toggle_ready` key and a click is refused
+				-- with a log line, rather than the row vanishing from the submenu.
+				local toggle_ready = not paused
 					and activation_requirement_owner ~= nil
 					and type(models_mgr.pause_requirements) == "function"
-					and activation_controller.is_registered() and function()
+					and activation_controller.is_registered()
+				local function refuse_toggle()
+						Logger.warn(LOG, "IA switch refused: %s.", paused and "the script is paused"
+							or "the activation owner is not ready")
+						return false
+				end
+				local toggle_action = toggle_ready and function()
 						activation_generation = activation_generation + 1
 						local my_generation = activation_generation
 						local activation_backend = state.llm_backend
@@ -1549,7 +1560,7 @@ local function create_menu(deps)
 						if commit_enabled(false) ~= true then return false end
 						publish_toggle()
 						return true
-				end or nil
+				end or refuse_toggle
 
 				local main_menu = {}
 				do
@@ -1570,11 +1581,12 @@ local function create_menu(deps)
 												end
 										end
 								end
-								-- No command while paused or before the activation owner exists:
-								-- the renderer then draws no gate rather than one that does nothing.
 								local render_ctx = {
-										commands      = { llm_toggle = toggle_action },
-										state_getters = { llm_enabled = function() return state.llm_enabled == true end },
+										commands      = { ["llm_toggle"] = toggle_action },
+										state_getters = {
+												llm_enabled      = function() return state.llm_enabled == true end,
+												llm_toggle_ready = function() return toggle_ready == true end,
+										},
 								}
 								main_menu = ManifestMenu.build("llm_menu", "LLM", handlers, nil, render_ctx, {}) or {}
 						else
@@ -1582,10 +1594,11 @@ local function create_menu(deps)
 						end
 				end
 
+				-- The tick mirrors the switch; the parent has no action, since a row
+				-- that opens a submenu is never clicked.
 				return {
 						label   = i18n.get("menu.llm.title"),
 						checked = state.llm_enabled or nil,
-						action  = toggle_action,
 						submenu = main_menu
 				}
 		end

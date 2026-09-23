@@ -2466,6 +2466,7 @@
 	"platform_reason.llm_lists_are_inline_on_linux": "Linux 전용: 이 드라이버는 모델과 두 가지 생성 설정을 메뉴에 바로 나열합니다. macOS와 Windows는 같은 선택지를 하위 메뉴 항목 뒤에 두며, 이는 위의 각자 항목이 선언합니다.",
 	"platform_reason.selection_operations_are_a_block_on_linux": "Linux 전용: 이 드라이버는 선택 영역 관련 작업 — CapsWord, 대소문자 변환, 단어나 줄 선택, 서식 없이 붙여넣기 — 을 한 묶음으로 둡니다. macOS는 같은 작업에 Ctrl 단축키로, Windows는 자체 키 조합으로 접근하므로, 공용 항목을 두면 그쪽에서 두 번 나열됩니다.",
 	"platform_reason.layout_bundle_and_menubar_are_macos": "macOS 전용: 이 항목들은 시스템의 입력 소스 메커니즘을 통해 .bundle 키보드 레이아웃을 사용자 범위와 시스템 범위로 설치하고, 메뉴 막대 아이콘을 고릅니다. Windows는 자체 설치 프로그램으로 .klc를 설치하고 Linux는 XKB 레이아웃을 생성하며, 둘 다 메뉴 막대가 없습니다.",
+	"platform_reason.layout_emulation_is_windows_only": "Windows 전용: 이 드라이버는 Ergopti 레이아웃을 직접 에뮬레이션하므로 끌 수 있는 에뮬레이션이 있습니다. macOS는 레이아웃을 시스템 입력 소스로 설치하고 Linux는 kanata로 키보드를 다시 매핑하므로 그쪽에는 끌 것이 없습니다.",
 	"platform_reason.remap_engine_is_per_driver": "각 드라이버는 서로 다른 엔진으로 키보드를 다시 매핑합니다 — Windows는 자체 탭홀드 계층, macOS는 Karabiner-Elements, Linux는 자체 데몬 안의 탭홀드 엔진. 그래서 각자 자신이 돌리는 엔진의 메뉴만 갖고 있으며, 다른 엔진을 설정할 수는 없습니다.",
 	"platform_reason.debug_surface_is_each_drivers_own": "각 드라이버는 자신의 런타임으로 디버깅합니다. AutoHotkey는 Window Spy와 변수 목록, 키 기록을 제공하고 Hammerspoon은 Lua 콘솔을 제공합니다. 다른 런타임에는 열 만한 대응물이 없습니다.",
 	"platform_reason.chord_families_are_each_platforms": "드라이버가 묶는 조합 계열은 그 플랫폼의 것입니다. Windows는 AltGr과 CapsLock 조합을 묶고 개인 단축키 파일을 두며, macOS는 Ctrl과 Cmd 단축키를 묶습니다. 각 드라이버는 자신이 묶는 계열만 나열합니다.",

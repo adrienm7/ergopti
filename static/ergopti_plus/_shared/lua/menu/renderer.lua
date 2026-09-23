@@ -271,6 +271,15 @@ function M.new(deps)
 			Logger.error(LOG, "List '%s' row '%s' carries `fn` — a provider row says `action`, so the row does "
 				.. "nothing when clicked.", tostring(list_id), named)
 		end
+		-- A row that opens a submenu is never clicked: AppKit sends no action for
+		-- it and neither appindicator nor Win32 binds one. The subtree wins below,
+		-- so this action is dropped — which is how Gestures, Shortcuts, Metrics
+		-- and the Hotstrings master became impossible to switch on from the macOS
+		-- menu bar while their switch sat on the parent row.
+		if row.action ~= nil and (row.items ~= nil or row.submenu ~= nil) then
+			Logger.error(LOG, "List '%s' row '%s' carries both an `action` and a subtree — a row that opens a "
+				.. "submenu is never clicked, so the action can never run.", tostring(list_id), named)
+		end
 	end
 
 	--- Returns true when a menu item table is a separator.
@@ -474,8 +483,11 @@ function M.new(deps)
 				if i18n_key == "" then
 					Logger.warn(LOG, "'toggle' item in '%s' declares no i18n — skipped.", manifest_key)
 				elseif type(fn) ~= "function" then
-					Logger.debug(LOG, "No command '%s' for the '%s' toggle — row skipped.",
-						tostring(cmd_id), manifest_key)
+					-- An ERROR, not a note: the submenu is shown without its switch, so
+					-- the category cannot be turned on from the tray. This was a DEBUG
+					-- line on the premise that a tray parent can toggle instead; none can.
+					Logger.error(LOG, "No command '%s' for the '%s' category switch — its submenu has no way to "
+						.. "turn it on or off.", tostring(cmd_id), manifest_key)
 				else
 					flush_sep()
 					table.insert(result, {

@@ -474,9 +474,23 @@ function M.generate(ctx, menu_mods, actions)
 		local bulk_rows = type(menu_mods.hotstrings.build_bulk_actions) == "function"
 			and menu_mods.hotstrings.build_bulk_actions(ctx) or {}
 		hs_ctx.commands = {
+			-- The category switch, first row of the submenu. It used to be the
+			-- parent row's `action`, which AppKit never sends for an item that
+			-- opens a submenu, so the Hotstrings master could not be switched from
+			-- the menu bar at all.
+			["hotstrings_toggle"]      = function()
+				if ctx.paused then
+					Logger.warn(LOG, "Hotstrings switch refused: the script is paused.")
+					return false
+				end
+				return toggle_all_hotstrings()
+			end,
 			["hotstrings_enable_all"]  = bulk_rows[1] and bulk_rows[1].action or function() end,
 			["hotstrings_disable_all"] = bulk_rows[2] and bulk_rows[2].action or function() end,
 		}
+		hs_ctx.state_getters = {}
+		for key, value in pairs(ctx.state_getters or {}) do hs_ctx.state_getters[key] = value end
+		hs_ctx.state_getters["hotstrings_enabled"] = function() return all_enabled end
 
 		local providers = {
 			["hotstring_categories_standard"] = function() return std_groups end,
@@ -527,11 +541,12 @@ function M.generate(ctx, menu_mods, actions)
 			or  hotstrings_label
 
 		if #hotstrings_menu > 0 then
+			-- The tick mirrors the switch; the switch itself is the submenu's first
+			-- row, since a row that opens a submenu is never clicked.
 			table.insert(items, {
 				label = hotstrings_title,
 				submenu = hotstrings_menu,
 				checked = all_enabled or nil,
-				action = not ctx.paused and toggle_all_hotstrings or nil
 			})
 		else
 			Logger.warn(LOG, "Hotstrings submenu is empty — ignored.")
