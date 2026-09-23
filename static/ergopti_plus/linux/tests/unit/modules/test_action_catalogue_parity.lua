@@ -281,4 +281,27 @@ helpers.describe("gesture assignment validation (Linux)", function()
 		helpers.assert_true(M.set_action("tap_3", "none"), "none clears a binding")
 	end)
 
+	helpers.it("ignores an unknown id found in config.toml, loudly", function()
+		-- set_action refuses such an id, so config.toml can only carry one from a
+		-- hand edit or another OS. The loader used to bind it anyway, and the
+		-- gesture then dispatched a no-op every time it fired.
+		local path = os.tmpname()
+		local fh = assert(io.open(path, "w"))
+		fh:write('[gestures]\ntap_3 = "no_such_action"\ntap_4 = "enter"\n')
+		fh:close()
+		local M, warnings = recording_manager()
+		local ok, err = pcall(function()
+			M.init({ enabled = false, persist = true, config_path = path })
+			helpers.assert_eq(M.get_action("tap_4"), "enter", "a catalogue id still loads")
+			helpers.assert_eq(M.get_action("tap_3"), "none", "an unknown id must not be bound")
+		end)
+		os.remove(path)
+		if not ok then error(err, 0) end
+		local named = false
+		for _, message in ipairs(warnings) do
+			named = named or message:find("no_such_action", 1, true) ~= nil
+		end
+		helpers.assert_true(named, "the ignored id must be named in a warning")
+	end)
+
 end)
