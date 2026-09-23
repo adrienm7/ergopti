@@ -354,6 +354,7 @@ contract. Both drivers are free to keep or remove them independently.
 | Coloured console output        | ✗   | ✓   | `hs.console.printStyledText()` with per-variant RGB colour          |
 | DEBUG-axis indentation         | ✗   | ✓   | 10-space prefix on DEBUG / TRACE / DONE lines in console            |
 | Error notification callback    | ✗   | ✓   | Optional handler passed to `set_error_notification_handler()`       |
+| Stall-tolerant ACK transport   | ✗   | ✓   | Fatal after `stall_fatal_ms` without ACK; sheds DEBUG while stalled |
 | `pcall` wrapper                | ✗   | ✓   | `Logger.pcall(module, fn, ...)` — wraps pcall with error logging    |
 | `build` wrapper                | ✗   | ✓   | `Logger.build(module, label, fn, ctx)` — builder with error logging |
 

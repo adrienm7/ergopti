@@ -21,7 +21,8 @@ local function load_policy_logger()
 	return require("infra.logger")
 end
 
-local function load_fixture()
+local function load_fixture(config)
+	config = config or {}
 	local hs_stub = require("tests.stubs.hs")
 	hs_stub.__reset()
 	_G.hs = hs_stub
@@ -104,6 +105,7 @@ local function load_fixture()
 		token = token,
 		max_batch_records = 1,
 		bootstrap_socket_factory = bootstrap_socket_factory,
+		clock = config.clock,
 	})
 	helpers.assert_true(ready, "the fake transport must commit: " .. tostring(ready_err))
 	helpers.assert_eq(#bootstrap_requests, 1,
@@ -155,9 +157,10 @@ end
 
 --- Runs the real asynchronous logger fixture and all its callback assertions.
 --- @param callback function Receives the ready fixture.
+--- @param config table|nil Optional `clock` function (seconds) for the transport.
 --- @return ... Callback results.
-function M.with_fixture(callback)
-	return M.with_scope(function() return callback(load_fixture()) end)
+function M.with_fixture(callback, config)
+	return M.with_scope(function() return callback(load_fixture(config)) end)
 end
 
 --- Runs a fresh real logger for boot-policy assertions.
