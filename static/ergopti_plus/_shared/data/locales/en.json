@@ -791,6 +791,7 @@
 	"layout.ergoptiplus": "Apply the minor AltGr changes of Ergopti➕",
 	"layout.ctrlmagicsave": "Ctrl+★ sends Ctrl+S",
 	"menu.layout.emulated_layout": "Emulated custom layout",
+	"layouts.linux_needs_python": "Converting this layout for Linux needs Python 3.8 or newer (python3). Install it, then try again.",
 	"llm.deps.browser_install_tip": "Download Ollama for Windows from the page just opened in your browser, run the installer, then come back — the connection will be detected automatically.",
 	"llm.deps.done_success": "✅ Ollama ready",
 	"llm.deps.fail_server_not_responding": "Installer exited but the Ollama server is not responding.",

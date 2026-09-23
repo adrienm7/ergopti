@@ -121,7 +121,8 @@ const SHARED_LUA_CLIENT = path.join(SP, '_shared', 'lua', 'layouts', 'registry.l
 check('every registry client reads the URL template and owner/repo from the shared defaults', () => {
 	const platforms = {
 		windows: driverSources(path.join(SP, 'windows'), ['.ahk']),
-		macos: driverSources(path.join(SP, 'macos'), ['.lua'])
+		macos: driverSources(path.join(SP, 'macos'), ['.lua']),
+		linux: driverSources(path.join(SP, 'linux'), ['.lua'])
 	};
 	const shared = driverSources(path.join(SP, '_shared', 'lua'), ['.lua']);
 	const code = (file) => stripComments(fs.readFileSync(file, 'utf8'), path.extname(file)).replace(/\\\\?/g, '/');

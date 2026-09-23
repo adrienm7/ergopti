@@ -52,6 +52,12 @@ const DESTINATION = /(?:\/usr\/lib|\$\{?HOME\}?\/\.local\/lib|\/usr\/share|\/etc
 // Paths built at runtime from a variable, or globs — not statically checkable.
 const NOT_STATIC = /[*?$]|\{|\}/;
 
+// Package folders the Linux build fills from the keyboard-layout tree rather
+// than from the driver tree: the .keylayout converter lands in the driver as
+// linux/xkb_generation/ (tools/test/test-linux-ships-keylayout-converter.cjs).
+// A path under one of them must exist at its layout-tree source instead.
+const FROM_LAYOUT_TREE = ['linux/xkb_generation'];
+
 const errors = [];
 
 if (!fs.existsSync(BUILD_DIR)) {
@@ -92,7 +98,8 @@ for (const name of scripts) {
 			// The keyboard layout tree (static/ergopti/) sits beside the driver tree
 			// and shares its top-level names, so a path under it resolves there.
 			const start = m.index + m[0].length - rel.length;
-			const layoutTree = /(?:^|[^A-Za-z0-9_])ergopti\/$/.test(line.slice(0, start));
+			const layoutTree = /(?:^|[^A-Za-z0-9_])ergopti\/$/.test(line.slice(0, start))
+				|| FROM_LAYOUT_TREE.some((folder) => rel === folder || rel.startsWith(folder + '/'));
 			const base = layoutTree ? LAYOUT_ROOT : SP;
 			if (!fs.existsSync(path.join(base, rel))) {
 				errors.push(

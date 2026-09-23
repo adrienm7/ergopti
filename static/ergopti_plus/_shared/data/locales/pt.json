@@ -796,6 +796,7 @@
 	"layout.ergoptiplus": "Aplicar as alterações menores de AltGr do Ergopti➕",
 	"layout.ctrlmagicsave": "Ctrl+★ envia Ctrl+S",
 	"menu.layout.emulated_layout": "Disposição personalizada emulada",
+	"layouts.linux_needs_python": "Converter esta disposição para Linux requer Python 3.8 ou mais recente (python3). Instale-o e tente novamente.",
 	"llm.deps.browser_install_tip": "Baixe o Ollama para Windows da página aberta no seu navegador, execute o instalador e volte aqui — a conexão será detectada automaticamente.",
 	"llm.deps.done_success": "✅ Ollama pronto",
 	"llm.deps.fail_server_not_responding": "O instalador terminou mas o servidor Ollama não está a responder.",

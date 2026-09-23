@@ -18,14 +18,17 @@ index.json            generated catalogue: id, checksum, size, licence, ...
 One layout is one `.keylayout`, and that file is its only source. Nothing
 derived from it is stored here:
 
-- macOS installs the `.keylayout` as it is;
+- macOS installs the `.keylayout` as it is, in `~/Library/Keyboard Layouts`
+  (`macos/modules/keymap/layout_registry.lua`);
 - Windows (AutoHotkey) parses the `.keylayout` when the layout is loaded or
   changed and emulates it; there is no Windows version of a layout. The
   emulated layout is `[layout] emulated_layout` in `config.toml` (a registry
   id, empty for none); the driver downloads it at boot when its verified copy
   is missing from `<configuration folder>/layouts/`;
 - Linux converts the `.keylayout` to XKB symbols and an XCompose file on the
-  device, with `static/ergopti/linux/xkb_generation`.
+  device (`linux/modules/keymap/layout_registry.lua`), with the converter of
+  `static/ergopti/linux/xkb_generation` that the Linux package ships; it needs
+  python3 (3.8 or newer), like every Linux layout installer of this project.
 
 ## Adding a layout
 
