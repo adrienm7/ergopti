@@ -92,6 +92,9 @@ local function with_subject(initial_action, scenario)
 	end
 	package.loaded["infra.logger"] = logger
 	package.loaded["modules.gestures.actions"] = {
+		-- The transaction under test is independent of which ids exist; the
+		-- catalogue refusal has its own test (test_action_catalogue_parity.lua).
+		is_assignable = function(action_id) return type(action_id) == "string" end,
 		execute_single = function(action_id)
 			fired[#fired + 1] = action_id
 			return true

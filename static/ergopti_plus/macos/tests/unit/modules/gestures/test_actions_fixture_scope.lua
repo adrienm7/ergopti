@@ -37,7 +37,8 @@ helpers.describe("Gesture actions fixture ownership", function()
 					if initial == "false" then sentinel = false end
 					if initial == "existing" then sentinel = {} end
 					for _, name in ipairs({ "modules.gestures.actions", "infra.notifications",
-						"adapters.timer_scheduler", "_generated.gesture_emit_actions", "hs", "hs.timer",
+						"adapters.timer_scheduler", "_generated.gesture_emit_actions",
+						"_generated.action_catalogue", "hs", "hs.timer",
 						"ui.menu.gesture_fixture_unrelated" }) do
 						package.loaded[name] = sentinel
 					end

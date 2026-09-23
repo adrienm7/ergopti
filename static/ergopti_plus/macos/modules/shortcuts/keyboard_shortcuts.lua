@@ -420,6 +420,12 @@ function M.set_action(slot_id, action_id)
 		Logger.error(LOG, "set_action(): both arguments must be strings.")
 		return false
 	end
+	-- The same catalogue check the gesture slots and the Windows driver apply: an
+	-- unknown id would be persisted, bound, and then do nothing on every press.
+	if not GestActions.is_assignable(action_id) then
+		Logger.warn(LOG, "set_action(): refusing unknown action '%s' for slot '%s'.", action_id, slot_id)
+		return false
+	end
 	if _lifecycle_paused == true or _start_attempt ~= nil then return false end
 	local old_action = _actions[slot_id] or "none"
 	if old_action == action_id then return true end

@@ -189,9 +189,21 @@ helpers.describe("gestures.actions: get_label", function()
 		end
 		helpers.assert_true(contains(Actions.SG_NAMES, "ctrl_a"))
 		helpers.assert_true(contains(Actions.SG_NAMES, "cmd_ctrl_option_shift_z"))
-		helpers.assert_true(contains(Actions.SG_NAMES, "#modifier_chords"))
-		helpers.assert_true(contains(Actions.SG_NAMES, "##Raccourcis Ctrl"))
-		helpers.assert_true(contains(Actions.SG_NAMES, "##Raccourcis Cmd + Ctrl + Option + Shift"))
+		-- Headings are built from locale keys; test_action_catalogue_parity.lua
+		-- renders them in two real locales. Here: the H1 comes from its key and
+		-- every chord block opens under a level-2 group heading.
+		local i18n = require("infra.i18n")
+		helpers.assert_true(contains(Actions.SG_NAMES,
+			"#" .. i18n.get("sg_actions.sg_order.header.modifier_chords")))
+		local groups = 0
+		for index, name in ipairs(Actions.SG_NAMES) do
+			if name == "ctrl_a" or name == "cmd_ctrl_option_shift_a" then
+				helpers.assert_eq(Actions.SG_NAMES[index - 1]:sub(1, 2), "##",
+					name .. " must open its modifier group")
+				groups = groups + 1
+			end
+		end
+		helpers.assert_eq(groups, 2)
 	end)
 end)
 

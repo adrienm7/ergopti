@@ -1681,108 +1681,30 @@ sg("open_console",                        function() pcall(hs.openConsole) end)
 -- tools/test/test-action-labels-have-locale-keys.cjs fails if any registered
 -- action lacks a label key in any of the 21 locales.
 
--- Path to the shared actions.toml, resolved through the single shared-tree
--- resolver (Paths.shared) so the shared root lives in exactly one place.
-local _shared_toml = Paths.shared("modules/actions/actions.toml")
 local _modifier_chords_json = Paths.shared("modules/actions/modifier_chords.json")
 
---- Parses the shared actions.toml using a lightweight line-by-line reader.
---- Returns { sg_order = [...], ax_order = [...], sg_actions = {name={platform=...}},
---- ax_actions = {name={platform=...}}, karabiner_aliases = {karabiner_id = shared_id} }
-local function load_shared_actions(path)
-	local result = { sg_order = {}, ax_order = {}, sg_actions = {}, ax_actions = {}, karabiner_aliases = {} }
-	local ok, f = pcall(io.open, path, "r")
-	if not ok or not f then
-		Logger.warn("gestures.actions", "Shared actions TOML not found: %s — using fallback.", tostring(path))
-		return nil
-	end
-
-	local current_section = nil
-	local current_key     = nil
-	local in_array        = false
-	local array_buf       = {}
-	local current_action  = nil  -- e.g. "sg_actions.left_click_toggle"
-
-	for line in f:lines() do
-		local trimmed = line:match("^%s*(.-)%s*$")
-
-		-- Skip blank lines and comments
-		if trimmed == "" or trimmed:sub(1, 1) == "#" then goto continue end
-
-		-- Multi-line array continuation
-		if in_array then
-			if trimmed:sub(1, 1) == "]" then
-				-- End of array
-				if current_section == "sg_order" then
-					result.sg_order = array_buf
-				elseif current_section == "ax_order" then
-					result.ax_order = array_buf
-				end
-				in_array  = false
-				array_buf = {}
-			else
-				-- Collect array items: strip trailing comma and quotes
-				local item = trimmed:match('^"(.-)"')
-				if item then array_buf[#array_buf + 1] = item end
-			end
-			goto continue
-		end
-
-		-- Section header [name] or [name.subkey]
-		local section = trimmed:match("^%[([^%[%]]+)%]$")
-		if section then
-			current_section = section
-			current_action  = nil
-			-- Pre-create entry for known action sections
-			local kind, name = section:match("^(sg_actions)%.(.+)$")
-			if not kind then kind, name = section:match("^(ax_actions)%.(.+)$") end
-			if kind and name then
-				current_action = section
-				result[kind][name] = result[kind][name] or {}
-			end
-			goto continue
-		end
-
-		-- Key = value
-		local key, val = trimmed:match("^([%w_]+)%s*=%s*(.+)$")
-		if key and val then
-			-- Unquote string values
-			local str_val = val:match('^"(.-)"$') or val
-			-- Array opening without closing on same line
-			if val:sub(1, 1) == "[" and not val:find("]", 2, true) then
-				current_key = key
-				in_array    = true
-				array_buf   = {}
-			elseif current_action then
-				-- Store attribute of current [sg_actions.X] or [ax_actions.X]
-				local kind, name = current_action:match("^(sg_actions)%.(.+)$")
-				if not kind then kind, name = current_action:match("^(ax_actions)%.(.+)$") end
-				if kind and name then
-					result[kind][name][key] = str_val
-				end
-			elseif current_section == "karabiner_aliases" then
-				-- A flat id = "target" table, not an action block: without this
-				-- branch the reader silently drops it and the remap picker shows
-				-- the raw Karabiner identifier for every aliased action.
-				result.karabiner_aliases[key] = str_val
-			end
-		end
-
-		::continue::
-	end
-	f:close()
-	return result
+-- The macOS action catalogue, generated from _shared/modules/actions/actions.toml
+-- by tools/codegen/codegen-action-catalogue.cjs and already filtered to this
+-- platform: picker order, heading levels and locale keys, per-action metadata
+-- and the Karabiner aliases. It replaces a hand-written line reader that only
+-- understood `key = "string"` and stored anything else as a raw string without
+-- an error. Missing is a broken install, not an empty picker.
+local ok_catalogue, Catalogue = pcall(require, "_generated.action_catalogue")
+if not ok_catalogue or type(Catalogue) ~= "table" or type(Catalogue.actions) ~= "table"
+	or type(Catalogue.sg_items) ~= "table" or type(Catalogue.ax_items) ~= "table" then
+	error("gestures/actions: _generated/action_catalogue.lua is missing or invalid — "
+		.. "the action picker would be empty. Run `npm run gen`: " .. tostring(Catalogue))
 end
-
-local _shared = load_shared_actions(_shared_toml)
 
 --- Karabiner ids that name an action the catalogue already carries under another
 --- name, as { karabiner_id = shared_id }. The remap picker is indexed on
 --- Karabiner ids, so it resolves a label through this rather than carrying a
 --- second copy of the same translated string in twenty-one locale files.
---- @return table
+--- @return table A copy, so a caller cannot edit the catalogue.
 function M.karabiner_aliases()
-	return (_shared and _shared.karabiner_aliases) or {}
+	local out = {}
+	for alias, target in pairs(Catalogue.karabiner_aliases or {}) do out[alias] = target end
+	return out
 end
 
 local function parameter_key(binding, action)
@@ -1794,8 +1716,8 @@ end
 --- first delimiter would restore the parameter under the wrong binding.
 function M.split_action_parameter_key(key)
 	if type(key) ~= "string" then return nil, nil end
-	for action, meta in pairs((_shared and _shared.sg_actions) or {}) do
-		if type(meta) == "table" and type(meta.parameter) == "string" then
+	for action, meta in pairs(Catalogue.actions) do
+		if type(meta.parameter) == "string" then
 			local suffix = "__" .. action
 			if key:sub(-#suffix) == suffix then return key:sub(1, #key - #suffix), action end
 		end
@@ -1804,7 +1726,7 @@ function M.split_action_parameter_key(key)
 end
 
 function M.get_action_parameter_spec(action)
-	local meta = _shared and _shared.sg_actions and _shared.sg_actions[action]
+	local meta = Catalogue.actions[action]
 	return meta and meta.parameter or nil
 end
 
@@ -1899,146 +1821,81 @@ end
 
 register_modifier_chords(load_modifier_chords(_modifier_chords_json))
 
--- The driver key this build of the catalogue answers to.
-local THIS_PLATFORM = "hs"
-
---- True when a catalogue `platform` field claims this driver.
----
---- The field is "all", one driver key, or a comma-separated list of them. The
---- list form exists because the field could not previously say "two drivers out
---- of three": the two window cyclers ship on macOS and Windows and not on
---- Linux, and both single-value answers were false — "all" put dead rows in the
---- Linux picker, "hs" or "ahk" hid half the feature.
---- @param platform string|nil The declared field, or nil for the "all" default.
---- @return boolean
-local function claims_this_platform(platform)
-	if type(platform) ~= "string" or platform == "" or platform == "all" then return true end
-	for key in platform:gmatch("[^,%s]+") do
-		if key == THIS_PLATFORM then return true end
-	end
-	return false
+--- The translated text of one picker heading. Older header values carry a
+--- leading "#" from when the level was spelled inside the text; the level now
+--- comes only from the catalogue, so the marker is stripped.
+--- @param key string Locale key of the heading.
+--- @return string
+local function heading_text(key)
+	return (i18n.get(key):gsub("^#+", ""))
 end
 
---- Builds a picker-order list from the shared TOML, keeping only entries
---- matching the given platform ("hs") plus sentinels ("--", "#…").
---- The modifier-chord placeholder is expanded from modifier_chords.json.
-local function build_sg_names(shared)
-	if not shared then
-		-- The shared action-order catalogue is unavailable: omit picker entries
-		-- rather than exposing an unsynchronised fallback list.
-		return nil
-	end
-	local out = {}
-	for _, item in ipairs(shared.sg_order) do
-		-- Sentinels and headers always pass through (TOML uses "--" and "#…")
-		if item == "--" then
-			out[#out + 1] = "-"
-		elseif item:sub(1, 1) == "#" then
-			-- Header from TOML: the number of leading "#" encodes the heading
-			-- level ("#grp_input" = h1, "##mouse_nav" = h2). Re-emit with the
-			-- SAME marker so the picker can render the hierarchy. The locale value
-			-- carries a legacy "#" prefix — strip it so the level comes only from
-			-- the TOML marker, not the translated text.
-			local hashes     = item:match("^#+")
-			local key_suffix = item:sub(#hashes + 1)
-			local i18n_key   = "sg_actions.sg_order.header." .. key_suffix
-			local translated = i18n.get(i18n_key)
-			local title      = (translated ~= i18n_key) and translated or key_suffix
-			title            = (title:gsub("^#+", ""))
-			out[#out + 1] = hashes .. title
-		elseif item == "_modifier_chords_placeholder" then
-			for _, group in ipairs(MODIFIER_ACTION_GROUPS) do
-				out[#out + 1] = "##Raccourcis " .. group.label
-				for _, action_id in ipairs(group.actions) do out[#out + 1] = action_id end
-			end
-		elseif item:sub(1, 1) == "_" then
-			-- Driver-specific placeholders are ignored deliberately.
-		else
-			local meta = shared.sg_actions[item]
-			if claims_this_platform(meta and meta.platform) then
-				out[#out + 1] = item
-			end
-		end
-	end
-	return out
-end
-
-local function build_ax_names(shared)
-	if not shared then return nil end
-	-- "none" is the disabled-axis sentinel; always first, never in the TOML order list
-	local out = {"none"}
-	for _, item in ipairs(shared.ax_order) do
-		local meta = shared.ax_actions[item]
-		if claims_this_platform(meta and meta.platform) then
-			out[#out + 1] = item
-		end
-	end
-	return out
-end
-
-M.AX_NAMES = build_ax_names(_shared) or {
-	"none", "char", "char_sel", "words", "words_sel",
-	"line_arrow", "line_sel", "lines", "paragraphs", "line_bounds", "document",
-	"tabs", "windows", "spaces", "volume", "brightness", "tracks",
-}
+--- Ordered axis names for the picker, "none" first (the disabled-axis sentinel
+--- the picker shows as its own row). Only macOS dispatches an axis, so this is
+--- the one catalogue that lists any.
+M.AX_NAMES = { "none" }
+for _, name in ipairs(Catalogue.ax_items) do M.AX_NAMES[#M.AX_NAMES + 1] = name end
 
 -- Static export so callers (script_control, tests) can read SG_NAMES directly
 -- without calling get_sg_names(); mirrors the AX_NAMES pattern above.
--- Built once at module load time using the fallback list when _shared is absent.
 M.SG_NAMES = nil  -- populated below after get_sg_names() is defined
 
---- Returns the ordered list of SG action names with translated section headers.
+--- Returns the ordered SG names with translated section headers: action ids,
+--- and headings as "#" (level 1) or "##" (level 2) followed by their text. The
+--- modifier-chord block expands into one sub-heading per modifier combination,
+--- built from the localized group key and the language-neutral combination
+--- label; it used to be a hardcoded French heading in every locale.
 --- Called at menu-build time so headers always reflect the active locale.
 function M.get_sg_names()
-	local names = build_sg_names(_shared)
-	if names then return names end
-	-- Fallback when the shared TOML could not be loaded
-	local h = function(key) return "#" .. i18n.get(key) end
-	return {
-		"none", "-",
-		h("sg_actions.sg_order.header.mouse_nav"),
-		"left_click_toggle", "right_click_toggle", "lookup",
-		"app_switcher", "app_previous", "app_window_previous",
-		"-", h("sg_actions.sg_order.header.keys"),
-		"enter", "tab", "escape", "backspace", "delete",
-		"-", h("sg_actions.sg_order.header.tabs"),
-		"tab_new", "tab_close", "tab_prev", "tab_next",
-		"-", h("sg_actions.sg_order.header.windows"),
-		"win_prev", "win_next", "close_window", "fullscreen",
-		"snap_left", "snap_right", "maximize",
-		"-", h("sg_actions.sg_order.header.spaces"),
-		"space_prev", "space_next", "mission_control", "app_expose",
-		"-", h("sg_actions.sg_order.header.cursor"),
-		"arrow_up", "arrow_down", "arrow_left", "arrow_right",
-		"word_prev", "word_next",
-		"line_up", "line_down", "line_start", "line_end",
-		"para_prev", "para_next", "doc_start", "doc_end",
-		"-", h("sg_actions.sg_order.header.selection"),
-		"sel_up", "sel_down", "sel_left", "sel_right",
-		"sel_word_prev", "sel_word_next",
-		"-", h("sg_actions.sg_order.header.media"),
-		"vol_up", "vol_down", "mute", "brightness_up", "brightness_down",
-		"track_play", "track_next", "track_prev",
-		"-", h("sg_actions.sg_order.header.screenshot"),
-		"screenshot_window_clipboard", "screenshot_window_save",
-		"screenshot_region_clipboard", "screenshot_region_save",
-		"screenshot_fullscreen_clipboard", "screenshot_fullscreen_save",
-		"-", h("sg_actions.sg_order.header.system"),
-		"lock_screen", "notification_center",
-		"-", h("sg_actions.sg_order.header.ui"),
-		"open_metrics_typing", "open_metrics_apps",
-		"open_hotstrings_editor", "open_paths_editor",
-		"-", h("sg_actions.sg_order.header.files"),
-		"open_script_source", "open_personal_shortcuts",
-		"open_personal_hotstrings", "open_personal_info",
-		"open_config", "open_logs_folder", "open_today_log", "open_error_log",
-		"-", h("sg_actions.sg_order.header.script"),
-		"script_pause_toggle", "script_reload", "script_save_reload", "script_quit",
-		"-", h("sg_actions.sg_order.header.debug"),
-		"open_console",
-		"-", h("sg_actions.sg_order.header.cmd"),
-		"-", h("sg_actions.sg_order.header.cmd_shift"),
-	}
+	local out = {}
+	for _, item in ipairs(Catalogue.sg_items) do
+		if item.kind == "action" then
+			out[#out + 1] = item.id
+		elseif item.kind == "heading" then
+			out[#out + 1] = string.rep("#", item.level) .. heading_text(item.key)
+		elseif item.kind == "modifier_chords" then
+			for _, group in ipairs(MODIFIER_ACTION_GROUPS) do
+				out[#out + 1] = string.rep("#", item.level) .. i18n.format(item.group_key, group.label)
+				for _, action_id in ipairs(group.actions) do out[#out + 1] = action_id end
+			end
+		else
+			error("gestures/actions: unknown catalogue item kind '" .. tostring(item.kind) .. "'.")
+		end
+	end
+	return out
+end
+
+--- Every id a binding may name: the listed single actions (modifier chords
+--- included), the axis actions and "none". Built once — the catalogue and the
+--- chord matrix are fixed for the life of the process.
+local ASSIGNABLE = { none = true }
+for _, item in ipairs(Catalogue.sg_items) do
+	if item.kind == "action" then ASSIGNABLE[item.id] = true end
+end
+for _, group in ipairs(MODIFIER_ACTION_GROUPS) do
+	for _, action_id in ipairs(group.actions) do ASSIGNABLE[action_id] = true end
+end
+for _, name in ipairs(Catalogue.ax_items) do ASSIGNABLE[name] = true end
+
+--- True when `name` is an action the catalogue offers on macOS. Bindings are
+--- validated against this, as Windows validates against its registry, so an id
+--- that no longer exists is refused at assignment instead of being stored and
+--- dispatched as a silent no-op.
+--- @param name any
+--- @return boolean
+function M.is_assignable(name)
+	return type(name) == "string" and ASSIGNABLE[name] == true
+end
+
+--- The ids this driver can actually run, for the catalogue parity test.
+--- @return table { sg = {id...}, ax = {id...} }, each sorted.
+function M.registered_action_ids()
+	local out = { sg = {}, ax = {} }
+	for name in pairs(SG) do out.sg[#out.sg + 1] = name end
+	for name in pairs(AX) do out.ax[#out.ax + 1] = name end
+	table.sort(out.sg)
+	table.sort(out.ax)
+	return out
 end
 
 function M.get_label(name)
@@ -2046,17 +1903,17 @@ function M.get_label(name)
 		return i18n.get("sg_actions.none")
 	end
 	if MODIFIER_ACTION_LABELS[name] then return MODIFIER_ACTION_LABELS[name] end
-	-- Prefer locale JSON so the label is translated for the active language
-	local key_sg = "sg_actions." .. name
-	local s = i18n.get(key_sg)
-	if s ~= key_sg then return s end
-	local key_ax = "ax_actions." .. name
-	local s_ax = i18n.get(key_ax)
-	if s_ax ~= key_ax then return s_ax end
-	-- No hardcoded fallback: an action without a label key is a gate failure
-	-- (test-action-labels-have-locale-keys.cjs), not something to paper over with
-	-- a second copy of the English strings. Returning the id makes the omission
-	-- visible if one ever slips past.
+	-- The label key the generated catalogue declares. An id this platform does
+	-- not offer (a binding written on another OS) still resolves through the
+	-- conventional keys. No hardcoded fallback: an action without a label key is
+	-- a gate failure (test-action-catalogue-codegen.cjs), not something to paper
+	-- over with a second copy of the English strings; the id is shown as-is.
+	local meta = Catalogue.actions[name]
+	local keys = meta and { meta.label_key } or { "sg_actions." .. name, "ax_actions." .. name }
+	for _, key in ipairs(keys) do
+		local s = i18n.get(key)
+		if s ~= key then return s end
+	end
 	return name
 end
 
