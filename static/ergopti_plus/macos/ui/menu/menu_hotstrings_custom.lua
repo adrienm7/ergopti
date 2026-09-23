@@ -127,6 +127,47 @@ local function setGroupSectionsFn(ctx, group_name, enable)
 	end
 end
 
+--- Whether every group of `group_names` is on and every one of its real sections
+--- is on: the tick of an « all sections » checkbox. menu_hotstrings reads it too,
+--- for the category, language and whole-tree checkboxes, so there is one answer
+--- to « is all of this on ». A set with no group is not « all on »: there is
+--- nothing the checkbox could have switched on.
+--- @param ctx table Context.
+--- @param group_names table Array of group names.
+--- @return boolean
+function M.all_sections_on(ctx, group_names)
+	if #group_names == 0 then return false end
+	local km = ctx.keymap
+	local section_on = km and type(km.is_section_enabled) == "function" and km.is_section_enabled or nil
+	for _, name in ipairs(group_names) do
+		if not groupEnabled(ctx, name) then return false end
+		for _, section in ipairs(section_names_for(km, name)) do
+			if not (section_on and section_on(name, section)) then return false end
+		end
+	end
+	return true
+end
+
+--- One checkbox for every section of `group_names`, where a « tout activer » /
+--- « tout désactiver » pair used to be: two rows and two keys for one control,
+--- whose state the user could only guess. Ticked when all of them are on; a click
+--- switches them all to the other side through `set_fn(enable)`, the scope's
+--- batched writer. Greyed and inert while the script is paused, like every
+--- hotstring row.
+--- @param ctx table Context.
+--- @param group_names table Array of group names.
+--- @param set_fn function Returns the writer for one target state.
+--- @return table Provider row.
+function M.all_sections_row(ctx, group_names, set_fn)
+	local all_on = M.all_sections_on(ctx, group_names)
+	return {
+		label    = i18n.get("menu.hotstrings.enable_all_sections"),
+		checked  = all_on,
+		disabled = ctx.paused or nil,
+		action   = not ctx.paused and set_fn(not all_on) or nil,
+	}
+end
+
 local function open_toml_path(path)
 	if type(path) ~= "string" or path == "" then return end
 	DeferredWork.after(0, function()
@@ -384,17 +425,10 @@ function M.build_custom(ctx, counts)
 		end
 		if not has_real then return end
 
-		-- Section-level bulk actions for this personal subgroup.
-		target[#target + 1] = {
-			label    = i18n.get("menu.hotstrings.enable_all"),
-			disabled = paused or nil,
-			action       = not paused and setGroupSectionsFn(ctx, group_name, true) or nil,
-		}
-		target[#target + 1] = {
-			label    = i18n.get("menu.hotstrings.disable_all"),
-			disabled = paused or nil,
-			action       = not paused and setGroupSectionsFn(ctx, group_name, false) or nil,
-		}
+		-- One checkbox for every section of this personal subgroup.
+		target[#target + 1] = M.all_sections_row(ctx, { group_name }, function(enable)
+			return setGroupSectionsFn(ctx, group_name, enable)
+		end)
 		target[#target + 1] = { separator = true }
 
 		for _, sec in ipairs(secs) do
@@ -615,8 +649,10 @@ function M.build_custom(ctx, counts)
 		ctx.notify_feature(base_title, will_enable)
 		ctx.updateMenu()
 	end
+	-- A checkbox with one label: the state is the tick, not the words.
 	table.insert(menu_items, 1, {
-		label    = i18n.get(both_enabled and "menu.hotstrings.category_on" or "menu.hotstrings.category_off"),
+		label    = i18n.get("menu.hotstrings.category_enable"),
+		checked  = both_enabled,
 		disabled = paused or nil,
 		action   = not paused and toggle_personal or nil,
 	})

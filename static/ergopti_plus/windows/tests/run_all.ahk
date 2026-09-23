@@ -158,6 +158,8 @@ global _DefaultLogsDir := _LogsDir
 #Include ../platform/remap/tap_hold_loader.ahk
 #Include ../platform/remap/tap_hold_writer.ahk
 #Include ../ui/menu/menu_taphold.ahk
+; The hotstring gate and « all sections » rows, built over the live Features.
+#Include ../ui/menu/menu_hotstring_switches.ahk
 #Include ../_generated/features_manifest.ahk
 #Include ../infra/manifest_reader.ahk
 ; The dynamic-hotstring module, for its pure helpers (SpacedPrefix, the three
@@ -1080,6 +1082,8 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_manifest_menu_no_double_separator.ahk
 ; Regression: every category switch is a first-row checkbox with one label.
 #Include unit/test_category_toggle_checkbox.ahk
+; Regression: each hotstring « tout activer » / « tout désactiver » pair is one checkbox.
+#Include unit/test_hotstring_bulk_checkboxes.ahk
 ; Regression: Shortcuts submenu block separator and screenshot key label.
 #Include unit/test_shortcuts_menu_blocks.ahk
 #Include unit/test_shortcuts_menu_groups_unique.ahk

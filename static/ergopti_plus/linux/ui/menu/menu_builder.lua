@@ -560,6 +560,52 @@ local function _manifest_hotstring_rows(ctx, config)
 		return (category and category.count) or 0
 	end
 
+	--- Whether every listed category's gate is open and every one of its sections
+	--- is ticked: the state an « all sections » checkbox shows. A list with no
+	--- category is not « all on », since there is nothing the checkbox could have
+	--- switched on.
+	--- @param ids table Array of category ids.
+	--- @return boolean
+	local function sections_all_on(ids)
+		-- The same per-section question the section rows below ask: what the user
+		-- ticked, not what the closed gate makes effective.
+		local section_on = config.is_section_checked or config.is_section_enabled
+		if #ids == 0 or type(config.is_group_enabled) ~= "function" or type(section_on) ~= "function" then
+			return false
+		end
+		for _, id in ipairs(ids) do
+			if not config.is_group_enabled(id) then return false end
+			local category = type(config.get_category) == "function" and config.get_category(id) or nil
+			for name in pairs(category and category.sections or {}) do
+				if not section_on(id, name) then return false end
+			end
+		end
+		return true
+	end
+
+	--- One checkbox for every section of `ids`, where a « tout activer » / « tout
+	--- désactiver » pair used to be: two rows and two keys for one control, whose
+	--- state the user could only guess. Ticked when all of them are on; a click
+	--- switches them all to the other side in one write, and enabling lifts each
+	--- gate (config.set_categories_sections does it).
+	--- @param ids table Array of category ids.
+	--- @return table Provider row.
+	local function all_sections_row(ids)
+		local all_on = sections_all_on(ids)
+		return {
+			label   = i18n_safe("menu.hotstrings.enable_all_sections"),
+			checked = all_on,
+			action  = function()
+				if type(config.set_categories_sections) ~= "function" then
+					Logger.error(LOG, "The hotstrings config has no set_categories_sections — "
+						.. "the « all sections » switch did nothing.")
+					return
+				end
+				config.set_categories_sections(ids, not all_on)
+			end,
+		}
+	end
+
 	--- One category, as a submenu rather than a single toggle.
 	---
 	--- This is where roughly four fifths of the rows the other two drivers show
@@ -576,10 +622,13 @@ local function _manifest_hotstring_rows(ctx, config)
 
 		local sub = {}
 
-		-- The gate first, because everything under it is inert while it is off.
+		-- The gate first, because everything under it is inert while it is off. A
+		-- checkbox with one label: it alternated « ✅ Activée (cliquer pour
+		-- désactiver) » and « ❌ Désactivée (cliquer pour activer) ».
 		sub[#sub + 1] = {
-			label = i18n_safe(on and "menu.hotstrings.category_on" or "menu.hotstrings.category_off"),
-			action    = function()
+			label   = i18n_safe("menu.hotstrings.category_enable"),
+			checked = on and true or false,
+			action  = function()
 				if config.toggle_group then config.toggle_group(id) end
 			end,
 		}
@@ -596,28 +645,11 @@ local function _manifest_hotstring_rows(ctx, config)
 		local sections = category and category.sections_order or {}
 		if #sections > 0 then
 			sub[#sub + 1] = { separator = true }
-			-- enable_all / disable_all, the keys both other drivers use for these two
-			-- rows. Linux said "Tout cocher / Tout décocher" where macOS and Windows
-			-- say "Tout activer / Tout désactiver", in all 21 languages, for the same
-			-- pair of controls.
-			--
-			-- No longer greyed while the category is off, either. Enabling now lifts
-			-- the gate (config.set_all_sections does it), so this is one click from a
-			-- switched-off category to a fully-on one — which is what the other two
-			-- do. Greying it forced the user to find a second control first.
-			sub[#sub + 1] = {
-				label = i18n_safe("menu.hotstrings.enable_all"),
-				action = function()
-					if config.set_all_sections then config.set_all_sections(id, true) end
-				end,
-			}
-			sub[#sub + 1] = {
-				label = i18n_safe("menu.hotstrings.disable_all"),
-				disabled = not on,
-				action = function()
-					if config.set_all_sections then config.set_all_sections(id, false) end
-				end,
-			}
+			-- One checkbox for every section, the key all three drivers use. Not
+			-- greyed while the category is off: enabling lifts the gate, so this is
+			-- one click from a switched-off category to a fully-on one, and the tick
+			-- counts the gate so that click is the enabling one.
+			sub[#sub + 1] = all_sections_row({ id })
 			sub[#sub + 1] = { separator = true }
 
 			for _, name in ipairs(sections) do
@@ -696,24 +728,15 @@ local function _manifest_hotstring_rows(ctx, config)
 	local language_packs = type(config.language_packs) == "function" and config.language_packs() or {}
 	for id in pairs(Languages.groups(language_packs)) do classified[id] = true end
 
-	--- One row per language: its native name, « tout activer » / « tout
-	--- désactiver » for all of its categories, then each category's submenu.
+	--- One row per language: its native name, one « all sections » checkbox for
+	--- all of its categories, then each category's submenu.
 	--- @return table
 	local function language_rows()
 		local rows = {}
 		for _, pack in ipairs(language_packs) do
 			local ids = {}
 			for _, stem in ipairs(pack.categories) do ids[#ids + 1] = Languages.group_id(pack.id, stem) end
-			local items = {}
-			for _, bulk in ipairs({ { key = "enable_all", on = true }, { key = "disable_all", on = false } }) do
-				items[#items + 1] = {
-					label  = i18n_safe("menu.hotstrings." .. bulk.key),
-					action = function()
-						if config.set_categories_sections then config.set_categories_sections(ids, bulk.on) end
-					end,
-				}
-			end
-			items[#items + 1] = { separator = true }
+			local items = { all_sections_row(ids), { separator = true } }
 			local total = 0
 			for _, id in ipairs(ids) do
 				local category = type(config.get_category) == "function" and config.get_category(id) or nil
@@ -730,31 +753,18 @@ local function _manifest_hotstring_rows(ctx, config)
 		return rows
 	end
 
-	--- Flips everything on or off, in one write.
-	---
-	--- This looped `toggle_group` over each category until 2026-08-05, which was
-	--- wrong twice. It never touched the SECTION keys, so a user who had unticked
-	--- sections and then clicked "Tout activer" did not get them back and had to
-	--- walk into every category by hand — the row silently did less than its label
-	--- promised. And each `toggle_group` ends in a full `load_all()`, so one click
-	--- re-parsed the whole catalogue — magickey.toml alone is 305 KB — once per
-	--- category, inside a menu callback, with the tray rebuilt each time.
-	---
-	--- `enable_all` clears the whole `_disabled_groups` set, and that set holds the
-	--- "category.section" keys in the same namespace as the bare category ids —
-	--- which is exactly what makes it the correct answer for both halves.
-	--- @param on boolean
-	--- @return function
-	local function set_all(on)
-		return function()
-			local changed = false
-			if on then
-				if config.enable_all then changed = config.enable_all() end
-			else
-				if config.disable_all then changed = config.disable_all() end
-			end
-			if changed ~= false and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-		end
+	--- Every known category id, sorted: the scope of the whole-tree « all
+	--- sections » checkbox, switched in ONE write. The row it replaced looped
+	--- `toggle_group` until 2026-08-05, which never touched the section keys and
+	--- ended each category in a full `load_all()` — magickey.toml alone is 305 KB —
+	--- inside a menu callback.
+	--- @return table Array of category ids.
+	local function all_category_ids()
+		local ids = {}
+		local categories = type(config.get_categories) == "function" and config.get_categories() or nil
+		for id in pairs(categories or {}) do ids[#ids + 1] = id end
+		table.sort(ids)
+		return ids
 	end
 
 	--- Renders a delay for a menu label: "750 ms", or the infinity sign for 0.
@@ -1158,8 +1168,9 @@ local function _manifest_hotstring_rows(ctx, config)
 
 			local sub = {
 				{
-					label = i18n_safe(on and "menu.hotstrings.category_on" or "menu.hotstrings.category_off"),
-					action    = function()
+					label   = i18n_safe("menu.hotstrings.category_enable"),
+					checked = on and true or false,
+					action  = function()
 						if type(dyn.set_enabled) == "function" then dyn.set_enabled(not on) end
 						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					end,
@@ -1183,23 +1194,28 @@ local function _manifest_hotstring_rows(ctx, config)
 			-- it. This driver simply passed nil for it.
 			local families = type(dyn.rule_families) == "function" and dyn.rule_families() or {}
 			if #families > 0 then
-				-- The two bulk rows the other drivers put at the top of this submenu.
-				-- They act on the families only; the category gate above is separate,
-				-- and "tout désactiver" leaving the category on is the point — it is
-				-- what lets the user switch families back on one at a time.
-				sub[#sub + 1] = { separator = true }
-				for _, bulk in ipairs({ { key = "enable_all", on = true }, { key = "disable_all", on = false } }) do
-					sub[#sub + 1] = {
-						label    = i18n_safe("menu.hotstrings." .. bulk.key),
-						disabled = not on,
-						action       = function()
-							for _, family in ipairs(families) do
-								if family.section then dyn.set_rule_enabled(family.section, bulk.on) end
-							end
-							if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-						end,
-					}
+				-- The one « all » checkbox the other drivers put at the top of this
+				-- submenu, where a « tout activer » / « tout désactiver » pair used to
+				-- be. It acts on the families only; the category gate above is
+				-- separate, and switching every family off leaving the category on is
+				-- the point — it is what lets the user switch families back on one at
+				-- a time.
+				local all_families_on = true
+				for _, family in ipairs(families) do
+					if family.section and not family.enabled then all_families_on = false end
 				end
+				sub[#sub + 1] = { separator = true }
+				sub[#sub + 1] = {
+					label    = i18n_safe("menu.hotstrings.enable_all_sections"),
+					checked  = all_families_on,
+					disabled = not on,
+					action   = function()
+						for _, family in ipairs(families) do
+							if family.section then dyn.set_rule_enabled(family.section, not all_families_on) end
+						end
+						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					end,
+				}
 				sub[#sub + 1] = { separator = true }
 
 				for _, family in ipairs(families) do
@@ -1471,15 +1487,15 @@ local function _manifest_hotstring_rows(ctx, config)
 		end,
 	}
 
-	-- The two bulk rows are `type = "command"` now: one declaration each, built
-	-- by the shared renderer, so this driver supplies only the behaviour.
+	-- The « all sections » checkbox is a `check` declaration, built by the shared
+	-- renderer, so this driver supplies only its behaviour and its tick.
 	local hs_ctx = {}
 	for key, value in pairs(ctx) do hs_ctx[key] = value end
 	local function all_groups_on() return _all_hotstring_groups_on(config) end
+	local whole_tree = all_sections_row(all_category_ids())
 
 	hs_ctx.commands = {
-		["hotstrings_enable_all"]  = set_all(true),
-		["hotstrings_disable_all"] = set_all(false),
+		["hotstrings_all_sections"] = whole_tree.action,
 		-- The category switch, the submenu's first row. Every driver registers it:
 		-- no tray can switch a category from the row that opens its submenu.
 		["hotstrings_toggle"]      = function()
@@ -1504,6 +1520,7 @@ local function _manifest_hotstring_rows(ctx, config)
 	hs_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do hs_ctx.state_getters[key] = value end
 	hs_ctx.state_getters["hotstrings_enabled"] = all_groups_on
+	hs_ctx.state_getters["hotstrings_all_sections_enabled"] = function() return whole_tree.checked end
 
 	return ManifestMenu.build("hotstrings_menu", "Hotstrings", nil, group_builders, hs_ctx, providers)
 end

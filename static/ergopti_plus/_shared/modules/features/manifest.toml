@@ -3834,15 +3834,15 @@ type = "group"
 id = "hotstrings_params"
 i18n = "menu.hotstrings.params"
 
+# One checkbox for every section of every category, where a « Tout activer » /
+# « Tout désactiver » pair of commands used to be: two rows and two keys for one
+# control, whose state the user could only guess. Ticked when every category and
+# every one of its sections is on; a click switches them all to the other side.
 [[menu.hotstrings_menu]]
-type = "command"
-id = "hotstrings_enable_all"
-i18n = "menu.hotstrings.enable_all"
-
-[[menu.hotstrings_menu]]
-type = "command"
-id = "hotstrings_disable_all"
-i18n = "menu.hotstrings.disable_all"
+type = "check"
+id = "hotstrings_all_sections"
+i18n = "menu.hotstrings.enable_all_sections"
+checked_when = ["hotstrings_all_sections_enabled"]
 
 [[menu.hotstrings_menu]]
 type = "---"
@@ -3862,9 +3862,9 @@ id = "hotstring_categories_dynamic"
 # One row per language pack declared in _shared/modules/hotstrings/_index.toml
 # [languages], labelled with the language's flag and native name from
 # _shared/data/locale_names.json (Windows draws that locale's flag icon, since
-# Win32 menus cannot render flag emoji). Each opens a submenu with « tout
-# activer » / « tout désactiver » for the whole language, then that language's
-# categories built exactly like the neutral ones above. Under a header of their
+# Win32 menus cannot render flag emoji). Each opens a submenu with one « all
+# sections » checkbox for the whole language, then that language's categories
+# built exactly like the neutral ones above. Under a header of their
 # own: a lone language row among the neutral categories did not read as the
 # entry point to that language's hotstrings.
 [[menu.hotstrings_menu]]

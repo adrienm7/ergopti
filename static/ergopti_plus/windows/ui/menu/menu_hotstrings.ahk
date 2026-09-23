@@ -681,6 +681,18 @@ _HS_GetOrCreateNode(Root, PathParts) {
 	return Node
 }
 
+; True when the personal hotstrings' gate is open (it follows the Hotstrings
+; master) and every section HS_TogglePersonalAllSections switches is on: the tick
+; of the personal « all sections » checkbox.
+_HS_PersonalSectionsAllOn(TomlData) {
+	Paths := []
+	for _, SecName in TomlData["sections_order"] {
+		if (SecName != "-")
+			Paths.Push("hotstrings.personal." . StrLower(SecName))
+	}
+	return _HS_ScopeAllOn(["Personal"], Paths)
+}
+
 ; Dynamic handler: personal hotstrings (personal_hotstrings.toml + pre-scanned ext tree).
 _HS_PersonalRows() {
 	global ScriptInformation, Features, _PersonalExtTree
@@ -754,13 +766,9 @@ _HS_PersonalRows() {
 			"checked", (_EditorPrefGet("close_on_add", "1") == "1") ? true : false))
 		if (TomlData["sections_order"].Length > 0) {
 			PersonalRows.Push(Map("separator", true))
-			; Section-level bulk actions for the personal hotstrings.
-			PersonalRows.Push(Map(
-				"label",  t("menu.hotstrings.enable_all"),
-				"action", (*) => HS_TogglePersonalAllSections(true)))
-			PersonalRows.Push(Map(
-				"label",  t("menu.hotstrings.disable_all"),
-				"action", (*) => HS_TogglePersonalAllSections(false)))
+			; One « all sections » checkbox for the personal hotstrings.
+			PersonalRows.Push(_HS_AllSectionsRow(_HS_PersonalSectionsAllOn(TomlData),
+				(Bool) => HS_TogglePersonalAllSections(Bool)))
 			PersonalRows.Push(Map("separator", true))
 			for _, SecName in TomlData["sections_order"] {
 				if (SecName == "-") {

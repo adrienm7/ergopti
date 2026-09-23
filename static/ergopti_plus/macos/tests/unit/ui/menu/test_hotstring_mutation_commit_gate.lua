@@ -211,6 +211,9 @@ helpers.describe("hotstring menu mutations: publish only exact commitments", fun
 			state = { hotstrings = { alpha = true, beta = true }, keymap = true },
 			keymap = {
 				get_sections = function(group) return { { name = group .. "_one" } } end,
+				-- Every section on, so the « all sections » checkbox is ticked and
+				-- its click switches the whole tree off.
+				is_section_enabled = function() return true end,
 				set_groups_sections_enabled = function(changes, enabled)
 					calls.mutations = calls.mutations + 1
 					helpers.assert_eq(#changes, 2)
@@ -224,7 +227,7 @@ helpers.describe("hotstring menu mutations: publish only exact commitments", fun
 			updateMenu = function() calls.updates = calls.updates + 1 end,
 		}
 
-		local action = hotstrings.build_bulk_actions(ctx)[2].action
+		local action = hotstrings.all_sections_switch(ctx).action
 		local ok, err = pcall(action)
 		package.loaded["infra.notifications"] = previous_notifications
 		package.loaded["ui.menu.keymap_lifecycle"] = nil

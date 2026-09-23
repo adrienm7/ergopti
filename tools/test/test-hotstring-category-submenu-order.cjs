@@ -12,17 +12,23 @@
  *   Linux     gate, ouvrir le fichier, ─, tout activer, tout désactiver, ─, sections
  *   macOS     ouvrir le fichier, ─, tout activer, tout désactiver, ─, sections
  *
- * macOS relied on the PARENT row toggling the group when clicked. It works, and
- * nobody discovers it: the parent of a submenu reads as something you open, not
- * something you switch off.
+ * THE ORDER BELOW IS THE SHARED ONE — the gate first, since everything under it
+ * is inert while it is off:
  *
- * THE ORDER BELOW IS THE SHARED ONE — Linux's, because it reads best: the gate
- * first, since everything under it is inert while it is off.
+ *   gate checkbox, ouvrir le fichier, ─, « toutes les sections » checkbox, ─, sections
+ *
+ * Both controls are checkboxes with one label each. The gate read « ✅ Activée
+ * (cliquer pour désactiver) » / « ❌ Désactivée (cliquer pour activer) », and the
+ * sections came with a « Tout activer » / « Tout désactiver » pair: two keys per
+ * control, and a state readable only from the words. The same single checkbox
+ * replaces the pair at the top of each language submenu, the personal and
+ * dynamic submenus and the Hotstrings menu itself.
  *
  * WHY A SOURCE SCAN: the three builders are written in three languages and none
  * of them can be executed by the other two's test runner. What CAN be compared
- * is the order in which each names the four shared label keys, which is exactly
- * the thing that differed.
+ * is the order in which each builds the shared controls, and that no driver
+ * source still names a retired key. Each driver's own suite tests the rows
+ * behaviourally (test_hotstring_bulk_checkboxes on all three).
  * ==============================================================================
  */
 
@@ -34,22 +40,78 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
 
-// The canonical sequence. `open_file` is optional per category (a category with
-// no TOML on disk has nothing to open), so it is checked only where it appears.
-const ORDER = [
-	'menu.hotstrings.category_o', // category_on / category_off — the gate
-	'menu.hotstrings.open_file',
-	'menu.hotstrings.enable_all',
+const GATE_KEY = 'menu.hotstrings.category_enable';
+const OPEN_FILE_KEY = 'menu.hotstrings.open_file';
+const ALL_SECTIONS_KEY = 'menu.hotstrings.enable_all_sections';
+
+// Label keys retired with the pairs and the alternating gate labels. A driver
+// source still naming one draws the old controls. The quote closes each key so
+// `enable_all` does not match `enable_all_sections`.
+const RETIRED = [
+	'menu.hotstrings.category_on',
+	'menu.hotstrings.category_off',
+	'menu.hotstrings.enable_all"',
+	"menu.hotstrings.enable_all'",
 	'menu.hotstrings.disable_all',
 ];
 
-// Each driver's category-submenu builder, delimited by two literals unique to it.
-const REGIONS = [
+// The key fragments a driver could build a retired key from at run time, the
+// way the Linux language rows once did with "menu.hotstrings." .. bulk.key, and
+// the two command ids the manifest no longer declares.
+const RETIRED_FRAGMENTS = [
+	'key = "enable_all"',
+	'key = "disable_all"',
+	'"hotstrings_enable_all"',
+	'"hotstrings_disable_all"',
+];
+
+// Each driver: the one helper that draws the « all sections » checkbox (it must
+// name the shared key), and the files that build hotstring submenus.
+const DRIVERS = [
 	{
 		driver: 'windows',
-		file: 'windows/ui/menu/menu_submenus.ahk',
-		from: 'for _, V1Cat in _FLAT_HOTSTRING_V1_CATS',
-		to: 'SubMenus[V1Cat] := SubMenu',
+		helper: {
+			file: 'windows/ui/menu/menu_hotstring_switches.ahk',
+			from: '_HS_AllSectionsRow(AllOn, Apply) {',
+			to: '\n}',
+		},
+		call: '_HS_AllSectionsRow(',
+		files: [
+			'windows/ui/menu/menu_hotstring_switches.ahk',
+			'windows/ui/menu/menu_submenus.ahk',
+			'windows/ui/menu/menu_hotstrings.ahk',
+			'windows/ui/menu/menu_init.ahk',
+		],
+	},
+	{
+		driver: 'macos',
+		helper: {
+			file: 'macos/ui/menu/menu_hotstrings_custom.lua',
+			from: 'function M.all_sections_row(',
+			to: '\nend',
+		},
+		call: 'all_sections_row(',
+		files: [
+			'macos/ui/menu/menu_hotstrings.lua',
+			'macos/ui/menu/menu_hotstrings_custom.lua',
+			'macos/ui/menu/builder.lua',
+		],
+	},
+	{
+		driver: 'linux',
+		helper: { file: 'linux/ui/menu/menu_builder.lua', from: 'local function all_sections_row(ids)', to: '\n\tend' },
+		call: 'all_sections_row(',
+		files: ['linux/ui/menu/menu_builder.lua'],
+	},
+];
+
+// Each driver's category-submenu builder, delimited by two literals unique to it.
+const CATEGORY_REGIONS = [
+	{
+		driver: 'windows',
+		file: 'windows/ui/menu/menu_hotstring_switches.ahk',
+		from: '_HS_CategoryHeadRows(V1Cat, V2Section, TomlPath) {',
+		to: '\treturn Rows\n}',
 	},
 	{
 		driver: 'macos',
@@ -65,53 +127,139 @@ const REGIONS = [
 	},
 ];
 
+// Each driver's language-submenu builder: one « toutes les sections » checkbox
+// opens it, never the retired pair.
+const LANGUAGE_REGIONS = [
+	{
+		driver: 'windows',
+		file: 'windows/ui/menu/menu_submenus.ahk',
+		from: '_HS_LanguageRows() {',
+		to: 'Rows.Push(Map(\n\t\t\t"label", HotstringsLanguageName',
+		// The language checkbox has a builder of its own here, which the unit
+		// harness can reach; it draws the row through _HS_AllSectionsRow.
+		call: '_HS_LanguageSwitchRow(',
+	},
+	{
+		driver: 'macos',
+		file: 'macos/ui/menu/menu_hotstrings.lua',
+		from: 'function M.build_language_bulk_actions(',
+		to: 'local _mgmt = require',
+	},
+	{
+		driver: 'linux',
+		file: 'linux/ui/menu/menu_builder.lua',
+		from: 'local function language_rows()',
+		to: 'label = string.format("%s (%d)", language_label(pack.locale), total)',
+	},
+];
+
 const errors = [];
 
-for (const { driver, file, from, to } of REGIONS) {
+/**
+ * The text of a driver file, or null with an error recorded.
+ * @param {string} driver
+ * @param {string} file
+ * @returns {string|null}
+ */
+function read(driver, file) {
 	const full = path.join(SP, file);
 	if (!fs.existsSync(full)) {
 		errors.push(`${driver}: ${file} is gone — this gate compares nothing until the anchor is updated`);
-		continue;
+		return null;
 	}
-	const src = fs.readFileSync(full, 'utf8');
-	const start = src.indexOf(from);
-	const end = src.indexOf(to, start + 1);
+	return fs.readFileSync(full, 'utf8');
+}
+
+/**
+ * The source between two anchors, or null with an error recorded.
+ * @param {string} driver
+ * @param {{file: string, from: string, to: string}} region
+ * @returns {string|null}
+ */
+function slice(driver, region) {
+	const src = read(driver, region.file);
+	if (src === null) return null;
+	const start = src.indexOf(region.from);
+	const end = src.indexOf(region.to, start + 1);
 	if (start < 0 || end < 0) {
 		errors.push(
-			`${driver}: could not delimit the category-submenu builder (looked for ${JSON.stringify(from)} then ` +
-				`${JSON.stringify(to)}). Re-anchor it rather than deleting the check.`
+			`${driver}: could not delimit ${region.file} (looked for ${JSON.stringify(region.from)} then ` +
+				`${JSON.stringify(region.to)}). Re-anchor it rather than deleting the check.`
 		);
-		continue;
+		return null;
 	}
-	const region = src.slice(start, end);
+	return src.slice(start, end);
+}
 
+let regions = 0;
+const byDriver = new Map(DRIVERS.map((d) => [d.driver, d]));
+
+for (const d of DRIVERS) {
+	const helper = slice(d.driver, d.helper);
+	if (helper !== null) {
+		regions += 1;
+		if (!helper.includes(ALL_SECTIONS_KEY)) {
+			errors.push(`${d.driver}: the « all sections » helper never names ${ALL_SECTIONS_KEY}`);
+		}
+	}
+	for (const file of d.files) {
+		const src = read(d.driver, file);
+		if (src === null) continue;
+		regions += 1;
+		for (const key of [...RETIRED, ...RETIRED_FRAGMENTS]) {
+			if (src.includes(key)) {
+				errors.push(
+					`${d.driver}: ${file} still names ${key.replace(/["']$/, '')}. The pair and the alternating ` +
+						'gate labels are one checkbox each now, with one key.'
+				);
+			}
+		}
+	}
+}
+
+for (const region of CATEGORY_REGIONS) {
+	const text = slice(region.driver, region);
+	if (text === null) continue;
+	regions += 1;
+	const order = [GATE_KEY, OPEN_FILE_KEY, byDriver.get(region.driver).call];
 	const seen = [];
-	for (const key of ORDER) {
-		const at = region.indexOf(key);
-		if (at >= 0) seen.push({ key, at });
+	for (const token of order) {
+		const at = text.indexOf(token);
+		if (at >= 0) seen.push({ token, at });
 	}
-
-	// The gate row and the two bulk actions are not optional anywhere.
-	for (const required of ['menu.hotstrings.category_o', 'menu.hotstrings.enable_all', 'menu.hotstrings.disable_all']) {
-		if (!seen.some((s) => s.key === required)) {
+	for (const required of [GATE_KEY, byDriver.get(region.driver).call]) {
+		if (!seen.some((s) => s.token === required)) {
 			errors.push(
-				`${driver}: the category submenu never names ${required}. Every driver shows this control; ` +
-					'one that does not is a capability the user of that OS has to discover elsewhere, or does ' +
-					'not have.'
+				`${region.driver}: the category submenu never builds ${required}. Every driver shows this ` +
+					'control; one that does not is a capability the user of that OS has to discover elsewhere, ' +
+					'or does not have.'
 			);
 		}
 	}
-
-	const sorted = [...seen].sort((a, b) => a.at - b.at);
-	const actual = sorted.map((s) => s.key).join(' → ');
-	const wanted = seen.map((s) => s.key).join(' → ');
+	const actual = [...seen].sort((a, b) => a.at - b.at).map((s) => s.token).join(' → ');
+	const wanted = seen.map((s) => s.token).join(' → ');
 	if (actual !== wanted) {
 		errors.push(
-			`${driver}: the category submenu is built in the order\n        ${actual}\n      and the shared ` +
+			`${region.driver}: the category submenu is built in the order\n        ${actual}\n      and the shared ` +
 				`order is\n        ${wanted}\n      Three drivers with three orders for one submenu is what this ` +
 				'gate exists to end.'
 		);
 	}
+}
+
+for (const region of LANGUAGE_REGIONS) {
+	const text = slice(region.driver, region);
+	if (text === null) continue;
+	regions += 1;
+	if (!text.includes(region.call || byDriver.get(region.driver).call)) {
+		errors.push(`${region.driver}: the language submenu never opens with the « all sections » checkbox`);
+	}
+}
+
+const expected =
+	DRIVERS.reduce((n, d) => n + 1 + d.files.length, 0) + CATEGORY_REGIONS.length + LANGUAGE_REGIONS.length;
+if (regions < expected && errors.length === 0) {
+	errors.push(`only ${regions} of ${expected} region(s) were read — the gate compared less than it claims`);
 }
 
 if (errors.length > 0) {
@@ -121,6 +269,7 @@ if (errors.length > 0) {
 }
 
 console.log(
-	'\x1b[32m[OK] all three drivers build the hotstring category submenu in the same order ' +
-		'(gate → open file → bulk actions → sections).\x1b[0m'
+	`\x1b[32m[OK] all three drivers build the hotstring category submenu in the same order ` +
+		`(gate → open file → all sections → sections), open each language with one checkbox, and name no ` +
+		`retired key (${regions} region(s) read).\x1b[0m`
 );

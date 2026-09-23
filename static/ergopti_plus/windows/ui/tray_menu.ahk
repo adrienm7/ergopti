@@ -120,6 +120,7 @@ global _DYNAMIC_HOTSTRINGS_ORDER := ["DateLongFr", "DateFr", "Date",
 	"TextExpansionPersonalInformation"]
 
 
+#Include menu/menu_hotstring_switches.ahk
 #Include menu/menu_submenus.ahk
 #Include menu/menu_shortcuts.ahk
 #Include menu/menu_taphold.ahk
