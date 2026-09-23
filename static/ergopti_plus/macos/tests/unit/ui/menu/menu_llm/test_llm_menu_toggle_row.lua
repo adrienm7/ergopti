@@ -52,13 +52,14 @@ helpers.describe("IA submenu on/off row", function()
 		local rows = render(render_ctx)
 		helpers.assert_true(type(rows[1]) == "table" and rows[1].fn == item.action,
 			"the IA submenu must open with its on/off row")
-		helpers.assert_eq(rows[1].title, "menu.llm.toggle_enable",
-			"a disabled IA must offer to enable the suggestions")
+		helpers.assert_eq(rows[1].title, "menu.llm.enable", "the IA switch is labelled by its one key")
+		helpers.assert_eq(rows[1].checked, false, "a disabled IA shows an unticked switch")
 	end)
 
-	helpers.it("offers to disable once the suggestions are on", function()
+	helpers.it("ticks the same switch once the suggestions are on", function()
 		local _, render_ctx = build_item(true)
 		local rows = render(render_ctx)
-		helpers.assert_eq(rows[1] and rows[1].title, "menu.llm.toggle_disable")
+		helpers.assert_eq(rows[1] and rows[1].title, "menu.llm.enable")
+		helpers.assert_eq(rows[1] and rows[1].checked, true)
 	end)
 end)

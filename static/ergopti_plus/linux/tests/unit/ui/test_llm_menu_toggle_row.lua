@@ -4,10 +4,11 @@
 --- MODULE: The AI Master Toggle Row And The Keyboard Slot Groups (Linux tray)
 --- DESCRIPTION:
 --- The AI submenu's first row is the manifest's `llm_toggle`: this driver
---- registers the command, and the shared renderer draws the row with its own
---- two translated labels. Nothing pinned that the row exists, reads the live
---- state and reaches the engine, so a rename on either side would have left the
---- AI with no switch in the tray.
+--- registers the command, and the shared renderer draws it as a checkbox with
+--- one translated label, ticked from the live state; the parent row carries the
+--- same tick. Nothing pinned that the row exists, reads the live state and
+--- reaches the engine, so a rename on either side would have left the AI with no
+--- switch in the tray.
 ---
 --- The Shortcuts submenu drew one submenu per keyboard slot group even when the
 --- shared key catalogue could not be read, so the tray showed three groups that
@@ -24,6 +25,18 @@ local function submenu_of(items, key)
 	local label = require("infra.i18n").get(key)
 	for _, item in ipairs(items) do
 		if type(item.title) == "string" and item.title:find(label, 1, true) then return item.menu end
+	end
+	return nil
+end
+
+--- The top-level row whose title contains the translation of `key`.
+--- @param items table
+--- @param key string
+--- @return table|nil
+local function parent_of(items, key)
+	local label = require("infra.i18n").get(key)
+	for _, item in ipairs(items) do
+		if type(item.title) == "string" and item.title:find(label, 1, true) then return item end
 	end
 	return nil
 end
@@ -55,18 +68,24 @@ local function build(llm, changed)
 end
 
 helpers.describe("tray (linux): the AI master toggle row", function()
-	helpers.it("draws the enable label first while the AI is off", function()
+	helpers.it("draws an unticked switch first while the AI is off", function()
 		local llm = fake_llm(false)
-		local rows = submenu_of(build(llm), "menu.llm.title")
+		local items = build(llm)
+		local rows = submenu_of(items, "menu.llm.title")
 		helpers.assert_true(rows ~= nil and rows[1] ~= nil, "the AI submenu must be drawn")
-		helpers.assert_eq(rows[1].title, require("infra.i18n").get("menu.llm.toggle_enable"))
+		helpers.assert_eq(rows[1].title, require("infra.i18n").get("menu.llm.enable"))
+		helpers.assert_eq(rows[1].checked, false, "the switch is a checkbox, unticked while off")
 		helpers.assert_eq(type(rows[1].fn), "function", "the toggle row must act")
+		helpers.assert_eq(parent_of(items, "menu.llm.title").checked, false, "the parent is unticked too")
 	end)
 
-	helpers.it("draws the disable label while the AI is on", function()
+	helpers.it("ticks the same switch, and its parent, while the AI is on", function()
 		local llm = fake_llm(true)
-		local rows = submenu_of(build(llm), "menu.llm.title")
-		helpers.assert_eq(rows[1].title, require("infra.i18n").get("menu.llm.toggle_disable"))
+		local items = build(llm)
+		local rows = submenu_of(items, "menu.llm.title")
+		helpers.assert_eq(rows[1].title, require("infra.i18n").get("menu.llm.enable"))
+		helpers.assert_eq(rows[1].checked, true, "the switch is ticked while on")
+		helpers.assert_eq(parent_of(items, "menu.llm.title").checked, true, "the parent row is ticked too")
 	end)
 
 	helpers.it("clicking it toggles the engine and redraws the tray", function()

@@ -16,10 +16,12 @@
 // every list in the manifest:
 //   - type === "feature" with a `path` → the path resolves to a real
 //     manifest.toml feature entry;
-//   - any i18n key (i18n / i18n_on / i18n_off / i18n_dynamic) exists in the
+//   - any i18n key (i18n / i18n_dynamic) exists in the
 //     reference locales (fr + en — full parity is enforced separately);
 //   - any `platforms` value is one of the known drivers (ahk / hs);
-//   - type === "toggle" carries a non-empty `category`.
+//   - type === "toggle" carries a non-empty `category` and ONE `i18n` key (a
+//     checkbox label, never an alternating i18n_on / i18n_off pair), and is the
+//     first row of its menu: it is the category's master switch.
 //
 // Exit 0 when clean, 1 with a list of violations otherwise.
 
@@ -101,7 +103,7 @@ function main() {
 	const localeKeys = loadLocaleKeys();
 	const violations = [];
 
-	const i18nFields = ['i18n', 'i18n_on', 'i18n_off', 'i18n_dynamic'];
+	const i18nFields = ['i18n', 'i18n_dynamic'];
 
 	// Walk every array at the top level of the manifest and validate each
 	// object element. Maps (gesture_slots, hotstring_groups, …) and string
@@ -121,6 +123,15 @@ function main() {
 			if (item.type === 'toggle') {
 				if (typeof item.category !== 'string' || item.category === '') {
 					violations.push(`${where}: toggle is missing a non-empty "category"`);
+				}
+				if (typeof item.i18n !== 'string' || item.i18n === '') {
+					violations.push(`${where}: toggle must name its checkbox label with one "i18n" key`);
+				}
+				if ('i18n_on' in item || 'i18n_off' in item) {
+					violations.push(`${where}: toggle carries i18n_on/i18n_off — a checkbox has one label`);
+				}
+				if (idx !== 0) {
+					violations.push(`${where}: a toggle is its menu's master switch and must be its first row`);
 				}
 			}
 

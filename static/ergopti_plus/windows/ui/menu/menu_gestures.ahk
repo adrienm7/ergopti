@@ -15,9 +15,6 @@
 
 
 BuildGesturesMenu() {
-	global Features
-	GestEnabled := Features.Has("gestures") and Features["gestures"].Has("enabled")
-		and Features["gestures"]["enabled"] = true
 	DynHandlers := Map(
 		"gesture_slots_2",    (M, C) => _GES_Slots2(M, C),
 		"gesture_slots_3",    (M, C) => _GES_Slots3(M, C),
@@ -31,20 +28,26 @@ BuildGesturesMenu() {
 	; The two whole-tree actions joined them on the same day, and the two buttons
 	; below on 2026-08-07: each handler's whole body was one row with a static
 	; label, which the declaration already expresses.
+	; The category switch is the manifest's `gestures_toggle` row. Its command is
+	; the dedicated writer (gestures.enabled + reload) rather than the generic
+	; CategoryEnabled flip the master-gated menus register.
 	Commands := Map(
+		"gestures_toggle",  (*) => ToggleGesturesEnabled(),
 		"disable_all",      (*) => _GES_SetEverySlot("none"),
 		"restore_defaults", (*) => _GES_RestoreFactoryDefaults(),
 		"auto_configure",   (*) => GestureAutoConfigureAction(),
 		"manual_tutorial",  (*) => GestureShowManualTutorialDialog(),
 	)
+	Getters := Map("gestures_enabled", _GES_IsEnabled)
 	ListProviders := Map("gesture_slots_ahk", (*) => _GES_SlotRows())
-	GMenu := MenuRenderer_Build("gestures_menu", "Gestures", DynHandlers, "", ListProviders, Commands)
-	; Gestures toggle uses a dedicated fn (writes Features.Enabled + Reload)
-	; rather than the generic ToggleCategoryAllFeatures used by other menus.
-	AddCategoryToggleItem(GMenu,
-		t("menu.gestures.on"), t("menu.gestures.off"),
-		GestEnabled, (*) => ToggleGesturesEnabled())
-	return GMenu
+	return MenuRenderer_Build("gestures_menu", "Gestures", DynHandlers, "", ListProviders, Commands, Getters)
+}
+
+; True when the gestures feature is switched on in the loaded configuration.
+_GES_IsEnabled() {
+	global Features
+	return Features.Has("gestures") and Features["gestures"].Has("enabled")
+		and Features["gestures"]["enabled"] = true
 }
 
 
@@ -123,46 +126,13 @@ SetGestureSlotAction(Slot, ActionName) {
 ; Toggles the Gestures enabled state and reloads.
 ToggleGesturesEnabled() {
 	global Features
-	NewVal := !(Features.Has("gestures") and Features["gestures"].Has("enabled")
-		and Features["gestures"]["enabled"] = true)
+	NewVal := !_GES_IsEnabled()
 	; v2-native write via the canonical manifest path — no v1->v2 translation.
 	; WriteFeatureV2 derives the [gestures] section + the Features node from
 	; the path and persists in lock-step (see infra/feature_io.ahk).
 	if !WriteFeatureV2(Features, "gestures.enabled", NewVal)
 		return ConfigReportPersistenceFailure("the gestures enable toggle")
 	return ReloadPreservingSuspend()
-}
-
-
-
-
-
-; =====================================
-; =====================================
-; ======= 1.X / Category toggle =======
-; =====================================
-; =====================================
-
-; Insert the canonical « ✅ X activé(s) (cliquer pour désactiver) » /
-; « ❌ X désactivé(s) (cliquer pour activer) » synthetic top item into a
-; submenu, followed by a separator at position 2. AHK does not let us
-; bind a callback on the parent label of a submenu (clicks open the
-; submenu), so this is how every category exposes its global on/off
-; toggle in a uniform way — same pattern Métriques uses.
-;
-; ``on_label`` and ``off_label`` are passed in full (not built from a
-; template) so each category keeps its own French gender/number
-; agreement: « activée » for « Disposition », « activés » for
-; « Raccourcis », « activées » for « Métriques », etc.
-AddCategoryToggleItem(menu, on_label, off_label, is_enabled, on_click) {
-	label := is_enabled ? on_label : off_label
-	; Insert via the bypass helper so the category-level toggle gets the
-	; same WM_COMMAND retry coverage as the individual feature toggles
-	; below. Without this, clicks on the "Activer / Désactiver" row at
-	; the top of every submenu are still subject to AHK's native dispatch
-	; drop pattern.
-	RegisterMenuItemInsert(menu, "1&", label, on_click)
-	menu.Insert("2&")  ; separator
 }
 
 

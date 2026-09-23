@@ -6,10 +6,10 @@
 ; Renders every menu of the shared manifest and fails on any separator that
 ; does not sit between two real items: two in a row, or one at either end.
 ;
-; The tray showed two lines in a row under « Disposition »: AddCategoryToggleItem
-; inserts its own separator after a category toggle, while the shared Lua
-; renderer adds none, so layout_menu declares a "---" right after its toggle for
-; the Lua drivers — and MenuRenderer_Build added that "---" as well. Every probe
+; The tray showed two lines in a row under « Disposition »: the category switch
+; was inserted by hand with a separator of its own, and layout_menu declared a
+; "---" right after its toggle for the Lua drivers — so MenuRenderer_Build added
+; a second one. Every probe
 ; here brings a separator on both sides of its row, the worst case a driver row
 ; can produce. The Lua suites run the same check through test.menu_separators.
 ; ==============================================================================

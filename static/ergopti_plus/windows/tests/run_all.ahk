@@ -1076,8 +1076,10 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_menu_top_level_drift_gate.ahk
 ; Regression: the separator between Gestures and "Actions globales" must survive the tail loader.
 #Include meta/test_menu_gestures_actions_separator.ahk
-; Regression: a category toggle's own separator absorbs the manifest "---" after it.
+; Regression: no separator doubles up in any manifest menu.
 #Include unit/test_manifest_menu_no_double_separator.ahk
+; Regression: every category switch is a first-row checkbox with one label.
+#Include unit/test_category_toggle_checkbox.ahk
 ; Regression: Shortcuts submenu block separator and screenshot key label.
 #Include unit/test_shortcuts_menu_blocks.ahk
 #Include unit/test_shortcuts_menu_groups_unique.ahk

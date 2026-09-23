@@ -45,7 +45,7 @@ _THRD_ButtonsAreCommands() {
 	Assert(Body != "", "_BuildTapHoldsSubmenu must be present in the driver source")
 
 	; Both buttons reach the renderer as named commands. A `command` row is drawn
-	; by _MR_RenderToggle/_MR_RenderRows' sibling path, which registers it — the
+	; by the renderer's _MR_RenderRows path, which registers it — the
 	; driver never adds it, so it cannot add it raw.
 	for _, Id in ["reset_defaults", "disable_all"] {
 		Assert(InStr(Body, Chr(34) . Id . Chr(34)) > 0,

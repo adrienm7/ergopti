@@ -57,7 +57,7 @@ end
 --- @return table|nil row
 local function switch_row(rows)
 	for _, row in ipairs(rows or {}) do
-		if row.title == "menu.tapholds.on" or row.title == "menu.tapholds.off" then return row end
+		if row.title == "menu.tapholds.enable" then return row end
 	end
 	return nil
 end
@@ -73,7 +73,7 @@ helpers.describe("the macOS Tap-Holds submenu draws its feature switch", functio
 		helpers.assert_eq(built.checked, true, "the parent row reports the switch")
 		local row = switch_row(built.submenu)
 		helpers.assert_true(row ~= nil, "the Tap-Holds submenu must draw its on/off row")
-		helpers.assert_eq(row.title, "menu.tapholds.on")
+		helpers.assert_eq(row.checked, true, "the switch is a checkbox, ticked while on")
 		row.fn()
 		helpers.assert_eq(observed.enabled, false)
 		helpers.assert_eq(observed.regenerations, 1, "the switched rules must be redeployed")
@@ -81,7 +81,7 @@ helpers.describe("the macOS Tap-Holds submenu draws its feature switch", functio
 		built = menu.build(ctx)
 		helpers.assert_nil(built.checked)
 		row = switch_row(built.submenu)
-		helpers.assert_eq(row.title, "menu.tapholds.off")
+		helpers.assert_eq(row.checked, false, "and unticked once switched off")
 		row.fn()
 		helpers.assert_eq(observed.enabled, true, "re-enabling restores the feature")
 		helpers.assert_eq(#observed.switch_writes, 2)

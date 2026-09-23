@@ -114,11 +114,12 @@ LLM_Menu_BuildSubmenu() {
 	; feature back on.
 	_disabled := !_LLM_Menu["enabled"]
 
-	AddCategoryToggleItem(_LLM_Menu_Handle,
-		t("menu.llm.on"),
-		t("menu.llm.off"),
-		_LLM_Menu["enabled"],
-		LLM_Menu_OnToggle)
+	; The category switch is the manifest's `llm_toggle` row, drawn by the shared
+	; renderer code like every other category's: one label, ticked from intent.
+	MenuRenderer_AppendToggle(_LLM_Menu_Handle, "llm_menu", "llm_toggle",
+		Map("llm_toggle", LLM_Menu_OnToggle),
+		Map("llm_enabled", () => _LLM_Menu["enabled"]))
+	_LLM_Menu_Handle.Add()  ; separator after the switch, as the manifest declares
 
 	; Warning row — surfaces when the feature is ON but the active backend
 	; can't actually answer (Ollama not installed yet, install crashed

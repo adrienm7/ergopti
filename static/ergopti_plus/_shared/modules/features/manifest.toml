@@ -2813,6 +2813,14 @@ description_key = "menu.category_enabled.tap_holds"
 # in sync. Both drivers read the generated JSON at runtime (unchanged). Item
 # types: toggle / feature / action / dynamic / group / section_header /
 # letter_picker / "---" separator. platforms = ["ahk"|"hs"] gates per driver.
+#
+# A `toggle` is a category's master switch and the FIRST row of its submenu: a
+# checkbox labelled by one `i18n` key, ticked from `checked_when`, running the
+# command each driver registers under its id. A driver that shows the row and
+# registers no command is a defect the renderers report, never a way of saying
+# "this tray toggles from the parent row" — no tray can: AppKit never sends the
+# action of an item that opens a submenu, and neither appindicator nor Win32
+# binds a click on one.
 
 [menu]
 # dynamic_hotstrings_order lived here and was read by nobody. The order that
@@ -2965,17 +2973,19 @@ id = "debug"
 # the row stays usable while the feature is OFF, so the user can configure a
 # backend and a model before enabling anything. Everything else greys out.
 # `health_dot` marks the one row that carries the backend-reachability dot.
-# The IA master gate. Its two labels have been translated in twenty-one locales
-# since the menu was written and read by nobody — this driver glued " ✓" onto a
-# generic « Activé » instead, and the other two toggle from the tray parent, which
-# is a driver answer expressed by registering the command or not.
+# The IA master gate, and like every `toggle` the first row of its submenu: a
+# checkbox labelled by ONE key and ticked from checked_when. The two alternating
+# « activée (cliquer pour désactiver) » labels it replaced were a status line
+# dressed as a control, and a pair of keys per row to keep in step.
 [[menu.llm_menu]]
 type = "toggle"
 id = "llm_toggle"
-i18n_on = "menu.llm.toggle_disable"
-i18n_off = "menu.llm.toggle_enable"
+i18n = "menu.llm.enable"
 checked_when = ["llm_enabled"]
 category = "LLM"
+
+[[menu.llm_menu]]
+type = "---"
 
 [[menu.llm_menu]]
 type = "dynamic"
@@ -3244,10 +3254,12 @@ i18n = "menu.debug.healthcheck"
 [[menu.shortcuts_menu]]
 type = "toggle"
 id = "shortcuts_toggle"
-i18n_on = "menu.shortcuts.on"
-i18n_off = "menu.shortcuts.off"
+i18n = "menu.shortcuts.enable"
 checked_when = ["shortcuts_enabled"]
 category = "Shortcuts"
+
+[[menu.shortcuts_menu]]
+type = "---"
 
 [[menu.shortcuts_menu]]
 type = "command"
@@ -3422,32 +3434,20 @@ path = "shortcuts.lalt_caps_lock"
 group_label = "LAltCapsLock"
 platforms = ["ahk"]
 
-# Every driver DRAWS this toggle; only macOS may declare it, and the difference
-# is the two renderers rather than the feature. The AHK renderer materialises a
-# `toggle` row (infra/manifest_menu.ahk, _MR_RenderToggle) while the shared Lua
-# one skips it by contract and leaves it to the caller. So an unrestricted
-# declaration gives Windows a SECOND toggle beside the one menu_metrics.ahk
-# already builds — which is what tests/meta/test_menu_metrics_disabled_when.ahk
-# was written to prevent, and what it caught when this restriction was briefly
-# lifted on 2026-08-07.
-# The row exists wherever a driver registers a command for it: macOS toggles
-# metrics from the tray parent and registers none, Linux cannot and does. The
-# platforms list was recording which driver BUILT it, which is the driver's
-# answer rather than the manifest's.
+# Unrestricted: every driver draws this row from the declaration and registers
+# only what the click does. Windows used to insert its own master row by hand in
+# BuildMetricsMenu, which is why this row once excluded "ahk" — a second
+# description of one switch, with its own two labels. Its command there is
+# ToggleMetricsEnabled, which keeps the security-warning dialog.
 [[menu.metrics_menu]]
 type = "toggle"
 id = "metrics_toggle"
-i18n_on = "menu.metrics.on"
-i18n_off = "menu.metrics.off"
+i18n = "menu.metrics.enable"
 checked_when = ["keylogger_enabled"]
 category = "Metrics"
-# ahk is excluded and must stay excluded: that driver builds this row itself in
-# BuildMetricsMenu (AddCategoryToggleItem), so an unrestricted declaration makes
-# its renderer draw a SECOND, non-functional master row. Linux joined the list on
-# 2026-08-08 — it registers a `metrics_toggle` command, which is what asks the
-# shared renderer for the row.
-platforms = ["hs", "linux"]
-reason_key = "platform_reason.category_toggle_is_drawn_by_the_caller"
+
+[[menu.metrics_menu]]
+type = "---"
 
 # `command` since 2026-08-07. These two are buttons: a label, a greying rule and
 # a click. `action` hands the id back, so all three drivers built the same row
@@ -3655,8 +3655,7 @@ reason_key = "platform_reason.only_linux_migrates_in_the_background"
 [[menu.layout_menu]]
 type = "toggle"
 id = "layout_toggle"
-i18n_on = "menu.layout.on"
-i18n_off = "menu.layout.off"
+i18n = "menu.layout.enable"
 checked_when = ["layout_enabled"]
 category = "Layout"
 
@@ -3813,10 +3812,12 @@ platforms = ["ahk"]
 [[menu.hotstrings_menu]]
 type = "toggle"
 id = "hotstrings_toggle"
-i18n_on = "menu.hotstrings.on"
-i18n_off = "menu.hotstrings.off"
+i18n = "menu.hotstrings.enable"
 checked_when = ["hotstrings_enabled"]
 category = "Hotstrings"
+
+[[menu.hotstrings_menu]]
+type = "---"
 
 [[menu.hotstrings_menu]]
 type = "group"
@@ -4000,18 +4001,18 @@ checked_when = ["hotstrings_repeat_enabled"]
 # manifest simply had no opinion about Linux, and an absent opinion reads as
 # "restricted elsewhere" rather than as the omission it was.
 [[menu.gestures_menu]]
-# Same asymmetry as the metrics toggle: Windows builds this row itself in
-# ui/menu/menu_gestures.ahk, and the AHK renderer would draw a second one from an
-# unrestricted declaration. No test guarded this one — the metrics test caught
-# the pair.
+# Unrestricted, like the metrics toggle: Windows used to insert this row by hand
+# in ui/menu/menu_gestures.ahk and the declaration excluded it to avoid drawing a
+# second one. Every driver now draws it from here; Windows registers
+# ToggleGesturesEnabled as its command.
 type = "toggle"
 id = "gestures_toggle"
-i18n_on = "menu.gestures.on"
-i18n_off = "menu.gestures.off"
+i18n = "menu.gestures.enable"
 checked_when = ["gestures_enabled"]
 category = "Gestures"
-platforms = ["hs", "linux"]
-reason_key = "platform_reason.category_toggle_is_drawn_by_the_caller"
+
+[[menu.gestures_menu]]
+type = "---"
 
 # `command` since 2026-08-07: the handler's whole body was one row with a static
 # label, which is what a declaration already expresses.
@@ -4130,13 +4131,15 @@ reason_key = "platform_reason.libinput_reader_is_linux_only"
 [[menu.tap_holds_menu]]
 type = "toggle"
 id = "tapholds_toggle"
-i18n_on = "menu.tapholds.on"
-i18n_off = "menu.tapholds.off"
+i18n = "menu.tapholds.enable"
 checked_when = ["tapholds_enabled"]
 category = "TapHolds"
 # macOS switches the feature, not its remap engine (always on): off stops
 # generating the per-key rules while keeping every assignment, like a pause.
 # Linux takes the engine out of its keyboard hook, keeping every assignment.
+
+[[menu.tap_holds_menu]]
+type = "---"
 
 # `command` since 2026-08-07, not `action`. Both were handlers whose whole body
 # was "add a button, and log that the action just happened" — at MENU BUILD time,

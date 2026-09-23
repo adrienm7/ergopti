@@ -21,6 +21,8 @@
 ; Render shape:
 ;
 ;   ☰ Tap-Hold
+;     ↳ ✓ Activer les tap-holds        [the TapHolds master gate]
+;     ↳ ---
 ;     ↳ Réinitialiser les valeurs par défaut
 ;     ↳ Tout désactiver
 ;     ↳ ---
@@ -38,11 +40,13 @@
 ; reload the script to refresh the menu.
 _BuildTapHoldsSubmenu() {
 	Commands := Map(
-		"reset_defaults", _TH_ResetAllToDefaults,
-		"disable_all",    _TH_DisableAll
+		"tapholds_toggle", MenuRenderer_CategoryGateCommand("TapHolds"),
+		"reset_defaults",  _TH_ResetAllToDefaults,
+		"disable_all",     _TH_DisableAll
 	)
+	Getters := Map("tapholds_enabled", () => IsCategoryGated("TapHolds"))
 	ListProviders := Map("tap_hold_keys", (*) => _TH_KeyRows())
-	return MenuRenderer_Build("tap_holds_menu", "TapHolds", "", "", ListProviders, Commands)
+	return MenuRenderer_Build("tap_holds_menu", "TapHolds", "", "", ListProviders, Commands, Getters)
 }
 
 ; List provider: one row per configurable key.

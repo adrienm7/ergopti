@@ -59,8 +59,8 @@ _LMDG_BuildGreysRowsWhenOff() {
 		"LLM_Menu_BuildSubmenu must compute _disabled from the enabled flag to grey settings rows when off")
 	Assert(InStr(Seg, '_row["disabled_when_off"] ? _disabled : false') > 0,
 		"LLM_Menu_BuildSubmenu must resolve each row's greying against the shared spec policy (disabled_when_off ? _disabled : false) — so backend/model stay usable while the rest grey out")
-	Assert(InStr(Seg, "AddCategoryToggleItem(_LLM_Menu_Handle,") > 0,
-		"LLM_Menu_BuildSubmenu must always add the enable toggle (AddCategoryToggleItem)")
+	Assert(InStr(Seg, 'MenuRenderer_AppendToggle(_LLM_Menu_Handle, "llm_menu", "llm_toggle",') > 0,
+		"LLM_Menu_BuildSubmenu must always add the manifest's IA switch (MenuRenderer_AppendToggle)")
 }
 Test("menu_main: LLM_Menu_Build greys the settings rows when the feature is off (llm-menu-disabled-greyed)", _LMDG_BuildGreysRowsWhenOff)
 
