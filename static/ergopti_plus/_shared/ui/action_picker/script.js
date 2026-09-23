@@ -10,6 +10,11 @@
  * ({type:"heading",level,text}) and actions ({type:"action",id,label}); the page
  * posts {action:'confirm',id} on a pick and {action:'cancel'} on dismiss.
  *
+ * An action may carry `disabled: true` and a `hint` when the host has proven
+ * that this machine cannot run it (a missing tool, the wrong session). The row
+ * stays visible and greyed with its reason instead of vanishing — a row that
+ * disappears reads as a bug — and it can be neither highlighted nor confirmed.
+ *
  * UX: type to filter, ↑/↓ to move the highlight, Enter to confirm, Esc to cancel,
  * click a row to pick it. Headings render as h1/h2/h3… by their level, fold their
  * descendants on click, and a table-of-contents button jumps to any heading.
@@ -24,6 +29,7 @@ var post = makeHostBridge('action_picker_bridge');
 
 function doConfirm(id) {
 	if (id === '' || id === undefined || id === null) return;
+	if (!isConfirmable(id)) return;
 	post({ action: 'confirm', id: id });
 }
 
@@ -36,7 +42,7 @@ function doCancel() {
 // ============================================================
 
 // Ordered entries: specials first ({kind:'action',special:true}), then the
-// host's items as {kind:'heading',level,text} / {kind:'action',id,label}.
+// host's items as {kind:'heading',level,text} / {kind:'action',id,label,disabled,hint}.
 let entries = [];
 
 // Heading entry-indices the user has collapsed (folded). Survives re-render.
@@ -80,7 +86,14 @@ function init(data) {
 		if (it.type === 'heading') {
 			entries.push({ kind: 'heading', level: it.level || 1, text: it.text || '' });
 		} else if (it.type === 'action') {
-			entries.push({ kind: 'action', id: it.id, label: it.label, special: false });
+			entries.push({
+				kind: 'action',
+				id: it.id,
+				label: it.label,
+				special: false,
+				disabled: it.disabled === true,
+				hint: it.hint || ''
+			});
 		}
 	});
 
@@ -170,7 +183,9 @@ function render() {
 			}
 			const row = buildActionRow(e, e.special ? 0 : curLevel);
 			list.appendChild(row);
-			visible.push({ id: e.id, el: row });
+			// A greyed row is shown but never focusable, so neither the arrows nor
+			// Enter can land on an action this machine cannot run.
+			if (!e.disabled) visible.push({ id: e.id, el: row });
 		}
 	}
 
@@ -187,6 +202,15 @@ function render() {
 
 function matches(actionEntry, q) {
 	return (actionEntry.label || '').toLowerCase().indexOf(q) !== -1;
+}
+
+// Whether an id may be confirmed: known to the list and not greyed out.
+function isConfirmable(id) {
+	for (let i = 0; i < entries.length; i++) {
+		const e = entries[i];
+		if (e.kind === 'action' && e.id === id) return !e.disabled;
+	}
+	return false;
 }
 
 function buildHeadingRow(i, e) {
@@ -217,7 +241,8 @@ function buildHeadingRow(i, e) {
 
 function buildActionRow(e, depth) {
 	const row = document.createElement('div');
-	row.className = 'row' + (e.special ? ' special' : '') + (e.id === currentId ? ' current' : '');
+	row.className =
+		'row' + (e.special ? ' special' : '') + (e.id === currentId ? ' current' : '') + (e.disabled ? ' disabled' : '');
 	row.dataset.id = e.id;
 	row.style.paddingLeft = 12 + (depth || 0) * 16 + 'px';
 
@@ -229,6 +254,17 @@ function buildActionRow(e, depth) {
 	label.textContent = e.label;
 	row.appendChild(tick);
 	row.appendChild(label);
+	if (e.hint) {
+		const hint = document.createElement('span');
+		hint.className = 'row-hint';
+		hint.textContent = e.hint;
+		row.appendChild(hint);
+		row.title = e.hint;
+	}
+	if (e.disabled) {
+		row.setAttribute('aria-disabled', 'true');
+		return row;
+	}
 
 	const idx = visible.length;
 	row.addEventListener('click', function () { doConfirm(e.id); });
