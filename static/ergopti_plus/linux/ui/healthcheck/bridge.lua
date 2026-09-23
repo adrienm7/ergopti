@@ -55,6 +55,12 @@ local NOT_AVAILABLE = "n/a"
 -- container.
 local _started_at = os.time()
 
+-- The daemon parts the report checks. The required ones run in every daemon;
+-- the AI engine is loaded optionally (RuntimeGuard.optional_require), so its
+-- absence is a feature that is off, not a failure.
+local REQUIRED_PARTS = { "engine", "keylogger", "config" }
+local OPTIONAL_PARTS = { "llm" }
+
 
 -- =========================================
 -- =========================================
@@ -356,17 +362,27 @@ local function build_snapshot(state)
 	-- Which of the daemon's parts are wired. Reported as adapter lists because
 	-- that is what the page renders, and because "the LLM section is missing"
 	-- is a more useful sentence than a section quietly rendering zeroes.
-	local loaded, failed = {}, {}
+	local loaded, failed, disabled = {}, {}, {}
 	-- Iterated over a list of NAMES, not over a table built from the state. A
 	-- constructor drops its nil values, so `pairs{ engine = state.engine, … }`
 	-- is empty exactly when every part is missing — the report would have been
 	-- silent about a completely unwired daemon, which is the one case this
 	-- window exists for.
-	for _, name in ipairs({ "engine", "keylogger", "config", "llm" }) do
+	for _, name in ipairs(REQUIRED_PARTS) do
 		if state[name] then
 			loaded[#loaded + 1] = name
 		else
 			failed[#failed + 1] = name .. " (not wired)"
+		end
+	end
+	-- An optional part that is absent is off, not broken: it used to be listed
+	-- with the failures in red, so a user without the AI module read the report
+	-- as a crash
+	for _, name in ipairs(OPTIONAL_PARTS) do
+		if state[name] then
+			loaded[#loaded + 1] = name
+		else
+			disabled[#disabled + 1] = name
 		end
 	end
 
@@ -384,6 +400,7 @@ local function build_snapshot(state)
 		-- answer to a question the page asks of every platform.
 		ports_validated  = loaded,
 		failed_adapters  = failed,
+		disabled_adapters = disabled,
 		uptime_sec       = os.time() - _started_at,
 		recent_issues    = recent_issues,
 		recent_issues_source = issues_source,

@@ -103,4 +103,27 @@ p.source {
 	color: #666;
 }
 
-.ok{color:#1a7f37;font-weight:600;}.fail{color:#cf222e;font-weight:600;}.unwired{color:#9a6700;font-weight:600;}
+h3 {
+	font-size: .95em;
+	margin: .9em 0 .3em;
+	color: #333;
+}
+
+details.developer {
+	margin: 1.2em 0 .3em;
+	border-top: 1px solid #e0e0e0;
+	padding-top: .4em;
+}
+
+details > summary {
+	cursor: pointer;
+	font-weight: 600;
+	color: #333;
+}
+
+details details > summary {
+	font-weight: 500;
+	color: #555;
+}
+
+.ok{color:#1a7f37;font-weight:600;}.fail{color:#cf222e;font-weight:600;}.unwired{color:#9a6700;font-weight:600;}.disabled{color:#6e7781;font-weight:600;}

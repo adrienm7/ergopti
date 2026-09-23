@@ -59,6 +59,27 @@ helpers.describe("healthcheck (linux): the system facts", function()
 	end)
 end)
 
+helpers.describe("healthcheck (linux): optional modules that are off", function()
+	-- The AI module is loaded optionally; when it is absent the report used to
+	-- list "llm (not wired)" as a red failure beside the modules the daemon
+	-- cannot run without (developer-details).
+	helpers.it("reports a missing AI module as disabled, not failed (developer-details)", function()
+		local snapshot = helpers.load_module("ui.healthcheck.bridge").on_message("ready", {
+			engine = {}, keylogger = {}, config = {},
+		})
+		helpers.assert_eq(snapshot.failed_adapters, {})
+		helpers.assert_eq(snapshot.disabled_adapters, { "llm" })
+	end)
+
+	helpers.it("still fails a missing required module (developer-details)", function()
+		local snapshot = helpers.load_module("ui.healthcheck.bridge").on_message("ready", {
+			keylogger = {}, config = {}, llm = {},
+		})
+		helpers.assert_eq(snapshot.failed_adapters, { "engine (not wired)" })
+		helpers.assert_eq(snapshot.disabled_adapters, {})
+	end)
+end)
+
 helpers.describe("healthcheck (linux): the sys payload the page renders", function()
 	helpers.it("sends every Linux row the page's Linux branch reads", function()
 		local previous = package.loaded["infra.diagnostic_snapshot"]
