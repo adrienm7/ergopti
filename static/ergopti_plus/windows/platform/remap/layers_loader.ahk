@@ -20,9 +20,10 @@
 ;    silently stops working. This reader takes tables, strings, integers,
 ;    floats and booleans, and rejects anything else — a duplicate key or table
 ;    included — as toml_invalid, which is what the Lua and JS parsers answer.
-;    Arrays, inline tables, dotted keys and multi-line strings are not part of
-;    the layer-file format and are rejected here even where full TOML accepts
-;    them.
+;    Arrays, inline tables, dotted keys, multi-line strings, control
+;    characters and integers beyond 15 digits are not part of the layer-file
+;    format (layer_actions.toml, "File format"); the Lua and JS loaders check
+;    the same rules before their TOML parsers run, so all three reject them.
 ; 2. Errors are data: each is a Map of code, layer, section, key, detail and
 ;    reason_key (absent parts ""), with the codes the corpus asserts. A
 ;    file-level problem rejects the whole file; an entry-level problem drops
@@ -40,6 +41,12 @@ global KEYMAP_LAYERS_SECTION_ALL := "all"
 ; contain a dot, so the dot cannot be the separator.
 global KEYMAP_LAYERS_PATH_SEPARATOR := Chr(31)
 global KEYMAP_LAYERS_ID_PATTERN := "^[a-z][a-z0-9_]*$"
+; Every control character but tab. A carriage return is allowed only as the
+; first half of a CRLF line end, which the reader removes before this check.
+global KEYMAP_LAYERS_CONTROL_PATTERN := "[\x{00}-\x{08}\x{0A}-\x{1F}\x{7F}]"
+; The most digits every loader holds exactly: JS numbers are exact to 2^53,
+; and Integer() wraps a longer integer round (2^64 + 1 reads as 1).
+global KEYMAP_LAYERS_MAX_INTEGER_DIGITS := 15
 
 
 
@@ -295,7 +302,7 @@ _KL_LoadLayer(Result, LayerId, Layer, Os, Ctx) {
 ; Parses one binding value. Syntax only; availability on an OS comes later.
 ; Returns the binding Map, or "" with ErrCode and Detail set.
 _KL_ParseBinding(Value, Ctx, &ErrCode, &Detail) {
-	global KEYMAP_LAYERS_ID_PATTERN
+	global KEYMAP_LAYERS_ID_PATTERN, KEYMAP_LAYERS_MAX_INTEGER_DIGITS
 	ErrCode := "", Detail := ""
 	if !(Value is String) {
 		ErrCode := "invalid_value_type", Detail := "a binding must be a string"
@@ -313,7 +320,10 @@ _KL_ParseBinding(Value, Ctx, &ErrCode, &Detail) {
 	Rest := SubStr(Value, Colon + 1)
 	if (Head == "repeat_count") {
 		Param := Ctx["repeat_count"]
-		if !RegExMatch(Rest, "^[0-9]+$") || Integer(Rest) < Param["min"] || Integer(Rest) > Param["max"] {
+		; Integer() wraps a number beyond 64 bits round into range, so a count
+		; too long to hold is refused by its length before it is converted.
+		if !RegExMatch(Rest, "^[0-9]+$") || StrLen(LTrim(Rest, "0")) > KEYMAP_LAYERS_MAX_INTEGER_DIGITS
+				|| Integer(Rest) < Param["min"] || Integer(Rest) > Param["max"] {
 			ErrCode := "invalid_parameter"
 			Detail := "repeat_count takes an integer from " . Param["min"] . " to " . Param["max"]
 			return ""
@@ -474,7 +484,7 @@ _KL_ResolveBinding(Binding, Os, Ctx, &Unavailable) {
 ; Parses the layer-file subset of TOML into nested Maps. Throws a ValueError
 ; naming the line on anything outside the subset or on a redefinition.
 _KL_ParseToml(Text) {
-	global KEYMAP_LAYERS_PATH_SEPARATOR
+	global KEYMAP_LAYERS_PATH_SEPARATOR, KEYMAP_LAYERS_CONTROL_PATTERN
 	if (SubStr(Text, 1, 1) == Chr(0xFEFF))
 		Text := SubStr(Text, 2)
 	Root := Map()
@@ -482,9 +492,16 @@ _KL_ParseToml(Text) {
 	Kinds := Map()
 	Current := Root
 	CurrentPath := ""
-	loop parse, Text, "`n", "`r" {
+	loop parse, Text, "`n" {
 		LineNo := A_Index
-		Line := Trim(A_LoopField, " `t")
+		Line := A_LoopField
+		; A CRLF line end is one line end; any other carriage return is a
+		; control character.
+		if (SubStr(Line, -1) == "`r")
+			Line := SubStr(Line, 1, -1)
+		if RegExMatch(Line, KEYMAP_LAYERS_CONTROL_PATTERN)
+			throw ValueError("line " . LineNo . ": control characters other than tab are not allowed")
+		Line := Trim(Line, " `t")
 		if (Line == "" || SubStr(Line, 1, 1) == "#")
 			continue
 		if (SubStr(Line, 1, 1) == "[") {
@@ -546,14 +563,21 @@ _KL_OpenTable(Root, Kinds, Segments, LineNo) {
 ; Parses the value after `=`: a basic or literal string, a boolean, an integer
 ; or a float, with an optional trailing comment.
 _KL_ParseValue(Rest, LineNo) {
+	global KEYMAP_LAYERS_MAX_INTEGER_DIGITS
 	if RegExMatch(Rest, '^"((?:[^"\\]|\\.)*)"[ \t]*(?:#.*)?$', &Match)
 		return _KL_UnescapeBasic(Match[1], LineNo)
 	if RegExMatch(Rest, "^'([^']*)'[ \t]*(?:#.*)?$", &Match)
 		return Match[1]
 	if RegExMatch(Rest, "^(true|false)[ \t]*(?:#.*)?$", &Match)
 		return TOML_Bool(Match[1] == "true")
-	if RegExMatch(Rest, "^([+-]?(?:0|[1-9](?:_?[0-9])*))[ \t]*(?:#.*)?$", &Match)
-		return Integer(StrReplace(Match[1], "_"))
+	; An integer is read as an integer or not at all: it never falls through
+	; to the float form, whatever its length.
+	if RegExMatch(Rest, "^([+-]?)(0|[1-9](?:_?[0-9])*)[ \t]*(?:#.*)?$", &Match) {
+		Digits := StrReplace(Match[2], "_")
+		if (StrLen(Digits) > KEYMAP_LAYERS_MAX_INTEGER_DIGITS)
+			throw ValueError("line " . LineNo . ": an integer has at most " . KEYMAP_LAYERS_MAX_INTEGER_DIGITS . " digits")
+		return Integer(Match[1] . Digits)
+	}
 	if RegExMatch(Rest, "^([+-]?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)[ \t]*(?:#.*)?$", &Match)
 		return Float(Match[1])
 	throw ValueError("line " . LineNo . ": unsupported value (a layer file holds strings, integers, floats and booleans)")

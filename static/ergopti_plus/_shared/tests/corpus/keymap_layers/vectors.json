@@ -1,5 +1,5 @@
 {
-	"description": "Cross-driver corpus for layer files (_shared/keymap/layers.recommended.toml and the user's layers.toml). Every vector is replayed by the JS reference loader (tools/lib/keymap-layers.cjs), the shared Lua loader (_shared/lua/keymap/layers.lua) under both the macOS and the Linux suite, and the AutoHotkey loader (windows/platform/remap/layers_loader.ahk). The expected answers are written by hand from the vocabulary (_shared/keymap/layer_actions.toml), not computed by any of the loaders.",
+	"description": "Cross-driver corpus for layer files (_shared/keymap/layers.recommended.toml and the user's layers.toml). Every vector is replayed by the JS reference loader (tools/lib/keymap-layers.cjs), the shared Lua loader (_shared/lua/keymap/layers.lua) under both the macOS and the Linux suite, and the AutoHotkey loader (windows/platform/remap/layers_loader.ahk). The expected answers are written by hand from the vocabulary (_shared/keymap/layer_actions.toml), not computed by any of the loaders. Files outside the layer-file format described there (valid TOML the AutoHotkey reader cannot read) are toml_invalid on every OS.",
 	"version": 1,
 	"field_semantics": {
 		"os": "The OS the file is resolved for: windows, macos or linux. Sections for the other OSes are still validated.",
@@ -98,6 +98,104 @@
 			"description": "A key that is a value cannot later open as a table.",
 			"os": "linux",
 			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav]\nall = \"arrow_left\"\n\n[layers.nav.all]\n\"KeyK\" = \"arrow_left\"\n",
+			"expected": { "errors": ["toml_invalid||||"], "layers": {} }
+		},
+		{
+			"id": "inline_table_is_outside_the_format",
+			"description": "An inline table is valid TOML but not the layer-file format: every loader rejects the file, instead of macOS and Linux binding the key while Windows rejects it.",
+			"os": "macos",
+			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav]\nall = { KeyK = \"arrow_left\" }\n",
+			"expected": { "errors": ["toml_invalid||||"], "layers": {} }
+		},
+		{
+			"id": "array_value_is_outside_the_format",
+			"description": "An array is outside the format too, so the whole file is rejected on every OS rather than one entry on some and the file on others.",
+			"os": "windows",
+			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"KeyK\" = [\"arrow_left\"]\n\"KeyL\" = \"arrow_right\"\n",
+			"expected": { "errors": ["toml_invalid||||"], "layers": {} }
+		},
+		{
+			"id": "dotted_key_is_outside_the_format",
+			"description": "A dotted key is outside the format: one TOML parser nests it, another keeps the dots in one key.",
+			"os": "linux",
+			"toml": "[_meta]\nschema_version = 1\n\n[layers]\nnav.all.KeyK = \"arrow_left\"\n",
+			"expected": { "errors": ["toml_invalid||||"], "layers": {} }
+		},
+		{
+			"id": "quoted_header_segment_is_outside_the_format",
+			"description": "A table header names bare keys only.",
+			"os": "windows",
+			"toml": "[_meta]\nschema_version = 1\n\n[layers.\"nav\".all]\n\"KeyK\" = \"arrow_left\"\n",
+			"expected": { "errors": ["toml_invalid||||"], "layers": {} }
+		},
+		{
+			"id": "multiline_string_is_outside_the_format",
+			"description": "A value is a one-line string: a multi-line string is outside the format.",
+			"os": "macos",
+			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"KeyK\" = \"\"\"arrow_left\"\"\"\n",
+			"expected": { "errors": ["toml_invalid||||"], "layers": {} }
+		},
+		{
+			"id": "non_decimal_integer_is_outside_the_format",
+			"description": "Integers are decimal: 0x1 is outside the format, not the version 1.",
+			"os": "linux",
+			"toml": "[_meta]\nschema_version = 0x1\n",
+			"expected": { "errors": ["toml_invalid||||"], "layers": {} }
+		},
+		{
+			"id": "integer_too_large_to_hold_is_invalid_toml",
+			"description": "2^64 + 1 cannot be held exactly: it is rejected, never wrapped round to the version 1.",
+			"os": "windows",
+			"toml": "[_meta]\nschema_version = 18446744073709551617\n",
+			"expected": { "errors": ["toml_invalid||||"], "layers": {} }
+		},
+		{
+			"id": "integer_of_sixteen_digits_is_invalid_toml",
+			"description": "An integer has at most 15 digits, the most every loader holds exactly.",
+			"os": "macos",
+			"toml": "[_meta]\nschema_version = 1000000000000001\n",
+			"expected": { "errors": ["toml_invalid||||"], "layers": {} }
+		},
+		{
+			"id": "integer_of_fifteen_digits_is_read",
+			"description": "15 digits still read as a number: this one is simply not a version this build knows.",
+			"os": "linux",
+			"toml": "[_meta]\nschema_version = 100_000_000_000_001\n",
+			"expected": { "errors": ["schema_version_unsupported||||"], "layers": {} }
+		},
+		{
+			"id": "toml_1_1_escape_is_invalid_toml",
+			"description": "\\e is a TOML 1.1 escape, not a TOML 1.0 one: every loader rejects it.",
+			"os": "macos",
+			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"KeyK\" = \"arrow\\eleft\"\n",
+			"expected": { "errors": ["toml_invalid||||"], "layers": {} }
+		},
+		{
+			"id": "nul_escape_is_invalid_toml",
+			"description": "A layer file cannot hold U+0000, escaped or not.",
+			"os": "linux",
+			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"KeyK\" = \"arrow\\u0000left\"\n",
+			"expected": { "errors": ["toml_invalid||||"], "layers": {} }
+		},
+		{
+			"id": "surrogate_escape_is_invalid_toml",
+			"description": "\\uD800 names half of a UTF-16 pair, not a character.",
+			"os": "windows",
+			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"KeyK\" = \"arrow\\uD800left\"\n",
+			"expected": { "errors": ["toml_invalid||||"], "layers": {} }
+		},
+		{
+			"id": "control_character_is_invalid_toml",
+			"description": "A control character other than tab (here DEL) is not TOML, even inside a comment.",
+			"os": "linux",
+			"toml": "# hand-edited\u007f\n[_meta]\nschema_version = 1\n",
+			"expected": { "errors": ["toml_invalid||||"], "layers": {} }
+		},
+		{
+			"id": "bare_carriage_return_is_invalid_toml",
+			"description": "A carriage return ends a line only as part of CRLF.",
+			"os": "macos",
+			"toml": "[_meta]\rschema_version = 1\n",
 			"expected": { "errors": ["toml_invalid||||"], "layers": {} }
 		},
 		{
@@ -326,6 +424,26 @@
 						"KeyL": "keystroke:ArrowRight@repeat"
 					}
 				}
+			}
+		},
+		{
+			"id": "byte_order_mark_and_crlf_read_the_same",
+			"description": "A file saved with a UTF-8 byte order mark and CRLF line ends, as some Windows editors do, reads like any other.",
+			"os": "linux",
+			"toml": "﻿[_meta]\r\nschema_version = 1\r\n\r\n[layers.nav.all]\r\n\"KeyK\" = \"arrow_left\" # left\r\n\"KeyL\"=\"arrow_right\"#right\r\n",
+			"expected": {
+				"errors": [],
+				"layers": { "nav": { "KeyK": "keystroke:ArrowLeft@repeat", "KeyL": "keystroke:ArrowRight@repeat" } }
+			}
+		},
+		{
+			"id": "repeat_count_too_large_to_hold_is_invalid",
+			"description": "A repeat count beyond 64 bits is out of range, never wrapped round into it; leading zeros still read as the number.",
+			"os": "windows",
+			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"Digit1\" = \"repeat_count:18446744073709551621\"\n\"Digit2\" = \"repeat_count:0005\"\n",
+			"expected": {
+				"errors": ["invalid_parameter|nav|all|Digit1|"],
+				"layers": { "nav": { "Digit2": "repeat_count:5" } }
 			}
 		},
 		{

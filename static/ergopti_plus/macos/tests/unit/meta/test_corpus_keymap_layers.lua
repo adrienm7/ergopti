@@ -71,6 +71,18 @@ local function sorted_copy(list)
 	return out
 end
 
+--- The text a vector hands the loader. _shared/lua/json.lua decodes a JSON null
+--- inside an object to its own sentinel table, not to nil, and the JS gate lets
+--- "toml" be only a string or null: anything else here is that null, the absent
+--- file, which load() takes as nil.
+--- @param v table One vector.
+--- @return string|nil text
+local function vector_text(v)
+	if v.file then return read_file(helpers.shared("keymap/" .. v.file)) end
+	if type(v.toml) == "string" then return v.toml end
+	return nil
+end
+
 
 
 
@@ -89,11 +101,17 @@ helpers.describe("keymap_layers corpus — replay through the shared Lua loader"
 			"only " .. #corpus.vectors .. " vectors (floor " .. MIN_VECTORS .. ")")
 	end)
 
+	helpers.it("at least one vector hands the loader an absent file", function()
+		local absent = 0
+		for _, v in ipairs(corpus.vectors) do
+			if vector_text(v) == nil then absent = absent + 1 end
+		end
+		helpers.assert_true(absent >= 1, "no vector replays the absent layers.toml (nil)")
+	end)
+
 	for _, v in ipairs(corpus.vectors) do
 		helpers.it("vector " .. v.id, function()
-			local text = v.toml
-			if v.file then text = read_file(helpers.shared("keymap/" .. v.file)) end
-			local result = Layers.load(text, v.os, ctx, toml_codec.decode)
+			local result = Layers.load(vector_text(v), v.os, ctx, toml_codec.decode)
 			local actual_errors = signatures(result)
 			helpers.assert_eq(actual_errors, sorted_copy(v.expected.errors), v.id .. ": errors")
 			helpers.assert_eq(formatted_layers(result), v.expected.layers, v.id .. ": layers")
@@ -174,5 +192,9 @@ helpers.describe("keymap_layers — broken shipped data raises", function()
 
 	helpers.it("an OS the vocabulary does not know raises", function()
 		helpers.assert_throws(function() Layers.load(nil, "beos", ctx, toml_codec.decode) end)
+	end)
+
+	helpers.it("a text that is neither a string nor nil raises instead of reading as no layer", function()
+		helpers.assert_throws(function() Layers.load({}, "macos", ctx, toml_codec.decode) end)
 	end)
 end)

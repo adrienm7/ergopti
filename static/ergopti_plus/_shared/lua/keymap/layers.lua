@@ -25,6 +25,10 @@
 ---    loader reads raises instead of quietly loading an empty layer.
 --- 4. An OS entry replaces the `all` entry for its key even when the OS entry
 ---    is the invalid one: a rejected override never falls back to `all`.
+--- 5. One file format: a layer file is the line-oriented TOML subset described
+---    in layer_actions.toml. It is checked line by line before the TOML codec
+---    reads the file, exactly as the JS and AHK loaders check it, so a file one
+---    TOML parser reads and another cannot is rejected by all of them.
 --- ==============================================================================
 
 local M = {}
@@ -45,6 +49,21 @@ local SECTION_ALL = "all"
 local META = "_meta"
 local LAYERS = "layers"
 local SIGNATURE_SEPARATOR = "|"
+
+-- The layer-file format (layer_actions.toml, "File format"). The JS loader and
+-- the AHK reader implement the same rules; the corpus holds them together.
+local BOM = "\239\187\191"
+-- Every control character but tab: bytes 1-8, 10-31 and 127 (NUL is found
+-- apart, as a plain byte, because LuaJIT patterns cannot hold one).
+local CONTROL_CHARACTER = "[\1-\8\10-\31\127]"
+local NUL = "\0"
+-- The most digits every loader holds exactly: JS numbers are exact to 2^53,
+-- and AutoHotkey wraps a longer integer round instead of refusing it.
+local MAX_INTEGER_DIGITS = 15
+local MAX_UNICODE_SCALAR = 0x10FFFF
+local SURROGATE_FIRST = 0xD800
+local SURROGATE_LAST = 0xDFFF
+local SIMPLE_ESCAPES = "btnfr\"\\"
 
 
 
@@ -109,9 +128,170 @@ end
 
 
 
+-- ==============================
+-- ==============================
+-- ======= 3/ File format =======
+-- ==============================
+-- ==============================
+
+--- @param rest string What follows a header or a value on its line.
+--- @return boolean ends True when only blanks and an optional comment remain.
+local function ends_line(rest)
+	return rest:match("^[ \t]*$") ~= nil or rest:match("^[ \t]*#") ~= nil
+end
+
+--- Reads a basic string at the start of `s`, like the regex "((?:[^"\\]|\\.)*)".
+--- @param s string Text starting with a double quote.
+--- @return string|nil contents The text between the quotes, or nil when unterminated.
+--- @return string|nil rest What follows the closing quote.
+local function scan_basic_string(s)
+	if s:sub(1, 1) ~= '"' then return nil end
+	local i = 2
+	while i <= #s do
+		local c = s:sub(i, i)
+		if c == "\\" then
+			if i == #s then return nil end
+			i = i + 2
+		elseif c == '"' then
+			return s:sub(2, i - 1), s:sub(i + 1)
+		else
+			i = i + 1
+		end
+	end
+	return nil
+end
+
+--- Checks the escapes of a basic string's contents (TOML 1.0 escapes only).
+--- @param contents string The text between the quotes.
+--- @return string|nil problem Why the escapes are invalid, or nil.
+local function escape_problem(contents)
+	local i = 1
+	while i <= #contents do
+		if contents:sub(i, i) ~= "\\" then
+			i = i + 1
+		else
+			local nxt = contents:sub(i + 1, i + 1)
+			if nxt ~= "" and SIMPLE_ESCAPES:find(nxt, 1, true) then
+				i = i + 2
+			else
+				local width = (nxt == "u" and 4) or (nxt == "U" and 8) or 0
+				local hex = contents:sub(i + 2, i + 1 + width)
+				if width == 0 or #hex ~= width or hex:find("[^0-9A-Fa-f]") then
+					return '"\\' .. nxt .. '" is not a TOML escape'
+				end
+				local code = tonumber(hex, 16)
+				if code == 0 or code > MAX_UNICODE_SCALAR or (code >= SURROGATE_FIRST and code <= SURROGATE_LAST) then
+					return '"\\' .. nxt .. hex .. '" is not a character a layer file can hold'
+				end
+				i = i + 2 + width
+			end
+		end
+	end
+	return nil
+end
+
+--- @param value string A value with nothing before it.
+--- @return boolean is_float True for a decimal float, like the regex
+---   [+-]?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)? then the end of the line.
+local function is_float(value)
+	local pos = 1
+	local sign = value:sub(1, 1)
+	if sign == "+" or sign == "-" then pos = 2 end
+	local whole = value:match("^[0-9]+", pos)
+	if not whole or (#whole > 1 and whole:sub(1, 1) == "0") then return false end
+	pos = pos + #whole
+	if value:sub(pos, pos) == "." then
+		local fraction = value:match("^[0-9]+", pos + 1)
+		if not fraction then return false end
+		pos = pos + 1 + #fraction
+	end
+	local e = value:sub(pos, pos)
+	if e == "e" or e == "E" then
+		local exponent = value:match("^[+-]?[0-9]+", pos + 1)
+		if not exponent then return false end
+		pos = pos + 1 + #exponent
+	end
+	return ends_line(value:sub(pos))
+end
+
+--- Checks the value of one key = value line.
+--- @param value string The text after `=`.
+--- @return string|nil problem Why the value is outside the format, or nil.
+local function value_problem(value)
+	local first = value:sub(1, 1)
+	if first == '"' then
+		local contents, rest = scan_basic_string(value)
+		if contents and ends_line(rest) then return escape_problem(contents) end
+	elseif first == "'" then
+		local rest = value:match("^'[^']*'(.*)$")
+		if rest and ends_line(rest) then return nil end
+	else
+		local rest = value:match("^true(.*)$") or value:match("^false(.*)$")
+		if rest and ends_line(rest) then return nil end
+		-- An integer is read as an integer or not at all: it never falls
+		-- through to the float form, whatever its length.
+		local digits, after = value:match("^[+-]?([0-9_]+)(.*)$")
+		if digits and ends_line(after) and (digits == "0" or (digits:match("^[1-9]") and not digits:find("__", 1, true)
+				and digits:sub(-1) ~= "_")) then
+			if #digits:gsub("_", "") > MAX_INTEGER_DIGITS then
+				return "an integer has at most " .. MAX_INTEGER_DIGITS .. " digits"
+			end
+			return nil
+		end
+		if is_float(value) then return nil end
+	end
+	return "a value is a one-line string, true, false, a decimal integer or a decimal float"
+end
+
+--- Checks that a layer file stays inside the layer-file format.
+--- @param text string The file content without its byte order mark.
+--- @return string|nil problem The first problem, naming its line, or nil.
+local function format_problem(text)
+	for index, raw in ipairs(split_plain(text, "\n")) do
+		local where = "line " .. index .. ": "
+		-- A CRLF line end is one line end; any other carriage return is a
+		-- control character.
+		local line = raw:sub(-1) == "\r" and raw:sub(1, -2) or raw
+		if line:find(CONTROL_CHARACTER) or line:find(NUL, 1, true) then
+			return where .. "control characters other than tab are not allowed"
+		end
+		line = line:match("^[ \t]*(.-)[ \t]*$")
+		if line ~= "" and line:sub(1, 1) ~= "#" then
+			if line:sub(1, 1) == "[" then
+				local inner, rest = line:match("^%[([^%]]*)%](.*)$")
+				local valid = inner ~= nil and ends_line(rest)
+				for _, segment in ipairs(valid and split_plain(inner, ".") or {}) do
+					if not segment:match("^[ \t]*[A-Za-z0-9_%-]+[ \t]*$") then valid = false end
+				end
+				if not valid then return where .. "a table header names bare keys only, like [layers.nav.all]" end
+			else
+				local value = line:match("^[A-Za-z0-9_%-]+[ \t]*=[ \t]*(.*)$")
+				if not value and line:sub(1, 1) == '"' then
+					local contents, rest = scan_basic_string(line)
+					local key_problem = contents and escape_problem(contents)
+					if key_problem then return where .. key_problem end
+					value = rest and rest:match("^[ \t]*=[ \t]*(.*)$")
+				elseif not value and line:sub(1, 1) == "'" then
+					value = line:match("^'[^']*'[ \t]*=[ \t]*(.*)$")
+				end
+				if not value then
+					return where .. "expected a table header or one key = value pair (dotted keys are not part of the format)"
+				end
+				local problem = value_problem(value)
+				if problem then return where .. problem end
+			end
+		end
+	end
+	return nil
+end
+
+
+
+
+
 -- ==========================
 -- ==========================
--- ======= 3/ Context =======
+-- ======= 4/ Context =======
 -- ==========================
 -- ==========================
 
@@ -180,7 +360,7 @@ end
 
 -- ==================================
 -- ==================================
--- ======= 4/ Binding grammar =======
+-- ======= 5/ Binding grammar =======
 -- ==================================
 -- ==================================
 
@@ -325,7 +505,7 @@ end
 
 -- =======================================
 -- =======================================
--- ======= 5/ Loading a layer file =======
+-- ======= 6/ Loading a layer file =======
 -- =======================================
 -- =======================================
 
@@ -386,6 +566,11 @@ end
 --- @return table result { ok = boolean, errors = {…}, layers = { layer id -> { key code -> resolution } } }
 function M.load(text, os, ctx, toml_decode)
 	if not list_has(ctx.platforms, os) then error("keymap.layers: unknown OS " .. tostring(os), 2) end
+	-- nil is the absent file; anything else that is not text is a caller bug,
+	-- never an empty layer file.
+	if text ~= nil and type(text) ~= "string" then
+		error("keymap.layers: the layer file text must be a string, or nil when the file is absent, not a " .. type(text), 2)
+	end
 	local result = { ok = true, errors = {}, layers = {} }
 	local function reject(err)
 		result.errors[#result.errors + 1] = err
@@ -398,7 +583,10 @@ function M.load(text, os, ctx, toml_decode)
 		result.ok = false
 	end
 	if text == nil then return result end
-	local decoded_ok, doc = pcall(toml_decode, text)
+	local body = text:sub(1, #BOM) == BOM and text:sub(#BOM + 1) or text
+	local problem = format_problem(body)
+	if problem then return reject(new_error("toml_invalid", nil, nil, nil, problem)) end
+	local decoded_ok, doc = pcall(toml_decode, body)
 	if not decoded_ok or not is_table(doc) then
 		return reject(new_error("toml_invalid", nil, nil, nil, decoded_ok and "the file is not valid TOML" or tostring(doc)))
 	end
@@ -461,7 +649,7 @@ end
 
 -- =======================================
 -- =======================================
--- ======= 6/ Canonical text forms =======
+-- ======= 7/ Canonical text forms =======
 -- =======================================
 -- =======================================
 

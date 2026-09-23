@@ -16,6 +16,16 @@
 # commas are sent in order. A key absent from a layer keeps its normal
 # behaviour while the layer is held.
 #
+# File format. A layer file is line-oriented TOML 1.0: blank lines, comments,
+# `[a.b.c]` headers of bare keys, and one `key = value` per line whose key is
+# bare, "basic" or 'literal' and whose value is a one-line string, true, false,
+# a decimal integer of at most 15 digits or a decimal float. A UTF-8 byte order
+# mark and CRLF line ends are allowed; other control characters are not.
+# Inline tables, arrays, dotted keys, quoted header segments, multi-line
+# strings and other number forms are valid TOML but outside this format: the
+# AutoHotkey loader has no full TOML parser, so every loader rejects them
+# (toml_invalid) rather than three parsers reading one file three ways.
+#
 # Each named action resolves per OS through `windows` / `macos` / `linux`, or
 # `all` for every OS that has no entry of its own. A resolution is one of
 #   keystroke:<chord>[,<chord>…]   what the driver sends

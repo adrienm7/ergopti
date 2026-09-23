@@ -23,6 +23,10 @@
  * 3. File-level errors (unreadable TOML, missing or unsupported schema
  *    version) reject the whole file; entry-level errors drop that entry only
  *    and are all reported.
+ * 4. One file format: a layer file is the line-oriented TOML subset described
+ *    in layer_actions.toml. It is checked line by line before smol-toml reads
+ *    the file, exactly as the Lua and AHK loaders check it, so a file one
+ *    TOML parser reads and another cannot is rejected by all of them.
  * ==============================================================================
  */
 
@@ -39,6 +43,96 @@ const RECOMMENDED_PATH = shared('keymap', 'layers.recommended.toml');
 const ACTION_ID = /^[a-z][a-z0-9_]*$/;
 const LAYER_ID = /^[a-z][a-z0-9_]*$/;
 const SECTION_ALL = 'all';
+
+// The layer-file format (layer_actions.toml, "File format"). The Lua loader
+// and the AHK reader implement the same rules; the corpus holds them together.
+const BOM = '﻿';
+const CONTROL_CHARACTER = /[\u0000-\u0008\u000A-\u001F\u007F]/;
+const TABLE_HEADER = /^\[[ \t]*[A-Za-z0-9_-]+(?:[ \t]*\.[ \t]*[A-Za-z0-9_-]+)*[ \t]*\][ \t]*(?:#.*)?$/;
+const KEY_VALUE = /^(?:[A-Za-z0-9_-]+|"((?:[^"\\]|\\.)*)"|'[^']*')[ \t]*=[ \t]*(.*)$/;
+const BASIC_STRING_VALUE = /^"((?:[^"\\]|\\.)*)"[ \t]*(?:#.*)?$/;
+const LITERAL_STRING_VALUE = /^'[^']*'[ \t]*(?:#.*)?$/;
+const BOOLEAN_VALUE = /^(?:true|false)[ \t]*(?:#.*)?$/;
+const INTEGER_VALUE = /^[+-]?(0|[1-9](?:_?[0-9])*)[ \t]*(?:#.*)?$/;
+const FLOAT_VALUE = /^[+-]?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?[ \t]*(?:#.*)?$/;
+// The most digits every loader holds exactly: JS numbers are exact to 2^53,
+// and AutoHotkey wraps a longer integer round instead of refusing it.
+const MAX_INTEGER_DIGITS = 15;
+const MAX_UNICODE_SCALAR = 0x10ffff;
+const SURROGATE_FIRST = 0xd800;
+const SURROGATE_LAST = 0xdfff;
+const SIMPLE_ESCAPES = 'btnfr"\\';
+
+/**
+ * Checks the escapes of a basic string's contents (TOML 1.0 escapes only).
+ * @param {string} contents - The text between the quotes.
+ * @returns {string|null} Why the escapes are invalid, or null.
+ */
+function escapeProblem(contents) {
+	for (let i = 0; i < contents.length; i++) {
+		if (contents[i] !== '\\') continue;
+		const next = contents[i + 1];
+		if (SIMPLE_ESCAPES.includes(next)) {
+			i += 1;
+			continue;
+		}
+		const width = next === 'u' ? 4 : next === 'U' ? 8 : 0;
+		const hex = contents.slice(i + 2, i + 2 + width);
+		if (width === 0 || hex.length !== width || /[^0-9A-Fa-f]/.test(hex)) return `"\\${next}" is not a TOML escape`;
+		const code = parseInt(hex, 16);
+		if (code === 0 || code > MAX_UNICODE_SCALAR || (code >= SURROGATE_FIRST && code <= SURROGATE_LAST))
+			return `"\\${next}${hex}" is not a character a layer file can hold`;
+		i += 1 + width;
+	}
+	return null;
+}
+
+/**
+ * Checks that a layer file stays inside the layer-file format.
+ * @param {string} text - The file content without its byte order mark.
+ * @returns {string|null} The first problem, naming its line, or null.
+ */
+function formatProblem(text) {
+	const lines = text.split('\n');
+	for (let index = 0; index < lines.length; index++) {
+		const where = `line ${index + 1}`;
+		let line = lines[index];
+		// A CRLF line end is one line end; any other carriage return is a
+		// control character.
+		if (line.endsWith('\r')) line = line.slice(0, -1);
+		if (CONTROL_CHARACTER.test(line)) return `${where}: control characters other than tab are not allowed`;
+		line = line.replace(/^[ \t]+|[ \t]+$/g, '');
+		if (line === '' || line.startsWith('#')) continue;
+		if (line.startsWith('[')) {
+			if (!TABLE_HEADER.test(line)) return `${where}: a table header names bare keys only, like [layers.nav.all]`;
+			continue;
+		}
+		const pair = KEY_VALUE.exec(line);
+		if (!pair) return `${where}: expected a table header or one key = value pair (dotted keys are not part of the format)`;
+		if (pair[1] !== undefined) {
+			const problem = escapeProblem(pair[1]);
+			if (problem) return `${where}: ${problem}`;
+		}
+		const value = pair[2];
+		const basic = BASIC_STRING_VALUE.exec(value);
+		if (basic) {
+			const problem = escapeProblem(basic[1]);
+			if (problem) return `${where}: ${problem}`;
+			continue;
+		}
+		if (LITERAL_STRING_VALUE.test(value) || BOOLEAN_VALUE.test(value)) continue;
+		// An integer is read as an integer or not at all: it never falls
+		// through to the float form, whatever its length.
+		const integer = INTEGER_VALUE.exec(value);
+		if (integer) {
+			if (integer[1].replace(/_/g, '').length > MAX_INTEGER_DIGITS) return `${where}: an integer has at most ${MAX_INTEGER_DIGITS} digits`;
+			continue;
+		}
+		if (FLOAT_VALUE.test(value)) continue;
+		return `${where}: a value is a one-line string, true, false, a decimal integer or a decimal float`;
+	}
+	return null;
+}
 
 /**
  * Loads the registry and the vocabulary once.
@@ -184,9 +278,12 @@ function loadLayers(text, os, ctx) {
 		return result;
 	};
 	if (text === null) return result;
+	const body = text.startsWith(BOM) ? text.slice(BOM.length) : text;
+	const problem = formatProblem(body);
+	if (problem) return reject(error('toml_invalid', null, null, null, problem));
 	let doc;
 	try {
-		doc = TOML.parse(text);
+		doc = TOML.parse(body);
 	} catch (e) {
 		return reject(error('toml_invalid', null, null, null, e.message));
 	}
