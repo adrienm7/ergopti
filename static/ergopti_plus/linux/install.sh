@@ -482,10 +482,10 @@ _lua_module_candidates() {
 		dnf:lfs)      echo "lua5.1-filesystem compat-lua-filesystem luajit2.1-filesystem" ;;
 		dnf:posix)    echo "lua5.1-posix compat-lua-posix luajit2.1-posix" ;;
 		dnf:lgi)      echo "lua5.1-lgi compat-lua-lgi luajit2.1-lgi" ;;
-		zypper:luv)   echo "lua51-luv" ;;
-		zypper:lfs)   echo "lua51-luafilesystem" ;;
-		zypper:posix) echo "lua51-luaposix" ;;
-		zypper:lgi)   echo "lua51-lgi" ;;
+		zypper:luv)   echo "luajit-luv lua51-luv" ;;
+		zypper:lfs)   echo "luajit-luafilesystem lua51-luafilesystem" ;;
+		zypper:posix) echo "luajit-luaposix lua51-luaposix" ;;
+		zypper:lgi)   echo "luajit-lgi lua51-lgi" ;;
 		pacman:luv)   echo "lua51-luv luajit-luv" ;;
 		pacman:lfs)   echo "lua51-filesystem" ;;
 		pacman:posix) echo "lua51-posix" ;;

@@ -44,7 +44,7 @@ prepare_test_tooling() {
 			python3 python3-gi gir1.2-glib-2.0 dbus xvfb xauth procps >/dev/null
 	elif command -v zypper >/dev/null 2>&1; then
 		zypper --non-interactive install -y sudo curl python3 python3-gobject \
-			typelib-1_0-Gio-2_0 dbus-1 xorg-x11-server-Xvfb procps shadow >/dev/null
+			typelib-1_0-Gio-2_0 dbus-1 dbus-1-daemon xorg-x11-server-Xvfb procps shadow >/dev/null
 	elif command -v dnf >/dev/null 2>&1; then
 		dnf install -y -q sudo curl python3 python3-gobject-base dbus-daemon dbus-tools \
 			xorg-x11-server-Xvfb procps-ng findutils shadow-utils >/dev/null
