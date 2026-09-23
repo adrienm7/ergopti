@@ -55,6 +55,44 @@ local SHARED_PROBE_FILE = "data/locales/en.json"
 -- =========================================
 -- =========================================
 
+--- The process working directory, or nil when it cannot be read.
+--- @return string|nil
+local function current_dir()
+	local ok_ffi, ffi = pcall(require, "ffi")
+	if ok_ffi and ffi.os ~= "Windows" then
+		pcall(ffi.cdef, "char *getcwd(char *buf, size_t size);")
+		local buf = ffi.new("char[?]", 4096)
+		local ok, res = pcall(function() return ffi.C.getcwd(buf, 4096) end)
+		if ok and res ~= nil then return ffi.string(buf) end
+	end
+	local pwd = os.getenv("PWD")
+	if type(pwd) == "string" and pwd:sub(1, 1) == "/" then return pwd end
+	local pipe = io.popen("pwd 2>/dev/null")
+	if not pipe then return nil end
+	local out = (pipe:read("*l") or "")
+	pipe:close()
+	return out ~= "" and out or nil
+end
+
+--- Anchors a path to the working directory when it is relative.
+---
+--- A relative root is not a local inconvenience: every path built from it is
+--- handed to OTHER processes — the tray icon to the panel, pages to WebKit, the
+--- config to kanata — and each of those resolves it against its own working
+--- directory. Launched from a checkout (`luajit ergopti_hotstrings.lua`, a
+--- relative package.path), the tray announced "./../_shared/assets/…" and the
+--- panel, running elsewhere, drew nothing.
+--- @param path string
+--- @return string
+local function absolute(path)
+	if path:sub(1, 1) == "/" or path:match("^%a:/") then return path end
+	local cwd = current_dir()
+	if not cwd then return path end
+	cwd = cwd:gsub("\\", "/"):gsub("/+$", "")
+	if path == "." then return cwd end
+	return cwd .. "/" .. path:gsub("^%./", "")
+end
+
 --- The driver root (…/static/ergopti_plus/linux), derived from this file.
 --- @return string Absolute path, forward slashes, no trailing slash.
 local function driver_root()
@@ -62,7 +100,7 @@ local function driver_root()
 	if src:sub(1, 1) == "@" then src = src:sub(2) end
 	src = src:gsub("\\", "/")
 	-- src is <driver root>/infra/paths.lua
-	return src:match("^(.*)/infra/paths%.lua$") or "."
+	return absolute(src:match("^(.*)/infra/paths%.lua$") or ".")
 end
 
 local _driver_root = driver_root()
@@ -137,6 +175,15 @@ function M.shared(rel)
 	if not root then return nil end
 	if type(rel) ~= "string" or rel == "" then return root end
 	return (root .. "/" .. (rel:gsub("^/", "")))
+end
+
+--- Test seam: the anchoring rule driver_root() applies to its own location.
+--- The runner loads this file through an absolute path, so the relative case a
+--- checkout launch produces is only reachable through here.
+--- @param path string
+--- @return string
+function M._absolute_for_test(path)
+	return absolute(path)
 end
 
 --- The driver root, for callers that need a driver-relative path.
