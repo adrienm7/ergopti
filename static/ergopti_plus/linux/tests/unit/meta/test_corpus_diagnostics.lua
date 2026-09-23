@@ -10,6 +10,9 @@
 ---    healthcheck.snapshot.parse_errors_tail (the window's recent issues).
 --- 2. _shared/tests/corpus/diagnostics/issue_link_vectors.json through
 ---    diagnostics.issue_link (the prefilled GitHub issue URL).
+--- 3. _shared/tests/corpus/diagnostics/redaction_vectors.json through
+---    diagnostics.redact with the rules of
+---    _shared/modules/diagnostics/redaction.json (what leaves the machine).
 --- Each corpus fails loudly when unreadable or empty: a replay over zero
 --- vectors would report success while checking nothing.
 --- ==============================================================================
@@ -88,6 +91,23 @@ helpers.describe("diagnostics corpus (linux): GitHub issue link", function()
 				helpers.assert_true(ok, vector.id .. ": " .. tostring(url))
 				helpers.assert_eq(url, vector.expected, vector.id)
 			end
+		end)
+	end
+end)
+
+helpers.describe("diagnostics corpus (linux): redaction", function()
+	local corpus = read_corpus("tests/corpus/diagnostics/redaction_vectors.json")
+	local rules = read_corpus("modules/diagnostics/redaction.json")
+	local Redact = require("diagnostics.redact")
+
+	helpers.it("has vectors (redaction-corpus)", function()
+		helpers.assert_true(type(corpus.vectors) == "table" and #corpus.vectors >= 10,
+			"the redaction corpus must hold its vectors")
+	end)
+
+	for _, vector in ipairs(corpus.vectors or {}) do
+		helpers.it("apply: " .. vector.id .. " (redaction-corpus)", function()
+			helpers.assert_eq(Redact.apply(vector.input, rules, vector.context), vector.expected, vector.id)
 		end)
 	end
 end)
