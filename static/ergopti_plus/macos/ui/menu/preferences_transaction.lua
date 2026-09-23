@@ -50,7 +50,8 @@ end
 --- `opts.persisted_view(state)`, when given, returns the table a save must
 --- serialise instead of the live state (session demotions keep the saved value
 --- of a feature whose runtime refused it); the rollback snapshot stays the live
---- state either way.
+--- state either way. `opts.read_only_reason()`, when it returns a string, makes
+--- every save refuse to write and roll the unsaved change back.
 --- @param preferences table Preferences module or test double.
 --- @param opts table Transaction dependencies and initial snapshots.
 --- @return function save Transactional save function.
@@ -58,6 +59,9 @@ function M.bind(preferences, opts)
 	if type(opts) ~= "table" then error("preferences transaction options are required", 2) end
 	if opts.persisted_view ~= nil and type(opts.persisted_view) ~= "function" then
 		error("persisted_view must be a function", 2)
+	end
+	if opts.read_only_reason ~= nil and type(opts.read_only_reason) ~= "function" then
+		error("read_only_reason must be a function", 2)
 	end
 	local state = opts.state
 	local committed_state = clone_value(opts.initial_state)
@@ -81,6 +85,21 @@ function M.bind(preferences, opts)
 
 	return function()
 		if rolling_back then return false end
+		local read_only = nil
+		if opts.read_only_reason then read_only = opts.read_only_reason() end
+		if read_only ~= nil then
+			if type(read_only) ~= "string" then
+				error("read_only_reason must return nil or a reason string", 2)
+			end
+			Logger.error(LOG, "Preferences are read-only for this session (%s); config.toml was "
+				.. "not written and the change was rolled back. Reload once the cause is fixed.",
+				tostring(read_only))
+			local rollback_ok, rollback_result = xpcall(rollback, debug.traceback)
+			if not rollback_ok or rollback_result ~= true then
+				Logger.error(LOG, "Preference rollback did not commit: %s.", tostring(rollback_result))
+			end
+			return false
+		end
 		local persisted_state = state
 		if opts.persisted_view then persisted_state = opts.persisted_view(state) end
 		local committed, snapshot = M.commit(

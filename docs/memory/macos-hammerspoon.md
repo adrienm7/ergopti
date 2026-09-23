@@ -304,7 +304,9 @@ default after one refusal (Gestures, Metrics, AI OFF with config.toml ON) and
 the next toggle wrote them over the file; a save from inside the sync also ran
 before the boot transaction was seeded and failed. Only an unprovable posture
 (`report.unsettled`) or a raised sync rolls the whole state back. Keep new
-refusal paths in memory; never call `save_prefs` from the sync.
+refusal paths in memory; never call `save_prefs` from the sync. A rolled-back
+session over a present file, and one whose config.toml could not be decoded,
+holds only defaults: its save transaction is read-only (refuse, roll back, ERROR).
 
 ### project-hs-fork-admission-in-both-launch-modes
 
