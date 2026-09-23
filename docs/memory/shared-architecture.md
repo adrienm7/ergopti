@@ -57,6 +57,16 @@ rendering but must not fork labels or help text.
 Owning a native menu object does not transfer content ownership. The shared
 manifest remains authoritative for ordering and entries.
 
+### project-action-catalogue-is-generated
+
+No driver parses `_shared/modules/actions/actions.toml`: run
+`npm run codegen:action-catalogue` after editing it, and each driver loads its
+platform-filtered `_generated/action_catalogue.*`. Each driver suite compares
+that catalogue with its runnable registry in both directions
+(`(action-catalogue-parity)`). On Linux the runnable set is exactly the
+executor's tables, so a new Linux action is a row in one of them, never an
+`elseif` the parity test cannot see.
+
 ### project-a-toggle-is-opt-in-per-driver
 
 A shared setting is not automatically supported by every driver. Add explicit
