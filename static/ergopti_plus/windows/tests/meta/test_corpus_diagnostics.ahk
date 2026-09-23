@@ -12,6 +12,9 @@
 ; 2. _shared/tests/corpus/diagnostics/issue_link_vectors.json through
 ;    IssueLink_PercentEncode and IssueLink_BuildUrl (the prefilled GitHub issue
 ;    URL).
+; 3. _shared/tests/corpus/diagnostics/redaction_vectors.json through
+;    Redact_Apply with the rules of _shared/modules/diagnostics/redaction.json
+;    (what leaves the machine).
 ; Each corpus fails loudly when unreadable or empty: a replay over zero
 ; vectors would report success while checking nothing.
 ; ==============================================================================
@@ -113,3 +116,23 @@ _TCD_IssueLink() {
 }
 
 Test("corpus:diagnostics: GitHub issue link vectors (issue-link-corpus)", _TCD_IssueLink)
+
+
+
+
+
+; ============================
+; ============================
+; ======= 4/ Redaction =======
+; ============================
+; ============================
+
+_TCD_Redaction() {
+	Data := _TCD_Corpus("tests\corpus\diagnostics\redaction_vectors.json")
+	Rules := _TCD_Corpus("modules\diagnostics\redaction.json")
+	Assert(Data["vectors"].Length >= 10, "the redaction corpus must hold its vectors")
+	for Vector in Data["vectors"]
+		AssertEqual(Vector["expected"], Redact_Apply(Vector["input"], Rules, Vector["context"]), Vector["id"])
+}
+
+Test("corpus:diagnostics: redaction vectors (redaction-corpus)", _TCD_Redaction)
