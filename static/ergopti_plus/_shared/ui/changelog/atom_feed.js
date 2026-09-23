@@ -214,10 +214,17 @@
 		return node.children.map(textOf).join('');
 	}
 
-	/** Returns an absolute http(s) link destination safe to embed in Markdown. */
+	/**
+	 * Returns a link destination safe to embed in Markdown: an absolute http(s)
+	 * URL, or an in-page fragment kept verbatim so the feed body carries the same
+	 * "[…](#downloads)" jump link as the API body and the section splitter drops
+	 * it alike (the renderer never makes a fragment clickable).
+	 */
 	function linkDestination(attrs) {
 		var href = readAttribute(attrs, 'href');
-		if (!href || !/^https?:\/\//i.test(href.trim())) return null;
+		if (!href) return null;
+		if (/^#[A-Za-z0-9_-]+$/.test(href.trim())) return href.trim();
+		if (!/^https?:\/\//i.test(href.trim())) return null;
 		return href.trim().replace(/[\s()<>\\]/g, function (ch) {
 			return '%' + ch.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0');
 		});
