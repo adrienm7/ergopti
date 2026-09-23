@@ -26,6 +26,12 @@
  * The tray's libayatana-appindicator and the windows' WebKit2GTK typelib were
  * left to the user, so a fresh install showed no tray icon anywhere. Each must
  * be requested from the package manager when its probe fails.
+ *
+ * ROOT CAUSE 4 — AN OPTIONAL LUA PACKAGE ABSENT FROM THE ARCHIVE ABORTED IT.
+ * lua-http does not exist on Arch, lua-filesystem not on openSUSE; the package
+ * manager failed under `set -e` and the script died before copying the driver.
+ * The names were also Lua 5.4 builds there, invisible to LuaJIT. An optional
+ * module that cannot be installed must be reported and skipped.
  * ==============================================================================
  */
 
@@ -84,7 +90,15 @@ function runInstaller(scenario) {
 	stub(stubs, 'sudo', `${log}\n[ "$1" = apt-get ] && exec "$@"\nexit 0`);
 	stub(stubs, 'systemctl', `${log}\nexit 1`);
 	// The package manager "installs" by dropping a marker the probes read.
-	stub(stubs, 'apt-get', `${log}\nfor p in "$@"; do touch ${JSON.stringify(bashPath(state))}/"$p"; done\nexit 0`);
+	// A package named in scenario.absentPackages is not in the archive: the
+	// manager fails, as apt/pacman/zypper do for an unknown name.
+	const absent = (scenario.absentPackages || []).join(' ');
+	stub(
+		stubs,
+		'apt-get',
+		`${log}\nfor p in "$@"; do case " ${absent} " in *" $p "*) exit 100 ;; esac; done\n` +
+			`for p in "$@"; do touch ${JSON.stringify(bashPath(state))}/"$p"; done\nexit 0`
+	);
 	// Every command a real system would provide.
 	for (const name of ['notify-send', 'xkbcli', 'unzip', 'sha256sum']) stub(stubs, name, 'exit 0');
 	// luajit: library probes answer from the markers, so the desktop backends
@@ -98,6 +112,7 @@ function runInstaller(scenario) {
 			'case "$code" in',
 			`  *appindicator*) [ -e "$st/libayatana-appindicator3-1" ] || [ "${scenario.desktopProvided ? 1 : 0}" = 1 ] ;;`,
 			`  *WebKit2*) [ -e "$st/gir1.2-webkit2-4.1" ] || [ "${scenario.desktopProvided ? 1 : 0}" = 1 ] ;;`,
+			`  *"require('posix')"*) [ -e "$st/lua-posix" ] || [ "${scenario.posixProvided === false ? 0 : 1}" = 1 ] ;;`,
 			'  *) exit 0 ;;',
 			'esac'
 		].join('\n')
@@ -160,6 +175,32 @@ const errors = [];
 	}
 }
 
+// ── An optional Lua package the archive does not carry ─────────────────────
+{
+	const run = runInstaller({
+		distroKanata: true,
+		desktopProvided: true,
+		posixProvided: false,
+		absentPackages: ['lua-posix']
+	});
+	try {
+		if (run.status !== 0) {
+			errors.push(
+				`install.sh exited ${run.status} when an optional Lua package was absent from the archive:\n` +
+					run.output.split('\n').slice(-8).join('\n')
+			);
+		}
+		if (!fs.existsSync(path.join(run.home, '.local', 'bin', 'ergopti-hotstrings'))) {
+			errors.push('no launcher was installed after an optional Lua package failed');
+		}
+		if (!/posix \(signaux SIGTERM\/SIGHUP\) indisponible pour LuaJIT/.test(run.output)) {
+			errors.push('an optional Lua module that stayed unavailable was not reported');
+		}
+	} finally {
+		run.cleanup();
+	}
+}
+
 // ── A kanata the distribution already provides ─────────────────────────────
 {
 	const run = runInstaller({ distroKanata: true, desktopProvided: true });
@@ -191,5 +232,5 @@ if (errors.length > 0) {
 	process.exit(1);
 }
 console.log(
-	'\x1b[32m[OK] install.sh finishes without kanata, runs a distribution kanata, and installs the tray and window backends.\x1b[0m'
+	'\x1b[32m[OK] install.sh finishes without kanata, runs a distribution kanata, and installs the tray and window backends, and survives a missing optional package.\x1b[0m'
 );

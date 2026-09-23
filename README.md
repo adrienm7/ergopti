@@ -236,14 +236,15 @@ bash static/ergopti_plus/linux/install.sh --no-deps   # …same, minus the packa
 | `lua-posix`                        | no `SIGTERM`/`SIGHUP` handlers, and no `stat()` polling to fall back on        |
 | `lua-lgi`                          | no typing-speed pill and no WebKit2GTK windows                                 |
 | `lua-filesystem`                   | existence checks fall back from `stat()` to opening the path                   |
-| `lua-http`                         | nothing today — installed, required by no module                               |
 
 `install.sh` installs every row, plus the WebKit2GTK typelib the tray's windows
 are drawn with. The tray and window backends are best effort — a headless
 machine still gets working hotstrings — but each is re-probed after its package
 is installed and reported when it stays unavailable. Every Lua library is loaded
 through `pcall(require, …)`, so a bare box starts and silently does less rather
-than failing.
+than failing. The Lua modules are installed as LuaJIT (Lua 5.1 ABI) builds —
+`lua51-*` on Arch and openSUSE, `lua5.1-*` on Alpine — because the generic
+`lua-*` packages there are Lua 5.4 builds LuaJIT cannot load.
 
 **2. Permissions** — this is where people get stuck
 
