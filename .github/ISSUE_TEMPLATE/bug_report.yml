@@ -1,0 +1,71 @@
+# .github/ISSUE_TEMPLATE/bug_report.yml
+#
+# The form ErgoptiPlus opens from Debug > Report a bug. The app prefills the
+# fields listed in static/ergopti_plus/_shared/modules/diagnostics/issue_templates.json
+# by their `id`; tools/test/test-issue-templates.cjs keeps both in step.
+# Labels live here because the URL's `labels=` parameter only applies to users
+# with triage permission.
+
+name: Bug report
+description: Something in ErgoptiPlus does not work as expected. / Quelque chose ne fonctionne pas comme prévu.
+title: "[Bug] "
+labels: ["bug", "from-app"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a problem. ErgoptiPlus's Debug > Report a bug fills in the version, the system and a diagnostics summary, and copies the full diagnostics to your clipboard.
+        Merci de signaler ce problème. Débogage > Signaler un bug remplit la version, le système et un résumé du diagnostic, et copie le diagnostic complet dans le presse-papiers.
+  - type: textarea
+    id: what_happened
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead. / Ce que vous avez fait, ce que vous attendiez et ce qui s'est passé.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The shortest sequence that shows the problem. / La suite d'actions la plus courte qui montre le problème.
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: ErgoptiPlus version
+      description: Shown in the About submenu. / Affichée dans le sous-menu À propos.
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: macOS 15.1, Windows 11 24H2, Fedora Linux 41 (GNOME, Wayland)
+    validations:
+      required: true
+  - type: input
+    id: driver
+    attributes:
+      label: Driver
+      description: macos, windows or linux.
+    validations:
+      required: false
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: Paste the diagnostics copied by Debug > Report a bug (Ctrl+V or Cmd+V), or drag the saved .md file here. The home folder, the account name and tokens are already removed. / Collez le diagnostic copié par Débogage > Signaler un bug, ou glissez ici le fichier .md enregistré. Le dossier personnel, le nom du compte et les jetons sont déjà retirés.
+    validations:
+      required: false
+  - type: checkboxes
+    id: consent
+    attributes:
+      label: Before submitting / Avant d'envoyer
+      options:
+        - label: I checked that what I share contains nothing I do not want to publish. / J'ai vérifié que ce que je partage ne contient rien que je ne veuille pas publier.
+          required: true
