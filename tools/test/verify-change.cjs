@@ -392,6 +392,8 @@ const RULES = [
 			f.includes('/adapters/') ||
 			f.includes('_shared/') ||
 			f.startsWith('static/ergopti_plus/macos/launcher/') ||
+			// A .keylayout edit alone changes the registry checksums the drivers verify.
+			f.startsWith('static/layouts/registry/') ||
 			f.startsWith('tools/') ||
 			f.includes('/locales/') ||
 			f.endsWith('.json') ||
