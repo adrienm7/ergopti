@@ -109,13 +109,13 @@ _MMDW_MenubarColorsLoadBearing() {
 		; left to the caller, so declaring one made the item never render at all.
 		; It was `dynamic` until 2026-08-07 and is `check` now — the renderer
 		; builds the checkbox from the declaration rather than the driver building
-		; one it already knows how to draw. Both are rendered; `feature` and
-		; `toggle` are not, which is what this states instead of naming the single
-		; type that happened to satisfy it.
+		; one it already knows how to draw. Both are rendered; `feature` is not,
+		; which is what this states instead of naming the single type that happened
+		; to satisfy it.
 		RenderedTypes := Map("dynamic", true, "check", true, "command", true, "list", true, "action", true)
 		Assert(RenderedTypes.Has(Entry["type"]),
 			"menubar_colors is type=" . Entry["type"] . ", which the renderer does not materialise — "
-			. "`feature` and `toggle` are left to the caller, so the row disappears with nothing "
+			. "`feature` is left to the caller, so the row disappears with nothing "
 			. "reporting it (MG-2)")
 		Assert(!Entry.Has("depends_on"),
 			"menubar_colors must no longer carry the dead depends_on key — superseded by disabled_when")
@@ -205,50 +205,49 @@ Test("menu-metrics-disabled-when: shared getters map reads the correct AHK state
 ; =======================================================
 
 ; ToggleMetricsEnabled() holds the real MetricsShortcuts.enabled flip plus the
-; confirm/security-warning dialogs. If it has zero call sites, the master
-; toggle row either doesn't exist or silently falls through to the generic
-; manifest renderer (which writes a key ApplyMasterGatesToFeatures never
-; reads) — see F2 in AUDIT_AHK_2026-07-01.md.
+; confirm/security-warning dialogs. The master row is the manifest's
+; `metrics_toggle`, so the command BuildMetricsMenu registers under that id is
+; the one wire that reaches it. Without it the renderer reports the switch and
+; draws nothing; with the generic ToggleCategoryAllFeatures instead, it would
+; write a key ApplyMasterGatesToFeatures never reads — see F2 in
+; AUDIT_AHK_2026-07-01.md.
 _MMDW_ToggleMetricsEnabledIsWired() {
-	Src := _DriverSourceConcat()
-	Assert(InStr(Src, "ToggleMetricsEnabled())") > 0,
-		"BuildMetricsMenu must wire the master row to ToggleMetricsEnabled() via AddCategoryToggleItem — found no call site")
+	Body := _StripFullLineComments(_DriverFuncBody("BuildMetricsMenu"))
+	Assert(Body != "", "BuildMetricsMenu must be present in the driver source")
+	Assert(RegExMatch(Body, '"metrics_toggle",\s*\(\*\)\s*=>\s*ToggleMetricsEnabled\(\)') > 0,
+		"BuildMetricsMenu must register ToggleMetricsEnabled() as the metrics_toggle command (F2)")
 }
-Test("menu-metrics-disabled-when: ToggleMetricsEnabled has a real call site (F2)", _MMDW_ToggleMetricsEnabledIsWired)
+Test("menu-metrics-disabled-when: the metrics switch runs ToggleMetricsEnabled (F2)", _MMDW_ToggleMetricsEnabledIsWired)
 
-; The manifest's own generic toggle entry must be excluded on AHK — otherwise
-; _MR_RenderToggle auto-renders a second, non-functional master row that
-; writes a dead ToggleCategoryAllFeatures("Metrics", ...) key. Mirrors the
-; gestures_menu toggle entry, which already carries platforms:["hs"].
-_MMDW_ManifestToggleExcludesAhk() {
-	; NOTE: this file's tests are static-source-scan only — infra/manifest_menu.ahk
-	; (which defines _MR_Get/MenuRenderer_Build) is deliberately NOT #Included by
-	; run_all.ahk, so this reads the parsed JSON directly via Map access rather
-	; than calling into manifest_menu.ahk's helpers.
+; The manifest's toggle entry is the ONLY metrics switch on AHK now, so it must
+; be visible there. It used to exclude "ahk" because BuildMetricsMenu inserted a
+; second, hand-built master row; that row is gone, and an exclusion would leave
+; the submenu with no switch at all.
+_MMDW_ManifestToggleReachesAhk() {
 	for Entry in _MMDW_LoadMetricsMenu() {
 		if !(Entry is Map)
 			continue
 		if !Entry.Has("type") || Entry["type"] != "toggle"
 			continue
-		Assert(Entry.Has("platforms"), "metrics_menu toggle entry must declare a platforms filter excluding ahk (F2)")
-		Plats := Entry["platforms"]
-		Assert(Plats is Array, "metrics_menu toggle entry's platforms must be an array")
-		for P in Plats
-			Assert(P != "ahk", "metrics_menu toggle entry must NOT include 'ahk' in platforms — the real toggle is BuildMetricsMenu's AddCategoryToggleItem (F2)")
+		if Entry.Has("platforms") {
+			Plats := Entry["platforms"]
+			Assert(Plats is Array, "metrics_menu toggle entry's platforms must be an array")
+			Found := false
+			for P in Plats
+				Found := Found || (P == "ahk")
+			Assert(Found, "metrics_menu toggle entry must reach ahk — it is the only metrics switch there (F2)")
+		}
 		return
 	}
 	Assert(false, "metrics_menu must declare a type=toggle entry")
 }
-Test("menu-metrics-disabled-when: manifest toggle entry excludes ahk so the bespoke toggle isn't shadowed (F2)", _MMDW_ManifestToggleExcludesAhk)
+Test("menu-metrics-disabled-when: the manifest metrics switch reaches Windows (F2)", _MMDW_ManifestToggleReachesAhk)
 
-; The two prior assertions only read the GENERATED menu_manifest.json, which
-; can silently drift from its own source: an earlier fix pass hand-edited the
-; generated JSON directly instead of manifest.toml, so regenerating via
-; `node tools/build/build-menu-manifest.js` reintroduced the F2 bug (the
-; regenerated JSON lost platforms:["hs"] because manifest.toml never had it).
-; This guards the TRUE source of truth so a future regeneration can never
-; silently resurrect the dead duplicate toggle.
-_MMDW_ManifestTomlSourceExcludesAhk() {
+; The prior assertion reads the GENERATED menu_manifest.json, which can drift
+; from its own source: an earlier fix pass hand-edited the generated JSON
+; instead of manifest.toml, and regenerating undid it. This reads the TRUE
+; source so a regeneration cannot silently take the switch away from Windows.
+_MMDW_ManifestTomlSourceReachesAhk() {
 	SplitPath(A_ScriptDir, , &WinDir)
 	SplitPath(WinDir, , &EpDir)
 	TomlPath := EpDir . "\_shared\modules\features\manifest.toml"
@@ -262,19 +261,14 @@ _MMDW_ManifestTomlSourceExcludesAhk() {
 	Body := (NextTablePos > 0) ? SubStr(Toml, HeaderPos, NextTablePos - HeaderPos) : SubStr(Toml, HeaderPos)
 	Assert(InStr(Body, 'type = "toggle"') > 0,
 		'the first [[menu.metrics_menu]] table must be the type="toggle" master entry')
-	; The INVARIANT is that ahk is excluded, not that the list reads exactly
-	; ["hs"]: Linux joined it on 2026-08-08 when the shared renderer learned to
-	; build `toggle` rows, and pinning the spelling would have failed a change that
-	; respects the rule completely.
 	PlatPos := InStr(Body, "platforms = [")
-	Assert(PlatPos > 0,
-		'manifest.toml`'s [[menu.metrics_menu]] toggle entry must declare a platforms filter — without one, regenerating menu_manifest.json from source silently resurrects the dead duplicate toggle (F2)')
-	PlatEnd := InStr(Body, "]", , PlatPos)
-	PlatList := SubStr(Body, PlatPos, PlatEnd - PlatPos + 1)
-	Assert(!RegExMatch(PlatList, 'i)"ahk"'),
-		'manifest.toml`'s [[menu.metrics_menu]] toggle entry must NOT list "ahk" — that driver builds this row itself in BuildMetricsMenu, and an unrestricted declaration makes its renderer draw a second, dead one (F2). Found: ' . PlatList)
+	if (PlatPos > 0) {
+		PlatList := SubStr(Body, PlatPos, InStr(Body, "]", , PlatPos) - PlatPos + 1)
+		Assert(RegExMatch(PlatList, 'i)"ahk"'),
+			'manifest.toml`'s [[menu.metrics_menu]] toggle entry must reach "ahk" — it is the only metrics switch there (F2). Found: ' . PlatList)
+	}
 }
-Test("menu-metrics-disabled-when: manifest.toml SOURCE excludes ahk from the metrics toggle, not just the generated JSON (F2)", _MMDW_ManifestTomlSourceExcludesAhk)
+Test("menu-metrics-disabled-when: manifest.toml SOURCE keeps the metrics switch on Windows, not just the generated JSON (F2)", _MMDW_ManifestTomlSourceReachesAhk)
 
 
 

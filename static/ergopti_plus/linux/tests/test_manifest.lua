@@ -113,6 +113,7 @@ return {
 	"tests.unit.meta.test_menu_off_platform_rows_hidden",
 	"tests.unit.meta.test_menu_reload_reaches_the_daemon",
 	"tests.unit.meta.test_menu_row_dialect",
+	"tests.unit.meta.test_menu_toggle_row_is_check",
 	"tests.unit.meta.test_metrics_persist_before_shutdown",
 	"tests.unit.meta.test_monotonic",
 	"tests.unit.meta.test_no_method_call_on_plain_function",

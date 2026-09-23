@@ -61,6 +61,10 @@ local CANONICAL_HOTSTRINGS_MENU = {
 	-- to build `toggle` rows: the signature keys on the id when there is one, and
 	-- an id is what lets a driver register the command that asks for the row.
 	"toggle:hotstrings_toggle",
+	-- The switch is set apart from what it governs, on every driver: the
+	-- Windows renderer used to insert this separator itself, beside the switch it
+	-- also inserted by hand, and the Lua drivers drew none.
+	"---",
 	"group:hotstrings_params",
 	-- One `dynamic:hotstring_bulk_actions` row until 2026-08-06, which expanded
 	-- to TWO rows inside each driver — so the manifest described neither, and

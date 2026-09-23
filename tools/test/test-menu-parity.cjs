@@ -177,7 +177,7 @@ function identityOf(row) {
 	const parts = [row.type || 'ref'];
 	if (row.id) parts.push(`#${row.id}`);
 	if (row.path) parts.push(`:${row.path}`);
-	const key = row.i18n || row.i18n_on || row.category;
+	const key = row.i18n || row.category;
 	if (key) parts.push(`@${key}`);
 	return parts.join(' ');
 }
@@ -366,7 +366,7 @@ for (const menuKey of MENU_KEYS) {
 // A menu row whose key is missing from a locale renders the raw key. Checked in
 // every shipped locale rather than in the reference one, because the reference
 // is the one that never has the gap.
-const LABEL_FIELDS = ['i18n', 'i18n_on', 'i18n_off', 'reason_key'];
+const LABEL_FIELDS = ['i18n', 'reason_key'];
 
 const namedKeys = [];
 for (const menuKey of MENU_KEYS) {

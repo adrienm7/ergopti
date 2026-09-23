@@ -43,7 +43,8 @@ const HEADER = {
 	_comment2:
 		"platforms field: omit or 'both' = all platforms, 'ahk' = Windows only, 'hs' = macOS only.",
 	_comment3:
-		"item types: 'toggle' = category on/off gate, 'feature' = manifest-path toggle, " +
+		"item types: 'toggle' = a category's first-row checkbox (its master gate, one i18n key), " +
+		"'feature' = manifest-path toggle, " +
 		"'action' = stateless button, 'dynamic' = rendered by platform code, " +
 		"'group' = named submenu, 'section_header' = disabled label, '---' = separator, " +
 		"'list' = rows supplied at build time by a named provider, 'letter_picker' = " +

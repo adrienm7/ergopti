@@ -47,11 +47,14 @@ _BuildShortcutsSubmenu() {
 	)
 
 	; `command` rows: a static label, a click, and the renderer builds the row.
+	; The category switch is one of them: the Shortcuts master gate.
 	Commands := Map(
+		"shortcuts_toggle", MenuRenderer_CategoryGateCommand("Shortcuts"),
 		"edit_shortcuts", OpenPersonalShortcuts
 	)
+	Getters := Map("shortcuts_enabled", () => IsCategoryGated("Shortcuts"))
 
-	return MenuRenderer_Build("shortcuts_menu", "Shortcuts", DynHandlers, "", ListProviders, Commands)
+	return MenuRenderer_Build("shortcuts_menu", "Shortcuts", DynHandlers, "", ListProviders, Commands, Getters)
 }
 
 ; Dynamic handler: personal shortcuts submenu (if any registered).

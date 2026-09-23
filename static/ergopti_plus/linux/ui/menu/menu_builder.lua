@@ -448,6 +448,23 @@ local function _build_layouts(ctx)
 	return { label = i18n_safe("menu.layout.title"), submenu = rows }
 end
 
+--- True only when every hotstring group is on: the state the Hotstrings switch
+--- and its parent row both show on this driver, where the category gate is the
+--- set of groups rather than a flag of its own.
+--- @param config table The hotstrings config module.
+--- @return boolean
+local function _all_hotstring_groups_on(config)
+	if type(config.get_groups) ~= "function" or type(config.is_group_enabled) ~= "function" then
+		return false
+	end
+	local groups = config.get_groups() or {}
+	if #groups == 0 then return false end
+	for _, name in ipairs(groups) do
+		if not config.is_group_enabled(name) then return false end
+	end
+	return true
+end
+
 --- Renders the rows of the hotstrings submenu that the manifest describes.
 ---
 --- Defined BEFORE its caller: a `local function` is not hoisted
@@ -1465,20 +1482,7 @@ local function _manifest_hotstring_rows(ctx, config)
 	-- by the shared renderer, so this driver supplies only the behaviour.
 	local hs_ctx = {}
 	for key, value in pairs(ctx) do hs_ctx[key] = value end
-	--- True only when every hotstring group is on — what the gate row's two
-	--- labels distinguish.
-	--- @return boolean
-	local function all_groups_on()
-		if type(config.get_groups) ~= "function" or type(config.is_group_enabled) ~= "function" then
-			return false
-		end
-		local groups = config.get_groups() or {}
-		if #groups == 0 then return false end
-		for _, name in ipairs(groups) do
-			if not config.is_group_enabled(name) then return false end
-		end
-		return true
-	end
+	local function all_groups_on() return _all_hotstring_groups_on(config) end
 
 	hs_ctx.commands = {
 		["hotstrings_enable_all"]  = set_all(true),
@@ -1552,7 +1556,10 @@ local function _build_hotstrings(ctx)
 	local title = i18n_safe("menu.hotstrings.title")
 	if grand_total > 0 then title = string.format("%s (%d)", title, grand_total) end
 
-	return { label = title, submenu = items }
+	-- The parent carries the same tick as the switch that opens the submenu, for
+	-- a user scanning the top level. It cannot be clicked: no tray binds a click
+	-- on a row that opens a submenu, which is why the switch is a row inside.
+	return { label = title, checked = _all_hotstring_groups_on(config), submenu = items }
 end
 
 --- Builds the AI / LLM submenu.
@@ -2053,7 +2060,9 @@ local function _build_llm(ctx)
 		or {}
 	for _, row in ipairs(rendered) do items[#items + 1] = row end
 
-	return { label = i18n_safe("menu.llm.title"), submenu = items }
+	-- The parent carries the same tick as the switch inside, for a user scanning
+	-- the top level; it cannot be clicked, which is why the switch is a row.
+	return { label = i18n_safe("menu.llm.title"), checked = enabled, submenu = items }
 end
 
 --- Builds the metrics/keylogger submenu.
@@ -2363,7 +2372,8 @@ local function _build_metrics(ctx)
 	-- the gate as the `toggle` row every driver's metrics menu declares, the
 	-- readout as a `list`, because its label IS the progress and no static
 	-- declaration can spell "n / total".
-	return { label = i18n_safe("menu.metrics.title"), submenu = items }
+	local on = type(k.is_enabled) == "function" and k.is_enabled() == true
+	return { label = i18n_safe("menu.metrics.title"), checked = on, submenu = items }
 end
 
 --- Builds the shortcuts submenu.
@@ -2754,7 +2764,7 @@ local function _build_shortcuts(ctx)
 		for _, row in ipairs(manifest_rows) do items[#items + 1] = row end
 	end
 
-	return { label = i18n_safe("menu.shortcuts.title"), submenu = items }
+	return { label = i18n_safe("menu.shortcuts.title"), checked = enabled, submenu = items }
 end
 
 --- Display name of a tap-hold key, from the shared `tap_hold.group.*` labels
@@ -3115,7 +3125,7 @@ local function _build_gestures(ctx)
 	local menu = {}
 	for _, row in ipairs(rendered or {}) do menu[#menu + 1] = row end
 
-	return { label = i18n_safe("menu.gestures.title"), submenu = menu }
+	return { label = i18n_safe("menu.gestures.title"), checked = gestures_on, submenu = menu }
 end
 
 --- Builds the apps submenu.

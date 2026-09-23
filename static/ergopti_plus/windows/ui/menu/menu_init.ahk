@@ -111,7 +111,9 @@ initMenu(PublishAuthorizeFn := 0) {
 	)
 	; The accented-letter group stays enabled without the Ergopti emulation: the
 	; shortcuts then follow the user's own layout (accented_shortcuts.ahk).
-	LayoutMenu  := MenuRenderer_Build("layout_menu", "Layout", "", "", LayoutListProviders)
+	LayoutMenu  := MenuRenderer_Build("layout_menu", "Layout", "", "", LayoutListProviders,
+		Map("layout_toggle", MenuRenderer_CategoryGateCommand("Layout")),
+		Map("layout_enabled", () => IsCategoryGated("Layout")))
 	LayoutGated := IsCategoryGated("Layout")
 	LayoutMenuTitle := t("menu.layout.title")
 	TrayMenuStage_AddFeature(LayoutMenuTitle, LayoutMenu)
@@ -122,8 +124,8 @@ initMenu(PublishAuthorizeFn := 0) {
 
 	; ── Hotstrings ⚡ — built from manifest via MenuRenderer_Build.
 	; Dynamic handlers supply the runtime-dependent blocks (params, categories,
-	; personal tree, extensions). The toggle is rendered by the manifest toggle
-	; type entry but uses the ToggleAllHostrings* pattern for hotstrings.
+	; personal tree, extensions). The switch is the manifest's hotstrings_toggle
+	; row: the Hotstrings master gate, which leaves every category as it is.
 	HotstringsAllEnabled := IsCategoryGated("Hotstrings")
 
 	; Empty since 2026-08-07: every row of the hotstrings tree is declarative or a
@@ -168,15 +170,17 @@ initMenu(PublishAuthorizeFn := 0) {
 	; manifest described neither. They are two `command` rows now — which is
 	; also how macOS got them: it had no handler for the old id at all.
 	_HotCommands := Map(
+		"hotstrings_toggle",      MenuRenderer_CategoryGateCommand("Hotstrings"),
 		"hotstrings_enable_all",  ToggleAllHotstringsOn,
 		"hotstrings_disable_all", ToggleAllHotstringsOff,
 	)
+	_HotGetters := Map("hotstrings_enabled", () => IsCategoryGated("Hotstrings"))
 
 	_HotGroupBuilders := Map(
 		"hotstrings_params", (*) => MenuRenderer_Build("hotstrings_params_group", "Hotstrings", _HotDynHandlers, "", _HotListProviders, _HotParamCommands, _HotParamGetters),
 	)
 	BootProfile_Mark("MENU/initMenu: pre-hotstrings render")
-	HotstringsMenu := MenuRenderer_Build("hotstrings_menu", "Hotstrings", _HotDynHandlers, _HotGroupBuilders, _HotListProviders, _HotCommands)
+	HotstringsMenu := MenuRenderer_Build("hotstrings_menu", "Hotstrings", _HotDynHandlers, _HotGroupBuilders, _HotListProviders, _HotCommands, _HotGetters)
 	BootProfile_Mark("MENU/initMenu: hotstrings menu rendered")
 
 	HotstringsMenuTitle := t("menu.hotstrings.title") . " (" . FmtCount(_HS_ComputeGrandTotal()) . ")"

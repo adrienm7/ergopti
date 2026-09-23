@@ -176,8 +176,7 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 		PendingSep := false
 
 		if ItemType == "toggle" {
-			_MR_RenderToggle(Result, Item, CategoryName)
-			ItemCount++
+			ItemCount += _MR_RenderToggle(Result, Item, ManifestKey, Commands, StateGetters)
 
 		} else if ItemType == "feature" {
 			_MR_RenderFeature(Result, Item, CategoryName)
@@ -409,22 +408,69 @@ _MR_RenderRows(TargetMenu, Rows, ListId, Depth) {
 	return Added
 }
 
-; Render the category on/off toggle item (always inserted at position 1).
-; The caller typically calls ``AddCategoryToggleItem`` directly before calling
-; ``MenuRenderer_Build`` so the toggle lands at the top before any manifest
-; items; this handler is here as a safety net for menus that embed it inline.
-_MR_RenderToggle(ResultMenu, Item, CategoryName) {
-	I18nOn  := _MR_Get(Item, "i18n_on")
-	I18nOff := _MR_Get(Item, "i18n_off")
-	if (I18nOn == "" or I18nOff == "") {
-		try LoggerWarn("MenuRenderer", "toggle item missing i18n_on/i18n_off — skipped.")
-		return
+; Renders a category's master switch as a checkbox row, in manifest order.
+;
+; The row is labelled by the toggle's one ``i18n`` key, ticked from its
+; ``checked_when`` getters and greyed by its ``disabled_when`` ones, exactly like
+; a ``check`` row, and it runs the command the caller registered under its id.
+; It used to be a row whose label alternated between « ✅ … (cliquer pour
+; désactiver) » and « ❌ … (cliquer pour activer) », inserted at position 1 with
+; its own separator, and three builders inserted theirs by hand instead. A toggle
+; with no registered command is reported and not drawn: falling back to a
+; generic category flip would hide a builder that forgot the switch.
+; @returns {Integer} 1 when the row was drawn, 0 otherwise.
+_MR_RenderToggle(ResultMenu, Item, ManifestKey, Commands, StateGetters) {
+	Id := _MR_Get(Item, "id")
+	I18nKey := _MR_Get(Item, "i18n")
+	CmdId := _MR_Get(Item, "command")
+	if (CmdId == "") {
+		CmdId := Id
 	}
-	IsGated := IsCategoryGated(CategoryName)
-	AddCategoryToggleItem(ResultMenu,
-		t(I18nOn), t(I18nOff),
-		IsGated,
-		((Cat, Gated) => (*) => ToggleCategoryAllFeatures(Cat, !Gated))(CategoryName, IsGated))
+	if (Id == "" or I18nKey == "") {
+		try LoggerWarn("MenuRenderer", "toggle item in '{1}' missing id or i18n — skipped.", ManifestKey)
+		return 0
+	}
+	if !(Commands is Map and Commands.Has(CmdId)) {
+		try LoggerError("MenuRenderer", "No command '{1}' for the '{2}' category switch — its submenu has no way to turn it on or off.", CmdId, ManifestKey)
+		return 0
+	}
+	Row := Map(
+		"label",   t(I18nKey),
+		"action",  Commands[CmdId],
+		"checked", MenuRenderer_ResolveCheckedWhen(ManifestKey, Id, StateGetters))
+	if MenuRenderer_ResolveDisabledWhen(ManifestKey, Id, StateGetters) {
+		Row["disabled"] := true
+	}
+	return _MR_RenderRows(ResultMenu, [Row], Id, 1)
+}
+
+; The command every master-gated category registers for its switch: flip
+; ``CategoryEnabled[Category]`` and leave the category's own rows as they are.
+; The state is read at click time, not captured when the menu was built.
+; @param Category {String} Master-gate category name (e.g. "Shortcuts").
+; @returns {Func} The menu callback.
+MenuRenderer_CategoryGateCommand(Category) {
+	return (*) => ToggleCategoryAllFeatures(Category, !IsCategoryGated(Category))
+}
+
+; Renders ONE declared toggle into a menu a driver builds itself.
+;
+; The IA submenu is assembled natively row by row and does not go through
+; MenuRenderer_Build, but its switch is still the manifest's row: the same
+; label, tick and command lookup as every other category, from the same code.
+; @param TargetMenu {Menu} The menu being built.
+; @param ManifestKey {String} Manifest array holding the toggle (e.g. "llm_menu").
+; @param ToggleId {String} The toggle row's id.
+; @param Commands {Map} Command id → callback.
+; @param StateGetters {Map} checked_when / disabled_when key → getter.
+; @returns {Integer} 1 when the row was drawn, 0 otherwise.
+MenuRenderer_AppendToggle(TargetMenu, ManifestKey, ToggleId, Commands, StateGetters) {
+	Item := _MR_FindItemById(ManifestKey, ToggleId)
+	if (Item == false or _MR_Get(Item, "type") != "toggle") {
+		try LoggerError("MenuRenderer", "No toggle '{1}' in '{2}' — the category switch is not drawn.", ToggleId, ManifestKey)
+		return 0
+	}
+	return _MR_RenderToggle(TargetMenu, Item, ManifestKey, Commands, StateGetters)
 }
 
 ; Render a manifest-path feature toggle.
@@ -447,11 +493,10 @@ _MR_RenderFeature(ResultMenu, Item, CategoryName) {
 ; items: a leading one, a trailing one, or the second of two in a row.
 ;
 ; The deferred "---" in MenuRenderer_Build only sees the manifest's own
-; separators. Rows the driver supplies bring their own: AddCategoryToggleItem
-; inserts one after every category toggle (the Lua renderer adds none, so the
-; manifest declares a "---" there for the Lua drivers), and list providers
-; return separator rows. One landing beside a manifest "---" drew two lines in a
-; row under « Disposition ». The shared Lua renderer applies the same rule.
+; separators. Rows the driver supplies bring their own — list providers return
+; separator rows — and one landing beside a manifest "---" drew two lines in a
+; row under « Disposition », back when the category switch was inserted by hand
+; with a separator of its own. The shared Lua renderer applies the same rule.
 _MR_NormalizeSeparators(TargetMenu) {
 	Count := TrayMenuItemCount(TargetMenu)
 	Position := 0            ; zero-based, as TrayMenuIsSeparatorAt takes it
