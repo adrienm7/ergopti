@@ -177,9 +177,8 @@ Default level: **10** (all variants active).
 A line that passes the filter can still be withheld by one of the two
 suppression layers below. Both are implemented once in the shared Lua core
 (macOS and Linux) and mirrored in `windows/infra/logger.ahk`, and both are
-pinned by `_shared/tests/corpus/logger/behaviour_vectors.json`: all three driver
-suites replay its `dedup` section, and the AHK and Linux suites its `repeat`
-section.
+pinned by `_shared/tests/corpus/logger/behaviour_vectors.json`, whose `dedup`
+and `repeat` sections all three driver suites replay.
 
 ### 4.1 Consecutive-line deduplication
 
@@ -233,6 +232,10 @@ in between, or one whose arguments change. Repeat collapsing does.
   - AHK: armed in `LoggerInit`'s one-time block; periodic flush in
     `_LoggerFlush` on its `LOGGER_FLUSH_INTERVAL_MS` timer; terminal flush in
     `_LoggerOnExitFlush`.
+  - macOS: armed by `Logger.enable_repeat_collapsing(TimerScheduler)` in
+    `init.lua` once the native sink is committed, with a TimerScheduler tick at
+    `[logger] flush_interval_ms`; terminal flush in
+    `Logger.begin_async_sink_shutdown()`.
 
 ---
 

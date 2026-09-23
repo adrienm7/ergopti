@@ -335,6 +335,18 @@ end
 -- the readable trail, so launcher.log keeps only fatal lines from here on.
 BootJournal.set_user_log_ready(true)
 boot_note("Native logger handshake committed: the launcher worker owns %s.", tostring(Logger.UNIFIED_LOG_FILE))
+
+-- Arm repeat collapsing (logger SPEC § 4.2) now that its summaries have a
+-- durable destination, and before any periodic source starts. Its flush tick is
+-- a TimerScheduler timer, so teardown cancels it with every other one; a refusal
+-- only costs collapsing, so it is reported and boot continues.
+do
+	local repeat_armed, repeat_err = Logger.enable_repeat_collapsing(TimerScheduler)
+	if repeat_armed ~= true then
+		Logger.error(LOG, "Repeat collapsing could not be armed; periodic lines stay uncollapsed: %s.",
+			tostring(repeat_err))
+	end
+end
 Boot.mark("Path: native asynchronous logger transport committed")
 Boot.stage("Path: runtime error capture installed")
 

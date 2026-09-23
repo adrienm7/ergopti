@@ -9,9 +9,11 @@
 ---
 --- WHAT IS THIS MODULE'S, AND WHAT IS THE SHARED CORE'S.
 --- _shared/lua/logger owns the canonical line format, the eight variants, the
---- 200-entry ring and the five-second dedup window — items 4, 5 and 8 below. This
---- file owns the production in-memory handoff, topical routing policy, deferred
---- console/notification delivery, and the synchronous early-boot/test fallback.
+--- 200-entry ring, the five-second dedup window and repeat collapsing — items 4,
+--- 5 and 8 below. This file owns the production in-memory handoff, topical
+--- routing policy, deferred console/notification delivery, the synchronous
+--- early-boot/test fallback, and the periodic tick that flushes due repeat
+--- summaries once boot arms collapsing.
 --- The native launcher worker owns production file persistence, daily rotation,
 --- retention purge and errors/topical fan-out. The split is not cosmetic: the
 --- core's half is replayed against a cross-driver corpus so all three drivers are
@@ -31,6 +33,8 @@
 ---    Seeing a START without a following SUCCESS points to a silent failure.
 --- 5. Deduplication: consecutive identical lines are suppressed automatically;
 ---    a count summary is printed when the run breaks, using the same color/level.
+---    Once armed, repeat collapsing also folds a line that recurs with other
+---    lines in between into its first occurrence plus one timed summary.
 --- 6. Unified rotating file sink: the acknowledged native worker writes one file
 ---    per calendar day under <config>/logs/,
 ---    named ErgoptiPlus_YYYY-MM-DD.log (mirrors the AHK driver naming convention).
@@ -817,6 +821,12 @@ local function _timestamp()
 	return os.date("%Y-%m-%d %H:%M:%S", sec) .. string.format(":%03d", ms)
 end
 
+--- Timestamp provider for every line the core formats. Replaceable for the same
+--- reason as M.clock_fn: a repeat summary quotes the timestamps of the lines it
+--- withheld, and a test can only pin that text when it owns the clock face. The
+--- core reads this field through a closure installed by M.claim_core_hooks().
+M.timestamp_fn = _timestamp
+
 --- Returns an open append handle to the current daily log file, re-opening on
 --- day rollover or after init_log_path() re-points UNIFIED_LOG_FILE.
 local function _ensure_log_file()
@@ -1147,6 +1157,9 @@ end
 --- @return string|nil error_message Immediate refusal detail.
 function M.begin_async_sink_shutdown(on_done)
 	if type(on_done) ~= "function" then return false, "on_done callback is required" end
+	-- Exit and reload are the last chance to close a suppression streak: emit
+	-- the pending summaries now so the drain below carries them to the file.
+	Core.flush_repeats(true)
 	local owner = _async_sink_state
 	if not _async_sink_active then
 		local ok, callback_err = xpcall(function() on_done(true, "transport already inactive") end,
@@ -1227,7 +1240,7 @@ end
 --- local declared further down would not be captured at all.
 function M.claim_core_hooks()
 	Core.set_sink(_driver_sink)
-	Core.timestamp_fn = _timestamp
+	Core.timestamp_fn = function() return M.timestamp_fn() end
 	Core.clock_fn     = function() return M.clock_fn() end
 end
 
@@ -1404,12 +1417,73 @@ function M.reset_dedup() Core.reset_dedup() end
 --- @return number
 function M.dedup_suppressed_count() return Core.dedup_suppressed_count() end
 
---- Clock used to measure the dedup window, in seconds.
+--- Clock used to measure the dedup and repeat windows, in seconds.
 --- Replaceable so a test can drive the five-second window without sleeping for
 --- it: a window measured in seconds cannot otherwise be exercised by a suite that
 --- runs in milliseconds. The core reads this field through a closure installed in
 --- Section 3.2, so replacing it here still takes effect.
 M.clock_fn = _gettime
+
+-- The periodic tick that closes due repeat streaks, owned from arming until
+-- M.disable_repeat_collapsing() — or until TimerScheduler teardown cancels
+-- every scheduler-owned timer at exit.
+local _repeat_tick = nil
+
+--- Arms repeat collapsing (spec § 4.2) and commits its periodic flush tick.
+--- Boot calls this once the native sink owns the file: a summary emitted by the
+--- tick is an ordinary line and needs that destination. The tick runs at the
+--- registry's logger flush interval on the TimerScheduler, never on the HID path.
+--- @param scheduler table TimerScheduler-shaped adapter (every / cancel).
+--- @return boolean armed True when collapsing and its tick are both committed.
+--- @return string|nil error_message Exact refusal reason.
+function M.enable_repeat_collapsing(scheduler)
+	if Core.repeat_collapsing_enabled() then
+		return false, "repeat collapsing is already enabled"
+	end
+	if type(scheduler) ~= "table" or type(scheduler.every) ~= "function"
+		or type(scheduler.cancel) ~= "function" then
+		return false, "repeat collapsing needs a scheduler with every() and cancel()"
+	end
+	-- Required here, not at load: infra.timings itself requires this module.
+	local interval_sec = require("infra.timings").sec("logger", "flush_interval_ms")
+	Core.enable_repeat_collapsing()
+	local ok, handle_or_err, committed = pcall(scheduler.every, interval_sec, function()
+		Core.flush_repeats(false)
+	end)
+	if not ok or committed ~= true or type(handle_or_err) ~= "table" then
+		Core.disable_repeat_collapsing()
+		if ok and type(handle_or_err) == "table" then pcall(scheduler.cancel, handle_or_err) end
+		return false, "repeat flush tick could not be committed: " .. tostring(handle_or_err)
+	end
+	_repeat_tick = { scheduler = scheduler, handle = handle_or_err }
+	return true
+end
+
+--- Cancels the tick and disarms collapsing, forgetting live streaks without a
+--- summary. For test teardown; a live driver closes its streaks through the
+--- terminal flush in M.begin_async_sink_shutdown() instead.
+--- @return boolean disarmed False when the tick refused cancellation.
+--- @return string|nil error_message Exact refusal reason.
+function M.disable_repeat_collapsing()
+	local tick = _repeat_tick
+	if tick then
+		local ok, cancelled = pcall(tick.scheduler.cancel, tick.handle)
+		if not ok or cancelled ~= true then
+			return false, "repeat flush tick refused cancellation: " .. tostring(cancelled)
+		end
+		_repeat_tick = nil
+	end
+	Core.disable_repeat_collapsing()
+	return true
+end
+
+--- Reports whether repeat collapsing is armed.
+--- @return boolean
+function M.repeat_collapsing_enabled() return Core.repeat_collapsing_enabled() end
+
+--- Emits the summaries that are due; see the core's flush_repeats().
+--- @param force boolean True at a terminal boundary (exit, reload).
+function M.flush_repeats(force) Core.flush_repeats(force) end
 
 
 

@@ -115,6 +115,7 @@ local function run_isolated(options, assertions)
 		function Logger.init_log_path() return true end
 		function Logger.classify_async_sink_boot_environment() return "managed" end
 		function Logger.start_async_sink() return true end
+		function Logger.enable_repeat_collapsing() return true end
 		function Logger.install_runtime_error_capture() return true end
 		function Logger.set_async_sink_failure_handler(handler)
 			state.async_failure_handler = handler
