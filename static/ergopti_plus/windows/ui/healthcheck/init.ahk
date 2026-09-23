@@ -22,8 +22,11 @@
 ; 5. System info: captures OS version (including build number), CPU, RAM, AHK
 ;    runtime, screen resolution, locale, and config directory for a complete
 ;    at-a-glance snapshot.
-; 6. Recent log entries: pulls the last 50 WARNING/ERROR lines from the in-memory
-;    ring buffer so diagnosis is possible without opening log files.
+; 6. Recent log entries: reads the newest WARNING/ERROR entries from a bounded
+;    tail of today's errors file (bounds in
+;    _shared/modules/diagnostics/recent_issues.json), and from the in-memory
+;    ring only before that file exists, so diagnosis is possible without
+;    opening log files.
 ; 7. Selectable window: displays the report in a WebView2 window (text is
 ;    selectable and copyable) with a fallback read-only Edit control.
 ; ==============================================================================
