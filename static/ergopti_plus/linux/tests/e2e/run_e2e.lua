@@ -388,6 +388,49 @@ local corpus_assertions = pass_count + fail_count - corpus_before
 assert_true("corpus vector floor", vectors ~= nil and #vectors >= Contract.MIN_VECTOR_COUNT)
 assert_true("corpus assertion floor", corpus_assertions >= Contract.MIN_CORPUS_ASSERTIONS)
 
+-- The real daemon main(), one process per scenario (it runs once per
+-- process), against a scripted keyboard and a model of the focused field.
+-- These pin what no engine-level vector can: the injector's erase arithmetic,
+-- the undo, and the order the hook and the daemon see keys in.
+local DAEMON_SCENARIOS = {
+	{ name = "an end-char trigger expands and keeps its terminator", keys = "adn ", screen = "ADN " },
+	{ name = "Enter is a terminator", keys = "adn{ENTER}", screen = "ADN\n" },
+	{ name = "an auto-expanding trigger fires on its last character", keys = "pk★", screen = "parce que" },
+	-- "adn " → "ADN ", and the Backspace removes the REPLAYED space: undo must
+	-- count it, or the first character of the replacement stays ("Aadn").
+	{ name = "Backspace after an end-char expansion restores the trigger", keys = "adn {BS}", screen = "adn" },
+	{ name = "Backspace after an auto expansion restores the trigger", keys = "pk★{BS}", screen = "pk★" },
+}
+
+if package.config:sub(1, 1) == "\\" then
+	print("\n--- Daemon key scenarios: not run (a POSIX shell spawns each daemon) ---")
+else
+	print("\n--- Daemon key scenarios (real main(), scripted keyboard) ---")
+	local interpreter = arg and arg[-1] or "luajit"
+	local home = os.tmpname()
+	os.remove(home)
+	os.execute("mkdir -p '" .. home .. "'")
+	local device = os.tmpname()
+	for _, scenario in ipairs(DAEMON_SCENARIOS) do
+		local command = string.format(
+			"HOME='%s' %s tests/e2e/daemon_keys_child.lua tests/e2e/fixtures/daemon_keys.toml '%s' %q 2>/dev/null",
+			home, interpreter, device, scenario.keys)
+		local pipe = io.popen(command, "r")
+		local output = pipe and pipe:read("*a") or ""
+		if pipe then pipe:close() end
+		local quoted = output:match("SCREEN (%b\"\")")
+		local screen = quoted and (loadstring or load)("return " .. quoted)() or nil
+		if screen == scenario.screen then
+			pass(scenario.name)
+		else
+			fail(scenario.name, string.format("%q", scenario.screen),
+				screen and string.format("%q", screen) or ("no SCREEN line: " .. output:sub(-300)))
+		end
+	end
+	os.remove(device)
+	os.execute("rm -rf '" .. home .. "'")
+end
+
 -- Final summary.
 local total = pass_count + fail_count
 print(string.format("\n1..%d", total))
