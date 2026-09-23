@@ -187,6 +187,25 @@ for mod in luv lfs posix lgi; do
 done
 
 
+# Which packages this archive offers for the modules LuaJIT could not load.
+# Informational: it is how the per-distribution candidate names in install.sh
+# are kept honest when an archive renames a package.
+lua_package_search() {
+	if command -v apt-cache >/dev/null 2>&1; then apt-cache search --names-only "$1" 2>/dev/null
+	elif command -v zypper >/dev/null 2>&1; then zypper --non-interactive search "$1" 2>/dev/null | grep -E "\| *[a-z0-9.-]*$1" 
+	elif command -v dnf >/dev/null 2>&1; then dnf -q search "$1" 2>/dev/null
+	elif command -v pacman >/dev/null 2>&1; then pacman -Ss "$1" 2>/dev/null | grep -v "^ "
+	elif command -v apk >/dev/null 2>&1; then apk search "$1" 2>/dev/null
+	fi | head -8 | sed 's/^/          /'
+}
+for mod in luv lgi posix filesystem; do
+	if ! as_user "luajit -e \"require('$( [ "${mod}" = filesystem ] && echo lfs || echo "${mod}")')\"" >/dev/null 2>&1; then
+		info "archive packages matching '${mod}':"
+		lua_package_search "${mod}"
+	fi
+done
+
+
 section "Tray icon"
 READY="$(mktemp -u)"
 SNI_REPORT="$(mktemp)"
@@ -195,6 +214,10 @@ TRAY_SCRIPT="$(mktemp)"
 cat > "${TRAY_SCRIPT}" << TRAY
 set -u
 export LUA_PATH='${INSTALLED_LUA_PATH}'
+# A private session bus started by hand: dbus-run-session is not shipped
+# everywhere (openSUSE), dbus-daemon is.
+DBUS_SESSION_BUS_ADDRESS="\$(dbus-daemon --session --fork --print-address=1 --print-pid=3 3>/tmp/ergopti-e2e-dbus.pid)"
+export DBUS_SESSION_BUS_ADDRESS
 Xvfb :77 -screen 0 1024x768x24 >/dev/null 2>&1 &
 XVFB=\$!
 export DISPLAY=:77
@@ -207,11 +230,12 @@ luajit '${SRC}/static/ergopti_plus/linux/tests/hardware/run_tray_icon.lua' 10
 PROBE=\$?
 wait \$HOST; STATUS=\$?
 kill \$XVFB 2>/dev/null
+kill "\$(cat /tmp/ergopti-e2e-dbus.pid)" 2>/dev/null
 [ "\$PROBE" = "0" ] || exit 10
 exit \$STATUS
 TRAY
 chmod 0755 "${TRAY_SCRIPT}"
-if as_user "dbus-run-session -- bash ${TRAY_SCRIPT}" >"${SNI_REPORT}.log" 2>&1; then
+if as_user "bash ${TRAY_SCRIPT}" >"${SNI_REPORT}.log" 2>&1; then
 	ok "the tray item registered, Active, with the Ergopti logo and its menu"
 else
 	fail "the tray icon did not appear through a StatusNotifier host"
