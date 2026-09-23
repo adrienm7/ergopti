@@ -623,6 +623,18 @@ ring_buffer_size = 200
 # same duration expressed in seconds — the gate converts and compares).
 dedup_window_ms = 5000
 
+# How long a repeat streak stays open once a driver arms repeat collapsing
+# (logger SPEC § 4.2): later occurrences of a line are counted, not written,
+# and one summary is written when this window has elapsed.
+# AHK: logger.ahk LOGGER_REPEAT_WINDOW_MS. Shared core (macOS, Linux):
+# _shared/lua/logger/init.lua REPEAT_WINDOW_SEC, in seconds.
+repeat_window_ms = 600000
+
+# Repeat streaks tracked at once; the least recently used one is summarised and
+# evicted to make room for a new one.
+# AHK: logger.ahk LOGGER_REPEAT_CAPACITY. Shared core: REPEAT_CAPACITY.
+repeat_streak_capacity = 64
+
 # Interval at which the queued-write drain appends pending lines in one call.
 # AHK: logger.ahk LOGGER_FLUSH_INTERVAL_MS.
 flush_interval_ms = 500

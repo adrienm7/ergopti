@@ -7,10 +7,11 @@ Divergences are listed explicitly in
 [§ Driver-specific extensions](#driver-specific-extensions) and are intentional.
 
 > Note on the third implementation: `_shared/lua/logger/init.lua` is the
-> platform-neutral core (levels, formatter, ring buffer, level filter) and is
-> designed to be extended by injecting an output sink via `M.set_sink()`. It is
-> consumed today by the **Linux** driver only, via `logger/shim.lua`; macOS and
-> Windows each re-implement the same contract independently.
+> platform-neutral core (levels, formatter, ring buffer, level filter,
+> suppression) and is designed to be extended by injecting an output sink via
+> `M.set_sink()`. The **Linux** driver runs it via `logger/shim.lua` and the
+> **macOS** driver via `infra/logger.lua`; Windows mirrors the same contract in
+> `windows/infra/logger.ahk`.
 
 ---
 
@@ -173,6 +174,66 @@ String aliases accepted by `set_level()`:
 
 Default level: **10** (all variants active).
 
+A line that passes the filter can still be withheld by one of the two
+suppression layers below. Both are implemented once in the shared Lua core
+(macOS and Linux) and mirrored in `windows/infra/logger.ahk`, and both are
+pinned by `_shared/tests/corpus/logger/behaviour_vectors.json`: all three driver
+suites replay its `dedup` section, and the AHK and Linux suites its `repeat`
+section.
+
+### 4.1 Consecutive-line deduplication
+
+- Always on. The key is everything after the timestamp:
+  `[LEVEL] [MODULE] body`.
+- A line whose key equals the previous accepted line's, within
+  `dedup_window_ms` (5000, `_shared/modules/timings/constants.toml [logger]`)
+  of that line, is not emitted; it is counted.
+- The next accepted line first emits
+  `[LEVEL] [logger] ↑ N identical line(s) suppressed` at the suppressed variant.
+- A terminal flush (exit, reload) emits that summary for a streak still open.
+
+### 4.2 Repeat collapsing
+
+The consecutive dedup cannot see a line that recurs every 30 s with other lines
+in between, or one whose arguments change. Repeat collapsing does.
+
+- **Arming.** Disarmed until the driver's logger boot arms it, exactly once; a
+  second arming is refused. A test process that never boots a driver therefore
+  sees no collapsing. The owners are listed at the end of this section.
+- **Key.** Variant + module + text. The text is the **unformatted template** for
+  `debug` and `info`, so a counter in the arguments cannot defeat the key, and
+  the **formatted body** for `warn` and `error`, so every distinct failure is
+  still recorded once. `trace`, `done`, `start` and `success` are never
+  collapsed: both halves of a lifecycle pair (§ 1.2) always stay visible.
+- **Order.** Only lines that § 4.1 let through reach this layer, so a burst is
+  reported once, by the dedup summary.
+- **Streaks.** The first occurrence is emitted and opens a streak. Later
+  occurrences within `repeat_window_ms` (600000) of that first one are withheld:
+  counted, with the first and last withheld timestamps and the last formatted
+  body recorded. A withheld line reaches no sink and no ring buffer.
+- **Closing.** A streak closes when its window has elapsed (checked on every
+  emission and on the driver's periodic flush tick), when the calendar date of
+  the current timestamp differs from the streak's (every streak closes), when it
+  is the least recently used of `repeat_streak_capacity` (64) live streaks and a
+  new one needs room, or on a terminal flush, which closes the § 4.1 streak
+  first. The next occurrence after a close is emitted and opens a new streak.
+- **Summary.** A closed streak that withheld at least one line emits one line at
+  its own variant and under its own module, so a collapsed warning still reaches
+  the errors-only file and a topical file still receives it:
+
+  ```
+  TIMESTAMP [LEVEL] [module] ↑ "<text>" repeated N more time(s) between <first> and <last>[ (last: <body>)].
+  ```
+
+  The `(last: …)` clause appears only when the last formatted body differs from
+  the key text. Streaks closed together are summarised in the order they opened.
+- **Owners.** Each driver arms the layer once, runs the periodic flush on a
+  timer that is never the input path, and runs the terminal flush at exit and
+  reload:
+  - AHK: armed in `LoggerInit`'s one-time block; periodic flush in
+    `_LoggerFlush` on its `LOGGER_FLUSH_INTERVAL_MS` timer; terminal flush in
+    `_LoggerOnExitFlush`.
+
 ---
 
 ## 5. Ring Buffer
@@ -282,7 +343,6 @@ contract. Both drivers are free to keep or remove them independently.
 | ------------------------------ | --- | --- | ------------------------------------------------------------------- |
 | Coloured console output        | ✗   | ✓   | `hs.console.printStyledText()` with per-variant RGB colour          |
 | DEBUG-axis indentation         | ✗   | ✓   | 10-space prefix on DEBUG / TRACE / DONE lines in console            |
-| Consecutive-line deduplication | ✓   | ✓   | Suppresses repeated identical lines; prints count summary. AHK: `_LOGGER_DEDUP_KEY/_LEVEL/_COUNT` + `_LoggerEmitDedupSummary`, guarded by `tests/meta/test_logger_dedup_tick.ahk` and `test_logger_dedup_exit_flush.ahk` |
 | Error notification callback    | ✗   | ✓   | Optional handler passed to `set_error_notification_handler()`       |
 | `pcall` wrapper                | ✗   | ✓   | `Logger.pcall(module, fn, ...)` — wraps pcall with error logging    |
 | `build` wrapper                | ✗   | ✓   | `Logger.build(module, label, fn, ctx)` — builder with error logging |

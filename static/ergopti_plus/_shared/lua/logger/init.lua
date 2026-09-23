@@ -21,6 +21,10 @@
 --- 5. Lifecycle pairs: trace/done and start/success are paired at DEBUG and
 ---    INFO level respectively. A start/trace without a following success/done
 ---    in the ring buffer indicates a silent failure.
+--- 6. Two suppression layers (spec § 4.1 and § 4.2): a consecutive-line dedup,
+---    always on, and a bounded repeat collapser that a driver arms once at boot.
+---    The second is what folds a 30 s poll with other lines in between, or a
+---    line whose arguments change, into its first occurrence plus one summary.
 --- ==============================================================================
 
 local M = {}
@@ -74,6 +78,41 @@ local DEDUP_WINDOW_SEC = 5
 --- SAME variant, so a suppressed error storm is still reported as an error.
 local _dedup = { line = nil, time = 0, count = 0, variant = nil }
 
+--- How long a repeat streak stays open, in seconds (spec § 4.2). Ten minutes
+--- folds a 30 s poll into two lines per window while a summary still lands close
+--- to the events it describes.
+--- Single source: _shared/modules/timings/constants.toml [logger] repeat_window_ms.
+local REPEAT_WINDOW_SEC = 600
+
+--- How many repeat streaks are tracked at once. Bounded because every distinct
+--- template opens one: an unbounded table grows with every line a session ever
+--- logs. The least recently used streak makes room and reports its count first.
+--- Single source: _shared/modules/timings/constants.toml [logger] repeat_streak_capacity.
+local REPEAT_CAPACITY = 64
+
+--- What a collapsible variant is keyed on, beside its variant and module.
+--- debug and info use the UNFORMATTED template, so a counter in the arguments
+--- cannot defeat the key; warn and error use the formatted body, so every
+--- distinct failure is still recorded once. trace, done, start and success are
+--- absent on purpose: a collapsed half of a lifecycle pair would leave the other
+--- half alone in the log, which reads as exactly the silent failure the pairing
+--- rule exists to expose.
+local REPEAT_KEY_BY = {
+	debug = "template",
+	info  = "template",
+	warn  = "body",
+	error = "body",
+}
+
+--- Repeat-collapsing state. Disarmed until a driver's boot calls
+--- M.enable_repeat_collapsing(): the core is a process singleton shared by every
+--- unit test of a driver suite, and a ten-minute window armed by default would
+--- make one test's line withhold another test's.
+--- `date` is the calendar day every live streak belongs to; `oldest` is the
+--- earliest streak start, so the per-line due check is one comparison; `seq`
+--- orders streaks by creation and `use` by recency.
+local _repeat = { enabled = false, streaks = {}, size = 0, date = nil, oldest = nil, seq = 0, use = 0 }
+
 --- Optional sink function called with every accepted formatted line.
 --- Signature: function(line: string, variant: string) → void
 local _sink = nil
@@ -125,7 +164,7 @@ end
 --- Signature: function() → string in "YYYY-MM-DD HH:MM:SS:mmm" format.
 M.timestamp_fn = M.default_timestamp
 
---- Monotonic-ish seconds provider, used only to measure the dedup window.
+--- Monotonic-ish seconds provider, used only to measure the dedup and repeat windows.
 --- os.time() has one-second resolution, which is coarse but never runs backwards
 --- within a session; a driver with a better clock replaces this.
 --- @return number
@@ -133,7 +172,7 @@ function M.default_clock()
 	return os.time()
 end
 
---- Clock provider for the dedup window. Replace with a higher-resolution one.
+--- Clock provider for the suppression windows. Replace with a higher-resolution one.
 M.clock_fn = M.default_clock
 
 
@@ -241,7 +280,144 @@ local function flush_dedup_summary()
 	deliver(summary, variant)
 end
 
---- Formats a log line per spec § 3, deduplicates it, and delivers it.
+
+
+
+-- ==================================
+-- ===== 5.1) Repeat Collapsing =====
+-- ==================================
+
+--- Emits the summary that closes one repeat streak, at the streak's variant and
+--- under its module, so a collapsed warning still reaches the errors-only file
+--- and a topical file still receives its own module's summary.
+--- An open dedup streak is closed first: its suppressed lines are the most
+--- recent ones, and a summary written after this one would read out of order.
+--- @param streak table The closed streak.
+--- @param ts string Timestamp the summary line is stamped with.
+local function emit_repeat_summary(streak, ts)
+	flush_dedup_summary()
+	local times = streak.count == 1 and "time" or "times"
+	local last = ""
+	if streak.last_body ~= streak.text then last = " (last: " .. streak.last_body .. ")" end
+	deliver(string.format("%s [%s] [%s] \u{2191} \"%s\" repeated %d more %s between %s and %s%s.",
+		ts, LABELS[streak.variant], streak.module, streak.text, streak.count, times,
+		streak.first_ts, streak.last_ts, last), streak.variant)
+end
+
+--- Recomputes the earliest live streak start after streaks were removed.
+local function recompute_oldest_streak()
+	local oldest = nil
+	for _, streak in pairs(_repeat.streaks) do
+		if oldest == nil or streak.start < oldest then oldest = streak.start end
+	end
+	_repeat.oldest = oldest
+end
+
+--- Closes every streak whose window has elapsed at `now`, or all of them, and
+--- emits their summaries in the order the streaks were opened. Streaks are
+--- unpublished BEFORE any summary is delivered, so a sink that logs cannot
+--- observe a half-closed table.
+--- @param now number Current clock reading, in seconds.
+--- @param everything boolean True to close every streak regardless of age.
+--- @param ts string Timestamp the summaries are stamped with.
+local function close_repeat_streaks(now, everything, ts)
+	local closing = {}
+	for _, streak in pairs(_repeat.streaks) do
+		if everything or (now - streak.start) >= REPEAT_WINDOW_SEC then
+			closing[#closing + 1] = streak
+		end
+	end
+	if #closing == 0 then return end
+	table.sort(closing, function(a, b) return a.seq < b.seq end)
+	for _, streak in ipairs(closing) do
+		_repeat.streaks[streak.key] = nil
+		_repeat.size = _repeat.size - 1
+	end
+	recompute_oldest_streak()
+	for _, streak in ipairs(closing) do
+		if streak.count > 0 then emit_repeat_summary(streak, ts) end
+	end
+end
+
+--- Closes what is due: every streak when the calendar date changed (a streak
+--- never spans two days), otherwise the streaks whose window has elapsed. The
+--- common case — nothing due — is one comparison.
+--- @param now number Current clock reading, in seconds.
+--- @param ts string Current timestamp; its first ten characters are the date.
+local function expire_repeat_streaks(now, ts)
+	local date = ts:sub(1, 10)
+	if _repeat.size == 0 then
+		_repeat.date = date
+		return
+	end
+	if date ~= _repeat.date then
+		close_repeat_streaks(now, true, ts)
+		_repeat.date = date
+	elseif _repeat.oldest ~= nil and (now - _repeat.oldest) >= REPEAT_WINDOW_SEC then
+		close_repeat_streaks(now, false, ts)
+	end
+end
+
+--- Evicts the least recently used streak to make room for a new one, reporting
+--- its count first so a bounded table never loses a suppressed occurrence.
+--- @param ts string Timestamp the eviction summary is stamped with.
+local function evict_least_recent_streak(ts)
+	local victim = nil
+	for _, streak in pairs(_repeat.streaks) do
+		if victim == nil or streak.used < victim.used then victim = streak end
+	end
+	_repeat.streaks[victim.key] = nil
+	_repeat.size = _repeat.size - 1
+	if victim.start == _repeat.oldest then recompute_oldest_streak() end
+	if victim.count > 0 then emit_repeat_summary(victim, ts) end
+end
+
+--- Decides whether one line is a repeat to withhold, recording it when it is and
+--- opening a new streak when it is the first occurrence.
+--- @param variant string Core variant name.
+--- @param module_text string Module tag, already stringified.
+--- @param msg any The unformatted template the caller passed.
+--- @param body string The formatted body.
+--- @param ts string The line's timestamp.
+--- @param now number Current clock reading, in seconds.
+--- @return boolean withheld True when the line must not be delivered.
+local function withhold_repeat(variant, module_text, msg, body, ts, now)
+	local key_by = REPEAT_KEY_BY[variant]
+	if key_by == nil then return false end
+	local text = (key_by == "template") and tostring(msg) or body
+	local key = variant .. "\31" .. module_text .. "\31" .. text
+	_repeat.use = _repeat.use + 1
+
+	local streak = _repeat.streaks[key]
+	if streak then
+		streak.count = streak.count + 1
+		if streak.count == 1 then streak.first_ts = ts end
+		streak.last_ts   = ts
+		streak.last_body = body
+		streak.used      = _repeat.use
+		return true
+	end
+
+	if _repeat.size >= REPEAT_CAPACITY then evict_least_recent_streak(ts) end
+	_repeat.seq = _repeat.seq + 1
+	_repeat.streaks[key] = {
+		key = key, variant = variant, module = module_text, text = text,
+		start = now, seq = _repeat.seq, used = _repeat.use, count = 0,
+	}
+	_repeat.size = _repeat.size + 1
+	if _repeat.oldest == nil or now < _repeat.oldest then _repeat.oldest = now end
+	return false
+end
+
+
+
+
+-- =========================
+-- ===== 5.2) Emission =====
+-- =========================
+
+--- Formats a log line per spec § 3, suppresses it per spec § 4.1 and § 4.2,
+--- and delivers it.
 --- @param variant string  One of: debug/trace/done/info/start/success/warn/error
 --- @param module_name string  Caller-supplied tag (e.g. "menu_llm")
 --- @param msg string  Format string (Lua string.format syntax)
@@ -260,20 +436,31 @@ local function emit(variant, module_name, msg, ...)
 		body = tostring(msg)
 	end
 
-	local label = LABELS[variant] or variant:upper()
-	local ts    = M.timestamp_fn()
-	local line  = string.format("%s [%s] [%s] %s", ts, label, tostring(module_name), body)
+	local label       = LABELS[variant] or variant:upper()
+	local module_text = tostring(module_name)
+	local ts          = M.timestamp_fn()
+	local line        = string.format("%s [%s] [%s] %s", ts, label, module_text, body)
 
 	-- Deduplication is keyed on everything AFTER the timestamp: two emissions of
 	-- one message a second apart differ only in their timestamp, so keying on the
 	-- whole line would suppress nothing at all.
-	local body_key = string.format("[%s] [%s] %s", label, tostring(module_name), body)
+	local body_key = string.format("[%s] [%s] %s", label, module_text, body)
 	local now = M.clock_fn()
 
+	-- Due repeat streaks are closed on every emission, not only on a driver's
+	-- tick: that keeps the rule identical on a driver whose tick is slow or
+	-- stopped, and puts each summary before the line that found it due.
+	if _repeat.enabled then expire_repeat_streaks(now, ts) end
 
 	if body_key == _dedup.line and (now - _dedup.time) < DEDUP_WINDOW_SEC then
 		_dedup.count   = _dedup.count + 1
 		_dedup.variant = variant
+		return nil
+	end
+
+	-- The repeat layer only sees what the consecutive dedup let through, so a
+	-- burst is reported once, promptly, by the dedup summary and never twice.
+	if _repeat.enabled and withhold_repeat(variant, module_text, msg, body, ts, now) then
 		return nil
 	end
 
@@ -396,6 +583,66 @@ end
 --- @return number
 function M.ring_buffer_size()
 	return _ring_size
+end
+
+
+
+
+
+-- =================================================
+-- =================================================
+-- ======= 8/ Public API — Repeat Collapsing =======
+-- =================================================
+-- =================================================
+
+--- Arms repeat collapsing (spec § 4.2). Called exactly once by a driver's boot;
+--- a second call raises instead of silently discarding every live streak and
+--- the counts they carry.
+function M.enable_repeat_collapsing()
+	if _repeat.enabled then
+		error("logger: repeat collapsing is already enabled", 2)
+	end
+	_repeat.enabled = true
+	_repeat.streaks = {}
+	_repeat.size    = 0
+	_repeat.date    = nil
+	_repeat.oldest  = nil
+end
+
+--- Disarms repeat collapsing and forgets every streak without a summary. For
+--- test teardown and for an owner that is being torn down; a live driver closes
+--- its streaks with M.flush_repeats(true) first.
+function M.disable_repeat_collapsing()
+	_repeat.enabled = false
+	_repeat.streaks = {}
+	_repeat.size    = 0
+	_repeat.date    = nil
+	_repeat.oldest  = nil
+end
+
+--- Reports whether repeat collapsing is armed.
+--- @return boolean
+function M.repeat_collapsing_enabled()
+	return _repeat.enabled
+end
+
+--- Emits the summaries that are due.
+--- The periodic form (force false) closes the streaks whose window has elapsed,
+--- or all of them when the calendar date changed — the same rule every emission
+--- applies, run from a driver's timer so a source that fell silent is still
+--- summarised. The terminal form (force true) is for exit and reload, after which
+--- nothing would ever close a streak again: it closes the open consecutive-dedup
+--- streak first, then every repeat streak.
+--- @param force boolean True at a terminal boundary.
+function M.flush_repeats(force)
+	if force then
+		flush_dedup_summary()
+		if _repeat.enabled then close_repeat_streaks(M.clock_fn(), true, M.timestamp_fn()) end
+		return
+	end
+	if _repeat.enabled and _repeat.size > 0 then
+		expire_repeat_streaks(M.clock_fn(), M.timestamp_fn())
+	end
 end
 
 

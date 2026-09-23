@@ -4,14 +4,18 @@
  * ==============================================================================
  * MODULE: Logger Scalars Single-Source Guard
  * DESCRIPTION:
- * Four logger scalars are declared once per driver rather than once. This gate
+ * Six logger scalars are declared once per driver rather than once. This gate
  * pins every copy to _shared/modules/timings/constants.toml [logger]:
  *
- *   retention_days    14    AHK LOGGER_RETENTION_DAYS · HS max_age_days (×2)
- *   ring_buffer_size  200   AHK LOGGER_RING_BUFFER_SIZE · HS RING_BUFFER_SIZE ·
- *                           shared core RING_CAPACITY
- *   dedup_window_ms   5000  AHK LOGGER_DEDUP_WINDOW_MS · HS DEDUP_WINDOW_SEC
- *   flush_interval_ms 500   AHK LOGGER_FLUSH_INTERVAL_MS
+ *   retention_days         14      AHK LOGGER_RETENTION_DAYS · HS max_age_days (×2)
+ *   ring_buffer_size       200     AHK LOGGER_RING_BUFFER_SIZE · HS RING_BUFFER_SIZE ·
+ *                                  shared core RING_CAPACITY
+ *   dedup_window_ms        5000    AHK LOGGER_DEDUP_WINDOW_MS · HS DEDUP_WINDOW_SEC
+ *   flush_interval_ms      500     AHK LOGGER_FLUSH_INTERVAL_MS
+ *   repeat_window_ms       600000  AHK LOGGER_REPEAT_WINDOW_MS · shared core
+ *                                  REPEAT_WINDOW_SEC (seconds)
+ *   repeat_streak_capacity 64      AHK LOGGER_REPEAT_CAPACITY · shared core
+ *                                  REPEAT_CAPACITY
  *
  * ROOT CAUSE ENCODED — THE DEDUP WINDOW WAS THE BAD ONE:
  * It was not merely duplicated. It existed only as a BARE LITERAL on both
@@ -240,6 +244,63 @@ check(
 	}
 }
 
+// ── repeat collapsing: window and streak capacity ───────────────────────────
+//
+// The AutoHotkey logger mirrors the shared core rather than running it, so the
+// two declare these values separately, the window in two units. The macOS
+// driver runs the core and must not hold a copy of its own.
+
+check(
+	'windows/infra/logger.ahk',
+	'LOGGER_REPEAT_WINDOW_MS',
+	/LOGGER_REPEAT_WINDOW_MS\s*:=\s*(\d+)/g,
+	registry.logger.repeat_window_ms
+);
+check(
+	'_shared/lua/logger/init.lua',
+	'REPEAT_WINDOW_SEC',
+	/\bREPEAT_WINDOW_SEC\s*=\s*(\d+)/g,
+	registry.logger.repeat_window_ms / 1000,
+	'the shared core holds this in SECONDS — the registry value is milliseconds'
+);
+check(
+	'windows/infra/logger.ahk',
+	'LOGGER_REPEAT_CAPACITY',
+	/LOGGER_REPEAT_CAPACITY\s*:=\s*(\d+)/g,
+	registry.logger.repeat_streak_capacity
+);
+check(
+	'_shared/lua/logger/init.lua',
+	'REPEAT_CAPACITY',
+	/\bREPEAT_CAPACITY\s*=\s*(\d+)/g,
+	registry.logger.repeat_streak_capacity
+);
+mustNotDeclare(
+	'macos/infra/logger.lua',
+	'REPEAT_WINDOW_SEC',
+	/\bREPEAT_WINDOW_SEC\s*=\s*\d+/g,
+	'the macOS driver delegates repeat collapsing to the shared core'
+);
+
+// The corpus's expected summaries quote timestamps a window apart, and its
+// eviction case fills exactly one table: both are measured against these values.
+{
+	const corpus = JSON.parse(read('_shared/tests/corpus/logger/behaviour_vectors.json'));
+	const section = corpus.repeat || {};
+	if (section.window_ms !== registry.logger.repeat_window_ms) {
+		errors.push(
+			`the logger behaviour corpus records a ${section.window_ms} ms repeat window, the registry says ` +
+				`${registry.logger.repeat_window_ms} ms. Its expected summaries would describe a window no driver uses.`
+		);
+	}
+	if (section.capacity !== registry.logger.repeat_streak_capacity) {
+		errors.push(
+			`the logger behaviour corpus records a repeat capacity of ${section.capacity}, the registry says ` +
+				`${registry.logger.repeat_streak_capacity}. Its eviction case would fill a table of the wrong size.`
+		);
+	}
+}
+
 // ── flush_interval_ms ───────────────────────────────────────────────────────
 
 check(
@@ -272,6 +333,6 @@ if (errors.length > 0) {
 }
 
 console.log(
-	'\x1b[32m[OK] all 8 logger scalar declaration(s) across the three drivers match ' +
-		'[logger] in the shared timing registry (dedup window verified across the s/ms unit split).\x1b[0m'
+	'\x1b[32m[OK] all 12 logger scalar declaration(s) across the three drivers match ' +
+		'[logger] in the shared timing registry (dedup and repeat windows verified across the s/ms unit split).\x1b[0m'
 );
