@@ -592,6 +592,10 @@ _install_kanata() (
 	if ! version_output="$("${candidate}" --version 2>&1)" \
 		|| ! printf '%s\n' "${version_output}" | grep -Eq "(^|[^0-9])${KANATA_VERSION}([^0-9]|$)"; then
 		echo "  ✗  Le binaire kanata téléchargé n'annonce pas la version ${KANATA_VERSION}." >&2
+		# The reason, not only the verdict. The upstream binary is linked
+		# against a recent glibc (2.39 for 1.12.0), and on an older system the
+		# loader's "GLIBC_2.39 not found" is the one line that explains it.
+		printf '%s\n' "${version_output}" | head -3 | sed 's/^/     /' >&2
 		return 1
 	fi
 
@@ -605,7 +609,26 @@ _install_kanata() (
 if ! $SKIP_DEPS; then
 	echo ""
 	echo "=== Installation de kanata ==="
-	_install_kanata
+	# Not fatal. kanata carries tap-holds and layers; hotstrings, the tray and
+	# every window work without it. Aborting here (set -e) is what an Ubuntu
+	# 22.04 or Debian 12 install used to do: the upstream binary needs glibc
+	# 2.39, its version check failed, and the script died BEFORE copying a
+	# single driver file — no launcher, no service, nothing to start.
+	if ! _install_kanata; then
+		echo "  ⚠  kanata indisponible — les hotstrings fonctionneront sans tap-hold ni couches." >&2
+		echo "     Installez kanata depuis votre distribution ou avec « cargo install kanata »," >&2
+		echo "     puis relancez l'installateur." >&2
+	fi
+fi
+
+# The kanata the unit will run: the one this script installed, else one the
+# distribution provides on PATH (AUR, Nix, cargo). The unit used to name
+# ${BIN_DIR}/kanata unconditionally, so a packaged kanata was never enabled.
+KANATA_BIN=""
+if [ -x "${BIN_DIR}/kanata" ]; then
+	KANATA_BIN="${BIN_DIR}/kanata"
+elif command -v kanata >/dev/null 2>&1; then
+	KANATA_BIN="$(command -v kanata)"
 fi
 
 
@@ -749,7 +772,7 @@ PartOf=graphical-session.target
 
 [Service]
 Type=simple
-ExecStart=${BIN_DIR}/kanata --quiet --cfg ${KANATA_CONFIG_DIR}/ergopti.kbd
+ExecStart=${KANATA_BIN:-${BIN_DIR}/kanata} --quiet --cfg ${KANATA_CONFIG_DIR}/ergopti.kbd
 Restart=on-failure
 RestartSec=3s
 Nice=-10
@@ -782,7 +805,7 @@ KANATA_SERVICE
 		echo "  ✔  service ergopti-hotstrings activé et démarré"
 
 		# Enable kanata if the binary was installed.
-		if [ -x "${BIN_DIR}/kanata" ]; then
+		if [ -n "${KANATA_BIN}" ]; then
 			systemctl --user enable  kanata.service
 			systemctl --user restart kanata.service
 			echo "  ✔  service kanata activé et démarré"
