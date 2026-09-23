@@ -9,6 +9,7 @@
 
 local helpers = require("tests.helpers")
 local Fakes = require("tests.fakes")
+local TomlCodec = require("toml_codec")
 
 local MODULES = {
 	"modules.gestures.manager",
@@ -160,6 +161,34 @@ helpers.describe("gestures: durable master state", function()
 				helpers.assert_eq(reader.open_attempt, nil,
 					"the restored off state must leave the touchpad closed")
 			end)
+		end)
+
+		os.remove(path)
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("keeps a saved ON in config.toml when the boot reader cannot open (R5 parity)", function()
+		-- macOS once saved the refused posture over config.toml; a boot refusal
+		-- here must stay in memory, and a later save of another key must not
+		-- turn the saved switch off either.
+		local path = os.tmpname()
+		local fh = assert(io.open(path, "w"))
+		fh:write("[gestures]\nenabled = true\n")
+		fh:close()
+
+		local ok, err = pcall(function()
+			with_manager(true, { persist = true, config_path = path }, function(manager)
+				helpers.assert_eq(manager.is_enabled(), false,
+					"a reader that cannot open must leave gestures off for this session")
+				helpers.assert_true(manager.set_action("tap_3", "none"),
+					"an unrelated gesture save must still commit")
+			end)
+			local out = assert(io.open(path, "r"))
+			local decoded = TomlCodec.decode(out:read("*a"))
+			out:close()
+			helpers.assert_eq(decoded.gestures.enabled, true,
+				"the runtime refusal must never rewrite the saved master switch")
+			helpers.assert_eq(decoded.gestures.tap_3, "none")
 		end)
 
 		os.remove(path)
