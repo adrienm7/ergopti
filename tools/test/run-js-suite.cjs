@@ -316,6 +316,7 @@ const CHECKS = [
 	{ name: 'Linux metrics SQLite bridge (persistent manifest + selected-range refresh)', cmd: 'node', args: ['tools/test/test-linux-metrics-sqlite-bridge.cjs'], repro: 'node tools/test/test-linux-metrics-sqlite-bridge.cjs' },
 	{ name: 'Windows metrics range bridge (native selected date/app refresh)', cmd: 'node', args: ['tools/test/test-windows-metrics-range-bridge.cjs'], repro: 'node tools/test/test-windows-metrics-range-bridge.cjs' },
 	{ name: 'keycode data single source (generated JS matches azerty.json, DC-1)', cmd: 'node', args: ['tools/test/test-keycode-data-js-parity.cjs'], repro: 'node tools/test/test-keycode-data-js-parity.cjs' },
+	{ name: 'physical-key registry is complete, unique per driver and agrees with every hand copy (evdev, kVK, SC, Karabiner, kanata)', cmd: 'node', args: ['tools/test/test-physical-keys-registry.cjs'], repro: 'npm run test:physical-keys-registry' },
 	{ name: 'tooltip corpus parity (JSON corpus matches JS layoutTestVectors + dequeueTestVectors)', cmd: 'node', args: ['tools/test/test-tooltip-corpus-parity.cjs'], repro: 'node tools/test/test-tooltip-corpus-parity.cjs' },
 	{ name: 'TOML coercion parity (corpus cross-driver gate)', cmd: 'node', args: ['tools/test/test-toml-coercion-parity.cjs'], repro: 'node tools/test/test-toml-coercion-parity.cjs' },
 	{ name: 'shared test.format single source (inspect/deep_equal/fail_msg_for consumed from _shared, no local copies)', cmd: 'node', args: ['tools/test/test-shared-test-format.cjs'], repro: 'node tools/test/test-shared-test-format.cjs' },
