@@ -37,6 +37,7 @@ local M = {}
 local Logger = require("logger.shim")
 local EvdevCodes = require("infra.evdev_codes")
 local KeyboardLayout = require("adapters.keyboard_layout")
+local XkbCapture = require("adapters.xkb_capture")
 local Clipboard = require("adapters.clipboard")
 local OutputTransaction = require("modules.hotstrings.output_transaction")
 
@@ -198,18 +199,35 @@ local function send_text_native(tx, text)
 		return false
 	end
 
-	for _, step in ipairs(plan) do
-		for _, mod in ipairs(step.mods) do
-			must_emit(tx, MODIFIER_CODES[mod], EVDEV_VALUE_DOWN, "layout modifier down")
-		end
-		must_emit(tx, step.keycode, EVDEV_VALUE_DOWN, "replacement key down")
-		must_emit(tx, step.keycode, EVDEV_VALUE_UP, "replacement key up")
-		-- Released in reverse, and always: a modifier left held after an
-		-- interrupted injection turns every subsequent keystroke into a shortcut.
-		for i = #step.mods, 1, -1 do
-			must_emit(tx, MODIFIER_CODES[step.mods[i]], EVDEV_VALUE_UP, "layout modifier up")
-		end
+	-- The plan is the chord for each character with CapsLock OFF. Typed under a
+	-- locked CapsLock every letter inverts ("Bonjour" arrives as "bONJOUR"), and
+	-- on Ergopti, whose type maps Lock to its own level, other keys change too.
+	-- So the lock is released for the replacement and restored after it —
+	-- restored even when an emit fails, or the user is left with CapsLock off.
+	local caps = XkbCapture.caps_locked()
+	if caps then
+		must_emit(tx, EvdevCodes.KEY_CAPSLOCK, EVDEV_VALUE_DOWN, "capslock release down")
+		must_emit(tx, EvdevCodes.KEY_CAPSLOCK, EVDEV_VALUE_UP, "capslock release up")
 	end
+	local ok_typed, typed_err = pcall(function()
+		for _, step in ipairs(plan) do
+			for _, mod in ipairs(step.mods) do
+				must_emit(tx, MODIFIER_CODES[mod], EVDEV_VALUE_DOWN, "layout modifier down")
+			end
+			must_emit(tx, step.keycode, EVDEV_VALUE_DOWN, "replacement key down")
+			must_emit(tx, step.keycode, EVDEV_VALUE_UP, "replacement key up")
+			-- Released in reverse, and always: a modifier left held after an
+			-- interrupted injection turns every subsequent keystroke into a shortcut.
+			for i = #step.mods, 1, -1 do
+				must_emit(tx, MODIFIER_CODES[step.mods[i]], EVDEV_VALUE_UP, "layout modifier up")
+			end
+		end
+	end)
+	if caps then
+		must_emit(tx, EvdevCodes.KEY_CAPSLOCK, EVDEV_VALUE_DOWN, "capslock restore down")
+		must_emit(tx, EvdevCodes.KEY_CAPSLOCK, EVDEV_VALUE_UP, "capslock restore up")
+	end
+	if not ok_typed then error(typed_err, 0) end
 	return true
 end
 

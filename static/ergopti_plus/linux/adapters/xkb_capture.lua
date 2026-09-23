@@ -172,6 +172,7 @@ local function bind_ffi_backend()
 		unsigned int xkb_keymap_min_keycode(struct xkb_keymap *keymap);
 		unsigned int xkb_keymap_max_keycode(struct xkb_keymap *keymap);
 		const char *xkb_keymap_key_get_name(struct xkb_keymap *keymap, unsigned int key);
+		int xkb_state_mod_name_is_active(struct xkb_state *state, const char *name, int type);
 
 		struct xkb_compose_table *xkb_compose_table_new_from_locale(
 			struct xkb_context *context,
@@ -308,6 +309,12 @@ local function bind_ffi_backend()
 		lib.xkb_compose_state_reset(session.compose_state)
 	end
 
+	-- XKB_STATE_MODS_LOCKED: CapsLock toggles the Lock modifier into the locked set.
+	local XKB_STATE_MODS_LOCKED = 4
+	function backend.caps_locked(session)
+		return lib.xkb_state_mod_name_is_active(session.state, "Lock", XKB_STATE_MODS_LOCKED) == 1
+	end
+
 	-- The physical chords the injector can press, cheapest first. Each is
 	-- pressed on a FRESH state, so the answer is what an application receives
 	-- from exactly that chord — whatever the key's type says a level means.
@@ -440,6 +447,18 @@ end
 --- @return boolean True when process() has a validated live state.
 function M.is_ready()
 	return _session ~= nil
+end
+
+--- Whether CapsLock is locked in the live capture state.
+---
+--- The state follows every physical key transition, CapsLock included, so it
+--- is the session's own answer; the LED is not, because under the grab the
+--- kernel drops the compositor's LED writes to the grabbed keyboard.
+--- @return boolean
+function M.caps_locked()
+	if not _session or type(_backend.caps_locked) ~= "function" then return false end
+	local ok, locked = pcall(_backend.caps_locked, _session)
+	return ok and locked == true
 end
 
 --- The character → keystroke table injection types with, asked of libxkbcommon.

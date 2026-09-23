@@ -293,5 +293,39 @@ do
 	end
 end
 
+-- What an application receives from an injection, replayed through a real XKB
+-- state: every emitted key goes through the same libxkbcommon state capture
+-- uses, which stands in for the desktop's. Under a locked CapsLock the plan used
+-- to be typed as-is and every letter came out inverted.
+print("--- injection under CapsLock (fr) ---")
+do
+	local keymap = compile("fr")
+	if keymap and load_through_driver(keymap) then
+		local Capture = require("adapters.xkb_capture")
+		local Codes = require("infra.evdev_codes")
+		local injector = require("modules.hotstrings.injector")
+		local received = {}
+		injector._set_uinput({
+			is_open = function() return true end,
+			sync = function() return true end,
+			emit = function(code, value)
+				local text = Capture.process(code, value)
+				if value == 1 and text then received[#received + 1] = text end
+				return true
+			end,
+		})
+		Capture.process(Codes.KEY_CAPSLOCK, 1)
+		Capture.process(Codes.KEY_CAPSLOCK, 0)
+		check(Capture.caps_locked(), "the capture state reports CapsLock locked")
+		injector.inject(0, "Bonjour à tous")
+		check(table.concat(received) == "Bonjour à tous", string.format(
+			"under CapsLock the application receives %q", table.concat(received)))
+		check(Capture.caps_locked(), "and CapsLock is still locked afterwards")
+	else
+		_failures = _failures + 1
+		print("  FAIL could not load fr for the CapsLock replay")
+	end
+end
+
 print(string.format("=== %d check(s), %d failure(s) ===", _checks, _failures))
 os.exit(_failures == 0 and 0 or 1)
