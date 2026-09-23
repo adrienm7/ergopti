@@ -1562,6 +1562,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_updater_loadchannel_try_wrap.ahk
 #Include meta/test_crash_report_sysinfo_dedup.ahk
 #Include meta/test_logger_dedup_exit_flush.ahk
+#Include meta/test_logger_repeat_collapsing.ahk
 #Include meta/test_shell_runner_boot_crash_and_quoting.ahk
 #Include meta/test_hotpath_priority_starvation.ahk
 #Include meta/test_priority_baseline_single_source.ahk

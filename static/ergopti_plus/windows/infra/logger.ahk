@@ -25,6 +25,10 @@
 ; 6. Dedicated errors-only sink: every WARNING/ERROR line is also appended to
 ;    ErgoptiPlus_errors_YYYY-MM-DD.log (same daily rotation/purge policy). This
 ;    gives a small, focused file for quick triage of problems.
+; 7. Two suppression layers, mirroring the shared Lua core (spec section 4): a
+;    consecutive-line dedup and, once LoggerInit arms it, a bounded repeat
+;    collapser that folds a line recurring with other lines in between, or with
+;    changing arguments, into its first occurrence plus one timed summary.
 ; ==============================================================================
 
 
@@ -201,6 +205,43 @@ global _LOGGER_DEDUP_LEVEL := ""
 global _LOGGER_DEDUP_COUNT := 0
 global _LastErrTime := 0
 
+; How long a repeat streak stays open, and how many streaks are tracked at once
+; (spec section 4.2). The shared Lua core holds the same values, the window in
+; seconds; test-logger-scalars-single-source.cjs pins both to the registry.
+; Single source: _shared/modules/timings/constants.toml [logger]
+; repeat_window_ms and repeat_streak_capacity.
+global LOGGER_REPEAT_WINDOW_MS := 600000
+global LOGGER_REPEAT_CAPACITY := 64
+
+; What a collapsible level is keyed on, beside its level and tag. DEBUG and INFO
+; use the UNFORMATTED template so a changing counter cannot defeat the key;
+; WARNING and ERROR use the formatted body so every distinct failure is still
+; recorded once. TRACE, DONE, START and SUCCESS are absent on purpose: a
+; collapsed half of a lifecycle pair would read as the silent failure the
+; pairing rule exists to expose.
+global LOGGER_REPEAT_KEY_BY := Map("DEBUG", "template", "INFO", "template",
+		"WARNING", "body", "ERROR", "body")
+
+; Repeat-collapsing state, disarmed until LoggerInit's one-time block arms it:
+; the whole AHK suite shares this process, and a ten-minute window armed by
+; default would make one test's line withhold another test's. _DATE is the day
+; every live streak belongs to, _OLDEST the earliest streak start (tick ms, ""
+; when none) so the per-line due check is one comparison, _SEQ orders streaks
+; by creation and _USE by recency.
+global _LOGGER_REPEAT_ENABLED := False
+global _LOGGER_REPEAT_STREAKS := Map()
+global _LOGGER_REPEAT_DATE := ""
+global _LOGGER_REPEAT_OLDEST := ""
+global _LOGGER_REPEAT_SEQ := 0
+global _LOGGER_REPEAT_USE := 0
+
+; Test seams for the suppression clock and the line timestamp, mirroring the
+; shared core's clock_fn / timestamp_fn: a ten-minute window and a midnight
+; rollover cannot be exercised by a suite that runs in seconds. 0 means the
+; production A_TickCount / WallClockTimestamp().
+global _LOGGER_CLOCK_FN := 0
+global _LOGGER_STAMP_FN := 0
+
 
 
 
@@ -272,6 +313,10 @@ LoggerInit() {
 		if !_LOGGER_FLUSH_TIMER_STARTED {
 				SetTimer(_LoggerFlush, LOGGER_FLUSH_INTERVAL_MS)
 				OnExit(_LoggerOnExitFlush)
+				; Armed with the timer that summarises due streaks and the exit hook
+				; that closes the rest (spec section 4.2), and exactly once: a second
+				; arming is refused rather than dropping the live counts.
+				_LoggerRepeatEnable()
 				_LOGGER_FLUSH_TIMER_STARTED := True
 				; Session boundary marker (matches the macOS driver) so tailing the log
 				; reveals where the driver (re)started. Written once per session to the
@@ -539,6 +584,11 @@ _LoggerFlushOwned(ForceFlush := false) {
 	global _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
 	global _LOGGER_PATH_DATE, LOGGER_RETENTION_DAYS
 
+	; This is the periodic tick: close the repeat streaks that are due, so a
+	; source that fell silent is summarised without waiting for another line.
+	; First, so the summaries join the queue this very flush writes.
+	_LoggerFlushRepeats(false)
+
 	; Midnight rollover. The driver routinely stays up across several days, so
 	; without this the dated filename resolved at init would capture every later
 	; entry — misdating the log and making _LoggerPurgeOldLogs, which ages files
@@ -743,17 +793,14 @@ _LoggerRequeue(Pending, PendingErr) {
 }
 
 _LoggerOnExitFlush(ExitReason, ExitCode) {
-		global _LOGGER_DEDUP_COUNT, _LOGGER_DEDUP_LEVEL
 		; If the very last log call before shutdown was itself a suppressed
 		; duplicate, its streak's "N more identical lines" summary is still
 		; pending — the streak only ever gets flushed when a DIFFERENT line
-		; arrives (see _LoggerEmit). Emit it now so a repeating warning/error
+		; arrives (see _LoggerEmit). The same holds for every open repeat
+		; streak. The terminal flush emits both now so a repeating warning/error
 		; storm immediately preceding this exit/reload is not silently lost
 		; (logger-dedup-streak-lost-on-exit).
-		if (_LOGGER_DEDUP_COUNT > 0) {
-				_LoggerEmitDedupSummary(_LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT)
-				_LOGGER_DEDUP_COUNT := 0
-		}
+		_LoggerFlushRepeats(true)
 		; Use the forced-flush path on exit too — a subsequent OS kill cannot
 		; replay the buffered append.
 		_LoggerFlush(true)
@@ -1014,6 +1061,7 @@ LoggerRingBufferSnapshot() {
 _LoggerEmit(Level, Tag, Msg, Args*) {
 		global LOGGER_LOG_PATH, LOGGER_MIN_LEVEL, LOGGER_SEVERITY, _LOGGER_PENDING
 		global _LOGGER_DEDUP_KEY, _LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT, _LastErrTime
+		global _LOGGER_REPEAT_ENABLED, _LOGGER_STAMP_FN
 		; Safety net for unknown levels — the public wrappers already short-circuit
 		; on the per-level fast-path flags, so a severity comparison here would be
 		; a redundant second filter. Only guard against a completely unrecognised Level.
@@ -1038,28 +1086,41 @@ _LoggerEmit(Level, Tag, Msg, Args*) {
 		}
 		; The shared wall-clock helper caches the second-resolution text while
 		; sampling seconds and milliseconds from one non-interruptible SYSTEMTIME.
-		Stamp := WallClockTimestamp()
+		; The test clock face, when installed, replaces that one sample.
+		Stamp := _LOGGER_STAMP_FN ? _LOGGER_STAMP_FN.Call() : WallClockTimestamp()
 		; Timestamp-independent message identity — the dedup key. Matches the macOS
 		; logger, which dedups on its "[LEVEL] [module] body" line.
 		MsgLine := Format("[{1}] [{2}] {3}", Level, Tag, Body)
 		Line := Stamp . " " . MsgLine
+		Now := _LoggerNowMs()
+
+		; Due repeat streaks are closed on every emission, not only on the flush
+		; tick, exactly like the shared core: each summary lands before the line
+		; that found it due, and a slow tick cannot change what is written.
+		if _LOGGER_REPEAT_ENABLED
+				_LoggerExpireRepeatStreaks(Now, Stamp)
 
 		; ── Deduplication ──
 		; Suppress consecutive identical lines (any level) within a 5000 ms window so a
 		; recurring line is de-bounced, not permanently silenced (logger-dedup-tick): a
 		; streak that outlives the window re-surfaces. When the streak ends a single
 		; "N identical lines suppressed" summary is emitted. Mirrors the macOS driver.
-		if (MsgLine == _LOGGER_DEDUP_KEY and ((A_TickCount - _LastErrTime + 0x100000000) & 0xFFFFFFFF) < LOGGER_DEDUP_WINDOW_MS) {
+		if (MsgLine == _LOGGER_DEDUP_KEY and ((Now - _LastErrTime + 0x100000000) & 0xFFFFFFFF) < LOGGER_DEDUP_WINDOW_MS) {
 				_LOGGER_DEDUP_COUNT += 1
 				return
 		}
+		; ── Repeat collapsing ──
+		; Only what the dedup let through reaches this layer, so a burst is reported
+		; once, promptly, by the dedup summary and never counted twice.
+		if (_LOGGER_REPEAT_ENABLED and _LoggerWithholdRepeat(Level, Tag, Msg, Body, Stamp, Now))
+				return
 		if (_LOGGER_DEDUP_COUNT > 0) {
 				_LoggerEmitDedupSummary(_LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT)
 		}
 		_LOGGER_DEDUP_KEY := MsgLine
 		_LOGGER_DEDUP_LEVEL := Level
 		_LOGGER_DEDUP_COUNT := 0
-		_LastErrTime := A_TickCount
+		_LastErrTime := Now
 
 		_LoggerPushRing(Line)
 		if _LOGGER_TEST_SINK != 0 {
@@ -1116,6 +1177,231 @@ _LoggerEmitDedupSummary(Level, Count) {
 	}
 	_LoggerFanOut("logger", Line)
 }
+
+
+
+
+; ==================================
+; ===== 3.1) Repeat collapsing =====
+; ==================================
+
+; Milliseconds on the clock both suppression windows are measured with:
+; A_TickCount, or the test clock when one is installed.
+_LoggerNowMs() {
+	global _LOGGER_CLOCK_FN
+	return _LOGGER_CLOCK_FN ? _LOGGER_CLOCK_FN.Call() : A_TickCount
+}
+
+; Elapsed milliseconds between two readings of that clock, safe across the
+; 32-bit tick rollover exactly like the dedup window's own comparison.
+_LoggerElapsedMs(Now, Since) {
+	return (Now - Since + 0x100000000) & 0xFFFFFFFF
+}
+
+; Arms repeat collapsing (spec section 4.2). LoggerInit's one-time block is the
+; only production caller; a second arming raises instead of silently discarding
+; every live streak and the counts it carries.
+_LoggerRepeatEnable() {
+	global _LOGGER_REPEAT_ENABLED
+	if _LOGGER_REPEAT_ENABLED
+		throw Error("logger: repeat collapsing is already enabled")
+	_LoggerRepeatForget()
+	_LOGGER_REPEAT_ENABLED := True
+}
+
+; Disarms repeat collapsing and forgets every streak without a summary. For test
+; teardown; a live driver closes its streaks with _LoggerFlushRepeats(true).
+_LoggerRepeatDisable() {
+	global _LOGGER_REPEAT_ENABLED
+	_LOGGER_REPEAT_ENABLED := False
+	_LoggerRepeatForget()
+}
+
+_LoggerRepeatForget() {
+	global _LOGGER_REPEAT_STREAKS, _LOGGER_REPEAT_DATE, _LOGGER_REPEAT_OLDEST
+	_LOGGER_REPEAT_STREAKS := Map()
+	_LOGGER_REPEAT_DATE := ""
+	_LOGGER_REPEAT_OLDEST := ""
+}
+
+; Emits the summaries that are due. The periodic form (Force false) closes the
+; streaks whose window has elapsed, or all of them when the calendar date
+; changed; the flush tick runs it so a source that fell silent is still
+; summarised. The terminal form (Force true) is for exit and reload, after which
+; nothing would ever close a streak again: it closes the open dedup streak first,
+; then every repeat streak.
+_LoggerFlushRepeats(Force) {
+	global _LOGGER_REPEAT_ENABLED, _LOGGER_REPEAT_STREAKS, _LOGGER_DEDUP_COUNT, _LOGGER_DEDUP_LEVEL
+	global _LOGGER_STAMP_FN
+	if Force {
+		if (_LOGGER_DEDUP_COUNT > 0) {
+			_LoggerEmitDedupSummary(_LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT)
+			_LOGGER_DEDUP_COUNT := 0
+		}
+		if _LOGGER_REPEAT_ENABLED
+			_LoggerCloseRepeatStreaks(_LoggerNowMs(), true,
+				_LOGGER_STAMP_FN ? _LOGGER_STAMP_FN.Call() : WallClockTimestamp())
+		return
+	}
+	if (_LOGGER_REPEAT_ENABLED and _LOGGER_REPEAT_STREAKS.Count > 0)
+		_LoggerExpireRepeatStreaks(_LoggerNowMs(),
+			_LOGGER_STAMP_FN ? _LOGGER_STAMP_FN.Call() : WallClockTimestamp())
+}
+
+; Closes what is due: every streak when the calendar date changed (a streak
+; never spans two days), otherwise the streaks whose window has elapsed. The
+; common case, nothing due, costs one comparison.
+_LoggerExpireRepeatStreaks(Now, Stamp) {
+	global _LOGGER_REPEAT_STREAKS, _LOGGER_REPEAT_DATE, _LOGGER_REPEAT_OLDEST, LOGGER_REPEAT_WINDOW_MS
+	Date := SubStr(Stamp, 1, 10)
+	if (_LOGGER_REPEAT_STREAKS.Count == 0) {
+		_LOGGER_REPEAT_DATE := Date
+		return
+	}
+	if (Date !== _LOGGER_REPEAT_DATE) {
+		_LoggerCloseRepeatStreaks(Now, true, Stamp)
+		_LOGGER_REPEAT_DATE := Date
+	} else if (_LOGGER_REPEAT_OLDEST != ""
+			and _LoggerElapsedMs(Now, _LOGGER_REPEAT_OLDEST) >= LOGGER_REPEAT_WINDOW_MS) {
+		_LoggerCloseRepeatStreaks(Now, false, Stamp)
+	}
+}
+
+; Closes every streak whose window has elapsed at Now, or all of them, and emits
+; their summaries in the order the streaks were opened. Streaks are unpublished
+; BEFORE any summary is emitted, so nothing re-entering the logger can observe a
+; half-closed table.
+_LoggerCloseRepeatStreaks(Now, Everything, Stamp) {
+	global _LOGGER_REPEAT_STREAKS, LOGGER_REPEAT_WINDOW_MS
+	Closing := []
+	for _, Streak in _LOGGER_REPEAT_STREAKS {
+		if (Everything or _LoggerElapsedMs(Now, Streak.Start) >= LOGGER_REPEAT_WINDOW_MS)
+			Closing.Push(Streak)
+	}
+	if (Closing.Length == 0)
+		return
+	; Insertion sort by creation order: at most LOGGER_REPEAT_CAPACITY entries
+	loop Closing.Length - 1 {
+		Current := Closing[A_Index + 1]
+		Slot := A_Index
+		while (Slot >= 1 and Closing[Slot].Seq > Current.Seq) {
+			Closing[Slot + 1] := Closing[Slot]
+			Slot -= 1
+		}
+		Closing[Slot + 1] := Current
+	}
+	for _, Streak in Closing
+		_LOGGER_REPEAT_STREAKS.Delete(Streak.Key)
+	_LoggerRecomputeOldestStreak(Now)
+	for _, Streak in Closing {
+		if (Streak.Count > 0)
+			_LoggerEmitRepeatSummary(Streak, Stamp)
+	}
+}
+
+; Recomputes the earliest live streak start after streaks were removed. Ages
+; are compared rather than raw ticks so the rollover cannot reorder them.
+_LoggerRecomputeOldestStreak(Now) {
+	global _LOGGER_REPEAT_STREAKS, _LOGGER_REPEAT_OLDEST
+	Oldest := ""
+	OldestAge := -1
+	for _, Streak in _LOGGER_REPEAT_STREAKS {
+		Age := _LoggerElapsedMs(Now, Streak.Start)
+		if (Age > OldestAge) {
+			OldestAge := Age
+			Oldest := Streak.Start
+		}
+	}
+	_LOGGER_REPEAT_OLDEST := Oldest
+}
+
+; Evicts the least recently used streak to make room for a new one, reporting its
+; count first so a bounded table never loses a withheld occurrence.
+_LoggerEvictLeastRecentStreak(Now, Stamp) {
+	global _LOGGER_REPEAT_STREAKS, _LOGGER_REPEAT_OLDEST
+	Victim := 0
+	for _, Streak in _LOGGER_REPEAT_STREAKS {
+		if (!IsObject(Victim) or Streak.Used < Victim.Used)
+			Victim := Streak
+	}
+	_LOGGER_REPEAT_STREAKS.Delete(Victim.Key)
+	if (Victim.Start == _LOGGER_REPEAT_OLDEST)
+		_LoggerRecomputeOldestStreak(Now)
+	if (Victim.Count > 0)
+		_LoggerEmitRepeatSummary(Victim, Stamp)
+}
+
+; Decides whether one line is a repeat to withhold, recording it when it is and
+; opening a new streak when it is the first occurrence. Returns true when the
+; line must not be emitted.
+_LoggerWithholdRepeat(Level, Tag, Msg, Body, Stamp, Now) {
+	global LOGGER_REPEAT_KEY_BY, LOGGER_REPEAT_CAPACITY, _LOGGER_REPEAT_STREAKS
+	global _LOGGER_REPEAT_OLDEST, _LOGGER_REPEAT_SEQ, _LOGGER_REPEAT_USE
+	if !LOGGER_REPEAT_KEY_BY.Has(Level)
+		return false
+	Text := (LOGGER_REPEAT_KEY_BY[Level] == "template") ? String(Msg) : Body
+	Key := Level . Chr(31) . Tag . Chr(31) . Text
+	_LOGGER_REPEAT_USE += 1
+
+	if _LOGGER_REPEAT_STREAKS.Has(Key) {
+		Streak := _LOGGER_REPEAT_STREAKS[Key]
+		Streak.Count += 1
+		if (Streak.Count == 1)
+			Streak.FirstStamp := Stamp
+		Streak.LastStamp := Stamp
+		Streak.LastBody := Body
+		Streak.Used := _LOGGER_REPEAT_USE
+		return true
+	}
+
+	if (_LOGGER_REPEAT_STREAKS.Count >= LOGGER_REPEAT_CAPACITY)
+		_LoggerEvictLeastRecentStreak(Now, Stamp)
+	_LOGGER_REPEAT_SEQ += 1
+	_LOGGER_REPEAT_STREAKS[Key] := {Key: Key, Level: Level, Tag: Tag, Text: Text, Start: Now,
+		Seq: _LOGGER_REPEAT_SEQ, Used: _LOGGER_REPEAT_USE, Count: 0,
+		FirstStamp: "", LastStamp: "", LastBody: ""}
+	if (_LOGGER_REPEAT_OLDEST == "")
+		_LOGGER_REPEAT_OLDEST := Now
+	return false
+}
+
+; Emits the summary that closes one repeat streak, at the streak's own level and
+; under its own tag, so a collapsed warning still reaches the errors-only file
+; and a topical file still receives its own module's summary. Matches the shared
+; core byte for byte; Chr(0x2191) keeps the up-arrow out of the source. An open
+; dedup streak is closed first: its suppressed lines are the most recent ones.
+_LoggerEmitRepeatSummary(Streak, Stamp) {
+	global LOGGER_SEVERITY, _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, _LOGGER_TEST_SINK
+	global _LOGGER_DEDUP_COUNT, _LOGGER_DEDUP_LEVEL
+	if (_LOGGER_DEDUP_COUNT > 0) {
+		_LoggerEmitDedupSummary(_LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT)
+		_LOGGER_DEDUP_COUNT := 0
+	}
+	Times := (Streak.Count == 1) ? "time" : "times"
+	Last := (Streak.LastBody !== Streak.Text) ? " (last: " . Streak.LastBody . ")" : ""
+	Line := Stamp . " [" . Streak.Level . "] [" . Streak.Tag . "] " . Chr(0x2191) . ' "' . Streak.Text
+		. '" repeated ' . Streak.Count . " more " . Times . " between " . Streak.FirstStamp
+		. " and " . Streak.LastStamp . Last . "."
+	_LoggerPushRing(Line)
+	if _LOGGER_TEST_SINK != 0 {
+		try _LOGGER_TEST_SINK(Line)
+	}
+	_LOGGER_PENDING.Push(Line)
+	if LOGGER_SEVERITY[Streak.Level] >= LOGGER_SEVERITY["WARNING"] {
+		_LOGGER_PENDING_ERRORS.Push(Line)
+	}
+	if LOGGER_SEVERITY[Streak.Level] >= LOGGER_SEVERITY["ERROR"] {
+		_LoggerFlush(true)
+	}
+	_LoggerFanOut(Streak.Tag, Line)
+}
+
+
+
+
+; ============================================
+; ===== 3.2) Fan-out, retention and ring =====
+; ============================================
 
 ; Resolves absolute paths for every sub-file and deletes any stale sub-file
 ; whose date does not match today. Sub-files are ephemeral (today only) — they
