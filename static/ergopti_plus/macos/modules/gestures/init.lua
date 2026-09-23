@@ -107,9 +107,6 @@ M.DEFAULT_MODES = {
 -- Default sensitivity (step) for incremental mode
 M.DEFAULT_SENSITIVITY = 3.5
 
--- Raw touch frames are high-frequency, so diagnostics sample about every 2 s
-local FRAME_HEARTBEAT_EVERY = 120
-
 -- space_wrap is the one cross-driver gesture default in the shared manifest, so
 -- it is sourced from there; the `gestures` enabled flag has no manifest path,
 -- modes are computed per swipe slot below and sensitivities read per slot.
@@ -293,6 +290,16 @@ end
 -- Reset whenever a device gets a fresh watcher via create_watcher.
 local frame_counters = {}
 
+-- Devices whose current touch session already logged its heartbeat. A session
+-- runs from the first frame with a finger down to the first frame with none:
+-- frames arrive about a hundred times a second while touching, so one line per
+-- session is the most the log can usefully carry.
+local touch_session_logged = {}
+
+-- Watcher count the health check last reported, nil before its first report. A
+-- stable 30 s tick is not news; only a changed count is logged.
+local health_reported_watchers = nil
+
 --- Counts currently-registered watchers (diagnostic helper).
 --- @return number Watcher count.
 local function count_watchers()
@@ -455,9 +462,13 @@ local function create_watcher(deviceID)
 					tostring(deviceID), fc, #touches,
 					tonumber(pos.x) or -1, tonumber(pos.y) or -1)
 			end
-			if fc == 1 or fc % FRAME_HEARTBEAT_EVERY == 0 then
-				Logger.debug(LOG, "frame#%d device=%s touches=%d", fc, tostring(deviceID),
-					type(touches) == "table" and #touches or 0)
+			local finger_count = type(touches) == "table" and #touches or 0
+			if finger_count == 0 then
+				touch_session_logged[deviceID] = nil
+			elseif not touch_session_logged[deviceID] then
+				touch_session_logged[deviceID] = true
+				Logger.debug(LOG, "Touch session started on device=%s (frame %d, touches=%d).",
+					tostring(deviceID), fc, finger_count)
 			end
 			if not Logger.pcall(LOG, Engine.process_frame, touches) then
 				-- A failed frame may leave the native scroll blocker engaged
@@ -1042,6 +1053,9 @@ end
 --- aggressive startup probe so recovery is fast.
 start_health_check_loop = function()
 	Logger.info(LOG, "ENTER slow health-check loop (cadence=%.0fs)", HEALTH_CHECK_INTERVAL_SEC)
+	-- Each entry reports its own settled count once: after a lost frame stream
+	-- or a restart, the count the recovery reached is exactly the news.
+	health_reported_watchers = nil
 	return start_discovery_timer(HEALTH_CHECK_INTERVAL_SEC, "health check", function()
 		if not _G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME then
 			-- Defensive: should not happen, but if we lost the stream entirely,
@@ -1050,7 +1064,6 @@ start_health_check_loop = function()
 			start_startup_probe_loop()
 			return
 		end
-		Logger.debug(LOG, "Health-check tick (watchers=%d)", count_watchers())
 		-- Reattach any watcher that stopped (device sleep, USB disconnect…)
 		for id, w in pairs(touch_watchers) do
 			local ok, r = pcall(function() return w:running() end)
@@ -1063,6 +1076,14 @@ start_health_check_loop = function()
 			end
 		end
 		ensure_watchers()
+		-- The settled count, reported only when it changed: logging every tick
+		-- wrote thousands of identical lines a day and said nothing new.
+		local watchers = count_watchers()
+		if watchers ~= health_reported_watchers then
+			Logger.info(LOG, "Health-check: %d watcher(s) attached (previously %s).", watchers,
+				health_reported_watchers == nil and "unreported" or tostring(health_reported_watchers))
+			health_reported_watchers = watchers
+		end
 	end)
 end
 
@@ -1359,19 +1380,18 @@ function M.start()
 			end
 			local t = event:getType()
 			primer_event_count = primer_event_count + 1
-			-- Throttled visibility: 5 events/sec max, so we see something is happening
-			-- without flooding the log during normal use.
-			local now = hs.timer.secondsSinceEpoch()
-			if (now - primer_last_log_time) > 0.2 then
-				primer_last_log_time = now
-				Logger.debug(LOG, "PRIMER event#%d type=%d first_frame=%s",
-					primer_event_count, t, tostring(_G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME))
-			end
 			-- Wakeup signal: gesture-class event reached us but the touchdevice
 			-- callback has not fired yet → the subscription is dormant. Recycle.
+			-- That dormancy is the only thing this line diagnoses, so it is logged
+			-- only then, throttled to 5 per second; once frames flow, every scroll
+			-- passes through here and a line per event said nothing new.
 			if not _G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME then
-				Logger.debug(LOG, "PRIMER caught event#%d type=%d BEFORE any touchdevice frame — calling schedule_emergency_recycle()",
-					primer_event_count, t)
+				local now = hs.timer.secondsSinceEpoch()
+				if (now - primer_last_log_time) > 0.2 then
+					primer_last_log_time = now
+					Logger.debug(LOG, "PRIMER caught event#%d type=%d BEFORE any touchdevice frame — calling schedule_emergency_recycle()",
+						primer_event_count, t)
+				end
 				schedule_emergency_recycle()
 			end
 			return false
