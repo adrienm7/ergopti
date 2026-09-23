@@ -1378,6 +1378,20 @@ helpers.describe("ui.bridge_handlers", function()
       helpers.assert_eq(refused.opened, false)
       helpers.assert_eq(#commands, 0, "a foreign URL must reach no shell command")
     end)
+    helpers.it("refuses a repository that only shares the name's prefix (repo-url-single-source)", function()
+      -- The allow-pattern was a typed copy of the repository, and it accepted
+      -- any name that merely started with it
+      local Shell = require("adapters.shell_runner")
+      local commands = {}
+      Shell._set_runner(function(command) commands[#commands + 1] = command; return true end)
+      local refused = handler.on_message({
+        action = "open_url",
+        url = "https://github.com/adrienm7/ergopti-lookalike/releases",
+      }, state)
+      Shell._reset_runner()
+      helpers.assert_eq(refused.opened, false)
+      helpers.assert_eq(#commands, 0, "a lookalike repository must reach no shell command")
+    end)
     helpers.it("handles 'close' string", function()
       local result = handler.on_message("close", state)
       helpers.assert_eq(result, nil)
