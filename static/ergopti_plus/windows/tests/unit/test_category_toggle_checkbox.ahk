@@ -50,6 +50,15 @@ _CTC_LabelAt(TargetMenu, Position) {
 	return StrGet(Buffer_, "UTF-16")
 }
 
+; Frees a menu this file built, before the runner exits. The WPM rows of the
+; Metrics menu hold that menu in their callbacks, which the dispatcher registry
+; keeps alive: AHK then destroyed it during its exit teardown, and the runner
+; ended in STATUS_HEAP_CORRUPTION after every test had passed.
+_CTC_ReleaseMenu(TargetMenu) {
+	TargetMenu.Delete()
+	MenuDispatcher_PruneMenu(TargetMenu)
+}
+
 ; How many rows of a menu carry exactly Label.
 _CTC_CountLabel(TargetMenu, Label) {
 	Found := 0
@@ -160,9 +169,13 @@ _CTC_GesturesMenuFirstRowIsCheckbox() {
 		for State in [true, false] {
 			Features["gestures"]["enabled"] := State
 			GMenu := BuildGesturesMenu()
-			AssertEqual(Label, _CTC_LabelAt(GMenu, 0), "the gestures submenu opens with its switch")
-			AssertEqual(State, _CTC_IsChecked(GMenu, 0), "the gestures switch is ticked from gestures.enabled")
-			AssertEqual(1, _CTC_CountLabel(GMenu, Label), "the gestures switch is drawn once")
+			try {
+				AssertEqual(Label, _CTC_LabelAt(GMenu, 0), "the gestures submenu opens with its switch")
+				AssertEqual(State, _CTC_IsChecked(GMenu, 0), "the gestures switch is ticked from gestures.enabled")
+				AssertEqual(1, _CTC_CountLabel(GMenu, Label), "the gestures switch is drawn once")
+			} finally {
+				_CTC_ReleaseMenu(GMenu)
+			}
 		}
 	} finally {
 		Features["gestures"]["enabled"] := Saved
@@ -178,9 +191,13 @@ _CTC_MetricsMenuFirstRowIsCheckbox() {
 		for State in [true, false] {
 			MetricsShortcuts.enabled := State
 			MMenu := BuildMetricsMenu()
-			AssertEqual(Label, _CTC_LabelAt(MMenu, 0), "the metrics submenu opens with its switch")
-			AssertEqual(State, _CTC_IsChecked(MMenu, 0), "the metrics switch is ticked from the metrics state")
-			AssertEqual(1, _CTC_CountLabel(MMenu, Label), "the metrics switch is drawn once")
+			try {
+				AssertEqual(Label, _CTC_LabelAt(MMenu, 0), "the metrics submenu opens with its switch")
+				AssertEqual(State, _CTC_IsChecked(MMenu, 0), "the metrics switch is ticked from the metrics state")
+				AssertEqual(1, _CTC_CountLabel(MMenu, Label), "the metrics switch is drawn once")
+			} finally {
+				_CTC_ReleaseMenu(MMenu)
+			}
 		}
 	} finally {
 		MetricsShortcuts.enabled := Saved
