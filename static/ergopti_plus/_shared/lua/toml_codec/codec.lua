@@ -650,10 +650,19 @@ split_kv = function(line)
 	return nil, nil
 end
 
---- Parse a key — either a bare identifier or a quoted string.
+--- Parse a key — a bare identifier, a basic string or a literal string.
+--- A literal-string key ('KeyL') used to come back with its quotes, so it named
+--- a different key from "KeyL" and a layer file written with single quotes
+--- bound nothing on macOS and Linux while every other parser read it.
 parse_key = function(raw)
 	if raw:sub(1, 1) == '"' and raw:sub(-1) == '"' then
 		return BasicString.unescape_body(raw:sub(2, -2))
+	end
+	if #raw >= 2 and raw:sub(1, 1) == "'" and raw:sub(-1) == "'" then
+		local body = raw:sub(2, -2)
+		-- A literal string has no escapes, so a quote inside it ends it early.
+		if body:find("'", 1, true) then return nil end
+		return body
 	end
 	return raw
 end
