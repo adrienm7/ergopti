@@ -4,8 +4,9 @@
 --- MODULE: Root Input Pre-start Fail-fast Regression
 --- DESCRIPTION:
 --- Root init cannot be loaded by the headless suite, so this guard connects its
---- three input-subsystem calls to the behaviourally tested startup transaction.
---- It also preserves the onboarding short-circuit and early panic-button order.
+--- two keyboard input-subsystem calls to the behaviourally tested startup
+--- transaction, and proves boot leaves the gestures runtime to the preference
+--- sync. It also preserves the onboarding short-circuit and panic-button order.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -29,10 +30,9 @@ end
 -- ====================================================
 
 helpers.describe("root pre-start: exact startup transaction", function()
-	helpers.it("routes all three starts through the tested transaction", function()
+	helpers.it("routes both keyboard input starts through the tested transaction", function()
 		local src = boot_source()
 		local transaction_at = src:find("StartupTransaction.run({", 1, true)
-		local gestures_at = src:find("gestures.start()", 1, true)
 		local shortcuts_at = src:find("shortcuts.start()", 1, true)
 		local script_at = src:find(
 			"shortcuts.start_script_control(keymap, shortcuts, gestures, karabiner)", 1, true)
@@ -41,19 +41,29 @@ helpers.describe("root pre-start: exact startup transaction", function()
 
 		helpers.assert_not_nil(transaction_at,
 			"root boot must invoke the behaviourally tested startup transaction")
-		helpers.assert_true(gestures_at and shortcuts_at and script_at,
-			"all three user-input start calls must remain present")
-		helpers.assert_true(transaction_at < gestures_at and gestures_at < shortcuts_at
-			and shortcuts_at < script_at,
-			"gestures, shortcuts, then panic-button must retain their intentional order")
+		helpers.assert_true(shortcuts_at and script_at,
+			"both keyboard input start calls must remain present")
+		helpers.assert_true(transaction_at < shortcuts_at and shortcuts_at < script_at,
+			"shortcuts, then panic-button must retain their intentional order")
 		helpers.assert_true(transaction_end and script_at < transaction_end,
-			"all three input starts must remain inside one transaction descriptor list")
+			"both input starts must remain inside one transaction descriptor list")
 		helpers.assert_true(failure_at and transaction_end < failure_at,
 			"root boot must inspect the exact aggregate result after every start")
 
 		local failure_body = src:sub(failure_at, failure_at + 180)
 		helpers.assert_true(failure_body:find("error(", 1, true) ~= nil,
 			"a refused pre-start must abort boot loudly instead of continuing half-active")
+	end)
+
+	helpers.it("never arms the gestures runtime before the saved preference applies", function()
+		-- A boot-time gestures.start() ran the touch watchers, the primer tap and the
+		-- health-check timer even with Gestures OFF. The menu's preference sync owns
+		-- that runtime through gestures.enable_all()/disable_all().
+		local src = boot_source()
+		helpers.assert_true(src:find("StartupTransaction.run({", 1, true) ~= nil,
+			"the boot source must be the root init.lua")
+		helpers.assert_eq(src:find("gestures.start(", 1, true), nil,
+			"root boot must not start the gestures runtime unconditionally")
 	end)
 
 	helpers.it("keeps first-launch onboarding ahead of the transaction", function()

@@ -1,7 +1,7 @@
 --- tests/meta/test_init_onboarding_before_prestart.lua
 
 --- ==============================================================================
---- MODULE: Regression — onboarding short-circuit fires before gestures pre-start (M-14)
+--- MODULE: Regression — onboarding short-circuit fires before input pre-start (M-14)
 --- DESCRIPTION:
 --- Before M-14, init.lua ran gestures.start() and shortcuts.start() (Section 1
 --- Module Pre-start) BEFORE the onboarding early-return check in Section 3.
@@ -10,10 +10,12 @@
 --- sent Alt+arrow keys to the focused window — all before the user consented.
 ---
 --- Fix: the onboarding should_run/return block was moved to BEFORE Section 1,
---- so gestures and shortcuts are never pre-started during the wizard.
+--- so no input owner is pre-started during the wizard. Boot no longer starts
+--- gestures at all (the preference sync acquires its runtime), so shortcuts.start()
+--- is now the first input owner the guard must precede.
 ---
 --- Test: source scan — assert the onboarding guard byte-position is strictly
---- before both gestures.start() and require("modules.llm.boot_cleanup").
+--- before both shortcuts.start() and require("modules.llm.boot_cleanup").
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -66,8 +68,8 @@ local function onboarding_failure_is_terminal(source)
 	local code = strip_lua_comments(source)
 	local req_pos = code:find('pcall(require, "ui.onboarding")', 1, true)
 	local should_pos = code:find("should_run", req_pos or 1, true)
-	local gesture_pos = code:find("gestures.start()", should_pos or 1, true)
-	if not req_pos or not should_pos or not gesture_pos then
+	local input_pos = code:find("shortcuts.start()", should_pos or 1, true)
+	if not req_pos or not should_pos or not input_pos then
 		return false, "onboarding boot anchors are incomplete"
 	end
 
@@ -82,8 +84,8 @@ local function onboarding_failure_is_terminal(source)
 	if not (refusal_at < log_at and log_at < exit_at and exit_at < return_at) then
 		return false, "the onboarding load refusal operations are out of order"
 	end
-	if should_pos >= gesture_pos then
-		return false, "the onboarding guard runs after gestures start"
+	if should_pos >= input_pos then
+		return false, "the onboarding guard runs after the first input owner starts"
 	end
 	return true
 end
@@ -92,15 +94,15 @@ end
 
 
 
--- =================================================================================
--- =================================================================================
--- ======= 1/ init.lua: onboarding check is before gestures pre-start (M-14) =======
--- =================================================================================
--- =================================================================================
+-- ==============================================================================
+-- ==============================================================================
+-- ======= 1/ init.lua: onboarding check is before input pre-start (M-14) =======
+-- ==============================================================================
+-- ==============================================================================
 
 helpers.describe("M-14: onboarding short-circuit before module pre-start", function()
 
-	helpers.it("onboarding.should_run appears before gestures.start() in init.lua", function()
+	helpers.it("onboarding.should_run appears before shortcuts.start() in init.lua", function()
 		-- Selected by a declaration unique to init.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
@@ -108,15 +110,15 @@ helpers.describe("M-14: onboarding short-circuit before module pre-start", funct
 		helpers.assert_true(src ~= nil, "init.lua source must be locatable")
 
 		local ob_pos      = src:find("should_run", 1, true)
-		local gesture_pos = src:find("gestures.start()", 1, true)
+		local input_pos   = src:find("shortcuts.start()", 1, true)
 
 		helpers.assert_true(ob_pos ~= nil,
 			"init.lua must call onboarding.should_run() to guard first-launch")
-		helpers.assert_true(gesture_pos ~= nil,
-			"init.lua must call gestures.start()")
-		helpers.assert_true(ob_pos < gesture_pos,
-			"onboarding.should_run() must appear BEFORE gestures.start() in init.lua — " ..
-			"gestures must not arm before the user has completed the wizard (M-14)")
+		helpers.assert_true(input_pos ~= nil,
+			"init.lua must call shortcuts.start()")
+		helpers.assert_true(ob_pos < input_pos,
+			"onboarding.should_run() must appear BEFORE shortcuts.start() in init.lua — " ..
+			"no input owner may arm before the user has completed the wizard (M-14)")
 	end)
 
 	helpers.it("onboarding.should_run appears before boot_cleanup in init.lua", function()

@@ -227,6 +227,8 @@ helpers.describe("HS-012 pause-owner class-wide settlement matrix", function()
 		})
 		package.loaded["modules.gestures"] = nil
 		local real_gestures = helpers.load_with_stubs("modules.gestures")
+		-- A loaded module is OFF until the saved preference applies; pause an ON one.
+		helpers.assert_true(real_gestures.enable_all())
 		local script_control = load_inventory_context({
 			gestures = real_gestures,
 			fail_owner = "remote_warmup",
