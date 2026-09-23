@@ -575,11 +575,18 @@ end
 --- @param app_name string The app directory name.
 --- @return string
 local function _app_title(app_name)
+	-- Windows named after the menu row that opens them, in the user's language,
+	-- as macOS and Windows already title them
+	local title_keys = {
+		healthcheck             = "menu.debug.healthcheck",
+	}
+	if title_keys[app_name] then
+		return require("infra.i18n").get(title_keys[app_name])
+	end
 	local titles = {
 		action_picker           = "Action Picker",
 		changelog               = "Releases",
 		download_window         = "Download",
-		healthcheck             = "Diagnostic",
 		hotstrings_config_window = "Hotstrings Config",
 		hotstring_editor        = "Hotstring Editor",
 		metrics_apps            = "Metrics — Apps",
@@ -596,6 +603,7 @@ local function _app_title(app_name)
 		return (a:upper() .. b:gsub("_", " "))
 	end)
 end
+M._app_title = _app_title
 
 
 -- =========================================

@@ -59,6 +59,19 @@ helpers.describe("healthcheck (linux): the system facts", function()
 	end)
 end)
 
+helpers.describe("healthcheck (linux): the window title", function()
+	-- macOS and Windows title the window with menu.debug.healthcheck; Linux
+	-- hardcoded "Diagnostic", in English, whatever the user's language
+	-- (diagnostics-window-name).
+	helpers.it("uses the menu row's translated name (diagnostics-window-name)", function()
+		local I18n = require("infra.i18n")
+		I18n.init()
+		local expected = I18n.get("menu.debug.healthcheck")
+		helpers.assert_true(expected ~= "menu.debug.healthcheck", "the locale must be loaded")
+		helpers.assert_eq(helpers.load_module("ui.webview_manager")._app_title("healthcheck"), expected)
+	end)
+end)
+
 helpers.describe("healthcheck (linux): optional modules that are off", function()
 	-- The AI module is loaded optionally; when it is absent the report used to
 	-- list "llm (not wired)" as a red failure beside the modules the daemon

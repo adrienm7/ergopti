@@ -677,7 +677,7 @@
 	"menu.builder.title": "Ergopti+",
 	"menu.builder.title_paused": "Ergopti+ ⏸",
 	"menu.debug.console": "콘솔",
-	"menu.debug.healthcheck": "상태 점검",
+	"menu.debug.healthcheck": "시스템 진단",
 	"menu.debug.key_history": "키 기록",
 	"menu.debug.list_vars": "변수 상태",
 	"menu.debug.log_level": "로그 수준",

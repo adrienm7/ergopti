@@ -672,7 +672,7 @@
 	"menu.builder.title": "Ergopti+",
 	"menu.builder.title_paused": "Ergopti+ ⏸",
 	"menu.debug.console": "Console",
-	"menu.debug.healthcheck": "Healthcheck",
+	"menu.debug.healthcheck": "System diagnostics",
 	"menu.debug.key_history": "Key history",
 	"menu.debug.list_vars": "Variable state",
 	"menu.debug.log_level": "Log level",
