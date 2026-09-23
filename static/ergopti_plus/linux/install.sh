@@ -330,6 +330,14 @@ _required_dependency_package() {
 		pacman:webkit) echo "webkit2gtk-4.1" ;;
 		xbps:webkit) echo "libwebkit2gtk41" ;;
 		apk:webkit) echo "webkit2gtk-4.1" ;;
+		# GNOME Shell hosts no tray icon on its own: an SNI host extension must be
+		# enabled. Ubuntu ships and enables its own; the others do not.
+		apt:gnome-tray) echo "gnome-shell-extension-appindicator" ;;
+		dnf:gnome-tray) echo "gnome-shell-extension-appindicator" ;;
+		zypper:gnome-tray) echo "gnome-shell-extension-appindicator" ;;
+		pacman:gnome-tray) echo "gnome-shell-extension-appindicator" ;;
+		xbps:gnome-tray) echo "gnome-shell-extension-appindicator" ;;
+		apk:gnome-tray) echo "gnome-shell-extension-appindicator" ;;
 		*) return 1 ;;
 	esac
 }
@@ -448,8 +456,57 @@ _ensure_desktop_backend() {
 	fi
 }
 
+# The icon exists once the library does; on GNOME it is only SHOWN when an
+# extension hosts StatusNotifierItems. Without one the daemon registers its
+# icon, the bus accepts it, and nothing appears — on Fedora and Debian GNOME,
+# i.e. every GNOME that is not Ubuntu's. Enabling takes effect at the next
+# login, which the input groups already require.
+GNOME_TRAY_EXTENSION="appindicatorsupport@rgcjonas.gmail.com"
+_ensure_gnome_tray_host() {
+	case "${XDG_CURRENT_DESKTOP:-}" in
+		*GNOME*|*gnome*) ;;
+		*) return 0 ;;
+	esac
+	if ! command -v gnome-extensions >/dev/null 2>&1; then
+		echo "  ⚠  GNOME sans gnome-extensions — activez une extension AppIndicator pour voir l'icône." >&2
+		return 0
+	fi
+	if gnome-extensions list --enabled 2>/dev/null | grep -qi "appindicator"; then
+		echo "  ✔  extension GNOME AppIndicator — déjà active"
+		return 0
+	fi
+	local pkg_mgr
+	local package_name
+	pkg_mgr="$(_detect_pkg_manager)"
+	if ! gnome-extensions list 2>/dev/null | grep -qx "${GNOME_TRAY_EXTENSION}" \
+		&& package_name="$(_required_dependency_package "${pkg_mgr}" gnome-tray)"; then
+		echo "  →  extension GNOME AppIndicator manquante — installation de ${package_name}…"
+		_install_required_package "${pkg_mgr}" "${package_name}" || true
+	fi
+	if gnome-extensions enable "${GNOME_TRAY_EXTENSION}" 2>/dev/null; then
+		echo "  ✔  extension GNOME AppIndicator activée"
+		return 0
+	fi
+	# A package installed during this session is unknown to the running shell,
+	# which then refuses to enable it. The setting it reads at the next login is
+	# written instead, merged into the user's list rather than replacing it.
+	local enabled
+	enabled="$(gsettings get org.gnome.shell enabled-extensions 2>/dev/null || true)"
+	case "${enabled}" in
+		*"'${GNOME_TRAY_EXTENSION}'"*) ;;
+		"@as []"|"[]"|"") enabled="['${GNOME_TRAY_EXTENSION}']" ;;
+		*) enabled="${enabled%]}, '${GNOME_TRAY_EXTENSION}']" ;;
+	esac
+	if gsettings set org.gnome.shell enabled-extensions "${enabled}" 2>/dev/null; then
+		echo "  ✔  extension GNOME AppIndicator activée (effective à la prochaine connexion)"
+	else
+		echo "  ⚠  Impossible d'activer l'extension AppIndicator — sans elle, GNOME n'affiche pas l'icône." >&2
+	fi
+}
+
 echo ""
 echo "=== Icône de la barre système et fenêtres ==="
+_ensure_gnome_tray_host
 _ensure_desktop_backend tray "icône de la barre système (libayatana-appindicator)" \
 	"local ffi=require('ffi'); for _, n in ipairs({'libayatana-appindicator3.so.1','libappindicator3.so.1'}) do if pcall(ffi.load, n) then os.exit(0) end end; os.exit(1)"
 

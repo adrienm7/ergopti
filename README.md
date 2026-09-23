@@ -238,7 +238,8 @@ bash static/ergopti_plus/linux/install.sh --no-deps   # …same, minus the packa
 | `lua-filesystem`                   | existence checks fall back from `stat()` to opening the path                   |
 
 `install.sh` installs every row, plus the WebKit2GTK typelib the tray's windows
-are drawn with. The tray and window backends are best effort — a headless
+are drawn with, and on GNOME the AppIndicator shell extension — GNOME shows no
+tray icon without one (Ubuntu enables its own; Fedora and Debian GNOME do not). The tray and window backends are best effort — a headless
 machine still gets working hotstrings — but each is re-probed after its package
 is installed and reported when it stays unavailable. Every Lua library is loaded
 through `pcall(require, …)`, so a bare box starts and silently does less rather
