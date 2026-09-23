@@ -989,7 +989,8 @@ Updater_ShowUpdatePrompt(Release, Request := unset) {
 		return
 	}
 
-	; Spin up WebView2 for Markdown rendering after Show() (Hwnd is valid then).
+	; Spin up WebView2 after Show() (Hwnd is valid then) and load the shared
+	; release-notes page: the release's changelog, rendered like the Versions window.
 	UseWV := IsSet(WebView2) && FileExist(_VendorDir . "\64bit\WebView2Loader.dll") && !WebView_ShouldUseNativeFallback()
 	if UseWV {
 		loader := _VendorDir . "\64bit\WebView2Loader.dll"
@@ -1012,13 +1013,21 @@ Updater_ShowUpdatePrompt(Release, Request := unset) {
 				s.AreBrowserAcceleratorKeysEnabled := false
 			}
 			WVC.Fill()
-			WVC.CoreWebView2.NavigateToString(_Updater_MakeMarkdownHtml(Release.Body))
+			try {
+				G.WVSub := _Updater_NavigateReleaseNotes(WVC, Release)
+			} catch as Err {
+				try LoggerWarn("Updater", "Update prompt shows the native notes instead: {1}.", Err.Message)
+				try WVC.Close()
+				G.WVC := 0
+				UseWV := false
+			}
 		}
 	}
 	if (!UseWV or !IsSet(WVC)) {
-		; Fallback: replace the placeholder with a plain read-only Edit.
+		; Fallback: replace the placeholder with a plain read-only Edit showing the
+		; changelog section (or the localized empty-notes message).
 		BodyPane.GetPos(&bx, &by, &bw, &bh)
-		BodyText := (Release.Body != "") ? _Updater_MarkdownToPlain(Release.Body) : t("updater.changelog_empty")
+		BodyText := _Updater_ReleaseNotesToPlain(Release.Body)
 		G.Add("Edit", "x" . bx . " y" . by . " w" . bw . " h" . bh
 			. " ReadOnly +Multi -Wrap +VScroll", BodyText)
 	}
@@ -1084,6 +1093,10 @@ _Updater_CloseGui(G) {
 	; the changelog window's own Gui instance, so only clear the singleton
 	; when this call is actually closing the update prompt.
 	IsPromptGui := IsSet(_Updater_PromptGui) && (G.Hwnd == _Updater_PromptGui.Hwnd)
+	; Release the notes pane's bridge subscription while its controller is still
+	; alive: freeing it unsubscribes on the controller, which fails once closed.
+	if G.HasProp("WVSub")
+		G.WVSub := 0
 	if G.HasProp("WVC") && G.WVC
 		try G.WVC.Close()
 	try G.Destroy()

@@ -24,7 +24,8 @@ _JSLSS_AllWebViewStringHelpers() {
 
 _JSLSS_EveryWebViewHelperDelegates() {
 	Names := _JSLSS_AllWebViewStringHelpers()
-	Assert(Names.Count >= 13,
+	; Twelve helpers exist today; a lower count means the discovery broke.
+	Assert(Names.Count >= 12,
 		"the discovery must find every JsStr/JSStr helper, including generic and Ollama variants")
 	for Name, _ in Names {
 		Body := _DriverFuncBody(Name)
