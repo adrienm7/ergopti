@@ -133,6 +133,8 @@
 	"changelog_window.open_github": "View on GitHub ↗",
 	"changelog_window.open_releases_page": "Öppna versionssidan ↗",
 	"changelog_window.retry": "Retry",
+	"changelog_window.section_changelog": "Ändringslogg",
+	"changelog_window.section_downloads": "Nedladdningar och installation",
 	"changelog_window.window_title": "Versioner",
 	"common.browse": "Bläddra…",
 	"common.cancel": "Avbryt",

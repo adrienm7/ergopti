@@ -133,6 +133,8 @@
 	"changelog_window.open_github": "View on GitHub ↗",
 	"changelog_window.open_releases_page": "Åpne utgivelsessiden ↗",
 	"changelog_window.retry": "Retry",
+	"changelog_window.section_changelog": "Endringslogg",
+	"changelog_window.section_downloads": "Nedlastinger og installasjon",
 	"changelog_window.window_title": "Versjoner",
 	"common.browse": "Bla gjennom…",
 	"common.cancel": "Avbryt",

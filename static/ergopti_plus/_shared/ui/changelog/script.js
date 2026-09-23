@@ -22,6 +22,9 @@
  * 4. Remote-content boundary: release body text never becomes active HTML; it
  *    reaches the DOM through createElement/createTextNode only, and host JSON
  *    arrives as a string that is parsed, never evaluated.
+ * 5. Changelog first: CI orders a release body for github.com (downloads, then
+ *    the changelog folded). The body is split into sections (./release_body.js)
+ *    and shown as the changelog, expanded, then the downloads, collapsed.
  * ==============================================================================
  */
 
@@ -524,40 +527,92 @@ function selectRelease(idx) {
 	var raw = release.body || '';
 	bodyEl.replaceChildren();
 	if (!raw || raw.trim() === '') {
-		var empty = document.createElement('p');
-		empty.className = 'empty-notes';
-		empty.textContent = _t('changelog_window.no_notes') || '(Aucune note de version disponible.)';
-		bodyEl.appendChild(empty);
+		bodyEl.appendChild(_emptyNotes());
 		return;
 	}
 	// Remote Markdown becomes DOM nodes only (never parsed HTML). Links stay
 	// href-less; a click reaches the native open_url action, and only for URLs
 	// on this repository's HTTPS surface — the same allowlist the hosts enforce.
-	renderMarkdownInto(bodyEl, raw, {
+	var markdownOptions = {
 		allow: _isAllowedRepositoryUrl,
 		open: function (url) {
 			_postChangelogMessage({ action: 'open_url', url: url });
 		}
-	});
+	};
+	// CI orders the body for github.com (downloads first, changelog folded);
+	// the sections are read before rendering, which strips their markers.
+	var parts = splitReleaseBody(raw);
+	if (parts.format === 'unknown') {
+		renderMarkdownInto(bodyEl, raw, markdownOptions);
+		return;
+	}
+	_renderReleaseSections(bodyEl, parts, markdownOptions);
+}
+
+/**
+ * Renders a split release body: the changelog first and expanded, then the
+ * downloads (with the intro lines that present them) folded, then the footer.
+ * @param {Element} bodyEl - Content pane.
+ * @param {Object} parts - splitReleaseBody() result.
+ * @param {Object} markdownOptions - Link policy for renderMarkdownInto().
+ */
+function _renderReleaseSections(bodyEl, parts, markdownOptions) {
+	var changelog = _makeReleaseSection('release-section-changelog', 'changelog_window.section_changelog', true);
+	if (parts.changelog !== '') renderMarkdownInto(changelog.body, parts.changelog, markdownOptions);
+	else changelog.body.appendChild(_emptyNotes());
+	bodyEl.appendChild(changelog.details);
+
+	var downloadsSource = [parts.intro, parts.downloads]
+		.filter(function (source) {
+			return source !== '';
+		})
+		.join('\n\n');
+	if (downloadsSource !== '') {
+		var downloads = _makeReleaseSection('release-section-downloads', 'changelog_window.section_downloads', false);
+		renderMarkdownInto(downloads.body, downloadsSource, markdownOptions);
+		bodyEl.appendChild(downloads.details);
+	}
+
+	if (parts.footer !== '') {
+		var footer = document.createElement('div');
+		footer.className = 'release-footer';
+		renderMarkdownInto(footer, parts.footer, markdownOptions);
+		bodyEl.appendChild(footer);
+	}
+}
+
+/**
+ * Builds one collapsible page section titled by a locale key. The key is also
+ * set as data-i18n, so a late locale load relabels it through applyLabels().
+ * @return {{details: Element, body: Element}}
+ */
+function _makeReleaseSection(className, titleKey, open) {
+	var details = document.createElement('details');
+	details.className = 'release-section ' + className;
+	if (open) details.setAttribute('open', '');
+	var summary = document.createElement('summary');
+	summary.className = 'release-section-title';
+	summary.setAttribute('data-i18n', titleKey);
+	summary.textContent = _t(titleKey) || '';
+	details.appendChild(summary);
+	var body = document.createElement('div');
+	body.className = 'release-section-body';
+	details.appendChild(body);
+	return { details: details, body: body };
+}
+
+/** Builds the "no release notes" paragraph. */
+function _emptyNotes() {
+	var empty = document.createElement('p');
+	empty.className = 'empty-notes';
+	empty.setAttribute('data-i18n', 'changelog_window.no_notes');
+	empty.textContent = _t('changelog_window.no_notes') || '';
+	return empty;
 }
 
 /** Returns whether a URL belongs to this repository's HTTPS surface. */
 function _isAllowedRepositoryUrl(value) {
-	if (typeof value !== 'string' || value === '') return false;
-	try {
-		var parsed = new URL(value);
-		var root = '/' + _ghOwner + '/' + _ghRepo;
-		return (
-			parsed.protocol === 'https:' &&
-			parsed.hostname === 'github.com' &&
-			parsed.username === '' &&
-			parsed.password === '' &&
-			parsed.port === '' &&
-			(parsed.pathname === root || parsed.pathname.indexOf(root + '/') === 0)
-		);
-	} catch (error) {
-		return false;
-	}
+	return isRepositoryUrl(value, _ghOwner, _ghRepo);
 }
 
 /** Opens the currently selected release page on GitHub. */

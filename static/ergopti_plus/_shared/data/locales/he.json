@@ -133,6 +133,8 @@
 	"changelog_window.open_github": "View on GitHub ↗",
 	"changelog_window.open_releases_page": "פתח את דף הגרסאות ↗",
 	"changelog_window.retry": "Retry",
+	"changelog_window.section_changelog": "יומן שינויים",
+	"changelog_window.section_downloads": "הורדות והתקנה",
 	"changelog_window.window_title": "גרסאות",
 	"common.browse": "עיין…",
 	"common.cancel": "ביטול",
