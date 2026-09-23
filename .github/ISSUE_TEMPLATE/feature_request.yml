@@ -7,7 +7,7 @@
 name: Feature request
 description: Suggest an idea or an improvement. / Proposer une idée ou une amélioration.
 title: "[Feature] "
-labels: ["enhancement", "from-app"]
+labels: ["enhancement"]
 body:
   - type: textarea
     id: problem
