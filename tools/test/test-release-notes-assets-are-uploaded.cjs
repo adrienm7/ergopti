@@ -44,6 +44,9 @@
  *    refuses to publish when one is missing, so every linked asset, derived
  *    from the same links, must be in its list, with the Sparkle signature, the
  *    channel appcast and the Linux bundle checksum.
+ * 5. Section markers: the body's invisible <!-- ergopti:section=NAME -->
+ *    markers must match the names the in-app splitter
+ *    (_shared/ui/changelog/release_body.js) exports, in order, each closed.
  * ==============================================================================
  */
 
@@ -52,6 +55,7 @@
 const fs = require('fs');
 const path = require('path');
 const pipeline = require('./ci-pipeline.cjs');
+const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 
@@ -351,6 +355,32 @@ if (downloadsAt < 0 || foldAt < 0 || changelogAt < 0 || !(downloadsAt < foldAt &
 }
 if (/Skip to downloads|DOWNLOADS_ANCHOR/.test(pipeline.text())) {
 	errors.push('release notes must not rely on a jump link to the downloads (it cannot scroll on the first click)');
+}
+// The in-app Versions pages show the changelog first; they find it through the
+// invisible section markers, which the page splitter reads before the Markdown
+// renderer strips every comment. The names come from the splitter itself.
+const splitterSandbox = { window: {} };
+vm.createContext(splitterSandbox);
+vm.runInContext(
+	fs.readFileSync(path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'ui', 'changelog', 'release_body.js'), 'utf8'),
+	splitterSandbox,
+	{ filename: 'release_body.js' }
+);
+const sectionNames = splitterSandbox.window.RELEASE_BODY_SECTIONS || [];
+if (sectionNames.length < 4) {
+	errors.push(`release_body.js exports ${sectionNames.length} section name(s); the marker pin would check nothing`);
+}
+const openMarkers = [...releaseBody.matchAll(/<!-- ergopti:section=([a-z]+) -->/g)].map((m) => m[1]);
+const closeMarkers = releaseBody.match(/<!-- \/ergopti:section -->/g) || [];
+if (JSON.stringify(openMarkers) !== JSON.stringify(sectionNames) || closeMarkers.length !== sectionNames.length) {
+	errors.push(
+		`the release body must open each section once, in the splitter's order (${sectionNames.join(', ')}), and ` +
+			`close each one: found ${openMarkers.join(', ') || 'none'} with ${closeMarkers.length} close marker(s)`
+	);
+}
+const changelogOpen = releaseBody.indexOf('<!-- ergopti:section=changelog -->');
+if (!(changelogOpen >= 0 && changelogOpen < foldAt && foldAt < changelogAt)) {
+	errors.push('the changelog marker must open before its <details> fold and the changelog it wraps');
 }
 // The repository sidebar truncates long release titles, which hid the version.
 // The title is computed in shell once, in validate's plan; later steps only forward it via ${{ }}.

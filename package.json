@@ -287,6 +287,7 @@
 		"test:changelog-security": "node ./tools/test/test-changelog-security.cjs",
 		"test:changelog-markdown": "node ./tools/test/test-changelog-markdown.cjs",
 		"test:changelog-network-resilience": "node ./tools/test/test-changelog-network-resilience.cjs",
+		"test:release-body-sections": "node ./tools/test/test-release-body-sections.cjs",
 		"test:download-window-session": "node ./tools/test/test-download-window-session.cjs",
 		"test:model-browser-session": "node ./tools/test/test-model-browser-session.cjs",
 		"test:onboarding-wizard-page": "node ./tools/test/test-onboarding-wizard-page.cjs",

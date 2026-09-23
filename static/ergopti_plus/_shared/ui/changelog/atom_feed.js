@@ -15,7 +15,10 @@
  *    handed to a document parser, a markup sink or an evaluator.
  * 2. Markdown output: release notes arrive as rendered HTML; they are converted
  *    to the Markdown subset of ../markdown.js, whose DOM-only renderer remains
- *    the single boundary between remote text and the document.
+ *    the single boundary between remote text and the document. A <details>
+ *    fold becomes the exact structural lines that renderer and the section
+ *    splitter (./release_body.js) recognise, so a feed body folds and splits
+ *    like an API body.
  * 3. Repository-bound entries: an entry whose link is not a release tag of the
  *    expected repository is discarded instead of being trusted.
  * ==============================================================================
@@ -356,6 +359,25 @@
 	}
 
 	/**
+	 * Renders a fold as the exact structural lines the Markdown renderer and the
+	 * release-body splitter recognise. Its attributes are not carried over, and
+	 * the summary text is escaped like any other text, so no tag can leak in.
+	 */
+	function detailsLines(node) {
+		var summary = null;
+		var rest = [];
+		node.children.forEach(function (child) {
+			if (!summary && child.tag === 'summary') summary = child;
+			else rest.push(child);
+		});
+		var lines = [readAttribute(node.attrs, 'open') !== null ? '<details open>' : '<details>'];
+		if (summary) lines.push('<summary>' + inlineLines(summary.children).join(' ') + '</summary>');
+		var inner = blockLines(rest, false);
+		if (inner.length > 0) lines = lines.concat([''], inner);
+		return lines.concat(['', '</details>']);
+	}
+
+	/**
 	 * Renders a node list as Markdown block lines.
 	 * @param {Array} nodes
 	 * @param {boolean} tight - Inside a list item: no blank line between blocks.
@@ -416,6 +438,9 @@
 					break;
 				case 'table':
 					lines = tableLines(node);
+					break;
+				case 'details':
+					lines = detailsLines(node);
 					break;
 				default:
 					lines = blockLines(node.children, tight);
