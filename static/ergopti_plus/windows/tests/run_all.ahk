@@ -160,6 +160,10 @@ global _DefaultLogsDir := _LogsDir
 #Include ../ui/menu/menu_taphold.ahk
 ; The hotstring gate and « all sections » rows, built over the live Features.
 #Include ../ui/menu/menu_hotstring_switches.ahk
+; The whole tree's path collector and tick, which the bulk hotstring writer in
+; infra/config_io.ahk calls. Definitions only; the category tables they read are
+; declared by ui/tray_menu.ahk, which is not loaded, so a test supplies them.
+#Include ../ui/menu/menu_submenus.ahk
 #Include ../_generated/features_manifest.ahk
 #Include ../infra/manifest_reader.ahk
 ; The dynamic-hotstring module, for its pure helpers (SpacedPrefix, the three

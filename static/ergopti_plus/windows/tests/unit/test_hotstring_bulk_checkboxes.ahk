@@ -14,6 +14,11 @@
 ; for one control, and a state the user could only read from the words. The
 ; rows are built by the real builders over the live Features and CategoryEnabled
 ; maps, which each test restores.
+;
+; The whole tree's checkbox went on calling the pair's old writer, which closed
+; the Hotstrings switch when unticked and never opened a closed category gate
+; when ticked, so it stayed unticked however often it was clicked. Its writer is
+; run here against a scratch config.toml.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -190,6 +195,97 @@ _HBC_LanguageSwitchRowIsACheckbox() {
 	}
 }
 
+
+
+
+
+; ==========================================
+; ==========================================
+; ======= 4/ The whole-tree checkbox =======
+; ==========================================
+; ==========================================
+
+; Runs Body(ConfigPath) against a scratch config.toml with Gates applied over a
+; copy of the live gates, then restores every global the writer replaces. The
+; tree is the Rolls category: ui/tray_menu.ahk, which declares the tray's
+; category tables, is not loaded by this runner, so the fixture declares them.
+_HBC_WithScratchConfig(Gates, Body) {
+	global ConfigurationFile, Features, CategoryEnabled, _Stub_SentText, _ParseTomlCache
+	global _FLAT_HOTSTRING_V1_CATS, _LegacyTopCategoryMap
+	Assert(!IsSet(_FLAT_HOTSTRING_V1_CATS) and !IsSet(_LegacyTopCategoryMap),
+		"the runner loads the tray's category tables now; use them instead of this fixture's")
+	SavedPath := ConfigurationFile
+	SavedFeatures := Features
+	SavedCategories := CategoryEnabled
+	ReloadsBefore := _Stub_SentText.Length
+	ConfigPath := A_Temp . "\ergopti_hbc_whole_tree_" . A_ScriptHwnd . "_" . A_TickCount . ".toml"
+	try FileDelete(ConfigPath)
+	try {
+		_FLAT_HOTSTRING_V1_CATS := ["Rolls"]
+		_LegacyTopCategoryMap := Map("Rolls", "hotstrings.rolls")
+		ConfigurationFile := ConfigPath
+		CategoryEnabled := CategoryEnabled.Clone()
+		for Gate, Value in Gates
+			CategoryEnabled[Gate] := Value
+		Body(ConfigPath)
+	} finally {
+		_FLAT_HOTSTRING_V1_CATS := unset
+		_LegacyTopCategoryMap := unset
+		ConfigurationFile := SavedPath
+		Features := SavedFeatures
+		CategoryEnabled := SavedCategories
+		while (_Stub_SentText.Length > ReloadsBefore)
+			_Stub_SentText.Pop()
+		if _ParseTomlCache.Has(ConfigPath)
+			_ParseTomlCache.Delete(ConfigPath)
+		try FileDelete(ConfigPath)
+	}
+}
+
+; What the reload that follows every write does before the tray is drawn again:
+; a closed gate zeroes its sections in Features.
+_HBC_ApplyGatesAsAtBoot() {
+	global Features
+	ApplyMasterGatesToFeatures(Features, Map(), IsCategoryGated, 0)
+}
+
+; Unticking switches every section off and leaves the gates as they are: the
+; Hotstrings switch and each category gate are checkboxes of their own.
+_HBC_WholeTreeUntickKeepsGates() {
+	_HBC_WithScratchConfig(Map("Hotstrings", true, "Rolls", true), _HBC_AssertUntickKeepsGates)
+}
+
+_HBC_AssertUntickKeepsGates(ConfigPath) {
+	global CategoryEnabled
+	AssertTrue(ToggleAllHotstrings(false), "the whole-tree write must commit")
+	AssertTrue(CategoryEnabled["Hotstrings"],
+		"unticking every section must leave the Hotstrings switch on, as macOS and Linux do")
+	AssertTrue(CategoryEnabled["Rolls"], "and every category gate as it was")
+	AssertEqual(-1, TOML_Read(ConfigPath, "category_enabled", "hotstrings", -1),
+		"no gate is written when the sections are switched off")
+	_HBC_ApplyGatesAsAtBoot()
+	AssertFalse(_HS_AllHotstringsOn(), "every section is off, so the checkbox is unticked")
+}
+
+; Ticking with a category gate closed opens it: that gate zeroes its sections at
+; every boot, so leaving it shut left the checkbox unticked however often it was
+; clicked.
+_HBC_WholeTreeTickOpensEveryGate() {
+	_HBC_WithScratchConfig(Map("Hotstrings", false, "Rolls", false), _HBC_AssertTickOpensGates)
+}
+
+_HBC_AssertTickOpensGates(ConfigPath) {
+	global CategoryEnabled
+	AssertFalse(_HS_AllHotstringsOn(), "closed gates leave the checkbox unticked")
+	AssertTrue(ToggleAllHotstrings(true), "the whole-tree write must commit")
+	AssertTrue(CategoryEnabled["Hotstrings"], "ticking every section opens the Hotstrings switch")
+	AssertTrue(CategoryEnabled["Rolls"], "and every closed category gate of the tree")
+	AssertEqual(1, TOML_Read(ConfigPath, "category_enabled", "rolls", -1),
+		"the opened category gate is persisted")
+	_HBC_ApplyGatesAsAtBoot()
+	AssertTrue(_HS_AllHotstringsOn(), "one click ticks the checkbox, once the reload has applied the gates")
+}
+
 Test("hotstring bulk: the « all sections » row is one checkbox (hotstring-bulk-checkboxes)",
 	_HBC_AllSectionsRowIsACheckbox)
 Test("hotstring bulk: « all on » reads the gate and every section (hotstring-bulk-checkboxes)",
@@ -198,3 +294,7 @@ Test("hotstring bulk: a category opens with its gate and one « all » checkbox 
 	_HBC_CategoryHeadRows)
 Test("hotstring bulk: a language opens with one « all » checkbox (hotstring-bulk-checkboxes)",
 	_HBC_LanguageSwitchRowIsACheckbox)
+Test("hotstring bulk: unticking the whole tree keeps every gate (hotstring-bulk-checkboxes)",
+	_HBC_WholeTreeUntickKeepsGates)
+Test("hotstring bulk: ticking the whole tree opens every gate (hotstring-bulk-checkboxes)",
+	_HBC_WholeTreeTickOpensEveryGate)
