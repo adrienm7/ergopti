@@ -1644,6 +1644,7 @@ _LogBootProgress("keylogger modules + tests included")
 ; headless-safe (function definitions only, no top-level side effects).
 #Include ../ui/healthcheck/core.ahk
 #Include ../ui/healthcheck/helpers.ahk
+#Include ../ui/healthcheck/report.ahk
 #Include meta/test_healthcheck_format_helpers.ahk
 #Include unit/test_healthcheck_copy_receipt.ahk
 #Include unit/test_kana_altgr_readers.ahk
@@ -1651,6 +1652,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_kana_altgr_ctrl_chords.ahk
 #Include unit/test_healthcheck_os_name_windows11.ahk
 #Include unit/test_healthcheck_issues_from_errors_file.ahk
+#Include unit/test_healthcheck_report_issue.ahk
 #Include meta/test_corpus_diagnostics.ahk
 
 ; Guards the _HsEdWeb_Reset() idempotency fix for the live-log access-violation

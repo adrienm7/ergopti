@@ -3522,6 +3522,10 @@ local function _build_debug(ctx)
 		["open_today_log"] = call_ctx("on_open_today_log"),
 		["open_error_log"] = call_ctx("on_open_error_log"),
 		["healthcheck"]    = call_ctx("on_healthcheck"),
+		-- Self-contained: the report reads the daemon state the webview manager
+		-- already holds, so the daemon supplies no callback for them
+		["report_bug"]      = function() require("ui.healthcheck.report").report_bug() end,
+		["suggest_feature"] = function() require("ui.healthcheck.report").suggest_feature() end,
 	}
 
 	local rows = ManifestMenu.build("debug_menu", "Debug", nil, nil, render_ctx, providers)

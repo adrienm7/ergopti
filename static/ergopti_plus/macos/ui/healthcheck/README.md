@@ -11,6 +11,7 @@ Runtime diagnostic probe accessible from the Debug menu. Snapshots the Hammerspo
 | `init.lua`  | `M.show()` — collects diagnostics and opens the window                     |
 | `core.lua`  | Diagnostic collection logic (state gathering, formatting)                  |
 | `helpers.lua`| Module-status helpers used by `core.lua`                                  |
+| `report.lua` | Debug > Report a bug / Suggest a feature: redacted report + GitHub form  |
 
 ## Usage
 

@@ -675,6 +675,8 @@ function M.generate(ctx, menu_mods, actions)
 				["open_today_log"] = actions.open_today_log,
 				["open_error_log"] = actions.open_error_log,
 				["healthcheck"]    = function() healthcheck.show_window() end,
+				["report_bug"]      = function() require("ui.healthcheck.report").report_bug() end,
+				["suggest_feature"] = function() require("ui.healthcheck.report").suggest_feature() end,
 			}
 			-- The picker's own row carries the level currently set, which is why it
 			-- is a `list` and not a `command`: a declaration cannot spell a label

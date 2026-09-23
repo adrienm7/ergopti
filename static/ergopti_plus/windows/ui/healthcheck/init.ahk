@@ -38,6 +38,8 @@
 ; namespace, so load order is irrelevant.
 ;   healthcheck/core.ahk    -- Probe, public API, WebView2 report window.
 ;   healthcheck/helpers.ahk -- State-gathering probes + snapshot rendering.
+;   healthcheck/report.ahk  -- Debug > Report a bug / Suggest a feature.
 
 #Include core.ahk
 #Include helpers.ahk
+#Include report.ahk

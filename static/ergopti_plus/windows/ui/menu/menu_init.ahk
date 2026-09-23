@@ -500,7 +500,9 @@ _MI_BuildDebuggingMenu() {
 		"open_logs",      OpenLogsFolder,
 		"open_today_log", OpenTodayLog,
 		"open_error_log", OpenErrorLog,
-		"healthcheck",    ShowHealthCheck
+		"healthcheck",    ShowHealthCheck,
+		"report_bug",      (*) => HealthCheck_ReportBug(),
+		"suggest_feature", (*) => HealthCheck_SuggestFeature()
 	)
 	ListProviders := Map("log_level", (*) => _MI_LogLevelRows())
 	return MenuRenderer_Build("debug_menu", "Debug", "", "", ListProviders, Commands)
