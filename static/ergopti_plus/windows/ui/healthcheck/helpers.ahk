@@ -28,19 +28,12 @@
 _HealthCheck_SysInfo() {
 	Info := Map()
 
-	; Windows display name + build number from registry (more accurate than A_OSVersion)
-	OsName  := A_OSVersion
-	OsBuild := ""
-	OsArch  := A_Is64bitOS ? "64 bits" : "32 bits"
-	try {
-		OsName  := RegRead("HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion", "ProductName")
-		OsBuild := RegRead("HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion", "CurrentBuildNumber")
-		UBR     := RegRead("HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion", "UBR")
-		OsBuild := OsBuild . "." . UBR
-	}
-	Info["os_name"]  := OsName
-	Info["os_build"] := OsBuild
-	Info["os_arch"]  := OsArch
+	; Windows display name + build from the boot snapshot's probe: a raw
+	; ProductName read here reported every Windows 11 machine as Windows 10
+	OsInfo := DiagSnapshot_OsInfo()
+	Info["os_name"]  := OsInfo["os"]
+	Info["os_build"] := OsInfo["os_version"]
+	Info["os_arch"]  := A_Is64bitOS ? "64 bits" : "32 bits"
 
 	; CPU name + logical core count via WMI (first processor record)
 	CpuName  := "inconnu"
