@@ -10,7 +10,19 @@
  * replaced by a stub on PATH. It answers the questions a first install
  * answers, on any machine, in a second:
  *
- * ROOT CAUSE — THE DESKTOP HALF WAS NEVER INSTALLED.
+ * ROOT CAUSE 1 — A KANATA THAT CANNOT RUN ABORTED THE WHOLE INSTALL.
+ * The upstream kanata 1.12.0 binary needs glibc 2.39. On Ubuntu 22.04 and
+ * Debian 12 its version check failed, _install_kanata returned 1 under
+ * `set -e`, and the script died BEFORE copying a single driver file: no
+ * launcher, no service, nothing to start — for a component hotstrings do not
+ * even need. A failed kanata must leave a working install behind.
+ *
+ * ROOT CAUSE 2 — A DISTRIBUTION'S KANATA WAS NEVER ENABLED.
+ * With kanata already on PATH (AUR, Nix, cargo) the download is skipped, but
+ * the unit's ExecStart and the enable guard both named ~/.local/bin/kanata,
+ * which then does not exist. The unit must run the kanata that is there.
+ *
+ * ROOT CAUSE 3 — THE DESKTOP HALF WAS NEVER INSTALLED.
  * The tray's libayatana-appindicator and the windows' WebKit2GTK typelib were
  * left to the user, so a fresh install showed no tray icon anywhere. Each must
  * be requested from the package manager when its probe fails.
@@ -115,13 +127,26 @@ function runInstaller(scenario) {
 
 const errors = [];
 
-// ── The desktop backends are missing ────────────────────────────────────────
+// ── A kanata that cannot be installed ──────────────────────────────────────
 {
-	const run = runInstaller({ distroKanata: true, desktopProvided: false });
+	const run = runInstaller({ distroKanata: false, desktopProvided: false });
 	try {
 		if (run.status !== 0) {
-			errors.push(`install.sh exited ${run.status}:\n${run.output.split('\n').slice(-12).join('\n')}`);
+			errors.push(
+				`install.sh exited ${run.status} when kanata could not be installed — it must finish the ` +
+					`install without it. Last lines:\n${run.output.split('\n').slice(-12).join('\n')}`
+			);
 		}
+		const launcher = path.join(run.home, '.local', 'bin', 'ergopti-hotstrings');
+		if (!fs.existsSync(launcher)) {
+			errors.push('no launcher was installed after a failed kanata download');
+		}
+		const daemon = path.join(run.home, '.local', 'lib', 'ergopti', 'linux', 'ergopti_hotstrings.lua');
+		if (!fs.existsSync(daemon)) errors.push('the driver tree was not copied after a failed kanata download');
+		if (!/kanata indisponible/.test(run.output)) {
+			errors.push('a failed kanata install must be reported, not silent');
+		}
+		// Root cause 3: both desktop backends were requested and re-probed.
 		for (const pkg of ['libayatana-appindicator3-1', 'gir1.2-webkit2-4.1']) {
 			if (!run.calls.some((call) => call.startsWith('sudo apt-get install') && call.includes(pkg))) {
 				errors.push(`install.sh never asked the package manager for ${pkg}`);
@@ -135,11 +160,23 @@ const errors = [];
 	}
 }
 
-// ── The desktop backends are already present ────────────────────────────────
+// ── A kanata the distribution already provides ─────────────────────────────
 {
 	const run = runInstaller({ distroKanata: true, desktopProvided: true });
 	try {
-		if (run.status !== 0) errors.push(`install.sh exited ${run.status} with every backend present`);
+		if (run.status !== 0) errors.push(`install.sh exited ${run.status} with kanata already on PATH`);
+		const unit = path.join(run.home, '.config', 'systemd', 'user', 'kanata.service');
+		const text = fs.existsSync(unit) ? fs.readFileSync(unit, 'utf8') : '';
+		const execStart = (text.match(/^ExecStart=(\S+)/m) || [])[1] || '';
+		if (execStart !== `${bashPath(run.stubs)}/kanata`) {
+			errors.push(
+				`kanata.service runs '${execStart || '<missing>'}' while the only kanata is the distribution's ` +
+					`at ${bashPath(run.stubs)}/kanata — the unit would start nothing`
+			);
+		}
+		if (run.calls.some((call) => call.startsWith('curl'))) {
+			errors.push('kanata was downloaded although one is already on PATH');
+		}
 		if (run.calls.some((call) => /appindicator|webkit2/.test(call))) {
 			errors.push('desktop backends that were already present were installed again');
 		}
@@ -154,5 +191,5 @@ if (errors.length > 0) {
 	process.exit(1);
 }
 console.log(
-	'\x1b[32m[OK] install.sh installs and re-probes the tray and window backends.\x1b[0m'
+	'\x1b[32m[OK] install.sh finishes without kanata, runs a distribution kanata, and installs the tray and window backends.\x1b[0m'
 );
