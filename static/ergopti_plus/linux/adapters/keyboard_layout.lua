@@ -309,6 +309,23 @@ function M.source()
 	return _table and _source or nil
 end
 
+--- The key a Ctrl shortcut on `letter` must press in the live layout.
+---
+--- Applications match Ctrl+V by the SYMBOL the key produces, so the physical key
+--- depends on the layout: the same on QWERTY and AZERTY for c, v and t, but not
+--- for w (Ctrl+KEY_W is Ctrl+Z, undo, on AZERTY), and different for nearly every
+--- letter on Ergopti, where KEY_V types a comma. A letter the layout has no
+--- unmodified key for (a Cyrillic layout) keeps `us_code`: that is exactly the
+--- key GTK and Qt fall back to for shortcuts on a non-Latin layout.
+--- @param letter string A single lowercase ASCII letter.
+--- @param us_code integer The letter's evdev code on a US layout.
+--- @return integer
+function M.shortcut_keycode(letter, us_code)
+	local hit = _table and _table[letter]
+	if hit and #hit.mods == 0 then return hit.keycode end
+	return us_code
+end
+
 --- True when a layout table is loaded.
 --- @return boolean
 function M.is_ready()
