@@ -17,6 +17,10 @@
 ; 2. TapHolds gets the same treatment via ``TapHold["keys"]`` — disabling
 ;    that master clears the keys Map so ``TapHoldIsConfigured`` returns false
 ;    for every physical key.
+; 3. A registry layout the driver emulates (``Features["layout"]["emulated_layout"]``,
+;    modules/keymap/keylayout/) replaces the Ergopti emulation, so the Ergopti
+;    layout features are turned off the same way: here, on every path that
+;    rebuilds Features, and never in the saved configuration.
 ; ============================================================================== 
 
 
@@ -51,6 +55,11 @@ ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget, CategoryGateFn, LogDeb
 						FeaturesTarget["layout"][V2Id] := false
 				}
 		}
+
+		; A selected registry layout supersedes the Ergopti emulation. After the
+		; Layout master: a disabled category has already turned the selection off.
+		if FeaturesTarget.Has("layout")
+				_MG_SupersedeErgoptiEmulation(FeaturesTarget["layout"])
 
 		; Shortcuts master
 		if !CategoryGateFn.Call("Shortcuts") and FeaturesTarget.Has("shortcuts") {
@@ -125,6 +134,31 @@ ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget, CategoryGateFn, LogDeb
 
 		if HasMethod(LogDebugFn, "Call")
 				try LogDebugFn.Call("MasterGates", "ApplyMasterGatesToFeatures done.")
+}
+
+; Layout features the registry layout emulation replaces: the Ergopti base and
+; AltGr layers, the Ergopti+ AltGr changes and the digit-row swap (the emulated
+; layout decides its own digit row). ctrl_magic_save works on any layout.
+global MG_ERGOPTI_EMULATION_FEATURES := ["ergopti_base", "ergopti_alt_gr", "ergopti_plus",
+		"direct_access_digits"]
+
+; Turns the Ergopti emulation features off in ``LayoutFeatures`` when a registry
+; layout is selected there (a non-empty ``emulated_layout`` string).
+; @param {Map} LayoutFeatures - The Features["layout"] Map to update.
+; @returns {Integer} Number of features turned off.
+_MG_SupersedeErgoptiEmulation(LayoutFeatures) {
+		global MG_ERGOPTI_EMULATION_FEATURES
+		Selected := LayoutFeatures.Get("emulated_layout", "")
+		if !(Selected is String) or (Selected == "")
+				return 0
+		Count := 0
+		for V2Id in MG_ERGOPTI_EMULATION_FEATURES {
+				if LayoutFeatures.Has(V2Id) and LayoutFeatures[V2Id] {
+						LayoutFeatures[V2Id] := false
+						Count += 1
+				}
+		}
+		return Count
 }
 
 

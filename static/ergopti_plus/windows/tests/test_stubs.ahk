@@ -97,6 +97,7 @@ global Features := Map(
         "direct_access_digits", true,
         "ergopti_alt_gr",       true,
         "ergopti_plus",         false,
+        "emulated_layout",      "",
     ),
     "gestures", Map(
         "enabled", false,

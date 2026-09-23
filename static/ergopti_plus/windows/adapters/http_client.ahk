@@ -254,6 +254,8 @@ class CurlAsyncRequest {
 		this.Url := ""
 		this.Headers := Map()
 		this.Proxy := ""
+		; "" = the body arrives on stdout as ResponseText (see SetOutputFile).
+		this.OutputPath := ""
 		this.ConnectTimeoutMs := 5000
 		this.TotalTimeoutMs := 30000
 		this.Handle := 0
@@ -296,6 +298,16 @@ class CurlAsyncRequest {
 		this.Proxy := Proxy
 	}
 
+	; Makes curl write the response body to Path, byte for byte, instead of
+	; stdout: the stdout collector decodes and trims what it reads, which a
+	; download verified against a checksum afterwards cannot afford. The caller
+	; owns Path (ResponseText stays empty) and removes it when it is not wanted.
+	SetOutputFile(Path) {
+		if !(Path is String) || (Path == "") || !_HTTP_CurlScalarIsSafe(Path)
+			throw ValueError("HTTP output path must be a non-empty path without control characters.")
+		this.OutputPath := Path
+	}
+
 	SetTimeouts(ResolveMs, ConnectMs, SendMs, ReceiveMs) {
 		this.ConnectTimeoutMs := Max(1, Integer(ResolveMs) + Integer(ConnectMs))
 		this.TotalTimeoutMs := Max(1, Integer(ResolveMs) + Integer(ConnectMs)
@@ -328,7 +340,7 @@ class CurlAsyncRequest {
 		Config .= "max-time = " . Ceil(this.TotalTimeoutMs / 1000) . "`n"
 		Config .= "max-filesize = " . HTTP_CURL_MAX_RESPONSE_BYTES . "`n"
 		Config .= "dump-header = " . _HTTP_CurlConfigQuote(this.HeaderPath) . "`n"
-		Config .= "output = " . _HTTP_CurlConfigQuote("-") . "`n"
+		Config .= "output = " . _HTTP_CurlConfigQuote(this.OutputPath != "" ? this.OutputPath : "-") . "`n"
 		; Schannel treats an unreachable revocation server as a TLS failure. A
 		; corporate TLS-inspection CA often publishes none reachable from the
 		; client, so check revocation best-effort, as browsers do.

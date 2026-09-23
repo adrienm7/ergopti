@@ -1,11 +1,12 @@
 {
-	"_comment": "Keyboard-layout registry location, the single source for every driver and tool. The registry is a folder of this repository: one <id>/<id>.keylayout (the only source of a layout) plus <id>/meta.toml per layout, and index.json generated from them by tools/build/build-layouts-index.cjs. Drivers download index.json and the chosen .keylayout straight from that folder through raw_url_template; owner and repo come from ../updater/defaults.json. branch stays main until an update-channel registry exists to map the user's channel to its branch. max_file_bytes bounds every download (index or layout).",
+	"_comment": "Keyboard-layout registry location, the single source for every driver and tool. The registry is a folder of this repository: one <id>/<id>.keylayout (the only source of a layout) plus <id>/meta.toml per layout, and index.json generated from them by tools/build/build-layouts-index.cjs. Drivers download index.json and the chosen .keylayout straight from that folder through raw_url_template; owner and repo come from ../updater/defaults.json. branch stays main until an update-channel registry exists to map the user's channel to its branch. max_file_bytes bounds every download (index or layout). local_folder is the folder, inside the configuration folder, where a driver keeps the layouts it downloaded (<id>.keylayout) next to the index.json they were verified against.",
 	"registry": {
 		"folder": "static/layouts/registry",
 		"index_file": "index.json",
 		"branch": "main",
 		"raw_url_template": "https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{folder}/{path}",
 		"download_timeout_sec": 30,
-		"max_file_bytes": 2097152
+		"max_file_bytes": 2097152,
+		"local_folder": "layouts"
 	}
 }

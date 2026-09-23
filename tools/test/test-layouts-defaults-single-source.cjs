@@ -92,6 +92,8 @@ check('the scalars are positive and the branch is a plain name', () => {
 	assert.ok(Number.isInteger(registry.download_timeout_sec) && registry.download_timeout_sec > 0);
 	assert.ok(Number.isInteger(registry.max_file_bytes) && registry.max_file_bytes > 0);
 	assert.match(registry.branch, /^[A-Za-z0-9._-]+$/);
+	// A folder name inside the configuration folder, never a path out of it.
+	assert.match(registry.local_folder, /^[A-Za-z0-9_-]+$/);
 });
 
 check('no driver source spells the registry host or folder', () => {
@@ -110,6 +112,25 @@ check('no driver source spells the registry host or folder', () => {
 		}
 	}
 	assert.deepStrictEqual(offenders, [], 'these files retype the registry location');
+});
+
+check('every registry client reads the URL template and owner/repo from the shared defaults', () => {
+	const files = [
+		...driverSources(path.join(SP, 'windows'), ['.ahk']),
+		...driverSources(path.join(SP, 'macos'), ['.lua']),
+		...driverSources(path.join(SP, 'linux'), ['.lua']),
+		...driverSources(path.join(SP, '_shared', 'lua'), ['.lua'])
+	];
+	const clients = files.filter((file) =>
+		stripComments(fs.readFileSync(file, 'utf8'), path.extname(file)).includes('raw_url_template')
+	);
+	assert.ok(clients.length >= 1, 'no driver builds a registry URL');
+	for (const file of clients) {
+		const code = stripComments(fs.readFileSync(file, 'utf8'), path.extname(file)).replace(/\\\\?/g, '/');
+		const rel = path.relative(ROOT, file);
+		assert.ok(code.includes('modules/layouts/defaults.json'), `${rel} does not read the layouts defaults`);
+		assert.ok(code.includes('modules/updater/defaults.json'), `${rel} does not read owner/repo from the updater defaults`);
+	}
 });
 
 if (failures > 0) process.exit(1);

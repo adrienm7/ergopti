@@ -795,6 +795,7 @@
 	"layout.ergoptibase": "Эмулировать базовый слой раскладки Ergopti",
 	"layout.ergoptiplus": "Применить незначительные изменения AltGr в Ergopti➕",
 	"layout.ctrlmagicsave": "Ctrl+★ отправляет Ctrl+S",
+	"menu.layout.emulated_layout": "Эмулируемая пользовательская раскладка",
 	"llm.deps.browser_install_tip": "Скачайте Ollama для Windows со страницы, открывшейся в браузере, запустите установщик и вернитесь сюда — подключение будет обнаружено автоматически.",
 	"llm.deps.done_success": "✅ Ollama готов",
 	"llm.deps.fail_server_not_responding": "Установщик завершился, но сервер Ollama не отвечает.",

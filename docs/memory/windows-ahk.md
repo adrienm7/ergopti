@@ -357,6 +357,16 @@ entry and reveal the icon on the driver path only; a worker suspends and
 retitles itself first (`WinSetTitle` on the pure `A_ScriptHwnd` reaches the
 hidden window without a DllCall).
 
+### project-ahk-hotkey-variant-precedence
+
+When several `HotIf` variants of one hotkey are eligible, AutoHotkey v2 fires the
+one created EARLIEST, and the criterion-less (global) variant always loses
+(`lib/Hotkey.htm` of the shipped help). Static `::` hotkeys are created at load,
+before any `Hotkey()` call. A layer that must own keys another layer also binds
+registers first: the registry layout emulation registers at boot, before
+`modules/keymap/layout.ahk`. The AltGr comment in `layout.ahk` that says the
+most recently defined variant wins is wrong; do not reason from it.
+
 ## Files, configuration, and UI hosts
 
 ### project-ahk-unreadable-config-persists-defaults

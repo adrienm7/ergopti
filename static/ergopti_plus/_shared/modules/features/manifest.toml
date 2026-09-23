@@ -2824,6 +2824,19 @@ default = false
 type = "boolean"
 description_key = "menu.layout.ctrl_magic_save"
 
+# The registry layout (static/layouts/registry, _shared/modules/layouts) the
+# Windows driver emulates by reading its .keylayout, "" for none. While set it
+# supersedes the Ergopti emulation above. A choice, not a switch: no toggle row
+# lists it. Windows only, like this whole section: macOS installs a registry
+# .keylayout and Linux converts it to XKB, and the system's input sources then
+# select it.
+[[features.layout]]
+id = "emulated_layout"
+platforms = ["ahk"]
+default = ""
+type = "string"
+description_key = "menu.layout.emulated_layout"
+
 
 
 # ================================
