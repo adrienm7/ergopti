@@ -238,10 +238,12 @@ bash static/ergopti_plus/linux/install.sh --no-deps   # …same, minus the packa
 | `lua-filesystem`                   | existence checks fall back from `stat()` to opening the path                   |
 | `lua-http`                         | nothing today — installed, required by no module                               |
 
-`install.sh` installs every row except `libayatana-appindicator3`, whose package
-name the tray adapter prints for your distribution the first time `--tray` cannot
-bind it. Every Lua library is loaded through `pcall(require, …)`, so a bare box
-starts and silently does less rather than failing.
+`install.sh` installs every row, plus the WebKit2GTK typelib the tray's windows
+are drawn with. The tray and window backends are best effort — a headless
+machine still gets working hotstrings — but each is re-probed after its package
+is installed and reported when it stays unavailable. Every Lua library is loaded
+through `pcall(require, …)`, so a bare box starts and silently does less rather
+than failing.
 
 **2. Permissions** — this is where people get stuck
 
