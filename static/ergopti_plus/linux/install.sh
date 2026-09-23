@@ -444,50 +444,79 @@ _ensure_desktop_backend tray "icône de la barre système (libayatana-appindicat
 echo ""
 echo "=== Dépendances Lua optionnelles (event loop, timers, webviews, signaux) ==="
 
-# Probe each Lua module individually via luajit -e 'require("<name>")'.
-# _check_or_install with 'lua' would only check the interpreter, not the lib.
+# Each module must be loadable by LUAJIT, which speaks the Lua 5.1 ABI. The
+# generic names this list used (lua-lgi, lua-posix…) are Lua 5.4 builds on
+# Fedora, Arch, openSUSE and Alpine: installed successfully and invisible to
+# luajit, so the windows never opened there. Worse, a name the archive does not
+# carry (lua-http on Arch, lua-filesystem on openSUSE) failed under set -e and
+# aborted the install before a single driver file was copied.
+#
+# So: a list of candidates per manager, the 5.1/LuaJIT build first; each one is
+# tried until luajit can require the module; a missing package is never fatal.
 _lua_module_installed() {
-	local mod="$1"
-	luajit -e "require('${mod}')" >/dev/null 2>&1
+	luajit -e "require('$1')" >/dev/null 2>&1
 }
 
-_install_lua_pkgs() {
-	local mod="$1"
-	local pkg_apt="$2"
-	local pkg_dnf="$3"
-	local pkg_pacman="$4"
-
-	if _lua_module_installed "$mod"; then
-		echo "  ✔  ${mod} (Lua module) — déjà installé"
-		return 0
-	fi
-
-	echo "  →  ${mod} manquant — installation du paquet (${pkg_apt}/${pkg_dnf})…"
-	local pkg_mgr
-	pkg_mgr=$(_detect_pkg_manager)
-
-	case "$pkg_mgr" in
-		apt)     sudo apt-get install -y "$pkg_apt" ;;
-		dnf)     sudo dnf install -y "$pkg_dnf" ;;
-		zypper)  sudo zypper --non-interactive install "$pkg_dnf" ;;
-		pacman)  sudo pacman -Sy --noconfirm "$pkg_pacman" ;;
-		xbps)    sudo xbps-install -Sy "$pkg_pacman" ;;
-		apk)     sudo apk add "$pkg_pacman" ;;
-		*)
-			echo "  ⚠  Gestionnaire de paquets inconnu — installez '${mod}' manuellement." >&2
-			return 0
-			;;
+_lua_module_candidates() {
+	case "$1:$2" in
+		apt:luv)      echo "lua-luv" ;;
+		apt:lfs)      echo "lua-filesystem" ;;
+		apt:posix)    echo "lua-posix" ;;
+		apt:lgi)      echo "lua-lgi" ;;
+		dnf:luv)      echo "luajit2.1-luv lua5.1-luv compat-lua-luv" ;;
+		dnf:lfs)      echo "lua5.1-filesystem compat-lua-filesystem luajit2.1-filesystem" ;;
+		dnf:posix)    echo "lua5.1-posix compat-lua-posix luajit2.1-posix" ;;
+		dnf:lgi)      echo "lua5.1-lgi compat-lua-lgi luajit2.1-lgi" ;;
+		zypper:luv)   echo "lua51-luv" ;;
+		zypper:lfs)   echo "lua51-luafilesystem" ;;
+		zypper:posix) echo "lua51-luaposix" ;;
+		zypper:lgi)   echo "lua51-lgi" ;;
+		pacman:luv)   echo "lua51-luv luajit-luv" ;;
+		pacman:lfs)   echo "lua51-filesystem" ;;
+		pacman:posix) echo "lua51-posix" ;;
+		pacman:lgi)   echo "lua51-lgi" ;;
+		xbps:luv)     echo "lua51-luv" ;;
+		xbps:lfs)     echo "lua51-luafilesystem" ;;
+		xbps:posix)   echo "lua51-luaposix" ;;
+		xbps:lgi)     echo "lua51-lgi" ;;
+		apk:luv)      echo "lua5.1-luv" ;;
+		apk:lfs)      echo "lua5.1-filesystem" ;;
+		apk:posix)    echo "lua5.1-posix" ;;
+		apk:lgi)      echo "lua5.1-lgi" ;;
+		*) return 1 ;;
 	esac
 }
 
-_install_lua_pkgs luv    lua-luv        lua-luv        lua-luv
-_install_lua_pkgs lfs    lua-filesystem lua-filesystem lua-filesystem
-_install_lua_pkgs posix  lua-posix      lua-posix      lua-posix
-_install_lua_pkgs lgi    lua-lgi        lua-lgi        lua-lgi
+_install_lua_module() {
+	local mod="$1"
+	local label="$2"
+	if _lua_module_installed "${mod}"; then
+		echo "  ✔  ${mod} (${label}) — déjà installé"
+		return 0
+	fi
+	local pkg_mgr
+	local candidates
+	pkg_mgr="$(_detect_pkg_manager)"
+	if ! candidates="$(_lua_module_candidates "${pkg_mgr}" "${mod}")"; then
+		echo "  ⚠  ${mod} (${label}) : aucun paquet ${pkg_mgr} connu pour LuaJIT." >&2
+		return 0
+	fi
+	local package_name
+	for package_name in ${candidates}; do
+		echo "  →  ${mod} manquant — essai du paquet ${package_name}…"
+		_install_required_package "${pkg_mgr}" "${package_name}" >/dev/null 2>&1 || true
+		if _lua_module_installed "${mod}"; then
+			echo "  ✔  ${mod} (${label}) — capacité vérifiée"
+			return 0
+		fi
+	done
+	echo "  ⚠  ${mod} (${label}) indisponible pour LuaJIT — fonction dégradée." >&2
+}
 
-# lua-http uses the module name 'http' (not 'http' which collides). Store as lua-http.
-# Most distros ship lua-http; the module is require("http") at runtime.
-_install_lua_pkgs http   lua-http       lua-http       lua-http
+_install_lua_module luv   "boucle d'évènements, inotify"
+_install_lua_module lfs   "système de fichiers"
+_install_lua_module posix "signaux SIGTERM/SIGHUP"
+_install_lua_module lgi   "fenêtres WebKit, compteur de vitesse"
 
 echo "  → Les dépendances Lua optionnelles sont installées si disponibles."
 
