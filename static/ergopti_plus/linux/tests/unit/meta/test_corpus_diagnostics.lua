@@ -8,6 +8,8 @@
 --- golden vectors:
 --- 1. _shared/tests/corpus/healthcheck/errors_tail_vectors.json through
 ---    healthcheck.snapshot.parse_errors_tail (the window's recent issues).
+--- 2. _shared/tests/corpus/diagnostics/issue_link_vectors.json through
+---    diagnostics.issue_link (the prefilled GitHub issue URL).
 --- Each corpus fails loudly when unreadable or empty: a replay over zero
 --- vectors would report success while checking nothing.
 --- ==============================================================================
@@ -53,6 +55,39 @@ helpers.describe("diagnostics corpus (linux): errors-file tail", function()
 			local entries = Snapshot.parse_errors_tail(from_hex(input.prefix_hex) .. input.chunk,
 				input.at_file_start, input.max_entries)
 			helpers.assert_eq(entries, vector.expected, vector.id)
+		end)
+	end
+end)
+
+helpers.describe("diagnostics corpus (linux): GitHub issue link", function()
+	local corpus = read_corpus("tests/corpus/diagnostics/issue_link_vectors.json")
+	local IssueLink = require("diagnostics.issue_link")
+
+	helpers.it("has vectors (issue-link-corpus)", function()
+		helpers.assert_true(type(corpus.encode_vectors) == "table" and #corpus.encode_vectors >= 5,
+			"the issue-link corpus must hold its encoding vectors")
+		helpers.assert_true(type(corpus.url_vectors) == "table" and #corpus.url_vectors >= 5,
+			"the issue-link corpus must hold its URL vectors")
+	end)
+
+	for _, vector in ipairs(corpus.encode_vectors or {}) do
+		helpers.it("percent_encode: " .. vector.id .. " (issue-link-corpus)", function()
+			helpers.assert_eq(IssueLink.percent_encode(vector.input), vector.expected, vector.id)
+		end)
+	end
+
+	for _, vector in ipairs(corpus.url_vectors or {}) do
+		helpers.it("build_url: " .. vector.id .. " (issue-link-corpus)", function()
+			local templates = {}
+			for key, value in pairs(corpus.templates) do templates[key] = value end
+			templates.max_url_bytes = vector.max_url_bytes
+			local ok, url = pcall(IssueLink.build_url, templates, corpus.repository, vector.template, vector.values)
+			if vector.expect_error then
+				helpers.assert_eq(ok, false, vector.id .. ": an error was expected, got " .. tostring(url))
+			else
+				helpers.assert_true(ok, vector.id .. ": " .. tostring(url))
+				helpers.assert_eq(url, vector.expected, vector.id)
+			end
 		end)
 	end
 end)

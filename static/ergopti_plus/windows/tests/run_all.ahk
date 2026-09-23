@@ -130,6 +130,7 @@ global _DefaultLogsDir := _LogsDir
 ; two counters only, exercised by unit/test_diagnostic_logging.ahk.
 #Include ../infra/boot_profiler.ahk
 #Include ../infra/diagnostic_snapshot.ahk
+#Include ../infra/issue_link.ahk
 #Include ../infra/toml/toml_helpers.ahk
 ; Shared timing registry reader (TimingsLoadShared / TimingsGet) — needs
 ; ParseTomlFile above; exercised by test_timings_config.ahk.

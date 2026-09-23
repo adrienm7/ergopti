@@ -1,0 +1,10 @@
+# .github/ISSUE_TEMPLATE/config.yml
+#
+# Every issue starts from a form, so a report always carries the version and
+# the system. Bug reports go through GitHub only.
+
+blank_issues_enabled: false
+contact_links:
+  - name: Ergopti website / Site d'Ergopti
+    url: https://ergopti.fr
+    about: Documentation of the layout and of ErgoptiPlus. / Documentation de la disposition et d'ErgoptiPlus.
