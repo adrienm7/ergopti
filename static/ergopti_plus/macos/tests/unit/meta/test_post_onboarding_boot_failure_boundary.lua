@@ -124,7 +124,8 @@ local function boundary_is_exact(source)
 	local fatal_count = count_bare_error_calls(body)
 	local total_post_owner_fatals = root_owner_at
 		and count_bare_error_calls(source:sub(root_owner_at)) or 0
-	if fatal_count < 8 then return false, fatal_count, "fatal inventory below floor" end
+	-- Floor = the live inventory (menu.start joined it), so removing one gate fails.
+	if fatal_count < 9 then return false, fatal_count, "fatal inventory below floor" end
 	if fatal_count ~= total_post_owner_fatals then
 		return false, fatal_count, "a post-owner fatal gate escaped the boundary"
 	end
@@ -163,7 +164,7 @@ helpers.describe("root boot has one bounded post-onboarding failure boundary", f
 		helpers.assert_true(valid,
 			"post-onboarding input startup through boot success must be one xpcall-owned unit: "
 				.. tostring(reason))
-		helpers.assert_true(fatal_count >= 8,
+		helpers.assert_true(fatal_count >= 9,
 			"the guard must cover the complete non-vacuous fatal-gate inventory")
 	end)
 
