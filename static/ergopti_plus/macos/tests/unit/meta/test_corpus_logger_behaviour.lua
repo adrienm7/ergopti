@@ -24,6 +24,9 @@
 --- 4. Lifecycle pairs — trace/done and start/success can never be split.
 --- 5. Ring buffer — capacity, order, the two boundary cases either side of
 ---    capacity, and clear-after-wrap.
+--- 6. Dedup — the consecutive-line layer alone, with repeat collapsing disarmed.
+--- 7. Repeat collapsing — every "repeat" case replayed through this driver's
+---    arming API on a driven clock, exact delivered lines and summaries.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -106,6 +109,8 @@ helpers.describe("Logger behaviour corpus: integrity", function()
 		helpers.assert_true(#CORPUS.lifecycle_pairs > 0, "the lifecycle-pair section is empty")
 		helpers.assert_eq(type(CORPUS.ring_buffer), "table", "the corpus must declare the ring-buffer contract")
 		helpers.assert_true(#CORPUS.ring_buffer.cases > 0, "the ring-buffer section is empty")
+		helpers.assert_true(type(CORPUS["repeat"]) == "table" and #CORPUS["repeat"].cases > 0,
+			"the repeat section is empty — every repeat case below would pass vacuously")
 	end)
 
 	helpers.it("names all eight variants, and this driver emits every one of them", function()
@@ -346,6 +351,10 @@ helpers.describe("Logger behaviour corpus: dedup", function()
 	--- @param variant string|nil Variant to emit them with (default "info").
 	--- @return table lines Every line the sink received.
 	local function run(messages, variant)
+		-- These cases pin the consecutive layer ALONE (see the corpus comment): an
+		-- armed repeat layer would withhold the third line of a,b,a on its own.
+		helpers.assert_eq(Logger.repeat_collapsing_enabled(), false,
+			"the dedup cases must replay with repeat collapsing disarmed")
 		local lines = {}
 		local saved_clock = Logger.clock_fn
 		local saved_level = Logger.current_level
@@ -456,4 +465,219 @@ helpers.describe("Logger behaviour corpus: dedup", function()
 		Logger.reset_dedup()
 		Logger.ring_buffer_clear()
 	end)
+end)
+
+
+
+
+
+-- ==============================================
+-- ==============================================
+-- ======= 8/ Repeat Collapsing =================
+-- ==============================================
+-- ==============================================
+
+helpers.describe("Logger behaviour corpus: repeat collapsing", function()
+	local SECTION = CORPUS["repeat"]
+
+	-- The corpus writes its single format placeholder neutrally; this driver's
+	-- formatter is string.format.
+	local PLACEHOLDER = "%s"
+
+	local LABELS = {
+		debug = "DEBUG", trace = "TRACE", done = "DONE", info = "INFO",
+		start = "START", success = "SUCCESS", warn = "WARNING", error = "ERROR",
+	}
+
+	-- A repeat summary quotes its streak's text right after the arrow; a dedup
+	-- summary never does, which is what tells the two apart.
+	local REPEAT_SUMMARY_PREFIX = "\u{2191} \""
+	local DEDUP_SUMMARY_PREFIX  = "\u{2191} "
+
+	--- A scheduler that commits the periodic tick without ever firing it: the
+	--- corpus drives every flush explicitly, at the time it names.
+	local IDLE_SCHEDULER = {
+		every = function() return { idle = true }, true end,
+		cancel = function() return true end,
+	}
+
+	--- Replaces every literal occurrence of token, with no pattern semantics:
+	--- the placeholder being substituted is itself a pattern character in Lua.
+	--- @param text string
+	--- @param token string
+	--- @param value string
+	--- @return string
+	local function substitute(text, token, value)
+		local parts, from = {}, 1
+		while true do
+			local i, j = text:find(token, from, true)
+			if not i then break end
+			parts[#parts + 1] = text:sub(from, i - 1)
+			parts[#parts + 1] = value
+			from = j + 1
+		end
+		parts[#parts + 1] = text:sub(from)
+		return table.concat(parts)
+	end
+
+	--- Converts "YYYY-MM-DD HH:MM:SS" to an epoch in local time. The rendering
+	--- below uses local time too, so the round trip is exact on dates without a
+	--- daylight-saving change — which is why the corpus picks mid-January.
+	--- @param text string
+	--- @return number
+	local function epoch_of(text)
+		local y, mo, d, h, mi, s = tostring(text):match("^(%d+)-(%d+)-(%d+) (%d+):(%d+):(%d+)$")
+		assert(y, "base_time must read YYYY-MM-DD HH:MM:SS, got " .. tostring(text))
+		return os.time({
+			year = tonumber(y), month = tonumber(mo), day = tonumber(d),
+			hour = tonumber(h), min = tonumber(mi), sec = tonumber(s),
+		})
+	end
+
+	--- Expands a case's steps into one flat, timed action list.
+	--- @param steps table
+	--- @return table
+	local function expand(steps)
+		local actions = {}
+		for _, step in ipairs(steps) do
+			if step.flush then
+				actions[#actions + 1] = { at = step.at, flush = step.flush }
+			elseif step.range then
+				for n = step.range[1], step.range[2] do
+					actions[#actions + 1] = {
+						at = step.at + (n - step.range[1]) * step.every,
+						variant = step.variant, module = step.module,
+						template = substitute(step.template, "<n>", tostring(n)),
+					}
+				end
+			else
+				for i = 1, (step.times or 1) do
+					actions[#actions + 1] = {
+						at = step.at + (i - 1) * (step.every or 0),
+						variant = step.variant, module = step.module,
+						template = step.template, arg = step.arg,
+					}
+				end
+			end
+		end
+		return actions
+	end
+
+	--- Splits a delivered line into its four fields.
+	--- @param line string
+	--- @return table
+	local function parse(line)
+		local stamp, label, module_name, body = tostring(line):match(
+			"^(%d%d%d%d%-%d%d%-%d%d %d%d:%d%d:%d%d:%d%d%d) %[([A-Z]+)%] %[([^%]]*)%] (.*)$")
+		helpers.assert_true(stamp ~= nil, "every delivered line must follow spec § 3, got: " .. tostring(line))
+		return { stamp = stamp, label = label, module = module_name, body = body }
+	end
+
+	--- Replays one case on a driven clock through this driver's public API and
+	--- returns what the sink received. The layer is always disarmed again, even
+	--- when the case fails, so one red case cannot leak suppression into every
+	--- later test in this process.
+	--- @param case table
+	--- @return table delivered Parsed lines, in delivery order.
+	--- @return number ring Ring-buffer size after the case.
+	local function replay(case)
+		local base = epoch_of(case.base_time or SECTION.base_time)
+		local at = 0
+		local delivered = {}
+		local saved_clock, saved_stamp, saved_level = Logger.clock_fn, Logger.timestamp_fn, Logger.current_level
+		Logger.clock_fn = function() return at end
+		Logger.timestamp_fn = function() return os.date("%Y-%m-%d %H:%M:%S", base + at) .. ":000" end
+		Logger.set_level("DEBUG")
+		Logger.reset_dedup()
+		Logger.ring_buffer_clear()
+		Logger.set_sink(function(line, variant)
+			local parsed = parse(line)
+			parsed.variant = variant
+			delivered[#delivered + 1] = parsed
+		end)
+
+		local ok, err = pcall(function()
+			local armed, arm_err = Logger.enable_repeat_collapsing(IDLE_SCHEDULER)
+			assert(armed == true, "arming must succeed: " .. tostring(arm_err))
+			local previous = nil
+			for _, action in ipairs(expand(case.steps)) do
+				assert(previous == nil or action.at >= previous,
+					case.id .. ": corpus steps must be listed in time order")
+				previous = action.at
+				at = action.at
+				if action.flush then
+					Logger.flush_repeats(action.flush == "terminal")
+				else
+					local template = substitute(action.template, "<arg>", PLACEHOLDER)
+					if action.arg ~= nil then
+						EMITTERS[action.variant](action.module, template, action.arg)
+					else
+						EMITTERS[action.variant](action.module, template)
+					end
+				end
+			end
+		end)
+		local ring = Logger.ring_buffer_size()
+		Logger.set_sink(nil)
+		Logger.disable_repeat_collapsing()
+		Logger.reset_dedup()
+		Logger.ring_buffer_clear()
+		Logger.clock_fn, Logger.timestamp_fn = saved_clock, saved_stamp
+		Logger.set_level(saved_level)
+		if not ok then error(err, 0) end
+		return delivered, ring
+	end
+
+	--- Asserts one delivered line against one expected corpus entry.
+	--- @param id string
+	--- @param index number
+	--- @param got table
+	--- @param want table
+	local function assert_line(id, index, got, want)
+		local where = id .. " line " .. tostring(index)
+		helpers.assert_eq(got.label, LABELS[want.variant], where .. ": level label")
+		helpers.assert_eq(got.variant, want.variant, where .. ": the sink must receive the streak's own variant")
+		helpers.assert_eq(got.module, want.module, where .. ": module tag")
+		helpers.assert_eq(got.body, substitute(want.body, "<arg>", PLACEHOLDER), where .. ": body")
+		if want.stamp then helpers.assert_eq(got.stamp, want.stamp, where .. ": timestamp") end
+	end
+
+	for _, case in ipairs(SECTION.cases) do
+		helpers.it(case.id, function()
+			local delivered, ring = replay(case)
+
+			if case.expect then
+				helpers.assert_eq(#delivered, #case.expect,
+					case.id .. ": exactly the expected lines must reach the sink")
+				for i, want in ipairs(case.expect) do
+					assert_line(case.id, i, delivered[i], want)
+				end
+			end
+
+			if case.expect_ring then
+				helpers.assert_eq(ring, case.expect_ring,
+					case.id .. ": withheld occurrences must stay out of the ring the crash report reads")
+			end
+
+			if case.expect_line_count then
+				local plain, summaries = 0, {}
+				for i, got in ipairs(delivered) do
+					if got.body:sub(1, #REPEAT_SUMMARY_PREFIX) == REPEAT_SUMMARY_PREFIX then
+						summaries[#summaries + 1] = { line = got, next = delivered[i + 1] }
+					elseif got.body:sub(1, #DEDUP_SUMMARY_PREFIX) ~= DEDUP_SUMMARY_PREFIX then
+						plain = plain + 1
+					end
+				end
+				helpers.assert_eq(plain, case.expect_line_count, case.id .. ": non-summary line count")
+				helpers.assert_eq(#summaries, #case.expect_summaries, case.id .. ": repeat summary count")
+				for i, want in ipairs(case.expect_summaries) do
+					assert_line(case.id, i, summaries[i].line, want)
+					if want.followed_by then
+						helpers.assert_true(summaries[i].next ~= nil and summaries[i].next.body == want.followed_by,
+							case.id .. ": the summary must be emitted right before '" .. want.followed_by .. "'")
+					end
+				end
+			end
+		end)
+	end
 end)
