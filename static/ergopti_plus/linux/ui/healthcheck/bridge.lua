@@ -55,9 +55,11 @@ local NOT_AVAILABLE = "n/a"
 -- container.
 local _started_at = os.time()
 
--- The daemon parts the report checks. The required ones run in every daemon;
--- the AI engine is loaded optionally (RuntimeGuard.optional_require), so its
--- absence is a feature that is off, not a failure.
+-- The daemon parts the report checks. The required ones run in every daemon.
+-- The optional ones are loaded by every daemon too, through
+-- RuntimeGuard.optional_require, but the user can switch them off: switched off
+-- is a neutral "disabled"; absent means the module failed to load (logged by
+-- the guard), which is a failure.
 local REQUIRED_PARTS = { "engine", "keylogger", "config" }
 local OPTIONAL_PARTS = { "llm" }
 
@@ -375,14 +377,17 @@ local function build_snapshot(state)
 			failed[#failed + 1] = name .. " (not wired)"
 		end
 	end
-	-- An optional part that is absent is off, not broken: it used to be listed
-	-- with the failures in red, so a user without the AI module read the report
-	-- as a crash
+	-- An optional part the user switched off is neutral, not a red failure. One
+	-- that is absent did not load: calling it "disabled" would hide that
+	-- failure behind the colour meant for a user's choice.
 	for _, name in ipairs(OPTIONAL_PARTS) do
-		if state[name] then
-			loaded[#loaded + 1] = name
-		else
+		local part = state[name]
+		if not part then
+			failed[#failed + 1] = name .. " (not loaded)"
+		elseif type(part.is_enabled) == "function" and part.is_enabled() == false then
 			disabled[#disabled + 1] = name
+		else
+			loaded[#loaded + 1] = name
 		end
 	end
 

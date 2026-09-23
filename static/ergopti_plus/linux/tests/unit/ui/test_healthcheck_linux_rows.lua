@@ -73,15 +73,37 @@ helpers.describe("healthcheck (linux): the window title", function()
 end)
 
 helpers.describe("healthcheck (linux): optional modules that are off", function()
-	-- The AI module is loaded optionally; when it is absent the report used to
-	-- list "llm (not wired)" as a red failure beside the modules the daemon
-	-- cannot run without (developer-details).
-	helpers.it("reports a missing AI module as disabled, not failed (developer-details)", function()
+	-- The AI engine is loaded by every daemon, whether the user enabled it or
+	-- not. Switched off, it must read as a neutral "disabled", never as a red
+	-- failure beside the modules the daemon cannot run without; absent, it did
+	-- not load, which is a failure and must not be dressed as "disabled"
+	-- (developer-details).
+	helpers.it("reports an AI engine the user switched off as disabled, not failed (developer-details)", function()
 		local snapshot = helpers.load_module("ui.healthcheck.bridge").on_message("ready", {
 			engine = {}, keylogger = {}, config = {},
+			llm = { is_enabled = function() return false end },
 		})
 		helpers.assert_eq(snapshot.failed_adapters, {})
 		helpers.assert_eq(snapshot.disabled_adapters, { "llm" })
+		helpers.assert_eq(snapshot.ports_validated, { "engine", "keylogger", "config" })
+	end)
+
+	helpers.it("counts an AI engine that is switched on as loaded (developer-details)", function()
+		local snapshot = helpers.load_module("ui.healthcheck.bridge").on_message("ready", {
+			engine = {}, keylogger = {}, config = {},
+			llm = { is_enabled = function() return true end },
+		})
+		helpers.assert_eq(snapshot.failed_adapters, {})
+		helpers.assert_eq(snapshot.disabled_adapters, {})
+		helpers.assert_eq(snapshot.ports_validated, { "engine", "keylogger", "config", "llm" })
+	end)
+
+	helpers.it("fails an AI engine that did not load instead of calling it disabled (developer-details)", function()
+		local snapshot = helpers.load_module("ui.healthcheck.bridge").on_message("ready", {
+			engine = {}, keylogger = {}, config = {},
+		})
+		helpers.assert_eq(snapshot.failed_adapters, { "llm (not loaded)" })
+		helpers.assert_eq(snapshot.disabled_adapters, {})
 	end)
 
 	helpers.it("still fails a missing required module (developer-details)", function()
