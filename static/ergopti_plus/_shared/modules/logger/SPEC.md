@@ -255,6 +255,16 @@ in between, or one whose arguments change. Repeat collapsing does.
 - A `ring_buffer_snapshot()` / `LoggerRingBufferSnapshot()` function returns
   the entries in chronological order as a flat list.
 
+### 5.1 Session issue counters
+
+Every driver counts the `WARNING` and `ERROR` lines it emits for the whole
+session and keeps the last `ERROR` line (the complete formatted line), apart
+from the ring: DEBUG output evicts the ring within minutes, and the diagnostic
+window's counters and "Last recorded error" must not forget a problem that
+early. A line swallowed by the dedup window is not counted. The Lua core
+exposes `session_issues()` → `{ warn_count, err_count, last_error }`; the AHK
+logger feeds `HealthCheck_RecordWarn()` / `HealthCheck_RecordError(Line)`.
+
 ---
 
 ## 6. Log Files

@@ -685,6 +685,7 @@ function M.make_logger_stub()
 		warn    = noop, error   = noop,
 		set_level = noop, set_sink = noop, is_enabled = function() return false end,
 		ring_buffer_snapshot = function() return {} end,
+		session_issues = function() return { warn_count = 0, err_count = 0, last_error = nil } end,
 		pcall   = function(_, fn, ...) return pcall(fn, ...) end,
 		callback = function(_, _, fn, ...) return xpcall(fn, debug.traceback, ...) end,
 		build   = function() return noop end,

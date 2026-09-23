@@ -1230,8 +1230,10 @@ _LoggerEmit(Level, Tag, Msg, Args*) {
 		if IsSet(HealthCheck_RecordWarn)
 			HealthCheck_RecordWarn()
 	} else if (Level == "ERROR") {
+		; The whole line, as the macOS and Linux logger cores record it: the body
+		; alone said neither when the error happened nor which module raised it
 		if IsSet(HealthCheck_RecordError)
-			HealthCheck_RecordError(Body)
+			HealthCheck_RecordError(Line)
 	}
 	; Always enqueue the line unconditionally so pre-init messages (emitted
 	; before LoggerInit has resolved LOGGER_LOG_PATH) survive until the first

@@ -1493,6 +1493,12 @@ function M.reset_dedup() Core.reset_dedup() end
 --- @return number
 function M.dedup_suppressed_count() return Core.dedup_suppressed_count() end
 
+--- Warnings and errors emitted this session, and the last ERROR line. Owned by
+--- the core like the ring, but never evicted by it: the healthcheck's counters
+--- and "Last recorded error" read this, not the 200-line ring.
+--- @return table { warn_count, err_count, last_error }
+function M.session_issues() return Core.session_issues() end
+
 --- Clock used to measure the dedup and repeat windows, in seconds.
 --- Replaceable so a test can drive the five-second window without sleeping for
 --- it: a window measured in seconds cannot otherwise be exercised by a suite that

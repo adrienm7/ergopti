@@ -9,7 +9,7 @@
 --- command, or any other surface that needs a quick sanity check.
 ---
 --- This is the entry point: requiring "ui.healthcheck" returns the public API
---- (run / record_error / format_plain / show_window). The implementation is split
+--- (run / format_plain / show_window). The implementation is split
 --- to mirror the Windows ui/healthcheck/{init,core,helpers} layout:
 ---   ui.healthcheck.core    -- Probe, public API, hs.webview report window.
 ---   ui.healthcheck.helpers -- State-gathering probes + snapshot rendering.

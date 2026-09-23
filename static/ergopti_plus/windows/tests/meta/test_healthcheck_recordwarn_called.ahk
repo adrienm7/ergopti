@@ -12,7 +12,7 @@ _THR_Check() {
 	Src := _DriverDirConcat("infra")
 	Assert(Src != "", "Source file logger.ahk must exist")
 	Assert(InStr(Src, "HealthCheck_RecordWarn()") > 0, "logger.ahk must call HealthCheck_RecordWarn")
-	Assert(InStr(Src, "HealthCheck_RecordError(Body)") > 0, "logger.ahk must call HealthCheck_RecordError")
+	Assert(InStr(Src, "HealthCheck_RecordError(Line)") > 0, "logger.ahk must record the full ERROR line")
 }
 
 Test("HealthCheck: logger increments warn/err counters", _THR_Check)

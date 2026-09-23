@@ -60,9 +60,6 @@ local MAX_RECENT_ISSUES = 100
 -- container.
 local _started_at = os.time()
 
--- The most recent error worth surfacing, if anything set one.
-local _last_error = nil
-
 
 -- =========================================
 -- =========================================
@@ -96,6 +93,16 @@ local function ring_lines()
 	end
 	local ok_snapshot, lines = pcall(real.ring_buffer_snapshot)
 	return (ok_snapshot and type(lines) == "table") and lines or {}
+end
+
+--- The logger core's session counters: every WARNING and ERROR since the
+--- daemon started, and the last ERROR line. They used to be counted inside the
+--- 200-line ring, which DEBUG output evicts within minutes, while the page
+--- labels them "Session counters"; and the last error came from a
+--- record_error() that nothing in production called.
+--- @return table { warn_count, err_count, last_error }
+local function session_issues()
+	return require("logger").session_issues()
 end
 
 --- Whether the daemon is paused, and what answered.
@@ -325,7 +332,6 @@ end
 local function build_snapshot(state)
 	state = type(state) == "table" and state or {}
 	local lines = ring_lines()
-	local warn_count, err_count = Snapshot.count_issues(lines)
 
 	-- Which of the daemon's parts are wired. Reported as adapter lists because
 	-- that is what the page renders, and because "the LLM section is missing"
@@ -358,15 +364,7 @@ local function build_snapshot(state)
 		-- answer to a question the page asks of every platform.
 		ports_validated  = loaded,
 		failed_adapters  = failed,
-		-- `false` rather than nil when nothing has failed. The shared validator
-		-- reads a nil field as MISSING, so a healthy daemon would have reported
-		-- itself as an incomplete snapshot — and the page's `if (s.last_error)`
-		-- treats false and nil identically, so nothing is printed either way.
-		-- "No error" is a value; the absence of the field is a different claim.
-		last_error       = _last_error or false,
 		uptime_sec       = os.time() - _started_at,
-		warn_count       = warn_count,
-		err_count        = err_count,
 		recent_issues    = Snapshot.extract_recent_issues(lines, MAX_RECENT_ISSUES),
 		sys              = collect("sys", collect_sys),
 		pause_state      = collect("pause_state", function() return collect_pause_state(state) end),
@@ -378,6 +376,16 @@ local function build_snapshot(state)
 		config           = collect("config", function() return collect_config(state) end),
 	}
 
+	-- Read after every collector, so a problem this very build logged is counted
+	-- too. `false` rather than nil when nothing has failed: the shared validator
+	-- reads a nil field as MISSING, and the page's `if (s.last_error)` treats
+	-- false and nil alike. "No error" is a value; an absent field is a different
+	-- claim.
+	local issues = session_issues()
+	snapshot.warn_count = issues.warn_count
+	snapshot.err_count  = issues.err_count
+	snapshot.last_error = issues.last_error or false
+
 	-- Validated against the shared contract before it is sent. A section that is
 	-- silently absent is worse than a loud gap: the reader cannot tell "not
 	-- measured" from "measured as nothing", and this window exists to answer
@@ -388,14 +396,6 @@ local function build_snapshot(state)
 			#missing, table.concat(missing, ", "))
 	end
 	return snapshot
-end
-
---- Records an error for the next snapshot to surface.
---- @param message string
-function M.record_error(message)
-	if type(message) ~= "string" or message == "" then return end
-	_last_error = message
-	Logger.debug(LOG, "Last error recorded for the healthcheck report.")
 end
 
 --- Handles an incoming JS message.
