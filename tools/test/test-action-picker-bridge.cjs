@@ -142,6 +142,11 @@ for (const tok of ['"heading"', '"action"', '"level"', '"text"']) {
 check('macOS host builds heading/action items',
 	/type\s*=\s*"heading"/.test(macMenu) && /type\s*=\s*"action"/.test(macMenu) && /level\s*=/.test(macMenu));
 
+// 4b'. A row the host proved unrunnable is greyed with its reason
+// (behaviour pinned by test-action-picker-disabled-rows.cjs).
+check('page reads item.disabled and item.hint',
+	/it\.disabled/.test(script) && /it\.hint/.test(script));
+
 // 4c. Hierarchy / fold / TOC features present in the frontend.
 check('frontend folds headings (toggleFold)', /function toggleFold/.test(script) && /collapsed/.test(script));
 check('frontend renders heading levels', /lvl/.test(script) && /level/.test(script));
@@ -167,6 +172,7 @@ check('macOS open_action_chooser routes through the shared picker',
 let locale = {};
 try { locale = JSON.parse(enLocale); } catch (err) { check('en.json parses', false, err.message); }
 for (const key of ['dialog.action_picker.search', 'dialog.action_picker.no_results',
+	'dialog.action_picker.requires_tool', 'dialog.action_picker.requires_x11',
 	'sg_actions.sg_order.header.grp_input', 'sg_actions.sg_order.header.grp_system']) {
 	check(`locale has "${key}"`, typeof locale[key] === 'string' && locale[key].length > 0);
 }

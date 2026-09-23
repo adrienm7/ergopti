@@ -270,6 +270,26 @@ body {
 	color: #fff;
 }
 
+/* A row the host proved this machine cannot run: shown with its reason, but
+   never highlighted or picked. */
+.row.disabled {
+	cursor: default;
+	opacity: 0.55;
+}
+.row.disabled:hover {
+	background: none;
+}
+
+.row-hint {
+	color: var(--sub);
+	flex-shrink: 0;
+	font-size: 11px;
+	max-width: 45%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
 #empty {
 	color: var(--sub);
 	flex: 1;
