@@ -3342,6 +3342,16 @@ type = "command"
 id = "healthcheck"
 i18n = "menu.debug.healthcheck"
 
+[[menu.debug_menu]]
+type = "command"
+id = "report_bug"
+i18n = "menu.debug.report_bug"
+
+[[menu.debug_menu]]
+type = "command"
+id = "suggest_feature"
+i18n = "menu.debug.suggest_feature"
+
 [[menu.shortcuts_menu]]
 type = "toggle"
 id = "shortcuts_toggle"
