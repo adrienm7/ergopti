@@ -5,9 +5,10 @@
 ; DESCRIPTION:
 ; Mirrors macos/modules/gestures/actions.lua. Contains the complete gesture
 ; action registry (GESTURE_ACTIONS Map), all action implementation functions
-; (GestureScreenshotInstant, GestureOpenConfiguredURL, etc.), the deferred
-; catalogue loader (_GestureLoadActionCatalog), and the shared state used by
-; the dispatcher (GestureAssignments, window-cycle tracker).
+; (GestureScreenshotInstant, GestureOpenConfiguredURL, etc.), the picker walk
+; over the generated catalogue (GestureActionPickerItems, from
+; _generated/action_catalogue.ahk), and the shared state used by the
+; dispatcher (GestureAssignments, window-cycle tracker).
 ;
 ; Included by modules/gestures/init.ahk after the constants block.
 ; ==============================================================================
@@ -237,10 +238,9 @@ global GESTURE_ACTIONS := Map(
 ; not a crash and not a failing test.
 ;
 ; They now come from _shared/modules/actions/actions.toml through
-; _generated/gesture_emit_actions.ahk. Registered HERE, at static-init, and not
-; in _GestureLoadActionCatalog(): that loader is deliberately deferred off the
-; boot path, so building handlers there would open a window in which a gesture
-; fires and finds nothing registered.
+; _generated/gesture_emit_actions.ahk. Registered HERE, at static-init: a
+; handler built by anything deferred off the boot path would open a window in
+; which a gesture fires and finds nothing registered.
 for _EmitId, _Emit in GestureEmitActionsData() {
 		if _Emit.HasOwnProp("Seq") {
 				; Raw send sequence — no portable key/modifier form exists for it.
