@@ -67,9 +67,10 @@ _HealthCheck_AdapterSpecs() {
 ; ===================================================
 ; ===================================================
 
-; Stores an error message for later retrieval by HealthCheck_Run().
-; Call from any error handler that wants healthcheck visibility.
-; @param Msg {String} Human-readable error description.
+; Stores the last ERROR line for later retrieval by HealthCheck_Run(). The
+; logger calls it on every emitted ERROR with the whole formatted line, which
+; is what the macOS and Linux logger cores keep as their session last error.
+; @param Msg {String} The formatted log line.
 HealthCheck_RecordError(Msg) {
 	global _HealthCheckLastError, _HealthCheckErrCount
 	if !IsSet(_HealthCheckLastError)

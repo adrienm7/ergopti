@@ -106,6 +106,20 @@ Test("HealthCheck: Run reflects recorded warnings, errors, and last error messag
 	_TestHC_RunReflectsCounters)
 
 
+; The last error is the whole logged line, as on macOS and Linux: the bare body
+; told a reader neither when it happened nor which module raised it.
+_TestHC_LoggerErrorRecordsFullLine() {
+	global _HealthCheckLastError
+	Marker := "full-line-" . A_TickCount
+	LoggerError("HcProbe", "boom {1}", Marker)
+	AssertContains(_HealthCheckLastError, "[ERROR] [HcProbe] boom " . Marker,
+		"a real LoggerError must reach the last error with its level and module")
+}
+
+Test("HealthCheck: a LoggerError is recorded as its full line (healthcheck-last-error-wired)",
+	_TestHC_LoggerErrorRecordsFullLine)
+
+
 _TestHC_RunUptimeIsPositive() {
 	Result := HealthCheck_Run()
 	Assert(Result["uptime_sec"] >= 0,

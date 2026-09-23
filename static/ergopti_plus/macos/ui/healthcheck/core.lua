@@ -49,9 +49,6 @@ local EVENT_TAP_REVIEWED_VERSION = "1.1.1"
 -- Module load timestamp — used to approximate driver uptime.
 local _load_time = os.time()
 
--- Last error captured by M.record_error(); persists until the next record_error() call.
-local _last_error = nil
-
 -- Reference to the currently open webview window (singleton — one at a time).
 local _window = nil
 
@@ -437,15 +434,6 @@ local ADAPTER_SPECS = {
 --- =============================
 --- =============================
 
---- Records the most recent driver error so M.run() can surface it.
---- Call this from any error handler that wants healthcheck visibility.
---- @param msg string Human-readable error description.
-function M.record_error(msg)
-	_last_error = tostring(msg)
-	Logger.debug(LOG, "Last error recorded: %s.", _last_error)
-end
-
-
 --- Probes all registered adapters and port contracts, then returns a snapshot
 --- table with: version, loaded_adapters, ports_validated, last_error, uptime_sec, sys.
 --- @return table Snapshot with fields described above.
@@ -514,10 +502,8 @@ function M.run()
 		Logger.error(LOG, "Logger.ring_buffer_snapshot() returned nil — ring buffer unavailable.")
 		all_lines = {}
 	end
-	local warn_count, err_count = Snapshot.count_issues(all_lines)
-	local recent_issues         = Snapshot.extract_recent_issues(all_lines, 100)
-	Logger.debug(LOG, "Ring buffer: %d line(s), %d warning(s), %d error(s).",
-		#all_lines, warn_count, err_count)
+	local recent_issues = Snapshot.extract_recent_issues(all_lines, 100)
+	Logger.debug(LOG, "Ring buffer: %d line(s), %d recent issue(s).", #all_lines, #recent_issues)
 
 	-- Run each enriched collector in a protected call so a single broken
 	-- collector cannot abort the entire healthcheck.
@@ -540,10 +526,7 @@ function M.run()
 		wired_count      = wired_count,
 		adapter_count    = #ADAPTER_SPECS,
 		unwired_adapters = unwired_adapters,
-		last_error       = _last_error,
 		uptime_sec       = uptime_sec,
-		warn_count       = warn_count,
-		err_count        = err_count,
 		recent_issues    = recent_issues,
 		event_tap_timeout_telemetry = event_tap_timeout_telemetry(sys and sys.hs_version),
 		sys              = sys,
@@ -558,6 +541,16 @@ function M.run()
 		coverage         = safe_collect("platform_coverage",   H.collect_platform_coverage),
 		permissions      = safe_collect("permissions",         H.collect_permissions),
 	}
+
+	-- Read last, after every collector, so a problem this very run logged is
+	-- counted too. These are the logger's session counters: the ring they used
+	-- to be counted from forgets them within minutes of DEBUG output.
+	local issues = Logger.session_issues()
+	result.warn_count = issues.warn_count
+	result.err_count  = issues.err_count
+	-- false, not nil, when nothing failed: the shared validator reads a nil
+	-- field as missing, and "no error" is a value
+	result.last_error = issues.last_error or false
 
 	Logger.success(LOG, "Healthcheck complete — %d/%d adapter(s) wired, %d contract-healthy, %d failed, uptime %ds.",
 		wired_count, #ADAPTER_SPECS, #ports_validated, #failed_adapters, uptime_sec)

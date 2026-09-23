@@ -113,6 +113,12 @@ local REPEAT_KEY_BY = {
 --- orders streaks by creation and `use` by recency.
 local _repeat = { enabled = false, streaks = {}, size = 0, date = nil, oldest = nil, seq = 0, use = 0 }
 
+--- Session issue counters (spec § 5.1): every WARNING and ERROR line accepted
+--- since the process started, and the last ERROR line. Kept apart from the ring
+--- because the ring holds every level, so a few minutes of DEBUG lines evict the
+--- very problems a diagnostic is opened to show.
+local _session = { warn_count = 0, err_count = 0, last_error = nil }
+
 --- Optional sink function called with every accepted formatted line.
 --- Signature: function(line: string, variant: string) → void
 local _sink = nil
@@ -469,6 +475,15 @@ local function emit(variant, module_name, msg, ...)
 	_dedup.time    = now
 	_dedup.variant = nil
 
+	-- Counted before delivery and never logged about: the sink may be a driver
+	-- callback, and a counter update must not depend on it returning
+	if variant == "warn" then
+		_session.warn_count = _session.warn_count + 1
+	elseif variant == "error" then
+		_session.err_count = _session.err_count + 1
+		_session.last_error = line
+	end
+
 	deliver(line, variant)
 	return line
 end
@@ -643,6 +658,37 @@ function M.flush_repeats(force)
 	if _repeat.enabled and _repeat.size > 0 then
 		expire_repeat_streaks(M.clock_fn(), M.timestamp_fn())
 	end
+end
+
+
+
+
+
+-- ================================================
+-- ================================================
+-- ======= 9/ Session Issue Counters ==============
+-- ================================================
+-- ================================================
+
+--- Returns the session's issue counters as a fresh table, so a caller can
+--- never mutate the core's own state.
+--- A line swallowed by the dedup window is not counted: the counters describe
+--- the log a user can open, where the streak appears once plus its summary.
+--- @return table { warn_count = number, err_count = number, last_error = string|nil }
+function M.session_issues()
+	return {
+		warn_count = _session.warn_count,
+		err_count  = _session.err_count,
+		last_error = _session.last_error,
+	}
+end
+
+--- Zeroes the session counters. For tests and for a driver that restarts its
+--- session inside one process; the running drivers never call it.
+function M.reset_session_issues()
+	_session.warn_count = 0
+	_session.err_count  = 0
+	_session.last_error = nil
 end
 
 
