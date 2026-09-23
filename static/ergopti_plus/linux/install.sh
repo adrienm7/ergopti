@@ -128,18 +128,25 @@ DEST_SHARED="${LIB_DIR}/_shared"
 
 # Ordered from most to least specific. zypper before dnf because openSUSE ships
 # both on some images, and xbps before apk for the same reason on Void.
+_has_manager() {
+	# /sbin and /usr/sbin too: Alpine keeps apk in /sbin, which an ordinary
+	# user's PATH does not include there, so `command -v apk` alone answered
+	# "unknown" and the installer refused every dependency on Alpine.
+	command -v "$1" >/dev/null 2>&1 || [ -x "/sbin/$1" ] || [ -x "/usr/sbin/$1" ]
+}
+
 _detect_pkg_manager() {
-	if command -v apt-get >/dev/null 2>&1; then
+	if _has_manager apt-get; then
 		echo "apt"
-	elif command -v zypper >/dev/null 2>&1; then
+	elif _has_manager zypper; then
 		echo "zypper"
-	elif command -v dnf >/dev/null 2>&1; then
+	elif _has_manager dnf; then
 		echo "dnf"
-	elif command -v pacman >/dev/null 2>&1; then
+	elif _has_manager pacman; then
 		echo "pacman"
-	elif command -v xbps-install >/dev/null 2>&1; then
+	elif _has_manager xbps-install; then
 		echo "xbps"
-	elif command -v apk >/dev/null 2>&1; then
+	elif _has_manager apk; then
 		echo "apk"
 	else
 		echo "unknown"
@@ -188,8 +195,10 @@ _setup_permissions() {
 
 	# The uinput group is ours to create; input already exists on every distro
 	# that ships udev, but creating it is harmless and covers the ones that do not.
-	sudo groupadd -f uinput 2>/dev/null || true
-	sudo groupadd -f input  2>/dev/null || true
+	# groupadd/usermod are shadow-utils; BusyBox systems (Alpine) ship
+	# addgroup instead, and an unguarded usermod aborted the install there.
+	sudo groupadd -f uinput 2>/dev/null || sudo addgroup -S uinput 2>/dev/null || true
+	sudo groupadd -f input  2>/dev/null || sudo addgroup -S input  2>/dev/null || true
 
 	# `id -un` rather than $USER. This script runs under `set -u`, and $USER is set
 	# by a login shell — not by a container, a systemd unit, a cron job or
@@ -199,8 +208,14 @@ _setup_permissions() {
 	# the kernel, which always answers.
 	local target_user
 	target_user="$(id -un)"
-	sudo usermod -aG input  "${target_user}"
-	sudo usermod -aG uinput "${target_user}"
+	local group
+	for group in input uinput; do
+		if ! sudo usermod -aG "${group}" "${target_user}" 2>/dev/null \
+			&& ! sudo addgroup "${target_user}" "${group}" 2>/dev/null; then
+			echo "  ✗  Impossible d'ajouter ${target_user} au groupe ${group}." >&2
+			return 1
+		fi
+	done
 	echo "  ✔  ${target_user} ajouté aux groupes input et uinput"
 
 	# The directory is created first, and its absence is not fatal. A Fedora
