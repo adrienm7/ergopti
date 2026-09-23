@@ -302,6 +302,17 @@ function checkVectors(modules) {
 	} else {
 		expect(false, 'the legacy jump-link vector is missing');
 	}
+
+	// A note after a legacy changelog fold that is not the CI credit line is
+	// shown in the footer, never dropped with the fold's surroundings.
+	const note = 'Full Changelog: https://github.com/adrienm7/ergopti/compare/v1.2.2...v1.2.3';
+	const trailing = modules.splitReleaseBody(
+		['## Downloads', '', 'Files.', '', '<details>', '<summary>Changelog</summary>', '', '- **Ci: Fold**', '', '</details>', '', note].join('\n')
+	);
+	expect(
+		trailing.format === 'legacy' && trailing.changelog === '- **Ci: Fold**' && trailing.footer === note,
+		`a note after the changelog fold must move to the footer (changelog "${trailing.changelog}", footer "${trailing.footer}")`
+	);
 }
 
 // ==========================================
