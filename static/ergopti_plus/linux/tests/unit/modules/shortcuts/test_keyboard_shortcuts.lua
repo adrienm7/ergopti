@@ -140,6 +140,35 @@ helpers.describe("keyboard shortcuts: what is stored", function()
 		helpers.assert_eq(action, "select_line")
 	end)
 
+	helpers.it("ignores a stored action the catalogue does not offer, loudly", function()
+		-- set_action refuses such an id, so it can only come from a hand edit or
+		-- an id this driver retired. Windows drops it at load with a warning;
+		-- this loader bound it, so the chord fired a no-op on every press.
+		local warnings = {}
+		local logger = helpers.make_logger_stub()
+		logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
+		local saved_logger = package.loaded["logger.shim"]
+		package.loaded["logger.shim"] = logger
+		local ok, err = pcall(function()
+			local shortcuts = load_over_storage({
+				["shortcuts.keyboard.ctrl_j"] = "select_line",
+				["shortcuts.keyboard.ctrl_k"] = "no_such_action",
+			})
+			helpers.assert_eq(shortcuts.get_action("ctrl_j"), "select_line", "a catalogue id still loads")
+			helpers.assert_eq(shortcuts.get_action("ctrl_k"), "none",
+				"an id the catalogue does not offer must not be bound")
+			helpers.assert_eq(#shortcuts.assigned_slots("ctrl_"), 1, "only the valid slot is bound")
+		end)
+		package.loaded["logger.shim"] = saved_logger
+		drop_storage()
+		if not ok then error(err, 0) end
+		local named = false
+		for _, message in ipairs(warnings) do
+			named = named or message:find("no_such_action", 1, true) ~= nil
+		end
+		helpers.assert_true(named, "the ignored id must be named in a warning")
+	end)
+
 	helpers.it("clears the entry when the binding is removed", function()
 		local shortcuts, storage = load_over_storage({ ["shortcuts.keyboard.ctrl_j"] = "select_line" })
 		shortcuts.set_action("ctrl_j", "none")
@@ -190,7 +219,7 @@ helpers.describe("keyboard shortcuts: what is stored", function()
 	helpers.it("lists only the slots of the group asked for", function()
 		local shortcuts = load_over_storage({
 			["shortcuts.keyboard.ctrl_j"] = "select_line",
-			["shortcuts.keyboard.alt_j"] = "select_word",
+			["shortcuts.keyboard.alt_j"] = "enter",
 		})
 		local ctrl = shortcuts.assigned_slots("ctrl_")
 		drop_storage()
