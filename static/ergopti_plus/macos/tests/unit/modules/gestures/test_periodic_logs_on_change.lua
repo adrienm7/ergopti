@@ -14,7 +14,8 @@
 --- A poll logged its pass instead of its news. The rule pinned here is the one
 --- the Windows idle gate already follows: log a state when it changes.
 --- 1. The health check reports its settled watcher count once, then only when
----    that count changes.
+---    that count changes, and each change survives repeat collapsing, which
+---    would otherwise fold every change into the first report's streak.
 --- 2. The primer's per-event line exists to diagnose touchdevice dormancy, so it
 ---    logs only before the first frame arrived.
 --- 3. The frame heartbeat logs at most once per touch session (fingers down to
@@ -22,6 +23,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local Replay  = require("tests.support.repeat_collapsing_replay")
 
 
 
@@ -82,9 +84,14 @@ local function with_fixture(scenario)
 
 	local function noop() end
 	local function capture(level)
-		return function(_, message, ...)
+		return function(module_name, message, ...)
 			local text = select("#", ...) > 0 and string.format(message, ...) or tostring(message)
-			runtime.lines[#runtime.lines + 1] = { level = level, text = text }
+			-- The raw call is kept too, so a test can replay it through the core
+			-- with repeat collapsing armed and see what the log really keeps.
+			runtime.lines[#runtime.lines + 1] = {
+				level = level, text = text,
+				module = module_name, msg = message, args = table.pack(...),
+			}
 		end
 	end
 	local logger = setmetatable({
@@ -259,6 +266,35 @@ helpers.describe("gestures health check logs on change only", function()
 			health.callback()
 			helpers.assert_eq(count_lines(runtime, "Health-check: 2 watcher(s) attached", "info"), 1,
 				"a changed watcher count must be reported once, at info")
+		end)
+	end)
+
+	helpers.it("keeps every watcher-count change in the log once repeat collapsing is armed", function()
+		with_fixture(function(gestures, runtime)
+			helpers.assert_eq(gestures.start(), true, "fixture: gestures must start")
+			_G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME = true
+			runtime.timers[1].callback()
+			local health = runtime.timers[#runtime.timers]
+
+			runtime.lines = {}
+			health.callback()
+			runtime.device_ids = { 42, 43 }
+			health.callback()
+			runtime.device_ids = { 42, 43, 44 }
+			health.callback()
+
+			local calls = {}
+			for _, line in ipairs(runtime.lines) do
+				if line.text:find("Health-check:", 1, true) then
+					calls[#calls + 1] = { variant = line.level, module = line.module, msg = line.msg, args = line.args }
+				end
+			end
+			helpers.assert_eq(#calls, 3, "fixture: three different watcher counts must be reported")
+			-- Collapsing keys an info line on its unformatted template: a change
+			-- passed as format arguments would fold into the first report's streak
+			-- and reach the log only as a summary up to a window later.
+			helpers.assert_eq(#Replay.delivered(calls), 3,
+				"each watcher-count change is news and must be written when it happens")
 		end)
 	end)
 

@@ -981,8 +981,14 @@ end
 local function report_heartbeat_recovery(generation, via)
 	local failures = generation.heartbeat_transport_failures or 0
 	if failures > 0 then
-		Logger.info(LOG, "Karabiner lease %s heartbeat recovered by a clean %s after %d failed transport(s).",
-			generation.token, via, failures)
+		-- Formatted here, not by the logger: repeat collapsing keys an info line on
+		-- its template, so every later recovery would fold into the first one's
+		-- streak while each numbered failure warning stays visible. Naming the
+		-- last failed heartbeat gives each episode its own line and ties it to
+		-- the warning it clears.
+		Logger.info(LOG, string.format(
+			"Karabiner lease %s heartbeat recovered by a clean %s after %d failed transport(s) (last failed: heartbeat %s).",
+			generation.token, via, failures, tostring(generation.last_failed_heartbeat)))
 	end
 end
 
@@ -1079,6 +1085,7 @@ local function process_line(generation, line)
 		if ping_result == "failed" then
 			generation.heartbeat_transport_failures =
 				(generation.heartbeat_transport_failures or 0) + 1
+			generation.last_failed_heartbeat = ping_sequence
 			Logger.warn(LOG, "Karabiner lease %s heartbeat %d had no clean local CLI transport.",
 				generation.token, ping_sequence)
 			if generation.heartbeat_transport_failures

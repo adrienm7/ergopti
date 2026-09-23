@@ -1080,8 +1080,11 @@ start_health_check_loop = function()
 		-- wrote thousands of identical lines a day and said nothing new.
 		local watchers = count_watchers()
 		if watchers ~= health_reported_watchers then
-			Logger.info(LOG, "Health-check: %d watcher(s) attached (previously %s).", watchers,
-				health_reported_watchers == nil and "unreported" or tostring(health_reported_watchers))
+			-- Formatted here, not by the logger: repeat collapsing keys an info
+			-- line on its template, which would fold every later change into the
+			-- first report's streak; the formatted text keys each change apart.
+			Logger.info(LOG, string.format("Health-check: %d watcher(s) attached (previously %s).", watchers,
+				health_reported_watchers == nil and "unreported" or tostring(health_reported_watchers)))
 			health_reported_watchers = watchers
 		end
 	end)
