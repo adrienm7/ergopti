@@ -69,10 +69,12 @@ against files that had changed under it mid-run, and correctly said so.
 ## Resuming
 
 A workflow persists its script and returns a `runId`. After a mid-run failure —
-an agent dying on a schema mismatch, a stop — relaunch with
-`{scriptPath, resumeFromRunId}`: the unchanged prefix replays from cache and only
-the failed and subsequent calls run live. Do not edit the script before resuming
-unless you _want_ the tail re-run: the cache key is `(prompt, opts)`.
+an agent dying on a schema mismatch, a quota stop — relaunch with
+`{scriptPath, resumeFromRunId}`: only the longest unchanged prefix of calls, in
+issue order, replays from cache. In a parallel script, editing any prompt
+issued early re-runs every later call, finished ones included. Resume with the
+script unchanged, and never stop a run to inject a new requirement: follow
+`workflow-change-control`.
 
 ## When not to do this
 

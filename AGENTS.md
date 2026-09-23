@@ -13,6 +13,9 @@ skills and durable technical knowledge in routed memory.
   scope.
 - Never push `dev` or `main` without explicit authorization in the current
   conversation. Commits and green tests do not imply push permission.
+- Never stop, edit-and-resume or relaunch a running multi-agent workflow to add
+  a new requirement; route it to a follow-up run (skill
+  `workflow-change-control`).
 - Store text as LF on every OS. AutoHotkey source additionally keeps its
   UTF-8 BOM; use the repository encoding gate after touching it.
 

@@ -211,6 +211,18 @@ LF for new files. Lua and AutoHotkey remain outside automatic formatting.
 
 ## Agent context
 
+### feedback-never-restart-a-running-workflow
+
+A multi-agent workflow must not be stopped, edited and resumed to inject a
+requirement the user adds mid-run. The resume cache replays only the longest
+unchanged prefix of calls, in issue order. In a parallel lane script, one edited
+early prompt makes every later call run live, finished steps included. On
+2026-09-23 three such restarts discarded agents that had worked 20 to 77
+minutes; the elapsed time had been guessed from conversation turns. Route new
+requirements to follow-up runs. Stop only for active damage, after measuring
+in-flight time from transcript timestamps and asking the user. Follow the
+`workflow-change-control` skill.
+
 ### project-agent-startup-is-routing-only
 
 `AGENTS.md` contains the small cross-agent safety, routing, and universal
