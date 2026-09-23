@@ -891,6 +891,11 @@ jobs:
           mkdir -p "$XDG_RUNTIME_DIR" && chmod 700 "$XDG_RUNTIME_DIR"
           # A compositor with no config and no outputs. WLR_BACKENDS=headless is
           # what lets it start without a seat or a GPU on a CI runner.
+          # French on purpose: a US answer is what a guessed table produces, so
+          # only a layout where "é" has its own key proves the keymap was read.
+          # sway honours XKB_DEFAULT_LAYOUT, and so does the driver's last
+          # fallback when libxkbcommon is too old to dump the compositor's map.
+          export XKB_DEFAULT_LAYOUT=fr ERGOPTI_EXPECT_LAYOUT=fr
           WLR_BACKENDS=headless WLR_LIBINPUT_NO_DEVICES=1 sway --config /dev/null &
           SWAY_PID=$!
           # Poll for the socket rather than sleeping a fixed time: a loaded runner
