@@ -1821,6 +1821,8 @@
 	"shortcuts.uppercase": "Win + U(ppercase) = Alterna selezione maiuscolo/minuscolo",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
 	"startup.accessibility_required": "ErgoptiPlus ha bisogno dell’autorizzazione Accessibilità per leggere la tastiera. In Impostazioni di Sistema > Privacy e sicurezza > Accessibilità, attiva la voce Hammerspoon che appartiene a ErgoptiPlus, poi riapri ErgoptiPlus. Un’app Hammerspoon che esegui separatamente ha una voce propria.",
+	"startup.linux_input_access_body": "Ergopti+ non può ancora leggere la tastiera né scrivere in /dev/uinput. Esci e rientra nella sessione (o riavvia) perché i gruppi «input» e «uinput» aggiunti dall’installer abbiano effetto. Se il problema persiste, esegui: bash install.sh --setup-perms",
+	"startup.linux_input_access_title": "Ergopti+ non può ancora usare la tastiera",
 	"startup.manifest_missing": "Errore di avvio: il file _generated/features_manifest.ahk è assente o corrotto.\n\nEsegui `npm run build:manifest` dalla directory del progetto, poi riavvia lo script.",
 	"startup.manifest_title": "ErgoptiPlus — manifest assente",
 	"startup.native_logger_unavailable": "ErgoptiPlus non può avviarsi perché il servizio di registrazione nativo non è disponibile. Avvia ErgoptiPlus tramite il suo launcher.",

@@ -30,6 +30,7 @@ return {
 	"tests.unit.infra.test_diagnostic_snapshot",
 	"tests.unit.infra.test_display_server",
 	"tests.unit.infra.test_driver_version",
+	"tests.unit.infra.test_input_access",
 	"tests.unit.infra.test_input_capture_gate",
 	"tests.unit.infra.test_locale_path_layouts",
 	"tests.unit.infra.test_input_event_codec",

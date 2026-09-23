@@ -1821,6 +1821,8 @@
 	"shortcuts.uppercase": "Win + U(ppercase) = Toggle selection uppercase/lowercase",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
 	"startup.accessibility_required": "ErgoptiPlus needs the Accessibility permission to read the keyboard. In System Settings > Privacy & Security > Accessibility, turn on the Hammerspoon entry that belongs to ErgoptiPlus, then open ErgoptiPlus again. A Hammerspoon app you run separately has its own entry.",
+	"startup.linux_input_access_body": "Ergopti+ cannot read the keyboard or write to /dev/uinput yet. Log out and back in (or restart) so the “input” and “uinput” groups added by the installer take effect. If it persists, run: bash install.sh --setup-perms",
+	"startup.linux_input_access_title": "Ergopti+ cannot use the keyboard yet",
 	"startup.manifest_missing": "Startup error: the _generated/features_manifest.ahk file is missing or corrupted.\n\nRun `npm run build:manifest` from the project directory, then restart the script.",
 	"startup.manifest_title": "ErgoptiPlus — manifest missing",
 	"startup.native_logger_unavailable": "ErgoptiPlus cannot start because its native logging worker is unavailable. Start ErgoptiPlus through its launcher.",

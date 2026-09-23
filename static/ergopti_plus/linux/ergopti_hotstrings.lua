@@ -620,6 +620,16 @@ local function main()
 		print("Error: no keyboard device detected. Specify one with --device.")
 		os.exit(1)
 	end
+	-- Found but unreadable is the first launch after install.sh: the input group
+	-- it granted only applies from the next session. Say so on screen — the
+	-- console line below used to be the only trace — and exit with a status
+	-- the unit does not retry, since only a new session can fix it.
+	local InputAccess = require("infra.input_access")
+	if InputAccess.is_denied(device) then
+		Logger.error(LOG, "Keyboard device %s exists but this session may not read it.", device)
+		os.exit(InputAccess.report({ i18n = RuntimeGuard.optional_require("infra.i18n"), notifier = notifier },
+			device .. " is not readable (the input group applies from the next session)"))
+	end
 	Logger.info(LOG, "Using device: %s.", device)
 	BootProfiler.stage_done("input device", opts.device and "pinned by --device" or "auto-detected")
 
@@ -1360,10 +1370,8 @@ local function main()
 		-- uinput group and the module loaded. Silence used to be the answer to all
 		-- three of "wrong permissions", "module absent" and "no FFI".
 		Logger.error(LOG, "Cannot open /dev/uinput — refusing to grab the keyboard.")
-		print("Erreur : impossible d'ouvrir /dev/uinput.")
-		print("Le daemon a besoin d'y écrire pour rendre les touches qu'il intercepte.")
-		print("Corrigez les permissions (bash install.sh --setup-perms) ou lancez avec --no-grab.")
-		os.exit(1)
+		os.exit(require("infra.input_access").report({ i18n = RuntimeGuard.optional_require("infra.i18n"), notifier = notifier },
+			"/dev/uinput cannot be opened for writing (uinput group or module missing)"))
 	end
 
 	-- Resolve the OUTPUT layout before the first expansion can fire. This is the

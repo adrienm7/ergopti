@@ -1821,6 +1821,8 @@
 	"shortcuts.uppercase": "Win + U(ppercase) = चयन अपरकेस/लोअरकेस टॉगल करें",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
 	"startup.accessibility_required": "कीबोर्ड पढ़ने के लिए ErgoptiPlus को Accessibility अनुमति चाहिए। System Settings > Privacy & Security > Accessibility में ErgoptiPlus से जुड़ी Hammerspoon प्रविष्टि चालू करें, फिर ErgoptiPlus दोबारा खोलें। अलग से चलाए गए Hammerspoon ऐप की अपनी अलग प्रविष्टि होती है।",
+	"startup.linux_input_access_body": "Ergopti+ अभी कीबोर्ड पढ़ नहीं सकता या /dev/uinput में लिख नहीं सकता। इंस्टॉलर द्वारा जोड़े गए “input” और “uinput” समूह लागू हों, इसके लिए लॉग आउट करके फिर से लॉग इन करें (या रीस्टार्ट करें)। समस्या बनी रहे तो चलाएँ: bash install.sh --setup-perms",
+	"startup.linux_input_access_title": "Ergopti+ अभी कीबोर्ड का उपयोग नहीं कर सकता",
 	"startup.manifest_missing": "स्टार्टअप त्रुटि: _generated/features_manifest.ahk फ़ाइल अनुपस्थित या दूषित है।\n\nप्रोजेक्ट डायरेक्टरी से `npm run build:manifest` चलाएं, फिर स्क्रिप्ट को पुनः प्रारंभ करें।",
 	"startup.manifest_title": "ErgoptiPlus — manifest अनुपस्थित",
 	"startup.native_logger_unavailable": "ErgoptiPlus शुरू नहीं हो सकता क्योंकि उसकी मूल लॉगिंग सेवा उपलब्ध नहीं है। ErgoptiPlus को उसके लॉन्चर से शुरू करें।",

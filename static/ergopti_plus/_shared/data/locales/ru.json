@@ -1821,6 +1821,8 @@
 	"shortcuts.uppercase": "Win + U(ppercase) = Переключить регистр выделения",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
 	"startup.accessibility_required": "ErgoptiPlus нужно разрешение «Универсальный доступ», чтобы считывать клавиатуру. В разделе Системные настройки > Конфиденциальность и безопасность > Универсальный доступ включите пункт Hammerspoon, относящийся к ErgoptiPlus, затем снова откройте ErgoptiPlus. У отдельно запускаемого приложения Hammerspoon свой пункт.",
+	"startup.linux_input_access_body": "Ergopti+ пока не может читать клавиатуру или писать в /dev/uinput. Выйдите из сеанса и войдите снова (или перезагрузитесь), чтобы вступили в силу группы «input» и «uinput», добавленные установщиком. Если проблема сохраняется, выполните: bash install.sh --setup-perms",
+	"startup.linux_input_access_title": "Ergopti+ пока не может использовать клавиатуру",
 	"startup.manifest_missing": "Ошибка запуска: файл _generated/features_manifest.ahk отсутствует или повреждён.\n\nЗапустите `npm run build:manifest` из каталога проекта и перезапустите скрипт.",
 	"startup.manifest_title": "ErgoptiPlus — manifest отсутствует",
 	"startup.native_logger_unavailable": "ErgoptiPlus не может запуститься, потому что нативная служба журналирования недоступна. Запустите ErgoptiPlus через его средство запуска.",
