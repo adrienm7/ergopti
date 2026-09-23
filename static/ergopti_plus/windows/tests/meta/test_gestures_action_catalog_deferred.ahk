@@ -1,21 +1,23 @@
 ﻿; tests/meta/test_gestures_action_catalog_deferred.ahk
 
 ; ==============================================================================
-; MODULE: Gestures Action-Catalog Deferred-Init Regression Test
+; MODULE: Gestures Action-Catalogue Boot-Cost Regression Test
 ; DESCRIPTION:
-; Guards that the gesture action-catalog (ParseTomlFile + GESTURE_ACTION_NAMES /
-; GESTURE_AX_NAMES building) is deferred off the boot critical path via a
-; zero-delay SetTimer, not executed inline during auto-execute.
+; Guards that the gesture action catalogue costs nothing at boot and is ready
+; synchronously: it is the generated data function GestureActionCatalogueData()
+; (_generated/action_catalogue.ahk), and no driver code parses actions.toml.
 ;
-; WHY THIS MATTERS (the regression this encodes):
-;   Building GESTURE_ACTION_NAMES requires ParseTomlFile(actions.toml) plus
-;   iterating hundreds of entries with placeholder expansions. Measured boot
-;   cost: ~100 ms of the 183 ms gestures module init time.  These lists are
-;   only used by the gesture-picker menu (built in the deferred initMenu phase
-;   ~250 ms after boot), so there is no functional reason to block the critical
-;   path on them. Reverting to inline execution restores the 100 ms regression.
-;
-; SCOPE: source introspection of modules/gestures.ahk.
+; WHY THIS MATTERS (the regressions this encodes):
+;   perf-gestures-deferred: building the picker list used to run
+;   ParseTomlFile(actions.toml) plus a walk of hundreds of entries — ~100 ms of
+;   the 183 ms gestures init — so it was deferred with SetTimer(-1).
+;   gesture-action-catalog-never-loads: that deferral once used SetTimer(fn, -0),
+;   which AHK v2 treats as 0 and DISABLES, so the list stayed empty and the
+;   picker was blank. The deferral also left parameter metadata empty until the
+;   timer fired, so an early open_url binding was invoked without its binding id.
+;   The generated catalogue removes the parse and the timer altogether; this test
+;   pins both halves: the data is there without calling any loader, and no
+;   runtime TOML read of the action registry can creep back.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -31,44 +33,29 @@
 ; =====================================
 
 _MetaCheckGesturesActionCatalogDeferred() {
-	; Move-resilient: scan the modules tree via the framework helper instead of a
-	; pinned gestures path. Every token below is _Gesture*-prefixed and unique to
-	; gestures.ahk within modules/, so the scope stays meaningful.
-	Body := _DriverDirConcat("modules")
-	Assert(Body != "", "modules\gestures.ahk must be readable for the gestures-deferred meta-test")
+	global GESTURE_ACTION_CATALOGUE
+	; Behavioural half: populated at static-init, no loader, no timer.
+	Assert(IsSet(GESTURE_ACTION_CATALOGUE) && IsObject(GESTURE_ACTION_CATALOGUE),
+		"the generated action catalogue must be loaded at static-init (perf-gestures-deferred)")
+	Assert(GESTURE_ACTION_CATALOGUE.SgItems.Length >= 100,
+		"the catalogue carries only " . GESTURE_ACTION_CATALOGUE.SgItems.Length
+		. " picker item(s) before any timer ran (gesture-action-catalog-never-loads)")
+	AssertEqual("url", GestureActionParameterSpec("open_url"),
+		"parameter metadata must be ready before the first dispatch, not after a deferred loader")
 
-	; The deferred loader function must exist.
-	Assert(InStr(Body, "_GestureLoadActionCatalog("),
-		"gestures.ahk must define _GestureLoadActionCatalog() to build the action catalog off the boot path")
-
-	; It must be armed as a run-once SetTimer with a negative NON-ZERO period
-	; (fires once after auto-execute finishes).
-	Assert(InStr(Body, "SetTimer(_GestureLoadActionCatalog, -1)"),
-		"gestures.ahk must call SetTimer(_GestureLoadActionCatalog, -1) to defer catalog init (perf-gestures-deferred)")
-
-	; Regression for gesture-action-catalog-never-loads: AHK v2 treats -0 as 0,
-	; and SetTimer(fn, 0) DISABLES the timer — the callback never fires, so
-	; GESTURE_ACTION_NAMES stayed empty and the action picker was blank. The
-	; defer period must never be -0 (or 0).
-	Assert(!InStr(Body, "SetTimer(_GestureLoadActionCatalog, -0)")
-		and !InStr(Body, "SetTimer(_GestureLoadActionCatalog, 0)"),
-		"gestures.ahk must NOT defer the catalog with a zero period — SetTimer(fn, -0)/(fn, 0) "
-		. "disables the timer so the catalog never loads (gesture-action-catalog-never-loads)")
-
-	; The inline ParseTomlFile call for the shared TOML must be gone from the
-	; auto-execute body — it must live inside _GestureLoadActionCatalog, not at
-	; file scope where it blocks every boot.
-	; Strategy: verify there is NO top-level ParseTomlFile call that references
-	; the shared actions.toml path outside of a function body. We do this by
-	; checking that the pattern "_GestureSharedToml := " (the old file-scope var)
-	; is absent from the top-level code.
-	Assert(!InStr(Body, "_GestureSharedToml := "),
-		"gestures.ahk must not have a top-level '_GestureSharedToml :=' assignment — "
-		. "ParseTomlFile must only run inside _GestureLoadActionCatalog (perf-gestures-deferred)")
-	Assert(!InStr(Body, "_GestureTomlData := ParseTomlFile("),
-		"gestures.ahk must not have a top-level '_GestureTomlData := ParseTomlFile(...)' call — "
-		. "the TOML parse must only run inside _GestureLoadActionCatalog (perf-gestures-deferred)")
+	; Source half: the registry is never parsed at runtime again. Comments are
+	; stripped so this header, and the module docs that name the source file,
+	; cannot satisfy or trip the scan.
+	Src := _DriverSourceNoComments()
+	Assert(Src != "", "driver source must be readable for the catalogue boot-cost meta-test")
+	Assert(InStr(Src, "GestureActionCatalogueData()"),
+		"the driver must build its catalogue from the generated data function")
+	Assert(!InStr(Src, "actions\actions.toml") && !InStr(Src, "actions/actions.toml"),
+		"no driver code may read the shared actions.toml at runtime — run "
+		. "npm run codegen:action-catalogue and consume _generated/action_catalogue.ahk (perf-gestures-deferred)")
+	Assert(!InStr(Src, "_GestureLoadActionCatalog"),
+		"the deferred TOML loader must not come back (gesture-action-catalog-never-loads)")
 }
 
-Test("meta perf: gestures action catalog deferred via SetTimer (perf-gestures-deferred)",
+Test("meta perf: gestures action catalogue is generated data, ready without a timer (perf-gestures-deferred)",
 	_MetaCheckGesturesActionCatalogDeferred)

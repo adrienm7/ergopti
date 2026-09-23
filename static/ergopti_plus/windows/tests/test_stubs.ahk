@@ -359,9 +359,8 @@ global SpaceAroundSymbols := ""
 ; Points at the real ``static/`` tree (three levels up from the tests folder)
 ; so:
 ;   - i18n.ahk resolves real locale JSONs and t() returns translated strings
-;   - modules/gestures.ahk parses the bundled ``_shared/actions.toml`` and
-;     populates GESTURE_ACTION_NAMES with the production gesture catalog
-;     (the gesture tests would otherwise see an empty registry).
+;   - the gesture tests resolve the production catalogue's labels and
+;     headings (_generated/action_catalogue.ahk) through t().
 ;
 ; The hotstrings-config tests guard against picking up the bundled
 ; rolls.toml / autocorrection.toml metadata by pre-caching empty entries in

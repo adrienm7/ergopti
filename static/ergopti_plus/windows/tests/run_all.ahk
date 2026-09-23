@@ -223,6 +223,7 @@ global _DefaultLogsDir := _LogsDir
 ; management) follows it and calls into the loaders/state it declares.
 #Include ../infra/locale.ahk
 #Include ../_generated/gesture_emit_actions.ahk
+#Include ../_generated/action_catalogue.ahk
 #Include ../_generated/locale_table.ahk
 #Include ../infra/i18n.ahk
 _LogBootProgress("i18n included (t() available)")

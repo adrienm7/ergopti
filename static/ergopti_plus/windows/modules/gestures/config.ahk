@@ -83,9 +83,12 @@ GestureSetActionParameter(BindingId, ActionName, Value, WriterFn := 0, NotifyFn 
 		return true
 }
 
+; The parameter kind the generated catalogue declares for an action ("url",
+; "search_url"), or "" when it takes none.
 GestureActionParameterSpec(ActionName) {
-		global GESTURE_ACTION_PARAMETER_SPECS
-		return GESTURE_ACTION_PARAMETER_SPECS.Has(ActionName) ? GESTURE_ACTION_PARAMETER_SPECS[ActionName] : ""
+		global GESTURE_ACTION_CATALOGUE
+		return GESTURE_ACTION_CATALOGUE.Actions.Has(ActionName)
+				? GESTURE_ACTION_CATALOGUE.Actions[ActionName].Parameter : ""
 }
 
 GestureValidateActionParameter(ActionName, Value, &ErrorText := "") {
