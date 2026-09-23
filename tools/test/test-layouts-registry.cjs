@@ -167,11 +167,19 @@ check('the Ergopti entries are the latest macOS bundle layouts', () => {
 	}
 });
 
-check('a .keylayout-only change selects the gate that runs this file', () => {
-	const { selectGates } = require('./verify-change.cjs');
+check('a .keylayout-only change selects the registry and XKB conversion gates', () => {
+	const { selectGates, GATE_COMMANDS } = require('./verify-change.cjs');
+	assert.ok(GATE_COMMANDS['xkb-python'], 'the XKB Python gate has no command');
 	for (const entry of entries) {
 		const gates = selectGates([`static/layouts/registry/${entry.file}`]);
 		assert.ok(gates.has('js'), `editing ${entry.file} would not run the registry checksum gate`);
+		assert.ok(gates.has('xkb-python'), `editing ${entry.file} would not re-run its XKB conversion`);
+	}
+	for (const file of [
+		'static/ergopti/linux/xkb_generation/keylayout_to_xkb.py',
+		'static/ergopti_plus/_shared/modules/layouts/mac_keycodes.json'
+	]) {
+		assert.ok(selectGates([file]).has('xkb-python'), `${file} does not select the XKB Python gate`);
 	}
 });
 
@@ -193,7 +201,12 @@ check('the meta.toml validator rejects every malformed shape', () => {
 		['malformed source digest', (m) => (m.source_sha256 = 'abc')],
 		['non-MIT licence without its file', (m) => (m.licence = 'WTFPL')],
 		['licence file that does not exist', (m) => (m.licence_file = 'MISSING')],
-		['variant that is not an id', (m) => (m.variants = ['Not An Id'])]
+		['variant that is not an id', (m) => (m.variants = ['Not An Id'])],
+		['unknown xkb key', (m) => (m.xkb = { colour: 'blue' })],
+		['xkb override that is not a pair', (m) => (m.xkb = { keysym_overrides: [['a']] })],
+		['xkb override to a malformed keysym', (m) => (m.xkb = { keysym_overrides: [['a', 'not a keysym']] })],
+		['xkb override mapping one text twice', (m) => (m.xkb = { keysym_overrides: [['a', 'b'], ['a', 'c']] })],
+		['empty base_level_only', (m) => (m.xkb = { base_level_only: [] })]
 	];
 	for (const [label, mutate] of cases) {
 		const meta = validMeta();

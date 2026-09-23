@@ -72,7 +72,9 @@ const REQUIRED_KEYS = [
 	'platforms',
 	'keycode_convention'
 ];
-const OPTIONAL_KEYS = ['licence_file', 'source_sha256'];
+const OPTIONAL_KEYS = ['licence_file', 'source_sha256', 'xkb'];
+const XKB_KEYS = ['keysym_overrides', 'base_level_only'];
+const KEYSYM_RE = /^[A-Za-z0-9_]+$/;
 
 
 
@@ -151,6 +153,7 @@ function validateMeta(id, meta, fileExists) {
 	if ('source_sha256' in meta && !(typeof meta.source_sha256 === 'string' && SHA256_RE.test(meta.source_sha256))) {
 		errors.push(`${id}: source_sha256 must be 64 lowercase hex digits`);
 	}
+	if ('xkb' in meta) validateXkb(errors, id, meta.xkb);
 	if ('licence_file' in meta) {
 		if (!isNonEmptyString(meta.licence_file) || !fileExists(meta.licence_file)) {
 			errors.push(`${id}: licence_file ${JSON.stringify(meta.licence_file)} does not exist`);
@@ -159,6 +162,49 @@ function validateMeta(id, meta, fileExists) {
 		errors.push(`${id}: a ${meta.licence} layout must ship its licence text (licence_file)`);
 	}
 	return errors;
+}
+
+/**
+ * The optional [xkb] table: keysym_overrides is an ordered list of
+ * [output text, keysym] pairs the Linux converter uses instead of the keysym
+ * it would derive (order is kept: the XCompose file lists them in it), and
+ * base_level_only lists outputs a key types on its base level only.
+ * @param {string[]} errors - Collector.
+ * @param {string} id - Registry id.
+ * @param {object} xkb - Parsed [xkb] table.
+ */
+function validateXkb(errors, id, xkb) {
+	if (typeof xkb !== 'object' || xkb === null || Array.isArray(xkb)) {
+		errors.push(`${id}: xkb must be a table`);
+		return;
+	}
+	for (const key of Object.keys(xkb)) {
+		if (!XKB_KEYS.includes(key)) errors.push(`${id}: unknown key xkb.${key}`);
+	}
+	if ('base_level_only' in xkb) {
+		validateUniqueList(errors, id, 'xkb.base_level_only', xkb.base_level_only, isNonEmptyString, false);
+	}
+	const pairs = xkb.keysym_overrides;
+	if (pairs === undefined) return;
+	if (!Array.isArray(pairs) || pairs.length === 0) {
+		errors.push(`${id}: xkb.keysym_overrides must be a non-empty array of [text, keysym] pairs`);
+		return;
+	}
+	const texts = new Set();
+	for (const pair of pairs) {
+		const valid =
+			Array.isArray(pair) &&
+			pair.length === 2 &&
+			isNonEmptyString(pair[0]) &&
+			typeof pair[1] === 'string' &&
+			KEYSYM_RE.test(pair[1]);
+		if (!valid) {
+			errors.push(`${id}: xkb.keysym_overrides has an invalid pair ${JSON.stringify(pair)}`);
+			continue;
+		}
+		if (texts.has(pair[0])) errors.push(`${id}: xkb.keysym_overrides maps ${JSON.stringify(pair[0])} twice`);
+		texts.add(pair[0]);
+	}
 }
 
 /**
@@ -276,6 +322,11 @@ function buildIndex(registryDir) {
 		};
 		if (meta.source_sha256) entry.source_sha256 = meta.source_sha256;
 		if (meta.licence_file) entry.licence_file = meta.licence_file;
+		if (meta.xkb) {
+			entry.xkb = {};
+			if (meta.xkb.keysym_overrides) entry.xkb.keysym_overrides = meta.xkb.keysym_overrides.map((pair) => [...pair]);
+			if (meta.xkb.base_level_only) entry.xkb.base_level_only = [...meta.xkb.base_level_only];
+		}
 		return entry;
 	});
 	const index = {

@@ -52,7 +52,38 @@
 				"windows"
 			],
 			"keycode_convention": "iso",
-			"source_url": "https://github.com/adrienm7/ergopti/tree/main/static/ergopti/macos/bundles/Ergopti_v2.2.2.bundle"
+			"source_url": "https://github.com/adrienm7/ergopti/tree/main/static/ergopti/macos/bundles/Ergopti_v2.2.2.bundle",
+			"xkb": {
+				"keysym_overrides": [
+					[
+						"« ",
+						"guillemotleft"
+					],
+					[
+						" »",
+						"guillemotright"
+					],
+					[
+						"ᵉ",
+						"uparrow"
+					],
+					[
+						"ᵢ",
+						"downarrow"
+					],
+					[
+						"ℝ",
+						"infinity"
+					],
+					[
+						"µ",
+						"mu"
+					]
+				],
+				"base_level_only": [
+					"★"
+				]
+			}
 		},
 		{
 			"id": "ergopti_ansi",
@@ -79,7 +110,38 @@
 				"windows"
 			],
 			"keycode_convention": "iso",
-			"source_url": "https://github.com/adrienm7/ergopti/tree/main/static/ergopti/macos/bundles/Ergopti_v2.2.2.bundle"
+			"source_url": "https://github.com/adrienm7/ergopti/tree/main/static/ergopti/macos/bundles/Ergopti_v2.2.2.bundle",
+			"xkb": {
+				"keysym_overrides": [
+					[
+						"« ",
+						"guillemotleft"
+					],
+					[
+						" »",
+						"guillemotright"
+					],
+					[
+						"ᵉ",
+						"uparrow"
+					],
+					[
+						"ᵢ",
+						"downarrow"
+					],
+					[
+						"ℝ",
+						"infinity"
+					],
+					[
+						"µ",
+						"mu"
+					]
+				],
+				"base_level_only": [
+					"★"
+				]
+			}
 		},
 		{
 			"id": "ergopti_plus",
@@ -106,7 +168,38 @@
 				"windows"
 			],
 			"keycode_convention": "iso",
-			"source_url": "https://github.com/adrienm7/ergopti/tree/main/static/ergopti/macos/bundles/Ergopti_v2.2.2.bundle"
+			"source_url": "https://github.com/adrienm7/ergopti/tree/main/static/ergopti/macos/bundles/Ergopti_v2.2.2.bundle",
+			"xkb": {
+				"keysym_overrides": [
+					[
+						"« ",
+						"guillemotleft"
+					],
+					[
+						" »",
+						"guillemotright"
+					],
+					[
+						"ᵉ",
+						"uparrow"
+					],
+					[
+						"ᵢ",
+						"downarrow"
+					],
+					[
+						"ℝ",
+						"infinity"
+					],
+					[
+						"µ",
+						"mu"
+					]
+				],
+				"base_level_only": [
+					"★"
+				]
+			}
 		},
 		{
 			"id": "ergopti_plus_ansi",
@@ -133,7 +226,38 @@
 				"windows"
 			],
 			"keycode_convention": "iso",
-			"source_url": "https://github.com/adrienm7/ergopti/tree/main/static/ergopti/macos/bundles/Ergopti_v2.2.2.bundle"
+			"source_url": "https://github.com/adrienm7/ergopti/tree/main/static/ergopti/macos/bundles/Ergopti_v2.2.2.bundle",
+			"xkb": {
+				"keysym_overrides": [
+					[
+						"« ",
+						"guillemotleft"
+					],
+					[
+						" »",
+						"guillemotright"
+					],
+					[
+						"ᵉ",
+						"uparrow"
+					],
+					[
+						"ᵢ",
+						"downarrow"
+					],
+					[
+						"ℝ",
+						"infinity"
+					],
+					[
+						"µ",
+						"mu"
+					]
+				],
+				"base_level_only": [
+					"★"
+				]
+			}
 		}
 	]
 }
