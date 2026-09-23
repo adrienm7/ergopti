@@ -124,7 +124,7 @@ local function dump_log()
 	print("  --- daemon log (last lines) ---")
 	local lines = {}
 	for line in text:gmatch("[^\n]+") do lines[#lines + 1] = line end
-	for i = math.max(1, #lines - 40), #lines do print("  " .. lines[i]) end
+	for i = math.max(1, #lines - 80), #lines do print("  " .. lines[i]) end
 end
 
 local output_node = await(function() return node_for(DAEMON_OUTPUT) end, 20)
@@ -164,8 +164,21 @@ sleep(1.5)
 -- =========================================
 -- =========================================
 
+-- Re-resolved rather than reused: the daemon may recreate its virtual keyboard
+-- after startup, and the node number moves with it.
 local out_slot = "output"
-if not EvdevReader.open(output_node, out_slot) then abort("cannot read the daemon's output keyboard") end
+local opened_output = await(function()
+	local node = node_for(DAEMON_OUTPUT)
+	return node and EvdevReader.open(node, out_slot) and node or nil
+end, 10)
+if not opened_output then
+	dump_log()
+	stop_daemon()
+	os.execute("ls -l /dev/input; cat /proc/bus/input/devices | grep -A5 -i ergopti")
+	print("  FAIL cannot read the daemon's output keyboard")
+	os.exit(1)
+end
+print("  reading the daemon's output on " .. opened_output)
 
 for char in ("adn "):gmatch(".") do
 	Keyboard.emit(KEY_OF[char], 1)
