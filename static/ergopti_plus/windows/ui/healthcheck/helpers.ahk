@@ -266,8 +266,10 @@ _HealthCheck_FormatUptime(Sec) {
 	return s . "s"
 }
 
-; Extracts the last N WARNING and ERROR lines from the in-memory ring buffer.
-_HealthCheck_RecentIssues(MaxLines) {
+; Extracts the last N WARNING and ERROR lines from the in-memory ring buffer:
+; the fallback of _HealthCheck_RecentIssues when today's errors file does not
+; exist yet.
+_HealthCheck_RingIssues(MaxLines) {
 	All    := LoggerRingBufferSnapshot()
 	Issues := []
 	for _, Line in All {
@@ -285,3 +287,114 @@ _HealthCheck_RecentIssues(MaxLines) {
 	return Result
 }
 
+; Loads the recent-issue bounds shared by the three drivers.
+; @returns {Map} { tail_max_bytes, max_entries }
+; @throws {ValueError} When the shared file is missing a positive integer bound.
+_HealthCheck_RecentIssueLimits() {
+	global _SharedDir
+	Path := _SharedDir . "\modules\diagnostics\recent_issues.json"
+	Data := JsonParse(FileRead(Path, "UTF-8"))
+	Limits := Map(
+		"tail_max_bytes", Data.Get("errors_tail_max_bytes", 0),
+		"max_entries",    Data.Get("max_entries", 0))
+	for Name, Value in Limits {
+		if !(Value is Integer) || Value < 1
+			throw ValueError("Recent issue limit '" . Name . "' must be a positive integer in " . Path . ".")
+	}
+	return Limits
+}
+
+; Reads at most MaxBytes from the end of a file, as raw bytes decoded as UTF-8.
+; @param Path {String}
+; @param MaxBytes {Integer}
+; @returns {Map|Integer} { chunk, at_file_start }, or 0 when the file does not exist.
+_HealthCheck_ReadTail(Path, MaxBytes) {
+	if !FileExist(Path)
+		return 0
+	; UTF-8-RAW: positions are bytes and no byte order mark is skipped, so the
+	; offset below is exact and the parser sees the file as written
+	File := FileOpen(Path, "r", "UTF-8-RAW")
+	try {
+		Size := File.Length
+		Start := Max(0, Size - MaxBytes)
+		File.Pos := Start
+		Bytes := Buffer(Max(1, Size - Start))
+		Read := File.RawRead(Bytes, Size - Start)
+	} finally {
+		File.Close()
+	}
+	return Map("chunk", _HealthCheck_DecodeTail(Bytes, Read), "at_file_start", Start == 0)
+}
+
+; Decodes tail bytes as UTF-8. A read that began inside a sequence decodes its
+; first bytes to U+FFFD, on the first line the parser always drops.
+; @param Bytes {Buffer}
+; @param Length {Integer} Byte count.
+; @returns {String}
+_HealthCheck_DecodeTail(Bytes, Length) {
+	return (Length > 0) ? StrGet(Bytes, Length, "UTF-8") : ""
+}
+
+; Turns the tail of an errors file into its WARNING and ERROR entries: the AHK
+; copy of the shared parse_errors_tail (_shared/lua/healthcheck/snapshot.lua),
+; pinned by _shared/tests/corpus/healthcheck/errors_tail_vectors.json.
+; @param Chunk {String} Text read from the end of the file.
+; @param AtFileStart {Boolean} True when the read began at byte 0.
+; @param MaxEntries {Integer} How many of the newest entries to keep.
+; @returns {Array} Entries, oldest first.
+_HealthCheck_ParseErrorsTail(Chunk, AtFileStart, MaxEntries) {
+	Text := Chunk
+	if (AtFileStart && SubStr(Text, 1, 1) == Chr(0xFEFF))
+		Text := SubStr(Text, 2)
+	Text := StrReplace(StrReplace(Text, "`r`n", "`n"), "`r", "`n")
+	Entries := []
+	; Index of the entry continuation lines join; -1 inside an entry of another
+	; level, 0 before the first entry
+	Current := 0
+	for Index, Line in StrSplit(Text, "`n") {
+		; A read that did not start at byte 0 began inside a line
+		if ((Index == 1 && !AtFileStart) || Line == "")
+			continue
+		if RegExMatch(Line, "^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}:\d{3} \[([A-Z]+)\] ", &Match) {
+			if (Match[1] == "WARNING" || Match[1] == "ERROR") {
+				Entries.Push(Line)
+				Current := Entries.Length
+			} else {
+				Current := -1
+			}
+		} else if (Current > 0) {
+			Entries[Current] := Entries[Current] . "`n" . Line
+		}
+	}
+	if (Entries.Length <= MaxEntries)
+		return Entries
+	Newest := []
+	Loop MaxEntries
+		Newest.Push(Entries[Entries.Length - MaxEntries + A_Index])
+	return Newest
+}
+
+; Today's errors file, as the logger names it: the one accessor the healthcheck
+; reads it through, so the logs-folder owner can move it.
+; @returns {String} "" before the logger has resolved its paths.
+_HealthCheck_ErrorsLogPath() {
+	global LOGGER_ERRORS_LOG_PATH
+	return IsSet(LOGGER_ERRORS_LOG_PATH) ? LOGGER_ERRORS_LOG_PATH : ""
+}
+
+; The window's recent warnings and errors: the tail of today's errors file, or
+; the ring when that file does not exist yet. The ring holds every level, so at
+; DEBUG a few minutes of routine lines evicted the problems the window is
+; opened to show; the errors file keeps WARNING and ERROR only.
+; @param ErrorsPath {String} Today's errors file ("" when the logger has none).
+; @returns {Map} { entries: Array oldest first, source: "errors_file" | "ring" }
+_HealthCheck_RecentIssues(ErrorsPath) {
+	Limits := _HealthCheck_RecentIssueLimits()
+	Tail := (ErrorsPath != "") ? _HealthCheck_ReadTail(ErrorsPath, Limits["tail_max_bytes"]) : 0
+	if (Tail is Map) {
+		return Map(
+			"entries", _HealthCheck_ParseErrorsTail(Tail["chunk"], Tail["at_file_start"], Limits["max_entries"]),
+			"source",  "errors_file")
+	}
+	return Map("entries", _HealthCheck_RingIssues(Limits["max_entries"]), "source", "ring")
+}

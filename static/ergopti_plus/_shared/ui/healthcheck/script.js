@@ -18,7 +18,7 @@
 //       ports_validated, failed_adapters,
 //       wired_count, adapter_count, unwired_adapters,  (macOS only)
 //       event_tap_timeout_telemetry,                    (macOS only)
-//       last_error, recent_issues,
+//       last_error, recent_issues, recent_issues_source,
 //       pause_state, keylogger, llm, layout, hotstrings, logs, config,
 //       remap                                           (macOS only)
 //       permissions                                     (macOS only)
@@ -323,9 +323,22 @@ window.renderHealthcheck = function (s) {
 	}
 
 	// ── Recent issues ────────────────────────────────────────────────────
-	html += '<h2>Recent warnings / errors (' + issues.length + '/100)</h2>';
+	// Read from today's errors file, which holds WARNING and ERROR only; the
+	// in-memory ring, which DEBUG lines evict within minutes, is the fallback
+	// before that file exists. The page says which one answered.
+	var source = s.recent_issues_source;
+	html += '<h2>Recent warnings / errors (' + issues.length + ')</h2>';
+	if (source === 'errors_file') {
+		html += '<p class="source">Newest entries of today&#x2019;s errors file.</p>';
+	} else if (source === 'ring') {
+		html += '<p class="source">From the in-memory log: today&#x2019;s errors file does not exist yet.</p>';
+	} else if (source) {
+		html += '<p class="source fail">The recent entries could not be read; see the log.</p>';
+	}
 	if (issues.length === 0) {
-		html += '<em>No warnings or errors since startup.</em>';
+		html += '<em>' + (source === 'errors_file'
+			? 'No warnings or errors today.'
+			: 'No warnings or errors since startup.') + '</em>';
 	} else {
 		var lines = issues.map(function (l) { return escapeHtml(String(l)); }).join('\n');
 		html += '<pre>' + lines + '</pre>';

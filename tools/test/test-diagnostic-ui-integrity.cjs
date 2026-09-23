@@ -308,6 +308,56 @@ function checkLinuxSystemRows() {
 
 checkLinuxSystemRows();
 
+/**
+ * Renders a snapshot through the shared page and returns the HTML.
+ * @param {object} snapshot
+ * @returns {string}
+ */
+function renderSnapshot(snapshot) {
+	const content = { innerHTML: '' };
+	const sandbox = {
+		window: {},
+		document: { getElementById: () => content },
+		escapeHtml: value => String(value),
+	};
+	const script = fs.readFileSync(path.join(REPO_ROOT, SHARED_SCRIPT), 'utf8');
+	vm.runInNewContext(script, sandbox, { filename: SHARED_SCRIPT });
+	sandbox.window.renderHealthcheck(snapshot);
+	return content.innerHTML;
+}
+
+/**
+ * The recent warnings and errors come from today's errors file, or from the
+ * in-memory ring before that file exists; the page says which one answered,
+ * and no longer claims a fixed "/100" capacity the ring never had.
+ */
+function checkRecentIssuesSource() {
+	const fromFile = renderSnapshot({
+		version: 'test', uptime_sec: 0, sys: {},
+		recent_issues: ['2026-09-23 10:00:01:002 [ERROR] [Probe] boom'],
+		recent_issues_source: 'errors_file',
+	});
+	const fromRing = renderSnapshot({
+		version: 'test', uptime_sec: 0, sys: {}, recent_issues: [], recent_issues_source: 'ring',
+	});
+	const problems = [];
+	if (!fromFile.includes('<h2>Recent warnings / errors (1)</h2>')) problems.push('heading without the count');
+	if (!fromFile.includes('today&#x2019;s errors file.')) problems.push('the errors-file source is not named');
+	if (!fromFile.includes('[ERROR] [Probe] boom')) problems.push('the entry is not rendered');
+	if (!fromRing.includes('today&#x2019;s errors file does not exist yet')) problems.push('the ring fallback is not named');
+	if (/\/100\)/.test(fromFile)) problems.push('the stale /100 capacity is still claimed');
+	if (problems.length === 0) {
+		total_pass++;
+		console.log(`  ${PASS_SYMBOL}  Shared: recent issues name their source (errors-file-issues)`);
+		return;
+	}
+	total_fail++;
+	console.log(`  ${FAIL_SYMBOL}  Shared: recent issues name their source (errors-file-issues)`);
+	console.log(`       Violation: ${problems.join('; ')}`);
+}
+
+checkRecentIssuesSource();
+
 // --- Hammerspoon (macOS) Checks ---
 // The HTML rendering now lives in _shared/ui/healthcheck/; helpers.lua
 // has only the state-gathering probes + format_uptime. core.lua loads the
