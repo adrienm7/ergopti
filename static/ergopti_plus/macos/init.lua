@@ -1587,11 +1587,17 @@ Boot.mark("UI: karabiner.init")
 Boot.stage("UI: menu.start (menubar + state sync + engines + LLM handler)")
 
 Logger.debug(LOG, "Starting user interface components…")
-menu.start(
+local menubar = menu.start(
 	base_dir, hotfiles, gestures,
 	keymap, dynamic_hotstrings, module_sections,
 	karabiner, hotfile_paths
 )
+-- nil means no tray: the menubar, its native menu or the preference rollback
+-- could not settle. Ignoring it still logged "boot SUCCESSFUL" with no menu.
+if menubar == nil then
+	Logger.error(LOG, "Menubar startup did not commit; no tray menu is available.")
+	error("menu.start did not commit")
+end
 Boot.mark("UI: menu.start (menubar + state sync + engines + LLM handler)")
 Boot.stage("UI: menu + vscode bridge ready")
 
