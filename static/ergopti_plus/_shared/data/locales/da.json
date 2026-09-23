@@ -1821,6 +1821,8 @@
 	"shortcuts.uppercase": "Win + U(ppercase) = Slå valg versaler/gemener til/fra",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
 	"startup.accessibility_required": "ErgoptiPlus skal have tilladelsen Tilgængelighed for at kunne læse tastaturet. Slå Hammerspoon-emnet, der hører til ErgoptiPlus, til under Systemindstillinger > Anonymitet og sikkerhed > Tilgængelighed, og åbn derefter ErgoptiPlus igen. Et Hammerspoon, du kører separat, har sit eget emne.",
+	"startup.linux_input_access_body": "Ergopti+ kan endnu ikke læse tastaturet eller skrive til /dev/uinput. Log ud og ind igen (eller genstart), så grupperne “input” og “uinput”, som installationsprogrammet tilføjede, træder i kraft. Hvis problemet fortsætter, kør: bash install.sh --setup-perms",
+	"startup.linux_input_access_title": "Ergopti+ kan ikke bruge tastaturet endnu",
 	"startup.manifest_missing": "Opstartsfejl: filen _generated/features_manifest.ahk mangler eller er beskadiget.\n\nKør `npm run build:manifest` fra projektmappen og genstart scriptet.",
 	"startup.manifest_title": "ErgoptiPlus — manifest mangler",
 	"startup.native_logger_unavailable": "ErgoptiPlus kan ikke starte, fordi den indbyggede logtjeneste ikke er tilgængelig. Start ErgoptiPlus via programstarteren.",

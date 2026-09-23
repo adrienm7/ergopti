@@ -1821,6 +1821,8 @@
 	"shortcuts.uppercase": "Win + U(ppercase) = Přepnout výběr velká/malá písmena",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
 	"startup.accessibility_required": "ErgoptiPlus potřebuje oprávnění Zpřístupnění, aby mohl číst klávesnici. V Nastavení systému > Soukromí a zabezpečení > Zpřístupnění zapněte položku Hammerspoon, která patří k ErgoptiPlus, a poté ErgoptiPlus znovu otevřete. Samostatně spouštěná aplikace Hammerspoon má vlastní položku.",
+	"startup.linux_input_access_body": "Ergopti+ zatím nemůže číst klávesnici ani zapisovat do /dev/uinput. Odhlaste se a znovu přihlaste (nebo restartujte), aby se projevily skupiny „input“ a „uinput“ přidané instalátorem. Pokud problém přetrvává, spusťte: bash install.sh --setup-perms",
+	"startup.linux_input_access_title": "Ergopti+ zatím nemůže používat klávesnici",
 	"startup.manifest_missing": "Chyba při spuštění: soubor _generated/features_manifest.ahk chybí nebo je poškozen.\n\nSpusťte `npm run build:manifest` z adresáře projektu a skript restartujte.",
 	"startup.manifest_title": "ErgoptiPlus — manifest chybí",
 	"startup.native_logger_unavailable": "ErgoptiPlus nelze spustit, protože nativní služba protokolování není dostupná. Spusťte ErgoptiPlus prostřednictvím jeho spouštěče.",

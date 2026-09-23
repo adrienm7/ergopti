@@ -1821,6 +1821,8 @@
 	"shortcuts.uppercase": "Win + U(ppercase) = החלף בחירה אותיות גדולות/קטנות",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
 	"startup.accessibility_required": "ErgoptiPlus זקוק להרשאת נגישות כדי לקרוא את המקלדת. בהגדרות המערכת > פרטיות ואבטחה > נגישות, הפעל את הפריט Hammerspoon השייך ל־ErgoptiPlus, ואז פתח שוב את ErgoptiPlus. ליישום Hammerspoon שאתה מפעיל בנפרד יש פריט משלו.",
+	"startup.linux_input_access_body": "Ergopti+ עדיין לא יכול לקרוא את המקלדת או לכתוב אל ‎/dev/uinput. התנתקו והתחברו מחדש (או הפעילו מחדש) כדי שהקבוצות „input” ו־„uinput” שהמתקין הוסיף ייכנסו לתוקף. אם הבעיה נמשכת, הריצו: bash install.sh --setup-perms",
+	"startup.linux_input_access_title": "Ergopti+ עדיין לא יכול להשתמש במקלדת",
 	"startup.manifest_missing": "שגיאת הפעלה: הקובץ _generated/features_manifest.ahk חסר או פגום.\n\nהפעל `npm run build:manifest` מתיקיית הפרויקט ולאחר מכן הפעל מחדש את הסקריפט.",
 	"startup.manifest_title": "ErgoptiPlus — manifest חסר",
 	"startup.native_logger_unavailable": "לא ניתן להפעיל את ErgoptiPlus מכיוון ששירות הרישום המקורי שלו אינו זמין. יש להפעיל את ErgoptiPlus דרך המשגר שלו.",

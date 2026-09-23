@@ -1821,6 +1821,8 @@
 	"shortcuts.uppercase": "Win + U(ppercase) = تبديل التحديد بين الأحرف الكبيرة والصغيرة",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
 	"startup.accessibility_required": "يحتاج ErgoptiPlus إلى إذن تسهيلات الاستخدام لقراءة لوحة المفاتيح. في إعدادات النظام > الخصوصية والأمان > تسهيلات الاستخدام، فعّل عنصر Hammerspoon التابع لـ ErgoptiPlus، ثم افتح ErgoptiPlus مرة أخرى. تطبيق Hammerspoon الذي تشغّله بشكل منفصل له عنصر خاص به.",
+	"startup.linux_input_access_body": "لا يستطيع Ergopti+ بعدُ قراءة لوحة المفاتيح أو الكتابة في ‎/dev/uinput. سجّل الخروج ثم الدخول من جديد (أو أعد التشغيل) حتى تسري المجموعتان «input» و«uinput» اللتان أضافهما المثبّت. إذا استمرت المشكلة، نفّذ: bash install.sh --setup-perms",
+	"startup.linux_input_access_title": "لا يستطيع Ergopti+ استخدام لوحة المفاتيح بعد",
 	"startup.manifest_missing": "خطأ في بدء التشغيل: الملف _generated/features_manifest.ahk مفقود أو تالف.\n\nشغّل `npm run build:manifest` من مجلد المشروع، ثم أعد تشغيل السكريبت.",
 	"startup.manifest_title": "ErgoptiPlus — ملف manifest مفقود",
 	"startup.native_logger_unavailable": "لا يمكن بدء ErgoptiPlus لأن خدمة التسجيل الأصلية غير متاحة. شغّل ErgoptiPlus عبر المشغّل الخاص به.",

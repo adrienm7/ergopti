@@ -1821,6 +1821,8 @@
 	"shortcuts.uppercase": "Win + U（大写）= 切换选区大小写",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
 	"startup.accessibility_required": "ErgoptiPlus 需要“辅助功能”权限才能读取键盘。请在“系统设置 > 隐私与安全性 > 辅助功能”中打开属于 ErgoptiPlus 的 Hammerspoon 项，然后重新打开 ErgoptiPlus。你单独运行的 Hammerspoon 应用有自己的单独条目。",
+	"startup.linux_input_access_body": "Ergopti+ 暂时无法读取键盘或写入 /dev/uinput。请注销并重新登录（或重启），使安装程序添加的“input”和“uinput”用户组生效。如果问题仍然存在，请运行：bash install.sh --setup-perms",
+	"startup.linux_input_access_title": "Ergopti+ 暂时无法使用键盘",
 	"startup.manifest_missing": "启动错误：_generated/features_manifest.ahk 文件缺失或已损坏。\n\n从项目目录运行 `npm run build:manifest`，然后重新启动脚本。",
 	"startup.manifest_title": "ErgoptiPlus — manifest 缺失",
 	"startup.native_logger_unavailable": "ErgoptiPlus 无法启动，因为其原生日志服务不可用。请通过 ErgoptiPlus 启动器启动。",

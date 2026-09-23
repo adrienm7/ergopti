@@ -1821,6 +1821,8 @@
 	"shortcuts.uppercase": "Win + U(ppercase) = Schakel selectie hoofdletters/kleine letters",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
 	"startup.accessibility_required": "ErgoptiPlus heeft de toestemming Toegankelijkheid nodig om het toetsenbord te lezen. Zet in Systeeminstellingen > Privacy en beveiliging > Toegankelijkheid het Hammerspoon-onderdeel aan dat bij ErgoptiPlus hoort en open ErgoptiPlus daarna opnieuw. Een Hammerspoon-app die je apart gebruikt, heeft een eigen onderdeel.",
+	"startup.linux_input_access_body": "Ergopti+ kan het toetsenbord nog niet lezen of niet naar /dev/uinput schrijven. Meld u af en weer aan (of herstart) zodat de groepen ‘input’ en ‘uinput’ die het installatieprogramma heeft toegevoegd van kracht worden. Blijft het probleem, voer dan uit: bash install.sh --setup-perms",
+	"startup.linux_input_access_title": "Ergopti+ kan het toetsenbord nog niet gebruiken",
 	"startup.manifest_missing": "Opstartfout: het bestand _generated/features_manifest.ahk ontbreekt of is beschadigd.\n\nVoer `npm run build:manifest` uit vanuit de projectmap en start het script opnieuw.",
 	"startup.manifest_title": "ErgoptiPlus — manifest ontbreekt",
 	"startup.native_logger_unavailable": "ErgoptiPlus kan niet starten omdat de systeemeigen logboekservice niet beschikbaar is. Start ErgoptiPlus via het startprogramma.",
