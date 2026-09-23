@@ -296,6 +296,7 @@ const CHECKS = [
 	{ name: 'changelog remote content and native bridge stay inside their authenticated boundary', cmd: 'node', args: ['tools/test/test-changelog-security.cjs'], repro: 'npm run test:changelog-security' },
 	{ name: 'changelog release notes render as sanitized Markdown (DOM-only, repository links only)', cmd: 'node', args: ['tools/test/test-changelog-markdown.cjs'], repro: 'npm run test:changelog-markdown' },
 	{ name: 'changelog loads are bounded and fall back to the releases Atom feed', cmd: 'node', args: ['tools/test/test-changelog-network-resilience.cjs'], repro: 'npm run test:changelog-network-resilience' },
+	{ name: 'release bodies split into changelog, downloads, intro and footer (CI markers, legacy and feed bodies)', cmd: 'node', args: ['tools/test/test-release-body-sections.cjs'], repro: 'npm run test:release-body-sections' },
 	{ name: 'download actions retain their operation session across native reuse', cmd: 'node', args: ['tools/test/test-download-window-session.cjs'], repro: 'npm run test:download-window-session' },
 	{ name: 'model browser actions retain their operation session across native reuse', cmd: 'node', args: ['tools/test/test-model-browser-session.cjs'], repro: 'npm run test:model-browser-session' },
 	{ name: 'onboarding page title, folder picker and metrics consent path follow the host', cmd: 'node', args: ['tools/test/test-onboarding-wizard-page.cjs'], repro: 'npm run test:onboarding-wizard-page' },
