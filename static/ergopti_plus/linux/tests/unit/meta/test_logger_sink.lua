@@ -120,6 +120,34 @@ helpers.describe("logger sink — production wiring", function()
 			"install() must precede the first Logger.* call, otherwise the earliest " ..
 			"lines (including boot failures) are still discarded")
 	end)
+
+	helpers.it("the periodic callback closes due repeat streaks", function()
+		-- Without a periodic flush a source that fell silent keeps its count
+		-- until some unrelated line happens to arrive, possibly never.
+		local body = entry:match("local on_periodic = function%(%)(.-)\n\tend\n")
+		helpers.assert_not_nil(body, "the daemon's on_periodic callback was not found")
+		local helper = body:match('RuntimeGuard%.call%("logger repeat flush", ([%w_]+)%)')
+		helpers.assert_not_nil(helper, "on_periodic must run the periodic repeat flush under RuntimeGuard")
+		helpers.assert_contains(entry, "local function " .. helper .. "() Logger.flush_repeats(false) end",
+			"the periodic flush must be the non-terminal form")
+	end)
+
+	helpers.it("the exit paths close every open streak before the last line", function()
+		-- Exit and crash are the last chance to emit a withheld count.
+		local exiting_at = entry:find('Logger.info(LOG, "Daemon exiting.")', 1, true)
+		local crash_at = entry:find('Logger.error(LOG, "Daemon terminated by an unhandled error', 1, true)
+		helpers.assert_not_nil(exiting_at, "the clean-exit line was not found")
+		helpers.assert_not_nil(crash_at, "the crash line was not found")
+		-- A direct call, or the guarded pcall form the crash path uses.
+		local terminal_flush = "()Logger%.flush_repeats[%(,]%s*true%)"
+		local flushes = {}
+		for at in entry:gmatch(terminal_flush) do flushes[#flushes + 1] = at end
+		helpers.assert_eq(#flushes, 2, "the clean exit and the crash path each need one terminal flush")
+		helpers.assert_true(flushes[1] < exiting_at and exiting_at - flushes[1] < 200,
+			"the clean exit must flush right before its last line")
+		helpers.assert_true(flushes[2] < crash_at and crash_at - flushes[2] < 400,
+			"the crash path must flush right before its fatal line")
+	end)
 end)
 
 
@@ -178,6 +206,34 @@ helpers.describe("logger sink — output reaches disk", function()
 			"INFO must NOT reach the errors-only file — that file exists to be short")
 		helpers.assert_contains(main, "marker-fatal",
 			"ERROR must also reach the daily file, not only the mirror")
+	end)
+
+	helpers.it("install arms repeat collapsing once and uninstall disarms it", function()
+		local Sink   = helpers.load_module("infra.logger_sink")
+		local Logger = helpers.load_module("logger")
+		local dir    = temp_dir()
+		local date   = os.date("%Y-%m-%d")
+
+		cleanup(dir, date)
+		Sink.install(Logger, { log_dir = dir })
+		local armed = Logger.repeat_collapsing_enabled()
+		-- A second install is the documented idempotent no-op: it must not trip
+		-- the core's refusal of a second arming.
+		local again_ok = pcall(Sink.install, Logger, { log_dir = dir })
+		Logger.debug("sink_test", "marker-repeat-%d", 1)
+		Logger.info("sink_test", "marker-between")
+		Logger.debug("sink_test", "marker-repeat-%d", 2)
+		local content = read_file(dir .. "/ErgoptiPlus_" .. date .. ".log")
+		Sink.uninstall(Logger)
+		local disarmed = not Logger.repeat_collapsing_enabled()
+		cleanup(dir, date)
+
+		helpers.assert_true(armed, "install() is this driver's logger boot and must arm repeat collapsing")
+		helpers.assert_true(again_ok, "a second install() must stay a no-op")
+		helpers.assert_contains(content, "marker-repeat-1", "the first occurrence must be written")
+		helpers.assert_true(not content:find("marker%-repeat%-2"),
+			"a repeat of the same template inside the window must be withheld")
+		helpers.assert_true(disarmed, "uninstall() must disarm what install() armed")
 	end)
 
 	helpers.it("uninstall clears the sink so the core stops emitting", function()

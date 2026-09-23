@@ -236,6 +236,9 @@ in between, or one whose arguments change. Repeat collapsing does.
     `init.lua` once the native sink is committed, with a TimerScheduler tick at
     `[logger] flush_interval_ms`; terminal flush in
     `Logger.begin_async_sink_shutdown()`.
+  - Linux: armed by `infra/logger_sink.install()`; periodic flush in the
+    daemon's periodic callback; terminal flush on the daemon's exit and crash
+    paths.
 
 ---
 
