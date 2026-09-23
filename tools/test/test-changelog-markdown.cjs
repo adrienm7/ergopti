@@ -17,6 +17,10 @@
  *    insertAdjacentHTML, so remote text can only reach the page as text nodes.
  * 3. Safe links: anchors carry no href (the WebView never navigates) and a
  *    click is routed to the native open_url action only for repository URLs.
+ * 4. Folds: CI wraps the changelog in <details>/<summary> for github.com, which
+ *    the renderer showed as literal tags. Exact fold lines must build
+ *    attribute-free elements while an attribute, a script or a fenced fold
+ *    stays text.
  * ==============================================================================
  */
 
@@ -359,10 +363,149 @@ function checkRendering() {
 	}
 }
 
+// ==========================================
+// ==========================================
+// ======= 4/ Details Folds ================
+// ==========================================
+// ==========================================
+
+// CI folds the changelog in <details>/<summary> for github.com. Exact structural
+// lines must become real folds; any other tag, attribute or script stays text.
+const FOLD_BODY = [
+	'Intro line',
+	'<details>',
+	'<summary><b>Changelog</b> (click to expand)</summary>',
+	'',
+	'- Folded **item**',
+	'',
+	'</details>',
+	'',
+	'<details open>',
+	'<summary>Open fold</summary>',
+	'Inside the open fold.',
+	'<details>',
+	'<summary>Nested</summary>',
+	'Nested body.',
+	'</details>',
+	'</details>',
+	'',
+	'<details ontoggle="window.pwned=3">',
+	'<summary onclick="window.pwned=4">Hostile</summary>',
+	'</details>',
+	'',
+	'<details>',
+	'<summary>Scripted</summary>',
+	'<script>window.pwned = 5</script>',
+	'</details>',
+	'',
+	'<details>',
+	'<summary class="x">Classy</summary>',
+	'</details>',
+	'',
+	'```',
+	'<details>',
+	'<summary>Fenced</summary>',
+	'</details>',
+	'```',
+	'',
+	'<a id="downloads-v1-1-0"></a>',
+	'Outro line'
+].join('\n');
+
+/** Text of a subtree, skipping every element with the given tag. */
+function textOutside(node, skippedTag) {
+	if (node.nodeType === 3) return node._text;
+	if (node.tagName === skippedTag) return '';
+	return node.children.map((child) => textOutside(child, skippedTag)).join('');
+}
+
+function checkDetailsFolds() {
+	const { sandbox, document } = runPage();
+	const root = document.createElement('div');
+	sandbox.renderMarkdownInto(root, FOLD_BODY, {});
+	const folds = byTag(root, 'details');
+	const text = root.textContent;
+
+	expect(folds.length === 5, `exact <details> lines must build 5 folds (got ${folds.length})`);
+	if (folds.length !== 5) return;
+	const [changelog, openFold, nested, scripted, classy] = folds;
+
+	expect(
+		Object.keys(changelog.attributes).length === 0,
+		'a plain <details> line must build a fold with zero attributes'
+	);
+	const summary = changelog.children[0];
+	expect(
+		Boolean(summary) &&
+			summary.tagName === 'summary' &&
+			Object.keys(summary.attributes).length === 0 &&
+			summary.textContent === 'Changelog (click to expand)' &&
+			byTag(summary, 'strong').some((s) => s.textContent === 'Changelog'),
+		'the <summary> line must become the first child, with <b> rendered as strong'
+	);
+	expect(
+		byTag(changelog, 'li').some((li) => byTag(li, 'strong').some((s) => s.textContent === 'item')),
+		'the Markdown inside a fold must render as Markdown'
+	);
+	expect(
+		JSON.stringify(openFold.attributes) === '{"open":""}',
+		'<details open> must build an expanded fold and copy nothing else'
+	);
+	expect(
+		byTag(openFold, 'details').includes(nested) && nested.children[0].textContent === 'Nested',
+		'a nested fold must close on its own </details>, not on the outer one'
+	);
+	expect(
+		scripted.textContent.includes('<script>window.pwned = 5</script>'),
+		'a <script> inside a fold must stay literal text'
+	);
+	expect(
+		byTag(classy, 'summary').length === 0 &&
+			classy.textContent === '<summary class="x">Classy</summary>',
+		'a <summary> line carrying attributes must stay literal text inside a fold'
+	);
+	expect(
+		text.includes('<details ontoggle="window.pwned=3">') &&
+			text.includes('<summary onclick="window.pwned=4">Hostile</summary>'),
+		'a <details> or <summary> line carrying attributes must stay literal text'
+	);
+	expect(
+		byTag(root, 'pre').some((pre) =>
+			pre.textContent.includes('<details>\n<summary>Fenced</summary>\n</details>')
+		),
+		'a fold inside a fenced code block must stay code'
+	);
+	const prose = textOutside(root, 'pre');
+	expect(
+		!prose.includes('<summary><b>') && !prose.includes('</details>') && !prose.includes('<details>\n'),
+		'structural fold lines must not leak as text outside code'
+	);
+	expect(
+		!text.includes('<a id=') && text.includes('Intro line') && text.includes('Outro line'),
+		'an empty anchor line is invisible, as on GitHub, and its neighbours survive'
+	);
+	const all = elements(root);
+	expect(
+		all.every((node) => !['script', 'img', 'iframe', 'object'].includes(node.tagName)),
+		'folds must never create active elements'
+	);
+	expect(
+		all.every((node) => Object.keys(node.attributes).every((name) => !/^on/i.test(name))),
+		'no fold may carry an event-handler attribute'
+	);
+	expect(sandbox.pwned === undefined, 'no fold payload may execute');
+}
+
 try {
 	checkRendering();
 } catch (error) {
 	expect(false, `the changelog Markdown rendering raised: ${error.message}`);
+}
+
+try {
+	checkDetailsFolds();
+} catch (error) {
+	expect(false, `the changelog fold rendering raised: ${error.message}`);
 }
 
 console.log(`1..${failures.length === 0 ? 1 : failures.length}`);
