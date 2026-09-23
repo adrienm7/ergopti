@@ -37,6 +37,11 @@
  * apk lives in /sbin, absent from an ordinary Alpine user's PATH, so the
  * manager was detected as "unknown" and every dependency refused; and the
  * group setup called usermod, which BusyBox does not ship, under set -e.
+ *
+ * ROOT CAUSE 6 — ON GNOME THE ICON WAS REGISTERED AND NEVER SHOWN.
+ * GNOME Shell hosts no StatusNotifierItem without an extension; Ubuntu enables
+ * its own, Fedora and Debian GNOME do not. The installer now installs and
+ * enables the AppIndicator extension there, merged into the user's list.
  * ==============================================================================
  */
 
@@ -134,8 +139,19 @@ function runInstaller(scenario) {
 	// same failure branch a binary that needs a newer glibc reaches.
 	stub(stubs, 'curl', `${log}\nwhile [ $# -gt 0 ]; do [ "$1" = --output ] && { echo junk > "$2"; }; shift; done\nexit 0`);
 	if (scenario.distroKanata) stub(stubs, 'kanata', 'echo "kanata 1.12.0"');
+	if (scenario.gnome) {
+		// A GNOME Shell with no AppIndicator extension, which refuses to enable
+		// one installed during this session (the running shell never loaded it).
+		stub(stubs, 'gnome-extensions', `${log}\n[ "$1" = enable ] && exit 1\nexit 0`);
+		stub(
+			stubs,
+			'gsettings',
+			`${log}\n[ "$1" = get ] && { echo "['user-theme@gnome-shell-extensions.gcampax.github.com']"; exit 0; }\nexit 0`
+		);
+	}
 
 	const env = {
+		...(scenario.gnome ? { XDG_CURRENT_DESKTOP: 'ubuntu:GNOME' } : {}),
 		HOME: bashPath(home),
 		PATH: `${bashPath(stubs)}:/usr/bin:/bin`,
 		TMPDIR: bashPath(sandbox),
@@ -264,6 +280,36 @@ const errors = [];
 		} finally {
 			fs.rmSync(fixture, { recursive: true, force: true });
 		}
+	}
+}
+
+// ── GNOME without a tray host ──────────────────────────────────────────────
+{
+	const run = runInstaller({ distroKanata: true, desktopProvided: true, gnome: true });
+	try {
+		if (run.status !== 0) errors.push(`install.sh exited ${run.status} on GNOME`);
+		if (!run.calls.some((call) => call.startsWith('sudo apt-get install') && call.includes('gnome-shell-extension-appindicator'))) {
+			errors.push('GNOME without an AppIndicator extension: the extension was not installed');
+		}
+		const set = run.calls.find((call) => call.startsWith('gsettings set org.gnome.shell enabled-extensions'));
+		const expected = "['user-theme@gnome-shell-extensions.gcampax.github.com', 'appindicatorsupport@rgcjonas.gmail.com']";
+		if (!set || !set.endsWith(expected)) {
+			errors.push(
+				`the extension must be enabled for the next login, merged into the user's list; got ${set || '<no gsettings set>'}`
+			);
+		}
+	} finally {
+		run.cleanup();
+	}
+}
+{
+	const run = runInstaller({ distroKanata: true, desktopProvided: true });
+	try {
+		if (run.calls.some((call) => /gnome-extensions|gsettings/.test(call))) {
+			errors.push('outside GNOME, no GNOME extension may be touched');
+		}
+	} finally {
+		run.cleanup();
 	}
 }
 
