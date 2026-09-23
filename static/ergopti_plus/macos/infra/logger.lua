@@ -555,6 +555,20 @@ function M.init_log_path(config_dir, max_age_days)
 	return folder_error == nil, folder_error
 end
 
+--- Returns today's unified log path in the chosen log folder. The date is read
+--- per call: the native worker rolls files by each record's date, while
+--- M.UNIFIED_LOG_FILE keeps the name chosen when the folder was set.
+--- @return string path
+function M.today_log_path()
+	return _log_dir .. "ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log"
+end
+
+--- Returns today's errors-only log path (WARNING and ERROR lines), read per call.
+--- @return string path
+function M.today_errors_path()
+	return _log_dir .. "ErgoptiPlus_errors_" .. os.date("%Y-%m-%d") .. ".log"
+end
+
 --- Removes one stale log and records any OS refusal without fabricating success.
 --- @param path string Absolute file path selected by the retention policy.
 --- @return boolean removed True only when os.remove confirms deletion.

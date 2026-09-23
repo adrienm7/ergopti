@@ -50,6 +50,26 @@ helpers.describe("fatal exits are reported before exit (silent-boot-abort)", fun
 			"the durable report must precede the emergency exit request")
 	end)
 
+	helpers.it("(fatal-runtime-kind) a failure after boot completed is reported as a runtime stop", function()
+		local body = function_body(init_source(),
+			"local function emergency_exit_after_runtime_failure(")
+		local presentation_at = body:find("BootFatal.presentation(", 1, true)
+		helpers.assert_true(presentation_at ~= nil,
+			"the report kind must be chosen by BootFatal.presentation")
+		local complete_at = body:find("Boot.is_complete()", presentation_at, true)
+		local runtime_at = body:find("BootFatal.report_runtime(", 1, true)
+		local request_at = body:find("EmergencyExit.request(", 1, true)
+		helpers.assert_true(complete_at ~= nil and complete_at < (runtime_at or 0),
+			"whether boot completed must decide the presentation before reporting")
+		helpers.assert_true(runtime_at ~= nil and request_at ~= nil and runtime_at < request_at,
+			"the runtime report must precede the emergency exit request")
+		local runtime_call = body:sub(runtime_at, request_at)
+		helpers.assert_contains(runtime_call, "Logger.today_log_path()")
+		helpers.assert_contains(runtime_call, "Logger.today_errors_path()")
+		helpers.assert_true(body:find('"dialog.fatal_error.cannot_start"', 1, true) == nil,
+			"a runtime stop must not default to the could-not-start message")
+	end)
+
 	helpers.it("every abort call names its stage", function()
 		local source = init_source()
 		local calls = 0

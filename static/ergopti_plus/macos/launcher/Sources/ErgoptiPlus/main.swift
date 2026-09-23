@@ -958,13 +958,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		// handshake is also what a fatal Lua abort looks like, and treating it as
 		// a Quit made v0.0.0-dev.128 vanish with no dialog and no log.
 		if let report = fatalReportStore.read() {
+			let localization = LauncherLocalization.load()
 			fail(
 				report.diagnostic,
 				alertText: embeddedFatalAlertText(
 					report,
 					logPath: LauncherLog.filePath,
-					localization: LauncherLocalization.load()
-				)
+					localization: localization
+				),
+				title: embeddedFatalAlertTitle(report, localization: localization)
 			)
 			return
 		}
@@ -1028,7 +1030,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	// catalog. When that catalog is itself unreadable (a damaged bundle), the
 	// English developer diagnostic is shown instead: the documented pre-i18n
 	// fatal-modal exception.
-	private func fail(_ message: String, alertText: String? = nil) {
+	private func fail(_ message: String, alertText: String? = nil, title: String? = nil) {
 		if let fatalReporter {
 			fatalReporter(message)
 			return
@@ -1038,7 +1040,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 		let localization = LauncherLocalization.load()
 		let alert = NSAlert()
-		alert.messageText = localization?.text("launcher.fatal.title") ?? "ErgoptiPlus could not start"
+		// A runtime stop brings its own title; every other failure is a failed start.
+		alert.messageText = title ?? localization?.text("launcher.fatal.title") ?? kFatalBootTitleFallback
 		alert.informativeText = alertText ?? message
 		alert.alertStyle = .critical
 		alert.addButton(withTitle: localization?.text("launcher.fatal.quit") ?? "Quit")

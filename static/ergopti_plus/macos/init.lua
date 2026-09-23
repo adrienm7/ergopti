@@ -813,11 +813,19 @@ local function emergency_exit_after_runtime_failure(owner, reason, message_key)
 	-- the cause durable and hand it to the launcher's modal alert first. No
 	-- local modal here: input owners may be armed, and a blocking dialog would
 	-- delay the bounded exit that lets the guardian revoke the exact lease.
-	-- The generic post-onboarding owner names the boot stage that was running.
-	local report_stage = exact_owner
-	if exact_owner == "boot" and not Boot.is_complete() then report_stage = Boot.current_stage() end
-	BootFatal.report(report_stage, exact_reason,
-		i18n.get(message_key or "dialog.fatal_error.cannot_start"))
+	-- A failure after boot completed stopped a running app: it is reported as a
+	-- runtime stop naming the component and today's logs, never as "could not
+	-- start". Before that, the generic post-onboarding owner names the boot
+	-- stage that was running.
+	local report_kind, report_stage, default_message_key = BootFatal.presentation(
+		exact_owner, Boot.is_complete(), Boot.current_stage())
+	local report_message = i18n.get(message_key or default_message_key)
+	if report_kind == BootFatal.KIND_RUNTIME then
+		BootFatal.report_runtime(report_stage, exact_reason, report_message,
+			{ Logger.today_log_path(), Logger.today_errors_path() })
+	else
+		BootFatal.report(report_stage, exact_reason, report_message)
+	end
 
 	-- Arm the deadline BEFORE starting a request that may never settle. If exact
 	-- STOPPED arrives in time, the normal coordinator fences, tears down, and exits.
