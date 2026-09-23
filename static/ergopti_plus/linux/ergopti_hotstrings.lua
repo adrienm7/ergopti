@@ -922,6 +922,9 @@ local function main()
 					_undoable = {
 						trigger     = result.trigger,
 						replacement = result.replacement,
+						-- The terminator typed back AFTER the replacement: it is the
+						-- character an immediate Backspace actually removes.
+						replayed    = replay_terminator,
 					}
 					-- Replay queued input only after output committed. On failure the
 					-- hook emergency-ungrabs and the logical text position is unknown.
@@ -1165,9 +1168,14 @@ local function main()
 		-- what is left. Counted in codepoints, not bytes: "N'T" is three
 		-- characters and four bytes, and erasing four would eat the character
 		-- before it.
+		--
+		-- An end-char expansion replays its terminator after the replacement
+		-- ("adn " → "ADN "), so THAT is what the Backspace removed, and the whole
+		-- replacement is still on screen. Counting the replacement alone left its
+		-- first character behind: "adn " then Backspace read "Aadn".
 		if key_name == "backspace" and _undoable and not opts.dry_run then
 			local remaining = 0
-			for _ in _undoable.replacement:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+			for _ in (_undoable.replacement .. (_undoable.replayed or "")):gmatch("[%z\1-\127\194-\244][\128-\191]*") do
 				remaining = remaining + 1
 			end
 			if remaining >= 1 then
