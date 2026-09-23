@@ -237,6 +237,8 @@ const CHECKS = [
 	{ name: 'lua gsub returns one value (bare return leaks the replacement count)', cmd: 'node', args: ['tools/test/test-lua-gsub-single-return.cjs'], repro: 'node tools/test/test-lua-gsub-single-return.cjs' },
 	{ name: 'tooltip [positioning] constant reach (which driver reads which value)', cmd: 'node', args: ['tools/test/test-tooltip-positioning-reach.cjs'], repro: 'node tools/test/test-tooltip-positioning-reach.cjs' },
 	{ name: 'tooltip style single source (both drivers read constants.toml; hex companions match macOS)', cmd: 'node', args: ['tools/test/test-tooltip-style-single-source.cjs'], repro: 'node tools/test/test-tooltip-style-single-source.cjs' },
+	{ name: 'keyboard-layout registry (index.json in sync, checksums, schema, vendored digests)', cmd: 'node', args: ['tools/test/test-layouts-registry.cjs'], repro: 'npm run test:layouts-registry' },
+	{ name: 'keyboard-layout registry location single source (defaults.json folder; no driver retypes the URL)', cmd: 'node', args: ['tools/test/test-layouts-defaults-single-source.cjs'], repro: 'npm run test:layouts-defaults-single-source' },
 	{ name: 'shared JS is loadable (module.exports in an ESM package exports nothing)', cmd: 'node', args: ['tools/test/test-shared-js-is-loadable.cjs'], repro: 'node tools/test/test-shared-js-is-loadable.cjs' },
 	{ name: 'hotstring editor confirm dialog wiring (delete actually fires)', cmd: 'node', args: ['tools/test/test-hotstring-editor-confirm-wiring.cjs'], repro: 'node tools/test/test-hotstring-editor-confirm-wiring.cjs' },
 	{ name: 'WebView2 host teardown order (closing a window must not quit AHK)', cmd: 'node', args: ['tools/test/test-webview-teardown-order.cjs'], repro: 'node tools/test/test-webview-teardown-order.cjs' },
