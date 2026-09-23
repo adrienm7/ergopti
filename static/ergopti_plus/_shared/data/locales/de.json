@@ -586,7 +586,7 @@
 	"keylogger_ui.app_metrics": "Zeit in Anwendungen",
 	"keylogger_ui.launch_error": "Dashboard kann nicht gestartet werden : {1}",
 	"keylogger_ui.metrics_disabled": "Metriken sind deaktiviert.",
-	"keylogger_ui.metrics_disabled_body": "Zum Aktivieren : Symbol im Infobereich → 📊 Metriken → « ❌ Metriken deaktiviert (klicken zum Aktivieren) ».",
+	"keylogger_ui.metrics_disabled_body": "Zum Aktivieren : Symbol im Infobereich → 📊 Metriken → « Metriken aktivieren ».",
 	"keylogger_ui.metrics_title": "📊 Metriken",
 	"keylogger_ui.typing_metrics": "Tippmetriken",
 	"launcher.fatal.quit": "Beenden",

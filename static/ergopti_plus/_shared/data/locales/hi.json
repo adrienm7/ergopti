@@ -586,7 +586,7 @@
 	"keylogger_ui.app_metrics": "ऐप में समय",
 	"keylogger_ui.launch_error": "डैशबोर्ड लॉन्च नहीं हो सका: {1}",
 	"keylogger_ui.metrics_disabled": "मेट्रिक्स अक्षम हैं।",
-	"keylogger_ui.metrics_disabled_body": "सक्षम करने के लिए: सिस्टम ट्रे आइकन → 📊 मेट्रिक्स",
+	"keylogger_ui.metrics_disabled_body": "सक्षम करने के लिए: सिस्टम ट्रे आइकन → 📊 मेट्रिक्स → « मेट्रिक्स सक्षम करें »",
 	"keylogger_ui.metrics_title": "📊 मेट्रिक्स",
 	"keylogger_ui.typing_metrics": "टाइपिंग मेट्रिक्स",
 	"launcher.fatal.quit": "बंद करें",

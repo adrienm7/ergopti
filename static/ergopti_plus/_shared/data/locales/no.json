@@ -586,7 +586,7 @@
 	"keylogger_ui.app_metrics": "Tid i apper",
 	"keylogger_ui.launch_error": "Kunne ikke starte dashbordet: {1}",
 	"keylogger_ui.metrics_disabled": "Målinger er deaktivert.",
-	"keylogger_ui.metrics_disabled_body": "For å aktivere: systemstatiusikon → 📊 Målinger",
+	"keylogger_ui.metrics_disabled_body": "For å aktivere: systemstatusikon → 📊 Metrikker → « Aktiver metrikker ».",
 	"keylogger_ui.metrics_title": "📊 Målinger",
 	"keylogger_ui.typing_metrics": "Skrivemålinger",
 	"launcher.fatal.quit": "Avslutt",

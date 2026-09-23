@@ -586,7 +586,7 @@
 	"keylogger_ui.app_metrics": "Tid i apps",
 	"keylogger_ui.launch_error": "Dashboardet kunne ikke startes: {1}",
 	"keylogger_ui.metrics_disabled": "Målinger er deaktiveret.",
-	"keylogger_ui.metrics_disabled_body": "For at aktivere: statuslinjens ikon → 📊 Målinger",
+	"keylogger_ui.metrics_disabled_body": "For at aktivere: statuslinjens ikon → 📊 Målinger → « Aktivér metrics ».",
 	"keylogger_ui.metrics_title": "📊 Målinger",
 	"keylogger_ui.typing_metrics": "Skrivestatistik",
 	"launcher.fatal.quit": "Afslut",

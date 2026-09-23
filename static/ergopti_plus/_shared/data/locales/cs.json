@@ -586,7 +586,7 @@
 	"keylogger_ui.app_metrics": "Čas v aplikacích",
 	"keylogger_ui.launch_error": "Nelze spustit přehled : {1}",
 	"keylogger_ui.metrics_disabled": "Metriky jsou deaktivovány.",
-	"keylogger_ui.metrics_disabled_body": "Pro aktivaci : ikona v oznamovací oblasti → 📊 Metriky → « ❌ Metriky deaktivovány (klikněte pro aktivaci) ».",
+	"keylogger_ui.metrics_disabled_body": "Pro aktivaci : ikona v oznamovací oblasti → 📊 Metriky → « Povolit metriky ».",
 	"keylogger_ui.metrics_title": "📊 Metriky",
 	"keylogger_ui.typing_metrics": "Metriky psaní",
 	"launcher.fatal.quit": "Ukončit",

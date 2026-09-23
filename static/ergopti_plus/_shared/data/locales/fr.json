@@ -581,7 +581,7 @@
 	"keylogger_ui.app_metrics": "Temps sur les applications",
 	"keylogger_ui.launch_error": "Impossible de lancer le tableau de bord : {1}",
 	"keylogger_ui.metrics_disabled": "Les métriques sont désactivées.",
-	"keylogger_ui.metrics_disabled_body": "Pour les activer : icône de la zone de notification → 📊 Métriques → « ❌ Métriques désactivées (cliquer pour activer) ».",
+	"keylogger_ui.metrics_disabled_body": "Pour les activer : icône de la zone de notification → 📊 Métriques → « Activer les métriques ».",
 	"keylogger_ui.metrics_title": "📊 Métriques",
 	"keylogger_ui.typing_metrics": "Métriques de frappe",
 	"launcher.fatal.quit": "Quitter",

@@ -586,7 +586,7 @@
 	"keylogger_ui.app_metrics": "Tempo nelle app",
 	"keylogger_ui.launch_error": "Impossibile avviare la dashboard : {1}",
 	"keylogger_ui.metrics_disabled": "Le metriche sono disattivate.",
-	"keylogger_ui.metrics_disabled_body": "Per attivarle : icona dell’area di notifica → 📊 Metriche → « ❌ Metriche disattivate (clicca per attivare) ».",
+	"keylogger_ui.metrics_disabled_body": "Per attivarle : icona dell’area di notifica → 📊 Metriche → « Abilita le metriche ».",
 	"keylogger_ui.metrics_title": "📊 Metriche",
 	"keylogger_ui.typing_metrics": "Metriche di digitazione",
 	"launcher.fatal.quit": "Esci",
