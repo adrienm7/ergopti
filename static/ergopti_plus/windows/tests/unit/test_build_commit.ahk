@@ -164,9 +164,9 @@ _TBC_SnapshotUsesStamp() {
 }
 Test("build commit: the boot snapshot reports the compiled build's stamp", _TBC_SnapshotUsesStamp)
 
-; The copy-to-clipboard texts (plain and Markdown) must carry the same two rows
-; the HTML view shows. They lacked both, so a pasted report named no commit and
-; no install folder: exactly the two facts a bug triage asks for first.
+; The copy-to-clipboard text must carry the same two rows the HTML view shows.
+; It lacked both, so a pasted report named no commit and no install folder:
+; exactly the two facts a bug triage asks for first.
 _TBC_CopyTextsCarryCommitAndAppDir() {
 	global _TBC_SHA, BUNDLE_COMMIT
 	Old := BUNDLE_COMMIT
@@ -174,11 +174,8 @@ _TBC_CopyTextsCarryCommitAndAppDir() {
 	try {
 		Snapshot := HealthCheck_Run()
 		Plain := HealthCheck_FormatPlain(Snapshot)
-		Markdown := HealthCheck_FormatMarkdown(Snapshot)
 		Assert(InStr(Plain, "Last git commit : f58d15798 (build)`r`n") > 0, Plain)
 		Assert(InStr(Plain, "App dir         : " . A_ScriptDir . "`r`n") > 0, Plain)
-		Assert(InStr(Markdown, "| Last git commit | f58d15798 (build) |") > 0, Markdown)
-		Assert(InStr(Markdown, '| App dir | ``' . A_ScriptDir . '`` |') > 0, Markdown)
 	} finally {
 		BUNDLE_COMMIT := Old
 	}

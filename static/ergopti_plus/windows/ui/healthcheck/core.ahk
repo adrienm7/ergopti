@@ -4,10 +4,10 @@
 ; MODULE: Healthcheck / Probe + Public API + Window
 ; DESCRIPTION:
 ; Module-level counters, the adapter/port registry probe, the public API
-; (HealthCheck_Run / RecordError / RecordWarn / FormatMarkdown / FormatPlain /
-; Format) and the WebView2 report window. The report HTML is rendered by the
-; shared frontend _shared/ui/healthcheck/ (loaded via virtual host); the
-; snapshot is injected as JSON after navigation completes.
+; (HealthCheck_Run / RecordError / RecordWarn / FormatPlain) and the WebView2
+; report window. The report HTML is rendered by the shared frontend
+; _shared/ui/healthcheck/ (loaded via virtual host); the snapshot is injected
+; as JSON after navigation completes.
 ;
 ; Split out of the former infra/healthcheck.ahk (the module split); see
 ; ui/healthcheck/init.ahk for the module overview. Functions and globals are
@@ -228,98 +228,6 @@ _HealthCheck_CommitText(Sys) {
 	Text := (Commit != "") ? Commit : "unknown"
 	Source := Sys.Get("commit_source", "")
 	return (Source != "") ? Text . " (" . Source . ")" : Text
-}
-
-; Formats a healthcheck snapshot as a Markdown string suitable for WebView2 rendering.
-; @param Snapshot {Map|0} Result from HealthCheck_Run(), or 0 to run fresh.
-; @return {String}
-HealthCheck_FormatMarkdown(Snapshot := 0) {
-	if !(Snapshot is Map)
-		Snapshot := HealthCheck_Run()
-
-	Sys := Snapshot["sys"]
-
-	Lines := []
-	Lines.Push("# System diagnostic")
-	Lines.Push("")
-
-	; ── System info ───────────────────────────────────────────────────────────
-	Lines.Push("## System")
-	Lines.Push("")
-	Lines.Push("| Field | Value |")
-	Lines.Push("|---|---|")
-	Lines.Push("| ErgoptiPlus version | " . '``' . Snapshot["version"] . '``' . " |")
-	Lines.Push("| Last git commit | " . _HealthCheck_CommitText(Sys) . " |")
-	Lines.Push("| Uptime | " . _HealthCheck_FormatUptime(Snapshot["uptime_sec"]) . " |")
-	Lines.Push("| AutoHotkey | " . Sys["ahk_version"] . " " . Sys["ahk_bitness"] . " |")
-	Lines.Push("| Windows | " . Sys["os_name"] . " |")
-	Lines.Push("| Windows build | " . Sys["os_build"] . " |")
-	Lines.Push("| Architecture | " . Sys["os_arch"] . " |")
-	Lines.Push("| CPU | " . Sys["cpu_name"] . " |")
-	Lines.Push("| Logical cores | " . Sys["cpu_cores"] . " |")
-	Lines.Push("| Total RAM | " . Sys["ram_total_gb"] . " GB |")
-	Lines.Push("| Available RAM | " . Sys["ram_free_gb"] . " GB |")
-	Lines.Push("| Screen resolution | " . Sys["screen_res"] . " |")
-	Lines.Push("| DPI | " . Sys["dpi"] . " (" . Sys["dpi_scale"] . "%) |")
-	Lines.Push("| Locale | " . Sys["locale"] . " |")
-	if Sys["config_dir"] != ""
-		Lines.Push("| Config dir | " . '``' . Sys["config_dir"] . '``' . " |")
-	if Sys.Get("script_dir", "") != ""
-		Lines.Push("| App dir | " . '``' . Sys["script_dir"] . '``' . " |")
-	Lines.Push("")
-
-	; ── Session counters ──────────────────────────────────────────────────────
-	WarnCount := Snapshot["warn_count"]
-	ErrCount  := Snapshot["err_count"]
-	Lines.Push("## Session counters")
-	Lines.Push("")
-	Lines.Push("| Type | Count |")
-	Lines.Push("|---|---|")
-	Lines.Push("| ⚠️ Warnings | " . (WarnCount = 0 ? "✅ " : "❌ ") . WarnCount . " |")
-	Lines.Push("| 🔴 Errors   | " . (ErrCount  = 0 ? "✅ " : "❌ ") . ErrCount  . " |")
-	Lines.Push("")
-
-	; ── Adapters ──────────────────────────────────────────────────────────────
-	OkList   := Snapshot["ports_validated"]
-	FailList := Snapshot["failed_adapters"]
-	Total    := OkList.Length + FailList.Length
-
-	Lines.Push("## Adapters (" . OkList.Length . "/" . Total . " OK)")
-	Lines.Push("")
-	for _, Name in OkList
-		Lines.Push("- ✓ " . '``' . Name . '``')
-	for _, Name in FailList
-		Lines.Push("- ✗ " . '``' . Name . '``')
-	Lines.Push("")
-
-	; ── Last recorded error ───────────────────────────────────────────────────
-	Lines.Push("## Last recorded error")
-	Lines.Push("")
-	LastErr := Snapshot["last_error"]
-	Fence   := Chr(96) . Chr(96) . Chr(96)
-	if LastErr != ""
-		Lines.Push(Fence . "`n" . LastErr . "`n" . Fence)
-	else
-		Lines.Push("_No error recorded._")
-	Lines.Push("")
-
-	; ── Recent warnings / errors ──────────────────────────────────────────────
-	RecentIssues := Snapshot["recent_issues"]
-	Lines.Push("## Recent warnings / errors (" . RecentIssues.Length . "/100)")
-	Lines.Push("")
-	if RecentIssues.Length = 0 {
-		Lines.Push("_No warnings or errors since startup._")
-	} else {
-		Lines.Push(Fence)
-		for _, L in RecentIssues
-			Lines.Push(L)
-		Lines.Push(Fence)
-	}
-
-	Out := ""
-	for i, L in Lines
-		Out .= (i > 1 ? "`n" : "") . L
-	return Out
 }
 
 ; Exact dimensions for the diagnostic window — mirrors the updater layout approach.
