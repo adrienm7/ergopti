@@ -90,6 +90,10 @@ helpers.describe("script lifecycle actions", function()
 			["shortcuts.keyboard.ctrl_k"] = "script_pause_toggle",
 		} })
 		package.loaded["modules.gestures.manager"] = {
+			-- The loader keeps only the ids the catalogue offers; both stored ones are.
+			is_assignable = function(action)
+				return action == "select_line" or action == "script_pause_toggle"
+			end,
 			execute_action = function(action) executed[#executed + 1] = action return true end,
 		}
 		package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil

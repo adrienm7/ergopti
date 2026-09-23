@@ -217,20 +217,45 @@ end
 -- =========================================
 -- =========================================
 
+--- The gestures manager, whose catalogue decides which action ids a slot may
+--- hold. Required lazily: the daemon loads it after this module.
+--- @return table|nil The manager, or nil (logged) when its catalogue is unavailable.
+local function action_catalogue()
+	local ok, Gestures = pcall(require, "modules.gestures.manager")
+	if not ok or type(Gestures) ~= "table" or type(Gestures.is_assignable) ~= "function" then
+		Logger.error(LOG, "The action catalogue is unavailable: %s", tostring(Gestures))
+		return nil
+	end
+	return Gestures
+end
+
 --- Reads every stored assignment. Idempotent.
 local function load_assignments()
 	if _loaded then return end
 	_loaded = true
 	local ok, Storage = pcall(require, "adapters.storage")
 	if not ok or not Storage or type(Storage.keys) ~= "function" then return end
+	-- The check set_action applies, applied to what was stored: an id the
+	-- catalogue does not offer (hand-edited, or retired by an update) would bind
+	-- the chord to a no-op. Windows drops it at load the same way.
+	local Gestures = action_catalogue()
+	if not Gestures then
+		Logger.error(LOG, "Keyboard shortcut assignments not loaded: no catalogue to check them against.")
+		return
+	end
 	local count = 0
 	for _, key in ipairs(Storage.keys()) do
 		if key:sub(1, #PREF_PREFIX) == PREF_PREFIX then
 			local slot = key:sub(#PREF_PREFIX + 1)
 			local action = Storage.get(key, nil)
 			if type(action) == "string" and action ~= "" and action ~= "none" then
-				_assignments[slot] = action
-				count = count + 1
+				if Gestures.is_assignable(action) then
+					_assignments[slot] = action
+					count = count + 1
+				else
+					Logger.warn(LOG, "Keyboard slot '%s' holds unknown action '%s' — left unbound.",
+						slot, action)
+				end
 			end
 		end
 	end
@@ -284,9 +309,9 @@ function M.set_action(slot_id, action_id)
 
 	-- The same catalogue check the gesture slots apply, and Windows applies to
 	-- both: an unknown id would be stored, fire on the chord, and do nothing.
-	local ok_gestures, Gestures = pcall(require, "modules.gestures.manager")
-	if not ok_gestures or type(Gestures.is_assignable) ~= "function" then
-		Logger.error(LOG, "set_action(): the action catalogue is unavailable — '%s' not bound.", slot_id)
+	local Gestures = action_catalogue()
+	if not Gestures then
+		Logger.error(LOG, "set_action(): '%s' not bound without the action catalogue.", slot_id)
 		return false
 	end
 	if not Gestures.is_assignable(action_id) then
