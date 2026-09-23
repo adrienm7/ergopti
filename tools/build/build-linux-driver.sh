@@ -176,6 +176,9 @@ REQUIRED_FILES=(
 	"_shared/lua/llm/prompt_builder.lua"
 	"linux/infra/llm_bridge.lua"
 	"_shared/lua/tray/protocol.lua"
+	# The tray logo. Without it the icon silently falls back to a generic glyph.
+	"_shared/assets/ergopti_tray.png"
+	"_shared/assets/ergopti_tray_paused.png"
 	"_shared/lua/compat/base64.lua"
 	"_shared/lua/compat/utf8.lua"
 	"_shared/lua/keymap/terminators.lua"

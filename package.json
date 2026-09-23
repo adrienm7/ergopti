@@ -217,6 +217,7 @@
 		"test:shared-toml-codec-purity": "node ./tools/test/test-shared-toml-codec-purity.cjs",
 		"test:linux-package-layout": "node ./tools/test/test-linux-package-layout.cjs",
 		"test:linux-tracked-copy": "node ./tools/test/test-linux-tracked-copy.cjs",
+		"test:linux-tray-icon-assets": "node ./tools/test/test-linux-tray-icon-assets.cjs",
 		"test:linux-ci-evidence": "node ./tools/test/test-linux-ci-evidence.cjs",
 		"test:linux-webview-security": "node ./tools/test/test-linux-webview-security.cjs",
 		"test:linux-metrics-webview-lifecycle": "node ./tools/test/test-linux-metrics-webview-lifecycle.cjs",

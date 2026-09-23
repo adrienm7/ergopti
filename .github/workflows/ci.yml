@@ -937,6 +937,35 @@ jobs:
           env LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;' luajit tests/hardware/run_tray_symbols.lua
         timeout-minutes: 4
 
+      # The symbols resolving is not the icon appearing. A panel shows a tray
+      # icon when an item registers with org.kde.StatusNotifierWatcher and then
+      # answers for its properties and its com.canonical.dbusmenu menu — the
+      # protocol KDE Plasma, GNOME's AppIndicator extension, waybar and
+      # xfce4-panel all speak. sni_host.py is that watcher and nothing else, so
+      # "the icon appears" is checked here with the production adapter: the item
+      # is Active, carries the Ergopti logo as an ABSOLUTE file path (the panel
+      # resolves it in its own working directory) and serves the menu rows.
+      - name: The tray icon registers with a StatusNotifier host
+        if: always()
+        working-directory: static/ergopti_plus/linux
+        run: |
+          sudo apt-get install -y --no-install-recommends python3-gi gir1.2-glib-2.0 dbus xvfb
+          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+          dbus-run-session -- bash -c '
+            ready="$(mktemp -u)"
+            python3 tests/hardware/sni_host.py --ready-file "$ready" --timeout 30 \
+              --expect-label "Ergopti+ tray probe" --expect-icon-file > "$RUNNER_TEMP/sni.json" &
+            host=$!
+            for _ in $(seq 1 40); do [ -f "$ready" ] && break; sleep 0.25; done
+            [ -f "$ready" ] || { echo "::error::the StatusNotifier host never started"; exit 1; }
+            xvfb-run -a luajit tests/hardware/run_tray_icon.lua 10
+            probe=$?
+            wait "$host"; status=$?
+            cat "$RUNNER_TEMP/sni.json"
+            [ "$probe" = "0" ] || exit "$probe"
+            exit "$status"'
+        timeout-minutes: 4
+
       # touchpad_finder reads capability bits out of a printed bitmap, and that
       # rests on one thing the text cannot confirm: that the words are 64 bits
       # wide, most significant first, with leading zero words omitted. Its unit
@@ -1086,6 +1115,7 @@ jobs:
               --subject x11-display=1 \
               --subject wayland-display=1 \
               --subject tray-symbols=1 \
+              --subject tray-sni-registration=1 \
               --subject touchpad-capability=1 \
               --subject gesture-roundtrip=1 \
               --subject webview-settings=1 \
