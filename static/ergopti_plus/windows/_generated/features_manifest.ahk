@@ -259,6 +259,7 @@ global FEATURES_MANIFEST := Map(
         Map("path", "layout.ergopti_alt_gr", "id", "ergopti_alt_gr", "section", "layout", "default", true, "type", "boolean", "description_key", "menu.layout.ergopti_alt_gr", "platforms", ["ahk"]),
         Map("path", "layout.ergopti_plus", "id", "ergopti_plus", "section", "layout", "default", true, "type", "boolean", "description_key", "menu.layout.ergopti_plus", "platforms", ["ahk"]),
         Map("path", "layout.ctrl_magic_save", "id", "ctrl_magic_save", "section", "layout", "default", false, "type", "boolean", "description_key", "menu.layout.ctrl_magic_save", "platforms", ["ahk"]),
+        Map("path", "layout.emulated_layout", "id", "emulated_layout", "section", "layout", "default", "", "type", "string", "description_key", "menu.layout.emulated_layout", "platforms", ["ahk"]),
         Map("path", "category_enabled.hotstrings", "id", "hotstrings", "section", "category_enabled", "default", true, "type", "boolean", "description_key", "menu.category_enabled.hotstrings", "platforms", ["ahk"]),
         Map("path", "category_enabled.layout", "id", "layout", "section", "category_enabled", "default", true, "type", "boolean", "description_key", "menu.category_enabled.layout", "platforms", ["ahk"]),
         Map("path", "category_enabled.shortcuts", "id", "shortcuts", "section", "category_enabled", "default", true, "type", "boolean", "description_key", "menu.category_enabled.shortcuts", "platforms", ["ahk"]),

@@ -29,7 +29,7 @@ function build(config = evidenceConfig) {
 
 const rows = build();
 const summary = summarize(rows);
-assert.strictEqual(summary.total, 333, 'the canonical Linux projection must classify all 333 features');
+assert.strictEqual(summary.total, 334, 'the canonical Linux projection must classify all 334 features');
 assert.ok(summary.claimed_supported >= 126, 'supported feature count may only increase from the audited 126');
 assert.ok(summary.unavailable <= 198, 'unavailable feature count may only decrease from the audited 198');
 // Only macOS draws a menubar icon whose variant the user picks.
@@ -37,6 +37,12 @@ const menubarIcon = rows.find((row) => row.path === 'ui.menubar_icon');
 assert.ok(menubarIcon && menubarIcon.status === 'unavailable'
 	&& menubarIcon.reason.kind === 'macos_specific',
 	'ui.menubar_icon must stay a macOS-specific setting, not a Linux gap');
+// layout.emulated_layout is unavailable on Linux: layout.emulated_layout, Windows-specific by design: Windows
+// emulates a registry layout, Linux converts the same .keylayout to XKB.
+const emulatedLayout = rows.find((row) => row.path === 'layout.emulated_layout');
+assert.ok(emulatedLayout && emulatedLayout.status === 'unavailable'
+	&& emulatedLayout.reason.kind === 'windows_specific',
+	'layout.emulated_layout must stay a Windows-specific setting, not a Linux gap');
 assert.strictEqual(summary.claimed_supported + summary.unavailable, summary.total);
 assert.strictEqual(rows.filter((row) => !row.reason?.kind).length, 0, 'every row needs a reason classification');
 assert.strictEqual(rows.filter((row) => !row.owner).length, 0, 'every row needs an owner');

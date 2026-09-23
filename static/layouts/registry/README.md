@@ -20,7 +20,10 @@ derived from it is stored here:
 
 - macOS installs the `.keylayout` as it is;
 - Windows (AutoHotkey) parses the `.keylayout` when the layout is loaded or
-  changed and emulates it; there is no Windows version of a layout;
+  changed and emulates it; there is no Windows version of a layout. The
+  emulated layout is `[layout] emulated_layout` in `config.toml` (a registry
+  id, empty for none); the driver downloads it at boot when its verified copy
+  is missing from `<configuration folder>/layouts/`;
 - Linux converts the `.keylayout` to XKB symbols and an XCompose file on the
   device, with `static/ergopti/linux/xkb_generation`.
 

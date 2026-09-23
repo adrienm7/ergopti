@@ -36,10 +36,11 @@ _LAY_LayoutFeatureBaseRows() {
 ; List provider: the Ergopti AltGr features (ergopti_alt_gr, ergopti_plus).
 ; The rows that work on any layout are declared on their own in the manifest's
 ; « any layout » section: direct_access_digits, and ctrl_magic_save after the
-; magic-key replace option it depends on.
+; magic-key replace option it depends on. emulated_layout names a registry
+; layout: a choice, not a switch, so no toggle row lists it.
 _LAY_LayoutFeatureAltGrRows() {
 	static STANDALONE_IDS := Map("ergopti_base", true, "ctrl_magic_save", true,
-		"direct_access_digits", true)
+		"direct_access_digits", true, "emulated_layout", true)
 	Rows := []
 	for _, LayoutEntry in ManifestFeaturesForSection("layout") {
 		if !STANDALONE_IDS.Has(LayoutEntry["id"]) {

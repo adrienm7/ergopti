@@ -489,6 +489,11 @@ if UIASW_IsWorkerInvocation()
 #Include ui/personal_toml_editor_webview.ahk
 #Include modules/keymap/layout/layout_altgr.ahk
 #Include modules/keymap/layout/layout_shift_caps.ahk
+; Registry layout emulation (a .keylayout read at boot): definitions only, the
+; hotkeys are registered by KeylayoutEmulation_Boot below.
+#Include modules/keymap/keylayout/keylayout_parser.ahk
+#Include modules/keymap/keylayout/keylayout_emulation.ahk
+#Include modules/keymap/keylayout/layout_registry.ahk
 #Include infra/app_picker.ahk
 #Include infra/config_shortcuts.ahk
 #Include infra/metrics/metrics_shortcuts.ahk
@@ -1233,6 +1238,10 @@ global _FmtCountCache := Map()
 #Include infra/script_altgr_hotkeys.ahk
 BootProfile_StageBegin("layout and remaps")
 _RegisterScriptAltGrHotkeys()
+; Before modules/keymap/layout.ahk: AHK fires the earliest-created hotkey variant
+; whose criterion holds, so the registry layout emulation must register first to
+; own its keys over every Ergopti layer. A no-op when no registry layout is chosen.
+KeylayoutEmulation_Boot(_ConfigDir)
 
 ; Personal hotstrings are loaded exactly once, inside RegisterAllHotstrings()
 ; below. There used to be an inline forward-order load here at #InputLevel 0,

@@ -452,6 +452,7 @@ direct_access_digits = true
 ergopti_alt_gr = true
 ergopti_plus = true
 ctrl_magic_save = false
+emulated_layout = ""
 
 [category_enabled]
 hotstrings = true

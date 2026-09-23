@@ -1045,6 +1045,9 @@ M.unavailable = {
 		path = "layout.ctrl_magic_save", section = "layout", reason_key = "", platforms = { "ahk" },
 	},
 	{
+		path = "layout.emulated_layout", section = "layout", reason_key = "", platforms = { "ahk" },
+	},
+	{
 		path = "category_enabled.hotstrings", section = "category_enabled", reason_key = "", platforms = { "ahk" },
 	},
 	{
