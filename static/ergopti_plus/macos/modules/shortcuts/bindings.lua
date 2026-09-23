@@ -965,27 +965,41 @@ function M.has_pause_debt()
 		or children_have_pause_debt()
 end
 
---- Enables a single named hotkey by running its factory function.
+--- Records the user's preference for one named hotkey and binds it when the
+--- layer admits native acquisition. Behind the pause fence (Shortcuts OFF,
+--- ScriptControl PAUSE, layout-rebind recovery) only the preference changes:
+--- the boot and Disable All synchronizations replay every saved key there, and
+--- refusing them lost the preference and logged an ERROR per key. The next
+--- start/resume binds every shortcut that is not in _disabled_set.
 --- @param name string The shortcut identifier.
---- @return boolean committed
+--- @return boolean committed True once the preference is recorded and, when
+---   admission is open, the native hotkey is owned.
 function M.enable(name)
 	if type(name) ~= "string" then
 		Logger.error(LOG, "M.enable(): name must be a string.")
 		return false
 	end
-	if not admission_open() or start_attempt ~= nil then
-		Logger.error(LOG, "M.enable(): lifecycle admission is paused.")
+	if start_attempt ~= nil then
+		Logger.error(LOG, "M.enable(): a start transaction is acquiring native hotkeys.")
 		return false
-	end
-	if hotkeys[name] then
-		Logger.debug(LOG, "Hotkey '%s' already enabled — skipping.", name)
-		return true
 	end
 	local def = hotkey_defs[name]
 	if type(def) ~= "function" then
 		Logger.error(LOG, "M.enable(): unknown hotkey '%s'.", name)
 		return false
 	end
+	if not admission_open() then
+		_disabled_set[name] = nil
+		Logger.debug(LOG, "Hotkey '%s' enabled while the layer is paused — it binds on resume.", name)
+		return true
+	end
+	if hotkeys[name] then
+		Logger.debug(LOG, "Hotkey '%s' already enabled — skipping.", name)
+		return true
+	end
+	-- A refused acquisition is no change: the saved preference must survive a
+	-- factory failure or a superseding pause exactly as it was before the call.
+	local previously_disabled = _disabled_set[name]
 	_disabled_set[name] = nil
 	local acquisition_epoch = lifecycle_epoch
 	native_acquisition_depth = native_acquisition_depth + 1
@@ -1001,13 +1015,13 @@ function M.enable(name)
 				Logger.error(LOG,
 					"M.enable(): superseded factory cleanup remains pending for '%s'.", name)
 			end
-			_disabled_set[name] = true
+			_disabled_set[name] = previously_disabled
 			return false
 		end
 		Logger.debug(LOG, "Hotkey '%s' enabled.", name)
 		return true
 	end
-	_disabled_set[name] = true
+	_disabled_set[name] = previously_disabled
 	Logger.error(LOG, "M.enable(): factory for '%s' failed: %s.", name, tostring(obj))
 	return false
 end
@@ -1048,10 +1062,20 @@ function M.disable(name)
 	return true
 end
 
---- Returns whether a specific hotkey is currently active.
+--- Returns the user's preference for a named hotkey, whatever the layer's
+--- lifecycle. This is what config.toml persists and the menu checks: a pause,
+--- Shortcuts OFF or a layout rebind releases the native hotkey, never the
+--- preference.
 --- @param name string The shortcut identifier.
---- @return boolean True if the hotkey is bound.
+--- @return boolean True when the shortcut is registered and not disabled.
 function M.is_enabled(name)
+	return hotkey_defs[name] ~= nil and not _disabled_set[name]
+end
+
+--- Returns whether a named hotkey currently owns a native binding.
+--- @param name string The shortcut identifier.
+--- @return boolean True if the hotkey is bound right now.
+function M.is_bound(name)
 	return hotkeys[name] ~= nil
 end
 
@@ -1096,14 +1120,19 @@ function M.set_chatgpt_url(url)
 end
 
 --- Returns a sorted array of all registered shortcuts with their current status.
---- @return table Array of {id, label, enabled} tables.
+--- `enabled` is the user's preference (see M.is_enabled), which Preferences
+--- persists to [shortcuts.keys]; `bound` is the live native state (see
+--- M.is_bound). Reporting the binding as `enabled` wrote every key false on
+--- any save made while the layer was paused or off.
+--- @return table Array of {id, label, enabled, bound} tables.
 function M.list_shortcuts()
 	local out = {}
 	for name in pairs(hotkey_defs) do
 		table.insert(out, {
 			id      = name,
 			label   = hotkey_labels[name] or name,
-			enabled = (hotkeys[name] ~= nil),
+			enabled = M.is_enabled(name),
+			bound   = M.is_bound(name),
 		})
 	end
 	table.sort(out, function(a, b) return sort_key(a.id) < sort_key(b.id) end)

@@ -279,6 +279,20 @@ The keycode-based script-control event tap survives layout changes and pause.
 Do not restart it through shortcut lifecycle or regenerate Karabiner state on a
 pause-driven layout switch.
 
+### project-hs-shortcut-preference-is-not-the-binding
+
+Named shortcuts in `modules/shortcuts/bindings.lua` have two axes:
+`is_enabled`/`list_shortcuts().enabled` is the user preference (not in
+`_disabled_set`), `is_bound`/`.bound` the live native hotkey. Pause, Shortcuts
+OFF, stop and the layout-rebind fence release every hotkey but never the
+preference, and `Preferences.snapshot` persists only the preference to
+`[shortcuts.keys]`. Reading the binding as the preference wrote every key false
+on each save made behind the fence (Disable All saves exactly there). Behind the
+fence `enable` records the preference and binds nothing; the next start/resume
+binds it. The boot and Disable All syncs replay saved keys in that window. Test
+doubles must keep both axes and the admission fence
+(`tests/support/shortcut_bindings_fixture.lua`).
+
 ### project-hs-fork-admission-in-both-launch-modes
 
 Opening ordinary Hammerspoon with a Git checkout is a supported launch path;
