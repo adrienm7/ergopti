@@ -1301,8 +1301,11 @@ jobs:
           - { distro: ubuntu-24.04, image: 'ubuntu:24.04' }
           - { distro: debian-12, image: 'debian:12' }
           - { distro: debian-13, image: 'debian:13' }
-          - { distro: fedora-41, image: 'fedora:41' }
-          - { distro: fedora-latest, image: 'fedora:latest' }
+          # Fedora packages lgi for Lua 5.4 only: the tray works there, its
+          # WebKit windows cannot open under LuaJIT. Declared, and the entry
+          # fails if that ever stops being true.
+          - { distro: fedora-41, image: 'fedora:41', known: webkit }
+          - { distro: fedora-latest, image: 'fedora:latest', known: webkit }
           - { distro: arch, image: 'archlinux:latest' }
           - { distro: opensuse-tumbleweed, image: 'opensuse/tumbleweed:latest' }
           - { distro: alpine, image: 'alpine:latest' }
@@ -1313,6 +1316,7 @@ jobs:
         timeout-minutes: 25
         run: |
           set -euo pipefail
+          export ERGOPTI_E2E_DOCKER_ARGS="-e ERGOPTI_E2E_KNOWN_LIMITATIONS=${{ matrix.known || '' }}"
           bash static/ergopti_plus/linux/tests/distro/run_in_docker.sh '${{ matrix.image }}' \
             | tee "$RUNNER_TEMP/first-install.log"
 

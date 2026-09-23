@@ -168,8 +168,22 @@ fi
 # The tray's windows (settings, editor, metrics, onboarding) are WebKit2GTK
 # pages driven through lgi. Without both, every menu row that opens a window
 # does nothing on a fresh install.
+# ERGOPTI_E2E_KNOWN_LIMITATIONS names what a matrix entry declares missing on
+# that distribution (Fedora packages lgi for Lua 5.4 only). Declared, not
+# skipped: the entry fails the day the limitation disappears, so the
+# declaration cannot outlive the fact.
+known_limitation() {
+	case " ${ERGOPTI_E2E_KNOWN_LIMITATIONS:-} " in *" $1 "*) return 0 ;; esac
+	return 1
+}
 if as_user "luajit -e \"local core=require('lgi.core'); os.exit(core.gi.require('WebKit2') and 0 or 1)\"" >/dev/null 2>&1; then
-	ok "WebKit2GTK loads through lgi (the tray's windows can open)"
+	if known_limitation webkit; then
+		fail "WebKit2GTK now loads through lgi here — remove the declared 'webkit' limitation"
+	else
+		ok "WebKit2GTK loads through lgi (the tray's windows can open)"
+	fi
+elif known_limitation webkit; then
+	info "KNOWN LIMITATION: no LuaJIT build of lgi on this distribution — the tray works, its windows do not"
 else
 	fail "WebKit2GTK does not load through lgi — the tray's windows cannot open"
 fi
