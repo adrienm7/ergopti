@@ -64,6 +64,33 @@ Test("HealthCheck: the ring answers only before today's errors file exists (erro
 	_THIE_RingOnlyWhenTheFileIsAbsent)
 
 
+; An errors file that exists but cannot be read is a failure the snapshot
+; reports as unavailable; the ring must not answer as if the file were absent.
+; The macOS and Linux snapshots pin the same rule.
+_THIE_UnreadableFileIsNotTheRing() {
+	Path := _THIE_WriteErrorsFile()
+	; Denies every other open, this process's included
+	Lock := FileOpen(Path, "rw -rwd")
+	Assert(IsObject(Lock), "the fixture file must be locked")
+	try {
+		Threw := false
+		try {
+			Result := _HealthCheck_RecentIssues(Path)
+		} catch {
+			Threw := true
+		}
+		Assert(Threw, "an unreadable errors file must fail, not fall back to the ring: got "
+			. (IsSet(Result) ? Result["source"] : "nothing"))
+	} finally {
+		Lock.Close()
+		try FileDelete(Path)
+	}
+}
+
+Test("HealthCheck: an unreadable errors file is a failure, never the ring (errors-file-issues)",
+	_THIE_UnreadableFileIsNotTheRing)
+
+
 _THIE_RunReportsTheSource() {
 	global LOGGER_ERRORS_LOG_PATH
 	Saved := LOGGER_ERRORS_LOG_PATH

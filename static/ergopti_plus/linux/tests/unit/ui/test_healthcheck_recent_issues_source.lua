@@ -58,4 +58,24 @@ helpers.describe("healthcheck (linux): recent issues source", function()
 			helpers.assert_true(found, "the ring fallback must carry the warning just logged")
 		end)
 	end)
+
+	helpers.it("reports an errors file that exists but cannot be read, never the ring (errors-file-issues)", function()
+		local Logger = require("logger")
+		Logger.warn("probe", "ring entry that must not stand in for the file")
+		local path = TMP .. "/ergopti_hc_unreadable_" .. tostring(os.time()) .. ".log"
+		-- The file is there but refuses to open: the ring would answer as if it
+		-- did not exist, and the page would say so
+		local real_open = io.open
+		io.open = function(name, ...)
+			if name == path then return nil, path .. ": Permission denied", 13 end
+			return real_open(name, ...)
+		end
+		local ok, err = pcall(with_errors_path, path, function(Bridge)
+			local snapshot = Bridge.on_message("ready", {})
+			helpers.assert_eq(snapshot.recent_issues_source, "unavailable")
+			helpers.assert_eq(snapshot.recent_issues, {})
+		end)
+		io.open = real_open
+		if not ok then error(err, 0) end
+	end)
 end)

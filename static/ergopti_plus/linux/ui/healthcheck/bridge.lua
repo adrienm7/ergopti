@@ -114,9 +114,10 @@ end
 --- opened to show; the errors file keeps WARNING and ERROR only.
 --- @param lines table The ring-buffer snapshot.
 --- @return table entries Oldest first.
---- @return string source "errors_file", "ring", or "unavailable" (logged).
+--- @return string source "errors_file", "ring", or "unavailable" when the
+---   bounds or an existing errors file could not be read (logged).
 local function collect_recent_issues(lines)
-	local ok, entries, source, problem = pcall(function()
+	local ok, entries, source = pcall(function()
 		local limits = Snapshot.load_recent_issue_limits(
 			require("infra.paths").shared("modules/diagnostics/recent_issues.json"))
 		return Snapshot.collect_recent_issues(LoggerSink.errors_log_path(), lines, limits)
@@ -124,10 +125,6 @@ local function collect_recent_issues(lines)
 	if not ok then
 		Logger.error(LOG, "Recent issues could not be collected: %s.", tostring(entries))
 		return {}, "unavailable"
-	end
-	if problem then
-		Logger.warn(LOG, "Today's errors file could not be read (%s); recent issues come from the ring.",
-			tostring(problem))
 	end
 	return entries, source
 end

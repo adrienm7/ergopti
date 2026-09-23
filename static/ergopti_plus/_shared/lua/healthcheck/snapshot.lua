@@ -264,22 +264,24 @@ function M.load_recent_issue_limits(path)
 end
 
 --- The window's recent warnings and errors: the tail of today's errors file,
---- or the ring when that file does not exist yet.
+--- or the ring when that file does not exist yet. A file that exists but does
+--- not open raises an error, never a reason to answer from the ring: the page
+--- would then say the file does not exist, and the AHK port fails the same way.
 --- @param errors_path string Today's errors file.
 --- @param ring_lines table The logger's ring buffer snapshot.
 --- @param limits table From load_recent_issue_limits().
 --- @param open_fn function|nil io.open replacement for tests.
 --- @return table entries Oldest first.
 --- @return string source "errors_file" or "ring".
---- @return string|nil problem Why the file could not be read, when it exists
----   but did not open (the caller logs it; the ring still answers).
 function M.collect_recent_issues(errors_path, ring_lines, limits, open_fn)
 	local chunk, at_start, code = M.read_tail(errors_path, limits.tail_max_bytes, open_fn)
 	if chunk then
-		return M.parse_errors_tail(chunk, at_start, limits.max_entries), "errors_file", nil
+		return M.parse_errors_tail(chunk, at_start, limits.max_entries), "errors_file"
 	end
-	local problem = code ~= ENOENT and at_start or nil
-	return M.extract_recent_issues(ring_lines, limits.max_entries), "ring", problem
+	if code ~= ENOENT then
+		error("today's errors file cannot be read: " .. tostring(at_start), 2)
+	end
+	return M.extract_recent_issues(ring_lines, limits.max_entries), "ring"
 end
 
 return M
