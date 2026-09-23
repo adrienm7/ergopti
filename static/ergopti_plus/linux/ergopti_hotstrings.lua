@@ -1657,6 +1657,8 @@ local function main()
 				return
 			end
 			tray_menu.setMenu(items)
+			-- Every pause toggle rebuilds the menu, so the logo follows here.
+			if type(tray_menu.setPaused) == "function" then tray_menu.setPaused(ctx.paused == true) end
 		end
 		rebuild_tray_menu()
 		else

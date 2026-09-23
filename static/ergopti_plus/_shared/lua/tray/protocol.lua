@@ -31,28 +31,36 @@ local M = {}
 -- =======================================
 -- =======================================
 
---- Candidate icon locations, in preference order: the shared asset tree first,
---- then a driver-local override.
-local CANDIDATES = {
-	"/../_shared/assets/ergopti_tray.png",
-	"/../_shared/assets/ergopti_tray.svg",
-	"/assets/tray_icon.png",
+--- The bundled icons, relative to the shared tree. Byte copies of
+--- static/img/logo/logo_simple{,_disabled}.png — the logo macOS draws in its
+--- menu bar and Windows in its tray — held in _shared because every Linux
+--- package format ships that tree and none ships static/img. The copies are
+--- pinned to their originals by tools/test/test-linux-tray-icon-assets.cjs.
+local ICONS = {
+	active = "/assets/ergopti_tray.png",
+	paused = "/assets/ergopti_tray_paused.png",
 }
 
 --- Finds the bundled tray icon.
 ---
 --- Returns "" when there is none, and the CALLER must treat that as "use a
 --- themed name" rather than as an icon. An empty icon name produces a blank,
---- unclickable space in the panel — which is what shipped, because the assets
---- directory does not exist and the result was assigned to a local nothing read.
---- @param driver_root string|nil Absolute path to the driver root.
+--- unclickable space in the panel.
+---
+--- Resolved from the SHARED root, not from the driver root. The candidates used
+--- to be "<driver root>/../_shared/assets/…", which is wrong on the system
+--- packages (the shared tree is a CHILD of /usr/lib/ergopti there), and the
+--- assets directory did not exist anyway: every Linux user saw a generic
+--- keyboard glyph instead of the logo the other two drivers show.
+--- @param shared_root string|nil Absolute path to the shared tree.
+--- @param paused boolean|nil True for the greyed logo shown while paused.
 --- @return string Absolute path to an existing icon file, or "".
-function M.resolve_tray_icon(driver_root)
-	driver_root = driver_root or "."
+function M.resolve_tray_icon(shared_root, paused)
+	if type(shared_root) ~= "string" or shared_root == "" then return "" end
 	local sep = package.config:sub(1, 1)
-
-	for _, suffix in ipairs(CANDIDATES) do
-		local path = driver_root .. suffix
+	local order = paused and { ICONS.paused, ICONS.active } or { ICONS.active }
+	for _, suffix in ipairs(order) do
+		local path = shared_root .. suffix
 		if sep == "\\" then path = path:gsub("/", "\\") end
 		local fh = io.open(path, "r")
 		if fh then

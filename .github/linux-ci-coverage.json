@@ -11,6 +11,7 @@
 				"x11-display": 1,
 				"wayland-display": 1,
 				"tray-symbols": 1,
+				"tray-sni-registration": 1,
 				"touchpad-capability": 1,
 				"gesture-roundtrip": 1,
 				"webview-settings": 1,
