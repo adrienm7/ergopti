@@ -23,6 +23,7 @@
 import argparse
 import json
 import os
+import re
 import sys
 
 try:
@@ -65,6 +66,14 @@ def main():
     parser.add_argument("--timeout", type=float, default=30.0)
     parser.add_argument("--expect-label", action="append", default=[])
     parser.add_argument("--expect-icon-file", action="store_true")
+    # The indicator registers with an empty menu and the daemon fills it just
+    # after: inspecting at once would read that placeholder.
+    parser.add_argument("--settle", type=float, default=0.0)
+    parser.add_argument("--min-labels", type=int, default=0)
+    # A label shaped like "menu.global.reload" is an i18n key the catalogue did
+    # not resolve — the whole menu reads like that when the locale files are
+    # not found.
+    parser.add_argument("--forbid-raw-keys", action="store_true")
     args = parser.parse_args()
 
     bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
@@ -84,7 +93,7 @@ def main():
                 items.append((service, "/StatusNotifierItem"))
             conn.emit_signal(None, "/StatusNotifierWatcher", "org.kde.StatusNotifierWatcher",
                              "StatusNotifierItemRegistered", GLib.Variant("(s)", (service,)))
-            GLib.idle_add(inspect)
+            GLib.timeout_add(int(args.settle * 1000), inspect)
         invocation.return_value(None)
 
     def on_get(conn, sender, path, iface, prop):
@@ -140,6 +149,12 @@ def main():
             if not any(os.path.isfile(c) for c in candidates):
                 report["failures"].append(
                     f"icon {icon!r} (theme path {theme!r}) is not the bundled Ergopti logo file")
+        if len(labels) < args.min_labels:
+            report["failures"].append(f"the menu has {len(labels)} row(s), expected at least {args.min_labels}")
+        if args.forbid_raw_keys:
+            raw = [label for label in labels if re.fullmatch(r"[a-z_]+(\.[a-z0-9_]+)+", label)]
+            if raw:
+                report["failures"].append(f"untranslated i18n keys in the menu: {raw[:5]}")
         for expected in args.expect_label:
             if not any(expected in label for label in labels):
                 report["failures"].append(f"no menu row contains {expected!r}")

@@ -978,6 +978,22 @@ jobs:
           bash static/ergopti_plus/linux/tests/hardware/run_atspi_focus.sh
         timeout-minutes: 5
 
+      # The program a user starts, started: the real daemon with --tray on a
+      # keyboard created through uinput, under an X server, a session bus, the
+      # accessibility bus, a window manager and a focused GTK field (nothing
+      # expands without the privacy gate's answer). A trigger typed on that
+      # keyboard must reach the desktop expanded, through the grab and the
+      # daemon's own virtual keyboard, while sni_host.py checks the tray it shows:
+      # the logo, and a translated menu with no raw i18n key.
+      - name: The whole daemon, live — a trigger typed, a tray shown
+        if: always()
+        run: |
+          sudo modprobe uinput
+          sudo apt-get install -y --no-install-recommends at-spi2-core openbox python3-gi gir1.2-gtk-3.0 \
+            dbus-x11 xvfb x11-xkb-utils libayatana-appindicator3-1
+          sudo bash static/ergopti_plus/linux/tests/hardware/run_daemon_live.sh
+        timeout-minutes: 6
+
       # touchpad_finder reads capability bits out of a printed bitmap, and that
       # rests on one thing the text cannot confirm: that the words are 64 bits
       # wide, most significant first, with leading zero words omitted. Its unit
@@ -1129,6 +1145,7 @@ jobs:
               --subject tray-symbols=1 \
               --subject tray-sni-registration=1 \
               --subject atspi-focus-probe=1 \
+              --subject daemon-live=1 \
               --subject touchpad-capability=1 \
               --subject gesture-roundtrip=1 \
               --subject webview-settings=1 \
