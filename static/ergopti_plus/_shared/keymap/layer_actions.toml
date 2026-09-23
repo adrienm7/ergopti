@@ -1,0 +1,364 @@
+# _shared/keymap/layer_actions.toml
+#
+# The vocabulary a layer binding may use, and what each word does on each OS.
+#
+# A layer file (layers.recommended.toml here, the user's layers.toml in the
+# config folder) binds a physical key, named by its W3C KeyboardEvent.code in
+# _shared/data/keycodes/physical_keys.json, to one value of this grammar:
+#
+#   <action id>          a named action declared under [actions.*] below
+#   repeat_count:<N>     sets how many times the next repeatable action runs
+#   keystroke:<chord>    sends a literal chord once, e.g. keystroke:primary+shift+Home
+#
+# A chord is `modifier+…+Key`, Key a physical-key code of kind "key" and each
+# modifier one of [_meta].modifier_order or `primary` — the modifier each OS
+# uses for its own shortcuts ([primary_modifier]). Several chords separated by
+# commas are sent in order. A key absent from a layer keeps its normal
+# behaviour while the layer is held.
+#
+# Each named action resolves per OS through `windows` / `macos` / `linux`, or
+# `all` for every OS that has no entry of its own. A resolution is one of
+#   keystroke:<chord>[,<chord>…]   what the driver sends
+#   call:<handler>                 a driver-native handler ([call_handlers])
+#   none                           the key does nothing while the layer is held
+# An action that cannot resolve on an OS leaves that OS out of its reach and
+# says why through `reason_key`, a locale key under platform_reason.*. So does
+# a restricted modifier or parameter.
+#
+# `repeatable = true` means the repeat count set by repeat_count:<N> applies:
+# the LAST chord of the resolution is sent N times. `catalogue = true` means the
+# id is the same action as [sg_actions.<id>] in _shared/modules/actions/
+# actions.toml; tools/test/test-layer-actions-vocabulary.cjs pins every such
+# resolution to the keystroke the catalogue emits for that OS. An OS listed in
+# `catalogue_divergence` deliberately resolves differently, and the comment on
+# that action says why.
+#
+# Loaders: _shared/lua/keymap/layers.lua (macOS, Linux) and
+# windows/platform/remap/layers_loader.ahk (Windows).
+
+
+
+
+
+# =======================
+# =======================
+# ======= 1. Meta =======
+# =======================
+# =======================
+
+[_meta]
+schema_version = 1
+# The [_meta].schema_version every layer file must declare.
+layers_schema_version = 1
+# The user's layer file, at the root of the configuration folder.
+user_file = "layers.toml"
+platforms = ["windows", "macos", "linux"]
+# The order a resolved chord lists its modifiers in.
+modifier_order = ["ctrl", "alt", "shift", "meta", "fn"]
+
+[primary_modifier]
+windows = "ctrl"
+macos = "meta"
+linux = "ctrl"
+
+# fn is a key only macOS sees; Windows and Linux keyboards resolve it in
+# their own firmware, so no driver there can send it.
+[modifiers.fn]
+platforms = ["macos"]
+reason_key = "platform_reason.layer_fn_modifier_is_macos"
+
+# Driver-native handlers a `call:` resolution may name, per OS.
+[call_handlers]
+windows = ["maximize_window"]
+macos = []
+linux = []
+
+
+
+
+
+# =============================
+# =============================
+# ======= 2. Parameters =======
+# =============================
+# =============================
+
+[parameters.repeat_count]
+platforms = ["windows"]
+reason_key = "platform_reason.layer_repeat_count_is_windows_only"
+min = 1
+max = 99
+
+[parameters.keystroke]
+platforms = ["windows", "macos", "linux"]
+
+
+
+
+
+# =======================================
+# =======================================
+# ======= 3. Cursor and selection =======
+# =======================================
+# =======================================
+
+[actions.arrow_up]
+catalogue = true
+repeatable = true
+all = "keystroke:ArrowUp"
+
+[actions.arrow_down]
+catalogue = true
+repeatable = true
+all = "keystroke:ArrowDown"
+
+[actions.arrow_left]
+catalogue = true
+repeatable = true
+all = "keystroke:ArrowLeft"
+
+[actions.arrow_right]
+catalogue = true
+repeatable = true
+all = "keystroke:ArrowRight"
+
+[actions.sel_up]
+catalogue = true
+repeatable = true
+all = "keystroke:shift+ArrowUp"
+
+[actions.sel_down]
+catalogue = true
+repeatable = true
+all = "keystroke:shift+ArrowDown"
+
+[actions.sel_left]
+catalogue = true
+repeatable = true
+all = "keystroke:shift+ArrowLeft"
+
+[actions.sel_right]
+catalogue = true
+repeatable = true
+all = "keystroke:shift+ArrowRight"
+
+[actions.word_prev]
+catalogue = true
+repeatable = true
+all = "keystroke:ctrl+ArrowLeft"
+macos = "keystroke:alt+ArrowLeft"
+
+[actions.word_next]
+catalogue = true
+repeatable = true
+all = "keystroke:ctrl+ArrowRight"
+macos = "keystroke:alt+ArrowRight"
+
+[actions.sel_word_prev]
+catalogue = true
+repeatable = true
+all = "keystroke:ctrl+shift+ArrowLeft"
+macos = "keystroke:alt+shift+ArrowLeft"
+
+[actions.sel_word_next]
+catalogue = true
+repeatable = true
+all = "keystroke:ctrl+shift+ArrowRight"
+macos = "keystroke:alt+shift+ArrowRight"
+
+[actions.line_start]
+catalogue = true
+repeatable = false
+all = "keystroke:Home"
+macos = "keystroke:meta+ArrowLeft"
+
+[actions.line_end]
+catalogue = true
+repeatable = false
+all = "keystroke:End"
+macos = "keystroke:meta+ArrowRight"
+
+[actions.sel_line_start]
+repeatable = false
+all = "keystroke:shift+Home"
+macos = "keystroke:shift+meta+ArrowLeft"
+
+[actions.sel_line_end]
+repeatable = false
+all = "keystroke:shift+End"
+macos = "keystroke:shift+meta+ArrowRight"
+
+[actions.para_prev]
+catalogue = true
+repeatable = true
+all = "keystroke:ctrl+ArrowUp"
+macos = "keystroke:alt+ArrowUp"
+
+[actions.para_next]
+catalogue = true
+repeatable = true
+all = "keystroke:ctrl+ArrowDown"
+macos = "keystroke:alt+ArrowDown"
+
+# macOS keeps the chord its Karabiner layer has always sent for these two.
+[actions.sel_para_prev]
+repeatable = true
+all = "keystroke:ctrl+shift+ArrowUp"
+macos = "keystroke:alt+shift+meta+ArrowUp"
+
+[actions.sel_para_next]
+repeatable = true
+all = "keystroke:ctrl+shift+ArrowDown"
+macos = "keystroke:alt+shift+meta+ArrowDown"
+
+[actions.doc_start]
+catalogue = true
+repeatable = false
+all = "keystroke:ctrl+Home"
+macos = "keystroke:meta+ArrowUp"
+
+[actions.doc_end]
+catalogue = true
+repeatable = false
+all = "keystroke:ctrl+End"
+macos = "keystroke:meta+ArrowDown"
+
+[actions.sel_doc_start]
+repeatable = false
+all = "keystroke:ctrl+shift+Home"
+macos = "keystroke:shift+meta+ArrowUp"
+
+[actions.sel_doc_end]
+repeatable = false
+all = "keystroke:ctrl+shift+End"
+macos = "keystroke:shift+meta+ArrowDown"
+
+
+
+
+
+# ===============================
+# ===============================
+# ======= 4. Line editing =======
+# ===============================
+# ===============================
+
+[actions.move_line_up]
+repeatable = true
+all = "keystroke:alt+ArrowUp"
+
+[actions.move_line_down]
+repeatable = true
+all = "keystroke:alt+ArrowDown"
+
+[actions.duplicate_line_up]
+repeatable = true
+all = "keystroke:alt+shift+ArrowUp"
+
+[actions.duplicate_line_down]
+repeatable = true
+all = "keystroke:alt+shift+ArrowDown"
+
+# End of the line, then a new line: repeated, it opens N empty lines.
+[actions.new_line_below]
+repeatable = true
+all = "keystroke:End,Enter"
+macos = "keystroke:meta+ArrowRight,Enter"
+
+[actions.backspace]
+catalogue = true
+repeatable = true
+all = "keystroke:Backspace"
+
+[actions.delete]
+catalogue = true
+repeatable = true
+all = "keystroke:Delete"
+
+[actions.enter]
+catalogue = true
+repeatable = true
+all = "keystroke:Enter"
+
+[actions.tab]
+catalogue = true
+repeatable = true
+all = "keystroke:Tab"
+
+[actions.escape]
+catalogue = true
+repeatable = true
+all = "keystroke:Escape"
+
+[actions.none]
+catalogue = true
+repeatable = false
+all = "none"
+
+
+
+
+
+# ==========================
+# ==========================
+# ======= 5. Windows =======
+# ==========================
+# ==========================
+
+# Windows maximises through its own API: Win+Up on a window snapped to one half
+# of the screen moves it to a quarter instead of maximising it, so the layer
+# does not send the catalogue's Win+Up there.
+[actions.maximize]
+catalogue = true
+catalogue_divergence = ["windows"]
+repeatable = false
+windows = "call:maximize_window"
+macos = "keystroke:ctrl+meta+fn+KeyY"
+linux = "keystroke:meta+ArrowUp"
+
+[actions.snap_left]
+catalogue = true
+repeatable = false
+all = "keystroke:meta+ArrowLeft"
+macos = "keystroke:ctrl+fn+ArrowLeft"
+
+[actions.snap_right]
+catalogue = true
+repeatable = false
+all = "keystroke:meta+ArrowRight"
+macos = "keystroke:ctrl+fn+ArrowRight"
+
+[actions.window_to_monitor_left]
+repeatable = false
+all = "keystroke:shift+meta+ArrowLeft"
+macos = "keystroke:ctrl+alt+meta+ArrowLeft"
+
+[actions.window_to_monitor_right]
+repeatable = false
+all = "keystroke:shift+meta+ArrowRight"
+macos = "keystroke:ctrl+alt+meta+ArrowRight"
+
+
+
+
+
+# ========================
+# ========================
+# ======= 6. Media =======
+# ========================
+# ========================
+
+[actions.vol_up]
+catalogue = true
+repeatable = true
+all = "keystroke:AudioVolumeUp"
+
+[actions.vol_down]
+catalogue = true
+repeatable = true
+all = "keystroke:AudioVolumeDown"
+
+[actions.mute]
+catalogue = true
+repeatable = false
+all = "keystroke:AudioVolumeMute"
