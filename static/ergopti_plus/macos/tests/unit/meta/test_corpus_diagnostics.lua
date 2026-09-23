@@ -13,6 +13,8 @@
 --- 3. _shared/tests/corpus/diagnostics/redaction_vectors.json through
 ---    diagnostics.redact with the rules of
 ---    _shared/modules/diagnostics/redaction.json (what leaves the machine).
+--- 4. _shared/tests/corpus/diagnostics/issue_report_vectors.json through
+---    diagnostics.issue_report (the bug report text, summary and file name).
 --- Each corpus fails loudly when unreadable or empty: a replay over zero
 --- vectors would report success while checking nothing.
 --- ==============================================================================
@@ -106,6 +108,39 @@ helpers.describe("diagnostics corpus: redaction (redaction-corpus)", function()
 	for _, vector in ipairs(corpus.vectors or {}) do
 		helpers.it("apply: " .. vector.id .. " (redaction-corpus)", function()
 			helpers.assert_eq(Redact.apply(vector.input, rules, vector.context), vector.expected, vector.id)
+		end)
+	end
+end)
+
+helpers.describe("diagnostics corpus: bug report text (issue-report-corpus)", function()
+	local corpus = read_corpus("tests/corpus/diagnostics/issue_report_vectors.json")
+	local IssueReport = require("diagnostics.issue_report")
+
+	helpers.it("has vectors (issue-report-corpus)", function()
+		for _, list in ipairs({ "dump_vectors", "summary_vectors", "markdown_vectors", "file_name_vectors" }) do
+			helpers.assert_true(type(corpus[list]) == "table" and #corpus[list] >= 2,
+				"the bug-report corpus must hold its " .. list)
+		end
+	end)
+
+	for _, vector in ipairs(corpus.dump_vectors or {}) do
+		helpers.it("dump: " .. vector.id .. " (issue-report-corpus)", function()
+			helpers.assert_eq(IssueReport.dump(vector.input), vector.expected, vector.id)
+		end)
+	end
+	for _, vector in ipairs(corpus.summary_vectors or {}) do
+		helpers.it("summary: " .. vector.id .. " (issue-report-corpus)", function()
+			helpers.assert_eq(IssueReport.summary(vector.info, vector.file_name), vector.expected, vector.id)
+		end)
+	end
+	for _, vector in ipairs(corpus.markdown_vectors or {}) do
+		helpers.it("markdown: " .. vector.id .. " (issue-report-corpus)", function()
+			helpers.assert_eq(IssueReport.markdown(vector.info, vector.body), vector.expected, vector.id)
+		end)
+	end
+	for _, vector in ipairs(corpus.file_name_vectors or {}) do
+		helpers.it("file_name: " .. vector.id .. " (issue-report-corpus)", function()
+			helpers.assert_eq(IssueReport.file_name(vector.info), vector.expected, vector.id)
 		end)
 	end
 end)

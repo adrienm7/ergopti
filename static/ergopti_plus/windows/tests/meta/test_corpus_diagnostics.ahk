@@ -15,6 +15,9 @@
 ; 3. _shared/tests/corpus/diagnostics/redaction_vectors.json through
 ;    Redact_Apply with the rules of _shared/modules/diagnostics/redaction.json
 ;    (what leaves the machine).
+; 4. _shared/tests/corpus/diagnostics/issue_report_vectors.json through
+;    IssueReport_Dump, IssueReport_Summary, IssueReport_Markdown and
+;    IssueReport_FileName (the bug report text, summary and file name).
 ; Each corpus fails loudly when unreadable or empty: a replay over zero
 ; vectors would report success while checking nothing.
 ; ==============================================================================
@@ -136,3 +139,29 @@ _TCD_Redaction() {
 }
 
 Test("corpus:diagnostics: redaction vectors (redaction-corpus)", _TCD_Redaction)
+
+
+
+
+
+; ==================================
+; ==================================
+; ======= 5/ Bug Report Text =======
+; ==================================
+; ==================================
+
+_TCD_IssueReport() {
+	Data := _TCD_Corpus("tests\corpus\diagnostics\issue_report_vectors.json")
+	for List in ["dump_vectors", "summary_vectors", "markdown_vectors", "file_name_vectors"]
+		Assert(Data[List].Length >= 2, "the bug-report corpus must hold its " . List)
+	for Vector in Data["dump_vectors"]
+		AssertEqual(Vector["expected"], IssueReport_Dump(Vector["input"]), Vector["id"])
+	for Vector in Data["summary_vectors"]
+		AssertEqual(Vector["expected"], IssueReport_Summary(Vector["info"], Vector["file_name"]), Vector["id"])
+	for Vector in Data["markdown_vectors"]
+		AssertEqual(Vector["expected"], IssueReport_Markdown(Vector["info"], Vector["body"]), Vector["id"])
+	for Vector in Data["file_name_vectors"]
+		AssertEqual(Vector["expected"], IssueReport_FileName(Vector["info"]), Vector["id"])
+}
+
+Test("corpus:diagnostics: bug report text vectors (issue-report-corpus)", _TCD_IssueReport)
