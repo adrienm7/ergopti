@@ -295,8 +295,9 @@ function loadLocales() {
 const ACTIONS_ROOT = resolve(SHARED_ROOT, 'modules/actions');
 
 /**
- * Load the shared action catalog (single source of truth consumed by all
- * three drivers at boot), grouped exactly like the driver's action picker:
+ * Load the shared action catalog (the single source of truth each driver's
+ * generated _generated/action_catalogue.* is built from, by
+ * tools/codegen/codegen-action-catalogue.cjs), grouped like the picker:
  * sg_order.items uses "#key" for group headers, "##key" for sub-headers and
  * "--" for separators. Headers resolve through the same locale keys the
  * picker uses. Axis actions form a final dedicated group.
