@@ -2073,8 +2073,13 @@ local function main()
 		shutdown.request("runtime callback failure", "runtime callback failure")
 	end
 
+	-- Summarises the repeat streaks that are due, so a source that fell silent
+	-- keeps no withheld count waiting for an unrelated line (logger SPEC § 4.2).
+	local function flush_due_repeats() Logger.flush_repeats(false) end
+
 	local on_periodic = function()
 		tick_count = tick_count + 1
+		RuntimeGuard.call("logger repeat flush", flush_due_repeats)
 		-- Here rather than in onIdle: it re-reads /proc/bus/input/devices, which
 		-- has no business on the keystroke path. A keyboard unplugged and plugged
 		-- back in gets a new eventN node, and restarting the remap daemon
@@ -2204,6 +2209,8 @@ local function main()
 	Logger.info(LOG, "Session ended: %d keystroke(s), ~%d word(s), %ds.",
 		stats.keystrokes, stats.words, math.floor(stats.duration_ms / 1000))
 	keylogger.flush()
+	-- The last chance to emit the withheld counts of every open streak.
+	Logger.flush_repeats(true)
 	Logger.info(LOG, "Daemon exiting.")
 end
 
@@ -2219,6 +2226,13 @@ end
 -- message handler, before the unwind.
 local ok_main, err_main = CrashReporter.protect("ergopti_hotstrings", main)
 if not ok_main then
+	-- Withheld counts first, so the fatal line stays the last thing in the log.
+	-- Guarded because the crash may have come from the logger itself, and
+	-- nothing may stand between an unhandled error and the non-zero exit below.
+	local flushed, flush_err = pcall(Logger.flush_repeats, true)
+	if not flushed then
+		io.stderr:write("[ergopti_hotstrings] terminal log flush failed: " .. tostring(flush_err) .. "\n")
+	end
 	Logger.error(LOG, "Daemon terminated by an unhandled error: %s", tostring(err_main))
 	-- Non-zero, so systemd sees a failure and its Restart= policy applies. A daemon
 	-- that crashes and exits 0 is a daemon the supervisor believes finished its work.

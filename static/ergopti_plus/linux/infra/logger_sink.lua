@@ -32,6 +32,9 @@
 --- 6. Never fatal. A directory that cannot be created degrades to stdout-only and
 ---    says so; a broken handle degrades to stdout. The daemon must not die
 ---    because logging failed.
+--- 7. The logger boot. install() is also where this driver arms the core's
+---    repeat collapsing (logger SPEC § 4.2), once; the daemon's periodic callback
+---    and exit paths own its flushes.
 --- ==============================================================================
 
 local M = {}
@@ -298,8 +301,9 @@ end
 --- @return boolean True when a durable file sink is active, false when the sink
 ---   is installed but degraded to stdout-only.
 function M.install(logger, opts)
-	if type(logger) ~= "table" or type(logger.set_sink) ~= "function" then
-		io.stderr:write("[logger_sink] install(): logger has no set_sink — no output installed.\n")
+	if type(logger) ~= "table" or type(logger.set_sink) ~= "function"
+		or type(logger.enable_repeat_collapsing) ~= "function" then
+		io.stderr:write("[logger_sink] install(): logger is not the shared core — no output installed.\n")
 		return false
 	end
 	if _installed then return not _stdout_only end
@@ -323,6 +327,10 @@ function M.install(logger, opts)
 	end
 
 	logger.set_sink(sink)
+	-- Armed here, behind the _installed guard, so a repeated install() stays the
+	-- no-op it is documented to be instead of tripping the core's refusal of a
+	-- second arming.
+	logger.enable_repeat_collapsing()
 	_installed = true
 
 	if _stdout_only then
@@ -341,6 +349,9 @@ end
 function M.uninstall(logger)
 	if type(logger) == "table" and type(logger.set_sink) == "function" then
 		logger.set_sink(nil)
+	end
+	if type(logger) == "table" and type(logger.disable_repeat_collapsing) == "function" then
+		logger.disable_repeat_collapsing()
 	end
 	close_handles()
 	_dir         = nil
