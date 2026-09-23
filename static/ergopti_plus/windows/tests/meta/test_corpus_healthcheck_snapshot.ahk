@@ -108,35 +108,6 @@ _HCSC_IssuesConsistency() {
 }
 Test("corpus:hc-snap: extract_recent_issues expected arrays are internally consistent", _HCSC_IssuesConsistency)
 
-; ── count_issues — validate expected values ──────────────────────────────────
-
-_HCSC_CountConsistency() {
-	Raw := _HCSC_LoadCorpus()
-	Data := _HCSC_ParseJson(Raw)
-	for _, V in Data["vectors"] {
-		if V["category"] != "count_issues"
-			continue
-		Expected := V["expected"]
-		AssertTrue(Expected.Has("warn_count"), V["id"] . ": expected must have warn_count")
-		AssertTrue(Expected.Has("err_count"), V["id"] . ": expected must have err_count")
-		; Recount from the input lines to verify the expected values
-		Lines := V["input"]["lines"]
-		if !(Lines is Array)
-			continue
-		WarnCount := 0
-		ErrCount := 0
-		for _, Line in Lines {
-			if InStr(Line, "[WARNING]")
-				WarnCount += 1
-			if InStr(Line, "[ERROR]")
-				ErrCount += 1
-		}
-		AssertEqual(Expected["warn_count"], WarnCount, V["id"] . ": warn_count must match input lines")
-		AssertEqual(Expected["err_count"], ErrCount, V["id"] . ": err_count must match input lines")
-	}
-}
-Test("corpus:hc-snap: count_issues expected values match input line contents", _HCSC_CountConsistency)
-
 ; ── validate_snapshot — validate schema field list ───────────────────────────
 
 _HCSC_SchemaFields() {

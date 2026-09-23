@@ -434,6 +434,40 @@ local ADAPTER_SPECS = {
 --- =============================
 --- =============================
 
+--- Today's errors file: the same path the Debug menu's "open error log" row
+--- opens, read through one accessor so the logs-folder owner can move it.
+--- @return string
+local function errors_log_path()
+	return Logger.ERRORS_LOG_FILE
+end
+
+--- The window's recent warnings and errors: a bounded tail of today's errors
+--- file, or the ring before that file exists. The ring holds every level, so
+--- at DEBUG a few minutes of routine lines evicted the problems the window is
+--- opened to show; the errors file keeps WARNING and ERROR only.
+--- @param ring_lines table The logger's ring buffer snapshot.
+--- @return table entries Oldest first.
+--- @return string source "errors_file", "ring", or "unavailable" when the
+---   bounds could not be read (logged).
+local function collect_recent_issues(ring_lines)
+	local ok, entries, source, problem = pcall(function()
+		local limits = Snapshot.load_recent_issue_limits(
+			Paths.shared("modules/diagnostics/recent_issues.json"))
+		return Snapshot.collect_recent_issues(errors_log_path(), ring_lines, limits)
+	end)
+	if not ok then
+		Logger.error(LOG, "Recent issues could not be collected: %s.", tostring(entries))
+		return {}, "unavailable"
+	end
+	if problem then
+		Logger.warn(LOG, "Today's errors file could not be read (%s); recent issues come from the ring.",
+			tostring(problem))
+	end
+	Logger.debug(LOG, "Recent issues: %d entry(ies) from %s.", #entries, source)
+	return entries, source
+end
+
+
 --- Probes all registered adapters and port contracts, then returns a snapshot
 --- table with: version, loaded_adapters, ports_validated, last_error, uptime_sec, sys.
 --- @return table Snapshot with fields described above.
@@ -496,14 +530,14 @@ function M.run()
 	local uptime_sec = os.time() - _load_time
 	Logger.debug(LOG, "Uptime: %ds.", uptime_sec)
 
-	-- Collect recent WARNING/ERROR lines from the in-memory ring buffer
+	-- The ring is only the fallback of the recent issues, before today's errors
+	-- file exists
 	local all_lines = Logger.ring_buffer_snapshot()
 	if not all_lines then
 		Logger.error(LOG, "Logger.ring_buffer_snapshot() returned nil — ring buffer unavailable.")
 		all_lines = {}
 	end
-	local recent_issues = Snapshot.extract_recent_issues(all_lines, 100)
-	Logger.debug(LOG, "Ring buffer: %d line(s), %d recent issue(s).", #all_lines, #recent_issues)
+	local recent_issues, issues_source = collect_recent_issues(all_lines)
 
 	-- Run each enriched collector in a protected call so a single broken
 	-- collector cannot abort the entire healthcheck.
@@ -528,6 +562,7 @@ function M.run()
 		unwired_adapters = unwired_adapters,
 		uptime_sec       = uptime_sec,
 		recent_issues    = recent_issues,
+		recent_issues_source = issues_source,
 		event_tap_timeout_telemetry = event_tap_timeout_telemetry(sys and sys.hs_version),
 		sys              = sys,
 		pause_state      = safe_collect("pause_state",         H.collect_pause_state),

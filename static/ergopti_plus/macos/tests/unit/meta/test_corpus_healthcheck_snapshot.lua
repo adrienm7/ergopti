@@ -9,7 +9,7 @@
 --- output matches the expected golden values.
 ---
 --- This pins the shared snapshot logic (format_uptime, extract_recent_issues,
---- count_issues, validate_snapshot) against golden vectors so any divergence
+--- validate_snapshot) against golden vectors so any divergence
 --- between the Lua and AHK implementations is caught immediately.
 --- ==============================================================================
 
@@ -72,12 +72,6 @@ local function dispatch(S, vec)
 			return S.extract_recent_issues(nil, input.max_lines)
 		end
 		return S.extract_recent_issues(input.lines, input.max_lines)
-
-	elseif cat == "count_issues" then
-		if input.lines == nil then
-			return { S.count_issues(nil) }
-		end
-		return { S.count_issues(input.lines) }
 
 	elseif cat == "validate_snapshot" then
 		local ok, missing = S.validate_snapshot(input.snapshot)
@@ -165,19 +159,6 @@ helpers.describe("healthcheck snapshot corpus — vector replay", function()
 				helpers.assert_eq(result[i], expected_line,
 					vec.id .. ": line " .. i .. " mismatch")
 			end
-		end)
-	end
-
-	-- count_issues vectors
-	for _, vec in ipairs(by_cat["count_issues"] or {}) do
-		helpers.it("count_issues: " .. vec.id, function()
-			local result = dispatch(S, vec)
-			helpers.assert_true(type(result) == "table" and #result == 2,
-				vec.id .. ": count_issues must return (warn, err)")
-			helpers.assert_eq(result[1], vec.expected.warn_count,
-				vec.id .. ": warn_count mismatch")
-			helpers.assert_eq(result[2], vec.expected.err_count,
-				vec.id .. ": err_count mismatch")
 		end)
 	end
 

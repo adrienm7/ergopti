@@ -49,11 +49,6 @@ local LoggerSink = require("infra.logger_sink")
 -- page as a number that looks measured.
 local NOT_AVAILABLE = "n/a"
 
--- How many WARNING/ERROR lines the report carries. The shared extractor's own
--- default, named here because the page scrolls them and an unbounded list on a
--- bad day is a window that takes seconds to render.
-local MAX_RECENT_ISSUES = 100
-
 -- When the daemon started, in seconds. Captured at load rather than read from
 -- the process table: /proc/self/stat gives jiffies since boot, which needs the
 -- clock tick and the boot time to become an age, and both can be wrong in a
@@ -103,6 +98,30 @@ end
 --- @return table { warn_count, err_count, last_error }
 local function session_issues()
 	return require("logger").session_issues()
+end
+
+--- The window's recent warnings and errors: a bounded tail of today's errors
+--- file, or the ring before that file exists. The ring holds every level, so
+--- at DEBUG a few minutes of routine lines evicted the problems the window is
+--- opened to show; the errors file keeps WARNING and ERROR only.
+--- @param lines table The ring-buffer snapshot.
+--- @return table entries Oldest first.
+--- @return string source "errors_file", "ring", or "unavailable" (logged).
+local function collect_recent_issues(lines)
+	local ok, entries, source, problem = pcall(function()
+		local limits = Snapshot.load_recent_issue_limits(
+			require("infra.paths").shared("modules/diagnostics/recent_issues.json"))
+		return Snapshot.collect_recent_issues(LoggerSink.errors_log_path(), lines, limits)
+	end)
+	if not ok then
+		Logger.error(LOG, "Recent issues could not be collected: %s.", tostring(entries))
+		return {}, "unavailable"
+	end
+	if problem then
+		Logger.warn(LOG, "Today's errors file could not be read (%s); recent issues come from the ring.",
+			tostring(problem))
+	end
+	return entries, source
 end
 
 --- Whether the daemon is paused, and what answered.
@@ -332,6 +351,7 @@ end
 local function build_snapshot(state)
 	state = type(state) == "table" and state or {}
 	local lines = ring_lines()
+	local recent_issues, issues_source = collect_recent_issues(lines)
 
 	-- Which of the daemon's parts are wired. Reported as adapter lists because
 	-- that is what the page renders, and because "the LLM section is missing"
@@ -365,7 +385,8 @@ local function build_snapshot(state)
 		ports_validated  = loaded,
 		failed_adapters  = failed,
 		uptime_sec       = os.time() - _started_at,
-		recent_issues    = Snapshot.extract_recent_issues(lines, MAX_RECENT_ISSUES),
+		recent_issues    = recent_issues,
+		recent_issues_source = issues_source,
 		sys              = collect("sys", collect_sys),
 		pause_state      = collect("pause_state", function() return collect_pause_state(state) end),
 		keylogger        = collect("keylogger", function() return collect_keylogger(state) end),

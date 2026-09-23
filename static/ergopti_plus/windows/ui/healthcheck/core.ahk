@@ -100,7 +100,9 @@ HealthCheck_RecordWarn() {
 ;   "warn_count"      -> Integer number of WARNING-level lines emitted this session
 ;   "err_count"       -> Integer number of errors recorded via HealthCheck_RecordError
 ;   "sys"             -> Map     OS/runtime/hardware snapshot (see _HealthCheck_SysInfo)
-;   "recent_issues"   -> Array   last 50 WARNING/ERROR lines from the ring buffer
+;   "recent_issues"   -> Array   newest WARNING/ERROR entries of today's errors file
+;                                (the ring before that file exists)
+;   "recent_issues_source" -> String "errors_file", "ring" or "unavailable"
 ;   "pause_state"     -> Map     {is_paused, source} — project_suspend_pause_invariant friendly (read-only)
 ;   "keylogger"       -> Map     safe summary (events, wpm, privacy counts, log paths incl. errors sink)
 ;   "llm"             -> Map     backend, profile, model, basic settings (no prompts)
@@ -176,7 +178,9 @@ HealthCheck_Run() {
 	; crash report it was being run to produce — down with it. _HealthCheck_SysInfo
 	; is the most exposed: it does a WMI ConnectServer, three RegRead calls and a
 	; git subprocess poll.
-	RecentIssues := _HealthCheck_Collect("recent_issues", () => _HealthCheck_RecentIssues(100), [])
+	RecentIssues := _HealthCheck_Collect("recent_issues",
+		() => _HealthCheck_RecentIssues(_HealthCheck_ErrorsLogPath()),
+		Map("entries", [], "source", "unavailable"))
 	Sys          := _HealthCheck_Collect("sys", _HealthCheck_SysInfo, Map())
 	PauseState   := _HealthCheck_Collect("pause_state", _HealthCheck_PauseState, Map())
 	KeyloggerSum := _HealthCheck_Collect("keylogger", _HealthCheck_KeyloggerSummary, Map())
@@ -196,7 +200,8 @@ HealthCheck_Run() {
 		"warn_count",      _HealthCheckWarnCount,
 		"err_count",       _HealthCheckErrCount,
 		"sys",             Sys,
-		"recent_issues",   RecentIssues,
+		"recent_issues",   RecentIssues["entries"],
+		"recent_issues_source", RecentIssues["source"],
 		; Enriched (maximum completeness)
 		"pause_state",     PauseState,
 		"keylogger",       KeyloggerSum,

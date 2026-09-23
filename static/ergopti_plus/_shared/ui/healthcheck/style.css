@@ -98,4 +98,9 @@ em {
 	color: #666;
 }
 
+p.source {
+	margin: .2em 0 .4em;
+	color: #666;
+}
+
 .ok{color:#1a7f37;font-weight:600;}.fail{color:#cf222e;font-weight:600;}.unwired{color:#9a6700;font-weight:600;}

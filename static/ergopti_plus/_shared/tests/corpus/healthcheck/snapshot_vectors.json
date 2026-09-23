@@ -1,5 +1,5 @@
 {
-  "description": "Golden vectors for the shared healthcheck snapshot logic (format_uptime, extract_recent_issues, count_issues, validate_snapshot). Consumed by macOS Lua and AHK corpus tests.",
+  "description": "Golden vectors for the shared healthcheck snapshot logic (format_uptime, extract_recent_issues, validate_snapshot). Consumed by macOS Lua and AHK corpus tests.",
   "vectors": [
     {
       "id": "uptime_seconds",
@@ -112,48 +112,6 @@
       "category": "extract_recent_issues",
       "input": { "lines": null, "max_lines": 100 },
       "expected": []
-    },
-    {
-      "id": "count_no_issues",
-      "category": "count_issues",
-      "input": {
-        "lines": [
-          "[INFO] All good",
-          "[DEBUG] Debugging"
-        ]
-      },
-      "expected": { "warn_count": 0, "err_count": 0 }
-    },
-    {
-      "id": "count_mixed",
-      "category": "count_issues",
-      "input": {
-        "lines": [
-          "[WARNING] w1",
-          "[ERROR] e1",
-          "[INFO] info",
-          "[WARNING] w2",
-          "[ERROR] e2",
-          "[ERROR] e3"
-        ]
-      },
-      "expected": { "warn_count": 2, "err_count": 3 }
-    },
-    {
-      "id": "count_line_with_both_tags",
-      "category": "count_issues",
-      "input": {
-        "lines": [
-          "[WARNING] then [ERROR] in same line"
-        ]
-      },
-      "expected": { "warn_count": 1, "err_count": 1 }
-    },
-    {
-      "id": "count_nil",
-      "category": "count_issues",
-      "input": { "lines": null },
-      "expected": { "warn_count": 0, "err_count": 0 }
     },
     {
       "id": "schema_all_present",
