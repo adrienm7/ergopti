@@ -275,15 +275,18 @@ _GestureMakeSeqEmitter(Seq) {
 }
 
 
-; Returns the translated label for a gesture action.
-; Uses t("sg_actions.X") from the active locale JSON as the canonical source.
-; Falls back to the raw action name when the key is absent — labels are no
-; longer hardcoded in GESTURE_ACTIONS, so the locale is the single source of truth.
+; Returns the translated label for a gesture action, through the label key the
+; generated catalogue declares for it. Returns the raw action name when the key
+; is absent — labels are not hardcoded in GESTURE_ACTIONS, so the locale is the
+; single source of truth, and test-action-catalogue-codegen.cjs fails on a
+; catalogue label key missing from any locale.
 _GestureActionLabel(Name) {
-	global GESTURE_MODIFIER_ACTION_LABELS
+	global GESTURE_MODIFIER_ACTION_LABELS, GESTURE_ACTION_CATALOGUE
 	if GESTURE_MODIFIER_ACTION_LABELS.Has(Name)
 		return GESTURE_MODIFIER_ACTION_LABELS[Name]
-	Key := "sg_actions." . Name
+	Key := (IsSet(GESTURE_ACTION_CATALOGUE) && GESTURE_ACTION_CATALOGUE.Actions.Has(Name))
+		? GESTURE_ACTION_CATALOGUE.Actions[Name].LabelKey
+		: "sg_actions." . Name
 	Translated := t(Key)
 	; t() returns the raw key when no translation is found — treat that as a miss
 	if (Translated != Key)
@@ -725,101 +728,79 @@ GestureEditPersonalShortcuts() {
 		}
 }
 
-; Ordered list of action names for the menu — built from the shared TOML so
-; Hammerspoon and AHK always show the same picker order, filtering each side
-; to its own platform entries. "--" entries become visual separators;
-; "#Titre" entries become non-selectable section headers.
-global GESTURE_ACTION_NAMES := []
-global GESTURE_AX_NAMES := []
-global GESTURE_ACTION_PARAMETER_SPECS := Map()
+; The Windows action catalogue, generated from _shared/modules/actions/actions.toml
+; by tools/codegen/codegen-action-catalogue.cjs and already filtered to this
+; platform. It used to be built by parsing the TOML with ParseTomlFile inside a
+; loader deferred off the boot path (a SetTimer worth ~100 ms); the generated
+; file is plain data, so there is nothing left to defer and no window in which
+; the picker is empty.
+global GESTURE_ACTION_CATALOGUE := GestureActionCatalogueData()
 global GestureActionParameters := Map()
 
-; True when a catalogue `platform` field claims this driver.
-;
-; The field is "all", one driver key, or a comma-separated list of them. The
-; list form exists because the field could not previously say "two drivers out
-; of three": the two window cyclers ship on Windows and macOS and not on Linux,
-; and both single-value answers were false — "all" put dead rows in the Linux
-; picker, "ahk" or "hs" hid half the feature.
-_GestureActionClaimsThisPlatform(Platform) {
-		if (Platform = "" || Platform = "all")
-				return true
-		for _, Key in StrSplit(Platform, ",", " `t")
-				if (Key = "ahk")
-						return true
-		return false
+; Ordered action ids the picker lists, modifier-chord block expanded, "none"
+; included. The single list every picker and the parity test walk.
+; @returns {Array}
+GestureActionPickerIds() {
+		global GESTURE_ACTION_CATALOGUE, GESTURE_MODIFIER_ACTION_GROUPS
+		Ids := []
+		for _, Item in GESTURE_ACTION_CATALOGUE.SgItems {
+				switch Item.Kind {
+						case "action":
+								Ids.Push(Item.Id)
+						case "modifier_chords":
+								for _, Group in GESTURE_MODIFIER_ACTION_GROUPS
+										for _, ActionId in Group.Actions
+												Ids.Push(ActionId)
+						case "heading":
+								continue
+						default:
+								throw ValueError("Unknown action catalogue item kind '" . Item.Kind . "'.")
+				}
+		}
+		return Ids
 }
 
-; Populate GESTURE_ACTION_NAMES / GESTURE_AX_NAMES by parsing the shared
-; cross-platform action registry (actions.toml). These lists are only needed
-; when the gesture-picker menu is built — which happens in the deferred
-; initMenu phase (~250 ms after boot). Deferring the TOML parse off the
-; critical boot path removes ~100 ms from the gestures module init time.
-; A run-once SetTimer(-1) fires ~1 ms after the auto-execute section finishes,
-; well before initMenu runs, so the lists are always ready for the menu.
-_GestureLoadActionCatalog(*) {
-		global GESTURE_ACTION_NAMES, GESTURE_AX_NAMES, GESTURE_ACTIONS, GESTURE_MODIFIER_ACTION_GROUPS, GESTURE_ACTION_PARAMETER_SPECS, _SharedDir
-
-		GESTURE_ACTION_NAMES := []
-		GESTURE_AX_NAMES := []
-		GESTURE_ACTION_PARAMETER_SPECS := Map()
-
-		_SharedToml := _SharedDir . "\modules\actions\actions.toml"
-		_Toml       := ParseTomlFile(_SharedToml)
-
-		; Build GESTURE_ACTION_NAMES from [sg_order].items, keeping only entries
-		; that are sentinels ("--", "#…") or actions whose platform is "all"/"ahk".
-		if _Toml.Has("sg_order") && _Toml["sg_order"].Has("items") {
-				for _, _Item in _Toml["sg_order"]["items"] {
-						; Sentinels and headers pass through unconditionally
-						if (_Item = "--" || SubStr(_Item, 1, 1) = "#") {
-								GESTURE_ACTION_NAMES.Push(_Item)
-								continue
-						}
-						; The shared modifier-chord placeholder expands to the complete
-						; platform-native matrix registered from modifier_chords.json.
-						if (SubStr(_Item, 1, 1) = "_") {
-								if (_Item = "_modifier_chords_placeholder") {
-										for _, _Group in GESTURE_MODIFIER_ACTION_GROUPS {
-												GESTURE_ACTION_NAMES.Push("##Raccourcis " . _Group.Label)
-												for _, _ActionId in _Group.Actions
-														GESTURE_ACTION_NAMES.Push(_ActionId)
-										}
+; Ordered picker items for the active language: headings carry their level and
+; translated text, actions their id and label. "none" is left out because both
+; pickers add their own translated "nothing" row.
+; @returns {Array} of { Type: "heading", Level, Text } / { Type: "action", Id, Label }
+GestureActionPickerItems() {
+		global GESTURE_ACTION_CATALOGUE, GESTURE_MODIFIER_ACTION_GROUPS
+		Items := []
+		for _, Item in GESTURE_ACTION_CATALOGUE.SgItems {
+				switch Item.Kind {
+						case "heading":
+								Items.Push({ Type: "heading", Level: Item.Level, Text: _GestureHeadingText(Item.Key) })
+						case "action":
+								if (Item.Id != "none")
+										Items.Push({ Type: "action", Id: Item.Id, Label: _GestureActionLabel(Item.Id) })
+						case "modifier_chords":
+								; One sub-heading per modifier combination. The combination label
+								; ("Ctrl + Shift") is language-neutral; the words around it are not,
+								; which is why this used to read "Raccourcis Ctrl" in every locale.
+								Template := t(Item.GroupKey)
+								for _, Group in GESTURE_MODIFIER_ACTION_GROUPS {
+										Items.Push({ Type: "heading", Level: Item.Level,
+												Text: StrReplace(Template, "{1}", Group.Label) })
+										for _, ActionId in Group.Actions
+												Items.Push({ Type: "action", Id: ActionId, Label: _GestureActionLabel(ActionId) })
 								}
-								continue
-						}
-						; Regular action — keep if platform is "all" or "ahk"
-						_SecKey := "sg_actions." . _Item
-						if _Toml.Has(_SecKey) {
-								if _Toml[_SecKey].Has("parameter")
-										GESTURE_ACTION_PARAMETER_SPECS[_Item] := _Toml[_SecKey]["parameter"]
-								_Plat := _Toml[_SecKey].Has("platform") ? _Toml[_SecKey]["platform"] : "all"
-								if _GestureActionClaimsThisPlatform(_Plat)
-										GESTURE_ACTION_NAMES.Push(_Item)
-						} else if GESTURE_ACTIONS.Has(_Item) {
-								; Action exists in registry but not in shared TOML — include it
-								GESTURE_ACTION_NAMES.Push(_Item)
-						}
+						default:
+								throw ValueError("Unknown action catalogue item kind '" . Item.Kind . "'.")
 				}
 		}
-
-		; Build GESTURE_AX_NAMES from [ax_order].items, same filtering logic.
-		if _Toml.Has("ax_order") && _Toml["ax_order"].Has("items") {
-				for _, _Item in _Toml["ax_order"]["items"] {
-						_SecKey := "ax_actions." . _Item
-						if _Toml.Has(_SecKey) {
-								_Plat := _Toml[_SecKey].Has("platform") ? _Toml[_SecKey]["platform"] : "all"
-								if _GestureActionClaimsThisPlatform(_Plat)
-										GESTURE_AX_NAMES.Push(_Item)
-						}
-				}
-		}
+		return Items
 }
-; Run-once, deferred off the boot path. MUST be a negative NON-ZERO period:
-; AHK v2 treats -0 as 0, and SetTimer(fn, 0) DISABLES the timer (the callback
-; never fires), which left GESTURE_ACTION_NAMES empty and the action picker
-; blank. -1 fires once ~1 ms after the auto-execute section finishes.
-SetTimer(_GestureLoadActionCatalog, -1)
+
+; The translated text of one picker heading. Older header values carry a
+; leading "#" from when the level was spelled inside the text; the level now
+; comes only from the catalogue, so the marker is stripped.
+_GestureHeadingText(Key) {
+		Text := t(Key)
+		while (SubStr(Text, 1, 1) = "#")
+				Text := SubStr(Text, 2)
+		return Text
+}
 
 ; Factory gesture slot actions: the manifest's Windows values (constants.ahk).
 global GESTURE_FACTORY_DEFAULTS := GestureRecommendedActions()

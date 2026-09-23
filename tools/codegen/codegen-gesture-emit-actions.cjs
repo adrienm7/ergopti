@@ -8,12 +8,11 @@
  * catalogue fully describes — 58 key+modifier actions and 4 raw sequences.
  *
  * WHY GENERATED RATHER THAN BUILT AT RUNTIME:
- * The obvious move is to have _GestureLoadActionCatalog() install these while it
- * already has the TOML parsed. It must not: that loader is deliberately deferred
- * off the boot path (a SetTimer with a negative period, worth ~100 ms), so
- * building handlers there opens a window in which a gesture fires and finds no
- * handler at all. Generating a plain data function keeps registration at
- * static-init where it is today, with no TOML parse on the boot path.
+ * Registration has to happen at static-init: a handler built later leaves a
+ * window in which a gesture fires and finds nothing registered. Generating a
+ * plain data function keeps it there with no TOML parse on the boot path — the
+ * same reason the picker catalogue itself is generated
+ * (codegen-action-catalogue.cjs) instead of parsed by a deferred loader.
  *
  * WHY GENERATED RATHER THAN HAND-WRITTEN:
  * These 62 entries were 62 hand-written lambdas — `copy` spelling out

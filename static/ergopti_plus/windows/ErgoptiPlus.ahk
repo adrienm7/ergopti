@@ -457,6 +457,7 @@ if UIASW_IsWorkerInvocation()
 ; locale.ahk (string loading + t()) precedes i18n.ahk (locale management), which calls into it.
 #Include infra/locale.ahk
 #Include _generated/gesture_emit_actions.ahk
+#Include _generated/action_catalogue.ahk
 #Include _generated/locale_table.ahk
 #Include infra/i18n.ahk
 #Include ui/onboarding/init.ahk

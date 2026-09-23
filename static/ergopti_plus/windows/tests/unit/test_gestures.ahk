@@ -86,29 +86,21 @@ Test("Gestures: reversal-relevant 4-finger slots are configured", TestGestures_R
 ; ==================================
 ; ==================================
 
-; Helper � separators (``--``) and section headers (``#�``) are visual-only
-; entries in GESTURE_ACTION_NAMES; they intentionally have no matching record
-; in the GESTURE_ACTIONS registry and must be filtered out before assertions
-; that walk the registry.
-_GestureIsRealAction(name) {
-    return name != "--" and SubStr(name, 1, 1) != "#"
-}
-
+; The ordered ids the picker lists come from the generated catalogue
+; (_generated/action_catalogue.ahk) with the modifier-chord block expanded, so
+; every assertion below walks exactly what a user can pick.
 TestGestures_AllActionNamesInRegistry() {
-    for ActionName in GESTURE_ACTION_NAMES {
-        if !_GestureIsRealAction(ActionName)
-            continue
+    Ids := GestureActionPickerIds()
+    Assert(Ids.Length >= 500, "the picker lists only " . Ids.Length . " action(s) — the catalogue walk collapsed")
+    for ActionName in Ids
         AssertTrue(GESTURE_ACTIONS.Has(ActionName), "missing action in registry: " . ActionName)
-    }
 }
 Test("Gestures: all action names exist in registry", TestGestures_AllActionNamesInRegistry)
 
 TestGestures_ActionsHaveProperties() {
-    for ActionName in GESTURE_ACTION_NAMES {
-        if !_GestureIsRealAction(ActionName)
-            continue
+    for ActionName in GestureActionPickerIds() {
         Action := GESTURE_ACTIONS[ActionName]
-        ; Labels are no longer stored on the action object � they come from
+        ; Labels are not stored on the action object — they come from
         ; _GestureActionLabel() (i18n), which falls back to the raw key name
         AssertTrue(StrLen(_GestureActionLabel(ActionName)) > 0, "missing Label for: " . ActionName)
         AssertTrue(Action.HasOwnProp("Fn"), "missing Fn for: " . ActionName)
@@ -116,23 +108,38 @@ TestGestures_ActionsHaveProperties() {
 }
 Test("Gestures: every action has Label and Fn properties", TestGestures_ActionsHaveProperties)
 
+; The picker headings used to be the literal "#Raccourcis" and
+; "##Raccourcis <mods>", French in every locale. They are now locale keys, and
+; the group heading places the language-neutral modifier label through {1}.
 TestGestures_SharedModifierChordsAreRegisteredAndLabelled() {
-    global GESTURE_ACTION_NAMES
-    if (GESTURE_ACTION_NAMES.Length = 0)
-        _GestureLoadActionCatalog()
     for Name in ["ctrl_a", "ctrl_alt_a", "ctrl_shift_alt_win_enter"]
         AssertTrue(GESTURE_ACTIONS.Has(Name), "missing shared modifier action: " . Name)
     AssertEqual("Ctrl + A", _GestureActionLabel("ctrl_a"), "Ctrl+A label must never expose the internal id")
     AssertEqual("Ctrl + Alt + A", _GestureActionLabel("ctrl_alt_a"), "multi-modifier label must use the shared format")
     AssertEqual("Ctrl + Shift + Alt + Win + Enter", _GestureActionLabel("ctrl_shift_alt_win_enter"), "full modifier matrix must include special keys")
+    ChordsTitle := t("sg_actions.sg_order.header.modifier_chords")
+    GroupTemplate := t("sg_actions.sg_order.header.modifier_chord_group")
+    AssertTrue(ChordsTitle != "sg_actions.sg_order.header.modifier_chords", "the chord heading key must resolve")
+    AssertTrue(InStr(GroupTemplate, "{1}") > 0, "the chord group heading must place the modifier label")
+    CtrlTitle := StrReplace(GroupTemplate, "{1}", "Ctrl")
     HasShortcutsH1 := false
     HasCtrlH2 := false
-    for Name in GESTURE_ACTION_NAMES {
-        HasShortcutsH1 := HasShortcutsH1 || (Name = "#modifier_chords")
-        HasCtrlH2 := HasCtrlH2 || (Name = "##Raccourcis Ctrl")
+    CtrlH2FollowedByCtrlA := false
+    Items := GestureActionPickerItems()
+    for Index, Item in Items {
+        if (Item.Type != "heading")
+            continue
+        AssertFalse(InStr(Item.Text, "sg_actions.") = 1, "a heading shows its raw key: " . Item.Text)
+        HasShortcutsH1 := HasShortcutsH1 || (Item.Level = 1 && Item.Text == ChordsTitle)
+        if (Item.Level = 2 && Item.Text == CtrlTitle) {
+            HasCtrlH2 := true
+            CtrlH2FollowedByCtrlA := Items.Length > Index && Items[Index + 1].Type = "action"
+                && Items[Index + 1].Id = "ctrl_a"
+        }
     }
-    AssertTrue(HasShortcutsH1, "modifier actions must be under the modifier_chords H1")
-    AssertTrue(HasCtrlH2, "Ctrl actions must be under the Raccourcis Ctrl H2")
+    AssertTrue(HasShortcutsH1, "modifier actions must be under the localized shortcuts H1")
+    AssertTrue(HasCtrlH2, "Ctrl actions must be under the localized Ctrl H2")
+    AssertTrue(CtrlH2FollowedByCtrlA, "the Ctrl H2 must head its own chords")
 }
 Test("Gestures: shared modifier chords are registered and labelled", TestGestures_SharedModifierChordsAreRegisteredAndLabelled)
 
@@ -202,23 +209,27 @@ TestGestures_ToggleUIRejectsLiveActivationRefusal() {
 Test("Gestures: toggle surfaces a live activation refusal (gesture-toggle-activation-race)",
 	TestGestures_ToggleUIRejectsLiveActivationRefusal)
 
+; Catalogue <-> registry parity, both directions. A listed id with no handler
+; is a binding that does nothing when it fires; a registered handler the
+; catalogue does not list is a feature nobody can bind. The generated catalogue
+; is filtered to this platform by the codegen, so the two sets must be equal.
 TestGestures_RegistrySizeMatchesNames() {
-    ; Ensure GESTURE_ACTION_NAMES is populated — SetTimer(-0) defers the
-    ; catalog load past the synchronous test phase in headless CI runners.
-    if (GESTURE_ACTION_NAMES.Length = 0)
-        _GestureLoadActionCatalog()
-    ; Filter the visual sentinels from GESTURE_ACTION_NAMES before comparing
-    ; with GESTURE_ACTIONS.Count � every real action must have exactly one
-    ; entry in both lists, but separators and headers live only on the menu
-    ; (NAMES) side and never bubble up into the registry (ACTIONS).
-    ExpectedCount := 0
-    for ActionName in GESTURE_ACTION_NAMES {
-        if _GestureIsRealAction(ActionName)
-            ExpectedCount += 1
+    Listed := Map()
+    for ActionName in GestureActionPickerIds() {
+        AssertFalse(Listed.Has(ActionName), "the picker lists '" . ActionName . "' twice")
+        Listed[ActionName] := true
     }
-    AssertEqual(ExpectedCount, GESTURE_ACTIONS.Count, "registry size mismatch (real actions only)")
+    Hidden := []
+    for ActionName in GESTURE_ACTIONS {
+        if !Listed.Has(ActionName)
+            Hidden.Push(ActionName)
+    }
+    AssertEqual(0, Hidden.Length, "registered but never listed: " . (Hidden.Length ? Hidden[1] : ""))
+    AssertEqual(Listed.Count, GESTURE_ACTIONS.Count, "catalogue and registry must be the same set")
+    AssertEqual(0, GESTURE_ACTION_CATALOGUE.AxItems.Length,
+        "Windows has no axis dispatcher, so its catalogue must offer no axis action")
 }
-Test("Gestures: action count matches GESTURE_ACTION_NAMES length", TestGestures_RegistrySizeMatchesNames)
+Test("Gestures: the generated catalogue and the registry are the same set (action-catalogue-parity)", TestGestures_RegistrySizeMatchesNames)
 
 
 
@@ -267,8 +278,6 @@ Test("Gestures: GestureSaveAssignment updates map", TestGestures_SaveAssignmentU
 TestGestures_ParameterizedActionValuesAreBindingScoped() {
     global GestureActionParameters
 
-    if (GESTURE_ACTION_PARAMETER_SPECS.Count = 0)
-        _GestureLoadActionCatalog()
     AssertEqual("url", GestureActionParameterSpec("open_url"), "open_url parameter metadata")
     AssertEqual("search_url", GestureActionParameterSpec("search_web"), "search_web parameter metadata")
 

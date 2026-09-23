@@ -54,34 +54,12 @@ ShowKeyboardSlotPicker(Prefix) {
 }
 
 ShowActionPicker(Title, Current, OnConfirm, ShowNative := false) {
-		global GESTURE_ACTION_NAMES, GESTURE_ACTIONS
-		; Prefer the shared WebView2 picker (identical UI to macOS). It receives the
-		; ordered item list (headings carry their level, derived from the number of
-		; leading "#" on the catalogue entry; the page injects its own native/none
-		; rows). The native searchable ListBox below remains as an automatic fallback.
-		_apItems := []
-		for _apName in GESTURE_ACTION_NAMES {
-				if (_apName == "--" or _apName == "none")
-						continue
-				if (SubStr(_apName, 1, 1) = "#") {
-						_apLvl := 0
-						while (SubStr(_apName, _apLvl + 1, 1) = "#")
-								_apLvl++
-						_apHeaderId := SubStr(_apName, _apLvl + 1)
-						_apHdr := t("sg_actions.sg_order.header." . _apHeaderId)
-						if (_apHdr = "sg_actions.sg_order.header." . _apHeaderId)
-								_apHdr := _apHeaderId
-						; The locale value carries a legacy "#" prefix — strip it so the level
-						; comes only from the catalogue marker, not the translated text.
-						while (SubStr(_apHdr, 1, 1) = "#")
-								_apHdr := SubStr(_apHdr, 2)
-						_apItems.Push({ Type: "heading", Level: _apLvl, Text: _apHdr })
-						continue
-				}
-				if GESTURE_ACTIONS.Has(_apName)
-						_apItems.Push({ Type: "action", Id: _apName, Label: _GestureActionLabel(_apName) })
-		}
-		if _ActPickWeb_TryOpen(Title, Current, _apItems, OnConfirm, ShowNative)
+		; Prefer the shared WebView2 picker (identical UI to macOS and Linux). It
+		; receives the ordered items of the generated catalogue, headings already
+		; localized with their level; the page injects its own native/none rows.
+		; The native searchable ListBox below remains as an automatic fallback.
+		PickerItems := GestureActionPickerItems()
+		if _ActPickWeb_TryOpen(Title, Current, PickerItems, OnConfirm, ShowNative)
 				return
 		AllItems := []
 		_PushItem(Id, Label, Cat) {
@@ -90,27 +68,14 @@ ShowActionPicker(Title, Current, OnConfirm, ShowNative := false) {
 		if ShowNative
 				_PushItem("__native__", t("tap_hold.tap.none"), "")
 		_PushItem("none", t("dialog.action_picker.disabled"), "")
+		; The ListBox has one level of grouping: every heading, whatever its
+		; level, starts the category the rows below it are shown under.
 		CurrentCat := ""
-		for ActionName in GESTURE_ACTION_NAMES {
-				if (ActionName == "--" or ActionName == "none")
-						continue
-				if (SubStr(ActionName, 1, 1) = "#") {
-						; Level-aware: strip every leading "#" (h1/h2/…) from the catalogue
-						; marker to resolve the locale key, and any legacy "#" from the value.
-						local _hl := 0
-						while (SubStr(ActionName, _hl + 1, 1) = "#")
-								_hl++
-						local HeaderId := SubStr(ActionName, _hl + 1)
-						local TranslatedHeader := t("sg_actions.sg_order.header." . HeaderId)
-						if (TranslatedHeader = "sg_actions.sg_order.header." . HeaderId)
-								TranslatedHeader := HeaderId
-						while (SubStr(TranslatedHeader, 1, 1) = "#")
-								TranslatedHeader := SubStr(TranslatedHeader, 2)
-						CurrentCat := TranslatedHeader
-						continue
-				}
-				if GESTURE_ACTIONS.Has(ActionName)
-						_PushItem(ActionName, _GestureActionLabel(ActionName), CurrentCat)
+		for _, Item in PickerItems {
+				if (Item.Type = "heading")
+						CurrentCat := Item.Text
+				else
+						_PushItem(Item.Id, Item.Label, CurrentCat)
 		}
 		BuildListRows(Items) {
 				Ids := []
