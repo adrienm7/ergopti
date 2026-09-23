@@ -586,7 +586,7 @@
 	"keylogger_ui.app_metrics": "앱 사용 시간",
 	"keylogger_ui.launch_error": "대시보드를 실행할 수 없습니다 : {1}",
 	"keylogger_ui.metrics_disabled": "메트릭이 비활성화되었습니다.",
-	"keylogger_ui.metrics_disabled_body": "활성화하려면 : 알림 영역 아이콘 → 📊 메트릭 → « ❌ 메트릭 비활성화됨 (클릭하여 활성화) »",
+	"keylogger_ui.metrics_disabled_body": "활성화하려면 : 알림 영역 아이콘 → 📊 지표 → « 지표 활성화 »",
 	"keylogger_ui.metrics_title": "📊 메트릭",
 	"keylogger_ui.typing_metrics": "타이핑 메트릭",
 	"launcher.fatal.quit": "종료",

@@ -586,7 +586,7 @@
 	"keylogger_ui.app_metrics": "アプリ使用時間",
 	"keylogger_ui.launch_error": "ダッシュボードを起動できません : {1}",
 	"keylogger_ui.metrics_disabled": "メトリクスは無効です。",
-	"keylogger_ui.metrics_disabled_body": "有効にするには : 通知エリアのアイコン → 📊 メトリクス → « ❌ メトリクス無効（クリックして有効化）»",
+	"keylogger_ui.metrics_disabled_body": "有効にするには : 通知エリアのアイコン → 📊 指標 → « 指標を有効にする »",
 	"keylogger_ui.metrics_title": "📊 メトリクス",
 	"keylogger_ui.typing_metrics": "タイピングメトリクス",
 	"launcher.fatal.quit": "終了",

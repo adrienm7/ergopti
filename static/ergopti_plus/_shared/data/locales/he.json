@@ -586,7 +586,7 @@
 	"keylogger_ui.app_metrics": "זמן באפליקציות",
 	"keylogger_ui.launch_error": "לא ניתן להפעיל את לוח הבקרה: {1}",
 	"keylogger_ui.metrics_disabled": "המדדים מושבתים.",
-	"keylogger_ui.metrics_disabled_body": "להפעלה: סמל מגש המערכת → 📊 מדדים",
+	"keylogger_ui.metrics_disabled_body": "להפעלה: סמל מגש המערכת → 📊 מטריקות → « הפעל מטריקות ».",
 	"keylogger_ui.metrics_title": "📊 מדדים",
 	"keylogger_ui.typing_metrics": "מדדי הקלדה",
 	"launcher.fatal.quit": "יציאה",

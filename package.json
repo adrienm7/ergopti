@@ -255,6 +255,7 @@
 		"test:launcher-single-instance": "node ./tools/test/test-launcher-single-instance.cjs",
 		"test:menu-manifest": "node ./tools/test/test-menu-manifest.cjs",
 		"test:locale-catalogue-complete": "node ./tools/test/test-locale-catalogue-complete.cjs",
+		"test:locale-hints-quote-live-labels": "node ./tools/test/test-locale-hints-quote-live-labels.cjs",
 		"test:magic-key-single-source": "node ./tools/test/test-magic-key-single-source.cjs",
 		"test:tap-hold-threshold-parity": "node ./tools/test/test-tap-hold-threshold-parity.cjs",
 		"test:adapter-reachability": "node ./tools/test/test-adapter-reachability.cjs",

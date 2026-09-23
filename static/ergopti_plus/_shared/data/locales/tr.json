@@ -586,7 +586,7 @@
 	"keylogger_ui.app_metrics": "Uygulamalarda geçen süre",
 	"keylogger_ui.launch_error": "Gösterge paneli başlatılamıyor : {1}",
 	"keylogger_ui.metrics_disabled": "Metrikler devre dışı.",
-	"keylogger_ui.metrics_disabled_body": "Etkinleştirmek için : bildirim alanı simgesi → 📊 Metrikler → « ❌ Metrikler devre dışı (etkinleştirmek için tıkla) ».",
+	"keylogger_ui.metrics_disabled_body": "Etkinleştirmek için : bildirim alanı simgesi → 📊 İstatistikler → « İstatistikleri etkinleştir ».",
 	"keylogger_ui.metrics_title": "📊 Metrikler",
 	"keylogger_ui.typing_metrics": "Yazma metrikleri",
 	"launcher.fatal.quit": "Çık",

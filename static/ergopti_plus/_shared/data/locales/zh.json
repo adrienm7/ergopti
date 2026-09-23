@@ -586,7 +586,7 @@
 	"keylogger_ui.app_metrics": "应用使用时间",
 	"keylogger_ui.launch_error": "无法启动仪表板：{1}",
 	"keylogger_ui.metrics_disabled": "指标已禁用。",
-	"keylogger_ui.metrics_disabled_body": "要启用：通知区域图标 → 📊 指标 → « ❌ 指标已禁用（点击以启用）»",
+	"keylogger_ui.metrics_disabled_body": "要启用：通知区域图标 → 📊 统计数据 → « 启用统计数据 »",
 	"keylogger_ui.metrics_title": "📊 指标",
 	"keylogger_ui.typing_metrics": "打字指标",
 	"launcher.fatal.quit": "退出",

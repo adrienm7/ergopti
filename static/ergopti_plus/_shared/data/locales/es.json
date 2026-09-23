@@ -586,7 +586,7 @@
 	"keylogger_ui.app_metrics": "Tiempo en apps",
 	"keylogger_ui.launch_error": "No se puede abrir el panel : {1}",
 	"keylogger_ui.metrics_disabled": "Las métricas están desactivadas.",
-	"keylogger_ui.metrics_disabled_body": "Para activarlas : icono del área de notificación → 📊 Métricas → « ❌ Métricas desactivadas (clic para activar) ».",
+	"keylogger_ui.metrics_disabled_body": "Para activarlas : icono del área de notificación → 📊 Métricas → « Activar las métricas ».",
 	"keylogger_ui.metrics_title": "📊 Métricas",
 	"keylogger_ui.typing_metrics": "Métricas de escritura",
 	"launcher.fatal.quit": "Salir",

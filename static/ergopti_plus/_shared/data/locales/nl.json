@@ -586,7 +586,7 @@
 	"keylogger_ui.app_metrics": "Tijd in apps",
 	"keylogger_ui.launch_error": "Kan het dashboard niet starten : {1}",
 	"keylogger_ui.metrics_disabled": "Metriek is uitgeschakeld.",
-	"keylogger_ui.metrics_disabled_body": "Activeren : systeemvakpictogram → 📊 Metriek → « ❌ Metriek uitgeschakeld (klik om te activeren) ».",
+	"keylogger_ui.metrics_disabled_body": "Activeren : systeemvakpictogram → 📊 Statistieken → « Statistieken inschakelen ».",
 	"keylogger_ui.metrics_title": "📊 Metriek",
 	"keylogger_ui.typing_metrics": "Typmetriek",
 	"launcher.fatal.quit": "Stop",

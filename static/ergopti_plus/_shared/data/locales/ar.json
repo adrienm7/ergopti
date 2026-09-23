@@ -586,7 +586,7 @@
 	"keylogger_ui.app_metrics": "وقت التطبيقات",
 	"keylogger_ui.launch_error": "تعذّر تشغيل لوحة التحكم : {1}",
 	"keylogger_ui.metrics_disabled": "المقاييس معطّلة.",
-	"keylogger_ui.metrics_disabled_body": "لتفعيلها : أيقونة شريط الإشعارات → 📊 مقاييس → « ❌ المقاييس معطّلة (انقر للتفعيل) ».",
+	"keylogger_ui.metrics_disabled_body": "لتفعيلها : أيقونة شريط الإشعارات → 📊 مقاييس → « تفعيل المقاييس ».",
 	"keylogger_ui.metrics_title": "📊 مقاييس",
 	"keylogger_ui.typing_metrics": "مقاييس الكتابة",
 	"launcher.fatal.quit": "إنهاء",

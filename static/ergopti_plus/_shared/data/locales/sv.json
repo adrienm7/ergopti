@@ -586,7 +586,7 @@
 	"keylogger_ui.app_metrics": "Tid i appar",
 	"keylogger_ui.launch_error": "Det gick inte att starta instrumentpanelen: {1}",
 	"keylogger_ui.metrics_disabled": "Mätvärden är inaktiverade.",
-	"keylogger_ui.metrics_disabled_body": "För att aktivera: systemfältsikon → 📊 Mätvärden",
+	"keylogger_ui.metrics_disabled_body": "För att aktivera: systemfältsikon → 📊 Mätvärden → « Aktivera mätvärden ».",
 	"keylogger_ui.metrics_title": "📊 Mätvärden",
 	"keylogger_ui.typing_metrics": "Skrivmätvärden",
 	"launcher.fatal.quit": "Avsluta",

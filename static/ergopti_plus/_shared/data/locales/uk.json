@@ -586,7 +586,7 @@
 	"keylogger_ui.app_metrics": "Час у застосунках",
 	"keylogger_ui.launch_error": "Не вдалося запустити панель : {1}",
 	"keylogger_ui.metrics_disabled": "Метрики вимкнені.",
-	"keylogger_ui.metrics_disabled_body": "Для вмикнення : значок в зоні сповіщень → 📊 Метрики → « ❌ Метрики вимкнені (натисніть для вмикнення) ».",
+	"keylogger_ui.metrics_disabled_body": "Для вмикнення : значок в зоні сповіщень → 📊 Метрики → « Увімкнути метрики ».",
 	"keylogger_ui.metrics_title": "📊 Метрики",
 	"keylogger_ui.typing_metrics": "Метрики набору",
 	"launcher.fatal.quit": "Вийти",

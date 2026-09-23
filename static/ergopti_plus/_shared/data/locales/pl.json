@@ -586,7 +586,7 @@
 	"keylogger_ui.app_metrics": "Czas w aplikacjach",
 	"keylogger_ui.launch_error": "Nie można uruchomić pulpitu nawigacyjnego : {1}",
 	"keylogger_ui.metrics_disabled": "Metryki są wyłączone.",
-	"keylogger_ui.metrics_disabled_body": "Aby włączyć : ikona w zasobniku systemowym → 📊 Metryki → « ❌ Metryki wyłączone (kliknij, aby włączyć) ».",
+	"keylogger_ui.metrics_disabled_body": "Aby włączyć : ikona w zasobniku systemowym → 📊 Statystyki → « Włącz statystyki ».",
 	"keylogger_ui.metrics_title": "📊 Metryki",
 	"keylogger_ui.typing_metrics": "Metryki pisania",
 	"launcher.fatal.quit": "Zakończ",
