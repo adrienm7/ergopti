@@ -299,6 +299,22 @@ _required_dependency_package() {
 		pacman:libatspi.so.0) echo "at-spi2-core" ;;
 		xbps:libatspi.so.0) echo "at-spi2-core" ;;
 		apk:libatspi.so.0) echo "at-spi2-core" ;;
+		# The tray icon. platform/tray/appindicator.lua binds this library
+		# through FFI; without it --tray has nothing to host the icon in.
+		apt:tray) echo "libayatana-appindicator3-1" ;;
+		dnf:tray) echo "libayatana-appindicator-gtk3" ;;
+		zypper:tray) echo "libayatana-appindicator3-1" ;;
+		pacman:tray) echo "libayatana-appindicator" ;;
+		xbps:tray) echo "libayatana-appindicator" ;;
+		apk:tray) echo "libayatana-appindicator" ;;
+		# The WebKit2GTK typelib the tray's windows (settings, editor,
+		# metrics, onboarding) are drawn with through lgi.
+		apt:webkit) echo "gir1.2-webkit2-4.1" ;;
+		dnf:webkit) echo "webkit2gtk4.1" ;;
+		zypper:webkit) echo "typelib-1_0-WebKit2-4_1" ;;
+		pacman:webkit) echo "webkit2gtk-4.1" ;;
+		xbps:webkit) echo "libwebkit2gtk41" ;;
+		apk:webkit) echo "webkit2gtk-4.1" ;;
 		*) return 1 ;;
 	esac
 }
@@ -386,6 +402,42 @@ _check_or_install xkbcli
 # optional desktop convenience makes the privacy filter fail closed forever.
 _check_or_install_library libatspi.so.0
 
+# The desktop half: the tray icon and the windows it opens. Best effort rather
+# than fatal, because a headless machine or a server needs neither and must
+# still get working hotstrings — but VERIFIED, and said out loud when it
+# fails, because "the icon never appeared" is otherwise indistinguishable from
+# a daemon that did not start. Neither was installed at all before: the README
+# told users to find the tray package themselves, so the first run of a fresh
+# install showed no icon on every distribution.
+_ensure_desktop_backend() {
+	local capability="$1"
+	local label="$2"
+	local probe="$3"
+	if luajit -e "${probe}" >/dev/null 2>&1; then
+		echo "  ✔  ${label} — déjà installé"
+		return 0
+	fi
+	local pkg_mgr
+	local package_name
+	pkg_mgr="$(_detect_pkg_manager)"
+	if ! package_name="$(_required_dependency_package "${pkg_mgr}" "${capability}")"; then
+		echo "  ⚠  ${label} : aucun paquet ${pkg_mgr} connu — à installer manuellement." >&2
+		return 0
+	fi
+	echo "  →  ${label} manquant — installation de ${package_name}…"
+	_install_required_package "${pkg_mgr}" "${package_name}" || true
+	if luajit -e "${probe}" >/dev/null 2>&1; then
+		echo "  ✔  ${label} — capacité vérifiée"
+	else
+		echo "  ⚠  ${label} indisponible après installation de ${package_name}." >&2
+	fi
+}
+
+echo ""
+echo "=== Icône de la barre système et fenêtres ==="
+_ensure_desktop_backend tray "icône de la barre système (libayatana-appindicator)" \
+	"local ffi=require('ffi'); for _, n in ipairs({'libayatana-appindicator3.so.1','libappindicator3.so.1'}) do if pcall(ffi.load, n) then os.exit(0) end end; os.exit(1)"
+
 # Optional Lua libraries — the daemon degrades gracefully without them,
 # but the full feature set (async event loop, webview rendering, tray SNI,
 # signal handlers) requires these packages.
@@ -438,6 +490,13 @@ _install_lua_pkgs lgi    lua-lgi        lua-lgi        lua-lgi
 _install_lua_pkgs http   lua-http       lua-http       lua-http
 
 echo "  → Les dépendances Lua optionnelles sont installées si disponibles."
+
+# After lgi, which is how the windows reach WebKit: the typelib is useless to a
+# luajit that cannot load lgi, and the probe needs both. lgi.core loads the
+# typelib WITHOUT initialising GTK: `lgi.WebKit2` would call gtk_init, which
+# fails with no display — i.e. during every install over SSH or from a TTY.
+_ensure_desktop_backend webkit "fenêtres de configuration (WebKit2GTK)" \
+	"local core=require('lgi.core'); os.exit(core.gi.require('WebKit2') and 0 or 1)"
 fi
 
 

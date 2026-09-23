@@ -216,6 +216,7 @@
 		"test:llm-stop-sequences-single-source": "node ./tools/test/test-llm-stop-sequences-single-source.cjs",
 		"test:shared-toml-codec-purity": "node ./tools/test/test-shared-toml-codec-purity.cjs",
 		"test:linux-package-layout": "node ./tools/test/test-linux-package-layout.cjs",
+		"test:linux-install-sandbox": "node ./tools/test/test-linux-install-sandbox.cjs",
 		"test:linux-tracked-copy": "node ./tools/test/test-linux-tracked-copy.cjs",
 		"test:linux-tray-icon-assets": "node ./tools/test/test-linux-tray-icon-assets.cjs",
 		"test:linux-ci-evidence": "node ./tools/test/test-linux-ci-evidence.cjs",
