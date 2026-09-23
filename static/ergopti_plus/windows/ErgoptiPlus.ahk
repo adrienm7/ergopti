@@ -203,7 +203,7 @@ if !_DriverIsDetachedWorker
 ; well-formed.
 global CapsWordEnabled := False
 global LayerEnabled := False
-global TapHold := Map("keys", Map(), "layers", Map())
+global TapHold := Map("keys", Map())
 ; Read in FIRST position by a parse-time #HotIf (platform/remap/altgr.ahk), which
 ; can be evaluated during Bundle_Init's message-pumping RunWait — long before
 ; infra/hotstrings/hotstring_engine.ahk's include position. Seed it here so that #HotIf

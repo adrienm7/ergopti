@@ -45,9 +45,8 @@ _TH_MissingFileReturnsEmptyScaffold() {
 	TH := LoadTapHoldToml(A_ScriptDir . "\does_not_exist_tap_hold.toml")
 	AssertEqual("Map", Type(TH))
 	AssertTrue(TH.Has("keys"))
-	AssertTrue(TH.Has("layers"))
 	AssertEqual(0, TH["keys"].Count)
-	AssertEqual(0, TH["layers"].Count)
+	AssertFalse(TH.Has("layers"), "layer bindings are not tap-hold data")
 }
 Test("LoadTapHoldToml: missing file returns empty scaffold", _TH_MissingFileReturnsEmptyScaffold)
 
@@ -150,19 +149,23 @@ _TH_ParsesMultipleKeysIndependently() {
 }
 Test("LoadTapHoldToml: parses multiple keys independently", _TH_ParsesMultipleKeysIndependently)
 
-_TH_ParsesLayerMappingsBlock() {
+; Layer bindings moved to layers.toml (platform/remap/layers_loader.ahk). The
+; old [tap_hold.layers.<id>.mappings] table was loaded and written back by this
+; driver and read by no other, so it looked configurable and did nothing.
+_TH_LayerSectionsAreNotTapHoldData() {
 	Path := _TH_Write(
 		"[tap_hold.layers.nav.mappings]`r`n"
 		. 'h = "arrow_left"' . "`r`n"
-		. 'j = "arrow_down"' . "`r`n"
+		. "[tap_hold.keys.caps_lock]`r`n"
+		. 'tap_action = "enter"' . "`r`n"
 	)
 	TH := LoadTapHoldToml(Path)
 	_TH_Clean()
-	AssertTrue(TH["layers"].Has("nav"))
-	AssertEqual("arrow_left", TH["layers"]["nav"]["mappings"]["h"])
-	AssertEqual("arrow_down", TH["layers"]["nav"]["mappings"]["j"])
+	AssertFalse(TH.Has("layers"), "[tap_hold.layers.*] must not become tap-hold state")
+	AssertEqual(1, TH["keys"].Count)
+	AssertEqual("enter", TH["keys"]["caps_lock"]["tap_action"])
 }
-Test("LoadTapHoldToml: parses layer mappings block", _TH_ParsesLayerMappingsBlock)
+Test("LoadTapHoldToml: [tap_hold.layers.*] is not tap-hold data", _TH_LayerSectionsAreNotTapHoldData)
 
 _TH_IgnoresUnrecognisedSectionHeaders() {
 	Path := _TH_Write(
@@ -327,10 +330,6 @@ TestTapHold_InvalidSchemaTypesFailClosed() {
 			. "hold_modifier = 1`r`n"
 			. "[tap_hold.keys.space]`r`n"
 			. "hold_layer = false`r`n"
-			. "[tap_hold.layers.nav]`r`n"
-			. "description_key = true`r`n"
-			. "[tap_hold.layers.nav.mappings]`r`n"
-			. "h = false`r`n"
 			. "[tap_hold.keys.tab]`r`n"
 			. 'tap_action = "alt_tab_monitor"' . "`r`n"
 			. "time_activation_seconds = 0.2`r`n")
@@ -346,17 +345,11 @@ TestTapHold_InvalidSchemaTypesFailClosed() {
 			TapHoldDuration(TH, "caps_lock"))
 		AssertTrue(TapHoldIsActive(TH, "tab"),
 			"one invalid entry must not suppress later valid sections")
-		AssertFalse(TH["layers"].Has("nav")
-			&& TH["layers"]["nav"].Get("description_key", "") != "",
-			"a non-string layer description must not be published")
-		AssertFalse(TH["layers"].Has("nav")
-			&& TH["layers"]["nav"].Get("mappings", Map()).Has("h"),
-			"a non-string layer mapping must not be published")
 		Errors := 0
 		for Line in Captured
 			if InStr(Line, "[ERROR]", true)
 				Errors += 1
-		AssertTrue(Errors >= 6,
+		AssertTrue(Errors >= 5,
 			"every rejected tap-hold field must remain visible in the logs")
 	} finally {
 		LoggerClearTestSink()
