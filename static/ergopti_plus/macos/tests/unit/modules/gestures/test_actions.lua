@@ -189,7 +189,7 @@ helpers.describe("gestures.actions: get_label", function()
 		end
 		helpers.assert_true(contains(Actions.SG_NAMES, "ctrl_a"))
 		helpers.assert_true(contains(Actions.SG_NAMES, "cmd_ctrl_option_shift_z"))
-		helpers.assert_true(contains(Actions.SG_NAMES, "#Raccourcis"))
+		helpers.assert_true(contains(Actions.SG_NAMES, "#modifier_chords"))
 		helpers.assert_true(contains(Actions.SG_NAMES, "##Raccourcis Ctrl"))
 		helpers.assert_true(contains(Actions.SG_NAMES, "##Raccourcis Cmd + Ctrl + Option + Shift"))
 	end)

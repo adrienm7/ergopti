@@ -128,10 +128,10 @@ TestGestures_SharedModifierChordsAreRegisteredAndLabelled() {
     HasShortcutsH1 := false
     HasCtrlH2 := false
     for Name in GESTURE_ACTION_NAMES {
-        HasShortcutsH1 := HasShortcutsH1 || (Name = "#Raccourcis")
+        HasShortcutsH1 := HasShortcutsH1 || (Name = "#modifier_chords")
         HasCtrlH2 := HasCtrlH2 || (Name = "##Raccourcis Ctrl")
     }
-    AssertTrue(HasShortcutsH1, "modifier actions must be under the Raccourcis H1")
+    AssertTrue(HasShortcutsH1, "modifier actions must be under the modifier_chords H1")
     AssertTrue(HasCtrlH2, "Ctrl actions must be under the Raccourcis Ctrl H2")
 }
 Test("Gestures: shared modifier chords are registered and labelled", TestGestures_SharedModifierChordsAreRegisteredAndLabelled)

@@ -1,28 +1,43 @@
 # _shared/modules/actions/actions.toml
 #
-# Source de vérité unique pour les actions de gestes.
-# Lue par Hammerspoon (modules/gestures/actions.lua) et AutoHotkey
-# (modules/gestures.ahk) au démarrage pour construire la liste ordonnée
-# du picker et valider les noms d'actions.
+# The single source of truth for every bindable action (gestures, keyboard
+# slots, tap-holds). No driver reads this file at runtime:
+# tools/codegen/codegen-action-catalogue.cjs turns it into one generated
+# catalogue per driver (macos/_generated/action_catalogue.lua,
+# linux/_generated/action_catalogue.lua,
+# windows/_generated/action_catalogue.ahk), already filtered to that driver's
+# platform, with the picker order, heading levels and i18n keys resolved. Run
+# `npm run codegen:action-catalogue` (or `npm run gen`) after editing it.
 #
-# platform : "all" | "hs" | "ahk" | "linux" | une liste séparée par des virgules
-#   "all"     — disponible sur tous les drivers
-#   "hs"      — macOS / Hammerspoon uniquement
-#   "ahk"     — Windows / AutoHotkey uniquement
-#   "linux"   — Linux uniquement
-#   "hs,ahk"  — exactement ces drivers-là
+# The generator validates every field strictly: an unknown field, platform
+# token, parameter kind or requirement token stops generation instead of being
+# dropped, because a dropped field is a promise the picker silently breaks.
 #
-# La forme liste a été ajoutée le 2026-08-03 parce que le champ ne savait pas
-# dire « deux drivers sur trois ». Les deux cycleurs de fenêtres existent sur
-# macOS et Windows et pas sur Linux : les déclarer "all" mettait deux lignes
-# mortes dans le picker Linux, et les déclarer "hs" ou "ahk" cachait la moitié
-# du travail. Aucune des deux réponses n'était vraie, donc c'est le champ qui
-# était faux.
+# FIELDS OF [sg_actions.<id>] (single-fire) AND [ax_actions.<id>] (axis):
+#   platform  "all", one of "hs" / "ahk" / "linux", or a comma-separated list
+#             such as "hs,ahk". It decides which pickers list the action, so it
+#             must be true: each driver's suite compares its generated catalogue
+#             with the set of actions it can actually run, in both directions.
+#   emit_*    Per-OS keystrokes (see the three codegen-gesture-emit-actions
+#             generators). The rows are per-OS on purpose: 13 of the 24
+#             keystrokes both desktop drivers share genuinely differ.
+#   parameter A per-binding value the user types when binding the action:
+#             "url" or "search_url" (a URL template with exactly one %s).
+#   confirm   true for a destructive action that must ask before it runs.
+#   requires_linux / requires_hs / requires_ahk
+#             Capabilities the action needs on that OS. The picker greys a row
+#             whose requirement the driver proves absent, with the reason as a
+#             hint, instead of offering a binding that would do nothing. Linux
+#             understands "tool:<binary>" (on PATH) and "session:x11"; macOS
+#             and Windows declare no probe yet, so the generator refuses a
+#             token for them rather than emitting one nothing checks.
+#   scalable  (axis only) whether the axis repeats with the swipe distance.
 #
-# type : "sg" (action ponctuelle) | "ax" (axe continu)
-#
-# Les séparateurs "--" et les titres "#Titre" dans [sg_order] / [ax_order]
-# sont des directives de mise en forme pour le picker — pas des actions.
+# [sg_order] / [ax_order] give the picker order. "#name" is a level-1 heading,
+# "##name" a level-2 one; both resolve through the locale key
+# sg_actions.sg_order.header.<name>. A heading left with no action for a driver
+# is dropped from that driver's catalogue. "--" is a visual break in this file
+# only: the pickers group by heading, so separators are not emitted.
 
 
 # ==============================================================================
@@ -55,82 +70,84 @@ axis = [
 
 
 # ==============================================================================
-# Axe actions (swipes continus / scalables)
+# Axis actions (continuous, optionally scalable swipes)
 # ==============================================================================
+#
+# Only macOS dispatches an axis (modules/gestures/engine.lua). Windows receives
+# its gestures as ten Precision Touchpad hotkeys and Linux as finished
+# direction swipes, so neither has an axis to feed. These were declared "all",
+# which promised Windows and Linux fifteen bindings neither could run; the
+# Windows-only "desktops" axis was declared and never wired at all.
 
 [ax_actions]
 
 [ax_actions.tabs]
-platform = "all"
+platform = "hs"
 scalable = true
 
 [ax_actions.char]
-platform = "all"
+platform = "hs"
 scalable = true
 
 [ax_actions.char_sel]
-platform = "all"
+platform = "hs"
 scalable = true
 
 [ax_actions.line_arrow]
-platform = "all"
+platform = "hs"
 scalable = true
 
 [ax_actions.line_sel]
-platform = "all"
+platform = "hs"
 scalable = true
 
 [ax_actions.words]
-platform = "all"
+platform = "hs"
 scalable = true
 
 [ax_actions.words_sel]
-platform = "all"
+platform = "hs"
 scalable = true
 
 [ax_actions.windows]
-platform = "all"
+platform = "hs"
 scalable = false
 
 [ax_actions.spaces]
 platform = "hs"
 scalable = false
 
-[ax_actions.desktops]
-platform = "ahk"
-scalable = false
-
 [ax_actions.volume]
-platform = "all"
+platform = "hs"
 scalable = true
 
 [ax_actions.brightness]
-platform = "all"
+platform = "hs"
 scalable = true
 
 [ax_actions.tracks]
-platform = "all"
+platform = "hs"
 scalable = false
 
 [ax_actions.lines]
-platform = "all"
+platform = "hs"
 scalable = true
 
 [ax_actions.line_bounds]
-platform = "all"
+platform = "hs"
 scalable = false
 
 [ax_actions.paragraphs]
-platform = "all"
+platform = "hs"
 scalable = true
 
 [ax_actions.document]
-platform = "all"
+platform = "hs"
 scalable = false
 
 
 # ==============================================================================
-# Ordre du picker pour les axes
+# Axis picker order
 # ==============================================================================
 
 [ax_order]
@@ -144,7 +161,6 @@ items = [
     "words_sel",
     "windows",
     "spaces",
-    "desktops",
     "volume",
     "brightness",
     "tracks",
@@ -168,9 +184,12 @@ platform = "all"
 
 [sg_actions.left_click_toggle]
 platform = "all"
+# Linux holds the button through xdotool, which only reaches an X11 session.
+requires_linux = ["session:x11", "tool:xdotool"]
 
 [sg_actions.right_click_toggle]
 platform = "all"
+requires_linux = ["session:x11", "tool:xdotool"]
 
 [sg_actions.lookup]
 platform = "hs"
@@ -187,7 +206,9 @@ emit_linux = "alt+Tab"
 platform = "hs"
 
 [sg_actions.app_window_previous]
-platform = "hs"
+# Linux runs it through its emit row; declared "hs" alone, the Linux picker
+# could not offer a binding its driver has always performed.
+platform = "hs,linux"
 emit_linux = "alt+Escape"
 
 # --- Editing (Windows and Linux; macOS uses Cmd+C/V/X in cmd_*) ---
@@ -379,12 +400,15 @@ platform = "hs"
 platform = "hs"
 
 [sg_actions.desktop_prev]
-platform = "ahk"
+# Linux switches workspace through wmctrl, falling back to xdotool: both X11.
+platform = "ahk,linux"
+requires_linux = ["session:x11"]
 emit_ahk_key = "Left"
 emit_ahk_mods = ["ctrl", "super"]
 
 [sg_actions.desktop_next]
-platform = "ahk"
+platform = "ahk,linux"
+requires_linux = ["session:x11"]
 emit_ahk_key = "Right"
 emit_ahk_mods = ["ctrl", "super"]
 
@@ -701,8 +725,8 @@ platform = "all"
 # --- Actions système avancées ---
 
 [sg_actions.select_line]
-# Implemented on BOTH: Windows in modules/shortcuts, macOS in
-# modules/shortcuts/actions/ and registered into the gesture registry.
+# Windows emits the sequence below, macOS registers its shortcut-layer function
+# into the gesture registry, and Linux routes it to modules/shortcuts/manager.
 platform = "all"
 emit_ahk = "{Home}{Shift Down}{End}{Shift Up}"
 
@@ -719,6 +743,7 @@ emit_ahk = "#+t"
 
 [sg_actions.open_url]
 platform = "all"
+requires_linux = ["tool:xdg-open"]
 # The parameter belongs to a binding (gesture, tap-hold or shortcut), never to
 # the action globally: two bindings may legitimately open two different URLs.
 parameter = "url"
@@ -738,6 +763,8 @@ emit_ahk = "{Home}({End}){Home}"
 
 [sg_actions.search_web]
 platform = "all"
+# Linux reads the query from the X11 primary selection and opens the result.
+requires_linux = ["tool:xclip", "tool:xdg-open"]
 # URL template containing exactly one %s placeholder for the selected query.
 parameter = "search_url"
 
@@ -980,11 +1007,13 @@ platform = "ahk"
 [sg_actions.open_key_history]
 platform = "ahk"
 
-# --- Raccourcis modificateur + touche ---
-# La matrice exhaustive est déclarée une seule fois dans
-# modifier_chords.json. Chaque driver génère toutes les combinaisons non vides
-# de ses modificateurs natifs et les expose sous des libellés non traduits comme
-# « Ctrl + A ». Les identifiants internes ne doivent jamais être affichés.
+# --- Modifier + key shortcuts ---
+# The exhaustive matrix is declared once in modifier_chords.json. Each driver
+# registers every non-empty combination of its native modifiers and shows them
+# under language-neutral labels such as "Ctrl + A"; the internal ids are never
+# displayed. In the picker they sit under the localized
+# sg_order.header.modifier_chords heading, one sub-heading per modifier
+# combination built from sg_order.header.modifier_chord_group.
 
 [sg_actions._modifier_chords_placeholder]
 platform = "all"
@@ -1135,7 +1164,7 @@ items = [
     "sel_word_prev",
     "sel_word_next",
     "--",
-    "#Raccourcis",
+    "#modifier_chords",
     "_modifier_chords_placeholder",
     "--",
     "#grp_media",
