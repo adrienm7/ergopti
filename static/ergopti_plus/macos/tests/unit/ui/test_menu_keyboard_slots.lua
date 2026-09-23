@@ -45,7 +45,7 @@ local function make_ctx()
 	local updates = { count = 0 }
 	local ctx = {
 		gestures = {
-			get_sg_names = function() return { "#header", "copy_selection", "paste_plain" } end,
+			get_sg_names = function() return { "#header", "lookup", "select_line" } end,
 			get_action_label = function(id) return "Label:" .. id end,
 		},
 		updateMenu = function() updates.count = updates.count + 1 end,
@@ -151,7 +151,7 @@ helpers.describe("menu_keyboard_slots: adding a binding", function()
 		local ctx = make_ctx()
 		local group = shortcuts.get_keyboard_slot_groups()[1]
 		local taken = group.prefix .. FIRST_KEY
-		shortcuts.set_keyboard_action(taken, "copy_selection")
+		shortcuts.set_keyboard_action(taken, "lookup")
 
 		local rows = ui.provide_rows(ctx, nil)
 		rows[1].items[#rows[1].items].action()
@@ -178,9 +178,9 @@ helpers.describe("menu_keyboard_slots: adding a binding", function()
 		picker.opened[1].confirm(slot)
 
 		helpers.assert_eq(#picker.opened, 2, "picking a slot must then ask what it should do")
-		picker.opened[2].confirm("paste_plain")
+		picker.opened[2].confirm("select_line")
 
-		helpers.assert_eq(shortcuts.get_keyboard_action(slot), "paste_plain",
+		helpers.assert_eq(shortcuts.get_keyboard_action(slot), "select_line",
 			"the assignment must be persisted, not merely displayed")
 		helpers.assert_true(updates.count > 0, "and the menu must be rebuilt so the new row shows")
 
@@ -219,12 +219,12 @@ helpers.describe("menu_keyboard_slots: editing a binding", function()
 		local ctx = make_ctx()
 		local group = shortcuts.get_keyboard_slot_groups()[1]
 		local slot = group.prefix .. "m"
-		shortcuts.set_keyboard_action(slot, "copy_selection")
+		shortcuts.set_keyboard_action(slot, "lookup")
 
 		local rows = ui.provide_rows(ctx, nil)
 		local found = nil
 		for _, inner in ipairs(rows[1].items) do
-			if inner.label:find("Label:copy_selection", 1, true) then found = inner end
+			if inner.label:find("Label:lookup", 1, true) then found = inner end
 		end
 		helpers.assert_true(found ~= nil,
 			"an assigned slot must appear in its group, labelled with what it does")
@@ -237,12 +237,12 @@ helpers.describe("menu_keyboard_slots: editing a binding", function()
 		local ctx = make_ctx()
 		local group = shortcuts.get_keyboard_slot_groups()[1]
 		local slot = group.prefix .. "m"
-		shortcuts.set_keyboard_action(slot, "copy_selection")
+		shortcuts.set_keyboard_action(slot, "lookup")
 
 		local rows = ui.provide_rows(ctx, nil)
 		rows[1].items[1].action()
 
-		helpers.assert_eq(picker.opened[1].opts.current, "copy_selection",
+		helpers.assert_eq(picker.opened[1].opts.current, "lookup",
 			"the picker must open on what the slot holds, not on 'none'")
 
 		shortcuts.set_keyboard_action(slot, "none")
@@ -253,7 +253,7 @@ helpers.describe("menu_keyboard_slots: editing a binding", function()
 		local ctx = make_ctx()
 		local group = shortcuts.get_keyboard_slot_groups()[1]
 		local slot = group.prefix .. "m"
-		shortcuts.set_keyboard_action(slot, "copy_selection")
+		shortcuts.set_keyboard_action(slot, "lookup")
 
 		local rows = ui.provide_rows(ctx, nil)
 		rows[1].items[1].action()
@@ -280,7 +280,7 @@ helpers.describe("menu_keyboard_slots: editing a binding", function()
 			local rows = ui.provide_rows(ctx, nil)
 			rows[1].items[#rows[1].items].action()
 			picker.opened[1].confirm(slot)
-			picker.opened[2].confirm("copy_selection")
+			picker.opened[2].confirm("lookup")
 			helpers.assert_eq(updates.count, 0,
 				"a refused native/persistence transaction must not publish a success refresh")
 		end, debug.traceback)

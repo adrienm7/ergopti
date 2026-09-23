@@ -591,6 +591,14 @@ function M.set_action(slot, action)
 		Logger.error(LOG, "set_action(): slot and action must be strings.")
 		return false
 	end
+	-- Refused like Windows refuses it: an id the catalogue does not offer here
+	-- (renamed, another OS's, or a typo in config.toml) used to be stored and
+	-- then dispatched as a silent no-op, indistinguishable from a gesture that
+	-- was never recognised.
+	if not Actions.is_assignable(action) then
+		Logger.warn(LOG, "set_action(): refusing unknown action '%s' for slot '%s'.", action, slot)
+		return false
+	end
 	CoreState.ga[slot] = action
 	Logger.debug(LOG, "Gesture action '%s' → '%s'.", slot, action)
 	return true
