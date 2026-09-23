@@ -1002,20 +1002,23 @@ Boot.mark("First-launch guard (onboarding check)")
 -- ====================================
 -- ===================================
 
--- Pre-start modules so they are active before menu.lua reads saved prefs.
--- Menu.lua will honor saved state and stop/start them as needed. All three
--- input owners share one transaction because continuing after a refused start
--- leaves a half-functional keyboard while the boot log still claims success.
+-- Pre-start the keyboard input owners so they are active before menu.lua reads
+-- saved prefs. Menu.lua will honor saved state and pause/resume them as needed.
+-- Both share one transaction because continuing after a refused start leaves a
+-- half-functional keyboard while the boot log still claims success. Gestures is
+-- deliberately absent: its native runtime (touch watchers, primer tap, health
+-- check) exists only while the feature is ON, so the menu's preference sync
+-- acquires it through gestures.enable_all() and a saved OFF never arms it.
 -- Script control (the AltGr+Enter/Backspace/Escape panic-button eventtap) is
 -- armed as early as its real dependencies allow. M.start() only stores the
 -- keymap/shortcuts/gestures/karabiner module TABLES for later pause/resume
 -- dispatch and creates its own eventtap — it does not call into any of their
 -- own start-up entry points, so it has no technical dependency on the keymap
 -- engine, the Karabiner bridge, or the LLM/TOML boot steps below. Moved here
--- (right after the gestures/shortcuts pre-start) so the user's one boot-time
--- recourse exists for the entire remainder of a slow boot, instead of only
--- after MLX cleanup, LLM bootstrap, TOML loading and the keymap engine startup
--- have all completed (F-MED-19).
+-- (right after the shortcuts pre-start) so the user's one boot-time recourse
+-- exists for the entire remainder of a slow boot, instead of only after MLX
+-- cleanup, LLM bootstrap, TOML loading and the keymap engine startup have all
+-- completed (F-MED-19).
 local function finish_boot_after_onboarding()
 Boot.stage("Accessibility permission")
 -- Every input owner below is an eventtap, and an untrusted process gets taps
@@ -1038,18 +1041,9 @@ if accessibility_trusted ~= true then
 end
 Logger.info(LOG, "Accessibility permission is granted; arming input owners.")
 Boot.mark("Accessibility permission")
-Boot.stage("Gestures + shortcuts pre-start")
+Boot.stage("Shortcuts pre-start")
 
 local prestart_committed = StartupTransaction.run({
-	{
-		name = "gestures",
-		allow_unavailable = true,
-		start = function()
-			Logger.debug(LOG, "Starting gestures module…")
-			return gestures.start()
-		end,
-		stop = gestures.stop,
-	},
 	{
 		name = "shortcuts",
 		start = function()
@@ -1061,7 +1055,7 @@ local prestart_committed = StartupTransaction.run({
 	{
 		name = "script_control",
 		start = function()
-			Boot.mark("Gestures + shortcuts pre-start")
+			Boot.mark("Shortcuts pre-start")
 			Boot.stage("Script control engine started (panic-button eventtap)")
 			Logger.debug(LOG, "Starting script control engine…")
 			return shortcuts.start_script_control(keymap, shortcuts, gestures, karabiner)

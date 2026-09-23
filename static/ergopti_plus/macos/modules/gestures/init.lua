@@ -165,8 +165,10 @@ M.AXIS_SLOTS = {
 -- ====================================
 -- ====================================
 
+-- `enabled` starts OFF: the native runtime is acquired only by enable_all() or
+-- start(), so a loaded module never claims ON before the saved preference applies.
 local CoreState = {
-	enabled        = true,
+	enabled        = false,
 	suspended      = false,  -- set by pause/resume (separate from the user feature flag)
 	ga             = {},
 	modes          = {},
@@ -222,6 +224,22 @@ local gesture_lifecycle_epoch = 0
 local gesture_start_attempt = nil
 local gesture_resume_start_required = false
 local teardown_gesture_runtime
+local release_native_runtime
+
+-- True only between a committed start() and the next native release. The runtime
+-- follows the feature switch: enable_all() acquires it, disable_all() releases it.
+local runtime_live = false
+
+--- Returns whether any native gesture owner is live or retained as cleanup debt.
+--- @return boolean owned
+local function native_runtime_owned()
+	return runtime_live == true
+		or gesture_primer ~= nil
+		or sleep_watcher ~= nil
+		or discovery_timer ~= nil
+		or next(discovery_cleanup_debt) ~= nil
+		or next(touch_watchers) ~= nil
+end
 
 -- Debounce for primer-triggered emergency recycles
 local last_emergency_recycle = 0
@@ -683,7 +701,10 @@ function M.enable_all()
 		end
 		return false
 	end
-	if gesture_resume_start_required == true then
+	-- The native runtime exists only while Gestures is ON, so ON acquires it
+	-- unless it is already live. Without a touchdevice API only the feature flag
+	-- is published; start() logs that degraded runtime.
+	if gesture_resume_start_required == true or (touchdevice and runtime_live ~= true) then
 		if teardown_gesture_runtime(true) ~= true then
 			Logger.error(LOG,
 				"Gesture enable cannot rebuild while native rollback debt remains.")
@@ -735,12 +756,18 @@ function M.disable_all()
 			Actions.force_cleanup, debug.traceback, GESTURE_ACTION_PARENT)
 		cleanup_settled = ok_cancel and cancel_result == true
 			and ok_cleanup and cleanup_result == true
+		-- OFF releases the native runtime too: otherwise the touch watchers, the
+		-- primer tap and the health-check timer keep polling with Gestures off.
+		if cleanup_settled and native_runtime_owned() then
+			cleanup_settled = release_native_runtime()
+		end
 	end
 	if cleanup_settled ~= true then
 		Logger.error(LOG, "Gesture disable cleanup refused; feature state preserved.")
 		return false
 	end
 	CoreState.enabled = false
+	Logger.info(LOG, "Gestures disabled; no native gesture owner remains.")
 	return true
 end
 function M.enable(name)
@@ -1120,16 +1147,12 @@ local function stop_sleep_watcher()
 	return true
 end
 
---- Settles every native gesture runtime owner without necessarily changing the
---- user feature snapshot. Startup rollback under ScriptControl PAUSE uses the
---- preserving form so RESUME can reconstruct the exact previously-ON posture.
---- @param preserve_feature_state boolean
---- @return boolean settled
-teardown_gesture_runtime = function(preserve_feature_state)
-	local cleanup_ok, cleanup_result = xpcall(
-		Actions.force_cleanup, debug.traceback, GESTURE_ACTION_PARENT)
-	if preserve_feature_state ~= true then CoreState.enabled = false end
-
+--- Releases every native gesture owner: touch watchers, the primer tap, the
+--- discovery or health-check timer, the wake watcher and the engine. The feature
+--- flag and the action scope stay with the caller.
+--- @return boolean settled True only when no native owner remains.
+release_native_runtime = function()
+	runtime_live = false
 	local watchers_stopped = recycle_watchers(false)
 	local primer_stopped = stop_gesture_primer()
 	local timer_stopped = cancel_discovery_timer("module stop")
@@ -1141,10 +1164,27 @@ teardown_gesture_runtime = function(preserve_feature_state)
 		Logger.error(LOG, "Gesture engine stop failed: %s.", tostring(engine_stop_result))
 	end
 
-	if not cleanup_ok or cleanup_result ~= true
-		or watchers_stopped ~= true or timer_stopped ~= true
+	if watchers_stopped ~= true or timer_stopped ~= true
 		or primer_stopped ~= true or wake_watcher_stopped ~= true
 		or not engine_stopped or engine_stop_result ~= true then
+		Logger.error(LOG, "Gesture native runtime release incomplete; cleanup is retryable.")
+		return false
+	end
+	return true
+end
+
+--- Settles every native gesture runtime owner without necessarily changing the
+--- user feature snapshot. Startup rollback under ScriptControl PAUSE uses the
+--- preserving form so RESUME can reconstruct the exact previously-ON posture.
+--- @param preserve_feature_state boolean
+--- @return boolean settled
+teardown_gesture_runtime = function(preserve_feature_state)
+	local cleanup_ok, cleanup_result = xpcall(
+		Actions.force_cleanup, debug.traceback, GESTURE_ACTION_PARENT)
+	if preserve_feature_state ~= true then CoreState.enabled = false end
+
+	local native_released = release_native_runtime()
+	if not cleanup_ok or cleanup_result ~= true or native_released ~= true then
 		Logger.error(LOG, "Gestures runtime teardown incomplete; native cleanup is retryable.")
 		return false
 	end
@@ -1197,7 +1237,6 @@ function M.start()
 	end
 	-- A reload, duplicate start, or earlier failed rollback can leave exact native
 	-- owners published. Settle them before creating any successor capability.
-	local entry_enabled = CoreState.enabled == true
 	if gesture_primer or sleep_watcher or discovery_timer
 		or next(discovery_cleanup_debt) ~= nil or next(touch_watchers) ~= nil then
 		if teardown_gesture_runtime(true) ~= true then
@@ -1214,11 +1253,11 @@ function M.start()
 		end
 		return false
 	end
+	-- start() is the ON transition: from here the feature flag carries the user's
+	-- intent, and a PAUSE-interrupted attempt keeps it so RESUME rebuilds the runtime.
+	CoreState.enabled = true
 	gesture_lifecycle_epoch = gesture_lifecycle_epoch + 1
-	local start_attempt = {
-		epoch = gesture_lifecycle_epoch,
-		previous_enabled = entry_enabled,
-	}
+	local start_attempt = { epoch = gesture_lifecycle_epoch }
 	gesture_start_attempt = start_attempt
 	local function reject_attempt(reason)
 		local paused_during_start = CoreState.suspended == true
@@ -1227,9 +1266,9 @@ function M.start()
 			gesture_lifecycle_epoch = gesture_lifecycle_epoch + 1
 			gesture_start_attempt = nil
 			local rollback_settled = teardown_gesture_runtime(true)
-			CoreState.enabled = start_attempt.previous_enabled
+			CoreState.enabled = true
 			CoreState.suspended = true
-			gesture_resume_start_required = start_attempt.previous_enabled == true
+			gesture_resume_start_required = true
 			if rollback_settled ~= true then
 				Logger.error(LOG,
 					"Gesture PAUSE startup rollback remains incomplete and retryable.")
@@ -1239,10 +1278,8 @@ function M.start()
 		end
 		return false
 	end
-	local action_lifecycle = CoreState.enabled == true
-		and Actions.resume_after_cleanup or Actions.force_cleanup
 	local actions_ok, actions_result = xpcall(
-		action_lifecycle, debug.traceback, GESTURE_ACTION_PARENT)
+		Actions.resume_after_cleanup, debug.traceback, GESTURE_ACTION_PARENT)
 	if not actions_ok or actions_result ~= true then
 		Logger.error(LOG, "Gesture startup refused while action cleanup remains pending: %s.",
 			tostring(actions_result))
@@ -1280,7 +1317,6 @@ function M.start()
 		Logger.info(LOG, "  pre-init device #%d: id=%s", i, tostring(id))
 	end
 
-	CoreState.enabled = true
 	_G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME = false
 	last_emergency_recycle = 0
 	primer_event_count = 0
@@ -1445,6 +1481,7 @@ function M.start()
 	end
 	gesture_start_attempt = nil
 	gesture_resume_start_required = false
+	runtime_live = true
 	Logger.success(LOG, "============== gestures module startup COMPLETE — primer events so far: %d ==============", primer_event_count)
 	return true
 end

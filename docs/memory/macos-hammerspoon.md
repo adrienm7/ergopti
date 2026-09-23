@@ -407,6 +407,17 @@ sends no resume message, so no window appears, but nothing relaunches either.
 Action: do not re-investigate a configuration fix; only a patched Sparkle
 build or an owned relaunch helper can remove the window.
 
+### project-hs-gestures-runtime-follows-feature
+
+The gestures native runtime (touch watchers, primer eventtap, discovery and
+30 s health-check timer, wake watcher) exists only while Gestures is ON:
+`modules/gestures/init.lua` `enable_all()` acquires it through `start()` and
+`disable_all()` releases it. Boot never calls `gestures.start()`; the menu's
+preference sync does it. Before 2026-09, boot started it unconditionally and OFF
+only cleared a flag, so the taps and "Health-check tick" lines kept running with
+Gestures off; such a line now proves Gestures was ON. Test doubles:
+`tests/support/gesture_runtime_fixture.lua`.
+
 ## Clipboard, files, and privacy
 
 ### project-hs-clipboard-transaction-ownership
