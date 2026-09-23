@@ -101,6 +101,14 @@ local DEVICE_VER    = 0x0001
 
 local UINPUT_PATH = "/dev/uinput"
 
+-- errno for "present but this user may not read it". A write-only group grant on
+-- /dev/uinput answers exactly this to a read probe.
+local EACCES = 13
+
+-- The node every probe and open() targets. Only the tests move it: probing the
+-- real node from a root test run is how a stray regular file came to sit there.
+local _uinput_path = UINPUT_PATH
+
 
 
 
@@ -296,21 +304,27 @@ end
 --- @return boolean
 function M.is_available()
 	if not _backend and not M.use_ffi_backend() then return false end
-	local fh = io.open(UINPUT_PATH, "r")
+	local fh, _, errno = io.open(_uinput_path, "r")
 	if fh then
 		fh:close()
 		return true
 	end
 	-- Unreadable but present is normal: /dev/uinput is commonly write-only for
-	-- the owning group, so a write probe is the honest test. It is deferred to
-	-- open() rather than done here, because opening IS the side effect.
-	local fh_w = io.open(UINPUT_PATH, "a")
-	if fh_w then
-		fh_w:close()
-		return true
-	end
-	Logger.debug(LOG, "%s is not accessible — the caller keeps its existing channel.", UINPUT_PATH)
+	-- the owning group, so the honest write test is deferred to open(), where
+	-- opening IS the side effect. It is never probed with a write-mode io.open:
+	-- "a" CREATES a missing path, so a root process on a kernel whose uinput
+	-- module is not loaded left a regular file at /dev/uinput. That file then
+	-- answered every later probe as "available" and shadowed the real node the
+	-- module creates on load, so injection stayed broken until a reboot.
+	if errno == EACCES then return true end
+	Logger.debug(LOG, "%s is not accessible — the caller keeps its existing channel.", _uinput_path)
 	return false
+end
+
+--- Test seam: points every probe and open() at another node.
+--- @param path string|nil nil restores /dev/uinput.
+function M._set_path_for_test(path)
+	_uinput_path = path or UINPUT_PATH
 end
 
 --- Creates the virtual keyboard device.
@@ -331,9 +345,9 @@ function M.open()
 		return false
 	end
 
-	local fd, err = _backend.open(UINPUT_PATH)
+	local fd, err = _backend.open(_uinput_path)
 	if not fd then
-		Logger.warn(LOG, "open(): cannot open %s (%s).", UINPUT_PATH, tostring(err))
+		Logger.warn(LOG, "open(): cannot open %s (%s).", _uinput_path, tostring(err))
 		return false
 	end
 
@@ -368,7 +382,7 @@ function M.open()
 	end
 
 	_fd = fd
-	Logger.success(LOG, "Virtual keyboard created on %s.", UINPUT_PATH)
+	Logger.success(LOG, "Virtual keyboard created on %s.", _uinput_path)
 	return true
 end
 
