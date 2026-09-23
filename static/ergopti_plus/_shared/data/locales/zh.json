@@ -2667,6 +2667,8 @@
 	"platform_reason.layout_bundle_and_menubar_are_macos": "仅限 macOS：这些项通过系统自身的输入源机制安装 .bundle 键盘布局，分用户范围和系统范围，并选择菜单栏图标。Windows 用自己的安装程序安装 .klc，Linux 生成 XKB 布局，两者都没有菜单栏。",
 	"platform_reason.layout_emulation_is_windows_only": "仅限 Windows：此驱动程序自行模拟 Ergopti 布局，因此有可以关闭的模拟。macOS 将布局安装为系统输入源，Linux 通过 kanata 重新映射键盘，因此那里没有可关闭的内容。",
 	"platform_reason.remap_engine_is_per_driver": "每个驱动用不同的引擎重映射键盘——Windows 用自己的点按长按层，macOS 用 Karabiner-Elements，Linux 用自身守护进程中的点按长按引擎——所以各自只带自己所运行引擎的菜单，谁也配置不了别人的。",
+	"platform_reason.layer_repeat_count_is_windows_only": "目前仅限 Windows：重复次数需要层在下一个按键之前记住一个数字，Windows 层会自行完成这一点。macOS 上的 Karabiner-Elements 和 Linux 上的 kanata 单独处理每次按键，不会在两个按键之间保存计数。",
+	"platform_reason.layer_fn_modifier_is_macos": "仅限 macOS：Fn 只有在 Mac 上才是修饰键。PC 键盘在键盘内部处理 Fn，因此 Windows 和 Linux 永远收不到它，也无法发送它。",
 	"platform_reason.debug_surface_is_each_drivers_own": "每个驱动通过自己的运行时调试：AutoHotkey 提供 Window Spy、变量列表和按键历史，Hammerspoon 提供 Lua 控制台。其他运行时没有可打开的对应物。",
 	"platform_reason.chord_families_are_each_platforms": "驱动所绑定的组合键族属于它的平台：Windows 归拢 AltGr 和 CapsLock 组合并保有一份个人快捷键文件，macOS 归拢 Ctrl 和 Cmd 快捷键。每个驱动只列出自己绑定的那一族。",
 	"platform_reason.metrics_extras_are_not_on_linux": "Linux 上没有：该驱动没有按应用的排除名单，也无法从此菜单把度量窗口挂到键盘快捷键上。",
