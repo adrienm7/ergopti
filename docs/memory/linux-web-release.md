@@ -25,6 +25,44 @@ it. Tests must execute selection through injection.
 Provider APIs may return a single computed label wrapped as a list. Normalize at
 the adapter boundary rather than spreading shape checks through the driver.
 
+### project-linux-keymap-before-libxkbcommon-1-8
+
+`xkbcli dump-keymap-{wayland,x11}` only exists from libxkbcommon 1.8; Ubuntu
+24.04 ships 1.6. `adapters/keyboard_layout.lua` therefore falls back to
+XWayland's keymap (`xkbcomp -xkb $DISPLAY`, exact because XWayland receives the
+compositor's keymap) and then to `xkbcli compile-keymap` from the session's
+layout names (`infra/xkb_rmlvo.lua`). Action: a keymap source must be proven on
+the runner's own libxkbcommon through `refresh()`, never through a fallback the
+test writes itself.
+
+### project-linux-injection-table-comes-from-libxkbcommon
+
+The char → keystroke table is probed on the validated keymap
+(`XkbCapture.inverse_table()`): each chord the injector can press is applied to
+a fresh XKB state. A text model that maps level N to a fixed modifier is wrong
+for keypad types (NumLock) and Ergopti's `ERGOPTI_SEVEN_LEVEL` (Shift = level
+3). Shortcut letters (Ctrl+V, Ctrl+W) go through
+`keyboard_layout.shortcut_keycode()`. Action: never add a hardcoded evdev
+letter or a level → modifier table.
+
+### project-linux-atspi-focus-is-per-application
+
+Every GTK application keeps STATE_FOCUSED on its last focused field; only the
+window manager's STATE_ACTIVE frame says which one the user is in. A
+desktop-wide search is ambiguous with two windows open, and the daemon fails
+closed on ambiguity: every expansion blocked. Measured cost is ~1 ms per node
+against a 1 s probe deadline. Action: keep the search scoped to the active
+window and prove changes with `tests/hardware/run_atspi_focus.sh`.
+
+### project-linux-first-install-needs-luajit-module-builds
+
+Generic `lua-*` packages are Lua 5.4 builds on Fedora, Arch, openSUSE and
+Alpine; LuaJIT needs `lua51-*` (Arch), `luajit-*` (openSUSE), `lua5.1-*`
+(Alpine, Fedora). Fedora has no LuaJIT lgi, so its WebKit windows cannot open
+(declared in the `first-install-distros` matrix). GNOME shows no tray icon
+without an AppIndicator extension. Action: prove installer changes with
+`tests/distro/run_in_docker.sh <image>` and the first-install matrix.
+
 ## Website and documentation
 
 ### project-site-i18n-gettext-french-key
