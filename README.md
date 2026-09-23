@@ -229,7 +229,7 @@ bash static/ergopti_plus/linux/install.sh --no-deps   # …same, minus the packa
 | ---------------------------------- | ------------------------------------------------------------------------------ |
 | `luajit`                           | the launcher refuses to start                                                  |
 | `libnotify` (`notify-send`)        | the launcher refuses to start                                                  |
-| `libxkbcommon-tools` (`xkbcli`)    | the output layout cannot be read, so every replacement is pasted via the clipboard instead of typed |
+| `libxkbcommon-tools` (`xkbcli`)    | no keymap source on Wayland without XWayland, so the keyboard is refused; before libxkbcommon 1.8 (Ubuntu 24.04, Debian 12) the keymap is read from XWayland (`xkbcomp`) or compiled from the session's layout names (GNOME, Plasma, `XKB_DEFAULT_*`, `localectl`) |
 | `libayatana-appindicator3`         | `--tray` has nothing to host the icon in                                       |
 | `kanata`                           | no tap-hold and no layers; hotstrings still work                               |
 | `lua-luv`                          | no inotify — the loop falls back to an FFI sleep and file watching to `stat()` polling |
