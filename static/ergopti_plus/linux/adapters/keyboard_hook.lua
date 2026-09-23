@@ -254,6 +254,32 @@ local function _reset_capture_state()
 	return XkbCapture.reset_state()
 end
 
+--- Seeds the capture state's CapsLock from the keyboard's LED.
+---
+--- A fresh XKB state starts unlocked, and the capture state learns CapsLock only
+--- from key presses. Started (or re-acquired after a hotplug) while CapsLock was
+--- already on, the daemon therefore believed it off: typed triggers were read in
+--- the wrong case, and the injector — which releases a locked CapsLock around a
+--- replacement — typed it inverted. The LED is read at acquisition, before the
+--- grab can make it stale (the kernel drops the compositor's LED writes to a
+--- grabbed device), and matches what the desktop last set.
+--- @param path string|nil The keyboard source just acquired.
+--- @return boolean True when the state now matches the LED.
+local function _seed_caps_lock(path)
+	if not path then return false end
+	local leds, led_err = EvdevReader.active_leds(keyboard_slot(path), LED_CAPSL)
+	if not leds then
+		Logger.warn(LOG, "CapsLock state of %s unreadable — assuming off (%s).", path, tostring(led_err))
+		return false
+	end
+	if leds[LED_CAPSL] == true then
+		_capture(EvdevCodes.KEY_CAPSLOCK, InputEvent.VALUE_DOWN)
+		_capture(EvdevCodes.KEY_CAPSLOCK, InputEvent.VALUE_UP)
+		Logger.debug(LOG, "CapsLock is on at acquisition — capture state locked to match.")
+	end
+	return true
+end
+
 
 
 
@@ -1018,6 +1044,7 @@ function M.check_device()
 	end
 	local acquired, acquire_err = _acquire(keyboards, force_path)
 	if acquired then
+		_seed_caps_lock(_devices[1])
 		_reset_modifier_state()
 		_physical_down = {}
 		_sync_dropped = {}
@@ -1197,6 +1224,7 @@ function M.start(opts)
 		_device = nil
 		return
 	end
+	_seed_caps_lock(_devices[1])
 
 	-- The pointer is opened last and its failure is not fatal: a machine with no
 	-- pointer, or one whose node this user cannot read, still expands hotstrings.
@@ -1348,6 +1376,13 @@ M.DEVICE_CHECK_TICKS = DEVICE_CHECK_TICKS
 
 --- @param intercept boolean Whether to run the pass-through branch.
 --- @return integer Number of events drained.
+--- Test seam: runs the CapsLock seeding against an already-open source.
+--- @param path string
+--- @return boolean
+function M._seed_caps_lock_for_test(path)
+	return _seed_caps_lock(path)
+end
+
 function M._test_drive(events, callbacks, intercept)
 	local size = InputEvent.native_size()
 	local queue = {}
