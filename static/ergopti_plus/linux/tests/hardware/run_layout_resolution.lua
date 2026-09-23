@@ -50,7 +50,13 @@ local MIN_PLAUSIBLE_ENTRIES = 60
 local LAYOUTS = {
 	{
 		id      = "fr",
-		typable = { "é", "è", "à", "ç", "ù" },
+		typable = { "é", "è", "à", "ç", "ù", "€" },
+		-- The digit row, and on the digit row: every digit is Shift + the key
+		-- above the letters (evdev 2-11). Planned from the keymap text in hash
+		-- order, a digit could land on the keypad key of the same level —
+		-- Shift+KP1 moves the caret with NumLock off — and differently from
+		-- one start to the next.
+		keys    = { ["1"] = 2, ["2"] = 3, ["5"] = 6, ["9"] = 10, ["0"] = 11, ["€"] = 18 },
 		-- No ñ on a French keyboard at any level. This is the exact case from the
 		-- question "what about a Spanish hotstring pack".
 		refused = { "ñ" },
@@ -138,6 +144,20 @@ end
 
 
 
+--- Loads keymap text the way the daemon does: refresh() with an override file,
+--- which runs XKB capture and builds the injection table from libxkbcommon.
+--- @param keymap string
+--- @return boolean
+local function load_through_driver(keymap)
+	local path = os.tmpname()
+	local fh = assert(io.open(path, "w"))
+	fh:write(keymap)
+	fh:close()
+	local ok = KeyboardLayout.refresh(path)
+	os.remove(path)
+	return ok
+end
+
 -- =======================================
 -- =======================================
 -- ======= 2/ The environment ============
@@ -177,15 +197,15 @@ for _, spec in ipairs(LAYOUTS) do
 		_failures = _failures + 1
 		print("  FAIL could not compile layout " .. spec.id)
 	else
-		local table_built = KeyboardLayout.build(keymap)
-		local count = 0
-		for _ in pairs(table_built or {}) do count = count + 1 end
+		check(load_through_driver(keymap), string.format(
+			"%s loads through the driver's own refresh(), as a live session would", spec.id))
 
-		check(count >= MIN_PLAUSIBLE_ENTRIES, string.format(
-			"%s yields %d typable character(s) — at or above the %d the driver requires",
-			spec.id, count, MIN_PLAUSIBLE_ENTRIES))
-
-		KeyboardLayout._set_table_for_test(table_built)
+		for char, keycode in pairs(spec.keys or {}) do
+			local hit = KeyboardLayout.resolve(char)
+			check(hit ~= nil and hit.keycode == keycode, string.format(
+				"%s types %s on evdev %d (got %s)", spec.id, char, keycode,
+				hit and tostring(hit.keycode) or "nothing"))
+		end
 
 		for _, char in ipairs(spec.typable) do
 			local plan, blocker = KeyboardLayout.plan(char)
@@ -215,6 +235,61 @@ for _, spec in ipairs(LAYOUTS) do
 				"%s names %s as the blocker, so the log says which character stopped it",
 				spec.id, spec.refused[1]))
 		end
+	end
+end
+
+-- The Ergopti layout itself, compiled from the files this repository ships.
+-- Its ERGOPTI_SEVEN_LEVEL type puts Shift on level 3 and CapsLock on level 2,
+-- so a table that assumed "level 2 = Shift" typed "mon-fichier" for
+-- "mon_fichier" and sent most punctuation through the clipboard.
+print("--- ergopti (v2.2.1 plus) ---")
+do
+	local here = debug.getinfo(1, "S").source:gsub("^@", ""):gsub("[^/]+$", "")
+	local repo_linux = here .. "../../../../ergopti/linux/v2_2_1/"
+	local tmp = os.tmpname()
+	os.remove(tmp)
+	os.execute(string.format("mkdir -p '%s/symbols' '%s/types'", tmp, tmp))
+	os.execute(string.format("cp '%sErgopti_v2_2_1_plus.xkb' '%s/symbols/ergopti'", repo_linux, tmp))
+	os.execute(string.format("cp '%sxkb_types.txt' '%s/types/ergopti'", repo_linux, tmp))
+	-- Compiled through libxkbcommon with the fixture directory on its include
+	-- path: `xkbcli compile-keymap --keymap` only exists from 1.11, and the
+	-- rules path would pair the symbols with the stock types instead of
+	-- ERGOPTI_SEVEN_LEVEL.
+	local ffi = require("ffi")
+	pcall(ffi.cdef, [[
+		struct xkb_context *xkb_context_new(int flags);
+		int xkb_context_include_path_append(struct xkb_context *context, const char *path);
+		struct xkb_keymap *xkb_keymap_new_from_string(struct xkb_context *context,
+			const char *string, int format, int flags);
+		char *xkb_keymap_get_as_string(struct xkb_keymap *keymap, int format);
+	]])
+	local lib = ffi.load("xkbcommon.so.0")
+	local ctx = lib.xkb_context_new(1)
+	lib.xkb_context_include_path_append(ctx, tmp)
+	lib.xkb_context_include_path_append(ctx, "/usr/share/X11/xkb")
+	local compiled = lib.xkb_keymap_new_from_string(ctx, [[xkb_keymap {
+	xkb_keycodes { include "evdev+aliases(azerty)" };
+	xkb_types { include "ergopti" };
+	xkb_compat { include "complete" };
+	xkb_symbols { include "pc+ergopti(Ergopti_v2_2_1_plus)+inet(evdev)" };
+};]], 1, 0)
+	local keymap = compiled ~= nil and ffi.string(lib.xkb_keymap_get_as_string(compiled, 1)) or ""
+	os.execute(string.format("rm -rf '%s'", tmp))
+	if not keymap:find("xkb_keymap", 1, true) then
+		_failures = _failures + 1
+		print("  FAIL could not compile the Ergopti layout: " .. keymap:sub(1, 300))
+	else
+		check(load_through_driver(keymap), "ergopti loads through the driver's own refresh()")
+		for _, text in ipairs({ "mon_fichier", "c’est-à-dire", "(a) [b] <c> @d", "2024, fin." }) do
+			local plan, blocker = KeyboardLayout.plan(text)
+			check(plan ~= nil, string.format("ergopti types %q as keystrokes%s", text,
+				plan and "" or (" — blocked on " .. tostring(blocker))))
+		end
+		local underscore = KeyboardLayout.resolve("_")
+		local minus = KeyboardLayout.resolve("-")
+		check(underscore and minus and (underscore.keycode ~= minus.keycode
+			or table.concat(underscore.mods, "+") ~= table.concat(minus.mods, "+")),
+			"ergopti plans _ and - as different keystrokes")
 	end
 end
 
