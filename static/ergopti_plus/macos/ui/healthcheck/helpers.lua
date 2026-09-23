@@ -51,7 +51,8 @@ local LOG = "healthcheck"
 --- @return table
 function H.sys_info()
 	local info = {}
-	info.wifi_ssid_hash = NetworkInfo.getSsidHash()
+	-- The signal strength only: the Wi-Fi name identifies a place, and a hash of
+	-- it is reversed with a dictionary of common names
 	info.wifi_signal = NetworkInfo.getSignalStrength()
 
 	-- Hammerspoon version

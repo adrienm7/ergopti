@@ -915,9 +915,6 @@ function M.format_plain(snapshot)
 		table.insert(lines, string.format("DPI              : %s", dpi_text))
 	end
 	table.insert(lines, string.format("Locale           : %s", tostring(sys.locale or "?")))
-	if sys.wifi_ssid_hash then
-		table.insert(lines, string.format("Wi-Fi SSID hash  : %s", tostring(sys.wifi_ssid_hash)))
-	end
 	if sys.wifi_signal then
 		table.insert(lines, string.format("Wi-Fi signal     : %s%%", tostring(sys.wifi_signal)))
 	end
