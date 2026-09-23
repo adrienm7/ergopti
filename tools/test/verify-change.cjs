@@ -404,6 +404,16 @@ const RULES = [
 			f.endsWith('.md')),
 	},
 	{
+		gate: 'xkb-python',
+		// The shipped XKB files, the Linux installers and every registry layout's
+		// conversion are checked by Python suites no JS or Lua gate runs.
+		why: 'the .keylayout to XKB converter, the Linux installers, the layout registry or the shared keycode table changed',
+		match: (f) =>
+			f.startsWith('static/ergopti/linux/') ||
+			f.startsWith('static/layouts/registry/') ||
+			f.startsWith('static/ergopti_plus/_shared/modules/layouts/'),
+	},
+	{
 		gate: 'swift-launcher',
 		why: 'native launcher code must compile and its process-level XCTest must run on macOS; other hosts report the CI deferral explicitly',
 		match: (f) => f.startsWith('static/ergopti_plus/macos/launcher/'),
@@ -509,6 +519,7 @@ const GATE_COMMANDS = {
 	'report-style': { npm: 'lint:conventions:strict', coveredBy: 'js' },
 	js: { npm: 'test:js' },
 	'swift-launcher': { npm: 'test:macos-swift-launcher' },
+	'xkb-python': { npm: 'test:xkb' },
 	hs: { npm: 'test:hs' },
 	'hs-e2e': { npm: 'test:hs:e2e' },
 	linux: { npm: 'test:linux' },

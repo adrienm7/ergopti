@@ -1,6 +1,9 @@
 # .github/workflows/linux-layout.yml
 #
 # Dedicated gate for the Ergopti XKB layout installation stack:
+#   - the generic .keylayout to XKB converter: the shipped Ergopti files must
+#     come out byte-for-byte, and every registry layout (Ergo-L included) must
+#     convert completely, on the newest and the oldest supported Python;
 #   - unit + sandbox tests for the Python installers (layout_package core,
 #     both installers end-to-end against temporary roots, the diagnostic);
 #   - the same suites on the oldest supported interpreter (3.8);
@@ -19,10 +22,14 @@ on:
     branches: [main, dev]
     paths:
       - 'static/ergopti/linux/**'
+      - 'static/layouts/registry/**'
+      - 'static/ergopti_plus/_shared/modules/layouts/**'
       - '.github/workflows/linux-layout.yml'
   pull_request:
     paths:
       - 'static/ergopti/linux/**'
+      - 'static/layouts/registry/**'
+      - 'static/ergopti_plus/_shared/modules/layouts/**'
       - '.github/workflows/linux-layout.yml'
   workflow_dispatch:
 
@@ -83,6 +90,9 @@ jobs:
       - name: Run installer test suites (unit, consistency, sandbox, real compilers where present)
         run: python static/ergopti/linux/xkb_installation/tests/run_all_tests.py
 
+      - name: Run the .keylayout to XKB converter tests (Ergopti golden files, registry layouts)
+        run: python static/ergopti/linux/xkb_generation/tests/run_all_tests.py
+
       - name: Run the real shell entrypoint in isolated filesystems
         run: bash static/ergopti/linux/xkb_installation/tests/test_install_entrypoint.sh
 
@@ -100,6 +110,11 @@ jobs:
       # run there, not only on the interpreter the maintainer develops with.
       - name: Run installer test suites
         run: python static/ergopti/linux/xkb_installation/tests/run_all_tests.py
+
+      # The Linux package runs the converter on the user's machine, so it has
+      # the installers' interpreter floor too.
+      - name: Run the .keylayout to XKB converter tests
+        run: python static/ergopti/linux/xkb_generation/tests/run_all_tests.py
 
   shell-lint:
     name: 'Shell syntax + shellcheck'

@@ -51,7 +51,10 @@ const PKG = path.join(ROOT, 'package.json');
 const NOT_SUITE_ENTRIES = new Set([
 	'tools/test/run-js-suite.cjs',   // the suite itself
 	'tools/test/verify-change.cjs',  // derives which gates a change needs
-	'tools/test/test-properties.cjs' // property + mutation pass, run under --full
+	'tools/test/test-properties.cjs', // property + mutation pass, run under --full
+	// Python suites: verify-change's xkb-python gate and linux-layout.yml run
+	// them; the JS suite stays free of a Python dependency.
+	'tools/test/run-xkb-python-tests.cjs'
 ]);
 
 // Gates the suite runs with no npm alias. Zero since 2026-08-03, when the last

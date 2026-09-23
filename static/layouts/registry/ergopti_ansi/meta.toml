@@ -17,3 +17,19 @@ platforms = ["linux", "macos", "windows"]
 # key left of Z. The ANSI variants keep this numbering and swap the two keys'
 # characters instead.
 keycode_convention = "iso"
+
+[xkb]
+# Keysyms the shipped Ergopti XKB files have always used for these outputs:
+# each guillemet with its no-break space, and the dead keys that have no XKB
+# dead keysym of their own (superscript, subscript, double-struck, Greek).
+keysym_overrides = [
+	["«\u00A0", "guillemotleft"],
+	["\u00A0»", "guillemotright"],
+	["ᵉ", "uparrow"],
+	["ᵢ", "downarrow"],
+	["ℝ", "infinity"],
+	["µ", "mu"],
+]
+# The magic key types ★ only on its base level; the others keep the letter
+# its action is named after (j).
+base_level_only = ["★"]
