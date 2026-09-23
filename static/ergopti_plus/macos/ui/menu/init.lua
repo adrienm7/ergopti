@@ -36,6 +36,7 @@ local TimerScheduler = require("adapters.timer_scheduler")
 local DeferredWork = require("infra.deferred_work")
 local TerminationCoordinator = require("infra.termination_coordinator")
 local PreferencesTransaction = require("ui.menu.preferences_transaction")
+local SessionDemotions = require("ui.menu.session_demotions")
 local GlobalActionsTransaction = require("ui.menu.global_actions_transaction")
 local RecoverableFileMoves = require("ui.menu.recoverable_file_moves")
 local FactoryResetJournal = require("infra.factory_reset_journal")
@@ -462,6 +463,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local sync_state_to_modules
 	local transactional_save_prefs = nil
 	local llm_handler = nil
+	-- Features whose runtime refused the saved value this session: their state
+	-- shows the real posture while saves keep the value config.toml holds.
+	local session_demotions = SessionDemotions.new()
 
 	local function save_prefs()
 		if type(transactional_save_prefs) ~= "function" then
@@ -469,6 +473,19 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			return false
 		end
 		return transactional_save_prefs()
+	end
+
+	--- Saves a global action's candidate. It sets every feature explicitly, so no
+	--- session demotion may keep substituting the saved value; a refused save
+	--- restores the demotions it detached.
+	--- @return boolean committed
+	local function save_prefs_superseding_demotions()
+		local released = session_demotions.release_all()
+		if save_prefs() ~= true then
+			session_demotions.readopt(released)
+			return false
+		end
+		return true
 	end
 
 
@@ -578,12 +595,14 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			gestures                 = gestures,
 			hotstring_editor         = hotstring_editor,
 			core_mods                = core_mods,
-			save_prefs               = save_prefs,
 			apply_metrics_shortcut   = apply_metrics_shortcut,
 			apply_apps_time_shortcut = apply_apps_time_shortcut,
 			_metrics_hk              = _metrics_hk_box,
 			_apps_time_hk            = _apps_time_hk_box,
 			restoring                 = restoring == true,
+			-- A deferred engine refusal (keylogger start) lands after this sync
+			-- returned; it keeps the acknowledged value on disk like a boot one.
+			on_runtime_demotion      = session_demotions.record,
 		})
 	end
 
@@ -708,7 +727,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		sync_runtime = function(snapshot, restoring)
 			return sync_state_to_modules(snapshot, false, restoring == true) == true
 		end,
-		save_preferences = save_prefs,
+		save_preferences = save_prefs_superseding_demotions,
 		restore_state = PreferencesTransaction.restore_table,
 		ensure_enable_ready = function()
 			return KeymapLifecycle.ensure_started({ state = state, keymap = keymap },
@@ -859,10 +878,34 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- Do not ask MenuState to seed config.toml yet: the transaction must first be
 	-- initialized from the fully hydrated runtime. This is crucial for the first
 	-- user click after boot, before any successful save has occurred.
-	local initial_sync_ok = sync_state_to_modules(saved, false)
-	if initial_sync_ok ~= true then
+	local initial_call_ok, initial_sync_ok, initial_report = xpcall(function()
+		return sync_state_to_modules(saved, false)
+	end, debug.traceback)
+	-- A refused owner demotes only its own feature, in memory, and the rest of the
+	-- saved configuration stays applied. Restoring every pre-load default for one
+	-- refusal showed Gestures, Metrics and AI OFF and let the next toggle write
+	-- those defaults over config.toml. Only a refusal whose runtime posture is
+	-- unknown, or a sync that raised, still forces the whole rollback below.
+	local unisolated_failure = nil
+	if not initial_call_ok then
+		unisolated_failure = "the synchronization raised: " .. tostring(initial_sync_ok)
+	elseif initial_sync_ok ~= true then
+		if type(initial_report) ~= "table" or type(initial_report.unsettled) ~= "table"
+			or type(initial_report.demotions) ~= "table"
+			or type(initial_report.failures) ~= "table" then
+			unisolated_failure = "the synchronization returned no feature report"
+		elseif #initial_report.unsettled > 0 then
+			local features = {}
+			for _, entry in ipairs(initial_report.unsettled) do
+				features[#features + 1] = tostring(entry.feature)
+			end
+			unisolated_failure = "unknown runtime posture for " .. table.concat(features, ", ")
+		end
+	end
+	if unisolated_failure then
 		Logger.error(LOG,
-			"Initial preference synchronization did not complete; restoring pre-load runtime state.")
+			"Initial preference synchronization did not complete (%s); restoring pre-load runtime state.",
+			unisolated_failure)
 		local state_restored = PreferencesTransaction.restore_table(state, pre_load_state)
 		local rollback_ok = false
 		local rollback_result
@@ -882,6 +925,11 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end
 		Logger.warn(LOG,
 			"Persisted preferences were rejected; the pre-load runtime state was restored.")
+	elseif initial_sync_ok ~= true then
+		for _, record in ipairs(initial_report.demotions) do session_demotions.record(record) end
+		Logger.warn(LOG,
+			"Saved preferences applied except %d refused step(s), isolated to their feature.",
+			#initial_report.failures)
 	end
 	local snapshot_ok, initial_preferences = pcall(Preferences.snapshot, state, hotfiles, core_mods)
 	if not snapshot_ok or type(initial_preferences) ~= "table" then
@@ -898,6 +946,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		hot_counter         = HotCounter,
 		initial_state       = state,
 		initial_preferences = initial_preferences,
+		persisted_view      = session_demotions.persisted_view,
 		restore_runtime     = function(snapshot)
 			if sync_state_to_modules(snapshot, false, true) ~= true then return false end
 			if type(llm_handler) == "table"
@@ -916,6 +965,14 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	})
 	if config_absent and save_prefs() ~= true then
 		Logger.error(LOG, "Could not seed the initial preference file.")
+	end
+	-- Repairs the sync made in memory (quarantined custom terminators) are only
+	-- persisted now: the sync itself runs before this transaction exists.
+	if not config_absent and not unisolated_failure and type(initial_report) == "table"
+		and type(initial_report.repairs) == "table" and #initial_report.repairs > 0
+		and save_prefs() ~= true then
+		Logger.error(LOG, "Repaired preferences (%s) could not be saved.",
+			table.concat(initial_report.repairs, ", "))
 	end
 
 	if menu_mods.llm and type(menu_mods.llm.create) == "function" then

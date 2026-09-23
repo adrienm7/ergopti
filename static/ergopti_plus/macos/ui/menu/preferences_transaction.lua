@@ -47,11 +47,18 @@ function M.restore_table(target, snapshot)
 end
 
 --- Creates a save wrapper with rollback snapshots already seeded from boot.
+--- `opts.persisted_view(state)`, when given, returns the table a save must
+--- serialise instead of the live state (session demotions keep the saved value
+--- of a feature whose runtime refused it); the rollback snapshot stays the live
+--- state either way.
 --- @param preferences table Preferences module or test double.
 --- @param opts table Transaction dependencies and initial snapshots.
 --- @return function save Transactional save function.
 function M.bind(preferences, opts)
 	if type(opts) ~= "table" then error("preferences transaction options are required", 2) end
+	if opts.persisted_view ~= nil and type(opts.persisted_view) ~= "function" then
+		error("persisted_view must be a function", 2)
+	end
 	local state = opts.state
 	local committed_state = clone_value(opts.initial_state)
 	local committed_preferences = clone_value(opts.initial_preferences)
@@ -74,10 +81,12 @@ function M.bind(preferences, opts)
 
 	return function()
 		if rolling_back then return false end
+		local persisted_state = state
+		if opts.persisted_view then persisted_state = opts.persisted_view(state) end
 		local committed, snapshot = M.commit(
 			preferences,
 			opts.path,
-			state,
+			persisted_state,
 			opts.hotfiles,
 			opts.core_modules,
 			opts.builder,

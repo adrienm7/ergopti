@@ -293,6 +293,19 @@ binds it. The boot and Disable All syncs replay saved keys in that window. Test
 doubles must keep both axes and the admission fence
 (`tests/support/shortcut_bindings_fixture.lua`).
 
+### project-hs-boot-sync-never-saves-runtime-refusals
+
+`MenuState.sync_state_to_modules` never persists and isolates failures per
+feature: a refused lifecycle whose posture can be read back demotes only that
+state flag, in memory (`report.demotions`), and `ui/menu/session_demotions.lua`
+makes every save keep the config.toml value until the user changes that key or
+a global action saves explicitly. The old all-or-nothing sync restored every
+default after one refusal (Gestures, Metrics, AI OFF with config.toml ON) and
+the next toggle wrote them over the file; a save from inside the sync also ran
+before the boot transaction was seeded and failed. Only an unprovable posture
+(`report.unsettled`) or a raised sync rolls the whole state back. Keep new
+refusal paths in memory; never call `save_prefs` from the sync.
+
 ### project-hs-fork-admission-in-both-launch-modes
 
 Opening ordinary Hammerspoon with a Git checkout is a supported launch path;
