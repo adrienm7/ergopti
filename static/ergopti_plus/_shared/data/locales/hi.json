@@ -677,7 +677,7 @@
 	"menu.builder.title": "Ergopti+",
 	"menu.builder.title_paused": "Ergopti+ ⏸",
 	"menu.debug.console": "कंसोल",
-	"menu.debug.healthcheck": "स्वास्थ्य जांच",
+	"menu.debug.healthcheck": "सिस्टम निदान",
 	"menu.debug.key_history": "कुंजी इतिहास",
 	"menu.debug.list_vars": "चर स्थिति",
 	"menu.debug.log_level": "लॉग स्तर",

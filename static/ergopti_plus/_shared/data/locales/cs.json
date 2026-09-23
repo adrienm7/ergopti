@@ -677,7 +677,7 @@
 	"menu.builder.title": "Ergopti+",
 	"menu.builder.title_paused": "Ergopti+ ⏸",
 	"menu.debug.console": "Konzole",
-	"menu.debug.healthcheck": "Kontrola stavu",
+	"menu.debug.healthcheck": "Diagnostika systému",
 	"menu.debug.key_history": "Historie kláves",
 	"menu.debug.list_vars": "Stav proměnných",
 	"menu.debug.log_level": "Úroveň logu",

@@ -677,7 +677,7 @@
 	"menu.builder.title": "Ergopti+",
 	"menu.builder.title_paused": "Ergopti+ ⏸",
 	"menu.debug.console": "Консоль",
-	"menu.debug.healthcheck": "Перевірка системи",
+	"menu.debug.healthcheck": "Діагностика системи",
 	"menu.debug.key_history": "Історія клавіш",
 	"menu.debug.list_vars": "Стан змінних",
 	"menu.debug.log_level": "Рівень логування",

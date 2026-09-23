@@ -677,7 +677,7 @@
 	"menu.builder.title": "Ergopti+",
 	"menu.builder.title_paused": "Ergopti+ ⏸",
 	"menu.debug.console": "קונסולה",
-	"menu.debug.healthcheck": "בדיקת מצב",
+	"menu.debug.healthcheck": "אבחון מערכת",
 	"menu.debug.key_history": "היסטוריית מקשים",
 	"menu.debug.list_vars": "מצב משתנים",
 	"menu.debug.log_level": "רמת יומן",

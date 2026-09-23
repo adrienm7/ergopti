@@ -677,7 +677,7 @@
 	"menu.builder.title": "Ergopti+",
 	"menu.builder.title_paused": "Ergopti+ ⏸",
 	"menu.debug.console": "Konsol",
-	"menu.debug.healthcheck": "Helbredstjek",
+	"menu.debug.healthcheck": "Systemdiagnostik",
 	"menu.debug.key_history": "Tasthhistorik",
 	"menu.debug.list_vars": "Variabeltilstand",
 	"menu.debug.log_level": "Logniveau",
