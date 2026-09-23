@@ -870,13 +870,28 @@ ToggleAllFeatures(Value) {
 		return ReloadPreservingSuspend()
 }
 
+; The whole tree's « all sections » checkbox: every hotstring section on or off
+; in one transaction. Ticking also opens the Hotstrings switch and every closed
+; gate of the categories it writes: a closed gate zeroes its sections at boot, so
+; the box stayed unticked however often it was clicked. Unticking leaves every
+; gate as it is, since each is a checkbox of its own; this closed the Hotstrings
+; switch too, which neither macOS nor Linux does.
 ToggleAllHotstrings(Value) {
-		global CategoryEnabled, ConfigurationFile, Features
+		global CategoryEnabled, ConfigurationFile, Features, _FLAT_HOTSTRING_V1_CATS
 		Bool := (Value = true or Value = 1)
 		CandidateCategories := CategoryEnabled.Clone()
 		CandidateFeatures := _HSDeepCloneMap(Features)
-		CandidateCategories["Hotstrings"] := Bool
-		Updates := [{ Section: "category_enabled", Key: "hotstrings", Value: TOML_Bool(Bool) }]
+		Updates := []
+		if Bool {
+				Gates := ["Hotstrings"]
+				Gates.Push(_FLAT_HOTSTRING_V1_CATS*)
+				for _, Gate in Gates {
+						if (CandidateCategories.Has(Gate) and !CandidateCategories[Gate]) {
+								CandidateCategories[Gate] := true
+								Updates.Push({ Section: "category_enabled", Key: _CategoryEnabledKey(Gate), Value: TOML_Bool(true) })
+						}
+				}
+		}
 		Entries := []
 		for V2Path in _CollectAllHotstringsV2Paths(CandidateFeatures)
 				Entries.Push(Map("path", V2Path, "value", Bool))
