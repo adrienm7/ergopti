@@ -117,10 +117,11 @@ helpers.describe("ShellRunner: argv typing", function()
 	-- The whole class, not the one site the defect was found at: a future third
 	-- spawn that skips the check is exactly how "fixed on Windows, still broken
 	-- here" ships. Ordering matters too -- a check after luv.spawn proves nothing.
-	helpers.it("both luv.spawn sites validate their argv before spawning", function()
+	helpers.it("every luv.spawn site validates its argv before spawning", function()
 		local sites = {
 			{ file = "adapters/http_client.lua", binary = "curl" },
 			{ file = "adapters/file_digest.lua", binary = "sha256sum" },
+			{ file = "adapters/process_runner.lua", binary = "any program (python3 for layouts)" },
 		}
 		local checked = 0
 		for _, site in ipairs(sites) do
@@ -144,7 +145,7 @@ helpers.describe("ShellRunner: argv typing", function()
 				site.file .. " must validate BEFORE luv.spawn, so a refusal costs no "
 				.. "process (keylogger-worker-timings-must-be-strings)")
 		end
-		helpers.assert_eq(checked, 2, "both spawn sites must have been inspected")
+		helpers.assert_eq(checked, 3, "every spawn site must have been inspected")
 	end)
 
 	-- The three drivers must agree on this contract, or the next audit fixes it

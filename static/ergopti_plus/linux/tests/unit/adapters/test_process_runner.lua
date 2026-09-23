@@ -1,0 +1,150 @@
+--- tests/unit/adapters/test_process_runner.lua
+
+--- ==============================================================================
+--- MODULE: Asynchronous Process Runner
+--- DESCRIPTION:
+--- The .keylayout converter runs through adapters/process_runner so the daemon,
+--- which owns the grabbed keyboard, never waits on it (layout-registry-convert).
+--- Driven through a controllable libuv double, these tests prove the run is
+--- dispatched without blocking, reports its exit code and output once, tells a
+--- program that cannot start (ENOENT) from one that fails, kills the process
+--- group at its deadline, and refuses an ill-typed argument vector before
+--- spawning anything.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+
+--- Creates the minimum libuv process/pipe/timer surface the runner uses.
+--- @param config table|nil { spawn_error? }
+--- @return table fake, table state
+local function fake_luv(config)
+	local options = config or {}
+	local state = { kills = {}, spawns = {} }
+	local fake = {}
+
+	local function handle(kind)
+		return { kind = kind, closing = false }
+	end
+
+	function fake.new_pipe() return handle("pipe") end
+	function fake.new_timer()
+		state.timer = handle("timer")
+		return state.timer
+	end
+	function fake.timer_start(timer, timeout_ms, repeat_ms, callback)
+		timer.timeout_ms = timeout_ms
+		timer.callback = callback
+		return true
+	end
+	function fake.timer_stop(timer) timer.stopped = true; return true end
+	function fake.read_start(pipe, callback) pipe.read_callback = callback; return true end
+	function fake.read_stop(pipe) pipe.read_stopped = true; return true end
+	function fake.is_closing(value) return value.closing end
+	function fake.close(value) value.closing = true end
+	function fake.kill(pid, signal)
+		state.kills[#state.kills + 1] = { pid = pid, signal = signal }
+		return true
+	end
+	function fake.spawn(program, spawn_options, callback)
+		state.spawns[#state.spawns + 1] = { program = program, options = spawn_options }
+		if options.spawn_error then return nil, options.spawn_error, "ENOENT" end
+		state.options = spawn_options
+		state.exit_callback = callback
+		return handle("process"), 7001
+	end
+
+	function state.stdout(chunk) state.options.stdio[2].read_callback(nil, chunk) end
+	function state.stderr(chunk) state.options.stdio[3].read_callback(nil, chunk) end
+	function state.finish(code)
+		state.stdout(nil)
+		state.stderr(nil)
+		state.exit_callback(code, 0)
+	end
+	return fake, state
+end
+
+--- Loads a fresh runner against one fake libuv instance.
+--- @param config table|nil
+--- @return table runner, table state
+local function fresh_runner(config)
+	local fake, state = fake_luv(config)
+	local previous_luv = package.loaded["luv"]
+	local previous = package.loaded["adapters.process_runner"]
+	package.loaded["luv"] = fake
+	package.loaded["adapters.process_runner"] = nil
+	local runner = require("adapters.process_runner")
+	package.loaded["luv"] = previous_luv
+	package.loaded["adapters.process_runner"] = previous
+	return runner, state
+end
+
+--- Runs one program and collects its terminal results.
+local function start(runner, program, args, options)
+	local results = {}
+	local dispatched = runner.run(program, args, options, function(result)
+		results[#results + 1] = result
+	end)
+	return dispatched, results
+end
+
+helpers.describe("process_runner: asynchronous argv processes", function()
+	helpers.it("dispatches without waiting and reports the exit code and output once (layout-registry-convert)", function()
+		local runner, state = fresh_runner()
+		local dispatched, results = start(runner, "python3", { "-c", "print(1)" }, { timeout_ms = 5000 })
+		helpers.assert_true(dispatched, "the child must be started")
+		helpers.assert_eq(#results, 0, "nothing is reported before the child ends")
+		helpers.assert_eq(state.spawns[1].program, "python3")
+		helpers.assert_eq(state.spawns[1].options.args[2], "print(1)", "the argument vector reaches execve as given")
+		helpers.assert_true(state.spawns[1].options.detached, "the child leads its own process group")
+		helpers.assert_eq(state.timer.timeout_ms, 5000)
+		state.stdout("1\n")
+		state.stderr("warning\n")
+		state.finish(0)
+		helpers.assert_eq(#results, 1)
+		helpers.assert_eq(results[1].exit_code, 0)
+		helpers.assert_eq(results[1].stdout, "1\n")
+		helpers.assert_eq(results[1].stderr, "warning\n")
+		helpers.assert_nil(results[1].error, "exit code 0 is a success")
+		state.finish(0)
+		helpers.assert_eq(#results, 1, "a late libuv callback must be inert")
+	end)
+
+	helpers.it("reports a failing program with its exit code (layout-registry-convert)", function()
+		local runner, state = fresh_runner()
+		local _, results = start(runner, "python3", { "convert.py" }, {})
+		state.stderr("Traceback\n")
+		state.finish(3)
+		helpers.assert_eq(results[1].exit_code, 3)
+		helpers.assert_contains(results[1].error, "exited with code 3")
+		helpers.assert_eq(results[1].stderr, "Traceback\n")
+		helpers.assert_true(results[1].not_found ~= true)
+	end)
+
+	helpers.it("tells a program that cannot start from one that fails (layout-registry-convert)", function()
+		local runner = fresh_runner({ spawn_error = "ENOENT: no such file or directory" })
+		local dispatched, results = start(runner, "python3", { "--version" }, {})
+		helpers.assert_true(dispatched == false)
+		helpers.assert_eq(#results, 1)
+		helpers.assert_true(results[1].not_found, "ENOENT means the program is not installed")
+		helpers.assert_contains(results[1].error, "cannot start python3")
+	end)
+
+	helpers.it("kills the process group at its deadline (layout-registry-convert)", function()
+		local runner, state = fresh_runner()
+		local _, results = start(runner, "python3", { "slow.py" }, { timeout_ms = 10 })
+		state.timer.callback()
+		helpers.assert_eq(#results, 1)
+		helpers.assert_contains(results[1].error, "did not finish")
+		helpers.assert_eq(state.kills[1].pid, -7001, "the whole group is signalled")
+		state.finish(0)
+		helpers.assert_eq(#results, 1, "the late exit must not publish a second result")
+	end)
+
+	helpers.it("refuses an ill-typed argument vector before spawning (layout-registry-convert)", function()
+		local runner, state = fresh_runner()
+		local dispatched, results = start(runner, "python3", { "--timeout", 5 }, {})
+		helpers.assert_true(dispatched == false)
+		helpers.assert_contains(results[1].error, "argument 2")
+		helpers.assert_eq(#state.spawns, 0, "a refusal must cost no process")
+	end)
+end)

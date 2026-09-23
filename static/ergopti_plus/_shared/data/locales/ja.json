@@ -796,6 +796,7 @@
 	"layout.ergoptiplus": "Ergopti➕のマイナーなAltGr変更を適用",
 	"layout.ctrlmagicsave": "Ctrl+★ は Ctrl+S を送信",
 	"menu.layout.emulated_layout": "エミュレートするカスタム配列",
+	"layouts.linux_needs_python": "この配列を Linux 用に変換するには Python 3.8 以降（python3）が必要です。インストールしてから、もう一度お試しください。",
 	"llm.deps.browser_install_tip": "ブラウザで開いたページから Windows 用 Ollama をダウンロードし、インストーラを実行してここに戻ってください。接続は自動的に検出されます。",
 	"llm.deps.done_success": "✅ Ollama 準備完了",
 	"llm.deps.fail_server_not_responding": "インストーラーが終了しましたが、Ollamaサーバーが応答しません。",

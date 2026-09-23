@@ -240,6 +240,17 @@ text (headers, body and URL now go through `--config -`). Remote API keys
 live in `~/.config/ergopti_plus/api_keys.json`, mode 0600, outside the
 possibly-synced config folder. Action: keep both live steps green for any
 change to the injector, the engine, the parser or the HTTP client.
+### project-ergopti-xcompose-chained-dead-keys-are-unreachable
+
+The committed Ergopti XCompose files name a dead key pressed inside a dead-key
+state after the character its action is named after (`<dead_circumflex>
+<diaeresis> : "/"`), but that key types `dead_diaeresis`, so the sequence can
+never be typed on Linux; `^ ^` only works through the `include "%L"` system
+table. The generic converter reproduces this on purpose (the Ergopti golden
+test pins those files byte for byte), and
+`xkb_generation/tests/test_keystroke_vectors.py` skips the two shared vectors
+by id. Action: fixing it is a deliberate regeneration of the Ergopti XKB
+files, golden files included, not a converter tweak.
 
 ## Release artifacts
 
