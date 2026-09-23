@@ -13,7 +13,8 @@
 ; 1. Every vector: the sorted error signatures and the resolved layers equal
 ;    the hand-written expectation, and `ok` is exactly "no error".
 ; 2. The user's layers.toml: an absent file is no layer; a present one is read
-;    from the configuration folder under the vocabulary's file name.
+;    from the configuration folder under the vocabulary's file name; one that
+;    exists but cannot be read is an error, never an empty layer.
 ; 3. Shipped data fails fast: a registry or vocabulary missing what the loader
 ;    reads throws instead of loading nothing.
 ; ==============================================================================
@@ -185,6 +186,31 @@ _KLCorpus_PresentUserFileResolves() {
 	}
 }
 Test("keymap_layers  --  a present layers.toml resolves for Windows", _KLCorpus_PresentUserFileResolves)
+
+_KLCorpus_UnreadableUserFileIsAnError() {
+	Ctx := KeymapLayers_LoadContext(_KLCorpus_SharedDir())
+	Dir := _KLCorpus_TempConfigDir()
+	DirCreate(Dir)
+	try {
+		Path := Dir . "\layers.toml"
+		FileAppend('[_meta]`nschema_version = 1`n`n[layers.nav.all]`n"KeyQ" = "sel_doc_start"`n', Path, "UTF-8")
+		; A handle that shares nothing makes every other open fail, as a file
+		; another program holds locked does.
+		Lock := FileOpen(Path, "rw -rwd")
+		try {
+			Result := KeymapLayers_LoadUserFile(Ctx, Dir)
+		} finally {
+			Lock.Close()
+		}
+		AssertFalse(Result["ok"], "an unreadable layers.toml must not report ok")
+		AssertEqual(1, Result["errors"].Length, "an unreadable layers.toml is exactly one error")
+		AssertEqual("file_unreadable||||", KeymapLayers_ErrorSignature(Result["errors"][1]))
+		AssertEqual(0, Result["layers"].Count, "an unreadable layers.toml binds nothing")
+	} finally {
+		DirDelete(Dir, true)
+	}
+}
+Test("keymap_layers  --  an unreadable layers.toml is an error, not an empty layer", _KLCorpus_UnreadableUserFileIsAnError)
 
 
 
