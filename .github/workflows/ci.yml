@@ -966,6 +966,18 @@ jobs:
             exit "$status"'
         timeout-minutes: 4
 
+      # The secure-field probe decides whether ANY expansion may fire (it fails
+      # closed), and its one real input is a desktop: an accessibility bus, a
+      # window manager and applications that keep FOCUSED on their last field.
+      # With two windows open the old desktop-wide search found two focused
+      # fields and blocked every expansion; only a real bus shows that.
+      - name: The secure-field probe on a real accessibility bus
+        if: always()
+        run: |
+          sudo apt-get install -y --no-install-recommends at-spi2-core openbox python3-gi gir1.2-gtk-3.0 dbus-x11 xvfb
+          bash static/ergopti_plus/linux/tests/hardware/run_atspi_focus.sh
+        timeout-minutes: 5
+
       # touchpad_finder reads capability bits out of a printed bitmap, and that
       # rests on one thing the text cannot confirm: that the words are 64 bits
       # wide, most significant first, with leading zero words omitted. Its unit
@@ -1116,6 +1128,7 @@ jobs:
               --subject wayland-display=1 \
               --subject tray-symbols=1 \
               --subject tray-sni-registration=1 \
+              --subject atspi-focus-probe=1 \
               --subject touchpad-capability=1 \
               --subject gesture-roundtrip=1 \
               --subject webview-settings=1 \
