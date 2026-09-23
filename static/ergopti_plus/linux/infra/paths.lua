@@ -90,7 +90,8 @@ local function absolute(path)
 	if not cwd then return path end
 	cwd = cwd:gsub("\\", "/"):gsub("/+$", "")
 	if path == "." then return cwd end
-	return cwd .. "/" .. path:gsub("^%./", "")
+	local relative = path:gsub("^%./", "")
+	return cwd .. "/" .. relative
 end
 
 --- The driver root (…/static/ergopti_plus/linux), derived from this file.
