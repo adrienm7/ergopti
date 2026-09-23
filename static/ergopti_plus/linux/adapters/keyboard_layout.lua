@@ -195,11 +195,13 @@ end
 -- ===============================================
 -- ===============================================
 
---- Builds char → (keycode, level, mods) from a keymap dump.
+--- Builds char → (keycode, level, mods) from a keymap dump, by text alone.
 ---
---- Exposed rather than private because it is the whole algorithm, and a keymap
---- dump is a file: driving it from a fixture is the only way to assert that a
---- French layout produces the French answers without a French machine.
+--- NOT what refresh() uses. The text model assumes every key follows the
+--- standard four-level type (level 2 = Shift, 3 = AltGr), which the keypad
+--- (NumLock) and the Ergopti layout (Shift on level 3) are not; the live table
+--- comes from libxkbcommon through XkbCapture.inverse_table(). This remains the
+--- libxkbcommon-free model the planner's fixture tests drive plan() with.
 --- @param text string Keymap dump.
 --- @return table char → { keycode, level, mods }, and the count.
 function M.build(text)
@@ -273,7 +275,17 @@ function M.refresh(override_path)
 		return false
 	end
 
-	local built, count = M.build(text)
+	-- Asked of libxkbcommon on the keymap capture just validated, not parsed
+	-- from the text: the parser assumed standard four-level types, which the
+	-- keypad (NumLock) and the Ergopti layout (Shift on level 3) are not.
+	local built, inverse_err = XkbCapture.inverse_table()
+	if not built then
+		_table = nil
+		Logger.error(LOG, "Cannot enumerate the keymap via %s — %s.", tostring(source), tostring(inverse_err))
+		return false
+	end
+	local count = 0
+	for _ in pairs(built) do count = count + 1 end
 	if count < MIN_PLAUSIBLE_ENTRIES then
 		-- A keymap that parsed to almost nothing is a parse failure wearing the
 		-- shape of a success, and the consequence is silent: every expansion
