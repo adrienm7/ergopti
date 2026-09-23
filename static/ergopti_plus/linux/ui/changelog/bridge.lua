@@ -30,7 +30,10 @@ local Json = require("json")
 local Base64 = require("compat.base64")
 local ReleaseSources = require("updater.release_sources")
 
-local REPOSITORY_URL = "https://github.com/adrienm7/ergopti"
+-- The owner and the repository come from the shared updater defaults, their
+-- single source (tools/test/test-repo-url-single-source.cjs). The loader is
+-- defined with the native fetch below.
+local load_sources
 local APP_NAME = "changelog"
 local HTTP_OWNER = "changelog"
 -- Feeds carry the rendered notes of ten releases (about 0.5 MB today).
@@ -39,20 +42,37 @@ local MAX_SOURCE_BYTES = 4 * 1024 * 1024
 local _fetch_generation = 0
 local _sources = nil
 
---- Returns whether a URL belongs to the repository's HTTPS surface.
+--- The repository's web root, from the shared updater defaults.
+--- @return string|nil url
+--- @return string|nil error Why the defaults are unusable.
+local function repository_url()
+	local sources, err = load_sources()
+	if not sources then return nil, err end
+	return "https://github.com/" .. sources.owner .. "/" .. sources.repo, nil
+end
+
+--- Returns whether a URL belongs to the repository's HTTPS surface: the root
+--- itself, or a path, query or fragment below it, never a longer name.
 --- @param value any
 --- @return boolean
 local function is_allowed_repository_url(value)
-	return type(value) == "string"
-		and value:match("^https://github%.com/adrienm7/ergopti/?[A-Za-z0-9._~/%?=&+#-]*$") ~= nil
+	local root, err = repository_url()
+	if not root then
+		Logger.error(LOG, "Repository unknown, no URL is allowed: %s.", tostring(err))
+		return false
+	end
+	if type(value) ~= "string" or value:sub(1, #root) ~= root then return false end
+	local rest = value:sub(#root + 1)
+	return rest == "" or rest:match("^[/%?#][A-Za-z0-9._~/%?=&+#-]*$") ~= nil
 end
 
 --- Converts the updater's cached record to the page's release schema.
 --- @param cached table
+--- @param releases_url string The repository's releases page.
 --- @return table
-local function page_release(cached)
+local function page_release(cached, releases_url)
 	local tag = type(cached.tag) == "string" and cached.tag or ""
-	local release_url = REPOSITORY_URL .. "/releases"
+	local release_url = releases_url
 	if tag:match("^[A-Za-z0-9._+-]+$") then release_url = release_url .. "/tag/" .. tag end
 	return {
 		tag_name = tag,
@@ -91,12 +111,16 @@ end
 local function _build_initial_payload(state, channel)
 	state = type(state) == "table" and state or {}
 	local releases = {}
+	local sources, sources_err = load_sources()
+	if not sources then
+		Logger.error(LOG, "Release sources unavailable, no cached release is shown: %s.", tostring(sources_err))
+	end
 
 	-- The updater's cached release belongs to the channel it checked, which is
 	-- the subscribed one: it is a valid first entry only on that channel's view.
 	local manager = updater()
 	local subscribed = nil
-	if manager then
+	if sources and manager then
 		local ok_subscribed, id = pcall(manager.get_channel)
 		subscribed = ok_subscribed and registry_channel(id) or nil
 		local ok_cached, cached = pcall(function()
@@ -106,7 +130,7 @@ local function _build_initial_payload(state, channel)
 			return type(manager.get_channel) == "function" and manager.get_channel() or nil
 		end)
 		if ok_cached and cached and ok_channel and cached_channel == channel then
-			releases[#releases + 1] = page_release(cached)
+			releases[#releases + 1] = page_release(cached, sources.page_url)
 		end
 	end
 
@@ -117,7 +141,7 @@ local function _build_initial_payload(state, channel)
 		-- The channel the user receives updates from, for the page's banner.
 		subscribed_channel = subscribed,
 		cache_miss = #releases == 0,
-		repo_url = REPOSITORY_URL .. "/releases",
+		repo_url = sources and sources.page_url or nil,
 		version = state._version or Version.VERSION,
 	}
 end
@@ -135,7 +159,7 @@ end
 --- Loads and validates the release sources once from the shared defaults.
 --- @return table|nil sources
 --- @return string|nil error
-local function load_sources()
+load_sources = function()
 	if _sources then return _sources, nil end
 	local ok_paths, Paths = pcall(require, "infra.paths")
 	local path = ok_paths and Paths.shared("modules/updater/defaults.json") or nil

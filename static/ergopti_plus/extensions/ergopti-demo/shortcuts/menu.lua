@@ -24,6 +24,6 @@ add_item({ title = "-" })   -- separator
 add_item({
 	title   = t("ext.demo.visit_docs"),
 	fn      = function()
-		hs.urlevent.openURL("https://github.com/ergopti/ergopti")
+		hs.urlevent.openURL("https://github.com/adrienm7/ergopti")
 	end,
 })

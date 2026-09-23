@@ -20,5 +20,5 @@ _ErgoptiDemo_ShowInfo(*) {
 }
 
 _ErgoptiDemo_VisitDocs(*) {
-    Run("https://github.com/ergopti/ergopti")
+    Run("https://github.com/adrienm7/ergopti")
 }

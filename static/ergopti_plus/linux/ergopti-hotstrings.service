@@ -20,7 +20,7 @@
 
 [Unit]
 Description=Ergopti — expansion de texte et métriques clavier (LuaJIT)
-Documentation=https://github.com/ergopti/ergopti
+Documentation=https://github.com/adrienm7/ergopti
 
 # PartOf as well as After. Without it the daemon outlives the graphical session
 # it belongs to: logging out leaves it running against a display server that no
