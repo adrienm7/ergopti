@@ -54,9 +54,15 @@ end
 --- The shape is the page's contract, not this driver's: title/label/
 --- searchPlaceholder/cancelLabel/noneLabel strings, `current` (the id already
 --- bound), `allowNative`, and an ordered `items` list of
---- {type="heading",level,text} / {type="action",id,label}. Every string comes
---- from i18n — the three hardcoded French labels this handler used to return
---- were not translations of anything, they were invented here.
+--- {type="heading",level,text} / {type="action",id,label,disabled?,hint?}.
+--- Every string comes from i18n — the three hardcoded French labels this
+--- handler used to return were not translations of anything, they were invented
+--- here.
+---
+--- The items are the gestures manager's picker items, built from the generated
+--- catalogue: the same order and headings the other two drivers show. They used
+--- to be a flat, alphabetical list of a hard-coded 42-id table, with no heading
+--- at all and 38 of the actions this driver runs missing.
 --- @param opts table|nil { current: string|nil, allow_native: boolean|nil }
 --- @return table Payload for init(data).
 function M.build_init_payload(opts)
@@ -67,20 +73,10 @@ function M.build_init_payload(opts)
 	if not items then
 		items = {}
 		local ok_actions, Actions = pcall(require, "modules.gestures.manager")
-		if not ok_actions or type(Actions.get_action_names) ~= "function"
-			or type(Actions.get_action_label) ~= "function" then
+		if not ok_actions or type(Actions.get_picker_items) ~= "function" then
 			Logger.error(LOG, "Cannot build the action catalogue: the gestures action registry is unavailable.")
 		else
-			for _, name in ipairs(Actions.get_action_names()) do
-				-- The page adds its own translated `none` row before this catalogue.
-				if name ~= "none" then
-					items[#items + 1] = {
-						type  = "action",
-						id    = name,
-						label = Actions.get_action_label(name),
-					}
-				end
-			end
+			items = Actions.get_picker_items()
 		end
 	end
 

@@ -212,6 +212,7 @@ return {
 	"tests.unit.modules.shortcuts.test_chatgpt",
 	"tests.unit.modules.shortcuts.test_keyboard_shortcuts",
 	"tests.unit.modules.shortcuts.test_master_state",
+	"tests.unit.modules.test_action_catalogue_parity",
 	"tests.unit.modules.test_action_handlers_declared",
 	"tests.unit.modules.test_combo_emitter",
 	"tests.unit.modules.test_combo_press_order",

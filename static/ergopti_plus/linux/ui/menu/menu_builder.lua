@@ -222,22 +222,6 @@ end
 --- @param current string Current action id.
 --- @param on_confirm function Transactional assignment callback.
 --- @return boolean opened
---- The actions a slot's submenu lists inline: its current one, then "none".
----
---- Everything else is reached through the action picker, which is the first
---- row of that submenu. Kept in catalogue order and only among actions the
---- catalogue still offers, so a stale binding is not resurrected as a row.
---- @param action_names table The full action catalogue, in order.
---- @param current string|nil The slot's bound action.
---- @return table
-local function inline_slot_options(action_names, current)
-	local out = {}
-	for _, option in ipairs(action_names or {}) do
-		if option == current or option == "none" then out[#out + 1] = option end
-	end
-	return out
-end
-
 local function open_action_picker(title, current, on_confirm)
 	local ok_picker, Picker = pcall(require, "ui.action_picker.bridge")
 	if not ok_picker or type(Picker.open) ~= "function" then
@@ -249,6 +233,33 @@ local function open_action_picker(title, current, on_confirm)
 		label = i18n_safe("dialog.action_picker.label"),
 		current = current or "none",
 	}, on_confirm)
+end
+
+--- The rows under one bindable slot: the searchable picker and, when the slot
+--- is bound, a row that clears it.
+---
+--- The whole catalogue used to be inlined here, about 640 rows per slot — for
+--- each of the 39 gesture slots and every keyboard slot — which no tray menu
+--- can present usably and which the picker, with its headings and search,
+--- already offers.
+--- @param slot_label string Already-localised target label.
+--- @param bound string The action currently bound ("none" when unbound).
+--- @param assign function(option) Transactional assignment; true on commit.
+--- @return table Provider rows.
+local function slot_binding_rows(slot_label, bound, assign)
+	local rows = {
+		{
+			label = i18n_safe("dialog.action_picker.label") .. "…",
+			action = function() open_action_picker(slot_label, bound, assign) end,
+		},
+	}
+	if bound ~= "none" then
+		rows[#rows + 1] = {
+			label = i18n_safe("dialog.action_picker.disabled"),
+			action = function() assign("none") end,
+		}
+	end
+	return rows
 end
 
 --- Asks a yes/no question.
@@ -2597,11 +2608,8 @@ local function _build_shortcuts(ctx)
 			return {}
 		end
 
-		-- The action catalogue is the gestures manager's, and the labels with it.
-		-- A second list here would drift from the one the gestures draw, and the
-		-- user would see the same action named two ways in one menu.
-		local action_names = Gestures.get_action_names and Gestures.get_action_names() or { "none" }
-
+		-- The action catalogue is the gestures manager's, and the labels with it:
+		-- the picker opened below lists it with its headings.
 		local out = {}
 		local skipped = {}
 		local function assign_slot(slot, option)
@@ -2617,38 +2625,13 @@ local function _build_shortcuts(ctx)
 			end
 			return assigned
 		end
-		local function build_choice(slot, option, bound)
-			return {
-				label   = Gestures.get_action_label(option),
-				-- `checked` rather than a "✓" glued to the label: the tray draws
-				-- its own mark, and the glued form puts one platform's
-				-- convention inside a string twenty other languages also read.
-				checked = option == bound,
-				action  = function() assign_slot(slot, option) end,
-			}
-		end
 		for _, group in ipairs(Keyboard.SLOT_GROUPS) do
 			local rows = {}
 			for _, slot in ipairs(Keyboard.available_slots(group.prefix)) do
-				local bound = Keyboard.get_action(slot)
+				local bound = Keyboard.get_action(slot) or "none"
 				local slot_label = Keyboard.get_slot_label(slot)
-				local choices = {
-					{
-						label = i18n_safe("dialog.action_picker.label") .. "…",
-						action = function()
-							open_action_picker(slot_label, bound,
-								function(option) return assign_slot(slot, option) end)
-						end,
-					},
-				}
-				-- The picker above lists the catalogue; inline, only the current
-				-- binding and the way to clear it. Listing all ~640 actions under
-				-- every slot put 77 000 rows in the tray: eight seconds of GTK at
-				-- every rebuild, and a dbusmenu layout no panel can page through.
-				-- macOS offers the same slots through its picker alone.
-				for _, option in ipairs(inline_slot_options(action_names, bound)) do
-					choices[#choices + 1] = build_choice(slot, option, bound)
-				end
+				local choices = slot_binding_rows(slot_label, bound,
+					function(option) return assign_slot(slot, option) end)
 				rows[#rows + 1] = {
 					label = slot_label
 						.. " → " .. Gestures.get_action_label(bound),
@@ -3046,33 +3029,13 @@ local function _build_gestures(ctx)
 			local label = ge.get_action_display_label and ge.get_action_display_label(slot)
 				or ge.get_action_label(action)
 			local slot_label = gesture_slot_label(slot)
-			local choices = {
-				{
-					label = i18n_safe("dialog.action_picker.label") .. "…",
-					action = function()
-						open_action_picker(slot_label, action, function(option)
-							local assigned = assign_action(slot, option)
-							if assigned and type(ctx.on_menu_changed) == "function" then
-								ctx.on_menu_changed()
-							end
-							return assigned
-						end)
-					end,
-				},
-			}
-			-- Inline: the current action and "none" only; the picker holds the
-			-- catalogue (see keyboard_slots for why the full list cannot be here).
-			for _, option in ipairs(inline_slot_options(
-				ge.get_action_names and ge.get_action_names() or { "none" }, action)) do
-				choices[#choices + 1] = {
-					label   = ge.get_action_label(option),
-					-- `checked`, not a "✓" glued to the label: the tray draws its own
-					-- mark, and the glued form put one platform's convention inside a
-					-- string that twenty other languages also read.
-					checked = option == action,
-					action  = function() assign_action(slot, option) end,
-				}
-			end
+			local choices = slot_binding_rows(slot_label, action, function(option)
+				local assigned = assign_action(slot, option)
+				if assigned and type(ctx.on_menu_changed) == "function" then
+					ctx.on_menu_changed()
+				end
+				return assigned
+			end)
 			out[#out + 1] = {
 				label = slot_label .. " → " .. label,
 				items = choices,

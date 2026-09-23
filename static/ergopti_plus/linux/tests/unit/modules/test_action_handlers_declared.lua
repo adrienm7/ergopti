@@ -554,7 +554,7 @@ helpers.describe("linux actions: workspace switch", function()
 		return commands, pressed
 	end
 
-	local COMBO = { ws_prev = "ctrl+alt+Left", ws_next = "ctrl+alt+Right" }
+	local COMBO = { desktop_prev = "ctrl+alt+Left", desktop_next = "ctrl+alt+Right" }
 
 	helpers.it("asks wmctrl first, and presses nothing when it switched (workspace-uinput)", function()
 		for action in pairs(COMBO) do
@@ -589,7 +589,7 @@ helpers.describe("linux actions: workspace switch", function()
 		-- The command used to end in `| xargs -r wmctrl -s`, which exits 0 on
 		-- empty input: a wmctrl that could not list anything reported success
 		-- and nothing ran after it. Run for real against stand-in wmctrls.
-		local commands = switch("ws_prev", true, true)
+		local commands = switch("desktop_prev", true, true)
 		local dir = os.tmpname()
 		os.remove(dir)
 		os.execute("mkdir " .. dir)
