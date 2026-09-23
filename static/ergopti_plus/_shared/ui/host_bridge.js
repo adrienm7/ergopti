@@ -27,6 +27,7 @@
 //   model_browser_bridge      — _shared/ui/model_browser
 //   numeric_prompt_bridge     — _shared/ui/numeric_prompt
 //   prompt_bridge             — _shared/ui/prompt_editor
+//   release_notes_bridge      — _shared/ui/release_notes (Windows update prompt)
 //   token_bridge              — _shared/ui/token_prompt
 //   healthcheck               — _shared/ui/healthcheck
 //

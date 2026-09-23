@@ -4,9 +4,10 @@
  * ==============================================================================
  * MODULE: Changelog Page Recording DOM
  * DESCRIPTION:
- * Runs the shared changelog page (_shared/ui/changelog/index.html) in a VM
- * against a recording DOM, exactly as the document loads it, for the page
- * tests that inspect what remote release notes become.
+ * Runs a shared page that renders release notes (the changelog window by
+ * default, or the update prompt's release_notes pane) in a VM against a
+ * recording DOM, exactly as its index.html loads it, for the page tests that
+ * inspect what remote release notes become.
  *
  * FEATURES & RATIONALE:
  * 1. Real page chain: scripts are read from index.html, so a module written
@@ -24,7 +25,6 @@ const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..', '..', '..');
 const SHARED_UI = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'ui');
-const CHANGELOG = path.join(SHARED_UI, 'changelog');
 
 // Scripts the recording sandbox replaces with stubs: they talk to the native
 // host or fetch locale files, neither of which the page tests exercise.
@@ -152,9 +152,12 @@ function textOutside(node, skippedTag) {
 // ==========================================
 // ==========================================
 
-/** Returns the local scripts index.html loads, in document order. */
-function pageScripts() {
-	const html = fs.readFileSync(path.join(CHANGELOG, 'index.html'), 'utf8');
+/**
+ * Returns the local scripts a page's index.html loads, in document order.
+ * @param {string} [page] - Shared UI page directory (default: the changelog).
+ */
+function pageScripts(page = 'changelog') {
+	const html = fs.readFileSync(path.join(SHARED_UI, page, 'index.html'), 'utf8');
 	const scripts = [];
 	const pattern = /<script\s+src="([^"]+)"/g;
 	let match;
@@ -164,10 +167,11 @@ function pageScripts() {
 }
 
 /**
- * Executes the page and returns its sandbox, document and posted messages.
+ * Executes a page and returns its sandbox, document and posted messages.
  * @param {Object} [globals] - Extra window globals (e.g. _i18n_strings).
+ * @param {string} [page] - Shared UI page directory (default: the changelog).
  */
-function runPage(globals = {}) {
+function runPage(globals = {}, page = 'changelog') {
 	const byId = new Map();
 	const posted = [];
 	const document = {
@@ -198,8 +202,8 @@ function runPage(globals = {}) {
 	};
 	sandbox.window = sandbox;
 	vm.createContext(sandbox);
-	for (const src of pageScripts()) {
-		const file = path.resolve(CHANGELOG, src);
+	for (const src of pageScripts(page)) {
+		const file = path.resolve(SHARED_UI, page, src);
 		if (STUBBED_SCRIPTS.has(path.basename(file))) continue;
 		if (!file.startsWith(SHARED_UI + path.sep)) throw new Error(`page script ${src} escapes the shared UI root`);
 		vm.runInContext(fs.readFileSync(file, 'utf8'), sandbox, { filename: src });

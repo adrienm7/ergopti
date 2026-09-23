@@ -416,6 +416,7 @@ InstallSendNoOps()
 #Include unit/test_uninstall.ahk
 #Include unit/test_start_at_login.ahk
 #Include meta/test_uninstall_shutdown_gate.ahk
+#Include unit/test_updater_release_notes.ahk
 #Include unit/test_updater_staging_transport.ahk
 #Include unit/test_updater_swap_transaction.ahk
 #Include unit/test_updater_swap_cancellation.ahk
@@ -1072,6 +1073,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_updater_download_receive_timeout.ahk
 #Include meta/test_updater_download_reentrancy_guard.ahk
 #Include meta/test_updater_download_requires_consent.ahk
+#Include meta/test_updater_prompt_uses_shared_notes.ahk
 #Include meta/test_personal_load_once.ahk
 #Include meta/test_menu_llm_actions_include.ahk
 #Include meta/test_llm_menu_suspend_bootstrap.ahk
