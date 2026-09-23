@@ -12,7 +12,8 @@
  * 1. every template names an existing form, and every prefilled id is a field
  *    of that form;
  * 2. the forms carry their labels (the URL's labels= only works for users with
- *    triage permission) and blank issues are off;
+ *    triage permission), each one a label the repository has, and blank
+ *    issues are off;
  * 3. the repository comes from the updater defaults, and a worst-case prefill
  *    (long accented text and emoji in every field) stays within max_url_bytes.
  * ==============================================================================
@@ -44,8 +45,24 @@ const registry = JSON.parse(
 const defaults = JSON.parse(fs.readFileSync(path.join(SHARED, 'modules', 'updater', 'defaults.json'), 'utf8'));
 const repository = defaults.github;
 
+// The labels the repository has (`gh label list`, GitHub's default set). A form
+// label the repository lacks is dropped from the issue without any error, so a
+// new label is created in the repository first, then added here.
+const REPOSITORY_LABELS = new Set([
+	'bug',
+	'documentation',
+	'duplicate',
+	'enhancement',
+	'good first issue',
+	'help wanted',
+	'invalid',
+	'question',
+	'wontfix'
+]);
+
 const failures = [];
 let fieldsChecked = 0;
+let labelsChecked = 0;
 
 // ── Registry shape ────────────────────────────────────────────────────────
 const templateIds = Object.keys(registry.templates || {});
@@ -82,6 +99,12 @@ for (const id of templateIds) {
 	if (!Array.isArray(form.labels) || form.labels.length === 0) {
 		failures.push(`${template.file}: labels must be declared in the form`);
 	}
+	for (const label of Array.isArray(form.labels) ? form.labels : []) {
+		labelsChecked++;
+		if (!REPOSITORY_LABELS.has(label)) {
+			failures.push(`${template.file}: label "${label}" does not exist in the repository, so GitHub drops it`);
+		}
+	}
 	if (form.title !== template.title_prefix) {
 		failures.push(`${template.file}: title "${form.title}" differs from the registry prefix "${template.title_prefix}"`);
 	}
@@ -99,6 +122,7 @@ for (const id of templateIds) {
 	}
 }
 if (fieldsChecked < 4) failures.push(`only ${fieldsChecked} prefilled field(s) checked`);
+if (labelsChecked < templateIds.length) failures.push(`only ${labelsChecked} form label(s) checked`);
 
 // ── config.yml ────────────────────────────────────────────────────────────
 try {

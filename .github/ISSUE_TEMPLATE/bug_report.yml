@@ -4,12 +4,13 @@
 # fields listed in static/ergopti_plus/_shared/modules/diagnostics/issue_templates.json
 # by their `id`; tools/test/test-issue-templates.cjs keeps both in step.
 # Labels live here because the URL's `labels=` parameter only applies to users
-# with triage permission.
+# with triage permission. GitHub drops a label the repository does not have, so
+# each one must exist there (tools/test/test-issue-templates.cjs).
 
 name: Bug report
 description: Something in ErgoptiPlus does not work as expected. / Quelque chose ne fonctionne pas comme prévu.
 title: "[Bug] "
-labels: ["bug", "from-app"]
+labels: ["bug"]
 body:
   - type: markdown
     attributes:
