@@ -466,6 +466,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- Features whose runtime refused the saved value this session: their state
 	-- shows the real posture while saves keep the value config.toml holds.
 	local session_demotions = SessionDemotions.new()
+	-- Set when this session only holds defaults in place of a present config.toml
+	-- (corrupt file, or a boot rollback): saving would overwrite the user's file.
+	local read_only_reason = nil
 
 	local function save_prefs()
 		if type(transactional_save_prefs) ~= "function" then
@@ -837,6 +840,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- therefore treated as present-but-unusable - defaults in memory for this
 	-- session, and nothing written back.
 	local config_absent = (load_status == "absent") and (next(saved) == nil)
+	if load_status == "corrupt" then
+		read_only_reason = "config.toml could not be read or decoded at startup"
+		Logger.error(LOG, "Preference saves are read-only for this session: %s.", read_only_reason)
+	end
 
 	if config_absent then
 		for _, f in ipairs(type(hotfiles) == "table" and hotfiles or {}) do
@@ -925,6 +932,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end
 		Logger.warn(LOG,
 			"Persisted preferences were rejected; the pre-load runtime state was restored.")
+		if not config_absent then
+			read_only_reason = "the saved preferences could not be applied at startup"
+			Logger.error(LOG, "Preference saves are read-only for this session: %s.", read_only_reason)
+		end
 	elseif initial_sync_ok ~= true then
 		for _, record in ipairs(initial_report.demotions) do session_demotions.record(record) end
 		Logger.warn(LOG,
@@ -947,6 +958,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		initial_state       = state,
 		initial_preferences = initial_preferences,
 		persisted_view      = session_demotions.persisted_view,
+		read_only_reason    = function() return read_only_reason end,
 		restore_runtime     = function(snapshot)
 			if sync_state_to_modules(snapshot, false, true) ~= true then return false end
 			if type(llm_handler) == "table"
