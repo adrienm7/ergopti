@@ -155,10 +155,13 @@ helpers.describe("gestures: durable binding transactions", function()
 		if not ok then error(err, 0) end
 	end)
 
-	helpers.it("unknown-action: a persisted unknown action survives a restart", function()
+	helpers.it("unknown-action: refused at assignment, so nothing reverts at restart", function()
 		-- Regression: set_action() warned but committed an unknown action,
 		-- while the load silently dropped it — so the binding reverted on
-		-- every restart and the save looked intermittently broken.
+		-- every restart and the save looked intermittently broken. The fix
+		-- that kept it bound made a stored no-op instead. The id is now refused
+		-- where the user makes the choice, as Windows refuses it: nothing is
+		-- written, the durable binding stays, and a restart shows the same one.
 		local path = os.tmpname()
 		os.remove(path)
 		local saved = {
@@ -171,15 +174,16 @@ helpers.describe("gestures: durable binding transactions", function()
 		local ok, err = pcall(function()
 			local manager = require(MANAGER)
 			manager.init({ enabled = false, persist = true, config_path = path })
-			helpers.assert_true(manager.set_action("tap_3", "future_action_xyz"),
-				"set_action reports success for the unknown action")
+			helpers.assert_true(manager.set_action("tap_3", "enter"), "a catalogue id is stored")
+			helpers.assert_eq(manager.set_action("tap_3", "future_action_xyz"), false,
+				"an id the catalogue does not offer must be refused, not stored as a no-op")
+			helpers.assert_eq(manager.get_action("tap_3"), "enter", "the refusal leaves the binding alone")
 
 			package.loaded[MANAGER] = nil
 			local restarted = require(MANAGER)
 			restarted.init({ enabled = false, persist = true, config_path = path })
-			helpers.assert_eq(restarted.get_action("tap_3"), "future_action_xyz",
-				"a save that reported success must still be there after a restart — "
-					.. "not silently reverted to the default")
+			helpers.assert_eq(restarted.get_action("tap_3"), "enter",
+				"the durable binding survives the restart — nothing reverts")
 		end)
 
 		for name, module in pairs(saved) do package.loaded[name] = module end

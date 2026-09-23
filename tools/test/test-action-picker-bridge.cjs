@@ -40,6 +40,7 @@ const WIN_NATIVE = 'static/ergopti_plus/windows/ui/action_picker/init.ahk';
 const MAC_HOST = 'static/ergopti_plus/macos/ui/action_picker/init.lua';
 const MAC_MENU = 'static/ergopti_plus/macos/ui/menu/menu_gestures.lua';
 const LINUX_HOST = 'static/ergopti_plus/linux/ui/action_picker/bridge.lua';
+const LINUX_ACTIONS = 'static/ergopti_plus/linux/modules/gestures/manager.lua';
 const EN_LOCALE = 'static/ergopti_plus/_shared/data/locales/en.json';
 
 let total_pass = 0;
@@ -75,6 +76,7 @@ const winNative = read(WIN_NATIVE);
 const macHost = read(MAC_HOST);
 const macMenu = read(MAC_MENU);
 const linuxHost = read(LINUX_HOST);
+const linuxActions = read(LINUX_ACTIONS);
 const enLocale = read(EN_LOCALE);
 
 // 1. Host-agnostic post().
@@ -141,6 +143,15 @@ for (const tok of ['"heading"', '"action"', '"level"', '"text"']) {
 }
 check('macOS host builds heading/action items',
 	/type\s*=\s*"heading"/.test(macMenu) && /type\s*=\s*"action"/.test(macMenu) && /level\s*=/.test(macMenu));
+
+// Linux sent a flat, alphabetical list with no heading at all; its items now
+// come from the gestures manager's catalogue walk, headings included.
+check('Linux host sends the catalogue picker items',
+	/Actions\.get_picker_items\(\)/.test(linuxHost) && !/get_action_names/.test(linuxHost));
+check('Linux manager builds heading/action items with levels',
+	/type = "heading", level = item\.level/.test(linuxActions) && /type = "action"/.test(linuxActions));
+check('Linux manager greys a row whose requirement is absent, with the reason',
+	/disabled = not available or nil/.test(linuxActions) && /hint = hint/.test(linuxActions));
 
 // 4b'. A row the host proved unrunnable is greyed with its reason
 // (behaviour pinned by test-action-picker-disabled-rows.cjs).

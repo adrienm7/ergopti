@@ -124,11 +124,11 @@ helpers.describe("keyboard shortcuts: what is stored", function()
 
 	helpers.it("stores a binding the user makes", function()
 		local shortcuts, storage = load_over_storage()
-		local ok = shortcuts.set_action("ctrl_shift_p", "select_word")
+		local ok = shortcuts.set_action("ctrl_shift_p", "select_line")
 		local stored = storage.get("shortcuts.keyboard.ctrl_shift_p")
 		drop_storage()
 		helpers.assert_true(ok)
-		helpers.assert_eq(stored, "select_word",
+		helpers.assert_eq(stored, "select_line",
 			"an assignment that is not persisted is a menu that forgets what the "
 				.. "user told it at every restart")
 	end)
@@ -154,7 +154,7 @@ helpers.describe("keyboard shortcuts: what is stored", function()
 		local shortcuts, storage = load_over_storage({
 			["shortcuts.keyboard.ctrl_j"] = "select_line",
 		}, true)
-		local rebound = shortcuts.set_action("ctrl_j", "select_word")
+		local rebound = shortcuts.set_action("ctrl_j", "enter")
 		local removed = shortcuts.set_action("ctrl_j", "none")
 		local active = shortcuts.get_action("ctrl_j")
 		local stored = storage.get("shortcuts.keyboard.ctrl_j")
@@ -165,9 +165,20 @@ helpers.describe("keyboard shortcuts: what is stored", function()
 		helpers.assert_eq(stored, "select_line", "the durable action must remain untouched")
 	end)
 
+	helpers.it("refuses an action the catalogue does not offer", function()
+		local shortcuts, storage = load_over_storage()
+		local ok = shortcuts.set_action("ctrl_shift_p", "select_word")
+		local written = #storage.keys()
+		drop_storage()
+		helpers.assert_eq(ok, false,
+			"an id no Linux executor runs would be stored, fire on the chord and do "
+				.. "nothing — refused here as the gesture slots and Windows refuse it")
+		helpers.assert_eq(written, 0)
+	end)
+
 	helpers.it("refuses a slot with no known modifier prefix", function()
 		local shortcuts, storage = load_over_storage()
-		local ok = shortcuts.set_action("hyper_z", "select_word")
+		local ok = shortcuts.set_action("hyper_z", "select_line")
 		local written = #storage.keys()
 		drop_storage()
 		helpers.assert_true(not ok,

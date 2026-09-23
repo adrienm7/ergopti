@@ -282,6 +282,18 @@ function M.set_action(slot_id, action_id)
 		return true
 	end
 
+	-- The same catalogue check the gesture slots apply, and Windows applies to
+	-- both: an unknown id would be stored, fire on the chord, and do nothing.
+	local ok_gestures, Gestures = pcall(require, "modules.gestures.manager")
+	if not ok_gestures or type(Gestures.is_assignable) ~= "function" then
+		Logger.error(LOG, "set_action(): the action catalogue is unavailable — '%s' not bound.", slot_id)
+		return false
+	end
+	if not Gestures.is_assignable(action_id) then
+		Logger.warn(LOG, "set_action(): refusing unknown action '%s' for %s.", action_id, slot_id)
+		return false
+	end
+
 	if not Storage.set(PREF_PREFIX .. slot_id, action_id) then
 		Logger.error(LOG, "set_action(): could not persist '%s'.", slot_id)
 		return false

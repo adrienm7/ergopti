@@ -7,9 +7,10 @@
  * The gesture slot key-space (tap/swipe slot names) is identical on every driver:
  * a gesture bound on one platform must name the same slot on the other. The single
  * declared slot-space lives in _shared/modules/actions/actions.toml [slots]. The
- * Linux manager derives its lists from that file at runtime (this gate checks it
- * reads the canonical file and never re-hardcodes them; the Linux Lua suite proves
- * the derived lists match in order). macOS still hardcodes the lists, so this gate
+ * Linux manager takes its lists from its generated action catalogue (this gate
+ * checks the generated lists equal the TOML in order, and that the manager reads
+ * them rather than re-hardcoding them; the Linux Lua suite proves the loaded lists
+ * match at runtime). macOS still hardcodes the lists, so this gate
  * pins the macOS literals to the TOML and asserts its DEFAULT_GESTURES key-space
  * equals single + axis; only the mapped action VALUES may differ per platform.
  * ==============================================================================
@@ -70,18 +71,28 @@ try {
 		}
 	}
 
-	// Linux derives the slot arrays from actions.toml at runtime (the shared
-	// codec now decodes multi-line arrays), so there is no literal to pin. Assert
-	// it reads the canonical file and never re-hardcodes the lists; the Linux Lua
-	// suite proves the derived lists equal the TOML in order.
+	// Linux takes the slot arrays from linux/_generated/action_catalogue.lua,
+	// which tools/codegen/codegen-action-catalogue.cjs writes from [slots]. Pin
+	// the generated lists to the TOML in order, and assert the manager reads
+	// them and never re-hardcodes the lists.
 	{
+		const generated = read('linux/_generated/action_catalogue.lua');
+		const slots = generated.match(/\n\tslots = \{\n\t\tsingle = \{([^}]*)\},\n\t\taxis = \{([^}]*)\},/);
+		if (!slots) {
+			errors.push('linux/_generated/action_catalogue.lua carries no slots table');
+		} else {
+			const names = (body) => [...body.matchAll(/"([a-z0-9_]+)"/g)].map((x) => x[1]);
+			if (!eqOrdered(names(slots[1]), single)) errors.push('generated Linux slots.single != actions.toml [slots].single');
+			if (!eqOrdered(names(slots[2]), axis)) errors.push('generated Linux slots.axis != actions.toml [slots].axis');
+		}
 		const file = 'linux/modules/gestures/manager.lua';
 		const src = read(file);
-		if (!/load_slot_space\s*\(/.test(src)) {
-			errors.push('linux manager must derive the slot-space via load_slot_space()');
+		if (!src.includes('M.SINGLE_SLOTS = copy_list(Catalogue.slots.single)')
+			|| !src.includes('M.AXIS_SLOTS = copy_list(Catalogue.slots.axis)')) {
+			errors.push('linux manager must take SINGLE_SLOTS/AXIS_SLOTS from the generated catalogue');
 		}
-		if (!src.includes('_shared/modules/actions/actions.toml')) {
-			errors.push('linux manager must read the shared actions.toml');
+		if (!src.includes('require, "_generated.action_catalogue"')) {
+			errors.push('linux manager must load _generated/action_catalogue.lua');
 		}
 		if (/M\.SINGLE_SLOTS\s*=\s*\{\s*"/.test(src) || /M\.AXIS_SLOTS\s*=\s*\{\s*"/.test(src)) {
 			errors.push('linux manager re-hardcodes SINGLE_SLOTS/AXIS_SLOTS instead of deriving them');
@@ -97,4 +108,4 @@ if (errors.length > 0) {
 	process.exit(1);
 }
 
-console.log('\x1b[32m[OK] Gesture slot-space single source — Linux derives from actions.toml [slots]; macOS literals + DEFAULT_GESTURES key-space match it.\x1b[0m');
+console.log('\x1b[32m[OK] Gesture slot-space single source — Linux takes the generated [slots]; macOS literals + DEFAULT_GESTURES key-space match it.\x1b[0m');
