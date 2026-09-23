@@ -29,6 +29,20 @@
 				"distro-opensuse": 1
 			}
 		},
+		"first-install-distros": {
+			"classification": "mandatory",
+			"subjects": {
+				"first-install-ubuntu-22.04": 1,
+				"first-install-ubuntu-24.04": 1,
+				"first-install-debian-12": 1,
+				"first-install-debian-13": 1,
+				"first-install-fedora-41": 1,
+				"first-install-fedora-latest": 1,
+				"first-install-arch": 1,
+				"first-install-opensuse-tumbleweed": 1,
+				"first-install-alpine": 1
+			}
+		},
 		"e2e-linux": {
 			"classification": "mandatory",
 			"subjects": {

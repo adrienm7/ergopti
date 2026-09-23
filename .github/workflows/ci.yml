@@ -1274,6 +1274,74 @@ jobs:
           if-no-files-found: error
 
   # ─────────────────────────────────────────────────
+  # 4.1c) Linux first install, WITH dependencies, per distribution
+  # ─────────────────────────────────────────────────
+  # install-linux-distros runs --no-deps on purpose, and nothing ran the
+  # installer the way the README tells a user to: with its dependencies. That
+  # path is where the first-run failures lived — a kanata needing glibc 2.39
+  # aborting the whole install on Ubuntu 22.04 and Debian 12, the tray library
+  # never installed at all. tests/distro/e2e_install.sh runs install.sh as an
+  # unprivileged sudo user against each distribution's real archives, then
+  # checks the INSTALLED tree: the launcher, every FFI library, WebKit through
+  # lgi, and a tray icon registered with a StatusNotifierWatcher (the protocol
+  # KDE, GNOME's AppIndicator extension, waybar and xfce4-panel speak).
+  #
+  # The matrix spans what differs underneath: glibc and musl, libxkbcommon
+  # before and after 1.8, six package managers, LTS and rolling releases.
+  # Reproduce any entry locally with:
+  #   static/ergopti_plus/linux/tests/distro/run_in_docker.sh <image>
+  first-install-distros:
+    name: 'Linux · first install with deps (${{ matrix.distro }})'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { distro: ubuntu-22.04, image: 'ubuntu:22.04' }
+          - { distro: ubuntu-24.04, image: 'ubuntu:24.04' }
+          - { distro: debian-12, image: 'debian:12' }
+          - { distro: debian-13, image: 'debian:13' }
+          - { distro: fedora-41, image: 'fedora:41' }
+          - { distro: fedora-latest, image: 'fedora:latest' }
+          - { distro: arch, image: 'archlinux:latest' }
+          - { distro: opensuse-tumbleweed, image: 'opensuse/tumbleweed:latest' }
+          - { distro: alpine, image: 'alpine:latest' }
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install on ${{ matrix.image }} and verify the first run
+        timeout-minutes: 25
+        run: |
+          set -euo pipefail
+          bash static/ergopti_plus/linux/tests/distro/run_in_docker.sh '${{ matrix.image }}' \
+            | tee "$RUNNER_TEMP/first-install.log"
+
+      - name: Record mandatory first-install evidence
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/linux-ci-evidence"
+          mkdir -p "$evidence_dir"
+          printf '%s\n' \
+            '{' \
+            '  "schema_version": 1,' \
+            '  "job": "first-install-distros",' \
+            "  \"sha\": \"$GITHUB_SHA\"," \
+            "  \"architecture\": \"$RUNNER_ARCH\"," \
+            '  "distro": "${{ matrix.distro }}",' \
+            '  "session": "container-first-install",' \
+            '  "interpreter": "LuaJIT",' \
+            '  "subjects": { "first-install-${{ matrix.distro }}": 1 }' \
+            '}' > "$evidence_dir/first-install-${{ matrix.distro }}.json"
+
+      - name: Upload mandatory first-install evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-ci-evidence-first-install-${{ matrix.distro }}
+          retention-days: 7
+          path: ${{ runner.temp }}/linux-ci-evidence/first-install-${{ matrix.distro }}.json
+          if-no-files-found: error
+
+  # ─────────────────────────────────────────────────
   # 4.2) Linux E2E — virtual-keyboard harness (stubbed, no real evdev/ytotool)
   # ─────────────────────────────────────────────────
   # This job runs on ubuntu-latest against the pure-Lua hotstring engine — no
@@ -2117,6 +2185,7 @@ jobs:
     needs:
       - test-linux
       - install-linux-distros
+      - first-install-distros
       - e2e-linux
       - build-deb
       - build-rpm
