@@ -400,6 +400,10 @@ local DAEMON_SCENARIOS = {
 	-- count it, or the first character of the replacement stays ("Aadn").
 	{ name = "Backspace after an end-char expansion restores the trigger", keys = "adn {BS}", screen = "adn" },
 	{ name = "Backspace after an auto expansion restores the trigger", keys = "pk★{BS}", screen = "pk★" },
+	-- Backspace edits the buffer instead of wiping it and declaring a word start.
+	{ name = "a corrected typo still expands", keys = "adx{BS}n ", screen = "ADN " },
+	{ name = "a word-only trigger does not fire mid-word after a Backspace", keys = "xy{BS}adn ", screen = "xadn " },
+	{ name = "a word-only trigger does not fire after an arrow key", keys = "x{LEFT}adn ", screen = "xadn " },
 }
 
 if package.config:sub(1, 1) == "\\" then

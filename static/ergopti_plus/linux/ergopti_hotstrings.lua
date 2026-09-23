@@ -1190,14 +1190,21 @@ local function main()
 		end
 		_undoable = nil
 
-		engine:reset()
+		-- Backspace edits the buffer as it edited the text; every other control
+		-- key moves or leaves the caret, so what follows is not known to start a
+		-- word. Escape alone leaves the caret where it was.
+		if key_name == "backspace" then
+			engine:backspace()
+		else
+			engine:reset(key_name == "escape")
+		end
 		-- Cancel any in-flight LLM prediction on Backspace or Escape.
 		if key_name == "backspace" or key_name == "escape" then
 			if prediction_engine then
 				pcall(function() prediction_engine.cancel() end)
 			end
 		end
-		Logger.debug(LOG, "Control key '%s' — buffer reset.", key_name)
+		Logger.debug(LOG, "Control key '%s' — buffer updated.", key_name)
 	end
 	local on_control = input_capture_gate.guard(handle_control)
 

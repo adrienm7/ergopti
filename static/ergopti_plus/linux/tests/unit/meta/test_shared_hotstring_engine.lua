@@ -673,3 +673,41 @@ helpers.describe("shared hotstring engine — inter-key trigger timing", functio
 			"fresh post-reset typing must remain eligible")
 	end)
 end)
+
+helpers.describe("shared hotstring engine — Backspace edits the buffer", function()
+
+	local function type_into(e, text)
+		local result
+		for ch in text:gmatch("[%z\1-\127\194-\244][\128-\191]*") do result = e:on_char(ch) end
+		return result
+	end
+
+	helpers.it("a corrected typo still completes its trigger", function()
+		local e = engine_mod.new()
+		e:load_mappings({ { auto_expand = true, trigger = "btw", replacement = "by the way" } })
+		type_into(e, "btx")
+		e:backspace()
+		local result = type_into(e, "w")
+		helpers.assert_true(result ~= nil and result.trigger == "btw",
+			"Backspace used to wipe the whole buffer, so b-t-x-Backspace-w expanded nothing")
+	end)
+
+	helpers.it("Backspace on an empty buffer means the text continues something unseen", function()
+		local e = engine_mod.new()
+		e:load_mappings({ { auto_expand = true, is_word = true, trigger = "adn", replacement = "ADN" } })
+		e:backspace()
+		helpers.assert_nil(type_into(e, "adn"),
+			"a word-only trigger must not fire after deleting into text the engine never saw")
+		e:reset()
+		helpers.assert_true(type_into(e, "adn") ~= nil, "a genuine reset is a word boundary again")
+	end)
+
+	helpers.it("a reset away from a boundary refuses word-only triggers", function()
+		local e = engine_mod.new()
+		e:load_mappings({ { auto_expand = true, is_word = true, trigger = "adn", replacement = "ADN" } })
+		e:reset(false)
+		helpers.assert_nil(type_into(e, "adn"),
+			"after an arrow key the caret may sit mid-word")
+	end)
+
+end)
