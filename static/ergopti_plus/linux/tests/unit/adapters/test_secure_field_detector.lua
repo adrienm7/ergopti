@@ -37,6 +37,27 @@ helpers.describe("SecureFieldDetector: tri-state verdicts", function()
 			"the legacy boolean port must fail closed while the verdict is unknown")
 	end)
 
+	helpers.it("says once, at warning level, that text is withheld", function()
+		-- An inconclusive probe blocks every expansion. At debug level that was
+		-- indistinguishable from a daemon doing nothing.
+		local warnings = {}
+		local logger = helpers.make_logger_stub()
+		logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
+		package.loaded["logger.shim"] = logger
+		local conclusive = false
+		local adapter = fresh(function() if conclusive then return 61, true end return nil, false end)
+		adapter.refresh()
+		adapter.refresh()
+		helpers.assert_eq(#warnings, 1, "one warning per blocked streak, not one per probe")
+		helpers.assert_contains(warnings[1], "withheld")
+		conclusive = true
+		adapter.refresh()
+		conclusive = false
+		adapter.refresh()
+		helpers.assert_eq(#warnings, 2, "a new streak after a conclusive answer warns again")
+		package.loaded["logger.shim"] = helpers.make_logger_stub()
+	end)
+
 	helpers.it("recognises official ATSPI_ROLE_PASSWORD_TEXT value 40", function()
 		local adapter = fresh(function() return 40, true end)
 		local accepted, verdict = adapter.refresh()
