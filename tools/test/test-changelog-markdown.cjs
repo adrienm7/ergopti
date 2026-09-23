@@ -21,7 +21,7 @@
  * 4. Folds: CI wraps the changelog in <details>/<summary> for github.com, which
  *    the renderer showed as literal tags. Exact fold lines must build
  *    attribute-free elements while an attribute, a script or a fenced fold
- *    stays text.
+ *    stays text, and a </details> quoted in code inside a fold stays code.
  * ==============================================================================
  */
 
@@ -322,6 +322,44 @@ function checkDetailsFolds() {
 	expect(sandbox.pwned === undefined, 'no fold payload may execute');
 }
 
+// A fence inside a fold is code: a </details> line quoted there must not close
+// the fold, or the rest of the fold would spill out of it.
+const FENCED_FOLD_BODY = [
+	'<details>',
+	'<summary>Quoted HTML</summary>',
+	'',
+	'```html',
+	'</details>',
+	'```',
+	'',
+	'After the fence.',
+	'</details>',
+	'',
+	'Outside the fold.'
+].join('\n');
+
+function checkFenceInsideFold() {
+	const { sandbox, document } = runPage();
+	const root = document.createElement('div');
+	sandbox.renderMarkdownInto(root, FENCED_FOLD_BODY, {});
+	const folds = byTag(root, 'details');
+	expect(folds.length === 1, `a fold quoting </details> in code must stay one fold (got ${folds.length})`);
+	if (folds.length !== 1) return;
+	const fold = folds[0];
+	expect(
+		byTag(fold, 'pre').some((pre) => pre.textContent === '</details>'),
+		'a </details> line quoted in a fenced block inside a fold must stay code in that fold'
+	);
+	expect(
+		fold.textContent.includes('After the fence.') && !fold.textContent.includes('Outside the fold.'),
+		'the fold must close on its own </details>, after the fenced code'
+	);
+	expect(
+		textOutside(root, 'details').includes('Outside the fold.'),
+		'the text after the fold must render outside it'
+	);
+}
+
 try {
 	checkRendering();
 } catch (error) {
@@ -332,6 +370,12 @@ try {
 	checkDetailsFolds();
 } catch (error) {
 	expect(false, `the changelog fold rendering raised: ${error.message}`);
+}
+
+try {
+	checkFenceInsideFold();
+} catch (error) {
+	expect(false, `the fenced fold rendering raised: ${error.message}`);
 }
 
 console.log(`1..${failures.length === 0 ? 1 : failures.length}`);

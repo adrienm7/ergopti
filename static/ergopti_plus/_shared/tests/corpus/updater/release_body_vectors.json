@@ -244,6 +244,49 @@
 			]
 		},
 		{
+			"id": "fenced-fold-end-and-markers-stay-in-the-changelog",
+			"format": "marked",
+			"body": [
+				"<!-- ergopti:section=downloads -->",
+				"",
+				"## Downloads",
+				"",
+				"Files.",
+				"",
+				"<!-- /ergopti:section -->",
+				"",
+				"<!-- ergopti:section=changelog -->",
+				"",
+				"<details>",
+				"<summary><b>Changelog</b> (click to expand)</summary>",
+				"",
+				"- **Ci: Quote the fold end and the section close**",
+				"",
+				"```html",
+				"</details>",
+				"<!-- /ergopti:section -->",
+				"<!-- ergopti:section=footer -->",
+				"```",
+				"",
+				"- **Ci: Keep the fold whole**",
+				"",
+				"</details>",
+				"",
+				"<!-- /ergopti:section -->"
+			],
+			"changelog": [
+				"- **Ci: Quote the fold end and the section close**",
+				"",
+				"```html",
+				"</details>",
+				"<!-- /ergopti:section -->",
+				"<!-- ergopti:section=footer -->",
+				"```",
+				"",
+				"- **Ci: Keep the fold whole**"
+			]
+		},
+		{
 			"id": "carriage-returns-are-line-feeds",
 			"format": "legacy",
 			"body": [
