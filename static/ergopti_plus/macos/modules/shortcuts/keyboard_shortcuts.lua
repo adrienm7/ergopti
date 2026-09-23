@@ -483,8 +483,15 @@ local function load_assignments()
 		if k:sub(1, prefix_len) == _settings_prefix then
 			local slot = k:sub(prefix_len + 1)
 			local val  = Storage.get(k)
-			if type(val) == "string" then
+			-- The check set_action applies, applied to what was stored: an id the
+			-- catalogue does not offer (hand-edited, or retired by an update)
+			-- would bind the chord to a no-op. Windows drops it at load the same
+			-- way and keeps the slot's default.
+			if type(val) == "string" and GestActions.is_assignable(val) then
 				_actions[slot] = val
+			elseif type(val) == "string" then
+				Logger.warn(LOG, "Keyboard slot '%s' holds unknown action '%s' — keeping '%s'.",
+					slot, val, _actions[slot] or "none")
 			end
 		end
 	end
