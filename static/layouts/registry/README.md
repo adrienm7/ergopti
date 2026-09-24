@@ -24,7 +24,11 @@ derived from it is stored here:
   changed and emulates it; there is no Windows version of a layout. The
   emulated layout is `[layout] emulated_layout` in `config.toml` (a registry
   id, empty for none); the driver downloads it at boot when its verified copy
-  is missing from `<configuration folder>/layouts/`;
+  is missing from `<configuration folder>/layouts/`. The Windows Ergopti
+  emulation itself reads `ergopti.keylayout` and `ergopti_plus.keylayout`
+  from the copy of this folder the driver ships
+  (`windows/modules/keymap/layout/layout_ergopti.ahk`), so editing an Ergopti
+  file here changes what Windows types too;
 - Linux converts the `.keylayout` to XKB symbols and an XCompose file on the
   device (`linux/modules/keymap/layout_registry.lua`), with the converter of
   `static/ergopti/linux/xkb_generation` that the Linux package ships; it needs

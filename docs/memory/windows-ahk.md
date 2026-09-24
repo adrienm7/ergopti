@@ -367,6 +367,20 @@ registers first: the registry layout emulation registers at boot, before
 `modules/keymap/layout.ahk`. The AltGr comment in `layout.ahk` that says the
 most recently defined variant wins is wrong; do not reason from it.
 
+### project-ergopti-tables-come-from-the-keylayout
+
+The Ergopti emulation has no hand-written character table: `layout_ergopti.ahk`
+reads the shipped `static/layouts/registry` Ergopti `.keylayout` files at boot
+and every layer table is derived from that data. To change what a key types,
+change the `.keylayout` (through its macOS bundle), never AHK source.
+Windows-only behaviour lives in the overlays and the two deviation tables of
+that module; `tests/fixtures/ergopti_emulation_golden.json` freezes what the
+emulation typed when the hand-written tables were retired, so an intended change
+to Windows output updates that file in the same commit, and a deviation the
+`.keylayout` catches up with must be deleted (a test fails while it lingers).
+The compiled driver needs the registry folder in its bundle
+(`build_static_bundle.py` REQUIRED_ASSETS), or boot fails.
+
 ## Files, configuration, and UI hosts
 
 ### project-ahk-unreadable-config-persists-defaults

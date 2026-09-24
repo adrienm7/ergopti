@@ -3,302 +3,26 @@
 ; ==============================================================================
 ; MODULE: Layout
 ; DESCRIPTION:
-; Defines all physical key remappings for the Ergopti keyboard layout.
-; Covers the base layer, Shift, CapsLock, AltGr/ShiftAltGr, and Control
-; variants, as well as all dead-key mapping tables.
+; Registers all physical key remappings of the Ergopti keyboard layout: the
+; base layer, Shift, CapsLock, AltGr/ShiftAltGr and Control variants, and the
+; dead-key state machine. What each key types is read from the Ergopti
+; .keylayout (layout/layout_ergopti.ahk); this file owns the hotkeys.
 ; ==============================================================================
 
 
 
 
 
-; =======================================
-; =======================================
-; ======= 1/ DEAD KEY DEFINITIONS =======
-; =======================================
-; =======================================
+; ================================
+; ================================
+; ======= 1/ LAYOUT TABLES =======
+; ================================
+; ================================
 
-; TODO : if KbdEdit is upgraded, some "NEW" Unicode characters will become available
-; This AutoHotkey script has all the characters, and the KbdEdit file has some missing ones
-; For example, there is no 🄋 character yet in KbdEdit, but it is already available in this emulation
-
-global DeadkeyMappingCircumflex := Map(
-	" ", "^", "^", "^",
-	"¨", "/", "_", "\",
-	"'", "⚠",
-	",", "➜",
-	".", "•",
-	"/", "⁄",
-	"0", "🄋", ; NEW
-	"1", "➀",
-	"2", "➁",
-	"3", "➂",
-	"4", "➃",
-	"5", "➄",
-	"6", "➅",
-	"7", "➆",
-	"8", "➇",
-	"9", "➈",
-	":", "▶",
-	";", "↪",
-	"a", "â", "A", "Â",
-	"b", "ó", "B", "Ó",
-	"c", "ç", "C", "Ç",
-	"d", "★", "D", "☆",
-	"e", "ê", "E", "Ê",
-	"f", "⚐", "F", "⚑",
-	"g", "ĝ", "G", "Ĝ",
-	"h", "ĥ", "H", "Ĥ",
-	"i", "î", "I", "Î",
-	"j", "j", "J", "J",
-	"★", "j", 
-	"k", "☺", "K", "☻",
-	"l", "†", "L", "‡",
-	"m", "✅", "M", "☑",
-	"n", "ñ", "N", "Ñ",
-	"o", "ô", "O", "Ô",
-	"p", "¶", "P", "⁂",
-	"q", "☒", "Q", "☐",
-	"r", "º", "R", "°",
-	"s", "ß", "S", "ẞ",
-	"t", "!", "T", "¡",
-	"u", "û", "U", "Û",
-	"v", "✓", "V", "✔",
-	"w", "ù", "W", "Ù",
-	"x", "✕", "X", "✖",
-	"y", "ŷ", "Y", "Ŷ",
-	"z", "ẑ", "Z", "Ẑ",
-	"à", "æ", "À", "Æ",
-	"è", "í", "È", "Í",
-	"é", "œ", "É", "Œ",
-	"ê", "á", "Ê", "Á",
-)
-
-global DeadkeyMappingDiaresis := Map(
-	" ", "¨", "¨", "¨",
-	"0", "🄌", ; NEW
-	"1", "➊",
-	"2", "➋",
-	"3", "➌",
-	"4", "➍",
-	"5", "➎",
-	"6", "➏",
-	"7", "➐",
-	"8", "➑",
-	"9", "➒",
-	"a", "ä", "A", "Ä",
-	"c", "©", "C", "©",
-	"e", "ë", "E", "Ë",
-	"h", "ḧ", "H", "Ḧ",
-	"i", "ï", "I", "Ï",
-	; ¨+n → narrow no-break space (U+202F) — mnemonic: N for Narrow nbsp
-	"n", Chr(0x202F), "N", Chr(0x202F),
-	"o", "ö", "O", "Ö",
-	"r", "®", "R", "®",
-	; ¨+s → no-break space (U+00A0) — mnemonic: S for Space (insécable)
-	"s", Chr(0x00A0), "S", Chr(0x00A0),
-	"t", "™", "T", "™",
-	"u", "ü", "U", "Ü",
-	"w", "ẅ", "W", "Ẅ",
-	"x", "ẍ", "X", "Ẍ",
-	"y", "ÿ", "Y", "Ÿ",
-)
-
-global DeadkeyMappingSuperscript := Map(
-	" ", "ᵉ",
-	"(", "⁽", ")", "⁾",
-	"+", "⁺",
-	",", "ᶿ",
-	"-", "⁻",
-	".", "ᵝ",
-	"/", "̸",
-	"0", "⁰",
-	"1", "¹",
-	"2", "²",
-	"3", "³",
-	"4", "⁴",
-	"5", "⁵",
-	"6", "⁶",
-	"7", "⁷",
-	"8", "⁸",
-	"9", "⁹",
-	"=", "⁼",
-	"a", "ᵃ", "A", "ᴬ",
-	"b", "ᵇ", "B", "ᴮ",
-	"c", "ᶜ", "C", "ꟲ",
-	"d", "ᵈ", "D", "ᴰ",
-	"e", "ᵉ", "E", "ᴱ",
-	"f", "ᶠ", "F", "ꟳ",
-	"g", "ᶢ", "G", "ᴳ",
-	"h", "ʰ", "H", "ᴴ",
-	"i", "ⁱ", "I", "ᴵ",
-	"j", "ʲ", "J", "ᴶ",
-	"k", "ᵏ", "K", "ᴷ",
-	"l", "ˡ", "L", "ᴸ",
-	"m", "ᵐ", "M", "ᴹ",
-	"n", "ⁿ", "N", "ᴺ",
-	"o", "ᵒ", "O", "ᴼ",
-	"p", "ᵖ", "P", "ᴾ",
-	"q", "𐞥", "Q", "ꟴ", ; 𐞥 is NEW
-	"r", "ʳ", "R", "ᴿ",
-	"s", "ˢ", "S", "", ; There is no superscript capital s yet in Unicode
-	"t", "ᵗ", "T", "ᵀ",
-	"u", "ᵘ", "U", "ᵁ",
-	"v", "ᵛ", "V", "ⱽ",
-	"w", "ʷ", "W", "ᵂ",
-	"x", "ˣ", "X", "", ; There is no superscript capital x yet in Unicode
-	"y", "ʸ", "Y", "", ; There is no superscript capital y yet in Unicode
-	"z", "ᶻ", "Z", "", ; There is no superscript capital z yet in Unicode
-	"[", "˹", "]", "˺",
-	"à", "ᵡ", "À", "", ; There is no superscript capital ᵡ yet in Unicode
-	"æ", "𐞃", "Æ", "ᴭ", ; 𐞃 is NEW
-	"è", "ᵞ", "È", "", ; There is no superscript capital ᵞ yet in Unicode
-	"é", "ᵟ", "É", "", ; There is no superscript capital ᵟ yet in Unicode
-	"ê", "ᵠ", "Ê", "", ; There is no superscript capital ᵠ yet in Unicode
-	"œ", "ꟹ", "Œ", "", ; There is no superscript capital œ yet in Unicode
-)
-
-global DeadkeyMappingSubscript := Map(
-	" ", "ᵢ",
-	"(", "₍", ")", "₎",
-	"+", "₊", "-", "₋",
-	"/", "̸",
-	"0", "₀",
-	"1", "₁",
-	"2", "₂",
-	"3", "₃",
-	"4", "₄",
-	"5", "₅",
-	"6", "₆",
-	"7", "₇",
-	"8", "₈",
-	"9", "₉",
-	"=", "₌",
-	"a", "ₐ", "A", "ᴀ",
-	"b", "ᵦ", "B", "ʙ", ; ᵦ, not real subscript b
-	"c", "", "C", "ᴄ", ; There is no subscript c yet in Unicode
-	"d", "", "D", "ᴅ", ; There is no subscript d yet in Unicode
-	"e", "ₑ", "E", "ᴇ", ; There is no subscript f yet in Unicode
-	"f", "", "F", "ꜰ",
-	"g", "ᵧ", "G", "ɢ", ; ᵧ, not real subscript g
-	"h", "ₕ", "H", "ʜ",
-	"i", "ᵢ", "I", "ɪ",
-	"j", "ⱼ", "J", "ᴊ",
-	"k", "ₖ", "K", "ᴋ",
-	"l", "ₗ", "L", "ʟ",
-	"m", "ₘ", "M", "ᴍ",
-	"n", "ₙ", "N", "ɴ",
-	"o", "ₒ", "O", "ᴏ",
-	"p", "ᵨ", "P", "ₚ",
-	"q", "", "Q", "ꞯ", ; There is no subscript q yet in Unicode
-	"r", "ᵣ", "R", "ʀ",
-	"s", "ₛ", "S", "ꜱ",
-	"t", "ₜ", "T", "ᴛ",
-	"u", "ᵤ", "U", "ᴜ",
-	"v", "ᵥ", "V", "ᴠ",
-	"w", "", "W", "ᴡ", ; There is no subscript w yet in Unicode
-	"x", "ₓ", "X", "ᵪ", ; There is no subscript capital x yet in Unicode, we use subscript capital chi instead
-	"y", "ᵧ", "Y", "ʏ", ; There is no subscript y yet in Unicode, we use subscript gamma instead
-	"z", "", "Z", "ᴢ", ; There is no subscript z yet in Unicode
-	"[", "˻", "]", "˼",
-	"æ", "", "Æ", "ᴁ", ; There is no subscript æ yet in Unicode
-	"è", "ᵧ", "È", "", ; There is no subscript capital ᵧ yet in Unicode
-	"ê", "ᵩ", "Ê", "", ; There is no subscript capital ᵩ yet in Unicode
-	"œ", "", "Œ", "ɶ", ; There is no subscript œ yet in Unicode
-)
-
-global DeadkeyMappingGreek := Map(
-	" ", "µ",
-	"'", "ς",
-	"-", "Μ",
-	"_", "Ω", ; Attention, Ohm symbol and not capital Omega
-	"a", "α", "A", "Α",
-	"b", "β", "B", "Β",
-	"c", "ψ", "C", "Ψ",
-	"d", "δ", "D", "Δ",
-	"e", "ε", "E", "Ε",
-	"f", "φ", "F", "Φ",
-	"g", "γ", "G", "Γ",
-	"h", "η", "H", "Η",
-	"i", "ι", "I", "Ι",
-	"j", "ξ", "J", "Ξ",
-	"k", "κ", "K", "Κ",
-	"l", "λ", "L", "Λ",
-	"m", "μ", "M", "Μ",
-	"n", "ν", "N", "Ν",
-	"o", "ο", "O", "Ο",
-	"p", "π", "P", "Π",
-	"q", "χ", "Q", "Χ",
-	"r", "ρ", "R", "Ρ",
-	"s", "σ", "S", "Σ",
-	"t", "τ", "T", "Τ",
-	"u", "θ", "U", "Θ",
-	"v", "ν", "V", "Ν",
-	"w", "ω", "W", "Ω",
-	"x", "ξ", "X", "Ξ",
-	"y", "υ", "Y", "Υ",
-	"z", "ζ", "Z", "Ζ",
-	"é", "η", "É", "Η",
-	"ê", "ϕ", "Ê", "", ; Alternative phi character
-)
-
-global DeadkeyMappingR := Map(
-	" ", "ℝ",
-	"'", "ℜ",
-	"(", "⟦", ")", "⟧",
-	"[", "⟦", "]", "⟧",
-	"<", "⟪", ">", "⟫",
-	"«", "⟪", "»", "⟫",
-	"b", "", "B", "ℬ",
-	"c", "", "C", "ℂ",
-	"e", "", "E", "⅀",
-	"f", "", "F", "ℱ",
-	"g", "ℊ", "G", "ℊ",
-	"h", "", "H", "ℋ",
-	"j", "", "J", "ℐ",
-	"l", "ℓ", "L", "ℒ",
-	"m", "", "M", "ℳ",
-	"n", "", "N", "ℕ",
-	"p", "", "P", "ℙ",
-	"q", "", "Q", "ℚ",
-	"r", "", "R", "ℝ",
-	"s", "", "S", "⅀",
-	"t", "", "T", "ℭ",
-	"u", "", "U", "ℿ",
-	"x", "", "X", "ℛ",
-	"z", "", "Z", "ℨ",
-)
-
-global DeadkeyMappingCurrency := Map(
-	" ", "¤",
-	"$", "£",
-	"&", "৳",
-	"'", "£",
-	"-", "£",
-	"_", "€",
-	'``', "₰",
-	"a", "؋", "A", "₳",
-	"b", "₿", "B", "฿",
-	"c", "¢", "C", "₵",
-	"d", "₫", "D", "₯",
-	"e", "€", "E", "₠",
-	"f", "ƒ", "F", "₣",
-	"g", "₲", "G", "₲",
-	"h", "₴", "H", "₴",
-	"i", "﷼", "I", "៛",
-	"k", "₭", "K", "₭",
-	"l", "₺", "L", "₤",
-	"m", "₥", "M", "ℳ",
-	"n", "₦", "N", "₦",
-	"o", "௹", "O", "૱",
-	"p", "₱", "P", "₧",
-	"r", "₽", "R", "₹",
-	"s", "₪", "S", "₷",
-	"t", "₸", "T", "₮",
-	"u", "元", "U", "圓",
-	"w", "₩", "W", "₩",
-	"y", "¥", "Y", "円",
-)
+; Every character below comes from the Ergopti .keylayout the driver ships
+; (static/layouts/registry), read once here, before any layer registers and
+; before the hotstrings use the circumflex table (layout/layout_ergopti.ahk).
+ErgoptiLayout_Init(LayoutRegistry_BundledDir())
 
 
 
@@ -1038,8 +762,8 @@ _DigitShiftSend(Symbol, *) {
 }
 
 ; Cannot be HotIf because the remapping is done with Hotkey function and cannot be undone afterwards.
-; The character mapping itself lives in modules/keymap/layout/layout_ergopti.ahk so the
-; keylogger heatmap can read the same source of truth without drifting.
+; The character mapping comes from modules/keymap/layout/layout_ergopti.ahk (read from the
+; .keylayout) so the keylogger heatmap reads the same source of truth without drifting.
 if Features["layout"]["ergopti_base"] {
 	for sc_int, entry in ErgoptiBaseMapping() {
 		sc_str := Format("SC{:03X}", sc_int)
@@ -1050,12 +774,11 @@ if Features["layout"]["ergopti_base"] {
 			RemapKey(sc_str, entry.c, alt)
 		}
 	}
-	; Dead keys (¨ and ^) — their behaviour goes through DeadKey()
-	; rather than RemapKey, so they stay inline next to their state
-	; machine. Their *positions* are still listed in
-	; ErgoptiBaseLabels() so the heatmap can label them.
-	Hotkey("SC01B", _DeadKeyDispatch.Bind("¨", DeadkeyMappingDiaresis), "I2")
-	Hotkey("SC02B", _DeadKeyDispatch.Bind("^", DeadkeyMappingCircumflex), "I2")
+	; Dead keys (¨ and ^ on Ergopti) — their behaviour goes through DeadKey()
+	; rather than RemapKey, so they stay next to their state machine. Their
+	; positions are also in ErgoptiBaseLabels() so the heatmap can label them.
+	for DeadSc, DeadKeyEntry in ErgoptiBaseDeadKeys()
+		Hotkey(DeadSc, _DeadKeyDispatch.Bind(DeadKeyEntry["chain"], DeadKeyEntry["table"]), "I2")
 } else {
 	; Without the emulation, the accented-letter shortcuts follow the user's own
 	; layout (AZERTY, BÉPO, the installed Ergopti driver…) instead of Ergopti's

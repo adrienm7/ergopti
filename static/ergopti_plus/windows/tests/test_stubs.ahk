@@ -428,15 +428,6 @@ global OneShotShiftEnabled := false
 global NumberOfRepetitions := 1
 global ActivitySimulation := false
 
-; Dummy deadkey Maps so layout_altgr.ahk's _BuildAltGrTables can run.
-global DeadkeyMappingCircumflex := Map()
-global DeadkeyMappingDiaresis := Map()
-global DeadkeyMappingSuperscript := Map()
-global DeadkeyMappingSubscript := Map()
-global DeadkeyMappingGreek := Map()
-global DeadkeyMappingR := Map()
-global DeadkeyMappingCurrency := Map()
-
 
 
 
@@ -488,6 +479,14 @@ UpdateLastSentCharacter(Character) {
 DeadKey(Mapping) {
     global _Stub_DeadKeyCalls
     _Stub_DeadKeyCalls.Push(Mapping)
+}
+
+; modules/keymap/layout.ahk reads the Ergopti layout tables at boot, and the
+; runner does not include it: every test that builds a layer loads them through
+; here, once per run, from the registry folder the driver ships.
+_TestEnsureErgoptiLayout() {
+    if !ErgoptiLayout_IsLoaded()
+        ErgoptiLayout_Init(LayoutRegistry_BundledDir())
 }
 
 ; UpdateCapsLockLED lives in modules/shortcuts/capsword.ahk (not included).
