@@ -150,6 +150,9 @@ describe("Diagnostic snapshot: Linux collector", function()
 		assert_eq("false", values.elevated, "uid 1000 is not elevated")
 		assert_eq("3/5", values.features_enabled)
 		assert_eq("812", values.boot_ms)
+		-- The logs folder always ends in the application folder (default or override).
+		assert_true(type(values.logs_dir) == "string" and values.logs_dir:find("ergopti_plus", 1, true) ~= nil,
+			"logs_dir must name the resolved logs folder: " .. tostring(values.logs_dir))
 		assert_eq("4242", Collector.pid(env))
 	end)
 

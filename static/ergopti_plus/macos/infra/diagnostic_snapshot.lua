@@ -129,6 +129,8 @@ function M.collect(ctx, system)
 		dpi              = scale and string.format("%gx", scale) or nil,
 		display          = "quartz",
 		config_dir       = Snapshot.redact_home(ctx.config_dir, system.home()),
+		-- Where this report's own logs are, from the logger's one resolver.
+		logs_dir         = Snapshot.redact_home(Logger.logs_dir(), system.home()),
 		log_level        = level_name(),
 		features_enabled = Snapshot.features_ratio(enabled, total),
 		boot_ms          = ctx.boot_ms and string.format("%.0f", ctx.boot_ms) or nil,

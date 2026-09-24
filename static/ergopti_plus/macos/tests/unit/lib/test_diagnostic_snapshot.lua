@@ -97,10 +97,17 @@ helpers.describe("Diagnostic snapshot: macOS collector", function()
 			git_fs = { read = function() return nil end, exists = function() return false end },
 		}
 		local first, second
-		local lines = capture(function()
+		-- The logs folder comes from the logger's resolver, redacted like the
+		-- configuration folder.
+		local Logger = require("infra.logger")
+		local real_logs_dir = Logger.logs_dir
+		Logger.logs_dir = function() return "/Users/alice/Library/Logs/ergopti_plus/" end
+		local ok_capture, lines = pcall(capture, function()
 			first = Collector.emit_once(ctx, FAKE_SYSTEM)
 			second = Collector.emit_once(ctx, FAKE_SYSTEM)
 		end)
+		Logger.logs_dir = real_logs_dir
+		if not ok_capture then error(lines, 0) end
 		helpers.assert_true(type(first) == "string", "the first call logs")
 		helpers.assert_eq(nil, second, "a second call in the same Lua state is refused")
 		local found = {}
@@ -115,6 +122,7 @@ helpers.describe("Diagnostic snapshot: macOS collector", function()
 		end
 		helpers.assert_true(found[1]:find("features_enabled=2/4", 1, true) ~= nil, found[1])
 		helpers.assert_true(found[1]:find("config_dir=~/Library/Ergopti", 1, true) ~= nil, found[1])
+		helpers.assert_true(found[1]:find("logs_dir=~/Library/Logs/ergopti_plus/", 1, true) ~= nil, found[1])
 		helpers.assert_eq(nil, found[1]:find("alice", 1, true), "the account name must not be logged")
 		Collector._reset_for_test()
 	end)

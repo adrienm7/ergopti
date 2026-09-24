@@ -19,6 +19,7 @@
 		"dpi",
 		"display",
 		"config_dir",
+		"logs_dir",
 		"log_level",
 		"features_enabled",
 		"boot_ms"
@@ -43,11 +44,12 @@
 				"dpi": "144",
 				"display": "win32",
 				"config_dir": "~/config/ergopti_plus",
+				"logs_dir": "~/AppData/Local/ergopti_plus/logs",
 				"log_level": "DEBUG",
 				"features_enabled": "42/97",
 				"boot_ms": "812"
 			},
-			"expected": "Diagnostic snapshot (driver=windows version=3.1.0 commit=3b924cd46 os=\"Windows 11 Home\" os_version=26100.4652 arch=x64 runtime=\"AutoHotkey 2.0.19\" elevated=false locale=fr keyboard_layout=0x040C040C monitors=2 dpi=144 display=win32 config_dir=~/config/ergopti_plus log_level=DEBUG features_enabled=42/97 boot_ms=812)."
+			"expected": "Diagnostic snapshot (driver=windows version=3.1.0 commit=3b924cd46 os=\"Windows 11 Home\" os_version=26100.4652 arch=x64 runtime=\"AutoHotkey 2.0.19\" elevated=false locale=fr keyboard_layout=0x040C040C monitors=2 dpi=144 display=win32 config_dir=~/config/ergopti_plus logs_dir=~/AppData/Local/ergopti_plus/logs log_level=DEBUG features_enabled=42/97 boot_ms=812)."
 		},
 		{
 			"id": "missing_values",
@@ -70,7 +72,7 @@
 				"features_enabled": "3/5",
 				"boot_ms": "120"
 			},
-			"expected": "Diagnostic snapshot (driver=linux version=3.0.0 commit=unknown os=Ubuntu os_version=24.04 arch=x86_64 runtime=\"LuaJIT 2.1\" elevated=false locale=en keyboard_layout=unknown monitors=1 dpi=unknown display=\"wayland GNOME\" config_dir=~/.config/ergopti log_level=INFO features_enabled=3/5 boot_ms=120)."
+			"expected": "Diagnostic snapshot (driver=linux version=3.0.0 commit=unknown os=Ubuntu os_version=24.04 arch=x86_64 runtime=\"LuaJIT 2.1\" elevated=false locale=en keyboard_layout=unknown monitors=1 dpi=unknown display=\"wayland GNOME\" config_dir=~/.config/ergopti logs_dir=unknown log_level=INFO features_enabled=3/5 boot_ms=120)."
 		},
 		{
 			"id": "sanitised",
@@ -90,11 +92,12 @@
 				"dpi": "2",
 				"display": "quartz",
 				"config_dir": "~/Library/Ergopti\tPlus",
+				"logs_dir": "~/Library/Logs/ergopti plus",
 				"log_level": "DEBUG",
 				"features_enabled": "10/12",
 				"boot_ms": "950"
 			},
-			"expected": "Diagnostic snapshot (driver=macos version=3.1.0 commit=abc1234 os=\"macOS 15.5\" os_version=15.5 arch=arm64 runtime=\"Hammerspoon '1.0.0'\" elevated=false locale=fr keyboard_layout=com.apple.keylayout.French monitors=1 dpi=2 display=quartz config_dir=\"~/Library/Ergopti Plus\" log_level=DEBUG features_enabled=10/12 boot_ms=950)."
+			"expected": "Diagnostic snapshot (driver=macos version=3.1.0 commit=abc1234 os=\"macOS 15.5\" os_version=15.5 arch=arm64 runtime=\"Hammerspoon '1.0.0'\" elevated=false locale=fr keyboard_layout=com.apple.keylayout.French monitors=1 dpi=2 display=quartz config_dir=\"~/Library/Ergopti Plus\" logs_dir=\"~/Library/Logs/ergopti plus\" log_level=DEBUG features_enabled=10/12 boot_ms=950)."
 		}
 	]
 }

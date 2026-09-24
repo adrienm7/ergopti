@@ -59,6 +59,7 @@ M.FIELDS = {
 	"dpi",
 	"display",
 	"config_dir",
+	"logs_dir",
 	"log_level",
 	"features_enabled",
 	"boot_ms",
