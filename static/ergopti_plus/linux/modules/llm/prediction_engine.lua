@@ -267,6 +267,25 @@ local function prompt_language()
 	return require("infra.manifest_reader").default_for("script.locale")
 end
 
+--- The profile's name as the menu shows it, for the suggestions' info bar:
+--- a user profile's own label, a built-in's translated name. The bar showed
+--- the internal id, so a custom prompt read "user_1727…_3".
+--- @param profile table
+--- @return string
+local function profile_display_name(profile)
+	-- User profile ids are "user_…" by construction (profile_settings).
+	if tostring(profile.id):match("^user_") and type(profile.label) == "string" and profile.label ~= "" then
+		return profile.label
+	end
+	local ok, I18n = pcall(require, "infra.i18n")
+	local key = "llm.profile." .. tostring(profile.id) .. ".label"
+	local label = ok and type(I18n.get) == "function" and I18n.get(key) or nil
+	if type(label) ~= "string" or label == "" or label == key then return tostring(profile.id) end
+	-- The menu's long form is "●○○ Basic — Simple prediction"; the bar keeps
+	-- the name.
+	return (label:gsub("%s+—.*$", ""))
+end
+
 local function resolve_system_prompt(profile, params, count)
 	-- The context is left empty here and sent once, by build_messages.
 	local max_words = tonumber(params.max_words) or 0
@@ -321,7 +340,7 @@ function M.predict(context, output_context)
 	local request_index = 0
 	local meta = {
 		model = model,
-		profile = profile.id,
+		profile = profile_display_name(profile),
 		loading = true,
 		validation_modifiers = NavigationSettings.get(),
 	}
