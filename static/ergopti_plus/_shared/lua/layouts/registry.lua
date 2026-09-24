@@ -10,9 +10,10 @@
 --- modules/keymap/keylayout/layout_registry.ahk.
 ---
 --- FEATURES & RATIONALE:
---- 1. PURE Lua: no driver imports, no io/network/OS calls. The transport, the
----    JSON decoder and the SHA-256 digest are injected, so both drivers share
----    one decision table and tests replay a download without a network.
+--- 1. PURE Lua: no driver imports, no io/network/OS calls. The transport and
+---    the SHA-256 digest are injected, so both drivers share one decision
+---    table and tests replay a download without a network. The index itself is
+---    fetched and decoded by the catalogue (catalogue.lua).
 --- 2. One location: folder, branch, URL template, bounds and local folder come
 ---    from _shared/modules/layouts/defaults.json, owner and repo from
 ---    _shared/modules/updater/defaults.json.
@@ -260,56 +261,6 @@ function M.fetch_layout(settings, entry, transport, on_done)
 				return
 			end
 			finish(true, body)
-		end)
-	end)
-end
-
---- Downloads index.json and one layout, and verifies the layout against it.
---- on_done(true, { entry, index_text, layout_text }) or on_done(false, reason)
---- is called exactly once; nothing is written here.
---- @param settings table Result of M.resolve().
---- @param id string Registry id.
---- @param transport table { get, decode_json, sha256 }.
---- @param on_done function Terminal callback.
-function M.fetch(settings, id, transport, on_done)
-	local finished = false
-	local function finish(ok, detail)
-		if finished then return end
-		finished = true
-		on_done(ok, detail)
-	end
-	if not M.is_valid_id(id) then
-		finish(false, "'" .. tostring(id) .. "' is not a registry layout id")
-		return
-	end
-	local index_url = M.raw_url(settings, settings.index_file)
-	transport.get(index_url, { ["User-Agent"] = USER_AGENT }, settings.timeout_ms, function(status, body, err)
-		if tonumber(status) ~= 200 or type(body) ~= "string" then
-			finish(false, failure_reason(index_url, status, err))
-			return
-		end
-		if #body > settings.max_file_bytes then
-			finish(false, "the registry index exceeds the download bound")
-			return
-		end
-		-- A decoder may raise or return nil (the shared json.lua returns nil).
-		local decoded_ok, index = pcall(transport.decode_json, body)
-		if not decoded_ok or type(index) ~= "table" then
-			finish(false, "the registry index is not valid JSON"
-				.. (decoded_ok and "" or ": " .. tostring(index)))
-			return
-		end
-		local entry, entry_err = M.find_entry(index, id)
-		if not entry then
-			finish(false, entry_err)
-			return
-		end
-		M.fetch_layout(settings, entry, transport, function(ok, detail)
-			if not ok then
-				finish(false, detail)
-				return
-			end
-			finish(true, { entry = entry, index_text = body, layout_text = detail })
 		end)
 	end)
 end
