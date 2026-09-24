@@ -102,6 +102,23 @@ helpers.describe("LLM profile settings: durable effective profile", function()
 		restore()
 	end)
 
+	helpers.it("keeps every other prompt when one stored entry is unreadable", function()
+		local good_a = { id = "user_a", label = "A", system_single = "Style A {context}", batch = false }
+		local broken = { id = "user_broken", label = "", system_single = "", batch = "yes" }
+		local good_b = { id = "user_b", label = "B", system_single = "Style B {context}", batch = false }
+		local settings, storage = load_settings({ ["llm.profiles.user_profiles"] = { good_a, broken, good_b } })
+		local offered = settings.list_user()
+		helpers.assert_eq(#offered, 2, "the readable prompts are still offered")
+		helpers.assert_true(settings.save_user_profile(
+			{ id = "user_c", label = "C", system_single = "Style C {context}", batch = false }, false, false))
+		local stored = storage.get("llm.profiles.user_profiles")
+		helpers.assert_eq(#stored, 4, "A, B, the new C, and the unreadable entry, untouched")
+		local ids = {}
+		for _, entry in ipairs(stored) do ids[#ids + 1] = entry.id end
+		helpers.assert_eq(table.concat(ids, ","), "user_a,user_b,user_c,user_broken")
+		restore()
+	end)
+
 	helpers.it("creates, resolves, edits, and deletes one user profile durably", function()
 		local settings, storage = load_settings()
 		local profile = {
