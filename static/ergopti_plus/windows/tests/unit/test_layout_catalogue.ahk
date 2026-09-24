@@ -330,6 +330,15 @@ _LCT_UninstallCase() {
 	} finally DirDelete(Dir, true)
 }
 
+Test("layout catalogue: only the Ergopti family is an Ergopti layout (layout-catalogue)", _LCT_IsErgoptiCase)
+
+_LCT_IsErgoptiCase() {
+	AssertTrue(LayoutCatalogue_IsErgopti(Map("id", "ergopti_ansi", "family", "ergopti")))
+	AssertFalse(LayoutCatalogue_IsErgopti(Map("id", "ergol", "family", "ergol")))
+	AssertFalse(LayoutCatalogue_IsErgopti(Map("id", "ergopti_like")), "an entry without a family is not Ergopti")
+	AssertFalse(LayoutCatalogue_IsErgopti(0))
+}
+
 Test("layout catalogue: a damaged record is refused, never read as empty (layout-catalogue)",
 	_LCT_DamagedRecordCase)
 

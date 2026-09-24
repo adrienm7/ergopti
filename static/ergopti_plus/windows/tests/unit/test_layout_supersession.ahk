@@ -81,6 +81,60 @@ _LSD_ReasonCase() {
 	AssertEqual("", LayoutSupersededReason(Other, Emulating), "a feature that works on any layout keeps its row")
 }
 
+Test("layout supersession: the Ergopti hotstrings are off under a layout of another family (layout-ergopti-hotstrings)",
+	_LSD_ErgoptiHotstringsCase)
+
+_LSD_ErgoptiHotstringsCase() {
+	Families := Map("ergol", "ergol", "ergopti_ansi", "ergopti")
+	EntryFn := (Id) => Families.Has(Id) ? Map("id", Id, "family", Families[Id]) : 0
+	Make(Emulated) => Map(
+		"layout", Map("emulated_layout", Emulated),
+		"hotstrings", Map(
+			"sfbs_reduction", Map("comma", Map("enabled", true), "bu", Map("enabled", false)),
+			"rolls", Map("hc", Map("enabled", true)),
+			"autocorrection", Map("accents", Map("enabled", true))))
+	Groups := _MG_ErgoptiHotstringGroups()
+	AssertEqual("sfbs_reduction,rolls", _LSD_Join(Groups), "the groups come from hotstring_groups.ergopti")
+
+	Target := Make("ergol")
+	AssertEqual(2, _MG_SupersedeErgoptiHotstrings(Target, Groups, EntryFn))
+	AssertFalse(Target["hotstrings"]["sfbs_reduction"]["comma"]["enabled"])
+	AssertFalse(Target["hotstrings"]["rolls"]["hc"]["enabled"])
+	AssertTrue(Target["hotstrings"]["autocorrection"]["accents"]["enabled"], "a hotstring of any layout stays on")
+	AssertEqual(LAYOUT_ERGOPTI_HOTSTRINGS_REASON, LayoutErgoptiHotstringsReason(Target, EntryFn))
+	AssertTrue(t(LAYOUT_ERGOPTI_HOTSTRINGS_REASON) != LAYOUT_ERGOPTI_HOTSTRINGS_REASON, "the reason translates")
+
+	for Emulated in ["ergopti_ansi", ""] {
+		Target := Make(Emulated)
+		AssertEqual(0, _MG_SupersedeErgoptiHotstrings(Target, Groups, EntryFn), "nothing is off under '" . Emulated . "'")
+		AssertTrue(Target["hotstrings"]["sfbs_reduction"]["comma"]["enabled"])
+		AssertEqual("", LayoutErgoptiHotstringsReason(Target, EntryFn))
+	}
+	AssertEqual(LAYOUT_ERGOPTI_HOTSTRINGS_REASON, LayoutErgoptiHotstringsReason(Make("unrecorded"), EntryFn),
+		"a layout the record does not vouch for is not an Ergopti layout")
+}
+
+_LSD_Join(Items) {
+	Out := ""
+	for Item in Items
+		Out .= (A_Index > 1 ? "," : "") . Item
+	return Out
+}
+
+Test("layout supersession: the gate and the menu apply the Ergopti hotstrings decision (layout-ergopti-hotstrings)",
+	_LSD_ErgoptiHotstringsWiringCase)
+
+_LSD_ErgoptiHotstringsWiringCase() {
+	Gate := _DriverFuncBody("ApplyMasterGatesToFeatures")
+	Assert(InStr(Gate, "_MG_SupersedeErgoptiHotstrings(FeaturesTarget)"),
+		"every path that rebuilds Features must turn the Ergopti hotstrings off")
+	Rows := _DriverFuncBody("_HS_CategoryRowsErgopti")
+	Assert(Rows != "", "_HS_CategoryRowsErgopti must exist in ui/menu/menu_hotstrings.ahk")
+	Assert(RegExMatch(Rows, 's)LayoutErgoptiHotstringsReason\(\).*Row\["disabled"\] := true'),
+		"an Ergopti category row must be greyed while its hotstrings are off")
+	Assert(RegExMatch(Rows, 's)Row\["label"\] := .*t\(Reason\)'), "the greyed row must say why")
+}
+
 Test("layout supersession: MenuRowFromManifest greys and labels a superseded row (layout-supersession-declared)",
 	_LSD_MenuWiringCase)
 
