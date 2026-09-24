@@ -741,8 +741,16 @@ platform = "all"
 emit_ahk = "^{Right}^+{Left}"
 
 [sg_actions.screen_capture]
-platform = "ahk"
+# Opens the operating system's own capture tool through the shortcut the OS
+# reserves for it: the Snipping Tool overlay (Win+Shift+S), the macOS
+# Screenshot toolbar (Cmd+Shift+5), and whatever the Linux desktop binds to
+# Print (GNOME's screenshot UI, KDE Spectacle, Xfce Screenshooter). The
+# number-row tap key left of 1 runs it by default.
+platform = "all"
 emit_ahk = "#+s"
+emit_hs_key = "5"
+emit_hs_mods = ["cmd", "shift"]
+emit_linux = "Print"
 
 [sg_actions.screen_capture_instant]
 platform = "ahk"

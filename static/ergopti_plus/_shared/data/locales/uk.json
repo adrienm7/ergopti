@@ -1592,7 +1592,7 @@
 	"sg_actions.pick_color": "🎨 HEX-колір під курсором",
 	"sg_actions.redo": "↪ Повторити",
 	"sg_actions.right_click_toggle": "🖱 П Правий клік (утримання)",
-	"sg_actions.screen_capture": "📸 Вибірковий захват (Win+Shift+S)",
+	"sg_actions.screen_capture": "📸 Системний інструмент знімків екрана",
 	"sg_actions.screen_capture_instant": "📸 Миттєвий захват (вікно)",
 	"sg_actions.screen_record": "⏺ Запис екрана",
 	"sg_actions.screenshot_fullscreen_clipboard": "📸 🖥 Копіювати екран",

@@ -1592,7 +1592,7 @@
 	"sg_actions.pick_color": "🎨 HEX-farge under markør",
 	"sg_actions.redo": "↪ Gjør om",
 	"sg_actions.right_click_toggle": "🖱 H Høyre klikk (hold)",
-	"sg_actions.screen_capture": "📸 Selektiv opptak (Win+Shift+S)",
+	"sg_actions.screen_capture": "📸 Systemets skjermbildeverktøy",
 	"sg_actions.screen_capture_instant": "📸 Øyeblikkelig opptak (vindu)",
 	"sg_actions.screen_record": "⏺ Skjermopptak",
 	"sg_actions.screenshot_fullscreen_clipboard": "📸 🖥 Kopier skjerm",

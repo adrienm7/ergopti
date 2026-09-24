@@ -51,6 +51,7 @@ return {
 	["para_prev"] = "ctrl+Up",
 	["paste"] = "ctrl+v",
 	["redo"] = "ctrl+shift+z",
+	["screen_capture"] = "Print",
 	["sel_down"] = "shift+Down",
 	["sel_left"] = "shift+Left",
 	["sel_right"] = "shift+Right",

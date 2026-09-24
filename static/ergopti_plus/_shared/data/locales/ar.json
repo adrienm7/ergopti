@@ -1592,7 +1592,7 @@
 	"sg_actions.pick_color": "🎨 لون HEX تحت المؤشر",
 	"sg_actions.redo": "↪ إعادة",
 	"sg_actions.right_click_toggle": "🖱 R نقر أيمن (ضغط مستمر)",
-	"sg_actions.screen_capture": "📸 لقطة انتقائية (Win+Shift+S)",
+	"sg_actions.screen_capture": "📸 أداة لقطة الشاشة في النظام",
 	"sg_actions.screen_capture_instant": "📸 لقطة فورية (نافذة)",
 	"sg_actions.screen_record": "⏺ تسجيل الشاشة",
 	"sg_actions.screenshot_fullscreen_clipboard": "📸 🖥 نسخ الشاشة",

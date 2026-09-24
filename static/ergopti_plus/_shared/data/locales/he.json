@@ -1592,7 +1592,7 @@
 	"sg_actions.pick_color": "🎨 צבע HEX מתחת לסמן",
 	"sg_actions.redo": "↪ בצע שוב",
 	"sg_actions.right_click_toggle": "🖱 R לחיצה ימנית (החזק)",
-	"sg_actions.screen_capture": "📸 צילום סלקטיבי (Win+Shift+S)",
+	"sg_actions.screen_capture": "📸 כלי צילום המסך של המערכת",
 	"sg_actions.screen_capture_instant": "📸 צילום מיידי (חלון)",
 	"sg_actions.screen_record": "⏺ הקלטת מסך",
 	"sg_actions.screenshot_fullscreen_clipboard": "📸 🖥 העתק מסך",
