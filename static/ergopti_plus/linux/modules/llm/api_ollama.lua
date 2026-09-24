@@ -44,43 +44,11 @@ local _request_epoch = 0
 -- =========================================
 -- =========================================
 
--- JSON encoder: delegates to the shared linux_bridge module (single source of truth).
-local json_encode = nil
-local ok_encode, bridge_mod = pcall(require, "infra.llm_bridge")
-if ok_encode and bridge_mod and bridge_mod.json_encode then
-	json_encode = bridge_mod.json_encode
-else
-	-- Fallback: minimal encoder for Ollama payloads.
-	json_encode = function(tbl)
-		if type(tbl) ~= "table" then return tostring(tbl) end
-		-- Arrays first. The payload now carries the stop-sequence list, and
-		-- encoding an array as an object gives Ollama {"1":"…","2":"…"} — which it
-		-- rejects, so the whole request fails on a machine where only the primary
-		-- encoder was missing. A fallback that turns one absent module into a
-		-- dead feature is worse than no fallback.
-		local count = #tbl
-		if count > 0 then
-			local items = {}
-			for index = 1, count do items[index] = json_encode(tbl[index]) end
-			return "[" .. table.concat(items, ",") .. "]"
-		end
-		local parts = {}
-		for k, v in pairs(tbl) do
-			local val
-			if type(v) == "string" then
-				val = string.format('"%s"', v:gsub('"', '\\"'):gsub("\n", "\\n"))
-			elseif type(v) == "number" or type(v) == "boolean" then
-				val = tostring(v)
-			elseif type(v) == "table" then
-				val = json_encode(v)
-			else
-				val = "null"
-			end
-			parts[#parts + 1] = string.format('"%s":%s', tostring(k):gsub('"', '\\"'), val)
-		end
-		return "{" .. table.concat(parts, ",") .. "}"
-	end
-end
+-- The bridge carries the payload contract (endpoint, stream parsing) and
+-- delegates JSON to the shared codec. It used to be optional, with a local
+-- encoder as a fallback; that copy escaped nothing but quotes and newlines.
+local bridge_mod = require("infra.llm_bridge")
+local json_encode = bridge_mod.json_encode
 
 
 
@@ -172,14 +140,14 @@ local function consume_chunk(request, chunk, flush)
 		if not newline then break end
 		local line = request.pending:sub(1, newline - 1):gsub("\r$", "")
 		request.pending = request.pending:sub(newline + 1)
-		local content = bridge_mod and bridge_mod.parse_stream_line(line)
+		local content = bridge_mod.parse_stream_line(line)
 		if content then
 			request.full_text = request.full_text .. content
 			if type(request.on_chunk) == "function" then pcall(request.on_chunk, content) end
 		end
 	end
 	if flush and request.pending ~= "" then
-		local content = bridge_mod and bridge_mod.parse_stream_line(request.pending:gsub("\r$", ""))
+		local content = bridge_mod.parse_stream_line(request.pending:gsub("\r$", ""))
 		request.pending = ""
 		if content then
 			request.full_text = request.full_text .. content
@@ -231,7 +199,7 @@ function M.chat(base_url, model, messages, opts, on_chunk, on_done)
 	end
 
 	local json_body = json_encode(payload)
-	local url = bridge_mod and bridge_mod.ollama_endpoint(base_url, "chat") or nil
+	local url = bridge_mod.ollama_endpoint(base_url, "chat")
 	if not url then
 		Logger.error(LOG, "chat(): invalid Ollama origin — cannot build the chat endpoint.")
 		if on_done then pcall(on_done, "", "invalid Ollama origin") end
