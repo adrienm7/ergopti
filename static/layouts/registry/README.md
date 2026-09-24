@@ -33,8 +33,11 @@ derived from it is stored here:
   file here changes what Windows types too;
 - Linux converts the `.keylayout` to XKB symbols and an XCompose file on the
   device (`linux/modules/keymap/layout_registry.lua`), with the converter of
-  `static/ergopti/linux/xkb_generation` that the Linux package ships; it needs
+  `static/ergopti/linux/xkb_generation` that the Linux package ships, and
+  installs them in the user XKB tree without sudo
+  (`static/ergopti/linux/xkb_installation/user_layout_installer.py`); it needs
   python3 (3.8 or newer), like every Linux layout installer of this project.
+  The package ships this folder, so its layouts install offline.
 
 ## Adding a layout
 

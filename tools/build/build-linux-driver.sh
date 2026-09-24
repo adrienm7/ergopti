@@ -103,6 +103,18 @@ echo "--- Copying the .keylayout converter ---"
 copy_tree "${REPO_ROOT}/static/ergopti/linux/xkb_generation/" "${BUILD_DIR}/linux/xkb_generation/" \
 	--exclude tests --exclude generate_xkb_files.py
 
+echo "--- Copying the user XKB installer and the layout registry ---"
+
+# The layout manager installs a converted layout in the user XKB tree without
+# sudo (user_layout_installer.py and the modules it imports), and installs the
+# Ergopti layouts offline from the registry folder shipped at its repository
+# path below the driver (modules/keymap/layout_registry.lua).
+mkdir -p "${BUILD_DIR}/linux/xkb_installation"
+cp "${REPO_ROOT}/static/ergopti/linux/xkb_installation/user_layout_installer.py" "${BUILD_DIR}/linux/xkb_installation/"
+cp "${REPO_ROOT}/static/ergopti/linux/xkb_installation/layout_package.py" "${BUILD_DIR}/linux/xkb_installation/"
+cp "${REPO_ROOT}/static/ergopti/linux/xkb_installation/desktop_activation.py" "${BUILD_DIR}/linux/xkb_installation/"
+copy_tree "${REPO_ROOT}/static/layouts/registry/" "${BUILD_DIR}/linux/static/layouts/registry/"
+
 # ============================================================================
 # 4. Copy the install script
 # ============================================================================
@@ -173,6 +185,7 @@ REQUIRED_FILES=(
 	# converter with every data file it reads (tools/test/
 	# test-linux-ships-keylayout-converter.cjs keeps this list complete).
 	"_shared/lua/layouts/registry.lua"
+	"_shared/lua/layouts/catalogue.lua"
 	"_shared/modules/layouts/defaults.json"
 	"_shared/modules/layouts/mac_keycodes.json"
 	"linux/modules/keymap/layout_registry.lua"
@@ -181,6 +194,10 @@ REQUIRED_FILES=(
 	"linux/xkb_generation/data/key_sym.json"
 	"linux/xkb_generation/data/xkb_symbols.txt"
 	"linux/xkb_generation/data/xkb_types.txt"
+	"linux/xkb_installation/user_layout_installer.py"
+	"linux/xkb_installation/layout_package.py"
+	"linux/xkb_installation/desktop_activation.py"
+	"linux/static/layouts/registry/index.json"
 	"_shared/modules/updater/defaults.json"
 	# The daemon migrates config.toml at start; without the registry or the
 	# engine every session would refuse to write it.
