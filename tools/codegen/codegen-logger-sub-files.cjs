@@ -42,9 +42,23 @@ const toml = require('smol-toml');
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const SOURCE = path.join(SP, '_shared/modules/logger/sub_files.toml');
+// The file-name prefix and extension belong to the application-folders
+// registry, which names every log file; this table only adds the topic.
+const APP_DIRS = path.join(SP, '_shared/modules/paths/app_dirs.toml');
 
 const parsed = toml.parse(fs.readFileSync(SOURCE, 'utf8'));
 const entries = parsed.sub_files || [];
+
+const logFiles = (toml.parse(fs.readFileSync(APP_DIRS, 'utf8')).logs || {}).files || {};
+const TOPICAL_PREFIX = logFiles.topical_prefix;
+const LOG_EXTENSION = logFiles.extension;
+if (typeof TOPICAL_PREFIX !== 'string' || TOPICAL_PREFIX === '' || typeof LOG_EXTENSION !== 'string' || LOG_EXTENSION === '') {
+	console.error('[ERROR] app_dirs.toml [logs.files] must declare topical_prefix and extension.');
+	process.exit(1);
+}
+
+/** The file name of one topical sub-file. */
+const topicalFileName = (name) => TOPICAL_PREFIX + name + LOG_EXTENSION;
 
 if (entries.length === 0) {
 	console.error('[ERROR] sub_files.toml declares no [[sub_files]] entries.');
@@ -93,7 +107,7 @@ function emitLua() {
 		const pats = e.patterns.map(luaStr).join(', ');
 		return (
 			`\t-- ${e.description || e.name}\n` +
-			`\t{ name = "ErgoptiPlus_${e.name}.log", patterns = { ${pats} } },`
+			`\t{ name = ${luaStr(topicalFileName(e.name))}, patterns = { ${pats} } },`
 		);
 	});
 
@@ -129,7 +143,7 @@ function emitAhk() {
 		const pats = e.patterns.map(ahkStr).join(', ');
 		return (
 			`\t\t; ${e.description || e.name}\n` +
-			`\t\tMap("name", "ErgoptiPlus_${e.name}.log", "tags", [${pats}]),`
+			`\t\tMap("name", ${ahkStr(topicalFileName(e.name))}, "tags", [${pats}]),`
 		);
 	});
 
@@ -169,7 +183,7 @@ function emitAhk() {
 
 function emitSwift() {
 	const rows = forPlatform('hs').map((e) =>
-		`\t${swiftStr(`ErgoptiPlus_${e.name}.log`)},`
+		`\t${swiftStr(topicalFileName(e.name))},`
 	);
 
 	return (
