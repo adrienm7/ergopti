@@ -1530,6 +1530,18 @@ local function main()
 		-- and the updater's on_available callback (which triggers a rebuild
 		-- so the menu label changes when an update is found).
 		local function _build_menu_ctx()
+			-- Required here rather than at file scope: main() sits at LuaJIT's
+			-- upvalue limit, and only the three log rows below use them.
+			local LogOpeners = require("ui.log_openers")
+			--- Hands one log path to xdg-open in the background.
+			--- @param target string Absolute folder or file.
+			--- @return boolean started
+			local function xdg_open_log_target(target)
+				Logger.info(LOG, "Opening %s", target)
+				-- "'\\''" is the POSIX close-escape-reopen idiom, as in the pack opener.
+				local started = os.execute(string.format("xdg-open '%s' 2>/dev/null &", target:gsub("'", "'\\''")))
+				return started == true or started == 0
+			end
 			return {
 				_version      = Version.VERSION,
 				-- Read at every rebuild: the pause toggle rebuilds the menu, which
@@ -1678,27 +1690,17 @@ local function main()
 				Logger.info(LOG, "Opening config folder: %s", d)
 				os.execute(string.format("xdg-open '%s' 2>/dev/null &", d:gsub("'", "'\\''")))
 			end,
+			-- The three log rows open through ui/log_openers, shared with the
+			-- gesture actions: every path comes from the sink that writes it, and
+			-- a missing errors file is announced instead of opened blindly.
 			on_open_logs = function()
-				-- Single resolver, shared with the sink that writes there: this action
-				-- used to open a hardcoded HOME path that ignored XDG_DATA_HOME and
-				-- that nothing ever wrote to.
-				local log_dir = LoggerSink.log_dir()
-				Logger.info(LOG, "Opening log folder: %s", log_dir)
-				os.execute(string.format("xdg-open '%s' 2>/dev/null &", log_dir:gsub("'", "'\\''")))
+				return LogOpeners.open_logs_folder(xdg_open_log_target)
 			end,
-			-- The two rows the shared manifest has always declared for this platform
-			-- and that this driver never built: they are translated in all 21
-			-- locales and present on the other two drivers. Both paths come from
-			-- the sink that writes them, so neither can name a file nobody fills.
 			on_open_today_log = function()
-				local path = LoggerSink.main_log_path()
-				Logger.info(LOG, "Opening today's log: %s", path)
-				os.execute(string.format("xdg-open '%s' 2>/dev/null &", path:gsub("'", "'\\''")))
+				return LogOpeners.open_today_log(xdg_open_log_target)
 			end,
 			on_open_error_log = function()
-				local path = LoggerSink.errors_log_path()
-				Logger.info(LOG, "Opening the errors log: %s", path)
-				os.execute(string.format("xdg-open '%s' 2>/dev/null &", path:gsub("'", "'\\''")))
+				return LogOpeners.open_today_errors(xdg_open_log_target)
 			end,
 			on_healthcheck = function()
 				if webview_manager then

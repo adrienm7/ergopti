@@ -119,9 +119,10 @@ local function collect_keylogger(state)
 		wpm = NOT_AVAILABLE,
 		events_session = NOT_AVAILABLE,
 		privacy_hits = NOT_AVAILABLE,
-		today_log = "",
-		errors_log = "",
-		notes = "High-severity lines are also written to ErgoptiPlus_errors_*.log.",
+		-- From the sink's own resolver, named at call time.
+		today_log = LoggerSink.main_log_path(),
+		errors_log = LoggerSink.errors_log_path(),
+		notes = "High-severity lines are also written to today's errors file.",
 	}
 	local keylogger = state.keylogger
 	if not keylogger then return summary end
@@ -138,12 +139,6 @@ local function collect_keylogger(state)
 	end
 	if type(keylogger.is_suppressed) == "function" then
 		summary.privacy_hits = keylogger.is_suppressed() and "suppressed now" or "not suppressing"
-	end
-	local dir = LoggerSink.log_dir()
-	if dir and dir ~= "" then
-		local today = os.date("%Y-%m-%d")
-		summary.today_log = dir .. "/ErgoptiPlus_" .. today .. ".log"
-		summary.errors_log = dir .. "/ErgoptiPlus_errors_" .. today .. ".log"
 	end
 	return summary
 end
@@ -241,11 +236,12 @@ end
 --- @param lines table The ring-buffer snapshot.
 --- @return table
 local function collect_logs(lines)
-	local dir = LoggerSink.log_dir()
-	local today = os.date("%Y-%m-%d")
+	-- The sink is the one resolver of the logs folder and of today's files.
 	return {
-		unified_today = (dir ~= "" and dir .. "/ErgoptiPlus_" .. today .. ".log") or "",
-		errors_today = (dir ~= "" and dir .. "/ErgoptiPlus_errors_" .. today .. ".log") or "",
+		logs_dir = LoggerSink.log_dir(),
+		unified_today = LoggerSink.main_log_path(),
+		errors_today = LoggerSink.errors_log_path(),
+		crash_reports_dir = LoggerSink.crash_reports_dir(),
 		errors_sink_active = LoggerSink.is_file_sink_active(),
 		ring_lines = #lines,
 		note = "The dedicated errors sink keeps the main daily log readable.",
