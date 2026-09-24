@@ -23,6 +23,7 @@ return {
 	"tests.unit.adapters.test_secure_field_detector",
 	"tests.unit.adapters.test_shortcut_keys_follow_layout",
 	"tests.unit.adapters.test_spawn_args_are_strings",
+	"tests.unit.adapters.test_shell_runner_run_async",
 	"tests.unit.adapters.test_tray_indicator",
 	"tests.unit.adapters.test_tray_menu_adapter",
 	"tests.unit.adapters.test_uinput_writer",
