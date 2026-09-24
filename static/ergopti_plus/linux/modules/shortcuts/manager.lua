@@ -332,6 +332,20 @@ function M.select_line()
 	return ComboEmitter.press("shift+End")
 end
 
+--- Wraps the current line in parentheses: Home, "(", End, ")", Home, the
+--- sequence the Windows driver emits for the same action.
+--- @return boolean True when every step was emitted.
+function M.surround_line_with_parens()
+	record("surround_parens")
+	local function typed(text)
+		local result = Injector.inject(0, text, false)
+		return type(result) == "table" and result.ok == true
+	end
+	return ComboEmitter.press("Home") and typed("(")
+		and ComboEmitter.press("End") and typed(")")
+		and ComboEmitter.press("Home")
+end
+
 --- Pastes clipboard content as plain text (strips formatting).
 function M.paste_plain()
 	record("paste_plain")
@@ -354,6 +368,7 @@ function M.action_handlers()
 		["select_line"] = function() return M.select_line() end,
 		["select_word"] = function() return M.select_word() end,
 		["paste_plain"] = function() return M.paste_plain() end,
+		["surround_parens"] = function() return M.surround_line_with_parens() end,
 		["uppercase_selection"] = function() return M.transform_uppercase() end,
 		["titlecase_selection"] = function() return M.transform_titlecase() end,
 		["selection_uppercase"] = function() return M.transform_to_uppercase() end,

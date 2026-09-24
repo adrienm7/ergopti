@@ -972,6 +972,8 @@ sg("titlecase_selection", text_action("toggle_titlecase"))
 sg("selection_uppercase", text_action("selection_uppercase"))
 sg("selection_lowercase", text_action("selection_lowercase"))
 sg("selection_titlecase", text_action("selection_titlecase"))
+-- Wraps the current LINE (Cmd+Left, "(", Cmd+Right, ")"), like Windows.
+sg("surround_parens", text_action("surround_with_parens"))
 -- The pair is the binding's own parameter: two bindings may wrap with two pairs.
 sg("wrap_selection", function(binding)
 	local value = M.get_action_parameter(binding, "wrap_selection")
@@ -1005,6 +1007,37 @@ end)
 sg("toggle_capslock", function()
 	local ok, Sys = pcall(require, "modules.shortcuts.actions.system")
 	if ok and type(Sys.toggle_capslock) == "function" then Sys.toggle_capslock() end
+end)
+
+--- Builds a gesture action that runs one function of the shortcut layer's
+--- parent-scoped mouse owner under the dispatching parent.
+--- @param method string Public function of modules.shortcuts.actions.system_mouse.
+--- @return function
+local function mouse_action(method)
+	return function()
+		local ok, Mouse = pcall(require, "modules.shortcuts.actions.system_mouse")
+		if not ok or type(Mouse[method]) ~= "function" then
+			Logger.error(LOG, "Mouse action '%s' is unavailable: %s.", method, tostring(Mouse))
+			return false
+		end
+		return Mouse[method](current_action_parent())
+	end
+end
+
+-- Formerly fixed hotkeys only (Ctrl+., Ctrl+P): no gesture or slot could bind them.
+sg("open_emoji_picker", mouse_action("open_emoji_picker"))
+sg("display_mirror_toggle", mouse_action("toggle_display_mirror"))
+-- Keep-awake is one session for the machine, whoever starts it: the shortcut
+-- layer owns it (its Bindings lifecycle pauses and resumes it) and it stops by
+-- itself at the first physical input, so a gesture leaves nothing that outlives
+-- the user's next action.
+sg("activity_simulation", function()
+	local ok, Sys = pcall(require, "modules.shortcuts.actions.system")
+	if not ok or type(Sys.toggle_awake) ~= "function" then
+		Logger.error(LOG, "Keep-awake is unavailable: %s.", tostring(Sys))
+		return false
+	end
+	return Sys.toggle_awake()
 end)
 
 sg("lock_screen", function()

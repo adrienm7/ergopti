@@ -28,6 +28,7 @@ local DELEGATES = {
 	selection_uppercase = "selection_uppercase",
 	selection_lowercase = "selection_lowercase",
 	selection_titlecase = "selection_titlecase",
+	surround_parens = "surround_with_parens",
 }
 
 helpers.describe("gesture actions delegate to the text owner under their parent", function()
@@ -48,7 +49,7 @@ helpers.describe("gesture actions delegate to the text owner under their parent"
 				action_id .. " bound to a keyboard slot runs under the shortcut parent")
 			checked = checked + 1
 		end
-		helpers.assert_eq(checked, 8)
+		helpers.assert_eq(checked, 9)
 	end)
 
 	it("a paused gesture parent fences the text actions only for gestures", function(fresh_actions)

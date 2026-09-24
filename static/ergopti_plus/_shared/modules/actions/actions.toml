@@ -761,14 +761,32 @@ parameter = "url"
 [sg_actions.pick_color]
 platform = "ahk"
 
+[sg_actions.open_emoji_picker]
+# Windows opens its panel with Win+., macOS its Character Viewer (Ctrl+Cmd+Space,
+# run by the shortcut layer's mouse owner). Linux has no desktop-wide emoji
+# picker: GNOME's lives inside GTK text fields, KDE's is a Plasma shortcut.
+platform = "hs,ahk"
+emit_ahk = "#."
+
 [sg_actions.take_note]
 platform = "ahk"
 
 [sg_actions.activity_simulation]
-platform = "ahk"
+# One keep-awake session per machine, stopped by the first physical input on
+# both drivers. Linux has no input-simulation keep-awake; an idle inhibitor
+# would be a different feature.
+platform = "ahk,hs"
+
+[sg_actions.display_mirror_toggle]
+# macOS mirrors through the CoreGraphics display-configuration API. Windows
+# projection (Win+P) and Linux (xrandr, kscreen-doctor, per-compositor tools)
+# have no single call that toggles mirroring back and forth.
+platform = "hs"
 
 [sg_actions.surround_parens]
-platform = "ahk"
+# Wraps the current LINE in parentheses (Home, "(", End, ")"), not the
+# selection: wrap_selection does that. The label says so.
+platform = "all"
 emit_ahk = "{Home}({End}){Home}"
 
 [sg_actions.search_web]
@@ -1208,6 +1226,7 @@ items = [
     "uppercase_selection",
     "titlecase_selection",
     "wrap_selection",
+    "surround_parens",
     "--",
     "#modifier_chords",
     "_modifier_chords_placeholder",
@@ -1244,9 +1263,10 @@ items = [
     "ocr_screenshot",
     "open_url",
     "pick_color",
+    "open_emoji_picker",
     "take_note",
     "activity_simulation",
-    "surround_parens",
+    "display_mirror_toggle",
     "search_web",
     "teleport_mouse",
     "spotlight_mouse",
