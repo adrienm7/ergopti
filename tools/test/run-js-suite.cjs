@@ -158,6 +158,7 @@ const CHECKS = [
 	{ name: 'webview geometry single source (macOS defers to manifest; Windows literals match; P0-A)', cmd: 'node', args: ['tools/test/test-webview-geometry-single-source.cjs'], repro: 'node tools/test/test-webview-geometry-single-source.cjs' },
 	{ name: 'diagnostic UI integrity (macOS + Windows healthcheck render path)', cmd: 'node', args: ['tools/test/test-diagnostic-ui-integrity.cjs'], repro: 'node tools/test/test-diagnostic-ui-integrity.cjs' },
 	{ name: 'GitHub issue link builder replays its vectors (bounded, UTF-8 percent-encoded prefill)', cmd: 'node', args: ['tools/test/test-issue-link-vectors.cjs'], repro: 'node tools/test/test-issue-link-vectors.cjs' },
+	{ name: 'diagnostics page redactor replays the Lua and AHK redaction vectors', cmd: 'node', args: ['tools/test/test-diagnostics-redaction-vectors.cjs'], repro: 'node tools/test/test-diagnostics-redaction-vectors.cjs' },
 	{ name: 'GitHub issue forms declare every field the app prefills, and a worst-case prefill fits the URL budget', cmd: 'node', args: ['tools/test/test-issue-templates.cjs'], repro: 'node tools/test/test-issue-templates.cjs' },
 	{ name: 'repository URL single source (every GitHub link derives from the updater defaults)', cmd: 'node', args: ['tools/test/test-repo-url-single-source.cjs'], repro: 'node tools/test/test-repo-url-single-source.cjs' },
 	{ name: 'UI focus-fix regression (force-focus + no raw blockAlert)', cmd: 'node', args: ['tools/test/test-ui-focus-fix.cjs'], repro: 'node tools/test/test-ui-focus-fix.cjs' },
