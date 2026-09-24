@@ -1655,7 +1655,7 @@ helpers.describe("ui.bridge_handlers", function()
     local handler = helpers.load_module("ui.paths_editor.bridge")
 
 		local function paths_state()
-			local values = { config_dir = "/tmp/ergopti-current" }
+			local values = { config_dir = "/tmp/ergopti-current", logs_dir = "/tmp/ergopti-logs" }
 			local captured = { pushes = {}, hidden = 0, reloaded = 0 }
 			return {
 				config_paths = {
@@ -1666,6 +1666,8 @@ helpers.describe("ui.bridge_handlers", function()
 						values.config_dir = value:gsub("/+$", "")
 						return true
 					end,
+					get_logs_dir = function() return values.logs_dir end,
+					default_logs_dir = function() return "/tmp/ergopti-default-logs" end,
 				},
 				i18n = { get = function(key) return "translated:" .. key end },
 				shell = {
@@ -1697,6 +1699,8 @@ helpers.describe("ui.bridge_handlers", function()
 			helpers.assert_true(result.pushed)
 			helpers.assert_eq(result.data.configDir, "/tmp/ergopti-current")
 			helpers.assert_eq(result.data.defaultConfigDir, "/tmp/ergopti-default")
+			helpers.assert_eq(result.data.logsDir, "/tmp/ergopti-logs")
+			helpers.assert_eq(result.data.defaultLogsDir, "/tmp/ergopti-default-logs")
 			helpers.assert_eq(result.data.version, require("infra.version").VERSION)
 			helpers.assert_eq(result.data.strings["paths_editor.heading"],
 				"translated:paths_editor.heading")

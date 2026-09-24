@@ -16,8 +16,10 @@
 ---    writer; this file decides only what happens afterwards, which for the
 ---    editor is a reload so every module picks up the new location. The
 ---    onboarding wizard makes the opposite choice through the same call.
---- 3. Single Key: only ConfigDirPath is stored, so the form is one folder field
----    with a "Parcourir…" button.
+--- 3. Two keys: ConfigDirPath and LogsDirPath, one folder field each with a
+---    "Parcourir…" button and the default shown beside it. A new logs folder
+---    needs the save-and-reload: the native logger worker refuses to change
+---    folders inside a running session.
 --- ==============================================================================
 
 local M = {}
@@ -129,12 +131,14 @@ end
 --- Persists through ConfigPaths and distinguishes a returned I/O failure from a
 --- no-change success. Lua file writes normally return false rather than raise,
 --- so pcall status alone is not a commit acknowledgement.
---- @param new_dir string|nil
+--- @param new_dir string|nil Configuration folder, "" for the default.
+--- @param new_logs_dir string|nil Logs folder, "" for the default, nil to keep it.
 --- @return boolean persisted
 --- @return boolean|string changed_or_err
-local function persist_config_dir(new_dir)
+local function persist_config_dir(new_dir, new_logs_dir)
 	local ok, changed, save_err = xpcall(function()
-		return ConfigPaths.set_config_dir(new_dir)
+		if new_logs_dir == nil then return ConfigPaths.set_config_dir(new_dir) end
+		return ConfigPaths.set_paths(new_dir or "", new_logs_dir)
 	end, debug.traceback)
 	if not ok then return false, changed end
 	if save_err ~= nil then return false, tostring(save_err) end
@@ -271,15 +275,17 @@ local function close_webview()
 	return true
 end
 
---- Applies the new config directory and triggers a reload.
---- @param new_dir string The chosen directory (with trailing slash).
-local function apply_and_reload(new_dir)
-	-- The store itself is ConfigPaths.set_config_dir — the single writer. What is
+--- Applies the new folders and triggers a reload.
+--- @param new_dir string The chosen configuration folder (with trailing slash).
+--- @param new_logs_dir string|nil The chosen logs folder, "" for the default, nil to keep it.
+local function apply_and_reload(new_dir, new_logs_dir)
+	-- The store itself is ConfigPaths.set_paths — the single writer. What is
 	-- left here is the editor's own decision: reload afterwards, so every module
-	-- picks up the new location. The wizard calls the same writer and deliberately
-	-- does not reload, which is the entire difference between the two writers this
+	-- picks up the new location and the native logger opens a new session in the
+	-- new logs folder. The wizard calls the same writer and deliberately does not
+	-- reload, which is the entire difference between the two writers this
 	-- replaces.
-	local persisted, changed_or_err = persist_config_dir(new_dir)
+	local persisted, changed_or_err = persist_config_dir(new_dir, new_logs_dir)
 	if not persisted then
 		Logger.error(LOG, "Paths editor save failed: %s.", tostring(changed_or_err))
 		local ok_dialog, dialog = pcall(require, "infra.dialog_util")
@@ -392,7 +398,8 @@ local function inject_init_data(owner)
 		local i18n_keys = {
 			"menu.paths.window_title",
 			"paths_editor.heading", "paths_editor.subtitle", "paths_editor.label_config_dir",
-			"paths_editor.tag_default", "paths_editor.tag_modified",
+			"paths_editor.label_logs_dir", "paths_editor.hint_logs_dir",
+			"paths_editor.tag_default", "paths_editor.default_label", "paths_editor.tag_modified",
 			"paths_editor.btn_browse", "paths_editor.btn_reset",
 			"paths_editor.btn_cancel", "paths_editor.btn_save",
 		}
@@ -404,6 +411,8 @@ local function inject_init_data(owner)
 		return {
 			configDir        = current_dir,
 			defaultConfigDir = default_dir,
+			logsDir          = ConfigPaths.get_logs_dir(),
+			defaultLogsDir   = ConfigPaths.get_default_logs_dir(),
 			strings          = strings,
 		}
 	end)
@@ -432,12 +441,16 @@ local function handle_message(body)
 	if action == "ready" then
 		inject_init_data(owner)
 	elseif action == "browse" then
+		-- "logs" picks the logs folder; anything else keeps the historical
+		-- meaning, the configuration folder.
+		local target = body.target == "logs" and "logs" or "config"
 		owner.browse = {}
 		owner.token.browse = owner.browse
 		defer_delivery(owner, 0, "menu_paths.browse", function()
 			Logger.start(LOG, "Opening native folder picker…")
 			if not owner_is_current(owner) then return end
-			local picked = pick_dir(ConfigPaths.get_config_dir())
+			local start_dir = target == "logs" and ConfigPaths.get_logs_dir() or ConfigPaths.get_config_dir()
+			local picked = pick_dir(start_dir)
 			if not owner_is_current(owner) then return end
 			Logger.success(LOG, "Folder picker completed.")
 			if picked and picked ~= "" then
@@ -447,14 +460,17 @@ local function handle_message(body)
 					return
 				end
 				defer_delivery(owner, 0.1, "menu_paths.browse_result", function()
-					submit_javascript(owner, "window.applyBrowseResult(" .. encoded .. ")")
+					submit_javascript(owner,
+						"window.applyBrowseResult(" .. encoded .. ", \"" .. target .. "\")")
 				end)
 			else
 				Logger.warn(LOG, "browse: picker returned nothing — user cancelled.")
 			end
 		end)
 	elseif action == "save" then
-		apply_and_reload(type(body.configDir) == "string" and body.configDir or "")
+		-- A missing logsDir keeps the stored logs folder; "" asks for the default.
+		apply_and_reload(type(body.configDir) == "string" and body.configDir or "",
+			type(body.logsDir) == "string" and body.logsDir or nil)
 	elseif action == "cancel" then
 		close_webview()
 	end

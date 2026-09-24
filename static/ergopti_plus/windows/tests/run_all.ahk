@@ -305,6 +305,10 @@ InstallSendNoOps()
 #Include ../ui/log_openers.ahk
 #Include unit/test_logs_dir_resolver.ahk
 #Include meta/test_logs_dir_single_resolver.ahk
+; The folders editor host: definitions only until a window is opened; its
+; initData builder and logs-folder save are exercised headlessly.
+#Include ../ui/paths_editor/init.ahk
+#Include unit/test_paths_editor_logs_dir.ahk
 #Include unit/test_healthcheck_core.ahk
 #Include unit/test_healthcheck_owner_snapshots.ahk
 #Include unit/test_tooltip_tint_contract.ahk

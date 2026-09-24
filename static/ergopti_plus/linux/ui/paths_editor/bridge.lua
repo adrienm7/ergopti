@@ -36,11 +36,31 @@ local function push(state, function_name, payload)
 	return pushed and accepted == true
 end
 
+--- Hands a picked folder back to the field it was picked for.
+--- @param state table Daemon state and optional test-injected authorities.
+--- @param path string The picked folder.
+--- @param target string "logs" or "config".
+--- @return boolean pushed
+local function push_browse_result(state, path, target)
+	local manager = dependency(state, "webview_manager", "ui.webview_manager")
+	if not manager or type(manager.eval_js) ~= "function" then return false end
+	local ok_path, encoded_path = pcall(Json.encode, path)
+	local ok_target, encoded_target = pcall(Json.encode, target)
+	if not ok_path or not ok_target then
+		Logger.error(LOG, "Could not encode the picked folder for the paths editor.")
+		return false
+	end
+	local pushed, accepted = pcall(manager.eval_js, APP_NAME,
+		"if(window.applyBrowseResult) window.applyBrowseResult(" .. encoded_path .. "," .. encoded_target .. ")")
+	return pushed and accepted == true
+end
+
 local function build_strings(i18n)
 	local keys = {
 		"menu.paths.window_title",
 		"paths_editor.heading", "paths_editor.subtitle", "paths_editor.label_config_dir",
-		"paths_editor.tag_default", "paths_editor.tag_modified",
+		"paths_editor.label_logs_dir", "paths_editor.hint_logs_dir",
+		"paths_editor.tag_default", "paths_editor.default_label", "paths_editor.tag_modified",
 		"paths_editor.btn_browse", "paths_editor.btn_reset",
 		"paths_editor.btn_cancel", "paths_editor.btn_save",
 	}
@@ -58,12 +78,16 @@ end
 local function build_initial_payload(state)
 	local config_paths = dependency(state, "config_paths", "infra.config_paths")
 	if not config_paths or type(config_paths.get_config_dir) ~= "function"
-		or type(config_paths.default_config_dir) ~= "function" then
+		or type(config_paths.default_config_dir) ~= "function"
+		or type(config_paths.get_logs_dir) ~= "function"
+		or type(config_paths.default_logs_dir) ~= "function" then
 		return nil
 	end
 	return {
 		configDir = config_paths.get_config_dir(),
 		defaultConfigDir = config_paths.default_config_dir(),
+		logsDir = config_paths.get_logs_dir(),
+		defaultLogsDir = config_paths.default_logs_dir(),
 		version = state._version or Version.VERSION,
 		strings = build_strings(dependency(state, "i18n", "infra.i18n")),
 	}
@@ -90,9 +114,12 @@ function M.on_message(payload, state)
 		return { pushed = push(state, "initData", data), data = data }
 	elseif action == "browse" then
 		local config_paths = dependency(state, "config_paths", "infra.config_paths")
+		-- "logs" picks the logs folder; anything else the configuration folder.
+		local target = payload.target == "logs" and "logs" or "config"
 		local current = payload.current
-		if current == nil and config_paths and type(config_paths.get_config_dir) == "function" then
-			current = config_paths.get_config_dir()
+		if current == nil and config_paths then
+			local getter = target == "logs" and config_paths.get_logs_dir or config_paths.get_config_dir
+			if type(getter) == "function" then current = getter() end
 		end
 		local selected, select_err = ConfigDirPicker.pick(
 			dependency(state, "shell", "adapters.shell_runner"),
@@ -107,7 +134,7 @@ function M.on_message(payload, state)
 		return {
 			picked = true,
 			path = selected,
-			pushed = push(state, "applyBrowseResult", selected),
+			pushed = push_browse_result(state, selected, target),
 		}
 	elseif action == "save" then
 		local config_paths = dependency(state, "config_paths", "infra.config_paths")
@@ -116,6 +143,17 @@ function M.on_message(payload, state)
 		if not saved then
         Logger.error(LOG, "Configuration directory was not persisted; editor remains open.")
 			return { saved = false }
+		end
+		-- A page that sends no logs folder keeps the stored one.
+		if type(payload.logsDir) == "string" then
+			local logs_saved, logs_err = false, "config_paths.set_logs_dir is unavailable"
+			if type(config_paths.set_logs_dir) == "function" then
+				logs_saved, logs_err = config_paths.set_logs_dir(payload.logsDir)
+			end
+			if logs_saved ~= true then
+				Logger.error(LOG, "Logs folder was not persisted (%s); editor remains open.", tostring(logs_err))
+				return { saved = false }
+			end
 		end
 		local hidden = hide(state)
 		local reloaded = false
