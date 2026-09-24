@@ -167,6 +167,8 @@ REQUIRED_FILES=(
 	"_shared/lua/text_case/init.lua"
 	"_shared/lua/text_case/unicode_case_data.lua"
 	"_shared/lua/wrap_pair/init.lua"
+	"_shared/lua/send_input/init.lua"
+	"_shared/modules/actions/send_keys.json"
 	"_shared/data/keycodes/evdev.json"
 	"_shared/data/locales/fr.json"
 	"_shared/data/locales/en.json"

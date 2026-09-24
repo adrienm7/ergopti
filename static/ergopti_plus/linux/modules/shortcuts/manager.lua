@@ -32,13 +32,26 @@ local Paths  = require("infra.paths")
 local Manifest = require("infra.manifest_reader")
 local TextCase = require("unicode_case")
 local WrapPair = require("wrap_pair")
+local SendInput = require("send_input")
 local TomlCodec = require("toml_codec")
 local Clipboard = require("adapters.clipboard")
 local EventLoop = require("adapters.event_loop")
 local ComboEmitter = require("modules.gestures.combo_emitter")
 local Injector = require("modules.hotstrings.injector")
+local EvdevCodes = require("infra.evdev_codes")
 local LOG = "modules.shortcuts.manager"
 local ENABLED_PATH = "shortcuts.enabled"
+
+-- The send_text / send_key / send_shortcut vocabulary, read on first use.
+local SEND_KEYS_REL_PATH = "modules/actions/send_keys.json"
+local _send_vocabulary = nil
+
+-- The keys that select the level keyboard_layout reports a character on, for a
+-- shortcut whose key is a character: Shift for level 2, AltGr for level 3.
+local LEVEL_MODIFIER_CODES = {
+	shift = EvdevCodes.KEY_LEFTSHIFT,
+	altgr = EvdevCodes.KEY_RIGHTALT,
+}
 local CONFIG_SECTION = "shortcuts"
 local DEFAULT_ENABLED = Manifest.default_for(ENABLED_PATH)
 
@@ -201,6 +214,84 @@ end
 --- @return string|nil right Both nil when the value names no pair.
 function M.resolve_wrap_pair(value)
 	return WrapPair.parse(value, WRAP_PAIR_LIST)
+end
+
+--- The vocabulary of the send_text, send_key and send_shortcut parameters,
+--- read once from _shared/modules/actions/send_keys.json. A missing or
+--- malformed file raises: every send_* binding would otherwise refuse its value
+--- with no explanation.
+--- @return table The decoded vocabulary.
+function M.send_vocabulary()
+	if _send_vocabulary then return _send_vocabulary end
+	local path = Paths.shared(SEND_KEYS_REL_PATH)
+	local handle = path and io.open(path, "r")
+	if not handle then error("shortcuts: cannot read " .. tostring(path)) end
+	local body = handle:read("*a")
+	handle:close()
+	local ok, parsed = pcall(require("json").decode, body)
+	if not ok or type(parsed) ~= "table" or type(parsed.keys) ~= "table"
+		or type(parsed.modifiers) ~= "table" or type(parsed.text_max_code_points) ~= "number" then
+		error("shortcuts: " .. tostring(path) .. " is not a send-input vocabulary")
+	end
+	_send_vocabulary = parsed
+	return parsed
+end
+
+--- Parses a send_* parameter (_shared/lua/send_input over the vocabulary).
+--- @param kind string "text", "key" or "shortcut".
+--- @param value any The stored parameter.
+--- @return table|nil The parse, or nil when the value is invalid.
+function M.parse_send_input(kind, value)
+	return SendInput.parse(kind, value, M.send_vocabulary())
+end
+
+--- Presses a parsed key or shortcut on the daemon's uinput device.
+---
+--- A named key is its evdev code. A character in a shortcut is the key the
+--- loaded keymap types it with, plus that key's level modifier: on AZERTY,
+--- Ctrl+A is Ctrl with the key the kernel calls KEY_Q. A character alone
+--- (send_key "é") is typed through the injector instead, which knows every
+--- level and falls back to the clipboard.
+--- @param kind string "key" or "shortcut".
+--- @param parsed table A parse from parse_send_input.
+--- @return boolean True when the input was sent.
+local function send_keystroke(kind, parsed)
+	local vocabulary = M.send_vocabulary()
+	local mod_codes, held = {}, {}
+	local function hold(code)
+		if not held[code] then
+			held[code] = true
+			mod_codes[#mod_codes + 1] = code
+		end
+	end
+	for _, id in ipairs(parsed.mods or {}) do
+		hold(SendInput.entry(vocabulary, "modifiers", id).linux)
+	end
+	if parsed.named then
+		return ComboEmitter.press_codes(mod_codes,
+			{ SendInput.entry(vocabulary, "keys", parsed.named).linux }, parsed.canonical)
+	end
+	if kind == "key" then
+		local result = Injector.inject(0, parsed.char, false)
+		return type(result) == "table" and result.ok == true
+	end
+	local ok_layout, Layout = pcall(require, "adapters.keyboard_layout")
+	local hit = ok_layout and type(Layout.resolve) == "function" and Layout.resolve(parsed.char) or nil
+	if type(hit) ~= "table" then
+		Logger.error(LOG, "send_shortcut: the loaded keymap has no key for '%s' — nothing pressed.",
+			parsed.char)
+		return false
+	end
+	for _, level_modifier in ipairs(hit.mods or {}) do
+		local code = LEVEL_MODIFIER_CODES[level_modifier]
+		if not code then
+			Logger.error(LOG, "send_shortcut: '%s' needs the modifier '%s', which cannot be pressed.",
+				parsed.char, tostring(level_modifier))
+			return false
+		end
+		hold(code)
+	end
+	return ComboEmitter.press_codes(mod_codes, { hit.keycode }, parsed.canonical)
 end
 
 --- Wraps the current selection with left/right symbols.
@@ -374,6 +465,24 @@ function M.action_handlers()
 		["selection_uppercase"] = function() return M.transform_to_uppercase() end,
 		["selection_lowercase"] = function() return M.transform_lowercase() end,
 		["selection_titlecase"] = function() return M.transform_to_titlecase() end,
+		-- The value is the binding's own parameter, validated by the executor.
+		["send_text"] = function(_, parameter)
+			record("send_text")
+			local parsed = M.parse_send_input("text", parameter)
+			if not parsed then return false end
+			local result = Injector.inject(0, parsed.text, false)
+			return type(result) == "table" and result.ok == true
+		end,
+		["send_key"] = function(_, parameter)
+			record("send_key")
+			local parsed = M.parse_send_input("key", parameter)
+			return parsed ~= nil and send_keystroke("key", parsed)
+		end,
+		["send_shortcut"] = function(_, parameter)
+			record("send_shortcut")
+			local parsed = M.parse_send_input("shortcut", parameter)
+			return parsed ~= nil and send_keystroke("shortcut", parsed)
+		end,
 		-- The pair is the binding's own parameter, validated by the executor.
 		-- Nothing selected: nothing is typed, as on macOS and Windows.
 		["wrap_selection"] = function(_, parameter)

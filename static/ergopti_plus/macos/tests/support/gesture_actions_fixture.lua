@@ -14,6 +14,7 @@ local OWNERS = {
 	"_generated.gesture_emit_actions",
 	"adapters.file_system",
 	"adapters.hotkey_registrar",
+	"adapters.json_codec",
 	"adapters.key_state",
 	"adapters.synthetic_input",
 	"adapters.timer_scheduler",
@@ -43,6 +44,7 @@ local OWNERS = {
 	"modules.shortcuts.bindings",
 	"modules.shortcuts.keyboard_shortcuts",
 	"modules.shortcuts.script_control",
+	"send_input",
 	"text_utils",
 	"toml_codec.basic_string",
 	"toml_codec.bom",
@@ -114,6 +116,7 @@ local function fresh_actions(options)
 		clipboard_restore_calls = 0,
 		lookup_cleanup_results = {},
 		errors = {},
+		typed = {},
 	}
 	calls.controls = controls
 	local clipboard_data = { ["public.utf8-plain-text"] = "original" }
@@ -516,7 +519,17 @@ local function fresh_actions(options)
 		end,
 	}, { __index = function() return function() return true end end })
 	package.loaded["adapters.file_system"] = {
-		read = function() return nil end,
+		-- Only the send-input vocabulary is real: the send_* actions cannot parse
+		-- a value without it, and every other shared file stays missing.
+		read = function(path)
+			if type(path) ~= "string" or not path:find("modules/actions/send_keys.json", 1, true) then
+				return nil
+			end
+			local handle = assert(io.open(helpers.shared("modules/actions/send_keys.json"), "r"))
+			local body = handle:read("*a")
+			handle:close()
+			return body
+		end,
 		read_file = function() return nil end,
 	}
 	package.loaded["adapters.key_state"] = setmetatable({}, {
@@ -561,6 +574,10 @@ local function fresh_actions(options)
 			for _, owner in ipairs(handoff.owners) do owner.active = false end
 			return handoff.events
 		end,
+		emit_key_strokes = function(value)
+			calls.typed[#calls.typed + 1] = value
+			return true
+		end,
 		emit_key_stroke = function(mods, key)
 			if controls.search_reenter == "emit" and key == "c" then
 				controls.search_reenter = nil
@@ -584,7 +601,7 @@ local function fresh_actions(options)
 		end,
 	}, { __index = function() return function() return true end end })
 	package.loaded["infra.termination_coordinator"] = { request_exit = function() return true end }
-	package.loaded["infra.paths"] = { shared = function() return "Z:/missing" end }
+	package.loaded["infra.paths"] = { shared = function(rel) return "Z:/missing/" .. tostring(rel) end }
 	package.loaded["infra.timings"] = { sec = function() return 0.2 end }
 	local logger = helpers.make_logger_stub()
 	logger.error = function(module_name, message, ...)

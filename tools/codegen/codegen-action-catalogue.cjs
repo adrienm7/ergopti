@@ -60,7 +60,7 @@ const CHORD_PLACEHOLDER = '_modifier_chords_placeholder';
 
 // Every driver validates and prompts for each kind; adding one means adding it
 // to the three gesture modules (validator, prompt, error text) in the same change.
-const PARAMETER_KINDS = new Set(['url', 'search_url', 'wrap_pair']);
+const PARAMETER_KINDS = new Set(['url', 'search_url', 'wrap_pair', 'text', 'key', 'shortcut']);
 
 const SG_FIELDS = new Set([
 	'platform',

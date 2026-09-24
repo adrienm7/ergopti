@@ -402,6 +402,7 @@ if UIASW_IsWorkerInvocation()
 #Include infra/text_utils.ahk
 #Include infra/text_case.ahk
 #Include infra/wrap_pair.ahk
+#Include infra/send_input_parameter.ahk
 #Include ui/spotlight/init.ahk
 #Include infra/nav_layer_helpers.ahk
 

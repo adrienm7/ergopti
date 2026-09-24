@@ -22,10 +22,13 @@
 #             generators). The rows are per-OS on purpose: 13 of the 24
 #             keystrokes both desktop drivers share genuinely differ.
 #   parameter A per-binding value the user types when binding the action:
-#             "url", "search_url" (a URL template with exactly one %s) or
+#             "url", "search_url" (a URL template with exactly one %s),
 #             "wrap_pair" (a symbol of _shared/modules/wrap_symbols/wrap_symbols.json
 #             or a custom left|right pair; rule pinned by
-#             _shared/tests/corpus/action_parameters/wrap_pair_vectors.json).
+#             _shared/tests/corpus/action_parameters/wrap_pair_vectors.json), or
+#             "text", "key" and "shortcut" (a text to type, a key, modifiers
+#             plus a key; vocabulary send_keys.json, rule pinned by
+#             _shared/tests/corpus/action_parameters/send_input_vectors.json).
 #   confirm   true for a destructive action that must ask before it runs.
 #   requires_linux / requires_hs / requires_ahk
 #             Capabilities the action needs on that OS. The picker greys a row
@@ -299,6 +302,22 @@ emit_ahk_mods = []
 emit_hs_key = "forwarddelete"
 emit_hs_mods = []
 emit_linux = "Delete"
+
+# The binding's own text, key or shortcut, typed or pressed through each
+# driver's synthetic-input choke point. The vocabulary (named keys, modifiers
+# with the portable "primary", the text limit) is send_keys.json; the grammar is
+# pinned by _shared/tests/corpus/action_parameters/send_input_vectors.json.
+[sg_actions.send_text]
+platform = "all"
+parameter = "text"
+
+[sg_actions.send_key]
+platform = "all"
+parameter = "key"
+
+[sg_actions.send_shortcut]
+platform = "all"
+parameter = "shortcut"
 
 # --- Onglets ---
 
@@ -1192,6 +1211,9 @@ items = [
     "escape",
     "backspace",
     "delete",
+    "send_key",
+    "send_shortcut",
+    "send_text",
     "--",
     "#grp_windows",
     "##tabs",

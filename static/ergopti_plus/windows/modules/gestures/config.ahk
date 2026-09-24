@@ -84,7 +84,7 @@ GestureSetActionParameter(BindingId, ActionName, Value, WriterFn := 0, NotifyFn 
 }
 
 ; The parameter kind the generated catalogue declares for an action ("url",
-; "search_url", "wrap_pair"), or "" when it takes none.
+; "search_url", "wrap_pair", "text", "key", "shortcut"), or "" when it takes none.
 GestureActionParameterSpec(ActionName) {
 		global GESTURE_ACTION_CATALOGUE
 		return GESTURE_ACTION_CATALOGUE.Actions.Has(ActionName)
@@ -93,9 +93,18 @@ GestureActionParameterSpec(ActionName) {
 
 GestureValidateActionParameter(ActionName, Value, &ErrorText := "") {
 		Spec := GestureActionParameterSpec(ActionName)
-		Value := Trim(Value)
 		if (Spec = "")
 				return true
+		; Checked before the trim below: the spaces of a text to type are part of it,
+		; and the key and shortcut rules trim for themselves.
+		if (Spec = "text" || Spec = "key" || Spec = "shortcut") {
+				if (SendInputParse(Spec, Value) is Map)
+						return true
+				ErrorText := StrReplace(t("dialog.gestures.param_err_" . Spec), "{1}",
+						SendInputVocabulary()["text_max_code_points"])
+				return false
+		}
+		Value := Trim(Value)
 		if (Spec = "wrap_pair") {
 				if (GestureWrapPairFor(Value) is Map)
 						return true
@@ -136,6 +145,12 @@ GestureActionParameterPrompt(ActionName) {
 				case "wrap_pair":
 						return StrReplace(t("dialog.gestures.param_wrap_pair"), "{1}",
 								WrapPairDescribe(_WS_BUILTIN_PAIRS))
+				case "text":
+						return StrReplace(t("dialog.gestures.param_text"), "{1}",
+								SendInputVocabulary()["text_max_code_points"])
+				case "key", "shortcut":
+						return StrReplace(t("dialog.gestures.param_" . GestureActionParameterSpec(ActionName)),
+								"{1}", SendInputDescribeKeys())
 		}
 		throw ValueError("No prompt for the parameter of action '" . ActionName . "'.")
 }
@@ -150,11 +165,14 @@ GesturePromptActionParameter(BindingId, ActionName) {
 		Prompt := GestureActionParameterPrompt(ActionName)
 		Title  := StrReplace(t("dialog.gestures.param_title"), "{1}", _GestureActionLabel(ActionName))
 		loop {
-				; The wrap-pair prompt lists the catalogue under its text.
-				Result := InputBox(Prompt, Title, (Spec = "wrap_pair") ? "w680 h300" : "w680 h160", Existing)
+				; The wrap-pair and shortcut prompts list a catalogue under their text.
+				Result := InputBox(Prompt, Title,
+						(Spec = "wrap_pair" || Spec = "shortcut") ? "w680 h300"
+						: (Spec = "key") ? "w680 h220" : "w680 h160", Existing)
 				if (Result.Result != "OK")
 						return false
-				Value := Trim(Result.Value)
+				; A text to type keeps its spaces; every other kind is trimmed.
+				Value := (Spec = "text") ? Result.Value : Trim(Result.Value)
 				ErrorText := ""
 				if GestureValidateActionParameter(ActionName, Value, &ErrorText)
 						return Map("has_value", true,

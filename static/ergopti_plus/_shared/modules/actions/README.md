@@ -14,6 +14,7 @@ with the picker order, heading levels and locale keys resolved.
 | ---------------------- | ---------------------------------------------------------------------------- |
 | `actions.toml`         | Every action with its platform, keystrokes, parameter kind and requirements  |
 | `modifier_chords.json` | The modifier + key matrix each driver registers as chord actions             |
+| `send_keys.json`       | Named keys, modifiers and text limit of the send_key/shortcut/text actions  |
 
 ## Generated outputs
 
@@ -33,7 +34,8 @@ the set of actions it can actually run, in both directions (tests tagged
 `(action-catalogue-parity)`), so a declaration without a handler, or a
 handler hidden by its declaration, fails the build.
 
-A parameter kind (`url`, `search_url`, `wrap_pair`) is validated, prompted
+A parameter kind (`url`, `search_url`, `wrap_pair`, `text`, `key`,
+`shortcut`) is validated, prompted
 for and explained by each driver's gesture module: macOS
 `modules/gestures/actions.lua` (`validate_action_parameter`,
 `parameter_prompt`, `parameter_error`), Linux `modules/gestures/manager.lua`
@@ -42,4 +44,7 @@ for and explained by each driver's gesture module: macOS
 (`GestureValidateActionParameter`, `GestureActionParameterPrompt`). A new kind
 is added to all three and to `PARAMETER_KINDS` in the generator in one change;
 the `wrap_pair` rule is pinned by
-`_shared/tests/corpus/action_parameters/wrap_pair_vectors.json`.
+`_shared/tests/corpus/action_parameters/wrap_pair_vectors.json`, and the
+`text`, `key` and `shortcut` rules (over `send_keys.json`, parsed by
+`_shared/lua/send_input` and `windows/infra/send_input_parameter.ahk`) by
+`_shared/tests/corpus/action_parameters/send_input_vectors.json`.

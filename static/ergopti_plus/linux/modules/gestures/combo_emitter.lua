@@ -209,15 +209,6 @@ local function held_modifier_codes()
 end
 
 --- Presses a combo on the daemon's uinput device.
----
---- Modifiers down, keys down, keys up, modifiers up in reverse — the order a
---- physical hand produces, and the order every compositor expects. Releasing a
---- modifier before the key it modifies leaves the application seeing a bare
---- keystroke, which is the classic way a synthesised chord half-works.
----
---- A chord modifier whose exact key is already down is neither pressed nor
---- released: the kernel keeps one bit per key, drops the second press, and the
---- release would lift the modifier a hold or the hand still owns.
 --- @param combo string
 --- @return boolean True when every event was written.
 function M.press(combo)
@@ -226,16 +217,40 @@ function M.press(combo)
 		Logger.error(LOG, "Cannot emit '%s': %s.", tostring(combo), tostring(unknown))
 		return false
 	end
+	return M.press_codes(parsed.mods, parsed.keys, combo)
+end
+
+--- Presses evdev codes on the daemon's uinput device: the modifiers held, the
+--- keys struck, as one chord.
+---
+--- Modifiers down, keys down, keys up, modifiers up in reverse — the order a
+--- physical hand produces, and the order every compositor expects. Releasing a
+--- modifier before the key it modifies leaves the application seeing a bare
+--- keystroke, which is the classic way a synthesised chord half-works. The
+--- send_key and send_shortcut actions press codes the user chose rather than a
+--- catalogue combo, which is why this takes codes and not keysym names.
+--- A modifier already held by the hand or a tap-hold is neither pressed nor
+--- released: releasing it would lift a key this emission does not own.
+--- @param mods table Array of modifier evdev codes, pressed in order.
+--- @param keys table Non-empty array of key evdev codes.
+--- @param label string|nil What to call the chord in the log.
+--- @return boolean True when every event was written.
+function M.press_codes(mods, keys, label)
+	if type(mods) ~= "table" or type(keys) ~= "table" or #keys == 0 then
+		Logger.error(LOG, "press_codes() needs a modifier list and at least one key.")
+		return false
+	end
+	local name = label or (table.concat(mods, "+") .. "|" .. table.concat(keys, "+"))
 
 	local ok_writer, Writer = pcall(require, "adapters.uinput_writer")
 	if not ok_writer or type(Writer.emit) ~= "function" then
-		Logger.error(LOG, "No uinput writer — '%s' cannot be emitted.", combo)
+		Logger.error(LOG, "No uinput writer — '%s' cannot be emitted.", name)
 		return false
 	end
 	if type(Writer.is_open) == "function" and not Writer.is_open() then
 		-- Loud rather than opened here: the daemon owns that device's lifetime,
 		-- and a module that opened it on demand would race the one that closes it.
-		Logger.error(LOG, "The uinput device is not open — '%s' was not emitted.", combo)
+		Logger.error(LOG, "The uinput device is not open — '%s' was not emitted.", name)
 		return false
 	end
 
@@ -260,25 +275,24 @@ function M.press(combo)
 		return clean
 	end
 	local already_down = held_modifier_codes()
-	local mods = {}
-	for _, code in ipairs(parsed.mods) do
-		if not already_down[code] then mods[#mods + 1] = code end
-	end
+	local owned_mods = {}
 	for _, code in ipairs(mods) do
+		if not already_down[code] then owned_mods[#owned_mods + 1] = code end
+	end
+	for _, code in ipairs(owned_mods) do
 		if not emit(code, PRESS) then cleanup(); return false end
 	end
-	for _, code in ipairs(parsed.keys) do
+	for _, code in ipairs(keys) do
 		if not emit(code, PRESS) then cleanup(); return false end
 	end
-	for i = #parsed.keys, 1, -1 do
-		if not emit(parsed.keys[i], RELEASE) then cleanup(); return false end
+	for i = #keys, 1, -1 do
+		if not emit(keys[i], RELEASE) then cleanup(); return false end
 	end
-	for i = #mods, 1, -1 do
-		if not emit(mods[i], RELEASE) then cleanup(); return false end
+	for i = #owned_mods, 1, -1 do
+		if not emit(owned_mods[i], RELEASE) then cleanup(); return false end
 	end
 
-	Logger.debug(LOG, "Emitted '%s' (%d modifier(s), %d key(s)).",
-		combo, #parsed.mods, #parsed.keys)
+	Logger.debug(LOG, "Emitted '%s' (%d modifier(s), %d key(s)).", name, #owned_mods, #keys)
 	return true
 end
 

@@ -40,6 +40,9 @@ GestureActionCatalogueData() {
 	Items.Push({ Kind: "action", Id: "escape" })
 	Items.Push({ Kind: "action", Id: "backspace" })
 	Items.Push({ Kind: "action", Id: "delete" })
+	Items.Push({ Kind: "action", Id: "send_key" })
+	Items.Push({ Kind: "action", Id: "send_shortcut" })
+	Items.Push({ Kind: "action", Id: "send_text" })
 	Items.Push({ Kind: "heading", Level: 1, Key: "sg_actions.sg_order.header.grp_windows" })
 	Items.Push({ Kind: "heading", Level: 2, Key: "sg_actions.sg_order.header.tabs" })
 	Items.Push({ Kind: "action", Id: "tab_new" })
@@ -272,6 +275,9 @@ GestureActionCatalogueData() {
 	Actions["selection_lowercase"] := { Family: "sg", LabelKey: "sg_actions.selection_lowercase", Parameter: "", Confirm: false }
 	Actions["selection_titlecase"] := { Family: "sg", LabelKey: "sg_actions.selection_titlecase", Parameter: "", Confirm: false }
 	Actions["selection_uppercase"] := { Family: "sg", LabelKey: "sg_actions.selection_uppercase", Parameter: "", Confirm: false }
+	Actions["send_key"] := { Family: "sg", LabelKey: "sg_actions.send_key", Parameter: "key", Confirm: false }
+	Actions["send_shortcut"] := { Family: "sg", LabelKey: "sg_actions.send_shortcut", Parameter: "shortcut", Confirm: false }
+	Actions["send_text"] := { Family: "sg", LabelKey: "sg_actions.send_text", Parameter: "text", Confirm: false }
 	Actions["snap_left"] := { Family: "sg", LabelKey: "sg_actions.snap_left", Parameter: "", Confirm: false }
 	Actions["snap_right"] := { Family: "sg", LabelKey: "sg_actions.snap_right", Parameter: "", Confirm: false }
 	Actions["space"] := { Family: "sg", LabelKey: "sg_actions.space", Parameter: "", Confirm: false }

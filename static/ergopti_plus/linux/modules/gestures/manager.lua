@@ -1021,6 +1021,20 @@ function M.get_action_parameter_spec(action_name)
 	return M.ACTION_PARAMETER_SPECS[action_name]
 end
 
+-- The parameter kinds the shortcuts manager parses (_shared/lua/send_input).
+local SEND_INPUT_KINDS = { text = true, key = true, shortcut = true }
+
+--- Replaces the {1} of a localized template on plain indices: the detail may
+--- hold a % that gsub would read as a capture reference.
+--- @param template string
+--- @param detail string
+--- @return string
+local function fill_placeholder(template, detail)
+	local at = template:find("{1}", 1, true)
+	if not at then return template end
+	return template:sub(1, at - 1) .. detail .. template:sub(at + 3)
+end
+
 --- The shortcuts manager, which owns the wrap-pair catalogue. Required lazily:
 --- the daemon loads it after this module.
 --- @return table|nil
@@ -1033,12 +1047,25 @@ local function shortcuts_manager()
 	return Shortcuts
 end
 
+--- The send-input vocabulary the shortcuts manager reads. Raises when that
+--- manager is unavailable: a prompt or refusal without it would name no key.
+--- @return table
+local function send_vocabulary()
+	local Shortcuts = shortcuts_manager()
+	if not Shortcuts then error("the send-input vocabulary is unavailable: no shortcuts manager") end
+	return Shortcuts.send_vocabulary()
+end
+
 function M.validate_action_parameter(action_name, value)
 	local spec = M.get_action_parameter_spec(action_name)
 	if not spec then return true end
 	if spec == "wrap_pair" then
 		local Shortcuts = shortcuts_manager()
 		return Shortcuts ~= nil and (Shortcuts.resolve_wrap_pair(value)) ~= nil
+	end
+	if SEND_INPUT_KINDS[spec] then
+		local Shortcuts = shortcuts_manager()
+		return Shortcuts ~= nil and Shortcuts.parse_send_input(spec, value) ~= nil
 	end
 	if type(value) ~= "string" or not value:match("^https?://%S+$") then return false end
 	if spec == "search_url" then
@@ -1067,6 +1094,12 @@ function M.get_action_parameter_prompt(action_name)
 		if not at then return template .. "\n" .. samples end
 		return template:sub(1, at - 1) .. samples .. template:sub(at + 3)
 	end
+	if SEND_INPUT_KINDS[spec] then
+		local vocabulary = send_vocabulary()
+		local detail = spec == "text" and tostring(vocabulary.text_max_code_points)
+			or require("send_input").describe_keys(vocabulary)
+		return fill_placeholder(i18n.get("dialog.gestures.param_" .. spec), detail)
+	end
 	error("no prompt for parameter kind '" .. tostring(spec) .. "'")
 end
 
@@ -1076,6 +1109,10 @@ end
 function M.get_action_parameter_error(action_name)
 	local spec = M.get_action_parameter_spec(action_name)
 	if spec == "wrap_pair" then return i18n.get("dialog.gestures.param_err_wrap_pair") end
+	if SEND_INPUT_KINDS[spec] then
+		return fill_placeholder(i18n.get("dialog.gestures.param_err_" .. spec),
+			tostring(send_vocabulary().text_max_code_points))
+	end
 	if spec == "search_url" then
 		return i18n.get("dialog.gestures.param_err_url") .. " "
 			.. i18n.get("dialog.gestures.param_err_many_placeholders")
