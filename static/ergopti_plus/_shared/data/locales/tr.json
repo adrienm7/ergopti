@@ -1592,7 +1592,7 @@
 	"sg_actions.pick_color": "🎨 İmlecin altındaki HEX rengi",
 	"sg_actions.redo": "↪ Yinele",
 	"sg_actions.right_click_toggle": "🖱 Sağ Sağ tıklama (basılı tut)",
-	"sg_actions.screen_capture": "📸 Seçici yakalama (Win+Shift+S)",
+	"sg_actions.screen_capture": "📸 Sistemin ekran görüntüsü aracı",
 	"sg_actions.screen_capture_instant": "📸 Anlık yakalama (pencere)",
 	"sg_actions.screen_record": "⏺ Ekran kaydı",
 	"sg_actions.screenshot_fullscreen_clipboard": "📸 🖥 Ekranı kopyala",

@@ -105,6 +105,10 @@ local KEYSYM_TO_CODE = {
 	XF86AudioPrev         = 165, -- KEY_PREVIOUSSONG
 	XF86MonBrightnessDown = 224, -- KEY_BRIGHTNESSDOWN
 	XF86MonBrightnessUp   = 225, -- KEY_BRIGHTNESSUP
+	-- The key every Linux desktop binds to its own screenshot tool, which is
+	-- what the screen_capture action opens.
+	Print     = 99,  -- KEY_SYSRQ
+
 }
 
 -- The character each shortcut key types, looked up in the live layout: a

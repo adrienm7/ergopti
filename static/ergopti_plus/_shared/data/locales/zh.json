@@ -1592,7 +1592,7 @@
 	"sg_actions.pick_color": "🎨 光标下的 HEX 颜色",
 	"sg_actions.redo": "↪ 重做",
 	"sg_actions.right_click_toggle": "🖱 R 鼠标右键（长按）",
-	"sg_actions.screen_capture": "📸 选区截图（Win+Shift+S）",
+	"sg_actions.screen_capture": "📸 系统截图工具",
 	"sg_actions.screen_capture_instant": "📸 即时截图（窗口）",
 	"sg_actions.screen_record": "⏺ 录屏",
 	"sg_actions.screenshot_fullscreen_clipboard": "📸 🖥 复制全屏截图",

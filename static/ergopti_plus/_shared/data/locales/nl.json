@@ -1592,7 +1592,7 @@
 	"sg_actions.pick_color": "🎨 HEX-kleur onder cursor",
 	"sg_actions.redo": "↪ Opnieuw",
 	"sg_actions.right_click_toggle": "🖱 R Rechtermuisknop (vasthouden)",
-	"sg_actions.screen_capture": "📸 Selectieve opname (Win+Shift+S)",
+	"sg_actions.screen_capture": "📸 Schermafbeeldingstool van het systeem",
 	"sg_actions.screen_capture_instant": "📸 Directe opname (venster)",
 	"sg_actions.screen_record": "⏺ Schermopname",
 	"sg_actions.screenshot_fullscreen_clipboard": "📸 🖥 Scherm kopiëren",

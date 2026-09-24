@@ -1592,7 +1592,7 @@
 	"sg_actions.pick_color": "🎨 Couleur HEX sous le curseur",
 	"sg_actions.redo": "↪ Rétablir",
 	"sg_actions.right_click_toggle": "🖱 R Clic droit (maint.)",
-	"sg_actions.screen_capture": "📸 Capture sélective (Win+Shift+S)",
+	"sg_actions.screen_capture": "📸 Outil de capture d’écran du système",
 	"sg_actions.screen_capture_instant": "📸 Capture instantanée (fenêtre)",
 	"sg_actions.screen_record": "⏺ Capture vidéo",
 	"sg_actions.screenshot_fullscreen_clipboard": "📸 🖥 Copier écran",

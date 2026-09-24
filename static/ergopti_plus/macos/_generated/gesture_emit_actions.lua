@@ -46,6 +46,7 @@ return {
 	{ id = "para_next", key = "down", mods = { "alt" } },
 	{ id = "para_prev", key = "up", mods = { "alt" } },
 	{ id = "save", key = "s", mods = { "cmd" } },
+	{ id = "screen_capture", key = "5", mods = { "cmd", "shift" } },
 	{ id = "sel_down", key = "down", mods = { "shift" } },
 	{ id = "sel_left", key = "left", mods = { "shift" } },
 	{ id = "sel_right", key = "right", mods = { "shift" } },
