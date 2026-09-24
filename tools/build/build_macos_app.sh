@@ -56,9 +56,10 @@ HAMMERSPOON_VERSION="${HAMMERSPOON_VERSION:-1.1.1}"
 ERGOPTI_VERSION="${ERGOPTI_VERSION:-0.0.0-dev}"
 ERGOPTI_BUILD="${ERGOPTI_BUILD:-1}"
 
-# Sparkle update channel — used to pick between appcast-main.xml and
-# appcast-dev.xml on the release host. Default is main; dev branch builds set
-# this to "dev" via the CI workflow.
+# Sparkle update channel — picks appcast-<channel>.xml on the release host.
+# The release workflow sets it to the channel the shared registry
+# (_shared/modules/updater/channels.json) gives the release tag; a local build
+# defaults to main.
 ERGOPTI_CHANNEL="${ERGOPTI_CHANNEL:-main}"
 
 # Karabiner-Elements version bundled for key-remapping. The DMG is downloaded

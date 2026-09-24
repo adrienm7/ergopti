@@ -27,7 +27,10 @@
  *    are also read back and compared with the registry itself (the AHK suite
  *    checks its data by replaying the vectors through it).
  * 5. The tag families the release workflow publishes each belong to exactly one
- *    channel, and that channel's github_prerelease flag is the one CI sets.
+ *    channel, and that channel's github_prerelease flag is the one CI sets. The
+ *    workflow stamps the channel the registry gives the tag
+ *    (tools/build/release-channel.cjs), never one derived from that flag, and
+ *    each channel's appcast carries the name the workflow publishes.
  * 6. Ratchet: the sources that decide or display channels never quote a
  *    channel id or alias in code; they read the registry.
  * ==============================================================================
@@ -38,6 +41,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { spawnSync } = require('child_process');
 const { pathToFileURL } = require('url');
 
 const ROOT = path.resolve(__dirname, '..', '..');
@@ -47,6 +51,10 @@ const VECTORS_PATH = path.join(SHARED, 'modules', 'updater', 'channel_vectors.js
 const MATCHER_PATH = path.join(SHARED, 'ui', 'update_channels.js');
 const LOCALES_DIR = path.join(SHARED, 'data', 'locales');
 const WORKFLOW_PATH = path.join(ROOT, '.github', 'workflows', 'ci.yml');
+const RELEASE_CHANNEL_TOOL = path.join(ROOT, 'tools', 'build', 'release-channel.cjs');
+// The one expression every release step reads the published channel from.
+const pipeline = require('./ci-pipeline.cjs');
+const RELEASE_CHANNEL_OUTPUT = '${{ needs.validate.outputs.channel }}';
 const GENERATOR_PATH = path.join(ROOT, 'tools', 'codegen', 'codegen-update-channels.cjs');
 const VERSION_PATH = path.join(SHARED, 'modules', 'updater', 'version.js');
 const PAGE_DATA_PATH = path.join(SHARED, 'ui', '_generated', 'update_channel_registry.js');
@@ -285,6 +293,89 @@ function checkWorkflowFamilies(channels) {
 	}
 }
 
+/**
+ * The release workflow names the channel of the release it publishes through
+ * the registry: validate asks tools/build/release-channel.cjs which
+ * channel owns the new tag, and every stamp (the Windows bundle, the macOS
+ * bundle, its appcast and the feed branch) reads that one output. The workflow
+ * used to turn GitHub's prerelease flag into "dev" or "main" in five places, so
+ * a second prerelease channel would have been stamped as dev.
+ */
+function checkWorkflowChannelSource() {
+	const text = pipeline.text();
+	const plan = pipeline.job('validate');
+	const meta = pipeline.step(plan, 'Compute tag and version');
+	expect(plan.includes('channel: ${{ steps.meta.outputs.channel }}'), 'validate must publish its channel');
+	expect(meta.includes('channel="$(node tools/build/release-channel.cjs "$tag")"'),
+		'validate must resolve the release tag through the registry');
+	expect(meta.includes('emit channel "$channel"'), 'the release path must publish the resolved channel');
+	expect(/uses: actions\/setup-node@v4\s*\n\s*with:\s*\n\s*node-version-file: '\.node-version'/.test(plan),
+		'validate must install the pinned Node before running the registry tool');
+	for (const caller of ['windows', 'macos']) {
+		expect(pipeline.job(caller).includes('channel: ' + RELEASE_CHANNEL_OUTPUT),
+			caller + ' must receive the resolved channel');
+	}
+	const macos = pipeline.job('package-macos');
+	const feed = pipeline.step(pipeline.job('release'), 'Publish channel feed for Sparkle');
+	const stamps = [...macos.matchAll(/ERGOPTI_CHANNEL:\s*(.+)/g)].map(match => match[1].trim());
+	expect(stamps.length === 2 && stamps.every(value => value === '${{ inputs.channel }}'),
+		'the macOS bundle and appcast must stamp their input channel');
+	expect(feed.includes('ERGOPTI_CHANNEL: ' + RELEASE_CHANNEL_OUTPUT),
+		'the published feed must use the resolved channel');
+	expect(macos.includes('OUTPUT_PATH: build/macos/appcast-${{ inputs.channel }}.xml'),
+		'the appcast basename must use the lane input channel');
+	expect(pipeline.job('package-windows').includes('$channel = "${{ inputs.channel }}"'),
+		'the Windows bundle must stamp the lane input channel');
+	expect(!/outputs\.prerelease\s*==\s*'true'\s*&&/.test(text)
+		&& !/-eq\s+'true'\)\s*\{\s*'/.test(text)
+		&& !/if \[ "\$prerelease" = "true" \]; then channel=/.test(text),
+		'no pipeline step may turn the prerelease flag into a channel id');
+}
+
+/**
+ * Runs the release tool over the tags the workflow publishes: each prints the
+ * channel the registry gives it, and a tag no channel owns fails the release.
+ */
+function checkReleaseChannelTool(channels) {
+	const run = (args) => spawnSync(process.execPath, [RELEASE_CHANNEL_TOOL, ...args], { encoding: 'utf8' });
+	expect(fs.existsSync(RELEASE_CHANNEL_TOOL), 'tools/build/release-channel.cjs must exist');
+	if (!fs.existsSync(RELEASE_CHANNEL_TOOL)) return;
+	const families = workflowTagFamilies();
+	expect(families.length > 0, 'the release tool check needs the workflow tag families');
+	for (const family of families) {
+		for (const tag of family.samples) {
+			const result = run([tag]);
+			expect(
+				result.status === 0 && result.stdout === `${channels.channelForTag(tag)}\n`,
+				`release-channel.cjs ${tag} must print ${channels.channelForTag(tag)}, got status ` +
+					`${result.status} and ${JSON.stringify(result.stdout)} ${result.stderr}`
+			);
+		}
+	}
+	for (const args of [['nightly'], ['v1.2.3-beta.1'], [], ['v1.2.3', 'v1.2.4']]) {
+		const result = run(args);
+		expect(
+			result.status !== 0 && result.stdout === '',
+			`release-channel.cjs ${JSON.stringify(args)} must fail without printing a channel`
+		);
+	}
+}
+
+/**
+ * build_macos_app.sh (SUFeedURL) and the release workflow name a channel's
+ * appcast appcast-<id>.xml, while the launcher serves the registry's
+ * sparkle_feed: a different name would point Sparkle at a feed nobody writes.
+ */
+function checkSparkleFeedNames(registry) {
+	for (const channel of registry.channels) {
+		expect(
+			channel.sparkle_feed === `appcast-${channel.id}.xml`,
+			`channel ${channel.id}: sparkle_feed must be appcast-${channel.id}.xml, the name the release ` +
+				'workflow and build_macos_app.sh publish'
+		);
+	}
+}
+
 // ==========================================
 // ==========================================
 // ======= 7/ Hardcoded Channel Ratchet ====
@@ -391,6 +482,9 @@ function checkNoHardcodedChannels(registry) {
 		checkPageData(registry);
 		checkSwiftFeeds(registry);
 		checkWorkflowFamilies(channels);
+		checkWorkflowChannelSource();
+		checkReleaseChannelTool(channels);
+		checkSparkleFeedNames(registry);
 		checkNoHardcodedChannels(registry);
 	} catch (error) {
 		failures.push(`the contract could not run: ${error && error.stack ? error.stack : error}`);
