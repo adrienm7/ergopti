@@ -21,6 +21,8 @@ local DisplaySettings = require("modules.llm.display_settings")
 local ProfileSettings = require("modules.llm.profile_settings")
 local NavigationSettings = require("modules.llm.navigation_settings")
 local TimerScheduler = require("adapters.timer_scheduler")
+local Inference = require("modules.llm.inference")
+local Monotonic = require("infra.monotonic")
 
 local LOG = "modules.llm.prediction_engine"
 
@@ -45,6 +47,29 @@ local function get_ollama()
 	local ok, module = pcall(require, "modules.llm.api_ollama")
 	return ok and module or nil
 end
+
+local function get_remote()
+	local ok, module = pcall(require, "modules.llm.api_remote")
+	return ok and module or nil
+end
+
+local function get_api_entries()
+	local ok, module = pcall(require, "modules.llm.api_entries")
+	return ok and module or nil
+end
+
+-- Which backend answers: "ollama" (local) or "api" (a remote provider). The
+-- manifest declares the key and its default for every driver.
+local BACKEND_KEY = "llm.models.selected"
+local BACKENDS = { ollama = true, api = true }
+
+-- The backend module serving the request in flight, so dismiss cancels it.
+local _inflight_backend = nil
+-- When each backend was last sent a request, and the timer holding one back
+-- until its minimum interval has passed.
+local _last_request_ms = {}
+local _rate_timer = nil
+local _clock_ms = Monotonic.now_ms
 
 local function get_profiles()
 	local ok, module = pcall(require, "modules.llm.profiles")
@@ -176,6 +201,10 @@ function M.init(opts)
 	if type(options.triggers) == "table" then _triggers = options.triggers end
 	if _pending_trigger then _scheduler.cancel(_pending_trigger) end
 	_scheduler = type(options.scheduler) == "table" and options.scheduler or TimerScheduler
+	-- The pacing clock must be the scheduler's: a test's virtual timers would
+	-- otherwise be measured against real time.
+	_clock_ms = type(options.clock_ms) == "function" and options.clock_ms or Monotonic.now_ms
+	_last_request_ms = {}
 	_pending_trigger = nil
 	_request_epoch = _request_epoch + 1
 	_predicting = false
@@ -246,11 +275,8 @@ function M.predict(context, output_context)
 		return
 	end
 
-	local ollama = get_ollama()
-	local profiles = get_profiles()
-	local model = profiles and profiles.get_current_model()
-	if not ollama then Logger.warn(LOG, "predict(): Ollama API not available."); return end
-	if not model then Logger.warn(LOG, "predict(): No model selected - run Ollama and refresh models."); return end
+	local backend, target, model = M.resolve_backend()
+	if not backend then return end
 
 	local clean_context, trigger_chars = context_without_trigger(context,
 		type(output_context) == "table" and output_context.input_chars or 0)
@@ -274,7 +300,6 @@ function M.predict(context, output_context)
 		return
 	end
 
-	local base_url = profiles.get_base_url() or HttpBridge.resolve_base_url() or ""
 	local messages = PromptBuilder.build_messages(system_prompt, params.context, params.context_tail)
 	local candidates = {}
 	local request_index = 0
@@ -295,8 +320,8 @@ function M.predict(context, output_context)
 	_request_epoch = _request_epoch + 1
 	local epoch = _request_epoch
 	show_candidates({}, meta)
-	Logger.info(LOG, "Sending prediction request to %s (model=%s, context=%d chars).",
-		base_url, model, #params.context)
+	Logger.info(LOG, "Sending prediction request (backend=%s, model=%s, context=%d chars).",
+		M.get_backend(), model, #params.context)
 
 	local function parse_response(raw, batch, extra_deletes)
 		local parsed = {}
@@ -321,12 +346,34 @@ function M.predict(context, output_context)
 	local dispatch
 	dispatch = function()
 		if epoch ~= _request_epoch then return end
+		local kind = M.get_backend()
+		local now = _clock_ms()
+		local wait_ms = (_last_request_ms[kind] or -math.huge) + Inference.min_interval_ms(kind) - now
+		if wait_ms > 0 then
+			_rate_timer = _scheduler.after(wait_ms / 1000, function()
+				_rate_timer = nil
+				dispatch()
+			end)
+			if type(_rate_timer) ~= "table" or _rate_timer.armed ~= true then
+				_rate_timer = nil
+				_predicting = false
+				meta.loading = false
+				Logger.error(LOG, "Prediction could not be paced: timer unavailable.")
+				-- The variants already received stay on offer.
+				if #candidates > 0 then publish() else clear_offer() end
+			end
+			return
+		end
+		_last_request_ms[kind] = now
 		request_index = request_index + 1
 		local think_filter = Parser.new_thinking_filter()
 		local streamed = ""
-		ollama.chat(base_url, model, messages, {
+		_inflight_backend = backend
+		backend.chat(target, model, messages, {
 			stream = DisplaySettings.get("streaming") == true,
-			temperature = params.temperature,
+			-- Each sequential variant a little warmer, or they repeat each other.
+			temperature = is_batch and params.temperature
+				or Inference.variant_temperature(params.temperature, request_index),
 			max_tokens = (_max_tokens or params.max_tokens) * (is_batch and requested or 1),
 			line_mode = profile.id == "raw" or profile.id == "basic",
 		}, function(delta)
@@ -350,7 +397,12 @@ function M.predict(context, output_context)
 				append_unique(candidates, candidate, 0)
 			end
 			Logger.info(LOG, "Prediction request complete: %d chars, %d candidates.", #clean, #candidates)
-			if not is_batch and request_index < requested then dispatch(); return end
+			if not is_batch and request_index < requested then
+				-- Shown now: the next variant may wait for the backend's interval.
+				if #candidates > 0 then publish() end
+				dispatch()
+				return
+			end
 			_predicting = false
 			meta.loading = false
 			if #candidates > 0 then publish() else clear_offer() end
@@ -376,10 +428,9 @@ end
 --- Dismisses in-flight and visible suggestions without changing the buffer.
 function M.dismiss()
 	_request_epoch = _request_epoch + 1
-	if _predicting then
-		local ollama = get_ollama()
-		if ollama then ollama.cancel() end
-	end
+	if _rate_timer then _scheduler.cancel(_rate_timer); _rate_timer = nil end
+	if _predicting and _inflight_backend then _inflight_backend.cancel() end
+	_inflight_backend = nil
 	_predicting = false
 	clear_offer()
 end
@@ -477,6 +528,54 @@ function M.set_triggers(triggers)
 	_triggers = accepted
 	Logger.info(LOG, "Triggers: %d configured.", #_triggers)
 	return true
+end
+
+--- The selected backend: "ollama" or "api".
+--- @return string
+function M.get_backend()
+	local ok, Storage = pcall(require, "adapters.storage")
+	local value = ok and Storage.get(BACKEND_KEY, nil) or nil
+	if BACKENDS[value] then return value end
+	return require("infra.manifest_reader").default_for(BACKEND_KEY)
+end
+
+--- Selects the backend.
+--- @param kind string "ollama" or "api"
+--- @return boolean
+function M.set_backend(kind)
+	if not BACKENDS[kind] then return false end
+	M.dismiss()
+	local ok, Storage = pcall(require, "adapters.storage")
+	if not ok then return false end
+	Storage.set(BACKEND_KEY, kind)
+	Logger.info(LOG, "Prediction backend set to '%s'.", kind)
+	return true
+end
+
+--- The module, target and model a prediction is sent with, or nil when the
+--- selected backend cannot answer (reason logged).
+--- @return table|nil backend, any target, string|nil model
+function M.resolve_backend()
+	if M.get_backend() == "api" then
+		local remote, entries = get_remote(), get_api_entries()
+		local entry = entries and entries.active() or nil
+		if not remote or not entry then
+			Logger.warn(LOG, "predict(): the API backend is selected but no API entry is — add one in the AI menu.")
+			return nil
+		end
+		local provider = remote.provider(entry.provider)
+		local model = entry.model ~= "" and entry.model or (provider and provider.default_model) or nil
+		if not model or model == "" then
+			Logger.warn(LOG, "predict(): API entry '%s' names no model.", entry.label)
+			return nil
+		end
+		return remote, entry, model
+	end
+	local ollama, profiles = get_ollama(), get_profiles()
+	local model = profiles and profiles.get_current_model()
+	if not ollama then Logger.warn(LOG, "predict(): Ollama API not available."); return nil end
+	if not model then Logger.warn(LOG, "predict(): No model selected - run Ollama and refresh models."); return nil end
+	return ollama, profiles.get_base_url() or HttpBridge.resolve_base_url() or "", model
 end
 
 function M.get_models()

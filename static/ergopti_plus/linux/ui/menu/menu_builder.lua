@@ -34,6 +34,7 @@ local MagicKey = require("modules.hotstrings.magic_key")
 local PreviewSettings = require("modules.hotstrings.preview_settings")
 local RepeatKey = require("modules.hotstrings.repeat_key")
 local Modal = require("ui.modal")
+local LlmBackendRows = require("ui.menu.llm_backend_rows")
 local LOG = "ui.menu.menu_builder"
 
 -- Delays are stored in seconds and typed in milliseconds: seconds is what the
@@ -114,11 +115,13 @@ end
 --- @param title string Window title.
 --- @param prompt string The question.
 --- @param initial string|nil Pre-filled value.
+--- @param hidden boolean|nil Mask the typed text (an API key).
 --- @return string|nil The entered text, or nil when the dialog was cancelled.
-local function prompt_text(title, prompt, initial)
+local function prompt_text(title, prompt, initial, hidden)
 	local command = "zenity --entry --title=" .. shell_quote(title)
 		.. " --text=" .. shell_quote(prompt)
-		.. " --entry-text=" .. shell_quote(initial or "") .. " 2>/dev/null"
+		.. " --entry-text=" .. shell_quote(initial or "")
+		.. (hidden and " --hide-text" or "") .. " 2>/dev/null"
 	local value, ok = Modal.run(function()
 		local pipe = io.popen(command, "r")
 		if not pipe then return nil, nil end
@@ -1906,7 +1909,7 @@ local function _build_llm(ctx)
 
 	-- The models this machine actually has. A `list`, because the rows are
 	-- whatever Ollama reports and no static entry can enumerate them.
-	providers["llm_models"] = function()
+	local function ollama_model_rows()
 		if type(llm.get_models) ~= "function" then return {} end
 		local models = llm.get_models()
 		if type(models) ~= "table" then return {} end
@@ -1937,6 +1940,18 @@ local function _build_llm(ctx)
 			end,
 		}
 		return rows
+	end
+
+	-- Who answers: Ollama's models above, or the API entries (Cerebras, …).
+	providers["llm_models"] = function()
+		return LlmBackendRows.rows(llm, {
+			prompt = prompt_text,
+			error = show_error,
+			info = show_info,
+			confirm = function(title, text)
+				return ask_yes_no(title, zenity_plain(text), i18n_safe("button.delete"), i18n_safe("button.cancel"))
+			end,
+		}, ctx.on_menu_changed, ollama_model_rows)
 	end
 
 	-- Temperature and context length. The manifest has declared both as features
