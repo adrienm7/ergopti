@@ -81,6 +81,8 @@ end
 -- =========================================
 
 Widget.restore()
+-- A place kept by an earlier run is not the default this checks.
+expect(Widget.reset_position(), "the widget starts from its default place")
 expect(Widget.start(), "the widget starts")
 tick(fresh(typing_ai))
 expect(Surface.is_visible(), "the pill is on screen while the user types")

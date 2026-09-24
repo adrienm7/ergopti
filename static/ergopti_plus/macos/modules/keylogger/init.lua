@@ -69,6 +69,8 @@ local SESSION_TIMEOUT_MS         = Timings.ms("keylogger", "session_timeout_ms")
 local WPM_WINDOW_MS              = Timings.ms("keylogger", "wpm_window_ms")
 -- Minimum time window for WPM calculation to avoid division by near-zero (2 s)
 local WPM_MIN_DURATION_MS        = Timings.ms("keylogger", "wpm_min_duration_ms")
+-- Silence after which the live WPM reads 0 (the Linux readouts use the same).
+local WPM_IDLE_RESET_MS          = Timings.ms("keylogger", "wpm_idle_reset_ms")
 -- How often the idle check and mouse-distance poll run (seconds)
 local IDLE_CHECK_INTERVAL_SEC    = Timings.sec("keylogger", "idle_check_interval_ms")
 -- How often the maintenance timer fires for day-rotation and mouse polling (seconds)
@@ -1215,7 +1217,7 @@ function M.get_live_stats()
 	end
 
 	local is_idle = (CoreState.session_last_active == 0)
-		or ((now - CoreState.session_last_active) > 5000)
+		or ((now - CoreState.session_last_active) > WPM_IDLE_RESET_MS)
 
 	local wpm_eff, wpm_phys = 0, 0
 	if not is_idle then
