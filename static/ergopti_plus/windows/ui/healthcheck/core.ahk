@@ -253,8 +253,10 @@ _HealthCheck_NowMs() {
 HealthCheck_Run(Detailed := false) {
 	global _HealthCheckStartMs
 	try LoggerStart("Healthcheck", "Collecting the diagnostics…")
-	Started := _HealthCheck_NowMs()
+	; The budget is the collection's: the shared documents are parsed once per
+	; session (about 30 ms on the first opening), before the clock starts
 	Schema := HealthCheck_Config()["schema"]
+	Started := _HealthCheck_NowMs()
 	UptimeSec := (A_TickCount - (_HealthCheckStartMs) & 0xFFFFFFFF) // 1000
 	ReportSubdir := Schema["report"]["subdir"]
 
@@ -297,8 +299,10 @@ HealthCheck_Run(Detailed := false) {
 	; A Float: Round(x, 1) returns a String in AHK v2
 	Elapsed := Round((_HealthCheck_NowMs() - Started) * 10) / 10
 	Developer["phase_a_ms"] := Elapsed
+	; Not a warning: the next snapshot would count it among the session's
+	; problems. The report's developer section carries the duration.
 	if (Elapsed > Schema["phase_a_budget_ms"])
-		try LoggerWarn("Healthcheck", "The synchronous diagnostics took {1} ms, over the {2} ms budget.",
+		try LoggerInfo("Healthcheck", "The synchronous diagnostics took {1} ms, over the {2} ms budget.",
 			Elapsed, Schema["phase_a_budget_ms"])
 	Undeclared := HealthCheck_CheckFields(Snapshot, Schema)["undeclared"]
 	if (Undeclared.Length > 0)
