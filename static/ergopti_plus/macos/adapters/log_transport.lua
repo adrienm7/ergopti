@@ -26,7 +26,11 @@ local PROTOCOL_VERSION = 1
 local LOOPBACK_HOST = "127.0.0.1"
 local PUMP_INTERVAL_SEC = 0.01
 local ACK_RETRY_SEC = 0.50
-local MAX_ACK_ATTEMPTS_BEFORE_FAILURE = 4
+-- Silence from the worker for this long, retransmitting every ACK_RETRY_SEC,
+-- is a dead logger. It was four sends — 1.5 s, the fourth never waited for —
+-- and a macOS Intel runner opening the onboarding webview at boot went that
+-- long without an ACK from a live worker: the fatal verdict stopped the app.
+local ACK_FAILURE_SEC = 5.0
 local BOOT_CONFIGURE_TIMEOUT_SEC = 0.25
 local DEFAULT_DRAIN_TIMEOUT_SEC = 2.0
 local MAX_DATAGRAM_BYTES = 60000
@@ -812,12 +816,14 @@ local function pump(owner)
 		return
 	end
 	_inflight.attempts = (_inflight.attempts or 0) + 1
-	if _inflight.attempts >= MAX_ACK_ATTEMPTS_BEFORE_FAILURE
-		and _inflight.failure_reported ~= true then
+	_inflight.first_sent_at = _inflight.first_sent_at or _inflight.sent_at
+	local silent_sec = _inflight.sent_at - _inflight.first_sent_at
+	if silent_sec >= ACK_FAILURE_SEC and _inflight.failure_reported ~= true then
 		_inflight.failure_reported = true
 		set_error(string.format(
-			"native logger did not ACK retained sequence %d after %d sends",
+			"native logger did not ACK retained sequence %d in %.1f s (%d sends)",
 			_inflight.sequence,
+			silent_sec,
 			_inflight.attempts
 		), true)
 	end
