@@ -1090,21 +1090,13 @@ local function main()
 			if value == InputEvent.VALUE_DOWN then capture_owned_scancodes[scancode] = true end
 		end)
 
-	-- 8.6) Initialise the LLM prediction engine if available.
-	-- Use the shared canonical DEFAULT_CONTEXT_LENGTH from the linux_bridge
-	-- (mirrors _shared/modules/llm/defaults.json llm_context_length = 500)
-	-- so all three drivers send the same context window.
+	-- 8.6) Initialise the LLM prediction engine if available. The context
+	-- length is read from its settings, which the menu writes.
 	if prediction_engine then
-		local canonical_ctx = 500  -- defensive fallback
-		local ok_lb, lb = pcall(require, "infra.llm_bridge")
-		if ok_lb and lb and lb.DEFAULT_CONTEXT_LENGTH then
-			canonical_ctx = lb.DEFAULT_CONTEXT_LENGTH
-		end
 		prediction_engine.init({
 			engine        = engine,
 			keyboard_hook = keyboard_hook,
 			triggers      = { "//", ";;", "--" },
-			max_context   = canonical_ctx,
 			overlay       = llm_overlay,
 			apply_prediction = function(candidate)
 				local result = injector.inject(candidate.deletes, candidate.to_type, false)
@@ -1121,7 +1113,6 @@ local function main()
 					type(context) == "table" and context.input_chars or 0)
 			end,
 		})
-		Logger.info(LOG, "LLM prediction engine initialised (max_context=%d).", canonical_ctx)
 	end
 
 	-- 8.6a) Initialise dynamic hotstrings (@-tag expansions).

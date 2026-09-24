@@ -38,7 +38,6 @@ local _suggestion_context = nil
 local _pending_trigger = nil
 local _scheduler = TimerScheduler
 local _triggers = { "//", ";;", "--" }
-local _max_context_chars = nil
 local _max_tokens = nil
 local _request_epoch = 0
 
@@ -57,10 +56,10 @@ local function get_secure_field_detector()
 	return ok and module or nil
 end
 
+-- The stored setting is the only source: an in-memory override set at boot
+-- once shadowed the menu's choice for the whole session.
 local function max_context_chars()
-	return _max_context_chars
-		or Settings.get("context_length")
-		or HttpBridge.DEFAULT_CONTEXT_LENGTH
+	return Settings.get("context_length") or HttpBridge.DEFAULT_CONTEXT_LENGTH
 end
 
 local function _is_secure_context()
@@ -175,7 +174,6 @@ function M.init(opts)
 	_on_offer = type(options.on_offer) == "function" and options.on_offer or nil
 	_offer_notified = false
 	if type(options.triggers) == "table" then _triggers = options.triggers end
-	if type(options.max_context) == "number" then _max_context_chars = options.max_context end
 	if _pending_trigger then _scheduler.cancel(_pending_trigger) end
 	_scheduler = type(options.scheduler) == "table" and options.scheduler or TimerScheduler
 	_pending_trigger = nil
@@ -549,9 +547,7 @@ function M.set_temperature(value) return Settings.set("temperature", tonumber(va
 function M.get_max_context() return max_context_chars() end
 
 function M.set_max_context(value)
-	if type(value) ~= "number" or value <= 0 then return false end
-	_max_context_chars = value
-	return true
+	return Settings.set("context_length", value)
 end
 
 function M.get_stop_sequences() return {} end

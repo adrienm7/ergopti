@@ -51,12 +51,17 @@ local function messages_for(profile, context)
 	package.loaded["modules.llm.profiles"] = {
 		get_current_model = function() return "test-model" end,
 		get_base_url = function() return "http://127.0.0.1:11434" end,
+		init = function() end,
+		is_enabled = function() return true end,
 	}
 	package.loaded["modules.llm.profile_settings"] = {
 		get = function(key) if key == "num_predictions" then return 1 end end,
 		resolve = function() return profile end,
 	}
 	local engine = helpers.load_module("modules.llm.prediction_engine")
+	-- Initialised as the daemon does, which once passed a context length that
+	-- shadowed the menu's setting.
+	engine.init({ max_context = 500, triggers = { "//" } })
 	local ok, err = pcall(engine.predict, context)
 	for _, name in ipairs(names) do package.loaded[name] = previous[name] end
 	package.loaded["modules.llm.prediction_engine"] = nil
@@ -104,6 +109,21 @@ helpers.describe("prediction messages: the typed text is sent once, in the shape
 	helpers.it("keeps a percent sign typed by the user", function()
 		local sent = messages_for(builtin("raw"), "une remise de 50% sur")
 		helpers.assert_eq(occurrences(sent, "une remise de 50% sur"), 1)
+	end)
+
+end)
+
+helpers.describe("prediction messages: the context length chosen in the menu applies", function()
+
+	helpers.it("caps the context at the stored setting", function()
+		local Settings = require("modules.llm.settings")
+		local previous = Settings.get("context_length")
+		helpers.assert_true(Settings.set("context_length", 100))
+		local long = string.rep("mot ", 150)
+		local sent = messages_for(builtin("raw"), long)
+		Settings.set("context_length", previous)
+		helpers.assert_true(#sent[#sent].content <= 100,
+			"the menu's 100 characters must bound the request; sent " .. #sent[#sent].content)
 	end)
 
 end)
