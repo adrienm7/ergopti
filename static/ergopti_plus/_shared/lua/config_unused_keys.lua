@@ -24,7 +24,8 @@
 ---    still holds the bytes that were backed up.
 --- 4. Conservative addressing. Keys outside any table, quoted keys, and
 ---    array-of-tables records are never offered: removing them by text alone
----    cannot be proven exact.
+---    cannot be proven exact. Metadata tables ([_meta] and any other [_*]) are
+---    never offered either, as on Windows.
 --- ==============================================================================
 
 local M = {}
@@ -313,7 +314,11 @@ function M.find_in_source(source, collect)
 
 	local keys = {}
 	for _, record in ipairs(scan.records) do
-		if record.addressable and not consumption.touches(record.path) then
+		-- A [_*] table is metadata no reader marks: [_meta] holds the schema
+		-- stamp the boot migration reads before any reader runs. The Windows
+		-- loader skips the same tables.
+		local metadata = record.addressable and record.path[1]:sub(1, 1) == "_"
+		if record.addressable and not metadata and not consumption.touches(record.path) then
 			keys[#keys + 1] = {
 				section = record.section,
 				key     = record.key,
