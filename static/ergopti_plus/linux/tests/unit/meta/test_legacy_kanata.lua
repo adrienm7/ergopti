@@ -72,3 +72,16 @@ helpers.describe("legacy kanata retirement", function()
 	end)
 
 end)
+
+helpers.describe("legacy kanata retirement: the daemon runs it before taking the keyboard", function()
+	helpers.it("is called in main() before the keyboard device is resolved", function()
+		local fh = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "r"))
+		local src = fh:read("*a")
+		fh:close()
+		local retire = src:find('require("platform.remap.legacy_kanata").retire', 1, true)
+		local resolve = src:find("dev_finder.find_keyboard()", 1, true)
+		helpers.assert_true(retire ~= nil, "the daemon retires the legacy unit")
+		helpers.assert_true(resolve ~= nil and retire < resolve,
+			"before the keyboard is chosen: a running kanata would hold it first")
+	end)
+end)
