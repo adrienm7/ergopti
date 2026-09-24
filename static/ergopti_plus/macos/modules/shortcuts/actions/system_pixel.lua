@@ -13,6 +13,10 @@
 ---    so the main thread is never blocked during a user-driven screenshot.
 ---    It captures to an owned file and announces success only after the image
 ---    is read back from the clipboard (see screen_capture_flow).
+--- 3. Parent-scoped lifecycle: the fixed shortcuts run under the
+---    "shortcut_bindings" parent and the gesture actions under "gestures", each
+---    with its own admission generation, so pausing one feature never fences or
+---    settles the other's work. One capture runs at a time, whatever its parent.
 --- ==============================================================================
 
 local M = {}
@@ -38,15 +42,31 @@ local PYTHON_BIN        = "/usr/bin/python3"
 -- fires. Canonical spelling recognised by tests/unit/meta/test_gc_retention.lua;
 -- entries are released when the callback runs or the launch is refused.
 local _active_tasks = {}
-local _terminal_callback_depth = 0
 
--- Pixel/screenshot work is a child of the shortcut bindings lifecycle.  The
--- logical admission fence closes before native termination, while this slot
--- retains the one exact task until its completion callback proves settlement.
+-- The parent of a call that names none: the fixed shortcuts of bindings.lua.
+local DEFAULT_ACTION_PARENT = "shortcut_bindings"
+
+-- Pixel/screenshot work is a child of one parent lifecycle: the shortcut
+-- bindings or the gesture actions. Each parent scope has its own logical
+-- admission fence, closed before native termination, while this one slot
+-- retains the exact task of whichever scope owns it until its completion
+-- callback proves settlement.
 local _current_operation = nil
-local _generation = 0
 local _next_operation_id = 0
-local _paused = false
+local _pixel_scopes = {}
+
+--- Resolves one parent-scoped admission state.
+--- @param parent string|nil Stable action parent.
+--- @return table scope
+local function pixel_scope(parent)
+	local scope_id = type(parent) == "string" and parent ~= ""
+		and parent or DEFAULT_ACTION_PARENT
+	local scope = _pixel_scopes[scope_id]
+	if scope then return scope end
+	scope = { id = scope_id, paused = false, generation = 0, terminal_depth = 0 }
+	_pixel_scopes[scope_id] = scope
+	return scope
+end
 
 
 
@@ -62,10 +82,10 @@ local _paused = false
 --- @param operation table Operation identity.
 --- @return boolean authorized
 local function operation_is_authorized(operation)
-	return _paused ~= true
+	return operation.scope.paused ~= true
 		and _current_operation == operation
 		and operation.authorized == true
-		and operation.generation == _generation
+		and operation.generation == operation.scope.generation
 end
 
 --- Removes the exact capture file owned by one operation. A refused cleanup
@@ -148,11 +168,11 @@ drain_terminal = function(operation, slot)
 	end
 
 	slot.callback_active = true
-	_terminal_callback_depth = _terminal_callback_depth + 1
+	operation.scope.terminal_depth = operation.scope.terminal_depth + 1
 	local callback_ok, callback_result = xpcall(function()
 		return slot.on_terminal(table.unpack(terminal, 1, terminal.n))
 	end, debug.traceback)
-	_terminal_callback_depth = _terminal_callback_depth - 1
+	operation.scope.terminal_depth = operation.scope.terminal_depth - 1
 	slot.callback_active = false
 	release_task_slot(operation, slot)
 	if not callback_ok then
@@ -224,7 +244,7 @@ local function start_task_phase(operation, label, executable, args, on_terminal)
 	if not operation_is_authorized(operation) then return false end
 	local slot = nil
 	local preconstruction_terminal = nil
-	local acquisition_generation = _generation
+	local acquisition_generation = operation.scope.generation
 	operation.acquiring = true
 	local constructed, task = xpcall(TaskLifecycle.native, debug.traceback,
 		label, executable, function(...)
@@ -265,7 +285,7 @@ local function start_task_phase(operation, label, executable, args, on_terminal)
 			tostring(label))
 		return false
 	end
-	if acquisition_generation ~= _generation
+	if acquisition_generation ~= operation.scope.generation
 		or not operation_is_authorized(operation) then
 		-- PAUSE/STOP may synchronously re-enter TaskLifecycle.native(). Publish and
 		-- pin the returned exact identity before settling it, but never call start()
@@ -284,14 +304,14 @@ local function start_task_phase(operation, label, executable, args, on_terminal)
 		return false
 	end
 
-	local start_generation = _generation
+	local start_generation = operation.scope.generation
 	operation.acquiring = true
 	local start_ok, start_result = xpcall(
 		TaskLifecycle.start, debug.traceback, task, label)
 	local started = start_ok and start_result == true
 	operation.acquiring = false
 	slot.starting = false
-	if start_generation ~= _generation
+	if start_generation ~= operation.scope.generation
 		or not operation_is_authorized(operation)
 		or operation.slot ~= slot then
 		operation.authorized = false
@@ -340,11 +360,13 @@ local function start_task_phase(operation, label, executable, args, on_terminal)
 end
 
 --- Creates one top-level user operation. Concurrent work and cleanup debt are
---- rejected rather than overlapped over an owned capture or clipboard sink.
+--- rejected rather than overlapped over an owned capture or clipboard sink,
+--- whichever parent owns them.
+--- @param scope table Parent scope of the operation.
 --- @param label string Stable operation label.
 --- @return table|nil operation
-local function begin_operation(label)
-	if _paused == true then
+local function begin_operation(scope, label)
+	if scope.paused == true then
 		Logger.warn(LOG, "%s refused while pixel actions are paused.", tostring(label))
 		return nil
 	end
@@ -356,7 +378,7 @@ local function begin_operation(label)
 			and _current_operation.acquiring ~= true then
 			finish_operation(_current_operation)
 		end
-		if not _current_operation then return begin_operation(label) end
+		if not _current_operation then return begin_operation(scope, label) end
 		Logger.warn(LOG, "%s refused while prior pixel work remains owned.", tostring(label))
 		return nil
 	end
@@ -364,7 +386,8 @@ local function begin_operation(label)
 	local operation = {
 		id = _next_operation_id,
 		label = label,
-		generation = _generation,
+		scope = scope,
+		generation = scope.generation,
 		authorized = true,
 		slot = nil,
 		acquiring = false,
@@ -374,14 +397,16 @@ local function begin_operation(label)
 	return operation
 end
 
---- Closes admission and joins the current task without replaying user work.
+--- Closes one scope's admission and joins its current task without replaying
+--- user work. A sibling scope's task is left untouched.
+--- @param scope table Parent scope.
 --- @param boundary string Diagnostic boundary.
 --- @return boolean settled
-local function quiesce(boundary)
-	if _paused ~= true then _generation = _generation + 1 end
-	_paused = true
+local function quiesce(scope, boundary)
+	if scope.paused ~= true then scope.generation = scope.generation + 1 end
+	scope.paused = true
 	local operation = _current_operation
-	if not operation then return _terminal_callback_depth == 0 end
+	if not operation or operation.scope ~= scope then return scope.terminal_depth == 0 end
 	if operation.authorized == true then
 		Logger.warn(LOG, "%s cancelled by %s.", tostring(operation.label), tostring(boundary))
 	end
@@ -392,7 +417,7 @@ local function quiesce(boundary)
 		return _current_operation == nil
 	end
 	return terminate_task_slot(operation, operation.slot, boundary) == true
-		and _current_operation == nil and _terminal_callback_depth == 0
+		and _current_operation == nil and scope.terminal_depth == 0
 end
 
 
@@ -487,11 +512,13 @@ except Exception:
 end
 
 --- Reads the color of the pixel currently under the mouse cursor and copies it to the clipboard.
-function M.copy_pixel_color()
+--- @param parent string|nil Stable action parent.
+--- @return boolean accepted
+function M.copy_pixel_color(parent)
 	-- Without Screen Recording the capture omits every window, so the color of
 	-- the desktop behind them would be copied as if it were the real pixel.
 	if not CaptureFlow.ensure_permission("Pixel color read") then return false end
-	local operation = begin_operation("Pixel color read")
+	local operation = begin_operation(pixel_scope(parent), "Pixel color read")
 	if not operation then return false end
 	Logger.trace(LOG, "Pixel color read started…")
 	local ok, pos = pcall(hs.mouse.absolutePosition)
@@ -532,10 +559,11 @@ end
 --- The capture goes to an owned temporary file rather than `-c`: the file is
 --- the proof that an image exists, and the clipboard is filled from it and read
 --- back before success is announced.
+--- @param parent string|nil Stable action parent.
 --- @return boolean accepted True when the capture process was started.
-function M.interactive_screenshot()
+function M.interactive_screenshot(parent)
 	if not CaptureFlow.ensure_permission("Interactive screenshot") then return false end
-	local operation = begin_operation("Interactive screenshot")
+	local operation = begin_operation(pixel_scope(parent), "Interactive screenshot")
 	if not operation then return false end
 	Logger.trace(LOG, "Interactive screenshot started…")
 	local allocation_ok, tmpfile, allocation_detail = xpcall(
@@ -587,49 +615,57 @@ end
 -- ========================================
 -- ========================================
 
---- Fences and joins pixel/screenshot work for a ScriptControl PAUSE attempt.
+--- Fences and joins one parent's pixel/screenshot work for a PAUSE attempt.
+--- @param parent string|nil Stable action parent.
 --- @return boolean settled
-function M.pause_pixel_actions()
-	return quiesce("pixel action pause") == true
+function M.pause_pixel_actions(parent)
+	return quiesce(pixel_scope(parent), "pixel action pause") == true
 end
 
---- Reopens admission only after every exact native task has terminated.
---- User actions interrupted by pause are deliberately not replayed.
+--- Reopens a parent's admission only after its exact native task has
+--- terminated. User actions interrupted by pause are deliberately not replayed.
+--- @param parent string|nil Stable action parent.
 --- @return boolean settled
-function M.resume_pixel_actions()
-	if _current_operation then
-		local operation = _current_operation
+function M.resume_pixel_actions(parent)
+	local scope = pixel_scope(parent)
+	local operation = _current_operation
+	if operation and operation.scope == scope then
 		operation.authorized = false
 		if not operation.slot
 			or terminate_task_slot(operation, operation.slot,
 				"pixel action resume cleanup") ~= true
 			or _current_operation ~= nil then
-			_paused = true
+			scope.paused = true
 			return false
 		end
 	end
-	_generation = _generation + 1
-	_paused = false
+	scope.generation = scope.generation + 1
+	scope.paused = false
 	return true
 end
 
 --- Stops the child owner for Bindings.stop(). A later Bindings.start() may call
 --- resume_pixel_actions() after this exact cleanup has settled.
+--- @param parent string|nil Stable action parent.
 --- @return boolean settled
-function M.stop_pixel_actions()
-	return quiesce("pixel action stop") == true
+function M.stop_pixel_actions(parent)
+	return quiesce(pixel_scope(parent), "pixel action stop") == true
 end
 
 --- Diagnostic state for lifecycle composition/tests.
+--- @param parent string|nil Stable action parent.
 --- @return boolean paused
-function M.is_pixel_actions_paused()
-	return _paused == true
+function M.is_pixel_actions_paused(parent)
+	return pixel_scope(parent).paused == true
 end
 
 --- Diagnostic ownership query; true includes termination debt.
+--- @param parent string|nil Stable action parent.
 --- @return boolean pending
-function M.has_pending_pixel_action()
-	return _current_operation ~= nil or _terminal_callback_depth ~= 0
+function M.has_pending_pixel_action(parent)
+	local scope = pixel_scope(parent)
+	return (_current_operation ~= nil and _current_operation.scope == scope)
+		or scope.terminal_depth ~= 0
 end
 
 return M
