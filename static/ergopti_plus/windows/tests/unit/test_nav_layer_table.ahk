@@ -23,7 +23,8 @@
 ;    not, repeat_count sets the count, and every call handler the vocabulary
 ;    declares for Windows is implemented.
 ; 6. Boot: NavLayer_Init registers the layers.toml of the configuration folder
-;    it is given, and nothing without one.
+;    it is given, nothing without one, and a file rejected as a whole closes
+;    its START with an error and no SUCCESS.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -387,3 +388,15 @@ _NLT_InitWithoutAFileRegistersNothing() {
 	AssertEqual(0, Run["errors"].Length, "an absent file is not an error")
 }
 Test("nav layer boot: no layers.toml registers nothing (nav-layer-generated)", _NLT_InitWithoutAFileRegistersNothing)
+
+_NLT_InitRejectedFileIsAnErrorNotASuccess() {
+	Run := _NLT_Init("[_meta]`nschema_version = 99`n`n[layers.nav.all]`n" . '"KeyS" = "arrow_up"' . "`n")
+	AssertEqual(0, Run["count"], "a file rejected as a whole binds no key")
+	AssertEqual(0, Run["names"].Length, "a file rejected as a whole registers nothing")
+	AssertEqual(1, Run["starts"].Length, "one START for the load")
+	AssertEqual(1, Run["errors"].Length, "the rejected file is logged as an error")
+	AssertEqual(0, Run["successes"].Length,
+		"the load did not succeed: no SUCCESS may follow the error that closed its START")
+}
+Test("nav layer boot: a layers.toml rejected as a whole logs an error, never a success (nav-layer-generated)",
+	_NLT_InitRejectedFileIsAnErrorNotASuccess)

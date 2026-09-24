@@ -306,13 +306,15 @@ function M.load(opts)
 	local Json = require("json")
 	local TomlCodec = require("toml_codec")
 	local Layers = require("keymap.layers")
-	Logger.start(LOG, "Loading the navigation layer from '%s'…", config_dir)
+	-- The shipped registry and vocabulary first: a broken copy raises before this
+	-- load has started, and the regeneration logs that failure.
 	local ctx = Layers.load_context({
 		shared_root = shared_root,
 		json_decode = Json.decode,
 		toml_decode = TomlCodec.decode,
 		read_file   = read_shipped,
 	})
+	Logger.start(LOG, "Loading the navigation layer from '%s'…", config_dir)
 	local result = Layers.load_user_file({
 		config_dir  = config_dir,
 		os          = OS,
@@ -323,8 +325,11 @@ function M.load(opts)
 	for _, err in ipairs(result.errors) do
 		Logger.warn(LOG, "%s: %s (%s) — %s.", result.path, tostring(err.code), error_where(err), tostring(err.detail))
 	end
+	-- A file rejected as a whole is this load's failure: the error closes the
+	-- START, and no SUCCESS may follow it for a layer that binds nothing.
 	if not result.ok and next(result.layers) == nil then
 		Logger.error(LOG, "'%s' could not be used as a whole: the navigation layer binds no key.", result.path)
+		return { bindings = {}, registry = ctx.registry }
 	end
 	for layer_id in pairs(result.layers) do
 		if layer_id ~= M.NAV_LAYER_ID then

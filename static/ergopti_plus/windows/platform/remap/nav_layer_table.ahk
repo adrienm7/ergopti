@@ -312,9 +312,13 @@ NavLayer_Init(SharedDir, ConfigDir, HotkeyFn := Hotkey, HotIfFn := HotIf) {
 		for Err in Result["errors"]
 			LoggerWarn("NavLayer", "{1}: {2} ({3}) — {4}.", Result["path"], Err["code"],
 				_NavLayer_ErrorWhere(Err), Err["detail"])
-		if !Result["ok"] && Result["layers"].Count == 0
+		; A file rejected as a whole is this load's failure: the error closes the
+		; START, and no SUCCESS may follow it for a layer that binds nothing.
+		if !Result["ok"] && Result["layers"].Count == 0 {
 			LoggerError("NavLayer", "'{1}' could not be used as a whole: the navigation layer binds no key.",
 				Result["path"])
+			return 0
+		}
 		for LayerId in Result["layers"] {
 			if (LayerId != NAV_LAYER_ID)
 				LoggerWarn("NavLayer", "Layer '{1}' in '{2}' has no hold key to activate it on Windows; only '{3}' does.",
