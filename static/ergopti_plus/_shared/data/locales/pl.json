@@ -664,7 +664,7 @@
 	"menu.debug.key_history": "Historia klawiszy",
 	"menu.debug.list_vars": "Stan zmiennych",
 	"menu.debug.log_level": "Poziom logowania",
-	"menu.debug.open_error_log": "Open error log",
+	"menu.debug.open_error_log": "Otwórz dzisiejszy plik błędów",
 	"menu.debug.no_errors_today": "Dziś brak ostrzeżeń i błędów",
 	"menu.debug.open_logs": "Otwórz folder logów",
 	"menu.debug.open_today_log": "Otwórz dzisiejszy plik logów",

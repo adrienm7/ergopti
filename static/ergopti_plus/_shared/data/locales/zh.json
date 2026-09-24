@@ -664,7 +664,7 @@
 	"menu.debug.key_history": "按键历史",
 	"menu.debug.list_vars": "变量状态",
 	"menu.debug.log_level": "日志级别",
-	"menu.debug.open_error_log": "Open error log",
+	"menu.debug.open_error_log": "打开今日错误文件",
 	"menu.debug.no_errors_today": "今天没有警告或错误",
 	"menu.debug.open_logs": "打开日志文件夹",
 	"menu.debug.open_today_log": "打开今日日志文件",

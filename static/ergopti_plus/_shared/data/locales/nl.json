@@ -664,7 +664,7 @@
 	"menu.debug.key_history": "Toetsgeschiedenis",
 	"menu.debug.list_vars": "Variabelestatus",
 	"menu.debug.log_level": "Logniveau",
-	"menu.debug.open_error_log": "Open error log",
+	"menu.debug.open_error_log": "Foutenbestand van vandaag openen",
 	"menu.debug.no_errors_today": "Vandaag geen waarschuwingen of fouten",
 	"menu.debug.open_logs": "Logmap openen",
 	"menu.debug.open_today_log": "Logbestand van vandaag openen",

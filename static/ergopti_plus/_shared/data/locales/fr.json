@@ -659,7 +659,7 @@
 	"menu.debug.key_history": "Historique des touches",
 	"menu.debug.list_vars": "État des variables",
 	"menu.debug.log_level": "Niveau de log",
-	"menu.debug.open_error_log": "Ouvrir le journal des erreurs",
+	"menu.debug.open_error_log": "Ouvrir le fichier des erreurs du jour",
 	"menu.debug.no_errors_today": "Aucun avertissement ni erreur aujourd'hui",
 	"menu.debug.open_logs": "Ouvrir le dossier de logs",
 	"menu.debug.open_today_log": "Ouvrir le fichier de log du jour",

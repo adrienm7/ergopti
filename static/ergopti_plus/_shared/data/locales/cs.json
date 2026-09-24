@@ -664,7 +664,7 @@
 	"menu.debug.key_history": "Historie kláves",
 	"menu.debug.list_vars": "Stav proměnných",
 	"menu.debug.log_level": "Úroveň logu",
-	"menu.debug.open_error_log": "Open error log",
+	"menu.debug.open_error_log": "Otevřít dnešní soubor chyb",
 	"menu.debug.no_errors_today": "Dnes žádná varování ani chyby",
 	"menu.debug.open_logs": "Otevřít složku protokolů",
 	"menu.debug.open_today_log": "Otevřít dnešní soubor protokolu",

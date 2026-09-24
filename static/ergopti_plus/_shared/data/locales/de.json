@@ -664,7 +664,7 @@
 	"menu.debug.key_history": "Tastenverlauf",
 	"menu.debug.list_vars": "Variablenstatus",
 	"menu.debug.log_level": "Log-Stufe",
-	"menu.debug.open_error_log": "Open error log",
+	"menu.debug.open_error_log": "Fehlerdatei von heute öffnen",
 	"menu.debug.no_errors_today": "Heute keine Warnungen oder Fehler",
 	"menu.debug.open_logs": "Protokollordner öffnen",
 	"menu.debug.open_today_log": "Heutiges Protokoll öffnen",

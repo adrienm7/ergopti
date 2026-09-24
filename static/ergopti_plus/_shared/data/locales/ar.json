@@ -664,7 +664,7 @@
 	"menu.debug.key_history": "سجل المفاتيح",
 	"menu.debug.list_vars": "حالة المتغيرات",
 	"menu.debug.log_level": "مستوى السجل",
-	"menu.debug.open_error_log": "Open error log",
+	"menu.debug.open_error_log": "فتح ملف أخطاء اليوم",
 	"menu.debug.no_errors_today": "لا توجد تحذيرات أو أخطاء اليوم",
 	"menu.debug.open_logs": "فتح مجلد السجلات",
 	"menu.debug.open_today_log": "فتح ملف سجل اليوم",

@@ -664,7 +664,7 @@
 	"menu.debug.key_history": "キー履歴",
 	"menu.debug.list_vars": "変数の状態",
 	"menu.debug.log_level": "ログレベル",
-	"menu.debug.open_error_log": "Open error log",
+	"menu.debug.open_error_log": "本日のエラーファイルを開く",
 	"menu.debug.no_errors_today": "今日は警告もエラーもありません",
 	"menu.debug.open_logs": "ログフォルダーを開く",
 	"menu.debug.open_today_log": "本日のログファイルを開く",
