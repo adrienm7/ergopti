@@ -953,8 +953,10 @@ jobs:
           export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
           dbus-run-session -- bash -c '
             ready="$(mktemp -u)"
-            python3 tests/hardware/sni_host.py --ready-file "$ready" --timeout 30 \
-              --expect-label "Ergopti+ tray probe" --expect-icon-file > "$RUNNER_TEMP/sni.json" &
+            export ERGOPTI_TRAY_CLICK_FILE="$(mktemp -u)"
+            python3 tests/hardware/sni_host.py --ready-file "$ready" --timeout 30 --settle 1 \
+              --expect-label "Ergopti+ tray probe" --expect-icon-file \
+              --click-label "Click probe" > "$RUNNER_TEMP/sni.json" &
             host=$!
             for _ in $(seq 1 40); do [ -f "$ready" ] && break; sleep 0.25; done
             [ -f "$ready" ] || { echo "::error::the StatusNotifier host never started"; exit 1; }
@@ -963,6 +965,9 @@ jobs:
             wait "$host"; status=$?
             cat "$RUNNER_TEMP/sni.json"
             [ "$probe" = "0" ] || exit "$probe"
+            # The click went panel → dbusmenu → libdbusmenu → the shared
+            # dispatcher → the row: its marker is the proof.
+            [ -f "$ERGOPTI_TRAY_CLICK_FILE" ] || { echo "::error::a menu click never reached its row"; exit 1; }
             exit "$status"'
         timeout-minutes: 4
 

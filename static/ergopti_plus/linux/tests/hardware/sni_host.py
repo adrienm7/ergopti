@@ -48,16 +48,21 @@ WATCHER_XML = """
 """
 
 
-def menu_labels(layout):
-    """Flattens a dbusmenu GetLayout tree into its visible labels, in order."""
-    labels = []
-    _, props, children = layout
+def menu_rows(layout):
+    """Flattens a dbusmenu GetLayout tree into (id, visible label) pairs, in order."""
+    rows = []
+    item_id, props, children = layout
     label = props.get("label")
     if label and props.get("visible", True):
-        labels.append(label.replace("_", ""))
+        rows.append((item_id, label.replace("_", "")))
     for child in children:
-        labels.extend(menu_labels(child.unpack() if hasattr(child, "unpack") else child))
-    return labels
+        rows.extend(menu_rows(child.unpack() if hasattr(child, "unpack") else child))
+    return rows
+
+
+def menu_labels(layout):
+    """The visible labels of a dbusmenu GetLayout tree, in order."""
+    return [label for _, label in menu_rows(layout)]
 
 
 def main():
@@ -74,6 +79,10 @@ def main():
     # not resolve — the whole menu reads like that when the locale files are
     # not found.
     parser.add_argument("--forbid-raw-keys", action="store_true")
+    # Clicks the row with this label exactly as a panel does (dbusmenu Event
+    # "clicked"), so the application's own handler runs through its real
+    # signal path.
+    parser.add_argument("--click-label")
     args = parser.parse_args()
 
     bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
@@ -127,7 +136,17 @@ def main():
                                        GLib.Variant("(iias)", (0, -1, [])),
                                        GLib.VariantType("(u(ia{sv}av))"),
                                        Gio.DBusCallFlags.NONE, 5000, None)
-                labels = menu_labels(layout.unpack()[1])
+                rows = menu_rows(layout.unpack()[1])
+                labels = [label for _, label in rows]
+                if args.click_label:
+                    target = [row_id for row_id, label in rows if label == args.click_label]
+                    if not target:
+                        report["failures"].append(f"no row labelled {args.click_label!r} to click")
+                    else:
+                        bus.call_sync(name, item["Menu"], "com.canonical.dbusmenu", "Event",
+                                      GLib.Variant("(isvu)", (target[0], "clicked", GLib.Variant("i", 0), 0)),
+                                      None, Gio.DBusCallFlags.NONE, 5000, None)
+                        item["clicked"] = args.click_label
             item["labels"] = labels
         except GLib.Error as err:
             report["failures"].append(f"inspecting {name}{path}: {err.message}")
