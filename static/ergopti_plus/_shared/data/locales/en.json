@@ -2421,6 +2421,7 @@
 	"updater.checking": "Checking for updates on the '{1}' channel…\n(This may take a few seconds.)",
 	"updater.close": "Close",
 	"updater.install_error": "Could not install the update. Check the logs for details.",
+	"updater.installed_restarting": "Update {1} installed — ErgoptiPlus is restarting on the new version.",
 	"updater.install_error_download": "Failed to download the update package. Check your internet connection and try again.",
 	"updater.install_error_no_asset": "The release does not include a Windows executable to install. Open the release page to download manually.",
 	"updater.install_local_source": "Running from local source — automatic install is only available for release builds.",

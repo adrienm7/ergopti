@@ -2421,6 +2421,7 @@
 	"updater.checking": "‘{1}’ 채널에서 업데이트를 확인하는 중…\n(몇 초가 걸릴 수 있습니다.)",
 	"updater.close": "닫기",
 	"updater.install_error": "업데이트를 설치할 수 없습니다. 자세한 내용은 로그를 확인하십시오.",
+	"updater.installed_restarting": "업데이트 {1} 설치 완료 — ErgoptiPlus가 새 버전으로 다시 시작합니다.",
 	"updater.install_error_download": "업데이트 패키지를 다운로드하지 못했습니다. 인터넷 연결을 확인하고 다시 시도하십시오.",
 	"updater.install_error_no_asset": "이 릴리스에는 Windows 실행 파일이 포함되어 있지 않습니다. 릴리스 페이지를 열어 수동으로 다운로드하십시오.",
 	"updater.install_local_source": "로컬 소스에서 실행 중 — 자동 설치는 릴리스 빌드에서만 가능합니다.",

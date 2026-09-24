@@ -1001,6 +1001,19 @@ jobs:
           sudo bash static/ergopti_plus/linux/tests/hardware/run_daemon_live.sh
         timeout-minutes: 6
 
+      # The updater a user runs, run: this tree built as an old release and
+      # installed with its own install.sh, then its updater finds the newest
+      # published release on GitHub, verifies and installs it, and restarts the
+      # daemon on it. An installed prerelease once asked the "stable" channel
+      # and never found an update; an installed update once waited for the
+      # next login.
+      - name: The Linux updater, live — update to the newest release and restart
+        if: always()
+        run: |
+          sudo apt-get install -y --no-install-recommends lua-luv
+          bash static/ergopti_plus/linux/tests/hardware/run_updater_live.sh
+        timeout-minutes: 10
+
       # The AI a user runs locally, run: the official Ollama serving a small
       # model, asked through the production modules and the real curl transport
       # for its model list, a download, streamed predictions, and — on its

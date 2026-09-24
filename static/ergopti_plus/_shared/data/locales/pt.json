@@ -2421,6 +2421,7 @@
 	"updater.checking": "A procurar atualizações no canal «{1}»…\n(Esta operação pode demorar alguns segundos.)",
 	"updater.close": "Fechar",
 	"updater.install_error": "Não foi possível instalar a atualização. Consulte os registos para mais detalhes.",
+	"updater.installed_restarting": "Atualização {1} instalada — o ErgoptiPlus está reiniciando na nova versão.",
 	"updater.install_error_download": "Falha ao transferir o pacote de atualização. Verifique a sua ligação à Internet e tente novamente.",
 	"updater.install_error_no_asset": "Esta versão não inclui um executável para Windows. Abra a página da versão para transferir manualmente.",
 	"updater.install_local_source": "A executar a partir de fonte local — a instalação automática só está disponível para builds de release.",

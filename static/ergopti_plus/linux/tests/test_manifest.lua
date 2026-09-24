@@ -137,6 +137,8 @@ return {
 	"tests.unit.meta.test_ui_bridge_handlers",
 	"tests.unit.meta.test_updater_constants_single_source",
 	"tests.unit.meta.test_updater_manager",
+	"tests.unit.meta.test_updater_channel_and_recheck",
+	"tests.unit.meta.test_updater_restart",
 	"tests.unit.meta.test_updater_version_shared",
 	"tests.unit.meta.test_webkit_host",
 	"tests.unit.meta.test_webkit_host_asset_query",

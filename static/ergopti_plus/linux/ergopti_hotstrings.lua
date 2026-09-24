@@ -1570,6 +1570,47 @@ local function main()
 			on_menu_changed = function()
 				if rebuild_tray_menu then rebuild_tray_menu() end
 			end,
+			-- A check asked from the tray: its answer is told, and the menu redrawn
+			-- so an install row appears for a found release.
+			on_update_checked = function(available, release, err)
+				if notifier and ok_i18n and i18n_mod then
+					local body
+					if available and release then
+						body = i18n_mod.get("updater.tray_new_version_body")
+							:gsub("{1}", (tostring(release.tag):gsub("%%", "%%%%")))
+					elseif err then
+						body = i18n_mod.get("updater.no_connection")
+					else
+						body = i18n_mod.get("updater.up_to_date")
+							:gsub("{1}", (tostring(updater.current_version()):gsub("%%", "%%%%")))
+					end
+					notifier.send(body, { title = i18n_mod.get("updater.title_update"), level = "info" })
+				end
+				if rebuild_tray_menu then rebuild_tray_menu() end
+			end,
+			-- An update downloaded and installed: the daemon restarts on it.
+			on_update_finished = function(installed, tag, stage)
+				local title = ok_i18n and i18n_mod and i18n_mod.get("updater.title_update") or nil
+				if not installed then
+					if notifier and title then
+						notifier.send(i18n_mod.get(stage == "download" and "updater.install_error_download"
+							or "updater.install_error"), { title = title, level = "error" })
+					end
+					if rebuild_tray_menu then rebuild_tray_menu() end
+					return
+				end
+				if notifier and title then
+					notifier.send(i18n_mod.get("updater.installed_restarting")
+						:gsub("{1}", (tostring(tag):gsub("%%", "%%%%"))), { title = title, level = "info" })
+				end
+				local launch_args = {}
+				for index = 1, #arg do launch_args[index] = arg[index] end
+				local how = require("modules.updater.restarter").restart({
+					wrapper = updater.installed_launcher(),
+					args = launch_args,
+				})
+				if how == "relay" then shutdown.request("update installed") end
+			end,
 			-- Adding a delimiter needs a text field, and this driver's only text
 			-- field is the settings window. Opening it is honest; a native prompt
 			-- would mean a second dialog toolkit for one input.

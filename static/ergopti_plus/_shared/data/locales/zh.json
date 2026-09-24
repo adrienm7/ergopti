@@ -2421,6 +2421,7 @@
 	"updater.checking": "正在“{1}”通道上检查更新…\n(可能需要几秒钟。)",
 	"updater.close": "关闭",
 	"updater.install_error": "无法安装更新。请查看日志了解详情。",
+	"updater.installed_restarting": "更新 {1} 已安装 — ErgoptiPlus 正在以新版本重新启动。",
 	"updater.install_error_download": "下载更新包失败。请检查你的网络连接后重试。",
 	"updater.install_error_no_asset": "此版本不包含 Windows 可执行文件。请打开发布页面手动下载。",
 	"updater.install_local_source": "正从本地源运行 —— 自动安装仅适用于 release 构建。",

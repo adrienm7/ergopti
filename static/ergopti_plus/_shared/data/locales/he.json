@@ -2421,6 +2421,7 @@
 	"updater.checking": "מחפש עדכונים בערוץ \"{1}\"…\n(הפעולה עשויה להימשך מספר שניות.)",
 	"updater.close": "סגור",
 	"updater.install_error": "לא ניתן להתקין את העדכון. בדוק את היומנים לפרטים נוספים.",
+	"updater.installed_restarting": "העדכון {1} הותקן — ErgoptiPlus מופעל מחדש בגרסה החדשה.",
 	"updater.install_error_download": "הורדת חבילת העדכון נכשלה. בדוק את חיבור האינטרנט שלך ונסה שוב.",
 	"updater.install_error_no_asset": "גרסה זו אינה כוללת קובץ הפעלה ל-Windows. פתח את עמוד הגרסה להורדה ידנית.",
 	"updater.install_local_source": "פועל ממקור מקומי — התקנה אוטומטית זמינה רק לבניות release.",

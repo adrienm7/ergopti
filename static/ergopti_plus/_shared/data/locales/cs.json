@@ -2421,6 +2421,7 @@
 	"updater.checking": "Hledám aktualizace v kanálu „{1}“…\n(Operace může trvat několik sekund.)",
 	"updater.close": "Zavřít",
 	"updater.install_error": "Nelze nainstalovat aktualizaci. Podrobnosti najdete v logu.",
+	"updater.installed_restarting": "Aktualizace {1} nainstalována — ErgoptiPlus se restartuje na novou verzi.",
 	"updater.install_error_download": "Stažení aktualizačního balíčku selhalo. Zkontrolujte připojení k internetu a zkuste to znovu.",
 	"updater.install_error_no_asset": "Toto vydání neobsahuje spustitelný soubor pro Windows. Otevřete stránku vydání pro ruční stažení.",
 	"updater.install_local_source": "Spuštěno z lokálního zdroje — automatická instalace je dostupná pouze pro release sestavení.",
