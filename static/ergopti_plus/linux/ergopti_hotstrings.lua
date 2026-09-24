@@ -1731,7 +1731,13 @@ local function main()
 					end
 				end,
 			})
-			if llm_overlay and not llm_overlay.init({ style = style }) then llm_overlay = nil end
+			-- Placed where the hotstring preview goes: without these the
+			-- suggestions were centred on an assumed 1920x1080 screen.
+			if llm_overlay and not llm_overlay.init({
+				style = style,
+				anchor_provider = tooltip_preview.resolve_anchor,
+				screen_provider = tooltip_preview.screen_frame,
+			}) then llm_overlay = nil end
 			Logger.info(LOG, "Preview tooltip initialised (renderer available: %s).",
 				tostring(require("adapters.graphics_renderer").is_available()))
 		else
