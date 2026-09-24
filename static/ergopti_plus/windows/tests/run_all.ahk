@@ -169,6 +169,9 @@ global _DefaultLogsDir := _LogsDir
 ; The layer-file loader reads _shared/keymap and the physical-key registry at run
 ; time; meta/test_corpus_keymap_layers.ahk replays the cross-driver corpus through it.
 #Include ../platform/remap/layers_loader.ahk
+; The navigation layer's hotkey table, built from layer files; registration is
+; injectable, so unit/test_nav_layer_table.ahk drives it without a live hook.
+#Include ../platform/remap/nav_layer_table.ahk
 #Include ../ui/menu/menu_taphold.ahk
 ; The hotstring gate and « all sections » rows, built over the live Features.
 #Include ../ui/menu/menu_hotstring_switches.ahk
@@ -415,6 +418,7 @@ InstallSendNoOps()
 #Include unit/test_personal_toml_io.ahk
 #Include unit/test_personal_info_persistence_transaction_20260813.ahk
 #Include unit/test_nav_layer_helpers.ahk
+#Include unit/test_nav_layer_table.ahk
 #Include unit/test_synthetic_buffer_effects.ahk
 #Include unit/test_prefix_finalizer_generation.ahk
 #Include unit/test_synthetic_sends_declare_buffer_effect.ahk

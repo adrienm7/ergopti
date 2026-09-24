@@ -12,14 +12,16 @@
 # _shared/data/keycodes/physical_keys.json, written quoted because they are
 # data, not setting names. Values follow the grammar in layer_actions.toml.
 #
-# The `all` table reproduces the Windows layer (windows/platform/remap/
-# nav_layer.ahk) key for key; tools/test/test-nav-layer-recommended-golden.cjs
-# fails on any difference. The number row, Space and Tab mean different things
-# on each OS today, so they live in the OS tables: a repeat count on Windows,
-# F1-F12, Spotlight and window cycling on macOS, nothing on Linux. macOS also
-# keeps Escape on the right Command key, which sits where the right Alt key
-# sits on a PC board. The wheel is volume on Windows and Linux only: the macOS
-# layer cannot take wheel input ([source_kinds.wheel] in layer_actions.toml).
+# The `all` table reproduces key for key the Windows layer as it was written by
+# hand before the drivers generated it from layer files, frozen in
+# windows/tests/fixtures/nav_layer_golden.json;
+# tools/test/test-nav-layer-recommended-golden.cjs fails on any difference. The
+# number row, Space and Tab mean different things on each OS, so they live in
+# the OS tables: a repeat count on Windows, F1-F12, Spotlight and window
+# cycling on macOS, nothing on Linux. macOS also keeps Escape on the right
+# Command key, which sits where the right Alt key sits on a PC board. The wheel
+# is volume on Windows and Linux only: the macOS layer cannot take wheel input
+# ([source_kinds.wheel] in layer_actions.toml).
 #
 # The layer id is the value a tap-hold key's hold_layer names
 # (_shared/tap_hold/defaults.toml [tap_hold.hold_picker].layers).
