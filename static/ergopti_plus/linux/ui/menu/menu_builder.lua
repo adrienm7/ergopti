@@ -2970,6 +2970,16 @@ local function _build_tap_holds(ctx)
 	for key, value in pairs(ctx.state_getters or {}) do render_ctx.state_getters[key] = value end
 	render_ctx.state_getters["tapholds_enabled"] = function() return feature_on end
 
+	-- The navigation layer editor: the shared page, saved and applied by
+	-- ui/layer_editor/bridge.lua.
+	render_ctx.commands["edit_nav_layer"] = function()
+		if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
+			Logger.error(LOG, "No webview manager in the menu context — the layer editor cannot open.")
+			return
+		end
+		ctx.webview.show("layer_editor")
+	end
+
 	local rows = ManifestMenu
 		and ManifestMenu.build("tap_holds_menu", "TapHolds", nil, nil, render_ctx, providers)
 		or {}

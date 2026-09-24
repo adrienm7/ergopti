@@ -1433,6 +1433,7 @@
 	"menu.tapholds.title": "⌨️ タップホールド",
 	"menu.tapholds.combo_arrow": "コンボ → %s",
 	"menu.tapholds.copy_tap_to_combo": "🔁 修飾キーにタップ→コンボをコピー",
+	"menu.tapholds.edit_nav_layer": "ナビゲーションレイヤーを編集…",
 	"menu.tapholds.header_shortcuts": "修飾キーショートカット",
 	"menu.tapholds.header_taps_holds": "タップ / ホールド",
 	"menu.tapholds.hold_arrow": "ホールド → %s",

@@ -1433,6 +1433,7 @@
 	"menu.tapholds.title": "⌨️ Касание-Удержание",
 	"menu.tapholds.combo_arrow": "Комбо → %s",
 	"menu.tapholds.copy_tap_to_combo": "🔁 Скопировать нажатие → комбо для клавиш-модификаторов",
+	"menu.tapholds.edit_nav_layer": "Изменить слой навигации…",
 	"menu.tapholds.header_shortcuts": "Комбинации клавиш-модификаторов",
 	"menu.tapholds.header_taps_holds": "Касание / Удержание",
 	"menu.tapholds.hold_arrow": "Удержание → %s",

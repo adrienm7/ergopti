@@ -1433,6 +1433,7 @@
 	"menu.tapholds.title": "⌨️ Tap-Hold",
 	"menu.tapholds.combo_arrow": "Combo → %s",
 	"menu.tapholds.copy_tap_to_combo": "🔁 Copia tap → combo per tasti modificatori",
+	"menu.tapholds.edit_nav_layer": "Modifica il livello di navigazione…",
 	"menu.tapholds.header_shortcuts": "Scorciatoie modificatori",
 	"menu.tapholds.header_taps_holds": "Tap / Hold",
 	"menu.tapholds.hold_arrow": "Hold → %s",

@@ -1433,6 +1433,7 @@
 	"menu.tapholds.title": "⌨️ 탭-홀드",
 	"menu.tapholds.combo_arrow": "콤보 → %s",
 	"menu.tapholds.copy_tap_to_combo": "🔁 수정 키에 tap → combo 복사",
+	"menu.tapholds.edit_nav_layer": "탐색 레이어 편집…",
 	"menu.tapholds.header_shortcuts": "수정 키 단축키",
 	"menu.tapholds.header_taps_holds": "탭 / 홀드",
 	"menu.tapholds.hold_arrow": "홀드 → %s",

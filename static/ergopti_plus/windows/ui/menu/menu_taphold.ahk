@@ -42,7 +42,8 @@ _BuildTapHoldsSubmenu() {
 	Commands := Map(
 		"tapholds_toggle", MenuRenderer_CategoryGateCommand("TapHolds"),
 		"reset_defaults",  _TH_ResetAllToDefaults,
-		"disable_all",     _TH_DisableAll
+		"disable_all",     _TH_DisableAll,
+		"edit_nav_layer", LayerEditor_Open
 	)
 	Getters := Map("tapholds_enabled", () => IsCategoryGated("TapHolds"))
 	ListProviders := Map("tap_hold_keys", (*) => _TH_KeyRows())
