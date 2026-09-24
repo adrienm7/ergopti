@@ -88,8 +88,9 @@ local function read_shared_json(rel)
 	local path = Paths.shared(rel)
 	local raw = type(path) == "string" and FileSystem.read(path) or nil
 	if type(raw) ~= "string" then return nil, "_shared/" .. rel .. " is unreadable" end
+	-- The shared json.lua answers nil to invalid JSON rather than raising.
 	local ok, decoded = pcall(Json.decode, raw)
-	if not ok then return nil, "_shared/" .. rel .. " is not valid JSON" end
+	if not ok or type(decoded) ~= "table" then return nil, "_shared/" .. rel .. " is not valid JSON" end
 	return decoded, nil
 end
 

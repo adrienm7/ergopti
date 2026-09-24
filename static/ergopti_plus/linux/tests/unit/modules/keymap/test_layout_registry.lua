@@ -103,6 +103,28 @@ local function arg_value(args, flag)
 end
 
 helpers.describe("layout registry (Linux): converting a registry layout on the device", function()
+	helpers.it("names the shared defaults file it cannot decode (layout-registry-convert)", function()
+		-- The shared json.lua answers nil to invalid JSON instead of raising, so a
+		-- reader that only checks the pcall status loses the reason.
+		local FileSystem = require("adapters.file_system")
+		local LayoutRegistry = helpers.load_module("modules.keymap.layout_registry")
+		local original_read = FileSystem.read
+		local served = 0
+		FileSystem.read = function(path)
+			if type(path) == "string" and path:find("modules/layouts/defaults.json", 1, true) then
+				served = served + 1
+				return "{ not json"
+			end
+			return original_read(path)
+		end
+		local called, settings, err = pcall(LayoutRegistry.settings)
+		FileSystem.read = original_read
+		helpers.assert_true(called, "settings() must report, not raise: " .. tostring(settings))
+		helpers.assert_eq(served, 1, "the malformed defaults file must be the one read")
+		helpers.assert_nil(settings)
+		helpers.assert_contains(tostring(err), "modules/layouts/defaults.json is not valid JSON")
+	end)
+
 	helpers.it("converts the verified layout with the shipped converter (layout-registry-convert)", function()
 		local layout = registry_file("ergol/ergol.keylayout")
 		local result, state = prepare("ergol", served_registry(layout), { OK_RUN, OK_RUN })
