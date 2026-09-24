@@ -19,6 +19,8 @@
 ---    healthcheck.actions (what the diagnostics page may ask its host to do).
 --- 6. _shared/tests/corpus/diagnostics/error_policy_vectors.json through
 ---    diagnostics.error_policy (when a logged ERROR opens the error window).
+--- 7. _shared/tests/corpus/diagnostics/error_report_vectors.json through
+---    diagnostics.error_report (the report the error window shows and sends).
 --- Each corpus fails loudly when unreadable or empty: a replay over zero
 --- vectors would report success while checking nothing.
 --- ==============================================================================
@@ -212,6 +214,31 @@ helpers.describe("diagnostics corpus: error window policy (error-policy-corpus)"
 	for _, vector in ipairs(corpus.invalid_policies or {}) do
 		helpers.it("validate refuses: " .. vector.id .. " (error-policy-corpus)", function()
 			local ok = pcall(Policy.validate, vector.policy)
+			helpers.assert_eq(ok, false, vector.id .. " must be refused")
+		end)
+	end
+end)
+
+helpers.describe("diagnostics corpus: error report (error-report-corpus)", function()
+	local corpus = read_corpus("tests/corpus/diagnostics/error_report_vectors.json")
+	local ErrorReport = require("diagnostics.error_report")
+
+	helpers.it("has vectors (error-report-corpus)", function()
+		helpers.assert_true(type(corpus.vectors) == "table" and #corpus.vectors >= 3,
+			"the error-report corpus must hold its vectors")
+		helpers.assert_true(type(corpus.invalid_errors) == "table" and #corpus.invalid_errors >= 3,
+			"the error-report corpus must hold its invalid errors")
+	end)
+
+	for _, vector in ipairs(corpus.vectors or {}) do
+		helpers.it("compose: " .. vector.id .. " (error-report-corpus)", function()
+			helpers.assert_eq(ErrorReport.compose(vector.error, vector.identity), vector.expected, vector.id)
+		end)
+	end
+
+	for _, vector in ipairs(corpus.invalid_errors or {}) do
+		helpers.it("compose refuses: " .. vector.id .. " (error-report-corpus)", function()
+			local ok = pcall(ErrorReport.compose, vector.error, vector.identity)
 			helpers.assert_eq(ok, false, vector.id .. " must be refused")
 		end)
 	end
