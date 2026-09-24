@@ -4,9 +4,9 @@
 --- MODULE: Accepting Prediction N With The Digit N
 --- DESCRIPTION:
 --- By default a bare digit accepts the prediction it numbers; the AI menu can
---- require a modifier instead. While the tooltip shows predictions, that digit
---- is the instruction to insert one and never text: not when the slot is
---- missing, not when the insertion fails. Without a tooltip, digits type.
+--- require a modifier instead. While the tooltip shows predictions, the digit
+--- of a shown one is the instruction to insert it and never text, even when
+--- the insertion fails; a digit beyond them, or with no tooltip, types.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -88,9 +88,9 @@ helpers.describe("prediction digit accept: the engine", function()
 		end)
 	end)
 
-	helpers.it("swallows a digit whose prediction is not on offer", function()
+	helpers.it("types a digit beyond the predictions on offer", function()
 		with_offer(1, function(engine, state)
-			helpers.assert_true(engine.handle_shortcut({ key = "7", mods = {} }), "never typed while shown")
+			helpers.assert_true(not engine.handle_shortcut({ key = "7", mods = {} }), "7 with one shown is text")
 			helpers.assert_eq(#state.applied, 0)
 			helpers.assert_true(engine.has_suggestions(), "the offer stays")
 		end)
@@ -133,7 +133,7 @@ helpers.describe("prediction digit accept: the engine", function()
 
 	helpers.it("reads the keypad digits, and 0 as prediction 10", function()
 		with_offer(1, function(engine, state)
-			helpers.assert_true(engine.handle_shortcut({ key = "0", mods = {} }), "0 is slot 10: swallowed")
+			helpers.assert_true(not engine.handle_shortcut({ key = "0", mods = {} }), "0 is slot 10: not on offer, typed")
 			helpers.assert_eq(#state.applied, 0)
 			helpers.assert_true(engine.handle_shortcut({ key = "KP_1", mods = {} }))
 			helpers.assert_eq(#state.applied, 1)
@@ -161,6 +161,26 @@ helpers.describe("prediction digit accept: through the keyboard hook", function(
 			helpers.assert_eq(table.concat(emitted, " "), "3:1 3:0", "1 swallowed, the next digit types")
 			helpers.assert_eq(table.concat(chars), "2")
 			helpers.assert_eq(#state.applied, 1)
+		end)
+	end)
+
+end)
+
+helpers.describe("prediction digit accept: a digit beyond the offer", function()
+
+	helpers.it("reaches the application through the hook, and keeps the offer", function()
+		with_offer(1, function(engine, state)
+			local hook = helpers.load_module("adapters.keyboard_hook")
+			local emitted = {}
+			hook._test_drive({
+				{ type = 1, code = 4, value = 1 },
+				{ type = 1, code = 4, value = 0 },
+			}, {
+				onConsume = function(detail) return engine.handle_shortcut(detail) end,
+				onEmitRaw = function(code, value) emitted[#emitted + 1] = code .. ":" .. value; return true end,
+			}, true)
+			helpers.assert_eq(table.concat(emitted, " "), "4:1 4:0", "3 with one prediction shown is typed")
+			helpers.assert_eq(#state.applied, 0)
 		end)
 	end)
 
