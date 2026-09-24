@@ -166,6 +166,21 @@ compositor, generation-2 leftovers) and a GNOME session on a private D-Bus bus
 with a real dconf. Action: any installer change lands with a green matrix; a
 new distribution family is added as a matrix entry, not as a manual checklist.
 
+### project-linux-daemon-is-proven-live-through-a-real-kernel
+
+`tests/hardware/run_daemon_live.sh` (CI step in `test-linux`) starts the real
+daemon with `--tray` on a uinput keyboard, types "adn " and decodes what the
+daemon's own virtual keyboard sends, while `sni_host.py` reads the tray menu.
+It found three bugs that no recorder-based test could: every tray row's
+`ffi.cast` callback leaked (LuaJIT never frees them, so the daemon crashed
+with "too many callbacks"; one process-wide dispatcher now routes by id), a
+100k-row menu that took seconds to build, and the expansion's replayed
+terminator dropped because its key-down was still held on the virtual
+keyboard (the kernel ignores a key-down for a key already down). Action:
+inject through `injector.run_transaction`, which releases
+`keyboard_hook.held_forwarded_keys()` first; never add a per-item FFI
+callback; keep this live step green for any hook, injector or tray change.
+
 ## Release artifacts
 
 ### project-release-notes-are-not-joined-to-the-assets
