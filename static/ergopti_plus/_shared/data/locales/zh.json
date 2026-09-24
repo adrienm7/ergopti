@@ -796,6 +796,8 @@
 	"layout.ergoptiplus": "应用 Ergopti➕ 的 AltGr 小幅调整",
 	"layout.ctrlmagicsave": "Ctrl+★ 发送 Ctrl+S",
 	"menu.layout.emulated_layout": "模拟的自定义键盘布局",
+	"menu.layout.superseded_ergopti_only": "仅限 Ergopti 布局：正在模拟其他布局",
+	"menu.layout.superseded_digit_row": "所模拟的布局自行决定数字行",
 	"layouts.linux_needs_python": "将此键盘布局转换为 Linux 格式需要 Python 3.8 或更高版本（python3）。请安装后重试。",
 	"llm.deps.browser_install_tip": "请从浏览器打开的页面下载 Windows 版 Ollama，运行安装程序后返回 — 连接将被自动检测。",
 	"llm.deps.done_success": "✅ Ollama 已就绪",

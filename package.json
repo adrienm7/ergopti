@@ -102,6 +102,7 @@
 		"test:tooltip-style-single-source": "node ./tools/test/test-tooltip-style-single-source.cjs",
 		"test:layouts-registry": "node ./tools/test/test-layouts-registry.cjs",
 		"test:layouts-defaults-single-source": "node ./tools/test/test-layouts-defaults-single-source.cjs",
+		"test:layout-supersession-declared": "node ./tools/test/test-layout-supersession-declared.cjs",
 		"test:linux-ships-keylayout-converter": "node ./tools/test/test-linux-ships-keylayout-converter.cjs",
 		"test:xkb": "node ./tools/test/run-xkb-python-tests.cjs",
 		"test:shared-js-loadable": "node ./tools/test/test-shared-js-is-loadable.cjs",

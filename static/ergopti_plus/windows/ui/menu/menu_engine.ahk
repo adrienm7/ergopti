@@ -87,6 +87,14 @@ MenuRowFromManifest(ManifestEntry, V1CategoryPath) {
 		or (SubCategory != "DynamicHotstrings" and !IsCategoryGated(SubCategory)) {
 		Row["disabled"] := true
 	}
+	; A feature an emulated registry layout replaces is off while one is emulated
+	; (infra/master_gates.ahk): grey its row and say why, so the unticked box does
+	; not read as a setting the user can turn back on.
+	SupersededReason := LayoutSupersededReason(ManifestEntry)
+	if (SupersededReason != "") {
+		Row["disabled"] := true
+		Row["label"] := MenuTitle . " (" . t(SupersededReason) . ")"
+	}
 	return Row
 }
 

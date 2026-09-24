@@ -796,6 +796,8 @@
 	"layout.ergoptiplus": "Tillämpa de mindre AltGr-ändringarna för Ergopti➕",
 	"layout.ctrlmagicsave": "Ctrl+★ skickar Ctrl+S",
 	"menu.layout.emulated_layout": "Emulerad anpassad tangentbordslayout",
+	"menu.layout.superseded_ergopti_only": "Endast Ergopti-layout: en annan layout emuleras",
+	"menu.layout.superseded_digit_row": "Den emulerade layouten bestämmer själv sin sifferrad",
 	"layouts.linux_needs_python": "Att konvertera den här tangentbordslayouten för Linux kräver Python 3.8 eller senare (python3). Installera det och försök igen.",
 	"llm.deps.browser_install_tip": "Ladda ned Ollama för Windows från sidan som öppnats i webbläsaren, kör installationsprogrammet och kom tillbaka — anslutningen upptäcks automatiskt.",
 	"llm.deps.done_success": "✅ Ollama redo",

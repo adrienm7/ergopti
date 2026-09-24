@@ -796,6 +796,8 @@
 	"layout.ergoptiplus": "Ergopti➕의 소규모 AltGr 변경 사항 적용",
 	"layout.ctrlmagicsave": "Ctrl+★ → Ctrl+S 전송",
 	"menu.layout.emulated_layout": "에뮬레이션할 사용자 지정 자판",
+	"menu.layout.superseded_ergopti_only": "Ergopti 자판 전용: 다른 자판을 에뮬레이션하는 중",
+	"menu.layout.superseded_digit_row": "에뮬레이션 중인 자판이 숫자 줄을 직접 정합니다",
 	"layouts.linux_needs_python": "이 자판을 Linux용으로 변환하려면 Python 3.8 이상(python3)이 필요합니다. 설치한 뒤 다시 시도하세요.",
 	"llm.deps.browser_install_tip": "브라우저에서 열린 페이지에서 Windows용 Ollama를 다운로드하고 설치 프로그램을 실행한 후 다시 돌아오세요 — 연결이 자동으로 감지됩니다.",
 	"llm.deps.done_success": "✅ Ollama 逌비됨",

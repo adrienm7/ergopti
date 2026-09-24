@@ -791,6 +791,8 @@
 	"layout.ergoptiplus": "Appliquer les légers changements en AltGr d'Ergopti➕",
 	"layout.ctrlmagicsave": "Ctrl+★ envoie Ctrl+S",
 	"menu.layout.emulated_layout": "Disposition personnalisée émulée",
+	"menu.layout.superseded_ergopti_only": "Disposition Ergopti uniquement : une autre disposition est émulée",
+	"menu.layout.superseded_digit_row": "La disposition émulée définit sa propre rangée de chiffres",
 	"layouts.linux_needs_python": "La conversion de cette disposition pour Linux nécessite Python 3.8 ou plus récent (python3). Installez-le, puis réessayez.",
 	"llm.deps.browser_install_tip": "Téléchargez Ollama pour Windows depuis la page ouverte dans le navigateur, lancez l'installeur, puis revenez ici — la connexion sera détectée automatiquement.",
 	"llm.deps.done_success": "✅ Ollama prêt",

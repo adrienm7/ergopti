@@ -40,6 +40,10 @@
 #       description_key         Required. i18n key for the menu label.
 #       platforms               Optional. Defaults to the parent section's
 #                               ``platforms`` value if absent.
+#       superseded_reason_key   Optional, Windows-only booleans. i18n key of
+#                               why the feature is off while a registry layout
+#                               is emulated (layout.emulated_layout): the master
+#                               gate turns it off and the menu greys its row.
 #
 # Examples:
 #   [[features.script]]
@@ -2789,12 +2793,18 @@ description_key = "menu.gestures.sensitivities.swipe_5_right_up"
 # ===== 3.7 layout =====
 # ======================
 
+# superseded_reason_key marks a feature of the Ergopti emulation (its layers and
+# the overlays they carry: typography, selection wrapping, the Ergopti+ changes)
+# or one an emulated layout decides for itself (the digit row). While a registry
+# layout is emulated (emulated_layout below) the Windows master gate turns it off
+# and the menu greys its row with this reason.
 [[features.layout]]
 id = "ergopti_base"
 platforms = ["ahk"]
 default = true
 type = "boolean"
 description_key = "menu.layout.ergopti_base"
+superseded_reason_key = "menu.layout.superseded_ergopti_only"
 
 [[features.layout]]
 id = "direct_access_digits"
@@ -2802,6 +2812,7 @@ platforms = ["ahk"]
 default = true
 type = "boolean"
 description_key = "menu.layout.direct_access_digits"
+superseded_reason_key = "menu.layout.superseded_digit_row"
 
 [[features.layout]]
 id = "ergopti_alt_gr"
@@ -2809,6 +2820,7 @@ platforms = ["ahk"]
 default = true
 type = "boolean"
 description_key = "menu.layout.ergopti_alt_gr"
+superseded_reason_key = "menu.layout.superseded_ergopti_only"
 
 [[features.layout]]
 id = "ergopti_plus"
@@ -2816,6 +2828,7 @@ platforms = ["ahk"]
 default = true
 type = "boolean"
 description_key = "menu.layout.ergopti_plus"
+superseded_reason_key = "menu.layout.superseded_ergopti_only"
 
 [[features.layout]]
 id = "ctrl_magic_save"

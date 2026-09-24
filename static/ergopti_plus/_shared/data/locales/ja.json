@@ -796,6 +796,8 @@
 	"layout.ergoptiplus": "Ergopti➕のマイナーなAltGr変更を適用",
 	"layout.ctrlmagicsave": "Ctrl+★ は Ctrl+S を送信",
 	"menu.layout.emulated_layout": "エミュレートするカスタム配列",
+	"menu.layout.superseded_ergopti_only": "Ergopti 配列専用：別の配列をエミュレート中",
+	"menu.layout.superseded_digit_row": "エミュレート中の配列が数字の列を決めます",
 	"layouts.linux_needs_python": "この配列を Linux 用に変換するには Python 3.8 以降（python3）が必要です。インストールしてから、もう一度お試しください。",
 	"llm.deps.browser_install_tip": "ブラウザで開いたページから Windows 用 Ollama をダウンロードし、インストーラを実行してここに戻ってください。接続は自動的に検出されます。",
 	"llm.deps.done_success": "✅ Ollama 準備完了",
