@@ -400,6 +400,7 @@ if UIASW_IsWorkerInvocation()
 #Include infra/window_utils.ahk
 #Include infra/external_url_policy.ahk
 #Include infra/text_utils.ahk
+#Include infra/text_case.ahk
 #Include ui/spotlight/init.ahk
 #Include infra/nav_layer_helpers.ahk
 

@@ -139,6 +139,7 @@ global _DefaultLogsDir := _LogsDir
 #Include ../infra/external_url_policy.ahk
 #Include ../ui/tooltip/position_receipt.ahk
 #Include ../infra/text_utils.ahk
+#Include ../infra/text_case.ahk
 #Include ../infra/nav_layer_helpers.ahk
 #Include ../infra/hotstrings/hotstring_engine.ahk
 #Include ../infra/altgr_family.ahk
@@ -605,6 +606,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_onboarding_finish_payload.ahk
 #Include unit/test_onboarding_metrics_path.ahk
 #Include unit/test_gestures.ahk
+#Include unit/test_text_case_vectors.ahk
 #Include unit/test_gesture_cycle_candidates.ahk
 #Include unit/test_gesture_recommended_actions.ahk
 #Include unit/test_config_persistence_transactions.ahk

@@ -547,43 +547,9 @@ if Features["shortcuts"]["title_case"] {
 		; Win + W (TitleCase)
 		AddShortcut("#", "w", ConvertToTitleCase)
 
+		; The same transform as the titlecase_selection action (infra/text_case.ahk).
 		ConvertToTitleCase(*) {
-				GetSelectionAsync(_ConvertToTitleCaseSelection)
-		}
-
-		_ConvertToTitleCaseSelection(Text) {
-				; No-op on an empty/failed capture: an async timeout/cancellation must
-				; never turn into a stale SendInstant paste.
-				if (Text = "")
-						return
-
-				; Pattern to detect if text is already in title case:
-				; Each word starts with an uppercase letter (including accented),
-				; followed by lowercase letters (including accented) or digits or allowed symbols.
-				; Words are separated by spaces, tabs or returns ([ \t\r\n]).
-				TitleCasePattern :=
-						"^(?:[A-ZÉÈÀÙÂÊÎÔÛÇ][a-zéèàùâêîôûç0-9''\(\),.\-:;!?\-]*[ \t\r\n]+)*[A-ZÉÈÀÙÂÊÎÔÛÇ][a-zéèàùâêîôûç0-9''\(\),.\-:;!?\-]*$"
-				; Pattern to detect if text is all uppercase (including accented), digits, spaces, and allowed symbols
-				UpperCasePattern := "^[A-ZÉÈÀÙÂÊÎÔÛÇ0-9''\(\),.\-:;!?\s]+$"
-
-				SyntheticOwner := 0
-				try SyntheticOwner := KL_MarkSynthetic("case-transform")
-				try {
-						if RegExMatch(Text, TitleCasePattern) {
-								; Text is Title Case -> convert to lowercase
-								SendInstant(Format("{:L}", Text))
-						} else if RegExMatch(Text, UpperCasePattern) {
-								; Text is UPPERCASE -> convert to TitleCase
-								SendInstant(Format("{:T}", Text))
-						} else {
-								; Otherwise, convert to TitleCase
-								SendInstant(Format("{:T}", Text))
-						}
-						SetTimer((*) => KL_ClearSynthetic(SyntheticOwner), -300)
-				} catch {
-						KL_ClearSynthetic(SyntheticOwner)
-						throw
-				}
+				GestureTransformSelection(TextCaseToggleTitle)
 		}
 }
 
@@ -591,29 +557,9 @@ if Features["shortcuts"]["uppercase"] {
 		; Win + U (Uppercase)
 		AddShortcut("#", "u", ConvertToUppercase)
 
+		; The same transform as the uppercase_selection action (infra/text_case.ahk).
 		ConvertToUppercase(*) {
-				GetSelectionAsync(_ConvertToUppercaseSelection)
-		}
-
-		_ConvertToUppercaseSelection(Text) {
-				; No-op on an empty/failed capture: an async timeout/cancellation must
-				; never turn into a stale SendInstant paste.
-				if (Text = "")
-						return
-				; Check if the selected text contains at least one lowercase letter
-				SyntheticOwner := 0
-				try SyntheticOwner := KL_MarkSynthetic("case-transform")
-				try {
-						if RegExMatch(Text, "[a-zà-ÿ]") {
-								SendInstant(Format("{:U}", Text)) ; Convert to uppercase
-						} else {
-								SendInstant(Format("{:L}", Text)) ; Convert to lowercase
-						}
-						SetTimer((*) => KL_ClearSynthetic(SyntheticOwner), -300)
-				} catch {
-						KL_ClearSynthetic(SyntheticOwner)
-						throw
-				}
+				GestureTransformSelection(TextCaseToggleUpper)
 		}
 }
 

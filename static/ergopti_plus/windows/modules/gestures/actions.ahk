@@ -191,12 +191,6 @@ global GESTURE_ACTIONS := Map(
 		"teleport_mouse", {
 				Fn: (*) => GestureTeleportMouse(),
 		},
-		"uppercase_selection", {
-				Fn: (*) => GestureToggleUppercase(),
-		},
-		"titlecase_selection", {
-				Fn: (*) => GestureToggleTitleCase(),
-		},
 		"spotlight_mouse", {
 				Fn: (*) => (MouseGetPos(&_Mx, &_My), SpotlightMouseAt(_Mx, _My, 5000)),
 		},
@@ -410,11 +404,30 @@ GestureTeleportMouse() {
 		SpotlightMouseAt(TargetX, TargetY, 3000)
 }
 
-GestureToggleUppercase() {
-		GetSelectionAsync(_GestureToggleUppercaseSelection)
+; Case action id -> the pure transform it applies to the selection
+; (infra/text_case.ahk). The registry below and the shared-corpus replay
+; (tests/unit/test_text_case_vectors.ahk) both read this map, so an id cannot be
+; tested against one transform and run another.
+; @returns {Map}
+GestureCaseTransforms() {
+		static Transforms := Map(
+				"selection_uppercase", TextCaseUpper,
+				"selection_lowercase", TextCaseLower,
+				"selection_titlecase", TextCaseTitle,
+				"uppercase_selection", TextCaseToggleUpper,
+				"titlecase_selection", TextCaseToggleTitle,
+		)
+		return Transforms
 }
 
-_GestureToggleUppercaseSelection(Text) {
+; Captures the selection, applies Transform and pastes the result over it. The
+; Win+U / Win+W shortcuts go through here too.
+; @param {Func} Transform String -> String.
+GestureTransformSelection(Transform) {
+		GetSelectionAsync((Text) => _GestureSendTransformedSelection(Text, Transform))
+}
+
+_GestureSendTransformedSelection(Text, Transform) {
 		; No-op on an empty/failed capture: async cancellation must never turn into
 		; a stale SendInstant paste.
 		if (Text = "")
@@ -422,10 +435,7 @@ _GestureToggleUppercaseSelection(Text) {
 		SyntheticOwner := 0
 		try SyntheticOwner := KL_MarkSynthetic("case-transform")
 		try {
-				if RegExMatch(Text, "[a-zà-ÿ]")
-						SendInstant(Format("{:U}", Text))
-				else
-						SendInstant(Format("{:L}", Text))
+				SendInstant(Transform.Call(Text))
 				SetTimer((*) => KL_ClearSynthetic(SyntheticOwner), -300)
 		} catch {
 				KL_ClearSynthetic(SyntheticOwner)
@@ -433,30 +443,14 @@ _GestureToggleUppercaseSelection(Text) {
 		}
 }
 
-GestureToggleTitleCase() {
-		GetSelectionAsync(_GestureToggleTitleCaseSelection)
+; Built in a helper rather than inline, so each registered closure captures its
+; own transform instead of the loop variable.
+_GestureMakeCaseAction(Transform) {
+		return (*) => GestureTransformSelection(Transform)
 }
 
-_GestureToggleTitleCaseSelection(Text) {
-		; No-op on an empty/failed capture (see GestureToggleUppercase).
-		if (Text = "")
-				return
-		TitleCasePattern :=
-				"^(?:[A-ZÉÈÀÙÂÊÎÔÛÇ][a-zéèàùâêîôûç0-9''\(\),.\-:;!?\-]*[ \t\r\n]+)*[A-ZÉÈÀÙÂÊÎÔÛÇ][a-zéèàùâêîôûç0-9''\(\),.\-:;!?\-]*$"
-		UpperCasePattern := "^[A-ZÉÈÀÙÂÊÎÔÛÇ0-9''\(\),.\-:;!?\s]+$"
-		SyntheticOwner := 0
-		try SyntheticOwner := KL_MarkSynthetic("case-transform")
-		try {
-				if RegExMatch(Text, TitleCasePattern)
-						SendInstant(Format("{:L}", Text))
-				else
-						SendInstant(Format("{:T}", Text))
-				SetTimer((*) => KL_ClearSynthetic(SyntheticOwner), -300)
-		} catch {
-				KL_ClearSynthetic(SyntheticOwner)
-				throw
-		}
-}
+for _CaseActionId, _CaseTransform in GestureCaseTransforms()
+		GESTURE_ACTIONS[_CaseActionId] := { Fn: _GestureMakeCaseAction(_CaseTransform) }
 
 ; Deferred clipboard restore for GesturePastePlain. Runs on a negative-delay
 ; SetTimer so the synthetic ^v has already consumed the coerced text before the

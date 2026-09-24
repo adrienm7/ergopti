@@ -88,6 +88,12 @@ GestureActionCatalogueData() {
 	Items.Push({ Kind: "action", Id: "sel_right" })
 	Items.Push({ Kind: "action", Id: "sel_word_prev" })
 	Items.Push({ Kind: "action", Id: "sel_word_next" })
+	Items.Push({ Kind: "heading", Level: 2, Key: "sg_actions.sg_order.header.text_transform" })
+	Items.Push({ Kind: "action", Id: "selection_uppercase" })
+	Items.Push({ Kind: "action", Id: "selection_lowercase" })
+	Items.Push({ Kind: "action", Id: "selection_titlecase" })
+	Items.Push({ Kind: "action", Id: "uppercase_selection" })
+	Items.Push({ Kind: "action", Id: "titlecase_selection" })
 	Items.Push({ Kind: "heading", Level: 1, Key: "sg_actions.sg_order.header.modifier_chords" })
 	Items.Push({ Kind: "modifier_chords", Level: 2, GroupKey: "sg_actions.sg_order.header.modifier_chord_group" })
 	Items.Push({ Kind: "heading", Level: 1, Key: "sg_actions.sg_order.header.grp_media" })
@@ -124,8 +130,6 @@ GestureActionCatalogueData() {
 	Items.Push({ Kind: "action", Id: "surround_parens" })
 	Items.Push({ Kind: "action", Id: "search_web" })
 	Items.Push({ Kind: "action", Id: "teleport_mouse" })
-	Items.Push({ Kind: "action", Id: "uppercase_selection" })
-	Items.Push({ Kind: "action", Id: "titlecase_selection" })
 	Items.Push({ Kind: "action", Id: "spotlight_mouse" })
 	Items.Push({ Kind: "action", Id: "toggle_capslock" })
 	Items.Push({ Kind: "action", Id: "microsoft_bold" })
@@ -252,6 +256,9 @@ GestureActionCatalogueData() {
 	Actions["sel_word_prev"] := { Family: "sg", LabelKey: "sg_actions.sel_word_prev", Parameter: "", Confirm: false }
 	Actions["select_all"] := { Family: "sg", LabelKey: "sg_actions.select_all", Parameter: "", Confirm: false }
 	Actions["select_line"] := { Family: "sg", LabelKey: "sg_actions.select_line", Parameter: "", Confirm: false }
+	Actions["selection_lowercase"] := { Family: "sg", LabelKey: "sg_actions.selection_lowercase", Parameter: "", Confirm: false }
+	Actions["selection_titlecase"] := { Family: "sg", LabelKey: "sg_actions.selection_titlecase", Parameter: "", Confirm: false }
+	Actions["selection_uppercase"] := { Family: "sg", LabelKey: "sg_actions.selection_uppercase", Parameter: "", Confirm: false }
 	Actions["snap_left"] := { Family: "sg", LabelKey: "sg_actions.snap_left", Parameter: "", Confirm: false }
 	Actions["snap_right"] := { Family: "sg", LabelKey: "sg_actions.snap_right", Parameter: "", Confirm: false }
 	Actions["space"] := { Family: "sg", LabelKey: "sg_actions.space", Parameter: "", Confirm: false }

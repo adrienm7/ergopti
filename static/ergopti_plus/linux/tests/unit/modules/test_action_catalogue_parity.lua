@@ -42,12 +42,16 @@ local function recording_manager()
 	return manager, warnings
 end
 
---- The script-control handlers the daemon injects, exactly as it builds them.
+--- The handlers the daemon injects, built by the same composer it calls: the
+--- script-control actions plus the shortcuts manager's text actions.
 --- @return table
 local function daemon_handlers()
 	local ScriptActions = helpers.load_module("modules.shortcuts.script_actions")
+	local ActionHandlers = helpers.load_module("modules.shortcuts.action_handlers")
+	local Shortcuts = helpers.load_module("modules.shortcuts.manager")
 	local noop = function() end
-	return ScriptActions.new({ reset = noop, reload = noop, quit = noop }).handlers
+	return ActionHandlers.compose(
+		ScriptActions.new({ reset = noop, reload = noop, quit = noop }).handlers, Shortcuts)
 end
 
 --- Runs `body` with every tool probe answering "absent", without a shell.

@@ -164,6 +164,8 @@ REQUIRED_FILES=(
 	"_shared/core/config_schema/migrations.toml"
 	"_shared/lua/config_migrate.lua"
 	"_shared/lua/json.lua"
+	"_shared/lua/text_case/init.lua"
+	"_shared/lua/text_case/unicode_case_data.lua"
 	"_shared/data/keycodes/evdev.json"
 	"_shared/data/locales/fr.json"
 	"_shared/data/locales/en.json"

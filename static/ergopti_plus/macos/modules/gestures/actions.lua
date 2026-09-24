@@ -946,13 +946,29 @@ end)
 -- Required lazily, inside the closure: these modules pull in the whole shortcuts
 -- tree, and requiring it at gesture-registry load time would drag it into boot
 -- for users who never bind one of these.
-sg("select_line", function()
-	local ok, Text = pcall(require, "modules.shortcuts.actions.text")
-	if ok and type(Text.select_line) == "function" then
-		return Text.select_line(current_action_parent())
+--- Builds a gesture action that runs one function of the shortcut layer's text
+--- module under the dispatching parent, so PAUSE of that parent fences it.
+--- @param method string Public function of modules.shortcuts.actions.text.
+--- @return function
+local function text_action(method)
+	return function()
+		local ok, Text = pcall(require, "modules.shortcuts.actions.text")
+		if not ok or type(Text[method]) ~= "function" then
+			Logger.error(LOG, "Text action '%s' is unavailable: %s.", method, tostring(Text))
+			return false
+		end
+		return Text[method](current_action_parent())
 	end
-	return false
-end)
+end
+
+sg("select_line", text_action("select_line"))
+-- The case actions: the two toggles and the three explicit conversions, all
+-- through the shared Unicode table (unicode_case), pinned by the shared corpus.
+sg("uppercase_selection", text_action("toggle_uppercase"))
+sg("titlecase_selection", text_action("toggle_titlecase"))
+sg("selection_uppercase", text_action("selection_uppercase"))
+sg("selection_lowercase", text_action("selection_lowercase"))
+sg("selection_titlecase", text_action("selection_titlecase"))
 sg("teleport_mouse", function()
 	local ok, Mouse = pcall(require, "modules.shortcuts.actions.system_mouse")
 	if ok and type(Mouse.teleport_mouse) == "function" then

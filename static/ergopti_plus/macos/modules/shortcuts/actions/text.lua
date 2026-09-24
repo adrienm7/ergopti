@@ -575,22 +575,16 @@ end
 -- ==========================================
 -- ==========================================
 
---- Trims leading and trailing whitespace from a string.
---- @param s string The input string.
---- @return string The trimmed string.
-local function trim(s)
-	if type(s) ~= "string" then return "" end
-	return (s:gsub("^%s*(.-)%s*$", "%1"))
-end
+-- The shared Unicode case module, required on the first case action rather than
+-- at load: its generated table is about 150 KB, and most sessions never
+-- transform a selection. string.upper/string.lower work on bytes and left é, à
+-- and ç unchanged, so they are not an alternative.
+local _text_case = nil
 
---- Converts a string to Title Case.
---- @param s string The input string.
---- @return string The Title Case string.
-local function titlecase(s)
-	if type(s) ~= "string" then return "" end
-	return (s:lower():gsub("(%S+)", function(w)
-		return w:sub(1, 1):upper() .. w:sub(2)
-	end))
+--- @return table The shared unicode_case module.
+local function text_case()
+	if _text_case == nil then _text_case = require("unicode_case") end
+	return _text_case
 end
 
 --- Asynchronous text-transform engine.
@@ -1498,20 +1492,38 @@ function M.surround_with_parens(parent)
 end
 
 --- Toggles the current selection between Title Case and lowercase.
+--- @param parent string|nil Stable action parent.
+--- @return boolean started
 function M.toggle_titlecase(parent)
-	return do_transform(function(sel)
-		local t = titlecase(sel)
-		-- If already title-cased, drop to lowercase; otherwise apply title case
-		return (sel == t) and sel:lower() or t
-	end, parent)
+	return do_transform(function(sel) return text_case().toggle_title(sel) end, parent)
 end
 
 --- Toggles the current selection between UPPERCASE and lowercase.
+--- @param parent string|nil Stable action parent.
+--- @return boolean started
 function M.toggle_uppercase(parent)
-	return do_transform(function(sel)
-		-- Promote if any lowercase exists; demote otherwise
-		return sel:match("%l") and sel:upper() or sel:lower()
-	end, parent)
+	return do_transform(function(sel) return text_case().toggle_upper(sel) end, parent)
+end
+
+--- Converts the current selection to UPPERCASE, whatever its current case.
+--- @param parent string|nil Stable action parent.
+--- @return boolean started
+function M.selection_uppercase(parent)
+	return do_transform(function(sel) return text_case().upper(sel) end, parent)
+end
+
+--- Converts the current selection to lowercase, whatever its current case.
+--- @param parent string|nil Stable action parent.
+--- @return boolean started
+function M.selection_lowercase(parent)
+	return do_transform(function(sel) return text_case().lower(sel) end, parent)
+end
+
+--- Converts the current selection to Title Case, whatever its current case.
+--- @param parent string|nil Stable action parent.
+--- @return boolean started
+function M.selection_titlecase(parent)
+	return do_transform(function(sel) return text_case().title(sel) end, parent)
 end
 
 --- Selects the current word under the cursor (Alt+Right, then Alt+Shift+Left).
