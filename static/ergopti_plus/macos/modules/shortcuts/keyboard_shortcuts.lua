@@ -31,6 +31,10 @@ local Storage     = require("adapters.storage")
 
 local LOG = "shortcuts.keyboard_shortcuts"
 
+-- The binding a slot's action is dispatched under. Action parameters are stored
+-- under it too, so a menu that asks for one must use this spelling.
+local BINDING_PREFIX = "keyboard__"
+
 local _hotkeys   = {}  -- slot_id → registrar handle
 local _actions   = {}  -- slot_id → action_id
 local _started   = false
@@ -250,7 +254,7 @@ local function bind_slot(slot_id, action_id)
 		Logger.debug(LOG, "Keyboard shortcut fired: %s → %s.", slot_id, current_action)
 		local ok_action, handled = Logger.callback(LOG,
 			"Configurable shortcut '" .. tostring(slot_id) .. "'",
-			GestActions.execute_single, current_action, "keyboard__" .. slot_id)
+			GestActions.execute_single, current_action, M.binding_id(slot_id))
 		if not ok_action then return false end
 		if handled ~= true then
 			Logger.error(LOG, "Configurable shortcut '%s' was not handled by action '%s'.",
@@ -409,6 +413,13 @@ function M.assigned_slots(prefix)
 		end
 	end
 	return out
+end
+
+--- The binding a slot's action is dispatched under, and its parameter stored under.
+--- @param slot_id string
+--- @return string
+function M.binding_id(slot_id)
+	return BINDING_PREFIX .. tostring(slot_id)
 end
 
 --- Configures the action for a slot without replacing an already-owned chord.

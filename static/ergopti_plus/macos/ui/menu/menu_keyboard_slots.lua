@@ -31,6 +31,7 @@ local i18n         = require("infra.i18n")
 local Logger       = require("infra.logger")
 local DeferredWork = require("infra.deferred_work")
 local ActionPicker = require("ui.action_picker")
+local ShortcutUtils = require("ui.menu.shortcut_utils")
 local KbShortcuts  = require("modules.shortcuts")
 
 local LOG = "menu.keyboard_slots"
@@ -116,11 +117,28 @@ local function choose_action_for(slot_id, ctx)
 		items   = build_action_items(ctx.gestures),
 	}, function(action_id)
 		if type(action_id) ~= "string" then return end
-		if KbShortcuts.set_keyboard_action(slot_id, action_id) ~= true then
-			Logger.error(LOG, "Keyboard shortcut edit refused for slot '%s'.", tostring(slot_id))
-			return false
+		local function bind()
+			if KbShortcuts.set_keyboard_action(slot_id, action_id) ~= true then
+				Logger.error(LOG, "Keyboard shortcut edit refused for slot '%s'.", tostring(slot_id))
+				return false
+			end
+			if type(ctx.updateMenu) == "function" then ctx.updateMenu() end
+			return true
 		end
-		if type(ctx.updateMenu) == "function" then ctx.updateMenu() end
+		-- An action with a parameter (wrap_selection's pair, open_url's link) does
+		-- nothing without it: ask first, under the binding the slot dispatches
+		-- with, and bind only a configured action. Deferred so the prompt opens
+		-- after the picker window has closed.
+		local gestures = ctx.gestures
+		local spec = type(gestures) == "table" and type(gestures.get_action_parameter_spec) == "function"
+			and gestures.get_action_parameter_spec(action_id) or nil
+		if not spec then return bind() end
+		DeferredWork.after(0.05, function()
+			if ShortcutUtils.prompt_action_parameter(gestures,
+				KbShortcuts.keyboard_binding_id(slot_id), action_id, spec) then
+				bind()
+			end
+		end, "menu_keyboard_slots.action_parameter")
 		return true
 	end)
 end
