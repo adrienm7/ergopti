@@ -302,12 +302,13 @@ helpers.describe("modules/updater/manager.lua", function()
 		end)
 	end)
 
-	helpers.it("set_check_interval and get_check_interval round-trip", function()
-		local orig = M.get_check_interval()
-		M.set_check_interval(3600)
-		helpers.assert_eq(M.get_check_interval(), 3600, "interval should be 3600")
-		-- Restore.
-		M.set_check_interval(orig)
+	helpers.it("set_check_interval and get_check_interval round-trip through config.toml", function()
+		with_config(nil, function(fresh, path)
+			helpers.assert_true(fresh.set_check_interval(3600))
+			helpers.assert_eq(fresh.get_check_interval(), 3600, "interval should be 3600")
+			helpers.assert_eq(read_config(path).updater.check_interval_seconds, 3600,
+				"the interval lives in config.toml like on the other drivers")
+		end)
 	end)
 
 	helpers.it("set_check_interval rejects negative values", function()
@@ -319,10 +320,7 @@ helpers.describe("modules/updater/manager.lua", function()
 	helpers.it("keeps the durable channel and interval when persistence fails", function()
 		local previous_storage = package.loaded["adapters.storage"]
 		local previous_manager = package.loaded["modules.updater.manager"]
-		local storage = Fakes.storage({
-			initial = { ["updater.interval_sec"] = 21600 },
-			writes_fail = true,
-		})
+		local storage = Fakes.storage({ writes_fail = true })
 		package.loaded["adapters.storage"] = storage
 		package.loaded["modules.updater.manager"] = nil
 		local failing = require("modules.updater.manager")
@@ -343,8 +341,7 @@ helpers.describe("modules/updater/manager.lua", function()
 		helpers.assert_eq(channel_changed, false)
 		helpers.assert_eq(interval_changed, false)
 		helpers.assert_eq(channel, before, "a failed write must not switch the live release feed")
-		helpers.assert_eq(interval, 21600, "a failed write must not change the live schedule")
-		helpers.assert_eq(storage.get("updater.interval_sec"), 21600)
+		helpers.assert_eq(interval, failing.DEFAULT_INTERVAL_SEC, "a failed write must not change the live schedule")
 	end)
 
 	helpers.it("clear_cached_release resets state to idle", function()
@@ -428,30 +425,24 @@ helpers.describe("modules/updater/manager.lua", function()
 			"missing luv must be a truthful unavailable capability, not a green schedule")
 	end)
 
-	helpers.it("rolls back a partially armed background schedule", function()
+	helpers.it("reports a schedule whose timer was not armed", function()
 		local previous_timer = package.loaded["adapters.timer_scheduler"]
 		local previous_manager = package.loaded["modules.updater.manager"]
-		local cancelled = {}
 		local timer = { HAS_ASYNC = true }
-		function timer.after() return { id = "boot", armed = true } end
-		function timer.every() return { id = "repeat", armed = false, fired = true } end
+		function timer.after() return { id = "refused", armed = false, fired = true } end
 		function timer.cancel(handle)
-			cancelled[#cancelled + 1] = handle.id
 			handle.armed = false
 			return true
 		end
 		package.loaded["adapters.timer_scheduler"] = timer
 		package.loaded["modules.updater.manager"] = nil
-		local partial = require("modules.updater.manager")
-		partial.current_version = function() return "1.0.0" end
-		local started = partial.start_background_checks(nil, 60)
+		local refused = require("modules.updater.manager")
+		refused.current_version = function() return "1.0.0" end
+		local started = refused.start_background_checks()
 
 		package.loaded["adapters.timer_scheduler"] = previous_timer
 		package.loaded["modules.updater.manager"] = previous_manager
-		helpers.assert_eq(started, false)
-		table.sort(cancelled)
-		helpers.assert_eq(cancelled, { "boot", "repeat" },
-			"both halves of a partial schedule must release ownership")
+		helpers.assert_eq(started, false, "a refused timer must not read as a running schedule")
 	end)
 
 	helpers.it("init loads persisted settings and initialises", function()

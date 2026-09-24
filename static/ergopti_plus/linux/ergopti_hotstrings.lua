@@ -1933,7 +1933,9 @@ local function main()
 				if rebuild_tray_menu then rebuild_tray_menu() end
 			end
 		end
-		updater.init({ on_available = on_available })
+		-- A paused driver dispatches no automatic check (the record is kept, so
+		-- the check runs at the first evaluation after resuming).
+		updater.init({ on_available = on_available, is_paused = script_actions.is_paused })
 	end
 	BootProfiler.stage_done("services")
 
