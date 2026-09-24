@@ -53,7 +53,7 @@ for _ in $(seq 1 40); do [ -f "${LLM_READY}" ] && break; sleep 0.25; done
 READY="$(mktemp -u)"
 REPORT="$(mktemp)"
 python3 tests/hardware/sni_host.py --ready-file "${READY}" --timeout 60 --settle 3 \
-	--expect-icon-file --min-labels 5 --forbid-raw-keys > "${REPORT}" &
+	--expect-icon-file --min-labels 5 --forbid-raw-keys --expect-label "Tap-Holds" > "${REPORT}" &
 HOST=$!
 for _ in $(seq 1 40); do [ -f "${READY}" ] && break; sleep 0.25; done
 [ -f "${READY}" ] || { echo "ENVIRONMENT: the StatusNotifier host never started" >&2; exit 2; }

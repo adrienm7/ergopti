@@ -44,7 +44,7 @@ const SCHEMA_PATH = shared('core/config_schema/config.schema.json');
 
 // A driver is a directory with an adapters/ tree — the hexagonal marker. Naming
 // the drivers by hand is what let Linux be missed; listing every subdirectory
-// would sweep in docs/, extensions/, kanata/ and old/.
+// would sweep in docs/, extensions/ and old/.
 const DRIVERS_DIR = path.join(ROOT, 'static', 'ergopti_plus');
 const DRIVERS = fs
 	.readdirSync(DRIVERS_DIR, { withFileTypes: true })

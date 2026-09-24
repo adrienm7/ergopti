@@ -149,19 +149,18 @@ local function full_context()
 			get_privacy_state = function() return {} end,
 			flush             = noop,
 		},
-		kanata = {
-			is_running = function() return false end,
-			-- Distinct from is_running: one asks whether ANY kanata is up, the
-			-- other whether this daemon started it. The menu reads the cheap one
-			-- because answering the first truthfully costs a subprocess, and a
-			-- double missing it makes the whole submenu render empty — the
-			-- provider raises and the renderer skips it, which looks from here
-			-- like a menu bug rather than a stale stub.
-			owns_process = function() return false end,
-			start      = noop,
-			stop       = noop,
-			restart    = noop,
-			generate   = noop,
+		-- The tap-hold manager (platform/remap/tap_hold_manager). It replaced the
+		-- kanata stub on 2026-09-24, when the tap-holds moved into the daemon:
+		-- without it _build_tap_holds renders a disabled title and every row the
+		-- manifest declares in tap_holds_menu goes unchecked.
+		tap_holds = {
+			is_enabled    = function() return true end,
+			file_enabled  = function() return true end,
+			set_enabled   = noop,
+			keys          = function() return {} end,
+			-- The shared builder, so every hold picker holds at least « none ».
+			hold_options  = function() return require("tap_hold.hold_options").build({}) end,
+			tap_actions   = function() return {} end,
 		},
 		dyn_hotstrings = {
 			is_enabled      = function() return true end,

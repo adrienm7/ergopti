@@ -9,7 +9,7 @@
  * driver names every id it is expected to dispatch.
  *
  * WHAT IT PROVES, category by category — shortcuts, hotstrings, tap-holds,
- * metrics, gestures, layout, IA, debug, updates, apps, kanata, Karabiner and the
+ * metrics, gestures, layout, IA, debug, updates, apps, Karabiner and the
  * tray root — is that the manifest describes the menu and each driver answers
  * only ids the manifest names. A row a driver draws from nothing would not be
  * declared; a row declared and unanswered renders one item short, permanently.

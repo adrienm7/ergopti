@@ -63,6 +63,18 @@ Alpine; LuaJIT needs `lua51-*` (Arch), `luajit-*` (openSUSE), `lua5.1-*`
 without an AppIndicator extension. Action: prove installer changes with
 `tests/distro/run_in_docker.sh <image>` and the first-install matrix.
 
+### project-linux-tap-holds-run-in-the-daemon
+
+Since 2026-09-24 the Linux tap-holds and navigation layer run in the daemon
+(`platform/remap/tap_hold_engine.lua`, installed by `tap_hold_manager` through
+`keyboard_hook.set_remapper`, which releases every held key on swap, pause and
+stop). They replaced kanata, which needed glibc 2.39 (absent on Debian 12 and
+Ubuntu 22.04), was never started by the daemon, and broke its whole config on
+one free-text action. `legacy_kanata.lua` and `install.sh` retire only the
+kanata unit an earlier install wrote (exact `Description=` match). Action: do
+not reintroduce an external remapper or a `kanata.kbd` release asset; change
+tap-hold behaviour in the engine and its loader/writer, with Lua tests.
+
 ## Website and documentation
 
 ### project-site-i18n-gettext-french-key

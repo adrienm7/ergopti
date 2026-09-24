@@ -233,8 +233,8 @@ for (const [rel, copySource] of packageUiCopies) {
 
 // tap_hold/ is a shared runtime root beside lua/, data/, modules/ and ui/. The
 // system packagers previously maintained a four-entry allow-list, so their
-// generated Kanata configuration lost every canonical alias while other formats
-// retained them. Require the complete assembled closure in both system formats.
+// tap-hold defaults went missing while other formats retained them — and the
+// in-daemon tap-hold engine reads tap_hold/defaults.toml at startup. Require the complete assembled closure in both system formats.
 for (const rel of ['tools/build/build-linux-deb.sh', 'tools/build/build-linux-rpm.sh']) {
 	const src = read(rel);
 	if (!src.includes('cp -r "$BUILD_DIR/_shared/."')) {
@@ -270,7 +270,7 @@ const UNIT_SOURCES = [
 ];
 
 // An ExecStart launches the ergopti daemon when it points at the daemon launcher
-// or the wrapper. The kanata unit is a different binary and must NOT carry --tray.
+// or the wrapper.
 const DAEMON_EXEC_RE = /^ExecStart=(?<cmd>\S*(?:ergopti-hotstrings|\/ergopti))(?<args>.*)$/gm;
 
 let daemonExecStartsFound = 0;
@@ -290,13 +290,6 @@ for (const rel of UNIT_SOURCES) {
 				`${rel}: "${m[0].trim()}" launches the daemon without --tray, so the ` +
 				`installed service has no tray icon and no menu.`
 			);
-		}
-	}
-
-	// The kanata unit shares these files; it must never gain the daemon's flag.
-	for (const line of src.split('\n')) {
-		if (/^ExecStart=/.test(line) && /kanata/.test(line) && /--tray/.test(line)) {
-			errors.push(`${rel}: "${line.trim()}" — --tray belongs to the ergopti daemon, not kanata.`);
 		}
 	}
 }
@@ -338,38 +331,27 @@ if (desktopEntriesFound !== EXPLICIT_TRAY_DESKTOP_SOURCES.length) {
 	);
 }
 
-// ─── 6. The remap config is a copy the daemon owns, never a link to the source ──
+// ─── 6. The installer links no user file back at the install tree ──────────
 //
 // ROOT CAUSE ENCODED: install.sh used to symlink ~/.config/kanata/ergopti.kbd at
-// the tracked template, and platform/remap/manager.write_kbd() opens that exact
-// path for writing on every daemon start. The first restart therefore followed
-// the link and rewrote the template inside the install tree — so the file the
-// parity gate reads was being overwritten by the generator the gate exists to
-// check, and a machine that had ever run the daemon no longer had the config the
-// repo believes it ships.
-//
-// Two writers, one path is the defect; the fix is that only the generator writes
-// and the installer merely seeds. A regular file also means the unit below can be
-// enabled before the daemon has ever run, which is the order install.sh uses.
+// the tracked template, and the daemon opened that exact path for writing on
+// every start. The first restart therefore followed the link and rewrote the
+// template inside the install tree. kanata is gone (the tap-holds run in the
+// daemon since 2026-09-24), but the class remains: the daemon writes its user
+// files (tap_hold.toml, config.toml, …) in place, so any of them linked into the
+// install tree would make the daemon overwrite its own shipped source. The
+// installer seeds copies and never links.
 
 const INSTALL_SH = 'static/ergopti_plus/linux/install.sh';
 const installSrc = read(INSTALL_SH);
-const KANATA_USER_CONFIG = '${KANATA_CONFIG_DIR}/ergopti.kbd';
 
 for (const line of installSrc.split('\n')) {
-	if (/^\s*ln\s+-s/.test(line) && line.includes('ergopti.kbd')) {
+	if (/^\s*ln\s+-[A-Za-z]*s/.test(line) && /\.config|CONFIG/.test(line)) {
 		errors.push(
-			`${INSTALL_SH}: "${line.trim()}" links the generated remap config back at the ` +
-			'tracked template; the daemon writes that path, so the link makes it overwrite its own source.'
+			`${INSTALL_SH}: "${line.trim()}" links a user config file into the install tree; the ` +
+			'daemon writes that path, so the link makes it overwrite its own source.'
 		);
 	}
-}
-
-if (!installSrc.includes(`install -m 0644 "${'${KANATA_SRC}'}" "${KANATA_USER_CONFIG}"`)) {
-	errors.push(
-		`${INSTALL_SH}: must seed ${KANATA_USER_CONFIG} with a copy of the template ` +
-		'(install -m 0644), so the unit it enables has a loadable config before the daemon first runs.'
-	);
 }
 
 // ─── 6.1. The standalone installer elects exactly one startup owner ─────────
@@ -434,7 +416,10 @@ for (const rel of UNIT_SOURCES) {
 	// Any other .service filename is a second unit by definition.
 	for (const m of src.matchAll(/([A-Za-z0-9_.-]+)\.service\b/g)) {
 		const name = m[1] + '.service';
-		if (name !== CANONICAL_UNIT_NAME && name !== 'kanata.service') {
+		// install.sh names kanata.service only to retire the unit earlier installs
+		// wrote (the tap-holds now run in the daemon); nowhere else may name it.
+		const retiredLegacy = name === 'kanata.service' && rel === INSTALL_SH;
+		if (name !== CANONICAL_UNIT_NAME && !retiredLegacy) {
 			errors.push(
 				`${rel}: names "${name}" — there is one unit, ${CANONICAL_UNIT_NAME}. ` +
 				`A second name means two installers can each enable a daemon, and both grab the keyboard.`
@@ -477,7 +462,11 @@ for (const rel of UNIT_SOURCES) {
 	const full = path.join(ROOT, rel);
 	if (!fs.existsSync(full)) continue;
 	const src = fs.readFileSync(full, 'utf8');
-	const daemonUnits = (src.match(/ExecStart=\S*(?:ergopti-hotstrings|\/ergopti)\b/g) || []).length;
+	// Anchored to a line start: install.sh does not declare a unit, it rewrites
+	// the ExecStart of the canonical ergopti-hotstrings.service (itself scanned
+	// here) with sed. Counting that sed expression as a unit let the kanata
+	// unit's own PartOf line satisfy the check in its place.
+	const daemonUnits = (src.match(/^ExecStart=\S*(?:ergopti-hotstrings|\/ergopti)\b/gm) || []).length;
 	const partOf = (src.match(/^PartOf=graphical-session\.target$/gm) || []).length;
 	if (daemonUnits > 0 && partOf < daemonUnits) {
 		errors.push(

@@ -116,6 +116,10 @@ as_user() {
 
 
 section "Installer"
+# An earlier install's kanata unit, as install.sh used to write it: an upgrade
+# must retire it, or it grabs the keyboard before the daemon does.
+as_user "mkdir -p ~/.config/systemd/user && printf '[Unit]\nDescription=Kanata key remapping daemon (Ergopti)\n' > ~/.config/systemd/user/kanata.service"
+
 INSTALL_LOG="$(mktemp)"
 if as_user "bash ~/ergopti/static/ergopti_plus/linux/install.sh" >"${INSTALL_LOG}" 2>&1; then
 	ok "install.sh exited 0 with dependencies"
@@ -140,19 +144,15 @@ INSTALLED_LUA_PATH="${LIB_ROOT}/linux/?.lua;${LIB_ROOT}/linux/?/init.lua;${LIB_R
 
 
 section "Runtime dependencies"
-for cmd in luajit notify-send zenity sqlite3 xkbcli sha256sum unzip; do
+for cmd in luajit notify-send zenity sqlite3 xkbcli sha256sum; do
 	if as_user "command -v ${cmd}" >/dev/null 2>&1; then ok "${cmd} is on PATH"; else fail "${cmd} is missing after install"; fi
 done
-# kanata is optional by design (tap-holds and layers; hotstrings work without
-# it) and the upstream binary needs glibc 2.39, so on an older distribution the
-# honest outcome is "reported unavailable", not "installed". What must never
-# happen is a silent absence.
-if as_user "command -v kanata || test -x ~/.local/bin/kanata" >/dev/null 2>&1; then
-	ok "kanata is installed"
-elif grep -q "kanata indisponible" "${INSTALL_LOG}"; then
-	info "kanata unavailable here ($(ldd --version 2>&1 | head -1 | grep -oE '[0-9]+\.[0-9]+$' || echo '?') glibc) — reported by the installer"
+# The tap-holds run in the daemon: nothing installs kanata any more, and no
+# kanata unit is left to grab the keyboard before the daemon does.
+if as_user "test -e ~/.config/systemd/user/kanata.service" >/dev/null 2>&1; then
+	fail "the installer left a kanata unit that would grab the keyboard"
 else
-	fail "kanata is missing after install and the installer did not say so"
+	ok "no kanata unit is installed"
 fi
 
 ffi_load() {

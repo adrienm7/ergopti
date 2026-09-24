@@ -178,7 +178,6 @@ Recommends:     lua-luv
 Recommends:     lua-filesystem
 Recommends:     openssl
 Recommends:     yad
-Recommends:     kanata
 
 %description
 Ergopti is a cross-platform keyboard optimizer that provides an intelligent

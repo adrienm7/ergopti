@@ -22,11 +22,10 @@
  * manifests, and their names are not ours to choose. WebView2Loader.dll is
  * called that by Microsoft.
  *
- * WHY THIS IS A RATCHET AND NOT AN ASSERTION OF ZERO: two files are genuine
- * violations that need a placement decision rather than a mechanical move —
- * linux/ui/webkit_host.lua and _shared/lua/tap_hold/kanata_generator.lua. A
- * gate that fails today teaches people to disable it; one that freezes the
- * number they cannot yet fix keeps counting while they decide.
+ * WHY THIS IS A RATCHET AND NOT AN ASSERTION OF ZERO: linux/ui/webkit_host.lua
+ * is a genuine violation that needs a placement decision rather than a
+ * mechanical move. A gate that fails today teaches people to disable it; one
+ * that freezes the number they cannot yet fix keeps counting while they decide.
  * ==============================================================================
  */
 
@@ -60,7 +59,10 @@ const EXEMPT = /[/\\](platform|adapters|vendor|tests|docs)[/\\]/;
 //             _shared/lua/tap_hold/kanata_generator.lua and its golden fixture
 //             are the shared emitter for one of the three remap back-ends, and
 //             Lot 8.4 turns them into one IR plus three named emitters.)
-const PATH_BASELINE = 3;
+//          1 (2026-09-24, Linux retired kanata for the in-daemon tap-hold engine
+//             under platform/remap/, which deleted kanata_generator.lua and its
+//             golden fixture. webkit_host.lua is the one left.)
+const PATH_BASELINE = 1;
 
 /**
  * Every tracked file under static/ergopti_plus.

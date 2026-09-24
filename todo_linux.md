@@ -48,8 +48,12 @@ exactement cette verrue — et le code d'espanso *prouve* que la voie evdev marc
 aussi sous X11 (`USE_EVDEV=true` force le backend evdev sur leur build X11).
 
 ```
-Physique ──► kanata (grab + remap Ergo) ──► périph. uinput « kanata »
+Physique ──► daemon Ergopti+ (grab + tap-holds + hotstrings) ──► périph. uinput « Ergopti Virtual Keyboard »
 ```
+
+> Jusqu'au 2026-09-24 la chaîne commençait par kanata (grab + remap), dont le
+> périphérique uinput « kanata » était lu par le daemon. Les tap-holds et la
+> couche navigation tournent désormais dans le daemon (`platform/remap/`).
 
 ---
 
@@ -89,6 +93,11 @@ touches tapées pendant l'expansion. `EVIOCGRAB` + ré-émission via notre propr
 uinput est le **seul** design qui corrige C4.
 
 ### 3.3 Coordination kanata : chaîner, pas rivaliser
+
+> **Caduc depuis le 2026-09-24.** kanata a été remplacé par le moteur tap-hold
+> interne au daemon (`platform/remap/tap_hold_engine.lua`) : il n'y a plus de
+> chaîne à coordonner. Le daemon et `install.sh` retirent l'unité kanata qu'une
+> installation antérieure avait écrite. Conservé pour l'historique.
 
 - Le périphérique de sortie de kanata s'appelle **exactement `kanata`** (défaut
 - **Fix :** générer le defcfg kanata avec
@@ -474,7 +483,7 @@ pas les rouvrir sans raison nouvelle.
 > chaque ligne pour savoir laquelle exactement, et ce qui reste.
 
 
-- 👁 Frappe normale capturée sous X11 **et** sous Wayland (post-grab kanata).
+- 👁 Frappe normale capturée sous X11 **et** sous Wayland (post-grab du daemon).
       *(le cœur — capture, grab, ré-émission — est vérifié ; reste la partie
       « le texte apparaît bien dans une vraie fenêtre », sur les deux serveurs)*
 - 👁 Expansion accentuée (`NT’ ➜ N’T`, phrase FR) correcte sur les deux serveurs.
@@ -790,7 +799,9 @@ Rien de neuf à installer : `install.sh` ajoute déjà l'utilisateur aux groupes
 - [x] **Le bouton de remise à zéro des tableaux de bord ne fait rien**, et
       `metrics_apps` appelle une fonction qui n existe pas.
 - [ ] **La couche navigation laisse la molette transparente** (`volu`/`vold` sur
-      `mwu`/`mwd`, au-dessus du marqueur GENERATED BLOCK).
+      `mwu`/`mwd`, au-dessus du marqueur GENERATED BLOCK). *Constat fait sur
+      l'ancien `kanata.kbd` ; la couche tourne depuis le 2026-09-24 dans
+      `platform/remap/tap_hold_engine.lua`, à revérifier là.*
 - [x] **« Démarrer kanata » peut lancer une seconde instance** à côté de celle que
       systemd gère : `is_running()` ne teste que le processus qu il a lancé lui-même.
 - [x] **Un `tap_hold.toml` utilisateur remplace les défauts partagés en bloc** au

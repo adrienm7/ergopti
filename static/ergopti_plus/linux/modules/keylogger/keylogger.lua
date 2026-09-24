@@ -1056,8 +1056,8 @@ end
 --- Records how long one key was held.
 ---
 --- The threshold between a tap and a hold is the shared tap-hold activation
---- time, so this driver's idea of the difference is the same one kanata acts
---- on. A second number here would let the dashboard call something a tap that
+--- time, so this driver's idea of the difference is the same one the tap-hold
+--- engine acts on. A second number here would let the dashboard call something a tap that
 --- the keyboard treated as a hold.
 --- @param app_id string|nil
 --- @param scancode number evdev code.

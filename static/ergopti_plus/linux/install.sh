@@ -184,7 +184,7 @@ _setup_permissions() {
 	echo "     Appartenir au groupe « input » permet de lire TOUTES les frappes"
 	echo "     clavier de la session, y compris les mots de passe saisis dans"
 	echo "     n'importe quelle application. C'est ce qu'exige un moteur de"
-	echo "     hotstrings, et c'est ce que font kanata, keyd et xremap."
+	echo "     hotstrings, et c'est ce que font keyd et xremap."
 	echo ""
 
 	if ! command -v sudo >/dev/null 2>&1; then
@@ -290,12 +290,6 @@ _required_dependency_package() {
 		pacman:notify-send) echo "libnotify" ;;
 		xbps:notify-send) echo "libnotify" ;;
 		apk:notify-send) echo "libnotify" ;;
-		apt:unzip) echo "unzip" ;;
-		dnf:unzip) echo "unzip" ;;
-		zypper:unzip) echo "unzip" ;;
-		pacman:unzip) echo "unzip" ;;
-		xbps:unzip) echo "unzip" ;;
-		apk:unzip) echo "unzip" ;;
 		apt:sha256sum) echo "coreutils" ;;
 		dnf:sha256sum) echo "coreutils" ;;
 		zypper:sha256sum) echo "coreutils" ;;
@@ -433,7 +427,6 @@ _check_or_install luajit
 _check_or_install notify-send
 _check_or_install zenity
 _check_or_install sqlite3
-_check_or_install unzip
 _check_or_install sha256sum
 # The live keymap shared by capture and injection. The daemon now fails closed
 # without libxkbcommon state, while the injector falls back to the clipboard if
@@ -621,139 +614,7 @@ fi
 
 # =================================
 # =================================
-# ======= 5/ Kanata Install =======
-# =================================
-# =================================
-
-# These four values describe one reviewed upstream artifact. Keep them together:
-# changing a version without its matching checksum must make the installer fail.
-KANATA_VERSION="1.12.0"
-KANATA_LINUX_X64_ASSET="linux-binaries-x64.zip"
-KANATA_LINUX_X64_SHA256="0bedd91567c5d7c54679061baadc37e4f83fb71750003999bc1d11f2c9754f36"
-KANATA_LINUX_X64_BINARY="kanata_linux_x64"
-
-_install_kanata() (
-	if command -v kanata >/dev/null 2>&1; then
-		echo "  ✔  kanata — déjà installé"
-		return 0
-	fi
-
-	local machine
-	machine="$(uname -m)"
-	case "${machine}" in
-		x86_64|amd64) ;;
-		*)
-			echo "  ✗  Aucun binaire Linux kanata authentifié pour ${machine}." >&2
-			echo "     Installez kanata manuellement, puis relancez l'installateur." >&2
-			return 1
-			;;
-	esac
-
-	local url="https://github.com/jtroo/kanata/releases/download/v${KANATA_VERSION}/${KANATA_LINUX_X64_ASSET}"
-	echo "  →  kanata manquant — téléchargement (${machine}, v${KANATA_VERSION})…"
-	local dest="${BIN_DIR}/kanata"
-	local temp_dir
-	local archive
-	local candidate
-	local install_tmp=""
-	install -d "${BIN_DIR}"
-	temp_dir="$(mktemp -d "${TMPDIR:-/tmp}/ergopti-kanata.XXXXXX")" || {
-		echo "  ✗  Impossible de créer un répertoire temporaire pour kanata." >&2
-		return 1
-	}
-	archive="${temp_dir}/${KANATA_LINUX_X64_ASSET}"
-	candidate="${temp_dir}/${KANATA_LINUX_X64_BINARY}"
-	trap 'rm -f -- "${archive}" "${candidate}" "${install_tmp}"; rmdir -- "${temp_dir}" 2>/dev/null || true' EXIT
-
-	if command -v curl >/dev/null 2>&1; then
-		curl --proto '=https' --tlsv1.2 --silent --show-error --location --fail \
-			--connect-timeout 15 --max-time 120 --max-filesize 67108864 \
-			--output "${archive}" "${url}" || {
-			echo "  ✗  Téléchargement de kanata échoué." >&2
-			return 1
-		}
-	elif command -v wget >/dev/null 2>&1; then
-		(
-			ulimit -f 131072
-			wget --quiet --https-only --output-document "${archive}" "${url}"
-		) || {
-			echo "  ✗  Téléchargement de kanata échoué." >&2
-			return 1
-		}
-	else
-		echo "  ✗  Ni curl ni wget — impossible de télécharger kanata." >&2
-		return 1
-	fi
-
-	if ! printf '%s  %s\n' "${KANATA_LINUX_X64_SHA256}" "${archive}" \
-		| sha256sum --check --status; then
-		echo "  ✗  L'archive kanata ne correspond pas au SHA-256 attendu." >&2
-		return 1
-	fi
-
-	if ! unzip -p "${archive}" "${KANATA_LINUX_X64_BINARY}" > "${candidate}"; then
-		echo "  ✗  Le binaire attendu est absent de l'archive kanata." >&2
-		return 1
-	fi
-
-	# Validate the object format without trusting `file`'s localized prose:
-	# ELF64, little-endian, x86-64 (e_machine 0x003e).
-	local elf_header
-	elf_header="$(od -An -tx1 -N20 "${candidate}" | tr -d ' \n')"
-	if [ "${elf_header:0:12}" != "7f454c460201" ] \
-		|| [ "${elf_header:36:4}" != "3e00" ]; then
-		echo "  ✗  Le fichier kanata n'est pas un exécutable Linux x86-64." >&2
-		return 1
-	fi
-
-	chmod 0755 "${candidate}"
-	local version_output
-	if ! version_output="$("${candidate}" --version 2>&1)" \
-		|| ! printf '%s\n' "${version_output}" | grep -Eq "(^|[^0-9])${KANATA_VERSION}([^0-9]|$)"; then
-		echo "  ✗  Le binaire kanata téléchargé n'annonce pas la version ${KANATA_VERSION}." >&2
-		# The reason, not only the verdict. The upstream binary is linked
-		# against a recent glibc (2.39 for 1.12.0), and on an older system the
-		# loader's "GLIBC_2.39 not found" is the one line that explains it.
-		printf '%s\n' "${version_output}" | head -3 | sed 's/^/     /' >&2
-		return 1
-	fi
-
-	install_tmp="$(mktemp "${BIN_DIR}/.kanata.XXXXXX")"
-	install -m 0755 "${candidate}" "${install_tmp}"
-	mv -f -- "${install_tmp}" "${dest}"
-	install_tmp=""
-	echo "  ✔  kanata installé dans ${dest}"
-)
-
-if ! $SKIP_DEPS; then
-	echo ""
-	echo "=== Installation de kanata ==="
-	# Not fatal. kanata carries tap-holds and layers; hotstrings, the tray and
-	# every window work without it. Aborting here (set -e) is what an Ubuntu
-	# 22.04 or Debian 12 install used to do: the upstream binary needs glibc
-	# 2.39, its version check failed, and the script died BEFORE copying a
-	# single driver file — no launcher, no service, nothing to start.
-	if ! _install_kanata; then
-		echo "  ⚠  kanata indisponible — les hotstrings fonctionneront sans tap-hold ni couches." >&2
-		echo "     Installez kanata depuis votre distribution ou avec « cargo install kanata »," >&2
-		echo "     puis relancez l'installateur." >&2
-	fi
-fi
-
-# The kanata the unit will run: the one this script installed, else one the
-# distribution provides on PATH (AUR, Nix, cargo). The unit used to name
-# ${BIN_DIR}/kanata unconditionally, so a packaged kanata was never enabled.
-KANATA_BIN=""
-if [ -x "${BIN_DIR}/kanata" ]; then
-	KANATA_BIN="${BIN_DIR}/kanata"
-elif command -v kanata >/dev/null 2>&1; then
-	KANATA_BIN="$(command -v kanata)"
-fi
-
-
-# =================================
-# =================================
-# ======= 6/ File Installation =======
+# ======= 5/ File Installation =======
 # =================================
 # =================================
 
@@ -803,57 +664,9 @@ echo "  ✔  lanceur : ${BIN_DIR}/ergopti-hotstrings"
 # silent — the daemon starts, logs one line, and expands nothing.
 _setup_permissions
 
-# =======================================
-# =======================================
-# ======= 7/ Kanata Configuration =======
-# =======================================
-# =======================================
-
-KANATA_CONFIG_DIR="${HOME}/.config/kanata"
-# The layout ships in two shapes: flattened beside install.sh in the built
-# package, and inside the driver tree in a source checkout. Probe both rather
-# than assume one — the previous single path was correct only in a checkout.
-KANATA_SRC=""
-for _kanata_candidate in \
-	"${SCRIPT_DIR}/kanata.kbd" \
-	"${SCRIPT_DIR}/platform/remap/data/kanata.kbd" \
-	"${SCRIPT_DIR}/linux/platform/remap/data/kanata.kbd"
-do
-	if [ -f "${_kanata_candidate}" ]; then
-		KANATA_SRC="${_kanata_candidate}"
-		break
-	fi
-done
-
-echo ""
-echo "=== Configuration de kanata ==="
-
-install -d "${KANATA_CONFIG_DIR}"
-
-# A COPY, never a symlink. This used to link ~/.config/kanata/ergopti.kbd back at
-# the tracked template, and the daemon's generator opens that same path for
-# writing on every start — so the first restart followed the link and overwrote
-# the source of truth in the install tree. The two writers then disagreed in the
-# worst possible direction: the file the parity gate reads had been rewritten by
-# the thing the gate exists to check.
-#
-# Copying also closes an ordering gap. The unit below is enabled and started
-# before the daemon has ever run, so without a file already in place kanata would
-# start pointing at nothing. The committed template is a complete, loadable
-# config — its generated block is pinned byte for byte to what the generator
-# emits — so the copy is correct on its own and the daemon merely refreshes it
-# once the user has a tap-hold override worth applying.
-if [ -f "${KANATA_SRC}" ]; then
-	install -m 0644 "${KANATA_SRC}" "${KANATA_CONFIG_DIR}/ergopti.kbd"
-	echo "  ✔  configuration kanata : ${KANATA_CONFIG_DIR}/ergopti.kbd"
-else
-	echo "  Avertissement : fichier kanata source introuvable — configuration ignorée." >&2
-fi
-
-
 # ========================================
 # ========================================
-# ======= 8/ Systemd Service Setup =======
+# ======= 6/ Systemd Service Setup =======
 # ========================================
 # ========================================
 
@@ -878,27 +691,17 @@ if $INSTALL_SERVICE; then
 		"${SRC_DRIVER}/ergopti-hotstrings.service" \
 		> "${SYSTEMD_DIR}/ergopti-hotstrings.service"
 
-	# kanata key-remapping daemon (tap-hold + layer switching)
-	# Runs alongside ergopti-hotstrings; reads the generated .kbd from
-	# ~/.config/kanata/ergopti.kbd (written by the kanata manager module).
-	cat > "${SYSTEMD_DIR}/kanata.service" << KANATA_SERVICE
-[Unit]
-Description=Kanata key remapping daemon (Ergopti)
-# Same session lifetime as the daemon that reads its output: a remap daemon
-# still running after logout re-maps the login screen.
-After=graphical-session.target
-PartOf=graphical-session.target
-
-[Service]
-Type=simple
-ExecStart=${KANATA_BIN:-${BIN_DIR}/kanata} --quiet --cfg ${KANATA_CONFIG_DIR}/ergopti.kbd
-Restart=on-failure
-RestartSec=3s
-Nice=-10
-
-[Install]
-WantedBy=graphical-session.target
-KANATA_SERVICE
+	# The kanata unit earlier installs wrote and enabled. The daemon now runs
+	# the tap-holds itself, and a kanata still grabbing the keyboard first would
+	# apply every one of them twice. Only the unit Ergopti wrote is removed; the
+	# daemon does the same at boot for installs the updater upgrades.
+	LEGACY_KANATA_UNIT="${SYSTEMD_DIR}/kanata.service"
+	if [ -f "${LEGACY_KANATA_UNIT}" ] \
+		&& grep -qxF "Description=Kanata key remapping daemon (Ergopti)" "${LEGACY_KANATA_UNIT}"; then
+		systemctl --user disable --now kanata.service >/dev/null 2>&1 || true
+		rm -f -- "${LEGACY_KANATA_UNIT}" "${HOME}/.config/kanata/ergopti.kbd"
+		echo "  ✔  ancien service kanata retiré (les tap-holds tournent dans le daemon)"
+	fi
 
 	# Guarded, because systemd is not universal: Alpine runs OpenRC, Void runs
 	# runit, and Gentoo may run either. Those systems get the XDG autostart entry
@@ -923,14 +726,6 @@ KANATA_SERVICE
 		STARTUP_OWNER="systemd"
 		echo "  ✔  service ergopti-hotstrings activé et démarré"
 
-		# Enable kanata if the binary was installed.
-		if [ -n "${KANATA_BIN}" ]; then
-			systemctl --user enable  kanata.service
-			systemctl --user restart kanata.service
-			echo "  ✔  service kanata activé et démarré"
-		else
-			echo "  ⚠  kanata binaire absent — service créé mais non activé"
-		fi
 	elif command -v systemctl >/dev/null 2>&1; then
 		echo "  ⚠  systemd présent mais aucun bus utilisateur joignable (session absente)."
 		if systemctl --user is-enabled ergopti-hotstrings.service >/dev/null 2>&1; then
@@ -962,11 +757,11 @@ AUTOSTART
 fi
 
 
-# =========================================
-# =========================================
-# ======= 10/ Post-Install Summary =======
-# =========================================
-# =========================================
+# =======================================
+# =======================================
+# ======= 7/ Post-Install Summary =======
+# =======================================
+# =======================================
 
 echo ""
 echo "=== Installation terminée ==="

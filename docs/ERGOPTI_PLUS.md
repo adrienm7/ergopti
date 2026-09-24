@@ -61,7 +61,7 @@ Trois implémentations, une par OS, appelées **drivers** :
 |---|---|---|---|
 | `windows/` | AutoHotkey v2 | émulation en processus (`Hotkey()` par scancode) | `SendInput` |
 | `macos/` | Lua sur Hammerspoon | disposition `.bundle` installée dans l'OS + Karabiner-Elements pour le tap-hold | `hs.eventtap` |
-| `linux/` | Lua sur LuaJIT, daemon | `kanata` (daemon séparé, `/dev/input` + `uinput`) | `ydotool` |
+| `linux/` | Lua sur LuaJIT, daemon | moteur tap-hold dans le daemon (`platform/remap/`, depuis le 2026-09-24 ; `kanata` en daemon séparé auparavant) | `ydotool` |
 
 **Ce que les trois partagent** : les données (hotstrings, actions, manifestes, locales), la
 logique pure en Lua, les frontends web des fenêtres de configuration, les contrats de ports,
@@ -88,7 +88,6 @@ static/ergopti_plus/
 ├── windows/          driver AHK v2
 ├── macos/            driver Hammerspoon
 ├── linux/            driver LuaJIT
-├── kanata/           layouts kanata (consommés par Linux)
 ├── extensions/       packs d'extensions (hotstrings + raccourcis tiers)
 └── docs/             architecture.md (généré), ADR, spec keylogger, glossaire
 ```
@@ -165,7 +164,7 @@ ne jamais l'éditer à la main.
 `_shared/modules/actions/modifier_chords.json` | **le seul fichier exprimant une équivalence de modificateur par OS** | non | les trois + le générateur Karabiner | — |
 `_shared/modules/hotstrings/*.toml` (2 994 entrées) | les hotstrings livrées, par catégorie | non | les trois | corpus `hotstrings/` |
 `_shared/modules/hotstrings/priority.json` | les 3 rangs de priorité (10/30/50) | non | Windows + macOS | `test:priority-parity` |
-`_shared/tap_hold/defaults.toml` (430 l) | défauts tap-hold ⚠ **deux espaces de noms non reliés dans un seul fichier** | non | Windows + kanata (`[tap_hold.*]`) ; macOS (`[hs_*]`) | `test:kanata-defalias-parity` |
+`_shared/tap_hold/defaults.toml` (430 l) | défauts tap-hold ⚠ **deux espaces de noms non reliés dans un seul fichier** | non | Windows + Linux (`[tap_hold.*]`) ; macOS (`[hs_*]`) | corpus `tap_hold/` |
 `_shared/modules/timings/constants.toml` (523 l) | tous les délais nommés | non | les trois | `test-keylogger-timings-single-source` etc. |
 `_shared/modules/tooltip/constants.toml` (360 l) | style visuel de l'infobulle | non | Windows + macOS (échec bruyant si manquant) | `test:tooltip-shared-style` (partiel) |
 `_shared/modules/llm/*.json` | fournisseurs, modèles, profils, défauts, layout du menu IA | `models.json` **oui** | les trois (partiellement) | famille `*-single-source` |
@@ -364,6 +363,11 @@ le lecteur macOS ignore chaque `[tap_hold.*]`, et rien ne les recoupe.
 
 ⚠ Le générateur kanata de Linux produit aujourd'hui une configuration **inchargeable**
 (quatre alias pendants, blocage B3 du plan).
+
+> **Caduc depuis le 2026-09-24.** kanata, son générateur et `kanata.kbd` ont été retirés :
+> la colonne Linux ci-dessus décrit l'ancien chemin. Les tap-holds et la couche navigation
+> tournent désormais dans le daemon (`linux/platform/remap/tap_hold_engine.lua`), avec la
+> sémantique et les seuils par touche de Windows, lus depuis `[tap_hold.*]`.
 
 ### 6.4 Gestes
 
@@ -1065,7 +1069,7 @@ Le hook tourne en **mode observe** | tout ce qui est tapé pendant la fenêtre d
 `string.format("%q")` est un quoteur de **littéral Lua**, pas de shell | il laisse `$`, `` ` `` et `$( )` vivants ; utiliser `shell_runner.quote()` |
 Le décodeur evdev n'est ni exécuté ni testé | — |
 Aucune isolation inter-fichiers dans le runner de tests | un `package.loaded[…] = stub` au niveau module suffit à créer un flake dépendant de l'ordre |
-kanata choisit son périphérique sans coordination avec le hook | — |
+kanata choisit son périphérique sans coordination avec le hook | caduc depuis le 2026-09-24 (kanata retiré) |
 
 ---
 
@@ -1082,7 +1086,8 @@ répétés ici parce qu'ils changent la façon de lire le code.
    fatales. Si vous déboguez Linux, ne cherchez pas de log : il n'y en a pas.
 2. **Le menu n'existe dans aucune installation packagée** : le tray est conditionné par
    `--tray`, et aucune des 5 unités systemd ne le passe.
-3. **La config kanata générée est inchargeable** (quatre alias pendants).
+3. **La config kanata générée est inchargeable** (quatre alias pendants). *Caduc depuis le
+   2026-09-24 : kanata a été remplacé par le moteur tap-hold du daemon.*
 4. **Le keylogger tourne toujours, en clair, sans détection de champ sécurisé et sans
    possibilité de désactivation**, et le texte tapé transite par un fichier `/tmp` lisible
    par tous à chaque flush.

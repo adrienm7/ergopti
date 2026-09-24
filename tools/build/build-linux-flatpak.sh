@@ -48,15 +48,13 @@
 #
 # FURTHER SANDBOX LIMITS, STATED RATHER THAN HIDDEN:
 #   - Helper binaries the driver shells out to (xclip, wl-clipboard, xdotool,
-#     yad, kanata) are host programs and are not in the runtime. Features that
+#     yad) are host programs and are not in the runtime. Features that
 #     depend on them degrade until each is added as a module here. Deliberately
 #     NOT worked around with --talk-name=org.freedesktop.Flatpak: spawning on
 #     the host is a sandbox escape, not a packaging fix.
 #   - Same for shared libraries loaded through FFI at runtime: the tray dlopens
 #     libayatana-appindicator, which the freedesktop runtime does not carry, so
 #     the icon and menu stay absent until that library is added as a module too.
-#   - kanata remaps at the host level and runs as its own service; it stays a
-#     host install and is not part of this bundle.
 #   - Flatpak points XDG_CONFIG_HOME and XDG_DATA_HOME at ~/.var/app/<app-id>/,
 #     and infra/config_paths.lua honours both. The Flatpak therefore keeps its
 #     own config and data there and does NOT read an existing ~/.config/ergopti

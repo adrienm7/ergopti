@@ -41,15 +41,7 @@
  * syntax; PATH-only exposure in Nix is not accepted in place of the shared
  * library path used by LuaJIT FFI.
  *
- * ROOT CAUSE 4 — THE STANDALONE KANATA BOOTSTRAP WAS NOT A LINUX INSTALLER.
- * Its x86_64 URL named an obsolete unarchived asset under the mutable `latest`
- * alias, while its ARM branch downloaded a macOS executable. Download failures
- * and invalid payloads then returned success, leaving a supported installation
- * without the launcher's hard dependency. The guard below requires a pinned,
- * checksummed Linux archive, fail-closed architecture handling, object and
- * version validation, and atomic publication after every validation step.
- *
- * ROOT CAUSE 5 — THREE PACKAGE COLUMNS PRETENDED TO COVER SIX MANAGERS.
+ * ROOT CAUSE 4 — THREE PACKAGE COLUMNS PRETENDED TO COVER SIX MANAGERS.
  * zypper reused Fedora names while apk and xbps reused Arch names, so Alpine
  * requested `libxkbcommon` instead of the package that actually owns xkbcli.
  * A package-manager exit code was then accepted without re-probing the required
@@ -129,8 +121,8 @@ if (launcherDeps.length < 2) {
 }
 
 // What install.sh actually provides: every command handed to _check_or_install,
-// plus every _install_<name> helper that probes `command -v <name>` (that is how
-// kanata is installed — by its own function, not by the generic helper).
+// plus every _install_<name> helper that probes `command -v <name>` (a command
+// installed by its own function rather than by the generic helper).
 const installed = new Set(
 	[...installerCode.matchAll(/_check_or_install\s+([A-Za-z0-9_.-]+)/g)].map((m) => m[1])
 );
@@ -163,7 +155,7 @@ const packageRows = [...installerCode.matchAll(
 )];
 const packageTable = new Map(packageRows.map((match) => [`${match[1]}:${match[2]}`, match[3]]));
 const packageManagers = ['apt', 'dnf', 'zypper', 'pacman', 'xbps', 'apk'];
-const requiredCapabilities = ['luajit', 'notify-send', 'unzip', 'sha256sum', 'xkbcli', 'libatspi.so.0'];
+const requiredCapabilities = ['luajit', 'notify-send', 'sha256sum', 'xkbcli', 'libatspi.so.0'];
 if (packageRows.length !== packageTable.size) {
 	errors.push('the required dependency table contains a duplicate manager/capability row');
 }
@@ -178,37 +170,31 @@ for (const manager of packageManagers) {
 const expectedPackages = new Map([
 	['apt:luajit', 'luajit'],
 	['apt:notify-send', 'libnotify-bin'],
-	['apt:unzip', 'unzip'],
 	['apt:sha256sum', 'coreutils'],
 	['apt:xkbcli', 'libxkbcommon-tools'],
 	['apt:libatspi.so.0', 'at-spi2-core'],
 	['dnf:luajit', 'luajit'],
 	['dnf:notify-send', 'libnotify'],
-	['dnf:unzip', 'unzip'],
 	['dnf:sha256sum', 'coreutils'],
 	['dnf:xkbcli', 'libxkbcommon-utils'],
 	['dnf:libatspi.so.0', 'at-spi2-core'],
 	['zypper:luajit', 'luajit'],
 	['zypper:notify-send', 'libnotify-tools'],
-	['zypper:unzip', 'unzip'],
 	['zypper:sha256sum', 'coreutils'],
 	['zypper:xkbcli', 'libxkbcommon-tools'],
 	['zypper:libatspi.so.0', 'at-spi2-core'],
 	['pacman:luajit', 'luajit'],
 	['pacman:notify-send', 'libnotify'],
-	['pacman:unzip', 'unzip'],
 	['pacman:sha256sum', 'coreutils'],
 	['pacman:xkbcli', 'libxkbcommon'],
 	['pacman:libatspi.so.0', 'at-spi2-core'],
 	['xbps:luajit', 'LuaJIT'],
 	['xbps:notify-send', 'libnotify'],
-	['xbps:unzip', 'unzip'],
 	['xbps:sha256sum', 'coreutils'],
 	['xbps:xkbcli', 'libxkbcommon-tools'],
 	['xbps:libatspi.so.0', 'at-spi2-core'],
 	['apk:luajit', 'luajit'],
 	['apk:notify-send', 'libnotify'],
-	['apk:unzip', 'unzip'],
 	['apk:sha256sum', 'coreutils'],
 	['apk:xkbcli', 'xkbcli'],
 	['apk:libatspi.so.0', 'at-spi2-core']
@@ -407,80 +393,7 @@ if (packageDependencyChecks.some((value) => value == null || value === '' || val
 
 // =========================================================
 // =========================================================
-// ======= 4/ Kanata Bootstrap Supply Chain =======
-// =========================================================
-// =========================================================
-
-const kanataBody =
-	(installerCode.match(/^_install_kanata\(\)\s*\(([\s\S]*?)^\)$/m) || [])[1] || '';
-if (kanataBody.length < 500) {
-	errors.push(
-		'_install_kanata() is missing or too small to contain download, authentication, validation and publication'
-	);
-}
-
-const kanataVersion =
-	(installerCode.match(/^KANATA_VERSION="([0-9]+\.[0-9]+\.[0-9]+)"$/m) || [])[1] || '';
-const kanataAsset =
-	(installerCode.match(/^KANATA_LINUX_X64_ASSET="([^"]+)"$/m) || [])[1] || '';
-const kanataSha256 =
-	(installerCode.match(/^KANATA_LINUX_X64_SHA256="([0-9a-f]{64})"$/m) || [])[1] || '';
-const kanataBinary =
-	(installerCode.match(/^KANATA_LINUX_X64_BINARY="([^"]+)"$/m) || [])[1] || '';
-
-if (!kanataVersion || !kanataAsset || !kanataSha256 || !kanataBinary) {
-	errors.push(
-		'the Kanata release contract must declare one semantic version, Linux x64 archive, SHA-256 and archive member'
-	);
-}
-if (!/^linux-.*x64\.zip$/.test(kanataAsset)) {
-	errors.push(`the pinned Kanata asset must be a Linux x64 ZIP, got '${kanataAsset || '<missing>'}'`);
-}
-if (!/^kanata_linux_.*x64$/.test(kanataBinary)) {
-	errors.push(
-		`the extracted Kanata member must identify Linux x64, got '${kanataBinary || '<missing>'}'`
-	);
-}
-if (/releases\/latest\/download/.test(kanataBody)) {
-	errors.push('the Kanata download still follows the mutable releases/latest alias');
-}
-if (/macos|darwin/i.test(kanataBody)) {
-	errors.push('the Linux Kanata bootstrap still references a macOS artifact');
-}
-if (!/x86_64\|amd64\)\s*;;[\s\S]*?\*\)[\s\S]*?return\s+1/.test(kanataBody)) {
-	errors.push('unsupported Kanata architectures must fail explicitly instead of reporting success');
-}
-
-const kanataStages = [
-	['versioned release URL', 'releases/download/v${KANATA_VERSION}/${KANATA_LINUX_X64_ASSET}'],
-	['archive download destination', '--output "${archive}"'],
-	['SHA-256 authentication', 'sha256sum --check --status'],
-	['single-member extraction', 'unzip -p "${archive}" "${KANATA_LINUX_X64_BINARY}"'],
-	['ELF architecture validation', '${elf_header:36:4}'],
-	['runtime version validation', '"${candidate}" --version'],
-	['atomic publication', 'mv -f -- "${install_tmp}" "${dest}"']
-];
-let previousStage = -1;
-for (const [label, needle] of kanataStages) {
-	const stage = kanataBody.indexOf(needle);
-	if (stage === -1) {
-		errors.push(`the Kanata bootstrap is missing its ${label} stage`);
-	} else if (stage <= previousStage) {
-		errors.push(`the Kanata ${label} stage runs before an earlier validation stage`);
-	}
-	previousStage = Math.max(previousStage, stage);
-}
-
-const kanataInvocation = installerCode.match(
-	/if ! \$SKIP_DEPS; then[\s\S]*?=== Installation de kanata ===[\s\S]*?_install_kanata[\s\S]*?fi/
-);
-if (!kanataInvocation) {
-	errors.push('--no-deps must skip the Kanata dependency download as its help text promises');
-}
-
-// =========================================================
-// =========================================================
-// ======= 5/ Report =======
+// ======= 4/ Report =======
 // =========================================================
 // =========================================================
 
@@ -495,5 +408,5 @@ if (errors.length > 0) {
 console.log(
 	`\x1b[32m[OK] launcher hard-requires ${launcherDeps.length} command(s), all installed by install.sh; ` +
 		`${referenced.length} exported LUA_PATH root(s) resolve to real directories; ` +
-		`4 package recipe(s) hard-provide live XKB; Kanata ${kanataVersion} is authenticated and published atomically.\x1b[0m`
+		`4 package recipe(s) hard-provide live XKB.\x1b[0m`
 );

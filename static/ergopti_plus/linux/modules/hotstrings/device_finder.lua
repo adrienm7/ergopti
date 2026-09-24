@@ -14,11 +14,9 @@
 ---    EV=120013, which includes EV_KEY (0x1), EV_MSC (0x10), EV_LED (0x11),
 ---    and EV_REP (0x14). The finder matches any device with bit 0 set in the
 ---    EV mask (EV_KEY present) and at least one handler matching event[0-9]+.
---- 2. The remap daemon's output wins outright. Its device carries POST-remap
----    keycodes — what the application actually receives — so reading anything
----    else means the engine resolves characters the user never typed. Picking it
----    is a rule, not a heuristic: it is matched by exact name before any ranking
----    runs.
+--- 2. No remap daemon's output is preferred any more: the tap-holds run in
+---    this daemon, on the physical keyboard it grabs. A remap daemon's output
+---    is a uinput device like any other injector's, and is excluded as one.
 --- 3. Synthetic devices are excluded, and that is a correctness fix rather than
 ---    tidiness. Our own uinput device is called "Ergopti Virtual Keyboard", so
 ---    the name heuristic below ranked it in the PREFERRED tier: whenever it
@@ -239,17 +237,13 @@ end
 --- Chooses every keyboard stream to read from a parsed descriptor list.
 ---
 --- Selection rules, in order:
----   1. One remap-daemon output, matched by exact name. It is already the
----      consolidated post-remap stream, so opening physical keyboards as well
----      would duplicate every key and bypass the remapping contract.
----   2. Every physical device whose name says "keyboard" or "kbd".
----   3. Every non-pointer physical EV_KEY device when none is keyboard-named.
---- Synthetic devices never reach rules 2 and 3 — reading one means reading our
+---   1. Every physical device whose name says "keyboard" or "kbd".
+---   2. Every non-pointer physical EV_KEY device when none is keyboard-named.
+--- Synthetic devices never reach either rule — reading one means reading our
 --- own injections back.
 --- @param devices table Array of descriptors from parse_devices().
 --- @return table paths, string|nil reason Device paths and the rule that chose them.
 function M.select_keyboards(devices)
-	local remap = nil
 	local preferred = {}
 	local fallback = {}
 
@@ -260,12 +254,6 @@ function M.select_keyboards(devices)
 
 		local path = event_path(dev)
 		if not path then goto next_dev end
-
-		if dev.name == DeviceNames.REMAP_OUTPUT then
-			if not remap then remap = path end
-			Logger.debug(LOG, "Remap output device: '%s' → %s", dev.name, path)
-			goto next_dev
-		end
 
 		if is_synthetic(dev) then
 			Logger.debug(LOG, "Skipping synthetic device: '%s' (sysfs=%s)", dev.name, dev.sysfs)
@@ -285,7 +273,6 @@ function M.select_keyboards(devices)
 		::next_dev::
 	end
 
-	if remap then return { remap }, "remap_output" end
 	local selected = #preferred > 0 and preferred or fallback
 	table.sort(selected)
 	if #selected > 0 then

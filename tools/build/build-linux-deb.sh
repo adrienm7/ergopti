@@ -54,7 +54,7 @@ echo "Copying driver files..."
 # The whole driver tree, not a list of directories to remember. The list this
 # replaced named *.lua, modules, adapters, infra, ui and vendor — so it silently
 # dropped _generated (without which the daemon refuses to start) and platform
-# (the kanata remap config), while vendor had already stopped existing in the
+# (the remap and tap-hold engine), while vendor had already stopped existing in the
 # bundle. Every line also ended in `2>/dev/null || true`, so none of that made a
 # sound. Tests are the one thing a system package has no use for.
 cp -r "$BUILD_DIR/linux/." "$DEB_ROOT/usr/lib/ergopti/"
@@ -176,7 +176,7 @@ Version: $VERSION
 Architecture: $ARCH
 Maintainer: Ergopti Contributors <ergopti@example.com>
 Depends: luajit (>= 2.1), xclip, libnotify-bin, curl, libxkbcommon0, libxkbcommon-tools, at-spi2-core
-Recommends: lua-luv, lua-filesystem, openssl, kanata, libayatana-appindicator3-1, xdotool, wl-clipboard
+Recommends: lua-luv, lua-filesystem, openssl, libayatana-appindicator3-1, xdotool, wl-clipboard
 Section: utils
 Priority: optional
 Homepage: https://github.com/adrienm7/ergopti

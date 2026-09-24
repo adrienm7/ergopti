@@ -6,7 +6,7 @@
 --- Owns the tray's « Disable all » and « Enable all » global actions.
 ---
 --- « Disable all » behaves like a pause: every feature switch goes off
---- (hotstrings, shortcuts, gestures, AI, metrics, dynamic hotstrings, kanata
+--- (hotstrings, shortcuts, gestures, AI, metrics, dynamic hotstrings,
 --- tap-holds) while every per-key, per-slot and per-section assignment stays as
 --- configured, and the script-control shortcuts keep working because they are
 --- how a user gets back. « Enable all » restores exactly what was on before.
