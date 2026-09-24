@@ -95,7 +95,7 @@ _GES_SlotRows() {
 			"disabled", !GestEnabled,
 			"action",   ((_s, _l) => (*) => ShowActionPicker(_l,
 				GestureAssignments.Has(_s) ? GestureAssignments[_s] : "none",
-				(Id) => SetGestureSlotAction(_s, Id)))(Slot, SlotLabel)))
+				(Id) => SetGestureSlotAction(_s, Id), false, GestureBindingId("gesture", _s)))(Slot, SlotLabel)))
 	}
 	return Rows
 }

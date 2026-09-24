@@ -284,6 +284,7 @@ const CHECKS = [
 	{ name: 'the send_text, send_key and send_shortcut parameter rules are one shared corpus every driver suite replays', cmd: 'node', args: ['tools/test/test-send-input-vectors-shared.cjs'], repro: 'npm run test:send-input-vectors-shared' },
 	{ name: 'the number-row tap keys are one list, pinned to the manifest defaults and the Windows hotkeys', cmd: 'node', args: ['tools/test/test-tap-keys-single-source.cjs'], repro: 'npm run test:tap-keys-single-source' },
 	{ name: 'action picker greys a host-disabled row with its reason and never confirms it', cmd: 'node', args: ['tools/test/test-action-picker-disabled-rows.cjs'], repro: 'npm run test:action-picker-disabled-rows' },
+	{ name: 'action picker edits a text, a key or a shortcut and validates it as the drivers do', cmd: 'node', args: ['tools/test/test-action-picker-parameter-editor.cjs'], repro: 'npm run test:action-picker-parameter-editor' },
 	{ name: 'file-path headers (convention 3, every source file names itself)', cmd: 'node', args: ['tools/lint/audit-file-headers.cjs'], repro: 'node tools/lint/audit-file-headers.cjs' },
 	{ name: 'window titles (Gui/windowTitle carry the "ErgoptiPlus" prefix)', cmd: 'node', args: ['tools/lint/audit-gui-titles.cjs'], repro: 'node tools/lint/audit-gui-titles.cjs' },
 	{ name: 'updater constants single source (owner/repo/timing literals match defaults.json)', cmd: 'node', args: ['tools/test/test-updater-constants-single-source.cjs'], repro: 'node tools/test/test-updater-constants-single-source.cjs' },

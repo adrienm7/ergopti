@@ -53,13 +53,15 @@ ShowKeyboardSlotPicker(Prefix) {
 		}
 }
 
-ShowActionPicker(Title, Current, OnConfirm, ShowNative := false) {
+; BindingId, when given, is the binding the choice is for: the picker opens its
+; own editor on the value that binding already holds for a send_* action.
+ShowActionPicker(Title, Current, OnConfirm, ShowNative := false, BindingId := "") {
 		; Prefer the shared WebView2 picker (identical UI to macOS and Linux). It
 		; receives the ordered items of the generated catalogue, headings already
 		; localized with their level; the page injects its own native/none rows.
 		; The native searchable ListBox below remains as an automatic fallback.
 		PickerItems := GestureActionPickerItems()
-		if _ActPickWeb_TryOpen(Title, Current, PickerItems, OnConfirm, ShowNative)
+		if _ActPickWeb_TryOpen(Title, Current, PickerItems, OnConfirm, ShowNative, BindingId)
 				return
 		AllItems := []
 		_PushItem(Id, Label, Cat) {
@@ -152,7 +154,8 @@ ShowActionPicker(Title, Current, OnConfirm, ShowNative := false) {
 ShowKeyboardShortcutPicker(SlotId) {
 		global KeyboardShortcutAssignments
 		Current := KeyboardShortcutAssignments.Has(SlotId) ? KeyboardShortcutAssignments[SlotId] : "none"
-		ShowActionPicker(t("dialog.keyboard_shortcut.title_prefix") . _FormatSlotLabel(SlotId), Current, (Id) => SetKeyboardShortcutAction(SlotId, Id))
+		ShowActionPicker(t("dialog.keyboard_shortcut.title_prefix") . _FormatSlotLabel(SlotId), Current,
+				(Id) => SetKeyboardShortcutAction(SlotId, Id), false, GestureBindingId("keyboard", SlotId))
 }
 
 FilePathsEditor(*) {

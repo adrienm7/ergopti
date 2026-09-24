@@ -237,5 +237,5 @@ TapKeyRows(Probe := "") {
 
 _TapKeyPickerOpener(Id, Name) {
 	return (*) => ShowActionPicker(Name, TapKeyAssignments.Get(Id, "none"),
-		(ActionName) => SetTapKeyAction(Id, ActionName))
+		(ActionName) => SetTapKeyAction(Id, ActionName), false, TapKeyBindingId(Id))
 }

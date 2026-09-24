@@ -178,8 +178,10 @@ end
 --- @param binding string Exact binding identity used during dispatch.
 --- @param action string Action identifier.
 --- @param assign function Publishes the binding only after its parameter is durable.
+--- @param picked string|nil A value the action picker's own editor collected: it
+---   is validated and stored without a prompt.
 --- @return boolean assigned True only when the whole user-visible assignment succeeded.
-local function assign_parameterized_action(ctx, gestures, binding, action, assign)
+local function assign_parameterized_action(ctx, gestures, binding, action, assign, picked)
 	local spec = type(gestures.get_action_parameter_spec) == "function"
 		and gestures.get_action_parameter_spec(action) or nil
 	if not spec then return assign() == true end
@@ -187,7 +189,9 @@ local function assign_parameterized_action(ctx, gestures, binding, action, assig
 	local prior = type(gestures.get_action_parameter) == "function"
 		and gestures.get_action_parameter(binding, action) or ""
 	local value
-	if type(ctx.prompt_action_parameter) == "function" then
+	if type(picked) == "string" then
+		value = picked
+	elseif type(ctx.prompt_action_parameter) == "function" then
 		value = ctx.prompt_action_parameter(binding, action, spec, prior)
 	else
 		local label = type(gestures.get_action_label) == "function"
@@ -219,19 +223,28 @@ end
 --- Opens the shared searchable action catalogue for one current assignment.
 --- @param title string Already-localised target label.
 --- @param current string Current action id.
---- @param on_confirm function Transactional assignment callback.
+--- @param binding string The binding the pick is for: the picker's own editor
+---   starts from the value it holds for a send_* action.
+--- @param on_confirm function Transactional assignment callback, given the action
+---   id and the value the picker's editor collected, if any.
 --- @return boolean opened
-local function open_action_picker(title, current, on_confirm)
+local function open_action_picker(title, current, binding, on_confirm)
 	local ok_picker, Picker = pcall(require, "ui.action_picker.bridge")
-	if not ok_picker or type(Picker.open) ~= "function" then
+	local ok_gestures, Gestures = pcall(require, "modules.gestures.manager")
+	if not ok_picker or type(Picker.open) ~= "function" or not ok_gestures then
 		Logger.error(LOG, "Action picker is unavailable for '%s'.", tostring(title))
 		return false
 	end
+	local items = Gestures.get_picker_items()
+	local editor = Gestures.get_picker_parameter_fields(items, binding)
 	return Picker.open({
 		title = title,
 		label = i18n_safe("dialog.action_picker.label"),
 		current = current or "none",
-	}, on_confirm)
+		items = items,
+		send_vocabulary = editor.send_vocabulary,
+		parameter_strings = editor.parameter_strings,
+	}, function(option, _state, picked) return on_confirm(option, picked) end)
 end
 
 --- The rows under one bindable slot: the searchable picker and, when the slot
@@ -243,13 +256,14 @@ end
 --- already offers.
 --- @param slot_label string Already-localised target label.
 --- @param bound string The action currently bound ("none" when unbound).
---- @param assign function(option) Transactional assignment; true on commit.
+--- @param binding string The binding the slot dispatches its action under.
+--- @param assign function(option, picked) Transactional assignment; true on commit.
 --- @return table Provider rows.
-local function slot_binding_rows(slot_label, bound, assign)
+local function slot_binding_rows(slot_label, bound, binding, assign)
 	local rows = {
 		{
 			label = i18n_safe("dialog.action_picker.label") .. "…",
-			action = function() open_action_picker(slot_label, bound, assign) end,
+			action = function() open_action_picker(slot_label, bound, binding, assign) end,
 		},
 	}
 	if bound ~= "none" then
@@ -2611,13 +2625,14 @@ local function _build_shortcuts(ctx)
 		-- the picker opened below lists it with its headings.
 		local out = {}
 		local skipped = {}
-		local function assign_slot(slot, option)
+		local function assign_slot(slot, option, picked)
 			local assigned = assign_parameterized_action(
 				ctx,
 				Gestures,
 				"keyboard__" .. slot,
 				option,
-				function() return Keyboard.set_action(slot, option) end
+				function() return Keyboard.set_action(slot, option) end,
+				picked
 			)
 			if assigned and type(ctx.on_menu_changed) == "function" then
 				ctx.on_menu_changed()
@@ -2629,8 +2644,8 @@ local function _build_shortcuts(ctx)
 			for _, slot in ipairs(Keyboard.available_slots(group.prefix)) do
 				local bound = Keyboard.get_action(slot) or "none"
 				local slot_label = Keyboard.get_slot_label(slot)
-				local choices = slot_binding_rows(slot_label, bound,
-					function(option) return assign_slot(slot, option) end)
+				local choices = slot_binding_rows(slot_label, bound, "keyboard__" .. slot,
+					function(option, picked) return assign_slot(slot, option, picked) end)
 				rows[#rows + 1] = {
 					label = slot_label
 						.. " → " .. Gestures.get_action_label(bound),
@@ -2667,16 +2682,16 @@ local function _build_shortcuts(ctx)
 		for _, key in ipairs(TapKeys.keys()) do
 			local bound = TapKeys.get_action(key.id)
 			local name = TapKeys.display_name(key.id, ok_layout and Layout or nil, labels)
-			local function assign(option)
+			local function assign(option, picked)
 				local assigned = assign_parameterized_action(ctx, Gestures, TapKeys.binding_id(key.id),
-					option, function() return TapKeys.set_action(key.id, option) end)
+					option, function() return TapKeys.set_action(key.id, option) end, picked)
 				if assigned and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 				return assigned
 			end
 			rows[#rows + 1] = {
 				label = name .. " → " .. (bound ~= "none" and Gestures.get_action_label(bound)
 					or i18n_safe("menu.shortcuts.tap_keys.unassigned")),
-				items = slot_binding_rows(name, bound, assign),
+				items = slot_binding_rows(name, bound, TapKeys.binding_id(key.id), assign),
 			}
 		end
 		return rows
@@ -3001,13 +3016,14 @@ local function _build_gestures(ctx)
 		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 	end
 
-	local function assign_action(slot, action)
+	local function assign_action(slot, action, picked)
 		return assign_parameterized_action(
 			ctx,
 			ge,
 			slot,
 			action,
-			function() return ge.set_action(slot, action) end
+			function() return ge.set_action(slot, action) end,
+			picked
 		)
 	end
 
@@ -3058,8 +3074,8 @@ local function _build_gestures(ctx)
 			local label = ge.get_action_display_label and ge.get_action_display_label(slot)
 				or ge.get_action_label(action)
 			local slot_label = gesture_slot_label(slot)
-			local choices = slot_binding_rows(slot_label, action, function(option)
-				local assigned = assign_action(slot, option)
+			local choices = slot_binding_rows(slot_label, action, slot, function(option, picked)
+				local assigned = assign_action(slot, option, picked)
 				if assigned and type(ctx.on_menu_changed) == "function" then
 					ctx.on_menu_changed()
 				end

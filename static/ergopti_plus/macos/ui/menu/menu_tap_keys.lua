@@ -50,12 +50,16 @@ local _subscribed = false
 --- @param name string The key's live name, for the picker title.
 --- @param ctx table The menu context (gestures, updateMenu).
 local function choose_action_for(id, name, ctx)
+	local items = KeyboardSlots.build_action_items(ctx.gestures)
+	local editor = ShortcutUtils.picker_parameter_fields(ctx.gestures, items, TapKeys.binding_id(id))
 	ActionPicker.open({
 		title   = name,
 		label   = i18n.get("dialog.action_picker.label"),
 		current = TapKeys.get_action(id),
-		items   = KeyboardSlots.build_action_items(ctx.gestures),
-	}, function(action_id)
+		items   = items,
+		send_vocabulary   = editor.send_vocabulary,
+		parameter_strings = editor.parameter_strings,
+	}, function(action_id, picked)
 		if type(action_id) ~= "string" then return end
 		local function bind()
 			if TapKeys.set_action(id, action_id, ctx.gestures.is_assignable) ~= true then
@@ -67,10 +71,12 @@ local function choose_action_for(id, name, ctx)
 		end
 		local spec = ctx.gestures.get_action_parameter_spec(action_id)
 		if not spec then return bind() end
-		-- Asked after the picker window has closed, under the binding the key
-		-- dispatches with, and bound only once the value is stored.
+		-- Asked after the picker window has closed, unless the picker's editor
+		-- collected it, under the binding the key dispatches with, and bound only
+		-- once the value is stored.
 		DeferredWork.after(0.05, function()
-			if ShortcutUtils.prompt_action_parameter(ctx.gestures, TapKeys.binding_id(id), action_id, spec) then
+			if ShortcutUtils.prompt_action_parameter(ctx.gestures, TapKeys.binding_id(id), action_id, spec,
+				picked) then
 				bind()
 			end
 		end, "menu_tap_keys.action_parameter")

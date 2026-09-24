@@ -1142,6 +1142,38 @@ function M.get_action_parameter(binding, action_name)
 	return _action_params[parameter_key(binding, action_name)] or ""
 end
 
+--- Readies picker items for the picker's own parameter editor: each action whose
+--- parameter is a text, a key or a shortcut is marked with its kind and the value
+--- `binding` holds for it, and the returned fields give the page the send-input
+--- vocabulary and the same prompts and refusals as the zenity prompt.
+--- @param items table get_picker_items() output, marked in place.
+--- @param binding string|nil The binding the pick is for; nil marks no value.
+--- @return table { send_vocabulary, parameter_strings }, the options the picker
+---   bridge's open() reads.
+function M.get_picker_parameter_fields(items, binding)
+	local prompts, errors = {}, {}
+	for _, item in ipairs(items) do
+		local kind = item.type == "action" and M.get_action_parameter_spec(item.id) or nil
+		if SEND_INPUT_KINDS[kind] then
+			item.parameter = kind
+			item.parameterValue = binding and M.get_action_parameter(binding, item.id) or ""
+			prompts[kind] = M.get_action_parameter_prompt(item.id)
+			errors[kind] = M.get_action_parameter_error(item.id)
+		end
+	end
+	return {
+		send_vocabulary = send_vocabulary(),
+		parameter_strings = {
+			save = i18n.get("button.save"),
+			back = i18n.get("dialog.action_picker.back"),
+			captureKey = i18n.get("dialog.action_picker.capture_key"),
+			captureShortcut = i18n.get("dialog.action_picker.capture_shortcut"),
+			prompts = prompts,
+			errors = errors,
+		},
+	}
+end
+
 function M.set_action_parameter(binding, action_name, value)
 	if not M.validate_action_parameter(action_name, value) then return false end
 	local key = parameter_key(binding, action_name)

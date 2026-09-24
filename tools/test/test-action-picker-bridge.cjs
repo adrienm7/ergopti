@@ -18,7 +18,9 @@
  * 4. Wiring + fallback — Windows ShowActionPicker tries the webview first and
  *    keeps the native ListBox fallback; macOS open_action_chooser routes through
  *    the shared picker.
- * 5. Locale — the two new keys the picker needs exist in the reference locale.
+ * 5. Locale — the keys the picker needs exist in the reference locale.
+ * 6. Parameter editor — every host sends what the page's send_* editor needs
+ *    and forwards the value it collected.
  * ==============================================================================
  */
 
@@ -39,6 +41,7 @@ const WIN_HOST = 'static/ergopti_plus/windows/ui/action_picker_webview.ahk';
 const WIN_NATIVE = 'static/ergopti_plus/windows/ui/action_picker/init.ahk';
 const MAC_HOST = 'static/ergopti_plus/macos/ui/action_picker/init.lua';
 const MAC_MENU = 'static/ergopti_plus/macos/ui/menu/menu_gestures.lua';
+const MAC_UTILS = 'static/ergopti_plus/macos/ui/menu/shortcut_utils.lua';
 const LINUX_HOST = 'static/ergopti_plus/linux/ui/action_picker/bridge.lua';
 const LINUX_ACTIONS = 'static/ergopti_plus/linux/modules/gestures/manager.lua';
 const EN_LOCALE = 'static/ergopti_plus/_shared/data/locales/en.json';
@@ -75,6 +78,7 @@ const winHost = read(WIN_HOST);
 const winNative = read(WIN_NATIVE);
 const macHost = read(MAC_HOST);
 const macMenu = read(MAC_MENU);
+const macUtils = read(MAC_UTILS);
 const linuxHost = read(LINUX_HOST);
 const linuxActions = read(LINUX_ACTIONS);
 const enLocale = read(EN_LOCALE);
@@ -158,6 +162,31 @@ check('Linux manager greys a row whose requirement is absent, with the reason',
 check('page reads item.disabled and item.hint',
 	/it\.disabled/.test(script) && /it\.hint/.test(script));
 
+// 4b''. The page's own editor for send_text / send_key / send_shortcut
+// (behaviour pinned by test-action-picker-parameter-editor.cjs): every host
+// sends what the page edits with, marks the rows it edits, and forwards the
+// value it collected with the pick. A host that forgot either half would show an
+// editor whose value is thrown away, or no editor at all.
+for (const f of ['platform', 'sendVocabulary', 'parameterStrings']) {
+	check(`page reads data.${f}`, script.includes(`data.${f}`));
+	check(`Windows host emits "${f}"`, winHost.includes(`"${f}"`));
+	check(`macOS host emits ${f}`, new RegExp(`\\b${f}\\b`).test(macHost));
+	check(`Linux host emits ${f}`, new RegExp(`\\b${f}\\b`).test(linuxHost));
+}
+check('macOS host names its platform "hs" (Command is the primary modifier)', /platform\s*=\s*"hs"/.test(macHost));
+check('page reads item.parameter and item.parameterValue',
+	/it\.parameter\b/.test(script) && /it\.parameterValue/.test(script));
+check('Windows host marks the send_* rows with their kind and value',
+	winHost.includes('"parameter"') && winHost.includes('"parameterValue"'));
+check('macOS marks the send_* rows with their kind and value', /item\.parameterValue\s*=/.test(macUtils));
+check('Linux marks the send_* rows with their kind and value', /item\.parameterValue\s*=/.test(linuxActions));
+check('page posts the collected value with the pick',
+	/action:\s*'confirm',\s*id:\s*editing\.id,\s*parameter:/.test(script));
+check('Windows host forwards the collected value to the parameter prompt',
+	/Payload\["parameter"\]/.test(winHost) && /GestureOfferPickedParameter\(/.test(winHost));
+check('macOS host forwards the collected value', /body\.parameter/.test(macHost));
+check('Linux host forwards the collected value', /data\.parameter/.test(linuxHost));
+
 // 4c. Hierarchy / fold / TOC features present in the frontend.
 check('frontend folds headings (toggleFold)', /function toggleFold/.test(script) && /collapsed/.test(script));
 check('frontend renders heading levels', /lvl/.test(script) && /level/.test(script));
@@ -184,6 +213,7 @@ let locale = {};
 try { locale = JSON.parse(enLocale); } catch (err) { check('en.json parses', false, err.message); }
 for (const key of ['dialog.action_picker.search', 'dialog.action_picker.no_results',
 	'dialog.action_picker.requires_tool', 'dialog.action_picker.requires_x11',
+	'dialog.action_picker.back', 'dialog.action_picker.capture_key', 'dialog.action_picker.capture_shortcut',
 	'sg_actions.sg_order.header.grp_input', 'sg_actions.sg_order.header.grp_system']) {
 	check(`locale has "${key}"`, typeof locale[key] === 'string' && locale[key].length > 0);
 }

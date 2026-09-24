@@ -574,6 +574,7 @@ M.parameter_prompt   = Actions.parameter_prompt
 M.parameter_error    = Actions.parameter_error
 M.get_action_parameter = Actions.get_action_parameter
 M.set_action_parameter = Actions.set_action_parameter
+M.send_vocabulary    = Actions.send_vocabulary
 M.get_all_action_parameters = Actions.get_all_action_parameters
 M.forceCleanup       = Actions.force_cleanup
 M.toggleRightClick   = Actions.toggle_right_click

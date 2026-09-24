@@ -283,7 +283,8 @@ class _TH_TapPickerFnObj {
 		try LoggerDebug("TapHoldMenu", "Opening tap picker for '{1}' (current='{2}').", this.KeyId, (Current == "" ? "<native>" : Current))
 		Title := t("tap_hold.picker.title_prefix") . this.KeyLabel
 		_KeyId := this.KeyId
-		ShowActionPicker(Title, Current, (Id) => _TH_ApplyTap(_KeyId, Id), true)
+		ShowActionPicker(Title, Current, (Id) => _TH_ApplyTap(_KeyId, Id), true,
+			GestureBindingId("tap_hold", _KeyId))
 	}
 }
 
