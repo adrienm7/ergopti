@@ -77,7 +77,7 @@ config_schema = "https://ergopti.com/schema/config.schema.json"
 # ===========================
 
 [sections]
-order = ["script", "hotstrings", "llm", "metrics", "shortcuts", "gestures", "layout", "category_enabled"]
+order = ["script", "hotstrings", "llm", "metrics", "shortcuts", "gestures", "layout", "category_enabled", "ui"]
 
 
 
@@ -210,6 +210,12 @@ platforms = ["ahk"]
 [sections.layout]
 description_key = "menu.layout"
 platforms = ["ahk"]
+
+# The tray's own appearance, which is not a keyboard feature. macOS alone draws a
+# menubar icon whose variant the user picks.
+[sections.ui]
+description_key = "menu.ui"
+platforms = ["hs"]
 
 [sections.shortcuts.alt_gr_caps_lock]
 description_key = "menu.shortcuts.alt_gr_caps_lock"
@@ -2787,6 +2793,23 @@ description_key = "menu.category_enabled.tap_holds"
 
 
 
+# ==================
+# ===== 3.9 ui =====
+# ==================
+
+# The macOS menubar icon: v1 is the simple glyph, v2 the detailed Ergopti logo.
+# It lived in hs.settings (menubar_logo_variant) with its default written twice
+# in the driver; it is a config.toml setting like every other one now.
+[[features.ui]]
+id = "menubar_icon"
+platforms = ["hs"]
+default = "v1"
+type = "enum"
+enum_values = ["v1", "v2"]
+description_key = "menu.layout.menubar_icon"
+
+
+
 # =====================================
 # =====================================
 # ======= 4. Tap-hold reference =======
@@ -2817,7 +2840,14 @@ description_key = "menu.category_enabled.tap_holds"
 # menu_manifest.json from these [menu.*] tables, and a drift gate keeps the two
 # in sync. Both drivers read the generated JSON at runtime (unchanged). Item
 # types: toggle / feature / action / dynamic / group / section_header /
-# letter_picker / "---" separator. platforms = ["ahk"|"hs"] gates per driver.
+# letter_picker / choice / "---" separator. platforms = ["ahk"|"hs"] gates per
+# driver.
+#
+# A `choice` is one enum feature (`path`) drawn as ONE row titled by `i18n`,
+# with one row per value beneath it and the current value ticked. The values are
+# the feature's `enum_values`, projected into the row by build-menu-manifest.js
+# with the label keys `<i18n>.<value>`; a driver registers the command under the
+# row id (called with the value chosen) and a state getter under the path.
 #
 # A `toggle` is a category's master switch and the FIRST row of its submenu: a
 # checkbox labelled by one `i18n` key, ticked from `checked_when`, running the
@@ -3718,34 +3748,6 @@ id = "layout_bundle"
 platforms = ["hs"]
 reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
 
-[[menu.layout_menu]]
-type = "---"
-platforms = ["hs"]
-
-# The input sources macOS has enabled, under a header of their own (« Sources
-# de saisie »): without it the list read as more Ergopti settings.
-[[menu.layout_menu]]
-type = "section_header"
-i18n = "menu.layout.active_layouts"
-platforms = ["hs"]
-reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
-
-[[menu.layout_menu]]
-type = "list"
-id = "active_layouts"
-platforms = ["hs"]
-reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
-
-[[menu.layout_menu]]
-type = "---"
-platforms = ["hs"]
-
-[[menu.layout_menu]]
-type = "list"
-id = "layout_logo"
-platforms = ["hs"]
-reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
-
 # `list` rather than `dynamic` since 2026-08-07: the driver answers with row
 # DATA and the renderer materialises it, where a `dynamic` handler was handed the
 # menu object and built the rows itself.
@@ -3768,6 +3770,34 @@ type = "list"
 id = "layout_features_altgr"
 platforms = ["ahk"]
 reason_key = "platform_reason.lists_windows_only_settings"
+
+# The menubar icon, ONE row with its variants beneath it, last of the Ergopti
+# section. It was two sibling rows, one per variant, stored in hs.settings.
+[[menu.layout_menu]]
+type = "choice"
+id = "menubar_icon"
+path = "ui.menubar_icon"
+i18n = "menu.layout.menubar_icon"
+platforms = ["hs"]
+reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
+
+[[menu.layout_menu]]
+type = "---"
+platforms = ["hs"]
+
+# The input sources macOS has enabled, under a header of their own (« Sources
+# de saisie »): without it the list read as more Ergopti settings.
+[[menu.layout_menu]]
+type = "section_header"
+i18n = "menu.layout.active_layouts"
+platforms = ["hs"]
+reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
+
+[[menu.layout_menu]]
+type = "list"
+id = "active_layouts"
+platforms = ["hs"]
+reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
 
 [[menu.layout_menu]]
 type = "---"

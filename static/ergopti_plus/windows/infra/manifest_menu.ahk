@@ -178,6 +178,9 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 		if ItemType == "toggle" {
 			ItemCount += _MR_RenderToggle(Result, Item, ManifestKey, Commands, StateGetters)
 
+		} else if ItemType == "choice" {
+			ItemCount += _MR_RenderChoice(Result, Item, ManifestKey, Commands, StateGetters)
+
 		} else if ItemType == "feature" {
 			_MR_RenderFeature(Result, Item, CategoryName)
 			ItemCount++
@@ -444,6 +447,59 @@ _MR_RenderToggle(ResultMenu, Item, ManifestKey, Commands, StateGetters) {
 		"label",   t(I18nKey),
 		"action",  Commands[CmdId],
 		"checked", MenuRenderer_ResolveCheckedWhen(ManifestKey, Id, StateGetters))
+	if MenuRenderer_ResolveDisabledWhen(ManifestKey, Id, StateGetters) {
+		Row["disabled"] := true
+	}
+	return _MR_RenderRows(ResultMenu, [Row], Id, 1)
+}
+
+; Renders a ``choice`` row: one setting with a fixed set of values, drawn as ONE
+; row whose submenu lists the values with the current one ticked.
+;
+; The values and their label keys come from the row's ``choices``, which
+; build-menu-manifest.js projects from the enum feature at ``path`` — a value
+; added to the feature appears without a driver change. The driver supplies the
+; current value through ``StateGetters[path]`` and what choosing a value does
+; through ``Commands[id]``, called with that value. The shared Lua renderer
+; draws the identical row.
+; @returns {Integer} 1 when the row was drawn, 0 otherwise.
+_MR_RenderChoice(ResultMenu, Item, ManifestKey, Commands, StateGetters) {
+	Id := _MR_Get(Item, "id")
+	I18nKey := _MR_Get(Item, "i18n")
+	Path := _MR_Get(Item, "path")
+	Choices := _MR_Get(Item, "choices", 0)
+	CmdId := _MR_Get(Item, "command")
+	if (CmdId == "") {
+		CmdId := Id
+	}
+	if (Id == "" or I18nKey == "" or Path == "" or !(Choices is Array) or Choices.Length == 0) {
+		try LoggerError("MenuRenderer", "choice item in '{1}' needs id, i18n, path and choices — skipped.", ManifestKey)
+		return 0
+	}
+	if !(Commands is Map and Commands.Has(CmdId)) {
+		try LoggerError("MenuRenderer", "No command '{1}' for the '{2}.{3}' choice — skipped.", CmdId, ManifestKey, Id)
+		return 0
+	}
+	; Fails open like checked_when: no value is ticked rather than a guessed one,
+	; and the drift is loud.
+	Current := ""
+	HasCurrent := false
+	if (StateGetters is Map and StateGetters.Has(Path)) {
+		Current := (StateGetters[Path])()
+		HasCurrent := true
+	} else {
+		try LoggerError("MenuRenderer", "No getter for the '{1}' value of choice '{2}.{3}' — nothing is ticked.", Path, ManifestKey, Id)
+	}
+	Command := Commands[CmdId]
+	Rows := []
+	for Choice in Choices {
+		Value := _MR_Get(Choice, "value")
+		Rows.Push(Map(
+			"label",   t(_MR_Get(Choice, "i18n")),
+			"checked", HasCurrent and Current == Value,
+			"action",  ((V) => (*) => Command(V))(Value)))
+	}
+	Row := Map("label", t(I18nKey), "items", Rows)
 	if MenuRenderer_ResolveDisabledWhen(ManifestKey, Id, StateGetters) {
 		Row["disabled"] := true
 	}

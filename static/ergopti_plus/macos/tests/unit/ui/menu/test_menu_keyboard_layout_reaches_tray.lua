@@ -68,7 +68,7 @@ helpers.describe("Keyboard layout submenu reaches the tray populated", function(
 		local seen = titles(row.menu)
 		helpers.assert_true(seen["— menu.layout.header_ergopti —"] or seen["menu.layout.header_ergopti"],
 			"the manifest's Ergopti header must be in the rendered submenu")
-		helpers.assert_true(seen["menu.layout.logo_default"], "the logo rows must be in the rendered submenu")
+		helpers.assert_true(seen["menu.layout.menubar_icon"], "the menubar icon row must be in the rendered submenu")
 	end)
 
 	helpers.it("the pause/resume pickers are collected before the manifest renders them", function()

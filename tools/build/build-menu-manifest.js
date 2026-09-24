@@ -13,7 +13,8 @@
 //
 // Both drivers read the generated JSON at runtime unchanged. The emitted data
 // is a verbatim projection of the [menu.*] tables (only the leading _comment
-// header fields are added), so behavior is identical to the previous
+// header fields are added, and each `choice` row gains the `choices` of its
+// enum feature), so behavior is identical to the previous
 // hand-maintained file — guaranteed by the menu drift gate
 // (tools/test/test-menu-manifest.cjs) and the build:domain regeneration check.
 //
@@ -50,8 +51,51 @@ const HEADER = {
 		"'list' = rows supplied at build time by a named provider, 'letter_picker' = " +
 		"the A-Z chooser. The last two were in use and undocumented here, which matters " +
 		"because 'list' is the ONLY type that moves a row from the driver into the " +
-		"renderer — 'dynamic' hands the rendering straight back to platform code."
+		"renderer — 'dynamic' hands the rendering straight back to platform code. " +
+		"'choice' = one enum feature (path) as one row with its values beneath it; its " +
+		"'choices' are projected from the feature's enum_values by this generator."
 };
+
+/**
+ * Projects each `choice` row's values from the enum feature its `path` names.
+ *
+ * A choice row is one setting with a fixed set of values, drawn as one row with
+ * the values beneath it. The values belong to the feature (its `enum_values`),
+ * so the row never lists them itself: each becomes `{ value, i18n }`, labelled
+ * by the key `<row i18n>.<value>`. A row whose path is not an enum feature, that
+ * lists its choices by hand, or that is shown on a platform the feature does not
+ * declare fails the build instead of drawing a row no driver can store.
+ * @param {object} menu The parsed [menu] tables, completed in place.
+ * @param {string} raw The manifest source, for the feature entries.
+ */
+function projectChoices(menu, raw) {
+	const flattened = parseToml(
+		raw.replace(/^\[\[features\.([^\]]+)\]\]\r?$/gm, (_m, prefix) => `[[entries]]\npath_prefix = "${prefix}"`)
+	);
+	const enums = new Map();
+	for (const entry of flattened.entries || []) {
+		if (entry.type === 'enum') enums.set(`${entry.path_prefix}.${entry.id}`, entry);
+	}
+	for (const [key, rows] of Object.entries(menu)) {
+		if (!Array.isArray(rows)) continue;
+		for (const row of rows) {
+			if (!row || typeof row !== 'object' || row.type !== 'choice') continue;
+			const where = `menu.${key} choice "${row.id}"`;
+			const feature = enums.get(row.path);
+			if (!feature) throw new Error(`${where} names "${row.path}", which is no enum feature`);
+			if (row.choices !== undefined) throw new Error(`${where} lists its choices by hand; they come from the feature`);
+			if (typeof row.i18n !== 'string' || row.i18n === '') throw new Error(`${where} has no i18n key`);
+			if (!Array.isArray(feature.platforms)) throw new Error(`"${row.path}" must declare its platforms to back a choice row`);
+			// A row with no `platforms` is shown by every driver.
+			for (const platform of row.platforms || ['ahk', 'hs', 'linux']) {
+				if (!feature.platforms.includes(platform)) {
+					throw new Error(`${where} is shown on ${platform}, where "${row.path}" does not exist`);
+				}
+			}
+			row.choices = feature.enum_values.map((value) => ({ value, i18n: `${row.i18n}.${value}` }));
+		}
+	}
+}
 
 function build() {
 	const raw = readFileSync(MANIFEST_PATH, 'utf8');
@@ -60,6 +104,7 @@ function build() {
 		throw new Error('manifest.toml is missing the [menu] tables — cannot emit menu_manifest.json');
 	}
 
+	projectChoices(parsed.menu, raw);
 	const out = { ...HEADER, ...parsed.menu };
 	const json = JSON.stringify(out, null, '\t') + '\n';
 	writeFileSync(OUT_PATH, json, 'utf8');

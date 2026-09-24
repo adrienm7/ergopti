@@ -16,7 +16,8 @@
 		"shortcuts": { "$ref": "#/$defs/shortcuts" },
 		"gestures": { "$ref": "#/$defs/gestures" },
 		"layout": { "$ref": "#/$defs/layout" },
-		"category_enabled": { "$ref": "#/$defs/category_enabled" }
+		"category_enabled": { "$ref": "#/$defs/category_enabled" },
+		"ui": { "$ref": "#/$defs/ui" }
 	},
 
 	"$defs": {
@@ -277,6 +278,15 @@
 		"category_enabled": {
 			"type": "object",
 			"additionalProperties": { "type": "boolean" }
+		},
+
+		"ui": {
+			"description": "The tray's own appearance. menubar_icon is the macOS menubar icon variant; its values are the manifest's ui.menubar_icon enum.",
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"menubar_icon": { "type": "string", "enum": ["v1", "v2"] }
+			}
 		}
 	}
 }

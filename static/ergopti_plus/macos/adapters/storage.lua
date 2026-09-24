@@ -48,7 +48,6 @@ local LEGACY_FIXED_KEYS = {
 
 local LEGACY_RENAMED_KEYS = {
 	["ergopti_hs_boot_ready_v1"] = "hs_boot_ready_v1",
-	["ergopti_menubar_logo_variant"] = "menubar_logo_variant",
 	["ergopti_reload_in_progress"] = "reload_in_progress",
 	["ergopti_ui_restore_state"] = "ui_restore_state",
 	["ergopti_plus.synthetic_input.next_tag_sequence_v2"] =

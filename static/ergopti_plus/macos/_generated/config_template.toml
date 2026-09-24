@@ -423,3 +423,6 @@ swipe_5_left_down = 3.5
 swipe_5_left_up = 3.5
 swipe_5_right_down = 3.5
 swipe_5_right_up = 3.5
+
+[ui]
+menubar_icon = "v1"

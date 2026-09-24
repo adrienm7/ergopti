@@ -29,9 +29,14 @@ function build(config = evidenceConfig) {
 
 const rows = build();
 const summary = summarize(rows);
-assert.strictEqual(summary.total, 326, 'the canonical Linux projection must classify all 326 features');
+assert.strictEqual(summary.total, 327, 'the canonical Linux projection must classify all 327 features');
 assert.ok(summary.claimed_supported >= 126, 'supported feature count may only increase from the audited 126');
 assert.ok(summary.unavailable <= 198, 'unavailable feature count may only decrease from the audited 198');
+// Only macOS draws a menubar icon whose variant the user picks.
+const menubarIcon = rows.find((row) => row.path === 'ui.menubar_icon');
+assert.ok(menubarIcon && menubarIcon.status === 'unavailable'
+	&& menubarIcon.reason.kind === 'macos_specific',
+	'ui.menubar_icon must stay a macOS-specific setting, not a Linux gap');
 assert.strictEqual(summary.claimed_supported + summary.unavailable, summary.total);
 assert.strictEqual(rows.filter((row) => !row.reason?.kind).length, 0, 'every row needs a reason classification');
 assert.strictEqual(rows.filter((row) => !row.owner).length, 0, 'every row needs an owner');

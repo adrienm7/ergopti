@@ -135,6 +135,23 @@ function main() {
 				}
 			}
 
+			if (item.type === 'choice') {
+				if (typeof item.path !== 'string' || !featurePaths.has(item.path)) {
+					violations.push(`${where}: choice path "${item.path}" not found in manifest.toml`);
+				}
+				if (!Array.isArray(item.choices) || item.choices.length < 2) {
+					violations.push(`${where}: choice carries no projected values — run npm run build:menu`);
+				} else {
+					for (const choice of item.choices) {
+						for (const loc of ['fr', 'en']) {
+							if (!localeKeys[loc].has(choice.i18n)) {
+								violations.push(`${where}: choice label "${choice.i18n}" missing from ${loc}.json`);
+							}
+						}
+					}
+				}
+			}
+
 			for (const field of i18nFields) {
 				const key = item[field];
 				if (typeof key !== 'string' || key === '') continue;

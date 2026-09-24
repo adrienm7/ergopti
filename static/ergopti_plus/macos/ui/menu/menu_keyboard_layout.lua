@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Provides the "Disposition clavier" submenu in the Hammerspoon menu bar.
 --- Lets the user install the bundled Ergopti keyboard layout (user or system),
---- open the macOS input-source preferences, switch the menubar logo variant,
+--- open the macOS input-source preferences, pick the menubar icon variant,
 --- and inspect / activate any of the input sources currently enabled in macOS.
 ---
 --- FEATURES & RATIONALE:
@@ -23,7 +23,7 @@ local M = {}
 
 local hs            = hs
 local Logger        = require("infra.logger")
-local Storage       = require("adapters.storage")
+local Manifest      = require("infra.manifest_reader")
 local DeferredWork  = require("infra.deferred_work")
 local Timings       = require("infra.timings")
 local notifications = require("infra.notifications")
@@ -37,6 +37,8 @@ M.DEFAULT_STATE = {
 	layout_pause_switch_enabled = false,
 	layout_on_pause             = false,
 	layout_on_resume            = false,
+	-- config.toml [ui] menubar_icon; its values and default are the manifest's.
+	menubar_icon                = Manifest.default_for("ui.menubar_icon"),
 }
 
 
@@ -52,10 +54,6 @@ M.DEFAULT_STATE = {
 -- Path of the bundles directory relative to the Hammerspoon driver root.
 -- Resolved at runtime against base_dir (which already ends with "/")
 local BUNDLES_RELDIR = "../../ergopti/macos/bundles/"
-
--- Persisted preference key for the menubar logo variant
-local LOGO_VARIANT_KEY     = "menubar_logo_variant"
-local LOGO_VARIANT_DEFAULT = "simple"
 
 -- macOS URL that opens System Settings → Keyboard → Input Sources directly
 local KEYBOARD_PREFS_URL = "x-apple.systempreferences:com.apple.preference.keyboard?InputSources"
@@ -222,12 +220,11 @@ function M.build(ctx)
 	local base_dir     = ctx and ctx.base_dir or ""
 	local bundles_dir  = base_dir .. BUNDLES_RELDIR
 
-	-- The two blocks this driver alone has — installing the .bundle layout macOS
-	-- needs, and choosing the menubar logo — are collected for the manifest slots
-	-- that declare them rather than appended here. They were eight and two rows
-	-- of a shared menu that nothing described.
+	-- The block this driver alone has — installing the .bundle layout macOS
+	-- needs — is collected for the manifest slot that declares it rather than
+	-- appended here. The menubar icon is the manifest's `choice` row: this
+	-- driver supplies only its current value and what choosing one does.
 	local bundle_rows    = {}
-	local logo_rows      = {}
 	-- Which layout to switch to when the driver pauses and when it resumes. Three
 	-- more rows this driver alone has, for the same reason as the two above: they
 	-- name macOS input sources.
@@ -434,32 +431,6 @@ function M.build(ctx)
 			disabled = true,
 		}
 	end
-
-	-- The separator that stood here is a `---` row in the manifest now.
-
-	-- Logo variant toggle (persisted via hs.settings)
-	local current_variant = Storage.get(LOGO_VARIANT_KEY) or LOGO_VARIANT_DEFAULT
-	local function set_variant(v)
-		Storage.set(LOGO_VARIANT_KEY, v)
-		Logger.debug(LOG, "Logo variant: %s.", tostring(v))
-		-- Re-render the menubar icon and rebuild the submenu so the checkmarks
-		-- reflect the new state. refresh_icon is provided directly by ui.menu.init
-		-- via ctx, avoiding a require() round-trip that previously could re-enter
-		-- a partially-initialized module
-		if type(refresh_icon) == "function" then pcall(refresh_icon) end
-		-- pcall guards a hard crash from any rebuild path
-		if type(update_menu) == "function" then pcall(update_menu) end
-	end
-	logo_rows[#logo_rows + 1] = {
-		label   = i18n.get("menu.layout.logo_default"),
-		checked = current_variant == "simple",
-		action      = function() set_variant("simple") end,
-	}
-	logo_rows[#logo_rows + 1] = {
-		label   = i18n.get("menu.layout.logo_custom"),
-		checked = current_variant == "complex",
-		action      = function() set_variant("complex") end,
-	}
 
 	-- The separator that stood here is a `---` row in the manifest now.
 
@@ -681,10 +652,33 @@ function M.build(ctx)
 		Logger.error(LOG, "Manifest renderer unavailable — the layout list is not rendered.")
 		return nil
 	end
-	local submenu = ManifestMenu.build("layout_menu", "Layout", nil, nil, ctx, {
+	-- The menubar icon choice: the renderer draws the row and its values from
+	-- the manifest, ticks the stored value and hands the chosen one back here.
+	local render_ctx = {}
+	for key, value in pairs(ctx or {}) do render_ctx[key] = value end
+	render_ctx.commands = {}
+	for key, value in pairs(type(ctx) == "table" and type(ctx.commands) == "table" and ctx.commands or {}) do
+		render_ctx.commands[key] = value
+	end
+	render_ctx.state_getters = {}
+	for key, value in pairs(type(ctx) == "table" and type(ctx.state_getters) == "table" and ctx.state_getters or {}) do
+		render_ctx.state_getters[key] = value
+	end
+	render_ctx.state_getters["ui.menubar_icon"] = function() return state and state.menubar_icon end
+	render_ctx.commands["menubar_icon"] = function(variant)
+		if not state then return false end
+		state.menubar_icon = variant
+		if type(save_prefs) ~= "function" or save_prefs() ~= true then return false end
+		Logger.info(LOG, "Menubar icon set to %s.", tostring(variant))
+		-- refresh_icon comes from ui.menu.init through ctx: a require() round-trip
+		-- could re-enter that module while it is still initialising.
+		if type(refresh_icon) == "function" then pcall(refresh_icon) end
+		if type(update_menu) == "function" then pcall(update_menu) end
+		return true
+	end
+	local submenu = ManifestMenu.build("layout_menu", "Layout", nil, nil, render_ctx, {
 		["active_layouts"]   = active_layout_rows,
 		["layout_bundle"]    = function() return bundle_rows end,
-		["layout_logo"]      = function() return logo_rows end,
 		["layout_switching"] = function() return switching_rows end,
 	})
 
