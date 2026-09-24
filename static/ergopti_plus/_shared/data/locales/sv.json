@@ -1559,7 +1559,7 @@
 	"sg_actions.one_shot_shift": "⇧ OneShotShift",
 	"sg_actions.open_config": "⚙ Konfiguration",
 	"sg_actions.open_console": "▤ Konsol",
-	"sg_actions.open_error_log": "📄 Error log",
+	"sg_actions.open_error_log": "📄 Dagens felfil",
 	"sg_actions.open_hotstrings_editor": "⌨ Hotstrings-redigerare",
 	"sg_actions.open_key_history": "Tangenthistorik",
 	"sg_actions.open_list_vars": "Variabeltillstånd",

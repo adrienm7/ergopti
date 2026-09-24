@@ -1559,7 +1559,7 @@
 	"sg_actions.one_shot_shift": "⇧ OneShotShift",
 	"sg_actions.open_config": "⚙ Конфігурація",
 	"sg_actions.open_console": "▤ Консоль",
-	"sg_actions.open_error_log": "📄 Error log",
+	"sg_actions.open_error_log": "📄 Файл помилок за сьогодні",
 	"sg_actions.open_hotstrings_editor": "⌨ Редактор хотстрингів",
 	"sg_actions.open_key_history": "Історія клавіш",
 	"sg_actions.open_list_vars": "Стан змінних",

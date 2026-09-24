@@ -1559,7 +1559,7 @@
 	"sg_actions.one_shot_shift": "⇧ OneShotShift",
 	"sg_actions.open_config": "⚙ Konfigurace",
 	"sg_actions.open_console": "▤ Konzole",
-	"sg_actions.open_error_log": "📄 Error log",
+	"sg_actions.open_error_log": "📄 Dnešní soubor chyb",
 	"sg_actions.open_hotstrings_editor": "⌨ Editor hotstring",
 	"sg_actions.open_key_history": "Historie kláves",
 	"sg_actions.open_list_vars": "Stav proměnných",

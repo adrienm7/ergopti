@@ -1559,7 +1559,7 @@
 	"sg_actions.one_shot_shift": "⇧ OneShotShift",
 	"sg_actions.open_config": "⚙ कॉन्फ़िगरेशन",
 	"sg_actions.open_console": "▤ कंसोल",
-	"sg_actions.open_error_log": "📄 Error log",
+	"sg_actions.open_error_log": "📄 आज की त्रुटि फ़ाइल",
 	"sg_actions.open_hotstrings_editor": "⌨ Hotstrings संपादक",
 	"sg_actions.open_key_history": "कुंजी इतिहास",
 	"sg_actions.open_list_vars": "चर स्थिति",
