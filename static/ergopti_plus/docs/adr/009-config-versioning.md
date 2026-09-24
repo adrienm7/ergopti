@@ -54,11 +54,14 @@ At boot, before anything applies or saves the file, each driver classifies it:
 
 A file this build creates carries this build's version: the Lua writer adds
 the stamp when it creates the file, the macOS preferences save stamps a file it
-creates, the Windows first-run wizard stamps the file it creates, and the
-Windows full save always writes the registry's current version. A later boot
-therefore never mistakes a new file for an old one. A writer never stamps a
-file that already exists: only the boot migration moves an existing stamp,
-after running the steps the file still needs.
+creates, and the Windows first-run wizard stamps the file it creates. A later
+boot therefore never mistakes a new file for an old one. A writer never stamps
+a file that already exists: only the boot migration moves an existing stamp,
+after running the steps the file still needs. The one exception is the Windows
+full save, which rewrites the whole file and always writes the registry's
+current version. It is safe only because it runs after the boot migration has
+made the file current, and a read-only session never runs it; a Windows path
+that switched config.toml without that boot migration would skip its steps.
 
 An explicit user reset is not a migration: it replaces the file with a
 placeholder stamped with the current version.

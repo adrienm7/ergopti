@@ -98,6 +98,9 @@ moving, retyping or removing a config key ships a registry step in the same
 commit, with a corpus case each named driver replays; readers drop the old
 spelling at once. A writer stamps only a file it creates; an existing file
 keeps the stamp the boot migration gave it, or its remaining steps are skipped.
+The Windows full save is the one exception: it always writes the current
+version, which is safe only because it runs after the boot migration and never
+in a read-only session.
 
 ### project-toml-cache-returns-real-booleans
 
