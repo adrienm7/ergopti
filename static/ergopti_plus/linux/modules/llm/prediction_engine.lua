@@ -252,13 +252,29 @@ function M.on_hotstring_expired(context, output_context)
 	return schedule(context, output_context, 0, "Hotstring-expiry")
 end
 
+-- What {max_words} reads when the user chose no maximum (0). The built-in
+-- prompts are English, and Windows writes the same word; a literal 0 asked the
+-- model for "between 3 and 0 words".
+local UNLIMITED_WORDS = "unlimited"
+
+--- The locale the model falls back to when the text's language is ambiguous:
+--- the interface's, as on macOS, not always French.
+--- @return string
+local function prompt_language()
+	local ok, I18n = pcall(require, "infra.i18n")
+	local locale = ok and type(I18n.get_locale) == "function" and I18n.get_locale() or nil
+	if type(locale) == "string" and locale ~= "" then return locale end
+	return require("infra.manifest_reader").default_for("script.locale")
+end
+
 local function resolve_system_prompt(profile, params, count)
 	-- The context is left empty here and sent once, by build_messages.
+	local max_words = tonumber(params.max_words) or 0
 	local resolved = ProfileSelector.resolve_system_prompt(profile, {
 		context = "",
 		tail = "",
 		min_words = params.min_words,
-		max_words = params.max_words,
+		max_words = max_words > 0 and max_words or UNLIMITED_WORDS,
 		n = count,
 		language = params.language,
 	})
@@ -289,7 +305,7 @@ function M.predict(context, output_context)
 		num_predictions = requested,
 		temperature = Settings.get("temperature"),
 		auto_raise_temp = Settings.get("auto_raise_temp"),
-		language = "fr",
+		language = prompt_language(),
 		context_window_chars = max_context_chars(),
 	})
 	local is_batch = profile.batch == true and requested > 1
