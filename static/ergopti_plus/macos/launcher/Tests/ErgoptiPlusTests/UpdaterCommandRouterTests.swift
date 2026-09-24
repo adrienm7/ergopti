@@ -41,17 +41,23 @@ final class UpdaterCommandRouterTests: XCTestCase {
 		}
 	}
 
-	private func boundRouter(_ journal: Journal) -> (UpdaterCommandRouter, UpdateCheckerSpy, ChannelSelectorSpy) {
+	/// The router holds its checker and selector weakly, as it holds the
+	/// launcher's controller and feed. A spy discarded with `_` is released at
+	/// once and the router then only queues, so the test keeps both alive here.
+	private var retainedSpies: [AnyObject] = []
+
+	private func boundRouter(_ journal: Journal) -> UpdaterCommandRouter {
 		let checker = UpdateCheckerSpy(journal)
 		let selector = ChannelSelectorSpy(journal)
+		retainedSpies = [checker, selector]
 		let router = UpdaterCommandRouter(knownChannels: ["main", "dev"])
 		router.bind(checker, channelSelector: selector)
-		return (router, checker, selector)
+		return router
 	}
 
 	func testExactCommandChecksOnce() throws {
 		let journal = Journal()
-		let (router, _, _) = boundRouter(journal)
+		let router = boundRouter(journal)
 
 		XCTAssertTrue(router.route(try XCTUnwrap(URL(string: "ergoptiplus://updater/check"))))
 		XCTAssertEqual(journal.events, ["check"])
@@ -59,7 +65,7 @@ final class UpdaterCommandRouterTests: XCTestCase {
 
 	func testChannelCheckSelectsTheChannelBeforeChecking() throws {
 		let journal = Journal()
-		let (router, _, _) = boundRouter(journal)
+		let router = boundRouter(journal)
 
 		XCTAssertTrue(router.route(try XCTUnwrap(URL(string: "ergoptiplus://updater/check/dev"))))
 		XCTAssertEqual(journal.events, ["select:dev", "check"])
@@ -67,7 +73,7 @@ final class UpdaterCommandRouterTests: XCTestCase {
 
 	func testChannelCommandSelectsWithoutChecking() throws {
 		let journal = Journal()
-		let (router, _, _) = boundRouter(journal)
+		let router = boundRouter(journal)
 
 		XCTAssertTrue(router.route(try XCTUnwrap(URL(string: "ergoptiplus://updater/channel/main"))))
 		XCTAssertEqual(journal.events, ["select:main"])
@@ -75,7 +81,7 @@ final class UpdaterCommandRouterTests: XCTestCase {
 
 	func testRejectsEveryNonExactCommandComponent() throws {
 		let journal = Journal()
-		let (router, _, _) = boundRouter(journal)
+		let router = boundRouter(journal)
 		let rejected = [
 			"https://updater/check",
 			"ergoptiplus://other/check",
@@ -117,6 +123,7 @@ final class UpdaterCommandRouterTests: XCTestCase {
 		let journal = Journal()
 		let checker = UpdateCheckerSpy(journal)
 		let selector = ChannelSelectorSpy(journal)
+		retainedSpies = [checker, selector]
 		let router = UpdaterCommandRouter()
 		router.bind(checker, channelSelector: selector)
 
