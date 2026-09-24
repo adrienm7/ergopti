@@ -410,7 +410,10 @@ function M.predict(context, output_context)
 			temperature = is_batch and params.temperature
 				or Inference.variant_temperature(params.temperature, request_index),
 			max_tokens = (_max_tokens or params.max_tokens) * (is_batch and requested or 1),
-			line_mode = profile.id == "raw" or profile.id == "basic",
+			-- Decided from the prompt, as macOS does: one continuation, unless the
+			-- prompt asks for the two-line correction format or a batch. By id, a
+			-- user's copy of "basic" never got the single-line stops.
+			line_mode = not is_batch and not system_prompt:find("TAIL_CORRECTED", 1, true),
 		}, function(delta)
 			if epoch ~= _request_epoch then return end
 			streamed = streamed .. think_filter:feed(delta)

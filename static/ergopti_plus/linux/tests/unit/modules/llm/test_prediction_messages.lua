@@ -32,6 +32,7 @@ end
 --- @param context string
 --- @return table messages
 local last_meta = nil
+local last_opts = nil
 
 local function messages_for(profile, context)
 	local names = {
@@ -47,7 +48,7 @@ local function messages_for(profile, context)
 		isUrlBar = function() return false end,
 	}
 	package.loaded["modules.llm.api_ollama"] = {
-		chat = function(_, _, messages) sent = messages end,
+		chat = function(_, _, messages, opts) sent = messages; last_opts = opts end,
 		cancel = function() end,
 	}
 	package.loaded["modules.llm.profiles"] = {
@@ -153,6 +154,21 @@ helpers.describe("prediction messages: the word limits and language the prompt s
 		local sent = messages_for(builtin("basic"), "Hallo zusammen")
 		I18n.get_locale = previous
 		helpers.assert_true(sent[1].content:find("default to de", 1, true) ~= nil, sent[1].content)
+	end)
+
+end)
+
+helpers.describe("prediction requests: single-line stops follow the prompt", function()
+
+	helpers.it("applies them to a user's copy of the basic prompt", function()
+		local copy = builtin("basic")
+		messages_for({ id = "user_copy", label = "Copie", system_single = copy.system_single }, "Bonjour")
+		helpers.assert_true(last_opts.line_mode, "a copy of basic is a one-line continuation too")
+	end)
+
+	helpers.it("leaves them off for the two-line correction format", function()
+		messages_for(builtin("advanced"), "Bonjour")
+		helpers.assert_true(not last_opts.line_mode)
 	end)
 
 end)
