@@ -384,7 +384,7 @@ _CrashReport_CheapSnapshot(Exc) {
 	; These two values authorize only local worker operations. They are excluded
 	; from the canonical schema and removed before either worker writes a report.
 	Snapshot["_transport_script_dir"] := A_ScriptDir
-	Snapshot["_transport_config_dir"] := _ConfigDir
+	Snapshot["_transport_reports_dir"] := LoggerCrashReportsDir()
 	return _CrashReport_RedactCanonical(Snapshot)
 }
 

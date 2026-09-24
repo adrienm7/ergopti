@@ -11,6 +11,7 @@ SetWorkingDir("static\ergopti_plus\windows\tests")
 global _AHK_DRY_RUN := true
 #Include test_framework.ahk
 #Include test_stubs.ahk
+#Include ../_generated/app_dirs.ahk
 #Include ../infra/logger.ahk
 #Include ../infra/toml/toml_helpers.ahk
 #Include ../infra/toml/toml_loader.ahk

@@ -617,8 +617,10 @@ HealthCheck_FormatPlain(Snapshot) {
 
 	if Snapshot.Has("logs") {
 		lg := Snapshot["logs"]
+		Lines.Push("Logs folder     : " . (lg.Get("logs_dir", "") != "" ? lg["logs_dir"] : "n/a"))
 		Lines.Push("Logs (unified)  : " . (lg["unified_today"] != "" ? lg["unified_today"] : "n/a"))
 		Lines.Push("Errors sink     : " . (lg["errors_today"] != "" ? lg["errors_today"] : "n/a") . "  (WARNING/ERROR only — keeps main log clean)")
+		Lines.Push("Crash reports   : " . (lg.Get("crash_reports_dir", "") != "" ? lg["crash_reports_dir"] : "n/a"))
 	}
 
 	if Snapshot.Has("keylogger") {

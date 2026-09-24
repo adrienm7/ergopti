@@ -53,7 +53,7 @@ function Protect-CrashReportPrivacy {
 		}
 	}
 	$Snapshot.PSObject.Properties.Remove("_transport_script_dir")
-	$Snapshot.PSObject.Properties.Remove("_transport_config_dir")
+	$Snapshot.PSObject.Properties.Remove("_transport_reports_dir")
 }
 
 $mapping = [IO.MemoryMappedFiles.MemoryMappedFile]::OpenExisting(
@@ -82,8 +82,9 @@ try {
 
 $snapshot = [Text.Encoding]::UTF8.GetString($payloadBytes) | ConvertFrom-Json
 $transportScriptDir = [string]$snapshot._transport_script_dir
-$transportConfigDir = [string]$snapshot._transport_config_dir
-if ([string]::IsNullOrWhiteSpace($transportConfigDir)) {
+# The crash-reports folder inside the logs folder, resolved by the driver.
+$transportReportsDir = [string]$snapshot._transport_reports_dir
+if ([string]::IsNullOrWhiteSpace($transportReportsDir)) {
 	throw "Crash-report transport has no destination directory"
 }
 $enrichmentErrors = [Collections.Generic.List[string]]::new()
@@ -141,7 +142,7 @@ if ([string]::IsNullOrWhiteSpace([string]$snapshot.git_hash)) {
 
 Set-CrashField $snapshot "enrichment_errors" $enrichmentErrors.ToArray()
 
-$reportDir = Join-Path $transportConfigDir "autohotkey\crash_reports"
+$reportDir = $transportReportsDir
 [IO.Directory]::CreateDirectory($reportDir) | Out-Null
 $reportName = "{0}_{1}.json" -f (Get-Date -Format "yyyy-MM-ddTHH-mm-ss"), [guid]::NewGuid().ToString("N")
 $reportPath = Join-Path $reportDir $reportName

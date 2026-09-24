@@ -33,7 +33,9 @@ function fail(message) {
 }
 
 function logTail(configRoot) {
-	const logs = path.join(configRoot, 'config', 'autohotkey', 'logs');
+	// Under the smoke, boot puts the default logs folder at
+	// <smoke dir>\<AppDirsWindowsLogsRelative()>.
+	const logs = path.join(configRoot, 'ergopti_plus', 'logs');
 	if (!fs.existsSync(logs)) return '';
 	const files = fs.readdirSync(logs)
 		.filter((name) => name.includes('errors_') || /^ErgoptiPlus_\d/.test(name))

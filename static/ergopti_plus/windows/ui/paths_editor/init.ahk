@@ -242,7 +242,7 @@ _PathsEdWeb_Save(ConfigDir) {
 ; @param N {String} Target directory, backslash-separated and trailing-slashed.
 ; @returns {Boolean} True when the file was written; false after reporting.
 _PathsFile_Write(N) {
-	global _PathsFile, ConfigurationFile, _DefaultConfigDir
+	global _PathsFile, ConfigurationFile, _DefaultConfigDir, _DefaultLogsDir
 	PreviousCritical := Critical("Off")
 	try {
 	N := ConfigTransitionNormalizeConfigDir(N)
@@ -275,7 +275,9 @@ _PathsFile_Write(N) {
 			return false
 		}
 		try DirCreate(SubStr(_PathsFile, 1, InStr(_PathsFile, "\", , -1) - 1))
-		NewContent := ConfigTransitionPathsTomlContent(N, _DefaultConfigDir)
+		; A configuration-folder change keeps the user's LogsDirPath.
+		NewContent := ConfigTransitionPathsTomlContent(N, _DefaultConfigDir,
+			ConfigTransitionCurrentLogsOverride(), _DefaultLogsDir)
 		CommitResult := ConfigTransitionCommitOwned(_PathsFile,
 			[ConfigTransitionPresentTarget(_PathsFile, NewContent)],
 			OwnerBundle)

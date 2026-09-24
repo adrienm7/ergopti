@@ -120,7 +120,12 @@ OnError(_FatalErrorHandler)
 #Include ../ui/menu/menu_llm/menu_build_coordinator.ahk
 #Include ../infra/ui_style.ahk
 #Include ../_generated/logger_sub_files.ahk
+#Include ../_generated/app_dirs.ahk
 #Include ../infra/logger.ahk
+; The logs folder every logger test writes to: a private temp folder, never the
+; user's real %LOCALAPPDATA%\ergopti_plus\logs\ (boot.ahk sets it in the driver).
+global _LogsDir := A_Temp . "\ergopti_test_logs\ergopti_plus\"
+global _DefaultLogsDir := _LogsDir
 ; Boot stage profiler and the cross-driver diagnostic snapshot: definitions and
 ; two counters only, exercised by unit/test_diagnostic_logging.ahk.
 #Include ../infra/boot_profiler.ahk
@@ -295,6 +300,11 @@ InstallSendNoOps()
 #Include unit/test_build_commit.ahk
 #Include unit/test_version_display_strips_build_metadata.ahk
 #Include unit/test_logger_daily_rotation.ahk
+; The logs-folder resolver and the Debug menu log openers built on it
+; (logs-dir-resolver). log_openers.ahk is definitions only.
+#Include ../ui/log_openers.ahk
+#Include unit/test_logs_dir_resolver.ahk
+#Include meta/test_logs_dir_single_resolver.ahk
 #Include unit/test_healthcheck_core.ahk
 #Include unit/test_healthcheck_owner_snapshots.ahk
 #Include unit/test_tooltip_tint_contract.ahk

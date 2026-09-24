@@ -5,9 +5,10 @@
 ; DESCRIPTION:
 ; Lightweight central logger for ErgoptiPlus, matching the 8-variant taxonomy
 ; in _shared/modules/logger/SPEC.md (debug / trace / done / info / start / success /
-; warn / error). Writes structured lines to ``ErgoptiPlus.log`` next to the
-; script and keeps a small in-memory ring buffer that the tray menu can dump
-; for live debugging without re-reading the file.
+; warn / error). Writes structured lines to the daily log in the logs folder
+; (LoggerLogsDir: LogsDirPath, or %LOCALAPPDATA%\ergopti_plus\logs\) and keeps
+; a small in-memory ring buffer that the tray menu can dump for live debugging
+; without re-reading the file.
 ;
 ; FEATURES & RATIONALE:
 ; 1. Eight variants on two axes (importance × lifecycle role) so every call
@@ -252,25 +253,114 @@ global _LOGGER_STAMP_FN := 0
 ; =============================
 ; =============================
 
-; Resolve the dated log-file paths for TODAY under <ConfigDir>/autohotkey/logs/,
-; creating the directory if needed, and record the date they were built for.
-; Resolves _ConfigDir at call time so any later override (paths.toml) is picked
-; up. Shared by LoggerInit and the midnight rollover in _LoggerFlush so the
-; filename format lives in exactly one place.
+; The OS-default logs folder, %LOCALAPPDATA%\ergopti_plus\logs\ (from
+; _generated/app_dirs.ahk). Local, not Roaming: logs are machine state.
+; @returns {String} Absolute folder with a trailing backslash.
+LoggerDefaultLogsDir() {
+		Root := EnvGet(AppDirsWindowsLogsBaseEnv())
+		if (Root == "")
+				throw Error("%" . AppDirsWindowsLogsBaseEnv() . "% is empty: the default logs folder cannot be resolved.")
+		return RTrim(Root, "\/") . "\" . AppDirsWindowsLogsRelative() . "\"
+}
+
+; Resolves the LogsDirPath override read from paths.toml. Empty means the OS
+; default. The default folder, or one whose last component is the application
+; folder name, is used as is; anything else gets that subfolder appended, so
+; retention never deletes in a folder the user merely picked. An override that
+; is not an absolute path is refused visibly and the default is used, exactly
+; like an unreadable paths.toml.
+; @param Override {String} Raw LogsDirPath value, "" when absent.
+; @param DefaultDir {String} Folder used when the override is empty or invalid.
+; @returns {String} Absolute folder with a trailing backslash.
+LoggerResolveLogsDir(Override, DefaultDir) {
+		if !(Override is String) || !(DefaultDir is String) || DefaultDir == ""
+				throw TypeError("LoggerResolveLogsDir needs a String override and a default folder.")
+		Dir := StrReplace(Trim(Override), "/", "\")
+		if (Dir == "")
+				return DefaultDir
+		if !RegExMatch(Dir, "^[A-Za-z]:\\") && SubStr(Dir, 1, 2) != "\\" {
+				try LoggerError("Logger", "{1} '{2}' is not an absolute folder; logs stay in '{3}'.",
+						AppDirsLogsOverrideKey(), Override, DefaultDir)
+				return DefaultDir
+		}
+		Dir := RTrim(Dir, "\")
+		if (Dir . "\" = DefaultDir)
+				return DefaultDir
+		SplitPath(Dir, &Leaf)
+		if (Leaf != AppDirsFolderName())
+				Dir .= "\" . AppDirsFolderName()
+		return Dir . "\"
+}
+
+; THE logs-folder resolver: the folder boot resolved from paths.toml, or the OS
+; default before boot has run (the logger may emit from the first #Include).
+; @returns {String} Absolute folder with a trailing backslash.
+LoggerLogsDir() {
+		global _LogsDir
+		; Exactly one trailing backslash, whatever the folder was stored with:
+		; every consumer appends a bare name to it.
+		if IsSet(_LogsDir) && (_LogsDir is String) && _LogsDir != ""
+				return RTrim(_LogsDir, "\/") . "\"
+		return LoggerDefaultLogsDir()
+}
+
+; Today's unified log, named at call time so a driver up past midnight never
+; opens yesterday's file.
+; @returns {String}
+LoggerTodayLogPath() {
+		return LoggerLogsDir() . AppDirsLogUnifiedPrefix() . FormatTime(, "yyyy-MM-dd") . AppDirsLogExtension()
+}
+
+; Today's errors-only log (WARNING and ERROR lines). It exists only once
+; something warned that day.
+; @returns {String}
+LoggerTodayErrorsPath() {
+		return LoggerLogsDir() . AppDirsLogErrorsPrefix() . FormatTime(, "yyyy-MM-dd") . AppDirsLogExtension()
+}
+
+; The folder crash reports are written to, inside the logs folder.
+; @returns {String} Absolute folder with a trailing backslash.
+LoggerCrashReportsDir() {
+		return LoggerLogsDir() . AppDirsCrashReportsDir() . "\"
+}
+
+; Appends one line to bootstrap.log, the sink for what happens before
+; paths.toml is read and before LoggerInit may run: a second instance yielding
+; to the live owner, a refused configuration transition. LogsDirPath is not
+; known yet, so the file is in the default logs folder, the one boot names in
+; _DefaultLogsDir or, before boot, the OS default. It never touches the dated
+; files a live owner is writing.
+; @param Severity {String} "WARNING" or "ERROR".
+; @param Source {String} Module name shown between brackets.
+; @param Message {String} The line, without timestamp.
+; @returns {String} The file written.
+LoggerAppendBootstrapLine(Severity, Source, Message) {
+		global _DefaultLogsDir
+		Dir := (IsSet(_DefaultLogsDir) && (_DefaultLogsDir is String) && _DefaultLogsDir != "")
+				? _DefaultLogsDir : LoggerDefaultLogsDir()
+		if !DirExist(Dir)
+				DirCreate(Dir)
+		BootstrapLog := Dir . "bootstrap.log"
+		FileAppend(FormatTime(A_Now, "yyyy-MM-dd HH:mm:ss") . " [" . Severity . "] ["
+				. Source . "] " . Message . "`r`n", BootstrapLog, "UTF-8")
+		return BootstrapLog
+}
+
+; Resolve the dated log-file paths for TODAY in the logs folder, creating the
+; directory if needed, and record the date they were built for. Shared by
+; LoggerInit and the midnight rollover in _LoggerFlush so the filename format
+; lives in exactly one place.
 ; @returns {String} The resolved log directory, with a trailing backslash.
 _LoggerResolveDatedPaths() {
 		global LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, _LOGGER_PATH_DATE
-		global _ConfigDir, _AhkSubDir
 
-		LogDir := (IsSet(_ConfigDir) and _ConfigDir != "")
-				? _ConfigDir . _AhkSubDir . "logs\"
-				: A_ScriptDir . "\logs\"
+		LogDir := LoggerLogsDir()
 		if !DirExist(LogDir) {
 				try DirCreate(LogDir)
 		}
 		Today := FormatTime(, "yyyy-MM-dd")
-		LOGGER_LOG_PATH := LogDir . "ErgoptiPlus_" . Today . ".log"
-		LOGGER_ERRORS_LOG_PATH := LogDir . "ErgoptiPlus_errors_" . Today . ".log"
+		LOGGER_LOG_PATH := LogDir . AppDirsLogUnifiedPrefix() . Today . AppDirsLogExtension()
+		LOGGER_ERRORS_LOG_PATH := LogDir . AppDirsLogErrorsPrefix() . Today . AppDirsLogExtension()
 		_LOGGER_PATH_DATE := Today
 		return LogDir
 }
@@ -713,8 +803,8 @@ _LoggerDatedPathForDate(Date, ErrorsOnly := false) {
 	SlashAt := InStr(BasePath, "\", false, -1)
 	if (BasePath == "" || SlashAt == 0)
 		return ""
-	Prefix := ErrorsOnly ? "ErgoptiPlus_errors_" : "ErgoptiPlus_"
-	return SubStr(BasePath, 1, SlashAt) . Prefix . Date . ".log"
+	Prefix := ErrorsOnly ? AppDirsLogErrorsPrefix() : AppDirsLogUnifiedPrefix()
+	return SubStr(BasePath, 1, SlashAt) . Prefix . Date . AppDirsLogExtension()
 }
 
 _LoggerAppendDatedQueue(Lines, ErrorsOnly, FallbackDate, ForceFlush) {
@@ -1507,12 +1597,14 @@ _LoggerPurgeOldLogs(LogDir, MaxAgeDays) {
 		}
 		CutoffStamp := DateAdd(A_Now, -MaxAgeDays, "Days")
 		CutoffDate := SubStr(CutoffStamp, 1, 8)  ; YYYYMMDD
+		; Supports both unified (ErgoptiPlus_YYYY-MM-DD.log) and the dedicated
+		; errors file (ErgoptiPlus_errors_YYYY-MM-DD.log); \Q..\E keeps the
+		; generated names literal inside the pattern.
+		Dated := "^(?:\Q" . AppDirsLogErrorsPrefix() . "\E|\Q" . AppDirsLogUnifiedPrefix()
+				. "\E)(\d{4})-(\d{2})-(\d{2})\Q" . AppDirsLogExtension() . "\E$"
 		try {
-				loop files, LogDir . "ErgoptiPlus_*.log" {
-						; Supports both unified (ErgoptiPlus_YYYY-MM-DD.log) and the dedicated
-						; errors file (ErgoptiPlus_errors_YYYY-MM-DD.log).
-						if RegExMatch(A_LoopFileName, "^ErgoptiPlus(?:_errors)?_(\d{4})-(\d{2})-(\d{2})\.log$",
-								&Match) {
+				loop files, LogDir . AppDirsLogUnifiedPrefix() . "*" . AppDirsLogExtension() {
+						if RegExMatch(A_LoopFileName, Dated, &Match) {
 								FileDate := Match[1] . Match[2] . Match[3]
 								if (FileDate < CutoffDate) {
 										try FileDelete(A_LoopFileFullPath)

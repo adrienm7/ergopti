@@ -51,6 +51,12 @@ global _PathsFile := (_DriverStartupSmokeDir != "")
 		: (A_IsCompiled
 				? (A_AppData . "\Ergopti\paths.toml")
 				: (A_ScriptDir . "\_generated\paths.toml"))
+; The OS-default logs folder, %LOCALAPPDATA%\ergopti_plus\logs\. Named before
+; the transition recovery below: a refusal it writes to bootstrap.log lands
+; here, which under the startup smoke keeps it inside the isolated tree.
+global _DefaultLogsDir := (_DriverStartupSmokeDir != "")
+		? (_DriverStartupSmokeDir . "\" . AppDirsWindowsLogsRelative() . "\")
+		: LoggerDefaultLogsDir()
 ; A valid transition chooses one complete old/new image before the locator is
 ; read. Quarantine is visible and fatal: continuing would let a mixed image
 ; select the wrong config directory and later be persisted as coherent state.
@@ -76,6 +82,13 @@ if !DirExist(_ConfigDir) {
 		catch as _CfgDirErr
 				LoggerError("Boot", "Configuration directory '{1}' could not be created: {2}.", _ConfigDir, _CfgDirErr.Message)
 }
+
+; LogsDirPath relocates the logs folder; empty means _DefaultLogsDir.
+; LoggerLogsDir() reads _LogsDir, so every consumer (menu, gestures, health
+; check, crash reports) follows it; lines logged before LoggerInit are queued
+; and reach the resolved folder.
+global _LogsDir := LoggerResolveLogsDir(
+		_PathsOverrides.Get(AppDirsLogsOverrideKey(), ""), _DefaultLogsDir)
 
 ; Subfolder name for AHK-specific user files under _ConfigDir. Centralised so
 ; a future rename only requires changing this one constant.
