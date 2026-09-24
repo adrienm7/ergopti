@@ -14,6 +14,8 @@
 // 4. Real UDP boundary: a loopback client reaches the pre-bound launcher worker.
 // 5. Native retention: dated archives and stale topical views purge off Lua.
 // 6. Receive fairness: empty datagrams cannot monopolize the serial worker queue.
+// 7. Latency: kept descriptors are reused until their inode is unlinked,
+//    replaced or rotated, and a slow datagram is reported with its cost.
 // ==============================================================================
 
 import Darwin
@@ -997,7 +999,140 @@ final class LoggerDatagramWorkerTests: XCTestCase {
 
 	// ============================================
 	// ============================================
-	// ======= 4/ Test Helpers =====================
+	// ======= 4/ Latency Under Stall =============
+	// ============================================
+	// ============================================
+
+	/// Every append used to pay openat + fchmod + close per file. The kept
+	/// descriptor is reused while the directory entry still names its inode.
+	func testSinkReusesADescriptorAcrossAppendsAndReopensAfterUnlink() throws {
+		let directory = try makeLogDirectory()
+		let now = try fixedDate(year: 2026, month: 8, day: 14)
+		var opened: [String] = []
+		let sink = LoggerRecordSink(
+			now: { now },
+			openOperation: { directoryDescriptor, name, flags, mode in
+				opened.append(name)
+				return name.withCString { Darwin.openat(directoryDescriptor, $0, flags, mode) }
+			}
+		)
+		XCTAssertTrue(sink.configure(directoryPath: directory.path, retentionDays: 14))
+		let unifiedName = "ErgoptiPlus_2026-08-14.log"
+		let unified = directory.appendingPathComponent(unifiedName)
+
+		for sequence in 1...3 {
+			XCTAssertTrue(sink.append(
+				line: "kept-\(sequence)",
+				variant: "info",
+				topics: [],
+				calendarDate: "2026-08-14",
+				operationId: "session-a:\(sequence)"
+			))
+		}
+		XCTAssertEqual(opened, [unifiedName], "three appends to one file must open it once")
+		XCTAssertEqual(try String(contentsOf: unified), "kept-1\nkept-2\nkept-3\n")
+
+		try FileManager.default.removeItem(at: unified)
+		XCTAssertTrue(sink.append(
+			line: "after-unlink",
+			variant: "info",
+			topics: [],
+			calendarDate: "2026-08-14",
+			operationId: "session-a:4"
+		))
+		XCTAssertEqual(opened, [unifiedName, unifiedName],
+			"an unlinked file must be reopened, never written through its stale descriptor")
+		XCTAssertEqual(try String(contentsOf: unified), "after-unlink\n")
+
+		let replacement = directory.appendingPathComponent("replacement.log")
+		try Data("replaced\n".utf8).write(to: replacement)
+		XCTAssertEqual(Darwin.rename(replacement.path, unified.path), 0)
+		XCTAssertTrue(sink.append(
+			line: "after-replace",
+			variant: "info",
+			topics: [],
+			calendarDate: "2026-08-14",
+			operationId: "session-a:5"
+		))
+		XCTAssertEqual(opened.count, 3, "a replaced inode must be reopened by name")
+		XCTAssertEqual(try String(contentsOf: unified), "replaced\nafter-replace\n")
+
+		XCTAssertTrue(sink.append(
+			line: "next-day",
+			variant: "info",
+			topics: [],
+			calendarDate: "2026-08-15",
+			operationId: "session-a:6"
+		))
+		XCTAssertEqual(opened.last, "ErgoptiPlus_2026-08-15.log")
+	}
+
+	/// A slow datagram is what the Lua transport sees as a stall; its cause must
+	/// reach launcher.log with the time spent opening, locking and writing.
+	func testSlowDatagramIsReportedWithItsCostBreakdown() throws {
+		let directory = try makeLogDirectory()
+		let now = try fixedDate(year: 2026, month: 8, day: 14)
+		var clock: TimeInterval = 1_000
+		let sink = LoggerRecordSink(
+			now: { now },
+			writeOperation: { descriptor, bytes, count in
+				clock += 0.6
+				return Darwin.write(descriptor, bytes, count)
+			},
+			uptime: { clock }
+		)
+		var reports: [String] = []
+		let processor = LoggerDatagramProcessor(
+			token: "secret",
+			sink: sink,
+			uptime: { clock }
+		)
+		processor.slowOperationReporter = { reports.append($0) }
+		XCTAssertEqual(response(processor.handle(
+			configure(directory, session: "session-a"),
+			sourceIsLoopback: true
+		))["ack"] as? Int, 0)
+		XCTAssertEqual(reports, [], "a configure that touches no file is not slow")
+
+		XCTAssertEqual(response(processor.handle(
+			record(sequence: 1, line: "slow-write", session: "session-a"),
+			sourceIsLoopback: true
+		))["ack"] as? Int, 1)
+		XCTAssertEqual(reports.count, 1)
+		let report = try XCTUnwrap(reports.first)
+		XCTAssertTrue(report.contains("took 600 ms"), report)
+		XCTAssertTrue(report.contains("1 record(s)"), report)
+		XCTAssertTrue(report.contains("1 file open(s)"), report)
+		XCTAssertTrue(report.contains("write 600 ms"), report)
+	}
+
+	func testFastDatagramIsNotReported() throws {
+		let directory = try makeLogDirectory()
+		let now = try fixedDate(year: 2026, month: 8, day: 14)
+		let clock: TimeInterval = 1_000
+		var reports: [String] = []
+		let processor = LoggerDatagramProcessor(
+			token: "secret",
+			sink: LoggerRecordSink(now: { now }, uptime: { clock }),
+			uptime: { clock }
+		)
+		processor.slowOperationReporter = { reports.append($0) }
+		_ = processor.handle(configure(directory, session: "session-a"), sourceIsLoopback: true)
+		_ = processor.handle(
+			record(sequence: 1, line: "fast-write", session: "session-a"),
+			sourceIsLoopback: true
+		)
+		processor.performDeferredMaintenance()
+		XCTAssertEqual(reports, [])
+	}
+
+
+
+
+
+	// ============================================
+	// ============================================
+	// ======= 5/ Test Helpers =====================
 	// ============================================
 	// ============================================
 

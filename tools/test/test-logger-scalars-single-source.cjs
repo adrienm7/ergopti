@@ -355,6 +355,21 @@ if (
 			'would declare the worker dead before it was ever asked twice.'
 	);
 }
+// The native worker reports its own slow replies to launcher.log; its threshold
+// must stay well inside the transport's first resend, or the report would only
+// ever describe stalls the transport had already acted on.
+check(
+	'macos/launcher/Sources/ErgoptiPlus/LoggerDatagramWorker.swift',
+	'kLoggerSlowBatchThresholdMilliseconds',
+	/\bkLoggerSlowBatchThresholdMilliseconds\s*=\s*(\d+)/g,
+	registry.logger.native_slow_batch_ms
+);
+if (!(registry.logger.native_slow_batch_ms > 0 && registry.logger.native_slow_batch_ms <= registry.logger.ack_retry_ms)) {
+	errors.push(
+		`[logger] native_slow_batch_ms (${registry.logger.native_slow_batch_ms}) must be positive and no longer ` +
+			`than ack_retry_ms (${registry.logger.ack_retry_ms}): a slower reply has already cost a resend.`
+	);
+}
 mustNotDeclare(
 	'macos/adapters/log_transport.lua',
 	'MAX_ACK_ATTEMPTS_BEFORE_FAILURE',

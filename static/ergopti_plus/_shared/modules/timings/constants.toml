@@ -655,3 +655,8 @@ ack_retry_cap_ms = 4000
 # or App Nap can stall it for seconds; that is not a failure.
 # HS: adapters/log_transport.lua STALL_FATAL_SEC (seconds).
 stall_fatal_ms = 30000
+
+# A native worker datagram or retention pass slower than this is reported to
+# launcher.log with the time spent opening files, waiting for locks and writing.
+# Swift: LoggerDatagramWorker.swift kLoggerSlowBatchThresholdMilliseconds.
+native_slow_batch_ms = 500

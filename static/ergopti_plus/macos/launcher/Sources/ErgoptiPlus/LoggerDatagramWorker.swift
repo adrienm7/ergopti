@@ -18,6 +18,12 @@
 //    following their final path components, and all writes happen off AppKit.
 // 4. Native rotation/purge: daily and topical maintenance cannot block a Lua
 //    timer or eventtap callback.
+// 5. Latency: the Lua transport treats a long silence as a dead worker, so the
+//    worker runs at user-initiated QoS, keeps each validated file descriptor
+//    open between records (revalidated by inode before every append) instead
+//    of paying open/fchmod/close per record and file, and reports any datagram
+//    or retention pass slower than kLoggerSlowBatchThresholdMilliseconds to
+//    launcher.log with the time spent opening, waiting for locks and writing.
 // ==============================================================================
 
 import Darwin
@@ -37,6 +43,11 @@ import Foundation
 
 let kLoggerDatagramPortEnvironment = "ERGOPTI_LOG_PORT"
 let kLoggerDatagramTokenEnvironment = "ERGOPTI_LOG_TOKEN"
+
+/// A datagram or retention pass slower than this is reported to launcher.log.
+/// Registry: _shared/modules/timings/constants.toml [logger] native_slow_batch_ms,
+/// pinned by tools/test/test-logger-scalars-single-source.cjs.
+let kLoggerSlowBatchThresholdMilliseconds = 500
 
 struct LoggerDatagramEndpoint: Equatable {
 	let port: UInt16
@@ -61,6 +72,14 @@ protocol LoggerDatagramServing: AnyObject {
 // ============================================
 // ============================================
 
+/// Where one datagram's time went inside the file sink.
+struct LoggerSinkStatistics: Equatable {
+	var appends = 0
+	var opens = 0
+	var lockWaitSeconds: TimeInterval = 0
+	var writeSeconds: TimeInterval = 0
+}
+
 /// Serial file authority used only from LoggerDatagramProcessor's private queue.
 final class LoggerRecordSink {
 	private static let maximumLineBytes = 48 * 1_024
@@ -79,11 +98,26 @@ final class LoggerRecordSink {
 	private var pendingWriteRollback: PendingWriteRollback?
 	private var purgePending = false
 	private var lastMaintenanceDate: String?
+	private var openFiles: [String: OpenFile] = [:]
 	private let now: () -> Date
 	private let beforeLock: (Int32, String) -> Void
 	private let writeOperation: (Int32, UnsafeRawPointer?, Int) -> Int
 	private let truncateOperation: (Int32, off_t) -> Int32
 	private let synchronizeOperation: (Int32) -> Int32
+	private let openOperation: (Int32, String, Int32, mode_t) -> Int32
+	private let uptime: () -> TimeInterval
+
+	/// Cost breakdown since the last resetStatistics(), read by the processor.
+	private(set) var statistics = LoggerSinkStatistics()
+
+	/// One validated append descriptor, kept open between records. Its inode
+	/// identity is compared with the directory entry before every append, so a
+	/// purged, unlinked or replaced file is reopened rather than written blind.
+	private struct OpenFile {
+		let descriptor: Int32
+		let device: dev_t
+		let inode: ino_t
+	}
 
 	private struct PendingRecord: Equatable {
 		let operationId: String
@@ -108,13 +142,19 @@ final class LoggerRecordSink {
 		truncateOperation: @escaping (Int32, off_t) -> Int32 = {
 			Darwin.ftruncate($0, $1)
 		},
-		synchronizeOperation: @escaping (Int32) -> Int32 = { Darwin.fsync($0) }
+		synchronizeOperation: @escaping (Int32) -> Int32 = { Darwin.fsync($0) },
+		openOperation: @escaping (Int32, String, Int32, mode_t) -> Int32 = { directory, name, flags, mode in
+			name.withCString { Darwin.openat(directory, $0, flags, mode) }
+		},
+		uptime: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
 	) {
 		self.now = now
 		self.beforeLock = beforeLock
 		self.writeOperation = writeOperation
 		self.truncateOperation = truncateOperation
 		self.synchronizeOperation = synchronizeOperation
+		self.openOperation = openOperation
+		self.uptime = uptime
 	}
 
 	deinit {
@@ -122,7 +162,13 @@ final class LoggerRecordSink {
 			_ = ergoptiFlock(rollback.descriptor, LOCK_UN)
 			Darwin.close(rollback.descriptor)
 		}
+		closeOpenFiles()
 		if directoryDescriptor >= 0 { Darwin.close(directoryDescriptor) }
+	}
+
+	/// Starts a new cost breakdown, one per datagram.
+	func resetStatistics() {
+		statistics = LoggerSinkStatistics()
 	}
 
 	/// The exact log-folder refusal of the latest configure, nil after success.
@@ -173,6 +219,9 @@ final class LoggerRecordSink {
 			&& previousAttributes.st_dev == attributes.st_dev
 			&& previousAttributes.st_ino == attributes.st_ino
 
+		// Kept descriptors belong to the previous directory descriptor, even at
+		// the same pathname: a replaced folder must never receive them.
+		closeOpenFiles()
 		if directoryDescriptor >= 0 { Darwin.close(directoryDescriptor) }
 		directoryDescriptor = descriptor
 		self.directoryPath = normalizedPath
@@ -190,11 +239,14 @@ final class LoggerRecordSink {
 	/// Runs retention only after the transport has sent the configure ACK. This
 	/// preserves the boot barrier without putting an unbounded directory walk on
 	/// the critical path before Hammerspoon may arm its input callbacks.
-	func performDeferredMaintenance() {
-		guard purgePending else { return }
+	/// - Returns: Whether a retention pass ran.
+	@discardableResult
+	func performDeferredMaintenance() -> Bool {
+		guard purgePending else { return false }
 		purgePending = false
 		purgeOldLogs()
 		lastMaintenanceDate = Self.calendarDate(now())
+		return true
 	}
 
 	/// Applies the sink's complete record policy without mutating filesystem state.
@@ -258,6 +310,9 @@ final class LoggerRecordSink {
 			forceTopicalResetForObservedTransition = topicalWriteDate != nil
 			topicalWriteDate = calendarDate
 			initializedTopicalFiles.removeAll()
+			// Day rotation: the dated names change and the undated topical views
+			// may be truncated, so every kept descriptor is reopened.
+			closeOpenFiles()
 		}
 		guard let bytes = (persistedLine + "\n").data(using: .utf8) else { return false }
 		let unifiedName = "ErgoptiPlus_\(calendarDate).log"
@@ -286,6 +341,7 @@ final class LoggerRecordSink {
 			if target.topical { initializedTopicalFiles.insert(target.name) }
 		}
 		pendingRecord = nil
+		statistics.appends += 1
 		return true
 	}
 
@@ -333,53 +389,93 @@ final class LoggerRecordSink {
 		}
 	}
 
-	/// Opens and validates one exact sink before performing a bounded append.
+	/// Returns the kept descriptor of one sink when its directory entry still
+	/// names the same inode, else opens and validates a fresh one.
+	private func openFile(_ fileName: String) -> OpenFile? {
+		if let kept = openFiles[fileName] {
+			var entryAttributes = stat()
+			let inspected = fileName.withCString { name in
+				Darwin.fstatat(directoryDescriptor, name, &entryAttributes, AT_SYMLINK_NOFOLLOW)
+			}
+			if inspected == 0,
+				(entryAttributes.st_mode & S_IFMT) == S_IFREG,
+				entryAttributes.st_dev == kept.device,
+				entryAttributes.st_ino == kept.inode {
+				return kept
+			}
+			// Unlinked by retention or a user, or replaced: never write through it.
+			closeOpenFile(fileName)
+		}
+
+		// Never put O_TRUNC on the pathname open: validation must happen before
+		// any existing inode can be mutated (an owned hard link is still rejected).
+		let flags = O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK
+		let descriptor = openOperation(directoryDescriptor, fileName, flags, S_IRUSR | S_IWUSR)
+		guard descriptor >= 0 else { return nil }
+		statistics.opens += 1
+		var attributes = stat()
+		guard Darwin.fstat(descriptor, &attributes) == 0,
+			(attributes.st_mode & S_IFMT) == S_IFREG,
+			attributes.st_uid == geteuid(),
+			attributes.st_nlink == 1,
+			Darwin.fchmod(descriptor, S_IRUSR | S_IWUSR) == 0
+		else {
+			Darwin.close(descriptor)
+			return nil
+		}
+		let file = OpenFile(descriptor: descriptor, device: attributes.st_dev, inode: attributes.st_ino)
+		openFiles[fileName] = file
+		return file
+	}
+
+	private func closeOpenFile(_ fileName: String) {
+		guard let file = openFiles.removeValue(forKey: fileName) else { return }
+		Darwin.close(file.descriptor)
+	}
+
+	private func closeOpenFiles() {
+		for fileName in Array(openFiles.keys) { closeOpenFile(fileName) }
+	}
+
+	/// Validates one exact sink under its lock before performing a bounded append.
+	/// A descriptor is kept only after a complete append; every failure closes
+	/// it, so the retry revalidates from the directory entry.
 	private func write(
 		_ data: Data,
 		fileName: String,
 		resetUnlessDate: String? = nil,
 		forceReset: Bool = false
 	) -> Bool {
-		// Never put O_TRUNC on the pathname open: validation must happen before
-		// any existing inode can be mutated (an owned hard link is still rejected).
-		let flags = O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK
-		let descriptor = fileName.withCString { name in
-			Darwin.openat(
-				directoryDescriptor,
-				name,
-				flags,
-				S_IRUSR | S_IWUSR
-			)
-		}
-		guard descriptor >= 0 else { return false }
-		var releaseDescriptor = true
+		guard let file = openFile(fileName) else { return false }
+		let descriptor = file.descriptor
+		var keepOpen = false
+		var retainedForRollback = false
 		var locked = false
 		defer {
-			if releaseDescriptor {
+			if !retainedForRollback {
 				if locked { _ = ergoptiFlock(descriptor, LOCK_UN) }
-				Darwin.close(descriptor)
+				if !keepOpen { closeOpenFile(fileName) }
 			}
 		}
 
-		var prelockAttributes = stat()
-		guard Darwin.fstat(descriptor, &prelockAttributes) == 0,
-			(prelockAttributes.st_mode & S_IFMT) == S_IFREG,
-			prelockAttributes.st_uid == geteuid(),
-			prelockAttributes.st_nlink == 1
-		else { return false }
 		beforeLock(descriptor, fileName)
-		guard acquireLock(descriptor) else { return false }
+		let lockStarted = uptime()
+		let lockAcquired = acquireLock(descriptor)
+		statistics.lockWaitSeconds += uptime() - lockStarted
+		guard lockAcquired else { return false }
 		locked = true
 
 		// Rotation is decided from the inode metadata observed while holding the
 		// same exclusive lock as the write. A snapshot taken before flock can be
 		// stale after waiting behind a writer and must never authorize truncation.
+		// The inode must also still be the one validated at open and still linked.
 		var lockedAttributes = stat()
 		guard Darwin.fstat(descriptor, &lockedAttributes) == 0,
 			(lockedAttributes.st_mode & S_IFMT) == S_IFREG,
 			lockedAttributes.st_uid == geteuid(),
 			lockedAttributes.st_nlink == 1,
-			Darwin.fchmod(descriptor, S_IRUSR | S_IWUSR) == 0
+			lockedAttributes.st_dev == file.device,
+			lockedAttributes.st_ino == file.inode
 		else { return false }
 		if let resetUnlessDate {
 			let inodeDate = Self.calendarDate(Date(
@@ -394,22 +490,29 @@ final class LoggerRecordSink {
 		var appendAttributes = stat()
 		guard Darwin.fstat(descriptor, &appendAttributes) == 0 else { return false }
 		let originalSize = appendAttributes.st_size
+		let writeStarted = uptime()
 		let complete = writeLauncherLogData(
 			data,
 			descriptor: descriptor,
 			writeOperation: writeOperation
 		)
-		if complete { return true }
+		statistics.writeSeconds += uptime() - writeStarted
+		if complete {
+			keepOpen = true
+			return true
+		}
 		if rollbackWrite(descriptor, originalSize: originalSize) { return false }
 
 		// A failed rollback leaves a partially appended inode. Retain that exact
 		// locked descriptor so a sequence retry cannot append a full duplicate
-		// beside the prefix, nor accidentally repair a replacement pathname.
+		// beside the prefix, nor accidentally repair a replacement pathname. It
+		// leaves the kept set: the rollback debt now owns and closes it.
+		openFiles.removeValue(forKey: fileName)
 		pendingWriteRollback = PendingWriteRollback(
 			descriptor: descriptor,
 			originalSize: originalSize
 		)
-		releaseDescriptor = false
+		retainedForRollback = true
 		return false
 	}
 
@@ -599,22 +702,62 @@ final class LoggerDatagramProcessor {
 	private var configuredDirectory: String?
 	private var configuredRetention: Int?
 	private var lastSequence = 0
+	private let uptime: () -> TimeInterval
+	private let slowThresholdSeconds: TimeInterval
 	var hasConfiguredSession: Bool { session != nil }
 	/// Receives every refused log folder on the processor queue.
 	var configureRefusalHandler: ((LogDirectoryFailure) -> Void)?
+	/// Receives one diagnostic per datagram or retention pass slower than the
+	/// threshold, on the processor queue. The Lua transport reads a long
+	/// silence as a stall, so the reason for each slow reply must be on record.
+	var slowOperationReporter: ((String) -> Void)?
 
-	init(token: String, sink: LoggerRecordSink = LoggerRecordSink()) {
+	init(
+		token: String,
+		sink: LoggerRecordSink = LoggerRecordSink(),
+		uptime: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
+		slowThresholdSeconds: TimeInterval = Double(kLoggerSlowBatchThresholdMilliseconds) / 1_000
+	) {
 		self.token = token
 		self.sink = sink
+		self.uptime = uptime
+		self.slowThresholdSeconds = slowThresholdSeconds
 	}
 
 	/// Runs native-only work deliberately ordered after the response datagram.
 	func performDeferredMaintenance() {
-		sink.performDeferredMaintenance()
+		let started = uptime()
+		guard sink.performDeferredMaintenance() else { return }
+		let elapsed = uptime() - started
+		guard elapsed >= slowThresholdSeconds else { return }
+		slowOperationReporter?(
+			"native logger retention pass took \(Self.milliseconds(elapsed)) ms"
+		)
 	}
 
 	/// Accepts one loopback packet and returns an authenticated ACK/NACK payload.
 	func handle(_ data: Data, sourceIsLoopback: Bool) -> Data? {
+		let started = uptime()
+		sink.resetStatistics()
+		let reply = handleUnmeasured(data, sourceIsLoopback: sourceIsLoopback)
+		let elapsed = uptime() - started
+		if elapsed >= slowThresholdSeconds {
+			let cost = sink.statistics
+			slowOperationReporter?(
+				"native logger datagram of \(data.count) bytes took \(Self.milliseconds(elapsed)) ms: "
+					+ "\(cost.appends) record(s), \(cost.opens) file open(s), "
+					+ "lock wait \(Self.milliseconds(cost.lockWaitSeconds)) ms, "
+					+ "write \(Self.milliseconds(cost.writeSeconds)) ms"
+			)
+		}
+		return reply
+	}
+
+	private static func milliseconds(_ seconds: TimeInterval) -> Int {
+		return Int((seconds * 1_000).rounded())
+	}
+
+	private func handleUnmeasured(_ data: Data, sourceIsLoopback: Bool) -> Data? {
 		guard sourceIsLoopback,
 			!data.isEmpty,
 			data.count <= Self.maximumPacketBytes,
@@ -985,16 +1128,20 @@ final class LoggerDatagramWorker: LoggerDatagramServing {
 
 	private let descriptor: Int32
 	private let processor: LoggerDatagramProcessor
+	// Not .utility: that class is throttled under I/O contention, and the Lua
+	// transport counts every unanswered second against its stall budget.
 	private let queue = DispatchQueue(
 		label: "com.ergoptiplus.logger-datagram",
-		qos: .utility
+		qos: .userInitiated
 	)
 	private var readSource: DispatchSourceRead?
 	private var bootstrapReadyHandler: (() -> Void)?
 	private var bootstrapReadyReported = false
 	private var stopped = false
 
-	init?() {
+	/// Binds the loopback socket and starts serving it.
+	/// - Parameter slowOperationReporter: Receives slow-datagram diagnostics.
+	init?(slowOperationReporter: @escaping (String) -> Void = { LauncherLog.write($0) }) {
 		let socketDescriptor = Darwin.socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
 		guard socketDescriptor >= 0 else { return nil }
 		guard Darwin.fcntl(socketDescriptor, F_SETFD, FD_CLOEXEC) == 0,
@@ -1041,7 +1188,9 @@ final class LoggerDatagramWorker: LoggerDatagramServing {
 			port: UInt16(bigEndian: liveAddress.sin_port),
 			token: token
 		)
-		processor = LoggerDatagramProcessor(token: token)
+		let processor = LoggerDatagramProcessor(token: token)
+		processor.slowOperationReporter = slowOperationReporter
+		self.processor = processor
 
 		let source = DispatchSource.makeReadSource(fileDescriptor: socketDescriptor, queue: queue)
 		readSource = source
