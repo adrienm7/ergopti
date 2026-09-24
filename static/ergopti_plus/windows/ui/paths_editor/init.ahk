@@ -3,9 +3,10 @@
 ; ==============================================================================
 ; MODULE: Paths Editor WebView2 Host
 ; DESCRIPTION:
-; Renders the config-folder editor on Windows via WebView2, loading the shared
-; frontend at _shared/ui/paths_editor/ so the AHK and Hammerspoon drivers show
-; an identical UI. Replaces the single-field native dialog (FilePathsEditor).
+; Renders the folders editor (configuration folder and logs folder) on Windows
+; via WebView2, loading the shared frontend at _shared/ui/paths_editor/ so every
+; driver shows an identical UI. Replaces the single-field native dialog
+; (FilePathsEditor).
 ;
 ; FEATURES & RATIONALE:
 ; 1. Shared frontend — same index.html/script.js/style.css as macOS, resolved
@@ -83,13 +84,13 @@ _PathsEdWeb_TryOpen() {
 	g.BackColor := "0x1e1e1e"
 	g.MarginX   := 0
 	g.MarginY   := 0
-	Placeholder := g.Add("Text", "x0 y0 w720 h300", "")
+	Placeholder := g.Add("Text", "x0 y0 w720 h440", "")
 	g.OnEvent("Close", _PathsEdWeb_SessionCall.Bind(SessionEpoch, _PathsEdWeb_OnClose))
 	g.OnEvent("Size",  _PathsEdWeb_SessionCall.Bind(SessionEpoch, _PathsEdWeb_OnResize))
 
 	; Show BEFORE creating the control — a hidden Gui has a zero client rect, so
 	; the control lays out blank and never recovers.
-	g.Show("w720 h300 Center")
+	g.Show("w720 h440 Center")
 	_PathsEdWeb_Gui := g
 
 	loader := _VendorDir . "\64bit\WebView2Loader.dll"
@@ -162,10 +163,13 @@ _PathsEdWeb_OnWebMessage(SessionEpoch, Handler, Args) {
 	if (Action == "ready") {
 		SetTimer(_PathsEdWeb_SessionCall.Bind(SessionEpoch, _PathsEdWeb_PushInitData), -1)
 	} else if (Action == "browse") {
-		SetTimer(_PathsEdWeb_SessionCall.Bind(SessionEpoch, _PathsEdWeb_Browse), -1)
+		Target := (Payload.Has("target") && Payload["target"] == "logs") ? "logs" : "config"
+		SetTimer(_PathsEdWeb_SessionCall.Bind(SessionEpoch, _PathsEdWeb_Browse, Target), -1)
 	} else if (Action == "save") {
 		Dir := Payload.Has("configDir") ? Payload["configDir"] : ""
-		SetTimer(_PathsEdWeb_SessionCall.Bind(SessionEpoch, _PathsEdWeb_Save, Dir), -1)
+		; A page that sends no logs folder keeps the stored one (the 0 sentinel).
+		LogsDir := (Payload.Has("logsDir") && Payload["logsDir"] is String) ? Payload["logsDir"] : 0
+		SetTimer(_PathsEdWeb_SessionCall.Bind(SessionEpoch, _PathsEdWeb_Save, Dir, LogsDir), -1)
 	} else if (Action == "cancel") {
 		SetTimer(_PathsEdWeb_SessionCall.Bind(SessionEpoch, _PathsEdWeb_Close), -1)
 	}
@@ -194,22 +198,38 @@ _PathsEdWeb_PushInitData() {
 }
 
 ; Opens the native folder picker and hands the chosen path back to the page.
-_PathsEdWeb_Browse() {
+; @param Target {String} "logs" for the logs folder, else the configuration folder.
+_PathsEdWeb_Browse(Target := "config") {
 	global _ConfigDir
 	if A_IsSuspended
 		return false
-	StartDir := StrReplace(Trim(_ConfigDir), "/", "\")
+	StartDir := StrReplace(Trim(Target == "logs" ? LoggerLogsDir() : _ConfigDir), "/", "\")
 	Picked := DirSelect("*" . StartDir, 1, t("dialog.config_folder.select_title"))
 	if (Picked == "")
 		return
 	Fwd := StrReplace(Picked, "\", "/")
 	if !RegExMatch(Fwd, "/$")
 		Fwd .= "/"
-	_PathsEdWeb_Eval("if(window.applyBrowseResult)window.applyBrowseResult(" . _PathsEdWeb_JsStr(Fwd) . ")")
+	_PathsEdWeb_Eval("if(window.applyBrowseResult)window.applyBrowseResult("
+		. _PathsEdWeb_JsStr(Fwd) . "," . _PathsEdWeb_JsStr(Target) . ")")
 }
 
-; Persists the chosen config directory and reloads, mirroring the native dialog.
-_PathsEdWeb_Save(ConfigDir) {
+; The LogsDirPath a save must store: "" for the default, the resolved folder
+; otherwise, or 0 to keep the stored one when the page sent no logs folder.
+; @param LogsDir {String|Integer} Value from the page, or the 0 sentinel.
+; @returns {String|Integer}
+_PathsEdWeb_LogsOverride(LogsDir) {
+	global _DefaultLogsDir
+	if (LogsDir is Integer)
+		return ConfigTransitionCurrentLogsOverride()
+	Resolved := LoggerResolveLogsDir(LogsDir, _DefaultLogsDir)
+	return (Resolved = _DefaultLogsDir) ? "" : Resolved
+}
+
+; Persists the chosen folders and reloads, mirroring the native dialog.
+; @param ConfigDir {String} Configuration folder from the page.
+; @param LogsDir {String|Integer} Logs folder from the page, or 0 to keep it.
+_PathsEdWeb_Save(ConfigDir, LogsDir := 0) {
 	global _ConfigDir, _PathsFile, _DefaultConfigDir
 	if A_IsSuspended
 		return false
@@ -218,8 +238,9 @@ _PathsEdWeb_Save(ConfigDir) {
 		N := _DefaultConfigDir
 	if !RegExMatch(N, "\\$")
 		N .= "\"
+	NewLogs := _PathsEdWeb_LogsOverride(LogsDir)
 	; No change — just close, never reload for nothing.
-	if (N == _ConfigDir) {
+	if (N == _ConfigDir && NewLogs = ConfigTransitionCurrentLogsOverride()) {
 		_PathsEdWeb_Close()
 		return
 	}
@@ -227,7 +248,7 @@ _PathsEdWeb_Save(ConfigDir) {
 	; read-only or locked target the user's chosen directory was discarded, the
 	; log asserted the opposite, and the Reload() dropped them back into the OLD
 	; directory with no error anywhere — the change simply appeared not to happen.
-	if !_PathsFile_Write(N)
+	if !_PathsFile_Write(N, NewLogs)
 		return
 }
 
@@ -240,8 +261,10 @@ _PathsEdWeb_Save(ConfigDir) {
 ; chosen directory on a read-only or locked target, then Reload()ing them back
 ; into the OLD directory with no error anywhere. Both callers now share this.
 ; @param N {String} Target directory, backslash-separated and trailing-slashed.
+; @param LogsDir {String|Integer} LogsDirPath to store ("" for the default), or
+;   0 to keep the stored one.
 ; @returns {Boolean} True when the file was written; false after reporting.
-_PathsFile_Write(N) {
+_PathsFile_Write(N, LogsDir := 0) {
 	global _PathsFile, ConfigurationFile, _DefaultConfigDir, _DefaultLogsDir
 	PreviousCritical := Critical("Off")
 	try {
@@ -276,8 +299,10 @@ _PathsFile_Write(N) {
 		}
 		try DirCreate(SubStr(_PathsFile, 1, InStr(_PathsFile, "\", , -1) - 1))
 		; A configuration-folder change keeps the user's LogsDirPath.
+		if (LogsDir is Integer)
+			LogsDir := ConfigTransitionCurrentLogsOverride()
 		NewContent := ConfigTransitionPathsTomlContent(N, _DefaultConfigDir,
-			ConfigTransitionCurrentLogsOverride(), _DefaultLogsDir)
+			LogsDir, _DefaultLogsDir)
 		CommitResult := ConfigTransitionCommitOwned(_PathsFile,
 			[ConfigTransitionPresentTarget(_PathsFile, NewContent)],
 			OwnerBundle)
@@ -335,16 +360,20 @@ _PathsFile_RollbackRefusedReload(OwnerBundle) {
 ; ===================================
 ; ==============================================================
 
-; Builds the window.initData({...}) call: the current + default config dir
-; (forward-slash for display parity with macOS) plus the localized UI strings.
+; Builds the window.initData({...}) call: the current + default config and logs
+; folders (forward-slash for display parity with macOS) plus the localized UI
+; strings.
 _PathsEdWeb_InitDataJs() {
-	global _ConfigDir, _DefaultConfigDir
+	global _ConfigDir, _DefaultConfigDir, _DefaultLogsDir
 	Cur := StrReplace(_ConfigDir, "\", "/")
 	Def := StrReplace(_DefaultConfigDir, "\", "/")
+	Logs := StrReplace(LoggerLogsDir(), "\", "/")
+	DefLogs := StrReplace(_DefaultLogsDir, "\", "/")
 
 	Keys := ["menu.paths.window_title"
 		, "paths_editor.heading", "paths_editor.subtitle", "paths_editor.label_config_dir"
-		, "paths_editor.tag_default", "paths_editor.tag_modified"
+		, "paths_editor.label_logs_dir", "paths_editor.hint_logs_dir"
+		, "paths_editor.tag_default", "paths_editor.default_label", "paths_editor.tag_modified"
 		, "paths_editor.btn_browse", "paths_editor.btn_reset"
 		, "paths_editor.btn_cancel", "paths_editor.btn_save"]
 	Strings := ""
@@ -357,6 +386,8 @@ _PathsEdWeb_InitDataJs() {
 	return "if(window.initData)window.initData({"
 		. "configDir:" . _PathsEdWeb_JsStr(Cur) . ","
 		. "defaultConfigDir:" . _PathsEdWeb_JsStr(Def) . ","
+		. "logsDir:" . _PathsEdWeb_JsStr(Logs) . ","
+		. "defaultLogsDir:" . _PathsEdWeb_JsStr(DefLogs) . ","
 		. "strings:{" . Strings . "}"
 		. "})"
 }

@@ -34,8 +34,29 @@ function applyDomStrings() {
 	});
 }
 
-// Current working value for the config directory
-let _currentDir = '';
+// The two edited folders, keyed by the target name the hosts answer to:
+// "config" (ConfigDirPath) and "logs" (LogsDirPath). Each entry names its DOM
+// ids and the payload fields holding its current and default value.
+const FIELDS = {
+	config: {
+		input: 'input-config-dir',
+		tag: 'tag-config-dir',
+		defaultText: 'default-config-dir',
+		browse: 'btn-browse',
+		current: 'configDir',
+		fallback: 'defaultConfigDir',
+		value: ''
+	},
+	logs: {
+		input: 'input-logs-dir',
+		tag: 'tag-logs-dir',
+		defaultText: 'default-logs-dir',
+		browse: 'btn-browse-logs',
+		current: 'logsDir',
+		fallback: 'defaultLogsDir',
+		value: ''
+	}
+};
 
 // =====================================
 // =====================================
@@ -44,33 +65,32 @@ let _currentDir = '';
 // =====================================
 
 /**
- * Returns the directory input element.
- * @returns {HTMLInputElement}
+ * Updates one field's tag (default/modified) from its value vs its default.
+ * @param {string} name Field key in FIELDS.
  */
-function dirInput() {
-	return document.getElementById('input-config-dir');
-}
-
-/**
- * Returns the status tag element.
- * @returns {HTMLElement}
- */
-function dirTag() {
-	return document.getElementById('tag-config-dir');
-}
-
-/**
- * Updates the tag (default/modified) based on current value vs default.
- */
-function refreshTag() {
+function refreshTag(name) {
 	if (!_data) return;
-	const inp = dirInput();
-	const tag = dirTag();
+	const field = FIELDS[name];
+	const inp = document.getElementById(field.input);
+	const tag = document.getElementById(field.tag);
 	if (!inp || !tag) return;
-	const isDefault = _currentDir === _data.defaultConfigDir;
+	const isDefault = field.value === _data[field.fallback];
 	inp.classList.toggle('is-default', isDefault);
 	tag.textContent = isDefault ? _t('paths_editor.tag_default') : _t('paths_editor.tag_modified');
 	tag.className = isDefault ? 'tag-default' : 'tag-modified';
+}
+
+/**
+ * Sets one field's value in the state and the input, then refreshes its tag.
+ * @param {string} name Field key in FIELDS.
+ * @param {string} value New folder.
+ */
+function setField(name, value) {
+	const field = FIELDS[name];
+	field.value = value;
+	const inp = document.getElementById(field.input);
+	if (inp) inp.value = value;
+	refreshTag(name);
 }
 
 // =============================================
@@ -83,7 +103,7 @@ const _post = makeHostBridge('hsPaths');
 
 /**
  * Called by the host once the webview is ready, with initial data.
- * @param {Object} data - {configDir, defaultConfigDir}
+ * @param {Object} data - {configDir, defaultConfigDir, logsDir, defaultLogsDir, strings}
  */
 window.initData = function (data) {
 	_data = data;
@@ -91,33 +111,41 @@ window.initData = function (data) {
 		_strings = data.strings;
 		applyDomStrings();
 	}
-	_currentDir = data.configDir || data.defaultConfigDir || '';
-	const inp = dirInput();
-	if (inp) inp.value = _currentDir;
-	refreshTag();
+	Object.keys(FIELDS).forEach(function (name) {
+		const field = FIELDS[name];
+		const shown = document.getElementById(field.defaultText);
+		if (shown) shown.textContent = data[field.fallback] || '';
+		setField(name, data[field.current] || data[field.fallback] || '');
+	});
 };
 
 /**
- * Called by Lua after the user picks a folder via the native folder picker.
+ * Called by the host after the user picks a folder via the native folder picker.
  * @param {string} path - The picked absolute directory path (with trailing slash).
+ * @param {string} [target] - "logs" for the logs folder; the configuration folder otherwise.
  */
-window.applyBrowseResult = function (path) {
+window.applyBrowseResult = function (path, target) {
 	if (!path) return;
-	_currentDir = path;
-	const inp = dirInput();
-	if (inp) inp.value = path;
-	refreshTag();
+	setField(target === 'logs' ? 'logs' : 'config', path);
 };
 
 // ==========================================
 // ==========================================
-// ======= 4/ Input Listener ================
+// ======= 4/ Input Listeners ===============
 // ==========================================
 // ==========================================
 
-dirInput().addEventListener('input', function () {
-	_currentDir = dirInput().value;
-	refreshTag();
+Object.keys(FIELDS).forEach(function (name) {
+	const field = FIELDS[name];
+	document.getElementById(field.input).addEventListener('input', function (event) {
+		field.value = event.target.value;
+		refreshTag(name);
+	});
+	document.getElementById(field.browse).addEventListener('click', function () {
+		setTimeout(function () {
+			_post({ action: 'browse', target: name });
+		}, 0);
+	});
 });
 
 // ==========================================
@@ -126,15 +154,9 @@ dirInput().addEventListener('input', function () {
 // ==========================================
 // ==========================================
 
-document.getElementById('btn-browse').addEventListener('click', function () {
-	setTimeout(function () {
-		_post({ action: 'browse' });
-	}, 0);
-});
-
 document.getElementById('btn-save').addEventListener('click', function () {
 	setTimeout(function () {
-		_post({ action: 'save', configDir: _currentDir });
+		_post({ action: 'save', configDir: FIELDS.config.value, logsDir: FIELDS.logs.value });
 	}, 0);
 });
 
@@ -146,10 +168,9 @@ document.getElementById('btn-cancel').addEventListener('click', function () {
 
 document.getElementById('btn-reset').addEventListener('click', function () {
 	if (!_data) return;
-	_currentDir = _data.defaultConfigDir || '';
-	const inp = dirInput();
-	if (inp) inp.value = _currentDir;
-	refreshTag();
+	Object.keys(FIELDS).forEach(function (name) {
+		setField(name, _data[FIELDS[name].fallback] || '');
+	});
 });
 
 // ========================================

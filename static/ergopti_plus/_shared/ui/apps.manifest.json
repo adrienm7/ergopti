@@ -80,7 +80,7 @@
     },
     "paths_editor": {
       "width": 720,
-      "height": 300,
+      "height": 440,
       "min_width": 560,
       "min_height": 200,
       "vhost": "ergopti.paths"

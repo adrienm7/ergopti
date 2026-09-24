@@ -97,7 +97,9 @@ _PFSW_CallersSkipReloadOnFailure() {
 		; Skip the definition itself.
 		LineStart := InStr(Src, "`n", , Pos - 120) + 1
 		Head := SubStr(Src, (Pos > 120) ? Pos - 120 : 1, 120)
-		if (InStr(Head, "_PathsFile_Write(N) {") == 0 and InStr(SubStr(Src, Pos, 40), "(N) {") == 0) {
+		; The definition is the one occurrence followed by its parameter list and
+		; an opening brace, whatever its parameters are named.
+		if !RegExMatch(SubStr(Src, Pos, 120), "^_PathsFile_Write\([^)]*\)\s*\{") {
 			Checked += 1
 			Window := SubStr(Src, (Pos > 40) ? Pos - 40 : 1, 200)
 			Assert(InStr(Window, "if !_PathsFile_Write") > 0,
