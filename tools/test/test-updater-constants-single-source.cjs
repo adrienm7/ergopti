@@ -108,6 +108,30 @@ if (!ahkIntervalM) {
 	pass(`core.ahk UPDATER_DEFAULT_INTERVAL matches defaults.json (${interval})`);
 }
 
+// Every update channel reads one release list (never /releases/latest, which
+// answers 404 while a channel has no release). AHK cannot read JSON at include
+// time, so its template literal is pinned here.
+const checkUrl = defaults.update_check && defaults.update_check.releases_url;
+const ahkCheckUrlM = ahkSrc.match(/UPDATER_RELEASES_API_URL_TEMPLATE\s*:=\s*"([^"]+)"/);
+if (typeof checkUrl !== "string" || !checkUrl.includes("{owner}/{repo}") || checkUrl.includes("/releases/latest")) {
+	fail("defaults.json update_check.releases_url must be an {owner}/{repo} release-list template");
+} else if (!ahkCheckUrlM) {
+	fail("core.ahk: could not find UPDATER_RELEASES_API_URL_TEMPLATE");
+} else if (ahkCheckUrlM[1] !== checkUrl) {
+	fail(`core.ahk UPDATER_RELEASES_API_URL_TEMPLATE="${ahkCheckUrlM[1]}" does not match defaults.json update_check.releases_url="${checkUrl}"`);
+} else {
+	pass("core.ahk UPDATER_RELEASES_API_URL_TEMPLATE matches defaults.json update_check.releases_url");
+}
+const ahkApiLatest = ahkSrc
+	.split("\n")
+	.filter((line) => !/^\s*;/.test(line))
+	.filter((line) => line.includes("api.github.com") && line.includes("/releases/latest"));
+if (ahkApiLatest.length > 0) {
+	fail("core.ahk still requests the API's /releases/latest, which answers 404 while a channel has no release");
+} else {
+	pass("core.ahk requests no /releases/latest endpoint");
+}
+
 // ─── Check Lua updater.lua no longer has bare literals ───────────────────────
 
 const luaSrc = fs.readFileSync(LUA_UPDATER, "utf8");

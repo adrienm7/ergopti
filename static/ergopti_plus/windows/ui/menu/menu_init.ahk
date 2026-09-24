@@ -412,7 +412,8 @@ _MI_BuildConfigurationMenu() {
 }
 
 
-; Builds the About submenu (version, channel, update frequency, changelog).
+; Builds the About submenu (version, channels, update check, check frequency,
+; Versions and its GitHub page).
 _MI_BuildAboutMenu() {
 	global UPDATER_CHANNEL, UPDATER_CHECK_INTERVAL, UPDATER_INTERVAL_PRESETS, UPDATER_LATEST_RELEASE
 
@@ -429,14 +430,16 @@ _MI_BuildAboutMenu() {
 	return MenuRenderer_Build("about_menu", "About", "", "", Providers, Commands)
 }
 
-; List provider: the version row, the channel picker, and — unless this is a
-; local checkout — the update-frequency picker and the one-click update row.
-_MI_AboutUpdateRows() {
+; List provider: the version row, one row per channel of the shared registry
+; (ticked on the subscribed one) right before the check row, then the
+; update-frequency picker. A local checkout has neither the check row nor the
+; frequency picker: it has no release to update from.
+_MI_AboutUpdateRows(IsLocal := Updater_IsLocalSource(), SetChannelFn := Updater_SetChannel) {
 	global UPDATER_CHANNEL, UPDATER_CHECK_INTERVAL, UPDATER_INTERVAL_PRESETS, UPDATER_LATEST_RELEASE
 	Rows := []
 
 	VerLabel := "ErgoptiPlus " . Updater_CurrentVersion()
-	if Updater_IsLocalSource() {
+	if IsLocal {
 		; A local checkout has no release to open, so the version reads as a label.
 		Rows.Push(Map("label", VerLabel, "disabled", true))
 	} else {
@@ -444,24 +447,20 @@ _MI_AboutUpdateRows() {
 	}
 	Rows.Push(Map("separator", true))
 
-	; The two channels as nested row DATA. The parent's label carries the channel
-	; currently set, which is why the row stays a provider's rather than a
-	; declaration's — but what hangs off it is the renderer's to draw.
-	ChannelDisplay := (UPDATER_CHANNEL == "dev") ? t("menu.about.channel_dev") : t("menu.about.channel_main")
-	Rows.Push(Map(
-		"label", t("menu.about.channel_menu") . ": " . ChannelDisplay,
-		"items", [
-			Map("label",   t("menu.about.channel_main"),
-				"action",  (*) => Updater_SetChannel("main"),
-				"checked", (UPDATER_CHANNEL != "dev")),
-			Map("label",   t("menu.about.channel_dev"),
-				"action",  (*) => Updater_SetChannel("dev"),
-				"checked", (UPDATER_CHANNEL == "dev"))
-		]))
+	for _, Id in UpdateChannels_Ids()
+		Rows.Push(Map(
+			"label",   t(UpdateChannels_Field(Id, "menu_label_key")),
+			"action",  _MI_ChannelSetter(Id, SetChannelFn),
+			"checked", (Id == UPDATER_CHANNEL)))
 
-	if Updater_IsLocalSource() {
+	if IsLocal {
 		return Rows
 	}
+
+	Rows.Push(Map(
+		"label",    Updater_GetUpdateMenuLabel(),
+		"action",   Updater_OneClickUpdate,
+		"disabled", (Updater_GetUpdateState() == "checking")))
 
 	; Same shape for the check-frequency presets: one nested row per preset, the
 	; tick on whichever matches the interval in force.
@@ -483,12 +482,13 @@ _MI_AboutUpdateRows() {
 	Rows.Push(Map(
 		"label", t("menu.about.frequency_menu") . ": " . FreqDisplay,
 		"items", FreqRows))
-
-	Rows.Push(Map(
-		"label",    Updater_GetUpdateMenuLabel(),
-		"action",   Updater_OneClickUpdate,
-		"disabled", (Updater_GetUpdateState() == "checking")))
 	return Rows
+}
+
+; Binds one channel id per row. A fat arrow written in the loop above would
+; share the loop variable and switch every row to the last channel.
+_MI_ChannelSetter(Id, SetChannelFn) {
+	return (*) => SetChannelFn.Call(Id)
 }
 
 

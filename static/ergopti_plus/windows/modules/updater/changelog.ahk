@@ -56,33 +56,6 @@ Updater_GetUpdateMenuLabel() {
 	return t("menu.about.check_for_updates")
 }
 
-; Displays the current version in a MsgBox and offers to open the releases page.
-Updater_ShowVersion(*) {
-	global UPDATER_REQUEST_ORIGIN_MANUAL
-	if A_IsSuspended
-		return _Updater_RefuseManualWhileSuspended()
-	Request := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
-	if Request.BornSuspended
-		return _Updater_RefuseManualWhileSuspended()
-	if !_Updater_RequestMayPublish(Request)
-		return
-	Ver := Updater_CurrentVersion()
-	global UPDATER_CHANNEL
-	if Updater_IsLocalSource()
-		ChannelSuffix := t("updater.channel_local_source_suffix")
-	else
-		ChannelSuffix := (UPDATER_CHANNEL == "dev")
-			? t("updater.channel_dev_suffix")
-			: t("updater.channel_main_suffix")
-	Res := MsgBox(
-		Format(t("updater.version_message"), Ver, ChannelSuffix),
-		t("updater.title_version"),
-		"YesNo Iconi"
-	)
-	if (Res == "Yes")
-		_Updater_OpenManualUrl(Updater_ReleasesPageUrl, Request)
-}
-
 ; One-click update entry point wired to the dynamic tray menu item.
 ;
 ; State machine:
@@ -156,6 +129,14 @@ _Updater_OneClickUpdateCallback(Json, Current, Request, Terminal := 0) {
 		TrayTip(t("updater.no_connection"), t("updater.title_update"))
 		return
 	}
+	if _Updater_JsonIsNoChannelRelease(Json) {
+		try LoggerDone("Updater", "One-click update check: no release on channel {1} yet.", Request.Channel)
+		_Updater_ScheduleMenuRebuildForRequest(Request)
+		if !_Updater_RequestMayPublish(Request)
+			return
+		TrayTip(_Updater_NoChannelReleaseMessage(Request.Channel), t("updater.title_update"))
+		return
+	}
 	Latest := Updater_ParseTagName(Json)
 	if (Latest == "") {
 		try LoggerWarn("Updater", "One-click check: tag parse failed.")
@@ -166,7 +147,7 @@ _Updater_OneClickUpdateCallback(Json, Current, Request, Terminal := 0) {
 		TrayTip(t("updater.parse_failed"), t("updater.title_update"))
 		return
 	}
-	if !_Updater_ShouldOfferCandidate(
+	if !UpdateChannels_ShouldOffer(
 		Latest, Current, Request.Channel, _Updater_InstalledChannel()) {
 		try LoggerSuccess("Updater", "One-click check: already up to date ({1}).", Current)
 		_Updater_ScheduleMenuRebuildForRequest(Request)
@@ -315,8 +296,14 @@ _Updater_OpenSelectedReleaseUrl(ListBox, Releases, IsSuspended := unset, NotifyF
 	return true
 }
 
-_Updater_SwitchChangelogChannel(G, IsLocal, OtherChannel, IsSuspended := unset, NotifyFn := 0, CloseFn := 0, OpenFn := 0, SetChannelFn := 0) {
+; Shows another channel's releases in the native Versions window. Viewing a
+; channel never changes the subscription; _Updater_SubscribeChangelogChannel does.
+_Updater_ViewChangelogChannel(G, Channel, IsSuspended := unset, NotifyFn := 0, CloseFn := 0, OpenFn := 0) {
 	global UPDATER_REQUEST_ORIGIN_MANUAL
+	if !UpdateChannels_IsKnown(Channel) {
+		try LoggerError("Updater", "The Versions window refused an unknown channel to view.")
+		return false
+	}
 	HasSuspendOverride := IsSet(IsSuspended)
 	if (HasSuspendOverride ? IsSuspended : A_IsSuspended)
 		return _Updater_RefuseManualWhileSuspended(NotifyFn)
@@ -335,22 +322,48 @@ _Updater_SwitchChangelogChannel(G, IsLocal, OtherChannel, IsSuspended := unset, 
 		CloseFn.Call(G)
 	else
 		_Updater_CloseGui(G)
+	if IsObject(OpenFn)
+		return OpenFn.Call(Channel, Request)
+	return _Updater_OpenChangelogWindow(Channel, Request)
+}
+
+; Subscribes to the channel the native Versions window shows. Updater_SetChannel
+; reloads the app, which closes this window, so the user confirms first.
+_Updater_SubscribeChangelogChannel(G, Channel, IsSuspended := unset, NotifyFn := 0, CloseFn := 0, ConfirmFn := 0, SetChannelFn := 0) {
+	global UPDATER_REQUEST_ORIGIN_MANUAL
+	if !UpdateChannels_IsKnown(Channel) {
+		try LoggerError("Updater", "The Versions window refused an unknown channel to subscribe to.")
+		return false
+	}
+	HasSuspendOverride := IsSet(IsSuspended)
+	if (HasSuspendOverride ? IsSuspended : A_IsSuspended)
+		return _Updater_RefuseManualWhileSuspended(NotifyFn)
+	Request := HasSuspendOverride
+		? _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL, IsSuspended)
+		: _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
+	if Request.BornSuspended
+		return _Updater_RefuseManualWhileSuspended(NotifyFn)
+	Question := StrReplace(t("changelog_window.subscribe_restart"), "{channel}", _Updater_ChannelLabel(Channel))
+	Answer := IsObject(ConfirmFn)
+		? ConfirmFn.Call(Question)
+		: MsgBox(Question, t("updater.title_changelog"), "YesNo Icon?")
+	if (Answer !== "Yes") {
+		try LoggerInfo("Updater", "Subscription to channel {1} cancelled from the Versions window.", Channel)
+		return false
+	}
 	if HasSuspendOverride {
 		if !_Updater_RequestMayPublish(Request, IsSuspended)
 			return false
 	} else if !_Updater_RequestMayPublish(Request) {
 		return false
 	}
-	if IsLocal {
-		if IsObject(OpenFn)
-			return OpenFn.Call(OtherChannel, Request)
-		return _Updater_OpenChangelogWindow(OtherChannel, Request)
-	}
-	if IsObject(SetChannelFn)
-		SetChannelFn.Call(OtherChannel)
+	if IsObject(CloseFn)
+		CloseFn.Call(G)
 	else
-		Updater_SetChannel(OtherChannel, Request)
-	return true
+		_Updater_CloseGui(G)
+	if IsObject(SetChannelFn)
+		return SetChannelFn.Call(Channel, Request)
+	return Updater_SetChannel(Channel, Request)
 }
 
 _Updater_RefreshChangelogSelection(ListBox, Releases, BtnInstall, IsLocal, ShowBodyFn, IsSuspended := unset, NotifyFn := 0, RefreshInstallFn := 0) {
@@ -433,18 +446,17 @@ _Updater_BuildChangelogGui(Json, Channel, Request, Terminal := 0) {
 		return
 	}
 
-	; Dev channel shows everything; main channel shows stable releases only.
-	; When there are no releases we still open the window: the empty-state is
-	; shown inside the notes pane so the user can switch channel without a popup.
-	MainOnly := (Channel != "dev")
-	Releases := Updater_ParseReleasesList(Json, MainOnly)
+	; A channel's view lists its own releases and those of every more stable
+	; channel (the shared registry decides). When there are none we still open
+	; the window: the empty-state is shown inside the notes pane so the user can
+	; view another channel without a popup.
+	Releases := Updater_ParseReleasesList(Json, Channel)
 
 	HasReleases := (Releases.Length > 0)
 	Labels := []
 	for _, R in Releases {
 		Date   := SubStr(R.PublishedAt, 1, 10)
-		Marker := R.Prerelease ? "  [dev]" : ""
-		Label  := (Date != "") ? (R.Tag . "  —  " . Date . Marker) : (R.Tag . Marker)
+		Label  := (Date != "") ? (R.Tag . "  —  " . Date) : R.Tag
 		Labels.Push(Label)
 	}
 	if !_Updater_RequestMayPublish(Request)
@@ -465,27 +477,30 @@ _Updater_BuildChangelogGui(Json, Channel, Request, Terminal := 0) {
 	RightColW := InnerW - LeftColW - ColGap   ; 640
 
 	; ── Header bar ────────────────────────────────────────────────────────────
+	; The picker changes only which channel is shown, like the page's tabs; the
+	; button subscribes to the shown channel and is inactive for the current one.
+	global UPDATER_CHANNEL
 	IsLocal := Updater_IsLocalSource()
-	BadgeText := IsLocal
-		? (t("menu.about.channel_local_source") . "  |  " . t("updater.changelog_channel_label") . "  " . Channel)
-		: (t("updater.changelog_channel_label") . "  " . Channel)
-	OtherChannel := (Channel == "dev") ? "main" : "dev"
-	SwitchLabel  := (Channel == "dev")
-		? t("updater.changelog_switch_to_main")
-		: t("updater.changelog_switch_to_dev")
+	ChannelIds := UpdateChannels_Ids()
+	ChannelLabels := []
+	ShownIndex := 0
+	for Index, Id in ChannelIds {
+		ChannelLabels.Push(_Updater_ChannelLabel(Id))
+		if (Id == Channel)
+			ShownIndex := Index
+	}
+	SubscribeLabel := StrReplace(t("changelog_window.subscribe"), "{channel}", _Updater_ChannelLabel(Channel))
 
-	BadgeW    := InnerW - ColGap - (InnerW - LeftColW - ColGap)   ; 260 = LeftColW
-	BtnSwitchW := InnerW - BadgeW - ColGap                         ; 640
-	G.Add("Text", "xm yp+4 w" . BadgeW . " +0x200", BadgeText)
-	BtnSwitch := G.Add("Button", "x+10 yp w" . BtnSwitchW, SwitchLabel)
-
-	if (IsLocal)
-		G.Add("Text", "xm y+4 w" . InnerW . " cGray", t("updater.changelog_local_source_note"))
+	PickerW       := LeftColW                                     ; 260
+	BtnSubscribeW := InnerW - PickerW - ColGap                    ; 640
+	Picker := G.Add("DropDownList", "xm yp+4 w" . PickerW . " Choose" . ShownIndex, ChannelLabels)
+	BtnSubscribe := G.Add("Button", "x+10 yp w" . BtnSubscribeW, SubscribeLabel)
+	BtnSubscribe.Enabled := (Channel !== UPDATER_CHANNEL)
 
 	G.Add("Text", "xm y+8 w" . LeftColW, t("updater.changelog_select_release"))
 
 	; ── Two-pane area ─────────────────────────────────────────────────────────
-	ListHeight := IsLocal ? 460 : 480
+	ListHeight := 480
 
 	Lb := G.Add("ListBox", "xm y+4 w" . LeftColW . " h" . ListHeight . " vRelLb", Labels)
 
@@ -530,8 +545,10 @@ _Updater_BuildChangelogGui(Json, Channel, Request, Terminal := 0) {
 			: ""
 	)
 
-	BtnSwitch.OnEvent("Click", (*) => _Updater_SwitchChangelogChannel(
-		G, IsLocal, OtherChannel))
+	Picker.OnEvent("Change", (*) => (Picker.Value >= 1 && ChannelIds[Picker.Value] !== Channel)
+		? _Updater_ViewChangelogChannel(G, ChannelIds[Picker.Value])
+		: "")
+	BtnSubscribe.OnEvent("Click", (*) => _Updater_SubscribeChangelogChannel(G, Channel))
 
 	Lb.OnEvent("Change", RefreshBody)
 	Lb.OnEvent("DoubleClick", OpenSelected)

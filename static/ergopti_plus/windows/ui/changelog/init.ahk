@@ -37,7 +37,7 @@ global _CLW_Controller := unset
 global _CLW_MsgSub     := unset
 global _CLW_Ready      := false
 global _CLW_Queue      := []
-global _CLW_Channel    := "dev"
+global _CLW_Channel    := ""
 global _CLW_Request    := unset
 global _CLW_BridgeSessionToken := ""
 global _CLW_BridgeRejectionReported := false
@@ -91,9 +91,9 @@ global _CLW_FeedStarter := 0
 
 /**
  * Opens (or brings to front) the shared changelog webview window.
- * @param {string} Channel - "main" or "dev" (default "dev").
+ * @param {string} Channel - Registry channel shown first (the subscribed one).
  */
-Changelog_Open(Channel := "dev") {
+Changelog_Open(Channel) {
 	global UPDATER_REQUEST_ORIGIN_MANUAL
 	if A_IsSuspended
 		return _Updater_RefuseManualWhileSuspended()
@@ -464,7 +464,7 @@ _CLW_SafetyFlush(ExpectedWindowEpoch) {
  * Receives messages from the page via chrome.webview.postMessage.
  * Expected payloads (JSON strings), each carrying the injected session token:
  *   {"action":"ready","session":"…"}
- *   {"action":"fetch","channel":"dev","session":"…"}
+ *   {"action":"fetch","channel":"<registry channel id>","session":"…"}
  *   {"action":"open_url","url":"…","session":"…"}
  */
 _CLW_OnWebMessage(ExpectedWindowEpoch, ExpectedSession, ExpectedSource, Handler, Args) {
@@ -519,6 +519,10 @@ _CLW_OnWebMessage(ExpectedWindowEpoch, ExpectedSession, ExpectedSource, Handler,
 
 	if (Action == "fetch") {
 		Ch := Payload.Has("channel") ? Payload["channel"] : _CLW_Channel
+		if !UpdateChannels_IsKnown(Ch) {
+			try LoggerWarn("Changelog", "Refused a fetch for a channel outside the registry.")
+			return
+		}
 		_CLW_Channel := Ch
 		_CLW_FetchAndInject(Ch, Request)
 	} else if (Action == "open_url") {
@@ -546,7 +550,7 @@ _CLW_OnWebMessage(ExpectedWindowEpoch, ExpectedSession, ExpectedSource, Handler,
 /**
  * Fetches releases from GitHub in a tree-owned curl child and injects them via JS.
  * Defers to next message-loop tick; every network phase stays off the AHK thread.
- * @param {string} Channel - "main" or "dev".
+ * @param {string} Channel - Registry channel id.
  */
 _CLW_FetchAndInject(Channel, Request := unset, ExpectedWindowEpoch := 0) {
 	global UPDATER_REQUEST_ORIGIN_MANUAL
@@ -754,7 +758,7 @@ _CLW_PollFetch(Req, Context, Polls) {
 
 	; The text crosses into the page as a JS string literal and is parsed there
 	; (JSON.parse or the Atom reader); a response is never evaluated as script.
-	; injectReleases* filters pre-releases for the "main" channel.
+	; injectReleases* keeps what the channel's view lists (shared registry).
 	if (Context.Stage == "feed") {
 		try LoggerDone("Changelog", "Injecting releases from the Atom feed (channel={1}; API failed: {2})…",
 			Channel, Context.ApiFailure)
@@ -864,7 +868,7 @@ _CLW_InvalidateWindowSession() {
 /**
  * Allocates immutable provenance for one channel request and aborts its
  * superseded predecessor outside Critical.
- * @param {string} Channel - "main" or "dev".
+ * @param {string} Channel - Registry channel id.
  * @returns {object} Bound window/request epochs and channel.
  */
 _CLW_BeginFetchRequest(Channel, Request := unset, ExpectedWindowEpoch := 0) {

@@ -1,5 +1,5 @@
 {
-    "_comment": "Cross-driver updater scalars and release artifact names. Single source replacing per-file literals in lib/updater/core.ahk, lib/updater.lua, the Linux updater, and release CI. AHK keeps inline scalars guarded by the JS drift gate; macOS and Linux read this file at require-time via Paths.shared. Interval presets stay driver-specific (identical values, complex TOML array-of-tables not worth a custom parser). release_sources: URL templates ({owner}/{repo}) and budgets of the changelog window, which tries the REST API first and the public Atom feed when the API is blocked or slow; ui_watchdog_sec must exceed proxy_resolve_timeout_sec + 2 * source_timeout_sec.",
+    "_comment": "Cross-driver updater scalars and release artifact names. Single source replacing per-file literals in lib/updater/core.ahk, lib/updater.lua, the Linux updater, and release CI. AHK keeps inline scalars guarded by the JS drift gate; macOS and Linux read this file at require-time via Paths.shared. Interval presets stay driver-specific (identical values, complex TOML array-of-tables not worth a custom parser). release_sources: URL templates ({owner}/{repo}) and budgets of the changelog window, which tries the REST API first and the public Atom feed when the API is blocked or slow; ui_watchdog_sec must exceed proxy_resolve_timeout_sec + 2 * source_timeout_sec. update_check: the release list every update channel reads; each driver keeps its channel's latest release through the shared registry (channels.json), since /releases/latest ignores prereleases and answers 404 while a channel has no release.",
     "github": {
         "owner": "adrienm7",
         "repo": "ergopti"
@@ -10,6 +10,9 @@
     },
     "release_assets": {
         "linux_bundle": "ergopti-plus-linux.tar.gz"
+    },
+    "update_check": {
+        "releases_url": "https://api.github.com/repos/{owner}/{repo}/releases?per_page=100"
     },
     "release_sources": {
         "api_releases_url": "https://api.github.com/repos/{owner}/{repo}/releases?per_page=20",
