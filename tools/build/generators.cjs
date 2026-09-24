@@ -81,6 +81,14 @@ const GENERATORS = [
 		outputs: ['static/ergopti_plus/_shared/core/ports/contracts.json']
 	},
 	{
+		script: 'codegen/codegen-app-dirs.cjs',
+		outputs: [
+			'static/ergopti_plus/_shared/lua/app_dirs.lua',
+			'static/ergopti_plus/windows/_generated/app_dirs.ahk',
+			'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/AppDirs.generated.swift'
+		]
+	},
+	{
 		script: 'codegen/codegen-logger-sub-files.cjs',
 		outputs: [
 			'static/ergopti_plus/macos/_generated/logger_sub_files.lua',
