@@ -15,14 +15,57 @@
 
 local helpers = require("tests.helpers")
 
+-- Two samples of the /proc files the processor probe reads, 1500 ticks apart:
+-- 700 of them idle, 75 spent by the daemon, whose command name holds a space
+-- and parentheses
+local PROC_BEFORE = {
+	["/proc/stat"] = "cpu  1000 0 500 8000 500 0 0 0 0 0\ncpu0 500 0 250 4000 250 0 0 0 0 0\n",
+	["/proc/self/stat"] = "4242 (lua (ergopti) d) S 1 4242 4242 0 -1 4194304 1000 0 0 0 100 50 0 0 20 0 3 0 12345\n",
+}
+local PROC_AFTER = {
+	["/proc/stat"] = "cpu  1600 0 700 8600 600 0 0 0 0 0\ncpu0 800 0 350 4300 300 0 0 0 0 0\n",
+	["/proc/self/stat"] = "4242 (lua (ergopti) d) S 1 4242 4242 0 -1 4194304 1000 0 0 0 150 75 0 0 20 0 3 0 12345\n",
+}
+
+--- An io.open answering the /proc paths of world.proc from memory.
+--- @param world table
+--- @param real function The real io.open.
+--- @return function
+local function proc_open(world, real)
+	return function(path, mode)
+		local content = world.proc and world.proc[path]
+		if content == nil then return real(path, mode) end
+		return {
+			read = function() return content end,
+			close = function() return true end,
+		}
+	end
+end
+
 --- Runs body with the real probes over recorded adapters.
 --- @param async boolean Whether libuv is available.
 --- @param body function(Probes, world)
 local function with_probes(async, body)
-	local names = { "ui.healthcheck.probes", "adapters.http_client", "adapters.shell_runner" }
+	local names = { "ui.healthcheck.probes", "adapters.http_client", "adapters.shell_runner",
+		"adapters.timer_scheduler" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
-	local world = { requests = {}, children = {}, cancelled_owners = {}, cancelled_children = 0 }
+	local world = { requests = {}, children = {}, cancelled_owners = {}, cancelled_children = 0, timers = {},
+		cancelled_timers = 0, proc = PROC_BEFORE }
+	package.loaded["adapters.timer_scheduler"] = {
+		HAS_ASYNC = async,
+		after = function(delay, fn)
+			local handle = { delay = delay, fn = fn }
+			world.timers[#world.timers + 1] = handle
+			return handle
+		end,
+		cancel = function(handle)
+			handle.cancelled = true
+			world.cancelled_timers = world.cancelled_timers + 1
+		end,
+	}
+	local real_open = io.open
+	io.open = proc_open(world, real_open)
 	package.loaded["adapters.http_client"] = {
 		HAS_ASYNC = async,
 		get = function(url, headers, options, callback)
@@ -41,6 +84,7 @@ local function with_probes(async, body)
 	}
 	package.loaded["ui.healthcheck.probes"] = nil
 	local ok, err = pcall(body, require("ui.healthcheck.probes"), world)
+	io.open = real_open
 	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 	if not ok then error(err, 0) end
 end
@@ -92,8 +136,56 @@ helpers.describe("diagnostics probes (linux)", function()
 			helpers.assert_eq(answers.github_api.result.state, "unsupported")
 			helpers.assert_eq(answers.ai_health.result.state, "unsupported")
 			helpers.assert_eq(answers.system_details.result.state, "unsupported")
+			helpers.assert_eq(answers.cpu_load.result.state, "unsupported")
 			helpers.assert_eq(#world.requests, 0)
 			helpers.assert_eq(#world.children, 0)
+			helpers.assert_eq(#world.timers, 0)
+			-- A probe the schema declares and nothing starts reads "checking…" forever
+			local schema = helpers.load_module("ui.healthcheck.bridge").config().schema
+			local declared = 0
+			for id, probe in pairs(schema.probes) do
+				if require("healthcheck.snapshot").applies(probe, "linux") then
+					declared = declared + 1
+					helpers.assert_true(answers[id] ~= nil, "the " .. id .. " probe never answered")
+				end
+			end
+			helpers.assert_true(declared >= 4, "the schema declares " .. declared .. " Linux probes")
+		end)
+	end)
+
+	helpers.it("reads the processor load and the daemon's share from two /proc samples (system-load)", function()
+		with_probes(true, function(Probes, world)
+			local _, answers = start(Probes)
+			local timer = world.timers[1]
+			helpers.assert_true(timer ~= nil, "the second sample waits for a timer")
+			helpers.assert_eq(timer.delay, 1)
+			helpers.assert_nil(answers.cpu_load, "no answer before the second sample")
+			world.proc = PROC_AFTER
+			timer.fn()
+			helpers.assert_eq(answers.cpu_load.result.state, "ok")
+			helpers.assert_eq(answers.cpu_load.sections.system.cpu_usage, 53.3)
+			helpers.assert_eq(answers.cpu_load.sections.system.process_cpu, 5)
+		end)
+	end)
+
+	helpers.it("computes the shares from the /proc fields, whatever the command name (system-load)", function()
+		with_probes(true, function(Probes)
+			local before = Probes.cpu_times(PROC_BEFORE["/proc/stat"], PROC_BEFORE["/proc/self/stat"])
+			helpers.assert_eq(before, { total = 10000, idle = 8500, process = 150 })
+			local after = Probes.cpu_times(PROC_AFTER["/proc/stat"], PROC_AFTER["/proc/self/stat"])
+			helpers.assert_eq(Probes.cpu_shares(before, after), { system = 53.3, process = 5 })
+			helpers.assert_nil(Probes.cpu_shares(before, before), "no elapsed time measures nothing")
+			helpers.assert_nil(Probes.cpu_times(nil, PROC_BEFORE["/proc/self/stat"]), "an unreadable /proc/stat")
+			helpers.assert_nil(Probes.cpu_times(PROC_BEFORE["/proc/stat"], "4242 (truncated"), "a cut /proc/self/stat")
+		end)
+	end)
+
+	helpers.it("reports unreadable /proc files as an error, not a load of zero (system-load)", function()
+		with_probes(true, function(Probes, world)
+			world.proc = { ["/proc/stat"] = "", ["/proc/self/stat"] = "" }
+			local _, answers = start(Probes)
+			helpers.assert_eq(answers.cpu_load.result.state, "error")
+			helpers.assert_eq(#world.timers, 0)
 		end)
 	end)
 
@@ -107,6 +199,7 @@ helpers.describe("diagnostics probes (linux)", function()
 			helpers.assert_nil(answers.system_details)
 			helpers.assert_eq(world.cancelled_owners, { "diagnostics.github" })
 			helpers.assert_eq(world.cancelled_children, 2)
+			helpers.assert_eq(world.cancelled_timers, 1, "the processor sample's timer is stopped")
 		end)
 	end)
 end)

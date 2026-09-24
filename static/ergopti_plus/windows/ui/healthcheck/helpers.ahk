@@ -199,6 +199,20 @@ _HealthCheck_Hardware() {
 	return Hardware
 }
 
+; The working set of this process, in bytes.
+; @returns {Integer}
+; @throws {OSError} When Windows refuses the query.
+_HealthCheck_ProcessMemory() {
+	; PROCESS_MEMORY_COUNTERS: two DWORDs, then SIZE_T fields, the second of
+	; which is the working set
+	Size := 8 + 8 * A_PtrSize
+	Counters := Buffer(Size, 0)
+	NumPut("UInt", Size, Counters, 0)
+	if !DllCall("K32GetProcessMemoryInfo", "Ptr", DllCall("GetCurrentProcess", "Ptr"), "Ptr", Counters, "UInt", Size)
+		throw OSError(A_LastError, -1, "K32GetProcessMemoryInfo")
+	return NumGet(Counters, 8 + A_PtrSize, "UPtr")
+}
+
 ; The Windows name of the user's locale, such as "fr-FR".
 ; @returns {String}
 _HealthCheck_LocaleName() {
@@ -244,6 +258,9 @@ _HealthCheck_System(Detailed, UptimeSec) {
 		if IsNumber(FreeMb)
 			System["disk_free"] := FreeMb * 1048576
 	}
+	ProcessMemory := _HealthCheck_Read("the ErgoptiPlus memory", _HealthCheck_ProcessMemory)
+	if IsInteger(ProcessMemory)
+		System["process_memory"] := ProcessMemory
 	System["uptime"] := UptimeSec
 	System["elevated"] := A_IsAdmin ? true : false
 	if Detailed {

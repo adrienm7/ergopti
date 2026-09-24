@@ -28,7 +28,20 @@ local function with_probes(body)
 	helpers.with_stub_scope(FIXTURE_MODULES, function()
 		helpers.load_with_stubs("infra.logger")
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		local world = { timers = {}, requests = {}, tasks = {}, cancelled_requests = 0, terminated = 0, llm_on = false }
+		local world = { timers = {}, requests = {}, tasks = {}, cancelled_requests = 0, terminated = 0, llm_on = false,
+			samplers = {}, stopped_samplers = 0 }
+		-- The callback form, which samples on its own timer; the blocking form
+		-- (no callback) is never what a probe may call. Restored on the same
+		-- table, whichever runtime the scope installed.
+		local host = hs.host
+		local saved_cpu_usage = host.cpuUsage
+		host.cpuUsage = function(period, callback)
+			if type(callback) ~= "function" then error("hs.host.cpuUsage called without a callback blocks") end
+			local sampler = { period = period, callback = callback }
+			function sampler.stop() world.stopped_samplers = world.stopped_samplers + 1 end
+			world.samplers[#world.samplers + 1] = sampler
+			return sampler
+		end
 		package.loaded["adapters.timer_scheduler"] = {
 			after = function(delay, callback)
 				local handle = { delay = delay, callback = callback }
@@ -64,7 +77,9 @@ local function with_probes(body)
 			get_backend = function() return "ollama" end,
 		}
 		package.loaded["ui.healthcheck.probes"] = nil
-		body(require("ui.healthcheck.probes"), world)
+		local ok, err = pcall(body, require("ui.healthcheck.probes"), world)
+		host.cpuUsage = saved_cpu_usage
+		if not ok then error(err, 0) end
 	end)
 	-- The scope already restored it; written out so the suite-wide stub hygiene
 	-- scan (tests/meta/test_shell_runner_stub_restore.lua) sees the restore
@@ -90,6 +105,15 @@ end
 --- @return table|nil
 local function answer_of(answers, id)
 	for _, answer in ipairs(answers) do if answer.id == id then return answer end end
+	return nil
+end
+
+--- The task started for one executable, or nil.
+--- @param world table
+--- @param executable string
+--- @return table|nil
+local function task_of(world, executable)
+	for _, task in ipairs(world.tasks) do if task.executable == executable then return task end end
 	return nil
 end
 
@@ -153,6 +177,37 @@ helpers.describe("diagnostics probes (macOS)", function()
 			helpers.assert_eq(count, 1)
 			helpers.assert_eq(answer_of(answers, "github_api").result.state, "timeout")
 			helpers.assert_true(world.cancelled_requests >= 1, "a timed-out request must be stopped")
+			-- A probe the schema declares and nothing starts reads "checking…" forever
+			local schema = require("healthcheck.snapshot").load_config(require("infra.paths").shared).schema
+			local declared = 0
+			for id, probe in pairs(schema.probes) do
+				if require("healthcheck.snapshot").applies(probe, "macos") then
+					declared = declared + 1
+					helpers.assert_true(answer_of(answers, id) ~= nil, "the " .. id .. " probe never answered")
+				end
+			end
+			helpers.assert_true(declared >= 4, "the schema declares " .. declared .. " macOS probes")
+		end)
+	end)
+
+	helpers.it("reads the processor load and ErgoptiPlus's share and memory (system-load)", function()
+		with_probes(function(Probes, world)
+			local _, answers = start(Probes)
+			local sampler = world.samplers[1]
+			helpers.assert_true(sampler ~= nil, "the load is sampled by hs.host.cpuUsage's timer")
+			helpers.assert_eq(sampler.period, 1)
+			local ps = task_of(world, "/bin/ps")
+			helpers.assert_true(ps ~= nil, "ErgoptiPlus's share and memory come from ps, as a task")
+			helpers.assert_eq(ps.args, { "-o", "%cpu=,rss=", "-p", tostring(hs.processInfo.processID) })
+			-- A decimal comma under some locales; one core is 100 %
+			ps.on_done(0, " 20,0  51200\n")
+			helpers.assert_nil(answer_of(answers, "cpu_load"), "one step is not the whole probe")
+			sampler.callback({ { active = 50 }, { active = 30 }, overall = { active = 40.04 }, n = 2 })
+			local answer = answer_of(answers, "cpu_load")
+			helpers.assert_eq(answer.result.state, "ok")
+			helpers.assert_eq(answer.sections.system.cpu_usage, 40)
+			helpers.assert_eq(answer.sections.system.process_cpu, 10, "20 % of one core is 10 % of two")
+			helpers.assert_eq(answer.sections.system.process_memory, 51200 * 1024)
 		end)
 	end)
 
@@ -165,7 +220,8 @@ helpers.describe("diagnostics probes (macOS)", function()
 			world.tasks[1].on_done(0, "x\ny\n1\n")
 			helpers.assert_eq(#answers, before, "nothing of a cancelled run reaches the page")
 			helpers.assert_true(world.cancelled_requests >= 1)
-			helpers.assert_eq(world.terminated, 2)
+			helpers.assert_eq(world.terminated, 3, "sysctl, df and ps are stopped")
+			helpers.assert_eq(world.stopped_samplers, 1, "the processor sampler is stopped")
 		end)
 	end)
 end)

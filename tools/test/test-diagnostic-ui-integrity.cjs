@@ -253,5 +253,27 @@ report('Linux: no blocking child in the collection or the probes',
 	!/io\.popen\s*\(|os\.execute\s*\(|Shell\.(run|exec[a-z_]*)\s*\(/.test(linuxCollect),
 	'a synchronous child runs on the event loop that reads the grabbed keyboard');
 
+// A field filled by a probe reads "checking…" until its driver answers that
+// probe: every probe the schema declares for a driver must be started by the
+// driver's probe module, which names it when it starts and finishes it
+{
+	const schema = JSON.parse(fs.readFileSync(path.join(SHARED, 'modules', 'diagnostics', 'schema.json'), 'utf8'));
+	const probeModules = {
+		windows: withoutComments(read('windows/ui/healthcheck/probes.ahk')),
+		macos: withoutComments(read('macos/ui/healthcheck/probes.lua')),
+		linux: withoutComments(read('linux/ui/healthcheck/probes.lua')),
+	};
+	let declared = 0;
+	for (const [driver, source] of Object.entries(probeModules)) {
+		for (const [id, probe] of Object.entries(schema.probes || {})) {
+			if (Array.isArray(probe.platforms) && !probe.platforms.includes(driver)) continue;
+			declared++;
+			report(`${driver}: the ${id} probe is started`, source.includes(`"${id}"`),
+				`${driver}/ui/healthcheck/probes never names the ${id} probe the schema declares for it`);
+		}
+	}
+	report('Shared: the probe check sees every driver\'s probes', declared >= 9, `only ${declared} probe(s) declared`);
+}
+
 console.log(`\nResults: ${totalPass} passed, ${totalFail} failed.`);
 if (totalFail > 0) process.exit(1);

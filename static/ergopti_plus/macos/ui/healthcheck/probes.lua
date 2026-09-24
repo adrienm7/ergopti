@@ -18,7 +18,10 @@
 ---    of the logs volume) as tasks. hs.execute ran sysctl on the main run loop
 ---    before, which dispatches the event taps: opening the window could stall
 ---    typing.
---- 4. A run is cancelled as a whole when the window closes or refreshes, and a
+--- 4. cpu_load samples the machine with hs.host.cpuUsage's callback form,
+---    which waits on its own timer (the form without a callback blocks), and
+---    reads ErgoptiPlus's processor share and memory with ps, as a task.
+--- 5. A run is cancelled as a whole when the window closes or refreshes, and a
 ---    late answer of a cancelled run publishes nothing.
 --- ==============================================================================
 
@@ -31,6 +34,9 @@ local LOG = "healthcheck.probes"
 -- The executables the system probe runs, by absolute path
 local SYSCTL = "/usr/sbin/sysctl"
 local DF = "/bin/df"
+
+-- ps prints this process's processor share (100 = one core) and resident memory (KiB)
+local PS = "/bin/ps"
 
 -- The sysctl keys, in the order they are printed
 local SYSCTL_KEYS = { "hw.model", "machdep.cpu.brand_string", "hw.logicalcpu" }
@@ -232,6 +238,62 @@ local function system_details(logs_dir)
 	end
 end
 
+--- A share rounded to a tenth.
+--- @param value number
+--- @return number
+local function tenth(value)
+	return math.floor(value * 10 + 0.5) / 10
+end
+
+--- The processor's load, and ErgoptiPlus's share of it and its memory.
+--- @param config table { sample_ms }
+--- @return function Probe body.
+local function cpu_load(config)
+	return function(done, on_cancel)
+		local sections = { system = {} }
+		local cores, process_share = nil, nil
+		local pending, failures = 2, {}
+		local function step(detail)
+			if detail then failures[#failures + 1] = detail end
+			pending = pending - 1
+			if pending > 0 then return end
+			-- ps counts one core as 100 %; the page shows a share of the whole machine
+			if process_share and cores and cores > 0 then
+				sections.system.process_cpu = tenth(process_share / cores)
+			end
+			if #failures > 0 then
+				done({ state = "error", detail = table.concat(failures, "; ") }, sections)
+			else
+				done({ state = "ok" }, sections)
+			end
+		end
+		local sampler = hs.host.cpuUsage(config.sample_ms / 1000, function(result)
+			local overall = type(result) == "table" and result.overall or nil
+			if type(overall) ~= "table" or type(overall.active) ~= "number" then
+				step("hs.host.cpuUsage answered no overall load")
+				return
+			end
+			-- One entry per core, keyed 1..n, beside "overall"
+			cores = 0
+			for key in pairs(result) do
+				if type(key) == "number" then cores = cores + 1 end
+			end
+			sections.system.cpu_usage = tenth(overall.active)
+			step(nil)
+		end)
+		on_cancel(function()
+			if type(sampler) == "table" and type(sampler.stop) == "function" then sampler:stop() end
+		end)
+		run_task(PS, { "-o", "%cpu=,rss=", "-p", tostring(hs.processInfo.processID) }, on_cancel, function(stdout)
+			-- A decimal comma under some locales
+			local share, rss = stdout:match("([%d%.,]+)%s+(%d+)")
+			process_share = share and tonumber((share:gsub(",", "."))) or nil
+			sections.system.process_memory = rss and tonumber(rss) * 1024 or nil
+			step(nil)
+		end, step)
+	end
+end
+
 
 
 
@@ -253,6 +315,7 @@ function M.start(schema, paths, publish)
 	start_probe(run, "github_api", config.github_api.timeout_ms, github_api(config.github_api))
 	start_probe(run, "ai_health", config.ai_health.timeout_ms, ai_health(config.ai_health))
 	start_probe(run, "system_details", config.system_details.timeout_ms, system_details(paths.logs_dir))
+	start_probe(run, "cpu_load", config.cpu_load.timeout_ms, cpu_load(config.cpu_load))
 	function run.cancel()
 		run.cancelled = true
 		for _, finisher in ipairs(run.finishers) do finisher() end

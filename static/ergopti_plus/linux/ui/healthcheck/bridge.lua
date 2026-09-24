@@ -214,12 +214,20 @@ local function collect_hardware(facts)
 end
 
 --- Whether the daemon runs with an effective uid of 0.
+--- @param status string|nil Content of /proc/self/status.
 --- @return boolean|nil
-local function elevated()
-	local status = read_file("/proc/self/status")
+local function elevated(status)
 	local _, effective = (status or ""):match("\nUid:%s+(%d+)%s+(%d+)")
 	if not effective then return nil end
 	return effective == "0"
+end
+
+--- The daemon's resident memory, in bytes.
+--- @param status string|nil Content of /proc/self/status.
+--- @return number|nil
+local function process_memory(status)
+	local kib = (status or ""):match("\nVmRSS:%s+(%d+) kB")
+	return kib and tonumber(kib) * 1024 or nil
 end
 
 --- The system section and its load.
@@ -228,6 +236,7 @@ end
 --- @return table
 local function collect_system(facts, state)
 	local layout = state.layout
+	local status = read_file("/proc/self/status")
 	return {
 		os              = facts.os_name,
 		kernel          = facts.kernel,
@@ -236,8 +245,9 @@ local function collect_system(facts, state)
 		locale          = facts.locale,
 		keyboard_layout = type(layout) == "string" and layout or nil,
 		ram_free        = facts.ram_free,
+		process_memory  = process_memory(status),
 		uptime          = os.time() - _started_at,
-		elevated        = elevated(),
+		elevated        = elevated(status),
 	}
 end
 
