@@ -149,6 +149,7 @@ OnError(_FatalErrorHandler)
 #Include ../infra/toml/toml_loader.ahk
 #Include ../infra/hotstrings/hotstrings_cache.ahk
 #Include ../infra/toml/toml_config_loader.ahk
+#Include ../infra/config_migrate.ahk
 #Include ../platform/remap/tap_hold_loader.ahk
 #Include ../platform/remap/tap_hold_writer.ahk
 #Include ../ui/menu/menu_taphold.ahk
@@ -593,6 +594,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_config_typed_updates.ahk
 #Include unit/test_config_typed_transactions.ahk
 #Include unit/test_config_unused_keys.ahk
+#Include unit/test_config_migrate.ahk
 #Include unit/test_config_partial_load_persistence.ahk
 #Include unit/test_config_partial_load_llm.ahk
 #Include unit/test_toml_numeric_strings.ahk
