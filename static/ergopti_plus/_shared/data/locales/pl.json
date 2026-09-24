@@ -2421,6 +2421,7 @@
 	"updater.checking": "Sprawdzanie aktualizacji w kanale „{1}”…\n(Może to potrwać kilka sekund.)",
 	"updater.close": "Zamknij",
 	"updater.install_error": "Nie udało się zainstalować aktualizacji. Szczegóły znajdziesz w logach.",
+	"updater.installed_restarting": "Aktualizacja {1} zainstalowana — ErgoptiPlus uruchamia się ponownie w nowej wersji.",
 	"updater.install_error_download": "Pobieranie pakietu aktualizacji nie powiodło się. Sprawdź połączenie internetowe i spróbuj ponownie.",
 	"updater.install_error_no_asset": "Ta wersja nie zawiera pliku wykonywalnego dla Windows. Otwórz stronę wydania, aby pobrać ręcznie.",
 	"updater.install_local_source": "Uruchamianie z lokalnego źródła — automatyczna instalacja jest dostępna tylko dla wersji release.",

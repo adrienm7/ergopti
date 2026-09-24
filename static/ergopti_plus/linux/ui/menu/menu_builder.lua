@@ -3261,6 +3261,11 @@ local function _build_updates(ctx)
 					else
 						Logger.info(LOG, "No update available (current: %s).", up.current_version())
 					end
+					-- Told, and the menu redrawn: the install row appears only on a
+					-- rebuild, so a found update stayed invisible until the next one.
+					if type(ctx.on_update_checked) == "function" then
+						ctx.on_update_checked(available, release, err)
+					end
 				end)
 			end,
 		}
@@ -3274,10 +3279,13 @@ local function _build_updates(ctx)
 					label = _fill(i18n_safe("menu.updates.download_install"), "{tag}", rel.tag),
 					action = function()
 						up.download_update(nil, function(archive, err)
-							if archive then
-								up.install_update(archive)
-							elseif err then
+							local installed = archive ~= nil and up.install_update(archive)
+							if not archive then
 								Logger.error(LOG, "Update download failed: %s.", tostring(err))
+							end
+							-- The daemon restarts on the new version, or tells why not.
+							if type(ctx.on_update_finished) == "function" then
+								ctx.on_update_finished(installed, rel.tag, archive and "install" or "download")
 							end
 						end)
 					end,

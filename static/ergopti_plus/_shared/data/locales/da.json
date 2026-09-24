@@ -2421,6 +2421,7 @@
 	"updater.checking": "Søger efter opdateringer på kanalen »{1}«…\n(Dette kan tage et par sekunder.)",
 	"updater.close": "Luk",
 	"updater.install_error": "Opdateringen kunne ikke installeres. Tjek loggene for detaljer.",
+	"updater.installed_restarting": "Opdatering {1} installeret — ErgoptiPlus genstarter med den nye version.",
 	"updater.install_error_download": "Det lykkedes ikke at hente opdateringspakken. Tjek din internetforbindelse, og prøv igen.",
 	"updater.install_error_no_asset": "Denne udgivelse indeholder ikke en Windows-eksekverbar fil. Åbn udgivelsessiden for at hente den manuelt.",
 	"updater.install_local_source": "Kører fra lokal kilde — automatisk installation er kun tilgængelig for release-builds.",

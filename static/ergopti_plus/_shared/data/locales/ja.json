@@ -2421,6 +2421,7 @@
 	"updater.checking": "「{1}」チャンネルでアップデートを確認しています…\n(数秒かかる場合があります。)",
 	"updater.close": "閉じる",
 	"updater.install_error": "アップデートをインストールできませんでした。詳細はログを確認してください。",
+	"updater.installed_restarting": "アップデート {1} をインストールしました。ErgoptiPlus を新しいバージョンで再起動します。",
 	"updater.install_error_download": "アップデートパッケージのダウンロードに失敗しました。インターネット接続を確認して再試行してください。",
 	"updater.install_error_no_asset": "このリリースには Windows 用実行ファイルが含まれていません。リリースページを開いて手動でダウンロードしてください。",
 	"updater.install_local_source": "ローカルソースから実行中 — 自動インストールは release ビルドでのみ利用可能です。",

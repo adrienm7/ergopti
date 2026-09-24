@@ -2421,6 +2421,7 @@
 	"updater.checking": "Recherche de mises à jour sur le canal « {1} »…\n(L’opération peut prendre quelques secondes.)",
 	"updater.close": "Fermer",
 	"updater.install_error": "Impossible d’installer la mise à jour. Consultez les journaux pour plus de détails.",
+	"updater.installed_restarting": "Mise à jour {1} installée — ErgoptiPlus redémarre sur la nouvelle version.",
 	"updater.install_error_download": "Le téléchargement de la mise à jour a échoué. Vérifiez votre connexion Internet et réessayez.",
 	"updater.install_error_no_asset": "Cette version ne contient pas d’exécutable Windows à installer. Ouvrez la page de la version pour télécharger manuellement.",
 	"updater.install_local_source": "Exécution depuis une source locale — l’installation automatique n’est disponible que pour les versions de release.",

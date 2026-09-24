@@ -183,6 +183,7 @@ local _bg_timer_handle = nil       -- timer_scheduler handle for background poll
 local _boot_timer_handle = nil     -- one-shot boot-check handle
 local _check_interval  = DEFAULT_INTERVAL_SEC
 local _channel         = "stable" -- "stable" | "dev"
+local _installed_launcher = nil  -- wrapper of the installation an update replaced
 local _download_part   = nil
 local _download_dest   = nil
 local _verified_archive = nil
@@ -207,8 +208,20 @@ local function _storage_set(key, value)
 	return false
 end
 
+--- The channel an installation follows until the user picks one: the one its
+--- own version was published on, as on macOS. A prerelease build ("-dev.N")
+--- follows prereleases; on "stable" it asked /releases/latest, which never
+--- lists a prerelease, and so found no update at all (HTTP 404).
+--- @return string "stable" | "dev"
+function M.default_channel()
+	local version = tostring(M.current_version())
+	if version == "local" or version:match("%-dev%.") then return "dev" end
+	return "stable"
+end
+
 local function _load_persisted()
-	_channel = _storage_get("updater.channel", "stable")
+	local stored = _storage_get("updater.channel", nil)
+	_channel = (stored == "stable" or stored == "dev") and stored or M.default_channel()
 	local interval = _storage_get("updater.interval_sec", nil)
 	if type(interval) == "number" and interval >= 0 then
 		_check_interval = interval
@@ -437,33 +450,38 @@ function M.check_for_updates(channel, callback)
 		return false
 	end
 	Logger.info(LOG, "Update check requested on channel '%s'.", tostring(channel))
+	-- The release already found stays known until a response replaces it: an
+	-- unchanged answer (304, the ETag at work) or a failed request says nothing
+	-- new, and used to forget an update the menu had just offered.
+	local known = channel == _channel and _cached_release or nil
 	_state = "checking"
-	_cached_release = nil
 	local published = false
 	local ok, dispatched_or_error = pcall(M._fetch_releases, channel,
 		function(body, status, fetch_error)
 			published = true
 			if not body then
-				_state = "idle"
+				_cached_release = known
+				_state = known and "available" or "idle"
 				if status ~= 304 then
 					Logger.warn(LOG, "Check failed (HTTP %d): %s.", status or 0,
 						tostring(fetch_error or "empty body"))
 				end
-				publish_check(callback, false, nil, fetch_error)
+				publish_check(callback, known ~= nil, known, status ~= 304 and fetch_error or nil)
 				return
 			end
+			_cached_release = nil
 			local available = M._process_release_response(body, channel)
 			publish_check(callback, available, _cached_release, nil)
 		end)
 	if not ok then
-		_state = "idle"
+		_state = known and "available" or "idle"
 		Logger.error(LOG, "Update request dispatch raised: %s.", tostring(dispatched_or_error))
 		publish_check(callback, false, nil, tostring(dispatched_or_error))
 		return false
 	end
 	local dispatched = dispatched_or_error == true
 	if not dispatched and not published then
-		_state = "idle"
+		_state = known and "available" or "idle"
 		publish_check(callback, false, nil, "update request was not dispatched")
 	end
 	return dispatched
@@ -780,10 +798,18 @@ function M.install_update(archive_path)
 		return false
 	end
 	if detail then Logger.warn(LOG, "%s.", detail) end
-	Logger.success(LOG, "Update installed with a verified rollback backup. Restart the daemon to apply.")
+	Logger.success(LOG, "Update installed with a verified rollback backup.")
 	_verified_archive = nil
+	_installed_launcher = context.wrapper
 	_state = "idle"
 	return true
+end
+
+--- The launcher of the installation the last update replaced, which starts
+--- the new version.
+--- @return string|nil
+function M.installed_launcher()
+	return _installed_launcher
 end
 
 -- =========================================

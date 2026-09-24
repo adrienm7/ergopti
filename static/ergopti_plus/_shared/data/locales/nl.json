@@ -2421,6 +2421,7 @@
 	"updater.checking": "Bezig met zoeken naar updates op kanaal '{1}'…\n(Dit kan enkele seconden duren.)",
 	"updater.close": "Sluiten",
 	"updater.install_error": "De update kan niet worden geïnstalleerd. Raadpleeg de logboeken voor details.",
+	"updater.installed_restarting": "Update {1} geïnstalleerd — ErgoptiPlus start opnieuw met de nieuwe versie.",
 	"updater.install_error_download": "Het downloaden van het updatepakket is mislukt. Controleer uw internetverbinding en probeer het opnieuw.",
 	"updater.install_error_no_asset": "Deze release bevat geen Windows-uitvoerbaar bestand. Open de releasepagina om handmatig te downloaden.",
 	"updater.install_local_source": "Uitgevoerd vanaf lokale bron — automatische installatie is alleen beschikbaar voor release-builds.",
