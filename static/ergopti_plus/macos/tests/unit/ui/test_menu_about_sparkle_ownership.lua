@@ -17,8 +17,8 @@ helpers.describe("menu_about: Sparkle owns every update mutation", function()
 		local code = source:gsub("%-%-[^\n]*", "")
 
 		helpers.assert_true(
-			code:find("UpdateLauncher.request_check()", 1, true) ~= nil,
-			"the menu action must delegate to the native Sparkle controller"
+			code:find("UpdateLauncher.request_check(channel)", 1, true) ~= nil,
+			"the menu action must delegate the subscribed channel's check to the native Sparkle controller"
 		)
 		for _, forbidden in ipairs({
 			"hs.http.asyncGet",

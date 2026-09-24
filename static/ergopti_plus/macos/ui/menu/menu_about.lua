@@ -10,8 +10,11 @@
 --- FEATURES & RATIONALE:
 --- 1. Native ownership: Sparkle's standard controller provides authenticated
 ---    download progress and replaces the actual outer bundle.
---- 2. Build-owned channel: stable and development bundles keep the immutable
----    feed stamped by CI; the Lua menu cannot diverge from Sparkle's feed.
+--- 2. One channel owner: the rows list every channel of the shared registry and
+---    subscribe through the menu session's channel owner (ctx.channel_owner,
+---    modules/updater/channel.lua), which persists the choice and
+---    tells the launcher which feed Sparkle reads; the check names the same
+---    channel, so the menu cannot diverge from Sparkle's feed.
 --- ==============================================================================
 
 local M = {}
@@ -60,7 +63,7 @@ end
 --- Opens the dedicated changelog window for the given channel.
 --- Delegates to ui.changelog which shows a webview with the full release list
 --- and markdown-rendered notes instead of a plain text dialog.
---- @param channel string "main" or "dev"
+--- @param channel string Registry channel shown first (the subscribed one).
 local function show_changelog(channel)
 	Logger.info(LOG, "Opening changelog window (channel=%s).", channel)
 	changelog.open({ channel = channel })
@@ -79,7 +82,11 @@ end
 --- @param ctx table Menu context.
 --- @return table Menu item table for insertion into the parent menu.
 function M.build(ctx)
-	local channel = Updater.default_channel()
+	local owner = type(ctx) == "table" and ctx.channel_owner or nil
+	if type(owner) ~= "table" then
+		Logger.error(LOG, "No update channel owner in the menu context — the channel rows are left out.")
+	end
+	local channel = owner and owner.get() or Updater.installed_channel()
 	local ver     = current_version()
 	local ver_label = i18n.get("menu.about.title")
 
@@ -106,13 +113,27 @@ function M.build(ctx)
 
 	table.insert(menu_items, { separator = true })
 
+	-- One row per registry channel, ticked on the subscribed one, right before the
+	-- check row. The owner persists the choice and refreshes the menu.
+	local registry = Updater.channels()
+	for _, id in ipairs(owner and registry.ids() or {}) do
+		table.insert(menu_items, {
+			label = i18n.get(registry.channel(id).menu_label_key),
+			checked = id == channel,
+			action = function()
+				Logger.info(LOG, "User chose the update channel '%s'.", id)
+				owner.set(id)
+			end,
+		})
+	end
+
 	if not local_src then
 		-- A packaged build delegates the entire transaction to Sparkle.
 		table.insert(menu_items, {
 			label = i18n.get("menu.about.check_for_updates"),
 			action = function()
 				Logger.info(LOG, "User triggered one-click update (channel: %s).", channel)
-				UpdateLauncher.request_check()
+				UpdateLauncher.request_check(channel)
 			end,
 		})
 	end

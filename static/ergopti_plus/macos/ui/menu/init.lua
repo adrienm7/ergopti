@@ -882,6 +882,22 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			table.concat(initial_report.repairs, ", "))
 	end
 
+	-- The update channel's one owner for this session writes through the same
+	-- preferences transaction and tells the launcher's Sparkle feed; the menu
+	-- follows its durable changes. The About menu reads it from ctx.channel_owner.
+	local channel_owner = nil
+	local ok_owner, owner_or_err = pcall(function()
+		return require("modules.updater.channel").new({ state = state, save = save_prefs })
+	end)
+	if ok_owner then
+		channel_owner = owner_or_err
+		channel_owner.subscribe("menu", function()
+			if type(updateMenu) == "function" then updateMenu() end
+		end)
+	else
+		Logger.error(LOG, "The update channel owner could not start: %s.", tostring(owner_or_err))
+	end
+
 	if menu_mods.llm and type(menu_mods.llm.create) == "function" then
 		local ok_h, res = pcall(menu_mods.llm.create, {
 			state          = state,
@@ -1182,6 +1198,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		apply_apps_time_shortcut = apply_apps_time_shortcut,
 		llm_handler              = llm_handler,
 		karabiner                = karabiner,
+		channel_owner            = channel_owner,
 	}
 
 	-- updateMenu refreshes the menubar icon and re-wires script_control extras,
