@@ -304,6 +304,41 @@ helpers.describe("llm_bridge fallback prediction selection", function()
 				"configured modifier-plus-digit selection remains available")
 		end)
 	end)
+
+	helpers.it("(bare-digit-validation) empty validation modifiers own bare digits", function()
+		with_bridge_fixture(function(fixture)
+			fixture.engine_visible = true
+			fixture.predictions = { "only" }
+			fixture.current_index = 1
+			fixture.validation_mods = {}
+			fixture.engine.set_llm_enabled(true)
+
+			local accepted = {}
+			local apply_result = true
+			fixture.bridge.apply_prediction = function(index)
+				accepted[#accepted + 1] = index
+				return apply_result
+			end
+
+			helpers.assert_eq(fixture.bridge.handle_llm_keys(18, { alt = true }, false), false,
+				"a modified digit must reach the application when validation uses bare digits")
+			helpers.assert_eq(fixture.bridge.handle_llm_keys(19, {}, false), false,
+				"a digit beyond the shown predictions keeps the pass-through")
+			helpers.assert_eq(#accepted, 0)
+
+			helpers.assert_eq(fixture.bridge.handle_llm_keys(18, {}, false), true,
+				"a bare 1 must accept even the single shown prediction")
+			apply_result = false
+			helpers.assert_eq(fixture.bridge.handle_llm_keys(18, {}, false), true,
+				"a failed injection must still consume the digit instead of typing it")
+			helpers.assert_eq(accepted, { 1, 1 })
+
+			fixture.engine_visible = false
+			helpers.assert_eq(fixture.bridge.handle_llm_keys(18, {}, false), false,
+				"digits type normally when no prediction is shown")
+			helpers.assert_eq(accepted, { 1, 1 })
+		end)
+	end)
 end)
 
 
