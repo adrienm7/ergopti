@@ -56,7 +56,33 @@ local LLM_LOG = os.getenv("ERGOPTI_LIVE_LLM_LOG")
 local LLM_REPLY = os.getenv("ERGOPTI_LIVE_LLM_REPLY")
 local LLM_KEY = "live-test-key"
 
-local function sleep(seconds) os.execute(string.format("sleep %.3f", seconds)) end
+local Monotonic = require("infra.monotonic")
+
+-- Once the daemon's output is open, every wait of this harness also reads it:
+-- the kernel keeps about 32 keystrokes for a reader, and an expansion typed
+-- while the harness slept overflowed it (SYN_DROPPED) and read as lost text.
+local out_slot = "output"
+local out_open = false
+local pending = {}
+
+--- Waits `seconds`, reading the daemon's output into `pending` meanwhile.
+local function sleep(seconds)
+	if not out_open then
+		os.execute(string.format("sleep %.3f", seconds))
+		return
+	end
+	local deadline = Monotonic.now_ms() + seconds * 1000
+	repeat
+		local left = math.max(0, math.floor(deadline - Monotonic.now_ms()))
+		if EvdevReader.wait_readable(math.min(left, 50), out_slot) then
+			local ev = EvdevReader.read_event(out_slot)
+			while ev do
+				pending[#pending + 1] = ev
+				ev = EvdevReader.read_event(out_slot)
+			end
+		end
+	until Monotonic.now_ms() >= deadline
+end
 local function abort(message)
 	io.stderr:write("ENVIRONMENT: " .. message .. "\n")
 	os.exit(2)
@@ -233,7 +259,6 @@ sleep(1.5)
 
 -- Re-resolved rather than reused: the daemon may recreate its virtual keyboard
 -- after startup, and the node number moves with it.
-local out_slot = "output"
 local opened_output = await(function()
 	local node = node_for(DAEMON_OUTPUT)
 	return node and EvdevReader.open(node, out_slot) and node or nil
@@ -246,6 +271,7 @@ if not opened_output then
 	os.exit(1)
 end
 print("  reading the daemon's output on " .. opened_output)
+out_open = true
 
 --- Types text on the test keyboard.
 --- @param text string
@@ -263,35 +289,31 @@ end
 --- @return string text, string trail, table alt_chords
 local function read_output(seconds)
 	local text, shift, alt, trail, alt_chords = {}, false, false, {}, {}
-	local deadline = os.time() + seconds
-	while os.time() <= deadline do
-		if EvdevReader.wait_readable(200, out_slot) then
-			local ev = EvdevReader.read_event(out_slot)
-			while ev do
-				if ev.type == 0 and ev.code == 3 then
-					-- SYN_DROPPED: this reader fell behind and the kernel dropped
-					-- events. Said as what it is, never read as the daemon's text.
-					trail[#trail + 1] = "DROPPED"
-					text[#text + 1] = "<dropped>"
-				end
-				if ev.type == 1 then
-					if ev.value ~= 2 then trail[#trail + 1] = ev.code .. (ev.value == 1 and "↓" or "↑") end
-					if ev.code == EvdevCodes.KEY_LEFTSHIFT or ev.code == EvdevCodes.KEY_RIGHTSHIFT then
-						shift = ev.value ~= 0
-					elseif ev.code == KEY_LEFTALT then
-						alt = ev.value ~= 0
-					elseif ev.code == EvdevCodes.KEY_F24 then
-						-- The injector's modifier mask: no text, and meant to sit inside Alt.
-					elseif ev.value == 1 then
-						if alt then alt_chords[#alt_chords + 1] = ev.code end
-						if ev.code == EvdevCodes.KEY_BACKSPACE then table.remove(text)
-						elseif ev.code == 57 then text[#text + 1] = " "
-						elseif LETTERS[ev.code] then
-							text[#text + 1] = shift and LETTERS[ev.code]:upper() or LETTERS[ev.code]
-						else text[#text + 1] = "<" .. ev.code .. ">" end
-					end
-				end
-				ev = EvdevReader.read_event(out_slot)
+	sleep(seconds)
+	local events = pending
+	pending = {}
+	for _, ev in ipairs(events) do
+		if ev.type == 0 and ev.code == 3 then
+			-- SYN_DROPPED: this reader fell behind and the kernel dropped
+			-- events. Said as what it is, never read as the daemon's text.
+			trail[#trail + 1] = "DROPPED"
+			text[#text + 1] = "<dropped>"
+		end
+		if ev.type == 1 then
+			if ev.value ~= 2 then trail[#trail + 1] = ev.code .. (ev.value == 1 and "↓" or "↑") end
+			if ev.code == EvdevCodes.KEY_LEFTSHIFT or ev.code == EvdevCodes.KEY_RIGHTSHIFT then
+				shift = ev.value ~= 0
+			elseif ev.code == KEY_LEFTALT then
+				alt = ev.value ~= 0
+			elseif ev.code == EvdevCodes.KEY_F24 then
+				-- The injector's modifier mask: no text, and meant to sit inside Alt.
+			elseif ev.value == 1 then
+				if alt then alt_chords[#alt_chords + 1] = ev.code end
+				if ev.code == EvdevCodes.KEY_BACKSPACE then table.remove(text)
+				elseif ev.code == 57 then text[#text + 1] = " "
+				elseif LETTERS[ev.code] then
+					text[#text + 1] = shift and LETTERS[ev.code]:upper() or LETTERS[ev.code]
+				else text[#text + 1] = "<" .. ev.code .. ">" end
 			end
 		end
 	end
