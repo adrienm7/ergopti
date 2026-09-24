@@ -6,8 +6,9 @@
  * DESCRIPTION:
  * Emits the shared update-channel registry
  * (_shared/modules/updater/channels.json) for the consumers that cannot read the
- * JSON file themselves: the WebView pages (a script that defines the data) and
- * the Windows driver (a data function the AHK matcher interprets).
+ * JSON file themselves: the WebView pages (a script that defines the data), the
+ * Windows driver (a data function the AHK matcher interprets) and the macOS
+ * launcher (the appcast of every channel, the only ids its commands accept).
  *
  * WHY THIS EXISTS:
  * The channels were spelled by hand in every driver — "main"/"dev" literals in
@@ -35,6 +36,14 @@ const SOURCE = path.join(SP, '_shared', 'modules', 'updater', 'channels.json');
 const MATCHER = path.join(SP, '_shared', 'ui', 'update_channels.js');
 const PAGE_OUTPUT = path.join(SP, '_shared', 'ui', '_generated', 'update_channel_registry.js');
 const AHK_OUTPUT = path.join(SP, 'windows', '_generated', 'update_channels.ahk');
+const SWIFT_OUTPUT = path.join(
+	SP,
+	'macos',
+	'launcher',
+	'Sources',
+	'ErgoptiPlus',
+	'UpdateChannels.generated.swift'
+);
 const RUN_HINT = 'npm run codegen:update-channels';
 
 // ==========================================
@@ -143,6 +152,34 @@ function emitAhk(registry) {
 	);
 }
 
+/** A Swift double-quoted string literal. */
+function swiftStr(value) {
+	return '"' + String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+}
+
+function emitSwift(registry) {
+	const rows = registry.channels.map(
+		(channel) => `\t${swiftStr(channel.id)}: ${swiftStr(channel.sparkle_feed)},`
+	);
+	return (
+		'// Sources/ErgoptiPlus/UpdateChannels.generated.swift\n' +
+		'// AUTO-GENERATED from _shared/modules/updater/channels.json.\n' +
+		`// DO NOT EDIT BY HAND -- run \`${RUN_HINT}\` to refresh.\n` +
+		'\n' +
+		'// ==============================================================================\n' +
+		'// MODULE: Update Channel Feeds\n' +
+		'// DESCRIPTION:\n' +
+		'// The Sparkle appcast of every channel of the shared update-channel registry.\n' +
+		'// The launcher accepts a channel command only for these ids and serves Sparkle\n' +
+		"// the subscribed channel's appcast, so a new channel is a data edit.\n" +
+		'// ==============================================================================\n' +
+		'\n' +
+		'let kUpdateChannelFeeds: [String: String] = [\n' +
+		rows.join('\n') +
+		'\n]\n'
+	);
+}
+
 // ==========================================
 // ==========================================
 // ======= 3/ Public API & Main ============
@@ -158,7 +195,8 @@ function renderOutputs(registry) {
 	validate(registry);
 	return [
 		{ path: PAGE_OUTPUT, content: emitPage(registry) },
-		{ path: AHK_OUTPUT, content: emitAhk(registry) }
+		{ path: AHK_OUTPUT, content: emitAhk(registry) },
+		{ path: SWIFT_OUTPUT, content: emitSwift(registry) }
 	];
 }
 

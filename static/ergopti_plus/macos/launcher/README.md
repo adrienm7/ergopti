@@ -101,11 +101,16 @@ Do **not** commit either key. The launcher's `Info.plist` is generated at
 build time so the public key is injected from the secret rather than living
 in source.
 
-`SUFeedURL` points to the machine-managed `sparkle-feed` release, using
-`appcast-main.xml` for stable builds and `appcast-dev.xml` for prereleases.
-Release finalization replaces only the current channel's asset after the
-versioned release and its signed application archive have been published, then
-downloads the permanent feed again and compares it byte-for-byte.
+`SUFeedURL` points to the build channel's appcast on the machine-managed
+`sparkle-appcasts` branch, using `appcast-main.xml` for stable builds and
+`appcast-dev.xml` for prereleases. Once the menu names a channel
+(`ergoptiplus://updater/check/<channel>` or `ergoptiplus://updater/channel/<channel>`,
+accepted only for the ids in `UpdateChannels.generated.swift`),
+`UpdateChannelFeed` serves Sparkle that channel's appcast from the same
+directory instead, and keeps the choice for the scheduled checks. Release
+finalization replaces only the current channel's asset after the versioned
+release and its signed application archive have been published, then downloads
+the permanent feed again and compares it byte-for-byte.
 
 The release generator accepts `sign_update -f` output only in its complete
 `sparkle:edSignature="…" length="…"` form. It rejects extra attributes and

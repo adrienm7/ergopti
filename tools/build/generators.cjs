@@ -80,7 +80,8 @@ const GENERATORS = [
 		script: 'codegen/codegen-update-channels.cjs',
 		outputs: [
 			'static/ergopti_plus/_shared/ui/_generated/update_channel_registry.js',
-			'static/ergopti_plus/windows/_generated/update_channels.ahk'
+			'static/ergopti_plus/windows/_generated/update_channels.ahk',
+			'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/UpdateChannels.generated.swift'
 		]
 	},
 	{

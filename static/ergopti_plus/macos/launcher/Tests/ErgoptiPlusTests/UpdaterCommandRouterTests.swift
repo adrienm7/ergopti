@@ -4,30 +4,78 @@ import Foundation
 import XCTest
 @testable import ErgoptiPlus
 
+/// Ordered record of what the router asked for, shared by both spies.
+private final class Journal {
+	private(set) var events: [String] = []
+
+	func record(_ event: String) {
+		events.append(event)
+	}
+}
+
+/// Non-isolated like the protocol it conforms to.
+private final class ChannelSelectorSpy: UpdateChannelSelecting {
+	private let journal: Journal
+
+	init(_ journal: Journal) {
+		self.journal = journal
+	}
+
+	func selectChannel(_ channel: String) {
+		journal.record("select:" + channel)
+	}
+}
+
 @MainActor
 final class UpdaterCommandRouterTests: XCTestCase {
 	private final class UpdateCheckerSpy: UpdateChecking {
-		private(set) var calls = 0
+		private let journal: Journal
+
+		init(_ journal: Journal) {
+			self.journal = journal
+		}
 
 		func checkForUpdates() {
 			XCTAssertTrue(Thread.isMainThread)
-			calls += 1
+			journal.record("check")
 		}
 	}
 
+	private func boundRouter(_ journal: Journal) -> (UpdaterCommandRouter, UpdateCheckerSpy, ChannelSelectorSpy) {
+		let checker = UpdateCheckerSpy(journal)
+		let selector = ChannelSelectorSpy(journal)
+		let router = UpdaterCommandRouter(knownChannels: ["main", "dev"])
+		router.bind(checker, channelSelector: selector)
+		return (router, checker, selector)
+	}
+
 	func testExactCommandChecksOnce() throws {
-		let checker = UpdateCheckerSpy()
-		let router = UpdaterCommandRouter()
-		router.bind(checker)
+		let journal = Journal()
+		let (router, _, _) = boundRouter(journal)
 
 		XCTAssertTrue(router.route(try XCTUnwrap(URL(string: "ergoptiplus://updater/check"))))
-		XCTAssertEqual(checker.calls, 1)
+		XCTAssertEqual(journal.events, ["check"])
+	}
+
+	func testChannelCheckSelectsTheChannelBeforeChecking() throws {
+		let journal = Journal()
+		let (router, _, _) = boundRouter(journal)
+
+		XCTAssertTrue(router.route(try XCTUnwrap(URL(string: "ergoptiplus://updater/check/dev"))))
+		XCTAssertEqual(journal.events, ["select:dev", "check"])
+	}
+
+	func testChannelCommandSelectsWithoutChecking() throws {
+		let journal = Journal()
+		let (router, _, _) = boundRouter(journal)
+
+		XCTAssertTrue(router.route(try XCTUnwrap(URL(string: "ergoptiplus://updater/channel/main"))))
+		XCTAssertEqual(journal.events, ["select:main"])
 	}
 
 	func testRejectsEveryNonExactCommandComponent() throws {
-		let checker = UpdateCheckerSpy()
-		let router = UpdaterCommandRouter()
-		router.bind(checker)
+		let journal = Journal()
+		let (router, _, _) = boundRouter(journal)
 		let rejected = [
 			"https://updater/check",
 			"ergoptiplus://other/check",
@@ -36,23 +84,45 @@ final class UpdaterCommandRouterTests: XCTestCase {
 			"ergoptiplus://updater/check#fragment",
 			"ergoptiplus://user@updater/check",
 			"ergoptiplus://updater:42/check",
+			"ergoptiplus://updater/check/beta",
+			"ergoptiplus://updater/check/Dev",
+			"ergoptiplus://updater/check/",
+			"ergoptiplus://updater/check/dev/again",
+			"ergoptiplus://updater/channel",
+			"ergoptiplus://updater/channel/stable",
+			"ergoptiplus://updater/install/dev",
 		]
 
 		for rawURL in rejected {
 			XCTAssertFalse(router.route(try XCTUnwrap(URL(string: rawURL))), rawURL)
 		}
-		XCTAssertEqual(checker.calls, 0)
+		XCTAssertEqual(journal.events, [])
 	}
 
 	func testCoalescesCommandsReceivedBeforeControllerBinding() throws {
-		let checker = UpdateCheckerSpy()
-		let router = UpdaterCommandRouter()
-		let command = try XCTUnwrap(URL(string: "ergoptiplus://updater/check"))
+		let journal = Journal()
+		let checker = UpdateCheckerSpy(journal)
+		let selector = ChannelSelectorSpy(journal)
+		let router = UpdaterCommandRouter(knownChannels: ["main", "dev"])
+		let command = try XCTUnwrap(URL(string: "ergoptiplus://updater/check/dev"))
 
 		XCTAssertTrue(router.route(command))
 		XCTAssertTrue(router.route(command))
-		XCTAssertEqual(checker.calls, 0)
-		router.bind(checker)
-		XCTAssertEqual(checker.calls, 1)
+		XCTAssertEqual(journal.events, [])
+		router.bind(checker, channelSelector: selector)
+		XCTAssertEqual(journal.events, ["select:dev", "check"])
+	}
+
+	func testDefaultChannelsAreTheGeneratedRegistry() throws {
+		let journal = Journal()
+		let checker = UpdateCheckerSpy(journal)
+		let selector = ChannelSelectorSpy(journal)
+		let router = UpdaterCommandRouter()
+		router.bind(checker, channelSelector: selector)
+
+		for channel in kUpdateChannelFeeds.keys.sorted() {
+			XCTAssertTrue(router.route(try XCTUnwrap(URL(string: "ergoptiplus://updater/channel/" + channel))))
+		}
+		XCTAssertEqual(journal.events, kUpdateChannelFeeds.keys.sorted().map { "select:" + $0 })
 	}
 }
