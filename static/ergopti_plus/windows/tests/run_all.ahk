@@ -423,6 +423,7 @@ InstallSendNoOps()
 #Include ../ui/menu/menu_init.ahk
 #Include ../ui/menu/menu_actions.ahk
 #Include unit/test_about_menu_channel_rows.ahk
+#Include unit/test_changelog_subscribe_channel.ahk
 #Include unit/test_updater_release_notes.ahk
 #Include unit/test_updater_staging_transport.ahk
 #Include unit/test_updater_swap_transaction.ahk

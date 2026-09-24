@@ -3292,6 +3292,14 @@ local function _about_update_rows(ctx)
 			action  = function()
 				if not up.set_channel(id) then return end
 				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				-- An open Versions page follows, so its banner never offers the
+				-- channel the user just chose here.
+				local ok_bridge, Changelog = pcall(require, "ui.changelog.bridge")
+				if ok_bridge then
+					Changelog.push_subscribed_channel(id)
+				else
+					Logger.error(LOG, "The Versions page bridge is unavailable: %s.", tostring(Changelog))
+				end
 			end,
 		}
 	end

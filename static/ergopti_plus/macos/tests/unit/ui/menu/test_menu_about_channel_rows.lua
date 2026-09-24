@@ -57,6 +57,30 @@ helpers.describe("menu_about: one row per registry channel", function()
 		helpers.assert_eq(calls, ids, "each row subscribes to its own channel, in registry order")
 	end)
 
+	-- The Versions window's banner used to have no owner to subscribe through.
+	helpers.it("the Versions row opens on the subscribed channel with the owner", function()
+		local owner = fake_owner("dev")
+		local previous = package.loaded["ui.changelog"]
+		local opened = {}
+		package.loaded["ui.changelog"] = { open = function(opts) opened[#opened + 1] = opts return true end }
+		local ok, err = pcall(function()
+			local rows = build(owner)
+			local label = require("infra.i18n").get("menu.about.changelog")
+			local versions = nil
+			for _, row in ipairs(rows) do
+				if row.title == label then versions = row end
+			end
+			helpers.assert_not_nil(versions, "the About submenu must list the Versions row")
+			versions.fn()
+			helpers.assert_eq(#opened, 1, "the Versions window must open once")
+			helpers.assert_eq(opened[1].channel, "dev", "it opens on the subscribed channel")
+			helpers.assert_true(opened[1].channel_owner == owner, "its banner subscribes through the same owner")
+		end)
+		package.loaded["ui.changelog"] = previous
+		package.loaded["ui.menu.menu_about"] = nil
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("without an owner the rows are left out rather than drawn dead", function()
 		local rows = build(nil)
 		local Updater = require("modules.updater")

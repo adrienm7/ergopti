@@ -506,7 +506,9 @@
 	 * @param {string} xml - Feed document text.
 	 * @param {string} owner - Expected repository owner.
 	 * @param {string} repo - Expected repository name.
-	 * @return {Array<{tag_name: string, body: string, html_url: string, published_at: string, prerelease: boolean}>}
+	 * GitHub does not publish the pre-release flag in the feed, so the records
+	 * carry none; the page reads it from the update-channel registry.
+	 * @return {Array<{tag_name: string, body: string, html_url: string, published_at: string}>}
 	 * @throws {Error} When the text is not an Atom feed.
 	 */
 	function parseReleasesAtom(xml, owner, repo) {
@@ -532,10 +534,7 @@
 				tag_name: tag,
 				body: releaseNotesHtmlToMarkdown(content || ''),
 				html_url: prefix + encodedTag,
-				published_at: (elementText(entry, 'updated') || '').trim(),
-				// GitHub does not publish the pre-release flag in the feed; the CI tag
-				// families encode it (stable = plain semver, dev = semver pre-release).
-				prerelease: /^v?\d+\.\d+\.\d+-/.test(tag)
+				published_at: (elementText(entry, 'updated') || '').trim()
 			});
 		});
 		return releases;

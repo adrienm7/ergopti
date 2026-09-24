@@ -172,6 +172,52 @@ body {
 	overflow: hidden;
 }
 
+/* Shown while the page lists a channel the user does not receive updates from. */
+#subscribe-banner {
+	align-items: center;
+	background: rgba(10, 132, 255, 0.08);
+	border-bottom: 1px solid rgba(10, 132, 255, 0.3);
+	color: #c8c8cc;
+	flex-shrink: 0;
+	flex-wrap: wrap;
+	font-size: 12px;
+	gap: 10px;
+	padding: 8px 20px;
+}
+
+#subscribe-text,
+#subscribe-confirm-text {
+	flex: 1;
+	min-width: 0;
+}
+
+#subscribe-confirm {
+	align-items: center;
+	flex-basis: 100%;
+	gap: 8px;
+}
+
+#subscribe-banner button {
+	background: rgba(10, 132, 255, 0.18);
+	border: 1px solid rgba(10, 132, 255, 0.55);
+	border-radius: 6px;
+	color: #4da6ff;
+	cursor: pointer;
+	font-size: 12px;
+	font-weight: 500;
+	padding: 4px 10px;
+	white-space: nowrap;
+}
+
+#subscribe-banner button:hover {
+	background: rgba(10, 132, 255, 0.28);
+}
+
+#subscribe-banner button:disabled {
+	cursor: default;
+	opacity: 0.5;
+}
+
 #content-header {
 	align-items: center;
 	background: #1c1c1e;

@@ -347,3 +347,94 @@ helpers.describe("changelog_bridge: native fetch push", function()
 		Bridge._reset()
 	end)
 end)
+
+-- The page's tabs used to be the only channel control the window had, and the
+-- subscription lived in the menu alone: the page could not subscribe, and a
+-- menu change never reached an open page.
+helpers.describe("changelog_bridge: subscription", function()
+	local Bridge = helpers.load_module("ui.changelog.bridge")
+
+	--- Runs a body with a manager double over the real one (for its registry).
+	--- @param subscribed string Channel the double starts on.
+	--- @param accept boolean What set_channel answers.
+	--- @param body function Receives the record of set_channel calls.
+	local function with_manager(subscribed, accept, body)
+		local real = require("modules.updater.manager")
+		local previous = package.loaded["modules.updater.manager"]
+		local record = { calls = {}, current = subscribed }
+		package.loaded["modules.updater.manager"] = setmetatable({
+			get_channel = function() return record.current end,
+			get_cached_release = function() return nil end,
+			set_channel = function(id)
+				record.calls[#record.calls + 1] = id
+				if accept then record.current = id end
+				return accept
+			end,
+		}, { __index = real })
+		Bridge._reset()
+		local pushed = {}
+		Bridge._http_get = function() end
+		Bridge._push = function(payload) pushed[#pushed + 1] = payload; return true end
+		record.pushed = pushed
+		local ok, err = pcall(body, record)
+		package.loaded["modules.updater.manager"] = previous
+		Bridge._reset()
+		if not ok then error(err, 0) end
+	end
+
+	helpers.it("tells the page which channel the user receives on opening", function()
+		with_manager("dev", true, function()
+			local initial = Bridge.on_message("ready", {})
+			helpers.assert_eq(initial.subscribed_channel, "dev", "the banner needs the subscription")
+		end)
+	end)
+
+	helpers.it("subscribes through the updater and rebuilds the menu", function()
+		with_manager("dev", true, function(record)
+			local rebuilt = 0
+			local answer = Bridge.on_message({ action = "set_channel", channel = "main" },
+				{ on_config_changed = function() rebuilt = rebuilt + 1 end })
+			helpers.assert_eq(#record.calls, 1, "the updater must be asked once")
+			helpers.assert_eq(record.calls[1], "main")
+			helpers.assert_eq(rebuilt, 1, "the menu tick must follow the new channel")
+			helpers.assert_eq(answer.action, "channel_changed")
+			helpers.assert_eq(answer.channel, "main")
+			helpers.assert_true(answer.ok, "an accepted change must be reported")
+		end)
+	end)
+
+	helpers.it("refuses ids outside the registry without touching the updater", function()
+		with_manager("dev", true, function(record)
+			for _, unknown in ipairs({ "stable", "beta", "Main", 42 }) do
+				local rebuilt = 0
+				local answer = Bridge.on_message({ action = "set_channel", channel = unknown },
+					{ on_config_changed = function() rebuilt = rebuilt + 1 end })
+				helpers.assert_eq(answer.ok, false, tostring(unknown) .. " must be refused")
+				helpers.assert_eq(answer.channel, "dev", "the answer keeps the current subscription")
+				helpers.assert_eq(rebuilt, 0)
+			end
+			helpers.assert_eq(#record.calls, 0, "no unknown id may reach the updater")
+		end)
+	end)
+
+	helpers.it("reports a refusal of the updater to the page", function()
+		with_manager("dev", false, function(record)
+			local answer = Bridge.on_message({ action = "set_channel", channel = "main" }, {})
+			helpers.assert_eq(#record.calls, 1)
+			helpers.assert_eq(answer.ok, false)
+			helpers.assert_eq(answer.channel, "dev")
+		end)
+	end)
+
+	helpers.it("pushes a menu change to an open page", function()
+		with_manager("dev", true, function(record)
+			helpers.assert_true(Bridge.push_subscribed_channel("main"))
+			helpers.assert_eq(#record.pushed, 1)
+			helpers.assert_eq(record.pushed[1].action, "channel_changed")
+			helpers.assert_eq(record.pushed[1].channel, "main")
+			helpers.assert_true(record.pushed[1].ok)
+			helpers.assert_eq(Bridge.push_subscribed_channel("stable"), false, "aliases are not pushed")
+			helpers.assert_eq(#record.pushed, 1)
+		end)
+	end)
+end)
