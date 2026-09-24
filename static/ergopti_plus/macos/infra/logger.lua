@@ -464,6 +464,18 @@ local function _stop_pending_purge_timers()
 	return settled, first_error
 end
 
+--- Returns the unified and errors-only log paths of one calendar date. The only
+--- place that spells the dated names, which the folder setup, the midnight
+--- rollover and the fatal report's log list all resolve through.
+--- @param log_dir string Log folder, with its trailing separator.
+--- @param date string Calendar date, "%Y-%m-%d".
+--- @return string unified_path
+--- @return string errors_path
+local function _dated_log_paths(log_dir, date)
+	return log_dir .. "ErgoptiPlus_" .. date .. ".log",
+		log_dir .. "ErgoptiPlus_errors_" .. date .. ".log"
+end
+
 --- Configures the log file path under <config_dir>/hammerspoon/logs/ with
 --- daily rotation (ErgoptiPlus_YYYY-MM-DD.log) and purges files older than
 --- max_age_days. Best-effort: an I/O failure cannot block init, but every
@@ -544,8 +556,7 @@ function M.init_log_path(config_dir, max_age_days)
 		_last_log_path = nil
 	end
 
-	M.UNIFIED_LOG_FILE = log_dir .. "ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log"
-	M.ERRORS_LOG_FILE = log_dir .. "ErgoptiPlus_errors_" .. os.date("%Y-%m-%d") .. ".log"
+	M.UNIFIED_LOG_FILE, M.ERRORS_LOG_FILE = _dated_log_paths(log_dir, os.date("%Y-%m-%d"))
 
 
 	-- Old-log purge is pure housekeeping — defer it off the boot critical path.
@@ -560,13 +571,15 @@ end
 --- M.UNIFIED_LOG_FILE keeps the name chosen when the folder was set.
 --- @return string path
 function M.today_log_path()
-	return _log_dir .. "ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log"
+	local unified_path = _dated_log_paths(_log_dir, os.date("%Y-%m-%d"))
+	return unified_path
 end
 
 --- Returns today's errors-only log path (WARNING and ERROR lines), read per call.
 --- @return string path
 function M.today_errors_path()
-	return _log_dir .. "ErgoptiPlus_errors_" .. os.date("%Y-%m-%d") .. ".log"
+	local _, errors_path = _dated_log_paths(_log_dir, os.date("%Y-%m-%d"))
+	return errors_path
 end
 
 --- Removes one stale log and records any OS refusal without fabricating success.
@@ -849,8 +862,7 @@ local function _ensure_log_file()
 	-- Recompute the dated paths when the calendar date changes so midnight
 	-- rollovers write to the new day's file rather than reopening yesterday's.
 	if _log_dir and _last_log_date ~= today then
-		M.UNIFIED_LOG_FILE = _log_dir .. "ErgoptiPlus_" .. today .. ".log"
-		M.ERRORS_LOG_FILE  = _log_dir .. "ErgoptiPlus_errors_" .. today .. ".log"
+		M.UNIFIED_LOG_FILE, M.ERRORS_LOG_FILE = _dated_log_paths(_log_dir, today)
 	end
 	if _file_handle and _last_log_date == today and _last_log_path == M.UNIFIED_LOG_FILE then
 		return _file_handle
