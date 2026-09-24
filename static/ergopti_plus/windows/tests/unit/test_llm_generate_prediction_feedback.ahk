@@ -197,3 +197,20 @@ _LMPF_RefusalOrderAndKeys() {
 }
 Test("LLM manual prediction: refusal order and notice keys (llm-manual-prediction-feedback)",
 	_LMPF_RefusalOrderAndKeys)
+
+_LMPF_ActionRunsTheManualTrigger() {
+	global GESTURE_ACTIONS
+	Assert(GESTURE_ACTIONS.Has("llm_generate_prediction"),
+		"the catalogue action must be registered in the gesture registry")
+	_LMPF_Run(_LMPF_Menu(false), "hello world", _Body)
+	_Body(Lines) {
+		; Dispatched the way a binding dispatches it: with its binding id.
+		GESTURE_ACTIONS["llm_generate_prediction"].Fn.Call("keyboard__win_space")
+		AssertEqual(1, _LMPF_InfoLinesFor(Lines, "disabled"),
+			"a bound gesture or keyboard slot must reach the manual trigger and its feedback")
+		AssertEqual(t("llm.manual_prediction.disabled"), _LMPF_PendingTooltipText(),
+			"the action must show the same notice as the trigger")
+	}
+}
+Test("LLM manual prediction: the llm_generate_prediction action runs the trigger (llm-manual-prediction-feedback)",
+	_LMPF_ActionRunsTheManualTrigger)

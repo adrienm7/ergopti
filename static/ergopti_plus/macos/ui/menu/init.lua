@@ -988,7 +988,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 					pcall(hs.execute, "open " .. text_utils.shell_quote(personal_path))
 				end, "menu.open_personal_toml")
 			end,
-			trigger_prediction = function() if keymap and type(keymap.trigger_prediction) == "function" then pcall(keymap.trigger_prediction) end end,
 			add_hotstring = function()
 				-- Toggle: close if already open, otherwise open
 				if hotstring_editor then

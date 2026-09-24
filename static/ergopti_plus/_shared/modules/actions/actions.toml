@@ -893,6 +893,15 @@ platform = "all"
 platform = "all"
 parameter = "wrap_pair"
 
+[sg_actions.llm_generate_prediction]
+# Asks the AI for a prediction now, from the text typed so far: Windows
+# LLM_Menu_TriggerPrediction, macOS the keymap bridge's
+# request_manual_prediction, Linux the prediction engine's trigger_now (a
+# daemon-injected handler). Each driver logs every refusal (paused, AI off,
+# backend not ready, nothing typed) at INFO and shows it, so a binding that
+# cannot predict never looks broken.
+platform = "all"
+
 [sg_actions.spotlight_mouse]
 # Implemented on BOTH: Windows in modules/shortcuts, macOS in
 # modules/shortcuts/actions/. Linux has no cross-desktop overlay implementation;
@@ -1294,6 +1303,9 @@ items = [
     "titlecase_selection",
     "wrap_selection",
     "surround_parens",
+    "--",
+    "##ai",
+    "llm_generate_prediction",
     "--",
     "#modifier_chords",
     "_modifier_chords_placeholder",

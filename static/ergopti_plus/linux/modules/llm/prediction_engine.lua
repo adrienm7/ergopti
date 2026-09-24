@@ -23,6 +23,7 @@ local NavigationSettings = require("modules.llm.navigation_settings")
 local TimerScheduler = require("adapters.timer_scheduler")
 local Inference = require("modules.llm.inference")
 local Monotonic = require("infra.monotonic")
+local i18n = require("infra.i18n")
 
 local LOG = "modules.llm.prediction_engine"
 
@@ -42,6 +43,24 @@ local _scheduler = TimerScheduler
 local _triggers = { "//", ";;", "--" }
 local _max_tokens = nil
 local _request_epoch = 0
+
+-- Injected by init(): whether the daemon is paused, and how a manual request
+-- tells the user it was refused (a desktop notification in the daemon).
+local function NEVER_PAUSED() return false end
+local _is_paused = NEVER_PAUSED
+local _notify = nil
+
+-- The reasons a manual request is refused, each with the locale key of the
+-- notice that tells the user. manual_refusal checks them in this order: a pause
+-- outranks everything, then the AI switch, then the backend, then the typed
+-- context. Windows and macOS declare the same four
+-- (tools/test/test-manual-prediction-refusals-single-source.cjs).
+local MANUAL_REFUSAL_KEYS = {
+	paused            = "llm.manual_prediction.paused",
+	disabled          = "llm.manual_prediction.disabled",
+	backend_not_ready = "llm.manual_prediction.backend_not_ready",
+	empty_context     = "llm.manual_prediction.empty_context",
+}
 
 local function get_ollama()
 	local ok, module = pcall(require, "modules.llm.api_ollama")
@@ -197,6 +216,8 @@ function M.init(opts)
 	_apply_prediction = type(options.apply_prediction) == "function" and options.apply_prediction or nil
 	_on_output = type(options.on_output) == "function" and options.on_output or nil
 	_on_offer = type(options.on_offer) == "function" and options.on_offer or nil
+	_is_paused = type(options.is_paused) == "function" and options.is_paused or NEVER_PAUSED
+	_notify = type(options.notify) == "function" and options.notify or nil
 	_offer_notified = false
 	if type(options.triggers) == "table" then _triggers = options.triggers end
 	if _pending_trigger then _scheduler.cancel(_pending_trigger) end
@@ -454,6 +475,55 @@ function M.predict(context, output_context)
 		end)
 	end
 	dispatch()
+end
+
+--- Decides why a manual prediction request cannot run, if it cannot.
+--- @return string|nil reason A key of MANUAL_REFUSAL_KEYS, or nil when ready.
+--- @return string context The typing buffer the prediction would complete.
+local function manual_refusal()
+	if _is_paused() then return "paused", "" end
+	if not _enabled then return "disabled", "" end
+	local profiles = get_profiles()
+	if not get_ollama() or not profiles or not profiles.get_current_model() then
+		return "backend_not_ready", ""
+	end
+	local buffer = _engine and type(_engine.current_buffer) == "function" and _engine:current_buffer() or ""
+	if type(buffer) ~= "string" or buffer == "" then return "empty_context", "" end
+	return nil, buffer
+end
+
+--- Runs a prediction now from the whole typing buffer: the llm_generate_prediction
+--- action. Automatic triggers wait for typing; this one is a chord pressed on
+--- purpose, so every refusal is logged at INFO and shown as a notification, as
+--- the other two drivers do.
+--- @param output_context table|nil { app_id } for the metrics; nil lets the
+---   daemon's observers fall back to the focused application.
+--- @return boolean requested True when predict() was started.
+function M.trigger_now(output_context)
+	local reason, context = manual_refusal()
+	if reason then
+		Logger.info(LOG, "Manual prediction refused (%s).", reason)
+		if not _notify then
+			Logger.error(LOG, "No notice surface injected — the '%s' refusal is only logged.", reason)
+		elseif _notify(i18n.get(MANUAL_REFUSAL_KEYS[reason])) ~= true then
+			Logger.warn(LOG, "The '%s' refusal notice was not shown.", reason)
+		end
+		return false
+	end
+	if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
+	if _predicting or #_suggestions > 0 then M.dismiss() end
+	Logger.info(LOG, "Manual prediction requested (%d context byte(s)).", #context)
+	M.predict(context, output_context)
+	return true
+end
+
+--- The catalogue actions this engine answers, for the gesture executor's
+--- daemon-injected handlers (modules/shortcuts/action_handlers.lua).
+--- @return table { [action_id] = function(binding, parameter) }
+function M.action_handlers()
+	return {
+		llm_generate_prediction = function() return M.trigger_now() end,
+	}
 end
 
 --- Cancels pending and in-flight work and shows nothing, leaving the hotstring

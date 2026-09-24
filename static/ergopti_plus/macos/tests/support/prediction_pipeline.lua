@@ -75,8 +75,11 @@ local function load_fixture(options)
 	end
 	package.loaded["infra.logger"] = logger
 
+	local defaults = make_defaults()
+	-- The engine reads its enable switch from these defaults when it loads.
+	if options.llm_enabled == false then defaults.llm_enabled = false end
 	local core = {
-		DEFAULT_STATE = make_defaults(),
+		DEFAULT_STATE = defaults,
 		get_current_model = function() return "test-model" end,
 		get_backend = function() return "ollama" end,
 		get_active_profile = function() return nil end,
@@ -163,7 +166,7 @@ local function load_fixture(options)
 	fixture.handler = StreamingHandler
 	fixture.engine = Engine
 	Engine.init({
-		buffer = "hello world",
+		buffer = options.buffer or "hello world",
 		mappings = {},
 		DELAYS = { llm_prediction = 1 },
 		ignored_window_titles = {},

@@ -1053,6 +1053,20 @@ end
 sg("send_text", function(binding) return send_input_action("send_text", binding) end)
 sg("send_key", function(binding) return send_input_action("send_key", binding) end)
 sg("send_shortcut", function(binding) return send_input_action("send_shortcut", binding) end)
+-- A prediction now, from the text typed so far. The keymap bridge owns the
+-- prediction engine, which logs and shows every refusal (paused, AI off,
+-- backend not ready, nothing typed). Required at dispatch: the keymap loads
+-- after this registry.
+sg("llm_generate_prediction", function()
+	local ok_keymap, keymap = pcall(require, "modules.keymap")
+	if not ok_keymap or type(keymap) ~= "table"
+		or type(keymap.request_manual_prediction) ~= "function" then
+		Logger.error(LOG, "llm_generate_prediction: the keymap bridge is unavailable: %s.",
+			tostring(keymap))
+		return false
+	end
+	return keymap.request_manual_prediction()
+end)
 sg("teleport_mouse", function()
 	local ok, Mouse = pcall(require, "modules.shortcuts.actions.system_mouse")
 	if ok and type(Mouse.teleport_mouse) == "function" then
