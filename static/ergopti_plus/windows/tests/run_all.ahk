@@ -1070,18 +1070,19 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_llm_menu_disabled_greyed.ahk
 #Include meta/test_language_menu_deferred_publication.ahk
 #Include meta/test_llm_menu_layout_shared.ahk
-; MenuManifest_LoadTopLevelTail/LoadGlobalActions/LoadDebugMenu — needed so
-; the gestures-actions-separator regression test can exercise the real
-; production loader (not a source-scan) against the real shared manifest.
+; MenuManifest_LoadTopLevel/LoadGlobalActions/LoadDebugMenu — needed so the
+; top-level drift gate stages the root from the real shared manifest.
 #Include ../infra/menu_manifest.ahk
 ; The generic manifest walker. Pure function definitions — no top-level
 ; statements, no includes — so pulling it in is side-effect free, and it lets
 ; disabled_when tests exercise the real resolver instead of scanning its source.
 #Include ../infra/manifest_menu.ahk
-; Drift gate: manifest top_level tail (from global_actions) must match the AHK dispatch table.
+; The tray root builder: its top-level dispatcher and the id → builder table.
+; Function definitions only, and the table names only its own _MI_ builders,
+; so pulling it in stages nothing and resolves no menu dependency at load.
+#Include ../ui/menu/menu_init.ahk
+; Drift gate: the staged tray root follows the manifest's top level, separators included.
 #Include meta/test_menu_top_level_drift_gate.ahk
-; Regression: the separator between Gestures and "Actions globales" must survive the tail loader.
-#Include meta/test_menu_gestures_actions_separator.ahk
 ; Regression: no separator doubles up in any manifest menu.
 #Include unit/test_manifest_menu_no_double_separator.ahk
 ; Regression: every category switch is a first-row checkbox with one label.
