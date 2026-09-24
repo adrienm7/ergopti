@@ -37,6 +37,7 @@ local function manager(user_text)
 	Manager.init({
 		keyboard_hook = hook,
 		execute_action = function(action, binding) actions[#actions + 1] = action .. "@" .. binding end,
+		action_names = function() return { "open_url" } end,
 		defaults_path = DEFAULTS,
 		user_path = user_path,
 	})

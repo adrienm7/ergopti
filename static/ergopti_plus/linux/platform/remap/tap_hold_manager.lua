@@ -24,6 +24,8 @@ local Logger = require("logger.shim")
 local Config = require("platform.remap.tap_hold_loader")
 local Engine = require("platform.remap.tap_hold_engine")
 local Timings = require("infra.timings")
+local HoldOptions = require("tap_hold.hold_options")
+local EmitActions = require("_generated.gesture_emit_actions")
 
 local LOG = "platform.remap.tap_hold_manager"
 local MS_PER_SECOND = 1000
@@ -38,6 +40,7 @@ local MS_PER_SECOND = 1000
 local _initialized = false
 local _hook = nil            -- The keyboard hook the engine is installed in.
 local _execute_action = nil  -- Runs a catalogue action by name.
+local _action_names = nil    -- The action catalogue's ids.
 local _defaults_path = nil
 local _user_path = nil
 local _loaded = nil          -- Config.load() result.
@@ -104,15 +107,15 @@ end
 
 --- Loads the configuration and installs the engine.
 --- @param opts table { keyboard_hook, execute_action(action, binding),
----   defaults_path, user_path }
+---   action_names() -> ids, defaults_path, user_path }
 function M.init(opts)
 	if _initialized then error("tap-hold manager already initialised", 2) end
 	if type(opts) ~= "table" then error("tap-hold manager options must be a table", 2) end
 	if type(opts.keyboard_hook) ~= "table" or type(opts.keyboard_hook.set_remapper) ~= "function" then
 		error("tap-hold manager requires a keyboard hook with set_remapper()", 2)
 	end
-	if type(opts.execute_action) ~= "function" then
-		error("tap-hold manager requires an execute_action function", 2)
+	for _, name in ipairs({ "execute_action", "action_names" }) do
+		if type(opts[name]) ~= "function" then error("tap-hold manager requires " .. name, 2) end
 	end
 	for _, name in ipairs({ "defaults_path", "user_path" }) do
 		if type(opts[name]) ~= "string" or opts[name] == "" then
@@ -122,6 +125,7 @@ function M.init(opts)
 	Logger.start(LOG, "Initialising tap-holds…")
 	_hook = opts.keyboard_hook
 	_execute_action = opts.execute_action
+	_action_names = opts.action_names
 	_defaults_path = opts.defaults_path
 	_user_path = opts.user_path
 	_enabled, _paused = true, false
@@ -207,6 +211,56 @@ function M.defaults_path()
 	return _defaults_path
 end
 
+--- The ids a tap can be set to, sorted: the key taps the engine types itself,
+--- the one-shot Shift, and every catalogue action this driver can run.
+--- @return table
+function M.tap_actions()
+	_require_init()
+	local seen = { none = true }
+	local ids = {}
+	local function add(id)
+		if type(id) == "string" and id ~= "" and not seen[id] then
+			seen[id] = true
+			ids[#ids + 1] = id
+		end
+	end
+	for id in pairs(Engine.KEY_TAPS) do add(id) end
+	add("one_shot_shift")
+	for id in pairs(EmitActions) do add(id) end
+	for _, id in ipairs(_action_names()) do add(id) end
+	table.sort(ids)
+	return ids
+end
+
+--- Whether `action` is an id a tap can be set to.
+--- @param action string
+--- @return boolean
+function M.is_tap_action(action)
+	for _, id in ipairs(M.tap_actions()) do
+		if id == action then return true end
+	end
+	return false
+end
+
+--- The hold picker's options, in the shared order: none, every modifier
+--- combination, then the layers.
+--- @return table { { id, kind, i18n } }
+function M.hold_options()
+	_require_init()
+	return HoldOptions.build(_loaded.hold_picker)
+end
+
+--- Whether a hold option exists.
+--- @param kind string
+--- @param id string
+--- @return boolean
+function M.is_hold_option(kind, id)
+	for _, option in ipairs(M.hold_options()) do
+		if option.kind == kind and option.id == id then return true end
+	end
+	return false
+end
+
 --- The one tap/hold threshold of the configuration, in milliseconds, for the
 --- metrics' tap/hold split. nil when the keys disagree or none is configured:
 --- the metrics then decline to split rather than use a number nobody chose.
@@ -230,7 +284,7 @@ end
 --- Test seam: forgets the initialisation so a test can init again.
 function M._reset_for_test()
 	if _hook then _hook.set_remapper(nil) end
-	_initialized, _hook, _execute_action, _loaded, _engine = false, nil, nil, nil, nil
+	_initialized, _hook, _execute_action, _action_names, _loaded, _engine = false, nil, nil, nil, nil, nil
 	_enabled, _paused = true, false
 end
 

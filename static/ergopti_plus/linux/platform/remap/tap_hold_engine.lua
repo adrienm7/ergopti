@@ -36,6 +36,12 @@ M.KEY_CODES = {
 	right_shift = 54, enter = 28, backspace = 14, delete = 111,
 }
 
+-- The keys in the order the tray lists them (the Windows order).
+M.KEY_ORDER = {
+	"escape", "tab", "caps_lock", "left_shift", "left_ctrl", "win", "left_alt",
+	"space", "alt_gr", "right_ctrl", "right_shift", "enter", "backspace", "delete",
+}
+
 -- evdev codes of the holdable modifiers.
 M.MODIFIER_CODES = { ctrl = 29, shift = 42, alt = 56, alt_gr = 100, win = 125 }
 
@@ -118,14 +124,19 @@ function M.new(opts)
 				end
 			end
 			local layer = type(config.hold_layer) == "string" and config.hold_layer ~= "" and config.hold_layer or nil
+			local tap = type(config.tap_action) == "string" and config.tap_action or ""
+			-- A native tap and no hold is the key itself: left alone, so it keeps
+			-- its autorepeat and its press is not delayed to its release.
+			if tap == "" and #mods == 0 and not layer then goto continue end
 			self.by_code[code] = {
 				id = key_id,
-				tap = type(config.tap_action) == "string" and config.tap_action or "",
+				tap = tap,
 				mods = layer and {} or mods,
 				layer = layer,
 				threshold_ms = math.floor((tonumber(config.time_activation_seconds) or 0) * 1000 + 0.5),
 			}
 		end
+		::continue::
 	end
 	return setmetatable(self, { __index = M })
 end

@@ -184,21 +184,6 @@ local secure_field_detector = RuntimeGuard.optional_require("adapters.secure_fie
 local webview_manager = RuntimeGuard.optional_require("ui.webview_manager")
 local input_capture_gate = nil
 
--- Kanata manager (optional — key remapping daemon lifecycle).
--- Handles .kbd generation and kanata process start/stop/restart.
-local kanata = RuntimeGuard.optional_require("platform.remap.manager")
-
--- Tap-hold writer (optional — persists a menu change to the user's tap_hold.toml
--- and reloads kanata). Initialised here because it needs the manager above: this
--- driver could READ its tap-hold configuration and not change it until
--- 2026-08-08, so every row of that submenu was greyed.
-if kanata then
-	local thw_mod = RuntimeGuard.optional_require("platform.remap.tap_hold_writer")
-	if thw_mod and type(thw_mod.init) == "function" then
-		thw_mod.init({ manager = kanata })
-	end
-end
-
 -- File watchers (optional — inotify-based TOML/.lua hot reload).
 -- When luv is present, uses native inotify via luv.new_fs_event();
 -- otherwise falls back to mtime polling driven by the event loop.
@@ -662,8 +647,17 @@ local function main()
 			if not gestures then error("the action catalogue (gestures module) is not loaded") end
 			gestures.execute_action(action, binding)
 		end,
+		action_names = function() return gestures and gestures.get_action_names() or {} end,
 		defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"),
 		user_path = require("infra.config_paths").config("tap_hold.toml"),
+	})
+	-- The tray's tap-hold rows write the user's file through this and reload
+	-- the engine live.
+	require("platform.remap.tap_hold_writer").init({
+		path = TapHold.user_path(),
+		reload = TapHold.reload,
+		is_tap_action = TapHold.is_tap_action,
+		is_hold_option = TapHold.is_hold_option,
 	})
 
 	local script_actions = ScriptActions.new({
@@ -1554,7 +1548,7 @@ local function main()
 		llm           = prediction_engine,
 		gestures      = gestures,
 		shortcuts     = shortcuts,
-		kanata        = kanata,
+		tap_holds     = TapHold,
 		updater       = updater,
 		webview       = webview_manager,
 			dry_run       = opts.dry_run,
@@ -1669,15 +1663,6 @@ local function main()
 
 		rebuild_tray_menu = function()
 			local ctx = _build_menu_ctx()
-			-- Probed here rather than inside the builder. Answering truthfully means
-			-- asking the system whether ANY kanata is running — including one under
-			-- systemd — and that is a subprocess. Building a menu must not spawn
-			-- one, so the daemon does it at the moment it decides to rebuild and
-			-- hands the answer over as state.
-			if kanata then
-				local ok_state, running = pcall(kanata.is_running)
-				ctx.kanata_running = ok_state and running or false
-			end
 			local ok_build, items = pcall(menu_builder.build, ctx)
 			if not ok_build then
 				Logger.error(LOG, "Menu rebuild failed — %s", tostring(items))
