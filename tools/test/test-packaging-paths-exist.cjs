@@ -53,10 +53,16 @@ const DESTINATION = /(?:\/usr\/lib|\$\{?HOME\}?\/\.local\/lib|\/usr\/share|\/etc
 const NOT_STATIC = /[*?$]|\{|\}/;
 
 // Package folders the Linux build fills from the keyboard-layout tree rather
-// than from the driver tree: the .keylayout converter lands in the driver as
-// linux/xkb_generation/ (tools/test/test-linux-ships-keylayout-converter.cjs).
+// than from the driver tree: the .keylayout converter and the user XKB
+// installer land in the driver as linux/xkb_generation/ and
+// linux/xkb_installation/ (tools/test/test-linux-ships-keylayout-converter.cjs).
 // A path under one of them must exist at its layout-tree source instead.
-const FROM_LAYOUT_TREE = ['linux/xkb_generation'];
+const FROM_LAYOUT_TREE = ['linux/xkb_generation', 'linux/xkb_installation'];
+
+// The layout registry ships below the driver at its repository path
+// (linux/static/layouts/registry): a path there exists at static/... of the
+// repository.
+const FROM_REPOSITORY_STATIC = 'linux/static/';
 
 const errors = [];
 
@@ -100,8 +106,10 @@ for (const name of scripts) {
 			const start = m.index + m[0].length - rel.length;
 			const layoutTree = /(?:^|[^A-Za-z0-9_])ergopti\/$/.test(line.slice(0, start))
 				|| FROM_LAYOUT_TREE.some((folder) => rel === folder || rel.startsWith(folder + '/'));
-			const base = layoutTree ? LAYOUT_ROOT : SP;
-			if (!fs.existsSync(path.join(base, rel))) {
+			const repositoryStatic = rel.startsWith(FROM_REPOSITORY_STATIC);
+			const base = repositoryStatic ? ROOT : layoutTree ? LAYOUT_ROOT : SP;
+			const source = repositoryStatic ? rel.slice('linux/'.length) : rel;
+			if (!fs.existsSync(path.join(base, source))) {
 				errors.push(
 					`tools/build/${name}:${i + 1}: copies "${rel}", which does not exist under ` +
 						`${path.relative(ROOT, base).split(path.sep).join('/')}/. Most of these copies are written "|| true", so the package ` +

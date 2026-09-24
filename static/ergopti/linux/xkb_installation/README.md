@@ -140,6 +140,29 @@ inside temporary directories without root privileges:
 Clean Python installer exit codes: `0` success, `2` invalid arguments, `3` inconsistent
 package or invalid keymap, `4` installation aborted.
 
+## Registry layouts installed by ErgoptiPlus (no sudo)
+
+The ErgoptiPlus layout manager converts a registry `.keylayout` on the device
+(`../xkb_generation/keylayout_to_xkb.py`) and installs the result with
+`user_layout_installer.py` in the user XKB tree that libxkbcommon reads first,
+`${XDG_CONFIG_HOME:-~/.config}/xkb`: `symbols/<id>`, `types/<id>`,
+`compose/<id>.XCompose`, a `rules/evdev` that starts with `! include %S/evdev`
+and appends the types rules of every installed layout (the fragment the clean
+package installs as `evdev.post`, indexed rules included), a `rules/evdev.xml`
+for the desktop pickers, and an owned block of includes in `~/.XCompose`.
+
+- It never writes a file it did not create: a manifest
+  (`.ergopti_plus_layouts.json`) lists its layouts and the rules files carry an
+  owner marker; any other existing file is a conflict (exit 3, `"code":
+  "conflict"` in the JSON report) and nothing is written.
+- Only libxkbcommon reads this tree, so it serves Wayland sessions; an X11
+  session needs the system installer above.
+- `install` compiles the layout with `xkbcli` when it is installed and reports
+  `verified`; `activate` and `uninstall` add or remove the layout in the
+  GNOME/KDE input sources through `desktop_activation.py`.
+- `ERGOPTI_XKB_USER_ROOT` and `ERGOPTI_XKB_USER_HOME` override the tree and the
+  home folder for sandboxed tests.
+
 ## Files in this directory
 
 - `install.sh`: installation entry point for downloading, selection and installation.
