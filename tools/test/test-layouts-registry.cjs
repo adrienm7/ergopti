@@ -35,7 +35,8 @@ const {
 	INDEX_PATH,
 	buildIndex,
 	validateMeta,
-	validateRegistry
+	validateRegistry,
+	validateKeylayout
 } = require('../build/build-layouts-index.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
@@ -143,6 +144,21 @@ check('every layout names its family and the Ergopti layouts are the Ergopti fam
 	const ergopti = entries.filter((e) => e.family === ergoptiFamily).map((e) => e.id).sort();
 	assert.deepStrictEqual(ergopti, ['ergopti', 'ergopti_ansi', 'ergopti_plus', 'ergopti_plus_ansi']);
 	assert.notStrictEqual(byId.get('ergol').family, ergoptiFamily, 'Ergo-L is not an Ergopti layout');
+});
+
+// macOS lists, selects and removes an installed .keylayout under the name its
+// <keyboard> element declares, so the index publishes it as the file says.
+check('every entry publishes the keyboard name its .keylayout declares', () => {
+	for (const entry of entries) {
+		const text = fs.readFileSync(path.join(REGISTRY_DIR, ...entry.file.split('/')), 'utf8');
+		const declared = /<keyboard\b[^>]*\sname="([^"]+)"/.exec(text);
+		assert.ok(declared, `${entry.id}: the .keylayout declares no keyboard name`);
+		assert.strictEqual(entry.keyboard_name, declared[1], `${entry.id}: keyboard_name differs from the file`);
+	}
+	const unnamed = Buffer.from('<keyboard group="0" id="1"><layouts><modifierMap><keyMapSet><keyMap index="0">');
+	assert.ok(validateKeylayout('unnamed', unnamed).some((e) => e.includes('declares no name')), 'a nameless layout was accepted');
+	const names = entries.map((e) => e.keyboard_name);
+	assert.strictEqual(new Set(names).size, names.length, 'two layouts would install under one input-source name');
 });
 
 check('vendored layouts are byte-identical to their upstream release asset', () => {
