@@ -29,6 +29,20 @@ _UCSch_Store(Initial := "") {
 	return Store
 }
 
+; Every updater test that arms the cadence (here, in test_updater.ahk and in the
+; admission tests) loads the check record; without this suite-wide store it
+; would read, and seed, the real HKCU Storage key of the driver running on the
+; same machine. Assigned at include time, before RunTests starts any test.
+global _UpdaterCheckStateStore := _UCSch_Store().Port
+
+_UCSch_SuiteUsesAnInMemoryRecord() {
+	global _UpdaterCheckStateStore
+	AssertTrue(_UpdaterCheckStateStore is Map, "the suite must never touch the real Storage port")
+	AssertTrue(HasMethod(_UpdaterCheckStateStore["read"], "Call")
+		&& HasMethod(_UpdaterCheckStateStore["write"], "Call"), "the suite store reads and writes")
+}
+Test("Updater schedule: the suite runs over an in-memory check record", _UCSch_SuiteUsesAnInMemoryRecord)
+
 _UCSch_Record(Store) {
 	return Store.Values.Get(UpdateSchedule_Timing()["state_storage_key"], "")
 }
