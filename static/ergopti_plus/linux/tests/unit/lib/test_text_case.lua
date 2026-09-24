@@ -1,9 +1,10 @@
---- tests/unit/infra/test_unicode_case.lua
+--- tests/unit/lib/test_text_case.lua
 
 --- ==============================================================================
---- MODULE: Unicode Case Conversion
+--- MODULE: Unicode Text Case
 --- DESCRIPTION:
---- Regression coverage for non-ASCII and multi-codepoint selection casing.
+--- Regression coverage for non-ASCII and multi-codepoint selection casing in the
+--- shared unicode_case module the macOS and Linux drivers both load.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -31,12 +32,13 @@ helpers.describe("Unicode case conversion", function()
 			"case-ignorable combining marks must not hide the surrounding letters")
 	end)
 
-	helpers.it("titlecases the first cased character after punctuation", function()
+	helpers.it("titlecases the first character after punctuation and hyphens", function()
 		helpers.assert_eq(
 			UnicodeCase.title("«ÉTÉ» STRAẞE МОСКВА"),
 			"«Été» Straße Москва"
 		)
-		helpers.assert_eq(UnicodeCase.title("ß foo-bar ǆungla"), "Ss Foo-bar ǅungla")
+		helpers.assert_eq(UnicodeCase.title("ß foo-bar ǆungla"), "Ss Foo-Bar ǅungla",
+			"a hyphen starts a word, as in Jean-Pierre")
 	end)
 
 	helpers.it("detects whether uppercase toggle should promote or demote", function()

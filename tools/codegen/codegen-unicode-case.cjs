@@ -1,17 +1,26 @@
-// tools/codegen/codegen-unicode-case-linux.cjs
+// tools/codegen/codegen-unicode-case.cjs
 
 /**
  * ==============================================================================
- * MODULE: Unicode Case Data Codegen (shared)
+ * MODULE: Unicode Case Data Codegen
  * DESCRIPTION:
  * Emits complete default Unicode upper-, lower-, and title-case mappings for the
- * Lua drivers. Lua's byte-oriented string.upper/string.lower only handle
- * ASCII, so runtime selection transforms consume this generated lookup instead.
+ * shared Lua text-case module (_shared/lua/unicode_case), which the macOS and Linux
+ * drivers both load. Lua's byte-oriented string.upper/string.lower only handle
+ * ASCII, so the selection case actions consume this generated lookup instead.
+ * Windows converts through the operating system (StrUpper / StrLower) and does
+ * not read this table.
+ *
+ * WHY ONE TABLE IN _shared:
+ * The table used to be generated for Linux alone, while macOS transformed the
+ * selection with string.upper/string.lower and left é, à and ç unchanged. One
+ * generated file loaded by both drivers leaves no second copy to drift.
  *
  * REPRODUCIBILITY:
  * ECMAScript case conversion is defined from Unicode default case conversion.
- * Node 22 is the repository CI runtime; the explicit Unicode-version guard makes
- * a future runtime data upgrade fail loudly instead of silently changing output.
+ * The repository pins its Node runtime in .node-version; the explicit
+ * Unicode-version guard makes a runtime data upgrade fail loudly instead of
+ * silently changing output.
  * ==============================================================================
  */
 
@@ -62,6 +71,7 @@ const upper = [];
 const lower = [];
 const title = [];
 const boundary = [];
+const wordSeparator = [];
 const caseIgnorable = [];
 for (let codepoint = 0; codepoint <= 0x10FFFF; codepoint++) {
 	if (codepoint >= 0xD800 && codepoint <= 0xDFFF) continue;
@@ -69,6 +79,7 @@ for (let codepoint = 0; codepoint <= 0x10FFFF; codepoint++) {
 	const uppercase = character.toUpperCase();
 	const lowercase = character.toLowerCase();
 	if (/^[\p{White_Space}\p{P}]$/u.test(character)) boundary.push(character);
+	if (/^[\p{White_Space}\p{Pd}]$/u.test(character)) wordSeparator.push(character);
 	if (/^\p{Case_Ignorable}$/u.test(character)) caseIgnorable.push(character);
 	if (uppercase !== character) {
 		upper.push([character, uppercase]);
@@ -79,10 +90,11 @@ for (let codepoint = 0; codepoint <= 0x10FFFF; codepoint++) {
 }
 
 if (upper.length < 1500 || lower.length < 1400 || title.length < 1500
-		|| boundary.length < 800 || caseIgnorable.length < 2700) {
+		|| boundary.length < 800 || wordSeparator.length < 45 || caseIgnorable.length < 2700) {
 	throw new Error(
 		`case data unexpectedly small: upper=${upper.length}, lower=${lower.length}, ` +
-		`title=${title.length}, boundary=${boundary.length}, caseIgnorable=${caseIgnorable.length}`
+		`title=${title.length}, boundary=${boundary.length}, wordSeparator=${wordSeparator.length}, ` +
+		`caseIgnorable=${caseIgnorable.length}`
 	);
 }
 if ('straße'.toUpperCase() !== 'STRASSE' || titlecaseCharacter('ß') !== 'Ss'
@@ -102,13 +114,14 @@ function quote(value) {
 const lines = [
 	'--- _shared/lua/unicode_case/data.lua',
 	'--- AUTO-GENERATED from Unicode default case conversion in Node 22.',
-	'--- DO NOT EDIT BY HAND — run `npm run codegen:unicode-case:linux` to refresh.',
+	'--- DO NOT EDIT BY HAND — run `npm run codegen:unicode-case` to refresh.',
 	'',
 	'--- ==============================================================================',
-	'--- MODULE: Unicode Case Data (shared)',
+	'--- MODULE: Unicode Case Data',
 	'--- DESCRIPTION:',
 	`--- Complete Unicode ${EXPECTED_UNICODE_VERSION} default case mappings consumed by`,
-	'--- unicode_case/init.lua. Multi-codepoint mappings are retained verbatim.',
+	'--- unicode_case/init.lua on macOS and Linux. Multi-codepoint mappings are retained',
+	'--- verbatim. word_separator (whitespace and dashes) starts a title-case word.',
 	'--- ==============================================================================',
 	'',
 	'return {',
@@ -120,12 +133,15 @@ for (const [name, rows] of [['upper', upper], ['lower', lower], ['title', title]
 	for (const [from, to] of rows) lines.push(`\t\t[${quote(from)}] = ${quote(to)},`);
 	lines.push('\t},');
 }
-lines.push('\tboundary = {');
-for (const character of boundary) lines.push(`\t\t[${quote(character)}] = true,`);
-lines.push('\t},');
-lines.push('\tcase_ignorable = {');
-for (const character of caseIgnorable) lines.push(`\t\t[${quote(character)}] = true,`);
-lines.push('\t},');
+for (const [name, characters] of [
+	['boundary', boundary],
+	['word_separator', wordSeparator],
+	['case_ignorable', caseIgnorable]
+]) {
+	lines.push(`\t${name} = {`);
+	for (const character of characters) lines.push(`\t\t[${quote(character)}] = true,`);
+	lines.push('\t},');
+}
 lines.push('}', '');
 
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
@@ -134,5 +150,6 @@ console.log(`  wrote ${path.relative(ROOT, OUT).split(path.sep).join('/')}`);
 console.log(
 	`[OK] Unicode ${EXPECTED_UNICODE_VERSION}: ${upper.length} upper, ${lower.length} lower, ` +
 	`${title.length} title mappings, ${boundary.length} word boundaries, ` +
+	`${wordSeparator.length} title-case word separators, ` +
 	`${caseIgnorable.length} case-ignorable characters.`
 );

@@ -30,7 +30,7 @@ local M = {}
 local Logger = require("logger.shim")
 local Paths  = require("infra.paths")
 local Manifest = require("infra.manifest_reader")
-local UnicodeCase = require("unicode_case")
+local TextCase = require("unicode_case")
 local TomlCodec = require("toml_codec")
 local Clipboard = require("adapters.clipboard")
 local EventLoop = require("adapters.event_loop")
@@ -167,7 +167,7 @@ local WRAP_PAIRS = load_wrap_pairs()
 function M.get_wrap_pair(ch)
 	-- One CHARACTER, not one byte: « », “ ” and the CJK brackets are pairs of
 	-- the catalogue too, and a byte test made every one of them unmatched.
-	if not UnicodeCase.is_single_character(ch) then return nil end
+	if not TextCase.is_single_character(ch) then return nil end
 	return WRAP_PAIRS[ch]
 end
 
@@ -226,10 +226,10 @@ end
 --- @return string|nil Modified character (upper-cased), or nil to pass through.
 function M.process_caps_word(ch)
 	if not _caps_word_active then return nil end
-	if not UnicodeCase.is_single_character(ch) then return nil end
+	if not TextCase.is_single_character(ch) then return nil end
 
 	-- Word boundaries: Unicode whitespace and punctuation.
-	local is_boundary = UnicodeCase.is_word_boundary(ch)
+	local is_boundary = TextCase.is_word_boundary(ch)
 
 	if is_boundary then
 		-- Word boundary reached — prepare for next word.
@@ -240,7 +240,7 @@ function M.process_caps_word(ch)
 	if not _caps_word_triggered then
 		-- First letter of new word — capitalize and disengage for this word.
 		_caps_word_triggered = true
-		local upper = UnicodeCase.upper(ch)
+		local upper = TextCase.upper(ch)
 		if upper == ch then
 			return nil  -- already uppercase, no change needed
 		end
@@ -266,24 +266,27 @@ end
 
 --- Toggles the current selection between Unicode uppercase and lowercase.
 function M.transform_uppercase()
-	return transform_selection("to_uppercase", function(selected)
-		return UnicodeCase.has_lowercase(selected)
-			and UnicodeCase.upper(selected)
-			or UnicodeCase.lower(selected)
-	end)
+	return transform_selection("to_uppercase", TextCase.toggle_upper)
 end
 
 --- Transforms the current selection to lowercase.
 function M.transform_lowercase()
-	return transform_selection("to_lowercase", UnicodeCase.lower)
+	return transform_selection("to_lowercase", TextCase.lower)
 end
 
 --- Toggles the current selection between Unicode title case and lowercase.
 function M.transform_titlecase()
-	return transform_selection("to_titlecase", function(selected)
-		local title = UnicodeCase.title(selected)
-		return selected == title and UnicodeCase.lower(selected) or title
-	end)
+	return transform_selection("to_titlecase", TextCase.toggle_title)
+end
+
+--- Transforms the current selection to uppercase, whatever its current case.
+function M.transform_to_uppercase()
+	return transform_selection("selection_uppercase", TextCase.upper)
+end
+
+--- Transforms the current selection to title case, whatever its current case.
+function M.transform_to_titlecase()
+	return transform_selection("selection_titlecase", TextCase.title)
 end
 
 --- Selects the current word under cursor (Ctrl+Shift+Left, Ctrl+Shift+Right).
@@ -309,6 +312,21 @@ function M.paste_plain()
 	end
 	local result = Injector.inject(0, text, false)
 	return type(result) == "table" and result.ok == true
+end
+
+--- The catalogue actions this module performs, by action id, for the gesture
+--- executor. The daemon injects them through modules/shortcuts/action_handlers,
+--- so a gesture or a keyboard slot runs the same code as the tray row instead
+--- of a second copy in the gesture layer.
+--- @return table { [action_id] = function(binding, parameter): boolean }
+function M.action_handlers()
+	return {
+		["uppercase_selection"] = function() return M.transform_uppercase() end,
+		["titlecase_selection"] = function() return M.transform_titlecase() end,
+		["selection_uppercase"] = function() return M.transform_to_uppercase() end,
+		["selection_lowercase"] = function() return M.transform_lowercase() end,
+		["selection_titlecase"] = function() return M.transform_to_titlecase() end,
+	}
 end
 
 -- =========================================

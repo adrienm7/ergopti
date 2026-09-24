@@ -18,7 +18,7 @@ const path = require('node:path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const WORKFLOWS = path.join(ROOT, '.github', 'workflows');
 const VERSION_FILE = path.join(ROOT, '.node-version');
-const UNICODE_GENERATOR = path.join(ROOT, 'tools', 'codegen', 'codegen-unicode-case-linux.cjs');
+const UNICODE_GENERATOR = path.join(ROOT, 'tools', 'codegen', 'codegen-unicode-case.cjs');
 const errors = [];
 
 const pinnedVersion = fs.readFileSync(VERSION_FILE, 'utf8').trim();
@@ -56,7 +56,7 @@ const generatorSource = fs.readFileSync(UNICODE_GENERATOR, 'utf8');
 const expectedUnicode =
 	(generatorSource.match(/EXPECTED_UNICODE_VERSION\s*=\s*['"]([^'"]+)['"]/) ?? [])[1] ?? '';
 if (!expectedUnicode) {
-	errors.push('the Linux Unicode generator no longer declares its reviewed Unicode version');
+	errors.push('the Unicode case generator no longer declares its reviewed Unicode version');
 }
 if (process.version !== `v${pinnedVersion}`) {
 	errors.push(`the active Node ${process.version} does not match the repository pin v${pinnedVersion}`);

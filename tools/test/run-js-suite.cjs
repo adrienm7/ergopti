@@ -279,6 +279,7 @@ const CHECKS = [
 	{ name: 'hotstring colour presets identical on macOS and Linux', cmd: 'node', args: ['tools/test/test-color-presets-parity.cjs'], repro: 'node tools/test/test-color-presets-parity.cjs' },
 	{ name: 'prompt editor bridge (shared frontend ↔ Windows host)', cmd: 'node', args: ['tools/test/test-prompt-editor-bridge.cjs'], repro: 'node tools/test/test-prompt-editor-bridge.cjs' },
 	{ name: 'action picker bridge (shared frontend ↔ both hosts)', cmd: 'node', args: ['tools/test/test-action-picker-bridge.cjs'], repro: 'node tools/test/test-action-picker-bridge.cjs' },
+	{ name: 'the selection case actions share one text-case corpus that every driver suite replays', cmd: 'node', args: ['tools/test/test-text-case-vectors-shared.cjs'], repro: 'npm run test:text-case-vectors-shared' },
 	{ name: 'action picker greys a host-disabled row with its reason and never confirms it', cmd: 'node', args: ['tools/test/test-action-picker-disabled-rows.cjs'], repro: 'npm run test:action-picker-disabled-rows' },
 	{ name: 'file-path headers (convention 3, every source file names itself)', cmd: 'node', args: ['tools/lint/audit-file-headers.cjs'], repro: 'node tools/lint/audit-file-headers.cjs' },
 	{ name: 'window titles (Gui/windowTitle carry the "ErgoptiPlus" prefix)', cmd: 'node', args: ['tools/lint/audit-gui-titles.cjs'], repro: 'node tools/lint/audit-gui-titles.cjs' },

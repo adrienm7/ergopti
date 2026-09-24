@@ -1805,9 +1805,11 @@ local function main()
 
 	-- 8.10c) Initialise the gestures manager (trackpad/mouse gesture recognition).
 	if gestures then
+		-- Required here, not at file scope: main() sits near LuaJIT's 60-upvalue limit.
+		local ActionHandlers = require("modules.shortcuts.action_handlers")
 		gestures.init({
 			persist = true,
-			action_handlers = script_actions.handlers,
+			action_handlers = ActionHandlers.compose(script_actions.handlers, shortcuts),
 			is_paused = script_actions.is_paused,
 		})
 		Logger.info(LOG, "Gestures manager initialised.")

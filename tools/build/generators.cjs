@@ -125,7 +125,7 @@ const GENERATORS = [
 		]
 	},
 	{
-		script: 'codegen/codegen-unicode-case-linux.cjs',
+		script: 'codegen/codegen-unicode-case.cjs',
 		outputs: ['static/ergopti_plus/_shared/lua/unicode_case/data.lua']
 	},
 	{

@@ -70,28 +70,19 @@ _GSBlk_PollCancelsStaleContexts() {
 Test("hotstring_engine: selection poll cancels stale contexts (getselection-blocks-and-eats-keys)",
 	_GSBlk_PollCancelsStaleContexts)
 
-; The four case-conversion actions must use async capture and their completion
-; functions must no-op on an empty/failed capture.
+; The case-conversion actions share one async completion function, which must
+; no-op on an empty/failed capture.
 _GSBlk_CaseChordsNoOpOnEmpty() {
-	WinSrc := _GSBlk_ReadSource("modules/shortcuts/win.ahk")
-	GestSrc := _DriverDirConcat("modules/gestures")
 	EmptyGuard := "if (Text = " . Chr(34) . Chr(34) . ")"
+	Seg := _DriverFuncBody("_GestureSendTransformedSelection")
+	Assert(Seg != "", "_GestureSendTransformedSelection must exist")
+	Assert(InStr(Seg, EmptyGuard) > 0,
+		"the case actions must no-op on an empty selection (no stale SendInstant)")
 
-	UpperSeg := _DriverFuncBody("_ConvertToUppercaseSelection")
-	Assert(InStr(UpperSeg, EmptyGuard) > 0,
-		"ConvertToUppercase must no-op on an empty selection (no stale SendInstant)")
-
-	TitleSeg := _DriverFuncBody("_ConvertToTitleCaseSelection")
-	Assert(InStr(TitleSeg, EmptyGuard) > 0,
-		"ConvertToTitleCase must no-op on an empty selection (no stale SendInstant)")
-
-	GUpperSeg := _DriverFuncBody("_GestureToggleUppercaseSelection")
-	Assert(InStr(GUpperSeg, EmptyGuard) > 0,
-		"GestureToggleUppercase must no-op on an empty selection (no stale SendInstant)")
-
-	GTitleSeg := _DriverFuncBody("_GestureToggleTitleCaseSelection")
-	Assert(InStr(GTitleSeg, EmptyGuard) > 0,
-		"GestureToggleTitleCase must no-op on an empty selection (no stale SendInstant)")
+	; Behavioural half: an empty capture never reaches the transform.
+	Called := false
+	_GestureSendTransformedSelection("", (Text) => (Called := true, Text))
+	Assert(!Called, "an empty capture must not be transformed nor pasted")
 }
 Test("hotstring_engine: async case-conversion callbacks no-op on empty selection (getselection-blocks-and-eats-keys)",
 	_GSBlk_CaseChordsNoOpOnEmpty)

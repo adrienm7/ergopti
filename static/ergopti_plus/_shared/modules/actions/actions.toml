@@ -774,11 +774,26 @@ parameter = "search_url"
 # warping the pointer, and Wayland intentionally forbids global pointer moves.
 platform = "ahk,hs"
 
+# The case actions share one rule on every driver, pinned by the corpus
+# _shared/tests/corpus/text_case/vectors.json that the three suites replay:
+# macOS and Linux read the generated Unicode table of _shared/lua/text_case,
+# Windows converts through StrUpper / StrLower (infra/text_case.ahk). The two
+# *_selection ids toggle (a second press undoes the first); the three
+# selection_* ids convert whatever the current case.
 [sg_actions.uppercase_selection]
-platform = "ahk"
+platform = "all"
 
 [sg_actions.titlecase_selection]
-platform = "ahk"
+platform = "all"
+
+[sg_actions.selection_uppercase]
+platform = "all"
+
+[sg_actions.selection_lowercase]
+platform = "all"
+
+[sg_actions.selection_titlecase]
+platform = "all"
 
 [sg_actions.spotlight_mouse]
 # Implemented on BOTH: Windows in modules/shortcuts, macOS in
@@ -1164,6 +1179,13 @@ items = [
     "sel_word_prev",
     "sel_word_next",
     "--",
+    "##text_transform",
+    "selection_uppercase",
+    "selection_lowercase",
+    "selection_titlecase",
+    "uppercase_selection",
+    "titlecase_selection",
+    "--",
     "#modifier_chords",
     "_modifier_chords_placeholder",
     "--",
@@ -1205,8 +1227,6 @@ items = [
     "surround_parens",
     "search_web",
     "teleport_mouse",
-    "uppercase_selection",
-    "titlecase_selection",
     "spotlight_mouse",
     "toggle_capslock",
     "microsoft_bold",
