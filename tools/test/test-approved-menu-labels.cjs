@@ -36,7 +36,9 @@ const APPROVED = {
 	'changelog_window.window_title': { fr: 'Versions', en: 'Releases' },
 	'updater.title_changelog': { fr: 'ErgoptiPlus — Versions', en: 'ErgoptiPlus — Releases' },
 	// App Cloner duplicates one application at a time.
-	'menu.apps.clone_desc': { fr: 'Dupliquer une application', en: 'Duplicate an app' }
+	'menu.apps.clone_desc': { fr: 'Dupliquer une application', en: 'Duplicate an app' },
+	// The header over the input sources macOS has enabled.
+	'menu.layout.active_layouts': { fr: 'Sources de saisie', en: 'Input sources' }
 };
 
 const errors = [];

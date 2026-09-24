@@ -932,7 +932,7 @@
 	"menu.gestures.reading_off": "libinput-læsning: fra",
 	"menu.keyboard_layout.add_ergopti": "➕ Tilføj Ergopti v%s til layoutliste",
 	"menu.keyboard_layout.open_system_prefs": "Åbn Systemindstillinger → Tastatur",
-	"menu.layout.active_layouts": "Aktive layouts",
+	"menu.layout.active_layouts": "Inputkilder",
 	"menu.layout.header_any": "Alle layouts",
 	"menu.layout.header_ergopti": "Ergopti-layout",
 	"menu.layout.add_fail": "Tilføjelse mislykkedes — se konsol.",

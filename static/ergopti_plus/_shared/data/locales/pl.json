@@ -932,7 +932,7 @@
 	"menu.gestures.reading_off": "Odczyt libinput: wyłączony",
 	"menu.keyboard_layout.add_ergopti": "➕ Dodaj Ergopti v%s do listy układów",
 	"menu.keyboard_layout.open_system_prefs": "Otwórz Preferencje systemowe → Klawiatura",
-	"menu.layout.active_layouts": "Aktywne układy",
+	"menu.layout.active_layouts": "Źródła wprowadzania",
 	"menu.layout.header_any": "Wszystkie układy",
 	"menu.layout.header_ergopti": "Układ Ergopti",
 	"menu.layout.add_fail": "Dodawanie nie powiodło się — sprawdź konsolę.",

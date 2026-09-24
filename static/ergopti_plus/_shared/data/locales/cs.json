@@ -932,7 +932,7 @@
 	"menu.gestures.reading_off": "Čtení libinput: vypnuto",
 	"menu.keyboard_layout.add_ergopti": "➕ Přidat Ergopti v%s do seznamu rozložení",
 	"menu.keyboard_layout.open_system_prefs": "Otevřít Systémové předvolby → Klávesnice",
-	"menu.layout.active_layouts": "Aktivní rozložení",
+	"menu.layout.active_layouts": "Vstupní zdroje",
 	"menu.layout.header_any": "Všechna rozložení",
 	"menu.layout.header_ergopti": "Rozložení Ergopti",
 	"menu.layout.add_fail": "Přidání selhalo — viz konzole.",

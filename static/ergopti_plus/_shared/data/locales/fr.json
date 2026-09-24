@@ -927,7 +927,7 @@
 	"menu.gestures.reading_off": "Lecture libinput : inactive",
 	"menu.keyboard_layout.add_ergopti": "➕ Ajouter Ergopti v%s à la liste des dispositions",
 	"menu.keyboard_layout.open_system_prefs": "Ouvrir Préférences Système → Clavier",
-	"menu.layout.active_layouts": "Dispositions actives",
+	"menu.layout.active_layouts": "Sources de saisie",
 	"menu.layout.header_any": "Toutes dispositions",
 	"menu.layout.header_ergopti": "Disposition Ergopti",
 	"menu.layout.add_fail": "Échec de l'ajout — voir la console.",

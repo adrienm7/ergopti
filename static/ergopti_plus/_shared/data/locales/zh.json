@@ -932,7 +932,7 @@
 	"menu.gestures.reading_off": "libinput 读取：关",
 	"menu.keyboard_layout.add_ergopti": "➕ 将 Ergopti v%s 添加到布局列表",
 	"menu.keyboard_layout.open_system_prefs": "打开系统偏好设置 → 键盘",
-	"menu.layout.active_layouts": "已激活的布局",
+	"menu.layout.active_layouts": "输入法",
 	"menu.layout.header_any": "所有布局",
 	"menu.layout.header_ergopti": "Ergopti 布局",
 	"menu.layout.add_fail": "添加失败——请查看控制台。",

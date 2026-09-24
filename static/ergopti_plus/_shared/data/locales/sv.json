@@ -932,7 +932,7 @@
 	"menu.gestures.reading_off": "libinput-läsning: av",
 	"menu.keyboard_layout.add_ergopti": "➕ Lägg till Ergopti v%s i layoutlistan",
 	"menu.keyboard_layout.open_system_prefs": "Öppna Systeminställningar → Tangentbord",
-	"menu.layout.active_layouts": "Aktiva layouter",
+	"menu.layout.active_layouts": "Inmatningskällor",
 	"menu.layout.header_any": "Alla layouter",
 	"menu.layout.header_ergopti": "Ergopti-layout",
 	"menu.layout.add_fail": "Tillägg misslyckades — se konsolen.",

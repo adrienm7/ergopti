@@ -932,7 +932,7 @@
 	"menu.gestures.reading_off": "libinput 読み取り：オフ",
 	"menu.keyboard_layout.add_ergopti": "➕ Ergopti v%s をレイアウトリストに追加",
 	"menu.keyboard_layout.open_system_prefs": "システム環境設定 → キーボードを開く",
-	"menu.layout.active_layouts": "有効なレイアウト",
+	"menu.layout.active_layouts": "入力ソース",
 	"menu.layout.header_any": "すべての配列",
 	"menu.layout.header_ergopti": "Ergopti 配列",
 	"menu.layout.add_fail": "追加に失敗しました — コンソールを確認してください。",

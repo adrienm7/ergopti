@@ -859,6 +859,14 @@
 			]
 		},
 		{
+			"type": "section_header",
+			"i18n": "menu.layout.active_layouts",
+			"platforms": [
+				"hs"
+			],
+			"reason_key": "platform_reason.layout_bundle_and_menubar_are_macos"
+		},
+		{
 			"type": "list",
 			"id": "active_layouts",
 			"platforms": [
