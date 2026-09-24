@@ -81,7 +81,7 @@ _LLM_Menu_RestoreSavedOptsOnce(saved_opts) {
 	for key in ["nav_modifiers", "val_modifiers"] {
 		if !LLM_Menu_IsValidModifierString(_LLM_Menu[key]) {
 			LoggerError("LLM", "Ignoring invalid persisted {1} value: '{2}'.", key, _LLM_Menu[key])
-			_LLM_Menu[key] := (key == "val_modifiers") ? "alt" : ""
+			_LLM_Menu[key] := LLM_Defaults_ModifierString("llm_" . key)
 		}
 	}
 	for key in _num_keys {
