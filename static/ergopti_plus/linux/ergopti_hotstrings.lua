@@ -1562,7 +1562,8 @@ local function main()
 						webview_manager.set_daemon_state({
 							engine = engine, keylogger = keylogger,
 							config = hotstrings_config, llm = prediction_engine,
-							gestures = gestures, dyn_hotstrings = dyn_hotstrings, magic_key = MagicKey,
+							gestures = gestures, shortcuts = shortcuts,
+							dyn_hotstrings = dyn_hotstrings, magic_key = MagicKey,
 							input_capture_gate = input_capture_gate,
 							is_paused = script_actions.is_paused,
 							layout = new_layout,
@@ -1869,6 +1870,7 @@ local function main()
 			config    = hotstrings_config,
 			llm       = prediction_engine,
 			gestures  = gestures,
+			shortcuts = shortcuts,
 			dyn_hotstrings = dyn_hotstrings,
 			magic_key = MagicKey,
 			input_capture_gate = input_capture_gate,
