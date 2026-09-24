@@ -413,8 +413,6 @@ _MI_StageDebug() {
 ; everything else. Linux has rendered this same array for weeks.
 _MI_BuildGlobalActionsMenu() {
 	Commands := Map(
-		"enable_all",     ToggleAllFeaturesOn,
-		"disable_all",    ToggleAllFeaturesOff,
 		"reset_defaults", ReloadWithDefaultConfig,
 		"clean_unused_keys", ShowUnusedConfigKeysCleanup,
 		"uninstall", ShowUninstallErgopti,

@@ -22,7 +22,7 @@
 ; =========================================
 
 _CTFP_CategoryProducersRetainBooleanIntent() {
-	for Name in ["ToggleAllFeatures", "ToggleAllHotstrings", "ToggleCategoryAllFeatures",
+	for Name in ["ToggleAllHotstrings", "ToggleCategoryAllFeatures",
 		"ToggleCategoryAllSections", "HS_TogglePersonalAllSections", "_ConfigCollectFullSaveUpdates"] {
 		Body := _StripFullLineComments(_DriverFuncBody(Name))
 		Assert(Body != "", "category producer must exist: " . Name)

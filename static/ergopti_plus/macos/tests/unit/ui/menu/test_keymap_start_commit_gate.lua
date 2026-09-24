@@ -77,7 +77,9 @@ helpers.describe("menu keymap lifecycle: strict start commitment", function()
 			{ marker = "function M.build_custom", expected = 3, label = "custom hotstrings" },
 			{ marker = "function M.schedule_pause_layout_switch", expected = 1, label = "layout menu" },
 			{ marker = "function M.sync_state_to_modules", expected = 1, label = "state synchronization" },
-			{ marker = "local function bind_managed_hotkey", expected = 1, label = "enable-all action" },
+			-- The menu root (ui/menu/init.lua) starts nothing any more: its one entry
+			-- point, the global « Tout activer », was retired on every driver.
+			{ marker = "local function bind_managed_hotkey", expected = 0, label = "menu root" },
 		}
 		for _, unit in ipairs(units) do
 			local source, err = helpers.read_driver_unit(unit.marker)

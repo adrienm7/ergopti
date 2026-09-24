@@ -5,10 +5,10 @@
 ; DESCRIPTION:
 ; Validates that flattening the in-memory Features tree back into TOML
 ; {section, key, value} writes puts every leaf in the ONE section the loader
-; will read it back from. Covers both call sites that flatten Features:
-; _CollectFeatureUpdates (SaveFullConfig, the boot-time full-config flush) and
-; _CollectFeatureFlipUpdates (ToggleAllFeatures, the tray menu's
-; "Tout activer"/"Tout desactiver").
+; will read it back from. Covers the call site that flattens Features:
+; _CollectFeatureUpdates (SaveFullConfig, the boot-time full-config flush). The
+; second one, the bulk flip behind the retired « Tout activer » / « Tout
+; désactiver » rows, is gone with them.
 ;
 ; ROOT CAUSE:
 ; A leaf written to TWO sections is the defect. TOML_BatchWrite sorts sections
@@ -185,70 +185,3 @@ _CFP_CollectFeatureUpdates_SectionsAreLoadable() {
 }
 Test("config_io: every section _CollectFeatureUpdates emits is loadable back",
 	_CFP_CollectFeatureUpdates_SectionsAreLoadable)
-
-
-
-
-; ==============================================================================
-; ==============================================================================
-; ======= 3/ _CollectFeatureFlipUpdates (ToggleAllFeatures path) ==============
-; ==============================================================================
-; ==============================================================================
-
-; Mirrors ToggleAllFeatures's own top-level loop, without ever calling
-; ToggleAllFeatures itself -- ToggleAllFeatures ends with an unconditional
-; Reload(), which would tear down the headless test runner (see
-; tests/meta/test_updater_setchannel_cancels_async.ahk for the same
-; constraint). _CollectFeatureFlipUpdates is a plain module function (not a
-; nested closure), so it is directly reachable here.
-_CFP_RunAllFeaturesFlip(Bool, Fixture) {
-	Updates := []
-	for TopKey, TopVal in Fixture {
-		if (Type(TopVal) == "Map")
-			_CollectFeatureFlipUpdates(Bool, TopKey, TopVal, Updates)
-	}
-	return Updates
-}
-
-_CFP_ToggleAllFeatures_SectionsMatchNesting() {
-	ManifestEnsureLoaded()
-	Updates := _CFP_RunAllFeaturesFlip(false, _CFP_Fixture())
-
-	AssertTrue(_CFP_HasUpdate(Updates, "layout", "ergopti_base", false),
-		"ToggleAllFeatures must write layout.ergopti_base to [layout]")
-	AssertTrue(_CFP_HasUpdate(Updates, "shortcuts.personal", "laptop_broken_key", false),
-		"ToggleAllFeatures must write shortcuts.personal.laptop_broken_key to [shortcuts.personal]")
-	AssertTrue(_CFP_HasUpdate(Updates, "category_enabled", "hotstrings", false),
-		"ToggleAllFeatures must write category_enabled.hotstrings to [category_enabled]")
-	; "gestures" is itself alpha-shaped (carries "enabled" alongside action
-	; strings), so the flip walker's alpha branch fires and flips ONLY "enabled".
-	AssertTrue(_CFP_HasUpdate(Updates, "gestures", "enabled", false),
-		"ToggleAllFeatures must write gestures.enabled to [gestures]")
-
-	; Same reasoning as the SaveFullConfig path: the whole emission, so a second
-	; section for an already-covered leaf cannot hide behind a passing spot check.
-	; "gestures" and "shortcuts.gpt" both stop at their own "enabled" (the alpha
-	; branch), which is why swipe_3_down and link do not appear here.
-	Expected := "category_enabled|hotstrings`n"
-		. "gestures|enabled`n"
-		. "layout|ergopti_base`n"
-		. "shortcuts.gpt|enabled`n"
-		. "shortcuts.personal|laptop_broken_key`n"
-		. "shortcuts|microsoft_bold"
-	AssertEqual(Expected, _CFP_Emission(Updates),
-		"the flip walker must produce exactly these 6 section|key writes")
-}
-Test("config_io: ToggleAllFeatures's flip walker writes each leaf to its walked section",
-	_CFP_ToggleAllFeatures_SectionsMatchNesting)
-
-_CFP_ToggleAllFeatures_MutatesFixtureInPlace() {
-	; The flip walker must still mutate Features nodes in place (the in-memory
-	; state the rest of the driver reads) in addition to collecting the writes.
-	Fixture := _CFP_Fixture()
-	_CFP_RunAllFeaturesFlip(true, Fixture)
-	AssertEqual(true, Fixture["layout"]["ergopti_base"])
-	AssertEqual(true, Fixture["gestures"]["enabled"])
-	AssertEqual(true, Fixture["shortcuts"]["microsoft_bold"])
-}
-Test("config_io: ToggleAllFeatures's flip walker still mutates Features in place",
-	_CFP_ToggleAllFeatures_MutatesFixtureInPlace)

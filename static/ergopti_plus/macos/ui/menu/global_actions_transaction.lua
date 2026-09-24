@@ -3,9 +3,15 @@
 --- ==============================================================================
 --- MODULE: Global Menu Actions Transaction
 --- DESCRIPTION:
---- Owns Enable All, Disable All, and factory reset across live feature state, configurable
---- bindings, preferences, settings, recoverable files, Karabiner deployment,
---- and the controlled reload handoff.
+--- Owns the factory reset across live feature state, configurable bindings,
+--- preferences, settings, recoverable files, Karabiner deployment, and the
+--- controlled reload handoff, plus the admission fence every other global
+--- writer (Quit, the manual reload) runs under.
+---
+--- The reset is the one transaction left. Enable All and Disable All were two
+--- more kinds of it until they were retired from every driver: each category
+--- has its own switch, and an empty configuration already starts with every
+--- input-altering feature off.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Single Journal: Every attempted synchronous mutation is journaled before
@@ -52,21 +58,14 @@ local function deep_equal(left, right)
 	return true
 end
 
---- Creates one session owner for both destructive global actions.
+--- Creates the session owner of the factory reset and the global writer fence.
 --- @param deps table Exact runtime, persistence, settings, file, and reload ports.
 --- @return table|nil owner
 function M.create(deps)
 	if type(deps) ~= "table" or type(deps.state) ~= "table"
 		or type(deps.capture_preferences) ~= "function"
 		or type(deps.sync_runtime) ~= "function"
-		or type(deps.save_preferences) ~= "function"
-		or type(deps.detach_demotions) ~= "function"
-		or type(deps.readopt_demotions) ~= "function"
 		or type(deps.restore_state) ~= "function"
-		or type(deps.ensure_enable_ready) ~= "function"
-		or type(deps.apply_enable_features) ~= "function"
-		or type(deps.restore_enable_features) ~= "function"
-		or type(deps.list_enable_terminators) ~= "function"
 		or type(deps.settings) ~= "table"
 		or type(deps.settings.get) ~= "function"
 		or type(deps.settings.set) ~= "function"
@@ -86,9 +85,6 @@ function M.create(deps)
 		or type(deps.gestures.enable_all) ~= "function"
 		or type(deps.gestures.disable_all) ~= "function"
 		or type(deps.shortcuts) ~= "table"
-		or type(deps.shortcuts.list_shortcuts) ~= "function"
-		or type(deps.shortcuts.enable) ~= "function"
-		or type(deps.shortcuts.disable) ~= "function"
 		or type(deps.shortcuts.set_shortcut_action) ~= "function"
 		or type(deps.shortcuts.get_keyboard_action) ~= "function"
 		or type(deps.shortcuts.set_keyboard_action) ~= "function"
@@ -96,9 +92,6 @@ function M.create(deps)
 		or type(deps.karabiner) ~= "table"
 		or type(deps.karabiner.snapshot_settings) ~= "function"
 		or type(deps.karabiner.reset_to_defaults) ~= "function"
-		or type(deps.karabiner.get_tap_holds_enabled) ~= "function"
-		or type(deps.karabiner.set_tap_holds_enabled) ~= "function"
-		or type(deps.karabiner.regenerate) ~= "function"
 		or type(deps.karabiner.restore_settings) ~= "function"
 		or type(deps.request_reload) ~= "function"
 		or type(deps.terminal_pending) ~= "function" then
@@ -132,24 +125,6 @@ function M.create(deps)
 			return false
 		end
 		return true
-	end
-
-	--- Publishes an Enable All or Disable All candidate. It sets every feature
-	--- explicitly, so no session demotion may keep substituting its saved value;
-	--- the transaction keeps the detached demotions for its inverse.
-	--- @param transaction table Active enable or disable transaction.
-	--- @return boolean committed
-	local function publish_candidate_preferences(transaction)
-		if transaction.detached_demotions == nil then
-			local detached = deps.detach_demotions()
-			if type(detached) ~= "table" then
-				Logger.error(LOG, "Global %s could not detach the session demotions.",
-					transaction.kind)
-				return false
-			end
-			transaction.detached_demotions = detached
-		end
-		return deps.save_preferences()
 	end
 
 	--- Reads one settings value without collapsing a native error into nil.
@@ -240,27 +215,13 @@ function M.create(deps)
 				kind, tostring(preference_snapshot))
 			return nil
 		end
-		local karabiner_snapshot = {}
-		if kind == "reset" then
-			local karabiner_ok
-			karabiner_ok, karabiner_snapshot = xpcall(
-				deps.karabiner.snapshot_settings,
-				debug.traceback
-			)
-			if not karabiner_ok or type(karabiner_snapshot) ~= "table" then
-				Logger.error(LOG, "Global %s Karabiner snapshot failed: %s.",
-					kind, tostring(karabiner_snapshot))
-				return nil
-			end
-		end
-
-		local tap_holds_ok, tap_holds_enabled = xpcall(
-			deps.karabiner.get_tap_holds_enabled,
+		local karabiner_ok, karabiner_snapshot = xpcall(
+			deps.karabiner.snapshot_settings,
 			debug.traceback
 		)
-		if not tap_holds_ok or type(tap_holds_enabled) ~= "boolean" then
-			Logger.error(LOG, "Global %s Tap-Holds snapshot failed: %s.",
-				kind, tostring(tap_holds_enabled))
+		if not karabiner_ok or type(karabiner_snapshot) ~= "table" then
+			Logger.error(LOG, "Global %s Karabiner snapshot failed: %s.",
+				kind, tostring(karabiner_snapshot))
 			return nil
 		end
 
@@ -274,60 +235,13 @@ function M.create(deps)
 			gesture_snapshot[slot] = action
 		end
 
-		local shortcut_snapshot = {}
-		if kind == "enable" then
-			local list_ok, listed = xpcall(shortcuts.list_shortcuts, debug.traceback)
-			if not list_ok or type(listed) ~= "table" then
-				Logger.error(LOG, "Named shortcut snapshot failed: %s.", tostring(listed))
-				return nil
-			end
-			for _, shortcut in ipairs(listed) do
-				if type(shortcut) == "table" and type(shortcut.id) == "string" then
-					shortcut_snapshot[#shortcut_snapshot + 1] = {
-						id = shortcut.id,
-						enabled = shortcut.enabled == true,
-					}
-				end
-			end
-			table.sort(shortcut_snapshot, function(left, right) return left.id < right.id end)
-		end
-
-		local keyboard_snapshot = {}
-		if kind == "reset" then
-			keyboard_snapshot = capture_keyboard_slots()
-			if not keyboard_snapshot then return nil end
-		end
+		local keyboard_snapshot = capture_keyboard_slots()
+		if not keyboard_snapshot then return nil end
 		local reset_settings = {}
-		if kind == "reset" then
-			for _, key in ipairs(RESET_SETTING_KEYS) do
-				local setting_ok, value = read_setting(key)
-				if not setting_ok then return nil end
-				reset_settings[#reset_settings + 1] = { key = key, value = value }
-			end
-		end
-		local enable_terminators = {}
-		if kind == "enable" then
-			local terminators_ok, listed_terminators = xpcall(
-				deps.list_enable_terminators,
-				debug.traceback
-			)
-			if not terminators_ok or type(listed_terminators) ~= "table" then
-				Logger.error(LOG, "Enable All terminator snapshot failed: %s.",
-					tostring(listed_terminators))
-				return nil
-			end
-			local seen_terminators = {}
-			for _, key in ipairs(listed_terminators) do
-				if type(key) ~= "string" or key == "" then
-					Logger.error(LOG, "Enable All terminator snapshot contained an invalid key.")
-					return nil
-				end
-				if not seen_terminators[key] then
-					seen_terminators[key] = true
-					enable_terminators[#enable_terminators + 1] = key
-				end
-			end
-			table.sort(enable_terminators)
+		for _, key in ipairs(RESET_SETTING_KEYS) do
+			local setting_ok, value = read_setting(key)
+			if not setting_ok then return nil end
+			reset_settings[#reset_settings + 1] = { key = key, value = value }
 		end
 
 		return {
@@ -336,91 +250,16 @@ function M.create(deps)
 			preference_snapshot = clone_value(preference_snapshot),
 			gesture_snapshot = gesture_snapshot,
 			script_snapshot = clone_value(state.script_control_shortcuts or {}),
-			shortcut_snapshot = shortcut_snapshot,
 			keyboard_snapshot = keyboard_snapshot,
 			reset_settings = reset_settings,
-			enable_terminators = enable_terminators,
 			reset_paths = clone_value(deps.reset_paths or {}),
 			karabiner_snapshot = clone_value(karabiner_snapshot),
-			tap_holds_enabled = tap_holds_enabled,
 			journal = {},
 			rollback_index = 0,
 			karabiner_attempted = false,
 			karabiner_restored = false,
 			settled = false,
 		}
-	end
-
-	--- Mutates the shared state and detached preference candidate to Enable All.
-	--- @param transaction table Active transaction.
-	local function mutate_enable_state(transaction)
-		state.keymap = true
-		state.gestures = true
-		state.shortcuts = true
-		state.llm_enabled = true
-		state.keylogger_enabled = true
-		state.script_control_enabled = true
-		if state.personal_info ~= nil then state.personal_info = true end
-		for name in pairs(state.hotstrings or {}) do state.hotstrings[name] = true end
-		for key in pairs(state.terminator_states or {}) do state.terminator_states[key] = true end
-		for _, key in ipairs(transaction.enable_terminators) do
-			state.terminator_states[key] = true
-		end
-		state.preview_star_enabled = true
-		state.preview_autocorrect_enabled = true
-		state.preview_ai_enabled = true
-
-		local candidate = clone_value(transaction.preference_snapshot)
-		for _, key in ipairs({
-			"keymap", "gestures", "shortcuts", "llm_enabled", "keylogger_enabled",
-			"script_control_enabled", "personal_info", "preview_star_enabled",
-			"preview_autocorrect_enabled", "preview_ai_enabled",
-		}) do
-			if state[key] ~= nil then candidate[key] = state[key] end
-		end
-		candidate.hotstrings = clone_value(state.hotstrings or {})
-		candidate.terminator_states = clone_value(state.terminator_states or {})
-		for _, sections in pairs(candidate.section_states or {}) do
-			if type(sections) == "table" then
-				for section in pairs(sections) do sections[section] = true end
-			end
-		end
-		candidate.shortcut_keys = {}
-		for _, shortcut in ipairs(transaction.shortcut_snapshot) do
-			candidate.shortcut_keys[shortcut.id] = true
-		end
-		transaction.candidate_preferences = candidate
-	end
-
-	--- Mutates the shared state table to the Disable All candidate.
-	--- Only the feature switches move, exactly like a pause: every per-slot
-	--- assignment (gesture actions, script-control keys, named and keyboard
-	--- shortcuts, terminators, tap-hold bindings) stays as configured, so Enable
-	--- All or a per-feature toggle brings the user's own configuration back. The
-	--- script-control keys are left alone because they are how a user resumes.
-	--- @param transaction table Active transaction.
-	local function mutate_disable_state(transaction)
-		state.keymap = false
-		state.gestures = false
-		state.shortcuts = false
-		state.llm_enabled = false
-		state.keylogger_enabled = false
-		if state.personal_info ~= nil then state.personal_info = false end
-		for name in pairs(state.hotstrings or {}) do state.hotstrings[name] = false end
-		state.preview_star_enabled = false
-		state.preview_autocorrect_enabled = false
-		state.preview_ai_enabled = false
-
-		local candidate = clone_value(transaction.preference_snapshot)
-		for _, key in ipairs({
-			"keymap", "gestures", "shortcuts", "llm_enabled", "keylogger_enabled",
-			"personal_info", "preview_star_enabled", "preview_autocorrect_enabled",
-			"preview_ai_enabled",
-		}) do
-			if state[key] ~= nil then candidate[key] = state[key] end
-		end
-		candidate.hotstrings = clone_value(state.hotstrings or {})
-		transaction.candidate_preferences = candidate
 	end
 
 	--- Mutates only reset-time binding state while config files remain recoverable.
@@ -434,38 +273,15 @@ function M.create(deps)
 		transaction.candidate_preferences.gesture_actions = clone_value(gesture_defaults)
 	end
 
-	--- Applies every state-backed runtime binding and optional config publication.
+	--- Applies every state-backed runtime binding.
 	--- @param transaction table Active transaction.
 	--- @return boolean committed
 	local function apply_state_runtime(transaction)
-		if transaction.kind == "disable" then
-			mutate_disable_state(transaction)
-		elseif transaction.kind == "enable" then
-			if call_exact("Enable All keymap preflight", deps.ensure_enable_ready) ~= true then
-				return false
-			end
-			mutate_enable_state(transaction)
-		else
-			mutate_reset_state(transaction)
-		end
-		if transaction.kind == "enable" then
-			if call_exact("Gesture master enable", gestures.enable_all) ~= true then return false end
-			for _, shortcut in ipairs(transaction.shortcut_snapshot) do
-				if call_exact(
-					"Named shortcut enable '" .. shortcut.id .. "'",
-					shortcuts.enable,
-					shortcut.id
-				) ~= true then return false end
-			end
-		end
+		mutate_reset_state(transaction)
 		if call_exact("Global runtime synchronization", deps.sync_runtime,
 			transaction.candidate_preferences, false) ~= true then return false end
-		if transaction.kind == "disable"
-			and call_exact("Gesture master disable", gestures.disable_all) ~= true then
-			return false
-		end
 
-		for _, slot in ipairs(transaction.kind == "reset" and gesture_slots or {}) do
+		for _, slot in ipairs(gesture_slots) do
 			local target = gesture_defaults[slot]
 			if type(target) ~= "string" or call_exact(
 				"Gesture setter '" .. tostring(slot) .. "'",
@@ -474,7 +290,7 @@ function M.create(deps)
 				target
 			) ~= true then return false end
 		end
-		for _, slot in ipairs(transaction.kind == "reset" and SCRIPT_SLOTS or {}) do
+		for _, slot in ipairs(SCRIPT_SLOTS) do
 			local target = script_defaults[slot]
 			if type(target) ~= "string" or call_exact(
 				"Script-control setter '" .. slot .. "'",
@@ -497,15 +313,7 @@ function M.create(deps)
 		local gesture_master = transaction.state_snapshot.gestures == true
 			and gestures.enable_all or gestures.disable_all
 		if call_exact("Gesture master inverse", gesture_master) ~= true then return false end
-		for _, shortcut in ipairs(transaction.shortcut_snapshot) do
-			local method = shortcut.enabled and shortcuts.enable or shortcuts.disable
-			if call_exact(
-				"Named shortcut inverse '" .. shortcut.id .. "'",
-				method,
-				shortcut.id
-			) ~= true then return false end
-		end
-		for _, slot in ipairs(transaction.kind == "reset" and gesture_slots or {}) do
+		for _, slot in ipairs(gesture_slots) do
 			if call_exact(
 				"Gesture inverse '" .. tostring(slot) .. "'",
 				gestures.set_action,
@@ -513,26 +321,13 @@ function M.create(deps)
 				transaction.gesture_snapshot[slot]
 			) ~= true then return false end
 		end
-		for _, slot in ipairs(transaction.kind == "reset" and SCRIPT_SLOTS or {}) do
+		for _, slot in ipairs(SCRIPT_SLOTS) do
 			if call_exact(
 				"Script-control inverse '" .. slot .. "'",
 				shortcuts.set_shortcut_action,
 				slot,
 				transaction.script_snapshot[slot]
 			) ~= true then return false end
-		end
-		if transaction.kind == "disable"
-			or (transaction.kind == "enable" and transaction.preferences_attempted) then
-			-- The inverse republishes the pre-action file, so every demotion the
-			-- candidate detached must again keep its saved value in that save.
-			if transaction.detached_demotions ~= nil then
-				if call_exact("Session demotion inverse", deps.readopt_demotions,
-					transaction.detached_demotions) ~= true then return false end
-				transaction.detached_demotions = nil
-			end
-			if call_exact("Global preference inverse", deps.save_preferences) ~= true then
-				return false
-			end
 		end
 		return true
 	end
@@ -560,52 +355,6 @@ function M.create(deps)
 			function() return apply_state_runtime(transaction) end,
 			function() return restore_state_runtime(transaction) end
 		) ~= true then return false end
-
-		-- The Tap-Holds switch, not its per-key assignments: off keeps every
-		-- binding stored and only stops generating them, exactly like a pause.
-		if transaction.kind ~= "reset" then
-			local target = transaction.kind == "enable"
-			if run_step(
-				transaction,
-				"Tap-Holds feature switch",
-				function() return deps.karabiner.set_tap_holds_enabled(target) end,
-				function()
-					return deps.karabiner.set_tap_holds_enabled(transaction.tap_holds_enabled)
-				end
-			) ~= true then return false end
-		end
-
-		if transaction.kind == "enable" then
-			if run_step(
-				transaction,
-				"Enable All keymap feature candidate",
-				function()
-					return deps.apply_enable_features(transaction.candidate_preferences)
-				end,
-				function()
-					return deps.restore_enable_features(transaction.preference_snapshot)
-				end
-			) ~= true then return false end
-			if run_step(
-				transaction,
-				"Global preference publication",
-				function()
-					transaction.preferences_attempted = true
-					return publish_candidate_preferences(transaction)
-				end,
-				function() return true end
-			) ~= true then return false end
-			return true
-		end
-
-		if transaction.kind == "disable" then
-			if run_step(
-				transaction,
-				"Global preference publication",
-				function() return publish_candidate_preferences(transaction) end,
-				function() return true end
-			) ~= true then return false end
-		end
 
 		for _, slot in ipairs(transaction.keyboard_snapshot) do
 			local captured = slot
@@ -772,25 +521,6 @@ function M.create(deps)
 		return true
 	end
 
-	--- Publishes the success-only UI effects after the final exact boundary.
-	--- @param transaction table Committed transaction.
-	local function publish_success(transaction)
-		transaction.settled = true
-		transaction.phase = "committed"
-		if active_transaction == transaction then active_transaction = nil end
-		if type(deps.notify_success) == "function" then
-			local notify_ok, notify_err = xpcall(function()
-				return deps.notify_success(transaction.kind)
-			end, debug.traceback)
-			if not notify_ok then Logger.error(LOG, "Global action success notification failed: %s.", tostring(notify_err)) end
-		end
-		if type(deps.update_menu) == "function" then
-			local update_ok, update_err = xpcall(deps.update_menu, debug.traceback)
-			if not update_ok then Logger.error(LOG, "Global action menu refresh failed: %s.", tostring(update_err)) end
-		end
-		Logger.success(LOG, "Global %s transaction committed.", transaction.kind)
-	end
-
 	--- Handles the exact candidate Karabiner terminal and final reload boundary.
 	--- @param transaction table Active transaction.
 	--- @param committed boolean Exact terminal state.
@@ -802,36 +532,31 @@ function M.create(deps)
 			transaction.completion_result = false
 			return reject_transaction(transaction, "Karabiner terminal refused: " .. tostring(detail))
 		end
-		if transaction.kind == "reset" then
-			if apply_post_karabiner_steps(transaction) ~= true then
-				transaction.completion_result = false
-				return reject_transaction(transaction, "recoverable file move refused")
-			end
-			transaction.phase = "reload-handoff"
-			local reload_ok, reload_result = xpcall(function()
-				return deps.request_reload(function(abort_detail)
-					if transaction.settled or active_transaction ~= transaction then
-						return false
-					end
-					transaction.completion_result = false
-					return reject_transaction(
-						transaction,
-						"reload handoff aborted: " .. tostring(abort_detail)
-					)
-				end)
-			end, debug.traceback)
-			if not reload_ok or reload_result ~= true then
-				transaction.completion_result = false
-				return reject_transaction(transaction, "reload handoff refused: " .. tostring(reload_result))
-			end
-			-- Ownership now belongs jointly to this retained global mutation fence and
-			-- the controlled reload coordinator. Do not clear the owner, notify,
-			-- refresh the menu, or log after request_reload(): a synchronous coordinator
-			-- may already have finalized every local capability before hs.reload returns.
-			return true
+		if apply_post_karabiner_steps(transaction) ~= true then
+			transaction.completion_result = false
+			return reject_transaction(transaction, "recoverable file move refused")
 		end
-		publish_success(transaction)
-		transaction.completion_result = true
+		transaction.phase = "reload-handoff"
+		local reload_ok, reload_result = xpcall(function()
+			return deps.request_reload(function(abort_detail)
+				if transaction.settled or active_transaction ~= transaction then
+					return false
+				end
+				transaction.completion_result = false
+				return reject_transaction(
+					transaction,
+					"reload handoff aborted: " .. tostring(abort_detail)
+				)
+			end)
+		end, debug.traceback)
+		if not reload_ok or reload_result ~= true then
+			transaction.completion_result = false
+			return reject_transaction(transaction, "reload handoff refused: " .. tostring(reload_result))
+		end
+		-- Ownership now belongs jointly to this retained global mutation fence and
+		-- the controlled reload coordinator. Do not clear the owner, notify,
+		-- refresh the menu, or log after request_reload(): a synchronous coordinator
+		-- may already have finalized every local capability before hs.reload returns.
 		return true
 	end
 
@@ -925,7 +650,7 @@ function M.create(deps)
 	end
 
 	--- Starts one global transaction after settling any retained inverse debt.
-	--- @param kind string `disable` or `reset`.
+	--- @param kind string Transaction kind: `reset`, the one it owns.
 	--- @return boolean accepted_or_committed
 	local function request(kind)
 		if external_writer ~= nil then
@@ -977,40 +702,14 @@ function M.create(deps)
 		if apply_synchronous_steps(transaction) ~= true then
 			return reject_transaction(transaction, "synchronous candidate refused")
 		end
-		-- Disable All no longer rewrites tap-hold bindings, so it has no Karabiner
-		-- deployment to wait for: gating it on one left every feature checked
-		-- whenever the remap lease could not deploy (helper awaiting approval).
-		if kind == "enable" or kind == "disable" then
-			publish_success(transaction)
-			-- The committed Tap-Holds switch is redeployed afterwards, best-effort:
-			-- without a live lease the next provisioned generation is built from it.
-			local deploy_ok, deploy_err = xpcall(function()
-				return deps.karabiner.regenerate(function(ok, reason)
-					if ok ~= true then
-						Logger.warn(LOG, "Global %s Tap-Holds rules not redeployed yet: %s.",
-							kind, tostring(reason))
-					end
-				end)
-			end, debug.traceback)
-			if not deploy_ok then
-				Logger.error(LOG, "Global %s Tap-Holds redeploy raised: %s.", kind, tostring(deploy_err))
-			end
-			return true
-		end
 		return dispatch_candidate(transaction)
 	end
 
 	local owner = {}
 
-	--- Requests the exact Enable All transaction.
-	--- @return boolean committed
-	function owner.enable_all()
-		return request("enable")
-	end
-
 	--- Runs one non-transactional global writer under the same admission fence as
-	--- Disable All and Reset. The token is published before any opaque preflight
-	--- and released by identity after the callback returns or throws.
+	--- the factory reset. The token is published before any opaque preflight and
+	--- released by identity after the callback returns or throws.
 	--- @param label string Diagnostic action label.
 	--- @param callback function Entire external writer body.
 	--- @return any result Exact callback result, or false on refusal/throw.
@@ -1047,12 +746,6 @@ function M.create(deps)
 			return false
 		end
 		return result
-	end
-
-	--- Requests the exact Disable All transaction.
-	--- @return boolean accepted_or_committed
-	function owner.disable_all()
-		return request("disable")
 	end
 
 	--- Requests the exact factory-reset transaction.

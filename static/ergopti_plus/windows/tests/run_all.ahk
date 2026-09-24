@@ -184,12 +184,11 @@ global _DefaultLogsDir := _LogsDir
 #Include ../infra/lifecycle_transition.ahk
 #Include ../infra/config_transition.ahk
 #Include ../infra/config_transition_runtime.ahk
-; _CollectFeatureUpdates / _CollectFeatureFlipUpdates are exercised directly by
-; the section-resolution regression tests
-; (test_config_io_feature_section_resolution.ahk).
-; ToggleAllFeatures/SaveFullConfig themselves are never invoked here (they
-; depend on numerous boot-only globals, and the successful bulk path reloads),
-; so including this file is safe — only function definitions at top level.
+; _CollectFeatureUpdates is exercised directly by the section-resolution
+; regression tests (test_config_io_feature_section_resolution.ahk).
+; SaveFullConfig itself is never invoked here (it depends on numerous
+; boot-only globals), so including this file is safe — only function
+; definitions at top level.
 #Include ../infra/config_io.ahk
 #Include ../ui/personal_toml_editor.ahk
 #Include ../ui/personal_toml_editor_webview.ahk
@@ -392,7 +391,6 @@ InstallSendNoOps()
 #Include unit/test_wpm_canon.ahk
 #Include unit/test_features_manifest.ahk
 #Include unit/test_config_io_feature_section_resolution.ahk
-#Include unit/test_global_disable_all_preserves_assignments.ahk
 #Include unit/test_hotstrings_full.ahk
 #Include unit/test_tap_hold_loader.ahk
 #Include unit/test_i18n.ahk

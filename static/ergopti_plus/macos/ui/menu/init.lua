@@ -26,7 +26,6 @@ local Builder       = require("ui.menu.builder")
 local HotCounter    = require("ui.menu.hotstring_counter")
 local MenuPaths     = require("ui.menu.menu_paths")
 local MenuState     = require("ui.menu.menu_state")
-local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
 local MenuWatchers  = require("ui.menu.menu_watchers")
 local TrayMenu      = require("adapters.tray_menu")
 local Storage       = require("adapters.storage")
@@ -630,94 +629,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	end
 	table.sort(global_gesture_slots)
 
-	--- Applies the keymap-backed portion of one detached Enable All snapshot.
-	--- Section and preview setters require exact true; terminator setters retain
-	--- their established nil-on-success contract while still rejecting false.
-	--- @param snapshot table Detached preference candidate or inverse.
-	--- @return boolean committed
-	local function apply_enable_feature_snapshot(snapshot)
-		if type(snapshot) ~= "table" or type(keymap) ~= "table" then return false end
-		local function call_feature(label, fn, nil_is_success, ...)
-			if type(fn) ~= "function" then
-				Logger.error(LOG, "Enable All %s is unavailable.", label)
-				return false
-			end
-			local call_ok, result = xpcall(function(...) return fn(...) end,
-				debug.traceback, ...)
-			local committed = call_ok and (result == true or (nil_is_success and result == nil))
-			if not committed then
-				Logger.error(LOG, "Enable All %s did not commit: %s.", label, tostring(result))
-			end
-			return committed
-		end
-
-		local section_batches = { enabled = {}, disabled = {} }
-		for group_name, sections in pairs(snapshot.section_states or {}) do
-			if type(sections) == "table" then
-				local enabled_sections = {}
-				local disabled_sections = {}
-				for section_name, enabled in pairs(sections) do
-					local target = enabled == false and disabled_sections or enabled_sections
-					target[#target + 1] = section_name
-				end
-				table.sort(enabled_sections)
-				table.sort(disabled_sections)
-				if #enabled_sections > 0 then
-					section_batches.enabled[#section_batches.enabled + 1] = {
-						name = group_name, sections = enabled_sections, enable_group = false,
-					}
-				end
-				if #disabled_sections > 0 then
-					section_batches.disabled[#section_batches.disabled + 1] = {
-						name = group_name, sections = disabled_sections, enable_group = false,
-					}
-				end
-			end
-		end
-		table.sort(section_batches.enabled, function(left, right) return left.name < right.name end)
-		table.sort(section_batches.disabled, function(left, right) return left.name < right.name end)
-		if #section_batches.enabled > 0 and not call_feature(
-			"section enable batch", keymap.set_groups_sections_enabled, false,
-			section_batches.enabled, true) then return false end
-		if #section_batches.disabled > 0 and not call_feature(
-			"section disable batch", keymap.set_groups_sections_enabled, false,
-			section_batches.disabled, false) then return false end
-		local group_names = {}
-		for group_name in pairs(snapshot.hotstrings or {}) do
-			group_names[#group_names + 1] = group_name
-		end
-		table.sort(group_names)
-		for _, group_name in ipairs(group_names) do
-			local enabled = snapshot.hotstrings[group_name] == true
-			local method = enabled and keymap.enable_group or keymap.disable_group
-			if not call_feature(
-				"hotstring group '" .. tostring(group_name) .. "'",
-				method,
-				false,
-				group_name
-			) then return false end
-		end
-
-		for terminator, enabled in pairs(snapshot.terminator_states or {}) do
-			if not call_feature(
-				"terminator '" .. tostring(terminator) .. "'",
-				keymap.set_terminator_enabled,
-				true,
-				terminator,
-				enabled
-			) then return false end
-		end
-		for _, item in ipairs({
-			{ key = "preview_star_enabled", fn = "set_preview_star_enabled" },
-			{ key = "preview_autocorrect_enabled", fn = "set_preview_autocorrect_enabled" },
-			{ key = "preview_ai_enabled", fn = "set_preview_ai_enabled" },
-		}) do
-			if snapshot[item.key] ~= nil and not call_feature(
-				item.fn, keymap[item.fn], false, snapshot[item.key]) then return false end
-		end
-		return true
-	end
-
 	local global_actions_owner = GlobalActionsTransaction.create({
 		state = state,
 		capture_preferences = function()
@@ -726,31 +637,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		sync_runtime = function(snapshot, restoring)
 			return sync_state_to_modules(snapshot, false, restoring == true) == true
 		end,
-		save_preferences = save_prefs,
-		-- Enable/Disable All set every feature explicitly: the transaction detaches
-		-- the session demotions for its candidate and re-adopts them in its inverse.
-		detach_demotions = session_demotions.release_all,
-		readopt_demotions = session_demotions.readopt,
 		restore_state = PreferencesTransaction.restore_table,
-		ensure_enable_ready = function()
-			return KeymapLifecycle.ensure_started({ state = state, keymap = keymap },
-				"enable all features")
-		end,
-		apply_enable_features = apply_enable_feature_snapshot,
-		restore_enable_features = apply_enable_feature_snapshot,
-		list_enable_terminators = function()
-			local keys = {}
-			local defs = type(keymap) == "table"
-				and type(keymap.get_terminator_defs) == "function"
-				and keymap.get_terminator_defs() or nil
-			if type(defs) ~= "table" then return keys end
-			for _, def in ipairs(defs) do
-				if type(def) == "table" and type(def.key) == "string" then
-					keys[#keys + 1] = def.key
-				end
-			end
-			return keys
-		end,
 		settings = {
 			get = Storage.get,
 			set = Storage.set,
@@ -775,21 +662,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		terminal_pending = function()
 			return TerminationCoordinator.is_pending()
 		end,
-		notify_success = function(kind)
-			if kind == "enable" then
-				return notifications.notify(
-					i18n.get("notify.all_features_enabled"), nil, "success")
-			end
-			if kind == "disable" then
-				return notifications.notify(
-					i18n.get("notify.all_features_disabled"), nil, "error")
-			end
-			return notifications.notify(i18n.get("notify.defaults_reset"), nil, "info")
-		end,
-		update_menu = function()
-			if type(updateMenu) == "function" then updateMenu() end
-			return true
-		end,
 	})
 
 	run_global_exclusive = function(action_label, callback)
@@ -800,16 +672,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			return false
 		end
 		return global_actions_owner.run_exclusive(action_label, callback)
-	end
-
-	local function set_all_enabled(enabled)
-		if not global_actions_owner then
-			Logger.error(LOG, "%s transaction owner is unavailable.",
-				enabled == true and "Enable All" or "Disable All")
-			return false
-		end
-		if enabled == true then return global_actions_owner.enable_all() end
-		return global_actions_owner.disable_all()
 	end
 
 	local function reset_all_defaults()
@@ -1185,8 +1047,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				return require("ui.menu.uninstall").run()
 			end)
 		end,
-		enable_all                = function() return set_all_enabled(true) end,
-		disable_all               = function() return set_all_enabled(false) end,
 		reset_defaults            = function() return reset_all_defaults() end,
 		clean_unused_keys         = function()
 			return require("ui.menu.unused_keys_cleanup").run_from_menu()
