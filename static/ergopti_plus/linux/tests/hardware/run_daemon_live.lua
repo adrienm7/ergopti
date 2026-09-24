@@ -214,13 +214,14 @@ for char in ("adn "):gmatch(".") do
 end
 
 -- Decode what the desktop receives: US letters, Shift, Space, Backspace.
-local text, shift = {}, false
+local text, shift, trail = {}, false, {}
 local deadline = os.time() + 3
 while os.time() <= deadline do
 	if EvdevReader.wait_readable(200, out_slot) then
 		local ev = EvdevReader.read_event(out_slot)
 		while ev do
 			if ev.type == 1 then
+				if ev.value ~= 2 then trail[#trail + 1] = ev.code .. (ev.value == 1 and "↓" or "↑") end
 				if ev.code == EvdevCodes.KEY_LEFTSHIFT or ev.code == EvdevCodes.KEY_RIGHTSHIFT then
 					shift = ev.value ~= 0
 				elseif ev.value == 1 then
@@ -237,6 +238,7 @@ while os.time() <= deadline do
 end
 local got = table.concat(text)
 print(string.format("  the desktop received %q", got))
+print("  key events: " .. table.concat(trail, " "))
 
 -- Left running a little longer so the panel stand-in can finish reading the
 -- tray menu, then stopped.
