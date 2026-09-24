@@ -11,6 +11,7 @@
 ; 2. A save stores the logs folder the resolver would use, "" for the default,
 ;    and keeps the stored one when the page sent none.
 ; 3. A folder that is not absolute is refused, never saved as the default.
+; 4. A folder that cannot be created is refused before paths.toml changes.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -78,3 +79,25 @@ _PELD_RelativeLogsFolderIsRefused() {
 }
 Test("paths editor: a relative logs folder is refused, not reset to the default (paths-editor-logs-dir)",
 	_PELD_RelativeLogsFolderIsRefused)
+
+; The logger creates its folder silently at boot, so a stored folder that
+; cannot be created left the next session logging nowhere. The editor creates
+; it before storing it, and refuses it when that fails.
+_PELD_UncreatableLogsFolderIsRefused() {
+	Root := A_Temp . "\ergopti_peld_" . A_TickCount
+	Blocker := Root . "\a_file"
+	try {
+		DirCreate(Root)
+		FileAppend("x", Blocker, "UTF-8")
+		Fresh := Root . "\fresh\ergopti_plus\"
+		_PathsEdWeb_PrepareLogsFolder(Fresh)
+		AssertTrue(DirExist(Fresh) != "", "a new logs folder is created before it is stored")
+		_PathsEdWeb_PrepareLogsFolder("")
+		AssertThrows(() => _PathsEdWeb_PrepareLogsFolder(Blocker . "\ergopti_plus\"),
+			"a logs folder that cannot be created is refused")
+	} finally {
+		try DirDelete(Root, true)
+	}
+}
+Test("paths editor: a logs folder that cannot be created is refused (paths-editor-logs-dir)",
+	_PELD_UncreatableLogsFolderIsRefused)

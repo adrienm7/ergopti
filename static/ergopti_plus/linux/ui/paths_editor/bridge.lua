@@ -150,6 +150,17 @@ function M.on_message(payload, state)
 				return { saved = false }
 			end
 			local normalized, refusal = config_paths.normalize_logs_dir(payload.logsDir)
+			-- A folder the next start could not use is refused now rather than
+			-- stored: install() would fall back to stdout for it.
+			if normalized ~= nil and normalized ~= "" and normalized ~= config_paths.default_logs_dir() then
+				local sink = dependency(state, "logger_sink", "infra.logger_sink")
+				if not sink or type(sink.prepare_dir) ~= "function" then
+					normalized, refusal = nil, "the logs folder cannot be prepared"
+				else
+					local ready, why = sink.prepare_dir(normalized)
+					if ready ~= true then normalized, refusal = nil, why end
+				end
+			end
 			if normalized == nil then
 				Logger.error(LOG, "Logs folder '%s' was refused (%s); nothing was saved and the editor remains open.",
 					payload.logsDir, tostring(refusal))

@@ -346,6 +346,31 @@ function M.install(logger, opts)
 	return true
 end
 
+--- Creates a logs folder and proves it writable before anything names it: the
+--- paths editor calls this before storing LogsDirPath, since install() at the
+--- next start would otherwise fall back to stdout for a folder it cannot use.
+--- @param dir string Absolute folder, no trailing slash.
+--- @return boolean ready
+--- @return string|nil error_message
+function M.prepare_dir(dir)
+	if type(dir) ~= "string" or dir:sub(1, 1) ~= "/" then
+		return false, "the logs folder must be an absolute path"
+	end
+	if not ensure_dir(dir) then
+		return false, "the logs folder '" .. dir .. "' could not be created"
+	end
+	-- ensure_dir() trusts a zero mkdir status when its probe fails, which an
+	-- existing read-only folder returns: prove the write here.
+	local probe_path = dir .. "/.write_probe"
+	local probe = io.open(probe_path, "a")
+	if not probe then
+		return false, "the logs folder '" .. dir .. "' is not writable"
+	end
+	probe:close()
+	os.remove(probe_path)
+	return true
+end
+
 --- Moves the installed file sink to the logs folder infra/config_paths now
 --- resolves. The paths editor saves LogsDirPath while the daemon keeps running
 --- (its reload re-reads the hotstrings, it does not restart the process), so

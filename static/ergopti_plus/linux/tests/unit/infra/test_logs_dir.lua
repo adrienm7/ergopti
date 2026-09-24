@@ -167,6 +167,32 @@ helpers.describe("logs folder resolution (logs-dir-resolver)", function()
 		end)
 	end)
 
+	-- The paths editor asks this before storing a folder: install() at the next
+	-- start would otherwise fall back to stdout for a folder it cannot use.
+	helpers.it("prepares a logs folder only when it can be created and written", function()
+		local base = os.tmpname()
+		os.remove(base)
+		with_paths({ XDG_STATE_HOME = "/state" }, {}, function(_, Sink)
+			local fresh = base .. "_prepared/ergopti_plus"
+			local ready, err = Sink.prepare_dir(fresh)
+			helpers.assert_true(ready == true, "a new folder is created: " .. tostring(err))
+			local probe = io.open(fresh .. "/probe.txt", "w")
+			helpers.assert_not_nil(probe, "the prepared folder exists and is writable")
+			probe:close()
+			os.remove(fresh .. "/probe.txt")
+
+			local blocker = base .. "_blocker"
+			local handle = assert(io.open(blocker, "w"))
+			handle:write("x")
+			handle:close()
+			local refused, why = Sink.prepare_dir(blocker .. "/ergopti_plus")
+			os.remove(blocker)
+			helpers.assert_true(refused == false, "a folder under a file cannot be created")
+			helpers.assert_not_nil(why)
+			helpers.assert_true(Sink.prepare_dir("relative/ergopti_plus") == false, "a relative folder is refused")
+		end)
+	end)
+
 	helpers.it("writes crash dumps into the logs folder", function()
 		with_paths({ XDG_STATE_HOME = "/state" }, {}, function()
 			package.loaded["modules.diagnostics.crash_reporter"] = nil

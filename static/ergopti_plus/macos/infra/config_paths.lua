@@ -743,6 +743,14 @@ function M.set_paths(new_config_dir, new_logs_dir)
 		if normalized == nil then return false, validation_error end
 		logs_value = normalized
 	end
+	-- A logs override is created before anything changes: the native worker
+	-- refuses a folder it cannot open and the start then stops, so a folder
+	-- stored without existing would keep the application from booting until
+	-- paths.toml is edited by hand.
+	if logs_value ~= nil and logs_value ~= "" and logs_value ~= (_default_logs_dir or "")
+		and not ensure_dir(logs_value) then
+		return false, string.format("could not create logs directory '%s'", logs_value)
+	end
 
 	local old_dir, old_logs = config_dir(), logs_dir()
 	local old_config_override = _bootstrap[CONFIG_DIR_KEY]
