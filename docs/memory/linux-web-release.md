@@ -181,6 +181,35 @@ inject through `injector.run_transaction`, which releases
 `keyboard_hook.held_forwarded_keys()` first; never add a per-item FFI
 callback; keep this live step green for any hook, injector or tray change.
 
+### project-linux-tray-dialogs-and-windows-cross-the-grab-and-json
+
+Two boundaries silently broke every tray UI on Linux while unit tests stayed
+green. (1) A zenity/kdialog dialog runs inside a menu callback and blocks the
+event loop that forwards the grabbed keyboard, so nothing could be typed into
+it: every blocking dialog must go through `ui/modal.lua`
+(`keyboard_hook.while_released`). (2) The webview manager decoded page
+messages and encoded replies through `dkjson`, which is never installed: all
+page objects arrived as nil. It uses the shared `json` codec now; bridge tests
+that pass Lua tables to `route_message` cannot catch this, so
+`tests/hardware/run_webview_roundtrip.lua` lets a real page post its own
+request. Action: never add an optional JSON dependency or a dialog outside
+`Modal.run`; a new window needs a round-trip check, not only a bridge test.
+
+### project-linux-ai-is-proven-against-real-servers
+
+The AI path is exercised end to end in CI: `run_daemon_live` accepts a
+prediction from `fake_llm_server.py` (OpenAI dialect, as Cerebras) with Alt+1
+through the real kernel, and `run_ollama_live.lua` drives the real Ollama
+(model list, `/api/pull`, predictions, and the remote backend on Ollama's
+`/v1` endpoint). They caught what scripted tests could not: text typed while
+the accepting Alt was still held (every injection now releases Ctrl/Alt/Super
+after an F24 mask tap, never restoring them), a double space from the parser
+spacing against the word-rebuilt tail, and curl argv exposing keys and typed
+text (headers, body and URL now go through `--config -`). Remote API keys
+live in `~/.config/ergopti_plus/api_keys.json`, mode 0600, outside the
+possibly-synced config folder. Action: keep both live steps green for any
+change to the injector, the engine, the parser or the HTTP client.
+
 ## Release artifacts
 
 ### project-release-notes-are-not-joined-to-the-assets
