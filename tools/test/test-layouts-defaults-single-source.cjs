@@ -83,9 +83,17 @@ check('the URL template takes every part from a placeholder', () => {
 		assert.ok(registry.raw_url_template.includes(part), `raw_url_template lacks ${part}`);
 	}
 	assert.ok(registry.raw_url_template.startsWith('https://'), 'the registry must be fetched over HTTPS');
-	const text = fs.readFileSync(DEFAULTS_PATH, 'utf8');
-	assert.ok(!text.includes(`"${updater.github.owner}"`), 'owner is repeated instead of read from the updater defaults');
-	assert.ok(!text.includes(`"${updater.github.repo}"`), 'repo is repeated instead of read from the updater defaults');
+	// The URL is built from the template and the fields it names; none of them
+	// may carry owner or repo itself. Other values may coincide with the repo
+	// name (the Ergopti family is called ergopti) without locating anything.
+	for (const key of ['owner', 'repo', 'github']) {
+		assert.ok(!(key in registry), `registry.${key} repeats the updater defaults`);
+	}
+	for (const key of ['raw_url_template', 'folder', 'branch', 'index_file']) {
+		for (const part of [updater.github.owner, updater.github.repo]) {
+			assert.ok(!registry[key].split(/[/{}.]/).includes(part), `registry.${key} spells ${part} instead of reading it from the updater defaults`);
+		}
+	}
 });
 
 check('the scalars are positive and the branch is a plain name', () => {

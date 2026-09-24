@@ -5,6 +5,9 @@
 # test fails when the two drift apart.
 
 name = "Ergopti"
+# The Ergopti-only features and hotstrings apply to this family alone
+# (registry.ergopti_family in _shared/modules/layouts/defaults.json).
+family = "ergopti"
 version = "2.2.2"
 author = "Adrien Moyaux"
 licence = "MIT"
