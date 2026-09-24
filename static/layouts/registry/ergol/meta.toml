@@ -5,6 +5,7 @@
 # Licence: WTFPL v2, see LICENSE next to this file.
 
 name = "Ergo-L"
+family = "ergol"
 version = "1.0.2"
 author = "Léo Cazenave (NuclearSquid)"
 licence = "WTFPL"

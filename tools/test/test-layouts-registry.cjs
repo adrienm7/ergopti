@@ -40,6 +40,9 @@ const {
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const BUNDLES_DIR = path.join(ROOT, 'static', 'ergopti', 'macos', 'bundles');
+const LAYOUT_DEFAULTS = JSON.parse(
+	fs.readFileSync(path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'modules', 'layouts', 'defaults.json'), 'utf8')
+);
 
 let failures = 0;
 let passes = 0;
@@ -63,6 +66,7 @@ function sha256(buffer) {
 function validMeta() {
 	return {
 		name: 'Sample',
+		family: 'sample',
 		version: '1.2.3',
 		author: 'Someone',
 		licence: 'MIT',
@@ -122,6 +126,23 @@ check('each registry folder holds exactly one .keylayout named after its id', ()
 		const layouts = fs.readdirSync(path.join(REGISTRY_DIR, folder.name)).filter((f) => f.endsWith('.keylayout'));
 		assert.deepStrictEqual(layouts, [`${folder.name}.keylayout`], `${folder.name}: one layout = one .keylayout`);
 	}
+});
+
+// The drivers switch the Ergopti-only features off while another layout is
+// active, so which layouts are Ergopti must be data every driver can read.
+check('every layout names its family and the Ergopti layouts are the Ergopti family', () => {
+	const ergoptiFamily = LAYOUT_DEFAULTS.registry.ergopti_family;
+	assert.match(String(ergoptiFamily), /^[a-z][a-z0-9_]*$/, 'defaults.json declares no ergopti_family');
+	const byId = new Map(entries.map((e) => [e.id, e]));
+	for (const entry of entries) {
+		assert.match(String(entry.family), /^[a-z][a-z0-9_]*$/, `${entry.id} declares no family`);
+		for (const variant of entry.variants) {
+			assert.strictEqual(byId.get(variant).family, entry.family, `${entry.id} and its variant ${variant} disagree about their family`);
+		}
+	}
+	const ergopti = entries.filter((e) => e.family === ergoptiFamily).map((e) => e.id).sort();
+	assert.deepStrictEqual(ergopti, ['ergopti', 'ergopti_ansi', 'ergopti_plus', 'ergopti_plus_ansi']);
+	assert.notStrictEqual(byId.get('ergol').family, ergoptiFamily, 'Ergo-L is not an Ergopti layout');
 });
 
 check('vendored layouts are byte-identical to their upstream release asset', () => {
@@ -190,6 +211,8 @@ check('the meta.toml validator accepts a complete record', () => {
 check('the meta.toml validator rejects every malformed shape', () => {
 	const cases = [
 		['missing name', (m) => delete m.name],
+		['missing family', (m) => delete m.family],
+		['family that is not an id', (m) => (m.family = 'Ergo L')],
 		['unknown key', (m) => (m.colour = 'blue')],
 		['non-semver version', (m) => (m.version = 'latest')],
 		['plain-http homepage', (m) => (m.homepage = 'http://example.org')],
@@ -224,6 +247,10 @@ check('the registry validator rejects asymmetric and dangling variants', () => {
 	assert.ok(validateRegistry(new Map([['c', c]])).length > 0, 'dangling variant accepted');
 	const d = { ...validMeta(), variants: ['d'] };
 	assert.ok(validateRegistry(new Map([['d', d]])).length > 0, 'self variant accepted');
+	const e = { ...validMeta(), variants: ['f'] };
+	const f = { ...validMeta(), family: 'other', variants: ['e'] };
+	assert.ok(validateRegistry(new Map([['e', e], ['f', f]])).length > 0, 'variants of two families accepted');
+	assert.deepStrictEqual(validateRegistry(new Map([['e', e], ['f', { ...f, family: 'sample' }]])), []);
 });
 
 console.log(`\n${passes} passed, ${failures} failed`);

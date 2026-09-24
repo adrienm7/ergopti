@@ -62,6 +62,7 @@ const SHA256_RE = /^[0-9a-f]{64}$/;
 
 const REQUIRED_KEYS = [
 	'name',
+	'family',
 	'version',
 	'author',
 	'licence',
@@ -128,6 +129,11 @@ function validateMeta(id, meta, fileExists) {
 	}
 	for (const key of ['name', 'author']) {
 		if (key in meta && !isNonEmptyString(meta[key])) errors.push(`${id}: ${key} must be a non-empty string`);
+	}
+	// The family groups a layout with its variants; the drivers compare it with
+	// registry.ergopti_family of the shared defaults to tell Ergopti layouts apart.
+	if ('family' in meta && !(typeof meta.family === 'string' && ID_RE.test(meta.family))) {
+		errors.push(`${id}: family must be a registry id (${ID_RE})`);
 	}
 	if ('version' in meta && !(typeof meta.version === 'string' && VERSION_RE.test(meta.version))) {
 		errors.push(`${id}: version must be semantic (x.y.z)`);
@@ -208,8 +214,8 @@ function validateXkb(errors, id, xkb) {
 }
 
 /**
- * Cross-record rules: every variant exists, is not the layout itself, and
- * lists this layout back.
+ * Cross-record rules: every variant exists, is not the layout itself, lists
+ * this layout back and belongs to the same family.
  * @param {Map<string, object>} metas - Registry id → meta record.
  * @returns {string[]} Every problem found.
  */
@@ -223,6 +229,8 @@ function validateRegistry(metas) {
 				errors.push(`${id}: variant ${variant} is not a registry layout`);
 			} else if (!(metas.get(variant).variants || []).includes(id)) {
 				errors.push(`${id}: variant ${variant} does not list ${id} back`);
+			} else if (metas.get(variant).family !== meta.family) {
+				errors.push(`${id}: variant ${variant} belongs to another family`);
 			}
 		}
 	}
@@ -307,6 +315,7 @@ function buildIndex(registryDir) {
 		const entry = {
 			id,
 			name: meta.name,
+			family: meta.family,
 			version: meta.version,
 			file: `${id}/${id}.keylayout`,
 			sha256: crypto.createHash('sha256').update(bytes).digest('hex'),
