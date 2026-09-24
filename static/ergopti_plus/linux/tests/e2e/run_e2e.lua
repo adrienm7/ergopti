@@ -431,6 +431,27 @@ else
 				screen and string.format("%q", screen) or ("no SCREEN line: " .. output:sub(-300)))
 		end
 	end
+
+	-- The real tray menu, every module loaded, rows counted without GTK. The
+	-- ceiling is generous for a menu people navigate and far below the 103 058
+	-- rows the inline action lists once produced (eight seconds of GTK per
+	-- rebuild, and a dbusmenu layout no panel can page through).
+	local MENU_ROW_CEILING = 3000
+	local rows_file = os.tmpname()
+	os.execute(string.format(
+		"HOME='%s' ERGOPTI_E2E_MENU_ROWS='%s' %s tests/e2e/daemon_keys_child.lua tests/e2e/fixtures/daemon_keys.toml '%s' %q >/dev/null 2>&1",
+		home, rows_file, interpreter, device, "a"))
+	local rows_fh = io.open(rows_file, "r")
+	local rows = rows_fh and tonumber(rows_fh:read("*l")) or nil
+	if rows_fh then rows_fh:close() end
+	os.remove(rows_file)
+	if rows and rows > 100 and rows <= MENU_ROW_CEILING then
+		pass(string.format("the real tray menu has %d rows (ceiling %d)", rows, MENU_ROW_CEILING))
+	else
+		fail("the real tray menu stays navigable", string.format("100 < rows <= %d", MENU_ROW_CEILING),
+			tostring(rows))
+	end
+
 	os.remove(device)
 	os.execute("rm -rf '" .. home .. "'")
 end

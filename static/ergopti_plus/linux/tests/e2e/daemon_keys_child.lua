@@ -84,9 +84,42 @@ hook.get_mode = function() return "scripted" end
 hook.held_text_modifier_codes = function() return {} end
 hook.emergency_stop = function(why) print("EMERGENCY STOP: " .. tostring(why)) end
 
+-- ERGOPTI_E2E_MENU_ROWS=<file>: build the REAL tray menu with every module
+-- loaded, count its rows through a recording indicator (no GTK needed), and
+-- write the count. The menu once held 103 058 rows — eight seconds of GTK at
+-- every rebuild — and nothing measured it.
+local MENU_ROWS_FILE = os.getenv("ERGOPTI_E2E_MENU_ROWS")
+if MENU_ROWS_FILE then
+	arg[#arg + 1] = "--tray"
+	package.preload["platform.tray.appindicator"] = function()
+		local function count(items)
+			local n = 0
+			for _, item in ipairs(items or {}) do
+				n = n + 1 + (type(item.menu) == "table" and count(item.menu) or 0)
+			end
+			return n
+		end
+		local live = false
+		return {
+			is_available = function() return true end,
+			create = function() live = true; return true end,
+			set_icon = function() return true end,
+			set_menu = function(items)
+				local fh = io.open(MENU_ROWS_FILE, "w")
+				fh:write(tostring(count(items)), "\n")
+				fh:close()
+				return true
+			end,
+			pump = function() return 0 end,
+			destroy = function() live = false end,
+			is_live = function() return live end,
+		}
+	end
+end
+
 -- Everything that needs a desktop is switched off; the daemon loads each of
 -- these optionally and runs without it.
-for _, name in ipairs({ "ui.tooltip.preview", "ui.tooltip.llm", "adapters.tray_menu",
+for _, name in ipairs(MENU_ROWS_FILE and {} or { "ui.tooltip.preview", "ui.tooltip.llm", "adapters.tray_menu",
 	"ui.menu.menu_builder", "modules.llm.prediction_engine", "modules.updater.manager",
 	"modules.gestures.manager", "adapters.window_info", "adapters.process_lifecycle",
 	"ui.webview_manager", "platform.remap.manager", "platform.remap.tap_hold_writer",

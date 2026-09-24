@@ -216,6 +216,22 @@ end
 --- @param current string Current action id.
 --- @param on_confirm function Transactional assignment callback.
 --- @return boolean opened
+--- The actions a slot's submenu lists inline: its current one, then "none".
+---
+--- Everything else is reached through the action picker, which is the first
+--- row of that submenu. Kept in catalogue order and only among actions the
+--- catalogue still offers, so a stale binding is not resurrected as a row.
+--- @param action_names table The full action catalogue, in order.
+--- @param current string|nil The slot's bound action.
+--- @return table
+local function inline_slot_options(action_names, current)
+	local out = {}
+	for _, option in ipairs(action_names or {}) do
+		if option == current or option == "none" then out[#out + 1] = option end
+	end
+	return out
+end
+
 local function open_action_picker(title, current, on_confirm)
 	local ok_picker, Picker = pcall(require, "ui.action_picker.bridge")
 	if not ok_picker or type(Picker.open) ~= "function" then
@@ -2556,7 +2572,12 @@ local function _build_shortcuts(ctx)
 						end,
 					},
 				}
-				for _, option in ipairs(action_names) do
+				-- The picker above lists the catalogue; inline, only the current
+				-- binding and the way to clear it. Listing all ~640 actions under
+				-- every slot put 77 000 rows in the tray: eight seconds of GTK at
+				-- every rebuild, and a dbusmenu layout no panel can page through.
+				-- macOS offers the same slots through its picker alone.
+				for _, option in ipairs(inline_slot_options(action_names, bound)) do
 					choices[#choices + 1] = build_choice(slot, option, bound)
 				end
 				rows[#rows + 1] = {
@@ -3100,7 +3121,10 @@ local function _build_gestures(ctx)
 					end,
 				},
 			}
-			for _, option in ipairs(ge.get_action_names and ge.get_action_names() or { "none" }) do
+			-- Inline: the current action and "none" only; the picker holds the
+			-- catalogue (see keyboard_slots for why the full list cannot be here).
+			for _, option in ipairs(inline_slot_options(
+				ge.get_action_names and ge.get_action_names() or { "none" }, action)) do
 				choices[#choices + 1] = {
 					label   = ge.get_action_label(option),
 					-- `checked`, not a "✓" glued to the label: the tray draws its own
