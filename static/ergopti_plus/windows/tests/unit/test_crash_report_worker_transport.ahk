@@ -52,7 +52,7 @@ _CRWT_RequiredKeys() {
 		"os_name", "os_build", "os_arch", "ahk_version", "ahk_bitness",
 		"cpu_name", "cpu_cores", "ram_total_gb", "ram_free_gb",
 		"screen_resolution", "dpi", "dpi_scale", "locale", "script_dir",
-		"git_hash", "username_hash", "uptime_sec", "active_window_title",
+		"git_hash", "uptime_sec", "active_window_title",
 		"active_window_process", "stuck_modifiers", "adapters_ok",
 		"adapters_failed", "session_warnings", "session_errors",
 		"keylogger_initialized", "config_dir", "log_tail"
@@ -83,6 +83,24 @@ _CRWT_PrivacyCanariesAreRedactedFromCanonicalJson() {
 Test("crash report: canonical JSON redacts every free-text privacy source "
 	. "(audit-ahk-008)",
 	_CRWT_PrivacyCanariesAreRedactedFromCanonicalJson)
+
+; A 32-bit FNV fold of the account name is reversed by hashing a list of common
+; names, so it identified the user as surely as the name itself. Nothing about
+; the account is collected: the shared redactor removes the name wherever it
+; appears in text that leaves the machine (no-account-hash).
+_CRWT_NoAccountNameHash() {
+	Fields := _CrashReport_CanonicalFields()
+	AssertTrue(Fields.Length > 20, "the canonical schema must be listed")
+	for _, Key in Fields
+		AssertFalse(InStr(Key, "user"), "the crash report must not carry " . Key)
+	Snapshot := _CrashReport_CheapSnapshot(Error("no-account-hash"))
+	AssertTrue(Snapshot.Count > 20, "the cheap snapshot must be built")
+	for Key in Snapshot
+		AssertFalse(InStr(Key, "user"), "the cheap crash snapshot must not carry " . Key)
+}
+
+Test("crash report: nothing is derived from the account name (no-account-hash)",
+	_CRWT_NoAccountNameHash)
 
 _CRWT_RecordDone(State, ExitCode, Stdout, Stderr) {
 	State["called"] := true
@@ -204,7 +222,9 @@ _CRWT_LargeSnapshotCrossesProcessBoundary(Options := 0) {
 
 		Report := JsonParse(Raw)
 		Required := _CRWT_RequiredKeys()
-		Assert(Required.Length >= 37, "the schema oracle must retain the established crash-report field floor")
+		; 36 since username_hash left the schema: nothing is derived from the
+		; account name (no-account-hash)
+		Assert(Required.Length >= 36, "the schema oracle must retain the established crash-report field floor")
 		for _, Key in Required
 			Assert(Report.Has(Key), "isolated crash report missing canonical field: " . Key)
 		if Options is Map && Options.Get("faults", "") != "" {

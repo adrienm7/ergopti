@@ -370,7 +370,6 @@ _CrashReport_CheapSnapshot(Exc) {
 		"dpi", String(A_ScreenDPI),
 		"dpi_scale", String(Round(A_ScreenDPI / 96 * 100)),
 		"locale", A_Language, "script_dir", A_ScriptDir, "git_hash", BuiltCommit,
-		"username_hash", _CrashReport_FoldHash(A_UserName),
 		"uptime_sec", String(UptimeSec),
 		"active_window_title", ActiveWindowTitle,
 		"active_window_process", ActiveWindowProcess,

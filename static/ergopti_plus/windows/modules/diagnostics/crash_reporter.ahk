@@ -211,7 +211,6 @@ CrashReport_Build(ErrorObj) {
 		"locale",               Sys.Get("locale", ""),
 		"script_dir",           A_ScriptDir,
 		"git_hash",             Sys.Get("git_hash", ""),
-		"username_hash",        _CrashReport_FoldHash(A_UserName),
 		; ── Runtime context ──
 		"uptime_sec",           String(UptimeSec),
 		"active_window_title",  ActiveWindowTitle,
@@ -382,18 +381,6 @@ _CrashReport_IsoTimestamp() {
 	return FormatTime(A_NowUTC, "yyyy-MM-ddTHH:mm:ss") . "Z"
 }
 
-; FNV-1a 32-bit fold: stable, non-reversible hex digest of a string.
-; @param Str {String}
-; @return {String} Eight-character lowercase hex string.
-_CrashReport_FoldHash(Str) {
-	Acc := 0x811C9DC5
-	Loop StrLen(Str) {
-		Acc := ((Acc ^ Ord(SubStr(Str, A_Index, 1))) * 0x01000193) & 0xFFFFFFFF
-		Acc := ((Acc >> 3) | (Acc << 29)) & 0xFFFFFFFF
-	}
-	return Format("{:08x}", Acc)
-}
-
 ; Replaces every free-form source that can carry user data while preserving the
 ; canonical schema. The function clones its input so a caller retaining the
 ; diagnostic Map never observes a half-redacted mutation.
@@ -439,7 +426,7 @@ _CrashReport_CanonicalFields() {
 		"cpu_name", "cpu_cores",
 		"ram_total_gb", "ram_free_gb",
 		"screen_resolution", "dpi", "dpi_scale",
-		"locale", "script_dir", "git_hash", "username_hash",
+		"locale", "script_dir", "git_hash",
 		"uptime_sec", "active_window_title", "active_window_process",
 		"stuck_modifiers",
 		"adapters_ok", "adapters_failed",
