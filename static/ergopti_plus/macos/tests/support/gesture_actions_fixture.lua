@@ -390,7 +390,7 @@ local function fresh_actions(options)
 			-- name and the parent it ran under.
 			for _, name in ipairs({ "select_line", "select_word", "paste_as_plain_text",
 				"toggle_uppercase", "toggle_titlecase", "selection_uppercase",
-				"selection_lowercase", "selection_titlecase" }) do
+				"selection_lowercase", "selection_titlecase", "surround_with_parens" }) do
 				child[name] = function(parent)
 					parent = parent or "shortcut_bindings"
 					if paused[parent] == true then return false end
@@ -419,6 +419,16 @@ local function fresh_actions(options)
 					name = "teleport_mouse", parent = parent,
 				}
 				return true
+			end
+			for _, name in ipairs({ "open_emoji_picker", "toggle_display_mirror" }) do
+				child[name] = function(parent)
+					parent = parent or "shortcut_bindings"
+					if paused[parent] == true then return false end
+					calls.mouse_actions[#calls.mouse_actions + 1] = {
+						name = name, parent = parent,
+					}
+					return true
+				end
 			end
 			child.lock_screen = function(parent)
 				parent = parent or "shortcut_bindings"

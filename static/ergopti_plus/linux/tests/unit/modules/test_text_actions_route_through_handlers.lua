@@ -125,6 +125,17 @@ helpers.describe("Linux text actions route through the daemon handlers", functio
 		helpers.assert_true(ok, tostring(err))
 	end)
 
+	helpers.it("surround_parens wraps the current line, as on Windows", function()
+		local Gestures, log = routed_gestures()
+		local ok, err = pcall(function()
+			Gestures.execute_action("surround_parens", "tap_3")
+			helpers.assert_eq(table.concat(log.presses, " / "), "Home / End / Home")
+			helpers.assert_eq(table.concat(log.injected, " / "), "( / )")
+		end)
+		log.restore()
+		helpers.assert_true(ok, tostring(err))
+	end)
+
 	helpers.it("the text actions exist only through the injected handlers", function()
 		local Gestures = helpers.load_module("modules.gestures.manager")
 		Gestures.init({ enabled = false, persist = false })

@@ -98,6 +98,7 @@ GestureActionCatalogueData() {
 	Items.Push({ Kind: "action", Id: "uppercase_selection" })
 	Items.Push({ Kind: "action", Id: "titlecase_selection" })
 	Items.Push({ Kind: "action", Id: "wrap_selection" })
+	Items.Push({ Kind: "action", Id: "surround_parens" })
 	Items.Push({ Kind: "heading", Level: 1, Key: "sg_actions.sg_order.header.modifier_chords" })
 	Items.Push({ Kind: "modifier_chords", Level: 2, GroupKey: "sg_actions.sg_order.header.modifier_chord_group" })
 	Items.Push({ Kind: "heading", Level: 1, Key: "sg_actions.sg_order.header.grp_media" })
@@ -128,9 +129,9 @@ GestureActionCatalogueData() {
 	Items.Push({ Kind: "action", Id: "ocr_screenshot" })
 	Items.Push({ Kind: "action", Id: "open_url" })
 	Items.Push({ Kind: "action", Id: "pick_color" })
+	Items.Push({ Kind: "action", Id: "open_emoji_picker" })
 	Items.Push({ Kind: "action", Id: "take_note" })
 	Items.Push({ Kind: "action", Id: "activity_simulation" })
-	Items.Push({ Kind: "action", Id: "surround_parens" })
 	Items.Push({ Kind: "action", Id: "search_web" })
 	Items.Push({ Kind: "action", Id: "teleport_mouse" })
 	Items.Push({ Kind: "action", Id: "spotlight_mouse" })
@@ -214,6 +215,7 @@ GestureActionCatalogueData() {
 	Actions["ocr_screenshot"] := { Family: "sg", LabelKey: "sg_actions.ocr_screenshot", Parameter: "", Confirm: false }
 	Actions["one_shot_shift"] := { Family: "sg", LabelKey: "sg_actions.one_shot_shift", Parameter: "", Confirm: false }
 	Actions["open_config"] := { Family: "sg", LabelKey: "sg_actions.open_config", Parameter: "", Confirm: false }
+	Actions["open_emoji_picker"] := { Family: "sg", LabelKey: "sg_actions.open_emoji_picker", Parameter: "", Confirm: false }
 	Actions["open_error_log"] := { Family: "sg", LabelKey: "sg_actions.open_error_log", Parameter: "", Confirm: false }
 	Actions["open_hotstrings_editor"] := { Family: "sg", LabelKey: "sg_actions.open_hotstrings_editor", Parameter: "", Confirm: false }
 	Actions["open_key_history"] := { Family: "sg", LabelKey: "sg_actions.open_key_history", Parameter: "", Confirm: false }
