@@ -137,6 +137,24 @@ _LMH_ReadyCase() {
 	} finally DirDelete(Dir, true)
 }
 
+Test("layout manager host: before any refresh the page shows the shipped catalogue as such (layout-manager-shipped-first)",
+	_LMH_ShippedFirstCase)
+
+_LMH_ShippedFirstCase() {
+	global _LayoutCatalogueLast
+	Dir := _LMH_TempDir()
+	Saved := _LayoutCatalogueLast
+	try {
+		_LayoutCatalogueLast := Map("index", 0, "source", "none", "error", 0)
+		State := LayoutManager_PageState(Dir)
+		Assert(State["index"] is Map, "the index shipped with the driver is listed before the first refresh")
+		AssertEqual("bundled", State["source"], "the page must not call the shipped catalogue no catalogue")
+	} finally {
+		_LayoutCatalogueLast := Saved
+		DirDelete(Dir, true)
+	}
+}
+
 Test("layout manager host: the active layout follows the emulation settings (layout-manager-bridge)", () => (
 	AssertEqual("ergol", LayoutManager_ActiveId(Map("layout", Map("emulated_layout", "ergol", "ergopti_base", true)))),
 	AssertEqual(ERGOPTI_PLUS_LAYOUT_ID, LayoutManager_ActiveId(Map("layout",
