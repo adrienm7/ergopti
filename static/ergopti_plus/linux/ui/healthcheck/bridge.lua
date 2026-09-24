@@ -481,8 +481,10 @@ end
 --- @return table
 function M.build_snapshot(state, detailed)
 	state = type(state) == "table" and state or {}
-	local started = now_ms()
+	-- The budget is the collection's: the shared documents load once per
+	-- session, before the clock starts
 	local schema = M.config().schema
+	local started = now_ms()
 	local facts = collect("system facts", function() return require("infra.diagnostic_snapshot").system_facts() end)
 	local permission_ids = {}
 	for id in pairs(schema.permissions[M.DRIVER] or {}) do permission_ids[#permission_ids + 1] = id end
@@ -511,8 +513,10 @@ function M.build_snapshot(state, detailed)
 	}
 	local elapsed = now_ms() - started
 	sections.developer.phase_a_ms = elapsed
+	-- Not a warning: the next snapshot would count it among the session's
+	-- problems. The report's developer section carries the duration.
 	if elapsed > schema.phase_a_budget_ms then
-		Logger.warn(LOG, "The synchronous diagnostics took %.1f ms, over the %d ms budget.", elapsed,
+		Logger.info(LOG, "The synchronous diagnostics took %.1f ms, over the %d ms budget.", elapsed,
 			schema.phase_a_budget_ms)
 	end
 	local undeclared = Snapshot.check_fields(snapshot, schema)

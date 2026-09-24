@@ -528,8 +528,10 @@ function M.run(opts)
 	opts = type(opts) == "table" and opts or {}
 	local detailed = opts.detailed == true
 	Logger.start(LOG, "Collecting the diagnostics…")
-	local started = hs.timer.absoluteTime()
+	-- The budget is the collection's: the shared documents load once per
+	-- session, before the clock starts
 	local schema = M.config().schema
+	local started = hs.timer.absoluteTime()
 	local permission_ids = {}
 	for id in pairs(schema.permissions[M.DRIVER] or {}) do permission_ids[#permission_ids + 1] = id end
 	table.sort(permission_ids)
@@ -571,8 +573,10 @@ function M.run(opts)
 
 	local elapsed = (hs.timer.absoluteTime() - started) / 1e6
 	sections.developer.phase_a_ms = elapsed
+	-- Not a warning: the next snapshot would count it among the session's
+	-- problems. The report's developer section carries the duration.
 	if elapsed > schema.phase_a_budget_ms then
-		Logger.warn(LOG, "The synchronous diagnostics took %.1f ms, over the %d ms budget.", elapsed,
+		Logger.info(LOG, "The synchronous diagnostics took %.1f ms, over the %d ms budget.", elapsed,
 			schema.phase_a_budget_ms)
 	end
 	local undeclared = Snapshot.check_fields(snapshot, schema)

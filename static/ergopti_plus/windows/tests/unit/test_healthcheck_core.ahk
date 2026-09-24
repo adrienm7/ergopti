@@ -173,6 +173,38 @@ Test("HealthCheck: an opening after the first reads no shared file (phase-a-shar
 	_TestHC_SecondOpeningReadsNoSharedFile)
 
 
+; Phase A logged its own overrun of the budget as a WARNING, which the next
+; snapshot counted among the session's problems: the window inflated the
+; counts it reports. The duration stays in the developer section. Compared
+; with the same two collections under a budget they cannot overrun, so a
+; collector's own warning does not count here (phase-a-budget-not-a-warning).
+_TestHC_OverBudgetIsNotAWarning() {
+	global _HealthCheckWarnCount
+	Schema := HealthCheck_Config()["schema"]
+	Saved := Schema["phase_a_budget_ms"]
+	try {
+		Schema["phase_a_budget_ms"] := 1000000
+		Before := _HealthCheckWarnCount
+		HealthCheck_Run()
+		HealthCheck_Run()
+		WithinBudget := _HealthCheckWarnCount - Before
+		; Every collection overruns a negative budget
+		Schema["phase_a_budget_ms"] := -1
+		Before := _HealthCheckWarnCount
+		HealthCheck_Run()
+		Last := HealthCheck_Run()
+		OverBudget := _HealthCheckWarnCount - Before
+	} finally {
+		Schema["phase_a_budget_ms"] := Saved
+	}
+	AssertEqual(WithinBudget, OverBudget, "an over-budget collection logged a warning")
+	Assert(Last["sections"]["developer"]["phase_a_ms"] is Number, "the duration stays in the developer section")
+}
+
+Test("HealthCheck: an over-budget collection is not a warning (phase-a-budget-not-a-warning)",
+	_TestHC_OverBudgetIsNotAWarning)
+
+
 ; =============================================
 ; ======= 2b/ The probes ======================
 ; =============================================

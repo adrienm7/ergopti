@@ -80,4 +80,24 @@ helpers.describe("healthcheck session issues (healthcheck-last-error-wired)", fu
 			helpers.assert_true(counts.error - errors_before >= 1, "the marker error must have been emitted")
 		end)
 	end)
+
+	-- Phase A logged its own overrun of the 5 ms budget as a WARNING, which the
+	-- next snapshot counted among the session's problems: the window inflated
+	-- the counts it reports, and the case above failed whenever a loaded
+	-- machine made one collection slower than the next. The duration stays in
+	-- the report's developer section (phase-a-budget-not-a-warning).
+	helpers.it("never counts its own duration among the session's warnings (phase-a-budget-not-a-warning)", function()
+		with_real_logger(function(_, healthcheck, counts)
+			-- Every collection overruns a negative budget
+			healthcheck.config().schema.phase_a_budget_ms = -1
+			local warns_before = counts.warn
+			local first = healthcheck.run()
+			local second = healthcheck.run()
+			helpers.assert_eq(counts.warn - warns_before, 0, "an over-budget collection logged a warning")
+			helpers.assert_eq(second.sections.issues.warn_count, first.sections.issues.warn_count,
+				"the first collection's duration was counted by the second")
+			helpers.assert_true(type(second.sections.developer.phase_a_ms) == "number",
+				"the duration stays in the developer section")
+		end)
+	end)
 end)
