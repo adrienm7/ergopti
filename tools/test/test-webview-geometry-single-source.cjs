@@ -109,7 +109,7 @@ const MACOS_MODULES = {
 	layer_editor: 'ui/layer_editor/init.lua',
 	onboarding: 'ui/onboarding/init.lua',
 	paths_editor: 'ui/menu/menu_paths.lua',
-	layout_manager: 'ui/menu/menu_layout_manager.lua',
+	layout_manager: 'ui/layout_manager/init.lua',
 	token_prompt: 'ui/menu/menu_llm/models_selector.lua',
 	healthcheck: 'ui/healthcheck/core.lua',
 	error_dialog: 'ui/error_dialog/init.lua',
