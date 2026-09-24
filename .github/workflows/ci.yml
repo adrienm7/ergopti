@@ -1001,6 +1001,26 @@ jobs:
           sudo bash static/ergopti_plus/linux/tests/hardware/run_daemon_live.sh
         timeout-minutes: 6
 
+      # The AI a user runs locally, run: the official Ollama serving a small
+      # model, asked through the production modules and the real curl transport
+      # for its model list, a download, streamed predictions, and — on its
+      # OpenAI-compatible endpoint, the dialect Cerebras speaks — the remote
+      # backend and its connectivity probe.
+      - name: AI predictions against a real Ollama
+        if: always()
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y --no-install-recommends lua-luv
+          curl -fsSL https://ollama.com/install.sh | sh
+          (ollama serve > "$RUNNER_TEMP/ollama.log" 2>&1 &) || true
+          for _ in $(seq 1 60); do curl -sf http://127.0.0.1:11434/api/tags >/dev/null && break; sleep 1; done
+          ollama pull qwen2.5:0.5b
+          cd static/ergopti_plus/linux
+          HOME="$(mktemp -d)" XDG_CONFIG_HOME= \
+            LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;' \
+            luajit tests/hardware/run_ollama_live.lua qwen2.5:0.5b
+        timeout-minutes: 12
+
       # touchpad_finder reads capability bits out of a printed bitmap, and that
       # rests on one thing the text cannot confirm: that the words are 64 bits
       # wide, most significant first, with leading zero words omitted. Its unit
@@ -1153,6 +1173,7 @@ jobs:
               --subject tray-sni-registration=1 \
               --subject atspi-focus-probe=1 \
               --subject daemon-live=1 \
+              --subject ollama-live=1 \
               --subject touchpad-capability=1 \
               --subject gesture-roundtrip=1 \
               --subject webview-settings=1 \

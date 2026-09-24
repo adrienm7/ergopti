@@ -14,6 +14,7 @@
 				"tray-sni-registration": 1,
 				"atspi-focus-probe": 1,
 				"daemon-live": 1,
+				"ollama-live": 1,
 				"touchpad-capability": 1,
 				"gesture-roundtrip": 1,
 				"webview-settings": 1,
