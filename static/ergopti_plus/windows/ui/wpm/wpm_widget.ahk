@@ -25,7 +25,9 @@
 ; =====================================================
 ; =====================================================
 
-; Returns a hex color string darkened by 25% (each RGB channel × 0.75).
+; Returns a hex color string with each RGB channel × the canon's
+; unit_strip_darken_factor, rounded half up — the rounding the shared Lua model
+; (_shared/lua/wpm_widget/model.lua darken_hex) uses on macOS and Linux.
 ; Input and output are 6-character hex strings without leading '#'.
 _WPMWidget_DarkenHex(hex) {
 		f := WPMWidgetConst.UNIT_DARKEN
@@ -69,6 +71,10 @@ WPMWidget_BuildCompact() {
 		g.OnEvent("Close", WPMWidget_Close)
 		; WM_EXITSIZEMOVE fires after the OS native move loop completes (PostMessage WM_NCLBUTTONDOWN).
 		OnMessage(0x0232, WPMWidget_DragEnd, 1)
+		; Rounded corners of the canon's radius, as on macOS and Linux: the pill
+		; used to be the only square one.
+		Diameter := 2 * WPMWidgetConst.CORNER_R
+		WinSetRegion("0-0 w" . w . " h" . h . " r" . Diameter . "-" . Diameter, "ahk_id " . g.Hwnd)
 
 		WPMWidget._gui       := g
 		WPMWidget._lbl_wpm   := lbl_wpm
@@ -266,11 +272,14 @@ WPMWidget_DrawGraph(pGfx, W, H, Label, AccentHex, Hist, Receipt,
 		Native := _WPMGdipFrameNative,
 		LabelPx := WPMWidgetConst.GRAPH_LABEL_PX,
 		GraphScaleMax := WPMWidgetConst.GRAPH_SCALE_MAX) {
-		static PAD := 5, CORNER_R := 8
-		static PILL_FILL   := 0xCC000000   ; rgba(0,0,0,0.8)
-		static PILL_STROKE := 0x66FFFFFF   ; rgba(255,255,255,0.4)
-		static LABEL_COLOR := 0xFFFFFFFF
-		static FILL_ALPHA  := 0x33         ; 0.2 x 255 — sparkline fill area
+		; The panel's look is the shared canon's [graph], as on macOS and Linux.
+		PAD         := WPMWidgetConst.GRAPH_PAD
+		CORNER_R    := WPMWidgetConst.GRAPH_CORNER_R
+		PILL_FILL   := _WPMWidget_Argb(WPMWidgetConst.GRAPH_BG, WPMWidgetConst.GRAPH_BG_ALPHA)
+		PILL_STROKE := _WPMWidget_Argb(WPMWidgetConst.GRAPH_BORDER, WPMWidgetConst.GRAPH_BORDER_ALPHA)
+		LABEL_COLOR := _WPMWidget_Argb(WPMWidgetConst.GRAPH_TEXT, 1.0)
+		FILL_ALPHA  := Round(WPMWidgetConst.GRAPH_FILL_ALPHA * 255)
+		LINE_ALPHA  := Round(WPMWidgetConst.GRAPH_LINE_ALPHA * 255)
 		LH := LabelPx * 2
 		GH := H - LH - PAD * 2
 		GW := W - PAD * 2
@@ -285,7 +294,7 @@ WPMWidget_DrawGraph(pGfx, W, H, Label, AccentHex, Hist, Receipt,
 		_WPMGdipFrameRequireOk(Native.FillPath(pGfx, bgBrush, pPath),
 				"GdipFillPath for the WPM background")
 		bgPen := 0
-		Status := Native.CreatePen(PILL_STROKE, 1, &bgPen)
+		Status := Native.CreatePen(PILL_STROKE, WPMWidgetConst.GRAPH_BORDER_W, &bgPen)
 		_WPMGdipFrameRequireCreated(Receipt, "pen", Status, bgPen,
 				"GdipCreatePen1 for the WPM background")
 		_WPMGdipFrameRequireOk(Native.DrawPath(pGfx, bgPen, pPath),
@@ -332,7 +341,7 @@ WPMWidget_DrawGraph(pGfx, W, H, Label, AccentHex, Hist, Receipt,
 										ptsLine, i * 8 + 4)
 						}
 						linePen := 0
-						Status := Native.CreatePen(0xFF000000 | Rgb, 2, &linePen)
+						Status := Native.CreatePen((LINE_ALPHA << 24) | Rgb, WPMWidgetConst.GRAPH_LINE_W, &linePen)
 						_WPMGdipFrameRequireCreated(Receipt, "pen", Status,
 								linePen, "GdipCreatePen1 for the WPM line")
 						_WPMGdipFrameRequireOk(Native.DrawLines(pGfx, linePen,
@@ -355,6 +364,12 @@ WPMWidget_DrawGraph(pGfx, W, H, Label, AccentHex, Hist, Receipt,
 		_WPMGdipFrameRequireOk(Native.DrawString(pGfx, Label,
 				WPMWidget._gdip_font, rect, WPMWidget._gdip_fmt, txtBrush),
 				"GdipDrawString for the WPM label")
+}
+
+
+; A canon colour and a 0.0-1.0 opacity as a GDI+ 0xAARRGGBB value.
+_WPMWidget_Argb(Hex, Alpha) {
+		return (Round(Alpha * 255) << 24) | WPMWidget_HexToRgbInt(Hex)
 }
 
 
@@ -381,13 +396,13 @@ WPMWidget_MakeRoundRectPath(X, Y, W, H, R, Receipt,
 
 
 ; Parses a 6-hex color string ("#rrggbb" or "rrggbb") into a 0xRRGGBB integer for
-; GDI+ ARGB construction. Falls back to the manual blue accent on bad input.
+; GDI+ ARGB construction. Falls back to the canon's manual colour on bad input.
 WPMWidget_HexToRgbInt(Hex) {
 		H := Trim(Hex)
 		if (SubStr(H, 1, 1) == "#")
 				H := SubStr(H, 2)
 		if !RegExMatch(H, "^[0-9A-Fa-f]{6}$")
-				H := "4499FF"
+				H := WPMWidgetConst.COLOR_BG_MANUAL
 		return (Integer("0x" . SubStr(H, 1, 2)) << 16)
 				| (Integer("0x" . SubStr(H, 3, 2)) << 8)
 				| Integer("0x" . SubStr(H, 5, 2))

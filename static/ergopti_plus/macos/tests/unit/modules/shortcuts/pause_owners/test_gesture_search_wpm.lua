@@ -45,6 +45,12 @@ local function load_real_wpm_surface(module_name)
 		format_mpm_label = function(value) return tostring(value) end,
 	}
 	package.loaded["infra.paths"] = { shared = function() return nil end }
+	-- The shared tree is unreachable here, so the timings registry is too: this
+	-- test is about pause ownership, not about where a refresh rate comes from.
+	package.loaded["infra.timings"] = {
+		sec = function() return 0.2 end,
+		ms = function() return 200 end,
+	}
 	package.loaded["adapters.graphics_renderer"] = {}
 	package.loaded["ui.tooltip"] = { is_visible = function() return false end }
 	reset_module(module_name)

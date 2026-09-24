@@ -7,6 +7,12 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local WPMModel = require("wpm_widget.model")
+local TomlCodec = require("toml_codec")
+local Paths = require("infra.paths")
+
+-- The real canon, read before any stub replaces the paths it lives at.
+local CANON = assert(WPMModel.load(Paths.shared("modules/wpm_widget/constants.toml"), TomlCodec.decode))
 
 return function(callback)
 	local original_hs = _G.hs
@@ -25,7 +31,7 @@ return function(callback)
 			package.loaded["modules.keylogger"] = { get_live_stats = function() return { wpm = 10 } end }
 			package.loaded["ui.wpm.wpm_widget"] = { _load_shared_const = function() return { source_color_duration = 1 } end }
 			package.loaded["ui.wpm.shared"] = { get_active_source = function() return "none" end,
-				format_mpm_label = function() return "10" end }
+				format_mpm_label = function() return "10" end, canon = function() return CANON end }
 			package.loaded["ui.tooltip"] = { is_visible = function() return false end }
 			package.loaded["adapters.timer_scheduler"] = {
 				every = function(_, run)

@@ -52,9 +52,6 @@ number_font_size = 20
 # Font size of the unit label, in points.
 unit_font_size = 8
 
-# Horizontal padding inside the pill (left and right of the number).
-padding_x = 14
-
 # How much of each RGB channel the unit strip keeps relative to the pill
 # background (strip = background × factor, rounded half up; 0.40 = 60 % darker).
 unit_strip_darken_factor = 0.40
@@ -161,11 +158,6 @@ text_idle = "#555577"
 
 # A hotstring group with no usable colour of its own.
 fallback_accent = "#007aff"
-
-# HSL parameters to re-project a group accent onto bg_manual's brightness
-# (#0055cc → L=0.40 S=1.00), keeping its hue.
-widget_hsl_l = 0.40
-widget_hsl_s = 1.00
 
 
 # ==================================
