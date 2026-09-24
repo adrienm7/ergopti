@@ -3266,127 +3266,109 @@ local function _build_language(ctx)
 	return { label = i18n_safe("menu.global.language"), submenu = rows }
 end
 
---- Builds the updater submenu (GitHub releases, channel switching, download).
-local function _build_updates(ctx)
+--- The updater block of the About submenu, as provider DATA: the version, one
+--- row per channel of the shared registry (ticked on the subscribed one) right
+--- before the check row, then the check-frequency picker. It used to be a
+--- Linux-only top-level "Updates" submenu with its own 'stable'/'dev' rows.
+--- @param ctx table Menu context.
+--- @return table rows
+local function _about_update_rows(ctx)
 	local up = ctx.updater
+	local version = up and up.current_version() or Version.VERSION
+	local out = {
+		{ label = "ErgoptiPlus " .. tostring(version), disabled = true },
+		{ separator = true },
+	}
 	if not up then
-		return { label = i18n_safe("menu.updates.title"), items = {
-			{ label = i18n_safe("menu.updates.unavailable"), disabled = true },
-		}}
-	end
-
-	--- The rows, as DATA. Every checkmark here is `checked`, not a "✓" glued onto
-	--- a label: the tray draws its own, so the string form was one platform's
-	--- convention leaking into text that twenty other languages also read.
-	--- @return table
-	local function rows()
-		local channel  = up.get_channel()
-		local interval = up.get_check_interval()
-		local out = {}
-
-		-- The version and channel the user is on, which is the question this
-		-- submenu is opened to answer.
-		out[#out + 1] = {
-			label = string.format("v%s (%s)", up.current_version(), channel),
-			disabled = true,
-		}
-		out[#out + 1] = { separator = true }
-
-		out[#out + 1] = {
-			label = up.get_menu_label(),
-			action = function()
-				up.check_for_updates(nil, function(available, release, err)
-					if available and release then
-						Logger.info(LOG, "Update available: %s.", release.tag)
-					elseif err then
-						Logger.warn(LOG, "Update check failed: %s.", tostring(err))
-					else
-						Logger.info(LOG, "No update available (current: %s).", up.current_version())
-					end
-					-- Told, and the menu redrawn: the install row appears only on a
-					-- rebuild, so a found update stayed invisible until the next one.
-					if type(ctx.on_update_checked) == "function" then
-						ctx.on_update_checked(available, release, err)
-					end
-				end)
-			end,
-		}
-
-		-- Only once there is something to install: a permanently visible
-		-- "download" row that does nothing is indistinguishable from a broken one.
-		if up.get_state() == "available" then
-			local rel = up.get_cached_release()
-			if rel then
-				out[#out + 1] = {
-					label = _fill(i18n_safe("menu.updates.download_install"), "{tag}", rel.tag),
-					action = function()
-						-- Consent names the release this row shows: the manager refuses
-						-- it if a background check replaced the cached release since.
-						up.download_update(rel.download_url, function(archive, err)
-							local installed = archive ~= nil and up.install_update(archive)
-							if not archive then
-								Logger.error(LOG, "Update download failed: %s.", tostring(err))
-							end
-							-- The daemon restarts on the new version, or tells why not.
-							if type(ctx.on_update_finished) == "function" then
-								ctx.on_update_finished(installed, rel.tag, archive and "install" or "download")
-							end
-						end)
-					end,
-				}
-			end
-		end
-
-		out[#out + 1] = { separator = true }
-
-		for _, entry in ipairs({
-			{ code = "stable", key = "menu.updates.channel_stable" },
-			{ code = "dev",    key = "menu.updates.channel_dev" },
-		}) do
-			out[#out + 1] = {
-				label   = i18n_safe(entry.key),
-				checked = channel == entry.code,
-				action  = function()
-					up.set_channel(entry.code)
-					Logger.info(LOG, "Update channel set to %s.", entry.code)
-				end,
-			}
-		end
-
-		out[#out + 1] = { separator = true }
-
-		for _, preset in ipairs(up.INTERVAL_PRESETS) do
-			out[#out + 1] = {
-				label   = _fill(i18n_safe("menu.updates.check_every"), "{interval}", preset.code),
-				checked = preset.seconds == interval,
-				action  = function()
-					up.set_check_interval(preset.seconds)
-					up.stop_background_checks()
-					up.start_background_checks()
-				end,
-			}
-		end
-
-		out[#out + 1] = { separator = true }
-
-		out[#out + 1] = {
-			label  = i18n_safe("menu.updates.open_releases"),
-			action = function()
-				local url = up.releases_page_url()
-				Logger.info(LOG, "Opening releases page: %s", url)
-				os.execute(string.format("xdg-open '%s' 2>/dev/null &", url:gsub("'", "'\\''")))
-			end,
-		}
-
+		Logger.error(LOG, "No updater module — the About menu shows no channel or check row.")
 		return out
 	end
 
-	local providers = { ["updates_actions"] = rows }
-	local items = ManifestMenu
-		and ManifestMenu.build("updates_menu", "Updates", nil, nil, ctx, providers)
-		or {}
-	return { label = i18n_safe("menu.updates.title"), submenu = items }
+	local channel = up.get_channel()
+	for _, id in ipairs(up.CHANNELS.ids()) do
+		out[#out + 1] = {
+			label   = i18n_safe(up.CHANNELS.channel(id).menu_label_key),
+			checked = channel == id,
+			action  = function()
+				if not up.set_channel(id) then return end
+				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			end,
+		}
+	end
+
+	-- A check discovers releases; installation needs the separately named row.
+	out[#out + 1] = {
+		label = up.get_menu_label(),
+		disabled = up.get_state() == "checking" or up.get_state() == "downloading"
+			or up.get_state() == "installing",
+		action = function()
+			up.check_for_updates(nil, function(available, release, err)
+				if available and release then
+					Logger.info(LOG, "Update available: %s.", release.tag)
+				elseif err then
+					Logger.warn(LOG, "Update check failed: %s.", tostring(err))
+				else
+					Logger.info(LOG, "No update available (current: %s).", up.current_version())
+				end
+				if type(ctx.on_update_checked) == "function" then
+					ctx.on_update_checked(available, release, err)
+				end
+				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			end)
+		end,
+	}
+
+	-- Only once there is something to install: a permanently visible
+	-- "download" row that does nothing is indistinguishable from a broken one.
+	if up.get_state() == "available" then
+		local rel = up.get_cached_release()
+		if rel then
+			out[#out + 1] = {
+				label = _fill(i18n_safe("menu.about.update_now"), "{tag}", rel.tag),
+				action = function()
+					-- Consent names the release this row shows: the manager refuses
+					-- it if a background check replaced the cached release since.
+					up.download_update(rel.download_url, function(archive, err)
+						local installed = archive ~= nil and up.install_update(archive)
+						if not archive then
+							Logger.error(LOG, "Update download failed: %s.", tostring(err))
+						end
+						-- The daemon restarts on the new version, or tells why not.
+						if type(ctx.on_update_finished) == "function" then
+							ctx.on_update_finished(installed, rel.tag, archive and "install" or "download")
+						end
+					end)
+				end,
+			}
+		end
+	end
+
+
+	local interval = up.get_check_interval()
+	local frequency_rows = {}
+	local current_label = nil
+	for _, preset in ipairs(up.INTERVAL_PRESETS) do
+		local label = i18n_safe("menu.about.frequency." .. preset.code)
+		if preset.seconds == interval then current_label = label end
+		frequency_rows[#frequency_rows + 1] = {
+			label   = label,
+			checked = preset.seconds == interval,
+			action  = function()
+				up.set_check_interval(preset.seconds)
+				up.stop_background_checks()
+				up.start_background_checks()
+				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			end,
+		}
+	end
+	out[#out + 1] = {
+		label = i18n_safe("menu.about.frequency_menu") .. ": " .. (current_label or tostring(interval)),
+		items = frequency_rows,
+	}
+	return out
 end
+
+M._about_update_rows = _about_update_rows
 
 --- Builds the about item.
 local function _build_about(ctx)
@@ -3404,10 +3386,21 @@ local function _build_about(ctx)
 			end
 			ctx.webview.show("changelog")
 		end,
+		["about_releases_page"] = function()
+			if type(ctx.updater) ~= "table" then
+				Logger.error(LOG, "No updater module — the releases page URL is unknown.")
+				return
+			end
+			local url = ctx.updater.releases_page_url()
+			Logger.info(LOG, "Opening releases page: %s", url)
+			pcall(function() os.execute("xdg-open " .. shell_quote(url) .. " 2>/dev/null &") end)
+		end,
 	}
 
 	local rows = ManifestMenu
-		and ManifestMenu.build("about_menu", "About", nil, nil, render_ctx)
+		and ManifestMenu.build("about_menu", "About", nil, nil, render_ctx, {
+			["about_updates"] = function() return _about_update_rows(ctx) end,
+		})
 		or {}
 	return { label = i18n_safe("menu.about.title"), submenu = rows }
 end
@@ -3615,7 +3608,6 @@ function M.build(ctx)
 		["shortcuts"]       = _build_shortcuts,
 		["tap_holds"]       = _build_tap_holds,
 		["gestures"]        = _build_gestures,
-		["updates"]         = _build_updates,
 		["configuration"]   = _build_configuration,
 		["language"]        = _build_language,
 		["about"]           = _build_about,

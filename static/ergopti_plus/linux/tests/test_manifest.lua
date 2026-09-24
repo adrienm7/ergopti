@@ -234,6 +234,7 @@ return {
 	"tests.unit.modules.test_gesture_under_load",
 	"tests.unit.modules.test_mt_decoder",
 	"tests.unit.modules.test_touchpad_finder",
+	"tests.unit.ui.test_about_menu_channel_rows",
 	"tests.unit.ui.test_asset_inlining_is_loud",
 	"tests.unit.ui.test_healthcheck_linux_rows",
 	"tests.unit.ui.test_hotstring_bulk_checkboxes",

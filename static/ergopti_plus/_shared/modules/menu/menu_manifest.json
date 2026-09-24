@@ -293,19 +293,10 @@
 	"about_menu": [
 		{
 			"type": "list",
-			"id": "about_updates",
-			"platforms": [
-				"ahk",
-				"hs"
-			],
-			"reason_key": "platform_reason.tray_top_level_rows_are_each_drivers"
+			"id": "about_updates"
 		},
 		{
-			"type": "---",
-			"platforms": [
-				"ahk",
-				"hs"
-			]
+			"type": "---"
 		},
 		{
 			"type": "command",
@@ -315,12 +306,7 @@
 		{
 			"type": "command",
 			"id": "about_releases_page",
-			"i18n": "menu.about.open_releases_page",
-			"platforms": [
-				"ahk",
-				"hs"
-			],
-			"reason_key": "platform_reason.tray_top_level_rows_are_each_drivers"
+			"i18n": "menu.about.open_releases_page"
 		}
 	],
 	"apps_menu": [
@@ -336,15 +322,6 @@
 		{
 			"type": "list",
 			"id": "locales"
-		}
-	],
-	"updates_menu": [
-		{
-			"type": "list",
-			"id": "updates_actions",
-			"platforms": [
-				"linux"
-			]
 		}
 	],
 	"configuration_menu": [

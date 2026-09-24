@@ -5,11 +5,12 @@
 --- DESCRIPTION:
 --- Self-update engine for the Linux driver. Checks the GitHub Releases API,
 --- compares versions via the shared semver module, downloads the latest asset,
---- verifies integrity, and performs self-replacement. Supports channel switching
---- (stable → dev, dev → stable) and background polling at a configurable interval.
+--- verifies integrity, and performs self-replacement. Owns the subscribed update
+--- channel (any channel of the shared registry) and background polling at a
+--- configurable interval.
 ---
---- Persists user preferences (channel, interval, last notified tag) via the
---- storage adapter so settings survive daemon restarts.
+--- The channel is config.toml [updater] channel, like on the other drivers;
+--- the interval and the last notified tag stay in the storage adapter.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Event-loop-owned transport: the shared Linux HTTP adapter spawns curl
@@ -19,7 +20,10 @@
 ---    the API rate limit.
 --- 3. Shared parser: delegates JSON parsing to _shared/lua/updater/release_parser.lua
 ---    which requires no full JSON decoder.
---- 4. Version compare: delegates to _shared/lua/updater/version.lua (semver).
+--- 4. Shared channels: every channel reads the same release list and keeps its
+---    latest release through _shared/lua/updater/channels.lua (the registry in
+---    _shared/modules/updater/channels.json); version order comes from
+---    _shared/lua/updater/version.lua.
 --- 5. Background poller: uses the timer_scheduler adapter (luv-based when
 ---    available) with a graceful fallback message when luv is absent.
 --- 6. Self-replace: downloads the latest archive, extracts it, and replaces
@@ -32,8 +36,11 @@ local Logger    = require("logger.shim")
 local Paths     = require("infra.paths")
 local Version   = require("updater.version")
 local Parser    = require("updater.release_parser")
+local Channels  = require("updater.channels")
 local Installer = require("modules.updater.installer")
 local Json      = require("json")
+local TomlCodec = require("toml_codec")
+local TomlWriter = require("toml_codec.writer")
 local Fs        = require("adapters.file_system")
 local HttpClient = require("adapters.http_client")
 local FileDigest = require("adapters.file_digest")
@@ -99,8 +106,42 @@ local _defs = load_updater_defaults()
 local GH_OWNER = (_defs.github and _defs.github.owner) or _DEFAULTS_FALLBACK.github.owner
 local GH_REPO  = (_defs.github and _defs.github.repo)  or _DEFAULTS_FALLBACK.github.repo
 
--- How many prerelease pages to fetch for the dev channel.
-local DEV_PAGE_SIZE = 10
+--- Resolves the release list every channel reads. No fallback: /releases/latest
+--- ignores prereleases and answers 404 while a channel has no release, which is
+--- the failure this list replaced.
+--- @param defs table Parsed updater defaults.
+--- @return string url
+local function require_check_releases_url(defs)
+	local check = type(defs) == "table" and defs.update_check or nil
+	local template = type(check) == "table" and check.releases_url or nil
+	if type(template) ~= "string" or not template:find("{owner}/{repo}", 1, true)
+		or not template:match("^https://api%.github%.com/") then
+		error("updater defaults do not declare update_check.releases_url", 0)
+	end
+	return (template:gsub("{owner}", function() return GH_OWNER end)
+		:gsub("{repo}", function() return GH_REPO end))
+end
+
+local CHECK_RELEASES_URL = require_check_releases_url(_defs)
+
+--- Loads the shared update-channel registry. Unlike the timing defaults it has
+--- no fallback: a guessed channel list could offer another channel's artifacts.
+--- @return table registry updater.channels interpreter.
+local function load_channel_registry()
+	local path = Paths.shared("modules/updater/channels.json")
+	local raw = path and Fs.read(path) or nil
+	if type(raw) ~= "string" then error("the shared update channel registry is unreadable", 0) end
+	local registry, err = Channels.load(Json.decode(raw))
+	if not registry then error("the shared update channel registry is invalid: " .. tostring(err), 0) end
+	return registry
+end
+
+local CHANNELS = load_channel_registry()
+M.CHANNELS = CHANNELS
+
+-- The config.toml section and key of the subscribed channel, as on the other drivers.
+local CONFIG_SECTION = "updater"
+local CONFIG_CHANNEL_KEY = "channel"
 
 -- User-Agent header required by GitHub API.
 local USER_AGENT = "ErgoptiPlus-Updater-Linux/1.0"
@@ -166,7 +207,7 @@ M.LINUX_CHECKSUM_ASSET_NAME = LINUX_CHECKSUM_ASSET_NAME
 -- Path for the ETag cache (one per channel).
 local function etag_cache_path(channel)
 	local home = require("infra.config_paths").home()
-	return home .. "/.cache/ergopti_updater_etag_" .. (channel or "stable") .. ".txt"
+	return home .. "/.cache/ergopti_updater_etag_" .. channel .. ".txt"
 end
 
 -- =========================================
@@ -182,7 +223,9 @@ local _session_notified = ""       -- throttles repeats when persistence is unav
 local _bg_timer_handle = nil       -- timer_scheduler handle for background polling
 local _boot_timer_handle = nil     -- one-shot boot-check handle
 local _check_interval  = DEFAULT_INTERVAL_SEC
-local _channel         = nil -- "stable" | "dev"; resolved below, then by init()
+local _channel         = nil       -- registry channel id; resolved at the end of this file
+local _config_path     = nil       -- config.toml holding [updater] channel; set by init()
+local _channel_persisted = false   -- whether config.toml names the channel (else it is the default)
 local _installed_launcher = nil  -- wrapper of the installation an update replaced
 local _download_part   = nil
 local _download_dest   = nil
@@ -208,25 +251,60 @@ local function _storage_set(key, value)
 	return false
 end
 
---- The channel an installation follows until the user picks one: the one its
---- own version was published on, as on macOS. A prerelease build ("-dev.N")
---- follows prereleases; on "stable" it asked /releases/latest, which never
---- lists a prerelease, and so found no update at all (HTTP 404).
---- @return string "stable" | "dev"
-function M.default_channel()
-	local version = tostring(M.current_version())
-	if version == "local" or version:match("%-dev%.") then return "dev" end
-	return "stable"
+--- Reads the subscribed channel from config.toml [updater] channel, resolved
+--- through the registry (a hand-written alias such as "stable" reads as its
+--- channel). An absent file or key yields nil; an unreadable file or an unknown
+--- value is logged and yields nil, so the installed build's channel is followed.
+--- @param path string|nil config.toml path.
+--- @return string|nil id
+local function _read_persisted_channel(path)
+	if type(path) ~= "string" or path == "" then return nil end
+	local content = Fs.read(path)
+	if content == nil then return nil end
+	local ok, config = pcall(TomlCodec.decode, content)
+	if not ok or type(config) ~= "table" then
+		Logger.error(LOG, "config.toml could not be parsed; the update channel follows the installed build.")
+		return nil
+	end
+	local section = config[CONFIG_SECTION]
+	local raw = type(section) == "table" and section[CONFIG_CHANNEL_KEY] or nil
+	if raw == nil then return nil end
+	local id = CHANNELS.resolve(raw)
+	if not id then
+		Logger.warn(LOG, "config.toml names an unknown update channel '%s'; following the installed build.",
+			tostring(raw))
+	end
+	return id
 end
 
 local function _load_persisted()
-	local stored = _storage_get("updater.channel", nil)
-	_channel = (stored == "stable" or stored == "dev") and stored or M.default_channel()
+	local persisted = _read_persisted_channel(_config_path)
+	_channel_persisted = persisted ~= nil
+	_channel = persisted or M.installed_channel()
 	local interval = _storage_get("updater.interval_sec", nil)
 	if type(interval) == "number" and interval >= 0 then
 		_check_interval = interval
 	end
 	_last_notified = _storage_get("updater.last_notified", "")
+end
+
+--- Writes the subscribed channel to config.toml through the shared TOML writer.
+--- @param id string Registry channel id.
+--- @return boolean committed
+local function _persist_channel(id)
+	if type(_config_path) ~= "string" or _config_path == "" then
+		Logger.error(LOG, "Update channel '%s' cannot be saved: the updater has no config path (init not run).", id)
+		return false
+	end
+	local call_ok, committed, err = pcall(TomlWriter.batch_write, _config_path, {
+		{ section = CONFIG_SECTION, key = CONFIG_CHANNEL_KEY, value = id },
+	})
+	if not call_ok or committed ~= true then
+		Logger.error(LOG, "Update channel '%s' could not be written to config.toml: %s.", id,
+			tostring(call_ok and err or committed))
+		return false
+	end
+	return true
 end
 
 -- =========================================
@@ -235,17 +313,12 @@ end
 -- =========================================
 -- =========================================
 
---- Builds the GitHub Releases API URL for a given channel.
---- Stable → /releases/latest (single object)
---- Dev    → /releases?per_page=N (sorted array, newest first)
---- @param channel string "stable" | "dev"
+--- Returns the GitHub Releases list every channel reads (defaults.json
+--- update_check.releases_url). Each channel keeps its own latest release from
+--- it through the shared registry.
 --- @return string URL
-function M.release_api_url(channel)
-	local base = "https://api.github.com/repos/" .. GH_OWNER .. "/" .. GH_REPO .. "/releases"
-	if channel == "dev" then
-		return base .. "?per_page=" .. tostring(DEV_PAGE_SIZE)
-	end
-	return base .. "/latest"
+function M.release_api_url()
+	return CHECK_RELEASES_URL
 end
 
 --- Returns the public releases page URL shown to the user.
@@ -254,7 +327,7 @@ function M.releases_page_url()
 end
 
 --- Builds one shell-free conditional GitHub Releases request.
---- @param channel string "stable" | "dev".
+--- @param channel string Registry channel id (keys the ETag cache).
 --- @return string url
 --- @return table headers
 --- @return table options
@@ -275,7 +348,7 @@ local function _build_fetch_request(channel)
 		options.etag_save = etag_file
 		if Fs.exists(etag_file) then options.etag_compare = etag_file end
 	end
-	return M.release_api_url(channel), {
+	return M.release_api_url(), {
 		Accept = "application/vnd.github+json",
 		["User-Agent"] = USER_AGENT,
 	}, options
@@ -313,18 +386,22 @@ end
 
 M._fetch_releases = _fetch_releases
 
---- Normalises the raw release JSON based on channel.
---- Stable: the response IS the release object.
---- Dev: the response is an array — picks the latest prerelease (or first item).
---- @param body string Raw JSON response.
---- @param channel string
---- @return string Normalised release object JSON.
-local function _normalize_release_json(body, channel)
-	if channel == "dev" and body:match("^%s*%[") then
-		return Parser.pick_latest_prerelease(body, Version.compare_versions)
-	end
-	return body
+--- Returns the JSON object of a channel's latest release in the release list,
+--- chosen by the registry's tag rule and semver order (GitHub lists by publish
+--- date, so a later stable must not hide a higher dev build or the reverse).
+--- @param body string Raw releases array JSON.
+--- @param channel string Registry channel id.
+--- @return string|nil release Release object JSON, or nil when the list holds none.
+local function _select_channel_release(body, channel)
+	if not body:match("^%s*%[") then return nil end
+	local chunks = Parser.split_releases_array(body)
+	local tags = {}
+	for index, chunk in ipairs(chunks) do tags[index] = Parser.parse_tag(chunk) end
+	local best = CHANNELS.pick_latest(tags, channel)
+	return best and chunks[best] or nil
 end
+
+M._select_channel_release = _select_channel_release
 
 --- Selects only the canonical Linux self-update archive from one release.
 --- The shared parser binds name and URL from the same asset object and returns
@@ -362,12 +439,25 @@ function M.repo_info()
 	return { owner = GH_OWNER, repo = GH_REPO }
 end
 
---- Applies one validated release response to updater state.
---- @param body string Raw GitHub response body.
---- @param channel string "stable" | "dev".
+--- Returns the channel of the running build: the registry channel that owns its
+--- version, or the unreleased-build channel for a source checkout.
+--- @return string id
+function M.installed_channel()
+	return CHANNELS.channel_for_tag(M.current_version()) or CHANNELS.unreleased_build_channel
+end
+
+--- Applies one validated release list to updater state.
+--- @param body string Raw GitHub response body (the release list).
+--- @param channel string Registry channel id.
 --- @return boolean Whether a newer canonical Linux release is available.
 local function _process_release_response(body, channel)
-	body = _normalize_release_json(body, channel)
+	local release = _select_channel_release(body, channel)
+	if not release then
+		Logger.info(LOG, "Update check result: no release on channel '%s' yet.", channel)
+		_state = "idle"
+		return false
+	end
+	body = release
 	local latest_tag = Parser.parse_tag(body)
 
 	if latest_tag == "" then
@@ -393,7 +483,10 @@ local function _process_release_response(body, channel)
 		return true
 	end
 
-	if not Version.is_newer_version(latest_tag, current) then
+	-- A deliberate switch to another channel offers that channel's latest release
+	-- even when semver orders it below the installed build (the same rule as the
+	-- other drivers, pinned by channel_vectors.json).
+	if not CHANNELS.should_offer(latest_tag, current, channel, M.installed_channel()) then
 		-- Info, not debug: "the check ran and found nothing" is the answer a user
 		-- asking "why did it not update" needs, and it happens a few times a day.
 		Logger.info(LOG, "Update check result: up to date (current %s, latest %s).", current, latest_tag)
@@ -439,7 +532,7 @@ local function publish_check(callback, available, release, err)
 end
 
 --- Checks the GitHub API for a newer release without blocking the event loop.
---- @param channel string|nil "stable" or "dev"; defaults to active channel.
+--- @param channel string|nil Registry channel id; defaults to the active channel.
 --- @param callback function|nil Receives available, release, error.
 --- @return boolean Whether the asynchronous request was dispatched.
 function M.check_for_updates(channel, callback)
@@ -516,7 +609,7 @@ end
 --- Starts periodic update checks.
 --- The first check fires after boot_check_delay_sec; subsequent checks run
 --- every interval_sec seconds.
---- @param channel string|nil "stable" or "dev"; defaults to persisted channel.
+--- @param channel string|nil Registry channel id; defaults to the persisted channel.
 --- @param interval_sec number|nil Seconds between checks; defaults to persisted interval.
 --- @param on_available function|nil Callback invoked when a new version is found.
 function M.start_background_checks(channel, interval_sec, on_available)
@@ -823,26 +916,30 @@ function M.get_channel()
 	return _channel
 end
 
---- Switches the update channel and persists the choice.
+--- Switches the update channel and persists it to config.toml [updater] channel.
 --- Clears cached release data when switching channels.
---- @param new_channel string "stable" | "dev"
+--- @param new_channel string Registry channel id (exact; aliases are resolved
+---   only where config.toml is read).
 --- @return boolean Whether the active channel matches the request.
 function M.set_channel(new_channel)
-	if new_channel ~= "stable" and new_channel ~= "dev" then
+	if type(new_channel) ~= "string" or CHANNELS.channel(new_channel) == nil then
 		Logger.warn(LOG, "Unknown channel '%s' — keeping '%s'.", tostring(new_channel), _channel)
 		return false
 	end
-	if new_channel == _channel then return true end
+	-- A choice equal to the default is still written: the user picked it, and
+	-- a later build of another channel must not move them off it.
+	if new_channel == _channel and _channel_persisted then return true end
 	if (_state == "checking" or _state == "downloading") and not M.cancel_update() then
 		Logger.error(LOG, "Update channel cannot change while updater ownership is live.")
 		return false
 	end
 
-	if not _storage_set("updater.channel", new_channel) then
+	if not _persist_channel(new_channel) then
 		Logger.error(LOG, "Update channel '%s' could not be persisted — keeping '%s'.", new_channel, _channel)
 		return false
 	end
 	_channel = new_channel
+	_channel_persisted = true
 	if _verified_archive then Fs.delete(_verified_archive); _verified_archive = nil end
 	_state = "idle"
 	_cached_release = nil
@@ -940,11 +1037,7 @@ function M.get_menu_label()
 	if _state == "installing" then
 		return i18n.get("menu.about.update_installing")
 	end
-	-- "(dev)" is the channel's own name, the same token in every locale — see
-	-- changelog_window.channel_dev, which is "Dev" in English and in French.
-	if _channel == "dev" then
-		return i18n.get("menu.about.check_for_updates") .. " (dev)"
-	end
+	-- The channel has its own row; checking never grants install consent.
 	return i18n.get("menu.about.check_for_updates")
 end
 
@@ -955,10 +1048,11 @@ end
 -- =========================================
 
 --- Initialises the updater: loads persisted settings, starts background checks.
---- @param opts table|nil { channel, interval_sec, on_available }
+--- @param opts table|nil { config_path, channel, interval_sec, on_available }
 function M.init(opts)
 	opts = type(opts) == "table" and opts or {}
 
+	_config_path = opts.config_path or require("infra.config_paths").config("config.toml")
 	_load_persisted()
 
 	if opts.channel then
@@ -975,7 +1069,7 @@ function M.init(opts)
 	M.start_background_checks(nil, nil, on_available)
 end
 
--- The channel before init() reads the user's choice: the one the build follows.
-_channel = M.default_channel()
+-- Until init() reads config.toml, the running build's channel is followed.
+_channel = M.installed_channel()
 
 return M

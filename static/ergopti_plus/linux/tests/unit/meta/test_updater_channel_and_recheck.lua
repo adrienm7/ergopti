@@ -20,16 +20,35 @@ local function updater(version, stored)
 		version = package.loaded["infra.version"],
 		storage = package.loaded["adapters.storage"],
 		manager = package.loaded["modules.updater.manager"],
+		fs = package.loaded["adapters.file_system"],
 	}
+	local fs = require("adapters.file_system")
+	local config_path = "/virtual/updater-channel-test.toml"
+	local configured = stored and stored["updater.channel"]
+	package.loaded["adapters.file_system"] = setmetatable({
+		read = function(path)
+			if path == config_path then
+				return configured and ('[updater]\nchannel = "' .. configured .. '"\n') or nil
+			end
+			return fs.read(path)
+		end,
+	}, { __index = fs })
 	package.loaded["infra.version"] = { VERSION = version }
 	package.loaded["adapters.storage"] = Fakes.storage({ initial = stored or {} })
 	package.loaded["modules.updater.manager"] = nil
 	local M = require("modules.updater.manager")
+	local init = M.init
+	M.init = function(opts)
+		opts = opts or {}
+		opts.config_path = config_path
+		return init(opts)
+	end
 	local function restore()
 		M.stop_background_checks()
 		package.loaded["infra.version"] = saved.version
 		package.loaded["adapters.storage"] = saved.storage
 		package.loaded["modules.updater.manager"] = saved.manager
+		package.loaded["adapters.file_system"] = saved.fs
 	end
 	return M, restore
 end
@@ -63,14 +82,14 @@ helpers.describe("updater: the channel an installation follows", function()
 	helpers.it("follows stable releases when it is one", function()
 		with_updater("4.2.0", nil, function(M)
 			M.init({ interval_sec = 0 })
-			helpers.assert_eq(M.get_channel(), "stable")
+			helpers.assert_eq(M.get_channel(), M.CHANNELS.resolve("stable"))
 		end)
 	end)
 
 	helpers.it("keeps the channel the user picked", function()
 		with_updater("0.0.0-dev.133", { ["updater.channel"] = "stable" }, function(M)
 			M.init({ interval_sec = 0 })
-			helpers.assert_eq(M.get_channel(), "stable")
+			helpers.assert_eq(M.get_channel(), M.CHANNELS.resolve("stable"))
 		end)
 	end)
 

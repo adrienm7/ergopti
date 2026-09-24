@@ -3188,19 +3188,17 @@ platforms = ["ahk", "hs", "linux"]
 # The About submenu. Declared 2026-08-07; it had no description on any driver,
 # and the three carried the same shapes independently.
 #
-# The updater block and the releases link are ahk and hs only, and the reason is
-# already written for the top-level rows: Linux has its updater as its own
-# top-level entry (`updates_menu`), where the other two keep theirs under About.
-# The changelog is the one row all three share.
+# All three drivers show the same block: the version, one row per channel of the
+# shared update-channel registry right before the check row, the check
+# frequency (a `list`, because its rows come from the registry and the updater
+# state), then Versions and its GitHub page. Linux had its updater as a separate
+# top-level "Updates" entry until 2026-09.
 [[menu.about_menu]]
 type = "list"
 id = "about_updates"
-platforms = ["ahk", "hs"]
-reason_key = "platform_reason.tray_top_level_rows_are_each_drivers"
 
 [[menu.about_menu]]
 type = "---"
-platforms = ["ahk", "hs"]
 
 [[menu.about_menu]]
 type = "command"
@@ -3211,8 +3209,6 @@ i18n = "menu.about.changelog"
 type = "command"
 id = "about_releases_page"
 i18n = "menu.about.open_releases_page"
-platforms = ["ahk", "hs"]
-reason_key = "platform_reason.tray_top_level_rows_are_each_drivers"
 
 # The Applications submenu, macOS only: it lists the bundled applications
 # found on disk and launches them. Linux's copy held only the config-folder row,
@@ -3237,16 +3233,6 @@ platforms = ["hs"]
 [[menu.language_menu]]
 type = "list"
 id = "locales"
-
-# The updates submenu — Linux is the only driver with an in-app updater surface
-# at top level; the other two carry theirs under "about". It is a `list` because
-# its rows are the current version, the channel the user picked and the interval
-# presets, none of which a static entry can enumerate, and a `list` is what puts
-# them in the renderer rather than in the driver.
-[[menu.updates_menu]]
-type = "list"
-id = "updates_actions"
-platforms = ["linux"]
 
 # The Configuration submenu: everything about the configuration itself, never
 # one feature. It replaced « Actions globales », whose « Tout activer » and
