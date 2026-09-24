@@ -22,9 +22,10 @@
  *    replay the same file through their ports.
  * 2. A malformed registry is refused at creation, never degraded to a default.
  * 3. Every channel names locale keys present and non-empty in all 21 locales.
- * 4. The generated artifacts (page data, AHK constants) equal a fresh render
- *    of the registry, and the page data evaluates to the registry itself (the
- *    AHK suite checks its data by replaying the vectors through it).
+ * 4. The generated artifacts (page data, AHK data, launcher feeds) equal a
+ *    fresh render of the registry; the page data and the launcher feed table
+ *    are also read back and compared with the registry itself (the AHK suite
+ *    checks its data by replaying the vectors through it).
  * 5. The tag families the release workflow publishes each belong to exactly one
  *    channel, and that channel's github_prerelease flag is the one CI sets.
  * ==============================================================================
@@ -47,6 +48,9 @@ const WORKFLOW_PATH = path.join(ROOT, '.github', 'workflows', 'ci.yml');
 const GENERATOR_PATH = path.join(ROOT, 'tools', 'codegen', 'codegen-update-channels.cjs');
 const VERSION_PATH = path.join(SHARED, 'modules', 'updater', 'version.js');
 const PAGE_DATA_PATH = path.join(SHARED, 'ui', '_generated', 'update_channel_registry.js');
+const SWIFT_FEEDS_PATH = path.join(
+	ROOT, 'static', 'ergopti_plus', 'macos', 'launcher', 'Sources', 'ErgoptiPlus', 'UpdateChannels.generated.swift'
+);
 const LOCALE_COUNT = 21;
 const MIN_VECTORS = { tag: 20, resolve: 5, visible: 5, offer: 8, pick: 5 };
 
@@ -208,13 +212,31 @@ function checkPageData(registry) {
 	);
 }
 
+/**
+ * Reads the launcher's committed feed table back and compares it with the
+ * registry: the launcher accepts a command only for these ids and serves the
+ * named appcast, so a stale table would route a channel to another feed.
+ */
+function checkSwiftFeeds(registry) {
+	const source = fs.readFileSync(SWIFT_FEEDS_PATH, 'utf8');
+	const table = /let kUpdateChannelFeeds: \[String: String\] = \[([\s\S]*?)\n\]/.exec(source);
+	expect(table !== null, 'UpdateChannels.generated.swift must declare kUpdateChannelFeeds');
+	if (!table) return;
+	const pairs = [...table[1].matchAll(/"([^"]+)": "([^"]+)",/g)].map((m) => [m[1], m[2]]);
+	const expected = registry.channels.map((channel) => [channel.id, channel.sparkle_feed]);
+	expect(
+		JSON.stringify(pairs) === JSON.stringify(expected),
+		`the launcher's feed table ${JSON.stringify(pairs)} must equal the registry ${JSON.stringify(expected)}`
+	);
+}
+
 function checkGeneratedArtifacts(registry) {
 	// eslint-disable-next-line global-require
 	const generator = require(GENERATOR_PATH);
 	expect(typeof generator.renderOutputs === 'function', 'the generator must export renderOutputs(registry)');
 	if (typeof generator.renderOutputs !== 'function') return;
 	const outputs = generator.renderOutputs(registry);
-	expect(outputs.length >= 2, 'the generator must render the page data and the AHK constants');
+	expect(outputs.length >= 3, 'the generator must render the page data, the AHK data and the Swift feeds');
 	for (const output of outputs) {
 		const committed = fs.existsSync(output.path) ? fs.readFileSync(output.path, 'utf8') : null;
 		expect(
@@ -282,6 +304,7 @@ function checkWorkflowFamilies(channels) {
 		checkLocales(registry);
 		checkGeneratedArtifacts(registry);
 		checkPageData(registry);
+		checkSwiftFeeds(registry);
 		checkWorkflowFamilies(channels);
 	} catch (error) {
 		failures.push(`the contract could not run: ${error && error.stack ? error.stack : error}`);

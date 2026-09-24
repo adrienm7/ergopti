@@ -521,6 +521,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	private var hsLogFolderRefusal: LogDirectoryFailure?
 	private var loggerWorker: LoggerDatagramServing?
 	private var updater: SPUUpdater?
+	// Retained here: Sparkle keeps its delegate weakly.
+	private let updateChannelFeed = UpdateChannelFeed()
 	private let updaterCommandRouter = UpdaterCommandRouter()
 	private let launcherIdentityReader: (String?) -> (device: String, inode: String)?
 	private let applicationLauncher: (
@@ -628,7 +630,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			hostBundle: Bundle.main,
 			applicationBundle: Bundle.main,
 			userDriver: userDriver,
-			delegate: nil
+			delegate: updateChannelFeed
 		)
 		if let refusal = UpdateConsentPolicy.refusal(for: sparkle) {
 			LauncherLog.write("ERROR: Sparkle updater not started: \(refusal)")
@@ -636,7 +638,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			do {
 				try sparkle.start()
 				updater = sparkle
-				updaterCommandRouter.bind(sparkle)
+				updaterCommandRouter.bind(sparkle, channelSelector: updateChannelFeed)
 				LauncherLog.write("launcher stage: Sparkle updater wired (+\(elapsedMilliseconds()) ms)")
 			} catch {
 				let failure = error as NSError
@@ -676,10 +678,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		startManagedHammerspoon(at: hsBinary, launcherPath: launcherPath)
 	}
 
-	/// Routes the private menu command to the retained Sparkle controller.
+	/// Routes the private menu commands to the retained Sparkle controller.
 	func application(_ application: NSApplication, open urls: [URL]) {
 		for url in urls where updaterCommandRouter.route(url) {
-			LauncherLog.write("accepted native updater check command")
+			LauncherLog.write("accepted native updater command \(url.path)")
 		}
 	}
 
