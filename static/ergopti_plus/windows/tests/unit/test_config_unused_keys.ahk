@@ -270,7 +270,7 @@ Test("config unused keys: a refused write reports failure and keeps the config "
 
 _CUK_MenuDeclaresTheAction() {
 	Found := false
-	for Entry in _MM_GetManifestRoot()["global_actions"] {
+	for Entry in _MM_GetManifestRoot()["configuration_menu"] {
 		if (Entry.Get("id", "") != "clean_unused_keys")
 			continue
 		Found := true
@@ -281,11 +281,11 @@ _CUK_MenuDeclaresTheAction() {
 		AssertFalse(Entry.Has("platforms"), "the cleanup row must not be restricted to one platform")
 		AssertFalse(Entry.Has("reason_key"), "an unrestricted row has no platform reason")
 	}
-	AssertTrue(Found, "global_actions must declare clean_unused_keys")
-	Body := _DriverFuncBody("_MI_BuildGlobalActionsMenu")
-	AssertTrue(Body != "", "_MI_BuildGlobalActionsMenu must be found")
-	AssertTrue(InStr(Body, '"clean_unused_keys", ShowUnusedConfigKeysCleanup') > 0,
-		"the Windows global actions menu must dispatch clean_unused_keys")
+	AssertTrue(Found, "configuration_menu must declare clean_unused_keys")
+	Body := _DriverFuncBody("_MI_BuildConfigurationMenu")
+	AssertTrue(Body != "", "_MI_BuildConfigurationMenu must be found")
+	AssertTrue(RegExMatch(Body, '"clean_unused_keys",\s+ShowUnusedConfigKeysCleanup') > 0,
+		"the Windows Configuration menu must dispatch clean_unused_keys")
 }
-Test("config unused keys: the global actions menu declares and dispatches the cleanup "
+Test("config unused keys: the Configuration menu declares and dispatches the cleanup "
 	. "(config-unused-keys-menu)", _CUK_MenuDeclaresTheAction)

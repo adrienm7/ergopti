@@ -37,7 +37,7 @@ local _ergopti_groups_cache    = nil
 local _top_level_cache         = nil
 
 -- The top-level rows a pause greys and strips of their handler: every feature
--- the pause switches off. Every other row (global actions, language, about,
+-- the pause switches off. Every other row (configuration, language, about,
 -- reload, quit, debug) and the title row that resumes the script stay live,
 -- because they are how the user inspects, resumes or leaves a paused script.
 -- Keyed by manifest id, so the rule follows a row wherever the manifest puts it.
@@ -590,45 +590,50 @@ function M.generate(ctx, menu_mods, actions)
 		["tap_holds"]       = function() return module_rows("tap_holds") end,
 		["gestures"]        = function() return module_rows("gestures") end,
 		["apps"]            = function() return module_rows("apps") end,
-		["global_actions"]  = function()
-			-- Pause owns the bindings axis for the whole pause window: pause_all()
-			-- snapshots what was running and resume_all() restores that snapshot.
-			-- A global action taken in between is therefore either silently
-			-- discarded on resume or breaks the « pause = tout éteint » invariant
-			-- the pause exists to guarantee. The per-feature toggles were gated for
-			-- exactly this, and so are these rows, which rewrite the configuration.
-			-- The rows are `type = "command"` in the manifest: their labels and
-			-- their order are declared, and this file supplies only what each one
-			-- does.
-			local ga_items = {}
-			local ga_ctx = {}
-			for key, value in pairs(ctx or {}) do ga_ctx[key] = value end
-			ga_ctx.commands = {
-				["reset_defaults"]  = actions.reset_defaults,
-				["clean_unused_keys"] = actions.clean_unused_keys,
-				["uninstall"] = actions.uninstall,
-				["start_at_login"] = actions.start_at_login,
+		["configuration"]   = function()
+			-- Every row is `type = "command"` in the manifest: labels, order and
+			-- the separator are declared, and this file supplies only what each
+			-- row does. Read once, so the pause gate below can tell the rows apart
+			-- by the handler they carry.
+			local restore = actions.reset_defaults
+			local clean = actions.clean_unused_keys
+			local cfg_ctx = {}
+			for key, value in pairs(ctx or {}) do cfg_ctx[key] = value end
+			cfg_ctx.commands = {
+				["restore_recommended"] = restore,
+				["clean_unused_keys"]   = clean,
+				["config_folder"]       = actions.open_paths,
+				["setup_wizard"]        = actions.show_setup_wizard,
+				["uninstall"]           = actions.uninstall,
+				["start_at_login"]      = actions.start_at_login,
 			}
-			ga_ctx.state_getters = {}
-			for key, value in pairs(ctx.state_getters or {}) do ga_ctx.state_getters[key] = value end
-			ga_ctx.state_getters.start_at_login_enabled = function()
+			cfg_ctx.state_getters = {}
+			for key, value in pairs(ctx.state_getters or {}) do cfg_ctx.state_getters[key] = value end
+			cfg_ctx.state_getters.start_at_login_enabled = function()
 				return require("ui.menu.start_at_login").enabled()
 			end
-			for _, row in ipairs(ManifestMenu.build("global_actions", "Global", nil, nil, ga_ctx) or {}) do
-				local independent = (type(actions.uninstall) == "function" and row.fn == actions.uninstall)
-					or (type(actions.start_at_login) == "function" and row.fn == actions.start_at_login)
-				if ctx.paused and not independent then
-					-- Greyed AND stripped of its handler, not merely greyed. A
-					-- disabled row whose fn survives still fires the moment the
-					-- greying is rendered wrong somewhere else, and these rows rewrite
-					-- the configuration behind every binding — which is the whole
-					-- reason the pause window has to own that axis alone.
-					row.disabled = true
-					row.fn = nil
-				end
-				table.insert(ga_items, row)
+			-- Pause owns the bindings axis for the whole pause window: pause_all()
+			-- snapshots what was running and resume_all() restores that snapshot.
+			-- A row that rewrites the configuration in between is either discarded
+			-- on resume or breaks the « pause = tout éteint » invariant, so those
+			-- two are greyed AND stripped of their handler: a disabled row whose fn
+			-- survives still fires the moment the greying is rendered wrong
+			-- somewhere else. The two rows that only open a window stay live.
+			local pause_gated = {}
+			for _, fn in ipairs({ restore, clean }) do
+				-- An unregistered command draws no row, so it has nothing to gate.
+				if type(fn) == "function" then pause_gated[fn] = true end
 			end
-			return { { label = i18n.get("menu.global.title"), submenu = ga_items } }
+			local rows = ManifestMenu.build("configuration_menu", "Configuration", nil, nil, cfg_ctx) or {}
+			if ctx.paused then
+				for _, row in ipairs(rows) do
+					if row.fn ~= nil and pause_gated[row.fn] then
+						row.disabled = true
+						row.fn = nil
+					end
+				end
+			end
+			return { { label = i18n.get("menu.configuration.title"), submenu = rows } }
 		end,
 		["language"]        = function()
 			-- The locale rows reach the tray through the manifest's `language_menu`.
@@ -638,12 +643,6 @@ function M.generate(ctx, menu_mods, actions)
 				["locales"] = function() return i18n.build_language_menu_items() or {} end,
 			})
 			return { { label = i18n.get("menu.global.language"), submenu = rendered } }
-		end,
-		["config_folder"]   = function()
-			return { { label = i18n.get("menu.global.config_folder"), action = actions.open_paths } }
-		end,
-		["setup_wizard"]    = function()
-			return { { label = i18n.get("menu.global.setup_wizard"), action = actions.show_setup_wizard } }
 		end,
 		["about"]           = function()
 			if type(menu_mods.about) ~= "table" or type(menu_mods.about.build) ~= "function" then

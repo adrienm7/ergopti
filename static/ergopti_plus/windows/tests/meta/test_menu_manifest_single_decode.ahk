@@ -59,10 +59,10 @@ _MMSD_LoadersReuseTheParsedRoot() {
 		Names[M[1]] := true
 		Pos := Found + StrLen(M[0])
 	}
-	Assert(Names.Count >= 4,
+	Assert(Names.Count >= 3,
 		"the manifest-loader class must be derived from driver source and hold every public loader "
-		. "(hotstring groups, debug menu, top-level tail, global actions) - an empty or truncated "
-		. "class would make this test vacuous")
+		. "(hotstring groups, debug menu, top level) - an empty or truncated class would make this "
+		. "test vacuous")
 
 	for Name in Names {
 		Body := _DriverFuncBody(Name)

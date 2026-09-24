@@ -35,7 +35,7 @@ local MENU_MODULES = {
 local EXPECTED_SUBMENUS = {
 	"menu.layout.title", "menu.hotstrings.title", "menu.metrics.title",
 	"menu.shortcuts.title", "menu.tapholds.title", "menu.gestures.title",
-	"menu.apps.title", "menu.llm.title", "menu.global.title", "menu.global.language",
+	"menu.apps.title", "menu.llm.title", "menu.configuration.title", "menu.global.language",
 	"menu.about.title", "menu.debug.title",
 }
 
@@ -239,7 +239,7 @@ helpers.describe("the real macOS tray: every submenu reaches the menu bar popula
 		helpers.assert_eq(#named, 0, "the remap engine must stay invisible: " .. table.concat(named, ", "))
 	end)
 
-	helpers.it("draws the config folder row once, at the top level", function()
+	helpers.it("draws the config folder row once, in the Configuration submenu", function()
 		local found = {}
 		walk(MENU, function(row, where, depth)
 			if type(row.title) == "string" and row.title:find(CONFIG_FOLDER, 1, true) then
@@ -247,8 +247,11 @@ helpers.describe("the real macOS tray: every submenu reaches the menu bar popula
 			end
 		end)
 		helpers.assert_eq(#found, 1, "the config folder row must appear exactly once")
-		helpers.assert_eq(found[1].depth, 1, "the config folder row belongs to the top level, not "
-			.. found[1].where)
+		helpers.assert_eq(found[1].depth, 2, "the config folder row belongs to the Configuration "
+			.. "submenu, not " .. found[1].where)
+		helpers.assert_true(found[1].where:find("menu.configuration.title", 1, true) ~= nil
+			or found[1].where:find(require("infra.i18n").get("menu.configuration.title"), 1, true) ~= nil,
+			"the config folder row must sit under Configuration, not " .. found[1].where)
 	end)
 
 	helpers.it("no clickable row is duplicated across two top-level submenus", function()
@@ -298,15 +301,18 @@ helpers.describe("the real macOS tray: every submenu reaches the menu bar popula
 		helpers.assert_eq(rows[at - 2].title, "-", "and a separator must precede that header")
 	end)
 
-	helpers.it("global actions: a separator sets the unused-settings cleanup apart", function()
-		local rows = top_submenu("menu.global.title")
-		helpers.assert_true(type(rows) == "table", "the tray must carry the global actions submenu")
-		local label = require("infra.i18n").get("menu.global.clean_unused_keys")
-		local at
-		for index, row in ipairs(rows) do
-			if row.title == label then at = index end
-		end
-		helpers.assert_true(at ~= nil and at > 1, "the cleanup row must be drawn after the other actions")
-		helpers.assert_eq(rows[at - 1].title, "-", "a separator must precede « Nettoyer les réglages inutilisés »")
+	helpers.it("configuration: the rows that rewrite the file come before the windows", function()
+		local rows = top_submenu("menu.configuration.title")
+		helpers.assert_true(type(rows) == "table", "the tray must carry the Configuration submenu")
+		local i18n = require("infra.i18n")
+		local drawn = {}
+		for index, row in ipairs(rows) do drawn[index] = row.title end
+		helpers.assert_eq(table.concat(drawn, " | "), table.concat({
+			i18n.get("common.restore_recommended"),
+			i18n.get("menu.global.clean_unused_keys"),
+			"-",
+			CONFIG_FOLDER,
+			i18n.get("menu.global.setup_wizard"),
+		}, " | "))
 	end)
 end)

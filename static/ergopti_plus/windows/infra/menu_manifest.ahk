@@ -33,7 +33,6 @@ global _MM_FALLBACK_DYNAMIC   := ["DynamicHotstrings"]
 ; Cached objects to avoid redundant disk I/O and JSON parsing
 global _MM_HOTSTRING_GROUPS_CACHE := false
 global _MM_DEBUG_MENU_CACHE       := false
-global _MM_GLOBAL_ACTIONS_CACHE   := false
 
 ; The PARSED manifest root, cached for the process lifetime and deliberately NOT
 ; cleared by MenuManifest_InvalidateCache(). The three tail loaders below each
@@ -125,10 +124,8 @@ _MM_GetManifestRoot() {
 ; Invalidates all manifest-driven caches.
 MenuManifest_InvalidateCache() {
 	global _MM_HOTSTRING_GROUPS_CACHE, _MM_DEBUG_MENU_CACHE
-	global _MM_GLOBAL_ACTIONS_CACHE
 	_MM_HOTSTRING_GROUPS_CACHE := false
 	_MM_DEBUG_MENU_CACHE       := false
-	_MM_GLOBAL_ACTIONS_CACHE   := false
 }
 
 ; Loads ``static/ergopti_plus/_shared/menu_manifest.json`` and converts the hotstring group id lists
@@ -308,67 +305,4 @@ MenuManifest_LoadTopLevel() {
 		return []
 	}
 	return RawItems
-}
-
-
-
-
-; ==================================================
-; ==================================================
-; ======= 4/ Global Actions Loader (MENU-2) ========
-; ==================================================
-; ==================================================
-
-; Loads the ``global_actions`` array from the shared manifest (items for the
-; "Actions globales" submenu), filtered for the AHK platform.  Returned as
-; an Array of Maps with "id".  Used by _MI_BuildGlobalActionsMenu().
-MenuManifest_LoadGlobalActions() {
-	global _MM_GLOBAL_ACTIONS_CACHE
-
-	if (_MM_GLOBAL_ACTIONS_CACHE != false)
-		return _MM_GLOBAL_ACTIONS_CACHE
-
-	Root := _MM_GetManifestRoot()
-	if !(Root is Map)
-		return _MM_GlobalActionsFallback()
-
-	RawItems := _MM_MapGet(Root, "global_actions")
-	if !(RawItems is Array) || RawItems.Length == 0
-		return _MM_GlobalActionsFallback()
-
-	Result := []
-	for Entry in RawItems {
-		if !(Entry is Map)
-			continue
-		Id := _MM_MapGet(Entry, "id")
-		if Id == ""
-			continue
-		; Filter by platform
-		Platforms := _MM_MapGet(Entry, "platforms", 0)
-		if Platforms is Array {
-			IsForAhk := false
-			for P in Platforms {
-				if P == "ahk" {
-					IsForAhk := true
-					break
-				}
-			}
-			if !IsForAhk
-				continue
-		}
-		Result.Push(Map("id", Id))
-	}
-
-	try LoggerDone("MenuManifest", "Global actions loaded ({1} item(s)).", Result.Length)
-	_MM_GLOBAL_ACTIONS_CACHE := Result.Length > 0 ? Result : _MM_GlobalActionsFallback()
-	return _MM_GLOBAL_ACTIONS_CACHE
-}
-
-; Hard-coded fallback — mirrors the canonical content of menu_manifest.json global_actions.
-_MM_GlobalActionsFallback() {
-	return [
-		Map("id", "enable_all"),
-		Map("id", "disable_all"),
-		Map("id", "reset_defaults"),
-	]
 }

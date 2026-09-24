@@ -31,7 +31,7 @@ local FEATURE_ROWS = {
 }
 
 local META_ROWS = {
-	"menu.global.title", "menu.global.language", "menu.global.setup_wizard",
+	"menu.configuration.title", "menu.global.language",
 	"menu.about.title", "menu.global.reload", "menu.global.quit", "menu.debug.title",
 }
 

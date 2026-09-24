@@ -207,7 +207,7 @@ helpers.with_stub_scope(MODULES, function()
 	-- =======================================
 
 	helpers.describe("unused keys (macos): tray wiring", function()
-		helpers.it("unused keys: the Global actions submenu offers and dispatches the row", function()
+		helpers.it("unused keys: the Configuration submenu offers and dispatches the row", function()
 			local fired = 0
 			local builder = helpers.load_with_stubs("ui.menu.builder")
 			local i18n = require("infra.i18n")
@@ -218,19 +218,19 @@ helpers.with_stub_scope(MODULES, function()
 				set_log_level = noop, open_logs = noop, open_today_log = noop,
 				open_error_log = noop, open_console = noop, show_setup_wizard = noop,
 				open_paths = noop, reload = noop, quit = noop,
-				enable_all = noop, disable_all = noop, reset_defaults = noop,
+				reset_defaults = noop,
 				clean_unused_keys = function() fired = fired + 1 end,
 			})
 			helpers.assert_true(ok, "the menu must build: " .. tostring(menu))
 			local row
 			for _, item in ipairs(menu) do
-				if item.title == "menu.global.title" then
+				if item.title == "menu.configuration.title" then
 					for _, child in ipairs(item.menu or {}) do
 						if child.title == "menu.global.clean_unused_keys" then row = child end
 					end
 				end
 			end
-			helpers.assert_true(row ~= nil, "the cleanup row must be in Global actions on macOS")
+			helpers.assert_true(row ~= nil, "the cleanup row must be in Configuration on macOS")
 			helpers.assert_eq(type(row.fn), "function")
 			row.fn()
 			helpers.assert_eq(fired, 1)
