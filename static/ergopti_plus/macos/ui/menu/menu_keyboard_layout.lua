@@ -97,7 +97,6 @@ local invalidate_bundle_caches = install.invalidate_bundle_caches
 local USER_LAYOUTS_DIR     = install.USER_LAYOUTS_DIR
 local SYSTEM_LAYOUTS_DIR   = install.SYSTEM_LAYOUTS_DIR
 
-local ERGOPTI_VARIANTS              = input_sources.ERGOPTI_VARIANTS
 local extract_ergopti_version       = input_sources.extract_ergopti_version
 local format_ergopti_display        = input_sources.format_ergopti_display
 local parse_active_layouts          = input_sources.parse_active_layouts
@@ -105,7 +104,7 @@ local compute_active_layouts_fast   = input_sources.compute_active_layouts_fast
 local refresh_active_layouts_async  = input_sources.refresh_active_layouts_async
 local list_active_keyboard_layouts  = input_sources.list_active_keyboard_layouts
 local set_input_source_async        = input_sources.set_input_source_async
-local enable_and_select_source_async = input_sources.enable_and_select_source_async
+local enable_keylayout_source_async = input_sources.enable_keylayout_source_async
 local is_legacy_ergopti_id          = input_sources.is_legacy_ergopti_id
 local migrate_legacy_id             = input_sources.migrate_legacy_id
 local upgrade_active_list_async     = input_sources.upgrade_active_list_async
@@ -176,6 +175,16 @@ local function run_install_and_chain(install_fn, legacy_active, update_menu)
 		return
 	end
 	schedule_menu_refresh(update_menu)
+end
+
+--- Display label of a layout an installed bundle declares: its KeyboardLayout
+--- Name without the version its row already shows (Ergopti_v2_2_2_plus is
+--- "Ergopti+"), or the name itself for a layout that is not Ergopti.
+--- @param name string KeyboardLayout Name from the bundle's Info.plist.
+--- @return string
+local function variant_label(name)
+	local unversioned = (name:gsub("_v%d+[_.]%d+[_.]%d+", ""))
+	return format_ergopti_display(unversioned) or name
 end
 
 --- Builds an install/update menu item for one scope (user or system).
@@ -320,10 +329,23 @@ function M.build(ctx)
 	--   5. absent, latest NOT installed    → greyed: install latest first
 	local latest_ver = latest and parse_version(latest) or nil
 	local latest_str = latest_ver and version_str(latest_ver)
-	local all_variants_active = true
+	-- The layouts the installed bundle declares in its Info.plist (system scope
+	-- first, like the input-source map): the bundle says what it installs.
+	local installed_dir, installed_name
+	if system_best then
+		installed_dir  = SYSTEM_LAYOUTS_DIR
+		installed_name = system_best.name
+	elseif user_best then
+		installed_dir  = USER_LAYOUTS_DIR
+		installed_name = user_best.name
+	end
+	local bundle_full_path = (installed_dir and installed_name) and
+		(installed_dir:gsub("[/\\]$", "") .. "/" .. installed_name) or ""
+	local variants = bundle_full_path ~= "" and install.bundle_variants(bundle_full_path) or {}
+	local all_variants_active = #variants > 0
 	local active_variant_count = 0
-	for _, var in ipairs(ERGOPTI_VARIANTS) do
-		if active_id_set_pre[var.id] then
+	for _, var in ipairs(variants) do
+		if active_id_set_pre[var.tis_id] then
 			active_variant_count = active_variant_count + 1
 		else
 			all_variants_active = false
@@ -334,7 +356,7 @@ function M.build(ctx)
 	local installed_ver = (system_best and system_best.version) or (user_best and user_best.version)
 	Logger.debug(LOG,
 		"Active layout state — stable=%d/%d legacy=%d installed=%s latest_installed=%s.",
-		active_variant_count, #ERGOPTI_VARIANTS, #legacy_active,
+		active_variant_count, #variants, #legacy_active,
 		installed_ver and version_str(installed_ver) or "none",
 		tostring(latest_installed_anywhere))
 	if all_variants_active and #legacy_active == 0 and installed_ver then
@@ -378,40 +400,23 @@ function M.build(ctx)
 		-- variant. Already-added variants are greyed individually with ✅.
 		local active_id_set = active_id_set_pre
 
-		-- Resolve the installed bundle path (system preferred over user).
-		-- The keylayout internal name base is the bundle basename without ".bundle",
-		-- with dots replaced by underscores (e.g. "Ergopti_v2.2.2.bundle" → "Ergopti_v2_2_2").
-		local installed_dir, installed_name
-		if system_best then
-			installed_dir  = SYSTEM_LAYOUTS_DIR
-			installed_name = system_best.name
-		elseif user_best then
-			installed_dir  = USER_LAYOUTS_DIR
-			installed_name = user_best.name
-		end
-		local bundle_base = installed_name and installed_name:gsub("%.bundle$", ""):gsub("%.", "_") or ""
-		local bundle_full_path = (installed_dir and installed_name) and
-			(installed_dir:gsub("[/\\]$", "") .. "/" .. installed_name) or ""
-
 		local add_sub = {}
-		for _, var in ipairs(ERGOPTI_VARIANTS) do
-			local id            = var.id
-			local suffix        = var.suffix or ""
-			local internal_name = bundle_base .. suffix
-			local already_added = active_id_set[id] == true
+		for _, var in ipairs(variants) do
+			local label         = variant_label(var.name)
+			local already_added = active_id_set[var.tis_id] == true
 			if already_added then
 				add_sub[#add_sub + 1] = {
-					label    = string.format(i18n.get("menu.layout.already_added"), var.label, latest_str),
+					label    = string.format(i18n.get("menu.layout.already_added"), label, latest_str),
 					disabled = true,
 				}
 			else
 				add_sub[#add_sub + 1] = {
-					label = string.format("%s v%s", var.label, latest_str),
+					label = string.format("%s v%s", label, latest_str),
 					action    = function()
 						defer_tis_call(function()
-							enable_and_select_source_async(id, var.label, bundle_full_path, internal_name,
+							enable_keylayout_source_async(var.keylayout, label,
 								function(ok)
-									if ok then pcall(notifications.notify, string.format(i18n.get("menu.layout.add_ok"), var.label), nil, "success") end
+									if ok then pcall(notifications.notify, string.format(i18n.get("menu.layout.add_ok"), label), nil, "success") end
 									if not ok then pcall(notifications.notify, i18n.get("menu.layout.add_fail"), nil, "error") end
 									schedule_menu_refresh(update_menu)
 								end)

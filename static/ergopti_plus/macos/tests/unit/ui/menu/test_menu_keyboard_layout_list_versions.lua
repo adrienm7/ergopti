@@ -52,9 +52,10 @@ local function bundle_labels(opts)
 		local install = require("modules.keymap.layout_install")
 		package.loaded["infra.i18n"] = { get = function(key) return LABELS[key] or key end }
 		package.loaded["infra.notifications"] = { notify = function() end }
-		input_sources.ERGOPTI_VARIANTS = {
-			{ id = "com.apple.keyboardlayout.ergopti.plus", label = "Ergopti+", suffix = "_plus" },
-		}
+		install.bundle_variants = function()
+			return { { name = "Ergopti_v2_2_2_plus", tis_id = "com.apple.keyboardlayout.ergopti.plus",
+				keylayout = "/b/Ergopti_v2_2_2_plus.keylayout" } }
+		end
 		input_sources.list_active_keyboard_layouts = function()
 			return { { id = opts.legacy, name = "g★", selected = true } }
 		end
