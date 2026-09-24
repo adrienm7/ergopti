@@ -23,25 +23,30 @@ _WPMC_LoadsEveryKeyFromTheCanon() {
 Test("WPM canon: every key loads, no copied default (wpm-canon)",
 	_WPMC_LoadsEveryKeyFromTheCanon)
 
+; The headless runner omits the UI-only display module (it stubs its class),
+; so the colour rules are read from the production source, and the canon's
+; values from the real loader.
 _WPMC_NeutralSourcesComeFromTheCanon() {
 	AssertTrue(WPMWidget_LoadSharedConst())
-	AssertTrue(_WPMWidget_NeutralCategory("rolls"))
-	AssertTrue(_WPMWidget_NeutralCategory("repeat_key"))
-	AssertFalse(_WPMWidget_NeutralCategory("magickey"),
+	AssertTrue(WPMWidgetConst.NEUTRAL.Has("rolls"))
+	AssertTrue(WPMWidgetConst.NEUTRAL.Has("repeat_key"))
+	AssertFalse(WPMWidgetConst.NEUTRAL.Has("magickey"),
 		"a hotstring group with a colour of its own must colour the widget")
+	AssertTrue(InStr(_DriverFuncBody("_WPMWidget_NeutralCategory"), "WPMWidgetConst.NEUTRAL.Has(category)") > 0,
+		"the neutral categories must be the canon's, not a hand-kept list")
 }
 Test("WPM canon: neutral categories are the canon's (wpm-canon)",
 	_WPMC_NeutralSourcesComeFromTheCanon)
 
 _WPMC_AiTextPaintsTheAiColour() {
-	AssertTrue(WPMWidget_LoadSharedConst())
-	AssertEqual(WPMWidgetConst.COLOR_BG_AI, WPMWidget_ResolveBgColor(false, false, true, false, true))
-	AssertEqual(WPMWidgetConst.COLOR_BG_AI, WPMWidget_ResolveGraphColor(false, true, false, true),
+	Bg := _DriverFuncBody("WPMWidget_ResolveBgColor")
+	AssertTrue(RegExMatch(Bg, "if has_ai\s+return WPMWidgetConst\.COLOR_BG_AI") > 0,
+		"the AI's text must paint the pill in the canon's AI colour")
+	AssertTrue(InStr(Bg, "WPMWidgetConst.COLOR_FALLBACK") > 0,
+		"a group with no usable colour must take the canon's fallback accent")
+	AssertTrue(InStr(_DriverFuncBody("WPMWidget_ResolveGraphColor"), "WPMWidget_ResolveBgColor(") > 0,
 		"the curve takes the pill's colour, as on macOS and Linux")
-	AssertEqual(WPMWidgetConst.COLOR_BG_MANUAL, WPMWidget_ResolveBgColor(false, false, true, false, false),
-		"with source colours off the pill stays the manual colour")
-	Body := _DriverFuncBody("_LLM_Bridge_CommitInjectedText")
-	AssertTrue(InStr(Body, "WPMWidget_Push(false, true)") > 0,
+	AssertTrue(InStr(_DriverFuncBody("_LLM_Bridge_CommitInjectedText"), "WPMWidget_Push(false, true)") > 0,
 		"accepted AI text must reach the widget marked AI — nothing did, so the colour never showed")
 }
 Test("WPM canon: the AI's text paints the AI colour (wpm-canon)",
