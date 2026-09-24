@@ -142,6 +142,26 @@ helpers.describe("healthcheck (linux): the system rows the page renders", functi
 	end)
 end)
 
+helpers.describe("healthcheck (linux): the daemon's own load", function()
+	-- The resident memory of the daemon, which a report of a slow or leaking
+	-- driver is read for (system-load)
+	helpers.it("reports the daemon's resident memory from /proc/self/status (system-load)", function()
+		local real_open = io.open
+		io.open = function(path, mode)
+			if path ~= "/proc/self/status" then return real_open(path, mode) end
+			local content = "Name:\tluajit\nUid:\t1000\t1000\t1000\t1000\nVmRSS:\t   51200 kB\nThreads:\t3\n"
+			return { read = function() return content end, close = function() return true end }
+		end
+		local ok, result = pcall(function()
+			return helpers.load_module("ui.healthcheck.bridge").build_snapshot({}, false)
+		end)
+		io.open = real_open
+		helpers.assert_true(ok, tostring(result))
+		helpers.assert_eq(result.sections.system.process_memory, 51200 * 1024)
+		helpers.assert_eq(result.sections.system.elevated, false, "the same file answers the elevation")
+	end)
+end)
+
 helpers.describe("healthcheck (linux): the features the page lists", function()
 	--- The features section of a snapshot, as an id → enabled map.
 	--- @param state table Daemon state.

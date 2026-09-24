@@ -10,8 +10,9 @@ snapshot as plain text in a read-only field.
 Collection runs in two phases. Phase A reads registry values, Win32 calls,
 memory and small files only, under the schema's 5 ms budget, because the AHK
 thread also serves the keyboard hook. Phase B runs the probes (api.github.com
-and the local AI backend) as curl children harvested by timers, and pushes each
-answer into the open page. The page can collect again, with or without the
+and the local AI backend as curl children harvested by timers, and the
+processor load from two samples of the system and process times taken on a
+timer), and pushes each answer into the open page. The page can collect again, with or without the
 opt-in details.
 
 ## Key files

@@ -249,6 +249,57 @@ Test("HealthCheck: a cancelled probe run publishes nothing and stops its childre
 	_TestHC_CancelledRunPublishesNothing)
 
 
+; The load: the machine's processor, and ErgoptiPlus's own share of it and
+; memory, which a report of a slow or stuck driver is read for (system-load).
+_TestHC_ProcessMemoryInPhaseA() {
+	Memory := HealthCheck_Run()["sections"]["system"].Get("process_memory", 0)
+	AssertTrue(Memory is Integer, "the working set is a byte count")
+	AssertTrue(Memory > 1048576, "a running AutoHotkey process uses more than 1 MB, got " . Memory)
+}
+
+Test("HealthCheck: phase A reports ErgoptiPlus's memory (system-load)", _TestHC_ProcessMemoryInPhaseA)
+
+_TestHC_CpuSharesArithmetic() {
+	; 100 ns units; Windows counts the idle time inside the kernel time
+	Before := Map("idle", 1000, "kernel", 3000, "user", 1000, "process", 100)
+	After := Map("idle", 2500, "kernel", 6000, "user", 2000, "process", 500)
+	Shares := HealthCheck_CpuShares(Before, After)
+	AssertEqual(62.5, Shares["system"], "4000 elapsed, 1500 idle")
+	AssertEqual(10.0, Shares["process"], "400 of 4000")
+	Threw := false
+	try HealthCheck_CpuShares(After, After)
+	catch ValueError
+		Threw := true
+	AssertTrue(Threw, "two identical samples measure nothing and must say so")
+}
+
+Test("HealthCheck: the processor shares come from two samples (system-load)", _TestHC_CpuSharesArithmetic)
+
+_TestHC_CpuProbeSamplesTwice() {
+	Published := []
+	Run := { Epoch: 7, Cancelled: false, Requests: [],
+		Publish: (Epoch, Id, Result, Sections) => Published.Push(Map("id", Id, "result", Result, "sections", Sections)) }
+	_HC_ProbeCpu(Run, Map("sample_ms", 30, "timeout_ms", 4000))
+	AssertEqual(0, Published.Length, "the second sample waits for its timer")
+	Deadline := A_TickCount + 2000
+	while (Published.Length = 0 && A_TickCount < Deadline)
+		Sleep(20)
+	AssertEqual(1, Published.Length, "the probe answers once after its sample")
+	AssertEqual("cpu_load", Published[1]["id"])
+	AssertEqual("ok", Published[1]["result"]["state"])
+	System := Published[1]["sections"]["system"]
+	for Key in ["cpu_usage", "process_cpu"]
+		AssertTrue(System[Key] >= 0 && System[Key] <= 100, Key . " is a share of the machine, got " . System[Key])
+	Cancelled := { Epoch: 8, Cancelled: false, Requests: [], Publish: (*) => Published.Push("late") }
+	_HC_ProbeCpu(Cancelled, Map("sample_ms", 30, "timeout_ms", 4000))
+	Cancelled.Cancelled := true
+	Sleep(150)
+	AssertEqual(1, Published.Length, "a cancelled sample publishes nothing")
+}
+
+Test("HealthCheck: the processor probe publishes the load once (system-load)", _TestHC_CpuProbeSamplesTwice)
+
+
 ; =============================================
 ; ======= 3/ Registered in run_all ============
 ; =============================================

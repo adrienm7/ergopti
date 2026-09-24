@@ -158,6 +158,8 @@
 				return formatSeconds(value);
 			case 'ms':
 				return Math.round(Number(value)) + ' ms';
+			case 'percent':
+				return Math.round(Number(value) * 10) / 10 + '%';
 			case 'list':
 				if (!Array.isArray(value)) return String(value);
 				return value.length > 0 ? value.map(String).join(', ') : t('healthcheck.value.none');

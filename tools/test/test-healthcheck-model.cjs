@@ -33,7 +33,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const SHARED = path.join(ROOT, 'static', 'ergopti_plus', '_shared');
 const LOCALES_DIR = path.join(SHARED, 'data', 'locales');
 const DRIVERS = ['windows', 'macos', 'linux'];
-const FIELD_TYPES = ['text', 'path', 'count', 'bytes', 'seconds', 'ms', 'bool', 'list', 'log', 'enum'];
+const FIELD_TYPES = ['text', 'path', 'count', 'bytes', 'seconds', 'ms', 'percent', 'bool', 'list', 'log', 'enum'];
 
 const failures = [];
 const fail = (message) => failures.push(message);
@@ -193,6 +193,21 @@ for (const key of labelKeys) {
 	}
 }
 
+// The system section reports the load on every driver: the machine's free
+// memory, free disk and processor load, and ErgoptiPlus's own processor share
+// and memory, which a report of a slow or stuck driver is read for
+for (const driver of DRIVERS) {
+	const system = Model.sectionsFor(schema, driver).find((section) => section.id === 'system');
+	const ids = system ? system.fields.map((field) => field.id) : [];
+	for (const id of ['ram_free', 'disk_free', 'cpu_usage', 'process_cpu', 'process_memory', 'uptime']) {
+		if (!ids.includes(id)) fail(`${driver}: the system section does not report ${id}`);
+	}
+}
+for (const [value, expected] of [[12.34, '12.3%'], [0, '0%'], [100, '100%']]) {
+	const got = Model.formatValue({ type: 'percent' }, value, t);
+	if (got !== expected) fail(`a percent of ${value} reads ${got}, expected ${expected}`);
+}
+
 // ================================
 // ================================
 // ======= 3/ Driver Fixtures =====
@@ -213,7 +228,7 @@ function fixture(driver, overrides) {
 			if (Model.probeFor(field, driver)) continue;
 			data[field.id] = {
 				text: `${field.id} value`, path: `/home/jdoe/${field.id}`, count: 3, bytes: 17179869184,
-				seconds: 3725, ms: 3.4, bool: false, list: [`${field.id} one`, `${field.id} two`],
+				seconds: 3725, ms: 3.4, percent: 12.5, bool: false, list: [`${field.id} one`, `${field.id} two`],
 				log: [`2026-09-24 10:00:00:000 [ERROR] [Probe] ${field.id} <b>boom</b>`], enum: field.values && field.values[0],
 			}[field.type];
 		}
