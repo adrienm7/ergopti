@@ -24,6 +24,9 @@ M.OLLAMA_CHAT_PATH = "/api/chat"
 --- Ollama endpoint path for the installed-model catalogue.
 M.OLLAMA_TAGS_PATH = "/api/tags"
 
+--- Ollama endpoint path that downloads a model.
+M.OLLAMA_PULL_PATH = "/api/pull"
+
 --- Default host for Ollama (loopback). Not in defaults.json (macOS/Windows bind
 --- loopback implicitly); this is the single Linux-side source, so profiles.lua
 --- and prediction_engine.lua must read it here rather than re-typing "localhost".
@@ -92,6 +95,7 @@ function M.ollama_endpoint(base_url, operation)
 	local paths = {
 		chat = M.OLLAMA_CHAT_PATH,
 		tags = M.OLLAMA_TAGS_PATH,
+		pull = M.OLLAMA_PULL_PATH,
 	}
 	local path = paths[operation]
 	if not path then return nil end
