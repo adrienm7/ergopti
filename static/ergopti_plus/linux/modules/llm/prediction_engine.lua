@@ -328,6 +328,8 @@ function M.predict(context, output_context)
 		context_window_chars = max_context_chars(),
 	})
 	local is_batch = profile.batch == true and requested > 1
+	local base_temperature = Settings.get("temperature")
+	local auto_raise = Settings.get("auto_raise_temp") == true
 	local system_prompt = resolve_system_prompt(profile, params, is_batch and requested or 1)
 	-- Empty is valid: the raw profile is its context alone, sent as the user turn.
 	if type(system_prompt) ~= "string" then
@@ -406,9 +408,14 @@ function M.predict(context, output_context)
 		_inflight_backend = backend
 		backend.chat(target, model, messages, {
 			stream = DisplaySettings.get("streaming") == true,
-			-- Each sequential variant a little warmer, or they repeat each other.
+			-- A batch asks once, at the builder's temperature. Sequential variants
+			-- each start from the user's own temperature and, when "raise the
+			-- temperature" is on, get a little warmer so they differ. Warming the
+			-- builder's already-raised value heated them twice, and warming with
+			-- the switch off made the switch do nothing.
 			temperature = is_batch and params.temperature
-				or Inference.variant_temperature(params.temperature, request_index),
+				or (auto_raise and Inference.variant_temperature(base_temperature, request_index))
+				or base_temperature,
 			max_tokens = (_max_tokens or params.max_tokens) * (is_batch and requested or 1),
 			-- Decided from the prompt, as macOS does: one continuation, unless the
 			-- prompt asks for the two-line correction format or a batch. By id, a

@@ -18,7 +18,7 @@ local ENTRY = { id = "cerebras-1", provider = "cerebras", label = "Cerebras", to
 --- @param backend string "api" or "ollama"
 --- @param entry table|nil The active API entry.
 --- @return table engine, table calls, table scheduler, function restore
-local function load(backend, entry)
+local function load(backend, entry, stored_settings)
 	local names = {
 		"adapters.secure_field_detector", "modules.llm.api_ollama", "modules.llm.api_remote",
 		"modules.llm.api_entries", "modules.llm.profiles", "modules.llm.profile_settings", "adapters.storage",
@@ -55,6 +55,9 @@ local function load(backend, entry)
 		resolve = function() return { id = "raw", system_single = "{context}" } end,
 	}
 	local stored = { ["llm.models.selected"] = backend }
+	for key, value in pairs(stored_settings or {}) do stored[key] = value end
+	-- Settings caches what it read; a fresh copy reads this storage.
+	package.loaded["modules.llm.settings"] = nil
 	package.loaded["adapters.storage"] = {
 		get = function(key, default) if stored[key] ~= nil then return stored[key] end return default end,
 		set = function(key, value) stored[key] = value; return true end,
@@ -69,6 +72,7 @@ local function load(backend, entry)
 	return engine, calls, scheduler, function()
 		for _, name in ipairs(names) do package.loaded[name] = previous[name] end
 		package.loaded["modules.llm.prediction_engine"] = nil
+		package.loaded["modules.llm.settings"] = nil
 	end
 end
 
@@ -162,6 +166,35 @@ helpers.describe("prediction backend: the model the menu shows profiles for", fu
 		local handler = source:match('dynamic_handlers%["llm_profile"%] = function%(target%)(.-)local function refresh')
 		helpers.assert_true(handler ~= nil and handler:find("get_prediction_model", 1, true) ~= nil,
 			"the profile rows must follow the model predictions use")
+	end)
+
+end)
+
+helpers.describe("prediction backend: the raise-temperature switch", function()
+
+	local SETTINGS = {
+		["llm.generation.temperature"] = 0.3,
+	}
+
+	helpers.it("keeps every variant at the user's temperature when off", function()
+		local stored = { ["llm.generation.auto_raise_temp"] = false }
+		for key, value in pairs(SETTINGS) do stored[key] = value end
+		local engine, calls, scheduler, restore = load("api", ENTRY, stored)
+		engine.predict("Bonjour à tous")
+		scheduler.settle()
+		restore()
+		for index = 1, 3 do helpers.assert_eq(calls.remote[index].opts.temperature, 0.3) end
+	end)
+
+	helpers.it("starts from the user's temperature when on, warming only the next ones", function()
+		local stored = { ["llm.generation.auto_raise_temp"] = true }
+		for key, value in pairs(SETTINGS) do stored[key] = value end
+		local engine, calls, scheduler, restore = load("api", ENTRY, stored)
+		engine.predict("Bonjour à tous")
+		scheduler.settle()
+		restore()
+		helpers.assert_eq(calls.remote[1].opts.temperature, 0.3, "the first variant is not pre-heated")
+		helpers.assert_true(calls.remote[2].opts.temperature > 0.3)
 	end)
 
 end)
