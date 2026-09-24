@@ -630,7 +630,7 @@ end
 --- @param session table
 local function start_probes(session)
 	if session.probes then session.probes.cancel() end
-	session.probes = require("ui.healthcheck.probes").start(M.config().schema, session.snapshot.sections.paths,
+	session.probes = require("ui.healthcheck.probes").start(M.config().schema, session.snapshot,
 		function(id, result, sections)
 			if _session ~= session then return end
 			session.snapshot.probes[id] = result

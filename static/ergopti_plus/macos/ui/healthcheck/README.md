@@ -11,9 +11,10 @@ Collection runs in two phases. Phase A reads memory, Hammerspoon queries and
 small files only, under the schema's 5 ms budget, because the main run loop
 also dispatches the event taps. Phase B runs the probes (api.github.com, the
 local AI backend, sysctl and df, the processor load through the callback form
-of `hs.host.cpuUsage` and ErgoptiPlus's own share and memory through ps) as
-tasks, timers and HTTP requests bounded by their timeouts, and pushes each
-answer into the open page.
+of `hs.host.cpuUsage` and ErgoptiPlus's own share and memory through ps, and
+the Bluetooth keyboards, mice and trackpads through system_profiler, since
+`hs.usb` sees none of them) as tasks, timers and HTTP requests bounded by their
+timeouts, and pushes each answer into the open page.
 
 ## Key files
 

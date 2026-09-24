@@ -86,18 +86,48 @@ local function with_probes(body)
 	package.loaded["adapters.shell_runner"] = saved_shell_runner
 end
 
---- The probes of the real schema, started with a recorder.
+--- The probes of the real schema, started on a phase A snapshot with a recorder.
 --- @param Probes table
---- @param paths table|nil
+--- @param paths table|nil The snapshot's paths section.
+--- @param options table|nil { usb = the phase A peripherals, detailed = boolean }
 --- @return table run, table answers
-local function start(Probes, paths)
+local function start(Probes, paths, options)
+	options = options or {}
 	local schema = require("healthcheck.snapshot").load_config(require("infra.paths").shared).schema
 	local answers = {}
-	local run = Probes.start(schema, paths or {}, function(id, result, sections)
+	local snapshot = {
+		detailed = options.detailed == true,
+		sections = { paths = paths or {}, peripherals = { items = options.usb or {} } },
+	}
+	local run = Probes.start(schema, snapshot, function(id, result, sections)
 		answers[#answers + 1] = { id = id, result = result, sections = sections }
 	end)
 	return run, answers
 end
+
+-- What system_profiler prints for a Magic Keyboard and a mouse in use, a
+-- headset in use, and a trackpad paired but away; with the addresses and
+-- serial numbers it also prints
+local BLUETOOTH_REPORT = [[{
+  "SPBluetoothDataType" : [ {
+    "controller_properties" : { "controller_address" : "AA:BB:CC:DD:EE:FF" },
+    "device_connected" : [
+      { "Magic Keyboard" : { "device_address" : "11:22:33:44:55:66", "device_minorType" : "Keyboard",
+          "device_productID" : "0x029C", "device_serialNumber" : "F0T123", "device_vendorID" : "0x004C" } },
+      { "MX Master 3" : { "device_address" : "22:33:44:55:66:77", "device_minorType" : "Mouse",
+          "device_productID" : "0xB023", "device_vendorID" : "0x046D" } },
+      { "AirPods Pro" : { "device_address" : "33:44:55:66:77:88", "device_minorType" : "Headphones",
+          "device_productID" : "0x200E", "device_vendorID" : "0x004C" } }
+    ],
+    "device_not_connected" : [
+      { "Magic Trackpad" : { "device_address" : "44:55:66:77:88:99", "device_minorType" : "Trackpad",
+          "device_productID" : "0x0265", "device_vendorID" : "0x004C" } }
+    ]
+  } ]
+}]]
+
+-- A USB device phase A listed
+local USB_KEYBOARD = { bus = "usb", kind = "keyboard", vendor_id = "05ac", product_id = "024f" }
 
 --- The answer of one probe, or nil.
 --- @param answers table
@@ -190,6 +220,44 @@ helpers.describe("diagnostics probes (macOS)", function()
 		end)
 	end)
 
+	helpers.it("adds the connected Bluetooth keyboards and mice to the USB devices (bluetooth-peripherals)", function()
+		with_probes(function(Probes, world)
+			local _, answers = start(Probes, nil, { usb = { USB_KEYBOARD } })
+			local profiler = task_of(world, "/usr/sbin/system_profiler")
+			helpers.assert_true(profiler ~= nil, "hs.usb sees no Bluetooth device: system_profiler reads them, as a task")
+			helpers.assert_eq(profiler.args, { "SPBluetoothDataType", "-json" })
+			profiler.on_done(0, BLUETOOTH_REPORT)
+			local answer = answer_of(answers, "bluetooth")
+			helpers.assert_eq(answer.result.state, "ok")
+			helpers.assert_eq(answer.sections.peripherals.items, {
+				USB_KEYBOARD,
+				{ bus = "bluetooth", kind = "keyboard", vendor_id = "004c", product_id = "029c" },
+				{ bus = "bluetooth", kind = "mouse", vendor_id = "046d", product_id = "b023" },
+			}, "input devices in use only, without their names, addresses or serial numbers")
+		end)
+	end)
+
+	helpers.it("names the Bluetooth devices only when details are included (bluetooth-peripherals)", function()
+		with_probes(function(Probes, world)
+			local _, answers = start(Probes, nil, { detailed = true })
+			task_of(world, "/usr/sbin/system_profiler").on_done(0, BLUETOOTH_REPORT)
+			local items = answer_of(answers, "bluetooth").sections.peripherals.items
+			helpers.assert_eq(#items, 2)
+			helpers.assert_eq(items[1].name, "Magic Keyboard")
+			helpers.assert_eq(items[2].name, "MX Master 3")
+		end)
+	end)
+
+	helpers.it("reports an unreadable Bluetooth report as an error (bluetooth-peripherals)", function()
+		with_probes(function(Probes, world)
+			local _, answers = start(Probes, nil, { usb = { USB_KEYBOARD } })
+			task_of(world, "/usr/sbin/system_profiler").on_done(0, "not json")
+			local answer = answer_of(answers, "bluetooth")
+			helpers.assert_eq(answer.result.state, "error")
+			helpers.assert_nil(answer.sections, "the USB list on the page stays as phase A read it")
+		end)
+	end)
+
 	helpers.it("reads the processor load and ErgoptiPlus's share and memory (system-load)", function()
 		with_probes(function(Probes, world)
 			local _, answers = start(Probes)
@@ -220,7 +288,7 @@ helpers.describe("diagnostics probes (macOS)", function()
 			world.tasks[1].on_done(0, "x\ny\n1\n")
 			helpers.assert_eq(#answers, before, "nothing of a cancelled run reaches the page")
 			helpers.assert_true(world.cancelled_requests >= 1)
-			helpers.assert_eq(world.terminated, 3, "sysctl, df and ps are stopped")
+			helpers.assert_eq(world.terminated, 4, "sysctl, df, ps and system_profiler are stopped")
 			helpers.assert_eq(world.stopped_samplers, 1, "the processor sampler is stopped")
 		end)
 	end)

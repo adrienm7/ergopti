@@ -409,10 +409,11 @@ end
 -- ==========================
 -- ==========================
 
---- The kind of a USB device, from its product name.
+--- The kind of a device, from its USB product name or its Bluetooth minor
+--- type ("Keyboard", "Mouse", "Trackpad").
 --- @param name string|nil
 --- @return string
-local function device_kind(name)
+function H.device_kind(name)
 	local lower = type(name) == "string" and name:lower() or ""
 	for _, entry in ipairs(DEVICE_KINDS) do
 		if lower:find(entry.pattern, 1, true) then return entry.kind end
@@ -421,7 +422,8 @@ local function device_kind(name)
 end
 
 --- The attached USB devices: bus, kind and ids, and their names only when
---- the user ticked "Include details".
+--- the user ticked "Include details". hs.usb sees no Bluetooth device: the
+--- bluetooth probe (ui.healthcheck.probes) completes the list.
 --- @param detailed boolean
 --- @return table
 function H.collect_peripherals(detailed)
@@ -429,7 +431,7 @@ function H.collect_peripherals(detailed)
 	for _, device in ipairs(read("the USB devices", function() return hs.usb.attachedDevices() end) or {}) do
 		local item = {
 			bus        = "usb",
-			kind       = device_kind(device.productName),
+			kind       = H.device_kind(device.productName),
 			vendor_id  = type(device.vendorID) == "number" and string.format("%04x", device.vendorID) or nil,
 			product_id = type(device.productID) == "number" and string.format("%04x", device.productID) or nil,
 		}
