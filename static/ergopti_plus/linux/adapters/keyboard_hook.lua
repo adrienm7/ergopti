@@ -133,7 +133,7 @@ local _release_remapped
 local _remap_owned = {}
 local _remap_orphans = {}
 -- Test seam: the time the engine reads while _test_drive replays a stream
--- whose events carry `at_ms`. nil in production.
+-- whose events carry `at_ms` and no kernel timestamp. nil in production.
 local _test_clock_ms = nil
 
 -- Only EV_KEY is forwarded. The uinput channel appends its own SYN_REPORT after
@@ -475,6 +475,19 @@ end
 --- into the domain callbacks.
 --- @param ev table { type = integer, code = integer, value = integer }.
 --- @param source string|nil Stable source identity.
+--- When a key event happened, in milliseconds, for telling a tap from a hold.
+--- The kernel's stamp, not the time the daemon reads the event: a daemon busy
+--- for a moment reads a 100 ms tap's release late, and timed on reading it
+--- measured a hold (a Shift tap that never copied). Every evdev device stamps
+--- on the same clock, so stamps compare across keyboards; only an event the
+--- kernel did not stamp (a replayed test stream) is timed on reading it.
+--- @param ev table A decoded event.
+--- @return number
+local function _event_time_ms(ev)
+	if type(ev.timestamp_us) == "number" and ev.timestamp_us > 0 then return ev.timestamp_us / 1000 end
+	return _test_clock_ms or Monotonic.now_ms()
+end
+
 local function _dispatch_event(ev, source)
 	-- Intercept mode grabbed the device, so nothing reaches the application
 	-- except through here: put the raw event back BEFORE doing anything else.
@@ -506,7 +519,7 @@ local function _dispatch_event(ev, source)
 		return
 	end
 	if _remapper and _intercept and not ev.remapped then
-		local out, tap = _remapper:process(ev.code, ev.value, _test_clock_ms or Monotonic.now_ms())
+		local out, tap = _remapper:process(ev.code, ev.value, _event_time_ms(ev))
 		if ev.value == InputEvent.VALUE_UP then
 			_remap_owned[owned_key] = nil
 		elseif out and ev.value == InputEvent.VALUE_DOWN then
@@ -1564,7 +1577,7 @@ end
 --- the descriptor, the drain and the dispatch are joined — a seam that skipped
 --- the reader would have kept passing through the entire period in which capture
 --- produced nothing at all.
---- @param events table Array of { type, code, value } tables, in arrival order.
+--- @param events table Array of { type, code, value, at_ms?, timestamp_us? } tables, in arrival order.
 --- @param callbacks table { onChar?, onKey?, onPhysical?, onHold?, onConsume?, onDesync?, onEmitRaw?, captureEvent?, keyState?, ledState? }.
 -- Exposed so the watchdog test can advance exactly as many ticks as the check
 -- needs, instead of hardcoding a number that silently stops matching.
@@ -1583,7 +1596,7 @@ function M._test_drive(events, callbacks, intercept)
 	local size = InputEvent.native_size()
 	local queue, times = {}, {}
 	for i, ev in ipairs(events or {}) do
-		queue[i] = InputEvent.encode(ev.type, ev.code, ev.value, size)
+		queue[i] = InputEvent.encode(ev.type, ev.code, ev.value, size, ev.timestamp_us)
 		times[i] = ev.at_ms
 	end
 	local at = 0

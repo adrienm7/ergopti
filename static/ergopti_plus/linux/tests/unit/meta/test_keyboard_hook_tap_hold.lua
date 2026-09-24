@@ -112,4 +112,30 @@ helpers.describe("keyboard hook + tap-hold engine", function()
 		helpers.assert_eq(table.concat(emitted, " "), "58:1 58:0", "the key does not stay down")
 	end)
 
+
+	--- A lone Shift through a 350 ms engine; events are { value, kernel µs, read ms }.
+	local function shift_taps(stream)
+		local kh = helpers.load_module("adapters.keyboard_hook")
+		local engine = Engine.new({ keys = { left_shift = { tap_action = "copy", hold_modifier = "shift",
+			time_activation_seconds = 0.35 } }, tap_min_ms = 50, one_shot_timeout_ms = 2000 })
+		local taps = {}
+		kh.set_remapper(engine, function(action) taps[#taps + 1] = action end)
+		local events = {}
+		for index, ev in ipairs(stream) do
+			events[index] = { type = EV_KEY, code = 42, value = ev[1], timestamp_us = ev[2], at_ms = ev[3] }
+		end
+		kh._test_drive(events, { onEmitRaw = function() return true end }, true)
+		kh.set_remapper(nil)
+		return taps
+	end
+
+	helpers.it("times a tap by when the keys moved, not by when the daemon read them", function()
+		-- Measured in CI: a 100 ms Shift tap, its release read 500 ms after
+		-- the press by a daemon busy elsewhere, sent Shift and never copied.
+		local taps = shift_taps({ { 1, 1000000000, 0 }, { 0, 1000100000, 500 } })
+		helpers.assert_eq(taps[1], "copy", "100 ms between the kernel's stamps is a tap")
+		local held = shift_taps({ { 1, 1000000000, 0 }, { 0, 1000500000, 10 } })
+		helpers.assert_eq(#held, 0, "500 ms between the stamps is a hold, however fast it was read")
+	end)
+
 end)
