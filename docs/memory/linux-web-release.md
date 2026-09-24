@@ -209,8 +209,9 @@ request. Action: never add an optional JSON dependency or a dialog outside
 ### project-linux-ai-is-proven-against-real-servers
 
 The AI path is exercised end to end in CI: `run_daemon_live` accepts a
-prediction from `fake_llm_server.py` (OpenAI dialect, as Cerebras) with Alt+1
-through the real kernel, and `run_ollama_live.lua` drives the real Ollama
+prediction from `fake_llm_server.py` (OpenAI dialect, as Cerebras) with a
+bare 1 (the default chord since 2026-09-24; Alt+1 once the AI menu requires
+Alt) through the real kernel, and `run_ollama_live.lua` drives the real Ollama
 (model list, `/api/pull`, predictions, and the remote backend on Ollama's
 `/v1` endpoint). They caught what scripted tests could not: text typed while
 the accepting Alt was still held (every injection now releases Ctrl/Alt/Super

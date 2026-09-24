@@ -22,7 +22,7 @@
 ---
 --- Then the AI: with the API backend selected and an entry pointing at
 --- tests/hardware/fake_llm_server.py (a Cerebras-style OpenAI-compatible API),
---- "//" asks for a prediction and Alt+1 accepts it. The check reads what the
+--- "//" asks for a prediction and a bare 1 accepts it. The check reads what the
 --- server received (the key, the endpoint) and what the desktop received.
 ---
 --- HOW TO RUN IT: through tests/hardware/run_daemon_live.sh, which provides the
@@ -47,7 +47,7 @@ local LETTERS = {
 }
 local KEY_OF = { [" "] = 57 }
 for code, char in pairs(LETTERS) do KEY_OF[char] = code end
-local KEY_LEFTALT, KEY_1, KEY_TAB = 56, 2, 15
+local KEY_LEFTALT, KEY_1 = 56, 2
 local KEY_CAPSLOCK, KEY_LEFTSHIFT, KEY_LEFTCTRL, KEY_ENTER, KEY_LEFT = 58, 42, 29, 28, 105
 
 -- The fake API the AI phase talks to (run_daemon_live.sh starts it).
@@ -437,21 +437,20 @@ if LLM_PORT then
 		if not request:find('"path": "/v1/chat/completions"', 1, true) then
 			failures[#failures + 1] = "the request did not reach /v1/chat/completions"
 		end
-		-- The offer is drawn once the reply is parsed; then Alt+1 accepts it.
-		-- Alt is Tab held, as on Windows: left Alt is the navigation layer.
-		-- No pause after the 1: the injection is a burst, and a reader asleep
-		-- meanwhile loses it to the evdev buffer's overflow.
+		-- The offer is drawn once the reply is parsed; then the bare 1 accepts
+		-- it (the default: no modifier), and must never be typed itself.
 		sleep(1.5)
-		Keyboard.emit(KEY_TAB, 1)
 		Keyboard.emit(KEY_1, 1)
 		Keyboard.emit(KEY_1, 0)
-		Keyboard.emit(KEY_TAB, 0)
 		local ai_text, ai_trail, alt_chords = read_output(3)
-		print(string.format("  after Alt+1 the desktop received %q", ai_text))
+		print(string.format("  after 1 the desktop received %q", ai_text))
 		print("  key events: " .. ai_trail)
 		local expected = (LLM_REPLY:gsub("^%s+", ""))
 		if not ai_text:find("bonjour " .. expected, 1, true) then
 			failures[#failures + 1] = string.format("the desktop does not read \"bonjour %s\" (one space)", expected)
+		end
+		if ai_trail:find("2↓", 1, true) then
+			failures[#failures + 1] = "the accepting 1 reached the desktop"
 		end
 		if ai_text:find("/", 1, true) then
 			failures[#failures + 1] = "the \"//\" trigger was not erased on acceptance"
@@ -470,7 +469,7 @@ stop_daemon()
 Keyboard.close()
 
 if #failures == 0 then
-	print("  ok   the prediction was requested with the entry's key and typed on Alt+1")
+	print("  ok   the prediction was requested with the entry's key and typed on a bare 1")
 	os.exit(0)
 end
 dump_log()

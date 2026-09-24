@@ -1079,9 +1079,12 @@ platforms = ["hs"]
 # ===== 3.3.6 llm.navigation =====
 # ================================
 
+# A bare digit accepts prediction N by default: the digit is swallowed while
+# the tooltip shows predictions, and types normally otherwise. The AI menu can
+# require a modifier (Alt, Ctrl, Cmd/Win, Shift or a combination).
 [[features.llm.navigation]]
 id = "val_modifiers"
-default = ["alt"]
+default = []
 type = "array"
 description_key = "menu.llm.navigation.val_modifiers"
 
