@@ -263,6 +263,16 @@ LoggerDefaultLogsDir() {
 		return RTrim(Root, "\/") . "\" . AppDirsWindowsLogsRelative() . "\"
 }
 
+; The one rule for an acceptable logs folder: an absolute path on a drive or a
+; UNC share. Shared by the boot resolver and the paths editor, which refuses
+; what this rejects instead of saving a folder the resolver would discard.
+; @param Dir {String} Candidate folder, slashes in either direction.
+; @returns {Boolean}
+LoggerIsAbsoluteFolder(Dir) {
+		Dir := StrReplace(Trim(Dir), "/", "\")
+		return RegExMatch(Dir, "^[A-Za-z]:\\") || SubStr(Dir, 1, 2) == "\\"
+}
+
 ; Resolves the LogsDirPath override read from paths.toml. Empty means the OS
 ; default. The default folder, or one whose last component is the application
 ; folder name, is used as is; anything else gets that subfolder appended, so
@@ -278,7 +288,7 @@ LoggerResolveLogsDir(Override, DefaultDir) {
 		Dir := StrReplace(Trim(Override), "/", "\")
 		if (Dir == "")
 				return DefaultDir
-		if !RegExMatch(Dir, "^[A-Za-z]:\\") && SubStr(Dir, 1, 2) != "\\" {
+		if !LoggerIsAbsoluteFolder(Dir) {
 				try LoggerError("Logger", "{1} '{2}' is not an absolute folder; logs stay in '{3}'.",
 						AppDirsLogsOverrideKey(), Override, DefaultDir)
 				return DefaultDir
