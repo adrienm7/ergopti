@@ -25,9 +25,9 @@ Audit `static/ergopti_plus/windows/`. Read `ahk-driver`, `windows-toolchain`,
   covered. A guard scoped to one function is suspect when the invariant is
   tree-wide.
 
-For G4 evidence, use `perf-profiling`'s AHK reference. Resolve
-`%APPDATA%\Ergopti\paths.toml` before inspecting
-`<ConfigDir>/autohotkey/logs/`; never infer an event date from the process-start
+For G4 evidence, use `perf-profiling`'s AHK reference. Resolve `LogsDirPath` in
+`%APPDATA%\Ergopti\paths.toml` (empty: `%LOCALAPPDATA%\ergopti_plus\logs\`)
+before inspecting the logs; never infer an event date from the process-start
 date in the filename or count the errors-only mirror twice.
 
 Search existing tests before reporting: a test can refute the hypothesis, and a

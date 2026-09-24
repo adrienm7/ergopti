@@ -270,8 +270,28 @@ in between, or one whose arguments change. Repeat collapsing does.
 | Retention      | Files older than **14 days** are deleted on the next rotation |
 | Purge strategy | Based on date in filename, not file modification time         |
 
-AHK path: `<ConfigDir>/autohotkey/logs/ErgoptiPlus_YYYY-MM-DD.log`
-HS path: `<ConfigDir>/hammerspoon/logs/ErgoptiPlus_YYYY-MM-DD.log`
+The logs folder, the file-name prefixes and the crash-reports subfolder are
+declared once in [`paths/app_dirs.toml`](../paths/app_dirs.toml) and generated
+for every driver; each driver has one resolver that consumers ask at call time
+(`Logger.logs_dir()` / `today_log_path()` / `today_errors_path()` /
+`crash_reports_dir()` on macOS, `LoggerLogsDir()` and its siblings on Windows,
+`logger_sink.log_dir()` and its siblings on Linux).
+
+Default logs folder:
+
+- macOS: `~/Library/Logs/ergopti_plus/` (also holds the launcher's `launcher.log`)
+- Windows: `%LOCALAPPDATA%\ergopti_plus\logs\`
+- Linux: `${XDG_STATE_HOME:-~/.local/state}/ergopti_plus/logs/`
+
+`LogsDirPath` (paths.toml on macOS and Windows, bootstrap storage on Linux)
+moves the folder; a folder that is neither the default nor named
+`ergopti_plus` gets an `ergopti_plus` subfolder, so retention never deletes in
+a folder the user merely picked. Crash reports go to `<logs>/crash_reports/`;
+metrics stay in the configuration folder. What is written before paths.toml
+is read stays in the default folder whatever `LogsDirPath` says: the macOS
+boot fallback log, `launcher.log` and the fatal report, and on Windows
+`bootstrap.log` (a yielding second instance, a refused configuration
+transition).
 
 ### 6.2 Fan-out sub-files
 
