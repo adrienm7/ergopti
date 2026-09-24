@@ -216,12 +216,18 @@ _PathsEdWeb_Browse(Target := "config") {
 
 ; The LogsDirPath a save must store: "" for the default, the resolved folder
 ; otherwise, or 0 to keep the stored one when the page sent no logs folder.
+; A folder that is not absolute is refused, as on macOS and Linux: the boot
+; resolver would discard it, and replacing it by the default here saved and
+; reloaded without the user's entry, with only a log line to say why.
 ; @param LogsDir {String|Integer} Value from the page, or the 0 sentinel.
 ; @returns {String|Integer}
+; @throws {ValueError} When the page sent a folder that is not absolute.
 _PathsEdWeb_LogsOverride(LogsDir) {
 	global _DefaultLogsDir
 	if (LogsDir is Integer)
 		return ConfigTransitionCurrentLogsOverride()
+	if (Trim(LogsDir) != "" && !LoggerIsAbsoluteFolder(LogsDir))
+		throw ValueError(AppDirsLogsOverrideKey() . " must be an absolute folder, not '" . LogsDir . "'")
 	Resolved := LoggerResolveLogsDir(LogsDir, _DefaultLogsDir)
 	return (Resolved = _DefaultLogsDir) ? "" : Resolved
 }
@@ -238,7 +244,14 @@ _PathsEdWeb_Save(ConfigDir, LogsDir := 0) {
 		N := _DefaultConfigDir
 	if !RegExMatch(N, "\\$")
 		N .= "\"
-	NewLogs := _PathsEdWeb_LogsOverride(LogsDir)
+	try NewLogs := _PathsEdWeb_LogsOverride(LogsDir)
+	catch ValueError as Err {
+		; Nothing is written and the editor stays open for another folder.
+		try LoggerError("PathsEditor", "Refused the logs folder: {1}.", Err.Message)
+		try MsgBox(t("paths_editor.save_failed"),
+			t("paths_editor.save_failed_title"), "Iconx")
+		return false
+	}
 	; No change — just close, never reload for nothing.
 	if (N == _ConfigDir && NewLogs = ConfigTransitionCurrentLogsOverride()) {
 		_PathsEdWeb_Close()
