@@ -73,6 +73,186 @@ _Updater_FindAsset(Json, AssetName, Tag) {
 
 
 ; =========================================
+; ===== 2.2a) Check schedule ============
+; =========================================
+
+; Automatic checks follow the persisted check record, not the process start:
+; a restart mid-interval does not check at boot, a machine that was off past its
+; due time catches up once the boot delay has passed, and failures retry on the
+; shared backoff. The decision is the shared port (modules/updater/schedule.ahk,
+; replayed against _shared/modules/updater/schedule_vectors.json).
+
+; Test seams: the Storage port (a Map with "read" and "write" callables) and the
+; wall clock (a callable returning epoch seconds). 0 means the production ones.
+global _UpdaterCheckStateStore := 0
+global _UpdaterClockFn := 0
+; The persisted check record, loaded once from the Storage port.
+global _UpdaterCheckState := 0
+; When the driver started or the system last woke (epoch seconds): a catch-up
+; check waits the shared boot delay after it, so the network can come up.
+global _UpdaterStartedAt := _Updater_EpochNow()
+
+; WM_POWERBROADCAST and its two resume notices (one per wake, the second only
+; when a user is present). Re-evaluating twice is harmless.
+global UPDATER_WM_POWERBROADCAST := 0x218
+global UPDATER_PBT_APMRESUMESUSPEND := 0x7
+global UPDATER_PBT_APMRESUMEAUTOMATIC := 0x12
+
+; Current wall clock in UTC epoch seconds (the injected test clock when set).
+_Updater_EpochNow() {
+	global _UpdaterClockFn
+	if HasMethod(_UpdaterClockFn, "Call")
+		return _UpdaterClockFn.Call()
+	return DateDiff(A_NowUTC, "19700101000000", "Seconds")
+}
+
+_Updater_CheckStateRead(Key) {
+	global _UpdaterCheckStateStore
+	if (_UpdaterCheckStateStore is Map)
+		return _UpdaterCheckStateStore["read"].Call(Key)
+	return ST_Get(Key, "")
+}
+
+_Updater_CheckStateWrite(Key, Value) {
+	global _UpdaterCheckStateStore
+	if (_UpdaterCheckStateStore is Map)
+		return _UpdaterCheckStateStore["write"].Call(Key, Value)
+	return ST_Set(Key, Value)
+}
+
+; Returns the persisted check record, loading it once. An invalid field is
+; dropped with a warning; a missing install seed is created and saved. The last
+; notified release is restored so a restart does not announce it again.
+_Updater_CheckState() {
+	global _UpdaterCheckState, UPDATER_LAST_NOTIFIED_TAG
+	if (_UpdaterCheckState is Map)
+		return _UpdaterCheckState
+	Key := UpdateSchedule_Timing()["state_storage_key"]
+	Result := UpdateSchedule_SanitizeState(_Updater_CheckStateRead(Key))
+	for _, Field in Result.Dropped
+		try LoggerWarn("Updater", "Dropped the invalid '{1}' of the stored update-check record.", Field)
+	State := Result.State
+	_UpdaterCheckState := State
+	if !State.Has("seed") {
+		State["seed"] := Format("{:08x}{:08x}", Random(0, 0x7FFFFFFF), Random(0, 0x7FFFFFFF))
+		_Updater_SaveCheckState(State)
+	}
+	if State.Has("last_notified_tag")
+		UPDATER_LAST_NOTIFIED_TAG := State["last_notified_tag"]
+	try LoggerDebug("Updater", "Update-check record loaded (last check {1}, failures {2}).",
+		State.Get("last_check_at", "never"), State.Get("failures", 0))
+	return State
+}
+
+; Saves the record. A refused write still advances this session's copy, so a
+; failing Storage port cannot turn every re-evaluation into a new check.
+_Updater_SaveCheckState(State) {
+	global _UpdaterCheckState
+	_UpdaterCheckState := State
+	Saved := false
+	try Saved := _Updater_CheckStateWrite(UpdateSchedule_Timing()["state_storage_key"], State)
+	catch as Err
+		try LoggerError("Updater", "The update-check record write raised: {1}.", Err.Message)
+	if (Saved != true) {
+		try LoggerError("Updater", "Could not save the update-check record; the schedule restarts from it next launch only if a later write succeeds.")
+		return false
+	}
+	return true
+}
+
+; Records one completed background check. Ok means GitHub answered with a
+; usable release list (up to date, a new release or no release yet).
+_Updater_RecordBackgroundCheck(Ok) {
+	Next := UpdateSchedule_RecordCheck(_Updater_CheckState(), _Updater_EpochNow(), Ok)
+	_Updater_SaveCheckState(Next)
+	try LoggerInfo("Updater", "Background check recorded: {1} (consecutive failures: {2}).",
+		Ok ? "success" : "failure", Next["failures"])
+}
+
+; Persists the release the user was just told about.
+_Updater_RecordNotifiedTag(Tag) {
+	State := _Updater_CheckState().Clone()
+	State["last_notified_tag"] := Tag
+	_Updater_SaveCheckState(State)
+}
+
+; The schedule at the current wall clock: { Due, WaitMs, ReevaluateMs, DueAt,
+; Reason }. WaitMs is the timer delay while nothing is due (never past the due
+; time, never beyond reevaluate_sec, at least one second).
+_Updater_ScheduleDecision() {
+	global UPDATER_CHECK_INTERVAL, _UpdaterStartedAt
+	Timing := UpdateSchedule_Timing()
+	Now := _Updater_EpochNow()
+	ReevaluateMs := Timing["reevaluate_sec"] * 1000
+	Next := UpdateSchedule_NextDue(Now, _UpdaterStartedAt, UPDATER_CHECK_INTERVAL, _Updater_CheckState())
+	if (Next.DueAt == "")
+		return { Due: false, WaitMs: ReevaluateMs, ReevaluateMs: ReevaluateMs, DueAt: "", Reason: Next.Reason }
+	return {
+		Due: Next.DueAt <= Now,
+		WaitMs: Max(1000, UpdateSchedule_DelayUntil(Next.DueAt, Now) * 1000),
+		ReevaluateMs: ReevaluateMs,
+		DueAt: Next.DueAt,
+		Reason: Next.Reason
+	}
+}
+
+; WM_POWERBROADCAST handler: a resume defers one re-evaluation off the message
+; handler (the machine may have slept through a due check).
+_Updater_OnPowerBroadcast(wParam, lParam, msg, hwnd, ReevaluateFn := 0) {
+	global UPDATER_PBT_APMRESUMEAUTOMATIC, UPDATER_PBT_APMRESUMESUSPEND
+	if (wParam != UPDATER_PBT_APMRESUMEAUTOMATIC and wParam != UPDATER_PBT_APMRESUMESUSPEND)
+		return
+	if HasMethod(ReevaluateFn, "Call") {
+		ReevaluateFn.Call()
+		return
+	}
+	SetTimer(_Updater_ReevaluateAfterWake, -1)
+}
+
+; Restarts the boot delay at the wake and re-arms the live cadence owner from
+; the schedule. Nothing is dispatched here: a due check runs from its timer.
+_Updater_ReevaluateAfterWake(*) {
+	global _UpdaterStartedAt
+	_UpdaterStartedAt := _Updater_EpochNow()
+	return _Updater_RearmBackgroundOwner("wake")
+}
+
+; Re-arms the one armed cadence owner for the current schedule and disarms the
+; timer it supersedes. A queued old callback is inert: its arm epoch is stale.
+_Updater_RearmBackgroundOwner(Reason) {
+	global _UpdaterBackgroundOwner
+	Owner := 0
+	PreviousCritical := A_IsCritical
+	Critical("On")
+	try {
+		if (IsObject(_UpdaterBackgroundOwner) and _UpdaterBackgroundOwner.Active
+			and _UpdaterBackgroundOwner.Armed and _UpdaterBackgroundOwner.Phase == "armed")
+			Owner := _UpdaterBackgroundOwner
+	} finally {
+		Critical(PreviousCritical ? PreviousCritical : "Off")
+	}
+	if !IsObject(Owner) {
+		try LoggerDebug("Updater", "No armed update-check timer to re-evaluate after a {1}.", Reason)
+		return false
+	}
+	OldTimerFn := Owner.TimerFn
+	Decision := _Updater_ScheduleDecision()
+	if !_Updater_ArmBackgroundOwner(Owner, -Decision.WaitMs) {
+		if Updater_StopBackgroundChecks(false, Owner)
+			try LoggerError("Updater", "Could not re-arm the background update timer after a {1}: {2}.",
+				Reason, Owner.LastArmError)
+		return false
+	}
+	if IsObject(OldTimerFn)
+		try _Updater_BackgroundSchedule(Owner, 0, OldTimerFn)
+	try LoggerInfo("Updater", "Update-check schedule re-evaluated after a {1}: next evaluation in {2} s ({3}).",
+		Reason, Decision.WaitMs // 1000, Decision.Reason)
+	return true
+}
+
+
+
+; =========================================
 ; ===== 2.2) Background poller ==========
 ; =========================================
 
@@ -132,9 +312,11 @@ Updater_StartBackgroundChecks(ScheduleFn := 0, IsLocalSource := unset) {
 		try LoggerDebug("Updater", "Background checks already running — ignoring start.")
 		return true
 	}
-	; Fire once shortly after boot (capped by the configured interval) so short
-	; presets like "1m" are honoured without an extra-long initial wait.
-	FirstMs := Min(30000, Max(1000, UPDATER_CHECK_INTERVAL * 1000))
+	; The first timer follows the persisted schedule: the boot delay for a fresh
+	; install or an overdue check, the remaining wait otherwise (bounded by the
+	; re-evaluation period). It used to fire min(30 s, interval) after every boot.
+	Decision := _Updater_ScheduleDecision()
+	FirstMs := Decision.WaitMs
 	if !_Updater_ArmBackgroundOwner(Owner, -FirstMs) {
 		Retired := false
 		PreviousCritical := A_IsCritical
@@ -162,7 +344,8 @@ Updater_StartBackgroundChecks(ScheduleFn := 0, IsLocalSource := unset) {
 			Owner.LastArmError == "" ? "timer owner was displaced" : Owner.LastArmError)
 		return false
 	}
-	try LoggerInfo("Updater", "Background update checks armed (every {1}s).", UPDATER_CHECK_INTERVAL)
+	try LoggerInfo("Updater", "Background update checks armed (every {1} s; next evaluation in {2} s, {3}).",
+		UPDATER_CHECK_INTERVAL, FirstMs // 1000, Decision.Reason)
 	return true
 }
 
@@ -385,9 +568,18 @@ Updater_BackgroundTick(Owner := 0, ArmEpoch := 0, *) {
 	}
 	if InlineArm or !MayRun
 		return false
-	; Re-arm first so a thrown error below cannot leave the loop dead.
+	; The wall clock decides, so a timer that slept through a suspend is
+	; corrected at its next re-evaluation.
+	try Decision := _Updater_ScheduleDecision()
+	catch as Err {
+		try LoggerError("Updater", "Update-check schedule could not be evaluated: {1}.", Err.Message)
+		Decision := { Due: false, WaitMs: UpdateSchedule_Timing()["reevaluate_sec"] * 1000, Reason: "error" }
+	}
+	; Re-arm first so a thrown error below cannot leave the loop dead. A due
+	; check is re-evaluated after reevaluate_sec: its completion records the
+	; check, from which the next due time follows.
 	if !_Updater_ArmBackgroundOwner(
-		Owner, -UPDATER_CHECK_INTERVAL * 1000) {
+		Owner, -(Decision.Due ? Decision.ReevaluateMs : Decision.WaitMs)) {
 		; Retire only the owner whose arm failed. A yielding scheduler may already
 		; have run Stop -> Start and installed a successor.
 		if Updater_StopBackgroundChecks(false, Owner)
@@ -395,14 +587,18 @@ Updater_BackgroundTick(Owner := 0, ArmEpoch := 0, *) {
 				Owner.LastArmError)
 		return false
 	}
+	if !Decision.Due
+		return
 	; Pause invariant: a suspended driver must be fully silent. SetTimer
 	; callbacks are not gated by native Suspend, so we re-arm above (so the
 	; loop survives pause and resumes cleanly) but skip the network dispatch,
-	; the TrayTip and the tray-menu rebuild while suspended.
+	; the TrayTip and the tray-menu rebuild while suspended. The record is left
+	; unchanged, so the check runs at the first re-evaluation after resuming.
 	if A_IsSuspended
 		return
 	if !_Updater_BackgroundMayDispatch(, Owner)
 		return
+	try LoggerInfo("Updater", "Background update check due ({1}).", Decision.Reason)
 	Current := Updater_CurrentVersion()
 	Request := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_BACKGROUND)
 	; ``Current`` and request provenance are captured at the same dispatch
@@ -431,19 +627,23 @@ _Updater_HandleBackgroundResult(Json, Current, Request, Terminal := 0) {
 	; and what did it find" is the first question when an update never arrives.
 	if _Updater_JsonPayloadIsFailure(Json) {
 		try LoggerInfo("Updater", "Background check result: network unreachable.")
+		_Updater_RecordBackgroundCheck(false)
 		return
 	}
 	if _Updater_JsonIsNoChannelRelease(Json) {
 		try LoggerInfo("Updater", "Background check result: no release on channel {1} yet (current {2}).",
 			Request.Channel, Current)
+		_Updater_RecordBackgroundCheck(true)
 		return
 	}
 	Latest := Updater_ParseTagName(Json)
 	if (Latest == "") {
 		; This used to be reported as "up to date", hiding a malformed response.
 		try LoggerWarn("Updater", "Background check result: the release response carried no tag (current {1}).", Current)
+		_Updater_RecordBackgroundCheck(false)
 		return
 	}
+	_Updater_RecordBackgroundCheck(true)
 	if !UpdateChannels_ShouldOffer(
 		Latest, Current, Request.Channel, _Updater_InstalledChannel()) {
 		try LoggerInfo("Updater", "Background check result: up to date (current {1}, latest {2}, channel {3}).",
@@ -479,7 +679,8 @@ _Updater_HandleBackgroundResult(Json, Current, Request, Terminal := 0) {
 	}
 	try {
 		TrayTip(Format(t("updater.tray_new_version_body"), Latest), t("updater.tray_new_version_title"))
-		_Updater_CommitReleaseNotification(Reservation, Request)
+		if _Updater_CommitReleaseNotification(Reservation, Request)
+			_Updater_RecordNotifiedTag(Latest)
 	} catch as Err {
 		_Updater_ReleaseNotificationReservation(Reservation)
 		try LoggerError("Updater", "Could not surface background update notification: {1}.", Err.Message)
@@ -493,9 +694,12 @@ _Updater_HandleBackgroundResult(Json, Current, Request, Terminal := 0) {
 ; Safe to call multiple times — the handler is idempotent (OnMessage replaces
 ; any prior registration for the same message + function pair).
 Updater_InitTrayNotifyHandler() {
+	global UPDATER_WM_POWERBROADCAST
 	; maxThreads=1: no reentrant update prompts.
 	OnMessage(0x404, _Updater_OnTrayMsg, 1)
-	try LoggerDebug("Updater", "Tray notification click handler registered.")
+	; A wake re-evaluates the update-check schedule (_Updater_OnPowerBroadcast).
+	OnMessage(UPDATER_WM_POWERBROADCAST, _Updater_OnPowerBroadcast)
+	try LoggerDebug("Updater", "Tray notification click and wake handlers registered.")
 }
 
 ; OnMessage handler for WM_TRAYICON (0x404).

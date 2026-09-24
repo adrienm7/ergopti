@@ -115,6 +115,19 @@ if (!/UPDATER_DEFAULT_INTERVAL\s*:=\s*UpdateSchedule_Timing\(\)\["default_check_
 	}
 }
 
+// The first background check used to fire min(30000 ms, interval) after every
+// boot, a literal no gate pinned. The delay now comes from the shared schedule.
+const AHK_SELF_UPDATE = path.join(ROOT, "static", "ergopti_plus", "windows", "modules", "updater", "self_update.ahk");
+const selfUpdateSrc = fs.readFileSync(AHK_SELF_UPDATE, "utf8");
+const startBody = selfUpdateSrc.match(/\nUpdater_StartBackgroundChecks\([^)]*\) \{([\s\S]*?)\n\}/);
+if (!startBody) {
+	fail("self_update.ahk: could not find Updater_StartBackgroundChecks");
+} else if (/\b30000\b|boot_check_delay_sec\s*\*/.test(startBody[1]) || !startBody[1].includes("_Updater_ScheduleDecision()")) {
+	fail("Updater_StartBackgroundChecks must arm its first check from _Updater_ScheduleDecision(), not a boot-delay literal");
+} else {
+	pass("Updater_StartBackgroundChecks arms its first check from the shared schedule");
+}
+
 // A preset table spelled in a driver is the hand copy this gate retired: the
 // Windows and Linux updaters each carried one (1m ... 7d) while the shared
 // defaults said the presets "stay driver-specific".
