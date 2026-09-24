@@ -67,14 +67,13 @@ global BUNDLE_RELEASE_URL := "__BUNDLE_RELEASE_URL__"
 ; if a future rename happens, only this placeholder needs to track it.
 global BUNDLE_RELEASE_ASSET := "ErgoptiPlus.exe"
 
-; Update channel this exe was BUILT from. The release workflow rewrites the
-; placeholder to "dev" for pre-release builds and "main" for stable releases.
-; ``Updater_LoadChannel`` honours this as the default when no explicit
-; ``[Updater] UpdateChannel`` override exists in config.toml — so a user who
-; downloaded a dev exe stays on dev (and gets dev-channel update prompts)
-; without having to flip the channel manually. The menu's channel submenu
-; lets them switch afterwards. In source / dev mode the placeholder stays
-; unresolved and we default to "main" for backward compatibility.
+; Update channel this exe was BUILT from: the release workflow rewrites the
+; placeholder to the registry id of the channel it publishes
+; (_shared/modules/updater/channels.json). The updater follows it while
+; config.toml [updater] channel names none, so a user who downloaded a
+; pre-release build keeps receiving that channel; the About menu's channel
+; rows switch it afterwards. A source run keeps the placeholder, which is no
+; registry id, and follows the registry's unreleased-build channel instead.
 global BUNDLE_CHANNEL := "__BUNDLE_CHANNEL__"
 
 ; Resolved at runtime by Bundle_Init() — empty string in dev mode (callers

@@ -28,6 +28,8 @@
  *    checks its data by replaying the vectors through it).
  * 5. The tag families the release workflow publishes each belong to exactly one
  *    channel, and that channel's github_prerelease flag is the one CI sets.
+ * 6. Ratchet: the sources that decide or display channels never quote a
+ *    channel id or alias in code; they read the registry.
  * ==============================================================================
  */
 
@@ -285,7 +287,90 @@ function checkWorkflowFamilies(channels) {
 
 // ==========================================
 // ==========================================
-// ======= 7/ Main =========================
+// ======= 7/ Hardcoded Channel Ratchet ====
+// ==========================================
+// ==========================================
+
+// Sources that decide or display update channels. Each reads the ids from the
+// registry; a quoted channel id or alias in code means a site spelled the
+// channel by hand again.
+const CHANNEL_CONSUMERS = [
+	'windows/infra/bundle.ahk',
+	'windows/modules/updater.ahk',
+	'windows/modules/updater/channels.ahk',
+	'windows/modules/updater/core.ahk',
+	'windows/modules/updater/changelog.ahk',
+	'windows/modules/updater/self_update.ahk',
+	'windows/ui/changelog/init.ahk',
+	'windows/ui/menu/menu_init.ahk',
+	'macos/modules/updater/init.lua',
+	'macos/modules/updater/channel.lua',
+	'macos/ui/menu/menu_about.lua',
+	'macos/ui/changelog/init.lua',
+	'macos/adapters/update_launcher.lua',
+	'macos/launcher/Sources/ErgoptiPlus/UpdaterCommandRouter.swift',
+	'macos/launcher/Sources/ErgoptiPlus/UpdateChannelFeed.swift',
+	'linux/modules/updater/manager.lua',
+	'linux/ui/changelog/bridge.lua',
+	'linux/ui/menu/menu_builder.lua',
+	'_shared/lua/updater/channels.lua',
+	'_shared/lua/updater/release_parser.lua',
+	'_shared/ui/update_channels.js',
+	'_shared/ui/changelog/script.js',
+	'_shared/ui/changelog/atom_feed.js',
+	'_shared/modules/updater/version.js'
+];
+
+/** Whether a source line is a comment in any of the consumers' languages. */
+function isCommentLine(line) {
+	return /^\s*(;|--|\/\/|\/\*|\*)/.test(line);
+}
+
+/**
+ * Lists the code lines of a source that quote a channel id or alias.
+ * @param {string} text - Source text.
+ * @param {Set<string>} names - Channel ids and aliases.
+ * @returns {Array<{line: number, name: string}>}
+ */
+function hardcodedChannelsIn(text, names) {
+	const hits = [];
+	text.split('\n').forEach((line, index) => {
+		if (isCommentLine(line)) return;
+		for (const name of names) {
+			if (line.includes(`"${name}"`) || line.includes(`'${name}'`)) hits.push({ line: index + 1, name });
+		}
+	});
+	return hits;
+}
+
+function checkNoHardcodedChannels(registry) {
+	const names = new Set();
+	for (const channel of registry.channels) {
+		names.add(channel.id);
+		for (const alias of channel.aliases) names.add(alias);
+	}
+	expect(names.size > registry.channels.length, 'the ratchet must look for every channel id and alias');
+	// The scan must be able to fail: a quoted id in code is found, a comment is not.
+	const probe = `x = 1\nif (channel === '${registry.channels[0].id}') {}\n// "${registry.channels[0].id}" in prose\n`;
+	const probeHits = hardcodedChannelsIn(probe, names);
+	expect(
+		probeHits.length === 1 && probeHits[0].line === 2,
+		`the ratchet must flag a quoted channel in code and skip comments (got ${JSON.stringify(probeHits)})`
+	);
+	const plus = path.join(ROOT, 'static', 'ergopti_plus');
+	for (const relative of CHANNEL_CONSUMERS) {
+		const file = path.join(plus, relative);
+		expect(fs.existsSync(file), `channel consumer ${relative} is missing; update CHANNEL_CONSUMERS`);
+		if (!fs.existsSync(file)) continue;
+		for (const hit of hardcodedChannelsIn(fs.readFileSync(file, 'utf8'), names)) {
+			expect(false, `${relative}:${hit.line} spells the channel "${hit.name}" by hand; read it from the registry`);
+		}
+	}
+}
+
+// ==========================================
+// ==========================================
+// ======= 8/ Main =========================
 // ==========================================
 // ==========================================
 
@@ -306,6 +391,7 @@ function checkWorkflowFamilies(channels) {
 		checkPageData(registry);
 		checkSwiftFeeds(registry);
 		checkWorkflowFamilies(channels);
+		checkNoHardcodedChannels(registry);
 	} catch (error) {
 		failures.push(`the contract could not run: ${error && error.stack ? error.stack : error}`);
 	}
