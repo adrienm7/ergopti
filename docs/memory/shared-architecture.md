@@ -72,6 +72,16 @@ and every driver that shows it registers its command. Both renderers report a
 missing toggle command and a provider row carrying `action` plus a subtree as
 errors; `test-menu-toggle-registered.cjs` pins the registrations.
 
+### project-tray-root-is-the-manifest-top-level
+
+Each of the three drivers builds its tray root with one loop over the manifest
+`top_level` and an id → builder table: macOS `Builder.generate`, Windows
+`_MI_TopLevelBuilders`/`_MI_StageTopLevel`, Linux `M.build`. To reorder the root,
+edit `manifest.toml`, not a driver. `test-menu-top-level-parity.cjs` pins the
+approved order and checks both directions of each table. The macOS and AHK drift
+gates also render a shuffled top level. Pause greying is keyed by id, so a moved
+feature row stays greyed.
+
 ### project-two-keys-for-one-row-is-two-menus
 
 Two manifest keys that describe one visible row create two sources of truth.
