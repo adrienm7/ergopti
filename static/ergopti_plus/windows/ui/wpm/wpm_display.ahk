@@ -704,7 +704,8 @@ WPMWidget_Tick() {
     ; Hide immediately if the mouse/touchpad was used more recently than the last keystroke —
     ; A_TimeIdleMouse is built into AHK and requires no hook install.
     mouse_active  := A_TimeIdleMouse < A_TimeIdleKeyboard
-    should_show   := !keyboard_idle && !mouse_active && ((wpm > 0) || has_hs || has_ai || has_ac)
+    should_show   := _WPMWidget_TooltipUp()
+        || (!keyboard_idle && !mouse_active && ((wpm > 0) || has_hs || has_ai || has_ac))
     gui_ref := WPMWidget.show_graph ? WPMWidget._graph_gui : WPMWidget._gui
     if !gui_ref
         return
@@ -791,6 +792,16 @@ _WPMWidget_HideSurface(gui_ref) {
 ; This only ever drives the HIDE transition: the 500 ms display tick's own
 ; mouse_active gate keeps it hidden afterwards and re-shows it once the user types
 ; again, so no re-show bookkeeping is needed here.
+; Whether a hotstring preview or an AI suggestion is on screen. It keeps the
+; widget up, as on macOS and Linux: the user is mid-typing, choosing what to
+; insert.
+_WPMWidget_TooltipUp() {
+    try return (IsSet(TooltipIsVisible) && TooltipIsVisible())
+        || (IsSet(LLM_TooltipIsVisible) && LLM_TooltipIsVisible())
+    catch
+        return false
+}
+
 WPMWidget_MouseWatch() {
     if !WPMWidget.visible
         return
@@ -805,6 +816,10 @@ WPMWidget_MouseWatch() {
         return
     WPMWidget._last_mouse_x := mx
     WPMWidget._last_mouse_y := my
+    ; The tick keeps the widget up while a preview is on screen; hiding it here
+    ; would only make it flicker back.
+    if _WPMWidget_TooltipUp()
+        return
     gui_ref := WPMWidget.show_graph ? WPMWidget._graph_gui : WPMWidget._gui
     if gui_ref
         try _WPMWidget_HideSurface(gui_ref)
