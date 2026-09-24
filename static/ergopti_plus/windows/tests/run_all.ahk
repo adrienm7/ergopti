@@ -543,6 +543,7 @@ _LogBootProgress("loading LLM modules")
 #Include unit/test_accented_shortcuts.ahk
 #Include unit/test_keylayout_emulation.ahk
 #Include unit/test_ergopti_keylayout_tables.ahk
+#Include unit/test_layout_supersession.ahk
 ; parser.ahk (the AHK semantic-diff parser) was previously exercised by no suite,
 ; which let a crash in its Levenshtein helper survive — include it + its tests.
 #Include ../modules/llm/parser.ahk

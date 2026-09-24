@@ -18,9 +18,10 @@
 ;    that master clears the keys Map so ``TapHoldIsConfigured`` returns false
 ;    for every physical key.
 ; 3. A registry layout the driver emulates (``Features["layout"]["emulated_layout"]``,
-;    modules/keymap/keylayout/) replaces the Ergopti emulation, so the Ergopti
-;    layout features are turned off the same way: here, on every path that
-;    rebuilds Features, and never in the saved configuration.
+;    modules/keymap/keylayout/) replaces the Ergopti emulation, so the features
+;    the manifest declares with superseded_reason_key are turned off the same
+;    way: here, on every path that rebuilds Features, and never in the saved
+;    configuration. The menu greys their rows with that reason.
 ; ============================================================================== 
 
 
@@ -58,8 +59,7 @@ ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget, CategoryGateFn, LogDeb
 
 		; A selected registry layout supersedes the Ergopti emulation. After the
 		; Layout master: a disabled category has already turned the selection off.
-		if FeaturesTarget.Has("layout")
-				_MG_SupersedeErgoptiEmulation(FeaturesTarget["layout"])
+		_MG_SupersedeForEmulatedLayout(FeaturesTarget)
 
 		; Shortcuts master
 		if !CategoryGateFn.Call("Shortcuts") and FeaturesTarget.Has("shortcuts") {
@@ -136,25 +136,55 @@ ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget, CategoryGateFn, LogDeb
 				try LogDebugFn.Call("MasterGates", "ApplyMasterGatesToFeatures done.")
 }
 
-; Layout features the registry layout emulation replaces: the Ergopti base and
-; AltGr layers, the Ergopti+ AltGr changes and the digit-row swap (the emulated
-; layout decides its own digit row). ctrl_magic_save works on any layout.
-global MG_ERGOPTI_EMULATION_FEATURES := ["ergopti_base", "ergopti_alt_gr", "ergopti_plus",
-		"direct_access_digits"]
+; Manifest features an emulated registry layout supersedes: the ones declaring
+; superseded_reason_key (the Ergopti emulation's layers with their overlays,
+; and the digit-row swap, since the emulated layout decides its own digit row).
+; @returns {Array} Their manifest entries.
+LayoutSupersededFeatures() {
+		Entries := []
+		for Entry in ManifestFeatures() {
+				if (Entry.Get("superseded_reason_key", "") != "")
+						Entries.Push(Entry)
+		}
+		return Entries
+}
 
-; Turns the Ergopti emulation features off in ``LayoutFeatures`` when a registry
-; layout is selected there (a non-empty ``emulated_layout`` string).
-; @param {Map} LayoutFeatures - The Features["layout"] Map to update.
+; Why the menu greys a feature's row: its superseded_reason_key while a registry
+; layout is emulated, "" otherwise.
+; @param {Map} ManifestEntry - The feature's manifest entry.
+; @param {Map} FeaturesSource - Features Map to read; the live one by default.
+; @returns {string} Locale key of the reason, or "".
+LayoutSupersededReason(ManifestEntry, FeaturesSource := unset) {
+		Reason := ManifestEntry.Get("superseded_reason_key", "")
+		if (Reason == "")
+				return ""
+		Selected := IsSet(FeaturesSource) ? KeylayoutEmulation_SelectedId(FeaturesSource) : KeylayoutEmulation_SelectedId()
+		return (Selected != "") ? Reason : ""
+}
+
+; Turns the superseded features off in ``FeaturesTarget`` when a registry layout
+; is selected there (a non-empty ``emulated_layout`` string).
+; @param {Map} FeaturesTarget - The Features Map to update.
+; @param {Array} Entries - Manifest entries to supersede (LayoutSupersededFeatures by default).
 ; @returns {Integer} Number of features turned off.
-_MG_SupersedeErgoptiEmulation(LayoutFeatures) {
-		global MG_ERGOPTI_EMULATION_FEATURES
-		Selected := LayoutFeatures.Get("emulated_layout", "")
-		if !(Selected is String) or (Selected == "")
+_MG_SupersedeForEmulatedLayout(FeaturesTarget, Entries := unset) {
+		if (KeylayoutEmulation_SelectedId(FeaturesTarget) == "")
 				return 0
+		if !IsSet(Entries)
+				Entries := LayoutSupersededFeatures()
 		Count := 0
-		for V2Id in MG_ERGOPTI_EMULATION_FEATURES {
-				if LayoutFeatures.Has(V2Id) and LayoutFeatures[V2Id] {
-						LayoutFeatures[V2Id] := false
+		for Entry in Entries {
+				Node := FeaturesTarget
+				for Part in StrSplit(Entry["section"], ".") {
+						if !(Node is Map) or !Node.Has(Part) {
+								Node := 0
+								break
+						}
+						Node := Node[Part]
+				}
+				Id := Entry["id"]
+				if (Node is Map) and Node.Has(Id) and Node[Id] {
+						Node[Id] := false
 						Count += 1
 				}
 		}

@@ -796,6 +796,8 @@
 	"layout.ergoptiplus": "Pas de kleine AltGr-wijzigingen van Ergopti➕ toe",
 	"layout.ctrlmagicsave": "Ctrl+★ stuurt Ctrl+S",
 	"menu.layout.emulated_layout": "Geëmuleerde aangepaste indeling",
+	"menu.layout.superseded_ergopti_only": "Alleen Ergopti-indeling: een andere indeling wordt geëmuleerd",
+	"menu.layout.superseded_digit_row": "De geëmuleerde indeling bepaalt zelf haar cijferrij",
 	"layouts.linux_needs_python": "Het omzetten van deze indeling voor Linux vereist Python 3.8 of nieuwer (python3). Installeer het en probeer het opnieuw.",
 	"llm.deps.browser_install_tip": "Download Ollama voor Windows van de pagina die net in je browser is geopend, voer het installatieprogramma uit en kom terug — de verbinding wordt automatisch gedetecteerd.",
 	"llm.deps.done_success": "✅ Ollama klaar",

@@ -208,6 +208,19 @@ function validate(features) {
 					'there is no absence to explain'
 			);
 		}
+		// superseded_reason_key: a feature an emulated registry layout replaces
+		// (the Ergopti emulation, the digit-row swap). Only the Windows driver
+		// emulates layouts, and its master gate can only turn a boolean off.
+		if (f.superseded_reason_key !== undefined) {
+			if (typeof f.superseded_reason_key !== 'string' || !/^[a-z][a-z0-9_.]*$/.test(f.superseded_reason_key)) {
+				throw new Error(`feature ${f.path} has an invalid superseded_reason_key`);
+			}
+			if (f.type !== 'boolean' || !Array.isArray(f.platforms) || f.platforms.join(',') !== 'ahk') {
+				throw new Error(
+					`feature ${f.path} declares superseded_reason_key but is not a Windows-only boolean`
+				);
+			}
+		}
 	}
 }
 
@@ -306,6 +319,7 @@ function renderAhkManifest(manifest, sections, features) {
 			platforms: f.platforms
 		};
 		if (f.enum_values) entry.enum_values = f.enum_values;
+		if (f.superseded_reason_key) entry.superseded_reason_key = f.superseded_reason_key;
 		return `        ${ahkLiteral(entry)}`;
 	});
 	lines.push(featLines.join(',\n'));

@@ -796,6 +796,8 @@
 	"layout.ergoptiplus": "Anvend mindre AltGr-ændringer fra Ergopti➕",
 	"layout.ctrlmagicsave": "Ctrl+★ sender Ctrl+S",
 	"menu.layout.emulated_layout": "Emuleret brugerdefineret tastaturlayout",
+	"menu.layout.superseded_ergopti_only": "Kun Ergopti-layout: et andet layout emuleres",
+	"menu.layout.superseded_digit_row": "Det emulerede layout bestemmer selv sin talrække",
 	"layouts.linux_needs_python": "Konvertering af dette tastaturlayout til Linux kræver Python 3.8 eller nyere (python3). Installer det, og prøv igen.",
 	"llm.deps.browser_install_tip": "Download Ollama til Windows fra siden, der lige åbnede i din browser, kør installationsprogrammet og kom tilbage — forbindelsen registreres automatisk.",
 	"llm.deps.done_success": "✅ Ollama klar",

@@ -796,6 +796,8 @@
 	"layout.ergoptiplus": "Застосувати незначні зміни AltGr в Ergopti➕",
 	"layout.ctrlmagicsave": "Ctrl+★ надсилає Ctrl+S",
 	"menu.layout.emulated_layout": "Емульована користувацька розкладка",
+	"menu.layout.superseded_ergopti_only": "Лише розкладка Ergopti: емулюється інша розкладка",
+	"menu.layout.superseded_digit_row": "Емульована розкладка сама визначає ряд цифр",
 	"layouts.linux_needs_python": "Для перетворення цієї розкладки для Linux потрібен Python 3.8 або новіший (python3). Установіть його та спробуйте ще раз.",
 	"llm.deps.browser_install_tip": "Завантажте Ollama для Windows зі сторінки, що відкрилася у браузері, запустіть інсталятор і поверніться сюди — з'єднання буде виявлено автоматично.",
 	"llm.deps.done_success": "✅ Ollama готовий",

@@ -796,6 +796,8 @@
 	"layout.ergoptiplus": "החל את שינויי ה-AltGr המינוריים של Ergopti➕",
 	"layout.ctrlmagicsave": "Ctrl+★ שולח Ctrl+S",
 	"menu.layout.emulated_layout": "פריסה מותאמת אישית מדומה",
+	"menu.layout.superseded_ergopti_only": "פריסת Ergopti בלבד: פריסה אחרת מדומה",
+	"menu.layout.superseded_digit_row": "הפריסה המדומה קובעת בעצמה את שורת הספרות",
 	"layouts.linux_needs_python": "המרת פריסה זו עבור Linux דורשת Python 3.8 ומעלה (python3). התקינו אותו ונסו שוב.",
 	"llm.deps.browser_install_tip": "הורד את Ollama עבור Windows מהדף שנפתח בדפדפן, הפעל את תוכנת ההתקנה וחזור לכאן — החיבור יזוהה אוטומטית.",
 	"llm.deps.done_success": "✅ Ollama מוכן",
