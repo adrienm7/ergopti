@@ -1606,6 +1606,7 @@
 	"sg_actions.sel_word_prev": "✎ W ← Vorh. Wort auswählen",
 	"sg_actions.select_all": "⬚ Alles auswählen",
 	"sg_actions.select_line": "☰ Zeile auswählen",
+	"sg_actions.select_word": "▭ Wort auswählen",
 	"sg_actions.selection_lowercase": "aa Kleinbuchstaben",
 	"sg_actions.selection_titlecase": "Aa Wortanfänge groß",
 	"sg_actions.selection_uppercase": "AA Großbuchstaben",

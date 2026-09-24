@@ -65,7 +65,9 @@ platform-filtered `_generated/action_catalogue.*`. Each driver suite compares
 that catalogue with its runnable registry in both directions
 (`(action-catalogue-parity)`). On Linux the runnable set is exactly the
 executor's tables, so a new Linux action is a row in one of them, never an
-`elseif` the parity test cannot see.
+`elseif` the parity test cannot see. Actions another module owns (script
+control, the shortcuts manager's text actions) are injected at init through
+`modules/shortcuts/action_handlers.lua`; the parity test builds the same table.
 
 ### project-text-case-is-one-rule
 

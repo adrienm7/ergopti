@@ -1606,6 +1606,7 @@
 	"sg_actions.sel_word_prev": "✎ W ← تحديد الكلمة السابقة",
 	"sg_actions.select_all": "⬚ تحديد الكل",
 	"sg_actions.select_line": "☰ تحديد السطر",
+	"sg_actions.select_word": "▭ تحديد الكلمة",
 	"sg_actions.selection_lowercase": "aa أحرف صغيرة",
 	"sg_actions.selection_titlecase": "Aa حرف كبير في بداية كل كلمة",
 	"sg_actions.selection_uppercase": "AA أحرف كبيرة",

@@ -1606,6 +1606,7 @@
 	"sg_actions.sel_word_prev": "✎ W ← בחר מילה קודמת",
 	"sg_actions.select_all": "⬚ בחר הכל",
 	"sg_actions.select_line": "☰ בחר שורה",
+	"sg_actions.select_word": "▭ בחר מילה",
 	"sg_actions.selection_lowercase": "aa אותיות קטנות",
 	"sg_actions.selection_titlecase": "Aa אות גדולה בתחילת כל מילה",
 	"sg_actions.selection_uppercase": "AA אותיות גדולות",

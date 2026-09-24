@@ -1606,6 +1606,7 @@
 	"sg_actions.sel_word_prev": "✎ W ← Sel. palabra ant.",
 	"sg_actions.select_all": "⬚ Seleccionar todo",
 	"sg_actions.select_line": "☰ Seleccionar línea",
+	"sg_actions.select_word": "▭ Seleccionar palabra",
 	"sg_actions.selection_lowercase": "aa Minúsculas",
 	"sg_actions.selection_titlecase": "Aa Mayúscula inicial en cada palabra",
 	"sg_actions.selection_uppercase": "AA Mayúsculas",

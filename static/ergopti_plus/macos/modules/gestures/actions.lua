@@ -962,6 +962,8 @@ local function text_action(method)
 end
 
 sg("select_line", text_action("select_line"))
+sg("select_word", text_action("select_word"))
+sg("paste_plain", text_action("paste_as_plain_text"))
 -- The case actions: the two toggles and the three explicit conversions, all
 -- through the shared Unicode table (unicode_case), pinned by the shared corpus.
 sg("uppercase_selection", text_action("toggle_uppercase"))

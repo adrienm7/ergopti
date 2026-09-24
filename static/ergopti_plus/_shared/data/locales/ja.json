@@ -1606,6 +1606,7 @@
 	"sg_actions.sel_word_prev": "✎ W ← 前の単語を選択",
 	"sg_actions.select_all": "⬚ すべて選択",
 	"sg_actions.select_line": "☰ 行を選択",
+	"sg_actions.select_word": "▭ 単語を選択",
 	"sg_actions.selection_lowercase": "aa 小文字",
 	"sg_actions.selection_titlecase": "Aa 各単語の先頭を大文字",
 	"sg_actions.selection_uppercase": "AA 大文字",

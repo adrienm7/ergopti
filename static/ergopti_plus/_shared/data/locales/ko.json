@@ -1606,6 +1606,7 @@
 	"sg_actions.sel_word_prev": "✎ W ← 이전 단어 선택",
 	"sg_actions.select_all": "⬚ 모두 선택",
 	"sg_actions.select_line": "☰ 줄 선택",
+	"sg_actions.select_word": "▭ 단어 선택",
 	"sg_actions.selection_lowercase": "aa 소문자",
 	"sg_actions.selection_titlecase": "Aa 단어 첫 글자 대문자",
 	"sg_actions.selection_uppercase": "AA 대문자",

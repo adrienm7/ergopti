@@ -1606,6 +1606,7 @@
 	"sg_actions.sel_word_prev": "✎ W ← Vybrat předch. slovo",
 	"sg_actions.select_all": "⬚ Vybrat vše",
 	"sg_actions.select_line": "☰ Vybrat řádek",
+	"sg_actions.select_word": "▭ Vybrat slovo",
 	"sg_actions.selection_lowercase": "aa Malá písmena",
 	"sg_actions.selection_titlecase": "Aa Velká počáteční písmena",
 	"sg_actions.selection_uppercase": "AA Velká písmena",

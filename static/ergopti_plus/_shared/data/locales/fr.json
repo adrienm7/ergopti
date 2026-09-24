@@ -1606,6 +1606,7 @@
 	"sg_actions.sel_word_prev": "✎ W ← Sél. Mot préc.",
 	"sg_actions.select_all": "⬚ Tout sélectionner",
 	"sg_actions.select_line": "☰ Sélectionner la ligne",
+	"sg_actions.select_word": "▭ Sélectionner le mot",
 	"sg_actions.selection_lowercase": "aa Minuscules",
 	"sg_actions.selection_titlecase": "Aa Majuscule en début de mot",
 	"sg_actions.selection_uppercase": "AA Majuscules",

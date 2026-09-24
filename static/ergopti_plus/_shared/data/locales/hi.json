@@ -1606,6 +1606,7 @@
 	"sg_actions.sel_word_prev": "✎ W ← पिछला शब्द चुनें",
 	"sg_actions.select_all": "⬚ सभी चुनें",
 	"sg_actions.select_line": "☰ पंक्ति चुनें",
+	"sg_actions.select_word": "▭ शब्द चुनें",
 	"sg_actions.selection_lowercase": "aa लोअरकेस",
 	"sg_actions.selection_titlecase": "Aa हर शब्द का पहला अक्षर बड़ा",
 	"sg_actions.selection_uppercase": "AA अपरकेस",

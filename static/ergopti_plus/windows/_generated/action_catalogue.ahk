@@ -28,6 +28,7 @@ GestureActionCatalogueData() {
 	Items.Push({ Kind: "heading", Level: 2, Key: "sg_actions.sg_order.header.edition" })
 	Items.Push({ Kind: "action", Id: "copy" })
 	Items.Push({ Kind: "action", Id: "paste" })
+	Items.Push({ Kind: "action", Id: "paste_plain" })
 	Items.Push({ Kind: "action", Id: "cut" })
 	Items.Push({ Kind: "action", Id: "undo" })
 	Items.Push({ Kind: "action", Id: "redo" })
@@ -88,6 +89,8 @@ GestureActionCatalogueData() {
 	Items.Push({ Kind: "action", Id: "sel_right" })
 	Items.Push({ Kind: "action", Id: "sel_word_prev" })
 	Items.Push({ Kind: "action", Id: "sel_word_next" })
+	Items.Push({ Kind: "action", Id: "select_word" })
+	Items.Push({ Kind: "action", Id: "select_line" })
 	Items.Push({ Kind: "heading", Level: 2, Key: "sg_actions.sg_order.header.text_transform" })
 	Items.Push({ Kind: "action", Id: "selection_uppercase" })
 	Items.Push({ Kind: "action", Id: "selection_lowercase" })
@@ -119,7 +122,6 @@ GestureActionCatalogueData() {
 	Items.Push({ Kind: "action", Id: "lock_screen" })
 	Items.Push({ Kind: "action", Id: "notification_center" })
 	Items.Push({ Kind: "heading", Level: 2, Key: "sg_actions.sg_order.header.system_actions" })
-	Items.Push({ Kind: "action", Id: "select_line" })
 	Items.Push({ Kind: "action", Id: "screen_capture" })
 	Items.Push({ Kind: "action", Id: "screen_capture_instant" })
 	Items.Push({ Kind: "action", Id: "ocr_screenshot" })
@@ -133,7 +135,6 @@ GestureActionCatalogueData() {
 	Items.Push({ Kind: "action", Id: "spotlight_mouse" })
 	Items.Push({ Kind: "action", Id: "toggle_capslock" })
 	Items.Push({ Kind: "action", Id: "microsoft_bold" })
-	Items.Push({ Kind: "action", Id: "paste_plain" })
 	Items.Push({ Kind: "heading", Level: 2, Key: "sg_actions.sg_order.header.tapholds" })
 	Items.Push({ Kind: "action", Id: "one_shot_shift" })
 	Items.Push({ Kind: "action", Id: "caps_word" })
@@ -256,6 +257,7 @@ GestureActionCatalogueData() {
 	Actions["sel_word_prev"] := { Family: "sg", LabelKey: "sg_actions.sel_word_prev", Parameter: "", Confirm: false }
 	Actions["select_all"] := { Family: "sg", LabelKey: "sg_actions.select_all", Parameter: "", Confirm: false }
 	Actions["select_line"] := { Family: "sg", LabelKey: "sg_actions.select_line", Parameter: "", Confirm: false }
+	Actions["select_word"] := { Family: "sg", LabelKey: "sg_actions.select_word", Parameter: "", Confirm: false }
 	Actions["selection_lowercase"] := { Family: "sg", LabelKey: "sg_actions.selection_lowercase", Parameter: "", Confirm: false }
 	Actions["selection_titlecase"] := { Family: "sg", LabelKey: "sg_actions.selection_titlecase", Parameter: "", Confirm: false }
 	Actions["selection_uppercase"] := { Family: "sg", LabelKey: "sg_actions.selection_uppercase", Parameter: "", Confirm: false }

@@ -385,13 +385,19 @@ local function fresh_actions(options)
 			end,
 		}
 		if kind == "text" then
-			child.select_line = function(parent)
-				parent = parent or "shortcut_bindings"
-				if paused[parent] == true then return false end
-				calls.text_actions[#calls.text_actions + 1] = {
-					name = "select_line", parent = parent,
-				}
-				return true
+			-- Every text-layer function a gesture action delegates to records its
+			-- name and the parent it ran under.
+			for _, name in ipairs({ "select_line", "select_word", "paste_as_plain_text",
+				"toggle_uppercase", "toggle_titlecase", "selection_uppercase",
+				"selection_lowercase", "selection_titlecase" }) do
+				child[name] = function(parent)
+					parent = parent or "shortcut_bindings"
+					if paused[parent] == true then return false end
+					calls.text_actions[#calls.text_actions + 1] = {
+						name = name, parent = parent,
+					}
+					return true
+				end
 			end
 		else
 			child.teleport_mouse = function(parent)

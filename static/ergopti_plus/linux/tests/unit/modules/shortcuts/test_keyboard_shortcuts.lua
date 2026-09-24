@@ -196,7 +196,7 @@ helpers.describe("keyboard shortcuts: what is stored", function()
 
 	helpers.it("refuses an action the catalogue does not offer", function()
 		local shortcuts, storage = load_over_storage()
-		local ok = shortcuts.set_action("ctrl_shift_p", "select_word")
+		local ok = shortcuts.set_action("ctrl_shift_p", "no_such_action")
 		local written = #storage.keys()
 		drop_storage()
 		helpers.assert_eq(ok, false,

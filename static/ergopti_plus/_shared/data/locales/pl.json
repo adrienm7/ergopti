@@ -1606,6 +1606,7 @@
 	"sg_actions.sel_word_prev": "✎ W ← Zaznacz poprz. słowo",
 	"sg_actions.select_all": "⬚ Zaznacz wszystko",
 	"sg_actions.select_line": "☰ Zaznacz wiersz",
+	"sg_actions.select_word": "▭ Zaznacz słowo",
 	"sg_actions.selection_lowercase": "aa Małe litery",
 	"sg_actions.selection_titlecase": "Aa Wielka litera w każdym słowie",
 	"sg_actions.selection_uppercase": "AA Wielkie litery",
