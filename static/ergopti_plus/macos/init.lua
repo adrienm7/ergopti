@@ -946,6 +946,24 @@ Logger.set_error_notification_handler(function(module_name, message)
 	)
 end)
 Boot.mark("Config-dependent module requires")
+Boot.stage("Config schema migration")
+
+-- Version config.toml before anything reads or writes it: the first-run
+-- wizard, config_overrides, Preferences.load and every menu save below see the
+-- migrated file, and a file the wizard creates carries this build's version. A
+-- file this build cannot version (a newer schema, a failed migration) stays
+-- untouched and every write to it is refused for the session
+-- (_shared/lua/config_migrate.lua, docs/adr/009-config-versioning.md).
+do
+	local ConfigMigrate = require("config_migrate")
+	ConfigMigrate.boot({
+		path          = config_paths.get("ConfigTomlPath"),
+		driver        = "hs",
+		registry_path = require("infra.paths").shared(ConfigMigrate.REGISTRY_PATH),
+		file_adapter  = file_system,
+	})
+end
+Boot.mark("Config schema migration")
 Boot.stage("First-launch guard (onboarding check)")
 
 -- Global uncaught-error handler: offer the user an opt-in crash report.

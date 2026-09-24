@@ -13,8 +13,9 @@
 --- longer decode is never replaced by the owned sections alone.
 --- ==============================================================================
 
-local helpers   = require("tests.helpers")
-local TomlCodec = require("toml_codec")
+local helpers    = require("tests.helpers")
+local TomlCodec  = require("toml_codec")
+local TomlWriter = require("toml_codec.writer")
 
 local PATH = "/virtual/preferences_unowned/config.toml"
 
@@ -104,5 +105,27 @@ helpers.describe("Preferences.save keeps what it does not own (preferences-unown
 			"a save that cannot keep the other tables must not publish")
 		helpers.assert_eq(#writes, 0, "nothing reaches the adapter")
 		helpers.assert_eq(disk[path], corrupt, "the file keeps its exact bytes")
+	end)
+
+	helpers.it("stamps a file it creates with the rows the boot migration registered", function()
+		local path = "/virtual/preferences_unowned/created.toml"
+		local disk = {}
+		local preferences = load_preferences(disk)
+		helpers.assert_eq(select(2, preferences.load(path)), "absent")
+		TomlWriter.set_create_rows(path, { { section = "_meta", key = "schema_version", value = 3 } })
+		helpers.assert_eq(preferences.save(path, {}, {}, {}), true)
+		helpers.assert_eq(TomlCodec.decode(disk[path])._meta, { schema_version = 3 },
+			"a file this build creates is at this build's version")
+	end)
+
+	helpers.it("refuses to save over a file this session must not write", function()
+		local path = "/virtual/preferences_unowned/refused.toml"
+		local disk = { [path] = SOURCE }
+		local preferences, writes = load_preferences(disk)
+		preferences.load(path)
+		TomlWriter.refuse_writes(path, "the file declares a newer schema")
+		helpers.assert_eq(preferences.save(path, {}, {}, {}), false)
+		helpers.assert_eq(#writes, 0, "nothing reaches the adapter")
+		helpers.assert_eq(disk[path], SOURCE)
 	end)
 end)

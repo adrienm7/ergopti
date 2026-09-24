@@ -538,6 +538,19 @@ local function main()
 	end
 
 	BootProfiler.stage("config")
+	-- 8.0) Version config.toml before anything reads or writes it: the gesture
+	-- and shortcut managers below load the migrated file, and a file the wizard
+	-- creates carries this build's version. A file this build cannot version (a
+	-- newer schema, a failed migration) stays untouched and every write to it is
+	-- refused for the session (_shared/lua/config_migrate.lua,
+	-- docs/adr/009-config-versioning.md). Required here, not at the top: main()
+	-- sits near LuaJIT's upvalue limit.
+	require("config_migrate").boot({
+		path          = require("infra.config_paths").config("config.toml"),
+		driver        = "linux",
+		registry_path = require("infra.paths").shared(require("config_migrate").REGISTRY_PATH),
+	})
+
 	-- 8.1) Initialise the hotstring engine.
 	local engine = engine_mod.new()
 
