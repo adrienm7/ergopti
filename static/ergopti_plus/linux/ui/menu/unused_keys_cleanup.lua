@@ -4,9 +4,9 @@
 --- MODULE: Unused Configuration Keys (Linux)
 --- DESCRIPTION:
 --- Wires the shared config_unused_keys engine to the Linux readers of
---- config.toml, for the tray row "Clean up unused settings…" under Global
---- actions. The dialogs are the tray's own zenity helpers, handed in by the
---- menu builder.
+--- config.toml, for the tray row « Nettoyer config.toml » under
+--- Configuration. The dialogs are the tray's own zenity helpers, handed in by
+--- the menu builder.
 ---
 --- FEATURES & RATIONALE:
 --- 1. The driver's rule, from its readers. Linux has no single loader: the

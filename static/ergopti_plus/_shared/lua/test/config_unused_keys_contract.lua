@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Unused Configuration Keys Contract
 --- DESCRIPTION:
---- The behaviour every Lua driver's "Clean up unused settings…" row must keep,
+--- The behaviour every Lua driver's « Nettoyer config.toml » row must keep,
 --- registered once per driver suite so the macOS runner (Lua 5.4) and the
 --- Linux runner (LuaJIT in CI) both prove it: detection by the driver's own
 --- rule, a verified byte-exact backup before any change, a refusal that leaves
