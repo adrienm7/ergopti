@@ -182,7 +182,7 @@ local _session_notified = ""       -- throttles repeats when persistence is unav
 local _bg_timer_handle = nil       -- timer_scheduler handle for background polling
 local _boot_timer_handle = nil     -- one-shot boot-check handle
 local _check_interval  = DEFAULT_INTERVAL_SEC
-local _channel         = "stable" -- "stable" | "dev"
+local _channel         = nil -- "stable" | "dev"; resolved below, then by init()
 local _installed_launcher = nil  -- wrapper of the installation an update replaced
 local _download_part   = nil
 local _download_dest   = nil
@@ -983,5 +983,8 @@ function M.init(opts)
 	local on_available = opts.on_available
 	M.start_background_checks(nil, nil, on_available)
 end
+
+-- The channel before init() reads the user's choice: the one the build follows.
+_channel = M.default_channel()
 
 return M
