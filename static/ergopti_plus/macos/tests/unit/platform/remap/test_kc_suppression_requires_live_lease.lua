@@ -160,7 +160,11 @@ local function load_remap(initially_enabled, options)
 		end,
 	}
 	package.loaded["infra.timings"] = { sec = function() return 0.01 end }
-	package.loaded["infra.config_paths"] = { get = function() return "missing-config.toml" end }
+	-- layers.toml, read at every regeneration, lives in get_config_dir(); none here.
+	package.loaded["infra.config_paths"] = {
+		get = function() return "missing-config.toml" end,
+		get_config_dir = function() return "tests/unit/platform/remap/no-layers-toml" end,
+	}
 	package.loaded["modules.keylogger.kc_bridge"] = {
 		refresh_managed_set = function(tap_hold_config)
 			ctx.suppresses_personal_output = next(tap_hold_config) ~= nil

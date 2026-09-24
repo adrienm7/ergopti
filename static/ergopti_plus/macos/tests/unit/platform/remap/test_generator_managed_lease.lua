@@ -67,7 +67,7 @@ helpers.describe("Karabiner generator managed lease gates", function()
 				mod_combos = {},
 				non_canonical = {},
 				capsword = _G.hs.json.decode(fixture.file_data["/managed/capsword.json"]),
-				layer_keys = _G.hs.json.decode(fixture.file_data["/managed/layer_keys.json"]),
+				layer_keys = _G.hs.json.decode(fixture.file_data["/managed/legacy_layer_keys.json"]),
 				combos = _G.hs.json.decode(fixture.file_data["/managed/combos.json"]),
 				script_control_slots = {
 					{ from_key = "delete_or_backspace", sentinel = "key_107" },
@@ -165,19 +165,18 @@ helpers.describe("Karabiner generator managed lease gates", function()
 					},
 				},
 			})
-			fixture.file_data["/managed/layer_keys.json"] = _G.hs.json.encode({
-				description = "Layer runtime probe",
-				manipulators = {
-					{
-						type = "basic",
-						from = { key_code = "h" },
-						conditions = {
-							{ type = "variable_if", name = "layer_active", value = 1 },
-						},
-						to = { { key_code = "left_arrow" } },
-					},
+			-- The layer_active consumer is the generated navigation layer, built
+			-- from layers.toml bindings (platform/remap/nav_layer.lua).
+			local nav_layer = {
+				bindings = {
+					KeyH = { kind = "keystroke", chords = { { mods = {}, key = "ArrowLeft" } },
+						repeatable = true, action = "arrow_left" },
 				},
-			})
+				registry = { keys = {
+					KeyH = { kind = "key", group = "alphanumeric", karabiner = { key_code = "h" } },
+					ArrowLeft = { kind = "key", group = "navigation", karabiner = { key_code = "left_arrow" } },
+				} },
+			}
 
 			local actions = {
 				{ id = "none", label = "None", karabiner_to = {} },
@@ -195,6 +194,7 @@ helpers.describe("Karabiner generator managed lease gates", function()
 			}
 			local runtime_state = state({
 				tap_hold_config = { right_command = { tap = "none", hold = "layer" } },
+				nav_layer = nav_layer,
 			})
 			local function build_runtime(token)
 				return Generator.build_karabiner_json(
@@ -241,6 +241,19 @@ helpers.describe("Karabiner generator managed lease gates", function()
 				helpers.assert_nil(names_a[logical_name], "bare personal names must stay unclaimed")
 				helpers.assert_nil(names_b[logical_name], "bare personal names must stay unclaimed")
 			end
+			-- The generated navigation layer is the layer_active consumer: its
+			-- condition must read this generation's variable, never the bare one.
+			local consumers = 0
+			for _, rule in ipairs(generated_a.profiles[1].complex_modifications.rules) do
+				for _, manipulator in ipairs(rule.manipulators or {}) do
+					if manipulator.from and manipulator.from.key_code == "h" then
+						helpers.assert_eq(condition_count(manipulator, scoped("layer_active", TOKEN), 1), 1,
+							"the navigation layer must read the generation's own layer variable")
+						consumers = consumers + 1
+					end
+				end
+			end
+			helpers.assert_eq(consumers, 1, "the generated navigation layer must be deployed once")
 			helpers.assert_true((names_a["system.use_fkeys_as_standard_function_keys"] or 0) > 0,
 				"the stock system preference must remain intentionally shared and unrenamed")
 
@@ -250,7 +263,7 @@ helpers.describe("Karabiner generator managed lease gates", function()
 			helpers.assert_true((legacy_names.ke_held_right_command or 0) > 0,
 				"legacy ownership proof must retain the exact historical bare graph")
 			fixture.file_data["/managed/capsword.json"] = nil
-			fixture.file_data["/managed/layer_keys.json"] = nil
+			fixture.file_data["/managed/legacy_layer_keys.json"] = nil
 		end)
 	end)
 
@@ -473,7 +486,7 @@ helpers.describe("Karabiner generator managed lease gates", function()
 			local build_with = fixture.build_with
 			local install_legacy_static_fixtures = fixture.install_legacy_static_fixtures
 			local saved_capsword = fixture.file_data["/managed/capsword.json"]
-			local saved_layer_keys = fixture.file_data["/managed/layer_keys.json"]
+			local saved_layer_keys = fixture.file_data["/managed/legacy_layer_keys.json"]
 			local saved_combos = fixture.file_data["/managed/combos.json"]
 			install_legacy_static_fixtures()
 			fixture.file_data["/managed/combos.json"] = _G.hs.json.encode({
@@ -499,7 +512,7 @@ helpers.describe("Karabiner generator managed lease gates", function()
 				{}
 			)
 			fixture.file_data["/managed/capsword.json"] = saved_capsword
-			fixture.file_data["/managed/layer_keys.json"] = saved_layer_keys
+			fixture.file_data["/managed/legacy_layer_keys.json"] = saved_layer_keys
 			fixture.file_data["/managed/combos.json"] = saved_combos
 			helpers.assert_not_nil(generated, build_err)
 

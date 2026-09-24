@@ -42,6 +42,7 @@ local LeaseContract = require("platform.remap.lease_contract")
 local LegacyReleaseFixtures = require("platform.remap.legacy_release_fixtures")
 local ActionCatalogue = require("platform.remap.action_catalogue")
 local ControlSignals = require("platform.remap.control_signals")
+local NavLayer = require("platform.remap.nav_layer")
 
 local LOG = "karabiner"
 
@@ -53,11 +54,16 @@ local LEGACY_PARAMETER_TAP = "basic.to_if_alone_timeout_milliseconds"
 local LEGACY_PARAMETER_SIMULTANEOUS = "basic.simultaneous_threshold_milliseconds"
 
 -- Always-on rule files loaded in order after CapsWord (which is loaded first
--- separately to guarantee the highest priority in the KE rule engine).
+-- separately to guarantee the highest priority in the KE rule engine) and after
+-- the navigation layer, which platform/remap/nav_layer.lua generates.
 local ALWAYS_ON_RULES = {
-	"layer_keys.json",  -- Navigation mappings (letter→arrow, number→F-key…)
 	"combos.json",      -- 2-letter combo mappings (e.g. Esc on R Cmd + R Ctrl)
 }
+
+-- The navigation layer every release up to the generated one appended verbatim.
+-- It is no longer deployed: it is the anchor that proves an older, unleased
+-- ErgoptiPlus block in karabiner.json, which the legacy migration then removes.
+local LEGACY_LAYER_KEYS_FILE = "legacy_layer_keys.json"
 
 -- The eight modifier keys: Shift, Control, Option and Command on each side.
 local ACTUAL_MODIFIER_KEY_CODES = {
@@ -1462,13 +1468,14 @@ end
 ---
 --- Rule priority order (highest → lowest):
 ---   1. CapsWord (must win against any combo or tap/hold sharing its keys)
----   2. Dynamic modifier combo rules (before layer_keys)
+---   2. Dynamic modifier combo rules (before the navigation layer)
 ---   3. Script-control sentinel rules
----   4. Always-on static rules (layer_keys, combos)
+---   4. The navigation layer (state.nav_layer), then the always-on combos
 ---   5. Dynamic tap/hold manipulators
 ---   6. Pause-only script-control rules (mutually exclusive with 1–5)
 ---
---- @param state table Current module state (_state from init.lua).
+--- @param state table Current module state (_state from init.lua); state.nav_layer
+---   is { bindings, registry } from platform/remap/nav_layer.lua, nil for none.
 --- @param available_actions table List from Config.load_available_actions.
 --- @param tap_hold_keys table List from Config.load_tap_hold_keys.
 --- @param mod_combos table List from Config.load_mod_combos.
@@ -1562,8 +1569,9 @@ function M.build_karabiner_json(
 	end
 
 
-	-- Dynamic modifier combo manipulators (after CapsWord, before layer_keys so
-	-- a user-defined combo involving a layer-remapped key matches the combo first).
+	-- Dynamic modifier combo manipulators (after CapsWord, before the navigation
+	-- layer so a user-defined combo involving a layer-remapped key matches the
+	-- combo first).
 	for _, combo_def in ipairs(mod_combos) do
 		-- Skip combos handled outside KE (menu_hidden = handled by Hammerspoon directly)
 		if combo_def.menu_hidden then goto continue end
@@ -1616,14 +1624,36 @@ function M.build_karabiner_json(
 	end
 
 
+	-- The navigation layer, generated from the user's layers.toml. No file (or a
+	-- file binding nothing) is no rule: the keys keep their normal behaviour.
+	-- Every older release put its static layer at this position, which the
+	-- historical graph below reproduces.
+	local nav_layer_position = #all_rules
+	local nav_rule = nil
+	if state.nav_layer ~= nil then
+		local nav_ok, built = pcall(NavLayer.build_rule, state.nav_layer.bindings, state.nav_layer.registry)
+		if not nav_ok then
+			local err = "navigation layer: " .. tostring(built)
+			Logger.error(LOG, "Cannot build Karabiner config: %s.", err)
+			return nil, err
+		end
+		nav_rule = built
+		if nav_rule then all_rules[#all_rules + 1] = nav_rule end
+	end
+	local legacy_layer_keys = load_json_file(shared_dir .. LEGACY_LAYER_KEYS_FILE)
+	if legacy_layer_keys then
+		legacy_static_anchors.layer_keys = legacy_layer_keys
+	else
+		Logger.warn(LOG, "Legacy layer anchor not found: '%s' — older blocks cannot be proven.",
+			LEGACY_LAYER_KEYS_FILE)
+	end
+
 	-- Always-on rules (complex logic that cannot be expressed as tap / hold).
 	-- CapsWord is already at the top of all_rules — skipped here intentionally.
 	for _, fname in ipairs(ALWAYS_ON_RULES) do
 		local rule = load_json_file(shared_dir .. fname)
 		if rule then
-			if fname == "layer_keys.json" then
-				legacy_static_anchors.layer_keys = deep_copy(rule)
-			elseif fname == "combos.json" then
+			if fname == "combos.json" then
 				legacy_static_anchors.combos = deep_copy(rule)
 			end
 			all_rules[#all_rules + 1] = rule
@@ -1675,8 +1705,19 @@ function M.build_karabiner_json(
 	-- timings, ownership tags, and atomic mode gates mutate it. Individual members
 	-- are non-owning compatibility hints: deletion requires reconstruction and
 	-- proof of the complete contiguous historical block.
+	-- An older release generated the same graph with its static navigation layer
+	-- where this one generates the layer from layers.toml.
 	local legacy_available_actions = detach_runtime_variable_actions(available_actions)
-	local legacy_rules = deep_copy(all_rules)
+	local legacy_rules = {}
+	for index, rule in ipairs(all_rules) do
+		if rule ~= nav_rule then legacy_rules[#legacy_rules + 1] = deep_copy(rule) end
+		if index == nav_layer_position and legacy_layer_keys then
+			legacy_rules[#legacy_rules + 1] = deep_copy(legacy_layer_keys)
+		end
+	end
+	if nav_layer_position == 0 and legacy_layer_keys then
+		table.insert(legacy_rules, 1, deep_copy(legacy_layer_keys))
+	end
 	for _, paused_rule in ipairs(build_raw_paused_script_control_rules()) do
 		legacy_rules[#legacy_rules + 1] = deep_copy(paused_rule)
 	end

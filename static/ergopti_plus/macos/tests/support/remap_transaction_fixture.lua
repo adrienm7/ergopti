@@ -366,7 +366,11 @@ return function(run)
 			end
 			function timer_scheduler.every() return { committed = false, fired = true }, false end
 			package.loaded["adapters.timer_scheduler"] = timer_scheduler
-			package.loaded["infra.config_paths"] = { get = function() return "missing-config.toml" end }
+			-- layers.toml, read at every regeneration, lives in get_config_dir(); none here.
+			package.loaded["infra.config_paths"] = {
+				get = function() return "missing-config.toml" end,
+				get_config_dir = function() return "tests/unit/platform/remap/no-layers-toml" end,
+			}
 			package.loaded["modules.keylogger.kc_bridge"] = {
 				refresh_managed_set = function()
 					calls.classifier_refreshes = calls.classifier_refreshes + 1

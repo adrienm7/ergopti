@@ -182,8 +182,10 @@ local function with_remap(options, body)
 		end
 	end
 	package.loaded["infra.logger"] = logger
+	-- layers.toml, read at every regeneration, lives in get_config_dir(); none here.
 	package.loaded["infra.config_paths"] = {
 		get = function() return "tests/unit/platform/remap/guardian-recovery.toml" end,
+		get_config_dir = function() return "tests/unit/platform/remap/no-layers-toml" end,
 	}
 	package.loaded["infra.timings"] = {
 		sec = function(category, key)

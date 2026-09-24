@@ -263,7 +263,11 @@ local function load_remap(options)
 		stop_alt_tab_apps_tracker = function() return true end,
 	}
 	package.loaded["adapters.hotkey_registrar"] = { unbind = function() return true end }
-	package.loaded["infra.config_paths"] = { get = function() return "missing-config.toml" end }
+	-- layers.toml, read at every regeneration, lives in get_config_dir(); none here.
+	package.loaded["infra.config_paths"] = {
+		get = function() return "missing-config.toml" end,
+		get_config_dir = function() return "tests/unit/platform/remap/no-layers-toml" end,
+	}
 	package.loaded["modules.keylogger.kc_bridge"] = {
 		clear_managed_set = function()
 			calls.managed_clear = calls.managed_clear + 1

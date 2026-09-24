@@ -324,7 +324,7 @@ local function with_fixture(callback)
 					{ type = "basic", from = { key_code = "caps_lock" }, to = { { key_code = "caps_lock" } } },
 				},
 			})
-			fixture.file_data["/managed/layer_keys.json"] = _G.hs.json.encode({
+			fixture.file_data["/managed/legacy_layer_keys.json"] = _G.hs.json.encode({
 				description = "Layer legacy anchor",
 				manipulators = {
 					{ type = "basic", from = { key_code = "a" }, to = { { key_code = "left_arrow" } } },
