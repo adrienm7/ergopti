@@ -6,7 +6,9 @@
  * DESCRIPTION:
  * Asserts that editing a cross-driver contract — anything under
  * `_shared/core/` (the port specs) or `_shared/tests/` (the corpora the three
- * suites replay) — selects the unit suite of EVERY driver in verify-change.cjs.
+ * suites replay), and the layer data every driver's loader reads at run time
+ * (`_shared/keymap/` and the physical-key registry) — selects the unit suite
+ * of EVERY driver in verify-change.cjs.
  *
  * ROOT CAUSE ENCODED:
  * ADR-006 declares those two trees binding on all three drivers, yet they were
@@ -90,17 +92,30 @@ for (const gate of DRIVER_UNIT_GATES) {
 // ==========================================================
 // ==========================================================
 
-for (const tree of ['core', 'tests']) {
+// The layer vocabulary, the presets and the physical-key registry are read by
+// the AHK and Lua layer loaders and replayed by every driver's corpus consumer;
+// an edit that ran only the JS gate would leave two loaders unexercised.
+const SHARED_TREES = ['core', 'tests', 'keymap'];
+const SHARED_FILES = ['data/keycodes/physical_keys.json'];
+
+const samples = [];
+for (const tree of SHARED_TREES) {
 	const sample = findRealFile(tree);
 	check(sample !== null, `_shared/${tree}/ holds no file — the sample walk found nothing, so nothing below was verified`);
-	if (sample === null) continue;
+	if (sample !== null) samples.push(sample);
+}
+for (const rel of SHARED_FILES) {
+	check(fs.existsSync(path.join(SHARED, rel)), `_shared/${rel} does not exist — the assertion below would check a fiction`);
+	samples.push(path.relative(ROOT, path.join(SHARED, rel)).replace(/\\/g, '/'));
+}
 
+for (const sample of samples) {
 	const selected = [...selectGates([sample]).keys()];
 	for (const gate of DRIVER_UNIT_GATES) {
 		check(
 			selected.includes(gate),
 			`editing "${sample}" selects [${selected.join(', ')}] — "${gate}" is missing. ` +
-				'ADR-006 makes this tree binding on every driver, so every driver suite has to run for it'
+				'Every driver reads or replays this file, so every driver suite has to run for it'
 		);
 	}
 }
@@ -117,4 +132,4 @@ if (failures.length > 0) {
 	process.exit(1);
 }
 
-console.log(`[OK] shared-contract gate coverage (2 shared trees x ${DRIVER_UNIT_GATES.length} driver suites).`);
+console.log(`[OK] shared-contract gate coverage (${samples.length} shared samples x ${DRIVER_UNIT_GATES.length} driver suites).`);
