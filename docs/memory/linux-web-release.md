@@ -249,8 +249,11 @@ never be typed on Linux; `^ ^` only works through the `include "%L"` system
 table. The generic converter reproduces this on purpose (the Ergopti golden
 test pins those files byte for byte), and
 `xkb_generation/tests/test_keystroke_vectors.py` skips the two shared vectors
-by id. Action: fixing it is a deliberate regeneration of the Ergopti XKB
-files, golden files included, not a converter tweak.
+by id. The converter reports such outputs in `Conversion.unreachable`;
+`test_registry_conversion.py` pins Ergopti's three and requires none for every
+other registry layout, so a new layout hitting the limit fails there. Action:
+fixing it is a deliberate regeneration of the Ergopti XKB files, golden files
+included, not a converter tweak.
 
 ## Release artifacts
 

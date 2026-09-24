@@ -432,6 +432,12 @@ class Conversion:
         # works on keysyms, so two keys typing the same keysym cannot be told
         # apart; the first output wins and the conflict is reported here.
         self.conflicts: List[Tuple[str, str, str]] = []
+        # (dead-key state, action) outputs no key can reach: the Compose line
+        # names the character the action is called after, but every key using
+        # that action sends another keysym (a dead key pressed inside a
+        # dead-key state sends its own dead keysym). Reported, not fixed, so
+        # the shipped Ergopti files keep their historical sequences.
+        self.unreachable: List[Tuple[str, str]] = []
 
 
 class _Converter:
@@ -460,6 +466,8 @@ class _Converter:
         self.typed_keysyms = self._plain_keysyms()
         self.taken = set(self.typed_keysyms) | set(self.borrowed.values())
         self.dead_triggers: Dict[str, str] = {}
+        # Action id -> keysyms its keys type (see _keysyms_typing_action).
+        self._action_keysyms: Optional[Dict[str, List[str]]] = None
 
     # -- keysym choice ----------------------------------------------------
 
@@ -546,15 +554,21 @@ class _Converter:
 
     def _keysyms_typing_action(self, action_id: str) -> List[str]:
         """Keysyms of every key/level whose <key> uses ``action_id``."""
-        found: List[str] = []
-        for xkb, code in self.keycodes:
-            for level, index in enumerate(self.level_indices):
-                entry = self.layout.key_entry(index, code)
-                if entry == ("action", action_id):
+        if self._action_keysyms is None:
+            # One pass over the keyboard, built once every keysym is chosen
+            # (after symbols()): compose() asks it for every dead-key output.
+            by_action: Dict[str, List[str]] = {}
+            for xkb, code in self.keycodes:
+                for level, index in enumerate(self.level_indices):
+                    entry = self.layout.key_entry(index, code)
+                    if entry is None or entry[0] != "action":
+                        continue
                     keysym = self._cell_keysym(self.grid[xkb][level])
+                    found = by_action.setdefault(entry[1], [])
                     if keysym and keysym not in found:
                         found.append(keysym)
-        return found
+            self._action_keysyms = by_action
+        return self._action_keysyms.get(action_id, [])
 
     def dead_sequences(self) -> Dict[str, List[List[str]]]:
         """Keysym sequences entering each dead-key state, chains included."""
@@ -642,6 +656,11 @@ class _Converter:
         for state in sorted(outputs):
             if state not in sequences:
                 continue
+            for action_id, _output in sorted(outputs[state]):
+                # An action no key uses cannot be typed on macOS either.
+                typed = self._keysyms_typing_action(action_id)
+                if typed and self.base_keysym(action_id) not in typed:
+                    self.result.unreachable.append((state, action_id))
             for prefix in sequences[state]:
                 if not first:
                     lines.append("")
