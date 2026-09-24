@@ -170,13 +170,15 @@ _MI_StageTopLevel(TopLevel, Builders) {
 ; ``active_layouts`` is macOS-only and skipped by the AHK platform filter.
 _MI_StageLayout() {
 	LayoutListProviders := Map(
+		"custom_layouts",         (*) => _LAY_CustomLayoutRows(),
 		"layout_features_base",   (*) => _LAY_LayoutFeatureBaseRows(),
 		"layout_features_altgr",  (*) => _LAY_LayoutFeatureAltGrRows(),
 	)
 	; The accented-letter group stays enabled without the Ergopti emulation: the
 	; shortcuts then follow the user's own layout (accented_shortcuts.ahk).
 	LayoutMenu  := MenuRenderer_Build("layout_menu", "Layout", "", "", LayoutListProviders,
-		Map("layout_toggle", MenuRenderer_CategoryGateCommand("Layout")),
+		Map("layout_toggle", MenuRenderer_CategoryGateCommand("Layout"),
+			"layout_manager", LayoutManager_Open),
 		Map("layout_enabled", () => IsCategoryGated("Layout")))
 	LayoutMenuTitle := t("menu.layout.title")
 	TrayMenuStage_AddFeature(LayoutMenuTitle, LayoutMenu)

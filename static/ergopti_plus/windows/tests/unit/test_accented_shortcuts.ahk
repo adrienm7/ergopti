@@ -155,16 +155,16 @@ _ACS_TokenIndex(Tokens, Token) {
 	throw Error("Layout menu row '" . Token . "' is not declared.")
 }
 
-Test("layout menu: Ergopti-only rows precede the any-layout section (layout-menu-sections)", () => _ACS_LayoutSectionsCase())
+Test("layout menu: the custom layout rows precede the any-layout section (layout-menu-sections)", () => _ACS_LayoutSectionsCase())
 
 _ACS_LayoutSectionsCase() {
 	Tokens := _ACS_LayoutMenuTokens()
-	Ergopti := _ACS_TokenIndex(Tokens, "menu.layout.header_ergopti")
+	Custom := _ACS_TokenIndex(Tokens, "menu.layout.header_custom")
 	AnyLayout := _ACS_TokenIndex(Tokens, "menu.layout.header_any")
-	Assert(Ergopti < AnyLayout, "the Ergopti section must come first")
-	for Row in ["layout_features_base", "layout_features_altgr"]
-		Assert(_ACS_TokenIndex(Tokens, Row) > Ergopti && _ACS_TokenIndex(Tokens, Row) < AnyLayout,
-			Row . " only applies to the Ergopti layout")
+	Assert(Custom < AnyLayout, "the custom layout section must come first")
+	for Row in ["custom_layouts", "layout_manager", "layout_features_base", "layout_features_altgr"]
+		Assert(_ACS_TokenIndex(Tokens, Row) > Custom && _ACS_TokenIndex(Tokens, Row) < AnyLayout,
+			Row . " belongs to the custom layout section")
 	for Row in ["layout.direct_access_digits", "accented_letters",
 			"hotstrings.magic_key.replace", "layout.ctrl_magic_save"]
 		Assert(_ACS_TokenIndex(Tokens, Row) > AnyLayout, Row . " works on any layout")

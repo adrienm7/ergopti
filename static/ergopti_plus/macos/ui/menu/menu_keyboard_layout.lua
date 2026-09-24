@@ -29,6 +29,7 @@ local Timings       = require("infra.timings")
 local notifications = require("infra.notifications")
 local i18n          = require("infra.i18n")
 local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
+local LayoutManagerWindow = require("ui.layout_manager")
 local install       = require("modules.keymap.layout_install")
 local input_sources = require("modules.keymap.input_sources")
 local LOG           = "menu.keyboard_layout"
@@ -185,6 +186,43 @@ end
 local function variant_label(name)
 	local unversioned = (name:gsub("_v%d+[_.]%d+[_.]%d+", ""))
 	return format_ergopti_display(unversioned) or name
+end
+
+--- The custom layout picker: the registry layouts the layout manager
+--- installed, the one of the current input source checked; choosing one
+--- makes it the current input source.
+--- @param update_menu function|nil Menu rebuild callback.
+--- @return table Rows for the `custom_layouts` provider.
+local function custom_layout_rows(update_menu)
+	local rows = {}
+	local ok, LayoutRegistry = pcall(require, "modules.keymap.layout_registry")
+	local picked_ok, picker = false, nil
+	if ok then picked_ok, picker = pcall(LayoutRegistry.picker) end
+	if not picked_ok or type(picker) ~= "table" then
+		Logger.error(LOG, "The installed layouts could not be listed: %s.", tostring(picker))
+		picker = { layouts = {}, active = "" }
+	end
+	for _, entry in ipairs(picker.layouts) do
+		local id = entry.id
+		rows[#rows + 1] = {
+			label   = type(entry.name) == "string" and entry.name or id,
+			checked = picker.active == id or nil,
+			action  = function()
+				defer_tis_call(function()
+					LayoutRegistry.select(id, function(selected)
+						if not selected then
+							pcall(notifications.notify, i18n.get("layout_manager.failure_other"), nil, "error")
+						end
+						schedule_menu_refresh(update_menu)
+					end)
+				end)
+			end,
+		}
+	end
+	if #rows == 0 then
+		rows[1] = { label = i18n.get("menu.layout.none_installed"), disabled = true }
+	end
+	return rows
 end
 
 --- Builds an install/update menu item for one scope (user or system).
@@ -657,10 +695,10 @@ function M.build(ctx)
 		Logger.error(LOG, "Manifest renderer unavailable — the layout list is not rendered.")
 		return nil
 	end
-	-- The menubar icon choice: the renderer draws the row and its values from
-	-- the manifest, ticks the stored value and hands the chosen one back here.
+	-- Layout management and the menubar icon remain manifest commands; other
+	-- commands of the context stay available to the renderer.
 	local render_ctx = {}
-	for key, value in pairs(ctx or {}) do render_ctx[key] = value end
+	for key, value in pairs(type(ctx) == "table" and ctx or {}) do render_ctx[key] = value end
 	render_ctx.commands = {}
 	for key, value in pairs(type(ctx) == "table" and type(ctx.commands) == "table" and ctx.commands or {}) do
 		render_ctx.commands[key] = value
@@ -681,7 +719,10 @@ function M.build(ctx)
 		if type(update_menu) == "function" then pcall(update_menu) end
 		return true
 	end
+	render_ctx.commands["layout_manager"] = LayoutManagerWindow.menu_command()
+	local custom_rows = custom_layout_rows(update_menu)
 	local submenu = ManifestMenu.build("layout_menu", "Layout", nil, nil, render_ctx, {
+		["custom_layouts"]   = function() return custom_rows end,
 		["active_layouts"]   = active_layout_rows,
 		["layout_bundle"]    = function() return bundle_rows end,
 		["layout_switching"] = function() return switching_rows end,

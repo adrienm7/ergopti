@@ -310,6 +310,19 @@ helpers.describe("layout manager (macOS): uninstalling and selecting", function(
 		helpers.assert_eq(result.detail, LayoutRegistry.FAILURE_NOT_INSTALLED)
 	end)
 
+	helpers.it("gives the menu picker the installed layouts and the active one (layout-registry-install)", function()
+		local LayoutRegistry, deps, state = with_ergol()
+		local bundle_scans = 0
+		deps.bundle_names = function() bundle_scans = bundle_scans + 1; return {} end
+		local picker = LayoutRegistry.picker(deps)
+		helpers.assert_eq(#picker.layouts, 1)
+		helpers.assert_eq(picker.layouts[1].id, "ergol")
+		helpers.assert_eq(picker.active, "ergol")
+		helpers.assert_eq(bundle_scans, 0, "opening the menu scans no bundle")
+		state.files[LAYOUTS_DIR .. "ergol.keylayout"] = nil
+		helpers.assert_eq(#LayoutRegistry.picker(deps).layouts, 0, "a layout whose file is gone is not offered")
+	end)
+
 	helpers.it("does not list a recorded layout whose file is gone (layout-registry-install)", function()
 		local LayoutRegistry, deps, state = with_ergol()
 		state.files[LAYOUTS_DIR .. "ergol.keylayout"] = nil
