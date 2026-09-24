@@ -678,6 +678,7 @@ _Updater_HandleBackgroundResult(Json, Current, Request, Terminal := 0) {
 		return
 	}
 	try {
+		_Updater_ClaimBalloon()
 		TrayTip(Format(t("updater.tray_new_version_body"), Latest), t("updater.tray_new_version_title"))
 		if _Updater_CommitReleaseNotification(Reservation, Request)
 			_Updater_RecordNotifiedTag(Latest)
@@ -687,10 +688,55 @@ _Updater_HandleBackgroundResult(Json, Current, Request, Terminal := 0) {
 	}
 }
 
-; Wires an OnMessage handler so clicking a Windows balloon notification fires
-; Updater_ShowAvailableUpdate. AHK v2 does not expose a dedicated TrayTip-click
-; callback, but Windows posts WM_TRAYICON (0x404) with lParam == 0x405
-; (NIN_BALLOONUSERCLICK) when the user clicks the notification body.
+; Balloon ownership. Every balloon of the driver is a TrayTip on the one tray
+; icon, and Windows reports a click with no balloon identity, so ownership is
+; last-shown-wins: the updater claims the balloon right before its update offer
+; and releases it before any other balloon it shows; a NIN_BALLOONSHOW it did
+; not claim hands the balloon to whoever showed it. Only a click while the
+; updater owns the balloon opens the update prompt: a saved screenshot, a
+; copied colour or the manual check's "up to date" used to open it too.
+global _UpdaterBalloon := { Owned: false, ShowPending: false }
+global UPDATER_NIN_BALLOONSHOW := 0x402
+global UPDATER_NIN_BALLOONUSERCLICK := 0x405
+
+; Claims the balloon the updater is about to show (its update offer).
+_Updater_ClaimBalloon() {
+	global _UpdaterBalloon
+	_UpdaterBalloon.Owned := true
+	_UpdaterBalloon.ShowPending := true
+}
+
+; Gives up the balloon before the updater shows one that is not an offer.
+_Updater_ReleaseBalloon() {
+	global _UpdaterBalloon
+	_UpdaterBalloon.Owned := false
+	_UpdaterBalloon.ShowPending := false
+}
+
+; NIN_BALLOONSHOW: the first show after a claim is the updater's own; any
+; later one replaced it.
+_Updater_OnBalloonShown() {
+	global _UpdaterBalloon
+	if _UpdaterBalloon.ShowPending {
+		_UpdaterBalloon.ShowPending := false
+		return
+	}
+	_UpdaterBalloon.Owned := false
+}
+
+; Spends the claim on the click that answers it; false when not owned.
+_Updater_TakeBalloonClick() {
+	global _UpdaterBalloon
+	if !_UpdaterBalloon.Owned
+		return false
+	_Updater_ReleaseBalloon()
+	return true
+}
+
+; Wires an OnMessage handler so clicking the updater's balloon notification
+; fires Updater_ShowAvailableUpdate. AHK v2 does not expose a dedicated
+; TrayTip-click callback, but Windows posts WM_TRAYICON (0x404) with lParam ==
+; 0x405 (NIN_BALLOONUSERCLICK) when the user clicks the notification body.
 ; Safe to call multiple times — the handler is idempotent (OnMessage replaces
 ; any prior registration for the same message + function pair).
 Updater_InitTrayNotifyHandler() {
@@ -703,12 +749,22 @@ Updater_InitTrayNotifyHandler() {
 }
 
 ; OnMessage handler for WM_TRAYICON (0x404).
-; lParam 0x405 = NIN_BALLOONUSERCLICK — user clicked the notification body.
-; Returns "" to let AHK continue its own tray processing.
+; lParam 0x402 = NIN_BALLOONSHOW, 0x405 = NIN_BALLOONUSERCLICK (the user clicked
+; the notification body). Returns "" to let AHK continue its own tray processing.
 _Updater_OnTrayMsg(wParam, lParam, msg, hwnd, ShowFn := 0) {
-	; OnMessage bypasses native Suspend, so every genuine click must reach the
-	; same visible entry policy as the tray-menu action instead of disappearing.
-	if (lParam == 0x405) {
+	global UPDATER_NIN_BALLOONSHOW, UPDATER_NIN_BALLOONUSERCLICK
+	if (lParam == UPDATER_NIN_BALLOONSHOW) {
+		_Updater_OnBalloonShown()
+		return ""
+	}
+	; OnMessage bypasses native Suspend, so every genuine click on the updater's
+	; balloon must reach the same visible entry policy as the tray-menu action
+	; instead of disappearing.
+	if (lParam == UPDATER_NIN_BALLOONUSERCLICK) {
+		if !_Updater_TakeBalloonClick() {
+			try LoggerDebug("Updater", "Balloon click ignored: the balloon is not the updater's offer.")
+			return ""
+		}
 		if IsObject(ShowFn) {
 			try ShowFn.Call()
 		} else {
@@ -1354,16 +1410,20 @@ _Updater_ShowAvailableUpdateRunning() {
 	; auto-dismisses the brief "Verification…" notice; the actual update prompt
 	; is surfaced from the async callback once the response arrives.
 	MsgBox(Format(t("updater.checking"), _Updater_ChannelLabel(UPDATER_CHANNEL)), t("updater.title_update"), "Iconi T2")
+	; ``Current`` is captured with the request, as on the background path.
+	Current := Updater_CurrentVersion()
 	_Updater_FetchLatestJsonAsync(UPDATER_CHANNEL, Request,
 		(Json, CompletedRequest, Terminal := 0) => _Updater_ShowAvailableUpdateCallback(
-			Json, CompletedRequest, Terminal))
+			Json, CompletedRequest, Terminal, 0, 0, Current))
 }
 
 ; Completion handler for the async fetch dispatched by Updater_ShowAvailableUpdate
 ; when no release is cached. Mirrors the synchronous tail it replaced: surfaces a
-; localized error on failure, otherwise builds the release record and shows the
-; update prompt. Runs off a poll timer so it never blocks the main thread.
-_Updater_ShowAvailableUpdateCallback(Json, Request, Terminal := 0, NotifyFn := 0) {
+; localized error on failure, reports an installed version that is already the
+; channel's latest, otherwise builds the release record and shows the update
+; prompt. Runs off a poll timer so it never blocks the main thread. NotifyFn and
+; PromptFn are test seams for the message box and the prompt.
+_Updater_ShowAvailableUpdateCallback(Json, Request, Terminal := 0, NotifyFn := 0, PromptFn := 0, Current := unset) {
 	if !_Updater_RequestMayPublish(Request)
 		return
 	if _Updater_AsyncTerminalIsCancelled(Terminal) {
@@ -1392,6 +1452,23 @@ _Updater_ShowAvailableUpdateCallback(Json, Request, Terminal := 0, NotifyFn := 0
 		MsgBox(t("updater.parse_failed"), t("updater.title_update"), "Icon!")
 		return
 	}
+	if !IsSet(Current)
+		Current := Updater_CurrentVersion()
+	; The same offer rule as the background check: this fallback used to show
+	; the prompt for whatever the list's latest tag was, so a balloon click
+	; announced "Update available" for the version already installed.
+	if !UpdateChannels_ShouldOffer(Tag, Current, Request.Channel, _Updater_InstalledChannel()) {
+		try LoggerInfo("Updater", "Update prompt not shown: {1} is up to date (latest {2}, channel {3}).",
+			Current, Tag, Request.Channel)
+		if !_Updater_RequestMayPublish(Request)
+			return
+		Message := Format(t("updater.up_to_date"), Current)
+		if IsObject(NotifyFn)
+			NotifyFn.Call(Message, t("updater.title_update"), "Iconi")
+		else
+			MsgBox(Message, t("updater.title_update"), "Iconi")
+		return
+	}
 	Release := {
 		Tag:         Tag,
 		Body:        Updater_ParseBody(Json),
@@ -1404,7 +1481,10 @@ _Updater_ShowAvailableUpdateCallback(Json, Request, Terminal := 0, NotifyFn := 0
 	; crossed that boundary while release metadata was being parsed.
 	if !_Updater_RequestMayPublish(Request)
 		return
-	Updater_ShowUpdatePrompt(Release, Request)
+	if IsObject(PromptFn)
+		PromptFn.Call(Release, Request)
+	else
+		Updater_ShowUpdatePrompt(Release, Request)
 }
 
 
@@ -2647,8 +2727,10 @@ _Updater_FailSwapTransaction(TransactionId, Message, ShowUi := true) {
 ; named timer coalesces the failure notice and guarantees that a post-teardown
 ; reload happens only after the user has seen the updater failure.
 _Updater_ShowDeferredSwapFailureNotice(*) {
-	NotifyFn := (*) => TrayTip(t("updater.install_error"),
-		t("updater.title_update"), "Iconx Mute")
+	; A failure balloon is not an update offer: a click on it must not open the
+	; update prompt.
+	NotifyFn := (*) => (_Updater_ReleaseBalloon(), TrayTip(t("updater.install_error"),
+		t("updater.title_update"), "Iconx Mute"))
 	ArmRetryFn := (DelayMs) => TimerArmOneShotMs(
 		_Updater_ShowDeferredSwapFailureNotice, DelayMs)
 	if _Updater_AttemptLifecycleRecovery(NotifyFn, ArmRetryFn,

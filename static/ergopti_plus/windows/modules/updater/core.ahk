@@ -162,6 +162,9 @@ _Updater_SurfaceFailure(MessageKey, LogMessage, NotifyFn := 0,
 	Level := "error") {
 	try LoggerError("Updater", LogMessage)
 	try {
+		; A failure balloon is not an update offer: a click on it must not open
+		; the update prompt.
+		_Updater_ReleaseBalloon()
 		Message := t(MessageKey)
 		Options := Map("title", t("updater.title_update"), "level", Level)
 		Result := IsObject(NotifyFn)

@@ -126,6 +126,7 @@ _Updater_OneClickUpdateCallback(Json, Current, Request, Terminal := 0) {
 		_Updater_ScheduleMenuRebuildForRequest(Request)
 		if !_Updater_RequestMayPublish(Request)
 			return
+		_Updater_ReleaseBalloon()
 		TrayTip(t("updater.no_connection"), t("updater.title_update"))
 		return
 	}
@@ -134,6 +135,7 @@ _Updater_OneClickUpdateCallback(Json, Current, Request, Terminal := 0) {
 		_Updater_ScheduleMenuRebuildForRequest(Request)
 		if !_Updater_RequestMayPublish(Request)
 			return
+		_Updater_ReleaseBalloon()
 		TrayTip(_Updater_NoChannelReleaseMessage(Request.Channel), t("updater.title_update"))
 		return
 	}
@@ -144,6 +146,7 @@ _Updater_OneClickUpdateCallback(Json, Current, Request, Terminal := 0) {
 		_Updater_ScheduleMenuRebuildForRequest(Request)
 		if !_Updater_RequestMayPublish(Request)
 			return
+		_Updater_ReleaseBalloon()
 		TrayTip(t("updater.parse_failed"), t("updater.title_update"))
 		return
 	}
@@ -153,6 +156,7 @@ _Updater_OneClickUpdateCallback(Json, Current, Request, Terminal := 0) {
 		_Updater_ScheduleMenuRebuildForRequest(Request)
 		if !_Updater_RequestMayPublish(Request)
 			return
+		_Updater_ReleaseBalloon()
 		TrayTip(Format(t("updater.up_to_date"), Current), t("updater.title_update"))
 		return
 	}
