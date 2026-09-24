@@ -14,7 +14,9 @@
 --- 4. A refused logs folder saves nothing: validating it after the
 ---    configuration folder was stored reported a failed save that had half
 ---    happened.
---- 5. A saved logs folder moves the running sink. The daemon outlives the
+--- 5. A logs folder that cannot be created is refused before anything is
+---    stored: the next start would fall back to stdout for it.
+--- 6. A saved logs folder moves the running sink. The daemon outlives the
 ---    editor's reload, so without the move the lines kept going to the old
 ---    folder while every opener named the new one.
 --- ==============================================================================
@@ -47,7 +49,12 @@ local function with_bridge(stored, body)
 		local pushed = {}
 		-- The running sink: a save must move it, since the daemon outlives
 		-- this editor's reload.
-		local sink = { moves = 0 }
+		local sink = { moves = 0, prepared = {} }
+		function sink.prepare_dir(dir)
+			sink.prepared[#sink.prepared + 1] = dir
+			if sink.prepare_result == false then return false, "the folder cannot be created" end
+			return true
+		end
 		function sink.repoint()
 			sink.moves = sink.moves + 1
 			return sink.repoint_result ~= false, "the folder is not writable"
@@ -128,6 +135,28 @@ helpers.describe("paths editor: logs folder (paths-editor-logs-dir)", function()
 			helpers.assert_true(result.saved == true)
 			helpers.assert_eq(values["paths.logs_dir"], "/sync/logs/ergopti_plus")
 			helpers.assert_eq(state.logger_sink.moves, 1, "the sink must follow the saved folder")
+		end)
+	end)
+
+	helpers.it("creates the logs folder before storing it", function()
+		with_bridge({}, function(handler, state)
+			local result = handler.on_message({ action = "save", configDir = "", logsDir = "/sync/logs" }, state)
+			helpers.assert_true(result.saved == true)
+			helpers.assert_eq(state.logger_sink.prepared, { "/sync/logs/ergopti_plus" })
+		end)
+	end)
+
+	helpers.it("refuses a logs folder that cannot be created and stores nothing", function()
+		with_bridge({}, function(handler, state, values)
+			state.logger_sink.prepare_result = false
+			local result = handler.on_message({
+				action = "save", configDir = "/tmp/ergopti-custom/", logsDir = "/sync/logs",
+			}, state)
+			helpers.assert_true(result.saved == false)
+			helpers.assert_nil(values["paths.config_dir"], "a refused save must not half happen")
+			helpers.assert_nil(values["paths.logs_dir"],
+				"a folder the next start could not use is never stored")
+			helpers.assert_eq(state.logger_sink.moves, 0)
 		end)
 	end)
 

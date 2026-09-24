@@ -232,6 +232,20 @@ _PathsEdWeb_LogsOverride(LogsDir) {
 	return (Resolved = _DefaultLogsDir) ? "" : Resolved
 }
 
+; Creates the logs folder a save is about to store. The logger creates its
+; folder silently at boot, so a stored folder that cannot be created left the
+; next session logging nowhere; refusing it here keeps the editor open.
+; @param Override {String} Value _PathsEdWeb_LogsOverride returned; "" is the
+;   OS default, which the logger creates itself.
+; @throws {ValueError} When the folder cannot be created.
+_PathsEdWeb_PrepareLogsFolder(Override) {
+	if (Override == "" || DirExist(Override))
+		return
+	try DirCreate(Override)
+	catch as Err
+		throw ValueError("the logs folder '" . Override . "' cannot be created (" . Err.Message . ")")
+}
+
 ; Persists the chosen folders and reloads, mirroring the native dialog.
 ; @param ConfigDir {String} Configuration folder from the page.
 ; @param LogsDir {String|Integer} Logs folder from the page, or 0 to keep it.
@@ -244,8 +258,10 @@ _PathsEdWeb_Save(ConfigDir, LogsDir := 0) {
 		N := _DefaultConfigDir
 	if !RegExMatch(N, "\\$")
 		N .= "\"
-	try NewLogs := _PathsEdWeb_LogsOverride(LogsDir)
-	catch ValueError as Err {
+	try {
+		NewLogs := _PathsEdWeb_LogsOverride(LogsDir)
+		_PathsEdWeb_PrepareLogsFolder(NewLogs)
+	} catch ValueError as Err {
 		; Nothing is written and the editor stays open for another folder.
 		try LoggerError("PathsEditor", "Refused the logs folder: {1}.", Err.Message)
 		try MsgBox(t("paths_editor.save_failed"),

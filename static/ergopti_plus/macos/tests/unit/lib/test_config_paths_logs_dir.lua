@@ -15,6 +15,9 @@
 --- 3. A relative override is refused, on load and on save.
 --- 4. The one writer stores both keys in one publication, keeps the other key
 ---    untouched, and clears an override equal to the default.
+--- 5. A logs folder that cannot be created is refused before anything is
+---    published: the native worker would refuse it at the next start, which
+---    then stops.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -120,6 +123,21 @@ helpers.describe("config_paths: logs folder override (config-paths-logs-dir)", f
 		helpers.assert_contains(written, '# LogsDirPath = "' .. DEFAULT_LOGS .. '"')
 		helpers.assert_nil(written:find('\nLogsDirPath', 1, true), "the default is never stored as an override")
 		helpers.assert_eq(ConfigPaths.get_logs_dir(), DEFAULT_LOGS)
+	end)
+
+	-- The native worker refuses a logs folder it cannot open and the start then
+	-- stops: a folder saved without being created would leave the application
+	-- unable to boot until paths.toml is edited by hand.
+	helpers.it("refuses a logs folder it cannot create and publishes nothing", function()
+		local ConfigPaths, observations = fresh_resolver('ConfigDirPath = "/fixture/cfg/"\n')
+		local writes_before = #observations.writes
+		local changed, err = ConfigPaths.set_paths("/fixture/cfg2/", "/unwritable/place")
+		helpers.assert_true(changed == false, "an uncreatable logs folder must be refused")
+		helpers.assert_not_nil(err)
+		helpers.assert_eq(#observations.writes, writes_before, "a refusal publishes nothing")
+		helpers.assert_eq(ConfigPaths.get_logs_dir(), DEFAULT_LOGS)
+		helpers.assert_eq(ConfigPaths.get_config_dir(), "/fixture/cfg/",
+			"a refused save keeps the configuration folder too")
 	end)
 
 	helpers.it("refuses a relative override at save and keeps the stored one", function()
