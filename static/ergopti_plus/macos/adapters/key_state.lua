@@ -250,4 +250,22 @@ function M.toggle_capslock()
 	return state_or_err, nil
 end
 
+
+--- Reads the CapsLock lock state without changing it.
+--- @return boolean|nil state True when CapsLock is locked, nil on failure.
+--- @return string|nil error_message Failure detail.
+function M.capslock_on()
+	local ok, state_or_err = pcall(function()
+		assert(hs.hid and hs.hid.capslock
+			and type(hs.hid.capslock.get) == "function",
+			"hs.hid.capslock.get is unavailable")
+		return hs.hid.capslock.get()
+	end)
+	if not ok then return nil, tostring(state_or_err) end
+	if type(state_or_err) ~= "boolean" then
+		return nil, "hs.hid.capslock.get returned no boolean state"
+	end
+	return state_or_err, nil
+end
+
 return M
