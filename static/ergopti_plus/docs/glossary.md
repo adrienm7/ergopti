@@ -231,11 +231,13 @@ configuration folder, written in the vocabulary of
 `_shared/keymap/layer_actions.toml` against the physical-key registry
 `_shared/data/keycodes/physical_keys.json`. They are read by
 `_shared/lua/keymap/layers.lua` (macOS, Linux) and
-`windows/platform/remap/layers_loader.ahk`. Windows registers the navigation
-layer from the user's `layers.toml` (`windows/platform/remap/nav_layer_table.ahk`,
-no file = no binding); macOS and Linux still apply their hand-written copies
-(`platform/remap/data/layer_keys.json`, the kanata `deflayer navigation`). The
-preset reproduces the hand-written Windows layer key for key.
+`windows/platform/remap/layers_loader.ahk`. Windows registers its navigation
+hotkeys from the user's `layers.toml` (no file = no binding), through
+`windows/platform/remap/nav_layer_table.ahk`. macOS still applies
+`platform/remap/data/layer_keys.json`. Linux runs its navigation layer in
+`linux/platform/remap/tap_hold_engine.lua`; connecting the shared layer file
+to that native engine remains pending. Linux has no Kanata runtime or generated
+Kanata configuration. The preset reproduces the Windows layer key for key.
 
 **Nav-Layer Sentinel**
 A synthetic keycode (F20, keycode 90) injected by Karabiner-Elements when a

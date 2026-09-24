@@ -174,6 +174,10 @@ REQUIRED_FILES=(
 	"_shared/modules/actions/send_keys.json"
 	"_shared/modules/actions/tap_keys.json"
 	"_shared/data/keycodes/evdev.json"
+	# Shared layer data used by the configuration editor.
+	"_shared/lua/keymap/layers.lua"
+	"_shared/keymap/layer_actions.toml"
+	"_shared/data/keycodes/physical_keys.json"
 	"_shared/data/locales/fr.json"
 	"_shared/data/locales/en.json"
 	"_shared/modules/timings/constants.toml"
