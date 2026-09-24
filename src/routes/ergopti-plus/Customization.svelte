@@ -48,7 +48,7 @@ FEATURES & RATIONALE:
 	// French display names for the full native-window list.
 	const windowNames = {
 		action_picker: 'Sélecteur d’actions',
-		changelog: 'Notes de version',
+		changelog: 'Versions',
 		download_window: 'Téléchargements',
 		healthcheck: 'Diagnostic',
 		hotstring_editor: 'Éditeur de hotstrings',

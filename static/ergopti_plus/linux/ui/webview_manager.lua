@@ -577,7 +577,7 @@ end
 local function _app_title(app_name)
 	local titles = {
 		action_picker           = "Action Picker",
-		changelog               = "Release Notes",
+		changelog               = "Releases",
 		download_window         = "Download",
 		healthcheck             = "Diagnostic",
 		hotstrings_config_window = "Hotstrings Config",
