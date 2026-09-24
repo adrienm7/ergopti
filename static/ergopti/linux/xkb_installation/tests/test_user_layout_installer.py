@@ -129,6 +129,38 @@ class UserInstallerTests(unittest.TestCase):
         report = self.install("ergol", "French (Ergo-L)")
         self.assertTrue(report["ok"], report)
 
+    def tree_files(self) -> dict:
+        """Every file of the user tree and the home folder, with its content."""
+        return {
+            str(path.relative_to(self.scratch)): path.read_text(encoding="utf-8")
+            for base in (self.root, self.home) if base.exists()
+            for path in sorted(base.rglob("*")) if path.is_file()
+        }
+
+    def test_a_layout_that_does_not_compile_leaves_the_tree_as_it_was(self) -> None:
+        # The desktop pickers read the tree: a layout that does not compile
+        # must not stay registered there while the daemon reports a failure.
+        self.install("ergopti", "Ergopti")
+        self.install("ergol", "French (Ergo-L)")
+        installed = self.tree_files()
+        self.assertGreaterEqual(len(installed), 8, "the two layouts own files in the tree")
+        changed = self.sources["ergol"] / "ergol.xkb"
+        changed.write_text(changed.read_text(encoding="utf-8") + "// a newer conversion\n", encoding="utf-8")
+        compiles = installer.verify
+        installer.verify = lambda root, layout_id: False
+        try:
+            update = self.install("ergol", "French (Ergo-L)")
+            self.assertFalse(update["ok"], update)
+            self.assertEqual(self.tree_files(), installed, "an update that does not compile restores the previous files")
+
+            installer.uninstall("ergopti", self.root, self.home, deactivate=False)
+            without = self.tree_files()
+            fresh = self.install("ergopti", "Ergopti")
+            self.assertFalse(fresh["ok"], fresh)
+            self.assertEqual(self.tree_files(), without, "a new layout that does not compile is removed again")
+        finally:
+            installer.verify = compiles
+
     def test_uninstall_removes_everything_it_installed(self) -> None:
         self.install("ergol", "French (Ergo-L)")
         self.install("ergopti", "Ergopti")
