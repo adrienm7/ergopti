@@ -24,6 +24,8 @@
 ; 6. _shared/tests/corpus/diagnostics/error_policy_vectors.json through
 ;    ErrorPolicy_Validate, ErrorPolicy_Signature and ErrorPolicy_Decide (when
 ;    a logged ERROR opens the error window).
+; 7. _shared/tests/corpus/diagnostics/error_report_vectors.json through
+;    ErrorReport_Compose (the report the error window shows and sends).
 ; Each corpus fails loudly when unreadable or empty: a replay over zero
 ; vectors would report success while checking nothing.
 ; ==============================================================================
@@ -265,3 +267,32 @@ _TCD_ErrorPolicy() {
 }
 
 Test("corpus:diagnostics: error window policy vectors (error-policy-corpus)", _TCD_ErrorPolicy)
+
+
+
+
+
+; ===============================
+; ===============================
+; ======= 8/ Error Report =======
+; ===============================
+; ===============================
+
+_TCD_ErrorReport() {
+	Data := _TCD_Corpus("tests\corpus\diagnostics\error_report_vectors.json")
+	Assert(Data["vectors"].Length >= 3, "the error-report corpus must hold its vectors")
+	Assert(Data["invalid_errors"].Length >= 3, "the error-report corpus must hold its invalid errors")
+	for Vector in Data["vectors"] {
+		Got := ErrorReport_Compose(Vector["error"], Vector["identity"])
+		Expected := Vector["expected"]
+		AssertEqual(Expected["name"], Got["name"], Vector["id"] . ": name")
+		AssertEqual(Expected["text"], Got["text"], Vector["id"] . ": text")
+		for Id, Value in Expected["fields"]
+			AssertEqual(Value, Got["fields"].Get(Id, ""), Vector["id"] . ": " . Id)
+		AssertEqual(Expected["fields"].Count, Got["fields"].Count, Vector["id"] . ": the fields carry extra keys")
+	}
+	for Vector in Data["invalid_errors"]
+		AssertThrows(ErrorReport_Compose.Bind(Vector["error"], Vector["identity"]), Vector["id"] . " must be refused")
+}
+
+Test("corpus:diagnostics: error window report vectors (error-report-corpus)", _TCD_ErrorReport)

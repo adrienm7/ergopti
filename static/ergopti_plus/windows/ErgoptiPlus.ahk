@@ -340,6 +340,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include infra/redact.ahk
 #Include infra/issue_report.ahk
 #Include infra/error_policy.ahk
+#Include infra/error_report.ahk
 #Include infra/hotpath_profiler.ahk
 #Include infra/registry.ahk
 #Include infra/app_state.ahk
