@@ -384,6 +384,8 @@
 		if (section.id === 'permissions' && column === 'state') return t('healthcheck.state.' + value);
 		if (section.id === 'peripherals' && column === 'bus') return t('healthcheck.bus.' + value);
 		if (section.id === 'peripherals' && column === 'kind') return t('healthcheck.device.' + value);
+		// The host sends the manifest's reason key: the report is in the reader's language
+		if (section.id === 'unavailable' && column === 'reason') return t(value);
 		return String(value);
 	}
 

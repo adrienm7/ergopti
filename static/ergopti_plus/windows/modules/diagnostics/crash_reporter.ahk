@@ -94,37 +94,28 @@ CrashReport_Build(ErrorObj) {
 	; already degraded, so a second redundant run only widens the input-dead window.
 	HC := ""
 	try HC := HealthCheck_Run()
-	; ── Full system info (mirrors healthcheck _HealthCheck_SysInfo + enriched fields) ──────────
-	; HC["sys"] already ran the exact same WMI ConnectServer / RegRead / git-subprocess
-	; probes above via HealthCheck_Run — recomputing them here would double that
-	; blocking work on the crash handler's deferred timer (crash-report-sysinfo-dedup).
-	; Only fall back to a fresh probe if the healthcheck itself failed to produce one.
-	; .Count > 0, not just .Has(). _HealthCheck_Collect substitutes an EMPTY Map
-	; when a collector throws, and the healthcheck result always carries the "sys"
-	; key — so testing presence alone made this fallback unreachable dead code,
-	; and every Sys[...] read below would then throw on the missing key. That
-	; would abort CrashReport_Build inside the error net's catch: logged, never
-	; reported. Which is precisely the failure the healthcheck's own degradation
-	; was added to prevent.
-	Sys := (HC != "" and HC.Has("sys") and HC["sys"].Count > 0) ? HC["sys"] : _CrashReport_SysInfo()
-	; Pull a few safe enriched fields from the live healthcheck for even richer crash reports (pause state, key logs paths, etc.)
-	; Each field is enriched independently and read with .Get. The outer keys
-	; were guarded but the INNER ones were not, and both lived in one try — so a
-	; degraded pause_state Map threw and silently took errors_log_path with it,
-	; into a bare catch that recorded nothing.
-	if (HC != "") {
-		try {
-			if (HC.Has("pause_state") and HC["pause_state"].Count > 0)
-				Sys["pause_at_crash"] := HC["pause_state"].Get("is_paused", false) ? "paused" : "running"
-		} catch as Err {
-			try LoggerDebug("CrashReporter", "Crash report enrichment 'pause_state' degraded: {1}.", Err.Message)
-		}
-		try {
-			if (HC.Has("logs") and HC["logs"].Count > 0)
-				Sys["errors_log_path"] := HC["logs"].Get("errors_today", "")
-		} catch as Err {
-			try LoggerDebug("CrashReporter", "Crash report enrichment 'logs' degraded: {1}.", Err.Message)
-		}
+	; The version 2 snapshot's sections (_shared/modules/diagnostics/schema.json).
+	; _HealthCheck_Collect substitutes an EMPTY Map when a collector throws, so
+	; every read below goes through .Get.
+	Sections := (HC is Map && HC.Has("sections")) ? HC["sections"] : Map()
+	; ── Full system info ───────────────────────────────────────────────────────
+	; The healthcheck already read the processor from the registry: reusing it
+	; keeps the WMI query of _CrashReport_SysInfo off the crash handler's deferred
+	; timer, which shares the keyboard hook's thread (crash-report-sysinfo-dedup).
+	Sys := _CrashReport_SysInfo(Sections.Get("hardware", Map()))
+	; Each field is enriched independently and read with .Get: a degraded
+	; section must not take the next one with it.
+	try {
+		Input := Sections.Get("input", Map())
+		if Input.Has("paused")
+			Sys["pause_at_crash"] := Input["paused"] ? "paused" : "running"
+	} catch as Err {
+		try LoggerDebug("CrashReporter", "Crash report enrichment 'input' degraded: {1}.", Err.Message)
+	}
+	try {
+		Sys["errors_log_path"] := Sections.Get("paths", Map()).Get("errors_today", "")
+	} catch as Err {
+		try LoggerDebug("CrashReporter", "Crash report enrichment 'paths' degraded: {1}.", Err.Message)
 	}
 
 	; ── Uptime ────────────────────────────────────────────────────────────────
@@ -161,10 +152,12 @@ CrashReport_Build(ErrorObj) {
 			; failed collector to an empty Map. A raw read threw into a catch-less
 			; try, leaving ErrCount at "0" — indistinguishable from a genuine
 			; clean session, on a report written because something crashed.
-			AdaptersOk     := _CrashReport_JoinArr(HC.Get("ports_validated", []))
-			AdaptersFailed := _CrashReport_JoinArr(HC.Get("failed_adapters", []))
-			WarnCount      := String(HC.Get("warn_count", "unknown"))
-			ErrCount       := String(HC.Get("err_count", "unknown"))
+			Developer      := Sections.Get("developer", Map())
+			Issues         := Sections.Get("issues", Map())
+			AdaptersOk     := _CrashReport_JoinArr(Developer.Get("modules_ok", []))
+			AdaptersFailed := _CrashReport_JoinArr(Developer.Get("modules_failed", []))
+			WarnCount      := String(Issues.Get("warn_count", "unknown"))
+			ErrCount       := String(Issues.Get("err_count", "unknown"))
 		}
 	}
 
@@ -240,7 +233,13 @@ CrashReport_Build(ErrorObj) {
 	return _CrashReport_RedactCanonical(Report)
 }
 
-; Writes a crash report Map to disk as a JSON file in the crash-reports folder.
+; The crash folder resolved by the logger, exposed to the diagnostics page.
+; @return {String} Absolute path without a trailing separator.
+CrashReport_Dir() {
+	return RTrim(LoggerCrashReportsDir(), "\/")
+}
+
+; Writes a crash report Map beside the logger-owned daily log.
 ; Creates the directory on demand. Returns the file path on success, or "" on failure.
 ; @param Report {Map} The report Map returned by CrashReport_Build().
 ; @param WriterFn {Func|Integer} Optional durable-writer seam for regression coverage.
@@ -314,9 +313,9 @@ CrashReport_PromptUser(Report) {
 ; ==========================
 
 ; Returns a Map with full OS, CPU, RAM, screen, AHK, and git fields.
-; Mirrors _HealthCheck_SysInfo() so the crash report is a superset of the
-; healthcheck diagnostic without duplicating the collection logic.
-_CrashReport_SysInfo() {
+; @param Hardware {Map} The diagnostics snapshot's hardware section: its
+;   processor is reused, and WMI is asked only when it has none.
+_CrashReport_SysInfo(Hardware := 0) {
 	Info := Map()
 
 	; The boot snapshot's probe, so a crash on Windows 11 is not filed as Windows 10
@@ -327,13 +326,18 @@ _CrashReport_SysInfo() {
 
 	CpuName  := "unknown"
 	CpuCores := ""
-	try {
-		WMI  := ComObject("WbemScripting.SWbemLocator").ConnectServer()
-		Qry  := WMI.ExecQuery("SELECT Name, NumberOfLogicalProcessors FROM Win32_Processor")
-		Enum := Qry._NewEnum()
-		if Enum.Next(&Item) {
-			CpuName  := Trim(Item.Name)
-			CpuCores := Item.NumberOfLogicalProcessors
+	if (Hardware is Map) && Hardware.Has("cpu") {
+		CpuName  := Hardware["cpu"]
+		CpuCores := Hardware.Get("cpu_cores", "")
+	} else {
+		try {
+			WMI  := ComObject("WbemScripting.SWbemLocator").ConnectServer()
+			Qry  := WMI.ExecQuery("SELECT Name, NumberOfLogicalProcessors FROM Win32_Processor")
+			Enum := Qry._NewEnum()
+			if Enum.Next(&Item) {
+				CpuName  := Trim(Item.Name)
+				CpuCores := Item.NumberOfLogicalProcessors
+			}
 		}
 	}
 	Info["cpu_name"]  := CpuName

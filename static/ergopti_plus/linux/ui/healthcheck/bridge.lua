@@ -1,35 +1,25 @@
 --- ui/healthcheck/bridge.lua
 
 --- ==============================================================================
---- BRIDGE HANDLER: Healthcheck Dashboard
+--- BRIDGE HANDLER: Diagnostics Window (Linux)
 --- DESCRIPTION:
---- Builds the diagnostic snapshot the shared healthcheck page renders, in the
---- canonical shape `_shared/lua/healthcheck/snapshot.lua` declares.
+--- Serves the shared diagnostics page (_shared/ui/healthcheck/): the version 2
+--- snapshot of _shared/modules/diagnostics/schema.json, the asynchronous
+--- probes that complete it, and the actions the page asks for (copy, save,
+--- report on GitHub, open a folder, refresh, close).
 --- Bridge name: "healthcheck"
 ---
---- WHY THE WINDOW USED TO OPEN EMPTY:
---- This bridge answered with `{ modules = {…}, version, platform, locale }` — a
---- shape of its own invention. The page's `renderHealthcheck` reads
---- `version, sys, uptime_sec, warn_count, err_count, ports_validated,
---- failed_adapters, last_error, recent_issues, pause_state, keylogger, llm,
---- layout, hotstrings, logs, config`, found none of them, and rendered an empty
---- report. Nothing errored on either side: the bridge answered, the page ran,
---- and the window showed nothing — which reads as "the daemon has no diagnostics
---- to give" rather than as two halves speaking different languages.
----
---- The shared module has declared this contract and validated it since it was
---- written, and macOS is the only driver that ever bound it.
----
 --- FEATURES & RATIONALE:
---- 1. Every collector is isolated. A diagnostic report exists to be readable
----    when things are broken, so one collector raising must cost its own section
----    and not the whole window.
---- 2. The snapshot is validated before it is sent, and a missing field is logged
----    by name. A report with a silently absent section is worse than a loud one:
----    the reader cannot tell "not measured" from "measured as nothing".
---- 3. Values that this driver genuinely cannot answer are reported as "n/a"
----    rather than as a plausible default. macOS does the same, for the same
----    reason: a fabricated zero is indistinguishable from a real one.
+--- 1. One collector per section, each isolated: a report exists to be read
+---    when things are broken, so one collector raising costs its own section,
+---    never the window. Phase A reads /proc, /sys and daemon memory only.
+--- 2. The probes (api.github.com, the AI backend, kanata and df) run as curl
+---    and child processes owned by libuv; their answers are pushed into the
+---    page only while the page they were started for is still open.
+--- 3. Every page message is validated by healthcheck.actions before anything
+---    happens: the host opens only the paths it collected, by field id.
+--- 4. Values that cannot be read stay absent (the page shows "unknown"): a
+---    fabricated zero is indistinguishable from a measured one.
 --- ==============================================================================
 
 local M = {}
@@ -38,16 +28,12 @@ M.bridge_name = "healthcheck"
 local Logger = require("logger.shim")
 local LOG = "bridge.healthcheck"
 
--- Single source of the driver version (never a re-typed literal).
 local Version = require("infra.version")
--- The canonical snapshot shape, its uptime formatting and its issue extraction.
 local Snapshot = require("healthcheck.snapshot")
+local Actions = require("healthcheck.actions")
 local LoggerSink = require("infra.logger_sink")
 
--- What this driver cannot currently measure. Spelled once so a reader can see
--- at a glance which gaps are deliberate, and so "not measured" never reaches the
--- page as a number that looks measured.
-local NOT_AVAILABLE = "n/a"
+M.DRIVER = "linux"
 
 -- When the daemon started, in seconds. Captured at load rather than read from
 -- the process table: /proc/self/stat gives jiffies since boot, which needs the
@@ -55,328 +41,374 @@ local NOT_AVAILABLE = "n/a"
 -- container.
 local _started_at = os.time()
 
--- The daemon parts the report checks. The required ones run in every daemon.
--- The optional ones are loaded by every daemon too, through
--- RuntimeGuard.optional_require, but the user can switch them off: switched off
--- is a neutral "disabled"; absent means the module failed to load (logged by
--- the guard), which is a failure.
+-- The daemon parts the developer section checks. The required ones run in
+-- every daemon. The optional ones are loaded by every daemon too, through
+-- RuntimeGuard.optional_require, but the user can switch them off: switched
+-- off is a neutral "disabled"; absent means the module failed to load (logged
+-- by the guard), which is a failure.
 local REQUIRED_PARTS = { "engine", "keylogger", "config" }
 local OPTIONAL_PARTS = { "llm" }
 
+-- The evdev bus numbers of /proc/bus/input/devices, as schema buses
+local BUSES = { ["0003"] = "usb", ["0005"] = "bluetooth", ["0011"] = "internal", ["0018"] = "internal",
+	["0019"] = "internal" }
 
--- =========================================
--- =========================================
--- ======= 1/ Collectors ===================
--- =========================================
--- =========================================
+-- The documents of the diagnostics window, loaded once
+local _config = nil
+
+-- The state of the window's current page: its epoch, whether details are
+-- included, its last snapshot and its running probes
+local _session = nil
+
+
+
+
+
+-- ================================
+-- ================================
+-- ======= 1/ Configuration =======
+-- ================================
+-- ================================
+
+--- The schema, the issue forms, the redaction rules and the repository,
+--- loaded once: they are files of the shared tree, not settings.
+--- @return table
+function M.config()
+	if not _config then
+		_config = Snapshot.load_config(function(rel) return require("infra.paths").shared(rel) end)
+	end
+	return _config
+end
+
+
+
+
+
+-- =============================
+-- =============================
+-- ======= 2/ Collectors =======
+-- =============================
+-- =============================
 
 --- Runs a collector, isolating a failure to its own section.
----
---- A report exists to be readable when things are broken, so one collector
---- raising must not take the window with it. The failure is logged by name and
---- the section comes back nil, which the validator below then reports.
 --- @param name string Section name, for the log line.
---- @param fn function Collector.
---- @return table|nil
+--- @param fn function
+--- @return table
 local function collect(name, fn)
 	local ok, value = pcall(fn)
 	if not ok then
-		Logger.error(LOG, "Healthcheck collector '%s' raised: %s — section omitted.", name, tostring(value))
-		return nil
+		Logger.error(LOG, "Diagnostics collector '%s' raised: %s — section left empty.", name, tostring(value))
+		return {}
 	end
 	return value
 end
 
---- The logger's ring buffer, or an empty list when it is unavailable.
+--- Reads a small file, nil when it cannot be read.
+--- @param path string
+--- @return string|nil
+local function read_file(path)
+	local fh = io.open(path, "rb")
+	if not fh then return nil end
+	local content = fh:read("*a")
+	fh:close()
+	return content
+end
+
+--- The folder part of a path.
+--- @param path string|nil
+--- @return string|nil
+local function dirname(path)
+	if type(path) ~= "string" then return nil end
+	return path:match("^(.*)/[^/]*$")
+end
+
+--- The folders and files the page lists and opens by id.
+--- @param schema table
 --- @return table
-local function ring_lines()
-	local ok, real = pcall(require, "logger")
-	if not ok or type(real) ~= "table" or type(real.ring_buffer_snapshot) ~= "function" then
-		return {}
+local function collect_paths(schema)
+	local logs_dir = LoggerSink.log_dir()
+	if logs_dir == "" then logs_dir = nil end
+	return {
+		config_dir      = require("infra.config_paths").get_config_dir(),
+		logs_dir        = logs_dir,
+		log_today       = LoggerSink.main_log_path(),
+		errors_today    = LoggerSink.errors_log_path(),
+		crash_dir       = require("modules.diagnostics.crash_reporter").get_crash_dir(),
+		diagnostics_dir = logs_dir and (logs_dir .. "/" .. schema.report.subdir) or nil,
+		app_dir         = require("infra.paths").driver_root(),
+	}
+end
+
+--- The installed WebKitGTK version, when GTK is loaded in this process.
+--- @return string|nil
+local function webkit_version()
+	local ok, lgi = pcall(require, "lgi")
+	if not ok then return nil end
+	local ok_version, version = pcall(function()
+		local WebKit = lgi.WebKit2
+		return string.format("WebKitGTK %d.%d.%d", WebKit.get_major_version(), WebKit.get_minor_version(),
+			WebKit.get_micro_version())
+	end)
+	return ok_version and version or nil
+end
+
+--- The versions a bug report is triaged by.
+--- @param facts table system_facts()
+--- @return table
+local function collect_versions(facts)
+	local commit, source = require("infra.diagnostic_snapshot").resolve_commit()
+	local ok_updater, Updater = pcall(require, "modules.updater.manager")
+	return {
+		ergopti_version = Version.VERSION,
+		commit          = commit .. " (" .. source .. ")",
+		channel         = ok_updater and Updater.get_channel() or nil,
+		runtime         = facts.runtime,
+		webview         = webkit_version(),
+	}
+end
+
+--- The machine model, from the firmware tables (never a serial number).
+--- @return string|nil
+local function machine_model()
+	local vendor = read_file("/sys/class/dmi/id/sys_vendor")
+	local product = read_file("/sys/class/dmi/id/product_name")
+	local text = ((vendor or "") .. " " .. (product or "")):gsub("%s+", " "):match("^%s*(.-)%s*$")
+	return text ~= "" and text or nil
+end
+
+--- The displays GTK knows, when GTK is loaded in this process.
+--- @return table|nil
+local function displays()
+	local ok, lgi = pcall(require, "lgi")
+	if not ok then return nil end
+	local ok_list, list = pcall(function()
+		local Gdk = lgi.Gdk
+		local display = Gdk.Display.get_default()
+		if not display then return nil end
+		local out = {}
+		for index = 0, display:get_n_monitors() - 1 do
+			local monitor = display:get_monitor(index)
+			local geometry = monitor:get_geometry()
+			local scale = monitor:get_scale_factor()
+			local text = string.format("%d×%d @%dx", geometry.width * scale, geometry.height * scale, scale)
+			if monitor:is_primary() then text = text .. " (main)" end
+			out[#out + 1] = text
+		end
+		return out
+	end)
+	return ok_list and list or nil
+end
+
+--- The hardware section.
+--- @param facts table system_facts()
+--- @return table
+local function collect_hardware(facts)
+	return {
+		model     = machine_model(),
+		cpu       = facts.cpu_model,
+		cpu_cores = facts.cpu_cores,
+		arch      = facts.arch,
+		ram_total = facts.ram_total,
+		displays  = displays(),
+	}
+end
+
+--- Whether the daemon runs with an effective uid of 0.
+--- @return boolean|nil
+local function elevated()
+	local status = read_file("/proc/self/status")
+	local _, effective = (status or ""):match("\nUid:%s+(%d+)%s+(%d+)")
+	if not effective then return nil end
+	return effective == "0"
+end
+
+--- The system section and its load.
+--- @param facts table system_facts()
+--- @param state table Daemon state.
+--- @return table
+local function collect_system(facts, state)
+	local layout = state.layout
+	return {
+		os              = facts.os_name,
+		kernel          = facts.kernel,
+		display_server  = facts.display_server,
+		desktop         = facts.desktop,
+		locale          = facts.locale,
+		keyboard_layout = type(layout) == "string" and layout or nil,
+		ram_free        = facts.ram_free,
+		uptime          = os.time() - _started_at,
+		elevated        = elevated(),
+	}
+end
+
+--- The keyboard state at this instant, and the remapping engine's.
+--- @param state table Daemon state.
+--- @return table
+local function collect_input(state)
+	local input = {}
+	-- The pause belongs to the script actions, which the daemon hands over
+	if type(state.is_paused) == "function" then input.paused = state.is_paused() == true end
+	local Hook = require("adapters.keyboard_hook")
+	local held = Hook.held_modifiers()
+	for _, name in ipairs({ "shift", "ctrl", "alt", "altgr", "meta" }) do input[name] = held[name] == true end
+	local caps_lock, caps_err = Hook.caps_lock_on()
+	if caps_lock == nil then Logger.warn(LOG, "Diagnostics could not read the CapsLock state: %s.", tostring(caps_err)) end
+	input.caps_lock = caps_lock
+	local ok_manager, Manager = pcall(require, "platform.remap.manager")
+	if ok_manager then input.kanata_running = Manager.owns_process() end
+	input.keymap_resolved = require("adapters.keyboard_layout").is_ready() == true
+	return input
+end
+
+--- The feature switches this driver can answer, as { id, enabled } items.
+--- @param state table Daemon state.
+--- @return table
+local function collect_features(state)
+	local items = {}
+	local function add(id, enabled)
+		if type(enabled) == "boolean" then items[#items + 1] = { id = id, enabled = enabled } end
 	end
-	local ok_snapshot, lines = pcall(real.ring_buffer_snapshot)
-	return (ok_snapshot and type(lines) == "table") and lines or {}
+	local ok_manager, Manager = pcall(require, "platform.remap.manager")
+	if ok_manager then add("tapholds", Manager.tap_holds_enabled()) end
+	if state.llm and type(state.llm.is_enabled) == "function" then add("llm", state.llm.is_enabled() == true) end
+	if state.keylogger and type(state.keylogger.is_enabled) == "function" then
+		add("metrics", state.keylogger.is_enabled() == true)
+	end
+	return { items = items }
 end
 
---- The logger core's session counters: every WARNING and ERROR since the
---- daemon started, and the last ERROR line. They used to be counted inside the
---- 200-line ring, which DEBUG output evicts within minutes, while the page
---- labels them "Session counters"; and the last error came from a
---- record_error() that nothing in production called.
---- @return table { warn_count, err_count, last_error }
-local function session_issues()
-	return require("logger").session_issues()
+--- The AI section.
+--- @param state table Daemon state.
+--- @return table
+local function collect_ai(state)
+	local llm = state.llm
+	if not llm then return {} end
+	return {
+		ai_enabled = type(llm.is_enabled) == "function" and llm.is_enabled() == true or nil,
+		-- Ollama is the only backend this driver has
+		ai_backend = "ollama",
+		ai_model   = type(llm.get_current_model) == "function" and llm.get_current_model() or nil,
+	}
 end
 
---- The window's recent warnings and errors: a bounded tail of today's errors
---- file, or the ring before that file exists. The ring holds every level, so
---- at DEBUG a few minutes of routine lines evicted the problems the window is
---- opened to show; the errors file keeps WARNING and ERROR only.
---- @param lines table The ring-buffer snapshot.
---- @return table entries Oldest first.
---- @return string source "errors_file", "ring", or "unavailable" when the
----   bounds or an existing errors file could not be read (logged).
-local function collect_recent_issues(lines)
-	local ok, entries, source = pcall(function()
+--- Whether the daemon may open a device, without keeping it open.
+--- @param path string
+--- @param mode string io.open mode.
+--- @return string "granted", "missing" or "unknown"
+local function device_access(path, mode)
+	local fh, err, code = io.open(path, mode)
+	if fh then
+		fh:close()
+		return "granted"
+	end
+	-- EACCES and EPERM: the file exists and this user may not open it
+	if code == 13 or code == 1 then return "missing" end
+	Logger.warn(LOG, "Diagnostics could not check %s: %s.", path, tostring(err))
+	return "unknown"
+end
+
+--- The devices /proc/bus/input/devices lists, one table per block.
+--- @return table
+local function input_devices()
+	local text = read_file("/proc/bus/input/devices") or ""
+	local devices = {}
+	for block in (text .. "\n\n"):gmatch("(.-)\n\n") do
+		local bus, vendor, product = block:match("I: Bus=(%x+) Vendor=(%x+) Product=(%x+)")
+		if bus then
+			devices[#devices + 1] = {
+				bus = bus, vendor = vendor, product = product,
+				name = block:match('N: Name="([^"]*)"'),
+				handlers = block:match("H: Handlers=([^\n]*)") or "",
+			}
+		end
+	end
+	return devices
+end
+
+--- The permissions the daemon needs, in the schema's order.
+--- @param ids table The schema's permission ids for Linux, ordered.
+--- @return table
+local function collect_permissions(ids)
+	local event = nil
+	for _, device in ipairs(input_devices()) do
+		local node = device.handlers:match("(event%d+)")
+		if node and device.handlers:find("kbd", 1, true) then
+			event = "/dev/input/" .. node
+			break
+		end
+	end
+	local readers = {
+		input_devices = function() return event and device_access(event, "rb") or "unknown" end,
+		uinput        = function() return device_access("/dev/uinput", "ab") end,
+	}
+	local items = {}
+	for _, id in ipairs(ids) do
+		local reader = readers[id]
+		if not reader then error("no reader for the permission " .. tostring(id)) end
+		items[#items + 1] = { id = id, state = reader() }
+	end
+	return { items = items }
+end
+
+--- The keyboards, mice and touchpads the kernel lists: bus, kind and ids, and
+--- their names only when the user ticked "Include details". Virtual devices,
+--- including the daemon's own output keyboard, are left out.
+--- @param detailed boolean
+--- @return table
+local function collect_peripherals(detailed)
+	local items = {}
+	for _, device in ipairs(input_devices()) do
+		local lower = (device.name or ""):lower()
+		local kind = nil
+		if lower:find("touchpad", 1, true) or lower:find("trackpad", 1, true) then kind = "touchpad"
+		elseif device.handlers:find("mouse", 1, true) then kind = "mouse"
+		elseif device.handlers:find("kbd", 1, true) then kind = "keyboard" end
+		if kind and device.bus ~= "0006" then
+			local item = {
+				bus = BUSES[device.bus] or "other",
+				kind = kind,
+				vendor_id = device.vendor,
+				product_id = device.product,
+			}
+			if detailed then item.name = device.name end
+			items[#items + 1] = item
+		end
+	end
+	return { items = items }
+end
+
+--- The warnings and errors: the session counters, the last error and the
+--- newest entries of today's errors file (the ring before it exists).
+--- @return table
+local function collect_issues()
+	local lines = require("logger").ring_buffer_snapshot() or {}
+	local issues = require("logger").session_issues()
+	local recent, source = {}, "unavailable"
+	local ok, err = pcall(function()
 		local limits = Snapshot.load_recent_issue_limits(
 			require("infra.paths").shared("modules/diagnostics/recent_issues.json"))
-		return Snapshot.collect_recent_issues(LoggerSink.errors_log_path(), lines, limits)
+		recent, source = Snapshot.collect_recent_issues(LoggerSink.errors_log_path(), lines, limits)
 	end)
-	if not ok then
-		Logger.error(LOG, "Recent issues could not be collected: %s.", tostring(entries))
-		return {}, "unavailable"
-	end
-	return entries, source
-end
-
---- Whether the daemon is paused, and what answered.
---- @param state table Daemon state.
---- @return table
-local function collect_pause_state(state)
-	if state.engine and type(state.engine.is_paused) == "function" then
-		return { is_paused = not not state.engine.is_paused(), source = "engine" }
-	end
-	-- Reported as unknown rather than as false. "Not paused" and "nobody could
-	-- say" are different answers, and only one of them should reassure a reader.
-	return { is_paused = false, source = "engine (no is_paused)" }
-end
-
---- Live keylogger figures.
---- @param state table Daemon state.
---- @return table
-local function collect_keylogger(state)
-	local summary = {
-		enabled = NOT_AVAILABLE,
-		wpm = NOT_AVAILABLE,
-		events_session = NOT_AVAILABLE,
-		privacy_hits = NOT_AVAILABLE,
-		-- From the sink's own resolver, named at call time.
-		today_log = LoggerSink.main_log_path(),
-		errors_log = LoggerSink.errors_log_path(),
-		notes = "High-severity lines are also written to today's errors file.",
-	}
-	local keylogger = state.keylogger
-	if not keylogger then return summary end
-
-	if type(keylogger.is_enabled) == "function" then
-		summary.enabled = tostring(keylogger.is_enabled())
-	end
-	if type(keylogger.get_wpm) == "function" then
-		summary.wpm = keylogger.get_wpm()
-	end
-	if type(keylogger.get_session_stats) == "function" then
-		local stats = keylogger.get_session_stats() or {}
-		summary.events_session = stats.keystrokes or NOT_AVAILABLE
-	end
-	if type(keylogger.is_suppressed) == "function" then
-		summary.privacy_hits = keylogger.is_suppressed() and "suppressed now" or "not suppressing"
-	end
-	return summary
-end
-
---- LLM backend state.
---- @param state table Daemon state.
---- @return table
-local function collect_llm(state)
-	local llm_state = {
-		enabled = NOT_AVAILABLE,
-		-- Ollama is the only backend this driver has. Saying so is more useful
-		-- than "unknown", and less misleading than naming one it cannot reach.
-		backend = "ollama",
-		active_profile = NOT_AVAILABLE,
-		model = NOT_AVAILABLE,
-		n_predictions = NOT_AVAILABLE,
-		streaming = "true",
-	}
-	local llm = state.llm
-	if not llm then
-		llm_state.enabled = "false"
-		return llm_state
-	end
-	if type(llm.is_enabled) == "function" then
-		llm_state.enabled = tostring(llm.is_enabled())
-	end
-	if type(llm.get_current_model) == "function" then
-		llm_state.model = llm.get_current_model() or NOT_AVAILABLE
-	end
-	return llm_state
-end
-
---- Keyboard layout state.
---- @param state table Daemon state.
---- @return table
-local function collect_layout(state)
-	local layout_state = {
-		ergopti_base = state.layout or NOT_AVAILABLE,
-		altgr = NOT_AVAILABLE,
-		shift = NOT_AVAILABLE,
-		caps = NOT_AVAILABLE,
-		prefix_latch = "clean",
-	}
-	-- `held_modifiers`, not `held_text_modifiers`. The latter answers a different
-	-- question and answers it as an ARRAY of names, so indexing it by name gives
-	-- nil for every modifier — which renders as "off" for all of them and reads
-	-- as a report rather than as a failed read.
-	local ok, hook = pcall(require, "adapters.keyboard_hook")
-	if ok and type(hook.held_modifiers) == "function" then
-		local ok_held, held = pcall(hook.held_modifiers)
-		if ok_held and type(held) == "table" then
-			layout_state.shift = held.shift and "active" or "off"
-			layout_state.altgr = held.altgr and "active" or "off"
-			layout_state.ctrl = held.ctrl and "active" or "off"
-			layout_state.meta = held.meta and "active" or "off"
-		end
-	end
-	-- Whether a typable keymap resolved at all. This is the single most useful
-	-- line in the report for the driver's most common failure: with no keymap
-	-- every expansion silently reroutes through the clipboard.
-	local ok_layout, keyboard_layout = pcall(require, "adapters.keyboard_layout")
-	if ok_layout and type(keyboard_layout.is_ready) == "function" then
-		layout_state.keymap = keyboard_layout.is_ready() and "resolved" or "UNRESOLVED"
-	end
-	return layout_state
-end
-
---- Hotstring engine figures.
---- @param state table Daemon state.
---- @return table
-local function collect_hotstrings(state)
-	local hotstrings = {
-		terminators = 0,
-		magic_key = "",
-		personal_count = 0,
-		dynamic_count = 0,
-		default_delay = NOT_AVAILABLE,
-	}
-	local config = state.config
-	if config and type(config.mapping_count) == "function" then
-		hotstrings.personal_count = config.mapping_count() or 0
-	end
-	local ok_magic, MagicKey = pcall(require, "modules.hotstrings.magic_key")
-	if ok_magic and type(MagicKey.get) == "function" then
-		hotstrings.magic_key = MagicKey.get() or ""
-	end
-	local ok_dyn, dynamic = pcall(require, "modules.dynamic_hotstrings.manager")
-	if ok_dyn and type(dynamic.active_count) == "function" then
-		hotstrings.dynamic_count = dynamic.active_count() or 0
-	end
-	return hotstrings
-end
-
---- Where the logs are and how much is buffered.
---- @param lines table The ring-buffer snapshot.
---- @return table
-local function collect_logs(lines)
-	-- The sink is the one resolver of the logs folder and of today's files.
+	if not ok then Logger.error(LOG, "Recent issues could not be collected: %s.", tostring(err)) end
 	return {
-		logs_dir = LoggerSink.log_dir(),
-		unified_today = LoggerSink.main_log_path(),
-		errors_today = LoggerSink.errors_log_path(),
-		crash_reports_dir = LoggerSink.crash_reports_dir(),
-		errors_sink_active = LoggerSink.is_file_sink_active(),
-		ring_lines = #lines,
-		note = "The dedicated errors sink keeps the main daily log readable.",
+		warn_count    = issues.warn_count,
+		err_count     = issues.err_count,
+		last_error    = issues.last_error,
+		recent_source = source,
+		recent        = recent,
 	}
 end
 
---- Which configuration files this install reads.
+--- The daemon parts, the log level and the in-memory log.
 --- @param state table Daemon state.
 --- @return table
-local function collect_config(state)
-	local summary = {
-		overrides = 0,
-		enabled_hotstrings = tostring(state.config ~= nil),
-		enabled_gestures = NOT_AVAILABLE,
-		enabled_llm = tostring(state.llm ~= nil),
-		config_files = {},
-	}
-	local ok, ConfigPaths = pcall(require, "infra.config_paths")
-	if ok and type(ConfigPaths.config) == "function" then
-		summary.config_files = {
-			ConfigPaths.config("hotstrings"),
-			ConfigPaths.config("tap_hold.toml"),
-		}
-	end
-	return summary
-end
-
---- Host information.
---- @return table
-local function collect_sys()
-	-- The same probes as the boot snapshot line (infra/diagnostic_snapshot), so
-	-- the window and the log describe one machine. The page's Linux branch reads
-	-- these names, and a fact that could not be read stays absent: the page
-	-- omits its row instead of printing "?". The sys table used to carry only
-	-- os, arch and the display kind, so every CPU, RAM, screen and locale row
-	-- read "?" and no row said which distribution or kernel it was.
-	local facts = require("infra.diagnostic_snapshot").system_facts()
-	local sys = { os = "linux" }
-	for _, name in ipairs({
-		"os_name", "kernel", "arch", "runtime", "display_server", "desktop",
-		"cpu_model", "cpu_cores", "ram_total", "ram_free", "locale",
-	}) do
-		sys[name] = facts[name]
-	end
-	-- The page's "Last git commit" row read "unknown" on every Linux build:
-	-- this collector never sent one. The shared resolver answers from the
-	-- package's build stamp, then the source checkout.
-	sys.git_hash, sys.commit_source = require("infra.diagnostic_snapshot").resolve_commit()
-	-- The folder config.toml and the hotstrings are read from, and separately
-	-- the one the daemon's scripts run from (/usr/lib/ergopti, the AppImage
-	-- mount, ...): the two are never the same place in a package.
-	sys.config_dir = require("infra.config_paths").get_config_dir()
-	sys.script_dir = require("infra.paths").driver_root()
-	return sys
-end
-
-
--- =========================================
--- =========================================
--- ======= 2/ The Snapshot =================
--- =========================================
--- =========================================
-
---- Resolves the active UI locale so the healthcheck window renders in the
---- user's language instead of a hardcoded "fr". Falls back to "fr" only when
---- i18n truly fails to load or expose get_locale — a fail-safe default, not a
---- silent override of the user's persisted choice.
---- @return string
-local function resolve_locale()
-	local ok, i18n = pcall(require, "infra.i18n")
-	if ok and type(i18n) == "table" and type(i18n.get_locale) == "function" then
-		local ok_locale, locale = pcall(i18n.get_locale)
-		if ok_locale and type(locale) == "string" and locale ~= "" then return locale end
-	end
-	return "fr"
-end
-
---- Builds the full diagnostic snapshot.
---- @param state table Daemon state.
---- @return table
-local function build_snapshot(state)
-	state = type(state) == "table" and state or {}
-	local lines = ring_lines()
-	local recent_issues, issues_source = collect_recent_issues(lines)
-
-	-- Which of the daemon's parts are wired. Reported as adapter lists because
-	-- that is what the page renders, and because "the LLM section is missing"
-	-- is a more useful sentence than a section quietly rendering zeroes.
-	local loaded, failed, disabled = {}, {}, {}
-	-- Iterated over a list of NAMES, not over a table built from the state. A
-	-- constructor drops its nil values, so `pairs{ engine = state.engine, … }`
-	-- is empty exactly when every part is missing — the report would have been
-	-- silent about a completely unwired daemon, which is the one case this
-	-- window exists for.
+local function collect_developer(state)
+	local ok_list, failed, disabled = {}, {}, {}
+	-- Iterated over a list of NAMES: a constructor drops its nil values, so a
+	-- table built from the state is empty exactly when every part is missing
 	for _, name in ipairs(REQUIRED_PARTS) do
-		if state[name] then
-			loaded[#loaded + 1] = name
-		else
-			failed[#failed + 1] = name .. " (not wired)"
-		end
+		if state[name] then ok_list[#ok_list + 1] = name else failed[#failed + 1] = name .. " (not wired)" end
 	end
-	-- An optional part the user switched off is neutral, not a red failure. One
-	-- that is absent did not load: calling it "disabled" would hide that
-	-- failure behind the colour meant for a user's choice.
 	for _, name in ipairs(OPTIONAL_PARTS) do
 		local part = state[name]
 		if not part then
@@ -384,75 +416,250 @@ local function build_snapshot(state)
 		elseif type(part.is_enabled) == "function" and part.is_enabled() == false then
 			disabled[#disabled + 1] = name
 		else
-			loaded[#loaded + 1] = name
+			ok_list[#ok_list + 1] = name
 		end
 	end
-
-	local snapshot = {
-		version          = Version.VERSION,
-		platform         = "linux",
-		-- Carried alongside the canonical fields rather than in place of them.
-		-- The shared contract does not name it and the page does not require it,
-		-- but the window is one of the few surfaces a user reads in their own
-		-- language, and hardcoding "fr" here was a bug once already.
-		locale           = resolve_locale(),
-		loaded_adapters  = loaded,
-		-- This driver has no port-contract validation pass, so claiming a
-		-- validated list would be inventing one. The loaded list is the honest
-		-- answer to a question the page asks of every platform.
-		ports_validated  = loaded,
-		failed_adapters  = failed,
-		disabled_adapters = disabled,
-		uptime_sec       = os.time() - _started_at,
-		recent_issues    = recent_issues,
-		recent_issues_source = issues_source,
-		sys              = collect("sys", collect_sys),
-		pause_state      = collect("pause_state", function() return collect_pause_state(state) end),
-		keylogger        = collect("keylogger", function() return collect_keylogger(state) end),
-		llm              = collect("llm", function() return collect_llm(state) end),
-		layout           = collect("layout", function() return collect_layout(state) end),
-		hotstrings       = collect("hotstrings", function() return collect_hotstrings(state) end),
-		logs             = collect("logs", function() return collect_logs(lines) end),
-		config           = collect("config", function() return collect_config(state) end),
+	local logger = require("logger")
+	local level = nil
+	for name, value in pairs(logger.LEVELS) do
+		if value == logger.get_level() then level = name end
+	end
+	return {
+		modules_ok       = ok_list,
+		modules_failed   = failed,
+		modules_disabled = disabled,
+		log_level        = level,
+		ring_lines       = #(logger.ring_buffer_snapshot() or {}),
 	}
+end
 
-	-- Read after every collector, so a problem this very build logged is counted
-	-- too. `false` rather than nil when nothing has failed: the shared validator
-	-- reads a nil field as MISSING, and the page's `if (s.last_error)` treats
-	-- false and nil alike. "No error" is a value; an absent field is a different
-	-- claim.
-	local issues = session_issues()
-	snapshot.warn_count = issues.warn_count
-	snapshot.err_count  = issues.err_count
-	snapshot.last_error = issues.last_error or false
 
-	-- Validated against the shared contract before it is sent. A section that is
-	-- silently absent is worse than a loud gap: the reader cannot tell "not
-	-- measured" from "measured as nothing", and this window exists to answer
-	-- exactly that kind of question.
-	local ok, missing = Snapshot.validate_snapshot(snapshot)
-	if not ok then
-		Logger.error(LOG, "Healthcheck snapshot is missing %d field(s): %s.",
-			#missing, table.concat(missing, ", "))
+
+
+
+-- ===============================
+-- ===============================
+-- ======= 3/ The Snapshot =======
+-- ===============================
+-- ===============================
+
+--- Milliseconds, for the collection's duration.
+--- @return number
+local function now_ms()
+	return require("infra.monotonic").now_ms()
+end
+
+--- Builds the synchronous (phase A) snapshot.
+--- @param state table Daemon state.
+--- @param detailed boolean Whether the user ticked "Include details".
+--- @return table
+function M.build_snapshot(state, detailed)
+	state = type(state) == "table" and state or {}
+	local started = now_ms()
+	local schema = M.config().schema
+	local facts = collect("system facts", function() return require("infra.diagnostic_snapshot").system_facts() end)
+	local permission_ids = {}
+	for id in pairs(schema.permissions[M.DRIVER] or {}) do permission_ids[#permission_ids + 1] = id end
+	table.sort(permission_ids)
+	local sections = {
+		paths       = collect("paths", function() return collect_paths(schema) end),
+		versions    = collect("versions", function() return collect_versions(facts) end),
+		hardware    = collect("hardware", function() return collect_hardware(facts) end),
+		system      = collect("system", function() return collect_system(facts, state) end),
+		input       = collect("input", function() return collect_input(state) end),
+		features    = collect("features", function() return collect_features(state) end),
+		ai          = collect("ai", function() return collect_ai(state) end),
+		network     = {},
+		permissions = collect("permissions", function() return collect_permissions(permission_ids) end),
+		peripherals = collect("peripherals", function() return collect_peripherals(detailed == true) end),
+		issues      = collect("issues", collect_issues),
+		developer   = collect("developer", function() return collect_developer(state) end),
+	}
+	local snapshot = {
+		schema_version = schema.schema_version,
+		driver         = M.DRIVER,
+		generated_at   = Snapshot.utc_now(),
+		detailed       = detailed == true,
+		sections       = sections,
+		probes         = Snapshot.pending_probes(schema, M.DRIVER),
+	}
+	local elapsed = now_ms() - started
+	sections.developer.phase_a_ms = elapsed
+	if elapsed > schema.phase_a_budget_ms then
+		Logger.warn(LOG, "The synchronous diagnostics took %.1f ms, over the %d ms budget.", elapsed,
+			schema.phase_a_budget_ms)
+	end
+	local undeclared = Snapshot.check_fields(snapshot, schema)
+	if #undeclared > 0 then
+		Logger.error(LOG, "The diagnostics snapshot carries fields the schema does not declare: %s.",
+			table.concat(undeclared, ", "))
 	end
 	return snapshot
 end
 
---- Handles an incoming JS message.
---- @param payload any  String or table from host_bridge.js.
---- @param state  table Daemon state { engine, keylogger, config, llm, layout }.
---- @return any|nil  Response to send back to JS.
-function M.on_message(payload, state)
-	local action = type(payload) == "table" and payload.action or payload
-	if action == "ready" then
-		Logger.info(LOG, "Healthcheck UI ready.")
-		return build_snapshot(state)
+
+
+
+
+-- ======================================
+-- ======================================
+-- ======= 4/ Pushing To The Page =======
+-- ======================================
+-- ======================================
+
+--- Pushes a message into the page, only while the page that asked is open.
+--- @param session table
+--- @param message table
+--- @return boolean pushed
+local function push(session, message)
+	if _session ~= session then return false end
+	local manager = require("ui.webview_manager")
+	if manager.current_epoch("healthcheck") ~= session.epoch then return false end
+	local ok, json = pcall(require("json").encode, message)
+	if not ok then
+		Logger.error(LOG, "A diagnostics message could not be encoded: %s.", tostring(json))
+		return false
 	end
-	if action == "refresh" then
-		return build_snapshot(state)
+	return manager.eval_js("healthcheck", "if(window.receiveDiagnostics)window.receiveDiagnostics(" .. json .. ")")
+end
+
+--- Cancels the probes of a session.
+--- @param session table|nil
+local function cancel_probes(session)
+	if session and session.probes then
+		session.probes.cancel()
+		session.probes = nil
 	end
-	Logger.warn(LOG, "Unknown bridge action received: %s.", tostring(action))
-	return nil
+end
+
+--- Starts the probes of a session's snapshot.
+--- @param session table
+--- @param state table Daemon state.
+local function start_probes(session, state)
+	cancel_probes(session)
+	session.probes = require("ui.healthcheck.probes").start(M.config().schema, session.snapshot.sections.paths, state,
+		function(id, result, sections)
+			if _session ~= session then return end
+			session.snapshot.probes[id] = result
+			for section_id, values in pairs(sections or {}) do
+				local target = session.snapshot.sections[section_id]
+				for key, value in pairs(values) do target[key] = value end
+			end
+			push(session, { type = "probe", id = id, result = result, sections = sections })
+		end)
+end
+
+--- The first message of a page: its configuration and the first snapshot.
+--- @param session table
+--- @return table
+local function init_message(session)
+	local documents = M.config()
+	return {
+		type = "init",
+		config = {
+			schema    = documents.schema,
+			redaction = documents.redaction,
+			context   = require("ui.healthcheck.report").redaction_context(),
+			mode      = session.mode,
+		},
+		snapshot = session.snapshot,
+	}
+end
+
+
+
+
+
+-- ===============================
+-- ===============================
+-- ======= 5/ Page Actions =======
+-- ===============================
+-- ===============================
+
+--- Performs one validated action.
+--- @param session table
+--- @param action table From healthcheck.actions.
+--- @param state table Daemon state.
+--- @param context table The routed message's context (close_owned_window).
+--- @return table|nil The answer to the page.
+local function perform(session, action, state, context)
+	local Report = require("ui.healthcheck.report")
+	local documents = M.config()
+	if action.action == "refresh" then
+		session.detailed = action.detailed
+		session.snapshot = M.build_snapshot(state, action.detailed)
+		start_probes(session, state)
+		return { type = "snapshot", snapshot = session.snapshot }
+	end
+	if action.action == "close" then
+		cancel_probes(session)
+		if context and type(context.close_owned_window) == "function" then context.close_owned_window() end
+		return nil
+	end
+	local result = Report.perform(action, session.snapshot.sections.paths, documents, Report.redaction_context())
+	result.type = "action"
+	result.action = action.action
+	return result
+end
+
+--- Handles an incoming page message.
+--- @param payload any String or table from host_bridge.js.
+--- @param state table Daemon state { engine, keylogger, config, llm, layout }.
+--- @param context table|nil { app_name, epoch, close_owned_window } from the webview manager.
+--- @return table|nil The answer the page receives.
+function M.on_message(payload, state, context)
+	state = type(state) == "table" and state or {}
+	local epoch = type(context) == "table" and context.epoch or nil
+	if payload == "ready" then
+		Logger.info(LOG, "Diagnostics page ready.")
+		cancel_probes(_session)
+		_session = {
+			epoch    = epoch,
+			detailed = false,
+			mode     = M._pending_mode,
+		}
+		M._pending_mode = nil
+		_session.snapshot = M.build_snapshot(state, false)
+		local message = init_message(_session)
+		start_probes(_session, state)
+		return message
+	end
+	if not _session or _session.epoch ~= epoch then
+		Logger.warn(LOG, "A diagnostics page message arrived for a page that is gone.")
+		return nil
+	end
+	local action, reason = Actions.validate(payload, {
+		schema = M.config().schema, templates = M.config().templates, driver = M.DRIVER,
+	})
+	if not action then
+		Logger.warn(LOG, "Refused a diagnostics page action (%s).", tostring(reason))
+		return nil
+	end
+	Logger.info(LOG, "Diagnostics page action: %s.", action.action)
+	-- The page is told its button did nothing, rather than left waiting
+	local ok, answer = xpcall(perform, debug.traceback, _session, action, state, context)
+	if not ok then
+		Logger.error(LOG, "The diagnostics action '%s' failed: %s", action.action, tostring(answer))
+		return { type = "action", action = action.action, ok = false }
+	end
+	return answer
+end
+
+--- Opens the diagnostics window, in report mode when asked: the page then
+--- starts from the preview of what is shared and the report button. An open
+--- window is replaced, as on macOS and Windows: bringing it forward would keep
+--- its mode and its stale snapshot.
+--- @param mode string|nil "report" or nil.
+--- @return boolean opened
+function M.open(mode)
+	local manager = require("ui.webview_manager")
+	local epoch = manager.current_epoch("healthcheck")
+	if epoch ~= nil and not manager.hide("healthcheck", epoch) then
+		Logger.error(LOG, "The open diagnostics window could not be replaced.")
+		return false
+	end
+	M._pending_mode = mode
+	return manager.show("healthcheck", require("infra.i18n").get_locale())
 end
 
 return M

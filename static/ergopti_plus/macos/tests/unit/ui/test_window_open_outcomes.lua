@@ -147,14 +147,15 @@ local function with_healthcheck(controls, callback)
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.dialog_util"] = { block_alert = function() return true end }
 		package.loaded["adapters.timer_scheduler"] = {
-			every = function() error("poll must not start before navigation") end,
+			every = function() error("the diagnostics window polls nothing") end,
 			cancel = function() return true end,
 			after = function() return true end,
 		}
 		package.loaded["ui.ui_builder"] = {
 			build_injected_html = function() return "<html></html>" end,
 			window_chrome_steps = function() return {} end,
-			get_app_geometry = function() return { width = 740, height = 560 } end,
+			get_app_geometry = function() return { width = 860, height = 720 } end,
+			window_title = function(title) return "ErgoptiPlus — " .. tostring(title) end,
 			force_focus = function() state.focus_calls = state.focus_calls + 1; return true end,
 		}
 
@@ -190,7 +191,6 @@ local function with_healthcheck(controls, callback)
 
 		local healthcheck = require("ui.healthcheck.core")
 		healthcheck.run = function() return {} end
-		healthcheck.format_plain = function() return "diagnostic" end
 		callback(healthcheck, state)
 	end)
 end

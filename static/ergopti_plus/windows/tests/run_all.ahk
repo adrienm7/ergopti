@@ -1639,15 +1639,13 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_dpapi_blob_size.ahk
 #Include meta/test_llm_diff_french_accents.ahk
 #Include unit/test_audit_v5_fixes.ahk
-; Healthcheck pure formatters (uptime / HTML-escape) — coverage preserved from
-; the deleted P5-stale test_session_regressions orphan. helpers.ahk is
-; headless-safe (function definitions only, no top-level side effects).
+; The diagnostics window's sources are headless-safe: function definitions and
+; their globals only, no top-level side effects.
 #Include ../ui/healthcheck/core.ahk
 #Include ../ui/healthcheck/helpers.ahk
+#Include ../ui/healthcheck/probes.ahk
 #Include ../ui/healthcheck/report.ahk
 #Include ../ui/healthcheck/actions.ahk
-#Include meta/test_healthcheck_format_helpers.ahk
-#Include unit/test_healthcheck_copy_receipt.ahk
 #Include unit/test_kana_altgr_readers.ahk
 #Include unit/test_kana_altgr_lift_respects_owner.ahk
 #Include unit/test_kana_altgr_ctrl_chords.ahk

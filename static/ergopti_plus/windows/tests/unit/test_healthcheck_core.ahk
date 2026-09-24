@@ -58,48 +58,53 @@ Test("HealthCheck: multiple RecordWarn calls accumulate correctly",
 ; ======= 2/ HealthCheck_Run structure ========
 ; =============================================
 
-_TestHC_RunReturnsMap() {
+_TestHC_RunIsVersion2() {
 	Result := HealthCheck_Run()
-	Assert(Result is Map,
-		"HealthCheck_Run must return a Map")
+	Assert(Result is Map, "HealthCheck_Run must return a Map")
+	AssertEqual(2, Result["schema_version"])
+	AssertEqual("windows", Result["driver"])
+	Assert(RegExMatch(Result["generated_at"], "^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$"),
+		"generated_at must be UTC ISO 8601: " . Result["generated_at"])
+	for Id in ["github_api", "ai_health"]
+		AssertEqual("pending", Result["probes"][Id]["state"], Id . " must start pending")
 }
 
-Test("HealthCheck: Run returns a Map",
-	_TestHC_RunReturnsMap)
+Test("HealthCheck: Run returns a version 2 snapshot with its probes pending",
+	_TestHC_RunIsVersion2)
 
 
-_TestHC_RunHasRequiredKeys() {
+; Every section the schema declares for Windows is produced, and nothing the
+; schema does not declare: the page would never show it.
+_TestHC_RunMatchesTheSchema() {
 	Result := HealthCheck_Run()
-	for Key in ["version", "uptime_sec", "warn_count", "err_count",
-	            "last_error", "loaded_adapters", "failed_adapters",
-	            "ports_validated", "recent_issues", "sys"] {
-		Assert(Result.Has(Key),
-			"HealthCheck_Run result must contain key: " . Key)
+	Schema := HealthCheck_Config()["schema"]
+	for Section in Schema["sections"] {
+		if (Section.Get("kind", "fields") == "summary") || !_HealthCheck_Applies(Section)
+			continue
+		Assert(Result["sections"].Has(Section["id"]), "the snapshot misses the section " . Section["id"])
 	}
+	Check := HealthCheck_CheckFields(Result, Schema)
+	AssertEqual(0, Check["undeclared"].Length, "undeclared fields: " . _HC_Join(Check["undeclared"], ", "))
 }
 
-Test("HealthCheck: Run result contains all required top-level keys",
-	_TestHC_RunHasRequiredKeys)
+Test("HealthCheck: Run produces the schema's sections and only its fields",
+	_TestHC_RunMatchesTheSchema)
 
 
 _TestHC_RunReflectsCounters() {
-	global _HealthCheckWarnCount, _HealthCheckErrCount, _HealthCheckLastError
+	global _HealthCheckLastError
 
 	HealthCheck_RecordWarn()
 	HealthCheck_RecordError("run-reflects-test")
 
-	Result := HealthCheck_Run()
-	Assert(Result["warn_count"] >= 1,
-		"warn_count must reflect recorded warnings")
-	Assert(Result["err_count"] >= 1,
-		"err_count must reflect recorded errors")
+	Issues := HealthCheck_Run()["sections"]["issues"]
+	Assert(Issues["warn_count"] >= 1, "warn_count must reflect recorded warnings")
+	Assert(Issues["err_count"] >= 1, "err_count must reflect recorded errors")
 	; HealthCheck_Run probes live adapters and may itself record a newer diagnostic.
 	; The snapshot must therefore mirror the current healthcheck state at the end
 	; of the probe, rather than assuming the pre-probe test message stays newest.
-	Assert(Result["last_error"] == _HealthCheckLastError,
+	AssertEqual(_HealthCheckLastError, Issues["last_error"],
 		"last_error must reflect the healthcheck state captured by HealthCheck_Run")
-	Assert(Result["last_error"] != "",
-		"last_error must include the recorded error or a newer probe diagnostic")
 }
 
 Test("HealthCheck: Run reflects recorded warnings, errors, and last error message",
@@ -120,26 +125,72 @@ Test("HealthCheck: a LoggerError is recorded as its full line (healthcheck-last-
 	_TestHC_LoggerErrorRecordsFullLine)
 
 
-_TestHC_RunUptimeIsPositive() {
-	Result := HealthCheck_Run()
-	Assert(Result["uptime_sec"] >= 0,
-		"uptime_sec must be non-negative")
+_TestHC_RunSystemAndVersions() {
+	Sections := HealthCheck_Run()["sections"]
+	Assert(Sections["system"]["uptime"] >= 0, "uptime must be non-negative")
+	AssertContains(Sections["system"]["os"], "Windows")
+	AssertEqual("AutoHotkey " . A_AhkVersion, SubStr(Sections["versions"]["runtime"], 1, 11 + StrLen(A_AhkVersion)))
+	Assert(Sections["developer"]["phase_a_ms"] is Number, "the synchronous phase must record its duration")
 }
 
-Test("HealthCheck: Run uptime_sec is non-negative",
-	_TestHC_RunUptimeIsPositive)
+Test("HealthCheck: Run reports the system, the runtime and its own duration",
+	_TestHC_RunSystemAndVersions)
 
 
-_TestHC_RunSysHasOsInfo() {
-	Result := HealthCheck_Run()
-	Sys := Result["sys"]
-	Assert(Sys is Map, "sys must be a Map")
-	Assert(Sys.Has("os_name"), "sys must contain os_name")
-	Assert(Sys.Has("ahk_version"), "sys must contain ahk_version")
+; Open applications are opt-in: collected only when the user ticks the box.
+_TestHC_RunningAppsAreOptIn() {
+	AssertFalse(HealthCheck_Run(false)["sections"]["system"].Has("running_apps"),
+		"the open applications must not be collected without details")
+	Assert(HealthCheck_Run(true)["sections"]["system"]["running_apps"] is Array,
+		"the open applications must be collected once details are included")
 }
 
-Test("HealthCheck: Run sys section contains OS and AHK info",
-	_TestHC_RunSysHasOsInfo)
+Test("HealthCheck: open applications are collected only with details (opt-in)",
+	_TestHC_RunningAppsAreOptIn)
+
+
+; =============================================
+; ======= 2b/ The probes ======================
+; =============================================
+
+_TestHC_GithubAnswerIsRead() {
+	Answer := _HC_GithubAnswer(200, '{"resources":{"core":{"limit":60,"remaining":57}}}')
+	AssertEqual("ok", Answer["result"]["state"])
+	AssertEqual("HTTP 200, 57/60", Answer["sections"]["network"]["github_api"])
+	AssertEqual("HTTP 503", _HC_GithubAnswer(503, "")["result"]["detail"])
+	AssertEqual("error", _HC_GithubAnswer(0, "")["result"]["state"], "no answer at all is an error, not a success")
+}
+
+Test("HealthCheck: the GitHub probe reads the rate limit and reports a failed request",
+	_TestHC_GithubAnswerIsRead)
+
+
+; A probe answers once into its run, and a cancelled run publishes nothing.
+_TestHC_CancelledRunPublishesNothing() {
+	global _HC_ProbeRun
+	Published := []
+	Aborted := []
+	Request := { Abort: (*) => (Aborted.Push(true), true) }
+	Run := { Epoch: 5, Cancelled: false, Requests: [Request], Publish: (Epoch, Id, Result, Sections) => Published.Push(Id) }
+	_HC_ProbeFinish(Run, "github_api", A_TickCount, Map("state", "ok"))
+	AssertEqual(1, Published.Length, "a live run publishes its answer")
+	Saved := _HC_ProbeRun
+	try {
+		_HC_ProbeRun := Run
+		HealthCheck_CancelProbes()
+		AssertTrue(Run.Cancelled, "cancelling marks the run")
+		AssertEqual(1, Aborted.Length, "cancelling stops the run's curl children")
+		AssertEqual(0, _HC_ProbeRun, "no run remains current")
+		_HC_ProbeFinish(Run, "ai_health", A_TickCount, Map("state", "ok"))
+		AssertEqual(1, Published.Length, "a cancelled run must not publish a late answer")
+		HealthCheck_CancelProbes()
+	} finally {
+		_HC_ProbeRun := Saved
+	}
+}
+
+Test("HealthCheck: a cancelled probe run publishes nothing and stops its children",
+	_TestHC_CancelledRunPublishesNothing)
 
 
 ; =============================================

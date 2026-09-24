@@ -3,47 +3,42 @@
 --- ==============================================================================
 --- MODULE: Healthcheck Memory Page Size Regression
 --- DESCRIPTION:
---- Exercises the real system collector with native memory snapshots so free
---- memory uses the host page size instead of assuming Intel-sized pages.
+--- Exercises the real hardware and system collectors with native memory
+--- snapshots so free memory uses the host page size instead of assuming
+--- Intel-sized pages. The values are bytes; the shared page formats them.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
 helpers.describe("healthcheck-memory-page-size", function()
+	--- Loads the real collectors over one hs.host.vmStat answer.
+	--- @param snapshot table What vmStat returns.
+	--- @return table hardware, table system
 	local function collect(snapshot)
-		helpers.load_with_stubs("infra.logger", {
-			execute = function(command)
-				if command:find("vm_stat", 1, true) then return tostring(snapshot.pagesFree) .. "\n" end
-				if command:find("hw.memsize", 1, true) then return tostring(snapshot.memSize) .. "\n" end
-				return ""
-			end,
-		})
-		package.loaded["hs.host"] = {
-			operatingSystemVersionString = function() return "macOS" end,
-			locale = { current = function() return "en_US" end },
-			vmStat = function() return snapshot end,
-		}
+		helpers.load_with_stubs("infra.logger")
+		hs.host.vmStat = function() return snapshot end
 		package.loaded["ui.healthcheck.helpers"] = nil
-		return require("ui.healthcheck.helpers").sys_info()
+		local H = require("ui.healthcheck.helpers")
+		return H.collect_hardware(), H.collect_system(false, 0)
 	end
 
 	helpers.it("uses 16 KiB native pages when computing free memory", function()
-		local info = collect({ pagesFree = 65536, pageSize = 16384, memSize = 17179869184 })
-		helpers.assert_eq(info.ram_free, "1.0 GB")
-		helpers.assert_eq(info.ram_total, "16.0 GB")
+		local hardware, system = collect({ pagesFree = 65536, pageSize = 16384, memSize = 17179869184 })
+		helpers.assert_eq(system.ram_free, 1073741824)
+		helpers.assert_eq(hardware.ram_total, 17179869184)
 	end)
 
 	helpers.it("preserves 4 KiB pages and zero free memory", function()
-		local info = collect({ pagesFree = 262144, pageSize = 4096, memSize = 8589934592 })
-		helpers.assert_eq(info.ram_free, "1.0 GB")
-		helpers.assert_eq(info.ram_total, "8.0 GB")
-		info = collect({ pagesFree = 0, pageSize = 16384, memSize = 17179869184 })
-		helpers.assert_eq(info.ram_free, "0.0 GB")
+		local hardware, system = collect({ pagesFree = 262144, pageSize = 4096, memSize = 8589934592 })
+		helpers.assert_eq(system.ram_free, 1073741824)
+		helpers.assert_eq(hardware.ram_total, 8589934592)
+		local _, empty = collect({ pagesFree = 0, pageSize = 16384, memSize = 17179869184 })
+		helpers.assert_eq(empty.ram_free, 0)
 	end)
 
 	helpers.it("does not invent a page size when the native snapshot is incomplete", function()
-		local info = collect({ pagesFree = 65536, memSize = 17179869184 })
-		helpers.assert_eq(info.ram_free, "?")
-		helpers.assert_eq(info.ram_total, "16.0 GB")
+		local hardware, system = collect({ pagesFree = 65536, memSize = 17179869184 })
+		helpers.assert_nil(system.ram_free, "an unknown page size must leave free memory unknown")
+		helpers.assert_eq(hardware.ram_total, 17179869184)
 	end)
 end)

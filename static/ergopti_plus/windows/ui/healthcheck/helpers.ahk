@@ -1,270 +1,449 @@
 ﻿; ui/healthcheck/helpers.ahk
 
 ; ==============================================================================
-; MODULE: Healthcheck / State-gathering Helpers
+; MODULE: Healthcheck / Collectors
 ; DESCRIPTION:
-; Internal probes that gather the runtime snapshot: system info, pause state, keylogger / LLM / layout / hotstrings state, log info, config summary, uptime formatting, and recent-issue extraction.
+; The synchronous half of the diagnostics snapshot (version 2 of
+; _shared/modules/diagnostics/schema.json): one collector per section, each
+; returning that section's fields as a Map. The asynchronous probes (network
+; and AI backend) live in ui/healthcheck/probes.ahk.
 ;
-; The HTML rendering is now in the shared frontend _shared/ui/healthcheck/;
-; core.ahk injects the snapshot as JSON and the client-side script.js renders
-; the report.
+; FEATURES & RATIONALE:
+; 1. Phase A stays in-process: registry reads, Win32 calls, memory and small
+;    files. The processor used to come from a WMI ConnectServer on the AHK
+;    thread, which is the thread that serves the keyboard hook: opening the
+;    window could stall typing for hundreds of milliseconds.
+; 2. Values are raw (bytes, seconds, booleans as 1 and 0); the shared page
+;    formats them, so the three drivers show one format.
+; 3. A fact that cannot be read is left out and logged; the page shows it as
+;    unknown. A fabricated default would read as a measurement.
+; 4. Nothing identifies a place or a device: no host name, no serial, no
+;    device instance path. Open applications and device names are collected
+;    only when the user ticks "Include details".
 ;
 ; Split out of the former infra/healthcheck.ahk (the module split); see
 ; ui/healthcheck/init.ahk for the module overview. Functions and globals are
 ; hoisted, so load order across the healthcheck/*.ahk files is irrelevant.
 ; ==============================================================================
 
+; The WebView2 runtime's EdgeUpdate client id, under which Windows records the
+; installed runtime version, machine-wide or per user
+global HC_WEBVIEW2_CLIENT := "{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
+
+; GetRawInputDeviceInfo's command for the device interface path
+global HC_RIDI_DEVICENAME := 0x20000007
 
 
 
 
-; ===================================================
-; ===================================================
-; ======= 3/ Internal Helpers =======================
-; ===================================================
-; ===================================================
 
-; Returns a Map with OS, CPU, RAM, and screen fields for inclusion in the snapshot.
-_HealthCheck_SysInfo() {
-	Info := Map()
+; ==========================================
+; ==========================================
+; ======= 1/ Reading Without Failing =======
+; ==========================================
+; ==========================================
 
-	; Windows display name + build from the boot snapshot's probe: a raw
-	; ProductName read here reported every Windows 11 machine as Windows 10
-	OsInfo := DiagSnapshot_OsInfo()
-	Info["os_name"]  := OsInfo["os"]
-	Info["os_build"] := OsInfo["os_version"]
-	Info["os_arch"]  := A_Is64bitOS ? "64 bits" : "32 bits"
-
-	; CPU name + logical core count via WMI (first processor record)
-	CpuName  := "inconnu"
-	CpuCores := A_ComSpec ? "" : ""   ; placeholder — filled below
-	try {
-		WMI  := ComObject("WbemScripting.SWbemLocator").ConnectServer()
-		Qry  := WMI.ExecQuery("SELECT Name, NumberOfLogicalProcessors FROM Win32_Processor")
-		Enum := Qry._NewEnum()
-		if Enum.Next(&Item) {
-			CpuName  := Trim(Item.Name)
-			CpuCores := Item.NumberOfLogicalProcessors
-		}
+; Calls a reader and returns its value, or "" after logging why it failed.
+; @param Label {String} What was read, for the log.
+; @param Reader {Func} Zero-argument reader.
+; @returns {Any}
+_HealthCheck_Read(Label, Reader) {
+	try return Reader.Call()
+	catch as Err {
+		LoggerWarn("Healthcheck", "Diagnostics could not read {1}: {2}.", Label, Err.Message)
+		return ""
 	}
-	Info["cpu_name"]  := CpuName
-	Info["cpu_cores"] := CpuCores
+}
 
-	; Physical + available RAM via GlobalMemoryStatusEx DllCall
-	RamTotalGb := "?"
-	RamFreeGb  := "?"
-	try {
-		MemStatus := Buffer(64, 0)
-		NumPut("UInt", 64, MemStatus, 0)   ; dwLength
-		if DllCall("GlobalMemoryStatusEx", "Ptr", MemStatus) {
-			TotalBytes    := NumGet(MemStatus, 8,  "UInt64")
-			AvailBytes    := NumGet(MemStatus, 16, "UInt64")
-			RamTotalGb    := Format("{:.1f}", TotalBytes / 1073741824)
-			RamFreeGb     := Format("{:.1f}", AvailBytes / 1073741824)
-		}
+; Stores a value in a section unless it is "" (unknown).
+; @param Section {Map}
+; @param Key {String}
+; @param Value {Any}
+_HealthCheck_Put(Section, Key, Value) {
+	if !(Value is String) || (Value != "")
+		Section[Key] := Value
+}
+
+; The folder part of a path.
+; @param Path {String}
+; @returns {String} "" when the path has no folder.
+_HealthCheck_Dirname(Path) {
+	if (Path == "")
+		return ""
+	SplitPath(Path, , &Dir)
+	return Dir
+}
+
+
+
+
+
+; ========================
+; ========================
+; ======= 2/ Paths =======
+; ========================
+; ========================
+
+; The folders and files the diagnostics page lists and opens by id.
+; @param ReportSubdir {String} The schema's report.subdir.
+; @returns {Map}
+_HealthCheck_Paths(ReportSubdir) {
+	global _ConfigDir
+	Paths := Map()
+	LogToday := LoggerTodayLogPath()
+	LogsDir := LoggerLogsDir()
+	_HealthCheck_Put(Paths, "config_dir", IsSet(_ConfigDir) ? RTrim(_ConfigDir, "\") : "")
+	_HealthCheck_Put(Paths, "logs_dir", LogsDir)
+	_HealthCheck_Put(Paths, "log_today", LogToday)
+	_HealthCheck_Put(Paths, "errors_today", _HealthCheck_ErrorsLogPath())
+	_HealthCheck_Put(Paths, "crash_dir", _HealthCheck_Read("the crash reports folder", CrashReport_Dir))
+	_HealthCheck_Put(Paths, "diagnostics_dir", (LogsDir != "") ? LogsDir . "\" . ReportSubdir : "")
+	_HealthCheck_Put(Paths, "app_dir", A_ScriptDir)
+	return Paths
+}
+
+
+
+
+
+; ===========================
+; ===========================
+; ======= 3/ Versions =======
+; ===========================
+; ===========================
+
+; The installed WebView2 runtime version, machine-wide or per user.
+; @returns {String} "" when no runtime is registered.
+_HealthCheck_WebView2Version() {
+	global HC_WEBVIEW2_CLIENT
+	for Key in ["HKLM\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\" . HC_WEBVIEW2_CLIENT
+		, "HKLM\SOFTWARE\Microsoft\EdgeUpdate\Clients\" . HC_WEBVIEW2_CLIENT
+		, "HKCU\Software\Microsoft\EdgeUpdate\Clients\" . HC_WEBVIEW2_CLIENT] {
+		Version := RegRead(Key, "pv", "")
+		if (Version != "" && Version != "0.0.0.0")
+			return "WebView2 " . Version
 	}
-	Info["ram_total_gb"] := RamTotalGb
-	Info["ram_free_gb"]  := RamFreeGb
+	return ""
+}
 
-	; Screen + DPI
-	Info["screen_res"] := A_ScreenWidth . "x" . A_ScreenHeight
-	Info["dpi"]        := A_ScreenDPI
-	Info["dpi_scale"]  := Round(A_ScreenDPI / 96 * 100)
-
-	; AHK runtime
-	Info["ahk_version"] := A_AhkVersion
-	Info["ahk_bitness"] := (A_PtrSize = 8) ? "64-bit" : "32-bit"
-
-	; Locale
-	Info["locale"] := A_Language
-
-	; Config directory (optional — only set if the global exists)
-	ConfigDir := ""
-	try {
-		global _ConfigDir
-		ConfigDir := _ConfigDir
-	}
-	Info["config_dir"] := ConfigDir
-	; Where the scripts run from, under its own label: in a compiled build it is
-	; the extracted bundle, never the configuration folder.
-	Info["script_dir"] := A_ScriptDir
-
-	; Commit: the compiled build's BUNDLE_COMMIT stamp, else the source
-	; checkout's HEAD read from .git. `git rev-parse` answered nothing for every
-	; compiled release (no checkout) and, being a subprocess, had to be polled
-	; with a bounded Sleep on the crash-handler path; file reads need neither.
+; The versions a bug report is triaged by.
+; @returns {Map}
+_HealthCheck_Versions() {
+	global UPDATER_CHANNEL
+	Versions := Map()
+	_HealthCheck_Put(Versions, "ergopti_version", _HealthCheck_Read("the ErgoptiPlus version",
+		() => Updater_CurrentVersion()))
 	Commit := DiagSnapshot_ResolveCommit(A_ScriptDir)
-	Info["git_hash"] := Commit["commit"]
-	Info["commit_source"] := Commit["source"]
-
-	return Info
+	Versions["commit"] := Commit["commit"] . " (" . Commit["source"] . ")"
+	_HealthCheck_Put(Versions, "channel", IsSet(UPDATER_CHANNEL) ? UPDATER_CHANNEL : "")
+	Versions["runtime"] := "AutoHotkey " . A_AhkVersion . " " . ((A_PtrSize = 8) ? "64-bit" : "32-bit")
+	_HealthCheck_Put(Versions, "webview", _HealthCheck_WebView2Version())
+	return Versions
 }
 
-; === Enriched collectors for "le plus complet possible" diagnostic ===
-; All protected (pcall) so the healthcheck itself cannot crash the driver.
-; Privacy: counts, states, paths only — never raw user text / expansions / prompts.
 
-_HealthCheck_PauseState() {
-	St := Map("is_paused", false, "source", "unknown")
-	try {
-		; AHK: A_IsSuspended is the primary gate; script_control may expose more.
-		St["is_paused"] := (A_IsSuspended ? true : false)
-		St["source"] := "A_IsSuspended"
-		try {
-			; If script_control is loaded, prefer its view (more precise for non-hotkey paths).
-			global script_control
-			if IsSet(script_control) && script_control.HasProp("is_paused") {
-				St["is_paused"] := !!script_control.is_paused
-				St["source"] := "script_control"
-			}
-		}
+
+
+
+; ====================================
+; ====================================
+; ======= 4/ Hardware And Load =======
+; ====================================
+; ====================================
+
+; Physical and available memory, in bytes.
+; @returns {Map} { total, free }
+_HealthCheck_Memory() {
+	MemStatus := Buffer(64, 0)
+	NumPut("UInt", 64, MemStatus, 0)
+	if !DllCall("GlobalMemoryStatusEx", "Ptr", MemStatus)
+		throw OSError(A_LastError, -1, "GlobalMemoryStatusEx")
+	return Map("total", NumGet(MemStatus, 8, "UInt64"), "free", NumGet(MemStatus, 16, "UInt64"))
+}
+
+; Every display: its resolution, the primary one's scale.
+; @returns {Array}
+_HealthCheck_Displays() {
+	Displays := []
+	Primary := MonitorGetPrimary()
+	Loop MonitorGetCount() {
+		MonitorGet(A_Index, &Left, &Top, &Right, &Bottom)
+		Text := (Right - Left) . "×" . (Bottom - Top)
+		if (A_Index = Primary)
+			Text .= " @" . Round(A_ScreenDPI / 96 * 100) . "% (main)"
+		Displays.Push(Text)
 	}
-	return St
+	return Displays
 }
 
-_HealthCheck_KeyloggerSummary(SnapshotFn := 0) {
-	Sum := Map("enabled", "unknown", "wpm", "n/a", "events_session", 0, "privacy_hits", 0, "today_log", "", "errors_log", "", "notes", "see separate errors sink for high-severity")
-	; Paths from the logger's resolver, named at call time.
-	Sum["today_log"] := LoggerTodayLogPath()
-	Sum["errors_log"] := LoggerTodayErrorsPath()
-	Sum["notes"] := "High-severity (WARNING/ERROR) lines are also written to today's errors file (Debug > Open today's errors file)"
-	if !HasMethod(SnapshotFn, "Call") && IsSet(KL_HealthSnapshot)
-		SnapshotFn := KL_HealthSnapshot
-	if HasMethod(SnapshotFn, "Call") {
-		Owner := SnapshotFn.Call()
-		if !(Owner is Map)
-			throw TypeError("Keylogger health owner returned a non-Map snapshot.")
-		for Key in ["enabled", "wpm", "events_session", "privacy_hits", "today_log"] {
-			if !Owner.Has(Key)
-				throw Error("Keylogger health snapshot is missing '" . Key . "'.")
-		}
-		Sum["enabled"] := Owner["enabled"] ? "true" : "false"
-		Sum["wpm"] := Owner["wpm"]
-		Sum["events_session"] := Owner["events_session"]
-		Sum["privacy_hits"] := Owner["privacy_hits"]
-		Sum["today_log"] := Owner["today_log"]
+; The hardware section.
+; @returns {Map}
+_HealthCheck_Hardware() {
+	Hardware := Map()
+	Model := _HealthCheck_Read("the machine model", () => Trim(
+		RegRead("HKLM\HARDWARE\DESCRIPTION\System\BIOS", "SystemManufacturer", "") . " "
+		. RegRead("HKLM\HARDWARE\DESCRIPTION\System\BIOS", "SystemProductName", "")))
+	_HealthCheck_Put(Hardware, "model", Model)
+	_HealthCheck_Put(Hardware, "cpu", _HealthCheck_Read("the processor", () => Trim(
+		RegRead("HKLM\HARDWARE\DESCRIPTION\System\CentralProcessor\0", "ProcessorNameString"))))
+	Cores := EnvGet("NUMBER_OF_PROCESSORS")
+	if IsInteger(Cores)
+		Hardware["cpu_cores"] := Integer(Cores)
+	Hardware["arch"] := A_Is64bitOS ? "x64" : "x86"
+	Memory := _HealthCheck_Read("the memory", _HealthCheck_Memory)
+	if (Memory is Map)
+		Hardware["ram_total"] := Memory["total"]
+	Displays := _HealthCheck_Read("the displays", _HealthCheck_Displays)
+	if (Displays is Array)
+		Hardware["displays"] := Displays
+	return Hardware
+}
+
+; The Windows name of the user's locale, such as "fr-FR".
+; @returns {String}
+_HealthCheck_LocaleName() {
+	Name := Buffer(85 * 2, 0)
+	if !DllCall("GetUserDefaultLocaleName", "Ptr", Name, "Int", 85)
+		throw OSError(A_LastError, -1, "GetUserDefaultLocaleName")
+	return StrGet(Name, "UTF-16")
+}
+
+; The process names of the visible windows (opt-in).
+; @returns {Array} Sorted, one entry per process.
+_HealthCheck_RunningApps() {
+	Seen := Map()
+	for Info in WIGetAll() {
+		if (Info["windowTitle"] != "")
+			Seen[Info["appId"]] := true
 	}
-	return Sum
+	Names := ""
+	for Name in Seen
+		Names .= (Names == "" ? "" : "`n") . Name
+	Sorted := (Names == "") ? [] : StrSplit(Sort(Names, "C"), "`n")
+	return Sorted
 }
 
-_HealthCheck_LLMState(SnapshotFn := 0) {
-	St := Map("enabled", "unknown", "backend", "unknown", "active_profile", "unknown", "model", "n/a", "n_predictions", "n/a", "streaming", "n/a")
+; The system section and its load.
+; @param Detailed {Boolean} Whether the user ticked "Include details".
+; @param UptimeSec {Integer}
+; @returns {Map}
+_HealthCheck_System(Detailed, UptimeSec) {
+	System := Map()
+	OsInfo := DiagSnapshot_OsInfo()
+	System["os"] := Trim(OsInfo["os"] . " " . OsInfo["os_version"])
+	_HealthCheck_Put(System, "locale", _HealthCheck_Read("the locale", _HealthCheck_LocaleName))
+	Hkl := IsSet(KS_ResolveKeyboardLayout) ? KS_ResolveKeyboardLayout() : 0
+	if Hkl
+		System["keyboard_layout"] := Format("0x{:08X}", Hkl & 0xFFFFFFFF)
+	Memory := _HealthCheck_Read("the memory", _HealthCheck_Memory)
+	if (Memory is Map)
+		System["ram_free"] := Memory["free"]
+	LogsDir := _HealthCheck_Dirname(_HealthCheck_ErrorsLogPath())
+	if (LogsDir != "") {
+		FreeMb := _HealthCheck_Read("the free disk space", () => DriveGetSpaceFree(LogsDir))
+		if IsNumber(FreeMb)
+			System["disk_free"] := FreeMb * 1048576
+	}
+	System["uptime"] := UptimeSec
+	System["elevated"] := A_IsAdmin ? true : false
+	if Detailed {
+		Apps := _HealthCheck_Read("the open applications", _HealthCheck_RunningApps)
+		if (Apps is Array)
+			System["running_apps"] := Apps
+	}
+	return System
+}
+
+
+
+
+
+; =========================================
+; =========================================
+; ======= 5/ Input, Features And AI =======
+; =========================================
+; =========================================
+
+; The keyboard state at this instant.
+; @returns {Map}
+_HealthCheck_Input() {
+	return Map(
+		"paused",    A_IsSuspended ? true : false,
+		"shift",     KS_IsDown("Shift") ? true : false,
+		"ctrl",      KS_IsDown("Ctrl") ? true : false,
+		"alt",       KS_IsDown("LAlt") ? true : false,
+		"altgr",     KS_IsDown(KS_AltGrKeyName()) ? true : false,
+		"meta",      (KS_IsDown("LWin") || KS_IsDown("RWin")) ? true : false,
+		; The lock state, not the key: "T" is the toggle
+		"caps_lock", GetKeyState("CapsLock", "T") ? true : false)
+}
+
+; The feature switches this driver can answer, as { id, enabled } items.
+; @param LlmSnapshotFn {Func|Integer} LLM owner snapshot (tests replace it).
+; @param KeyloggerSnapshotFn {Func|Integer} Keylogger owner snapshot.
+; @returns {Map} { items: Array }
+_HealthCheck_Features(LlmSnapshotFn := 0, KeyloggerSnapshotFn := 0) {
+	global Features
+	Items := []
+	for Id, Category in Map("hotstrings", "Hotstrings", "shortcuts", "Shortcuts", "tapholds", "TapHolds",
+		"layout", "Layout")
+		Items.Push(Map("id", Id, "enabled", IsCategoryGated(Category) ? true : false))
+	if (IsSet(Features) && Features is Map && Features.Has("gestures") && Features["gestures"] is Map)
+		Items.Push(Map("id", "gestures", "enabled", Features["gestures"].Get("enabled", false) ? true : false))
+	Llm := _HealthCheck_LlmOwner(LlmSnapshotFn)
+	if (Llm is Map)
+		Items.Push(Map("id", "llm", "enabled", Llm["enabled"] ? true : false))
+	if !HasMethod(KeyloggerSnapshotFn, "Call") && IsSet(KL_HealthSnapshot)
+		KeyloggerSnapshotFn := KL_HealthSnapshot
+	if HasMethod(KeyloggerSnapshotFn, "Call") {
+		Owner := KeyloggerSnapshotFn.Call()
+		if (Owner is Map && Owner.Has("enabled"))
+			Items.Push(Map("id", "metrics", "enabled", Owner["enabled"] ? true : false))
+	}
+	return Map("items", Items)
+}
+
+; The published LLM menu owner snapshot, or 0 before it is loaded.
+; @param SnapshotFn {Func|Integer}
+; @returns {Map|Integer}
+_HealthCheck_LlmOwner(SnapshotFn := 0) {
 	if !HasMethod(SnapshotFn, "Call") && IsSet(LLM_Menu_HealthSnapshot)
 		SnapshotFn := LLM_Menu_HealthSnapshot
 	if !HasMethod(SnapshotFn, "Call")
-		return St
+		return 0
 	Owner := SnapshotFn.Call()
 	if !(Owner is Map) || !Owner.Get("available", false)
-		return St
-	for Key in ["enabled", "backend", "profile_id", "model", "n_predictions", "streaming"] {
+		return 0
+	for Key in ["enabled", "backend", "profile_id", "model"] {
 		if !Owner.Has(Key)
 			throw Error("LLM health snapshot is missing '" . Key . "'.")
 	}
-	St["enabled"] := Owner["enabled"] ? "true" : "false"
-	St["backend"] := Owner["backend"]
-	St["active_profile"] := Owner["profile_id"]
-	St["model"] := Owner["model"]
-	St["n_predictions"] := Owner["n_predictions"]
-	St["streaming"] := Owner["streaming"]
-	return St
+	return Owner
 }
 
-_HealthCheck_LayoutState() {
-	St := Map("ergopti_base", "unknown", "altgr", "unknown", "shift", "unknown", "caps", "unknown", "prefix_latch", "clean")
+; The AI section: the switch, the backend, the model and the profile.
+; @param SnapshotFn {Func|Integer} LLM owner snapshot (tests replace it).
+; @returns {Map}
+_HealthCheck_Ai(SnapshotFn := 0) {
+	Ai := Map()
+	Owner := _HealthCheck_LlmOwner(SnapshotFn)
+	if !(Owner is Map)
+		return Ai
+	Ai["ai_enabled"] := Owner["enabled"] ? true : false
+	_HealthCheck_Put(Ai, "ai_backend", String(Owner["backend"]))
+	_HealthCheck_Put(Ai, "ai_model", String(Owner["model"]))
+	_HealthCheck_Put(Ai, "ai_profile", String(Owner["profile_id"]))
+	return Ai
+}
+
+
+
+
+
+; ==========================
+; ==========================
+; ======= 6/ Devices =======
+; ==========================
+; ==========================
+
+; The interface path of one raw input device.
+; @param Handle {Integer}
+; @returns {String}
+_HealthCheck_RawInputName(Handle) {
+	global HC_RIDI_DEVICENAME
+	Chars := 0
+	DllCall("GetRawInputDeviceInfoW", "Ptr", Handle, "UInt", HC_RIDI_DEVICENAME, "Ptr", 0, "UInt*", &Chars)
+	if (Chars = 0)
+		return ""
+	Name := Buffer(Chars * 2, 0)
+	if (DllCall("GetRawInputDeviceInfoW", "Ptr", Handle, "UInt", HC_RIDI_DEVICENAME, "Ptr", Name
+		, "UInt*", &Chars, "Int") < 0)
+		return ""
+	return StrGet(Name, "UTF-16")
+}
+
+; The product name a HID device reports (opt-in).
+; @param Path {String} The device interface path.
+; @returns {String} "" when the device does not answer.
+_HealthCheck_HidProductName(Path) {
+	; Zero access rights: the product string needs no read or write access, so
+	; nothing is opened for input
+	Handle := DllCall("CreateFileW", "Str", Path, "UInt", 0, "UInt", 3, "Ptr", 0, "UInt", 3, "UInt", 0
+		, "Ptr", 0, "Ptr")
+	if (Handle = -1)
+		return ""
 	try {
-		global Features
-		if IsSet(Features) && Features is Map
-			St["ergopti_base"] := Features["layout"]["ergopti_base"] ? "on" : "off"
-		; RAlt is a plain Alt on a Kana-style layout, whose AltGr is SC138.
-		St["altgr"] := GetKeyState(KS_AltGrKeyName(), "P") ? "active" : "off"
-		St["shift"] := GetKeyState("Shift", "P") ? "active" : "off"
-		St["caps"] := GetKeyState("CapsLock", "T") ? "active" : "off"
-		if GetKeyState("SC138") && !GetKeyState("SC138", "P")
-			St["prefix_latch"] := "latched (check after suspend)"
-	} catch {
+		Name := Buffer(512, 0)
+		if !DllCall("hid\HidD_GetProductString", "Ptr", Handle, "Ptr", Name, "UInt", Name.Size)
+			return ""
+		return Trim(StrGet(Name, "UTF-16"))
+	} finally {
+		DllCall("CloseHandle", "Ptr", Handle)
 	}
-	return St
 }
 
-_HealthCheck_HotstringsState() {
-	St := Map("terminators", 0, "magic_key", "", "personal_count", 0, "dynamic_count", 0, "default_delay", "n/a")
-	try {
-		global TERMINATORS, DYN_HOTSTRINGS_DEFAULT_DELAY, ScriptInformation, Features
-		if IsSet(TERMINATORS) && TERMINATORS is Array
-			St["terminators"] := TERMINATORS.Length
-		if IsSet(DYN_HOTSTRINGS_DEFAULT_DELAY)
-			St["default_delay"] := DYN_HOTSTRINGS_DEFAULT_DELAY
-		if IsSet(ScriptInformation) && ScriptInformation is Map
-			St["magic_key"] := ScriptInformation.Get("MagicKey", "")
-		if IsSet(Features) && Features is Map && Features.Has("hotstrings") {
-			Hotstrings := Features["hotstrings"]
-			if Hotstrings.Has("personal") && Hotstrings["personal"] is Map
-				St["personal_count"] := Hotstrings["personal"].Count
-			if Hotstrings.Has("dynamic") && Hotstrings["dynamic"] is Map
-				St["dynamic_count"] := Hotstrings["dynamic"].Count
+; One device's bus, from its interface path.
+; @param Path {String}
+; @returns {String} "usb", "bluetooth", "internal" or "other".
+_HealthCheck_DeviceBus(Path) {
+	if RegExMatch(Path, "i)BTHENUM|BTHLE|\{00001124-0000-1000-8000-00805f9b34fb\}")
+		return "bluetooth"
+	if RegExMatch(Path, "i)VID_[0-9A-F]{4}")
+		return "usb"
+	if RegExMatch(Path, "i)^\\\\\?\\(ACPI|HID#(ELAN|SYNA|MSFT|CONVERTEDDEVICE))")
+		return "internal"
+	return "other"
+}
+
+; The keyboards and mice Windows sees: bus, kind and ids, and their names only
+; when the user ticked "Include details". The interface path carries a device
+; instance id, so only its vendor and product ids are kept.
+; @param Detailed {Boolean}
+; @returns {Map} { items: Array }
+_HealthCheck_Peripherals(Detailed) {
+	Size := A_PtrSize * 2
+	Count := 0
+	DllCall("GetRawInputDeviceList", "Ptr", 0, "UInt*", &Count, "UInt", Size)
+	Items := []
+	if (Count = 0)
+		return Map("items", Items)
+	List := Buffer(Count * Size, 0)
+	Count := DllCall("GetRawInputDeviceList", "Ptr", List, "UInt*", &Count, "UInt", Size, "Int")
+	if (Count < 0)
+		throw OSError(A_LastError, -1, "GetRawInputDeviceList")
+	Loop Count {
+		Offset := (A_Index - 1) * Size
+		Type := NumGet(List, Offset + A_PtrSize, "UInt")
+		; 0 = mouse, 1 = keyboard; generic HID devices are neither
+		if (Type > 1)
+			continue
+		Path := _HealthCheck_RawInputName(NumGet(List, Offset, "Ptr"))
+		if (Path == "")
+			continue
+		Item := Map("bus", _HealthCheck_DeviceBus(Path), "kind", (Type = 1) ? "keyboard" : "mouse")
+		if RegExMatch(Path, "i)VID_([0-9A-F]{4})", &Vid)
+			Item["vendor_id"] := StrLower(Vid[1])
+		if RegExMatch(Path, "i)PID_([0-9A-F]{4})", &Pid)
+			Item["product_id"] := StrLower(Pid[1])
+		if Detailed {
+			Name := _HealthCheck_HidProductName(Path)
+			if (Name != "")
+				Item["name"] := Name
 		}
-	} catch {
+		Items.Push(Item)
 	}
-	return St
+	return Map("items", Items)
 }
 
-_HealthCheck_LogsInfo() {
-	Info := Map("logs_dir", "", "unified_today", "", "errors_today", "", "crash_reports_dir", "",
-		"errors_sink_active", false, "ring_lines", 0, "note", "Use the dedicated errors log for WARNING/ERROR only — keeps main logs clean.")
-	; The logger is the one resolver of the logs folder and of today's files.
-	Info["logs_dir"] := LoggerLogsDir()
-	Info["unified_today"] := LoggerTodayLogPath()
-	Info["errors_today"] := LoggerTodayErrorsPath()
-	Info["crash_reports_dir"] := LoggerCrashReportsDir()
-	try {
-		global LOGGER_ERRORS_LOG_PATH, LOGGER_RING_BUFFER
-		; Active once LoggerInit resolved the dated files and the flush owns them.
-		Info["errors_sink_active"] := IsSet(LOGGER_ERRORS_LOG_PATH) && LOGGER_ERRORS_LOG_PATH != ""
-		if IsSet(LOGGER_RING_BUFFER) && LOGGER_RING_BUFFER is Array
-			Info["ring_lines"] := LOGGER_RING_BUFFER.Length
-	} catch {
-	}
-	return Info
-}
 
-_HealthCheck_ConfigSummary() {
-	Sum := Map("overrides", 0, "enabled_hotstrings", "n/a", "enabled_gestures", "n/a", "enabled_llm", "n/a", "config_files", [])
-	try {
-		; Best effort from known loader globals / _IniCache counts.
-		global _IniCache, _ConfigDir
-		if IsSet(_IniCache) && _IniCache is Map {
-			; Rough count of sections that look like overrides
-			c := 0
-			for k in _IniCache
-				c += 1
-			Sum["overrides"] := c
-		}
-		global Features
-		if IsSet(Features) && Features is Map {
-			Sum["enabled_hotstrings"] := IsCategoryGated("Hotstrings") ? "true" : "false"
-			if Features.Has("gestures") && Features["gestures"] is Map
-				Sum["enabled_gestures"] := Features["gestures"].Get("enabled", false) ? "true" : "false"
-			if Features.Has("llm") && Features["llm"] is Map
-				Sum["enabled_llm"] := Features["llm"].Get("enabled", false) ? "true" : "false"
-		}
-		if IsSet(_ConfigDir) && _ConfigDir != ""
-			Sum["config_files"].Push(_ConfigDir . "\config.toml")
-	} catch {
-	}
-	return Sum
-}
 
-; Converts a raw second count to a human-readable uptime string (e.g. "2h 04m 37s").
-_HealthCheck_FormatUptime(Sec) {
-	h := Sec // 3600
-	m := (Sec - h * 3600) // 60
-	s := Sec - h * 3600 - m * 60
-	if h > 0
-		return h . "h " . Format("{:02d}", m) . "m " . Format("{:02d}", s) . "s"
-	if m > 0
-		return m . "m " . Format("{:02d}", s) . "s"
-	return s . "s"
-}
+
+
+; ================================
+; ================================
+; ======= 7/ Recent Issues =======
+; ================================
+; ================================
 
 ; Extracts the last N WARNING and ERROR lines from the in-memory ring buffer:
 ; the fallback of _HealthCheck_RecentIssues when today's errors file does not
@@ -378,8 +557,7 @@ _HealthCheck_ParseErrorsTail(Chunk, AtFileStart, MaxEntries) {
 ; reads it through, so the logs-folder owner can move it.
 ; @returns {String} "" before the logger has resolved its paths.
 _HealthCheck_ErrorsLogPath() {
-	global LOGGER_ERRORS_LOG_PATH
-	return IsSet(LOGGER_ERRORS_LOG_PATH) ? LOGGER_ERRORS_LOG_PATH : ""
+	return LoggerTodayErrorsPath()
 }
 
 ; The window's recent warnings and errors: the tail of today's errors file, or

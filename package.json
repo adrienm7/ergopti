@@ -45,6 +45,7 @@
 		"test:issue-link-vectors": "node ./tools/test/test-issue-link-vectors.cjs",
 		"test:diagnostics-redaction-vectors": "node ./tools/test/test-diagnostics-redaction-vectors.cjs",
 		"test:healthcheck-model": "node ./tools/test/test-healthcheck-model.cjs",
+		"test:healthcheck-page": "node ./tools/test/test-healthcheck-page.cjs",
 		"test:issue-templates": "node ./tools/test/test-issue-templates.cjs",
 		"test:repo-url-single-source": "node ./tools/test/test-repo-url-single-source.cjs",
 		"test:manifest-equivalence": "node ./tools/test/test-manifest-equivalence.cjs",

@@ -1,14 +1,22 @@
 ﻿; tests/unit/test_healthcheck_report_issue.ahk
 
 ; ==============================================================================
-; MODULE: Report A Bug / Suggest A Feature (Windows)
+; MODULE: Diagnostics Page Actions And Suggest A Feature (Windows)
 ; DESCRIPTION:
-; Debug > Report a bug copies the full diagnostics to the clipboard, saves them
-; as a Markdown file beside today's errors file, selects it in Explorer, then
-; opens the GitHub bug form with a bounded prefill; Suggest a feature opens the
-; feature form. Everything that leaves the machine is redacted: the profile
-; folder and the account name must reach neither the clipboard, the file nor
-; the URL (report-bug-flow).
+; Drives HealthCheck_PerformAction, what the diagnostics page's buttons do once
+; HealthCheck_ValidateAction accepted them, over recorded side effects (Debug >
+; Report a bug opens the page at its preview; its report button sends the
+; "report" action):
+; 1. copy writes the redacted report, and a refused clipboard is a failure
+;    that keeps the window (nothing closes here);
+; 2. save writes the redacted report under the snapshot's diagnostics folder
+;    and selects it in Explorer;
+; 3. report copies, saves, selects, then opens the bug form last, its fields
+;    redacted, and a refused clipboard stops it before the browser;
+; 4. open_path opens the path the host collected, creating a missing folder,
+;    and refuses a file that does not exist;
+; 5. an unknown profile folder refuses everything: nothing could be redacted;
+; 6. Suggest a feature opens the feature form with the version and the system.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -17,142 +25,154 @@
 
 
 
-; =========================================
-; =========================================
-; ======= 1/ Recording side effects =======
-; =========================================
-; =========================================
+; ==============================
+; ==============================
+; ======= 1/ The Fixture =======
+; ==============================
+; ==============================
 
-; The fixture's account: its folder appears in the snapshot's config dir.
-global _THRI_HOME := "C:\Users\JDoe"
-
-; Builds side effects that record every call instead of acting.
-_THRI_Effects(Calls) {
-	for Name in ["copy", "save", "reveal", "open_url", "notify"]
-		Calls[Name] := []
+; Side effects that record every call in order.
+; @param Calls {Array} Receives "name:argument" entries.
+; @param Options {Map} { clipboard: Boolean, exists: Boolean }
+; @returns {Map}
+_THPA_Effects(Calls, Options := 0) {
+	Options := (Options is Map) ? Options : Map()
 	return Map(
-		"identity", () => Map("home", _THRI_HOME, "user", "JDoe"),
-		"now_utc",  () => "20260921141320",
-		"copy",     (Text) => (Calls["copy"].Push(Text), true),
-		"save",     (Dir, Name, Text) => (Calls["save"].Push(Map("dir", Dir, "name", Name, "text", Text)), Dir . "\" . Name),
-		"reveal",   (Path) => (Calls["reveal"].Push(Path), true),
-		"open_url", (Url) => (Calls["open_url"].Push(Url), true),
-		"notify",   (Title, Body, Kind) => (Calls["notify"].Push(Map("title", Title, "kind", Kind)), true))
+		"copy",     (Text) => (Calls.Push("copy:" . Text), Options.Get("clipboard", true)),
+		"save",     (Dir, Name, Text) => (Calls.Push("save:" . Dir . "\" . Name . ":" . Text), Dir . "\" . Name),
+		"reveal",   (Path) => (Calls.Push("reveal:" . Path), true),
+		"make_dir", (Dir) => (Calls.Push("make_dir:" . Dir), true),
+		"exists",   (Path) => (Calls.Push("exists:" . Path), Options.Get("exists", true)),
+		"open",     (Path) => (Calls.Push("open:" . Path), true),
+		"open_url", (Url) => (Calls.Push("open_url:" . Url), true),
+		"notify",   (Title, Body, Kind) => (Calls.Push("notify:" . Kind), true),
+		"identity", () => Map("home", "C:\Users\JDoe", "user", "JDoe"))
 }
 
-; The repository the URLs must point at, read from its single source.
-_THRI_UrlPrefix(Template) {
-	global _SharedDir
-	GitHub := JsonParse(FileRead(_SharedDir . "\modules\updater\defaults.json", "UTF-8"))["github"]
-	return "https://github.com/" . GitHub["owner"] . "/" . GitHub["repo"]
-		. "/issues/new?template=" . Template . "&version="
+; The snapshot's paths section of the fixture.
+_THPA_Paths() {
+	return Map(
+		"logs_dir",        "C:\Users\JDoe\AppData\Local\ergopti_plus\logs",
+		"diagnostics_dir", "C:\Users\JDoe\AppData\Local\ergopti_plus\logs\diagnostics",
+		"errors_today",    "C:\Users\JDoe\AppData\Local\ergopti_plus\logs\ErgoptiPlus_errors_2026-09-24.log")
 }
 
-; Runs Body with a config dir under the fixture account and a known errors file.
-_THRI_WithFixture(Body) {
-	global _ConfigDir, LOGGER_ERRORS_LOG_PATH
-	SavedConfig := IsSet(_ConfigDir) ? _ConfigDir : ""
-	SavedErrors := LOGGER_ERRORS_LOG_PATH
-	try {
-		_ConfigDir := _THRI_HOME . "\Documents\ergopti_plus"
-		LOGGER_ERRORS_LOG_PATH := A_Temp . "\ergopti_report_logs\ErgoptiPlus_errors_2026-09-21.log"
-		Body.Call()
-	} finally {
-		_ConfigDir := SavedConfig
-		LOGGER_ERRORS_LOG_PATH := SavedErrors
-	}
+; Joins the recorded calls for a readable assertion.
+_THPA_Join(Calls) {
+	Out := ""
+	for Index, Call in Calls
+		Out .= (Index > 1 ? " | " : "") . Call
+	return Out
 }
 
 
 
 
 
-; ===================================
-; ===================================
-; ======= 2/ The report flows =======
-; ===================================
-; ===================================
+; ============================
+; ============================
+; ======= 2/ The Tests =======
+; ============================
+; ============================
 
-_THRI_ReportBug() {
-	_THRI_WithFixture(_THRI_ReportBugBody)
+_THPA_CopyIsRedacted() {
+	Calls := []
+	Outcome := HealthCheck_PerformAction(Map("action", "copy", "text", "log at c:\users\jdoe\x by JDoe"),
+		_THPA_Paths(), HealthCheck_Config(), _THPA_Effects(Calls))
+	AssertTrue(Outcome["ok"])
+	AssertEqual("copy:log at ~\x by <user>", _THPA_Join(Calls))
 }
+Test("Diagnostics page: copy writes the redacted report (page-actions)", _THPA_CopyIsRedacted)
 
-_THRI_ReportBugBody() {
-	Calls := Map()
-	AssertTrue(HealthCheck_ReportBug(_THRI_Effects(Calls)), "the report must succeed")
-	AssertEqual(1, Calls["copy"].Length, "the diagnostics reach the clipboard once")
-	Markdown := Calls["copy"][1]
-	AssertEqual("# ErgoptiPlus diagnostics`n", SubStr(Markdown, 1, 26), "a Markdown report")
-	AssertContains(Markdown, "config_dir: ~\Documents\ergopti_plus", "the profile folder becomes ~")
-	Assert(!InStr(Markdown, "JDoe"), "the account name never leaves the machine")
-
-	AssertEqual(1, Calls["save"].Length)
-	AssertEqual(A_Temp . "\ergopti_report_logs\diagnostics", Calls["save"][1]["dir"])
-	Assert(RegExMatch(Calls["save"][1]["name"], "^ergopti-diagnostics-windows-[\w.\-]+-20260921T141320Z\.md$"),
-		"the saved name carries the driver, the version and the UTC time: " . Calls["save"][1]["name"])
-	AssertEqual(Markdown, Calls["save"][1]["text"], "the saved file is what was copied")
-	AssertEqual(Calls["save"][1]["dir"] . "\" . Calls["save"][1]["name"], Calls["reveal"][1])
-
-	AssertEqual(1, Calls["open_url"].Length)
-	Url := Calls["open_url"][1]
-	Prefix := _THRI_UrlPrefix("bug_report.yml")
-	AssertEqual(Prefix, SubStr(Url, 1, StrLen(Prefix)))
-	AssertContains(Url, "&driver=windows&diagnostics=Version%3A%20")
-	Assert(StrLen(Url) <= 7000, "the prefill stays within the URL budget")
-	Assert(!InStr(Url, "JDoe"), "the URL carries no account name")
-	AssertEqual("info", Calls["notify"][1]["kind"])
+_THPA_RefusedCopyFails() {
+	Calls := []
+	Outcome := HealthCheck_PerformAction(Map("action", "copy", "text", "report"), _THPA_Paths(), HealthCheck_Config(),
+		_THPA_Effects(Calls, Map("clipboard", false)))
+	AssertFalse(Outcome["ok"], "a refused clipboard must be reported to the page as a failure")
 }
+Test("Diagnostics page: a refused clipboard is a failure (healthcheck-copy-receipt)", _THPA_RefusedCopyFails)
 
-Test("Report a bug: copies, saves, reveals, then opens the bug form (report-bug-flow)", _THRI_ReportBug)
-
-
-_THRI_RefusedClipboard() {
-	_THRI_WithFixture(_THRI_RefusedClipboardBody)
+_THPA_SaveUnderDiagnostics() {
+	Calls := []
+	Name := "ergopti-diagnostics-windows-2.1.0-20260924T100000Z.md"
+	Outcome := HealthCheck_PerformAction(Map("action", "save", "text", "C:\Users\JDoe\file", "name", Name),
+		_THPA_Paths(), HealthCheck_Config(), _THPA_Effects(Calls))
+	Expected := _THPA_Paths()["diagnostics_dir"] . "\" . Name
+	AssertTrue(Outcome["ok"])
+	AssertEqual(Expected, Outcome["path"])
+	AssertEqual("save:" . Expected . ":~\file | reveal:" . Expected, _THPA_Join(Calls))
 }
+Test("Diagnostics page: save writes under the diagnostics folder and selects it (page-actions)",
+	_THPA_SaveUnderDiagnostics)
 
-_THRI_RefusedClipboardBody() {
-	Calls := Map()
-	Effects := _THRI_Effects(Calls)
-	Effects["copy"] := (Text) => false
-	AssertFalse(HealthCheck_ReportBug(Effects), "a refused clipboard fails the report")
-	AssertEqual(0, Calls["save"].Length, "nothing is saved")
-	AssertEqual(0, Calls["open_url"].Length, "the form never opens without its report")
-	AssertEqual("error", Calls["notify"][1]["kind"])
+_THPA_ReportOrder() {
+	Calls := []
+	Name := "ergopti-diagnostics-windows-2.1.0-x.md"
+	Fields := Map("version", "2.1.0", "os", "Windows 11", "driver", "windows",
+		"diagnostics", "Last error: C:\Users\JDoe\boom")
+	Outcome := HealthCheck_PerformAction(Map("action", "report", "text", "report", "name", Name, "fields", Fields),
+		_THPA_Paths(), HealthCheck_Config(), _THPA_Effects(Calls))
+	AssertTrue(Outcome["ok"])
+	AssertEqual(4, Calls.Length, _THPA_Join(Calls))
+	AssertTrue(InStr(Calls[1], "copy:") = 1 && InStr(Calls[2], "save:") = 1 && InStr(Calls[3], "reveal:") = 1
+		&& InStr(Calls[4], "open_url:https://github.com/") = 1, "the browser must open last: " . _THPA_Join(Calls))
+	AssertTrue(InStr(Calls[4], "template=bug_report.yml") > 0, Calls[4])
+	AssertTrue(InStr(Calls[4], "JDoe") = 0, "the prefilled fields must be redacted: " . Calls[4])
 }
+Test("Diagnostics page: report copies, saves, selects, then opens the bug form (report-bug-flow)",
+	_THPA_ReportOrder)
 
-Test("Report a bug: stops before the browser when the clipboard refuses (report-bug-flow)", _THRI_RefusedClipboard)
-
-
-_THRI_UnknownHome() {
-	_THRI_WithFixture(_THRI_UnknownHomeBody)
+_THPA_ReportStopsOnRefusedClipboard() {
+	Calls := []
+	Outcome := HealthCheck_PerformAction(Map("action", "report", "text", "report", "name",
+		"ergopti-diagnostics-w.md", "fields", Map()), _THPA_Paths(), HealthCheck_Config(),
+		_THPA_Effects(Calls, Map("clipboard", false)))
+	AssertFalse(Outcome["ok"])
+	for Call in Calls
+		AssertTrue(InStr(Call, "open_url:") = 0, "the browser must not open without the report in the clipboard")
 }
+Test("Diagnostics page: report stops before the browser when the clipboard refuses (report-bug-flow)",
+	_THPA_ReportStopsOnRefusedClipboard)
 
-; Nothing could remove the profile folder, so every path under it would leak.
-_THRI_UnknownHomeBody() {
-	Calls := Map()
-	Effects := _THRI_Effects(Calls)
+_THPA_OpenPath() {
+	Calls := []
+	Outcome := HealthCheck_PerformAction(Map("action", "open_path", "id", "diagnostics_dir"), _THPA_Paths(),
+		HealthCheck_Config(), _THPA_Effects(Calls))
+	Dir := _THPA_Paths()["diagnostics_dir"]
+	AssertTrue(Outcome["ok"])
+	AssertEqual("make_dir:" . Dir . " | exists:" . Dir . " | open:" . Dir, _THPA_Join(Calls))
+
+	Calls := []
+	Outcome := HealthCheck_PerformAction(Map("action", "open_path", "id", "errors_today"), _THPA_Paths(),
+		HealthCheck_Config(), _THPA_Effects(Calls, Map("exists", false)))
+	AssertFalse(Outcome["ok"], "a missing errors file must not be reported as opened")
+	for Call in Calls
+		AssertTrue(InStr(Call, "make_dir:") = 0 && InStr(Call, "open:") = 0, "a file is never created: " . Call)
+}
+Test("Diagnostics page: open_path opens the collected path, creating only folders (page-actions)", _THPA_OpenPath)
+
+_THPA_UnknownHomeRefuses() {
+	Calls := []
+	Effects := _THPA_Effects(Calls)
 	Effects["identity"] := () => Map("home", "", "user", "JDoe")
-	AssertFalse(HealthCheck_ReportBug(Effects), "an unknown profile folder fails the report")
-	AssertEqual(0, Calls["copy"].Length, "nothing unredacted reaches the clipboard")
-	AssertEqual(0, Calls["save"].Length, "nothing is saved")
-	AssertEqual(0, Calls["open_url"].Length, "the form never opens")
-	AssertEqual("error", Calls["notify"][1]["kind"])
+	Outcome := HealthCheck_PerformAction(Map("action", "copy", "text", "C:\Users\JDoe"), _THPA_Paths(),
+		HealthCheck_Config(), Effects)
+	AssertFalse(Outcome["ok"])
+	AssertEqual(0, Calls.Length, "nothing may leave the machine unredacted: " . _THPA_Join(Calls))
 }
+Test("Diagnostics page: an unknown profile folder refuses every export (page-actions)", _THPA_UnknownHomeRefuses)
 
-Test("Report a bug: refuses to report when the profile folder is unknown (report-bug-flow)", _THRI_UnknownHome)
-
-
-_THRI_SuggestFeature() {
-	_THRI_WithFixture(_THRI_SuggestFeatureBody)
+_THPA_SuggestFeature() {
+	global _SharedDir
+	Calls := []
+	AssertTrue(HealthCheck_SuggestFeature(_THPA_Effects(Calls)))
+	AssertEqual(1, Calls.Length, _THPA_Join(Calls))
+	GitHub := JsonParse(FileRead(_SharedDir . "\modules\updater\defaults.json", "UTF-8"))["github"]
+	Prefix := "open_url:https://github.com/" . GitHub["owner"] . "/" . GitHub["repo"]
+		. "/issues/new?template=feature_request.yml&"
+	AssertEqual(Prefix, SubStr(Calls[1], 1, StrLen(Prefix)))
+	AssertContains(Calls[1], "driver=windows")
+	Assert(!InStr(Calls[1], "JDoe"), "the URL carries no account name")
 }
-
-_THRI_SuggestFeatureBody() {
-	Calls := Map()
-	AssertTrue(HealthCheck_SuggestFeature(_THRI_Effects(Calls)))
-	AssertEqual(0, Calls["copy"].Length, "a feature request copies nothing")
-	Prefix := _THRI_UrlPrefix("feature_request.yml")
-	AssertEqual(Prefix, SubStr(Calls["open_url"][1], 1, StrLen(Prefix)))
-	AssertContains(Calls["open_url"][1], "&driver=windows")
-}
-
-Test("Suggest a feature: opens the feature form with the version and the system (report-bug-flow)", _THRI_SuggestFeature)
+Test("Suggest a feature: opens the feature form with the version and the system (report-bug-flow)",
+	_THPA_SuggestFeature)

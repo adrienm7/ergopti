@@ -120,6 +120,7 @@
 			]
 		},
 		{ "id": "features", "kind": "items", "columns": ["id", "enabled"] },
+		{ "id": "unavailable", "kind": "items", "columns": ["feature", "platforms", "reason"], "platforms": ["macos"], "collapsed": true },
 		{
 			"id": "ai",
 			"fields": [
@@ -133,7 +134,8 @@
 		{
 			"id": "network",
 			"fields": [
-				{ "id": "github_api", "type": "text", "probe": "github_api", "show_ms": true }
+				{ "id": "github_api", "type": "text", "probe": "github_api", "show_ms": true },
+				{ "id": "wifi_signal", "type": "text", "platforms": ["macos"] }
 			]
 		},
 		{ "id": "permissions", "kind": "items", "columns": ["id", "state"], "platforms": ["macos", "linux"] },
@@ -167,6 +169,7 @@
 				{ "id": "modules_ok", "type": "list" },
 				{ "id": "log_level", "type": "text" },
 				{ "id": "ring_lines", "type": "count" },
+				{ "id": "event_tap_telemetry", "type": "text", "platforms": ["macos"] },
 				{ "id": "phase_a_ms", "type": "ms" }
 			]
 		}

@@ -23,10 +23,10 @@
       "vhost": "ergopti.download"
     },
     "healthcheck": {
-      "width": 740,
-      "height": 560,
-      "min_width": 540,
-      "min_height": 420,
+      "width": 860,
+      "height": 720,
+      "min_width": 640,
+      "min_height": 480,
       "vhost": "ergopti.healthcheck"
     },
     "hotstrings_config_window": {

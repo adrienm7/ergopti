@@ -28,7 +28,7 @@ _VDSB_OwnerStripsBuildMetadata() {
 }
 
 _VDSB_SurfacesReadTheOwner() {
-	for _, Name in ["_MI_AboutUpdateRows", "HealthCheck_Run"] {
+	for _, Name in ["_MI_AboutUpdateRows", "_HealthCheck_Versions"] {
 		Body := _StripFullLineComments(_DriverFuncBody(Name))
 		Assert(Body != "", Name . " must be readable")
 		Assert(InStr(Body, "Updater_CurrentVersion()") > 0,
@@ -37,10 +37,10 @@ _VDSB_SurfacesReadTheOwner() {
 			Name . " must never display the raw stamp, which carries +build metadata")
 	}
 	Snapshot := HealthCheck_Run()
-	AssertEqual(Updater_CurrentVersion(), Snapshot["version"],
+	AssertEqual(Updater_CurrentVersion(), Snapshot["sections"]["versions"]["ergopti_version"],
 		"the diagnostics version is the owner's")
-	Assert(InStr(HealthCheck_FormatPlain(Snapshot), "Version         : " . Updater_CurrentVersion() . "`r`n") > 0,
-		"the copied diagnostics must show exactly the owner's version")
+	Assert(InStr(HealthCheck_FormatPlain(Snapshot), "`r`nversions.ergopti_version: " . Updater_CurrentVersion() . "`r`n") > 0,
+		"the plain-text diagnostics must show exactly the owner's version")
 }
 
 Test("version display: build metadata is stripped at the owner (version-display-build-metadata)",

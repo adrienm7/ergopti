@@ -49,7 +49,7 @@ helpers.describe("healthcheck session issues (healthcheck-last-error-wired)", fu
 			Logger.error("probe", "boom %d", 42)
 			Logger.ring_buffer_clear()
 			local snapshot = healthcheck.run()
-			helpers.assert_contains(tostring(snapshot.last_error), "[ERROR] [probe] boom 42",
+			helpers.assert_contains(tostring(snapshot.sections.issues.last_error), "[ERROR] [probe] boom 42",
 				"the last error must come from the logger, not from a dead record_error path")
 		end)
 	end)
@@ -57,11 +57,11 @@ helpers.describe("healthcheck session issues (healthcheck-last-error-wired)", fu
 	helpers.it("keeps the last error across snapshots until a newer error replaces it (healthcheck-last-error-wired)", function()
 		with_real_logger(function(Logger, healthcheck)
 			Logger.error("probe", "first diagnostic failure")
-			helpers.assert_contains(tostring(healthcheck.run().last_error), "first diagnostic failure")
-			helpers.assert_contains(tostring(healthcheck.run().last_error), "first diagnostic failure",
+			helpers.assert_contains(tostring(healthcheck.run().sections.issues.last_error), "first diagnostic failure")
+			helpers.assert_contains(tostring(healthcheck.run().sections.issues.last_error), "first diagnostic failure",
 				"a second snapshot must not consume the recorded error")
 			Logger.error("probe", "replacement diagnostic failure")
-			helpers.assert_contains(tostring(healthcheck.run().last_error), "replacement diagnostic failure")
+			helpers.assert_contains(tostring(healthcheck.run().sections.issues.last_error), "replacement diagnostic failure")
 		end)
 	end)
 
@@ -73,9 +73,9 @@ helpers.describe("healthcheck session issues (healthcheck-last-error-wired)", fu
 			Logger.error("probe", "session error marker")
 			Logger.ring_buffer_clear()
 			local second = healthcheck.run()
-			helpers.assert_eq(second.warn_count - first.warn_count, counts.warn - warns_before,
+			helpers.assert_eq(second.sections.issues.warn_count - first.sections.issues.warn_count, counts.warn - warns_before,
 				"every emitted warning between two snapshots must be counted once")
-			helpers.assert_eq(second.err_count - first.err_count, counts.error - errors_before,
+			helpers.assert_eq(second.sections.issues.err_count - first.sections.issues.err_count, counts.error - errors_before,
 				"every emitted error between two snapshots must be counted once")
 			helpers.assert_true(counts.error - errors_before >= 1, "the marker error must have been emitted")
 		end)

@@ -97,12 +97,12 @@ _THIE_RunReportsTheSource() {
 	Path := _THIE_WriteErrorsFile()
 	try {
 		LOGGER_ERRORS_LOG_PATH := Path
-		Result := HealthCheck_Run()
-		AssertEqual("errors_file", Result["recent_issues_source"], "the snapshot names its source")
+		Issues := HealthCheck_Run()["sections"]["issues"]
+		AssertEqual("errors_file", Issues["recent_source"], "the snapshot names its source")
 		; The logger may append its own lines to this file during the run, so
 		; the fixture's entry is searched for rather than expected last
 		Found := false
-		for Entry in Result["recent_issues"]
+		for Entry in Issues["recent"]
 			Found := Found || (Entry == "2026-09-23 10:00:01:002 [ERROR] [Probe] second from the file")
 		Assert(Found, "the snapshot must carry the errors file's entries")
 	} finally {

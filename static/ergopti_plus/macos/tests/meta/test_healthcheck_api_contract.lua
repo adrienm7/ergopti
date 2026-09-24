@@ -3,40 +3,83 @@
 --- ==============================================================================
 --- MODULE: Healthcheck Diagnostic API Contract
 --- DESCRIPTION:
---- Pins every external module symbol that ui/healthcheck/helpers.lua's collectors
---- call, so a renamed or removed API fails CI here instead of silently degrading
---- the user-facing diagnostic.
+--- Pins every external module symbol that the diagnostics collectors, probes
+--- and actions call (ui/healthcheck/helpers.lua, probes.lua, report.lua), so a
+--- renamed or removed API fails CI here instead of silently degrading the
+--- user-facing diagnostic.
 ---
 --- WHY THIS EXISTS (regression for project-healthcheck-stale-api):
 --- The diagnostic collectors probed functions that did not exist — log_manager
 --- .get_paths(), aggregator.get_stats(), keylogger.privacy (whole module),
 --- llm.get_state(), layout.is_ergopti_base(), key_state.get_altgr/get_shift/
---- get_caps(), terminators.count()/get_magic_key(). Each call is guarded with a
---- `type(x) ~= "function"` check that logs a WARNING and falls back, so nothing
---- crashed — but the diagnostic window showed "unknown"/"n/a" for almost every
---- runtime field and every boot logged a wall of "X is not a function" warnings.
---- The guards made the breakage invisible to a "does it crash?" test. This
---- contract makes the breakage visible: it asserts the REAL functions the
---- collectors now depend on actually exist on the real modules.
+--- get_caps(), terminators.count()/get_magic_key(). Each call was guarded, so
+--- nothing crashed — but the diagnostic window showed "unknown" for almost
+--- every runtime field. The guards made the breakage invisible to a "does it
+--- crash?" test. This contract makes it visible: it asserts the REAL functions
+--- the collectors depend on exist on the real modules, then runs the real
+--- collectors and requires that none of them failed.
 ---
---- MAINTENANCE: when a collector in ui/healthcheck/helpers.lua starts calling a
---- new module function, add it here. Keep this list in lock-step with the collectors.
+--- MAINTENANCE: when a collector starts calling a new module function, add it
+--- here. Keep this list in lock-step with the collectors.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
--- The exact external surface ui/healthcheck/helpers.lua's collectors rely on.
+-- The exact external surface the diagnostics window relies on.
 -- mod = require path; fns = functions that must exist; constants = fields read.
 local CONTRACT = {
-	{ mod = "infra.logger",                       fns = { "ring_buffer_snapshot", "logs_dir", "today_log_path",
-		"today_errors_path", "crash_reports_dir" } },
-	{ mod = "modules.keylogger",                fns = { "get_live_stats" } },
-	{ mod = "modules.llm",                      fns = { "get_runtime_llm_enabled", "get_backend", "get_active_profile" } },
-	{ mod = "adapters.key_state",               fns = { "is_right_altgr_held", "isDown" } },
-	{ mod = "modules.keymap.terminators",       fns = { "get_terminator_defs" } },
-	{ mod = "modules.keymap",                   fns = { "get_trigger_char" } },
+	{ mod = "infra.logger",                       fns = { "ring_buffer_snapshot", "session_issues",
+		"logs_dir", "today_log_path", "today_errors_path", "crash_reports_dir" } },
+	{ mod = "infra.config_paths",               fns = { "is_initialized", "get_config_dir" } },
+	{ mod = "infra.diagnostic_snapshot",        fns = { "resolve_commit" } },
+	{ mod = "modules.diagnostics.crash_reporter", fns = { "reports_dir" } },
+	{ mod = "adapters.boot_fatal",              constants = { "LAUNCHER_LOG_ENV" } },
+	{ mod = "adapters.system_info",             fns = { "runtime_version", "arch", "os_version", "keyboard_layout",
+		"elevated" } },
+	{ mod = "modules.updater",                  fns = { "current_version", "installed_channel" } },
+	{ mod = "platform.remap.ke_paths",          constants = { "CLI" } },
+	{ mod = "adapters.file_system",             fns = { "exists" } },
 	{ mod = "modules.shortcuts.script_control", fns = { "is_paused" } },
+	{ mod = "adapters.key_state",               fns = { "isDown", "is_right_altgr_held", "capslock_on" } },
+	{ mod = "platform.remap.lease_controller",  fns = { "status" } },
+	{ mod = "modules.llm",                      fns = { "get_runtime_llm_enabled", "get_backend", "get_current_model",
+		"get_active_profile" } },
+	{ mod = "modules.llm.api_ollama",           fns = { "get_base_url" } },
+	{ mod = "modules.llm.api_mlx",              fns = { "get_base_url" } },
+	{ mod = "adapters.accessibility_permission", fns = { "is_trusted" } },
+	{ mod = "adapters.screen_capture",          fns = { "permission_state" } },
+	{ mod = "adapters.http_client",             fns = { "new" } },
+	{ mod = "adapters.shell_runner",            fns = { "spawn" } },
+	{ mod = "adapters.json_codec",              fns = { "decode" } },
+	{ mod = "adapters.clipboard",               fns = { "write" } },
+	{ mod = "adapters.notifier",                fns = { "send" } },
+	{ mod = "infra.locale",                     fns = { "all" } },
+	{ mod = "infra.manifest_reader",            fns = { "coverage_gaps" } },
+	{ mod = "adapters.network_info",            fns = { "getSignalStrength" } },
+	{ mod = "ui.ui_builder",                    fns = { "build_injected_html", "get_app_geometry", "window_title",
+		"window_chrome_steps", "force_focus", "open_http_url" } },
 }
+
+-- The adapters that capture the hs global when they load: reloaded inside
+-- the fixture so they read its answers
+local HS_READERS = {
+	"adapters.key_state", "adapters.accessibility_permission", "adapters.screen_capture", "adapters.system_info",
+}
+
+--- Answers the Hammerspoon queries the collectors make, as a Mac would.
+--- @param hs_stub table The fixture's hs.
+local function answer_as_a_mac(hs_stub)
+	hs_stub.hid = { capslock = { get = function() return false end } }
+	hs_stub.usb = { attachedDevices = function()
+		return { { productName = "Magic Keyboard", vendorID = 1452, productID = 615 } }
+	end }
+	hs_stub.host.vmStat = function() return { memSize = 17179869184, pageSize = 16384, pagesFree = 65536 } end
+	hs_stub.host.locale = { current = function() return "fr_FR" end }
+	hs_stub.application.runningApplications = function()
+		return { { kind = function() return 1 end, name = function() return "Safari" end } }
+	end
+	hs_stub.accessibilityState = function() return true end
+end
 
 
 
@@ -77,53 +120,57 @@ end)
 
 
 
--- =================================================
--- =================================================
--- ======= 2/ End-to-end: run with no stale probe ==
--- =================================================
--- =================================================
+
+-- ======================================================
+-- ======================================================
+-- ======= 2/ End-to-end: run with no stale probe =======
+-- ======================================================
+-- ======================================================
 
 helpers.describe("meta: healthcheck.run() probes no nonexistent API", function()
-	-- Self-syncing companion to the contract above: actually run the collectors
-	-- against the real modules and assert none logged a stale-API warning. Catches
-	-- a broken probe even if someone forgets to update the CONTRACT list.
-	helpers.load_with_stubs("infra.logger")
-	-- Force the real llm module (load_with_stubs injects a DEFAULT_STATE-only stub).
-	package.loaded["modules.llm"] = nil
-	package.loaded["ui.healthcheck"] = nil
-	package.loaded["ui.healthcheck.core"] = nil
-	package.loaded["ui.healthcheck.helpers"] = nil
-
-	local Logger = require("infra.logger")
-	local stale_probes = {}
-	local orig_warn = Logger.warn
-	Logger.warn = function(log_obj, fmt, ...)
-		local s = tostring(fmt)
-		-- Collector probe failures read "<x> is not a function" or "<mod> unavailable".
-		-- Exclude any mentioning a Hammerspoon API ("hs.…"): the headless test stub
-		-- intentionally omits hs.processInfo / hs.screen / hs.host fields, so _sys_info
-		-- legitimately warns about those — that is a stub limitation, not a driver-API
-		-- bug. We only care about DRIVER-MODULE symbols here.
-		if (s:find("is not a function", 1, true) or s:find("unavailable", 1, true))
-			and not s:find("hs%.") then
-			stale_probes[#stale_probes + 1] = s
+	-- Self-syncing companion to the contract above: run the collectors against
+	-- the real modules and require that none of them failed. A collector that
+	-- cannot read a fact logs a warning and leaves the field unknown, which is
+	-- exactly the silent degradation this test exists to catch.
+	local failures = {}
+	local ok_run, snap
+	local scope = {
+		"infra.logger", "logger", "modules.llm", "ui.healthcheck", "ui.healthcheck.core", "ui.healthcheck.helpers",
+	}
+	for _, name in ipairs(HS_READERS) do scope[#scope + 1] = name end
+	helpers.with_stub_scope(scope, function()
+		local Logger = helpers.load_with_stubs("infra.logger")
+		answer_as_a_mac(hs)
+		for _, name in ipairs(HS_READERS) do package.loaded[name] = nil end
+		-- Force the real llm module (load_with_stubs injects a DEFAULT_STATE-only stub).
+		package.loaded["modules.llm"] = nil
+		package.loaded["ui.healthcheck"] = nil
+		package.loaded["ui.healthcheck.core"] = nil
+		package.loaded["ui.healthcheck.helpers"] = nil
+		local orig_warn, orig_error = Logger.warn, Logger.error
+		local function capture(original)
+			return function(tag, fmt, ...)
+				-- The phase A budget is a production timing: here the first run also
+				-- loads every module it touches
+				if tostring(tag):find("^healthcheck") and not tostring(fmt):find("budget", 1, true) then
+					failures[#failures + 1] = string.format(tostring(fmt), ...)
+				end
+				return original(tag, fmt, ...)
+			end
 		end
-		return orig_warn(log_obj, fmt, ...)
-	end
-
-	local ok_run, snap = pcall(function()
-		return require("ui.healthcheck").run()
-	end)
-	Logger.warn = orig_warn
-
-	helpers.it("healthcheck.run() returns a snapshot", function()
-		helpers.assert_true(ok_run and type(snap) == "table",
-			"healthcheck.run() must succeed: " .. tostring(snap))
+		Logger.warn, Logger.error = capture(orig_warn), capture(orig_error)
+		ok_run, snap = pcall(function() return require("ui.healthcheck").run({ detailed = true }) end)
+		Logger.warn, Logger.error = orig_warn, orig_error
 	end)
 
-	helpers.it("no collector references a renamed/removed module API", function()
-		helpers.assert_true(#stale_probes == 0,
-			"healthcheck collectors probe APIs that don't exist (diagnostic shows 'unknown'/'n/a' "
-				.. "and warns every boot): " .. table.concat(stale_probes, " | "))
+	helpers.it("healthcheck.run() returns a version 2 snapshot", function()
+		helpers.assert_true(ok_run and type(snap) == "table", "healthcheck.run() must succeed: " .. tostring(snap))
+		helpers.assert_eq(snap.schema_version, 2)
+		helpers.assert_eq(snap.driver, "macos")
+	end)
+
+	helpers.it("no collector failed to read its facts", function()
+		helpers.assert_true(#failures == 0,
+			"healthcheck collectors failed (the page shows 'unknown'): " .. table.concat(failures, " | "))
 	end)
 end)

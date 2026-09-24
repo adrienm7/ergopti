@@ -11,8 +11,8 @@
 ; collectors read subsystem state the crash has just left half-built — so the
 ; run was most likely to abort exactly when it was most needed. Field evidence:
 ; "Running healthcheck..." was the last line two crashed processes ever wrote,
-; and neither produced a crash report. _HealthCheck_SysInfo is the most exposed
-; of the ten: WMI ConnectServer, three RegRead calls and a git subprocess poll.
+; and neither produced a crash report. The collectors now build the version 2
+; sections (_shared/modules/diagnostics/schema.json), one per section.
 ;
 ; FEATURES & RATIONALE:
 ; 1. Encodes the ROOT CAUSE — an unguarded collector between START and SUCCESS —
@@ -37,10 +37,10 @@
 ; =============================================
 ; =============================================
 
-; The enriched collector set, by the field name each populates in the result.
+; The collector set, by the section each populates in the snapshot.
 _HCG_CollectorFields() {
-	return ["recent_issues", "sys", "pause_state", "keylogger", "llm",
-		"layout", "hotstrings", "logs", "config"]
+	return ["paths", "versions", "hardware", "system", "input", "features", "ai",
+		"peripherals", "issues", "developer"]
 }
 
 _HCG_AllCollectorsAreGuarded() {
@@ -59,12 +59,15 @@ _HCG_ConstructorHasNoBareCollectorCalls() {
 	Body := _DriverFuncBody("HealthCheck_Run")
 	Assert(Body != "", "HealthCheck_Run() must exist")
 
-	MapPos := InStr(Body, "Result := Map(")
-	Assert(MapPos > 0, "HealthCheck_Run must still build its result with Result := Map(")
-	Constructor := SubStr(Body, MapPos)
-
-	Assert(RegExMatch(Constructor, "_HealthCheck_[A-Za-z]+\(") == 0,
-		"the Result := Map(...) constructor must not call a collector directly — a call nested in an argument list cannot be individually guarded, which is exactly how one failing subsystem took the whole healthcheck down")
+	for Name in ["Sections", "Snapshot"] {
+		MapPos := InStr(Body, Name . " := Map(")
+		Assert(MapPos > 0, "HealthCheck_Run must build its result with " . Name . " := Map(")
+		; The constructor ends at the first line that closes it
+		EndPos := InStr(Body, ")`n", , MapPos)
+		Constructor := SubStr(Body, MapPos, EndPos - MapPos)
+		Assert(RegExMatch(Constructor, "_HealthCheck_[A-Za-z]+\(") == 0,
+			"the " . Name . " := Map(...) constructor must not call a collector directly — a call nested in an argument list cannot be individually guarded, which is exactly how one failing subsystem took the whole healthcheck down")
+	}
 }
 
 ; The guard helper itself must degrade rather than rethrow, and must name the

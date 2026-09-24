@@ -53,8 +53,8 @@ helpers.describe("healthcheck recent issues source (errors-file-issues)", functi
 			local ok, snapshot = pcall(healthcheck.run)
 			os.remove(path)
 			helpers.assert_true(ok, tostring(snapshot))
-			helpers.assert_eq(snapshot.recent_issues_source, "errors_file")
-			helpers.assert_eq(snapshot.recent_issues, {
+			helpers.assert_eq(snapshot.sections.issues.recent_source, "errors_file")
+			helpers.assert_eq(snapshot.sections.issues.recent, {
 				"2026-09-23 10:00:00:001 [WARNING] [Layout] first from the file",
 				"2026-09-23 10:00:01:002 [ERROR] [Probe] second from the file",
 			})
@@ -67,9 +67,9 @@ helpers.describe("healthcheck recent issues source (errors-file-issues)", functi
 			Logger.set_level(SILENT_LEVEL)
 			Logger.ERRORS_LOG_FILE = helpers.temp_dir() .. "/ergopti_hc_absent_" .. tostring(os.time()) .. ".log"
 			local snapshot = healthcheck.run()
-			helpers.assert_eq(snapshot.recent_issues_source, "ring")
+			helpers.assert_eq(snapshot.sections.issues.recent_source, "ring")
 			local found = false
-			for _, line in ipairs(snapshot.recent_issues) do
+			for _, line in ipairs(snapshot.sections.issues.recent) do
 				if line:find("ring fallback marker", 1, true) then found = true end
 			end
 			helpers.assert_true(found, "the ring fallback must carry the warning just logged")
@@ -92,8 +92,8 @@ helpers.describe("healthcheck recent issues source (errors-file-issues)", functi
 			local ok, snapshot = pcall(healthcheck.run)
 			io.open = real_open
 			helpers.assert_true(ok, tostring(snapshot))
-			helpers.assert_eq(snapshot.recent_issues_source, "unavailable")
-			helpers.assert_eq(snapshot.recent_issues, {})
+			helpers.assert_eq(snapshot.sections.issues.recent_source, "unavailable")
+			helpers.assert_eq(snapshot.sections.issues.recent, {})
 		end)
 	end)
 end)

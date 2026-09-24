@@ -244,6 +244,8 @@ return {
 	"tests.unit.ui.test_healthcheck_last_error_wired",
 	"tests.unit.ui.test_healthcheck_linux_rows",
 	"tests.unit.ui.test_hotstring_bulk_checkboxes",
+	"tests.unit.ui.test_healthcheck_bridge_actions",
+	"tests.unit.ui.test_healthcheck_probes",
 	"tests.unit.ui.test_healthcheck_recent_issues_source",
 	"tests.unit.ui.test_healthcheck_report_issue",
 	"tests.unit.ui.test_llm_menu_toggle_row",

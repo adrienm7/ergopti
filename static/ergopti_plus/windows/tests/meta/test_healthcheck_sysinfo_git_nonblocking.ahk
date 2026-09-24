@@ -44,7 +44,7 @@
 ; ====================================================
 
 _HCSNB_SysInfoIsNonBlocking() {
-	for _, Name in ["_HealthCheck_SysInfo", "_CrashReport_SysInfo"] {
+	for _, Name in ["_HealthCheck_Versions", "_CrashReport_SysInfo"] {
 		Body := _DriverFuncBody(Name)
 		Assert(Body != "", Name . " must exist in the driver")
 		Assert(InStr(Body, "RunWait(") == 0,
@@ -56,4 +56,4 @@ _HCSNB_SysInfoIsNonBlocking() {
 			Name . " must take the commit from the shared resolver the boot snapshot uses")
 	}
 }
-Test("healthcheck: _HealthCheck_SysInfo reads the commit without a git subprocess (healthcheck-sysinfo-git-runwait-freeze)", _HCSNB_SysInfoIsNonBlocking)
+Test("healthcheck: the diagnostics and the crash report read the commit without a git subprocess (healthcheck-sysinfo-git-runwait-freeze)", _HCSNB_SysInfoIsNonBlocking)

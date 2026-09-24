@@ -3,32 +3,22 @@
 ; ==============================================================================
 ; MODULE: Healthcheck
 ; DESCRIPTION:
-; Diagnostic probe that snapshots the runtime state of the AutoHotkey driver
-; and returns it in both structured (Map) and human-readable (string) form.
-; Designed to be triggered from the tray Debug submenu or via a command-line
-; flag so operators can verify the driver is properly wired without log files.
+; The diagnostics window of the Debug menu. It collects a version 2 snapshot
+; (_shared/modules/diagnostics/schema.json) and shows it in the shared page
+; (_shared/ui/healthcheck/), which renders every section, keeps the preview of
+; what is shared and asks the host for each action by message.
 ;
 ; FEATURES & RATIONALE:
-; 1. Adapter probing: checks each adapter module file is present on disk and
-;    that the expected public function names are defined in the global scope,
-;    without calling or altering any of them.
-; 2. Port validation: records which adapters expose their full contract surface
-;    (load + all required functions present) vs which are partially broken.
-; 3. Last error capture: reads the module-level _HealthCheckLastError variable
-;    set by HealthCheck_RecordError() so callers can surface the most recent
-;    failure without parsing log files.
-; 4. Uptime: computes milliseconds elapsed since this module was loaded
-;    (captured in _HealthCheckStartMs at parse time) and converts to whole seconds.
-; 5. System info: captures OS version (including build number), CPU, RAM, AHK
-;    runtime, screen resolution, locale, and config directory for a complete
-;    at-a-glance snapshot.
-; 6. Recent log entries: reads the newest WARNING/ERROR entries from a bounded
-;    tail of today's errors file (bounds in
-;    _shared/modules/diagnostics/recent_issues.json), and from the in-memory
-;    ring only before that file exists, so diagnosis is possible without
-;    opening log files.
-; 7. Selectable window: displays the report in a WebView2 window (text is
-;    selectable and copyable) with a fallback read-only Edit control.
+; 1. Two phases: phase A reads registry values, Win32 calls, memory and small
+;    files under the schema's 5 ms budget, on the thread that also serves the
+;    keyboard hook; phase B runs the network probes as curl children harvested
+;    by timers, and pushes each answer into the open page.
+; 2. Every page message goes through HealthCheck_ValidateAction: the host opens
+;    only the paths it collected, by field id.
+; 3. Everything copied, saved or sent to GitHub is redacted again by
+;    Redact_Apply, whatever the page did.
+; 4. Without WebView2 the window shows the snapshot as plain text in a
+;    read-only field.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -36,12 +26,14 @@
 ; INDEX: this file declares nothing itself; it #Include-s the healthcheck
 ; sub-modules below. Functions and globals are hoisted into the global
 ; namespace, so load order is irrelevant.
-;   healthcheck/core.ahk    -- Probe, public API, WebView2 report window.
-;   healthcheck/helpers.ahk -- State-gathering probes + snapshot rendering.
-;   healthcheck/report.ahk  -- Debug > Report a bug / Suggest a feature.
+;   healthcheck/core.ahk    -- Session counters, the snapshot, the window and its messages.
+;   healthcheck/helpers.ahk -- One synchronous collector per section, and the recent issues.
+;   healthcheck/probes.ahk  -- The asynchronous probes (api.github.com, the local AI backend).
+;   healthcheck/report.ahk  -- The page's actions and the Debug menu's reports.
 ;   healthcheck/actions.ahk -- Validation of the diagnostics page's actions.
 
 #Include core.ahk
 #Include helpers.ahk
+#Include probes.ahk
 #Include report.ahk
 #Include actions.ahk
