@@ -309,13 +309,19 @@ function checkScannedSymbolsExist(files) {
  * Without this, the one file class the architecture calls mandatory everywhere
  * was the only one whose edit selected no driver suite at all — a corpus vector
  * could be changed and land fully "verified" having executed nothing.
+ *
+ * The layer data belongs here for the same reason: `_shared/keymap/` and the
+ * physical-key registry are read by the AHK and Lua layer loaders and replayed
+ * by every driver's corpus consumer, and no JS gate runs those loaders.
  * @param {string} f Repo-relative path.
  * @returns {boolean} Whether the path is a cross-driver contract.
  */
 function isCrossDriverContract(f) {
 	return (
 		f.startsWith('static/ergopti_plus/_shared/core/') ||
-		f.startsWith('static/ergopti_plus/_shared/tests/')
+		f.startsWith('static/ergopti_plus/_shared/tests/') ||
+		f.startsWith('static/ergopti_plus/_shared/keymap/') ||
+		f === 'static/ergopti_plus/_shared/data/keycodes/physical_keys.json'
 	);
 }
 
