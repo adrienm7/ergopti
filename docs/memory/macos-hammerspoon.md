@@ -6,7 +6,7 @@
 
 The launcher alert `Embedded Hammerspoon stopped unexpectedly with exit code 0`
 can hide a Lua startup failure; inspect the managed Lua error log as well as
-`~/Library/Logs/ErgoptiPlus/launcher.log`. The published v0.0.0-dev.126 archive
+`~/Library/Logs/ergopti_plus/launcher.log`. The published v0.0.0-dev.126 archive
 reproduced this on macOS in run `34865561172`: `log_transport` required LuaSocket,
 but Hammerspoon 1.1.1 does not ship it. Injecting `bootstrap_socket_factory` in
 unit fixtures cannot verify that distribution dependency. Test the extracted
@@ -48,8 +48,13 @@ first eventtap, and the launcher took the exit status 0 after logger readiness
 for a Quit. Never infer a clean exit from Hammerspoon's status: every fatal Lua
 path writes `adapters/boot_fatal.lua`'s report, which the launcher turns into
 a modal alert. `configured_symlink` now requires that named refusal, and
-`plain_open` launches without `open -n`. To see where a boot stopped, read
-`/tmp/ErgoptiPlus_boot.log`: every `Boot.stage`/`Boot.mark` pair is appended
+`plain_open` launches without `open -n`. Logs left the configuration folder
+(2026-09): `symlink_logs` keeps a legacy linked `hammerspoon/logs` that must
+stay untouched, `symlink_logs_dir` points LogsDirPath through a link and checks
+the picked folder keeps its permissions, and `dangling_logs` is a LogsDirPath
+link to nothing that must be refused by name. To see where a boot stopped, read
+`~/Library/Logs/ergopti_plus/ErgoptiPlus_boot.log` (the default logs folder, beside
+launcher.log; it was the shared `/tmp` root until 2026-09): every `Boot.stage`/`Boot.mark` pair is appended
 there synchronously by `adapters/boot_journal.lua` (and to launcher.log until
 the native logger commits); the last START without SUCCESS is the stage. Log folders are resolved once with
 realpath and opened with `O_NOFOLLOW_ANY` (`OwnedLogDirectory.swift`); never

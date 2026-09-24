@@ -79,8 +79,8 @@ Consequences to internalise:
 - **Hold refutations to the same standard as findings.** "This evidence does not
   exist" is a positive claim about the world and needs proof of where you looked.
   Absence of evidence at the wrong path is not evidence of absence.
-- **Resolve the config path before concluding anything about logs.** `paths.toml`
-  first, then the driver's subdirectory constant.
+- **Resolve the logs path before concluding anything about logs.** Read
+  `LogsDirPath` in `paths.toml` first (empty means the OS default below).
 - **Never present a sub-agent's or tool's output as measured evidence** without
   opening the artifact yourself. Aggregating an unverified claim launders it.
 - **Cheapest possible check first**, run at the _correct_ path:
@@ -91,13 +91,14 @@ Consequences to internalise:
   perfectly respectable basis for a finding. Dressing it up as a measurement is
   not. G4 in particular is unmeasured on this driver unless you have a log line
   to quote.
-- Where logs live: `<ConfigDir>/autohotkey/logs/` — note the subdirectory is
-  `autohotkey`, not `ahk`, and `<ConfigDir>` is redirected by
-  `%APPDATA%\Ergopti\paths.toml` (on the maintainer's machine, to
-  `D:\Documents\GitHub\config\ergopti_plus\`). There is a dedicated errors-only
-  sink and 14-day retention. Getting this path wrong is precisely what produced
-  the false refutation above. Files found elsewhere (e.g. `D:\tmp`) may be **test
-  harness output** rather than driver output — check before attributing them.
+- Where logs live: `%LOCALAPPDATA%\ergopti_plus\logs\` on Windows,
+  `~/Library/Logs/ergopti_plus/` on macOS, unless `LogsDirPath` in
+  `%APPDATA%\Ergopti\paths.toml` (macOS: the launcher-managed paths.toml) moves
+  them; logs written before 2026-09 are in the old `<ConfigDir>/autohotkey/logs/`
+  and `<ConfigDir>/hammerspoon/logs/`. There is a dedicated errors-only sink and
+  14-day retention. Getting this path wrong is precisely what produced the false
+  refutation above. Files found elsewhere (e.g. `D:\tmp`) may be **test harness
+  output** rather than driver output — check before attributing them.
 - Caveat when dating events: the log **filename carries the date the driver
   started, not the date of the entries** (the path is resolved once at init), so a
   file named `..._07-11.log` can hold entries from the 14th. Read the line's own

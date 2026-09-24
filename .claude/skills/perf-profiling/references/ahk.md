@@ -2,10 +2,10 @@
 
 ## Measurement sources
 
-Resolve `%APPDATA%\Ergopti\paths.toml`, then the `autohotkey/logs/`
-subdirectory. On the maintainer's current machine that resolves under
-`D:\Documents\GitHub\config\ergopti_plus\autohotkey\logs\`, but derive it; do
-not treat this example as configuration.
+Resolve `LogsDirPath` in `%APPDATA%\Ergopti\paths.toml`; empty means
+`%LOCALAPPDATA%\ergopti_plus\logs\`. Logs written before 2026-09 are under the
+old `<ConfigDir>\autohotkey\logs\`. Derive the folder; do not treat an example
+as configuration.
 
 `static/ergopti_plus/windows/infra/hotpath_profiler.ahk` uses QPC and emits
 `[HotPath] Slow <segment>: <ms> ms`. The default warning threshold is 5 ms, but

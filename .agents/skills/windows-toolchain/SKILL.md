@@ -107,11 +107,12 @@ explicitly. See `ship-fix` for the full regression-proof contract.
 
 `<ConfigDir>` is **not** the default folder: it is redirected by
 `%APPDATA%\Ergopti\paths.toml`. On the maintainer's box that resolves to
-`D:\Documents\GitHub\config\ergopti_plus\`, so the logs are at
-`…\config\ergopti_plus\autohotkey\logs\`. Looking in the repo for them finds
-nothing and invites the wrong conclusion. The log filename carries the date the
-**driver started**, not the date of the entries — always read the timestamp on
-the line.
+`D:\Documents\GitHub\config\ergopti_plus\`. The logs are not there: they are in
+`%LOCALAPPDATA%\ergopti_plus\logs\`, unless `LogsDirPath` in the same
+paths.toml moves them (logs from before 2026-09 stay in the old
+`…\config\ergopti_plus\autohotkey\logs\`). Looking in the repo for them finds
+nothing and invites the wrong conclusion. Always read the timestamp on the line
+rather than trusting a file's name for when an entry was written.
 
 AutoHotkey v2 is at `C:\Program Files\AutoHotkey\v2\AutoHotkey64.exe`.
 

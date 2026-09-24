@@ -29,5 +29,5 @@ Audit `static/ergopti_plus/macos/`. Read `hammerspoon-driver`,
   suite because `package.loaded` contamination can manufacture a green result.
 
 For G4 evidence, use `perf-profiling`'s Hammerspoon reference. Resolve the live
-config directory before reading `hammerspoon/logs/`, and distinguish code-derived
-hypotheses from observed runtime evidence.
+logs folder (`LogsDirPath`, else `~/Library/Logs/ergopti_plus/`) before reading
+the logs, and distinguish code-derived hypotheses from observed runtime evidence.
