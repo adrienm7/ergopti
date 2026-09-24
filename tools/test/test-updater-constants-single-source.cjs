@@ -17,9 +17,10 @@
  * 2. Additive: does not remove any existing checks; purely a new gate.
  *
  * THE THIRD DRIVER, AND THE FALLBACKS NOBODY WAS WATCHING:
- * Linux has a full updater with repository and timing fallbacks. macOS delegates
- * scheduling to Sparkle and therefore retains only a repository identity fallback.
- * Every surviving fallback scalar is pinned to defaults.json.
+ * Linux has a full updater with repository and timing fallbacks. macOS reads its
+ * timing through the shared schedule in modules/updater/auto_check.lua and retains
+ * only a repository identity fallback. Every surviving fallback scalar is pinned
+ * to defaults.json.
  * ==============================================================================
  */
 
@@ -201,10 +202,21 @@ if (!macFallback) {
 	if (macFallback[2] === repo) pass("macOS repository fallback repo matches defaults.json");
 	else fail(`macOS repository fallback repo=${macFallback[2]} does not match defaults.json`);
 }
+// The macOS cadence is the Lua driver's (modules/updater/auto_check.lua), which
+// reads the shared timing through the shared schedule port; the identity facade
+// keeps no timing literal of its own.
+const MAC_AUTO_CHECK = path.join(ROOT, "static", "ergopti_plus", "macos", "modules", "updater", "auto_check.lua");
 if (/start_background_checks|default_check_interval_sec|boot_check_delay_sec/.test(luaSrc)) {
-	fail("macOS identity facade must not retain the retired Lua poller timing contract");
+	fail("macOS identity facade must not carry update-check timing; auto_check.lua reads the shared schedule");
+} else if (!fs.existsSync(MAC_AUTO_CHECK)) {
+	fail("macos/modules/updater/auto_check.lua is missing: nothing owns the macOS update-check cadence");
 } else {
-	pass("macOS scheduling is owned exclusively by Sparkle");
+	const autoSrc = fs.readFileSync(MAC_AUTO_CHECK, "utf8");
+	if (!/defaults\.json/.test(autoSrc) || !autoSrc.includes('require("updater.schedule")') || /\b86400\b/.test(autoSrc)) {
+		fail("macOS auto_check.lua must read defaults.json through the shared schedule, without timing literals");
+	} else {
+		pass("macOS automatic checks read the shared timing through the shared schedule");
+	}
 }
 
 // Linux still owns its updater and therefore retains the complete fallback.

@@ -3,13 +3,17 @@
 --- ==============================================================================
 --- MODULE: Menu About / Update
 --- DESCRIPTION:
---- Builds the "About / Update" sub-menu for the macOS menubar. User-initiated
---- update checks cross the narrow launcher adapter so Sparkle alone verifies,
---- downloads, installs, and relaunches the outer application bundle.
+--- Builds the "About / Update" sub-menu for the macOS menubar. The automatic
+--- checks are the Lua driver's (modules/updater/auto_check.lua); the check row
+--- crosses the narrow launcher adapter so Sparkle verifies, downloads, installs,
+--- and relaunches the outer application bundle only when the user clicks it.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Native ownership: Sparkle's standard controller provides authenticated
 ---    download progress and replaces the actual outer bundle.
+--- 1b. Lua cadence: the frequency picker lists the shared presets and persists
+---    through the menu session's automatic-check owner (ctx.update_checks); the
+---    check row names a release that owner found.
 --- 2. One channel owner: the rows list every channel of the shared registry and
 ---    subscribe through the menu session's channel owner (ctx.channel_owner,
 ---    modules/updater/channel.lua), which persists the choice and
@@ -74,6 +78,43 @@ end
 
 
 
+--- "Update to {tag}" by plain substitution: a tag is outside data, and a "%" in
+--- it would be read as a capture reference in a gsub replacement.
+--- @param tag string Release tag.
+--- @return string label
+local function update_now_label(tag)
+	local template = i18n.get("menu.about.update_now")
+	local at = template:find("{tag}", 1, true)
+	if not at then return template .. " " .. tag end
+	return template:sub(1, at - 1) .. tag .. template:sub(at + 5)
+end
+
+--- The check-frequency picker: one row per shared preset, ticked on the
+--- interval in force, whose click persists through the automatic-check owner.
+--- @param checks table The menu session's automatic-check owner.
+--- @return table row A provider row with its items.
+local function frequency_picker(checks)
+	local current = checks.interval_code()
+	local rows = {}
+	for _, preset in ipairs(checks.presets()) do
+		rows[#rows + 1] = {
+			label = i18n.get("menu.about.frequency." .. preset.code),
+			checked = preset.code == current,
+			action = function()
+				Logger.info(LOG, "User chose the check frequency '%s'.", preset.code)
+				checks.set_interval(preset.seconds)
+			end,
+		}
+	end
+	return {
+		label = i18n.get("menu.about.frequency_menu") .. ": " .. i18n.get("menu.about.frequency." .. current),
+		items = rows,
+	}
+end
+
+
+
+
 -- ================================
 -- ================================
 -- ======= 3/ Menu builder =========
@@ -130,14 +171,24 @@ function M.build(ctx)
 	end
 
 	if not local_src then
-		-- A packaged build delegates the entire transaction to Sparkle.
-		table.insert(menu_items, {
+		-- A packaged build hands the transaction to Sparkle on this click only;
+		-- the automatic checks name the release they found here.
+		local checks = type(ctx) == "table" and ctx.update_checks or nil
+		local latest = type(checks) == "table" and checks.latest() or nil
+		local check_row = {
 			label = i18n.get("menu.about.check_for_updates"),
 			action = function()
 				Logger.info(LOG, "User triggered one-click update (channel: %s).", channel)
 				UpdateLauncher.request_check(channel)
 			end,
-		})
+		}
+		if latest then check_row.label = update_now_label(latest.tag) end
+		table.insert(menu_items, check_row)
+		if type(checks) == "table" then
+			table.insert(menu_items, frequency_picker(checks))
+		else
+			Logger.error(LOG, "No automatic update-check owner in the menu context — the frequency rows are left out.")
+		end
 	end
 
 	-- The updater block above is the manifest's `about_updates` list; the two rows

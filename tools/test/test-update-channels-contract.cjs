@@ -396,6 +396,7 @@ const CHANNEL_CONSUMERS = [
 	'windows/ui/menu/menu_init.ahk',
 	'macos/modules/updater/init.lua',
 	'macos/modules/updater/channel.lua',
+	'macos/modules/updater/auto_check.lua',
 	'macos/ui/menu/menu_about.lua',
 	'macos/ui/changelog/init.lua',
 	'macos/adapters/update_launcher.lua',
