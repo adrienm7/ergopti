@@ -264,13 +264,8 @@ function M.build(ctx)
 			if spec then
 				DeferredWork.after(0.05, function()
 					local prior = type(gestures.get_action_parameter) == "function" and gestures.get_action_parameter(slot, a) or ""
-					-- The %s inside the search-URL prompt is LITERAL — it is the
-					-- placeholder the user has to type — so this string is never run
-					-- through string.format. The title uses {1} so the two cannot be
-					-- confused.
-					local prompt = i18n.get(spec == "search_url"
-						and "dialog.gestures.param_search_url"
-						or  "dialog.gestures.param_link")
+					-- The prompt and its refusal text belong to the parameter kind.
+					local prompt = gestures.parameter_prompt(a)
 					local title    = shortcut_utils.action_parameter_title(gestures.get_action_label(a) or a)
 					local save_btn = i18n.get("button.save")
 					while true do
@@ -287,9 +282,7 @@ function M.build(ctx)
 							return
 						end
 						pcall(dialog.block_alert, i18n.get("dialog.gestures.param_error_title"),
-							i18n.get("dialog.gestures.param_err_url")
-							.. (spec == "search_url" and (" " .. i18n.get("dialog.gestures.param_err_many_placeholders")) or ""),
-							"OK", nil, "warning")
+							gestures.parameter_error(a), "OK", nil, "warning")
 						prior = value or prior
 					end
 				end, "menu_gestures.action_parameter")

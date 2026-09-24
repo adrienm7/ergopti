@@ -617,7 +617,18 @@ local function _execute_action(action_name, go_next, binding)
 
 	local handler = _action_handlers[action_name]
 	if handler then
-		local ok, err = pcall(handler)
+		-- A parameterized action receives the value stored for its binding, checked
+		-- here once for every provider rather than by each handler.
+		local parameter = nil
+		if M.ACTION_PARAMETER_SPECS[action_name] then
+			parameter = M.get_action_parameter(binding, action_name)
+			if not M.validate_action_parameter(action_name, parameter) then
+				Logger.warn(LOG, "'%s' ignored for binding '%s': its parameter is missing or invalid.",
+					action_name, tostring(binding))
+				return
+			end
+		end
+		local ok, err = pcall(handler, binding, parameter)
 		if not ok then
 			Logger.error(LOG, "Action '%s' failed: %s.", action_name, tostring(err))
 		end
@@ -988,15 +999,66 @@ function M.get_action_parameter_spec(action_name)
 	return M.ACTION_PARAMETER_SPECS[action_name]
 end
 
+--- The shortcuts manager, which owns the wrap-pair catalogue. Required lazily:
+--- the daemon loads it after this module.
+--- @return table|nil
+local function shortcuts_manager()
+	local ok, Shortcuts = pcall(require, "modules.shortcuts.manager")
+	if not ok or type(Shortcuts) ~= "table" or type(Shortcuts.resolve_wrap_pair) ~= "function" then
+		Logger.error(LOG, "The wrap-pair catalogue is unavailable: %s.", tostring(Shortcuts))
+		return nil
+	end
+	return Shortcuts
+end
+
 function M.validate_action_parameter(action_name, value)
 	local spec = M.get_action_parameter_spec(action_name)
 	if not spec then return true end
+	if spec == "wrap_pair" then
+		local Shortcuts = shortcuts_manager()
+		return Shortcuts ~= nil and (Shortcuts.resolve_wrap_pair(value)) ~= nil
+	end
 	if type(value) ~= "string" or not value:match("^https?://%S+$") then return false end
 	if spec == "search_url" then
 		local _, placeholders = value:gsub("%%s", "")
 		return placeholders == 1
 	end
-	return true
+	if spec == "url" then return true end
+	error("no validator for parameter kind '" .. tostring(spec) .. "'")
+end
+
+--- The text a binding editor shows to ask for an action's parameter. The
+--- search-URL prompt holds a LITERAL %s the user types, and a wrap-pair sample
+--- may hold a %, so {1} is replaced by plain indices, never gsub.
+--- @param action_name string Action id with a parameter.
+--- @return string
+function M.get_action_parameter_prompt(action_name)
+	local spec = M.get_action_parameter_spec(action_name)
+	if spec == "search_url" then return i18n.get("dialog.gestures.param_search_url") end
+	if spec == "url" then return i18n.get("dialog.gestures.param_link") end
+	if spec == "wrap_pair" then
+		local Shortcuts = shortcuts_manager()
+		local WrapPair = require("wrap_pair")
+		local samples = WrapPair.describe(Shortcuts and Shortcuts.get_wrap_pair_list() or {})
+		local template = i18n.get("dialog.gestures.param_wrap_pair")
+		local at = template:find("{1}", 1, true)
+		if not at then return template .. "\n" .. samples end
+		return template:sub(1, at - 1) .. samples .. template:sub(at + 3)
+	end
+	error("no prompt for parameter kind '" .. tostring(spec) .. "'")
+end
+
+--- The text shown when a typed parameter is refused.
+--- @param action_name string Action id with a parameter.
+--- @return string
+function M.get_action_parameter_error(action_name)
+	local spec = M.get_action_parameter_spec(action_name)
+	if spec == "wrap_pair" then return i18n.get("dialog.gestures.param_err_wrap_pair") end
+	if spec == "search_url" then
+		return i18n.get("dialog.gestures.param_err_url") .. " "
+			.. i18n.get("dialog.gestures.param_err_many_placeholders")
+	end
+	return i18n.get("dialog.gestures.param_err_url")
 end
 
 local function parameter_key(binding, action_name)

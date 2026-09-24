@@ -90,6 +90,7 @@ return {
 		{ kind = "action", id = "selection_titlecase" },
 		{ kind = "action", id = "uppercase_selection" },
 		{ kind = "action", id = "titlecase_selection" },
+		{ kind = "action", id = "wrap_selection" },
 		{ kind = "heading", level = 1, key = "sg_actions.sg_order.header.modifier_chords" },
 		{ kind = "modifier_chords", level = 2, group_key = "sg_actions.sg_order.header.modifier_chord_group" },
 		{ kind = "heading", level = 1, key = "sg_actions.sg_order.header.grp_media" },
@@ -247,6 +248,7 @@ return {
 		["win_prev"] = { family = "sg", label_key = "sg_actions.win_prev" },
 		["word_next"] = { family = "sg", label_key = "sg_actions.word_next" },
 		["word_prev"] = { family = "sg", label_key = "sg_actions.word_prev" },
+		["wrap_selection"] = { family = "sg", label_key = "sg_actions.wrap_selection", parameter = "wrap_pair" },
 	},
 	slots = {
 		single = { "tap_2", "tap_3", "tap_4", "tap_5", "swipe_2_left", "swipe_2_right", "swipe_2_up", "swipe_2_down", "swipe_2_left_up", "swipe_2_right_up", "swipe_2_left_down", "swipe_2_right_down", "swipe_3_left", "swipe_3_right", "swipe_3_up", "swipe_3_down", "swipe_3_left_up", "swipe_3_right_up", "swipe_3_left_down", "swipe_3_right_down", "swipe_4_left", "swipe_4_right", "swipe_4_up", "swipe_4_down", "swipe_4_left_up", "swipe_4_right_up", "swipe_4_left_down", "swipe_4_right_down", "swipe_5_left", "swipe_5_right", "swipe_5_up", "swipe_5_down", "swipe_5_left_up", "swipe_5_right_up", "swipe_5_left_down", "swipe_5_right_down" },

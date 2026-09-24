@@ -31,6 +31,7 @@ local Logger = require("logger.shim")
 local Paths  = require("infra.paths")
 local Manifest = require("infra.manifest_reader")
 local TextCase = require("unicode_case")
+local WrapPair = require("wrap_pair")
 local TomlCodec = require("toml_codec")
 local Clipboard = require("adapters.clipboard")
 local EventLoop = require("adapters.event_loop")
@@ -98,30 +99,34 @@ local function resolve_wrap_symbols_path()
 end
 
 --- Reads the shared wrap-symbols JSON and flattens its ordered groups into the
---- { [char] = { left, right } } lookup used at wrap time. Both the opening and
---- the closing character of each pair are registered as keys so typing either one
---- wraps the selection (mirrors the macOS driver's build loop). Fails loud with an
---- ERROR log and returns an empty table on any resolve/read/parse failure.
+--- { [char] = { left, right } } lookup used at wrap time, and the ordered pair
+--- list the wrap_selection parameter resolves against. Both the opening and
+--- the closing character of each pair are registered as lookup keys so typing
+--- either one wraps the selection (mirrors the macOS driver's build loop). Fails
+--- loud with an ERROR log and returns empty tables on any resolve/read/parse
+--- failure.
 --- @return table The flattened wrap-pair lookup.
+--- @return table The pairs in catalogue order, each { left, right }.
 local function load_wrap_pairs()
 	local lookup = {}
+	local ordered = {}
 
 	local ok_json, json = pcall(require, "json")
 	if not ok_json or type(json) ~= "table" or type(json.decode) ~= "function" then
 		Logger.error(LOG, "JSON decoder unavailable — wrap-symbol catalogue not loaded.")
-		return lookup
+		return lookup, ordered
 	end
 
 	local path = resolve_wrap_symbols_path()
 	if path == "" then
 		Logger.error(LOG, "Could not resolve the shared wrap-symbols path — catalogue not loaded.")
-		return lookup
+		return lookup, ordered
 	end
 
 	local fh = io.open(path, "r")
 	if not fh then
 		Logger.error(LOG, "Shared wrap-symbols catalogue unreadable at '%s'.", path)
-		return lookup
+		return lookup, ordered
 	end
 	local content = fh:read("*a")
 	fh:close()
@@ -133,7 +138,7 @@ local function load_wrap_pairs()
 	local ok, data = pcall(json.decode, content)
 	if not ok or type(data) ~= "table" or type(data.groups) ~= "table" then
 		Logger.error(LOG, "Shared wrap-symbols catalogue failed to parse — catalogue not loaded.")
-		return lookup
+		return lookup, ordered
 	end
 
 	for _, group in ipairs(data.groups) do
@@ -141,6 +146,7 @@ local function load_wrap_pairs()
 			if type(pair) == "table"
 					and type(pair.left) == "string" and pair.left ~= ""
 					and type(pair.right) == "string" and pair.right ~= "" then
+				ordered[#ordered + 1] = { left = pair.left, right = pair.right }
 				lookup[pair.left] = { left = pair.left, right = pair.right }
 				if pair.right ~= pair.left then
 					lookup[pair.right] = { left = pair.left, right = pair.right }
@@ -153,13 +159,14 @@ local function load_wrap_pairs()
 	for _ in pairs(lookup) do count = count + 1 end
 	Logger.info(LOG, "Wrap-symbol catalogue loaded from shared SSoT (%d lookup key(s)).", count)
 
-	return lookup
+	return lookup, ordered
 end
 
 --- Canonical wrap-pair catalogue, derived at require-time from the shared JSON
 --- single source of truth (never hardcoded here). Each entry maps a trigger
---- character to its { left, right } wrapping symbols.
-local WRAP_PAIRS = load_wrap_pairs()
+--- character to its { left, right } wrapping symbols; WRAP_PAIR_LIST keeps the
+--- catalogue order.
+local WRAP_PAIRS, WRAP_PAIR_LIST = load_wrap_pairs()
 
 --- Checks whether a character is a wrap-pair trigger.
 --- @param ch string Single character.
@@ -175,6 +182,25 @@ end
 --- @return table
 function M.get_wrap_pairs()
 	return WRAP_PAIRS
+end
+
+--- The built-in pairs in catalogue order, as a copy.
+--- @return table Array of { left, right }.
+function M.get_wrap_pair_list()
+	local list = {}
+	for index, pair in ipairs(WRAP_PAIR_LIST) do
+		list[index] = { left = pair.left, right = pair.right }
+	end
+	return list
+end
+
+--- The left and right symbols a wrap_selection parameter names: a catalogue
+--- symbol or a custom left|right pair (_shared/lua/wrap_pair).
+--- @param value any The stored parameter.
+--- @return string|nil left
+--- @return string|nil right Both nil when the value names no pair.
+function M.resolve_wrap_pair(value)
+	return WrapPair.parse(value, WRAP_PAIR_LIST)
 end
 
 --- Wraps the current selection with left/right symbols.
@@ -333,6 +359,18 @@ function M.action_handlers()
 		["selection_uppercase"] = function() return M.transform_to_uppercase() end,
 		["selection_lowercase"] = function() return M.transform_lowercase() end,
 		["selection_titlecase"] = function() return M.transform_to_titlecase() end,
+		-- The pair is the binding's own parameter, validated by the executor.
+		-- Nothing selected: nothing is typed, as on macOS and Windows.
+		["wrap_selection"] = function(_, parameter)
+			local left, right = M.resolve_wrap_pair(parameter)
+			if not left then
+				Logger.warn(LOG, "wrap_selection ignored: no valid pair ('%s').", tostring(parameter))
+				return false
+			end
+			return transform_selection("wrap_selection", function(selected)
+				return left .. selected .. right
+			end)
+		end,
 	}
 end
 

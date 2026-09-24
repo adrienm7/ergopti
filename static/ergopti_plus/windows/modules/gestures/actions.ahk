@@ -188,6 +188,9 @@ global GESTURE_ACTIONS := Map(
 		"search_web", {
 				Fn: (BindingId := "") => GestureSearchWeb(BindingId),
 		},
+		"wrap_selection", {
+				Fn: (BindingId := "") => GestureWrapSelection(BindingId),
+		},
 		"teleport_mouse", {
 				Fn: (*) => GestureTeleportMouse(),
 		},
@@ -451,6 +454,41 @@ _GestureMakeCaseAction(Transform) {
 
 for _CaseActionId, _CaseTransform in GestureCaseTransforms()
 		GESTURE_ACTIONS[_CaseActionId] := { Fn: _GestureMakeCaseAction(_CaseTransform) }
+
+; The pair a wrap_selection parameter names, resolved against the built-in
+; catalogue (_WS_BUILTIN_PAIRS, loaded from _shared/modules/wrap_symbols/wrap_symbols.json).
+; @param {String} Value The stored parameter.
+; @returns {Map|String} Map("left", ..., "right", ...), or "" when it names none.
+GestureWrapPairFor(Value) {
+		global _WS_BUILTIN_PAIRS
+		return WrapPairParse(Value, _WS_BUILTIN_PAIRS)
+}
+
+; The transform wrap_selection applies for one binding: its own stored pair
+; around the selection. "" when the binding stores no valid pair.
+; @param {String} BindingId
+; @returns {Func|String}
+GestureWrapSelectionTransform(BindingId) {
+		Pair := GestureWrapPairFor(GestureGetActionParameter(BindingId, "wrap_selection"))
+		if !(Pair is Map)
+				return ""
+		return _GestureMakeWrapTransform(Pair["left"], Pair["right"])
+}
+
+_GestureMakeWrapTransform(Left, Right) {
+		return (Text) => Left . Text . Right
+}
+
+; Wraps the selection with the binding's pair. Nothing selected: nothing is
+; typed (the capture returns "" and the paste is skipped).
+GestureWrapSelection(BindingId := "") {
+		Transform := GestureWrapSelectionTransform(BindingId)
+		if !(Transform is Func) {
+				LoggerWarn("gestures", "wrap_selection ignored for binding '{1}': no valid pair is stored.", BindingId)
+				return
+		}
+		GestureTransformSelection(Transform)
+}
 
 ; Deferred clipboard restore for GesturePastePlain. Runs on a negative-delay
 ; SetTimer so the synthetic ^v has already consumed the coerced text before the

@@ -22,7 +22,10 @@
 #             generators). The rows are per-OS on purpose: 13 of the 24
 #             keystrokes both desktop drivers share genuinely differ.
 #   parameter A per-binding value the user types when binding the action:
-#             "url" or "search_url" (a URL template with exactly one %s).
+#             "url", "search_url" (a URL template with exactly one %s) or
+#             "wrap_pair" (a symbol of _shared/modules/wrap_symbols/wrap_symbols.json
+#             or a custom left|right pair; rule pinned by
+#             _shared/tests/corpus/action_parameters/wrap_pair_vectors.json).
 #   confirm   true for a destructive action that must ask before it runs.
 #   requires_linux / requires_hs / requires_ahk
 #             Capabilities the action needs on that OS. The picker greys a row
@@ -802,6 +805,12 @@ platform = "all"
 [sg_actions.selection_titlecase]
 platform = "all"
 
+[sg_actions.wrap_selection]
+# Wraps the SELECTION with the pair stored for the binding (surround_parens
+# wraps the line). Nothing selected: nothing happens.
+platform = "all"
+parameter = "wrap_pair"
+
 [sg_actions.spotlight_mouse]
 # Implemented on BOTH: Windows in modules/shortcuts, macOS in
 # modules/shortcuts/actions/. Linux has no cross-desktop overlay implementation;
@@ -1198,6 +1207,7 @@ items = [
     "selection_titlecase",
     "uppercase_selection",
     "titlecase_selection",
+    "wrap_selection",
     "--",
     "#modifier_chords",
     "_modifier_chords_placeholder",

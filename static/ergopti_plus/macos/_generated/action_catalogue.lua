@@ -96,6 +96,7 @@ return {
 		{ kind = "action", id = "selection_titlecase" },
 		{ kind = "action", id = "uppercase_selection" },
 		{ kind = "action", id = "titlecase_selection" },
+		{ kind = "action", id = "wrap_selection" },
 		{ kind = "heading", level = 1, key = "sg_actions.sg_order.header.modifier_chords" },
 		{ kind = "modifier_chords", level = 2, group_key = "sg_actions.sg_order.header.modifier_chord_group" },
 		{ kind = "heading", level = 1, key = "sg_actions.sg_order.header.grp_media" },
@@ -312,6 +313,7 @@ return {
 		["word_prev"] = { family = "sg", label_key = "sg_actions.word_prev" },
 		["words"] = { family = "ax", label_key = "ax_actions.words" },
 		["words_sel"] = { family = "ax", label_key = "ax_actions.words_sel" },
+		["wrap_selection"] = { family = "sg", label_key = "sg_actions.wrap_selection", parameter = "wrap_pair" },
 	},
 	karabiner_aliases = {
 		["alt_tab_apps_list"] = "app_switcher",
