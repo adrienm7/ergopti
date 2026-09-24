@@ -779,6 +779,27 @@ function M.held_text_modifier_codes()
 	return held
 end
 
+--- Non-modifier keys this daemon has forwarded as pressed and not yet released.
+---
+--- An expansion fires on the terminator's key-DOWN, which has already been
+--- forwarded, so during the injection that key is still pressed on the virtual
+--- keyboard. The kernel drops a key-down for a key that is already down: the
+--- replayed terminator (the space after "adn ") vanished, and every end-char
+--- expansion glued the next word onto the replacement. Measured through a real
+--- kernel by tests/hardware/run_daemon_live.lua.
+--- @return table Sorted evdev keycodes.
+function M.held_forwarded_keys()
+	local codes, seen = {}, {}
+	for _, entry in pairs(_forwarded_down) do
+		if not EvdevCodes.MODIFIER_OF[entry.code] and not seen[entry.code] then
+			seen[entry.code] = true
+			codes[#codes + 1] = entry.code
+		end
+	end
+	table.sort(codes)
+	return codes
+end
+
 --- Every modifier currently held, keyed by name.
 ---
 --- Distinct from `held_text_modifiers`, which answers a different question and
