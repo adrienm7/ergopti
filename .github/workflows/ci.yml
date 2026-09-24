@@ -994,8 +994,10 @@ jobs:
         if: always()
         run: |
           sudo modprobe uinput
+          # lua-luv as install.sh installs it: the daemon's timers and every
+          # HTTP request (the AI phase) run on it.
           sudo apt-get install -y --no-install-recommends at-spi2-core openbox python3-gi gir1.2-gtk-3.0 \
-            dbus-x11 xvfb x11-xkb-utils libayatana-appindicator3-1
+            dbus-x11 xvfb x11-xkb-utils libayatana-appindicator3-1 lua-luv
           sudo bash static/ergopti_plus/linux/tests/hardware/run_daemon_live.sh
         timeout-minutes: 6
 
