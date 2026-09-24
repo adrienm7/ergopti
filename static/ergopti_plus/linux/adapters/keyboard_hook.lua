@@ -1344,6 +1344,57 @@ function M.emergency_stop(reason)
 	_physical_down = {}
 end
 
+--- Runs a blocking modal (a zenity dialog) with the keyboard handed back to
+--- the desktop, then takes it again.
+---
+--- The daemon forwards every grabbed key from its event loop, and a dialog run
+--- from a menu callback blocks that loop until it closes. Under the grab the
+--- dialog therefore never received a key: it could only be dismissed with the
+--- mouse, and no value (an API key, a delay) could be typed into it.
+--- Keys typed into the dialog are discarded on return, and keys still held
+--- then (the Enter that closed it) are treated as consumed, so neither reaches
+--- the hotstring buffer nor the application a second time.
+--- @param fn function The modal; its results are returned.
+--- @return any
+function M.while_released(fn)
+	if not _running or not _intercept then return fn() end
+	local paths = {}
+	for index, path in ipairs(_devices) do paths[index] = path end
+	local released, release_err = _release_forwarded_sources(paths)
+	if not released then
+		M.emergency_stop("could not release virtual keys before a dialog: " .. tostring(release_err))
+		return fn()
+	end
+	for _, path in ipairs(paths) do EvdevReader.ungrab(keyboard_slot(path)) end
+	Logger.debug(LOG, "Keyboard released to the desktop for a dialog.")
+
+	local results = { n = 0 }
+	local function keep(...) results = { n = select("#", ...), ... } end
+	local ok, err = pcall(function() keep(fn()) end)
+	if ok then err = nil end
+
+	for _, path in ipairs(paths) do
+		local slot = keyboard_slot(path)
+		repeat local drained = EvdevReader.drain(function() end, slot) until not drained or drained == 0
+		_pending_events[slot] = nil
+		if not EvdevReader.grab(slot) then
+			M.emergency_stop("could not take the keyboard back after a dialog: " .. path)
+			return (table.unpack or unpack)(results, 1, results.n)
+		end
+		local held = EvdevReader.pressed_keys(slot, KEY_MAX)
+		for code in pairs(held or {}) do _consumed_down[source_key(path, code)] = true end
+		local synced, sync_err = _resynchronise(path)
+		if not synced then
+			M.emergency_stop("could not resynchronise after a dialog: " .. tostring(sync_err))
+			return (table.unpack or unpack)(results, 1, results.n)
+		end
+	end
+	if _on_desync then _call_callback("input-desync callback", _on_desync) end
+	Logger.debug(LOG, "Keyboard taken back after a dialog.")
+	if err then error(err, 0) end
+	return (table.unpack or unpack)(results, 1, results.n)
+end
+
 --- Returns true if the keyboard hook is currently active.
 --- @return boolean
 function M.isRunning()
