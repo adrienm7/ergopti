@@ -18,8 +18,10 @@ index.json            generated catalogue: id, checksum, size, licence, ...
 One layout is one `.keylayout`, and that file is its only source. Nothing
 derived from it is stored here:
 
-- macOS installs the `.keylayout` as it is, in `~/Library/Keyboard Layouts`
-  (`macos/modules/keymap/layout_registry.lua`);
+- macOS installs the `.keylayout` as it is, in `~/Library/Keyboard Layouts`,
+  and adds it to the enabled input sources
+  (`macos/modules/keymap/layout_registry.lua`). The app ships this folder, so
+  its layouts install offline;
 - Windows (AutoHotkey) parses the `.keylayout` when the layout is loaded or
   changed and emulates it; there is no Windows version of a layout. The
   emulated layout is `[layout] emulated_layout` in `config.toml` (a registry

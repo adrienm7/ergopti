@@ -59,3 +59,59 @@ helpers.describe("http_client: response headers reach the caller", function()
 		helpers.assert_eq(result.headers, {}, "callers read headers without a nil check")
 	end)
 end)
+
+--- The adapter over a native double that answers through the returned hooks.
+--- @return table client, table callbacks
+local function load_fixture()
+	local callbacks = {}
+	local http = {}
+	function http.doAsyncRequest(_url, _method, _body, _headers, callback)
+		callbacks[#callbacks + 1] = callback
+		return nil
+	end
+	function http.asyncGet(_url, _headers, callback)
+		callbacks[#callbacks + 1] = callback
+		return nil
+	end
+	local timer = { secondsSinceEpoch = function() return 0 end }
+	function timer.new(_, callback)
+		local running = false
+		return {
+			start = function(self) running = true; return self end,
+			stop = function(self) running = false; return self end,
+			running = function() return running end,
+			callback = callback,
+		}
+	end
+	package.loaded["adapters.http_client"] = nil
+	package.loaded["adapters.timer_scheduler"] = nil
+	local HttpClient = helpers.load_with_stubs("adapters.http_client", { http = http, timer = timer })
+	return HttpClient.new(), callbacks
+end
+
+helpers.describe("HttpClient response headers", function()
+	helpers.it("hands the response headers to the caller, a 304 included (layout-catalogue)", function()
+		local client, callbacks = load_fixture()
+		local terminal
+		client.get("https://raw.example.test/index.json", { ["If-None-Match"] = '"e1"' },
+			function(result) terminal = result end)
+		helpers.assert_eq(#callbacks, 1)
+		callbacks[1](304, "", { ETag = '"e1"' })
+		helpers.assert_eq(terminal.status, 304)
+		helpers.assert_eq(terminal.headers.ETag, '"e1"')
+
+		client.get("https://raw.example.test/index.json", {}, function(result) terminal = result end)
+		callbacks[2](200, "{}", { Etag = '"e2"' })
+		helpers.assert_eq(terminal.ok, true)
+		helpers.assert_eq(terminal.headers.Etag, '"e2"')
+	end)
+
+	helpers.it("carries no header on a network failure (layout-catalogue)", function()
+		local client, callbacks = load_fixture()
+		local terminal
+		client.get("https://raw.example.test/index.json", {}, function(result) terminal = result end)
+		callbacks[1](-1, nil, { ETag = '"stale"' })
+		helpers.assert_eq(terminal.status, 0)
+		helpers.assert_nil(terminal.headers.ETag)
+	end)
+end)
