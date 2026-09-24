@@ -69,16 +69,40 @@ KeymapLayers_LoadContext(SharedDir) {
 		throw ValueError("KeymapLayers_LoadContext needs the _shared folder path.", -1)
 	Root := RTrim(SharedDir, "\/")
 	RegistryPath := Root . "\data\keycodes\physical_keys.json"
-	VocabularyPath := Root . "\keymap\layer_actions.toml"
 	; FileRead throws on a missing or locked file, which is the answer we want
 	; for shipped data.
 	Registry := JsonParse(FileRead(RegistryPath, "UTF-8"))
+	return KeymapLayers_NewContext(Registry, _KL_ReadVocabulary(Root))
+}
+
+/**
+ * Where the user's layer file lives, read from the vocabulary alone. Decoding
+ * the registry is the costly half of the context (about 160 ms on AutoHotkey):
+ * a caller that finds no file there has nothing to resolve against it.
+ * @param {string} SharedDir - Absolute path of the _shared folder.
+ * @param {string} ConfigDir - The configuration folder.
+ * @returns {string} The path of the user's layer file.
+ * @throws When the vocabulary is missing, unreadable or names no user file.
+ */
+KeymapLayers_UserFilePathFromVocabulary(SharedDir, ConfigDir) {
+	if !(SharedDir is String) || SharedDir == ""
+		throw ValueError("KeymapLayers_UserFilePathFromVocabulary needs the _shared folder path.", -1)
+	Meta := _KL_RequireSection(_KL_ReadVocabulary(RTrim(SharedDir, "\/")), "_meta")
+	if !Meta.Has("user_file") || !(Meta["user_file"] is String) || Meta["user_file"] == ""
+		throw Error("The layer vocabulary names no user file ([_meta].user_file).", -1)
+	return RTrim(ConfigDir, "\/") . "\" . Meta["user_file"]
+}
+
+; The vocabulary's sections, as the shared TOML helper returns them; throws when
+; the shipped file is missing or unreadable.
+_KL_ReadVocabulary(Root) {
+	VocabularyPath := Root . "\keymap\layer_actions.toml"
 	if !FileExist(VocabularyPath)
-		throw Error("The layer vocabulary is missing at '" . VocabularyPath . "'.", -1)
+		throw Error("The layer vocabulary is missing at '" . VocabularyPath . "'.", -2)
 	Sections := TOML_ParseFreshFile(VocabularyPath)
 	if TOML_ReadFailed(VocabularyPath)
-		throw Error("The layer vocabulary at '" . VocabularyPath . "' could not be read.", -1)
-	return KeymapLayers_NewContext(Registry, Sections)
+		throw Error("The layer vocabulary at '" . VocabularyPath . "' could not be read.", -2)
+	return Sections
 }
 
 /**

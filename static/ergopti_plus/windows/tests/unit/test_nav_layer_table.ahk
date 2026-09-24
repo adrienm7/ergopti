@@ -24,7 +24,8 @@
 ;    declares for Windows is implemented.
 ; 6. Boot: NavLayer_Init registers the layers.toml of the configuration folder
 ;    it is given, nothing without one, and a file rejected as a whole closes
-;    its START with an error and no SUCCESS.
+;    its START with an error and no SUCCESS. Without a layers.toml it never
+;    decodes the physical-key registry.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -344,8 +345,9 @@ _NLT_LogLines(Level) {
 }
 
 ; Runs NavLayer_Init on a configuration folder holding Text as layers.toml (none
-; when Text is unset) and returns what it registered and logged.
-_NLT_Init(Text?) {
+; when Text is unset), against SharedDir (the shipped _shared by default), and
+; returns what it registered and logged.
+_NLT_Init(Text?, SharedDir?) {
 	global LOGGER_MIN_LEVEL
 	Dir := _NLT_MakeConfigDir()
 	SavedLevel := LOGGER_MIN_LEVEL
@@ -357,7 +359,7 @@ _NLT_Init(Text?) {
 		if IsSet(Text)
 			FileAppend(Text, Dir . "\layers.toml", "UTF-8-RAW")
 		_NLT_ResetLog()
-		Count := NavLayer_Init(_NLT_SharedDir(), Dir . "\", HotkeyFn, HotIfFn)
+		Count := NavLayer_Init(IsSet(SharedDir) ? SharedDir : _NLT_SharedDir(), Dir . "\", HotkeyFn, HotIfFn)
 		return Map("count", Count, "names", Names, "starts", _NLT_LogLines("START"),
 			"successes", _NLT_LogLines("SUCCESS"), "errors", _NLT_LogLines("ERROR"))
 	} finally {
@@ -400,3 +402,32 @@ _NLT_InitRejectedFileIsAnErrorNotASuccess() {
 }
 Test("nav layer boot: a layers.toml rejected as a whole logs an error, never a success (nav-layer-generated)",
 	_NLT_InitRejectedFileIsAnErrorNotASuccess)
+
+; A _shared of its own holding the layer vocabulary and no physical-key
+; registry, so any read of the registry fails.
+_NLT_SharedWithoutRegistry() {
+	Dir := A_Temp . "\ergopti_nav_layer_shared_" . A_TickCount . "_" . Random(1000, 9999)
+	DirCreate(Dir . "\keymap")
+	FileCopy(_NLT_SharedDir() . "\keymap\layer_actions.toml", Dir . "\keymap\layer_actions.toml")
+	return Dir
+}
+
+; Decoding physical_keys.json costs AutoHotkey about 160 ms, and NavLayer_Init
+; runs on every boot: without a layers.toml nothing is resolved against the
+; registry, so the boot must not pay for it.
+_NLT_InitWithoutAFileReadsNoRegistry() {
+	Shared := _NLT_SharedWithoutRegistry()
+	try {
+		Run := _NLT_Init(, Shared)
+		AssertEqual(0, Run["count"], "no layers.toml, no hotkey")
+		AssertEqual(0, Run["errors"].Length, "without a layers.toml the registry must not be read")
+		AssertEqual(1, Run["successes"].Length, "an absent file is no layer, not a failure")
+		Run := _NLT_Init(_NLT_RecommendedText(), Shared)
+		AssertEqual(0, Run["count"], "a layer cannot be registered without the registry")
+		AssertEqual(1, Run["errors"].Length, "with a layers.toml the registry is required, and a missing one is an error")
+	} finally {
+		DirDelete(Shared, true)
+	}
+}
+Test("nav layer boot: without a layers.toml the physical-key registry is not read (nav-layer-generated)",
+	_NLT_InitWithoutAFileReadsNoRegistry)
