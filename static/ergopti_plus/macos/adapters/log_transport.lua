@@ -836,8 +836,13 @@ local function report_exhausted_stall_budget(at, run_loop_live)
 		or type(batch.first_sent_at) ~= "number" then return end
 	if at - batch.first_sent_at < STALL_FATAL_SEC then return end
 	-- After a frozen run loop this timer can fire before the socket callback
-	-- that holds the awaited ACK; the next live tick gives the verdict.
-	if not run_loop_live then return end
+	-- that holds the awaited ACK, so that tick hands the verdict to the next
+	-- one. Only once per batch: under App Nap or a saturated main thread every
+	-- tick is late, and waiting for a live one would never report a dead worker.
+	if not run_loop_live and batch.stall_verdict_deferred ~= true then
+		batch.stall_verdict_deferred = true
+		return
+	end
 	batch.failure_reported = true
 	set_error(string.format(
 		"native logger did not ACK retained sequence %d within the %d ms stall budget (%d sends)",
