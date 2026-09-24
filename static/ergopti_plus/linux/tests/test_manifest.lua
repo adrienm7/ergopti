@@ -180,6 +180,7 @@ return {
 	"tests.unit.modules.keylogger.test_metrics_collector_privacy",
 	"tests.unit.modules.keylogger.test_metrics_toggles_persist",
 	"tests.unit.modules.keylogger.test_sqlite_command",
+	"tests.unit.modules.keylogger.test_sqlite_first_open",
 	"tests.unit.modules.keylogger.test_suggestion_counters",
 	"tests.unit.modules.keylogger.test_system_metrics",
 	"tests.unit.modules.keylogger.test_text_crypto",
