@@ -224,7 +224,6 @@ return {
 	"tests.unit.modules.test_mt_decoder",
 	"tests.unit.modules.test_touchpad_finder",
 	"tests.unit.ui.test_asset_inlining_is_loud",
-	"tests.unit.ui.test_global_disable_all_features",
 	"tests.unit.ui.test_healthcheck_linux_rows",
 	"tests.unit.ui.test_hotstring_bulk_checkboxes",
 	"tests.unit.ui.test_llm_menu_toggle_row",

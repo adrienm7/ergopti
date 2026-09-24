@@ -3148,16 +3148,9 @@ type = "list"
 id = "updates_actions"
 platforms = ["linux"]
 
-[[menu.global_actions]]
-type = "command"
-id = "enable_all"
-i18n = "menu.global.enable_all"
-
-[[menu.global_actions]]
-type = "command"
-id = "disable_all"
-i18n = "menu.global.disable_all"
-
+# « Tout activer » and « Tout désactiver » used to open this menu. They were
+# retired on every driver: each category opens with its own switch, and an
+# empty configuration already starts with every input-altering feature off.
 [[menu.global_actions]]
 type = "command"
 id = "reset_defaults"
@@ -3167,8 +3160,8 @@ i18n = "menu.global.reset_defaults"
 # after a backup. Each driver applies its own reader's rule: Windows the boot
 # loader's unknown-key check against the manifest, macOS and Linux the keys
 # their config readers never consume (the shared config_unused_keys engine).
-# Set apart by a separator: the three rows above change which features run,
-# this one edits the configuration file itself.
+# Set apart by a separator: the reset above changes which features run, this
+# one edits the configuration file itself.
 [[menu.global_actions]]
 type = "---"
 

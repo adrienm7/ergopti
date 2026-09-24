@@ -87,14 +87,14 @@ _CPC_EveryDirectTomlWriterConsumesItsBoolean() {
 		Assert(_CPC_LineConsumesResult(Lines, Index),
 			"direct TOML writer result is discarded: '" . Trim(Line) . "'. TOML failures return false rather than throwing, so every production caller must test, assign or return that boolean")
 	}
-	; Audited inventory: config_shortcuts (1), config_io (10, the language-pack
+	; Audited inventory: config_shortcuts (1), config_io (9, the language-pack
 	; bulk toggle included), gestures (4),
 	; i18n (1), TOML_Write (1), personal editor (1), trigger journal (1),
 	; menu rebuild (1) and the unused-key cleanup (1). Pin the exact census so
 	; deleting a caller cannot make this class guard progressively vacuous, while
 	; every future sibling is still inspected by the loop above before the
 	; inventory assertion is reached.
-	AssertEqual(21, Calls,
+	AssertEqual(20, Calls,
 		"the production TOML writer/transaction-gateway inventory changed; audit every added or removed caller before updating the expected census")
 }
 Test("AHK-15-persistence: every TOML writer and transaction gateway consumes its boolean",
@@ -207,22 +207,6 @@ _CPC_AssertBulkFunctionStagesBeforePublishing(Name) {
 	ExpectedCommits := (Name == "ToggleCategoryAllFeatures") ? 2 : 1
 	AssertEqual(ExpectedCommits, _CPC_CountOccurrences(Body, "ConfigCommitUpdates("),
 		Name . " must keep exactly one config.toml batch on each mutually exclusive mutation branch")
-	if (Name == "ToggleAllFeatures") {
-		GatePos := InStr(Body, "ApplyMasterGatesToFeatures(")
-		PublishPos := InStr(Body, "Features := CandidateFeatures")
-		TapHoldPublishPos := InStr(Body, "TapHold := CandidateTapHold")
-		CriticalPos := InStr(Body, 'Critical("On")')
-		CriticalReleasePos := InStr(Body, "Critical(PreviousCritical)")
-		Assert(InStr(Body, "CandidateTapHold := _HSDeepCloneMap(TapHold)") > 0
-			and GatePos > 0 and GatePos < PersistPos,
-			"the detached TapHold candidate must be master-gated before the config.toml commit")
-		Assert(InStr(Body, "_TH_PersistTapHoldDisabled") = 0
-			and InStr(Body, "_TH_WriteTapHoldToml") = 0,
-			"the bulk toggle must not mutate a second durable store outside its config.toml transaction")
-		Assert(TapHoldPublishPos > PublishPos and TapHoldPublishPos > CriticalPos
-			and TapHoldPublishPos < CriticalReleasePos,
-			"the master-gated TapHold candidate must publish in the same Critical window as every sibling Map")
-	}
 	if (Name == "ToggleAllHotstrings") {
 		Assert(InStr(Body, "_CollectAllHotstringsV2Paths(CandidateFeatures)") > 0,
 			"personal hotstring discovery must seed only the detached candidate before persistence")
@@ -234,7 +218,7 @@ _CPC_AssertBulkFunctionStagesBeforePublishing(Name) {
 }
 
 _CPC_BulkMutationsStageBeforePublishing() {
-	for Name in ["ToggleAllFeatures", "ToggleAllHotstrings", "ToggleCategoryAllFeatures",
+	for Name in ["ToggleAllHotstrings", "ToggleCategoryAllFeatures",
 		"ToggleCategoryAllSections", "HS_TogglePersonalAllSections"]
 		_CPC_AssertBulkFunctionStagesBeforePublishing(Name)
 }

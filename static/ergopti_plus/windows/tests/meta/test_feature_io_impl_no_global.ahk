@@ -91,7 +91,7 @@ _FIONG_NoBareCallShapesRemain() {
 Test("menu_engine: every FeatureLocateV2/WriteFeatureV2/WriteFeatureBatchV2 caller resolves Features explicitly (F43)", _FIONG_NoBareCallShapesRemain)
 
 _FIONG_ConfigIoCallersResolveFeatures() {
-	for _, FuncName in ["ToggleAllFeatures", "ToggleAllHotstrings", "ToggleCategoryAllSections", "HS_TogglePersonalAllSections"] {
+	for _, FuncName in ["ToggleAllHotstrings", "ToggleCategoryAllSections", "HS_TogglePersonalAllSections"] {
 		Body := _DriverFuncBody(FuncName)
 		Assert(Body != "", FuncName . " must exist in infra/config_io.ahk")
 		Assert(InStr(Body, "global") > 0 and InStr(Body, "Features") > 0,

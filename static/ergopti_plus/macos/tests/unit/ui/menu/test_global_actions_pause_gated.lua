@@ -27,8 +27,8 @@
 
 local helpers = require("tests.helpers")
 
---- Minimal actions table satisfying builder.generate's top-level-tail loop. The
---- three global actions record their invocation so a "gated" item that still
+--- Minimal actions table satisfying builder.generate's top-level loop. The
+--- global actions record their invocation so a "gated" item that still
 --- fires can never pass.
 --- @param fired table Table the global actions record their id into.
 --- @return table
@@ -45,9 +45,8 @@ local function make_actions(fired)
 		quit              = function() end,
 		uninstall         = function() fired[#fired + 1] = "uninstall" end,
 		start_at_login    = function() fired[#fired + 1] = "start_at_login" end,
-		enable_all        = function() fired[#fired + 1] = "enable_all" end,
-		disable_all       = function() fired[#fired + 1] = "disable_all" end,
 		reset_defaults    = function() fired[#fired + 1] = "reset_defaults" end,
+		clean_unused_keys = function() fired[#fired + 1] = "clean_unused_keys" end,
 	}
 end
 
@@ -72,7 +71,7 @@ local function global_actions_items(paused, fired)
 	return nil
 end
 
---- Collects the three action entries by title, ignoring separators.
+--- Collects the action entries by title, ignoring separators.
 --- @param items table
 --- @return table Map of title → item.
 local function by_title(items)
@@ -83,10 +82,11 @@ local function by_title(items)
 	return out
 end
 
+-- « Tout activer » and « Tout désactiver » were retired on every driver; the
+-- rows left in this submenu rewrite the configuration and stay gated.
 local ACTION_TITLES = {
-	"menu.global.enable_all",
-	"menu.global.disable_all",
 	"menu.global.reset_defaults",
+	"menu.global.clean_unused_keys",
 }
 
 

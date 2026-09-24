@@ -594,10 +594,9 @@ function M.generate(ctx, menu_mods, actions)
 			-- Pause owns the bindings axis for the whole pause window: pause_all()
 			-- snapshots what was running and resume_all() restores that snapshot.
 			-- A global action taken in between is therefore either silently
-			-- discarded on resume, or — for « Tout activer » — binds every hotkey
-			-- immediately and breaks the « pause = tout éteint » invariant the
-			-- pause exists to guarantee. The per-feature toggles were gated for
-			-- exactly this; these three, which move ALL of them at once, were not.
+			-- discarded on resume or breaks the « pause = tout éteint » invariant
+			-- the pause exists to guarantee. The per-feature toggles were gated for
+			-- exactly this, and so are these rows, which rewrite the configuration.
 			-- The rows are `type = "command"` in the manifest: their labels and
 			-- their order are declared, and this file supplies only what each one
 			-- does.
@@ -605,8 +604,6 @@ function M.generate(ctx, menu_mods, actions)
 			local ga_ctx = {}
 			for key, value in pairs(ctx or {}) do ga_ctx[key] = value end
 			ga_ctx.commands = {
-				["enable_all"]      = actions.enable_all,
-				["disable_all"]     = actions.disable_all,
 				["reset_defaults"]  = actions.reset_defaults,
 				["clean_unused_keys"] = actions.clean_unused_keys,
 				["uninstall"] = actions.uninstall,
@@ -623,9 +620,9 @@ function M.generate(ctx, menu_mods, actions)
 				if ctx.paused and not independent then
 					-- Greyed AND stripped of its handler, not merely greyed. A
 					-- disabled row whose fn survives still fires the moment the
-					-- greying is rendered wrong somewhere else, and these rows move
-					-- every binding at once — which is the whole reason the pause
-					-- window has to own that axis alone.
+					-- greying is rendered wrong somewhere else, and these rows rewrite
+					-- the configuration behind every binding — which is the whole
+					-- reason the pause window has to own that axis alone.
 					row.disabled = true
 					row.fn = nil
 				end

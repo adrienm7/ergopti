@@ -710,64 +710,6 @@ local function main()
 		end,
 	})
 
-	-- « Disable all » / « Enable all »: every feature switch, not only the
-	-- hotstrings, and Enable all restores what was on rather than everything.
-	-- The closures read the module handles at call time, so features initialised
-	-- later in the boot (gestures, shortcuts) are covered.
-	--- A feature whose on/off state is one boolean.
-	--- @param id string
-	--- @param is_on function
-	--- @param set function Receives the wanted boolean, returns whether it holds.
-	--- @param persistent boolean|nil false for a switch with no persisted state.
-	local function switch_feature(id, is_on, set, persistent)
-		return {
-			id = id,
-			persistent = persistent,
-			capture = function() return is_on() == true end,
-			disable = function() return set(false) end,
-			restore = function(value) return set(value == true) end,
-			enable = function() return set(true) end,
-		}
-	end
-	local global_features = {
-		{
-			id = "hotstrings",
-			capture = function() return hotstrings_config.closed_category_gates() end,
-			disable = function() return hotstrings_config.disable_all() ~= false end,
-			restore = function(closed) return hotstrings_config.restore_category_gates(closed or {}) end,
-			enable = function() return hotstrings_config.restore_category_gates({}) end,
-		},
-	}
-	if shortcuts then
-		global_features[#global_features + 1] = switch_feature("shortcuts", shortcuts.is_enabled,
-			function(want) return want == shortcuts.is_enabled() or shortcuts.set_enabled(want) end)
-	end
-	if gestures then
-		global_features[#global_features + 1] = switch_feature("gestures", gestures.is_enabled,
-			function(want) return want == gestures.is_enabled() or gestures.set_enabled(want) end)
-	end
-	if prediction_engine then
-		global_features[#global_features + 1] = switch_feature("llm", prediction_engine.is_enabled,
-			function(want)
-				if want == prediction_engine.is_enabled() then return true end
-				if want then return prediction_engine.enable() end
-				return prediction_engine.disable()
-			end)
-	end
-	global_features[#global_features + 1] = switch_feature("metrics", keylogger.is_enabled,
-		function(want) return want == keylogger.is_enabled() or keylogger.set_enabled(want) end)
-	if dyn_hotstrings then
-		global_features[#global_features + 1] = switch_feature("dynamic_hotstrings", dyn_hotstrings.is_enabled,
-			function(want) dyn_hotstrings.set_enabled(want) return dyn_hotstrings.is_enabled() == want end, false)
-	end
-	global_features[#global_features + 1] = switch_feature("tap_holds", TapHold.is_enabled,
-		TapHold.set_enabled, false)
-	-- Required here, not at file scope: main() is at LuaJIT's 60-upvalue limit
-	-- and a file-scope module would be one more upvalue of it.
-	local GlobalFeatureSwitch = require("ui.menu.global_feature_switch")
-	local global_switch = GlobalFeatureSwitch.new({ features = global_features,
-		storage = require("adapters.storage") })
-
 	-- A control can change while app ID and window title stay identical. Raw Tab
 	-- and pointer events therefore invalidate the AT-SPI verdict synchronously;
 	-- the periodic loop probes only after the desktop has consumed the event.
@@ -1716,22 +1658,6 @@ local function main()
 					Logger.info(LOG, "[stub] Setup wizard — webview manager not available.")
 				end
 			end,
-			-- Called directly. These used to be guarded by `if
-			-- hotstrings_config.enable_all then`, and the functions did not exist —
-			-- so the guard was false, the row did nothing, and a click that did
-			-- nothing is indistinguishable from a click that missed.
-			--
-			-- They moved the hotstrings only, and Enable all switched every bundled
-			-- section on instead of restoring. They now go through the global
-			-- feature switch, which works like a pause (see global_feature_switch).
-			on_enable_all  = function()
-				global_switch.enable_all()
-				if rebuild_tray_menu then rebuild_tray_menu() end
-			end,
-			on_disable_all = function()
-				global_switch.disable_all()
-				if rebuild_tray_menu then rebuild_tray_menu() end
-			end,
 			on_reset_defaults = function() hotstrings_config.reset_defaults() end,
 			on_set_log_level = function(lvl)
 				if not ScriptSettings.set(lvl) then return end
@@ -1899,10 +1825,6 @@ local function main()
 		shortcuts.init({ persist = true })
 		Logger.info(LOG, "Shortcuts manager initialised.")
 	end
-
-	-- 8.10d') « Disable all » survives a restart: the persisted switches already
-	-- read back off, and the runtime-only ones are switched off again here.
-	global_switch.reapply_after_boot()
 
 	-- 8.10e) Wire daemon state into the webview manager so bridge handlers
 	-- can query/control daemon modules (keylogger, LLM, config, engine).

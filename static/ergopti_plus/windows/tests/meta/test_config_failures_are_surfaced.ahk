@@ -203,7 +203,7 @@ Test("meta config: the tap-hold disable failure is not swallowed",
 ; published. Reload is not recovery: it is itself a side effect and cannot be
 ; used to hide a mutation that never committed.
 _CFAS_BulkTogglesRecoverFromAFailedWrite() {
-	for Name in ["ToggleAllFeatures", "ToggleCategoryAllFeatures"] {
+	for Name in ["ToggleCategoryAllFeatures"] {
 		Body := _StripFullLineComments(_DriverFuncBody(Name))
 		Assert(Body != "", Name . "() must exist")
 		PersistPos := InStr(Body, "ConfigCommitUpdates(")

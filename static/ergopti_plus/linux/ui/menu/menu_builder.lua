@@ -3187,8 +3187,6 @@ local function _build_global_actions(ctx)
 	local render_ctx = {}
 	for key, value in pairs(ctx) do render_ctx[key] = value end
 	render_ctx.commands = {
-		["enable_all"]     = call_ctx("on_enable_all"),
-		["disable_all"]    = call_ctx("on_disable_all"),
 		["reset_defaults"] = call_ctx("on_reset_defaults"),
 		["start_at_login"] = function()
 			if not require("ui.menu.start_at_login").toggle() then
@@ -3619,8 +3617,6 @@ end
 ---   verbose        boolean  Verbose flag.
 ---   on_quit        function Called when Quit is selected.
 ---   on_open_config function Called to open config dir.
----   on_enable_all  function (optional) Global enable.
----   on_disable_all function (optional) Global disable.
 ---   on_reset_defaults function (optional) Reset.
 ---   on_set_log_level function (optional) Log level change.
 ---   on_open_logs   function (optional) Open logs dir.
