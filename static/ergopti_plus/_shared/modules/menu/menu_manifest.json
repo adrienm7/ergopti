@@ -481,12 +481,15 @@
 			"reason_key": "platform_reason.chatgpt_url_editor_is_placed_per_driver"
 		},
 		{
-			"type": "feature",
-			"path": "shortcuts.screen_instant",
-			"platforms": [
-				"ahk"
-			],
-			"reason_key": "platform_reason.chord_families_are_each_platforms"
+			"type": "section_header",
+			"i18n": "menu.shortcuts.header_tap_keys"
+		},
+		{
+			"type": "list",
+			"id": "tap_keys"
+		},
+		{
+			"type": "---"
 		},
 		{
 			"type": "feature",

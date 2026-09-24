@@ -136,3 +136,16 @@ ErgoptiBaseLabels() {
 	out[0x2B] := "^"  ; dead key — circumflex
 	return out
 }
+
+; Scancode → the character the digit-row emulation (direct_access_digits) types
+; on the three keys at the edges of the number row. Its hotkeys in
+; modules/keymap/layout.ahk type from this table, and the tap-key menu label
+; (infra/tap_keys.ahk) reads it, so a label cannot name a character the key
+; does not type.
+ErgoptiNumberRowEdgeMapping() {
+	return Map(
+		0x29, "$", ; SC029, left of 1
+		0x0C, "%", ; SC00C, first right of 0
+		0x0D, "=", ; SC00D, second right of 0
+	)
+}

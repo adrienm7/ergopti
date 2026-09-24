@@ -772,7 +772,12 @@ emit_hs_mods = ["cmd", "shift"]
 emit_linux = "Print"
 
 [sg_actions.screen_capture_instant]
-platform = "ahk"
+# The frontmost window, saved to the screenshots folder: GestureScreenshotInstant
+# on Windows, the shortcut layer's capture_frontmost_window on macOS (what the
+# key left of 1 ran before it became a tap key). Linux is not implemented, not
+# impossible: the focused window is readable on X11 and through each Wayland
+# compositor's own tool.
+platform = "ahk,hs"
 
 [sg_actions.ocr_screenshot]
 platform = "ahk"

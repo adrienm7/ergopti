@@ -91,6 +91,19 @@ local function find_row(rows, title)
 	return nil
 end
 
+--- Finds the first row, at any depth, whose title starts with a prefix.
+--- @param rows table|nil
+--- @param prefix string
+--- @return table|nil
+local function find_row_prefix(rows, prefix)
+	for _, row in ipairs(rows or {}) do
+		if type(row.title) == "string" and row.title:sub(1, #prefix) == prefix then return row end
+		local nested = find_row_prefix(row.menu, prefix)
+		if nested then return nested end
+	end
+	return nil
+end
+
 
 
 
@@ -216,7 +229,11 @@ helpers.describe("shortcuts menu: dispatched by id", function()
 				end,
 			})
 			local picker_label = require("infra.i18n").get("dialog.action_picker.label") .. "…"
-			local picker_choice = find_row(built, picker_label)
+			-- Searched under the slot's own row: the number-row tap keys above it
+			-- open the same picker.
+			local slot_row = find_row_prefix(built, "Ctrl+K")
+			helpers.assert_not_nil(slot_row, "the keyboard slot must be drawn")
+			local picker_choice = find_row(slot_row.menu, picker_label)
 			helpers.assert_not_nil(picker_choice,
 				"the shared searchable picker must be reachable from a keyboard slot")
 			helpers.assert_true(type(picker_choice.fn) == "function")

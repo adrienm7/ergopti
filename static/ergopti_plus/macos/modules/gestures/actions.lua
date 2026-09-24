@@ -96,12 +96,14 @@ local function is_script_control_plane_action(name, binding)
 		and (name == "script_reload" or name == "script_quit")
 end
 
---- Maps a configurable keyboard binding to the shortcut parent while every
---- engine and direct gesture dispatch remains in the gesture parent.
+--- Maps a configurable keyboard binding (a keyboard slot or a number-row tap
+--- key) to the shortcut parent while every engine and direct gesture dispatch
+--- remains in the gesture parent.
 --- @param binding any Binding identity supplied by execute_single().
 --- @return string parent
 local function parent_for_binding(binding)
-	if type(binding) == "string" and binding:match("^keyboard__") then
+	if type(binding) == "string"
+		and (binding:match("^keyboard__") or binding:match("^tap_key__")) then
 		return SHORTCUT_ACTION_PARENT
 	end
 	return GESTURE_ACTION_PARENT
@@ -1082,6 +1084,9 @@ sg("display_mirror_toggle", mouse_action("toggle_display_mirror"))
 -- Formerly fixed hotkeys only (Ctrl+D, Ctrl+E, Ctrl+I, Ctrl+S, Ctrl+X). The
 -- app-navigation and pixel owners are parent-scoped like the text and mouse
 -- ones, and joined to this module's lifecycle in scoped_action_children().
+-- The frontmost window saved to the screenshots folder, under the dispatching
+-- parent's screenshot owner: what the key left of 1 ran before it became a tap key.
+sg("screen_capture_instant", owner_action("modules.shortcuts.actions.system", "capture_frontmost_window"))
 sg("open_downloads", owner_action("modules.shortcuts.actions.apps", "open_downloads"))
 sg("open_file_manager", owner_action("modules.shortcuts.actions.apps", "open_finder"))
 sg("open_system_settings", owner_action("modules.shortcuts.actions.apps", "open_settings"))

@@ -22,6 +22,7 @@ local app_acts    = require("modules.shortcuts.actions.apps")
 local Logger      = require("infra.logger")
 local i18n        = require("infra.i18n")
 local Manifest    = require("infra.manifest_reader")
+local TapKeys     = require("modules.shortcuts.tap_keys")
 
 local LOG = "shortcuts.bindings"
 
@@ -71,7 +72,7 @@ local native_acquisition_depth = 0
 local rebind_recovery_intent = false
 
 local EXACT_RELEASE_IDS = {
-	at_hash = true,
+	tap_keys = true,
 	layer_scroll = true,
 	cmd_star = true,
 	wrap_text_if_selected = true,
@@ -252,10 +253,27 @@ end
 -- =====================================
 -- =====================================
 
--- Screenshots & Layer (appear first in the menu, before the Ctrl block)
-hotkey_labels.at_hash = i18n.get("shortcuts.label_at_hash")
-hotkey_defs.at_hash   = function()
-	return sys_acts.bind_instant_screenshot(delivery_admitted)
+--- What a plain tap on a keycode runs (modules/shortcuts/tap_keys.lua): the key's
+--- action through the gesture registry, under the key's own binding, or nil when
+--- the keycode is no assigned tap key. Memory only: asked inside the eventtap.
+--- @param keycode integer
+--- @return function|nil
+local function decide_tap_key(keycode)
+	local action, binding = TapKeys.decide(keycode)
+	if not action then return nil end
+	return function()
+		local GestActions = require("modules.gestures.actions")
+		return GestActions.execute_single(action, binding)
+	end
+end
+
+-- The number-row tap keys. Their rows are the tap_keys list of the manifest,
+-- not a toggle: an unassigned key is simply let through.
+hotkey_labels.tap_keys = i18n.get("menu.shortcuts.header_tap_keys")
+hotkey_defs.tap_keys   = function()
+	-- Read before the tap starts: its callback may only consult memory.
+	TapKeys.ensure_loaded(require("modules.gestures.actions").is_assignable)
+	return sys_acts.bind_tap_keys(delivery_admitted, decide_tap_key)
 end
 
 hotkey_labels.layer_scroll = i18n.get("shortcuts.label_layer_scroll")
@@ -1083,7 +1101,7 @@ end
 ---   1) ctrl + single letter (ctrl_a … ctrl_z)
 ---   2) ctrl + punctuation word (ctrl_period, ctrl_quote, …)
 ---   3) cmd shortcuts (cmd_shift_v, cmd_star, …)
----   4) everything else (at_hash, layer_scroll — extracted separately by the menu)
+---   4) everything else (tap_keys, layer_scroll — extracted separately by the menu)
 --- Within each group items sort alphabetically by id.
 --- @param id string The shortcut identifier.
 --- @return string Opaque sort key.

@@ -10,6 +10,10 @@
 
 local helpers = require("tests.helpers")
 
+-- A tap-key tap that lets every key through: these cases exercise the eventtap
+-- acquisition itself, not what a key runs.
+local NO_TAP_KEY = function() return nil end
+
 
 --- Copies a native API table while replacing selected fields.
 --- @param base table Base contract.
@@ -163,7 +167,7 @@ end
 helpers.describe("system shortcut eventtap factories are transactional", function()
 	helpers.it("rejects every single-tap factory when native start returns false", function()
 		local factories = {
-			function(system) return system.bind_instant_screenshot() end,
+			function(system) return system.bind_tap_keys(nil, NO_TAP_KEY) end,
 			function(system) return system.bind_cmd_star() end,
 			function(system) return system.bind_wrap_text_if_selected() end,
 		}
@@ -190,7 +194,7 @@ helpers.describe("system shortcut eventtap factories are transactional", functio
 			{ construct_throw = "CONSTRUCT_THROW" },
 		}) do
 			local fixture = load_fixture({ failed_plan, {} })
-			local call_ok, owner = pcall(fixture.system.bind_instant_screenshot)
+			local call_ok, owner = pcall(fixture.system.bind_tap_keys, nil, NO_TAP_KEY)
 			helpers.assert_true(call_ok, "constructor refusal must not escape the factory")
 			helpers.assert_nil(owner, "a false or throwing constructor cannot publish an owner")
 
@@ -212,7 +216,7 @@ helpers.describe("system shortcut eventtap factories are transactional", functio
 			},
 			{},
 		})
-		local call_ok, owner = pcall(fixture.system.bind_instant_screenshot)
+		local call_ok, owner = pcall(fixture.system.bind_tap_keys, nil, NO_TAP_KEY)
 		helpers.assert_true(call_ok, "native start exceptions must not escape a user binding factory")
 		helpers.assert_nil(owner, "a thrown start cannot publish an eventtap owner")
 		helpers.assert_true(fixture.taps[1].enabled,
@@ -233,7 +237,7 @@ helpers.describe("system shortcut eventtap factories are transactional", functio
 			stop_result = false,
 			disable_on_stop = false,
 		}})
-		local owner = fixture.system.bind_instant_screenshot()
+		local owner = fixture.system.bind_tap_keys(nil, NO_TAP_KEY)
 		helpers.assert_not_nil(owner)
 		local native = fixture.taps[1]
 

@@ -169,6 +169,7 @@ REQUIRED_FILES=(
 	"_shared/lua/wrap_pair/init.lua"
 	"_shared/lua/send_input/init.lua"
 	"_shared/modules/actions/send_keys.json"
+	"_shared/modules/actions/tap_keys.json"
 	"_shared/data/keycodes/evdev.json"
 	"_shared/data/locales/fr.json"
 	"_shared/data/locales/en.json"

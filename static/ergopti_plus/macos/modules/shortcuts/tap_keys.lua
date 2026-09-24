@@ -1,0 +1,208 @@
+--- modules/shortcuts/tap_keys.lua
+
+--- ==============================================================================
+--- MODULE: Number-Row Tap Keys (macOS)
+--- DESCRIPTION:
+--- The three keys at the edges of the number row, the key left of 1 and the two
+--- right of 0, each assignable to any catalogue action. A plain tap runs the
+--- action and the key is swallowed; with a modifier held (Option is this
+--- platform's AltGr), or while the key is unassigned, it types as usual.
+---
+--- FEATURES & RATIONALE:
+--- 1. Key identity is shared data (_shared/modules/actions/tap_keys.json). The
+---    key left of 1 has two macOS keycodes: kVK_ANSI_Grave (50) on an ANSI
+---    keyboard and behind Karabiner's ANSI virtual keyboard, kVK_ISO_Section
+---    (10) on a bare ISO one.
+--- 2. Assignments live in the Storage adapter under their own prefix, beside the
+---    keyboard slots, and are cached by load(): the shortcut layer's eventtap
+---    asks decide() on every press of these keys, and an eventtap callback may
+---    only do bounded in-memory work. A key never stored takes the manifest
+---    default (shortcuts.tap_keys.<id>), so the key left of 1 opens the capture
+---    tool out of the box.
+--- 3. This module decides; the raw eventtap (actions/system.lua bind_tap_keys)
+---    consumes the event and runs the action behind the callback.
+--- 4. The menu names each key by the character the current input source puts on
+---    it (infra/keycodes over hs.keycodes.map), never a fixed legend.
+--- ==============================================================================
+
+local M = {}
+
+local Logger     = require("infra.logger")
+local Paths      = require("infra.paths")
+local Manifest   = require("infra.manifest_reader")
+local Keycodes   = require("infra.keycodes")
+local FileSystem = require("adapters.file_system")
+local JsonCodec  = require("adapters.json_codec")
+local Storage    = require("adapters.storage")
+
+local LOG = "shortcuts.tap_keys"
+
+-- The Storage prefix of an assignment, and of the binding its action runs
+-- under (and stores its parameter under).
+local SETTINGS_PREFIX = "tap_key_"
+local BINDING_PREFIX  = "tap_key__"
+
+-- The shared key list, relative to the shared tree.
+local KEYS_REL_PATH = "modules/actions/tap_keys.json"
+
+-- Decoded tap_keys.json entries in menu order; nil until read.
+local _keys = nil
+
+-- tap key id -> action id, filled by load(); nil until then.
+local _assignments = nil
+
+
+
+
+-- ====================================
+-- ====================================
+-- ======= 1/ Keys and assignments ====
+-- ====================================
+-- ====================================
+
+--- The shared key list, read once. A missing or malformed file raises: the menu
+--- would otherwise show no tap key and nothing would say why.
+--- @return table Array of { id, hs = { keycode... } }.
+function M.keys()
+	if _keys then return _keys end
+	local path = Paths.shared(KEYS_REL_PATH)
+	local raw = FileSystem.read(path)
+	local decoded = raw and JsonCodec.decode(raw) or nil
+	if type(decoded) ~= "table" or type(decoded.keys) ~= "table" or #decoded.keys == 0 then
+		error("tap_keys: " .. tostring(path) .. " is unreadable or malformed")
+	end
+	for _, entry in ipairs(decoded.keys) do
+		if type(entry.id) ~= "string" or type(entry.hs) ~= "table" or #entry.hs == 0 then
+			error("tap_keys: an entry of " .. tostring(path) .. " lacks its id or keycodes")
+		end
+	end
+	_keys = decoded.keys
+	return _keys
+end
+
+--- The binding a tap key dispatches under.
+--- @param id string
+--- @return string
+function M.binding_id(id)
+	return BINDING_PREFIX .. tostring(id)
+end
+
+--- Reads every assignment into memory: the stored action, else the manifest
+--- default. An unknown stored id leaves the key alone rather than binding it to
+--- a no-op.
+--- @param is_assignable function The catalogue check.
+function M.load(is_assignable)
+	if type(is_assignable) ~= "function" then error("tap_keys.load() needs the catalogue check") end
+	local loaded = {}
+	for _, key in ipairs(M.keys()) do
+		local action = Storage.get(SETTINGS_PREFIX .. key.id, nil)
+		if action == nil then action = Manifest.default_for("shortcuts.tap_keys." .. key.id) end
+		if action ~= "none" and is_assignable(action) ~= true then
+			Logger.warn(LOG, "Tap key '%s' holds unknown action '%s' — left alone.", key.id, tostring(action))
+			action = "none"
+		end
+		loaded[key.id] = action
+	end
+	_assignments = loaded
+	Logger.info(LOG, "Tap keys loaded.")
+end
+
+--- Loads the assignments once; later calls keep the cached table, which
+--- set_action keeps current.
+--- @param is_assignable function The catalogue check.
+function M.ensure_loaded(is_assignable)
+	if not _assignments then M.load(is_assignable) end
+end
+
+--- The action a tap key runs, or "none".
+--- @param id string
+--- @return string
+function M.get_action(id)
+	if not _assignments then error("tap_keys.get_action() before load()") end
+	return _assignments[id] or "none"
+end
+
+--- Assigns an action to a tap key ("none" gives the key back to the layout).
+--- @param id string
+--- @param action_id string
+--- @param is_assignable function The catalogue check.
+--- @return boolean Whether the assignment was stored.
+function M.set_action(id, action_id, is_assignable)
+	M.ensure_loaded(is_assignable)
+	if _assignments[id] == nil then
+		Logger.error(LOG, "set_action(): '%s' is not a tap key.", tostring(id))
+		return false
+	end
+	if action_id ~= "none" and is_assignable(action_id) ~= true then
+		Logger.warn(LOG, "set_action(): refusing unknown action '%s' for tap key '%s'.",
+			tostring(action_id), id)
+		return false
+	end
+	if Storage.set(SETTINGS_PREFIX .. id, action_id) ~= true then
+		Logger.error(LOG, "set_action(): tap key '%s' could not be persisted.", id)
+		return false
+	end
+	_assignments[id] = action_id
+	Logger.info(LOG, "Tap key '%s' → '%s'.", id, action_id)
+	return true
+end
+
+--- The tap key a keycode belongs to.
+--- @param keycode integer
+--- @return string|nil id
+function M.key_for_keycode(keycode)
+	for _, key in ipairs(M.keys()) do
+		for _, code in ipairs(key.hs) do
+			if code == keycode then return key.id end
+		end
+	end
+	return nil
+end
+
+--- What a plain tap on a keycode should run: the tap key's action, or nil when
+--- the keycode is no tap key or its key is unassigned. Memory only: it runs in
+--- the eventtap callback.
+--- @param keycode integer
+--- @return string|nil action, string|nil binding
+function M.decide(keycode)
+	local id = M.key_for_keycode(keycode)
+	if not id or not _assignments then return nil, nil end
+	local action = _assignments[id] or "none"
+	if action == "none" then return nil, nil end
+	return action, M.binding_id(id)
+end
+
+
+
+
+-- ====================================
+-- ====================================
+-- ======= 2/ Live key labels =========
+-- ====================================
+-- ====================================
+
+--- The key's name in a menu row: the character the current input source puts
+--- on it (read from its first keycode), or a localized description of its
+--- position when it produces nothing printable.
+--- @param id string
+--- @param i18n table The i18n module.
+--- @return string
+function M.display_name(id, i18n)
+	local code = nil
+	for _, key in ipairs(M.keys()) do
+		if key.id == id then code = key.hs[1] end
+	end
+	local char = code and Keycodes.character_for(code) or nil
+	if type(char) ~= "string" or char == "" or char:match("^%s*$") then
+		return i18n.get("menu.shortcuts.tap_keys." .. tostring(id))
+	end
+	return char
+end
+
+--- Test seam: forgets the key list and the assignments.
+function M._reset()
+	_keys = nil
+	_assignments = nil
+end
+
+return M

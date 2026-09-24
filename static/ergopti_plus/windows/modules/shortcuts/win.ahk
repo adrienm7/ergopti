@@ -6,7 +6,7 @@
 ; Win-layer shortcuts: CapsLock toggle, line selection, screenshot, GPT link,
 ; hex color picker, note-taking, keep-awake simulation, surround-with-parens,
 ; search/regedit/path navigation, title-case, uppercase, mouse teleport,
-; spotlight overlay, Downloads opener, and the screen-instant SC029 hotkey.
+; spotlight overlay and Downloads opener.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -606,16 +606,6 @@ if Features["shortcuts"]["spotlight_mouse"] {
 		; Win + '
 		AddShortcut("#", "'", (*) => (MouseGetPos(&Mx, &My), SpotlightMouseAt(Mx, My, 5000)))
 }
-
-#HotIf IsSet(Features) and Features["shortcuts"]["screen_instant"]
-; SC029 (²/$ -- key left of 1) -- instant screenshot of the active window, saved to Pictures
-SC029:: {
-		; The gesture entry owns the shared staged worker and contains every OS
-		; boundary. Keeping the hotkey as a pure delegate prevents a future sibling
-		; PowerShell process from escaping suspend and shutdown cancellation.
-		GestureScreenshotInstant()
-}
-#HotIf
 
 ; SpotlightMouseAt is defined in infra/spotlight.ahk and included globally before this module.
 

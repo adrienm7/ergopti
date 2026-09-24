@@ -411,14 +411,6 @@ platforms = ["hs"]
 # =====================================================
 
 [[shortcuts]]
-id = "at_hash"
-label_key = "shortcuts.label_at_hash"
-description_key = "shortcuts.label_at_hash"
-default_key_ahk = ""
-default_key_hs = "at_hash"
-platforms = ["hs"]
-
-[[shortcuts]]
 id = "layer_scroll"
 label_key = "shortcuts.label_layer_scroll"
 description_key = "shortcuts.label_layer_scroll"

@@ -2652,6 +2652,36 @@ local function _build_shortcuts(ctx)
 		return out
 	end
 
+	-- The number-row tap keys: one row per key, named by what a tap on it types
+	-- under the loaded XKB keymap, then its action; the submenu opens the picker.
+	providers["tap_keys"] = function()
+		local ok_tap, TapKeys = pcall(require, "modules.shortcuts.tap_keys")
+		local ok_gestures, Gestures = pcall(require, "modules.gestures.manager")
+		if not ok_tap or not ok_gestures then
+			Logger.error(LOG, "Tap keys unavailable — the shortcuts submenu loses them.")
+			return {}
+		end
+		local ok_layout, Layout = pcall(require, "adapters.keyboard_layout")
+		local labels = { get = i18n_safe }
+		local rows = {}
+		for _, key in ipairs(TapKeys.keys()) do
+			local bound = TapKeys.get_action(key.id)
+			local name = TapKeys.display_name(key.id, ok_layout and Layout or nil, labels)
+			local function assign(option)
+				local assigned = assign_parameterized_action(ctx, Gestures, TapKeys.binding_id(key.id),
+					option, function() return TapKeys.set_action(key.id, option) end)
+				if assigned and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				return assigned
+			end
+			rows[#rows + 1] = {
+				label = name .. " → " .. (bound ~= "none" and Gestures.get_action_label(bound)
+					or i18n_safe("menu.shortcuts.tap_keys.unassigned")),
+				items = slot_binding_rows(name, bound, assign),
+			}
+		end
+		return rows
+	end
+
 	-- The wrap-symbol picker. The manifest called it Windows-only until
 	-- 2026-08-06 while this driver had been drawing it all along; it is a shared
 	-- `list` row now, in the same position on all three drivers.

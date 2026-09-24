@@ -1219,6 +1219,17 @@ local function main()
 		end,
 	})
 
+	-- The number-row tap keys: a plain press of one the user assigned runs its
+	-- action on the next loop tick and never reaches the application. Decided in
+	-- the consumption callback below, before wrap-on-type sees the key.
+	local tap_keys = require("modules.shortcuts.tap_keys")
+	tap_keys.init({
+		is_active = function()
+			return shortcuts ~= nil and shortcuts.is_enabled() and not script_actions.is_paused()
+		end,
+		defer = function(fn) return event_loop.defer(fn) end,
+	})
+
 	local function on_click()
 		secure_focus_guard.invalidate()
 		wrap_on_type.on_pointer_down()
@@ -1380,6 +1391,7 @@ local function main()
 		Logger.warn(LOG, "Layout unresolved — replacements will not be typed as keystrokes.")
 	end
 	local on_consume = input_capture_gate.guard(function(detail)
+		if tap_keys.on_key(detail) then return true end
 		if wrap_on_type.on_key(detail) then return true end
 		return prediction_engine
 			and type(prediction_engine.handle_shortcut) == "function"

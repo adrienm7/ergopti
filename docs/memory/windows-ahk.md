@@ -190,6 +190,16 @@ is not a stand-in for a physical key goes out at SendLevel 0
 (`TEXT_SENDER_SEND_LEVEL`), and observers use `I1`; the layout remap output
 stays at level 2 because it is the only trace of the key its hotkey suppresses.
 
+### project-ahk-hotif-variant-precedence
+
+When several `#HotIf` variants of one hotkey are eligible, AutoHotkey fires the
+earliest-created one, so a variant created later at run time through `Hotkey()`
+can never win over a static one. The number-row tap keys
+(`modules/shortcuts/tap_keys.ahk`) are static and `#Include`d before
+`modules/keymap/layout.ahk`, whose digit-row emulation binds the same
+scancodes; a `#HotIf` that answers false hands the key to the emulation or the
+OS. `tools/test/test-tap-keys-single-source.cjs` pins that order.
+
 ### project-ahk-probing-synthetic-input
 
 Tests of injected input must prove provenance and destination, not merely that a

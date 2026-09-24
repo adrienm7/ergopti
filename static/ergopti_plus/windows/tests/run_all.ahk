@@ -142,6 +142,7 @@ global _DefaultLogsDir := _LogsDir
 #Include ../infra/text_case.ahk
 #Include ../infra/wrap_pair.ahk
 #Include ../infra/send_input_parameter.ahk
+#Include ../infra/tap_keys.ahk
 #Include ../infra/nav_layer_helpers.ahk
 #Include ../infra/hotstrings/hotstring_engine.ahk
 #Include ../infra/altgr_family.ahk
@@ -611,6 +612,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_text_case_vectors.ahk
 #Include unit/test_wrap_selection_action.ahk
 #Include unit/test_send_input_actions.ahk
+#Include unit/test_tap_keys.ahk
 #Include unit/test_gesture_cycle_candidates.ahk
 #Include unit/test_gesture_recommended_actions.ahk
 #Include unit/test_config_persistence_transactions.ahk

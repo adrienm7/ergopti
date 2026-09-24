@@ -242,10 +242,11 @@ helpers.describe("shortcuts.bindings: list_shortcuts shape", function()
 		helpers.assert_true(seen.cmd_shift_v)
 	end)
 
-	helpers.it("includes the standalone at_hash and layer_scroll entries", function()
+	helpers.it("includes the standalone tap_keys and layer_scroll entries", function()
 		local seen = {}
 		for _, entry in ipairs(list) do seen[entry.id] = true end
-		helpers.assert_true(seen.at_hash)
+		helpers.assert_true(seen.tap_keys)
+		helpers.assert_nil(seen.at_hash, "the key left of 1 is a tap key now, not a fixed screenshot")
 		helpers.assert_true(seen.layer_scroll)
 	end)
 
@@ -267,7 +268,7 @@ helpers.describe("shortcuts.bindings: list_shortcuts shape", function()
 	helpers.it("orders cmd_* entries before the catch-all bucket", function()
 		local idx = {}
 		for i, entry in ipairs(list) do idx[entry.id] = i end
-		helpers.assert_true(idx.cmd_star < idx.at_hash)
+		helpers.assert_true(idx.cmd_star < idx.tap_keys)
 		helpers.assert_true(idx.cmd_star < idx.layer_scroll)
 	end)
 end)

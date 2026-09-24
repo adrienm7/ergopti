@@ -114,6 +114,7 @@
 		"test:text-case-vectors-shared": "node ./tools/test/test-text-case-vectors-shared.cjs",
 		"test:wrap-pair-vectors-shared": "node ./tools/test/test-wrap-pair-vectors-shared.cjs",
 		"test:send-input-vectors-shared": "node ./tools/test/test-send-input-vectors-shared.cjs",
+		"test:tap-keys-single-source": "node ./tools/test/test-tap-keys-single-source.cjs",
 		"test:js": "node ./tools/test/run-js-suite.cjs",
 		"test:js-suite-failure-diagnostics": "node ./tools/test/test-js-suite-failure-diagnostics.cjs",
 		"verify": "node ./tools/test/verify-change.cjs",

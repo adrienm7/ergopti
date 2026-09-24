@@ -118,7 +118,6 @@ global Features := Map(
         "open_downloads",           false,
         "move",                     false,
         "screen",                   false,
-        "screen_instant",           false,
         "win_caps_lock",            false,
         ; Modélisation α — Map per feature with { enabled, <extra props> }.
         "gpt", Map(
@@ -141,6 +140,12 @@ global Features := Map(
         "e_circ",   Map("enabled", true, "letter", "x"),
         "e_acute",  Map("enabled", true, "letter", "c"),
         "a_grave",  Map("enabled", true, "letter", "v"),
+        ; The number-row tap keys: an action id per key, "none" when unassigned.
+        "tap_keys", Map(
+            "number_row_left",    "screen_capture",
+            "number_row_right_1", "none",
+            "number_row_right_2", "none",
+        ),
         ; Sub-Maps — 10 entries each (same key set as the v1 Maps).
         ; A later refactor migrated the individual reads in modules/shortcuts.ahk
         ; (AltGrLAlt) and platform/remap.ahk (LAltCapsLock); phase 10

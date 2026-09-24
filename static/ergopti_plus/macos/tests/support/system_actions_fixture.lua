@@ -163,7 +163,7 @@ end
 
 -- Shared factory used by shortcuts-actions-1 and shortcuts-actions-2 tests.
 -- Returns (sys, spy) where spy = { captured_cb, do_after_calls, exec_calls }.
--- Uses a table reference for captured_cb so updates made when bind_instant_screenshot()
+-- Uses a table reference for captured_cb so updates made when bind_tap_keys()
 -- calls eventtap.new are visible AFTER the call (Lua scalars are returned by value;
 -- updating an upvalue after the function returns cannot be seen by the caller).
 -- window_override: optional `window` stub table (defaults to a window with id=42).
@@ -244,6 +244,18 @@ local function make_sys_screenshot_spies(window_override)
 	return sys, spy
 end
 
+
+--- The decision the removed at_hash binding hard-wired, for the generic tap-key
+--- tap: keycode 10 captures the frontmost window. The screenshot and fence tests
+--- drive that capture through bind_tap_keys.
+--- @param sys table The system actions module under test.
+--- @return function keycode -> function|nil
+local function capture_on_keycode_10(sys)
+	return function(keycode)
+		if keycode ~= 10 then return nil end
+		return function() return sys.capture_frontmost_window() end
+	end
+end
 
 --- Delivers the most recent post-eventtap callback in the screenshot fixture.
 --- @param spy table Fixture spy.
@@ -411,6 +423,7 @@ return {
 	fresh_hs_contract = fresh_hs_contract,
 	load_capslock_fixture = load_capslock_fixture,
 	make_sys_screenshot_spies = make_sys_screenshot_spies,
+	capture_on_keycode_10 = capture_on_keycode_10,
 	run_screenshot_deferred = run_screenshot_deferred,
 	spawn_of = spawn_of,
 	argv_of = argv_of,
