@@ -9,15 +9,16 @@
 ; No network calls are ever made.
 ;
 ; FEATURES & RATIONALE:
-; 1. Privacy-first: keystrokes, file contents, SSID, and raw usernames are
-;    never included. The username is hashed (FNV-1a fold) so incidents from
-;    the same user can be correlated without revealing the identity.
+; 1. Nothing is collected about the user: keystrokes, file contents, network
+;    names and the account name are never included, not even hashed.
 ; 2. No confirmation: the old opt-in prompt added friction with zero privacy
-;    benefit — the report is local-only and contains no PII. The user sees a
-;    single dialog showing the path of the saved file.
-; 3. Privacy-bounded diagnostics: the report keeps structured system, adapter,
-;    and session state while replacing free-form error text, paths, window
-;    context, and log bodies with explicit redaction markers.
+;    benefit — the report is local-only. The user is told the path of the
+;    saved file.
+; 3. Full detail locally: the error, its stack, the log tail and the window
+;    context are kept whole, since a report stripped of them cannot be
+;    triaged. The file never leaves the machine by itself; whatever is copied,
+;    saved for GitHub or sent is redacted at that boundary (Redact_Apply in the
+;    error and diagnostics windows).
 ; 4. Logs-scoped directory: reports live in <logs>\crash_reports\
 ;    (LoggerCrashReportsDir), beside the daily log that explains them, and
 ;    follow a LogsDirPath override.
@@ -56,8 +57,8 @@ global _CrashReporter_Modifiers := [
 ; =============================
 
 ; Builds a rich crash report Map from an AHK Error object.
-; Captures structured system, adapter, and session state, then replaces every
-; free-form privacy source with an explicit marker before returning.
+; Captures the error in full with the structured system, adapter and session
+; state; nothing is redacted here, the report stays on this machine.
 ; @param ErrorObj {Error} The AHK v2 Error object caught by the global handler.
 ; @return {Map} Report with all diagnostic fields documented below.
 CrashReport_Build(ErrorObj) {
@@ -171,8 +172,7 @@ CrashReport_Build(ErrorObj) {
 	}
 
 	; ── In-memory log ring buffer (all 200 lines, most recent last) ───────────
-	; Capture once so the redaction boundary can retain the line count. The raw
-	; bodies never leave CrashReport_Build or reach the artifact.
+	; Captured once, whole: the lines leading to a crash are what explains it.
 	LogLines := ""
 	try {
 		Snapshot := LoggerRingBufferSnapshot()
@@ -224,12 +224,12 @@ CrashReport_Build(ErrorObj) {
 		; ── Module state ──
 		"keylogger_initialized", KeyloggerInit,
 		"config_dir",           ConfigDir,
-		; ── Log line-count source; bodies are redacted before publication ──
+		; ── The log tail, whole; redacted only where a report is shared ──
 		"log_tail",             LogLines,
 	)
 
 	try LoggerDone("CrashReporter", "Crash report built (ts={1}, type={2}).", Ts, ErrorType)
-	return _CrashReport_RedactCanonical(Report)
+	return Report
 }
 
 ; The crash folder resolved by the logger, exposed to the diagnostics page.
@@ -381,41 +381,6 @@ _CrashReport_IsoTimestamp() {
 	return FormatTime(A_NowUTC, "yyyy-MM-ddTHH:mm:ss") . "Z"
 }
 
-; Replaces every free-form source that can carry user data while preserving the
-; canonical schema. The function clones its input so a caller retaining the
-; diagnostic Map never observes a half-redacted mutation.
-_CrashReport_RedactCanonical(Report) {
-	if !(Report is Map)
-		return Map()
-	Redacted := Report.Clone()
-	Fixed := Map(
-		"error_msg", "[redacted error message]",
-		"error_extra", "[redacted error context]",
-		"error_what", "[redacted error context]",
-		"error_file", "[redacted source path]",
-		"script_dir", "[redacted path]",
-		"active_window_title", "[redacted window title]",
-		"active_window_process", "[redacted process]",
-		"config_dir", "[redacted path]")
-	for Key, Marker in Fixed {
-		if Redacted.Has(Key) && String(Redacted[Key]) != ""
-			Redacted[Key] := Marker
-	}
-	for Key, Label in Map("stack_trace", "stack", "log_tail", "log") {
-		if !Redacted.Has(Key)
-			continue
-		Value := String(Redacted[Key])
-		if (Value == "")
-			continue
-		if RegExMatch(Value, "^\[redacted \d+ " . Label . " lines?\]$")
-			continue
-		LineCount := StrLen(Value) - StrLen(StrReplace(Value, "`n")) + 1
-		Redacted[Key] := "[redacted " . LineCount . " " . Label
-			. (LineCount == 1 ? " line]" : " lines]")
-	}
-	return Redacted
-}
-
 _CrashReport_CanonicalFields() {
 	return [
 		"version", "driver", "timestamp",
@@ -440,22 +405,20 @@ _CrashReport_CanonicalFields() {
 ; @param Report {Map}
 ; @return {String} Pretty-printed JSON string.
 _CrashReport_ToJson(Report) {
-	return _CrashReport_EncodeFields(
-		_CrashReport_RedactCanonical(Report), _CrashReport_CanonicalFields())
+	return _CrashReport_EncodeFields(Report, _CrashReport_CanonicalFields())
 }
 
 ; The isolated worker needs two raw paths to perform its local git probe and
 ; choose the destination directory. They live in pagefile-backed IPC only and
 ; are removed by both worker implementations before the canonical artifact is
-; written. Every report field in the same envelope is already redacted.
+; written; the report fields travel whole, as the local report keeps them.
 _CrashReport_ToWorkerJson(Report) {
-	SafeReport := _CrashReport_RedactCanonical(Report)
 	Fields := _CrashReport_CanonicalFields()
 	for Key in ["_transport_script_dir", "_transport_reports_dir"] {
-		if SafeReport.Has(Key)
+		if Report.Has(Key)
 			Fields.Push(Key)
 	}
-	return _CrashReport_EncodeFields(SafeReport, Fields)
+	return _CrashReport_EncodeFields(Report, Fields)
 }
 
 _CrashReport_EncodeFields(Report, Fields) {

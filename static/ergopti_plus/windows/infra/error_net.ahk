@@ -406,7 +406,7 @@ _CrashReport_CheapSnapshot(Exc) {
 	; from the canonical schema and removed before either worker writes a report.
 	Snapshot["_transport_script_dir"] := A_ScriptDir
 	Snapshot["_transport_reports_dir"] := LoggerCrashReportsDir()
-	return _CrashReport_RedactCanonical(Snapshot)
+	return Snapshot
 }
 
 _CrashReport_WorkerDone(ReleaseDedup, ExitCode, Stdout, Stderr) {
