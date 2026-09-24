@@ -40,13 +40,6 @@ function luaSlotArray(src, name, file) {
 	return [...m[1].matchAll(/"([a-z0-9_]+)"/g)].map((x) => x[1]);
 }
 
-// Bareword keys of the DEFAULT_GESTURES table.
-function defaultKeys(src, file) {
-	const m = src.match(/M\.DEFAULT_GESTURES\s*=\s*\{([\s\S]*?)\n\}/);
-	if (!m) throw new Error('could not find M.DEFAULT_GESTURES in ' + file);
-	return [...m[1].matchAll(/^\s*([a-z0-9_]+)\s*=/gm)].map((x) => x[1]);
-}
-
 function eqOrdered(a, b) { return a.length === b.length && a.every((v, i) => v === b[i]); }
 
 const errors = [];
@@ -70,13 +63,11 @@ try {
 		if (!eqOrdered(luaSlotArray(src, 'AXIS_SLOTS', file), axis)) {
 			errors.push('macos AXIS_SLOTS != actions.toml [slots].axis');
 		}
-		const keys = defaultKeys(src, file);
-		const keyset = new Set(keys);
-		if (keys.length !== keyset.size) errors.push('macos DEFAULT_GESTURES has duplicate keys');
-		const missing = [...union].filter((s) => !keyset.has(s));
-		const extra = [...keyset].filter((s) => !union.has(s));
-		if (missing.length) errors.push('macos DEFAULT_GESTURES missing slot(s): ' + missing.join(', '));
-		if (extra.length) errors.push('macos DEFAULT_GESTURES has unknown slot(s): ' + extra.join(', '));
+		// DEFAULT_GESTURES is built over exactly these two lists, so its key-space
+		// is single + axis by construction (the Lua suite checks the built table).
+		if (!/for _, slots in ipairs\(\{ M\.SINGLE_SLOTS, M\.AXIS_SLOTS \}\) do/.test(src)) {
+			errors.push('macos DEFAULT_GESTURES must be built over SINGLE_SLOTS and AXIS_SLOTS');
+		}
 	}
 
 	// Linux derives the slot arrays from actions.toml at runtime (the shared

@@ -1875,6 +1875,11 @@ description_key = "menu.shortcuts.keyboard.win_x"
 # ===== 3.6 gestures =====
 # ========================
 
+# The action defaults below are Ergopti's recommended gesture bindings, per
+# platform. A fresh config starts from them, and macOS (DEFAULT_GESTURES) and
+# Windows (GESTURE_FACTORY_DEFAULTS) build what « Restaurer les valeurs
+# conseillées » writes from them rather than from a copy of their own;
+# test-gesture-defaults-single-source.cjs holds both drivers to this list.
 [[features.gestures]]
 id = "enabled"
 platforms = ["ahk", "hs", "linux"]
@@ -1968,7 +1973,7 @@ description_key = "menu.gestures.circular_spaces"
 [[features.gestures]]
 id = "swipe_2_left"
 platforms = ["hs"]
-default = "arrow_up"
+default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_2_left"
 
@@ -2095,7 +2100,7 @@ description_key = "menu.gestures.swipe_3_diag"
 [[features.gestures]]
 id = "swipe_3_horiz"
 platforms = ["hs"]
-default = "words"
+default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_3_horiz"
 
@@ -2138,7 +2143,7 @@ description_key = "menu.gestures.swipe_4_diag"
 [[features.gestures]]
 id = "swipe_4_horiz"
 platforms = ["hs"]
-default = "spaces"
+default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_4_horiz"
 
@@ -2181,7 +2186,7 @@ description_key = "menu.gestures.swipe_5_diag"
 [[features.gestures]]
 id = "swipe_5_horiz"
 platforms = ["hs"]
-default = "windows"
+default = "none"
 type = "action"
 description_key = "menu.gestures.swipe_5_horiz"
 

@@ -35,4 +35,4 @@ Gestures.init(shared_state)
 Gestures.start()
 ```
 
-`M.DEFAULT_GESTURES` is the canonical source for default gesture bindings; menu modules must read from it. The `touchdevice` dependency is optional — if absent the module self-disables with a warning rather than crashing.
+`M.DEFAULT_GESTURES` holds the recommended gesture bindings, built from the shared features manifest (`gestures.<slot>`, macOS values) over `SINGLE_SLOTS` and `AXIS_SLOTS`; menu modules must read from it rather than keep a copy. The `touchdevice` dependency is optional — if absent the module self-disables with a warning rather than crashing.
