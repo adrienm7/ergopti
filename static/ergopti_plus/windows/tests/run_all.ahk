@@ -231,6 +231,7 @@ global _DefaultLogsDir := _LogsDir
 #Include ../modules/keymap/keylayout/keylayout_tables.ahk
 #Include ../modules/keymap/keylayout/keylayout_emulation.ahk
 #Include ../modules/keymap/keylayout/layout_registry.ahk
+#Include ../modules/keymap/keylayout/layout_catalogue.ahk
 ; Pure layout-poll quiescence decision (no OS deps, no top-level hotkeys) —
 ; exercised by meta/test_layout_quiescence.ahk and consumed by ErgoptiPlus.ahk.
 #Include ../modules/keymap/layout_poll_helper.ahk
@@ -542,6 +543,7 @@ _LogBootProgress("loading LLM modules")
 #Include unit/test_llm_tab_accept_policy.ahk
 #Include unit/test_accented_shortcuts.ahk
 #Include unit/test_keylayout_emulation.ahk
+#Include unit/test_layout_catalogue.ahk
 #Include unit/test_ergopti_keylayout_tables.ahk
 #Include unit/test_layout_supersession.ahk
 ; parser.ahk (the AHK semantic-diff parser) was previously exercised by no suite,

@@ -10,9 +10,8 @@
 ;   from the XML, replayed through the emulation for Ergo-L and Ergopti (the
 ;   Ergopti emulation's own tables are pinned by test_ergopti_keylayout_tables);
 ; - the reader's rules on synthetic layouts, and its fail-fast refusals;
-; - the registry client: URL, verification, local copy and a download replayed
-;   through an injected transport, including the refusal to publish a file
-;   that does not match its index;
+; - the registry client: URL, verification and the local copy read through
+;   the installed record (downloads are the catalogue's, test_layout_catalogue);
 ; - registration (every key, no native chord taken), supersession of the
 ;   Ergopti emulation by the master gates, and the boot sequence.
 ; Non-ASCII expectations come from the JSON vectors or Chr() so the suite
@@ -104,64 +103,6 @@ _KLT_WriteRaw(Path, Text) {
 	F := FileOpen(Path, "w", "UTF-8-RAW")
 	F.Write(Text)
 	F.Close()
-}
-
-; A registry download replayed from memory: Served maps each URL to the text a
-; request for it writes to its output file; any other URL answers HTTP 404.
-class _KLT_FakeRequest {
-	__New(Served, Log) {
-		this.Served := Served
-		this.Log := Log
-		this.Url := ""
-		this.OutputPath := ""
-		this.Status := 0
-	}
-	Open(Method, Url, Async := true) {
-		this.Url := Url
-	}
-	SetRequestHeader(Name, Value) {
-	}
-	SetProxy(Proxy) {
-	}
-	SetTimeouts(ResolveMs, ConnectMs, SendMs, ReceiveMs) {
-	}
-	SetOutputFile(Path) {
-		this.OutputPath := Path
-	}
-	Send(Body := "") {
-		this.Log.Push(this.Url)
-		this.Status := this.Served.Has(this.Url) ? 200 : 404
-		_KLT_WriteRaw(this.OutputPath, this.Served.Get(this.Url, "404: Not Found"))
-		return true
-	}
-	WaitForResponse(TimeoutSeconds := 0) {
-		return true
-	}
-	Abort() {
-		return true
-	}
-}
-
-_KLT_NoProxy(Urls, Callback) {
-	Resolved := Map()
-	for Url in Urls
-		Resolved[Url] := ""
-	Callback.Call(Resolved)
-}
-
-_KLT_Transport(Served, Log) {
-	return Map(
-		"request", () => _KLT_FakeRequest(Served, Log),
-		"resolve_proxy", _KLT_NoProxy,
-		"schedule", (Fn, DelayMs) => Fn.Call()
-	)
-}
-
-_KLT_ServedRegistry(LayoutText) {
-	return Map(
-		LayoutRegistry_RawUrl("index.json"), _KLT_IndexText(),
-		LayoutRegistry_RawUrl(_KLT_Entry("ergol")["file"]), LayoutText
-	)
 }
 
 ; Replaces the first occurrence of Old by New, failing loudly if absent so a
@@ -390,76 +331,21 @@ _KLT_CurlOutputFileCase() {
 	AssertThrows(() => CurlAsyncRequest().SetOutputFile(""), "an empty output path is refused")
 }
 
-Test("layout registry: a local copy is read only when it matches its index (layout-registry-emulation)",
+Test("layout registry: a local copy is read only when it matches its record (layout-registry-emulation)",
 	_KLT_ReadLocalCase)
 
 _KLT_ReadLocalCase() {
 	Dir := _KLT_TempDir()
 	try {
-		AssertThrows(() => LayoutRegistry_ReadLocal("ergol", Dir), "nothing downloaded yet")
-		_KLT_WriteRaw(Dir . "index.json", _KLT_IndexText())
+		AssertThrows(() => LayoutRegistry_ReadLocal("ergol", Dir), "nothing installed yet")
 		_KLT_WriteRaw(Dir . "ergol.keylayout", _KLT_LayoutText("ergol"))
+		AssertThrows(() => LayoutRegistry_ReadLocal("ergol", Dir), "an unrecorded copy is not installed")
+		LayoutCatalogue_WriteInstalled(Dir, Map("ergol", _KLT_Entry("ergol")))
 		LocalCopy := LayoutRegistry_ReadLocal("ergol", Dir)
 		AssertEqual("ergol", LocalCopy["Entry"]["id"])
 		AssertEqual(_KLT_LayoutText("ergol"), LocalCopy["Text"])
 		_KLT_WriteRaw(Dir . "ergol.keylayout", _KLT_Tamper(_KLT_LayoutText("ergol"), 'output="q"', 'output="z"'))
 		AssertThrows(() => LayoutRegistry_ReadLocal("ergol", Dir), "an edited local copy must be refused")
-	} finally DirDelete(Dir, true)
-}
-
-Test("layout registry: a download is verified before it is published (layout-registry-emulation)",
-	_KLT_FetchCase)
-
-_KLT_FetchCase() {
-	Dir := _KLT_TempDir()
-	try {
-		Log := []
-		Results := []
-		LayoutRegistry_Fetch("ergol", Dir, (Ok, Detail) => Results.Push([Ok, Detail]),
-			_KLT_Transport(_KLT_ServedRegistry(_KLT_LayoutText("ergol")), Log))
-		AssertEqual(1, Results.Length, "OnDone must be called exactly once")
-		AssertTrue(Results[1][1], "the download must succeed: " . (Results[1][2] is String ? Results[1][2] : ""))
-		AssertEqual("ergol", Results[1][2]["id"])
-		AssertEqual(2, Log.Length, "the index then the layout")
-		AssertEqual(LayoutRegistry_RawUrl("index.json"), Log[1])
-		AssertEqual(_KLT_LayoutText("ergol"), LayoutRegistry_ReadLocal("ergol", Dir)["Text"])
-		AssertFalse(FileExist(Dir . "index.json" . LAYOUT_REGISTRY_PARTIAL_SUFFIX), "no partial index left")
-		AssertFalse(FileExist(Dir . "ergol.keylayout" . LAYOUT_REGISTRY_PARTIAL_SUFFIX), "no partial layout left")
-
-		; A tampered layout is refused and the verified copy above survives it.
-		Results := []
-		LayoutRegistry_Fetch("ergol", Dir, (Ok, Detail) => Results.Push([Ok, Detail]),
-			_KLT_Transport(_KLT_ServedRegistry(_KLT_Tamper(_KLT_LayoutText("ergol"), 'output="q"', 'output="z"')), []))
-		AssertEqual(1, Results.Length)
-		AssertFalse(Results[1][1], "a layout that does not match the index must not be published")
-		AssertContains(Results[1][2], "checksum")
-		AssertEqual(_KLT_LayoutText("ergol"), LayoutRegistry_ReadLocal("ergol", Dir)["Text"],
-			"the previously verified copy must be left untouched")
-		AssertFalse(FileExist(Dir . "ergol.keylayout" . LAYOUT_REGISTRY_PARTIAL_SUFFIX), "the refused download is removed")
-	} finally DirDelete(Dir, true)
-}
-
-Test("layout registry: a missing index or layout fails the download (layout-registry-emulation)",
-	_KLT_FetchFailuresCase)
-
-_KLT_FetchFailuresCase() {
-	Dir := _KLT_TempDir()
-	try {
-		Results := []
-		LayoutRegistry_Fetch("ergol", Dir, (Ok, Detail) => Results.Push([Ok, Detail]),
-			_KLT_Transport(Map(), []))
-		AssertEqual(1, Results.Length)
-		AssertFalse(Results[1][1])
-		AssertContains(Results[1][2], "HTTP 404")
-		Results := []
-		LayoutRegistry_Fetch("optimot", Dir, (Ok, Detail) => Results.Push([Ok, Detail]),
-			_KLT_Transport(_KLT_ServedRegistry(_KLT_LayoutText("ergol")), []))
-		AssertFalse(Results[1][1], "a layout the index does not list cannot be downloaded")
-		AssertContains(Results[1][2], "not in the registry index")
-		AssertFalse(FileExist(Dir . "index.json"), "nothing is published from a failed download")
-		AssertFalse(FileExist(Dir . "index.json" . LAYOUT_REGISTRY_PARTIAL_SUFFIX))
-		AssertThrows(() => LayoutRegistry_Fetch("..\evil", Dir, (*) => 0, _KLT_Transport(Map(), [])),
-			"an invalid id is refused before any request")
 	} finally DirDelete(Dir, true)
 }
 
@@ -538,7 +424,7 @@ _KLT_BootDeps(Log, ReadLocalFn, FetchFn) {
 		"keycodes", LayoutRegistry_Keycodes,
 		"register", (Table) => (Log.Push("register"), 1),
 		"read_local", ReadLocalFn,
-		"fetch", FetchFn
+		"install", FetchFn
 	)
 }
 

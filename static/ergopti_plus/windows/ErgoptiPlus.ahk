@@ -496,6 +496,7 @@ if UIASW_IsWorkerInvocation()
 #Include modules/keymap/keylayout/keylayout_tables.ahk
 #Include modules/keymap/keylayout/keylayout_emulation.ahk
 #Include modules/keymap/keylayout/layout_registry.ahk
+#Include modules/keymap/keylayout/layout_catalogue.ahk
 #Include infra/app_picker.ahk
 #Include infra/config_shortcuts.ahk
 #Include infra/metrics/metrics_shortcuts.ahk
