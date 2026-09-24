@@ -1559,7 +1559,7 @@
 	"sg_actions.one_shot_shift": "⇧ OneShotShift",
 	"sg_actions.open_config": "⚙ 配置",
 	"sg_actions.open_console": "▤ 控制台",
-	"sg_actions.open_error_log": "📄 Error log",
+	"sg_actions.open_error_log": "📄 今日错误文件",
 	"sg_actions.open_hotstrings_editor": "⌨ 热字符串编辑器",
 	"sg_actions.open_key_history": "按键历史",
 	"sg_actions.open_list_vars": "变量状态",

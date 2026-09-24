@@ -1559,7 +1559,7 @@
 	"sg_actions.one_shot_shift": "⇧ OneShotShift",
 	"sg_actions.open_config": "⚙ Configuração",
 	"sg_actions.open_console": "▤ Console",
-	"sg_actions.open_error_log": "📄 Error log",
+	"sg_actions.open_error_log": "📄 Arquivo de erros de hoje",
 	"sg_actions.open_hotstrings_editor": "⌨ Editor de hotstrings",
 	"sg_actions.open_key_history": "Histórico de teclas",
 	"sg_actions.open_list_vars": "Estado das variáveis",

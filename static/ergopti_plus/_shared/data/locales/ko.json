@@ -1559,7 +1559,7 @@
 	"sg_actions.one_shot_shift": "⇧ OneShotShift",
 	"sg_actions.open_config": "⚙ 설정",
 	"sg_actions.open_console": "▤ 콘솔",
-	"sg_actions.open_error_log": "📄 Error log",
+	"sg_actions.open_error_log": "📄 오늘의 오류 파일",
 	"sg_actions.open_hotstrings_editor": "⌨ 핫스트링 편집기",
 	"sg_actions.open_key_history": "키 기록",
 	"sg_actions.open_list_vars": "변수 상태",

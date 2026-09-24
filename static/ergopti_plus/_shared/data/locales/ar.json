@@ -1559,7 +1559,7 @@
 	"sg_actions.one_shot_shift": "⇧ OneShotShift",
 	"sg_actions.open_config": "⚙ الإعدادات",
 	"sg_actions.open_console": "▤ وحدة التحكم",
-	"sg_actions.open_error_log": "📄 Error log",
+	"sg_actions.open_error_log": "📄 ملف أخطاء اليوم",
 	"sg_actions.open_hotstrings_editor": "⌨ محرر السلاسل النصية",
 	"sg_actions.open_key_history": "سجل المفاتيح",
 	"sg_actions.open_list_vars": "حالة المتغيرات",

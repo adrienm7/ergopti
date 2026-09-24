@@ -1559,7 +1559,7 @@
 	"sg_actions.one_shot_shift": "⇧ OneShotShift",
 	"sg_actions.open_config": "⚙ Configuratie",
 	"sg_actions.open_console": "▤ Console",
-	"sg_actions.open_error_log": "📄 Error log",
+	"sg_actions.open_error_log": "📄 Foutenbestand van vandaag",
 	"sg_actions.open_hotstrings_editor": "⌨ Hotstring-editor",
 	"sg_actions.open_key_history": "Toetsgeschiedenis",
 	"sg_actions.open_list_vars": "Variabelestatus",

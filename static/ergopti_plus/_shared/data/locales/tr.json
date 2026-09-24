@@ -1559,7 +1559,7 @@
 	"sg_actions.one_shot_shift": "⇧ OneShotShift",
 	"sg_actions.open_config": "⚙ Yapılandırma",
 	"sg_actions.open_console": "▤ Konsol",
-	"sg_actions.open_error_log": "📄 Error log",
+	"sg_actions.open_error_log": "📄 Bugünün hata dosyası",
 	"sg_actions.open_hotstrings_editor": "⌨ Kısaltma düzenleyicisi",
 	"sg_actions.open_key_history": "Tuş geçmişi",
 	"sg_actions.open_list_vars": "Değişken durumu",

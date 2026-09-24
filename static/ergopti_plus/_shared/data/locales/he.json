@@ -1559,7 +1559,7 @@
 	"sg_actions.one_shot_shift": "⇧ OneShotShift",
 	"sg_actions.open_config": "⚙ הגדרות",
 	"sg_actions.open_console": "▤ קונסולה",
-	"sg_actions.open_error_log": "📄 Error log",
+	"sg_actions.open_error_log": "📄 קובץ השגיאות של היום",
 	"sg_actions.open_hotstrings_editor": "⌨ עורך Hotstrings",
 	"sg_actions.open_key_history": "היסטוריית מקשים",
 	"sg_actions.open_list_vars": "מצב משתנים",
