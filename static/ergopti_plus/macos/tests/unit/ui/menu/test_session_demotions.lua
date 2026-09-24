@@ -6,8 +6,8 @@
 --- A feature whose runtime refused its saved value shows the real posture in
 --- memory while every save keeps the value config.toml holds. The demotion ends
 --- when a save commits the user's change of that value, and a global action
---- detaches every demotion for its own explicit save, restoring them only if
---- that save fails.
+--- detaches every demotion for its own explicit save, re-adopting them when
+--- that action is reversed.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -122,9 +122,11 @@ helpers.describe("session demotions and global actions", function()
 		local released = registry.release_all()
 		helpers.assert_eq(registry.persisted_view({ gestures = false }).gestures, false,
 			"Disable All must write its explicit OFF")
-		registry.readopt(released)
+		helpers.assert_eq(registry.readopt(released), true)
 		helpers.assert_eq(registry.persisted_view({ gestures = false }).gestures, true,
-			"a refused global save must not lose the saved value")
+			"a reversed global save must not lose the saved value")
+		helpers.assert_eq(registry.readopt(released), true, "a retried inverse may readopt again")
+		helpers.assert_eq(#registry.list(), 1)
 		helpers.assert_true(not pcall(registry.readopt, nil))
 	end)
 end)

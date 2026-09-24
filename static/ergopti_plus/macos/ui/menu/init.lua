@@ -478,19 +478,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		return transactional_save_prefs()
 	end
 
-	--- Saves a global action's candidate. It sets every feature explicitly, so no
-	--- session demotion may keep substituting the saved value; a refused save
-	--- restores the demotions it detached.
-	--- @return boolean committed
-	local function save_prefs_superseding_demotions()
-		local released = session_demotions.release_all()
-		if save_prefs() ~= true then
-			session_demotions.readopt(released)
-			return false
-		end
-		return true
-	end
-
 
 
 	-- =======================================
@@ -730,7 +717,11 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		sync_runtime = function(snapshot, restoring)
 			return sync_state_to_modules(snapshot, false, restoring == true) == true
 		end,
-		save_preferences = save_prefs_superseding_demotions,
+		save_preferences = save_prefs,
+		-- Enable/Disable All set every feature explicitly: the transaction detaches
+		-- the session demotions for its candidate and re-adopts them in its inverse.
+		detach_demotions = session_demotions.release_all,
+		readopt_demotions = session_demotions.readopt,
 		restore_state = PreferencesTransaction.restore_table,
 		ensure_enable_ready = function()
 			return KeymapLifecycle.ensure_started({ state = state, keymap = keymap },

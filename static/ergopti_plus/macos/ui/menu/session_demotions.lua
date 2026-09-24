@@ -134,13 +134,16 @@ function M.new()
 		return released
 	end
 
-	--- Restores entries detached by release_all() after their save failed.
+	--- Restores entries detached by release_all() when the explicit save they
+	--- made way for is reversed. Idempotent, so a retried inverse may call it again.
 	--- @param released table Entries returned by release_all().
+	--- @return boolean committed Always true; malformed input raises.
 	function registry.readopt(released)
 		if type(released) ~= "table" then error("readopt needs released entries", 2) end
 		for key, entry in pairs(released) do
 			if entries[key] == nil then entries[key] = entry end
 		end
+		return true
 	end
 
 	--- Lists the active demotions for diagnostics and tests.

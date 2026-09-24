@@ -301,7 +301,10 @@ state flag, in memory (`report.demotions`), and `ui/menu/session_demotions.lua`
 makes every save keep the config.toml value until a committed save carries a
 user change of that key (`settle` runs on commit, never while building the
 view, because a refused write rolls the key back to its demoted posture) or
-a global action saves explicitly. The old all-or-nothing sync restored every
+Enable/Disable All publishes explicit values. That transaction detaches the
+demotions for its candidate save and re-adopts them in its inverse; a global
+writer that saves without that pairing writes demoted values over config.toml
+when it is reversed. The old all-or-nothing sync restored every
 default after one refusal (Gestures, Metrics, AI OFF with config.toml ON) and
 the next toggle wrote them over the file; a save from inside the sync also ran
 before the boot transaction was seeded and failed. Only an unprovable posture
