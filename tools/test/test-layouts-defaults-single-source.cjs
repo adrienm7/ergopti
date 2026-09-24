@@ -144,5 +144,26 @@ check('every registry client reads the URL template and owner/repo from the shar
 		'only the shared client and the driver clients may expand the URL template');
 });
 
+// A registry id is also a file name on every OS, so each place that accepts
+// one must accept exactly what the index builder lets into the registry.
+check('every copy of the registry id rule is the index builder\'s', () => {
+	const { ID_RE } = require('../build/build-layouts-index.cjs');
+	const canonical = ID_RE.source;
+	assert.ok(/^\^.+\$$/.test(canonical), `the builder's id rule ${canonical} is not anchored`);
+	const copies = {
+		'_shared/lua/layouts/registry.lua': /M\.ID_PATTERN\s*=\s*"([^"]+)"/,
+		'windows/modules/keymap/keylayout/layout_registry.ahk': /LAYOUT_REGISTRY_ID_PATTERN\s*:=\s*"([^"]+)"/
+	};
+	for (const [rel, declaration] of Object.entries(copies)) {
+		const match = declaration.exec(fs.readFileSync(path.join(SP, ...rel.split('/')), 'utf8'));
+		assert.ok(match, `${rel} declares no registry id pattern`);
+		assert.strictEqual(match[1], canonical, `${rel} disagrees with the index builder about what a registry id is`);
+	}
+	const schema = JSON.parse(fs.readFileSync(path.join(SP, '_shared', 'core', 'config_schema', 'config.schema.json'), 'utf8'));
+	const selection = schema.$defs.layout.properties.emulated_layout;
+	assert.strictEqual(selection.pattern, `^(${canonical.slice(1, -1)})?$`,
+		'config.schema.json must accept a registry id or "" (no layout) and nothing else');
+});
+
 if (failures > 0) process.exit(1);
 console.log('All layout registry location checks passed.');

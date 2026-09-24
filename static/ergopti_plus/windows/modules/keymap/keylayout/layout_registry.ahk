@@ -36,9 +36,11 @@
 ; ============================
 ; ============================
 
-; A registry id is also a file name: lowercase letters, digits and underscores,
-; the rule tools/build/build-layouts-index.cjs enforces on the registry folder.
-global LAYOUT_REGISTRY_ID_PATTERN := "^[a-z0-9_]+$"
+; A registry id is also a file name: a lowercase letter, then lowercase letters,
+; digits and underscores, the rule tools/build/build-layouts-index.cjs enforces
+; on the registry folder (tools/test/test-layouts-defaults-single-source.cjs
+; pins this copy to it).
+global LAYOUT_REGISTRY_ID_PATTERN := "^[a-z][a-z0-9_]*$"
 
 ; Suffix of a file being downloaded; it is renamed only once verified.
 global LAYOUT_REGISTRY_PARTIAL_SUFFIX := ".download"

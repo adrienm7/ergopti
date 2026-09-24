@@ -369,6 +369,7 @@ if (require.main === module) main();
 module.exports = {
 	REGISTRY_DIR,
 	INDEX_PATH,
+	ID_RE,
 	buildIndex,
 	validateMeta,
 	validateRegistry,
