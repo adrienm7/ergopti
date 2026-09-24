@@ -449,7 +449,8 @@ if LLM_PORT then
 		if not ai_text:find("bonjour " .. expected, 1, true) then
 			failures[#failures + 1] = string.format("the desktop does not read \"bonjour %s\" (one space)", expected)
 		end
-		if ai_trail:find("2↓", 1, true) then
+		-- Code 2 exactly: "20↓" is the t the prediction types.
+		if (" " .. ai_trail .. " "):find(" 2↓ ", 1, true) then
 			failures[#failures + 1] = "the accepting 1 reached the desktop"
 		end
 		if ai_text:find("/", 1, true) then
