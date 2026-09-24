@@ -225,8 +225,11 @@ report('macOS: the window registers the "healthcheck" message handler the page p
 report('macOS: nothing polls the page for a copy flag',
 	!/__hs_copy_requested/.test(macCore) && !/TimerScheduler\.every\(/.test(macCore),
 	'the injected copy button or its 200 ms poll is back');
+// Any reference, not only a call: the old collectors ran pcall(hs.execute, "sysctl …"),
+// which a pattern requiring "hs.execute(" never saw. The behaviour is pinned by
+// macos/tests/unit/ui/test_healthcheck_phase_a_no_subprocess.lua.
 report('macOS: no synchronous subprocess in the diagnostics window',
-	!/hs\.execute\s*\(|io\.popen\s*\(|os\.execute\s*\(/.test(macCore) && macCore.length > 1000,
+	!/\bhs\.execute\b|\bio\.popen\b|\bos\.execute\b/.test(macCore) && macCore.length > 1000,
 	'an hs.execute, io.popen or os.execute runs on the run loop that dispatches the event taps');
 
 const winCore = withoutComments(readFolder('windows/ui/healthcheck'));
@@ -236,7 +239,7 @@ report('Windows: the native copy button is gone',
 	!/healthcheck\.copy_and_close/.test(winCore) && !/_HealthCheck_CopyAndClose/.test(winCore),
 	'the native copy-and-close button is back');
 report('Windows: no WMI or blocking child on the thread that serves the keyboard hook',
-	!/WbemScripting|winmgmts|RunWait\(/.test(winCore) && winCore.length > 1000,
+	!/WbemScripting|winmgmts|\bRunWait\b/i.test(winCore) && winCore.length > 1000,
 	'a WMI query or a RunWait runs on the AHK thread');
 report('Windows: the plain-text report stays for a machine without WebView2',
 	/"Edit"[^\n]*ReadOnly[\s\S]{0,120}HealthCheck_FormatPlain\(Snapshot\)/.test(winCore),
