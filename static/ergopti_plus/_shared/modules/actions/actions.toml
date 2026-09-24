@@ -759,7 +759,10 @@ requires_linux = ["tool:xdg-open"]
 parameter = "url"
 
 [sg_actions.pick_color]
-platform = "ahk"
+# macOS reads the pixel through screencapture (parent-scoped pixel owner).
+# Linux: Wayland forbids reading the screen outside a portal that asks the user
+# to pick, which is a different interaction.
+platform = "ahk,hs"
 
 [sg_actions.open_emoji_picker]
 # Windows opens its panel with Win+., macOS its Character Viewer (Ctrl+Cmd+Space,
@@ -788,6 +791,28 @@ platform = "hs"
 # selection: wrap_selection does that. The label says so.
 platform = "all"
 emit_ahk = "{Home}({End}){Home}"
+
+[sg_actions.open_downloads]
+# macOS reuses a Finder window already showing it; Windows and Linux open the
+# folder in the default file manager (Linux: the XDG DOWNLOAD directory).
+platform = "all"
+requires_linux = ["tool:xdg-open", "tool:xdg-user-dir"]
+
+[sg_actions.open_file_manager]
+platform = "all"
+requires_linux = ["tool:xdg-open"]
+
+[sg_actions.open_system_settings]
+# Linux launches the first settings application installed (GNOME, KDE, Xfce,
+# Cinnamon, MATE, LXQt) and logs an error when there is none.
+platform = "all"
+
+[sg_actions.copy_selected_path]
+# In a file manager: copy the path of the selection. Elsewhere: open the
+# selected link or path, or search the web for the selected text (macOS
+# copy_or_open_path, Windows Search). Linux file managers expose no selected
+# path to another process.
+platform = "hs,ahk"
 
 [sg_actions.search_web]
 platform = "all"
@@ -1262,12 +1287,16 @@ items = [
     "screen_capture_instant",
     "ocr_screenshot",
     "open_url",
+    "open_downloads",
+    "open_file_manager",
+    "open_system_settings",
     "pick_color",
     "open_emoji_picker",
     "take_note",
     "activity_simulation",
     "display_mirror_toggle",
     "search_web",
+    "copy_selected_path",
     "teleport_mouse",
     "spotlight_mouse",
     "toggle_capslock",

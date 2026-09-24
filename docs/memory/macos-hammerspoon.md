@@ -328,6 +328,17 @@ re-applies what config.toml holds; a candidate sync never records. A rolled-back
 session over a present file, and one whose config.toml could not be decoded,
 holds only defaults: its save transaction is read-only (refuse, roll back, ERROR).
 
+### project-hs-shortcut-owners-are-parent-scoped
+
+The shortcut layer's text, mouse, app-navigation and pixel owners keep one
+admission scope per action parent: "shortcut_bindings" when no parent is named
+(bindings.lua and keyboard slots), "gestures" for gesture dispatch. A gesture
+action passes `current_action_parent()` and its owner must be listed in
+`scoped_action_children()` of `modules/gestures/actions.lua`; a global owner
+there would let one feature's PAUSE settle or fence the other's work.
+Keep-awake is the deliberate exception: one machine session that stops at the
+first physical input.
+
 ### project-hs-fork-admission-in-both-launch-modes
 
 Opening ordinary Hammerspoon with a Git checkout is a supported launch path;

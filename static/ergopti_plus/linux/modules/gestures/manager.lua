@@ -460,11 +460,33 @@ local SCREENSHOT_KIND = {
 --- "Unknown action" at DEBUG, the silent failure this table replaces.
 local DIRECT_COMMANDS = {
 	["lock_screen"] = "loginctl lock-session 2>/dev/null || xdg-screensaver lock",
+	-- The user's own XDG Downloads directory (localised, relocatable), never a
+	-- guessed ~/Downloads.
+	["open_downloads"]    = 'xdg-open "$(xdg-user-dir DOWNLOAD)"',
+	["open_file_manager"] = 'xdg-open "$HOME"',
+}
+
+--- The settings applications open_system_settings tries, in order: GNOME, KDE,
+--- Xfce, Cinnamon, MATE, LXQt. Data, so the order is visible and testable.
+local SETTINGS_APPLICATIONS = {
+	"gnome-control-center", "systemsettings", "xfce4-settings-manager",
+	"cinnamon-settings", "mate-control-center", "lxqt-config",
 }
 
 --- Actions that need more than one fixed command, by action id. Each receives
 --- the binding that fired it, which parameterized actions read their value by.
 local BUILTIN_HANDLERS = {
+	["open_system_settings"] = function()
+		local Shell = require("adapters.shell_runner")
+		for _, application in ipairs(SETTINGS_APPLICATIONS) do
+			if Shell.has_command(application) then
+				run_background(shell_quote(application))
+				return
+			end
+		end
+		Logger.error(LOG, "open_system_settings: none of %s is installed — nothing opened.",
+			table.concat(SETTINGS_APPLICATIONS, ", "))
+	end,
 	["left_click_toggle"] = function() run_background(_click_toggle_command("1")) end,
 	["right_click_toggle"] = function() run_background(_click_toggle_command("3")) end,
 	["open_url"] = function(binding)

@@ -947,19 +947,27 @@ end)
 -- Required lazily, inside the closure: these modules pull in the whole shortcuts
 -- tree, and requiring it at gesture-registry load time would drag it into boot
 -- for users who never bind one of these.
---- Builds a gesture action that runs one function of the shortcut layer's text
---- module under the dispatching parent, so PAUSE of that parent fences it.
+--- Builds a gesture action that runs one function of a parent-scoped owner of
+--- the shortcut layer under the dispatching parent, so PAUSE of that parent
+--- fences it and a sibling parent's PAUSE does not.
+--- @param module_name string The owner module.
+--- @param method string Public function taking the parent as its last argument.
+--- @return function
+local function owner_action(module_name, method)
+	return function()
+		local ok, Owner = pcall(require, module_name)
+		if not ok or type(Owner) ~= "table" or type(Owner[method]) ~= "function" then
+			Logger.error(LOG, "Action '%s.%s' is unavailable: %s.", module_name, method, tostring(Owner))
+			return false
+		end
+		return Owner[method](current_action_parent())
+	end
+end
+
 --- @param method string Public function of modules.shortcuts.actions.text.
 --- @return function
 local function text_action(method)
-	return function()
-		local ok, Text = pcall(require, "modules.shortcuts.actions.text")
-		if not ok or type(Text[method]) ~= "function" then
-			Logger.error(LOG, "Text action '%s' is unavailable: %s.", method, tostring(Text))
-			return false
-		end
-		return Text[method](current_action_parent())
-	end
+	return owner_action("modules.shortcuts.actions.text", method)
 end
 
 sg("select_line", text_action("select_line"))
@@ -1009,24 +1017,23 @@ sg("toggle_capslock", function()
 	if ok and type(Sys.toggle_capslock) == "function" then Sys.toggle_capslock() end
 end)
 
---- Builds a gesture action that runs one function of the shortcut layer's
---- parent-scoped mouse owner under the dispatching parent.
 --- @param method string Public function of modules.shortcuts.actions.system_mouse.
 --- @return function
 local function mouse_action(method)
-	return function()
-		local ok, Mouse = pcall(require, "modules.shortcuts.actions.system_mouse")
-		if not ok or type(Mouse[method]) ~= "function" then
-			Logger.error(LOG, "Mouse action '%s' is unavailable: %s.", method, tostring(Mouse))
-			return false
-		end
-		return Mouse[method](current_action_parent())
-	end
+	return owner_action("modules.shortcuts.actions.system_mouse", method)
 end
 
 -- Formerly fixed hotkeys only (Ctrl+., Ctrl+P): no gesture or slot could bind them.
 sg("open_emoji_picker", mouse_action("open_emoji_picker"))
 sg("display_mirror_toggle", mouse_action("toggle_display_mirror"))
+-- Formerly fixed hotkeys only (Ctrl+D, Ctrl+E, Ctrl+I, Ctrl+S, Ctrl+X). The
+-- app-navigation and pixel owners are parent-scoped like the text and mouse
+-- ones, and joined to this module's lifecycle in scoped_action_children().
+sg("open_downloads", owner_action("modules.shortcuts.actions.apps", "open_downloads"))
+sg("open_file_manager", owner_action("modules.shortcuts.actions.apps", "open_finder"))
+sg("open_system_settings", owner_action("modules.shortcuts.actions.apps", "open_settings"))
+sg("copy_selected_path", owner_action("modules.shortcuts.actions.apps", "copy_or_open_path"))
+sg("pick_color", owner_action("modules.shortcuts.actions.system_pixel", "copy_pixel_color"))
 -- Keep-awake is one session for the machine, whoever starts it: the shortcut
 -- layer owns it (its Bindings lifecycle pauses and resumes it) and it stops by
 -- itself at the first physical input, so a gesture leaves nothing that outlives
@@ -1491,10 +1498,14 @@ end)
 local function scoped_action_children()
 	local text_ok, Text = pcall(require, "modules.shortcuts.actions.text")
 	local mouse_ok, Mouse = pcall(require, "modules.shortcuts.actions.system_mouse")
+	local apps_ok, Apps = pcall(require, "modules.shortcuts.actions.apps")
+	local pixel_ok, Pixel = pcall(require, "modules.shortcuts.actions.system_pixel")
 	if not text_ok or type(Text) ~= "table"
-		or not mouse_ok or type(Mouse) ~= "table" then
-		Logger.error(LOG, "Shared action lifecycle modules could not be loaded: %s / %s.",
-			tostring(Text), tostring(Mouse))
+		or not mouse_ok or type(Mouse) ~= "table"
+		or not apps_ok or type(Apps) ~= "table"
+		or not pixel_ok or type(Pixel) ~= "table" then
+		Logger.error(LOG, "Shared action lifecycle modules could not be loaded: %s / %s / %s / %s.",
+			tostring(Text), tostring(Mouse), tostring(Apps), tostring(Pixel))
 		return nil
 	end
 	return {
@@ -1507,6 +1518,12 @@ local function scoped_action_children()
 		{id = "mouse", subject = Mouse,
 			pause = "pause_mouse_actions", resume = "resume_mouse_actions",
 			query = "is_mouse_actions_paused", pending = "has_pending_mouse_action"},
+		{id = "apps", subject = Apps,
+			pause = "pause_apps_actions", resume = "resume_apps_actions",
+			query = "is_apps_actions_paused", pending = "has_pending_apps_action"},
+		{id = "pixel", subject = Pixel,
+			pause = "pause_pixel_actions", resume = "resume_pixel_actions",
+			query = "is_pixel_actions_paused", pending = "has_pending_pixel_action"},
 		{id = "screenshot", subject = ScreenshotSave,
 			pause = "pause_screenshot_actions", resume = "resume_screenshot_actions",
 			query = "has_screenshot_pause_claim",
