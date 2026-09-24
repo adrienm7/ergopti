@@ -1107,6 +1107,22 @@ function M.held_modifiers()
 	}
 end
 
+--- Whether CapsLock is locked, from the LED of the first open keyboard: the
+--- daemon forwards CapsLock and keeps no lock state of its own.
+--- @return boolean|nil locked Nil when no keyboard is open or the query failed.
+--- @return string|nil error Why the state is unknown.
+function M.caps_lock_on()
+	for _, path in ipairs(_devices) do
+		local slot = keyboard_slot(path)
+		if EvdevReader.is_open(slot) then
+			local leds, err = EvdevReader.active_leds(slot, LED_CAPSL)
+			if not leds then return nil, tostring(err) end
+			return leds[LED_CAPSL] == true
+		end
+	end
+	return nil, "no keyboard is open"
+end
+
 --- Resolves every device the daemon should be reading right now.
 --- @return table keyboards, table pointers
 local function _best_devices()
