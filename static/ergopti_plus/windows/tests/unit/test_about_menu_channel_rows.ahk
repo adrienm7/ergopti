@@ -54,6 +54,43 @@ _AMCR_ChannelRowsFollowTheRegistry() {
 }
 Test("About menu: one row per registry channel right before the check row", _AMCR_ChannelRowsFollowTheRegistry)
 
+; The frequency picker lists the shared presets (defaults.json, never last) and
+; its parent row reads the translated label of the preset in force. It used to
+; print the raw preset code ("Check frequency: 24h") and "?" for a saved value
+; outside its own hand-copied list.
+_AMCR_FrequencyPickerReadsTheSharedPresets() {
+	global UPDATER_CHECK_INTERVAL
+	SavedInterval := UPDATER_CHECK_INTERVAL
+	try {
+		Presets := UpdateSchedule_Presets()
+		AssertTrue(Presets.Length >= 5, "the shared presets must be listed")
+		for _, Pair in [[86400, "1d"], [600, "5m"], [0, "never"]] {
+			UPDATER_CHECK_INTERVAL := Pair[1]
+			Rows := _MI_AboutUpdateRows(false, _AMCR_RecordChannel.Bind({ Calls: [] }))
+			Frequency := Rows[Rows.Length]
+			AssertTrue(Frequency.Has("items"), "the frequency picker closes the updater block")
+			AssertEqual(t("menu.about.frequency_menu") . ": " . t("menu.about.frequency." . Pair[2]),
+				Frequency["label"], "the parent row reads the translated preset for " . Pair[1] . " s")
+			Items := Frequency["items"]
+			AssertEqual(Presets.Length, Items.Length, "one row per shared preset")
+			Ticked := 0
+			for Index, Preset in Presets {
+				AssertEqual(t("menu.about.frequency." . Preset["code"]), Items[Index]["label"],
+					"preset row " . Index . " reads its translated label")
+				if Items[Index]["checked"] {
+					Ticked += 1
+					AssertEqual(Pair[2], Preset["code"], "the preset in force is the ticked row")
+				}
+			}
+			AssertEqual(1, Ticked, "exactly one preset row is ticked for " . Pair[1] . " s")
+		}
+	} finally {
+		UPDATER_CHECK_INTERVAL := SavedInterval
+	}
+}
+Test("About menu: the frequency picker lists the shared presets with translated labels",
+	_AMCR_FrequencyPickerReadsTheSharedPresets)
+
 _AMCR_LocalCheckoutListsChannelsOnly() {
 	Ids := UpdateChannels_Ids()
 	Rows := _MI_AboutUpdateRows(true, _AMCR_RecordChannel.Bind({ Calls: [] }))

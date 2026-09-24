@@ -417,6 +417,8 @@ InstallSendNoOps()
 #Include unit/test_start_at_login.ahk
 #Include meta/test_uninstall_shutdown_gate.ahk
 #Include unit/test_updater_channel_registry.ahk
+#Include unit/test_updater_schedule_vectors.ahk
+#Include unit/test_updater_check_interval_snap.ahk
 #Include unit/test_updater_channel_selection.ahk
 ; The About submenu builder and its row actions: definitions only, drawn on
 ; demand by initMenu.

@@ -85,6 +85,10 @@ const GENERATORS = [
 		]
 	},
 	{
+		script: 'codegen/codegen-update-schedule.cjs',
+		outputs: ['static/ergopti_plus/windows/_generated/update_schedule.ahk']
+	},
+	{
 		script: 'codegen/codegen-contracts-json.cjs',
 		outputs: ['static/ergopti_plus/_shared/core/ports/contracts.json']
 	},

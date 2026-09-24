@@ -29,6 +29,7 @@ local function fake_updater(subscribed)
 	local up = {
 		CHANNELS = real.CHANNELS,
 		INTERVAL_PRESETS = real.INTERVAL_PRESETS,
+		TIMING = real.TIMING,
 		current_version = function() return "0.0.0-dev.140" end,
 		get_channel = function() return subscribed end,
 		set_channel = function(id)
@@ -113,6 +114,38 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 		rows[check_index + 1].fn()
 		helpers.assert_eq(downloads, { release.download_url },
 			"consent must retain the displayed URL so the manager can reject stale offers")
+	end)
+
+	-- The picker lists the shared presets (defaults.json, never last), and its
+	-- parent row names the preset in force in words. A value outside the presets
+	-- read as raw seconds ("Check frequency: 600") with no ticked row.
+	helpers.it("the frequency picker lists the shared presets with translated labels", function()
+		local Json = require("json")
+		local handle = assert(io.open(helpers.driver_root() .. "/../_shared/modules/updater/defaults.json", "rb"))
+		local presets = Json.decode(handle:read("*a")).timing.check_interval_presets
+		handle:close()
+		helpers.assert_true(#presets >= 5, "the shared presets must be present")
+		local i18n = require("infra.i18n")
+		for _, pair in ipairs({ { 86400, "1d" }, { 600, "5m" }, { 0, "never" } }) do
+			local up = fake_updater("dev")
+			up.get_check_interval = function() return pair[1] end
+			local rows = submenu_of(build(up), "menu.about.title")
+			local picker = rows[4 + #up.CHANNELS.ids()]
+			helpers.assert_eq(picker.title,
+				i18n.get("menu.about.frequency_menu") .. ": " .. i18n.get("menu.about.frequency." .. pair[2]),
+				"the parent row names the preset in force for " .. pair[1] .. " s")
+			helpers.assert_eq(#picker.menu, #presets, "one row per shared preset")
+			local ticked = 0
+			for index, preset in ipairs(presets) do
+				helpers.assert_eq(picker.menu[index].title, i18n.get("menu.about.frequency." .. preset.code),
+					"preset row " .. index .. " reads its translated label")
+				if picker.menu[index].checked == true then
+					ticked = ticked + 1
+					helpers.assert_eq(preset.code, pair[2], "the preset in force is the ticked row")
+				end
+			end
+			helpers.assert_eq(ticked, 1, "exactly one preset row is ticked for " .. pair[1] .. " s")
+		end
 	end)
 
 	-- A menu change used to leave an open Versions page offering the channel the

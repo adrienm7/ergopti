@@ -140,6 +140,7 @@ return {
 	"tests.unit.meta.test_top_level_order_is_the_manifest",
 	"tests.unit.meta.test_ui_bridge_handlers",
 	"tests.unit.meta.test_update_channels_vectors",
+	"tests.unit.meta.test_update_schedule_vectors",
 	"tests.unit.meta.test_updater_constants_single_source",
 	"tests.unit.meta.test_updater_manager",
 	"tests.unit.meta.test_updater_channel_and_recheck",

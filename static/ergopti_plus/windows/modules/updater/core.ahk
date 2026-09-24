@@ -37,12 +37,12 @@ global UPDATER_RELEASES_API_URL_TEMPLATE := "https://api.github.com/repos/{owner
 ; as unreachable.
 global UPDATER_NO_CHANNEL_RELEASE := "[]"
 
-; Background update-check interval. 0 means "never" (disabled). The default
-; 24h cadence is a sensible balance between freshness and network restraint
-; — most users do not want a release-day notification but appreciate hearing
-; about a security fix within the same day. Honoured by ``Updater_StartBackgroundChecks``.
+; Background update-check interval. 0 means "never" (disabled). The default and
+; the presets are the shared ones (_shared/modules/updater/defaults.json, read
+; through modules/updater/schedule.ahk); a saved value outside them snaps to
+; the nearest preset. Honoured by ``Updater_StartBackgroundChecks``.
 global UPDATER_INI_INTERVAL_KEY    := "check_interval_seconds"
-global UPDATER_DEFAULT_INTERVAL    := 86400
+global UPDATER_DEFAULT_INTERVAL    := UpdateSchedule_Timing()["default_check_interval_sec"]
 global UPDATER_CHECK_INTERVAL      := UPDATER_DEFAULT_INTERVAL
 
 ; WinHttp timeout budget (ms) for the synchronous GitHub Releases / asset calls.
@@ -116,24 +116,6 @@ global _UpdaterMenuRebuildPending       := false
 ; poll timer running forever.
 global UPDATER_ASYNC_POLL_MS   := 250
 global UPDATER_ASYNC_MAX_POLLS := Ceil((UPDATER_HTTP_RESOLVE_TIMEOUT_MS + UPDATER_HTTP_CONNECT_TIMEOUT_MS + UPDATER_HTTP_SEND_TIMEOUT_MS + UPDATER_HTTP_RECEIVE_TIMEOUT_MS) / UPDATER_ASYNC_POLL_MS) + 20
-
-; User-facing presets for the frequency submenu. Kept in display order so the
-; menu renders the way users naturally read time: short to long, with the
-; "off" row at the very bottom — a destructive choice deserves its own slot.
-global UPDATER_INTERVAL_PRESETS := [
-	{ Code: "1m",    Seconds: 60      },
-	{ Code: "5m",    Seconds: 300     },
-	{ Code: "10m",   Seconds: 600     },
-	{ Code: "1h",    Seconds: 3600    },
-	{ Code: "2h",    Seconds: 7200    },
-	{ Code: "3h",    Seconds: 10800   },
-	{ Code: "6h",    Seconds: 21600   },
-	{ Code: "12h",   Seconds: 43200   },
-	{ Code: "24h",   Seconds: 86400   },
-	{ Code: "2d",    Seconds: 172800  },
-	{ Code: "7d",    Seconds: 604800  },
-	{ Code: "never", Seconds: 0       }
-]
 
 ; Last release tag we already surfaced a notification for, so we don't keep
 ; nagging the user every interval tick about the same available update. Reset
@@ -1316,8 +1298,9 @@ Updater_SetChannel(Channel, Request := unset, IsSuspended := unset, NotifyFn := 
 ; =========================================
 
 ; Reads the saved background-check cadence from the INI cache. Accepts any
-; non-negative integer (seconds); 0 means "never". Defaults to 24h when the
-; key is absent so a fresh install gets a sensible cadence out of the box.
+; non-negative integer (seconds) and snaps it to the nearest shared preset, so
+; the frequency picker always ticks the cadence in force; 0 means "never". The
+; shared default applies when the key is absent.
 Updater_LoadCheckInterval() {
 	global _IniCache, UPDATER_CHECK_INTERVAL, UPDATER_INI_SECTION
 	global UPDATER_INI_INTERVAL_KEY, UPDATER_DEFAULT_INTERVAL
@@ -1350,7 +1333,11 @@ Updater_LoadCheckInterval() {
 	}
 	if (seconds < 0)
 		seconds := 0
-	UPDATER_CHECK_INTERVAL := seconds
+	Snap := UpdateSchedule_SnapInterval(seconds)
+	if Snap.Snapped
+		try LoggerWarn("Updater", "check_interval_seconds {1} is not a frequency preset — using the nearest one, {2} s ({3}).",
+			seconds, Snap.Seconds, Snap.Code)
+	UPDATER_CHECK_INTERVAL := Snap.Seconds
 }
 
 ; Builds the cadence transaction only after ConfigCommitBuilt owns config.toml.

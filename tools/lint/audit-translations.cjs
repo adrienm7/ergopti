@@ -100,21 +100,18 @@ const allFiles = [...ahkFiles, ...luaFiles];
 
 allFiles.forEach(auditFile);
 
-const REQUIRED_DYNAMIC_KEYS = [
-	'menu.about.frequency.1m',
-	'menu.about.frequency.5m',
-	'menu.about.frequency.10m',
-	'menu.about.frequency.1h',
-	'menu.about.frequency.2h',
-	'menu.about.frequency.3h',
-	'menu.about.frequency.6h',
-	'menu.about.frequency.12h',
-	'menu.about.frequency.24h',
-	'menu.about.frequency.2d',
-	'menu.about.frequency.7d',
-	'menu.about.frequency.never',
-	'menu.layout.no_bundle'
-];
+// The frequency rows build their key from the shared presets, so the keys come
+// from the same list the drivers read instead of a copy of it.
+const updaterDefaults = JSON.parse(fs.readFileSync(shared('modules/updater/defaults.json'), 'utf8'));
+const frequencyKeys = updaterDefaults.timing.check_interval_presets.map(
+	(preset) => `menu.about.frequency.${preset.code}`
+);
+if (frequencyKeys.length === 0) {
+	console.error('\x1b[31m[ERROR] defaults.json declares no check_interval_presets.\x1b[0m');
+	process.exit(1);
+}
+
+const REQUIRED_DYNAMIC_KEYS = [...frequencyKeys, 'menu.layout.no_bundle'];
 
 REQUIRED_DYNAMIC_KEYS.forEach(key => {
 	if (!availableKeys.has(key)) {

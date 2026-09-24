@@ -159,6 +159,7 @@ REQUIRED_FILES=(
 	"_shared/lua/updater/version.lua"
 	"_shared/lua/updater/release_sources.lua"
 	"_shared/lua/updater/channels.lua"
+	"_shared/lua/updater/schedule.lua"
 	"_shared/modules/updater/defaults.json"
 	# The daemon migrates config.toml at start; without the registry or the
 	# engine every session would refuse to write it.

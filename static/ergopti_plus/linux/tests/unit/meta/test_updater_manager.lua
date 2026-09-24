@@ -320,7 +320,7 @@ helpers.describe("modules/updater/manager.lua", function()
 		local previous_storage = package.loaded["adapters.storage"]
 		local previous_manager = package.loaded["modules.updater.manager"]
 		local storage = Fakes.storage({
-			initial = { ["updater.interval_sec"] = 7200 },
+			initial = { ["updater.interval_sec"] = 21600 },
 			writes_fail = true,
 		})
 		package.loaded["adapters.storage"] = storage
@@ -343,8 +343,8 @@ helpers.describe("modules/updater/manager.lua", function()
 		helpers.assert_eq(channel_changed, false)
 		helpers.assert_eq(interval_changed, false)
 		helpers.assert_eq(channel, before, "a failed write must not switch the live release feed")
-		helpers.assert_eq(interval, 7200, "a failed write must not change the live schedule")
-		helpers.assert_eq(storage.get("updater.interval_sec"), 7200)
+		helpers.assert_eq(interval, 21600, "a failed write must not change the live schedule")
+		helpers.assert_eq(storage.get("updater.interval_sec"), 21600)
 	end)
 
 	helpers.it("clear_cached_release resets state to idle", function()
