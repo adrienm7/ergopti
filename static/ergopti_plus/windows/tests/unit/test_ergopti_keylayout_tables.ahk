@@ -64,6 +64,15 @@ _EKT_Join(Items) {
 	return Out
 }
 
+; The error Fn throws, so a refusal test can pin WHY it was refused: a bare
+; AssertThrows also passes on a call to a function that does not exist.
+_EKT_Thrown(Fn) {
+	try Fn()
+	catch as Err
+		return Err
+	throw Error("expected an error, none was thrown")
+}
+
 ; Replaces the only occurrence of Old by New, failing loudly otherwise.
 _EKT_Tamper(Text, Old, New) {
 	Pos := InStr(Text, Old, true)
@@ -239,18 +248,26 @@ _EKT_ErgolSmokeCase() {
 	Assert(Tables["DeadKeys"].Count >= 10, "Ergo-L has at least ten dead keys")
 }
 
-Test("keylayout tables: a character composing two ways in one dead key is refused (ergopti-keylayout-tables)", () => (
-	AssertThrows(() => KeylayoutTables_DeadKeys(Keylayout_Parse(
+Test("keylayout tables: a character composing two ways in one dead key is refused (ergopti-keylayout-tables)",
+	_EKT_AmbiguousDeadKeyCase)
+
+_EKT_AmbiguousDeadKeyCase() {
+	Build(SecondOutput) => KeylayoutTables_DeadKeys(Keylayout_Parse(
 		'<keyboard group="0" id="1" name="T"><layouts><layout first="0" last="0" mapSet="S" modifiers="M"/></layouts>'
 		. '<modifierMap id="M" defaultIndex="0"><keyMapSelect mapIndex="0"><modifier keys=""/></keyMapSelect></modifierMap>'
 		. '<keyMapSet id="S"><keyMap index="0"><key code="0" action="d"/><key code="1" action="x1"/>'
 		. '<key code="2" action="x2"/></keyMap></keyMapSet>'
 		. '<actions><action id="d"><when state="none" next="s"/></action>'
 		. '<action id="x1"><when state="none" output="x"/><when state="s" output="1"/></action>'
-		. '<action id="x2"><when state="none" output="x"/><when state="s" output="2"/></action></actions>'
+		. '<action id="x2"><when state="none" output="x"/><when state="s" output="' . SecondOutput . '"/></action></actions>'
 		. '<terminators><when state="s" output="^"/></terminators></keyboard>'),
-		Map("SC010", 0, "SC011", 1, "SC012", 2)), "x cannot type both 1 and 2 after the dead key")
-))
+		Map("SC010", 0, "SC011", 1, "SC012", 2))
+	; Control: two keys composing the same way are one unambiguous entry.
+	AssertEqual("1", Build("1")["s"]["Inputs"]["x"]["Output"])
+	Err := _EKT_Thrown(() => Build("2"))
+	Assert(Err is ValueError, "an ambiguous dead key must raise a ValueError, got " . Type(Err) . ": " . Err.Message)
+	AssertContains(Err.Message, "compose differently", "x cannot type both 1 and 2 after the dead key")
+}
 
 
 
@@ -291,7 +308,8 @@ _EKT_PublishedCase() {
 	Labels := ErgoptiBaseLabels()
 	AssertEqual(36, Labels.Count, "the heatmap labels every remapped key and both dead keys")
 	AssertEqual(Chr(0xA8), Labels[0x1B])
-	AssertThrows(() => ErgoptiLayout_Init(LayoutRegistry_BundledDir()), "a second initialisation is refused")
+	AssertContains(_EKT_Thrown(() => ErgoptiLayout_Init(LayoutRegistry_BundledDir())).Message, "already loaded",
+		"a second initialisation is refused")
 }
 
 Test("ergopti tables: a shipped layout that fails its checksum is refused (ergopti-keylayout-tables)",
@@ -302,13 +320,19 @@ _EKT_ChecksumCase() {
 	DirCreate(Dir . "ergopti")
 	try {
 		FileCopy(LayoutRegistry_BundledDir() . "index.json", Dir . "index.json")
+		; Control: an untouched copy of the shipped folder reads, so the refusals
+		; below come from the edit and the missing file, not from the copy.
+		FileCopy(LayoutRegistry_BundledDir() . "ergopti\ergopti.keylayout", Dir . "ergopti\ergopti.keylayout")
+		AssertEqual("ergopti", LayoutRegistry_ReadBundled("ergopti", Dir)["Entry"]["id"])
 		Text := _EKT_Bundled("ergopti")["Text"]
 		Edited := _EKT_Tamper(Text, 'name="Ergopti_v2_2_2"', 'name="Ergopti_v2_2_3"')
 		F := FileOpen(Dir . "ergopti\ergopti.keylayout", "w", "UTF-8-RAW")
 		F.Write(Edited)
 		F.Close()
-		AssertThrows(() => LayoutRegistry_ReadBundled("ergopti", Dir), "an edited shipped layout must be refused")
-		AssertThrows(() => LayoutRegistry_ReadBundled("ergopti_plus", Dir), "a missing shipped layout must be refused")
+		AssertContains(_EKT_Thrown(() => LayoutRegistry_ReadBundled("ergopti", Dir)).Message, "checksum",
+			"an edited shipped layout must be refused")
+		AssertContains(_EKT_Thrown(() => LayoutRegistry_ReadBundled("ergopti_plus", Dir)).Message, "Cannot read",
+			"a missing shipped layout must be refused")
 	} finally DirDelete(Dir, true)
 }
 
