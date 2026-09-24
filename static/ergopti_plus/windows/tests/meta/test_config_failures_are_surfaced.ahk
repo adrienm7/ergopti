@@ -79,7 +79,8 @@ _CFAS_PlaceholderWriteIsChecked() {
 	Assert(Helper != "" && Body != "")
 	Assert(InStr(Helper, "ConfigTransitionPresentTarget(ConfigPath") > 0
 		&& InStr(Helper, "[_meta]") > 0
-		&& InStr(Helper, "schema_version = 2") > 0,
+		&& InStr(Helper, "schema_version = ") > 0
+		&& InStr(Helper, "ConfigMigrateCurrentVersion()") > 0,
 		"the reset transaction must declare one complete valid placeholder image")
 	Assert(InStr(Helper, "ConfigTransitionAbsentTarget(TapHoldPath)") > 0
 		&& InStr(Helper, "ConfigTransitionAbsentTarget(ApiEntriesPath)") > 0,

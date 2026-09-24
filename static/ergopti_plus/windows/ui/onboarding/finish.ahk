@@ -110,6 +110,8 @@ _Onboarding_Commit(BeforeReloadFn := 0) {
 					"onboarding.error.commit_trigger_recovery")
 				return false
 			}
+			; A config.toml the wizard creates carries this build's schema version.
+			updates := ConfigMigrateStampNewFile(updates, CandidateConfig)
 			updates := _ConfigPrepareTypedUpdates(updates)
 			CandidateResult := TOML_BuildUpdatedContent(CandidateConfig, updates)
 			if !ConfigTransitionResultIs(CandidateResult, "rendered")

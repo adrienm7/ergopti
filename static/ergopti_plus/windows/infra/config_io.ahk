@@ -1228,7 +1228,8 @@ _ConfigCollectFullSaveUpdates(FeaturesSource := unset, MenuSource := unset) {
 						throw Error("LLM menu state could not be reconciled into the full-save candidate")
 				_CollectFeatureUpdates(Updates, "",
 						_PruneMasterGatedFeatures(FeatureSnapshot))
-				Updates.Push({ Section: "_meta", Key: "schema_version", Value: 2 })
+				; The version the boot migration reads (infra/config_migrate.ahk).
+				Updates.Push({ Section: "_meta", Key: "schema_version", Value: ConfigMigrateCurrentVersion() })
 		}
 		Updates.Push({ Section: "script", Key: "locale", Value: I18nGetLocale() })
 		Updates.Push({ Section: "script", Key: "log_level", Value: IsSet(LOGGER_MIN_LEVEL) ? LOGGER_MIN_LEVEL : LOGGER_DEFAULT_LEVEL })
@@ -1299,7 +1300,17 @@ _ConfigCollectFullSaveUpdates(FeaturesSource := unset, MenuSource := unset) {
 ; Targeted repairs and explicit reset do not serialize the incomplete boot tree.
 ; Every full-state producer, including detached candidates, shares this gate.
 ConfigFullStateCanPersist() {
-	global _ConfigBootReadFailed, _ConfigBootRejectedOverrides
+	global _ConfigBootReadFailed, _ConfigBootRejectedOverrides, ConfigurationFile
+	; The boot migration refused the file (a newer schema, a failed migration):
+	; the loaded tree does not describe it, so it must never be serialized over it.
+	if IsSet(ConfigurationFile) {
+		Refusal := TOML_WriteRefusal(ConfigurationFile)
+		if (Refusal != "") {
+			try LoggerError("ConfigIO", "Refusing full-state persistence: config.toml is read-only for this session ({1}).",
+				Refusal)
+			return false
+		}
+	}
 	if IsSet(_ConfigBootReadFailed) && _ConfigBootReadFailed {
 		try LoggerError("ConfigIO", "Refusing full-state persistence: config.toml could not be read at boot. Restart the driver once the file is readable.")
 		return false

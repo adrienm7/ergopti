@@ -298,3 +298,95 @@ _CMG_RegistryLoaderRejectsDefects() {
 Test("config migrate: the registry loader rejects gaps, unknown ops, drivers and fields and "
 	. "misnamed steps (config-migrate-registry)", _CMG_RegistryLoaderRejectsDefects)
 
+
+
+
+
+; ================================
+; ================================
+; ======= 3/ Driver wiring =======
+; ================================
+; ================================
+
+; The full save stamps what the boot migration reads.
+_CMG_FullSaveStampsTheCurrentVersion() {
+	global _LLM_Menu
+	Menu := _HSDeepCloneMap(_LLM_Menu)
+	Menu["onboarding_seen"] := false
+	Menu["app_profile_overrides"] := Map()
+	Menu["user_profiles"] := []
+	Stamps := []
+	for Update in _ConfigCollectFullSaveUpdates(ManifestBuildFeaturesMap(), Menu) {
+		if (Update.Section == "_meta" && Update.Key == "schema_version")
+			Stamps.Push(Update.Value)
+	}
+	AssertEqual(1, Stamps.Length, "a full save stamps the version exactly once")
+	AssertEqual(ConfigMigrateCurrentVersion(), Stamps[1],
+		"a full save must stamp the registry's current version, not a literal")
+}
+Test("config migrate: the full save stamps the registry's current version "
+	. "(config-migrate-full-save-stamp)", _CMG_FullSaveStampsTheCurrentVersion)
+
+; The boot migrates before the first read of config.toml and before every
+; producer that can save it; the entry script cannot run headless, so its
+; order is read from the source.
+_CMG_BootMigratesBeforeAnyReaderOrWriter() {
+	SplitPath(A_ScriptDir, , &WindowsDir)
+	Body := ""
+	try Body := FileRead(WindowsDir . "\ErgoptiPlus.ahk", "UTF-8")
+	Assert(Body != "", "ErgoptiPlus.ahk must be readable")
+	Migrate := InStr(Body, "`nConfigMigrateBoot(ConfigurationFile)")
+	Snapshot := InStr(Body, "`nglobal _IniCache := ParseTomlFile(ConfigurationFile)")
+	Apply := InStr(Body, "ApplyBootConfigToml(Features,")
+	FullSave := InStr(Body, "_ConfigQueueFullSave(CONFIG_FULL_SAVE_BOOT_DELAY_MS")
+	Assert(Migrate > 0 && Snapshot > 0 && Apply > 0 && FullSave > 0,
+		"every boot marker must still exist in ErgoptiPlus.ahk")
+	Assert(Migrate < Snapshot && Snapshot < Apply && Apply < FullSave,
+		"the migration runs before the boot snapshot, ApplyBootConfigToml and the boot full save")
+	StrReplace(Body, "ConfigMigrateBoot(", , , &Calls)
+	AssertEqual(1, Calls, "the boot migrates exactly once")
+}
+Test("config migrate: the boot migrates config.toml before reading or saving it "
+	. "(config-migrate-boot-order)", _CMG_BootMigratesBeforeAnyReaderOrWriter)
+
+; A config.toml the session must not write keeps every full save disarmed.
+_CMG_ReadOnlyConfigBlocksFullSaves() {
+	global ConfigurationFile
+	Dir := _CMG_NewDir()
+	Previous := ConfigurationFile
+	try {
+		Path := Dir . "\config.toml"
+		AssertTrue(FSWriteDurable(Path, "[_meta]`nschema_version = 999`n"))
+		AssertEqual("newer", ConfigMigrateRun(Path)["status"])
+		ConfigurationFile := Path
+		AssertFalse(ConfigFullStateCanPersist(), "full saves stay disarmed for a read-only config")
+	} finally {
+		ConfigurationFile := Previous
+		DirDelete(Dir, true)
+	}
+}
+Test("config migrate: a read-only config.toml keeps every full save disarmed "
+	. "(config-migrate-full-save-read-only)", _CMG_ReadOnlyConfigBlocksFullSaves)
+
+; A file this build creates carries this build's version; an existing file
+; keeps its own, since stamping it would skip the steps it still needs.
+_CMG_OnlyANewFileIsStamped() {
+	Dir := _CMG_NewDir()
+	try {
+		Path := Dir . "\config.toml"
+		Updates := ConfigMigrateStampNewFile([{ Section: "script", Key: "locale", Value: "fr" }], Path)
+		AssertEqual(2, Updates.Length, "a file about to be created gets the stamp")
+		AssertEqual("_meta", Updates[2].Section)
+		AssertEqual("schema_version", Updates[2].Key)
+		AssertEqual(ConfigMigrateCurrentVersion(), Updates[2].Value)
+		AssertTrue(FSWriteDurable(Path, '[script]`nlocale = "en"`n'))
+		AssertEqual(1, ConfigMigrateStampNewFile([{ Section: "script", Key: "locale", Value: "fr" }], Path).Length,
+			"an existing file is never stamped by a writer")
+	} finally DirDelete(Dir, true)
+	Body := _DriverFuncBody("_Onboarding_Commit")
+	Assert(Body != "", "_Onboarding_Commit must be found")
+	Assert(InStr(Body, "ConfigMigrateStampNewFile(updates, CandidateConfig)", true) > 0,
+		"the wizard stamps the config.toml it creates")
+}
+Test("config migrate: only a config.toml this build creates is stamped by a writer "
+	. "(config-migrate-stamp-new-file)", _CMG_OnlyANewFileIsStamped)
