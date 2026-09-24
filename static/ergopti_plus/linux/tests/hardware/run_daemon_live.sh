@@ -3,8 +3,9 @@
 #
 # A desktop for run_daemon_live.lua: an X server, a session bus, the
 # accessibility bus, a window manager, a focused GTK text field (the fail-closed
-# privacy gate lets nothing expand without one), and sni_host.py standing in for
-# the panel. Then the real daemon, a real trigger, and the tray it shows.
+# privacy gate lets nothing expand without one), sni_host.py standing in for
+# the panel, and fake_llm_server.py standing in for a hosted AI API. Then the
+# real daemon, a real trigger, a real prediction, and the tray it shows.
 #
 # Needs root (uinput and the grab), Xvfb, dbus-launch, at-spi2-core, openbox,
 # xkbcomp, python3-gi with Gtk 3. Run from anywhere.
@@ -36,6 +37,18 @@ sleep 1
 python3 tests/hardware/atspi_fixture_app.py editor >/dev/null 2>&1 &
 PIDS="${PIDS} $!"
 sleep 2
+
+# A Cerebras-style API on loopback for the AI phase, answering with ASCII-escaped
+# JSON as Python servers do.
+LLM_READY="$(mktemp -u)"
+export ERGOPTI_LIVE_LLM_PORT=18431
+export ERGOPTI_LIVE_LLM_LOG="$(mktemp)"
+export ERGOPTI_LIVE_LLM_REPLY=" que tout le monde va bien"
+python3 tests/hardware/fake_llm_server.py --port "${ERGOPTI_LIVE_LLM_PORT}" --log "${ERGOPTI_LIVE_LLM_LOG}" \
+	--reply "${ERGOPTI_LIVE_LLM_REPLY}" --ready-file "${LLM_READY}" &
+PIDS="${PIDS} $!"
+for _ in $(seq 1 40); do [ -f "${LLM_READY}" ] && break; sleep 0.25; done
+[ -f "${LLM_READY}" ] || { echo "ENVIRONMENT: the fake LLM API never started" >&2; exit 2; }
 
 READY="$(mktemp -u)"
 REPORT="$(mktemp)"
