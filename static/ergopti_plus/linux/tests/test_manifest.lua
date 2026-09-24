@@ -83,6 +83,7 @@ return {
 	"tests.unit.meta.test_tap_hold_loader",
 	"tests.unit.meta.test_tap_hold_manager",
 	"tests.unit.meta.test_tap_hold_menu",
+	"tests.unit.meta.test_tap_hold_integration",
 	"tests.unit.meta.test_kanata_manager",
 	"tests.unit.meta.test_kanata_pointer_interrupts",
 	"tests.unit.meta.test_keyboard_hook_adapter",

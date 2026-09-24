@@ -49,6 +49,11 @@ local KEY_LEFTSHIFT = 42
 -- Every modifier key, left and right.
 local MODIFIER_KEYS = { [29] = true, [42] = true, [54] = true, [56] = true, [97] = true, [100] = true, [125] = true, [126] = true }
 local KEY_LEFTCTRL, KEY_LEFTALT, KEY_LEFTMETA = 29, 56, 125
+-- The keys that are themselves under a held modifier (Ctrl+Tab, Shift+Tab,
+-- Ctrl+Backspace), as the Windows hotkeys without a wildcard are. CapsLock
+-- and the modifier keys stay tap-holds, so LShift and CapsLock held together
+-- are Ctrl+Shift.
+local NATIVE_UNDER_MODIFIER = { [1] = true, [14] = true, [15] = true, [28] = true, [57] = true, [111] = true }
 local KEY_HOME, KEY_END, KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT = 102, 107, 103, 108, 105, 106
 local KEY_ENTER, KEY_BACKSPACE, KEY_ESC = 28, 14, 1
 local KEY_F2, KEY_F12 = 60, 88
@@ -113,6 +118,10 @@ function M.new(opts)
 		layer_keys = {},     -- code -> chord emitted for a key pressed on the layer
 		one_shot_until = nil,
 		one_shot_keys = {},  -- keys a one-shot Shift is wrapping (several can overlap)
+		native_keys = {},    -- configured keys pressed under a modifier: themselves until released
+		key_refs = {},       -- code -> how many of this engine's holders keep it down
+		passed_down = {},    -- keys that went through untouched and are down (the hand's)
+		modifiers_down = {}, -- modifier keys that went through untouched, and are down
 	}
 	for key_id, config in pairs(type(options.keys) == "table" and options.keys or {}) do
 		local code = M.KEY_CODES[key_id]
@@ -164,19 +173,84 @@ local function cancel_taps(self, except)
 	end
 end
 
+--- Presses a key for one more of this engine's holders. Only the first sends
+--- it down, and not even that one when the hand already holds it: two holds of
+--- one modifier (CapsLock and left Ctrl, both Ctrl), two layer keys that are
+--- both Left, a physical Backspace and the layer's are each one key to the
+--- kernel, and the first release must not lift it under the others.
+local function press(self, out, code)
+	local refs = (self.key_refs[code] or 0) + 1
+	self.key_refs[code] = refs
+	if refs == 1 and not self.passed_down[code] then out[#out + 1] = { code = code, value = DOWN } end
+end
+
+--- Releases a key for one of this engine's holders; only the last sends it
+--- up, and only when the hand does not still hold it.
+local function release(self, out, code)
+	local refs = (self.key_refs[code] or 0) - 1
+	if refs > 0 then
+		self.key_refs[code] = refs
+		return
+	end
+	self.key_refs[code] = nil
+	if not self.passed_down[code] then out[#out + 1] = { code = code, value = UP } end
+end
+
 --- Appends the events of a chord going down or up.
-local function chord_events(out, spec, value)
+local function chord_events(self, out, spec, value)
 	if value == DOWN then
-		for _, mod in ipairs(spec.mods) do out[#out + 1] = { code = mod, value = DOWN } end
+		for _, mod in ipairs(spec.mods) do press(self, out, mod) end
 		for index, key in ipairs(spec.keys) do
-			out[#out + 1] = { code = key, value = DOWN }
+			press(self, out, key)
 			-- A sequence (End then Enter) releases each key before the next.
-			if index < #spec.keys then out[#out + 1] = { code = key, value = UP } end
+			if index < #spec.keys then release(self, out, key) end
 		end
 	else
-		out[#out + 1] = { code = spec.keys[#spec.keys], value = UP }
-		for index = #spec.mods, 1, -1 do out[#out + 1] = { code = spec.mods[index], value = UP } end
+		release(self, out, spec.keys[#spec.keys])
+		for index = #spec.mods, 1, -1 do release(self, out, spec.mods[index]) end
 	end
+end
+
+--- Whether a modifier is down: one passed through, or one a hold emitted.
+local function modifier_held(self)
+	if next(self.modifiers_down) then return true end
+	for _, state in pairs(self.held) do
+		if #state.emitted > 0 then return true end
+	end
+	return false
+end
+
+--- Passes an event through, keeping track of what the hand holds. A key this
+--- engine already holds (CapsLock's Ctrl, then a physical Ctrl) is not pressed
+--- again, and is lifted by whichever of the two lets go last.
+--- @return table|nil nil to pass the event unchanged, {} to swallow it
+local function pass(self, code, value)
+	if value == REPEAT then return nil end
+	if MODIFIER_KEYS[code] then self.modifiers_down[code] = value == DOWN or nil end
+	self.passed_down[code] = value == DOWN or nil
+	if self.key_refs[code] then return {} end
+	return nil
+end
+
+--- A key typed by a tap. Already held through (Enter held while CapsLock types
+--- Enter), it is lifted and pressed again: a keystroke all the same, and the
+--- kernel's one bit for it ends as the user's hand has it.
+local function tap_key(self, out, code)
+	if self.key_refs[code] or self.passed_down[code] then
+		out[#out + 1] = { code = code, value = UP }
+		out[#out + 1] = { code = code, value = DOWN }
+	else
+		out[#out + 1] = { code = code, value = DOWN }
+		out[#out + 1] = { code = code, value = UP }
+	end
+end
+
+--- Presses a layer chord for `code` and remembers it until the key comes up.
+local function press_layer_key(self, code, spec)
+	local out = {}
+	self.layer_keys[code] = spec
+	chord_events(self, out, spec, DOWN)
+	return out
 end
 
 --- Processes one physical key event.
@@ -189,10 +263,41 @@ function M:process(code, value, now_ms)
 	local config = self.by_code[code]
 	local out = {}
 
+	-- A key pressed on the layer keeps its chord until it is released, even if
+	-- the layer key comes up first.
+	local on_layer = self.layer_keys[code]
+	if on_layer then
+		if value == REPEAT then
+			out[#out + 1] = { code = on_layer.keys[#on_layer.keys], value = REPEAT }
+		elseif value == UP then
+			self.layer_keys[code] = nil
+			chord_events(self, out, on_layer, UP)
+		end
+		return out
+	end
+
+	-- Tab, Enter and their kind pressed while a modifier was down are the key
+	-- itself (Ctrl+Tab, Shift+Tab), as on Windows, until released.
+	if self.native_keys[code] then
+		if value == UP then self.native_keys[code] = nil end
+		return pass(self, code, value)
+	end
+
 	if config then
 		if value == REPEAT then return out end
 		if value == DOWN then
 			if self.held[code] then return out end
+			-- On the layer, a configured key is a layer key like any other.
+			local spec = self.layer_depth > 0 and not config.layer and M.NAV_LAYER[code]
+			if spec then
+				cancel_taps(self, nil)
+				return press_layer_key(self, code, spec)
+			end
+			if NATIVE_UNDER_MODIFIER[code] and modifier_held(self) then
+				cancel_taps(self, nil)
+				self.native_keys[code] = true
+				return pass(self, code, value)
+			end
 			cancel_taps(self, code)
 			local state = { down_at = now_ms, cancelled = false, emitted = {} }
 			self.held[code] = state
@@ -201,7 +306,7 @@ function M:process(code, value, now_ms)
 				self.layer_depth = self.layer_depth + 1
 			end
 			for _, mod in ipairs(config.mods) do
-				out[#out + 1] = { code = mod, value = DOWN }
+				press(self, out, mod)
 				state.emitted[#state.emitted + 1] = mod
 			end
 			return out
@@ -212,7 +317,7 @@ function M:process(code, value, now_ms)
 		-- installed: the hook decides, from what it forwarded, what it means.
 		if not state then return nil end
 		self.held[code] = nil
-		for index = #state.emitted, 1, -1 do out[#out + 1] = { code = state.emitted[index], value = UP } end
+		for index = #state.emitted, 1, -1 do release(self, out, state.emitted[index]) end
 		if state.layer then self.layer_depth = math.max(0, self.layer_depth - 1) end
 		local elapsed = now_ms - state.down_at
 		local is_tap = not state.cancelled and elapsed <= config.threshold_ms and elapsed >= self.tap_min_ms
@@ -229,8 +334,7 @@ function M:process(code, value, now_ms)
 		end
 		local key_tap = M.KEY_TAPS[config.tap]
 		if key_tap then
-			out[#out + 1] = { code = key_tap, value = DOWN }
-			out[#out + 1] = { code = key_tap, value = UP }
+			tap_key(self, out, key_tap)
 			return out, nil
 		end
 		return out, config.tap
@@ -239,31 +343,17 @@ function M:process(code, value, now_ms)
 	-- Any other key: a chord for every held tap-hold key.
 	if value == DOWN then cancel_taps(self, nil) end
 
-	-- The navigation layer. A key pressed on the layer keeps its chord until it
-	-- is released, even if the layer key comes up first.
-	local on_layer = self.layer_keys[code]
-	if on_layer then
-		if value == REPEAT then
-			out[#out + 1] = { code = on_layer.keys[#on_layer.keys], value = REPEAT }
-		elseif value == UP then
-			self.layer_keys[code] = nil
-			chord_events(out, on_layer, UP)
-		end
-		return out
-	end
 	if self.layer_depth > 0 and value == DOWN then
 		local spec = M.NAV_LAYER[code]
-		if spec then
-			self.layer_keys[code] = spec
-			chord_events(out, spec, DOWN)
-			return out
-		end
+		if spec then return press_layer_key(self, code, spec) end
 	end
 
 	-- The one-shot Shift wraps the next key.
 	if self.one_shot_keys[code] and value == UP then
 		self.one_shot_keys[code] = nil
-		return { { code = code, value = UP }, { code = KEY_LEFTSHIFT, value = UP } }
+		release(self, out, code)
+		release(self, out, KEY_LEFTSHIFT)
+		return out
 	end
 	-- A modifier pressed meanwhile (Ctrl for Ctrl+Shift+T) leaves it armed.
 	if self.one_shot_until and value == DOWN and not MODIFIER_KEYS[code] then
@@ -271,10 +361,12 @@ function M:process(code, value, now_ms)
 		self.one_shot_until = nil
 		if armed and not self.one_shot_keys[code] then
 			self.one_shot_keys[code] = true
-			return { { code = KEY_LEFTSHIFT, value = DOWN }, { code = code, value = DOWN } }
+			press(self, out, KEY_LEFTSHIFT)
+			press(self, out, code)
+			return out
 		end
 	end
-	return nil
+	return pass(self, code, value)
 end
 
 --- A click or a wheel turn: it makes every held tap-hold key a chord.
@@ -286,19 +378,14 @@ end
 --- @return table events Key-ups, in the reverse of the order they went down.
 function M:release_all()
 	local out = {}
-	for code, spec in pairs(self.layer_keys) do
-		local _ = code
-		chord_events(out, spec, UP)
-	end
-	for code in pairs(self.one_shot_keys) do
-		out[#out + 1] = { code = code, value = UP }
-		out[#out + 1] = { code = KEY_LEFTSHIFT, value = UP }
-	end
-	for _, state in pairs(self.held) do
-		for index = #state.emitted, 1, -1 do out[#out + 1] = { code = state.emitted[index], value = UP } end
+	-- Every key this engine holds down, once, whoever of it holds it.
+	-- Keys the hand still holds stay down: they are the kernel's to release.
+	for code in pairs(self.key_refs) do
+		if not self.passed_down[code] then out[#out + 1] = { code = code, value = UP } end
 	end
 	self.held, self.layer_keys, self.layer_depth = {}, {}, 0
-	self.one_shot_until, self.one_shot_keys = nil, {}
+	self.one_shot_until, self.one_shot_keys, self.key_refs = nil, {}, {}
+	self.native_keys, self.modifiers_down, self.passed_down = {}, {}, {}
 	return out
 end
 
