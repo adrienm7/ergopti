@@ -228,6 +228,13 @@ _LLM_Bridge_CommitInjectedText(Transaction) {
 	if !IsSet(_PrefixCommitInputContext) or !IsSet(_PrefixFinishInputContext)
 		throw Error("Prefix/HSE paired commit owner is unavailable.")
 	PrefixCommit := _PrefixCommitInputContext(Transaction.SourceControl, false)
+	; Feed the WPM widget one sample per accepted character, marked AI, so the
+	; pill turns the AI colour as it does on macOS and Linux. Nothing marked
+	; AI text on this driver, so that colour was never shown.
+	if IsSet(WPMWidget_Push) {
+		Loop StrLen(Transaction.Text)
+			try WPMWidget_Push(false, true)
+	}
 	if IsSet(_LSCResetFrom) {
 		Tail := []
 		N := Min(StrLen(Transaction.Text), 5)

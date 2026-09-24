@@ -206,9 +206,11 @@ helpers.describe("wpm widget: it is ticked", function()
 		local handle = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "r"))
 		local source = handle:read("*a")
 		handle:close()
-		helpers.assert_true(source:find("wpm_widget%.tick") ~= nil,
+		helpers.assert_true(source:find('RuntimeGuard.call("WPM widget tick"', 1, true) ~= nil,
 			"a widget nobody ticks draws nothing, and every test of its frame "
 				.. "computation passes regardless")
+		helpers.assert_true(source:find("keylogger.get_live_stats(", 1, true) ~= nil,
+			"and one ticked with the session totals has no speed and no source to draw")
 		helpers.assert_true(source:find("wpm_widget%.restore") ~= nil,
 			"and one nobody restores comes up hidden however the user left it")
 	end)

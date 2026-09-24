@@ -32,16 +32,12 @@ local _pause_restore_pending = false
 local _use_source_colors = true
 local _generation        = 0
 
--- Source-color hold duration in seconds, single-sourced from the SAME shared TOML
--- the floating widget uses (wpm_color_hold_ms via wpm_widget._load_shared_const), so
--- the menubar and widget agree on how long the hotstring color lingers. Hardcoding it
--- (was 3.0) drifted from the widget's 1.0 s (F-L7). Read once at module load.
-local COLOR_HOLD_FALLBACK_S = 1.0  -- mirrors wpm_color_hold_ms = 1000 when the TOML is unreadable
-local COLOR_HOLD_S = (function()
-	local ok, ww = pcall(require, "ui.wpm.wpm_widget")
-	local d = ok and type(ww._load_shared_const) == "function" and ww._load_shared_const().source_color_duration
-	return (type(d) == "number" and d) or COLOR_HOLD_FALLBACK_S
-end)()
+-- The colour hold and the refresh, from the shared timings registry — the
+-- same hold the floating widget reads, so the two agree on how long a source
+-- colour lingers. The registry fails fast on a missing key: no literal copy.
+local Timings = require("infra.timings")
+local COLOR_HOLD_S = Timings.sec("ui", "wpm_color_hold_ms")
+local UPDATE_S = Timings.sec("ui", "wpm_menubar_update_ms")
 
 
 
@@ -94,6 +90,10 @@ update_menubar_body = function(generation)
 	if not is_current(generation) then return false end
 	
 	if display_wpm > 0 or tooltip_visible or (active_source ~= "none") then
+		-- The readout's style: the shared canon's [menubar] section.
+		local canon = WPMShared.canon()
+		if not canon then return false end
+		local style = canon.menubar
 		if not _menubar then 
 			_menubar = hs.menubar.new() 
 			if not _menubar then error("Menubar construction refused") end
@@ -105,13 +105,13 @@ update_menubar_body = function(generation)
 		-- Add a translucent background to preserve readability in the menubar
 		local bg_color = nil
 		if _use_source_colors and active_source ~= "none" then
-			bg_color = WPMShared.get_source_color(active_source, 0.5)
+			bg_color = WPMShared.get_source_color(active_source, style.background_alpha)
 		end
 		if not is_current(generation) or _menubar ~= item then return false end
 		
 		local attrs = { 
-			font = { name = ".AppleSystemUIFont", size = 13 }, 
-			color = { white = 1, alpha = 1 } 
+			font = { name = ".AppleSystemUIFont", size = style.font_size },
+			color = { hex = style.text_color, alpha = 1 }
 		}
 		if bg_color then attrs.backgroundColor = bg_color end
 		
@@ -177,7 +177,7 @@ function M.start()
 	_generation = _generation + 1
 	local generation = _generation
 	local ok, candidate, committed = xpcall(function()
-		return TimerScheduler.every(0.5, function()
+		return TimerScheduler.every(UPDATE_S, function()
 			if not _running or generation ~= _generation then return end
 			update_menubar(generation)
 		end)

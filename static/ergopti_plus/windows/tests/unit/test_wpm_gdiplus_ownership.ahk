@@ -339,6 +339,8 @@ Test("wpm GDI+ frame: ambiguous failed creates cannot leak a handle",
 	_WPMGF_AmbiguousCreateHandleIsStillOwned)
 
 _WPMGF_RealDrawFunctionRoutesEveryAllocationThroughReceipt() {
+	; The panel's padding, corners and colours are the shared canon's.
+	AssertTrue(WPMWidget_LoadSharedConst(), "the shared WPM canon must load")
 	_WPMGF_Native.Reset()
 	Receipt := _WPMGdipNewFrameReceipt()
 	WPMWidget_DrawGraph(601, 160, 80, "42 WPM", "#4499FF", [10, 20],
@@ -355,6 +357,7 @@ Test("wpm GDI+ frame: the real graph draw owns every allocation",
 	_WPMGF_RealDrawFunctionRoutesEveryAllocationThroughReceipt)
 
 _WPMGF_DrawActualGraph(Graphics, Receipt, Native) {
+	AssertTrue(WPMWidget_LoadSharedConst(), "the shared WPM canon must load")
 	WPMWidget_DrawGraph(Graphics, 160, 80, "42 WPM", "#4499FF",
 		[10, 20], Receipt, Native, 15, 120)
 }

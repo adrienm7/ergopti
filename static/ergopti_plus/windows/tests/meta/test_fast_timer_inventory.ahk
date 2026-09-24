@@ -85,7 +85,7 @@ _FTI_Inventory() {
 		"KLMouse.park_timer_fn",        "250",   ; mouse park detection
 		"_LoggerFlush",                 "500",   ; batched log write
 		"_UIA_SelectionPollTimer",      "500",   ; cross-process COM round-trip
-		"WPMWidget_Tick",               "500",   ; only armed while the WPM widget is visible
+		"WPMWidget_Tick",               "200",   ; only armed while the WPM widget is visible; timings [ui] wpm_widget_update_ms, the macOS rate
 		"BoundFn",                      "?",     ; generic scheduler adapter, period is the caller's
 		"_SuspendStateWatchdog",        "500",   ; lifecycle transitions and one-shot boot restore
 		"SimulateActivity",             "?")     ; randomised interval, awake mode only
@@ -172,6 +172,10 @@ _FTI_ResolvePeriod(Src, Expr) {
 		return Expr
 	if !RegExMatch(Expr, "^(?:[_A-Za-z][_A-Za-z0-9]*\.)?([_A-Za-z][_A-Za-z0-9]*)$", &Name)
 		return ""
+	; A constant loaded from the shared timings registry resolves to the
+	; registry's value: its static declaration is only a placeholder.
+	if RegExMatch(Src, '\.' . Name[1] . '\s*:=\s*(?:_WPMWidget_NeedTiming|TimingsGet)\(\s*"(\w+)"\s*,\s*"(\w+)"', &Timing)
+		return String(TimingsGet(Timing[1], Timing[2]))
 	if RegExMatch(Src, "m)^\s*(?:global|static)\s+" . Name[1] . "\s*:=\s*(\d+)\b", &Value)
 		return Value[1]
 	return ""

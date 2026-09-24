@@ -28,9 +28,11 @@ helpers.describe("wpm_widget._load_shared_const survives a missing/renamed TOML 
 		helpers.assert_true(ok, "loader must NOT raise on a missing/renamed TOML key (nil arithmetic)")
 		helpers.assert_true(type(cfg) == "table", "loader must still return a table")
 		-- The previously-crashing conversions now yield nil instead of throwing.
+		-- (Timings come from the shared timings registry, which owns its own
+		-- fail-fast check; only the canon's fields depend on this file.)
+		helpers.assert_nil(cfg.canon)
 		helpers.assert_nil(cfg.color_txt_active_alpha)
-		helpers.assert_nil(cfg.idle_hide_s)
-		helpers.assert_nil(cfg.source_color_duration)
+		helpers.assert_nil(cfg.compact_width)
 
 		package.loaded["ui.wpm.wpm_widget"] = nil
 		package.loaded["infra.paths"]         = nil

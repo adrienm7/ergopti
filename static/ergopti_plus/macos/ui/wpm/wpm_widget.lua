@@ -24,6 +24,11 @@ local Paths      = require("infra.paths")
 local GraphicsRenderer = require("adapters.graphics_renderer")
 local Storage = require("adapters.storage")
 local TimerScheduler = require("adapters.timer_scheduler")
+local Timings = require("infra.timings")
+local TomlCodec = require("toml_codec")
+-- What the readouts decide — colours, frames, the graph, the default place —
+-- shared with the Linux driver.
+local WPMModel = require("wpm_widget.model")
 
 local LOG = "wpm_widget"
 
@@ -70,107 +75,49 @@ end
 -- ================================
 -- ================================
 
--- Reads a flat key=value pair from a raw TOML line (no section header handling needed here).
-local function _toml_num(line, key)
-	local v = line:match("^" .. key .. "%s*=%s*([%d%.]+)")
-	return v and tonumber(v) or nil
-end
-
--- Loads _shared/modules/wpm_widget/constants.toml and _shared/modules/timings/constants.toml at runtime.
--- Returns a config table; logs an error and returns a safe-default stub on failure.
+-- Reads the shared canon (_shared/modules/wpm_widget/constants.toml, checked
+-- key by key by the shared model) and the refresh, hold and idle timings.
+-- Fails SOFT per field: an unusable canon logs an ERROR and leaves every canon
+-- field nil rather than raising at module load, where the require-time pcall in
+-- menu_metrics would silently drop the whole widget.
 local function _load_shared_const()
-	local wpm_path     = resolve_shared_constants_path("modules/wpm_widget/constants.toml")
-	local timings_path = resolve_shared_constants_path("modules/timings/constants.toml")
-
-	local function read_toml(path)
-		if not path then return {} end
-		local fh = io.open(path, "r")
-		if not fh then return {} end
-		local section, t = "", {}
-		for line in fh:lines() do
-			local s = line:match("^%[(.-)%]$")
-			if s then section = s; t[section] = t[section] or {} end
-			local k, v = line:match("^([%w_]+)%s*=%s*(.*)")
-			if k and section ~= "" then
-				t[section][k] = tonumber(v) or v:gsub('^"(.*)"$', "%1"):gsub("^'(.*)'$", "%1")
-			elseif k then
-				t[k] = tonumber(v) or v:gsub('^"(.*)"$', "%1"):gsub("^'(.*)'$", "%1")
-			end
-		end
-		fh:close()
-		return t
+	local path = resolve_shared_constants_path("modules/wpm_widget/constants.toml")
+	local canon, err = nil, "not found"
+	if path then canon, err = WPMModel.load(path, TomlCodec.decode) end
+	if not canon then
+		Logger.error(LOG, "_load_shared_const: the WPM canon is unusable (%s) — widget non-functional.", tostring(err))
 	end
 
-	local wc = read_toml(wpm_path)
-	local tc = read_toml(timings_path)
-
-	if not wpm_path then
-		Logger.error(LOG, "_load_shared_const: _shared/modules/wpm_widget/constants.toml not found — widget non-functional.")
-	end
-
-	local compact    = wc.compact    or {}
-	local colors     = wc.colors     or {}
-	local transp     = wc.transparency or {}
-
-	-- Strip leading '#' from hex strings for hs.canvas compatibility.
-	local function hex(s) return (s or ""):gsub("^#", "") end
-
-	-- Scale a TOML value, failing SOFT (per field) when the key is missing/renamed.
-	-- A bare `nil / 255` (etc.) would raise at module load and the require-time pcall
-	-- in menu_metrics would silently drop the ENTIRE widget; instead yield nil and
-	-- surface the drift loudly (rule 5.3). Downstream consumers tolerate a nil here.
-	local function scaled(v, divisor, key)
-		if type(v) ~= "number" then
-			Logger.error(LOG, "_load_shared_const: missing/non-numeric '%s' — leaving nil.", key)
+	local function timing_s(key)
+		local ok, value = pcall(Timings.sec, "ui", key)
+		if not ok then
+			Logger.error(LOG, "_load_shared_const: missing timing [ui].%s — leaving nil.", key)
 			return nil
 		end
-		return v / divisor
+		return value
 	end
 
-	-- No literal fallbacks below: the shared TOML is the single source of truth
-	-- (rules 5.2 / 5.4), mirroring the AHK WPMWidgetConst sentinel/fail-fast class.
-	-- A missing TOML is already logged as an ERROR above; a missing key then
-	-- surfaces loud (nil) rather than silently masking drift behind a re-typed
-	-- default. Covered by test_wpm_shared_constants.
+	local compact = canon and canon.compact or {}
+	local colors  = canon and canon.colors or {}
 	return {
-		-- Compact layout — _shared/modules/wpm_widget/constants.toml [compact]
+		canon                 = canon,
 		compact_width         = compact.width,
 		compact_height_number = compact.height_number,
 		compact_height_gap    = compact.height_gap,
 		compact_height_unit   = compact.height_unit,
-		compact_number_size   = compact.number_font_size,
-		compact_unit_size     = compact.unit_font_size,
-		compact_padding_x     = compact.padding_x,
 		compact_unit_darken   = compact.unit_strip_darken_factor,
-
-		-- Colors — _shared/modules/wpm_widget/constants.toml [colors]
-		color_bg_manual       = "#" .. hex(colors.bg_manual),
-		color_bg_idle         = "#" .. hex(colors.bg_idle),
-		color_txt_active_alpha = scaled(transp.alpha_active, 255, "[transparency].alpha_active"),
-		-- HSL target to normalise hotstring accent hues to the same brightness as bg_manual.
-		widget_hsl_l          = tonumber(colors.widget_hsl_l),
-		widget_hsl_s          = tonumber(colors.widget_hsl_s),
-
-		-- Idle hide and color-hold durations — _shared/modules/timings/constants.toml [ui]
-		idle_hide_s           = scaled(tc.ui and tc.ui.wpm_widget_idle_hide_ms, 1000, "[ui].wpm_widget_idle_hide_ms"),
-		source_color_duration = scaled(tc.ui and tc.ui.wpm_color_hold_ms,      1000, "[ui].wpm_color_hold_ms"),
-
-		-- Graph mode (HS-only, not in shared TOML)
-		use_fixed_scale       = true,
-		fixed_scale_max       = 120,
-		bg_color              = { white = 0, alpha = 0.8 },
-		border_color          = { white = 1, alpha = 0.4 },
-		border_width          = 1,
-		text_color            = { white = 1, alpha = 1 },
-		text_size             = 14,
-		graph_fill_alpha      = 0.2,
-		graph_line_width      = 2,
+		color_bg_manual       = colors.bg_manual,
+		color_bg_idle         = colors.bg_idle,
+		color_txt_active_alpha = canon and canon.transparency.alpha_active / 255 or nil,
+		idle_hide_s           = timing_s("wpm_widget_idle_hide_ms"),
+		source_color_duration = timing_s("wpm_color_hold_ms"),
+		update_s              = timing_s("wpm_widget_update_ms"),
 	}
 end
 
 -- Exposed for the shared-constants regression test (test_wpm_shared_constants):
--- it asserts every value is sourced from the shared TOML, with no re-typed
--- literal default in this loader (rules 5.2 / 5.4).
+-- it asserts every value is sourced from the shared canon, with no re-typed
+-- literal default in this loader.
 M._load_shared_const = _load_shared_const
 
 local CONFIG     = _load_shared_const()
@@ -250,76 +197,6 @@ end
 -- ===================================
 -- ===================================
 
--- Re-projects a hex accent color onto the widget HSL target (L, S from CONFIG)
--- so every hotstring/AI/AC hue is as vivid as the manual blue.
--- Returns a "#rrggbb" string; falls back to fallback_hex on bad input.
-local function _wpm_normalise_hex(accent_hex, fallback_hex)
-	local h = (accent_hex or ""):gsub("^#", "")
-	if #h ~= 6 then return fallback_hex end
-	local r = tonumber(h:sub(1, 2), 16) / 255.0
-	local g = tonumber(h:sub(3, 4), 16) / 255.0
-	local b = tonumber(h:sub(5, 6), 16) / 255.0
-	if not r or not g or not b then return fallback_hex end
-
-	local max_c = math.max(r, g, b)
-	local min_c = math.min(r, g, b)
-	local delta = max_c - min_c
-	if delta <= 0.0001 then return fallback_hex end  -- achromatic
-
-	local hue
-	if max_c == r then
-		hue = ((g - b) / delta + 6) % 6
-	elseif max_c == g then
-		hue = (b - r) / delta + 2
-	else
-		hue = (r - g) / delta + 4
-	end
-	hue = hue / 6
-
-	local L  = CONFIG.widget_hsl_l
-	local S  = CONFIG.widget_hsl_s
-	local C  = (1 - math.abs(2 * L - 1)) * S
-	local h6 = hue * 6
-	local X  = C * (1 - math.abs(h6 % 2 - 1))
-	local m  = L - C / 2
-	local nr, ng, nb
-	if     h6 < 1 then nr, ng, nb = C, X, 0
-	elseif h6 < 2 then nr, ng, nb = X, C, 0
-	elseif h6 < 3 then nr, ng, nb = 0, C, X
-	elseif h6 < 4 then nr, ng, nb = 0, X, C
-	elseif h6 < 5 then nr, ng, nb = X, 0, C
-	else                nr, ng, nb = C, 0, X
-	end
-	return string.format("#%02x%02x%02x",
-		math.max(0, math.min(255, math.floor((nr + m) * 255 + 0.5))),
-		math.max(0, math.min(255, math.floor((ng + m) * 255 + 0.5))),
-		math.max(0, math.min(255, math.floor((nb + m) * 255 + 0.5))))
-end
-
--- Returns a hex color darkened by the given factor (each RGB channel × factor).
--- Input may include a leading "#"; output always includes it.
--- hex ultimately traces back to a hotstring group's TOML _meta.color, which the
--- user can freely edit (ui/wpm/shared.lua resolve_source_hex) — a shorthand
--- "#fff", a bare color name, or plain garbage would otherwise reach the
--- tonumber(h:sub(...), 16) arithmetic below and either raise (nil arithmetic)
--- or silently produce a nonsense strip color. Mirrors the same length/format
--- guard already applied a few lines above in _wpm_normalise_hex.
-local function _wpm_darken_hex(hex, factor, fallback_hex)
-	local h = (hex or ""):gsub("^#", "")
-	if #h ~= 6 then return fallback_hex end
-	local r = tonumber(h:sub(1, 2), 16)
-	local g = tonumber(h:sub(3, 4), 16)
-	local b = tonumber(h:sub(5, 6), 16)
-	if not r or not g or not b then return fallback_hex end
-
-	-- Round-half-up (floor(x + 0.5)) is the single canonical rounding shared with
-	-- the AHK driver (Round()) and with _wpm_normalise_hex above, so the darkened
-	-- unit strip is byte-identical across drivers instead of drifting by ±1/255.
-	return string.format("#%02x%02x%02x",
-		math.floor(r * factor + 0.5), math.floor(g * factor + 0.5), math.floor(b * factor + 0.5))
-end
-
-
 -- Forward declaration: update_widget() (the pcall wrapper) is defined before its
 -- body so the body can be a plain local function referenced by name below.
 local update_widget_body
@@ -347,22 +224,27 @@ update_widget_body = function()
 		tooltip_visible = tooltip.is_visible()
 	end
 
-	local wpm_number_str = tostring(display_wpm)
-	local wpm_full_str   = string.format("%d MPM", display_wpm)
+	local canon = CONFIG.canon
+	if not canon then return end
+	local frame_opts = {
+		now_s = now,
+		hold_s = CONFIG.source_color_duration,
+		use_colors = _use_source_colors,
+		resolve = WPMShared.resolve_group_hex,
+		unit = WPMShared.unit_label(),
+	}
 
-	if display_wpm > 0 or active_source ~= "none" then
-		_last_active_sec = now
-	end
-	local inactive_for    = now - _last_active_sec
-	local keyboard_idle   = (_last_active_sec > 0) and (inactive_for >= IDLE_HIDE_S)
-	-- Hide if mouse/touchpad was used more recently than the last keystroke.
-	local mouse_active    = (_last_mouse_sec > _last_active_sec)
-	local recently_active = (_last_active_sec > 0) and not keyboard_idle and not mouse_active
+	-- One sample per refresh for the graph, and the shared rule for showing:
+	-- while text appears or a preview is up, and briefly after — unless the
+	-- mouse moved since the last keystroke.
+	WPMModel.push_history(canon, _wpm_history, display_wpm, active_source)
+	local show
+	show, _last_active_sec = WPMModel.widget_visible({
+		wpm = display_wpm, source = active_source, tooltip_visible = tooltip_visible, now_s = now,
+		last_active_s = _last_active_sec, last_mouse_s = _last_mouse_sec, idle_hide_s = IDLE_HIDE_S,
+	})
 
-	table.insert(_wpm_history, { v = display_wpm, s = active_source })
-	if #_wpm_history > 60 then table.remove(_wpm_history, 1) end
-
-	if display_wpm > 0 or tooltip_visible or recently_active then
+	if show then
 		-- hs.screen.mainScreen() is documented as possibly returning nil (e.g. no
 		-- display attached, or a display-reconfiguration race) — dereferencing it
 		-- unconditionally would raise inside this pcall-wrapped body every 0.2 s
@@ -373,25 +255,11 @@ update_widget_body = function()
 			return
 		end
 		local full_frame = screen:fullFrame()
-		local work_frame = screen:frame()
-
-		local dock_height = (full_frame.y + full_frame.h) - (work_frame.y + work_frame.h)
-		if dock_height < 20 then dock_height = 60 end
-
-		local canvas_width, canvas_height, target_x, target_y
-		local graph_margin = 5
-
-		-- Compact dimensions (shared constants).
-		local compact_w = CONFIG.compact_width
-		local compact_h = CONFIG.compact_height_number + CONFIG.compact_height_gap + CONFIG.compact_height_unit
-
-		if _show_graph then
-			canvas_height = dock_height - graph_margin - 5
-			canvas_width  = canvas_height * 3
-		else
-			canvas_width  = compact_w
-			canvas_height = compact_h
-		end
+		local frame = _show_graph and WPMModel.graph_frame(canon, _wpm_history, stats, frame_opts)
+			or WPMModel.compact_frame(canon, stats, frame_opts)
+		local canvas_width, canvas_height = frame.width, frame.height
+		local compact_w = canon.compact.width
+		local compact_h = canon.compact.height_number + canon.compact.height_gap + canon.compact.height_unit
 
 		-- Publish this cycle's geometry for the mouseCallback closure (see the
 		-- _canvas_geom declaration in section 2 for why this indirection exists).
@@ -400,26 +268,9 @@ update_widget_body = function()
 		_canvas_geom.compact_w     = compact_w
 		_canvas_geom.compact_h     = compact_h
 
-		-- Compute default compact top-left (bottom-right corner at screen edge - margin).
-		if not _pos_x then
-			local margin_bottom = graph_margin
-			local def_y = full_frame.y + full_frame.h - compact_h - margin_bottom
-			local margin_right = full_frame.y + full_frame.h - (def_y + compact_h)
-			local def_x = full_frame.x + full_frame.w - compact_w - margin_right
-			_pos_x = def_x
-			_pos_y = def_y
-		end
-
-		-- Derive current mode top-left from compact anchor, keeping bottom-right constant.
-		if _show_graph then
-			target_x = _pos_x + compact_w - canvas_width
-			target_y = _pos_y + compact_h - canvas_height
-		else
-			target_x = _pos_x
-			target_y = _pos_y
-		end
-
-		local bg_radius = 10
+		-- The pill's top-left is the anchor; the graph keeps its bottom-right.
+		if not _pos_x then _pos_x, _pos_y = WPMModel.default_anchor(canon, full_frame) end
+		local target_x, target_y = WPMModel.frame_origin(canon, frame, _pos_x, _pos_y)
 
 		if not _canvas then
 			_canvas = GraphicsRenderer.createWindow({
@@ -485,93 +336,42 @@ update_widget_body = function()
 			end
 		end
 
+		-- The frame the shared model computed, as hs.canvas elements.
 		local elements = {}
-
-		if _show_graph then
-			-- ── Graph mode: original HS style ─────────────────────────────────
-			local text_size = CONFIG.text_size
-			table.insert(elements, { type = "rectangle", action = "fill", fillColor = CONFIG.bg_color, roundedRectRadii = { xRadius = bg_radius, yRadius = bg_radius } })
-			table.insert(elements, { type = "rectangle", action = "stroke", strokeColor = CONFIG.border_color, strokeWidth = CONFIG.border_width, roundedRectRadii = { xRadius = bg_radius, yRadius = bg_radius } })
-
-			local max_val = CONFIG.use_fixed_scale and CONFIG.fixed_scale_max or 10
-			if not CONFIG.use_fixed_scale then
-				for _, d in ipairs(_wpm_history) do if d.v > max_val then max_val = d.v end end
+		local radii = { xRadius = frame.radius, yRadius = frame.radius }
+		if frame.mode == "graph" then
+			table.insert(elements, { type = "rectangle", action = "fill",
+				fillColor = { hex = frame.background, alpha = frame.background_alpha }, roundedRectRadii = radii })
+			table.insert(elements, { type = "rectangle", action = "stroke",
+				strokeColor = { hex = frame.border, alpha = frame.border_alpha },
+				strokeWidth = frame.border_width, roundedRectRadii = radii })
+			if #frame.points > 0 then
+				local area = { { x = frame.padding, y = frame.bottom } }
+				for _, point in ipairs(frame.points) do area[#area + 1] = point end
+				area[#area + 1] = { x = frame.width - frame.padding, y = frame.bottom }
+				table.insert(elements, { type = "segments", coordinates = area, action = "fill",
+					fillColor = { hex = frame.line, alpha = frame.fill_alpha } })
+				table.insert(elements, { type = "segments", coordinates = frame.points, action = "stroke",
+					strokeColor = { hex = frame.line, alpha = frame.line_alpha }, strokeWidth = frame.line_width })
 			end
-
-			local graph_padding = graph_margin
-			local graph_w = canvas_width - (graph_padding * 2)
-			local graph_h = canvas_height - (text_size * 2)
-			local step = graph_w / math.max(1, #_wpm_history - 1)
-
-			local current_color = _use_source_colors
-				and WPMShared.get_source_color(active_source, 0.8)
-				or WPMShared.get_source_color("manual", 0.8)
-
-			local fill_color = { hex = current_color.hex, alpha = CONFIG.graph_fill_alpha }
-
-			local path = {}
-			table.insert(path, { x = graph_padding, y = canvas_height - graph_padding })
-			for i, d in ipairs(_wpm_history) do
-				table.insert(path, { x = graph_padding + (i - 1) * step, y = canvas_height - graph_padding - ((d.v / max_val) * graph_h) })
-			end
-			table.insert(path, { x = canvas_width - graph_padding, y = canvas_height - graph_padding })
-			table.insert(elements, { type = "segments", coordinates = path, action = "fill", fillColor = fill_color })
-
-			local line_path = {}
-			for i, d in ipairs(_wpm_history) do
-				table.insert(line_path, { x = graph_padding + (i - 1) * step, y = canvas_height - graph_padding - ((d.v / max_val) * graph_h) })
-			end
-			table.insert(elements, { type = "segments", coordinates = line_path, action = "stroke", strokeColor = current_color, strokeWidth = CONFIG.graph_line_width })
-			table.insert(elements, { type = "text", text = wpm_full_str, textColor = CONFIG.text_color, textSize = text_size, textAlignment = "center", frame = { x = 0, y = 5, w = canvas_width, h = text_size + 6 } })
+			table.insert(elements, { type = "text", text = frame.label,
+				textColor = { hex = frame.text, alpha = 1 }, textSize = frame.text_size, textAlignment = "center",
+				frame = { x = 0, y = frame.padding, w = frame.width, h = frame.text_size + 6 } })
 		else
-			-- ── Compact mode: two-zone pill — upper number + lower darker unit strip ──
-			-- Layout mirrors _shared/modules/wpm_widget/constants.toml [compact] and AHK WPMWidget_BuildCompact.
-			local source = (_use_source_colors and active_source ~= "none") and active_source or "manual"
-			local source_color = WPMShared.get_source_color(source, 1.0)
-			local bg_hex     = source_color.hex
-			local main_alpha = CONFIG.color_txt_active_alpha
-
-			local h_num   = CONFIG.compact_height_number
-			local h_gap   = CONFIG.compact_height_gap
-			local h_unit  = CONFIG.compact_height_unit
-			local strip_y = h_num + h_gap
-
-			-- Main pill background (rounded full rect).
-			table.insert(elements, {
-				type = "rectangle", action = "fill",
-				fillColor = { hex = bg_hex, alpha = main_alpha },
-				roundedRectRadii = { xRadius = bg_radius, yRadius = bg_radius },
-			})
-
-			-- Darker strip behind the unit label (square bottom — the pill rounding clips it).
-			-- Falls back to the manual-mode blue (same default resolve_source_hex uses)
-			-- if bg_hex is a malformed user-edited TOML color.
-			local strip_hex = _wpm_darken_hex(bg_hex, CONFIG.compact_unit_darken, CONFIG.color_bg_manual)
-			table.insert(elements, {
-				type = "rectangle", action = "fill",
-				fillColor = { hex = strip_hex, alpha = main_alpha },
-				frame = { x = 0, y = strip_y, w = canvas_width, h = h_unit },
-			})
-
-			local ok_i18n, i18n = pcall(require, "infra.i18n")
-			local unit_label = (ok_i18n and type(i18n.get) == "function") and i18n.get("menu.metrics.wpm_unit") or "MPM"
-
-			-- WPM number — vertically centred in the upper zone.
-			table.insert(elements, {
-				type = "text", text = wpm_number_str,
-				textColor = { white = 1, alpha = 1 },
-				textSize = CONFIG.compact_number_size,
-				textAlignment = "center",
-				frame = { x = 0, y = 0, w = canvas_width, h = h_num },
-			})
-			-- Unit acronym label inside the strip.
-			table.insert(elements, {
-				type = "text", text = unit_label,
-				textColor = { white = 1, alpha = 0.9 },
-				textSize = CONFIG.compact_unit_size,
-				textAlignment = "center",
-				frame = { x = 0, y = strip_y, w = canvas_width, h = h_unit },
-			})
+			-- Two zones: the number over a darker strip holding the unit.
+			table.insert(elements, { type = "rectangle", action = "fill",
+				fillColor = { hex = frame.background, alpha = frame.alpha }, roundedRectRadii = radii })
+			table.insert(elements, { type = "rectangle", action = "fill",
+				fillColor = { hex = frame.strip, alpha = frame.alpha },
+				frame = { x = 0, y = frame.strip_y, w = frame.width, h = frame.height_unit } })
+			table.insert(elements, { type = "text", text = frame.number,
+				textColor = { hex = frame.text, alpha = frame.number_alpha },
+				textSize = frame.number_font_size, textAlignment = "center",
+				frame = { x = 0, y = 0, w = frame.width, h = frame.height_number } })
+			table.insert(elements, { type = "text", text = frame.unit,
+				textColor = { hex = frame.text, alpha = frame.unit_alpha },
+				textSize = frame.unit_font_size, textAlignment = "center",
+				frame = { x = 0, y = frame.strip_y, w = frame.width, h = frame.height_unit } })
 		end
 
 		_canvas:replaceElements(elements)
@@ -667,7 +467,7 @@ function M.start(show_graph)
 	_generation = _generation + 1
 	local generation = _generation
 	local timer_ok, timer_candidate, timer_committed = xpcall(function()
-		return TimerScheduler.every(0.2, function()
+		return TimerScheduler.every(CONFIG.update_s, function()
 			if not _running or generation ~= _generation then return end
 			update_widget()
 		end)

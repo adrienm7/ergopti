@@ -20,59 +20,115 @@
 ; =====================================
 ; =====================================
 
-; Reads _shared/modules/wpm_widget/constants.toml and _shared/modules/timings/constants.toml at
-; startup and populates the zero-initialised fields of WPMWidgetConst.
-; Logs an error and leaves the zeros in place if the file cannot be found.
+; Reads one required key of a parsed canon, or records it as missing.
+; @param Cache {Map} ParseTomlFile() result.
+; @param Section {String}
+; @param Key {String}
+; @param Missing {Array} Receives "[section] key" for every absent key.
+; @returns The value, or 0 when absent.
+_WPMWidget_Need(Cache, Section, Key, Missing) {
+		Value := IniCacheGet(Cache, Section, Key)
+		if (Value == "_" || Value == "") {
+				Missing.Push("[" . Section . "] " . Key)
+				return 0
+		}
+		return Value
+}
+
+; Reads one required timing, or records it as missing.
+_WPMWidget_NeedTiming(Section, Key, Missing) {
+		try return TimingsGet(Section, Key)
+		catch as Err {
+				Missing.Push("timings [" . Section . "] " . Key . " (" . Err.Message . ")")
+				return 0
+		}
+}
+
+; Reads _shared/modules/wpm_widget/constants.toml — the canon macOS and Linux
+; draw from too — and the timings registry into WPMWidgetConst. No key carries
+; a copied default: one missing key keeps the widget off and names itself.
+; @returns {Integer} true when every key was read.
 WPMWidget_LoadSharedConst() {
 		global _SharedDir
-		wpm_path     := _SharedDir . "\modules\wpm_widget\constants.toml"
-		timings_path := _SharedDir . "\modules\timings\constants.toml"
-
-		wpm_c := ParseTomlFile(wpm_path)
+		wpm_c := ParseTomlFile(_SharedDir . "\modules\wpm_widget\constants.toml")
 		if !wpm_c.Count {
-				LoggerError("WPMWidget", "_shared/modules/wpm_widget/constants.toml not found — widget non-functional.")
-				return
+				LoggerError("WPMWidget", "_shared/modules/wpm_widget/constants.toml not found — the widget stays off.")
+				return false
 		}
+		Missing := []
+		_hex := (s) => (SubStr(s, 1, 1) = "#") ? SubStr(s, 2) : s
 
 		; [compact]
-		WPMWidgetConst.W                := Integer(IniCacheGet(wpm_c, "compact", "width",                  "80"))
-		WPMWidgetConst.H                := Integer(IniCacheGet(wpm_c, "compact", "height",                 "68"))
-		WPMWidgetConst.H_NUMBER         := Integer(IniCacheGet(wpm_c, "compact", "height_number",          "44"))
-		WPMWidgetConst.H_GAP            := Integer(IniCacheGet(wpm_c, "compact", "height_gap",             "4"))
-		WPMWidgetConst.H_UNIT           := Integer(IniCacheGet(wpm_c, "compact", "height_unit",            "20"))
-		WPMWidgetConst.NUMBER_FONT_SIZE := Integer(IniCacheGet(wpm_c, "compact", "number_font_size",       "20"))
-		WPMWidgetConst.UNIT_FONT_SIZE   := Integer(IniCacheGet(wpm_c, "compact", "unit_font_size",         "8"))
-		WPMWidgetConst.UNIT_DARKEN      := Float(IniCacheGet(wpm_c, "compact",   "unit_strip_darken_factor","0.40"))
+		WPMWidgetConst.W                := Integer(_WPMWidget_Need(wpm_c, "compact", "width", Missing))
+		WPMWidgetConst.H                := Integer(_WPMWidget_Need(wpm_c, "compact", "height", Missing))
+		WPMWidgetConst.H_NUMBER         := Integer(_WPMWidget_Need(wpm_c, "compact", "height_number", Missing))
+		WPMWidgetConst.H_GAP            := Integer(_WPMWidget_Need(wpm_c, "compact", "height_gap", Missing))
+		WPMWidgetConst.H_UNIT           := Integer(_WPMWidget_Need(wpm_c, "compact", "height_unit", Missing))
+		WPMWidgetConst.NUMBER_FONT_SIZE := Integer(_WPMWidget_Need(wpm_c, "compact", "number_font_size", Missing))
+		WPMWidgetConst.UNIT_FONT_SIZE   := Integer(_WPMWidget_Need(wpm_c, "compact", "unit_font_size", Missing))
+		WPMWidgetConst.UNIT_DARKEN      := Float(_WPMWidget_Need(wpm_c, "compact", "unit_strip_darken_factor", Missing))
+		WPMWidgetConst.CORNER_R         := Integer(_WPMWidget_Need(wpm_c, "compact", "corner_radius", Missing))
+		WPMWidgetConst.EDGE_MARGIN      := Integer(_WPMWidget_Need(wpm_c, "compact", "edge_margin", Missing))
 
-		; [colors]  — strip leading '#' for AHK Gui compatibility
-		_strip := (s) => (SubStr(s, 1, 1) = "#") ? SubStr(s, 2) : s
-		WPMWidgetConst.COLOR_BG_MANUAL  := _strip(IniCacheGet(wpm_c, "colors", "bg_manual",   "#0055cc"))
-		WPMWidgetConst.COLOR_BG_AI      := _strip(IniCacheGet(wpm_c, "colors", "bg_ai",       "#7a30b0"))
-		WPMWidgetConst.COLOR_BG_IDLE    := _strip(IniCacheGet(wpm_c, "colors", "bg_idle",     "#1a1a2e"))
-		WPMWidgetConst.COLOR_TXT_ACTIVE := _strip(IniCacheGet(wpm_c, "colors", "text_active", "#ffffff"))
-		WPMWidgetConst.COLOR_TXT_IDLE   := _strip(IniCacheGet(wpm_c, "colors", "text_idle",   "#555577"))
+		; [graph]
+		WPMWidgetConst.GRAPH_W            := Integer(_WPMWidget_Need(wpm_c, "graph", "width", Missing))
+		WPMWidgetConst.GRAPH_H            := Integer(_WPMWidget_Need(wpm_c, "graph", "height", Missing))
+		WPMWidgetConst.GRAPH_CORNER_R     := Integer(_WPMWidget_Need(wpm_c, "graph", "corner_radius", Missing))
+		WPMWidgetConst.GRAPH_PAD          := Integer(_WPMWidget_Need(wpm_c, "graph", "padding", Missing))
+		WPMWidgetConst.GRAPH_HISTORY      := Integer(_WPMWidget_Need(wpm_c, "graph", "history_samples", Missing))
+		WPMWidgetConst.GRAPH_SCALE_MAX    := Integer(_WPMWidget_Need(wpm_c, "graph", "scale_max", Missing))
+		WPMWidgetConst.GRAPH_LABEL_PX     := Integer(_WPMWidget_Need(wpm_c, "graph", "text_size", Missing))
+		WPMWidgetConst.GRAPH_BG           := _hex(_WPMWidget_Need(wpm_c, "graph", "background", Missing))
+		WPMWidgetConst.GRAPH_BG_ALPHA     := Float(_WPMWidget_Need(wpm_c, "graph", "background_alpha", Missing))
+		WPMWidgetConst.GRAPH_BORDER       := _hex(_WPMWidget_Need(wpm_c, "graph", "border", Missing))
+		WPMWidgetConst.GRAPH_BORDER_ALPHA := Float(_WPMWidget_Need(wpm_c, "graph", "border_alpha", Missing))
+		WPMWidgetConst.GRAPH_BORDER_W     := Integer(_WPMWidget_Need(wpm_c, "graph", "border_width", Missing))
+		WPMWidgetConst.GRAPH_LINE_W       := Integer(_WPMWidget_Need(wpm_c, "graph", "line_width", Missing))
+		WPMWidgetConst.GRAPH_LINE_ALPHA   := Float(_WPMWidget_Need(wpm_c, "graph", "line_alpha", Missing))
+		WPMWidgetConst.GRAPH_FILL_ALPHA   := Float(_WPMWidget_Need(wpm_c, "graph", "fill_alpha", Missing))
+		WPMWidgetConst.GRAPH_TEXT         := _hex(_WPMWidget_Need(wpm_c, "graph", "text_color", Missing))
 
-		; [colors] — HSL normalisation target (same brightness as bg_manual)
-		WPMWidgetConst.COLOR_WIDGET_L := Float(IniCacheGet(wpm_c, "colors", "widget_hsl_l", "0.40"))
-		WPMWidgetConst.COLOR_WIDGET_S := Float(IniCacheGet(wpm_c, "colors", "widget_hsl_s", "1.00"))
+		; [colors] — without the leading '#', as AHK Gui colours take them
+		WPMWidgetConst.COLOR_BG_MANUAL  := _hex(_WPMWidget_Need(wpm_c, "colors", "bg_manual", Missing))
+		WPMWidgetConst.COLOR_BG_AI      := _hex(_WPMWidget_Need(wpm_c, "colors", "bg_ai", Missing))
+		WPMWidgetConst.COLOR_BG_IDLE    := _hex(_WPMWidget_Need(wpm_c, "colors", "bg_idle", Missing))
+		WPMWidgetConst.COLOR_TXT_ACTIVE := _hex(_WPMWidget_Need(wpm_c, "colors", "text_active", Missing))
+		WPMWidgetConst.COLOR_TXT_IDLE   := _hex(_WPMWidget_Need(wpm_c, "colors", "text_idle", Missing))
+		WPMWidgetConst.COLOR_FALLBACK   := _hex(_WPMWidget_Need(wpm_c, "colors", "fallback_accent", Missing))
+
+		; [neutral_sources]
+		Neutral := Map()
+		if wpm_c.Has("neutral_sources") && (wpm_c["neutral_sources"] is Map) {
+				for Name, IsNeutral in wpm_c["neutral_sources"]
+						if IsNeutral
+								Neutral[Name] := true
+		}
+		if !Neutral.Count
+				Missing.Push("[neutral_sources]")
+		WPMWidgetConst.NEUTRAL := Neutral
 
 		; [transparency]
-		WPMWidgetConst.ALPHA_ACTIVE := Integer(IniCacheGet(wpm_c, "transparency", "alpha_active", "220"))
-		WPMWidgetConst.ALPHA_IDLE   := Integer(IniCacheGet(wpm_c, "transparency", "alpha_idle",   "140"))
+		WPMWidgetConst.ALPHA_ACTIVE := Integer(_WPMWidget_Need(wpm_c, "transparency", "alpha_active", Missing))
+		WPMWidgetConst.ALPHA_IDLE   := Integer(_WPMWidget_Need(wpm_c, "transparency", "alpha_idle", Missing))
 
-		; _shared/modules/timings/constants.toml
-		tim_c := ParseTomlFile(timings_path)
-		if tim_c.Count {
-				WPMWidgetConst.IDLE_HIDE_MS  := Integer(IniCacheGet(tim_c, "ui", "wpm_widget_idle_hide_ms", "3000"))
-				WPMWidgetConst.COLOR_HOLD_MS := Integer(IniCacheGet(tim_c, "ui", "wpm_color_hold_ms",       "1000"))
-		} else {
-				LoggerError("WPMWidget", "_shared/modules/timings/constants.toml not found — IDLE_HIDE_MS and COLOR_HOLD_MS defaulting.")
-				WPMWidgetConst.IDLE_HIDE_MS  := 3000
-				WPMWidgetConst.COLOR_HOLD_MS := 1000
+		; Timings, from the registry every driver reads.
+		WPMWidgetConst.IDLE_HIDE_MS        := _WPMWidget_NeedTiming("ui", "wpm_widget_idle_hide_ms", Missing)
+		WPMWidgetConst.COLOR_HOLD_MS       := _WPMWidget_NeedTiming("ui", "wpm_color_hold_ms", Missing)
+		WPMWidgetConst.TICK_MS             := _WPMWidget_NeedTiming("ui", "wpm_widget_update_ms", Missing)
+		WPMWidgetConst.WINDOW_MS           := _WPMWidget_NeedTiming("keylogger", "wpm_window_ms", Missing)
+		WPMWidgetConst.WPM_MIN_DURATION_MS := _WPMWidget_NeedTiming("keylogger", "wpm_min_duration_ms", Missing)
+
+		if Missing.Length {
+				Names := ""
+				for _, Name in Missing
+						Names .= (Names == "" ? "" : ", ") . Name
+				LoggerError("WPMWidget", "The WPM canon is missing {1} — the widget stays off.", Names)
+				return false
 		}
-
-		LoggerDone("WPMWidget", "Shared constants loaded (W={1} H={2} darken={3} idle={4}ms color_hold={5}ms).",
-				WPMWidgetConst.W, WPMWidgetConst.H, WPMWidgetConst.UNIT_DARKEN, WPMWidgetConst.IDLE_HIDE_MS, WPMWidgetConst.COLOR_HOLD_MS)
+		LoggerDone("WPMWidget", "Shared constants loaded (W={1} H={2} graph={3}x{4} tick={5}ms).",
+				WPMWidgetConst.W, WPMWidgetConst.H, WPMWidgetConst.GRAPH_W, WPMWidgetConst.GRAPH_H,
+				WPMWidgetConst.TICK_MS)
+		return true
 }
 
 
@@ -108,7 +164,10 @@ _WPMWidget_CurrentWorkAreas() {
 }
 
 WPMWidget_LoadConfig(Cache, WorkAreas := unset) {
-		WPMWidget_LoadSharedConst()
+		if !WPMWidget_LoadSharedConst() {
+				WPMWidget.visible := false
+				return
+		}
 		raw_vis    := IniCacheGet(Cache, "metrics", WPMWidgetConst.CFG_VISIBLE)
 		raw_x      := IniCacheGet(Cache, "metrics", WPMWidgetConst.CFG_X)
 		raw_y      := IniCacheGet(Cache, "metrics", WPMWidgetConst.CFG_Y)
