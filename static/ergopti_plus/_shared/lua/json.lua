@@ -17,6 +17,23 @@ local utf8_lib = (type(utf8) == "table" and utf8.char) and utf8 or require("comp
 
 local M = {}
 
+-- What a lone UTF-16 surrogate decodes to: it names no character, and emitting
+-- it as-is would produce bytes no UTF-8 reader accepts.
+local REPLACEMENT_CHARACTER = 0xFFFD
+
+-- The short escapes JSON defines; every other control character is \u00XX.
+local CONTROL_ESCAPES = { ["\b"] = "\\b", ["\f"] = "\\f", ["\n"] = "\\n", ["\r"] = "\\r", ["\t"] = "\\t" }
+
+--- Quotes a string as JSON, escaping every character JSON forbids raw.
+--- @param value string
+--- @return string
+function M.quote(value)
+	local escaped = value:gsub("\\", "\\\\"):gsub('"', '\\"'):gsub("[%z\1-\31\127]", function(ch)
+		return CONTROL_ESCAPES[ch] or string.format("\\u%04x", ch:byte())
+	end)
+	return '"' .. escaped .. '"'
+end
+
 -- ============================================================================
 -- 1. JSON decoder (recursive descent)
 -- ============================================================================
@@ -65,12 +82,23 @@ function M.decode(raw)
 				elseif esc == "r"  then res[#res + 1] = "\r"
 				elseif esc == "t"  then res[#res + 1] = "\t"
 				elseif esc == "u" then
-					local hex = raw:sub(pos, pos + 3)
+					local code = tonumber(raw:sub(pos, pos + 3), 16)
+					if not code then return nil end
 					pos = pos + 4
-					local code = tonumber(hex, 16)
-					if code and code >= 32 then
-						res[#res + 1] = utf8_lib.char(code)
+					-- A character above the Basic Multilingual Plane arrives as a
+					-- surrogate pair; each half alone is not a character.
+					if code >= 0xD800 and code <= 0xDBFF then
+						local low = raw:sub(pos, pos + 1) == "\\u" and tonumber(raw:sub(pos + 2, pos + 5), 16)
+						if low and low >= 0xDC00 and low <= 0xDFFF then
+							pos = pos + 6
+							code = 0x10000 + (code - 0xD800) * 0x400 + (low - 0xDC00)
+						else
+							code = REPLACEMENT_CHARACTER
+						end
+					elseif code >= 0xDC00 and code <= 0xDFFF then
+						code = REPLACEMENT_CHARACTER
 					end
+					res[#res + 1] = utf8_lib.char(code)
 				else
 					res[#res + 1] = esc
 				end
@@ -160,10 +188,7 @@ function M.encode(val)
 			return (frac:gsub("0+$", ""))
 		end):gsub("%.$", "")
 	end
-	if t == "string" then
-		local escaped = val:gsub("\\", "\\\\"):gsub('"', '\\"'):gsub("\n", "\\n"):gsub("\r", "\\r"):gsub("\t", "\\t")
-		return '"' .. escaped .. '"'
-	end
+	if t == "string" then return M.quote(val) end
 	if t == "table" then
 		local is_array = true
 		local max_idx = 0

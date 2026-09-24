@@ -95,6 +95,7 @@ return {
 	"tests.unit.meta.test_linux_loader_delegates_toml_codec",
 	"tests.unit.meta.test_list_providers_cover_manifest",
 	"tests.unit.meta.test_llm_linux_bridge",
+	"tests.unit.meta.test_json_unicode_round_trip",
 	"tests.unit.meta.test_llm_prediction_engine_integration",
 	"tests.unit.meta.test_llm_thinking_filter",
 	"tests.unit.meta.test_locale_reader",
