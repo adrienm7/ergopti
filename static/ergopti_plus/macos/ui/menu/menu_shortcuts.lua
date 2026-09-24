@@ -271,7 +271,7 @@ local function build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
 		end or nil,
 	}
 	sub[#sub + 1] = {
-		label    = i18n.get("menu.global.reset_defaults"),
+		label    = i18n.get("common.restore_recommended"),
 		disabled = paused or nil,
 		action       = not paused and function()
 			state.wrap_symbol_states  = {}
