@@ -252,7 +252,19 @@ function validateKeylayout(id, bytes) {
 	for (const tag of ['<keyboard', '<layouts>', '<modifierMap', '<keyMapSet', '<keyMap ']) {
 		if (!text.includes(tag)) errors.push(`${id}: the .keylayout has no ${tag} element`);
 	}
+	if (keyboardName(text) === null) errors.push(`${id}: the <keyboard> element declares no name`);
 	return errors;
+}
+
+/**
+ * The name the <keyboard> element declares: macOS lists, selects and removes
+ * the installed layout under it (the KeyboardLayout Name of the input source).
+ * @param {string} text - .keylayout content.
+ * @returns {string|null} The name, or null when the element declares none.
+ */
+function keyboardName(text) {
+	const match = /<keyboard\b[^>]*\sname\s*=\s*"([^"]+)"/.exec(text);
+	return match ? match[1] : null;
 }
 
 
@@ -316,6 +328,7 @@ function buildIndex(registryDir) {
 			id,
 			name: meta.name,
 			family: meta.family,
+			keyboard_name: keyboardName(bytes.toString('utf8')),
 			version: meta.version,
 			file: `${id}/${id}.keylayout`,
 			sha256: crypto.createHash('sha256').update(bytes).digest('hex'),
@@ -382,5 +395,6 @@ module.exports = {
 	buildIndex,
 	validateMeta,
 	validateRegistry,
-	validateKeylayout
+	validateKeylayout,
+	keyboardName
 };
