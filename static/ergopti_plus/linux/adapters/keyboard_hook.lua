@@ -132,6 +132,9 @@ local _release_remapped
 -- orphan is swallowed whole, never sent as an up nothing went down for.
 local _remap_owned = {}
 local _remap_orphans = {}
+-- Test seam: the time the engine reads while _test_drive replays a stream
+-- whose events carry `at_ms`. nil in production.
+local _test_clock_ms = nil
 
 -- Only EV_KEY is forwarded. The uinput channel appends its own SYN_REPORT after
 -- each key, so forwarding the source stream's EV_SYN would double it; EV_MSC is
@@ -503,7 +506,7 @@ local function _dispatch_event(ev, source)
 		return
 	end
 	if _remapper and _intercept and not ev.remapped then
-		local out, tap = _remapper:process(ev.code, ev.value, Monotonic.now_ms())
+		local out, tap = _remapper:process(ev.code, ev.value, _test_clock_ms or Monotonic.now_ms())
 		if ev.value == InputEvent.VALUE_UP then
 			_remap_owned[owned_key] = nil
 		elseif out and ev.value == InputEvent.VALUE_DOWN then
@@ -1578,9 +1581,10 @@ end
 
 function M._test_drive(events, callbacks, intercept)
 	local size = InputEvent.native_size()
-	local queue = {}
+	local queue, times = {}, {}
 	for i, ev in ipairs(events or {}) do
 		queue[i] = InputEvent.encode(ev.type, ev.code, ev.value, size)
+		times[i] = ev.at_ms
 	end
 	local at = 0
 	local cb = callbacks or {}
@@ -1623,7 +1627,18 @@ function M._test_drive(events, callbacks, intercept)
 	local slot = keyboard_slot(test_path)
 	EvdevReader.open(test_path, slot)
 	_running = true
-	local drained = EvdevReader.drain(function(ev) _dispatch_event(ev, test_path) end, slot)
+	-- Drained to the end: one drain is bounded, and a long stream cut at the
+	-- bound reads as keys the daemon never released.
+	local drained, status = 0, "bounded"
+	while status == "bounded" do
+		local count
+		count, status = EvdevReader.drain(function(ev)
+			_test_clock_ms = times[at]
+			_dispatch_event(ev, test_path)
+		end, slot)
+		drained = drained + count
+	end
+	_test_clock_ms = nil
 	_running = false
 	_devices = {}
 	_device = nil
