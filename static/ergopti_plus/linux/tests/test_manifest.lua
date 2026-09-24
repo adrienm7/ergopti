@@ -221,6 +221,7 @@ return {
 	"tests.unit.ui.test_llm_menu_toggle_row",
 	"tests.unit.ui.test_llm_backend_rows",
 	"tests.unit.ui.test_llm_overlay_anchor",
+	"tests.unit.ui.test_webview_page_messages",
 	"tests.unit.ui.test_menu_languages_and_global_separator",
 	"tests.unit.ui.test_menu_pause_greys_features",
 	"tests.unit.ui.test_unused_keys_cleanup",
