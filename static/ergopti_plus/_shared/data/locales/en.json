@@ -1606,6 +1606,7 @@
 	"sg_actions.sel_word_prev": "✎ W ← Sel. prev. word",
 	"sg_actions.select_all": "⬚ Select all",
 	"sg_actions.select_line": "☰ Select line",
+	"sg_actions.select_word": "▭ Select word",
 	"sg_actions.selection_lowercase": "aa Lowercase",
 	"sg_actions.selection_titlecase": "Aa Title Case",
 	"sg_actions.selection_uppercase": "AA Uppercase",

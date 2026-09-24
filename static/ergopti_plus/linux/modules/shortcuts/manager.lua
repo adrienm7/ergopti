@@ -289,9 +289,13 @@ function M.transform_to_titlecase()
 	return transform_selection("selection_titlecase", TextCase.title)
 end
 
---- Selects the current word under cursor (Ctrl+Shift+Left, Ctrl+Shift+Right).
+--- Selects the word under the cursor: Ctrl+Right moves to its end, then
+--- Ctrl+Shift+Left selects back to its start, as macOS does with Option. Only
+--- the second half used to be sent, which selected from the caret to the start
+--- of the word instead of the word.
 function M.select_word()
 	record("select_word")
+	if not ComboEmitter.press("ctrl+Right") then return false end
 	return ComboEmitter.press("ctrl+shift+Left")
 end
 
@@ -321,6 +325,9 @@ end
 --- @return table { [action_id] = function(binding, parameter): boolean }
 function M.action_handlers()
 	return {
+		["select_line"] = function() return M.select_line() end,
+		["select_word"] = function() return M.select_word() end,
+		["paste_plain"] = function() return M.paste_plain() end,
 		["uppercase_selection"] = function() return M.transform_uppercase() end,
 		["titlecase_selection"] = function() return M.transform_titlecase() end,
 		["selection_uppercase"] = function() return M.transform_to_uppercase() end,

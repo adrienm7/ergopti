@@ -82,6 +82,7 @@ GestureEmitActionsData() {
 		"ocr_screenshot", { Seq: "#+t" },
 		"screen_capture", { Seq: "#+s" },
 		"select_line", { Seq: "{Home}{Shift Down}{End}{Shift Up}" },
+		"select_word", { Seq: "^{Right}^+{Left}" },
 		"surround_parens", { Seq: "{Home}({End}){Home}" }
 	)
 }

@@ -1606,6 +1606,7 @@
 	"sg_actions.sel_word_prev": "✎ W ← Vælg forrige ord",
 	"sg_actions.select_all": "⬚ Vælg alt",
 	"sg_actions.select_line": "☰ Vælg linje",
+	"sg_actions.select_word": "▭ Vælg ord",
 	"sg_actions.selection_lowercase": "aa Gemener",
 	"sg_actions.selection_titlecase": "Aa Stort forbogstav i hvert ord",
 	"sg_actions.selection_uppercase": "AA Versaler",

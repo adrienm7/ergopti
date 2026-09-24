@@ -1606,6 +1606,7 @@
 	"sg_actions.sel_word_prev": "✎ W ← Mark. föreg. ord",
 	"sg_actions.select_all": "⬚ Markera allt",
 	"sg_actions.select_line": "☰ Markera rad",
+	"sg_actions.select_word": "▭ Markera ord",
 	"sg_actions.selection_lowercase": "aa Gemener",
 	"sg_actions.selection_titlecase": "Aa Versal i början av varje ord",
 	"sg_actions.selection_uppercase": "AA Versaler",

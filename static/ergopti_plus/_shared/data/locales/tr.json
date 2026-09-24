@@ -1606,6 +1606,7 @@
 	"sg_actions.sel_word_prev": "✎ W ← Önceki kelimeyi seç",
 	"sg_actions.select_all": "⬚ Tümünü seç",
 	"sg_actions.select_line": "☰ Satırı seç",
+	"sg_actions.select_word": "▭ Kelimeyi seç",
 	"sg_actions.selection_lowercase": "aa Küçük harf",
 	"sg_actions.selection_titlecase": "Aa Her kelimenin ilk harfi büyük",
 	"sg_actions.selection_uppercase": "AA Büyük harf",

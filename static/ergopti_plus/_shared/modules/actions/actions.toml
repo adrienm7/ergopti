@@ -725,10 +725,17 @@ platform = "all"
 # --- Actions système avancées ---
 
 [sg_actions.select_line]
-# Windows emits the sequence below, macOS registers its shortcut-layer function
-# into the gesture registry, and Linux routes it to modules/shortcuts/manager.
+# Windows emits the sequence below, macOS runs its shortcut-layer text owner
+# under the dispatching parent, and Linux reaches modules/shortcuts/manager
+# through the daemon-injected handlers (modules/shortcuts/action_handlers.lua).
 platform = "all"
 emit_ahk = "{Home}{Shift Down}{End}{Shift Up}"
+
+[sg_actions.select_word]
+# Move to the end of the word, then select back to its start. Windows moves to
+# the start of the next word, so its selection keeps the trailing space.
+platform = "all"
+emit_ahk = "^{Right}^+{Left}"
 
 [sg_actions.screen_capture]
 platform = "ahk"
@@ -811,7 +818,10 @@ emit_linux = "Caps_Lock"
 platform = "ahk"
 
 [sg_actions.paste_plain]
-platform = "ahk"
+# Windows and macOS put the text form alone back on the clipboard and paste it,
+# then restore the clipboard; Linux types the clipboard text through its
+# injector, since no clipboard tool can drop the rich formats portably.
+platform = "all"
 
 # --- Tap-Hold (actions disponibles uniquement comme valeur au tap d'une touche remappée) ---
 
@@ -1097,6 +1107,7 @@ items = [
     "##edition",
     "copy",
     "paste",
+    "paste_plain",
     "cut",
     "undo",
     "redo",
@@ -1178,6 +1189,8 @@ items = [
     "sel_right",
     "sel_word_prev",
     "sel_word_next",
+    "select_word",
+    "select_line",
     "--",
     "##text_transform",
     "selection_uppercase",
@@ -1216,7 +1229,6 @@ items = [
     "spotlight",
     "--",
     "##system_actions",
-    "select_line",
     "screen_capture",
     "screen_capture_instant",
     "ocr_screenshot",
@@ -1230,7 +1242,6 @@ items = [
     "spotlight_mouse",
     "toggle_capslock",
     "microsoft_bold",
-    "paste_plain",
     "--",
     "##tapholds",
     "one_shot_shift",

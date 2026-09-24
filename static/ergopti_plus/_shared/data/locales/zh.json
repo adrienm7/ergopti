@@ -1606,6 +1606,7 @@
 	"sg_actions.sel_word_prev": "✎ W ← 选择上一个单词",
 	"sg_actions.select_all": "⬚ 全选",
 	"sg_actions.select_line": "☰ 选择行",
+	"sg_actions.select_word": "▭ 选择单词",
 	"sg_actions.selection_lowercase": "aa 小写",
 	"sg_actions.selection_titlecase": "Aa 每个单词首字母大写",
 	"sg_actions.selection_uppercase": "AA 大写",
