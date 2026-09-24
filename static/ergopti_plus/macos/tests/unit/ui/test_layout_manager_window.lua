@@ -1,4 +1,4 @@
---- tests/unit/ui/menu/test_menu_layout_manager.lua
+--- tests/unit/ui/test_layout_manager_window.lua
 
 --- ==============================================================================
 --- MODULE: Layout Manager Window (macOS host)
@@ -14,7 +14,7 @@ local Json = require("json")
 
 helpers.describe("layout manager window (macOS)", function()
 	helpers.it("sends every string the page declares, translated (layout-manager-bridge)", function()
-		local Host = helpers.load_with_stubs("ui.menu.menu_layout_manager")
+		local Host = helpers.load_with_stubs("ui.layout_manager")
 		local declared = Json.decode(assert(io.open(helpers.shared("ui/layout_manager/strings.json"), "rb")):read("*a"))
 		local strings = Host._page_strings()
 		local count = 0
@@ -26,7 +26,7 @@ helpers.describe("layout manager window (macOS)", function()
 	end)
 
 	helpers.it("pushes only into the window it was created for (layout-manager-bridge)", function()
-		local Host = helpers.load_with_stubs("ui.menu.menu_layout_manager")
+		local Host = helpers.load_with_stubs("ui.layout_manager")
 		local refreshed = 0
 		local saved = package.loaded["modules.keymap.layout_registry"]
 		package.loaded["modules.keymap.layout_registry"] = {

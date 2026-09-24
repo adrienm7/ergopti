@@ -1,4 +1,4 @@
---- ui/menu/menu_layout_manager.lua
+--- ui/layout_manager/init.lua
 
 --- ==============================================================================
 --- MODULE: Layout Manager Window (macOS host)
@@ -29,7 +29,7 @@ local FileSystem    = require("adapters.file_system")
 local Json          = require("json")
 local ManagerBridge = require("layouts.manager_bridge")
 
-local LOG = "menu_layout_manager"
+local LOG = "layout_manager"
 
 -- Name of the page's message handler (_shared/ui/host_bridge.js catalogue).
 local BRIDGE_NAME = "layout_manager_bridge"
@@ -165,7 +165,7 @@ function M.open()
 			if action == "didFinishNavigation" and candidate ~= nil and candidate == _webview and _controller then
 				DeferredWork.after(0.05, function()
 					if candidate == _webview and _controller then _controller.on_message({ action = "ready" }) end
-				end, "menu_layout_manager.navigation")
+				end, "layout_manager.navigation")
 			end
 			return true
 		end,
@@ -191,7 +191,7 @@ end
 --- @return function
 function M.menu_command()
 	return function()
-		DeferredWork.after(0.05, M.open, "menu_layout_manager.open")
+		DeferredWork.after(0.05, M.open, "layout_manager.open")
 	end
 end
 
