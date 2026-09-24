@@ -121,6 +121,3 @@ runner cannot answer.
   engine held before swapping — so switching off, pausing, reloading or
   stopping while CapsLock is down cannot leave Ctrl pressed. Never hand the
   hook an engine any other way.
-- **`legacy_kanata.lua`** retires, at boot, the kanata unit an earlier install
-  wrote (matched by its exact `Description=`); `install.sh` does the same. A
-  kanata unit the user set up is theirs and is left alone.

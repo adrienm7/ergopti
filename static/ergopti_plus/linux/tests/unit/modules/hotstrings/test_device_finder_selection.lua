@@ -15,8 +15,7 @@
 --- again. Nothing could catch that, because the module read /proc directly and
 --- exposed no seam, so there was no way to hand it a device list at all.
 ---
---- A remap daemon's output (kanata's, which earlier installs ran) used to win
---- outright. The tap-holds now run in this daemon on the physical keyboard, so
+--- A remap daemon's output (kanata's) used to win outright. The tap-holds now run in this daemon on the physical keyboard, so
 --- that output is one more uinput device and is excluded like any injector.
 ---
 --- The fixtures are real /proc/bus/input/devices syntax, including the `S: Sysfs=`

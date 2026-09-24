@@ -691,18 +691,6 @@ if $INSTALL_SERVICE; then
 		"${SRC_DRIVER}/ergopti-hotstrings.service" \
 		> "${SYSTEMD_DIR}/ergopti-hotstrings.service"
 
-	# The kanata unit earlier installs wrote and enabled. The daemon now runs
-	# the tap-holds itself, and a kanata still grabbing the keyboard first would
-	# apply every one of them twice. Only the unit Ergopti wrote is removed; the
-	# daemon does the same at boot for installs the updater upgrades.
-	LEGACY_KANATA_UNIT="${SYSTEMD_DIR}/kanata.service"
-	if [ -f "${LEGACY_KANATA_UNIT}" ] \
-		&& grep -qxF "Description=Kanata key remapping daemon (Ergopti)" "${LEGACY_KANATA_UNIT}"; then
-		systemctl --user disable --now kanata.service >/dev/null 2>&1 || true
-		rm -f -- "${LEGACY_KANATA_UNIT}" "${HOME}/.config/kanata/ergopti.kbd"
-		echo "  ✔  ancien service kanata retiré (les tap-holds tournent dans le daemon)"
-	fi
-
 	# Guarded, because systemd is not universal: Alpine runs OpenRC, Void runs
 	# runit, and Gentoo may run either. Those systems get the XDG autostart entry
 	# below instead, which every desktop environment honours regardless of init.

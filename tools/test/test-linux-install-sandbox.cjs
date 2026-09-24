@@ -17,29 +17,23 @@
  * installer fetches no remapper at all: the install must finish, and must not
  * write or download anything kanata.
  *
- * ROOT CAUSE 2 — AN EARLIER INSTALL'S KANATA UNIT KEPT GRABBING THE KEYBOARD.
- * Installs before the in-daemon engine enabled a kanata user unit. Left in
- * place, it would grab the keyboard first and apply every tap-hold twice. A
- * re-install must retire the unit Ergopti wrote, and only that one: a kanata
- * unit the user set up is theirs.
- *
- * ROOT CAUSE 3 — THE DESKTOP HALF WAS NEVER INSTALLED.
+ * ROOT CAUSE 2 — THE DESKTOP HALF WAS NEVER INSTALLED.
  * The tray's libayatana-appindicator and the windows' WebKit2GTK typelib were
  * left to the user, so a fresh install showed no tray icon anywhere. Each must
  * be requested from the package manager when its probe fails.
  *
- * ROOT CAUSE 4 — AN OPTIONAL LUA PACKAGE ABSENT FROM THE ARCHIVE ABORTED IT.
+ * ROOT CAUSE 3 — AN OPTIONAL LUA PACKAGE ABSENT FROM THE ARCHIVE ABORTED IT.
  * lua-http does not exist on Arch, lua-filesystem not on openSUSE; the package
  * manager failed under `set -e` and the script died before copying the driver.
  * The names were also Lua 5.4 builds there, invisible to LuaJIT. An optional
  * module that cannot be installed must be reported and skipped.
  *
- * ROOT CAUSE 5 — ALPINE WAS REFUSED OUTRIGHT.
+ * ROOT CAUSE 4 — ALPINE WAS REFUSED OUTRIGHT.
  * apk lives in /sbin, absent from an ordinary Alpine user's PATH, so the
  * manager was detected as "unknown" and every dependency refused; and the
  * group setup called usermod, which BusyBox does not ship, under set -e.
  *
- * ROOT CAUSE 6 — ON GNOME THE ICON WAS REGISTERED AND NEVER SHOWN.
+ * ROOT CAUSE 5 — ON GNOME THE ICON WAS REGISTERED AND NEVER SHOWN.
  * GNOME Shell hosts no StatusNotifierItem without an extension; Ubuntu enables
  * its own, Fedora and Debian GNOME do not. The installer now installs and
  * enables the AppIndicator extension there, merged into the user's list.
@@ -197,7 +191,7 @@ const errors = [];
 				`install.sh still downloads or manages kanata: ${run.calls.filter((c) => c.startsWith('curl') || /kanata/.test(c)).join(' | ')}`
 			);
 		}
-		// Root cause 3: both desktop backends were requested and re-probed.
+		// Root cause 2: both desktop backends were requested and re-probed.
 		for (const pkg of ['libayatana-appindicator3-1', 'gir1.2-webkit2-4.1']) {
 			if (!run.calls.some((call) => call.startsWith('sudo apt-get install') && call.includes(pkg))) {
 				errors.push(`install.sh never asked the package manager for ${pkg}`);
@@ -319,64 +313,11 @@ const errors = [];
 	}
 }
 
-// ── The kanata unit an earlier install wrote ───────────────────────────────
-/** Seeds a kanata user unit with the given Description line, plus Ergopti's layout. */
-function seedKanataUnit(description) {
-	return (home) => {
-		const unitDir = path.join(home, '.config', 'systemd', 'user');
-		fs.mkdirSync(unitDir, { recursive: true });
-		fs.writeFileSync(
-			path.join(unitDir, 'kanata.service'),
-			`[Unit]\n${description}\n[Service]\nExecStart=/usr/bin/kanata\n`,
-			'utf8'
-		);
-		fs.mkdirSync(path.join(home, '.config', 'kanata'), { recursive: true });
-		fs.writeFileSync(path.join(home, '.config', 'kanata', 'ergopti.kbd'), '(defcfg)\n', 'utf8');
-	};
-}
-{
-	const run = runInstaller({
-		desktopProvided: true,
-		seed: seedKanataUnit('Description=Kanata key remapping daemon (Ergopti)')
-	});
-	try {
-		if (run.status !== 0) errors.push(`install.sh exited ${run.status} over an earlier install's kanata unit`);
-		if (fs.existsSync(path.join(run.home, '.config', 'systemd', 'user', 'kanata.service'))) {
-			errors.push('the kanata unit an earlier install wrote was left in place — it would apply every tap-hold twice');
-		}
-		if (fs.existsSync(path.join(run.home, '.config', 'kanata', 'ergopti.kbd'))) {
-			errors.push("the earlier install's ~/.config/kanata/ergopti.kbd was left behind");
-		}
-		if (!run.calls.some((call) => call === 'systemctl --user disable --now kanata.service')) {
-			errors.push('the earlier kanata unit was deleted without being stopped and disabled first');
-		}
-		if (run.calls.some((call) => /appindicator|webkit2/.test(call))) {
-			errors.push('desktop backends that were already present were installed again');
-		}
-	} finally {
-		run.cleanup();
-	}
-}
-{
-	const run = runInstaller({ desktopProvided: true, seed: seedKanataUnit('Description=my kanata') });
-	try {
-		if (run.status !== 0) errors.push(`install.sh exited ${run.status} next to a user's own kanata unit`);
-		if (!fs.existsSync(path.join(run.home, '.config', 'systemd', 'user', 'kanata.service'))) {
-			errors.push('a kanata unit the user set up was deleted — only the one Ergopti wrote may be retired');
-		}
-		if (run.calls.some((call) => /kanata/.test(call))) {
-			errors.push("a kanata unit the user set up was stopped or disabled");
-		}
-	} finally {
-		run.cleanup();
-	}
-}
-
 if (errors.length > 0) {
 	console.error('\x1b[31m[FAIL] install.sh does not leave a working first install:\x1b[0m');
 	for (const error of errors) console.error(`  - ${error}`);
 	process.exit(1);
 }
 console.log(
-	'\x1b[32m[OK] install.sh finishes with no remapper to fetch, retires only the kanata unit an earlier install wrote, installs the tray and window backends, and survives a missing optional package.\x1b[0m'
+	'\x1b[32m[OK] install.sh finishes with no remapper to fetch, installs the tray and window backends, and survives a missing optional package.\x1b[0m'
 );
