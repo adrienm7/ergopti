@@ -83,6 +83,7 @@ return {
 	"tests.unit.meta.test_kanata_pointer_interrupts",
 	"tests.unit.meta.test_keyboard_hook_adapter",
 	"tests.unit.meta.test_keyboard_hook_intercept_passthrough",
+	"tests.unit.meta.test_keyboard_hook_modal_release",
 	"tests.unit.meta.test_keyboard_hook_layout_change",
 	"tests.unit.meta.test_keyboard_hook_pump",
 	"tests.unit.meta.test_keyboard_hook_shift",

@@ -33,6 +33,7 @@ local LocaleTable = require("_generated.locale_table")
 local MagicKey = require("modules.hotstrings.magic_key")
 local PreviewSettings = require("modules.hotstrings.preview_settings")
 local RepeatKey = require("modules.hotstrings.repeat_key")
+local Modal = require("ui.modal")
 local LOG = "ui.menu.menu_builder"
 
 -- Delays are stored in seconds and typed in milliseconds: seconds is what the
@@ -118,16 +119,19 @@ local function prompt_text(title, prompt, initial)
 	local command = "zenity --entry --title=" .. shell_quote(title)
 		.. " --text=" .. shell_quote(prompt)
 		.. " --entry-text=" .. shell_quote(initial or "") .. " 2>/dev/null"
-	local pipe = io.popen(command, "r")
-	if not pipe then
+	local value, ok = Modal.run(function()
+		local pipe = io.popen(command, "r")
+		if not pipe then return nil, nil end
+		local text = pipe:read("*a") or ""
+		return text, pipe:close()
+	end)
+	if value == nil then
 		Logger.error(LOG, "Zenity is unavailable: cannot prompt for '%s'.", tostring(title))
 		return nil
 	end
-	local value = pipe:read("*a") or ""
 	-- A non-zero exit is Cancel or the window being closed. Distinguished from an
 	-- empty entry, which exits zero: the first must change nothing, the second is
 	-- a value the caller gets to refuse with its own message.
-	local ok = pipe:close()
 	if not succeeded(ok) then return nil end
 	return (value:gsub("[\r\n]+$", ""))
 end
@@ -139,7 +143,7 @@ local function show_error(message, title)
 	local command = "zenity --error"
 		.. (title and (" --title=" .. shell_quote(title)) or "")
 		.. " --text=" .. shell_quote(message) .. " 2>/dev/null"
-	if not succeeded(os.execute(command)) then
+	if not succeeded(Modal.run(function() return os.execute(command) end)) then
 		-- Zenity absent: the refusal still has to reach someone, and a silent
 		-- rejection reads as a menu row that does nothing when clicked.
 		Logger.error(LOG, "%s", tostring(message))
@@ -152,7 +156,7 @@ end
 local function show_info(title, message)
 	local command = "zenity --info --title=" .. shell_quote(title)
 		.. " --text=" .. shell_quote(message) .. " 2>/dev/null"
-	if not succeeded(os.execute(command)) then
+	if not succeeded(Modal.run(function() return os.execute(command) end)) then
 		-- Zenity absent: the outcome is still recorded where a user can find it.
 		Logger.info(LOG, "%s", tostring(message))
 	end
@@ -272,7 +276,7 @@ local function ask_yes_no(title, text, ok_label, cancel_label)
 		return nil
 	end
 	-- zenity exits 0 for the OK button and 1 for cancel.
-	return succeeded(os.execute(command))
+	return succeeded(Modal.run(function() return os.execute(command) end))
 end
 
 local function gesture_slot_label(slot)
