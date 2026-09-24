@@ -49,6 +49,7 @@ M.APP_BRIDGES = {
 	healthcheck              = "healthcheck",
 	hotstring_editor         = "hsEditor",
 	hotstrings_config_window = "hotstrings_config_bridge",
+	layer_editor             = "layer_editor_bridge",
 	metrics_apps             = "metrics_apps_bridge",
 	metrics_typing           = "metrics_typing_bridge",
 	model_browser            = "model_browser_bridge",

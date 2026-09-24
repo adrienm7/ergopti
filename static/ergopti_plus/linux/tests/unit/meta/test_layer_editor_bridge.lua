@@ -1,0 +1,235 @@
+--- tests/unit/meta/test_layer_editor_bridge.lua
+
+--- ==============================================================================
+--- MODULE: Navigation Layer Editor Bridge (Linux)
+--- DESCRIPTION:
+--- Drives ui/layer_editor/bridge.lua the way the shared page does, with the
+--- real shared host logic, loader and TOML codec, and doubles for the webview
+--- manager and the remap manager.
+---
+--- COVERAGE:
+--- 1. The bridge is registered for the page, under the page's bridge name.
+--- 2. "ready" sends the user's file and the problems every OS's loader finds.
+--- 3. A save is refused, and nothing is written or restarted, when the text is
+---    not a string, is too large, names an action outside the vocabulary, or
+---    binds something one of the three OSes cannot resolve.
+--- 4. End to end: the page's scripted session (_shared/tests/corpus/
+---    layer_editor/edited_layers.toml) is saved, the remap manager is asked to
+---    regenerate, the window closes, and the kanata layer then generated from
+---    the folder carries every Linux edit.
+--- 5. A remap restart that fails keeps the window open.
+--- ==============================================================================
+
+local helpers     = require("tests.helpers")
+local Json        = require("json")
+local TomlCodec   = require("toml_codec")
+local Layers      = require("keymap.layers")
+local KanataLayer = require("platform.remap.kanata_layer")
+
+local SHARED_ROOT = helpers.driver_root() .. "/../_shared"
+local FIXTURE = SHARED_ROOT .. "/tests/corpus/layer_editor/edited_layers.toml"
+local TEMPLATE_PATH = helpers.driver_root() .. "/platform/remap/data/kanata.kbd"
+local LAYER = "navigation"
+
+
+
+
+
+-- ====================================
+-- ====================================
+-- ======= 1/ Doubles and setup =======
+-- ====================================
+-- ====================================
+
+--- Reads a whole file; raises when it cannot.
+local function read_file(path)
+	local fh, err = io.open(path, "rb")
+	if not fh then error("cannot open " .. path .. ": " .. tostring(err)) end
+	local content = fh:read("*a")
+	fh:close()
+	return content
+end
+
+--- Creates an empty folder of its own, standing for a configuration folder.
+local function make_config_dir()
+	local dir = os.tmpname()
+	os.remove(dir)
+	local ok_mkdir = os.execute('mkdir "' .. dir .. '"')
+	helpers.assert_true(ok_mkdir == true or ok_mkdir == 0, "sandbox directory must exist")
+	return dir
+end
+
+local function remove_config_dir(dir)
+	os.remove(dir .. "/layers.toml")
+	os.execute('rmdir "' .. dir .. '"')
+end
+
+--- A daemon state whose webview and remap managers record what they are asked.
+local function make_state(dir)
+	local world = { scripts = {}, hidden = 0, restarts = 0, restart_result = true, titles = {} }
+	world.state = {
+		webview_manager = {
+			eval_js = function(app, js)
+				world.scripts[#world.scripts + 1] = { app = app, js = js }
+				return true
+			end,
+			hide = function(app)
+				world.hidden = world.hidden + 1
+				return app == "layer_editor"
+			end,
+			set_title = function(app, label) world.titles[#world.titles + 1] = app .. "=" .. label end,
+		},
+		kanata = { restart = function()
+			world.restarts = world.restarts + 1
+			return world.restart_result
+		end },
+		paths = { shared_root = function() return SHARED_ROOT end },
+		config_paths = { get_config_dir = function() return dir end },
+		i18n = { get = function(key) return key end },
+	}
+	return world
+end
+
+--- The payload of the last call the page received to one of its functions.
+local function last_call(world, fn_name)
+	for i = #world.scripts, 1, -1 do
+		local payload = world.scripts[i].js:match("window%." .. fn_name .. "%((.*)%)$")
+		if payload then return Json.decode(payload) end
+	end
+	return nil
+end
+
+local function codes(payload)
+	local out = {}
+	for _, err in ipairs(payload.errors or {}) do out[#out + 1] = err.code end
+	table.sort(out)
+	return table.concat(out, ",")
+end
+
+--- defsrc token -> the generated navigation layer's action.
+local function layer_map(kbd)
+	local function entries(head)
+		local start = kbd:find("\n(" .. head .. "\n", 1, true)
+		helpers.assert_not_nil(start, "no (" .. head .. ") form")
+		local body = kbd:sub(start + #head + 3)
+		local out, depth, current = {}, 0, ""
+		for c in body:gmatch(".") do
+			if depth == 0 and c == ")" then break end
+			if c == "(" then depth = depth + 1 elseif c == ")" then depth = depth - 1 end
+			if depth == 0 and c:match("%s") then
+				if current ~= "" then out[#out + 1] = current end
+				current = ""
+			else
+				current = current .. c
+			end
+		end
+		if current ~= "" then out[#out + 1] = current end
+		return out
+	end
+	local keys, actions = entries("defsrc"), entries("deflayer " .. LAYER)
+	helpers.assert_eq(#actions, #keys, "the layer must line up with defsrc")
+	local out = {}
+	for i, key in ipairs(keys) do out[key] = actions[i] end
+	return out
+end
+
+
+
+
+
+-- =============================
+-- =============================
+-- ======= 2/ The bridge =======
+-- =============================
+-- =============================
+
+helpers.describe("Linux navigation layer editor bridge", function()
+	local Bridge = helpers.load_module("ui.layer_editor.bridge")
+
+	helpers.it("is the page's registered bridge", function()
+		local WebkitHost = require("ui.webkit_host")
+		helpers.assert_eq(Bridge.bridge_name, "layer_editor_bridge")
+		helpers.assert_eq(WebkitHost.bridge_for_app("layer_editor"), Bridge.bridge_name)
+	end)
+
+	helpers.it("sends the user's file and every OS's problems on ready", function()
+		local dir = make_config_dir()
+		local fh = assert(io.open(dir .. "/layers.toml", "wb"))
+		fh:write('[_meta]\nschema_version = 1\n\n[layers.nav.all]\n"WheelUp" = "vol_up"\n')
+		fh:close()
+		local world = make_state(dir)
+		local outcome = Bridge.on_message("ready", world.state)
+		remove_config_dir(dir)
+		helpers.assert_eq(outcome.pushed, true)
+		local init = last_call(world, "init")
+		helpers.assert_eq(init.os, "linux")
+		helpers.assert_true(init.text:match('"WheelUp" = "vol_up"') ~= nil, "init() carries the file's text")
+		-- The wheel is no layer key on macOS: that loader refuses the entry.
+		helpers.assert_eq(codes(init), "unavailable_on_os")
+		helpers.assert_eq(world.titles[1], "layer_editor=layer_editor.window_title")
+	end)
+
+	helpers.it("refuses, writes nothing and restarts nothing for an invalid save", function()
+		local dir = make_config_dir()
+		local world = make_state(dir)
+		local refused = {
+			{ text = nil, code = "invalid_payload" },
+			{ text = {}, code = "invalid_payload" },
+			{ text = string.rep("#", 70000), code = "invalid_payload" },
+			{ text = '[_meta]\nschema_version = 1\n[layers.nav.all]\n"KeyA" = "format_disk"\n', code = "unknown_action" },
+			{ text = '[_meta]\nschema_version = 1\n[layers.nav.all]\n"KeyA" = "spotlight"\n', code = "unavailable_on_os" },
+			{ text = '[_meta]\nschema_version = 1\n[layers.nav.all]\n"Digit1" = "repeat_count:500"\n', code = "invalid_parameter" },
+		}
+		for _, case in ipairs(refused) do
+			local outcome = Bridge.on_message({ action = "save", text = case.text }, world.state)
+			helpers.assert_eq(outcome.saved, false)
+			local result = last_call(world, "saveResult")
+			helpers.assert_eq(result.saved, false)
+			helpers.assert_eq(codes(result), case.code)
+		end
+		local created = io.open(dir .. "/layers.toml", "rb")
+		if created then created:close() end
+		remove_config_dir(dir)
+		helpers.assert_nil(created, "a refused save writes nothing")
+		helpers.assert_eq(world.restarts, 0, "a refused save restarts nothing")
+		helpers.assert_eq(world.hidden, 0, "a refused save keeps the window open")
+		helpers.assert_nil(Bridge.on_message({ action = "format_disk" }, world.state), "an unknown action does nothing")
+	end)
+
+	helpers.it("saves the page's session, applies it, closes, and the kanata layer carries it (e2e)", function()
+		local dir = make_config_dir()
+		local world = make_state(dir)
+		local text = read_file(FIXTURE)
+		local outcome = Bridge.on_message({ action = "save", text = text }, world.state)
+		local written = read_file(dir .. "/layers.toml")
+		local NavLayer = helpers.load_module("platform.remap.nav_layer")
+		local bindings, registry = NavLayer.load({ shared_root = SHARED_ROOT, config_dir = dir })
+		remove_config_dir(dir)
+		helpers.assert_eq(outcome.saved, true)
+		helpers.assert_eq(outcome.applied, true)
+		helpers.assert_eq(outcome.closed, true)
+		helpers.assert_eq(world.restarts, 1)
+		helpers.assert_eq(written:gsub("\r\n", "\n"), text, "the saved file is the page's text")
+		local result = last_call(world, "saveResult")
+		helpers.assert_eq(result.saved, true)
+		helpers.assert_eq(result.applied, true)
+		local layer = layer_map(KanataLayer.splice(read_file(TEMPLATE_PATH), LAYER, bindings, registry))
+		helpers.assert_eq(layer.t, "mute", "KeyT: the Linux edit")
+		helpers.assert_eq(layer.g, "f12", "KeyG keeps F12 on Linux")
+		helpers.assert_eq(layer.q, "C-S-home", "an untouched key keeps its recommended binding")
+	end)
+
+	helpers.it("keeps the window open when the remap restart fails", function()
+		local dir = make_config_dir()
+		local world = make_state(dir)
+		world.restart_result = false
+		local outcome = Bridge.on_message({ action = "save", text = read_file(FIXTURE) }, world.state)
+		remove_config_dir(dir)
+		helpers.assert_eq(outcome.saved, true)
+		helpers.assert_eq(outcome.applied, false)
+		helpers.assert_eq(world.hidden, 0)
+		helpers.assert_eq(last_call(world, "saveResult").applied, false)
+		local cancelled = Bridge.on_message({ action = "cancel" }, world.state)
+		helpers.assert_eq(cancelled.closed, true)
+	end)
+end)

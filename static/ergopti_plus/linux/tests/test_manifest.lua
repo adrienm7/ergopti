@@ -103,6 +103,7 @@ return {
 	"tests.unit.meta.test_keylogger_sqlite_reader",
 	"tests.unit.meta.test_keylogger_sqlite_writer",
 	"tests.unit.meta.test_keylogger_utils",
+	"tests.unit.meta.test_layer_editor_bridge",
 	"tests.unit.meta.test_linux_loader_delegates_toml_codec",
 	"tests.unit.meta.test_list_providers_cover_manifest",
 	"tests.unit.meta.test_llm_linux_bridge",

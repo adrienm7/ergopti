@@ -1,0 +1,172 @@
+--- _shared/lua/keymap/layer_editor.lua
+
+--- ==============================================================================
+--- MODULE: Layer Editor Host Logic (Shared)
+--- DESCRIPTION:
+--- What the macOS and Linux hosts of the navigation layer editor
+--- (_shared/ui/layer_editor) do with the page's messages, without any window:
+--- the payload init() receives, and the validation and write of a save. The
+--- Windows host implements the same contract in windows/ui/layer_editor/init.ahk.
+---
+--- FEATURES & RATIONALE:
+--- 1. A saved file must load without a single error on every OS. The page only
+---    offers what exists on the OS it edits for; the host still refuses any
+---    text that one of the three loaders would reject or drop, so the editor
+---    can never write a layers.toml another machine reads differently.
+--- 2. Only a string of bounded size reaches a loader; any other payload is
+---    refused first.
+--- 3. The file is published atomically through the shared TOML writer (the
+---    driver's own atomic adapter when it has one), against the content read
+---    just before, and a refused save leaves the file untouched.
+--- ==============================================================================
+
+local M = {}
+
+local Layers = require("keymap.layers")
+local TomlWriter = require("toml_codec.writer")
+
+
+
+
+
+-- ============================
+-- ============================
+-- ======= 1/ Constants =======
+-- ============================
+-- ============================
+
+-- The largest layers.toml the editor accepts. Every registry key bound in all
+-- four sections is about 25 KB; anything larger is not a layer file.
+M.MAX_TEXT_BYTES = 65536
+
+-- The error codes this module adds to the loader's.
+M.INVALID_PAYLOAD = "invalid_payload"
+M.WRITE_FAILED = "write_failed"
+M.FILE_UNREADABLE = "file_unreadable"
+
+
+
+
+
+-- ==========================
+-- ==========================
+-- ======= 2/ Helpers =======
+-- ==========================
+-- ==========================
+
+--- @return table error One error record in the loaders' shape.
+local function new_error(code, detail)
+	return { code = code, detail = detail }
+end
+
+--- Loads a text on every OS and returns each distinct error once.
+--- @param text string The layer file.
+--- @param ctx table The loader context.
+--- @param toml_decode function The TOML decoder.
+--- @return table errors
+local function errors_on_every_os(text, ctx, toml_decode)
+	local out, seen = {}, {}
+	for _, os_name in ipairs(ctx.platforms) do
+		local result = Layers.load(text, os_name, ctx, toml_decode)
+		for _, err in ipairs(result.errors) do
+			local signature = Layers.error_signature(err)
+			if not seen[signature] then
+				seen[signature] = true
+				out[#out + 1] = err
+			end
+		end
+	end
+	return out
+end
+
+
+
+
+
+-- =============================
+-- =============================
+-- ======= 3/ Public API =======
+-- =============================
+-- =============================
+
+--- Builds what the page's init() receives: the OS, the file's path and text,
+--- and every problem any OS's loader finds in it.
+--- @param opts table { os, ctx, config_dir, read_file, toml_decode } where
+---   read_file(path) returns the content, nil when the file does not exist, or
+---   raises when it exists and cannot be read.
+--- @return table payload { os, path, text|nil, errors }
+function M.init_payload(opts)
+	local path = Layers.user_file_path(opts.config_dir, opts.ctx)
+	local read_ok, text = pcall(opts.read_file, path)
+	if not read_ok then
+		return { os = opts.os, path = path, errors = { new_error(M.FILE_UNREADABLE, tostring(text)) } }
+	end
+	local errors = text ~= nil and errors_on_every_os(text, opts.ctx, opts.toml_decode) or {}
+	return { os = opts.os, path = path, text = text, errors = errors }
+end
+
+--- Validates the text of a layer file the page asks to save.
+--- @param text any The payload's text.
+--- @param ctx table The loader context.
+--- @param toml_decode function The TOML decoder.
+--- @return boolean valid True when every OS loads it without an error.
+--- @return table errors What is wrong, empty when valid.
+function M.validate(text, ctx, toml_decode)
+	if type(text) ~= "string" then
+		return false, { new_error(M.INVALID_PAYLOAD, "the save carries no layer file text") }
+	end
+	if #text > M.MAX_TEXT_BYTES then
+		return false, { new_error(M.INVALID_PAYLOAD,
+			"the layer file is " .. #text .. " bytes, more than " .. M.MAX_TEXT_BYTES) }
+	end
+	local errors = errors_on_every_os(text, ctx, toml_decode)
+	return #errors == 0, errors
+end
+
+--- Validates then publishes the user's layers.toml.
+--- @param opts table { text, ctx, config_dir, toml_decode, file_adapter } where
+---   file_adapter is the driver's atomic FileSystem adapter, or nil for the
+---   shared writer's own same-directory stage and rename.
+--- @return table result { saved = boolean, path = string, errors = table }
+function M.save(opts)
+	local path = Layers.user_file_path(opts.config_dir, opts.ctx)
+	local valid, errors = M.validate(opts.text, opts.ctx, opts.toml_decode)
+	if not valid then return { saved = false, path = path, errors = errors } end
+	local current, status, detail = TomlWriter.read_classified(path, opts.file_adapter)
+	if status ~= "ok" and status ~= "absent" then
+		return { saved = false, path = path, errors = { new_error(M.WRITE_FAILED, tostring(detail or status)) } }
+	end
+	local written, write_err = TomlWriter.publish_if_unchanged(path, opts.text, opts.file_adapter,
+		{ status = status, content = current })
+	if not written then
+		return { saved = false, path = path, errors = { new_error(M.WRITE_FAILED, tostring(write_err)) } }
+	end
+	return { saved = true, path = path, errors = {} }
+end
+
+--- Reads a file: its content, nil when it does not exist; raises otherwise.
+--- @param path string
+--- @return string|nil content
+function M.read_file(path)
+	local fh, err, code = io.open(path, "rb")
+	if not fh then
+		-- errno 2 (ENOENT): the file does not exist, which is no layer.
+		if code == 2 then return nil end
+		error(tostring(err), 0)
+	end
+	local content = fh:read("*a")
+	fh:close()
+	if content == nil then error("cannot read " .. path, 0) end
+	return content
+end
+
+--- Reads a shipped file; raises when it is missing or unreadable.
+--- @param path string
+--- @return string content
+function M.read_shipped(path)
+	local content = M.read_file(path)
+	if content == nil then error("layer_editor: shipped file missing: " .. path, 0) end
+	return content
+end
+
+return M

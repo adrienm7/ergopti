@@ -1225,6 +1225,7 @@ global _FmtCountCache := Map()
 #Include ui/action_picker_webview.ahk
 #Include ui/paths_editor/init.ahk
 #Include ui/personal_info_editor/init.ahk
+#Include ui/layer_editor/init.ahk
 
 #Include infra/suppressive_inputhook_ownership.ahk
 #Include infra/lifecycle.ahk

@@ -164,7 +164,9 @@ const ratio = union.size === 0 ? 0 : (shared.length / union.size) * 100;
 //                    once: the union grew with the shared count again. Measured,
 //                    and tightened to the measurement (the ratchet carried two
 //                    paths of slack).
-const BASELINE_SHARED = 29;
+//   30/53 (56.6 %) — ui/layer_editor joins ui/error_dialog on all three
+//                    drivers after integration; measured from the staged tree.
+const BASELINE_SHARED = 30;
 
 // The union is ratcheted too, downward: a driver that grows a new unshared
 // directory dilutes the ratio even when nothing was removed. Bounding it stops
@@ -193,7 +195,9 @@ const BASELINE_SHARED = 29;
 //
 //   51 → 52 on 2026-09-24 — ui/error_dialog, shared by all three drivers (see
 //   BASELINE_SHARED above): no driver grew an unshared directory.
-const BASELINE_UNION = 52;
+//   52 → 53 on 2026-09-28 — ui/layer_editor is present on all three drivers;
+//   the shared count grows with the union, so no new asymmetric directory.
+const BASELINE_UNION = 53;
 
 // ── The canonical features, the third measurement this gate never had ───────
 //

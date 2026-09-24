@@ -106,6 +106,7 @@ const MACOS_MODULES = {
 	model_browser: 'ui/model_browser/init.lua',
 	hotstring_editor: 'ui/hotstring_editor/init.lua',
 	personal_info_editor: 'ui/personal_info_editor/init.lua',
+	layer_editor: 'ui/layer_editor/init.lua',
 	onboarding: 'ui/onboarding/init.lua',
 	paths_editor: 'ui/menu/menu_paths.lua',
 	token_prompt: 'ui/menu/menu_llm/models_selector.lua',
@@ -176,6 +177,12 @@ const WINDOWS_APPS = {
 	action_picker: {
 		file: 'ui/action_picker_webview.ahk',
 		checks: (m) => [new RegExp(`ACTPICK_WIDTH\\s*:=\\s*${m.width}\\b`), new RegExp(`ACTPICK_HEIGHT\\s*:=\\s*${m.height}\\b`)]
+	},
+	layer_editor: {
+		file: 'ui/layer_editor/init.ahk',
+		// Opened through WebViewHost.TryOpen, which reads the size from the manifest
+		// itself: the check is that the host goes through it under its manifest id.
+		checks: () => [/WebViewHost\.TryOpen\(\s*LAYER_EDITOR_APP_ID\b/, /LAYER_EDITOR_APP_ID := "layer_editor"/]
 	},
 	download_window: {
 		file: 'modules/llm/ollama_webview.ahk',

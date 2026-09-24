@@ -57,6 +57,13 @@
       "min_height": 520,
       "vhost": "ergopti.hotstrings"
     },
+    "layer_editor": {
+      "width": 1120,
+      "height": 800,
+      "min_width": 900,
+      "min_height": 620,
+      "vhost": "ergopti.layereditor"
+    },
     "metrics_apps": {
       "width": 940,
       "height": 640,

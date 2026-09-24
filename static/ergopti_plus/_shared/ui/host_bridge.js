@@ -22,6 +22,7 @@
 //   hsEditor                  — _shared/ui/hotstring_editor
 //   hotstrings_config_bridge  — _shared/ui/hotstrings_config_window
 //   hsOnboarding              — _shared/ui/onboarding
+//   layer_editor_bridge       — _shared/ui/layer_editor
 //   hsPaths                   — _shared/ui/paths_editor
 //   hsPersonalInfo            — _shared/ui/personal_info_editor
 //   metrics_apps_bridge       — _shared/ui/metrics_apps
