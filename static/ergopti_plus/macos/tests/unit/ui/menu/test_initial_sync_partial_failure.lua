@@ -100,6 +100,33 @@ helpers.describe("initial sync isolates one refused owner (R5)", function()
 			"a global action sets every feature explicitly, so no demotion may override it")
 	end)
 
+	helpers.it("restores the saved value when a refused Disable All save is reversed", function()
+		local fixture = boot({ gestures_enable = false })
+		fixture.refuse_next_save()
+		helpers.assert_eq(fixture.global_actions().disable_all(), false,
+			"a refused candidate save must fail Disable All")
+		helpers.assert_eq(#fixture.saves, 1, "the inverse must republish the pre-action preferences")
+		helpers.assert_eq(fixture.saves[1].gestures, true,
+			"the inverse must keep the saved Gestures ON, not write the demoted posture")
+		helpers.assert_eq(fixture.state.gestures, false, "the live state keeps the real posture")
+
+		helpers.assert_eq(fixture.save_prefs(), true)
+		helpers.assert_eq(fixture.saves[#fixture.saves].gestures, true,
+			"the reversed action must leave the demotion active for later saves")
+	end)
+
+	helpers.it("restores the saved value when a refused Enable All save is reversed", function()
+		local fixture = boot({ keylogger_start = false })
+		fixture.flush_deferred()
+		helpers.assert_eq(fixture.state.keylogger_enabled, false)
+		fixture.refuse_next_save()
+		helpers.assert_eq(fixture.global_actions().enable_all(), false,
+			"a refused candidate save must fail Enable All")
+		helpers.assert_eq(#fixture.saves, 1, "the inverse must republish the pre-action preferences")
+		helpers.assert_eq(fixture.saves[1].keylogger_enabled, true,
+			"the inverse must keep the saved Metrics ON, not write the demoted posture")
+	end)
+
 	helpers.it("keeps Metrics ON in config.toml when the deferred keylogger start is refused", function()
 		local fixture = boot({ keylogger_start = false })
 		fixture.flush_deferred()

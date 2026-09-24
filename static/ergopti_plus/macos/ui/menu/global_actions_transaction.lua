@@ -60,6 +60,8 @@ function M.create(deps)
 		or type(deps.capture_preferences) ~= "function"
 		or type(deps.sync_runtime) ~= "function"
 		or type(deps.save_preferences) ~= "function"
+		or type(deps.detach_demotions) ~= "function"
+		or type(deps.readopt_demotions) ~= "function"
 		or type(deps.restore_state) ~= "function"
 		or type(deps.ensure_enable_ready) ~= "function"
 		or type(deps.apply_enable_features) ~= "function"
@@ -130,6 +132,24 @@ function M.create(deps)
 			return false
 		end
 		return true
+	end
+
+	--- Publishes an Enable All or Disable All candidate. It sets every feature
+	--- explicitly, so no session demotion may keep substituting its saved value;
+	--- the transaction keeps the detached demotions for its inverse.
+	--- @param transaction table Active enable or disable transaction.
+	--- @return boolean committed
+	local function publish_candidate_preferences(transaction)
+		if transaction.detached_demotions == nil then
+			local detached = deps.detach_demotions()
+			if type(detached) ~= "table" then
+				Logger.error(LOG, "Global %s could not detach the session demotions.",
+					transaction.kind)
+				return false
+			end
+			transaction.detached_demotions = detached
+		end
+		return deps.save_preferences()
 	end
 
 	--- Reads one settings value without collapsing a native error into nil.
@@ -501,10 +521,18 @@ function M.create(deps)
 				transaction.script_snapshot[slot]
 			) ~= true then return false end
 		end
-		if (transaction.kind == "disable"
-			or (transaction.kind == "enable" and transaction.preferences_attempted))
-			and call_exact("Global preference inverse", deps.save_preferences) ~= true then
-			return false
+		if transaction.kind == "disable"
+			or (transaction.kind == "enable" and transaction.preferences_attempted) then
+			-- The inverse republishes the pre-action file, so every demotion the
+			-- candidate detached must again keep its saved value in that save.
+			if transaction.detached_demotions ~= nil then
+				if call_exact("Session demotion inverse", deps.readopt_demotions,
+					transaction.detached_demotions) ~= true then return false end
+				transaction.detached_demotions = nil
+			end
+			if call_exact("Global preference inverse", deps.save_preferences) ~= true then
+				return false
+			end
 		end
 		return true
 	end
@@ -563,7 +591,7 @@ function M.create(deps)
 				"Global preference publication",
 				function()
 					transaction.preferences_attempted = true
-					return deps.save_preferences()
+					return publish_candidate_preferences(transaction)
 				end,
 				function() return true end
 			) ~= true then return false end
@@ -574,7 +602,7 @@ function M.create(deps)
 			if run_step(
 				transaction,
 				"Global preference publication",
-				function() return deps.save_preferences() end,
+				function() return publish_candidate_preferences(transaction) end,
 				function() return true end
 			) ~= true then return false end
 		end

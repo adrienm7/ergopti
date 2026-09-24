@@ -270,6 +270,10 @@ function M.boot(opts)
 		set_llm_model = function() return true end,
 		set_llm_enabled = function() return true end,
 		is_processing_paused = function() return false end,
+		-- Enable All requires the preview switches to commit exactly.
+		set_preview_star_enabled = function() return true end,
+		set_preview_autocorrect_enabled = function() return true end,
+		set_preview_ai_enabled = function() return true end,
 	}
 
 	local Menu = require("ui.menu.init")
