@@ -63,6 +63,8 @@ local KEYSYM_TO_CODE = {
 	Down      = 108, -- KEY_DOWN
 	Home      = 102, -- KEY_HOME
 	End       = 107, -- KEY_END
+	Prior     = 104, -- KEY_PAGEUP
+	Next      = 109, -- KEY_PAGEDOWN
 
 	-- Editing and control.
 	Return    = 28,  -- KEY_ENTER
@@ -71,6 +73,7 @@ local KEYSYM_TO_CODE = {
 	Caps_Lock = 58,  -- KEY_CAPSLOCK
 	BackSpace = 14,  -- KEY_BACKSPACE
 	Delete    = 111, -- KEY_DELETE
+	space     = 57,  -- KEY_SPACE
 
 	-- Function keys.
 	F4        = 62,  -- KEY_F4
@@ -86,6 +89,7 @@ local KEYSYM_TO_CODE = {
 	t         = 20,  -- KEY_T
 	v         = 47,  -- KEY_V
 	w         = 17,  -- KEY_W
+	x         = 45,  -- KEY_X
 }
 
 -- Which names are modifiers. A combo presses its modifiers first and releases

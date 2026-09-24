@@ -121,6 +121,18 @@ local _forwarded_down = {}
 local _physical_down = {}
 local _release_forwarded_sources
 
+-- The tap-hold engine (platform/remap/tap_hold_engine), set by the daemon. It rewrites
+-- the grabbed stream before anything else reads it, and _on_tap runs the tap
+-- actions it hands back that are not a plain key.
+local _remapper = nil
+local _on_tap = nil
+local _release_remapped
+-- Physical keys whose press the engine took, and those it took whose engine
+-- is gone (swapped, removed or reset while they were held): the release of an
+-- orphan is swallowed whole, never sent as an up nothing went down for.
+local _remap_owned = {}
+local _remap_orphans = {}
+
 -- Only EV_KEY is forwarded. The uinput channel appends its own SYN_REPORT after
 -- each key, so forwarding the source stream's EV_SYN would double it; EV_MSC is
 -- duplicate scancode metadata the desktop derives from the key report itself;
@@ -381,6 +393,19 @@ local function _resynchronise(source)
 		pressed[source_key(source, code)] = { source = source, code = code }
 	end
 
+	-- The engine's keys are released and its physically held keys consumed:
+	-- replaying a held CapsLock as itself would toggle the lock, where the user
+	-- was holding it for Ctrl.
+	if _remapper then
+		_release_remapped()
+		for key, current in pairs(pressed) do
+			if _remapper:handles(current.code) then
+				_remap_orphans[key] = true
+				pressed[key] = nil
+			end
+		end
+		_remap_owned = {}
+	end
 	local consumed = _consumed_down
 	local reset_ok, reset_err = _reset_capture_state()
 	if not reset_ok then return false, tostring(reset_err) end
@@ -468,6 +493,33 @@ local function _dispatch_event(ev, source)
 		return
 	end
 	if _sync_dropped[source] or ev.type ~= EVDEV_TYPE_KEY then return end
+
+	-- Tap-holds first: what the engine hands back is dispatched as if the user
+	-- had pressed it, so the modifier state, the hotstring buffer and the
+	-- virtual keyboard all see one consistent stream.
+	local owned_key = source_key(source, ev.code)
+	if _remap_orphans[owned_key] and not ev.remapped then
+		if ev.value == InputEvent.VALUE_UP then _remap_orphans[owned_key] = nil end
+		return
+	end
+	if _remapper and _intercept and not ev.remapped then
+		local out, tap = _remapper:process(ev.code, ev.value, Monotonic.now_ms())
+		if ev.value == InputEvent.VALUE_UP then
+			_remap_owned[owned_key] = nil
+		elseif out and ev.value == InputEvent.VALUE_DOWN then
+			_remap_owned[owned_key] = true
+		end
+		if out then
+			for _, remapped in ipairs(out) do
+				_dispatch_event({ type = EVDEV_TYPE_KEY, code = remapped.code, value = remapped.value,
+					remapped = true }, source)
+				if not _running then return end
+			end
+			if tap and _on_tap then _call_callback("tap action callback", _on_tap, tap) end
+			return
+		end
+	end
+
 	local physical_key = source_key(source, ev.code)
 	if ev.value == InputEvent.VALUE_DOWN then
 		_physical_down[physical_key] = { source = source, code = ev.code }
@@ -617,6 +669,24 @@ end
 
 
 
+--- Releases every key the tap-hold engine holds (a hold modifier, a layer
+--- chord, a one-shot Shift) through the normal path, so the virtual keyboard
+--- and the modifier state both see the key-ups.
+_release_remapped = function()
+	if not _remapper then return end
+	for _, released in ipairs(_remapper:release_all()) do
+		local source = _device
+		for _, entry in pairs(_forwarded_down) do
+			if entry.code == released.code then source = entry.source; break end
+		end
+		_dispatch_event({ type = EVDEV_TYPE_KEY, code = released.code, value = released.value,
+			remapped = true }, source)
+	end
+end
+
+
+
+
 -- =========================================
 -- =========================================
 -- ======= 4/ Context Helpers ==============
@@ -642,12 +712,19 @@ end
 -- =========================================
 -- =========================================
 
+local EVDEV_TYPE_REL = 2
+
 local function _dispatch_pointer(ev)
 	if ev.type == EVDEV_TYPE_KEY
 		and ev.code >= BTN_FIRST
 		and ev.value == InputEvent.VALUE_DOWN
 	then
+		-- A click while a tap-hold key is down makes it a chord (Shift+click).
+		if _remapper then _remapper:activity() end
 		_call_callback("pointer callback", _on_click, ev.code)
+	elseif ev.type == EVDEV_TYPE_REL and _remapper then
+		-- So does a wheel turn: Ctrl+wheel must not paste on release.
+		_remapper:activity()
 	end
 end
 
@@ -1313,6 +1390,7 @@ end
 
 function M.stop()
 	if not _running and not _reacquiring then return end
+	_release_remapped()
 	local released, release_err = _release_forwarded_sources(_devices)
 	if not released then
 		M.emergency_stop("could not release virtual keys during stop: " .. tostring(release_err))
@@ -1328,6 +1406,8 @@ function M.stop()
 	_reacquiring = false
 	_running = false
 	_consumed_down = {}
+	_remap_owned = {}
+	_remap_orphans = {}
 	_sync_dropped = {}
 	_forwarded_down = {}
 	_physical_down = {}
@@ -1343,6 +1423,13 @@ end
 function M.emergency_stop(reason)
 	local message = tostring(reason or "keyboard output path failed")
 	Logger.error(LOG, "Emergency keyboard stop — %s.", message)
+	-- Best effort, before the descriptors close: a Ctrl the virtual keyboard
+	-- still holds would stay down in every application once nothing forwards
+	-- its release. The output path may be what failed, so nothing here throws.
+	if _remapper then pcall(function() _remapper:release_all() end) end
+	if type(_emit_raw) == "function" then
+		for _, entry in pairs(_forwarded_down) do pcall(_emit_raw, entry.code, InputEvent.VALUE_UP) end
+	end
 	_close_paths(_pointer_devices, pointer_slot)
 	_close_paths(_devices, keyboard_slot)
 	_pointer_devices = {}
@@ -1353,6 +1440,8 @@ function M.emergency_stop(reason)
 	_reacquiring = false
 	_running = false
 	_consumed_down = {}
+	_remap_owned = {}
+	_remap_orphans = {}
 	_sync_dropped = {}
 	_forwarded_down = {}
 	_physical_down = {}
@@ -1374,6 +1463,7 @@ function M.while_released(fn)
 	if not _running or not _intercept then return fn() end
 	local paths = {}
 	for index, path in ipairs(_devices) do paths[index] = path end
+	_release_remapped()
 	local released, release_err = _release_forwarded_sources(paths)
 	if not released then
 		M.emergency_stop("could not release virtual keys before a dialog: " .. tostring(release_err))
@@ -1407,6 +1497,23 @@ function M.while_released(fn)
 	Logger.debug(LOG, "Keyboard taken back after a dialog.")
 	if err then error(err, 0) end
 	return (table.unpack or unpack)(results, 1, results.n)
+end
+
+--- Installs (or removes, with nil) the tap-hold engine. Whatever the previous
+--- engine held is released first.
+--- @param engine table|nil platform/remap/tap_hold_engine instance
+--- @param on_tap function|nil Runs a tap action the engine returns by name.
+function M.set_remapper(engine, on_tap)
+	_release_remapped()
+	for key in pairs(_remap_owned) do _remap_orphans[key] = true end
+	_remap_owned = {}
+	_remapper = engine
+	_on_tap = type(on_tap) == "function" and on_tap or nil
+end
+
+--- Releases every key the tap-hold engine holds (pause, feature switch).
+function M.release_remapped()
+	_release_remapped()
 end
 
 --- Returns true if the keyboard hook is currently active.

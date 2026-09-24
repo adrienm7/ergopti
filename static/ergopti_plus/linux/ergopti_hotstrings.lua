@@ -651,6 +651,21 @@ local function main()
 	-- same reason as the line above: the closure that reads it is below.
 	local _last_offered = nil
 
+	-- 8.3b) Tap-holds and the navigation layer, run by this process in the
+	-- keyboard hook. Required here rather than at file scope because main() is at
+	-- LuaJIT's 60-upvalue limit. Declared before the pause controller below,
+	-- whose closure reads it.
+	local TapHold = require("platform.remap.tap_hold_manager")
+	TapHold.init({
+		keyboard_hook = keyboard_hook,
+		execute_action = function(action, binding)
+			if not gestures then error("the action catalogue (gestures module) is not loaded") end
+			gestures.execute_action(action, binding)
+		end,
+		defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"),
+		user_path = require("infra.config_paths").config("tap_hold.toml"),
+	})
+
 	local script_actions = ScriptActions.new({
 		reset = function()
 			_undoable = nil
@@ -665,7 +680,10 @@ local function main()
 			and function() prediction_engine.cancel() end or nil,
 		-- The tray greys every feature row while paused and its title row
 		-- resumes; without a rebuild here the menu kept showing the old state.
-		on_pause_change = function()
+		on_pause_change = function(paused)
+			-- A paused script remaps nothing: CapsLock is CapsLock again, and a
+			-- modifier held through the pause is released.
+			TapHold.set_paused(paused)
 			if rebuild_tray_menu then rebuild_tray_menu() end
 		end,
 	})
@@ -720,10 +738,8 @@ local function main()
 		global_features[#global_features + 1] = switch_feature("dynamic_hotstrings", dyn_hotstrings.is_enabled,
 			function(want) dyn_hotstrings.set_enabled(want) return dyn_hotstrings.is_enabled() == want end, false)
 	end
-	if kanata then
-		global_features[#global_features + 1] = switch_feature("tap_holds", kanata.tap_holds_enabled,
-			kanata.set_tap_holds_enabled, false)
-	end
+	global_features[#global_features + 1] = switch_feature("tap_holds", TapHold.is_enabled,
+		TapHold.set_enabled, false)
 	-- Required here, not at file scope: main() is at LuaJIT's 60-upvalue limit
 	-- and a file-scope module would be one more upvalue of it.
 	local GlobalFeatureSwitch = require("ui.menu.global_feature_switch")
@@ -1441,15 +1457,11 @@ local function main()
 		tostring(keyboard_hook.get_mode and keyboard_hook.get_mode() or "unknown"),
 		keyboard_layout.is_ready() and "resolved" or "unresolved"))
 
-	-- The remap daemon is independent of this process but decides which keycodes
-	-- the grab sees; its state at boot is the first thing a remap bug report needs.
-	if kanata then
-		Logger.info(LOG, "Remap daemon: kanata running=%s owned=%s.",
-			tostring(kanata.is_running and kanata.is_running() or false),
-			tostring(kanata.owns_process and kanata.owns_process() or false))
-	else
-		Logger.info(LOG, "Remap daemon: kanata manager not loaded.")
-	end
+	-- Tap-holds rewrite the grabbed stream, so they need the grab: without it the
+	-- physical key already reached the desktop and there is nothing to rewrite.
+	Logger.info(LOG, "Tap-holds: %s.", not TapHold.is_active() and "inactive"
+		or (keyboard_hook.get_mode and keyboard_hook.get_mode() == "intercept") and "active"
+		or "configured, but inert without the keyboard grab (--no-grab)")
 
 	-- 8.8b) Initialise i18n (loads persisted locale, enables ★ substitution).
 	--
