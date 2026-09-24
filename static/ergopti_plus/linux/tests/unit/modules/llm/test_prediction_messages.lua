@@ -128,6 +128,30 @@ helpers.describe("prediction messages: the context length chosen in the menu app
 
 end)
 
+helpers.describe("prediction messages: the word limits and language the prompt states", function()
+
+	helpers.it("says unlimited when the user chose no maximum", function()
+		local Settings = require("modules.llm.settings")
+		local previous = Settings.get("max_words")
+		helpers.assert_true(Settings.set("max_words", 0))
+		local sent = messages_for(builtin("basic"), "Bonjour à tous")
+		Settings.set("max_words", previous)
+		local system = sent[1].content
+		helpers.assert_true(system:find("AT MOST unlimited words", 1, true) ~= nil, system)
+		helpers.assert_eq(system:find("AT MOST 0 words", 1, true), nil)
+	end)
+
+	helpers.it("falls back to the interface language, not always French", function()
+		local I18n = require("infra.i18n")
+		local previous = I18n.get_locale
+		I18n.get_locale = function() return "de" end
+		local sent = messages_for(builtin("basic"), "Hallo zusammen")
+		I18n.get_locale = previous
+		helpers.assert_true(sent[1].content:find("default to de", 1, true) ~= nil, sent[1].content)
+	end)
+
+end)
+
 helpers.describe("profile selector: placeholders are replaced in one pass", function()
 
 	helpers.it("does not expand a placeholder the user typed", function()
