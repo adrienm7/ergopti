@@ -1669,7 +1669,8 @@ local function _build_llm(ctx)
 	dynamic_handlers["llm_profile"] = function(target)
 		local ok_profiles, ProfileSettings = pcall(require, "modules.llm.profile_settings")
 		if not ok_profiles then return end
-		local current_model = llm.get_current_model and llm.get_current_model() or nil
+		-- The model predictions actually use: an API entry's when the API answers.
+		local current_model = llm.get_prediction_model and llm.get_prediction_model() or nil
 		local effective = ProfileSettings.effective_profile(current_model)
 		local count = ProfileSettings.get("num_predictions") or 1
 		local function refresh()

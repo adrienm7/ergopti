@@ -138,3 +138,30 @@ helpers.describe("prediction backend: variants are paced and diverse", function(
 	end)
 
 end)
+
+helpers.describe("prediction backend: the model the menu shows profiles for", function()
+
+	helpers.it("is the API entry's model when the API answers", function()
+		local engine, _, _, restore = load("api", ENTRY)
+		local model = engine.get_prediction_model()
+		restore()
+		helpers.assert_eq(model, "qwen-default")
+	end)
+
+	helpers.it("is Ollama's model otherwise", function()
+		local engine, _, _, restore = load("ollama", ENTRY)
+		local model = engine.get_prediction_model()
+		restore()
+		helpers.assert_eq(model, "ollama-model")
+	end)
+
+	helpers.it("is what the AI menu resolves the automatic profile against", function()
+		local fh = assert(io.open("ui/menu/menu_builder.lua", "r"))
+		local source = fh:read("*a")
+		fh:close()
+		local handler = source:match('dynamic_handlers%["llm_profile"%] = function%(target%)(.-)local function refresh')
+		helpers.assert_true(handler ~= nil and handler:find("get_prediction_model", 1, true) ~= nil,
+			"the profile rows must follow the model predictions use")
+	end)
+
+end)
