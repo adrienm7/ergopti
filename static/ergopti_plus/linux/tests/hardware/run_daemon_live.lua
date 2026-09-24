@@ -16,10 +16,15 @@
 --- focused field is known not to be a password), and the tray's D-Bus menu,
 --- checked by tests/hardware/sni_host.py in the calling script.
 ---
+--- Then the AI: with the API backend selected and an entry pointing at
+--- tests/hardware/fake_llm_server.py (a Cerebras-style OpenAI-compatible API),
+--- "//" asks for a prediction and Alt+1 accepts it. The check reads what the
+--- server received (the key, the endpoint) and what the desktop received.
+---
 --- HOW TO RUN IT: through tests/hardware/run_daemon_live.sh, which provides the
---- X server, the buses, the window manager, a focused GTK field and the panel.
---- Needs root (or the uinput/input groups) for /dev/uinput and the grab.
---- Exit 0 = the trigger expanded; 1 = it did not; 2 = no environment.
+--- X server, the buses, the window manager, a focused GTK field, the panel and
+--- the fake API. Needs root (or the uinput/input groups) for /dev/uinput and
+--- the grab. Exit 0 = both verified; 1 = a failure; 2 = no environment.
 --- ==============================================================================
 
 local EvdevCodes = require("infra.evdev_codes")
@@ -30,8 +35,21 @@ local DAEMON_OUTPUT = require("infra.device_names").VIRTUAL_KEYBOARD
 
 -- US evdev codes of the keys this harness types and decodes (Xvfb's default
 -- keymap is US, so the decode below is exact rather than assumed).
-local LETTERS = { [30] = "a", [32] = "d", [49] = "n" }
-local KEY_OF = { a = 30, d = 32, n = 49, [" "] = 57 }
+local LETTERS = {
+	[16] = "q", [17] = "w", [18] = "e", [19] = "r", [20] = "t", [21] = "y", [22] = "u", [23] = "i",
+	[24] = "o", [25] = "p", [30] = "a", [31] = "s", [32] = "d", [33] = "f", [34] = "g", [35] = "h",
+	[36] = "j", [37] = "k", [38] = "l", [44] = "z", [45] = "x", [46] = "c", [47] = "v", [48] = "b",
+	[49] = "n", [50] = "m", [53] = "/",
+}
+local KEY_OF = { [" "] = 57 }
+for code, char in pairs(LETTERS) do KEY_OF[char] = code end
+local KEY_LEFTALT, KEY_1 = 56, 2
+
+-- The fake API the AI phase talks to (run_daemon_live.sh starts it).
+local LLM_PORT = os.getenv("ERGOPTI_LIVE_LLM_PORT")
+local LLM_LOG = os.getenv("ERGOPTI_LIVE_LLM_LOG")
+local LLM_REPLY = os.getenv("ERGOPTI_LIVE_LLM_REPLY")
+local LLM_KEY = "live-test-key"
 
 local function sleep(seconds) os.execute(string.format("sleep %.3f", seconds)) end
 local function abort(message)
@@ -105,6 +123,20 @@ local home = os.tmpname()
 os.remove(home)
 os.execute("mkdir -p '" .. home .. "'")
 local log = home .. "/daemon.log"
+
+-- The AI configured as a user would leave it after "Add an API": enabled, the
+-- API backend selected, one entry in the private keys file.
+if LLM_PORT then
+	os.execute("mkdir -p '" .. home .. "/.config/ergopti_plus'")
+	local storage = io.open(home .. "/.config/ergopti_plus/storage.json", "w")
+	storage:write('{"llm.enabled":true,"llm.models.selected":"api","llm.profiles.num_predictions":1}')
+	storage:close()
+	local keys = io.open(home .. "/.config/ergopti_plus/api_keys.json", "w")
+	keys:write(string.format('{"version":1,"active_id":"live","entries":[{"id":"live","provider":"openai_compat",'
+		.. '"label":"Live","token":"%s","model":"live-model","base_url":"http://127.0.0.1:%s/v1"}]}', LLM_KEY, LLM_PORT))
+	keys:close()
+	os.execute("chmod 600 '" .. home .. "/.config/ergopti_plus/api_keys.json'")
+end
 local interpreter = arg and arg[-1] or "luajit"
 os.execute(string.format(
 	"HOME='%s' %s ergopti_hotstrings.lua --tray --verbose --device '%s' --config tests/e2e/fixtures/daemon_keys.toml > '%s' 2>&1 & echo $! > '%s/pid'",
@@ -207,38 +239,116 @@ if not opened_output then
 end
 print("  reading the daemon's output on " .. opened_output)
 
-for char in ("adn "):gmatch(".") do
-	Keyboard.emit(KEY_OF[char], 1)
-	Keyboard.emit(KEY_OF[char], 0)
-	sleep(0.03)
+--- Types text on the test keyboard.
+--- @param text string
+local function type_text(text)
+	for char in text:gmatch(".") do
+		Keyboard.emit(KEY_OF[char], 1)
+		Keyboard.emit(KEY_OF[char], 0)
+		sleep(0.03)
+	end
 end
 
--- Decode what the desktop receives: US letters, Shift, Space, Backspace.
-local text, shift, trail = {}, false, {}
-local deadline = os.time() + 3
-while os.time() <= deadline do
-	if EvdevReader.wait_readable(200, out_slot) then
-		local ev = EvdevReader.read_event(out_slot)
-		while ev do
-			if ev.type == 1 then
-				if ev.value ~= 2 then trail[#trail + 1] = ev.code .. (ev.value == 1 and "↓" or "↑") end
-				if ev.code == EvdevCodes.KEY_LEFTSHIFT or ev.code == EvdevCodes.KEY_RIGHTSHIFT then
-					shift = ev.value ~= 0
-				elseif ev.value == 1 then
-					if ev.code == EvdevCodes.KEY_BACKSPACE then table.remove(text)
-					elseif ev.code == 57 then text[#text + 1] = " "
-					elseif LETTERS[ev.code] then
-						text[#text + 1] = shift and LETTERS[ev.code]:upper() or LETTERS[ev.code]
-					else text[#text + 1] = "<" .. ev.code .. ">" end
+--- Decodes what the desktop receives for a while: US letters, Shift, Space,
+--- Backspace, and whether any key went out while Alt was held.
+--- @param seconds number
+--- @return string text, string trail, table alt_chords
+local function read_output(seconds)
+	local text, shift, alt, trail, alt_chords = {}, false, false, {}, {}
+	local deadline = os.time() + seconds
+	while os.time() <= deadline do
+		if EvdevReader.wait_readable(200, out_slot) then
+			local ev = EvdevReader.read_event(out_slot)
+			while ev do
+				if ev.type == 1 then
+					if ev.value ~= 2 then trail[#trail + 1] = ev.code .. (ev.value == 1 and "↓" or "↑") end
+					if ev.code == EvdevCodes.KEY_LEFTSHIFT or ev.code == EvdevCodes.KEY_RIGHTSHIFT then
+						shift = ev.value ~= 0
+					elseif ev.code == KEY_LEFTALT then
+						alt = ev.value ~= 0
+					elseif ev.value == 1 then
+						if alt then alt_chords[#alt_chords + 1] = ev.code end
+						if ev.code == EvdevCodes.KEY_BACKSPACE then table.remove(text)
+						elseif ev.code == 57 then text[#text + 1] = " "
+						elseif LETTERS[ev.code] then
+							text[#text + 1] = shift and LETTERS[ev.code]:upper() or LETTERS[ev.code]
+						else text[#text + 1] = "<" .. ev.code .. ">" end
+					end
 				end
+				ev = EvdevReader.read_event(out_slot)
 			end
-			ev = EvdevReader.read_event(out_slot)
+		end
+	end
+	return table.concat(text), table.concat(trail, " "), alt_chords
+end
+
+type_text("adn ")
+local got, trail = read_output(3)
+print(string.format("  the desktop received %q", got))
+print("  key events: " .. trail)
+local failures = {}
+if got == "ADN " then
+	print("  ok   typing \"adn \" on the keyboard reached the desktop as \"ADN \"")
+else
+	failures[#failures + 1] = "expected \"ADN \""
+end
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 4/ An AI prediction =============
+-- =========================================
+-- =========================================
+
+--- The requests the fake API received.
+--- @return table
+local function api_requests()
+	local requests = {}
+	local fh = LLM_LOG and io.open(LLM_LOG, "r")
+	if not fh then return requests end
+	for line in fh:lines() do requests[#requests + 1] = line end
+	fh:close()
+	return requests
+end
+
+if LLM_PORT then
+	type_text("bonjour //")
+	local asked = await(function() return #api_requests() > 0 or nil end, 6)
+	if not asked then
+		failures[#failures + 1] = "\"//\" sent no request to the API"
+	else
+		local request = api_requests()[1]
+		print("  the API received: " .. request:sub(1, 300))
+		if not request:find('"authorization": "Bearer ' .. LLM_KEY .. '"', 1, true) then
+			failures[#failures + 1] = "the request did not carry the entry's key"
+		end
+		if not request:find('"path": "/v1/chat/completions"', 1, true) then
+			failures[#failures + 1] = "the request did not reach /v1/chat/completions"
+		end
+		-- The offer is drawn once the reply is parsed; then Alt+1 accepts it.
+		sleep(1.5)
+		Keyboard.emit(KEY_LEFTALT, 1)
+		Keyboard.emit(KEY_1, 1)
+		Keyboard.emit(KEY_1, 0)
+		Keyboard.emit(KEY_LEFTALT, 0)
+		local ai_text, ai_trail, alt_chords = read_output(3)
+		print(string.format("  after Alt+1 the desktop received %q", ai_text))
+		print("  key events: " .. ai_trail)
+		local expected = (LLM_REPLY:gsub("^%s+", ""))
+		if not ai_text:find(expected, 1, true) then
+			failures[#failures + 1] = string.format("the accepted prediction %q did not reach the desktop", expected)
+		end
+		if ai_text:find("/", 1, true) then
+			failures[#failures + 1] = "the \"//\" trigger was not erased on acceptance"
+		end
+		if #alt_chords > 0 then
+			failures[#failures + 1] = string.format(
+				"%d key(s) of the prediction went out while Alt was held (Alt+letter shortcuts)", #alt_chords)
 		end
 	end
 end
-local got = table.concat(text)
-print(string.format("  the desktop received %q", got))
-print("  key events: " .. table.concat(trail, " "))
 
 -- Left running a little longer so the panel stand-in can finish reading the
 -- tray menu, then stopped.
@@ -246,10 +356,10 @@ sleep(3)
 stop_daemon()
 Keyboard.close()
 
-if got == "ADN " then
-	print("  ok   typing \"adn \" on the keyboard reached the desktop as \"ADN \"")
+if #failures == 0 then
+	print("  ok   the prediction was requested with the entry's key and typed on Alt+1")
 	os.exit(0)
 end
 dump_log()
-print("  FAIL expected \"ADN \"")
+for _, failure in ipairs(failures) do print("  FAIL " .. failure) end
 os.exit(1)
