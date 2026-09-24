@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/op_set_if_absent/case.toml
+
+[case]
+description = "set_if_absent writes a value only where the key is absent, creating its section."
+drivers = ["ahk", "hs", "linux"]
+outcome = "migrated"
+from_version = 1
+to_version = 2

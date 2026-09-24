@@ -1,0 +1,12 @@
+# _shared/tests/corpus/config_migrations/op_rename/input.toml
+
+[hotstrings.dynamic]
+datefr = true
+time = false
+
+[layout]
+new_flag = true
+old_flag = false
+
+[llm.trigger]
+debounce = 200

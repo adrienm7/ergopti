@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/current_version_untouched/input.toml
+
+[_meta]
+schema_version = 3
+
+[gestures]
+enabled = false
+space_wrap = true

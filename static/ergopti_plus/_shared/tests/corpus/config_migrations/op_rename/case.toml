@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/op_rename/case.toml
+
+[case]
+description = "rename moves one value within or across sections; an existing target wins and an absent source is a no-op."
+drivers = ["ahk", "hs", "linux"]
+outcome = "migrated"
+from_version = 1
+to_version = 2
