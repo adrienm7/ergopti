@@ -932,7 +932,7 @@
 	"menu.gestures.reading_off": "libinput-lezen: uit",
 	"menu.keyboard_layout.add_ergopti": "➕ Ergopti v%s toevoegen aan indelingslijst",
 	"menu.keyboard_layout.open_system_prefs": "Systeemvoorkeuren → Toetsenbord openen",
-	"menu.layout.active_layouts": "Actieve indelingen",
+	"menu.layout.active_layouts": "Invoerbronnen",
 	"menu.layout.header_any": "Alle indelingen",
 	"menu.layout.header_ergopti": "Ergopti-indeling",
 	"menu.layout.add_fail": "Toevoegen mislukt — zie console.",

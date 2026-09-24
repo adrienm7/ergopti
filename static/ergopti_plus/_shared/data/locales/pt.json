@@ -932,7 +932,7 @@
 	"menu.gestures.reading_off": "Leitura libinput: desativada",
 	"menu.keyboard_layout.add_ergopti": "➕ Adicionar Ergopti v%s à lista de layouts",
 	"menu.keyboard_layout.open_system_prefs": "Abrir Preferências do Sistema → Teclado",
-	"menu.layout.active_layouts": "Layouts ativos",
+	"menu.layout.active_layouts": "Fontes de entrada",
 	"menu.layout.header_any": "Todos os layouts",
 	"menu.layout.header_ergopti": "Layout Ergopti",
 	"menu.layout.add_fail": "Falha ao adicionar — veja o console.",

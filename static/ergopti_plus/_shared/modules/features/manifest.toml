@@ -3722,6 +3722,14 @@ reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
 type = "---"
 platforms = ["hs"]
 
+# The input sources macOS has enabled, under a header of their own (« Sources
+# de saisie »): without it the list read as more Ergopti settings.
+[[menu.layout_menu]]
+type = "section_header"
+i18n = "menu.layout.active_layouts"
+platforms = ["hs"]
+reason_key = "platform_reason.layout_bundle_and_menubar_are_macos"
+
 [[menu.layout_menu]]
 type = "list"
 id = "active_layouts"

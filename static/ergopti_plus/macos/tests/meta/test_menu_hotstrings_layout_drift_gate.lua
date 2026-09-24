@@ -135,6 +135,8 @@ local CANONICAL_LAYOUT_MENU = {
 	-- menubar icon; neither concept exists on the other two drivers.
 	"list:layout_bundle",
 	"---",
+	-- UPDATED 2026-09-24: the input sources sit under a header of their own.
+	"section_header:menu.layout.active_layouts",
 	-- `list`, not `dynamic`, since 2026-08-07. This driver has always supplied
 	-- active_layout_rows() as a LIST PROVIDER, and the manifest said `dynamic`,
 	-- so the renderer looked for a dynamic handler, found none, warned once and

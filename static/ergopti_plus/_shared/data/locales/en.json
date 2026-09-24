@@ -927,7 +927,7 @@
 	"menu.gestures.reading_off": "libinput reading: off",
 	"menu.keyboard_layout.add_ergopti": "➕ Add Ergopti v%s to layout list",
 	"menu.keyboard_layout.open_system_prefs": "Open System Preferences → Keyboard",
-	"menu.layout.active_layouts": "Active layouts",
+	"menu.layout.active_layouts": "Input sources",
 	"menu.layout.header_any": "Any layout",
 	"menu.layout.header_ergopti": "Ergopti layout",
 	"menu.layout.add_fail": "Add failed — see console.",

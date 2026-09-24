@@ -932,7 +932,7 @@
 	"menu.gestures.reading_off": "libinput पठन: बंद",
 	"menu.keyboard_layout.add_ergopti": "➕ Ergopti v%s को लेआउट सूची में जोड़ें",
 	"menu.keyboard_layout.open_system_prefs": "सिस्टम प्राथमिकताएं खोलें → कीबोर्ड",
-	"menu.layout.active_layouts": "सक्रिय लेआउट",
+	"menu.layout.active_layouts": "इनपुट स्रोत",
 	"menu.layout.header_any": "सभी लेआउट",
 	"menu.layout.header_ergopti": "Ergopti लेआउट",
 	"menu.layout.add_fail": "जोड़ने में विफल — कंसोल देखें।",

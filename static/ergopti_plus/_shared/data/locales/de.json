@@ -932,7 +932,7 @@
 	"menu.gestures.reading_off": "libinput-Lesen: aus",
 	"menu.keyboard_layout.add_ergopti": "➕ Ergopti v%s zur Belegungsliste hinzufügen",
 	"menu.keyboard_layout.open_system_prefs": "Systemeinstellungen → Tastatur öffnen",
-	"menu.layout.active_layouts": "Aktive Belegungen",
+	"menu.layout.active_layouts": "Eingabequellen",
 	"menu.layout.header_any": "Alle Layouts",
 	"menu.layout.header_ergopti": "Ergopti-Layout",
 	"menu.layout.add_fail": "Hinzufügen fehlgeschlagen — Konsole prüfen.",

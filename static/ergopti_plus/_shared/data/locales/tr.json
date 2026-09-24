@@ -932,7 +932,7 @@
 	"menu.gestures.reading_off": "libinput okuma: kapalı",
 	"menu.keyboard_layout.add_ergopti": "➕ Düzen listesine Ergopti v%s ekle",
 	"menu.keyboard_layout.open_system_prefs": "Sistem Tercihleri → Klavye'yi aç",
-	"menu.layout.active_layouts": "Aktif düzenler",
+	"menu.layout.active_layouts": "Giriş kaynakları",
 	"menu.layout.header_any": "Tüm düzenler",
 	"menu.layout.header_ergopti": "Ergopti düzeni",
 	"menu.layout.add_fail": "Ekleme başarısız — konsola bakın.",

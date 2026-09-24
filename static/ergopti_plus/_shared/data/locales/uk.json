@@ -932,7 +932,7 @@
 	"menu.gestures.reading_off": "Читання libinput: вимкнено",
 	"menu.keyboard_layout.add_ergopti": "➕ Додати Ergopti v%s до списку розкладок",
 	"menu.keyboard_layout.open_system_prefs": "Відкрити Системні налаштування → Клавіатура",
-	"menu.layout.active_layouts": "Активні розкладки",
+	"menu.layout.active_layouts": "Джерела введення",
 	"menu.layout.header_any": "Усі розкладки",
 	"menu.layout.header_ergopti": "Розкладка Ergopti",
 	"menu.layout.add_fail": "Додавання не вдалося — дивіться консоль.",

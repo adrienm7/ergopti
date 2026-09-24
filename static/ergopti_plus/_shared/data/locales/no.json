@@ -932,7 +932,7 @@
 	"menu.gestures.reading_off": "libinput-lesing: av",
 	"menu.keyboard_layout.add_ergopti": "➕ Legg til Ergopti v%s i oppsettsliste",
 	"menu.keyboard_layout.open_system_prefs": "Åpne Systeminnstillinger → Tastatur",
-	"menu.layout.active_layouts": "Aktive oppsett",
+	"menu.layout.active_layouts": "Inndatakilder",
 	"menu.layout.header_any": "Alle oppsett",
 	"menu.layout.header_ergopti": "Ergopti-oppsett",
 	"menu.layout.add_fail": "Tillegging mislyktes — se konsoll.",

@@ -932,7 +932,7 @@
 	"menu.gestures.reading_off": "libinput 읽기: 꺼짐",
 	"menu.keyboard_layout.add_ergopti": "➕ 레이아웃 목록에 Ergopti v%s 추가",
 	"menu.keyboard_layout.open_system_prefs": "시스템 환경설정 → 키보드 열기",
-	"menu.layout.active_layouts": "활성 레이아웃",
+	"menu.layout.active_layouts": "입력 소스",
 	"menu.layout.header_any": "모든 자판",
 	"menu.layout.header_ergopti": "Ergopti 자판",
 	"menu.layout.add_fail": "추가 실패 — 콘솔을 확인하세요.",

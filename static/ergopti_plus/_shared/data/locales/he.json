@@ -932,7 +932,7 @@
 	"menu.gestures.reading_off": "קריאת libinput: כבויה",
 	"menu.keyboard_layout.add_ergopti": "➕ הוסף את Ergopti v%s לרשימת הפריסות",
 	"menu.keyboard_layout.open_system_prefs": "פתח העדפות מערכת ← מקלדת",
-	"menu.layout.active_layouts": "פריסות פעילות",
+	"menu.layout.active_layouts": "מקורות קלט",
 	"menu.layout.header_any": "כל הפריסות",
 	"menu.layout.header_ergopti": "פריסת Ergopti",
 	"menu.layout.add_fail": "ההוספה נכשלה — ראה קונסולה.",
