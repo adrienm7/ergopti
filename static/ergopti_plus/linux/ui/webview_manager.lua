@@ -659,12 +659,14 @@ function M._create_gtk_window(app_name, html, handler)
 		return false, "bridge registration failed"
 	end
 
-	-- ── Connect script-message-received signals ──
-	-- lgi supports detailed GObject signals via table-of-callbacks assignment:
-	--   ucm.on_script_message_received = { [detail] = callback, ... }
-	-- Each bridge name maps to a closure that parses the JS value and dispatches
-	-- to M.route_message(), sending any response back to the webview.
-	local function handle_script_message(bridge_name, js_result)
+	-- ── Connect the script-message-received signal for this bridge ──
+	-- lgi connects a DETAILED signal by indexing the signal with its detail:
+	-- `ucm.on_script_message_received[detail] = callback`. This assigned a table
+	-- of callbacks to the signal instead, which lgi took for the callback itself:
+	-- every message a page posted raised "attempt to call upvalue 'target' (a
+	-- table value)" inside lgi and never reached its bridge. Only a real WebKit
+	-- page posting its own request shows it (tests/hardware/run_webview_roundtrip).
+	local function handle_script_message(js_result)
 		local js_value = js_result:get_js_value()
 		local payload = _js_value_to_lua(js_value)
 		local response = M.route_message(app_name, bridge_name, payload, window_epoch)
@@ -673,18 +675,18 @@ function M._create_gtk_window(app_name, html, handler)
 		end
 	end
 
-	local detailed_signals = {
-		[bridge_name] = function(_manager, js_result)
-			handle_script_message(bridge_name, js_result)
-		end,
-	}
-
-	local ok_sig = pcall(function()
-		ucm.on_script_message_received = detailed_signals
+	local ok_sig, sig_err = pcall(function()
+		ucm.on_script_message_received[bridge_name] = function(_manager, js_result)
+			local ok_handle, handle_err = pcall(handle_script_message, js_result)
+			if not ok_handle then
+				Logger.error(LOG, "Message from '%s' could not be handled: %s.", app_name, tostring(handle_err))
+			end
+		end
 	end)
 	if not ok_sig then
-		Logger.warn(LOG, "Detailed GObject signal connection failed for '%s' — " ..
-			"bridge handlers may not receive messages. Check lgi version.", app_name)
+		Logger.error(LOG, "Cannot create '%s': its page messages cannot be received (%s).",
+			app_name, tostring(sig_err))
+		return false, "bridge signal connection failed"
 	end
 
 	-- ── Create the WebView ──
