@@ -3955,7 +3955,7 @@ _UpdaterTest_RecordCrossChannelRebuild(State) {
 
 _UpdaterTest_ExplicitChannelTransitionUsesReleasePolicy() {
 	global UPDATER_LATEST_RELEASE, UPDATER_REQUEST_ORIGIN_MANUAL
-	ShouldOffer := _UpdaterTest_ResolveFunction("_Updater_ShouldOfferCandidate")
+	ShouldOffer := _UpdaterTest_ResolveFunction("UpdateChannels_ShouldOffer")
 	Publish := _UpdaterTest_ResolveFunction("_Updater_PublishOneClickRelease")
 	Workflow := FileRead(A_ScriptDir . "\..\..\..\..\.github\workflows\ci.yml", "UTF-8")
 	TagTemplate := 'tag="v0.0.0-dev.${next_n}"'

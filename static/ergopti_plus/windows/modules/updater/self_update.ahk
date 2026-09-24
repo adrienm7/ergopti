@@ -433,13 +433,18 @@ _Updater_HandleBackgroundResult(Json, Current, Request, Terminal := 0) {
 		try LoggerInfo("Updater", "Background check result: network unreachable.")
 		return
 	}
+	if _Updater_JsonIsNoChannelRelease(Json) {
+		try LoggerInfo("Updater", "Background check result: no release on channel {1} yet (current {2}).",
+			Request.Channel, Current)
+		return
+	}
 	Latest := Updater_ParseTagName(Json)
 	if (Latest == "") {
 		; This used to be reported as "up to date", hiding a malformed response.
 		try LoggerWarn("Updater", "Background check result: the release response carried no tag (current {1}).", Current)
 		return
 	}
-	if !_Updater_ShouldOfferCandidate(
+	if !UpdateChannels_ShouldOffer(
 		Latest, Current, Request.Channel, _Updater_InstalledChannel()) {
 		try LoggerInfo("Updater", "Background check result: up to date (current {1}, latest {2}, channel {3}).",
 			Current, Latest, Request.Channel)
@@ -1144,7 +1149,7 @@ _Updater_ShowAvailableUpdateRunning() {
 	; connect / receive budget on a stalled or captive-portal network). ``T2``
 	; auto-dismisses the brief "Verification…" notice; the actual update prompt
 	; is surfaced from the async callback once the response arrives.
-	MsgBox(Format(t("updater.checking"), UPDATER_CHANNEL), t("updater.title_update"), "Iconi T2")
+	MsgBox(Format(t("updater.checking"), _Updater_ChannelLabel(UPDATER_CHANNEL)), t("updater.title_update"), "Iconi T2")
 	_Updater_FetchLatestJsonAsync(UPDATER_CHANNEL, Request,
 		(Json, CompletedRequest, Terminal := 0) => _Updater_ShowAvailableUpdateCallback(
 			Json, CompletedRequest, Terminal))
@@ -1168,6 +1173,12 @@ _Updater_ShowAvailableUpdateCallback(Json, Request, Terminal := 0, NotifyFn := 0
 			NotifyFn.Call(t("updater.no_connection"), t("updater.title_update"), "Icon!")
 		else
 			MsgBox(t("updater.no_connection"), t("updater.title_update"), "Icon!")
+		return
+	}
+	if _Updater_JsonIsNoChannelRelease(Json) {
+		if !_Updater_RequestMayPublish(Request)
+			return
+		MsgBox(_Updater_NoChannelReleaseMessage(Request.Channel), t("updater.title_update"), "Iconi")
 		return
 	}
 	Tag := Updater_ParseTagName(Json)
