@@ -655,6 +655,7 @@
 	"healthcheck.status.copied": "تم النسخ إلى الحافظة.",
 	"healthcheck.status.saved": "تم الحفظ: %s",
 	"healthcheck.status.failed": "فشل هذا الإجراء؛ السبب موجود في ملف أخطاء اليوم.",
+	"healthcheck.status.missing": "هذا الملف غير موجود بعد.",
 	"healthcheck.status.report_mode": "راجع المعاينة أدناه، ثم انقر على «الإبلاغ على GitHub».",
 	"hotstrings.custom_terminator": "مخصص",
 	"hotstrings.custom_terminator_consumed": "مخصص (مُستهلَك)",

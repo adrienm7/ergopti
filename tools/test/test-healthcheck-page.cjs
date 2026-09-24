@@ -228,6 +228,17 @@ function init(page, detailed, mode) {
 	if (!page.elements.status.textContent.includes('/tmp/r.md')) fail('a saved report does not say where it went');
 	page.sandbox.window.receiveDiagnostics({ type: 'action', action: 'copy', ok: false });
 	if (!/fail/.test(page.elements.status.className)) fail('a failed action is not shown as a failure');
+	// Today's errors file does not exist before the day's first warning: no
+	// failure, and the page says why nothing opened (open-missing-file)
+	{
+		const en = JSON.parse(fs.readFileSync(path.join(SHARED, 'data', 'locales', 'en.json'), 'utf8'));
+		page.sandbox.window.receiveDiagnostics({ type: 'action', action: 'open_path', ok: 0, missing: 1 });
+		if (typeof en['healthcheck.status.missing'] !== 'string') fail('no healthcheck.status.missing label');
+		else if (page.elements.status.textContent !== en['healthcheck.status.missing']) {
+			fail(`a file not created yet reads "${page.elements.status.textContent}"`);
+		}
+		if (/fail/.test(page.elements.status.className)) fail('a file not created yet is shown as a failure');
+	}
 
 	page.elements['btn-close'].dispatch('click');
 	if (page.posted[page.posted.length - 1].action !== 'close') fail('Close does not ask the host to close');

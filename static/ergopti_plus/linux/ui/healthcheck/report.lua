@@ -19,7 +19,9 @@
 ---    above 8 KB, which is why the full report travels through the clipboard
 ---    and the saved file, and the form gets a summary.
 --- 3. Paths come from the snapshot the host collected, by field id; a folder
----    that does not exist yet is created before it is opened.
+---    that does not exist yet is created before it is opened; a file that does
+---    not exist yet (today's errors file before the day's first warning) is
+---    said to the page, not logged as a failure.
 --- 4. Side effects are one table so a test can observe each of them; the
 ---    browser opens last, after the clipboard holds what it asks for.
 --- ==============================================================================
@@ -150,7 +152,7 @@ end
 --- @param documents table { templates, repository, redaction }
 --- @param context table The redaction context.
 --- @param overrides table|nil Replacement side effects (tests only).
---- @return table { ok = boolean, path = string|nil }
+--- @return table { ok = boolean, path = string|nil, missing = true|nil }
 function M.perform(action, paths, documents, context, overrides)
 	local effects = effects_with(overrides)
 	local function redact(text) return Redact.apply(text, documents.redaction, context) end
@@ -177,7 +179,12 @@ function M.perform(action, paths, documents, context, overrides)
 			local path = paths[action.id]
 			if type(path) ~= "string" or path == "" then error("the path " .. action.id .. " is unknown") end
 			if FOLDER_IDS[action.id] and not effects.make_dir(path) then error("cannot create " .. path) end
-			if not effects.exists(path) then error(path .. " does not exist") end
+			if not effects.exists(path) then
+				if FOLDER_IDS[action.id] then error(path .. " does not exist") end
+				-- A file not created yet, such as today's errors file before the
+				-- day's first warning: nothing to open, and no failure of ours
+				return { missing = path }
+			end
 			if not effects.open(path) then error("the file manager could not open " .. path) end
 			return {}
 		end
@@ -186,6 +193,10 @@ function M.perform(action, paths, documents, context, overrides)
 	if not ok then
 		Logger.error(LOG, "Diagnostics action '%s' failed: %s", action.action, tostring(result))
 		return { ok = false }
+	end
+	if result.missing then
+		Logger.info(LOG, "Diagnostics action '%s': %s does not exist yet.", action.action, result.missing)
+		return { ok = false, missing = true }
 	end
 	Logger.success(LOG, "Diagnostics action '%s' done.", action.action)
 	result.ok = true

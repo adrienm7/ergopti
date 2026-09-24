@@ -139,6 +139,27 @@ helpers.describe("healthcheck page actions (report-bug-flow)", function()
 		helpers.assert_eq(#calls.open, 0)
 	end)
 
+	-- Today's errors file exists only once something went wrong today, so
+	-- asking to open it earlier is no failure of the program. It was logged as
+	-- an ERROR, which created that very file, counted as a session error and
+	-- would raise the error dialog (open-missing-file)
+	helpers.it("open_path on a file not created yet says so, without an error (open-missing-file)", function()
+		local Report, calls, overrides = load_report()
+		local logged = {}
+		local Logger = package.loaded["infra.logger"]
+		Logger.error = function(_, message, ...) logged[#logged + 1] = string.format(message, ...) end
+		Logger.warn = Logger.error
+		overrides.exists = function() return false end
+		local result = Report.perform({ action = "open_path", id = "errors_today" },
+			{ errors_today = LOGS .. "/ErgoptiPlus_errors_2026-09-24.log" }, documents(),
+			Report.redaction_context(overrides), overrides)
+		helpers.assert_eq(result.ok, false)
+		helpers.assert_eq(result.missing, true, "the page is told the file does not exist yet")
+		helpers.assert_eq(#calls.open, 0)
+		helpers.assert_eq(#calls.make_dir, 0, "a file is never created")
+		helpers.assert_eq(logged, {}, "a file not created yet is neither an error nor a warning")
+	end)
+
 	helpers.it("open_settings opens the page the schema declares", function()
 		local result, calls = perform({ action = "open_settings", id = "input_monitoring",
 			url = "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent" })

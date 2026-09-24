@@ -655,6 +655,7 @@
 	"healthcheck.status.copied": "클립보드에 복사했습니다.",
 	"healthcheck.status.saved": "저장됨: %s",
 	"healthcheck.status.failed": "이 작업이 실패했습니다. 원인은 오늘의 오류 파일에 있습니다.",
+	"healthcheck.status.missing": "이 파일은 아직 없습니다.",
 	"healthcheck.status.report_mode": "아래 미리 보기를 확인한 뒤 “GitHub에 보고”를 클릭하세요.",
 	"hotstrings.custom_terminator": "사용자 지정",
 	"hotstrings.custom_terminator_consumed": "사용자 지정 (소비됨)",

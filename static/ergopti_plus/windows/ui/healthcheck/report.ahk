@@ -18,7 +18,9 @@
 ;    8 KB, which is why the full report travels through the clipboard and the
 ;    saved file, and the form gets a summary.
 ; 3. Paths come from the snapshot the host collected, by field id; a folder
-;    that does not exist yet is created before it is opened.
+;    that does not exist yet is created before it is opened; a file that does
+;    not exist yet (today's errors file before the day's first warning) is
+;    said to the page, not logged as a failure.
 ; 4. Side effects are one Map so a test can observe each of them; the browser
 ;    opens last, after the clipboard holds what it asks for.
 ; ==============================================================================
@@ -142,12 +144,15 @@ _HCReport_SaveAndReveal(Effects, Paths, Name, Text) {
 ; @param Paths {Map} The snapshot's paths section.
 ; @param Config {Map} From HealthCheck_Config().
 ; @param Overrides {Map|Integer} Replacement side effects (tests only).
-; @returns {Map} { ok: Boolean, path?: String }
+; @returns {Map} { ok: Boolean, path?: String, missing?: true }
 HealthCheck_PerformAction(Action, Paths, Config, Overrides := 0) {
 	Name := Action["action"]
 	LoggerStart("HealthCheckReport", "Diagnostics action '{1}'…", Name)
 	Effects := _HCReport_Effects(Overrides)
 	Outcome := Map("ok", true)
+	; A file not created yet, such as today's errors file before the day's
+	; first warning: nothing to open, and no failure of ours
+	Missing := ""
 	try {
 		Context := HealthCheck_RedactionContext(Overrides)
 		Rules := Config["redaction"]
@@ -176,16 +181,23 @@ HealthCheck_PerformAction(Action, Paths, Config, Overrides := 0) {
 				Path := Paths[Id]
 				if HC_FOLDER_IDS.Has(Id)
 					Effects["make_dir"].Call(Path)
-				if !Effects["exists"].Call(Path)
-					throw Error(Path . " does not exist.")
-				if !Effects["open"].Call(Path)
+				if !Effects["exists"].Call(Path) {
+					if HC_FOLDER_IDS.Has(Id)
+						throw Error(Path . " does not exist.")
+					Missing := Path
+				} else if !Effects["open"].Call(Path) {
 					throw Error(Path . " could not be opened.")
+				}
 			default:
 				throw Error("No handler for the action " . Name . ".")
 		}
 	} catch as Err {
 		LoggerError("HealthCheckReport", "Diagnostics action '{1}' failed: {2}", Name, Err.Message)
 		return Map("ok", false)
+	}
+	if (Missing != "") {
+		LoggerInfo("HealthCheckReport", "Diagnostics action '{1}': {2} does not exist yet.", Name, Missing)
+		return Map("ok", false, "missing", true)
 	}
 	LoggerSuccess("HealthCheckReport", "Diagnostics action '{1}' done.", Name)
 	return Outcome

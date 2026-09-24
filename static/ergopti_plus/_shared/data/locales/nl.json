@@ -655,6 +655,7 @@
 	"healthcheck.status.copied": "Gekopieerd naar het klembord.",
 	"healthcheck.status.saved": "Opgeslagen: %s",
 	"healthcheck.status.failed": "Deze actie is mislukt; de reden staat in het foutenbestand van vandaag.",
+	"healthcheck.status.missing": "Dit bestand bestaat nog niet.",
 	"healthcheck.status.report_mode": "Controleer het voorbeeld hieronder en klik dan op “Melden op GitHub”.",
 	"hotstrings.custom_terminator": "Aangepast",
 	"hotstrings.custom_terminator_consumed": "Aangepast (verbruikt)",

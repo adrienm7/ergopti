@@ -655,6 +655,7 @@
 	"healthcheck.status.copied": "Zkopírováno do schránky.",
 	"healthcheck.status.saved": "Uloženo: %s",
 	"healthcheck.status.failed": "Tato akce selhala; důvod je v dnešním souboru chyb.",
+	"healthcheck.status.missing": "Tento soubor zatím neexistuje.",
 	"healthcheck.status.report_mode": "Zkontrolujte náhled níže a poté klikněte na „Nahlásit na GitHubu“.",
 	"hotstrings.custom_terminator": "Vlastní",
 	"hotstrings.custom_terminator_consumed": "Vlastní (spotřebováno)",

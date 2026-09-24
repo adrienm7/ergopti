@@ -650,6 +650,7 @@
 	"healthcheck.status.copied": "Copied to the clipboard.",
 	"healthcheck.status.saved": "Saved: %s",
 	"healthcheck.status.failed": "This action failed; the reason is in today’s errors file.",
+	"healthcheck.status.missing": "This file does not exist yet.",
 	"healthcheck.status.report_mode": "Check the preview below, then click “Report on GitHub”.",
 	"hotstrings.custom_terminator": "Custom",
 	"hotstrings.custom_terminator_consumed": "Custom (consumed)",

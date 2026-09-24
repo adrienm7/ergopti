@@ -655,6 +655,7 @@
 	"healthcheck.status.copied": "In die Zwischenablage kopiert.",
 	"healthcheck.status.saved": "Gespeichert: %s",
 	"healthcheck.status.failed": "Diese Aktion ist fehlgeschlagen; der Grund steht in der heutigen Fehlerdatei.",
+	"healthcheck.status.missing": "Diese Datei existiert noch nicht.",
 	"healthcheck.status.report_mode": "Prüfen Sie die Vorschau unten und klicken Sie dann auf „Auf GitHub melden“.",
 	"hotstrings.custom_terminator": "Benutzerdefiniert",
 	"hotstrings.custom_terminator_consumed": "Benutzerdefiniert (verbraucht)",

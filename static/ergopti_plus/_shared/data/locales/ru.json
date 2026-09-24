@@ -655,6 +655,7 @@
 	"healthcheck.status.copied": "Скопировано в буфер обмена.",
 	"healthcheck.status.saved": "Сохранено: %s",
 	"healthcheck.status.failed": "Действие не выполнено; причина указана в файле ошибок за сегодня.",
+	"healthcheck.status.missing": "Этот файл ещё не создан.",
 	"healthcheck.status.report_mode": "Проверьте предпросмотр ниже, затем нажмите «Сообщить на GitHub».",
 	"hotstrings.custom_terminator": "Пользовательский",
 	"hotstrings.custom_terminator_consumed": "Пользовательский (поглощён)",

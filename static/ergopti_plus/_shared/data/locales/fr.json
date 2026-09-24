@@ -650,6 +650,7 @@
 	"healthcheck.status.copied": "Copié dans le presse-papiers.",
 	"healthcheck.status.saved": "Enregistré : %s",
 	"healthcheck.status.failed": "Cette action a échoué ; la raison est dans le fichier des erreurs du jour.",
+	"healthcheck.status.missing": "Ce fichier n’existe pas encore.",
 	"healthcheck.status.report_mode": "Vérifiez l’aperçu ci-dessous, puis cliquez sur « Signaler sur GitHub ».",
 	"hotstrings.custom_terminator": "Personnalisé",
 	"hotstrings.custom_terminator_consumed": "Personnalisé (consommé)",

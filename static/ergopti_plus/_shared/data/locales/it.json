@@ -655,6 +655,7 @@
 	"healthcheck.status.copied": "Copiato negli appunti.",
 	"healthcheck.status.saved": "Salvato: %s",
 	"healthcheck.status.failed": "Questa azione non è riuscita; il motivo è nel file degli errori di oggi.",
+	"healthcheck.status.missing": "Questo file non esiste ancora.",
 	"healthcheck.status.report_mode": "Controlla l’anteprima qui sotto, poi fai clic su «Segnala su GitHub».",
 	"hotstrings.custom_terminator": "Personalizzato",
 	"hotstrings.custom_terminator_consumed": "Personalizzato (consumato)",

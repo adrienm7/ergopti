@@ -145,9 +145,15 @@
 
 	/**
 	 * Reports the outcome of an action the page asked for.
-	 * @param {object} message { action, ok, path }
+	 * @param {object} message { action, ok, path, missing }
 	 */
 	function onActionResult(message) {
+		// A file not created yet, such as today's errors file before the day's
+		// first warning, is nothing to open rather than a failure
+		if (isTrue(message.missing)) {
+			setStatus(t('healthcheck.status.missing'), 'info');
+			return;
+		}
 		if (!isTrue(message.ok)) {
 			setStatus(t('healthcheck.status.failed'), 'fail');
 			return;

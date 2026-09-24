@@ -655,6 +655,7 @@
 	"healthcheck.status.copied": "הועתק ללוח.",
 	"healthcheck.status.saved": "נשמר: %s",
 	"healthcheck.status.failed": "הפעולה נכשלה; הסיבה מופיעה בקובץ השגיאות של היום.",
+	"healthcheck.status.missing": "הקובץ הזה עדיין לא קיים.",
 	"healthcheck.status.report_mode": "בדקו את התצוגה המקדימה שלמטה ולאחר מכן לחצו על „דווח ב-GitHub”.",
 	"hotstrings.custom_terminator": "מותאם",
 	"hotstrings.custom_terminator_consumed": "מותאם (נצרך)",

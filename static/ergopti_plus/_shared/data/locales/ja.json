@@ -655,6 +655,7 @@
 	"healthcheck.status.copied": "クリップボードにコピーしました。",
 	"healthcheck.status.saved": "保存しました: %s",
 	"healthcheck.status.failed": "この操作は失敗しました。理由は今日のエラーファイルにあります。",
+	"healthcheck.status.missing": "このファイルはまだ存在しません。",
 	"healthcheck.status.report_mode": "下のプレビューを確認してから、「GitHub で報告」をクリックしてください。",
 	"hotstrings.custom_terminator": "カスタム",
 	"hotstrings.custom_terminator_consumed": "カスタム（消費済み）",

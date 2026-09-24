@@ -655,6 +655,7 @@
 	"healthcheck.status.copied": "Kopierat till urklipp.",
 	"healthcheck.status.saved": "Sparat: %s",
 	"healthcheck.status.failed": "Åtgärden misslyckades; orsaken står i dagens felfil.",
+	"healthcheck.status.missing": "Den här filen finns inte ännu.",
 	"healthcheck.status.report_mode": "Kontrollera förhandsvisningen nedan och klicka sedan på ”Rapportera på GitHub”.",
 	"hotstrings.custom_terminator": "Anpassad",
 	"hotstrings.custom_terminator_consumed": "Anpassad (förbrukad)",
