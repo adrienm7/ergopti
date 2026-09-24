@@ -154,6 +154,7 @@ M.get_keyboard_assignments = KeyboardShortcuts.get_assignments
 M.get_keyboard_slot_groups = function() return KeyboardShortcuts.SLOT_GROUPS end
 M.available_keyboard_slots = KeyboardShortcuts.available_slots
 M.assigned_keyboard_slots  = KeyboardShortcuts.assigned_slots
+M.keyboard_binding_id      = KeyboardShortcuts.binding_id
 
 --- Stops independent shortcut children without letting one refusal hide its sibling.
 --- @param steps table[] Ordered `{name, stop}` descriptors.

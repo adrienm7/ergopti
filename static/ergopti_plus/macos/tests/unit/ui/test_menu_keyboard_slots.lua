@@ -289,5 +289,91 @@ helpers.describe("menu_keyboard_slots: editing a binding", function()
 	end)
 end)
 
+
+
+
+-- ==========================================
+-- ==========================================
+-- ======= 5/ Parameterized Actions =========
+-- ==========================================
+-- ==========================================
+
+--- A context whose gesture registry declares wrap_selection's wrap_pair
+--- parameter and records where a value is stored.
+--- @return table ctx, table stored
+local function parameter_ctx()
+	local ctx = make_ctx()
+	local stored = {}
+	ctx.gestures.get_action_parameter_spec = function(id)
+		return id == "wrap_selection" and "wrap_pair" or nil
+	end
+	ctx.gestures.get_action_parameter = function() return "" end
+	ctx.gestures.validate_action_parameter = function(_, value) return value == "(" end
+	ctx.gestures.parameter_prompt = function() return "prompt" end
+	ctx.gestures.parameter_error = function() return "refused" end
+	ctx.gestures.set_action_parameter = function(binding, action, value)
+		stored[#stored + 1] = { binding = binding, action = action, value = value }
+		return true
+	end
+	return ctx, stored
+end
+
+helpers.describe("menu_keyboard_slots: parameterized actions", function()
+	-- A keyboard slot bound to wrap_selection (or open_url, search_web) did
+	-- nothing: the picker stored the action and never asked for its parameter,
+	-- which the handler reads under the slot's dispatch binding.
+	helpers.it("asks for the parameter under the slot's dispatch binding before binding", function()
+		local ui, shortcuts, picker = fresh()
+		local ctx, stored = parameter_ctx()
+		local dialog = package.loaded["infra.dialog_util"]
+		helpers.assert_eq(type(dialog), "table",
+			"the slot menu must reach the shared parameter prompt (ui.menu.shortcut_utils)")
+		local saved_prompt = dialog.text_prompt
+		dialog.text_prompt = function(_title, _prompt, _prior, confirm) return confirm, "(" end
+		local group = shortcuts.get_keyboard_slot_groups()[1]
+		local slot = group.prefix .. "w"
+
+		local ok, err = xpcall(function()
+			local rows = ui.provide_rows(ctx, nil)
+			rows[1].items[#rows[1].items].action()
+			picker.opened[1].confirm(slot)
+			picker.opened[2].confirm("wrap_selection")
+			helpers.assert_eq(#stored, 1, "the pair must be asked for and stored")
+			helpers.assert_eq(stored[1].binding, shortcuts.keyboard_binding_id(slot),
+				"under the binding the dispatcher passes, not the bare slot id")
+			helpers.assert_eq(stored[1].value, "(")
+			helpers.assert_eq(shortcuts.get_keyboard_action(slot), "wrap_selection",
+				"and only then may the slot be bound")
+		end, debug.traceback)
+		dialog.text_prompt = saved_prompt
+		shortcuts.set_keyboard_action(slot, "none")
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("leaves the slot unbound when the parameter prompt is cancelled", function()
+		local ui, shortcuts, picker = fresh()
+		local ctx, stored = parameter_ctx()
+		local dialog = package.loaded["infra.dialog_util"]
+		helpers.assert_eq(type(dialog), "table",
+			"the slot menu must reach the shared parameter prompt (ui.menu.shortcut_utils)")
+		local saved_prompt = dialog.text_prompt
+		dialog.text_prompt = function() return "cancel", nil end
+		local group = shortcuts.get_keyboard_slot_groups()[1]
+		local slot = group.prefix .. "w"
+
+		local ok, err = xpcall(function()
+			local rows = ui.provide_rows(ctx, nil)
+			rows[1].items[#rows[1].items].action()
+			picker.opened[1].confirm(slot)
+			picker.opened[2].confirm("wrap_selection")
+			helpers.assert_eq(#stored, 0)
+			helpers.assert_eq(shortcuts.get_keyboard_action(slot), "none",
+				"a binding without its pair would do nothing when pressed")
+		end, debug.traceback)
+		dialog.text_prompt = saved_prompt
+		if not ok then error(err, 0) end
+	end)
+end)
+
 package.loaded["infra.deferred_work"] = original_deferred_work
 package.loaded["ui.menu.menu_keyboard_slots"] = original_subject
