@@ -21,6 +21,8 @@
 // 7. Private inheritance: the launcher installs umask 0077 before child spawn.
 // 8. Launch Services isolation: parent GUI identity cannot leak into Hammerspoon.
 // 9. AppKit launch context: the embedded GUI starts through its .app bundle.
+// 10. App Nap: one activity is held from the logger handshake until the child
+//     exits or the launcher terminates, so the native logger stays responsive.
 //
 // NOTE: This target requires the macOS Swift toolchain. Verify with
 // `swift test --package-path static/ergopti_plus/macos/launcher` on macOS.
@@ -341,6 +343,65 @@ final class LauncherEnvironmentTests: XCTestCase {
 		)))
 
 		XCTAssertEqual(loggerWorker.stopCount, 1)
+	}
+
+	/// App Nap throttles an accessory launcher; its logger worker then answers
+	/// late and the Lua transport counts a stall. The activity spans the child.
+	func testChildActivityIsHeldWhileTheChildRunsAndReleasedAfterIt() throws {
+		var begun = 0
+		var ended = 0
+		let activity = EmbeddedChildActivity(
+			begin: {
+				begun += 1
+				return NSObject()
+			},
+			end: { _ in ended += 1 }
+		)
+		let store = try temporaryFatalReportStore()
+		let loggerWorker = TestLoggerDatagramServer()
+		let delegate = AppDelegate(
+			launcherIdentityReader: { _ in (device: "11", inode: "22") },
+			applicationLauncher: { _, _, _ in },
+			fatalReporter: { _ in },
+			applicationTerminator: { _ in },
+			loggerWorkerFactory: { loggerWorker },
+			fatalReportStore: store,
+			childActivity: activity
+		)
+
+		delegate.launchHammerspoon(at: testEmbeddedHammerspoonBinary)
+		XCTAssertTrue(activity.isHeld, "the worker must stay responsive from the configure handshake on")
+		XCTAssertEqual(begun, 1)
+		loggerWorker.reportBootstrapReady()
+		delegate.handleEmbeddedHammerspoonExit(.exited(code: 0), guardianStatus: .ready)
+		XCTAssertFalse(activity.isHeld)
+		XCTAssertEqual(ended, 1)
+
+		delegate.launchHammerspoon(at: testEmbeddedHammerspoonBinary)
+		XCTAssertEqual(begun, 2)
+		delegate.applicationWillTerminate(Notification(name: Notification.Name("test-termination")))
+		XCTAssertFalse(activity.isHeld)
+		XCTAssertEqual(ended, 2, "termination must end the activity it holds")
+	}
+
+	func testChildActivityHoldsAndReleasesExactlyOnce() {
+		var begun = 0
+		var ended = 0
+		let activity = EmbeddedChildActivity(
+			begin: {
+				begun += 1
+				return NSObject()
+			},
+			end: { _ in ended += 1 }
+		)
+		activity.release()
+		XCTAssertEqual(ended, 0, "nothing held, nothing to end")
+		activity.hold()
+		activity.hold()
+		XCTAssertEqual(begun, 1, "a second hold must not leak a second activity")
+		activity.release()
+		activity.release()
+		XCTAssertEqual(ended, 1)
 	}
 
 	/// A refused child start rolls back the already-bound logger authority exactly.

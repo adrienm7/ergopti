@@ -215,11 +215,16 @@ func writeLauncherLogData(
 }
 
 enum LauncherLog {
-	// Standard macOS per-app log location; readable by the user without special
-	// permissions and rotated by nothing — kept deliberately tiny (one line per
-	// launch event) so unbounded growth is not a practical concern.
+	// Standard macOS per-app log location, readable by the user without special
+	// permissions. Every launch, every boot stage until the native logger
+	// commits and every slow native-logger reply append here, so the file is
+	// bounded: past maximumFileBytes it becomes launcher.1.log, which replaces
+	// the previous rotation.
 	private static let logDirectory = NSHomeDirectory() + "/Library/Logs/ErgoptiPlus"
 	private static let logFileName = "launcher.log"
+	private static let rotatedFileName = "launcher.1.log"
+	/// Size past which launcher.log is rotated before the next append.
+	static let maximumFileBytes: off_t = 1_048_576
 	private static let queue = DispatchQueue(label: "com.ergoptiplus.launcher-log")
 	private static let lockTimeoutSeconds: TimeInterval = 0.25
 	private static let lockRetryMicroseconds: useconds_t = 1_000
@@ -258,7 +263,8 @@ enum LauncherLog {
 		_ message: String,
 		directoryPath: String,
 		beforeLock: (() -> Void)? = nil,
-		onFailure: ((String, Int32) -> Void)? = nil
+		onFailure: ((String, Int32) -> Void)? = nil,
+		maximumBytes: off_t = LauncherLog.maximumFileBytes
 	) -> Bool {
 		guard isValidTestLogDirectory(directoryPath) else {
 			onFailure?("validate-test-directory", EINVAL)
@@ -268,6 +274,7 @@ enum LauncherLog {
 			writeUnlocked(
 				message,
 				directoryPath: directoryPath,
+				maximumBytes: maximumBytes,
 				beforeLock: beforeLock,
 				onFailure: onFailure
 			)
@@ -400,6 +407,7 @@ enum LauncherLog {
 	private static func writeUnlocked(
 		_ message: String,
 		directoryPath: String,
+		maximumBytes: off_t = LauncherLog.maximumFileBytes,
 		beforeLock: (() -> Void)? = nil,
 		onFailure: ((String, Int32) -> Void)? = nil
 	) -> Bool {
@@ -410,6 +418,29 @@ enum LauncherLog {
 		let directoryDescriptor = openLogDirectory(directoryPath, onFailure: onFailure)
 		guard directoryDescriptor >= 0 else { return false }
 		defer { Darwin.close(directoryDescriptor) }
+		return appendRecord(
+			data,
+			directoryDescriptor: directoryDescriptor,
+			maximumBytes: maximumBytes,
+			mayRotate: true,
+			beforeLock: beforeLock,
+			onFailure: onFailure
+		)
+	}
+
+	/// Appends one record under the file lock. When this writer holds the file
+	/// the name still points to and the record would take it past the cap, the
+	/// file is first renamed to launcher.1.log and the record goes to a fresh
+	/// launcher.log. A writer that waited behind a rotation finds its inode no
+	/// longer named launcher.log and appends to the current file instead.
+	private static func appendRecord(
+		_ data: Data,
+		directoryDescriptor: Int32,
+		maximumBytes: off_t,
+		mayRotate: Bool,
+		beforeLock: (() -> Void)?,
+		onFailure: ((String, Int32) -> Void)?
+	) -> Bool {
 		let logDescriptor = openLogFile(
 			directoryDescriptor: directoryDescriptor,
 			onFailure: onFailure
@@ -422,6 +453,42 @@ enum LauncherLog {
 			return false
 		}
 		defer { _ = ergoptiFlock(logDescriptor, LOCK_UN) }
+
+		if mayRotate {
+			var held = stat()
+			var named = stat()
+			let heldKnown = Darwin.fstat(logDescriptor, &held) == 0
+			let namedKnown = logFileName.withCString { name in
+				Darwin.fstatat(directoryDescriptor, name, &named, AT_SYMLINK_NOFOLLOW)
+			} == 0
+			let holdsNamedFile = heldKnown && namedKnown
+				&& held.st_dev == named.st_dev && held.st_ino == named.st_ino
+			let appendToFreshFile: Bool
+			if !holdsNamedFile {
+				appendToFreshFile = true
+			} else if held.st_size > 0 && held.st_size + off_t(data.count) > maximumBytes {
+				appendToFreshFile = logFileName.withCString { current in
+					rotatedFileName.withCString { previous in
+						Darwin.renameat(directoryDescriptor, current, directoryDescriptor, previous)
+					}
+				} == 0
+				// A failed rename keeps the line: it matters more than the size bound.
+				if !appendToFreshFile { onFailure?("rotate-file", errno) }
+			} else {
+				appendToFreshFile = false
+			}
+			if appendToFreshFile {
+				return appendRecord(
+					data,
+					directoryDescriptor: directoryDescriptor,
+					maximumBytes: maximumBytes,
+					mayRotate: false,
+					beforeLock: nil,
+					onFailure: onFailure
+				)
+			}
+		}
+
 		let written = writeLauncherLogData(data, descriptor: logDescriptor)
 		if !written { onFailure?("write-file", errno) }
 		return written
@@ -464,6 +531,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	private let loggerWorkerFactory: () -> LoggerDatagramServing?
 	private let processExitMonitorFactory: EmbeddedProcessExitMonitorFactory
 	private let fatalReportStore: EmbeddedFatalReportStore
+	private let childActivity: EmbeddedChildActivity
 	private let guardianRegistrationQueue = DispatchQueue(
 		label: "com.ergoptiplus.remap-guardian.registration",
 		qos: .userInitiated
@@ -487,6 +555,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	///   - loggerWorkerFactory: Binds the native loopback logger before child start.
 	///   - processExitMonitorFactory: Acquires the child's kernel exit-status owner.
 	///   - fatalReportStore: Per-launch report the Lua runtime writes before a fatal exit.
+	///   - childActivity: Keeps App Nap off the launcher while its child runs.
 	init(
 		launcherIdentityReader: @escaping (String?) -> (device: String, inode: String)? =
 			launcherExecutableFileIdentity,
@@ -511,7 +580,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		processExitMonitorFactory: @escaping EmbeddedProcessExitMonitorFactory =
 			makeEmbeddedProcessExitMonitor,
 		fatalReportStore: EmbeddedFatalReportStore =
-			EmbeddedFatalReportStore(path: LauncherLog.fatalReportPath)
+			EmbeddedFatalReportStore(path: LauncherLog.fatalReportPath),
+		childActivity: EmbeddedChildActivity = EmbeddedChildActivity()
 	) {
 		self.launcherIdentityReader = launcherIdentityReader
 		self.applicationLauncher = applicationLauncher
@@ -521,6 +591,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		self.loggerWorkerFactory = loggerWorkerFactory
 		self.processExitMonitorFactory = processExitMonitorFactory
 		self.fatalReportStore = fatalReportStore
+		self.childActivity = childActivity
 		super.init()
 	}
 
@@ -652,6 +723,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		// teardown will eventually run the worker's deinitializer.
 		loggerWorker?.stop()
 		loggerWorker = nil
+		childActivity.release()
 	}
 
 
@@ -767,6 +839,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		LauncherLog.write(
 			"launcher stage: native logger worker bound on loopback port \(activeLoggerWorker.endpoint.port)"
 		)
+		// From the configure handshake on, a late ACK counts against the Lua
+		// transport's stall budget: keep App Nap off until the child is gone.
+		childActivity.hold()
 		hsLaunchContext = (binaryPath, remapGuardianStatus)
 		hsLogFolderRefusal = nil
 		activeLoggerWorker.setConfigureRefusalHandler { [weak self] failure in
@@ -814,6 +889,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		guard let applicationURL = embeddedApplicationBundleURL(binaryPath: binaryPath) else {
 			loggerWorker?.stop()
 			loggerWorker = nil
+			childActivity.release()
 			fail("Embedded Hammerspoon application bundle path is invalid.")
 			return
 		}
@@ -827,6 +903,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 				guard let application else {
 					self.loggerWorker?.stop()
 					self.loggerWorker = nil
+					self.childActivity.release()
 					self.fail(
 						"Failed to launch embedded Hammerspoon: "
 							+ (error?.localizedDescription ?? "Launch Services returned no application.")
@@ -940,6 +1017,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		_ exit: EmbeddedProcessExit,
 		guardianStatus: RemapGuardianRegistrationStatus
 	) {
+		// The child is gone; a bootstrap retry below holds the activity again.
+		childActivity.release()
 		guard !applicationIsTerminating else {
 			applicationTerminator(self)
 			return
