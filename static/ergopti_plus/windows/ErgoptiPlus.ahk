@@ -423,6 +423,8 @@ if UIASW_IsWorkerInvocation()
 #Include _generated/terminators.ahk
 #Include infra/toml/toml_loader.ahk
 #Include infra/toml/toml_config_loader.ahk
+; The config.toml schema migration the boot runs before any reader or writer.
+#Include infra/config_migrate.ahk
 ; manifest_reader.ahk + feature_io.ahk are loaded at the top of the file so
 ; Features / feature-IO functions are available before any #HotIf expression is
 ; evaluated. Re-listing them here would cause AHK to complain about the same
