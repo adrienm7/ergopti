@@ -115,6 +115,8 @@ local function normalise(rule)
 		local variant = m.conditions[2]
 		if variant then
 			helpers.assert_eq(variant.name, FKEYS_VAR)
+			-- Karabiner mirrors the macOS setting as a boolean: a 1 would never match.
+			helpers.assert_eq(variant.value, true, "the top-row mode is compared with true")
 			key = key .. (variant.type == "variable_unless" and "|media" or "|standard")
 		end
 		local parts = {}
