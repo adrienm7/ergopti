@@ -252,7 +252,9 @@ helpers.describe("modules/updater/manager.lua", function()
 		local i18n = require("infra.i18n")
 		M.clear_cached_release()
 		local label = M.get_menu_label()
-		helpers.assert_eq(label, i18n.get("menu.about.check_for_updates"),
+		-- "(dev)" names the prerelease channel, the same token in every locale.
+		local expected = i18n.get("menu.about.check_for_updates") .. (M.get_channel() == "dev" and " (dev)" or "")
+		helpers.assert_eq(label, expected,
 			"the idle label must be whatever the catalogue says for the active locale")
 		helpers.assert_true(label ~= "menu.about.check_for_updates",
 			"an echoed key means the catalogue was never reached")
@@ -325,10 +327,11 @@ helpers.describe("modules/updater/manager.lua", function()
 	end)
 
 	helpers.it("init loads persisted settings and initialises", function()
-		local orig_channel = M.get_channel()
+		local persisted = require("adapters.storage").get("updater.channel", nil)
+		local expected = (persisted == "stable" or persisted == "dev") and persisted or M.default_channel()
 		-- init() should work without opts.
 		M.init({})
-		helpers.assert_eq(M.get_channel(), orig_channel,
+		helpers.assert_eq(M.get_channel(), expected,
 			"init with no opts must not silently move the user off their release channel")
 		-- Channel should still be the same.
 		local ch = M.get_channel()

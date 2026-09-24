@@ -1149,6 +1149,21 @@ jobs:
           xvfb-run -a luajit tests/hardware/run_webview_roundtrip.lua
         timeout-minutes: 5
 
+      # The release list a user opens from the tray, opened: real WebKit, the
+      # Linux bridge fetching GitHub's releases through its curl adapter. It
+      # opened on the stable channel, which hides prereleases, and every
+      # release is one: the window listed nothing.
+      - name: The release list window lists GitHub's releases in real WebKit
+        if: always()
+        working-directory: static/ergopti_plus/linux
+        run: |
+          sudo apt-get install -y --no-install-recommends lua-luv
+          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+          export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
+          export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
+          xvfb-run -a luajit tests/hardware/run_changelog_live.lua
+        timeout-minutes: 5
+
       # window.setData is undefined in the settings window, so the host's
       # `if(window.setData)` guard discards every push. Seven explanations are
       # ruled out, and the informative one is the last: an explicit
