@@ -32,26 +32,11 @@ function Test-CrashFault {
 	return ($Faults -split ",") -contains $Name
 }
 
-function Protect-CrashReportPrivacy {
+# The report keeps its full detail on this machine; only the two transport
+# paths, which are not report fields, are dropped. Whatever is shared later is
+# redacted where it is shared (the error and diagnostics windows).
+function Remove-CrashTransportFields {
 	param([Parameter(Mandatory = $true)]$Snapshot)
-	$redactions = @{
-		error_msg = "[redacted error message]"
-		error_extra = "[redacted error context]"
-		error_what = "[redacted error context]"
-		error_file = "[redacted source path]"
-		stack_trace = "[redacted stack]"
-		script_dir = "[redacted path]"
-		active_window_title = "[redacted window title]"
-		active_window_process = "[redacted process]"
-		config_dir = "[redacted path]"
-		log_tail = "[redacted log]"
-	}
-	foreach ($name in $redactions.Keys) {
-		$property = $Snapshot.PSObject.Properties[$name]
-		if ($null -ne $property -and [string]$property.Value -ne "") {
-			Set-CrashField $Snapshot $name $redactions[$name]
-		}
-	}
 	$Snapshot.PSObject.Properties.Remove("_transport_script_dir")
 	$Snapshot.PSObject.Properties.Remove("_transport_reports_dir")
 }
@@ -146,7 +131,7 @@ $reportDir = $transportReportsDir
 [IO.Directory]::CreateDirectory($reportDir) | Out-Null
 $reportName = "{0}_{1}.json" -f (Get-Date -Format "yyyy-MM-ddTHH-mm-ss"), [guid]::NewGuid().ToString("N")
 $reportPath = Join-Path $reportDir $reportName
-Protect-CrashReportPrivacy $snapshot
+Remove-CrashTransportFields $snapshot
 [IO.File]::WriteAllText(
 	$reportPath,
 	($snapshot | ConvertTo-Json -Depth 8),

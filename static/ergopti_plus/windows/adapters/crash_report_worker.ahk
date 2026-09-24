@@ -234,8 +234,6 @@ _CrashReportWorkerFallbackSource(MappingName, DeadlineExpired := false) {
 		. '$s=[Text.Encoding]::UTF8.GetString($b)|ConvertFrom-Json;'
 		. DeadlineDiagnostic
 		. '$d=[string]$s._transport_reports_dir;if([string]::IsNullOrWhiteSpace($d)){throw "no crash reports folder"};[IO.Directory]::CreateDirectory($d)|Out-Null;'
-		. '$r=@{error_msg="[redacted error message]";error_extra="[redacted error context]";error_what="[redacted error context]";error_file="[redacted source path]";stack_trace="[redacted stack]";script_dir="[redacted path]";active_window_title="[redacted window title]";active_window_process="[redacted process]";config_dir="[redacted path]";log_tail="[redacted log]"};'
-		. 'foreach($k in $r.Keys){if(($s.PSObject.Properties.Name-contains $k)-and [string]$s.$k-ne ""){$s.$k=$r[$k]}};'
 		. '$s.PSObject.Properties.Remove("_transport_script_dir");$s.PSObject.Properties.Remove("_transport_reports_dir");'
 		. '$p=Join-Path $d ((Get-Date -Format "yyyy-MM-ddTHH-mm-ss")+"_"+[guid]::NewGuid().ToString("N")+".json");'
 		. '[IO.File]::WriteAllText($p,($s|ConvertTo-Json -Depth 8),[Text.UTF8Encoding]::new($false));Write-Output ("OK:"+$p)'
