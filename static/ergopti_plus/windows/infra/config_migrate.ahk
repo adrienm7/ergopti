@@ -237,6 +237,15 @@ ConfigMigrateCurrentVersion() {
 	return ConfigMigrateShippedRegistry()["current"]
 }
 
+; Adds the schema stamp to a writer's Updates when Path does not exist yet: a
+; file this build creates carries this build's version, so a later boot never
+; migrates it as an unstamped, older one. An existing file keeps the stamp the
+; boot migration gave it; stamping it here would skip the steps it still needs.
+ConfigMigrateStampNewFile(Updates, Path) {
+	if !FileExist(Path)
+		Updates.Push({ Section: "_meta", Key: "schema_version", Value: ConfigMigrateCurrentVersion() })
+	return Updates
+}
 
 
 

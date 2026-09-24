@@ -98,7 +98,7 @@ ConfigTransitionExpectedOld(Present, Content, Port := 0) {
 _ConfigResetTransitionTargets(ConfigPath, TapHoldPath, ApiEntriesPath) {
 	return [
 		ConfigTransitionPresentTarget(ConfigPath,
-			"[_meta]`nschema_version = 2`n"),
+			"[_meta]`nschema_version = " . ConfigMigrateCurrentVersion() . "`n"),
 		ConfigTransitionAbsentTarget(TapHoldPath),
 		ConfigTransitionAbsentTarget(ApiEntriesPath)
 	]

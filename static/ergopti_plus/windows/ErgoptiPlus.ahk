@@ -604,6 +604,13 @@ if (_DriverStartupSmokeDir != "") {
 ; in the timings.
 BootProfile_Stamp("Tray reset + onboarding")
 
+; Version config.toml before anything reads it: the snapshot below,
+; ApplyBootConfigToml and the boot full save all see the migrated file. A file
+; this build cannot version (a newer schema, a failed migration) stays
+; untouched and every write to it is refused for the session
+; (infra/config_migrate.ahk, docs/adr/009-config-versioning.md).
+ConfigMigrateBoot(ConfigurationFile)
+
 global _IniCache := ParseTomlFile(ConfigurationFile)
 ; Latch the session sentinel SaveFullConfig honours when that parse could not
 ; READ an existing config.toml. This snapshot is taken once and never refreshed,
