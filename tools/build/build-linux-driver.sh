@@ -158,11 +158,13 @@ REQUIRED_FILES=(
 	"_shared/lua/keycodes/evdev.lua"
 	"_shared/lua/updater/version.lua"
 	"_shared/lua/updater/release_sources.lua"
+	"_shared/lua/updater/channels.lua"
 	"_shared/modules/updater/defaults.json"
 	# The daemon migrates config.toml at start; without the registry or the
 	# engine every session would refuse to write it.
 	"_shared/core/config_schema/migrations.toml"
 	"_shared/lua/config_migrate.lua"
+	"_shared/modules/updater/channels.json"
 	"_shared/lua/json.lua"
 	"_shared/lua/unicode_case/init.lua"
 	"_shared/lua/unicode_case/data.lua"

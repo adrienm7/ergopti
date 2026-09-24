@@ -77,6 +77,13 @@ const GENERATORS = [
 		outputs: ['static/ergopti_plus/_shared/ui/metrics_typing/_generated/keycode_data.js']
 	},
 	{
+		script: 'codegen/codegen-update-channels.cjs',
+		outputs: [
+			'static/ergopti_plus/_shared/ui/_generated/update_channel_registry.js',
+			'static/ergopti_plus/windows/_generated/update_channels.ahk'
+		]
+	},
+	{
 		script: 'codegen/codegen-contracts-json.cjs',
 		outputs: ['static/ergopti_plus/_shared/core/ports/contracts.json']
 	},
