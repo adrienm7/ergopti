@@ -142,7 +142,7 @@ function M.build_management(ctx)
 	end
 	exp_sub[#exp_sub + 1] = { label = i18n.get("menu.hotstrings.check_all"),   disabled = paused or nil, action = not paused and function() return bulk_set_terminators(true)  end or nil }
 	exp_sub[#exp_sub + 1] = { label = i18n.get("menu.hotstrings.uncheck_all"), disabled = paused or nil, action = not paused and function() return bulk_set_terminators(false) end or nil }
-	exp_sub[#exp_sub + 1] = { label = i18n.get("menu.global.reset_defaults"),  disabled = paused or nil, action = not paused and reset_terminators or nil }
+	exp_sub[#exp_sub + 1] = { label = i18n.get("common.restore_recommended"), disabled = paused or nil, action = not paused and reset_terminators or nil }
 	exp_sub[#exp_sub + 1] = { separator = true }
 
 	-- Built-in terminators (non-custom), with consume indicator. The shared

@@ -192,7 +192,7 @@ _WS_BuildSymbolRows() {
 		"action", (*) => _WS_MenuSetAll(true)))
 	Rows.Push(Map("label", t("menu.shortcuts.wrap_symbols_uncheck_all"),
 		"action", (*) => _WS_MenuSetAll(false)))
-	Rows.Push(Map("label", t("menu.global.reset_defaults"),
+	Rows.Push(Map("label", t("common.restore_recommended"),
 		"action", (*) => _WS_MenuReset()))
 	Rows.Push(Map("separator", true))
 

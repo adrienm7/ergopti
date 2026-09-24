@@ -261,7 +261,7 @@ _HS_WordExpanderRows() {
 	; most of the catalogue ships disabled and "check all" is not that route.
 	Rows.Push(Map("label", t("menu.hotstrings.check_all"),   "action", (*) => _HS_DelimSetAll(true)))
 	Rows.Push(Map("label", t("menu.hotstrings.uncheck_all"), "action", (*) => _HS_DelimSetAll(false)))
-	Rows.Push(Map("label", t("menu.global.reset_defaults"),  "action", (*) => _HS_DelimReset()))
+	Rows.Push(Map("label", t("common.restore_recommended"), "action", (*) => _HS_DelimReset()))
 	Rows.Push(Map("separator", true))
 
 	; ── Built-in catalogue entries, in catalogue order ───────────────────────

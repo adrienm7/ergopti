@@ -1157,7 +1157,7 @@
 		{
 			"type": "command",
 			"id": "disable_all",
-			"i18n": "menu.gestures.disable_all",
+			"i18n": "common.clear_to_system",
 			"platforms": [
 				"hs",
 				"ahk",
@@ -1167,7 +1167,7 @@
 		{
 			"type": "command",
 			"id": "restore_defaults",
-			"i18n": "menu.gestures.restore_defaults",
+			"i18n": "common.restore_recommended",
 			"platforms": [
 				"hs",
 				"ahk",
@@ -1295,12 +1295,12 @@
 		{
 			"type": "command",
 			"id": "reset_defaults",
-			"i18n": "tap_hold.reset_defaults"
+			"i18n": "common.restore_recommended"
 		},
 		{
 			"type": "command",
 			"id": "disable_all",
-			"i18n": "tap_hold.disable_all"
+			"i18n": "common.clear_to_system"
 		},
 		{
 			"type": "command",

@@ -950,7 +950,7 @@ local function _manifest_hotstring_rows(ctx, config)
 			-- shipped set short of editing storage by hand — 15 of the 25 catalogue
 			-- delimiters ship disabled, so "check all" is not that route either.
 			sub[#sub + 1] = {
-				label = i18n_safe("menu.global.reset_defaults"),
+				label = i18n_safe("common.restore_recommended"),
 				action    = function()
 					local saved = snapshot()
 					local changes = {}

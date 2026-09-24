@@ -212,6 +212,7 @@
 		"test:menu-category-coverage": "node ./tools/test/test-menu-category-coverage.cjs",
 		"test:menu-toggle-registered": "node ./tools/test/test-menu-toggle-registered.cjs",
 		"test:menu-enable-disable-all-retired": "node ./tools/test/test-menu-enable-disable-all-retired.cjs",
+		"test:menu-reset-terminology": "node ./tools/test/test-menu-reset-terminology.cjs",
 		"test:tap-hold-hold-options-parity": "node ./tools/test/test-tap-hold-hold-options-parity.cjs",
 		"test:tap-hold-one-shot-results-single-source": "node ./tools/test/test-tap-hold-one-shot-results-single-source.cjs",
 		"test:hotstring-category-submenu-order": "node ./tools/test/test-hotstring-category-submenu-order.cjs",

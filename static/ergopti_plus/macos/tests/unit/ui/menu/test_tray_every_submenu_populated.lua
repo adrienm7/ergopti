@@ -255,12 +255,20 @@ helpers.describe("the real macOS tray: every submenu reaches the menu bar popula
 	end)
 
 	helpers.it("no clickable row is duplicated across two top-level submenus", function()
+		-- Restore and clear read one shared label in every section on purpose:
+		-- each row acts on its own section, and one wording is the decision.
+		local i18n = require("infra.i18n")
+		local shared_labels = {
+			[i18n.get("common.restore_recommended")] = true,
+			[i18n.get("common.clear_to_system")] = true,
+		}
 		local owner = {}
 		local duplicated = {}
 		for _, top in ipairs(MENU or {}) do
 			if type(top.menu) == "table" then
 				for _, row in ipairs(top.menu) do
-					if type(row.title) == "string" and row.title ~= "-" and type(row.fn) == "function" then
+					if type(row.title) == "string" and row.title ~= "-" and type(row.fn) == "function"
+						and not shared_labels[row.title] then
 						local first = owner[row.title]
 						if first and first ~= top.title then
 							duplicated[#duplicated + 1] = row.title .. " (" .. first .. " and " .. top.title .. ")"

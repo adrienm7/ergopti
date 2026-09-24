@@ -159,7 +159,7 @@ helpers.describe("word-expander terminator mutations are transactional", functio
 	local bulk_labels = {
 		i18n.get("menu.hotstrings.check_all"),
 		i18n.get("menu.hotstrings.uncheck_all"),
-		i18n.get("menu.global.reset_defaults"),
+		i18n.get("common.restore_recommended"),
 	}
 
 	helpers.it("retains every acknowledged bit when a bulk mutation is refused", function()
@@ -189,7 +189,7 @@ helpers.describe("word-expander terminator mutations are transactional", functio
 				expected = { space = false, slash = false },
 			},
 			{
-				label = i18n.get("menu.global.reset_defaults"),
+				label = i18n.get("common.restore_recommended"),
 				expected = { space = true, slash = false },
 			},
 		}
