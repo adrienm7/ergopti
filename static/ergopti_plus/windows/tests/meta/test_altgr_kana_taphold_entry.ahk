@@ -60,15 +60,32 @@ _AKTE_KanaAltGrHoldPassesThrough() {
 Test("tap-holds: the Kana AltGr held as AltGr passes itself through (altgr-single-identity-2026-09-25)",
     _AKTE_KanaAltGrHoldPassesThrough)
 
+; The navigation layer is a table built from layer files now
+; (platform/remap/nav_layer_table.ahk): a binding on AltRight must register the
+; bare SC138 under the Kana criterion, and its RAlt spellings must defer to it.
 _AKTE_NavigationOwnsKanaEscape() {
-    Src := _StripFullLineComments(_DriverDirConcat("platform/remap"))
-    Q := Chr(34)
-    Label := RegExMatch(Src, "SC01D & ~SC138::[^\r\n]*\R\s*\*SC138::[^\r\n]*\R\{\R\s*ActionLayer\(" . Q . "\{Escape ")
-    Assert(Label > 0, "the navigation layer must emit Escape from one SC138 AltGr variant")
-    Assert(_AKTE_GoverningHotIf(Src, Label) = "#HotIf LayerEnabled",
-        "the navigation Escape must apply on every layout, Kana-style ones included")
-    Assert(!InStr(Src, "#HotIf LayerEnabled and _ALTGR_KANA_FIXUP"),
-        "a separate Kana navigation variant would duplicate the one SC138 Escape")
+    SharedDir := A_ScriptDir . "\..\..\_shared"
+    Ctx := KeymapLayers_LoadContext(SharedDir)
+    Result := KeymapLayers_Load("windows", Ctx, '[_meta]`nschema_version = 1`n`n[layers.nav.all]`n"AltRight" = "escape"`n')
+    Assert(Result["ok"], "a layer binding Escape on AltRight must resolve for Windows")
+    Kana := 0, Guarded := 0
+    for Row in NavLayer_BuildTable(Result["layers"][NAV_LAYER_ID], Ctx) {
+        AssertEqual("send:{Escape N}", Row["action"], Row["hotkey"] . " must emit navigation Escape")
+        if (Row["hotkey"] == "SC138") {
+            Kana += 1
+            AssertEqual(NAV_LAYER_CRITERION_KANA, Row["criterion"],
+                "the SC138 Escape handler must be gated on both navigation and Kana state")
+            AssertFalse(Row["kana_guard"], "physical Kana AltGr is the handler the others defer to")
+        } else if Row["kana_guard"] {
+            Guarded += 1
+        }
+    }
+    AssertEqual(1, Kana, "physical Kana AltGr must emit navigation Escape exactly once")
+    AssertEqual(2, Guarded, "both RAlt spellings must defer to the physical SC138")
+    Body := _DriverFuncBody("_NavLayer_KanaGuarded")
+    Assert(Body != "", "_NavLayer_KanaGuarded must exist in platform/remap/nav_layer_table.ahk")
+    Assert(InStr(Body, '_ALTGR_KANA_FIXUP && GetKeyState("SC138", "P")') > 0,
+        "virtual RAlt navigation handler must not duplicate physical SC138 Escape")
 }
 Test("tap-holds: Kana SC138 owns navigation Escape exactly once (altgr-single-identity-2026-09-25)",
     _AKTE_NavigationOwnsKanaEscape)

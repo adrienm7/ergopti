@@ -5,30 +5,32 @@
  * MODULE: Recommended Navigation Layer ⇄ Windows Layer (Golden)
  * DESCRIPTION:
  * `_shared/keymap/layers.recommended.toml` is Ergopti's navigation layer as
- * data, and the Windows layer in windows/platform/remap/nav_layer.ahk is its
- * canonical behaviour. This gate reads the AutoHotkey hotkeys directly — every
- * scan code, every Send string, every repeat count — and requires the
- * recommended layer, resolved for Windows through the physical-key registry and
- * the layer vocabulary, to produce exactly the same thing key for key.
+ * data, and the Windows layer that used to be written by hand in
+ * windows/platform/remap/nav_layer.ahk is its canonical behaviour. That layer
+ * is frozen, hotkey by hotkey, in windows/tests/fixtures/nav_layer_golden.json;
+ * this gate requires the recommended layer, resolved for Windows through the
+ * physical-key registry and the layer vocabulary, to produce exactly the same
+ * thing key for key — and nav_layer.ahk to hold no binding of its own again.
  *
  * WHY IT EXISTS:
  * The layer was hand-written three times (AHK hotkeys, Karabiner JSON, kanata
  * deflayer) and the copies drifted: on Linux F2 and F12 swapped, A and F lost
  * Shift, V and CapsLock went transparent, and the shared
- * [tap_hold.layers.nav.mappings] table matched no driver at all. A data preset
- * is only a single source if something proves it equals the layer users have
- * today; until the drivers are generated from it, this is that proof.
+ * [tap_hold.layers.nav.mappings] table matched no driver at all. Every driver
+ * now generates its layer from layer files; this gate proves the preset still
+ * equals the layer Windows users had, and the AHK suite
+ * (tests/unit/test_nav_layer_table.ahk) proves the Windows table built from it
+ * registers exactly the frozen hotkeys.
  *
  * WHAT IS COMPARED:
- * Each hotkey under `#HotIf LayerEnabled` (and its AltGr-kana twin) becomes a
- * canonical string — keystroke:ctrl+shift+ArrowUp@repeat, repeat_count:3,
- * call:maximize_window — computed from the AHK source alone. The hotkeys under
- * any other condition are the activation special cases (CapsWord through LAlt,
- * the LAlt key-up fix, the swallowed Space); they are listed by name here, so a
- * new condition cannot slip past as "not layer content". The recommended file
- * must also resolve with zero errors on every OS, and its layer ids must be
- * exactly the layers the tap-hold hold picker offers — while the tap-hold
- * defaults bind no layer key of their own.
+ * Each golden row becomes a canonical string — keystroke:ctrl+shift+ArrowUp@repeat,
+ * repeat_count:3, call:maximize_window — computed from its Send string alone.
+ * nav_layer.ahk may only hold the activation special cases (CapsWord through
+ * LAlt, the LAlt key-up fix, the swallowed Space); they are listed by name here,
+ * so a hand-written binding cannot come back under another condition. The
+ * recommended file must also resolve with zero errors on every OS, and its layer
+ * ids must be exactly the layers the tap-hold hold picker offers — while the
+ * tap-hold defaults bind no layer key of their own.
  * ==============================================================================
  */
 
@@ -42,7 +44,12 @@ const { loadContext, loadLayers, formatResolution, RECOMMENDED_PATH } = require(
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const NAV_LAYER_AHK = path.join(SP, 'windows', 'platform', 'remap', 'nav_layer.ahk');
+const GOLDEN_PATH = path.join(SP, 'windows', 'tests', 'fixtures', 'nav_layer_golden.json');
 const TAP_HOLD_DEFAULTS = path.join(SP, '_shared', 'tap_hold', 'defaults.toml');
+
+// Floor: the hand-written layer bound 46 keys through 48 hotkeys. A fixture that
+// stopped being read would otherwise compare nothing.
+const MIN_GOLDEN_KEYS = 40;
 
 const errors = [];
 const fail = (msg) => errors.push(msg);
@@ -55,10 +62,14 @@ function report() {
 	}
 }
 
-if (!fs.existsSync(RECOMMENDED_PATH)) {
-	fail(`${path.relative(ROOT, RECOMMENDED_PATH)} is missing — the navigation layer exists only as three hand-written copies.`);
-	report();
+for (const [label, file] of [
+	['the recommended layer', RECOMMENDED_PATH],
+	['the frozen Windows layer', GOLDEN_PATH],
+	['nav_layer.ahk', NAV_LAYER_AHK]
+]) {
+	if (!fs.existsSync(file)) fail(`${path.relative(ROOT, file)} (${label}) is missing`);
 }
+report();
 
 const ctx = loadContext();
 const keys = ctx.registry.keys;
@@ -69,20 +80,9 @@ const keys = ctx.registry.keys;
 
 // ==========================================
 // ==========================================
-// ======= 1/ Read the AutoHotkey layer =====
+// ======= 1/ Read the frozen layer =========
 // ==========================================
 // ==========================================
-
-/** Drops `;` comments outside double-quoted strings (AHK needs a blank before an inline one). */
-function stripComment(line) {
-	let inString = false;
-	for (let i = 0; i < line.length; i++) {
-		const c = line[i];
-		if (c === '"') inString = !inString;
-		if (!inString && c === ';' && (i === 0 || /\s/.test(line[i - 1]))) return line.slice(0, i);
-	}
-	return line;
-}
 
 /** Maps an AHK hotkey label to the physical key it fires on. */
 function labelToCode(label) {
@@ -136,98 +136,52 @@ function sendToCanonical(send, where) {
 	return 'keystroke:' + chords.join(',') + (repeat ? '@repeat' : '');
 }
 
-/** Turns one hotkey body into the canonical behaviour string. */
-function bodyToCanonical(body, where) {
-	const calls = body.match(/ActionLayer\(/g) || [];
-	if (calls.length === 1) {
-		const arg = /ActionLayer\(([\s\S]*)\)/.exec(body)[1];
-		const collapsed = arg.replace(/"\s*\.\s*AppState_GetNumberOfRepetitions\(\)\s*\.\s*"/g, 'N');
-		const literal = /^\s*"([^"]*)"\s*$/.exec(collapsed);
-		if (!literal) {
-			fail(`${where}: ActionLayer argument is not a string with an optional repeat count: ${arg.trim()}`);
-			return null;
-		}
-		return sendToCanonical(literal[1], where);
-	}
-	if (calls.length > 1) {
-		fail(`${where}: more than one ActionLayer call`);
-		return null;
-	}
-	const rep = /^\s*SetNumberOfRepetitions\((\d+)\)\s*$/.exec(body);
-	if (rep) return `repeat_count:${rep[1]}`;
-	if (/WinMaximize\("A"\)/.test(body)) return 'call:maximize_window';
-	fail(`${where}: unrecognised hotkey body: ${body.trim().slice(0, 80)}`);
+/** Turns one golden action into the canonical behaviour string. */
+function actionToCanonical(action, where) {
+	if (action.startsWith('send:')) return sendToCanonical(action.slice(5), where);
+	if (/^repeat_count:\d+$/.test(action) || /^call:[a-z_]+$/.test(action) || action === 'none') return action;
+	fail(`${where}: unrecognised golden action "${action}"`);
 	return null;
 }
 
-const LAYER_CONDITIONS = new Set(['LayerEnabled', 'LayerEnabled and _ALTGR_KANA_FIXUP']);
-// The activation special cases: each is a fix for how a particular hold key
-// enters the layer, not a binding of the layer itself.
-const SPECIAL_CASES = [
-	{ token: '_AnyShortcutEnabled("lalt_caps_lock")', labels: ['SC03A'] },
-	{ token: '_LAltIsBackspaceLayer()', labels: ['SC038'] },
-	{ token: 'TapHoldHoldLayer(TapHold, "space") == "nav"', labels: ['SC039'] }
-];
-
-// AutoHotkey sources carry a UTF-8 BOM; drop it before the first label is read.
-const BOM = String.fromCharCode(0xfeff);
-const ahkSource = fs.readFileSync(NAV_LAYER_AHK, 'utf8');
-const lines = (ahkSource.startsWith(BOM) ? ahkSource.slice(1) : ahkSource).split(/\r?\n/).map(stripComment);
+const CRITERIA = new Set(['layer', 'layer_kana']);
+const golden = JSON.parse(fs.readFileSync(GOLDEN_PATH, 'utf8'));
 const windowsLayer = new Map();
-const specialSeen = new Set();
-let condition = null;
-let pendingLabels = [];
-
-function record(labels, body, lineNo) {
-	const where = `nav_layer.ahk:${lineNo}`;
-	if (condition === null) {
-		fail(`${where}: hotkey ${labels.join(', ')} outside any #HotIf`);
-		return;
+for (const [index, row] of (Array.isArray(golden.rows) ? golden.rows : []).entries()) {
+	const where = `nav_layer_golden.json row ${index + 1} (${row.hotkey})`;
+	if (!CRITERIA.has(row.criterion)) fail(`${where}: criterion "${row.criterion}" is not ${[...CRITERIA].join(' or ')}`);
+	const behaviour = actionToCanonical(String(row.action), where);
+	if (behaviour === null) continue;
+	const code = labelToCode(String(row.hotkey));
+	if (!code) {
+		fail(`${where}: hotkey label names no registry key`);
+		continue;
 	}
-	if (!LAYER_CONDITIONS.has(condition)) {
-		const special = SPECIAL_CASES.find((s) => condition.includes(s.token));
-		if (!special) fail(`${where}: hotkey under an unknown condition "${condition}" — layer content or a new activation fix?`);
-		else if (JSON.stringify(labels) !== JSON.stringify(special.labels)) fail(`${where}: the ${special.token} special case now covers ${labels.join(', ')}`);
-		else specialSeen.add(special.token);
-		return;
-	}
-	const behaviour = bodyToCanonical(body, where);
-	if (behaviour === null) return;
-	for (const label of labels) {
-		const code = labelToCode(label);
-		if (!code) {
-			fail(`${where}: hotkey label "${label}" names no registry key`);
-			continue;
-		}
-		if (windowsLayer.has(code) && windowsLayer.get(code) !== behaviour)
-			fail(`${where}: ${code} is bound twice with different behaviours (${windowsLayer.get(code)} vs ${behaviour})`);
-		windowsLayer.set(code, behaviour);
-	}
+	if (windowsLayer.has(code) && windowsLayer.get(code) !== behaviour)
+		fail(`${where}: ${code} is bound twice with different behaviours (${windowsLayer.get(code)} vs ${behaviour})`);
+	windowsLayer.set(code, behaviour);
 }
+if (windowsLayer.size < MIN_GOLDEN_KEYS) fail(`only ${windowsLayer.size} keys read from the frozen Windows layer (floor ${MIN_GOLDEN_KEYS})`);
 
-/** Net brace depth change of one line, ignoring braces inside double quotes. */
-function braceDelta(line) {
+
+
+
+
+// ===============================================
+// ===============================================
+// ======= 2/ nav_layer.ahk binds nothing ========
+// ===============================================
+// ===============================================
+
+/** Drops `;` comments outside double-quoted strings (AHK needs a blank before an inline one). */
+function stripComment(line) {
 	let inString = false;
-	let delta = 0;
-	for (const c of line) {
+	for (let i = 0; i < line.length; i++) {
+		const c = line[i];
 		if (c === '"') inString = !inString;
-		else if (!inString && c === '{') delta += 1;
-		else if (!inString && c === '}') delta -= 1;
+		if (!inString && c === ';' && (i === 0 || /\s/.test(line[i - 1]))) return line.slice(0, i);
 	}
-	return delta;
-}
-
-/** Reads the block that opens on line `open`; returns [body, index of its last line]. */
-function readBlock(open) {
-	let depth = braceDelta(lines[open]);
-	const body = [];
-	let i = open;
-	while (depth > 0 && i + 1 < lines.length) {
-		const next = lines[++i];
-		depth += braceDelta(next);
-		if (depth > 0) body.push(next);
-	}
-	return [body.join('\n'), i];
+	return line;
 }
 
 /** Net parenthesis depth change of one line. */
@@ -235,9 +189,23 @@ function parenDelta(text) {
 	return (text.match(/\(/g) || []).length - (text.match(/\)/g) || []).length;
 }
 
+// The activation special cases: each fixes how a particular hold key enters the
+// layer; none is a binding of the layer itself.
+const SPECIAL_CASES = [
+	{ token: '_AnyShortcutEnabled("lalt_caps_lock")', label: 'SC03A' },
+	{ token: '_LAltIsBackspaceLayer()', label: 'SC038' },
+	{ token: 'TapHoldHoldLayer(TapHold, "space") == "nav"', label: 'SC039' }
+];
+
+// AutoHotkey sources carry a UTF-8 BOM; drop it before the first label is read.
+const BOM = String.fromCharCode(0xfeff);
+const ahkSource = fs.readFileSync(NAV_LAYER_AHK, 'utf8');
+const lines = (ahkSource.startsWith(BOM) ? ahkSource.slice(1) : ahkSource).split(/\r?\n/).map(stripComment);
+const specialSeen = new Set();
+let condition = null;
+let hotkeys = 0;
 for (let i = 0; i < lines.length; i++) {
 	const line = lines[i].trim();
-	if (line === '') continue;
 	if (line.startsWith('#HotIf')) {
 		let text = line.slice('#HotIf'.length);
 		let depth = parenDelta(text);
@@ -246,38 +214,20 @@ for (let i = 0; i < lines.length; i++) {
 			text += ' ' + next;
 			depth += parenDelta(next);
 		}
-		text = text.replace(/\s+/g, ' ').trim().replace(/^\((.*)\)$/, '$1').trim();
-		condition = text === '' ? null : text;
+		condition = text.replace(/\s+/g, ' ').trim();
 		continue;
 	}
-	// A lone brace opens the body shared by the stacked labels above it.
-	if (line === '{' && pendingLabels.length > 0) {
-		const [body, last] = readBlock(i);
-		record(pendingLabels, body, i + 1);
-		pendingLabels = [];
-		i = last;
-		continue;
-	}
-	const hot = /^([^\s"(][^"]*?)::(.*)$/.exec(line);
+	const hot = /^([^\s"(][^"]*?)::/.exec(line);
 	if (!hot) continue;
-	pendingLabels.push(hot[1].trim());
-	const rest = hot[2].trim();
-	// `Label::` alone stacks onto the next hotkey or brace.
-	if (rest === '') continue;
-	if (rest === '{') {
-		const [body, last] = readBlock(i);
-		record(pendingLabels, body, i + 1);
-		i = last;
-	} else {
-		record(pendingLabels, rest, i + 1);
-	}
-	pendingLabels = [];
+	hotkeys += 1;
+	const label = hot[1].trim();
+	const special = SPECIAL_CASES.find((s) => condition && condition.includes(s.token));
+	if (!special) fail(`nav_layer.ahk:${i + 1}: hotkey ${label} under "${condition || 'no condition'}" — the layer's bindings live in layers.toml now`);
+	else if (label !== special.label) fail(`nav_layer.ahk:${i + 1}: the ${special.token} special case now covers ${label}`);
+	else specialSeen.add(special.token);
 }
-
-for (const s of SPECIAL_CASES) if (!specialSeen.has(s.token)) fail(`the ${s.token} special case was not found — the parser or the file changed`);
-// Floor: the layer binds the letters, the number row, CapsLock, AltRight and the
-// wheel. A parser that stopped matching would otherwise compare nothing.
-if (windowsLayer.size < 40) fail(`only ${windowsLayer.size} Windows layer bindings read from nav_layer.ahk (floor 40)`);
+for (const s of SPECIAL_CASES) if (!specialSeen.has(s.token)) fail(`the ${s.token} special case was not found in nav_layer.ahk — the parser or the file changed`);
+if (hotkeys !== SPECIAL_CASES.length) fail(`nav_layer.ahk declares ${hotkeys} hotkey(s); only the ${SPECIAL_CASES.length} activation fixes belong there`);
 
 
 
@@ -285,7 +235,7 @@ if (windowsLayer.size < 40) fail(`only ${windowsLayer.size} Windows layer bindin
 
 // ==========================================
 // ==========================================
-// ======= 2/ Compare with the preset =======
+// ======= 3/ Compare with the preset =======
 // ==========================================
 // ==========================================
 
@@ -300,11 +250,11 @@ for (const os of ctx.platforms) {
 const nav = (perOs.windows.layers || {}).nav || {};
 const recommended = new Map(Object.entries(nav).map(([code, r]) => [code, formatResolution(r)]));
 for (const [code, behaviour] of windowsLayer) {
-	if (!recommended.has(code)) fail(`${code}: Windows does ${behaviour}, the recommended layer leaves it unbound`);
-	else if (recommended.get(code) !== behaviour) fail(`${code}: Windows does ${behaviour}, the recommended layer does ${recommended.get(code)}`);
+	if (!recommended.has(code)) fail(`${code}: Windows did ${behaviour}, the recommended layer leaves it unbound`);
+	else if (recommended.get(code) !== behaviour) fail(`${code}: Windows did ${behaviour}, the recommended layer does ${recommended.get(code)}`);
 }
 for (const [code, behaviour] of recommended) {
-	if (!windowsLayer.has(code)) fail(`${code}: the recommended layer does ${behaviour} on Windows, nav_layer.ahk does not bind it`);
+	if (!windowsLayer.has(code)) fail(`${code}: the recommended layer does ${behaviour} on Windows, the hand-written layer did not bind it`);
 }
 
 // The hold picker offers exactly the layers the preset defines, and the
@@ -321,6 +271,6 @@ if (JSON.stringify(pickerLayers) !== JSON.stringify(presetLayers))
 
 report();
 console.log(
-	`\x1b[32m[OK] the recommended navigation layer reproduces all ${windowsLayer.size} Windows bindings and resolves cleanly on ` +
-		`${ctx.platforms.join(', ')}.\x1b[0m`
+	`\x1b[32m[OK] the recommended navigation layer reproduces all ${windowsLayer.size} frozen Windows bindings, nav_layer.ahk holds only ` +
+		`the ${SPECIAL_CASES.length} activation fixes, and the preset resolves cleanly on ${ctx.platforms.join(', ')}.\x1b[0m`
 );

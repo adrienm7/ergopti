@@ -1,13 +1,21 @@
 ﻿; platform/remap/nav_layer.ahk
-; Requires: TextSender
+; Requires: TextSender, platform/remap/nav_layer_table.ahk
 
 ; ==============================================================================
 ; MODULE: Tap-Holds — Navigation Layer
 ; DESCRIPTION:
-; Full navigation layer activated when the configured hold key is held past
-; its tap threshold. Remaps both hands to arrows, word/line/document
-; navigation, window management, volume control, and line-operation shortcuts.
-; Number-row keys 1-0 set the repeat multiplier for the current action.
+; The layer the configured hold key enters. What each key does there is data:
+; the user's layers.toml in the configuration folder, registered at boot by
+; platform/remap/nav_layer_table.ahk as one hotkey per bound key under the
+; LayerEnabled gate. Without a layers.toml nothing is bound and every key keeps
+; its normal behaviour while the layer is held; Ergopti's own layer is
+; _shared/keymap/layers.recommended.toml, which reaches layers.toml through the
+; first-run wizard or "Restore recommended values".
+;
+; What stays here is the code no binding can express: how a hold key ENTERS the
+; layer. Those fixes are static hotkeys, created when the script loads and so
+; before the table's variants: AutoHotkey fires the earliest-created eligible
+; variant, so each fix wins over whatever layers.toml binds on the same key.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -23,11 +31,11 @@ A_MaxHotkeysPerInterval := NAV_LAYER_MAX_HOTKEYS_PER_INTERVAL
 
 
 
-; ====================================
-; ====================================
-; ======= 10/ NAVIGATION LAYER =======
-; ====================================
-; ====================================
+; ==========================================
+; ==========================================
+; ======= 1/ Entering the layer ============
+; ==========================================
+; ==========================================
 
 ; ActivateLayer, DisableLayer, ResetNumberOfRepetitions, SetNumberOfRepetitions,
 ; and ActionLayer are defined in infra/nav_layer_helpers.ahk and loaded globally.
@@ -58,120 +66,18 @@ A_MaxHotkeysPerInterval := NAV_LAYER_MAX_HOTKEYS_PER_INTERVAL
 *SC038:: TapHoldSyntheticKeyUp("LAlt") ; Necessary to do this, otherwise multicursor trigger in VSCode when scrolling in the layer and then leaving it
 #HotIf
 
-#HotIf LayerEnabled
-; The base layer will become this one when the navigation layer variable is set to True
-
-*WheelUp:: {
-		ActionLayer("{Volume_Up " . AppState_GetNumberOfRepetitions() . "}") ; Turn on the volume by scrolling up
-}
-*WheelDown:: {
-		ActionLayer("{Volume_Down " . AppState_GetNumberOfRepetitions() . "}") ; Turn down the volume by scrolling down
-}
-
-; The AltGr key is declared by its scan code only: a "RAlt::" beside it is a
-; separate hotkey on the same scan code that swallowed the Kana-style AltGr and
-; lost this Escape (see platform/remap/altgr.ahk).
-~SC01D & ~SC138:: ; AltGr on an AltGr layout arrives as LControl & RAlt
-*SC138:: ; the AltGr key alone: RAlt on QWERTY, the Kana-style AltGr
-{
-		ActionLayer("{Escape " . AppState_GetNumberOfRepetitions() . "}")
-}
-
-; === Number row ===
-*SC002:: SetNumberOfRepetitions(1) ; On key 1
-*SC003:: SetNumberOfRepetitions(2) ; On key 2
-*SC004:: SetNumberOfRepetitions(3) ; On key 3
-*SC005:: SetNumberOfRepetitions(4) ; On key 4
-*SC006:: SetNumberOfRepetitions(5) ; On key 5
-*SC007:: SetNumberOfRepetitions(6) ; On key 6
-*SC008:: SetNumberOfRepetitions(7) ; On key 7
-*SC009:: SetNumberOfRepetitions(8) ; On key 8
-*SC00A:: SetNumberOfRepetitions(9) ; On key 9
 
 
 
 
+; ==========================================
+; ==========================================
+; ======= 2/ The layer's bindings ==========
+; ==========================================
+; ==========================================
 
-*SC00B:: SetNumberOfRepetitions(10) ; On key 0
-
-
-
-
-
-; =========================
-; =========================
-; ======= Left hand =======
-; =========================
-; =========================
-
-; === Top row ===
-*SC010:: ActionLayer("^+{Home}") ; Select to the beginning of the document
-*SC011:: ActionLayer("^{Home}") ; Go to the beginning of the document
-*SC012:: ActionLayer("^{End}") ; Go to the end of the document
-*SC013:: ActionLayer("^+{End}") ; Select to the end of the document
-*SC014:: ActionLayer("{F2}")
-
-; === Middle row ===
-; ``Format("{X {1}}", N)`` collapsed into direct concatenation -- the call
-; ran on every navigation keystroke and ``Format`` parses its template each
-; time. Concatenation produces the same string with zero parsing overhead.
-*SC03A:: ActionLayer("{BackSpace " . AppState_GetNumberOfRepetitions() . "}") ; "CapsLock" becomes BackSpace
-*SC01E:: ActionLayer("^+{Up " . AppState_GetNumberOfRepetitions() . "}")
-*SC01F:: ActionLayer("{Up " . AppState_GetNumberOfRepetitions() . "}") ; Up arrow
-*SC020:: ActionLayer("{Down " . AppState_GetNumberOfRepetitions() . "}") ; Down arrow
-*SC021:: ActionLayer("^+{Down " . AppState_GetNumberOfRepetitions() . "}")
-*SC022:: ActionLayer("{F12}")
-
-; === Bottom row ===
-*SC056:: ActionLayer("!+{Up " . AppState_GetNumberOfRepetitions() . "}")  ; Duplicate the line up
-*SC02C:: ActionLayer("!{Up " . AppState_GetNumberOfRepetitions() . "}") ; Move the line up
-*SC02D:: ActionLayer("!{Down " . AppState_GetNumberOfRepetitions() . "}") ; Move the line down
-*SC02E:: ActionLayer("!+{Down " . AppState_GetNumberOfRepetitions() . "}") ; Duplicate the line down
-*SC02F:: ActionLayer("{End}{Enter " . AppState_GetNumberOfRepetitions() . "}") ; Start a new line below the cursor
-
-
-
-
-
-; SC030:: ; On K
-
-
-
-
-
-; ==========================
-; ==========================
-; ======= Right hand =======
-; ==========================
-; ==========================
-
-; === Top row ===
-*SC015:: ActionLayer("+{Home}") ; Select everything to the beginning of the line
-*SC016:: ActionLayer("^+{Left " . AppState_GetNumberOfRepetitions() . "}") ; Select the previous word
-*SC017:: ActionLayer("+{Left " . AppState_GetNumberOfRepetitions() . "}") ; Select the previous character
-*SC018:: ActionLayer("+{Right " . AppState_GetNumberOfRepetitions() . "}") ; Select the next character
-*SC019:: ActionLayer("^+{Right " . AppState_GetNumberOfRepetitions() . "}") ; Select the next word
-*SC01A:: ActionLayer("+{End}") ; Select everything to the end of the line
-
-; === Middle row ===
-*SC023:: ActionLayer("#+{Left}") ; Move the window to the left screen
-*SC024:: ActionLayer("^{Left " . AppState_GetNumberOfRepetitions() . "}") ; Move to the previous word
-*SC025:: ActionLayer("{Left " . AppState_GetNumberOfRepetitions() . "}") ; Left arrow
-*SC026:: ActionLayer("{Right " . AppState_GetNumberOfRepetitions() . "}") ; Right arrow
-*SC027:: ActionLayer("^{Right " . AppState_GetNumberOfRepetitions() . "}") ; Move to the next word
-*SC028:: ActionLayer("#+{Right}") ; Move the window to the right screen
-
-; === Bottom row ===
-; Guarded: every other layer mapping goes through the send-based ActionLayer, but this
-; one calls a window-management API directly — WinMaximize throws TargetError when no
-; window is active (tray-only desktop, or the foreground window closing mid-press).
-*SC031:: {
-	try WinMaximize("A") ; Make the window fullscreen
-	catch
-		try LoggerDebug("NavLayer", "WinMaximize skipped — no active window.")
-}
-*SC032:: ActionLayer("{Home}") ; Go to the beginning of the line
-*SC033:: ActionLayer("#{Left}") ; Move the window to the left of the current screen
-*SC034:: ActionLayer("#{Right}") ; Move the window to the right of the current screen
-*SC035:: ActionLayer("{End}") ; Go to the end of the line
-#HotIf
+; Registered here, at this file's #Include position: after the layout
+; emulation and the shortcuts have created their own variants. None of those
+; can compete with the layer — the emulation's plain remaps are global variants
+; (always the lowest precedence) and its CapsLock layer excludes LayerEnabled.
+NavLayer_Init(_SharedDir, _ConfigDir)
