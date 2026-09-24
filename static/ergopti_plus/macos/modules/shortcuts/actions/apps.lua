@@ -14,6 +14,11 @@
 --- 2. Smart Copy/Search: Detects whether the frontmost app is a file manager to
 ---    decide between copying the current path vs. opening the selection in a
 ---    browser or running a Google search.
+--- 3. Parent-scoped lifecycle: the fixed shortcuts run under the
+---    "shortcut_bindings" parent and the gesture actions under "gestures", each
+---    with its own admission generation, so pausing one feature never fences or
+---    settles the other's work. The clipboard stays process-global: one capture
+---    at a time, whatever its parent.
 --- ==============================================================================
 
 local M = {}
@@ -40,6 +45,9 @@ local LOG = "shortcuts.actions.apps"
 -- the main run loop, so an omitted delay stalls the loop that services the typing
 -- event tap — long enough for macOS to disable it (kCGEventTapDisabledByTimeout).
 local KEYSTROKE_NO_DELAY_US = 0
+
+-- The parent of a call that names none: the fixed shortcuts of bindings.lua.
+local DEFAULT_ACTION_PARENT = "shortcut_bindings"
 
 
 
@@ -74,23 +82,24 @@ local FOLDER_OPEN_DELAY_SEC  = 0.12
 
 -- Clipboard ownership for copy_or_open_path. Overlapping actions keep the first
 -- user snapshot, and a native false/nil restore retains ownership for retry.
+-- The clipboard is process-global, so one capture exists at a time; it records
+-- the scope that owns it.
 local _copy_capture_in_flight = false
 local _copy_saved_prior = nil
 local _copy_capture_generation = 0
+local _copy_capture_scope = nil
 local _copy_capture_apps_generation = nil
 local _copy_recovery_only = false
 local _copy_capture_timer = nil
 local _copy_restore_retry_timer = nil
 
 -- App navigation owns two kinds of asynchronous native capabilities: deferred
--- timers and ShellRunner processes.  They share one admission generation so a
--- Bindings PAUSE can fence every callback before attempting fallible cleanup.
--- Refused cleanup retains the exact handle and blocks every successor until a
--- callback/onSettled observer proves that capability terminal.
-local _apps_paused = false
-local _apps_generation = 0
-local _apps_acquisitions = 0
-local _apps_callback_depth = 0
+-- timers and ShellRunner processes.  Each parent scope has one admission
+-- generation so its PAUSE can fence every callback it owns before attempting
+-- fallible cleanup. Refused cleanup retains the exact handle and blocks every
+-- successor in that scope until a callback/onSettled observer proves that
+-- capability terminal.
+local _apps_scopes = {}
 local _next_apps_owner_id = 0
 local _apps_timers = {}
 local _apps_shells = {}
@@ -105,15 +114,35 @@ local _apps_shells = {}
 -- ===================================
 -- ===================================
 
+--- Resolves one parent-scoped admission state.
+--- @param parent string|nil Stable action parent.
+--- @return table scope
+local function apps_scope(parent)
+	local scope_id = type(parent) == "string" and parent ~= ""
+		and parent or DEFAULT_ACTION_PARENT
+	local scope = _apps_scopes[scope_id]
+	if scope then return scope end
+	scope = {
+		id = scope_id,
+		paused = false,
+		generation = 0,
+		acquisitions = 0,
+		callback_depth = 0,
+	}
+	_apps_scopes[scope_id] = scope
+	return scope
+end
+
 local function next_apps_owner_id()
 	_next_apps_owner_id = _next_apps_owner_id + 1
 	return _next_apps_owner_id
 end
 
 local function apps_entry_authorized(entry)
-	return _apps_paused ~= true
+	local scope = entry.scope
+	return scope.paused ~= true
 		and entry.discard ~= true
-		and entry.generation == _apps_generation
+		and entry.generation == scope.generation
 end
 
 local function apps_shell_authorized(entry)
@@ -122,47 +151,54 @@ local function apps_shell_authorized(entry)
 		and _apps_shells[entry.id] == entry
 end
 
-local function apps_generation_authorized(generation)
-	return _apps_paused ~= true and generation == _apps_generation
+local function apps_generation_authorized(scope, generation)
+	return scope.paused ~= true and generation == scope.generation
 end
 
-local function copy_capture_authorized(capture_generation, apps_generation)
-	return apps_generation_authorized(apps_generation)
+local function copy_capture_authorized(capture_generation, scope, apps_generation)
+	return apps_generation_authorized(scope, apps_generation)
 		and _copy_capture_in_flight == true
+		and _copy_capture_scope == scope
 		and capture_generation == _copy_capture_generation
 		and apps_generation == _copy_capture_apps_generation
 end
 
-local function apps_owner_pending()
-	return _apps_acquisitions ~= 0 or _apps_callback_depth ~= 0
-		or next(_apps_timers) ~= nil
-		or next(_apps_shells) ~= nil
-		or _copy_capture_in_flight == true
-end
-
-local function apps_cleanup_debt()
-	if _apps_acquisitions ~= 0 then return true end
+local function apps_owner_pending(scope)
+	if scope.acquisitions ~= 0 or scope.callback_depth ~= 0 then return true end
 	for _, entry in pairs(_apps_timers) do
-		if entry.discard == true or entry.committed ~= true then return true end
+		if entry.scope == scope then return true end
 	end
 	for _, entry in pairs(_apps_shells) do
-		if entry.discard == true or entry.committed ~= true then return true end
+		if entry.scope == scope then return true end
 	end
-	return _copy_recovery_only == true
+	return _copy_capture_in_flight == true and _copy_capture_scope == scope
 end
 
-local function apps_admission_open()
-	return _apps_paused ~= true and not apps_cleanup_debt()
+local function apps_cleanup_debt(scope)
+	if scope.acquisitions ~= 0 then return true end
+	for _, entry in pairs(_apps_timers) do
+		if entry.scope == scope
+			and (entry.discard == true or entry.committed ~= true) then return true end
+	end
+	for _, entry in pairs(_apps_shells) do
+		if entry.scope == scope
+			and (entry.discard == true or entry.committed ~= true) then return true end
+	end
+	return _copy_recovery_only == true and _copy_capture_scope == scope
 end
 
-local function invoke_apps_callback(label, fn, ...)
+local function apps_admission_open(scope)
+	return scope.paused ~= true and not apps_cleanup_debt(scope)
+end
+
+local function invoke_apps_callback(scope, label, fn, ...)
 	if type(fn) ~= "function" then return true end
 	local args = table.pack(...)
-	_apps_callback_depth = _apps_callback_depth + 1
+	scope.callback_depth = scope.callback_depth + 1
 	local ok, err = xpcall(function()
 		return fn(table.unpack(args, 1, args.n))
 	end, debug.traceback)
-	_apps_callback_depth = _apps_callback_depth - 1
+	scope.callback_depth = scope.callback_depth - 1
 	if not ok then
 		Logger.error(LOG, "%s callback failed — %s.", tostring(label), tostring(err))
 		return false
@@ -180,7 +216,7 @@ local function observe_apps_timer(entry)
 		-- that entry until the callback marks it due; cancellation/debt paths can
 		-- retire immediately from this observer.
 		if entry.due == true or entry.discard == true
-			or entry.generation ~= _apps_generation or _apps_paused == true then
+			or entry.generation ~= entry.scope.generation or entry.scope.paused == true then
 			drain_apps_timer(entry)
 		end
 	end)
@@ -198,10 +234,10 @@ drain_apps_timer = function(entry)
 	entry.committed = false
 	entry.callback_active = true
 	if type(entry.on_settled) == "function" then
-		invoke_apps_callback(entry.label .. " settlement", entry.on_settled, entry)
+		invoke_apps_callback(entry.scope, entry.label .. " settlement", entry.on_settled, entry)
 	end
 	if deliver then
-		invoke_apps_callback(entry.label, entry.callback)
+		invoke_apps_callback(entry.scope, entry.label, entry.callback)
 	end
 	entry.callback_active = false
 	if _apps_timers[entry.id] == entry then _apps_timers[entry.id] = nil end
@@ -224,26 +260,27 @@ local function cancel_apps_timer(entry)
 	return false
 end
 
-local function schedule_apps_timer(delay, label, callback, on_settled, cleanup_only)
-	if _apps_paused == true or (cleanup_only ~= true and not apps_admission_open()) then
+local function schedule_apps_timer(scope, delay, label, callback, on_settled, cleanup_only)
+	if scope.paused == true or (cleanup_only ~= true and not apps_admission_open(scope)) then
 		return nil, false
 	end
 	local entry = {
 		id = next_apps_owner_id(),
+		scope = scope,
 		label = label,
 		callback = callback,
 		on_settled = on_settled,
-		generation = _apps_generation,
+		generation = scope.generation,
 		committed = false,
 		discard = false,
 		due = false,
 	}
-	_apps_acquisitions = _apps_acquisitions + 1
+	scope.acquisitions = scope.acquisitions + 1
 	local call_ok, handle, committed = pcall(TimerScheduler.after, delay, function()
 		entry.due = true
 		drain_apps_timer(entry)
 	end)
-	_apps_acquisitions = _apps_acquisitions - 1
+	scope.acquisitions = scope.acquisitions - 1
 	if call_ok and type(handle) == "table" then
 		entry.handle = handle
 		if handle.timer ~= nil or committed == true then
@@ -306,12 +343,13 @@ local function terminate_apps_shell(entry)
 	return false
 end
 
-local function start_owned_shell(method, payload, label, on_done)
-	if not apps_admission_open() then return false end
+local function start_owned_shell(scope, method, payload, label, on_done)
+	if not apps_admission_open(scope) then return false end
 	local entry = {
 		id = next_apps_owner_id(),
+		scope = scope,
 		label = label,
-		generation = _apps_generation,
+		generation = scope.generation,
 		committed = false,
 		discard = false,
 		released = false,
@@ -319,7 +357,7 @@ local function start_owned_shell(method, payload, label, on_done)
 		terminal_sent = false,
 	}
 	_apps_shells[entry.id] = entry
-	_apps_acquisitions = _apps_acquisitions + 1
+	scope.acquisitions = scope.acquisitions + 1
 	local function terminal(...)
 		if entry.terminal_sent == true then return end
 		entry.terminal_sent = true
@@ -327,7 +365,7 @@ local function start_owned_shell(method, payload, label, on_done)
 		if entry.dispatching == true then return end
 		if entry.committed == true and apps_shell_authorized(entry) then
 			entry.callback_active = true
-			invoke_apps_callback(label, on_done,
+			invoke_apps_callback(scope, label, on_done,
 				table.unpack(entry.terminal_args, 1, entry.terminal_args.n))
 			entry.callback_active = false
 			local settled_ok, settled = pcall(entry.handle.isSettled)
@@ -338,7 +376,7 @@ local function start_owned_shell(method, payload, label, on_done)
 	end
 	local call_ok, started, handle = pcall(method, payload, terminal)
 	entry.dispatching = false
-	_apps_acquisitions = _apps_acquisitions - 1
+	scope.acquisitions = scope.acquisitions - 1
 	if call_ok and type(handle) == "table" then
 		entry.handle = handle
 	end
@@ -356,7 +394,7 @@ local function start_owned_shell(method, payload, label, on_done)
 	entry.committed = true
 	if entry.terminal_args ~= nil and apps_shell_authorized(entry) then
 		entry.callback_active = true
-		invoke_apps_callback(label, on_done,
+		invoke_apps_callback(scope, label, on_done,
 			table.unpack(entry.terminal_args, 1, entry.terminal_args.n))
 		entry.callback_active = false
 	end
@@ -367,12 +405,12 @@ local function start_owned_shell(method, payload, label, on_done)
 	return true
 end
 
-local function start_owned_open(target, label, on_done)
-	return start_owned_shell(ShellRunner.open, target, label, on_done)
+local function start_owned_open(scope, target, label, on_done)
+	return start_owned_shell(scope, ShellRunner.open, target, label, on_done)
 end
 
-local function start_owned_applescript(script, label, on_done)
-	return start_owned_shell(ShellRunner.applescript, script, label, on_done)
+local function start_owned_applescript(scope, script, label, on_done)
+	return start_owned_shell(scope, ShellRunner.applescript, script, label, on_done)
 end
 -- ===================================
 
@@ -384,28 +422,29 @@ local function trim(s)
 	return (s:gsub("^%s*(.-)%s*$", "%1"))
 end
 
-local function begin_copy_capture()
-	if not apps_admission_open() or _copy_capture_in_flight then
+local function begin_copy_capture(scope)
+	if not apps_admission_open(scope) or _copy_capture_in_flight then
 		Logger.debug(LOG, "copy_or_open_path ignored while another capture owns the clipboard.")
 		return nil, nil
 	end
 	-- Publish the acquisition before crossing into the native pasteboard. A
 	-- re-entrant PAUSE must see an in-progress boundary even though there is no
 	-- clipboard snapshot to restore until readAllData returns.
-	local acquisition_generation = _apps_generation
-	_apps_acquisitions = _apps_acquisitions + 1
+	local acquisition_generation = scope.generation
+	scope.acquisitions = scope.acquisitions + 1
 	local ok_read, prior_or_error = pcall(pasteboard.readAllData)
-	_apps_acquisitions = _apps_acquisitions - 1
+	scope.acquisitions = scope.acquisitions - 1
 	if not ok_read or type(prior_or_error) ~= "table" then
 		Logger.error(LOG, "copy_or_open_path: clipboard snapshot failed — %s.",
 			tostring(prior_or_error))
 		return nil, nil
 	end
-	if not apps_generation_authorized(acquisition_generation) then
+	if not apps_generation_authorized(scope, acquisition_generation) then
 		return nil, nil
 	end
 	_copy_saved_prior = prior_or_error
 	_copy_capture_in_flight = true
+	_copy_capture_scope = scope
 	_copy_capture_generation = _copy_capture_generation + 1
 	_copy_capture_apps_generation = acquisition_generation
 	return _copy_saved_prior, _copy_capture_generation, acquisition_generation
@@ -420,6 +459,7 @@ local function release_copy_capture(generation)
 	if generation ~= _copy_capture_generation then return false end
 	_copy_capture_in_flight = false
 	_copy_saved_prior = nil
+	_copy_capture_scope = nil
 	_copy_capture_apps_generation = nil
 	_copy_recovery_only = false
 	_copy_capture_generation = _copy_capture_generation + 1
@@ -458,7 +498,9 @@ local function arm_copy_timer(slot, delay, label, generation, callback)
 			_copy_restore_retry_timer = nil
 		end
 	end
-	entry, committed = schedule_apps_timer(delay,
+	local scope = _copy_capture_scope
+	if scope == nil then return false, "no clipboard capture owns this timer" end
+	entry, committed = schedule_apps_timer(scope, delay,
 		"copy_or_open_path " .. label, function()
 			if generation ~= _copy_capture_generation then return end
 			local ok_callback, callback_error = xpcall(callback, debug.traceback)
@@ -481,7 +523,7 @@ end
 
 queue_copy_restore_retry = function(prior, generation)
 	if _copy_restore_retry_timer then return true end
-	if _apps_paused == true then return false end
+	if _copy_capture_scope == nil or _copy_capture_scope.paused == true then return false end
 	local function attempt_restore()
 		local restored, restore_error = restore_copy_capture(prior, generation)
 		if restored or generation ~= _copy_capture_generation then return end
@@ -590,9 +632,10 @@ local function center_windows_of_app(app)
 end
 
 --- Centers the frontmost application's windows after a short delay.
+--- @param scope table Parent scope that owns the timer.
 --- @param delay number Seconds to wait before centering.
-local function center_frontmost_after(delay)
-	local _, committed = schedule_apps_timer(tonumber(delay) or 0.2,
+local function center_frontmost_after(scope, delay)
+	local _, committed = schedule_apps_timer(scope, tonumber(delay) or 0.2,
 		"center frontmost application", function()
 		local ok, f = pcall(hs.application.frontmostApplication)
 		if ok and f then center_windows_of_app(f) end
@@ -629,9 +672,10 @@ end
 --- The result is delivered to a callback rather than returned: this script walks
 --- every open Finder window, so running it synchronously froze the whole driver —
 --- the keyboard tap included — for as long as that took, on a keystroke.
+--- @param scope table Parent scope that owns the probe.
 --- @param folder_path string POSIX path of the folder to look for.
 --- @param on_result function Called as on_result(focused) with a boolean.
-local function focus_existing_finder_window(folder_path, on_result)
+local function focus_existing_finder_window(scope, folder_path, on_result)
 	local script = text_utils.applescript_format([[
 		tell application "Finder"
 			set targetPath to POSIX file "%s" as alias
@@ -648,52 +692,56 @@ local function focus_existing_finder_window(folder_path, on_result)
 		return "none"
 	]], folder_path)
 
-	return start_owned_applescript(script, "Finder window probe", function(ok, result)
+	return start_owned_applescript(scope, script, "Finder window probe", function(ok, result)
 		on_result(ok and result == "ok")
 	end)
 end
 
 --- Opens the Downloads folder via the best available file manager.
 --- Reuses an existing window if one is already showing Downloads.
-function M.open_downloads()
-	if not apps_admission_open() then return false end
+--- @param parent string|nil Stable action parent.
+function M.open_downloads(parent)
+	local scope = apps_scope(parent)
+	if not apps_admission_open(scope) then return false end
 	local home = os.getenv("HOME") or "~"
 	local downloads = home .. "/Downloads"
 
 	-- The probe is asynchronous now, so everything that depended on its answer
 	-- moves into the continuation.
-	return focus_existing_finder_window(downloads, function(focused)
+	return focus_existing_finder_window(scope, downloads, function(focused)
 		if focused then
 			Logger.info(LOG, "Focused existing Finder window for Downloads.")
-			center_frontmost_after(CENTER_DELAY_SEC)
+			center_frontmost_after(scope, CENTER_DELAY_SEC)
 			return
 		end
 
 		if not launch_first_available(FILE_MANAGERS) then
-			start_owned_open(downloads, "open Downloads")
+			start_owned_open(scope, downloads, "open Downloads")
 		else
-			schedule_apps_timer(FOLDER_OPEN_DELAY_SEC,
+			schedule_apps_timer(scope, FOLDER_OPEN_DELAY_SEC,
 				"deferred Downloads open", function()
-					start_owned_open(downloads, "open Downloads")
+					start_owned_open(scope, downloads, "open Downloads")
 				end)
 		end
-		center_frontmost_after(CENTER_DELAY_SEC)
+		center_frontmost_after(scope, CENTER_DELAY_SEC)
 	end)
 end
 
 --- Opens the home directory via the best available file manager.
-function M.open_finder()
-	if not apps_admission_open() then return false end
+--- @param parent string|nil Stable action parent.
+function M.open_finder(parent)
+	local scope = apps_scope(parent)
+	if not apps_admission_open(scope) then return false end
 	local home = os.getenv("HOME") or "~"
 	if not launch_first_available(FILE_MANAGERS) then
-		start_owned_open(home, "open home folder")
+		start_owned_open(scope, home, "open home folder")
 	else
-		schedule_apps_timer(FOLDER_OPEN_DELAY_SEC,
+		schedule_apps_timer(scope, FOLDER_OPEN_DELAY_SEC,
 			"deferred home folder open", function()
-				start_owned_open(home, "open home folder")
+				start_owned_open(scope, home, "open home folder")
 			end)
 	end
-	center_frontmost_after(CENTER_DELAY_SEC)
+	center_frontmost_after(scope, CENTER_DELAY_SEC)
 	return true
 end
 
@@ -702,27 +750,32 @@ end
 --- thin, side-effect-only opener so there is a single source of truth for URL
 --- resolution (modules.shortcuts.bindings) instead of a second config reader here.
 --- @param url string The ChatGPT URL to open.
-function M.open_chatgpt(url)
-	if not apps_admission_open() then return false end
+--- @param parent string|nil Stable action parent.
+function M.open_chatgpt(url, parent)
+	if not apps_admission_open(apps_scope(parent)) then return false end
 	Logger.debug(LOG, "Opening ChatGPT URL: %s.", url)
 	local ok, opened = pcall(urlevent.openURL, url)
 	return ok and opened ~= false
 end
 
 --- Opens macOS System Settings (falls back to System Preferences on older macOS).
-function M.open_settings()
-	if not apps_admission_open() then return false end
+--- @param parent string|nil Stable action parent.
+function M.open_settings(parent)
+	local scope = apps_scope(parent)
+	if not apps_admission_open(scope) then return false end
 	if not AppLauncher.launch("System Settings") then
 		AppLauncher.launch("System Preferences")
 	end
-	center_frontmost_after(CENTER_DELAY_SEC)
+	center_frontmost_after(scope, CENTER_DELAY_SEC)
 	return true
 end
 
 --- In a file manager: copies the current path (Cmd+Opt+C).
 --- Elsewhere: copies the text selection and opens it as a URL or Google search.
-function M.copy_or_open_path()
-	if not apps_admission_open() then return false end
+--- @param parent string|nil Stable action parent.
+function M.copy_or_open_path(parent)
+	local scope = apps_scope(parent)
+	if not apps_admission_open(scope) then return false end
 	local name = WindowInfo.getFocused().appId
 	if name == "" then
 		local ok, front = pcall(hs.application.frontmostApplication)
@@ -736,27 +789,27 @@ function M.copy_or_open_path()
 		-- path", reported in the success notification, and the selection fallback
 		-- below became unreachable. The sibling branch already clears for exactly
 		-- this reason; this one did not.
-		local prior, capture_generation, capture_apps_generation = begin_copy_capture()
+		local prior, capture_generation, capture_apps_generation = begin_copy_capture(scope)
 		if capture_generation == nil then return false end
 		local ok_clear, clear_error = pcall(pasteboard.clearContents)
 		if not ok_clear then
 			abort_copy_capture(prior, capture_generation, "clipboard clear failed", clear_error)
 			return false
 		end
-		if not copy_capture_authorized(capture_generation, capture_apps_generation) then
+		if not copy_capture_authorized(capture_generation, scope, capture_apps_generation) then
 			return false
 		end
 		local function read_finder_path()
-			if not copy_capture_authorized(capture_generation, capture_apps_generation) then
+			if not copy_capture_authorized(capture_generation, scope, capture_apps_generation) then
 				return
 			end
 			local ok_p, p = pcall(pasteboard.getContents)
-			if not copy_capture_authorized(capture_generation, capture_apps_generation) then
+			if not copy_capture_authorized(capture_generation, scope, capture_apps_generation) then
 				return
 			end
 			if ok_p and p and p ~= "" then
 				if release_copy_capture(capture_generation) ~= true
-					or not apps_generation_authorized(capture_apps_generation) then
+					or not apps_generation_authorized(scope, capture_apps_generation) then
 					return
 				end
 				notifications.notify(string.format(i18n.get("shortcuts.copy_path_notif"), p), nil, "success")
@@ -770,15 +823,15 @@ function M.copy_or_open_path()
 			-- Finder did not populate the clipboard — copy the selection instead
 			Logger.debug(LOG, "Finder did not write a path — falling back to copying the selection.")
 			local function read_fallback_selection()
-				if not copy_capture_authorized(capture_generation, capture_apps_generation) then
+				if not copy_capture_authorized(capture_generation, scope, capture_apps_generation) then
 					return
 				end
 				local ok_sel, sel = pcall(pasteboard.getContents)
-				if not copy_capture_authorized(capture_generation, capture_apps_generation) then
+				if not copy_capture_authorized(capture_generation, scope, capture_apps_generation) then
 					return
 				end
 				local restored, restore_error = restore_copy_capture(prior, capture_generation)
-				if not apps_generation_authorized(capture_apps_generation) then return end
+				if not apps_generation_authorized(scope, capture_apps_generation) then return end
 				if not restored and capture_generation == _copy_capture_generation then
 					queue_copy_restore_retry(prior, capture_generation)
 				end
@@ -815,33 +868,33 @@ function M.copy_or_open_path()
 			abort_copy_capture(prior, capture_generation, "Finder copy shortcut refused", copied)
 			return false
 		end
-		if not copy_capture_authorized(capture_generation, capture_apps_generation) then
+		if not copy_capture_authorized(capture_generation, scope, capture_apps_generation) then
 			return false
 		end
 		return true
 	end
 
 	-- Outside a file manager: copy selection and open or search
-	local prior, capture_generation, capture_apps_generation = begin_copy_capture()
+	local prior, capture_generation, capture_apps_generation = begin_copy_capture(scope)
 	if capture_generation == nil then return false end
 	local ok_clear, clear_error = pcall(pasteboard.clearContents)
 	if not ok_clear then
 		abort_copy_capture(prior, capture_generation, "clipboard clear failed", clear_error)
 		return false
 	end
-	if not copy_capture_authorized(capture_generation, capture_apps_generation) then
+	if not copy_capture_authorized(capture_generation, scope, capture_apps_generation) then
 		return false
 	end
 	local function read_selection()
-		if not copy_capture_authorized(capture_generation, capture_apps_generation) then
+		if not copy_capture_authorized(capture_generation, scope, capture_apps_generation) then
 			return
 		end
 		local ok_sel, sel = pcall(pasteboard.getContents)
-		if not copy_capture_authorized(capture_generation, capture_apps_generation) then
+		if not copy_capture_authorized(capture_generation, scope, capture_apps_generation) then
 			return
 		end
 		local restored, restore_error = restore_copy_capture(prior, capture_generation)
-		if not apps_generation_authorized(capture_apps_generation) then return end
+		if not apps_generation_authorized(scope, capture_apps_generation) then return end
 		if not restored and capture_generation == _copy_capture_generation then
 			queue_copy_restore_retry(prior, capture_generation)
 		end
@@ -863,7 +916,7 @@ function M.copy_or_open_path()
 		abort_copy_capture(prior, capture_generation, "copy shortcut refused", copied)
 		return false
 	end
-	if not copy_capture_authorized(capture_generation, capture_apps_generation) then
+	if not copy_capture_authorized(capture_generation, scope, capture_apps_generation) then
 		return false
 	end
 	return true
@@ -879,20 +932,24 @@ end
 -- ========================================
 -- ========================================
 
-local function settle_apps_actions(boundary)
+local function settle_apps_actions(scope, boundary)
 	local timers = {}
-	for _, entry in pairs(_apps_timers) do timers[#timers + 1] = entry end
+	for _, entry in pairs(_apps_timers) do
+		if entry.scope == scope then timers[#timers + 1] = entry end
+	end
 	local shells = {}
-	for _, entry in pairs(_apps_shells) do shells[#shells + 1] = entry end
+	for _, entry in pairs(_apps_shells) do
+		if entry.scope == scope then shells[#shells + 1] = entry end
+	end
 
-	local settled = _apps_acquisitions == 0 and _apps_callback_depth == 0
+	local settled = scope.acquisitions == 0 and scope.callback_depth == 0
 	for _, entry in ipairs(timers) do
 		if cancel_apps_timer(entry) ~= true then settled = false end
 	end
 	for _, entry in ipairs(shells) do
 		if terminate_apps_shell(entry) ~= true then settled = false end
 	end
-	if _copy_capture_in_flight == true then
+	if _copy_capture_in_flight == true and _copy_capture_scope == scope then
 		local generation = _copy_capture_generation
 		local prior = _copy_saved_prior
 		local restored, restore_error = restore_copy_capture(prior, generation)
@@ -902,51 +959,59 @@ local function settle_apps_actions(boundary)
 				tostring(boundary), tostring(restore_error))
 		end
 	end
-	return settled == true and not apps_owner_pending()
+	return settled == true and not apps_owner_pending(scope)
 end
 
---- Fences and joins all app-navigation timers, processes and clipboard state.
+--- Fences and joins one parent's app-navigation timers, processes and
+--- clipboard state; a sibling parent's work is left untouched.
+--- @param parent string|nil Stable action parent.
 --- @return boolean settled
-function M.pause_apps_actions()
-	if _apps_paused ~= true then
-		_apps_generation = _apps_generation + 1
-		_apps_paused = true
+function M.pause_apps_actions(parent)
+	local scope = apps_scope(parent)
+	if scope.paused ~= true then
+		scope.generation = scope.generation + 1
+		scope.paused = true
 	end
-	return settle_apps_actions("apps pause") == true
+	return settle_apps_actions(scope, "apps pause") == true
 end
 
 --- Reopens admission only after every pre-pause capability has settled. User
 --- navigation interrupted by PAUSE is deliberately not replayed.
+--- @param parent string|nil Stable action parent.
 --- @return boolean settled
-function M.resume_apps_actions()
-	if _apps_paused ~= true then
+function M.resume_apps_actions(parent)
+	local scope = apps_scope(parent)
+	if scope.paused ~= true then
 		-- RESUME is an idempotent state transition. In particular it must not
 		-- settle/cancel legitimate ACTIVE work merely because the caller repeats it.
-		return not apps_cleanup_debt()
+		return not apps_cleanup_debt(scope)
 	end
-	if settle_apps_actions("apps resume cleanup") ~= true then
-		_apps_paused = true
+	if settle_apps_actions(scope, "apps resume cleanup") ~= true then
+		scope.paused = true
 		return false
 	end
-	_apps_generation = _apps_generation + 1
-	_apps_paused = false
+	scope.generation = scope.generation + 1
+	scope.paused = false
 	return true
 end
 
 --- Stops app work for Bindings.stop(); a later start may reopen it via resume.
+--- @param parent string|nil Stable action parent.
 --- @return boolean settled
-function M.stop_apps_actions()
-	return M.pause_apps_actions()
+function M.stop_apps_actions(parent)
+	return M.pause_apps_actions(parent)
 end
 
+--- @param parent string|nil Stable action parent.
 --- @return boolean paused
-function M.is_apps_actions_paused()
-	return _apps_paused == true
+function M.is_apps_actions_paused(parent)
+	return apps_scope(parent).paused == true
 end
 
+--- @param parent string|nil Stable action parent.
 --- @return boolean pending
-function M.has_pending_apps_action()
-	return apps_owner_pending()
+function M.has_pending_apps_action(parent)
+	return apps_owner_pending(apps_scope(parent))
 end
 
 return M
