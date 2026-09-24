@@ -23,7 +23,8 @@
 //    open between records (revalidated by inode before every append) instead
 //    of paying open/fchmod/close per record and file, and reports any datagram
 //    or retention pass slower than kLoggerSlowBatchThresholdMilliseconds to
-//    launcher.log with the time spent opening, waiting for locks and writing.
+//    launcher.log with the time spent opening, waiting for locks and writing,
+//    once its reply has been sent.
 // ==============================================================================
 
 import Darwin
@@ -711,6 +712,10 @@ final class LoggerDatagramProcessor {
 	/// threshold, on the processor queue. The Lua transport reads a long
 	/// silence as a stall, so the reason for each slow reply must be on record.
 	var slowOperationReporter: ((String) -> Void)?
+	/// Slow-datagram diagnostic held until performDeferredMaintenance(), after
+	/// the reply is sent: launcher.log usually shares the slow volume, so
+	/// writing it first would lengthen the very stall it describes.
+	private var pendingSlowDatagramReport: String?
 
 	init(
 		token: String,
@@ -724,8 +729,13 @@ final class LoggerDatagramProcessor {
 		self.slowThresholdSeconds = slowThresholdSeconds
 	}
 
-	/// Runs native-only work deliberately ordered after the response datagram.
+	/// Runs native-only work deliberately ordered after the response datagram:
+	/// the pending slow-datagram report, then retention.
 	func performDeferredMaintenance() {
+		if let report = pendingSlowDatagramReport {
+			pendingSlowDatagramReport = nil
+			slowOperationReporter?(report)
+		}
 		let started = uptime()
 		guard sink.performDeferredMaintenance() else { return }
 		let elapsed = uptime() - started
@@ -736,6 +746,8 @@ final class LoggerDatagramProcessor {
 	}
 
 	/// Accepts one loopback packet and returns an authenticated ACK/NACK payload.
+	/// A slow datagram's diagnostic is only recorded here; the caller sends the
+	/// reply first and then runs performDeferredMaintenance(), which reports it.
 	func handle(_ data: Data, sourceIsLoopback: Bool) -> Data? {
 		let started = uptime()
 		sink.resetStatistics()
@@ -743,12 +755,11 @@ final class LoggerDatagramProcessor {
 		let elapsed = uptime() - started
 		if elapsed >= slowThresholdSeconds {
 			let cost = sink.statistics
-			slowOperationReporter?(
+			pendingSlowDatagramReport =
 				"native logger datagram of \(data.count) bytes took \(Self.milliseconds(elapsed)) ms: "
 					+ "\(cost.appends) record(s), \(cost.opens) file open(s), "
 					+ "lock wait \(Self.milliseconds(cost.lockWaitSeconds)) ms, "
 					+ "write \(Self.milliseconds(cost.writeSeconds)) ms"
-			)
 		}
 		return reply
 	}
@@ -1258,7 +1269,11 @@ final class LoggerDatagramWorker: LoggerDatagramServing {
 				guard let response = processor.handle(
 					payload,
 					sourceIsLoopback: Self.isLoopback(sourceAddress)
-				) else { return }
+				) else {
+					// No reply to send: a slow refusal is reported right away.
+					processor.performDeferredMaintenance()
+					return
+				}
 				let sent = response.withUnsafeBytes { responseBytes in
 					withUnsafePointer(to: &sourceAddress) { addressPointer in
 						addressPointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {

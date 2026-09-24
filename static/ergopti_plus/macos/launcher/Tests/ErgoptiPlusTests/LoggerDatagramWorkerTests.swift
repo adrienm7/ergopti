@@ -1068,7 +1068,8 @@ final class LoggerDatagramWorkerTests: XCTestCase {
 	}
 
 	/// A slow datagram is what the Lua transport sees as a stall; its cause must
-	/// reach launcher.log with the time spent opening, locking and writing.
+	/// reach launcher.log with the time spent opening, locking and writing, but
+	/// only after the reply left: launcher.log usually shares the slow volume.
 	func testSlowDatagramIsReportedWithItsCostBreakdown() throws {
 		let directory = try makeLogDirectory()
 		let now = try fixedDate(year: 2026, month: 8, day: 14)
@@ -1098,7 +1099,11 @@ final class LoggerDatagramWorkerTests: XCTestCase {
 			record(sequence: 1, line: "slow-write", session: "session-a"),
 			sourceIsLoopback: true
 		))["ack"] as? Int, 1)
+		XCTAssertEqual(reports, [], "the ACK must leave before its slow report is written")
+		processor.performDeferredMaintenance()
 		XCTAssertEqual(reports.count, 1)
+		processor.performDeferredMaintenance()
+		XCTAssertEqual(reports.count, 1, "one slow datagram is reported once")
 		let report = try XCTUnwrap(reports.first)
 		XCTAssertTrue(report.contains("took 600 ms"), report)
 		XCTAssertTrue(report.contains("1 record(s)"), report)
