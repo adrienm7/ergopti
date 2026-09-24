@@ -241,7 +241,7 @@ jobs:
           fi
 
           version="${tag#v}"
-          if [ "$prerelease" = "true" ]; then channel="dev"; else channel="main"; fi
+          channel="$(node tools/build/release-channel.cjs "$tag")"
           emit release true
           emit tag "$tag"
           emit version "$version"

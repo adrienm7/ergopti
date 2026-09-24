@@ -14,7 +14,7 @@
 # REQUIRED ENV VARS:
 #   ERGOPTI_VERSION  — semver string, e.g. "1.2.3"
 #   ERGOPTI_BUILD    — integer build number (CFBundleVersion in Info.plist)
-#   ERGOPTI_CHANNEL  — "main" or "dev"
+#   ERGOPTI_CHANNEL  — update channel id (_shared/modules/updater/channels.json)
 #   SPARKLE_SIG_FILE — path to the .sig file written by sign_update
 #   ZIP_PATH         — path to ErgoptiPlus.app.zip
 #   GH_OWNER         — GitHub organisation / user name

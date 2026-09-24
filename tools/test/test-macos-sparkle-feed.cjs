@@ -2,7 +2,7 @@
 
 /**
  * Regression guard for the channel-specific Sparkle release contract. The
- * update channel is derived from the prerelease flag once, in ci.yml's plan
+ * update channel is resolved through the shared registry once, in ci.yml's plan
  * job; the macOS box stamps it into the bundle and the appcast, and the
  * release job publishes the feed of that same channel.
  */
@@ -52,13 +52,14 @@ if (channelAssignments.some((value) => value !== channelExpression)) {
 // result, so the bundle, the appcast, the Windows stamp and the published feed
 // cannot disagree.
 const planMeta = pipeline.step(pipeline.job('validate'), 'Compute tag and version');
-const channelRule = 'if [ "$prerelease" = "true" ]; then channel="dev"; else channel="main"; fi';
+const channelRule = 'channel="$(node tools/build/release-channel.cjs "$tag")"';
 if (!planMeta.includes(channelRule) || !planMeta.includes('emit channel "$channel"')) {
-	errors.push('plan must derive the update channel from the prerelease flag and emit it');
+	errors.push('plan must resolve the update channel through the registry and emit it');
 }
-if ((workflow.match(/channel="dev"/g) ?? []).length !== 1) {
-	errors.push('the prerelease-to-channel rule must exist once in the pipeline, in plan');
+if (workflow.split('node tools/build/release-channel.cjs "$tag"').length !== 2) {
+	errors.push('the registry channel resolution must exist once in the pipeline, in plan');
 }
+
 if (workflow.includes("prerelease == 'true' && 'dev' || 'main'") || /\$channel\s*=\s*if\s*\(\s*\$prerelease/.test(workflow)) {
 	errors.push('a job re-derives the channel from prerelease instead of reading plan\'s channel output');
 }
