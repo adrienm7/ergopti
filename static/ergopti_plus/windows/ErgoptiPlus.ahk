@@ -148,13 +148,11 @@ if !(_DriverIsDetachedWorker || _DriverStartupSmokeDir != "") {
 		; previous day — so a yielding instance would destroy the LIVE owner's
 		; gestures/layout/tray sub-logs on its way out.
 		;
-		; A_AppData is a built-in needing no bootstrap, and A_AppData\Ergopti is
-		; already where paths.toml lives, so this sink is reachable before any
-		; path resolution and never collides with the live owner's log files.
+		; LoggerAppendBootstrapLine writes to bootstrap.log in the default logs
+		; folder, which needs nothing but %LOCALAPPDATA%: it is reachable before
+		; any path resolution and never collides with the live owner's dated
+		; log files.
 		try {
-			_YieldDir := A_AppData . "\Ergopti"
-			if !DirExist(_YieldDir)
-				DirCreate(_YieldDir)
 			_MutexOutcome := (_DriverMutexDecision = DRIVER_MUTEX_YIELD)
 				? "Another instance owns the single-owner mutex after "
 					. DRIVER_MUTEX_WAIT_MS . " ms"
@@ -163,10 +161,8 @@ if !(_DriverIsDetachedWorker || _DriverStartupSmokeDir != "") {
 					. ", error=" . _DriverMutexError . ")"
 			_MutexSeverity := (_DriverMutexDecision = DRIVER_MUTEX_YIELD)
 				? "WARNING" : "ERROR"
-			FileAppend(FormatTime(A_Now, "yyyy-MM-dd HH:mm:ss")
-				. " [" . _MutexSeverity . "] [ErgoptiPlus] " . _MutexOutcome
-				. "; terminating without registering any hook.`r`n",
-				_YieldDir . "\bootstrap.log", "UTF-8")
+			LoggerAppendBootstrapLine(_MutexSeverity, "ErgoptiPlus",
+				_MutexOutcome . "; terminating without registering any hook.")
 		}
 		ExitApp(_DriverMutexDecision = DRIVER_MUTEX_YIELD ? 0 : 1)
 	}
@@ -332,6 +328,9 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 ; It defines a FUNCTION rather than a global, so this ordering is a convenience
 ; and not a requirement — LoggerSubFilesData() is called at LoggerInit time.
 #Include _generated/logger_sub_files.ahk
+; Application folder, logs folder and log file names, generated from
+; _shared/modules/paths/app_dirs.toml; functions too, read by the logger.
+#Include _generated/app_dirs.ahk
 #Include infra/tick_count.ahk
 #Include infra/wall_clock.ahk
 #Include infra/logger.ahk

@@ -125,4 +125,5 @@ global _DYNAMIC_HOTSTRINGS_ORDER := ["DateLongFr", "DateFr", "Date",
 #Include menu/menu_taphold.ahk
 #Include menu/menu_init.ahk
 #Include menu/menu_actions.ahk
+#Include log_openers.ahk
 #Include menu/menu_rebuild.ahk

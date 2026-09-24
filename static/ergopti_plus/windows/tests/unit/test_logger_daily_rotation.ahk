@@ -38,8 +38,9 @@
 ; run ``Body`` there. Restores the previous globals unconditionally so a failing
 ; assertion cannot leak the redirection into the rest of the suite.
 _LDR_WithTempConfigDir(Body) {
-	global _ConfigDir, _AhkSubDir, LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, _LOGGER_PATH_DATE
+	global _ConfigDir, _AhkSubDir, _LogsDir, LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, _LOGGER_PATH_DATE
 
+	PrevLogsDir := _LogsDir
 	HadConfigDir := IsSet(_ConfigDir)
 	HadSubDir := IsSet(_AhkSubDir)
 	PrevConfigDir := HadConfigDir ? _ConfigDir : ""
@@ -50,9 +51,11 @@ _LDR_WithTempConfigDir(Body) {
 
 	_ConfigDir := A_Temp . "\ergopti_logrotate_test\"
 	_AhkSubDir := "autohotkey\"
+	_LogsDir := A_Temp . "\ergopti_logrotate_test\ergopti_plus\"
 	try {
 		Body()
 	} finally {
+		_LogsDir := PrevLogsDir
 		_ConfigDir := PrevConfigDir
 		_AhkSubDir := PrevSubDir
 		LOGGER_LOG_PATH := PrevPath
@@ -154,12 +157,13 @@ _LDR_RetentionIsSingleSourced() {
 }
 
 _LDR_PreMidnightBatchKeepsItsEmissionDate() {
-	global _ConfigDir, _AhkSubDir, LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH
+	global _ConfigDir, _AhkSubDir, _LogsDir, LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH
 	global _LOGGER_PATH_DATE, _LOGGER_PENDING, _LOGGER_PENDING_ERRORS
 	global LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
 
 	PreviousConfigDir := _ConfigDir
 	PreviousAhkSubDir := _AhkSubDir
+	PreviousLogsDir := _LogsDir
 	PreviousPath := LOGGER_LOG_PATH
 	PreviousErrorsPath := LOGGER_ERRORS_LOG_PATH
 	PreviousPathDate := _LOGGER_PATH_DATE
@@ -178,6 +182,7 @@ _LDR_PreMidnightBatchKeepsItsEmissionDate() {
 		_ConfigDir := Root
 		_AhkSubDir := "autohotkey\"
 		LogDir := Root . _AhkSubDir . "logs\"
+		_LogsDir := LogDir
 		DirCreate(LogDir)
 		_LOGGER_PATH_DATE := Yesterday
 		LOGGER_LOG_PATH := LogDir . "ErgoptiPlus_" . Yesterday . ".log"
@@ -213,6 +218,7 @@ _LDR_PreMidnightBatchKeepsItsEmissionDate() {
 	} finally {
 		_ConfigDir := PreviousConfigDir
 		_AhkSubDir := PreviousAhkSubDir
+		_LogsDir := PreviousLogsDir
 		LOGGER_LOG_PATH := PreviousPath
 		LOGGER_ERRORS_LOG_PATH := PreviousErrorsPath
 		_LOGGER_PATH_DATE := PreviousPathDate

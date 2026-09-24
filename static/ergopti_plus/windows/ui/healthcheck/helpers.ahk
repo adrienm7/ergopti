@@ -131,16 +131,10 @@ _HealthCheck_PauseState() {
 
 _HealthCheck_KeyloggerSummary(SnapshotFn := 0) {
 	Sum := Map("enabled", "unknown", "wpm", "n/a", "events_session", 0, "privacy_hits", 0, "today_log", "", "errors_log", "", "notes", "see separate errors sink for high-severity")
-	try {
-		; Paths — unified + the dedicated errors sink (new feature)
-		global LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH
-		if IsSet(LOGGER_LOG_PATH) && LOGGER_LOG_PATH != ""
-			Sum["today_log"] := LOGGER_LOG_PATH
-		if IsSet(LOGGER_ERRORS_LOG_PATH) && LOGGER_ERRORS_LOG_PATH != ""
-			Sum["errors_log"] := LOGGER_ERRORS_LOG_PATH
-		; Note the separation
-		Sum["notes"] := "High-severity (WARNING/ERROR) are also written to the dedicated ErgoptiPlus_errors_*.log (use Debug > Open Error Log)"
-	}
+	; Paths from the logger's resolver, named at call time.
+	Sum["today_log"] := LoggerTodayLogPath()
+	Sum["errors_log"] := LoggerTodayErrorsPath()
+	Sum["notes"] := "High-severity (WARNING/ERROR) lines are also written to today's errors file (Debug > Open today's errors file)"
 	if !HasMethod(SnapshotFn, "Call") && IsSet(KL_HealthSnapshot)
 		SnapshotFn := KL_HealthSnapshot
 	if HasMethod(SnapshotFn, "Call") {
@@ -222,15 +216,17 @@ _HealthCheck_HotstringsState() {
 }
 
 _HealthCheck_LogsInfo() {
-	Info := Map("unified_today", "", "errors_today", "", "errors_sink_active", false, "ring_lines", 0, "note", "Use the dedicated errors log for WARNING/ERROR only — keeps main logs clean.")
+	Info := Map("logs_dir", "", "unified_today", "", "errors_today", "", "crash_reports_dir", "",
+		"errors_sink_active", false, "ring_lines", 0, "note", "Use the dedicated errors log for WARNING/ERROR only — keeps main logs clean.")
+	; The logger is the one resolver of the logs folder and of today's files.
+	Info["logs_dir"] := LoggerLogsDir()
+	Info["unified_today"] := LoggerTodayLogPath()
+	Info["errors_today"] := LoggerTodayErrorsPath()
+	Info["crash_reports_dir"] := LoggerCrashReportsDir()
 	try {
-		global LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, LOGGER_RING_BUFFER
-		if IsSet(LOGGER_LOG_PATH) && LOGGER_LOG_PATH != ""
-			Info["unified_today"] := LOGGER_LOG_PATH
-		if IsSet(LOGGER_ERRORS_LOG_PATH) && LOGGER_ERRORS_LOG_PATH != "" {
-			Info["errors_today"] := LOGGER_ERRORS_LOG_PATH
-			Info["errors_sink_active"] := true
-		}
+		global LOGGER_ERRORS_LOG_PATH, LOGGER_RING_BUFFER
+		; Active once LoggerInit resolved the dated files and the flush owns them.
+		Info["errors_sink_active"] := IsSet(LOGGER_ERRORS_LOG_PATH) && LOGGER_ERRORS_LOG_PATH != ""
 		if IsSet(LOGGER_RING_BUFFER) && LOGGER_RING_BUFFER is Array
 			Info["ring_lines"] := LOGGER_RING_BUFFER.Length
 	} catch {

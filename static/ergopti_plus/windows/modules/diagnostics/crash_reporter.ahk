@@ -18,9 +18,9 @@
 ; 3. Privacy-bounded diagnostics: the report keeps structured system, adapter,
 ;    and session state while replacing free-form error text, paths, window
 ;    context, and log bodies with explicit redaction markers.
-; 4. Driver-scoped directory: reports live under <config_dir>/autohotkey/crash_reports/
-;    so they are co-located with the AHK logs and config under the autohotkey/
-;    subfolder, separate from any Hammerspoon reports.
+; 4. Logs-scoped directory: reports live in <logs>\crash_reports\
+;    (LoggerCrashReportsDir), beside the daily log that explains them, and
+;    follow a LogsDirPath override.
 ; 5. Structured output: reports are written as JSON for easy machine and human
 ;    readability, one file per incident.
 ; ==============================================================================
@@ -36,11 +36,6 @@
 ; ======= 1/ Constants =======
 ; ============================
 ; ============================
-
-; Subdirectory under the config dir that receives all AHK crash report files.
-; Nested under autohotkey/ to mirror the driver folder layout and stay separate
-; from any Hammerspoon reports under hammerspoon/.
-global _CrashReporter_Subdir := "autohotkey\crash_reports"
 
 ; Modifier keys to inspect for stuck state at crash time.
 global _CrashReporter_Modifiers := [
@@ -245,23 +240,16 @@ CrashReport_Build(ErrorObj) {
 	return _CrashReport_RedactCanonical(Report)
 }
 
-; Writes a crash report Map to disk as a JSON file under autohotkey/crash_reports/.
+; Writes a crash report Map to disk as a JSON file in the crash-reports folder.
 ; Creates the directory on demand. Returns the file path on success, or "" on failure.
 ; @param Report {Map} The report Map returned by CrashReport_Build().
 ; @param WriterFn {Func|Integer} Optional durable-writer seam for regression coverage.
 ; @return {String} Absolute path to the written file, or "" on failure.
 CrashReport_Save(Report, WriterFn := 0) {
-	global _ConfigDir, _CrashReporter_Subdir
-
 	try LoggerStart("CrashReporter", "Saving crash report to disk…")
 
-	BaseDir := ""
-	try BaseDir := _ConfigDir
-	if (BaseDir == "")
-		try BaseDir := EnvGet("USERPROFILE") . "\.config\ergopti_plus\"
-	if !(BaseDir ~= "[/\\]$")
-		BaseDir .= "\"
-	ReportDir := BaseDir . _CrashReporter_Subdir . "\"
+	; The logger is the one resolver of the crash-reports folder.
+	ReportDir := LoggerCrashReportsDir()
 
 	try DirCreate(ReportDir)
 
@@ -479,7 +467,7 @@ _CrashReport_ToJson(Report) {
 _CrashReport_ToWorkerJson(Report) {
 	SafeReport := _CrashReport_RedactCanonical(Report)
 	Fields := _CrashReport_CanonicalFields()
-	for Key in ["_transport_script_dir", "_transport_config_dir"] {
+	for Key in ["_transport_script_dir", "_transport_reports_dir"] {
 		if SafeReport.Has(Key)
 			Fields.Push(Key)
 	}

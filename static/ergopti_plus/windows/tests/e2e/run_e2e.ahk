@@ -61,6 +61,7 @@ global TEST_RESULTS_FILE := A_ScriptDir . "\test_results.txt"
 ; Production engine dependencies (same order as run_all.ahk).
 #Include ../../infra/app_state.ahk
 #Include ../../infra/ui_style.ahk
+#Include ../../_generated/app_dirs.ahk
 #Include ../../infra/logger.ahk
 
 #Include ../../infra/window_utils.ahk
