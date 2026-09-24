@@ -537,7 +537,7 @@
 		},
 		{
 			"id": "recommended_layer_on_macos",
-			"description": "The same preset on macOS: macOS chords for the same actions, F1-F12 on the number row, Spotlight on Space, window cycling on Tab and Escape on the right Command key too.",
+			"description": "The same preset on macOS: macOS chords for the same actions, F1-F12 on the number row, Spotlight on Space, window cycling on Tab, and the right Command key as Escape on a tap and Option+Shift held (a macOS call handler).",
 			"os": "macos",
 			"file": "layers.recommended.toml",
 			"expected": {
@@ -585,7 +585,7 @@
 						"KeyX": "keystroke:alt+ArrowDown@repeat",
 						"KeyY": "keystroke:shift+meta+ArrowLeft",
 						"KeyZ": "keystroke:alt+ArrowUp@repeat",
-						"MetaRight": "keystroke:Escape@repeat",
+						"MetaRight": "call:tap_escape_hold_option_shift@repeat",
 						"Minus": "keystroke:F11",
 						"Period": "keystroke:ctrl+fn+ArrowRight",
 						"Quote": "keystroke:ctrl+alt+meta+ArrowRight",

@@ -108,11 +108,10 @@ schema_version = 1
 "Digit9" = "repeat_count:9"
 "Digit0" = "repeat_count:10"
 
-# Two parts of today's macOS layer have no binding form yet, so a generator
-# that builds the Karabiner layer from this table must keep them itself: the
-# number row sends F1-F12 with Fn added while macOS treats the top row as
-# media keys, and the right Command key is Option+Shift while held (Escape
-# only on a tap).
+# The Karabiner generator (macos/platform/remap/nav_layer.lua) sends every F1-F12
+# keystroke with Fn added while macOS treats the top row as media keys, so the
+# number row reaches the function keys in either mode. The right Command key is
+# Escape on a tap and Option+Shift while held.
 [layers.nav.macos]
 "Digit1" = "keystroke:F1"
 "Digit2" = "keystroke:F2"
@@ -128,7 +127,7 @@ schema_version = 1
 "Equal" = "keystroke:F12"
 "Space" = "spotlight"
 "Tab" = "keystroke:meta+Backquote"
-"MetaRight" = "escape"
+"MetaRight" = "escape_or_option_shift"
 
 [layers.nav.linux]
 # The wheel: volume instead of scroll, as on Windows.

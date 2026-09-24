@@ -89,7 +89,7 @@ reason_key = "platform_reason.layer_wheel_source_is_not_macos"
 # Driver-native handlers a `call:` resolution may name, per OS.
 [call_handlers]
 windows = ["maximize_window"]
-macos = []
+macos = ["tap_escape_hold_option_shift"]
 linux = []
 
 
@@ -308,6 +308,15 @@ all = "keystroke:Tab"
 catalogue = true
 repeatable = true
 all = "keystroke:Escape"
+
+# Escape on a tap. On macOS the key held down is Option+Shift instead, the
+# modifiers the Ergopti keylayout types its symbols with, so the symbols stay
+# reachable from inside the layer; a keystroke cannot be two things, so the
+# Karabiner generator implements it (platform/remap/nav_layer.lua).
+[actions.escape_or_option_shift]
+repeatable = true
+all = "keystroke:Escape"
+macos = "call:tap_escape_hold_option_shift"
 
 [actions.none]
 catalogue = true
