@@ -1552,28 +1552,12 @@ function M.flush()
 			_flushed_app_titles[app_id] = flushed_titles
 		end
 
-		-- 3. Persist per-app character n-grams and their synthetic provenance as
-		-- deltas. The physical text and generated output share one portable char
-		-- stream, while esrc_json keeps their origin queryable for the UI.
+		-- 3. Record which per-app character counts are now persisted, so the
+		-- live view adds only what came after. They were also written here, as a
+		-- delta, on top of the aggregate walker's rows for the same characters:
+		-- both upserts add, so every stored character count was doubled. The
+		-- walker's rows, which carry the sources too, are the only write.
 		for app_id, app_stats in pairs(_app_stats) do
-			local previous = _flushed_app_ngrams[app_id] or {}
-			local previous_sources = _flushed_app_sources[app_id] or {}
-			local delta = {}
-			for token, count in pairs(app_stats.ngrams or {}) do
-				local increment = math.max(0, count - (previous[token] or 0))
-				if increment > 0 then
-					local sources = {}
-					for source, source_count in pairs((app_stats.ngram_sources or {})[token] or {}) do
-						local persisted = ((previous_sources[token] or {})[source] or 0)
-						local source_increment = math.max(0, source_count - persisted)
-						if source_increment > 0 then sources[source] = source_increment end
-					end
-					delta[token] = { c = increment, sources = sources }
-				end
-			end
-			if next(delta) ~= nil then
-				if not SqliteWriter.upsert_ngrams(_device_id, date, dashboard_app_name(app_id), delta) then return end
-			end
 			_flushed_app_ngrams[app_id] = {}
 			for token, count in pairs(app_stats.ngrams or {}) do _flushed_app_ngrams[app_id][token] = count end
 			_flushed_app_sources[app_id] = {}
