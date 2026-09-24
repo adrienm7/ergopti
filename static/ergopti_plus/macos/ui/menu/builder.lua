@@ -677,7 +677,13 @@ function M.generate(ctx, menu_mods, actions)
 				["healthcheck"]    = function() healthcheck.show_window({ state = ctx.state }) end,
 				["report_bug"]      = function() require("ui.healthcheck.report").report_bug({ state = ctx.state }) end,
 				["suggest_feature"] = function() require("ui.healthcheck.report").suggest_feature() end,
+				["show_error_dialog"] = actions.toggle_error_dialog,
 			}
+			dbg_ctx.state_getters = {}
+			for key, value in pairs(ctx.state_getters or {}) do dbg_ctx.state_getters[key] = value end
+			dbg_ctx.state_getters["error_dialog_enabled"] = function()
+				return require("ui.error_dialog").is_enabled()
+			end
 			-- The picker's own row carries the level currently set, which is why it
 			-- is a `list` and not a `command`: a declaration cannot spell a label
 			-- that changes with the state behind it.

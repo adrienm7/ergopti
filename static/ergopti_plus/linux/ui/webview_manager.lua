@@ -30,6 +30,10 @@ local Logger = require("logger.shim")
 local Monotonic = require("infra.monotonic")
 local LOG = "ui.webview_manager"
 
+-- Windows that open by themselves while the user may be typing: shown
+-- without taking the keyboard focus.
+local UNFOCUSED_APPS = { error_dialog = true }
+
 -- Product name and separator of every window title (see M.window_title).
 local WINDOW_TITLE_PRODUCT = "Ergopti"
 local WINDOW_TITLE_SEPARATOR = " — "
@@ -134,6 +138,7 @@ local BRIDGE_MODULES = {
 	action_picker         = "ui.action_picker.bridge",
 	changelog             = "ui.changelog.bridge",
 	download_window       = "ui.download_window.bridge",
+	error_dialog          = "ui.error_dialog.bridge",
 	healthcheck           = "ui.healthcheck.bridge",
 	hotstring_editor      = "ui.hotstring_editor.bridge",
 	-- Keyed by the DIRECTORY name. It read "hotstrings_config" until 2026-08-05,
@@ -291,6 +296,13 @@ function M.hide(app_name, expected_epoch)
 	_windows[app_name] = nil
 	if _gtk_available then
 		M._destroy_gtk_window(app_name, owned.epoch)
+	end
+	-- A bridge that holds state for its window (the error window's policy) is
+	-- told when the window goes, whoever closed it
+	local handler = owned.handler
+	if type(handler) == "table" and type(handler.on_window_closed) == "function" then
+		local ok, err = pcall(handler.on_window_closed, owned.epoch)
+		if not ok then Logger.error(LOG, "The '%s' bridge failed on close: %s", app_name, tostring(err)) end
 	end
 	Logger.info(LOG, "Webview '%s' closed after %.1f s open.", app_name,
 		(Monotonic.now_ms() - (owned.opened_ms or Monotonic.now_ms())) / 1000)
@@ -578,6 +590,7 @@ local function _app_title(app_name)
 	-- Windows named after the menu row that opens them, in the user's language,
 	-- as macOS and Windows already title them
 	local title_keys = {
+		error_dialog            = "common.error_title",
 		healthcheck             = "menu.debug.healthcheck",
 	}
 	if title_keys[app_name] then
@@ -641,6 +654,8 @@ function M._create_gtk_window(app_name, html, handler)
 		default_height   = geometry.height,
 		window_position  = Gtk.WindowPosition.CENTER,
 		type             = Gtk.WindowType.TOPLEVEL,
+		-- A window that can appear while the user types must not take the keyboard
+		focus_on_map     = not UNFOCUSED_APPS[app_name],
 	})
 
 	-- Set minimum size if supported.

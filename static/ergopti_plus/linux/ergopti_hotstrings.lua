@@ -185,6 +185,12 @@ local secure_field_detector = RuntimeGuard.optional_require("adapters.secure_fie
 local webview_manager = RuntimeGuard.optional_require("ui.webview_manager")
 local input_capture_gate = nil
 
+-- The error window: a logged ERROR can open it (the shared policy decides),
+-- and the start after a crash announces the crash. Installed before main() so
+-- the boot's own errors count; it opens nothing before the event loop runs.
+local ErrorDialog = RuntimeGuard.optional_require("ui.error_dialog.bridge")
+if ErrorDialog and ErrorDialog.init() then Logger.set_error_observer(ErrorDialog.on_error) end
+
 -- File watchers (optional — inotify-based TOML/.lua hot reload).
 -- When luv is present, uses native inotify via luv.new_fs_event();
 -- otherwise falls back to mtime polling driven by the event loop.
@@ -1695,6 +1701,14 @@ local function main()
 			on_set_log_level = function(lvl)
 				if not ScriptSettings.set(lvl) then return end
 				Logger.info(LOG, "Log level set to %s.", lvl)
+				if rebuild_tray_menu then rebuild_tray_menu() end
+			end,
+			on_toggle_error_dialog = function()
+				if not ErrorDialog then
+					Logger.error(LOG, "The error window did not load; its setting cannot change.")
+					return
+				end
+				if not ErrorDialog.set_enabled(not ErrorDialog.is_enabled()) then return end
 				if rebuild_tray_menu then rebuild_tray_menu() end
 			end,
 			}

@@ -64,6 +64,9 @@ M.features = {
 		path = "script.log_level", id = "log_level", section = "script", default = "INFO", type = "enum", description_key = "menu.script.log_level", platforms = { "ahk", "hs", "linux" }, enum_values = { "DEBUG", "TRACE", "DONE", "INFO", "START", "SUCCESS", "WARNING", "ERROR" },
 	},
 	{
+		path = "script.show_error_dialog", id = "show_error_dialog", section = "script", default = true, type = "boolean", description_key = "menu.debug.show_error_dialog", platforms = { "ahk", "hs", "linux" },
+	},
+	{
 		path = "hotstrings.trigger_char", id = "trigger_char", section = "hotstrings", default = "★", type = "string", description_key = "menu.hotstrings.trigger_char", platforms = { "ahk", "hs", "linux" },
 	},
 	{

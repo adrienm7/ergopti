@@ -1202,6 +1202,13 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			_menu_dirty = true
 			if type(schedule_menu_refresh) == "function" then schedule_menu_refresh() end
 		end,
+		toggle_error_dialog       = function()
+			local ErrorDialog = require("ui.error_dialog")
+			if not ErrorDialog.set_enabled(not ErrorDialog.is_enabled()) then return end
+			-- The tick is part of the cached tree, like the log level's
+			_menu_dirty = true
+			if type(schedule_menu_refresh) == "function" then schedule_menu_refresh() end
+		end,
 	}
 
 	if type(core_mods.shortcuts_mod) == "table"

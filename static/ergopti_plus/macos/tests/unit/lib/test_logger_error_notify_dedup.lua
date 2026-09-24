@@ -73,4 +73,26 @@ helpers.describe("logger: error notifications respect dedup (no toast storm)", f
 		helpers.assert_true(notif[1]:find("first failure", 1, true) ~= nil)
 		helpers.assert_true(notif[2]:find("second failure", 1, true) ~= nil)
 	end)
+
+	-- The error window keys an error by its module and its template: the
+	-- formatted message alone would make every occurrence of one fault a new
+	-- signature, since its arguments change (error-dialog-template)
+	helpers.it("hands the handler the unformatted template beside the message (error-dialog-template)", function()
+		local Logger = helpers.load_with_stubs("infra.logger")
+		Logger.set_level("DEBUG")
+
+		local calls = {}
+		Logger.set_error_notification_handler(function(module_name, message, template)
+			calls[#calls + 1] = { module_name, message, template }
+			return true
+		end)
+		Logger.error("keylogger", "Flush failed: %s (%d)", "disk full", 3)
+		Logger.error("keylogger", "Plain failure")
+		Logger.set_error_notification_handler(nil)
+
+		helpers.assert_eq(calls, {
+			{ "keylogger", "Flush failed: disk full (3)", "Flush failed: %s (%d)" },
+			{ "keylogger", "Plain failure", "Plain failure" },
+		})
+	end)
 end)

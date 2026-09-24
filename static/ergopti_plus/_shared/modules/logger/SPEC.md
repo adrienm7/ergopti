@@ -265,6 +265,20 @@ early. A line swallowed by the dedup window is not counted. The Lua core
 exposes `session_issues()` → `{ warn_count, err_count, last_error }`; the AHK
 logger feeds `HealthCheck_RecordWarn()` / `HealthCheck_RecordError(Line)`.
 
+### 5.2 Error window hook
+
+Every emitted `ERROR` line is also handed to the driver's error window with its
+module, its formatted message and its **unformatted template** (the message
+before its arguments): the window keys an error by module and template, so
+arguments cannot make one fault look like many
+(`_shared/modules/diagnostics/error_policy.json`). A line swallowed by the dedup
+window is not handed over. The hook may run inside the keyboard hook, so it
+only decides and arms a timer; it never logs. AHK: `_LoggerEmit` calls
+`ErrorDialog_OnError(Tag, Template, Body, Stamp)`. Hammerspoon: the handler of
+`set_error_notification_handler()` receives `(module, message, template)`
+after the line's native ACK. Linux: the daemon installs the shared core's
+`set_error_observer(fn(module, template, body))`.
+
 ---
 
 ## 6. Log Files
@@ -372,7 +386,7 @@ global path variables, sets up the flush timer, and purges old log files.
 ```lua
 Logger.init_log_path(config_dir, max_age_days)
 Logger.set_level(level)                         -- optional, default = 10
-Logger.set_error_notification_handler(fn)       -- optional
+Logger.set_error_notification_handler(fn)       -- optional, fn(module, message, template)
 ```
 
 Called during the `init.lua` boot sequence.
@@ -390,6 +404,7 @@ contract. Both drivers are free to keep or remove them independently.
 | DEBUG-axis indentation         | ✗   | ✓   | 10-space prefix on DEBUG / TRACE / DONE lines in console            |
 | Error notification callback    | ✗   | ✓   | Optional handler passed to `set_error_notification_handler()`       |
 | Stall-tolerant ACK transport   | ✗   | ✓   | Fatal after `stall_fatal_ms` without ACK; sheds DEBUG while stalled |
+| Error window hook              | ✓   | ✓   | Every emitted ERROR reaches the error window (§ 5.2)                |
 | `pcall` wrapper                | ✗   | ✓   | `Logger.pcall(module, fn, ...)` — wraps pcall with error logging    |
 | `build` wrapper                | ✗   | ✓   | `Logger.build(module, label, fn, ctx)` — builder with error logging |
 

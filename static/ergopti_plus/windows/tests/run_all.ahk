@@ -1651,6 +1651,8 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_kana_altgr_readers.ahk
 #Include unit/test_kana_altgr_lift_respects_owner.ahk
 #Include unit/test_kana_altgr_ctrl_chords.ahk
+#Include ../ui/error_dialog/init.ahk
+#Include unit/test_error_dialog.ahk
 #Include unit/test_healthcheck_os_name_windows11.ahk
 #Include unit/test_healthcheck_issues_from_errors_file.ahk
 #Include unit/test_healthcheck_report_issue.ahk

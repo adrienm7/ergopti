@@ -8,12 +8,14 @@
 ; HookDispatcher.Dispatch's per-signature _err_cache throttle (a SetTimer
 ; callback, a hotkey a user holds/auto-repeats) re-ran the full WMI/
 ; healthcheck/git crash-report pipeline (SetTimer(_ErgoptiDeferredCrashReport...))
-; and the NotifierSend toast on EVERY single occurrence, backing up the one
-; thread that also serves every keystroke.
+; on EVERY single occurrence, backing up the one thread that also serves every
+; keystroke. The user-facing surface is the error window, whose own policy
+; (_shared/modules/diagnostics/error_policy.json) deduplicates what it shows,
+; so the handler raises no toast of its own.
 ;
 ; The fix mirrors HookDispatcher.Dispatch's own _err_cache pattern: a
 ; per-signature (message + location), TTL-based dedup cache that skips the
-; expensive deferred report + toast when the same fault fired again within
+; expensive deferred report when the same fault fired again within
 ; ERROR_NET_DEDUP_TTL_MS — the cheap modifier release + LoggerError still run
 ; every time, so nothing is silently dropped from the logs.
 ; ==============================================================================
@@ -37,7 +39,7 @@ _ENDT_HandlerHasDedupCache() {
 }
 Test("meta error-net: ErgoptiGlobalErrorHandler declares a static dedup cache (error-handler-no-dedup-throttle)", _ENDT_HandlerHasDedupCache)
 
-_ENDT_DedupGuardsSetTimerAndNotifier() {
+_ENDT_DedupGuardsTheCrashReport() {
 	Body := _DriverFuncBody("ErgoptiGlobalErrorHandler")
 	Assert(Body != "", "ErgoptiGlobalErrorHandler() must exist in infra/error_net.ahk")
 
@@ -46,19 +48,17 @@ _ENDT_DedupGuardsSetTimerAndNotifier() {
 		"ErgoptiGlobalErrorHandler must check the dedup cache before doing the expensive work (error-handler-no-dedup-throttle)")
 
 	SetTimerIdx := InStr(Body, "SetTimer(_ErgoptiDeferredCrashReport")
-	NotifierIdx := InStr(Body, "NotifierSend(")
 	Assert(SetTimerIdx > 0, "ErgoptiGlobalErrorHandler must schedule the deferred crash report")
-	Assert(NotifierIdx > 0, "ErgoptiGlobalErrorHandler must surface the error via NotifierSend")
+	Assert(InStr(_StripFullLineComments(Body), "NotifierSend(") = 0,
+		"ErgoptiGlobalErrorHandler must raise no toast of its own: the error window surfaces the logged ERROR "
+		. "under its own deduplication, and a second surface would double every error (error-handler-no-dedup-throttle)")
 
 	Assert(CacheCheckIdx < SetTimerIdx,
 		"The dedup cache check must run BEFORE SetTimer(_ErgoptiDeferredCrashReport...) so a repeatedly-throwing "
 		. "callback cannot re-run the ~100-500 ms WMI/healthcheck/git pipeline on every occurrence and back up the "
 		. "keystroke thread (error-handler-no-dedup-throttle)")
-	Assert(CacheCheckIdx < NotifierIdx,
-		"The dedup cache check must run BEFORE NotifierSend(...) so a repeatedly-throwing callback cannot spam the "
-		. "tray toast on every occurrence (error-handler-no-dedup-throttle)")
 }
-Test("meta error-net: dedup cache check gates both the deferred crash report and the toast (error-handler-no-dedup-throttle)", _ENDT_DedupGuardsSetTimerAndNotifier)
+Test("meta error-net: dedup cache check gates the deferred crash report (error-handler-no-dedup-throttle)", _ENDT_DedupGuardsTheCrashReport)
 
 ; An alt_gr tap-hold presses SC138, not RAlt, on a Kana-style layout. The crash
 ; net releases logically stuck modifiers after an uncaught error; a sweep that

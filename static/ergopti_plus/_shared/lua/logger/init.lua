@@ -123,6 +123,12 @@ local _session = { warn_count = 0, err_count = 0, last_error = nil }
 --- Signature: function(line: string, variant: string) → void
 local _sink = nil
 
+--- Optional observer of every accepted ERROR line, called after the sink.
+--- Signature: function(module_name: string, template: string, body: string) → void,
+--- template being the message before its arguments (the Linux error window keys
+--- an error by it, so arguments cannot make one fault look like many).
+local _error_observer = nil
+
 
 
 
@@ -241,6 +247,13 @@ end
 --- @param fn function|nil  function(line: string, variant: string) → void
 function M.set_sink(fn)
 	_sink = (type(fn) == "function") and fn or nil
+end
+
+--- Installs the ERROR observer. Call with nil to remove it (tests).
+--- A line swallowed by the dedup window is not observed, as it is not logged.
+--- @param fn function|nil  function(module_name, template, body) → void
+function M.set_error_observer(fn)
+	_error_observer = (type(fn) == "function") and fn or nil
 end
 
 
@@ -485,6 +498,12 @@ local function emit(variant, module_name, msg, ...)
 	end
 
 	deliver(line, variant)
+	if variant == "error" and _error_observer then
+		-- Swallowed like a sink failure: the logging call cannot log about itself,
+		-- and must complete whatever a driver callback does
+		local ok = pcall(_error_observer, tostring(module_name), tostring(msg), body)
+		if not ok then end
+	end
 	return line
 end
 

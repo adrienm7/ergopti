@@ -502,10 +502,12 @@ _MI_BuildDebuggingMenu() {
 		"open_error_log", OpenErrorLog,
 		"healthcheck",    ShowHealthCheck,
 		"report_bug",      (*) => HealthCheck_ReportBug(),
-		"suggest_feature", (*) => HealthCheck_SuggestFeature()
+		"suggest_feature", (*) => HealthCheck_SuggestFeature(),
+		"show_error_dialog", (*) => ErrorDialog_SetEnabled(!ErrorDialog_IsEnabled())
 	)
 	ListProviders := Map("log_level", (*) => _MI_LogLevelRows())
-	return MenuRenderer_Build("debug_menu", "Debug", "", "", ListProviders, Commands)
+	StateGetters := Map("error_dialog_enabled", ErrorDialog_IsEnabled)
+	return MenuRenderer_Build("debug_menu", "Debug", "", "", ListProviders, Commands, StateGetters)
 }
 
 ; List provider: the log-level picker, whose parent row reads the current level.

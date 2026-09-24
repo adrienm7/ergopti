@@ -17,6 +17,7 @@
 //   action_picker_bridge      — _shared/ui/action_picker
 //   changelog_bridge          — _shared/ui/changelog
 //   dl_bridge                 — _shared/ui/download_window
+//   error_dialog              — _shared/ui/error_dialog
 //   hsEditor                  — _shared/ui/hotstring_editor
 //   hotstrings_config_bridge  — _shared/ui/hotstrings_config_window
 //   hsOnboarding              — _shared/ui/onboarding

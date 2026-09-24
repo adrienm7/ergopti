@@ -60,6 +60,10 @@
 				"log_level": {
 					"enum": ["DEBUG", "TRACE", "DONE", "INFO", "START", "SUCCESS", "WARNING", "ERROR"]
 				},
+				"show_error_dialog": {
+					"type": "boolean",
+					"description": "Whether a logged error may open the error window (Debug menu)."
+				},
 				"alt_gr_is_kana_remap": {
 					"oneOf": [{ "type": "boolean" }, { "const": "auto" }]
 				}

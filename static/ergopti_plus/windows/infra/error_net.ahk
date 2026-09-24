@@ -7,8 +7,9 @@
 ; Without it, any uncaught error pops a blocking AHK dialog mid-keystroke and
 ; can leave modifiers stuck down; this handler releases only genuinely-stuck
 ; modifiers, logs the failure, saves a crash report (no opt-in prompt — the
-; confirmation step was removed as friction), and surfaces a non-blocking tray
-; toast — so one bad callback never locks the keyboard.
+; confirmation step was removed as friction), and lets the logged ERROR open
+; the non-modal error window (ui/error_dialog) — so one bad callback never
+; locks the keyboard.
 ; ==============================================================================
 
 
@@ -238,8 +239,10 @@ ErgoptiGlobalErrorHandler(Exc, Mode) {
 				try SendEvent("{" ModKey " Up}")
 		}
 		; Best-effort logging — guarded because the logger may not be initialised
-		; yet when an early-boot error fires the handler.
-		try LoggerError("ErgoptiPlus", "Uncaught error: {1}",
+		; yet when an early-boot error fires the handler. This ERROR is also what
+		; opens the error window: its template names the fault's site, so two
+		; faults in two places are two window signatures.
+		try LoggerError("ErgoptiPlus", _ErrorNet_UncaughtTemplate(Exc),
 				Exc.Message . (Exc.HasProp("Stack") ? " | " . Exc.Stack : ""))
 
 		; Per-signature dedup, mirroring HookDispatcher.Dispatch's _err_cache. A
@@ -289,13 +292,32 @@ ErgoptiGlobalErrorHandler(Exc, Mode) {
 		; releases its own throttle, while a delayed callback cannot retire a newer
 		; report for the same signature after TTL expiry or cache-cap eviction.
 		SetTimer(_ErgoptiDeferredCrashReport.Bind(Exc, ReleaseDedup), -1)
-		; Surface the error via a NON-BLOCKING tray notification, not a modal MsgBox.
-		; A modal dialog on the input thread starves the keyboard hook — every key
-		; pressed while it is up is dropped or queued, turning an uncaught error into
-		; a lost-keystroke window. The tray toast informs the user without blocking.
-		try NotifierSend(t("ergopti.error_caught") . "`n`n" . Exc.Message,
-				Map("title", "ErgoptiPlus", "level", "error"))
+		; No dialog here: the ERROR logged above reaches the error window, which
+		; opens later on a timer and never takes the keyboard. A modal on the input
+		; thread would starve the keyboard hook and drop every key pressed while it
+		; is up.
 		return true
+}
+
+; The logger template of an uncaught error: its type and site are part of the
+; template, the message and stack are its argument. The error window keys an
+; error by its template, so the site keeps two faults apart, and a message that
+; varies from one occurrence to the next cannot make one fault look like many.
+; Braces are escaped: Format would read them as placeholders.
+; @param Exc {Any} The thrown value.
+; @returns {String}
+_ErrorNet_UncaughtTemplate(Exc) {
+	What := ""
+	SourcePath := ""
+	Line := ""
+	try What := Exc.HasProp("What") ? String(Exc.What) : ""
+	try SourcePath := Exc.HasProp("File") ? String(Exc.File) : ""
+	try Line := Exc.HasProp("Line") ? String(Exc.Line) : ""
+	SplitPath(SourcePath, &FileName)
+	Site := Type(Exc) . " in " . What . " (" . FileName . ":" . Line . ")"
+	Site := StrReplace(StrReplace(Site, "{", Chr(1)), "}", Chr(2))
+	Site := StrReplace(StrReplace(Site, Chr(1), "{{}"), Chr(2), "{}}")
+	return "Uncaught " . Site . ": {1}"
 }
 
 _CrashReport_CheapAdapterState() {
