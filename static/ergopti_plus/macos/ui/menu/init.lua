@@ -570,7 +570,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- capture them as upvalues at definition time.)
 
 	sync_state_to_modules = function(saved, config_absent, restoring)
-		return MenuState.sync_state_to_modules(state, saved, config_absent, {
+		local committed, report = MenuState.sync_state_to_modules(state, saved, config_absent, {
 			keymap                   = keymap,
 			apply_llm_enabled         = function(enabled)
 				if type(llm_handler) == "table"
@@ -594,6 +594,13 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			-- returned; it keeps the acknowledged value on disk like a boot one.
 			on_runtime_demotion      = session_demotions.record,
 		})
+		-- A rollback re-applies what config.toml already holds, so a feature its
+		-- runtime refused on the way back keeps that value on disk, exactly like a
+		-- boot refusal. A candidate sync never records: its values are not saved.
+		if restoring == true and type(report) == "table" and type(report.demotions) == "table" then
+			for _, record in ipairs(report.demotions) do session_demotions.record(record) end
+		end
+		return committed, report
 	end
 
 	local gestures_core_mod = safe_require("modules.gestures", "gestures core")
