@@ -26,9 +26,9 @@ local function load_fixture()
 	local transport = { starts = {}, cancels = {} }
 	local window = { updates = {}, completions = {}, session = 11 }
 	local shown = nil
-	replace("infra.llm_bridge", {
-		ollama_endpoint = function(base_url, path) return base_url .. "/api/" .. path end,
-	})
+	-- The real bridge: a fake that accepted any operation hid that the real one
+	-- knew no "pull", so every download failed before reaching Ollama.
+	package.loaded["infra.llm_bridge"] = nil
 	replace("adapters.http_client", {
 		postStream = function(url, headers, body, opts, on_chunk, on_done)
 			transport.starts[#transport.starts + 1] = {
