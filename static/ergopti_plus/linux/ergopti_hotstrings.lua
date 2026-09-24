@@ -1076,6 +1076,15 @@ local function main()
 		prediction_engine.init({
 			engine        = engine,
 			keyboard_hook = keyboard_hook,
+			is_paused     = script_actions.is_paused,
+			-- How a manual prediction request says why it was refused: the daemon's
+			-- one transient surface outside the prediction overlay.
+			notify        = function(text)
+				if not notifier then return false end
+				-- send() reports its own failures and returns nothing.
+				notifier.send(text, { level = "info" })
+				return true
+			end,
 			triggers      = { "//", ";;", "--" },
 			overlay       = llm_overlay,
 			apply_prediction = function(candidate)
@@ -1821,7 +1830,7 @@ local function main()
 		local ActionHandlers = require("modules.shortcuts.action_handlers")
 		gestures.init({
 			persist = true,
-			action_handlers = ActionHandlers.compose(script_actions.handlers, shortcuts),
+			action_handlers = ActionHandlers.compose(script_actions.handlers, shortcuts, prediction_engine),
 			is_paused = script_actions.is_paused,
 		})
 		Logger.info(LOG, "Gestures manager initialised.")

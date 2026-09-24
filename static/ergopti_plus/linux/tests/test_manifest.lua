@@ -204,6 +204,7 @@ return {
 	"tests.unit.modules.llm.test_navigation_settings",
 	"tests.unit.modules.llm.test_prediction_digit_accept",
 	"tests.unit.modules.llm.test_prediction_engine_canonicals",
+	"tests.unit.modules.llm.test_prediction_trigger_now",
 	"tests.unit.modules.llm.test_prediction_triggers",
 	"tests.unit.modules.llm.test_profile_settings",
 	"tests.unit.modules.llm.test_token_prompt_setters",

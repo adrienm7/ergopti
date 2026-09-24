@@ -1820,7 +1820,7 @@ end
 ---   open_script_source, open_personal_shortcuts,
 ---   open_personal_hotstrings, open_personal_info,
 ---   open_config, open_logs_folder, open_today_log,
----   add_hotstring, trigger_prediction.
+---   add_hotstring.
 --- Keys with no handler are quietly skipped (debug log) so the right-Alt key
 --- slots and gestures stay assignable on a fresh install.
 function M.set_extras(tbl)

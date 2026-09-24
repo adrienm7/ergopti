@@ -229,6 +229,12 @@ global GESTURE_ACTIONS := Map(
 		"paste_plain", {
 				Fn: (*) => GesturePastePlain(),
 		},
+		; --- AI ---
+		; The manual prediction trigger; it logs and shows every refusal itself.
+		; The binding id is not forwarded: its only parameter is a test seam.
+		"llm_generate_prediction", {
+				Fn: (*) => LLM_Menu_TriggerPrediction(),
+		},
 		; --- Tap-hold tap actions (exposed here so the tap picker can list them) ---
 		; These are dispatched by the tap-hold runtime directly; the Fn below fires
 		; when the action is triggered via a gesture slot instead.
