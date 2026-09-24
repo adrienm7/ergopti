@@ -73,7 +73,8 @@ end
 --- Validates the shared defaults and returns the registry settings.
 --- @param layout_defaults table Decoded _shared/modules/layouts/defaults.json.
 --- @param updater_defaults table Decoded _shared/modules/updater/defaults.json.
---- @return table|nil settings { owner, repo, folder, index_file, branch, url_template, timeout_ms, max_file_bytes, local_folder }
+--- @return table|nil settings { owner, repo, folder, index_file, branch, url_template, timeout_ms,
+---   max_file_bytes, local_folder, installed_file, etag_file, ergopti_family }
 --- @return string|nil error Exact reason when the defaults are unusable.
 function M.resolve(layout_defaults, updater_defaults)
 	local registry = type(layout_defaults) == "table" and layout_defaults.registry or nil
@@ -102,14 +103,20 @@ function M.resolve(layout_defaults, updater_defaults)
 		branch = registry.branch,
 		url_template = template,
 		local_folder = registry.local_folder,
+		installed_file = registry.installed_file,
+		etag_file = registry.etag_file,
+		ergopti_family = registry.ergopti_family,
 	}
 	if type(settings.folder) ~= "string" or not settings.folder:match(FOLDER_PATTERN) then
 		return nil, "registry.folder is not a repository path"
 	end
-	for _, key in ipairs({ "index_file", "branch", "local_folder" }) do
+	for _, key in ipairs({ "index_file", "branch", "local_folder", "installed_file", "etag_file" }) do
 		if type(settings[key]) ~= "string" or not settings[key]:match(NAME_PATTERN) then
 			return nil, "registry." .. key .. " is not a plain name"
 		end
+	end
+	if not M.is_valid_id(settings.ergopti_family) then
+		return nil, "registry.ergopti_family is not a registry id"
 	end
 	local timeout_sec = positive_integer(registry.download_timeout_sec)
 	local max_bytes = positive_integer(registry.max_file_bytes)
@@ -209,13 +216,57 @@ local function failure_reason(url, status, err)
 	return "no HTTP response for " .. url .. " (network, proxy or timeout)"
 end
 
---- Downloads index.json and one layout, and verifies the layout against it.
---- transport.get(url, headers, timeout_ms, callback(status, body, err)) must call
---- back exactly once and bound the request; transport.decode_json(text) returns
---- the decoded value (nil or a raise when invalid); transport.sha256(text,
---- callback(hex, err)) digests
---- the bytes. on_done(true, { entry, index_text, layout_text }) or
+--- Downloads one layout described by an index entry and verifies it.
+--- transport.get(url, headers, timeout_ms, callback(status, body, err, headers))
+--- must call back exactly once and bound the request; transport.sha256(text,
+--- callback(hex, err)) digests the bytes. on_done(true, layout_text) or
 --- on_done(false, reason) is called exactly once; nothing is written here.
+--- @param settings table Result of M.resolve().
+--- @param entry table Registry index entry of the layout.
+--- @param transport table { get, sha256 }.
+--- @param on_done function Terminal callback.
+function M.fetch_layout(settings, entry, transport, on_done)
+	local finished = false
+	local function finish(ok, detail)
+		if finished then return end
+		finished = true
+		on_done(ok, detail)
+	end
+	if type(entry) ~= "table" or not M.is_valid_id(entry.id) then
+		finish(false, "the registry entry names no valid layout id")
+		return
+	end
+	if type(entry.size) ~= "number" or entry.size > settings.max_file_bytes
+		or entry.file ~= entry.id .. "/" .. entry.id .. ".keylayout" or type(entry.sha256) ~= "string" then
+		-- The index builder always files a layout as <id>/<id>.keylayout; any
+		-- other path would read outside the layout's own folder.
+		finish(false, "the registry entry of '" .. entry.id .. "' has no usable file, size or checksum")
+		return
+	end
+	local url = M.raw_url(settings, entry.file)
+	transport.get(url, { ["User-Agent"] = USER_AGENT }, settings.timeout_ms, function(status, body, err)
+		if tonumber(status) ~= 200 or type(body) ~= "string" then
+			finish(false, failure_reason(url, status, err))
+			return
+		end
+		transport.sha256(body, function(digest, digest_err)
+			if type(digest) ~= "string" then
+				finish(false, "cannot digest the downloaded layout: " .. tostring(digest_err))
+				return
+			end
+			local ok, reason = M.verify(entry, body, digest)
+			if not ok then
+				finish(false, reason)
+				return
+			end
+			finish(true, body)
+		end)
+	end)
+end
+
+--- Downloads index.json and one layout, and verifies the layout against it.
+--- on_done(true, { entry, index_text, layout_text }) or on_done(false, reason)
+--- is called exactly once; nothing is written here.
 --- @param settings table Result of M.resolve().
 --- @param id string Registry id.
 --- @param transport table { get, decode_json, sha256 }.
@@ -231,29 +282,8 @@ function M.fetch(settings, id, transport, on_done)
 		finish(false, "'" .. tostring(id) .. "' is not a registry layout id")
 		return
 	end
-	local headers = { ["User-Agent"] = USER_AGENT }
-
-	local function on_layout(entry, index_text, url, status, body, err)
-		if tonumber(status) ~= 200 or type(body) ~= "string" then
-			finish(false, failure_reason(url, status, err))
-			return
-		end
-		transport.sha256(body, function(digest, digest_err)
-			if type(digest) ~= "string" then
-				finish(false, "cannot digest the downloaded layout: " .. tostring(digest_err))
-				return
-			end
-			local ok, reason = M.verify(entry, body, digest)
-			if not ok then
-				finish(false, reason)
-				return
-			end
-			finish(true, { entry = entry, index_text = index_text, layout_text = body })
-		end)
-	end
-
 	local index_url = M.raw_url(settings, settings.index_file)
-	transport.get(index_url, headers, settings.timeout_ms, function(status, body, err)
+	transport.get(index_url, { ["User-Agent"] = USER_AGENT }, settings.timeout_ms, function(status, body, err)
 		if tonumber(status) ~= 200 or type(body) ~= "string" then
 			finish(false, failure_reason(index_url, status, err))
 			return
@@ -274,14 +304,12 @@ function M.fetch(settings, id, transport, on_done)
 			finish(false, entry_err)
 			return
 		end
-		if type(entry.size) ~= "number" or entry.size > settings.max_file_bytes
-			or type(entry.file) ~= "string" or type(entry.sha256) ~= "string" then
-			finish(false, "the registry entry of '" .. id .. "' has no usable file, size or checksum")
-			return
-		end
-		local layout_url = M.raw_url(settings, entry.file)
-		transport.get(layout_url, headers, settings.timeout_ms, function(layout_status, layout_body, layout_err)
-			on_layout(entry, body, layout_url, layout_status, layout_body, layout_err)
+		M.fetch_layout(settings, entry, transport, function(ok, detail)
+			if not ok then
+				finish(false, detail)
+				return
+			end
+			finish(true, { entry = entry, index_text = body, layout_text = detail })
 		end)
 	end)
 end
