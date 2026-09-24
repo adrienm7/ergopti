@@ -419,6 +419,7 @@ InstallSendNoOps()
 #Include unit/test_updater_channel_registry.ahk
 #Include unit/test_updater_schedule_vectors.ahk
 #Include unit/test_updater_check_interval_snap.ahk
+#Include unit/test_updater_check_schedule.ahk
 #Include unit/test_updater_channel_selection.ahk
 ; The About submenu builder and its row actions: definitions only, drawn on
 ; demand by initMenu.
@@ -1315,6 +1316,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_updater_setchannel_cancels_async.ahk
 #Include meta/test_updater_setchannel_blocks_during_download.ahk
 #Include meta/test_updater_setcheckinterval_coerces.ahk
+#Include meta/test_updater_scheduler_off_typing_path.ahk
 #Include meta/test_webview_temp_dir_and_com_leak_on_reload.ahk
 #Include meta/test_win_l_lock_resets_context.ahk
 #Include meta/test_winhttp_no_abort_on_poll_timeout.ahk
