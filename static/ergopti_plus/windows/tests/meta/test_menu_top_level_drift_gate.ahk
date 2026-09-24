@@ -18,7 +18,8 @@
 ;
 ; The builders are stubs here: each stages one row named by its id, so the
 ; order under test is the dispatcher's alone. The table they stand in for is
-; compared with the manifest separately, in both directions.
+; compared with the manifest separately, in both directions, and each of its
+; builders is held to the row its id names.
 ;
 ; The macOS half lives in macos/tests/meta/test_menu_top_level_drift_gate.lua,
 ; and tools/test/test-menu-top-level-parity.cjs holds the three builder tables
@@ -172,6 +173,49 @@ _DG_ReorderedManifestReordersTheRoot() {
 		"a reordered manifest must reorder the tray root, separators included")
 }
 
+; The row each top-level id stands for, as its builder spells the title. The
+; order cases above stage stubs, so they prove the dispatcher's order and not
+; the table: two ids swapped in _MI_TopLevelBuilders would draw the wrong rows
+; in the right slots and pass them. An id missing here fails the case below, so
+; a new builder has to say which row it stages.
+global _DG_BUILDER_TITLES := Map(
+	"keyboard_layout", 't("menu.layout.title")',
+	"hotstrings",      't("menu.hotstrings.title")',
+	"llm",             't("menu.llm.title")',
+	"metrics",         't("menu.metrics.title")',
+	"shortcuts",       'GetCategoryTitle("Shortcuts")',
+	"tap_holds",       'GetCategoryTitle("TapHolds")',
+	"gestures",        'GetCategoryTitle("Gestures")',
+	"configuration",   't("menu.configuration.title")',
+	"language",        't("menu.global.language")',
+	"about",           't("menu.about.title")',
+	"suspend",         't("menu.global.suspend")',
+	"reload",          't("menu.global.reload")',
+	"quit",            't("menu.global.quit")',
+	"debug",           't("menu.debug.title")'
+)
+
+_DG_EveryBuilderStagesItsOwnRow() {
+	Checked := 0
+	for Id, Builder in _MI_TopLevelBuilders() {
+		Assert(_DG_BUILDER_TITLES.Has(Id), "name the title the '" . Id . "' builder stages in _DG_BUILDER_TITLES")
+		Body := _StripFullLineComments(_DriverFuncBody(Builder.Name))
+		; The IA row is staged by LLM_Menu_Init, which owns its persistent submenu.
+		if (Id == "llm")
+			Body .= _StripFullLineComments(_DriverFuncBody("LLM_Menu_Init"))
+		Assert(Body != "", "the '" . Id . "' builder " . Builder.Name . " must be readable")
+		Assert(InStr(Body, _DG_BUILDER_TITLES[Id]) > 0,
+			"the '" . Id . "' builder " . Builder.Name . " must stage the row titled " . _DG_BUILDER_TITLES[Id])
+		for OtherId, Title in _DG_BUILDER_TITLES {
+			if (OtherId != Id)
+				Assert(!InStr(Body, Title), "the '" . Id . "' builder " . Builder.Name
+					. " stages the '" . OtherId . "' row (" . Title . ")")
+		}
+		Checked += 1
+	}
+	Assert(Checked >= 12, "the tray root must dispatch at least twelve builders, read " . Checked)
+}
+
 ; The production root goes through the same dispatcher, over the shipped array,
 ; and stages nothing of its own around it.
 _DG_InitMenuDispatchesTheWholeRoot() {
@@ -190,3 +234,5 @@ Test("menu drift gate (AHK): a reordered manifest reorders the root, separators 
 	_DG_ReorderedManifestReordersTheRoot)
 Test("menu drift gate (AHK): initMenu stages its whole root through the dispatcher",
 	_DG_InitMenuDispatchesTheWholeRoot)
+Test("menu drift gate (AHK): every root builder stages the row its id names",
+	_DG_EveryBuilderStagesItsOwnRow)
