@@ -21,8 +21,11 @@ The ErgoptiPlus daemon runs this module to install what it converted with
 
 Ownership: this module only ever writes files it created. A manifest in the
 tree lists the layouts it installed and the rules files carry an owner marker;
-an existing file it does not own is a conflict and nothing is written. The
-last line printed is a JSON report ({"ok", "verified", "detail"}).
+an existing file it does not own is a conflict and nothing is written. A
+failed installation (a write error, or a layout that does not compile) puts
+back what the layout owned before, so the desktop never lists a layout the
+daemon reported as failed. The last line printed is a JSON report
+({"ok", "verified", "detail"}).
 
 Exit codes: 0 success, 2 invalid arguments, 3 conflicting or inconsistent
 package (nothing written), 4 installation aborted by a filesystem error.
@@ -328,6 +331,8 @@ def install(layout_id: str, display_name: str, source_dir: Path, languages: List
     installed = read_manifest(root)
     check_conflicts(root, layout_id, installed)
     paths = layout_paths(root, layout_id)
+    # What this layout owned before, so a failed installation puts it back.
+    previous = {name: path.read_text(encoding="utf-8") for name, path in paths.items() if path.exists()}
     try:
         write_text(paths["symbols"], with_file_marker(patch_symbols_default(symbols), layout_id))
         write_text(paths["types"], with_file_marker(types, layout_id))
@@ -335,16 +340,36 @@ def install(layout_id: str, display_name: str, source_dir: Path, languages: List
             write_text(paths["compose"], compose_source.read_text(encoding="utf-8"))
         elif paths["compose"].exists():
             paths["compose"].unlink()
-        installed = dict(installed)
-        installed[layout_id] = {"name": display_name, "languages": list(languages)}
-        publish_shared_files(root, home, installed)
+        updated = dict(installed)
+        updated[layout_id] = {"name": display_name, "languages": list(languages)}
+        publish_shared_files(root, home, updated)
     except OSError as error:
+        restore_layout(root, home, paths, previous, installed)
         raise InstallError(EXIT_INSTALL_ABORTED, "cannot write the user XKB tree: %s" % error)
     verified = verify(root, layout_id)
     if verified is False:
+        # The desktop pickers read this tree: a layout that does not compile
+        # must not stay registered there while the daemon reports a failure.
+        restore_layout(root, home, paths, previous, installed)
         return {"ok": False, "verified": False,
-                "detail": "the installed layout does not compile with its key types"}
+                "detail": "the converted layout does not compile with its key types; the tree is unchanged"}
     return {"ok": True, "verified": verified, "detail": "installed in %s" % root}
+
+
+def restore_layout(root: Path, home: Path, paths: Dict[str, Path], previous: Dict[str, str],
+                   installed: Dict[str, dict]) -> None:
+    """Puts back the files one layout owned before a failed installation
+    (none for a new layout) and the shared files of the installed layouts."""
+    try:
+        for name, path in paths.items():
+            if name in previous:
+                write_text(path, previous[name])
+            elif path.exists():
+                path.unlink()
+        publish_shared_files(root, home, installed)
+    except OSError as error:
+        raise InstallError(EXIT_INSTALL_ABORTED,
+                           "cannot restore the user XKB tree after a failed installation: %s" % error)
 
 
 def uninstall(layout_id: str, root: Path, home: Path, deactivate: bool = True) -> dict:
