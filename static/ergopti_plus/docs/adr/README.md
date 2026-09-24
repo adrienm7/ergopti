@@ -39,3 +39,4 @@ Files are named `NNN-short-slug.md` where `NNN` is a zero-padded three-digit seq
 | [005](005-hotstring-engine-ownership.md)  | Hotstring engine canonical spec lives in `_shared/core/domain/` | Accepted           |
 | [006](006-cross-driver-corpus-testing.md) | Shared test-vector corpus consumed by all drivers          | Accepted           |
 | [007](007-i18n-audit-findings.md)         | i18n audit findings (1.3.6)                                | Partially resolved |
+| [009](009-config-versioning.md)           | Config versioning and deprecation policy                   | Accepted           |

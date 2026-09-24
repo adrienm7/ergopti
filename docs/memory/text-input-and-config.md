@@ -90,6 +90,15 @@ The v2 configuration schema is canonical. Driver-prefixed legacy sections such
 as `[ahk.layout]` are invalid; migration must remove them after preserving valid
 canonical values, not keep logging the same startup error forever.
 
+### project-config-versioning
+
+`config.toml` carries `[_meta] schema_version`, read at boot by every driver
+against `_shared/core/config_schema/migrations.toml` (ADR-009). Renaming,
+moving, retyping or removing a config key ships a registry step in the same
+commit, with a corpus case each named driver replays; readers drop the old
+spelling at once. A writer stamps only a file it creates; an existing file
+keeps the stamp the boot migration gave it, or its remaining steps are skipped.
+
 ### project-toml-cache-returns-real-booleans
 
 TOML caches return native booleans. Do not compare their values to string
