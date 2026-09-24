@@ -565,6 +565,7 @@ _LogBootProgress("loading menu_llm/persist")
 #Include ../infra/menu_dispatcher.ahk
 #Include ../ui/menu/menu_llm/menu_settings.ahk
 #Include unit/test_llm_backend_lifecycle_dispatch.ahk
+#Include unit/test_llm_generate_prediction_feedback.ahk
 #Include unit/test_llm_menu_persistence.ahk
 #Include unit/test_llm_temperature_boundary.ahk
 #Include unit/test_llm_numeric_option_ranges.ahk

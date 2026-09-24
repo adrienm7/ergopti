@@ -700,16 +700,65 @@ LLM_Menu_PromptTriggerShortcut() {
 	return Committed
 }
 
+; The reasons a manual prediction request is refused, each with the locale key
+; of the notice that tells the user. LLM_Menu_ManualPredictionRefusal decides
+; which one applies; the order it checks them in is the order they are listed.
+global LLM_MANUAL_PREDICTION_REFUSALS := Map(
+	"paused", "llm.manual_prediction.paused",
+	"disabled", "llm.manual_prediction.disabled",
+	"backend_not_ready", "llm.manual_prediction.backend_not_ready",
+	"empty_context", "llm.manual_prediction.empty_context",
+)
+
 /**
- * Fires an immediate prediction request (used by the trigger shortcut).
+ * Decides why a manual prediction request cannot run, if it cannot.
+ * A pause outranks everything (nothing may run while paused), then the AI
+ * switch, then the backend, then the typed context.
+ * @param {Boolean} IsSuspended Whether the script is paused.
+ * @param {Boolean} Enabled Whether the AI is switched on.
+ * @param {Boolean} BackendReady Whether the selected backend can answer.
+ * @param {String} Context The context the prediction would complete.
+ * @returns {String} A key of LLM_MANUAL_PREDICTION_REFUSALS, or "" when ready.
  */
-LLM_Menu_TriggerPrediction() {
-	global _LLM_Menu
-	if A_IsSuspended || !_LLM_Menu_BackendIsReadyForUse()
-		return
-	ctx := SubStr(_LLM_Bridge_Buffer, -_LLM_Menu["ctx_chars"])
-	if (ctx != "")
-		LLM_Engine_FirePrediction(ctx)
+LLM_Menu_ManualPredictionRefusal(IsSuspended, Enabled, BackendReady, Context) {
+	if IsSuspended
+		return "paused"
+	if !Enabled
+		return "disabled"
+	if !BackendReady
+		return "backend_not_ready"
+	if (Context == "")
+		return "empty_context"
+	return ""
+}
+
+/**
+ * Fires an immediate prediction request: the llm_generate_prediction action.
+ * Every refusal is logged at INFO with its reason and shown as a tooltip. A
+ * chord that silently does nothing reads as a broken shortcut, and the buffer
+ * it completes is cleared by every caret, focus or pointer move. While paused
+ * the tooltip layer paints nothing (« pause = tout éteint »), so the log line
+ * is then the only trace, and a suspended hotkey cannot reach here anyway.
+ * @param {Func} FireFn Receives the context; the engine when omitted.
+ * @returns {Boolean} True when a prediction was requested.
+ */
+LLM_Menu_TriggerPrediction(FireFn := 0) {
+	global _LLM_Menu, _LLM_Bridge_Buffer, LLM_MANUAL_PREDICTION_REFUSALS
+	Context := SubStr(_LLM_Bridge_Buffer, -_LLM_Menu["ctx_chars"])
+	Enabled := _LLM_Menu.Get("enabled", false)
+	Reason := LLM_Menu_ManualPredictionRefusal(A_IsSuspended, Enabled,
+		Enabled && _LLM_Menu_BackendIsReadyForUse(), Context)
+	if (Reason != "") {
+		LoggerInfo("LLM", "Manual prediction refused ({1}): backend '{2}', {3} context character(s).",
+			Reason, _LLM_Menu.Get("backend", ""), StrLen(Context))
+		TooltipShow({ Text: t(LLM_MANUAL_PREDICTION_REFUSALS[Reason]),
+			DurationSec: UI_HOTSTRING_TIMEOUT_SEC }, UI_HOTSTRING_TIMEOUT_SEC)
+		return false
+	}
+	LoggerInfo("LLM", "Manual prediction requested ({1} context character(s)).", StrLen(Context))
+	Fire := HasMethod(FireFn, "Call") ? FireFn : LLM_Engine_FirePrediction
+	Fire(Context)
+	return true
 }
 
 /**
