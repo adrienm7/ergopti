@@ -118,6 +118,7 @@ local system_metrics = RuntimeGuard.optional_require("modules.keylogger.system_m
 
 -- The typing-speed pill (optional — needs a graphics renderer and a display).
 local wpm_widget = RuntimeGuard.optional_require("ui.wpm.widget")
+local wpm_tray_readout = RuntimeGuard.optional_require("ui.wpm.tray_readout")
 
 -- Desktop notifications (optional — needs notify-send and a session bus). The
 -- adapter degrades to a log line on a headless machine, so a missing one is not
@@ -1837,6 +1838,13 @@ local function main()
 			Logger.error(LOG, "WPM widget state could not be restored: %s.", tostring(err_restore))
 		end
 	end
+	-- The tray readout needs a tray: without --tray there is no panel item to sit beside.
+	if wpm_tray_readout and opts.tray and tray_menu then
+		local ok_restore, err_restore = pcall(wpm_tray_readout.restore)
+		if not ok_restore then
+			Logger.error(LOG, "WPM tray readout state could not be restored: %s.", tostring(err_restore))
+		end
+	end
 
 	-- 8.10c) Initialise the gestures manager (trackpad/mouse gesture recognition).
 	if gestures then
@@ -2070,22 +2078,29 @@ local function main()
 			end, function() system_metrics = nil end)
 		end
 
-		-- The WPM widget's only clock. `ui/wpm/widget.lua` was complete — it
-		-- computes the frame, picks the colour from the keystroke source, throttles
-		-- redraws to what a user could actually see — and `tick` had no caller
-		-- anywhere in the driver, so the whole surface was inert on every desktop.
-		-- The same shape the preview bubble had.
-		--
-		-- Driven from here rather than from its own timer: a widget with a private
-		-- clock is a second thing to stop on shutdown and a second thing to leak.
-		if wpm_widget then
-			local owner = wpm_widget
-			RuntimeGuard.call("WPM widget tick", function()
-				wpm_widget.tick(keylogger.get_session_stats(), tick_count * PERIODIC_TICK_MS / 1000)
-			end, function()
-				if type(owner.stop) == "function" then owner.stop() end
-				wpm_widget = nil
-			end)
+		-- The WPM readouts' clock: the floating widget and the tray readout each
+		-- redraw at their shared rate however often this runs, from the live
+		-- stats — the speed of the text reaching the page, and its source.
+		if wpm_widget or wpm_tray_readout then
+			local now_ms = Monotonic.now_ms()
+			local live = keylogger.get_live_stats(now_ms)
+			if wpm_widget then
+				local owner = wpm_widget
+				RuntimeGuard.call("WPM widget tick", function()
+					owner.tick(live, now_ms / 1000)
+				end, function()
+					if type(owner.stop) == "function" then owner.stop() end
+					wpm_widget = nil
+				end)
+			end
+			if wpm_tray_readout then
+				local owner = wpm_tray_readout
+				RuntimeGuard.call("WPM tray readout tick", function()
+					owner.tick(live, now_ms / 1000)
+				end, function()
+					wpm_tray_readout = nil
+				end)
+			end
 		end
 	end
 

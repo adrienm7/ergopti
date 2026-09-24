@@ -29,7 +29,7 @@ function build(config = evidenceConfig) {
 
 const rows = build();
 const summary = summarize(rows);
-assert.strictEqual(summary.total, 324, 'the canonical Linux projection must classify all 324 features');
+assert.strictEqual(summary.total, 326, 'the canonical Linux projection must classify all 326 features');
 assert.ok(summary.claimed_supported >= 126, 'supported feature count may only increase from the audited 126');
 assert.ok(summary.unavailable <= 198, 'unavailable feature count may only decrease from the audited 198');
 assert.strictEqual(summary.claimed_supported + summary.unavailable, summary.total);

@@ -642,12 +642,13 @@
 				"metrics_menubar_wpm"
 			],
 			"platforms": [
-				"hs"
+				"hs",
+				"linux"
 			],
 			"disabled_when": [
 				"keylogger_enabled"
 			],
-			"reason_key": "platform_reason.wpm_readout_is_a_macos_menubar_item"
+			"reason_key": "platform_reason.wpm_readout_needs_a_menubar"
 		},
 		{
 			"type": "check",
@@ -657,13 +658,14 @@
 				"metrics_menubar_colors"
 			],
 			"platforms": [
-				"hs"
+				"hs",
+				"linux"
 			],
 			"disabled_when": [
 				"keylogger_enabled",
 				"wpm_menubar_visible"
 			],
-			"reason_key": "platform_reason.wpm_readout_is_a_macos_menubar_item"
+			"reason_key": "platform_reason.wpm_readout_needs_a_menubar"
 		},
 		{
 			"type": "dynamic",
@@ -686,12 +688,7 @@
 			"disabled_when": [
 				"keylogger_enabled",
 				"wpm_widget_visible"
-			],
-			"platforms": [
-				"ahk",
-				"hs"
-			],
-			"reason_key": "platform_reason.metrics_extras_are_not_on_linux"
+			]
 		},
 		{
 			"type": "command",
@@ -700,12 +697,7 @@
 			"disabled_when": [
 				"keylogger_enabled",
 				"wpm_widget_visible"
-			],
-			"platforms": [
-				"ahk",
-				"hs"
-			],
-			"reason_key": "platform_reason.metrics_extras_are_not_on_linux"
+			]
 		},
 		{
 			"type": "---"
