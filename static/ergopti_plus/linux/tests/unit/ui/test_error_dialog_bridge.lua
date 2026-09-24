@@ -13,7 +13,8 @@
 --- 3. "ready" answers with the error and its report, redacted;
 --- 4. copy, report and open go through the diagnostics actions with the
 ---    report the page showed; an unknown action is refused;
---- 5. closing, by the page or by the close box, frees the policy.
+--- 5. closing, by the page or by the close box, frees the policy;
+--- 6. the newest crash dump is announced once, as a crash notice.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -264,6 +265,54 @@ helpers.describe("error window bridge (linux): page and actions (error-dialog-li
 				"a message of a closed window is inert")
 			bridge.on_error("a", "two", "two")
 			helpers.assert_eq(#context.deferred, 1, "after the close box a new error opens a window again")
+		end)
+	end)
+end)
+
+helpers.describe("error window bridge (linux): crash notice (error-dialog-linux)", function()
+	helpers.it("parses a crash dump's module, error and stack (error-dialog-linux)", function()
+		with_bridge(nil, function(bridge)
+			local module_name, message = bridge.parse_crash_dump(table.concat({
+				"=== Ergopti Linux Crash Dump ===", "Timestamp: Wed Sep 23 21:04:11 2026", "Module:    ergopti_hotstrings",
+				"Error:     boom", "Version:   2.1.0 (build)", "Stack:", "boom", "stack traceback:", "\tmain.lua:3", "",
+			}, "\n"))
+			helpers.assert_eq(module_name, "ergopti_hotstrings")
+			helpers.assert_eq(message, "boom\nboom\nstack traceback:\n\tmain.lua:3")
+		end)
+	end)
+
+	helpers.it("announces the newest crash dump once (error-dialog-linux)", function()
+		with_bridge(nil, function(bridge, context)
+			local dir = os.tmpname()
+			os.remove(dir)
+			os.execute("mkdir -p '" .. dir .. "'")
+			local dump = "crash_2026-09-23T21-04-11_ergopti_hotstrings.txt"
+			local fh = io.open(dir .. "/" .. dump, "wb")
+			fh:write("=== Ergopti Linux Crash Dump ===\nModule:    ergopti_hotstrings\nError:     boom\n")
+			fh:close()
+			local Shell = require("adapters.shell_runner")
+			local exec_line = Shell.exec_line
+			Shell.exec_line = function() return dump end
+			local ok, err = pcall(function()
+				bridge.init()
+				helpers.assert_true(bridge.notify_last_crash(dir), "an unannounced dump is announced")
+				helpers.assert_eq(#context.deferred, 1)
+				run_deferred(context)
+				local init = bridge.on_message("ready", {}, page(context))
+				helpers.assert_eq(init.kind, "crash")
+				helpers.assert_eq(init.module, "ergopti_hotstrings")
+				helpers.assert_eq(init.message, "boom")
+				bridge.on_message({ action = "open_log" }, {}, page(context))
+				helpers.assert_eq(context.performed[1].action.id, "crash_report")
+				helpers.assert_eq(context.performed[1].paths.crash_report, dir .. "/" .. dump)
+				bridge.on_message({ action = "close" }, {}, page(context))
+				helpers.assert_eq(bridge.notify_last_crash(dir), false, "a dump already announced is not announced again")
+			end)
+			Shell.exec_line = exec_line
+			os.remove(dir .. "/" .. dump)
+			os.remove(dir .. "/.last_crash_notice")
+			os.remove(dir)
+			if not ok then error(err, 0) end
 		end)
 	end)
 end)

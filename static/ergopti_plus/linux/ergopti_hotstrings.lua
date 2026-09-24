@@ -2134,6 +2134,12 @@ local function main()
 		end
 	end
 
+	-- systemd restarts a crashed daemon, and the crash left no window behind: the
+	-- first tick of the new loop announces the newest crash dump, once
+	if ErrorDialog then
+		event_loop.defer(function() ErrorDialog.notify_last_crash(CrashReporter.get_crash_dir()) end, 0)
+	end
+
 	event_loop.run({
 		onIdle = function()
 			if not keyboard_hook.isRunning() and not keyboard_hook.isRecovering() then
