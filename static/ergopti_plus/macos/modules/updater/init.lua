@@ -3,10 +3,11 @@
 --- ==============================================================================
 --- MODULE: Packaged Update Identity
 --- DESCRIPTION:
---- Exposes the immutable channel, launcher version, and releases page used by
---- the About menu. The outer launcher's Sparkle controller exclusively owns
---- network checks, download progress, signature verification, installation,
---- and relaunch; this nested Hammerspoon module performs no update I/O.
+--- Exposes the installed build's channel, the launcher version, the releases
+--- page and the shared update-channel registry used by the About menu. The
+--- outer launcher's Sparkle controller exclusively owns network checks,
+--- download progress, signature verification, installation, and relaunch;
+--- this nested Hammerspoon module performs no update I/O.
 --- ==============================================================================
 
 local M = {}
@@ -16,6 +17,7 @@ local Logger     = require("infra.logger")
 local Paths      = require("infra.paths")
 local FileSystem = require("adapters.file_system")
 local JsonCodec  = require("adapters.json_codec")
+local Channels   = require("updater.channels")
 
 local LOG = "updater"
 local BUNDLED_ID = "com.ergoptiplus.app.hammerspoon"
@@ -44,7 +46,22 @@ local function load_github_identity()
 	return DEFAULT_GITHUB
 end
 
+--- Loads the shared update-channel registry. It has no fallback: a guessed
+--- channel list could point the launcher at another channel's feed.
+--- @return table registry updater.channels interpreter.
+local function load_channel_registry()
+	local path = Paths.shared("modules/updater/channels.json")
+	local raw = type(path) == "string" and path ~= "" and FileSystem.read(path) or nil
+	if type(raw) ~= "string" then error("the shared update channel registry is unreadable", 0) end
+	local decoded, decode_err = JsonCodec.decode(raw)
+	if decode_err then error("the shared update channel registry is not JSON: " .. tostring(decode_err), 0) end
+	local registry, load_err = Channels.load(decoded)
+	if not registry then error("the shared update channel registry is invalid: " .. tostring(load_err), 0) end
+	return registry
+end
+
 local github = load_github_identity()
+local channels = load_channel_registry()
 local launcher_version = (function()
 	local ok, value = pcall(os.getenv, "ERGOPTI_LAUNCHER_VERSION")
 	if ok and type(value) == "string" and value ~= "" then return value end
@@ -73,12 +90,18 @@ function M.current_version()
 	return (launcher_version:gsub("%+.*$", ""))
 end
 
---- Returns the immutable channel stamped into the packaged launcher version.
---- @return string channel Either "dev" or "main".
-function M.default_channel()
-	if M.is_local_source() then return "dev" end
-	if launcher_version and launcher_version:match("%-dev%.") then return "dev" end
-	return "main"
+--- Returns the shared update-channel registry (updater.channels interpreter).
+--- @return table registry
+function M.channels()
+	return channels
+end
+
+--- Returns the channel of the running build: the registry channel that owns
+--- the launcher version, or the unreleased-build channel for a source run.
+--- @return string channel Registry channel id.
+function M.installed_channel()
+	if M.is_local_source() then return channels.unreleased_build_channel end
+	return channels.channel_for_tag(M.current_version()) or channels.unreleased_build_channel
 end
 
 --- Returns the public releases page used by the About menu.
