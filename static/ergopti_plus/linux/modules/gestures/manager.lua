@@ -487,18 +487,23 @@ local OPEN_WINDOW = {
 
 --- The user-editable file each `open_*` action reveals, as a path resolver.
 ---
---- Resolvers rather than strings: the paths depend on $XDG_CONFIG_HOME and on
---- today's date, and freezing them at load would open yesterday's log after
---- midnight and the wrong directory under a changed environment.
+--- Resolvers rather than strings: the paths depend on $XDG_CONFIG_HOME, and
+--- freezing them at load would open the wrong directory under a changed
+--- environment.
 local OPEN_PATH = {
 	["open_script_source"]      = function() return require("infra.paths").driver_root() .. "/ergopti_hotstrings.lua" end,
 	["open_config"]             = function(Paths) return Paths.config("config.toml") end,
 	["open_personal_info"]      = function(Paths) return Paths.config("personal_info.toml") end,
 	["open_personal_hotstrings"] = function(Paths) return Paths.config("personal_hotstrings.toml") end,
 	["open_personal_shortcuts"] = function(Paths) return Paths.config("personal_shortcuts.toml") end,
-	["open_logs_folder"]        = function() return require("infra.logger_sink").log_dir() end,
-	["open_today_log"]          = function() return require("infra.logger_sink").main_log_path() end,
-	["open_error_log"]          = function() return require("infra.logger_sink").errors_log_path() end,
+}
+
+--- The three log actions, by ui/log_openers function: shared with the tray, so
+--- a missing errors file is announced there and here alike.
+local OPEN_LOG = {
+	["open_logs_folder"] = "open_logs_folder",
+	["open_today_log"]   = "open_today_log",
+	["open_error_log"]   = "open_today_errors",
 }
 
 --- The screenshot command for each capture action, one shell cascade per id.
@@ -608,6 +613,15 @@ local function _execute_action(action_name, go_next, binding)
 				return true
 			end
 			pcall(Webview.show, window)
+			return true
+		end
+
+		local log_opener = OPEN_LOG[name]
+		if log_opener then
+			require("ui.log_openers")[log_opener](function(target)
+				_run("xdg-open " .. shell_quote(target))
+				return true
+			end)
 			return true
 		end
 

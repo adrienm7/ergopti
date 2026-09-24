@@ -48,20 +48,17 @@ local M = {}
 -- ===============================
 -- ===============================
 
---- Environment variable that overrides the XDG data root.
-local XDG_DATA_HOME_ENV = "XDG_DATA_HOME"
-
---- Fallback data root when XDG_DATA_HOME is unset, relative to $HOME.
-local DEFAULT_DATA_HOME_REL = "/.local/share"
-
---- Log directory relative to the data root. Matches the path the tray menu opens.
-local LOG_SUBDIR = "/ergopti/logs"
+--- Application folder and log file names, generated from
+--- _shared/modules/paths/app_dirs.toml. The folder itself is resolved by
+--- infra/config_paths (LogsDirPath, or ${XDG_STATE_HOME:-~/.local/state}/
+--- ergopti_plus/logs).
+local AppDirs = require("app_dirs")
 
 --- Basename prefixes for the two files. The date suffix is the day the line was
 --- written, not the day the daemon started, so a long-running daemon rolls over.
-local MAIN_PREFIX   = "ErgoptiPlus_"
-local ERRORS_PREFIX = "ErgoptiPlus_errors_"
-local LOG_EXT       = ".log"
+local MAIN_PREFIX   = AppDirs.files.unified_prefix
+local ERRORS_PREFIX = AppDirs.files.errors_prefix
+local LOG_EXT       = AppDirs.files.extension
 
 --- Variants that are additionally mirrored into the errors-only file.
 local ERROR_VARIANTS = { warn = true, error = true }
@@ -135,15 +132,17 @@ end
 
 --- Resolves the canonical log directory for this driver.
 --- This is the single source: every consumer that needs the log path calls it
---- rather than re-deriving $HOME.
+--- rather than re-deriving $HOME. Resolved per call: the LogsDirPath override
+--- lives in bootstrap storage, next to the configuration-folder override.
 --- @return string Absolute path, no trailing slash.
 function M.log_dir()
-	local data_home = os.getenv(XDG_DATA_HOME_ENV)
-	if not data_home or data_home == "" then
-		local home = require("infra.config_paths").home()
-		data_home = home .. DEFAULT_DATA_HOME_REL
-	end
-	return data_home .. LOG_SUBDIR
+	return require("infra.config_paths").get_logs_dir()
+end
+
+--- The folder crash dumps are written to, inside the logs folder.
+--- @return string Absolute path, no trailing slash.
+function M.crash_reports_dir()
+	return M.log_dir() .. "/" .. AppDirs.crash_reports_dir
 end
 
 --- Returns today's date stamp used in the log basenames.
