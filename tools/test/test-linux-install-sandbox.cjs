@@ -118,7 +118,7 @@ function runInstaller(scenario) {
 			`for p in "$@"; do touch ${JSON.stringify(bashPath(state))}/"$p"; done\nexit 0`
 	);
 	// Every command a real system would provide.
-	for (const name of ['notify-send', 'xkbcli', 'unzip', 'sha256sum']) stub(stubs, name, 'exit 0');
+	for (const name of ['notify-send', 'zenity', 'xkbcli', 'unzip', 'sha256sum']) stub(stubs, name, 'exit 0');
 	// luajit: library probes answer from the markers, so the desktop backends
 	// are "missing" until the package manager was asked for them.
 	stub(
