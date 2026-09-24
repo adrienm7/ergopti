@@ -103,6 +103,11 @@ schema_version = 1
 "Digit9" = "repeat_count:9"
 "Digit0" = "repeat_count:10"
 
+# Two parts of today's macOS layer have no binding form yet, so a generator
+# that builds the Karabiner layer from this table must keep them itself: the
+# number row sends F1-F12 with Fn added while macOS treats the top row as
+# media keys, and the right Command key is Option+Shift while held (Escape
+# only on a tap).
 [layers.nav.macos]
 "Digit1" = "keystroke:F1"
 "Digit2" = "keystroke:F2"
@@ -116,6 +121,6 @@ schema_version = 1
 "Digit0" = "keystroke:F10"
 "Minus" = "keystroke:F11"
 "Equal" = "keystroke:F12"
-"Space" = "keystroke:meta+Space"
+"Space" = "spotlight"
 "Tab" = "keystroke:meta+Backquote"
 "MetaRight" = "escape"

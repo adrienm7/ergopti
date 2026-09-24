@@ -372,3 +372,21 @@ all = "keystroke:AudioVolumeDown"
 catalogue = true
 repeatable = false
 all = "keystroke:AudioVolumeMute"
+
+
+
+
+
+# =========================
+# =========================
+# ======= 7. System =======
+# =========================
+# =========================
+
+# The catalogue's Spotlight exists on macOS only; Windows and Linux users bind
+# their desktop's own search chord as a keystroke.
+[actions.spotlight]
+catalogue = true
+repeatable = false
+macos = "keystroke:meta+Space"
+reason_key = "platform_reason.layer_spotlight_is_macos"

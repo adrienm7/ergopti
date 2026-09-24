@@ -21,6 +21,8 @@
  *    difference that no longer differs fails too, so the excuse cannot outlive
  *    its reason.
  * 4. Reasons: every reason_key reads in all 21 locales.
+ * 5. Preset: the recommended layer never spells out, as a raw keystroke, a
+ *    chord a catalogue action already sends on that OS; it names the action.
  *
  * WHY IT EXISTS:
  * Gestures, shortcuts and the navigation layer name the same actions. Without a
@@ -35,7 +37,7 @@ const fs = require('fs');
 const path = require('path');
 const TOML = require('smol-toml');
 const { shared } = require('../lib/paths.cjs');
-const { loadContext, parseResolution, VOCABULARY_PATH } = require('../lib/keymap-layers.cjs');
+const { loadContext, loadLayers, parseResolution, VOCABULARY_PATH, RECOMMENDED_PATH } = require('../lib/keymap-layers.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const CATALOGUE_PATH = shared('modules', 'actions', 'actions.toml');
@@ -47,6 +49,7 @@ const COMBO_EMITTER = path.join(ROOT, 'static', 'ergopti_plus', 'linux', 'module
 const MIN_ACTIONS = 30;
 const MIN_CATALOGUE_PINS = 40;
 const MIN_LOCALES = 21;
+const MIN_CATALOGUE_CHORDS_SCANNED = 80;
 
 const errors = [];
 const fail = (msg) => errors.push(msg);
@@ -206,7 +209,8 @@ const HS_NAME_TO_KEYCODE = {
 	forwarddelete: 117,
 	return: 36,
 	escape: 53,
-	tab: 48
+	tab: 48,
+	space: 49
 };
 const MOD_ALIASES = { ctrl: 'ctrl', control: 'ctrl', shift: 'shift', alt: 'alt', option: 'alt', super: 'meta', win: 'meta', cmd: 'meta', meta: 'meta' };
 
@@ -217,20 +221,23 @@ if (!keysymBlock) fail('linux/modules/gestures/combo_emitter.lua: KEYSYM_TO_CODE
 else for (const m of keysymBlock[1].matchAll(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(\d+),/gm)) KEYSYM_TO_EVDEV[m[1]] = Number(m[2]);
 if (Object.keys(KEYSYM_TO_EVDEV).length < 15) fail(`only ${Object.keys(KEYSYM_TO_EVDEV).length} keysyms read from combo_emitter.lua (floor 15)`);
 
-function uniqueCode(pred, what) {
+// The helpers below report through `onProblem`: section 3 fails on every name
+// it cannot resolve, while the scan in section 5 skips catalogue entries this
+// gate cannot name (letters, F17 triggers) and relies on its own floor.
+function uniqueCode(pred, what, onProblem = fail) {
 	const hits = Object.keys(keys).filter((code) => keys[code].kind === 'key' && pred(keys[code]));
 	if (hits.length !== 1) {
-		fail(`${what} matches ${hits.length} registry keys`);
+		onProblem(`${what} matches ${hits.length} registry keys`);
 		return null;
 	}
 	return hits[0];
 }
 
-function canonical(mods, code, what) {
+function canonical(mods, code, what, onProblem = fail) {
 	const set = new Set();
 	for (const m of mods) {
 		if (!MOD_ALIASES[m]) {
-			fail(`${what}: unknown catalogue modifier "${m}"`);
+			onProblem(`${what}: unknown catalogue modifier "${m}"`);
 			return null;
 		}
 		set.add(MOD_ALIASES[m]);
@@ -239,29 +246,29 @@ function canonical(mods, code, what) {
 }
 
 /** What the catalogue sends for one action on one OS, canonical, or undefined when it emits nothing there. */
-function catalogueChord(entry, os, id) {
+function catalogueChord(entry, os, id, onProblem = fail) {
 	const what = `[sg_actions.${id}] on ${os}`;
 	if (os === 'windows' && entry.emit_ahk_key !== undefined) {
-		const code = uniqueCode((k) => k.ahk_send && k.ahk_send.toLowerCase() === entry.emit_ahk_key.toLowerCase(), `${what}: AHK key "${entry.emit_ahk_key}"`);
-		return canonical(entry.emit_ahk_mods || [], code, what);
+		const code = uniqueCode((k) => k.ahk_send && k.ahk_send.toLowerCase() === entry.emit_ahk_key.toLowerCase(), `${what}: AHK key "${entry.emit_ahk_key}"`, onProblem);
+		return canonical(entry.emit_ahk_mods || [], code, what, onProblem);
 	}
 	if (os === 'macos' && entry.emit_hs_key !== undefined) {
 		const keycode = HS_NAME_TO_KEYCODE[entry.emit_hs_key];
 		if (keycode === undefined) {
-			fail(`${what}: Hammerspoon key "${entry.emit_hs_key}" is not in this gate's name table — add its hs.keycodes.map code`);
+			onProblem(`${what}: Hammerspoon key "${entry.emit_hs_key}" is not in this gate's name table — add its hs.keycodes.map code`);
 			return null;
 		}
-		return canonical(entry.emit_hs_mods || [], uniqueCode((k) => k.hs === keycode, `${what}: macOS keycode ${keycode}`), what);
+		return canonical(entry.emit_hs_mods || [], uniqueCode((k) => k.hs === keycode, `${what}: macOS keycode ${keycode}`, onProblem), what, onProblem);
 	}
 	if (os === 'linux' && entry.emit_linux !== undefined) {
 		const parts = entry.emit_linux.split('+');
 		const name = parts.pop();
 		const evdev = KEYSYM_TO_EVDEV[name];
 		if (evdev === undefined) {
-			fail(`${what}: keysym "${name}" is not in combo_emitter.lua's table`);
+			onProblem(`${what}: keysym "${name}" is not in combo_emitter.lua's table`);
 			return null;
 		}
-		return canonical(parts, uniqueCode((k) => k.evdev === evdev, `${what}: evdev ${evdev}`), what);
+		return canonical(parts, uniqueCode((k) => k.evdev === evdev, `${what}: evdev ${evdev}`, onProblem), what, onProblem);
 	}
 	return undefined;
 }
@@ -315,6 +322,47 @@ for (const file of localeFiles) {
 	}
 }
 
+
+
+
+
+// =====================================================
+// =====================================================
+// ======= 5/ The preset names catalogue actions =======
+// =====================================================
+// =====================================================
+
+// A preset binding spelled as a raw keystroke that a catalogue action already
+// sends on that OS hides the action's name from the layer editor and lets the
+// two drift apart: the preset must bind the action by name instead.
+const catalogueByChord = Object.fromEntries(OSES.map((os) => [os, new Map()]));
+let scanned = 0;
+for (const [id, entry] of Object.entries(catalogue)) {
+	for (const os of OSES) {
+		const chord = catalogueChord(entry, os, id, () => {});
+		if (typeof chord !== 'string') continue;
+		scanned += 1;
+		if (!catalogueByChord[os].has(chord)) catalogueByChord[os].set(chord, []);
+		catalogueByChord[os].get(chord).push(id);
+	}
+}
+if (scanned < MIN_CATALOGUE_CHORDS_SCANNED) fail(`only ${scanned} catalogue keystrokes scanned (floor ${MIN_CATALOGUE_CHORDS_SCANNED})`);
+
+const presetText = fs.readFileSync(RECOMMENDED_PATH, 'utf8');
+let rawKeystrokes = 0;
+for (const os of OSES) {
+	for (const [layerId, bindings] of Object.entries(loadLayers(presetText, os, ctx).layers)) {
+		for (const [code, res] of Object.entries(bindings)) {
+			if (res.kind !== 'keystroke' || res.action !== null) continue;
+			rawKeystrokes += 1;
+			const chord = res.chords.map((c) => [...c.mods, c.key].join('+')).join(',');
+			const ids = catalogueByChord[os].get(chord);
+			if (ids) fail(`layers.recommended.toml: ${layerId}.${code} spells out ${chord} on ${os}, which the catalogue action ${ids.join(' / ')} sends — bind the action by name`);
+		}
+	}
+}
+if (rawKeystrokes === 0) fail('the recommended layer yielded no raw keystroke on any OS: the preset was not read');
+
 if (errors.length > 0) {
 	console.error('\x1b[31m[FAIL] the layer-action vocabulary is incomplete or disagrees with the action catalogue:\x1b[0m');
 	for (const e of errors) console.error('    - ' + e);
@@ -322,5 +370,6 @@ if (errors.length > 0) {
 }
 console.log(
 	`\x1b[32m[OK] ${Object.keys(actions).length} layer actions resolve on ${OSES.join(', ')}; ${pins} catalogue keystrokes agree; ` +
-		`${reasonKeys.size} reason key(s) read in ${localeFiles.length} locales.\x1b[0m`
+		`${reasonKeys.size} reason key(s) read in ${localeFiles.length} locales; ${rawKeystrokes} preset keystroke(s) duplicate none of ` +
+		`${scanned} catalogue keystrokes.\x1b[0m`
 );
