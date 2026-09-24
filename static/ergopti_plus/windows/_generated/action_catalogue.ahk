@@ -128,11 +128,15 @@ GestureActionCatalogueData() {
 	Items.Push({ Kind: "action", Id: "screen_capture_instant" })
 	Items.Push({ Kind: "action", Id: "ocr_screenshot" })
 	Items.Push({ Kind: "action", Id: "open_url" })
+	Items.Push({ Kind: "action", Id: "open_downloads" })
+	Items.Push({ Kind: "action", Id: "open_file_manager" })
+	Items.Push({ Kind: "action", Id: "open_system_settings" })
 	Items.Push({ Kind: "action", Id: "pick_color" })
 	Items.Push({ Kind: "action", Id: "open_emoji_picker" })
 	Items.Push({ Kind: "action", Id: "take_note" })
 	Items.Push({ Kind: "action", Id: "activity_simulation" })
 	Items.Push({ Kind: "action", Id: "search_web" })
+	Items.Push({ Kind: "action", Id: "copy_selected_path" })
 	Items.Push({ Kind: "action", Id: "teleport_mouse" })
 	Items.Push({ Kind: "action", Id: "spotlight_mouse" })
 	Items.Push({ Kind: "action", Id: "toggle_capslock" })
@@ -184,6 +188,7 @@ GestureActionCatalogueData() {
 	Actions["caps_word"] := { Family: "sg", LabelKey: "sg_actions.caps_word", Parameter: "", Confirm: false }
 	Actions["close_window"] := { Family: "sg", LabelKey: "sg_actions.close_window", Parameter: "", Confirm: false }
 	Actions["copy"] := { Family: "sg", LabelKey: "sg_actions.copy", Parameter: "", Confirm: false }
+	Actions["copy_selected_path"] := { Family: "sg", LabelKey: "sg_actions.copy_selected_path", Parameter: "", Confirm: false }
 	Actions["ctrl_backspace"] := { Family: "sg", LabelKey: "sg_actions.ctrl_backspace", Parameter: "", Confirm: false }
 	Actions["ctrl_delete"] := { Family: "sg", LabelKey: "sg_actions.ctrl_delete", Parameter: "", Confirm: false }
 	Actions["cut"] := { Family: "sg", LabelKey: "sg_actions.cut", Parameter: "", Confirm: false }
@@ -215,8 +220,10 @@ GestureActionCatalogueData() {
 	Actions["ocr_screenshot"] := { Family: "sg", LabelKey: "sg_actions.ocr_screenshot", Parameter: "", Confirm: false }
 	Actions["one_shot_shift"] := { Family: "sg", LabelKey: "sg_actions.one_shot_shift", Parameter: "", Confirm: false }
 	Actions["open_config"] := { Family: "sg", LabelKey: "sg_actions.open_config", Parameter: "", Confirm: false }
+	Actions["open_downloads"] := { Family: "sg", LabelKey: "sg_actions.open_downloads", Parameter: "", Confirm: false }
 	Actions["open_emoji_picker"] := { Family: "sg", LabelKey: "sg_actions.open_emoji_picker", Parameter: "", Confirm: false }
 	Actions["open_error_log"] := { Family: "sg", LabelKey: "sg_actions.open_error_log", Parameter: "", Confirm: false }
+	Actions["open_file_manager"] := { Family: "sg", LabelKey: "sg_actions.open_file_manager", Parameter: "", Confirm: false }
 	Actions["open_hotstrings_editor"] := { Family: "sg", LabelKey: "sg_actions.open_hotstrings_editor", Parameter: "", Confirm: false }
 	Actions["open_key_history"] := { Family: "sg", LabelKey: "sg_actions.open_key_history", Parameter: "", Confirm: false }
 	Actions["open_list_vars"] := { Family: "sg", LabelKey: "sg_actions.open_list_vars", Parameter: "", Confirm: false }
@@ -228,6 +235,7 @@ GestureActionCatalogueData() {
 	Actions["open_personal_info"] := { Family: "sg", LabelKey: "sg_actions.open_personal_info", Parameter: "", Confirm: false }
 	Actions["open_personal_shortcuts"] := { Family: "sg", LabelKey: "sg_actions.open_personal_shortcuts", Parameter: "", Confirm: false }
 	Actions["open_script_source"] := { Family: "sg", LabelKey: "sg_actions.open_script_source", Parameter: "", Confirm: false }
+	Actions["open_system_settings"] := { Family: "sg", LabelKey: "sg_actions.open_system_settings", Parameter: "", Confirm: false }
 	Actions["open_today_log"] := { Family: "sg", LabelKey: "sg_actions.open_today_log", Parameter: "", Confirm: false }
 	Actions["open_url"] := { Family: "sg", LabelKey: "sg_actions.open_url", Parameter: "url", Confirm: false }
 	Actions["open_window_spy"] := { Family: "sg", LabelKey: "sg_actions.open_window_spy", Parameter: "", Confirm: false }

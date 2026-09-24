@@ -35,8 +35,10 @@ local OWNERS = {
 	"modules.gestures.engine",
 	"modules.gestures.sticky_modifiers",
 	"modules.shortcuts",
+	"modules.shortcuts.actions.apps",
 	"modules.shortcuts.actions.screenshot_save",
 	"modules.shortcuts.actions.system_mouse",
+	"modules.shortcuts.actions.system_pixel",
 	"modules.shortcuts.actions.text",
 	"modules.shortcuts.bindings",
 	"modules.shortcuts.keyboard_shortcuts",
@@ -60,6 +62,8 @@ local function fresh_actions(options)
 		"modules.shortcuts.actions.screenshot_save",
 		"modules.shortcuts.actions.text",
 		"modules.shortcuts.actions.system_mouse",
+		"modules.shortcuts.actions.apps",
+		"modules.shortcuts.actions.system_pixel",
 		"adapters.file_system",
 		"adapters.key_state",
 		"adapters.synthetic_input",
@@ -92,6 +96,10 @@ local function fresh_actions(options)
 		action_parents = {},
 		text_actions = {},
 		mouse_actions = {},
+		apps_actions = {},
+		pixel_actions = {},
+		apps_lifecycle = {},
+		pixel_lifecycle = {},
 		text_lifecycle = {},
 		mouse_lifecycle = {},
 		text_queries = {},
@@ -451,6 +459,39 @@ local function fresh_actions(options)
 	end
 	package.loaded["modules.shortcuts.actions.text"] = scoped_child(text_paused, "text")
 	package.loaded["modules.shortcuts.actions.system_mouse"] = scoped_child(mouse_paused, "mouse")
+	--- A parent-scoped owner of the shortcut layer: its lifecycle edges and the
+	--- functions a gesture action delegates to, each recording its parent.
+	local function scoped_owner(kind, actions_list)
+		local paused = {}
+		local lifecycle_calls = calls[kind .. "_lifecycle"]
+		local owner = {}
+		owner["pause_" .. kind .. "_actions"] = function(parent)
+			lifecycle_calls[#lifecycle_calls + 1] = { edge = "pause", parent = parent }
+			paused[parent] = true
+			return true
+		end
+		owner["resume_" .. kind .. "_actions"] = function(parent)
+			lifecycle_calls[#lifecycle_calls + 1] = { edge = "resume", parent = parent }
+			paused[parent] = false
+			return true
+		end
+		owner["is_" .. kind .. "_actions_paused"] = function(parent) return paused[parent] == true end
+		owner["has_pending_" .. kind .. "_action"] = function() return false end
+		for _, name in ipairs(actions_list) do
+			owner[name] = function(parent)
+				parent = parent or "shortcut_bindings"
+				if paused[parent] == true then return false end
+				local recorded = calls[kind .. "_actions"]
+				recorded[#recorded + 1] = { name = name, parent = parent }
+				return true
+			end
+		end
+		return owner
+	end
+	package.loaded["modules.shortcuts.actions.apps"] = scoped_owner("apps",
+		{ "open_downloads", "open_finder", "open_settings", "copy_or_open_path" })
+	package.loaded["modules.shortcuts.actions.system_pixel"] = scoped_owner("pixel",
+		{ "copy_pixel_color" })
 	package.loaded["modules.gestures.actions_click"] = setmetatable({
 		force_cleanup = function(parent)
 			calls.click_force_parents[#calls.click_force_parents + 1] = parent

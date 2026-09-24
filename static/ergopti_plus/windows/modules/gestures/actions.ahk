@@ -191,6 +191,20 @@ global GESTURE_ACTIONS := Map(
 		"wrap_selection", {
 				Fn: (BindingId := "") => GestureWrapSelection(BindingId),
 		},
+		; The Win+D and Win+S shortcuts' own functions (modules/shortcuts/win.ahk),
+		; so a gesture and the fixed shortcut cannot drift apart.
+		"open_downloads", {
+				Fn: (*) => OpenDownloads(),
+		},
+		"copy_selected_path", {
+				Fn: (*) => Search(),
+		},
+		"open_file_manager", {
+				Fn: (*) => GestureRunShellTarget("explorer.exe", "open_file_manager"),
+		},
+		"open_system_settings", {
+				Fn: (*) => GestureRunShellTarget("ms-settings:", "open_system_settings"),
+		},
 		"teleport_mouse", {
 				Fn: (*) => GestureTeleportMouse(),
 		},
@@ -334,6 +348,17 @@ GestureOpenConfiguredURL(BindingId := "") {
 				LoggerError("gestures", "open_url launch failed for binding '{1}': {2}", BindingId, Err.Message)
 				try TrayTip("Could not open the configured URL.", "ErgoptiPlus", "Iconx Mute")
 		}
+}
+
+; Opens a shell target (an executable or a URI such as ms-settings:). A refusal
+; stays inside the gesture callback and is logged, never escalated to the
+; driver's global error handler.
+; @param {String} Target
+; @param {String} ActionName For the log line.
+GestureRunShellTarget(Target, ActionName) {
+		try Run(Target)
+		catch as Err
+				LoggerError("gestures", "{1} could not open '{2}': {3}", ActionName, Target, Err.Message)
 }
 
 GesturePickColor() {
