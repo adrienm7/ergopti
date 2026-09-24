@@ -209,12 +209,21 @@ M._release_app_ownership = _release_app_ownership
 --- Opens a webview window for the given shared UI app.
 --- If the window already exists, brings it to front instead of creating a new one.
 --- @param app_name string The shared UI app directory name (e.g. "action_picker").
---- @param active_locale string|nil Locale code (default: "fr").
+--- @param active_locale string|nil Locale code (default: the interface's).
 --- @return boolean true if the window was opened or brought to front.
 function M.show(app_name, active_locale)
 	if type(app_name) ~= "string" or app_name == "" then
 		Logger.error(LOG, "show(): app_name is required.")
 		return false
+	end
+	-- No caller passes a locale, and the page builder fell back to French: every
+	-- window was French whatever language the tray was set to.
+	if type(active_locale) ~= "string" or active_locale == "" then
+		local ok, I18n = pcall(require, "infra.i18n")
+		active_locale = ok and type(I18n.get_locale) == "function" and I18n.get_locale() or nil
+		if type(active_locale) ~= "string" or active_locale == "" then
+			active_locale = require("infra.manifest_reader").default_for("script.locale")
+		end
 	end
 
 	-- If window already exists, bring to front.
