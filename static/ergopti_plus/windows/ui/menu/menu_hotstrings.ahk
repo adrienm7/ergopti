@@ -521,6 +521,9 @@ _HS_CategoryRowsErgopti() {
 	global HotstringCategoriesErgopti, SubMenus
 	Rows := []
 	IsGated := IsCategoryGated("Hotstrings")
+	; Off while a layout of another family is emulated (infra/master_gates.ahk):
+	; grey the rows and say why, so the zero count does not read as a setting.
+	Reason := LayoutErgoptiHotstringsReason()
 	for _, Category in HotstringCategoriesErgopti {
 		if !SubMenus.Has(Category)
 			continue
@@ -529,10 +532,15 @@ _HS_CategoryRowsErgopti() {
 		; checkmark follows the category's own toggle, not its section states.
 		Total := _HS_GatedCount(IsGated and IsCategoryGated(Category), _CountEnabledForCategory(Category))
 		Title := GetCategoryTitle(Category) . " (" . FmtCount(Total) . ")"
-		Rows.Push(Map(
+		Row := Map(
 			"label",   Title,
 			"checked", (IsGated and IsCategoryGated(Category)) ? true : false,
-			"submenu", SubMenus[Category]))
+			"submenu", SubMenus[Category])
+		if (Reason != "") {
+			Row["disabled"] := true
+			Row["label"] := Title . " (" . t(Reason) . ")"
+		}
+		Rows.Push(Row)
 	}
 	return Rows
 }

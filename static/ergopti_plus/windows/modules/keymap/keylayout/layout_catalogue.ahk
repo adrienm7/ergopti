@@ -214,6 +214,17 @@ LayoutCatalogue_Entry(Index, Id) {
 	return 0
 }
 
+/**
+ * Whether a registry entry is an Ergopti layout: its family is the one
+ * _shared/modules/layouts/defaults.json names (catalogue.is_ergopti on macOS
+ * and Linux). The Ergopti-only hotstrings are written for its key positions.
+ * @param Entry - Index or installed-record entry (anything else is not Ergopti).
+ * @returns {boolean}
+ */
+LayoutCatalogue_IsErgopti(Entry) {
+	return (Entry is Map) && (Entry.Get("family", "") == LayoutRegistry_Settings()["ergopti_family"])
+}
+
 
 
 
