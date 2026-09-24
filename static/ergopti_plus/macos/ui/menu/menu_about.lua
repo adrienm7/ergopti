@@ -62,11 +62,13 @@ end
 
 --- Opens the dedicated changelog window for the given channel.
 --- Delegates to ui.changelog which shows a webview with the full release list
---- and markdown-rendered notes instead of a plain text dialog.
+--- and markdown-rendered notes instead of a plain text dialog. Its banner
+--- subscribes through the same channel owner as the rows below.
 --- @param channel string Registry channel shown first (the subscribed one).
-local function show_changelog(channel)
+--- @param owner table|nil The menu session's update-channel owner.
+local function show_changelog(channel, owner)
 	Logger.info(LOG, "Opening changelog window (channel=%s).", channel)
-	changelog.open({ channel = channel })
+	changelog.open({ channel = channel, channel_owner = owner })
 end
 
 
@@ -147,7 +149,7 @@ function M.build(ctx)
 	render_ctx.commands = {
 		["about_changelog"] = function()
 			Logger.info(LOG, "User opened changelog (channel: %s).", channel)
-			show_changelog(channel)
+			show_changelog(channel, owner)
 		end,
 		["about_releases_page"] = function() hs.urlevent.openURL(releases_page_url()) end,
 	}

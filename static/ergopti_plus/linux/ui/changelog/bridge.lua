@@ -10,6 +10,11 @@
 --- honoured by curl), trying the GitHub API first and the public Atom feed
 --- second (_shared/lua/updater/release_sources.lua), then pushes the result or
 --- a translated error key back through window.__hostBridgeResponse.
+---
+--- The page's subscription banner posts set_channel; the updater manager, the
+--- one channel owner, persists it, and the answer (channel_changed) carries
+--- the subscription that holds afterwards. A change made from the menu is
+--- pushed to an open page the same way.
 --- ==============================================================================
 
 local M = {}
@@ -90,7 +95,10 @@ local function _build_initial_payload(state, channel)
 	-- The updater's cached release belongs to the channel it checked, which is
 	-- the subscribed one: it is a valid first entry only on that channel's view.
 	local manager = updater()
+	local subscribed = nil
 	if manager then
+		local ok_subscribed, id = pcall(manager.get_channel)
+		subscribed = ok_subscribed and registry_channel(id) or nil
 		local ok_cached, cached = pcall(function()
 			return type(manager.get_cached_release) == "function" and manager.get_cached_release() or nil
 		end)
@@ -106,6 +114,8 @@ local function _build_initial_payload(state, channel)
 		action = "releases",
 		releases = releases,
 		channel = channel,
+		-- The channel the user receives updates from, for the page's banner.
+		subscribed_channel = subscribed,
 		cache_miss = #releases == 0,
 		repo_url = REPOSITORY_URL .. "/releases",
 		version = state._version or Version.VERSION,
@@ -219,6 +229,48 @@ function M.start_fetch(channel)
 	return generation
 end
 
+--- Subscribes to the channel the page asked for through the updater manager,
+--- the one channel owner, and has the tray menu rebuilt so its tick follows.
+--- @param channel any Channel id posted by the page.
+--- @param state table|nil Daemon state (on_config_changed rebuilds the menu).
+--- @return table answer { action = "channel_changed", channel, ok }
+function M.subscribe(channel, state)
+	local manager = updater()
+	local id = registry_channel(channel)
+	local committed = false
+	if manager and not id then
+		Logger.error(LOG, "Refused a subscription to a channel outside the registry.")
+	elseif manager then
+		local ok, result = pcall(manager.set_channel, id)
+		if not ok then Logger.error(LOG, "The updater raised while changing the channel: %s.", tostring(result)) end
+		committed = ok and result == true
+		if committed and type(state) == "table" and type(state.on_config_changed) == "function" then
+			local notified, err = pcall(state.on_config_changed)
+			if not notified then Logger.error(LOG, "The menu could not follow the new channel: %s.", tostring(err)) end
+		end
+	end
+	local held = nil
+	if manager then
+		local ok_held, current = pcall(manager.get_channel)
+		held = ok_held and registry_channel(current) or nil
+	end
+	Logger.info(LOG, "Subscription to '%s' %s (subscribed=%s).", tostring(channel),
+		committed and "committed" or "refused", tostring(held))
+	return { action = "channel_changed", channel = held, ok = committed }
+end
+
+--- Tells an open Versions page which channel the user now receives updates
+--- from; the menu calls it after its channel rows change the subscription.
+--- @param channel string Registry channel id.
+--- @return boolean pushed Whether a live page received it.
+function M.push_subscribed_channel(channel)
+	if not registry_channel(channel) then
+		Logger.error(LOG, "Refused to push a subscription outside the registry.")
+		return false
+	end
+	return M._push({ action = "channel_changed", channel = channel, ok = true }) == true
+end
+
 --- Clears cached state; used by tests.
 function M._reset()
 	_fetch_generation = 0
@@ -274,6 +326,10 @@ function M.on_message(payload, state)
 		end
 		M.start_fetch(payload.channel)
 		return _build_initial_payload(state, payload.channel)
+	end
+
+	if action == "set_channel" then
+		return M.subscribe(payload.channel, state)
 	end
 
 	if action == "open_url" then

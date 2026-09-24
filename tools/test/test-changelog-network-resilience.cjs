@@ -440,10 +440,19 @@ function checkAtomFallbackRendering() {
 		JSON.stringify(tags) === JSON.stringify(['v0.0.0-dev.130', 'v2.4.0', 'v0.0.0-dev.129']),
 		`feed entries must keep feed order and drop foreign repositories (got ${JSON.stringify(tags)})`
 	);
+	// The feed has no pre-release flag: the page takes it from the channel
+	// registry (github_prerelease of the channel owning each tag).
+	const flags = byTag(list, 'div')
+		.filter((node) => node.className.split(' ').includes('release-item'))
+		.map((node) => node.className.split(' ').includes('prerelease'));
+	expect(
+		JSON.stringify(flags) === JSON.stringify([true, false, true]),
+		`the dev tag family must be listed as pre-releases and plain semver as stable (got ${JSON.stringify(flags)})`
+	);
 	const records = page.sandbox.parseReleasesAtom(FEED, 'adrienm7', 'ergopti');
 	expect(
-		records[0].prerelease === true && records[1].prerelease === false,
-		'the dev tag family must map to pre-releases and plain semver to stable'
+		records.every((record) => !Object.prototype.hasOwnProperty.call(record, 'prerelease')),
+		'the feed reader must not guess a pre-release flag from the tag text'
 	);
 	expect(
 		records[0].html_url === RELEASES_PAGE + '/tag/v0.0.0-dev.130',

@@ -108,7 +108,10 @@ helpers.describe("changelog release response schema", function()
 				end)
 			end)
 		end
-		helpers.it("publishes optional notes and filters releases on " .. channel, function()
+		-- The host used to drop pre-releases from the "main" list by GitHub's flag;
+		-- the page now keeps each view's tags by the shared registry's rule
+		-- (tools/test/test-changelog-channel-sync.cjs), on every host alike.
+		helpers.it("publishes optional notes and leaves the channel filter to the page on " .. channel, function()
 			with_changelog(function(window, state, post)
 				hs.json.decode = json.decode
 				hs.json.encode = native_encode
@@ -116,12 +119,13 @@ helpers.describe("changelog release response schema", function()
 				post("ready")
 				post({ action = "fetch", channel = channel })
 				state.callbacks[1](200,
-					'[{"tag_name":"stable-v1","prerelease":false},'
-						.. '{"tag_name":"preview-v2","prerelease":true,"body":"notes"}]', {})
+					'[{"tag_name":"v1.0.0","prerelease":false},'
+						.. '{"tag_name":"v0.0.0-dev.2","prerelease":true,"body":"notes"}]', {})
 				helpers.assert_eq(#state.evaluations, 1)
 				helpers.assert_true(state.evaluations[1]:find("injectReleases([", 1, true) ~= nil)
-				helpers.assert_true(state.evaluations[1]:find("stable-v1", 1, true) ~= nil)
-				helpers.assert_eq(state.evaluations[1]:find("preview-v2", 1, true) ~= nil, channel == "dev")
+				helpers.assert_true(state.evaluations[1]:find("v1.0.0", 1, true) ~= nil)
+				helpers.assert_true(state.evaluations[1]:find("v0.0.0-dev.2", 1, true) ~= nil,
+					"the whole list reaches the page, which filters it for the view")
 			end)
 		end)
 	end

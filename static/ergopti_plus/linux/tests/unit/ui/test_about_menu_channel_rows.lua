@@ -114,4 +114,24 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 		helpers.assert_eq(downloads, { release.download_url },
 			"consent must retain the displayed URL so the manager can reject stale offers")
 	end)
+
+	-- A menu change used to leave an open Versions page offering the channel the
+	-- user had just picked.
+	helpers.it("a channel row tells an open Versions page", function()
+		local up = fake_updater("dev")
+		local Bridge = require("ui.changelog.bridge")
+		local previous_push = Bridge._push
+		local pushed = {}
+		Bridge._push = function(payload) pushed[#pushed + 1] = payload; return true end
+		local ok, err = pcall(function()
+			local rows = submenu_of(build(up), "menu.about.title")
+			local ids = up.CHANNELS.ids()
+			rows[3].fn()
+			helpers.assert_eq(#pushed, 1, "the page must hear of the change once")
+			helpers.assert_eq(pushed[1].action, "channel_changed")
+			helpers.assert_eq(pushed[1].channel, ids[1])
+		end)
+		Bridge._push = previous_push
+		if not ok then error(err, 0) end
+	end)
 end)

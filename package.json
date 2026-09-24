@@ -290,6 +290,7 @@
 		"test:changelog-network-resilience": "node ./tools/test/test-changelog-network-resilience.cjs",
 		"test:release-body-sections": "node ./tools/test/test-release-body-sections.cjs",
 		"test:update-channels-contract": "node ./tools/test/test-update-channels-contract.cjs",
+		"test:changelog-channel-sync": "node ./tools/test/test-changelog-channel-sync.cjs",
 		"test:download-window-session": "node ./tools/test/test-download-window-session.cjs",
 		"test:model-browser-session": "node ./tools/test/test-model-browser-session.cjs",
 		"test:onboarding-wizard-page": "node ./tools/test/test-onboarding-wizard-page.cjs",
