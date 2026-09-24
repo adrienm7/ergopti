@@ -269,6 +269,8 @@ local function read_output(seconds)
 						shift = ev.value ~= 0
 					elseif ev.code == KEY_LEFTALT then
 						alt = ev.value ~= 0
+					elseif ev.code == EvdevCodes.KEY_F24 then
+						-- The injector's modifier mask: no text, and meant to sit inside Alt.
 					elseif ev.value == 1 then
 						if alt then alt_chords[#alt_chords + 1] = ev.code end
 						if ev.code == EvdevCodes.KEY_BACKSPACE then table.remove(text)
@@ -340,8 +342,8 @@ if LLM_PORT then
 		print(string.format("  after Alt+1 the desktop received %q", ai_text))
 		print("  key events: " .. ai_trail)
 		local expected = (LLM_REPLY:gsub("^%s+", ""))
-		if not ai_text:find(expected, 1, true) then
-			failures[#failures + 1] = string.format("the accepted prediction %q did not reach the desktop", expected)
+		if not ai_text:find("bonjour " .. expected, 1, true) then
+			failures[#failures + 1] = string.format("the desktop does not read \"bonjour %s\" (one space)", expected)
 		end
 		if ai_text:find("/", 1, true) then
 			failures[#failures + 1] = "the \"//\" trigger was not erased on acceptance"

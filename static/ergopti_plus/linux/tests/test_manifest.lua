@@ -187,6 +187,7 @@ return {
 	"tests.unit.modules.keylogger.test_window_titles",
 	"tests.unit.modules.llm.test_llm_settings",
 	"tests.unit.modules.llm.test_prediction_messages",
+	"tests.unit.modules.llm.test_parser_spacing",
 	"tests.unit.modules.llm.test_api_remote",
 	"tests.unit.modules.llm.test_api_entries",
 	"tests.unit.modules.llm.test_prediction_backend",
