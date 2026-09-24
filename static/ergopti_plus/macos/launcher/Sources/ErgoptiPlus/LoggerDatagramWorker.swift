@@ -316,10 +316,10 @@ final class LoggerRecordSink {
 			closeOpenFiles()
 		}
 		guard let bytes = (persistedLine + "\n").data(using: .utf8) else { return false }
-		let unifiedName = "ErgoptiPlus_\(calendarDate).log"
+		let unifiedName = kLogUnifiedPrefix + calendarDate + kLogFileExtension
 		var targets = [(name: unifiedName, topical: false)]
 		if variant == "warn" || variant == "error" {
-			let errorsName = "ErgoptiPlus_errors_\(calendarDate).log"
+			let errorsName = kLogErrorsPrefix + calendarDate + kLogFileExtension
 			targets.append((name: errorsName, topical: false))
 		}
 		for topic in topics {
@@ -362,7 +362,7 @@ final class LoggerRecordSink {
 	}
 
 	private static func isValidCalendarDate(_ value: String) -> Bool {
-		guard let date = datedLogDate("ErgoptiPlus_\(value).log") else { return false }
+		guard let date = datedLogDate(kLogUnifiedPrefix + value + kLogFileExtension) else { return false }
 		return calendarDate(date) == value
 	}
 
@@ -373,12 +373,12 @@ final class LoggerRecordSink {
 		return topics.allSatisfy { name in
 			guard name.utf8.count <= maximumTopicNameBytes,
 				kLoggerTopicalFileNames.contains(name),
-				name.hasPrefix("ErgoptiPlus_"),
-				name.hasSuffix(".log"),
+				name.hasPrefix(kLogTopicalPrefix),
+				name.hasSuffix(kLogFileExtension),
 				datedLogDate(name) == nil,
-				!name.hasPrefix("ErgoptiPlus_errors_")
+				!name.hasPrefix(kLogErrorsPrefix)
 			else { return false }
-			let stem = name.dropFirst("ErgoptiPlus_".count).dropLast(".log".count)
+			let stem = name.dropFirst(kLogTopicalPrefix.count).dropLast(kLogFileExtension.count)
 			guard !stem.isEmpty else { return false }
 			return stem.utf8.allSatisfy { byte in
 				(byte >= 48 && byte <= 57)
@@ -627,15 +627,15 @@ final class LoggerRecordSink {
 
 	private static func datedLogDate(_ name: String) -> Date? {
 		let prefix: String
-		if name.hasPrefix("ErgoptiPlus_errors_") {
-			prefix = "ErgoptiPlus_errors_"
-		} else if name.hasPrefix("ErgoptiPlus_") {
-			prefix = "ErgoptiPlus_"
+		if name.hasPrefix(kLogErrorsPrefix) {
+			prefix = kLogErrorsPrefix
+		} else if name.hasPrefix(kLogUnifiedPrefix) {
+			prefix = kLogUnifiedPrefix
 		} else {
 			return nil
 		}
-		guard name.hasSuffix(".log") else { return nil }
-		let dateText = String(name.dropFirst(prefix.count).dropLast(4))
+		guard name.hasSuffix(kLogFileExtension) else { return nil }
+		let dateText = String(name.dropFirst(prefix.count).dropLast(kLogFileExtension.count))
 		guard dateText.count == 10 else { return nil }
 		let pieces = dateText.split(separator: "-")
 		guard pieces.count == 3,
@@ -653,7 +653,7 @@ final class LoggerRecordSink {
 	}
 
 	private static func isTopicalName(_ name: String) -> Bool {
-		guard name.hasPrefix("ErgoptiPlus_"), name.hasSuffix(".log"),
+		guard name.hasPrefix(kLogTopicalPrefix), name.hasSuffix(kLogFileExtension),
 			datedLogDate(name) == nil
 		else { return false }
 		return areValidTopics([name])

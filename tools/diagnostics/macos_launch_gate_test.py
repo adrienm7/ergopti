@@ -81,14 +81,14 @@ class VerdictTests(unittest.TestCase):
             boot_log=REFUSED_BOOT_LOG, alive_after_window=False)
         self.assertEqual(len(gate.evaluate("dangling_logs", generic)), 1)
         named = observe(
-            launcher_log="[t] FATAL: log folder /u/.config/ergopti_plus/hammerspoon/logs is a "
+            launcher_log="[t] FATAL: log folder /u/gitcfg/ergopti_plus is a "
                          "symbolic link whose target does not exist\n",
             boot_log=REFUSED_BOOT_LOG, alive_after_window=False)
         self.assertEqual(gate.evaluate("dangling_logs", named), [])
 
     def test_refused_state_must_not_keep_running(self):
         observation = observe(
-            launcher_log="FATAL: hammerspoon/logs is a symbolic link to nothing\n",
+            launcher_log="FATAL: gitcfg/ergopti_plus is a symbolic link to nothing\n",
             boot_log=REFUSED_BOOT_LOG)
         self.assertEqual(len(gate.evaluate("dangling_logs", observation)), 1)
 
@@ -140,6 +140,35 @@ class StateTests(unittest.TestCase):
             self.assertTrue(default.is_symlink())
             self.assertTrue((default / "hammerspoon/config.toml").is_file())
             self.assertEqual(state["symlinks"], [str(default)])
+
+    def test_logs_scenarios_seed_logs_dir_path(self):
+        with tempfile.TemporaryDirectory() as folder:
+            home = Path(folder)
+            try:
+                synced = gate.seed("symlink_logs_dir", home, "", "2026-09-24")
+                dangling = gate.seed("dangling_logs", home, "", "2026-09-24")
+            except OSError as error:
+                self.skipTest(f"symbolic links unavailable here: {error}")
+            self.assertEqual(synced["logs_dir"], home / "SyncedLogs/ergopti_plus")
+            self.assertIn(f'LogsDirPath = "{home}/SyncedLogs"',
+                synced["paths_toml"].read_text(encoding="utf-8"))
+            self.assertIn(f'LogsDirPath = "{home}/gitcfg/ergopti_plus"',
+                dangling["paths_toml"].read_text(encoding="utf-8"))
+            self.assertIn("symlink_logs_dir", gate.SCENARIOS)
+            self.assertEqual(gate.logs_folder(home), home / "Library/Logs/ergopti_plus")
+
+    def test_picked_logs_folder_losing_its_permissions_is_reported(self):
+        if os.name != "posix":
+            self.skipTest("POSIX permission bits are unavailable here")
+        with tempfile.TemporaryDirectory() as folder:
+            home = Path(folder)
+            picked = home / "picked"
+            picked.mkdir()
+            picked.chmod(0o755)
+            state = {"symlinks": [], "foreign_folder": (picked, 0o755)}
+            self.assertEqual(gate.check_state("symlink_logs_dir", state, home), [])
+            state["foreign_folder"] = (picked, 0o700)
+            self.assertEqual(len(gate.check_state("symlink_logs_dir", state, home)), 1)
 
     def test_replaced_symlink_and_unpersisted_tilde_are_reported(self):
         with tempfile.TemporaryDirectory() as folder:

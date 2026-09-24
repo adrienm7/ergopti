@@ -43,7 +43,10 @@ def main():
         if processes(executable):
             raise RuntimeError("A fixture executable is already running")
     report = {"app": str(app), "samples": [], "full_functionality_validated": False}
-    launcher_log = Path.home() / "Library/Logs/ErgoptiPlus/launcher.log"
+    # launcher.log and, without a LogsDirPath override, the driver logs share
+    # the default logs folder (_shared/modules/paths/app_dirs.toml).
+    logs = Path.home() / "Library/Logs/ergopti_plus"
+    launcher_log = logs / "launcher.log"
     if launcher_log.exists():
         raise RuntimeError("Release launch requires a fresh launcher log")
     started = time.monotonic()
@@ -62,7 +65,6 @@ def main():
             if sample["seconds"] >= 10 and (len(sample["launcher"]) != 1 or len(sample["hammerspoon"]) != 1):
                 raise RuntimeError("Published application did not retain both exact processes")
             time.sleep(1)
-        logs = Path.home() / ".config/ergopti_plus/hammerspoon/logs"
         text = "\n".join(path.read_text(encoding="utf-8") for path in logs.glob("ErgoptiPlus_*.log"))
         report["startup_ready"] = require_startup_ready(text)
         report["survived_observation"] = True
@@ -74,10 +76,9 @@ def main():
             report["screenshot_exit"] = screenshot.returncode
         except subprocess.TimeoutExpired:
             report["screenshot_error"] = "Screenshot timed out"
-        for path in (launcher_log, Path("/tmp/ErgoptiPlus_boot.log"), Path("/tmp/ErgoptiPlus_errors_boot.log")):
+        for path in (launcher_log, logs / "ErgoptiPlus_boot.log"):
             if path.is_file():
                 shutil.copyfile(path, output / path.name)
-        logs = Path.home() / ".config/ergopti_plus/hammerspoon/logs"
         if logs.is_dir():
             shutil.copytree(logs, output / "lua-logs")
         (output / "result.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")

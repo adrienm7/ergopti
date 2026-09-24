@@ -105,6 +105,28 @@ final class OwnedLogDirectoryTests: XCTestCase {
 		XCTAssertTrue(FileManager.default.fileExists(atPath: target.appendingPathComponent("logs").path))
 	}
 
+	/// LogsDirPath may name a folder the user merely picked, such as Documents:
+	/// only the application's own folder is restricted to its owner.
+	func testOnlyTheApplicationFolderIsRestrictedToItsOwner() throws {
+		let root = try makeRoot()
+		let foreign = root.appendingPathComponent("Documents", isDirectory: true)
+		try FileManager.default.createDirectory(at: foreign, withIntermediateDirectories: false)
+		XCTAssertEqual(Darwin.chmod(foreign.path, 0o755), 0)
+		XCTAssertNil(failureOf(foreign.path))
+		var attributes = stat()
+		XCTAssertEqual(Darwin.lstat(foreign.path, &attributes), 0)
+		XCTAssertEqual(attributes.st_mode & 0o777, 0o755,
+			"a folder the user picked keeps its own permissions")
+
+		let owned = foreign.appendingPathComponent(kAppFolderName, isDirectory: true)
+		try FileManager.default.createDirectory(at: owned, withIntermediateDirectories: false)
+		XCTAssertEqual(Darwin.chmod(owned.path, 0o755), 0)
+		XCTAssertNil(failureOf(owned.path))
+		XCTAssertEqual(Darwin.lstat(owned.path, &attributes), 0)
+		XCTAssertEqual(attributes.st_mode & 0o777, 0o700,
+			"the application's own folder is restricted to its owner")
+	}
+
 	/// A source-run driver leaves 0644 logs without locks; they stay appendable.
 	func testPreexistingSourceRunLogsAreReused() throws {
 		let logs = try makeRoot().appendingPathComponent("logs", isDirectory: true)
