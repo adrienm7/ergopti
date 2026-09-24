@@ -193,10 +193,9 @@ local function assign_parameterized_action(ctx, gestures, binding, action, assig
 		local label = type(gestures.get_action_label) == "function"
 			and gestures.get_action_label(action) or action
 		local title = _fill(i18n_safe("dialog.gestures.param_title"), "{1}", label)
-		local prompt = spec == "search_url"
-			and i18n_safe("dialog.gestures.param_search_url")
-			or i18n_safe("dialog.gestures.param_link")
-		value = prompt_text(title, prompt, prior)
+		-- The prompt belongs to the parameter kind (the gestures manager owns it).
+		-- Escaped: a wrap-pair sample such as <…> would be read as Pango markup.
+		value = prompt_text(title, zenity_plain(gestures.get_action_parameter_prompt(action)), prior)
 	end
 	if value == nil then return false end
 	if type(gestures.validate_action_parameter) ~= "function"
@@ -204,7 +203,7 @@ local function assign_parameterized_action(ctx, gestures, binding, action, assig
 	then
 		Logger.warn(LOG, "Invalid parameter for binding '%s' action '%s'.",
 			tostring(binding), tostring(action))
-		show_error(i18n_safe("dialog.gestures.param_err_url"))
+		show_error(zenity_plain(gestures.get_action_parameter_error(action)))
 		return false
 	end
 	if type(gestures.set_action_parameter) ~= "function"

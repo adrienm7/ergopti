@@ -58,7 +58,9 @@ const CHORD_GROUP_KEY = HEADER_KEY_PREFIX + 'modifier_chord_group';
 /** The sg_order entry that expands into the modifier-chord matrix. */
 const CHORD_PLACEHOLDER = '_modifier_chords_placeholder';
 
-const PARAMETER_KINDS = new Set(['url', 'search_url']);
+// Every driver validates and prompts for each kind; adding one means adding it
+// to the three gesture modules (validator, prompt, error text) in the same change.
+const PARAMETER_KINDS = new Set(['url', 'search_url', 'wrap_pair']);
 
 const SG_FIELDS = new Set([
 	'platform',

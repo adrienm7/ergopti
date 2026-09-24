@@ -110,6 +110,21 @@ helpers.describe("Linux text actions route through the daemon handlers", functio
 		helpers.assert_true(ok, tostring(err))
 	end)
 
+	helpers.it("wrap_selection wraps with the pair stored for its binding", function()
+		local Gestures, log = routed_gestures()
+		local ok, err = pcall(function()
+			helpers.assert_true(Gestures.set_action_parameter("tap_3", "wrap_selection", "«"))
+			Gestures.execute_action("wrap_selection", "tap_3")
+			helpers.assert_eq(table.concat(log.transformed, " / "), "« été »")
+			Gestures.execute_action("wrap_selection", "tap_4")
+			helpers.assert_eq(#log.transformed, 1,
+				"a binding without a stored pair must not wrap anything")
+			helpers.assert_eq(#log.injected, 0, "nor type a pair in place of a selection")
+		end)
+		log.restore()
+		helpers.assert_true(ok, tostring(err))
+	end)
+
 	helpers.it("the text actions exist only through the injected handlers", function()
 		local Gestures = helpers.load_module("modules.gestures.manager")
 		Gestures.init({ enabled = false, persist = false })

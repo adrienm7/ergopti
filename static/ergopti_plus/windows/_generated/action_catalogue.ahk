@@ -97,6 +97,7 @@ GestureActionCatalogueData() {
 	Items.Push({ Kind: "action", Id: "selection_titlecase" })
 	Items.Push({ Kind: "action", Id: "uppercase_selection" })
 	Items.Push({ Kind: "action", Id: "titlecase_selection" })
+	Items.Push({ Kind: "action", Id: "wrap_selection" })
 	Items.Push({ Kind: "heading", Level: 1, Key: "sg_actions.sg_order.header.modifier_chords" })
 	Items.Push({ Kind: "modifier_chords", Level: 2, GroupKey: "sg_actions.sg_order.header.modifier_chord_group" })
 	Items.Push({ Kind: "heading", Level: 1, Key: "sg_actions.sg_order.header.grp_media" })
@@ -289,5 +290,6 @@ GestureActionCatalogueData() {
 	Actions["win_prev"] := { Family: "sg", LabelKey: "sg_actions.win_prev", Parameter: "", Confirm: false }
 	Actions["word_next"] := { Family: "sg", LabelKey: "sg_actions.word_next", Parameter: "", Confirm: false }
 	Actions["word_prev"] := { Family: "sg", LabelKey: "sg_actions.word_prev", Parameter: "", Confirm: false }
+	Actions["wrap_selection"] := { Family: "sg", LabelKey: "sg_actions.wrap_selection", Parameter: "wrap_pair", Confirm: false }
 	return Catalogue
 }

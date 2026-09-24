@@ -1526,6 +1526,22 @@ function M.selection_titlecase(parent)
 	return do_transform(function(sel) return text_case().title(sel) end, parent)
 end
 
+--- Wraps the current selection with `left` and `right` (the wrap_selection
+--- action). The selection is copied rather than read through Accessibility, so
+--- Electron apps, which expose no AXSelectedText, are wrapped too; nothing is
+--- typed when nothing is selected.
+--- @param left string Opening text.
+--- @param right string Closing text.
+--- @param parent string|nil Stable action parent.
+--- @return boolean started
+function M.wrap_copied_selection(left, right, parent)
+	if type(left) ~= "string" or left == "" or type(right) ~= "string" or right == "" then
+		Logger.error(LOG, "Selection wrap refused: invalid delimiters.")
+		return false
+	end
+	return do_transform(function(sel) return left .. sel .. right end, parent)
+end
+
 --- Selects the current word under the cursor (Alt+Right, then Alt+Shift+Left).
 function M.select_word(parent)
 	local scope = text_scope(parent)
@@ -1564,6 +1580,21 @@ M.WRAP_PAIRS = WRAP_PAIRS
 --- named nested sub-submenu. Exposed so the menu mirrors the shared grouping and
 --- labels without duplicating the order or the catalogue.
 M.WRAP_GROUPS = WRAP_GROUPS
+
+--- The built-in pairs in catalogue order, the list the wrap_selection parameter
+--- is resolved against (_shared/lua/wrap_pair).
+--- @return table Array of { left, right }.
+function M.wrap_pair_list()
+	local list = {}
+	for _, group in ipairs(WRAP_GROUPS) do
+		for _, pair in ipairs(group.pairs or {}) do
+			if type(pair) == "table" and type(pair.left) == "string" and type(pair.right) == "string" then
+				list[#list + 1] = { left = pair.left, right = pair.right }
+			end
+		end
+	end
+	return list
+end
 
 --- Builds the active wrapping-pairs table from the built-in catalogue and user state.
 --- @param symbol_states table Map of symbol key → boolean (true = enabled).

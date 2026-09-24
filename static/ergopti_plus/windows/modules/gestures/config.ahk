@@ -84,7 +84,7 @@ GestureSetActionParameter(BindingId, ActionName, Value, WriterFn := 0, NotifyFn 
 }
 
 ; The parameter kind the generated catalogue declares for an action ("url",
-; "search_url"), or "" when it takes none.
+; "search_url", "wrap_pair"), or "" when it takes none.
 GestureActionParameterSpec(ActionName) {
 		global GESTURE_ACTION_CATALOGUE
 		return GESTURE_ACTION_CATALOGUE.Actions.Has(ActionName)
@@ -96,6 +96,14 @@ GestureValidateActionParameter(ActionName, Value, &ErrorText := "") {
 		Value := Trim(Value)
 		if (Spec = "")
 				return true
+		if (Spec = "wrap_pair") {
+				if (GestureWrapPairFor(Value) is Map)
+						return true
+				ErrorText := t("dialog.gestures.param_err_wrap_pair")
+				return false
+		}
+		if (Spec != "url" && Spec != "search_url")
+				throw ValueError("No validator for parameter kind '" . Spec . "'.")
 		if !RegExMatch(Value, "i)^https?://[^\s]+$") {
 				ErrorText := t("dialog.gestures.param_err_url")
 				return false
@@ -112,6 +120,26 @@ GestureValidateActionParameter(ActionName, Value, &ErrorText := "") {
 		return true
 }
 
+; The text a binding editor shows to ask for an action's parameter. The %s
+; inside the search-URL prompt is LITERAL — it is the placeholder the user has
+; to type — so no prompt is run through a formatter; the title and the
+; wrap-pair list use {1} so the two can never be confused.
+; @param {String} ActionName An action that takes a parameter.
+; @returns {String}
+GestureActionParameterPrompt(ActionName) {
+		global _WS_BUILTIN_PAIRS
+		switch GestureActionParameterSpec(ActionName) {
+				case "search_url":
+						return t("dialog.gestures.param_search_url")
+				case "url":
+						return t("dialog.gestures.param_link")
+				case "wrap_pair":
+						return StrReplace(t("dialog.gestures.param_wrap_pair"), "{1}",
+								WrapPairDescribe(_WS_BUILTIN_PAIRS))
+		}
+		throw ValueError("No prompt for the parameter of action '" . ActionName . "'.")
+}
+
 ; Builds a detached action-parameter candidate. Cancel is represented by false;
 ; a Map always means the user accepted and no persistence happened yet.
 GesturePromptActionParameter(BindingId, ActionName) {
@@ -119,15 +147,11 @@ GesturePromptActionParameter(BindingId, ActionName) {
 		if (Spec = "")
 				return Map("has_value", false)
 		Existing := GestureGetActionParameter(BindingId, ActionName)
-		; The %s inside the search-URL prompt is LITERAL — it is the placeholder the
-		; user has to type — so this string is never run through a formatter. The
-		; title uses {1} precisely so the two can never be confused.
-		Prompt := (Spec = "search_url")
-				? t("dialog.gestures.param_search_url")
-				: t("dialog.gestures.param_link")
+		Prompt := GestureActionParameterPrompt(ActionName)
 		Title  := StrReplace(t("dialog.gestures.param_title"), "{1}", _GestureActionLabel(ActionName))
 		loop {
-				Result := InputBox(Prompt, Title, "w680 h160", Existing)
+				; The wrap-pair prompt lists the catalogue under its text.
+				Result := InputBox(Prompt, Title, (Spec = "wrap_pair") ? "w680 h300" : "w680 h160", Existing)
 				if (Result.Result != "OK")
 						return false
 				Value := Trim(Result.Value)

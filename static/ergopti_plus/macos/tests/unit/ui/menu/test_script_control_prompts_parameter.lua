@@ -59,6 +59,8 @@ helpers.describe("the parameter prompt is shared, not duplicated", function()
 		local stored = {}
 		local gestures = {
 			get_action_label     = function(a) return a end,
+			parameter_prompt = function() return "prompt" end,
+			parameter_error = function() return "refused" end,
 			get_action_parameter = function() return "" end,
 			validate_action_parameter = function(_a, v) return v == "https://example.com" end,
 			set_action_parameter = function(binding, action, value)
@@ -96,6 +98,8 @@ helpers.describe("the parameter prompt is shared, not duplicated", function()
 		local stored = 0
 		local gestures = {
 			get_action_label     = function(a) return a end,
+			parameter_prompt = function() return "prompt" end,
+			parameter_error = function() return "refused" end,
 			get_action_parameter = function() return "" end,
 			validate_action_parameter = function() return true end,
 			set_action_parameter = function() stored = stored + 1 end,
@@ -123,6 +127,8 @@ helpers.describe("the parameter prompt is shared, not duplicated", function()
 		local setter_calls = 0
 		local ok, result = pcall(SU.prompt_action_parameter, {
 			get_action_label = function(action) return action end,
+			parameter_prompt = function() return "prompt" end,
+			parameter_error = function() return "refused" end,
 			get_action_parameter = function() return "" end,
 			validate_action_parameter = function() return true end,
 			set_action_parameter = function()
@@ -148,6 +154,8 @@ helpers.describe("the parameter prompt is shared, not duplicated", function()
 			local setter_calls = 0
 			local gestures = {
 				get_action_label = function(action) return action end,
+				parameter_prompt = function() return "prompt" end,
+				parameter_error = function() return "refused" end,
 				get_action_parameter = function() return "" end,
 				validate_action_parameter = function() return true end,
 				set_action_parameter = function()

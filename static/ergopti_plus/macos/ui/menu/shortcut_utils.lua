@@ -250,12 +250,9 @@ function M.prompt_action_parameter(gestures, binding, action, spec)
 
 	local label  = (type(gestures.get_action_label) == "function" and gestures.get_action_label(action)) or action
 	local prior  = (type(gestures.get_action_parameter) == "function" and gestures.get_action_parameter(binding, action)) or ""
-	-- The %s inside the search-URL prompt is LITERAL — it is the placeholder the
-	-- user has to type — so this string is never run through string.format. The
-	-- title uses {1} precisely so the two can never be confused.
-	local prompt = i18n.get(spec == "search_url"
-		and "dialog.gestures.param_search_url"
-		or  "dialog.gestures.param_link")
+	-- The prompt and its refusal text belong to the parameter kind; the gestures
+	-- module owns them for every binding editor.
+	local prompt = gestures.parameter_prompt(action)
 
 	-- Loop until the value validates or the user cancels: accepting an invalid one
 	-- would store a parameter the action's own validator later rejects, which is
@@ -273,9 +270,7 @@ function M.prompt_action_parameter(gestures, binding, action, spec)
 				binding, action, value)
 		end
 		pcall(dialog.block_alert, i18n.get("dialog.gestures.param_error_title"),
-			i18n.get("dialog.gestures.param_err_url")
-			.. (spec == "search_url" and (" " .. i18n.get("dialog.gestures.param_err_many_placeholders")) or ""),
-			"OK", nil, "warning")
+			gestures.parameter_error(action), "OK", nil, "warning")
 		prior = value or prior
 	end
 end

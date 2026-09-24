@@ -24,6 +24,7 @@ local Click         = require("modules.gestures.actions_click")
 local Sticky        = require("modules.gestures.sticky_modifiers")
 local AuxOwner      = require("modules.gestures.actions_aux_owner")
 local ScreenshotSave = require("modules.shortcuts.actions.screenshot_save")
+local WrapPair      = require("wrap_pair")
 local LOG           = "gestures.actions"
 
 -- Explicit inter-key delay for every simulated keystroke. hs.eventtap.keyStroke()
@@ -971,6 +972,22 @@ sg("titlecase_selection", text_action("toggle_titlecase"))
 sg("selection_uppercase", text_action("selection_uppercase"))
 sg("selection_lowercase", text_action("selection_lowercase"))
 sg("selection_titlecase", text_action("selection_titlecase"))
+-- The pair is the binding's own parameter: two bindings may wrap with two pairs.
+sg("wrap_selection", function(binding)
+	local value = M.get_action_parameter(binding, "wrap_selection")
+	local left, right = M.wrap_pair_for(value)
+	if not left then
+		Logger.warn(LOG, "wrap_selection ignored for binding '%s': no valid pair is stored ('%s').",
+			tostring(binding), tostring(value))
+		return false
+	end
+	local ok, Text = pcall(require, "modules.shortcuts.actions.text")
+	if not ok or type(Text.wrap_copied_selection) ~= "function" then
+		Logger.error(LOG, "Text action 'wrap_copied_selection' is unavailable: %s.", tostring(Text))
+		return false
+	end
+	return Text.wrap_copied_selection(left, right, current_action_parent())
+end)
 sg("teleport_mouse", function()
 	local ok, Mouse = pcall(require, "modules.shortcuts.actions.system_mouse")
 	if ok and type(Mouse.teleport_mouse) == "function" then
@@ -1748,15 +1765,70 @@ function M.get_action_parameter_spec(action)
 	return meta and meta.parameter or nil
 end
 
+--- The built-in wrap pairs in catalogue order, from the text module that loads
+--- _shared/modules/wrap_symbols/wrap_symbols.json.
+--- @return table Array of { left, right }.
+local function wrap_pair_list()
+	local ok, Text = pcall(require, "modules.shortcuts.actions.text")
+	if not ok or type(Text) ~= "table" or type(Text.wrap_pair_list) ~= "function" then
+		Logger.error(LOG, "The wrap-pair catalogue is unavailable: %s.", tostring(Text))
+		return {}
+	end
+	return Text.wrap_pair_list()
+end
+
+--- The left and right symbols a wrap_selection parameter names.
+--- @param value any The stored parameter.
+--- @return string|nil left
+--- @return string|nil right Both nil when the value names no pair.
+function M.wrap_pair_for(value)
+	return WrapPair.parse(value, wrap_pair_list())
+end
+
 function M.validate_action_parameter(action, value)
 	local spec = M.get_action_parameter_spec(action)
 	if not spec then return true end
+	if spec == "wrap_pair" then return (M.wrap_pair_for(value)) ~= nil end
 	if type(value) ~= "string" or not value:match("^https?://%S+$") then return false end
 	if spec == "search_url" then
 		local _, placeholders = value:gsub("%%s", "")
 		return placeholders == 1
 	end
-	return true
+	if spec == "url" then return true end
+	error("gestures/actions: no validator for parameter kind '" .. tostring(spec) .. "'.")
+end
+
+--- The text a binding editor shows to ask for an action's parameter. The
+--- search-URL prompt holds a LITERAL %s the user has to type, so no text here
+--- goes through string.format; {1} is replaced by plain indices for the same
+--- reason.
+--- @param action string Action id with a parameter.
+--- @return string
+function M.parameter_prompt(action)
+	local spec = M.get_action_parameter_spec(action)
+	if spec == "search_url" then return i18n.get("dialog.gestures.param_search_url") end
+	if spec == "url" then return i18n.get("dialog.gestures.param_link") end
+	if spec == "wrap_pair" then
+		local template = i18n.get("dialog.gestures.param_wrap_pair")
+		local samples = WrapPair.describe(wrap_pair_list())
+		local at = template:find("{1}", 1, true)
+		if not at then return template .. "\n" .. samples end
+		return template:sub(1, at - 1) .. samples .. template:sub(at + 3)
+	end
+	error("gestures/actions: no prompt for parameter kind '" .. tostring(spec) .. "'.")
+end
+
+--- The text shown when a typed parameter is refused.
+--- @param action string Action id with a parameter.
+--- @return string
+function M.parameter_error(action)
+	local spec = M.get_action_parameter_spec(action)
+	if spec == "wrap_pair" then return i18n.get("dialog.gestures.param_err_wrap_pair") end
+	if spec == "search_url" then
+		return i18n.get("dialog.gestures.param_err_url") .. " "
+			.. i18n.get("dialog.gestures.param_err_many_placeholders")
+	end
+	return i18n.get("dialog.gestures.param_err_url")
 end
 
 function M.get_action_parameter(binding, action)

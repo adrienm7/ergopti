@@ -45,6 +45,7 @@ local OWNERS = {
 	"toml_codec.basic_string",
 	"toml_codec.bom",
 	"toml_codec.reader",
+	"wrap_pair",
 }
 
 local function fresh_actions(options)
@@ -398,6 +399,17 @@ local function fresh_actions(options)
 					}
 					return true
 				end
+			end
+			child.wrap_pair_list = function()
+				return { { left = "(", right = ")" }, { left = "« ", right = " »" } }
+			end
+			child.wrap_copied_selection = function(left, right, parent)
+				parent = parent or "shortcut_bindings"
+				if paused[parent] == true then return false end
+				calls.text_actions[#calls.text_actions + 1] = {
+					name = "wrap_copied_selection", left = left, right = right, parent = parent,
+				}
+				return true
 			end
 		else
 			child.teleport_mouse = function(parent)
