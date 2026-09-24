@@ -107,6 +107,7 @@ return {
 	"tests.unit.meta.test_logger_shim_only",
 	"tests.unit.meta.test_logger_sink",
 	"tests.unit.meta.test_menu_builder_group_calls",
+	"tests.unit.meta.test_menu_choice_row",
 	"tests.unit.meta.test_menu_matches_manifest",
 	"tests.unit.meta.test_menu_prompt_cancel",
 	"tests.unit.meta.test_menu_no_double_separator",

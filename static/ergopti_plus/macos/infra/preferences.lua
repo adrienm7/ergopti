@@ -39,7 +39,7 @@ local LOG       = "preferences"
 
 
 --- Top-level TOML section names in the order they appear on disk.
-local SECTIONS = { "gestures", "hotstrings", "metrics", "llm", "shortcuts", "layout", "updater" }
+local SECTIONS = { "gestures", "hotstrings", "metrics", "llm", "shortcuts", "layout", "updater", "ui" }
 
 --- Maps every flat state key (as used in memory throughout the codebase) to
 --- its on-disk location. Fields:
@@ -129,6 +129,9 @@ local KEY_MAP = {
 	-- ── Updater ────────────────────────────────────────────────────────────
 	update_channel                       = { sec = "updater",  key = "channel"               },
 	update_check_interval_seconds        = { sec = "updater",  key = "check_interval_seconds" },
+
+	-- ── Interface ──────────────────────────────────────────────────────────
+	menubar_icon                         = { sec = "ui"                                        },
 }
 
 --- Maps nested-table flat state keys to their on-disk location.

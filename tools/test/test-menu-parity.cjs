@@ -587,6 +587,8 @@ for (const [driver, root] of Object.entries(DRIVER_ROOTS)) {
 			for (const field of ['disabled_when', 'checked_when']) {
 				if (Array.isArray(row[field])) for (const key of row[field]) needed.add(key);
 			}
+			// A choice row ticks the value its driver answers under the feature path.
+			if (row.type === 'choice' && typeof row.path === 'string') needed.add(row.path);
 		}
 	}
 	const absent = [...needed].filter((key) => !src.includes(key));

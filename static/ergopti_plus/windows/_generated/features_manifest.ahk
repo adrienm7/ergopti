@@ -4,7 +4,7 @@
 
 global FEATURES_MANIFEST := Map(
     "version", "2.0.0",
-    "section_order", ["script", "hotstrings", "llm", "metrics", "shortcuts", "gestures", "layout", "category_enabled"],
+    "section_order", ["script", "hotstrings", "llm", "metrics", "shortcuts", "gestures", "layout", "category_enabled", "ui"],
     "sections", Map(
         "script", Map("description_key", "menu.script", "platforms", ["ahk", "hs", "linux"], "subsections", []),
         "hotstrings", Map("description_key", "menu.hotstrings", "platforms", ["ahk", "hs", "linux"], "subsections", ["autocorrection", "distances_reduction", "sfbs_reduction", "rolls", "magic_key", "french_distancesreduction", "french_autocorrection", "french_magickey", "dynamic", "personal"]),
@@ -35,6 +35,7 @@ global FEATURES_MANIFEST := Map(
         "shortcuts.script_control", Map("description_key", "menu.shortcuts.script_control", "platforms", ["ahk"], "subsections", []),
         "category_enabled", Map("description_key", "menu.category_enabled", "platforms", ["ahk"], "subsections", []),
         "layout", Map("description_key", "menu.layout", "platforms", ["ahk"], "subsections", []),
+        "ui", Map("description_key", "menu.ui", "platforms", ["hs"], "subsections", []),
         "gestures", Map("description_key", "menu.gestures", "platforms", ["ahk", "hs", "linux"], "subsections", ["modes", "sensitivities"]),
         "gestures.modes", Map("description_key", "menu.gestures.modes", "platforms", ["hs"], "subsections", []),
         "gestures.sensitivities", Map("description_key", "menu.gestures.sensitivities", "platforms", ["hs"], "subsections", [])
@@ -367,6 +368,7 @@ global FEATURES_MANIFEST := Map(
         Map("path", "gestures.sensitivities.swipe_5_left_down", "section", "gestures.sensitivities", "reason_key", "", "platforms", ["hs"]),
         Map("path", "gestures.sensitivities.swipe_5_left_up", "section", "gestures.sensitivities", "reason_key", "", "platforms", ["hs"]),
         Map("path", "gestures.sensitivities.swipe_5_right_down", "section", "gestures.sensitivities", "reason_key", "", "platforms", ["hs"]),
-        Map("path", "gestures.sensitivities.swipe_5_right_up", "section", "gestures.sensitivities", "reason_key", "", "platforms", ["hs"])
+        Map("path", "gestures.sensitivities.swipe_5_right_up", "section", "gestures.sensitivities", "reason_key", "", "platforms", ["hs"]),
+        Map("path", "ui.menubar_icon", "section", "ui", "reason_key", "", "platforms", ["hs"])
     ]
 )

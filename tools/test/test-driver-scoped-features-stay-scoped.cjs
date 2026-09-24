@@ -58,7 +58,9 @@ const SINGLE_DRIVER_KEYS = [
 	['category_enabled.hotstrings', 'ahk'],
 	['category_enabled.layout', 'ahk'],
 	['category_enabled.shortcuts', 'ahk'],
-	['category_enabled.tap_holds', 'ahk']
+	['category_enabled.tap_holds', 'ahk'],
+	// Only macOS draws a menubar icon.
+	['ui.menubar_icon', 'hs']
 ];
 
 const errors = [];

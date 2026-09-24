@@ -118,7 +118,7 @@ const BASELINE = { ahk: 0, hs: 0, linux: 0 };
 // and `dynamic` hand the id to a handler, `list` to a provider, `check` and
 // `command` to a named command. A row of any other type is drawn from the
 // declaration alone and has nothing for a driver to miss.
-const BEHAVIOUR_TYPES = new Set(['action', 'dynamic', 'list', 'check', 'command']);
+const BEHAVIOUR_TYPES = new Set(['action', 'dynamic', 'list', 'check', 'command', 'choice']);
 
 // WHY LINUX IS ZERO AND macOS IS NOT, AND WHAT THE FIVE ARE.
 // Linux reached zero by wiring every row: its metrics and hotstrings submenus

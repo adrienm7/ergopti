@@ -38,7 +38,9 @@ const APPROVED = {
 	// App Cloner duplicates one application at a time.
 	'menu.apps.clone_desc': { fr: 'Dupliquer une application', en: 'Duplicate an app' },
 	// The header over the input sources macOS has enabled.
-	'menu.layout.active_layouts': { fr: 'Sources de saisie', en: 'Input sources' }
+	'menu.layout.active_layouts': { fr: 'Sources de saisie', en: 'Input sources' },
+	// ONE row for the macOS menubar icon, its variants beneath it.
+	'menu.layout.menubar_icon': { fr: 'Icône de la barre des menus', en: 'Menu bar icon' }
 };
 
 const errors = [];

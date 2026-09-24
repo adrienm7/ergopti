@@ -1086,6 +1086,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_manifest_menu_no_double_separator.ahk
 ; Regression: every category switch is a first-row checkbox with one label.
 #Include unit/test_category_toggle_checkbox.ahk
+#Include unit/test_menu_choice_row.ahk
 ; Regression: each hotstring « tout activer » / « tout désactiver » pair is one checkbox.
 #Include unit/test_hotstring_bulk_checkboxes.ahk
 ; Regression: Shortcuts submenu block separator and screenshot key label.

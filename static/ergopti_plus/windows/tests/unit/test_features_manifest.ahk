@@ -96,7 +96,7 @@ Test("manifest_v2: version is 2.0.0", TestFMv2_ManifestVersion)
 TestFMv2_SectionOrder() {
 	Order := ManifestSectionOrder()
 	AssertEqual("Array", Type(Order))
-	AssertEqual(8, Order.Length)
+	AssertEqual(9, Order.Length)
 	AssertEqual("script", Order[1])
 	AssertEqual("hotstrings", Order[2])
 	AssertEqual("llm", Order[3])
@@ -105,6 +105,7 @@ TestFMv2_SectionOrder() {
 	AssertEqual("gestures", Order[6])
 	AssertEqual("layout", Order[7])
 	AssertEqual("category_enabled", Order[8])
+	AssertEqual("ui", Order[9])
 	for Name in Order {
 		AssertTrue(Name != "ahk" and Name != "hs" and Name != "linux",
 			"section_order must not name a driver — it orders what is configured, not who implements it")
@@ -156,7 +157,7 @@ TestFMv2_BuildHasSectionOrder() {
 	Built := ManifestBuildFeaturesMap()
 	AssertTrue(Built.Has("section_order"))
 	AssertEqual("Array", Type(Built["section_order"]))
-	AssertEqual(8, Built["section_order"].Length)
+	AssertEqual(9, Built["section_order"].Length)
 }
 Test("ManifestBuildFeaturesMap: exposes section_order from the manifest",
 	TestFMv2_BuildHasSectionOrder)

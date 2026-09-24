@@ -17,7 +17,7 @@ local M = {}
 
 M.version = "2.0.0"
 
-M.section_order = { "script", "hotstrings", "llm", "metrics", "shortcuts", "gestures", "layout", "category_enabled" }
+M.section_order = { "script", "hotstrings", "llm", "metrics", "shortcuts", "gestures", "layout", "category_enabled", "ui" }
 
 M.sections = {
 	["script"] = { description_key = "menu.script", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
@@ -49,6 +49,7 @@ M.sections = {
 	["shortcuts.script_control"] = { description_key = "menu.shortcuts.script_control", platforms = { "ahk" }, subsections = {  } },
 	["category_enabled"] = { description_key = "menu.category_enabled", platforms = { "ahk" }, subsections = {  } },
 	["layout"] = { description_key = "menu.layout", platforms = { "ahk" }, subsections = {  } },
+	["ui"] = { description_key = "menu.ui", platforms = { "hs" }, subsections = {  } },
 	["gestures"] = { description_key = "menu.gestures", platforms = { "ahk", "hs", "linux" }, subsections = { "modes", "sensitivities" } },
 	["gestures.modes"] = { description_key = "menu.gestures.modes", platforms = { "hs" }, subsections = {  } },
 	["gestures.sensitivities"] = { description_key = "menu.gestures.sensitivities", platforms = { "hs" }, subsections = {  } },
@@ -711,6 +712,9 @@ M.features = {
 	},
 	{
 		path = "gestures.sensitivities.swipe_5_right_up", id = "swipe_5_right_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_5_right_up", platforms = { "hs" },
+	},
+	{
+		path = "ui.menubar_icon", id = "menubar_icon", section = "ui", default = "v1", type = "enum", description_key = "menu.layout.menubar_icon", platforms = { "hs" }, enum_values = { "v1", "v2" },
 	},
 }
 

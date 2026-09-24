@@ -20,6 +20,7 @@ local Logger           = require("infra.logger")
 local text_utils = require("infra.text_utils")
 local i18n             = require("infra.i18n")
 local ui_restore       = require("infra.ui_restore")
+local Manifest         = require("infra.manifest_reader")
 
 local Preferences   = require("infra.preferences")
 local Builder       = require("ui.menu.builder")
@@ -66,6 +67,14 @@ local MENU_CACHE_PRIME_DELAY_SEC = 2
 -- rebuild per change. Short enough to feel immediate, long enough to collapse
 -- the rapid updateMenu() calls a single user action can fan out into.
 local MENU_REFRESH_COALESCE_SEC = 0.05
+
+-- config.toml [ui] menubar_icon: its variants and its default are the
+-- manifest's. v1 draws the simple glyph, v2 the detailed Ergopti logo.
+local MENUBAR_ICON_DEFAULT = Manifest.default_for("ui.menubar_icon")
+local MENUBAR_ICON_VARIANTS = {}
+for _, variant in ipairs(Manifest.find_entry_by_path("ui.menubar_icon").enum_values) do
+	MENUBAR_ICON_VARIANTS[variant] = true
+end
 
 --- Safely loads a module and logs any loading failure.
 --- @param module_id string Lua module path.
@@ -324,17 +333,28 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		return (text:gsub("★", text_utils.escape_gsub_replacement(state.trigger_char)))
 	end
 
-	-- Inputs the menubar icon was last rendered for. Declared above update_icon:
-	-- a local below the closure would bind the nil global instead.
+	-- Inputs the menubar icon was last rendered for, and whether an unknown
+	-- stored variant was already reported. Declared above update_icon: a local
+	-- below the closure would bind the nil global instead.
 	local _last_icon_key = nil
+	local _unknown_icon_reported = false
 
 
 	local function update_icon(custom_text)
 		local shortcuts = core_mods.shortcuts_mod
 		local paused    = shortcuts and type(shortcuts.is_paused) == "function" and shortcuts.is_paused() or false
 
-		-- Logo variant is persisted via hs.settings; default is "simple"
-		local variant = Storage.get("menubar_logo_variant") or "simple"
+		-- config.toml [ui] menubar_icon, merged into the menu state. A value the
+		-- manifest does not list is reported once and drawn as its default.
+		local variant = state.menubar_icon
+		if not MENUBAR_ICON_VARIANTS[variant] then
+			if not _unknown_icon_reported then
+				_unknown_icon_reported = true
+				Logger.error(LOG, "config.toml [ui] menubar_icon is '%s', not a known variant — drawing %s.",
+					tostring(variant), MENUBAR_ICON_DEFAULT)
+			end
+			variant = MENUBAR_ICON_DEFAULT
+		end
 
 		-- Skip the whole rebuild when nothing that determines the icon changed.
 		--
@@ -353,7 +373,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		-- static/ergopti_plus/macos, where base_dir points)
 		local logo_dir = base_dir .. "../../img/logo/"
 		local logo_file
-		if variant == "simple" then
+		if variant == "v1" then
 			-- A dedicated disabled simple logo may not yet exist — fall back to logo_simple.png
 			if paused then
 				local disabled_path = logo_dir .. "logo_simple_disabled.png"
@@ -384,7 +404,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			-- legible. Keep both constants here so future tweaks live in one spot
 			local TARGET_SIMPLE  = 19
 			local TARGET_COMPLEX = 26
-			local TARGET = (variant == "complex") and TARGET_COMPLEX or TARGET_SIMPLE
+			local TARGET = (variant == "v2") and TARGET_COMPLEX or TARGET_SIMPLE
 			local scaled = ico
 			pcall(function()
 				local sz = ico.size and ico:size() or nil
@@ -691,7 +711,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	pcall(update_icon)
 
 	-- Expose a refresh hook so submenus can re-render the menubar icon after
-	-- toggling persisted preferences (e.g. logo variant)
+	-- changing a persisted preference (e.g. the menubar icon variant)
 	M.refresh_icon = function() pcall(update_icon) end
 
 	local saved, load_status = Preferences.load(MenuPaths.get("ConfigTomlPath"))

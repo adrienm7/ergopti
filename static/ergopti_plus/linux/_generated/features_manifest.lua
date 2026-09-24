@@ -17,7 +17,7 @@ local M = {}
 
 M.version = "2.0.0"
 
-M.section_order = { "script", "hotstrings", "llm", "metrics", "shortcuts", "gestures", "layout", "category_enabled" }
+M.section_order = { "script", "hotstrings", "llm", "metrics", "shortcuts", "gestures", "layout", "category_enabled", "ui" }
 
 M.sections = {
 	["script"] = { description_key = "menu.script", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
@@ -49,6 +49,7 @@ M.sections = {
 	["shortcuts.script_control"] = { description_key = "menu.shortcuts.script_control", platforms = { "ahk" }, subsections = {  } },
 	["category_enabled"] = { description_key = "menu.category_enabled", platforms = { "ahk" }, subsections = {  } },
 	["layout"] = { description_key = "menu.layout", platforms = { "ahk" }, subsections = {  } },
+	["ui"] = { description_key = "menu.ui", platforms = { "hs" }, subsections = {  } },
 	["gestures"] = { description_key = "menu.gestures", platforms = { "ahk", "hs", "linux" }, subsections = { "modes", "sensitivities" } },
 	["gestures.modes"] = { description_key = "menu.gestures.modes", platforms = { "hs" }, subsections = {  } },
 	["gestures.sensitivities"] = { description_key = "menu.gestures.sensitivities", platforms = { "hs" }, subsections = {  } },
@@ -1035,6 +1036,9 @@ M.unavailable = {
 	},
 	{
 		path = "category_enabled.tap_holds", section = "category_enabled", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "ui.menubar_icon", section = "ui", reason_key = "", platforms = { "hs" },
 	},
 }
 
