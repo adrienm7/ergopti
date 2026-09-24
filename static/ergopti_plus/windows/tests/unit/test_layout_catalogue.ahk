@@ -352,3 +352,19 @@ _LCT_DamagedRecordCase() {
 		}
 	} finally DirDelete(Dir, true)
 }
+
+Test("layout catalogue: an installation under a damaged record writes nothing (layout-install-record-first)",
+	_LCT_DamagedRecordInstallCase)
+
+_LCT_DamagedRecordInstallCase() {
+	Dir := _LCT_TempDir()
+	try {
+		_LCT_WriteRaw(Dir . "installed.json", "{ damaged")
+		Result := _LCT_Install("ergol", Dir, _LCT_Transport(Map(), [], true), _LCT_Index(), _LCT_RegistryDir())
+		AssertFalse(Result[1], "a layout cannot be recorded in a damaged record")
+		AssertEqual(LAYOUT_CATALOGUE_FAILURE_RECORD, Result[2])
+		AssertFalse(FileExist(Dir . "ergol.keylayout"), "no layout is written that the record cannot vouch for")
+		AssertEqual("{ damaged", _LCT_Read(Dir . "installed.json"), "the damaged record is left for the user to see")
+		AssertEqual(0, LayoutCatalogue_Busy(), "the operation slot is released")
+	} finally DirDelete(Dir, true)
+}

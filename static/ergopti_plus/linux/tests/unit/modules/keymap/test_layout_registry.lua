@@ -262,6 +262,21 @@ helpers.describe("layout manager (Linux): installing", function()
 		end
 	end)
 
+	helpers.it("writes and runs nothing while the installed record is unreadable (layout-install-record-first)", function()
+		-- A layout installed before the record fails is in the user XKB tree
+		-- with no record: the layout manager then neither lists nor removes it.
+		local files = shipped_files()
+		files[LOCAL_DIR .. "installed.json"] = "{ damaged"
+		local LayoutRegistry, deps, state = manager({ served = "offline", files = files })
+		local result = run(function(done) LayoutRegistry.install("ergol", done, deps) end)
+		helpers.assert_true(result.ok == false)
+		helpers.assert_eq(result.detail, LayoutRegistry.FAILURE_RECORD)
+		helpers.assert_eq(#state.runs, 0, "nothing is converted or installed")
+		helpers.assert_nil(state.files[LOCAL_DIR .. "ergol.keylayout"], "no local copy is written")
+		helpers.assert_eq(state.files[LOCAL_DIR .. "installed.json"], "{ damaged", "the damaged record is left as it is")
+		helpers.assert_nil(LayoutRegistry.snapshot(deps).busy, "the operation slot is released")
+	end)
+
 	helpers.it("reports the installer's own refusal and records nothing (layout-registry-convert)", function()
 		local LayoutRegistry, deps, state = manager({
 			served = "offline",

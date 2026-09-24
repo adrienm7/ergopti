@@ -245,6 +245,23 @@ helpers.describe("layout manager (macOS): installing", function()
 		helpers.assert_eq(state.files[LAYOUTS_DIR .. "ergol.keylayout"], "my own layout")
 	end)
 
+	helpers.it("writes nothing while the installed record is unreadable (layout-install-record-first)", function()
+		-- A layout written before the record fails stays unrecorded in the
+		-- user's layouts folder: every later installation then refuses it as a
+		-- foreign file and uninstall does not know it.
+		local files = shipped_files()
+		files[LOCAL_DIR .. "installed.json"] = "{ damaged"
+		local LayoutRegistry, deps, state = manager({ served = "offline", files = files })
+		local result = run(function(done) LayoutRegistry.install("ergol", done, deps) end)
+		helpers.assert_true(result.ok == false)
+		helpers.assert_eq(result.detail, LayoutRegistry.FAILURE_RECORD)
+		helpers.assert_nil(state.files[LAYOUTS_DIR .. "ergol.keylayout"], "no layout reaches the user's layouts folder")
+		helpers.assert_nil(state.files[LOCAL_DIR .. "ergol.keylayout"], "nor the local folder")
+		helpers.assert_eq(state.files[LOCAL_DIR .. "installed.json"], "{ damaged", "the damaged record is left as it is")
+		helpers.assert_eq(#state.enabled, 0)
+		helpers.assert_nil(LayoutRegistry.snapshot(deps).busy, "the operation slot is released")
+	end)
+
 	helpers.it("reports an installed layout it could not enable (layout-registry-install)", function()
 		local LayoutRegistry, deps = manager({ served = "offline", files = shipped_files(), enable_fails = true })
 		local result = run(function(done) LayoutRegistry.install("ergol", done, deps) end)
