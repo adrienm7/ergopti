@@ -226,9 +226,10 @@ function M.on_hotstring_expired(context, output_context)
 end
 
 local function resolve_system_prompt(profile, params, count)
+	-- The context is left empty here and sent once, by build_messages.
 	local resolved = ProfileSelector.resolve_system_prompt(profile, {
-		context = params.context,
-		tail = params.context_tail,
+		context = "",
+		tail = "",
 		min_words = params.min_words,
 		max_words = params.max_words,
 		n = count,
@@ -269,16 +270,14 @@ function M.predict(context, output_context)
 	})
 	local is_batch = profile.batch == true and requested > 1
 	local system_prompt = resolve_system_prompt(profile, params, is_batch and requested or 1)
-	if type(system_prompt) ~= "string" or system_prompt == "" then
+	-- Empty is valid: the raw profile is its context alone, sent as the user turn.
+	if type(system_prompt) ~= "string" then
 		Logger.error(LOG, "Prediction profile '%s' has no usable system prompt.", tostring(profile.id))
 		return
 	end
 
 	local base_url = profiles.get_base_url() or HttpBridge.resolve_base_url() or ""
-	local messages = {
-		{ role = "system", content = system_prompt },
-		{ role = "user", content = params.context },
-	}
+	local messages = PromptBuilder.build_messages(system_prompt, params.context, params.context_tail)
 	local candidates = {}
 	local request_index = 0
 	local meta = {
