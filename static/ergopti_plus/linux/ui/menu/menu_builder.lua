@@ -405,8 +405,51 @@ local function _build_layouts(ctx)
 	-- restricts the layout emulation switch to Windows with its reason.
 	local render_ctx = {}
 	for key, value in pairs(ctx) do render_ctx[key] = value end
+	-- The "Manage layouts…" row opens the shared layout manager window.
+	render_ctx.commands = {}
+	for key, value in pairs(ctx.commands or {}) do render_ctx.commands[key] = value end
+	render_ctx.commands["layout_manager"] = function()
+		if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
+			Logger.error(LOG, "No webview manager in the menu context — the layout manager cannot open.")
+			return false
+		end
+		return ctx.webview.show("layout_manager")
+	end
 
 	local providers = {
+		-- The custom layout picker: the registry layouts the layout manager
+		-- installed, the one this session activated checked; choosing one makes
+		-- it the first input source of the desktop session.
+		["custom_layouts"] = function()
+			local ok_registry, LayoutRegistry = pcall(require, "modules.keymap.layout_registry")
+			if not ok_registry then
+				Logger.error(LOG, "The layout registry client is unavailable: %s.", tostring(LayoutRegistry))
+				return {}
+			end
+			local snapshot = LayoutRegistry.snapshot()
+			local entries = {}
+			for _, entry in pairs(snapshot.installed or {}) do entries[#entries + 1] = entry end
+			table.sort(entries, function(a, b) return tostring(a.name) < tostring(b.name) end)
+			local rows = {}
+			for _, entry in ipairs(entries) do
+				local id = entry.id
+				rows[#rows + 1] = {
+					label   = type(entry.name) == "string" and entry.name or id,
+					checked = snapshot.active == id,
+					action  = function()
+						LayoutRegistry.select(id, function(selected, _, detail)
+							if not selected then
+								Logger.error(LOG, "The '%s' layout could not be activated: %s.", id, tostring(detail))
+							end
+						end)
+					end,
+				}
+			end
+			if #rows == 0 then
+				rows[1] = { label = i18n_safe("menu.layout.none_installed"), disabled = true }
+			end
+			return rows
+		end,
 		["base_layouts"] = function()
 			local ok_reader, reader = pcall(require, "modules.hotstrings.input_reader")
 			if not ok_reader or type(reader.get_layouts) ~= "function" then

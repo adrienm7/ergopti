@@ -129,7 +129,11 @@ local CANONICAL_LAYOUT_MENU = {
 	-- told apart from those that work on any layout (pause/resume switching, the
 	-- key turned into a star key). Same rows as before, regrouped under headers.
 	"---",
-	"section_header:menu.layout.header_ergopti",
+	-- UPDATED: the Ergopti section is the custom layout section, on every
+	-- driver: the registry layouts the layout manager installs, and its window.
+	"section_header:menu.layout.header_custom",
+	"list:custom_layouts",
+	"command:layout_manager",
 	-- The two blocks macOS alone has, declared 2026-08-07. It installs a .bundle
 	-- keyboard layout through the OS's input-source mechanism and draws a
 	-- menubar icon; neither concept exists on the other two drivers.

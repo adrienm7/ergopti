@@ -66,8 +66,9 @@ helpers.describe("Keyboard layout submenu reaches the tray populated", function(
 			"the Keyboard layout submenu reached the tray empty — materialised rows handed over as `items` "
 			.. "are dropped by the tray renderer; they must be handed over as `submenu`")
 		local seen = titles(row.menu)
-		helpers.assert_true(seen["— menu.layout.header_ergopti —"] or seen["menu.layout.header_ergopti"],
-			"the manifest's Ergopti header must be in the rendered submenu")
+		helpers.assert_true(seen["— menu.layout.header_custom —"] or seen["menu.layout.header_custom"],
+			"the manifest's custom layout header must be in the rendered submenu")
+		helpers.assert_true(seen["menu.layout.manage"], "the layout manager row must be in the rendered submenu")
 		helpers.assert_true(seen["menu.layout.menubar_icon"], "the menubar icon row must be in the rendered submenu")
 	end)
 

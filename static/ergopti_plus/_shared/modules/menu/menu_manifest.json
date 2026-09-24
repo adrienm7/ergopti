@@ -828,12 +828,16 @@
 		},
 		{
 			"type": "section_header",
-			"i18n": "menu.layout.header_ergopti",
-			"platforms": [
-				"ahk",
-				"hs"
-			],
-			"reason_key": "platform_reason.ergopti_section_has_no_linux_row"
+			"i18n": "menu.layout.header_custom"
+		},
+		{
+			"type": "list",
+			"id": "custom_layouts"
+		},
+		{
+			"type": "command",
+			"id": "layout_manager",
+			"i18n": "menu.layout.manage"
 		},
 		{
 			"type": "list",

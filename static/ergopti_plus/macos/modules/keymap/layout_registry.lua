@@ -303,6 +303,36 @@ function M.refresh(on_done, deps)
 	return true
 end
 
+--- What the menu's layout picker shows: the installed layouts, sorted by
+--- name, and the one of the current input source. It reads the record and the
+--- cached input-source list only, so opening the menu starts no subprocess.
+--- @param deps table|nil
+--- @return table { layouts, active }
+function M.picker(deps)
+	local picker = { layouts = {}, active = "" }
+	local resolved = resolve_deps(deps)
+	if not resolved then return picker end
+	deps = resolved
+	local record, record_err = read_installed(deps)
+	if not record then
+		Logger.error(LOG, "The installed-layouts record is unusable: %s.", tostring(record_err))
+		return picker
+	end
+	local names = {}
+	for _, entry in ipairs(Catalogue.installed_list(record)) do
+		if deps.exists(deps.layouts_dir .. entry.id .. ".keylayout") then
+			picker.layouts[#picker.layouts + 1] = entry
+			if type(entry.keyboard_name) == "string" then names[entry.keyboard_name] = entry.id end
+		end
+	end
+	table.sort(picker.layouts, function(a, b) return tostring(a.name) < tostring(b.name) end)
+	local ok, records = pcall(deps.active_sources)
+	for _, source in ipairs(ok and type(records) == "table" and records or {}) do
+		if source.selected and names[source.id] then picker.active = names[source.id] end
+	end
+	return picker
+end
+
 --- What the layout manager shows: the last catalogue, the installed layouts,
 --- the ones an Ergopti bundle provides, the operation in flight and the
 --- layout of the current input source.
