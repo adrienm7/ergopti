@@ -15,7 +15,9 @@
 ---    move_section, merge_into, map_value, delete, set_if_absent). The engine
 ---    holds the only op semantics on this side; the corpus under
 ---    _shared/tests/corpus/config_migrations pins them to the Windows
----    interpreter and to the JS reference.
+---    interpreter and to the JS reference, and the registry defects under
+---    _shared/tests/corpus/config_migration_registries pin which registries
+---    all three accept.
 --- 2. One flat model. A section is a ``[header]`` path and a key is one entry
 ---    inside it; arrays and inline tables are opaque values. Records the text
 ---    cannot address (quoted keys, arrays of tables, root keys) are invisible
@@ -61,6 +63,11 @@ M.STAMP_FORMAT = "%Y%m%d-%H%M%S"
 
 --- Driver identifiers a step may name.
 M.DRIVERS = { ahk = true, hs = true, linux = true }
+
+-- The only keys of [registry] and of a [steps.*] table. Anything else is a
+-- defect every interpreter rejects: the shared registry-defect corpus pins it.
+local REGISTRY_FIELDS = { current_version = true, unstamped_version = true }
+local STEP_FIELDS = { from = true, to = true, drivers = true, reason = true, ops = true }
 
 --- Fields of each op of the closed set.
 local OPS = {
@@ -134,6 +141,18 @@ local function is_scalar(value)
 	return kind == "string" or kind == "number" or kind == "boolean"
 end
 
+--- Whether a decoded value is a TOML array. toml_codec decodes arrays and
+--- inline tables into the same Lua tables, so only the keys tell them apart
+--- (an empty inline table stays indistinguishable from an empty array).
+--- @param value any
+--- @return boolean
+local function is_array(value)
+	if type(value) ~= "table" then return false end
+	local count = 0
+	for _ in pairs(value) do count = count + 1 end
+	return count == #value
+end
+
 --- Sorted keys of a table.
 local function sorted_keys(map)
 	local keys = {}
@@ -191,15 +210,20 @@ local function validate_op(op)
 		return false, "rename needs to_section or to_key"
 	end
 	if op.op == "map_value" then
-		if type(op.map) ~= "table" or #op.map == 0 then return false, "map_value needs a non-empty map" end
+		if not is_array(op.map) or #op.map == 0 then return false, "map_value needs a non-empty map" end
 		for _, pair in ipairs(op.map) do
 			if type(pair) ~= "table" or not is_scalar(pair.from) or not is_scalar(pair.to) then
 				return false, "each map entry is { from, to } with scalar values"
 			end
+			for field in pairs(pair) do
+				if field ~= "from" and field ~= "to" then
+					return false, "each map entry is { from, to } with scalar values"
+				end
+			end
 		end
 	end
 	if op.op == "set_if_absent" and not is_scalar(op.value) then
-		if type(op.value) ~= "table" then return false, "set_if_absent writes a scalar or an array" end
+		if not is_array(op.value) then return false, "set_if_absent writes a scalar or an array" end
 		for _, item in ipairs(op.value) do
 			if not is_scalar(item) then return false, "set_if_absent arrays hold scalars only" end
 		end
@@ -215,20 +239,38 @@ function M.validate_registry(decoded)
 	if type(decoded) ~= "table" or type(decoded.registry) ~= "table" then
 		return nil, "the registry has no [registry] table"
 	end
+	for name in pairs(decoded) do
+		if name ~= "registry" and name ~= "steps" then
+			return nil, "the registry has an unknown table [" .. tostring(name) .. "]"
+		end
+	end
+	for field in pairs(decoded.registry) do
+		if not REGISTRY_FIELDS[field] then
+			return nil, "[registry] has an unknown key '" .. tostring(field) .. "'"
+		end
+	end
+	if decoded.steps ~= nil and type(decoded.steps) ~= "table" then
+		return nil, "steps must be [steps.v<N>_to_v<N+1>] tables"
+	end
 	local current = decoded.registry.current_version
 	local unstamped = decoded.registry.unstamped_version
 	if not is_version(current) or not is_version(unstamped) or unstamped > current then
 		return nil, "current_version and unstamped_version must be integers with 1 <= unstamped <= current"
 	end
 	local steps = {}
-	for name, step in pairs(type(decoded.steps) == "table" and decoded.steps or {}) do
+	for name, step in pairs(decoded.steps or {}) do
 		if type(step) ~= "table" or not is_version(step.from) or step.to ~= step.from + 1 then
 			return nil, "step '" .. tostring(name) .. "' must go from N to N + 1"
+		end
+		for field in pairs(step) do
+			if not STEP_FIELDS[field] then
+				return nil, "step '" .. tostring(name) .. "' has an unknown field '" .. tostring(field) .. "'"
+			end
 		end
 		if name ~= "v" .. version_text(step.from) .. "_to_v" .. version_text(step.to) then
 			return nil, "step '" .. tostring(name) .. "' is misnamed"
 		end
-		if type(step.drivers) ~= "table" or #step.drivers == 0 then
+		if not is_array(step.drivers) or #step.drivers == 0 then
 			return nil, "step '" .. name .. "' names no driver"
 		end
 		local drivers = {}
@@ -236,10 +278,10 @@ function M.validate_registry(decoded)
 			if not M.DRIVERS[driver] then return nil, "step '" .. name .. "' names unknown driver '" .. tostring(driver) .. "'" end
 			drivers[driver] = true
 		end
-		if type(step.reason) ~= "string" or step.reason == "" then
+		if type(step.reason) ~= "string" or step.reason:match("^%s*$") then
 			return nil, "step '" .. name .. "' has no reason"
 		end
-		if type(step.ops) ~= "table" then return nil, "step '" .. name .. "' has no ops array" end
+		if not is_array(step.ops) then return nil, "step '" .. name .. "' has no ops array" end
 		for index, op in ipairs(step.ops) do
 			local ok, detail = validate_op(op)
 			if not ok then return nil, "step '" .. name .. "' op " .. index .. ": " .. detail end

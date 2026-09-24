@@ -36,7 +36,9 @@ data-only set: `rename`, `move_section`, `merge_into`, `map_value`, `delete`,
 `set_if_absent`. There is no code in a step, so the three interpreters cannot
 disagree about what a step means without the shared corpus
 (`_shared/tests/corpus/config_migrations/`, replayed by all three suites and by
-`tools/test/test-config-migrations.cjs`) failing.
+`tools/test/test-config-migrations.cjs`) failing. Nor can they disagree about
+which registry is valid: `_shared/tests/corpus/config_migration_registries/`
+holds a control every loader accepts and the defects every loader rejects.
 
 At boot, before anything applies or saves the file, each driver classifies it:
 
@@ -121,7 +123,8 @@ placeholder stamped with the current version.
 - Registry: `static/ergopti_plus/_shared/core/config_schema/migrations.toml`
 - Interpreters: `static/ergopti_plus/_shared/lua/config_migrate.lua`,
   `static/ergopti_plus/windows/infra/config_migrate.ahk`
-- Corpus: `static/ergopti_plus/_shared/tests/corpus/config_migrations/`
+- Corpus: `static/ergopti_plus/_shared/tests/corpus/config_migrations/`,
+  `static/ergopti_plus/_shared/tests/corpus/config_migration_registries/`
 - Gates: `tools/test/test-config-migrations.cjs` (registry shape, closed op set,
   reference replay, interpreter wiring),
   `static/ergopti_plus/windows/tests/unit/test_config_migrate.ahk`,

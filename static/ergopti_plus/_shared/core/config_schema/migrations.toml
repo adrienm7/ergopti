@@ -42,8 +42,10 @@
 #
 # Policy: a key rename, move or removal ships in the SAME commit as its step
 # here; readers drop the old spelling at once (no runtime aliases). The
-# registry, its corpus (_shared/tests/corpus/config_migrations/) and the three
-# interpreters are pinned together by tools/test/test-config-migrations.cjs.
+# registry, its corpus (_shared/tests/corpus/config_migrations/), the registry
+# defects every loader rejects (_shared/tests/corpus/config_migration_registries/)
+# and the three interpreters are pinned together by
+# tools/test/test-config-migrations.cjs.
 
 [registry]
 current_version = 3

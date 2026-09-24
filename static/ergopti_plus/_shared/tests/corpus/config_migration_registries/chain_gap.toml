@@ -1,0 +1,16 @@
+# _shared/tests/corpus/config_migration_registries/chain_gap.toml
+#
+# The chain stops at v2 while current_version is 3.
+
+[registry]
+current_version = 3
+unstamped_version = 1
+
+[steps.v1_to_v2]
+from = 1
+to = 2
+drivers = ["ahk", "hs", "linux"]
+reason = "Corpus: one delete."
+ops = [
+	{ op = "delete", section = "gestures", key = "space_wrap" },
+]

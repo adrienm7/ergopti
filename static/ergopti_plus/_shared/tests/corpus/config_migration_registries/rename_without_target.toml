@@ -1,0 +1,16 @@
+# _shared/tests/corpus/config_migration_registries/rename_without_target.toml
+#
+# A rename names neither to_section nor to_key.
+
+[registry]
+current_version = 2
+unstamped_version = 1
+
+[steps.v1_to_v2]
+from = 1
+to = 2
+drivers = ["ahk", "hs", "linux"]
+reason = "Corpus: one delete."
+ops = [
+	{ op = "rename", section = "gestures", key = "space_wrap" },
+]
