@@ -495,7 +495,7 @@ _MI_AboutUpdateRows() {
 
 ; Builds the Debug submenu from the manifest's debug_menu array.
 ;
-; Same move as the global actions above, and the same day: every row is a
+; Same shape as the Configuration submenu above: every row is a
 ; `command` except the log-level picker, whose label carries the CURRENT level
 ; and is therefore a `list` — exactly the shape Linux declared for it.
 _MI_BuildDebuggingMenu() {

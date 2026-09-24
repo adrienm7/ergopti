@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Wires the shared config_unused_keys engine to the macOS readers of
 --- hammerspoon/config.toml and to the driver's own dialogs, for the tray row
---- "Clean up unused settings…" under Global actions.
+--- « Nettoyer config.toml » under Configuration.
 ---
 --- FEATURES & RATIONALE:
 --- 1. The driver's rule, from its readers. A key is used when one of the three
