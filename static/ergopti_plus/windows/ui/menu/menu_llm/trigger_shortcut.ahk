@@ -224,7 +224,8 @@ _LLM_Menu_ContextualModifierSnapshot(MenuState := 0) {
 		NavModifiers := Source.Has("nav_modifiers")
 			? Source["nav_modifiers"] : ""
 		ValModifiers := Source.Has("val_modifiers")
-			? Source["val_modifiers"] : "alt"
+			? Source["val_modifiers"]
+			: LLM_Defaults_ModifierString("llm_val_modifiers")
 		return Map("nav_modifiers", NavModifiers,
 			"val_modifiers", ValModifiers)
 	} finally Critical(PreviousCritical)
@@ -242,7 +243,8 @@ _LLM_Menu_BuildNavModifierPrefixes(MenuState) {
 	NavModifiers := MenuState.Has("nav_modifiers")
 		? Trim(MenuState["nav_modifiers"]) : ""
 	ValModifiers := MenuState.Has("val_modifiers")
-		? Trim(MenuState["val_modifiers"]) : "alt"
+		? Trim(MenuState["val_modifiers"])
+		: LLM_Defaults_ModifierString("llm_val_modifiers")
 	if (!LLM_Menu_IsValidModifierString(NavModifiers)
 			|| !LLM_Menu_IsValidModifierString(ValModifiers))
 		return false
@@ -1467,7 +1469,8 @@ _LLM_Menu_BuildTriggerShortcutPlan(Outcome, RawText, CallbackFn, WriterFn,
 			"nav_modifiers", _LLM_Menu.Has("nav_modifiers")
 				? _LLM_Menu["nav_modifiers"] : "",
 			"val_modifiers", _LLM_Menu.Has("val_modifiers")
-				? _LLM_Menu["val_modifiers"] : "alt")
+				? _LLM_Menu["val_modifiers"]
+				: LLM_Defaults_ModifierString("llm_val_modifiers"))
 	} finally Critical(PreviousCritical)
 	if RecoveryPending {
 		_LLM_Menu_ReportTriggerFailure(RawText, "edit",

@@ -618,7 +618,6 @@ helpers.describe("modules/updater/manager.lua", function()
 		write_file(payload .. "/_shared/data/locales/en.json", "{}\n")
 		write_file(payload .. "/bin/ergopti-hotstrings", "#!/usr/bin/env bash\nexit 0\n")
 		write_file(payload .. "/install.sh", "#!/usr/bin/env bash\nexit 0\n")
-		write_file(payload .. "/kanata.kbd", "(defcfg)\n")
 		write_file(wrapper, "#!/usr/bin/env bash\nset -euo pipefail\n"
 			.. "grep -q 'version=4.0.0' " .. shell_quote(install_root .. "/_shared/build_stamp.txt") .. "\n"
 			.. "grep -q 'new-shared' " .. shell_quote(install_root .. "/_shared/lua/sentinel.lua") .. "\n"
@@ -628,7 +627,7 @@ helpers.describe("modules/updater/manager.lua", function()
 			.. " " .. shell_quote(payload .. "/install.sh")))
 		helpers.assert_true(command_ok("tar -czf " .. shell_quote(archive)
 			.. " -C " .. shell_quote(payload)
-			.. " linux _shared bin install.sh kanata.kbd"))
+			.. " linux _shared bin install.sh"))
 
 		local real_resolver = M._resolve_installation
 		M._resolve_installation = function()

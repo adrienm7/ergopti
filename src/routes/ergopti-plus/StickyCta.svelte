@@ -20,7 +20,7 @@ competes with the final call-to-action. OS-aware, like the hero button.
 		ui.osStyle === 'macos'
 			? (ui.release?.url('ErgoptiPlus.app.zip') ?? '#')
 			: ui.osStyle === 'linux'
-				? (ui.release?.url('kanata.kbd') ?? '#')
+				? (ui.release?.url('ErgoptiPlus-linux-x86_64.AppImage') ?? '#')
 				: (ui.release?.url('ErgoptiPlus.exe') ?? '#')
 	);
 	let label = $derived(

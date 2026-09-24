@@ -63,6 +63,8 @@ local KEYSYM_TO_CODE = {
 	Down      = 108, -- KEY_DOWN
 	Home      = 102, -- KEY_HOME
 	End       = 107, -- KEY_END
+	Prior     = 104, -- KEY_PAGEUP
+	Next      = 109, -- KEY_PAGEDOWN
 
 	-- Editing and control.
 	Return    = 28,  -- KEY_ENTER
@@ -71,6 +73,7 @@ local KEYSYM_TO_CODE = {
 	Caps_Lock = 58,  -- KEY_CAPSLOCK
 	BackSpace = 14,  -- KEY_BACKSPACE
 	Delete    = 111, -- KEY_DELETE
+	space     = 57,  -- KEY_SPACE
 
 	-- Function keys.
 	F4        = 62,  -- KEY_F4
@@ -81,10 +84,12 @@ local KEYSYM_TO_CODE = {
 	-- ctrl+w to close one. Added as the catalogue gained an emit_linux column for
 	-- the two tab actions — the parity test caught them the same commit, which is
 	-- what a table checked against the generated rows is for.
+	-- US positions: parse() moves each letter to where the live layout has it.
 	c         = 46,  -- KEY_C
 	t         = 20,  -- KEY_T
 	v         = 47,  -- KEY_V
 	w         = 17,  -- KEY_W
+	x         = 45,  -- KEY_X
 }
 
 -- Which names are modifiers. A combo presses its modifiers first and releases
@@ -115,8 +120,14 @@ function M.parse(combo)
 	if type(combo) ~= "string" or combo == "" then return nil, "empty combo" end
 
 	local mods, keys = {}, {}
+	local ok_layout, KeyboardLayout = pcall(require, "adapters.keyboard_layout")
 	for part in combo:gmatch("[^+%s]+") do
 		local code = KEYSYM_TO_CODE[part]
+		-- A letter is pressed where the live layout puts it, not where US does:
+		-- ctrl+w as KEY_W is Ctrl+Z (undo) on AZERTY.
+		if code and part:match("^%l$") and ok_layout then
+			code = KeyboardLayout.shortcut_keycode(part, code)
+		end
 		if not code then
 			-- Named, not swallowed. An unmapped key name means the action
 			-- catalogue grew and this table did not, and the symptom would

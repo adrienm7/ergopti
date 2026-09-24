@@ -37,12 +37,11 @@ local WINDOW_TITLE_SEPARATOR = " — "
 -- webkit_host provides HTML building and bridge name registry.
 local webkit_host = require("ui.webkit_host")
 
--- Optional JSON codec for manifest parsing and JS value conversion.
-local dkjson = nil
-pcall(function()
-	local ok, mod = pcall(require, "dkjson")
-	if ok then dkjson = mod end
-end)
+-- The shared JSON codec for page messages, replies and the geometry manifest.
+-- This used dkjson, loaded optionally, which is neither shipped nor installed:
+-- every object a page posted became nil and no reply reached a page, so the
+-- metrics windows stayed empty and the editors' buttons did nothing.
+local Json = require("json")
 
 
 -- =========================================
@@ -210,12 +209,21 @@ M._release_app_ownership = _release_app_ownership
 --- Opens a webview window for the given shared UI app.
 --- If the window already exists, brings it to front instead of creating a new one.
 --- @param app_name string The shared UI app directory name (e.g. "action_picker").
---- @param active_locale string|nil Locale code (default: "fr").
+--- @param active_locale string|nil Locale code (default: the interface's).
 --- @return boolean true if the window was opened or brought to front.
 function M.show(app_name, active_locale)
 	if type(app_name) ~= "string" or app_name == "" then
 		Logger.error(LOG, "show(): app_name is required.")
 		return false
+	end
+	-- No caller passes a locale, and the page builder fell back to French: every
+	-- window was French whatever language the tray was set to.
+	if type(active_locale) ~= "string" or active_locale == "" then
+		local ok, I18n = pcall(require, "infra.i18n")
+		active_locale = ok and type(I18n.get_locale) == "function" and I18n.get_locale() or nil
+		if type(active_locale) ~= "string" or active_locale == "" then
+			active_locale = require("infra.manifest_reader").default_for("script.locale")
+		end
 	end
 
 	-- If window already exists, bring to front.
@@ -498,9 +506,10 @@ local function _js_value_to_lua(js_value)
 		elseif js_value:is_object() then
 			-- Try JSON.stringify round-trip for objects.
 			local json_str = js_value:to_json(0)
-			if json_str and json_str ~= "" and dkjson then
-				local ok_json, parsed = pcall(dkjson.decode, json_str)
-				if ok_json then return parsed end
+			if json_str and json_str ~= "" then
+				local parsed = Json.decode(json_str)
+				if parsed ~= nil then return parsed end
+				Logger.warn(LOG, "A page message could not be decoded as JSON — dropped.")
 			end
 			return nil
 		end
@@ -518,9 +527,8 @@ end
 --- @param value any Lua value to send (converted to JSON then base64).
 local function _send_response_to_js(webview, bridge_name, value)
 	if not webview or value == nil then return end
-	if not dkjson then return end
 	-- Encode the value as JSON, then base64 to avoid any escaping hazards.
-	local json_str = dkjson.encode(value)
+	local json_str = Json.encode(value)
 	if not json_str then return end
 	local b64 = require("compat.base64")
 	local encoded = b64 and b64.encode(json_str) or json_str:gsub("[^%w]", function(c)
@@ -548,9 +556,9 @@ local function _read_app_geometry(app_name)
 	if not fh then return defaults end
 	local raw = fh:read("*a")
 	fh:close()
-	if not raw or raw == "" or not dkjson then return defaults end
-	local ok_dec, manifest = pcall(dkjson.decode, raw)
-	if not ok_dec or not manifest or not manifest.apps then return defaults end
+	if not raw or raw == "" then return defaults end
+	local manifest = Json.decode(raw)
+	if type(manifest) ~= "table" or type(manifest.apps) ~= "table" then return defaults end
 	local app = manifest.apps[app_name]
 	if app then
 		return {
@@ -651,12 +659,14 @@ function M._create_gtk_window(app_name, html, handler)
 		return false, "bridge registration failed"
 	end
 
-	-- ── Connect script-message-received signals ──
-	-- lgi supports detailed GObject signals via table-of-callbacks assignment:
-	--   ucm.on_script_message_received = { [detail] = callback, ... }
-	-- Each bridge name maps to a closure that parses the JS value and dispatches
-	-- to M.route_message(), sending any response back to the webview.
-	local function handle_script_message(bridge_name, js_result)
+	-- ── Connect the script-message-received signal for this bridge ──
+	-- lgi connects a DETAILED signal by indexing the signal with its detail:
+	-- `ucm.on_script_message_received[detail] = callback`. This assigned a table
+	-- of callbacks to the signal instead, which lgi took for the callback itself:
+	-- every message a page posted raised "attempt to call upvalue 'target' (a
+	-- table value)" inside lgi and never reached its bridge. Only a real WebKit
+	-- page posting its own request shows it (tests/hardware/run_webview_roundtrip).
+	local function handle_script_message(js_result)
 		local js_value = js_result:get_js_value()
 		local payload = _js_value_to_lua(js_value)
 		local response = M.route_message(app_name, bridge_name, payload, window_epoch)
@@ -665,18 +675,18 @@ function M._create_gtk_window(app_name, html, handler)
 		end
 	end
 
-	local detailed_signals = {
-		[bridge_name] = function(_manager, js_result)
-			handle_script_message(bridge_name, js_result)
-		end,
-	}
-
-	local ok_sig = pcall(function()
-		ucm.on_script_message_received = detailed_signals
+	local ok_sig, sig_err = pcall(function()
+		ucm.on_script_message_received[bridge_name] = function(_manager, js_result)
+			local ok_handle, handle_err = pcall(handle_script_message, js_result)
+			if not ok_handle then
+				Logger.error(LOG, "Message from '%s' could not be handled: %s.", app_name, tostring(handle_err))
+			end
+		end
 	end)
 	if not ok_sig then
-		Logger.warn(LOG, "Detailed GObject signal connection failed for '%s' — " ..
-			"bridge handlers may not receive messages. Check lgi version.", app_name)
+		Logger.error(LOG, "Cannot create '%s': its page messages cannot be received (%s).",
+			app_name, tostring(sig_err))
+		return false, "bridge signal connection failed"
 	end
 
 	-- ── Create the WebView ──
@@ -842,5 +852,10 @@ end
 
 -- Auto-init on module load so the GTK probe runs once.
 M.init()
+
+
+--- Exposes the page-message decoder and the reply encoder to tests.
+M._js_value_to_lua_for_test = _js_value_to_lua
+M._send_response_to_js_for_test = _send_response_to_js
 
 return M

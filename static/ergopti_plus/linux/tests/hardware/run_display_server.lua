@@ -130,38 +130,32 @@ end
 -- ===================================
 -- ===================================
 
--- The same cascade the driver uses: the Wayland dumper on Wayland, the X11 one
--- on X11. Asserted through the tools rather than through KeyboardLayout so a
--- failure names WHICH step broke — a layout table of zero entries is the same
--- symptom whether the dump failed or the parse did.
-local dump = ""
-if wayland_socket then
-	dump = capture("xkbcli dump-keymap-wayland")
-	if dump == "" then dump = capture("xkbcli compile-keymap --layout us") end
-else
-	dump = capture("xkbcli dump-keymap-x11")
-	if dump == "" then dump = capture("xkbcomp -xkb " .. tostring(x11_socket) .. " -") end
-end
+-- THE DRIVER'S OWN CASCADE, not one written for the test. This section used to
+-- dump the keymap itself and, on Wayland, fall back to
+-- `xkbcli compile-keymap --layout us` — a fallback the daemon did not have. On
+-- the runner's libxkbcommon 1.6 the dump command does not exist, so the test
+-- went green through its private fallback while the daemon, on the very same
+-- machine, found no keymap, refused the keyboard and exited at boot. Asserting
+-- through refresh() is what makes a missing source in the driver fail HERE.
+local KeyboardLayout = require("adapters.keyboard_layout")
+local resolved = KeyboardLayout.refresh(os.getenv("ERGOPTI_TEST_KEYMAP"))
+check(resolved, string.format("the driver resolves the live %s keymap through its own cascade (via %s)",
+	tostring(kind), tostring(KeyboardLayout.source())))
 
-if dump == "" then
-	-- Not a failure of the driver: a runner without xkbcli or x11-utils cannot
-	-- answer the question at all, and reporting that as a bug would send the
-	-- reader to the wrong file.
-	print("  SKIP no keymap dumper available (install libxkbcommon-tools or x11-utils)")
-else
-	local key_definitions = select(2, dump:gsub("key%s*<", ""))
-	check(key_definitions > 0, string.format(
-		"the live %s server yields a keymap (%d key definition(s))", tostring(kind), key_definitions))
-
-	local KeyboardLayout = require("adapters.keyboard_layout")
-	local built = KeyboardLayout.build(dump)
-	local entries = 0
-	for _ in pairs(built or {}) do entries = entries + 1 end
-	-- 60 is the floor the driver itself refuses below, rather than typing wrong
-	-- characters out of a half-read table.
-	check(entries >= 60, string.format(
-		"and the driver parses it into %d typable character(s), at or above its own floor of 60", entries))
+if resolved then
+	check(KeyboardLayout.resolve("a") ~= nil, "and can type a plain letter with it")
+	-- When the session names French, prove the table is French rather than a
+	-- plausible US default: "é" has no key at all on US.
+	local expected = os.getenv("ERGOPTI_EXPECT_LAYOUT")
+	if expected == "fr" then
+		local hit = KeyboardLayout.resolve("é")
+		check(hit ~= nil and hit.keycode == 3,
+			"the French session types é from the 2 key (evdev 3), not through a guessed US table")
+	end
 end
+print(string.format("  keymap binaries: xkbcli=%s xkbcomp=%s",
+	capture("command -v xkbcli") ~= "" and "yes" or "no",
+	capture("command -v xkbcomp") ~= "" and "yes" or "no"))
 
 
 

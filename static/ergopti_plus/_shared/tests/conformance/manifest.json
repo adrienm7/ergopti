@@ -8,14 +8,6 @@
 	"_tracked": "Where the work to remove the skip is recorded. \"none\" means there is nothing to remove — the skip is permanent by design.",
 	"entries": [
 		{
-			"id": "CONF-LINUX-TAPHOLD",
-			"driver": "linux",
-			"subject": "_shared/tests/corpus/tap_hold/vectors.json",
-			"status": "platform_gap",
-			"reason": "Linux delegates tap-hold remapping to kanata, so there is no Lua engine to replay the vectors through. The corpus is still loaded and counted, so a malformed file fails here.",
-			"tracked": "TODO.md — Lot 5 (Linux driver parity)"
-		},
-		{
 			"id": "CONF-LINUX-LLM-PARSER",
 			"driver": "linux",
 			"subject": "_shared/tests/corpus/llm/parser_test_vectors.json",

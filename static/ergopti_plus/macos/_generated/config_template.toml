@@ -295,7 +295,7 @@ url_bar_filter_enabled = false
 shortcut = false
 
 [llm.navigation]
-val_modifiers = ["alt"]
+val_modifiers = []
 arrow_nav_enabled = false
 
 [metrics]

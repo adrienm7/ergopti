@@ -128,18 +128,25 @@ DEST_SHARED="${LIB_DIR}/_shared"
 
 # Ordered from most to least specific. zypper before dnf because openSUSE ships
 # both on some images, and xbps before apk for the same reason on Void.
+_has_manager() {
+	# /sbin and /usr/sbin too: Alpine keeps apk in /sbin, which an ordinary
+	# user's PATH does not include there, so `command -v apk` alone answered
+	# "unknown" and the installer refused every dependency on Alpine.
+	command -v "$1" >/dev/null 2>&1 || [ -x "/sbin/$1" ] || [ -x "/usr/sbin/$1" ]
+}
+
 _detect_pkg_manager() {
-	if command -v apt-get >/dev/null 2>&1; then
+	if _has_manager apt-get; then
 		echo "apt"
-	elif command -v zypper >/dev/null 2>&1; then
+	elif _has_manager zypper; then
 		echo "zypper"
-	elif command -v dnf >/dev/null 2>&1; then
+	elif _has_manager dnf; then
 		echo "dnf"
-	elif command -v pacman >/dev/null 2>&1; then
+	elif _has_manager pacman; then
 		echo "pacman"
-	elif command -v xbps-install >/dev/null 2>&1; then
+	elif _has_manager xbps-install; then
 		echo "xbps"
-	elif command -v apk >/dev/null 2>&1; then
+	elif _has_manager apk; then
 		echo "apk"
 	else
 		echo "unknown"
@@ -177,7 +184,7 @@ _setup_permissions() {
 	echo "     Appartenir au groupe « input » permet de lire TOUTES les frappes"
 	echo "     clavier de la session, y compris les mots de passe saisis dans"
 	echo "     n'importe quelle application. C'est ce qu'exige un moteur de"
-	echo "     hotstrings, et c'est ce que font kanata, keyd et xremap."
+	echo "     hotstrings, et c'est ce que font keyd et xremap."
 	echo ""
 
 	if ! command -v sudo >/dev/null 2>&1; then
@@ -188,8 +195,10 @@ _setup_permissions() {
 
 	# The uinput group is ours to create; input already exists on every distro
 	# that ships udev, but creating it is harmless and covers the ones that do not.
-	sudo groupadd -f uinput 2>/dev/null || true
-	sudo groupadd -f input  2>/dev/null || true
+	# groupadd/usermod are shadow-utils; BusyBox systems (Alpine) ship
+	# addgroup instead, and an unguarded usermod aborted the install there.
+	sudo groupadd -f uinput 2>/dev/null || sudo addgroup -S uinput 2>/dev/null || true
+	sudo groupadd -f input  2>/dev/null || sudo addgroup -S input  2>/dev/null || true
 
 	# `id -un` rather than $USER. This script runs under `set -u`, and $USER is set
 	# by a login shell — not by a container, a systemd unit, a cron job or
@@ -199,8 +208,14 @@ _setup_permissions() {
 	# the kernel, which always answers.
 	local target_user
 	target_user="$(id -un)"
-	sudo usermod -aG input  "${target_user}"
-	sudo usermod -aG uinput "${target_user}"
+	local group
+	for group in input uinput; do
+		if ! sudo usermod -aG "${group}" "${target_user}" 2>/dev/null \
+			&& ! sudo addgroup "${target_user}" "${group}" 2>/dev/null; then
+			echo "  ✗  Impossible d'ajouter ${target_user} au groupe ${group}." >&2
+			return 1
+		fi
+	done
 	echo "  ✔  ${target_user} ajouté aux groupes input et uinput"
 
 	# The directory is created first, and its absence is not fatal. A Fedora
@@ -275,12 +290,6 @@ _required_dependency_package() {
 		pacman:notify-send) echo "libnotify" ;;
 		xbps:notify-send) echo "libnotify" ;;
 		apk:notify-send) echo "libnotify" ;;
-		apt:unzip) echo "unzip" ;;
-		dnf:unzip) echo "unzip" ;;
-		zypper:unzip) echo "unzip" ;;
-		pacman:unzip) echo "unzip" ;;
-		xbps:unzip) echo "unzip" ;;
-		apk:unzip) echo "unzip" ;;
 		apt:sha256sum) echo "coreutils" ;;
 		dnf:sha256sum) echo "coreutils" ;;
 		zypper:sha256sum) echo "coreutils" ;;
@@ -299,6 +308,46 @@ _required_dependency_package() {
 		pacman:libatspi.so.0) echo "at-spi2-core" ;;
 		xbps:libatspi.so.0) echo "at-spi2-core" ;;
 		apk:libatspi.so.0) echo "at-spi2-core" ;;
+		# Typing metrics: the keylogger writes and the metrics windows read
+		# through the sqlite3 CLI; without it both fall back to nothing useful.
+		apt:sqlite3) echo "sqlite3" ;;
+		dnf:sqlite3) echo "sqlite" ;;
+		zypper:sqlite3) echo "sqlite3" ;;
+		pacman:sqlite3) echo "sqlite" ;;
+		xbps:sqlite3) echo "sqlite" ;;
+		apk:sqlite3) echo "sqlite" ;;
+		# The tray's dialogs: every prompt (a delay, a link, an API key) and
+		# every confirmation is a zenity window. KDE and minimal images lack it.
+		apt:zenity) echo "zenity" ;;
+		dnf:zenity) echo "zenity" ;;
+		zypper:zenity) echo "zenity" ;;
+		pacman:zenity) echo "zenity" ;;
+		xbps:zenity) echo "zenity" ;;
+		apk:zenity) echo "zenity" ;;
+		# The tray icon. platform/tray/appindicator.lua binds this library
+		# through FFI; without it --tray has nothing to host the icon in.
+		apt:tray) echo "libayatana-appindicator3-1" ;;
+		dnf:tray) echo "libayatana-appindicator-gtk3" ;;
+		zypper:tray) echo "libayatana-appindicator3-1" ;;
+		pacman:tray) echo "libayatana-appindicator" ;;
+		xbps:tray) echo "libayatana-appindicator" ;;
+		apk:tray) echo "libayatana-appindicator" ;;
+		# The WebKit2GTK typelib the tray's windows (settings, editor,
+		# metrics, onboarding) are drawn with through lgi.
+		apt:webkit) echo "gir1.2-webkit2-4.1" ;;
+		dnf:webkit) echo "webkit2gtk4.1" ;;
+		zypper:webkit) echo "typelib-1_0-WebKit2-4_1" ;;
+		pacman:webkit) echo "webkit2gtk-4.1" ;;
+		xbps:webkit) echo "libwebkit2gtk41" ;;
+		apk:webkit) echo "webkit2gtk-4.1" ;;
+		# GNOME Shell hosts no tray icon on its own: an SNI host extension must be
+		# enabled. Ubuntu ships and enables its own; the others do not.
+		apt:gnome-tray) echo "gnome-shell-extension-appindicator" ;;
+		dnf:gnome-tray) echo "gnome-shell-extension-appindicator" ;;
+		zypper:gnome-tray) echo "gnome-shell-extension-appindicator" ;;
+		pacman:gnome-tray) echo "gnome-shell-extension-appindicator" ;;
+		xbps:gnome-tray) echo "gnome-shell-extension-appindicator" ;;
+		apk:gnome-tray) echo "gnome-shell-extension-appindicator" ;;
 		*) return 1 ;;
 	esac
 }
@@ -376,7 +425,8 @@ echo "=== Ergopti ${ERGOPTI_VERSION} — vérification des dépendances ==="
 # forked once per event, which is what made the keyboard grab unaffordable.
 _check_or_install luajit
 _check_or_install notify-send
-_check_or_install unzip
+_check_or_install zenity
+_check_or_install sqlite3
 _check_or_install sha256sum
 # The live keymap shared by capture and injection. The daemon now fails closed
 # without libxkbcommon state, while the injector falls back to the clipboard if
@@ -386,173 +436,185 @@ _check_or_install xkbcli
 # optional desktop convenience makes the privacy filter fail closed forever.
 _check_or_install_library libatspi.so.0
 
+# The desktop half: the tray icon and the windows it opens. Best effort rather
+# than fatal, because a headless machine or a server needs neither and must
+# still get working hotstrings — but VERIFIED, and said out loud when it
+# fails, because "the icon never appeared" is otherwise indistinguishable from
+# a daemon that did not start. Neither was installed at all before: the README
+# told users to find the tray package themselves, so the first run of a fresh
+# install showed no icon on every distribution.
+_ensure_desktop_backend() {
+	local capability="$1"
+	local label="$2"
+	local probe="$3"
+	if luajit -e "${probe}" >/dev/null 2>&1; then
+		echo "  ✔  ${label} — déjà installé"
+		return 0
+	fi
+	local pkg_mgr
+	local package_name
+	pkg_mgr="$(_detect_pkg_manager)"
+	if ! package_name="$(_required_dependency_package "${pkg_mgr}" "${capability}")"; then
+		echo "  ⚠  ${label} : aucun paquet ${pkg_mgr} connu — à installer manuellement." >&2
+		return 0
+	fi
+	echo "  →  ${label} manquant — installation de ${package_name}…"
+	_install_required_package "${pkg_mgr}" "${package_name}" || true
+	if luajit -e "${probe}" >/dev/null 2>&1; then
+		echo "  ✔  ${label} — capacité vérifiée"
+	else
+		echo "  ⚠  ${label} indisponible après installation de ${package_name}." >&2
+	fi
+}
+
+# The icon exists once the library does; on GNOME it is only SHOWN when an
+# extension hosts StatusNotifierItems. Without one the daemon registers its
+# icon, the bus accepts it, and nothing appears — on Fedora and Debian GNOME,
+# i.e. every GNOME that is not Ubuntu's. Enabling takes effect at the next
+# login, which the input groups already require.
+GNOME_TRAY_EXTENSION="appindicatorsupport@rgcjonas.gmail.com"
+_ensure_gnome_tray_host() {
+	case "${XDG_CURRENT_DESKTOP:-}" in
+		*GNOME*|*gnome*) ;;
+		*) return 0 ;;
+	esac
+	if ! command -v gnome-extensions >/dev/null 2>&1; then
+		echo "  ⚠  GNOME sans gnome-extensions — activez une extension AppIndicator pour voir l'icône." >&2
+		return 0
+	fi
+	if gnome-extensions list --enabled 2>/dev/null | grep -qi "appindicator"; then
+		echo "  ✔  extension GNOME AppIndicator — déjà active"
+		return 0
+	fi
+	local pkg_mgr
+	local package_name
+	pkg_mgr="$(_detect_pkg_manager)"
+	if ! gnome-extensions list 2>/dev/null | grep -qx "${GNOME_TRAY_EXTENSION}" \
+		&& package_name="$(_required_dependency_package "${pkg_mgr}" gnome-tray)"; then
+		echo "  →  extension GNOME AppIndicator manquante — installation de ${package_name}…"
+		_install_required_package "${pkg_mgr}" "${package_name}" || true
+	fi
+	if gnome-extensions enable "${GNOME_TRAY_EXTENSION}" 2>/dev/null; then
+		echo "  ✔  extension GNOME AppIndicator activée"
+		return 0
+	fi
+	# A package installed during this session is unknown to the running shell,
+	# which then refuses to enable it. The setting it reads at the next login is
+	# written instead, merged into the user's list rather than replacing it.
+	local enabled
+	enabled="$(gsettings get org.gnome.shell enabled-extensions 2>/dev/null || true)"
+	case "${enabled}" in
+		*"'${GNOME_TRAY_EXTENSION}'"*) ;;
+		"@as []"|"[]"|"") enabled="['${GNOME_TRAY_EXTENSION}']" ;;
+		*) enabled="${enabled%]}, '${GNOME_TRAY_EXTENSION}']" ;;
+	esac
+	if gsettings set org.gnome.shell enabled-extensions "${enabled}" 2>/dev/null; then
+		echo "  ✔  extension GNOME AppIndicator activée (effective à la prochaine connexion)"
+	else
+		echo "  ⚠  Impossible d'activer l'extension AppIndicator — sans elle, GNOME n'affiche pas l'icône." >&2
+	fi
+}
+
+echo ""
+echo "=== Icône de la barre système et fenêtres ==="
+_ensure_gnome_tray_host
+_ensure_desktop_backend tray "icône de la barre système (libayatana-appindicator)" \
+	"local ffi=require('ffi'); for _, n in ipairs({'libayatana-appindicator3.so.1','libappindicator3.so.1'}) do if pcall(ffi.load, n) then os.exit(0) end end; os.exit(1)"
+
 # Optional Lua libraries — the daemon degrades gracefully without them,
 # but the full feature set (async event loop, webview rendering, tray SNI,
 # signal handlers) requires these packages.
 echo ""
 echo "=== Dépendances Lua optionnelles (event loop, timers, webviews, signaux) ==="
 
-# Probe each Lua module individually via luajit -e 'require("<name>")'.
-# _check_or_install with 'lua' would only check the interpreter, not the lib.
+# Each module must be loadable by LUAJIT, which speaks the Lua 5.1 ABI. The
+# generic names this list used (lua-lgi, lua-posix…) are Lua 5.4 builds on
+# Fedora, Arch, openSUSE and Alpine: installed successfully and invisible to
+# luajit, so the windows never opened there. Worse, a name the archive does not
+# carry (lua-http on Arch, lua-filesystem on openSUSE) failed under set -e and
+# aborted the install before a single driver file was copied.
+#
+# So: a list of candidates per manager, the 5.1/LuaJIT build first; each one is
+# tried until luajit can require the module; a missing package is never fatal.
 _lua_module_installed() {
-	local mod="$1"
-	luajit -e "require('${mod}')" >/dev/null 2>&1
+	luajit -e "require('$1')" >/dev/null 2>&1
 }
 
-_install_lua_pkgs() {
-	local mod="$1"
-	local pkg_apt="$2"
-	local pkg_dnf="$3"
-	local pkg_pacman="$4"
-
-	if _lua_module_installed "$mod"; then
-		echo "  ✔  ${mod} (Lua module) — déjà installé"
-		return 0
-	fi
-
-	echo "  →  ${mod} manquant — installation du paquet (${pkg_apt}/${pkg_dnf})…"
-	local pkg_mgr
-	pkg_mgr=$(_detect_pkg_manager)
-
-	case "$pkg_mgr" in
-		apt)     sudo apt-get install -y "$pkg_apt" ;;
-		dnf)     sudo dnf install -y "$pkg_dnf" ;;
-		zypper)  sudo zypper --non-interactive install "$pkg_dnf" ;;
-		pacman)  sudo pacman -Sy --noconfirm "$pkg_pacman" ;;
-		xbps)    sudo xbps-install -Sy "$pkg_pacman" ;;
-		apk)     sudo apk add "$pkg_pacman" ;;
-		*)
-			echo "  ⚠  Gestionnaire de paquets inconnu — installez '${mod}' manuellement." >&2
-			return 0
-			;;
+_lua_module_candidates() {
+	case "$1:$2" in
+		apt:luv)      echo "lua-luv" ;;
+		apt:lfs)      echo "lua-filesystem" ;;
+		apt:posix)    echo "lua-posix" ;;
+		apt:lgi)      echo "lua-lgi" ;;
+		dnf:luv)      echo "luajit2.1-luv lua5.1-luv compat-lua-luv" ;;
+		dnf:lfs)      echo "lua5.1-filesystem compat-lua-filesystem luajit2.1-filesystem" ;;
+		dnf:posix)    echo "lua5.1-posix compat-lua-posix luajit2.1-posix" ;;
+		dnf:lgi)      echo "lua5.1-lgi compat-lua-lgi luajit2.1-lgi" ;;
+		zypper:luv)   echo "luajit-luv lua51-luv" ;;
+		zypper:lfs)   echo "luajit-luafilesystem lua51-luafilesystem" ;;
+		zypper:posix) echo "luajit-luaposix lua51-luaposix" ;;
+		zypper:lgi)   echo "luajit-lgi lua51-lgi" ;;
+		pacman:luv)   echo "lua51-luv luajit-luv" ;;
+		pacman:lfs)   echo "lua51-filesystem" ;;
+		pacman:posix) echo "lua51-posix" ;;
+		pacman:lgi)   echo "lua51-lgi" ;;
+		xbps:luv)     echo "lua51-luv" ;;
+		xbps:lfs)     echo "lua51-luafilesystem" ;;
+		xbps:posix)   echo "lua51-luaposix" ;;
+		xbps:lgi)     echo "lua51-lgi" ;;
+		apk:luv)      echo "lua5.1-luv" ;;
+		apk:lfs)      echo "lua5.1-filesystem" ;;
+		apk:posix)    echo "lua5.1-posix" ;;
+		apk:lgi)      echo "lua5.1-lgi" ;;
+		*) return 1 ;;
 	esac
 }
 
-_install_lua_pkgs luv    lua-luv        lua-luv        lua-luv
-_install_lua_pkgs lfs    lua-filesystem lua-filesystem lua-filesystem
-_install_lua_pkgs posix  lua-posix      lua-posix      lua-posix
-_install_lua_pkgs lgi    lua-lgi        lua-lgi        lua-lgi
+_install_lua_module() {
+	local mod="$1"
+	local label="$2"
+	if _lua_module_installed "${mod}"; then
+		echo "  ✔  ${mod} (${label}) — déjà installé"
+		return 0
+	fi
+	local pkg_mgr
+	local candidates
+	pkg_mgr="$(_detect_pkg_manager)"
+	if ! candidates="$(_lua_module_candidates "${pkg_mgr}" "${mod}")"; then
+		echo "  ⚠  ${mod} (${label}) : aucun paquet ${pkg_mgr} connu pour LuaJIT." >&2
+		return 0
+	fi
+	local package_name
+	for package_name in ${candidates}; do
+		echo "  →  ${mod} manquant — essai du paquet ${package_name}…"
+		_install_required_package "${pkg_mgr}" "${package_name}" >/dev/null 2>&1 || true
+		if _lua_module_installed "${mod}"; then
+			echo "  ✔  ${mod} (${label}) — capacité vérifiée"
+			return 0
+		fi
+	done
+	echo "  ⚠  ${mod} (${label}) indisponible pour LuaJIT — fonction dégradée." >&2
+}
 
-# lua-http uses the module name 'http' (not 'http' which collides). Store as lua-http.
-# Most distros ship lua-http; the module is require("http") at runtime.
-_install_lua_pkgs http   lua-http       lua-http       lua-http
+_install_lua_module luv   "boucle d'évènements, inotify"
+_install_lua_module lfs   "système de fichiers"
+_install_lua_module posix "signaux SIGTERM/SIGHUP"
+_install_lua_module lgi   "fenêtres WebKit, compteur de vitesse"
 
 echo "  → Les dépendances Lua optionnelles sont installées si disponibles."
+
+# After lgi, which is how the windows reach WebKit: the typelib is useless to a
+# luajit that cannot load lgi, and the probe needs both. lgi.core loads the
+# typelib WITHOUT initialising GTK: `lgi.WebKit2` would call gtk_init, which
+# fails with no display — i.e. during every install over SSH or from a TTY.
+_ensure_desktop_backend webkit "fenêtres de configuration (WebKit2GTK)" \
+	"local core=require('lgi.core'); os.exit(core.gi.require('WebKit2') and 0 or 1)"
 fi
 
 
 # =================================
 # =================================
-# ======= 5/ Kanata Install =======
-# =================================
-# =================================
-
-# These four values describe one reviewed upstream artifact. Keep them together:
-# changing a version without its matching checksum must make the installer fail.
-KANATA_VERSION="1.12.0"
-KANATA_LINUX_X64_ASSET="linux-binaries-x64.zip"
-KANATA_LINUX_X64_SHA256="0bedd91567c5d7c54679061baadc37e4f83fb71750003999bc1d11f2c9754f36"
-KANATA_LINUX_X64_BINARY="kanata_linux_x64"
-
-_install_kanata() (
-	if command -v kanata >/dev/null 2>&1; then
-		echo "  ✔  kanata — déjà installé"
-		return 0
-	fi
-
-	local machine
-	machine="$(uname -m)"
-	case "${machine}" in
-		x86_64|amd64) ;;
-		*)
-			echo "  ✗  Aucun binaire Linux kanata authentifié pour ${machine}." >&2
-			echo "     Installez kanata manuellement, puis relancez l'installateur." >&2
-			return 1
-			;;
-	esac
-
-	local url="https://github.com/jtroo/kanata/releases/download/v${KANATA_VERSION}/${KANATA_LINUX_X64_ASSET}"
-	echo "  →  kanata manquant — téléchargement (${machine}, v${KANATA_VERSION})…"
-	local dest="${BIN_DIR}/kanata"
-	local temp_dir
-	local archive
-	local candidate
-	local install_tmp=""
-	install -d "${BIN_DIR}"
-	temp_dir="$(mktemp -d "${TMPDIR:-/tmp}/ergopti-kanata.XXXXXX")" || {
-		echo "  ✗  Impossible de créer un répertoire temporaire pour kanata." >&2
-		return 1
-	}
-	archive="${temp_dir}/${KANATA_LINUX_X64_ASSET}"
-	candidate="${temp_dir}/${KANATA_LINUX_X64_BINARY}"
-	trap 'rm -f -- "${archive}" "${candidate}" "${install_tmp}"; rmdir -- "${temp_dir}" 2>/dev/null || true' EXIT
-
-	if command -v curl >/dev/null 2>&1; then
-		curl --proto '=https' --tlsv1.2 --silent --show-error --location --fail \
-			--connect-timeout 15 --max-time 120 --max-filesize 67108864 \
-			--output "${archive}" "${url}" || {
-			echo "  ✗  Téléchargement de kanata échoué." >&2
-			return 1
-		}
-	elif command -v wget >/dev/null 2>&1; then
-		(
-			ulimit -f 131072
-			wget --quiet --https-only --output-document "${archive}" "${url}"
-		) || {
-			echo "  ✗  Téléchargement de kanata échoué." >&2
-			return 1
-		}
-	else
-		echo "  ✗  Ni curl ni wget — impossible de télécharger kanata." >&2
-		return 1
-	fi
-
-	if ! printf '%s  %s\n' "${KANATA_LINUX_X64_SHA256}" "${archive}" \
-		| sha256sum --check --status; then
-		echo "  ✗  L'archive kanata ne correspond pas au SHA-256 attendu." >&2
-		return 1
-	fi
-
-	if ! unzip -p "${archive}" "${KANATA_LINUX_X64_BINARY}" > "${candidate}"; then
-		echo "  ✗  Le binaire attendu est absent de l'archive kanata." >&2
-		return 1
-	fi
-
-	# Validate the object format without trusting `file`'s localized prose:
-	# ELF64, little-endian, x86-64 (e_machine 0x003e).
-	local elf_header
-	elf_header="$(od -An -tx1 -N20 "${candidate}" | tr -d ' \n')"
-	if [ "${elf_header:0:12}" != "7f454c460201" ] \
-		|| [ "${elf_header:36:4}" != "3e00" ]; then
-		echo "  ✗  Le fichier kanata n'est pas un exécutable Linux x86-64." >&2
-		return 1
-	fi
-
-	chmod 0755 "${candidate}"
-	local version_output
-	if ! version_output="$("${candidate}" --version 2>&1)" \
-		|| ! printf '%s\n' "${version_output}" | grep -Eq "(^|[^0-9])${KANATA_VERSION}([^0-9]|$)"; then
-		echo "  ✗  Le binaire kanata téléchargé n'annonce pas la version ${KANATA_VERSION}." >&2
-		return 1
-	fi
-
-	install_tmp="$(mktemp "${BIN_DIR}/.kanata.XXXXXX")"
-	install -m 0755 "${candidate}" "${install_tmp}"
-	mv -f -- "${install_tmp}" "${dest}"
-	install_tmp=""
-	echo "  ✔  kanata installé dans ${dest}"
-)
-
-if ! $SKIP_DEPS; then
-	echo ""
-	echo "=== Installation de kanata ==="
-	_install_kanata
-fi
-
-
-# =================================
-# =================================
-# ======= 6/ File Installation =======
+# ======= 5/ File Installation =======
 # =================================
 # =================================
 
@@ -602,57 +664,9 @@ echo "  ✔  lanceur : ${BIN_DIR}/ergopti-hotstrings"
 # silent — the daemon starts, logs one line, and expands nothing.
 _setup_permissions
 
-# =======================================
-# =======================================
-# ======= 7/ Kanata Configuration =======
-# =======================================
-# =======================================
-
-KANATA_CONFIG_DIR="${HOME}/.config/kanata"
-# The layout ships in two shapes: flattened beside install.sh in the built
-# package, and inside the driver tree in a source checkout. Probe both rather
-# than assume one — the previous single path was correct only in a checkout.
-KANATA_SRC=""
-for _kanata_candidate in \
-	"${SCRIPT_DIR}/kanata.kbd" \
-	"${SCRIPT_DIR}/platform/remap/data/kanata.kbd" \
-	"${SCRIPT_DIR}/linux/platform/remap/data/kanata.kbd"
-do
-	if [ -f "${_kanata_candidate}" ]; then
-		KANATA_SRC="${_kanata_candidate}"
-		break
-	fi
-done
-
-echo ""
-echo "=== Configuration de kanata ==="
-
-install -d "${KANATA_CONFIG_DIR}"
-
-# A COPY, never a symlink. This used to link ~/.config/kanata/ergopti.kbd back at
-# the tracked template, and the daemon's generator opens that same path for
-# writing on every start — so the first restart followed the link and overwrote
-# the source of truth in the install tree. The two writers then disagreed in the
-# worst possible direction: the file the parity gate reads had been rewritten by
-# the thing the gate exists to check.
-#
-# Copying also closes an ordering gap. The unit below is enabled and started
-# before the daemon has ever run, so without a file already in place kanata would
-# start pointing at nothing. The committed template is a complete, loadable
-# config — its generated block is pinned byte for byte to what the generator
-# emits — so the copy is correct on its own and the daemon merely refreshes it
-# once the user has a tap-hold override worth applying.
-if [ -f "${KANATA_SRC}" ]; then
-	install -m 0644 "${KANATA_SRC}" "${KANATA_CONFIG_DIR}/ergopti.kbd"
-	echo "  ✔  configuration kanata : ${KANATA_CONFIG_DIR}/ergopti.kbd"
-else
-	echo "  Avertissement : fichier kanata source introuvable — configuration ignorée." >&2
-fi
-
-
 # ========================================
 # ========================================
-# ======= 8/ Systemd Service Setup =======
+# ======= 6/ Systemd Service Setup =======
 # ========================================
 # ========================================
 
@@ -677,28 +691,6 @@ if $INSTALL_SERVICE; then
 		"${SRC_DRIVER}/ergopti-hotstrings.service" \
 		> "${SYSTEMD_DIR}/ergopti-hotstrings.service"
 
-	# kanata key-remapping daemon (tap-hold + layer switching)
-	# Runs alongside ergopti-hotstrings; reads the generated .kbd from
-	# ~/.config/kanata/ergopti.kbd (written by the kanata manager module).
-	cat > "${SYSTEMD_DIR}/kanata.service" << KANATA_SERVICE
-[Unit]
-Description=Kanata key remapping daemon (Ergopti)
-# Same session lifetime as the daemon that reads its output: a remap daemon
-# still running after logout re-maps the login screen.
-After=graphical-session.target
-PartOf=graphical-session.target
-
-[Service]
-Type=simple
-ExecStart=${BIN_DIR}/kanata --quiet --cfg ${KANATA_CONFIG_DIR}/ergopti.kbd
-Restart=on-failure
-RestartSec=3s
-Nice=-10
-
-[Install]
-WantedBy=graphical-session.target
-KANATA_SERVICE
-
 	# Guarded, because systemd is not universal: Alpine runs OpenRC, Void runs
 	# runit, and Gentoo may run either. Those systems get the XDG autostart entry
 	# below instead, which every desktop environment honours regardless of init.
@@ -722,14 +714,6 @@ KANATA_SERVICE
 		STARTUP_OWNER="systemd"
 		echo "  ✔  service ergopti-hotstrings activé et démarré"
 
-		# Enable kanata if the binary was installed.
-		if [ -x "${BIN_DIR}/kanata" ]; then
-			systemctl --user enable  kanata.service
-			systemctl --user restart kanata.service
-			echo "  ✔  service kanata activé et démarré"
-		else
-			echo "  ⚠  kanata binaire absent — service créé mais non activé"
-		fi
 	elif command -v systemctl >/dev/null 2>&1; then
 		echo "  ⚠  systemd présent mais aucun bus utilisateur joignable (session absente)."
 		if systemctl --user is-enabled ergopti-hotstrings.service >/dev/null 2>&1; then
@@ -761,11 +745,11 @@ AUTOSTART
 fi
 
 
-# =========================================
-# =========================================
-# ======= 10/ Post-Install Summary =======
-# =========================================
-# =========================================
+# =======================================
+# =======================================
+# ======= 7/ Post-Install Summary =======
+# =======================================
+# =======================================
 
 echo ""
 echo "=== Installation terminée ==="

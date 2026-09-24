@@ -45,16 +45,17 @@ function M.pick(shell, config_paths, i18n, current)
 	if seed == nil then return nil, "configuration directory is unavailable" end
 	local title = type(i18n) == "table" and type(i18n.get) == "function"
 		and i18n.get("dialog.config_folder.select_title") or "Select configuration folder"
-	local chosen = nil
+	local command
 	if shell.has_command("zenity") then
-		chosen = shell.exec_line("zenity --file-selection --directory --title=" .. shell.quote(title)
-			.. " --filename=" .. shell.quote(seed .. "/") .. " 2>/dev/null")
+		command = "zenity --file-selection --directory --title=" .. shell.quote(title)
+			.. " --filename=" .. shell.quote(seed .. "/") .. " 2>/dev/null"
 	elseif shell.has_command("kdialog") then
-		chosen = shell.exec_line("kdialog --getexistingdirectory " .. shell.quote(seed)
-			.. " --title " .. shell.quote(title) .. " 2>/dev/null")
+		command = "kdialog --getexistingdirectory " .. shell.quote(seed)
+			.. " --title " .. shell.quote(title) .. " 2>/dev/null"
 	else
 		return nil, "neither zenity nor kdialog is available"
 	end
+	local chosen = require("ui.modal").run(function() return shell.exec_line(command) end)
 	local normalized = chosen and M.normalize(config_paths, chosen) or nil
 	if not normalized then return nil, "folder selection was cancelled" end
 	return normalized

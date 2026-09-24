@@ -33,10 +33,10 @@ FEATURES & RATIONALE:
 		{ label: 'Hotstrings + autocorrection (2 994 livrés)', win: 'yes', mac: 'yes', linux: 'alpha' },
 		{ label: 'Touche magique ★ (2 121 expansions)', win: 'yes', mac: 'yes', linux: 'alpha' },
 		{ label: 'Hotstrings personnels + dynamiques', win: 'yes', mac: 'yes', linux: 'alpha' },
-		{ label: 'Tap-holds (7 touches) + layer navigation', win: 'yes', mac: 'yes', linux: 'kanata' },
+		{ label: 'Tap-holds (7 touches) + layer navigation', win: 'yes', mac: 'yes', linux: 'alpha' },
 		{ label: 'Tooltips colorés en temps réel', win: 'yes', mac: 'yes', linux: 'X11' },
 		{ label: 'IA locale via Ollama (110 modèles)', win: 'yes', mac: 'yes', linux: 'alpha' },
-		{ label: 'IA distante (9 fournisseurs d’API)', win: 'yes', mac: 'yes', linux: 'no' },
+		{ label: 'IA distante (9 fournisseurs d’API)', win: 'yes', mac: 'yes', linux: 'alpha' },
 		{ label: 'Backend MLX (Apple Silicon)', win: 'no', mac: 'yes', linux: 'no' },
 		{ label: 'Gestes trackpad', win: '10 slots', mac: '36 + 3 axes', linux: 'no' },
 		{ label: 'Métriques de frappe + tableaux de bord', win: 'yes', mac: 'yes', linux: 'alpha' },
@@ -60,7 +60,7 @@ FEATURES & RATIONALE:
 
 	let urlWindows = $derived(ui.release?.url('ErgoptiPlus.exe') ?? '#');
 	let urlMacos = $derived(ui.release?.url('ErgoptiPlus.app.zip') ?? '#');
-	let urlKanata = $derived(ui.release?.url('kanata.kbd') ?? '#');
+	let urlLinux = $derived(ui.release?.url('ErgoptiPlus-linux-x86_64.AppImage') ?? '#');
 </script>
 
 <section class="platforms" id="ep-telecharger" style="--section-accent: var(--accent-blue);">
@@ -70,7 +70,7 @@ FEATURES & RATIONALE:
 			<h2>Windows et macOS à parité. Linux en alpha.</h2>
 			<p class="lead">
 				Le même fichier de hotstrings, les mêmes raccourcis, le même tooltip, le même menu — sur
-				AutoHotkey v2 (Windows) et Hammerspoon (macOS). Le driver Linux (kanata + daemon Lua) est
+				AutoHotkey v2 (Windows) et Hammerspoon (macOS). Le driver Linux (un daemon Lua qui gère aussi les tap-holds) est
 				complet sur le papier mais <strong>cherche encore ses premiers testeurs</strong>.
 			</p>
 		</header>
@@ -93,7 +93,7 @@ FEATURES & RATIONALE:
 						<th>
 							<i class="icon-linux"></i>
 							<span class="os-name">Linux</span>
-							<span class="os-driver">kanata + Lua · alpha</span>
+							<span class="os-driver">Lua · alpha</span>
 						</th>
 					</tr>
 				</thead>
@@ -181,7 +181,7 @@ FEATURES & RATIONALE:
 		<aside class="linux-callout ep-card" use:reveal>
 			<h3>🐧 Vous utilisez Linux ? On vous cherche.</h3>
 			<p>
-				Le driver Linux existe : 16 000 lignes de Lua, kanata pour les tap-holds, hotstrings via le
+				Le driver Linux existe : 16 000 lignes de Lua, tap-holds gérés par le daemon lui-même, hotstrings via le
 				moteur partagé, IA Ollama, métriques SQLite. Mais <strong
 					>personne ne l’a encore fait tourner en conditions réelles</strong
 				>
@@ -217,7 +217,7 @@ FEATURES & RATIONALE:
 				</a>
 				<a
 					class={ui.osStyle === 'linux' ? 'btn btn-primary' : 'btn btn-secondary'}
-					href={urlKanata}
+					href={urlLinux}
 					download={!!ui.release}
 				>
 					<i class="icon-linux"></i><span>Linux <small>(alpha)</small></span>

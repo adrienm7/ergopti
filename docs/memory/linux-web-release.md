@@ -25,6 +25,55 @@ it. Tests must execute selection through injection.
 Provider APIs may return a single computed label wrapped as a list. Normalize at
 the adapter boundary rather than spreading shape checks through the driver.
 
+### project-linux-keymap-before-libxkbcommon-1-8
+
+`xkbcli dump-keymap-{wayland,x11}` only exists from libxkbcommon 1.8; Ubuntu
+24.04 ships 1.6. `adapters/keyboard_layout.lua` therefore falls back to
+XWayland's keymap (`xkbcomp -xkb $DISPLAY`, exact because XWayland receives the
+compositor's keymap) and then to `xkbcli compile-keymap` from the session's
+layout names (`infra/xkb_rmlvo.lua`). Action: a keymap source must be proven on
+the runner's own libxkbcommon through `refresh()`, never through a fallback the
+test writes itself.
+
+### project-linux-injection-table-comes-from-libxkbcommon
+
+The char → keystroke table is probed on the validated keymap
+(`XkbCapture.inverse_table()`): each chord the injector can press is applied to
+a fresh XKB state. A text model that maps level N to a fixed modifier is wrong
+for keypad types (NumLock) and Ergopti's `ERGOPTI_SEVEN_LEVEL` (Shift = level
+3). Shortcut letters (Ctrl+V, Ctrl+W) go through
+`keyboard_layout.shortcut_keycode()`. Action: never add a hardcoded evdev
+letter or a level → modifier table.
+
+### project-linux-atspi-focus-is-per-application
+
+Every GTK application keeps STATE_FOCUSED on its last focused field; only the
+window manager's STATE_ACTIVE frame says which one the user is in. A
+desktop-wide search is ambiguous with two windows open, and the daemon fails
+closed on ambiguity: every expansion blocked. Measured cost is ~1 ms per node
+against a 1 s probe deadline. Action: keep the search scoped to the active
+window and prove changes with `tests/hardware/run_atspi_focus.sh`.
+
+### project-linux-first-install-needs-luajit-module-builds
+
+Generic `lua-*` packages are Lua 5.4 builds on Fedora, Arch, openSUSE and
+Alpine; LuaJIT needs `lua51-*` (Arch), `luajit-*` (openSUSE), `lua5.1-*`
+(Alpine, Fedora). Fedora has no LuaJIT lgi, so its WebKit windows cannot open
+(declared in the `first-install-distros` matrix). GNOME shows no tray icon
+without an AppIndicator extension. Action: prove installer changes with
+`tests/distro/run_in_docker.sh <image>` and the first-install matrix.
+
+### project-linux-tap-holds-run-in-the-daemon
+
+Since 2026-09-24 the Linux tap-holds and navigation layer run in the daemon
+(`platform/remap/tap_hold_engine.lua`, installed by `tap_hold_manager` through
+`keyboard_hook.set_remapper`, which releases every held key on swap, pause and
+stop). They replaced kanata, which needed glibc 2.39 (absent on Debian 12 and
+Ubuntu 22.04), was never started by the daemon, and broke its whole config on
+one free-text action. No Linux release had been installed, so nothing
+migrates an old kanata unit. Action: do not reintroduce an external remapper or a `kanata.kbd` release asset; change
+tap-hold behaviour in the engine and its loader/writer, with Lua tests.
+
 ## Website and documentation
 
 ### project-site-i18n-gettext-french-key
@@ -127,6 +176,51 @@ after uninstall. The Arch entry replays the host of issue #84 (fish, wlroots
 compositor, generation-2 leftovers) and a GNOME session on a private D-Bus bus
 with a real dconf. Action: any installer change lands with a green matrix; a
 new distribution family is added as a matrix entry, not as a manual checklist.
+
+### project-linux-daemon-is-proven-live-through-a-real-kernel
+
+`tests/hardware/run_daemon_live.sh` (CI step in `test-linux`) starts the real
+daemon with `--tray` on a uinput keyboard, types "adn " and decodes what the
+daemon's own virtual keyboard sends, while `sni_host.py` reads the tray menu.
+It found three bugs that no recorder-based test could: every tray row's
+`ffi.cast` callback leaked (LuaJIT never frees them, so the daemon crashed
+with "too many callbacks"; one process-wide dispatcher now routes by id), a
+100k-row menu that took seconds to build, and the expansion's replayed
+terminator dropped because its key-down was still held on the virtual
+keyboard (the kernel ignores a key-down for a key already down). Action:
+inject through `injector.run_transaction`, which releases
+`keyboard_hook.held_forwarded_keys()` first; never add a per-item FFI
+callback; keep this live step green for any hook, injector or tray change.
+
+### project-linux-tray-dialogs-and-windows-cross-the-grab-and-json
+
+Two boundaries silently broke every tray UI on Linux while unit tests stayed
+green. (1) A zenity/kdialog dialog runs inside a menu callback and blocks the
+event loop that forwards the grabbed keyboard, so nothing could be typed into
+it: every blocking dialog must go through `ui/modal.lua`
+(`keyboard_hook.while_released`). (2) The webview manager decoded page
+messages and encoded replies through `dkjson`, which is never installed: all
+page objects arrived as nil. It uses the shared `json` codec now; bridge tests
+that pass Lua tables to `route_message` cannot catch this, so
+`tests/hardware/run_webview_roundtrip.lua` lets a real page post its own
+request. Action: never add an optional JSON dependency or a dialog outside
+`Modal.run`; a new window needs a round-trip check, not only a bridge test.
+
+### project-linux-ai-is-proven-against-real-servers
+
+The AI path is exercised end to end in CI: `run_daemon_live` accepts a
+prediction from `fake_llm_server.py` (OpenAI dialect, as Cerebras) with a
+bare 1 (the default chord since 2026-09-24; Alt+1 once the AI menu requires
+Alt) through the real kernel, and `run_ollama_live.lua` drives the real Ollama
+(model list, `/api/pull`, predictions, and the remote backend on Ollama's
+`/v1` endpoint). They caught what scripted tests could not: text typed while
+the accepting Alt was still held (every injection now releases Ctrl/Alt/Super
+after an F24 mask tap, never restoring them), a double space from the parser
+spacing against the word-rebuilt tail, and curl argv exposing keys and typed
+text (headers, body and URL now go through `--config -`). Remote API keys
+live in `~/.config/ergopti_plus/api_keys.json`, mode 0600, outside the
+possibly-synced config folder. Action: keep both live steps green for any
+change to the injector, the engine, the parser or the HTTP client.
 
 ## Release artifacts
 

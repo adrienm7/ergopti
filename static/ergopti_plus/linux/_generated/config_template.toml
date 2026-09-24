@@ -292,7 +292,7 @@ secure_filter_enabled = true
 url_bar_filter_enabled = false
 
 [llm.navigation]
-val_modifiers = ["alt"]
+val_modifiers = []
 
 [metrics]
 enabled = true

@@ -7,7 +7,7 @@
 --- all » switched every category AND every bundled section on instead of giving
 --- the user back what they had. Both now go through ui/menu/global_feature_switch:
 --- every feature switch goes off (hotstrings, shortcuts, gestures, AI, metrics,
---- dynamic hotstrings, kanata tap-holds), no assignment is touched, and Enable
+--- dynamic hotstrings, tap-holds), no assignment is touched, and Enable
 --- all restores the persisted snapshot.
 --- ==============================================================================
 
@@ -170,49 +170,26 @@ helpers.describe("global disable all (linux): hotstring gates restore exactly", 
 	end)
 end)
 
-helpers.describe("global disable all (linux): kanata tap-holds switch", function()
-	helpers.it("types every tap-hold key natively when the feature is off", function()
-		local Gen = require("tap_hold.kanata_generator")
-		local keys = {
-			caps_lock  = { time_activation_seconds = 0.2, tap_action = "enter", hold_modifier = "ctrl" },
-			left_shift = { time_activation_seconds = 0.2, tap_action = "copy", hold_modifier = "shift" },
-			tab        = { time_activation_seconds = 0.2, tap_action = "alt_tab_monitor", hold_modifier = "alt" },
-			right_ctrl = { time_activation_seconds = 0.2, tap_action = "one_shot_shift" },
-		}
-		local on = Gen.generate(keys, { one_shot_shift_timeout_ms = 2000 })
-		local off = Gen.generate(keys, { one_shot_shift_timeout_ms = 2000, tap_holds_enabled = false })
-		helpers.assert_true(on:find("tap-hold-press", 1, true) ~= nil, "on keeps the directives")
-		helpers.assert_nil(off:find("tap-hold-press", 1, true), "off emits no tap-hold directive")
-		helpers.assert_nil(off:find("one-shot", 1, true), "off emits no one-shot directive")
-		for _, line in ipairs({ "cap        caps", "lsft       lsft", "alttab     tab", "ossft      rctl" }) do
-			helpers.assert_true(off:find(line, 1, true) ~= nil,
-				"every alias the layer references stays defined: missing '" .. line .. "' in\n" .. off)
-		end
-	end)
-end)
-
-helpers.describe("global disable all (linux): the tap-hold switch reaches kanata", function()
-	helpers.it("restarts a running kanata and rolls back when it cannot", function()
-		local Remap = helpers.load_module("platform.remap.manager")
-		local real_running, real_restart = Remap.is_running, Remap.restart
-		local restarts = {}
-		local restart_ok = true
-		Remap.is_running = function() return true end
-		Remap.restart = function()
-			restarts[#restarts + 1] = Remap.tap_holds_enabled()
-			return restart_ok
-		end
+helpers.describe("global disable all (linux): the tap-hold switch", function()
+	helpers.it("takes the engine out of the keyboard hook and puts it back", function()
+		local Manager = helpers.load_module("platform.remap.tap_hold_manager")
+		local installed = nil
+		local user_path = os.tmpname()
+		os.remove(user_path)
+		Manager.init({
+			keyboard_hook = { set_remapper = function(engine) installed = engine end },
+			execute_action = function() end,
+			action_names = function() return {} end,
+			defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"),
+			user_path = user_path,
+		})
 		local ok, err = pcall(function()
-			helpers.assert_true(Remap.set_tap_holds_enabled(false))
-			helpers.assert_eq(restarts, { false }, "kanata restarts on the configuration without tap-holds")
-			helpers.assert_eq(Remap.tap_holds_enabled(), false)
-			restart_ok = false
-			helpers.assert_true(not Remap.set_tap_holds_enabled(true))
-			helpers.assert_eq(Remap.tap_holds_enabled(), false,
-				"a switch kanata could not apply is rolled back, not reported as on")
+			helpers.assert_true(Manager.set_enabled(false))
+			helpers.assert_nil(installed, "off: every key is itself again")
+			helpers.assert_true(Manager.set_enabled(true))
+			helpers.assert_true(installed ~= nil, "on: the configured tap-holds are back")
 		end)
-		Remap.is_running, Remap.restart = real_running, real_restart
-		helpers.load_module("platform.remap.manager")
+		Manager._reset_for_test()
 		if not ok then error(err, 0) end
 	end)
 end)

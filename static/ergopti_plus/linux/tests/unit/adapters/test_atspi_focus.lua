@@ -60,6 +60,53 @@ helpers.describe("AT-SPI focus query", function()
 		helpers.assert_eq(#fake.released, 6, "every owned node, including the root, must release")
 	end)
 
+	helpers.it("searches only the active window when the window manager names one", function()
+		-- Measured on a real AT-SPI bus with openbox and two GTK windows: each
+		-- application keeps FOCUSED on its last focused field, and only the
+		-- frame carries ACTIVE. A desktop-wide search saw two focused fields,
+		-- called it ambiguous, and blocked every expansion.
+		local tree = {
+			id = "desktop",
+			children = {
+				{ id = "editor", children = {
+					{ id = "editor-frame", children = { { id = "editor-text", focused = true, role = 61 } } },
+				} },
+				{ id = "login", children = {
+					{ id = "login-frame", active = true, children = {
+						{ id = "login-password", focused = true, role = 40 },
+					} },
+				} },
+			},
+		}
+		local fake = backend(tree)
+		fake.active = function(node) return node.active == true end
+		AtspiFocus._set_backend_for_test(fake)
+		local role, conclusive = AtspiFocus.get_role()
+		helpers.assert_eq(conclusive, true, "the active window holds exactly one focused field")
+		helpers.assert_eq(role, 40, "and it is the active window's password field, not the editor's text")
+		local counts = {}
+		for _, id in ipairs(fake.released) do counts[id] = (counts[id] or 0) + 1 end
+		for _, id in ipairs({ "desktop", "editor", "editor-frame", "login", "login-frame", "login-password" }) do
+			helpers.assert_eq(counts[id], 1, id .. " must be released exactly once")
+		end
+		helpers.assert_nil(counts["editor-text"], "the inactive window's subtree is never walked")
+	end)
+
+	helpers.it("searches the whole desktop when no window is active", function()
+		-- No window manager: nothing is ACTIVE, and two focused fields stay an
+		-- ambiguity rather than a guess.
+		local tree = { id = "desktop", children = {
+			{ id = "a", children = { { id = "wa", children = { { id = "ta", focused = true, role = 61 } } } } },
+			{ id = "b", children = { { id = "wb", children = { { id = "tb", focused = true, role = 61 } } } } },
+		} }
+		local fake = backend(tree)
+		fake.active = function() return false end
+		AtspiFocus._set_backend_for_test(fake)
+		local role, conclusive = AtspiFocus.get_role()
+		helpers.assert_nil(role)
+		helpers.assert_eq(conclusive, false)
+	end)
+
 	helpers.it("rejects no focus, duplicate focus, and traversal failure", function()
 		local cases = {
 			{ id = "none", children = { { id = "plain", role = 57 } } },

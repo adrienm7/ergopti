@@ -56,7 +56,9 @@ global _LLM_Engine := Map(
 	"pred_indent",                0,
 	"auto_raise_temp",            true,
 	"nav_modifiers",              "",
-	"val_modifiers",              "alt",
+	; Placeholder only: LLM_Engine_ApplySharedDefaults() overwrites it from
+	; defaults.json ("" = bare digits select a prediction).
+	"val_modifiers",              "",
 	"timer_active",               false,
 	; Acceptance origin captured with the keystroke that arms a request. The
 	; detached presentation record receives its own immutable copy at pixel

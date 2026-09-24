@@ -59,3 +59,36 @@ _LLMDefaults_LoaderSourcesSharedFromJson() {
 	AssertTrue(LLM_Defaults.Has("llm_model"))
 }
 Test("LLMDefaults: loader populates shared keys from defaults.json + local keys", _LLMDefaults_LoaderSourcesSharedFromJson)
+
+
+
+
+
+; ==================================================
+; ==================================================
+; ======= 3/ Modifier Defaults Single Source =======
+; ==================================================
+; ==================================================
+
+; Menu and engine fallbacks for val_modifiers used to hardcode "alt" while the
+; shared default moved on. They now read LLM_Defaults_ModifierString(), so the
+; loaded value must already be the tray chord form ("alt+ctrl", "" = bare keys)
+; rather than the JSON array joined with commas.
+_LLMDefaults_ModifierDefaultsUseChordForm() {
+	global LLM_Defaults
+	LLM_Defaults_Load()
+	for Key in ["llm_val_modifiers", "llm_nav_modifiers"] {
+		Value := LLM_Defaults_ModifierString(Key)
+		AssertEqual(LLM_Defaults[Key], Value,
+			Key . " accessor must return the loaded shared default")
+		AssertTrue(RegExMatch(Value, "^([a-z]+(\+[a-z]+)*)?$") > 0,
+			Key . " default must use the '+' chord form, got '" . Value . "'")
+	}
+	Threw := false
+	try LLM_Defaults_ModifierString("llm_model")
+	catch ValueError
+		Threw := true
+	AssertTrue(Threw, "a non-modifier key must be rejected instead of returned")
+}
+Test("LLMDefaults: modifier defaults are exposed in the tray chord form",
+	_LLMDefaults_ModifierDefaultsUseChordForm)

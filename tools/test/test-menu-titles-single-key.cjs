@@ -41,10 +41,10 @@ const TITLES = [
 	{ key: 'menu.layout.title', on: ['windows', 'macos', 'linux'] },
 	{ key: 'menu.hotstrings.title', on: ['windows', 'macos', 'linux'] },
 	{ key: 'menu.shortcuts.title', on: ['windows', 'macos', 'linux'] },
-	// Windows only at top level: Linux keeps its tap-holds inside the kanata
-	// submenu (`kanata_tap_holds`) and macOS inside Karabiner, which is what the
-	// manifest's platforms list says for the top-level row.
-	{ key: 'menu.tapholds.title', on: ['windows'] },
+	// On every driver since 2026-09-24: Linux dropped its « Kanata » submenu for
+	// the shared tap-hold row when the tap-holds moved into the daemon, and the
+	// manifest's top-level tap_holds row carries no platform restriction.
+	{ key: 'menu.tapholds.title', on: ['windows', 'macos', 'linux'] },
 	{ key: 'menu.gestures.title', on: ['windows', 'macos', 'linux'] },
 	{ key: 'menu.metrics.title', on: ['windows', 'macos', 'linux'] },
 	{ key: 'menu.llm.title', on: ['windows', 'macos', 'linux'] },

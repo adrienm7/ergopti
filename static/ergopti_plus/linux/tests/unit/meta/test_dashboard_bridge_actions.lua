@@ -239,11 +239,13 @@ helpers.describe("dashboard bridges: the typing window answers from its cache", 
 		local Bridge, deferred = bridge_with_seams()
 		local keylogger, counts = counting_keylogger()
 		local state = { keylogger = keylogger }
-		Bridge.on_message("ready", state)
-		Bridge.on_message({ action = "clear_cache" }, state)
-		Bridge.on_message("ready", state)
-		helpers.assert_eq(counts.full, 2, "after a reset the page must not see the old cache")
-		helpers.assert_eq(#deferred, 0)
+		local first = Bridge.on_message("ready", state)
+		local reset = Bridge.on_message({ action = "clear_cache" }, state)
+		helpers.assert_eq(counts.full, 2, "the reset answers with a rebuilt payload")
+		helpers.assert_true(reset ~= first and reset.metrics_manifest ~= nil,
+			"the page applies every reply as data: the reset reply must carry the rebuilt dashboard")
+		helpers.assert_true(reset.cleared)
+		helpers.assert_eq(Bridge.on_message("ready", state), reset, "the next opening never sees the old cache")
 		Bridge._reset()
 	end)
 
@@ -257,6 +259,32 @@ helpers.describe("dashboard bridges: the typing window answers from its cache", 
 		EventLoop._run_idle_tick()
 		helpers.assert_eq(ran, 1, "and a callback runs once")
 		helpers.assert_true(not EventLoop.defer("nope"), "a non-function is refused")
+	end)
+
+end)
+
+helpers.describe("metrics apps bridge: every reply is dashboard data", function()
+
+	helpers.it("answers a category edit, the picker and a pause with the manifest", function()
+		local Bridge = helpers.load_module("ui.metrics_apps.bridge")
+		local state = { keylogger = {
+			get_dashboard_payload = function() return { metrics_manifest = { ["2026-09-24"] = {} } } end,
+			set_app_category = function() return true end,
+			suppress = function() end,
+		} }
+		-- The page applies each reply as the dashboard; one without the manifest
+		-- emptied it until the next poll.
+		for _, message in ipairs({
+			{ action = "edit", app = "firefox", cat = "web" },
+			{ action = "pick" },
+			{ action = "pause" },
+		}) do
+			local reply = Bridge.on_message(message, state)
+			helpers.assert_true(type(reply) == "table" and reply.metrics_manifest ~= nil,
+				message.action .. " must answer with the manifest")
+		end
+		helpers.assert_true(Bridge.on_message({ action = "edit", app = "firefox", cat = "web" }, state).saved)
+		helpers.assert_eq(Bridge.on_message({ action = "pick" }, state).supported, false)
 	end)
 
 end)

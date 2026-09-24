@@ -379,7 +379,7 @@ end
 --- Creates a new hotstring engine instance.
 --- Each instance is fully independent — multiple engines can coexist without
 --- shared state, which is useful for sandboxed testing and multi-context daemons.
---- @return table Engine object with methods :load_mappings(), :on_char(), :reset().
+--- @return table Engine object with methods :load_mappings(), :on_char(), :reset(), :backspace().
 function M.new()
 	-- Tail-char buckets: key = lower-cased last codepoint of trigger.
 	local _buckets = {}
@@ -754,13 +754,32 @@ function M.new()
 	end
 
 	--- Clears the rolling typing buffer (e.g., on focus change or Escape key).
-	function engine:reset()
+	--- @param at_boundary boolean|nil false when the caret moved somewhere this
+	---        engine never saw (an arrow, Home, a click): the next text does not
+	---        necessarily start a word. Omitted means a genuine boundary.
+	function engine:reset(at_boundary)
 		_buf_cps = {}
 		_buf_times = {}
-		-- A reset happens at a boundary — focus change, Escape, a final_result
-		-- expansion — so what follows genuinely starts a word.
-		_start_is_boundary = true
+		-- A plain reset happens at a boundary — focus change, Escape, a
+		-- final_result expansion — so what follows genuinely starts a word.
+		_start_is_boundary = at_boundary ~= false
 		Logger.debug(LOG, "Buffer reset.")
+	end
+
+	--- Mirrors a Backspace: drops the last codepoint, as the application did.
+	---
+	--- A Backspace used to reset the whole buffer on Linux, so a corrected typo
+	--- ("adx", Backspace, "n") never completed its trigger, and — worse — the
+	--- reset declared a word boundary: "xy", Backspace, "adn " fired a word-only
+	--- trigger in the middle of "xadn". macOS removes one character, and on an
+	--- empty buffer notes that the text now continues something it never saw.
+	function engine:backspace()
+		if #_buf_cps == 0 then
+			_start_is_boundary = false
+			return
+		end
+		table.remove(_buf_cps)
+		table.remove(_buf_times)
 	end
 
 	--- Rewrites the buffer to reflect an expansion the driver has just injected:

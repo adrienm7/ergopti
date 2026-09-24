@@ -38,6 +38,12 @@ local function fake_luv(config)
 	end
 	function fake.timer_stop(timer) timer.stopped = true; return true end
 	function fake.read_start(pipe, callback) pipe.read_callback = callback; return true end
+	function fake.write(pipe, data, callback)
+		pipe.written = (pipe.written or "") .. data
+		state.config = pipe.written
+		if callback then callback(nil) end
+		return true
+	end
 	function fake.read_stop(pipe) pipe.read_stopped = true; return true end
 	function fake.is_closing(value) return value.closing end
 	function fake.close(value) value.closing = true end
@@ -207,7 +213,24 @@ helpers.describe("http_client: asynchronous curl ownership", function()
 		helpers.assert_true(default_result.ok)
 	end)
 
-	helpers.it("dispatches without waiting and passes data as argv, never through a shell", function()
+	helpers.it("keeps the headers, the body and the URL off the command line", function()
+		-- Every local process can read /proc/<pid>/cmdline: an API key in a
+		-- header and the typed text in a body were exposed there.
+		local client, state = fresh_client()
+		client.post("https://api.cerebras.ai/v1/chat/completions",
+			{ Authorization = "Bearer sk-secret" }, '{"q":"Mon mot de passe \\"x\\""}', function() end)
+		local joined = table.concat(state.options.args, "\n")
+		helpers.assert_true(joined:find("sk-secret", 1, true) == nil, "the key must not be in argv")
+		helpers.assert_true(joined:find("mot de passe", 1, true) == nil, "the typed text must not be in argv")
+		helpers.assert_true(joined:find("cerebras", 1, true) == nil, "the URL must not be in argv")
+		helpers.assert_true(joined:find("\n--config\n-", 1, true) ~= nil, "curl reads its config from stdin")
+		helpers.assert_true(state.config:find('header = "Authorization: Bearer sk-secret"', 1, true) ~= nil)
+		helpers.assert_true(state.config:find('data-binary = "{\\"q\\":\\"Mon mot de passe \\\\\\"x\\\\\\"\\"}"', 1, true) ~= nil,
+			"quotes and backslashes are escaped for curl's config parser: " .. tostring(state.config))
+		helpers.assert_true(state.config:find('url = "https://api.cerebras.ai/v1/chat/completions"', 1, true) ~= nil)
+	end)
+
+	helpers.it("dispatches without waiting and passes data on stdin, never through a shell", function()
 		local client, state = fresh_client()
 		local callback_count = 0
 		local result = nil
@@ -221,9 +244,8 @@ helpers.describe("http_client: asynchronous curl ownership", function()
 		helpers.assert_eq(callback_count, 0, "post must return before any network output arrives")
 		helpers.assert_true(client.isActive(), "the adapter owns the live request")
 		helpers.assert_eq(state.timer.timeout_ms, 30000, "timeout is armed before completion")
-		local joined = table.concat(state.options.args, "\n")
-		helpers.assert_true(joined:find("{'quoted':true}", 1, true) ~= nil,
-			"the body must remain one literal argv entry")
+		helpers.assert_true(state.config:find([[data-binary = "{'quoted':true}"]], 1, true) ~= nil,
+			"the body must reach curl literally")
 		helpers.assert_true(state.options.detached == true,
 			"curl must own a process group that cancellation can target")
 

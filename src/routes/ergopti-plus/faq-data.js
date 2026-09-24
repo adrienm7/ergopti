@@ -43,6 +43,6 @@ export const FAQ_DATA = [
 	},
 	{
 		q: 'Windows, macOS ou Linux ?',
-		a: 'Windows (AutoHotkey) et macOS (Hammerspoon) sont à parité et prêts à l’emploi. Le driver Linux (kanata + daemon Lua) est complet mais en alpha — il cherche ses premiers testeurs.'
+		a: 'Windows (AutoHotkey) et macOS (Hammerspoon) sont à parité et prêts à l’emploi. Le driver Linux (un daemon Lua qui gère aussi les tap-holds) est complet mais en alpha — il cherche ses premiers testeurs.'
 	}
 ];

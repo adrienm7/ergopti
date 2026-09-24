@@ -891,6 +891,11 @@ jobs:
           mkdir -p "$XDG_RUNTIME_DIR" && chmod 700 "$XDG_RUNTIME_DIR"
           # A compositor with no config and no outputs. WLR_BACKENDS=headless is
           # what lets it start without a seat or a GPU on a CI runner.
+          # French on purpose: a US answer is what a guessed table produces, so
+          # only a layout where "é" has its own key proves the keymap was read.
+          # sway honours XKB_DEFAULT_LAYOUT, and so does the driver's last
+          # fallback when libxkbcommon is too old to dump the compositor's map.
+          export XKB_DEFAULT_LAYOUT=fr ERGOPTI_EXPECT_LAYOUT=fr
           WLR_BACKENDS=headless WLR_LIBINPUT_NO_DEVICES=1 sway --config /dev/null &
           SWAY_PID=$!
           # Poll for the socket rather than sleeping a fixed time: a loaded runner
@@ -931,6 +936,90 @@ jobs:
           sudo apt-get install -y --no-install-recommends libayatana-appindicator3-1 libgtk-3-0
           env LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;' luajit tests/hardware/run_tray_symbols.lua
         timeout-minutes: 4
+
+      # The symbols resolving is not the icon appearing. A panel shows a tray
+      # icon when an item registers with org.kde.StatusNotifierWatcher and then
+      # answers for its properties and its com.canonical.dbusmenu menu — the
+      # protocol KDE Plasma, GNOME's AppIndicator extension, waybar and
+      # xfce4-panel all speak. sni_host.py is that watcher and nothing else, so
+      # "the icon appears" is checked here with the production adapter: the item
+      # is Active, carries the Ergopti logo as an ABSOLUTE file path (the panel
+      # resolves it in its own working directory) and serves the menu rows.
+      - name: The tray icon registers with a StatusNotifier host
+        if: always()
+        working-directory: static/ergopti_plus/linux
+        run: |
+          sudo apt-get install -y --no-install-recommends python3-gi gir1.2-glib-2.0 dbus xvfb
+          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+          dbus-run-session -- bash -c '
+            ready="$(mktemp -u)"
+            export ERGOPTI_TRAY_CLICK_FILE="$(mktemp -u)"
+            python3 tests/hardware/sni_host.py --ready-file "$ready" --timeout 30 --settle 1 \
+              --expect-label "Ergopti+ tray probe" --expect-icon-file \
+              --click-label "Click probe" > "$RUNNER_TEMP/sni.json" &
+            host=$!
+            for _ in $(seq 1 40); do [ -f "$ready" ] && break; sleep 0.25; done
+            [ -f "$ready" ] || { echo "::error::the StatusNotifier host never started"; exit 1; }
+            xvfb-run -a luajit tests/hardware/run_tray_icon.lua 10
+            probe=$?
+            wait "$host"; status=$?
+            cat "$RUNNER_TEMP/sni.json"
+            [ "$probe" = "0" ] || exit "$probe"
+            # The click went panel → dbusmenu → libdbusmenu → the shared
+            # dispatcher → the row: its marker is the proof.
+            [ -f "$ERGOPTI_TRAY_CLICK_FILE" ] || { echo "::error::a menu click never reached its row"; exit 1; }
+            exit "$status"'
+        timeout-minutes: 4
+
+      # The secure-field probe decides whether ANY expansion may fire (it fails
+      # closed), and its one real input is a desktop: an accessibility bus, a
+      # window manager and applications that keep FOCUSED on their last field.
+      # With two windows open the old desktop-wide search found two focused
+      # fields and blocked every expansion; only a real bus shows that.
+      - name: The secure-field probe on a real accessibility bus
+        if: always()
+        run: |
+          sudo apt-get install -y --no-install-recommends at-spi2-core openbox python3-gi gir1.2-gtk-3.0 dbus-x11 xvfb
+          bash static/ergopti_plus/linux/tests/hardware/run_atspi_focus.sh
+        timeout-minutes: 5
+
+      # The program a user starts, started: the real daemon with --tray on a
+      # keyboard created through uinput, under an X server, a session bus, the
+      # accessibility bus, a window manager and a focused GTK field (nothing
+      # expands without the privacy gate's answer). A trigger typed on that
+      # keyboard must reach the desktop expanded, through the grab and the
+      # daemon's own virtual keyboard, while sni_host.py checks the tray it shows:
+      # the logo, and a translated menu with no raw i18n key.
+      - name: The whole daemon, live — a trigger typed, a tray shown
+        if: always()
+        run: |
+          sudo modprobe uinput
+          # lua-luv as install.sh installs it: the daemon's timers and every
+          # HTTP request (the AI phase) run on it.
+          sudo apt-get install -y --no-install-recommends at-spi2-core openbox python3-gi gir1.2-gtk-3.0 \
+            dbus-x11 xvfb x11-xkb-utils libayatana-appindicator3-1 lua-luv
+          sudo bash static/ergopti_plus/linux/tests/hardware/run_daemon_live.sh
+        timeout-minutes: 6
+
+      # The AI a user runs locally, run: the official Ollama serving a small
+      # model, asked through the production modules and the real curl transport
+      # for its model list, a download, streamed predictions, and — on its
+      # OpenAI-compatible endpoint, the dialect Cerebras speaks — the remote
+      # backend and its connectivity probe.
+      - name: AI predictions against a real Ollama
+        if: always()
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y --no-install-recommends lua-luv
+          curl -fsSL https://ollama.com/install.sh | sh
+          (ollama serve > "$RUNNER_TEMP/ollama.log" 2>&1 &) || true
+          for _ in $(seq 1 60); do curl -sf http://127.0.0.1:11434/api/tags >/dev/null && break; sleep 1; done
+          ollama pull qwen2.5:0.5b
+          cd static/ergopti_plus/linux
+          HOME="$(mktemp -d)" XDG_CONFIG_HOME= \
+            LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;' \
+            luajit tests/hardware/run_ollama_live.lua qwen2.5:0.5b
+        timeout-minutes: 12
 
       # touchpad_finder reads capability bits out of a printed bitmap, and that
       # rests on one thing the text cannot confirm: that the words are 64 bits
@@ -1033,6 +1122,20 @@ jobs:
           exit $STATUS
         timeout-minutes: 8
 
+      # The other direction: the metrics page posts its own {action: 'ready'}
+      # object and must get the daemon's data back. Both halves went through
+      # dkjson, which is not installed, so every tray window with a request of
+      # its own stayed empty while the push test above stayed green.
+      - name: A page's own request is answered in real WebKit
+        if: always()
+        working-directory: static/ergopti_plus/linux
+        run: |
+          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+          export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
+          export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
+          xvfb-run -a luajit tests/hardware/run_webview_roundtrip.lua
+        timeout-minutes: 5
+
       # window.setData is undefined in the settings window, so the host's
       # `if(window.setData)` guard discards every push. Seven explanations are
       # ruled out, and the informative one is the last: an explicit
@@ -1081,10 +1184,15 @@ jobs:
               --subject x11-display=1 \
               --subject wayland-display=1 \
               --subject tray-symbols=1 \
+              --subject tray-sni-registration=1 \
+              --subject atspi-focus-probe=1 \
+              --subject daemon-live=1 \
+              --subject ollama-live=1 \
               --subject touchpad-capability=1 \
               --subject gesture-roundtrip=1 \
               --subject webview-settings=1 \
               --subject webview-editor=1 \
+              --subject webview-roundtrip=1 \
               --subject page-load-errors=1
 
       - name: Upload mandatory Linux test evidence
@@ -1236,6 +1344,78 @@ jobs:
           name: linux-ci-evidence-distro-${{ matrix.distro }}
           retention-days: 7
           path: ${{ runner.temp }}/linux-ci-evidence/${{ matrix.distro }}.json
+          if-no-files-found: error
+
+  # ─────────────────────────────────────────────────
+  # 4.1c) Linux first install, WITH dependencies, per distribution
+  # ─────────────────────────────────────────────────
+  # install-linux-distros runs --no-deps on purpose, and nothing ran the
+  # installer the way the README tells a user to: with its dependencies. That
+  # path is where the first-run failures lived — a remap binary needing glibc
+  # 2.39 aborting the whole install on Ubuntu 22.04 and Debian 12, the tray library
+  # never installed at all. tests/distro/e2e_install.sh runs install.sh as an
+  # unprivileged sudo user against each distribution's real archives, then
+  # checks the INSTALLED tree: the launcher, every FFI library, WebKit through
+  # lgi, and a tray icon registered with a StatusNotifierWatcher (the protocol
+  # KDE, GNOME's AppIndicator extension, waybar and xfce4-panel speak).
+  #
+  # The matrix spans what differs underneath: glibc and musl, libxkbcommon
+  # before and after 1.8, six package managers, LTS and rolling releases.
+  # Reproduce any entry locally with:
+  #   static/ergopti_plus/linux/tests/distro/run_in_docker.sh <image>
+  first-install-distros:
+    name: 'Linux · first install with deps (${{ matrix.distro }})'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { distro: ubuntu-22.04, image: 'ubuntu:22.04' }
+          - { distro: ubuntu-24.04, image: 'ubuntu:24.04' }
+          - { distro: debian-12, image: 'debian:12' }
+          - { distro: debian-13, image: 'debian:13' }
+          # Fedora packages lgi for Lua 5.4 only: the tray works there, its
+          # WebKit windows cannot open under LuaJIT. Declared, and the entry
+          # fails if that ever stops being true.
+          - { distro: fedora-41, image: 'fedora:41', known: webkit }
+          - { distro: fedora-latest, image: 'fedora:latest', known: webkit }
+          - { distro: arch, image: 'archlinux:latest' }
+          - { distro: opensuse-tumbleweed, image: 'opensuse/tumbleweed:latest' }
+          - { distro: alpine, image: 'alpine:latest' }
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install on ${{ matrix.image }} and verify the first run
+        timeout-minutes: 25
+        run: |
+          set -euo pipefail
+          export ERGOPTI_E2E_DOCKER_ARGS="-e ERGOPTI_E2E_KNOWN_LIMITATIONS=${{ matrix.known || '' }}"
+          bash static/ergopti_plus/linux/tests/distro/run_in_docker.sh '${{ matrix.image }}' \
+            | tee "$RUNNER_TEMP/first-install.log"
+
+      - name: Record mandatory first-install evidence
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/linux-ci-evidence"
+          mkdir -p "$evidence_dir"
+          printf '%s\n' \
+            '{' \
+            '  "schema_version": 1,' \
+            '  "job": "first-install-distros",' \
+            "  \"sha\": \"$GITHUB_SHA\"," \
+            "  \"architecture\": \"$RUNNER_ARCH\"," \
+            '  "distro": "${{ matrix.distro }}",' \
+            '  "session": "container-first-install",' \
+            '  "interpreter": "LuaJIT",' \
+            '  "subjects": { "first-install-${{ matrix.distro }}": 1 }' \
+            '}' > "$evidence_dir/first-install-${{ matrix.distro }}.json"
+
+      - name: Upload mandatory first-install evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-ci-evidence-first-install-${{ matrix.distro }}
+          retention-days: 7
+          path: ${{ runner.temp }}/linux-ci-evidence/first-install-${{ matrix.distro }}.json
           if-no-files-found: error
 
   # ─────────────────────────────────────────────────
@@ -1658,8 +1838,8 @@ jobs:
           path: pkg
 
       - name: Install it the way a user would
-        # --no-install-recommends deliberately: the Recommends list names kanata
-        # and libayatana-appindicator3-1 among others, which are optional at
+        # --no-install-recommends deliberately: the Recommends list names
+        # libayatana-appindicator3-1 among others, which are optional at
         # runtime and not all in the Ubuntu archive. What is under test is that
         # the Depends resolve and that DEBIAN/postinst — never once executed
         # before this job existed — runs to completion, since apt fails the
@@ -2014,7 +2194,7 @@ jobs:
           echo "LINUX_BUNDLE_ASSET=$bundle_asset" >> "$GITHUB_ENV"
           bundle_path="$RUNNER_TEMP/$bundle_asset"
           tar -czf "$bundle_path" \
-              -C build/linux linux _shared bin install.sh kanata.kbd
+              -C build/linux linux _shared bin install.sh
           (cd "$RUNNER_TEMP" && sha256sum "$bundle_asset" > "$bundle_asset.sha256")
           (cd "$RUNNER_TEMP" && sha256sum --check "$bundle_asset.sha256")
           tar -tzf "$bundle_path" | wc -l
@@ -2082,6 +2262,7 @@ jobs:
     needs:
       - test-linux
       - install-linux-distros
+      - first-install-distros
       - e2e-linux
       - build-deb
       - build-rpm
@@ -2653,7 +2834,7 @@ jobs:
         run: |
           set -euo pipefail
           bash tools/build/write_build_stamp.sh verify build/linux/_shared
-          tar -czf "build/linux/$LINUX_BUNDLE_ASSET" -C build/linux linux _shared bin install.sh kanata.kbd
+          tar -czf "build/linux/$LINUX_BUNDLE_ASSET" -C build/linux linux _shared bin install.sh
           (cd build/linux && sha256sum "$LINUX_BUNDLE_ASSET" > "$LINUX_BUNDLE_ASSET.sha256")
           (cd build/linux && sha256sum --check "$LINUX_BUNDLE_ASSET.sha256")
           echo "Bundle contents:"
@@ -2733,15 +2914,10 @@ jobs:
         with:
           name: assets-linux
           retention-days: 1
-          # kanata.kbd is attached because the release notes have always linked
-          # it and nothing ever uploaded it: every published release carried a
-          # 404, and the site's Linux button — which looks the asset up by exact
-          # name — rendered as href="#".
           path: |
             build/linux/xkb/Ergopti_xkb.zip
             build/linux/${{ env.LINUX_BUNDLE_ASSET }}
             build/linux/${{ env.LINUX_BUNDLE_ASSET }}.sha256
-            build/linux/kanata.kbd
             build/linux/ErgoptiPlus-linux-amd64.deb
             build/linux/ErgoptiPlus-linux-noarch.rpm
             build/linux/ErgoptiPlus-linux-x86_64.AppImage
@@ -2935,7 +3111,6 @@ jobs:
           | Windows | [Ergopti_windows.exe](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Ergopti_windows.exe) | Run as Administrator, log out and back in, then select the layout in Settings → Time & Language → Language & region. |
           | macOS | [Ergopti_macOS.zip](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Ergopti_macOS.zip) | Unzip, copy the \`.bundle\` folder to \`/Library/Keyboard Layouts/\`, log out and back in, then add it in System Settings → Keyboard → Input Sources. |
           | Linux | [Ergopti_xkb.zip](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Ergopti_xkb.zip) | Follow the [XKB installation guide](https://github.com/${GITHUB_REPOSITORY}/tree/main/static/ergopti/linux/xkb_installation). Includes standard, ANSI, plus and plus-ANSI variants. |
-          | Kanata users | [kanata.kbd](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/kanata.kbd) | Use this configuration with an existing Kanata installation instead of a native layout. |
 
           ### Ergopti Plus — application with advanced typing tools
 

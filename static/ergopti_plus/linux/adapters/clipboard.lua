@@ -76,8 +76,11 @@ local COPY_SETTLE_MS = 80
 local VALUE_DOWN = 1
 local VALUE_UP   = 0
 
--- KEY_V, the second half of the paste chord.
-local KEY_V = 47
+-- KEY_V on a US layout. The chord presses whichever key types "v" in the live
+-- layout (keyboard_layout.shortcut_keycode): on Ergopti this code is a comma,
+-- and Ctrl+comma pasted nothing — or opened an editor's settings — while the
+-- expansion was recorded as delivered.
+local US_KEY_V = 47
 
 
 
@@ -263,9 +266,10 @@ end
 --- @param uinput table Channel exposing emit(code, value) -> boolean.
 --- @return boolean True only when the complete chord reached the wire.
 local function press_paste(uinput)
+	local key_v = require("adapters.keyboard_layout").shortcut_keycode("v", US_KEY_V)
 	if uinput.emit(EvdevCodes.KEY_LEFTCTRL, VALUE_DOWN) ~= true then return false end
-	if uinput.emit(KEY_V, VALUE_DOWN) ~= true then return false end
-	if uinput.emit(KEY_V, VALUE_UP) ~= true then return false end
+	if uinput.emit(key_v, VALUE_DOWN) ~= true then return false end
+	if uinput.emit(key_v, VALUE_UP) ~= true then return false end
 	if uinput.emit(EvdevCodes.KEY_LEFTCTRL, VALUE_UP) ~= true then return false end
 	return true
 end

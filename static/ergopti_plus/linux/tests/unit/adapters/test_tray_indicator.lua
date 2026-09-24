@@ -73,8 +73,11 @@ local function fake_binding()
 	}
 
 	local gobject = {
-		g_signal_connect_data = function(instance, signal, handler)
-			log.signals[#log.signals + 1] = { widget = instance, signal = signal, handler = handler }
+		g_signal_connect_data = function(instance, signal, handler, data)
+			local entry = { widget = instance, signal = signal, handler = handler, data = data }
+			-- Fired the way GTK fires "activate": (the item, the user data).
+			entry.fire = function() return handler(instance, data) end
+			log.signals[#log.signals + 1] = entry
 			return 1
 		end,
 	}
@@ -92,9 +95,18 @@ local function fake_binding()
 		app_indicator_set_title = function(_, title) log.title = title end,
 	}
 
-	-- The only FFI facility the module uses is cast(), and a recorded callback
-	-- is just the function itself.
-	local ffi = { cast = function(_, fn) return fn end }
+	-- The only FFI facility the module uses is cast(). A recorded callback is
+	-- just the function itself, and every function cast is counted once: each is
+	-- a LuaJIT callback slot, which is never garbage-collected.
+	local slots = {}
+	local ffi = { cast = function(_, value)
+		-- Re-casting an existing callback (to GCallback) reuses its slot.
+		if type(value) == "function" and not slots[value] then
+			slots[value] = true
+			log.callback_casts = (log.callback_casts or 0) + 1
+		end
+		return value
+	end }
 
 	return { ffi = ffi, gtk = gtk, gobject = gobject, indicator = indicator }, log
 end
@@ -282,8 +294,37 @@ helpers.describe("tray indicator: the widget tree", function()
 		ind.create("id", "icon", "title")
 		local fired = 0
 		ind.set_menu({ { title = "Reload", fn = function() fired = fired + 1 end } })
-		log.signals[1].handler()
+		log.signals[1].fire()
 		helpers.assert_eq(fired, 1, "the handler must reach the row's own function")
+		ind._set_binding_for_test(nil)
+	end)
+
+	helpers.it("uses one callback slot however large the menu and however often rebuilt", function()
+		-- LuaJIT never frees an FFI callback slot and has only a few hundred.
+		-- One callback per row per rebuild exhausted them during boot: the live
+		-- daemon died with "too many callbacks" before its first keystroke.
+		local ind, log = with_fake()
+		ind.create("id", "icon", "title")
+		local rows = {}
+		for i = 1, 500 do rows[i] = { title = "Row " .. i, fn = function() end } end
+		for _ = 1, 10 do ind.set_menu(rows) end
+		helpers.assert_eq(log.callback_casts, 1,
+			"5 000 actionable rows over ten rebuilds must share one callback")
+		ind._set_binding_for_test(nil)
+	end)
+
+	helpers.it("ignores a click on a row of a menu that was replaced", function()
+		local ind, log = with_fake()
+		ind.create("id", "icon", "title")
+		local old_fired, new_fired = 0, 0
+		ind.set_menu({ { title = "Old", fn = function() old_fired = old_fired + 1 end } })
+		local stale = log.signals[1]
+		ind.set_menu({ { title = "New", fn = function() new_fired = new_fired + 1 end } })
+		stale.fire()
+		helpers.assert_eq(old_fired + new_fired, 0,
+			"a stale row must run nothing, least of all whatever took its place")
+		log.signals[#log.signals].fire()
+		helpers.assert_eq(new_fired, 1)
 		ind._set_binding_for_test(nil)
 	end)
 
@@ -299,12 +340,12 @@ helpers.describe("tray indicator: the widget tree", function()
 		-- Called directly, not through pcall: an exception escaping here IS the
 		-- failure, and wrapping it would turn the assertion into "pcall reported
 		-- something", which is true of every possible implementation.
-		log.signals[1].handler()
+		log.signals[1].fire()
 
 		-- The claim is not that nothing crashed — it is that the tray is still a
 		-- tray. An exception escaping into GTK takes the icon down and the user
 		-- loses the menu for the rest of the session over one broken row.
-		log.signals[2].handler()
+		log.signals[2].fire()
 		helpers.assert_eq(after, 1,
 			"the row after the broken one must still fire")
 		ind.set_menu({ { title = "Rebuilt" } })
