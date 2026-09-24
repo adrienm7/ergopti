@@ -14,7 +14,6 @@ static/ergopti_plus/
 ├── windows/      AHK v2 driver
 ├── macos/        Hammerspoon / Lua driver
 ├── linux/        Lua driver
-├── kanata/       kanata layouts
 └── extensions/
 ```
 
@@ -47,7 +46,6 @@ trip:
 | `test:priority-parity`                              | resolution priority identical across drivers                                                                       |
 | `test:manifest-parity`, `test:manifest-equivalence` | feature/menu manifests agree                                                                                       |
 | `test:*-single-source`                              | one constant, one home (LLM defaults, temperature, max-tokens, Ollama port, versions, WPM, keycodes, buffer caps…) |
-| `test:kanata-defalias-parity`                       | kanata aliases match the layout                                                                                    |
 | `test:no-fallback-literals`                         | no hardcoded fallback shadowing a configured value                                                                 |
 | `test:git-mv-resilience`, `test:doc-paths`          | path references survive moves                                                                                      |
 

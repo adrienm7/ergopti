@@ -60,13 +60,10 @@ if (!fs.existsSync(RESOLVER)) {
 
 // The resolver is allowed to know where the tree is; that is its job. Two more
 // are exempt with a reason:
-//   - infra/locale.lua walks UPWARD looking for the tree rather than assuming a
-//     depth, which is a search, not a hardcoded count.
 //   - ui/webkit_host.lua probes a candidate list for the file:// base a webview
 //     needs before any module has loaded.
 const EXEMPT = new Set([
 	'infra/paths.lua',
-	'infra/locale.lua',
 	'ui/webkit_host.lua',
 	// The two bootstraps, whose depth is asserted separately below rather than
 	// trusted: they run before package.path includes the shared tree.

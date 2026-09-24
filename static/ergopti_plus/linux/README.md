@@ -9,7 +9,7 @@ desktop environments.
 ┌──────────────────────────────────────────────────────────────────┐
 │  Ergopti Linux — architecture overview                           │
 │                                                                  │
-│  Key remapping + tap-hold  →  kanata (/dev/input + uinput)       │
+│  Key remapping + tap-hold  →  platform/remap/ (in the daemon)    │
 │  Hotstrings + keylogger    →  ergopti_hotstrings.lua (LuaJIT)    │
 │    ├─ input_reader.lua     →  /dev/input/eventN (raw evdev)      │
 │    ├─ engine.lua           →  trigger matching (pure Lua)        │
@@ -46,7 +46,7 @@ LuaJIT instead of Rust.
 | Runtime                  | **LuaJIT 2.x**                 | Same language as the Hammerspoon driver; reuses all `_shared/lua/` modules directly. |
 | Keyboard input           | **/dev/input/eventN** (evdev)  | Raw 24-byte `input_event` structs; works on X11, Wayland, and TTY identically.       |
 | Text injection           | **ydotool** (uinput backend)   | Works on both X11 and Wayland; no display-server coupling.                           |
-| Key remapping + tap-hold | **kanata**                     | Rust daemon; reads `/dev/input` + writes `uinput`; already in the repo.              |
+| Key remapping + tap-hold | **platform/remap/** (in-daemon) | Tap-hold engine in the keyboard hook; same evdev grab and `uinput` output as the rest. |
 | Notifications            | **notify-send**                | D-Bus `org.freedesktop.Notifications` — works on GNOME, KDE, XFCE, wlroots.          |
 | Tray icon                | **StatusNotifierItem** (D-Bus) | De-facto Linux standard; KDE/Plasma, GNOME (with AppIndicator ext), wlroots.         |
 | HTTP                     | **curl** via io.popen          | Zero extra dependencies; async path via lua-http planned.                            |
@@ -112,15 +112,15 @@ Requires LuaJIT 2.x. Plain Lua 5.4 works for the meta tests (no luv dependency).
 bash static/ergopti_plus/linux/install.sh
 ```
 
-The installer detects apt/dnf/pacman, installs dependencies (luajit, ydotool,
-kanata, libnotify-bin), copies files to `~/.local/lib/ergopti/`, and installs
+The installer detects apt/dnf/pacman, installs dependencies (luajit,
+libnotify-bin, …), copies files to `~/.local/lib/ergopti/`, and installs
 a systemd user service.
 
 ## Known limitations by feature
 
 | Feature                  | X11                  | Wayland                | Notes                                               |
 | ------------------------ | -------------------- | ---------------------- | --------------------------------------------------- |
-| Key remapping + tap-hold | ✅ kanata            | ✅ kanata              | Bypasses display server via `/dev/input` + `uinput` |
+| Key remapping + tap-hold | ✅ in-daemon         | ✅ in-daemon           | Bypasses display server via `/dev/input` + `uinput` |
 | Hotstrings + metrics     | ✅                   | ✅                     | evdev read works on both; injection via ydotool     |
 | Text injection           | ✅ ydotool           | ✅ ydotool             | Requires `ydotoold` daemon + uinput permissions     |
 | Window info (active app) | ✅ xdotool           | ⚠️ compositor-specific | No universal Wayland protocol                       |

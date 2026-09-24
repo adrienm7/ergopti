@@ -60,8 +60,8 @@ export default {
 		'Show the windows in Windows style (AutoHotkey)',
 	'Afficher les fenêtres au style macOS (Hammerspoon)':
 		'Show the windows in macOS style (Hammerspoon)',
-	'Afficher les fenêtres au style Linux (kanata + daemon Lua, alpha)':
-		'Show the windows in Linux style (kanata + Lua daemon, alpha)',
+	'Afficher les fenêtres au style Linux (daemon Lua, alpha)':
+		'Show the windows in Linux style (Lua daemon, alpha)',
 	'Découvrir les fonctionnalités': 'Discover the features',
 
 	// ── Promises ─────────────────────────────────────────────────────────────
@@ -158,8 +158,8 @@ export default {
 	'Chaque fonctionnalité se désactive d’un clic dans le menu, et l’application se retire comme n’importe quelle autre. Vos données (base SQLite locale) vous appartiennent et partent avec.':
 		'Every feature switches off with one click in the menu, and the application removes like any other. Your data (a local SQLite database) is yours and leaves with it.',
 	'Windows, macOS ou Linux ?': 'Windows, macOS or Linux?',
-	'Windows (AutoHotkey) et macOS (Hammerspoon) sont à parité et prêts à l’emploi. Le driver Linux (kanata + daemon Lua) est complet mais en alpha — il cherche ses premiers testeurs.':
-		'Windows (AutoHotkey) and macOS (Hammerspoon) are at parity and ready to use. The Linux driver (kanata + Lua daemon) is complete but in alpha — looking for its first testers.',
+	'Windows (AutoHotkey) et macOS (Hammerspoon) sont à parité et prêts à l’emploi. Le driver Linux (un daemon Lua qui gère aussi les tap-holds) est complet mais en alpha — il cherche ses premiers testeurs.':
+		'Windows (AutoHotkey) and macOS (Hammerspoon) are at parity and ready to use. The Linux driver (a Lua daemon that also runs the tap-holds) is complete but in alpha — looking for its first testers.',
 
 	// ── Comparison ───────────────────────────────────────────────────────────
 	'Autocorr. native': 'Native autocorrect',

@@ -11,10 +11,15 @@
 				"x11-display": 1,
 				"wayland-display": 1,
 				"tray-symbols": 1,
+				"tray-sni-registration": 1,
+				"atspi-focus-probe": 1,
+				"daemon-live": 1,
+				"ollama-live": 1,
 				"touchpad-capability": 1,
 				"gesture-roundtrip": 1,
 				"webview-settings": 1,
 				"webview-editor": 1,
+				"webview-roundtrip": 1,
 				"page-load-errors": 1
 			}
 		},
@@ -26,6 +31,20 @@
 				"distro-arch": 1,
 				"distro-alpine": 1,
 				"distro-opensuse": 1
+			}
+		},
+		"first-install-distros": {
+			"classification": "mandatory",
+			"subjects": {
+				"first-install-ubuntu-22.04": 1,
+				"first-install-ubuntu-24.04": 1,
+				"first-install-debian-12": 1,
+				"first-install-debian-13": 1,
+				"first-install-fedora-41": 1,
+				"first-install-fedora-latest": 1,
+				"first-install-arch": 1,
+				"first-install-opensuse-tumbleweed": 1,
+				"first-install-alpine": 1
 			}
 		},
 		"e2e-linux": {

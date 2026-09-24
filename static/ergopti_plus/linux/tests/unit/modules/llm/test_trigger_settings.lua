@@ -97,7 +97,7 @@ helpers.describe("prediction engine: trigger settings affect requests", function
 		})
 		package.loaded["modules.llm.prediction_engine"] = nil
 		local engine = require("modules.llm.prediction_engine")
-		engine.init({ scheduler = scheduler })
+		engine.init({ scheduler = scheduler, clock_ms = function() return scheduler.now * 1000 end })
 		engine.on_char("/", "hello //", { app_id = "editor" })
 		helpers.assert_eq(chat_calls, 0, "a debounce control that fires synchronously is inert")
 		helpers.assert_eq(scheduler.test.advance(0.499), 0)

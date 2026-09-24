@@ -44,26 +44,19 @@ local MAX_TYPING_INTERVAL_MS = Timings.ms("keylogger", "max_keystroke_delay_ms")
 local MS_PER_SECOND = 1000
 
 -- Past this, a press was a HOLD rather than a tap. Read from the tap-hold
--- configuration the remap daemon actually runs, so this driver calls something
--- a hold exactly when kanata does — a number of its own here would let the
--- dashboard call a tap what the keyboard treated as a hold.
+-- configuration this daemon runs, so the metrics call something a hold exactly
+-- when the engine does — a number of its own here would let the dashboard call
+-- a tap what the keyboard treated as a hold. Asked each time: a change from the
+-- tray reloads the engine live.
 --
--- nil when the keys disagree or nothing could be read, and the split is then
+-- nil when the keys disagree or nothing is configured, and the split is then
 -- declined rather than made on a number nobody chose. The duration, the count
 -- and the maximum are still recorded: those need no threshold.
-local _tap_hold_threshold_ms = nil
-local _tap_hold_threshold_read = false
+local TapHold = require("platform.remap.tap_hold_manager")
 
 --- @return number|nil
 local function tap_hold_threshold_ms()
-	if _tap_hold_threshold_read then return _tap_hold_threshold_ms end
-	_tap_hold_threshold_read = true
-	local ok, Remap = pcall(require, "platform.remap.manager")
-	if ok and type(Remap.tap_hold_threshold_ms) == "function" then
-		local ok_value, value = pcall(Remap.tap_hold_threshold_ms)
-		if ok_value and type(value) == "number" then _tap_hold_threshold_ms = value end
-	end
-	return _tap_hold_threshold_ms
+	return TapHold.threshold_ms()
 end
 -- Metrics collector is optional — keylogger falls back gracefully without it.
 local Metrics  = nil
@@ -1063,8 +1056,8 @@ end
 --- Records how long one key was held.
 ---
 --- The threshold between a tap and a hold is the shared tap-hold activation
---- time, so this driver's idea of the difference is the same one kanata acts
---- on. A second number here would let the dashboard call something a tap that
+--- time, so this driver's idea of the difference is the same one the tap-hold
+--- engine acts on. A second number here would let the dashboard call something a tap that
 --- the keyboard treated as a hold.
 --- @param app_id string|nil
 --- @param scancode number evdev code.
@@ -1552,28 +1545,12 @@ function M.flush()
 			_flushed_app_titles[app_id] = flushed_titles
 		end
 
-		-- 3. Persist per-app character n-grams and their synthetic provenance as
-		-- deltas. The physical text and generated output share one portable char
-		-- stream, while esrc_json keeps their origin queryable for the UI.
+		-- 3. Record which per-app character counts are now persisted, so the
+		-- live view adds only what came after. They were also written here, as a
+		-- delta, on top of the aggregate walker's rows for the same characters:
+		-- both upserts add, so every stored character count was doubled. The
+		-- walker's rows, which carry the sources too, are the only write.
 		for app_id, app_stats in pairs(_app_stats) do
-			local previous = _flushed_app_ngrams[app_id] or {}
-			local previous_sources = _flushed_app_sources[app_id] or {}
-			local delta = {}
-			for token, count in pairs(app_stats.ngrams or {}) do
-				local increment = math.max(0, count - (previous[token] or 0))
-				if increment > 0 then
-					local sources = {}
-					for source, source_count in pairs((app_stats.ngram_sources or {})[token] or {}) do
-						local persisted = ((previous_sources[token] or {})[source] or 0)
-						local source_increment = math.max(0, source_count - persisted)
-						if source_increment > 0 then sources[source] = source_increment end
-					end
-					delta[token] = { c = increment, sources = sources }
-				end
-			end
-			if next(delta) ~= nil then
-				if not SqliteWriter.upsert_ngrams(_device_id, date, dashboard_app_name(app_id), delta) then return end
-			end
 			_flushed_app_ngrams[app_id] = {}
 			for token, count in pairs(app_stats.ngrams or {}) do _flushed_app_ngrams[app_id][token] = count end
 			_flushed_app_sources[app_id] = {}
@@ -1605,7 +1582,14 @@ function M.flush()
 		return
 	end
 
-	-- FALLBACK: JSON log file.
+	-- FALLBACK: JSON log file. It holds the session summary only, so the
+	-- buffered raw events are dropped here: kept, they grew for the whole
+	-- session, since only the SQLite branch ever emptied them.
+	_pending_typing_events = {}
+	_pending_hotstring_events = {}
+	_pending_shortcut_events = {}
+	_pending_app_switch_events = {}
+
 	if not _log_dir then
 		Logger.warn(LOG, "flush(): no log directory configured.")
 		return
@@ -1731,6 +1715,15 @@ _to_json = function(val)
 		end
 	end
 	return "null"
+end
+
+
+--- How many raw-event buffers are waiting for a flush (tests).
+--- @return integer
+function M._pending_buffer_count_for_test()
+	local count = #_pending_hotstring_events + #_pending_shortcut_events + #_pending_app_switch_events
+	for _, pending in pairs(_pending_typing_events) do count = count + #pending.events end
+	return count
 end
 
 return M

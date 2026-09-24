@@ -178,13 +178,13 @@ local function archive_is_canonical(archive_path)
 		end
 		local top = entry:match("^([^/]+)")
 		if top ~= "linux" and top ~= "_shared" and top ~= "bin"
-			and top ~= "install.sh" and top ~= "kanata.kbd" then
+			and top ~= "install.sh" then
 			return false, "archive contains an unexpected root: " .. tostring(top)
 		end
 		seen[top] = true
 	end
 
-	for _, required in ipairs({ "linux", "_shared", "bin", "install.sh", "kanata.kbd" }) do
+	for _, required in ipairs({ "linux", "_shared", "bin", "install.sh" }) do
 		if not seen[required] then return false, "archive root is missing " .. required end
 	end
 	for _, line in ipairs(split_lines(verbose)) do
@@ -285,7 +285,6 @@ local function validate_candidate(work_dir, expected_version, ops)
 		work_dir .. "/linux/infra/version.lua",
 		work_dir .. "/bin/ergopti-hotstrings",
 		work_dir .. "/install.sh",
-		work_dir .. "/kanata.kbd",
 	}
 	for _, path in ipairs(required_files) do
 		if not ops.is_file(path) then return false, "staged archive is missing " .. path end

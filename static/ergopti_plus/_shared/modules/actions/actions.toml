@@ -9,7 +9,7 @@
 #   "all"     — disponible sur tous les drivers
 #   "hs"      — macOS / Hammerspoon uniquement
 #   "ahk"     — Windows / AutoHotkey uniquement
-#   "linux"   — Linux / kanata uniquement
+#   "linux"   — Linux uniquement
 #   "hs,ahk"  — exactement ces drivers-là
 #
 # La forme liste a été ajoutée le 2026-08-03 parce que le champ ne savait pas
@@ -193,19 +193,22 @@ emit_linux = "alt+Escape"
 # --- Édition (Windows uniquement — macOS utilise Cmd+C/V/X dans cmd_*) ---
 
 [sg_actions.copy]
-platform = "ahk"
+platform = "ahk,linux"
 emit_ahk_key = "c"
 emit_ahk_mods = ["ctrl"]
+emit_linux = "ctrl+c"
 
 [sg_actions.paste]
-platform = "ahk"
+platform = "ahk,linux"
 emit_ahk_key = "v"
 emit_ahk_mods = ["ctrl"]
+emit_linux = "ctrl+v"
 
 [sg_actions.cut]
-platform = "ahk"
+platform = "ahk,linux"
 emit_ahk_key = "x"
 emit_ahk_mods = ["ctrl"]
+emit_linux = "ctrl+x"
 
 [sg_actions.undo]
 platform = "ahk"
@@ -770,22 +773,26 @@ platform = "ahk"
 platform = "ahk"
 
 [sg_actions.ctrl_backspace]
-platform = "ahk"
+platform = "ahk,linux"
 emit_ahk_key = "BackSpace"
 emit_ahk_mods = ["ctrl"]
+emit_linux = "ctrl+BackSpace"
 
 [sg_actions.ctrl_delete]
-platform = "ahk"
+platform = "ahk,linux"
 emit_ahk_key = "Delete"
 emit_ahk_mods = ["ctrl"]
+emit_linux = "ctrl+Delete"
 
 [sg_actions.space]
-platform = "ahk"
+platform = "ahk,linux"
 emit_ahk_key = "Space"
 emit_ahk_mods = []
+emit_linux = "space"
 
 [sg_actions.caps_lock]
-platform = "ahk"
+platform = "ahk,linux"
+emit_linux = "Caps_Lock"
 
 # --- Actions du remap Karabiner (macOS) ---
 # Les 36 actions « tappables » de macos/platform/remap/data/actions.json qui
@@ -862,9 +869,10 @@ emit_hs_mods = ["shift"]
 # partout. Ctrl+F17 est le quatrième et dernier accord F17 libre — les trois
 # autres portent déjà cycle_windows_in_app, alt_tab_windows et alt_tab_apps.
 [sg_actions.alt_tab_monitor]
-platform = "hs,ahk"
+platform = "all"
 emit_hs_key = "f17"
 emit_hs_mods = ["ctrl"]
+emit_linux = "alt+Tab"
 
 [sg_actions.cycle_windows_in_app]
 platform = "hs"
@@ -872,24 +880,28 @@ emit_hs_key = "f17"
 emit_hs_mods = []
 
 [sg_actions.home]
-platform = "hs"
+platform = "hs,linux"
 emit_hs_key = "home"
 emit_hs_mods = []
+emit_linux = "Home"
 
 [sg_actions.end]
-platform = "hs"
+platform = "hs,linux"
 emit_hs_key = "end"
 emit_hs_mods = []
+emit_linux = "End"
 
 [sg_actions.page_up]
-platform = "hs"
+platform = "hs,linux"
 emit_hs_key = "pageup"
 emit_hs_mods = []
+emit_linux = "Prior"
 
 [sg_actions.page_down]
-platform = "hs"
+platform = "hs,linux"
 emit_hs_key = "pagedown"
 emit_hs_mods = []
+emit_linux = "Next"
 
 [sg_actions.spotlight]
 platform = "hs"

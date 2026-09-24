@@ -16,9 +16,9 @@
 --- that was empty.
 ---
 --- WHY THE TAP/HOLD SPLIT CAN DECLINE TO ANSWER:
---- The threshold is read from the tap-hold configuration the remap daemon
---- actually runs, so this driver calls something a hold exactly when kanata
---- does. When the keys disagree, or nothing can be read, there IS no single
+--- The threshold is read from the tap-hold configuration the tap-hold engine
+--- actually runs, so this driver calls something a hold exactly when the
+--- engine does. When the keys disagree, or nothing can be read, there IS no single
 --- answer — and the split is skipped rather than made on a number nobody chose.
 --- The duration, the count and the maximum need no threshold and are recorded
 --- either way.
@@ -177,44 +177,52 @@ end)
 
 helpers.describe("hold durations: tap or hold", function()
 
-	helpers.it("takes the threshold from the configuration kanata runs", function()
-		local Remap = helpers.load_module("platform.remap.manager")
-		local threshold = Remap.tap_hold_threshold_ms()
-		-- nil is a legitimate answer — it means the declared keys disagree — so
-		-- both branches are stated rather than one being assumed.
-		helpers.assert_true(threshold == nil or type(threshold) == "number",
-			"the threshold is either one number the whole layout agrees on, or "
-				.. "there is no single answer and the split must be declined")
-		if type(threshold) == "number" then
-			helpers.assert_true(threshold > 0,
-				"a threshold of zero would call every press a hold")
+	--- Runs `body(threshold)` with the tap-hold manager on keys that all agree
+	--- on one threshold, or on the shared defaults (which disagree) when `seconds`
+	--- is nil.
+	local function with_tap_holds(seconds, body)
+		local TapHold = helpers.load_module("platform.remap.tap_hold_manager")
+		local user_path = os.tmpname()
+		local fh = assert(io.open(user_path, "w"))
+		if seconds then
+			fh:write('[tap_hold]\ninherit_defaults = false\n[tap_hold.keys.caps_lock]\n'
+				.. 'tap_action = "enter"\nhold_modifier = "ctrl"\ntime_activation_seconds = ' .. seconds .. '\n')
 		end
+		fh:close()
+		TapHold.init({
+			keyboard_hook = { set_remapper = function() end },
+			execute_action = function() end,
+			action_names = function() return {} end,
+			defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"),
+			user_path = user_path,
+		})
+		local ok, err = pcall(body, TapHold.threshold_ms())
+		TapHold._reset_for_test()
+		os.remove(user_path)
+		if not ok then error(err, 0) end
+	end
+
+	helpers.it("declines the split when the configured keys disagree", function()
+		with_tap_holds(nil, function(threshold)
+			helpers.assert_nil(threshold, "the shared defaults mix 0.35 s and 0.2 s")
+		end)
 	end)
 
-	helpers.it("splits on that threshold when there is one", function()
-		local Remap = helpers.load_module("platform.remap.manager")
-		local threshold = Remap.tap_hold_threshold_ms()
-		if type(threshold) ~= "number" then
-			-- Not a skip: the case above already asserted this is a legitimate
-			-- state, and asserting the split here would be asserting against a
-			-- configuration the product says has no answer.
-			helpers.assert_true(threshold == nil, "nothing to split on")
-			return
-		end
-
-		local writer = with_writer(function(keylogger)
-			keylogger.on_app_focus("code", 1000)
-			keylogger.record_hold("code", 30, threshold + 50)
-			keylogger.record_hold("code", 30, math.max(0, threshold - 50))
-			keylogger.flush()
+	helpers.it("splits on the threshold the tap-hold engine runs", function()
+		with_tap_holds(0.25, function(threshold)
+			helpers.assert_eq(threshold, 250)
+			local writer = with_writer(function(keylogger)
+				keylogger.on_app_focus("code", 1000)
+				keylogger.record_hold("code", 30, threshold + 50)
+				keylogger.record_hold("code", 30, threshold - 50)
+				keylogger.flush()
+			end)
+			local row = row_for(writer, 30)
+			helpers.assert_eq(row.hold_count, 1,
+				"reading the threshold from what the engine runs is what stops the "
+					.. "dashboard calling something a tap that the keyboard treated as a hold")
+			helpers.assert_eq(row.tap_count, 1)
 		end)
-
-		local row = row_for(writer, 30)
-		helpers.assert_eq(row.hold_count, 1,
-			"reading the threshold from what kanata runs is what stops the "
-				.. "dashboard calling something a tap that the keyboard treated as a "
-				.. "hold")
-		helpers.assert_eq(row.tap_count, 1)
 	end)
 
 end)

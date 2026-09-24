@@ -155,7 +155,9 @@ global _LLM_Menu := Map(
 	"pred_indent",                0,
 	"auto_raise_temp",            true,
 	"nav_modifiers",              "",
-	"val_modifiers",              "alt",
+	; Placeholder only: LLM_Menu_ApplySharedDefaults() overwrites it from
+	; defaults.json ("" = bare digits select a prediction).
+	"val_modifiers",              "",
 	; On-demand prediction shortcut. Ctrl+Space is the default — same key
 	; combo as Copilot's "trigger inline suggestion" so muscle memory
 	; carries over. The user can rebind it via the tray menu; setting it

@@ -8,7 +8,7 @@
 --- reflecting the current hotstring groups, layouts, LLM models, and metrics.
 ---
 --- The menu tree mirrors the macOS menubar (§9 of the parity plan):
----   Layout → Hotstrings → AI → Metrics → Shortcuts → Kanata → Gestures → Apps
+---   Layout → Hotstrings → AI → Metrics → Shortcuts → Tap-holds → Gestures → Apps
 ---   → separator → Global Actions → Language → Config Folder → Setup Wizard
 ---   → About → Reload → Quit → Debug
 ---
@@ -20,7 +20,7 @@
 --- 1. Hierarchical items: items with a `menu` sub-table are rendered as
 ---    submenus, which the tray backend renders as real nested GtkMenus.
 --- 2. All callbacks are closures over the daemon's state — zero global coupling.
---- 3. New sections (shortcuts, kanata, gestures, apps, global_actions, language,
+--- 3. New sections (shortcuts, tap-holds, gestures, apps, global_actions, language,
 ---    config, debug) are added as documented stubs so the menu shape is correct.
 --- ==============================================================================
 
@@ -33,6 +33,8 @@ local LocaleTable = require("_generated.locale_table")
 local MagicKey = require("modules.hotstrings.magic_key")
 local PreviewSettings = require("modules.hotstrings.preview_settings")
 local RepeatKey = require("modules.hotstrings.repeat_key")
+local Modal = require("ui.modal")
+local LlmBackendRows = require("ui.menu.llm_backend_rows")
 local LOG = "ui.menu.menu_builder"
 
 -- Delays are stored in seconds and typed in milliseconds: seconds is what the
@@ -113,21 +115,26 @@ end
 --- @param title string Window title.
 --- @param prompt string The question.
 --- @param initial string|nil Pre-filled value.
+--- @param hidden boolean|nil Mask the typed text (an API key).
 --- @return string|nil The entered text, or nil when the dialog was cancelled.
-local function prompt_text(title, prompt, initial)
+local function prompt_text(title, prompt, initial, hidden)
 	local command = "zenity --entry --title=" .. shell_quote(title)
 		.. " --text=" .. shell_quote(prompt)
-		.. " --entry-text=" .. shell_quote(initial or "") .. " 2>/dev/null"
-	local pipe = io.popen(command, "r")
-	if not pipe then
+		.. " --entry-text=" .. shell_quote(initial or "")
+		.. (hidden and " --hide-text" or "") .. " 2>/dev/null"
+	local value, ok = Modal.run(function()
+		local pipe = io.popen(command, "r")
+		if not pipe then return nil, nil end
+		local text = pipe:read("*a") or ""
+		return text, pipe:close()
+	end)
+	if value == nil then
 		Logger.error(LOG, "Zenity is unavailable: cannot prompt for '%s'.", tostring(title))
 		return nil
 	end
-	local value = pipe:read("*a") or ""
 	-- A non-zero exit is Cancel or the window being closed. Distinguished from an
 	-- empty entry, which exits zero: the first must change nothing, the second is
 	-- a value the caller gets to refuse with its own message.
-	local ok = pipe:close()
 	if not succeeded(ok) then return nil end
 	return (value:gsub("[\r\n]+$", ""))
 end
@@ -139,7 +146,7 @@ local function show_error(message, title)
 	local command = "zenity --error"
 		.. (title and (" --title=" .. shell_quote(title)) or "")
 		.. " --text=" .. shell_quote(message) .. " 2>/dev/null"
-	if not succeeded(os.execute(command)) then
+	if not succeeded(Modal.run(function() return os.execute(command) end)) then
 		-- Zenity absent: the refusal still has to reach someone, and a silent
 		-- rejection reads as a menu row that does nothing when clicked.
 		Logger.error(LOG, "%s", tostring(message))
@@ -152,7 +159,7 @@ end
 local function show_info(title, message)
 	local command = "zenity --info --title=" .. shell_quote(title)
 		.. " --text=" .. shell_quote(message) .. " 2>/dev/null"
-	if not succeeded(os.execute(command)) then
+	if not succeeded(Modal.run(function() return os.execute(command) end)) then
 		-- Zenity absent: the outcome is still recorded where a user can find it.
 		Logger.info(LOG, "%s", tostring(message))
 	end
@@ -216,6 +223,22 @@ end
 --- @param current string Current action id.
 --- @param on_confirm function Transactional assignment callback.
 --- @return boolean opened
+--- The actions a slot's submenu lists inline: its current one, then "none".
+---
+--- Everything else is reached through the action picker, which is the first
+--- row of that submenu. Kept in catalogue order and only among actions the
+--- catalogue still offers, so a stale binding is not resurrected as a row.
+--- @param action_names table The full action catalogue, in order.
+--- @param current string|nil The slot's bound action.
+--- @return table
+local function inline_slot_options(action_names, current)
+	local out = {}
+	for _, option in ipairs(action_names or {}) do
+		if option == current or option == "none" then out[#out + 1] = option end
+	end
+	return out
+end
+
 local function open_action_picker(title, current, on_confirm)
 	local ok_picker, Picker = pcall(require, "ui.action_picker.bridge")
 	if not ok_picker or type(Picker.open) ~= "function" then
@@ -256,7 +279,7 @@ local function ask_yes_no(title, text, ok_label, cancel_label)
 		return nil
 	end
 	-- zenity exits 0 for the OK button and 1 for cancel.
-	return succeeded(os.execute(command))
+	return succeeded(Modal.run(function() return os.execute(command) end))
 end
 
 local function gesture_slot_label(slot)
@@ -324,7 +347,7 @@ local PAUSE_GREYED_ROWS = {
 	llm             = true,
 	metrics         = true,
 	shortcuts       = true,
-	kanata          = true,
+	tap_holds       = true,
 	gestures        = true,
 	apps            = true,
 }
@@ -370,7 +393,7 @@ local function _build_layouts(ctx)
 	local render_ctx = {}
 	for key, value in pairs(ctx) do render_ctx[key] = value end
 	-- The category gate's state key. This driver registers no command for that
-	-- row — kanata owns the remap and there is no on/off for it here — so the
+	-- row — the layout has no on/off of its own here — so the
 	-- renderer builds nothing and this getter is never read. It is named anyway,
 	-- because the declaration promises the key to every platform the row is
 	-- visible on, and a key with no getter is an ERROR at render time rather than
@@ -1646,7 +1669,8 @@ local function _build_llm(ctx)
 	dynamic_handlers["llm_profile"] = function(target)
 		local ok_profiles, ProfileSettings = pcall(require, "modules.llm.profile_settings")
 		if not ok_profiles then return end
-		local current_model = llm.get_current_model and llm.get_current_model() or nil
+		-- The model predictions actually use: an API entry's when the API answers.
+		local current_model = llm.get_prediction_model and llm.get_prediction_model() or nil
 		local effective = ProfileSettings.effective_profile(current_model)
 		local count = ProfileSettings.get("num_predictions") or 1
 		local function refresh()
@@ -1886,7 +1910,7 @@ local function _build_llm(ctx)
 
 	-- The models this machine actually has. A `list`, because the rows are
 	-- whatever Ollama reports and no static entry can enumerate them.
-	providers["llm_models"] = function()
+	local function ollama_model_rows()
 		if type(llm.get_models) ~= "function" then return {} end
 		local models = llm.get_models()
 		if type(models) ~= "table" then return {} end
@@ -1917,6 +1941,18 @@ local function _build_llm(ctx)
 			end,
 		}
 		return rows
+	end
+
+	-- Who answers: Ollama's models above, or the API entries (Cerebras, …).
+	providers["llm_models"] = function()
+		return LlmBackendRows.rows(llm, {
+			prompt = prompt_text,
+			error = show_error,
+			info = show_info,
+			confirm = function(title, text)
+				return ask_yes_no(title, zenity_plain(text), i18n_safe("button.delete"), i18n_safe("button.cancel"))
+			end,
+		}, ctx.on_menu_changed, ollama_model_rows)
 	end
 
 	-- Temperature and context length. The manifest has declared both as features
@@ -2556,7 +2592,12 @@ local function _build_shortcuts(ctx)
 						end,
 					},
 				}
-				for _, option in ipairs(action_names) do
+				-- The picker above lists the catalogue; inline, only the current
+				-- binding and the way to clear it. Listing all ~640 actions under
+				-- every slot put 77 000 rows in the tray: eight seconds of GTK at
+				-- every rebuild, and a dbusmenu layout no panel can page through.
+				-- macOS offers the same slots through its picker alone.
+				for _, option in ipairs(inline_slot_options(action_names, bound)) do
 					choices[#choices + 1] = build_choice(slot, option, bound)
 				end
 				rows[#rows + 1] = {
@@ -2669,280 +2710,163 @@ local function _build_shortcuts(ctx)
 	return { label = i18n_safe("menu.shortcuts.title"), submenu = items }
 end
 
---- Builds the Kanata submenu (Linux's Karabiner equivalent).
---- Actions delegate to the kanata manager module passed via ctx.kanata.
---- Builds the kanata submenu — the first block of this file the shared renderer
---- materialises rather than this driver.
----
---- The rows are DATA here: the provider returns `{ label, action, checked }` and
---- `manifest_menu` turns each into a menu item. That distinction is the whole of
---- M3.3. Routing a menu through `ManifestMenu.build` while its handlers still
---- append rows moves nothing — the manifest then describes the slot and the
---- driver still builds the row, which is what the bypass ratchet measures and
---- why four of this driver's menus already call the renderer without having
---- moved a single row out of it.
---- Display name of a tap-hold key, from the shared vocabulary.
----
---- `tap_hold.group.*` is the catalogue Windows already labels its tap-hold menu
---- with, translated in every locale. Reaching for it rather than spelling the
---- seven key names out here is the difference between this driver agreeing with
---- the other two and merely resembling them.
---- @param key_id string Key id from the tap-hold configuration, e.g. "caps_lock".
---- @return string.
+--- Display name of a tap-hold key, from the shared `tap_hold.group.*` labels
+--- the Windows menu uses.
+--- @param key_id string e.g. "caps_lock".
+--- @return string
 local function _tap_hold_key_label(key_id)
 	local label = i18n_safe("tap_hold.group." .. key_id)
-	-- i18n_safe hands back the key when nothing is registered; an unlabelled key
-	-- is better shown by its id than by a dotted path the user cannot read.
 	if label == "tap_hold.group." .. key_id then return key_id end
 	return label
 end
 
---- Display name of a tap action. Falls back through the shared action catalogue
---- before giving up and showing the raw value, because a tap action is a key
---- name in some entries and an `sg_actions.*` id in others.
---- @param action string|nil Value of `tap_action`.
---- @return string.
-local function _tap_hold_action_label(action)
-	if type(action) ~= "string" or action == "" then
-		return i18n_safe("tap_hold.tap.none")
-	end
-	for _, prefix in ipairs({ "sg_actions.", "tap_hold.group." }) do
-		local label = i18n_safe(prefix .. action)
-		if label ~= prefix .. action then return label end
+--- Display name of a tap action: the key itself for "", else the catalogue's.
+--- @param action string|nil
+--- @param gestures table|nil The gestures manager, for the actions it labels.
+--- @return string
+local function _tap_hold_action_label(action, gestures)
+	if type(action) ~= "string" or action == "" then return i18n_safe("tap_hold.tap.none") end
+	local label = i18n_safe("sg_actions." .. action)
+	if label ~= "sg_actions." .. action then return label end
+	if gestures and type(gestures.get_action_label) == "function" then
+		local ok, named = pcall(gestures.get_action_label, action)
+		if ok and type(named) == "string" and named ~= "" then return named end
 	end
 	return action
 end
 
---- Display name of a hold modifier, from the shared `tap_hold.hold.*` catalogue.
---- @param modifier string|nil Value of `hold_modifier`.
---- @return string.
-local function _tap_hold_hold_label(modifier)
-	if type(modifier) ~= "string" or modifier == "" then
-		return i18n_safe("tap_hold.hold.none")
-	end
-	local label = i18n_safe("tap_hold.hold." .. modifier)
-	if label == "tap_hold.hold." .. modifier then return modifier end
-	return label
-end
-
---- The tap-hold writer, loaded lazily and once.
----
---- Lazily because a driver whose kanata manager never loaded must still build its
---- menu — the rows then report the configuration they can read and refuse to
---- change it, which is what it is.
+--- The hold option a key's entry matches.
+--- @param options table From the manager's hold_options().
+--- @param entry table The key's configuration.
 --- @return table|nil
-local function _tap_hold_writer()
-	local ok_mod, writer = pcall(require, "platform.remap.tap_hold_writer")
-	if not ok_mod or type(writer) ~= "table" then
-		Logger.error(LOG, "The tap-hold writer is unavailable — this key cannot be changed from the menu.")
-		return nil
-	end
-	return writer
-end
-
---- Whether the user's own file names this key.
---- @param key_id string
---- @return boolean
-local function _tap_hold_is_overridden(key_id)
-	local writer = _tap_hold_writer()
-	if not writer or type(writer.is_overridden) ~= "function" then return false end
-	local ok, overridden = pcall(writer.is_overridden, key_id)
-	return ok and overridden or false
-end
-
---- Returns this key to the shared default.
---- @param ctx table Menu context.
---- @param key_id string
-local function _tap_hold_clear(ctx, key_id)
-	local writer = _tap_hold_writer()
-	if not writer then return end
-	pcall(writer.clear_key, key_id)
-	if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-end
-
---- Asks for a new tap action and persists it.
----
---- A free-text prompt rather than a list, for the same reason Windows opens a
---- dialog here: a tap action is a key name in some entries and a shared action id
---- in others, so the set is not enumerable without deciding which half to drop.
---- @param ctx table Menu context.
---- @param key_id string
---- @param current string|nil
-local function _tap_hold_prompt_tap(ctx, key_id, current)
-	local writer = _tap_hold_writer()
-	if not writer then return end
-	local value = prompt_text(
-		i18n_safe("tap_hold.picker.tap_title"),
-		i18n_safe("tap_hold.picker.tap_prompt"),
-		current or "")
-	if value == nil then return end
-	-- An empty answer clears the tap action, which is how the key goes back to
-	-- emitting itself — the same meaning `tap_action = null` has in the file.
-	pcall(writer.set_field, key_id, "tap_action", value ~= "" and value or nil)
-	if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-end
-
---- The hold picker's rows, from the SHARED catalogue.
----
---- `_shared/lua/tap_hold/hold_options.lua` builds the ordered list — the "none"
---- sentinel, every combination of the declared modifiers, then the layers — from
---- `[tap_hold.hold_picker]` in the shared defaults. The AutoHotkey driver offers
---- the same list from the same table; before 2026-08-08 it was a hardcoded array
---- there and no list at all here.
---- @param ctx table Menu context.
---- @param key_id string
---- @param entry table The key's current configuration.
---- @return table Provider rows.
-local function _tap_hold_hold_rows(ctx, key_id, entry)
-	local ok_mod, HoldOptions = pcall(require, "tap_hold.hold_options")
-	if not ok_mod or type(HoldOptions) ~= "table" then
-		Logger.error(LOG, "The shared hold-option catalogue is unavailable — the hold picker is empty.")
-		return {}
-	end
-	local km = ctx.kanata
-	local catalogue = nil
-	if km and type(km.hold_picker_catalogue) == "function" then
-		local ok, value = pcall(km.hold_picker_catalogue)
-		catalogue = ok and value or nil
-	end
-
-	local current_mod   = type(entry.hold_modifier) == "string" and entry.hold_modifier or ""
-	local current_layer = type(entry.hold_layer) == "string" and entry.hold_layer or ""
-	local rows = {}
-	for _, option in ipairs(HoldOptions.build(catalogue)) do
-		local id, kind = option.id, option.kind
-		local checked = (kind == "none" and current_mod == "" and current_layer == "")
-			or (kind == "modifier" and current_mod == id)
-			or (kind == "layer" and current_layer == id)
-		rows[#rows + 1] = {
-			label   = HoldOptions.label(option, i18n_safe),
-			checked = checked or nil,
-			action  = function()
-				local writer = _tap_hold_writer()
-				if not writer then return end
-				if kind == "layer" then
-					pcall(writer.set_field, key_id, "hold_layer", id)
-				elseif kind == "modifier" then
-					pcall(writer.set_field, key_id, "hold_modifier", id)
-				else
-					pcall(writer.set_field, key_id, "hold_modifier", nil)
-				end
-				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-			end,
-		}
-	end
-	return rows
-end
-
---- @param ctx table Menu context.
---- @return table One menu entry with its submenu.
-local function _build_kanata(ctx)
-	local km = ctx.kanata
-
-	-- Fallback: try direct require if not passed via context.
-	if not km then
-		local ok_km, km_mod = pcall(require, "platform.remap.manager")
-		if ok_km then km = km_mod end
-	end
-
-	--- Wraps a manager call so a row is clickable even before the manager loads.
-	--- @param name string The manager function to call.
-	--- @return function
-	local function call(name)
-		return function()
-			if not km then
-				Logger.error(LOG, "Kanata manager not loaded — '%s' did nothing.", name)
-				return
-			end
-			local ok, result = pcall(km[name])
-			if not ok then
-				Logger.error(LOG, "kanata.%s() raised: %s.", name, tostring(result))
-			elseif name == "write_kbd" then
-				-- The only one with a meaningful return: it says whether the file
-				-- was written, and a silent failure here leaves kanata running the
-				-- previous layout with no sign that the new one never landed.
-				if result then
-					Logger.info(LOG, "Kanata .kbd generated.")
-				else
-					Logger.error(LOG, "Kanata .kbd generation failed.")
-				end
-			end
+local function _tap_hold_current_hold(options, entry)
+	local modifier = type(entry.hold_modifier) == "string" and entry.hold_modifier or ""
+	local layer = type(entry.hold_layer) == "string" and entry.hold_layer or ""
+	for _, option in ipairs(options) do
+		if (option.kind == "none" and modifier == "" and layer == "")
+			or (option.kind == "modifier" and option.id == modifier and layer == "")
+			or (option.kind == "layer" and option.id == layer) then
+			return option
 		end
+	end
+	return nil
+end
+
+--- Builds the Tap-Holds submenu: the feature switch, reset and disable-all,
+--- then one row per key with its tap picker, hold picker and delay — the
+--- Windows menu, on the engine this daemon runs. Every change writes the
+--- user's tap_hold.toml and reloads the engine, so it is in force at once.
+--- @param ctx table Menu context (ctx.tap_holds is the tap-hold manager).
+--- @return table One menu entry with its submenu.
+local function _build_tap_holds(ctx)
+	local th = ctx.tap_holds
+	if not th then
+		return { label = i18n_safe("menu.tapholds.title"), disabled = true }
+	end
+	local Writer = require("platform.remap.tap_hold_writer")
+	local HoldOptions = require("tap_hold.hold_options")
+	local Engine = require("platform.remap.tap_hold_engine")
+
+	local function changed(ok)
+		if not ok then show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title")) end
+		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+	end
+
+	local keys = th.keys()
+	local options = th.hold_options()
+	local feature_on = th.file_enabled() and th.is_enabled()
+
+	--- Opens the searchable action picker for a key's tap.
+	local function pick_tap(key_id, current)
+		local ok_picker, Picker = pcall(require, "ui.action_picker.bridge")
+		if not ok_picker or type(Picker.open) ~= "function" then
+			Logger.error(LOG, "Action picker is unavailable for the tap of '%s'.", key_id)
+			return
+		end
+		local items = {}
+		for _, id in ipairs(th.tap_actions()) do
+			items[#items + 1] = { type = "action", id = id, label = _tap_hold_action_label(id, ctx.gestures) }
+		end
+		table.sort(items, function(left, right) return left.label < right.label end)
+		Picker.open({
+			title = i18n_safe("tap_hold.picker.title_prefix") .. _tap_hold_key_label(key_id),
+			label = i18n_safe("dialog.action_picker.label"),
+			current = current == "" and "__native__" or current,
+			allow_native = true,
+			native_label = i18n_safe("tap_hold.tap.none"),
+			items = items,
+		}, function(option)
+			local ok = Writer.set_tap(key_id, option == "__native__" and "" or option)
+			changed(ok)
+			return ok
+		end)
+	end
+
+	--- Asks for a key's own delay, in milliseconds.
+	local function ask_delay(key_id, current_ms)
+		local value = prompt_text(i18n_safe("menu.tapholds.key_tap_delay_dialog_title"),
+			string.format(i18n_safe("menu.tapholds.key_tap_delay_dialog_prompt"), current_ms),
+			tostring(current_ms))
+		if value == nil then return end
+		local ms = tonumber(value)
+		if not ms or ms <= 0 then
+			Logger.warn(LOG, "Invalid tap-hold delay '%s' — ignored.", tostring(value))
+			show_error(tostring(value), i18n_safe("dialog.gestures.param_error_title"))
+			return
+		end
+		changed(Writer.set_threshold(key_id, math.floor(ms + 0.5) / 1000))
 	end
 
 	local providers = {
-		["kanata_actions"] = function()
-			-- Taken from the context, not probed here. Answering truthfully now
-			-- means asking the system whether ANY kanata is running, which is a
-			-- subprocess — and building a menu must not spawn one. The daemon
-			-- computes it when it decides to rebuild; `owns_process` is the
-			-- cheap fallback when nobody supplied it, and it can only
-			-- under-report, which greys a row rather than inventing a state.
-			local running = ctx.kanata_running
-			if running == nil then
-				running = km and km.owns_process() or false
-			end
-			return {
-				{ label = i18n_safe("menu.kanata.generate_kbd"), action = call("write_kbd") },
-				{ label = i18n_safe("menu.kanata.start"),   action = call("start"),   checked = running },
-				{ label = i18n_safe("menu.kanata.stop"),     action = call("stop") },
-				{ label = i18n_safe("menu.kanata.restart"),  action = call("restart") },
-			}
-		end,
-
-		-- One row per configured tap-hold key, read from the same loader that
-		-- feeds kanata's defalias block. Ordered, because the loader returns a map
-		-- and `pairs` would reshuffle the user's keys on every menu build.
-		["kanata_tap_holds"] = function()
-			if not km or type(km.tap_hold_keys) ~= "function" then
-				Logger.error(LOG, "Kanata manager not loaded — the tap-holds cannot be read.")
-				return {}
-			end
-			local ok, keys = pcall(km.tap_hold_keys)
-			if not ok or type(keys) ~= "table" then
-				Logger.error(LOG, "Tap-hold configuration unreadable — no row to show.")
-				return {}
-			end
-
-			local ids = {}
-			for id in pairs(keys) do ids[#ids + 1] = id end
-			table.sort(ids)
-
+		["tap_hold_keys"] = function()
 			local rows = {}
-			for _, id in ipairs(ids) do
-				local entry = keys[id] or {}
-				local seconds = tonumber(entry.time_activation_seconds)
-				local ms = seconds and math.floor(seconds * 1000 + 0.5) or nil
-				local key_id = id
-				-- CONTROLS since 2026-08-08, not a read-out. Every row below was
-				-- greyed, with the note « a clickable row that cannot change
-				-- anything is worse than a greyed one » — true of the row, and the
-				-- wrong conclusion for the driver: Windows has edited these from its
-				-- tray since the feature existed, from this same file format. The
-				-- writer lives in platform/remap/tap_hold_writer.lua and reloads
-				-- kanata, so a click here takes effect immediately.
+			for _, key_id in ipairs(Engine.KEY_ORDER) do
+				local entry = keys[key_id] or {}
+				local active = keys[key_id] ~= nil and entry.enabled ~= false
+				local tap = active and type(entry.tap_action) == "string" and entry.tap_action or ""
+				local hold = active and _tap_hold_current_hold(options, entry) or options[1]
+				local tap_label = _tap_hold_action_label(tap, ctx.gestures)
+				local hold_label = hold and HoldOptions.label(hold, i18n_safe) or i18n_safe("tap_hold.hold.none")
+				local configured = tap ~= "" or (hold ~= nil and hold.kind ~= "none")
+				local ms = math.floor((tonumber(entry.time_activation_seconds) or 0) * 1000 + 0.5)
+
+				local hold_rows = {}
+				for _, option in ipairs(options) do
+					hold_rows[#hold_rows + 1] = {
+						label = HoldOptions.label(option, i18n_safe),
+						checked = (hold == option) or nil,
+						action = function() changed(Writer.set_hold(key_id, option.kind, option.id)) end,
+					}
+				end
+
 				rows[#rows + 1] = {
-					label   = _tap_hold_key_label(id),
-					checked = _tap_hold_is_overridden(key_id),
-					items   = {
+					label = _tap_hold_key_label(key_id) .. "  :  "
+						.. (configured and (tap_label .. "  /  " .. hold_label) or "—"),
+					checked = configured or nil,
+					items = {
 						{
-							label    = i18n_safe("tap_hold.action.disable"),
-							disabled = not _tap_hold_is_overridden(key_id),
-							action   = function() _tap_hold_clear(ctx, key_id) end,
+							label = i18n_safe("tap_hold.action.disable"),
+							disabled = not configured or nil,
+							action = function() changed(Writer.set_native(key_id)) end,
 						},
 						{ separator = true },
 						{
-							label  = string.format(i18n_safe("tap_hold.picker.tap"),
-								_tap_hold_action_label(entry.tap_action)),
-							action = function() _tap_hold_prompt_tap(ctx, key_id, entry.tap_action) end,
+							label = string.format(i18n_safe("tap_hold.picker.tap"), tap_label),
+							action = function() pick_tap(key_id, tap) end,
 						},
 						{
-							label = string.format(i18n_safe("tap_hold.picker.hold"),
-								_tap_hold_hold_label(entry.hold_modifier)),
-							items = _tap_hold_hold_rows(ctx, key_id, entry),
+							label = string.format(i18n_safe("tap_hold.picker.hold"), hold_label),
+							items = hold_rows,
 						},
-						{ label = ms and string.format(i18n_safe("menu.kanata.tap_hold_delay"), tostring(ms))
-							or i18n_safe("menu.kanata.tap_hold_delay"), disabled = true },
+						{
+							label = string.format(i18n_safe("menu.tapholds.key_tap_delay"), ms .. " ms"),
+							items = {
+								{
+									label = i18n_safe("menu.tapholds.key_tap_delay_set"),
+									action = function() ask_delay(key_id, ms) end,
+								},
+							},
+						},
 					},
 				}
 			end
@@ -2950,40 +2874,29 @@ local function _build_kanata(ctx)
 		end,
 	}
 
-	-- Commands reach the renderer through the context, not as an argument: the
-	-- `command` branch reads ctx.commands[id]. Registering them on a local table
-	-- and passing it positionally would land in `list_providers` and the row
-	-- would render as an unanswered command.
-	ctx.commands = ctx.commands or {}
-	-- Opens the file the loader reads, resolved BY the loader. This driver can
-	-- read a user tap_hold.toml and cannot write one, so "configure" means
-	-- "open the file" until it can.
-	ctx.commands["kanata_edit_tap_holds"] = function()
-			if not km or type(km.tap_hold_config_path) ~= "function" then
-				Logger.error(LOG, "Kanata manager not loaded — no tap-hold file to open.")
-				return
-			end
-			local ok, path = pcall(km.tap_hold_config_path)
-			if not ok or type(path) ~= "string" or path == "" then
-				Logger.error(LOG, "Tap-hold file path unresolved — nothing opened.")
-				return
-			end
-			-- xdg-open on a missing file fails silently, and a user who has never
-			-- written an override is the common case — say so rather than letting
-			-- the row look dead.
-			local probe = io.open(path, "r")
-			if probe then
-				probe:close()
-			else
-				Logger.warn(LOG, "'%s' does not exist yet — the driver is running the shared defaults.", path)
-			end
-			pcall(function() os.execute("xdg-open " .. shell_quote(path) .. " 2>/dev/null &") end)
+	local render_ctx = {}
+	for key, value in pairs(ctx) do render_ctx[key] = value end
+	render_ctx.commands = {}
+	for key, value in pairs(ctx.commands or {}) do render_ctx.commands[key] = value end
+	-- The feature switch is persisted in the file ([tap_hold] enabled), as the
+	-- Windows toggle is in its config; turning it on also lifts a runtime
+	-- « Disable all ».
+	render_ctx.commands["tapholds_toggle"] = function()
+		local want = not feature_on
+		local ok = Writer.set_enabled(want)
+		if ok and want then ok = th.set_enabled(true) end
+		changed(ok)
 	end
+	render_ctx.commands["reset_defaults"] = function() changed(Writer.reset_all()) end
+	render_ctx.commands["disable_all"] = function() changed(Writer.disable_all()) end
+	render_ctx.state_getters = {}
+	for key, value in pairs(ctx.state_getters or {}) do render_ctx.state_getters[key] = value end
+	render_ctx.state_getters["tapholds_enabled"] = function() return feature_on end
 
 	local rows = ManifestMenu
-		and ManifestMenu.build("kanata_menu", "Kanata", nil, nil, ctx, providers)
+		and ManifestMenu.build("tap_holds_menu", "TapHolds", nil, nil, render_ctx, providers)
 		or {}
-	return { label = i18n_safe("menu.kanata.title"), submenu = rows }
+	return { label = i18n_safe("menu.tapholds.title"), submenu = rows }
 end
 
 --- Builds the gestures submenu.
@@ -3100,7 +3013,10 @@ local function _build_gestures(ctx)
 					end,
 				},
 			}
-			for _, option in ipairs(ge.get_action_names and ge.get_action_names() or { "none" }) do
+			-- Inline: the current action and "none" only; the picker holds the
+			-- catalogue (see keyboard_slots for why the full list cannot be here).
+			for _, option in ipairs(inline_slot_options(
+				ge.get_action_names and ge.get_action_names() or { "none" }, action)) do
 				choices[#choices + 1] = {
 					label   = ge.get_action_label(option),
 					-- `checked`, not a "✓" glued to the label: the tray draws its own
@@ -3647,7 +3563,7 @@ function M.build(ctx)
 		["llm"]             = _build_llm,
 		["metrics"]         = _build_metrics,
 		["shortcuts"]       = _build_shortcuts,
-		["kanata"]          = _build_kanata,
+		["tap_holds"]       = _build_tap_holds,
 		["gestures"]        = _build_gestures,
 		["apps"]            = _build_apps,
 		["updates"]         = _build_updates,

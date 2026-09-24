@@ -117,6 +117,11 @@ local _verdict = VERDICT_UNKNOWN
 -- to publish when the caret moved while that answer was being obtained.
 local _focus_epoch = 0
 
+-- Whether the last probe left text blocked for want of an answer. Reported
+-- once per streak: an inconclusive probe withholds EVERY expansion, and at
+-- debug level that looked exactly like a daemon that does nothing.
+local _withholding = false
+
 -- Test seam for deterministic role/failure and stale-epoch coverage. Production
 -- keeps this nil and uses the AT-SPI query below.
 local _probe_for_test = nil
@@ -159,12 +164,22 @@ function M.refresh(epoch)
 
 	if not ok or conclusive ~= true or type(role) ~= "number" then
 		_verdict = VERDICT_UNKNOWN
-		Logger.debug(LOG, "refresh(): AT-SPI2 verdict unknown — %s",
-			ok and "inconclusive response" or tostring(role))
+		local reason = ok and "inconclusive response" or tostring(role)
+		if not _withholding then
+			_withholding = true
+			Logger.warn(LOG, "Hotstrings withheld: the focused field could not be checked for a "
+				.. "password (AT-SPI2 %s). They resume at the next conclusive answer.", reason)
+		else
+			Logger.debug(LOG, "refresh(): AT-SPI2 verdict unknown — %s", reason)
+		end
 		return false, _verdict
 	end
 
 	_verdict = role == ROLE_PASSWORD_TEXT and VERDICT_SECURE or VERDICT_INSECURE
+	if _withholding then
+		_withholding = false
+		Logger.info(LOG, "Focused field checked again (%s) — hotstrings resume where allowed.", _verdict)
+	end
 	return true, _verdict
 end
 

@@ -74,8 +74,8 @@ ergopti-hotstrings --verbose 2>&1 | tee /tmp/ergopti.log
 
 Type a few words in any application.
 
-**Expect** in the log: `Keyboard device selected: /dev/input/eventN (remap_output)`
-when kanata is running, or `(named_keyboard)` when it is not; then
+**Expect** in the log: `Keyboard device selected: /dev/input/eventN (named_keyboards)`,
+or `(any_key_devices)` when no device calls itself a keyboard; then
 `Grabbed … — the desktop no longer sees this device.`; then a `Key code=` line per
 keystroke.
 
@@ -91,12 +91,12 @@ way round). **Do not reconfigure anything between the two.**
 ## 2. Which device was grabbed
 
 ```bash
-grep -E 'Remap output device|Skipping synthetic|Keyboard device selected' /tmp/ergopti.log
+grep -E 'Skipping synthetic|Keyboard device selected|kanata' /tmp/ergopti.log
 ```
 
-**Expect** the daemon to have chosen the device named exactly `kanata` when the
-remap daemon is running. If it chose the physical keyboard instead, the engine is
-seeing PRE-remap keycodes and will resolve characters you did not type.
+**Expect** the daemon to have chosen the physical keyboard: the tap-holds run in
+the daemon itself, on the device it grabs. A kanata you run yourself would grab
+the keyboard first and apply every tap-hold twice, so stop it for this test.
 
 **Expect** `Skipping synthetic device` for `Ergopti Virtual Keyboard`. If that
 line is absent and the daemon selected it, expansions will loop.

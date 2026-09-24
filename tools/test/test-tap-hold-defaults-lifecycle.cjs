@@ -18,9 +18,10 @@
  *            and merges the user file on top PER KEY. Its docstring says so in
  *            as many words — "editing defaults.toml takes effect on every reload
  *            even when the user file exists".
- *   Linux    platform/remap/manager.lua reads it, but a user file REPLACES it
- *            wholesale. Its comment claims this "mirrors the other drivers",
- *            which is precisely what Windows does not do.
+ *   Linux    platform/remap/manager.lua read it, but a user file REPLACED it
+ *            wholesale. Since 2026-09-24 ergopti_hotstrings.lua hands the path
+ *            to platform/remap/tap_hold_manager at boot, and tap_hold_loader
+ *            merges the user file on top per key and field, as Windows does.
  *   macOS    platform/remap/defaults.lua reads [hs_*] in its MODULE BODY at
  *            require time, unconditionally.
  *
@@ -63,9 +64,11 @@ const LOADERS = [
 		lifecycle: 'parses the shared defaults first, then merges the user file on top per key'
 	},
 	{
-		file: 'linux/platform/remap/manager.lua',
-		needle: 'tap_hold/defaults.toml',
-		lifecycle: 'reads the shared defaults; a user file replaces them wholesale'
+		// The boot wiring, not the loader's header comment: this is the line that
+		// actually hands the path to the tap-hold manager.
+		file: 'linux/ergopti_hotstrings.lua',
+		needle: 'shared("tap_hold/defaults.toml")',
+		lifecycle: 'passes the shared defaults to the tap-hold manager at boot; the loader merges the user file on top per key'
 	},
 	{
 		file: 'macos/platform/remap/defaults.lua',

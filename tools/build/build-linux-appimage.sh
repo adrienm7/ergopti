@@ -99,7 +99,7 @@ echo "Copying driver files..."
 # way the .deb packager does needs a `|| true` on every line to survive the
 # trees the builder excludes (vendor/), and that suffix is exactly what let the
 # PKGBUILD ship a package with no driver in it. It also silently omits
-# platform/, which carries the kanata remap config. One copy, allowed to fail.
+# platform/, which carries the remap and tap-hold engine. One copy, allowed to fail.
 cp -r "$BUILD_DIR/linux/." "$APPDIR_LIB/"
 cp -r "$BUILD_DIR/_shared/." "$APPDIR_LIB/_shared/"
 # The stamp build-linux-driver.sh wrote is how the mounted daemon names its

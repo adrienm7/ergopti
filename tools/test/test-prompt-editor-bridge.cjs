@@ -76,6 +76,21 @@ try { index = read(INDEX); } catch (err) { check('index.html readable at shared 
 try { host = read(WIN_HOST); } catch (err) { check('Windows host readable', false, err.message); }
 try { menu = read(WIN_MENU); } catch (err) { check('Windows menu_profiles readable', false, err.message); }
 
+// 0. Escape closes the placeholder suggestions without cancelling the editor.
+// The page-wide keydown listener cancels on Escape; the editor's own listener
+// must stop the event while suggestions are open, or dismissing them discards
+// every edit.
+{
+	const editorHandler = script.slice(script.indexOf("editorElement.addEventListener('keydown'"));
+	const escapeBranch = editorHandler.slice(editorHandler.indexOf("if (e.key === 'Escape') {"),
+		editorHandler.indexOf("if (e.key === 'Escape') {") + 400);
+	check(
+		'dismissing the suggestions with Escape does not reach the page-wide cancel',
+		escapeBranch.includes('hideAc()') && escapeBranch.includes('e.stopPropagation()'),
+		'The editor Escape branch must call e.stopPropagation() before the page-wide handler runs doCancel().'
+	);
+}
+
 // 1. Host-agnostic post(): chrome.webview probed before webkit.
 // Bridge patterns now live in host_bridge.js (shared across all webview apps).
 const chromeIdx = bridge.indexOf('window.chrome.webview');
