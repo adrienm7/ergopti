@@ -37,7 +37,7 @@ DiagSnapshot_Fields() {
 	static Fields := [
 		"driver", "version", "commit", "os", "os_version", "arch", "runtime",
 		"elevated", "locale", "keyboard_layout", "monitors", "dpi", "display",
-		"config_dir", "log_level", "features_enabled", "boot_ms"
+		"config_dir", "logs_dir", "log_level", "features_enabled", "boot_ms"
 	]
 	return Fields
 }
@@ -309,6 +309,8 @@ DiagSnapshot_Collect(BootMs) {
 	Values["dpi"] := A_ScreenDPI
 	Values["config_dir"] := IsSet(_ConfigDir)
 		? DiagSnapshot_RedactHome(_ConfigDir, EnvGet("USERPROFILE")) : ""
+	; Where this report's own logs are, from the logger's one resolver.
+	Values["logs_dir"] := DiagSnapshot_RedactHome(LoggerLogsDir(), EnvGet("USERPROFILE"))
 	Values["log_level"] := IsSet(LOGGER_MIN_LEVEL) ? LOGGER_MIN_LEVEL : ""
 	if (IsSet(Features) && Features is Map) {
 		Counts := DiagSnapshot_CountFeatures(Features)

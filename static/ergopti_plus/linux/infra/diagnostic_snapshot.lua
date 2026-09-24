@@ -220,6 +220,8 @@ function M.collect(ctx, env)
 		dpi              = nil,
 		display          = display,
 		config_dir       = Snapshot.redact_home(ConfigPaths.get_config_dir(), ConfigPaths.home()),
+		-- Where this report's own logs are, from the one logs-folder resolver.
+		logs_dir         = Snapshot.redact_home(ConfigPaths.get_logs_dir(), ConfigPaths.home()),
 		log_level        = ctx.log_level,
 		features_enabled = Snapshot.features_ratio(ctx.features_enabled, ctx.features_total),
 		boot_ms          = ctx.boot_ms and string.format("%.0f", ctx.boot_ms) or nil,
