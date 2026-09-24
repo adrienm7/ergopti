@@ -251,10 +251,24 @@ local function _storage_set(key, value)
 	return false
 end
 
---- Reads the subscribed channel from config.toml [updater] channel, resolved
---- through the registry (a hand-written alias such as "stable" reads as its
---- channel). An absent file or key yields nil; an unreadable file or an unknown
---- value is logged and yields nil, so the installed build's channel is followed.
+--- Resolves the subscribed channel of a decoded config.toml through the
+--- registry (a hand-written alias such as "stable" reads as its channel).
+--- @param config table Decoded config.toml.
+--- @param mark function|nil mark(...segments), called for the key it takes.
+--- @return string|nil id Channel id, or nil when the key is absent or unknown.
+--- @return any raw The persisted value, for the caller's log line.
+local function _channel_from_config(config, mark)
+	local section = config[CONFIG_SECTION]
+	local raw = type(section) == "table" and section[CONFIG_CHANNEL_KEY] or nil
+	if raw == nil then return nil, nil end
+	local id = CHANNELS.resolve(raw)
+	if id and mark then mark(CONFIG_SECTION, CONFIG_CHANNEL_KEY) end
+	return id, raw
+end
+
+--- Reads the subscribed channel from config.toml [updater] channel. An absent
+--- file or key yields nil; an unreadable file or an unknown value is logged and
+--- yields nil, so the installed build's channel is followed.
 --- @param path string|nil config.toml path.
 --- @return string|nil id
 local function _read_persisted_channel(path)
@@ -266,15 +280,23 @@ local function _read_persisted_channel(path)
 		Logger.error(LOG, "config.toml could not be parsed; the update channel follows the installed build.")
 		return nil
 	end
-	local section = config[CONFIG_SECTION]
-	local raw = type(section) == "table" and section[CONFIG_CHANNEL_KEY] or nil
-	if raw == nil then return nil end
-	local id = CHANNELS.resolve(raw)
-	if not id then
+	local id, raw = _channel_from_config(config)
+	if raw ~= nil and not id then
 		Logger.warn(LOG, "config.toml names an unknown update channel '%s'; following the installed build.",
 			tostring(raw))
 	end
 	return id
+end
+
+--- Marks the config.toml paths the updater takes, through the walk init() uses,
+--- so the unused-key cleanup never offers the subscribed channel.
+--- @param config table Decoded config.toml.
+--- @param mark function mark(...segments) from config_unused_keys.
+function M.mark_config_reads(config, mark)
+	if type(mark) ~= "function" or type(config) ~= "table" then
+		error("updater.mark_config_reads needs a decoded config and a mark function", 2)
+	end
+	_channel_from_config(config, mark)
 end
 
 local function _load_persisted()
