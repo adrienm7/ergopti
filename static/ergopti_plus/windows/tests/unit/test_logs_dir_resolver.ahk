@@ -163,6 +163,7 @@ _LDIR_MissingErrorsFileIsAnnounced() {
 	}
 	RecordNotice(Message, Opts) {
 		Notified.Push(Message)
+		return true
 	}
 	try {
 		AssertTrue(LogOpeners_OpenTodayErrors(RecordLaunch, RecordNotice))
@@ -183,6 +184,32 @@ _LDIR_MissingErrorsFileIsAnnounced() {
 }
 Test("log openers: a missing errors file is announced, an existing one is opened (logs-dir-resolver)",
 	_LDIR_MissingErrorsFileIsAnnounced)
+
+; The notice is the whole answer to the click, so a notice that never reached
+; the user is a failed click, as on macOS and Linux, not a success.
+_LDIR_UndeliveredNoticeIsAFailure() {
+	global _LogsDir
+	Saved := _LogsDir
+	Root := A_Temp . "\ergopti_ldir_notice_" . A_TickCount
+	_LogsDir := Root . "\ergopti_plus\"
+	Launched := []
+	RecordLaunch(Command) {
+		Launched.Push(Command)
+	}
+	RefuseNotice(Message, Opts) {
+		return false
+	}
+	try {
+		AssertFalse(LogOpeners_OpenTodayErrors(RecordLaunch, RefuseNotice),
+			"an undelivered notice must not report the click as handled")
+		AssertEqual(0, Launched.Length, "a missing errors file is still never opened")
+	} finally {
+		_LogsDir := Saved
+		try DirDelete(Root, true)
+	}
+}
+Test("log openers: an undelivered no-errors notice is a failure (logs-dir-resolver)",
+	_LDIR_UndeliveredNoticeIsAFailure)
 
 _LDIR_OpenersUseTheResolver() {
 	global _LogsDir

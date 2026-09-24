@@ -60,7 +60,8 @@ LogOpeners_OpenTodayLog(RunFn := 0) {
 ; nothing warned today.
 ; @param RunFn {Func|Integer} Launch seam for tests; 0 means Run.
 ; @param NotifyFn {Func|Integer} Notification seam for tests; 0 means NotifierSend.
-; @returns {Boolean} True when the file was opened or the user was told.
+; @returns {Boolean} True when the file was opened or the user was told; false
+;   when the notice was not delivered, since it is the whole answer to the click.
 LogOpeners_OpenTodayErrors(RunFn := 0, NotifyFn := 0) {
 	Path := LoggerTodayErrorsPath()
 	if FileExist(Path) {
@@ -68,7 +69,11 @@ LogOpeners_OpenTodayErrors(RunFn := 0, NotifyFn := 0) {
 		return true
 	}
 	try LoggerInfo("LogOpeners", "No errors file for today at '{1}'; the user is told instead.", Path)
-	(HasMethod(NotifyFn, "Call") ? NotifyFn : NotifierSend).Call(
+	Delivered := (HasMethod(NotifyFn, "Call") ? NotifyFn : NotifierSend).Call(
 		t("menu.debug.no_errors_today"), Map("level", "info"))
+	if !Delivered {
+		try LoggerError("LogOpeners", "The no-errors-today notification was not delivered.")
+		return false
+	}
 	return true
 }
