@@ -83,6 +83,35 @@ helpers.describe("tap-hold manager", function()
 		os.remove(user_path)
 	end)
 
+	helpers.it("keeps the running engine when a reload cannot read the defaults", function()
+		local Manager, hook, _, user_path = manager()
+		local running = hook.engine
+		local Loader = require("platform.remap.tap_hold_loader")
+		local real = Loader.load
+		Loader.load = function() error("defaults unreadable", 0) end
+		local ok = Manager.reload()
+		Loader.load = real
+		helpers.assert_true(not ok, "the failure is reported")
+		helpers.assert_true(hook.engine == running, "and the keyboard keeps working as before")
+		Manager._reset_for_test()
+		os.remove(user_path)
+	end)
+
+	helpers.it("offers every hold option and the catalogue as taps", function()
+		local Manager, _, _, user_path = manager()
+		helpers.assert_true(Manager.is_hold_option("layer", "nav"))
+		helpers.assert_true(Manager.is_hold_option("modifier", "ctrl+shift"))
+		helpers.assert_true(Manager.is_hold_option("none", ""))
+		helpers.assert_true(not Manager.is_hold_option("layer", "sym"))
+		for _, id in ipairs({ "copy", "paste", "enter", "one_shot_shift", "alt_tab_monitor", "open_url" }) do
+			helpers.assert_true(Manager.is_tap_action(id), id)
+		end
+		helpers.assert_true(not Manager.is_tap_action("none"), "none is a sentinel, not an action")
+		helpers.assert_true(not Manager.is_tap_action("rm -rf"))
+		Manager._reset_for_test()
+		os.remove(user_path)
+	end)
+
 	helpers.it("rejects a second init and a use before init", function()
 		local Manager, _, _, user_path = manager()
 		helpers.assert_true(not pcall(Manager.init, {}), "duplicate init")

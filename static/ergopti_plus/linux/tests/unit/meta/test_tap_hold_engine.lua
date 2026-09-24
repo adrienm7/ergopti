@@ -93,6 +93,56 @@ helpers.describe("tap-hold engine: a modifier key", function()
 
 end)
 
+helpers.describe("tap-hold engine: thresholds and holds", function()
+
+	helpers.it("counts a release exactly at the threshold or the minimum as a tap", function()
+		local e = engine()
+		e:process(SHIFT, DOWN, 0)
+		local _, at_threshold = e:process(SHIFT, UP, 350)
+		e:process(SHIFT, DOWN, 1000)
+		local _, at_minimum = e:process(SHIFT, UP, 1050)
+		e:process(SHIFT, DOWN, 2000)
+		local _, past = e:process(SHIFT, UP, 2351)
+		helpers.assert_eq(at_threshold, "copy")
+		helpers.assert_eq(at_minimum, "copy")
+		helpers.assert_nil(past)
+	end)
+
+	helpers.it("holds AltGr and Win, and every modifier of a combination in order", function()
+		local e = engine({
+			caps_lock = { tap_action = "", hold_modifier = "win", time_activation_seconds = 0.3 },
+			tab = { tap_action = "", hold_modifier = "alt_gr", time_activation_seconds = 0.3 },
+			left_shift = { tap_action = "", hold_modifier = "ctrl+shift+alt", time_activation_seconds = 0.3 },
+		})
+		helpers.assert_eq(trail(e:process(CAPS, DOWN, 0)), "125↓")
+		helpers.assert_eq(trail(e:process(CAPS, UP, 500)), "125↑")
+		helpers.assert_eq(trail(e:process(15, DOWN, 1000)), "100↓")
+		helpers.assert_eq(trail(e:process(15, UP, 1500)), "100↑")
+		helpers.assert_eq(trail(e:process(SHIFT, DOWN, 2000)), "29↓ 42↓ 56↓")
+		helpers.assert_eq(trail(e:process(SHIFT, UP, 2500)), "56↑ 42↑ 29↑", "released in reverse")
+	end)
+
+	helpers.it("types the key itself on a tap of a native-tap key that holds", function()
+		local e = engine({ caps_lock = { tap_action = "", hold_modifier = "ctrl", time_activation_seconds = 0.3 } })
+		e:process(CAPS, DOWN, 0)
+		helpers.assert_eq(trail((e:process(CAPS, UP, 100))), "29↑ 58↓ 58↑")
+	end)
+
+	helpers.it("ignores an unknown modifier name rather than pressing anything", function()
+		local e = engine({ caps_lock = { tap_action = "enter", hold_modifier = "hyper", time_activation_seconds = 0.3 } })
+		helpers.assert_eq(trail(e:process(CAPS, DOWN, 0)), "")
+		helpers.assert_eq(trail((e:process(CAPS, UP, 100))), "28↓ 28↑")
+	end)
+
+	helpers.it("types End then Enter for the layer's new-line key", function()
+		local e = engine()
+		e:process(ALT, DOWN, 0)
+		helpers.assert_eq(trail(e:process(47, DOWN, 30)), "107↓ 107↑ 28↓")
+		helpers.assert_eq(trail(e:process(47, UP, 60)), "28↑")
+	end)
+
+end)
+
 helpers.describe("tap-hold engine: the navigation layer", function()
 
 	helpers.it("turns layer keys into navigation chords while held", function()
