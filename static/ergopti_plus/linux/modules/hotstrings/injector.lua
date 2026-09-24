@@ -93,6 +93,15 @@ local function held_text_modifier_codes()
 	return (ok_call and type(held) == "table") and held or {}
 end
 
+--- Non-modifier keys the hook forwarded as pressed and not yet released.
+--- @return table evdev keycodes.
+local function held_forwarded_keys()
+	local ok, hook = pcall(require, "adapters.keyboard_hook")
+	if not ok or type(hook.held_forwarded_keys) ~= "function" then return {} end
+	local ok_call, held = pcall(hook.held_forwarded_keys)
+	return (ok_call and type(held) == "table") and held or {}
+end
+
 local function must_emit(tx, code, value, phase)
 	if not tx.emit(code, value, phase) then
 		error(tx.error() or (phase .. " failed"), 0)
@@ -313,6 +322,12 @@ local function run_transaction(label, body)
 	local tx = OutputTransaction.new(_uinput)
 	local ok, err = pcall(function()
 		if not tx.neutralize(held_text_modifier_codes()) then error(tx.error(), 0) end
+		-- Released, never restored: the key is the terminator the user already
+		-- typed, and pressing it again would type it twice. Its physical release
+		-- arrives later and is a harmless duplicate for the kernel.
+		for _, code in ipairs(held_forwarded_keys()) do
+			must_emit(tx, code, EVDEV_VALUE_UP, "held key release")
+		end
 		body(tx)
 	end)
 	if not ok and not tx.is_failed() then tx.fail(err, "unexpected exception") end

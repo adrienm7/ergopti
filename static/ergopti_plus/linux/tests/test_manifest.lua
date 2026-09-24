@@ -152,6 +152,7 @@ return {
 	"tests.unit.modules.hotstrings.test_expansion_delay",
 	"tests.unit.modules.hotstrings.test_hotstrings_menu_skeleton",
 	"tests.unit.modules.hotstrings.test_injector_caps_lock",
+	"tests.unit.modules.hotstrings.test_injector_held_terminator",
 	"tests.unit.modules.hotstrings.test_injector_fast_channel",
 	"tests.unit.modules.hotstrings.test_injector_untypable_text",
 	"tests.unit.modules.hotstrings.test_loader_catalogue",
