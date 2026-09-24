@@ -221,6 +221,65 @@ _KLT_VectorsCase() {
 	AssertEqual(0, Failures.Length, _KLT_Join(Failures))
 }
 
+; The registry emulation and the Ergopti emulation read the same .keylayout
+; through two readers (keylayout_emulation.ahk steps the model per key,
+; keylayout_tables.ahk flattens it into tables). The golden file records what
+; the Windows Ergopti emulation typed before either reader existed, so it is an
+; expectation independent of both: the registry emulation of Ergopti must type
+; it on every level, and compose it after both base dead keys, wherever the
+; Windows emulation does not deliberately deviate from the file.
+Test("keylayout emulation: emulating the Ergopti registry layout types what the Windows Ergopti emulation types (layout-registry-emulation)",
+	() => _KLT_WithEmulation(_KLT_ErgoptiGoldenCase))
+
+_KLT_ErgoptiGoldenCase() {
+	global ERGOPTI_KEY_DEVIATIONS, ERGOPTI_DEAD_KEY_DEVIATIONS
+	Golden := JsonParse(FileRead(_DriverDir . "\tests\fixtures\ergopti_emulation_golden.json", "UTF-8"))
+	; Level -> [Shift, CapsLock, AltGr] as the registry emulation receives them.
+	Levels := Map("base", [false, false, false], "shift", [true, false, false], "caps", [false, true, false],
+		"altgr_number_row", [false, false, true], "altgr_number_row_shift", [true, false, true],
+		"altgr_rows", [false, false, true], "altgr_rows_shift", [true, false, true])
+	_KLT_Load("ergopti")
+	Failures := []
+	Keys := 0
+	; Base-level key typing each character, for the dead-key replay below.
+	KeyOf := Map()
+	for Level, Flags in Levels {
+		for Sc, Descriptor in Golden["levels"][Level] {
+			if !Descriptor.Has("text")
+				continue
+			if ERGOPTI_KEY_DEVIATIONS.Has(Level) && ERGOPTI_KEY_DEVIATIONS[Level].Has(Sc)
+				continue
+			Keys += 1
+			KeylayoutEmulation_ResetDeadKey()
+			Typed := KeylayoutEmulation_Press(Sc, Flags[1], Flags[2], Flags[3])
+			if (Typed !== Descriptor["text"])
+				Failures.Push(Level . " " . Sc . " typed [" . Typed . "] instead of [" . Descriptor["text"] . "]")
+			if (Level == "base" || Level == "shift") && !KeyOf.Has(Descriptor["text"])
+				KeyOf[Descriptor["text"]] := [Sc, Flags[1]]
+		}
+	}
+	Composed := 0
+	for DeadSc, Name in Map("SC02B", "Circumflex", "SC01B", "Diaresis") {
+		AssertEqual(Name, Golden["levels"]["base"][DeadSc]["dead"], DeadSc . " must be the " . Name . " dead key")
+		Deviations := ERGOPTI_DEAD_KEY_DEVIATIONS.Get(Name, Map())
+		for Input, Output in Golden["dead_keys"][Name] {
+			if Deviations.Has(Input) || !KeyOf.Has(Input)
+				continue
+			Composed += 1
+			KeylayoutEmulation_ResetDeadKey()
+			Started := KeylayoutEmulation_Press(DeadSc, false, false, false)
+			Key := KeyOf[Input]
+			Typed := Started . KeylayoutEmulation_Press(Key[1], Key[2], false, false)
+			if (Typed !== Output)
+				Failures.Push(Name . " then " . Key[1] . " typed [" . Typed . "] instead of [" . Output . "]")
+		}
+	}
+	KeylayoutEmulation_ResetDeadKey()
+	Assert(Keys >= 150, "the golden levels must give at least 150 typed keys, got " . Keys)
+	Assert(Composed >= 80, "the two base dead keys must compose at least 80 golden entries, got " . Composed)
+	AssertEqual(0, Failures.Length, _KLT_Join(Failures))
+}
+
 
 
 
