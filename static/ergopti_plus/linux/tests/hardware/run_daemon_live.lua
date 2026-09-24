@@ -268,6 +268,12 @@ local function read_output(seconds)
 		if EvdevReader.wait_readable(200, out_slot) then
 			local ev = EvdevReader.read_event(out_slot)
 			while ev do
+				if ev.type == 0 and ev.code == 3 then
+					-- SYN_DROPPED: this reader fell behind and the kernel dropped
+					-- events. Said as what it is, never read as the daemon's text.
+					trail[#trail + 1] = "DROPPED"
+					text[#text + 1] = "<dropped>"
+				end
 				if ev.type == 1 then
 					if ev.value ~= 2 then trail[#trail + 1] = ev.code .. (ev.value == 1 and "↓" or "↑") end
 					if ev.code == EvdevCodes.KEY_LEFTSHIFT or ev.code == EvdevCodes.KEY_RIGHTSHIFT then
@@ -345,8 +351,10 @@ local _, caps_hold = read_output(1)
 expect_trail("CapsLock held + A is Ctrl+A", caps_hold, "29↓ 30↓ 30↑ 29↑")
 if caps_hold:find("58", 1, true) then failures[#failures + 1] = "CapsLock reached the desktop" end
 
--- CapsLock tapped after a trigger: a real Enter, which ends the hotstring.
-type_text("adn")
+-- CapsLock tapped after a trigger: a real Enter, which ends the hotstring. A
+-- space first: Ctrl+A above moved the caret, and a word-only trigger rightly
+-- does not fire where the daemon cannot tell a word starts.
+type_text(" adn")
 press(KEY_CAPSLOCK, 0.1)
 local caps_text, caps_tap = read_output(2)
 expect_trail("CapsLock tapped is Enter", caps_tap, "28↓ 28↑")
@@ -409,12 +417,12 @@ if LLM_PORT then
 		end
 		-- The offer is drawn once the reply is parsed; then Alt+1 accepts it.
 		-- Alt is Tab held, as on Windows: left Alt is the navigation layer.
+		-- No pause after the 1: the injection is a burst, and a reader asleep
+		-- meanwhile loses it to the evdev buffer's overflow.
 		sleep(1.5)
 		Keyboard.emit(KEY_TAB, 1)
-		sleep(0.05)
 		Keyboard.emit(KEY_1, 1)
 		Keyboard.emit(KEY_1, 0)
-		sleep(0.05)
 		Keyboard.emit(KEY_TAB, 0)
 		local ai_text, ai_trail, alt_chords = read_output(3)
 		print(string.format("  after Alt+1 the desktop received %q", ai_text))
