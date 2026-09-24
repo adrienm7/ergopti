@@ -14,6 +14,7 @@ return {
 	"tests.unit.adapters.test_clipboard_selection_transaction",
 	"tests.unit.adapters.test_evdev_reader",
 	"tests.unit.adapters.test_keyboard_hook_caps_lock_seed",
+	"tests.unit.adapters.test_keyboard_hook_caps_lock_state",
 	"tests.unit.adapters.test_keyboard_hook_device_watchdog",
 	"tests.unit.adapters.test_keyboard_hook_safety",
 	"tests.unit.adapters.test_keyboard_hook_xkb_capture",
