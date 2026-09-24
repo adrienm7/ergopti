@@ -408,6 +408,21 @@
 	}
 
 	/**
+	 * What an items section that a probe completes says while that probe has
+	 * not answered with the whole list, or null.
+	 * @param {object} section
+	 * @param {object} snapshot
+	 * @param {function(string, ...*): string} t
+	 * @returns {{text: string, state: string}|null}
+	 */
+	function itemsProbeNote(section, snapshot, t) {
+		var probeId = probeFor(section, snapshot.driver);
+		if (!probeId) return null;
+		var result = snapshot.probes ? snapshot.probes[probeId] : undefined;
+		return result && result.state === 'ok' ? null : probeState(result, t);
+	}
+
+	/**
 	 * The HTML of an items section.
 	 * @param {object} section
 	 * @param {object} data
@@ -418,7 +433,11 @@
 	 */
 	function renderItems(section, data, snapshot, schema, t) {
 		var items = Array.isArray(data.items) ? data.items : [];
-		if (items.length === 0) return '<p class="empty">' + escapeHtml(t('healthcheck.value.none')) + '</p>';
+		var note = itemsProbeNote(section, snapshot, t);
+		var noteHtml = note ? '<p class="' + note.state + '">' + escapeHtml(note.text) + '</p>' : '';
+		if (items.length === 0) {
+			return (note ? '' : '<p class="empty">' + escapeHtml(t('healthcheck.value.none')) + '</p>') + noteHtml;
+		}
 		var permissions = (schema.permissions && schema.permissions[snapshot.driver]) || {};
 		var columns = section.columns.filter(function (column) {
 			return snapshot.detailed || (section.opt_in_columns || []).indexOf(column) < 0;
@@ -444,7 +463,7 @@
 			});
 			html += '</tr>';
 		});
-		return html + '</tbody></table>';
+		return html + '</tbody></table>' + noteHtml;
 	}
 
 	/**
@@ -575,8 +594,9 @@
 		}
 		if (section.kind === 'items') {
 			var items = Array.isArray(data.items) ? data.items : [];
+			var note = itemsProbeNote(section, snapshot, t);
 			if (items.length === 0) {
-				lines.push(t('healthcheck.value.none'), '');
+				lines.push(note ? note.text : t('healthcheck.value.none'), '');
 				return lines;
 			}
 			var columns = section.columns.filter(function (column) {
@@ -594,6 +614,7 @@
 				}).join(' | ') + ' |');
 			});
 			lines.push('');
+			if (note) lines.push(note.text, '');
 			return lines;
 		}
 		var rows = [];

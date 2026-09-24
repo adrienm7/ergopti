@@ -104,6 +104,11 @@ for (const section of schema.sections || []) {
 	}
 	const kind = section.kind || 'fields';
 	if (!['fields', 'items', 'summary'].includes(kind)) fail(`section ${section.id} has an unknown kind ${kind}`);
+	const sectionProbes = typeof section.probe === 'string' ? [section.probe] : Object.values(section.probe || {});
+	for (const probe of sectionProbes) {
+		if (kind !== 'items') fail(`section ${section.id}: only an items section is completed by a probe`);
+		if (!schema.probes || !schema.probes[probe]) fail(`section ${section.id} names an undeclared probe ${probe}`);
+	}
 	if (kind === 'items') {
 		if (!Array.isArray(section.columns) || section.columns.length === 0) fail(`items section ${section.id} has no columns`);
 		for (const column of section.columns || []) labelKeys.add(`healthcheck.column.${section.id}.${column}`);
@@ -308,6 +313,38 @@ for (const driver of DRIVERS) {
 		fail('macOS: an unavailable feature does not show its translated reason');
 	}
 	if (!html.includes('hotstrings.expansion_delay')) fail('macOS: an unavailable feature without a reason is hidden');
+}
+
+// macOS lists USB devices at once and learns its Bluetooth ones from a probe
+// (hs.usb sees no Bluetooth keyboard): until that probe answers, the section
+// says the list is incomplete, on the page and in the report
+{
+	const peripherals = Model.sectionsFor(schema, 'macos').find((section) => section.id === 'peripherals');
+	const probeId = peripherals && Model.probeFor(peripherals, 'macos');
+	if (!probeId) fail('macOS: no probe completes the peripherals with the Bluetooth devices');
+	else {
+		const pending = fixture('macos');
+		const pendingSection = (html) => html.slice(html.indexOf('id="section-peripherals"'), html.indexOf('id="section-issues"'));
+		if (!pendingSection(Model.renderHtml(pending, schema, t)).includes(t('healthcheck.probe.pending'))) {
+			fail('macOS: the peripherals do not say their Bluetooth devices are still being read');
+		}
+		const markdown = Model.formatMarkdown(pending, schema, t);
+		const reportSection = markdown.slice(markdown.indexOf(`## ${t('healthcheck.section.peripherals')}`),
+			markdown.indexOf(`## ${t('healthcheck.section.issues')}`));
+		if (!reportSection.includes(t('healthcheck.probe.pending'))) fail('macOS: the report hides an unread Bluetooth list');
+		const done = fixture('macos');
+		done.probes[probeId] = { state: 'ok', ms: 900 };
+		if (pendingSection(Model.renderHtml(done, schema, t)).includes(t('healthcheck.probe.pending'))) {
+			fail('macOS: the peripherals still say "checking" once the Bluetooth probe answered');
+		}
+		const empty = fixture('macos');
+		empty.sections.peripherals = { items: [] };
+		empty.probes[probeId] = { state: 'timeout', ms: 10000 };
+		const emptyHtml = pendingSection(Model.renderHtml(empty, schema, t));
+		if (!emptyHtml.includes(t('healthcheck.probe.timeout', 10000))) fail('macOS: a timed-out Bluetooth read is not said');
+	}
+	const windows = Model.sectionsFor(schema, 'windows').find((section) => section.id === 'peripherals');
+	if (windows && Model.probeFor(windows, 'windows')) fail('Windows reads its Bluetooth devices at once and needs no probe');
 }
 
 // A value the model does not escape would run in the page

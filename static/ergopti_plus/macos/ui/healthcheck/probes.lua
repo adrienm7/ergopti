@@ -21,7 +21,11 @@
 --- 4. cpu_load samples the machine with hs.host.cpuUsage's callback form,
 ---    which waits on its own timer (the form without a callback blocks), and
 ---    reads ErgoptiPlus's processor share and memory with ps, as a task.
---- 5. A run is cancelled as a whole when the window closes or refreshes, and a
+--- 5. bluetooth reads the connected Bluetooth keyboards, mice and trackpads
+---    with system_profiler, as a task (1 to 3 s): hs.usb sees none of them,
+---    and a Magic Keyboard is the keyboard of most Macs on a desk. Its answer
+---    is the whole peripherals list, USB devices first.
+--- 6. A run is cancelled as a whole when the window closes or refreshes, and a
 ---    late answer of a cancelled run publishes nothing.
 --- ==============================================================================
 
@@ -37,6 +41,9 @@ local DF = "/bin/df"
 
 -- ps prints this process's processor share (100 = one core) and resident memory (KiB)
 local PS = "/bin/ps"
+
+-- system_profiler lists the Bluetooth devices hs.usb cannot see
+local SYSTEM_PROFILER = "/usr/sbin/system_profiler"
 
 -- The sysctl keys, in the order they are printed
 local SYSCTL_KEYS = { "hw.model", "machdep.cpu.brand_string", "hw.logicalcpu" }
@@ -294,6 +301,69 @@ local function cpu_load(config)
 	end
 end
 
+--- A "0x004C" id as the four lowercase hex digits of the USB rows.
+--- @param value any
+--- @return string|nil
+local function hex_id(value)
+	local digits = type(value) == "string" and value:match("^0[xX](%x+)$") or nil
+	return digits and string.format("%04x", tonumber(digits, 16)) or nil
+end
+
+--- The connected Bluetooth keyboards, mice and trackpads of system_profiler's
+--- report: bus, kind and ids, and their names only when details are
+--- included. The report also holds addresses and serial numbers, which are
+--- never read.
+--- @param json string Output of `system_profiler SPBluetoothDataType -json`.
+--- @param detailed boolean
+--- @return table|nil items
+--- @return string|nil error
+function M.bluetooth_devices(json, detailed)
+	local data = decode(json)
+	local controllers = type(data) == "table" and data.SPBluetoothDataType or nil
+	if type(controllers) ~= "table" then return nil, "system_profiler printed no Bluetooth report" end
+	local device_kind = require("ui.healthcheck.helpers").device_kind
+	local items = {}
+	for _, controller in ipairs(controllers) do
+		-- Absent when nothing is connected
+		local connected = type(controller) == "table" and controller.device_connected or nil
+		for _, entry in ipairs(type(connected) == "table" and connected or {}) do
+			for name, device in pairs(type(entry) == "table" and entry or {}) do
+				local kind = device_kind(type(device) == "table" and device.device_minorType or nil)
+				-- Headphones and speakers are no input device
+				if kind ~= "other" then
+					local item = {
+						bus = "bluetooth", kind = kind,
+						vendor_id = hex_id(device.device_vendorID), product_id = hex_id(device.device_productID),
+					}
+					if detailed then item.name = name end
+					items[#items + 1] = item
+				end
+			end
+		end
+	end
+	return items
+end
+
+--- The Bluetooth input devices, after the USB ones phase A listed.
+--- @param usb_items table The snapshot's peripherals items.
+--- @param detailed boolean
+--- @return function Probe body.
+local function bluetooth(usb_items, detailed)
+	return function(done, on_cancel)
+		run_task(SYSTEM_PROFILER, { "SPBluetoothDataType", "-json" }, on_cancel, function(stdout)
+			local devices, err = M.bluetooth_devices(stdout, detailed)
+			if not devices then
+				done({ state = "error", detail = err })
+				return
+			end
+			local items = {}
+			for _, item in ipairs(usb_items) do items[#items + 1] = item end
+			for _, item in ipairs(devices) do items[#items + 1] = item end
+			done({ state = "ok" }, { peripherals = { items = items } })
+		end, function(detail) done({ state = "error", detail = detail }) end)
+	end
+end
+
 
 
 
@@ -306,16 +376,20 @@ end
 
 --- Starts every probe of a snapshot.
 --- @param schema table
---- @param paths table The snapshot's paths section.
+--- @param snapshot table The phase A snapshot: its paths, its peripherals and
+---   whether details are included.
 --- @param publish function(id, result, sections) Receives each answer once.
 --- @return table run { cancel = function() } Cancels every probe still running.
-function M.start(schema, paths, publish)
+function M.start(schema, snapshot, publish)
 	local run = { cancelled = false, finishers = {}, publish = publish }
 	local config = schema.probes
+	local sections = snapshot.sections
 	start_probe(run, "github_api", config.github_api.timeout_ms, github_api(config.github_api))
 	start_probe(run, "ai_health", config.ai_health.timeout_ms, ai_health(config.ai_health))
-	start_probe(run, "system_details", config.system_details.timeout_ms, system_details(paths.logs_dir))
+	start_probe(run, "system_details", config.system_details.timeout_ms, system_details(sections.paths.logs_dir))
 	start_probe(run, "cpu_load", config.cpu_load.timeout_ms, cpu_load(config.cpu_load))
+	start_probe(run, "bluetooth", config.bluetooth.timeout_ms,
+		bluetooth(sections.peripherals.items or {}, snapshot.detailed == true))
 	function run.cancel()
 		run.cancelled = true
 		for _, finisher in ipairs(run.finishers) do finisher() end

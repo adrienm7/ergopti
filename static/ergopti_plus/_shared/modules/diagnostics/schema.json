@@ -1,5 +1,5 @@
 {
-	"_comment": "The diagnostics window's snapshot, version 2, produced by the three drivers and rendered and exported by the shared page (_shared/ui/healthcheck/model.js). A snapshot is { schema_version, driver, generated_at (UTC, ISO 8601), detailed, sections: { <section id>: { <field id>: value } or { items: [ ... ] } }, probes: { <probe id>: { state, ms, detail } } }. Sections render in this order; a section or a field whose `platforms` omits the driver is neither collected nor shown there. Labels come from the locales: healthcheck.section.<id>, healthcheck.field.<id>, healthcheck.column.<section>.<column>. Field types: text, path (the page offers Open; the host opens it by field id only, never by a path the page sends), count, bytes, seconds, ms, percent (0 to 100, of the whole machine's processor capacity), bool (true, or 1 from the AHK writer), list, log (an H3 and a block), enum (translated through enum_key + value). A field with `probe` is filled by that asynchronous probe and reads as pending until the probe answers; `probe` is a probe id, or a map from driver to probe id when only some drivers need one; show_ms appends the probe's duration. The cpu_load probe takes two samples sample_ms apart, on a timer. A field marked opt_in, and an items column in opt_in_columns, is collected and shown only when the user ticks 'Include details'. Phase A, the synchronous collection, must stay under phase_a_budget_ms and may only read memory, cached values and small files: every subprocess, network request or slow system query is a probe bounded by its timeout_ms. `permissions` lists, per driver, the permission ids the host reports, the system settings page it opens for one (by id) and whether a fix hint (healthcheck.permission_fix.<id>) exists. `report` bounds the Markdown file the page asks the host to save under the logs folder.",
+	"_comment": "The diagnostics window's snapshot, version 2, produced by the three drivers and rendered and exported by the shared page (_shared/ui/healthcheck/model.js). A snapshot is { schema_version, driver, generated_at (UTC, ISO 8601), detailed, sections: { <section id>: { <field id>: value } or { items: [ ... ] } }, probes: { <probe id>: { state, ms, detail } } }. Sections render in this order; a section or a field whose `platforms` omits the driver is neither collected nor shown there. Labels come from the locales: healthcheck.section.<id>, healthcheck.field.<id>, healthcheck.column.<section>.<column>. Field types: text, path (the page offers Open; the host opens it by field id only, never by a path the page sends), count, bytes, seconds, ms, percent (0 to 100, of the whole machine's processor capacity), bool (true, or 1 from the AHK writer), list, log (an H3 and a block), enum (translated through enum_key + value). A field with `probe` is filled by that asynchronous probe and reads as pending until the probe answers; `probe` is a probe id, or a map from driver to probe id when only some drivers need one; show_ms appends the probe's duration. The cpu_load probe takes two samples sample_ms apart, on a timer. An items section with `probe` lists what phase A read and says its list is incomplete until that probe answers with the whole list (macOS reads its Bluetooth devices with system_profiler). A field marked opt_in, and an items column in opt_in_columns, is collected and shown only when the user ticks 'Include details'. Phase A, the synchronous collection, must stay under phase_a_budget_ms and may only read memory, cached values and small files: every subprocess, network request or slow system query is a probe bounded by its timeout_ms. `permissions` lists, per driver, the permission ids the host reports, the system settings page it opens for one (by id) and whether a fix hint (healthcheck.permission_fix.<id>) exists. `report` bounds the Markdown file the page asks the host to save under the logs folder.",
 	"schema_version": 2,
 	"phase_a_budget_ms": 5,
 	"max_export_bytes": 2097152,
@@ -28,6 +28,10 @@
 		"cpu_load": {
 			"timeout_ms": 4000,
 			"sample_ms": 1000
+		},
+		"bluetooth": {
+			"timeout_ms": 10000,
+			"platforms": ["macos"]
 		}
 	},
 	"permissions": {
@@ -150,7 +154,8 @@
 			"id": "peripherals",
 			"kind": "items",
 			"columns": ["bus", "kind", "vendor_id", "product_id", "name"],
-			"opt_in_columns": ["name"]
+			"opt_in_columns": ["name"],
+			"probe": { "macos": "bluetooth" }
 		},
 		{
 			"id": "issues",

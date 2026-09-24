@@ -62,8 +62,9 @@ local function load_window(controls)
 		end,
 	}
 	package.loaded["ui.healthcheck.probes"] = {
-		start = function()
+		start = function(_, snapshot)
 			context.started_probes = context.started_probes + 1
+			context.probe_snapshot = snapshot
 			return { cancel = function() context.cancelled_probes = context.cancelled_probes + 1 end }
 		end,
 	}
@@ -168,6 +169,12 @@ helpers.describe("diagnostics window: the page's bridge (macOS)", function()
 			helpers.assert_eq(messages[1].config.context.case_insensitive, true)
 			helpers.assert_eq(messages[1].snapshot.driver, "macos")
 			helpers.assert_eq(context.started_probes, 1)
+			-- The probes complete the snapshot the page shows: its paths, its
+			-- peripherals and whether details are included (bluetooth-peripherals)
+			helpers.assert_true(type(context.probe_snapshot) == "table"
+				and type(context.probe_snapshot.sections) == "table"
+				and context.probe_snapshot.sections.paths ~= nil,
+				"the probes must receive the window's snapshot")
 		end)
 	end)
 
