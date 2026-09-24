@@ -28,7 +28,13 @@ const LOCALES = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'data', 'lo
 const APPROVED = {
 	// The errors file holds today's WARNING and ERROR lines; the gesture and
 	// shortcut action that opens it reads like the Debug row.
-	'sg_actions.open_error_log': { fr: '📄 Fichier des erreurs du jour', en: "📄 Today's errors file" }
+	'sg_actions.open_error_log': { fr: '📄 Fichier des erreurs du jour', en: "📄 Today's errors file" },
+	// « Versions » names the list of releases the row opens, and the window it
+	// opens carries the same name.
+	'menu.about.changelog': { fr: 'Versions', en: 'Releases' },
+	'menu.about.open_releases_page': { fr: 'Versions — GitHub', en: 'Releases — GitHub' },
+	'changelog_window.window_title': { fr: 'Versions', en: 'Releases' },
+	'updater.title_changelog': { fr: 'ErgoptiPlus — Versions', en: 'ErgoptiPlus — Releases' }
 };
 
 const errors = [];
