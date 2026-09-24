@@ -1466,8 +1466,6 @@ local function main()
 		tray_menu.setIcon({ title = "Ergopti" })
 
 	if menu_builder then
-		local config_dir = resolve_config_path(opts.config) or DEFAULT_CONFIG_DIR
-
 		-- Build the menu context once; shared between the initial menu build
 		-- and the updater's on_available callback (which triggers a rebuild
 		-- so the menu label changes when an update is found).
@@ -1626,11 +1624,6 @@ local function main()
 				-- unquoted: a pack under "/home/me/l'ergopti" then reached xdg-open as
 				-- two broken words and silently opened nothing.
 				os.execute(string.format("xdg-open '%s' 2>/dev/null &", path:gsub("'", "'\\''")))
-			end,
-			on_open_config = function(dir)
-				local d = dir or config_dir
-				Logger.info(LOG, "Opening config folder: %s", d)
-				os.execute(string.format("xdg-open '%s' 2>/dev/null &", d:gsub("'", "'\\''")))
 			end,
 			-- The three log rows open through ui/log_openers, shared with the
 			-- gesture actions: every path comes from the sink that writes it, and

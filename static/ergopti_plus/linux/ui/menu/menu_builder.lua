@@ -7,10 +7,9 @@
 --- ergopti_hotstrings.lua to populate the tray_menu adapter with dynamic items
 --- reflecting the current hotstring groups, layouts, LLM models, and metrics.
 ---
---- The menu tree mirrors the macOS menubar (§9 of the parity plan):
----   Layout → Hotstrings → AI → Metrics → Shortcuts → Tap-holds → Gestures → Apps
----   → separator → Global Actions → Language → Config Folder → Setup Wizard
----   → About → Reload → Quit → Debug
+--- The menu tree mirrors the macOS menubar (§9 of the parity plan): its rows,
+--- their order and the separators between them are the manifest's `top_level`,
+--- which M.build dispatches through its builder table.
 ---
 --- Items that depend on features not yet implemented on Linux
 --- are present as labelled stubs that log the action — they don't crash and
@@ -3566,7 +3565,7 @@ end
 ---   dry_run        boolean  Dry-run mode flag.
 ---   verbose        boolean  Verbose flag.
 ---   on_quit        function Called when Quit is selected.
----   on_open_config function Called to open config dir.
+---   webview        table    Webview manager; opens the folders editor.
 ---   on_reset_defaults function (optional) Reset.
 ---   on_set_log_level function (optional) Log level change.
 ---   on_open_logs   function (optional) Open logs dir.
