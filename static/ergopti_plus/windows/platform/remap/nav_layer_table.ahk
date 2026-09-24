@@ -307,6 +307,13 @@ NavLayer_Init(SharedDir, ConfigDir, HotkeyFn := Hotkey, HotIfFn := HotIf) {
 	global NAV_LAYER_ID
 	LoggerStart("NavLayer", "Loading the navigation layer from '{1}'…", ConfigDir)
 	try {
+		; This runs on every boot, and decoding the physical-key registry is the
+		; costly part: without a layers.toml nothing is bound, so it is skipped.
+		UserFile := KeymapLayers_UserFilePathFromVocabulary(SharedDir, ConfigDir)
+		if !FileExist(UserFile) {
+			LoggerSuccess("NavLayer", "No '{1}': the navigation layer binds no key.", UserFile)
+			return 0
+		}
 		Ctx := KeymapLayers_LoadContext(SharedDir)
 		Result := KeymapLayers_LoadUserFile(Ctx, ConfigDir, "windows")
 		for Err in Result["errors"]
