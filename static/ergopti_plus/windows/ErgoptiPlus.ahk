@@ -489,9 +489,11 @@ if UIASW_IsWorkerInvocation()
 #Include ui/personal_toml_editor_webview.ahk
 #Include modules/keymap/layout/layout_altgr.ahk
 #Include modules/keymap/layout/layout_shift_caps.ahk
-; Registry layout emulation (a .keylayout read at boot): definitions only, the
-; hotkeys are registered by KeylayoutEmulation_Boot below.
+; .keylayout reading (registry layout emulation and the Ergopti tables):
+; definitions only. The hotkeys are registered by KeylayoutEmulation_Boot below
+; and the Ergopti tables are read by modules/keymap/layout.ahk.
 #Include modules/keymap/keylayout/keylayout_parser.ahk
+#Include modules/keymap/keylayout/keylayout_tables.ahk
 #Include modules/keymap/keylayout/keylayout_emulation.ahk
 #Include modules/keymap/keylayout/layout_registry.ahk
 #Include infra/app_picker.ahk

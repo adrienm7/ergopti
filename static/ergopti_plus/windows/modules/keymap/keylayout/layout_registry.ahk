@@ -7,7 +7,9 @@
 ; settings (_shared/modules/layouts/defaults.json), the shared keycode table
 ; (_shared/modules/layouts/mac_keycodes.json), the download of index.json and
 ; of one .keylayout from the repository folder, and the local folder that keeps
-; each downloaded <id>.keylayout next to the index.json it was verified against.
+; each downloaded <id>.keylayout next to the index.json it was verified against,
+; and the copy of the registry folder shipped with the driver, which the Ergopti
+; emulation reads its layout from.
 ;
 ; FEATURES & RATIONALE:
 ; 1. One source for the registry location: the folder, branch, URL template,
@@ -144,6 +146,18 @@ LayoutRegistry_LocalDir(ConfigDir) {
 	return ConfigDir . LayoutRegistry_Settings()["local_folder"] . "\"
 }
 
+/**
+ * Registry folder shipped with the driver: the repository folder in a source
+ * checkout, and its copy under the same path in the extracted bundle of the
+ * compiled driver (tools/build/build_static_bundle.py). _StaticDir is the
+ * "static" folder of either tree, so the folder resolves from its parent.
+ * @returns {string} Folder path with a trailing backslash.
+ */
+LayoutRegistry_BundledDir() {
+	global _StaticDir
+	return _StaticDir . "\..\" . StrReplace(LayoutRegistry_Settings()["folder"], "/", "\") . "\"
+}
+
 
 
 
@@ -208,6 +222,29 @@ LayoutRegistry_ReadLocal(Id, LocalDir) {
 		throw Error("The layout '" . Id . "' is not downloaded in " . LocalDir)
 	Entry := LayoutRegistry_FindEntry(JsonParse(_LayoutRegistryReadText(IndexPath)), Id)
 	Text := _LayoutRegistryReadText(LayoutPath)
+	LayoutRegistry_Verify(Entry, Text)
+	return Map("Text", Text, "Entry", Entry)
+}
+
+/**
+ * Reads a layout shipped with the driver and verifies it against the shipped
+ * index, like a downloaded one: a damaged installation fails here instead of
+ * emulating something else.
+ * @param {string} Id - Registry id.
+ * @param {string} RegistryDir - Folder from LayoutRegistry_BundledDir.
+ * @returns {Map} Text (the .keylayout) and Entry (its index entry).
+ * @throws {Error} When the layout is missing, misplaced or fails verification.
+ */
+LayoutRegistry_ReadBundled(Id, RegistryDir) {
+	if !LayoutRegistry_IsValidId(Id)
+		throw ValueError("Invalid registry layout id.", -1, Id)
+	Index := JsonParse(_LayoutRegistryReadText(RegistryDir . LayoutRegistry_Settings()["index_file"]))
+	Entry := LayoutRegistry_FindEntry(Index, Id)
+	; The index builder always files a layout as <id>/<id>.keylayout; anything
+	; else would read outside the layout's own folder.
+	if (Entry["file"] !== Id . "/" . Id . ".keylayout")
+		throw Error("The registry index files the layout '" . Id . "' at an unexpected path: " . Entry["file"])
+	Text := _LayoutRegistryReadText(RegistryDir . StrReplace(Entry["file"], "/", "\"))
 	LayoutRegistry_Verify(Entry, Text)
 	return Map("Text", Text, "Entry", Entry)
 }

@@ -71,6 +71,11 @@ ASSET_TREES: list[tuple[str, str, tuple[str, ...]]] = [
 	# warns-and-continues on a missing source, so the shipped .exe carried no
 	# extension packs at all and CI stayed green.
 	("static/ergopti_plus/extensions",         "static/ergopti_plus/extensions",         (".git*",)),
+	# Keyboard-layout registry. The Windows Ergopti emulation reads its tables
+	# from the Ergopti .keylayout files here, verified against index.json
+	# (modules/keymap/layout/layout_ergopti.ahk). Same path as in the repository
+	# so LayoutRegistry_BundledDir resolves it identically in both modes.
+	("static/layouts/registry",                "static/layouts/registry",                ()),
 	# Driver icons and language flags read via _StaticDir + "\img\...".
 	("static/img/logo",                        "static/img/logo",                        ()),
 	("static/img/flags",                       "static/img/flags",                       ()),
@@ -103,6 +108,16 @@ REQUIRED_ASSETS: tuple[tuple[str, str], ...] = (
 	(
 		"static/ergopti_plus/windows/vendor/ergopti_crash_worker.ps1",
 		"vendor/ergopti_crash_worker.ps1",
+	),
+	# The Ergopti emulation cannot start without its layouts and their index.
+	("static/layouts/registry/index.json", "static/layouts/registry/index.json"),
+	(
+		"static/layouts/registry/ergopti/ergopti.keylayout",
+		"static/layouts/registry/ergopti/ergopti.keylayout",
+	),
+	(
+		"static/layouts/registry/ergopti_plus/ergopti_plus.keylayout",
+		"static/layouts/registry/ergopti_plus/ergopti_plus.keylayout",
 	),
 )
 

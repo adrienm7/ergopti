@@ -7,9 +7,8 @@
 ; Windows version of the layout anywhere (layout-registry-emulation). These
 ; tests drive the real modules on the real registry files:
 ; - the shared keystroke vectors (_shared/tests/corpus/layouts), read by hand
-;   from the XML, replayed through the emulation for Ergo-L and Ergopti;
-; - the Ergopti .keylayout read by the emulation against the hand-written
-;   Ergopti emulation tables (layout_ergopti.ahk), two independent sources;
+;   from the XML, replayed through the emulation for Ergo-L and Ergopti (the
+;   Ergopti emulation's own tables are pinned by test_ergopti_keylayout_tables);
 ; - the reader's rules on synthetic layouts, and its fail-fast refusals;
 ; - the registry client: URL, verification, local copy and a download replayed
 ;   through an injected transport, including the refusal to publish a file
@@ -220,32 +219,6 @@ _KLT_VectorsCase() {
 	AssertEqual(2, Layouts.Count, "the vectors must cover both the ansi (Ergo-L) and the iso (Ergopti) conventions")
 	Assert(Presses >= 25 && Shortcuts >= 4, "both vector kinds must be replayed")
 	AssertEqual(0, Failures.Length, _KLT_Join(Failures))
-}
-
-Test("keylayout emulation: the Ergopti .keylayout matches the hand-written Ergopti tables (layout-registry-emulation)",
-	() => _KLT_WithEmulation(_KLT_ErgoptiParityCase))
-
-_KLT_ErgoptiParityCase() {
-	global KLE_Model, KLE_LevelIndex, KLE_KeyCodes
-	_KLT_Load("ergopti")
-	Expected := Map()
-	for ScInt, Value in ErgoptiBaseMapping()
-		Expected[Format("SC{:03X}", ScInt)] := (Value is String) ? Value : Value.alt
-	Assert(Expected.Count >= 30, "the hand-written Ergopti base table must list at least 30 keys")
-	Mismatches := []
-	for Sc, Char in Expected {
-		KeylayoutEmulation_ResetDeadKey()
-		Typed := KeylayoutEmulation_Press(Sc, false, false, false)
-		if (Typed !== Char)
-			Mismatches.Push(Sc . " types [" . Typed . "], the Ergopti tables say [" . Char . "]")
-	}
-	AssertEqual(0, Mismatches.Length, _KLT_Join(Mismatches))
-	; The two dead keys the Ergopti emulation runs through DeadKey().
-	for Sc, Char in Map("SC01B", Chr(0xA8), "SC02B", "^") {
-		Resolved := Keylayout_Resolve(KLE_Model, KLE_LevelIndex[""], KLE_KeyCodes[Sc])
-		AssertEqual("dead", Resolved["Kind"], Sc . " must be a dead key in the .keylayout")
-		AssertEqual(Char, Resolved["Text"], Sc . " must type its accent on its own")
-	}
 }
 
 

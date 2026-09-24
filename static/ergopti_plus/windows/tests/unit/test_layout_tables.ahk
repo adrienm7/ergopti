@@ -9,7 +9,9 @@
 ; AltGrShiftDispatch and asserted no exception bubbles up.
 ; ==============================================================================
 
-; Build the tables once (idempotent — calling twice is fine).
+; Build the tables once (idempotent — calling twice is fine), from the Ergopti
+; layout tables the driver reads from the shipped .keylayout at boot.
+_TestEnsureErgoptiLayout()
 _BuildAltGrTables()
 _BuildShiftCapsTables()
 

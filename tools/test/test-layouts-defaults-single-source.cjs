@@ -165,5 +165,27 @@ check('every copy of the registry id rule is the index builder\'s', () => {
 		'config.schema.json must accept a registry id or "" (no layout) and nothing else');
 });
 
+// The compiled Windows driver reads its Ergopti tables from the registry folder
+// extracted next to it (LayoutRegistry_BundledDir: the declared folder, taken
+// from the parent of the static folder), so the bundle must copy that folder to
+// the same path and refuse to build without the files the emulation reads.
+check('the compiled Windows driver ships the registry folder the Ergopti emulation reads', () => {
+	const bundler = fs.readFileSync(path.join(ROOT, 'tools', 'build', 'build_static_bundle.py'), 'utf8');
+	const trees = [...bundler.matchAll(/\(\s*"([^"]+)",\s*"([^"]+)",\s*\(/g)].map((m) => [m[1], m[2]]);
+	assert.ok(trees.length >= 5, `found only ${trees.length} ASSET_TREES entries`);
+	assert.ok(trees.some(([src, dst]) => src === registry.folder && dst === registry.folder),
+		`ASSET_TREES must copy ${registry.folder} to the same path`);
+	const requiredBlock = /REQUIRED_ASSETS[^=]*=\s*\(([\s\S]*?)\n\)/.exec(bundler);
+	assert.ok(requiredBlock, 'build_static_bundle.py declares no REQUIRED_ASSETS');
+	const required = [...requiredBlock[1].matchAll(/\(\s*"([^"]+)",\s*"([^"]+)",?\s*\)/g)]
+		.filter(([, src, dst]) => src === dst).map((m) => m[1]);
+	const ergopti = fs.readFileSync(path.join(SP, 'windows', 'modules', 'keymap', 'layout', 'layout_ergopti.ahk'), 'utf8');
+	const ids = [...ergopti.matchAll(/^global ERGOPTI_(?:PLUS_)?LAYOUT_ID := "([a-z_]+)"$/gm)].map((m) => m[1]);
+	assert.strictEqual(ids.length, 2, 'layout_ergopti.ahk must declare the Ergopti and Ergopti+ registry ids');
+	for (const file of [registry.index_file, ...ids.map((id) => `${id}/${id}.keylayout`)]) {
+		assert.ok(required.includes(`${registry.folder}/${file}`), `REQUIRED_ASSETS must list ${registry.folder}/${file}`);
+	}
+});
+
 if (failures > 0) process.exit(1);
 console.log('All layout registry location checks passed.');

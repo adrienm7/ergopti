@@ -228,6 +228,7 @@ global _DefaultLogsDir := _LogsDir
 ; Registry layout emulation: definitions only (the hotkeys are registered by
 ; KeylayoutEmulation_Register, which the tests call with injected registrars).
 #Include ../modules/keymap/keylayout/keylayout_parser.ahk
+#Include ../modules/keymap/keylayout/keylayout_tables.ahk
 #Include ../modules/keymap/keylayout/keylayout_emulation.ahk
 #Include ../modules/keymap/keylayout/layout_registry.ahk
 ; Pure layout-poll quiescence decision (no OS deps, no top-level hotkeys) —
@@ -541,6 +542,7 @@ _LogBootProgress("loading LLM modules")
 #Include unit/test_llm_tab_accept_policy.ahk
 #Include unit/test_accented_shortcuts.ahk
 #Include unit/test_keylayout_emulation.ahk
+#Include unit/test_ergopti_keylayout_tables.ahk
 ; parser.ahk (the AHK semantic-diff parser) was previously exercised by no suite,
 ; which let a crash in its Levenshtein helper survive — include it + its tests.
 #Include ../modules/llm/parser.ahk
