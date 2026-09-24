@@ -5,8 +5,9 @@
 --- DESCRIPTION:
 --- A feature whose runtime refused its saved value shows the real posture in
 --- memory while every save keeps the value config.toml holds. The demotion ends
---- when the user changes that value, and a global action detaches every
---- demotion for its own explicit save, restoring them only if that save fails.
+--- when a save commits the user's change of that value, and a global action
+--- detaches every demotion for its own explicit save, restoring them only if
+--- that save fails.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -48,16 +49,29 @@ helpers.describe("session demotions keep config.toml values", function()
 		helpers.assert_true(rawequal(registry.persisted_view(state), state))
 	end)
 
-	helpers.it("ends a demotion once the user changes that value", function()
+	helpers.it("ends a demotion once a save commits the user's change of that value", function()
 		local registry = load_subject().new()
 		local state = { gestures = false }
 		registry.record({ feature = "gestures", key = "gestures", persisted = true, demoted = false })
 		state.gestures = true
 		helpers.assert_eq(registry.persisted_view(state).gestures, true)
+		helpers.assert_eq(#registry.list(), 1,
+			"building the view must not end the demotion before the save commits")
+		registry.settle(state)
+		helpers.assert_eq(#registry.list(), 0, "the committed change ends the demotion")
 		state.gestures = false
 		helpers.assert_eq(registry.persisted_view(state).gestures, false,
 			"a later explicit OFF must reach config.toml")
-		helpers.assert_eq(#registry.list(), 0)
+	end)
+
+	helpers.it("keeps a demotion whose key still holds its demoted posture at commit", function()
+		local registry = load_subject().new()
+		local state = { gestures = false, shortcuts = true }
+		registry.record({ feature = "gestures", key = "gestures", persisted = true, demoted = false })
+		registry.settle(state)
+		helpers.assert_eq(#registry.list(), 1, "an unrelated committed save must not end it")
+		helpers.assert_eq(registry.persisted_view(state).gestures, true)
+		helpers.assert_true(not pcall(registry.settle, nil))
 	end)
 
 	helpers.it("keeps the first saved value when the same key is demoted again", function()

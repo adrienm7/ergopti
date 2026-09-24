@@ -298,7 +298,9 @@ doubles must keep both axes and the admission fence
 `MenuState.sync_state_to_modules` never persists and isolates failures per
 feature: a refused lifecycle whose posture can be read back demotes only that
 state flag, in memory (`report.demotions`), and `ui/menu/session_demotions.lua`
-makes every save keep the config.toml value until the user changes that key or
+makes every save keep the config.toml value until a committed save carries a
+user change of that key (`settle` runs on commit, never while building the
+view, because a refused write rolls the key back to its demoted posture) or
 a global action saves explicitly. The old all-or-nothing sync restored every
 default after one refusal (Gestures, Metrics, AI OFF with config.toml ON) and
 the next toggle wrote them over the file; a save from inside the sync also ran

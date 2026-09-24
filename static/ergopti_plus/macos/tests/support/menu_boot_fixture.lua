@@ -102,6 +102,8 @@ function M.boot(opts)
 	local saves = {}
 	local deferred = {}
 	local fixture = { state = state, saves = saves, logs = logs, deferred = deferred }
+	-- Number of upcoming Preferences.save calls that fail to write config.toml.
+	local refused_saves = 0
 
 	for _, name in ipairs(REAL_MODULES) do package.loaded[name] = nil end
 	package.loaded["infra.logger"] = logger
@@ -130,6 +132,10 @@ function M.boot(opts)
 		end,
 		snapshot = function(live) return clone(live) end,
 		save = function(_path, live)
+			if refused_saves > 0 then
+				refused_saves = refused_saves - 1
+				return false
+			end
 			saves[#saves + 1] = clone(live)
 			return true, clone(live)
 		end,
@@ -293,6 +299,11 @@ function M.boot(opts)
 		helpers.assert_true(fixture.ctx ~= nil and type(fixture.ctx.save_prefs) == "function",
 			"the menu builder context must expose save_prefs")
 		return fixture.ctx.save_prefs()
+	end
+
+	--- Makes the next Preferences.save fail, as a full disk or a lost volume does.
+	function fixture.refuse_next_save()
+		refused_saves = refused_saves + 1
 	end
 
 	--- Returns the global actions table the menu hands to its builder.
