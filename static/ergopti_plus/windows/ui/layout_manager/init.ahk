@@ -120,13 +120,19 @@ _LayMgrWeb_Json(Value) {
  * @returns {Map}
  */
 LayoutManager_PageState(LocalDir := unset) {
-	global _ConfigDir, _LayMgrWeb_Result, JSON_NULL
+	global _ConfigDir, _LayMgrWeb_Result, JSON_NULL, LAYOUT_CATALOGUE_SOURCE_BUNDLED
 	if !IsSet(LocalDir)
 		LocalDir := LayoutRegistry_LocalDir(_ConfigDir)
 	Last := LayoutCatalogue_Last()
 	Index := Last["index"]
-	if !(Index is Map)
+	Source := Last["source"]
+	if !(Index is Map) {
+		; Before the first refresh the page lists the index shipped with the
+		; driver, and says so rather than "no catalogue".
 		Index := LayoutCatalogue_BundledIndex()
+		if (Index is Map)
+			Source := LAYOUT_CATALOGUE_SOURCE_BUNDLED
+	}
 	RecordError := JSON_NULL
 	try Installed := LayoutCatalogue_ReadInstalled(LocalDir)
 	catch as Err {
@@ -137,7 +143,7 @@ LayoutManager_PageState(LocalDir := unset) {
 	return Map(
 		"platform", LAYOUT_CATALOGUE_PLATFORM,
 		"index", (Index is Map) ? Index : JSON_NULL,
-		"source", Last["source"],
+		"source", Source,
 		"error", (Last["error"] is Map) ? Last["error"] : JSON_NULL,
 		"installed", Installed,
 		"provided", Map(),

@@ -340,6 +340,13 @@ helpers.describe("layout manager (macOS): uninstalling and selecting", function(
 		helpers.assert_eq(#LayoutRegistry.picker(deps).layouts, 0, "a layout whose file is gone is not offered")
 	end)
 
+	helpers.it("shows the shipped catalogue as such before the first refresh (layout-manager-shipped-first)", function()
+		local LayoutRegistry, deps = manager({ files = shipped_files() })
+		local snapshot = LayoutRegistry.snapshot(deps)
+		helpers.assert_true(type(snapshot.index) == "table", "the index shipped with the app is listed before any refresh")
+		helpers.assert_eq(snapshot.source, "bundled", "the page must not call the shipped catalogue no catalogue")
+	end)
+
 	helpers.it("does not list a recorded layout whose file is gone (layout-registry-install)", function()
 		local LayoutRegistry, deps, state = with_ergol()
 		state.files[LAYOUTS_DIR .. "ergol.keylayout"] = nil

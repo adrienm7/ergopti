@@ -532,7 +532,12 @@ function M.snapshot(deps)
 	}
 	if not resolved then return snapshot end
 	deps = resolved
-	if snapshot.index == nil then snapshot.index = bundled_index(deps) end
+	if snapshot.index == nil then
+		-- Before the first refresh the page lists the index shipped with the
+		-- package, and says so rather than "no catalogue".
+		snapshot.index = bundled_index(deps)
+		if snapshot.index ~= nil then snapshot.source = Catalogue.SOURCE_BUNDLED end
+	end
 	local record, record_err = read_installed(deps)
 	if not record then
 		snapshot.record_error = record_err

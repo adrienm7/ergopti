@@ -352,6 +352,12 @@ function M.snapshot(deps)
 	}
 	if not resolved then return snapshot end
 	deps = resolved
+	if snapshot.index == nil then
+		-- Before the first refresh the page lists the index shipped with the
+		-- app, and says so rather than "no catalogue".
+		snapshot.index = bundled_index(deps)
+		if snapshot.index ~= nil then snapshot.source = Catalogue.SOURCE_BUNDLED end
+	end
 	local record, record_err = read_installed(deps)
 	if not record then
 		snapshot.record_error = record_err
@@ -364,9 +370,8 @@ function M.snapshot(deps)
 		end
 	end
 	local provided = bundle_names(deps)
-	local index = snapshot.index or bundled_index(deps)
 	local names = {}
-	for _, entry in ipairs(type(index) == "table" and index.layouts or {}) do
+	for _, entry in ipairs(type(snapshot.index) == "table" and snapshot.index.layouts or {}) do
 		if type(entry.keyboard_name) == "string" then
 			names[entry.keyboard_name] = entry.id
 			if provided[entry.keyboard_name] then snapshot.provided[entry.id] = "bundle" end

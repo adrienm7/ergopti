@@ -322,6 +322,13 @@ helpers.describe("layout manager (Linux): uninstalling and activating", function
 		helpers.assert_eq(#state.runs, 0)
 	end)
 
+	helpers.it("shows the shipped catalogue as such before the first refresh (layout-manager-shipped-first)", function()
+		local LayoutRegistry, deps = manager({ files = shipped_files() })
+		local snapshot = LayoutRegistry.snapshot(deps)
+		helpers.assert_true(type(snapshot.index) == "table", "the index shipped with the package is listed before any refresh")
+		helpers.assert_eq(snapshot.source, "bundled", "the page must not call the shipped catalogue no catalogue")
+	end)
+
 	helpers.it("activates an installed layout through the installer (layout-registry-convert)", function()
 		local LayoutRegistry, deps, state = with_ergol({ OK_RUN, INSTALLED_RUN })
 		local result = run(function(done) LayoutRegistry.select("ergol", done, deps) end)
