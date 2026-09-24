@@ -16,14 +16,20 @@
 ---    and counted instead of filling the queue; nothing else is ever shed.
 --- 4. A pump tick that follows a frozen run loop defers its verdict, so an ACK
 ---    already waiting in the socket is read before the transport is declared dead.
+---    It defers once per batch: a run loop that stays throttled still gets one.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 local Fixture = require("tests.support.log_transport_fixture")
+local Timings = require("infra.timings")
 
 -- The pump runs every 10 ms in production; 50 ms keeps these loops short while
 -- remaining far below every retry interval under test.
 local PUMP_STEP_SEC = 0.05
+
+-- App Nap or a saturated main thread can space every pump tick further apart
+-- than the first resend, which is what the transport reads as a frozen run loop.
+local THROTTLED_PUMP_STEP_SEC = Timings.sec("logger", "ack_retry_ms") + 0.1
 
 --- Advances the fixture clock tick by tick, running the pump on each tick. Each
 --- tick is computed from the start rather than accumulated, so a retry that is
@@ -228,6 +234,25 @@ helpers.describe("Log transport stall budget", function()
 			context.state.pump()
 			helpers.assert_eq(#context.state.failures, 1,
 				"a live tick after the freeze still enforces the budget")
+		end)
+	end)
+
+	helpers.it("(transport-stall-budget) a run loop that stays throttled still reaches the verdict", function()
+		Fixture.with_fixture(function()
+			local context = Fixture.new_context()
+			Fixture.configure(context)
+			context.transport.enqueue("never-acknowledged-while-throttled", "error")
+			context.state.pump()
+			local first_send_at = context.state.clock
+			local budget = context.transport.status().stall_budget_sec
+
+			pump_until(context, first_send_at + budget - THROTTLED_PUMP_STEP_SEC, THROTTLED_PUMP_STEP_SEC)
+			helpers.assert_eq(#context.state.failures, 0,
+				"throttled ticks must not shorten the stall budget")
+			pump_until(context, first_send_at + budget + 5, THROTTLED_PUMP_STEP_SEC)
+			helpers.assert_eq(#context.state.failures, 1,
+				"every tick is late, so the verdict may wait one tick but never forever")
+			helpers.assert_contains(context.state.failures[1], "did not ACK retained sequence 1")
 		end)
 	end)
 end)
