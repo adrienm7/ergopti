@@ -17,6 +17,10 @@
 ---    deletes in the user's own folder.
 --- 3. Crash dumps went to ~/.local/share/ergopti/crashes, away from the log
 ---    that explains them.
+--- 4. The resolver read the saved override while the sink kept writing the
+---    folder it was installed with: after a save in the paths editor, which
+---    does not restart the daemon, "open today's log" named a file nobody
+---    wrote. It names the sink's folder until repoint() moves the sink.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -104,6 +108,62 @@ helpers.describe("logs folder resolution (logs-dir-resolver)", function()
 			helpers.assert_true(refused == false, "a relative folder is refused")
 			helpers.assert_not_nil(err)
 			helpers.assert_nil(values["paths.logs_dir"])
+		end)
+	end)
+
+	-- The daemon is never restarted by the paths editor, so the stored override
+	-- and the folder the sink writes can differ until the sink is moved. Every
+	-- consumer must name the folder the lines actually reach.
+	helpers.it("names the folder the installed sink writes until it is moved there", function()
+		-- A unique absolute POSIX prefix: the override must be an absolute path.
+		local base = os.tmpname()
+		os.remove(base)
+		local first = base .. "_first"
+		local second = base .. "_moved/ergopti_plus"
+		local day = os.date("%Y-%m-%d")
+		local function remove_day_files(dir)
+			os.remove(dir .. "/ErgoptiPlus_" .. day .. ".log")
+			os.remove(dir .. "/ErgoptiPlus_errors_" .. day .. ".log")
+		end
+		local function read(path)
+			local handle = io.open(path, "r")
+			if not handle then return nil end
+			local content = handle:read("*a")
+			handle:close()
+			return content
+		end
+		with_paths({ XDG_STATE_HOME = "/state" }, {}, function(_, Sink, values)
+			-- A stand-in core that only receives the sink, so the process-wide
+			-- logger other suites capture is left untouched.
+			local emit = nil
+			local Logger = {
+				set_sink = function(fn) emit = fn end,
+				enable_repeat_collapsing = function() end,
+				disable_repeat_collapsing = function() end,
+			}
+			remove_day_files(first)
+			remove_day_files(second)
+			local ok, err = pcall(function()
+				helpers.assert_true(Sink.install(Logger, { log_dir = first }), "the first folder is writable")
+				values["paths.logs_dir"] = second
+				helpers.assert_eq(Sink.log_dir(), first,
+					"a saved override the sink has not moved to yet must not be named")
+				helpers.assert_eq(Sink.main_log_path(), first .. "/ErgoptiPlus_" .. day .. ".log")
+				helpers.assert_eq(Sink.crash_reports_dir(), first .. "/crash_reports")
+
+				local moved, move_err = Sink.repoint()
+				helpers.assert_true(moved == true, "the sink moves to the saved folder: " .. tostring(move_err))
+				helpers.assert_eq(Sink.log_dir(), second)
+				emit("[INFO] [logs_dir_test] marker-after-repoint", "info")
+				helpers.assert_contains(read(second .. "/ErgoptiPlus_" .. day .. ".log") or "",
+					"marker-after-repoint", "the next line reaches the new folder")
+				helpers.assert_true(not (read(first .. "/ErgoptiPlus_" .. day .. ".log") or ""):find("marker%-after%-repoint"),
+					"the old folder receives nothing after the move")
+			end)
+			Sink.uninstall(Logger)
+			remove_day_files(first)
+			remove_day_files(second)
+			if not ok then error(err, 0) end
 		end)
 	end)
 

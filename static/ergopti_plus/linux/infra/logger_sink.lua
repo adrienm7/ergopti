@@ -132,10 +132,14 @@ end
 
 --- Resolves the canonical log directory for this driver.
 --- This is the single source: every consumer that needs the log path calls it
---- rather than re-deriving $HOME. Resolved per call: the LogsDirPath override
---- lives in bootstrap storage, next to the configuration-folder override.
+--- rather than re-deriving $HOME. Once the sink is installed it names the
+--- folder the lines actually reach: a LogsDirPath saved in bootstrap storage
+--- only takes effect when M.repoint() moves the sink there, and an opener or a
+--- health check naming the saved folder before that would point at files
+--- nobody writes. Before install it resolves the configured folder.
 --- @return string Absolute path, no trailing slash.
 function M.log_dir()
+	if _installed and _dir then return _dir end
 	return require("infra.config_paths").get_logs_dir()
 end
 
@@ -339,6 +343,38 @@ function M.install(logger, opts)
 		)
 		return false
 	end
+	return true
+end
+
+--- Moves the installed file sink to the logs folder infra/config_paths now
+--- resolves. The paths editor saves LogsDirPath while the daemon keeps running
+--- (its reload re-reads the hotstrings, it does not restart the process), so
+--- this is where a saved folder takes effect. The old folder keeps its files;
+--- a folder that cannot be created or written leaves the sink where it was.
+--- @return boolean moved True when the sink writes to the resolved folder, or
+---   when no sink is installed yet (install() will resolve the same folder).
+--- @return string|nil error_message Why the sink stayed where it was.
+function M.repoint()
+	if not _installed then return true end
+	local target = require("infra.config_paths").get_logs_dir()
+	if target == _dir and not _stdout_only then return true end
+	if not ensure_dir(target) then
+		return false, "the logs folder '" .. target .. "' could not be created"
+	end
+	local previous, previous_stdout_only = _dir, _stdout_only
+	close_handles()
+	_dir = target
+	open_handles(today())
+	if not _main_handle then
+		-- Back to the folder that worked: a sink with no file loses every line.
+		close_handles()
+		_dir = previous
+		open_handles(today())
+		_stdout_only = previous_stdout_only
+		return false, "the logs folder '" .. target .. "' is not writable"
+	end
+	_stdout_only = false
+	purge_old()
 	return true
 end
 

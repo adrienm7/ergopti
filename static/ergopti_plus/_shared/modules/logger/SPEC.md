@@ -286,12 +286,17 @@ Default logs folder:
 `LogsDirPath` (paths.toml on macOS and Windows, bootstrap storage on Linux)
 moves the folder; a folder that is neither the default nor named
 `ergopti_plus` gets an `ergopti_plus` subfolder, so retention never deletes in
-a folder the user merely picked. Crash reports go to `<logs>/crash_reports/`;
-metrics stay in the configuration folder. What is written before paths.toml
-is read stays in the default folder whatever `LogsDirPath` says: the macOS
-boot fallback log, `launcher.log` and the fatal report, and on Windows
-`bootstrap.log` (a yielding second instance, a refused configuration
-transition).
+a folder the user merely picked. Every resolver names the folder the lines
+actually reach, never a saved override the sink has not moved to yet: a new
+`LogsDirPath` takes effect with the next session on macOS (the native worker
+refuses a folder change inside a session) and on Windows (the paths editor
+reloads), and at once on Linux, whose paths editor moves the running sink
+because its reload does not restart the daemon. Crash reports go to
+`<logs>/crash_reports/`; metrics stay in the configuration folder. What is
+written before paths.toml is read stays in the default folder whatever
+`LogsDirPath` says: the macOS boot fallback log, `launcher.log` and the fatal
+report, and on Windows `bootstrap.log` (a yielding second instance, a refused
+configuration transition).
 
 ### 6.2 Fan-out sub-files
 
