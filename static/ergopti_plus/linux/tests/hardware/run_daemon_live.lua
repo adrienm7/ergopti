@@ -107,7 +107,7 @@ os.execute("mkdir -p '" .. home .. "'")
 local log = home .. "/daemon.log"
 local interpreter = arg and arg[-1] or "luajit"
 os.execute(string.format(
-	"HOME='%s' %s ergopti_hotstrings.lua --tray --device '%s' --config tests/e2e/fixtures/daemon_keys.toml > '%s' 2>&1 & echo $! > '%s/pid'",
+	"HOME='%s' %s ergopti_hotstrings.lua --tray --verbose --device '%s' --config tests/e2e/fixtures/daemon_keys.toml > '%s' 2>&1 & echo $! > '%s/pid'",
 	home, interpreter, keyboard_node, log, home))
 local pid_fh = io.open(home .. "/pid", "r")
 local pid = pid_fh and pid_fh:read("*l") or nil
@@ -121,10 +121,20 @@ local function dump_log()
 	if not fh then return end
 	local text = fh:read("*a")
 	fh:close()
-	print("  --- daemon log (last lines) ---")
+	-- The lines that decide whether text may expand, then the tail.
+	print("  --- daemon log: privacy, focus and matching ---")
 	local lines = {}
-	for line in text:gmatch("[^\n]+") do lines[#lines + 1] = line end
-	for i = math.max(1, #lines - 80), #lines do print("  " .. lines[i]) end
+	for line in text:gmatch("[^\n]+") do
+		lines[#lines + 1] = line
+		local lower = line:lower()
+		if lower:find("secure") or lower:find("focus") or lower:find("at%-spi") or lower:find("withheld")
+			or lower:find("match") or lower:find("inject") or lower:find("capture") or lower:find("keylogger")
+			or lower:find("error") then
+			print("  " .. line)
+		end
+	end
+	print("  --- daemon log (last lines) ---")
+	for i = math.max(1, #lines - 40), #lines do print("  " .. lines[i]) end
 end
 
 local output_node = await(function() return node_for(DAEMON_OUTPUT) end, 20)
