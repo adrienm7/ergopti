@@ -72,6 +72,16 @@ function receive_prompt(request) {
 	showError('');
 }
 
+/**
+ * A translated string from the strings i18n.js stored. The page called a
+ * window-level translator that nothing defines, so every refusal showed an
+ * empty, hidden message and the window seemed to ignore the click.
+ */
+function _t(key) {
+	const strings = window._i18n_strings || {};
+	return strings[key] !== undefined ? strings[key] : key;
+}
+
 /** Sends the typed value back, or reports why it cannot. */
 function doSave() {
 	const input = document.getElementById('value-input');
@@ -81,15 +91,15 @@ function doSave() {
 	// An empty field is not zero. Number('') is 0, and saving that would set a
 	// temperature of zero for a user who cleared the box to start over.
 	if (raw === '' || Number.isNaN(value)) {
-		showError(window.i18n_get ? window.i18n_get('numeric_prompt.not_a_number') : '');
+		showError(_t('numeric_prompt.not_a_number'));
 		return;
 	}
 	if (typeof bounds.min === 'number' && value < bounds.min) {
-		showError(window.i18n_get ? window.i18n_get('numeric_prompt.out_of_range') : '');
+		showError(_t('numeric_prompt.out_of_range'));
 		return;
 	}
 	if (typeof bounds.max === 'number' && value > bounds.max) {
-		showError(window.i18n_get ? window.i18n_get('numeric_prompt.out_of_range') : '');
+		showError(_t('numeric_prompt.out_of_range'));
 		return;
 	}
 
