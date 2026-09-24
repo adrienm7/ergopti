@@ -152,7 +152,24 @@ if not grabbed then
 	os.exit(1)
 end
 print("  ok   the daemon grabbed the keyboard")
--- The secure-field probe settles after acquisition; give it that time.
+-- Typed only once the daemon says it is ready: until then its loop is not
+-- draining the grabbed keyboard, and a fixed delay turned a slow boot into a
+-- failure that described the harness rather than the daemon.
+local ready = await(function()
+	local fh = io.open(log, "r")
+	if not fh then return nil end
+	local text = fh:read("*a")
+	fh:close()
+	return text:find("Daemon ready", 1, true) ~= nil or nil
+end, 60)
+if not ready then
+	dump_log()
+	stop_daemon()
+	print("  FAIL the daemon never reported itself ready")
+	os.exit(1)
+end
+print("  ok   the daemon reported itself ready")
+-- The secure-field probe settles after the first focus answer.
 sleep(1.5)
 
 
