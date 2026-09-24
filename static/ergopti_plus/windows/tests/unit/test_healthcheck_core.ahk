@@ -149,6 +149,30 @@ Test("HealthCheck: open applications are collected only with details (opt-in)",
 	_TestHC_RunningAppsAreOptIn)
 
 
+; Phase A runs on the thread that serves the keyboard hook, within 5 ms. The
+; recent-issue bounds were read and parsed from the shared tree on every
+; opening (1.6 ms of that budget, measured): the shared documents are read
+; once, so an opening after the first reads no shared file at all
+; (phase-a-shared-files-once).
+_TestHC_SecondOpeningReadsNoSharedFile() {
+	global _SharedDir
+	HealthCheck_Run()
+	Saved := _SharedDir
+	_SharedDir := A_Temp . "\ergopti_hc_no_shared_" . A_TickCount
+	try {
+		Issues := HealthCheck_Run()["sections"]["issues"]
+	} finally {
+		_SharedDir := Saved
+	}
+	AssertTrue(Issues.Has("recent_source"), "the issues section must be collected")
+	AssertTrue(Issues["recent_source"] != "unavailable",
+		"a second opening read the recent-issue bounds from the shared tree again")
+}
+
+Test("HealthCheck: an opening after the first reads no shared file (phase-a-shared-files-once)",
+	_TestHC_SecondOpeningReadsNoSharedFile)
+
+
 ; =============================================
 ; ======= 2b/ The probes ======================
 ; =============================================
