@@ -42,7 +42,7 @@ function resolvePython() {
 }
 
 function extractSupervisor(source) {
-	const match = source.match(/local py_script = \[\[([\s\S]*?)\n\]\]\n\n\tlocal nested_timeout/);
+	const match = source.match(/^local ENABLED_LIST_SCRIPT = \[\[([\s\S]*?)\n\]\]$/m);
 	if (!match) throw new Error('input-source Python supervisor block not found');
 	return match[1];
 }
@@ -52,7 +52,7 @@ function buildHarness(supervisor) {
 import builtins, json, os, plistlib, signal, subprocess, sys, time
 
 MODE = sys.argv[1]
-BUNDLE_PATH = sys.argv[2]
+KEYLAYOUT_PATH = sys.argv[2]
 SUPERVISOR = ${JSON.stringify(supervisor)}
 EVENTS = []
 HANDLERS = {}
@@ -138,7 +138,7 @@ class FakePopen:
 subprocess.Popen = FakePopen
 builtins.print = lambda *args, **_kwargs: EVENTS.append(
     ["print", " ".join(str(item) for item in args)])
-sys.argv = ["input-source-supervisor", BUNDLE_PATH, "Ergopti", "9"]
+sys.argv = ["input-source-supervisor", "enable", KEYLAYOUT_PATH, "9"]
 
 exit_code = 0
 try:
@@ -156,7 +156,7 @@ finally:
 function runMode(python, supervisor, fixtureDir, mode) {
 	const harnessPath = path.join(fixtureDir, `harness-${mode}.py`);
 	fs.writeFileSync(harnessPath, buildHarness(supervisor), 'utf8');
-	const run = spawnSync(python, [harnessPath, mode, fixtureDir], {
+	const run = spawnSync(python, [harnessPath, mode, path.join(fixtureDir, 'Ergopti.keylayout')], {
 		cwd: ROOT,
 		encoding: 'utf8',
 	});
@@ -220,11 +220,9 @@ if (!python) {
 const source = fs.readFileSync(INPUT_SOURCES, 'utf8');
 const supervisor = extractSupervisor(source);
 const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-input-source-'));
-const resourcesDir = path.join(fixtureDir, 'Contents', 'Resources');
 
 try {
-	fs.mkdirSync(resourcesDir, { recursive: true });
-	fs.writeFileSync(path.join(resourcesDir, 'Ergopti.keylayout'),
+	fs.writeFileSync(path.join(fixtureDir, 'Ergopti.keylayout'),
 		'<keyboard id="42" name="Ergopti"></keyboard>\n', 'utf8');
 
 	const budget = runMode(python, supervisor, fixtureDir, 'budget');

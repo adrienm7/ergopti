@@ -15,6 +15,9 @@
 ---    version so the menu can disable already-installed entries.
 --- 3. Resilient, SIP-aware filesystem probes: shells out to /bin/test and osascript
 ---    for privileged copies; every failure path is logged, never silent.
+--- 4. A bundle says what it installs: the layouts and input-source ids of its
+---    Info.plist (bundle_variants), and the keyboard names every installed bundle
+---    provides (bundle_keylayout_names), so no driver table repeats them.
 ---
 --- Owns the bundle-discovery memo (_installed_cache / _latest_bundle_cache /
 --- _keylayout_index_cache); the
@@ -341,6 +344,46 @@ local function keylayout_index(dir)
 	return index
 end
 
+--- Lists the keyboard layouts an installed bundle declares: each KLInfo_<name>
+--- entry of its Info.plist with the TISInputSourceID it registers, kept only
+--- when the bundle ships <name>.keylayout. The bundle itself says what it
+--- installs, so no list of variants is written anywhere.
+--- @param bundle_path string Absolute path of the .bundle directory.
+--- @return table Array of { name, tis_id, keylayout } in Info.plist order.
+local function bundle_variants(bundle_path)
+	if type(bundle_path) ~= "string" or bundle_path == "" then return {} end
+	local root = bundle_path:gsub("[/\\]$", "")
+	local content, status, detail = FileSystem.read_with_status(root .. "/Contents/Info.plist")
+	if status ~= "ok" or type(content) ~= "string" then
+		Logger.warn(LOG, "Bundle Info.plist unreadable — %s (%s: %s).", root, tostring(status), tostring(detail))
+		return {}
+	end
+	local variants = {}
+	for name, body in content:gmatch("<key>%s*KLInfo_([^<]-)%s*</key>%s*<dict>(.-)</dict>") do
+		local tis_id = body:match("<key>%s*TISInputSourceID%s*</key>%s*<string>%s*([^<]-)%s*</string>")
+		local keylayout = root .. "/Contents/Resources/" .. name .. ".keylayout"
+		-- A name is a file basename here; anything else would read outside the bundle.
+		if tis_id and name:match("^[%w_.%-]+$") and path_exists(keylayout) then
+			variants[#variants + 1] = { name = name, tis_id = tis_id, keylayout = keylayout }
+		end
+	end
+	if #variants == 0 then
+		Logger.warn(LOG, "Bundle %s declares no installable keyboard layout.", root)
+	end
+	return variants
+end
+
+--- Keyboard-layout names the installed bundles provide, in both scopes, so the
+--- layout manager never installs a second input source under one of them.
+--- @return table Set { [name] = true }.
+local function bundle_keylayout_names()
+	local names = {}
+	for _, dir in ipairs({ SYSTEM_LAYOUTS_DIR, USER_LAYOUTS_DIR }) do
+		for name in pairs(keylayout_index(dir)) do names[name] = true end
+	end
+	return names
+end
+
 --- Resolves the version of an active KeyboardLayout Name. A versioned name
 --- ("Ergopti_v2_1_0_plus") carries it; an unversioned one is traced to the
 --- installed bundle shipping that keylayout and read from its Info.plist.
@@ -570,6 +613,8 @@ return {
 	highest_installed      = highest_installed,
 	read_bundle_version    = read_bundle_version,
 	layout_version         = layout_version,
+	bundle_variants        = bundle_variants,
+	bundle_keylayout_names = bundle_keylayout_names,
 	install_user          = install_user,
 	install_system         = install_system,
 	invalidate_bundle_caches = invalidate_bundle_caches,
