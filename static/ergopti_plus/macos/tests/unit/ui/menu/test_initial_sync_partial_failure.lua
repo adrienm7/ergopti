@@ -91,6 +91,24 @@ helpers.describe("initial sync isolates one refused owner (R5)", function()
 			"a change that never reached config.toml must not end the demotion")
 	end)
 
+	helpers.it("keeps the saved value when a rollback cannot restore its runtime", function()
+		local fixture = boot({})
+		helpers.assert_eq(fixture.state.gestures, true)
+		-- The user's OFF reaches the runtime, then config.toml cannot be written and
+		-- the rollback's ON is refused: the runtime stays OFF, the file holds ON.
+		fixture.runtime.gestures = false
+		fixture.state.gestures = false
+		fixture.runtime.refuse_enable = true
+		fixture.refuse_next_save()
+		helpers.assert_eq(fixture.save_prefs(), false)
+		helpers.assert_eq(fixture.state.gestures, false,
+			"the refused rollback must show the real runtime posture")
+
+		helpers.assert_eq(fixture.save_prefs(), true)
+		helpers.assert_eq(fixture.saves[#fixture.saves].gestures, true,
+			"a runtime refusal during the rollback must not rewrite config.toml")
+	end)
+
 	helpers.it("lets Disable All write its explicit OFF over a demoted feature", function()
 		local fixture = boot({ gestures_enable = false })
 		helpers.assert_eq(fixture.global_actions().disable_all(), true)

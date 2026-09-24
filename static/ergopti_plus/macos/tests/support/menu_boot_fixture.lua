@@ -249,8 +249,9 @@ function M.boot(opts)
 	local runtime = { gestures = false }
 	fixture.runtime = runtime
 	local gestures = {
+		-- `runtime.refuse_enable` lets a case refuse ON after a successful boot.
 		enable_all = function()
-			if opts.gestures_enable == false then return false end
+			if opts.gestures_enable == false or runtime.refuse_enable == true then return false end
 			runtime.gestures = true
 			return true
 		end,
