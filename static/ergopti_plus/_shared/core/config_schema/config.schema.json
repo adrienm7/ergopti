@@ -276,7 +276,7 @@
 				"ergopti_alt_gr": { "type": "boolean" },
 				"ergopti_plus": { "type": "boolean" },
 				"ctrl_magic_save": { "type": "boolean" },
-				"emulated_layout": { "type": "string", "pattern": "^[a-z0-9_]*$" }
+				"emulated_layout": { "type": "string", "pattern": "^([a-z][a-z0-9_]*)?$" }
 			}
 		},
 

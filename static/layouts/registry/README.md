@@ -34,9 +34,10 @@ derived from it is stored here:
 
 Adding a layout is a data-only change:
 
-1. Create `<id>/` (lowercase letters, digits and `_`) and put the layout in it
-   as `<id>.keylayout`. A third-party layout is vendored unmodified: record the
-   digest its upstream release publishes as `source_sha256`.
+1. Create `<id>/` (a lowercase letter, then lowercase letters, digits and `_`)
+   and put the layout in it as `<id>.keylayout`. A third-party layout is
+   vendored unmodified: record the digest its upstream release publishes as
+   `source_sha256`.
 2. Write `<id>/meta.toml`. `keycode_convention` says how the file numbers the
    two keys whose macOS codes differ between Apple ISO and ANSI keyboards:
    `iso` when code 10 is the key left of 1 (Ergopti), `ansi` when code 50 is

@@ -22,9 +22,10 @@
 
 local M = {}
 
---- A registry id is also a file name: lowercase letters, digits and
---- underscores, the rule tools/build/build-layouts-index.cjs enforces.
-M.ID_PATTERN = "^[a-z0-9_]+$"
+--- A registry id is also a file name: a lowercase letter, then lowercase
+--- letters, digits and underscores, the rule tools/build/build-layouts-index.cjs
+--- enforces (tools/test/test-layouts-defaults-single-source.cjs pins this copy).
+M.ID_PATTERN = "^[a-z][a-z0-9_]*$"
 
 local NAME_PATTERN = "^[A-Za-z0-9._-]+$"
 local FOLDER_PATTERN = "^[A-Za-z0-9._/-]+$"
