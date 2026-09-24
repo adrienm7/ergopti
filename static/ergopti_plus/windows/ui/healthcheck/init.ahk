@@ -39,7 +39,9 @@
 ;   healthcheck/core.ahk    -- Probe, public API, WebView2 report window.
 ;   healthcheck/helpers.ahk -- State-gathering probes + snapshot rendering.
 ;   healthcheck/report.ahk  -- Debug > Report a bug / Suggest a feature.
+;   healthcheck/actions.ahk -- Validation of the diagnostics page's actions.
 
 #Include core.ahk
 #Include helpers.ahk
 #Include report.ahk
+#Include actions.ahk

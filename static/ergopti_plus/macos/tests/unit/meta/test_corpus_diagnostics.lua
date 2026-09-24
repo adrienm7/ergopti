@@ -15,6 +15,8 @@
 ---    _shared/modules/diagnostics/redaction.json (what leaves the machine).
 --- 4. _shared/tests/corpus/diagnostics/issue_report_vectors.json through
 ---    diagnostics.issue_report (the bug report text, summary and file name).
+--- 5. _shared/tests/corpus/healthcheck/action_vectors.json through
+---    healthcheck.actions (what the diagnostics page may ask its host to do).
 --- Each corpus fails loudly when unreadable or empty: a replay over zero
 --- vectors would report success while checking nothing.
 --- ==============================================================================
@@ -141,6 +143,30 @@ helpers.describe("diagnostics corpus: bug report text (issue-report-corpus)", fu
 	for _, vector in ipairs(corpus.file_name_vectors or {}) do
 		helpers.it("file_name: " .. vector.id .. " (issue-report-corpus)", function()
 			helpers.assert_eq(IssueReport.file_name(vector.info), vector.expected, vector.id)
+		end)
+	end
+end)
+
+helpers.describe("diagnostics corpus: page actions (page-actions-corpus)", function()
+	local corpus = read_corpus("tests/corpus/healthcheck/action_vectors.json")
+	local Actions = require("healthcheck.actions")
+
+	helpers.it("has vectors (page-actions-corpus)", function()
+		helpers.assert_true(type(corpus.vectors) == "table" and #corpus.vectors >= 30,
+			"the page-actions corpus must hold its vectors")
+	end)
+
+	for _, vector in ipairs(corpus.vectors or {}) do
+		helpers.it("validate: " .. vector.id .. " (page-actions-corpus)", function()
+			local action, reason = Actions.validate(vector.message,
+				{ schema = corpus.schema, templates = corpus.templates, driver = vector.driver })
+			if vector.error then
+				helpers.assert_eq(action, nil, vector.id .. " must be refused")
+				helpers.assert_eq(reason, vector.error, vector.id)
+			else
+				helpers.assert_eq(reason, nil, vector.id .. " must be accepted")
+				helpers.assert_eq(action, vector.expected, vector.id)
+			end
 		end)
 	end
 end)

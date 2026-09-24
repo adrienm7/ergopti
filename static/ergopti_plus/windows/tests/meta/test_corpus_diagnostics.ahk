@@ -18,6 +18,9 @@
 ; 4. _shared/tests/corpus/diagnostics/issue_report_vectors.json through
 ;    IssueReport_Dump, IssueReport_Summary, IssueReport_Markdown and
 ;    IssueReport_FileName (the bug report text, summary and file name).
+; 5. _shared/tests/corpus/healthcheck/action_vectors.json through
+;    HealthCheck_ValidateAction (what the diagnostics page may ask its host to
+;    do).
 ; Each corpus fails loudly when unreadable or empty: a replay over zero
 ; vectors would report success while checking nothing.
 ; ==============================================================================
@@ -165,3 +168,51 @@ _TCD_IssueReport() {
 }
 
 Test("corpus:diagnostics: bug report text vectors (issue-report-corpus)", _TCD_IssueReport)
+
+
+
+
+
+; ===============================
+; ===============================
+; ======= 6/ Page Actions =======
+; ===============================
+; ===============================
+
+; Asserts an accepted action carries exactly the expected values.
+; @param Expected {Map}
+; @param Actual {Any}
+; @param Id {String} The vector's id, for the messages.
+_TCD_AssertAction(Expected, Actual, Id) {
+	Assert(Actual is Map, Id . ': the action must be a Map')
+	for Key, Value in Expected {
+		Assert(Actual.Has(Key), Id . ': the action lacks ' . Key)
+		if (Value is Map) {
+			Assert(Actual[Key] is Map, Id . ': ' . Key . ' must be a Map')
+			for SubKey, SubValue in Value
+				AssertEqual(SubValue, Actual[Key].Get(SubKey, ''), Id . ': ' . Key . '.' . SubKey)
+			AssertEqual(Value.Count, Actual[Key].Count, Id . ': ' . Key . ' carries extra keys')
+		} else {
+			AssertEqual(Value, Actual[Key], Id . ': ' . Key)
+		}
+	}
+	AssertEqual(Expected.Count, Actual.Count, Id . ': the action carries extra keys')
+}
+
+_TCD_PageActions() {
+	Data := _TCD_Corpus("tests\corpus\healthcheck\action_vectors.json")
+	Assert(Data['vectors'].Length >= 30, 'the page-actions corpus must hold its vectors')
+	for Vector in Data['vectors'] {
+		Context := Map('schema', Data['schema'], 'templates', Data['templates'], 'driver', Vector['driver'])
+		Result := HealthCheck_ValidateAction(Vector['message'], Context)
+		if Vector.Has('error') {
+			Assert(!Result.Has('action'), Vector['id'] . ' must be refused')
+			AssertEqual(Vector['error'], Result.Get('reason', ''), Vector['id'])
+		} else {
+			Assert(!Result.Has('reason'), Vector['id'] . ' must be accepted: ' . Result.Get('reason', ''))
+			_TCD_AssertAction(Vector['expected'], Result['action'], Vector['id'])
+		}
+	}
+}
+
+Test('corpus:diagnostics: page action vectors (page-actions-corpus)', _TCD_PageActions)

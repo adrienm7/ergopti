@@ -1645,6 +1645,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include ../ui/healthcheck/core.ahk
 #Include ../ui/healthcheck/helpers.ahk
 #Include ../ui/healthcheck/report.ahk
+#Include ../ui/healthcheck/actions.ahk
 #Include meta/test_healthcheck_format_helpers.ahk
 #Include unit/test_healthcheck_copy_receipt.ahk
 #Include unit/test_kana_altgr_readers.ahk
