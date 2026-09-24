@@ -1433,6 +1433,7 @@
 	"menu.tapholds.title": "⌨️ Натискання-Утримання",
 	"menu.tapholds.combo_arrow": "Комбо → %s",
 	"menu.tapholds.copy_tap_to_combo": "🔁 Скопіювати натискання → комбо для клавіш-модифікаторів",
+	"menu.tapholds.edit_nav_layer": "Редагувати шар навігації…",
 	"menu.tapholds.header_shortcuts": "Комбінації клавіш-модифікаторів",
 	"menu.tapholds.header_taps_holds": "Натискання / Утримання",
 	"menu.tapholds.hold_arrow": "Утримання → %s",

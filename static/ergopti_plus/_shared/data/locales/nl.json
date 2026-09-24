@@ -1433,6 +1433,7 @@
 	"menu.tapholds.title": "⌨️ Tik-vasthouden",
 	"menu.tapholds.combo_arrow": "Combo → %s",
 	"menu.tapholds.copy_tap_to_combo": "🔁 Tap → combo kopiëren voor modifieertoetsen",
+	"menu.tapholds.edit_nav_layer": "Navigatielaag bewerken…",
 	"menu.tapholds.header_shortcuts": "Modifieertoetscombinaties",
 	"menu.tapholds.header_taps_holds": "Tik / Vasthouden",
 	"menu.tapholds.hold_arrow": "Vasthouden → %s",

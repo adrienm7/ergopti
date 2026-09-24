@@ -1433,6 +1433,7 @@
 	"menu.tapholds.title": "⌨️ Tap-Holds",
 	"menu.tapholds.combo_arrow": "Combo → %s",
 	"menu.tapholds.copy_tap_to_combo": "🔁 Kopiera tryck → kombination för modifieringstangenter",
+	"menu.tapholds.edit_nav_layer": "Redigera navigeringslagret…",
 	"menu.tapholds.header_shortcuts": "Modifieringskombinationer",
 	"menu.tapholds.header_taps_holds": "Tap / Hold",
 	"menu.tapholds.hold_arrow": "Hold → %s",

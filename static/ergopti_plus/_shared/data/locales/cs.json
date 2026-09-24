@@ -1433,6 +1433,7 @@
 	"menu.tapholds.title": "⌨️ Klepnutí-Přidržení",
 	"menu.tapholds.combo_arrow": "Kombo → %s",
 	"menu.tapholds.copy_tap_to_combo": "🔁 Zkopírovat tap → combo pro modifikátory",
+	"menu.tapholds.edit_nav_layer": "Upravit navigační vrstvu…",
 	"menu.tapholds.header_shortcuts": "Zkratky modifikátorů",
 	"menu.tapholds.header_taps_holds": "Klepnutí / Přidržení",
 	"menu.tapholds.hold_arrow": "Přidržení → %s",

@@ -1433,6 +1433,7 @@
 	"menu.tapholds.title": "⌨️ Dokunma-Basılı Tutma",
 	"menu.tapholds.combo_arrow": "Kombo → %s",
 	"menu.tapholds.copy_tap_to_combo": "🔁 Değiştirici tuşlar için tap → combo kopyala",
+	"menu.tapholds.edit_nav_layer": "Gezinme katmanını düzenle…",
 	"menu.tapholds.header_shortcuts": "Değiştirici kısayollar",
 	"menu.tapholds.header_taps_holds": "Dokunma / Basılı Tutma",
 	"menu.tapholds.hold_arrow": "Basılı Tutma → %s",

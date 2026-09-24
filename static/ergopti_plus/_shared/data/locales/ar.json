@@ -1433,6 +1433,7 @@
 	"menu.tapholds.title": "⌨️ نقر-ضغط",
 	"menu.tapholds.combo_arrow": "مزيج → %s",
 	"menu.tapholds.copy_tap_to_combo": "🔁 نسخ النقر ← كومبو للمفاتيح المعدِّلة",
+	"menu.tapholds.edit_nav_layer": "تحرير طبقة التنقل…",
 	"menu.tapholds.header_shortcuts": "اختصارات المفاتيح المعدِّلة",
 	"menu.tapholds.header_taps_holds": "نقر / ضغط",
 	"menu.tapholds.hold_arrow": "ضغط → %s",

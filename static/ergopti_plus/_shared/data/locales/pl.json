@@ -1433,6 +1433,7 @@
 	"menu.tapholds.title": "⌨️ Dotknięcie-Przytrzymanie",
 	"menu.tapholds.combo_arrow": "Kombo → %s",
 	"menu.tapholds.copy_tap_to_combo": "🔁 Skopiuj tap → combo dla klawiszy modyfikujących",
+	"menu.tapholds.edit_nav_layer": "Edytuj warstwę nawigacji…",
 	"menu.tapholds.header_shortcuts": "Skróty modyfikatorów",
 	"menu.tapholds.header_taps_holds": "Dotknięcie / Przytrzymanie",
 	"menu.tapholds.hold_arrow": "Przytrzymanie → %s",

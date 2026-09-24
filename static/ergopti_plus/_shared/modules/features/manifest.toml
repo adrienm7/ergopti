@@ -4343,6 +4343,18 @@ id = "tap_hold_chords"
 platforms = ["hs"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
 
+# The layer a hold key enters (hold_layer = "nav") is edited key by key in the
+# shared layer editor (_shared/ui/layer_editor), last in the submenu.
+[[menu.tap_holds_menu]]
+type = "---"
+platforms = ["ahk", "hs", "linux"]
+
+[[menu.tap_holds_menu]]
+type = "command"
+id = "edit_nav_layer"
+i18n = "menu.tapholds.edit_nav_layer"
+platforms = ["ahk", "hs", "linux"]
+
 # word_delimiter_defs (20 entries) lived here and was read by nobody on any
 # driver — not a duplicate, simply unreferenced. Its i18n keys are still in the
 # locale files because the hotstrings config window uses them directly.

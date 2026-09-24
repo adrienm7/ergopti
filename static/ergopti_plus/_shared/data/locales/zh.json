@@ -1433,6 +1433,7 @@
 	"menu.tapholds.title": "⌨️ 点按/长按",
 	"menu.tapholds.combo_arrow": "组合 → %s",
 	"menu.tapholds.copy_tap_to_combo": "🔁 将点击 → 组合键复制到所有修饰键快捷键",
+	"menu.tapholds.edit_nav_layer": "编辑导航层…",
 	"menu.tapholds.header_shortcuts": "修饰键快捷键",
 	"menu.tapholds.header_taps_holds": "点击 / 长按",
 	"menu.tapholds.hold_arrow": "长按 → %s",
