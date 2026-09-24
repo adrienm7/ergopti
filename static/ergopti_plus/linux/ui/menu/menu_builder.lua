@@ -59,6 +59,9 @@ local PERSONAL_CATEGORY = "personal"
 -- Single source of the driver version.
 local Version = require("infra.version")
 
+-- The shared automatic-check schedule (frequency presets and their snap).
+local Schedule = require("updater.schedule")
+
 --- Flag and native name of a locale code, from the generated locale table.
 --- @param code string
 --- @return string
@@ -3352,15 +3355,14 @@ local function _about_update_rows(ctx)
 	end
 
 
-	local interval = up.get_check_interval()
+	-- The tick and the parent label name the preset in force; a live value
+	-- outside the presets reads as its nearest preset, the one a restart loads.
+	local _, current_code = Schedule.snap_interval(up.get_check_interval(), up.TIMING)
 	local frequency_rows = {}
-	local current_label = nil
 	for _, preset in ipairs(up.INTERVAL_PRESETS) do
-		local label = i18n_safe("menu.about.frequency." .. preset.code)
-		if preset.seconds == interval then current_label = label end
 		frequency_rows[#frequency_rows + 1] = {
-			label   = label,
-			checked = preset.seconds == interval,
+			label   = i18n_safe("menu.about.frequency." .. preset.code),
+			checked = preset.code == current_code,
 			action  = function()
 				up.set_check_interval(preset.seconds)
 				up.stop_background_checks()
@@ -3370,7 +3372,7 @@ local function _about_update_rows(ctx)
 		}
 	end
 	out[#out + 1] = {
-		label = i18n_safe("menu.about.frequency_menu") .. ": " .. (current_label or tostring(interval)),
+		label = i18n_safe("menu.about.frequency_menu") .. ": " .. i18n_safe("menu.about.frequency." .. current_code),
 		items = frequency_rows,
 	}
 	return out

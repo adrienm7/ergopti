@@ -78,11 +78,9 @@ const ahkSrc = fs.readFileSync(AHK_CORE, "utf8");
 
 const ahkOwnerRe  = /UPDATER_GH_OWNER\s*:=\s*"([^"]+)"/;
 const ahkRepoRe   = /UPDATER_GH_REPO\s*:=\s*"([^"]+)"/;
-const ahkIntervalRe = /UPDATER_DEFAULT_INTERVAL\s*:=\s*(\d+)/;
 
 const ahkOwnerM   = ahkSrc.match(ahkOwnerRe);
 const ahkRepoM    = ahkSrc.match(ahkRepoRe);
-const ahkIntervalM = ahkSrc.match(ahkIntervalRe);
 
 if (!ahkOwnerM) {
 	fail("core.ahk: could not find UPDATER_GH_OWNER literal");
@@ -100,12 +98,37 @@ if (!ahkRepoM) {
 	pass(`core.ahk UPDATER_GH_REPO matches defaults.json ("${repo}")`);
 }
 
-if (!ahkIntervalM) {
-	fail("core.ahk: could not find UPDATER_DEFAULT_INTERVAL literal");
-} else if (Number(ahkIntervalM[1]) !== interval) {
-	fail(`core.ahk UPDATER_DEFAULT_INTERVAL=${ahkIntervalM[1]} does not match defaults.json timing.default_check_interval_sec=${interval}`);
+// The AHK default and presets come from the generated schedule data
+// (windows/_generated/update_schedule.ahk, kept fresh by
+// test-update-schedule-contract.cjs), never from a literal in the updater.
+const AHK_SCHEDULE_DATA = path.join(ROOT, "static", "ergopti_plus", "windows", "_generated", "update_schedule.ahk");
+if (!/UPDATER_DEFAULT_INTERVAL\s*:=\s*UpdateSchedule_Timing\(\)\["default_check_interval_sec"\]/.test(ahkSrc)) {
+	fail("core.ahk UPDATER_DEFAULT_INTERVAL must read the shared default through UpdateSchedule_Timing()");
+} else if (!fs.existsSync(AHK_SCHEDULE_DATA)) {
+	fail("windows/_generated/update_schedule.ahk is missing; run npm run codegen:update-schedule");
 } else {
-	pass(`core.ahk UPDATER_DEFAULT_INTERVAL matches defaults.json (${interval})`);
+	const generatedDefault = fs.readFileSync(AHK_SCHEDULE_DATA, "utf8").match(/"default_check_interval_sec",\s*(\d+)/);
+	if (!generatedDefault || Number(generatedDefault[1]) !== interval) {
+		fail(`the generated AHK schedule data does not carry defaults.json timing.default_check_interval_sec=${interval}`);
+	} else {
+		pass(`core.ahk UPDATER_DEFAULT_INTERVAL reads the generated shared default (${interval})`);
+	}
+}
+
+// A preset table spelled in a driver is the hand copy this gate retired: the
+// Windows and Linux updaters each carried one (1m ... 7d) while the shared
+// defaults said the presets "stay driver-specific".
+const presetLiteral = /(?:Code:\s*"|code\s*=\s*")(?:1m|5m|10m|1h|24h|1d|7d|never)"/;
+for (const [label, source] of [
+	["windows/modules/updater/core.ahk", ahkSrc],
+	["windows/ui/menu/menu_init.ahk", fs.readFileSync(path.join(ROOT, "static", "ergopti_plus", "windows", "ui", "menu", "menu_init.ahk"), "utf8")],
+	["linux/modules/updater/manager.lua", fs.readFileSync(LINUX_UPDATER, "utf8")]
+]) {
+	if (presetLiteral.test(source)) {
+		fail(`${label} spells a frequency preset by hand; read timing.check_interval_presets from defaults.json`);
+	} else {
+		pass(`${label} spells no frequency preset`);
+	}
 }
 
 // Every update channel reads one release list (never /releases/latest, which

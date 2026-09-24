@@ -2,20 +2,42 @@
 
 ## Purpose
 
-Single source of truth for cross-driver updater scalars. Eliminates the triplicated literals (`owner`, `repo`, interval, boot-delay) that previously lived independently in `windows/lib/updater/core.ahk`, `macos/lib/updater.lua`, and a dead `constants.toml`. Both drivers now read from `defaults.json` through their JSON adapters.
+Single source of truth for the cross-driver updater: the repository identity,
+the release list every update channel reads, the channel registry, and the
+automatic-check schedule (frequency presets, boot delay, jitter, failure
+backoff, re-evaluation period). The macOS and Linux drivers read these files
+at runtime; the Windows driver reads generated AHK copies.
 
 ## Key files
 
-| File           | Description                                                         |
-| -------------- | ------------------------------------------------------------------- |
-| `defaults.json`| Owner, repo, check interval (s), boot-delay (s) — all cross-driver scalars |
+| File                    | Description                                                                            |
+| ----------------------- | -------------------------------------------------------------------------------------- |
+| `defaults.json`         | Owner and repo, release list URL, automatic-check timing and presets, check-record key |
+| `channels.json`         | Update-channel registry, most stable first; tag rule as structured data                |
+| `channel_vectors.json`  | Vectors every channel port replays                                                     |
+| `schedule.js`           | Canonical automatic-check schedule: due time, snap to a preset, jitter, check record   |
+| `schedule_vectors.json` | Vectors the JavaScript, Lua (`_shared/lua/updater/schedule.lua`) and AHK ports replay  |
+| `version.js`            | Canonical semver order, replayed through `version_vectors.json`                        |
 
-## Drift gate
+## Generated consumers
 
-`tools/test/test-updater-constants-single-source.cjs` asserts that both AHK and Lua implementations read the scalars from `defaults.json` rather than re-declaring them. CI fails on any regression (P10.1).
+- `windows/_generated/update_schedule.ahk` — `npm run codegen:update-schedule`
+- `windows/_generated/update_channels.ahk`, the page registry and the launcher
+  feed table — `npm run codegen:update-channels`
 
-## Adding a new scalar
+## Drift gates
 
-1. Add the key to `defaults.json`.
-2. Read it in both `windows/lib/updater/core.ahk` (via `_Updater_ReadSharedDefaults`) and `macos/lib/updater.lua` (via `JsonCodec` + `FileSystem` adapters).
-3. Add an assertion to `test-updater-constants-single-source.cjs`.
+- `tools/test/test-update-schedule-contract.cjs`: the schedule vectors, the
+  presets' labels in all 21 locales, the generated Windows data and the wiring
+  of the Lua and AHK vector tests.
+- `tools/test/test-update-channels-contract.cjs`: the channel registry.
+- `tools/test/test-updater-constants-single-source.cjs`: the literals a driver
+  still carries (repository identity, release list URL) and the absence of a
+  hand-copied preset table.
+
+## Adding a frequency preset
+
+1. Add it to `timing.check_interval_presets` in `defaults.json`, in display
+   order (`never` stays last).
+2. Add `menu.about.frequency.<code>` to all 21 locales.
+3. Run `npm run codegen:update-schedule`; the three drivers read the rest.

@@ -37,6 +37,7 @@ local Paths     = require("infra.paths")
 local Version   = require("updater.version")
 local Parser    = require("updater.release_parser")
 local Channels  = require("updater.channels")
+local Schedule  = require("updater.schedule")
 local Installer = require("modules.updater.installer")
 local Json      = require("json")
 local TomlCodec = require("toml_codec")
@@ -152,21 +153,22 @@ local DOWNLOAD_TIMEOUT_MS = 5 * 60 * 1000
 local MAX_DOWNLOAD_BYTES = 256 * 1024 * 1024
 local MAX_CHECKSUM_BODY_BYTES = 4096
 
--- Interval presets (same as macOS).
-M.INTERVAL_PRESETS = {
-	{ code = "1m",    seconds = 60 },
-	{ code = "5m",    seconds = 300 },
-	{ code = "10m",   seconds = 600 },
-	{ code = "1h",    seconds = 3600 },
-	{ code = "2h",    seconds = 7200 },
-	{ code = "3h",    seconds = 10800 },
-	{ code = "6h",    seconds = 21600 },
-	{ code = "12h",   seconds = 43200 },
-	{ code = "24h",   seconds = 86400 },
-	{ code = "2d",    seconds = 172800 },
-	{ code = "7d",    seconds = 604800 },
-	{ code = "never", seconds = 0 },
-}
+--- Resolves the automatic-check timing (presets, backoff, jitter). No fallback:
+--- a guessed preset list would tick a row that does not match the cadence.
+--- @param defs table Parsed updater defaults.
+--- @return table timing defaults.json timing, validated by updater.schedule.
+local function require_timing(defs)
+	local timing = type(defs) == "table" and defs.timing or nil
+	local ok, err = Schedule.validate_timing(timing)
+	if not ok then error("updater defaults declare an invalid timing: " .. tostring(err), 0) end
+	return timing
+end
+
+local TIMING = require_timing(_defs)
+M.TIMING = TIMING
+
+-- The shared frequency presets in display order, never last (defaults.json).
+M.INTERVAL_PRESETS = TIMING.check_interval_presets
 
 --- Resolves the exact self-update asset emitted by release CI. Unlike timing
 --- defaults, this value has no fallback: guessing an asset can install a .deb,
@@ -304,8 +306,13 @@ local function _load_persisted()
 	_channel_persisted = persisted ~= nil
 	_channel = persisted or M.installed_channel()
 	local interval = _storage_get("updater.interval_sec", nil)
-	if type(interval) == "number" and interval >= 0 then
-		_check_interval = interval
+	if type(interval) == "number" and interval >= 0 and interval == math.floor(interval) then
+		local seconds, code, snapped = Schedule.snap_interval(interval, TIMING)
+		if snapped then
+			Logger.warn(LOG, "Saved check interval %ds is not a frequency preset — using the nearest one, %ds (%s).",
+				interval, seconds, code)
+		end
+		_check_interval = seconds
 	end
 	_last_notified = _storage_get("updater.last_notified", "")
 end

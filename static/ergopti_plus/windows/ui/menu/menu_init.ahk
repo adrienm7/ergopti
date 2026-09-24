@@ -415,7 +415,7 @@ _MI_BuildConfigurationMenu() {
 ; Builds the About submenu (version, channels, update check, check frequency,
 ; Versions and its GitHub page).
 _MI_BuildAboutMenu() {
-	global UPDATER_CHANNEL, UPDATER_CHECK_INTERVAL, UPDATER_INTERVAL_PRESETS, UPDATER_LATEST_RELEASE
+	global UPDATER_CHANNEL, UPDATER_CHECK_INTERVAL, UPDATER_LATEST_RELEASE
 
 	; The updater block is provider DATA since 2026-08-07: one row per entry,
 	; with the channel and frequency pickers handed over as the native Menus they
@@ -435,7 +435,7 @@ _MI_BuildAboutMenu() {
 ; update-frequency picker. A local checkout has neither the check row nor the
 ; frequency picker: it has no release to update from.
 _MI_AboutUpdateRows(IsLocal := Updater_IsLocalSource(), SetChannelFn := Updater_SetChannel) {
-	global UPDATER_CHANNEL, UPDATER_CHECK_INTERVAL, UPDATER_INTERVAL_PRESETS, UPDATER_LATEST_RELEASE
+	global UPDATER_CHANNEL, UPDATER_CHECK_INTERVAL, UPDATER_LATEST_RELEASE
 	Rows := []
 
 	VerLabel := "ErgoptiPlus " . Updater_CurrentVersion()
@@ -462,25 +462,19 @@ _MI_AboutUpdateRows(IsLocal := Updater_IsLocalSource(), SetChannelFn := Updater_
 		"action",   Updater_OneClickUpdate,
 		"disabled", (Updater_GetUpdateState() == "checking")))
 
-	; Same shape for the check-frequency presets: one nested row per preset, the
-	; tick on whichever matches the interval in force.
+	; Same shape for the shared check-frequency presets: one nested row per
+	; preset, the tick and the parent label on the preset in force (a live value
+	; outside them reads as its nearest preset, the one a reload would load).
 	FreqRows := []
-	CurrentLabel := ""
-	CurrentCode  := ""
-	for _, Preset in UPDATER_INTERVAL_PRESETS {
-		Label := t("menu.about.frequency." . Preset.Code)
+	CurrentCode := UpdateSchedule_SnapInterval(UPDATER_CHECK_INTERVAL).Code
+	for _, Preset in UpdateSchedule_Presets() {
 		FreqRows.Push(Map(
-			"label",   Label,
-			"action",  _MakeFreqSetter(Preset.Seconds),
-			"checked", (Preset.Seconds == UPDATER_CHECK_INTERVAL)))
-		if (Preset.Seconds == UPDATER_CHECK_INTERVAL) {
-			CurrentLabel := Label
-			CurrentCode  := Preset.Code
-		}
+			"label",   t("menu.about.frequency." . Preset["code"]),
+			"action",  _MakeFreqSetter(Preset["seconds"]),
+			"checked", (Preset["code"] == CurrentCode)))
 	}
-	FreqDisplay := (CurrentCode != "") ? CurrentCode : "?"
 	Rows.Push(Map(
-		"label", t("menu.about.frequency_menu") . ": " . FreqDisplay,
+		"label", t("menu.about.frequency_menu") . ": " . t("menu.about.frequency." . CurrentCode),
 		"items", FreqRows))
 	return Rows
 }

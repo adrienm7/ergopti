@@ -25,12 +25,15 @@
 ; sub-modules below. Functions and globals are hoisted into the global
 ; namespace, so load order is irrelevant.
 ;   updater/channels.ahk    -- Update-channel registry interpreter (generated data).
+;   updater/schedule.ahk    -- Automatic-check schedule port (generated timing).
 ;   updater/core.ahk        -- Config, version compare, release fetch + parse.
 ;   updater/changelog.ahk   -- Menu actions, one-click update, changelog window.
 ;   updater/self_update.ahk -- Download, executable swap, background polling.
 
 #Include ../_generated/update_channels.ahk
 #Include updater/channels.ahk
+#Include ../_generated/update_schedule.ahk
+#Include updater/schedule.ahk
 #Include updater/core.ahk
 #Include updater/changelog.ahk
 #Include updater/self_update.ahk
