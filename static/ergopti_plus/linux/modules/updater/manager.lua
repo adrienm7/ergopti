@@ -17,7 +17,9 @@
 ---    through libuv. Release checks therefore never block keyboard processing.
 --- 2. ETag caching: stores the GitHub ETag header per channel in a temp file
 ---    so background checks that return 304 Not Modified do not count against
----    the API rate limit.
+---    the API rate limit. A 304 has no body: it reuses the list this process
+---    read, and a request is conditional only while that list is held, so the
+---    first request after a start is a full one.
 --- 3. Shared parser: delegates JSON parsing to _shared/lua/updater/release_parser.lua
 ---    which requires no full JSON decoder.
 --- 4. Shared channels: every channel reads the same release list and keeps its
@@ -220,6 +222,7 @@ end
 
 local _state           = "idle"    -- "idle" | "checking" | "available" | "downloading" | "installing"
 local _cached_release  = nil       -- { tag, notes, download_url, published_at, prerelease }
+local _list_cache      = {}        -- channel -> the last release list a 200 returned
 local _last_notified   = ""        -- last tag we showed a tray notification for
 local _session_notified = ""       -- throttles repeats when persistence is unavailable
 local _bg_timer_handle = nil       -- timer_scheduler handle for background polling
@@ -372,10 +375,11 @@ local function _build_fetch_request(channel)
 	}
 	-- curl cannot create an ETag cache parent. Use conditional requests only
 	-- when the standard cache directory already exists; never shell out to make
-	-- it from the event-loop thread.
+	-- it from the event-loop thread. A 304 carries no body, so the request is
+	-- conditional only while this process holds the list the saved ETag names.
 	if parent and Fs.exists(parent) then
 		options.etag_save = etag_file
-		if Fs.exists(etag_file) then options.etag_compare = etag_file end
+		if _list_cache[channel] and Fs.exists(etag_file) then options.etag_compare = etag_file end
 	end
 	return M.release_api_url(), {
 		Accept = "application/vnd.github+json",
@@ -394,8 +398,14 @@ local function _fetch_releases(channel, callback)
 	return M._http_client.get(url, headers, options, function(result)
 		local status = tonumber(result and result.status) or 0
 		if status == 304 then
-			Logger.debug(LOG, "GitHub releases unchanged (304) for channel %s.", channel)
-			callback(nil, status, nil)
+			local cached = _list_cache[channel]
+			if not cached then
+				Logger.warn(LOG, "GitHub answered 304 for channel %s without a cached release list.", channel)
+				callback(nil, status, "not modified, and no release list is cached")
+				return
+			end
+			Logger.debug(LOG, "GitHub releases unchanged (304) for channel %s; reusing the cached list.", channel)
+			callback(cached, status, nil)
 			return
 		end
 		if not result or result.ok ~= true then
@@ -409,6 +419,7 @@ local function _fetch_releases(channel, callback)
 			callback(nil, status, "empty response body")
 			return
 		end
+		_list_cache[channel] = result.body
 		callback(result.body, status, nil)
 	end)
 end
@@ -483,6 +494,7 @@ local function _process_release_response(body, channel)
 	local release = _select_channel_release(body, channel)
 	if not release then
 		Logger.info(LOG, "Update check result: no release on channel '%s' yet.", channel)
+		_cached_release = nil
 		_state = "idle"
 		return false
 	end
@@ -491,6 +503,7 @@ local function _process_release_response(body, channel)
 
 	if latest_tag == "" then
 		Logger.warn(LOG, "Could not parse tag from GitHub response.")
+		_cached_release = nil
 		_state = "idle"
 		return false
 	end
@@ -519,6 +532,7 @@ local function _process_release_response(body, channel)
 		-- Info, not debug: "the check ran and found nothing" is the answer a user
 		-- asking "why did it not update" needs, and it happens a few times a day.
 		Logger.info(LOG, "Update check result: up to date (current %s, latest %s).", current, latest_tag)
+		_cached_release = nil
 		_state = "idle"
 		return false
 	end
@@ -528,6 +542,7 @@ local function _process_release_response(body, channel)
 	if asset_url == "" or checksum_url == "" then
 		Logger.error(LOG, "Release %s lacks the canonical Linux bundle or checksum (%s, %s).",
 			latest_tag, LINUX_ASSET_NAME, LINUX_CHECKSUM_ASSET_NAME)
+		_cached_release = nil
 		_state = "idle"
 		return false
 	end
@@ -584,11 +599,9 @@ function M.check_for_updates(channel, callback)
 			if not body then
 				_cached_release = known
 				_state = known and "available" or "idle"
-				if status ~= 304 then
-					Logger.warn(LOG, "Check failed (HTTP %d): %s.", status or 0,
-						tostring(fetch_error or "empty body"))
-				end
-				publish_check(callback, known ~= nil, known, status ~= 304 and fetch_error or nil)
+				Logger.warn(LOG, "Check failed (HTTP %d): %s.", status or 0,
+					tostring(fetch_error or "empty body"))
+				publish_check(callback, known ~= nil, known, fetch_error or "empty body")
 				return
 			end
 			_cached_release = nil

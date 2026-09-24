@@ -491,6 +491,59 @@ helpers.describe("modules/updater/manager.lua", function()
 		helpers.assert_eq(M.get_state(), "idle")
 	end)
 
+	-- GitHub answers 304 Not Modified, with no body, when the list is unchanged
+	-- since the ETag curl saved. check_for_updates cleared the cached release
+	-- before fetching and a 304 then read as "nothing available": an update
+	-- vanished at the next check, and a manual check said there was none.
+	helpers.it("a 304 keeps the release the previous 200 found available", function()
+		local real_fs = require("adapters.file_system")
+		local previous_fs = package.loaded["adapters.file_system"]
+		local previous_manager = package.loaded["modules.updater.manager"]
+		-- The ETag cache directory exists, so the request is conditional as soon
+		-- as the list it names is held.
+		package.loaded["adapters.file_system"] = setmetatable({
+			exists = function() return true end,
+		}, { __index = real_fs })
+		package.loaded["modules.updater.manager"] = nil
+		local fresh = require("modules.updater.manager")
+		package.loaded["adapters.file_system"] = previous_fs
+		package.loaded["modules.updater.manager"] = previous_manager
+
+		local list = "[" .. release("v0.0.0-dev.140", true) .. "," .. release("v1.2.0", false) .. "]"
+		local responses = {
+			{ ok = true, status = 200, body = list },
+			{ ok = false, status = 304, body = "", error = "HTTP 304" },
+		}
+		local requests = {}
+		fresh._http_client = {
+			get = function(_, _, options, callback)
+				requests[#requests + 1] = options
+				callback(table.remove(responses, 1))
+				return true
+			end,
+			cancel = function() return true end,
+		}
+		fresh.current_version = function() return "local" end
+
+		local results = {}
+		for _ = 1, 2 do
+			fresh.check_for_updates("main", function(available, release, err)
+				results[#results + 1] = { available = available, tag = release and release.tag, err = err }
+			end)
+		end
+
+		helpers.assert_eq(#requests, 2, "two checks, two requests")
+		helpers.assert_nil(requests[1].etag_compare,
+			"without the list an ETag names, the first request must be unconditional")
+		helpers.assert_true(requests[1].etag_save ~= nil, "the first answer's ETag is saved")
+		helpers.assert_true(requests[2].etag_compare ~= nil, "the second request is conditional")
+		helpers.assert_eq(results[1].available, true, "the 200 finds the release")
+		helpers.assert_eq(results[2].available, true, "the 304 keeps it available")
+		helpers.assert_eq(results[2].tag, results[1].tag, "the same release stays cached")
+		helpers.assert_eq(fresh.get_state(), "available")
+		helpers.assert_eq(fresh.get_cached_release().tag, "v1.2.0")
+	end)
+
 	helpers.it("builds a bounded HTTPS release request for the updater owner", function()
 		helpers.assert_true(type(M._build_fetch_request) == "function")
 		local url, headers, options = M._build_fetch_request("main")
