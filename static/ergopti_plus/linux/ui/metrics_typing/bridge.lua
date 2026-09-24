@@ -135,15 +135,22 @@ function M.on_message(payload, state)
 	-- macOS has handled this since the control existed; Linux answered nothing,
 	-- so a reset re-rendered the page against the same cached manifest and the
 	-- one observable effect was that resetting changed nothing.
+	-- The answer is the rebuilt payload itself: the page applies every reply as
+	-- dashboard data, and a bare { cleared = true } emptied the dashboard.
 	if action == "clear_cache" then
 		_cached_ready = nil
+		local cleared = false
 		if state.keylogger and type(state.keylogger.clear_cache) == "function" then
 			state.keylogger.clear_cache()
+			cleared = true
 			Logger.info(LOG, "Dashboard caches cleared by user reset.")
-			return { cleared = true }
+		else
+			Logger.error(LOG, "Reset requested but the keylogger exposes no clear_cache — nothing was cleared.")
 		end
-		Logger.error(LOG, "Reset requested but the keylogger exposes no clear_cache — nothing was cleared.")
-		return { cleared = false }
+		local fresh = build_payload(state, true)
+		if cleared then _cached_ready = fresh end
+		fresh.cleared = cleared
+		return fresh
 	end
 
 	if action == "range" and type(payload) == "table" then

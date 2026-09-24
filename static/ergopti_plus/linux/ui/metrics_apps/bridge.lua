@@ -57,6 +57,15 @@ function M.on_message(payload, state)
 
 	if type(payload) ~= "table" then return nil end
 
+	-- Every answer is a full dashboard payload, with the action's outcome added
+	-- as a field: the page applies each reply as dashboard data, and a bare
+	-- { saved = … } or { supported = false } emptied it until the next poll.
+	local function with_payload(fields)
+		local reply = _build_initial_payload(state, false)
+		for key, value in pairs(fields) do reply[key] = value end
+		return reply
+	end
+
 	local action = payload.action
 	if action == "ready" or action == "refresh" then
 		return _build_initial_payload(state, action == "ready")
@@ -80,23 +89,23 @@ function M.on_message(payload, state)
 	if action == "export" then
 		if state.keylogger and type(state.keylogger.export_json) == "function" then
 			local ok, json = pcall(state.keylogger.export_json)
-			return { exported = ok, json = ok and json or nil }
+			return with_payload({ exported = ok, json = ok and json or nil })
 		end
-		return { exported = false }
+		return with_payload({ exported = false })
 	end
 
 	if action == "pause" then
 		if state.keylogger and type(state.keylogger.suppress) == "function" then
 			state.keylogger.suppress()
 		end
-		return { suppressed = true }
+		return with_payload({ suppressed = true })
 	end
 
 	if action == "resume" then
 		if state.keylogger and type(state.keylogger.unsuppress) == "function" then
 			state.keylogger.unsuppress()
 		end
-		return { suppressed = false }
+		return with_payload({ suppressed = false })
 	end
 
 	-- The category editor. This is the one control on the page that writes
@@ -109,10 +118,10 @@ function M.on_message(payload, state)
 		local category = tostring(payload.cat or "")
 		if state.keylogger and type(state.keylogger.set_app_category) == "function" then
 			local ok = state.keylogger.set_app_category(app_name, category, tonumber(payload.score) or 0)
-			return { saved = ok, payload = _build_initial_payload(state, false) }
+			return with_payload({ saved = ok })
 		end
 		Logger.error(LOG, "Category edit for '%s' arrived but the keylogger cannot store it.", app_name)
-		return { saved = false }
+		return with_payload({ saved = false })
 	end
 
 	-- macOS answers this with a native chooser listing the known applications.
@@ -121,7 +130,7 @@ function M.on_message(payload, state)
 	-- from a handler that crashed.
 	if action == "pick" then
 		Logger.info(LOG, "Application picker requested; this driver has no native chooser.")
-		return { supported = false, apps = _build_initial_payload(state, false).metrics_manifest }
+		return with_payload({ supported = false })
 	end
 
 	Logger.warn(LOG, "Unknown bridge action received: %s.", tostring(action))
