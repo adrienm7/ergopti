@@ -34,6 +34,15 @@ from support import (
 ERGOL_LEVEL_INDICES = [0, 2, 1, 1, 0, 3, 4]
 KEYPAD_CODES = range(65, 93)
 
+# (dead-key state, action) outputs the shipped Ergopti XCompose files cannot
+# reach: the action's key is itself a dead key, so it sends its dead keysym, not
+# the character its Compose line names. The golden test freezes those files
+# (docs/memory/linux-web-release.md); any other layout must have none, so a new
+# registry layout that hits this converter limit fails here instead of shipping
+# sequences nobody can type.
+ERGOPTI_FAMILY = {"ergopti", "ergopti_ansi", "ergopti_plus", "ergopti_plus_ansi"}
+ERGOPTI_UNREACHABLE = {("s1_circumflex", "^"), ("s1_circumflex", "¨"), ("s3_diaeresis", "¨")}
+
 _COMPOSE_LINE_RE = re.compile(r'^((?:<[^>]+>\s*)+):\s*"((?:[^"\\]|\\.)*)"\s*$')
 
 
@@ -111,6 +120,15 @@ class RegistryConversionTests(unittest.TestCase):
             self.assertIn('xkb_symbols "%s"' % entry["id"], result.symbols_text)
             self.assertTrue(result.compose_text.startswith('include "%L"'), entry["id"])
             self.assertEqual(result.conflicts, [], entry["id"])
+
+    def test_every_dead_key_output_is_reachable_from_its_own_key(self):
+        entries = registry_entries()
+        self.assertGreaterEqual(len(entries), 5)
+        self.assertTrue(ERGOPTI_FAMILY <= {entry["id"] for entry in entries})
+        for entry in entries:
+            result = convert_registry_layout(entry["id"])
+            expected = ERGOPTI_UNREACHABLE if entry["id"] in ERGOPTI_FAMILY else set()
+            self.assertEqual(set(result.unreachable), expected, entry["id"])
 
 
 class ErgolCompletenessTests(unittest.TestCase):
