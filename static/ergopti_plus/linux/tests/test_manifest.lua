@@ -29,6 +29,7 @@ return {
 	"tests.unit.adapters.test_window_info_focus",
 	"tests.unit.adapters.test_xkb_capture",
 	"tests.unit.infra.test_build_commit",
+	"tests.unit.infra.test_config_migrate",
 	"tests.unit.infra.test_diagnostic_snapshot",
 	"tests.unit.infra.test_display_server",
 	"tests.unit.infra.test_driver_version",

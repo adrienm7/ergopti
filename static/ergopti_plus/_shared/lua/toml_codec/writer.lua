@@ -17,6 +17,9 @@
 ---    file — existing lines are updated in-place, new entries are appended.
 --- 3. Transactional publication: both writers require exact read/write/close/
 ---    rename acknowledgement before they report success or replace live data.
+--- 4. Session registries owned by the config migration: a path whose writes
+---    are refused (a config.toml this build cannot version) and the rows a
+---    writer adds when it creates a path (the schema stamp).
 --- ==============================================================================
 
 local M = {}
@@ -49,6 +52,25 @@ local BasicString = require("toml_codec.basic_string")
 -- ====================================
 
 local read_batch_source
+
+-- Paths this session must not write, with the reason. The config migration
+-- registers a config.toml it could not version (a newer schema, a failed
+-- migration): every publication below refuses it, so no writer can replace a
+-- file this build does not understand.
+local _refused_writes = {}
+
+-- Rows a writer adds when it creates a path from absence. The config migration
+-- registers the schema stamp here, so a config.toml this build creates carries
+-- this build's version and a later boot never mistakes it for an unstamped,
+-- older file.
+local _create_rows = {}
+
+--- The refusal registry key: one spelling per path, whatever the separators.
+--- @param path string
+--- @return string
+local function refusal_key(path)
+	return (tostring(path):gsub("\\", "/"):gsub("/+", "/"))
+end
 
 --- Publishes complete content through a same-directory staging file.
 --- A protected call only proves that Lua did not raise; file methods also
@@ -204,6 +226,10 @@ local read_existing
 --- @return boolean written
 --- @return string|nil error_message
 local function publish_content(path, content, file_adapter, expected_source)
+	local refusal = _refused_writes[refusal_key(path)]
+	if refusal then
+		return false, "writes to this file are refused for the session: " .. refusal
+	end
 	if type(file_adapter) == "table" and type(file_adapter.write) == "function" then
 		if type(expected_source) == "table" then
 			local current, current_status, current_detail = read_existing(path, file_adapter)
@@ -497,7 +523,22 @@ function M.batch_write(path, updates, file_adapter)
 		Logger.error(LOG, "batch_write: refusing unreadable destination '%s' — %s.", path, tostring(read_detail))
 		return false, tostring(read_detail)
 	end
-	if read_status == "absent" then source = "" end
+	if read_status == "absent" then
+		source = ""
+		local seeds = {}
+		for _, row in ipairs(_create_rows[refusal_key(path)] or {}) do
+			local sl, kl = row.section:lower(), row.key:lower()
+			if not (lookup[sl] and lookup[sl][kl]) then
+				if not lookup[sl] then lookup[sl] = {} end
+				lookup[sl][kl] = row
+				seeds[#seeds + 1] = row
+			end
+		end
+		if #seeds > 0 then
+			for _, u in ipairs(updates) do seeds[#seeds + 1] = u end
+			updates = seeds
+		end
+	end
 	for line in (source .. "\n"):gmatch("(.-)\r?\n") do lines[#lines + 1] = line end
 	if #lines == 1 and lines[1] == "" then lines = {} end
 
@@ -603,6 +644,62 @@ function M.publish_if_unchanged(path, content, file_adapter, expected_source)
 		return false, "publish_if_unchanged needs a path, a string payload and a source precondition"
 	end
 	return publish_content(path, content, file_adapter, expected_source)
+end
+
+--- Refuses every later publication to path for the rest of the session. There
+--- is deliberately no way to lift it: the file stays untouched until a restart
+--- re-evaluates it.
+--- @param path string Destination path.
+--- @param reason string Why the file must not be written (logged by callers).
+function M.refuse_writes(path, reason)
+	if type(path) ~= "string" or path == "" or type(reason) ~= "string" or reason == "" then
+		error("refuse_writes needs a path and a reason", 2)
+	end
+	_refused_writes[refusal_key(path)] = reason
+end
+
+--- Why writes to path are refused this session, or nil.
+--- @param path string Destination path.
+--- @return string|nil reason
+function M.write_refusal(path)
+	if type(path) ~= "string" then return nil end
+	return _refused_writes[refusal_key(path)]
+end
+
+--- Registers the rows batch_write adds whenever it creates path from absence,
+--- replacing any earlier registration. A whole-file writer that creates the
+--- file reads them through M.create_rows.
+--- @param path string Destination path.
+--- @param rows table Array of `{ section, key, value }` with scalar values.
+function M.set_create_rows(path, rows)
+	if type(path) ~= "string" or path == "" or type(rows) ~= "table" then
+		error("set_create_rows needs a path and an array of rows", 2)
+	end
+	local copy = {}
+	for index, row in ipairs(rows) do
+		local value_type = type(row) == "table" and type(row.value) or nil
+		if type(row) ~= "table" or type(row.section) ~= "string" or row.section == ""
+			or type(row.key) ~= "string" or row.key == ""
+			or (value_type ~= "string" and value_type ~= "number" and value_type ~= "boolean") then
+			error("set_create_rows: row " .. index .. " must be { section, key, scalar value }", 2)
+		end
+		copy[index] = { section = row.section, key = row.key, value = row.value }
+	end
+	_create_rows[refusal_key(path)] = copy
+end
+
+--- The rows a writer creating path must add, as a fresh copy, or nil.
+--- @param path string Destination path.
+--- @return table|nil rows
+function M.create_rows(path)
+	if type(path) ~= "string" then return nil end
+	local rows = _create_rows[refusal_key(path)]
+	if not rows then return nil end
+	local copy = {}
+	for index, row in ipairs(rows) do
+		copy[index] = { section = row.section, key = row.key, value = row.value }
+	end
+	return copy
 end
 
 return M
