@@ -16,7 +16,8 @@
 ;    map_value, delete, set_if_absent) and this file holds their only Windows
 ;    semantics. The corpus under _shared/tests/corpus/config_migrations is
 ;    replayed here, by the Lua engine and by the JS reference, so the three
-;    cannot drift.
+;    cannot drift; _shared/tests/corpus/config_migration_registries pins which
+;    registries all three accept.
 ; 2. The loader's model. A section is a ``[header]`` path and a key one entry
 ;    inside it, exactly as the typed TOML parse returns them. Booleans stay
 ;    TOML_Bool, so map_value tells ``true`` from ``1`` like the other drivers.
@@ -148,6 +149,10 @@ ConfigMigrateValidateRegistry(Sections) {
 	if !(Sections is Map) || !Sections.Has("registry")
 		throw Error("the registry has no [registry] table")
 	Head := Sections["registry"]
+	for Field in Head {
+		if !(Field == "current_version" || Field == "unstamped_version")
+			throw Error("[registry] has an unknown key '" . Field . "'")
+	}
 	Current := Head.Get("current_version", "")
 	Unstamped := Head.Get("unstamped_version", "")
 	if !_ConfigMigrateIsVersion(Current) || !_ConfigMigrateIsVersion(Unstamped)
@@ -158,6 +163,10 @@ ConfigMigrateValidateRegistry(Sections) {
 	Steps := []
 	for Name, Step in Sections {
 		if (Name == "registry")
+			continue
+		; An empty [steps] header next to its sub-tables is valid TOML; the Lua
+		; and JS decoders cannot even tell it from an implicit one.
+		if (Name == "steps" && (Step is Map) && Step.Count == 0)
 			continue
 		if (SubStr(Name, 1, 6) != "steps.")
 			throw Error("the registry has an unknown table [" . Name . "]")

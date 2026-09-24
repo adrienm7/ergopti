@@ -271,32 +271,30 @@ _CMG_UnparsableFileIsRefused() {
 Test("config migrate: a file the reader cannot fully parse is refused, never rewritten "
 	. "(config-migrate-unparsable)", _CMG_UnparsableFileIsRefused)
 
+; The shared registry-defect corpus: the loader accepts the control and rejects
+; every defect the Lua engine and the JS reference reject too.
 _CMG_RegistryLoaderRejectsDefects() {
-	Dir := _CMG_NewDir()
-	try {
-		RegistryPath := Dir . "\migrations.toml"
-		Base := "[registry]`ncurrent_version = 2`nunstamped_version = 1`n`n"
-		Step := '[steps.v1_to_v2]`nfrom = 1`nto = 2`ndrivers = ["ahk"]`nreason = "r"`n'
-		Defects := Map(
-			"a missing step", "[registry]`ncurrent_version = 3`nunstamped_version = 2`n",
-			"an unknown op", Base . Step . 'ops = [{ op = "explode", section = "a" }]`n',
-			"an unknown driver", Base . StrReplace(Step, '"ahk"', '"amiga"') . "ops = []`n",
-			"a misnamed step", Base . StrReplace(Step, "v1_to_v2", "first") . "ops = []`n",
-			"an unknown op field", Base . Step . 'ops = [{ op = "delete", section = "a", extra = 1 }]`n')
-		for Label, Text in Defects {
-			AssertTrue(FSWriteDurable(RegistryPath, Text))
-			AssertThrows(() => ConfigMigrateLoadRegistry(RegistryPath), "a registry with " . Label
-				. " must be rejected")
-		}
-		Shipped := ConfigMigrateShippedRegistry()
-		Assert(Shipped["steps"].Length >= 1
-			&& Shipped["steps"].Length == Shipped["current"] - Shipped["unstamped"],
-			"the shipped registry is a gap-free chain with at least one step")
-		AssertEqual(Shipped["current"], ConfigMigrateCurrentVersion())
-	} finally DirDelete(Dir, true)
+	global _SharedDir
+	Corpus := _SharedDir . "\tests\corpus\config_migration_registries"
+	Index := _CMG_Parse(Corpus . "\cases.toml")["corpus"]
+	Control := ConfigMigrateLoadRegistry(Corpus . "\" . Index["control"] . ".toml")
+	AssertEqual(2, Control["current"], "the control registry must be accepted")
+	Rejected := 0
+	for Name in Index["rejected"] {
+		Path := Corpus . "\" . Name . ".toml"
+		_CMG_Parse(Path)
+		AssertThrows(() => ConfigMigrateLoadRegistry(Path), Name . " must be rejected")
+		Rejected += 1
+	}
+	Assert(Rejected >= 20, "expected at least 20 rejected registries, found " . Rejected)
+	Shipped := ConfigMigrateShippedRegistry()
+	Assert(Shipped["steps"].Length >= 1
+		&& Shipped["steps"].Length == Shipped["current"] - Shipped["unstamped"],
+		"the shipped registry is a gap-free chain with at least one step")
+	AssertEqual(Shipped["current"], ConfigMigrateCurrentVersion())
 }
-Test("config migrate: the registry loader rejects gaps, unknown ops, drivers and fields and "
-	. "misnamed steps (config-migrate-registry)", _CMG_RegistryLoaderRejectsDefects)
+Test("config migrate: the registry loader accepts the control and rejects every shared registry "
+	. "defect (config-migrate-registry)", _CMG_RegistryLoaderRejectsDefects)
 
 
 

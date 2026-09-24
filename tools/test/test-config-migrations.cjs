@@ -25,6 +25,10 @@
  * 4. Coverage floors. Every op kind, every outcome and every driver appears in
  *    the corpus, so a new op cannot ship without a case the three interpreters
  *    replay.
+ * 5. Registry defects. The control of _shared/tests/corpus/
+ *    config_migration_registries must pass this validator and every defect
+ *    listed there must fail it; the Windows and Lua loaders replay the same
+ *    files, so no registry can be valid on one driver and refused on another.
  * ==============================================================================
  */
 
@@ -37,6 +41,7 @@ const { shared } = require('../lib/paths.cjs');
 
 const REGISTRY_PATH = shared('core/config_schema/migrations.toml');
 const CORPUS_DIR = shared('tests/corpus/config_migrations');
+const DEFECTS_DIR = shared('tests/corpus/config_migration_registries');
 
 const DRIVERS = ['ahk', 'hs', 'linux'];
 const OUTCOMES = ['migrated', 'current', 'newer', 'invalid', 'unsupported'];
@@ -560,6 +565,64 @@ const MIN_REPLAYS = 30;
 if (replays < MIN_REPLAYS)
 	fail('corpus', `expected at least ${MIN_REPLAYS} driver replays, ran ${replays}`);
 
+// The registry-defect corpus: the control registry must be accepted and every
+// listed defect rejected, here and by the Lua and Windows loaders, which replay
+// the same files. A defect this validator let through would be one a driver
+// may accept while another refuses it.
+
+/**
+ * The failures validateRegistry records for one document, taken back out of
+ * the gate's own list: a defect case is expected to fail.
+ * @param {object} doc - Parsed registry.
+ * @param {string} where - Label for the failures.
+ * @returns {string[]}
+ */
+function registryDefects(doc, where) {
+	const before = failures.length;
+	validateRegistry(doc, where);
+	return failures.splice(before);
+}
+
+const MIN_DEFECT_CASES = 20;
+const defectIndex = readToml(path.join(DEFECTS_DIR, 'cases.toml'));
+const defectCorpus = (defectIndex && defectIndex.corpus) || {};
+const rejectedCases = Array.isArray(defectCorpus.rejected) ? defectCorpus.rejected : [];
+const defectFiles = fs
+	.readdirSync(DEFECTS_DIR)
+	.filter((file) => file.endsWith('.toml') && file !== 'cases.toml')
+	.map((file) => file.slice(0, -'.toml'.length))
+	.sort();
+if (
+	JSON.stringify([defectCorpus.control, ...rejectedCases].sort()) !== JSON.stringify(defectFiles)
+) {
+	fail(
+		'config_migration_registries/cases.toml',
+		`declares control "${defectCorpus.control}" and [${rejectedCases.join(', ')}] but the files are [${defectFiles.join(', ')}]`
+	);
+}
+if (rejectedCases.length < MIN_DEFECT_CASES) {
+	fail(
+		'config_migration_registries',
+		`expected at least ${MIN_DEFECT_CASES} rejected registries, found ${rejectedCases.length}`
+	);
+}
+if (typeof defectCorpus.control === 'string') {
+	const control = readToml(path.join(DEFECTS_DIR, `${defectCorpus.control}.toml`));
+	const defects = control ? registryDefects(control, 'control') : [];
+	if (defects.length) {
+		fail('config_migration_registries/control.toml', `must be accepted: ${defects.join('; ')}`);
+	}
+}
+for (const name of rejectedCases) {
+	const doc = readToml(path.join(DEFECTS_DIR, `${name}.toml`));
+	if (doc && registryDefects(doc, name).length === 0) {
+		fail(
+			`config_migration_registries/${name}.toml`,
+			'the reference validator accepts it; every interpreter must reject it'
+		);
+	}
+}
+
 // ======================================
 // ======================================
 // ======= 4/ Interpreter wiring =======
@@ -587,12 +650,11 @@ const luaEngine = readSource(shared('lua/config_migrate.lua'));
 if (!luaEngine.includes(`M.REGISTRY_PATH = "${REGISTRY_RELATIVE}"`)) {
 	fail('wiring', `_shared/lua/config_migrate.lua must name the registry as "${REGISTRY_RELATIVE}"`);
 }
-if (
-	!readSource(shared('lua/test/config_migrate_contract.lua')).includes(
-		'/tests/corpus/config_migrations'
-	)
-) {
-	fail('wiring', 'the shared Lua contract must replay tests/corpus/config_migrations');
+const luaContract = readSource(shared('lua/test/config_migrate_contract.lua'));
+for (const corpus of ['config_migrations', 'config_migration_registries']) {
+	if (!luaContract.includes(`/tests/corpus/${corpus}"`)) {
+		fail('wiring', `the shared Lua contract must replay tests/corpus/${corpus}`);
+	}
 }
 // The Windows interpreter names the same registry, and the AHK suite that
 // replays the corpus with the ahk driver id is one run_all.ahk actually runs.
@@ -605,12 +667,18 @@ if (!ahkEngine.includes(`static Relative := "${REGISTRY_RELATIVE}"`)) {
 }
 const ahkSuite = readSource(shared('..', 'windows', 'tests', 'unit', 'test_config_migrate.ahk'));
 if (
-	!ahkSuite.includes('\\tests\\corpus\\config_migrations') ||
+	!ahkSuite.includes('\\tests\\corpus\\config_migrations"') ||
 	!ahkSuite.includes('_CMG_Has(Spec["drivers"], "ahk")')
 ) {
 	fail(
 		'wiring',
 		'windows/tests/unit/test_config_migrate.ahk must replay the corpus for driver "ahk"'
+	);
+}
+if (!ahkSuite.includes('\\tests\\corpus\\config_migration_registries"')) {
+	fail(
+		'wiring',
+		'windows/tests/unit/test_config_migrate.ahk must replay tests/corpus/config_migration_registries'
 	);
 }
 const runAll = readSource(shared('..', 'windows', 'tests', 'run_all.ahk'));
@@ -647,5 +715,5 @@ if (failures.length) {
 	process.exit(1);
 }
 console.log(
-	`Config migration gate: registry v${shipped.unstamped}..v${shipped.current} (${shipped.steps.length} step(s)), ${onDisk.length} corpus case(s), ${replays} driver replay(s) — OK`
+	`Config migration gate: registry v${shipped.unstamped}..v${shipped.current} (${shipped.steps.length} step(s)), ${onDisk.length} corpus case(s), ${replays} driver replay(s), ${rejectedCases.length} rejected registry defect(s) — OK`
 );

@@ -6,9 +6,10 @@
 --- The behaviour every Lua driver's boot migration must keep, registered once
 --- per driver suite so the macOS runner (Lua 5.4) and the Linux runner
 --- (LuaJIT in CI) both prove it: the shared corpus replayed through the engine
---- with the driver's own id, byte preservation of everything no op touches,
---- replay idempotence, and the boot run's backup, publication and refusal
---- outcomes, including the read-only session a newer file starts.
+--- with the driver's own id, the shared registry-defect corpus every loader
+--- must reject, byte preservation of everything no op touches, replay
+--- idempotence, and the boot run's backup, publication and refusal outcomes,
+--- including the read-only session a newer file starts.
 ---
 --- USAGE (one call per driver suite):
 ---   require("test.config_migrate_contract").register(helpers, { driver = "hs" })
@@ -22,6 +23,7 @@ local TomlWriter = require("toml_codec.writer")
 
 local STAMP = "20990101-000000"
 local MIN_CASES_PER_DRIVER = 10
+local MIN_REGISTRY_DEFECTS = 20
 local _sequence = 0
 
 
@@ -274,24 +276,22 @@ local function register_registry(h, driver)
 			h.assert_true(#registry.steps >= 1, "the registry ships at least one step")
 		end)
 
-		h.it("rejects a gap, an unknown op, an unknown driver and a misnamed step", function()
-			local base = table.concat({
-				"[registry]", "current_version = 3", "unstamped_version = 1", "",
-				"[steps.v1_to_v2]", "from = 1", "to = 2", "drivers = [\"hs\"]", "reason = \"r\"",
-				"ops = [{ op = \"delete\", section = \"a\", key = \"b\" }]", "",
-			}, "\n")
-			local cases = {
-				{ "gap", base },
-				{ "unknown op", (base:gsub("\"delete\"", "\"explode\"")) .. "\n[steps.v2_to_v3]\nfrom = 2\nto = 3\ndrivers = [\"hs\"]\nreason = \"r\"\nops = []\n" },
-				{ "unknown driver", (base:gsub("%[\"hs\"%]", "[\"amiga\"]", 1)) .. "\n[steps.v2_to_v3]\nfrom = 2\nto = 3\ndrivers = [\"hs\"]\nreason = \"r\"\nops = []\n" },
-				{ "misnamed", base .. "\n[steps.second]\nfrom = 2\nto = 3\ndrivers = [\"hs\"]\nreason = \"r\"\nops = []\n" },
-				{ "unknown field", (base:gsub("key = \"b\"", "key = \"b\", extra = 1")) .. "\n[steps.v2_to_v3]\nfrom = 2\nto = 3\ndrivers = [\"hs\"]\nreason = \"r\"\nops = []\n" },
-			}
-			for _, case in ipairs(cases) do
-				local registry, err = Engine.validate_registry(TomlCodec.decode(case[2]))
-				h.assert_nil(registry, case[1] .. " must be rejected")
-				h.assert_true(type(err) == "string" and err ~= "", case[1] .. " must explain the refusal")
+		h.it("accepts the control and rejects every registry of the shared defect corpus", function()
+			local corpus = shared_root() .. "/tests/corpus/config_migration_registries"
+			local index = read_corpus_file(corpus .. "/cases.toml").corpus or {}
+			local control, control_err = Engine.load_registry(corpus .. "/" .. tostring(index.control) .. ".toml")
+			h.assert_true(control ~= nil, "the control registry must be accepted: " .. tostring(control_err))
+			local rejected = 0
+			for _, name in ipairs(index.rejected or {}) do
+				local path = corpus .. "/" .. name .. ".toml"
+				read_corpus_file(path)
+				local registry, err = Engine.load_registry(path)
+				h.assert_nil(registry, name .. " must be rejected")
+				h.assert_true(type(err) == "string" and err ~= "", name .. " must explain the refusal")
+				rejected = rejected + 1
 			end
+			h.assert_true(rejected >= MIN_REGISTRY_DEFECTS, string.format(
+				"expected at least %d rejected registries, found %d", MIN_REGISTRY_DEFECTS, rejected))
 		end)
 
 		h.it("touches only the records the steps change", function()
