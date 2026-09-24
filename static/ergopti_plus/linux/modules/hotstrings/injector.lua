@@ -93,6 +93,15 @@ local function held_text_modifier_codes()
 	return (ok_call and type(held) == "table") and held or {}
 end
 
+--- Shortcut modifiers (Ctrl, Alt, Super) the user is holding.
+--- @return table Ordered evdev keycodes.
+local function held_shortcut_modifier_codes()
+	local ok, hook = pcall(require, "adapters.keyboard_hook")
+	if not ok or type(hook.held_shortcut_modifier_codes) ~= "function" then return {} end
+	local ok_call, held = pcall(hook.held_shortcut_modifier_codes)
+	return (ok_call and type(held) == "table") and held or {}
+end
+
 --- Non-modifier keys the hook forwarded as pressed and not yet released.
 --- @return table evdev keycodes.
 local function held_forwarded_keys()
@@ -322,6 +331,18 @@ local function run_transaction(label, body)
 	local tx = OutputTransaction.new(_uinput)
 	local ok, err = pcall(function()
 		if not tx.neutralize(held_text_modifier_codes()) then error(tx.error(), 0) end
+		-- Ctrl, Alt and Super are released for good: the chord that asked for
+		-- this text (Alt+1 on a prediction) is spent, and text typed under them
+		-- would be shortcuts. A masking tap comes first, so the release is not a
+		-- lone Alt tap that would move the focus to the application's menu bar.
+		local shortcut_modifiers = held_shortcut_modifier_codes()
+		if #shortcut_modifiers > 0 then
+			must_emit(tx, EvdevCodes.KEY_F24, EVDEV_VALUE_DOWN, "modifier mask")
+			must_emit(tx, EvdevCodes.KEY_F24, EVDEV_VALUE_UP, "modifier mask")
+			for _, code in ipairs(shortcut_modifiers) do
+				must_emit(tx, code, EVDEV_VALUE_UP, "shortcut modifier release")
+			end
+		end
 		-- Released, never restored: the key is the terminator the user already
 		-- typed, and pressing it again would type it twice. Its physical release
 		-- arrives later and is a harmless duplicate for the kernel.
