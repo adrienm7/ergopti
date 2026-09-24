@@ -7,9 +7,12 @@
 ;
 ; AHK's Reload starts a fresh process that is never suspended, and the driver had
 ; no suspend persistence at all. The tray menu is the ONE surface that stays
-; fully interactive while paused -- native Suspend disarms hotkeys and hotstrings
-; but never a tray WM_COMMAND -- so it is also the only surface that can reach a
-; Reload from the paused state. Every menu action that persists a setting and
+; interactive while paused -- native Suspend disarms hotkeys and hotstrings but
+; never a tray WM_COMMAND -- so it is also the only surface that can reach a
+; Reload from the paused state. Since pause greying (test_tray_pause_greys_features)
+; every FEATURE submenu is greyed while paused; the global rows (actions,
+; language, about, « Suspendre », reload, quit, debug) stay live, and a submenu
+; opened just before the pause can still commit. Every menu action that persists a setting and
 ; reloads (feature toggles, letter pickers, gesture slots, metrics filters,
 ; tap-hold options) therefore brought the driver back FULLY ARMED, with the
 ; « Suspendre » checkmark gone and not one line in the log to explain it.

@@ -359,7 +359,7 @@ M.features = {
 		path = "llm.trigger.shortcut", id = "shortcut", section = "llm.trigger", default = false, type = "boolean", description_key = "menu.llm.trigger.shortcut", platforms = { "hs" },
 	},
 	{
-		path = "llm.navigation.val_modifiers", id = "val_modifiers", section = "llm.navigation", default = { "alt" }, type = "array", description_key = "menu.llm.navigation.val_modifiers", platforms = { "ahk", "hs", "linux" },
+		path = "llm.navigation.val_modifiers", id = "val_modifiers", section = "llm.navigation", default = {  }, type = "array", description_key = "menu.llm.navigation.val_modifiers", platforms = { "ahk", "hs", "linux" },
 	},
 	{
 		path = "llm.navigation.arrow_nav_enabled", id = "arrow_nav_enabled", section = "llm.navigation", default = false, type = "boolean", description_key = "menu.llm.navigation.arrow_nav_enabled", platforms = { "hs" },
@@ -800,7 +800,7 @@ M.unavailable = {
 		path = "shortcuts.teleport_mouse", section = "shortcuts", reason_key = "", platforms = { "ahk" },
 	},
 	{
-		path = "shortcuts.wrap_text_if_selected", section = "shortcuts", reason_key = "", platforms = { "ahk" },
+		path = "shortcuts.wrap_text_if_selected", section = "shortcuts", reason_key = "", platforms = { "ahk", "linux" },
 	},
 	{
 		path = "shortcuts.open_downloads", section = "shortcuts", reason_key = "", platforms = { "ahk" },

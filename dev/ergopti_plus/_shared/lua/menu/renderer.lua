@@ -494,7 +494,29 @@ function M.new(deps)
 				end
 
 			elseif t == "feature" then
-				-- Feature items rendered by caller or dynamic handlers; skip silently.
+				-- A driver that draws a feature switch HERE registers its path in
+				-- ctx.feature_rows (path -> function returning one row of data): the
+				-- manifest then decides that the row exists and where it hangs.
+				-- Without a registration the row is the caller's, as before — macOS
+				-- builds its own shortcut feature rows.
+				local path = type(item.path) == "string" and item.path or ""
+				local providers = type(ctx) == "table" and type(ctx.feature_rows) == "table"
+					and ctx.feature_rows or {}
+				local provider = providers[path]
+				if type(provider) == "function" then
+					local ok, row = pcall(provider)
+					if not ok or type(row) ~= "table" then
+						Logger.error(LOG, "Feature row '%s' in '%s' failed: %s — row skipped.",
+							path, manifest_key, tostring(row))
+					else
+						local rendered = render_rows({ row }, path, 1)
+						if rendered[1] then
+							flush_sep()
+							table.insert(result, rendered[1])
+							item_count = item_count + 1
+						end
+					end
+				end
 
 			elseif t == "action" then
 				local action_id = type(item.id) == "string" and item.id or ""

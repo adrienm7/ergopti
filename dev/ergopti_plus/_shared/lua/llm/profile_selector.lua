@@ -246,14 +246,14 @@ function M.resolve_system_prompt(profile, vars)
 	local language = tostring(vars.language  or "fr")
 	local n_str    = tostring(n)
 
-	-- Single-pass substitution of all placeholders
-	local system = template
-		:gsub("{context}",   context)
-		:gsub("{tail}",      tail)
-		:gsub("{min_words}", min_w)
-		:gsub("{max_words}", max_w)
-		:gsub("{n}",         n_str)
-		:gsub("{language}",  language)
+	-- One pass, through a function: chained gsubs expanded a placeholder the
+	-- user had typed ("{n}" in the context became the prediction count), and a
+	-- replacement string reads "%" as a capture reference, mangling "50%".
+	local values = {
+		context = context, tail = tail, min_words = min_w,
+		max_words = max_w, n = n_str, language = language,
+	}
+	local system = template:gsub("{([%w_]+)}", function(name) return values[name] end)
 
 	return { system = system, is_batch = is_batch }
 end
@@ -310,6 +310,14 @@ function M.test_vectors()
 			},
 			vars   = { context = "ctx", n = 5 },
 			assert = { field = "system", contains = "BASE\n\nFOOTER n=5" },
+		},
+		{
+			id          = "typed_placeholder_not_expanded",
+			description = "A placeholder or percent sign inside the context is kept verbatim.",
+			call        = "resolve_system_prompt",
+			profile     = { id = "basic", system_single = "ctx={context} n={n}", batch = false },
+			vars        = { context = "{n} 100%", n = 3 },
+			assert      = { field = "system", value = "ctx={n} 100% n=3" },
 		},
 		{
 			id          = "raw_prompt_short_circuit",

@@ -16,6 +16,7 @@ local ShellRunner = require("adapters.shell_runner")
 local Timings = require("infra.timings")
 
 local LOG = "adapters.atspi_focus"
+local STATE_ACTIVE = 1
 local STATE_FOCUSED = 12
 local MAX_DEPTH = 64
 local MAX_NODES = 4096
@@ -93,6 +94,13 @@ local function load_native_backend()
 		local focused = atspi.atspi_state_set_contains(states, STATE_FOCUSED) ~= 0
 		gobject.g_object_unref(states)
 		return focused
+	end
+	function backend.active(node)
+		local states = atspi.atspi_accessible_get_state_set(node)
+		if states == nil then return nil end
+		local active = atspi.atspi_state_set_contains(states, STATE_ACTIVE) ~= 0
+		gobject.g_object_unref(states)
+		return active
 	end
 	function backend.role(node)
 		local error_slot = ffi.new("void *[1]")
@@ -190,8 +198,47 @@ local function traverse(backend)
 		end
 	end
 
-	local ok, traversal_error = pcall(visit, root, 0)
-	if backend.release then backend.release(root) end
+	-- Only the ACTIVE top-level window, when the window manager says which one
+	-- it is. Every application keeps FOCUSED on the widget it last focused, so a
+	-- desktop-wide search found one focused field per open GTK application —
+	-- measured with openbox and two windows: two FOCUSED text nodes, one ACTIVE
+	-- frame — declared the answer ambiguous, and blocked every expansion as
+	-- soon as a second application was open. It also walked every application's
+	-- tree against a one-second deadline. Without a window manager nothing is
+	-- ACTIVE and the whole desktop is searched, as before.
+	local scoped, owned = {}, {}
+	if type(backend.active) == "function" then
+		local apps = backend.children(root)
+		if type(apps) == "table" then
+			for _, app in ipairs(apps) do
+				owned[#owned + 1] = app
+				local windows = backend.children(app)
+				if type(windows) == "table" then
+					for _, window in ipairs(windows) do
+						if backend.active(window) == true then
+							scoped[#scoped + 1] = window
+						else
+							owned[#owned + 1] = window
+						end
+					end
+				end
+			end
+		end
+	end
+
+	local ok, traversal_error
+	if #scoped > 0 then
+		ok, traversal_error = pcall(function()
+			for _, window in ipairs(scoped) do visit(window, 2) end
+		end)
+		for _, window in ipairs(scoped) do owned[#owned + 1] = window end
+	else
+		ok, traversal_error = pcall(visit, root, 0)
+	end
+	if backend.release then
+		for _, node in ipairs(owned) do backend.release(node) end
+		backend.release(root)
+	end
 	if not ok then
 		Logger.debug(LOG, "AT-SPI traversal failed — %s", tostring(traversal_error))
 		return nil, false

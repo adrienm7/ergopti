@@ -20,6 +20,8 @@
 ; Critical section. This prevents both the empty-menu click window and a long
 ; Critical section around TOML, i18n, and renderer work.
 global _TrayMenuStage := false
+; Labels of the feature head rows in the published root (see TrayMenuStage_AddFeature).
+global _TrayFeatureHeadLabels := []
 global _TrayRootRequestedGeneration := 0
 global _TrayRootPublishedGeneration := 0
 global _TrayRootActive := false
@@ -121,13 +123,81 @@ TrayMenuStage_Disable(Label) {
 	_TrayMenuStage.Push(Map("kind", "disable", "label", Label))
 }
 
+; Stages one FEATURE head row (layout, hotstrings, IA, metrics, shortcuts,
+; tap-holds, gestures). Paused means every feature submenu is greyed out while
+; the global rows (actions, language, about, « Suspendre », reload, quit, debug)
+; stay live, and rebuilds are refused while paused — so the pause state has to
+; be applied to the LIVE root by label. Recording the feature rows here, at their
+; single construction point, is what lets UpdateTrayIcon find them.
+TrayMenuStage_AddFeature(Label, Target) {
+	global _TrayMenuStage, _TrayFeatureHeadLabels
+	if (Label == "")
+		throw ValueError("A tray feature head row requires a label")
+	if !IsObject(_TrayMenuStage) {
+		A_TrayMenu.Add(Label, Target)
+		if !_TrayFeatureLabelsHas(_TrayFeatureHeadLabels, Label)
+			_TrayFeatureHeadLabels.Push(Label)
+		TrayMenu_ApplyPauseGreying(A_IsSuspended, A_TrayMenu, [Label])
+		return
+	}
+	_TrayMenuStage.Push(Map("kind", "submenu", "label", Label, "target", Target,
+		"feature", true))
+}
+
+_TrayFeatureLabelsHas(Labels, Label) {
+	for _, Existing in Labels {
+		if (Existing == Label)
+			return true
+	}
+	return false
+}
+
+; Feature head labels named by a staged tree, in staging order.
+_TrayStageFeatureLabels(Stage) {
+	Labels := []
+	for _, Entry in Stage {
+		if Entry.Get("feature", false) && !_TrayFeatureLabelsHas(Labels, Entry["label"])
+			Labels.Push(Entry["label"])
+	}
+	return Labels
+}
+
+; Greys every recorded feature head row while paused and re-enables them on
+; resume. Global rows are never touched, so « Suspendre » stays clickable.
+; @param Paused {Boolean} Whether the driver is suspended.
+; @param TargetMenu {Menu} The root holding the rows (the tray by default).
+; @param Labels {Array} Feature labels to apply; the published set by default.
+; @returns {Integer} How many rows were updated.
+TrayMenu_ApplyPauseGreying(Paused, TargetMenu := A_TrayMenu, Labels := 0) {
+	global _TrayFeatureHeadLabels
+	if !(Labels is Array)
+		Labels := _TrayFeatureHeadLabels
+	Applied := 0
+	for _, Label in Labels {
+		try {
+			if Paused
+				TargetMenu.Disable(Label)
+			else
+				TargetMenu.Enable(Label)
+			Applied += 1
+		} catch as Err {
+			try LoggerError("TrayMenu",
+				"Feature row '{1}' could not be {2} for the pause state: {3}.",
+				Label, Paused ? "greyed" : "re-enabled", Err.Message)
+		}
+	}
+	try LoggerDebug("TrayMenu", "Pause greying applied (paused={1}) to {2} feature rows.",
+		Paused ? "true" : "false", Applied)
+	return Applied
+}
+
 TrayMenuStage_Abort() {
 	global _TrayMenuStage
 	_TrayMenuStage := false
 }
 
 TrayMenuStage_Publish(AuthorizeFn := 0, ApplyFn := 0) {
-	global _TrayMenuStage
+	global _TrayMenuStage, _TrayFeatureHeadLabels
 	if !IsObject(_TrayMenuStage)
 		throw Error("Tray-menu publication requires an active stage")
 	Stage := _TrayMenuStage
@@ -147,6 +217,7 @@ TrayMenuStage_Publish(AuthorizeFn := 0, ApplyFn := 0) {
 			Applied := ApplyFn.Call(Stage)
 			if !((Applied is Integer) and Applied == 1)
 				throw Error("Tray-menu publication adapter refused the staged tree")
+			_TrayFeatureHeadLabels := _TrayStageFeatureLabels(Stage)
 			_TrayMenuStage := false
 			return true
 		}
@@ -172,6 +243,11 @@ TrayMenuStage_Publish(AuthorizeFn := 0, ApplyFn := 0) {
 		; The new subtrees are now reachable from the tray. One whole-tree walk
 		; drops only registrations left behind by the retired generation.
 		MenuDispatcher_PruneMenu(A_TrayMenu)
+		; A new root starts with every row enabled. Re-apply the pause state
+		; right here so a root published while paused never offers a live
+		; feature submenu, whichever path requested it.
+		_TrayFeatureHeadLabels := _TrayStageFeatureLabels(Stage)
+		TrayMenu_ApplyPauseGreying(A_IsSuspended)
 		return true
 	} finally {
 		_TrayMenuStage := false

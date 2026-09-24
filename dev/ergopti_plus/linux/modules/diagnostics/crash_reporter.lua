@@ -71,8 +71,13 @@ end
 --- on the crash path itself (a few file reads, no subprocess), before the dump
 --- file is opened, and a resolver failure is written as its own reason rather
 --- than costing the dump.
+--- The version and the application directory are written the same way: the
+--- daemon's only caller passes no context, so a dump that depended on it never
+--- said which release crashed or which install tree it ran from.
 --- @return string commit_line "<commit> (<source>)" or the failure reason.
 --- @return string config_line The configuration directory or the failure reason.
+--- @return string version_line "<version> (<source>)" or the failure reason.
+--- @return string app_dir_line The driver root or the failure reason.
 local function _build_facts()
 	local ok_commit, commit, source = pcall(function()
 		return require("infra.diagnostic_snapshot").resolve_commit()
@@ -84,7 +89,18 @@ local function _build_facts()
 	end)
 	local config_line = ok_config and tostring(config_dir)
 		or ("unknown (resolution failed: " .. tostring(config_dir) .. ")")
-	return commit_line, config_line
+	local ok_version, version, version_source = pcall(function()
+		local Version = require("infra.version")
+		return Version.VERSION, Version.SOURCE
+	end)
+	local version_line = ok_version and string.format("%s (%s)", tostring(version), tostring(version_source))
+		or ("unknown (resolution failed: " .. tostring(version) .. ")")
+	local ok_app, app_dir = pcall(function()
+		return require("infra.paths").driver_root()
+	end)
+	local app_dir_line = ok_app and tostring(app_dir)
+		or ("unknown (resolution failed: " .. tostring(app_dir) .. ")")
+	return commit_line, config_line, version_line, app_dir_line
 end
 
 --- Writes a crash dump to the crash directory.
@@ -102,7 +118,7 @@ function M.dump(module_name, error_msg, context)
 	local ts = os.date("!%Y-%m-%dT%H-%M-%S")
 	local safe_name = module_name:gsub("[^%w_.-]", "_")
 	local path = CRASH_DIR .. "/crash_" .. ts .. "_" .. safe_name .. ".txt"
-	local commit_line, config_line = _build_facts()
+	local commit_line, config_line, version_line, app_dir_line = _build_facts()
 
 	local fh = io.open(path, "w")
 	if not fh then
@@ -115,15 +131,14 @@ function M.dump(module_name, error_msg, context)
 	fh:write(string.format("Timestamp: %s\n", os.date()))
 	fh:write(string.format("Module:    %s\n", module_name))
 	fh:write(string.format("Error:     %s\n", error_msg))
+	fh:write(string.format("Version:   %s\n", version_line))
 	fh:write(string.format("Commit:    %s\n", commit_line))
+	fh:write(string.format("App dir:   %s\n", app_dir_line))
 	fh:write(string.format("Config:    %s\n", config_line))
 
 	if type(context) == "table" then
 		if type(context.stack_trace) == "string" then
 			fh:write(string.format("Stack:\n%s\n", context.stack_trace))
-		end
-		if type(context.version) == "string" then
-			fh:write(string.format("Version: %s\n", context.version))
 		end
 		if type(context.layout) == "string" then
 			fh:write(string.format("Layout: %s\n", context.layout))

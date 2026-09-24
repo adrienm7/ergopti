@@ -37,6 +37,11 @@ ExecStart=%h/.local/bin/ergopti-hotstrings --tray
 # Restart on transient failures (the device not yet enumerated at login, etc.).
 Restart=on-failure
 RestartSec=3s
+# 78 (EX_CONFIG) is the daemon saying the session cannot read the keyboard or
+# write /dev/uinput (infra/input_access.lua). Only a new session fixes group
+# membership, so retrying would just repeat the on-screen explanation every
+# three seconds.
+RestartPreventExitStatus=78
 
 # NO Environment=DISPLAY. It used to be pinned to :0 — wrong on a second seat,
 # wrong under Wayland, and worst of all silently RIGHT often enough that the bug

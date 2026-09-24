@@ -1095,6 +1095,10 @@ UpdateTrayIcon() {
 				if FileExist(IconPath)
 						TraySetIcon(IconPath)
 		}
+		; Rebuilds are refused while paused, so the live root is what the user
+		; sees: grey every feature submenu on pause and restore them on resume.
+		; The global rows, « Suspendre » included, are not feature rows.
+		TrayMenu_ApplyPauseGreying(A_IsSuspended)
 }
 ; The tray menu's own « Recharger » item — the single most obviously
 ; paused-reachable reload in the driver, and it dropped the pause like all the

@@ -1228,10 +1228,23 @@
 							window.webkit.messageHandlers.metrics_apps_bridge.postMessage({ action: 'refresh' });
 						} catch (_) {}
 					};
+					// The poll answers every 2 s. Re-bootstrapping each time rebuilt
+					// the whole dashboard (charts, filters, categories) even when
+					// nothing had changed: an identical answer is skipped, and a
+					// changed one only merges the new days.
+					let last_manifest_json = null;
 					window.__hostBridgeResponse = (bridge, isBase64, payload) => {
 						if (bridge !== 'metrics_apps_bridge') return;
 						const response = decodeHostBridgeResponse(isBase64, payload);
-						if (response) apply_prefetch(response);
+						if (!response) return;
+						const manifest_json = JSON.stringify(response.metrics_manifest || {});
+						if (last_manifest_json === null) {
+							last_manifest_json = manifest_json;
+							apply_prefetch(response);
+						} else if (manifest_json !== last_manifest_json) {
+							last_manifest_json = manifest_json;
+							window.receive_live_update(response.metrics_manifest || {});
+						}
 					};
 					createVisibilityPoller(request_linux_refresh, 2000);
 					return;

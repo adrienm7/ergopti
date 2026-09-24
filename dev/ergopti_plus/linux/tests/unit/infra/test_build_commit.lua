@@ -211,6 +211,7 @@ describe("Build commit: the healthcheck reports the commit and the real config d
 		local result
 		with_module("infra.diagnostic_snapshot", {
 			resolve_commit = function() return SHORT, Snapshot.COMMIT_SOURCE_BUILD end,
+			system_facts = function() return {} end,
 		}, function()
 			result = handler.on_message("ready", {})
 		end)

@@ -173,13 +173,19 @@ function resolveSystemPrompt(profile, vars = {}) {
 	const maxWords = vars.max_words != null ? String(vars.max_words) : '5';
 	const language = vars.language ?? 'fr';
 
-	const system = template
-		.replace(/\{context\}/g, context)
-		.replace(/\{tail\}/g, tail)
-		.replace(/\{min_words\}/g, String(minWords))
-		.replace(/\{max_words\}/g, String(maxWords))
-		.replace(/\{n\}/g, String(n))
-		.replace(/\{language\}/g, language);
+	// One pass, through a function: chained replaces expanded a placeholder the
+	// user had typed, and a replacement string reads "$&" as a pattern.
+	const values = {
+		context,
+		tail,
+		min_words: String(minWords),
+		max_words: String(maxWords),
+		n: String(n),
+		language,
+	};
+	const system = template.replace(/\{(\w+)\}/g, (match, name) =>
+		Object.hasOwn(values, name) ? values[name] : match,
+	);
 
 	return { system, is_batch: isBatch };
 }
@@ -281,6 +287,16 @@ function profileSelectorTestVectors() {
 				{ context: 'test', n: 3 }
 			],
 			assert: { field: 'is_batch', value: true }
+		},
+		{
+			id: 'typed_placeholder_not_expanded',
+			description: 'A placeholder or percent sign inside the context is kept verbatim.',
+			call: 'resolveSystemPrompt',
+			args: [
+				{ id: 'basic', system_single: 'ctx={context} n={n}', batch: false },
+				{ context: '{n} 100%', n: 3 }
+			],
+			assert: { field: 'system', value: 'ctx={n} 100% n=3' }
 		},
 		{
 			id: 'raw_prompt_short_circuit',

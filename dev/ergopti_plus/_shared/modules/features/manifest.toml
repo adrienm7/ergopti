@@ -1079,9 +1079,12 @@ platforms = ["hs"]
 # ===== 3.3.6 llm.navigation =====
 # ================================
 
+# A bare digit accepts prediction N by default: the digit is swallowed while
+# the tooltip shows predictions, and types normally otherwise. The AI menu can
+# require a modifier (Alt, Ctrl, Cmd/Win, Shift or a combination).
 [[features.llm.navigation]]
 id = "val_modifiers"
-default = ["alt"]
+default = []
 type = "array"
 description_key = "menu.llm.navigation.val_modifiers"
 
@@ -1312,7 +1315,9 @@ id = "wrap_text_if_selected"
 default = true
 type = "boolean"
 description_key = "shortcuts.label_wrap_text"
-platforms = ["ahk"]
+# Linux decides in its keyboard hook's consumption callback, from the PRIMARY
+# selection (modules/shortcuts/wrap_on_type.lua).
+platforms = ["ahk", "linux"]
 
 [[features.shortcuts]]
 id = "open_downloads"
@@ -2838,22 +2843,13 @@ id = "metrics"
 [[menu.top_level]]
 id = "shortcuts"
 
-# Windows and macOS. macOS configures the same tap-holds under the same row and
-# the same name as Windows: Karabiner-Elements runs them, but that engine is an
-# implementation detail the user never has to know about, so macOS no longer has
-# a "Karabiner" row of its own. Linux reads its tap-holds under kanata instead.
+# The same row, name and submenu on every driver. The engine behind it is an
+# implementation detail the user never has to know about: Windows runs the
+# tap-holds in its own process, macOS through Karabiner-Elements, Linux in its
+# daemon's keyboard hook (kanata, which it used before, needed a newer glibc
+# than Debian 12 and Ubuntu 22.04 ship and was never started by the daemon).
 [[menu.top_level]]
 id = "tap_holds"
-platforms = ["ahk", "hs"]
-reason_key = "platform_reason.remap_engine_is_per_driver"
-
-# Le pendant Linux de Karabiner. Absent du manifeste jusqu'au 2026-08-03 alors
-# que menu_builder.lua le construit depuis toujours : le manifeste ne portait
-# aucune valeur "linux", donc rien ne pouvait constater le manque.
-[[menu.top_level]]
-id = "kanata"
-platforms = ["linux"]
-reason_key = "platform_reason.remap_engine_is_per_driver"
 [[menu.top_level]]
 id = "gestures"
 
@@ -2902,64 +2898,6 @@ id = "quit"
 
 [[menu.top_level]]
 id = "debug"
-
-# The kanata submenu, which only the Linux driver has — kanata is its remap
-# daemon, as Karabiner-Elements is macOS's. Declared as a `list` rather than four
-# `action` rows on purpose: an `action` names a handler and the handler appends
-# the row IN THE DRIVER, so the manifest would describe the slot while the driver
-# still built the menu. A `list` provider returns row DATA and the shared
-# renderer materialises it, which is the only shape that actually moves a row out
-# of the driver — see the header of tools/test/test-menu-rows-outside-renderer.cjs,
-# which records that a `list` migration is the only kind that has ever lowered
-# that count.
-#
-# Its four rows were hand-built in linux/ui/menu/menu_builder.lua until
-# 2026-08-05. This is the first block of that file to move, and the pattern the
-# rest of M3.3 follows.
-[[menu.kanata_menu]]
-type = "list"
-id = "kanata_actions"
-platforms = ["linux"]
-
-# The tap-hold read-out, added 2026-08-07.
-#
-# kanata IS the tap-hold engine on Linux — the defalias block it runs is
-# generated from _shared/tap_hold/defaults.toml, the same file Windows parses and
-# macOS's Karabiner defaults derive from. Yet `tap_holds_menu` said ["ahk"] and
-# `karabiner_menu` said ["hs"], so the one driver whose remap daemon exists
-# precisely to do tap-holds had no row about them anywhere in its tray. A user
-# could not see which key taps to what, or how long a hold takes, without
-# opening a generated .kbd.
-#
-# What it is NOT: the Windows menu lets the user CHANGE a tap action from the
-# tray, and this does not, because this driver has no writer for the user's
-# tap_hold.toml — only a reader. Declaring an editable row would promise a
-# control that does nothing. The edit row below opens the file instead, which is
-# the honest version of "configure this" for a driver that reads a file it
-# cannot yet write.
-[[menu.kanata_menu]]
-type = "---"
-platforms = ["linux"]
-
-[[menu.kanata_menu]]
-type = "section_header"
-i18n = "menu.kanata.header_tap_holds"
-platforms = ["linux"]
-reason_key = "platform_reason.tap_holds_live_under_the_remap_daemon"
-
-[[menu.kanata_menu]]
-type = "list"
-id = "kanata_tap_holds"
-platforms = ["linux"]
-reason_key = "platform_reason.tap_holds_live_under_the_remap_daemon"
-
-[[menu.kanata_menu]]
-type = "command"
-id = "kanata_edit_tap_holds"
-i18n = "menu.kanata.edit_tap_holds"
-platforms = ["linux"]
-reason_key = "platform_reason.tap_holds_live_under_the_remap_daemon"
-
 
 # The LLM submenu.
 #
@@ -3171,11 +3109,10 @@ type = "list"
 id = "locales"
 
 # The updates submenu — Linux is the only driver with an in-app updater surface
-# at top level; the other two carry theirs under "about". Same reasoning as the
-# kanata block above for why this is a `list`: its rows are the current version,
-# the channel the user picked and the interval presets, none of which a static
-# entry can enumerate, and a `list` is what puts them in the renderer rather than
-# in the driver.
+# at top level; the other two carry theirs under "about". It is a `list` because
+# its rows are the current version, the channel the user picked and the interval
+# presets, none of which a static entry can enumerate, and a `list` is what puts
+# them in the renderer rather than in the driver.
 [[menu.updates_menu]]
 type = "list"
 id = "updates_actions"
@@ -3714,7 +3651,7 @@ reason_key = "platform_reason.ergopti_section_has_no_linux_row"
 # TIS — the OS's own input-source mechanism, with a user scope and a system scope
 # — and it draws a menubar icon whose variant the user picks. Neither concept
 # exists on the other two drivers: Windows installs a .klc through its own
-# installer and Linux generates a kanata layout, and neither has a menubar.
+# installer and Linux installs an XKB layout, and neither has a menubar.
 #
 # Both were built by hand in ui/menu/menu_keyboard_layout.lua and described
 # nowhere until 2026-08-07, so ten rows of a shared menu had no platforms field
@@ -4173,8 +4110,7 @@ checked_when = ["tapholds_enabled"]
 category = "TapHolds"
 # macOS switches the feature, not its remap engine (always on): off stops
 # generating the per-key rules while keeping every assignment, like a pause.
-platforms = ["ahk", "hs"]
-reason_key = "platform_reason.remap_engine_is_per_driver"
+# Linux takes the engine out of its keyboard hook, keeping every assignment.
 
 # `command` since 2026-08-07, not `action`. Both were handlers whose whole body
 # was "add a button, and log that the action just happened" — at MENU BUILD time,
@@ -4185,13 +4121,11 @@ reason_key = "platform_reason.remap_engine_is_per_driver"
 type = "command"
 id = "reset_defaults"
 i18n = "tap_hold.reset_defaults"
-platforms = ["ahk", "hs"]
 
 [[menu.tap_holds_menu]]
 type = "command"
 id = "disable_all"
 i18n = "tap_hold.disable_all"
-platforms = ["ahk", "hs"]
 
 # macOS rows below: its engine also runs chords (two modifiers pressed
 # together), which have their own tap / hold / combo slots and timings.
@@ -4206,7 +4140,6 @@ reason_key = "platform_reason.remap_engine_is_per_driver"
 
 [[menu.tap_holds_menu]]
 type = "---"
-platforms = ["ahk", "hs"]
 
 [[menu.tap_holds_menu]]
 type = "list"
@@ -4224,7 +4157,6 @@ platforms = ["hs"]
 [[menu.tap_holds_menu]]
 type = "list"
 id = "tap_hold_keys"
-platforms = ["ahk", "hs"]
 
 [[menu.tap_holds_menu]]
 type = "---"

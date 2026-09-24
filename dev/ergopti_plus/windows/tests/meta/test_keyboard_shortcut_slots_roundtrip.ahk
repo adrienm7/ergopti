@@ -19,9 +19,8 @@
 ; FEATURES & RATIONALE:
 ; 1. Encodes the ROOT CAUSE — the read must cover PERSISTED slots, not just the
 ;    shipped ones — rather than naming win_b or any particular chord.
-; 2. Pins the drift directly: _GlobalClearAllBindings already walks _IniCache for
-;    exactly these non-default slots. The clear path and the read path must agree
-;    about which slots exist, and this asserts both consult the same source.
+; (The clear-path twin this file once pinned is gone: "tout désactiver" no
+; longer rewrites per-key assignments, see test_global_disable_all_preserves_assignments.)
 ;
 ; SCOPE: source introspection of infra/config_io.ahk.
 ; ==============================================================================
@@ -59,22 +58,6 @@ _KSSR_ReadCoversPersistedSlots() {
 		"the read must iterate the UNION of shipped and persisted slots — iterating the defaults and merely consulting the cache inside that loop leaves added slots unreachable")
 }
 
-; The clear path and the read path must agree on which slots exist. They drifted
-; once: _GlobalClearAllBindings walked _IniCache for non-default slots while the
-; reader did not, which is what proves the restriction was accidental.
-_KSSR_ClearAndReadAgreeOnSlotSource() {
-	Clear := _DriverFuncBody("_GlobalClearAllBindings")
-	Read := _DriverFuncBody("ReadKeyboardShortcutsConfig")
-	Assert(Clear != "" and Read != "", "both the clear and read paths must exist")
-
-	for Name, Body in Map("_GlobalClearAllBindings", Clear, "ReadKeyboardShortcutsConfig", Read) {
-		Assert(InStr(Body, '_IniCache["shortcuts.keyboard"]') > 0,
-			Name . " must enumerate the persisted keyboard-shortcut section — if only one of the two does, a slot exists for one operation and not the other")
-	}
-}
-
 
 Test("meta shortcuts: the keyboard read covers persisted slots, not just defaults",
 	_KSSR_ReadCoversPersistedSlots)
-Test("meta shortcuts: the clear and read paths enumerate the same slot source",
-	_KSSR_ClearAndReadAgreeOnSlotSource)

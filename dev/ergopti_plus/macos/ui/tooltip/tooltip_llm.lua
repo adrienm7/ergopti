@@ -29,6 +29,9 @@ local MAC_KEYCODES_NUMBERS = {
 	[22] = 6, [26] = 7, [28] = 8, [25] = 9, [29] = 10
 }
 
+-- Zero-width space the prediction engine passes for an empty validation chord.
+local EMPTY_SHORTCUT_PLACEHOLDER = "\226\128\139"
+
 
 
 
@@ -462,6 +465,21 @@ local function activate_context_watcher(watcher, label, events, watcher_epoch)
 	return true
 end
 
+--- Parses the display-form validation shortcut into the modifiers it requires.
+--- The prediction engine renders an empty chord as EMPTY_SHORTCUT_PLACEHOLDER so
+--- the footer keeps its layout slot; that glyph is layout, never a modifier.
+--- @param shortcut any Display shortcut such as "alt", "cmd+shift" or "none".
+--- @return table|nil mods Required modifiers ({} for bare digits), or nil when disabled.
+local function parse_validation_shortcut(shortcut)
+	if type(shortcut) ~= "string" or shortcut == "none" then return nil end
+	local mods = {}
+	for token in shortcut:gmatch("[^+]+") do
+		local mod = token:match("^%s*(.-)%s*$"):lower()
+		if mod ~= "" and mod ~= EMPTY_SHORTCUT_PLACEHOLDER then mods[#mods + 1] = mod end
+	end
+	return mods
+end
+
 --- Validates modifier flags securely against expected target mods.
 --- @param current_flags table Keystroke modifiers active.
 --- @param target_mods table List of required modifiers.
@@ -808,37 +826,20 @@ local function start_watchers()
 			end
 		end
 		
-		-- Handling Hotkey Selection
-		local shortcut_modifier = _state.shortcut_mod or "alt"
-		if shortcut_modifier ~= "none" then
-			local match_all = true
-			local required_flags = {}
-			
-			for mod_str in shortcut_modifier:gmatch("[^+]+") do 
-				required_flags[mod_str] = true
-				if not flags[mod_str] then match_all = false; break end 
+		-- Handling numbered selection. The validation chord is exact: bare digits
+		-- when no modifier is configured, so a matched digit N accepts prediction N
+		-- and is consumed instead of reaching the application.
+		local pred_index = MAC_KEYCODES_NUMBERS[keycode]
+		local validation_mods = pred_index and parse_validation_shortcut(_state.shortcut_mod)
+		if validation_mods and evaluate_modifiers(flags, validation_mods) then
+			local preds_count = type(_state.raw_predictions) == "table" and #_state.raw_predictions or 0
+			if pred_index <= preds_count then
+				local scheduled = defer_consumed_action("LLM tooltip numbered acceptance",
+					accept_prediction, pred_index)
+				return finish(scheduled)
 			end
-			
-			if match_all then
-				for flag_name, flag_active in pairs(flags) do 
-					if flag_active and not required_flags[flag_name] and (flag_name == "cmd" or flag_name == "alt" or flag_name == "shift" or flag_name == "ctrl") then 
-						match_all = false
-						break 
-					end 
-				end
-			end
-			
-			if match_all and MAC_KEYCODES_NUMBERS[keycode] then
-				local pred_index = MAC_KEYCODES_NUMBERS[keycode]
-				local preds_count = type(_state.raw_predictions) == "table" and #_state.raw_predictions or 0
-				if pred_index <= preds_count then
-					local scheduled = defer_consumed_action("LLM tooltip numbered acceptance",
-						accept_prediction, pred_index)
-					return finish(scheduled)
-				end
-				-- Reserved streaming slots are visual capacity, not input ownership.
-				return finish(false)
-			end
+			-- Reserved streaming slots are visual capacity, not input ownership.
+			return finish(false)
 		end
 		
 		-- The F20 navigation-layer sentinel is listed below: the keymap tap owns

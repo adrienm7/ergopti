@@ -277,6 +277,7 @@ InstallSendNoOps()
 #Include unit/test_take_note_async_job.ahk
 #Include unit/test_text_sender_modifiers.ahk
 #Include unit/test_timer_scheduler.ahk
+#Include unit/test_tray_pause_greys_features.ahk
 #Include unit/test_hook_dispatcher.ahk
 #Include unit/test_logger.ahk
 #Include unit/test_logger_shutdown_sinks.ahk
@@ -286,6 +287,7 @@ InstallSendNoOps()
 #Include unit/test_logger_contract.ahk
 #Include unit/test_diagnostic_logging.ahk
 #Include unit/test_build_commit.ahk
+#Include unit/test_version_display_strips_build_metadata.ahk
 #Include unit/test_logger_daily_rotation.ahk
 #Include unit/test_healthcheck_core.ahk
 #Include unit/test_healthcheck_owner_snapshots.ahk
@@ -363,6 +365,7 @@ InstallSendNoOps()
 #Include unit/test_wpm_drag_admission.ahk
 #Include unit/test_features_manifest.ahk
 #Include unit/test_config_io_feature_section_resolution.ahk
+#Include unit/test_global_disable_all_preserves_assignments.ahk
 #Include unit/test_hotstrings_full.ahk
 #Include unit/test_tap_hold_loader.ahk
 #Include unit/test_i18n.ahk
@@ -591,6 +594,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_config_typed_producers.ahk
 #Include unit/test_metrics_delivery_owner.ahk
 #Include unit/test_metrics_cached_ready.ahk
+#Include unit/test_metrics_warm_sidecar.ahk
 #Include unit/test_metrics_edge_sidecar.ahk
 #Include unit/test_metrics_store_isolation.ahk
 #Include unit/test_metrics_store_publication.ahk
@@ -1037,6 +1041,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_manifest_menu_no_double_separator.ahk
 ; Regression: Shortcuts submenu block separator and screenshot key label.
 #Include unit/test_shortcuts_menu_blocks.ahk
+#Include unit/test_shortcuts_menu_groups_unique.ahk
 ; Contract gate: metrics_menu disabled_when predicate == AHK handler resolver calls (MG-1/MG-2).
 #Include meta/test_list_providers_touch_no_menu.ahk
 #Include meta/test_menu_metrics_disabled_when.ahk

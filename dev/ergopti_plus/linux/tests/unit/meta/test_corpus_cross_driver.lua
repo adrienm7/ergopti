@@ -10,7 +10,7 @@
 ---
 --- CORPORA CONSUMED:
 --- 1. hotstrings/vectors.json         — shared hotstring engine (tested)
---- 2. tap_hold/vectors.json           — SKIP (kanata handles remapping on Linux)
+--- 2. tap_hold/vectors.json           — replayed through platform/remap/tap_hold_loader
 --- 3. llm/parser_test_vectors.json    — SKIP (LLM engine not implemented on Linux)
 --- 4. prompt_builder/vectors.json     — SKIP (PromptBuilder not wired on Linux)
 --- 5. security/keylogger vectors      — partially tested (pure-logic paths)
@@ -133,7 +133,7 @@ end)
 
 -- ==========================================================
 -- ==========================================================
--- ======= 3/ Corpus 2 — Tap-Hold (SKIP — kanata) ===========
+-- ======= 3/ Corpus 2 — Tap-Hold ===========================
 -- ==========================================================
 -- ==========================================================
 
@@ -151,16 +151,55 @@ describe("Corpus: tap_hold/vectors.json", function()
 		assert_true(n ~= nil and n >= 1, "expected >=1 vectors in tap_hold corpus")
 	end)
 
-	-- A skip has to assert the reason it skipped for, or it is just a green with
-	-- a sentence attached. Kanata reads the TOML config directly and emits
-	-- uinput events, so there is genuinely no Lua tap-hold engine here — and the
-	-- day someone writes one, this turns red rather than letting a whole corpus
-	-- stay unreplayed behind a stale rationale.
-	it("SKIP [CONF-LINUX-TAPHOLD] is still justified — no Lua tap-hold engine exists on Linux", function()
-		local ok = pcall(require, "modules.tap_hold")
-		assert_true(not ok,
-			"modules.tap_hold now loads on Linux — replay the tap_hold corpus against it instead of skipping it")
-	end)
+	-- Replayed through the daemon's own tap-hold loader. This used to be a skip:
+	-- tap-holds were kanata's, and no Lua engine existed to replay them through.
+	local Config = require("platform.remap.tap_hold_loader")
+	local defaults_path = require("infra.paths").shared("tap_hold/defaults.toml")
+
+	--- A TOML value for one corpus field.
+	local function toml_value(value)
+		if type(value) == "string" then return string.format("%q", value) end
+		return tostring(value)
+	end
+
+	-- This file's JSON loader decodes null as an empty table.
+	local function is_null(value)
+		return type(value) == "table" and next(value) == nil
+	end
+
+	for _, vector in ipairs(data and data.vectors or {}) do
+		it("tap_hold vector " .. vector.id, function()
+			local path = os.tmpname()
+			local fh = assert(io.open(path, "w"))
+			fh:write("[tap_hold]\ninherit_defaults = false\n")
+			if type(vector.config) == "table" and not is_null(vector.config) then
+				fh:write("[tap_hold.keys." .. vector.key .. "]\n")
+				local fields = {}
+				for field in pairs(vector.config) do fields[#fields + 1] = field end
+				table.sort(fields)
+				for _, field in ipairs(fields) do
+					fh:write(field .. " = " .. toml_value(vector.config[field]) .. "\n")
+				end
+			end
+			fh:close()
+			local loaded = Config.load(defaults_path, path)
+			os.remove(path)
+			local key = loaded.keys[vector.key]
+			local expected = vector.expected
+			assert_eq(key ~= nil, expected.configured, vector.id .. ": configured")
+			if not key then return end
+			if expected.tap_action ~= nil then assert_eq(key.tap_action, expected.tap_action, vector.id) end
+			if expected.duration ~= nil then assert_eq(key.time_activation_seconds, expected.duration, vector.id) end
+			for _, field in ipairs({ "hold_modifier", "hold_layer" }) do
+				if is_null(expected[field]) then
+					assert_eq(key[field], nil, vector.id .. ": " .. field .. " is absent")
+				elseif expected[field] ~= nil then
+					assert_eq(key[field], expected[field], vector.id .. ": " .. field)
+				end
+			end
+			if expected.enabled ~= nil then assert_eq(key.enabled ~= false, expected.enabled, vector.id) end
+		end)
+	end
 end)
 
 

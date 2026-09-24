@@ -97,6 +97,7 @@ local function finish(request, result, suppress_callback)
 	request.terminal = true
 	if _active[request.owner] == request then _active[request.owner] = nil end
 	close_timer(request)
+	close_stream(request, "stdin")
 	close_stream(request, "stdout")
 	close_stream(request, "stderr")
 	close_process(request)
@@ -138,7 +139,17 @@ end
 -- =========================================
 -- =========================================
 
---- Builds shell-free curl arguments.
+--- Quotes one value for a curl config file, escaping what its parser reads
+--- inside quotes: backslash, double quote, and the control escapes.
+--- @param value string
+--- @return string
+local function config_quote(value)
+	local escaped = value:gsub('[\\"]', "\\%0"):gsub("\n", "\\n"):gsub("\r", "\\r")
+		:gsub("\t", "\\t"):gsub("\v", "\\v")
+	return '"' .. escaped .. '"'
+end
+
+--- Builds shell-free curl arguments and the config curl reads from stdin.
 --- @param url string
 --- @param headers table
 --- @param body string|nil
@@ -173,23 +184,25 @@ local function curl_args(url, headers, body, options)
 		args[#args + 1] = "--max-filesize"
 		args[#args + 1] = tostring(options.max_download_bytes)
 	end
-	local names = {}
-	for name in pairs(headers) do names[#names + 1] = name end
-	table.sort(names)
-	for _, name in ipairs(names) do
-		args[#args + 1] = "--header"
-		args[#args + 1] = tostring(name) .. ": " .. tostring(headers[name])
-	end
-	if body ~= nil then
-		args[#args + 1] = "--data-binary"
-		args[#args + 1] = body
-	end
 	if options.buffered then
 		args[#args + 1] = "--write-out"
 		args[#args + 1] = "\n" .. STATUS_MARKER .. "%{http_code}\n"
 	end
-	args[#args + 1] = url
-	return args
+	-- Headers, body and URL go through a config read from stdin. On the command
+	-- line they were readable by every local process through /proc/<pid>/cmdline:
+	-- an API key in a header or a Gemini URL, and the typed text in the body.
+	args[#args + 1] = "--config"
+	args[#args + 1] = "-"
+	local lines = {}
+	local names = {}
+	for name in pairs(headers) do names[#names + 1] = name end
+	table.sort(names)
+	for _, name in ipairs(names) do
+		lines[#lines + 1] = "header = " .. config_quote(tostring(name) .. ": " .. tostring(headers[name]))
+	end
+	if body ~= nil then lines[#lines + 1] = "data-binary = " .. config_quote(body) end
+	lines[#lines + 1] = "url = " .. config_quote(url)
+	return args, table.concat(lines, "\n") .. "\n"
 end
 
 --- Converts a completed buffered curl request to the port result envelope.
@@ -214,6 +227,8 @@ local function buffered_result(request)
 		ok = succeeded,
 		status = status,
 		body = succeeded and body or "",
+		-- A refused request explains itself in its body ("invalid API key").
+		error_body = not succeeded and body or nil,
 		error = succeeded and nil or "HTTP " .. tostring(status),
 	}
 end
@@ -277,11 +292,11 @@ local function start_request(url, headers, body, options, on_chunk, on_done)
 		exited = false,
 		terminal = false,
 	}
-	local handles_ok, stdout, stderr, timer = pcall(function()
-		return luv.new_pipe(false), luv.new_pipe(false), luv.new_timer()
+	local handles_ok, stdin, stdout, stderr, timer = pcall(function()
+		return luv.new_pipe(false), luv.new_pipe(false), luv.new_pipe(false), luv.new_timer()
 	end)
-	request.stdout, request.stderr, request.timer = stdout, stderr, timer
-	if not handles_ok or not request.stdout or not request.stderr or not request.timer then
+	request.stdin, request.stdout, request.stderr, request.timer = stdin, stdout, stderr, timer
+	if not handles_ok or not request.stdin or not request.stdout or not request.stderr or not request.timer then
 		finish(request, { ok = false, status = 0, body = "", error = "libuv handle allocation failed" })
 		return false
 	end
@@ -310,7 +325,7 @@ local function start_request(url, headers, body, options, on_chunk, on_done)
 	-- Refuse an ill-typed argv before libuv sees it: curl_args interpolates
 	-- timeouts and byte budgets, and libuv would reject a bare number without
 	-- naming the slot (keylogger-worker-timings-must-be-strings).
-	local argv = curl_args(url, headers, body, request_options)
+	local argv, config = curl_args(url, headers, body, request_options)
 	local argv_refusal = ShellRunner.validate_spawn_args("curl", argv)
 	if argv_refusal ~= "" then
 		finish(request, {
@@ -321,7 +336,7 @@ local function start_request(url, headers, body, options, on_chunk, on_done)
 	end
 	local spawn_ok, process, pid, spawn_error = pcall(luv.spawn, "curl", {
 		args = argv,
-		stdio = { nil, request.stdout, request.stderr },
+		stdio = { request.stdin, request.stdout, request.stderr },
 		detached = true,
 	}, function(code, signal)
 		request.exited = true
@@ -339,6 +354,20 @@ local function start_request(url, headers, body, options, on_chunk, on_done)
 	end
 	request.process = process
 	request.pid = pid
+
+	local write_ok, write_result = pcall(luv.write, request.stdin, config, function(write_err)
+		if write_err and not request.terminal then
+			terminate_group(request)
+			finish(request, { ok = false, status = 0, body = "", error = "curl config write failed: " .. tostring(write_err) })
+			return
+		end
+		close_stream(request, "stdin")
+	end)
+	if not write_ok or write_result == false or write_result == nil then
+		terminate_group(request)
+		finish(request, { ok = false, status = 0, body = "", error = "curl config write failed" })
+		return false
+	end
 
 	local stdout_ok, stdout_result = pcall(luv.read_start, request.stdout, function(err, chunk)
 		if request.terminal then return end
@@ -399,10 +428,16 @@ end
 --- @param headers table
 --- @param body string
 --- @param callback function
-function M.post(url, headers, body, callback)
+--- @param options table|nil { timeout_ms?, owner?, max_body_bytes? }
+function M.post(url, headers, body, callback, options)
+	local request_options = {}
+	if type(options) == "table" then
+		for key, value in pairs(options) do request_options[key] = value end
+	end
+	request_options.buffered = true
+	request_options.method = "POST"
 	return start_request(url, type(headers) == "table" and headers or {},
-		type(body) == "string" and body or "",
-		{ buffered = true, method = "POST" }, nil, callback)
+		type(body) == "string" and body or "", request_options, nil, callback)
 end
 
 --- Sends a bounded buffered HTTP GET without blocking the event loop.

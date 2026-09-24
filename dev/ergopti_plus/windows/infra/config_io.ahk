@@ -768,52 +768,45 @@ ToggleAllFeaturesOff(*) {
 }
 
 
-; Clear every gesture, keyboard and script-control binding, appending the
-; matching TOML writes to the shared ``Updates`` accumulator.
-;
-; ``Updates`` is taken BY VALUE on purpose. It is an Array, so it already
-; mutates by reference, and the sibling walker _CollectFeatureFlipUpdates takes
-; the same accumulator the same way. Declaring it ByRef here made the one call
-; site (which passes the bare variable) raise a TypeError on every invocation of
-; "tout desactiver" — AHK v2 requires & at the call site for a ByRef parameter.
-_GlobalClearAllBindings(GestureTarget, KeyboardTarget, ScriptTarget, Updates) {
-		global GESTURE_SLOTS, KEYBOARD_SHORTCUT_DEFAULTS, SCRIPT_SHORTCUT_SLOTS, _IniCache
-		for Slot in GESTURE_SLOTS {
-				GestureTarget[Slot] := "none"
-				Updates.Push({ Section: "gestures", Key: Slot, Value: "none" })
+; Decides whether one non-table leaf of the Features tree is a feature SWITCH
+; that the bulk toggle may flip. "Tout désactiver" must behave like a pause, not
+; like a reset: it switched every leaf it met to a boolean, which rewrote
+; per-key assignments (keyboard and script-control slots, the AltGr chords, the
+; pause shortcut itself) and settings such as hotstrings.trigger_char or
+; script.log_level into true/false. Only a leaf the manifest declares boolean
+; is a switch; the chord groups are exclusive per-key assignments even though
+; their members are boolean. A runtime-registered leaf absent from the manifest
+; (a personal shortcut) is a switch when every declared sibling of its section
+; is one.
+_FeatureFlipLeafIsSwitch(SectionPath, Key) {
+		global _FEATURE_MUTEX_GROUPS
+		Parts := StrSplit(SectionPath, ".")
+		if (Parts.Length == 2 and Parts[1] == "shortcuts" and _FEATURE_MUTEX_GROUPS.Has(Parts[2]))
+				return false
+		Entry := ManifestFindEntryByPath(SectionPath . "." . Key)
+		if (Entry is Map)
+				return Entry.Get("type", "") == "boolean"
+		Declared := ManifestFeaturesForSection(SectionPath)
+		if (Declared.Length == 0)
+				return false
+		for _, Sibling in Declared {
+				if (Sibling.Get("type", "") != "boolean")
+						return false
 		}
-		KbWritten := Map()
-		for Slot, _ in KEYBOARD_SHORTCUT_DEFAULTS {
-				KeyboardTarget[Slot] := "none"
-				Updates.Push({ Section: "shortcuts.keyboard", Key: Slot, Value: "none" })
-				KbWritten[Slot] := true
-		}
-		if IsSet(_IniCache) and _IniCache.Has("shortcuts.keyboard") {
-				for Slot, _ in _IniCache["shortcuts.keyboard"] {
-						if !KbWritten.Has(Slot) {
-								KeyboardTarget[Slot] := "none"
-								Updates.Push({ Section: "shortcuts.keyboard", Key: Slot, Value: "none" })
-						}
-				}
-		}
-		for Slot in SCRIPT_SHORTCUT_SLOTS {
-				ScriptTarget[Slot] := "none"
-				Updates.Push({ Section: "shortcuts.script_control", Key: Slot, Value: "none" })
-		}
+		return true
 }
 
-; Recursively force every leaf under Node to Bool ("tout activer"/"tout
+; Recursively switch every feature under Node to Bool ("tout activer"/"tout
 ; desactiver"), mutating the caller's detached tree and appending the required
-; {Section, Key, Value} TOML writes to Updates. Extracted out of ToggleAllFeatures
-; as a standalone module function (rather than a nested closure) so the flip
-; logic is directly testable without triggering ToggleAllFeatures's trailing
-; Reload(). The walked nesting IS the TOML section: ManifestBuildFeaturesMap
-; files each feature under its manifest section verbatim, so descending the tree
-; reconstructs that section exactly. It used to need a per-leaf manifest lookup
-; (ManifestResolveFeatureSection) because the tree was built with the ahk. driver
-; prefix stripped, which merged a shared section and an AHK-only one under the
-; same top-level key and made the walked path ambiguous. Lot 4 removed the silos
-; and with them the ambiguity.
+; {Section, Key, Value} TOML writes to Updates. A node carrying its own
+; "enabled" flag is one feature: only that flag flips, its parameters stay. Any
+; other leaf flips only when _FeatureFlipLeafIsSwitch says it is a switch, so
+; strings, numbers, enums and action assignments are never rewritten.
+; Extracted out of ToggleAllFeatures as a standalone module function so the
+; flip logic is directly testable without triggering its trailing reload. The
+; walked nesting IS the TOML section: ManifestBuildFeaturesMap files each
+; feature under its manifest section verbatim, so descending the tree
+; reconstructs that section exactly.
 _CollectFeatureFlipUpdates(Bool, SectionPath, Node, Updates) {
 		if (Type(Node) != "Map")
 				return
@@ -825,7 +818,7 @@ _CollectFeatureFlipUpdates(Bool, SectionPath, Node, Updates) {
 		for K, V in Node {
 				if (Type(V) == "Map")
 						_CollectFeatureFlipUpdates(Bool, SectionPath . "." . K, V, Updates)
-				else {
+				else if _FeatureFlipLeafIsSwitch(SectionPath, K) {
 						Node[K] := Bool
 						Updates.Push({ Section: SectionPath, Key: K, Value: Bool })
 				}
@@ -834,16 +827,12 @@ _CollectFeatureFlipUpdates(Bool, SectionPath, Node, Updates) {
 
 ToggleAllFeatures(Value) {
 		global Features, CategoryEnabled, ConfigurationFile, TapHold
-		global GestureAssignments, KeyboardShortcutAssignments, ScriptShortcutAssignments
 		if !IsSet(Features)
 				return false
 		Bool := (Value = true or Value = 1)
 		CandidateFeatures := _HSDeepCloneMap(Features)
 		CandidateCategories := CategoryEnabled.Clone()
 		CandidateTapHold := _HSDeepCloneMap(TapHold)
-		CandidateGestures := GestureAssignments.Clone()
-		CandidateKeyboard := KeyboardShortcutAssignments.Clone()
-		CandidateScript := ScriptShortcutAssignments.Clone()
 		Updates := []
 		for TopKey, TopVal in CandidateFeatures {
 				if (Type(TopVal) == "Map")
@@ -859,8 +848,9 @@ ToggleAllFeatures(Value) {
 		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_VISIBLE, Value: Bool })
 		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_COLORS, Value: Bool })
 		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_GRAPH, Value: Bool })
-		if !Bool
-				_GlobalClearAllBindings(CandidateGestures, CandidateKeyboard, CandidateScript, Updates)
+		; Per-key assignments (gesture, keyboard and script-control slots) are never
+		; written here: the switches above already silence their features, and the
+		; script-control slots must keep the pause/reload/quit chords usable.
 		if !ConfigCommitUpdates(ConfigurationFile, Updates, "the bulk feature toggle")
 				return false
 
@@ -870,9 +860,6 @@ ToggleAllFeatures(Value) {
 		try {
 				Features := CandidateFeatures
 				CategoryEnabled := CandidateCategories
-				GestureAssignments := CandidateGestures
-				KeyboardShortcutAssignments := CandidateKeyboard
-				ScriptShortcutAssignments := CandidateScript
 				TapHold := CandidateTapHold
 				WPMWidget.visible := Bool
 				WPMWidget.use_colors := Bool
@@ -1815,10 +1802,6 @@ ReadKeyboardShortcutsConfig() {
 		; so no hotkey is registered and the entry vanishes from the menu too. The
 		; value stays on disk, so nothing looks lost — the addition just appears not
 		; to have taken.
-		;
-		; _GlobalClearAllBindings already walks _IniCache for exactly these
-		; non-default slots, which is what shows this to be a drift between the
-		; clear path and the read path rather than a deliberate restriction.
 		SlotsToRead := Map()
 		for Slot, _ in KEYBOARD_SHORTCUT_DEFAULTS
 				SlotsToRead[Slot] := true

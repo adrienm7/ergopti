@@ -14,6 +14,7 @@ local M = {}
 local Fs = require("adapters.file_system")
 local Paths = require("infra.paths")
 local Version = require("updater.version")
+local Snapshot = require("diagnostics.snapshot")
 
 local WORK_PREFIX = ".ergopti-update."
 
@@ -177,13 +178,13 @@ local function archive_is_canonical(archive_path)
 		end
 		local top = entry:match("^([^/]+)")
 		if top ~= "linux" and top ~= "_shared" and top ~= "bin"
-			and top ~= "install.sh" and top ~= "kanata.kbd" then
+			and top ~= "install.sh" then
 			return false, "archive contains an unexpected root: " .. tostring(top)
 		end
 		seen[top] = true
 	end
 
-	for _, required in ipairs({ "linux", "_shared", "bin", "install.sh", "kanata.kbd" }) do
+	for _, required in ipairs({ "linux", "_shared", "bin", "install.sh" }) do
 		if not seen[required] then return false, "archive root is missing " .. required end
 	end
 	for _, line in ipairs(split_lines(verbose)) do
@@ -284,7 +285,6 @@ local function validate_candidate(work_dir, expected_version, ops)
 		work_dir .. "/linux/infra/version.lua",
 		work_dir .. "/bin/ergopti-hotstrings",
 		work_dir .. "/install.sh",
-		work_dir .. "/kanata.kbd",
 	}
 	for _, path in ipairs(required_files) do
 		if not ops.is_file(path) then return false, "staged archive is missing " .. path end
@@ -293,8 +293,11 @@ local function validate_candidate(work_dir, expected_version, ops)
 		return false, "staged archive is missing the shared Lua tree"
 	end
 
-	local version_source = ops.read(work_dir .. "/linux/infra/version.lua")
-	local staged_version = version_source and version_source:match('M%.VERSION%s*=%s*"([^"]+)"') or nil
+	-- The driver version is the release version the release build stamped into
+	-- the shared tree (infra/version.lua reads the same entry at runtime), so the
+	-- staged tree's stamp is what the running daemon will report after the swap.
+	local stamp = ops.read(shared_root .. "/" .. Snapshot.BUILD_STAMP_FILE)
+	local staged_version = stamp and Snapshot.parse_build_version(stamp) or nil
 	if not staged_version
 		or Version.normalize_tag(staged_version) ~= Version.normalize_tag(expected_version) then
 		return false, "staged driver version does not match the selected release"

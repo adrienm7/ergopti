@@ -76,7 +76,10 @@ local _next_event_id = nil
 --- @return boolean
 local function _check_sqlite3()
 	if _available ~= nil then return _available end
-	local ok = os.execute("which sqlite3 >/dev/null 2>&1")
+	-- command -v, the shell's own lookup: `which` is a separate package that
+	-- Arch's base image and other minimal systems do not ship, and there the
+	-- probe reported sqlite3 missing and switched metrics to the JSON fallback.
+	local ok = os.execute("command -v sqlite3 >/dev/null 2>&1")
 	_available = (ok == true or ok == 0)
 	if not _available then
 		Logger.warn(LOG, "sqlite3 CLI not found — SQLite persistence disabled.")
@@ -102,7 +105,10 @@ local function _exec(sql)
 
 	-- The script carries the characters the user typed, so it travels on stdin.
 	-- Staging it in /tmp is what turned this module into a keystroke leak.
-	local cmd, reason = SqliteCommand.build(_db_path, sql, { capture_stderr = true })
+	-- Results are discarded so that only errors reach the pipe: the schema's
+	-- "PRAGMA journal_mode = DELETE" prints "delete", which read as a failure
+	-- and put every first start on the JSON fallback.
+	local cmd, reason = SqliteCommand.build(_db_path, ".output /dev/null\n" .. sql, { capture_stderr = true })
 	if not cmd then
 		Logger.error(LOG, "Cannot compose the sqlite3 command: %s.", reason)
 		return false

@@ -123,10 +123,15 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
       local control_start = assert(src:find("local function handle_control", 1, true))
       local click_start = assert(src:find("local function on_click", control_start, true))
       local control_body = src:sub(control_start, click_start - 1)
-      local gate = control_body:find("if shortcuts and shortcuts.is_enabled() then", 1, true)
-      local dispatch = control_body:find("pcall(keyboard_shortcuts.dispatch, detail)", 1, true)
+      -- The switch and the pause both narrow dispatch to the script-control
+      -- actions (keyboard_shortcuts' only_script), which is how the user resumes;
+      -- test_script_actions proves only_script holds Ctrl+G and assignments back.
+      local gate = control_body:find("shortcuts.is_enabled()", 1, true)
+      local dispatch = control_body:find("pcall(keyboard_shortcuts.dispatch, detail, {", 1, true)
+      local narrowed = control_body:find(
+        "only_script = script_actions.is_paused() or not shortcuts_on", 1, true)
 
-      helpers.assert_true(gate ~= nil and dispatch ~= nil and gate < dispatch,
+      helpers.assert_true(gate ~= nil and dispatch ~= nil and gate < dispatch and narrowed ~= nil,
         "the shortcuts master toggle must guard keyboard dispatch; disabling the "
           .. "feature cannot leave Ctrl+G and user assignments active")
     end)

@@ -349,3 +349,31 @@ end)
 -- The per-run base is the one level unstage() leaves behind, and removing it
 -- keeps the temp directory from collecting an empty directory per run.
 rmdir_one(FIXTURE_BASE)
+
+helpers.describe("paths: the driver root is absolute", function()
+
+	helpers.it("even when the modules load through a relative package.path", function()
+		-- The test runner and a checkout launch (`luajit ergopti_hotstrings.lua`)
+		-- both load infra/paths.lua as "./infra/paths.lua". The root it derived
+		-- was then "." and every path built on it — the tray icon handed to the
+		-- panel, pages handed to WebKit — resolved in the OTHER process's
+		-- working directory, i.e. nowhere.
+		local Paths = helpers.load_module("infra.paths")
+		for _, relative in ipairs({ ".", "./linux", "linux/sub" }) do
+			local anchored = Paths._absolute_for_test(relative)
+			helpers.assert_true(anchored:sub(1, 1) == "/" or anchored:match("^%a:/") ~= nil,
+				"'" .. relative .. "' must be anchored to the working directory, got " .. anchored)
+			helpers.assert_true(not anchored:find("/./", 1, true),
+				"the anchored path must not keep a './' segment: " .. anchored)
+		end
+		helpers.assert_eq(Paths._absolute_for_test("/usr/lib/ergopti"), "/usr/lib/ergopti",
+			"an absolute root is left alone")
+		local root = Paths.driver_root()
+		helpers.assert_true(root:sub(1, 1) == "/" or root:match("^%a:/") ~= nil,
+			"driver_root() must be absolute, got " .. tostring(root))
+		local shared = Paths.shared_root()
+		helpers.assert_true(shared ~= nil and (shared:sub(1, 1) == "/" or shared:match("^%a:/") ~= nil),
+			"shared_root() must be absolute, got " .. tostring(shared))
+	end)
+
+end)

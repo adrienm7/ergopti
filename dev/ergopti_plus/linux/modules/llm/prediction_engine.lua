@@ -21,6 +21,8 @@ local DisplaySettings = require("modules.llm.display_settings")
 local ProfileSettings = require("modules.llm.profile_settings")
 local NavigationSettings = require("modules.llm.navigation_settings")
 local TimerScheduler = require("adapters.timer_scheduler")
+local Inference = require("modules.llm.inference")
+local Monotonic = require("infra.monotonic")
 
 local LOG = "modules.llm.prediction_engine"
 
@@ -38,7 +40,6 @@ local _suggestion_context = nil
 local _pending_trigger = nil
 local _scheduler = TimerScheduler
 local _triggers = { "//", ";;", "--" }
-local _max_context_chars = nil
 local _max_tokens = nil
 local _request_epoch = 0
 
@@ -46,6 +47,29 @@ local function get_ollama()
 	local ok, module = pcall(require, "modules.llm.api_ollama")
 	return ok and module or nil
 end
+
+local function get_remote()
+	local ok, module = pcall(require, "modules.llm.api_remote")
+	return ok and module or nil
+end
+
+local function get_api_entries()
+	local ok, module = pcall(require, "modules.llm.api_entries")
+	return ok and module or nil
+end
+
+-- Which backend answers: "ollama" (local) or "api" (a remote provider). The
+-- manifest declares the key and its default for every driver.
+local BACKEND_KEY = "llm.models.selected"
+local BACKENDS = { ollama = true, api = true }
+
+-- The backend module serving the request in flight, so dismiss cancels it.
+local _inflight_backend = nil
+-- When each backend was last sent a request, and the timer holding one back
+-- until its minimum interval has passed.
+local _last_request_ms = {}
+local _rate_timer = nil
+local _clock_ms = Monotonic.now_ms
 
 local function get_profiles()
 	local ok, module = pcall(require, "modules.llm.profiles")
@@ -57,10 +81,10 @@ local function get_secure_field_detector()
 	return ok and module or nil
 end
 
+-- The stored setting is the only source: an in-memory override set at boot
+-- once shadowed the menu's choice for the whole session.
 local function max_context_chars()
-	return _max_context_chars
-		or Settings.get("context_length")
-		or HttpBridge.DEFAULT_CONTEXT_LENGTH
+	return Settings.get("context_length") or HttpBridge.DEFAULT_CONTEXT_LENGTH
 end
 
 local function _is_secure_context()
@@ -175,9 +199,12 @@ function M.init(opts)
 	_on_offer = type(options.on_offer) == "function" and options.on_offer or nil
 	_offer_notified = false
 	if type(options.triggers) == "table" then _triggers = options.triggers end
-	if type(options.max_context) == "number" then _max_context_chars = options.max_context end
 	if _pending_trigger then _scheduler.cancel(_pending_trigger) end
 	_scheduler = type(options.scheduler) == "table" and options.scheduler or TimerScheduler
+	-- The pacing clock must be the scheduler's: a test's virtual timers would
+	-- otherwise be measured against real time.
+	_clock_ms = type(options.clock_ms) == "function" and options.clock_ms or Monotonic.now_ms
+	_last_request_ms = {}
 	_pending_trigger = nil
 	_request_epoch = _request_epoch + 1
 	_predicting = false
@@ -225,12 +252,48 @@ function M.on_hotstring_expired(context, output_context)
 	return schedule(context, output_context, 0, "Hotstring-expiry")
 end
 
+-- What {max_words} reads when the user chose no maximum (0). The built-in
+-- prompts are English, and Windows writes the same word; a literal 0 asked the
+-- model for "between 3 and 0 words".
+local UNLIMITED_WORDS = "unlimited"
+
+--- The locale the model falls back to when the text's language is ambiguous:
+--- the interface's, as on macOS, not always French.
+--- @return string
+local function prompt_language()
+	local ok, I18n = pcall(require, "infra.i18n")
+	local locale = ok and type(I18n.get_locale) == "function" and I18n.get_locale() or nil
+	if type(locale) == "string" and locale ~= "" then return locale end
+	return require("infra.manifest_reader").default_for("script.locale")
+end
+
+--- The profile's name as the menu shows it, for the suggestions' info bar:
+--- a user profile's own label, a built-in's translated name. The bar showed
+--- the internal id, so a custom prompt read "user_1727…_3".
+--- @param profile table
+--- @return string
+local function profile_display_name(profile)
+	-- User profile ids are "user_…" by construction (profile_settings).
+	if tostring(profile.id):match("^user_") and type(profile.label) == "string" and profile.label ~= "" then
+		return profile.label
+	end
+	local ok, I18n = pcall(require, "infra.i18n")
+	local key = "llm.profile." .. tostring(profile.id) .. ".label"
+	local label = ok and type(I18n.get) == "function" and I18n.get(key) or nil
+	if type(label) ~= "string" or label == "" or label == key then return tostring(profile.id) end
+	-- The menu's long form is "●○○ Basic — Simple prediction"; the bar keeps
+	-- the name.
+	return (label:gsub("%s+—.*$", ""))
+end
+
 local function resolve_system_prompt(profile, params, count)
+	-- The context is left empty here and sent once, by build_messages.
+	local max_words = tonumber(params.max_words) or 0
 	local resolved = ProfileSelector.resolve_system_prompt(profile, {
-		context = params.context,
-		tail = params.context_tail,
+		context = "",
+		tail = "",
 		min_words = params.min_words,
-		max_words = params.max_words,
+		max_words = max_words > 0 and max_words or UNLIMITED_WORDS,
 		n = count,
 		language = params.language,
 	})
@@ -247,11 +310,8 @@ function M.predict(context, output_context)
 		return
 	end
 
-	local ollama = get_ollama()
-	local profiles = get_profiles()
-	local model = profiles and profiles.get_current_model()
-	if not ollama then Logger.warn(LOG, "predict(): Ollama API not available."); return end
-	if not model then Logger.warn(LOG, "predict(): No model selected - run Ollama and refresh models."); return end
+	local backend, target, model = M.resolve_backend()
+	if not backend then return end
 
 	local clean_context, trigger_chars = context_without_trigger(context,
 		type(output_context) == "table" and output_context.input_chars or 0)
@@ -264,26 +324,25 @@ function M.predict(context, output_context)
 		num_predictions = requested,
 		temperature = Settings.get("temperature"),
 		auto_raise_temp = Settings.get("auto_raise_temp"),
-		language = "fr",
+		language = prompt_language(),
 		context_window_chars = max_context_chars(),
 	})
 	local is_batch = profile.batch == true and requested > 1
+	local base_temperature = Settings.get("temperature")
+	local auto_raise = Settings.get("auto_raise_temp") == true
 	local system_prompt = resolve_system_prompt(profile, params, is_batch and requested or 1)
-	if type(system_prompt) ~= "string" or system_prompt == "" then
+	-- Empty is valid: the raw profile is its context alone, sent as the user turn.
+	if type(system_prompt) ~= "string" then
 		Logger.error(LOG, "Prediction profile '%s' has no usable system prompt.", tostring(profile.id))
 		return
 	end
 
-	local base_url = profiles.get_base_url() or HttpBridge.resolve_base_url() or ""
-	local messages = {
-		{ role = "system", content = system_prompt },
-		{ role = "user", content = params.context },
-	}
+	local messages = PromptBuilder.build_messages(system_prompt, params.context, params.context_tail)
 	local candidates = {}
 	local request_index = 0
 	local meta = {
 		model = model,
-		profile = profile.id,
+		profile = profile_display_name(profile),
 		loading = true,
 		validation_modifiers = NavigationSettings.get(),
 	}
@@ -298,8 +357,8 @@ function M.predict(context, output_context)
 	_request_epoch = _request_epoch + 1
 	local epoch = _request_epoch
 	show_candidates({}, meta)
-	Logger.info(LOG, "Sending prediction request to %s (model=%s, context=%d chars).",
-		base_url, model, #params.context)
+	Logger.info(LOG, "Sending prediction request (backend=%s, model=%s, context=%d chars).",
+		M.get_backend(), model, #params.context)
 
 	local function parse_response(raw, batch, extra_deletes)
 		local parsed = {}
@@ -324,14 +383,44 @@ function M.predict(context, output_context)
 	local dispatch
 	dispatch = function()
 		if epoch ~= _request_epoch then return end
+		local kind = M.get_backend()
+		local now = _clock_ms()
+		local wait_ms = (_last_request_ms[kind] or -math.huge) + Inference.min_interval_ms(kind) - now
+		if wait_ms > 0 then
+			_rate_timer = _scheduler.after(wait_ms / 1000, function()
+				_rate_timer = nil
+				dispatch()
+			end)
+			if type(_rate_timer) ~= "table" or _rate_timer.armed ~= true then
+				_rate_timer = nil
+				_predicting = false
+				meta.loading = false
+				Logger.error(LOG, "Prediction could not be paced: timer unavailable.")
+				-- The variants already received stay on offer.
+				if #candidates > 0 then publish() else clear_offer() end
+			end
+			return
+		end
+		_last_request_ms[kind] = now
 		request_index = request_index + 1
 		local think_filter = Parser.new_thinking_filter()
 		local streamed = ""
-		ollama.chat(base_url, model, messages, {
+		_inflight_backend = backend
+		backend.chat(target, model, messages, {
 			stream = DisplaySettings.get("streaming") == true,
-			temperature = params.temperature,
+			-- A batch asks once, at the builder's temperature. Sequential variants
+			-- each start from the user's own temperature and, when "raise the
+			-- temperature" is on, get a little warmer so they differ. Warming the
+			-- builder's already-raised value heated them twice, and warming with
+			-- the switch off made the switch do nothing.
+			temperature = is_batch and params.temperature
+				or (auto_raise and Inference.variant_temperature(base_temperature, request_index))
+				or base_temperature,
 			max_tokens = (_max_tokens or params.max_tokens) * (is_batch and requested or 1),
-			line_mode = profile.id == "raw" or profile.id == "basic",
+			-- Decided from the prompt, as macOS does: one continuation, unless the
+			-- prompt asks for the two-line correction format or a batch. By id, a
+			-- user's copy of "basic" never got the single-line stops.
+			line_mode = not is_batch and not system_prompt:find("TAIL_CORRECTED", 1, true),
 		}, function(delta)
 			if epoch ~= _request_epoch then return end
 			streamed = streamed .. think_filter:feed(delta)
@@ -353,7 +442,12 @@ function M.predict(context, output_context)
 				append_unique(candidates, candidate, 0)
 			end
 			Logger.info(LOG, "Prediction request complete: %d chars, %d candidates.", #clean, #candidates)
-			if not is_batch and request_index < requested then dispatch(); return end
+			if not is_batch and request_index < requested then
+				-- Shown now: the next variant may wait for the backend's interval.
+				if #candidates > 0 then publish() end
+				dispatch()
+				return
+			end
 			_predicting = false
 			meta.loading = false
 			if #candidates > 0 then publish() else clear_offer() end
@@ -362,20 +456,26 @@ function M.predict(context, output_context)
 	dispatch()
 end
 
---- Cancels pending/in-flight work and discards the current engine buffer.
-function M.cancel()
+--- Cancels pending and in-flight work and shows nothing, leaving the hotstring
+--- buffer alone. For edits the caller has already applied to that buffer:
+--- Backspace and Escape update it precisely, and a reset here undid the edit.
+function M.withdraw()
 	if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
 	M.dismiss()
+end
+
+--- Cancels pending/in-flight work and discards the current engine buffer.
+function M.cancel()
+	M.withdraw()
 	if _engine and type(_engine.reset) == "function" then _engine:reset() end
 end
 
 --- Dismisses in-flight and visible suggestions without changing the buffer.
 function M.dismiss()
 	_request_epoch = _request_epoch + 1
-	if _predicting then
-		local ollama = get_ollama()
-		if ollama then ollama.cancel() end
-	end
+	if _rate_timer then _scheduler.cancel(_rate_timer); _rate_timer = nil end
+	if _predicting and _inflight_backend then _inflight_backend.cancel() end
+	_inflight_backend = nil
 	_predicting = false
 	clear_offer()
 end
@@ -406,18 +506,39 @@ function M.select(index)
 	return true
 end
 
---- Consumes a configured modifier+digit validation chord when an offer exists.
+--- Whether an offer is on screen: suggestions exist and the tooltip, when this
+--- daemon has one, presents them. Its logical state, not its window's: the
+--- window maps asynchronously, and the digit must not type meanwhile. Hidden
+--- by any path (a pause, a focus change), it presents nothing.
+local function offer_visible()
+	if #_suggestions == 0 then return false end
+	if _overlay and type(_overlay.is_showing) == "function" then return _overlay.is_showing() == true end
+	return true
+end
+
+--- Consumes the validation chord (a digit, with the configured modifiers —
+--- none by default) while an offer is on screen.
+---
+--- Consumed whatever happens next: a digit pressed at a shown prediction is
+--- the instruction to insert it, never text. A slot that does not exist, or an
+--- insertion that fails, types nothing either.
 --- @param detail table { key, mods }
---- @return boolean
+--- @return boolean True when the key was the chord and must not reach the app.
 function M.handle_shortcut(detail)
-	if #_suggestions == 0 or type(detail) ~= "table" then return false end
+	if type(detail) ~= "table" or not offer_visible() then return false end
 	if not NavigationSettings.matches(detail.mods) then return false end
 	local key = tostring(detail.key or detail.char or "")
 	local digit = key:match("^([0-9])$") or key:match("^[Kk][Pp]_?([0-9])$")
 	if not digit then return false end
 	local index = digit == "0" and 10 or tonumber(digit)
-	if not _suggestions[index] then return false end
-	return M.accept(index)
+	if not _suggestions[index] then
+		Logger.debug(LOG, "Prediction %d is not on offer — the key is swallowed, nothing typed.", index)
+		return true
+	end
+	if not M.accept(index) then
+		Logger.warn(LOG, "Prediction %d could not be inserted — the key is swallowed, nothing typed.", index)
+	end
+	return true
 end
 
 function M.has_suggestions() return #_suggestions > 0 end
@@ -473,6 +594,70 @@ function M.set_triggers(triggers)
 	_triggers = accepted
 	Logger.info(LOG, "Triggers: %d configured.", #_triggers)
 	return true
+end
+
+--- The selected backend: "ollama" or "api".
+--- @return string
+function M.get_backend()
+	local ok, Storage = pcall(require, "adapters.storage")
+	local value = ok and Storage.get(BACKEND_KEY, nil) or nil
+	if BACKENDS[value] then return value end
+	return require("infra.manifest_reader").default_for(BACKEND_KEY)
+end
+
+--- Selects the backend.
+--- @param kind string "ollama" or "api"
+--- @return boolean
+function M.set_backend(kind)
+	if not BACKENDS[kind] then return false end
+	M.dismiss()
+	local ok, Storage = pcall(require, "adapters.storage")
+	if not ok then return false end
+	Storage.set(BACKEND_KEY, kind)
+	Logger.info(LOG, "Prediction backend set to '%s'.", kind)
+	return true
+end
+
+--- The module, target and model a prediction would be sent with.
+--- @param quiet boolean Do not log why the backend cannot answer.
+--- @return table|nil backend, any target, string|nil model
+local function backend_target(quiet)
+	local function refuse(...)
+		if not quiet then Logger.warn(LOG, ...) end
+		return nil
+	end
+	if M.get_backend() == "api" then
+		local remote, entries = get_remote(), get_api_entries()
+		local entry = entries and entries.active() or nil
+		if not remote or not entry then
+			return refuse("predict(): the API backend is selected but no API entry is — add one in the AI menu.")
+		end
+		local provider = remote.provider(entry.provider)
+		local model = entry.model ~= "" and entry.model or (provider and provider.default_model) or nil
+		if not model or model == "" then return refuse("predict(): API entry '%s' names no model.", entry.label) end
+		return remote, entry, model
+	end
+	local ollama, profiles = get_ollama(), get_profiles()
+	local model = profiles and profiles.get_current_model()
+	if not ollama then return refuse("predict(): Ollama API not available.") end
+	if not model then return refuse("predict(): No model selected - run Ollama and refresh models.") end
+	return ollama, profiles.get_base_url() or HttpBridge.resolve_base_url() or "", model
+end
+
+--- The module, target and model a prediction is sent with, or nil when the
+--- selected backend cannot answer (reason logged).
+--- @return table|nil backend, any target, string|nil model
+function M.resolve_backend()
+	return backend_target(false)
+end
+
+--- The model the next prediction goes to, whichever backend serves it. The
+--- menu resolves the automatic profile against it: resolving against the
+--- Ollama model while an API answered showed one profile and used another.
+--- @return string|nil
+function M.get_prediction_model()
+	local _, _, model = backend_target(true)
+	return model
 end
 
 function M.get_models()
@@ -543,9 +728,7 @@ function M.set_temperature(value) return Settings.set("temperature", tonumber(va
 function M.get_max_context() return max_context_chars() end
 
 function M.set_max_context(value)
-	if type(value) ~= "number" or value <= 0 then return false end
-	_max_context_chars = value
-	return true
+	return Settings.set("context_length", value)
 end
 
 function M.get_stop_sequences() return {} end

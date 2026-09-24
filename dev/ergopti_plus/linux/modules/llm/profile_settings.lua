@@ -36,6 +36,10 @@ local _defaults = {}
 local _values = {}
 local _profiles = nil
 local _user_profiles = nil
+-- Stored entries this version cannot read, kept verbatim and written back on
+-- every save: one bad entry used to empty the registry in memory, and the next
+-- save then erased every other prompt the user had written.
+local _unreadable_profiles = {}
 local _profile_serial = 0
 
 local function profiles()
@@ -105,18 +109,30 @@ local function load_user_profiles()
 		Logger.error(LOG, "Stored user-profile registry is not an array; ignoring it.")
 		return _user_profiles
 	end
+	_unreadable_profiles = {}
 	local seen = {}
 	for index, candidate in ipairs(stored) do
 		local profile = normalize_user_profile(candidate)
 		if not profile or seen[profile.id] or built_in_exists(profile.id) then
-			Logger.error(LOG, "Stored user profile at index %d is invalid; ignoring the registry.", index)
-			_user_profiles = {}
-			return _user_profiles
+			Logger.error(LOG, "Stored user profile at index %d is invalid; it is kept but not offered.", index)
+			_unreadable_profiles[#_unreadable_profiles + 1] = candidate
+		else
+			seen[profile.id] = true
+			_user_profiles[#_user_profiles + 1] = profile
 		end
-		seen[profile.id] = true
-		_user_profiles[#_user_profiles + 1] = profile
 	end
 	return _user_profiles
+end
+
+--- The registry to store: the readable profiles, then the unreadable entries
+--- exactly as they were found.
+--- @param profiles table
+--- @return table
+local function stored_registry(profiles)
+	local registry = {}
+	for index, profile in ipairs(profiles) do registry[index] = profile end
+	for _, raw in ipairs(_unreadable_profiles) do registry[#registry + 1] = raw end
+	return registry
 end
 
 local function profile_exists(profile_id)
@@ -322,7 +338,7 @@ function M.save_user_profile(candidate, activate, expected_existing)
 
 	local ok, Storage = pcall(require, "adapters.storage")
 	if not ok or not Storage or type(Storage.set_many) ~= "function" then return false end
-	local writes = { [USER_PROFILES_KEY] = next_profiles }
+	local writes = { [USER_PROFILES_KEY] = stored_registry(next_profiles) }
 	if activate == true then
 		writes[PREF_PREFIX .. "active"] = profile.id
 		writes[PREF_PREFIX .. "auto_profile_for_model"] = false
@@ -361,7 +377,7 @@ function M.delete_user_profile(profile_id)
 	local active = M.get("active")
 	local ok, Storage = pcall(require, "adapters.storage")
 	if not ok or not Storage or type(Storage.set_many) ~= "function" then return false end
-	local writes = { [USER_PROFILES_KEY] = next_profiles }
+	local writes = { [USER_PROFILES_KEY] = stored_registry(next_profiles) }
 	if active == profile_id then writes[PREF_PREFIX .. "active"] = "basic" end
 	if Storage.set_many(writes) ~= true then
 		Logger.error(LOG, "User profile '%s' could not be deleted; live registry is unchanged.",
@@ -381,6 +397,7 @@ function M._reset()
 	_values = {}
 	_profiles = nil
 	_user_profiles = nil
+	_unreadable_profiles = {}
 	_profile_serial = 0
 	ModelProfile._reset()
 end

@@ -34,6 +34,7 @@ local M = {}
 
 local Logger = require("logger.shim")
 local Keysym = require("infra.keysym")
+local EvdevCodes = require("infra.evdev_codes")
 
 local LOG = "adapters.xkb_capture"
 
@@ -57,6 +58,16 @@ local VALUE_REPEAT = 2
 
 local XKB_KEY_UP = 0
 local XKB_KEY_DOWN = 1
+
+-- The two modifier keys the injector presses (modules/hotstrings/injector.lua
+-- MODIFIER_CODES), in XKB numbering, so the inverse table is probed with the
+-- very chords that will be emitted.
+local XKB_LEFTSHIFT = EvdevCodes.KEY_LEFTSHIFT + EVDEV_TO_XKB_OFFSET
+local XKB_RIGHTALT = EvdevCodes.KEY_RIGHTALT + EVDEV_TO_XKB_OFFSET
+
+-- The highest evdev code the virtual keyboard registers (uinput_writer's
+-- KEY_CODE_MAX); a character on a higher key could never be typed.
+local UINPUT_KEY_MAX = 0x2FF
 
 
 
@@ -158,6 +169,10 @@ local function bind_ffi_backend()
 		unsigned int xkb_state_key_get_one_sym(
 			struct xkb_state *state,
 			unsigned int key);
+		unsigned int xkb_keymap_min_keycode(struct xkb_keymap *keymap);
+		unsigned int xkb_keymap_max_keycode(struct xkb_keymap *keymap);
+		const char *xkb_keymap_key_get_name(struct xkb_keymap *keymap, unsigned int key);
+		int xkb_state_mod_name_is_active(struct xkb_state *state, const char *name, int type);
 
 		struct xkb_compose_table *xkb_compose_table_new_from_locale(
 			struct xkb_context *context,
@@ -294,6 +309,71 @@ local function bind_ffi_backend()
 		lib.xkb_compose_state_reset(session.compose_state)
 	end
 
+	-- XKB_STATE_MODS_LOCKED: CapsLock toggles the Lock modifier into the locked set.
+	local XKB_STATE_MODS_LOCKED = 4
+	function backend.caps_locked(session)
+		return lib.xkb_state_mod_name_is_active(session.state, "Lock", XKB_STATE_MODS_LOCKED) == 1
+	end
+
+	-- The physical chords the injector can press, cheapest first. Each is
+	-- pressed on a FRESH state, so the answer is what an application receives
+	-- from exactly that chord — whatever the key's type says a level means.
+	local CHORDS = {
+		{ level = 1, mods = {},                  keys = {} },
+		{ level = 2, mods = { "shift" },         keys = { XKB_LEFTSHIFT } },
+		{ level = 3, mods = { "altgr" },         keys = { XKB_RIGHTALT } },
+		{ level = 4, mods = { "shift", "altgr" }, keys = { XKB_LEFTSHIFT, XKB_RIGHTALT } },
+	}
+
+	-- The typing block first (evdev 1-58 and the ISO key 86), across every
+	-- chord, before anything else. A keymap also binds characters to exotic
+	-- keys — EuroSign on a multimedia key at level 1, a parenthesis on
+	-- KEY_KPLEFTPAREN — that some applications ignore; a real key with a
+	-- modifier is what a person would press, so it wins.
+	local function in_typing_block(evdev)
+		return (evdev >= 1 and evdev <= 58) or evdev == 86
+	end
+
+	function backend.inverse(session)
+		local table_out = {}
+		local low = math.max(tonumber(lib.xkb_keymap_min_keycode(session.keymap)) or 8, 8)
+		local high = tonumber(lib.xkb_keymap_max_keycode(session.keymap)) or 255
+		for _, typing_block in ipairs({ true, false }) do
+		for _, chord in ipairs(CHORDS) do
+			for keycode = low, math.min(high, UINPUT_KEY_MAX + EVDEV_TO_XKB_OFFSET) do
+				if in_typing_block(keycode - EVDEV_TO_XKB_OFFSET) ~= typing_block then goto next_key end
+				local name_ptr = lib.xkb_keymap_key_get_name(session.keymap, keycode)
+				local name = name_ptr ~= nil and ffi.string(name_ptr) or nil
+				-- Keypad keys are never used: their levels depend on NumLock,
+				-- which the injector neither reads nor presses, so the same
+				-- chord types a digit or moves the caret depending on a LED.
+				if name and not name:match("^KP") then
+					local state = lib.xkb_state_new(session.keymap)
+					if state ~= nil then
+						for _, mod_key in ipairs(chord.keys) do
+							lib.xkb_state_update_key(state, mod_key, XKB_KEY_DOWN)
+						end
+						local text = utf8_from(function(buffer, size)
+							return lib.xkb_state_key_get_utf8(state, keycode, buffer, size)
+						end)
+						lib.xkb_state_unref(state)
+						local first = text and text:byte(1)
+						if first and first >= 32 and first ~= 127 and not table_out[text] then
+							table_out[text] = {
+								keycode = keycode - EVDEV_TO_XKB_OFFSET,
+								level = chord.level,
+								mods = chord.mods,
+							}
+						end
+					end
+				end
+				::next_key::
+			end
+		end
+		end
+		return table_out
+	end
+
 	_backend = backend
 	Logger.debug(LOG, "libxkbcommon capture backend bound.")
 	return true
@@ -367,6 +447,40 @@ end
 --- @return boolean True when process() has a validated live state.
 function M.is_ready()
 	return _session ~= nil
+end
+
+--- Whether CapsLock is locked in the live capture state.
+---
+--- The state follows every physical key transition, CapsLock included, so it
+--- is the session's own answer; the LED is not, because under the grab the
+--- kernel drops the compositor's LED writes to the grabbed keyboard.
+--- @return boolean
+function M.caps_locked()
+	if not _session or type(_backend.caps_locked) ~= "function" then return false end
+	local ok, locked = pcall(_backend.caps_locked, _session)
+	return ok and locked == true
+end
+
+--- The character → keystroke table injection types with, asked of libxkbcommon.
+---
+--- Built by pressing each chord the injector can emit (none, Shift, AltGr,
+--- Shift+AltGr) on a fresh state of the LOADED keymap and recording what comes
+--- out, cheapest chord first and lowest keycode first. It replaced a text
+--- parser that assumed every key followed the standard four-level type and
+--- walked keys in hash order: on AZERTY a digit could be planned as Shift+KP1,
+--- which moves the caret, differently from one start to the next; on the
+--- Ergopti layout, whose types put Shift on level 3, most characters came out
+--- wrong or went through the clipboard.
+--- @return table|nil char → { keycode = evdev, level = integer, mods = table }
+--- @return string|nil error
+function M.inverse_table()
+	if not _session then return nil, "XKB capture state is not ready" end
+	if type(_backend.inverse) ~= "function" then
+		return nil, "the capture backend cannot enumerate the keymap"
+	end
+	local ok, built = pcall(_backend.inverse, _session)
+	if not ok then return nil, tostring(built) end
+	return built
 end
 
 

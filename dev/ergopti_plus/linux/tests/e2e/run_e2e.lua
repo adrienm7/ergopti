@@ -388,6 +388,80 @@ local corpus_assertions = pass_count + fail_count - corpus_before
 assert_true("corpus vector floor", vectors ~= nil and #vectors >= Contract.MIN_VECTOR_COUNT)
 assert_true("corpus assertion floor", corpus_assertions >= Contract.MIN_CORPUS_ASSERTIONS)
 
+-- The real daemon main(), one process per scenario (it runs once per
+-- process), against a scripted keyboard and a model of the focused field.
+-- These pin what no engine-level vector can: the injector's erase arithmetic,
+-- the undo, and the order the hook and the daemon see keys in.
+local DAEMON_SCENARIOS = {
+	{ name = "an end-char trigger expands and keeps its terminator", keys = "adn ", screen = "ADN " },
+	{ name = "Enter is a terminator", keys = "adn{ENTER}", screen = "ADN\n" },
+	{ name = "an auto-expanding trigger fires on its last character", keys = "pk★", screen = "parce que" },
+	-- "adn " → "ADN ", and the Backspace removes the REPLAYED space: undo must
+	-- count it, or the first character of the replacement stays ("Aadn").
+	{ name = "Backspace after an end-char expansion restores the trigger", keys = "adn {BS}", screen = "adn" },
+	{ name = "Backspace after an auto expansion restores the trigger", keys = "pk★{BS}", screen = "pk★" },
+	-- Backspace edits the buffer instead of wiping it and declaring a word start.
+	{ name = "a corrected typo still expands", keys = "adx{BS}n ", screen = "ADN " },
+	{ name = "a word-only trigger does not fire mid-word after a Backspace", keys = "xy{BS}adn ", screen = "xadn " },
+	{ name = "a word-only trigger does not fire after an arrow key", keys = "x{LEFT}adn ", screen = "xadn " },
+	-- The same edits with the AI prediction engine loaded, as in the demo
+	-- configuration: its cancel on Backspace reset the buffer behind the edit.
+	{ name = "with AI loaded, a corrected typo still expands", keys = "adx{BS}n ", screen = "ADN ", llm = true },
+	{ name = "with AI loaded, a word-only trigger does not fire mid-word after a Backspace",
+		keys = "xy{BS}adn ", screen = "xadn ", llm = true },
+	{ name = "with AI loaded, an end-char trigger expands", keys = "adn ", screen = "ADN ", llm = true },
+}
+
+if package.config:sub(1, 1) == "\\" then
+	print("\n--- Daemon key scenarios: not run (a POSIX shell spawns each daemon) ---")
+else
+	print("\n--- Daemon key scenarios (real main(), scripted keyboard) ---")
+	local interpreter = arg and arg[-1] or "luajit"
+	local home = os.tmpname()
+	os.remove(home)
+	os.execute("mkdir -p '" .. home .. "'")
+	local device = os.tmpname()
+	for _, scenario in ipairs(DAEMON_SCENARIOS) do
+		local command = string.format(
+			"HOME='%s' ERGOPTI_E2E_LLM=%s %s tests/e2e/daemon_keys_child.lua tests/e2e/fixtures/daemon_keys.toml '%s' %q 2>/dev/null",
+			home, scenario.llm and "1" or "0", interpreter, device, scenario.keys)
+		local pipe = io.popen(command, "r")
+		local output = pipe and pipe:read("*a") or ""
+		if pipe then pipe:close() end
+		local quoted = output:match("SCREEN (%b\"\")")
+		local screen = quoted and (loadstring or load)("return " .. quoted)() or nil
+		if screen == scenario.screen then
+			pass(scenario.name)
+		else
+			fail(scenario.name, string.format("%q", scenario.screen),
+				screen and string.format("%q", screen) or ("no SCREEN line: " .. output:sub(-300)))
+		end
+	end
+
+	-- The real tray menu, every module loaded, rows counted without GTK. The
+	-- ceiling is generous for a menu people navigate and far below the 103 058
+	-- rows the inline action lists once produced (eight seconds of GTK per
+	-- rebuild, and a dbusmenu layout no panel can page through).
+	local MENU_ROW_CEILING = 3000
+	local rows_file = os.tmpname()
+	os.execute(string.format(
+		"HOME='%s' ERGOPTI_E2E_MENU_ROWS='%s' %s tests/e2e/daemon_keys_child.lua tests/e2e/fixtures/daemon_keys.toml '%s' %q >/dev/null 2>&1",
+		home, rows_file, interpreter, device, "a"))
+	local rows_fh = io.open(rows_file, "r")
+	local rows = rows_fh and tonumber(rows_fh:read("*l")) or nil
+	if rows_fh then rows_fh:close() end
+	os.remove(rows_file)
+	if rows and rows > 100 and rows <= MENU_ROW_CEILING then
+		pass(string.format("the real tray menu has %d rows (ceiling %d)", rows, MENU_ROW_CEILING))
+	else
+		fail("the real tray menu stays navigable", string.format("100 < rows <= %d", MENU_ROW_CEILING),
+			tostring(rows))
+	end
+
+	os.remove(device)
+	os.execute("rm -rf '" .. home .. "'")
+end
+
 -- Final summary.
 local total = pass_count + fail_count
 print(string.format("\n1..%d", total))

@@ -414,7 +414,10 @@ editorElement.addEventListener('keydown', function (e) {
 			return;
 		}
 		if (e.key === 'Escape') {
+			// Stopped here: the page-wide Escape cancels the editor, so closing
+			// the suggestions used to close the editor too and discard the edits.
 			e.preventDefault();
+			e.stopPropagation();
 			hideAc();
 			return;
 		}

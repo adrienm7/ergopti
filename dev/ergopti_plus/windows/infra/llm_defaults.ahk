@@ -99,10 +99,11 @@ _LLMD_GetBool(raw, key, dflt := false) {
  * Returns dflt if absent or empty.
  * @param {string} raw   - Raw JSON text.
  * @param {string} key   - Key to look up.
+ * @param {string} sep   - Separator placed between the joined elements.
  * @param {string} dflt  - Fallback value.
  * @returns {string}
  */
-_LLMD_GetStringArray(raw, key, dflt := "") {
+_LLMD_GetStringArray(raw, key, sep := ",", dflt := "") {
 	if !RegExMatch(raw, '"' key '"\s*:\s*(\[[^\]]*\])', &arr)
 		return dflt
 	lit  := arr[1]
@@ -115,7 +116,7 @@ _LLMD_GetStringArray(raw, key, dflt := "") {
 	; Key is present — return the join even when the array is empty ([]).
 	; Returning dflt for an explicit [] would be wrong: the caller cannot
 	; distinguish "key absent" from "key set to empty list".
-	return _LLMD_JoinArray(vals, ",")
+	return _LLMD_JoinArray(vals, sep)
 }
 
 /**
@@ -215,11 +216,13 @@ LLM_Defaults_Load() {
 		d["llm_temperature"] := Format("{:.2f}", _LLMD_GetNumber(raw, "llm_temperature"))
 
 	; Array-valued modifiers — present in defaults.json even when empty ([]).
+	; Stored in the tray chord form ("alt+ctrl", "" for none) that
+	; LLM_Menu_IsValidModifierString accepts, so defaults need no conversion.
 	for key in ["llm_nav_modifiers", "llm_val_modifiers"] {
 		if !_LLMD_HasKey(raw, key)
 			missing.Push(key)
 		else
-			d[key] := _LLMD_GetStringArray(raw, key)
+			d[key] := _LLMD_GetStringArray(raw, key, "+")
 	}
 
 	if (missing.Length > 0) {
@@ -233,4 +236,22 @@ LLM_Defaults_Load() {
 
 	LLM_Defaults := d
 	try LoggerDone("LLMDefaults", "Loaded {1} default values from defaults.json.", LLM_Defaults.Count)
+}
+
+/**
+ * Returns the shared default modifier chord in the tray string form.
+ * Fails fast when the defaults were not loaded, so no caller can substitute a
+ * literal that drifts from _shared/modules/llm/defaults.json.
+ * @param {string} SharedKey - "llm_val_modifiers" or "llm_nav_modifiers".
+ * @returns {string} Chord such as "alt" or "alt+ctrl"; "" means bare keys.
+ */
+LLM_Defaults_ModifierString(SharedKey) {
+	global LLM_Defaults
+	if !(SharedKey == "llm_val_modifiers" || SharedKey == "llm_nav_modifiers")
+		throw ValueError("Unknown LLM modifier default: " . SharedKey, -1)
+	if !IsSet(LLM_Defaults) || !(LLM_Defaults is Map)
+			|| !LLM_Defaults.Has(SharedKey)
+		throw Error("LLM defaults are not loaded; " . SharedKey
+			. " has no source.", -1)
+	return LLM_Defaults[SharedKey]
 }

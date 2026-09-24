@@ -1,7 +1,7 @@
 # `_shared/` — cross-driver shared tree
 
 Everything here is consumed by **more than one** driver (`windows/` AHK,
-`macos/` Hammerspoon/Lua, `linux/` Lua/kanata). The single most common point of
+`macos/` Hammerspoon/Lua, `linux/` LuaJIT). The single most common point of
 confusion is the difference between `lua/` and `modules/` — they look like they
 overlap (both have `llm/`, `logger/`) but they are **different kinds of thing**.
 This file is the invariant.

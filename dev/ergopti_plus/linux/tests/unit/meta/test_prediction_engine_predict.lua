@@ -216,7 +216,8 @@ helpers.describe("prediction_engine: durable logical-output callback", function(
 		helpers.assert_not_nil(applied)
 		helpers.assert_true(applied.candidate.deletes >= 2,
 			"acceptance must erase the explicit trigger before typing the completion")
-		helpers.assert_eq(observed.text, " est bien faite")
+		-- "Bonjour //" minus its trigger ends with a space: no second one.
+		helpers.assert_eq(observed.text, "est bien faite")
 		helpers.assert_eq(observed.context.app_id, "firefox")
 		helpers.assert_eq(observed.context.input_chars, 2)
 	end)
