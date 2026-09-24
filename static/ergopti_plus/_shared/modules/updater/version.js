@@ -1,16 +1,12 @@
 // _shared/modules/updater/version.js
 
 /**
- * Cross-driver version comparison and GitHub Releases URL helpers.
- * Both AHK (lib/updater.ahk) and Hammerspoon (lib/updater.lua) MUST
- * produce the same isNewerVersion() results as this module.
+ * Cross-driver version comparison: the canonical semver ordering the AHK,
+ * macOS and Linux updaters replay (version_vectors.json). Which release a
+ * channel offers is decided by the update-channel registry (channels.json).
  */
 
 'use strict';
-
-const DEFAULT_GH_OWNER = 'adrienm7';
-const DEFAULT_GH_REPO = 'ergopti';
-const DEV_RELEASES_PAGE_SIZE = 10;
 
 /**
  * @param {string} tag
@@ -113,109 +109,6 @@ function isNewerVersion(latest, current) {
 }
 
 /**
- * @param {string} channel "main" | "dev"
- * @param {object} [opts]
- * @returns {string}
- */
-function releaseApiUrl(channel, opts = {}) {
-	const owner = opts.owner ?? DEFAULT_GH_OWNER;
-	const repo = opts.repo ?? DEFAULT_GH_REPO;
-	const base = `https://api.github.com/repos/${owner}/${repo}/releases`;
-	if (channel === 'dev') {
-		const page = opts.devPageSize ?? DEV_RELEASES_PAGE_SIZE;
-		return `${base}?per_page=${page}`;
-	}
-	return `${base}/latest`;
-}
-
-/**
- * Extracts tag_name from a single-release JSON object string.
- * @param {string} json
- * @returns {string}
- */
-function parseTagName(json) {
-	const m = json.match(/"tag_name"\s*:\s*"([^"]+)"/);
-	return m ? m[1] : '';
-}
-
-/**
- * Picks the highest-semver prerelease from a GitHub releases array JSON string.
- * GitHub lists by publish date, not semver — a newer stable at the top must not
- * hide a higher prerelease further down the page.
- * @param {string} json
- * @returns {string}
- */
-function pickLatestPrereleaseJson(json) {
-	const chunks = splitReleasesArray(json);
-	let bestChunk = '';
-	let bestTag = '';
-	for (const chunk of chunks) {
-		if (!parsePrereleaseFlag(chunk)) continue;
-		const tag = parseTagName(chunk);
-		if (!tag) continue;
-		if (!bestTag || compareVersions(tag, bestTag) > 0) {
-			bestTag = tag;
-			bestChunk = chunk;
-		}
-	}
-	if (bestChunk) return bestChunk;
-	return chunks[0] ?? json;
-}
-
-/**
- * @param {string} json
- * @returns {string}
- */
-function unwrapFirstPrereleaseJson(json) {
-	return pickLatestPrereleaseJson(json);
-}
-
-/**
- * @param {string} json
- * @returns {boolean}
- */
-function parsePrereleaseFlag(json) {
-	const m = json.match(/"prerelease"\s*:\s*(true|false)/);
-	return m ? m[1] === 'true' : false;
-}
-
-/**
- * @param {string} json
- * @returns {string[]}
- */
-function splitReleasesArray(json) {
-	const out = [];
-	const trimmed = json.trimStart();
-	if (!trimmed.startsWith('[')) return out;
-	let pos = 1;
-	let depth = 0;
-	let start = 0;
-	let inStr = false;
-	let esc = false;
-	while (pos < trimmed.length) {
-		const c = trimmed[pos];
-		if (inStr) {
-			if (esc) esc = false;
-			else if (c === '\\') esc = true;
-			else if (c === '"') inStr = false;
-		} else if (c === '"') {
-			inStr = true;
-		} else if (c === '{') {
-			if (depth === 0) start = pos;
-			depth += 1;
-		} else if (c === '}') {
-			depth -= 1;
-			if (depth === 0 && start > 0) {
-				out.push(trimmed.slice(start, pos + 1));
-				start = 0;
-			}
-		}
-		pos += 1;
-	}
-	return out;
-}
-
-/**
  * @returns {object[]}
  */
 function versionTestVectors() {
@@ -260,18 +153,9 @@ function versionTestVectors() {
 }
 
 export {
-	DEFAULT_GH_OWNER,
-	DEFAULT_GH_REPO,
-	DEV_RELEASES_PAGE_SIZE,
 	normalizeTag,
 	parseVersion,
-	parseTagName,
 	compareVersions,
 	isNewerVersion,
-	releaseApiUrl,
-	pickLatestPrereleaseJson,
-	unwrapFirstPrereleaseJson,
-	splitReleasesArray,
-	parsePrereleaseFlag,
 	versionTestVectors
 };
