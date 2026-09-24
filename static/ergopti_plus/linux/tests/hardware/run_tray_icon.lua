@@ -33,11 +33,23 @@ if not Indicator.is_available() then
 end
 
 TrayMenu.setIcon({ title = "Ergopti" })
-TrayMenu.setMenu({
+-- The clickable row proves the whole click path: the panel's dbusmenu Event,
+-- libdbusmenu's "activate", the shared dispatcher, and this row's function.
+local click_file = os.getenv("ERGOPTI_TRAY_CLICK_FILE")
+local rows = {
 	{ title = "Ergopti+ tray probe" },
 	{ title = "-" },
+	{ title = "Click probe", fn = function()
+		if click_file then
+			local fh = io.open(click_file, "w")
+			if fh then fh:write("clicked\n"); fh:close() end
+		end
+	end },
 	{ title = "Quit probe", fn = function() os.exit(0) end },
-})
+}
+-- Rebuilt a few times first, as the daemon does at boot: the row's id must
+-- still reach the function of the CURRENT menu.
+for _ = 1, 3 do TrayMenu.setMenu(rows) end
 if TrayMenu.getBackend() ~= "appindicator" then
 	print("FAIL the adapter reports no live backend after setIcon")
 	os.exit(1)
