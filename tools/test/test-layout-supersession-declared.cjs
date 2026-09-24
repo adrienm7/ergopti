@@ -19,7 +19,10 @@
  *      Windows-only boolean (only that driver emulates layouts);
  *   2. every reason resolves in all 21 locales;
  *   3. the generated Windows manifest ships every declaration;
- *   4. the master gate and the menu read the declaration outside comments.
+ *   4. the master gate and the menu read the declaration outside comments;
+ *   5. the manifest schema declares every field a feature uses: its
+ *      feature_entry refuses undeclared fields, so a field the schema lacks
+ *      makes the manifest invalid against its own contract.
  * ==============================================================================
  */
 
@@ -32,6 +35,7 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const SOURCE = path.join(SP, '_shared', 'modules', 'features', 'manifest.toml');
+const SCHEMA = path.join(SP, '_shared', 'modules', 'features', 'manifest.schema.json');
 const LOCALES = path.join(SP, '_shared', 'data', 'locales');
 const GENERATED_AHK = path.join(SP, 'windows', '_generated', 'features_manifest.ahk');
 const CONSUMERS = [
@@ -73,7 +77,8 @@ function featureBlocks(source) {
 	return blocks;
 }
 
-const declared = featureBlocks(fs.readFileSync(SOURCE, 'utf8'))
+const blocks = featureBlocks(fs.readFileSync(SOURCE, 'utf8'));
+const declared = blocks
 	.filter((b) => b.fields.superseded_reason_key)
 	.map((b) => ({
 		id: JSON.parse(b.fields.id),
@@ -124,6 +129,16 @@ check('the master gate and the menu read the declaration', () => {
 			.filter((l) => !/^\s*;/.test(l))
 			.join('\n');
 		assert.ok(code.includes(c.token), `${path.relative(ROOT, c.file)} does not use ${c.token} outside comments`);
+	}
+});
+
+check('the manifest schema declares every field a feature uses', () => {
+	const entry = JSON.parse(fs.readFileSync(SCHEMA, 'utf8')).$defs.feature_entry;
+	assert.strictEqual(entry.additionalProperties, false, 'feature_entry no longer refuses undeclared fields');
+	const used = new Set(blocks.flatMap((b) => Object.keys(b.fields)));
+	assert.ok(used.size >= 5 && used.has('superseded_reason_key'), `only ${used.size} feature field(s) found`);
+	for (const field of used) {
+		assert.ok(Object.hasOwn(entry.properties, field), `manifest.schema.json does not declare the feature field ${field}`);
 	}
 });
 

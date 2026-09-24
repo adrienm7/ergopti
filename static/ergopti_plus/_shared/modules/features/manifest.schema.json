@@ -101,6 +101,11 @@
 					"type": "string",
 					"description": "Locale key explaining WHY this feature is unavailable on the platforms its \"platforms\" list excludes. Read by the platform-coverage report (Menu → Debug → Healthcheck), which is the only place a user can ask why a row is missing. Meaningless without a platforms restriction, and the generator refuses one that has none."
 				},
+				"superseded_reason_key": {
+					"type": "string",
+					"pattern": "^[a-z][a-z0-9_.]*$",
+					"description": "Locale key explaining why this feature is off while the Windows driver emulates a registry layout (layout.emulated_layout): the master gate turns it off and the menu greys its row with this reason. Only on a Windows-only boolean; the generator refuses it anywhere else."
+				},
 				"platforms": {
 					"type": "array",
 					"items": { "enum": ["ahk", "hs", "linux"] },
