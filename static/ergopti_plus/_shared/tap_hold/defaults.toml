@@ -340,9 +340,10 @@ lcmd_space = { combo = "none", tap = "none", hold = "none" }
 # lcmd + rcmd: canonical half of the (lcmd, rcmd) pair.
 #   combo : symmetric chord — fires opt_backspace regardless of press order.
 #   tap   : "none" here. When lcmd is first (layer active) + rcmd pressed,
-#           layer_keys.json's "Layer + Right Command" rule takes over
-#           (emits shift+option modifier). Adding a tap here would pre-empt it.
-#   hold  : "none" — same reason; layer_keys.json handles the lcmd-first hold path.
+#           the navigation layer's MetaRight binding in layers.toml takes over
+#           (Ergopti's preset: Escape on a tap, Option+Shift while held).
+#           Adding a tap here would pre-empt it.
+#   hold  : "none" — same reason; the navigation layer handles the lcmd-first hold path.
 lcmd_rcmd = { combo = "opt_backspace", tap = "none", hold = "none" }
 lcmd_ropt = { combo = "none", tap = "none", hold = "none" }
 lcmd_rshift = { combo = "none", tap = "none", hold = "none" }
