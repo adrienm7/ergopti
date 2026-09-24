@@ -149,6 +149,7 @@ local BRIDGE_MODULES = {
 	-- the bridge behind it was perfectly healthy. A half-registered name is worse
 	-- than an unregistered one — it looks supported at the only place anyone checks.
 	hotstrings_config_window = "ui.hotstrings_config_window.bridge",
+	layer_editor          = "ui.layer_editor.bridge",
 	metrics_apps          = "ui.metrics_apps.bridge",
 	metrics_typing        = "ui.metrics_typing.bridge",
 	model_browser         = "ui.model_browser.bridge",

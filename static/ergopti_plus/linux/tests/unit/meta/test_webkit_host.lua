@@ -42,7 +42,7 @@ helpers.describe("ui.webkit_host", function()
         "hsEditor", "hotstrings_config_bridge", "hsOnboarding",
         "hsPaths", "hsPersonalInfo", "metrics_apps_bridge", "metrics_typing_bridge",
         "model_browser_bridge", "numeric_prompt_bridge", "prompt_bridge",
-        "token_bridge", "healthcheck", "error_dialog", "config_cleanup_bridge",
+        "token_bridge", "healthcheck", "error_dialog", "config_cleanup_bridge", "layer_editor_bridge",
       }
       local set = {}
       for _, n in ipairs(names) do set[n] = true end
