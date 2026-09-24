@@ -552,30 +552,46 @@ function M.set_backend(kind)
 	return true
 end
 
---- The module, target and model a prediction is sent with, or nil when the
---- selected backend cannot answer (reason logged).
+--- The module, target and model a prediction would be sent with.
+--- @param quiet boolean Do not log why the backend cannot answer.
 --- @return table|nil backend, any target, string|nil model
-function M.resolve_backend()
+local function backend_target(quiet)
+	local function refuse(...)
+		if not quiet then Logger.warn(LOG, ...) end
+		return nil
+	end
 	if M.get_backend() == "api" then
 		local remote, entries = get_remote(), get_api_entries()
 		local entry = entries and entries.active() or nil
 		if not remote or not entry then
-			Logger.warn(LOG, "predict(): the API backend is selected but no API entry is — add one in the AI menu.")
-			return nil
+			return refuse("predict(): the API backend is selected but no API entry is — add one in the AI menu.")
 		end
 		local provider = remote.provider(entry.provider)
 		local model = entry.model ~= "" and entry.model or (provider and provider.default_model) or nil
-		if not model or model == "" then
-			Logger.warn(LOG, "predict(): API entry '%s' names no model.", entry.label)
-			return nil
-		end
+		if not model or model == "" then return refuse("predict(): API entry '%s' names no model.", entry.label) end
 		return remote, entry, model
 	end
 	local ollama, profiles = get_ollama(), get_profiles()
 	local model = profiles and profiles.get_current_model()
-	if not ollama then Logger.warn(LOG, "predict(): Ollama API not available."); return nil end
-	if not model then Logger.warn(LOG, "predict(): No model selected - run Ollama and refresh models."); return nil end
+	if not ollama then return refuse("predict(): Ollama API not available.") end
+	if not model then return refuse("predict(): No model selected - run Ollama and refresh models.") end
 	return ollama, profiles.get_base_url() or HttpBridge.resolve_base_url() or "", model
+end
+
+--- The module, target and model a prediction is sent with, or nil when the
+--- selected backend cannot answer (reason logged).
+--- @return table|nil backend, any target, string|nil model
+function M.resolve_backend()
+	return backend_target(false)
+end
+
+--- The model the next prediction goes to, whichever backend serves it. The
+--- menu resolves the automatic profile against it: resolving against the
+--- Ollama model while an API answered showed one profile and used another.
+--- @return string|nil
+function M.get_prediction_model()
+	local _, _, model = backend_target(true)
+	return model
 end
 
 function M.get_models()
