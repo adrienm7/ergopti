@@ -11,8 +11,9 @@
 --- FEATURES & RATIONALE:
 --- 1. Unified Registry: Reuses GestActions (gestures/actions.lua) so all action
 ---    labels, icons, and implementations stay in one place.
---- 2. Configurable Defaults: Current Cmd+ shortcuts that were hard-coded in
----    bindings.lua are seeded as defaults; the user can override any slot.
+--- 2. Manifest Defaults: the shipped bindings are the features manifest's
+---    shortcuts.keyboard entries for macOS (Ctrl+Space generates an AI
+---    prediction); the user can override or clear any slot.
 --- 3. Registrar Lifecycle: bindings are created by start(), released by stop(),
 ---    and rebuilt after any assignment change + reload. The OS call itself lives
 ---    in adapters/hotkey_registrar.lua, so this module never names hs.hotkey.
@@ -28,6 +29,7 @@ local Paths       = require("infra.paths")
 local Logger      = require("infra.logger")
 local GestActions = require("modules.gestures.actions")
 local Storage     = require("adapters.storage")
+local Manifest    = require("infra.manifest_reader")
 
 local LOG = "shortcuts.keyboard_shortcuts"
 
@@ -113,11 +115,23 @@ M.SLOT_GROUPS = {
 -- private list here would be a fourth answer to "which keys exist".
 local KEY_CATALOGUE_PATH = Paths.shared("modules/actions/modifier_chords.json")
 
--- Default assignments (mirrors common macOS conventions + current bindings.lua shortcuts)
-M.DEFAULTS = {
-	-- No hard defaults on a fresh install: all slots start at "none".
-	-- Users configure via the menu.
-}
+-- The manifest section whose entries are this driver's shipped slot bindings.
+-- tools/test/test-keyboard-slot-recommended-bindings.cjs pins what it holds.
+local KEYBOARD_SECTION = "shortcuts.keyboard"
+
+--- The shipped bindings: every manifest shortcuts.keyboard entry for macOS (the
+--- generated manifest lists only this driver's entries with their defaults).
+--- @return table slot_id → action_id
+local function manifest_defaults()
+	local defaults = {}
+	for _, entry in ipairs(Manifest.features()) do
+		if entry.section == KEYBOARD_SECTION and type(entry.id) == "string"
+			and type(entry.default) == "string" then
+			defaults[entry.id] = entry.default
+		end
+	end
+	return defaults
+end
 
 
 
@@ -375,6 +389,21 @@ function M.get_slot_label(slot_id)
 	return slot_label(slot_id)
 end
 
+--- The chord a slot binds, as canonical modifier names and key name.
+--- @param slot_id string
+--- @return table|nil mods, string|nil key Nil when the slot has no known prefix.
+function M.get_slot_chord(slot_id)
+	if type(slot_id) ~= "string" then return nil, nil end
+	for _, entry in ipairs(SLOT_MODS) do
+		local prefix, mods = entry[1], entry[2]
+		if slot_id:sub(1, #prefix) == prefix then
+			local suffix = slot_id:sub(#prefix + 1)
+			return mods, SPECIAL_KEYS[suffix] or suffix
+		end
+	end
+	return nil, nil
+end
+
 --- Lists every slot a group can offer, in catalogue order.
 --- Each entry is { id, label } ready for the picker. An unknown prefix yields an
 --- empty list rather than the whole key space, so a typo in a group definition
@@ -479,9 +508,14 @@ end
 
 --- Loads persisted assignments from hs.settings, seeding defaults first.
 local function load_assignments()
-	-- Seed defaults
-	for slot, action in pairs(M.DEFAULTS) do
-		_actions[slot] = action
+	-- Seed the manifest defaults; a stored value, "none" included, overrides one.
+	for slot, action in pairs(manifest_defaults()) do
+		if GestActions.is_assignable(action) then
+			_actions[slot] = action
+		else
+			Logger.error(LOG, "Manifest default '%s' for slot '%s' is not in the catalogue — left unbound.",
+				action, slot)
+		end
 	end
 	-- Apply user overrides from hs.settings
 	-- We iterate over all known SG action names to find relevant settings keys.

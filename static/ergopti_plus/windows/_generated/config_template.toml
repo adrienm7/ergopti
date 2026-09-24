@@ -425,6 +425,7 @@ win_t = "teleport_mouse"
 win_u = "uppercase_selection"
 win_w = "titlecase_selection"
 win_x = "pick_color"
+win_space = "llm_generate_prediction"
 
 [shortcuts.tap_keys]
 number_row_left = "screen_capture"

@@ -309,6 +309,9 @@ encrypt = false
 enabled = true
 chatgpt_url = "https://chat.openai.com"
 
+[shortcuts.keyboard]
+hs_ctrl_space = "llm_generate_prediction"
+
 [shortcuts.tap_keys]
 number_row_left = "screen_capture"
 number_row_right_1 = "none"

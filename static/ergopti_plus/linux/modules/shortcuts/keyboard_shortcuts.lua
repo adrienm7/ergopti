@@ -24,9 +24,10 @@
 --- 2. The ACTION space is the gestures manager's. One catalogue, one executor,
 ---    one set of labels — a shortcut that ran a second implementation of
 ---    "select the word" would drift from the gesture that runs the first.
---- 3. One default binding. Ctrl+G keeps the product's cross-driver ChatGPT
----    shortcut; every general catalogue slot starts unassigned because desktop
----    environments already own many modifier chords.
+--- 3. Few default bindings. Ctrl+G keeps the product's cross-driver ChatGPT
+---    shortcut, and the manifest's shortcuts.keyboard entries for Linux bind
+---    Super+Space to an AI prediction; every other catalogue slot starts
+---    unassigned because desktop environments already own many modifier chords.
 --- 4. Matching happens here, not in the kernel. There is no userland API on Linux
 ---    to reserve a chord — the daemon already sees every key, so it decides.
 ---    Under the grab (the default) a bound chord is claimed in the keyboard
@@ -41,6 +42,7 @@ local Logger = require("logger.shim")
 local Paths = require("infra.paths")
 local ChatGPT = require("modules.shortcuts.chatgpt")
 local ScriptActions = require("modules.shortcuts.script_actions")
+local Manifest = require("infra.manifest_reader")
 
 local LOG = "modules.shortcuts.keyboard_shortcuts"
 
@@ -95,7 +97,13 @@ M.SLOT_GROUPS = {
 	{ prefix = "ctrl_", group_key = "menu.shortcuts.ctrl_group", add_key = "menu.shortcuts.ctrl_add" },
 	{ prefix = "ctrl_shift_", group_key = "menu.shortcuts.ctrl_shift_group", add_key = "menu.shortcuts.ctrl_shift_add" },
 	{ prefix = "alt_", group_key = "menu.shortcuts.alt_group", add_key = "menu.shortcuts.alt_add" },
+	{ prefix = "super_", group_key = "menu.shortcuts.super_group", add_key = "menu.shortcuts.super_add" },
 }
+
+-- The manifest section whose entries are this driver's shipped slot bindings
+-- (Super+Space generates an AI prediction).
+-- tools/test/test-keyboard-slot-recommended-bindings.cjs pins what it holds.
+local KEYBOARD_SECTION = "shortcuts.keyboard"
 
 -- Where the assignments live. One key per slot rather than one blob, so a
 -- corrupt entry costs one binding instead of all of them.
@@ -238,7 +246,21 @@ local function action_catalogue()
 	return Gestures
 end
 
---- Reads every stored assignment. Idempotent.
+--- The shipped bindings: every manifest shortcuts.keyboard entry for Linux.
+--- @return table slot_id → action_id
+local function manifest_defaults()
+	local defaults = {}
+	for _, entry in ipairs(Manifest.features()) do
+		if entry.section == KEYBOARD_SECTION and type(entry.id) == "string"
+			and type(entry.default) == "string" then
+			defaults[entry.id] = entry.default
+		end
+	end
+	return defaults
+end
+
+--- Reads the manifest defaults, then every stored assignment over them: a
+--- stored "none" clears a default the user removed. Idempotent.
 local function load_assignments()
 	if _loaded then return end
 	_loaded = true
@@ -252,15 +274,23 @@ local function load_assignments()
 		Logger.error(LOG, "Keyboard shortcut assignments not loaded: no catalogue to check them against.")
 		return
 	end
-	local count = 0
+	for slot, action in pairs(manifest_defaults()) do
+		if Gestures.is_assignable(action) then
+			_assignments[slot] = action
+		else
+			Logger.error(LOG, "Manifest default '%s' for %s is not in the catalogue — left unbound.",
+				action, slot)
+		end
+	end
 	for _, key in ipairs(Storage.keys()) do
 		if key:sub(1, #PREF_PREFIX) == PREF_PREFIX then
 			local slot = key:sub(#PREF_PREFIX + 1)
 			local action = Storage.get(key, nil)
-			if type(action) == "string" and action ~= "" and action ~= "none" then
+			if action == "none" then
+				_assignments[slot] = nil
+			elseif type(action) == "string" and action ~= "" then
 				if Gestures.is_assignable(action) then
 					_assignments[slot] = action
-					count = count + 1
 				else
 					Logger.warn(LOG, "Keyboard slot '%s' holds unknown action '%s' — left unbound.",
 						slot, action)
@@ -268,6 +298,8 @@ local function load_assignments()
 			end
 		end
 	end
+	local count = 0
+	for _ in pairs(_assignments) do count = count + 1 end
 	Logger.info(LOG, "Keyboard shortcut assignments loaded (%d bound).", count)
 end
 
@@ -307,7 +339,14 @@ function M.set_action(slot_id, action_id)
 	end
 
 	if type(action_id) ~= "string" or action_id == "" or action_id == "none" then
-		if not Storage.delete(PREF_PREFIX .. slot_id) then
+		-- A slot the manifest binds keeps an explicit "none": deleting the entry
+		-- would bring the default back at the next start.
+		if manifest_defaults()[slot_id] ~= nil then
+			if not Storage.set(PREF_PREFIX .. slot_id, "none") then
+				Logger.error(LOG, "set_action(): could not persist the removal of '%s'.", slot_id)
+				return false
+			end
+		elseif not Storage.delete(PREF_PREFIX .. slot_id) then
 			Logger.error(LOG, "set_action(): could not persist the removal of '%s'.", slot_id)
 			return false
 		end

@@ -337,6 +337,22 @@
 				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/test_tap_keys.lua"
 			]
 		},
+		"shortcuts.keyboard.super_space": {
+			"registered": "yes",
+			"production_caller": "yes",
+			"persisted": "yes",
+			"applied": "yes",
+			"hardware_proven": "unverified",
+			"proof_tier": "unit",
+			"intentional": true,
+			"evidence": [
+				"static/ergopti_plus/linux/modules/shortcuts/keyboard_shortcuts.lua",
+				"static/ergopti_plus/linux/modules/llm/prediction_engine.lua",
+				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/test_keyboard_shortcuts.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/llm/test_prediction_trigger_now.lua"
+			]
+		},
 		"llm.trigger.debounce_ms": {
 			"registered": "yes",
 			"production_caller": "yes",

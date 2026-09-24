@@ -17,6 +17,7 @@ local MODULES = {
 	"adapters.file_system",
 	"infra.paths",
 	"infra.logger",
+	"infra.manifest_reader",
 	"modules.gestures.actions",
 	"modules.shortcuts.keyboard_shortcuts",
 }
@@ -85,6 +86,9 @@ local function with_subject(initial_action, scenario)
 		read = function() return '{"keys":[{"id":"a","label":"A"}]}' end,
 	}
 	package.loaded["infra.paths"] = {shared = function() return "catalogue.json" end}
+	-- No shipped bindings: the transaction under test owns the one cmd_a slot, and
+	-- the manifest defaults have their own test (test_keyboard_shortcuts_manifest_defaults.lua).
+	package.loaded["infra.manifest_reader"] = {features = function() return {} end}
 	local logger = helpers.make_logger_stub()
 	logger.callback = function(_, _, fn, ...)
 		local ok, result = xpcall(fn, debug.traceback, ...)

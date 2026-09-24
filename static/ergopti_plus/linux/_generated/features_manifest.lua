@@ -394,6 +394,9 @@ M.features = {
 		path = "shortcuts.wrap_text_if_selected", id = "wrap_text_if_selected", section = "shortcuts", default = true, type = "boolean", description_key = "shortcuts.label_wrap_text", platforms = { "ahk", "linux" },
 	},
 	{
+		path = "shortcuts.keyboard.super_space", id = "super_space", section = "shortcuts.keyboard", default = "llm_generate_prediction", type = "action", description_key = "menu.shortcuts.keyboard.super_space", platforms = { "linux" },
+	},
+	{
 		path = "shortcuts.tap_keys.number_row_left", id = "number_row_left", section = "shortcuts.tap_keys", default = "screen_capture", type = "action", description_key = "menu.shortcuts.tap_keys.number_row_left", platforms = { "ahk", "hs", "linux" },
 	},
 	{
@@ -797,6 +800,12 @@ M.unavailable = {
 	},
 	{
 		path = "shortcuts.keyboard.win_x", section = "shortcuts.keyboard", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.keyboard.win_space", section = "shortcuts.keyboard", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.keyboard.hs_ctrl_space", section = "shortcuts.keyboard", reason_key = "", platforms = { "hs" },
 	},
 	{
 		path = "gestures.space_wrap", section = "gestures", reason_key = "", platforms = { "hs" },

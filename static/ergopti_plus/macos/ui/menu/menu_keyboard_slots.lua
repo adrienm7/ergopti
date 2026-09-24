@@ -33,6 +33,9 @@ local DeferredWork = require("infra.deferred_work")
 local ActionPicker = require("ui.action_picker")
 local ShortcutUtils = require("ui.menu.shortcut_utils")
 local KbShortcuts  = require("modules.shortcuts")
+local InputSourceConflict = require("modules.shortcuts.input_source_conflict")
+local ShellRunner  = require("adapters.shell_runner")
+local dialog       = require("infra.dialog_util")
 
 local LOG = "menu.keyboard_slots"
 
@@ -109,6 +112,33 @@ end
 -- ==========================================
 -- ==========================================
 
+--- Warns, with a button to the fix, when macOS's own input-source shortcut
+--- still owns the chord just bound: the system takes the press first, so the
+--- slot would never fire and nothing would say why.
+--- @param slot_id string
+function M.warn_if_input_source_conflict(slot_id)
+	local mods, key = KbShortcuts.get_keyboard_slot_chord(slot_id)
+	if not mods then return false end
+	return InputSourceConflict.check(mods, key, function(ids)
+		if #ids == 0 then return end
+		Logger.warn(LOG, "Slot '%s' is also macOS's input-source shortcut (symbolic hotkey %s) — it will not fire.",
+			slot_id, table.concat(ids, ", "))
+		DeferredWork.after(0.3, function()
+			local open_label = i18n.get("button.open_settings")
+			local ok, clicked = pcall(dialog.block_alert,
+				i18n.get("dialog.keyboard_shortcut.input_source_conflict_title"),
+				string.format(i18n.get("dialog.keyboard_shortcut.input_source_conflict_body"),
+					KbShortcuts.get_keyboard_slot_label(slot_id)),
+				open_label, i18n.get("button.ok"), "warning")
+			if not ok then
+				Logger.error(LOG, "Input-source conflict dialog raised: %s.", tostring(clicked))
+			elseif clicked == open_label then
+				ShellRunner.open(InputSourceConflict.SETTINGS_URL)
+			end
+		end, "menu_keyboard_slots.input_source_conflict")
+	end)
+end
+
 --- Opens the action picker for one slot and applies the choice.
 --- @param slot_id string
 --- @param ctx table The menu context (needs gestures and updateMenu).
@@ -131,6 +161,7 @@ local function choose_action_for(slot_id, ctx)
 				return false
 			end
 			if type(ctx.updateMenu) == "function" then ctx.updateMenu() end
+			if action_id ~= NONE_ID then M.warn_if_input_source_conflict(slot_id) end
 			return true
 		end
 		-- An action with a parameter (wrap_selection's pair, open_url's link) does
