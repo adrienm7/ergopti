@@ -746,6 +746,34 @@ function M.set_layout_by_kl_name_async(kl_name, on_done)
 	return set_input_source_async(localised, kl_name, on_done)
 end
 
+--- The layout a pause (or a resume) switches to, or nil when switching is off
+--- or set to « no change ». Pause, resume and quit all read it here.
+--- @param state table|nil Menu state (layout_pause_switch_enabled, layout_on_pause, layout_on_resume).
+--- @param is_paused boolean True for the pause target, false for the resume one.
+--- @return string|nil kl_name
+local function switch_target(state, is_paused)
+	if type(state) ~= "table" or not state.layout_pause_switch_enabled then return nil end
+	local target = is_paused and state.layout_on_pause or state.layout_on_resume
+	-- Nil / false / "auto" / "" all mean « do nothing » (the dropdowns default to false).
+	if type(target) ~= "string" or target == "" then return nil end
+	return target
+end
+
+--- Switches to the pause layout before ErgoptiPlus quits: quitting leaves the
+--- keyboard on the input source a pause selects, and has no setting of its own.
+--- @param state table|nil Menu state.
+--- @param on_done function|nil fn(ok, output, reason), called exactly once when a
+---   switch was started (set_input_source_async answers on every path).
+--- @return string "none" when nothing is configured, "pending" once on_done is owed.
+function M.apply_quit_layout(state, on_done)
+	local target = switch_target(state, true)
+	if target == nil then return "none" end
+	Logger.info(LOG, "Quit: applying the pause keyboard layout.")
+	-- Looked up on M at call time so a test stub on the module is honoured.
+	M.set_layout_by_kl_name_async(target, on_done)
+	return "pending"
+end
+
 --- Schedules the pause / resume keyboard-layout switch on a DEFERRED run-loop
 --- cycle instead of running it inline.
 ---
@@ -757,10 +785,8 @@ end
 --- @param schedule function|nil Injectable scheduler(fn) for tests.
 --- @return string|nil The target layout that was scheduled, or nil when no switch is needed.
 function M.schedule_pause_layout_switch(is_paused, state, schedule)
-	if type(state) ~= "table" or not state.layout_pause_switch_enabled then return nil end
-	local target = is_paused and state.layout_on_pause or state.layout_on_resume
-	-- Nil / false / "auto" / "" all mean « do nothing » (the dropdowns default to false).
-	if type(target) ~= "string" or target == "" then return nil end
+	local target = switch_target(state, is_paused)
+	if target == nil then return nil end
 	-- Resolve hs.timer lazily so the module stays loadable in the cross-platform
 	-- test harness where hs is absent and the scheduler is injected.
 	if type(schedule) ~= "function" then
