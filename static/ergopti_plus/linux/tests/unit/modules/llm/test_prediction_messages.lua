@@ -31,6 +31,8 @@ end
 --- @param profile table
 --- @param context string
 --- @return table messages
+local last_meta = nil
+
 local function messages_for(profile, context)
 	local names = {
 		"adapters.secure_field_detector", "modules.llm.api_ollama",
@@ -61,7 +63,10 @@ local function messages_for(profile, context)
 	local engine = helpers.load_module("modules.llm.prediction_engine")
 	-- Initialised as the daemon does, which once passed a context length that
 	-- shadowed the menu's setting.
-	engine.init({ max_context = 500, triggers = { "//" } })
+	engine.init({ max_context = 500, triggers = { "//" }, overlay = {
+		show = function(_, meta) last_meta = meta; return true end,
+		hide = function() return true end,
+	} })
 	local ok, err = pcall(engine.predict, context)
 	for _, name in ipairs(names) do package.loaded[name] = previous[name] end
 	package.loaded["modules.llm.prediction_engine"] = nil
@@ -148,6 +153,21 @@ helpers.describe("prediction messages: the word limits and language the prompt s
 		local sent = messages_for(builtin("basic"), "Hallo zusammen")
 		I18n.get_locale = previous
 		helpers.assert_true(sent[1].content:find("default to de", 1, true) ~= nil, sent[1].content)
+	end)
+
+end)
+
+helpers.describe("prediction info bar: the profile is named, not numbered", function()
+
+	helpers.it("shows a user profile's own label", function()
+		messages_for({ id = "user_1727_3", label = "Mon style", system_single = "Écris la suite." }, "Bonjour")
+		helpers.assert_eq(last_meta.profile, "Mon style")
+	end)
+
+	helpers.it("shows a built-in's short translated name", function()
+		messages_for(builtin("basic"), "Bonjour")
+		helpers.assert_true(last_meta.profile ~= "basic" and not last_meta.profile:find("—", 1, true),
+			"got " .. tostring(last_meta.profile))
 	end)
 
 end)
