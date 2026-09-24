@@ -87,18 +87,27 @@ _TPGF_OwnersApplyGreying() {
 		"a freshly published root must receive the current pause state")
 }
 
-; The top-level ids a pause switches off. Each one's root builder must stage its
-; row as a feature row so the pause greys it, and every other builder must stage
-; a plain row so « Suspendre », language, reload, quit and debug stay live. Keyed
-; by manifest id rather than by position: the manifest decides where each row
-; sits, so "the rows before the tail" no longer names anything.
-global _TPGF_FEATURE_IDS := ["keyboard_layout", "hotstrings", "llm", "metrics",
-	"shortcuts", "tap_holds", "gestures"]
+; The top-level ids a pause switches off: the rows the manifest marks
+; `greyed_when_paused`, visible on this platform. Each one's root builder must
+; stage its row as a feature row so the pause greys it, and every other builder
+; must stage a plain row so « Suspendre », language, reload, quit and debug stay
+; live. Read from the manifest, which the macOS and Linux roots read too, so the
+; three trays grey the same rows.
+_TPGF_MarkedFeatureIds() {
+	Ids := []
+	for _, Entry in MenuManifest_LoadTopLevel() {
+		if (Entry is Map) && _MR_IsForAhk(Entry) && (Entry.Get("greyed_when_paused", false) == true)
+			Ids.Push(Entry["id"])
+	}
+	return Ids
+}
 
 _TPGF_EveryFeatureRowIsStagedAsAFeature() {
 	Builders := _MI_TopLevelBuilders()
 	Features := Map()
-	for _, Id in _TPGF_FEATURE_IDS {
+	Marked := _TPGF_MarkedFeatureIds()
+	Assert(Marked.Length >= 7, "the manifest must mark the feature rows a pause greys, got " . Marked.Length)
+	for _, Id in Marked {
 		Assert(Builders.Has(Id), "the tray root must have a builder for the feature row " . Id)
 		Features[Id] := true
 	}

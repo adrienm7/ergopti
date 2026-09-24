@@ -79,8 +79,10 @@ Each of the three drivers builds its tray root with one loop over the manifest
 `_MI_TopLevelBuilders`/`_MI_StageTopLevel`, Linux `M.build`. To reorder the root,
 edit `manifest.toml`, not a driver. `test-menu-top-level-parity.cjs` pins the
 approved order and checks both directions of each table. The macOS and AHK drift
-gates also render a shuffled top level. Pause greying is keyed by id, so a moved
-feature row stays greyed.
+gates also render a shuffled top level. The rows a pause greys carry
+`greyed_when_paused` in the manifest: macOS and Linux grey what it marks, the AHK
+pause test holds each Windows builder's `TrayMenuStage_AddFeature` to it, and a
+new feature row needs the mark, never a driver-side id list.
 
 ### project-two-keys-for-one-row-is-two-menus
 

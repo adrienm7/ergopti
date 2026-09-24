@@ -337,20 +337,6 @@ local function _build_header(ctx)
 	return { label = "Ergopti — " .. version, disabled = true }
 end
 
--- The top-level rows a pause greys: every feature the pause switches off. The
--- tail (updates, configuration, language, about, reload, quit, debug) stays
--- live, as on macOS — it is how the user inspects, resumes or leaves a paused
--- script.
-local PAUSE_GREYED_ROWS = {
-	keyboard_layout = true,
-	hotstrings      = true,
-	llm             = true,
-	metrics         = true,
-	shortcuts       = true,
-	tap_holds       = true,
-	gestures        = true,
-}
-
 --- Greys one feature row for a pause, and strips what would let it act.
 ---
 --- Stripped, not merely greyed: a disabled row whose submenu or handler survives
@@ -3660,7 +3646,11 @@ function M.build(ctx)
 					Logger.error(LOG, "No builder for top-level row '%s' — the entry is missing.", tostring(id))
 				elseif id == "quit" then
 					quit_row = build(ctx)
-				elseif ctx.paused == true and PAUSE_GREYED_ROWS[id] then
+				elseif ctx.paused == true and row.greyed_when_paused == true then
+					-- The rows the manifest marks as features, the same ones on the
+					-- three trays. The tail (updates, configuration, language, about,
+					-- reload, quit, debug) stays live: it is how the user inspects,
+					-- resumes or leaves a paused script.
 					rows[#rows + 1] = _grey_for_pause(build(ctx))
 				else
 					rows[#rows + 1] = build(ctx)

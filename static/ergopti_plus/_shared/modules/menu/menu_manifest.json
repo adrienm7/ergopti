@@ -75,34 +75,42 @@
 	},
 	"top_level": [
 		{
-			"id": "tap_holds"
+			"id": "tap_holds",
+			"greyed_when_paused": true
 		},
 		{
-			"id": "shortcuts"
+			"id": "shortcuts",
+			"greyed_when_paused": true
 		},
 		{
-			"id": "gestures"
-		},
-		{
-			"id": "---"
-		},
-		{
-			"id": "keyboard_layout"
-		},
-		{
-			"id": "hotstrings"
-		},
-		{
-			"id": "llm"
+			"id": "gestures",
+			"greyed_when_paused": true
 		},
 		{
 			"id": "---"
 		},
 		{
-			"id": "metrics"
+			"id": "keyboard_layout",
+			"greyed_when_paused": true
+		},
+		{
+			"id": "hotstrings",
+			"greyed_when_paused": true
+		},
+		{
+			"id": "llm",
+			"greyed_when_paused": true
+		},
+		{
+			"id": "---"
+		},
+		{
+			"id": "metrics",
+			"greyed_when_paused": true
 		},
 		{
 			"id": "apps",
+			"greyed_when_paused": true,
 			"platforms": [
 				"hs"
 			],

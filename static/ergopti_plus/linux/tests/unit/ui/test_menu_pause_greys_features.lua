@@ -5,9 +5,10 @@
 --- DESCRIPTION:
 --- The menu builder never read the pause state: while paused every feature row
 --- stayed live, and the title row was a disabled label with no action, so the
---- tray offered no way back. It now greys and strips every feature row, keeps
---- the tail (global actions, language, about, reload, quit, debug) live, and
---- the title row resumes the script, as on macOS.
+--- tray offered no way back. It now greys and strips every row the manifest
+--- marks `greyed_when_paused` (the features), keeps the tail (configuration,
+--- language, about, reload, quit, debug) live, and the title row resumes the
+--- script, as on macOS.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -115,6 +116,39 @@ helpers.describe("tray (linux): a pause greys every feature row", function()
 			local row = row_for(items, key)
 			helpers.assert_true(row ~= nil and row.disabled ~= true, key .. " must be live while running")
 		end
+	end)
+
+	helpers.it("greys exactly the rows the manifest marks, wherever they sit", function()
+		-- The mark moves from Metrics to Language. A driver that keeps its own
+		-- list of the feature ids keeps greying Metrics and leaves Language live,
+		-- so it fails even while that list matches the shipped manifest.
+		local ManifestMenu = require("infra.manifest_menu")
+		local shipped = ManifestMenu.get_array("top_level")
+		local marked = 0
+		local moved = {}
+		for index, row in ipairs(shipped) do
+			local copy = {}
+			for key, value in pairs(row) do copy[key] = value end
+			if copy.greyed_when_paused == true then marked = marked + 1 end
+			if copy.id == "metrics" then copy.greyed_when_paused = nil end
+			if copy.id == "language" then copy.greyed_when_paused = true end
+			moved[index] = copy
+		end
+		helpers.assert_true(marked >= 7,
+			"the manifest must mark the feature rows a pause greys, got " .. marked)
+		local original = ManifestMenu.get_array
+		ManifestMenu.get_array = function(key)
+			if key == "top_level" then return moved end
+			return original(key)
+		end
+		local ok, items = pcall(build, true)
+		ManifestMenu.get_array = original
+		helpers.assert_true(ok, "the tray must build: " .. tostring(items))
+		local metrics = row_for(items, "menu.metrics.title")
+		local language = row_for(items, "menu.global.language")
+		helpers.assert_true(metrics ~= nil and language ~= nil, "both rows must be drawn")
+		helpers.assert_true(metrics.disabled ~= true, "a row the manifest does not mark stays live while paused")
+		helpers.assert_eq(language.disabled, true, "a row the manifest marks is greyed while paused")
 	end)
 
 	helpers.it("shows a source run's version without a stray v", function()
