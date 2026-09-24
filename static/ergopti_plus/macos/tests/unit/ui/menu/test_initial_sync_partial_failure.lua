@@ -77,6 +77,20 @@ helpers.describe("initial sync isolates one refused owner (R5)", function()
 			"once the user changed it, the saved value no longer overrides the state")
 	end)
 
+	helpers.it("keeps the saved value when the change that ended a demotion fails to save", function()
+		local fixture = boot({ gestures_enable = false })
+		fixture.state.gestures = true
+		fixture.refuse_next_save()
+		helpers.assert_eq(fixture.save_prefs(), false, "the refused write must not commit")
+		helpers.assert_eq(fixture.state.gestures, false,
+			"the refused save must roll the change back to the demoted posture")
+		helpers.assert_eq(#fixture.saves, 0)
+
+		helpers.assert_eq(fixture.save_prefs(), true)
+		helpers.assert_eq(fixture.saves[#fixture.saves].gestures, true,
+			"a change that never reached config.toml must not end the demotion")
+	end)
+
 	helpers.it("lets Disable All write its explicit OFF over a demoted feature", function()
 		local fixture = boot({ gestures_enable = false })
 		helpers.assert_eq(fixture.global_actions().disable_all(), true)

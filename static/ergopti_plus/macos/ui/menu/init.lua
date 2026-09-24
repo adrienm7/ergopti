@@ -969,6 +969,8 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end,
 		on_commit           = function()
 			_menu_dirty = true
+			-- Only a written change ends a demotion; a refused write rolls it back.
+			session_demotions.settle(state)
 		end,
 		on_rollback         = function()
 			_menu_dirty = true
