@@ -314,6 +314,14 @@ _required_dependency_package() {
 		pacman:libatspi.so.0) echo "at-spi2-core" ;;
 		xbps:libatspi.so.0) echo "at-spi2-core" ;;
 		apk:libatspi.so.0) echo "at-spi2-core" ;;
+		# The tray's dialogs: every prompt (a delay, a link, an API key) and
+		# every confirmation is a zenity window. KDE and minimal images lack it.
+		apt:zenity) echo "zenity" ;;
+		dnf:zenity) echo "zenity" ;;
+		zypper:zenity) echo "zenity" ;;
+		pacman:zenity) echo "zenity" ;;
+		xbps:zenity) echo "zenity" ;;
+		apk:zenity) echo "zenity" ;;
 		# The tray icon. platform/tray/appindicator.lua binds this library
 		# through FFI; without it --tray has nothing to host the icon in.
 		apt:tray) echo "libayatana-appindicator3-1" ;;
@@ -415,6 +423,7 @@ echo "=== Ergopti ${ERGOPTI_VERSION} — vérification des dépendances ==="
 # forked once per event, which is what made the keyboard grab unaffordable.
 _check_or_install luajit
 _check_or_install notify-send
+_check_or_install zenity
 _check_or_install unzip
 _check_or_install sha256sum
 # The live keymap shared by capture and injection. The daemon now fails closed

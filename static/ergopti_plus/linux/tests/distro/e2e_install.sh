@@ -140,7 +140,7 @@ INSTALLED_LUA_PATH="${LIB_ROOT}/linux/?.lua;${LIB_ROOT}/linux/?/init.lua;${LIB_R
 
 
 section "Runtime dependencies"
-for cmd in luajit notify-send xkbcli sha256sum unzip; do
+for cmd in luajit notify-send zenity xkbcli sha256sum unzip; do
 	if as_user "command -v ${cmd}" >/dev/null 2>&1; then ok "${cmd} is on PATH"; else fail "${cmd} is missing after install"; fi
 done
 # kanata is optional by design (tap-holds and layers; hotstrings work without
