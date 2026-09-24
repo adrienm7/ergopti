@@ -12,6 +12,9 @@
 ---
 --- The hook now reports the non-modifier keys it forwarded as held, and every
 --- output transaction releases them before its first key.
+---
+--- The same holds for Ctrl, Alt and Super: a prediction accepted with Alt+1
+--- was typed with Alt still down, so the application received Alt+q, Alt+u…
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -60,10 +63,11 @@ end)
 --- Loads the injector over a hook that reports `held` and a recording channel.
 --- @param held table evdev keycodes the hook reports as forwarded and held.
 --- @return table injector, table channel
-local function load(held)
+local function load(held, shortcut_modifiers)
 	local real_hook = package.loaded["adapters.keyboard_hook"]
 	package.loaded["adapters.keyboard_hook"] = {
 		held_text_modifier_codes = function() return {} end,
+		held_shortcut_modifier_codes = function() return shortcut_modifiers or {} end,
 		held_forwarded_keys = function() return held end,
 	}
 	local layout = helpers.load_module("adapters.keyboard_layout")
@@ -113,6 +117,33 @@ helpers.describe("injector: a held terminator is released before the replacement
 		injector.inject(1, "x")
 		restore()
 		helpers.assert_eq(first(channel, KEY_SPACE, 0), nil)
+	end)
+
+end)
+
+helpers.describe("injector: text is never typed under Alt", function()
+
+	helpers.it("releases a held Alt after a masking tap and does not press it again", function()
+		-- Alt+1 accepts a prediction; the physical Alt is still down.
+		local KEY_LEFTALT, KEY_F24 = 56, 194
+		local injector, channel, restore = load({}, { KEY_LEFTALT })
+		injector.inject(2, "x")
+		restore()
+		local mask = first(channel, KEY_F24, 1)
+		local release = first(channel, KEY_LEFTALT, 0)
+		local text = first(channel, 45, 1)
+		helpers.assert_true(mask ~= nil and release ~= nil and mask < release,
+			"a masking key comes before the release, so it is not a lone Alt tap")
+		helpers.assert_true(release < first(channel, KEY_BACKSPACE, 1) and release < text,
+			"Alt is up before the first erase and the first letter")
+		helpers.assert_eq(first(channel, KEY_LEFTALT, 1), nil, "and it is not pressed again afterwards")
+	end)
+
+	helpers.it("adds no mask when no shortcut modifier is held", function()
+		local injector, channel, restore = load({}, {})
+		injector.inject(0, "x")
+		restore()
+		helpers.assert_eq(first(channel, 194, 1), nil)
 	end)
 
 end)

@@ -779,6 +779,20 @@ function M.held_text_modifier_codes()
 	return held
 end
 
+--- Shortcut modifiers (Ctrl, Alt, Super) the user is holding, in press order.
+---
+--- Text never needs them, and typed while one is held each character becomes a
+--- shortcut: accepting a prediction with Alt+1 typed it as Alt+q, Alt+u, …
+--- @return table Ordered evdev keycodes.
+function M.held_shortcut_modifier_codes()
+	local held = {}
+	for _, entry in ipairs(_modifier_order) do
+		local role = _modifier_down[entry.key]
+		if role == "ctrl" or role == "alt" or role == "meta" then held[#held + 1] = entry.code end
+	end
+	return held
+end
+
 --- Non-modifier keys this daemon has forwarded as pressed and not yet released.
 ---
 --- An expansion fires on the terminator's key-DOWN, which has already been
