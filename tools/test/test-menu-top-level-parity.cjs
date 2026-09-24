@@ -34,15 +34,14 @@
  * 2. Ordering divergences are declared with a reason. Linux is not required to
  *    match the manifest's ORDER — a tray menu has its own conventions — but a
  *    divergence has to be written down rather than discovered.
- * 3. macOS and Windows handle exactly the tail rows the manifest declares for
- *    them. Added 2026-08-04, because "those two render from the manifest" was
- *    true and misleading: they iterate it and dispatch each id through a
- *    hardcoded if/elseif chain, so the manifest supplies the ORDER and the driver
- *    supplies every ROW. An id added to the manifest and not to a chain renders
- *    nothing; an id removed leaves a dead branch. Their own drift gates compare
- *    the manifest against a hand-typed list and cannot see either. Linux — the
- *    driver with no manifest renderer at all — was the only one whose real
- *    builder was ever read.
+ * 3. macOS and Windows build exactly the top-level rows the manifest declares
+ *    for them. Added 2026-08-04, because "those two render from the manifest"
+ *    was true and misleading: they iterated only its tail and dispatched each id
+ *    through a hardcoded if/elseif chain, so the manifest supplied part of the
+ *    ORDER and the driver supplied every ROW. A driver whose root loops over the
+ *    whole top_level through a builder table is read here the way Linux is:
+ *    an id declared and missing from the table renders nothing, and an id in
+ *    the table the manifest does not declare is dead code.
  *
  * WHAT IT DELIBERATELY DOES NOT DO:
  * render the three menus and diff their translated labels. That needs Linux to
@@ -268,111 +267,102 @@ if (declaredOrder !== builtOrder && !KNOWN_ORDER_DIVERGENCES.linux) {
 // ==================================================
 
 // WHY THIS EXISTS, AND WHY IT WAS THE HOLE NOBODY SAW.
-// macOS and Windows both "render from the manifest", which is true and hid the
-// gap: they iterate the manifest's tail and dispatch each id through a hardcoded
-// if/elseif chain. The rows are NOT generic — the manifest supplies the order,
-// the driver supplies every row. So an id added to the manifest and not to a
-// chain renders nothing, and an id removed from the manifest leaves a dead
-// branch, and until 2026-08-04 neither was checked anywhere.
+// macOS and Windows both "rendered from the manifest", which was true and hid
+// the gap: they iterated only the manifest's TAIL, from `global_actions` onward,
+// and dispatched each id through a hardcoded if/elseif chain, while the feature
+// rows above it were a fixed sequence of calls. The manifest supplied half the
+// order and none of the rows, so reordering the feature rows, putting a
+// separator among them or renaming the anchor changed Linux and nothing else.
 //
-// Both drivers do have a drift gate — macos/tests/meta/ and windows/tests/meta/
-// test_menu_top_level_drift_gate.{lua,ahk} — but each compares the manifest
-// against a HAND-TYPED list of ids. That alarms on manifest edits and says
-// nothing about the drivers. Linux, the driver with no manifest renderer at all,
-// was the only one whose real builder was read (section 2 above). Generalising
-// that read to the other two is smaller than writing two more drift gates, and
-// it is what eventually makes the two hand-typed lists redundant.
-//
-// Order is deliberately NOT compared here. Both chains iterate the manifest and
-// dispatch, so the ORDER a user sees is the manifest's whatever order the
-// branches happen to be written in. Only membership can be wrong.
+// A driver that builds its root the way Linux does — one loop over the whole
+// top_level, one builder per id — gets the ORDER from the manifest by
+// construction. What can still be wrong is membership: an id declared and
+// absent from the table renders nothing (the loop logs it, nothing fails), and
+// an id in the table that the manifest does not declare for that driver is dead
+// code. Both directions are checked here, per driver. The rendered order,
+// separators included, is compared by each driver's own drift gate
+// (test_menu_top_level_drift_gate.{lua,ahk}), which renders the root.
 
-const DRIVER_TAIL_CHAINS = {
+const DRIVER_ROOTS = {
 	hs: {
 		file: path.join(SP, 'macos', 'ui', 'menu', 'builder.lua'),
 		label: 'macos/ui/menu/builder.lua',
-		// The tail loop. Its nested submenu chains compare `gid` and `did`, so a
-		// word-boundary match on `id` selects the top level and only the top level.
-		start: 'for _, entry in ipairs(load_top_level_tail()) do',
-		end: '\n\tend\n',
-		id: /\bid == "([^"]+)"/g
+		// The dispatch loop, which must read the WHOLE array, not a tail of it.
+		loop: 'for _, entry in ipairs(load_top_level()) do',
+		// The builder table M.generate dispatches through. Its entries sit two
+		// tabs deep; the command tables inside the builders sit deeper, so the
+		// anchored key pattern reads the top level and only the top level.
+		table: /\n\tlocal builders = \{\n([\s\S]*?)\n\t\}\n/,
+		key: /^\t\t\["(\w+)"\]\s*=/gm
 	},
 	ahk: {
 		file: path.join(SP, 'windows', 'ui', 'menu', 'menu_init.ahk'),
 		label: 'windows/ui/menu/menu_init.ahk',
-		start: '_MI_AppendTail() {',
-		end: '\n}',
-		id: /\bId == "([^"]+)"/g
+		loop: '_MI_StageTopLevel(MenuManifest_LoadTopLevel(), _MI_TopLevelBuilders())',
+		// The Map _MI_TopLevelBuilders returns: one "id", builder pair per line.
+		table: /\n_MI_TopLevelBuilders\(\) \{\n\treturn Map\(\n([\s\S]*?)\n\t\)\n\}/,
+		key: /^\t\t"(\w+)",\s*_MI_Stage\w+/gm
 	}
 };
 
 // Floor. A regex that stops matching would report the driver as building nothing
 // and then complain that the manifest declares everything — loud, but for the
 // wrong reason, and the fix would be to the wrong file.
-const MIN_TAIL_IDS = 8;
-
-// The tail is the manifest's own boundary between feature menus and system-wide
-// actions: both drivers slice top_level from `global_actions` onward, and Linux
-// builds the same rows through its own functions.
-const TAIL_ANCHOR = 'global_actions';
+const MIN_ROOT_IDS = 8;
 
 /**
- * The tail ids the manifest declares for one driver.
- * @param {string} driver "hs" or "ahk".
- * @returns {string[]}
+ * The top-level ids one driver builds, read from its source.
+ * @param {object} spec Entry of DRIVER_ROOTS.
+ * @param {string} src Driver source.
+ * @returns {string[]|null} Ids, or null when the scan found no anchor.
  */
-function tailProjectionFor(driver) {
-	const rows = topLevel || [];
-	const at = rows.findIndex((row) => row && row.id === TAIL_ANCHOR);
-	if (at < 0) return [];
-	return rows
-		.slice(at)
-		.filter((row) => !row.platforms || row.platforms.includes(driver))
-		.map((row) => row.id)
-		.filter((id) => id !== SEPARATOR);
+function builtIds(spec, src) {
+	if (!src.includes(spec.loop)) {
+		errors.push(
+			`${spec.label}: could not find "${spec.loop}" — the root no longer loops over the whole ` +
+				'top_level, so the manifest does not decide its order. Repoint this gate only if the loop ' +
+				'was renamed; a fixed sequence of calls is the defect it exists to catch.'
+		);
+		return null;
+	}
+	const block = src.match(spec.table);
+	if (!block) {
+		errors.push(`${spec.label}: could not find its builder table — this comparison reads nothing.`);
+		return null;
+	}
+	return [...block[1].matchAll(spec.key)].map((m) => m[1]);
 }
 
-for (const [driver, spec] of Object.entries(DRIVER_TAIL_CHAINS)) {
-	const src = fs.readFileSync(spec.file, 'utf8');
-	const from = src.indexOf(spec.start);
-	if (from < 0) {
-		errors.push(
-			`${spec.label}: could not find "${spec.start}" — the dispatch chain moved or was renamed, ` +
-				'and this comparison reads nothing. Repoint it; do not delete it.'
-		);
-		continue;
-	}
-	const rest = src.slice(from);
-	const to = rest.indexOf(spec.end);
-	const block = to > 0 ? rest.slice(0, to) : rest;
-	const built = [...block.matchAll(spec.id)].map((m) => m[1]).filter((id) => id !== SEPARATOR);
+for (const [driver, spec] of Object.entries(DRIVER_ROOTS)) {
+	const built = builtIds(spec, fs.readFileSync(spec.file, 'utf8'));
+	if (!built) continue;
 
-	if (built.length < MIN_TAIL_IDS) {
+	if (built.length < MIN_ROOT_IDS) {
 		errors.push(
-			`${spec.label}: read only ${built.length} tail id(s) (floor ${MIN_TAIL_IDS}) — the scan is ` +
-				'broken, so the comparison below would report the manifest as wholly unimplemented'
+			`${spec.label}: read only ${built.length} top-level id(s) (floor ${MIN_ROOT_IDS}) — the scan ` +
+				'is broken, so the comparison below would report the manifest as wholly unimplemented'
 		);
 		continue;
 	}
 
-	const declared = new Set(tailProjectionFor(driver));
+	const declared = new Set(projections[driver]);
 	const handled = new Set(built);
 
 	const unhandled = [...declared].filter((id) => !handled.has(id));
 	if (unhandled.length > 0) {
 		errors.push(
-			`the manifest declares ${unhandled.length} tail row(s) for ${driver} that ${spec.label} has no ` +
-				`branch for: ${unhandled.join(', ')}. The loop will reach the id and fall through, so the ` +
-				'row is in the manifest, counted by every gate, and invisible in the menu.'
+			`the manifest declares ${unhandled.length} top-level row(s) for ${driver} that ${spec.label} has ` +
+				`no builder for: ${unhandled.join(', ')}. The loop will reach the id and skip it, so the row is ` +
+				'in the manifest, counted by every gate, and invisible in the menu.'
 		);
 	}
 
 	const orphaned = [...handled].filter((id) => !declared.has(id));
 	if (orphaned.length > 0) {
 		errors.push(
-			`${spec.label} has ${orphaned.length} branch(es) for tail row(s) the manifest does not declare ` +
-				`for ${driver}: ${orphaned.join(', ')}. Either the manifest dropped the row and this is dead ` +
-				'code, or a platform restriction excludes it and the branch is unreachable.'
+			`${spec.label} has ${orphaned.length} builder(s) for top-level row(s) the manifest does not ` +
+				`declare for ${driver}: ${orphaned.join(', ')}. Either the manifest dropped the row and this is ` +
+				'dead code, or a platform restriction excludes it and the builder is unreachable.'
 		);
 	}
 }
@@ -395,8 +385,8 @@ if (errors.length > 0) {
 console.log(
 	`\x1b[32m[OK] top-level menu shape agrees: manifest projects ${projections.ahk.length} row(s) for ` +
 		`Windows, ${projections.hs.length} for macOS, ${projections.linux.length} for Linux; ` +
-		`menu_builder.lua builds exactly those ${linuxBuilt.length}, and both dispatch chains handle ` +
-		'exactly the tail rows their driver is declared for.\x1b[0m'
+		`menu_builder.lua builds exactly those ${linuxBuilt.length}, and the macOS and Windows roots ` +
+		'build exactly the rows their driver is declared for.\x1b[0m'
 );
 for (const [driver, why] of Object.entries(KNOWN_ORDER_DIVERGENCES)) {
 	console.log(`     · ${driver} order: ${why}`);

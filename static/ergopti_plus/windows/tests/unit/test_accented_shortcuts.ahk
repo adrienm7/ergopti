@@ -171,6 +171,6 @@ _ACS_LayoutSectionsCase() {
 	AltGrRows := _DriverFuncBody("_LAY_LayoutFeatureAltGrRows")
 	Assert(InStr(AltGrRows, '"direct_access_digits", true') > 0,
 		"the Ergopti AltGr list must not repeat the any-layout digit row")
-	Assert(InStr(_DriverFuncBody("initMenu"), "group_accented") == 0,
+	Assert(InStr(_TrayRootBuilderBodies(), "group_accented") == 0,
 		"the accented-letter group must stay enabled without the Ergopti emulation")
 }
