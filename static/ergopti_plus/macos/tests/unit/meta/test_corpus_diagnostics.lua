@@ -17,6 +17,8 @@
 ---    diagnostics.issue_report (the bug report text, summary and file name).
 --- 5. _shared/tests/corpus/healthcheck/action_vectors.json through
 ---    healthcheck.actions (what the diagnostics page may ask its host to do).
+--- 6. _shared/tests/corpus/diagnostics/error_policy_vectors.json through
+---    diagnostics.error_policy (when a logged ERROR opens the error window).
 --- Each corpus fails loudly when unreadable or empty: a replay over zero
 --- vectors would report success while checking nothing.
 --- ==============================================================================
@@ -167,6 +169,50 @@ helpers.describe("diagnostics corpus: page actions (page-actions-corpus)", funct
 				helpers.assert_eq(reason, nil, vector.id .. " must be accepted")
 				helpers.assert_eq(action, vector.expected, vector.id)
 			end
+		end)
+	end
+end)
+
+helpers.describe("diagnostics corpus: error window policy (error-policy-corpus)", function()
+	local corpus = read_corpus("tests/corpus/diagnostics/error_policy_vectors.json")
+	local Policy = require("diagnostics.error_policy")
+
+	helpers.it("has vectors (error-policy-corpus)", function()
+		helpers.assert_true(type(corpus.signature_vectors) == "table" and #corpus.signature_vectors >= 5,
+			"the error-policy corpus must hold its signature vectors")
+		helpers.assert_true(type(corpus.scenarios) == "table" and #corpus.scenarios >= 5,
+			"the error-policy corpus must hold its scenarios")
+		helpers.assert_true(type(corpus.invalid_policies) == "table" and #corpus.invalid_policies >= 5,
+			"the error-policy corpus must hold its invalid policies")
+	end)
+
+	helpers.it("the shipped policy is valid (error-policy-corpus)", function()
+		local ok, err = pcall(Policy.validate, read_corpus("modules/diagnostics/error_policy.json"))
+		helpers.assert_true(ok, "error_policy.json must validate: " .. tostring(err))
+	end)
+
+	for _, vector in ipairs(corpus.signature_vectors or {}) do
+		helpers.it("signature: " .. vector.id .. " (error-policy-corpus)", function()
+			helpers.assert_eq(Policy.signature({ signature_separator = vector.separator }, vector.module, vector.template),
+				vector.expected, vector.id)
+		end)
+	end
+
+	for _, scenario in ipairs(corpus.scenarios or {}) do
+		helpers.it("decide: " .. scenario.id .. " (error-policy-corpus)", function()
+			local policy = Policy.validate(scenario.policy)
+			local state = Policy.new_state()
+			for index, event in ipairs(scenario.events) do
+				local verdict = Policy.decide(state, policy, event)
+				helpers.assert_eq(verdict, event.expected, scenario.id .. " event " .. index)
+			end
+		end)
+	end
+
+	for _, vector in ipairs(corpus.invalid_policies or {}) do
+		helpers.it("validate refuses: " .. vector.id .. " (error-policy-corpus)", function()
+			local ok = pcall(Policy.validate, vector.policy)
+			helpers.assert_eq(ok, false, vector.id .. " must be refused")
 		end)
 	end
 end)

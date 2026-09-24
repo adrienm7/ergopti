@@ -21,6 +21,9 @@
 ; 5. _shared/tests/corpus/healthcheck/action_vectors.json through
 ;    HealthCheck_ValidateAction (what the diagnostics page may ask its host to
 ;    do).
+; 6. _shared/tests/corpus/diagnostics/error_policy_vectors.json through
+;    ErrorPolicy_Validate, ErrorPolicy_Signature and ErrorPolicy_Decide (when
+;    a logged ERROR opens the error window).
 ; Each corpus fails loudly when unreadable or empty: a replay over zero
 ; vectors would report success while checking nothing.
 ; ==============================================================================
@@ -216,3 +219,49 @@ _TCD_PageActions() {
 }
 
 Test('corpus:diagnostics: page action vectors (page-actions-corpus)', _TCD_PageActions)
+
+
+
+
+
+; ======================================
+; ======================================
+; ======= 7/ Error Window Policy =======
+; ======================================
+; ======================================
+
+_TCD_ErrorPolicy() {
+	Data := _TCD_Corpus("tests\corpus\diagnostics\error_policy_vectors.json")
+	Assert(Data["signature_vectors"].Length >= 5, "the error-policy corpus must hold its signature vectors")
+	Assert(Data["scenarios"].Length >= 5, "the error-policy corpus must hold its scenarios")
+	Assert(Data["invalid_policies"].Length >= 5, "the error-policy corpus must hold its invalid policies")
+
+	; The shipped thresholds pass the same validation the drivers apply at load
+	ErrorPolicy_Validate(_TCD_Corpus("modules\diagnostics\error_policy.json"))
+
+	for Vector in Data["signature_vectors"]
+		AssertEqual(Vector["expected"],
+			ErrorPolicy_Signature(Map("signature_separator", Vector["separator"]), Vector["module"], Vector["template"]),
+			Vector["id"])
+
+	Scenarios := 0
+	for Scenario in Data["scenarios"] {
+		Policy := ErrorPolicy_Validate(Scenario["policy"])
+		State := ErrorPolicy_NewState()
+		for Index, Event in Scenario["events"]
+			AssertEqual(Event["expected"], ErrorPolicy_Decide(State, Policy, Event)["verdict"],
+				Scenario["id"] . " event " . Index)
+		Scenarios += 1
+	}
+	AssertEqual(Data["scenarios"].Length, Scenarios, "every scenario must be replayed")
+
+	for Vector in Data["invalid_policies"] {
+		Refused := false
+		try ErrorPolicy_Validate(Vector["policy"])
+		catch ValueError
+			Refused := true
+		Assert(Refused, Vector["id"] . " must be refused")
+	}
+}
+
+Test("corpus:diagnostics: error window policy vectors (error-policy-corpus)", _TCD_ErrorPolicy)

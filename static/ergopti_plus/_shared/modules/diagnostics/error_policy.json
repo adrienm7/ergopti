@@ -1,0 +1,7 @@
+{
+	"_comment": "When a logged ERROR opens the error window (_shared/ui/error_dialog/). An error's signature is its module, signature_separator, then the message template as the code passed it to the logger, before its arguments are filled in: arguments that change from one occurrence to the next (a path, a count, a time) cannot defeat the deduplication. A signature opens the window at most once per session. At most max_dialogs windows open within any window_sec seconds; an error over that budget is logged only and may open the window when it recurs once the budget allows. An error logged while the window is open, or about to open, is folded into it (the window counts it) instead of opening another or spending the budget. The window never opens from the logging call itself, which can run inside the keyboard hook: the host schedules it present_delay_ms later on its own timer. Nothing opens while the Debug menu's 'Show a window for every error' is unticked (script.show_error_dialog in the features manifest). WARNING lines never open it. Implemented by _shared/lua/diagnostics/error_policy.lua (macOS, Linux) and windows/infra/error_policy.ahk, both replaying _shared/tests/corpus/diagnostics/error_policy_vectors.json.",
+	"signature_separator": "|",
+	"max_dialogs": 3,
+	"window_sec": 3600,
+	"present_delay_ms": 250
+}
