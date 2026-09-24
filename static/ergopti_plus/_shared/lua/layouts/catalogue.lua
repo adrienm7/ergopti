@@ -177,16 +177,23 @@ end
 --- deps.bundled_index is the decoded index shipped with the app (or nil);
 --- deps.transport.get(url, headers, timeout_ms, callback(status, body, err, headers))
 --- must call back exactly once; deps.decode_json decodes.
---- on_done(outcome) is called exactly once (see M.resolve_index).
+--- on_done(outcome) is called exactly once (see M.resolve_index); a cached
+--- index that could not be used is set aside and named in
+--- outcome.cache_warning, never dropped without a word.
 --- @param settings table Result of Registry.resolve().
 --- @param deps table
 --- @param on_done function
 function M.refresh(settings, deps, on_done)
 	local cached = nil
+	local cache_warning = nil
 	local cache = deps.read_cache()
-	if type(cache) == "table" and type(cache.text) == "string" then
-		local index = M.decode_index(cache.text, deps.decode_json, settings.max_file_bytes)
-		if index then cached = { index = index, etag = cache.etag } end
+	if type(cache) == "table" then
+		local index, _, detail = M.decode_index(cache.text, deps.decode_json, settings.max_file_bytes)
+		if index then
+			cached = { index = index, etag = cache.etag }
+		else
+			cache_warning = "the cached registry index is unusable: " .. tostring(detail)
+		end
 	end
 	local url = Registry.raw_url(settings, settings.index_file)
 	local headers = M.request_headers(cached and cached.etag or nil)
@@ -196,6 +203,7 @@ function M.refresh(settings, deps, on_done)
 		finished = true
 		local outcome = M.resolve_index({ status = status, body = body, err = err, headers = response_headers },
 			cached, deps.bundled_index, deps.decode_json, settings.max_file_bytes)
+		outcome.cache_warning = cache_warning
 		if outcome.store then
 			local stored, store_err = deps.write_cache(outcome.text, outcome.etag)
 			if not stored then

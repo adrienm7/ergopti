@@ -292,6 +292,7 @@ function M.refresh(on_done, deps)
 		transport = deps.transport,
 	}, function(outcome)
 		_catalogue = { index = outcome.index, source = outcome.source, error = outcome.error }
+		if outcome.cache_warning then Logger.warn(LOG, "%s; refreshed without it.", outcome.cache_warning) end
 		if outcome.error then
 			Logger.warn(LOG, "The layout catalogue shows the %s index: %s (%s).", outcome.source,
 				outcome.error.code, tostring(outcome.error.detail))

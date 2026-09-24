@@ -142,6 +142,30 @@ helpers.describe("layout catalogue: which index a refresh shows", function()
 		helpers.assert_eq(outcome.source, Catalogue.SOURCE_NETWORK)
 		helpers.assert_contains(outcome.cache_error, "disk full")
 	end)
+
+	helpers.it("says why a cached index was set aside (layout-catalogue-cache-report)", function()
+		-- Offline, a damaged cache changes what the catalogue shows: the driver
+		-- must be able to log why the last index it stored is not the one shown.
+		local outcome
+		Catalogue.refresh(settings(), {
+			read_cache = function() return { text = "{ damaged", etag = '"v1"' } end,
+			write_cache = function() error("nothing is stored offline") end,
+			bundled_index = vectors.indexes.shipped,
+			decode_json = Json.decode,
+			transport = { get = function(_, _, _, callback) callback(0, "", "could not connect", nil) end },
+		}, function(result) outcome = result end)
+		helpers.assert_eq(outcome.source, Catalogue.SOURCE_BUNDLED)
+		helpers.assert_contains(tostring(outcome.cache_warning), "not valid JSON")
+		local clean
+		Catalogue.refresh(settings(), {
+			read_cache = function() return nil end,
+			write_cache = function() error("nothing is stored offline") end,
+			bundled_index = vectors.indexes.shipped,
+			decode_json = Json.decode,
+			transport = { get = function(_, _, _, callback) callback(0, "", "could not connect", nil) end },
+		}, function(result) clean = result end)
+		helpers.assert_nil(clean.cache_warning, "no cache is not a damaged cache")
+	end)
 end)
 
 helpers.describe("layout catalogue: the installed-layouts record", function()
