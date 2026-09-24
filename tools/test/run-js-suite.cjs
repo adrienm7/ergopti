@@ -94,6 +94,7 @@ const CHECKS = [
 	{ name: 'every registered action resolves a label in all 21 locales', cmd: 'node', args: ['tools/test/test-action-labels-have-locale-keys.cjs'], repro: 'node tools/test/test-action-labels-have-locale-keys.cjs' },
 	{ name: 'Linux install.sh leaves a working first install (sandboxed real run)', cmd: 'node', args: ['tools/test/test-linux-install-sandbox.cjs'], repro: 'node tools/test/test-linux-install-sandbox.cjs' },
 	{ name: 'Linux tray icons mirror the Ergopti logo byte for byte', cmd: 'node', args: ['tools/test/test-linux-tray-icon-assets.cjs'], repro: 'node tools/test/test-linux-tray-icon-assets.cjs' },
+	{ name: 'the apps metrics window keeps its state across the Linux poll', cmd: 'node', args: ['tools/test/test-metrics-apps-linux-poll.cjs'], repro: 'node tools/test/test-metrics-apps-linux-poll.cjs' },
 	{ name: 'Linux modules resolve _shared through infra/paths.lua', cmd: 'node', args: ['tools/test/test-linux-shared-path-resolver.cjs'], repro: 'node tools/test/test-linux-shared-path-resolver.cjs' },
 	{ name: 'every _shared resolver executes and lands on a real file (Linux + macOS, and the unset-HOME fallback)', cmd: 'node', args: ['tools/test/test-shared-root-resolvers.cjs'], repro: 'node tools/test/test-shared-root-resolvers.cjs' },
 	{ name: 'driver-doc paths (no stale static/drivers in docs)', cmd: 'node', args: ['tools/test/test-doc-paths.cjs'], repro: 'node tools/test/test-doc-paths.cjs' },

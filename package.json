@@ -219,6 +219,7 @@
 		"test:linux-install-sandbox": "node ./tools/test/test-linux-install-sandbox.cjs",
 		"test:linux-tracked-copy": "node ./tools/test/test-linux-tracked-copy.cjs",
 		"test:linux-tray-icon-assets": "node ./tools/test/test-linux-tray-icon-assets.cjs",
+		"test:metrics-apps-linux-poll": "node ./tools/test/test-metrics-apps-linux-poll.cjs",
 		"test:linux-ci-evidence": "node ./tools/test/test-linux-ci-evidence.cjs",
 		"test:linux-webview-security": "node ./tools/test/test-linux-webview-security.cjs",
 		"test:linux-metrics-webview-lifecycle": "node ./tools/test/test-linux-metrics-webview-lifecycle.cjs",
