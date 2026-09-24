@@ -416,10 +416,7 @@ for (const rel of UNIT_SOURCES) {
 	// Any other .service filename is a second unit by definition.
 	for (const m of src.matchAll(/([A-Za-z0-9_.-]+)\.service\b/g)) {
 		const name = m[1] + '.service';
-		// install.sh names kanata.service only to retire the unit earlier installs
-		// wrote (the tap-holds now run in the daemon); nowhere else may name it.
-		const retiredLegacy = name === 'kanata.service' && rel === INSTALL_SH;
-		if (name !== CANONICAL_UNIT_NAME && !retiredLegacy) {
+		if (name !== CANONICAL_UNIT_NAME) {
 			errors.push(
 				`${rel}: names "${name}" — there is one unit, ${CANONICAL_UNIT_NAME}. ` +
 				`A second name means two installers can each enable a daemon, and both grab the keyboard.`

@@ -95,10 +95,8 @@ grep -E 'Skipping synthetic|Keyboard device selected|kanata' /tmp/ergopti.log
 ```
 
 **Expect** the daemon to have chosen the physical keyboard: the tap-holds run in
-the daemon itself, on the device it grabs. If an earlier install left its kanata
-unit behind, the daemon retires it at startup and logs so; a kanata you set up
-yourself would grab the keyboard first and apply every tap-hold twice, so stop it
-for this test.
+the daemon itself, on the device it grabs. A kanata you run yourself would grab
+the keyboard first and apply every tap-hold twice, so stop it for this test.
 
 **Expect** `Skipping synthetic device` for `Ergopti Virtual Keyboard`. If that
 line is absent and the daemon selected it, expansions will loop.
