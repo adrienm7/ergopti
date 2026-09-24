@@ -133,6 +133,7 @@ global _DefaultLogsDir := _LogsDir
 #Include ../infra/issue_link.ahk
 #Include ../infra/redact.ahk
 #Include ../infra/issue_report.ahk
+#Include ../infra/error_policy.ahk
 #Include ../infra/toml/toml_helpers.ahk
 ; Shared timing registry reader (TimingsLoadShared / TimingsGet) — needs
 ; ParseTomlFile above; exercised by test_timings_config.ahk.
