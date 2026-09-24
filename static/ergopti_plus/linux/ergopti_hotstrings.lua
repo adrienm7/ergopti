@@ -1399,12 +1399,34 @@ local function main()
 	if not keyboard_layout.refresh(opts.keymap) then
 		Logger.warn(LOG, "Layout unresolved — replacements will not be typed as keystrokes.")
 	end
+	-- A chord bound to a keyboard slot is claimed here, before the hook forwards
+	-- it, so the application never sees a chord Ergopti runs. It comes last: an
+	-- offered prediction's own digit chord is contextual and outranks a binding.
+	-- The press is recorded for the metrics exactly as the control callback
+	-- records a forwarded chord, and the typing buffer is left alone because the
+	-- key never reached the application (the gesture path runs actions the same way).
+	local function consume_bound_chord(detail)
+		local shortcuts_on = shortcuts ~= nil and shortcuts.is_enabled()
+		local consumed = keyboard_shortcuts.consume(detail, {
+			only_script = script_actions.is_paused() or not shortcuts_on,
+			defer = function(fn) return event_loop.defer(fn) end,
+		})
+		if not consumed then return false end
+		local chord = keyboard_shortcuts.chord_name(detail)
+		if chord then
+			keylogger.record_shortcut(_cached_app_id or "Unknown", chord, math.floor(Monotonic.now_ms()))
+		end
+		return true
+	end
 	local on_consume = input_capture_gate.guard(function(detail)
 		if tap_keys.on_key(detail) then return true end
 		if wrap_on_type.on_key(detail) then return true end
-		return prediction_engine
+		if prediction_engine
 			and type(prediction_engine.handle_shortcut) == "function"
-			and prediction_engine.handle_shortcut(detail) == true
+			and prediction_engine.handle_shortcut(detail) == true then
+			return true
+		end
+		return consume_bound_chord(detail)
 	end)
 	local function handle_hold(scancode, held_ms)
 		if capture_owned_scancodes[scancode] then

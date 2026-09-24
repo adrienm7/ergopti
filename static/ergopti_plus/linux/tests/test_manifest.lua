@@ -211,6 +211,7 @@ return {
 	"tests.unit.modules.llm.test_trigger_settings",
 	"tests.unit.modules.shortcuts.test_case_transforms",
 	"tests.unit.modules.shortcuts.test_chatgpt",
+	"tests.unit.modules.shortcuts.test_keyboard_slot_consumes_chord",
 	"tests.unit.modules.shortcuts.test_keyboard_shortcuts",
 	"tests.unit.modules.shortcuts.test_master_state",
 	"tests.unit.modules.test_action_catalogue_parity",
