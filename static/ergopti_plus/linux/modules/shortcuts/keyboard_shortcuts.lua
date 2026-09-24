@@ -28,10 +28,11 @@
 ---    shortcut; every general catalogue slot starts unassigned because desktop
 ---    environments already own many modifier chords.
 --- 4. Matching happens here, not in the kernel. There is no userland API on Linux
----    to reserve a chord — the daemon already sees every key, so it decides. The
----    consequence is that a bound chord ALSO reaches the focused application,
----    which is why general catalogue slots remain opt-in and why the labels say
----    what they do rather than promising exclusivity.
+---    to reserve a chord — the daemon already sees every key, so it decides.
+---    Under the grab (the default) a bound chord is claimed in the keyboard
+---    hook's consumption callback (consume) and never reaches the focused
+---    application. Without the grab only dispatch runs, after the key was
+---    forwarded, so the chord ALSO reaches the application there.
 --- ==============================================================================
 
 local M = {}
@@ -69,6 +70,14 @@ local MOD_LABELS = {
 	shift = "Maj",
 	alt = "Alt",
 	meta = "Super",
+}
+
+-- The slot suffix of a key the hook reports by the character it types.
+local SUFFIX_OF_IDENTITY = {
+	[" "] = "space",
+	["."] = "period",
+	[","] = "comma",
+	["\r"] = "enter",
 }
 
 -- Suffixes that name a key rather than spelling it.
@@ -361,24 +370,32 @@ end
 -- =========================================
 -- =========================================
 
---- Runs the action bound to the chord that was just pressed, if any.
+--- The slot suffix a reported key stands for. The hook reports a key by its XKB
+--- identity: the space bar as " ", the punctuation keys as their character, and
+--- a letter in upper case while Shift is held. Slot suffixes name those keys
+--- ("space", "period") and spell letters in lower case.
+--- @param key string|nil
+--- @return string|nil
+local function suffix_of(key)
+	if type(key) ~= "string" or key == "" then return nil end
+	return SUFFIX_OF_IDENTITY[key] or key:lower()
+end
+
+--- The binding a chord would fire right now, or nil.
 ---
---- Called from the daemon's control-key callback with what the hook reported.
---- Returns whether anything fired, so the caller can tell an unbound chord from
---- a handled one — the difference matters for the metrics, not for the user.
 --- While the script is paused, and while the shortcuts feature is switched off,
 --- only the script-control actions (pause, reload, quit) may fire: they are how
 --- the user gets the script back, and every other binding firing through a pause
---- is the pause not working.
+--- is the pause not working. A binding held back that way is reported, so the
+--- caller can leave its key alone.
 --- @param detail table|nil { key = string, mods = table } from the hook.
---- @param opts table|nil { only_script = boolean }
---- @return boolean fired, string|nil slot_id
-function M.dispatch(detail, opts)
-	if type(detail) ~= "table" then return false, nil end
-	local only_script = type(opts) == "table" and opts.only_script == true
-	local key = detail.key
+--- @param only_script boolean
+--- @return table|nil { slot, action, held_back }; action is nil for the default Ctrl+G.
+local function match(detail, only_script)
+	if type(detail) ~= "table" then return nil end
+	local key = suffix_of(detail.key)
+	if not key then return nil end
 	local held = type(detail.mods) == "table" and detail.mods or {}
-	if type(key) ~= "string" or key == "" then return false, nil end
 	load_assignments()
 
 	for slot, action in pairs(_assignments) do
@@ -393,21 +410,12 @@ function M.dispatch(detail, opts)
 			for _, name in ipairs({ "ctrl", "shift", "alt", "meta" }) do
 				if (required[name] == true) ~= (held[name] == true) then matches = false end
 			end
-			if matches and only_script and not ScriptActions.is_script_action(action) then
-				Logger.debug(LOG, "Keyboard shortcut %s → %s held back: only script control runs now.",
-					slot, action)
-				return false, slot
-			end
 			if matches then
-				Logger.debug(LOG, "Keyboard shortcut fired: %s → %s.", slot, action)
-				local ok_gestures, Gestures = pcall(require, "modules.gestures.manager")
-				if ok_gestures and type(Gestures.execute_action) == "function" then
-					pcall(Gestures.execute_action, action, "keyboard__" .. slot)
-				else
-					Logger.error(LOG,
-						"No action executor — '%s' is bound to %s and cannot run.", slot, action)
-				end
-				return true, slot
+				return {
+					slot = slot,
+					action = action,
+					held_back = only_script and not ScriptActions.is_script_action(action),
+				}
 			end
 		end
 	end
@@ -418,11 +426,74 @@ function M.dispatch(detail, opts)
 	-- chord can be chosen for the user.
 	if not only_script and key == "g" and held.ctrl == true
 		and held.shift ~= true and held.alt ~= true and held.meta ~= true then
+		return { slot = "ctrl_g", action = nil, held_back = false }
+	end
+	return nil
+end
+
+--- Runs a matched binding.
+--- @param hit table The record match() returned.
+local function fire(hit)
+	if hit.action == nil then
 		Logger.debug(LOG, "Default keyboard shortcut fired: ctrl_g → ChatGPT.")
 		pcall(ChatGPT.open)
-		return true, "ctrl_g"
+		return
 	end
-	return false, nil
+	Logger.debug(LOG, "Keyboard shortcut fired: %s → %s.", hit.slot, hit.action)
+	local ok_gestures, Gestures = pcall(require, "modules.gestures.manager")
+	if ok_gestures and type(Gestures.execute_action) == "function" then
+		pcall(Gestures.execute_action, hit.action, "keyboard__" .. hit.slot)
+	else
+		Logger.error(LOG,
+			"No action executor — '%s' is bound to %s and cannot run.", hit.slot, hit.action)
+	end
+end
+
+--- Runs the action bound to the chord that was just pressed, if any.
+---
+--- Called from the daemon's control-key callback with what the hook reported,
+--- which happens after the key was forwarded: without the grab this is the only
+--- path, and the chord also reaches the application. Returns whether anything
+--- fired, so the caller can tell an unbound chord from a handled one — the
+--- difference matters for the metrics, not for the user.
+--- @param detail table|nil { key = string, mods = table } from the hook.
+--- @param opts table|nil { only_script = boolean }
+--- @return boolean fired, string|nil slot_id
+function M.dispatch(detail, opts)
+	local hit = match(detail, type(opts) == "table" and opts.only_script == true)
+	if not hit then return false, nil end
+	if hit.held_back then
+		Logger.debug(LOG, "Keyboard shortcut %s → %s held back: only script control runs now.",
+			hit.slot, hit.action)
+		return false, hit.slot
+	end
+	fire(hit)
+	return true, hit.slot
+end
+
+--- Claims a bound chord from the keyboard hook's consumption callback.
+---
+--- Under the grab the hook asks this BEFORE forwarding the key, which is the one
+--- place a chord can be kept from the focused application: a bound Super+Space
+--- must not also switch the input source. The action runs on the next loop tick,
+--- never inside the callback, because the hook is mid-decision about a physical
+--- event. A chord that is unbound or held back is left to the application, and a
+--- key whose action cannot be queued is typed rather than lost.
+--- @param detail table { key, mods } from the hook.
+--- @param opts table { only_script = boolean, defer = function(fn): boolean }
+--- @return boolean consumed, string|nil slot_id
+function M.consume(detail, opts)
+	if type(opts) ~= "table" or type(opts.defer) ~= "function" then
+		Logger.error(LOG, "consume(): no deferral seam — bound chords reach the application.")
+		return false, nil
+	end
+	local hit = match(detail, opts.only_script == true)
+	if not hit or hit.held_back then return false, nil end
+	if opts.defer(function() fire(hit) end) ~= true then
+		Logger.error(LOG, "Keyboard shortcut %s could not be queued — the key is typed instead.", hit.slot)
+		return false, nil
+	end
+	return true, hit.slot
 end
 
 --- The chord a slot represents, as a string for the metrics.
