@@ -6,8 +6,8 @@
 --- Audit finding F-L7. wpm_menubar.lua passed a hardcoded 3.0 s to get_active_source
 --- while the floating widget uses CONFIG.source_color_duration (1.0 s from the shared
 --- wpm_color_hold_ms). The two WPM surfaces visibly disagreed on how long the source
---- color lingers (rules 5.1 magic number / 5.2 single source). Fix: read the duration
---- once from the same shared loader.
+--- color lingers (rules 5.1 magic number / 5.2 single source). Fix: both read
+--- wpm_color_hold_ms from the shared timings registry.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -23,8 +23,8 @@ helpers.describe("wpm_menubar color-hold duration is single-sourced", function()
 			"must NOT pass a hardcoded 3.0 to get_active_source")
 		helpers.assert_true(src:find("get_active_source(stats, COLOR_HOLD_S", 1, true) ~= nil,
 			"must pass the single-sourced COLOR_HOLD_S")
-		helpers.assert_true(src:find("source_color_duration", 1, true) ~= nil,
-			"COLOR_HOLD_S must derive from the widget's shared source_color_duration")
+		helpers.assert_true(src:find('Timings.sec("ui", "wpm_color_hold_ms")', 1, true) ~= nil,
+			"COLOR_HOLD_S must come from the timings registry the widget reads too")
 	end)
 
 	helpers.it("the menubar's hold duration equals the widget's source_color_duration", function()

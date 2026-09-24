@@ -135,17 +135,12 @@ helpers.describe("wpm_widget: mouseCallback reads live geometry across a graph-m
 		captured.canvas:frame(drop_frame)
 		captured.mouse_cb(captured.canvas, "mouseUp", 1, 0, 0)
 
-		-- Graph-mode geometry for this fixture: dock_height = (full_frame.y+h)
-		-- - (work_frame.y+h) = 1200 - 1160 = 40 (>= the 20 clamp floor, so it is
-		-- used as-is). canvas_height = dock_height - graph_margin - 5 = 40-5-5 = 30.
-		-- canvas_width = canvas_height * 3 = 90.
-		local expected_canvas_w = 90
-		local expected_canvas_h = 30
-
-		-- compact_w/compact_h come from the real shared CONFIG (no test double —
-		-- reuse the widget's own exposed loader so this test does not hardcode
-		-- a magic number that could silently drift from constants.toml).
+		-- Graph-mode geometry comes from the shared canon's [graph] size, and
+		-- compact_w/compact_h from its [compact] — both through the widget's own
+		-- exposed loader, so this test hardcodes no number that could drift.
 		local cfg = Widget._load_shared_const()
+		local expected_canvas_w = cfg.canon.graph.width
+		local expected_canvas_h = cfg.canon.graph.height
 		local compact_w = cfg.compact_width
 		local compact_h = cfg.compact_height_number + cfg.compact_height_gap + cfg.compact_height_unit
 

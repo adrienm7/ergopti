@@ -24,9 +24,10 @@
 ; ============================
 
 class WPMWidgetConst {
-    ; ── Values loaded at runtime from _shared/modules/wpm_widget/constants.toml ──────────
-    ; Populated by WPMWidget_LoadSharedConst() — zero fallback values here so a
-    ; missing TOML is detected immediately rather than silently using stale data.
+    ; ── Loaded at runtime by WPMWidget_LoadSharedConst() ─────────────────────────
+    ; From _shared/modules/wpm_widget/constants.toml (the canon every driver
+    ; reads) and _shared/modules/timings/constants.toml. Zero here, never a
+    ; copied default: a key missing from the canon keeps the widget off.
     ; [compact]
     static W                  := 0
     static H                  := 0
@@ -36,74 +37,66 @@ class WPMWidgetConst {
     static NUMBER_FONT_SIZE   := 0
     static UNIT_FONT_SIZE     := 0
     static UNIT_DARKEN        := 0.0
+    static CORNER_R           := 0
+    static EDGE_MARGIN        := 0
+    ; [graph]
+    static GRAPH_W            := 0
+    static GRAPH_H            := 0
+    static GRAPH_CORNER_R     := 0
+    static GRAPH_PAD          := 0
+    static GRAPH_HISTORY      := 0
+    static GRAPH_SCALE_MAX    := 0
+    static GRAPH_LABEL_PX     := 0
+    static GRAPH_BG           := ""
+    static GRAPH_BG_ALPHA     := 0.0
+    static GRAPH_BORDER       := ""
+    static GRAPH_BORDER_ALPHA := 0.0
+    static GRAPH_BORDER_W     := 0
+    static GRAPH_LINE_W       := 0
+    static GRAPH_LINE_ALPHA   := 0.0
+    static GRAPH_FILL_ALPHA   := 0.0
+    static GRAPH_TEXT         := ""
     ; [colors]  (hex strings without leading '#')
     static COLOR_BG_MANUAL    := ""
     static COLOR_BG_AI        := ""
     static COLOR_BG_IDLE      := ""
     static COLOR_TXT_ACTIVE   := ""
     static COLOR_TXT_IDLE     := ""
-    ; [colors] — HSL normalisation target for hotstring accent colors
-    static COLOR_WIDGET_L     := 0.0
-    static COLOR_WIDGET_S     := 0.0
+    static COLOR_FALLBACK     := ""
+    ; [neutral_sources] — categories that never colour the widget.
+    static NEUTRAL            := Map()
     ; [transparency]
     static ALPHA_ACTIVE       := 0
     static ALPHA_IDLE         := 0
-
-    ; ── Values loaded from _shared/modules/timings/constants.toml ────────────────────────
+    ; Timings: [ui] and [keylogger].
     static IDLE_HIDE_MS       := 0
-    ; How long the hotstring source color stays visible after the last fire.
-    ; Loaded from _shared/modules/timings/constants.toml [ui] wpm_color_hold_ms.
     static COLOR_HOLD_MS      := 0
+    static TICK_MS            := 0
+    static WINDOW_MS          := 0
+    static WPM_MIN_DURATION_MS := 0
 
-    ; ── AHK-only constants (no shared TOML equivalent needed) ───────────────────
-    ; Rolling window over which WPM is averaged (matches Hammerspoon 15 s).
-    static WINDOW_MS          := 15000
-    ; Timer tick — how often the display refreshes (ms).
-    static TICK_MS            := 500
-    ; Fast cursor-movement poll (ms). The display TICK_MS is far too coarse to get
-    ; the widget out of the way: it would sit over text the user is trying to read
-    ; for up to half a second after they grab the mouse. This dedicated poll hides
-    ; the surface within MOUSE_WATCH_MS of the slightest cursor movement. Polling
-    ; MouseGetPos keeps it hook-free (no global WH_MOUSE_LL install).
+    ; ── Windows-only: no counterpart on the other drivers ────────────────────────
+    ; Fast cursor-movement poll (ms). The display tick is too coarse to get the
+    ; widget out of the way: this dedicated poll hides the surface within
+    ; MOUSE_WATCH_MS of the slightest cursor movement. Polling MouseGetPos keeps
+    ; it hook-free (no global WH_MOUSE_LL install).
     static MOUSE_WATCH_MS     := 50
-    ; Delay (ms) after "ready" before the graph widget first appears. The GDI+
-    ; renderer has no cold-start (unlike the former WebView2 canvas, whose
-    ; msedgewebview2 processes hammered CPU/disk for ~3 s and caused per-keystroke
-    ; contention during the warm-up). This delay is now just a small settle so the
-    ; widget arrives a beat after boot rather than mid-startup; it could be lowered
-    ; safely if desired.
+    ; Delay (ms) after "ready" before the widget first appears, so it arrives a
+    ; beat after boot rather than mid-startup.
     static BOOT_SHOW_DELAY_MS := 2500
     ; Delay (ms) after "ready" before the graph window is PRE-WARMED (created +
     ; first hidden render + GDI+ startup) off the typing path, so the one-time DWM
     ; window-allocation cost is not absorbed by a tooltip render when the widget
-    ; first appears (it showed up as a ~110 ms Tooltip.Present blip). Lands in the
-    ; quiet slot after the deferred menu build and before the emoji/symbol pass.
+    ; first appears (it showed up as a ~110 ms Tooltip.Present blip).
     static PREWARM_DELAY_MS := 900
-    ; Graph mode dimensions (wider to show history).
-    static GRAPH_W            := 220
-    static GRAPH_H            := 100
-    ; Margin from screen edges (px).
-    static EDGE_MARGIN        := 12
-    ; Graph accent line colors — raw hue, used directly as canvas stroke colors.
-    static COLOR_GRAPH_MANUAL := "4499ff"
-    static COLOR_GRAPH_AI     := "cc88ff"
-    ; Config key names written to config.toml under [Script].
+    ; Config key names written to config.toml under [metrics].
     static CFG_VISIBLE        := "wpm_widget_visible"
     static CFG_X              := "wpm_widget_x"
     static CFG_Y              := "wpm_widget_y"
     static CFG_COLORS         := "wpm_widget_colors"
     static CFG_GRAPH          := "wpm_widget_graph"
-    ; Minimum window for WPM calculation.
-    static WPM_MIN_DURATION_MS := 2000
     ; Ring buffer capacity for recent keystrokes.
     static RING_CAP           := 2000
-    ; Number of history ticks kept for the graph.
-    static GRAPH_HISTORY      := 40
-    ; Maximum WPM assumed for graph scale.
-    static GRAPH_SCALE_MAX    := 120
-    ; Graph WPM label font size, in LOGICAL pixels (the GDI+ renderer scales it by
-    ; the DPI factor). Mirrors the old WebView2 canvas TS constant.
-    static GRAPH_LABEL_PX     := 15
 }
 
 
@@ -211,7 +204,7 @@ class WPMWidget {
 ; Categories whose expansions must not color the widget (no visible tooltip,
 ; or ergonomic substitutions that should stay at the default blue color).
 _WPMWidget_NeutralCategory(category) {
-    return (category == "rolls" or category == "repeat_key")
+    return WPMWidgetConst.NEUTRAL.Has(category)
 }
 
 ; Called by the keylogger hook after each accepted keystroke.
@@ -316,62 +309,6 @@ WPMWidget_Calc() {
     return Map("wpm", Round(wpm), "has_hs", has_hs, "has_ai", has_ai, "has_ac", has_ac)
 }
 
-
-; Re-projects AccentHex onto the widget HSL target (L=COLOR_WIDGET_L, S=COLOR_WIDGET_S)
-; so every hotstring/AI/AC accent color is as vivid as the manual blue (#0055cc).
-; Returns a 6-char uppercase hex without '#'. Falls back to FallbackHex on bad input.
-_WPMWidget_NormaliseHex(AccentHex, FallbackHex) {
-    H := Trim(AccentHex)
-    if (SubStr(H, 1, 1) == "#")
-        H := SubStr(H, 2)
-    if !RegExMatch(H, "^[0-9A-Fa-f]{6}$")
-        return FallbackHex
-
-    R := Integer("0x" . SubStr(H, 1, 2)) / 255.0
-    G := Integer("0x" . SubStr(H, 3, 2)) / 255.0
-    B := Integer("0x" . SubStr(H, 5, 2)) / 255.0
-
-    MaxC  := Max(R, G, B)
-    MinC  := Min(R, G, B)
-    Delta := MaxC - MinC
-
-    if (Delta <= 0.0001)
-        return FallbackHex   ; achromatic — no hue to preserve
-
-    if (MaxC == R)
-        Hue := Mod((G - B) / Delta + 6, 6)
-    else if (MaxC == G)
-        Hue := (B - R) / Delta + 2
-    else
-        Hue := (R - G) / Delta + 4
-    Hue := Hue / 6
-
-    L := WPMWidgetConst.COLOR_WIDGET_L
-    S := WPMWidgetConst.COLOR_WIDGET_S
-    C := (1 - Abs(2 * L - 1)) * S
-    H6 := Hue * 6
-    X  := C * (1 - Abs(Mod(H6, 2) - 1))
-    M  := L - C / 2
-
-    if (H6 < 1) {
-        Nr := C ; Ng := X ; Nb := 0
-    } else if (H6 < 2) {
-        Nr := X ; Ng := C ; Nb := 0
-    } else if (H6 < 3) {
-        Nr := 0 ; Ng := C ; Nb := X
-    } else if (H6 < 4) {
-        Nr := 0 ; Ng := X ; Nb := C
-    } else if (H6 < 5) {
-        Nr := X ; Ng := 0 ; Nb := C
-    } else {
-        Nr := C ; Ng := 0 ; Nb := X
-    }
-
-    return Format("{1:02X}{2:02X}{3:02X}",
-        Max(0, Min(255, Round((Nr + M) * 255))),
-        Max(0, Min(255, Round((Ng + M) * 255))),
-        Max(0, Min(255, Round((Nb + M) * 255))))
-}
 
 ; Resolve the color for a hotstring category.
 ;
@@ -490,27 +427,6 @@ WPMWidget_CategoryBgColor(CategoryName, FallbackHex, SectionHint := "") {
     return FallbackHex
 }
 
-; Returns the raw accent hex for a hotstring category (without leading '#'),
-; used as the graph sparkline stroke color. Falls back to FallbackHex.
-WPMWidget_CategoryGraphColor(CategoryName, FallbackHex, SectionHint := "") {
-    try {
-        raw := _WPMWidget_ReadTomlColor(CategoryName)
-        if (raw != "") {
-            return (SubStr(raw, 1, 1) == "#") ? SubStr(raw, 2) : raw
-        }
-        if (SectionHint != "") {
-            Basecat := _WPMWidget_SectionBaseCategory(SectionHint)
-            if (Basecat != "") {
-                raw2 := _WPMWidget_ReadTomlColor(Basecat)
-                if (raw2 != "") {
-                    return (SubStr(raw2, 1, 1) == "#") ? SubStr(raw2, 2) : raw2
-                }
-            }
-        }
-    }
-    return FallbackHex
-}
-
 ; Derive the standard category name from a section name by stripping the
 ; trailing PascalCase qualifier (e.g. "autocorrectionJ" → "autocorrection",
 ; "magickey" → "magickey", "distancesreductionQU" → "distancesreduction").
@@ -537,10 +453,12 @@ WPMWidget_ResolveBgColor(idle, has_hs, has_ai, has_ac, use_colors) {
             return WPMWidgetConst.COLOR_BG_AI
         if has_hs {
             LoggerDebug("WPMWidget", "ResolveBgColor: has_hs cat='{1}'", WPMWidget._last_hs_category)
-            return WPMWidget_CategoryBgColor(WPMWidget._last_hs_category, WPMWidgetConst.COLOR_BG_MANUAL, WPMWidget._last_hs_section)
+            ; A group with no usable colour takes the canon's fallback accent,
+            ; as it does on macOS and Linux.
+            return WPMWidget_CategoryBgColor(WPMWidget._last_hs_category, WPMWidgetConst.COLOR_FALLBACK, WPMWidget._last_hs_section)
         }
         if has_ac
-            return WPMWidget_CategoryBgColor("autocorrection", WPMWidgetConst.COLOR_BG_MANUAL)
+            return WPMWidget_CategoryBgColor("autocorrection", WPMWidgetConst.COLOR_FALLBACK)
     }
     LoggerDebug("WPMWidget", "ResolveBgColor: no color — use_colors={1} has_hs={2} has_ai={3} has_ac={4}", use_colors, has_hs, has_ai, has_ac)
     return WPMWidgetConst.COLOR_BG_MANUAL
@@ -550,15 +468,8 @@ WPMWidget_ResolveBgColor(idle, has_hs, has_ai, has_ac, use_colors) {
 ; Resolve the graph accent color hex string.
 ; HS and AC colors are sourced from the same TOML pipeline as tooltips.
 WPMWidget_ResolveGraphColor(has_hs, has_ai, has_ac, use_colors) {
-    if use_colors {
-        if has_ai
-            return WPMWidgetConst.COLOR_GRAPH_AI
-        if has_hs
-            return WPMWidget_CategoryGraphColor(WPMWidget._last_hs_category, WPMWidgetConst.COLOR_GRAPH_MANUAL, WPMWidget._last_hs_section)
-        if has_ac
-            return WPMWidget_CategoryGraphColor("autocorrection", WPMWidgetConst.COLOR_GRAPH_MANUAL)
-    }
-    return WPMWidgetConst.COLOR_GRAPH_MANUAL
+    ; The curve takes the pill's own colour, as on macOS and Linux.
+    return WPMWidget_ResolveBgColor(false, has_hs, has_ai, has_ac, use_colors)
 }
 
 
@@ -793,7 +704,8 @@ WPMWidget_Tick() {
     ; Hide immediately if the mouse/touchpad was used more recently than the last keystroke —
     ; A_TimeIdleMouse is built into AHK and requires no hook install.
     mouse_active  := A_TimeIdleMouse < A_TimeIdleKeyboard
-    should_show   := !keyboard_idle && !mouse_active && ((wpm > 0) || has_hs || has_ai || has_ac)
+    should_show   := _WPMWidget_TooltipUp()
+        || (!keyboard_idle && !mouse_active && ((wpm > 0) || has_hs || has_ai || has_ac))
     gui_ref := WPMWidget.show_graph ? WPMWidget._graph_gui : WPMWidget._gui
     if !gui_ref
         return
@@ -880,6 +792,16 @@ _WPMWidget_HideSurface(gui_ref) {
 ; This only ever drives the HIDE transition: the 500 ms display tick's own
 ; mouse_active gate keeps it hidden afterwards and re-shows it once the user types
 ; again, so no re-show bookkeeping is needed here.
+; Whether a hotstring preview or an AI suggestion is on screen. It keeps the
+; widget up, as on macOS and Linux: the user is mid-typing, choosing what to
+; insert.
+_WPMWidget_TooltipUp() {
+    try return (IsSet(TooltipIsVisible) && TooltipIsVisible())
+        || (IsSet(LLM_TooltipIsVisible) && LLM_TooltipIsVisible())
+    catch
+        return false
+}
+
 WPMWidget_MouseWatch() {
     if !WPMWidget.visible
         return
@@ -894,6 +816,10 @@ WPMWidget_MouseWatch() {
         return
     WPMWidget._last_mouse_x := mx
     WPMWidget._last_mouse_y := my
+    ; The tick keeps the widget up while a preview is on screen; hiding it here
+    ; would only make it flicker back.
+    if _WPMWidget_TooltipUp()
+        return
     gui_ref := WPMWidget.show_graph ? WPMWidget._graph_gui : WPMWidget._gui
     if gui_ref
         try _WPMWidget_HideSurface(gui_ref)

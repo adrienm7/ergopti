@@ -198,7 +198,10 @@
 				"metrics.system_auth_filter_enabled",
 				"metrics.encrypt",
 				"metrics.wpm_widget_visible",
-				"metrics.wpm_widget_colors"
+				"metrics.wpm_widget_colors",
+				"metrics.wpm_widget_graph",
+				"metrics.wpm_menubar_visible",
+				"metrics.wpm_menubar_colors"
 			],
 			"registered": "yes",
 			"production_caller": "yes",
@@ -212,7 +215,8 @@
 				"static/ergopti_plus/linux/modules/keylogger/metrics_collector.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/keylogger/test_keylogger_privacy_filters.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/keylogger/test_metrics_toggles_persist.lua",
-				"static/ergopti_plus/linux/tests/unit/ui/test_wpm_widget_frame.lua"
+				"static/ergopti_plus/linux/tests/unit/ui/test_wpm_readouts.lua",
+				"static/ergopti_plus/linux/tests/hardware/run_wpm_readouts_live.lua"
 			]
 		}
 	},

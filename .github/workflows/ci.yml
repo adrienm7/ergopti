@@ -1164,6 +1164,37 @@ jobs:
           xvfb-run -a luajit tests/hardware/run_changelog_live.lua
         timeout-minutes: 5
 
+      # The typing-speed readouts, drawn: the floating pill through its real GTK
+      # surface (placed, painted in the source's colour, switched to the graph,
+      # dragged by a real pointer) and the tray readout registered with a
+      # StatusNotifier host. The widget called a renderer function that never
+      # existed and read stats with no speed in them: it drew nothing anywhere.
+      - name: The WPM widget and tray readout draw on a real display
+        if: always()
+        working-directory: static/ergopti_plus/linux
+        run: |
+          sudo apt-get install -y --no-install-recommends xdotool python3-gi gir1.2-glib-2.0 dbus xvfb
+          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+          export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
+          export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
+          home="$(mktemp -d)"
+          export HOME="$home" XDG_CONFIG_HOME="$home/.config" XDG_DATA_HOME="$home/.local/share"
+          dbus-run-session -- bash -c '
+            ready="$(mktemp -u)"
+            python3 tests/hardware/sni_host.py --ready-file "$ready" --timeout 40 --settle 1 \
+              --expect-icon-file > "$RUNNER_TEMP/sni-wpm.json" &
+            host=$!
+            for _ in $(seq 1 40); do [ -f "$ready" ] && break; sleep 0.25; done
+            [ -f "$ready" ] || { echo "::error::the StatusNotifier host never started"; exit 1; }
+            xvfb-run -a luajit tests/hardware/run_wpm_readouts_live.lua 6
+            probe=$?
+            wait "$host"; status=$?
+            cat "$RUNNER_TEMP/sni-wpm.json"
+            [ "$probe" = "0" ] || exit "$probe"
+            grep -q "ergopti-plus-wpm" "$RUNNER_TEMP/sni-wpm.json" || { echo "::error::the readout item never registered"; exit 1; }
+            exit "$status"'
+        timeout-minutes: 5
+
       # window.setData is undefined in the settings window, so the host's
       # `if(window.setData)` guard discards every push. Seven explanations are
       # ruled out, and the informative one is the last: an explicit

@@ -62,7 +62,8 @@ local LOG = "platform.tray.appindicator"
 -- hardware, communications or system services.
 local CATEGORY_APPLICATION_STATUS = 0
 
--- AppIndicatorStatus.
+-- AppIndicatorStatus. PASSIVE is what hides an item from the panel.
+local STATUS_PASSIVE = 0
 local STATUS_ACTIVE = 1
 
 -- The sonames, not the -dev symlinks: a user's machine has libayatana-*.so.1 and
@@ -111,6 +112,9 @@ local _menu = nil
 local _actions = {}
 local _next_action = 0
 local _dispatcher = nil
+-- The action ids the main menu owns. A rebuild drops these and only these: a
+-- second tray item (the WPM readout) keeps its own rows alive.
+local _menu_actions = {}
 
 --- Loads the first of a list of sonames that resolves.
 --- @param ffi table The FFI module.
@@ -249,9 +253,10 @@ end
 --- @param lib table
 --- @param widget userdata
 --- @param fn function
-local function on_activate(lib, widget, fn)
+local function on_activate(lib, widget, fn, owned)
 	_next_action = _next_action + 1
 	_actions[_next_action] = fn
+	owned[#owned + 1] = _next_action
 	lib.gobject.g_signal_connect_data(widget, "activate", dispatcher(lib),
 		lib.ffi.cast("gpointer", _next_action), nil, 0)
 end
@@ -263,8 +268,9 @@ end
 --- decided by the manifest and this file be the only part that is GTK.
 --- @param lib table
 --- @param items table
+--- @param owned table Receives the action ids the menu registers.
 --- @return userdata GtkMenu
-local function build_menu(lib, items)
+local function build_menu(lib, items, owned)
 	local menu = lib.gtk.gtk_menu_new()
 
 	for _, item in ipairs(items or {}) do
@@ -279,9 +285,9 @@ local function build_menu(lib, items)
 		end
 
 		if type(item.menu) == "table" and #item.menu > 0 then
-			lib.gtk.gtk_menu_item_set_submenu(widget, build_menu(lib, item.menu))
+			lib.gtk.gtk_menu_item_set_submenu(widget, build_menu(lib, item.menu, owned))
 		elseif type(item.fn) == "function" then
-			on_activate(lib, widget, item.fn)
+			on_activate(lib, widget, item.fn, owned)
 		end
 
 		if item.disabled then
@@ -328,7 +334,7 @@ function M.create(id, icon_name, title)
 
 	-- An indicator with no menu is not shown by most panels, so an empty one is
 	-- set immediately rather than waiting for the first setMenu().
-	_menu = build_menu(lib, {})
+	_menu = build_menu(lib, {}, _menu_actions)
 	lib.indicator.app_indicator_set_menu(_indicator, _menu)
 
 	Logger.success(LOG, "Tray icon created (id=%s).", tostring(id))
@@ -344,8 +350,9 @@ function M.set_menu(items)
 
 	-- The replaced menu's actions go with it; its ids are never reissued, so a
 	-- late click on an old row finds nothing to run.
-	_actions = {}
-	_menu = build_menu(lib, items)
+	for _, id in ipairs(_menu_actions) do _actions[id] = nil end
+	_menu_actions = {}
+	_menu = build_menu(lib, items, _menu_actions)
 	lib.indicator.app_indicator_set_menu(_indicator, _menu)
 	return true
 end
@@ -385,16 +392,77 @@ function M.destroy()
 	-- Status PASSIVE (0) is what removes it from the panel; there is no
 	-- app_indicator_destroy, and dropping the reference alone leaves the icon on
 	-- screen until the process exits.
-	lib.indicator.app_indicator_set_status(_indicator, 0)
+	lib.indicator.app_indicator_set_status(_indicator, STATUS_PASSIVE)
 	_indicator = nil
 	_menu = nil
-	_actions = {}
+	for _, id in ipairs(_menu_actions) do _actions[id] = nil end
+	_menu_actions = {}
 	Logger.info(LOG, "Tray icon removed.")
 end
 
 --- @return boolean True when an icon is live.
 function M.is_live()
 	return _indicator ~= nil
+end
+
+
+
+
+-- ==============================================
+-- ==============================================
+-- ======= 5/ Extra items =======================
+-- ==============================================
+-- ==============================================
+
+--- A second tray item beside the main one, hidden until shown: the WPM
+--- readout, which appears only while the user types, like its macOS menu bar
+--- counterpart.
+--- @param id string Application id, distinct from the main icon's.
+--- @param icon_name string Icon theme name or absolute path.
+--- @param items table Its menu, in the neutral tree shape.
+--- @return table|nil An opaque handle.
+function M.new_item(id, icon_name, items)
+	local lib = bind()
+	if not lib then return nil end
+	local ptr = lib.indicator.app_indicator_new(tostring(id), tostring(icon_name), CATEGORY_APPLICATION_STATUS)
+	if ptr == nil then
+		Logger.error(LOG, "app_indicator_new returned nothing for '%s'.", tostring(id))
+		return nil
+	end
+	local handle = { ptr = ptr, owned = {}, active = false }
+	-- Most panels do not show an item without a menu.
+	handle.menu = build_menu(lib, items or {}, handle.owned)
+	lib.indicator.app_indicator_set_menu(ptr, handle.menu)
+	lib.indicator.app_indicator_set_status(ptr, STATUS_PASSIVE)
+	return handle
+end
+
+--- Updates an extra item's icon, accessible title and presence.
+--- @param handle table From new_item().
+--- @param opts table { icon?, title?, active? }
+--- @return boolean
+function M.update_item(handle, opts)
+	local lib = bind()
+	if not lib or type(handle) ~= "table" or handle.ptr == nil then return false end
+	if opts.icon then lib.indicator.app_indicator_set_icon_full(handle.ptr, tostring(opts.icon), "") end
+	if opts.title then lib.indicator.app_indicator_set_title(handle.ptr, tostring(opts.title)) end
+	if opts.active ~= nil and opts.active ~= handle.active then
+		lib.indicator.app_indicator_set_status(handle.ptr, opts.active and STATUS_ACTIVE or STATUS_PASSIVE)
+		handle.active = opts.active
+	end
+	return true
+end
+
+--- Removes an extra item from the panel and drops its menu's actions.
+--- @param handle table From new_item().
+function M.remove_item(handle)
+	local lib = bind()
+	if not lib or type(handle) ~= "table" or handle.ptr == nil then return end
+	lib.indicator.app_indicator_set_status(handle.ptr, STATUS_PASSIVE)
+	for _, id in ipairs(handle.owned) do _actions[id] = nil end
+	handle.owned = {}
+	handle.ptr = nil
+	handle.active = false
 end
 
 return M
