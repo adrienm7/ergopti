@@ -655,6 +655,7 @@
 	"healthcheck.status.copied": "已复制到剪贴板。",
 	"healthcheck.status.saved": "已保存：%s",
 	"healthcheck.status.failed": "此操作失败；原因见今天的错误文件。",
+	"healthcheck.status.missing": "此文件尚不存在。",
 	"healthcheck.status.report_mode": "请检查下面的预览，然后点击“在 GitHub 上报告”。",
 	"hotstrings.custom_terminator": "自定义",
 	"hotstrings.custom_terminator_consumed": "自定义（已消耗）",

@@ -645,6 +645,8 @@ _HC_PerformPageAction(WindowEpoch, Action, Config) {
 				. ',"ok":' . (Outcome["ok"] ? "true" : "false")
 			if Outcome.Has("path")
 				Json .= ',"path":' . _HC_JsStr(Outcome["path"])
+			if Outcome.Get("missing", false)
+				Json .= ',"missing":true'
 			_HC_Send(WindowEpoch, Json . '}')
 	}
 }

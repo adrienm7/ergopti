@@ -655,6 +655,7 @@
 	"healthcheck.status.copied": "Kopiert til utklippstavlen.",
 	"healthcheck.status.saved": "Lagret: %s",
 	"healthcheck.status.failed": "Handlingen mislyktes; årsaken står i dagens feilfil.",
+	"healthcheck.status.missing": "Denne filen finnes ikke ennå.",
 	"healthcheck.status.report_mode": "Kontroller forhåndsvisningen nedenfor, og klikk deretter på «Rapporter på GitHub».",
 	"hotstrings.custom_terminator": "Egendefinert",
 	"hotstrings.custom_terminator_consumed": "Egendefinert (konsumert)",

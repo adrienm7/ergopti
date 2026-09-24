@@ -151,6 +151,26 @@ _THPA_OpenPath() {
 }
 Test("Diagnostics page: open_path opens the collected path, creating only folders (page-actions)", _THPA_OpenPath)
 
+; Today's errors file exists only once something went wrong today, so asking
+; to open it earlier is no failure of the program. It was logged as an ERROR,
+; which created that very file, counted as a session error and would raise
+; the error dialog; the page is now told the file does not exist yet
+; (open-missing-file).
+_THPA_OpenMissingFile() {
+	global _HealthCheckErrCount, _HealthCheckWarnCount
+	Calls := []
+	Errors := _HealthCheckErrCount
+	Warnings := _HealthCheckWarnCount
+	Outcome := HealthCheck_PerformAction(Map("action", "open_path", "id", "errors_today"), _THPA_Paths(),
+		HealthCheck_Config(), _THPA_Effects(Calls, Map("exists", false)))
+	AssertFalse(Outcome["ok"], "a missing file is not reported as opened")
+	AssertTrue(Outcome.Get("missing", false), "the page is told the file does not exist yet")
+	AssertEqual(Errors, _HealthCheckErrCount, "a file not created yet is no error")
+	AssertEqual(Warnings, _HealthCheckWarnCount, "a file not created yet is no warning either")
+}
+Test("Diagnostics page: a file not created yet is said, not logged as an error (open-missing-file)",
+	_THPA_OpenMissingFile)
+
 _THPA_UnknownHomeRefuses() {
 	Calls := []
 	Effects := _THPA_Effects(Calls)

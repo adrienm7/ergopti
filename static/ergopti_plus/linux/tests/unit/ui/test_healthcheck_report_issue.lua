@@ -108,6 +108,34 @@ helpers.describe("healthcheck page actions (linux)", function()
 		helpers.assert_eq(calls.open, { LOGS_DIR .. "/diagnostics" })
 	end)
 
+	-- Today's errors file exists only once something went wrong today, so
+	-- asking to open it earlier is no failure of the program. It was logged as
+	-- an ERROR, which created that very file, counted as a session error and
+	-- would raise the error dialog (open-missing-file)
+	helpers.it("open_path on a file not created yet says so, without an error (open-missing-file)", function()
+		local Logger = require("logger")
+		local emitted = 0
+		Logger.set_sink(function(_, variant)
+			if variant == "warn" or variant == "error" then emitted = emitted + 1 end
+		end)
+		local ok, result, calls = pcall(function()
+			local Report = helpers.load_module("ui.healthcheck.report")
+			local recorded = {}
+			local overrides = recording(recorded)
+			overrides.exists = function() return false end
+			return Report.perform({ action = "open_path", id = "errors_today" },
+				{ errors_today = LOGS_DIR .. "/ergopti_plus_errors_2026-09-24.log" }, documents(),
+				Report.redaction_context(overrides), overrides), recorded
+		end)
+		Logger.set_sink(nil)
+		helpers.assert_true(ok, tostring(result))
+		helpers.assert_eq(result.ok, false)
+		helpers.assert_eq(result.missing, true, "the page is told the file does not exist yet")
+		helpers.assert_eq(#calls.open, 0)
+		helpers.assert_eq(#calls.make_dir, 0, "a file is never created")
+		helpers.assert_eq(emitted, 0, "a file not created yet is neither an error nor a warning")
+	end)
+
 	helpers.it("refuses to redact without the home folder (report-bug-flow)", function()
 		local Report = helpers.load_module("ui.healthcheck.report")
 		local ok, err = pcall(Report.redaction_context, { identity = function() return { user = "jdoe" } end })
