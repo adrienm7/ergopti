@@ -11,9 +11,10 @@
 --- FEATURES & RATIONALE:
 --- 1. The driver's rule, from its readers. Linux has no single loader: the
 ---    gestures manager ([gestures], [gesture_parameters] and their legacy
----    [linux.*] spellings), the shortcuts manager ([shortcuts].enabled) and
----    the setup wizard's import each read their own keys. Each marks what it
----    reads through the walk it applies, so the cleanup cannot drift from them.
+---    [linux.*] spellings), the shortcuts manager ([shortcuts].enabled), the
+---    updater ([updater].channel) and the setup wizard's import each read their
+---    own keys. Each marks what it reads through the walk it applies, so the
+---    cleanup cannot drift from them.
 --- 2. Same semantics as Windows: a verified byte-exact backup first, a refusal
 ---    that leaves the file untouched on any failure, and a report of the backup
 ---    path.
@@ -39,6 +40,7 @@ local Engine = require("config_unused_keys")
 function M.collect(decoded, mark)
 	require("modules.gestures.manager").mark_config_reads(decoded, mark)
 	require("modules.shortcuts.manager").mark_config_reads(decoded, mark)
+	require("modules.updater.manager").mark_config_reads(decoded, mark)
 	require("ui.onboarding.bridge")._answers_from_config(decoded, "", mark)
 	require("ui.onboarding.startup").should_show(decoded, mark)
 end

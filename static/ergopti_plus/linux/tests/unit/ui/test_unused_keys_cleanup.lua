@@ -23,6 +23,16 @@ local Sandbox = Contract.sandbox
 -- of them visibly changes the driver state.
 local SHORTCUTS_NON_DEFAULT = not require("infra.manifest_reader").default_for("shortcuts.enabled")
 
+-- The update channel the user subscribed to: a registry channel other than the
+-- installed build's, which is what the updater follows when the key is absent.
+local SUBSCRIBED_NON_DEFAULT = (function()
+	local updater = require("modules.updater.manager")
+	for _, id in ipairs(updater.CHANNELS.ids()) do
+		if id ~= updater.installed_channel() then return id end
+	end
+	error("the update channel registry must declare a second channel")
+end)()
+
 -- One key of each shape the Linux readers take, and six they never read.
 -- First-use completion survives cleanup because graphical startup reads it.
 local FIXTURE = table.concat({
@@ -54,6 +64,9 @@ local FIXTURE = table.concat({
 	"enabled = " .. tostring(SHORTCUTS_NON_DEFAULT),
 	"chatgpt_url = \"https://chat.example\"",
 	"",
+	"[updater]",
+	"channel = \"" .. SUBSCRIBED_NON_DEFAULT .. "\"",
+	"",
 	"[stale.section]",
 	"label = \"old\"",
 	"",
@@ -76,6 +89,7 @@ local SURVIVORS = {
 	{ { "gesture_parameters", "tap_3__open_url" }, "https://example.com" },
 	{ { "linux", "gestures", "swipe_3_up" }, "open_url" },
 	{ { "shortcuts", "enabled" }, SHORTCUTS_NON_DEFAULT },
+	{ { "updater", "channel" }, SUBSCRIBED_NON_DEFAULT },
 }
 
 local Cleanup = helpers.load_module("ui.menu.unused_keys_cleanup")
@@ -114,6 +128,18 @@ local function driver_state(path)
 	local shortcuts = helpers.load_module("modules.shortcuts.manager")
 	shortcuts.init({ persist = true, config_path = path })
 
+	-- The updater reads the subscribed channel at init; its background checks
+	-- stop at once, and the previous module comes back so no suite shares this one.
+	local previous_updater = package.loaded["modules.updater.manager"]
+	local updater = helpers.load_module("modules.updater.manager")
+	local ok_updater, updater_err = pcall(function()
+		updater.init({ config_path = path })
+		updater.stop_background_checks()
+	end)
+	local update_channel = updater.get_channel()
+	package.loaded["modules.updater.manager"] = previous_updater
+	if not ok_updater then error(updater_err, 0) end
+
 	local decoded = TomlCodec.decode(Sandbox.read_bytes(path))
 	return {
 		needs_onboarding = require("ui.onboarding.startup").should_show(decoded),
@@ -121,6 +147,7 @@ local function driver_state(path)
 		parameter = gestures.get_action_parameter("tap_3", "open_url"),
 		gestures_enabled = enable_requested,
 		shortcuts_enabled = shortcuts.is_enabled(),
+		update_channel = update_channel,
 		answers = require("ui.onboarding.bridge")._answers_from_config(decoded, ""),
 	}
 end
@@ -165,6 +192,21 @@ helpers.describe("unused keys (linux): the rule is exactly the readers'", functi
 	helpers.it("unused keys: a malformed shortcut switch is read (it fails closed), so it is kept", function()
 		local scan = Engine.find_in_source("[shortcuts]\nenabled = \"yes\"\n", Cleanup.collect)
 		helpers.assert_eq(#scan.keys, 0)
+	end)
+
+	helpers.it("unused keys: the subscribed update channel is read, an unknown one is offered", function()
+		local kept = Engine.find_in_source("[updater]\nchannel = \"" .. SUBSCRIBED_NON_DEFAULT .. "\"\n",
+			Cleanup.collect)
+		helpers.assert_eq(#kept.keys, 0, "the updater reads its channel from config.toml")
+		-- An alias is resolved by the registry, so it is read like the id it names.
+		local alias = "stable"
+		helpers.assert_true(require("modules.updater.manager").CHANNELS.resolve(alias) ~= nil,
+			"the registry must still declare the '" .. alias .. "' alias")
+		helpers.assert_eq(#Engine.find_in_source("[updater]\nchannel = \"" .. alias .. "\"\n",
+			Cleanup.collect).keys, 0, "an alias of a registry channel is read")
+		local unknown = Engine.find_in_source("[updater]\nchannel = \"no_such_channel\"\n", Cleanup.collect)
+		helpers.assert_eq(#unknown.keys, 1, "a channel outside the registry is ignored by the updater")
+		helpers.assert_eq(unknown.keys[1].key, "channel")
 	end)
 
 	helpers.it("unused keys: an invalid gesture parameter is ignored by the loader and offered", function()
