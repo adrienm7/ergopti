@@ -47,7 +47,6 @@ M.ERROR_NOT_MODIFIED_WITHOUT_CACHE = "not_modified_without_cache"
 
 local HTTP_OK = 200
 local HTTP_NOT_MODIFIED = 304
-local USER_AGENT = "ErgoptiPlus-Layouts/1.0"
 
 
 
@@ -121,7 +120,7 @@ end
 --- @param etag string|nil ETag of the cached index.
 --- @return table
 function M.request_headers(etag)
-	local headers = { ["User-Agent"] = USER_AGENT }
+	local headers = { ["User-Agent"] = Registry.USER_AGENT }
 	if type(etag) == "string" and etag ~= "" then headers["If-None-Match"] = etag end
 	return headers
 end

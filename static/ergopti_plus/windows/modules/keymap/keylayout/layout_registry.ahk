@@ -47,7 +47,8 @@ global LAYOUT_REGISTRY_ID_PATTERN := "^[a-z][a-z0-9_]*$"
 ; Suffix of a file being downloaded; it is renamed only once verified.
 global LAYOUT_REGISTRY_PARTIAL_SUFFIX := ".download"
 
-; User agent of every registry request.
+; User agent of every registry request: the one of the shared Lua client
+; (_shared/lua/layouts/registry.lua), pinned by test-layouts-defaults-single-source.cjs.
 global LAYOUT_REGISTRY_USER_AGENT := "ErgoptiPlus-Layouts/1.0"
 
 ; How often a running download is polled. Short enough that a layout is ready a

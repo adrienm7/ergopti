@@ -175,6 +175,21 @@ check('every copy of the registry id rule is the index builder\'s', () => {
 		'config.schema.json must accept a registry id or "" (no layout) and nothing else');
 });
 
+// Every registry request announces itself the same way; a second Lua copy of
+// the user agent drifts the day one of them is bumped.
+check('every copy of the registry user agent is the shared client\'s', () => {
+	const read = (rel) => fs.readFileSync(path.join(SP, ...rel.split('/')), 'utf8');
+	const shared = /^M\.USER_AGENT\s*=\s*"([^"]+)"$/m.exec(read('_shared/lua/layouts/registry.lua'));
+	assert.ok(shared, '_shared/lua/layouts/registry.lua declares no M.USER_AGENT');
+	const catalogue = stripComments(read('_shared/lua/layouts/catalogue.lua'), '.lua');
+	assert.ok(!catalogue.includes(`"${shared[1]}"`), 'catalogue.lua repeats the user agent instead of Registry.USER_AGENT');
+	assert.ok(catalogue.includes('Registry.USER_AGENT'), 'catalogue.lua does not announce itself as the registry client');
+	const windows = /^global LAYOUT_REGISTRY_USER_AGENT := "([^"]+)"$/m.exec(
+		read('windows/modules/keymap/keylayout/layout_registry.ahk'));
+	assert.ok(windows, 'layout_registry.ahk declares no LAYOUT_REGISTRY_USER_AGENT');
+	assert.strictEqual(windows[1], shared[1], 'the Windows registry client announces another user agent');
+});
+
 // The compiled Windows driver reads its Ergopti tables from the registry folder
 // extracted next to it (LayoutRegistry_BundledDir: the declared folder, taken
 // from the parent of the static folder), so the bundle must copy that folder to
