@@ -419,6 +419,14 @@
 			"i18n": "menu.debug.open_error_log"
 		},
 		{
+			"type": "check",
+			"id": "show_error_dialog",
+			"i18n": "menu.debug.show_error_dialog",
+			"checked_when": [
+				"error_dialog_enabled"
+			]
+		},
+		{
 			"type": "---",
 			"id": "---"
 		},

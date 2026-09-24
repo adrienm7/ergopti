@@ -3526,7 +3526,13 @@ local function _build_debug(ctx)
 		-- already holds, so the daemon supplies no callback for them
 		["report_bug"]      = function() require("ui.healthcheck.report").report_bug() end,
 		["suggest_feature"] = function() require("ui.healthcheck.report").suggest_feature() end,
+		["show_error_dialog"] = call_ctx("on_toggle_error_dialog"),
 	}
+	render_ctx.state_getters = {}
+	for key, value in pairs(ctx.state_getters or {}) do render_ctx.state_getters[key] = value end
+	render_ctx.state_getters["error_dialog_enabled"] = function()
+		return require("ui.error_dialog.bridge").is_enabled()
+	end
 
 	local rows = ManifestMenu.build("debug_menu", "Debug", nil, nil, render_ctx, providers)
 	return { label = i18n_safe("menu.debug.title"), submenu = rows }

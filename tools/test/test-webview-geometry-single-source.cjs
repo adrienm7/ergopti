@@ -109,6 +109,7 @@ const MACOS_MODULES = {
 	paths_editor: 'ui/menu/menu_paths.lua',
 	token_prompt: 'ui/menu/menu_llm/models_selector.lua',
 	healthcheck: 'ui/healthcheck/core.lua',
+	error_dialog: 'ui/error_dialog/init.lua',
 	download_window: 'ui/download_window/init.lua'
 };
 
@@ -134,6 +135,10 @@ const WINDOWS_APPS = {
 	healthcheck: {
 		file: 'ui/healthcheck/core.ahk',
 		checks: (m) => [new RegExp(`HC_WIDTH\\s*:=\\s*${m.width}\\b`), new RegExp(`HC_HEIGHT\\s*:=\\s*${m.height}\\b`)]
+	},
+	error_dialog: {
+		file: 'ui/error_dialog/init.ahk',
+		checks: (m) => [new RegExp(`ED_WIDTH\\s*:=\\s*${m.width}\\b`), new RegExp(`ED_HEIGHT\\s*:=\\s*${m.height}\\b`)]
 	},
 	changelog: {
 		file: 'ui/changelog/init.ahk',

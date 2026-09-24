@@ -1234,6 +1234,10 @@ _LoggerEmit(Level, Tag, Msg, Args*) {
 		; alone said neither when the error happened nor which module raised it
 		if IsSet(HealthCheck_RecordError)
 			HealthCheck_RecordError(Line)
+		; The UNFORMATTED template: the error window's signature must not change
+		; with the arguments. It only decides and arms a timer (no logging here)
+		if IsSet(ErrorDialog_OnError)
+			ErrorDialog_OnError(Tag, Msg, Body, Stamp)
 	}
 	; Always enqueue the line unconditionally so pre-init messages (emitted
 	; before LoggerInit has resolved LOGGER_LOG_PATH) survive until the first

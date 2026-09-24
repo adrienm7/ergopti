@@ -7,6 +7,7 @@
 [script]
 locale = "fr"
 log_level = "INFO"
+show_error_dialog = true
 
 [hotstrings]
 trigger_char = "★"

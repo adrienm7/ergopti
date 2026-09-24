@@ -459,6 +459,7 @@ if UIASW_IsWorkerInvocation()
 #Include infra/start_at_login.ahk
 #Include ui/changelog/init.ahk
 #Include ui/healthcheck/init.ahk
+#Include ui/error_dialog/init.ahk
 #Include modules/diagnostics/crash_reporter.ahk
 #Include infra/json.ahk
 ; i18n layer — must come after toml_loader.ahk (TOML_BatchWrite), logger.ahk, and json.ahk.
@@ -656,6 +657,9 @@ BootProfile_Stamp("Hotstring engine initialised")
 ; Initialise the logger now that the ini cache is built and ScriptInformation
 ; reflects user overrides — LoggerInit reads [Script] LogLevel from the ini.
 LoggerInit()
+; Right after the logger: every later ERROR of the boot can open the error
+; window, which waits for the driver to be ready before it shows
+ErrorDialog_Init(_IniCache)
 bootScriptName := IsSet(A_ScriptName) ? A_ScriptName : "ErgoptiPlus"
 if !IsSet(A_ScriptName) && IsSet(A_ScriptFullPath) {
 		bootScriptName := A_ScriptFullPath

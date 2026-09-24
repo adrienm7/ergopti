@@ -248,7 +248,8 @@ end
 M.current_level = M.LEVELS.WARNING
 
 -- Optional hook set by the bootstrapper after all modules are loaded.
--- Called with (module_name, formatted_message) on every Logger.error call.
+-- Called with (module_name, formatted_message, template) on every emitted
+-- Logger.error line: the template is the message before its arguments.
 local _error_notification_handler = nil
 
 -- Optional test sink registered by unit tests to capture formatted log lines
@@ -727,9 +728,11 @@ function M._purge_old_logs(log_dir, max_age_days)
 	end
 end
 
---- Registers a callback invoked on every Logger.error call to surface errors as
---- system notifications. Set once from init.lua after all modules are loaded.
---- @param fn function|nil Callback with signature fn(module_name, message).
+--- Registers a callback invoked on every emitted Logger.error line, after its
+--- native ACK: init.lua hands it to the error window. Set once from init.lua
+--- after all modules are loaded.
+--- @param fn function|nil Callback with signature fn(module_name, message, template),
+---   template being the message before its arguments.
 function M.set_error_notification_handler(fn)
 	_error_notification_handler = (type(fn) == "function") and fn or nil
 end
@@ -1132,7 +1135,8 @@ local function _deliver_async_record(record)
 			_error_notification_handler,
 			debug.traceback,
 			tostring(notification.module_name),
-			tostring(notification.message)
+			tostring(notification.message),
+			tostring(notification.template)
 		)
 		if not notified or delivered_or_err ~= true then
 			local detail = notified and (notification_err or delivered_or_err)
@@ -1416,6 +1420,7 @@ function M.warn(module_name, msg, ...) _log("WARNING", module_name, msg, ...) en
 function M.error(module_name, msg, ...)
 	local ok, base = pcall(tostring, msg)
 	local text = ok and base or "???"
+	local text_template = text
 	if select("#", ...) > 0 then
 		local ok_f, formatted = pcall(string.format, text, ...)
 		text = ok_f and formatted or text
@@ -1424,6 +1429,7 @@ function M.error(module_name, msg, ...)
 	local pending = {
 		module_name = tostring(module_name),
 		message = text,
+		template = text_template,
 		record = nil,
 	}
 	_pending_error_notification = pending
@@ -1433,6 +1439,7 @@ function M.error(module_name, msg, ...)
 		pending.record.notification = {
 			module_name = pending.module_name,
 			message = pending.message,
+			template = pending.template,
 		}
 	end
 	if emitted and not _async_sink_active and _error_notification_handler then
@@ -1440,7 +1447,8 @@ function M.error(module_name, msg, ...)
 			_error_notification_handler,
 			debug.traceback,
 			tostring(module_name),
-			text
+			text,
+			text_template
 		)
 		if not notified or delivered_or_err ~= true then
 			_async_sink_state.last_error = "error notification delivery failed: "
@@ -1649,8 +1657,9 @@ local _capture_installed = false
 --- return values, so discarding them here changes nothing.
 ---
 --- The error goes to the log — including the errors-only sink, since ERROR lines
---- are mirrored there — and NOWHERE else. It deliberately does not reach the crash
---- reporter: a throw inside a timer callback is recoverable BY DEFINITION, the
+--- are mirrored there — and, through M.error, to the error window's handler, which
+--- opens a non-modal window later on a timer. It deliberately does not reach the
+--- crash reporter: a throw inside a timer callback is recoverable BY DEFINITION, the
 --- callback is abandoned and the run loop carries on, so the driver has already
 --- survived it. The reporter is reserved for genuine uncaught fatals
 --- (errors-only-log-sink), and reaching it from here would run the healthcheck's
@@ -1666,7 +1675,7 @@ local function _guard_timer_cb(fn, kind)
 	return function(...)
 		local ok, err = xpcall(fn, debug.traceback, ...)
 		if not ok then
-			_log("ERROR", "runtime", "Uncaught error in hs.timer.%s callback: %s", kind, tostring(err))
+			M.error("runtime", "Uncaught error in hs.timer.%s callback: %s", kind, tostring(err))
 		end
 	end
 end

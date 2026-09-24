@@ -50,6 +50,7 @@ local MODULE_NAMES = {
 	"modules.llm.ollama_deps_checker",
 	"modules.llm.backend_detector",
 	"infra.notifications",
+	"ui.error_dialog",
 	"infra.ui_restore",
 	"ui.onboarding",
 }
@@ -96,6 +97,8 @@ local function run_isolated(options, assertions)
 			reload_marks = 0,
 			reload_clears = 0,
 			onboarding_runs = 0,
+			error_dialog_inits = 0,
+			error_dialog_calls = {},
 		}
 
 		local Logger = {}
@@ -300,6 +303,16 @@ local function run_isolated(options, assertions)
 			["modules.llm.ollama_deps_checker"] = {},
 			["modules.llm.backend_detector"] = {},
 			["infra.notifications"] = { notify = function() return true end },
+			["ui.error_dialog"] = {
+				init = function()
+					state.error_dialog_inits = state.error_dialog_inits + 1
+					return true
+				end,
+				on_error = function(module_name, template, message)
+					state.error_dialog_calls[#state.error_dialog_calls + 1] = { module_name, template, message }
+					return true
+				end,
+			},
 			["infra.ui_restore"] = {},
 			["ui.onboarding"] = {
 				should_run = function() return true end,
@@ -368,6 +381,17 @@ local function run_isolated(options, assertions)
 end
 
 helpers.describe("init: controlled reload owns the native shutdown handoff", function()
+	helpers.it("hands every logged ERROR to the error window, template included (error-dialog-macos)", function()
+		run_isolated(function(state)
+			helpers.assert_eq(state.error_dialog_inits, 1, "init.lua must initialise the error window once")
+			helpers.assert_eq(type(state.notification_handler), "function",
+				"init.lua must register the logger's error handler")
+			helpers.assert_eq(state.notification_handler("keylogger", "Flush failed: disk full", "Flush failed: %s"), true,
+				"the handler reports the error as handled")
+			helpers.assert_eq(state.error_dialog_calls, { { "keylogger", "Flush failed: %s", "Flush failed: disk full" } },
+				"the error window receives the module, the template and the message")
+		end)
+	end)
 	helpers.it("awaits the real root MLX callback before final teardown and reload (HS-008)", function()
 		run_isolated({ mlx_stop_mode = "deferred" }, function(state, hs_stub)
 			local accepted = hs_stub.reload("mlx-callback-pending")

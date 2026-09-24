@@ -159,7 +159,12 @@ const ratio = union.size === 0 ? 0 : (shared.length / union.size) * 100;
 //                    around one call is a folder, not an abstraction. The union
 //                    grew with the shared count, which is the only shape of
 //                    growth this ratchet permits.
-const BASELINE_SHARED = 26;
+//   29/52 (55.8 %) — ui/error_dialog, the host of the shared error window
+//                    (_shared/ui/error_dialog/), born on all three drivers at
+//                    once: the union grew with the shared count again. Measured,
+//                    and tightened to the measurement (the ratchet carried two
+//                    paths of slack).
+const BASELINE_SHARED = 29;
 
 // The union is ratcheted too, downward: a driver that grows a new unshared
 // directory dilutes the ratio even when nothing was removed. Bounding it stops
@@ -185,7 +190,10 @@ const BASELINE_SHARED = 26;
 //   Windows driver needs a packaged WH_KEYBOARD_LL component with its own C ABI,
 //   hook-free tests and hardened-build gate. Empty Lua counterparts would add
 //   structure without a corresponding macOS/Linux runtime responsibility.
-const BASELINE_UNION = 51;
+//
+//   51 → 52 on 2026-09-24 — ui/error_dialog, shared by all three drivers (see
+//   BASELINE_SHARED above): no driver grew an unshared directory.
+const BASELINE_UNION = 52;
 
 // ── The canonical features, the third measurement this gate never had ───────
 //

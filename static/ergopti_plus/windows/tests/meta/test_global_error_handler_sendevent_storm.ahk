@@ -13,8 +13,9 @@
 ;
 ; The fix: the release decision is factored into _ShouldReleaseModifier(ModKey),
 ; which releases ONLY modifiers that are logically down but NOT physically held
-; (genuinely stuck), and the user-facing surface routes through the non-blocking
-; NotifierSend tray notification instead of MsgBox. This test encodes both halves:
+; (genuinely stuck), and the user-facing surface is the ERROR the handler logs,
+; which opens the non-modal error window (ui/error_dialog) later on a timer,
+; instead of a MsgBox. This test encodes both halves:
 ; the handler must call _ShouldReleaseModifier (no bare GetKeyState(...,"P")
 ; release loop), and the RECOVERABLE (post-ready) path must NOT surface the error
 ; via MsgBox. A pre-ready fatal-exit MsgBox before ExitApp(1) IS allowed (no input
@@ -71,8 +72,8 @@ Test("ErgoptiPlus: _ShouldReleaseModifier spares physically-held keys (global-er
 _GEHSS_HandlerSurfaceIsNonBlocking() {
 	Src := _DriverSourceConcat()
 	Seg := _DriverFuncBody("ErgoptiGlobalErrorHandler")
-	Assert(InStr(Seg, "NotifierSend(") > 0,
-		"ErgoptiGlobalErrorHandler must surface the recoverable error via the non-blocking NotifierSend tray notification")
+	Assert(InStr(Seg, 'LoggerError("ErgoptiPlus", _ErrorNet_UncaughtTemplate(Exc)') > 0,
+		"ErgoptiGlobalErrorHandler must surface the recoverable error through the ERROR it logs, which opens the non-modal error window")
 	; A blocking MsgBox is forbidden on the RECOVERABLE (post-ready) path — a modal
 	; there starves the keyboard hook and drops keystrokes. It IS allowed in the
 	; pre-ready fatal-exit branch (no input pipeline is owned yet and ExitApp(1)
@@ -84,4 +85,4 @@ _GEHSS_HandlerSurfaceIsNonBlocking() {
 	Assert(InStr(Recoverable, "MsgBox(") = 0,
 		"the recoverable error path must NOT use a blocking MsgBox — a modal on the input thread starves the keyboard hook (a pre-ready fatal-exit MsgBox before ExitApp(1) is allowed)")
 }
-Test("ErgoptiPlus: error handler surfaces via NotifierSend not MsgBox (global-error-handler-sendevent-storm)", _GEHSS_HandlerSurfaceIsNonBlocking)
+Test("ErgoptiPlus: error handler surfaces via the error window, never a MsgBox (global-error-handler-sendevent-storm)", _GEHSS_HandlerSurfaceIsNonBlocking)

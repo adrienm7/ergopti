@@ -911,7 +911,7 @@ local menu               = require("ui.menu")
 local mlx_deps_checker    = require("modules.llm.mlx_deps_checker")
 local ollama_deps_checker = require("modules.llm.ollama_deps_checker")
 local backend_detector    = require("modules.llm.backend_detector")
-local notifications       = require("infra.notifications")
+local ErrorDialog         = require("ui.error_dialog")
 local ui_restore         = require("infra.ui_restore")
 
 do
@@ -968,15 +968,14 @@ do
 	end
 end
 
--- Wire Logger.error → system notification so every ERROR surfaces to the user
--- without any module needing to call notifications.notify() directly.
--- Registered here (after notifications is loaded) to keep logger dependency-free.
-Logger.set_error_notification_handler(function(module_name, message)
-	return notifications.notify(
-		i18n.get("common.error_prefix") .. tostring(module_name),
-		message,
-		"error"
-	)
+-- Wire Logger.error → the error window (ui/error_dialog), so an ERROR reaches
+-- the user without any module calling it directly: the shared policy decides
+-- which ERROR opens it, and it opens later, on a timer, without the keyboard.
+-- It replaces the system notification every ERROR used to raise. Registered
+-- here, once the modules it reads are loaded, to keep the logger dependency-free.
+ErrorDialog.init()
+Logger.set_error_notification_handler(function(module_name, message, template)
+	return ErrorDialog.on_error(module_name, template, message)
 end)
 Boot.mark("Config-dependent module requires")
 Boot.stage("Config schema migration")

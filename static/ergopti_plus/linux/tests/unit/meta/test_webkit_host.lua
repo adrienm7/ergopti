@@ -42,7 +42,7 @@ helpers.describe("ui.webkit_host", function()
         "hsEditor", "hotstrings_config_bridge", "hsOnboarding",
         "hsPaths", "hsPersonalInfo", "metrics_apps_bridge", "metrics_typing_bridge",
         "model_browser_bridge", "numeric_prompt_bridge", "prompt_bridge",
-        "token_bridge", "healthcheck",
+        "token_bridge", "healthcheck", "error_dialog",
       }
       local set = {}
       for _, n in ipairs(names) do set[n] = true end
@@ -51,8 +51,8 @@ helpers.describe("ui.webkit_host", function()
       end
     end)
 
-    helpers.it("has exactly 15 bridges", function()
-      helpers.assert_eq(#WH.get_bridge_names(), 15)
+    helpers.it("has exactly 16 bridges", function()
+      helpers.assert_eq(#WH.get_bridge_names(), 16)
     end)
   end)
 
