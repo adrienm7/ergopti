@@ -42,6 +42,9 @@
  *    whole top_level through a builder table is read here the way Linux is:
  *    an id declared and missing from the table renders nothing, and an id in
  *    the table the manifest does not declare is dead code.
+ * 4. The manifest declares the approved top-level order, and Applications for
+ *    macOS only. Every driver builds whatever the manifest declares, so this is
+ *    where a reordering is held to the product decision.
  *
  * WHAT IT DELIBERATELY DOES NOT DO:
  * render the three menus and diff their translated labels. That needs Linux to
@@ -372,7 +375,46 @@ for (const [driver, spec] of Object.entries(DRIVER_ROOTS)) {
 
 // ==================================================
 // ==================================================
-// ======= 5/ Report ================================
+// ======= 5/ The approved order ====================
+// ==================================================
+// ==================================================
+
+// The top-level order is a product decision, taken once for the three trays:
+// the keyboard and trackpad features first (Linux's kanata row takes the
+// Tap-Holds slot), then layout, hotstrings and AI, then metrics and the macOS
+// applications, then the configuration tail. The drivers build whatever the
+// manifest declares, so this is the one place a reordering of the manifest is
+// held to the decision rather than silently shipped. Changing the order means
+// changing this list, in the same commit and on purpose.
+const APPROVED_TOP_LEVEL = [
+	'tap_holds', 'kanata', 'shortcuts', 'gestures', SEPARATOR,
+	'keyboard_layout', 'hotstrings', 'llm', SEPARATOR,
+	'metrics', 'apps', SEPARATOR,
+	'configuration', 'language', 'updates', 'about', SEPARATOR,
+	'suspend', 'reload', 'quit', 'debug'
+];
+
+const declaredTopLevel = (topLevel || []).map((row) => row.id);
+if (declaredTopLevel.join(',') !== APPROVED_TOP_LEVEL.join(',')) {
+	errors.push(
+		'the manifest top level is not the approved order.\n' +
+			`      approved: ${APPROVED_TOP_LEVEL.join(', ')}\n      declared: ${declaredTopLevel.join(', ')}`
+	);
+}
+
+// Applications lists the applications bundled with the macOS app; the other
+// two drivers ship none.
+const appsRow = (topLevel || []).find((row) => row.id === 'apps');
+if (!appsRow || JSON.stringify(appsRow.platforms) !== JSON.stringify(['hs'])) {
+	errors.push('the Applications row must be declared for macOS only (platforms = ["hs"]).');
+}
+
+
+
+
+// ==================================================
+// ==================================================
+// ======= 6/ Report ================================
 // ==================================================
 // ==================================================
 
