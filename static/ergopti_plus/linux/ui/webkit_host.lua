@@ -55,6 +55,7 @@ M.APP_BRIDGES = {
 	model_browser            = "model_browser_bridge",
 	numeric_prompt           = "numeric_prompt_bridge",
 	onboarding               = "hsOnboarding",
+	layout_manager           = "layout_manager_bridge",
 	paths_editor             = "hsPaths",
 	personal_info_editor     = "hsPersonalInfo",
 	prompt_editor            = "prompt_bridge",

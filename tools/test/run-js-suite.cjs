@@ -278,6 +278,7 @@ const CHECKS = [
 	{ name: 'Karabiner package identity is shared and cached bytes are verified', cmd: 'node', args: ['tools/test/test-karabiner-package-manifest.cjs'], repro: 'node tools/test/test-karabiner-package-manifest.cjs' },
 	{ name: 'input-source Python supervisor enforces one bounded process group', cmd: 'node', args: ['tools/test/test-input-source-python-supervisor.cjs'], repro: 'npm run test:input-source-python-supervisor' },
 	{ name: 'input-source list edit adds and removes exactly the named layout', cmd: 'node', args: ['tools/test/test-input-source-enabled-list-edit.cjs'], repro: 'npm run test:input-source-enabled-list-edit' },
+	{ name: 'layout manager page decides its rows and posts only allowlisted actions', cmd: 'node', args: ['tools/test/test-layout-manager-page.cjs'], repro: 'npm run test:layout-manager-page' },
 	{ name: 'PTY process groups escalate and reap bounded descendants', cmd: 'node', args: ['tools/test/test-pty-process-group-escalation.cjs'], repro: 'npm run test:pty-process-group-escalation' },
 	{ name: 'MLX dependency bootstrap fingerprints both dependency manifests', cmd: 'node', args: ['tools/test/test-mlx-deps-lock-fingerprint.cjs'], repro: 'npm run test:mlx-deps-lock-fingerprint' },
 	{ name: 'App Cloner shortcuts preserve maximize intent', cmd: 'node', args: ['tools/test/test-app-cloner-shortcut-maximize.cjs'], repro: 'npm run test:app-cloner-shortcut-maximize' },
