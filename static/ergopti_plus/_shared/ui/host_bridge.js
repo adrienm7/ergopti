@@ -25,6 +25,7 @@
 //   layer_editor_bridge       — _shared/ui/layer_editor
 //   hsPaths                   — _shared/ui/paths_editor
 //   hsPersonalInfo            — _shared/ui/personal_info_editor
+//   layout_manager_bridge     — _shared/ui/layout_manager
 //   metrics_apps_bridge       — _shared/ui/metrics_apps
 //   metrics_typing_bridge     — _shared/ui/metrics_typing
 //   model_browser_bridge      — _shared/ui/model_browser

@@ -330,6 +330,7 @@
 		"test:karabiner-package-manifest": "node ./tools/test/test-karabiner-package-manifest.cjs",
 		"test:input-source-python-supervisor": "node ./tools/test/test-input-source-python-supervisor.cjs",
 		"test:input-source-enabled-list-edit": "node ./tools/test/test-input-source-enabled-list-edit.cjs",
+		"test:layout-manager-page": "node ./tools/test/test-layout-manager-page.cjs",
 		"test:pty-process-group-escalation": "node ./tools/test/test-pty-process-group-escalation.cjs",
 		"test:mlx-deps-lock-fingerprint": "node ./tools/test/test-mlx-deps-lock-fingerprint.cjs",
 		"test:app-cloner-shortcut-maximize": "node ./tools/test/test-app-cloner-shortcut-maximize.cjs",

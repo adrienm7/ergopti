@@ -64,6 +64,13 @@
       "min_height": 620,
       "vhost": "ergopti.layereditor"
     },
+    "layout_manager": {
+      "width": 720,
+      "height": 560,
+      "min_width": 560,
+      "min_height": 400,
+      "vhost": "ergopti.layoutmanager"
+    },
     "metrics_apps": {
       "width": 940,
       "height": 640,
