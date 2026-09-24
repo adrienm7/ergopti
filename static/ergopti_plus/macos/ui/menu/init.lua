@@ -714,6 +714,17 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- changing a persisted preference (e.g. the menubar icon variant)
 	M.refresh_icon = function() pcall(update_icon) end
 
+	-- Quitting applies the pause layout (one input-source setting for pause and
+	-- quit). The root teardown awaits it through ui.menu.quit_layout.
+	M.apply_quit_layout = function(on_done)
+		local kbd_layout_mod = menu_mods.keyboard_layout
+		if not kbd_layout_mod or type(kbd_layout_mod.apply_quit_layout) ~= "function" then
+			Logger.error(LOG, "Quit layout unavailable: the keyboard-layout menu module is not loaded.")
+			return "none"
+		end
+		return kbd_layout_mod.apply_quit_layout(state, on_done)
+	end
+
 	local saved, load_status = Preferences.load(MenuPaths.get("ConfigTomlPath"))
 	-- A CORRUPT file must never be treated as absent. Both yield an empty table,
 	-- but only "absent" means the user has no settings to lose: it seeds factory

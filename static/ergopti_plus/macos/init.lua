@@ -529,6 +529,12 @@ local function request_exact_lease_revoke(reason, on_done)
 	return true
 end
 
+-- The once-only quit step that applies the pause layout (ui.menu.quit_layout).
+local quit_layout_step = require("ui.menu.quit_layout").create({
+	resolve_menu = function() return package.loaded["ui.menu"] end,
+	logger = Logger,
+})
+
 --- Releases every Lua-owned resource. This function never owns Karabiner's
 --- shared processes; controlled callers invoke it only after the exact token
 --- fence. The native shutdown callback intentionally does not call it because
@@ -542,6 +548,12 @@ local function teardown_all_resources(termination_kind, on_teardown_ready)
 		_local_teardown_started = true
 		Logger.info(LOG, "Hammerspoon local teardown started (%s).", tostring(termination_kind or "shutdown"))
 	end
+
+	-- Quitting leaves the keyboard on the pause layout. Applied first, while every
+	-- owner is still live, and awaited: an asynchronous switch would otherwise be
+	-- collected with the process before it selects the input source.
+	local layout_accepted, layout_state = quit_layout_step.run(termination_kind, on_teardown_ready)
+	if layout_state == "pending" then return layout_accepted, layout_state end
 
 	-- The MLX task completion is asynchronous after terminate() accepts SIGTERM
 	-- Keep every remaining local owner alive until its exact callback proves the
