@@ -664,7 +664,7 @@
 	"menu.debug.key_history": "कुंजी इतिहास",
 	"menu.debug.list_vars": "चर स्थिति",
 	"menu.debug.log_level": "लॉग स्तर",
-	"menu.debug.open_error_log": "Open error log",
+	"menu.debug.open_error_log": "आज की त्रुटि फ़ाइल खोलें",
 	"menu.debug.no_errors_today": "आज कोई चेतावनी या त्रुटि नहीं",
 	"menu.debug.open_logs": "लॉग फोल्डर खोलें",
 	"menu.debug.open_today_log": "आज की लॉग फाइल खोलें",

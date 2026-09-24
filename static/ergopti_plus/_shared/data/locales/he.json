@@ -664,7 +664,7 @@
 	"menu.debug.key_history": "היסטוריית מקשים",
 	"menu.debug.list_vars": "מצב משתנים",
 	"menu.debug.log_level": "רמת יומן",
-	"menu.debug.open_error_log": "Open error log",
+	"menu.debug.open_error_log": "פתח את קובץ השגיאות של היום",
 	"menu.debug.no_errors_today": "אין אזהרות או שגיאות היום",
 	"menu.debug.open_logs": "פתח תיקיית יומנים",
 	"menu.debug.open_today_log": "פתח קובץ יומן היום",

@@ -664,7 +664,7 @@
 	"menu.debug.key_history": "Історія клавіш",
 	"menu.debug.list_vars": "Стан змінних",
 	"menu.debug.log_level": "Рівень логування",
-	"menu.debug.open_error_log": "Open error log",
+	"menu.debug.open_error_log": "Відкрити файл помилок за сьогодні",
 	"menu.debug.no_errors_today": "Сьогодні немає попереджень і помилок",
 	"menu.debug.open_logs": "Відкрити папку журналів",
 	"menu.debug.open_today_log": "Відкрити журнал за сьогодні",

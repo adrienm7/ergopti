@@ -664,7 +664,7 @@
 	"menu.debug.key_history": "Tangentkhistorik",
 	"menu.debug.list_vars": "Variabeltillstånd",
 	"menu.debug.log_level": "Loggnivå",
-	"menu.debug.open_error_log": "Open error log",
+	"menu.debug.open_error_log": "Öppna dagens felfil",
 	"menu.debug.no_errors_today": "Inga varningar eller fel i dag",
 	"menu.debug.open_logs": "Öppna loggmapp",
 	"menu.debug.open_today_log": "Öppna dagens loggfil",

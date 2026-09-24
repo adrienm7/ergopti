@@ -664,7 +664,7 @@
 	"menu.debug.key_history": "Cronologia tasti",
 	"menu.debug.list_vars": "Stato variabili",
 	"menu.debug.log_level": "Livello di log",
-	"menu.debug.open_error_log": "Open error log",
+	"menu.debug.open_error_log": "Apri il file degli errori di oggi",
 	"menu.debug.no_errors_today": "Nessun avviso né errore oggi",
 	"menu.debug.open_logs": "Apri cartella log",
 	"menu.debug.open_today_log": "Apri file log di oggi",

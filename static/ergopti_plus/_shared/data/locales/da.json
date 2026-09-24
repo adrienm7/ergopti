@@ -664,7 +664,7 @@
 	"menu.debug.key_history": "Tasthhistorik",
 	"menu.debug.list_vars": "Variabeltilstand",
 	"menu.debug.log_level": "Logniveau",
-	"menu.debug.open_error_log": "Open error log",
+	"menu.debug.open_error_log": "Åbn dagens fejlfil",
 	"menu.debug.no_errors_today": "Ingen advarsler eller fejl i dag",
 	"menu.debug.open_logs": "Åbn logmapper",
 	"menu.debug.open_today_log": "Åbn dagens logfil",
