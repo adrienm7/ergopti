@@ -7,7 +7,8 @@
 --- core's error observer, and the daemon is the one place that installs it:
 --- 1. the observer is installed, with the bridge's on_error, and only after
 ---    the bridge initialised (an uninitialised bridge has no policy);
---- 2. both happen before main() runs, so the boot's own errors count.
+--- 2. both happen before main() runs, so the boot's own errors count;
+--- 3. the newest crash dump is announced from the loop's first tick.
 ---
 --- WHY A SOURCE-ORDER SCAN: the daemon's entry point cannot run headless, and
 --- both halves of a wrong wiring succeed on their own: a bridge that is never
@@ -41,5 +42,16 @@ helpers.describe("daemon wiring: the error window observes logged errors (error-
 		helpers.assert_true(main_pos ~= nil, "main() must still be findable, or this test compares nothing")
 		helpers.assert_true(init_pos < observer_pos, "the observer must be installed once the bridge has its policy")
 		helpers.assert_true(observer_pos < main_pos, "the observer must be installed before main(), so boot errors count")
+	end)
+
+	helpers.it("announces the last crash from the new loop's first tick (error-dialog-linux)", function()
+		local src = daemon_code()
+		local notice_pos = src:find("ErrorDialog.notify_last_crash(CrashReporter.get_crash_dir())", 1, true)
+		local defer_pos = src:find("event_loop.defer(function() ErrorDialog.notify_last_crash", 1, true)
+		local run_pos = src:find("event_loop.run({", 1, true)
+		helpers.assert_true(notice_pos ~= nil, "the daemon must announce a crash found in the crash reporter's folder")
+		helpers.assert_true(defer_pos ~= nil, "the notice must be deferred onto the loop, where a window can open")
+		helpers.assert_true(run_pos ~= nil, "the event loop must still be findable, or this test compares nothing")
+		helpers.assert_true(defer_pos < run_pos, "the notice is queued before the loop starts, so it runs on its first tick")
 	end)
 end)

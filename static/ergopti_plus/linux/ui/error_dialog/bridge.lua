@@ -4,8 +4,9 @@
 --- BRIDGE HANDLER: Error Window (Linux)
 --- DESCRIPTION:
 --- Opens the shared error window (_shared/ui/error_dialog/) when a logged ERROR
---- passes the shared policy (_shared/modules/diagnostics/error_policy.json), and
---- serves the page's actions: report on GitHub, copy the report, open the file the error
+--- passes the shared policy (_shared/modules/diagnostics/error_policy.json), or
+--- at start-up when the daemon crashed since the last notice, and serves the
+--- page's actions: report on GitHub, copy the report, open the file the error
 --- is logged in, close.
 --- Bridge name: "error_dialog"
 ---
@@ -18,11 +19,14 @@
 ---    session, at most max_dialogs per window_sec, errors logged while a window
 ---    is open are counted in it, nothing while the Debug menu's "Show a window
 ---    for every error" is unticked.
---- 3. The report is diagnostics.error_report's, built from the diagnostics
+--- 3. A crash stops the daemon before any window can open, and systemd starts
+---    it again: the next start shows the newest crash dump once, as a crash
+---    notice, and remembers it in the crash folder.
+--- 4. The report is diagnostics.error_report's, built from the diagnostics
 ---    snapshot and redacted before the page sees it; copy, report and open go
 ---    through the diagnostics window's own actions (ui.healthcheck.report),
 ---    which redact again before anything leaves the machine.
---- 4. The window never takes the keyboard (focus_on_map off): it can appear
+--- 5. The window never takes the keyboard (focus_on_map off): it can appear
 ---    while the user is typing.
 --- ==============================================================================
 
@@ -40,6 +44,10 @@ local LOG = "bridge.error_dialog"
 -- as the features manifest declares it
 local APP = "error_dialog"
 local SETTING = "script.show_error_dialog"
+
+-- The name of the file, in the crash folder, that remembers the newest crash
+-- dump already announced
+local CRASH_ACK_FILE = ".last_crash_notice"
 
 -- The page's actions
 local PAGE_ACTIONS = { report = true, copy = true, open_log = true, close = true }
@@ -392,6 +400,75 @@ function M.on_error(module_name, template, message)
 		schedule({ kind = "error", module = tostring(module_name), message = tostring(message),
 			time = os.date("%Y-%m-%d %H:%M:%S") })
 	end
+end
+
+
+
+
+
+-- =================================
+-- =================================
+-- ======= 5/ Crash Notice =========
+-- =================================
+-- =================================
+
+--- Reads a whole small file.
+--- @param path string
+--- @return string|nil
+local function read_file(path)
+	local fh = io.open(path, "rb")
+	if not fh then return nil end
+	local content = fh:read("*a")
+	fh:close()
+	return content
+end
+
+--- The module and the error of a crash dump, from its header lines.
+--- @param text string
+--- @return string module
+--- @return string message The error, then the stack when the dump has one.
+function M.parse_crash_dump(text)
+	local module_name = text:match("\nModule:%s*([^\n]*)") or "daemon"
+	local message = text:match("\nError:%s*([^\n]*)") or ""
+	local stack = text:match("\nStack:\n(.*)$")
+	if stack and stack ~= "" then message = message .. "\n" .. stack:gsub("\n+$", "") end
+	return module_name, message
+end
+
+--- Shows the newest crash dump once, when the daemon crashed since the last
+--- notice. Called by the daemon once its loop runs.
+--- @param crash_dir string The crash reporter's folder.
+--- @return boolean shown
+function M.notify_last_crash(crash_dir)
+	if _policy == nil then return false end
+	-- Unticked, or a window already on its way: the dump stays unannounced and
+	-- is offered again at the next start
+	if not M.is_enabled() or _busy then return false end
+	local Shell = require("adapters.shell_runner")
+	local newest = Shell.exec_line("ls -1t " .. Shell.quote(crash_dir) .. " 2>/dev/null | grep -v '^%.' | head -n 1")
+	if type(newest) ~= "string" or newest == "" then return false end
+	local ack_path = crash_dir .. "/" .. CRASH_ACK_FILE
+	local acknowledged = read_file(ack_path)
+	if acknowledged and acknowledged:gsub("%s+$", "") == newest then return false end
+	-- Remembered before the window opens: a notice that crashes the daemon
+	-- again must not become a crash loop of notices
+	local fh = io.open(ack_path, "wb")
+	if not fh then
+		Logger.error(LOG, "The crash notice cannot be remembered in %s; it is not shown.", crash_dir)
+		return false
+	end
+	fh:write(newest, "\n")
+	fh:close()
+	local path = crash_dir .. "/" .. newest
+	local text = read_file(path)
+	if not text then
+		Logger.error(LOG, "The crash dump %s cannot be read.", path)
+		return false
+	end
+	local module_name, message = M.parse_crash_dump(text)
+	Logger.info(LOG, "The daemon crashed since the last start (%s); showing the notice.", newest)
+	schedule({ kind = "crash", module = module_name, message = message, time = newest, log_path = path })
+	return true
 end
 
 --- Test seam: forgets the policy, the decisions and the window.
