@@ -5,11 +5,12 @@
 ; DESCRIPTION:
 ; Where the Windows driver finds registry layouts: the shared registry
 ; settings (_shared/modules/layouts/defaults.json), the shared keycode table
-; (_shared/modules/layouts/mac_keycodes.json), the download of index.json and
-; of one .keylayout from the repository folder, and the local folder that keeps
-; each downloaded <id>.keylayout next to the index.json it was verified against,
-; and the copy of the registry folder shipped with the driver, which the Ergopti
-; emulation reads its layout from.
+; (_shared/modules/layouts/mac_keycodes.json), the verification of a layout
+; against its index entry, the local folder that keeps each installed
+; <id>.keylayout (verified against the entry its installation recorded,
+; layout_catalogue.ahk), the copy of the registry folder shipped with the
+; driver, which the Ergopti emulation reads its layout from, and the one
+; request every registry download goes through.
 ;
 ; FEATURES & RATIONALE:
 ; 1. One source for the registry location: the folder, branch, URL template,
@@ -18,9 +19,8 @@
 ; 2. A layout is only ever read after its size and checksum match the index
 ;    entry it was downloaded with: a truncated or edited file fails loudly
 ;    instead of emulating something else.
-; 3. A download never replaces a verified local copy with an unverified one:
-;    both files land under a temporary name and are published only once the
-;    layout matches the downloaded index.
+; 3. A download lands under a temporary name; the catalogue publishes it only
+;    once the layout matches its index entry.
 ; 4. The transfer runs in a curl child (CurlAsyncRequest) polled from a timer,
 ;    so the keyboard thread never waits on the network. Every collaborator is
 ;    injectable so tests replay a download without a network.
@@ -46,6 +46,9 @@ global LAYOUT_REGISTRY_ID_PATTERN := "^[a-z][a-z0-9_]*$"
 
 ; Suffix of a file being downloaded; it is renamed only once verified.
 global LAYOUT_REGISTRY_PARTIAL_SUFFIX := ".download"
+
+; User agent of every registry request.
+global LAYOUT_REGISTRY_USER_AGENT := "ErgoptiPlus-Layouts/1.0"
 
 ; How often a running download is polled. Short enough that a layout is ready a
 ; tenth of a second after curl exits, long enough to cost nothing while it runs.
@@ -207,20 +210,24 @@ _LayoutRegistryReadText(Path) {
 }
 
 /**
- * Reads a downloaded layout and verifies it against its local index.
+ * Reads an installed layout and verifies it against the entry its installation
+ * recorded (installed.json, layout_catalogue.ahk), so a catalogue refreshed
+ * since never invalidates it.
  * @param {string} Id - Registry id.
  * @param {string} LocalDir - Folder from LayoutRegistry_LocalDir.
- * @returns {Map} Text (the .keylayout) and Entry (its index entry).
- * @throws {Error} When the layout is not downloaded or fails verification.
+ * @returns {Map} Text (the .keylayout) and Entry (its recorded entry).
+ * @throws {Error} When the layout is not installed or fails verification.
  */
 LayoutRegistry_ReadLocal(Id, LocalDir) {
 	if !LayoutRegistry_IsValidId(Id)
 		throw ValueError("Invalid registry layout id.", -1, Id)
-	IndexPath := LocalDir . LayoutRegistry_Settings()["index_file"]
+	Installed := LayoutCatalogue_ReadInstalled(LocalDir)
+	if !Installed.Has(Id)
+		throw Error("The layout '" . Id . "' is not installed in " . LocalDir)
 	LayoutPath := LocalDir . Id . ".keylayout"
-	if !FileExist(IndexPath) || !FileExist(LayoutPath)
-		throw Error("The layout '" . Id . "' is not downloaded in " . LocalDir)
-	Entry := LayoutRegistry_FindEntry(JsonParse(_LayoutRegistryReadText(IndexPath)), Id)
+	if !FileExist(LayoutPath)
+		throw Error("The installed '" . Id . "' layout is missing from " . LocalDir)
+	Entry := Installed[Id]
 	Text := _LayoutRegistryReadText(LayoutPath)
 	LayoutRegistry_Verify(Entry, Text)
 	return Map("Text", Text, "Entry", Entry)
@@ -268,130 +275,74 @@ _LayoutRegistryDefaultTransport() {
 }
 
 /**
- * Downloads the registry index and one layout into ``LocalDir``, verifies the
- * layout against that index and only then publishes both files.
- * @param {string} Id - Registry id.
- * @param {string} LocalDir - Folder from LayoutRegistry_LocalDir.
- * @param {Func} OnDone - OnDone(Ok, Detail): Detail is the index entry on
- *   success, the failure reason otherwise. Called exactly once.
- * @param {Map} Transport - "request" (returns a CurlAsyncRequest-like object),
+ * Downloads one URL of the registry into ``Partial`` in a curl child polled
+ * from a timer, never on the keyboard thread, and calls
+ * OnSettled(Status, Etag, Error) exactly once: Status 0 when no HTTP response
+ * arrived, Error then saying why; Etag is the response's, "" when none.
+ * @param {string} Url
+ * @param {string} Partial - Output file; a stale one is removed first.
+ * @param {Map} Headers - Request headers.
+ * @param {Integer} TimeoutMs - Budget of the whole transfer, connection included.
+ * @param {Map} Transport - "request" (a CurlAsyncRequest-like object),
  *   "resolve_proxy" (SystemProxy_ResolveAsync) and "schedule" (Fn, DelayMs);
- *   injectable for tests.
+ *   the curl transport when 0.
+ * @param {Func} OnSettled
  */
-LayoutRegistry_Fetch(Id, LocalDir, OnDone, Transport := 0) {
-	global LAYOUT_REGISTRY_PARTIAL_SUFFIX
-	if !LayoutRegistry_IsValidId(Id)
-		throw ValueError("Invalid registry layout id.", -1, Id)
-	Settings := LayoutRegistry_Settings()
-	Job := {
-		Id: Id,
-		LocalDir: LocalDir,
-		OnDone: OnDone,
-		Transport: (Transport is Map) ? Transport : _LayoutRegistryDefaultTransport(),
-		TimeoutMs: Settings["download_timeout_sec"] * 1000,
-		IndexPartial: LocalDir . Settings["index_file"] . LAYOUT_REGISTRY_PARTIAL_SUFFIX,
-		LayoutPartial: LocalDir . Id . ".keylayout" . LAYOUT_REGISTRY_PARTIAL_SUFFIX,
-		Entry: 0,
-		Finished: false
-	}
-	LoggerStart("LayoutRegistry", "Downloading the '{1}' layout from the registry…", Id)
-	try {
-		if !DirExist(LocalDir)
-			DirCreate(LocalDir)
-		_LayoutRegistryDownload(Job, Settings["index_file"], Job.IndexPartial, _LayoutRegistryOnIndex)
-	} catch as Err {
-		_LayoutRegistryFinish(Job, false, Err.Message)
-	}
-}
-
-; Starts one file transfer once the system proxy for its URL is known.
-_LayoutRegistryDownload(Job, RelativePath, Partial, OnFile) {
-	Url := LayoutRegistry_RawUrl(RelativePath)
+LayoutRegistry_Request(Url, Partial, Headers, TimeoutMs, Transport, OnSettled) {
+	if !(Transport is Map)
+		Transport := _LayoutRegistryDefaultTransport()
+	Job := { Url: Url, Partial: Partial, Headers: Headers, TimeoutMs: TimeoutMs, Transport: Transport,
+		OnSettled: OnSettled, Settled: false }
 	LoggerDebug("LayoutRegistry", "Fetching {1}", Url)
-	Job.Transport["resolve_proxy"].Call([Url],
-		(Resolved) => _LayoutRegistrySend(Job, Url, Resolved[Url], Partial, OnFile))
+	Transport["resolve_proxy"].Call([Url], (Resolved) => _LayoutRegistrySend(Job, Resolved[Url]))
 }
 
-_LayoutRegistrySend(Job, Url, Proxy, Partial, OnFile) {
+_LayoutRegistrySettle(Job, Status, Etag, Err) {
+	if Job.Settled
+		return
+	Job.Settled := true
+	Job.OnSettled.Call(Status, Etag, Err)
+}
+
+_LayoutRegistrySend(Job, Proxy) {
 	try {
-		if !FSDelete(Partial)
-			throw Error("Cannot remove the stale partial download " . Partial)
+		if !FSDelete(Job.Partial)
+			throw Error("Cannot remove the stale partial download " . Job.Partial)
 		Req := Job.Transport["request"].Call()
-		Req.Open("GET", Url, true)
-		Req.SetRequestHeader("User-Agent", "ErgoptiPlus-Layouts/1.0")
+		Req.Open("GET", Job.Url, true)
+		for Name, Value in Job.Headers
+			Req.SetRequestHeader(Name, Value)
 		Req.SetProxy(Proxy)
 		; One budget for the whole transfer, connection included.
 		Req.SetTimeouts(0, Job.TimeoutMs, 0, 0)
-		Req.SetOutputFile(Partial)
+		Req.SetOutputFile(Job.Partial)
 		Req.Send()
 	} catch as Err {
-		_LayoutRegistryFinish(Job, false, "cannot download " . Url . ": " . Err.Message)
+		_LayoutRegistrySettle(Job, 0, "", "cannot download " . Job.Url . ": " . Err.Message)
 		return
 	}
-	_LayoutRegistryPoll(Job, Req, Url, OnFile, 0)
+	_LayoutRegistryPoll(Job, Req, 0)
 }
 
-_LayoutRegistryPoll(Job, Req, Url, OnFile, Polls) {
+_LayoutRegistryPoll(Job, Req, Polls) {
 	global LAYOUT_REGISTRY_POLL_MS, LAYOUT_REGISTRY_POLL_GRACE
 	try {
 		Ready := Req.WaitForResponse(0)
 	} catch as Err {
 		try Req.Abort()
-		_LayoutRegistryFinish(Job, false, "download of " . Url . " failed: " . Err.Message)
+		_LayoutRegistrySettle(Job, 0, "", "download of " . Job.Url . " failed: " . Err.Message)
 		return
 	}
 	if !Ready {
 		if (Polls > Ceil(Job.TimeoutMs / LAYOUT_REGISTRY_POLL_MS) + LAYOUT_REGISTRY_POLL_GRACE) {
 			try Req.Abort()
-			_LayoutRegistryFinish(Job, false, "download of " . Url . " did not finish in time")
+			_LayoutRegistrySettle(Job, 0, "", "download of " . Job.Url . " did not finish in time")
 			return
 		}
-		Job.Transport["schedule"].Call(_LayoutRegistryPoll.Bind(Job, Req, Url, OnFile, Polls + 1),
-			LAYOUT_REGISTRY_POLL_MS)
+		Job.Transport["schedule"].Call(_LayoutRegistryPoll.Bind(Job, Req, Polls + 1), LAYOUT_REGISTRY_POLL_MS)
 		return
 	}
-	if (Req.Status != 200) {
-		_LayoutRegistryFinish(Job, false, Req.Status == 0
-			? "no HTTP response for " . Url . " (network, proxy or timeout)"
-			: "HTTP " . Req.Status . " for " . Url)
-		return
-	}
-	try OnFile.Call(Job)
-	catch as Err
-		_LayoutRegistryFinish(Job, false, Err.Message)
-}
-
-_LayoutRegistryOnIndex(Job) {
-	Entry := LayoutRegistry_FindEntry(JsonParse(_LayoutRegistryReadText(Job.IndexPartial)), Job.Id)
-	if (Entry["size"] > LayoutRegistry_Settings()["max_file_bytes"])
-		throw Error(Format("The layout '{1}' ({2} bytes) exceeds the download bound.", Job.Id, Entry["size"]))
-	Job.Entry := Entry
-	_LayoutRegistryDownload(Job, Entry["file"], Job.LayoutPartial, _LayoutRegistryOnLayout)
-}
-
-_LayoutRegistryOnLayout(Job) {
-	Settings := LayoutRegistry_Settings()
-	LayoutRegistry_Verify(Job.Entry, _LayoutRegistryReadText(Job.LayoutPartial))
-	; The layout first: a crash between the two renames leaves a new layout
-	; beside the old index, which fails verification and is downloaded again.
-	if !FSAtomicMoveReplace(Job.LayoutPartial, Job.LocalDir . Job.Id . ".keylayout")
-		throw Error("Cannot publish the downloaded '" . Job.Id . "' layout in " . Job.LocalDir)
-	if !FSAtomicMoveReplace(Job.IndexPartial, Job.LocalDir . Settings["index_file"])
-		throw Error("Cannot publish the downloaded registry index in " . Job.LocalDir)
-	_LayoutRegistryFinish(Job, true, Job.Entry)
-}
-
-_LayoutRegistryFinish(Job, Ok, Detail) {
-	if Job.Finished
-		return
-	Job.Finished := true
-	if Ok {
-		LoggerSuccess("LayoutRegistry", "Downloaded the '{1}' layout (version {2}).", Job.Id, Detail["version"])
-	} else {
-		for Partial in [Job.IndexPartial, Job.LayoutPartial]
-			if !FSDelete(Partial)
-				LoggerWarn("LayoutRegistry", "Cannot remove the partial download {1}.", Partial)
-		LoggerError("LayoutRegistry", "The '{1}' layout could not be downloaded: {2}", Job.Id, Detail)
-	}
-	Job.OnDone.Call(Ok, Detail)
+	Status := Req.Status
+	_LayoutRegistrySettle(Job, Status, (Status == 0) ? "" : Req.GetResponseHeader("ETag"),
+		(Status == 0) ? "no HTTP response for " . Job.Url . " (network, proxy or timeout)" : "")
 }

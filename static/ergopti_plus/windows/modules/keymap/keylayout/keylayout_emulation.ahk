@@ -394,16 +394,17 @@ _KLE_DefaultBootDeps() {
 		"keycodes", LayoutRegistry_Keycodes,
 		"register", KeylayoutEmulation_Register,
 		"read_local", LayoutRegistry_ReadLocal,
-		"fetch", LayoutRegistry_Fetch
+		"install", LayoutCatalogue_Install
 	)
 }
 
 /**
- * Registers the emulation and loads the selected layout, downloading it first
- * when it is not in the local folder or no longer matches its index. Runs once
- * at boot, before the Ergopti layers register their hotkeys.
+ * Registers the emulation and loads the selected layout, installing it first
+ * through the layout catalogue when it is not installed or its copy no longer
+ * matches its record. Runs once at boot, before the Ergopti layers register
+ * their hotkeys.
  * @param {string} ConfigDir - Configuration folder, with its trailing backslash.
- * @param {Map} Deps - "keycodes", "register", "read_local" and "fetch"
+ * @param {Map} Deps - "keycodes", "register", "read_local" and "install"
  *   implementations; injectable for tests.
  * @returns {boolean} Whether the layout is emulated when this returns (false
  *   while it downloads, or when nothing is selected or it failed).
@@ -425,15 +426,15 @@ KeylayoutEmulation_Boot(ConfigDir, Deps := 0) {
 	try {
 		LocalCopy := Deps["read_local"].Call(Id, LocalDir)
 	} catch as Err {
-		LoggerInfo("LayoutEmulation", "The '{1}' layout is not usable locally ({2}); downloading it.", Id, Err.Message)
-		Deps["fetch"].Call(Id, LocalDir, _KLE_OnFetched.Bind(Id, LocalDir, KeycodeTable, Deps))
+		LoggerInfo("LayoutEmulation", "The '{1}' layout is not usable locally ({2}); installing it.", Id, Err.Message)
+		Deps["install"].Call(Id, LocalDir, _KLE_OnInstalled.Bind(Id, LocalDir, KeycodeTable, Deps))
 		return false
 	}
 	return _KLE_Activate(Id, LocalCopy, KeycodeTable)
 }
 
-_KLE_OnFetched(Id, LocalDir, KeycodeTable, Deps, Ok, Detail) {
-	; LayoutRegistry_Fetch already logged the failure and its reason.
+_KLE_OnInstalled(Id, LocalDir, KeycodeTable, Deps, Ok, Detail*) {
+	; LayoutCatalogue_Install already logged the failure and its reason.
 	if !Ok
 		return
 	try {

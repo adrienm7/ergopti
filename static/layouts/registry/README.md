@@ -25,8 +25,10 @@ derived from it is stored here:
 - Windows (AutoHotkey) parses the `.keylayout` when the layout is loaded or
   changed and emulates it; there is no Windows version of a layout. The
   emulated layout is `[layout] emulated_layout` in `config.toml` (a registry
-  id, empty for none); the driver downloads it at boot when its verified copy
-  is missing from `<configuration folder>/layouts/`. The Windows Ergopti
+  id, empty for none), installed with the layout manager: its verified copy
+  stays in `<configuration folder>/layouts/` with the entry it was verified
+  against (`installed.json`, `windows/modules/keymap/keylayout/layout_catalogue.ahk`),
+  and the boot installs it when it is missing. The Windows Ergopti
   emulation itself reads `ergopti.keylayout` and `ergopti_plus.keylayout`
   from the copy of this folder the driver ships
   (`windows/modules/keymap/layout/layout_ergopti.ahk`), so editing an Ergopti
