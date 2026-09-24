@@ -611,6 +611,13 @@ function M.install(id, on_done, deps)
 		on_done(false, code_or_detail, detail, user_message(deps, code_or_detail))
 	end
 	Logger.start(LOG, "Installing the '%s' layout…", id)
+	-- The record is read before anything is written: a layout installed that
+	-- it cannot record would be in the user XKB tree with nothing listing it.
+	local _, record_problem = read_installed(deps)
+	if record_problem ~= nil then
+		finish(false, M.FAILURE_RECORD, record_problem)
+		return false
+	end
 	M.refresh(function(outcome)
 		if not outcome.index then
 			finish(false, M.FAILURE_DOWNLOAD, outcome.error and outcome.error.detail or "no registry index")

@@ -462,6 +462,13 @@ function M.install(id, on_done, deps)
 		on_done(ok, code_or_detail, detail)
 	end
 	Logger.start(LOG, "Installing the '%s' layout…", id)
+	-- The record is read before anything is written: a layout it cannot record
+	-- would stay in the layouts folder as a file ErgoptiPlus refuses as foreign.
+	local record, record_err = read_installed(deps)
+	if not record then
+		finish(false, M.FAILURE_RECORD, record_err)
+		return false
+	end
 	M.refresh(function(outcome)
 		if not outcome.index then
 			finish(false, M.FAILURE_DOWNLOAD, outcome.error and outcome.error.detail or "no registry index")
@@ -481,8 +488,7 @@ function M.install(id, on_done, deps)
 			return
 		end
 		-- A file of that name the user put there is theirs: never overwritten.
-		local record = read_installed(deps)
-		if deps.exists(deps.layouts_dir .. id .. ".keylayout") and not (record and record.layouts[id]) then
+		if deps.exists(deps.layouts_dir .. id .. ".keylayout") and not record.layouts[id] then
 			finish(false, M.FAILURE_FOREIGN_FILE, deps.layouts_dir .. id .. ".keylayout was not installed by ErgoptiPlus")
 			return
 		end

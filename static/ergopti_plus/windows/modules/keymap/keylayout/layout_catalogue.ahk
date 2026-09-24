@@ -494,7 +494,7 @@ _LayoutCatalogueRelease() {
  * @param {string} BundledDir - Folder of the shipped registry; LayoutRegistry_BundledDir() when omitted.
  */
 LayoutCatalogue_Install(Id, LocalDir, OnDone, Transport := 0, Bundled := unset, BundledDir := unset) {
-	global LAYOUT_CATALOGUE_FAILURE_UNKNOWN_LAYOUT, LAYOUT_CATALOGUE_FAILURE_BUSY
+	global LAYOUT_CATALOGUE_FAILURE_UNKNOWN_LAYOUT, LAYOUT_CATALOGUE_FAILURE_BUSY, LAYOUT_CATALOGUE_FAILURE_RECORD
 	if !LayoutRegistry_IsValidId(Id) {
 		OnDone.Call(false, LAYOUT_CATALOGUE_FAILURE_UNKNOWN_LAYOUT, "'" . Id . "' is not a registry layout id")
 		return
@@ -509,6 +509,13 @@ LayoutCatalogue_Install(Id, LocalDir, OnDone, Transport := 0, Bundled := unset, 
 		BundledDir := LayoutRegistry_BundledDir()
 	LoggerStart("LayoutCatalogue", "Installing the '{1}' layout…", Id)
 	Finish := _LayoutCatalogueFinishInstall.Bind(Id, OnDone)
+	; The record is read before anything is written: a copy it cannot record
+	; would sit in the local folder with nothing vouching for it.
+	try LayoutCatalogue_ReadInstalled(LocalDir)
+	catch as Err {
+		Finish.Call(false, LAYOUT_CATALOGUE_FAILURE_RECORD, Err.Message)
+		return
+	}
 	LayoutCatalogue_Refresh(LocalDir, _LayoutCatalogueOnInstallIndex.Bind(Id, LocalDir, Transport, Bundled,
 		BundledDir, Finish), Transport, Bundled)
 }
