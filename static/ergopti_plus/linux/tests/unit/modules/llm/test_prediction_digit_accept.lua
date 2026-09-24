@@ -51,7 +51,9 @@ local function offering(count, apply_ok)
 		overlay = {
 			show = function() state.visible = true; return true end,
 			hide = function() state.visible = false end,
-			is_visible = function() return state.visible end,
+			is_showing = function() return state.visible end,
+			-- The window is not mapped yet: the offer is presented all the same.
+			is_visible = function() return false end,
 		},
 		apply_prediction = function(candidate)
 			state.applied[#state.applied + 1] = candidate.to_type
@@ -160,6 +162,18 @@ helpers.describe("prediction digit accept: through the keyboard hook", function(
 			helpers.assert_eq(table.concat(chars), "2")
 			helpers.assert_eq(#state.applied, 1)
 		end)
+	end)
+
+end)
+
+helpers.describe("prediction digit accept: the real tooltip's presented state", function()
+
+	helpers.it("presents candidates before its window maps, and none once hidden", function()
+		local overlay = helpers.load_module("ui.tooltip.llm")
+		pcall(overlay.show, { { to_type = "va bien" } }, {})
+		helpers.assert_true(overlay.is_showing(), "presented, whether or not the window is up yet")
+		overlay.hide()
+		helpers.assert_true(not overlay.is_showing(), "hidden by any path: nothing to accept")
 	end)
 
 end)
