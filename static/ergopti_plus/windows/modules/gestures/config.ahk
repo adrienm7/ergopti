@@ -100,8 +100,7 @@ GestureValidateActionParameter(ActionName, Value, &ErrorText := "") {
 		if (Spec = "text" || Spec = "key" || Spec = "shortcut") {
 				if (SendInputParse(Spec, Value) is Map)
 						return true
-				ErrorText := StrReplace(t("dialog.gestures.param_err_" . Spec), "{1}",
-						SendInputVocabulary()["text_max_code_points"])
+				ErrorText := GestureSendInputErrorText(Spec)
 				return false
 		}
 		Value := Trim(Value)
@@ -155,13 +154,53 @@ GestureActionParameterPrompt(ActionName) {
 		throw ValueError("No prompt for the parameter of action '" . ActionName . "'.")
 }
 
+; A value the action picker's own editor collected for the action it just
+; confirmed (send_text, send_key, send_shortcut), held for the next parameter
+; prompt of that action only: the picker's confirm callback runs the same
+; assignment as a native pick, and this is how its value reaches it.
+global _GesturePickedParameter := ""
+
+; @param {String} ActionName The action the picker confirmed.
+; @param {String} Value The value its editor collected.
+GestureOfferPickedParameter(ActionName, Value) {
+		global _GesturePickedParameter
+		_GesturePickedParameter := Map("action", ActionName, "value", Value)
+}
+
+GestureClearPickedParameter() {
+		global _GesturePickedParameter
+		_GesturePickedParameter := ""
+}
+
+; The refusal of a send_text, send_key or send_shortcut value. The action
+; picker's own editor shows the same text as the native prompt.
+; @param {String} Spec "text", "key" or "shortcut".
+; @returns {String}
+GestureSendInputErrorText(Spec) {
+		return StrReplace(t("dialog.gestures.param_err_" . Spec), "{1}",
+				SendInputVocabulary()["text_max_code_points"])
+}
+
 ; Builds a detached action-parameter candidate. Cancel is represented by false;
-; a Map always means the user accepted and no persistence happened yet.
+; a Map always means the user accepted and no persistence happened yet. A value
+; the picker's editor collected for this action is used without a prompt when it
+; validates, and prefills the prompt when it does not.
 GesturePromptActionParameter(BindingId, ActionName) {
+		global _GesturePickedParameter
 		Spec := GestureActionParameterSpec(ActionName)
 		if (Spec = "")
 				return Map("has_value", false)
 		Existing := GestureGetActionParameter(BindingId, ActionName)
+		if (_GesturePickedParameter is Map) && (_GesturePickedParameter["action"] == ActionName) {
+				Picked := _GesturePickedParameter["value"]
+				GestureClearPickedParameter()
+				if GestureValidateActionParameter(ActionName, Picked)
+						return Map("has_value", true,
+								"key", GestureActionParameterKey(BindingId, ActionName),
+								"value", Picked)
+				LoggerWarn("gestures", "The picker's value for '{1}' was refused — asking again.", ActionName)
+				Existing := Picked
+		}
 		Prompt := GestureActionParameterPrompt(ActionName)
 		Title  := StrReplace(t("dialog.gestures.param_title"), "{1}", _GestureActionLabel(ActionName))
 		loop {

@@ -1722,7 +1722,7 @@ BuildScriptShortcutsMenu() {
 				SlotLabel := t(SCRIPT_SHORTCUT_LABELS[Slot])
 				Rows.Push(Map(
 					"label",  SlotLabel . " : " . CurrentLabel,
-					"action", ((_s, _l) => (*) => ShowActionPicker(_l, ScriptShortcutAssignments.Has(_s) ? ScriptShortcutAssignments[_s] : "none", (Id) => SetScriptShortcutAction(_s, Id)))(Slot, SlotLabel)))
+					"action", ((_s, _l) => (*) => ShowActionPicker(_l, ScriptShortcutAssignments.Has(_s) ? ScriptShortcutAssignments[_s] : "none", (Id) => SetScriptShortcutAction(_s, Id), false, GestureBindingId("script", _s)))(Slot, SlotLabel)))
 		}
 		SMenu := Menu()
 		MenuRenderer_AppendRows(SMenu, "shortcuts_menu", "script_control", Rows)

@@ -80,7 +80,9 @@ class FakeElement {
 }
 
 const byId = {};
-for (const id of ['title', 'subtitle', 'search', 'btn-cancel', 'list', 'empty', 'count', 'toc', 'toc-inner']) {
+for (const id of ['title', 'subtitle', 'search', 'search-bar', 'btn-cancel', 'list', 'empty', 'count', 'toc',
+	'toc-inner', 'param', 'param-title', 'param-prompt', 'param-hint', 'param-input', 'param-error', 'param-back',
+	'param-save']) {
 	byId[id] = new FakeElement('div', id);
 }
 const docListeners = {};

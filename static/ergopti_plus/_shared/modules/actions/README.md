@@ -48,3 +48,11 @@ the `wrap_pair` rule is pinned by
 `text`, `key` and `shortcut` rules (over `send_keys.json`, parsed by
 `_shared/lua/send_input` and `windows/infra/send_input_parameter.ahk`) by
 `_shared/tests/corpus/action_parameters/send_input_vectors.json`.
+
+The shared action picker (`_shared/ui/action_picker/`) edits the `text`, `key`
+and `shortcut` kinds itself: a text field, a key capture and a shortcut
+capture that validate with the same corpus rules, then post the value with the
+pick, which the driver still validates before it stores it. Each host sends
+the page `send_keys.json` and the prompts and refusals above; the other kinds
+keep the driver's own prompt. `tools/test/test-action-picker-parameter-editor.cjs`
+replays the corpus against the page.

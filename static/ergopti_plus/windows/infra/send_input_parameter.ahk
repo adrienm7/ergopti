@@ -38,25 +38,37 @@ global SEND_INPUT_TRIM := " `t`r`n`v`f"
 
 ; The decoded send_keys.json, loaded on first use.
 global _SEND_INPUT_VOCABULARY := ""
+global _SEND_INPUT_VOCABULARY_JSON := ""
 
 ; Returns the shared vocabulary, loading it once. A missing or malformed file is
 ; a broken install, not an empty vocabulary: every send_* binding would refuse
 ; its value with no explanation.
 ; @returns {Map}
 SendInputVocabulary() {
-	global _SEND_INPUT_VOCABULARY, _SharedDir
+	global _SEND_INPUT_VOCABULARY, _SEND_INPUT_VOCABULARY_JSON, _SharedDir
 	if (_SEND_INPUT_VOCABULARY is Map)
 		return _SEND_INPUT_VOCABULARY
 	Path := _SharedDir . "\modules\actions\send_keys.json"
 	if !FileExist(Path)
 		throw Error("The send-input vocabulary is missing: " . Path)
-	Root := JsonParse(FileRead(Path, "UTF-8"))
+	Text := FileRead(Path, "UTF-8")
+	Root := JsonParse(Text)
 	if !(Root is Map) || !Root.Has("modifiers") || !(Root["modifiers"] is Array)
 			|| !Root.Has("keys") || !(Root["keys"] is Array)
 			|| !Root.Has("text_max_code_points") || !(Root["text_max_code_points"] is Integer)
 		throw Error("The send-input vocabulary is malformed: " . Path)
 	_SEND_INPUT_VOCABULARY := Root
+	_SEND_INPUT_VOCABULARY_JSON := Text
 	return Root
+}
+
+; The vocabulary as the JSON text of the shared file, for the action picker's
+; editor, which validates with the same rules in the page.
+; @returns {String}
+SendInputVocabularyJson() {
+	global _SEND_INPUT_VOCABULARY_JSON
+	SendInputVocabulary()
+	return _SEND_INPUT_VOCABULARY_JSON
 }
 
 ; Lowers A to Z only. StrLower would also lower É, which the Lua drivers cannot

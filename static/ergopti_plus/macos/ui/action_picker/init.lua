@@ -95,10 +95,12 @@ local function close_session(session)
 end
 
 --- Open the action picker for a new target, replacing any prior target.
---- @param opts table { title, label, current, actions = {{id,label,category}},
----   allow_native (bool), native_label }.
---- @param on_confirm function Invoked with the chosen action id on a pick. An
----   explicit false return refuses settlement and keeps the picker retryable.
+--- @param opts table { title, label, current, items, allow_native (bool),
+---   native_label, send_vocabulary, parameter_strings }; the last two come from
+---   ShortcutUtils.picker_parameter_fields and turn the page's editor on.
+--- @param on_confirm function Invoked with the chosen action id, and the value the
+---   page's editor collected for it, if any, on a pick. An explicit false return
+---   refuses settlement and keeps the picker retryable.
 --- @return boolean opened
 function M.open(opts, on_confirm)
 	opts = type(opts) == "table" and opts or {}
@@ -139,6 +141,11 @@ function M.open(opts, on_confirm)
 		noResults         = i18n.get("dialog.action_picker.no_results"),
 		cancelLabel       = i18n.get("button.cancel"),
 		items             = opts.items or {},
+		-- The page's own editor for send_text / send_key / send_shortcut; "hs"
+		-- makes Command the portable "primary" modifier of a captured shortcut.
+		platform          = "hs",
+		sendVocabulary    = opts.send_vocabulary,
+		parameterStrings  = opts.parameter_strings,
 	}
 
 	local function push_init()
@@ -165,10 +172,12 @@ function M.open(opts, on_confirm)
 			end
 			if session.settling then return end
 			local id = type(body.id) == "string" and body.id or "none"
+			-- A value the page's editor collected travels with the pick.
+			local parameter = type(body.parameter) == "string" and body.parameter or nil
 			local callback = session.on_confirm
 			session.settling = true
 			local callback_ok, callback_result = Logger.callback(
-				LOG, "Action picker confirmation", callback, id)
+				LOG, "Action picker confirmation", callback, id, parameter)
 			session.settling = false
 			if not callback_ok then return end
 			if callback_result == false then

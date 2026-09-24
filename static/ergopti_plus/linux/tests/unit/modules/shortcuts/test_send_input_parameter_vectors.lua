@@ -109,6 +109,28 @@ helpers.describe("send input parameters replay the shared send-input corpus (sen
 			"the shortcut prompt has its placeholder filled")
 	end)
 
+	-- The picker's own editor edits these three kinds: it is told which rows take
+	-- which, the value the binding holds, the vocabulary it validates with, and
+	-- the prompts and refusals the zenity prompt shows.
+	helpers.it("the picker's editor gets the send-input rows, their values and texts", function()
+		local items = {
+			{ type = "heading", level = 1, text = "Input" },
+			{ type = "action", id = "send_key", label = "Press a key" },
+			{ type = "action", id = "open_url", label = "Open a link" },
+		}
+		local fields = Gestures.get_picker_parameter_fields(items, "tap_key__number_row_left")
+		helpers.assert_eq(items[2].parameter, "key", "the send_key row names its kind")
+		helpers.assert_eq(items[2].parameterValue, "", "and the value its binding holds")
+		helpers.assert_eq(items[3].parameter, nil, "a URL stays with the zenity prompt")
+		helpers.assert_eq(items[1].parameter, nil, "a heading takes nothing")
+		helpers.assert_eq(fields.send_vocabulary, Shortcuts.send_vocabulary(), "the drivers' own vocabulary")
+		helpers.assert_eq(fields.parameter_strings.prompts.key, Gestures.get_action_parameter_prompt("send_key"))
+		helpers.assert_eq(fields.parameter_strings.errors.key, Gestures.get_action_parameter_error("send_key"))
+		helpers.assert_true(type(fields.parameter_strings.captureShortcut) == "string"
+			and fields.parameter_strings.captureShortcut ~= "dialog.action_picker.capture_shortcut",
+			"the capture hints are translated")
+	end)
+
 	for _, vector in ipairs(corpus.vectors) do
 		helpers.it("send-input vector '" .. vector.id .. "'", function()
 			local value = string.rep(vector.value, vector["repeat"] or 1)

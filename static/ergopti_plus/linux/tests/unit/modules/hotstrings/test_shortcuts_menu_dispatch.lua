@@ -175,88 +175,122 @@ end)
 -- =================================================================
 -- =================================================================
 
+--- Draws the shortcuts menu over a stubbed keyboard slot (ctrl_k), gestures
+--- manager and picker bridge, then clicks the slot's picker row.
+--- @param prompt function The zenity prompt test boundary.
+--- @return table { picker, events, prompt_args, items, editor }
+local function open_keyboard_slot_picker(prompt)
+	local prior_keyboard = package.loaded["modules.shortcuts.keyboard_shortcuts"]
+	local prior_gestures = package.loaded["modules.gestures.manager"]
+	local prior_picker = package.loaded["ui.action_picker.bridge"]
+	local scene = { events = {} }
+	local events = scene.events
+	scene.items = { { type = "action", id = "open_url", label = "Open URL" } }
+	scene.editor = { send_vocabulary = { keys = {} }, parameter_strings = { save = "Save" } }
+	package.loaded["modules.shortcuts.keyboard_shortcuts"] = {
+		SLOT_GROUPS = { { prefix = "ctrl_", group_key = "menu.shortcuts.mod_ctrl" } },
+		available_slots = function() return { "ctrl_k" } end,
+		get_action = function() return "none" end,
+		get_slot_label = function() return "Ctrl+K" end,
+		set_action = function(slot, action)
+			events[#events + 1] = "assign:" .. slot .. ":" .. action
+			return true
+		end,
+	}
+	package.loaded["modules.gestures.manager"] = {
+		get_action_names = function() return { "none", "open_url", "send_key" } end,
+		get_action_label = function(action)
+			return action == "open_url" and "Open URL" or "None"
+		end,
+		get_action_parameter_spec = function(action)
+			return ({ open_url = "url", send_key = "key" })[action]
+		end,
+		get_action_parameter = function(binding, action)
+			events[#events + 1] = "prior:" .. binding .. ":" .. action
+			return "https://old.example"
+		end,
+		validate_action_parameter = function(action, value)
+			return (action == "open_url" and value == "https://new.example")
+				or (action == "send_key" and value == "enter")
+		end,
+		set_action_parameter = function(binding, action, value)
+			events[#events + 1] = "parameter:" .. binding .. ":" .. action .. ":" .. value
+			return true
+		end,
+		get_picker_items = function() return scene.items end,
+		get_picker_parameter_fields = function(items, binding)
+			helpers.assert_eq(items, scene.items, "the editor marks the items the picker shows")
+			events[#events + 1] = "editor:" .. tostring(binding)
+			return scene.editor
+		end,
+	}
+	package.loaded["ui.action_picker.bridge"] = {
+		open = function(opts, on_confirm)
+			scene.picker = { opts = opts, on_confirm = on_confirm }
+			return true
+		end,
+	}
+
+	local ok, rows = pcall(function()
+		local built = shortcuts_menu({
+			prompt_action_parameter = function(binding, action, spec, prior)
+				scene.prompt_args = { binding, action, spec, prior }
+				return prompt(binding, action, spec, prior)
+			end,
+		})
+		local picker_label = require("infra.i18n").get("dialog.action_picker.label") .. "…"
+		-- Searched under the slot's own row: the number-row tap keys above it
+		-- open the same picker.
+		local slot_row = find_row_prefix(built, "Ctrl+K")
+		helpers.assert_not_nil(slot_row, "the keyboard slot must be drawn")
+		local picker_choice = find_row(slot_row.menu, picker_label)
+		helpers.assert_not_nil(picker_choice,
+			"the shared searchable picker must be reachable from a keyboard slot")
+		helpers.assert_true(type(picker_choice.fn) == "function")
+		picker_choice.fn()
+		return built
+	end)
+	package.loaded["modules.shortcuts.keyboard_shortcuts"] = prior_keyboard
+	package.loaded["modules.gestures.manager"] = prior_gestures
+	package.loaded["ui.action_picker.bridge"] = prior_picker
+	helpers.assert_true(ok, tostring(rows))
+	helpers.assert_not_nil(scene.picker, "clicking the production row must open the picker host")
+	return scene
+end
+
 helpers.describe("shortcuts menu: dispatched by id", function()
 
 	helpers.it("stores a parameter under the exact keyboard dispatch binding before assignment", function()
-		local prior_keyboard = package.loaded["modules.shortcuts.keyboard_shortcuts"]
-		local prior_gestures = package.loaded["modules.gestures.manager"]
-		local prior_picker = package.loaded["ui.action_picker.bridge"]
-		local events = {}
-		package.loaded["modules.shortcuts.keyboard_shortcuts"] = {
-			SLOT_GROUPS = { { prefix = "ctrl_", group_key = "menu.shortcuts.mod_ctrl" } },
-			available_slots = function() return { "ctrl_k" } end,
-			get_action = function() return "none" end,
-			get_slot_label = function() return "Ctrl+K" end,
-			set_action = function(slot, action)
-				events[#events + 1] = "assign:" .. slot .. ":" .. action
-				return true
-			end,
-		}
-		package.loaded["modules.gestures.manager"] = {
-			get_action_names = function() return { "none", "open_url" } end,
-			get_action_label = function(action)
-				return action == "open_url" and "Open URL" or "None"
-			end,
-			get_action_parameter_spec = function(action)
-				return action == "open_url" and "url" or nil
-			end,
-			get_action_parameter = function(binding, action)
-				events[#events + 1] = "prior:" .. binding .. ":" .. action
-				return "https://old.example"
-			end,
-			validate_action_parameter = function(action, value)
-				return action == "open_url" and value == "https://new.example"
-			end,
-			set_action_parameter = function(binding, action, value)
-				events[#events + 1] = "parameter:" .. binding .. ":" .. action .. ":" .. value
-				return true
-			end,
-		}
-		local picker = nil
-		package.loaded["ui.action_picker.bridge"] = {
-			open = function(opts, on_confirm)
-				picker = { opts = opts, on_confirm = on_confirm }
-				return true
-			end,
-		}
-
-		local prompt_args = nil
-		local ok, rows = pcall(function()
-			local built = shortcuts_menu({
-				prompt_action_parameter = function(binding, action, spec, prior)
-					prompt_args = { binding, action, spec, prior }
-					return "https://new.example"
-				end,
-			})
-			local picker_label = require("infra.i18n").get("dialog.action_picker.label") .. "…"
-			-- Searched under the slot's own row: the number-row tap keys above it
-			-- open the same picker.
-			local slot_row = find_row_prefix(built, "Ctrl+K")
-			helpers.assert_not_nil(slot_row, "the keyboard slot must be drawn")
-			local picker_choice = find_row(slot_row.menu, picker_label)
-			helpers.assert_not_nil(picker_choice,
-				"the shared searchable picker must be reachable from a keyboard slot")
-			helpers.assert_true(type(picker_choice.fn) == "function")
-			picker_choice.fn()
-			return built
+		local scene = open_keyboard_slot_picker(function(binding, action, spec, prior)
+			return "https://new.example"
 		end)
-		package.loaded["modules.shortcuts.keyboard_shortcuts"] = prior_keyboard
-		package.loaded["modules.gestures.manager"] = prior_gestures
-		package.loaded["ui.action_picker.bridge"] = prior_picker
-		helpers.assert_true(ok, tostring(rows))
+		helpers.assert_eq(scene.picker.opts.current, "none")
+		helpers.assert_true(scene.picker.on_confirm("open_url"))
 
-		helpers.assert_not_nil(picker, "clicking the production row must open the picker host")
-		helpers.assert_eq(picker.opts.current, "none")
-		helpers.assert_true(picker.on_confirm("open_url"))
-
-		helpers.assert_eq(prompt_args[1], "keyboard__ctrl_k")
-		helpers.assert_eq(prompt_args[2], "open_url")
-		helpers.assert_eq(prompt_args[3], "url")
-		helpers.assert_eq(prompt_args[4], "https://old.example")
-		helpers.assert_eq(events[#events - 1],
+		helpers.assert_eq(scene.prompt_args[1], "keyboard__ctrl_k")
+		helpers.assert_eq(scene.prompt_args[2], "open_url")
+		helpers.assert_eq(scene.prompt_args[3], "url")
+		helpers.assert_eq(scene.prompt_args[4], "https://old.example")
+		helpers.assert_eq(scene.events[#scene.events - 1],
 			"parameter:keyboard__ctrl_k:open_url:https://new.example")
-		helpers.assert_eq(events[#events], "assign:ctrl_k:open_url",
+		helpers.assert_eq(scene.events[#scene.events], "assign:ctrl_k:open_url",
 			"the visible key assignment must be published only after its parameter")
+	end)
+
+	helpers.it("hands the picker its editor for the slot's binding and stores what it collected", function()
+		local scene = open_keyboard_slot_picker(function()
+			error("the value the picker's editor collected must not be asked again")
+		end)
+		helpers.assert_eq(scene.events[1], "editor:keyboard__ctrl_k",
+			"the editor starts from the values this slot's binding holds")
+		helpers.assert_eq(scene.picker.opts.items, scene.items, "the marked items are the ones shown")
+		helpers.assert_eq(scene.picker.opts.send_vocabulary, scene.editor.send_vocabulary)
+		helpers.assert_eq(scene.picker.opts.parameter_strings, scene.editor.parameter_strings)
+
+		helpers.assert_true(scene.picker.on_confirm("send_key", {}, "enter"))
+		helpers.assert_eq(scene.prompt_args, nil, "no prompt for a value the page collected")
+		helpers.assert_eq(scene.events[#scene.events - 1], "parameter:keyboard__ctrl_k:send_key:enter")
+		helpers.assert_eq(scene.events[#scene.events], "assign:ctrl_k:send_key")
 	end)
 
 	helpers.it("renders the Linux ChatGPT URL editor declared by the manifest", function()

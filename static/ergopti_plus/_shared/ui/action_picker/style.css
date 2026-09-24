@@ -387,3 +387,70 @@ body {
 #btn-cancel:hover {
 	border-color: var(--accent);
 }
+
+/* ======================================== */
+/* ======================================== */
+/* ======= 6/ Parameter editor ============ */
+/* ======================================== */
+/* ======================================== */
+
+#param {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	gap: 10px;
+	padding: 16px 20px;
+}
+#param[hidden],
+#list[hidden],
+#search-bar[hidden] {
+	display: none;
+}
+
+#param-title {
+	font-size: 15px;
+	font-weight: 600;
+}
+
+#param-prompt,
+#param-hint {
+	color: var(--sub);
+	white-space: pre-line;
+}
+
+#param-input {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 7px;
+	color: var(--text);
+	font: inherit;
+	padding: 7px 10px;
+}
+#param-input:focus {
+	border-color: var(--accent);
+	outline: none;
+}
+
+#param-error {
+	color: #d70015;
+}
+
+.param-buttons {
+	display: flex;
+	gap: 8px;
+	justify-content: flex-end;
+}
+.param-buttons button {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: 7px;
+	color: var(--text);
+	cursor: pointer;
+	font: inherit;
+	padding: 6px 16px;
+}
+#param-save {
+	background: var(--accent);
+	border-color: var(--accent);
+	color: #fff;
+}

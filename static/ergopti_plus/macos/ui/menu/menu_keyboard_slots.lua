@@ -113,12 +113,17 @@ end
 --- @param slot_id string
 --- @param ctx table The menu context (needs gestures and updateMenu).
 local function choose_action_for(slot_id, ctx)
+	local items = build_action_items(ctx.gestures)
+	local editor = ShortcutUtils.picker_parameter_fields(ctx.gestures, items,
+		KbShortcuts.keyboard_binding_id(slot_id))
 	ActionPicker.open({
 		title   = i18n.get("dialog.keyboard_shortcut.title_prefix") .. KbShortcuts.get_keyboard_slot_label(slot_id),
 		label   = i18n.get("dialog.action_picker.label"),
 		current = KbShortcuts.get_keyboard_action(slot_id),
-		items   = build_action_items(ctx.gestures),
-	}, function(action_id)
+		items   = items,
+		send_vocabulary   = editor.send_vocabulary,
+		parameter_strings = editor.parameter_strings,
+	}, function(action_id, picked)
 		if type(action_id) ~= "string" then return end
 		local function bind()
 			if KbShortcuts.set_keyboard_action(slot_id, action_id) ~= true then
@@ -130,15 +135,16 @@ local function choose_action_for(slot_id, ctx)
 		end
 		-- An action with a parameter (wrap_selection's pair, open_url's link) does
 		-- nothing without it: ask first, under the binding the slot dispatches
-		-- with, and bind only a configured action. Deferred so the prompt opens
-		-- after the picker window has closed.
+		-- with, and bind only a configured action; a value the picker's editor
+		-- collected is stored without asking. Deferred so the prompt opens after
+		-- the picker window has closed.
 		local gestures = ctx.gestures
 		local spec = type(gestures) == "table" and type(gestures.get_action_parameter_spec) == "function"
 			and gestures.get_action_parameter_spec(action_id) or nil
 		if not spec then return bind() end
 		DeferredWork.after(0.05, function()
 			if ShortcutUtils.prompt_action_parameter(gestures,
-				KbShortcuts.keyboard_binding_id(slot_id), action_id, spec) then
+				KbShortcuts.keyboard_binding_id(slot_id), action_id, spec, picked) then
 				bind()
 			end
 		end, "menu_keyboard_slots.action_parameter")

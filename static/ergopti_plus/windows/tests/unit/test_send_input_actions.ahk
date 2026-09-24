@@ -128,3 +128,25 @@ _SIA_TypesText() {
 		"one exact {Text} send inside the synthetic transaction, and nothing for an invalid value")
 }
 Test("send input: send_text types the stored text through the final-result primitive (send-input-actions)", _SIA_TypesText)
+
+; The action picker's own editor collects the value before the assignment runs:
+; the prompt that assignment reaches must take it instead of asking again, and
+; only for the action it was collected for. A valid value is used, so this test
+; never opens the native InputBox.
+_SIA_PickedValueSkipsThePrompt() {
+	global _GesturePickedParameter
+	Binding := GestureBindingId("tap_key", "number_row_left")
+	Left := ""
+	try {
+		GestureOfferPickedParameter("send_shortcut", "ctrl+shift+t")
+		Candidate := GesturePromptActionParameter(Binding, "send_shortcut")
+		Left := _GesturePickedParameter
+	} finally {
+		GestureClearPickedParameter()
+	}
+	AssertTrue(Candidate is Map && Candidate["has_value"], "the picked value is the parameter")
+	AssertEqual(GestureActionParameterKey(Binding, "send_shortcut"), Candidate["key"], "stored under the binding")
+	AssertEqual("ctrl+shift+t", Candidate["value"], "stored as the editor collected it")
+	AssertFalse(Left is Map, "the value answers one prompt only")
+}
+Test("send input: a value the picker's editor collected is used without a prompt (send-input-actions)", _SIA_PickedValueSkipsThePrompt)

@@ -304,11 +304,14 @@ end)
 local function parameter_ctx()
 	local ctx = make_ctx()
 	local stored = {}
+	ctx.gestures.get_sg_names = function() return { "#header", "lookup", "select_line", "send_key" } end
 	ctx.gestures.get_action_parameter_spec = function(id)
-		return id == "wrap_selection" and "wrap_pair" or nil
+		return ({ wrap_selection = "wrap_pair", send_key = "key" })[id]
 	end
 	ctx.gestures.get_action_parameter = function() return "" end
-	ctx.gestures.validate_action_parameter = function(_, value) return value == "(" end
+	ctx.gestures.validate_action_parameter = function(_, value) return value == "(" or value == "enter" end
+	local vocabulary = { keys = {}, modifiers = {}, text_max_code_points = 500 }
+	ctx.gestures.send_vocabulary = function() return vocabulary end
 	ctx.gestures.parameter_prompt = function() return "prompt" end
 	ctx.gestures.parameter_error = function() return "refused" end
 	ctx.gestures.set_action_parameter = function(binding, action, value)
@@ -344,6 +347,43 @@ helpers.describe("menu_keyboard_slots: parameterized actions", function()
 			helpers.assert_eq(stored[1].value, "(")
 			helpers.assert_eq(shortcuts.get_keyboard_action(slot), "wrap_selection",
 				"and only then may the slot be bound")
+		end, debug.traceback)
+		dialog.text_prompt = saved_prompt
+		shortcuts.set_keyboard_action(slot, "none")
+		if not ok then error(err, 0) end
+	end)
+
+	-- The picker's own editor collects a send_* value before the pick: the
+	-- page must be given what it edits with, and the value it collected must be
+	-- stored without the native prompt asking for it again.
+	helpers.it("hands the picker its editor and stores the value it collected without a prompt", function()
+		local ui, shortcuts, picker = fresh()
+		local ctx, stored = parameter_ctx()
+		local dialog = package.loaded["infra.dialog_util"]
+		local saved_prompt = dialog.text_prompt
+		dialog.text_prompt = function() error("the value the picker's editor collected must not be asked again") end
+		local group = shortcuts.get_keyboard_slot_groups()[1]
+		local slot = group.prefix .. "w"
+
+		local ok, err = xpcall(function()
+			local rows = ui.provide_rows(ctx, nil)
+			rows[1].items[#rows[1].items].action()
+			picker.opened[1].confirm(slot)
+			local opts = picker.opened[2].opts
+			helpers.assert_eq(opts.send_vocabulary, ctx.gestures.send_vocabulary(),
+				"the page validates with the drivers' own vocabulary")
+			local marked = nil
+			for _, item in ipairs(opts.items) do
+				if item.id == "send_key" then marked = item end
+			end
+			helpers.assert_eq(marked and marked.parameter, "key", "the send_key row names its kind")
+			helpers.assert_eq(opts.parameter_strings.prompts.key, "prompt",
+				"the editor shows the native prompt's text")
+			picker.opened[2].confirm("send_key", "enter")
+			helpers.assert_eq(#stored, 1, "the collected value is stored")
+			helpers.assert_eq(stored[1].binding, shortcuts.keyboard_binding_id(slot))
+			helpers.assert_eq(stored[1].value, "enter")
+			helpers.assert_eq(shortcuts.get_keyboard_action(slot), "send_key", "and the slot is bound")
 		end, debug.traceback)
 		dialog.text_prompt = saved_prompt
 		shortcuts.set_keyboard_action(slot, "none")

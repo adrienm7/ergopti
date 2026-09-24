@@ -247,12 +247,16 @@ function M.build(ctx)
 	--- @param names table Ordered names list from get_sg_names().
 	--- @param current string|nil Currently assigned action name.
 	local function open_action_chooser(slot, names, current)
+		local items = build_items(names)
+		local editor = shortcut_utils.picker_parameter_fields(gestures, items, slot)
 		ActionPicker.open({
 			title   = slot_label(slot),
 			label   = i18n.get("dialog.action_picker.label"),
 			current = current or "none",
-			items   = build_items(names),
-		}, function(a)
+			items   = items,
+			send_vocabulary   = editor.send_vocabulary,
+			parameter_strings = editor.parameter_strings,
+		}, function(a, picked)
 			local function apply_action()
 				if type(gestures.set_action) == "function" then pcall(gestures.set_action, slot, a) end
 				local conflict = type(gestures.on_action_changed) == "function" and gestures.on_action_changed(slot, a) or nil
@@ -268,9 +272,14 @@ function M.build(ctx)
 					local prompt = gestures.parameter_prompt(a)
 					local title    = shortcut_utils.action_parameter_title(gestures.get_action_label(a) or a)
 					local save_btn = i18n.get("button.save")
+					-- A value the picker's editor collected is stored without asking.
+					local value = type(picked) == "string" and picked or nil
 					while true do
-						local button, value = dialog.text_prompt(title, prompt, prior, save_btn, i18n.get("button.cancel"))
-						if button ~= save_btn then return end
+						if value == nil then
+							local button, typed = dialog.text_prompt(title, prompt, prior, save_btn, i18n.get("button.cancel"))
+							if button ~= save_btn then return end
+							value = typed
+						end
 						if type(gestures.validate_action_parameter) == "function" and gestures.validate_action_parameter(a, value) then
 							pcall(gestures.set_action_parameter, slot, a, value)
 							local conflict = apply_action()
@@ -284,6 +293,7 @@ function M.build(ctx)
 						pcall(dialog.block_alert, i18n.get("dialog.gestures.param_error_title"),
 							gestures.parameter_error(a), "OK", nil, "warning")
 						prior = value or prior
+						value = nil
 					end
 				end, "menu_gestures.action_parameter")
 				return

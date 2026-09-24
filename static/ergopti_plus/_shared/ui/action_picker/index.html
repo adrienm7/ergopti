@@ -29,6 +29,20 @@
 
 		<main id="list" tabindex="-1"></main>
 
+		<!-- The editor of a send_text / send_key / send_shortcut value, shown in
+		     place of the list once such an action is picked. -->
+		<section id="param" hidden>
+			<h2 id="param-title"></h2>
+			<p id="param-prompt"></p>
+			<p id="param-hint"></p>
+			<input id="param-input" type="text" autocomplete="off" autocorrect="off" spellcheck="false" />
+			<p id="param-error" hidden></p>
+			<div class="param-buttons">
+				<button id="param-back" type="button"></button>
+				<button id="param-save" type="button"></button>
+			</div>
+		</section>
+
 		<div id="empty" hidden></div>
 
 		<!-- Table-of-contents drawer: lists every heading (indented by level). -->
