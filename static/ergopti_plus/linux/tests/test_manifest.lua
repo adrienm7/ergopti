@@ -196,6 +196,7 @@ return {
 	"tests.unit.modules.llm.test_model_download",
 	"tests.unit.modules.llm.test_display_settings",
 	"tests.unit.modules.llm.test_navigation_settings",
+	"tests.unit.modules.llm.test_prediction_digit_accept",
 	"tests.unit.modules.llm.test_prediction_engine_canonicals",
 	"tests.unit.modules.llm.test_prediction_triggers",
 	"tests.unit.modules.llm.test_profile_settings",

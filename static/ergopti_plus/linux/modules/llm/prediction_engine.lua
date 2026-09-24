@@ -506,18 +506,37 @@ function M.select(index)
 	return true
 end
 
---- Consumes a configured modifier+digit validation chord when an offer exists.
+--- Whether an offer is on screen: suggestions exist and the tooltip, when this
+--- daemon has one, shows them.
+local function offer_visible()
+	if #_suggestions == 0 then return false end
+	if _overlay and type(_overlay.is_visible) == "function" then return _overlay.is_visible() == true end
+	return true
+end
+
+--- Consumes the validation chord (a digit, with the configured modifiers —
+--- none by default) while an offer is on screen.
+---
+--- Consumed whatever happens next: a digit pressed at a shown prediction is
+--- the instruction to insert it, never text. A slot that does not exist, or an
+--- insertion that fails, types nothing either.
 --- @param detail table { key, mods }
---- @return boolean
+--- @return boolean True when the key was the chord and must not reach the app.
 function M.handle_shortcut(detail)
-	if #_suggestions == 0 or type(detail) ~= "table" then return false end
+	if type(detail) ~= "table" or not offer_visible() then return false end
 	if not NavigationSettings.matches(detail.mods) then return false end
 	local key = tostring(detail.key or detail.char or "")
 	local digit = key:match("^([0-9])$") or key:match("^[Kk][Pp]_?([0-9])$")
 	if not digit then return false end
 	local index = digit == "0" and 10 or tonumber(digit)
-	if not _suggestions[index] then return false end
-	return M.accept(index)
+	if not _suggestions[index] then
+		Logger.debug(LOG, "Prediction %d is not on offer — the key is swallowed, nothing typed.", index)
+		return true
+	end
+	if not M.accept(index) then
+		Logger.warn(LOG, "Prediction %d could not be inserted — the key is swallowed, nothing typed.", index)
+	end
+	return true
 end
 
 function M.has_suggestions() return #_suggestions > 0 end

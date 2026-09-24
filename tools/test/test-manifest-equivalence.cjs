@@ -460,6 +460,9 @@ function parseDefaultValue(raw, lang) {
  */
 function serialiseDefault(val) {
 	if (val === null || val === undefined) return String(val);
+	// An empty Lua table `{}` is both an empty list and an empty map, so an
+	// empty AHK `[]` or `Map()` must compare equal to it.
+	if (typeof val === 'object' && Object.keys(val).length === 0) return '[]';
 	if (typeof val === 'object' && !Array.isArray(val)) {
 		const keys = Object.keys(val).sort();
 		return '{' + keys.map((k) => `${k}:${serialiseDefault(val[k])}`).join(',') + '}';
