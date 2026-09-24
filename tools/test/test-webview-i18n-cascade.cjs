@@ -116,9 +116,10 @@ function make_context(elements, locale_files, active) {
 }
 
 /** Runs i18n.js in the sandbox and lets every stubbed promise settle. */
-async function run(elements, locale_files, active) {
+async function run(elements, locale_files, active, extend) {
 	const src = fs.readFileSync(I18N_JS, 'utf8');
 	const { ctx, fetched, win } = make_context(elements, locale_files, active);
+	if (extend) extend(ctx);
 	vm.createContext(ctx);
 	vm.runInContext(src, ctx, { filename: 'i18n.js' });
 	// The cascade is at most chain-length deep; drain more turns than it can use.
@@ -236,7 +237,36 @@ function check(label, cond, detail) {
 		);
 	}
 
-	// ── 6. The chain the code declares must be shipped ────────────────────────
+	// ── 6. A page that draws labels from data hears when the strings land ─────
+	//
+	// The layer editor builds its keys and actions from data, not from
+	// data-i18n attributes: it redraws on i18n:applied, fired once the strings
+	// are both stored and applied to the DOM.
+	{
+		const e = els();
+		const heard = [];
+		await run(e, { en: EN, fr: FR }, 'en', (ctx) => {
+			ctx.CustomEvent = class {
+				constructor(type) {
+					this.type = type;
+				}
+			};
+			ctx.document.dispatchEvent = (event) =>
+				heard.push({ type: event.type, strings: ctx.window._i18n_strings, text: e[0].textContent });
+		});
+		check(
+			'applied-event',
+			heard.length === 1 && heard[0].type === 'i18n:applied',
+			`expected one i18n:applied event, heard ${JSON.stringify(heard.map((h) => h.type))}`
+		);
+		check(
+			'applied-event-after-strings',
+			heard.length === 1 && heard[0].strings && heard[0].strings['k.one'] === 'One' && heard[0].text === 'One',
+			'i18n:applied must fire after the strings are stored and applied, or a page redraws with none'
+		);
+	}
+
+	// ── 7. The chain the code declares must be shipped ────────────────────────
 	//
 	// A cascade naming a locale that is not on disk is a cascade to nothing.
 	for (const code of ['en', 'fr']) {

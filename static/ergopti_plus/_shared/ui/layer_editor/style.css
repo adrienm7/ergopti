@@ -1,0 +1,431 @@
+/* _shared/ui/layer_editor/style.css */
+
+/* =========================================================================== */
+/* Layer Editor — a physical keyboard, numpad, mouse buttons and wheel drawn   */
+/* from the shared physical-key registry, with a panel that picks what the     */
+/* selected input does while the navigation layer is held. Light and dark.     */
+/* =========================================================================== */
+
+/* =============================== */
+/* =============================== */
+/* ======= 1/ Tokens & Base ====== */
+/* =============================== */
+/* =============================== */
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+	margin: 0;
+	padding: 0;
+}
+
+:root {
+	--bg: #f2f2f7;
+	--surface: #fff;
+	--surface-2: #f6f6f9;
+	--border: #d8d8de;
+	--text: #1d1d1f;
+	--sub: #6e6e73;
+	--accent: #007aff;
+	--accent-soft: rgba(0, 122, 255, 0.12);
+	--recommended: #2e9d4f;
+	--recommended-soft: rgba(46, 157, 79, 0.14);
+	--custom: #c77700;
+	--custom-soft: rgba(199, 119, 0, 0.16);
+	--invalid: #d70015;
+	--invalid-soft: rgba(215, 0, 21, 0.12);
+	--radius: 8px;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--bg: #1c1c1e;
+		--surface: #2c2c2e;
+		--surface-2: #242426;
+		--border: #3a3a3c;
+		--text: #fff;
+		--sub: rgba(235, 235, 245, 0.6);
+		--accent: #0a84ff;
+		--accent-soft: rgba(10, 132, 255, 0.22);
+		--recommended: #30d158;
+		--recommended-soft: rgba(48, 209, 88, 0.16);
+		--custom: #ff9f0a;
+		--custom-soft: rgba(255, 159, 10, 0.18);
+		--invalid: #ff453a;
+		--invalid-soft: rgba(255, 69, 58, 0.18);
+	}
+}
+
+html,
+body {
+	height: 100%;
+}
+
+body {
+	background: var(--bg);
+	color: var(--text);
+	display: flex;
+	flex-direction: column;
+	font: 13px -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+}
+
+button,
+select,
+input {
+	font: inherit;
+	color: inherit;
+}
+
+button {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	padding: 5px 12px;
+	cursor: pointer;
+	white-space: nowrap;
+}
+
+button.primary {
+	background: var(--accent);
+	border-color: var(--accent);
+	color: #fff;
+}
+
+button:disabled {
+	opacity: 0.45;
+	cursor: default;
+}
+
+/* ============================= */
+/* ============================= */
+/* ======= 2/ Header ========== */
+/* ============================= */
+/* ============================= */
+
+#hdr {
+	display: flex;
+	gap: 16px;
+	align-items: flex-start;
+	justify-content: space-between;
+	padding: 14px 18px 8px;
+}
+
+#hdr h1 {
+	font-size: 17px;
+}
+
+.subtitle,
+.note {
+	color: var(--sub);
+	margin-top: 3px;
+}
+
+.hdr-tools {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 6px;
+}
+
+.legend {
+	display: flex;
+	gap: 6px;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+}
+
+.chip {
+	border-radius: 10px;
+	padding: 1px 8px;
+	font-size: 11px;
+	border: 1px solid var(--border);
+}
+
+.chip.recommended {
+	background: var(--recommended-soft);
+	border-color: var(--recommended);
+}
+
+.chip.custom {
+	background: var(--custom-soft);
+	border-color: var(--custom);
+}
+
+.chip.unavailable {
+	opacity: 0.5;
+	border-style: dashed;
+}
+
+#banner {
+	margin: 0 18px 8px;
+	padding: 8px 10px;
+	border-radius: var(--radius);
+	background: var(--surface);
+	border: 1px solid var(--border);
+}
+
+#banner.error {
+	background: var(--invalid-soft);
+	border-color: var(--invalid);
+}
+
+/* ================================ */
+/* ================================ */
+/* ======= 3/ Keyboard & mouse ==== */
+/* ================================ */
+/* ================================ */
+
+#main {
+	flex: 1;
+	overflow: auto;
+	padding: 0 18px 10px;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+#board {
+	position: relative;
+	width: 100%;
+	height: 0;
+	flex: none;
+}
+
+/* A key's slot on the board; its cap is drawn 2px inside, the gap between keys. */
+.key {
+	position: absolute;
+	padding: 2px;
+	cursor: pointer;
+}
+
+.key .cap {
+	height: 100%;
+	padding: 2px 4px;
+	border: 1px solid var(--border);
+	border-radius: 5px;
+	background: var(--surface);
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+}
+
+#mouse .key {
+	position: static;
+	padding: 0;
+}
+
+#mouse .key .cap {
+	min-height: 44px;
+}
+
+.key .legend {
+	font-weight: 600;
+	font-size: 12px;
+	line-height: 1.1;
+}
+
+.key .binding {
+	font-size: 9.5px;
+	line-height: 1.15;
+	color: var(--sub);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.key.recommended .cap {
+	background: var(--recommended-soft);
+	border-color: var(--recommended);
+}
+
+.key.custom .cap {
+	background: var(--custom-soft);
+	border-color: var(--custom);
+}
+
+.key.invalid .cap {
+	background: var(--invalid-soft);
+	border-color: var(--invalid);
+}
+
+.key.unavailable {
+	opacity: 0.4;
+	cursor: default;
+}
+
+.key.unavailable .cap {
+	border-style: dashed;
+}
+
+.key.selected .cap {
+	box-shadow: 0 0 0 2px var(--accent);
+}
+
+/* The ISO Enter's lower row joins the upper one: no gap and no border between. */
+.key.enter-lower {
+	padding-top: 0;
+}
+
+.key.enter-lower .cap {
+	border-top: none;
+	border-top-left-radius: 0;
+	border-top-right-radius: 0;
+}
+
+.lower {
+	display: grid;
+	grid-template-columns: minmax(170px, 1fr) 3fr;
+	gap: 12px;
+	min-height: 0;
+}
+
+#mouse-pane h2,
+#panel h2 {
+	font-size: 14px;
+	margin-bottom: 6px;
+}
+
+#mouse {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 6px;
+}
+
+/* ============================= */
+/* ============================= */
+/* ======= 4/ Panel =========== */
+/* ============================= */
+/* ============================= */
+
+#panel {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	padding: 10px 12px;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.prompt,
+.reason {
+	color: var(--sub);
+}
+
+.recommended-line {
+	display: flex;
+	gap: 10px;
+	align-items: center;
+	flex-wrap: wrap;
+}
+
+.search {
+	width: 100%;
+	padding: 5px 8px;
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	background: var(--surface-2);
+}
+
+.list {
+	max-height: 220px;
+	overflow: auto;
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+}
+
+.list .heading {
+	font-weight: 600;
+	padding: 5px 8px 3px;
+	color: var(--sub);
+	background: var(--surface-2);
+}
+
+.list .row {
+	display: flex;
+	gap: 6px;
+	padding: 4px 10px;
+	cursor: pointer;
+}
+
+.list .row:hover {
+	background: var(--accent-soft);
+}
+
+.list .row .row-tick {
+	visibility: hidden;
+	width: 12px;
+}
+
+.list .row.current .row-tick {
+	visibility: visible;
+}
+
+.list .row.disabled {
+	opacity: 0.45;
+	cursor: default;
+}
+
+.list .empty {
+	padding: 8px 10px;
+	color: var(--sub);
+}
+
+.param {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	flex-wrap: wrap;
+}
+
+.param h3 {
+	width: 100%;
+	font-size: 12px;
+}
+
+.param.disabled {
+	opacity: 0.5;
+}
+
+.param .count {
+	width: 70px;
+	padding: 4px 6px;
+}
+
+.mods {
+	display: flex;
+	gap: 10px;
+	flex-wrap: wrap;
+}
+
+.mod {
+	display: flex;
+	gap: 4px;
+	align-items: center;
+}
+
+/* ============================= */
+/* ============================= */
+/* ======= 5/ Footer ========== */
+/* ============================= */
+/* ============================= */
+
+#ftr {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	padding: 10px 18px;
+	border-top: 1px solid var(--border);
+	background: var(--surface-2);
+}
+
+#status {
+	flex: 1;
+	color: var(--sub);
+	text-align: right;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
