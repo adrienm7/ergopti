@@ -30,7 +30,9 @@ M.ID_PATTERN = "^[a-z][a-z0-9_]*$"
 
 local NAME_PATTERN = "^[A-Za-z0-9._-]+$"
 local FOLDER_PATTERN = "^[A-Za-z0-9._/-]+$"
-local USER_AGENT = "ErgoptiPlus-Layouts/1.0"
+--- User agent of every registry request (the Windows client declares the same,
+--- tools/test/test-layouts-defaults-single-source.cjs pins the copy).
+M.USER_AGENT = "ErgoptiPlus-Layouts/1.0"
 local TEMPLATE_PLACEHOLDERS = { "{owner}", "{repo}", "{branch}", "{folder}", "{path}" }
 
 
@@ -245,7 +247,7 @@ function M.fetch_layout(settings, entry, transport, on_done)
 		return
 	end
 	local url = M.raw_url(settings, entry.file)
-	transport.get(url, { ["User-Agent"] = USER_AGENT }, settings.timeout_ms, function(status, body, err)
+	transport.get(url, { ["User-Agent"] = M.USER_AGENT }, settings.timeout_ms, function(status, body, err)
 		if tonumber(status) ~= 200 or type(body) ~= "string" then
 			finish(false, failure_reason(url, status, err))
 			return
