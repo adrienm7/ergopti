@@ -100,8 +100,8 @@ function M.new(opts)
 			return false
 		end
 		Logger.info(LOG, "Update channel set to '%s'.", id)
-		-- Sparkle's scheduled checks read the launcher's selection; a source run
-		-- has no launcher to tell.
+		-- Sparkle's checks read the launcher's selection; a source run has no
+		-- launcher to tell.
 		if not Updater.is_local_source() then UpdateLauncher.select_channel(id) end
 		for _, entry in ipairs(listeners) do
 			local notified, err = pcall(entry.fn, id)

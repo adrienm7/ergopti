@@ -71,4 +71,20 @@ helpers.describe("shutdown: the menubar's own watchers are stopped too", functio
 		end
 	end)
 
+	-- The automatic update checks own a timer and a wake watcher: a wake or a
+	-- due check firing during the teardown window would start a request into a
+	-- dying Lua state.
+	helpers.it("stops the automatic update checks the menu session started", function()
+		package.loaded["ui.menu"] = nil
+		local menu = helpers.load_with_stubs("ui.menu")
+		local stops = 0
+		menu._watcher = nil
+		menu._theme_watcher = nil
+		menu._update_checks = { stop = function() stops = stops + 1; return true end }
+		helpers.assert_eq(true, menu.stop_watchers(), "the session's checks stop with the menu watchers")
+		helpers.assert_eq(1, stops, "the automatic checks are stopped exactly once")
+		helpers.assert_eq(nil, menu._update_checks, "ownership clears after the stop")
+		package.loaded["ui.menu"] = nil
+	end)
+
 end)

@@ -31,6 +31,10 @@ const aboutSource = fs.readFileSync(
 	path.join(root, 'static', 'ergopti_plus', 'macos', 'ui', 'menu', 'menu_about.lua'),
 	'utf8'
 );
+const autoCheckSource = fs.readFileSync(
+	path.join(root, 'static', 'ergopti_plus', 'macos', 'modules', 'updater', 'auto_check.lua'),
+	'utf8'
+);
 const errors = [];
 
 // job() throws when package-macos is missing, so no check below can pass
@@ -100,10 +104,6 @@ if (!buildScript.includes('<key>CFBundleURLTypes</key>') ||
 	!buildScript.includes('<string>ergoptiplus</string>')) {
 	errors.push('the outer bundle must register the private updater command URL scheme');
 }
-if (!buildScript.includes('<key>SUEnableAutomaticChecks</key>        <true/>') ||
-	!buildScript.includes('<key>SUScheduledCheckInterval</key>       <integer>86400</integer>')) {
-	errors.push('Sparkle must own automatic checks at the declared 24-hour cadence');
-}
 // A scheduled check may only fetch the appcast. With SUAllowsAutomaticUpdates
 // true, one tick of Sparkle's "Automatically download and install" checkbox
 // made every later check download silently and install on quit
@@ -132,10 +132,23 @@ const startAt = launcherSource.search(/\.(?:startUpdater|start)\(\)/);
 if (policyAt < 0 || startAt < 0 || policyAt > startAt) {
 	errors.push('the launcher must prove the consent-only policy on the live updater before starting it');
 }
-if (menuSource.includes('Updater.start_background_checks') ||
-	aboutSource.includes('menu.about.frequency_menu') ||
-	aboutSource.includes('Updater.restart_background_checks')) {
-	errors.push('Lua must not retain a second update timer or expose controls that do not configure Sparkle');
+// The Lua driver owns the automatic-check cadence, as on Windows and Linux:
+// Sparkle's scheduler ran once a day whatever the menu said, refused intervals
+// under an hour and ignored the pause. Sparkle keeps only the authenticated
+// check, download and install, started by the menu, and never installs
+// silently. Its updater still starts, or those requests would find no owner.
+if (!buildScript.includes('<key>SUEnableAutomaticChecks</key>        <false/>') ||
+	!buildScript.includes('<key>SUAllowsAutomaticUpdates</key>       <false/>') ||
+	buildScript.includes('<key>SUScheduledCheckInterval</key>') ||
+	!launcherSource.includes('try sparkle.start()')) {
+	errors.push('Sparkle must schedule no check and install nothing silently; the Lua driver owns the cadence');
+}
+if (!menuSource.includes('require("modules.updater.auto_check")') ||
+	!menuSource.includes('AutoCheck.start_session') ||
+	!aboutSource.includes('menu.about.frequency_menu') ||
+	!autoCheckSource.includes('Schedule.next_due') ||
+	!autoCheckSource.includes('If-None-Match')) {
+	errors.push('the menu session must start the Lua automatic checks, conditional on an ETag, and About must offer their frequency');
 }
 if (/Rename appcast|_appcast-(?:main|dev)|build\/macos\/_appcast/.test(workflow)) {
 	errors.push('the published appcast basename must not be renamed behind SUFeedURL');

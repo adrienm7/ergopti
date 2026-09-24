@@ -561,14 +561,13 @@ generate_info_plist() {
 
 			<!-- Sparkle wiring. SUFeedURL points at a channel-scoped appcast
 			     on the mutable feed branch. SUPublicEDKey must match the
-			     private key the CI signing step uses. Automatic checks only
-			     fetch the appcast: SUAllowsAutomaticUpdates false (read from
-			     Info.plist only) keeps Sparkle from ever downloading before
-			     the user chose to install, whatever its defaults hold. -->
+			     private key the CI signing step uses. Sparkle schedules no
+			     check and never installs silently: the Lua driver owns the
+			     cadence (modules/updater/auto_check.lua), and Sparkle checks,
+			     downloads and installs only when the menu asks. -->
 			<key>SUFeedURL</key>                      <string>https://raw.githubusercontent.com/$GH_OWNER/$GH_REPO/sparkle-appcasts/appcast-$ERGOPTI_CHANNEL.xml</string>
 			<key>SUPublicEDKey</key>                  <string>$SPARKLE_PUBLIC_KEY</string>
-			<key>SUEnableAutomaticChecks</key>        <true/>
-			<key>SUScheduledCheckInterval</key>       <integer>86400</integer>
+			<key>SUEnableAutomaticChecks</key>        <false/>
 			<key>SUAllowsAutomaticUpdates</key>       <false/>
 		</dict>
 		</plist>

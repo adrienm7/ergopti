@@ -4,13 +4,15 @@
 --- MODULE: Native Update Launcher
 --- DESCRIPTION:
 --- Sends the embedded Hammerspoon menu commands to the outer ErgoptiPlus app.
---- The launcher-owned Sparkle controller is the sole update authority; these
---- commands only tell it which channel's feed to read and when to check.
+--- The launcher-owned Sparkle controller verifies, downloads and installs; it
+--- schedules no check (the Lua driver owns the cadence, modules/updater/
+--- auto_check.lua). These commands only tell it which channel's feed to read
+--- and when to check.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Exact commands: ergoptiplus://updater/check/<channel> (select the
 ---    channel, then check) and ergoptiplus://updater/channel/<channel> (select
----    it for the scheduled checks). The launcher accepts only channel ids of the
+---    it for the next check). The launcher accepts only channel ids of the
 ---    shared registry; this adapter refuses anything that is not an id.
 --- 2. Visible failure: a refused check surfaces a dialog (or a notification
 ---    when the dialog itself fails), never silence.
@@ -73,7 +75,7 @@ function M.request_check(channel)
 	return false
 end
 
---- Tells the native launcher which channel Sparkle's scheduled checks read.
+--- Tells the native launcher which channel Sparkle's next check reads.
 --- @param channel string Registry channel id.
 --- @return boolean sent True only when Launch Services accepted the command.
 function M.select_channel(channel)

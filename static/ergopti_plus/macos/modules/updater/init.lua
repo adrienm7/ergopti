@@ -5,9 +5,9 @@
 --- DESCRIPTION:
 --- Exposes the installed build's channel, the launcher version, the releases
 --- page and the shared update-channel registry used by the About menu. The
---- outer launcher's Sparkle controller exclusively owns network checks,
---- download progress, signature verification, installation, and relaunch;
---- this nested Hammerspoon module performs no update I/O.
+--- automatic checks are modules/updater/auto_check.lua's; the outer launcher's
+--- Sparkle controller owns download progress, signature verification,
+--- installation, and relaunch. This identity facade performs no update I/O.
 --- ==============================================================================
 
 local M = {}

@@ -614,12 +614,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		// is the only UI affordance the user should see.
 		NSApp.setActivationPolicy(.accessory)
 
-		// Wire Sparkle. Automatic checks (Info.plist SUEnableAutomaticChecks /
-		// SUScheduledCheckInterval) only fetch the appcast; a download must wait
-		// for the user's install choice, which the consent policy proves on the
-		// live updater before it may start. A refusal leaves updates off rather
-		// than letting Sparkle download in the background. The user driver
-		// speaks the shared locale catalog in the driver's chosen language.
+		// Lua owns the check cadence; Sparkle handles authenticated installation.
+		// Prove the consent policy before starting the localized user driver.
+		// The feed delegate serves the channel selected in the menu.
 		let userDriver = CatalogUpdateUserDriver(
 			textsProvider: { LauncherLocalization.load().flatMap(UpdatePromptTexts.init(localization:)) },
 			presenter: UpdatePromptPanel(),

@@ -411,6 +411,11 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.wake_watcher",
+		contract = { "new" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.window_info",
 		contract = { "getFocused", "getAll" },
 		wired    = true,

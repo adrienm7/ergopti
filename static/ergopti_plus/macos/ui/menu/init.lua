@@ -263,7 +263,9 @@ function M.stop_watchers()
 
 	local config_stopped = stop_owned("_watcher", "Menubar config watcher")
 	local theme_stopped = stop_owned("_theme_watcher", "Menubar theme watcher")
-	if config_stopped and theme_stopped then
+	-- The automatic update checks own a timer and a wake watcher.
+	local checks_stopped = stop_owned("_update_checks", "Automatic update checks")
+	if config_stopped and theme_stopped and checks_stopped then
 		Logger.debug(LOG, "Menubar watchers stopped.")
 		return true
 	end
@@ -898,6 +900,37 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		Logger.error(LOG, "The update channel owner could not start: %s.", tostring(owner_or_err))
 	end
 
+	-- The automatic update checks are this driver's: the launcher's Sparkle has
+	-- no scheduled checks and installs only when the About row is clicked. A
+	-- source run has no release to update from.
+	local update_checks = nil
+	if channel_owner then
+		local ok_checks, checks_or_err = pcall(function()
+			if require("modules.updater").is_local_source() then return nil end
+			local AutoCheck = require("modules.updater.auto_check")
+			return AutoCheck.start_session({
+				state = state,
+				save = save_prefs,
+				channel = channel_owner.get,
+				is_paused = function()
+					local shortcuts_mod = core_mods.shortcuts_mod
+					return type(shortcuts_mod) == "table" and type(shortcuts_mod.is_paused) == "function"
+						and shortcuts_mod.is_paused() == true
+				end,
+				on_available = function(release)
+					AutoCheck.announce(release)
+					if type(updateMenu) == "function" then updateMenu() end
+				end,
+			})
+		end)
+		if not ok_checks then
+			Logger.error(LOG, "The automatic update checks could not start: %s.", tostring(checks_or_err))
+		elseif checks_or_err ~= nil then
+			update_checks = checks_or_err
+			M._update_checks = update_checks
+		end
+	end
+
 	if menu_mods.llm and type(menu_mods.llm.create) == "function" then
 		local ok_h, res = pcall(menu_mods.llm.create, {
 			state          = state,
@@ -1199,6 +1232,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		llm_handler              = llm_handler,
 		karabiner                = karabiner,
 		channel_owner            = channel_owner,
+		update_checks            = update_checks,
 	}
 
 	-- updateMenu refreshes the menubar icon and re-wires script_control extras,
