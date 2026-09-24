@@ -56,6 +56,7 @@ graph TD
         LINUX_tray_menu["TrayMenu.lua"]
         LINUX_uinput_writer["UinputWriter.lua"]
         LINUX_window_info["WindowInfo.lua"]
+        LINUX_wpm_surface["WpmSurface.lua"]
         LINUX_xkb_capture["XkbCapture.lua"]
     end
 

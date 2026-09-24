@@ -3,236 +3,201 @@
 --- ==============================================================================
 --- MODULE: Floating WPM Widget (Linux)
 --- DESCRIPTION:
---- A small always-on-top pill showing live typing speed, coloured by where the
---- last characters came from — the user's own hands, a hotstring, or the LLM.
---- macOS draws it with hs.canvas and Windows with a layered Gui; this draws it
---- with the same GTK surface the preview bubble already uses.
+--- The small always-on-top readout of the live typing speed, as on macOS: a
+--- pill with the number over its unit, or a graph of the last seconds, coloured
+--- by where the text came from, shown while typing, hidden when the user goes
+--- back to the mouse, and left wherever the user drags it.
 ---
 --- FEATURES & RATIONALE:
---- 1. The arithmetic is separated from the drawing, and only the drawing needs a
----    display. `frame_for` turns the keylogger's stats into everything the
----    renderer needs — text, colours, opacity — and returns a plain table, so
----    every decision the widget makes is testable on a machine with no screen.
----    That split is why the preview bubble's logic could be tested at all, and
----    the same reasoning applies here.
---- 2. Geometry and colours come from _shared/modules/wpm_widget/constants.toml,
----    read rather than mirrored. The other two drivers each restate that table by
----    hand; a third hand-copy would be a third thing to drift.
---- 3. Idle is a state, not an absence. A widget that vanishes when the user stops
----    typing reads as a crash, so it dims to the idle colour and keeps its last
----    value — which is also the number the user wants to see after they stop.
+--- 1. Everything it decides is shared. What to draw, in which colour, when to
+---    show and where by default comes from _shared/lua/wpm_widget/model.lua
+---    and _shared/modules/wpm_widget/constants.toml, the same code and file
+---    macOS uses; this module holds only the user's choices and the timing.
+--- 2. It really draws. It used to call a renderer function that did not exist,
+---    read a stats table that carried no speed and no source, and so drew
+---    nothing on any desktop while its menu row ticked.
+--- 3. Only a CHANGE from the shipped default is stored. Persisting the default
+---    too would freeze today's default for everyone who ever toggled a row.
 --- ==============================================================================
 
 local M = {}
 
 local Logger    = require("logger.shim")
 local Constants = require("infra.wpm_constants")
+local Timings   = require("infra.timings")
+local Manifest  = require("infra.manifest_reader")
+local Model     = require("wpm_widget.model")
 
 local LOG = "ui.wpm.widget"
 
--- How long a keystroke's origin keeps colouring the pill. Beyond it the widget
--- returns to the neutral colour, so a single AI completion does not leave the
--- pill purple for the rest of the session. Mirrors the macOS default.
-local SOURCE_COLOR_DURATION_SEC = 1.0
-
--- The unit under the number. Not translated, deliberately: "MPM" is what the
--- other two drivers show, the metrics UI uses it as a column header, and a unit
--- that changes per locale cannot be compared against a screenshot in an issue.
-local UNIT_LABEL = "MPM"
-
--- Which colour key a source paints with. Anything not listed here is a source
--- this widget has no opinion about and falls back to the manual colour, which is
--- the honest answer: it was still typing.
-local COLOR_KEY_FOR_SOURCE = {
-	llm       = "bg_ai",
-	manual    = "bg_manual",
-	hotstring = "bg_manual",
-}
-
--- Populated from DEFAULTS below, once they are read. Declared here because the
--- rest of the module reads it, and initialised there because the shipped answer
--- is the manifest's to give.
-local _state = {
-	running        = false,
-	use_source_colors = false,
-	last_frame     = nil,
-}
-
--- Where the two user choices are kept, and the shape of that keeping: only a
--- CHANGE from the shipped default is stored. Persisting the default too would
--- freeze today's default for anyone who had already run the driver — a later
--- change to what ships would reach new installs and nobody else. The metrics
--- toggles and the dynamic-hotstring families are stored the same way for the
--- same reason.
---
--- Nothing was stored at all until now. A user who turned the widget on found it
--- gone after the next restart, with the menu row unticked and no sign that
--- anything had been forgotten — which reads as a control that does not work
--- rather than one whose answer is not kept.
+-- Where the choices are kept.
 local PREF_PREFIX = "wpm_widget."
+local POS_X_KEY = PREF_PREFIX .. "pos_x"
+local POS_Y_KEY = PREF_PREFIX .. "pos_y"
 
--- The shipped answers, read from the shared manifest rather than restated.
---
--- The colour mode used to be a literal `true` here while the manifest ships
--- `false` for the same setting on Windows: two drivers disagreeing about what a
--- fresh install looks like, with nothing anywhere saying which was intended.
--- The manifest is the single source for a default; a driver that writes its own
--- is not configurable, it is merely coincidentally similar.
-local Manifest = require("infra.manifest_reader")
+-- The refresh, colour hold and idle hide, from the shared timings.
+local UPDATE_S    = Timings.sec("ui", "wpm_widget_update_ms")
+local HOLD_S      = Timings.sec("ui", "wpm_color_hold_ms")
+local IDLE_HIDE_S = Timings.sec("ui", "wpm_widget_idle_hide_ms")
 
---- The manifest's answer for one of the two settings.
---- @param path string Feature path.
---- @param fallback boolean Used only when the manifest cannot be read at all.
+--- The manifest's shipped answer for one setting.
+--- @param path string
 --- @return boolean
-local function shipped(path, fallback)
-	local ok, value = pcall(Manifest.default_for, path)
-	if not ok or type(value) ~= "boolean" then
-		Logger.warn(LOG, "No manifest default for '%s' — using %s.", path, tostring(fallback))
-		return fallback
-	end
+local function shipped(path)
+	local value = Manifest.default_for(path)
+	if type(value) ~= "boolean" then error("no boolean manifest default for " .. path) end
 	return value
 end
 
 local DEFAULTS = {
-	visible = shipped("metrics.wpm_widget_visible", false),
-	source_colors = shipped("metrics.wpm_widget_colors", false),
+	visible = shipped("metrics.wpm_widget_visible"),
+	source_colors = shipped("metrics.wpm_widget_colors"),
+	graph = shipped("metrics.wpm_widget_graph"),
 }
 
-_state.use_source_colors = DEFAULTS.source_colors
+local _state = {
+	running = false,
+	use_source_colors = DEFAULTS.source_colors,
+	graph = DEFAULTS.graph,
+	anchor = nil,
+	history = {},
+	last_active_s = 0,
+	last_mouse_s = 0,
+	pointer = nil,
+	last_draw_s = nil,
+	last_frame = nil,
+	shown = false,
+}
 
---- Reads a persisted boolean, falling back to the shipped default.
+-- The drawing surface; replaceable by tests.
+local _surface = nil
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 1/ Choices ======================
+-- =========================================
+-- =========================================
+
+local function storage()
+	local ok, Storage = pcall(require, "adapters.storage")
+	if not ok or type(Storage) ~= "table" then return nil end
+	return Storage
+end
+
+--- A persisted boolean, or the shipped default.
 --- @param key string Suffix under PREF_PREFIX.
 --- @return boolean
 local function stored_bool(key)
-	local ok, Storage = pcall(require, "adapters.storage")
-	if not ok or not Storage then return DEFAULTS[key] end
+	local Storage = storage()
+	if not Storage then return DEFAULTS[key] end
 	local value = Storage.get(PREF_PREFIX .. key, nil)
-	-- Only a real boolean overrides the default. `value == true` collapses every
-	-- other stored shape to false — a string from a hand-edited store, a number
-	-- from a foreign writer — which would silently turn a setting off because its
-	-- value was unrecognisable.
+	-- Only a real boolean overrides the default: an unrecognisable value must
+	-- not silently turn a setting off.
 	if type(value) ~= "boolean" then return DEFAULTS[key] end
 	return value
 end
 
 --- Writes a boolean, or clears the entry when it returns to the default.
---- @param key string Suffix under PREF_PREFIX.
+--- @param key string
 --- @param value boolean
 --- @return boolean
 local function store_bool(key, value)
-	local ok, Storage = pcall(require, "adapters.storage")
-	if not ok or not Storage then
+	local Storage = storage()
+	if not Storage then
 		Logger.error(LOG, "No storage adapter — '%s' was not changed.", key)
 		return false
 	end
-	if value == DEFAULTS[key] then
-		-- Back to the default means back to no entry, so the default stays live
-		-- for this user rather than being pinned at the moment they toggled.
-		return Storage.delete(PREF_PREFIX .. key) == true
-	end
+	if value == DEFAULTS[key] then return Storage.delete(PREF_PREFIX .. key) == true end
 	return Storage.set(PREF_PREFIX .. key, value) == true
 end
 
-
-
-
--- =========================================
--- =========================================
--- ======= 1/ Colour helpers ===============
--- =========================================
--- =========================================
-
---- Turns "#RRGGBB" into the renderer's {red, green, blue} in 0..1.
---- @param hex string
---- @return table|nil
-local function rgb(hex)
-	if type(hex) ~= "string" then return nil end
-	local r, g, b = hex:match("^#(%x%x)(%x%x)(%x%x)$")
-	if not r then return nil end
-	return {
-		red   = tonumber(r, 16) / 255,
-		green = tonumber(g, 16) / 255,
-		blue  = tonumber(b, 16) / 255,
-	}
+--- The pill's saved top-left corner, or nil for the default place.
+local function stored_anchor()
+	local Storage = storage()
+	if not Storage then return nil end
+	local x, y = tonumber(Storage.get(POS_X_KEY, nil)), tonumber(Storage.get(POS_Y_KEY, nil))
+	if not x or not y then return nil end
+	return { x = x, y = y }
 end
 
---- Darkens a colour by a factor, per channel.
----
---- The unit strip under the number is the same colour as the pill, one shade
---- down; the canon carries the factor rather than a second colour so the two can
---- never be changed apart.
---- @param color table|nil
---- @param factor number
---- @return table|nil
-local function darken(color, factor)
-	if type(color) ~= "table" then return nil end
-	local keep = 1 - (tonumber(factor) or 0)
-	return { red = color.red * keep, green = color.green * keep, blue = color.blue * keep }
+local function surface()
+	if _surface then return _surface end
+	local ok, Surface = pcall(require, "adapters.wpm_surface")
+	if not ok or type(Surface) ~= "table" then return nil end
+	_surface = Surface
+	return _surface
 end
 
-
-
-
--- =========================================
--- =========================================
--- ======= 2/ The frame ====================
--- =========================================
--- =========================================
-
---- Which source is currently colouring the pill.
----
---- Same rule as macOS: a source colours the widget for a short window after the
---- keystroke that produced it, then the widget goes neutral. Passing `now` in
---- rather than reading a clock is what makes the decision testable — the whole
---- behaviour is "has enough time passed", and a test that cannot move time can
---- only assert the two extremes.
---- @param stats table|nil From keylogger.get_session_stats().
---- @param now number Seconds, monotonic.
---- @return string The source name, or "none".
-function M.active_source(stats, now)
-	if type(stats) ~= "table" then return "none" end
-	local source = stats.source_variant or stats.source or "none"
-	local since  = tonumber(stats.source_time) or 0
-	if source == "none" then return "none" end
-	if (now - since) > SOURCE_COLOR_DURATION_SEC then return "none" end
-	return source
-end
-
---- Everything the renderer needs to draw one frame.
----
---- Pure. Returns nil only when the shared constants could not be read, which is
---- the one condition under which there is nothing sensible to draw.
---- @param stats table|nil From keylogger.get_session_stats().
---- @param now number Seconds, monotonic.
---- @return table|nil { number, unit, width, height, background, strip, text, alpha }
-function M.frame_for(stats, now)
+--- Keeps the place the user dropped the widget at.
+--- @param x number The dropped frame's top-left corner.
+--- @param y number
+local function on_moved(x, y)
+	local frame = _state.last_frame
 	local canon = Constants.load()
-	if not canon then return nil end
+	if not frame or not canon then return end
+	local ax, ay = Model.anchor_from_origin(canon, frame, x, y)
+	_state.anchor = { x = ax, y = ay }
+	local Storage = storage()
+	if not Storage or Storage.set(POS_X_KEY, ax) ~= true or Storage.set(POS_Y_KEY, ay) ~= true then
+		Logger.error(LOG, "The widget's new place could not be saved — it returns to the last one on restart.")
+		return
+	end
+	Logger.debug(LOG, "Widget moved to %d,%d.", ax, ay)
+end
 
-	local wpm = math.floor(tonumber(stats and stats.wpm) or 0)
-	local source = _state.use_source_colors and M.active_source(stats, now) or "none"
-	local idle = source == "none"
 
-	local key = COLOR_KEY_FOR_SOURCE[source] or (idle and "bg_idle" or "bg_manual")
-	local background = rgb(canon.colors[key]) or rgb(canon.colors.bg_idle)
 
+
+-- =========================================
+-- =========================================
+-- ======= 2/ Colours and text =============
+-- =========================================
+-- =========================================
+
+--- A hotstring group's colour: its TOML _meta.color plus the user's override.
+--- @param group string
+--- @return string|nil
+local function group_colour(group)
+	local ok, Config = pcall(require, "modules.hotstrings.hotstrings_config")
+	if not ok or type(Config) ~= "table" or type(Config.resolve) ~= "function" then return nil end
+	local resolved = Config.resolve(group, nil)
+	return type(resolved) == "table" and resolved.color or nil
+end
+
+--- The unit under the number, in the user's language, as on macOS and Windows.
+local function unit_label()
+	local ok, I18n = pcall(require, "infra.i18n")
+	if not ok or type(I18n.get) ~= "function" then error("i18n is unavailable") end
+	return I18n.get("menu.metrics.wpm_unit")
+end
+
+--- The options every readout frame is computed with — the tray readout's too.
+--- @param now_s number
+--- @param use_colors boolean
+--- @return table
+function M.frame_options(now_s, use_colors)
 	return {
-		-- The number alone, with the unit on its own strip: the pill is 80 px wide
-		-- and "123 MPM" at the number's font size does not fit in it.
-		number     = tostring(wpm),
-		unit       = UNIT_LABEL,
-		width      = canon.compact.width,
-		height     = canon.compact.height,
-		background = background,
-		strip      = darken(background, canon.compact.unit_strip_darken_factor),
-		text       = rgb(idle and canon.colors.text_idle or canon.colors.text_active),
-		-- 0..255 in the canon, 0..1 here: the GTK surface takes a fraction, and
-		-- converting at the boundary keeps the canon readable as what the other two
-		-- drivers already use.
-		alpha      = (idle and canon.transparency.alpha_idle or canon.transparency.alpha_active) / 255,
-		idle       = idle,
-		source     = source,
+		now_s = now_s,
+		hold_s = HOLD_S,
+		use_colors = use_colors,
+		resolve = group_colour,
+		unit = unit_label(),
 	}
+end
+
+--- Whether a hotstring preview or an AI suggestion is on screen: the readouts
+--- stay up while one is.
+--- @return boolean
+function M.tooltip_visible()
+	local ok, Preview = pcall(require, "ui.tooltip.preview")
+	if ok and type(Preview) == "table" and type(Preview.is_visible) == "function" and Preview.is_visible() then
+		return true
+	end
+	local ok_llm, Llm = pcall(require, "ui.tooltip.llm")
+	return ok_llm and type(Llm) == "table" and type(Llm.is_showing) == "function" and Llm.is_showing() == true
 end
 
 
@@ -244,51 +209,39 @@ end
 -- =========================================
 -- =========================================
 
---- Whether the widget is currently shown.
 --- @return boolean
 function M.is_running()
 	return _state.running
 end
 
---- Starts the widget.
----
---- Does NOT draw by itself: `tick` is called from the daemon's periodic
---- callback, the same one that already drives the tray refresh. A widget with
---- its own timer is a second clock to stop on shutdown and a second thing to
---- leak.
---- @return boolean True when the widget can draw.
---- Starts the renderer after optionally persisting a user-requested start.
---- @param persist boolean False only while restoring an already-durable choice.
---- @return boolean
 local function start_widget(persist)
-	if _state.running then
-		Logger.debug(LOG, "start(): already running.")
-		return true
-	end
+	if _state.running then return true end
 	if not Constants.load() then
-		Logger.error(LOG, "The shared constants could not be read — the widget stays off.")
+		Logger.error(LOG, "The shared canon could not be read — the widget stays off.")
 		return false
 	end
 	if persist and not store_bool("visible", true) then
 		Logger.error(LOG, "The visible state could not be persisted — the widget stays off.")
 		return false
 	end
+	local Surface = surface()
+	if Surface and type(Surface.on_moved) == "function" then Surface.on_moved(on_moved) end
 	_state.running = true
-	Logger.info(LOG, "WPM widget started.")
+	_state.last_draw_s = nil
+	_state.last_frame = nil
+	Logger.info(LOG, "WPM widget started (%s).", _state.graph and "graph" or "compact")
 	return true
 end
 
 --- Applies the persisted choices and shows the widget if it was left on.
----
---- Called by the daemon at boot, before the first tick. Separate from `start`
---- because `start` is also what the menu row calls, and a menu click must not
---- re-read storage — the user just told it what they want.
 --- @return boolean True when the widget is running after this call.
 function M.restore()
 	_state.use_source_colors = stored_bool("source_colors")
+	_state.graph = stored_bool("graph")
+	_state.anchor = stored_anchor()
 	local visible = stored_bool("visible")
-	Logger.info(LOG, "Restored: visible=%s, source colours=%s.",
-		tostring(visible), tostring(_state.use_source_colors))
+	Logger.info(LOG, "Restored: visible=%s, source colours=%s, graph=%s.",
+		tostring(visible), tostring(_state.use_source_colors), tostring(_state.graph))
 	if not visible then return false end
 	return start_widget(false)
 end
@@ -297,7 +250,14 @@ function M.start()
 	return start_widget(true)
 end
 
+local function hide()
+	local Surface = surface()
+	if Surface and type(Surface.hide) == "function" then Surface.hide() end
+	_state.shown = false
+end
+
 --- Stops the widget and hides its window.
+--- @return boolean
 function M.stop()
 	if not _state.running then return true end
 	if not store_bool("visible", false) then
@@ -306,14 +266,14 @@ function M.stop()
 	end
 	_state.running = false
 	_state.last_frame = nil
-	local ok, Renderer = pcall(require, "adapters.graphics_renderer")
-	if ok and type(Renderer.hide) == "function" then pcall(Renderer.hide) end
+	_state.history = {}
+	hide()
 	Logger.info(LOG, "WPM widget stopped.")
 	return true
 end
 
---- Whether the pill is coloured by keystroke origin, or always neutral.
 --- @param enabled boolean
+--- @return boolean
 function M.set_use_source_colors(enabled)
 	local wanted = enabled and true or false
 	if not store_bool("source_colors", wanted) then
@@ -321,7 +281,7 @@ function M.set_use_source_colors(enabled)
 		return false
 	end
 	_state.use_source_colors = wanted
-	Logger.debug(LOG, "Source colours: %s.", tostring(_state.use_source_colors))
+	_state.last_draw_s = nil
 	return true
 end
 
@@ -330,39 +290,118 @@ function M.uses_source_colors()
 	return _state.use_source_colors
 end
 
---- Recomputes and redraws. Called from the daemon's periodic tick.
---- @param stats table|nil From keylogger.get_session_stats().
---- @param now number Seconds, monotonic.
---- @return table|nil The frame that was drawn, for tests and diagnostics.
-function M.tick(stats, now)
+--- Switches between the pill and the real-time graph.
+--- @param enabled boolean
+--- @return boolean
+function M.set_graph(enabled)
+	local wanted = enabled and true or false
+	if not store_bool("graph", wanted) then
+		Logger.error(LOG, "The graph state could not be persisted — it was not changed.")
+		return false
+	end
+	_state.graph = wanted
+	_state.last_draw_s = nil
+	return true
+end
+
+--- @return boolean
+function M.uses_graph()
+	return _state.graph
+end
+
+--- Puts the widget back in its default place.
+--- @return boolean
+function M.reset_position()
+	local Storage = storage()
+	if not Storage then
+		Logger.error(LOG, "No storage adapter — the widget's place was not reset.")
+		return false
+	end
+	if Storage.delete(POS_X_KEY) ~= true or Storage.delete(POS_Y_KEY) ~= true then
+		Logger.error(LOG, "The widget's saved place could not be cleared.")
+		return false
+	end
+	_state.anchor = nil
+	_state.last_draw_s = nil
+	Logger.info(LOG, "Widget position reset to the default place.")
+	return true
+end
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 4/ The refresh ==================
+-- =========================================
+-- =========================================
+
+--- Records whether the pointer moved since the last refresh.
+local function watch_pointer(Surface, now_s)
+	if type(Surface.pointer_position) ~= "function" then return end
+	local x, y = Surface.pointer_position()
+	if not x then return end
+	local last = _state.pointer
+	if last and (last.x ~= x or last.y ~= y) then _state.last_mouse_s = now_s end
+	_state.pointer = { x = x, y = y }
+end
+
+--- Refreshes the widget. Called from the daemon's periodic tick; it redraws
+--- at the shared refresh rate however often it is called.
+--- @param stats table|nil From keylogger.get_live_stats().
+--- @param now_s number Monotonic seconds.
+--- @return table|nil The frame drawn, for tests and diagnostics.
+function M.tick(stats, now_s)
 	if not _state.running then return nil end
+	if _state.last_draw_s and (now_s - _state.last_draw_s) < UPDATE_S then return nil end
+	_state.last_draw_s = now_s
+	local canon = Constants.load()
+	local Surface = surface()
+	if not canon or not Surface or not Surface.is_available() then return nil end
 
-	local frame = M.frame_for(stats, now)
-	if not frame then return nil end
+	local opts = M.frame_options(now_s, _state.use_source_colors)
+	local source = Model.active_source(stats, HOLD_S, now_s)
+	local wpm = tonumber(stats and stats.wpm) or 0
+	Model.push_history(canon, _state.history, wpm, source)
+	watch_pointer(Surface, now_s)
 
-	-- Redraw only when something a user could see has changed. The tick runs
-	-- several times a second and each draw is a GTK round trip; a widget that
-	-- repaints an identical pill is spending a display server's time to show the
-	-- same thing.
-	local last = _state.last_frame
-	if last and last.number == frame.number and last.source == frame.source then
-		return frame
+	local show, last_active = Model.widget_visible({
+		wpm = wpm, source = source, tooltip_visible = M.tooltip_visible(), now_s = now_s,
+		last_active_s = _state.last_active_s, last_mouse_s = _state.last_mouse_s,
+		idle_hide_s = IDLE_HIDE_S,
+	})
+	_state.last_active_s = last_active
+	-- A drag moves the pointer; the widget the user is holding must not vanish.
+	if Surface.is_dragging() then show = true end
+	if not show then
+		if _state.shown then hide() end
+		return nil
 	end
+
+	local frame = _state.graph and Model.graph_frame(canon, _state.history, stats, opts)
+		or Model.compact_frame(canon, stats, opts)
+	if not _state.anchor then
+		local screen = Surface.screen_frame()
+		if not screen then
+			Logger.debug(LOG, "No screen geometry yet — nothing drawn.")
+			return nil
+		end
+		local x, y = Model.default_anchor(canon, screen)
+		_state.anchor = { x = x, y = y }
+	end
+	local x, y = Model.frame_origin(canon, frame, _state.anchor.x, _state.anchor.y)
 	_state.last_frame = frame
-
-	local ok, Renderer = pcall(require, "adapters.graphics_renderer")
-	if not ok or type(Renderer.show_widget) ~= "function" then
-		-- Not an error worth repeating on every tick: a machine with no lgi has no
-		-- preview bubble either, and that is reported once at startup.
-		Logger.debug(LOG, "No widget surface available — nothing drawn.")
-		return frame
-	end
-	pcall(Renderer.show_widget, frame)
+	_state.shown = Surface.draw(frame, x, y) == true
 	return frame
 end
 
---- Clears module state. Tests only.
---- Test seam: the shipped answers, so a test cannot restate them and drift.
+--- Test seam: replaces the drawing surface.
+--- @param value table|nil
+function M._set_surface(value)
+	_surface = value
+end
+
+--- Test seam: the shipped answers.
 --- @return table
 function M._defaults()
 	local copy = {}
@@ -370,10 +409,20 @@ function M._defaults()
 	return copy
 end
 
+--- Clears module state. Tests only.
 function M._reset()
 	_state.running = false
 	_state.use_source_colors = DEFAULTS.source_colors
+	_state.graph = DEFAULTS.graph
+	_state.anchor = nil
+	_state.history = {}
+	_state.last_active_s = 0
+	_state.last_mouse_s = 0
+	_state.pointer = nil
+	_state.last_draw_s = nil
 	_state.last_frame = nil
+	_state.shown = false
+	_surface = nil
 end
 
 return M

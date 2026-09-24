@@ -3,20 +3,23 @@
 # ==============================================================================
 # SCHEMA: WPM Widget Visual Constants — Cross-Driver Canon
 # DESCRIPTION:
-# Single source of truth for every visual constant used by the Ergopti+
-# WPM floating widget across all drivers (AutoHotkey, Hammerspoon).
-# When a value changes here, the driver-side files must be updated to match.
+# Single source of truth for how the Ergopti+ typing-speed readouts look on
+# every driver: the floating pill, its real-time graph mode, and the menu bar
+# (macOS) or tray (Linux) readout. Windows has no menu bar readout.
 #
-# HOW EACH DRIVER CONSUMES THIS FILE:
-#   AHK         — lib/metrics/wpm_widget.ahk WPMWidgetConst class mirrors
-#                 every entry here. Comments cross-reference the key names below.
-#   Hammerspoon — ui/wpm/wpm_widget.lua CONFIG table mirrors every entry here.
-#                 Comments cross-reference the key names below.
+# EVERY DRIVER READS THIS FILE AT RUNTIME. No driver restates a value from it:
+#   Hammerspoon — ui/wpm/*.lua through the shared _shared/lua/wpm_widget model.
+#   Linux       — ui/wpm/*.lua through the same shared model.
+#   AutoHotkey  — ui/wpm/wpm_config.ahk, which refuses to draw when a key is
+#                 missing rather than falling back to a copied literal.
+# Tests on each driver fail when a key is read nowhere or restated in code.
+#
+# Timings (refresh rates, idle hide, colour hold) live in
+# _shared/modules/timings/constants.toml [ui] and [keylogger].
 #
 # COLOR FORMAT:
-#   Colors are stored as hex strings in "#RRGGBB" form.
-#   The unit_strip_darken_factor controls how much the lower strip is darkened
-#   relative to the main pill background (applied per-channel, range 0.0-1.0).
+#   Colors are "#RRGGBB" hex strings. Alphas are 0.0-1.0 unless the key name
+#   says otherwise (the [transparency] alphas are 0-255, as Windows applies them).
 # ==============================================================================
 
 
@@ -29,93 +32,170 @@
 [compact]
 
 # Pill width in logical pixels.
-# AHK: WPMWidgetConst.W  HS: computed from number width + compact_padding_x * 2.
 width = 80
 
-# Total pill height in logical pixels.
-# AHK: WPMWidgetConst.H  HS: h_number + h_gap + h_unit.
+# Total pill height in logical pixels: height_number + height_gap + height_unit.
 height = 68
 
 # Height of the upper zone that holds the WPM number.
-# AHK: WPMWidgetConst.H_NUMBER  HS: compact_height_number.
 height_number = 44
 
 # Vertical gap between the number zone and the unit strip.
-# AHK: WPMWidgetConst.H_GAP  HS: compact_height_gap.
 height_gap = 4
 
-# Height of the lower strip that holds the unit acronym label.
-# AHK: WPMWidgetConst.H_UNIT  HS: compact_height_unit.
+# Height of the lower strip that holds the unit label (MPM / WPM …).
 height_unit = 20
 
-# Font size of the WPM number.
-# AHK: s20 (Segoe UI)  HS: compact_number_size.
+# Font size of the WPM number, in points.
 number_font_size = 20
 
-# Font size of the unit label (MPM / WPM …).
-# AHK: s8 (Segoe UI)  HS: compact_unit_size.
+# Font size of the unit label, in points.
 unit_font_size = 8
 
 # Horizontal padding inside the pill (left and right of the number).
-# HS only — AHK uses a fixed width.
 padding_x = 14
 
-# How much to darken the unit strip background relative to the pill background
-# (multiplied per RGB channel; 0.40 = 60 % darker).
-# AHK: _WPMWidget_DarkenHex factor  HS: darken_factor in compact rendering.
+# How much of each RGB channel the unit strip keeps relative to the pill
+# background (strip = background × factor, rounded half up; 0.40 = 60 % darker).
 unit_strip_darken_factor = 0.40
 
+# Corner radius of the pill, in logical pixels.
+corner_radius = 10
+
+# Opacity of the number and of the unit label.
+number_text_alpha = 1.0
+unit_text_alpha = 0.9
+
+# Distance from the screen's bottom-right corner to the pill's default place.
+edge_margin = 5
+
+
+# ======================================
+# ======================================
+# ======= 2/ Graph mode layout =========
+# ======================================
+# ======================================
+
+[graph]
+
+# Graph panel size, in logical pixels. Its bottom-right corner stays on the
+# pill's, so switching mode never moves the readout away from where the user
+# put it.
+width = 216
+height = 72
+
+# Corner radius and inner padding of the panel.
+corner_radius = 10
+padding = 5
+
+# Samples kept for the curve: one per widget refresh (timings
+# [ui] wpm_widget_update_ms), so 60 × 200 ms = the last 12 s.
+history_samples = 60
+
+# The WPM at the top of the curve. Fixed so the curve's height means the same
+# speed from one moment to the next.
+scale_max = 120
+
+# Panel background and border.
+background = "#000000"
+background_alpha = 0.8
+border = "#ffffff"
+border_alpha = 0.4
+border_width = 1
+
+# The curve: a line in the source colour over a translucent fill.
+line_width = 2
+line_alpha = 0.8
+fill_alpha = 0.2
+
+# "123 MPM" above the curve.
+text_color = "#ffffff"
+text_size = 14
+
+
+# ======================================
+# ======================================
+# ======= 3/ Menu bar / tray readout ===
+# ======================================
+# ======================================
+
+[menubar]
+
+# Font size of the "123 MPM" readout, in points.
+font_size = 13
+
+# Opacity of the source-coloured background behind the readout.
+background_alpha = 0.5
+
+# Text colour of the readout.
+text_color = "#ffffff"
+
+# Background of the readout when no source colours it (Linux tray icon only:
+# a tray icon has no menu bar to sit on, so it always needs a fill).
+neutral_background = "#333344"
+
 
 # =========================
 # =========================
-# ======= 2/ Colors =======
+# ======= 4/ Colors =======
 # =========================
 # =========================
 
 [colors]
 
-# Default blue background for manual keystrokes.
-# AHK: WPMWidgetConst.COLOR_BG_MANUAL  HS: WPMShared.COLOR_FALLBACK.manual.
+# Background for manual keystrokes, and for every source that must not colour
+# the widget (see [neutral_sources]).
 bg_manual = "#0055cc"
 
-# Purple fallback for AI-generated keystrokes (no TOML source).
-# AHK: WPMWidgetConst.COLOR_BG_AI  HS: WPMShared.COLOR_FALLBACK.llm.
+# Background for AI-generated text.
 bg_ai = "#7a30b0"
 
-# Near-black used when the widget is in the idle state.
-# AHK: WPMWidgetConst.COLOR_BG_IDLE  HS: (computed from CONFIG.bg_color).
+# Near-black used when the widget is idle.
 bg_idle = "#1a1a2e"
 
 # Active text color (white).
-# AHK: WPMWidgetConst.COLOR_TXT_ACTIVE  HS: CONFIG.text_color.
 text_active = "#ffffff"
 
 # Idle / dimmed text color.
-# AHK: WPMWidgetConst.COLOR_TXT_IDLE  HS: (dimmed white alpha).
 text_idle = "#555577"
 
-# HSL parameters used to normalise hotstring/AI/AC accent colors so they are
-# all as bright as bg_manual (#0055cc → HSL L=0.40 S=1.00).
-# Any accent hue is re-projected onto this L/S target, keeping its hue but
-# making the pill as vivid and readable as the manual blue.
-# AHK: WPMWidgetConst.COLOR_WIDGET_L / COLOR_WIDGET_S
-# HS:  CONFIG.widget_hsl_l / CONFIG.widget_hsl_s
+# A hotstring group with no usable colour of its own.
+fallback_accent = "#007aff"
+
+# HSL parameters to re-project a group accent onto bg_manual's brightness
+# (#0055cc → L=0.40 S=1.00), keeping its hue.
 widget_hsl_l = 0.40
 widget_hsl_s = 1.00
 
 
+# ==================================
+# ==================================
+# ======= 5/ Neutral sources =======
+# ==================================
+# ==================================
+
+# Sources that never colour the widget: they are not hotstring groups with a
+# colour of their own, or are ergonomic substitutions that should read as the
+# user's own typing. Every other source name is a hotstring group whose TOML
+# _meta.color (plus any user override) colours the widget; "llm" uses bg_ai.
+[neutral_sources]
+none = true
+manual = true
+hotstring = true
+repeat_key = true
+rolls = true
+
+
 # ===============================
 # ===============================
-# ======= 3/ Transparency =======
+# ======= 6/ Transparency =======
 # ===============================
 # ===============================
 
 [transparency]
 
-# Opacity when the widget is active and displaying a non-zero WPM (0-255).
-# AHK: WPMWidgetConst.ALPHA_ACTIVE  HS: bg_color alpha ≈ 0.86.
+# Opacity of the pill when the widget is active (0-255).
 alpha_active = 220
 
-# Opacity when the widget is in the idle / fading state.
-# AHK: WPMWidgetConst.ALPHA_IDLE  HS: not currently used.
+# Opacity of the pill when it is idle (0-255).
 alpha_idle = 140

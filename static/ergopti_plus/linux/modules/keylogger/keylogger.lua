@@ -38,6 +38,18 @@ local PrivateWindow = require("keylogger.private_window")
 local SharedMetrics    = require("keylogger.metrics")
 local WPM_RING_CAPACITY = SharedMetrics.DEFAULT_WPM_RING_CAPACITY
 local MAX_TYPING_INTERVAL_MS = Timings.ms("keylogger", "max_keystroke_delay_ms")
+-- The WPM readouts' live speed and last source, the same tracker macOS reads.
+-- Counted here because every character that reaches the page passes here —
+-- typed, expanded or generated — and only here is it known which it was.
+local LiveWpm = require("keylogger.live_wpm")
+local function new_live_tracker()
+	return LiveWpm.new({
+		window_ms = Timings.ms("keylogger", "wpm_window_ms"),
+		min_duration_ms = Timings.ms("keylogger", "wpm_min_duration_ms"),
+		idle_reset_ms = Timings.ms("keylogger", "wpm_idle_reset_ms"),
+	})
+end
+local _live = new_live_tracker()
 
 -- For converting os.time()'s seconds to the millisecond scale the monotonic
 -- clock reports in, so the two can be subtracted.
@@ -487,6 +499,9 @@ function M.on_keydown(ch, timestamp_ms, app_id, scancode)
 	if Metrics then
 		Metrics.on_keydown(ch, timestamp_ms)
 	end
+	if type(ch) == "string" and ch ~= "" and type(timestamp_ms) == "number" then
+		LiveWpm.record(_live, 1, timestamp_ms)
+	end
 
 	-- Per-app tracking. Focus polling is asynchronous; use an explicit Unknown
 	-- bucket for the small startup/focus race rather than silently dropping a
@@ -697,6 +712,12 @@ function M.record_hotstring(app_id, trigger, replacement, timestamp_ms, h_type, 
 	append_synthetic_events(app_id, replacement, "hotstring",
 		deletes ~= nil and deletes or char_count(type(trigger) == "string" and trigger or ""),
 		is_private)
+	if type(timestamp_ms) == "number" then
+		-- The group names the colour the readouts take; a private expansion
+		-- still colours them — the colour says a hotstring fired, not what it typed.
+		LiveWpm.record(_live, char_count(replacement), timestamp_ms)
+		LiveWpm.mark_source(_live, "hotstring", h_type, timestamp_ms)
+	end
 	if is_private then
 		Logger.debug(LOG, "Private expansion fired (content withheld).")
 		return
@@ -758,6 +779,10 @@ function M.record_synthetic_output(app_id, text, source, timestamp_ms, deletes, 
 		app.llm_input_chars = app.llm_input_chars + math.max(0, math.floor(tonumber(input_chars) or 0))
 	end
 	append_synthetic_events(app_id, text, kind, deletes)
+	if type(timestamp_ms) == "number" then
+		LiveWpm.record(_live, char_count(text), timestamp_ms)
+		LiveWpm.mark_source(_live, kind, kind, timestamp_ms)
+	end
 end
 
 --- Records a foreground application transition from the process lifecycle port.
@@ -1625,6 +1650,13 @@ function M.get_wpm()
 	return Metrics.get_wpm()
 end
 
+--- The readouts' live numbers: { wpm, source, source_variant, source_time (s) }.
+--- @param now_ms number|nil Monotonic milliseconds; now when nil.
+--- @return table
+function M.get_live_stats(now_ms)
+	return LiveWpm.stats(_live, now_ms or Monotonic.now_ms())
+end
+
 --- Returns session statistics.
 --- Returns a safe empty table when metrics_collector is unavailable.
 --- @return table
@@ -1662,6 +1694,7 @@ function M.reset_session()
 	_pending_hotstring_events = {}
 	_pending_shortcut_events = {}
 	_pending_app_switch_events = {}
+	_live = new_live_tracker()
 	_session_started_at = os.time() * 1000
 end
 
