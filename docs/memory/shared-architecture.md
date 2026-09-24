@@ -72,6 +72,26 @@ and every driver that shows it registers its command. Both renderers report a
 missing toggle command and a provider row carrying `action` plus a subtree as
 errors; `test-menu-toggle-registered.cjs` pins the registrations.
 
+### project-a-setting-with-values-is-one-choice-row
+
+An enum feature shown in the tray is ONE manifest `choice` row (`path` = the
+feature, `i18n` = the row label), not one row per value. `build-menu-manifest.js`
+projects the feature's `enum_values` into the row's `choices` with label keys
+`<i18n>.<value>` and refuses a path that is not an enum feature or a platform
+the feature lacks. Both renderers draw it; the driver registers
+`commands[<row id>]`, called with the chosen value, and a state getter under
+the feature path. The macOS menubar icon (`ui.menubar_icon`) is the first one;
+the update channel and frequency rows have the same shape.
+
+### project-restore-and-clear-read-two-shared-keys
+
+Every row that puts a section back to Ergopti's preset reads
+`common.restore_recommended`, and every row that removes a section's settings
+so the OS behaves as without Ergopti reads `common.clear_to_system`, whatever
+the menu. A new reset or clear row takes one of the two keys, never a per-menu
+label; `test-menu-reset-terminology.cjs` holds the manifest rows, the rows
+drivers build by hand and the retired keys.
+
 ### project-tray-root-is-the-manifest-top-level
 
 Each of the three drivers builds its tray root with one loop over the manifest
