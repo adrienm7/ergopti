@@ -32,6 +32,7 @@
 local M = {}
 local hs        = hs
 local TomlCodec = require("infra.toml.codec")
+local TomlWriter = require("toml_codec.writer")
 local Logger    = require("infra.logger")
 local FileSystem = require("adapters.file_system")
 local LOG       = "preferences"
@@ -461,12 +462,26 @@ end
 --- not own: [_meta] (the schema version the boot migration stamps), the expert
 --- [script] and [features] layers config_overrides reads, and any table another
 --- reader keeps here. A save carries them over unchanged; replacing the file
---- with the owned sections alone erased them at the first menu change.
+--- with the owned sections alone erased them at the first menu change. A file
+--- the save creates gets the rows its creators must write instead (the schema
+--- stamp the boot migration registered through toml_codec.writer).
+--- @param prefs_file string Destination path.
 --- @param source table Exact source classification `{ status, content? }`.
 --- @return table|nil tables `{ [name] = value }`, nil when the file is not TOML.
 --- @return string|nil detail
-local function unowned_tables(source)
-	if source.status ~= "ok" then return {} end
+local function unowned_tables(prefs_file, source)
+	if source.status ~= "ok" then
+		local out = {}
+		for _, row in ipairs(TomlWriter.create_rows(prefs_file) or {}) do
+			local node = out
+			for segment in row.section:gmatch("[^%.]+") do
+				if type(node[segment]) ~= "table" then node[segment] = {} end
+				node = node[segment]
+			end
+			node[row.key] = row.value
+		end
+		return out
+	end
 	local ok, decoded = pcall(TomlCodec.decode, source.content)
 	if not ok or type(decoded) ~= "table" then
 		return nil, "the current config.toml is not valid TOML, so the tables it holds cannot be kept"
@@ -667,6 +682,14 @@ function M.save(prefs_file, state, hotfiles, core_mods)
 		Logger.error(LOG, "Cannot save preferences without a destination path.")
 		return false
 	end
+	-- The boot migration could not version this file (a newer schema, a failed
+	-- migration): this session never writes it.
+	local refusal = TomlWriter.write_refusal(prefs_file)
+	if refusal then
+		Logger.error(LOG, "Preferences NOT saved: writes to '%s' are refused for this session (%s).",
+			prefs_file, refusal)
+		return false
+	end
 	local existing = M.snapshot(state, hotfiles, core_mods)
 	local expected_source = _source_snapshots[prefs_file]
 	if type(expected_source) ~= "table" then
@@ -680,7 +703,7 @@ function M.save(prefs_file, state, hotfiles, core_mods)
 	end
 
 	local grouped = group_for_disk(existing)
-	local unowned, unowned_err = unowned_tables(expected_source)
+	local unowned, unowned_err = unowned_tables(prefs_file, expected_source)
 	if not unowned then
 		Logger.error(LOG, "Preferences NOT saved: %s.", unowned_err)
 		return false
