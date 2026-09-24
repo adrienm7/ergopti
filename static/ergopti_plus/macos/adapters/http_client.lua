@@ -18,7 +18,8 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Async with callback: hs.http is non-blocking. The callback is always
----    deferred to the next runloop cycle. Signature: { ok, status, body, error }.
+---    deferred to the next runloop cycle. Signature: { ok, status, body, error },
+---    plus headers (the response headers, possibly empty) on a completed response.
 --- 2. Cancel via task reference: when asyncPost/asyncGet return a cancellable
 ---    task, the adapter holds it so cancel() can abort in-flight work. The
 ---    generation fence suppresses completion even when no task is returned.
@@ -489,7 +490,7 @@ local function new(options)
 	end
 
 	local function _make_cb(callback, my_generation)
-		return function(status, response_body, _response_headers)
+		return function(status, response_body, response_headers)
 			-- A native task callback is terminal proof for that exact task even
 			-- after logical revocation. Clear only the matching generation so a
 			-- stale completion cannot consume a successor's capability.
@@ -529,6 +530,8 @@ local function new(options)
 				status = public_status,
 				body   = native_status >= 0 and type(response_body) == "string"
 					and response_body or "",
+				-- The response headers (an ETag for a conditional request, for one).
+				headers = type(response_headers) == "table" and response_headers or {},
 				error  = err_msg,
 			})
 			_notify_settlement_observers()
@@ -752,7 +755,7 @@ local function new(options)
 	--- Sends an HTTP GET request.
 	--- @param url      string   Absolute URL.
 	--- @param headers  table    Key→value header map.
-	--- @param callback function Called with { ok, status, body, error }.
+	--- @param callback function Called with { ok, status, body, headers, error }.
 	function inst.get(url, headers, callback)
 		if has_sensitive_headers(headers) then
 			return _dispatch_with_redirect_policy("get", url, headers, nil, callback)
