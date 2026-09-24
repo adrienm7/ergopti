@@ -33,7 +33,8 @@
 #   none                           the key does nothing while the layer is held
 # An action that cannot resolve on an OS leaves that OS out of its reach and
 # says why through `reason_key`, a locale key under platform_reason.*. So does
-# a restricted modifier or parameter.
+# a restricted modifier or parameter, and a kind of physical input
+# ([source_kinds]) that an OS cannot take as a layer key.
 #
 # `repeatable = true` means the repeat count set by repeat_count:<N> applies:
 # the LAST chord of the resolution is sent N times. `catalogue = true` means the
@@ -76,6 +77,14 @@ linux = "ctrl"
 [modifiers.fn]
 platforms = ["macos"]
 reason_key = "platform_reason.layer_fn_modifier_is_macos"
+
+# A kind of physical input (physical_keys.json "kind") that some OS cannot take
+# as a layer key. Karabiner-Elements, which carries the macOS layer, takes no
+# wheel input at all, so a wheel binding there would be a key that never fires;
+# the Layer + Scroll shortcut keeps the volume on the wheel on macOS instead.
+[source_kinds.wheel]
+platforms = ["windows", "linux"]
+reason_key = "platform_reason.layer_wheel_source_is_not_macos"
 
 # Driver-native handlers a `call:` resolution may name, per OS.
 [call_handlers]

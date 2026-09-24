@@ -397,6 +397,36 @@
 			}
 		},
 		{
+			"id": "wheel_is_not_a_macos_source",
+			"description": "Karabiner-Elements, which carries the macOS layer, takes no wheel input: a wheel direction bound on macOS is dropped and the reason is named, while a mouse button still binds.",
+			"os": "macos",
+			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"WheelUp\" = \"vol_up\"\n\"MouseMiddle\" = \"escape\"\n\n[layers.nav.linux]\n\"WheelDown\" = \"vol_down\"\n",
+			"expected": {
+				"errors": ["unavailable_on_os|nav|all|WheelUp|platform_reason.layer_wheel_source_is_not_macos"],
+				"layers": {
+					"nav": {
+						"MouseMiddle": "keystroke:Escape@repeat"
+					}
+				}
+			}
+		},
+		{
+			"id": "wheel_is_a_linux_source",
+			"description": "The same file on Linux: kanata takes the wheel, so both wheel directions bind.",
+			"os": "linux",
+			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"WheelUp\" = \"vol_up\"\n\"MouseMiddle\" = \"escape\"\n\n[layers.nav.linux]\n\"WheelDown\" = \"vol_down\"\n",
+			"expected": {
+				"errors": [],
+				"layers": {
+					"nav": {
+						"MouseMiddle": "keystroke:Escape@repeat",
+						"WheelDown": "keystroke:AudioVolumeDown@repeat",
+						"WheelUp": "keystroke:AudioVolumeUp@repeat"
+					}
+				}
+			}
+		},
+		{
 			"id": "several_layers_and_an_empty_one",
 			"description": "Each layer loads on its own; a layer whose table is empty is present and empty.",
 			"os": "linux",
@@ -562,9 +592,7 @@
 						"Semicolon": "keystroke:alt+ArrowRight@repeat",
 						"Slash": "keystroke:meta+ArrowRight",
 						"Space": "keystroke:meta+Space",
-						"Tab": "keystroke:meta+Backquote",
-						"WheelDown": "keystroke:AudioVolumeDown@repeat",
-						"WheelUp": "keystroke:AudioVolumeUp@repeat"
+						"Tab": "keystroke:meta+Backquote"
 					}
 				}
 			}

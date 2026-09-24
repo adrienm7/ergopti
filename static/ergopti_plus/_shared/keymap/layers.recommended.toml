@@ -18,7 +18,8 @@
 # on each OS today, so they live in the OS tables: a repeat count on Windows,
 # F1-F12, Spotlight and window cycling on macOS, nothing on Linux. macOS also
 # keeps Escape on the right Command key, which sits where the right Alt key
-# sits on a PC board.
+# sits on a PC board. The wheel is volume on Windows and Linux only: the macOS
+# layer cannot take wheel input ([source_kinds.wheel] in layer_actions.toml).
 #
 # The layer id is the value a tap-hold key's hold_layer names
 # (_shared/tap_hold/defaults.toml [tap_hold.hold_picker].layers).
@@ -86,12 +87,14 @@ schema_version = 1
 "Comma" = "snap_left"
 "Period" = "snap_right"
 "Slash" = "line_end"
-# Thumb and pointer.
+# Thumb.
 "AltRight" = "escape"
-"WheelUp" = "vol_up"
-"WheelDown" = "vol_down"
 
 [layers.nav.windows]
+# The wheel: volume instead of scroll.
+"WheelUp" = "vol_up"
+"WheelDown" = "vol_down"
+# The number row: how many times the next repeatable action runs.
 "Digit1" = "repeat_count:1"
 "Digit2" = "repeat_count:2"
 "Digit3" = "repeat_count:3"
@@ -124,3 +127,8 @@ schema_version = 1
 "Space" = "spotlight"
 "Tab" = "keystroke:meta+Backquote"
 "MetaRight" = "escape"
+
+[layers.nav.linux]
+# The wheel: volume instead of scroll, as on Windows.
+"WheelUp" = "vol_up"
+"WheelDown" = "vol_down"

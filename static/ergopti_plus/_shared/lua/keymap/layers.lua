@@ -327,6 +327,14 @@ function M.new_context(registry, vocabulary)
 			or not is_table(repeat_count.platforms) then
 		error("keymap.layers: the layer vocabulary has no usable [parameters.repeat_count]", 2)
 	end
+	if vocabulary.source_kinds ~= nil and not is_table(vocabulary.source_kinds) then
+		error("keymap.layers: the layer vocabulary's [source_kinds] is not a table", 2)
+	end
+	for kind, rule in pairs(vocabulary.source_kinds or {}) do
+		if not is_table(rule) or not is_table(rule.platforms) then
+			error("keymap.layers: the layer vocabulary's [source_kinds." .. tostring(kind) .. "] has no platforms list", 2)
+		end
+	end
 	return { registry = registry, vocabulary = vocabulary, platforms = meta.platforms }
 end
 
@@ -464,6 +472,18 @@ local function parse_resolution(text, os, ctx)
 	error('keymap.layers: vocabulary resolution "' .. text .. '" is not keystroke:, call: or none')
 end
 
+--- Says why a physical input cannot be a layer key on one OS.
+--- @param code string A registry key code.
+--- @return table|nil unavailable { detail, reason_key }, or nil when the input can be a layer key.
+local function source_unavailable(code, os, ctx)
+	local kind = ctx.registry.keys[code].kind
+	local rule = (ctx.vocabulary.source_kinds or {})[kind]
+	if is_table(rule) and not list_has(rule.platforms, os) then
+		return { detail = "a " .. tostring(kind) .. " input cannot be a layer key on " .. os, reason_key = rule.reason_key }
+	end
+	return nil
+end
+
 --- Resolves one syntactically valid binding on one OS.
 --- @return table|nil resolved The resolution.
 --- @return table|nil unavailable { detail, reason_key } when it cannot run on the OS.
@@ -550,7 +570,8 @@ local function load_layer(layer_id, layer, os, ctx, report)
 	for _, code in ipairs(sorted_keys(effective)) do
 		local entry = effective[code]
 		if entry.binding then
-			local resolved, unavailable = resolve_binding(entry.binding, os, ctx)
+			local resolved, unavailable = nil, source_unavailable(code, os, ctx)
+			if not unavailable then resolved, unavailable = resolve_binding(entry.binding, os, ctx) end
 			if resolved then out[code] = resolved
 			else report(new_error("unavailable_on_os", layer_id, entry.section, code, unavailable.detail, unavailable.reason_key)) end
 		end

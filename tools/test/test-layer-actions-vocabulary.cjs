@@ -97,6 +97,17 @@ for (const [mod, rule] of Object.entries(vocabulary.modifiers || {})) {
 	}
 }
 
+// A restricted source kind must name a kind the registry uses, or the rule
+// guards nothing; and the OS it leaves out must be told why.
+const registryKinds = new Set(Object.values(keys).map((k) => k.kind));
+for (const [kind, rule] of Object.entries(vocabulary.source_kinds || {})) {
+	if (!registryKinds.has(kind)) fail(`[source_kinds.${kind}] restricts a kind no physical key has (${[...registryKinds].join(', ')})`);
+	if (!Array.isArray(rule.platforms) || rule.platforms.some((p) => !OSES.includes(p))) fail(`[source_kinds.${kind}].platforms must list OSes`);
+	else if (rule.platforms.length === OSES.length) fail(`[source_kinds.${kind}] restricts nothing: every OS is listed`);
+	else if (typeof rule.reason_key !== 'string') fail(`[source_kinds.${kind}] leaves an OS out without a reason_key`);
+	else reasonKeys.add(rule.reason_key);
+}
+
 const repeatCount = (vocabulary.parameters || {}).repeat_count;
 if (!repeatCount || !Number.isInteger(repeatCount.min) || !Number.isInteger(repeatCount.max) || repeatCount.min < 1 || repeatCount.max < repeatCount.min)
 	fail('[parameters.repeat_count] needs integer min >= 1 and max >= min');

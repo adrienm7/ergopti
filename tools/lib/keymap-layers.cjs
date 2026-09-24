@@ -234,6 +234,18 @@ function parseResolution(text, os, ctx) {
 }
 
 /**
+ * Says why a physical input cannot be a layer key on one OS, or null when it can.
+ * @param {string} code - A registry key code.
+ * @returns {{detail: string, reason_key: string}|null}
+ */
+function sourceUnavailable(code, os, ctx) {
+	const kind = ctx.registry.keys[code].kind;
+	const rule = (ctx.vocabulary.source_kinds || {})[kind];
+	if (rule && !rule.platforms.includes(os)) return { detail: `a ${kind} input cannot be a layer key on ${os}`, reason_key: rule.reason_key };
+	return null;
+}
+
+/**
  * Resolves one syntactically valid binding on one OS.
  * @returns {{resolved?: object, unavailable?: {detail: string, reason_key: string}}}
  */
@@ -347,7 +359,8 @@ function loadLayers(text, os, ctx) {
 		for (const code of Object.keys(effective).sort()) {
 			const { section, binding } = effective[code];
 			if (!binding) continue;
-			const r = resolveBinding(binding, os, ctx);
+			const source = sourceUnavailable(code, os, ctx);
+			const r = source ? { unavailable: source } : resolveBinding(binding, os, ctx);
 			if (r.unavailable) report(error('unavailable_on_os', layerId, section, code, r.unavailable.detail, { reason_key: r.unavailable.reason_key }));
 			else out[code] = r.resolved;
 		}
