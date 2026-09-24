@@ -8,7 +8,7 @@
 --- reflecting the current hotstring groups, layouts, LLM models, and metrics.
 ---
 --- The menu tree mirrors the macOS menubar (§9 of the parity plan):
----   Layout → Hotstrings → AI → Metrics → Shortcuts → Kanata → Gestures → Apps
+---   Layout → Hotstrings → AI → Metrics → Shortcuts → Tap-holds → Gestures → Apps
 ---   → separator → Global Actions → Language → Config Folder → Setup Wizard
 ---   → About → Reload → Quit → Debug
 ---

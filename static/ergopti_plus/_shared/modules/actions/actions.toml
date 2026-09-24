@@ -9,7 +9,7 @@
 #   "all"     — disponible sur tous les drivers
 #   "hs"      — macOS / Hammerspoon uniquement
 #   "ahk"     — Windows / AutoHotkey uniquement
-#   "linux"   — Linux / kanata uniquement
+#   "linux"   — Linux uniquement
 #   "hs,ahk"  — exactement ces drivers-là
 #
 # La forme liste a été ajoutée le 2026-08-03 parce que le champ ne savait pas

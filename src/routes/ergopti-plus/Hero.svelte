@@ -109,7 +109,7 @@ FEATURES & RATIONALE:
 
 	let urlWindows = $derived(ui.release?.url('ErgoptiPlus.exe') ?? '#');
 	let urlMacos = $derived(ui.release?.url('ErgoptiPlus.app.zip') ?? '#');
-	let urlKanata = $derived(ui.release?.url('kanata.kbd') ?? '#');
+	let urlLinux = $derived(ui.release?.url('ErgoptiPlus-linux-x86_64.AppImage') ?? '#');
 
 	// A single download button, driven by the OS toggle. The previous layout
 	// showed a second *download* button for a different OS — so picking Linux
@@ -119,7 +119,7 @@ FEATURES & RATIONALE:
 		ui.osStyle === 'macos'
 			? { url: urlMacos, icon: 'icon-appleinc', label: t('Télécharger pour macOS') }
 			: ui.osStyle === 'linux'
-				? { url: urlKanata, icon: 'icon-linux', label: t('Télécharger pour Linux (alpha)') }
+				? { url: urlLinux, icon: 'icon-linux', label: t('Télécharger pour Linux (alpha)') }
 				: { url: urlWindows, icon: 'icon-windows', label: t('Télécharger pour Windows') }
 	);
 </script>
@@ -151,7 +151,7 @@ FEATURES & RATIONALE:
 				type="button"
 				class={ui.osStyle === 'linux' ? 'os-btn active' : 'os-btn'}
 				onclick={() => setOS('linux')}
-				title={t('Afficher les fenêtres au style Linux (kanata + daemon Lua, alpha)')}
+				title={t('Afficher les fenêtres au style Linux (daemon Lua, alpha)')}
 				aria-pressed={ui.osStyle === 'linux'}
 			>
 				<i class="icon-linux"></i><span>Linux</span>

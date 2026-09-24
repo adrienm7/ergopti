@@ -5,7 +5,7 @@
 #
 # This script is run by CI (build-linux job) after all validations pass. It:
 #   1. Copies the linux driver sources + _shared/ tree into build/linux/
-#   2. Copies kanata.kbd and install.sh
+#   2. Copies install.sh
 #   3. Resolves the Lua module search path and generates a wrapper script
 #   4. Verifies all required files exist (integrity check)
 #   5. Runs a smoke test: luajit ergopti_hotstrings.lua --help (exit 0 check)
@@ -50,7 +50,6 @@ copy_tree() {
 LINUX_SRC="${REPO_ROOT}/static/ergopti_plus/linux"
 SHARED_SRC="${REPO_ROOT}/static/ergopti_plus/_shared"
 SHARED_RELATIVE="static/ergopti_plus/_shared"
-KANATA_SRC="${REPO_ROOT}/static/ergopti_plus/linux/platform/remap/data/kanata.kbd"
 BUILD_DIR="${REPO_ROOT}/build/linux"
 
 echo "=== Ergopti Linux driver assembly ==="
@@ -96,11 +95,10 @@ copy_tree "${SHARED_SRC}/" "${BUILD_DIR}/_shared/" --exclude corpus
 bash "${SCRIPT_DIR}/write_build_stamp.sh" write "${BUILD_DIR}/_shared"
 
 # ============================================================================
-# 4. Copy kanata config and install script
+# 4. Copy the install script
 # ============================================================================
-echo "--- Copying kanata config ---"
+echo "--- Copying install script ---"
 
-cp "${KANATA_SRC}" "${BUILD_DIR}/kanata.kbd"
 cp "${LINUX_SRC}/install.sh" "${BUILD_DIR}/install.sh"
 chmod +x "${BUILD_DIR}/install.sh"
 
@@ -199,7 +197,6 @@ REQUIRED_FILES=(
 	"_shared/modules/hotstrings/defaults.toml"
 	"_shared/ui/host_bridge.js"
 	"_shared/ui/i18n.js"
-	"kanata.kbd"
 	"install.sh"
 	"bin/ergopti-hotstrings"
 )
@@ -366,5 +363,4 @@ echo ""
 echo "=== Linux driver assembled successfully ==="
 echo "  Output  : ${BUILD_DIR}/"
 echo "  Binary   : ${BUILD_DIR}/bin/ergopti-hotstrings"
-echo "  Kanata   : ${BUILD_DIR}/kanata.kbd"
 echo "  Installer: ${BUILD_DIR}/install.sh"

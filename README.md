@@ -127,9 +127,9 @@ A self-contained app bundling Hammerspoon and Karabiner-Elements.
 
 **Linux — alpha**
 
-The Linux driver (kanata + a Lua daemon) is feature-complete on paper but still
-looking for its first real-world testers. Grab `kanata.kbd` from the release and
-see [`static/ergopti_plus/linux/`](static/ergopti_plus/linux/) — feedback via
+The Linux driver (a Lua daemon, tap-holds included) is feature-complete on paper
+but still looking for its first real-world testers. Grab a Linux package (.deb,
+.rpm, AppImage or Flatpak) from the release and see [`static/ergopti_plus/linux/`](static/ergopti_plus/linux/) — feedback via
 [issues](https://github.com/adrienm7/ergopti/issues) is very welcome.
 
 ---
@@ -148,11 +148,11 @@ src/                      SvelteKit website (ergopti.fr)
 static/ergopti_plus/      The Ergopti+ driver suite
   windows/                AutoHotkey v2 driver (entry: ErgoptiPlus.ahk)
   macos/                  Hammerspoon driver (entry: init.lua) + bundled apps
-  linux/                  Lua daemon + kanata integration (alpha)
+  linux/                  Lua daemon, tap-hold engine included (alpha)
   _shared/                Cross-driver single source of truth
                           (hotstrings TOML, LLM catalogue, locales, menus, webview UIs…)
 static/ergopti/           Ergopti layout artefacts (keylayout, XKB, XCompose)
-static/drivers/           Driver support assets (alfred, espanso, kanata, kalamine)
+static/drivers/           Driver support assets (alfred, espanso, kalamine)
 tools/                    Build, codegen, lint and test tooling
 docs/                     Engineering docs — start with docs/memory/README.md
 ```
@@ -210,8 +210,9 @@ same time** — they compete for the same event taps.
 ### Linux driver (alpha)
 
 The daemon lives in [`static/ergopti_plus/linux/`](static/ergopti_plus/linux/)
-(entry: `ergopti_hotstrings.lua`, launcher: `bin/ergopti-hotstrings`) and pairs
-with [kanata](https://github.com/jtroo/kanata) for tap-holds.
+(entry: `ergopti_hotstrings.lua`, launcher: `bin/ergopti-hotstrings`). It runs
+the tap-holds and the navigation layer itself, in its keyboard hook
+(`platform/remap/`); no external remapper is needed.
 
 **Runtime — LuaJIT.** The test suite runs on any Lua (`npm run test:linux` probes
 `luajit`, then `lua5.4`, then `lua`), but the daemon binds `/dev/uinput`,
@@ -221,7 +222,7 @@ runs it.
 **1. Dependencies**
 
 ```bash
-bash static/ergopti_plus/linux/install.sh             # deps, kanata, files, permissions, autostart
+bash static/ergopti_plus/linux/install.sh             # deps, files, permissions, autostart
 bash static/ergopti_plus/linux/install.sh --no-deps   # …same, minus the package installs
 ```
 
@@ -231,7 +232,6 @@ bash static/ergopti_plus/linux/install.sh --no-deps   # …same, minus the packa
 | `libnotify` (`notify-send`)        | the launcher refuses to start                                                  |
 | `libxkbcommon-tools` (`xkbcli`)    | no keymap source on Wayland without XWayland, so the keyboard is refused; before libxkbcommon 1.8 (Ubuntu 24.04, Debian 12) the keymap is read from XWayland (`xkbcomp`) or compiled from the session's layout names (GNOME, Plasma, `XKB_DEFAULT_*`, `localectl`) |
 | `libayatana-appindicator3`         | `--tray` has nothing to host the icon in                                       |
-| `kanata`                           | no tap-hold and no layers; hotstrings still work                               |
 | `lua-luv`                          | no inotify — the loop falls back to an FFI sleep and file watching to `stat()` polling |
 | `lua-posix`                        | no `SIGTERM`/`SIGHUP` handlers, and no `stat()` polling to fall back on        |
 | `lua-lgi`                          | no typing-speed pill and no WebKit2GTK windows                                 |

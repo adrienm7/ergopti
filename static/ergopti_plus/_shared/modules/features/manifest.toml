@@ -3106,11 +3106,10 @@ type = "list"
 id = "locales"
 
 # The updates submenu — Linux is the only driver with an in-app updater surface
-# at top level; the other two carry theirs under "about". Same reasoning as the
-# kanata block above for why this is a `list`: its rows are the current version,
-# the channel the user picked and the interval presets, none of which a static
-# entry can enumerate, and a `list` is what puts them in the renderer rather than
-# in the driver.
+# at top level; the other two carry theirs under "about". It is a `list` because
+# its rows are the current version, the channel the user picked and the interval
+# presets, none of which a static entry can enumerate, and a `list` is what puts
+# them in the renderer rather than in the driver.
 [[menu.updates_menu]]
 type = "list"
 id = "updates_actions"
@@ -3649,7 +3648,7 @@ reason_key = "platform_reason.ergopti_section_has_no_linux_row"
 # TIS — the OS's own input-source mechanism, with a user scope and a system scope
 # — and it draws a menubar icon whose variant the user picks. Neither concept
 # exists on the other two drivers: Windows installs a .klc through its own
-# installer and Linux generates a kanata layout, and neither has a menubar.
+# installer and Linux installs an XKB layout, and neither has a menubar.
 #
 # Both were built by hand in ui/menu/menu_keyboard_layout.lua and described
 # nowhere until 2026-08-07, so ten rows of a shared menu had no platforms field

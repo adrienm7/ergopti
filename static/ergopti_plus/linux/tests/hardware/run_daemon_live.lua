@@ -16,6 +16,10 @@
 --- focused field is known not to be a password), and the tray's D-Bus menu,
 --- checked by tests/hardware/sni_host.py in the calling script.
 ---
+--- Then the tap-holds, which the daemon runs itself on the grabbed keyboard:
+--- CapsLock held is Ctrl and tapped is Enter, left Alt held is the navigation
+--- layer, Shift tapped copies — and no key the daemon pressed stays down.
+---
 --- Then the AI: with the API backend selected and an entry pointing at
 --- tests/hardware/fake_llm_server.py (a Cerebras-style OpenAI-compatible API),
 --- "//" asks for a prediction and Alt+1 accepts it. The check reads what the
@@ -43,7 +47,8 @@ local LETTERS = {
 }
 local KEY_OF = { [" "] = 57 }
 for code, char in pairs(LETTERS) do KEY_OF[char] = code end
-local KEY_LEFTALT, KEY_1 = 56, 2
+local KEY_LEFTALT, KEY_1, KEY_TAB = 56, 2, 15
+local KEY_CAPSLOCK, KEY_LEFTSHIFT, KEY_LEFTCTRL, KEY_ENTER, KEY_LEFT = 58, 42, 29, 28, 105
 
 -- The fake API the AI phase talks to (run_daemon_live.sh starts it).
 local LLM_PORT = os.getenv("ERGOPTI_LIVE_LLM_PORT")
@@ -303,7 +308,77 @@ end
 
 -- =========================================
 -- =========================================
--- ======= 4/ An AI prediction =============
+-- ======= 4/ Tap-holds ====================
+-- =========================================
+-- =========================================
+
+--- Presses one key for `hold_s` seconds, with `inner` run while it is down.
+local function press(code, hold_s, inner)
+	Keyboard.emit(code, 1)
+	sleep(hold_s)
+	if inner then inner() end
+	Keyboard.emit(code, 0)
+	sleep(0.05)
+end
+
+--- The keys still down on the daemon's output keyboard.
+local function keys_left_down()
+	local down = EvdevReader.pressed_keys(out_slot, 767) or {}
+	local codes = {}
+	for code in pairs(down) do codes[#codes + 1] = code end
+	table.sort(codes)
+	return codes
+end
+
+local function expect_trail(label, got_trail, expected)
+	print(string.format("  %s: %s", label, got_trail))
+	if got_trail:find(expected, 1, true) then
+		print("  ok   " .. label)
+	else
+		failures[#failures + 1] = string.format("%s: expected %q in %q", label, expected, got_trail)
+	end
+end
+
+-- CapsLock held with A: Ctrl+A, and the lock itself never reaches the desktop.
+press(KEY_CAPSLOCK, 0.4, function() press(KEY_OF.a, 0.05) end)
+local _, caps_hold = read_output(1)
+expect_trail("CapsLock held + A is Ctrl+A", caps_hold, "29↓ 30↓ 30↑ 29↑")
+if caps_hold:find("58", 1, true) then failures[#failures + 1] = "CapsLock reached the desktop" end
+
+-- CapsLock tapped after a trigger: a real Enter, which ends the hotstring.
+type_text("adn")
+press(KEY_CAPSLOCK, 0.1)
+local caps_text, caps_tap = read_output(2)
+expect_trail("CapsLock tapped is Enter", caps_tap, "28↓ 28↑")
+if not caps_text:find("ADN", 1, true) then
+	failures[#failures + 1] = string.format("the Enter from CapsLock did not end \"adn\" (%q)", caps_text)
+end
+
+-- Left Alt held with J: the navigation layer's Ctrl+Left, and no Alt at all.
+press(KEY_LEFTALT, 0.4, function() press(KEY_OF.j, 0.05) end)
+local _, layer = read_output(1)
+expect_trail("left Alt held + J is Ctrl+Left", layer, "29↓ 105↓ 105↑ 29↑")
+if layer:find("56", 1, true) then failures[#failures + 1] = "the layer key sent an Alt" end
+
+-- Shift tapped: copy, as Ctrl+C on the daemon's keyboard.
+press(KEY_LEFTSHIFT, 0.1)
+local _, shift_tap = read_output(1)
+expect_trail("Shift tapped is copy", shift_tap, "29↓ 46↓ 46↑ 29↑")
+
+-- Nothing the daemon pressed may stay down.
+local stuck = keys_left_down()
+if #stuck == 0 then
+	print("  ok   no key is left down on the daemon's keyboard")
+else
+	failures[#failures + 1] = "keys left down on the daemon's keyboard: " .. table.concat(stuck, ", ")
+end
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 5/ An AI prediction =============
 -- =========================================
 -- =========================================
 
@@ -333,11 +408,14 @@ if LLM_PORT then
 			failures[#failures + 1] = "the request did not reach /v1/chat/completions"
 		end
 		-- The offer is drawn once the reply is parsed; then Alt+1 accepts it.
+		-- Alt is Tab held, as on Windows: left Alt is the navigation layer.
 		sleep(1.5)
-		Keyboard.emit(KEY_LEFTALT, 1)
+		Keyboard.emit(KEY_TAB, 1)
+		sleep(0.05)
 		Keyboard.emit(KEY_1, 1)
 		Keyboard.emit(KEY_1, 0)
-		Keyboard.emit(KEY_LEFTALT, 0)
+		sleep(0.05)
+		Keyboard.emit(KEY_TAB, 0)
 		local ai_text, ai_trail, alt_chords = read_output(3)
 		print(string.format("  after Alt+1 the desktop received %q", ai_text))
 		print("  key events: " .. ai_trail)

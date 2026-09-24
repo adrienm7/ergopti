@@ -260,7 +260,6 @@ const CHECKS = [
 	{ name: 'action picker bridge (shared frontend ↔ both hosts)', cmd: 'node', args: ['tools/test/test-action-picker-bridge.cjs'], repro: 'node tools/test/test-action-picker-bridge.cjs' },
 	{ name: 'file-path headers (convention 3, every source file names itself)', cmd: 'node', args: ['tools/lint/audit-file-headers.cjs'], repro: 'node tools/lint/audit-file-headers.cjs' },
 	{ name: 'window titles (Gui/windowTitle carry the "ErgoptiPlus" prefix)', cmd: 'node', args: ['tools/lint/audit-gui-titles.cjs'], repro: 'node tools/lint/audit-gui-titles.cjs' },
-	{ name: 'kanata defalias parity (kanata.kbd timeouts match defaults.toml + golden corpus)', cmd: 'node', args: ['tools/test/test-kanata-defalias-parity.cjs'], repro: 'node tools/test/test-kanata-defalias-parity.cjs' },
 	{ name: 'updater constants single source (owner/repo/timing literals match defaults.json)', cmd: 'node', args: ['tools/test/test-updater-constants-single-source.cjs'], repro: 'node tools/test/test-updater-constants-single-source.cjs' },
 	{ name: 'name parity (text_utils + action_picker + manifest_menu symmetric across drivers)', cmd: 'node', args: ['tools/test/test-name-parity.cjs'], repro: 'node tools/test/test-name-parity.cjs' },
 	{ name: 'git-mv resilience (every path pin in the three suites resolves — macOS + Linux files, AHK dirs)', cmd: 'node', args: ['tools/test/test-git-mv-resilience.cjs'], repro: 'node tools/test/test-git-mv-resilience.cjs' },

@@ -77,9 +77,8 @@ end
 --- Anchors a path to the working directory when it is relative.
 ---
 --- A relative root is not a local inconvenience: every path built from it is
---- handed to OTHER processes — the tray icon to the panel, pages to WebKit, the
---- config to kanata — and each of those resolves it against its own working
---- directory. Launched from a checkout (`luajit ergopti_hotstrings.lua`, a
+--- handed to OTHER processes — the tray icon to the panel, pages to WebKit —
+--- and each of those resolves it against its own working directory. Launched from a checkout (`luajit ergopti_hotstrings.lua`, a
 --- relative package.path), the tray announced "./../_shared/assets/…" and the
 --- panel, running elsewhere, drew nothing.
 --- @param path string

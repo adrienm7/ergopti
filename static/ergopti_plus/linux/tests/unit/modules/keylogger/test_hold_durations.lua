@@ -16,9 +16,9 @@
 --- that was empty.
 ---
 --- WHY THE TAP/HOLD SPLIT CAN DECLINE TO ANSWER:
---- The threshold is read from the tap-hold configuration the remap daemon
---- actually runs, so this driver calls something a hold exactly when kanata
---- does. When the keys disagree, or nothing can be read, there IS no single
+--- The threshold is read from the tap-hold configuration the tap-hold engine
+--- actually runs, so this driver calls something a hold exactly when the
+--- engine does. When the keys disagree, or nothing can be read, there IS no single
 --- answer — and the split is skipped rather than made on a number nobody chose.
 --- The duration, the count and the maximum need no threshold and are recorded
 --- either way.

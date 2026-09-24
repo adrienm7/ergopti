@@ -1351,8 +1351,8 @@ jobs:
   # ─────────────────────────────────────────────────
   # install-linux-distros runs --no-deps on purpose, and nothing ran the
   # installer the way the README tells a user to: with its dependencies. That
-  # path is where the first-run failures lived — a kanata needing glibc 2.39
-  # aborting the whole install on Ubuntu 22.04 and Debian 12, the tray library
+  # path is where the first-run failures lived — a remap binary needing glibc
+  # 2.39 aborting the whole install on Ubuntu 22.04 and Debian 12, the tray library
   # never installed at all. tests/distro/e2e_install.sh runs install.sh as an
   # unprivileged sudo user against each distribution's real archives, then
   # checks the INSTALLED tree: the launcher, every FFI library, WebKit through
@@ -1838,8 +1838,8 @@ jobs:
           path: pkg
 
       - name: Install it the way a user would
-        # --no-install-recommends deliberately: the Recommends list names kanata
-        # and libayatana-appindicator3-1 among others, which are optional at
+        # --no-install-recommends deliberately: the Recommends list names
+        # libayatana-appindicator3-1 among others, which are optional at
         # runtime and not all in the Ubuntu archive. What is under test is that
         # the Depends resolve and that DEBIAN/postinst — never once executed
         # before this job existed — runs to completion, since apt fails the
@@ -2194,7 +2194,7 @@ jobs:
           echo "LINUX_BUNDLE_ASSET=$bundle_asset" >> "$GITHUB_ENV"
           bundle_path="$RUNNER_TEMP/$bundle_asset"
           tar -czf "$bundle_path" \
-              -C build/linux linux _shared bin install.sh kanata.kbd
+              -C build/linux linux _shared bin install.sh
           (cd "$RUNNER_TEMP" && sha256sum "$bundle_asset" > "$bundle_asset.sha256")
           (cd "$RUNNER_TEMP" && sha256sum --check "$bundle_asset.sha256")
           tar -tzf "$bundle_path" | wc -l
@@ -2834,7 +2834,7 @@ jobs:
         run: |
           set -euo pipefail
           bash tools/build/write_build_stamp.sh verify build/linux/_shared
-          tar -czf "build/linux/$LINUX_BUNDLE_ASSET" -C build/linux linux _shared bin install.sh kanata.kbd
+          tar -czf "build/linux/$LINUX_BUNDLE_ASSET" -C build/linux linux _shared bin install.sh
           (cd build/linux && sha256sum "$LINUX_BUNDLE_ASSET" > "$LINUX_BUNDLE_ASSET.sha256")
           (cd build/linux && sha256sum --check "$LINUX_BUNDLE_ASSET.sha256")
           echo "Bundle contents:"
@@ -2914,15 +2914,10 @@ jobs:
         with:
           name: assets-linux
           retention-days: 1
-          # kanata.kbd is attached because the release notes have always linked
-          # it and nothing ever uploaded it: every published release carried a
-          # 404, and the site's Linux button — which looks the asset up by exact
-          # name — rendered as href="#".
           path: |
             build/linux/xkb/Ergopti_xkb.zip
             build/linux/${{ env.LINUX_BUNDLE_ASSET }}
             build/linux/${{ env.LINUX_BUNDLE_ASSET }}.sha256
-            build/linux/kanata.kbd
             build/linux/ErgoptiPlus-linux-amd64.deb
             build/linux/ErgoptiPlus-linux-noarch.rpm
             build/linux/ErgoptiPlus-linux-x86_64.AppImage
@@ -3116,7 +3111,6 @@ jobs:
           | Windows | [Ergopti_windows.exe](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Ergopti_windows.exe) | Run as Administrator, log out and back in, then select the layout in Settings → Time & Language → Language & region. |
           | macOS | [Ergopti_macOS.zip](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Ergopti_macOS.zip) | Unzip, copy the \`.bundle\` folder to \`/Library/Keyboard Layouts/\`, log out and back in, then add it in System Settings → Keyboard → Input Sources. |
           | Linux | [Ergopti_xkb.zip](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Ergopti_xkb.zip) | Follow the [XKB installation guide](https://github.com/${GITHUB_REPOSITORY}/tree/main/static/ergopti/linux/xkb_installation). Includes standard, ANSI, plus and plus-ANSI variants. |
-          | Kanata users | [kanata.kbd](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/kanata.kbd) | Use this configuration with an existing Kanata installation instead of a native layout. |
 
           ### Ergopti Plus — application with advanced typing tools
 

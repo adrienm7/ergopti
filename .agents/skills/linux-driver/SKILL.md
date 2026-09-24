@@ -1,6 +1,6 @@
 ---
 name: linux-driver
-description: Apply the Linux driver's LuaJIT, evdev, ydotool, and kanata invariants. Use when writing, editing, or reviewing the Linux driver.
+description: Apply the Linux driver's LuaJIT, evdev, ydotool, and tap-hold engine invariants. Use when writing, editing, or reviewing the Linux driver.
 ---
 
 # Linux driver foot-guns
@@ -91,22 +91,36 @@ runner cannot answer.
   is welcome, re-deriving quoting at a new site is not.
 - **The race test's apostrophe hole.** It has a case named "types an apostrophe
   like any other character".
-- **kanata's device selection.** It takes neither `--device` nor
-  `--auto-detect` — no such flag exists. The generated config names the devices
-  to keep away from, and `device_finder` drops `/devices/virtual/` so the daemon
-  cannot read its own uinput device back.
-- **kanata double-start.** `is_running()` asks the system, `owns_process()`
-  asks whether this daemon spawned it, and only the second may be killed.
+- **kanata is gone (2026-09-24).** The tap-holds and the navigation layer
+  used to run in kanata, which needed a newer glibc than Debian 12 and Ubuntu
+  22.04 ship, was never started by the daemon, and broke its whole config on
+  the first free-text action. Its generator, golden file, `kanata.kbd`, the
+  kanata submenu and the parity gate are deleted. `device_finder` no longer
+  prefers a remap daemon's output; it still drops `/devices/virtual/` so the
+  daemon cannot read its own uinput device back.
 
-## kanata: never hand-edit the defalias block
+## Tap-holds run in the daemon (`platform/remap/`)
 
-`platform/remap/manager.lua` generates it from `_shared/tap_hold/defaults.toml`
-through the shared `kanata_generator` and merges it into the static
-`kanata.kbd` template. `npm run test:kanata-defalias-parity` pins every
-`tap-hold-press` timeout to `round(time_activation_seconds * 1000)` and the
-committed template to a golden file. Change the TOML and regenerate; the gate
-catches drift in either direction.
-
-A user's `tap_hold.toml` MERGES with the shared defaults key by key and field by
-field. It used to replace them wholesale, which meant a file naming one key
-disabled tap-hold on the rest of the keyboard.
+- **`tap_hold_engine.lua`** is pure: evdev events in, events out, with the
+  Windows semantics (hold taken at key-down; a tap only within the key's
+  threshold, no sooner than the minimum tap duration, with no other key,
+  click or wheel in between). Keep it free of I/O so it stays testable.
+- **`tap_hold_loader.lua`** lays the user's `tap_hold.toml` over
+  `_shared/tap_hold/defaults.toml` key by key and field by field (it used to
+  replace them wholesale, which disabled every key the file did not name).
+  A hold modifier drops the default layer and the reverse; `tap_action = ""`
+  is the native key and `"none"` swallows it; `inherit_defaults = false`
+  starts from no keys; a malformed user file is reported, never half-applied.
+- **`tap_hold_writer.lua`** writes only the keys the user changed, through the
+  shared TOML codec, via temp file then rename, and refuses to overwrite a file
+  that does not parse. Then it reloads the manager.
+- **`tap_hold_manager.lua`** is the single owner of "is a tap-hold active":
+  the feature switch, the file's `enabled` flag and the daemon's pause meet
+  in one place. It installs the engine only through
+  `keyboard_hook.set_remapper()`, which releases everything the previous
+  engine held before swapping — so switching off, pausing, reloading or
+  stopping while CapsLock is down cannot leave Ctrl pressed. Never hand the
+  hook an engine any other way.
+- **`legacy_kanata.lua`** retires, at boot, the kanata unit an earlier install
+  wrote (matched by its exact `Description=`); `install.sh` does the same. A
+  kanata unit the user set up is theirs and is left alone.

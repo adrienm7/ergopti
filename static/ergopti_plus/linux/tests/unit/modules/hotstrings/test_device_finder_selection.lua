@@ -15,11 +15,9 @@
 --- again. Nothing could catch that, because the module read /proc directly and
 --- exposed no seam, so there was no way to hand it a device list at all.
 ---
---- The second half is the remap daemon. Its output device carries POST-remap
---- keycodes — the codes the application actually receives — and reading anything
---- else means resolving characters the user never typed. It is itself a virtual
---- device, so a blanket "skip virtual" rule would drop it: the preference has to
---- be checked before the exclusion, and these tests pin that order.
+--- A remap daemon's output (kanata's, which earlier installs ran) used to win
+--- outright. The tap-holds now run in this daemon on the physical keyboard, so
+--- that output is one more uinput device and is excluded like any injector.
 ---
 --- The fixtures are real /proc/bus/input/devices syntax, including the `S: Sysfs=`
 --- line the parser used to discard. That line is the kernel's own answer to "is
@@ -124,31 +122,18 @@ end
 -- =================================================================
 -- =================================================================
 
-helpers.describe("device_finder: the remap output device is chosen by name", function()
+helpers.describe("device_finder: a remap daemon's output is not read", function()
 
-	helpers.it("prefers it over the physical keyboard, because its codes are post-remap", function()
+	helpers.it("takes the physical keyboard, not kanata's virtual output", function()
 		local path, reason = select_from(PHYSICAL_KEYBOARD .. REMAP_OUTPUT)
-		helpers.assert_eq(path, "/dev/input/event20",
-			"the remap daemon's output carries the keycodes the application receives; "
-				.. "grabbing the physical device resolves characters the user never typed")
-		helpers.assert_eq(reason, "remap_output",
-			"the choice must be reported as a rule, not as the ranking fallback")
+		helpers.assert_eq(path, "/dev/input/event3",
+			"the tap-holds run on the physical keyboard; the remap output is an injector")
+		helpers.assert_eq(reason, "named_keyboard")
 	end)
 
-	helpers.it("finds it even when it enumerates after every other device", function()
-		local path = select_from(POWER_BUTTON .. PHYSICAL_KEYBOARD .. MOUSE .. REMAP_OUTPUT)
-		helpers.assert_eq(path, "/dev/input/event20",
-			"enumeration order must not decide which stream the engine reads")
-	end)
-
-	helpers.it("is not dropped by the virtual-device exclusion it also matches", function()
-		-- The remap output IS a uinput device, registered under /devices/virtual/
-		-- like our own injector. If the exclusion ran first it would be skipped and
-		-- the daemon would silently fall back to pre-remap keycodes.
-		local path, reason = select_from(REMAP_OUTPUT)
-		helpers.assert_eq(path, "/dev/input/event20",
-			"the name preference must be evaluated before the synthetic-device exclusion")
-		helpers.assert_eq(reason, "remap_output", "and it must be the rule that reports the choice")
+	helpers.it("finds no keyboard in a remap output alone", function()
+		local path = select_from(REMAP_OUTPUT)
+		helpers.assert_nil(path, "a virtual device is never the keyboard")
 	end)
 
 end)
@@ -227,15 +212,6 @@ helpers.describe("device_finder: ranking when no remap daemon is running", funct
 		helpers.assert_eq(reason, "named_keyboards")
 	end)
 
-	helpers.it("uses only the consolidated remap output when it is healthy enough to enumerate", function()
-		local finder = helpers.load_module("modules.hotstrings.device_finder")
-		local paths, reason = finder.select_keyboards(
-			finder.parse_devices(PHYSICAL_KEYBOARD .. LAPTOP_KEYBOARD .. REMAP_OUTPUT))
-		helpers.assert_eq(paths, { "/dev/input/event20" },
-			"opening both Kanata output and its physical inputs would duplicate every key")
-		helpers.assert_eq(reason, "remap_output")
-	end)
-
 	helpers.it("prefers a keyboard-named device over another EV_KEY device", function()
 		local path, reason = select_from(POWER_BUTTON .. PHYSICAL_KEYBOARD)
 		helpers.assert_eq(path, "/dev/input/event3",
@@ -297,7 +273,7 @@ helpers.describe("device_finder: parse_devices keeps the fields the rules depend
 		helpers.assert_eq(devices[1].sysfs, "/devices/virtual/input/input20",
 			"the exclusion is built on this field; dropping it was why the rule could "
 				.. "not be written at all")
-		helpers.assert_eq(devices[1].name, "kanata", "the name drives the preference")
+		helpers.assert_eq(devices[1].name, "kanata")
 		helpers.assert_eq(devices[1].ev_mask, 0x120013, "EV= is hexadecimal")
 	end)
 

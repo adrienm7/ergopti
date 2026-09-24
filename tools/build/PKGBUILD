@@ -17,8 +17,7 @@ optdepends=('lua-luv: async I/O for timers and HTTP'
             'openssl: SHA-256 hashing for metrics privacy'
             'libayatana-appindicator: tray icon'
             'xdotool: focused-window identity on X11'
-            'wl-clipboard: clipboard fallback on Wayland'
-            'kanata: advanced keyboard remapping')
+            'wl-clipboard: clipboard fallback on Wayland')
 makedepends=('git' 'nodejs' 'lua')
 source=("ergopti::git+https://github.com/adrienm7/ergopti.git#branch=dev")
 sha256sums=('SKIP')
@@ -137,8 +136,5 @@ Post-installation steps:
 
   4. For the tray icon:
        sudo pacman -S libayatana-appindicator
-
-  5. For advanced keyboard remapping, install kanata:
-       sudo pacman -S kanata
 DOC
 }

@@ -90,11 +90,6 @@ const OPENS_SUBMENU = {
 	modifier_combos: 'modifier_combos_group',
 	accented_letters: 'accented_letters_group',
 	hotstrings_params: 'hotstrings_params_group',
-	// Linux's remap daemon, as Karabiner-Elements is macOS's. Mapped so its rows
-	// inherit `top_level/kanata`'s own linux-only visibility instead of each one
-	// having to repeat it — the same reason tap_holds_menu's children do not each
-	// carry "Windows only".
-	kanata: 'kanata_menu',
 	// The language selector. Its rows inherit `top_level/language`'s visibility,
 	// which is every driver — the DECLARATION is narrower than that, and says why
 	// in its own reason_key rather than through this map.

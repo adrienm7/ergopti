@@ -13,7 +13,7 @@ logique/config/UI :
 
 - `static/ergopti_plus/windows/` — driver AutoHotkey v2 (`ErgoptiPlus.ahk`).
 - `static/ergopti_plus/macos/` — driver Hammerspoon/Lua (`init.lua`).
-- `static/ergopti_plus/linux/` — driver Lua/kanata.
+- `static/ergopti_plus/linux/` — driver Lua/LuaJIT.
 - `static/ergopti_plus/_shared/` — code/données/UI partagés : `core/`, `data/`,
   `lua/`, `modules/`, `tap_hold/`, `tests/`, `ui/`.
 

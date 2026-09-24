@@ -50,7 +50,7 @@ const EXT = { windows: '.ahk', macos: '.lua', linux: '.lua' };
 const DECLARED_ABSENT = {
 	linux: {
 		AppLauncher: 'deleted under ADR-008 — zero production callers; the daemon launches nothing',
-		HotkeyRegistrar: 'no global keyboard-grab API in userland; kanata owns the key path',
+		HotkeyRegistrar: 'no global keyboard-grab API in userland; the evdev keyboard hook and its in-daemon tap-hold engine own the key path',
 		KeyState: 'deleted under ADR-008 — zero production callers',
 		MouseControl: 'deleted under ADR-008 — zero production callers; no gesture layer',
 		NetworkInfo: 'deleted under ADR-008 — zero production callers',

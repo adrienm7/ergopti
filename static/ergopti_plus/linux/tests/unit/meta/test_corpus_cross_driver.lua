@@ -10,7 +10,7 @@
 ---
 --- CORPORA CONSUMED:
 --- 1. hotstrings/vectors.json         — shared hotstring engine (tested)
---- 2. tap_hold/vectors.json           — SKIP (kanata handles remapping on Linux)
+--- 2. tap_hold/vectors.json           — replayed through platform/remap/tap_hold_loader
 --- 3. llm/parser_test_vectors.json    — SKIP (LLM engine not implemented on Linux)
 --- 4. prompt_builder/vectors.json     — SKIP (PromptBuilder not wired on Linux)
 --- 5. security/keylogger vectors      — partially tested (pure-logic paths)

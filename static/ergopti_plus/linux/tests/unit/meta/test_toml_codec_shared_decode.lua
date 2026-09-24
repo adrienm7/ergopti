@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Shared TOML Codec Decode Guard (Linux)
 --- DESCRIPTION:
---- Regression guard ensuring the kanata and dynamic_hotstrings managers parse
+--- Regression guard ensuring the tap-hold and dynamic_hotstrings readers parse
 --- their TOML through the shared toml_codec.decode() API rather than a bespoke
 --- mini-parser. The bug this locks down: both managers guarded their "shared
 --- codec" branch on toml_codec.parse — a function that never existed (the real
@@ -236,16 +236,19 @@ end)
 
 describe("managers delegate TOML parsing to the shared codec", function()
 
-	local kanata_src  = read_file(DRIVER_ROOT .. "/platform/remap/manager.lua")
+	local tap_hold_src = read_file(DRIVER_ROOT .. "/platform/remap/tap_hold_loader.lua")
+	local writer_src   = read_file(DRIVER_ROOT .. "/platform/remap/tap_hold_writer.lua")
 	local dynamic_src = read_file(DRIVER_ROOT .. "/modules/dynamic_hotstrings/manager.lua")
 
-	it("kanata manager calls .decode and drops the bespoke parser", function()
-		assert_true(kanata_src:find(".decode(", 1, true) ~= nil,
-			"kanata manager must call toml_codec .decode().")
-		assert_true(kanata_src:find("toml_codec.parse", 1, true) == nil,
-			"kanata manager still references the non-existent toml_codec.parse API.")
-		assert_true(kanata_src:find("parse_simple_toml", 1, true) == nil,
-			"kanata manager still defines the bespoke parse_simple_toml parser.")
+	it("the tap-hold loader and writer call .decode and keep no bespoke parser", function()
+		for _, src in ipairs({ tap_hold_src, writer_src }) do
+			assert_true(src:find(".decode(", 1, true) ~= nil,
+				"the tap-hold loader and writer must call toml_codec .decode().")
+			assert_true(src:find("toml_codec.parse", 1, true) == nil,
+				"a tap-hold module references the non-existent toml_codec.parse API.")
+			assert_true(src:find("fh:lines()", 1, true) == nil,
+				"a tap-hold module scans the file line by line instead of decoding it.")
+		end
 	end)
 
 	it("dynamic_hotstrings manager calls .decode and drops the bespoke parser", function()

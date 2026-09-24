@@ -594,7 +594,15 @@ local function main()
 	keylogger.init({})
 	BootProfiler.stage_done("keylogger")
 
-	-- 8.4) Resolve the input device.
+	-- 8.4) Resolve the input device — after retiring the kanata unit of an
+	-- earlier install, which would otherwise hold the keyboard first.
+	do
+		local ConfigPaths = require("infra.config_paths")
+		require("platform.remap.legacy_kanata").retire({
+			unit_path = ConfigPaths.config_home() .. "/systemd/user/kanata.service",
+			kbd_path = ConfigPaths.config_home() .. "/kanata/ergopti.kbd",
+		})
+	end
 	BootProfiler.stage("input device")
 	local device = opts.device
 	if not device then

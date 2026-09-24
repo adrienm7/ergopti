@@ -16,7 +16,9 @@
  *
  *   kanata   — built by Linux since it was written, ABSENT from the manifest.
  *              It is the Linux twin of `karabiner`, so the manifest described a
- *              driver with no remap menu at all.
+ *              driver with no remap menu at all. (Retired 2026-09-24: the
+ *              tap-holds moved into the daemon and Linux now shows the shared
+ *              `tap_holds` row, which section 1 pins on all three drivers.)
  *   updates  — built by Linux, absent from the manifest, and genuinely
  *              Linux-only: neither other driver has an update menu.
  *   apps     — built by Linux, and the manifest said platforms = ["hs"]. The
@@ -128,6 +130,19 @@ if (shapes.size === 1) {
 			'restriction was removed, or the projection is ignoring the platforms field — and in both ' +
 			'cases this gate is comparing nothing.'
 	);
+}
+
+// The tap-hold submenu is shared since 2026-09-24, when Linux retired kanata for
+// the in-daemon engine and its own « Kanata » submenu with it. A Linux-only
+// remap row reappearing, or tap_holds narrowing back to a subset of drivers,
+// would split the one tap-hold menu into per-driver copies again.
+for (const [driver, ids] of Object.entries(projections)) {
+	if (!ids.includes('tap_holds')) {
+		errors.push(`the manifest no longer projects the shared tap_holds row for ${driver}`);
+	}
+	if (ids.includes('kanata')) {
+		errors.push(`the manifest projects a kanata row for ${driver}; kanata was retired on 2026-09-24`);
+	}
 }
 
 
