@@ -293,4 +293,39 @@ helpers.describe("LogTransport authenticated ACK handling", function()
 			helpers.assert_eq(context.transport.status().inflight_sequence, 1)
 		end)
 	end)
+
+	helpers.it("waits out a stalled worker before calling the logger dead", function()
+		-- Measured on macOS Intel CI: a live worker silent for 1.5 s while the
+		-- onboarding webview opened at boot. Declared dead at the fourth send,
+		-- the fatal verdict stopped the app.
+		Fixture.with_fixture(function()
+			local context = new_context()
+			configure(context)
+			context.transport.enqueue("stalled", "info")
+			context.state.pump()
+			for _ = 1, 4 do
+				context.state.clock = context.state.clock + 0.51
+				context.state.pump()
+			end
+			helpers.assert_eq(#context.state.failures, 0, "five sends over 2 s are a stall, not a dead logger")
+			context:ack(1)
+			helpers.assert_eq(context.transport.status().queued, 0, "the late ACK still delivers")
+		end)
+	end)
+
+	helpers.it("calls a worker silent through the whole budget dead", function()
+		Fixture.with_fixture(function()
+			local context = new_context()
+			configure(context)
+			context.transport.enqueue("unanswered", "info")
+			context.state.pump()
+			for _ = 1, 10 do
+				context.state.clock = context.state.clock + 0.51
+				context.state.pump()
+			end
+			helpers.assert_eq(#context.state.failures, 1)
+			helpers.assert_contains(context.state.failures[1], "did not ACK retained sequence 1")
+			helpers.assert_eq(context.transport.status().queued, 1, "silence never dequeues the head")
+		end)
+	end)
 end)
