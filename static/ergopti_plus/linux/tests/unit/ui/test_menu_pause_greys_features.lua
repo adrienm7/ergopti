@@ -69,7 +69,7 @@ local FEATURE_KEYS = {
 
 -- The rows that must stay usable while paused.
 local LIVE_KEYS = {
-	"menu.global.title",
+	"menu.configuration.title",
 	"menu.debug.title",
 }
 

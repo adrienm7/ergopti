@@ -7,9 +7,9 @@
 ; The language packs were one bare « Français (n) » row among the neutral
 ; categories, which users read as one more category and overlooked: they now
 ; sit under their own header, behind a separator, and carry their locale's flag
-; (an icon here, since Win32 menus cannot render flag emoji). The cleanup of
-; unused settings edits the configuration file while the rows above it switch
-; features, so a separator now sets it apart.
+; (an icon here, since Win32 menus cannot render flag emoji). The Configuration
+; submenu draws the two rows that rewrite the configuration, a separator, then
+; the two that open a window.
 ; ============================================================================
 
 ; Index of the first manifest entry of ``Key`` whose ``Field`` equals ``Value``.
@@ -48,11 +48,23 @@ _MLG_LanguageRowCarriesItsFlag() {
 Test("menu layout: each hotstring language row carries its locale's flag (menu-languages-flag)",
 	_MLG_LanguageRowCarriesItsFlag)
 
-_MLG_CleanupIsSetApart() {
-	Entries := _MM_GetManifestRoot()["global_actions"]
-	At := _MLG_IndexOf(Entries, "id", "clean_unused_keys")
-	AssertTrue(At > 1, "global_actions must declare the cleanup after the other actions")
-	AssertEqual("---", Entries[At - 1]["type"], "a separator must precede the unused-settings cleanup")
+; The Configuration submenu: the two rows that rewrite the configuration, a
+; separator, then the two that open a window — and this driver registers a
+; command for each of the four.
+_MLG_ConfigurationRowsInOrder() {
+	Entries := _MM_GetManifestRoot()["configuration_menu"]
+	Order := ""
+	for _, Entry in Entries
+		Order .= (Order == "" ? "" : ", ") . (Entry.Get("type", "") == "---" ? "---" : Entry["id"])
+	AssertEqual("restore_recommended, clean_unused_keys, ---, config_folder, setup_wizard", Order,
+		"configuration_menu must declare its rows in this order")
+	Body := _DriverFuncBody("_MI_BuildConfigurationMenu")
+	for _, Pair in [["restore_recommended", "ReloadWithDefaultConfig"],
+			["clean_unused_keys", "ShowUnusedConfigKeysCleanup"],
+			["config_folder", "FilePathsEditor"],
+			["setup_wizard", "Onboarding_ShowFromMenu"]]
+		AssertTrue(RegExMatch(Body, '"' . Pair[1] . '",\s+' . Pair[2]) > 0,
+			"the Configuration menu must dispatch " . Pair[1] . " to " . Pair[2])
 }
-Test("menu layout: a separator precedes the unused-settings cleanup (menu-global-separator)",
-	_MLG_CleanupIsSetApart)
+Test("menu layout: the Configuration rows rewrite first, then open windows (menu-configuration)",
+	_MLG_ConfigurationRowsInOrder)

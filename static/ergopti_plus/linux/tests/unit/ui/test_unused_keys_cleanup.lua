@@ -218,7 +218,7 @@ local function with_execute(status, fn)
 end
 
 helpers.describe("unused keys (linux): tray wiring", function()
-	helpers.it("unused keys: the Global actions submenu offers the row and hands it the zenity dialogs", function()
+	helpers.it("unused keys: the Configuration submenu offers the row and hands it the zenity dialogs", function()
 		local previous = package.loaded["ui.menu.unused_keys_cleanup"]
 		local captured
 		package.loaded["ui.menu.unused_keys_cleanup"] = {
@@ -229,7 +229,7 @@ helpers.describe("unused keys (linux): tray wiring", function()
 			local i18n = require("infra.i18n")
 			local label = i18n.get("menu.global.clean_unused_keys")
 			local row = find_row(mb.build({ _version = "test", on_quit = function() end }), label)
-			helpers.assert_true(row ~= nil, "the cleanup row must be in Global actions on Linux")
+			helpers.assert_true(row ~= nil, "the cleanup row must be in Configuration on Linux")
 			local fn = row.fn or row.action
 			helpers.assert_eq(type(fn), "function")
 			fn()

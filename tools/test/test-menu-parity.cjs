@@ -79,7 +79,7 @@ const SEPARATOR = '---';
 // be a rule with four exceptions — and a missing entry here would silently make
 // a whole submenu unreachable, which is one of the things being checked.
 const OPENS_SUBMENU = {
-	global_actions: 'global_actions',
+	configuration: 'configuration_menu',
 	debug: 'debug_menu',
 	shortcuts: 'shortcuts_menu',
 	metrics: 'metrics_menu',
@@ -538,7 +538,10 @@ if (unreasoned.length < UNREASONED_BASELINE) {
 // `elseif` — so the declaration decided the order and this driver decided
 // everything else. Linux has rendered it since 2026-08-06 and Windows since this
 // morning; macOS was the last of the three to still spell it out.
-const RENDERED_THROUGH_SHARED = { hs: 13, linux: 14 };
+// linux 14 → 13, and no loss: its Applications submenu is gone. It held one
+// row, the config folder, which moved to the Configuration submenu the three
+// drivers render (global_actions became configuration_menu on all of them).
+const RENDERED_THROUGH_SHARED = { hs: 13, linux: 13 };
 
 const DRIVER_ROOTS = { hs: path.join(SP, 'macos'), linux: path.join(SP, 'linux') };
 

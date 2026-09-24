@@ -117,10 +117,8 @@ _MI_TopLevelBuilders() {
 		"shortcuts",       _MI_StageShortcuts,
 		"tap_holds",       _MI_StageTapHolds,
 		"gestures",        _MI_StageGestures,
-		"global_actions",  _MI_StageGlobalActions,
+		"configuration",   _MI_StageConfiguration,
 		"language",        _MI_StageLanguage,
-		"config_folder",   _MI_StageConfigFolder,
-		"setup_wizard",    _MI_StageSetupWizard,
 		"about",           _MI_StageAbout,
 		"suspend",         _MI_StageSuspend,
 		"reload",          _MI_StageReload,
@@ -333,8 +331,8 @@ _MI_StageGestures() {
 }
 
 
-_MI_StageGlobalActions() {
-	TrayMenuStage_Add(t("menu.global.title"), _MI_BuildGlobalActionsMenu())
+_MI_StageConfiguration() {
+	TrayMenuStage_Add(t("menu.configuration.title"), _MI_BuildConfigurationMenu())
 }
 
 
@@ -354,16 +352,6 @@ _MI_StageLanguage() {
 		TrayMenuStage_Disable(t("menu.global.language"))
 		_LangMenuBuildPending := true
 	}
-}
-
-
-_MI_StageConfigFolder() {
-	TrayMenuStage_AddAction(t("menu.global.config_folder"), FilePathsEditor)
-}
-
-
-_MI_StageSetupWizard() {
-	TrayMenuStage_AddAction(t("menu.global.setup_wizard"), Onboarding_ShowFromMenu)
 }
 
 
@@ -404,22 +392,23 @@ _MI_StageDebug() {
 }
 
 
-; Builds the "Actions globales" submenu from the manifest's global_actions array.
+; Builds the Configuration submenu from the manifest's configuration_menu array.
 ;
-; Every row there is a `command`, so the renderer builds each label and each
-; separator from the declaration and this driver supplies only what a click does.
-; It used to iterate the same array and then write the label for each id by hand,
-; in a chain of `else if` — the manifest decided the ORDER and this file decided
-; everything else. Linux has rendered this same array for weeks.
-_MI_BuildGlobalActionsMenu() {
+; Every row there is a `command`, so the renderer builds each label and the
+; separator from the declaration and this driver supplies only what a click
+; does. It replaced « Actions globales » and the two top-level rows that opened
+; the folders editor and the setup wizard.
+_MI_BuildConfigurationMenu() {
 	Commands := Map(
-		"reset_defaults", ReloadWithDefaultConfig,
-		"clean_unused_keys", ShowUnusedConfigKeysCleanup,
-		"uninstall", ShowUninstallErgopti,
-		"start_at_login", ToggleStartAtLogin
+		"restore_recommended", ReloadWithDefaultConfig,
+		"clean_unused_keys",   ShowUnusedConfigKeysCleanup,
+		"config_folder",       FilePathsEditor,
+		"setup_wizard",        Onboarding_ShowFromMenu,
+		"uninstall",           ShowUninstallErgopti,
+		"start_at_login",      ToggleStartAtLogin
 	)
 	StateGetters := Map("start_at_login_enabled", StartAtLoginEnabled)
-	return MenuRenderer_Build("global_actions", "Global", "", "", "", Commands, StateGetters)
+	return MenuRenderer_Build("configuration_menu", "Configuration", "", "", "", Commands, StateGetters)
 }
 
 

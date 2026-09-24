@@ -20,8 +20,8 @@
 --- 1. Hierarchical items: items with a `menu` sub-table are rendered as
 ---    submenus, which the tray backend renders as real nested GtkMenus.
 --- 2. All callbacks are closures over the daemon's state — zero global coupling.
---- 3. New sections (shortcuts, tap-holds, gestures, apps, global_actions, language,
----    config, debug) are added as documented stubs so the menu shape is correct.
+--- 3. New sections (shortcuts, tap-holds, gestures, configuration, language,
+---    debug) are added as documented stubs so the menu shape is correct.
 --- ==============================================================================
 
 local M = {}
@@ -338,9 +338,9 @@ local function _build_header(ctx)
 end
 
 -- The top-level rows a pause greys: every feature the pause switches off. The
--- tail (updates, global actions, language, config folder, setup wizard, about,
--- reload, quit, debug) stays live, as on macOS — it is how the user inspects,
--- resumes or leaves a paused script.
+-- tail (updates, configuration, language, about, reload, quit, debug) stays
+-- live, as on macOS — it is how the user inspects, resumes or leaves a paused
+-- script.
 local PAUSE_GREYED_ROWS = {
 	keyboard_layout = true,
 	hotstrings      = true,
@@ -349,7 +349,6 @@ local PAUSE_GREYED_ROWS = {
 	shortcuts       = true,
 	tap_holds       = true,
 	gestures        = true,
-	apps            = true,
 }
 
 --- Greys one feature row for a pause, and strips what would let it act.
@@ -3134,38 +3133,17 @@ local function _build_gestures(ctx)
 	return { label = i18n_safe("menu.gestures.title"), checked = gestures_on, submenu = menu }
 end
 
---- Builds the apps submenu.
+--- Builds the Configuration submenu.
 ---
---- Linux has no per-application profile model yet. The only honest row is the
---- config-folder shortcut; opening the generic hotstrings window under a
---- per-application label obscures that no application identity is persisted.
-local function _build_apps(ctx)
-	local render_ctx = {}
-	for key, value in pairs(ctx) do render_ctx[key] = value end
-	render_ctx.commands = {
-		-- The label was a hardcoded French string until 2026-08-03, so every
-		-- non-French user read one French row in an otherwise translated menu. The
-		-- key existed all along and is the one the other two drivers use.
-		["apps_config_folder"] = function()
-			if type(ctx.on_open_config) ~= "function" then
-				Logger.error(LOG, "ctx.on_open_config is absent — the row does nothing.")
-				return
-			end
-			ctx.on_open_config()
-		end,
-	}
-
-	local rows = ManifestMenu
-		and ManifestMenu.build("apps_menu", "Apps", nil, nil, render_ctx)
-		or {}
-	return { label = i18n_safe("menu.apps.title"), submenu = rows }
-end
-
---- Builds the global actions submenu.
-local function _build_global_actions(ctx)
+--- Everything about the configuration itself, never one feature: the
+--- recommended values, the file, the folders editor and the setup wizard. It
+--- replaced « Actions globales » and the two top-level rows that opened the
+--- folder and the wizard, and the Applications submenu whose only row was
+--- that same folder.
+local function _build_configuration(ctx)
 	if not ManifestMenu then
-		Logger.warn(LOG, "Manifest renderer unavailable — the global actions are not rendered.")
-		return { label = i18n_safe("menu.global.title"), submenu = {} }
+		Logger.warn(LOG, "Manifest renderer unavailable — the configuration rows are not rendered.")
+		return { label = i18n_safe("menu.configuration.title"), submenu = {} }
 	end
 
 	--- Calls one of the context's optional callbacks, saying so when it is absent.
@@ -3174,20 +3152,20 @@ local function _build_global_actions(ctx)
 	local function call_ctx(name)
 		return function()
 			if type(ctx[name]) ~= "function" then
-				Logger.error(LOG, "Global actions: ctx.%s is absent — the row does nothing.", name)
+				Logger.error(LOG, "Configuration: ctx.%s is absent — the row does nothing.", name)
 				return
 			end
 			ctx[name]()
 		end
 	end
 
-	-- The three rows are `type = "command"` in the manifest, and so is the
-	-- separator before the reset: labels, order and spacing declared once, with
-	-- this driver supplying only what each row does.
+	-- Every row is `type = "command"` in the manifest, and so is the separator
+	-- between them: labels, order and spacing declared once, with this driver
+	-- supplying only what each row does.
 	local render_ctx = {}
 	for key, value in pairs(ctx) do render_ctx[key] = value end
 	render_ctx.commands = {
-		["reset_defaults"] = call_ctx("on_reset_defaults"),
+		["restore_recommended"] = call_ctx("on_reset_defaults"),
 		["start_at_login"] = function()
 			if not require("ui.menu.start_at_login").toggle() then
 				show_error(i18n_safe("dialog.start_at_login.failed"), i18n_safe("menu.global.start_at_login"))
@@ -3227,6 +3205,17 @@ local function _build_global_actions(ctx)
 				fail = function(title, text) show_error(zenity_plain(text), title) end,
 			} })
 		end,
+		-- The folders editor, as on the other two drivers. This row used to open
+		-- the hotstrings folder in the file manager, a second meaning for one
+		-- label.
+		["config_folder"] = function()
+			if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
+				Logger.error(LOG, "No webview manager — the folders editor cannot open.")
+				return
+			end
+			ctx.webview.show("paths_editor")
+		end,
+		["setup_wizard"] = call_ctx("on_show_setup_wizard"),
 	}
 
 	render_ctx.state_getters = {}
@@ -3235,8 +3224,8 @@ local function _build_global_actions(ctx)
 		return require("ui.menu.start_at_login").enabled() == true
 	end
 	return {
-		label   = i18n_safe("menu.global.title"),
-		submenu = ManifestMenu.build("global_actions", "Global", nil, nil, render_ctx),
+		label   = i18n_safe("menu.configuration.title"),
+		submenu = ManifestMenu.build("configuration_menu", "Configuration", nil, nil, render_ctx),
 	}
 end
 
@@ -3282,31 +3271,6 @@ local function _build_language(ctx)
 		})
 		or {}
 	return { label = i18n_safe("menu.global.language"), submenu = rows }
-end
-
---- Builds the config folder launcher.
-local function _build_config_folder(ctx)
-	return {
-		label = i18n_safe("menu.global.config_folder"),
-		action = function()
-			-- Through the resolver: this concatenated a possibly-nil HOME, which
-			-- throws and takes the whole menu build with it.
-			local ConfigPaths = require("infra.config_paths")
-			local dir = ConfigPaths.config("hotstrings")
-			Logger.info(LOG, "Opening config folder: %s", dir)
-			if ctx.on_open_config then ctx.on_open_config(dir) end
-		end,
-	}
-end
-
---- Builds the setup wizard launcher (opens the WebKitGTK onboarding window).
-local function _build_setup_wizard(ctx)
-	return {
-		label = i18n_safe("menu.global.setup_wizard"),
-		action = function()
-			if ctx.on_show_setup_wizard then ctx.on_show_setup_wizard() end
-		end,
-	}
 end
 
 --- Builds the updater submenu (GitHub releases, channel switching, download).
@@ -3658,12 +3622,9 @@ function M.build(ctx)
 		["shortcuts"]       = _build_shortcuts,
 		["tap_holds"]       = _build_tap_holds,
 		["gestures"]        = _build_gestures,
-		["apps"]            = _build_apps,
 		["updates"]         = _build_updates,
-		["global_actions"]  = _build_global_actions,
+		["configuration"]   = _build_configuration,
 		["language"]        = _build_language,
-		["config_folder"]   = _build_config_folder,
-		["setup_wizard"]    = _build_setup_wizard,
 		["about"]           = _build_about,
 		["reload"]          = _build_reload,
 		["quit"]            = _build_quit,

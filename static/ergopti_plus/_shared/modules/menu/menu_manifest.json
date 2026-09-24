@@ -98,8 +98,7 @@
 		{
 			"id": "apps",
 			"platforms": [
-				"hs",
-				"linux"
+				"hs"
 			],
 			"reason_key": "platform_reason.tray_top_level_rows_are_each_drivers"
 		},
@@ -114,16 +113,10 @@
 			"id": "---"
 		},
 		{
-			"id": "global_actions"
+			"id": "configuration"
 		},
 		{
 			"id": "language"
-		},
-		{
-			"id": "config_folder"
-		},
-		{
-			"id": "setup_wizard"
 		},
 		{
 			"id": "about"
@@ -322,17 +315,7 @@
 			"id": "apps_installed",
 			"platforms": [
 				"hs"
-			],
-			"reason_key": "platform_reason.apps_menu_holds_what_each_platform_offers"
-		},
-		{
-			"type": "command",
-			"id": "apps_config_folder",
-			"i18n": "menu.global.config_folder",
-			"platforms": [
-				"linux"
-			],
-			"reason_key": "platform_reason.apps_menu_holds_what_each_platform_offers"
+			]
 		}
 	],
 	"language_menu": [
@@ -350,19 +333,29 @@
 			]
 		}
 	],
-	"global_actions": [
+	"configuration_menu": [
 		{
 			"type": "command",
-			"id": "reset_defaults",
-			"i18n": "menu.global.reset_defaults"
+			"id": "restore_recommended",
+			"i18n": "common.restore_recommended"
+		},
+		{
+			"type": "command",
+			"id": "clean_unused_keys",
+			"i18n": "menu.global.clean_unused_keys"
 		},
 		{
 			"type": "---"
 		},
 		{
 			"type": "command",
-			"id": "clean_unused_keys",
-			"i18n": "menu.global.clean_unused_keys"
+			"id": "config_folder",
+			"i18n": "menu.global.config_folder"
+		},
+		{
+			"type": "command",
+			"id": "setup_wizard",
+			"i18n": "menu.global.setup_wizard"
 		},
 		{
 			"type": "check",
