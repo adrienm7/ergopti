@@ -767,8 +767,10 @@ platform = "ahk,hs"
 
 [sg_actions.open_emoji_picker]
 # Windows opens its panel with Win+., macOS its Character Viewer (Ctrl+Cmd+Space,
-# run by the shortcut layer's mouse owner). Linux has no desktop-wide emoji
-# picker: GNOME's lives inside GTK text fields, KDE's is a Plasma shortcut.
+# run by the shortcut layer's mouse owner). Linux is not implemented, not
+# impossible: its desktops share no emoji chooser (GNOME's opens inside GTK text
+# fields, KDE ships the plasma-emojier application), so it needs a per-desktop
+# cascade.
 platform = "hs,ahk"
 emit_ahk = "#."
 
@@ -777,14 +779,16 @@ platform = "ahk"
 
 [sg_actions.activity_simulation]
 # One keep-awake session per machine, stopped by the first physical input on
-# both drivers. Linux has no input-simulation keep-awake; an idle inhibitor
-# would be a different feature.
+# both drivers. Linux is not implemented, not impossible: the driver's own
+# uinput device could nudge the pointer the same way (an idle inhibitor would
+# be a different feature).
 platform = "ahk,hs"
 
 [sg_actions.display_mirror_toggle]
-# macOS mirrors through the CoreGraphics display-configuration API. Windows
-# projection (Win+P) and Linux (xrandr, kscreen-doctor, per-compositor tools)
-# have no single call that toggles mirroring back and forth.
+# macOS mirrors through the CoreGraphics display-configuration API. Windows and
+# Linux are not implemented, not impossible: neither has one call that toggles
+# mirroring, so the current topology has to be read first (QueryDisplayConfig
+# on Windows; xrandr or kscreen-doctor, depending on the session, on Linux).
 platform = "hs"
 
 [sg_actions.surround_parens]
