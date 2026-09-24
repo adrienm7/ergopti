@@ -34,7 +34,9 @@ const APPROVED = {
 	'menu.about.changelog': { fr: 'Versions', en: 'Releases' },
 	'menu.about.open_releases_page': { fr: 'Versions — GitHub', en: 'Releases — GitHub' },
 	'changelog_window.window_title': { fr: 'Versions', en: 'Releases' },
-	'updater.title_changelog': { fr: 'ErgoptiPlus — Versions', en: 'ErgoptiPlus — Releases' }
+	'updater.title_changelog': { fr: 'ErgoptiPlus — Versions', en: 'ErgoptiPlus — Releases' },
+	// App Cloner duplicates one application at a time.
+	'menu.apps.clone_desc': { fr: 'Dupliquer une application', en: 'Duplicate an app' }
 };
 
 const errors = [];

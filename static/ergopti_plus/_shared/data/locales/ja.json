@@ -653,7 +653,7 @@
 	"menu.about.update_downloading": "Downloading…",
 	"menu.about.update_installing": "インストール中…",
 	"menu.about.update_now": "{tag} にアップデート",
-	"menu.apps.clone_desc": "インストール済みアプリを複製",
+	"menu.apps.clone_desc": "アプリを複製",
 	"menu.apps.config_per_app": "Configure hotstrings per application",
 	"menu.apps.encrypt_desc": "ファイルとフォルダーを暗号化",
 	"menu.apps.no_apps": "アプリケーションが見つかりません",
