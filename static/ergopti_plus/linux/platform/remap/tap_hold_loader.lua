@@ -75,7 +75,8 @@ end
 --- Loads the effective configuration.
 --- @param defaults_path string The shared defaults.toml.
 --- @param user_path string|nil The user's tap_hold.toml.
---- @return table { enabled = boolean, keys = { [id] = fields }, user_error = string|nil }
+--- @return table { enabled = boolean, keys = { [id] = fields }, user_error = string|nil,
+---   hold_picker = table|nil }
 function M.load(defaults_path, user_path)
 	local defaults, defaults_err = read_toml(defaults_path)
 	if not defaults then
@@ -115,7 +116,14 @@ function M.load(defaults_path, user_path)
 	end
 	for key_id, fields in pairs(keys) do keys[key_id] = validated(key_id, fields) end
 
-	return { enabled = section.enabled ~= false, keys = keys, user_error = user_err }
+	return {
+		enabled = section.enabled ~= false,
+		keys = keys,
+		user_error = user_err,
+		-- The hold picker's catalogue is the shipped one: a user file changes
+		-- what a key does, not what the tray offers.
+		hold_picker = type(defaults.tap_hold) == "table" and defaults.tap_hold.hold_picker or nil,
+	}
 end
 
 return M
