@@ -141,3 +141,55 @@ helpers.describe("healthcheck (linux): the system rows the page renders", functi
 		helpers.assert_eq(result.sections.versions.commit, "f58d15798 (build)")
 	end)
 end)
+
+helpers.describe("healthcheck (linux): the features the page lists", function()
+	--- The features section of a snapshot, as an id → enabled map.
+	--- @param state table Daemon state.
+	--- @return table
+	local function features_of(state)
+		local items = helpers.load_module("ui.healthcheck.bridge").build_snapshot(state, false).sections.features.items
+		local by_id = {}
+		for _, item in ipairs(items) do by_id[item.id] = item.enabled end
+		return by_id, #items
+	end
+
+	--- A hotstrings configuration whose named groups are on.
+	--- @param on table Set of the enabled group names.
+	--- @return table
+	local function hotstrings_config(on)
+		return {
+			get_groups = function() return { "base", "emoji", "symbols" } end,
+			is_group_enabled = function(name) return on[name] == true end,
+		}
+	end
+
+	-- The daemon runs hotstrings, shortcuts and gestures, and the page listed
+	-- none of them: a report saying "gestures off" on macOS said nothing at all
+	-- on Linux (features-parity)
+	helpers.it("lists hotstrings, shortcuts and gestures with their switches (features-parity)", function()
+		local features, count = features_of({
+			config    = hotstrings_config({ emoji = true }),
+			shortcuts = { is_enabled = function() return true end },
+			gestures  = { is_enabled = function() return false end },
+			llm       = { is_enabled = function() return false end },
+			keylogger = { is_enabled = function() return true end },
+		})
+		helpers.assert_eq(features.hotstrings, true, "one enabled group is hotstrings on")
+		helpers.assert_eq(features.shortcuts, true)
+		helpers.assert_eq(features.gestures, false)
+		helpers.assert_eq(features.llm, false)
+		helpers.assert_eq(features.metrics, true)
+		helpers.assert_true(count >= 5, "five switches at least, got " .. tostring(count))
+	end)
+
+	helpers.it("reads hotstrings as off when every group is off (features-parity)", function()
+		local features = features_of({ config = hotstrings_config({}) })
+		helpers.assert_eq(features.hotstrings, false)
+	end)
+
+	helpers.it("leaves out a feature whose module the daemon does not run (features-parity)", function()
+		local features = features_of({ config = hotstrings_config({ base = true }) })
+		helpers.assert_nil(features.shortcuts, "no shortcuts module: no row, rather than a guessed off")
+		helpers.assert_nil(features.gestures)
+	end)
+end)

@@ -260,7 +260,32 @@ local function collect_input(state)
 	return input
 end
 
---- The feature switches this driver can answer, as { id, enabled } items.
+--- Whether any hotstring group is on, as the macOS snapshot reads it; nil
+--- when the configuration cannot say.
+--- @param config table|nil The hotstrings configuration.
+--- @return boolean|nil
+local function hotstrings_enabled(config)
+	if type(config) ~= "table" or type(config.get_groups) ~= "function"
+		or type(config.is_group_enabled) ~= "function" then
+		return nil
+	end
+	for _, name in ipairs(config.get_groups() or {}) do
+		if config.is_group_enabled(name) == true then return true end
+	end
+	return false
+end
+
+--- The switch of a daemon module that exposes is_enabled(), nil without one.
+--- @param part table|nil
+--- @return boolean|nil
+local function module_enabled(part)
+	if type(part) ~= "table" or type(part.is_enabled) ~= "function" then return nil end
+	return part.is_enabled() == true
+end
+
+--- The feature switches this driver can answer, as { id, enabled } items. A
+--- module the daemon does not run has no row: a guessed "off" would read as
+--- the user's choice.
 --- @param state table Daemon state.
 --- @return table
 local function collect_features(state)
@@ -268,12 +293,13 @@ local function collect_features(state)
 	local function add(id, enabled)
 		if type(enabled) == "boolean" then items[#items + 1] = { id = id, enabled = enabled } end
 	end
+	add("hotstrings", hotstrings_enabled(state.config))
+	add("shortcuts", module_enabled(state.shortcuts))
+	add("gestures", module_enabled(state.gestures))
 	local ok_manager, Manager = pcall(require, "platform.remap.manager")
 	if ok_manager then add("tapholds", Manager.tap_holds_enabled()) end
-	if state.llm and type(state.llm.is_enabled) == "function" then add("llm", state.llm.is_enabled() == true) end
-	if state.keylogger and type(state.keylogger.is_enabled) == "function" then
-		add("metrics", state.keylogger.is_enabled() == true)
-	end
+	add("llm", module_enabled(state.llm))
+	add("metrics", module_enabled(state.keylogger))
 	return { items = items }
 end
 
@@ -604,7 +630,7 @@ end
 
 --- Handles an incoming page message.
 --- @param payload any String or table from host_bridge.js.
---- @param state table Daemon state { engine, keylogger, config, llm, layout }.
+--- @param state table Daemon state { engine, keylogger, config, llm, gestures, shortcuts, layout, … }.
 --- @param context table|nil { app_name, epoch, close_owned_window } from the webview manager.
 --- @return table|nil The answer the page receives.
 function M.on_message(payload, state, context)
