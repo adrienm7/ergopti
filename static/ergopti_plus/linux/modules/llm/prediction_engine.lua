@@ -507,10 +507,12 @@ function M.select(index)
 end
 
 --- Whether an offer is on screen: suggestions exist and the tooltip, when this
---- daemon has one, shows them.
+--- daemon has one, presents them. Its logical state, not its window's: the
+--- window maps asynchronously, and the digit must not type meanwhile. Hidden
+--- by any path (a pause, a focus change), it presents nothing.
 local function offer_visible()
 	if #_suggestions == 0 then return false end
-	if _overlay and type(_overlay.is_visible) == "function" then return _overlay.is_visible() == true end
+	if _overlay and type(_overlay.is_showing) == "function" then return _overlay.is_showing() == true end
 	return true
 end
 

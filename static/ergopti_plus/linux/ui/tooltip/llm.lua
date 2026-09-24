@@ -152,6 +152,16 @@ function M.hide()
 	_meta = {}
 end
 
+--- Whether candidates are presented: set by show(), cleared by hide().
+---
+--- The logical state, not the window's. The GTK surface maps asynchronously
+--- (and a session without a compositor may never report it mapped), so a key
+--- answered by "is the window up" would type the digit meant to accept.
+--- @return boolean
+function M.is_showing()
+	return #_candidates > 0
+end
+
 --- @return boolean
 function M.is_visible()
 	return #_candidates > 0
