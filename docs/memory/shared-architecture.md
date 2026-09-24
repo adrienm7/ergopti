@@ -50,6 +50,22 @@ keep confirmation explicit, and preserve the backup-first transaction.
 All user-facing text uses the locale system in every supported language. English
 is the canonical key set; developer logs remain English.
 
+### project-a-page-that-builds-labels-from-data-waits-for-i18n
+
+`_shared/ui/i18n.js` fills `data-i18n` attributes and stores the active locale
+in `window._i18n_strings`, but a page that builds its text from data (the layer
+editor's keys, actions and picker) has nothing to read until the locale fetch
+lands. Draw again on the `i18n:applied` DOM event i18n.js fires after every
+apply; a page drawn once at `init()` keeps raw keys on screen.
+
+### project-shared-ui-logic-is-a-classic-script
+
+`package.json` declares `"type": "module"`, so Node loads any `.js` under
+`_shared/ui/` as an ES module and a `module.exports` branch never runs. Page
+logic that Node tests need (the layer editor's `layer_model.js`) is a classic
+script defining one top-level `var`; the tests run the page's scripts in one
+`vm` context, as the browser does, and read that global from it.
+
 ### project-locale-placeholder-parity-is-not-a-defect
 
 Locale values may reorder placeholders. Validate placeholder sets and types, not
