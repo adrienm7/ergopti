@@ -457,6 +457,27 @@ local function same_source(left, right)
 		and (left.status ~= "ok" or left.content == right.content)
 end
 
+--- The top-level tables and values of the current file that Preferences does
+--- not own: [_meta] (the schema version the boot migration stamps), the expert
+--- [script] and [features] layers config_overrides reads, and any table another
+--- reader keeps here. A save carries them over unchanged; replacing the file
+--- with the owned sections alone erased them at the first menu change.
+--- @param source table Exact source classification `{ status, content? }`.
+--- @return table|nil tables `{ [name] = value }`, nil when the file is not TOML.
+--- @return string|nil detail
+local function unowned_tables(source)
+	if source.status ~= "ok" then return {} end
+	local ok, decoded = pcall(TomlCodec.decode, source.content)
+	if not ok or type(decoded) ~= "table" then
+		return nil, "the current config.toml is not valid TOML, so the tables it holds cannot be kept"
+	end
+	local out = {}
+	for name, value in pairs(decoded) do
+		if not _known_sections[name] then out[name] = value end
+	end
+	return out
+end
+
 --- Adopts a demonstrably changed, valid external source as the baseline for a
 --- later explicit save. The rejected candidate never overwrites the external
 --- winner; malformed or unreadable bytes never become overwrite authority.
@@ -635,7 +656,8 @@ end
 
 --- Save the current state to the TOML configuration file. Atomic via
 --- .tmp + rename so a crash mid-write cannot leave a half-written
---- file on disk.
+--- file on disk. The sections Preferences owns come from the state; every
+--- other top-level table of the file it replaces is carried over unchanged.
 --- @param prefs_file string Path to the config.toml file.
 --- @param state table The current global state.
 --- @param hotfiles table List of hotstring files.
@@ -657,7 +679,15 @@ function M.save(prefs_file, state, hotfiles, core_mods)
 		_source_snapshots[prefs_file] = expected_source
 	end
 
-	local ok, encoded = pcall(TomlCodec.encode, group_for_disk(existing))
+	local grouped = group_for_disk(existing)
+	local unowned, unowned_err = unowned_tables(expected_source)
+	if not unowned then
+		Logger.error(LOG, "Preferences NOT saved: %s.", unowned_err)
+		return false
+	end
+	for name, value in pairs(unowned) do grouped[name] = value end
+
+	local ok, encoded = pcall(TomlCodec.encode, grouped)
 	if not ok or type(encoded) ~= "string" then
 		-- A silent return here looks exactly like a successful save until the next
 		-- reload restores the previous file and the user's change is simply gone.
