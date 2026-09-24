@@ -18,7 +18,8 @@
 --- 3. Contracts: every manipulator is gated on layer_active; no binding is no
 ---    rule; `none` swallows the key; a mouse button is a layer key; the wheel
 ---    and a repeat count have no Karabiner form; every macOS call handler the
----    vocabulary declares is implemented.
+---    vocabulary declares is implemented; a layers.toml rejected as a whole
+---    closes its START with an error and no SUCCESS.
 --- 4. The generator deploys state.nav_layer in place of the static file and
 ---    still reads the frozen file as the legacy anchor.
 --- ==============================================================================
@@ -222,5 +223,35 @@ helpers.describe("Karabiner navigation layer contracts", function()
 			handler = "tap_escape_hold_option_shift", repeatable = true, action = "escape_or_option_shift" } },
 			ctx.registry))
 		helpers.assert_eq(actual.right_command, "to=left_shift[left_option] to_if_alone=escape")
+	end)
+
+	helpers.it("a layers.toml rejected as a whole logs an error, never a success (nav-layer-generated)", function()
+		local dir = helpers.temp_dir() .. "/ergopti_nav_layer_rejected_" .. tostring(os.time()) .. "_"
+			.. tostring(math.random(100000, 999999))
+		local ok_mkdir = os.execute('mkdir "' .. dir .. '"')
+		helpers.assert_true(ok_mkdir == true or ok_mkdir == 0, "sandbox directory must exist")
+		local fh = assert(io.open(dir .. "/layers.toml", "wb"))
+		fh:write('[_meta]\nschema_version = 99\n\n[layers.nav.all]\n"KeyS" = "arrow_up"\n')
+		fh:close()
+		local levels = {}
+		local capture = {}
+		for _, level in ipairs({ "trace", "debug", "done", "info", "start", "success", "warn", "error" }) do
+			capture[level] = function() levels[#levels + 1] = level end
+		end
+		local saved_logger = package.loaded["infra.logger"]
+		package.loaded["infra.logger"] = capture
+		local ok, err = pcall(function()
+			local Fresh = helpers.load_with_stubs("platform.remap.nav_layer")
+			local layer = Fresh.load({ shared_root = helpers.shared(), config_dir = dir })
+			helpers.assert_nil(next(layer.bindings), "a file rejected as a whole binds no key")
+			-- The problem, then the error that closes the START: the load failed,
+			-- so no SUCCESS may follow it.
+			helpers.assert_eq(table.concat(levels, " "), "start warn error")
+		end)
+		package.loaded["infra.logger"] = saved_logger
+		package.loaded["platform.remap.nav_layer"] = nil
+		os.remove(dir .. "/layers.toml")
+		os.execute('rmdir "' .. dir .. '"')
+		if not ok then error(err, 0) end
 	end)
 end)
