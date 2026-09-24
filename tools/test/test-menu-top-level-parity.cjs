@@ -44,7 +44,8 @@
  *    the table the manifest does not declare is dead code.
  * 4. The manifest declares the approved top-level order, and Applications for
  *    macOS only. Every driver builds whatever the manifest declares, so this is
- *    where a reordering is held to the product decision.
+ *    where a reordering is held to the product decision. It also marks the rows
+ *    a pause greys: every feature row, and no row of the tail.
  *
  * WHAT IT DELIBERATELY DOES NOT DO:
  * render the three menus and diff their translated labels. That needs Linux to
@@ -407,6 +408,40 @@ if (declaredTopLevel.join(',') !== APPROVED_TOP_LEVEL.join(',')) {
 const appsRow = (topLevel || []).find((row) => row.id === 'apps');
 if (!appsRow || JSON.stringify(appsRow.platforms) !== JSON.stringify(['hs'])) {
 	errors.push('the Applications row must be declared for macOS only (platforms = ["hs"]).');
+}
+
+// « Pause = tout éteint »: a pause greys every feature row and leaves the tail
+// live, because the tail is how the user resumes, inspects or leaves a paused
+// script. The manifest marks those rows once, the macOS and Linux roots read the
+// mark, and the AHK pause test holds the Windows builders to it. The approved
+// order puts every feature before the Configuration tail, so the mark must cover
+// exactly the rows above it.
+const PAUSE_MARK = 'greyed_when_paused';
+const tailAt = (topLevel || []).findIndex((row) => row.id === 'configuration');
+let pauseMarked = 0;
+(topLevel || []).forEach((row, index) => {
+	const mark = row[PAUSE_MARK];
+	if (mark !== undefined && mark !== true) {
+		errors.push(`top_level "${row.id}": ${PAUSE_MARK} is ${JSON.stringify(mark)}; only true is a mark.`);
+	}
+	if (row.id === SEPARATOR) {
+		if (mark !== undefined) errors.push(`a top_level separator carries ${PAUSE_MARK}; it has no row to grey.`);
+		return;
+	}
+	if (mark === true) pauseMarked += 1;
+	const isFeature = tailAt >= 0 && index < tailAt;
+	if (isFeature && mark !== true) {
+		errors.push(`the feature row "${row.id}" lacks ${PAUSE_MARK} = true: a pause would leave it live.`);
+	}
+	if (!isFeature && mark === true) {
+		errors.push(`the tail row "${row.id}" carries ${PAUSE_MARK}: a pause would grey a row the user resumes or leaves with.`);
+	}
+});
+if (tailAt < 0 || pauseMarked < 7) {
+	errors.push(
+		`read ${pauseMarked} row(s) marked ${PAUSE_MARK} (floor 7) and ${tailAt < 0 ? 'no' : 'a'} Configuration ` +
+			'row — the pause-mark check compared nothing'
+	);
 }
 
 

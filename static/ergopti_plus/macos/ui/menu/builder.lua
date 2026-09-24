@@ -36,22 +36,6 @@ local _language_packs_cache    = nil
 local _ergopti_groups_cache    = nil
 local _top_level_cache         = nil
 
--- The top-level rows a pause greys and strips of their handler: every feature
--- the pause switches off. Every other row (configuration, language, about,
--- reload, quit, debug) and the title row that resumes the script stay live,
--- because they are how the user inspects, resumes or leaves a paused script.
--- Keyed by manifest id, so the rule follows a row wherever the manifest puts it.
-local PAUSE_GREYED_ROWS = {
-	keyboard_layout = true,
-	hotstrings      = true,
-	llm             = true,
-	metrics         = true,
-	shortcuts       = true,
-	tap_holds       = true,
-	gestures        = true,
-	apps            = true,
-}
-
 --- Returns the parsed menu_manifest.json root.
 ---
 --- ONE READER, NOT THREE. This used to be a second open/read/hs.json.decode with
@@ -124,8 +108,11 @@ end
 --- feature rows, put a separator among them or renamed the anchor left this
 --- tray in its old order — and a missing anchor emptied the tail, taking
 --- Reload, Quit and Debug with it.
+---
+--- Each entry keeps the manifest's `greyed_when_paused` mark: the feature rows a
+--- pause greys, declared once for the three trays.
 --- Returns an empty array on failure and logs ERROR (fail-loud — no stale copy).
---- @return table Array of {id} entries in display order.
+--- @return table Array of {id, greyed_when_paused} entries in display order.
 local function load_top_level()
 	if _top_level_cache then return _top_level_cache end
 	local data = load_manifest()
@@ -143,7 +130,7 @@ local function load_top_level()
 			end
 			if not for_hs then goto continue end
 		end
-		table.insert(result, { id = entry.id })
+		table.insert(result, { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true })
 		::continue::
 	end
 	Logger.debug(LOG, "Top level loaded from manifest (%d item(s)).", #result)
@@ -716,12 +703,15 @@ function M.generate(ctx, menu_mods, actions)
 			Logger.error(LOG, "No builder for top-level row '%s' — the entry is missing.", tostring(id))
 		else
 			for _, row in ipairs(builders[id]() or {}) do
-				-- « Pause = tout éteint »: every feature row is greyed and stripped
-				-- of its handler in one place. Each builder used to decide this for
-				-- itself, so Shortcuts and Gestures greyed while Hotstrings, AI,
-				-- Metrics and Tap-Holds stayed live (Metrics could even be toggled
-				-- mid-pause).
-				if ctx.paused == true and PAUSE_GREYED_ROWS[id] and type(row) == "table" and row.separator ~= true then
+				-- « Pause = tout éteint »: every row the manifest marks as a feature
+				-- is greyed and stripped of its handler in one place. Each builder
+				-- used to decide this for itself, so Shortcuts and Gestures greyed
+				-- while Hotstrings, AI, Metrics and Tap-Holds stayed live (Metrics
+				-- could even be toggled mid-pause). The unmarked rows (configuration,
+				-- language, about, reload, quit, debug) and the title row that
+				-- resumes the script stay live: they are how the user inspects,
+				-- resumes or leaves a paused script.
+				if ctx.paused == true and entry.greyed_when_paused and type(row) == "table" and row.separator ~= true then
 					row.disabled = true
 					row.action = nil
 					row.fn = nil

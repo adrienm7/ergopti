@@ -160,9 +160,10 @@ end
 
 --- Renders the tray root over the manifest text given.
 --- @param manifest_text string Manifest JSON text.
+--- @param paused boolean|nil Whether the script is paused.
 --- @return table rows Rendered top-level rows, the title badge removed.
 --- @return table lines Recorded warnings and errors.
-local function render_root(manifest_text)
+local function render_root(manifest_text, paused)
 	local lines = {}
 	local rendered = ManifestFixture.with_manifest(manifest_text, recording_logger(lines), function()
 		local builder = helpers.load_with_stubs("ui.menu.builder")
@@ -178,6 +179,7 @@ local function render_root(manifest_text)
 			about           = build("menu.about.title"),
 		}
 		local ctx = {
+			paused         = paused == true,
 			config         = { log_level = 2 },
 			hotfiles       = {},
 			state          = { hotstrings = {} },
@@ -288,5 +290,36 @@ helpers.describe("menu drift gate (macOS): the tray root is the manifest's top l
 			"the shuffled top level must start with a different row")
 		local rows = render_root(with_top_level(raw, shuffled))
 		assert_same_order(rows, expected, "shuffled manifest")
+	end)
+
+	helpers.it("a pause greys exactly the rows the manifest marks, wherever they sit", function()
+		-- The mark moves from Metrics to Language here. A driver that keeps its
+		-- own list of the feature ids keeps greying Metrics and leaves Language
+		-- live, so it fails even while its list matches the shipped manifest.
+		local marked = 0
+		local moved = {}
+		for index, row in ipairs(top_level) do
+			local copy = {}
+			for key, value in pairs(row) do copy[key] = value end
+			if copy.greyed_when_paused == true then marked = marked + 1 end
+			if copy.id == "metrics" then copy.greyed_when_paused = nil end
+			if copy.id == "language" then copy.greyed_when_paused = true end
+			moved[index] = copy
+		end
+		helpers.assert_true(marked >= 7,
+			"the manifest must mark the feature rows a pause greys, got " .. marked)
+		local expected = {}
+		for _, id in ipairs(project_for_hs(moved)) do
+			for _, row in ipairs(moved) do
+				if row.id == id and row.greyed_when_paused == true then expected[#expected + 1] = id end
+			end
+		end
+		local rows = render_root(with_top_level(raw, moved), true)
+		local greyed = {}
+		for _, row in ipairs(rows) do
+			if row.title ~= "-" and row.disabled == true then greyed[#greyed + 1] = id_of(row) end
+		end
+		helpers.assert_eq(table.concat(greyed, ", "), table.concat(expected, ", "),
+			"a pause must grey the rows the manifest marks, and only those")
 	end)
 end)
