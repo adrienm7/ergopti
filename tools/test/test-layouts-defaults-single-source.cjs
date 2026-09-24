@@ -25,6 +25,8 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
+const { spawnSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
@@ -193,6 +195,47 @@ check('the compiled Windows driver ships the registry folder the Ergopti emulati
 	for (const file of [registry.index_file, ...ids.map((id) => `${id}/${id}.keylayout`)]) {
 		assert.ok(required.includes(`${registry.folder}/${file}`), `REQUIRED_ASSETS must list ${registry.folder}/${file}`);
 	}
+});
+
+// The macOS layout manager installs the Ergopti layouts offline from the
+// registry folder it resolves below the packaged app's static tree
+// (modules/keymap/layout_registry.lua: <shared>/../../../<folder>), so the
+// build must copy it there and refuse to build without its index.
+check('the packaged macOS app ships the registry folder the layout manager reads', () => {
+	const script = fs.readFileSync(path.join(ROOT, 'tools', 'build', 'build_macos_app.sh'), 'utf8');
+	const fn = /^bundle_layout_registry\(\) \{\n[\s\S]*?\n\}\n/m.exec(script);
+	assert.ok(fn, 'build_macos_app.sh defines no bundle_layout_registry()');
+	const assemble = /^assemble_app\(\) \{\n[\s\S]*?\n\}\n/m.exec(script);
+	assert.ok(assemble && /^\tbundle_layout_registry "\$static_root"$/m.test(assemble[0]),
+		'assemble_app() must call bundle_layout_registry "$static_root"');
+	assert.ok(registry.folder.startsWith('static/'), 'the registry folder must live under static/');
+	const run = (withIndex) => {
+		const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-registry-pack-'));
+		const source = path.join(fixture, 'repo', ...registry.folder.split('/'));
+		fs.mkdirSync(path.join(source, 'ergol'), { recursive: true });
+		fs.writeFileSync(path.join(source, 'ergol', 'ergol.keylayout'), 'layout');
+		if (withIndex) fs.writeFileSync(path.join(source, registry.index_file), '{}');
+		const staticRoot = path.join(fixture, 'app', 'static');
+		fs.mkdirSync(staticRoot, { recursive: true });
+		const bash = ['set -euo pipefail', 'log() { :; }', 'fail() { printf "FAIL: %s\\n" "$*" >&2; exit 1; }',
+			fn[0], 'bundle_layout_registry "$1"'].join('\n');
+		const result = spawnSync('bash', ['-c', bash, 'fixture', staticRoot.replace(/\\/g, '/')], {
+			encoding: 'utf8',
+			env: { ...process.env, REPO_ROOT: path.join(fixture, 'repo').replace(/\\/g, '/') }
+		});
+		const packaged = path.join(staticRoot, ...registry.folder.slice('static/'.length).split('/'));
+		const outcome = {
+			status: result.status,
+			index: fs.existsSync(path.join(packaged, registry.index_file)),
+			layout: fs.existsSync(path.join(packaged, 'ergol', 'ergol.keylayout'))
+		};
+		fs.rmSync(fixture, { recursive: true, force: true });
+		return outcome;
+	};
+	const shipped = run(true);
+	assert.deepStrictEqual(shipped, { status: 0, index: true, layout: true },
+		'the registry must land at <static root>/<folder below static/>');
+	assert.notStrictEqual(run(false).status, 0, 'a build without the registry index must fail');
 });
 
 if (failures > 0) process.exit(1);

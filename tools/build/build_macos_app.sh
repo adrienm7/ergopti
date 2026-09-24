@@ -402,6 +402,23 @@ bundle_keyboard_layout() {
 		|| fail "Keyboard layout bundle was not packaged at $dest_dir/$latest"
 }
 
+# The layout manager installs the Ergopti layouts offline from the keyboard-layout
+# registry shipped with the app (modules/keymap/layout_registry.lua), which it
+# resolves at the repository path mirrored under Resources: the folder of
+# _shared/modules/layouts/defaults.json below the static tree. A build without it
+# would need the network to install the very layouts it ships, so it fails.
+bundle_layout_registry() {
+	local static_root="$1"
+	local src_dir="$REPO_ROOT/static/layouts/registry"
+	[ -f "$src_dir/index.json" ] || fail "Keyboard-layout registry index missing: $src_dir/index.json"
+	local dest_dir="$static_root/layouts/registry"
+	log "Bundling the keyboard-layout registry"
+	mkdir -p "$static_root/layouts"
+	rm -rf "$dest_dir"
+	cp -R "$src_dir" "$dest_dir"
+	[ -f "$dest_dir/index.json" ] || fail "Keyboard-layout registry was not packaged at $dest_dir"
+}
+
 # Assemble the Ergopti.app skeleton, copy the launcher + Hammerspoon, drop our
 # Lua config into Resources/config/, and stamp Info.plist. The embedded
 # Hammerspoon's bundle id is rewritten so its preferences land under our id.
@@ -470,6 +487,7 @@ assemble_app() {
 	cp -R "$REPO_ROOT/static/img"                 "$static_root/"
 
 	bundle_keyboard_layout "$static_root"
+	bundle_layout_registry "$static_root"
 
 	# Bundle third-party tools so they are available on first launch with no
 	# runtime download. KE remains an installer app (a one-time system-extension

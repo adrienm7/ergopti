@@ -1,14 +1,17 @@
 --- tests/unit/modules/keymap/test_layout_registry.lua
 
 --- ==============================================================================
---- MODULE: Layout Registry Installation (macOS)
+--- MODULE: Layout Manager (macOS client)
 --- DESCRIPTION:
---- macOS installs a registry layout by placing its .keylayout, unchanged, in
---- ~/Library/Keyboard Layouts (layout-registry-install). These tests replay the
---- download through injected collaborators with the real registry files and
---- pin the whole transaction: the URLs come from the shared defaults, a layout
---- is written only once it matches its index, the installed file is the
---- registry file byte for byte, and every failure leaves nothing behind.
+--- macOS installs a registry layout by placing its verified .keylayout,
+--- unchanged, in ~/Library/Keyboard Layouts and adding it to the enabled input
+--- sources (layout-registry-install). These tests replay the layout manager's
+--- operations through injected collaborators with the real registry files: an
+--- in-memory file system, a registry served from a table, and input-source
+--- calls that only record what they were asked. They pin installation,
+--- update, uninstallation, the refusal of a file that does not match its
+--- index, the offline installation of the Ergopti shipped with the app, and
+--- the refusal to install a layout an Ergopti bundle already provides.
 --- The digest collaborator answers from a table of known contents: the real
 --- SHA-256 is the crypto adapter's job, the refusal of a mismatch is this one.
 --- ==============================================================================
@@ -19,6 +22,9 @@ local Json = require("json")
 local REGISTRY_DIR = helpers.driver_root() .. "/../../layouts/registry/"
 local INDEX_URL = "https://raw.githubusercontent.com/adrienm7/ergopti/main/static/layouts/registry/index.json"
 local ERGOL_URL = "https://raw.githubusercontent.com/adrienm7/ergopti/main/static/layouts/registry/ergol/ergol.keylayout"
+local LOCAL_DIR = "/cfg/layouts/"
+local LAYOUTS_DIR = "/home/Library/Keyboard Layouts/"
+local SHIPPED_DIR = "/app/static/layouts/registry/"
 
 --- Reads a file of the repository registry byte for byte.
 --- @param rel string
@@ -41,167 +47,272 @@ local function tamper(text, old, new)
 	return text:sub(1, first - 1) .. new .. text:sub(last + 1)
 end
 
---- Builds the collaborators of one installation.
---- @param served table URL -> body; any other URL answers HTTP 404.
---- @return table deps
---- @return table state { requests, writes, prepared }
-local function fake_deps(served)
-	local Registry = require("layouts.registry")
+local INDEX_TEXT = registry_file("index.json")
+local INDEX = Json.decode(INDEX_TEXT)
+
+--- The index entry of one layout.
+--- @param id string
+--- @return table
+local function entry_of(id)
+	for _, entry in ipairs(INDEX.layouts) do
+		if entry.id == id then return entry end
+	end
+	error("no entry " .. id)
+end
+
+--- Builds the layout manager with in-memory collaborators.
+--- @param options table { served, files, bundle_names, active }
+--- @return table module, table deps, table state
+local function manager(options)
+	options = options or {}
 	local LayoutRegistry = helpers.load_with_stubs("modules.keymap.layout_registry")
+	LayoutRegistry._reset()
 	local settings = assert(LayoutRegistry.settings())
-	local index_text = registry_file("index.json")
-	local ergol_sha = Registry.find_entry(Json.decode(index_text), "ergol").sha256
-	local digests = { [registry_file("ergol/ergol.keylayout")] = ergol_sha }
-	local state = { requests = {}, writes = {}, prepared = {} }
+	local digests = {}
+	for _, entry in ipairs(INDEX.layouts) do digests[registry_file(entry.file)] = entry.sha256 end
+	local state = { requests = {}, files = {}, enabled = {}, disabled = {}, selected = {}, deleted = {} }
+	for path, text in pairs(options.files or {}) do state.files[path] = text end
+	local served = options.served or {}
 	local deps = {
 		settings = settings,
 		transport = {
-			get = function(url, headers, timeout_ms, callback)
-				state.requests[#state.requests + 1] = { url = url, timeout_ms = timeout_ms, headers = headers }
-				if served[url] then callback(200, served[url], nil) else callback(404, "", "HTTP 404") end
+			get = function(url, headers, _timeout_ms, callback)
+				state.requests[#state.requests + 1] = { url = url, headers = headers }
+				if served == "offline" then callback(0, "", "could not connect", nil) return end
+				local body = served[url]
+				if body then callback(200, body, nil, { ETag = '"e1"' }) else callback(404, "", "HTTP 404", {}) end
 			end,
-			decode_json = Json.decode,
-			sha256 = function(text, callback)
-				callback(digests[text] or string.rep("0", 64), nil)
-			end,
+			sha256 = function(text, callback) callback(digests[text] or string.rep("0", 64), nil) end,
 		},
-		write = function(path, content)
-			state.writes[#state.writes + 1] = { path = path, content = content }
+		decode_json = Json.decode,
+		encode_json = Json.encode,
+		read = function(path) return state.files[path] end,
+		write = function(path, content) state.files[path] = content; return true end,
+		delete = function(path) state.files[path] = nil; state.deleted[#state.deleted + 1] = path; return true end,
+		exists = function(path) return state.files[path] ~= nil end,
+		prepare_parent = function() return true end,
+		local_dir = LOCAL_DIR,
+		layouts_dir = LAYOUTS_DIR,
+		bundled_dir = SHIPPED_DIR,
+		enable_source = function(path, label, on_done)
+			state.enabled[#state.enabled + 1] = { path = path, label = label }
+			on_done(options.enable_fails ~= true, "OK", options.enable_fails and "process_failed" or nil)
 			return true
 		end,
-		prepare_parent = function(path)
-			state.prepared[#state.prepared + 1] = path
+		disable_source = function(name, label, on_done)
+			state.disabled[#state.disabled + 1] = { name = name, label = label }
+			on_done(true, "OK", nil)
 			return true
 		end,
-		local_dir = "/cfg/layouts/",
-		layouts_dir = "/home/Library/Keyboard Layouts/",
+		select_source = function(localised, name, on_done)
+			state.selected[#state.selected + 1] = { localised = localised, name = name }
+			on_done(true, "OK", nil)
+			return true
+		end,
+		active_sources = function() return options.active or {} end,
+		bundle_names = function() return options.bundle_names or {} end,
 	}
 	return LayoutRegistry, deps, state
 end
 
---- Runs one installation and returns its single terminal result.
---- @return table result { ok, detail, calls }
-local function install(id, served, adjust)
-	local LayoutRegistry, deps, state = fake_deps(served)
-	if adjust then adjust(deps) end
+--- Runs one operation and returns its single terminal result.
+--- @param call function call(on_done)
+--- @return table { ok, detail, extra, calls }
+local function run(call)
 	local result = { calls = 0 }
-	LayoutRegistry.install(id, function(ok, detail)
+	call(function(ok, detail, extra)
 		result.calls = result.calls + 1
-		result.ok, result.detail = ok, detail
-	end, deps)
+		result.ok, result.detail, result.extra = ok, detail, extra
+	end)
 	helpers.assert_eq(result.calls, 1, "on_done must be called exactly once")
-	return result, state
+	return result
 end
 
-local function served_registry(layout_text)
-	return { [INDEX_URL] = registry_file("index.json"), [ERGOL_URL] = layout_text }
+--- The shipped registry: its index and every layout file, under SHIPPED_DIR.
+--- @return table
+local function shipped_files()
+	local files = { [SHIPPED_DIR .. "index.json"] = INDEX_TEXT }
+	for _, entry in ipairs(INDEX.layouts) do files[SHIPPED_DIR .. entry.file] = registry_file(entry.file) end
+	return files
 end
 
-helpers.describe("layout registry (macOS): installing a registry layout", function()
-	helpers.it("reads the registry location from the shared defaults (layout-registry-install)", function()
-		local LayoutRegistry = helpers.load_with_stubs("modules.keymap.layout_registry")
-		local Registry = require("layouts.registry")
-		local settings = assert(LayoutRegistry.settings())
-		helpers.assert_eq(Registry.raw_url(settings, settings.index_file), INDEX_URL)
-		helpers.assert_eq(settings.local_folder, "layouts")
-		helpers.assert_eq(settings.timeout_ms, 30000)
-		helpers.assert_true(Registry.is_valid_id("ergopti_plus_ansi"))
-		helpers.assert_true(not Registry.is_valid_id("../evil"), "an id is a file name and must not escape the folder")
-		helpers.assert_true(not Registry.is_valid_id("Ergol"))
-	end)
+--- The installed record as the module wrote it.
+--- @param state table
+--- @return table
+local function record(state)
+	return Json.decode(state.files[LOCAL_DIR .. "installed.json"])
+end
 
-	helpers.it("names the shared defaults file it cannot decode (layout-registry-install)", function()
-		-- The shared json.lua answers nil to invalid JSON instead of raising, so a
-		-- reader that only checks the pcall status loses the reason.
-		local FileSystem = require("adapters.file_system")
-		local LayoutRegistry = helpers.load_with_stubs("modules.keymap.layout_registry")
-		local original_read = FileSystem.read
-		local served = 0
-		FileSystem.read = function(path)
-			if type(path) == "string" and path:find("modules/layouts/defaults.json", 1, true) then
-				served = served + 1
-				return "{ not json"
-			end
-			return original_read(path)
-		end
-		local called, settings, err = pcall(LayoutRegistry.settings)
-		FileSystem.read = original_read
-		helpers.assert_true(called, "settings() must report, not raise: " .. tostring(settings))
-		helpers.assert_eq(served, 1, "the malformed defaults file must be the one read")
-		helpers.assert_nil(settings)
-		helpers.assert_contains(tostring(err), "modules/layouts/defaults.json is not valid JSON")
-	end)
-
-	helpers.it("installs the verified .keylayout unchanged (layout-registry-install)", function()
-		local layout = registry_file("ergol/ergol.keylayout")
-		local result, state = install("ergol", served_registry(layout))
-		helpers.assert_true(result.ok, "the installation must succeed: " .. tostring(result.detail))
-		helpers.assert_eq(result.detail.path, "/home/Library/Keyboard Layouts/ergol.keylayout")
-		helpers.assert_eq(result.detail.entry.id, "ergol")
+helpers.describe("layout manager (macOS): installing", function()
+	helpers.it("installs a downloaded layout, enables it and records it last (layout-registry-install)", function()
+		local LayoutRegistry, deps, state = manager({
+			served = { [INDEX_URL] = INDEX_TEXT, [ERGOL_URL] = registry_file("ergol/ergol.keylayout") },
+		})
+		local result = run(function(done) LayoutRegistry.install("ergol", done, deps) end)
+		helpers.assert_true(result.ok, "the installation must succeed: " .. tostring(result.extra))
+		helpers.assert_eq(result.detail.path, LAYOUTS_DIR .. "ergol.keylayout")
+		helpers.assert_eq(result.detail.source, "network")
+		helpers.assert_true(result.detail.enabled)
 		helpers.assert_eq(#state.requests, 2, "the index then the layout")
-		helpers.assert_eq(state.requests[1].url, INDEX_URL)
-		helpers.assert_eq(state.requests[2].url, ERGOL_URL)
-		helpers.assert_eq(state.requests[1].timeout_ms, 30000, "every request is bounded by the shared budget")
-		helpers.assert_eq(#state.writes, 3)
-		helpers.assert_eq(state.writes[1].path, "/cfg/layouts/ergol.keylayout", "the local copy first")
-		helpers.assert_eq(state.writes[2].path, "/cfg/layouts/index.json", "then the index it matches")
-		helpers.assert_eq(state.writes[3].path, "/home/Library/Keyboard Layouts/ergol.keylayout")
-		helpers.assert_true(state.writes[1].content == layout and state.writes[3].content == layout,
+		helpers.assert_true(state.files[LAYOUTS_DIR .. "ergol.keylayout"] == registry_file("ergol/ergol.keylayout"),
 			"the installed file is the registry file byte for byte")
-		helpers.assert_eq(state.writes[2].content, registry_file("index.json"))
-		helpers.assert_eq(#state.prepared, 3, "every folder is created before its file")
+		helpers.assert_true(state.files[LOCAL_DIR .. "ergol.keylayout"] == registry_file("ergol/ergol.keylayout"))
+		helpers.assert_eq(state.files[LOCAL_DIR .. "index.json"], INDEX_TEXT, "the refreshed index is cached")
+		helpers.assert_eq(state.files[LOCAL_DIR .. "index.etag"], '"e1"', "with the ETag it was served with")
+		helpers.assert_eq(record(state).layouts.ergol.sha256, entry_of("ergol").sha256)
+		helpers.assert_eq(state.enabled[1].path, LAYOUTS_DIR .. "ergol.keylayout")
+		local snapshot = LayoutRegistry.snapshot(deps)
+		helpers.assert_eq(snapshot.installed.ergol.version, entry_of("ergol").version)
+		helpers.assert_nil(snapshot.busy, "the operation slot is released")
+	end)
+
+	helpers.it("installs the Ergopti shipped with the app while offline (layout-registry-install)", function()
+		local LayoutRegistry, deps, state = manager({ served = "offline", files = shipped_files() })
+		local result = run(function(done) LayoutRegistry.install("ergopti_plus", done, deps) end)
+		helpers.assert_true(result.ok, "the shipped Ergopti must install offline: " .. tostring(result.extra))
+		helpers.assert_eq(result.detail.source, "bundled")
+		helpers.assert_eq(#state.requests, 1, "only the index refresh is attempted")
+		helpers.assert_true(state.files[LAYOUTS_DIR .. "ergopti_plus.keylayout"]
+			== registry_file("ergopti_plus/ergopti_plus.keylayout"))
+		local snapshot = LayoutRegistry.snapshot(deps)
+		helpers.assert_eq(snapshot.source, "bundled")
+		helpers.assert_eq(snapshot.error.code, "offline", "the snapshot says why the registry was not read")
+	end)
+
+	helpers.it("updates an installed layout to the version the index describes (layout-registry-install)", function()
+		local old = Json.decode(Json.encode(entry_of("ergol")))
+		old.version, old.sha256 = "1.0.0", string.rep("1", 64)
+		local installed = Json.encode({ schema_version = 1, layouts = { ergol = old } })
+		local LayoutRegistry, deps, state = manager({
+			served = { [INDEX_URL] = INDEX_TEXT, [ERGOL_URL] = registry_file("ergol/ergol.keylayout") },
+			files = {
+				[LOCAL_DIR .. "installed.json"] = installed,
+				[LAYOUTS_DIR .. "ergol.keylayout"] = "old bytes",
+			},
+		})
+		local result = run(function(done) LayoutRegistry.install("ergol", done, deps) end)
+		helpers.assert_true(result.ok, tostring(result.extra))
+		helpers.assert_eq(record(state).layouts.ergol.version, entry_of("ergol").version)
+		helpers.assert_eq(record(state).layouts.ergol.sha256, entry_of("ergol").sha256)
+		helpers.assert_true(state.files[LAYOUTS_DIR .. "ergol.keylayout"] == registry_file("ergol/ergol.keylayout"))
 	end)
 
 	helpers.it("refuses a layout that does not match its index and writes nothing (layout-registry-install)", function()
-		local layout = tamper(registry_file("ergol/ergol.keylayout"), 'output="q"', 'output="z"')
-		local result, state = install("ergol", served_registry(layout))
+		local LayoutRegistry, deps, state = manager({
+			served = {
+				[INDEX_URL] = INDEX_TEXT,
+				[ERGOL_URL] = tamper(registry_file("ergol/ergol.keylayout"), 'output="q"', 'output="z"'),
+			},
+		})
+		local result = run(function(done) LayoutRegistry.install("ergol", done, deps) end)
 		helpers.assert_true(result.ok == false)
-		helpers.assert_contains(result.detail, "checksum")
-		helpers.assert_eq(#state.writes, 0, "an unverified layout must never reach the disk")
-
-		local truncated = registry_file("ergol/ergol.keylayout"):sub(1, -2)
-		result, state = install("ergol", served_registry(truncated))
-		helpers.assert_contains(result.detail, "bytes instead of")
-		helpers.assert_eq(#state.writes, 0)
+		helpers.assert_eq(result.detail, LayoutRegistry.FAILURE_DOWNLOAD)
+		helpers.assert_contains(result.extra, "checksum")
+		helpers.assert_nil(state.files[LAYOUTS_DIR .. "ergol.keylayout"], "an unverified layout never reaches the disk")
+		helpers.assert_nil(state.files[LOCAL_DIR .. "installed.json"], "nor the record")
+		helpers.assert_eq(#state.enabled, 0)
 	end)
 
-	helpers.it("reports every other failure and writes nothing (layout-registry-install)", function()
-		local result, state = install("ergol", {})
-		helpers.assert_contains(result.detail, "HTTP 404")
-		helpers.assert_eq(#state.requests, 1, "no layout request after a failed index")
-		helpers.assert_eq(#state.writes, 0)
-
-		result, state = install("optimot", served_registry(registry_file("ergol/ergol.keylayout")))
-		helpers.assert_contains(result.detail, "not in the registry index")
-		helpers.assert_eq(#state.writes, 0)
-
-		result, state = install("../evil", served_registry(registry_file("ergol/ergol.keylayout")))
-		helpers.assert_contains(result.detail, "not a registry layout id")
-		helpers.assert_eq(#state.requests, 0, "an invalid id is refused before any request")
-
-		result, state = install("ergol", { [INDEX_URL] = "<html>proxy</html>" })
-		helpers.assert_contains(result.detail, "not valid JSON")
-		helpers.assert_eq(#state.writes, 0)
-
-		local oversized = registry_file("index.json"):gsub('"size": 66273', '"size": 99999999', 1)
-		result, state = install("ergol", { [INDEX_URL] = oversized })
-		helpers.assert_contains(result.detail, "no usable file, size or checksum")
-		helpers.assert_eq(#state.requests, 1, "an entry over the download bound is not downloaded")
+	helpers.it("reports an offline download it cannot serve from the app (layout-registry-install)", function()
+		local LayoutRegistry, deps, state = manager({ served = "offline" })
+		local result = run(function(done) LayoutRegistry.install("ergol", done, deps) end)
+		helpers.assert_true(result.ok == false)
+		helpers.assert_eq(result.detail, LayoutRegistry.FAILURE_DOWNLOAD)
+		helpers.assert_contains(result.extra, "could not connect")
+		helpers.assert_eq(#state.enabled, 0)
 	end)
 
-	helpers.it("stops at the first write that fails (layout-registry-install)", function()
-		local attempts = {}
-		local result = install("ergol", served_registry(registry_file("ergol/ergol.keylayout")),
-			function(deps)
-				deps.write = function(path, content)
-					attempts[#attempts + 1] = path
-					if #attempts == 2 then return false, "disk full" end
-					return true
-				end
-			end)
+	helpers.it("refuses a layout an installed Ergopti bundle already provides (layout-registry-install)", function()
+		local LayoutRegistry, deps, state = manager({
+			served = "offline",
+			files = shipped_files(),
+			bundle_names = { [entry_of("ergopti").keyboard_name] = true },
+		})
+		local result = run(function(done) LayoutRegistry.install("ergopti", done, deps) end)
 		helpers.assert_true(result.ok == false)
-		helpers.assert_contains(result.detail, "disk full")
-		helpers.assert_eq(#attempts, 2, "the layout is not installed once the local index could not be written")
-		helpers.assert_eq(attempts[2], "/cfg/layouts/index.json")
+		helpers.assert_eq(result.detail, LayoutRegistry.FAILURE_PROVIDED_BY_BUNDLE)
+		helpers.assert_nil(state.files[LAYOUTS_DIR .. "ergopti.keylayout"])
+		helpers.assert_eq(LayoutRegistry.snapshot(deps).provided.ergopti, "bundle")
+	end)
+
+	helpers.it("never overwrites a layout file it did not install (layout-registry-install)", function()
+		local files = shipped_files()
+		files[LAYOUTS_DIR .. "ergol.keylayout"] = "my own layout"
+		local LayoutRegistry, deps, state = manager({ served = "offline", files = files })
+		local result = run(function(done) LayoutRegistry.install("ergol", done, deps) end)
+		helpers.assert_true(result.ok == false)
+		helpers.assert_eq(result.detail, LayoutRegistry.FAILURE_FOREIGN_FILE)
+		helpers.assert_eq(state.files[LAYOUTS_DIR .. "ergol.keylayout"], "my own layout")
+	end)
+
+	helpers.it("reports an installed layout it could not enable (layout-registry-install)", function()
+		local LayoutRegistry, deps = manager({ served = "offline", files = shipped_files(), enable_fails = true })
+		local result = run(function(done) LayoutRegistry.install("ergol", done, deps) end)
+		helpers.assert_true(result.ok, tostring(result.extra))
+		helpers.assert_true(result.detail.enabled == false)
+	end)
+
+	helpers.it("refuses a second operation while one is running (layout-registry-install)", function()
+		local LayoutRegistry, deps = manager({ served = {} })
+		local pending
+		deps.transport.get = function(_, _, _, callback) pending = callback end
+		local first = { calls = 0 }
+		LayoutRegistry.install("ergol", function() first.calls = first.calls + 1 end, deps)
+		local second = run(function(done) LayoutRegistry.install("ergol", done, deps) end)
+		helpers.assert_true(second.ok == false)
+		helpers.assert_eq(second.detail, LayoutRegistry.FAILURE_BUSY)
+		pending(0, "", "offline", nil)
+		helpers.assert_eq(first.calls, 1)
+		helpers.assert_nil(LayoutRegistry.snapshot(deps).busy)
+	end)
+end)
+
+helpers.describe("layout manager (macOS): uninstalling and selecting", function()
+	--- A manager with Ergo-L installed.
+	local function with_ergol()
+		local installed = Json.encode({ schema_version = 1, layouts = { ergol = entry_of("ergol") } })
+		return manager({
+			files = {
+				[LOCAL_DIR .. "installed.json"] = installed,
+				[LOCAL_DIR .. "ergol.keylayout"] = registry_file("ergol/ergol.keylayout"),
+				[LAYOUTS_DIR .. "ergol.keylayout"] = registry_file("ergol/ergol.keylayout"),
+			},
+			active = { { id = entry_of("ergol").keyboard_name, name = "French (Ergo-L)", selected = true } },
+		})
+	end
+
+	helpers.it("removes the input source, the files and the record (layout-registry-install)", function()
+		local LayoutRegistry, deps, state = with_ergol()
+		helpers.assert_eq(LayoutRegistry.snapshot(deps).active, "ergol", "the current input source is recognised")
+		local result = run(function(done) LayoutRegistry.uninstall("ergol", done, deps) end)
+		helpers.assert_true(result.ok, tostring(result.extra))
+		helpers.assert_eq(state.disabled[1].name, entry_of("ergol").keyboard_name)
+		helpers.assert_nil(state.files[LAYOUTS_DIR .. "ergol.keylayout"])
+		helpers.assert_nil(state.files[LOCAL_DIR .. "ergol.keylayout"])
+		helpers.assert_nil(record(state).layouts.ergol)
+		helpers.assert_nil(LayoutRegistry.snapshot(deps).installed.ergol)
+	end)
+
+	helpers.it("refuses to uninstall what it did not install (layout-registry-install)", function()
+		local LayoutRegistry, deps, state = with_ergol()
+		local result = run(function(done) LayoutRegistry.uninstall("ergopti", done, deps) end)
+		helpers.assert_true(result.ok == false)
+		helpers.assert_eq(result.detail, LayoutRegistry.FAILURE_NOT_INSTALLED)
+		helpers.assert_eq(#state.deleted, 0)
+	end)
+
+	helpers.it("selects an installed layout by the name its file declares (layout-registry-install)", function()
+		local LayoutRegistry, deps, state = with_ergol()
+		local result = run(function(done) LayoutRegistry.select("ergol", done, deps) end)
+		helpers.assert_true(result.ok, tostring(result.extra))
+		helpers.assert_eq(state.selected[1].name, entry_of("ergol").keyboard_name)
+		result = run(function(done) LayoutRegistry.select("ergopti", done, deps) end)
+		helpers.assert_eq(result.detail, LayoutRegistry.FAILURE_NOT_INSTALLED)
+	end)
+
+	helpers.it("does not list a recorded layout whose file is gone (layout-registry-install)", function()
+		local LayoutRegistry, deps, state = with_ergol()
+		state.files[LAYOUTS_DIR .. "ergol.keylayout"] = nil
+		helpers.assert_nil(LayoutRegistry.snapshot(deps).installed.ergol)
 	end)
 end)

@@ -530,8 +530,9 @@ local function new(options)
 				status = public_status,
 				body   = native_status >= 0 and type(response_body) == "string"
 					and response_body or "",
-				-- The response headers (an ETag for a conditional request, for one).
-				headers = type(response_headers) == "table" and response_headers or {},
+				-- The response headers, for a conditional request's ETag.
+				headers = native_status >= 0 and type(response_headers) == "table"
+					and response_headers or {},
 				error  = err_msg,
 			})
 			_notify_settlement_observers()
