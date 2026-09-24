@@ -139,8 +139,11 @@ if LLM_PORT then
 end
 local interpreter = arg and arg[-1] or "luajit"
 os.execute(string.format(
-	"HOME='%s' %s ergopti_hotstrings.lua --tray --verbose --device '%s' --config tests/e2e/fixtures/daemon_keys.toml > '%s' 2>&1 & echo $! > '%s/pid'",
-	home, interpreter, keyboard_node, log, home))
+	-- XDG roots pinned too: a runner's XDG_CONFIG_HOME survives sudo, and the
+	-- daemon then read the runner's settings instead of the ones seeded here.
+	"HOME='%s' XDG_CONFIG_HOME='%s/.config' XDG_DATA_HOME='%s/.local/share' %s ergopti_hotstrings.lua --tray --verbose"
+		.. " --device '%s' --config tests/e2e/fixtures/daemon_keys.toml > '%s' 2>&1 & echo $! > '%s/pid'",
+	home, home, home, interpreter, keyboard_node, log, home))
 local pid_fh = io.open(home .. "/pid", "r")
 local pid = pid_fh and pid_fh:read("*l") or nil
 if pid_fh then pid_fh:close() end
@@ -161,7 +164,7 @@ local function dump_log()
 		local lower = line:lower()
 		if lower:find("secure") or lower:find("focus") or lower:find("at%-spi") or lower:find("withheld")
 			or lower:find("match") or lower:find("inject") or lower:find("capture") or lower:find("keylogger")
-			or lower:find("error") then
+			or lower:find("error") or lower:find("predict") or lower:find("llm") or lower:find("api") then
 			print("  " .. line)
 		end
 	end
