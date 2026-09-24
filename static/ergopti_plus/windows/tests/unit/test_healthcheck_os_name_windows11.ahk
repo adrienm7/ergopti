@@ -53,11 +53,9 @@ Test("Diagnostics: ProductName is corrected to Windows 11 from the build number 
 _TestWin11_HealthcheckUsesSnapshotProbe() {
 	Expected := DiagSnapshot_OsInfo()
 	Assert(Expected["os"] != "", "the snapshot probe must name the OS")
-	Sys := _HealthCheck_SysInfo()
-	AssertEqual(Expected["os"], Sys["os_name"],
-		"the healthcheck must report the same corrected OS name as the boot snapshot")
-	AssertEqual(Expected["os_version"], Sys["os_build"],
-		"the healthcheck must report the same build as the boot snapshot")
+	System := _HealthCheck_System(false, 0)
+	AssertEqual(Trim(Expected["os"] . " " . Expected["os_version"]), System["os"],
+		"the healthcheck must report the same corrected OS name and build as the boot snapshot")
 }
 
 Test("Diagnostics: the healthcheck reports the boot snapshot's OS name (win11-name)",

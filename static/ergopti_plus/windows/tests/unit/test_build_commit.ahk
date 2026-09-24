@@ -122,11 +122,11 @@ _TBC_HealthcheckUsesStamp() {
 	Old := BUNDLE_COMMIT
 	BUNDLE_COMMIT := _TBC_SHA
 	try {
-		Info := _HealthCheck_SysInfo()
-		AssertEqual("f58d15798", Info["git_hash"], "a compiled build's healthcheck names its stamped commit")
-		AssertEqual("build", Info["commit_source"])
-		AssertEqual(A_ScriptDir, Info["script_dir"], "the script folder has its own field")
-		AssertEqual(IsSet(_ConfigDir) ? _ConfigDir : "", Info["config_dir"],
+		AssertEqual("f58d15798 (build)", _HealthCheck_Versions()["commit"],
+			"a compiled build's healthcheck names its stamped commit and where it came from")
+		Paths := _HealthCheck_Paths("diagnostics")
+		AssertEqual(A_ScriptDir, Paths["app_dir"], "the script folder has its own field")
+		AssertEqual(IsSet(_ConfigDir) ? RTrim(_ConfigDir, "\") : "", Paths.Get("config_dir", ""),
 			"the config dir is the driver's configuration folder")
 	} finally {
 		BUNDLE_COMMIT := Old
@@ -164,20 +164,19 @@ _TBC_SnapshotUsesStamp() {
 }
 Test("build commit: the boot snapshot reports the compiled build's stamp", _TBC_SnapshotUsesStamp)
 
-; The copy-to-clipboard text must carry the same two rows the HTML view shows.
-; It lacked both, so a pasted report named no commit and no install folder:
-; exactly the two facts a bug triage asks for first.
+; The plain-text report (the window without WebView2) must carry the same two
+; rows the page shows. It once lacked both, so a pasted report named no commit
+; and no install folder: exactly the two facts a bug triage asks for first.
 _TBC_CopyTextsCarryCommitAndAppDir() {
 	global _TBC_SHA, BUNDLE_COMMIT
 	Old := BUNDLE_COMMIT
 	BUNDLE_COMMIT := _TBC_SHA
 	try {
-		Snapshot := HealthCheck_Run()
-		Plain := HealthCheck_FormatPlain(Snapshot)
-		Assert(InStr(Plain, "Last git commit : f58d15798 (build)`r`n") > 0, Plain)
-		Assert(InStr(Plain, "App dir         : " . A_ScriptDir . "`r`n") > 0, Plain)
+		Plain := HealthCheck_FormatPlain(HealthCheck_Run())
+		Assert(InStr(Plain, "`r`nversions.commit: f58d15798 (build)`r`n") > 0, Plain)
+		Assert(InStr(Plain, "`r`npaths.app_dir: " . A_ScriptDir . "`r`n") > 0, Plain)
 	} finally {
 		BUNDLE_COMMIT := Old
 	}
 }
-Test("build commit: the copied diagnostics carry Last git commit and App dir", _TBC_CopyTextsCarryCommitAndAppDir)
+Test("build commit: the plain-text diagnostics carry the commit and the app dir", _TBC_CopyTextsCarryCommitAndAppDir)

@@ -3,12 +3,13 @@
 --- ==============================================================================
 --- MODULE: The Linux Healthcheck Describes The Machine (Linux)
 --- DESCRIPTION:
---- The Linux snapshot's `sys` carried only os, arch and the display kind, so
---- the shared page printed "?" in every CPU, RAM, screen and locale row and had
---- no row naming the distribution or the kernel. The healthcheck now reports
+--- The Linux snapshot once carried only os, arch and the display kind, so the
+--- shared page printed "?" in every CPU, RAM, screen and locale row and had no
+--- row naming the distribution or the kernel. The version 2 snapshot reports
 --- the facts the boot snapshot line already probes (one probe set for both),
---- and a fact that cannot be read stays absent so the page omits its row.
---- tools/test/test-diagnostic-ui-integrity.cjs renders the page side.
+--- sizes in bytes the page formats, and a fact that cannot be read stays absent
+--- so the page shows it as unknown. tools/test/test-diagnostic-ui-integrity.cjs
+--- renders the page side.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -37,8 +38,8 @@ helpers.describe("healthcheck (linux): the system facts", function()
 		helpers.assert_eq(facts.kernel, "6.11.4-301.fc41.x86_64")
 		helpers.assert_eq(facts.cpu_model, "AMD Ryzen 7 7840U")
 		helpers.assert_eq(facts.cpu_cores, 2)
-		helpers.assert_eq(facts.ram_total, "31.0 GB")
-		helpers.assert_eq(facts.ram_free, "15.5 GB")
+		helpers.assert_eq(facts.ram_total, 32505856 * 1024)
+		helpers.assert_eq(facts.ram_free, 16252928 * 1024)
 		helpers.assert_true(type(facts.display_server) == "string" and facts.display_server ~= "")
 		helpers.assert_true(type(facts.runtime) == "string" and facts.runtime ~= "")
 	end)
@@ -79,63 +80,64 @@ helpers.describe("healthcheck (linux): optional modules that are off", function(
 	-- not load, which is a failure and must not be dressed as "disabled"
 	-- (developer-details).
 	helpers.it("reports an AI engine the user switched off as disabled, not failed (developer-details)", function()
-		local snapshot = helpers.load_module("ui.healthcheck.bridge").on_message("ready", {
+		local developer = helpers.load_module("ui.healthcheck.bridge").build_snapshot({
 			engine = {}, keylogger = {}, config = {},
 			llm = { is_enabled = function() return false end },
-		})
-		helpers.assert_eq(snapshot.failed_adapters, {})
-		helpers.assert_eq(snapshot.disabled_adapters, { "llm" })
-		helpers.assert_eq(snapshot.ports_validated, { "engine", "keylogger", "config" })
+		}, false).sections.developer
+		helpers.assert_eq(developer.modules_failed, {})
+		helpers.assert_eq(developer.modules_disabled, { "llm" })
+		helpers.assert_eq(developer.modules_ok, { "engine", "keylogger", "config" })
 	end)
 
 	helpers.it("counts an AI engine that is switched on as loaded (developer-details)", function()
-		local snapshot = helpers.load_module("ui.healthcheck.bridge").on_message("ready", {
+		local developer = helpers.load_module("ui.healthcheck.bridge").build_snapshot({
 			engine = {}, keylogger = {}, config = {},
 			llm = { is_enabled = function() return true end },
-		})
-		helpers.assert_eq(snapshot.failed_adapters, {})
-		helpers.assert_eq(snapshot.disabled_adapters, {})
-		helpers.assert_eq(snapshot.ports_validated, { "engine", "keylogger", "config", "llm" })
+		}, false).sections.developer
+		helpers.assert_eq(developer.modules_failed, {})
+		helpers.assert_eq(developer.modules_disabled, {})
+		helpers.assert_eq(developer.modules_ok, { "engine", "keylogger", "config", "llm" })
 	end)
 
 	helpers.it("fails an AI engine that did not load instead of calling it disabled (developer-details)", function()
-		local snapshot = helpers.load_module("ui.healthcheck.bridge").on_message("ready", {
+		local developer = helpers.load_module("ui.healthcheck.bridge").build_snapshot({
 			engine = {}, keylogger = {}, config = {},
-		})
-		helpers.assert_eq(snapshot.failed_adapters, { "llm (not loaded)" })
-		helpers.assert_eq(snapshot.disabled_adapters, {})
+		}, false).sections.developer
+		helpers.assert_eq(developer.modules_failed, { "llm (not loaded)" })
+		helpers.assert_eq(developer.modules_disabled, {})
 	end)
 
 	helpers.it("still fails a missing required module (developer-details)", function()
-		local snapshot = helpers.load_module("ui.healthcheck.bridge").on_message("ready", {
+		local developer = helpers.load_module("ui.healthcheck.bridge").build_snapshot({
 			keylogger = {}, config = {}, llm = {},
-		})
-		helpers.assert_eq(snapshot.failed_adapters, { "engine (not wired)" })
-		helpers.assert_eq(snapshot.disabled_adapters, {})
+		}, false).sections.developer
+		helpers.assert_eq(developer.modules_failed, { "engine (not wired)" })
+		helpers.assert_eq(developer.modules_disabled, {})
 	end)
 end)
 
-helpers.describe("healthcheck (linux): the sys payload the page renders", function()
-	helpers.it("sends every Linux row the page's Linux branch reads", function()
+helpers.describe("healthcheck (linux): the system rows the page renders", function()
+	helpers.it("sends every Linux system and hardware value the schema declares", function()
 		local previous = package.loaded["infra.diagnostic_snapshot"]
 		package.loaded["infra.diagnostic_snapshot"] = {
 			system_facts = function() return Collector.system_facts(fixture_env(MACHINE)) end,
 			resolve_commit = function() return "f58d15798", "build" end,
 		}
 		local ok, result = pcall(function()
-			return helpers.load_module("ui.healthcheck.bridge").on_message("ready", {})
+			return helpers.load_module("ui.healthcheck.bridge").build_snapshot({}, false)
 		end)
 		package.loaded["infra.diagnostic_snapshot"] = previous
 		helpers.assert_true(ok, tostring(result))
-		local sys = result.sys
-		helpers.assert_eq(sys.os, "linux", "the page picks its Linux branch from sys.os")
-		helpers.assert_eq(sys.os_name, "Fedora Linux 41 (Workstation Edition)")
-		helpers.assert_eq(sys.kernel, "6.11.4-301.fc41.x86_64")
-		helpers.assert_eq(sys.cpu_model, "AMD Ryzen 7 7840U")
-		helpers.assert_eq(sys.cpu_cores, 2)
-		helpers.assert_eq(sys.ram_total, "31.0 GB")
-		helpers.assert_eq(sys.ram_free, "15.5 GB")
-		helpers.assert_true(sys.display_server ~= nil, "the display server row needs its value")
-		helpers.assert_true(sys.arch ~= nil and sys.arch ~= "n/a", "no placeholder in place of the architecture")
+		local system, hardware = result.sections.system, result.sections.hardware
+		helpers.assert_eq(result.driver, "linux")
+		helpers.assert_eq(system.os, "Fedora Linux 41 (Workstation Edition)")
+		helpers.assert_eq(system.kernel, "6.11.4-301.fc41.x86_64")
+		helpers.assert_eq(hardware.cpu, "AMD Ryzen 7 7840U")
+		helpers.assert_eq(hardware.cpu_cores, 2)
+		helpers.assert_eq(hardware.ram_total, 32505856 * 1024)
+		helpers.assert_eq(system.ram_free, 16252928 * 1024)
+		helpers.assert_true(system.display_server ~= nil, "the display server row needs its value")
+		helpers.assert_true(hardware.arch ~= nil and hardware.arch ~= "n/a", "no placeholder in place of the architecture")
+		helpers.assert_eq(result.sections.versions.commit, "f58d15798 (build)")
 	end)
 end)

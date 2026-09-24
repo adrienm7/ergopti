@@ -43,12 +43,12 @@ helpers.describe("llm-core-runtime-identity", function()
 	helpers.it("reports the canonical live gate without loading a second core", function()
 		with_runtime(function(live, healthcheck)
 			helpers.assert_true(live.set_runtime_llm_enabled(true))
-			helpers.assert_eq(healthcheck.collect_llm_state().enabled, "true",
+			helpers.assert_eq(healthcheck.collect_ai().ai_enabled, true,
 				"diagnostics must read the live core, not fresh default runtime state")
 			helpers.assert_nil(package.loaded["modules.llm.init"],
 				"collecting diagnostics must not instantiate an alternate core owner")
 			helpers.assert_true(live.set_runtime_llm_enabled(false))
-			helpers.assert_eq(healthcheck.collect_llm_state().enabled, "false")
+			helpers.assert_eq(healthcheck.collect_ai().ai_enabled, false)
 			helpers.assert_true(package.loaded["modules.llm"] == live)
 		end)
 	end)

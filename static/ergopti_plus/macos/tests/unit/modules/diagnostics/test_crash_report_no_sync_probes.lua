@@ -20,7 +20,8 @@
 ---
 --- The test drives the real M.report with a healthcheck double that records
 --- whether it was invoked, which is the observable that matters: whether a report
---- forks subprocesses on the run loop.
+--- forks subprocesses on the run loop. When it is asked for, the report reads the
+--- version 2 snapshot's sections (_shared/modules/diagnostics/schema.json).
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -41,7 +42,13 @@ local function load_reporter()
 	package.loaded["ui.healthcheck"] = {
 		run = function()
 			probe.runs = probe.runs + 1
-			return { sys = {}, uptime_sec = 0, ports_validated = {}, failed_adapters = {} }
+			return { schema_version = 2, sections = {
+				system    = { os = "macOS 15.1", locale = "fr_FR", uptime = 42 },
+				versions  = { runtime = "Hammerspoon 1.1.1" },
+				hardware  = { displays = { "1440×900 @2x (main)" } },
+				developer = { modules_ok = { "adapters.clipboard" }, modules_failed = { "adapters.crypto (load failed)" } },
+				issues    = { warn_count = 3, err_count = 1 },
+			} }
 		end,
 	}
 	package.loaded["modules.diagnostics.crash_reporter"] = nil
@@ -80,5 +87,21 @@ helpers.describe("crash reports do not fork system probes on the run loop", func
 		helpers.assert_true(probe.runs >= 1,
 			"an explicit context.system_probes = true must still collect the probe data, "
 			.. "otherwise the diagnostic path loses information rather than deferring it")
+	end)
+
+	helpers.it("reads the system details from the version 2 snapshot", function()
+		local CR = load_reporter()
+
+		local report = CR.report("boom", { source = "test", system_probes = true })
+
+		helpers.assert_eq(report.os_version, "macOS 15.1")
+		helpers.assert_eq(report.hs_version, "Hammerspoon 1.1.1")
+		helpers.assert_eq(report.screen_res, "1440×900 @2x (main)")
+		helpers.assert_eq(report.locale, "fr_FR")
+		helpers.assert_eq(report.uptime_sec, "42")
+		helpers.assert_eq(report.adapters_ok, "adapters.clipboard")
+		helpers.assert_eq(report.adapters_failed, "adapters.crypto (load failed)")
+		helpers.assert_eq(report.session_warnings, "3")
+		helpers.assert_eq(report.session_errors, "1")
 	end)
 end)

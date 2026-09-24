@@ -3,21 +3,18 @@
 ; ==============================================================================
 ; MODULE: CrashReport_Build SysInfo Dedup Meta Test
 ; DESCRIPTION:
-; Regression guard: CrashReport_Build's own comment already promised running
-; "the healthcheck EXACTLY ONCE per crash and reuse its result for both the
-; enriched system fields and the adapter / session block below" — but the code
-; computed Sys via an independent _CrashReport_SysInfo() call BEFORE HealthCheck_Run
-; ever ran, silently breaking that stated invariant for the "enriched system
-; fields" half. _HealthCheck_SysInfo() (reached via HealthCheck_Run()["sys"]) does
-; the EXACT same WMI ConnectServer + 3x RegRead + git subprocess Sleep-poll as
-; _CrashReport_SysInfo(), so every crash paid that blocking cost TWICE on the
-; deferred-timer pseudo-thread that still shares the keyboard hook (Pattern:
-; deferred crash-report still blocks the keyboard-hook thread).
+; Regression guard: CrashReport_Build runs the healthcheck EXACTLY ONCE per
+; crash and reuses its result for the system fields, rather than paying the
+; slow processor query twice on the deferred-timer pseudo-thread that still
+; shares the keyboard hook (Pattern: deferred crash-report still blocks the
+; keyboard-hook thread).
 ;
-; The fix reuses HC["sys"] when HealthCheck_Run succeeded, only falling back to
-; a fresh _CrashReport_SysInfo() probe if it did not.
+; The diagnostics snapshot now reads the processor from the registry, so the
+; report takes it from the snapshot's hardware section and asks WMI only when
+; the snapshot has none (the healthcheck itself failed).
 ;
-; SCOPE: source introspection of modules/diagnostics/crash_reporter.ahk's CrashReport_Build.
+; SCOPE: source introspection of modules/diagnostics/crash_reporter.ahk and
+; ui/healthcheck/helpers.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -26,11 +23,11 @@
 
 
 
-; ======================================================================
-; ======================================================================
-; ======= 1/ Sys reuses HC["sys"] instead of a second full probe =======
-; ======================================================================
-; ======================================================================
+; ====================================================================
+; ====================================================================
+; ======= 1/ Sys reuses the snapshot instead of a second probe =======
+; ====================================================================
+; ====================================================================
 
 _CRSD_CheckSysReusesHealthcheck() {
 	Body := _DriverFuncBody("CrashReport_Build")
@@ -39,46 +36,40 @@ _CRSD_CheckSysReusesHealthcheck() {
 	HcPos  := InStr(Body, "HealthCheck_Run()")
 	SysPos := InStr(Body, "Sys := ")
 	Assert(HcPos > 0, "CrashReport_Build must call HealthCheck_Run()")
-	Assert(SysPos > 0, "CrashReport_Build must assign Sys")
-
-	; Sys must be assigned AFTER HealthCheck_Run() has run, not before — otherwise
-	; it cannot reuse HC's own sys block and pays the WMI/RegRead/git cost twice.
 	Assert(SysPos > HcPos,
-		'CrashReport_Build must assign Sys AFTER HealthCheck_Run() so it can reuse '
-		. 'HC["sys"] instead of independently re-probing WMI/RegRead/git '
-		. '(crash-report-sysinfo-dedup)')
+		"CrashReport_Build must assign Sys AFTER HealthCheck_Run() so it can reuse the snapshot "
+		. "(crash-report-sysinfo-dedup)")
+	Assert(InStr(Body, '_CrashReport_SysInfo(Sections.Get("hardware", Map()))') > 0,
+		"CrashReport_Build must hand the snapshot's hardware section to _CrashReport_SysInfo "
+		. "(crash-report-sysinfo-dedup)")
 
-	Assert(InStr(Body, 'HC["sys"]') > 0,
-		'CrashReport_Build must reuse HC["sys"] for its system-info block instead '
-		. 'of unconditionally calling _CrashReport_SysInfo() a second time '
-		. '(crash-report-sysinfo-dedup)')
+	SysBody := _DriverFuncBody("_CrashReport_SysInfo")
+	CpuPos := InStr(SysBody, 'Hardware.Has("cpu")')
+	WmiPos := InStr(SysBody, "WbemScripting")
+	Assert(CpuPos > 0 && WmiPos > CpuPos,
+		"_CrashReport_SysInfo must reuse the snapshot's processor and ask WMI only without one "
+		. "(crash-report-sysinfo-dedup)")
 }
-Test("crash_reporter: CrashReport_Build reuses HC[sys] instead of double-probing WMI/RegRead/git (crash-report-sysinfo-dedup)",
+Test("crash_reporter: CrashReport_Build reuses the snapshot's processor instead of a second WMI query (crash-report-sysinfo-dedup)",
 	_CRSD_CheckSysReusesHealthcheck)
 
 
 
 
 
-; ========================================================================
-; ========================================================================
-; ======= 2/ Every field CrashReport_Build reads from Sys is still =======
-; ========================================================================
-; ========================================================================
-; =======    produced by _HealthCheck_SysInfo ==========================
-; ======================================================================
-; ======================================================================
+; ===============================================================
+; ===============================================================
+; ======= 2/ The snapshot reads the processor without WMI =======
+; ===============================================================
+; ===============================================================
 
-_CRSD_CheckHealthcheckSysHasAllFields() {
-	HcSysBody := _DriverFuncBody("_HealthCheck_SysInfo")
-	Assert(HcSysBody != "", "_HealthCheck_SysInfo must exist in ui/healthcheck/helpers.ahk")
-
-	for _, Key in ["os_name", "os_build", "os_arch", "ahk_version", "ahk_bitness",
-		"cpu_name", "cpu_cores", "ram_total_gb", "ram_free_gb",
-		"screen_res", "dpi", "dpi_scale", "locale", "git_hash"]
-		Assert(InStr(HcSysBody, 'Info["' . Key . '"]') > 0,
-			'_HealthCheck_SysInfo must still set Info["' . Key . '"] — CrashReport_Build reads it '
-			. 'from the reused HC["sys"] block (crash-report-sysinfo-dedup)')
+_CRSD_CheckHardwareIsInProcess() {
+	Body := _DriverFuncBody("_HealthCheck_Hardware")
+	Assert(Body != "", "_HealthCheck_Hardware must exist in ui/healthcheck/helpers.ahk")
+	Assert(InStr(Body, "ProcessorNameString") > 0,
+		"_HealthCheck_Hardware must read the processor from the registry")
+	Assert(InStr(Body, "WbemScripting") = 0 && InStr(Body, "ComObject(") = 0,
+		"_HealthCheck_Hardware must not query WMI on the thread that serves the keyboard hook")
 }
-Test("crash_reporter: _HealthCheck_SysInfo still produces every field CrashReport_Build's Report reads (crash-report-sysinfo-dedup)",
-	_CRSD_CheckHealthcheckSysHasAllFields)
+Test("crash_reporter: the snapshot's processor comes from the registry, not WMI (crash-report-sysinfo-dedup)",
+	_CRSD_CheckHardwareIsInProcess)

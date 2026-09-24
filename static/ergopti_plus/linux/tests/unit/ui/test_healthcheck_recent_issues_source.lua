@@ -34,9 +34,9 @@ helpers.describe("healthcheck (linux): recent issues source", function()
 			.. "2026-09-23 10:00:01:002 [ERROR] [Probe] second from the file\n")
 		fh:close()
 		local ok, err = pcall(with_errors_path, path, function(Bridge)
-			local snapshot = Bridge.on_message("ready", {})
-			helpers.assert_eq(snapshot.recent_issues_source, "errors_file")
-			helpers.assert_eq(snapshot.recent_issues, {
+			local snapshot = Bridge.build_snapshot({}, false).sections.issues
+			helpers.assert_eq(snapshot.recent_source, "errors_file")
+			helpers.assert_eq(snapshot.recent, {
 				"2026-09-23 10:00:00:001 [WARNING] [Layout] first from the file",
 				"2026-09-23 10:00:01:002 [ERROR] [Probe] second from the file",
 			})
@@ -49,10 +49,10 @@ helpers.describe("healthcheck (linux): recent issues source", function()
 		local Logger = require("logger")
 		Logger.warn("probe", "ring fallback marker")
 		with_errors_path(TMP .. "/ergopti_hc_absent_" .. tostring(os.time()) .. ".log", function(Bridge)
-			local snapshot = Bridge.on_message("ready", {})
-			helpers.assert_eq(snapshot.recent_issues_source, "ring")
+			local snapshot = Bridge.build_snapshot({}, false).sections.issues
+			helpers.assert_eq(snapshot.recent_source, "ring")
 			local found = false
-			for _, line in ipairs(snapshot.recent_issues) do
+			for _, line in ipairs(snapshot.recent) do
 				if line:find("ring fallback marker", 1, true) then found = true end
 			end
 			helpers.assert_true(found, "the ring fallback must carry the warning just logged")
@@ -71,9 +71,9 @@ helpers.describe("healthcheck (linux): recent issues source", function()
 			return real_open(name, ...)
 		end
 		local ok, err = pcall(with_errors_path, path, function(Bridge)
-			local snapshot = Bridge.on_message("ready", {})
-			helpers.assert_eq(snapshot.recent_issues_source, "unavailable")
-			helpers.assert_eq(snapshot.recent_issues, {})
+			local snapshot = Bridge.build_snapshot({}, false).sections.issues
+			helpers.assert_eq(snapshot.recent_source, "unavailable")
+			helpers.assert_eq(snapshot.recent, {})
 		end)
 		io.open = real_open
 		if not ok then error(err, 0) end

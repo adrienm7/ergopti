@@ -3,16 +3,17 @@
 --- ==============================================================================
 --- MODULE: Healthcheck
 --- DESCRIPTION:
---- Diagnostic probe that snapshots the runtime state of the Hammerspoon driver
---- and returns it in both structured (table) and human-readable (string) form.
---- Designed to be called from the tray-menu "Healthcheck" item, an hs.ipc
---- command, or any other surface that needs a quick sanity check.
+--- The diagnostics window of the Hammerspoon driver: a snapshot of the runtime
+--- state in the version 2 shape of _shared/modules/diagnostics/schema.json,
+--- shown by the shared page _shared/ui/healthcheck/.
 ---
 --- This is the entry point: requiring "ui.healthcheck" returns the public API
---- (run / format_plain / show_window). The implementation is split
---- to mirror the Windows ui/healthcheck/{init,core,helpers} layout:
----   ui.healthcheck.core    -- Probe, public API, hs.webview report window.
----   ui.healthcheck.helpers -- State-gathering probes + snapshot rendering.
+--- (run / show_window / config / event_tap_telemetry). The implementation is
+--- split to mirror the Windows ui/healthcheck/ layout:
+---   ui.healthcheck.core    -- The snapshot, the window and its message bridge.
+---   ui.healthcheck.helpers -- The synchronous collectors, one per section.
+---   ui.healthcheck.probes  -- The asynchronous probes (network, AI, sysctl, df).
+---   ui.healthcheck.report  -- The page's actions and the Debug menu's reports.
 ---
 --- Unlike AutoHotkey, Lua does not hoist symbols across files, so this index does
 --- not merely #Include its siblings — it requires core (which in turn requires

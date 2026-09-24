@@ -1564,6 +1564,7 @@ local function main()
 							config = hotstrings_config, llm = prediction_engine,
 							gestures = gestures, dyn_hotstrings = dyn_hotstrings, magic_key = MagicKey,
 							input_capture_gate = input_capture_gate,
+							is_paused = script_actions.is_paused,
 							layout = new_layout,
 							on_reload = function() perform_reload("the paths editor") end,
 							on_config_changed = function()
@@ -1680,13 +1681,8 @@ local function main()
 			on_open_error_log = function()
 				return LogOpeners.open_today_errors(xdg_open_log_target)
 			end,
-			on_healthcheck = function()
-				if webview_manager then
-					webview_manager.show("healthcheck")
-				else
-					Logger.info(LOG, "[stub] Healthcheck — webview manager not available.")
-				end
-			end,
+			-- The bridge opens its window: it replaces an open one and resets its mode
+			on_healthcheck = function() require("ui.healthcheck.bridge").open() end,
 			on_show_setup_wizard = function()
 				if webview_manager then
 					webview_manager.show("onboarding")
@@ -1876,6 +1872,7 @@ local function main()
 			dyn_hotstrings = dyn_hotstrings,
 			magic_key = MagicKey,
 			input_capture_gate = input_capture_gate,
+			is_paused = script_actions.is_paused,
 			layout    = opts.layout,
 			on_reload = function() perform_reload("the paths editor") end,
 			on_config_changed = function()

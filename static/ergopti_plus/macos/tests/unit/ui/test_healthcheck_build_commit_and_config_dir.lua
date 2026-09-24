@@ -11,8 +11,8 @@
 ---    logged "unknown".
 --- 2. "Config dir" named the app bundle although setup had chosen another
 ---    folder: the healthcheck printed hs.configdir, the driver's script
----    directory. It now prints config_paths' directory and lists hs.configdir
----    separately as the script directory.
+---    directory. It now reports config_paths' directory and hs.configdir
+---    separately as the app directory.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -167,7 +167,7 @@ end)
 -- =====================================
 
 helpers.describe("build-commit: the healthcheck of a packaged app", function()
-	helpers.it("build-commit: reports the stamped commit, not a git subprocess answer", function()
+	helpers.it("build-commit: reports the stamped commit and its origin, with no subprocess", function()
 		helpers.with_stub_scope(FIXTURE_MODULES, function()
 			local executed = {}
 			local H = packaged_helpers()
@@ -175,41 +175,26 @@ helpers.describe("build-commit: the healthcheck of a packaged app", function()
 				executed[#executed + 1] = command
 				return ""
 			end
-			local info = H.sys_info()
-			helpers.assert_eq(SHORT, info.git_hash)
-			helpers.assert_eq(Snapshot.COMMIT_SOURCE_BUILD, info.commit_source)
-			for _, command in ipairs(executed) do
-				helpers.assert_eq(nil, command:find("rev-parse", 1, true),
-					"no git subprocess: the bundle has no .git to ask")
-			end
+			helpers.assert_eq(SHORT .. " (" .. Snapshot.COMMIT_SOURCE_BUILD .. ")", H.collect_versions().commit)
+			helpers.assert_eq(0, #executed, "no subprocess: the bundle has no .git to ask")
 		end)
 	end)
 
-	helpers.it("build-commit: the config dir is the chosen folder and the bundle is the script dir", function()
+	helpers.it("build-commit: the config dir is the chosen folder and the bundle is the app dir", function()
 		helpers.with_stub_scope(FIXTURE_MODULES, function()
-			local info = packaged_helpers().sys_info()
-			helpers.assert_eq(CHOSEN_DIR, info.config_dir,
+			local paths = packaged_helpers().collect_paths("diagnostics")
+			helpers.assert_eq(CHOSEN_DIR, paths.config_dir,
 				"the configuration directory is the one config.toml is read from")
-			helpers.assert_eq(APP_SCRIPTS, info.script_dir,
+			helpers.assert_eq(APP_SCRIPTS, paths.app_dir,
 				"the bundle path is reported, under its own label")
-			helpers.assert_eq(nil, info.config_dir:find("ErgoptiPlus.app", 1, true))
 		end)
 	end)
 
-	helpers.it("build-commit: the config file list names the files config_paths resolves", function()
-		helpers.with_stub_scope(FIXTURE_MODULES, function()
-			local summary = packaged_helpers().collect_config_summary()
-			helpers.assert_eq(1, #summary.config_files)
-			helpers.assert_eq(CHOSEN_DIR .. "hammerspoon/config.toml", summary.config_files[1])
-		end)
-	end)
-
-	helpers.it("build-commit: an uninitialised config_paths is reported, not replaced by the bundle", function()
+	helpers.it("build-commit: an uninitialised config_paths is left unknown, not replaced by the bundle", function()
 		helpers.with_stub_scope(FIXTURE_MODULES, function()
 			local H = packaged_helpers()
 			package.loaded["infra.config_paths"] = { is_initialized = function() return false end }
-			helpers.assert_eq("", H.config_dir())
-			helpers.assert_eq(0, #H.collect_config_summary().config_files)
+			helpers.assert_nil(H.collect_paths("diagnostics").config_dir)
 		end)
 	end)
 end)

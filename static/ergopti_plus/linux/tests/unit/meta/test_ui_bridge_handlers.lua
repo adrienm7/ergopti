@@ -774,66 +774,68 @@ helpers.describe("ui.bridge_handlers", function()
   helpers.describe("healthcheck_bridge", function()
     local handler = helpers.load_module("ui.healthcheck.bridge")
     local state = build_mock_state()
+    local Snapshot = helpers.load_module("healthcheck.snapshot")
+
+    -- The probes run curl and child processes; these cases answer the page
+    -- without starting any.
+    local function without_probes(fn)
+      local previous = package.loaded["ui.healthcheck.probes"]
+      package.loaded["ui.healthcheck.probes"] = { start = function() return { cancel = function() end } end }
+      local ok, err = pcall(fn)
+      package.loaded["ui.healthcheck.probes"] = previous
+      if not ok then error(err, 0) end
+    end
 
     helpers.it("has correct bridge_name", function()
       helpers.assert_eq(handler.bridge_name, "healthcheck")
     end)
-    -- These cases used to assert a `modules` table of this bridge's own
-    -- invention. The shared page reads `version, sys, uptime_sec, warn_count,
-    -- err_count, ports_validated, failed_adapters, last_error, recent_issues,
-    -- pause_state, keylogger, llm, layout, hotstrings, logs, config` and found
-    -- none of them, so the window rendered empty while both sides reported
-    -- success. The assertion is now the shared contract itself, which is
-    -- strictly more than the old shape checked: sixteen named fields instead of
-    -- five invented ones.
-    local Snapshot = helpers.load_module("healthcheck.snapshot")
 
-    helpers.it("'ready' answers in the shape the shared page reads", function()
-      local result = handler.on_message("ready", state)
-      helpers.assert_true(type(result) == "table")
-      local ok, missing = Snapshot.validate_snapshot(result)
-      helpers.assert_true(ok,
-        "the snapshot is missing " .. table.concat(missing or {}, ", ")
-          .. " — the page reads these by name and renders nothing for the ones "
-          .. "it cannot find, which looks like a daemon with no diagnostics "
-          .. "rather than two halves speaking different languages")
+    -- The shared page reads the version 2 snapshot of
+    -- _shared/modules/diagnostics/schema.json by section and field id, and
+    -- renders nothing for a field the schema does not declare.
+    helpers.it("'ready' answers the page's configuration and a snapshot the schema declares", function()
+      without_probes(function()
+        local result = handler.on_message("ready", state)
+        helpers.assert_eq(result.type, "init")
+        helpers.assert_eq(result.snapshot.schema_version, 2)
+        local undeclared = Snapshot.check_fields(result.snapshot, result.config.schema)
+        helpers.assert_eq(undeclared, {},
+          "the snapshot carries fields the page would never show: " .. table.concat(undeclared, ", "))
+      end)
     end)
 
     helpers.it("carries the live figures it was given", function()
-      local result = handler.on_message("ready", state)
-      helpers.assert_eq(result.keylogger.events_session, 42,
-        "the keystroke count must survive the reshape")
-      helpers.assert_eq(result.llm.model, "codellama")
-      helpers.assert_eq(result.hotstrings.personal_count, 50,
-        "the mapping count moved from modules.config to hotstrings, which is "
-          .. "where the page looks for it")
-      helpers.assert_eq(result.layout.ergopti_base, "qwerty")
+      without_probes(function()
+        local sections = handler.on_message("ready", state).snapshot.sections
+        helpers.assert_eq(sections.ai.ai_model, "codellama")
+        helpers.assert_eq(sections.ai.ai_enabled, true)
+      end)
     end)
 
-    helpers.it("'refresh' answers in the same shape", function()
-      local result = handler.on_message("refresh", state)
-      helpers.assert_true((Snapshot.validate_snapshot(result)),
-        "a refresh that answers a different shape is a window that empties "
-          .. "itself the first time the user asks it to update")
+    helpers.it("the page's refresh answers a new snapshot", function()
+      without_probes(function()
+        handler.on_message("ready", state)
+        local result = handler.on_message({ action = "refresh", detailed = false }, state)
+        helpers.assert_eq(result.type, "snapshot")
+        helpers.assert_eq(result.snapshot.schema_version, 2)
+      end)
     end)
 
-    helpers.it("still answers the contract with nothing wired at all", function()
-      local result = handler.on_message("ready", {})
-      local ok, missing = Snapshot.validate_snapshot(result)
-      helpers.assert_true(ok,
-        "an unwired daemon is exactly when this window is read, so it must not "
-          .. "be the case that answers only arrive when nothing is wrong: "
-          .. table.concat(missing or {}, ", "))
-      helpers.assert_true(#result.failed_adapters > 0,
-        "and it must SAY that nothing is wired, rather than reporting an empty "
-          .. "failure list that reads as a clean bill of health")
+    helpers.it("still answers with nothing wired at all, and says so", function()
+      without_probes(function()
+        local developer = handler.on_message("ready", {}).snapshot.sections.developer
+        helpers.assert_true(#developer.modules_failed > 0,
+          "an unwired daemon is exactly when this window is read: it must SAY that nothing is "
+            .. "wired, rather than report an empty failure list that reads as a clean bill of health")
+      end)
     end)
 
-    helpers.it("names the parts that are wired and the parts that are not", function()
-      local result = handler.on_message("ready", state)
-      helpers.assert_true(#result.loaded_adapters > 0,
-        "a report listing no loaded parts on a fully wired daemon is the empty "
-          .. "window in a different disguise")
+    helpers.it("names the parts that are wired", function()
+      without_probes(function()
+        local developer = handler.on_message("ready", state).snapshot.sections.developer
+        helpers.assert_true(#developer.modules_ok > 0,
+          "a report listing no loaded parts on a fully wired daemon is the empty window in a different disguise")
+      end)
     end)
   end)
 
@@ -1133,22 +1135,21 @@ helpers.describe("ui.bridge_handlers", function()
       if not ok then error(err, 0) end
     end
 
-    helpers.it("healthcheck payload uses the persisted locale, not a hardcoded 'fr'", function()
+    helpers.it("the healthcheck window opens in the persisted locale, not a hardcoded 'fr'", function()
       local hc = helpers.load_module("ui.healthcheck.bridge")
-      with_locale_module({ get_locale = function() return "de" end }, function()
-        local result = hc.on_message("ready", build_mock_state())
-        helpers.assert_eq(result.locale, "de",
-          "healthcheck must render in the user's locale (de), not the hardcoded 'fr'")
+      local previous = package.loaded["ui.webview_manager"]
+      local shown = nil
+      package.loaded["ui.webview_manager"] = {
+        current_epoch = function() return nil end,
+        show = function(app, locale) shown = { app = app, locale = locale }; return true end,
+      }
+      local ok, err = pcall(with_locale_module, { get_locale = function() return "de" end }, function()
+        helpers.assert_true(hc.open())
       end)
-    end)
-
-    helpers.it("falls back to 'fr' when lib.i18n resolves no locale", function()
-      local hc = helpers.load_module("ui.healthcheck.bridge")
-      with_locale_module({ get_locale = function() return nil end }, function()
-        local result = hc.on_message("ready", build_mock_state())
-        helpers.assert_eq(result.locale, "fr",
-          "must fall back to 'fr' when no locale resolves (fail-safe default)")
-      end)
+      package.loaded["ui.webview_manager"] = previous
+      if not ok then error(err, 0) end
+      helpers.assert_eq(shown, { app = "healthcheck", locale = "de" },
+        "healthcheck must render in the user's locale (de), not the hardcoded 'fr'")
     end)
   end)
 

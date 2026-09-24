@@ -1,29 +1,26 @@
 --- _shared/lua/healthcheck/snapshot.lua
 
 --- ==============================================================================
---- MODULE: Healthcheck Snapshot Shared Logic
+--- MODULE: Diagnostics Snapshot Shared Logic
 --- DESCRIPTION:
---- Pure functions shared between the macOS (Lua) and Linux (Lua) healthcheck
---- implementations. The Windows (AHK) driver cannot require Lua modules, so
---- its helpers.ahk keeps a hand-maintained copy whose output is pinned by the
---- shared corpus test (see _shared/tests/corpus/healthcheck/).
+--- Pure functions shared between the macOS (Lua) and Linux (Lua) diagnostics
+--- hosts. The Windows (AHK) driver cannot require Lua modules, so its
+--- ui/healthcheck/ keeps copies whose output is pinned by the shared corpora
+--- (_shared/tests/corpus/healthcheck/).
 ---
 --- FEATURES & RATIONALE:
---- 1. format_uptime: converts raw seconds to "Hh MMm SSs" / "Mm SSs" / "Ss".
----    Previously duplicated in macos/ui/healthcheck/helpers.lua,
----    windows/ui/healthcheck/helpers.ahk, and _shared/ui/healthcheck/script.js.
---- 2. extract_recent_issues: filters a ring-buffer snapshot for [WARNING] /
----    [ERROR] lines and trims to the last N entries. Previously inline in
----    macos/ui/healthcheck/core.lua and as a separate function in
----    windows/ui/healthcheck/helpers.ahk. Now only the fallback of 4.
---- 3. snapshot_schema: returns the canonical field list so both drivers and
----    the corpus test can validate that a snapshot has every expected key.
---- 4. recent_issues: the window's recent warnings and errors come from a
+--- 1. extract_recent_issues: the ring fallback of the recent warnings and
+---    errors, used only before today's errors file exists.
+--- 2. recent_issues: the window's recent warnings and errors come from a
 ---    bounded tail of today's errors file. The ring holds every level, so at
 ---    DEBUG a few minutes of routine lines evicted the very problems the
 ---    window is opened to show; the file keeps WARNING and ERROR only. The
----    ring is used only when today's file does not exist yet. The tail parser
----    is pinned by _shared/tests/corpus/healthcheck/errors_tail_vectors.json.
+---    tail parser is pinned by _shared/tests/corpus/healthcheck/errors_tail_vectors.json.
+--- 3. The version 2 snapshot: the schema loader, the platform rules, the
+---    pending probes and check_fields, which names the fields a driver
+---    produced that the schema does not declare (drift the page would never
+---    show) and the declared ones it left out. The shared page formats every
+---    value, so no formatter lives here any more.
 --- ==============================================================================
 
 local M = {}
@@ -34,37 +31,9 @@ local M = {}
 
 -- ==========================================
 -- ==========================================
--- ======= 1/ Uptime Formatter ==============
+-- ======= 1/ Recent Issues Extractor =======
 -- ==========================================
 -- ==========================================
-
---- Converts raw seconds to a human-readable uptime string.
---- Format: "Hh MMm SSs" when >= 1h, "Mm SSs" when >= 1m, "Ss" otherwise.
---- Zero-pads minutes and seconds to 2 digits when hours or minutes are present.
---- @param sec number Elapsed seconds (nil-safe — treated as 0).
---- @return string Formatted uptime.
-function M.format_uptime(sec)
-	sec = math.floor(sec or 0)
-	local h = math.floor(sec / 3600)
-	local m = math.floor((sec % 3600) / 60)
-	local s = sec % 60
-	if h > 0 then
-		return string.format("%dh %02dm %02ds", h, m, s)
-	elseif m > 0 then
-		return string.format("%dm %02ds", m, s)
-	else
-		return string.format("%ds", s)
-	end
-end
-
-
-
-
--- ==============================================
--- ==============================================
--- ======= 2/ Recent Issues Extractor ==========
--- ==============================================
--- ==============================================
 
 --- Filters a ring-buffer snapshot (array of strings) for [WARNING] and [ERROR]
 --- lines, then trims to the last ``max_lines`` entries.
@@ -100,60 +69,9 @@ end
 
 
 
-
--- ================================================
--- ================================================
--- ======= 3/ Snapshot Schema =====================
--- ================================================
--- ================================================
-
---- Returns the canonical list of top-level snapshot field names.
---- Both drivers (macOS Lua, AHK) must produce a snapshot containing every
---- key in this list. The corpus test validates this.
---- @return table Array of field name strings.
-function M.snapshot_fields()
-	return {
-		"version",
-		"loaded_adapters",
-		"ports_validated",
-		"failed_adapters",
-		"last_error",
-		"uptime_sec",
-		"warn_count",
-		"err_count",
-		"recent_issues",
-		"sys",
-		"pause_state",
-		"keylogger",
-		"llm",
-		"layout",
-		"hotstrings",
-		"logs",
-		"config",
-	}
-end
-
---- Validates that a snapshot table contains every canonical field.
---- @param snapshot table The snapshot to validate.
---- @return boolean ok, table missing Array of missing field names (empty if ok).
-function M.validate_snapshot(snapshot)
-	if type(snapshot) ~= "table" then return false, { "(not a table)" } end
-	local missing = {}
-	for _, field in ipairs(M.snapshot_fields()) do
-		if snapshot[field] == nil then
-			missing[#missing + 1] = field
-		end
-	end
-	return #missing == 0, missing
-end
-
-
-
-
-
 -- =========================================================
 -- =========================================================
--- ======= 4/ Recent Issues From Today's Errors File =======
+-- ======= 2/ Recent Issues From Today's Errors File =======
 -- =========================================================
 -- =========================================================
 
@@ -282,6 +200,134 @@ function M.collect_recent_issues(errors_path, ring_lines, limits, open_fn)
 		error("today's errors file cannot be read: " .. tostring(at_start), 2)
 	end
 	return M.extract_recent_issues(ring_lines, limits.max_entries), "ring"
+end
+
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 3/ The Version 2 Snapshot =======
+-- =========================================
+-- =========================================
+
+--- Decodes a JSON document from the shared tree.
+--- @param path string Absolute path.
+--- @return table
+local function read_json(path)
+	local fh, err = io.open(path, "rb")
+	if not fh then error("diagnostics: " .. path .. " is unreadable: " .. tostring(err), 3) end
+	local raw = fh:read("*a")
+	fh:close()
+	local data = require("json").decode(raw)
+	if type(data) ~= "table" then error("diagnostics: " .. path .. " is not a JSON object", 3) end
+	return data
+end
+
+--- Loads the diagnostics schema (_shared/modules/diagnostics/schema.json).
+--- @param path string Absolute path of schema.json.
+--- @return table
+function M.load_schema(path)
+	local schema = read_json(path)
+	if schema.schema_version ~= 2 or type(schema.sections) ~= "table" or type(schema.probes) ~= "table" then
+		error("diagnostics: " .. path .. " is not a version 2 schema", 2)
+	end
+	return schema
+end
+
+--- Loads the three documents a diagnostics host works from.
+--- @param shared function(rel) → absolute path under _shared/.
+--- @return table { schema, templates, redaction, repository }
+function M.load_config(shared)
+	local defaults = read_json(shared("modules/updater/defaults.json"))
+	return {
+		schema     = M.load_schema(shared("modules/diagnostics/schema.json")),
+		templates  = read_json(shared("modules/diagnostics/issue_templates.json")),
+		redaction  = read_json(shared("modules/diagnostics/redaction.json")),
+		repository = defaults.github,
+	}
+end
+
+--- True when a schema entry (a section, a field or a probe) applies to a driver.
+--- @param entry table
+--- @param driver string
+--- @return boolean
+function M.applies(entry, driver)
+	if type(entry.platforms) ~= "table" then return true end
+	for _, platform in ipairs(entry.platforms) do
+		if platform == driver then return true end
+	end
+	return false
+end
+
+--- The probe that fills a field on a driver, or nil.
+--- @param field table
+--- @param driver string
+--- @return string|nil
+function M.probe_for(field, driver)
+	if type(field.probe) == "string" then return field.probe end
+	if type(field.probe) == "table" then return field.probe[driver] end
+	return nil
+end
+
+--- The pending state of every probe that applies to a driver.
+--- @param schema table
+--- @param driver string
+--- @return table { <probe id> = { state = "pending" } }
+function M.pending_probes(schema, driver)
+	local probes = {}
+	for id, probe in pairs(schema.probes) do
+		if M.applies(probe, driver) then probes[id] = { state = "pending" } end
+	end
+	return probes
+end
+
+--- The current UTC time as ISO 8601, the snapshot's generated_at.
+--- @param now number|nil Epoch seconds (tests); os.time() otherwise.
+--- @return string
+function M.utc_now(now)
+	return os.date("!%Y-%m-%dT%H:%M:%SZ", now or os.time())
+end
+
+--- Compares a snapshot with the schema: the fields a driver produced that the
+--- schema does not declare for it (drift: the page would never show them),
+--- and the declared synchronous fields it did not produce (shown as unknown).
+--- @param snapshot table
+--- @param schema table
+--- @return table undeclared "section.field" names.
+--- @return table missing "section.field" names.
+function M.check_fields(snapshot, schema)
+	local driver = snapshot.driver
+	local undeclared, missing = {}, {}
+	local declared = {}
+	for _, section in ipairs(schema.sections) do
+		if M.applies(section, driver) then declared[section.id] = section end
+	end
+	for id, data in pairs(snapshot.sections or {}) do
+		local section = declared[id]
+		if not section then
+			undeclared[#undeclared + 1] = id
+		elseif section.kind ~= "items" and type(data) == "table" then
+			local fields = {}
+			for _, field in ipairs(section.fields or {}) do
+				if M.applies(field, driver) then fields[field.id] = field end
+			end
+			for field_id in pairs(data) do
+				if not fields[field_id] then undeclared[#undeclared + 1] = id .. "." .. tostring(field_id) end
+			end
+			for field_id, field in pairs(fields) do
+				local optional = field.opt_in or M.probe_for(field, driver)
+				if data[field_id] == nil and not optional then missing[#missing + 1] = id .. "." .. field_id end
+			end
+		end
+	end
+	for id, section in pairs(declared) do
+		if section.kind ~= "summary" and snapshot.sections[id] == nil then missing[#missing + 1] = id end
+	end
+	table.sort(undeclared)
+	table.sort(missing)
+	return undeclared, missing
 end
 
 return M

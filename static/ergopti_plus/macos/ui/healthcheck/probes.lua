@@ -1,0 +1,263 @@
+--- ui/healthcheck/probes.lua
+
+--- ==============================================================================
+--- MODULE: Healthcheck Probes (macOS)
+--- DESCRIPTION:
+--- The asynchronous half of the diagnostics snapshot: every fact that needs a
+--- subprocess or the network. Each probe runs off the main run loop (hs.task
+--- through adapters.shell_runner, hs.http through adapters.http_client), is
+--- bounded by its timeout in _shared/modules/diagnostics/schema.json, and
+--- answers exactly once: its result, a timeout or an error.
+---
+--- FEATURES & RATIONALE:
+--- 1. github_api asks api.github.com for its rate limit, the host every update
+---    check talks to; the endpoint does not count against that limit.
+--- 2. ai_health asks the local AI backend for its version when the AI is on;
+---    a remote backend is not probed (it would need the user's key).
+--- 3. system_details runs sysctl (model, processor, cores) and df (free space
+---    of the logs volume) as tasks. hs.execute ran sysctl on the main run loop
+---    before, which dispatches the event taps: opening the window could stall
+---    typing.
+--- 4. A run is cancelled as a whole when the window closes or refreshes, and a
+---    late answer of a cancelled run publishes nothing.
+--- ==============================================================================
+
+local M = {}
+
+local Logger = require("infra.logger")
+
+local LOG = "healthcheck.probes"
+
+-- The executables the system probe runs, by absolute path
+local SYSCTL = "/usr/sbin/sysctl"
+local DF = "/bin/df"
+
+-- The sysctl keys, in the order they are printed
+local SYSCTL_KEYS = { "hw.model", "machdep.cpu.brand_string", "hw.logicalcpu" }
+
+-- The User-Agent GitHub requires on every API request
+local USER_AGENT = "ErgoptiPlus-Diagnostics"
+
+
+
+
+
+-- =================================
+-- =================================
+-- ======= 1/ Probe Plumbing =======
+-- =================================
+-- =================================
+
+--- Milliseconds since an arbitrary origin, for durations.
+--- @return number
+local function now_ms()
+	return hs.timer.absoluteTime() / 1e6
+end
+
+--- Starts one probe with its timeout; publishes its single answer.
+--- @param run table The probe run (see M.start).
+--- @param id string Probe id.
+--- @param timeout_ms number
+--- @param body function(done, register_cancel) Starts the probe; calls done(result, sections).
+local function start_probe(run, id, timeout_ms, body)
+	local started = now_ms()
+	local settled = false
+	local cancellers = {}
+	local timer = nil
+	local function finish(result, sections)
+		if settled then return end
+		settled = true
+		if timer then require("adapters.timer_scheduler").cancel(timer) end
+		result.ms = math.floor(now_ms() - started + 0.5)
+		for _, cancel in ipairs(cancellers) do
+			local ok, err = pcall(cancel)
+			if not ok then Logger.error(LOG, "Probe '%s' could not be stopped: %s.", id, tostring(err)) end
+		end
+		if run.cancelled then
+			Logger.done(LOG, "Probe '%s' cancelled after %d ms.", id, result.ms)
+			return
+		end
+		Logger.done(LOG, "Probe '%s' answered: %s (%d ms).", id, result.state, result.ms)
+		run.publish(id, result, sections)
+	end
+	run.finishers[#run.finishers + 1] = function() finish({ state = "cancelled" }) end
+	Logger.trace(LOG, "Probe '%s' started (timeout %d ms)…", id, timeout_ms)
+	local handle, committed = require("adapters.timer_scheduler").after(timeout_ms / 1000, function()
+		finish({ state = "timeout" })
+	end)
+	if committed ~= true then
+		finish({ state = "error", detail = "the timeout could not be armed" })
+		return
+	end
+	timer = handle
+	local ok, err = xpcall(function()
+		body(finish, function(cancel) cancellers[#cancellers + 1] = cancel end)
+	end, debug.traceback)
+	if not ok then finish({ state = "error", detail = tostring(err):match("^[^\n]*") }) end
+end
+
+--- Decodes a JSON body, nil when it is not JSON.
+--- @param body string|nil
+--- @return table|nil
+local function decode(body)
+	if type(body) ~= "string" or body == "" then return nil end
+	local ok, data = pcall(require("adapters.json_codec").decode, body)
+	return (ok and type(data) == "table") and data or nil
+end
+
+
+
+
+
+-- =============================
+-- =============================
+-- ======= 2/ The Probes =======
+-- =============================
+-- =============================
+
+--- api.github.com's rate limit: reachable, and how many calls are left.
+--- @param config table { url, timeout_ms }
+--- @return function Probe body.
+local function github_api(config)
+	return function(done, on_cancel)
+		local client = require("adapters.http_client").new({ timeout_ms = config.timeout_ms })
+		on_cancel(function() client.cancel() end)
+		client.get(config.url, { ["User-Agent"] = USER_AGENT, ["Accept"] = "application/vnd.github+json" },
+			function(result)
+				local status = tonumber(result.status) or 0
+				if status ~= 200 then
+					done({ state = "error", detail = status > 0 and ("HTTP " .. status) or tostring(result.error) })
+					return
+				end
+				local data = decode(result.body)
+				local core = type(data) == "table" and type(data.resources) == "table" and data.resources.core or nil
+				local value = "HTTP 200"
+				if type(core) == "table" and core.remaining and core.limit then
+					value = string.format("HTTP 200, %s/%s", tostring(core.remaining), tostring(core.limit))
+				end
+				done({ state = "ok" }, { network = { github_api = value } })
+			end)
+	end
+end
+
+--- The local AI backend answers its version endpoint.
+--- @param config table { paths, timeout_ms }
+--- @return function Probe body.
+local function ai_health(config)
+	return function(done, on_cancel)
+		local llm = require("modules.llm")
+		if llm.get_runtime_llm_enabled() ~= true then
+			done({ state = "disabled" })
+			return
+		end
+		local backend = llm.get_backend()
+		local path = config.paths[backend]
+		if not path then
+			done({ state = "unsupported" })
+			return
+		end
+		local base = backend == "mlx" and require("modules.llm.api_mlx").get_base_url()
+			or require("modules.llm.api_ollama").get_base_url()
+		local client = require("adapters.http_client").new({ timeout_ms = config.timeout_ms })
+		on_cancel(function() client.cancel() end)
+		client.get(base .. path, {}, function(result)
+			local status = tonumber(result.status) or 0
+			if status < 200 or status >= 300 then
+				done({ state = "error", detail = status > 0 and ("HTTP " .. status) or tostring(result.error) })
+				return
+			end
+			local data = decode(result.body)
+			local version = type(data) == "table" and type(data.version) == "string" and data.version or nil
+			done({ state = "ok" }, { ai = { ai_health = version and (backend .. " " .. version) or ("HTTP " .. status) } })
+		end)
+	end
+end
+
+--- Runs one command as a task and hands its output to on_output(stdout) or
+--- on_failure(detail).
+--- @param executable string
+--- @param args table
+--- @param on_cancel function Registers a canceller.
+--- @param on_output function
+--- @param on_failure function
+local function run_task(executable, args, on_cancel, on_output, on_failure)
+	local handle = require("adapters.shell_runner").spawn(executable, args, function(code, stdout)
+		if code == 0 then on_output(stdout or "") else on_failure(executable .. " exited with " .. tostring(code)) end
+	end)
+	on_cancel(function() handle.terminate() end)
+	if not handle.start() then on_failure(executable .. " could not start") end
+end
+
+--- The model, processor and cores from sysctl, and the logs volume's free
+--- space from df.
+--- @param logs_dir string|nil
+--- @return function Probe body.
+local function system_details(logs_dir)
+	return function(done, on_cancel)
+		local sections = { hardware = {}, system = {} }
+		local pending = 0
+		local failures = {}
+		local function step_done()
+			pending = pending - 1
+			if pending > 0 then return end
+			if #failures > 0 then
+				done({ state = "error", detail = table.concat(failures, "; ") }, sections)
+			else
+				done({ state = "ok" }, sections)
+			end
+		end
+		local function failed(detail)
+			failures[#failures + 1] = detail
+			step_done()
+		end
+		pending = logs_dir and 2 or 1
+		local args = { "-n" }
+		for _, key in ipairs(SYSCTL_KEYS) do args[#args + 1] = key end
+		run_task(SYSCTL, args, on_cancel, function(stdout)
+			local lines = {}
+			for line in (stdout .. "\n"):gmatch("([^\n]*)\n") do lines[#lines + 1] = line end
+			sections.hardware.model = lines[1] ~= "" and lines[1] or nil
+			sections.hardware.cpu = lines[2] ~= "" and lines[2] or nil
+			sections.hardware.cpu_cores = tonumber(lines[3])
+			step_done()
+		end, failed)
+		if logs_dir then
+			run_task(DF, { "-k", logs_dir }, on_cancel, function(stdout)
+				-- Second line: filesystem, 1K-blocks, used, available, ...
+				local available = stdout:match("\n%S+%s+%d+%s+%d+%s+(%d+)")
+				sections.system.disk_free = available and tonumber(available) * 1024 or nil
+				step_done()
+			end, failed)
+		end
+	end
+end
+
+
+
+
+
+-- =============================
+-- =============================
+-- ======= 3/ Public API =======
+-- =============================
+-- =============================
+
+--- Starts every probe of a snapshot.
+--- @param schema table
+--- @param paths table The snapshot's paths section.
+--- @param publish function(id, result, sections) Receives each answer once.
+--- @return table run { cancel = function() } Cancels every probe still running.
+function M.start(schema, paths, publish)
+	local run = { cancelled = false, finishers = {}, publish = publish }
+	local config = schema.probes
+	start_probe(run, "github_api", config.github_api.timeout_ms, github_api(config.github_api))
+	start_probe(run, "ai_health", config.ai_health.timeout_ms, ai_health(config.ai_health))
+	start_probe(run, "system_details", config.system_details.timeout_ms, system_details(paths.logs_dir))
+	function run.cancel()
+		run.cancelled = true
+		for _, finisher in ipairs(run.finishers) do finisher() end
+	end
+	return run
+end
+
+return M

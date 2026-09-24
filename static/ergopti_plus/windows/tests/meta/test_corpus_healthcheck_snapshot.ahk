@@ -3,132 +3,54 @@
 ; ==============================================================================
 ; MODULE: Healthcheck Snapshot Corpus Consumer (Windows / AHK)
 ; DESCRIPTION:
-; Loads the cross-driver healthcheck snapshot corpus from
-; _shared/tests/corpus/healthcheck/snapshot_vectors.json and replays each
-; vector through the AHK healthcheck helpers (_HealthCheck_FormatUptime,
-; _HealthCheck_RecentIssues), then asserts the output matches the expected
-; golden values.
-;
-; The AHK driver cannot require Lua modules, so its helpers.ahk keeps a
-; hand-maintained copy of the shared logic. This test pins that copy against
-; the same golden vectors as the macOS Lua test so any divergence is caught.
+; Loads the cross-driver snapshot corpus
+; (_shared/tests/corpus/healthcheck/snapshot_vectors.json) and replays its
+; check_fields vectors through HealthCheck_CheckFields, the AHK copy of
+; healthcheck.snapshot.check_fields: which fields a snapshot carries that the
+; schema does not declare for its driver, and which declared synchronous fields
+; are absent. The macOS and Linux suites replay the same vectors through the
+; Lua function, and the page's model replays the format_uptime ones.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
 
-; ── Corpus path resolution ──────────────────────────────────────────────────
-; _SharedDir is set by the driver at startup; in the test harness it points to
-; the _shared/ tree relative to the Windows driver root
-_HCSC_LoadCorpus() {
+; The corpus, parsed.
+; @returns {Map}
+_HCSC_Corpus() {
 	global _SharedDir
-	if !IsSet(_SharedDir)
-		return ""
-	Path := _SharedDir . "\tests\corpus\healthcheck\snapshot_vectors.json"
-	if !FileExist(Path)
-		return ""
-	Raw := FileRead(Path, "UTF-8")
-	return Raw
+	return JsonParse(FileRead(_SharedDir . "\tests\corpus\healthcheck\snapshot_vectors.json", "UTF-8"))
 }
 
-_HCSC_ParseJson(Raw) {
-	if Raw = ""
-		return ""
-	try return JsonParse(Raw)
-	catch
-		return ""
+; A list as one line, for a readable assertion.
+_HCSC_Join(List) {
+	Out := ""
+	for Index, Item in List
+		Out .= (Index > 1 ? ", " : "") . Item
+	return Out
 }
-
-; ── Vector dispatch ──────────────────────────────────────────────────────────
-
-_HCSC_FormatUptime(Sec) {
-	return _HealthCheck_FormatUptime(Sec)
-}
-
-; AHK _HealthCheck_RecentIssues reads from the global ring buffer, so we
-; cannot replay arbitrary lines. We test format_uptime here (which is pure)
-; and validate the recent_issues logic via the Lua test only — the AHK
-; implementation is pinned by the existing test_healthcheck_format_helpers.ahk
-; and the shared corpus ensures both sides produce the same output
-
-; ── Corpus integrity ─────────────────────────────────────────────────────────
 
 _HCSC_Integrity() {
-	Raw := _HCSC_LoadCorpus()
-	AssertTrue(Raw != "", "corpus file must be readable")
-	Data := _HCSC_ParseJson(Raw)
-	AssertTrue(Data != "", "corpus JSON must be parseable")
-	AssertTrue(Data.Has("vectors"), "corpus must have a vectors array")
-	AssertTrue(Data["vectors"].Length > 0, "corpus must have at least one vector")
-
-	; Validate every vector has required fields
-	for _, V in Data["vectors"] {
+	Data := _HCSC_Corpus()
+	AssertTrue(Data.Has("vectors") && Data["vectors"].Length > 0, "the corpus must have vectors")
+	AssertTrue(Data.Has("check_fields_schema"), "the corpus must carry the schema its check_fields vectors use")
+	for V in Data["vectors"] {
 		AssertTrue(V.Has("id") && V["id"] != "", "vector missing id")
-		AssertTrue(V.Has("category"), "vector missing category")
-		AssertTrue(V.Has("expected"), "vector missing expected")
+		AssertTrue(V.Has("category"), V["id"] . ": vector missing category")
 	}
 }
-Test("corpus:hc-snap: corpus file is readable and every vector has required fields", _HCSC_Integrity)
+Test("corpus:hc-snap: the corpus is readable and every vector is named and categorised", _HCSC_Integrity)
 
-; ── format_uptime vectors ────────────────────────────────────────────────────
-
-_HCSC_UptimeSeconds() {
-	Raw := _HCSC_LoadCorpus()
-	Data := _HCSC_ParseJson(Raw)
-	for _, V in Data["vectors"] {
-		if V["category"] != "format_uptime"
+_HCSC_CheckFields() {
+	Data := _HCSC_Corpus()
+	Replayed := 0
+	for V in Data["vectors"] {
+		if (V["category"] != "check_fields")
 			continue
-		Sec := V["input"]["sec"]
-		if !(Sec is Number)
-			Sec := 0
-		Result := _HCSC_FormatUptime(Sec)
-		AssertEqual(V["expected"], Result, V["id"] . ": format_uptime(" . Sec . ")")
+		Result := HealthCheck_CheckFields(V["snapshot"], Data["check_fields_schema"])
+		AssertEqual(_HCSC_Join(V["expected_undeclared"]), _HCSC_Join(Result["undeclared"]), V["id"] . ": undeclared")
+		AssertEqual(_HCSC_Join(V["expected_missing"]), _HCSC_Join(Result["missing"]), V["id"] . ": missing")
+		Replayed += 1
 	}
+	AssertTrue(Replayed > 0, "the corpus must carry check_fields vectors")
 }
-Test("corpus:hc-snap: format_uptime vectors match golden values", _HCSC_UptimeSeconds)
-
-; ── extract_recent_issues — validate count logic ─────────────────────────────
-; The AHK _HealthCheck_RecentIssues reads from the live ring buffer, so we
-; cannot replay arbitrary lines. We validate the trim logic by checking that
-; the corpus expected arrays are internally consistent (length matches
-; expected_count when present)
-
-_HCSC_IssuesConsistency() {
-	Raw := _HCSC_LoadCorpus()
-	Data := _HCSC_ParseJson(Raw)
-	for _, V in Data["vectors"] {
-		if V["category"] != "extract_recent_issues"
-			continue
-		Expected := V["expected"]
-		AssertTrue(Expected is Array, V["id"] . ": expected must be an array")
-		if V.Has("expected_count") {
-			AssertEqual(V["expected_count"], Expected.Length,
-				V["id"] . ": expected_count must match array length")
-		}
-	}
-}
-Test("corpus:hc-snap: extract_recent_issues expected arrays are internally consistent", _HCSC_IssuesConsistency)
-
-; ── validate_snapshot — validate schema field list ───────────────────────────
-
-_HCSC_SchemaFields() {
-	Raw := _HCSC_LoadCorpus()
-	Data := _HCSC_ParseJson(Raw)
-	; The canonical field list must match between the Lua module and the corpus
-	ExpectedFields := [
-		"version", "loaded_adapters", "ports_validated", "failed_adapters",
-		"last_error", "uptime_sec", "warn_count", "err_count",
-		"recent_issues", "sys", "pause_state", "keylogger", "llm",
-		"layout", "hotstrings", "logs", "config"
-	]
-	; Find the schema_all_present vector and verify it has every field
-	for _, V in Data["vectors"] {
-		if V["id"] != "schema_all_present"
-			continue
-		Snap := V["input"]["snapshot"]
-		for _, Field in ExpectedFields {
-			AssertTrue(Snap.Has(Field),
-				"schema_all_present: snapshot must have field '" . Field . "'")
-		}
-	}
-}
-Test("corpus:hc-snap: schema_all_present vector contains every canonical field", _HCSC_SchemaFields)
+Test("corpus:hc-snap: check_fields vectors match golden values", _HCSC_CheckFields)

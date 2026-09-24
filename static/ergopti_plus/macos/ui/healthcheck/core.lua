@@ -3,28 +3,24 @@
 --- ==============================================================================
 --- MODULE: Healthcheck Core
 --- DESCRIPTION:
---- The healthcheck probe, public API, and report window. Extracted from the
---- former monolithic infra/healthcheck.lua (audit F2) so the macOS driver mirrors
---- the Windows ui/healthcheck/{init,core,helpers} layout.
+--- The version 2 diagnostics snapshot (_shared/modules/diagnostics/schema.json)
+--- and the window that shows it. The window loads the shared page
+--- (_shared/ui/healthcheck/); the page renders the snapshot, keeps the preview
+--- of what is shared and asks for every action by message.
 ---
 --- FEATURES & RATIONALE:
---- 1. Adapter probing: iterates the canonical adapter list, attempts a require()
----    for each module, and verifies the presence of its public contract methods —
----    without side effects.
---- 2. Port validation: records pass/fail per adapter contract.
---- 3. Last error capture: reads the last Logger ERROR entry stored in module
----    state so callers can surface the most recent failure without parsing logs.
---- 4. Uptime: computes seconds since the module was first required.
---- 5. Snapshot assembly: M.run() gathers system info, session counters, and the
----    enriched runtime collectors (delegated to ui.healthcheck.helpers) into one
----    table.
---- 6. Selectable window: M.show_window() loads the shared frontend at
----    _shared/ui/healthcheck/ via ui_builder.build_injected_html(), then injects
----    the snapshot as JSON — the client-side script.js renders the report.
----    All diagnostic labels are in English (developer-facing, not translated).
----
---- The state-gathering probes live in ui.healthcheck.helpers; the HTML rendering
---- is the shared _shared/ui/healthcheck/ frontend.
+--- 1. One hs.webview.usercontent controller per window, named "healthcheck"
+---    as host_bridge.js posts it. The copy button used to be JS injected into
+---    the page and a 200 ms timer polling a flag, because WKWebView refuses a
+---    custom URL scheme; every other macOS web UI already used a message
+---    handler, which needs no timer at all.
+--- 2. Every message is validated by healthcheck.actions against the schema's
+---    allowlist: the host opens only the paths it collected, by field id.
+--- 3. The page asks for the first snapshot with "ready"; the probes start then
+---    (ui.healthcheck.probes) and push their answers into that window only.
+--- 4. The module contract check stays: a developer section of the page. Its
+---    `wired` flag is a build-time fact kept honest by
+---    tests/meta/test_adapter_wiring_reachability.lua.
 --- ==============================================================================
 
 local M = {}
@@ -34,9 +30,15 @@ local Logger   = require("infra.logger")
 local H        = require("ui.healthcheck.helpers")
 local Paths    = require("infra.paths")
 local Snapshot = require("healthcheck.snapshot")
+local Actions  = require("healthcheck.actions")
 local TimerScheduler = require("adapters.timer_scheduler")
 
 local LOG = "healthcheck"
+
+M.DRIVER = "macos"
+
+-- The message handler name host_bridge.js posts to
+local BRIDGE = "healthcheck"
 
 -- The default build pin and this reviewed native contract are locked together
 -- by the native event-tap contract tests. Hammerspoon 1.1.1 consumes
@@ -49,13 +51,17 @@ local EVENT_TAP_REVIEWED_VERSION = "1.1.1"
 -- Module load timestamp — used to approximate driver uptime.
 local _load_time = os.time()
 
--- Reference to the currently open webview window (singleton — one at a time).
-local _window = nil
+-- The documents of the diagnostics window, loaded once
+local _config = nil
 
--- Poll timer for the copy-button JS flag; module-level so show_window() can
--- stop the PREVIOUS timer when reopening (a local would be orphaned on reopen).
-local _poll_timer = nil
+-- The menu state the last opening handed over, for the features section
+local _menu_state = nil
+
+-- Reference to the currently open webview window (singleton — one at a time),
+-- its generation and its page session.
+local _window = nil
 local _window_generation = 0
+local _session = nil
 local _continuation_timers = {}
 local _closing_window = nil
 local _focus_owner = nil
@@ -63,7 +69,7 @@ local _focus_owner = nil
 --- Returns an isolated description of the live eventtap telemetry contract.
 --- @param runtime_version string|nil Hammerspoon version reported at runtime.
 --- @return table Contract status safe to expose in a diagnostic snapshot.
-local function event_tap_timeout_telemetry(runtime_version)
+function M.event_tap_telemetry(runtime_version)
 	local runtime = type(runtime_version) == "string" and runtime_version ~= ""
 		and runtime_version or "unknown"
 	local reviewed = runtime == EVENT_TAP_REVIEWED_VERSION
@@ -86,20 +92,23 @@ local function event_tap_timeout_telemetry(runtime_version)
 	}
 end
 
-local function _stop_poll()
-	if not _poll_timer then return true end
-	local handle = _poll_timer
-	local ok, settled = xpcall(function()
-		return TimerScheduler.cancel(handle)
-	end, debug.traceback)
-	if not ok or settled ~= true then
-		Logger.error(LOG, "Copy-button poll timer cleanup failed; exact handle retained: %s.",
-			tostring(ok and settled or settled))
-		return false
+--- Stops a page session's probes and releases its message controller.
+--- @param session table|nil
+local function retire_session(session)
+	if not session then return end
+	if _session == session then _session = nil end
+	if session.probes then
+		session.probes.cancel()
+		session.probes = nil
 	end
-	if _poll_timer == handle then _poll_timer = nil end
-	Logger.debug(LOG, "Copy-button poll timer stopped.")
-	return true
+	local controller = session.controller
+	session.controller = nil
+	if controller then
+		local ok, result = pcall(function() return controller:setCallback(nil) end)
+		if not ok then
+			Logger.error(LOG, "The diagnostics message handler could not be released: %s.", tostring(result))
+		end
+	end
 end
 
 --- Cancels every delayed window continuation independently.
@@ -144,12 +153,12 @@ local function close_owned_window(webview, reason)
 	end
 	if _window == webview then _window = nil end
 	_window_generation = _window_generation + 1
-	local poll_stopped = _stop_poll()
+	retire_session(_session)
 	local continuations_stopped = stop_continuations()
-	if not poll_stopped or not continuations_stopped then
+	if not continuations_stopped then
 		Logger.error(LOG, "Healthcheck %s retained timer cleanup debt.", reason)
 	end
-	return poll_stopped and continuations_stopped
+	return continuations_stopped
 end
 
 --- Schedules one exact window-generation continuation.
@@ -428,313 +437,394 @@ local ADAPTER_SPECS = {
 
 
 
---- =============================
---- =============================
---- ======= 2/ Public API =======
---- =============================
---- =============================
+--- ===============================
+--- ===============================
+--- ======= 2/ The Snapshot =======
+--- ===============================
+--- ===============================
 
---- Today's errors file: the same path the Debug menu's "open error log" row
---- opens, read through one accessor so the logs-folder owner can move it.
---- @return string
-local function errors_log_path()
-	return Logger.ERRORS_LOG_FILE
+--- The schema, the issue forms, the redaction rules and the repository, loaded
+--- once: they are files of the shared tree, not settings.
+--- @return table { schema, templates, redaction, repository }
+function M.config()
+	if not _config then _config = Snapshot.load_config(Paths.shared) end
+	return _config
 end
 
---- The window's recent warnings and errors: a bounded tail of today's errors
---- file, or the ring before that file exists. The ring holds every level, so
---- at DEBUG a few minutes of routine lines evicted the problems the window is
---- opened to show; the errors file keeps WARNING and ERROR only.
---- @param ring_lines table The logger's ring buffer snapshot.
---- @return table entries Oldest first.
---- @return string source "errors_file", "ring", or "unavailable" when the
----   bounds or an existing errors file could not be read (logged).
-local function collect_recent_issues(ring_lines)
-	local ok, entries, source = pcall(function()
-		local limits = Snapshot.load_recent_issue_limits(
-			Paths.shared("modules/diagnostics/recent_issues.json"))
-		return Snapshot.collect_recent_issues(errors_log_path(), ring_lines, limits)
-	end)
-	if not ok then
-		Logger.error(LOG, "Recent issues could not be collected: %s.", tostring(entries))
-		return {}, "unavailable"
+--- The name of the logger's active level.
+--- @return string|nil
+local function level_name()
+	for name, value in pairs(Logger.LEVELS or {}) do
+		if value == Logger.current_level then return name end
 	end
-	Logger.debug(LOG, "Recent issues: %d entry(ies) from %s.", #entries, source)
-	return entries, source
+	return nil
 end
 
-
---- Probes all registered adapters and port contracts, then returns a snapshot
---- table with: version, loaded_adapters, ports_validated, last_error, uptime_sec, sys.
---- @return table Snapshot with fields described above.
-function M.run()
-	Logger.start(LOG, "Running healthcheck…")
-
-	-- The ErgoptiPlus version, from the same owner as the About menu.
-	-- hs.processInfo.version is the nested Hammerspoon's own version, already
-	-- reported on the Hammerspoon line; reading it here showed 1.1.1 as the
-	-- ErgoptiPlus version. Required lazily, and never allowed to fail the report.
-	local version = "unknown"
-	local ok_updater, Updater = pcall(require, "modules.updater")
-	if ok_updater and type(Updater) == "table" and type(Updater.current_version) == "function" then
-		local ok_version, value = pcall(Updater.current_version)
-		if ok_version and type(value) == "string" and value ~= "" then
-			version = value
-		else
-			Logger.warn(LOG, "ErgoptiPlus version unavailable: %s.", tostring(value))
-		end
-	else
-		Logger.warn(LOG, "ErgoptiPlus version unavailable: %s.", tostring(Updater))
-	end
-	Logger.debug(LOG, "Driver version: %s.", version)
-
-	local loaded_adapters  = {}
-	local ports_validated  = {}
-	local failed_adapters  = {}
-	local wired_count      = 0
-	local unwired_adapters = {}
-
+--- The module contract check: every adapter loads and exposes its contract.
+--- @return table ok Adapter ids that passed.
+--- @return table failed Adapter ids that did not, with the reason.
+local function check_modules()
+	local ok_list, failed = {}, {}
 	for _, spec in ipairs(ADAPTER_SPECS) do
-		if spec.wired then wired_count = wired_count + 1 else table.insert(unwired_adapters, spec.id) end
-
-		local ok, mod = pcall(require, spec.id)
-		if not ok then
-			table.insert(failed_adapters, spec.id .. " (load failed)")
+		local loaded, mod = pcall(require, spec.id)
+		if not loaded then
+			failed[#failed + 1] = spec.id .. " (load failed)"
 			Logger.warn(LOG, "Adapter '%s' could not be loaded: %s.", spec.id, tostring(mod))
 		else
-			table.insert(loaded_adapters, spec.id)
-			Logger.debug(LOG, "Adapter '%s' loaded.", spec.id)
-
-			-- Validate each method in the contract
-			local all_ok = true
+			local complete = true
 			for _, method in ipairs(spec.contract) do
 				if type(mod[method]) ~= "function" then
-					all_ok = false
+					complete = false
 					Logger.warn(LOG, "Adapter '%s' missing contract method '%s'.", spec.id, method)
 				end
 			end
-
-			if all_ok then
-				table.insert(ports_validated, spec.id)
-				Logger.debug(LOG, "Adapter '%s' contract validated.", spec.id)
-			else
-				table.insert(failed_adapters, spec.id .. " (contract incomplete)")
-			end
+			if complete then ok_list[#ok_list + 1] = spec.id
+			else failed[#failed + 1] = spec.id .. " (contract incomplete)" end
 		end
 	end
+	return ok_list, failed
+end
 
-	local uptime_sec = os.time() - _load_time
-	Logger.debug(LOG, "Uptime: %ds.", uptime_sec)
+--- The warnings and errors: the logger's session counters, its last error and
+--- the newest entries of today's errors file (the ring before it exists).
+--- @return table
+local function collect_issues()
+	local recent, source = {}, "unavailable"
+	local ok, err = pcall(function()
+		local limits = Snapshot.load_recent_issue_limits(Paths.shared("modules/diagnostics/recent_issues.json"))
+		recent, source = Snapshot.collect_recent_issues(Logger.today_errors_path(), Logger.ring_buffer_snapshot() or {},
+			limits)
+	end)
+	if not ok then Logger.error(LOG, "Recent issues could not be collected: %s.", tostring(err)) end
+	local issues = Logger.session_issues()
+	return {
+		warn_count    = issues.warn_count,
+		err_count     = issues.err_count,
+		last_error    = issues.last_error,
+		recent_source = source,
+		recent        = recent,
+	}
+end
 
-	-- The ring is only the fallback of the recent issues, before today's errors
-	-- file exists
-	local all_lines = Logger.ring_buffer_snapshot()
-	if not all_lines then
-		Logger.error(LOG, "Logger.ring_buffer_snapshot() returned nil — ring buffer unavailable.")
-		all_lines = {}
-	end
-	local recent_issues, issues_source = collect_recent_issues(all_lines)
+--- The developer section: the module check, the log level and the ring.
+--- @return table
+local function collect_developer()
+	local ok_list, failed = check_modules()
+	return {
+		modules_ok          = ok_list,
+		modules_failed      = failed,
+		modules_disabled    = {},
+		log_level           = level_name(),
+		ring_lines          = #(Logger.ring_buffer_snapshot() or {}),
+		event_tap_telemetry = M.event_tap_telemetry(require("adapters.system_info").runtime_version()).summary,
+	}
+end
 
-	-- Run each enriched collector in a protected call so a single broken
-	-- collector cannot abort the entire healthcheck.
-	local function safe_collect(name, fn)
-		local ok, val = pcall(fn)
+--- Collects the synchronous (phase A) snapshot: memory, Hammerspoon queries
+--- and small files only; the probes fill the rest.
+--- @param opts table|nil { detailed = boolean }
+--- @return table The version 2 snapshot.
+function M.run(opts)
+	opts = type(opts) == "table" and opts or {}
+	local detailed = opts.detailed == true
+	Logger.start(LOG, "Collecting the diagnostics…")
+	local started = hs.timer.absoluteTime()
+	local schema = M.config().schema
+	local permission_ids = {}
+	for id in pairs(schema.permissions[M.DRIVER] or {}) do permission_ids[#permission_ids + 1] = id end
+	table.sort(permission_ids)
+
+	-- Each collector is isolated: a report exists to be read when things are
+	-- broken, so one collector raising costs its own section, never the window
+	local function section(name, collector)
+		local ok, value = pcall(collector)
 		if not ok then
-			Logger.error(LOG, "Collector '%s' crashed: %s.", name, tostring(val))
-			return nil
+			Logger.error(LOG, "Diagnostics collector '%s' raised: %s — section left empty.", name, tostring(value))
+			return {}
 		end
-		Logger.debug(LOG, "Collector '%s' done.", name)
-		return val
+		return value
 	end
 
-	local sys = safe_collect("sys_info", H.sys_info)
-	local result = {
-		version          = version,
-		loaded_adapters  = loaded_adapters,
-		ports_validated  = ports_validated,
-		failed_adapters  = failed_adapters,
-		wired_count      = wired_count,
-		adapter_count    = #ADAPTER_SPECS,
-		unwired_adapters = unwired_adapters,
-		uptime_sec       = uptime_sec,
-		recent_issues    = recent_issues,
-		recent_issues_source = issues_source,
-		event_tap_timeout_telemetry = event_tap_timeout_telemetry(sys and sys.hs_version),
-		sys              = sys,
-		pause_state      = safe_collect("pause_state",         H.collect_pause_state),
-		keylogger        = safe_collect("keylogger_summary",   H.collect_keylogger_summary),
-		llm              = safe_collect("llm_state",           H.collect_llm_state),
-		layout           = safe_collect("layout_state",        H.collect_layout_state),
-		remap            = safe_collect("remap_state",         H.collect_remap_state),
-		hotstrings       = safe_collect("hotstrings_state",    H.collect_hotstrings_state),
-		logs             = safe_collect("logs_info",           H.collect_logs_info),
-		config           = safe_collect("config_summary",      H.collect_config_summary),
-		coverage         = safe_collect("platform_coverage",   H.collect_platform_coverage),
-		permissions      = safe_collect("permissions",         H.collect_permissions),
+	local sections = {
+		paths       = section("paths", function() return H.collect_paths(schema.report.subdir) end),
+		versions    = section("versions", H.collect_versions),
+		hardware    = section("hardware", H.collect_hardware),
+		system      = section("system", function() return H.collect_system(detailed, os.time() - _load_time) end),
+		input       = section("input", H.collect_input),
+		features    = section("features", function() return H.collect_features(_menu_state) end),
+		unavailable = section("platform_coverage", H.collect_unavailable),
+		ai          = section("ai", H.collect_ai),
+		network     = section("network", H.collect_network),
+		permissions = section("permissions", function() return H.collect_permissions(permission_ids) end),
+		peripherals = section("peripherals", function() return H.collect_peripherals(detailed) end),
+		issues      = section("issues", collect_issues),
+		developer   = section("developer", collect_developer),
+	}
+	local snapshot = {
+		schema_version = schema.schema_version,
+		driver         = M.DRIVER,
+		generated_at   = Snapshot.utc_now(),
+		detailed       = detailed,
+		sections       = sections,
+		probes         = Snapshot.pending_probes(schema, M.DRIVER),
 	}
 
-	-- Read last, after every collector, so a problem this very run logged is
-	-- counted too. These are the logger's session counters: the ring they used
-	-- to be counted from forgets them within minutes of DEBUG output.
-	local issues = Logger.session_issues()
-	result.warn_count = issues.warn_count
-	result.err_count  = issues.err_count
-	-- false, not nil, when nothing failed: the shared validator reads a nil
-	-- field as missing, and "no error" is a value
-	result.last_error = issues.last_error or false
-
-	Logger.success(LOG, "Healthcheck complete — %d/%d adapter(s) wired, %d contract-healthy, %d failed, uptime %ds.",
-		wired_count, #ADAPTER_SPECS, #ports_validated, #failed_adapters, uptime_sec)
-
-	return result
+	local elapsed = (hs.timer.absoluteTime() - started) / 1e6
+	sections.developer.phase_a_ms = elapsed
+	if elapsed > schema.phase_a_budget_ms then
+		Logger.warn(LOG, "The synchronous diagnostics took %.1f ms, over the %d ms budget.", elapsed,
+			schema.phase_a_budget_ms)
+	end
+	local undeclared = Snapshot.check_fields(snapshot, schema)
+	if #undeclared > 0 then
+		Logger.error(LOG, "The diagnostics snapshot carries fields the schema does not declare: %s.",
+			table.concat(undeclared, ", "))
+	end
+	Logger.success(LOG, "Diagnostics collected in %.1f ms.", elapsed)
+	return snapshot
 end
 
 
---- Opens a dedicated webview window displaying the healthcheck report.
---- Text is fully selectable and copyable. Replaces any existing window (singleton).
+
+
+
+--- =============================
+--- =============================
+--- ======= 3/ The Window =======
+--- =============================
+--- =============================
+
+--- Sends a message into the session's page.
+--- @param session table
+--- @param message table
+--- @return boolean submitted
+local function send(session, message)
+	if _session ~= session or _window ~= session.webview then return false end
+	local ok_json, json = pcall(hs.json.encode, message)
+	if not ok_json or type(json) ~= "string" then
+		Logger.error(LOG, "A diagnostics message could not be encoded: %s.", tostring(json))
+		return false
+	end
+	local WebviewResult = require("adapters.webview_result")
+	local ok, err = pcall(function()
+		session.webview:evaluateJavaScript("if(window.receiveDiagnostics)window.receiveDiagnostics(" .. json .. ")",
+			function(_, script_error)
+				if WebviewResult.is_error(script_error) then
+					Logger.error(LOG, "The diagnostics page refused a '%s' message.", tostring(message.type))
+				end
+			end)
+	end)
+	if not ok then
+		Logger.error(LOG, "The diagnostics page could not be reached: %s.", tostring(err))
+		return false
+	end
+	return true
+end
+
+--- Starts the probes of the session's snapshot; each answer is kept in the
+--- snapshot and pushed into the page.
+--- @param session table
+local function start_probes(session)
+	if session.probes then session.probes.cancel() end
+	session.probes = require("ui.healthcheck.probes").start(M.config().schema, session.snapshot.sections.paths,
+		function(id, result, sections)
+			if _session ~= session then return end
+			session.snapshot.probes[id] = result
+			for section_id, values in pairs(sections or {}) do
+				local target = session.snapshot.sections[section_id]
+				for key, value in pairs(values) do target[key] = value end
+			end
+			send(session, { type = "probe", id = id, result = result, sections = sections })
+		end)
+end
+
+--- The page's first message: its configuration and the first snapshot.
+--- @param session table
+--- @return table
+local function init_message(session)
+	local documents = M.config()
+	return {
+		type = "init",
+		config = {
+			schema    = documents.schema,
+			redaction = documents.redaction,
+			context   = require("ui.healthcheck.report").redaction_context(),
+			mode      = session.mode,
+		},
+		snapshot = session.snapshot,
+	}
+end
+
+--- Handles one validated action of the session's page.
+--- @param session table
+--- @param action table From healthcheck.actions.validate.
+--- @param documents table M.config().
+local function perform_action(session, action, documents)
+	if action.action == "close" then
+		close_owned_window(session.webview, "page close")
+	elseif action.action == "refresh" then
+		session.detailed = action.detailed
+		session.snapshot = M.run({ detailed = action.detailed })
+		send(session, { type = "snapshot", snapshot = session.snapshot })
+		start_probes(session)
+	else
+		local Report = require("ui.healthcheck.report")
+		local result = Report.perform(action, session.snapshot.sections.paths, documents, Report.redaction_context())
+		result.type = "action"
+		result.action = action.action
+		send(session, result)
+	end
+end
+
+--- Handles one message of the session's page.
+--- @param session table
+--- @param message table The usercontent message ({ body = … }).
+local function on_page_message(session, message)
+	if _session ~= session or _window ~= session.webview or _closing_window == session.webview then return end
+	local body = type(message) == "table" and message.body or nil
+	if body == "ready" then
+		Logger.info(LOG, "Diagnostics page ready.")
+		local ok, err = xpcall(function()
+			send(session, init_message(session))
+			start_probes(session)
+		end, debug.traceback)
+		if not ok then Logger.error(LOG, "The diagnostics page could not be initialised: %s", tostring(err)) end
+		return
+	end
+	local documents = M.config()
+	local action, reason = Actions.validate(body,
+		{ schema = documents.schema, templates = documents.templates, driver = M.DRIVER })
+	if not action then
+		Logger.warn(LOG, "Refused a diagnostics page action (%s).", tostring(reason))
+		return
+	end
+	Logger.info(LOG, "Diagnostics page action: %s.", action.action)
+	-- A message handler that raises is only printed to the console: the error
+	-- is logged here and the page is told its button did nothing
+	local ok, err = xpcall(perform_action, debug.traceback, session, action, documents)
+	if not ok then
+		Logger.error(LOG, "The diagnostics action '%s' failed: %s", action.action, tostring(err))
+		send(session, { type = "action", action = action.action, ok = false })
+	end
+end
+
+--- Hands the page the user's locale strings: i18n.js cannot fetch them from
+--- an inline page.
+--- @param webview table
+local function inject_strings(webview)
+	local ok_strings, strings = pcall(function() return require("infra.locale").all() end)
+	if not ok_strings or type(strings) ~= "table" then
+		Logger.error(LOG, "The diagnostics page's strings could not be read: %s.", tostring(strings))
+		return
+	end
+	local ok_json, json = pcall(hs.json.encode, strings)
+	if not ok_json then
+		Logger.error(LOG, "The diagnostics page's strings could not be encoded: %s.", tostring(json))
+		return
+	end
+	local ok, err = pcall(function()
+		webview:evaluateJavaScript("if(window.i18n_apply){window.i18n_apply(" .. json .. ");}")
+	end)
+	if not ok then Logger.error(LOG, "The diagnostics page's strings were refused: %s.", tostring(err)) end
+end
+
+--- Opens the diagnostics window. Replaces any existing window (singleton).
+--- @param opts table|nil { mode = "report"|nil, state = menu state|nil }
 --- @return boolean opened
-function M.show_window()
-	Logger.start(LOG, "Opening healthcheck window…")
+function M.show_window(opts)
+	opts = type(opts) == "table" and opts or {}
+	Logger.start(LOG, "Opening the diagnostics window…")
+	if type(opts.state) == "table" then _menu_state = opts.state end
 
 	if _window then
 		Logger.debug(LOG, "Closing existing healthcheck window before reopening.")
 		if not close_owned_window(_window, "reopen") then return false end
-	else
-		local poll_stopped = _stop_poll()
-		local continuations_stopped = stop_continuations()
-		if not poll_stopped or not continuations_stopped then
-			Logger.error(LOG, "Healthcheck startup refused: prior timer cleanup remains pending.")
-			return false
-		end
+	elseif not stop_continuations() then
+		Logger.error(LOG, "Healthcheck startup refused: prior timer cleanup remains pending.")
+		return false
 	end
 
 	local ok_snap, snapshot = pcall(M.run)
-	if not ok_snap or not snapshot then
-		Logger.error(LOG, "M.run() failed — cannot show healthcheck window: %s.", tostring(snapshot))
+	if not ok_snap or type(snapshot) ~= "table" then
+		Logger.error(LOG, "The diagnostics could not be collected: %s.", tostring(snapshot))
 		return false
 	end
 
-	local ok_plain, plain = pcall(M.format_plain, snapshot)
-	if not ok_plain or not plain then
-		Logger.error(LOG, "M.format_plain() failed: %s.", tostring(plain))
-		plain = "(format error)"
-	end
-
-	local i18n_ok, i18n = pcall(require, "infra.i18n")
-	if not i18n_ok then
-		Logger.warn(LOG, "lib.i18n unavailable — using key names as labels.")
-	end
-	local t = (i18n_ok and type(i18n) == "table" and type(i18n.get) == "function")
-		and function(k) return i18n.get(k) end
-		or  function(k) return k end
-
-	local title = t("menu.debug.healthcheck") or "System diagnostic"
-	if not title:find("ErgoptiPlus") then
-		title = "ErgoptiPlus — " .. title
-	end
-	local btn_label = t("healthcheck.copy_and_close") or "Copy to clipboard and close"
-
-	-- Build the self-contained HTML from the shared frontend (inlines CSS + JS).
+	local i18n = require("infra.i18n")
+	local ui_builder = require("ui.ui_builder")
+	local title = ui_builder.window_title(i18n.get("menu.debug.healthcheck"))
 	local shared_ui_dir = (Paths.shared("ui/healthcheck") or "") .. "/"
-	local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
-	if not ok_ui or not ui_builder then
-		Logger.error(LOG, "ui.ui_builder unavailable — falling back to text alert: %s.", tostring(ui_builder))
-		local ok_d, dialog = pcall(require, "infra.dialog_util")
-		if ok_d and dialog then
-			dialog.block_alert(title, plain, "OK")
-		end
-		return false
-	end
 	local ok_html, html = pcall(ui_builder.build_injected_html, shared_ui_dir)
-	if not ok_html or not html then
-		Logger.error(LOG, "build_injected_html() failed: %s.", tostring(html))
-		local ok_d, dialog = pcall(require, "infra.dialog_util")
-		if ok_d and dialog then
-			dialog.block_alert(title, plain, "OK")
-		end
+	if not ok_html or type(html) ~= "string" then
+		Logger.error(LOG, "The diagnostics page could not be built: %s.", tostring(html))
 		return false
 	end
 
-	-- Encode the snapshot as JSON for client-side rendering.
-	local ok_enc, snapshot_json = pcall(hs.json.encode, snapshot)
-	if not ok_enc or not snapshot_json then
-		Logger.error(LOG, "hs.json.encode() failed: %s.", tostring(snapshot_json))
-		local ok_d, dialog = pcall(require, "infra.dialog_util")
-		if ok_d and dialog then
-			dialog.block_alert(title, plain, "OK")
-		end
-		return false
-	end
-	local render_js = "if(window.renderHealthcheck)window.renderHealthcheck(" .. snapshot_json .. ")"
-
-	local ok_scr, screen = pcall(function() return hs.screen.mainScreen() end)
-	if not ok_scr or not screen then
-		Logger.warn(LOG, "hs.screen.mainScreen() failed — using default frame.")
-	end
-	local sf = (ok_scr and screen and type(screen.frame) == "function" and screen:frame())
-		or { x = 0, y = 0, w = 1440, h = 900 }
-
-	-- Geometry comes from _shared/ui/apps.manifest.json (SSoT). This window used
-	-- to hardcode 700x600 while Windows opened the same diagnostic at the
-	-- manifest's 740x560 — the drift the manifest exists to prevent, invisible
-	-- because the geometry gate had no entry for the macOS healthcheck.
+	-- Geometry comes from _shared/ui/apps.manifest.json, as on every driver
 	local geo = ui_builder.get_app_geometry("healthcheck")
 	if not geo then
 		Logger.error(LOG, "No geometry for 'healthcheck' in apps.manifest.json — cannot open the window.")
 		return false
 	end
+	local ok_scr, screen = pcall(function() return hs.screen.mainScreen() end)
+	local sf = (ok_scr and screen and type(screen.frame) == "function" and screen:frame())
+		or { x = 0, y = 0, w = 1440, h = 900 }
 	local frame = {
 		x = math.floor(sf.x + (sf.w - geo.width) / 2),
 		y = math.floor(sf.y + (sf.h - geo.height) / 2),
 		w = geo.width,
 		h = geo.height,
 	}
-	Logger.debug(LOG, "Webview frame: x=%d y=%d w=%d h=%d.", frame.x, frame.y, frame.w, frame.h)
 
-	local ok_wv, wv = pcall(hs.webview.new, frame, { developerExtrasEnabled = false })
-	if not ok_wv or not wv then
-		Logger.error(LOG, "hs.webview.new() failed — falling back to text alert: %s.", tostring(wv))
-		local ok_d, dialog = pcall(require, "infra.dialog_util")
-		if ok_d and dialog then
-			dialog.block_alert(title, plain, "OK")
-		end
+	local ok_ucc, controller = pcall(hs.webview.usercontent.new, BRIDGE)
+	if not ok_ucc or not controller then
+		Logger.error(LOG, "The diagnostics message handler could not be created: %s.", tostring(controller))
 		return false
 	end
-	Logger.debug(LOG, "Webview created.")
+	local ok_wv, wv = pcall(hs.webview.new, frame, { developerExtrasEnabled = false }, controller)
+	if not ok_wv or not wv then
+		Logger.error(LOG, "hs.webview.new() failed: %s.", tostring(wv))
+		return false
+	end
 	_window_generation = _window_generation + 1
 	local generation = _window_generation
 	_window = wv
 	local focus_owner = {}
 	_focus_owner = focus_owner
+	local session = {
+		generation = generation,
+		webview    = wv,
+		controller = controller,
+		snapshot   = snapshot,
+		detailed   = false,
+		mode       = opts.mode,
+	}
+	_session = session
 	local function abandon_open_window(label, detail)
 		Logger.error(LOG, "%s: %s.", label, tostring(detail))
 		close_owned_window(wv, "open-failure rollback")
-		local ok_d, dialog = pcall(require, "infra.dialog_util")
-		if ok_d and dialog then dialog.block_alert(title, plain, "OK") end
 		return false
 	end
+
+	local ok_cb, cb_err = pcall(function()
+		controller:setCallback(function(message) on_page_message(session, message) end)
+	end)
+	if not ok_cb then return abandon_open_window("The diagnostics message handler was refused", cb_err) end
 
 	-- The same chrome as every other Ergopti window (title bar, drop shadow,
 	-- floating level), from the one function that defines it.
 	local masks = hs.webview.windowMasks
 	for _, step in ipairs(ui_builder.window_chrome_steps(wv, {
-		style_masks = (masks["titled"] or 1) + (masks["closable"] or 2) + (masks["miniaturizable"] or 4),
+		style_masks = (masks["titled"] or 1) + (masks["closable"] or 2) + (masks["miniaturizable"] or 4)
+			+ (masks["resizable"] or 8),
 	})) do
 		local ok_step, step_err = pcall(step.apply)
 		if not ok_step then Logger.warn(LOG, "%s() failed: %s.", step.name, tostring(step_err)) end
 	end
-
 	pcall(function() wv:windowTitle(title) end)
 	pcall(function() wv:allowTextEntry(true) end)
 	pcall(function() wv:allowNewWindows(false) end)
 	pcall(function() wv:allowGestures(false) end)
-
-
-	-- Wire up the copy-and-close button using a flag polled from Lua.
-	-- WKWebView rejects custom URL schemes (ergopti://) with NSURLErrorDomain -1002
-	-- before willNavigate fires, so we set a JS global instead and poll it.
-	-- _poll_timer and _stop_poll() are module-level so reopening the window
-	-- can stop the previous timer before orphaning it.
 
 	local ok_wcb, wcb_err = pcall(function()
 		wv:windowCallback(function(action)
@@ -744,9 +834,8 @@ function M.show_window()
 			if action == "closing" or action == "closed" then
 				_window = nil
 				_window_generation = _window_generation + 1
-				local poll_stopped = _stop_poll()
-				local continuations_stopped = stop_continuations()
-				if not poll_stopped or not continuations_stopped then
+				retire_session(session)
+				if not stop_continuations() then
 					Logger.error(LOG, "Healthcheck close retained timer cleanup debt.")
 				end
 			end
@@ -755,92 +844,9 @@ function M.show_window()
 	if not ok_wcb then Logger.warn(LOG, "windowCallback() failed: %s.", tostring(wcb_err)) end
 
 	local ok_ncb, ncb_err = pcall(function()
-		wv:navigationCallback(function(action, _)
+		wv:navigationCallback(function(action)
 			if generation ~= _window_generation or _window ~= wv then return end
-			Logger.debug(LOG, "Navigation callback: action='%s'.", tostring(action))
-			if action == "didFinishNavigation" then
-				-- Render the report from the snapshot JSON, then wire the
-				-- copy button (injected into the page after render).
-				local ok_js, js_err = pcall(function()
-					wv:evaluateJavaScript(
-						render_js .. ";"
-						.. "window.__hs_copy_requested = false;"
-						.. "(function(){"
-						.. "var b=document.getElementById('btnCopy');"
-						.. "if(!b){b=document.createElement('button');b.id='btnCopy';"
-						.. "b.textContent='" .. btn_label:gsub("\\", "\\\\"):gsub("'", "\\'") .. "';"
-						.. "b.style.cssText='display:block;width:100%;padding:7px 20px;"
-						.. "font-family:-apple-system,sans-serif;font-size:13px;"
-						.. "background:#0078d4;color:#fff;border:none;border-radius:4px;cursor:pointer;';"
-						.. "var f=document.createElement('div');f.id='footer';"
-						.. "f.style.cssText='position:fixed;bottom:0;left:0;right:0;"
-						.. "padding:10px 20px;background:#fff;border-top:1px solid #e0e0e0;';"
-						.. "f.appendChild(b);document.body.appendChild(f);}"
-						.. "b.onclick=function(){window.__hs_copy_requested=true;};"
-						.. "})();"
-					)
-				end)
-				if not ok_js then
-					Logger.warn(LOG, "JS injection failed: %s.", tostring(js_err))
-				end
-				-- Stop any previous poll timer before arming a new one; a second
-				-- didFinishNavigation (re-navigation or webview redraw) would otherwise
-				-- orphan the existing timer and leave two timers polling in parallel.
-				if not _stop_poll() then
-					Logger.error(LOG, "Copy-button poll restart refused: prior cleanup remains pending.")
-					return
-				end
-				-- Poll every 200 ms for the flag; stop and clean up when triggered
-				local poll_ok, poll_candidate, poll_committed = xpcall(function()
-					return TimerScheduler.every(0.2, function()
-					if generation ~= _window_generation or _window ~= wv then return end
-					-- Wrap in pcall: a natively-closed webview is NOT nil in Lua but
-					-- becomes "dead userdata" — a stale Lua handle whose backing C object
-					-- is gone. :evaluateJavaScript() on a dead userdata raises a runtime
-					-- error every 200 ms until Hammerspoon is force-quit
-					-- (healthcheck-webview-dead-userdata).
-					local ok_ev, ev_err = pcall(function()
-						wv:evaluateJavaScript("window.__hs_copy_requested", function(result)
-							-- evaluateJavaScript yields to WebKit. The window may close or
-							-- be replaced before this completion arrives, so the entry fence
-							-- above is insufficient on its own.
-							if generation ~= _window_generation or _window ~= wv then return end
-							if result == true then
-								Logger.debug(LOG, "Copy button clicked — copying plain text to clipboard.")
-								local ok_write, write_result = pcall(hs.pasteboard.setContents, plain)
-								if not ok_write or write_result ~= true then
-									Logger.error(LOG, "Healthcheck clipboard write was refused: %s.",
-										tostring(write_result))
-									pcall(function()
-										wv:evaluateJavaScript("window.__hs_copy_requested=false")
-									end)
-									return
-								end
-								if not close_owned_window(wv, "copy-close") then
-									pcall(function()
-										wv:evaluateJavaScript("window.__hs_copy_requested=false")
-									end)
-								end
-							end
-						end)
-					end)
-					if not ok_ev then
-						Logger.warn(LOG, "evaluateJavaScript on dead webview — stopping poll: %s.", tostring(ev_err))
-						if not _stop_poll() then
-							Logger.error(LOG, "Dead-webview poll cleanup remains pending.")
-						end
-					end
-					end)
-				end, debug.traceback)
-				if type(poll_candidate) == "table" then _poll_timer = poll_candidate end
-				if not poll_ok or type(poll_candidate) ~= "table" or poll_committed ~= true then
-					if type(poll_candidate) == "table" then _stop_poll() end
-					Logger.error(LOG, "Copy-button poll timer was not committed: %s.",
-						tostring(poll_ok and poll_committed or poll_candidate))
-					return
-				end
-				Logger.debug(LOG, "Copy-button poll timer started.")
-			end
+			if action == "didFinishNavigation" then inject_strings(wv) end
 		end)
 	end)
 	if not ok_ncb then Logger.warn(LOG, "navigationCallback() failed: %s.", tostring(ncb_err)) end
@@ -855,14 +861,13 @@ function M.show_window()
 		return abandon_open_window("wv:show() failed — window will not appear", show_result)
 	end
 
-	local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
-	if ok_ui and ui_builder then
-		Logger.debug(LOG, "Delegating focus to ui_builder.force_focus().")
-		ui_builder.force_focus(wv, true, { is_current = function()
+	local ok_ui, focus_builder = pcall(require, "ui.ui_builder")
+	if ok_ui and focus_builder then
+		focus_builder.force_focus(wv, true, { is_current = function()
 			return _focus_owner == focus_owner and _window == wv and _window_generation == generation
 		end })
 	else
-		Logger.warn(LOG, "ui.ui_builder unavailable (%s) — using fallback focus.", tostring(ui_builder))
+		Logger.warn(LOG, "ui.ui_builder unavailable (%s) — using fallback focus.", tostring(focus_builder))
 		if not schedule_continuation(0.08, generation, wv, function()
 			if _focus_owner ~= focus_owner then return end
 			pcall(hs.focus)
@@ -877,160 +882,8 @@ function M.show_window()
 		end
 	end
 
-	Logger.success(LOG, "Healthcheck window opened.")
+	Logger.success(LOG, "Diagnostics window opened.")
 	return true
-end
-
-
---- Formats a snapshot as plain text (last-resort fallback when webview fails).
---- All labels are in English — diagnostic output is developer-facing, not user-facing.
---- @param snapshot table|nil Result from M.run(), or nil to run fresh.
---- @return string Plain-text diagnostic string.
-function M.format_plain(snapshot)
-	local s      = snapshot or M.run()
-	local sys    = s.sys or {}
-	local lines  = {}
-
-	table.insert(lines, "=== System diagnostic ===")
-	table.insert(lines, "")
-	table.insert(lines, string.format("Version          : %s", s.version))
-	table.insert(lines, string.format("Last git commit  : %s%s", tostring(sys.git_hash or "unknown"),
-		sys.commit_source and (" (" .. tostring(sys.commit_source) .. ")") or ""))
-	table.insert(lines, string.format("Uptime           : %s", H.format_uptime(s.uptime_sec)))
-	table.insert(lines, string.format("Hammerspoon      : %s", tostring(sys.hs_version or "?")))
-	table.insert(lines, string.format("macOS            : %s", tostring(sys.os_version or "?")))
-	table.insert(lines, string.format("Architecture     : %s", tostring(sys.arch or "?")))
-	table.insert(lines, string.format("CPU              : %s", tostring(sys.cpu_model or "?")))
-	table.insert(lines, string.format("Logical cores    : %s", tostring(sys.cpu_cores or "?")))
-	table.insert(lines, string.format("Total RAM        : %s", tostring(sys.ram_total or "?")))
-	table.insert(lines, string.format("Available RAM    : %s", tostring(sys.ram_free or "?")))
-	table.insert(lines, string.format("Screen           : %s", tostring(sys.screen_res or "?")))
-	if sys.dpi or sys.retina_scale then
-		local retina = sys.retina_scale and (sys.retina_scale .. " Retina") or nil
-		local dpi_text = sys.dpi and (tostring(sys.dpi) .. (retina and (" (" .. retina .. ")") or "")) or retina
-		table.insert(lines, string.format("DPI              : %s", dpi_text))
-	end
-	table.insert(lines, string.format("Locale           : %s", tostring(sys.locale or "?")))
-	if sys.wifi_signal then
-		table.insert(lines, string.format("Wi-Fi signal     : %s%%", tostring(sys.wifi_signal)))
-	end
-	if sys.config_dir and sys.config_dir ~= "" then
-		table.insert(lines, string.format("Config dir       : %s", sys.config_dir))
-	end
-	if sys.script_dir and sys.script_dir ~= "" then
-		table.insert(lines, string.format("App dir          : %s", sys.script_dir))
-	end
-	table.insert(lines, "")
-	table.insert(lines, string.format("Warnings         : %d", s.warn_count or 0))
-	table.insert(lines, string.format("Errors           : %d", s.err_count  or 0))
-	table.insert(lines, "")
-
-	-- Enriched sections (maximum diagnostic value)
-	if s.permissions then
-		table.insert(lines, string.format("Accessibility    : %s", tostring(s.permissions.accessibility)))
-		table.insert(lines, string.format("Screen Recording : %s", tostring(s.permissions.screen_recording)))
-	end
-	if s.pause_state then
-		local ps = s.pause_state
-		table.insert(lines, string.format("Pause / Suspend  : %s (%s)", ps.is_paused and "PAUSED" or "running", ps.source or "unknown"))
-	end
-	if s.logs then
-		local lg = s.logs
-		table.insert(lines, string.format("Logs folder      : %s", lg.logs_dir or "n/a"))
-		table.insert(lines, string.format("Logs (unified)   : %s", lg.unified_today or "n/a"))
-		table.insert(lines, string.format("Errors sink      : %s  (WARNING/ERROR only — keeps main log clean)", lg.errors_today or "n/a"))
-		table.insert(lines, string.format("Crash reports    : %s", lg.crash_reports_dir or "n/a"))
-	end
-	if s.keylogger then
-		local kl = s.keylogger
-		table.insert(lines, string.format("Keylogger        : events=%s wpm=%s privacy_hits=%s", tostring(kl.events_session), tostring(kl.wpm), tostring(kl.privacy_hits)))
-	end
-	if s.llm then
-		local ll = s.llm
-		table.insert(lines, string.format("LLM              : enabled=%s backend=%s profile=%s", tostring(ll.enabled), tostring(ll.backend), tostring(ll.active_profile)))
-	end
-	if s.layout then
-		local ly = s.layout
-		table.insert(lines, string.format("Layout           : base=%s altgr=%s shift=%s caps=%s prefix_latch=%s", tostring(ly.ergopti_base), tostring(ly.altgr), tostring(ly.shift), tostring(ly.caps), tostring(ly.prefix_latch)))
-	end
-	if s.remap then
-		local rm = s.remap
-		table.insert(lines, string.format("Remap engine     : phase=%s guardian=%s", tostring(rm.phase), tostring(rm.guardian_status)))
-		if rm.approval_required then
-			table.insert(lines, "ACTION REQUIRED  : approve ErgoptiPlus in System Settings > General > Login Items")
-		end
-	end
-	if s.hotstrings then
-		local hs = s.hotstrings
-		table.insert(lines, string.format("Hotstrings       : terminators=%s personal=%s dyn=%s magic=%s", tostring(hs.terminators), tostring(hs.personal_count), tostring(hs.dynamic_count), tostring(hs.magic_key)))
-	end
-
-	-- Absence is explicit: zero would claim that a real timeout measurement ran.
-	-- The fallback keeps copied/plain reports honest for older stored snapshots.
-	local event_tap_telemetry = s.event_tap_timeout_telemetry
-		or event_tap_timeout_telemetry(s.sys and s.sys.hs_version)
-	table.insert(lines, string.format("Native tap timeout telemetry: %s",
-		tostring(event_tap_telemetry.summary)))
-
-	-- Platform coverage: the only place a user can ask why a feature they read
-	-- about is not in their menu. The SILENT count is reported next to the
-	-- explained one on purpose — a list of only the explained absences would look
-	-- complete while hiding the ones that matter most.
-	if s.coverage then
-		local cv = s.coverage
-		table.insert(lines, "")
-		table.insert(lines, string.format("Unavailable here : %d feature(s) — %d explained, %d with no reason recorded",
-			cv.total or 0, cv.explained or 0, cv.silent or 0))
-		for _, entry in ipairs(cv.entries or {}) do
-			table.insert(lines, string.format("  · %s (only %s) — %s", entry.path, entry.only, entry.reason))
-		end
-	end
-
-	local ok_list      = s.ports_validated  or {}
-	local fail_list    = s.failed_adapters  or {}
-	local unwired_list = s.unwired_adapters or {}
-	-- "Contract-healthy" (all methods present) is NOT the same claim as "reachable
-	-- from a real feature" — an unwired adapter can be 100% contract-healthy while
-	-- no production code ever calls it (audit F-HIGH-10). Report both numbers so
-	-- this window can never again imply full coverage when it is not the case.
-	table.insert(lines, string.format("Adapters: %d/%d wired, %d/%d contract-healthy",
-		s.wired_count or 0, s.adapter_count or 0, #ok_list, s.adapter_count or 0))
-	table.insert(lines, string.format("Contract-healthy (%d):", #ok_list))
-	for _, name in ipairs(ok_list) do
-		table.insert(lines, "  + " .. name)
-	end
-	if #fail_list > 0 then
-		table.insert(lines, string.format("Failed (%d):", #fail_list))
-		for _, name in ipairs(fail_list) do
-			table.insert(lines, "  x " .. name)
-		end
-	else
-		table.insert(lines, "Failed : none")
-	end
-	if #unwired_list > 0 then
-		table.insert(lines, string.format("Unwired (%d) — no production call site yet:", #unwired_list))
-		for _, name in ipairs(unwired_list) do
-			table.insert(lines, "  ~ " .. name)
-		end
-	end
-
-	table.insert(lines, "")
-	if s.last_error then
-		table.insert(lines, "Last error : " .. s.last_error)
-	else
-		table.insert(lines, "Last error : none")
-	end
-
-	local issues = s.recent_issues or {}
-	if #issues > 0 then
-		table.insert(lines, "")
-		table.insert(lines, string.format("--- Recent warnings / errors (%d) ---", #issues))
-		for _, l in ipairs(issues) do
-			table.insert(lines, l)
-		end
-	end
-
-	return table.concat(lines, "\n")
 end
 
 return M

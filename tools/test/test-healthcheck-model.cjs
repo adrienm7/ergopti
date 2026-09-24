@@ -162,6 +162,28 @@ for (const key of [
 	labelKeys.add(key);
 }
 
+// The keys the page itself names: its data-i18n attributes and every literal
+// t('…') of its scripts, read from the sources so a new label cannot be
+// forgotten here
+{
+	const page = path.join(SHARED, 'ui', 'healthcheck');
+	const html = fs.readFileSync(path.join(page, 'index.html'), 'utf8');
+	let found = 0;
+	for (const match of html.matchAll(/data-i18n(?:-title|-placeholder)?="([^"]+)"/g)) {
+		labelKeys.add(match[1]);
+		found++;
+	}
+	for (const file of ['script.js', 'model.js']) {
+		const source = fs.readFileSync(path.join(page, file), 'utf8');
+		// A complete key only: t('healthcheck.column.' + id) builds one at run time
+		for (const match of source.matchAll(/\bt\(\s*'([a-z_]+\.[a-z0-9_.]*[a-z0-9_])'\s*[,)]/g)) {
+			labelKeys.add(match[1]);
+			found++;
+		}
+	}
+	if (found < 20) fail(`only ${found} literal page key(s) found in the page sources, expected at least 20`);
+}
+
 // Floor: the label scan must see the whole schema
 if (labelKeys.size < 100) fail(`only ${labelKeys.size} label key(s) derived from the schema, expected at least 100`);
 if (locales.size !== 21) fail(`found ${locales.size} locale catalogue(s), expected 21`);
@@ -199,6 +221,12 @@ function fixture(driver, overrides) {
 	}
 	sections.features = { items: [{ id: 'hotstrings', enabled: true }, { id: 'gestures', enabled: 0 }] };
 	sections.peripherals = { items: [{ bus: 'usb', kind: 'keyboard', vendor_id: '046d', product_id: 'c52b', name: 'Secret Keyboard' }] };
+	if (sections.unavailable) {
+		sections.unavailable = { items: [
+			{ feature: 'script.alt_gr_is_kana_remap', platforms: 'Windows', reason: 'platform_reason.alt_gr_is_kana_remap' },
+			{ feature: 'hotstrings.expansion_delay', platforms: 'macOS' },
+		] };
+	}
 	const permissions = Object.keys((schema.permissions || {})[driver] || {});
 	if (permissions.length > 0) {
 		sections.permissions = { items: permissions.map((id, index) => ({ id, state: index === 0 ? 'missing' : 'granted' })) };
@@ -255,6 +283,16 @@ for (const driver of DRIVERS) {
 	if (pathFields === 0 || pathButtons < pathFields) fail(`${driver}: ${pathButtons} Open button(s) for ${pathFields} path(s)`);
 	// The collapsed developer section stays last and collapsed
 	if (!/<details class="section" id="section-developer">/.test(html)) fail(`${driver}: the developer section is not collapsed`);
+}
+
+// The features this platform lacks, collapsed, each with its translated reason
+{
+	const html = Model.renderHtml(fixture('macos'), schema, t);
+	if (!/<details class="section" id="section-unavailable">/.test(html)) fail('macOS: the unavailable features are not collapsed');
+	if (!html.includes(t('platform_reason.alt_gr_is_kana_remap').slice(0, 40))) {
+		fail('macOS: an unavailable feature does not show its translated reason');
+	}
+	if (!html.includes('hotstrings.expansion_delay')) fail('macOS: an unavailable feature without a reason is hidden');
 }
 
 // A value the model does not escape would run in the page
@@ -344,6 +382,20 @@ for (const driver of DRIVERS) {
 // ======= 7/ Issue Summary And Name ===
 // =====================================
 // =====================================
+
+// The page formats every duration; the corpus once pinned the Lua and AHK
+// formatters it replaces
+{
+	const corpus = JSON.parse(
+		fs.readFileSync(path.join(SHARED, 'tests', 'corpus', 'healthcheck', 'snapshot_vectors.json'), 'utf8')
+	);
+	const uptime = corpus.vectors.filter((vector) => vector.category === 'format_uptime');
+	if (uptime.length < 4) fail('fewer than 4 format_uptime vectors');
+	for (const vector of uptime) {
+		const got = Model.formatValue({ type: 'seconds' }, vector.input.sec, t);
+		if (got !== vector.expected) fail(`format_uptime ${vector.id}: got ${got}, expected ${vector.expected}`);
+	}
+}
 
 const vectors = JSON.parse(
 	fs.readFileSync(path.join(SHARED, 'tests', 'corpus', 'diagnostics', 'issue_report_vectors.json'), 'utf8')

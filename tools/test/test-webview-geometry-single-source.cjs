@@ -133,9 +133,7 @@ const WINDOWS_APPS = {
 	},
 	healthcheck: {
 		file: 'ui/healthcheck/core.ahk',
-		// Width is a global; height is content-driven (Show uses AutoSize) with the
-		// canonical value held in ContentH.
-		checks: (m) => [new RegExp(`_HC_WIN_W\\s*:=\\s*${m.width}\\b`), new RegExp(`ContentH\\s*:=\\s*${m.height}\\b`)]
+		checks: (m) => [new RegExp(`HC_WIDTH\\s*:=\\s*${m.width}\\b`), new RegExp(`HC_HEIGHT\\s*:=\\s*${m.height}\\b`)]
 	},
 	changelog: {
 		file: 'ui/changelog/init.ahk',

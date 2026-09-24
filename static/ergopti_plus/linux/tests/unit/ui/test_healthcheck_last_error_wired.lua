@@ -39,20 +39,20 @@ helpers.describe("healthcheck (linux): session issues (healthcheck-last-error-wi
 		with_real_logger(function(Logger, Bridge)
 			Logger.error("probe", "boom %d", 42)
 			Logger.ring_buffer_clear()
-			local snapshot = Bridge.on_message("ready", {})
-			helpers.assert_contains(tostring(snapshot.last_error), "[ERROR] [probe] boom 42",
+			local issues = Bridge.build_snapshot({}, false).sections.issues
+			helpers.assert_contains(tostring(issues.last_error), "[ERROR] [probe] boom 42",
 				"the last error must come from the logger, not from a dead record_error path")
 		end)
 	end)
 
 	helpers.it("counts every warning and error of the session, not the ring's (healthcheck-last-error-wired)", function()
 		with_real_logger(function(Logger, Bridge, counts)
-			local first = Bridge.on_message("ready", {})
+			local first = Bridge.build_snapshot({}, false).sections.issues
 			local warns_before, errors_before = counts.warn, counts.error
 			Logger.warn("probe", "session warning marker")
 			Logger.error("probe", "session error marker")
 			Logger.ring_buffer_clear()
-			local second = Bridge.on_message("refresh", {})
+			local second = Bridge.build_snapshot({}, false).sections.issues
 			helpers.assert_eq(second.warn_count - first.warn_count, counts.warn - warns_before,
 				"every emitted warning between two snapshots must be counted once")
 			helpers.assert_eq(second.err_count - first.err_count, counts.error - errors_before,
