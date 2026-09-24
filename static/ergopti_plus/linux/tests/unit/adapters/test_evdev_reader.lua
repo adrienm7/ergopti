@@ -62,6 +62,15 @@ local function recorder(events, opts)
 	return backend, log
 end
 
+--- Whether one open(2) flag bit is set, spelled arithmetically because LuaJIT
+--- (what CI runs) has no bitwise operators.
+--- @param flags integer The flag word the reader passed to open().
+--- @param bit integer A single-bit flag value from fcntl.h.
+--- @return boolean
+local function flag_set(flags, bit)
+	return math.floor(flags / bit) % 2 == 1
+end
+
 --- Encodes one event the way the kernel would write it.
 --- @param ev_type integer
 --- @param code integer
@@ -98,9 +107,31 @@ helpers.describe("evdev_reader: open", function()
 		-- Without this bit every read blocks and the daemon advances only when a
 		-- key arrives — the defect that made the tray and every timer
 		-- keystroke-driven.
-		helpers.assert_eq(log.opened.flags, 0x0800,
+		helpers.assert_eq(flag_set(log.opened.flags, 0x0800), true,
 			"the descriptor must be opened O_NONBLOCK (0x800 on Linux); a blocking "
 				.. "read turns the event loop into a keystroke loop")
+		helpers.assert_eq(log.opened.flags % 4, 0,
+			"and read-only (O_ACCMODE bits 0): the reader never writes to the device")
+		reader._reset_backend()
+	end)
+
+	helpers.it("opens the device close-on-exec (cloexec-grab-outlives-daemon)", function()
+		-- EVIOCGRAB belongs to the open file, not to the process. Every child the
+		-- daemon starts (`xdg-open … &`, a gesture's application, the update
+		-- relay) inherits a descriptor opened without O_CLOEXEC, keeps that file
+		-- open after the daemon dies, and with it the grab: the keyboard stays
+		-- dead for as long as the child runs, and the restarted daemon's own grab
+		-- fails with EBUSY. Literal from fcntl.h for the same reason as above.
+		local reader = helpers.load_module("adapters.evdev_reader")
+		local backend, log = recorder()
+		reader._set_backend(backend)
+
+		helpers.assert_eq(reader.open("/dev/input/event3"), true, "the open must succeed")
+		helpers.assert_eq(flag_set(log.opened.flags, 0x80000), true,
+			"the descriptor must be opened O_CLOEXEC (0x80000 on Linux) so no child "
+				.. "the daemon starts can keep the grab after the daemon dies")
+		helpers.assert_eq(log.opened.flags, 0x80800,
+			"the whole flag word is O_RDONLY | O_NONBLOCK | O_CLOEXEC, nothing else")
 		reader._reset_backend()
 	end)
 
