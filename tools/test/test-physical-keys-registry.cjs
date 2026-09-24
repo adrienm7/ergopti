@@ -13,7 +13,8 @@
  * WHY IT EXISTS:
  * Physical-key identity used to be spread over five hand-kept tables (heatmap
  * KEY_POSITIONS, AHK SCnnn literals, evdev.json, Karabiner key_code strings in
- * layer_keys.json, kanata names in kanata.kbd, plus SC_TO_KC in heatmap_win.js).
+ * layer_keys.json, now frozen as legacy_layer_keys.json, kanata names in
+ * kanata.kbd, plus SC_TO_KC in heatmap_win.js).
  * Nothing tied them together, so a navigation layer written three times drifted
  * three ways. The registry is the one table a generated layer can be resolved
  * through, and it is only worth that if every column is right.
@@ -28,8 +29,8 @@
  * 4. Parity with every existing hand copy, each an independent oracle written
  *    before the registry: evdev.json, linux/infra/evdev_codes.lua,
  *    _shared/lua/keycodes/init.lua, azerty.json, heatmap_win.js SC_TO_KC, the
- *    Karabiner layer_keys.json and the kanata.kbd defsrc. Each scan is floored
- *    so a parser that stops matching cannot pass over nothing.
+ *    Karabiner legacy_layer_keys.json and the kanata.kbd defsrc. Each scan is
+ *    floored so a parser that stops matching cannot pass over nothing.
  * ==============================================================================
  */
 
@@ -392,10 +393,11 @@ const find = (pred) => codes.filter((c) => pred(keys[c]));
 	if (n < 55) fail(`heatmap_win.js: only ${n} scan codes compared (floor 55)`);
 }
 
-// --- 4.6 macOS layer_keys.json: every Karabiner key_code the layer uses. The
-// file was written on an Apple ISO board, so it resolves through macos_iso.
+// --- 4.6 macOS legacy_layer_keys.json: every Karabiner key_code the hand-written
+// layer used. The file was written on an Apple ISO board, so it resolves through
+// macos_iso.
 {
-	const layer = JSON.parse(read('macos/platform/remap/data/layer_keys.json'));
+	const layer = JSON.parse(read('macos/platform/remap/data/legacy_layer_keys.json'));
 	const names = new Set();
 	for (const m of layer.manipulators) {
 		names.add(m.from.key_code);
@@ -406,9 +408,9 @@ const find = (pred) => codes.filter((c) => pred(keys[c]));
 			const ev = resolved(c, 'karabiner', 'iso');
 			return ev && ev.key_code === name;
 		});
-		if (hit.length !== 1) fail(`layer_keys.json: key_code "${name}" resolves to ${JSON.stringify(hit)} on ISO`);
+		if (hit.length !== 1) fail(`legacy_layer_keys.json: key_code "${name}" resolves to ${JSON.stringify(hit)} on ISO`);
 	}
-	if (names.size < 40) fail(`layer_keys.json: only ${names.size} key codes compared (floor 40)`);
+	if (names.size < 40) fail(`legacy_layer_keys.json: only ${names.size} key codes compared (floor 40)`);
 }
 
 // --- 4.7 kanata.kbd defsrc: every source token names one registry entry.

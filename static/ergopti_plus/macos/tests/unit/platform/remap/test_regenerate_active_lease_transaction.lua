@@ -192,8 +192,10 @@ local function load_active_remap(options)
 	package.loaded["modules.gestures.engine"] = {}
 	package.loaded["modules.shortcuts"] = { is_paused = function() return false end }
 	package.loaded["infra.timings"] = { sec = function() return 0.01 end }
+	-- layers.toml, read at every regeneration, lives in get_config_dir(); none here.
 	package.loaded["infra.config_paths"] = {
 		get = function() return "tests/unit/platform/remap/active-regeneration.toml" end,
+		get_config_dir = function() return "tests/unit/platform/remap/no-layers-toml" end,
 	}
 	package.loaded["hs.caffeinate.watcher"] = {
 		systemDidWake = 7,
