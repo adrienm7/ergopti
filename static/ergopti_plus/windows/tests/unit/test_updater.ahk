@@ -756,6 +756,8 @@ _UpdaterTest_PausedTrayClickRefusesBeforeUpdaterWork() {
 		State.ShowCount += 1,
 		_Updater_ShowAvailableUpdateEntry(true, NotifyFn, ContinueFn))
 
+	; The click answers the updater's own balloon: only that one routes.
+	_Updater_ClaimBalloon()
 	_Updater_OnTrayMsg(0, 0x405, 0x404, 0, ShowFn)
 	AssertEqual(1, State.ShowCount,
 		"a genuine balloon click must reach the updater policy boundary while paused")
