@@ -37,12 +37,11 @@ local WINDOW_TITLE_SEPARATOR = " — "
 -- webkit_host provides HTML building and bridge name registry.
 local webkit_host = require("ui.webkit_host")
 
--- Optional JSON codec for manifest parsing and JS value conversion.
-local dkjson = nil
-pcall(function()
-	local ok, mod = pcall(require, "dkjson")
-	if ok then dkjson = mod end
-end)
+-- The shared JSON codec for page messages, replies and the geometry manifest.
+-- This used dkjson, loaded optionally, which is neither shipped nor installed:
+-- every object a page posted became nil and no reply reached a page, so the
+-- metrics windows stayed empty and the editors' buttons did nothing.
+local Json = require("json")
 
 
 -- =========================================
@@ -498,9 +497,10 @@ local function _js_value_to_lua(js_value)
 		elseif js_value:is_object() then
 			-- Try JSON.stringify round-trip for objects.
 			local json_str = js_value:to_json(0)
-			if json_str and json_str ~= "" and dkjson then
-				local ok_json, parsed = pcall(dkjson.decode, json_str)
-				if ok_json then return parsed end
+			if json_str and json_str ~= "" then
+				local parsed = Json.decode(json_str)
+				if parsed ~= nil then return parsed end
+				Logger.warn(LOG, "A page message could not be decoded as JSON — dropped.")
 			end
 			return nil
 		end
@@ -518,9 +518,8 @@ end
 --- @param value any Lua value to send (converted to JSON then base64).
 local function _send_response_to_js(webview, bridge_name, value)
 	if not webview or value == nil then return end
-	if not dkjson then return end
 	-- Encode the value as JSON, then base64 to avoid any escaping hazards.
-	local json_str = dkjson.encode(value)
+	local json_str = Json.encode(value)
 	if not json_str then return end
 	local b64 = require("compat.base64")
 	local encoded = b64 and b64.encode(json_str) or json_str:gsub("[^%w]", function(c)
@@ -548,9 +547,9 @@ local function _read_app_geometry(app_name)
 	if not fh then return defaults end
 	local raw = fh:read("*a")
 	fh:close()
-	if not raw or raw == "" or not dkjson then return defaults end
-	local ok_dec, manifest = pcall(dkjson.decode, raw)
-	if not ok_dec or not manifest or not manifest.apps then return defaults end
+	if not raw or raw == "" then return defaults end
+	local manifest = Json.decode(raw)
+	if type(manifest) ~= "table" or type(manifest.apps) ~= "table" then return defaults end
 	local app = manifest.apps[app_name]
 	if app then
 		return {
@@ -842,5 +841,10 @@ end
 
 -- Auto-init on module load so the GTK probe runs once.
 M.init()
+
+
+--- Exposes the page-message decoder and the reply encoder to tests.
+M._js_value_to_lua_for_test = _js_value_to_lua
+M._send_response_to_js_for_test = _send_response_to_js
 
 return M
