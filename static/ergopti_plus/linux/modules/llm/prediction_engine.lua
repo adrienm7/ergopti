@@ -362,10 +362,17 @@ function M.predict(context, output_context)
 	dispatch()
 end
 
---- Cancels pending/in-flight work and discards the current engine buffer.
-function M.cancel()
+--- Cancels pending and in-flight work and shows nothing, leaving the hotstring
+--- buffer alone. For edits the caller has already applied to that buffer:
+--- Backspace and Escape update it precisely, and a reset here undid the edit.
+function M.withdraw()
 	if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
 	M.dismiss()
+end
+
+--- Cancels pending/in-flight work and discards the current engine buffer.
+function M.cancel()
+	M.withdraw()
 	if _engine and type(_engine.reset) == "function" then _engine:reset() end
 end
 

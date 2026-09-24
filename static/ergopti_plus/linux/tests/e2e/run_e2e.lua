@@ -404,6 +404,12 @@ local DAEMON_SCENARIOS = {
 	{ name = "a corrected typo still expands", keys = "adx{BS}n ", screen = "ADN " },
 	{ name = "a word-only trigger does not fire mid-word after a Backspace", keys = "xy{BS}adn ", screen = "xadn " },
 	{ name = "a word-only trigger does not fire after an arrow key", keys = "x{LEFT}adn ", screen = "xadn " },
+	-- The same edits with the AI prediction engine loaded, as in the demo
+	-- configuration: its cancel on Backspace reset the buffer behind the edit.
+	{ name = "with AI loaded, a corrected typo still expands", keys = "adx{BS}n ", screen = "ADN ", llm = true },
+	{ name = "with AI loaded, a word-only trigger does not fire mid-word after a Backspace",
+		keys = "xy{BS}adn ", screen = "xadn ", llm = true },
+	{ name = "with AI loaded, an end-char trigger expands", keys = "adn ", screen = "ADN ", llm = true },
 }
 
 if package.config:sub(1, 1) == "\\" then
@@ -417,8 +423,8 @@ else
 	local device = os.tmpname()
 	for _, scenario in ipairs(DAEMON_SCENARIOS) do
 		local command = string.format(
-			"HOME='%s' %s tests/e2e/daemon_keys_child.lua tests/e2e/fixtures/daemon_keys.toml '%s' %q 2>/dev/null",
-			home, interpreter, device, scenario.keys)
+			"HOME='%s' ERGOPTI_E2E_LLM=%s %s tests/e2e/daemon_keys_child.lua tests/e2e/fixtures/daemon_keys.toml '%s' %q 2>/dev/null",
+			home, scenario.llm and "1" or "0", interpreter, device, scenario.keys)
 		local pipe = io.popen(command, "r")
 		local output = pipe and pipe:read("*a") or ""
 		if pipe then pipe:close() end

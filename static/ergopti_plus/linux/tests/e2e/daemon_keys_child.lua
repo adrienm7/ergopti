@@ -118,13 +118,19 @@ if MENU_ROWS_FILE then
 end
 
 -- Everything that needs a desktop is switched off; the daemon loads each of
--- these optionally and runs without it.
+-- these optionally and runs without it. ERGOPTI_E2E_LLM keeps the prediction
+-- engine, which the demo configuration loads: its cancel path runs on every
+-- Backspace and once wiped the hotstring buffer.
+local WITH_LLM = os.getenv("ERGOPTI_E2E_LLM") == "1"
 for _, name in ipairs(MENU_ROWS_FILE and {} or { "ui.tooltip.preview", "ui.tooltip.llm", "adapters.tray_menu",
-	"ui.menu.menu_builder", "modules.llm.prediction_engine", "modules.updater.manager",
+	"ui.menu.menu_builder", "modules.updater.manager",
 	"modules.gestures.manager", "adapters.window_info", "adapters.process_lifecycle",
 	"ui.webview_manager", "platform.remap.manager", "platform.remap.tap_hold_writer",
 	"infra.file_watchers", "ui.wpm.widget", "modules.keylogger.system_metrics", "adapters.notifier" }) do
 	package.preload[name] = function() error("disabled for the daemon key scenarios") end
+end
+if not MENU_ROWS_FILE and not WITH_LLM then
+	package.preload["modules.llm.prediction_engine"] = function() error("disabled for the daemon key scenarios") end
 end
 
 -- A focused ordinary text field, conclusively.

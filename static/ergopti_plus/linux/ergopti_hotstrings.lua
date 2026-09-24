@@ -1198,10 +1198,11 @@ local function main()
 		else
 			engine:reset(key_name == "escape")
 		end
-		-- Cancel any in-flight LLM prediction on Backspace or Escape.
+		-- Withdraw any LLM prediction on Backspace or Escape. Withdraw, not
+		-- cancel: the buffer was just edited above, and cancel resets it.
 		if key_name == "backspace" or key_name == "escape" then
 			if prediction_engine then
-				pcall(function() prediction_engine.cancel() end)
+				pcall(function() prediction_engine.withdraw() end)
 			end
 		end
 		Logger.debug(LOG, "Control key '%s' — buffer updated.", key_name)
