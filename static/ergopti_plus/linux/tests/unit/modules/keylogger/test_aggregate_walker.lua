@@ -322,6 +322,49 @@ end)
 
 
 
+helpers.describe("ngram walker: each character is stored once", function()
+
+	helpers.it("counts a typed character once in ngram_chars", function()
+		-- The walker writes every character, and step 3 of the flush wrote the
+		-- per-app delta of the same characters again: both upserts add, so every
+		-- persisted character count was doubled.
+		local chars_o = 0
+		local writer_name = "modules.keylogger.sqlite_writer"
+		local logger_name = "modules.keylogger.keylogger"
+		local prev_writer, prev_logger = package.loaded[writer_name], package.loaded[logger_name]
+		local writer = Fakes.sqlite_writer()
+		writer.upsert_ngrams = function(_device, _date, _app, ngrams, table_name)
+			if (table_name or "ngram_chars") == "ngram_chars" then
+				local entry = ngrams.o
+				chars_o = chars_o + (type(entry) == "table" and (entry.c or 0) or (entry or 0))
+			end
+			return true
+		end
+		package.loaded[writer_name] = writer
+		package.loaded[logger_name] = nil
+		local ok, err = pcall(function()
+			local kl = require(logger_name)
+			kl.init({ sqlite_path = "/tmp/ergopti_ngram_once.sqlite" })
+			kl.reset_session()
+			kl.on_app_focus("app.test", 1000)
+			local at = 1000
+			for char in ("bonjour "):gmatch(".") do
+				at = at + 120
+				kl.on_keydown(char, at, "app.test")
+			end
+			kl.flush()
+		end)
+		package.loaded[writer_name] = prev_writer
+		package.loaded[logger_name] = prev_logger
+		helpers.assert_true(ok, tostring(err))
+		helpers.assert_eq(chars_o, 2, "\"bonjour\" holds two o")
+	end)
+
+end)
+
+
+
+
 -- =================================================================
 -- =================================================================
 -- ======= 5/ The character composition ============================
