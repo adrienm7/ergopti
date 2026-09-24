@@ -365,6 +365,40 @@ end)
 
 
 
+helpers.describe("keylogger: the JSON fallback does not hoard raw events", function()
+
+	helpers.it("empties the raw buffers when it flushes without SQLite", function()
+		local writer_name = "modules.keylogger.sqlite_writer"
+		local logger_name = "modules.keylogger.keylogger"
+		local prev_writer, prev_logger = package.loaded[writer_name], package.loaded[logger_name]
+		package.loaded[writer_name] = Fakes.sqlite_writer({ available = false })
+		package.loaded[logger_name] = nil
+		local dir = os.tmpname()
+		os.remove(dir)
+		local before, after
+		local ok, err = pcall(function()
+			local kl = require(logger_name)
+			kl.init({ sqlite_path = "/tmp/ergopti_fallback.sqlite", log_dir = dir })
+			kl.reset_session()
+			kl.on_app_focus("app.test", 1000)
+			for index, char in ipairs({ "s", "a", "l", "u", "t" }) do kl.on_keydown(char, 1000 + index * 100, "app.test") end
+			before = kl._pending_buffer_count_for_test()
+			kl.flush()
+			after = kl._pending_buffer_count_for_test()
+		end)
+		package.loaded[writer_name] = prev_writer
+		package.loaded[logger_name] = prev_logger
+		os.execute("rm -rf '" .. dir .. "'")
+		helpers.assert_true(ok, tostring(err))
+		helpers.assert_true(before > 0, "keys were buffered")
+		helpers.assert_eq(after, 0, "only the SQLite branch emptied them; they grew all session")
+	end)
+
+end)
+
+
+
+
 -- =================================================================
 -- =================================================================
 -- ======= 5/ The character composition ============================

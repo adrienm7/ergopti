@@ -1589,7 +1589,14 @@ function M.flush()
 		return
 	end
 
-	-- FALLBACK: JSON log file.
+	-- FALLBACK: JSON log file. It holds the session summary only, so the
+	-- buffered raw events are dropped here: kept, they grew for the whole
+	-- session, since only the SQLite branch ever emptied them.
+	_pending_typing_events = {}
+	_pending_hotstring_events = {}
+	_pending_shortcut_events = {}
+	_pending_app_switch_events = {}
+
 	if not _log_dir then
 		Logger.warn(LOG, "flush(): no log directory configured.")
 		return
@@ -1715,6 +1722,15 @@ _to_json = function(val)
 		end
 	end
 	return "null"
+end
+
+
+--- How many raw-event buffers are waiting for a flush (tests).
+--- @return integer
+function M._pending_buffer_count_for_test()
+	local count = #_pending_hotstring_events + #_pending_shortcut_events + #_pending_app_switch_events
+	for _, pending in pairs(_pending_typing_events) do count = count + #pending.events end
+	return count
 end
 
 return M
