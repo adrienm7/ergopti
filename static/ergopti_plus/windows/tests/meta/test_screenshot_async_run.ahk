@@ -3,7 +3,10 @@
 ; ==============================================================================
 ; MODULE: Screenshot Async Run Meta-Test
 ; DESCRIPTION:
-; Structural regression for the screenshot hotkey fix in modules/shortcuts/win.ahk.
+; Structural regression for the screenshot hotkey fix. The key left of 1 (SC029)
+; was once a hard-wired screenshot key in modules/shortcuts/win.ahk; it is now
+; the number_row_left tap key (modules/shortcuts/tap_keys.ahk), whose assigned
+; catalogue action can be the same instant capture.
 ;
 ; Before the fix the SC029 hotkey called RunWait() to invoke the PowerShell
 ; screen capture script. RunWait blocks the calling AHK thread until the child
@@ -15,9 +18,10 @@
 ; The hotkey contains no process launch at all, and success is emitted only after
 ; the current generation publishes its private stage.
 ;
-; This test inspects shortcuts/win.ahk source and asserts:
-;   1. RunWait is NOT used in the screenshot block.
-;   2. The hotkey delegates to GestureScreenshotInstant without a sibling worker.
+; This test inspects the modules/shortcuts source and asserts:
+;   1. RunWait is NOT used in the SC029 block.
+;   2. The hotkey delegates through TapKeyFire and the gesture action table, whose
+;      instant capture is GestureScreenshotInstant, without a sibling worker.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -32,11 +36,10 @@
 ; ==========================================================
 
 ; Move-resilient: scan the shortcuts module dir via the framework helper instead
-; of a pinned win.ahk path. SC029:: is unique within modules/shortcuts (only the
-; screenshot hotkey lives here; layout.ahk's SC029:: is in modules/, out of scope),
-; so the first-match extraction below still targets the screenshot block. The
-; ~600-char window stays inside win.ahk (the block sits well before EOF), so it
-; never spills into a neighbouring file's content.
+; of a pinned file path. SC029:: is unique within modules/shortcuts (only the tap
+; key lives here; layout.ahk's SC029:: is in modules/keymap, out of scope), so the
+; first-match extraction below targets the tap key block, which ends at the
+; next #HotIf of the same file.
 _SAR_FindScreenshotBlock(src) {
 	pos := InStr(src, "SC029::")
 	if (!pos)
@@ -52,9 +55,11 @@ _SAR_FindScreenshotBlock(src) {
 ; supplies _DriverDirConcat. Consume its exported callable reference so isolated
 ; #Warn analysis does not mistake the cross-include function name for an unset
 ; local variable. A missing framework helper still fails loudly at test runtime.
+; Comments are stripped before the search: a header explaining the SC029::
+; hotkey must not be taken for the hotkey itself.
 _SAR_ShortcutsSource() {
 	global _DriverDirConcatFn
-	return _DriverDirConcatFn.Call("modules/shortcuts")
+	return _StripFullLineComments(_DriverDirConcatFn.Call("modules/shortcuts"))
 }
 
 
@@ -69,25 +74,39 @@ _SAR_ShortcutsSource() {
 _SAR_NoRunWait() {
 	block := _StripFullLineComments(_SAR_FindScreenshotBlock(_SAR_ShortcutsSource()))
 	Assert(block != "",
-		"shortcuts/win.ahk: SC029 screenshot hotkey block must be present")
+		"modules/shortcuts: SC029 tap key hotkey block must be present")
 	Assert(InStr(block, "RunWait") = 0,
-		"shortcuts/win.ahk: SC029 must not use RunWait — it blocks the keyboard hook thread during screen capture")
+		"modules/shortcuts: SC029 must not use RunWait — it blocks the keyboard hook thread during screen capture")
 }
 Test("Screenshot hotkey: RunWait not used in SC029 block (screenshot-async-run)", _SAR_NoRunWait)
 
 
+; The tap key reaches the capture only through the gesture action table, which is
+; the one place an action id becomes a function call.
+_SAR_TapKeyReachesTheSharedOwner() {
+	global _DriverDirConcatFn
+	block := _StripFullLineComments(_SAR_FindScreenshotBlock(_SAR_ShortcutsSource()))
+	FireBody := _DriverFuncBody("TapKeyFire")
+	ActionsSource := _StripFullLineComments(_DriverDirConcatFn.Call("modules/gestures"))
+	InstantPos := InStr(ActionsSource, '"screen_capture_instant", {')
+	return block != "" && InStr(block, 'TapKeyFire("number_row_left")') > 0
+		&& InStr(FireBody, "GestureInvokeAction(") > 0
+		&& InstantPos > 0
+		&& RegExMatch(ActionsSource, "Fn:\s*\(\*\)\s*=>\s*GestureScreenshotInstant\(\)", , InstantPos) > 0
+}
+
 _SAR_SharedWorkerDelegatePresent() {
 	block := _StripFullLineComments(_SAR_FindScreenshotBlock(_SAR_ShortcutsSource()))
-	Assert(InStr(block, "GestureScreenshotInstant()") > 0,
-		"shortcuts/win.ahk: SC029 must delegate to the shared screenshot worker owner")
+	Assert(_SAR_TapKeyReachesTheSharedOwner(),
+		"modules/shortcuts: SC029 must delegate through TapKeyFire and the gesture action table to the shared screenshot worker owner")
 	Assert(InStr(block, "Run(") = 0 && InStr(block, "powershell") = 0,
-		"shortcuts/win.ahk: SC029 must not retain an unowned sibling worker process")
+		"modules/shortcuts: SC029 must not retain an unowned sibling worker process")
 }
 Test("Screenshot hotkey: shared worker delegate owns SC029 (screenshot-async-run)", _SAR_SharedWorkerDelegatePresent)
 
 _SAR_HotkeyBoundariesAreContained() {
 	block := _StripFullLineComments(_SAR_FindScreenshotBlock(_SAR_ShortcutsSource()))
-	Assert(InStr(block, "GestureScreenshotInstant()") > 0,
+	Assert(_SAR_TapKeyReachesTheSharedOwner(),
 		"SC029 must hand desktop, filesystem, process, and publication failures to the shared owner")
 	Assert(InStr(block, "MsgBox") = 0,
 		"SC029 must not open a modal dialog from the keyboard hotkey thread")

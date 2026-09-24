@@ -309,6 +309,11 @@ encrypt = false
 enabled = true
 chatgpt_url = "https://chat.openai.com"
 
+[shortcuts.tap_keys]
+number_row_left = "screen_capture"
+number_row_right_1 = "none"
+number_row_right_2 = "none"
+
 [gestures]
 enabled = true
 swipe_3_down = "tab_next"

@@ -78,6 +78,9 @@ local function build_action_items(gestures)
 	return items
 end
 
+-- The tap-key rows (ui/menu/menu_tap_keys.lua) offer the same catalogue.
+M.build_action_items = build_action_items
+
 --- Builds the picker item list of the slots a group can still offer.
 --- Already-assigned slots are excluded: this list answers "which chord shall I
 --- add", and offering a bound one would silently overwrite it from a row that

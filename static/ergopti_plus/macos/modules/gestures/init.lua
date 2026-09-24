@@ -568,6 +568,7 @@ M.SG_NAMES           = Actions.SG_NAMES
 M.get_sg_names       = Actions.get_sg_names
 M.get_action_label   = Actions.get_label
 M.get_action_parameter_spec = Actions.get_action_parameter_spec
+M.is_assignable     = Actions.is_assignable
 M.validate_action_parameter = Actions.validate_action_parameter
 M.parameter_prompt   = Actions.parameter_prompt
 M.parameter_error    = Actions.parameter_error

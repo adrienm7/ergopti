@@ -328,7 +328,6 @@ wrap_text_if_selected = true
 open_downloads = true
 move = true
 screen = true
-screen_instant = true
 win_caps_lock = true
 
 [shortcuts.gpt]
@@ -426,6 +425,11 @@ win_t = "teleport_mouse"
 win_u = "uppercase_selection"
 win_w = "titlecase_selection"
 win_x = "pick_color"
+
+[shortcuts.tap_keys]
+number_row_left = "screen_capture"
+number_row_right_1 = "none"
+number_row_right_2 = "none"
 
 [gestures]
 enabled = true

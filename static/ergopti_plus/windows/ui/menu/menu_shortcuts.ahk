@@ -39,6 +39,8 @@ _BuildShortcutsSubmenu() {
 	ListProviders := Map(
 		"script_control_shortcuts",   () => _SC_ScriptControlRows(),
 		"keyboard_slots",             () => KeyboardSlotRows(),
+		; The number-row tap keys: labels read live from the layout in use.
+		"tap_keys",                   () => TapKeyRows(),
 		"wrap_symbols_menu",          () => _SC_WrapSymbolRows(),
 		; extensions_shortcuts left DynHandlers on 2026-08-07: its manifest row is
 		; `type = "list"` now, so the renderer draws the separator, the header and

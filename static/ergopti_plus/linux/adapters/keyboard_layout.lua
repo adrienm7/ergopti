@@ -88,6 +88,28 @@ local _table = nil
 -- What produced the loaded keymap (a command or "override"), for diagnostics.
 local _source = nil
 
+-- evdev keycode → its level-1 keysym, from the same dump. nil until built.
+local _base = nil
+
+-- The spacing symbol of each dead keysym a layout puts on a key, for a label:
+-- a dead key types nothing on its own, so Keysym.to_char has no character for
+-- it, yet the key is labelled with its accent everywhere.
+local DEAD_SYMBOLS = {
+	dead_grave       = "`",
+	dead_acute       = "´",
+	dead_circumflex  = "^",
+	dead_tilde       = "~",
+	dead_macron      = "¯",
+	dead_breve       = "˘",
+	dead_abovedot    = "˙",
+	dead_diaeresis   = "¨",
+	dead_abovering   = "˚",
+	dead_doubleacute = "˝",
+	dead_caron       = "ˇ",
+	dead_cedilla     = "¸",
+	dead_ogonek      = "˛",
+}
+
 -- Set once when no keymap could be obtained, so the reason is logged once rather
 -- than per expansion.
 local _reported_absent = false
@@ -250,7 +272,7 @@ function M.refresh(override_path)
 	if not text then text, source = dump_keymap() end
 
 	if not text then
-		_table = nil
+		_table, _base = nil, nil
 		if not _reported_absent then
 			_reported_absent = true
 			Logger.error(LOG,
@@ -270,7 +292,7 @@ function M.refresh(override_path)
 	-- to the clipboard.
 	local capture_ok, capture_err = XkbCapture.load(text)
 	if not capture_ok then
-		_table = nil
+		_table, _base = nil, nil
 		Logger.error(LOG, "Active keymap cannot initialise XKB capture via %s — %s.",
 			tostring(source), tostring(capture_err))
 		return false
@@ -291,7 +313,7 @@ function M.refresh(override_path)
 		-- A keymap that parsed to almost nothing is a parse failure wearing the
 		-- shape of a success, and the consequence is silent: every expansion
 		-- quietly reroutes to the clipboard and nobody knows why.
-		_table = nil
+		_table, _base = nil, nil
 		Logger.error(LOG, "Keymap parsed to %d character(s) via %s — refusing it as a parse failure.",
 			count, tostring(source))
 		return false
@@ -299,6 +321,8 @@ function M.refresh(override_path)
 
 	_table = built
 	_source = source
+
+	_base = M.build_base(text)
 	_reported_absent = false
 	Logger.success(LOG, "Layout resolved: %d typable character(s) via %s.", count, tostring(source))
 	return true
@@ -378,6 +402,46 @@ function M.plan(text)
 		plan[#plan + 1] = hit
 	end
 	return plan, nil
+end
+
+--- The level-1 keysym of every key, by evdev keycode: what a plain press types.
+---
+--- The reverse of build()'s question, asked by labels rather than by injection:
+--- the menu names a physical key by what it types under the loaded keymap.
+--- @param text string Keymap dump.
+--- @return table evdev keycode → keysym name.
+function M.build_base(text)
+	local base = {}
+	for _, entry in ipairs(XkbKeymap.parse(text or "")) do
+		if entry.level == 1 then base[entry.keycode] = entry.keysym end
+	end
+	return base
+end
+
+--- What a plain press of a key types under the loaded keymap.
+--- @param keycode integer evdev keycode.
+--- @return table|nil { text = string, dead = boolean }; nil when no keymap is
+---   loaded or the key types nothing printable.
+function M.base_symbol(keycode)
+	if not _base then return nil end
+	local keysym = _base[keycode]
+	if type(keysym) ~= "string" then return nil end
+	local dead = DEAD_SYMBOLS[keysym]
+	if dead then return { text = dead, dead = true } end
+	local char = Keysym.to_char(keysym)
+	if type(char) ~= "string" or char == "" or char:match("^%s+$") then return nil end
+	return { text = char, dead = false }
+end
+
+--- Test seam: loads both tables from a keymap dump, or clears them with nil.
+--- @param text string|nil
+function M._load_keymap_for_test(text)
+	if text == nil then
+		_table, _base = nil, nil
+	else
+		_table, _base = M.build(text), M.build_base(text)
+	end
+	_reported_absent = false
 end
 
 --- Test seam: installs a table directly, bypassing the probe.

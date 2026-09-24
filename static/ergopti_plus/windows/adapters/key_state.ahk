@@ -440,6 +440,40 @@ KS_LayoutDigitRowSymbols(Hkl) {
 	return Symbols
 }
 
+; Translates a scancode into its virtual key under Hkl, distinguishing left and
+; right keys (MAPVK_VSC_TO_VK_EX = 3).
+; @param Scancode {Integer} The physical scancode.
+; @param Hkl {Integer} The keyboard layout handle to probe.
+; @return {Integer} The virtual key, or 0 when the scancode is unmapped.
+KS_ScancodeToVk(Scancode, Hkl) {
+	try {
+		return DllCall("MapVirtualKeyExW", "UInt", Scancode, "UInt", 3, "Ptr", Hkl, "UInt")
+	} catch as e {
+		try LoggerError("KeyState", "KS_ScancodeToVk failed: {1}.", e.Message)
+		return 0
+	}
+}
+
+; What one key types with no modifier under Hkl. ToUnicodeEx is called with
+; wFlags=0x4 so reading a dead key cannot arm it for the user's next keystroke.
+; @param Vk {Integer} The virtual key.
+; @param Scancode {Integer} The physical scancode.
+; @param Hkl {Integer} The keyboard layout handle to probe.
+; @return {Object} { Count, Text }: ToUnicodeEx's result (-1 for a dead key,
+;   0 when the key types nothing or the call failed) and the characters written.
+KS_KeyTextNoStateChange(Vk, Scancode, Hkl) {
+	try {
+		local keyState := Buffer(256, 0)
+		local charBuf := Buffer(32, 0)
+		local count := DllCall("ToUnicodeEx", "UInt", Vk, "UInt", Scancode, "Ptr", keyState,
+			"Ptr", charBuf, "Int", 16, "UInt", 0x4, "Ptr", Hkl, "Int")
+		return { Count: count, Text: (count = 0) ? "" : StrGet(charBuf, Abs(count), "UTF-16") }
+	} catch as e {
+		try LoggerError("KeyState", "KS_KeyTextNoStateChange failed: {1}.", e.Message)
+		return { Count: 0, Text: "" }
+	}
+}
+
 ; Lists the keyboard layouts installed for the user (GetKeyboardLayoutList).
 ; @return {Array} HKL handles; empty when the list cannot be read.
 KS_InstalledKeyboardLayouts() {

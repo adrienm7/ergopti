@@ -1233,6 +1233,12 @@ _RegisterScriptAltGrHotkeys()
 ; them in forward order so first-declared (prominent) sections win HSE's
 ; first-registered-wins collision tiebreak, matching the old effective order.
 #InputLevel 2
+; The number-row tap keys first: AutoHotkey fires the earliest-created eligible
+; #HotIf variant of a hotkey, and the digit-row emulation below binds the same
+; three scancodes. Their assignments are read before a press can reach them.
+#Include infra/tap_keys.ahk
+#Include modules/shortcuts/tap_keys.ahk
+TapKeysReadConfig(_IniCache)
 #Include modules/keymap/layout.ahk
 #Include modules/shortcuts.ahk
 #Include platform/remap.ahk

@@ -25,6 +25,7 @@ local MenuUtils     = require("ui.menu.menu_utils")
 local ManifestMenu  = require("infra.manifest_menu")
 local ShortcutUtils = require("ui.menu.shortcut_utils")
 local KeyboardSlots = require("ui.menu.menu_keyboard_slots")
+local TapKeysMenu   = require("ui.menu.menu_tap_keys")
 local ManifestReader = require("infra.manifest_reader")
 local utf8_lib      = (type(utf8) == "table" and type(utf8.len) == "function")
 	and utf8 or require("compat.utf8")
@@ -67,7 +68,6 @@ M.DEFAULT_STATE = {
 --- @param state table The current state table (used for trigger_char substitution).
 --- @return string Display label for the trigger key(s).
 local function pretty_key(id, state)
-	if id == "at_hash" then return i18n.get("menu.shortcuts.key_at_hash") end
 	if id == "layer_scroll" or id == "layer+scroll" then return i18n.get("menu.shortcuts.key_layer_scroll") end
 	if id == "wrap_text_if_selected" then return i18n.get("menu.shortcuts.altgr_symbol") end
 
@@ -535,7 +535,7 @@ function M.build(ctx)
 	-- ==============================================
 
 	-- Build shortcut item buckets by iterating the shortcuts module list once.
-	local TOP_ORDER = { "at_hash", "layer_scroll" }
+	local TOP_ORDER = { "layer_scroll" }
 	local top_map   = {}
 	local wrap_item = nil
 	local ctrl_items = {}
@@ -547,7 +547,7 @@ function M.build(ctx)
 			for _, s in ipairs(list) do
 				if type(s) == "table" and s.id then
 					local mi = make_shortcut_item(s, shortcuts, ctx)
-					if s.id == "at_hash" or s.id == "layer_scroll" then
+					if s.id == "layer_scroll" then
 						top_map[s.id] = mi
 					elseif s.id == "wrap_text_if_selected" then
 						wrap_item = mi
@@ -797,7 +797,7 @@ function M.build(ctx)
 		end
 	end
 
-	-- The feature toggles (at_hash, layer_scroll, the wrap-text toggle) open the
+	-- The feature toggles (layer_scroll, the wrap-text toggle) open the
 	-- submenu. They are row DATA handed over by the wrap-symbols list provider,
 	-- which the manifest places first, so the renderer draws them like every
 	-- other row: prepended after rendering, the wrap-text toggle reached the tray
@@ -849,6 +849,12 @@ function M.build(ctx)
 				hs_ctrl_ = ctrl_items,
 				cmd_     = cmd_items,
 			})
+		end,
+		-- The number-row tap keys, named by what each types under the current
+		-- input source. Greyed only by a pause: with the category off they stay
+		-- editable, so a key can be set up before shortcuts are switched on.
+		tap_keys = function(_ctx)
+			return TapKeysMenu.provide_rows(ctx, paused or nil)
 		end,
 		["script_control_shortcuts"] = dyn_script_control,
 		["extensions_shortcuts"] = extension_shortcut_rows,

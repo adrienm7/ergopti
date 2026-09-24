@@ -201,7 +201,7 @@ platforms = ["ahk", "hs", "linux"]
 [sections.shortcuts]
 description_key = "menu.shortcuts"
 platforms = ["ahk", "hs", "linux"]
-subsections = ["alt_gr_caps_lock", "alt_gr_lalt", "keyboard", "lalt_caps_lock", "personal", "script_control"]
+subsections = ["alt_gr_caps_lock", "alt_gr_lalt", "keyboard", "lalt_caps_lock", "personal", "script_control", "tap_keys"]
 
 [sections.category_enabled]
 description_key = "menu.category_enabled"
@@ -240,6 +240,10 @@ platforms = ["ahk"]
 [sections.shortcuts.script_control]
 description_key = "menu.shortcuts.script_control"
 platforms = ["ahk"]
+
+[sections.shortcuts.tap_keys]
+description_key = "menu.shortcuts.header_tap_keys"
+platforms = ["ahk", "hs", "linux"]
 
 # ⚠ OPEN QUESTION, measured 2026-08-04 and left for the maintainer.
 # This section and all 45 of its features exclude Linux — 11 are ["ahk","hs"],
@@ -1363,14 +1367,6 @@ type = "boolean"
 description_key = "menu.shortcuts.screen"
 
 [[features.shortcuts]]
-id = "screen_instant"
-platforms = ["ahk"]
-default = true
-type = "boolean"
-# Names the key: its legend differs per layout, so it is described by position.
-description_key = "menu.shortcuts.screen_instant"
-
-[[features.shortcuts]]
 id = "win_caps_lock"
 platforms = ["ahk"]
 default = true
@@ -1874,6 +1870,39 @@ platforms = ["ahk"]
 default = "pick_color"
 type = "action"
 description_key = "menu.shortcuts.keyboard.win_x"
+
+
+
+# ======================================
+# ===== 3.5.11 shortcuts.tap_keys =====
+# ======================================
+
+# The three keys at the edges of the number row, tapped alone. Each runs the
+# action assigned to it (any catalogue action, through the shared picker) and
+# is swallowed; with a modifier held, on the AltGr layer, or set to "none", it
+# keeps its own character. Each driver's key identity is
+# _shared/modules/actions/tap_keys.json. The key left of 1 opens the system's
+# capture tool by default; the two right of 0 start unassigned.
+[[features.shortcuts.tap_keys]]
+id = "number_row_left"
+platforms = ["ahk", "hs", "linux"]
+default = "screen_capture"
+type = "action"
+description_key = "menu.shortcuts.tap_keys.number_row_left"
+
+[[features.shortcuts.tap_keys]]
+id = "number_row_right_1"
+platforms = ["ahk", "hs", "linux"]
+default = "none"
+type = "action"
+description_key = "menu.shortcuts.tap_keys.number_row_right_1"
+
+[[features.shortcuts.tap_keys]]
+id = "number_row_right_2"
+platforms = ["ahk", "hs", "linux"]
+default = "none"
+type = "action"
+description_key = "menu.shortcuts.tap_keys.number_row_right_2"
 
 
 
@@ -3323,11 +3352,20 @@ i18n = "menu.shortcuts.chatgpt_url_item"
 platforms = ["linux"]
 reason_key = "platform_reason.chatgpt_url_editor_is_placed_per_driver"
 
+# The number-row tap keys (shortcuts.tap_keys), on every platform. A `list`
+# because each row is named by the character its key types under the layout in
+# use, which only the driver can read, and holds the user's own action.
 [[menu.shortcuts_menu]]
-type = "feature"
-path = "shortcuts.screen_instant"
-platforms = ["ahk"]
-reason_key = "platform_reason.chord_families_are_each_platforms"
+type = "section_header"
+i18n = "menu.shortcuts.header_tap_keys"
+
+[[menu.shortcuts_menu]]
+type = "list"
+id = "tap_keys"
+
+[[menu.shortcuts_menu]]
+type = "---"
+
 [[menu.shortcuts_menu]]
 type = "feature"
 path = "shortcuts.wrap_text_if_selected"
