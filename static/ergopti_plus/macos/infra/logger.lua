@@ -36,8 +36,9 @@
 ---    Once armed, repeat collapsing also folds a line that recurs with other
 ---    lines in between into its first occurrence plus one timed summary.
 --- 6. Unified rotating file sink: the acknowledged native worker writes one file
----    per calendar day under <config>/logs/,
----    named ErgoptiPlus_YYYY-MM-DD.log (mirrors the AHK driver naming convention).
+---    per calendar day in the logs folder (LogsDirPath in paths.toml, or
+---    ~/Library/Logs/ergopti_plus/), named ErgoptiPlus_YYYY-MM-DD.log. This
+---    module is the one resolver of that folder and of today's file names.
 ---    Files older than max_age_days are purged automatically on init and after
 ---    the first successful write of each new calendar day.
 --- 7. Topical sub-files: lines are fan-out to per-subsystem logs (llm, karabiner…)
@@ -56,27 +57,38 @@ local M = {}
 local _ok_socket, _socket = pcall(require, "socket")
 local _gettime = (_ok_socket and _socket and _socket.gettime) or os.time
 
+-- Application folder name, default logs folder and log file-name prefixes,
+-- generated from _shared/modules/paths/app_dirs.toml. This module is the one
+-- resolver built on them: every consumer asks logs_dir(), today_log_path(),
+-- today_errors_path() or crash_reports_dir() rather than spelling a name.
+local AppDirs = require("app_dirs")
+local LogFolders = require("infra.log_folders")
+local LOG_FILES = AppDirs.files
+
 -- Early-boot fallback folder, used until M.init_log_path() re-points the sink.
--- It exists whatever the user configured, so fatal reports that must survive an
--- unusable configured folder are also written here.
-M.FALLBACK_LOG_DIR = "/tmp/"
+-- It is the default logs folder, which the launcher creates (it writes
+-- launcher.log there) before it starts Hammerspoon, so fatal reports that must
+-- survive an unusable configured folder land beside launcher.log. It is never
+-- the shared /tmp root, which every account on the Mac can read. Without a
+-- home folder there is no user-private location to prefer.
+M.FALLBACK_LOG_DIR = LogFolders.default_logs_dir(os.getenv(AppDirs.macos.base_env))
+	or LogFolders.homeless_logs_dir()
 
 -- The fallback boot log users are directed to when startup fails. The [init]
 -- topical fan-out writes the same file name, so every boot-stage line of an
 -- early run is already there.
-M.FALLBACK_BOOT_LOG_FILE = M.FALLBACK_LOG_DIR .. "ErgoptiPlus_boot.log"
+M.FALLBACK_BOOT_LOG_FILE = M.FALLBACK_LOG_DIR .. LOG_FILES.topical_prefix .. "boot" .. LOG_FILES.extension
 
--- Main unified log file. Set to a safe early-boot fallback; overridden by
--- M.init_log_path() once the user config directory is known.
-M.UNIFIED_LOG_FILE = M.FALLBACK_BOOT_LOG_FILE
-
--- Dedicated errors-only log (WARNING + ERROR levels). Daily file under the
--- driver logs directory. Purpose: quick triage of problems without the volume
--- of the full unified daily log.
-M.ERRORS_LOG_FILE = M.FALLBACK_LOG_DIR .. "ErgoptiPlus_errors_boot.log"
-
--- Log directory resolved after M.init_log_path(); used by sub-file fan-out.
+-- Log directory resolved after M.init_log_path(); used by sub-file fan-out and
+-- by every public resolver below.
 local _log_dir = M.FALLBACK_LOG_DIR
+
+-- Today's unified and errors-only files as last opened by the synchronous
+-- early-boot sink. Private on purpose: they used to be public fields, fixed when
+-- the folder was chosen, and every consumer that read them after midnight
+-- opened yesterday's file once the native worker owned the rollover.
+local _unified_path = nil
+local _errors_path = nil
 
 -- Delay (seconds) after which the daily old-log purge runs. The purge is pure
 -- housekeeping (deleting stale files) and nothing downstream waits on it, so it
@@ -94,6 +106,22 @@ local SECONDS_PER_DAY = 86400
 -- Anchoring at noon keeps the age comparison DST-safe: a ±1 h shift can never
 -- push a file across a day boundary the way a midnight anchor would.
 local PURGE_NOON_HOUR = 12
+
+--- Escapes Lua pattern magic characters so a generated name matches literally.
+--- @param text string
+--- @return string
+local function _literal_pattern(text)
+	return (text:gsub("[%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%0"))
+end
+
+-- Dated-file matchers of the retention purge, capturing year, month and day.
+-- The errors file needs its OWN pattern: the unified one anchors the date
+-- right after its prefix, so it can never match the "errors_" infix.
+local DATE_CAPTURE = "(%d%d%d%d)%-(%d%d)%-(%d%d)"
+local UNIFIED_DATED_PATTERN = "^" .. _literal_pattern(LOG_FILES.unified_prefix) .. DATE_CAPTURE
+	.. _literal_pattern(LOG_FILES.extension) .. "$"
+local ERRORS_DATED_PATTERN = "^" .. _literal_pattern(LOG_FILES.errors_prefix) .. DATE_CAPTURE
+	.. _literal_pattern(LOG_FILES.extension) .. "$"
 
 -- Topical sub-files: lines whose rendered "[tag]" matches any pattern are
 -- fan-out here in addition to the main unified file. Sub-files are ephemeral
@@ -472,26 +500,25 @@ end
 --- @return string unified_path
 --- @return string errors_path
 local function _dated_log_paths(log_dir, date)
-	return log_dir .. "ErgoptiPlus_" .. date .. ".log",
-		log_dir .. "ErgoptiPlus_errors_" .. date .. ".log"
+	return log_dir .. LOG_FILES.unified_prefix .. date .. LOG_FILES.extension,
+		log_dir .. LOG_FILES.errors_prefix .. date .. LOG_FILES.extension
 end
 
---- Configures the log file path under <config_dir>/hammerspoon/logs/ with
---- daily rotation (ErgoptiPlus_YYYY-MM-DD.log) and purges files older than
---- max_age_days. Best-effort: an I/O failure cannot block init, but every
---- rejected or throwing asynchronous purge boundary is logged explicitly.
---- @param config_dir string Absolute path to the user config directory (trailing slash optional).
+--- Points the sink at the logs folder resolved by infra/config_paths
+--- (LogsDirPath, or ~/Library/Logs/ergopti_plus/) with daily rotation and
+--- purges files older than max_age_days. Best-effort: an I/O failure cannot
+--- block init, but every rejected or throwing asynchronous purge boundary is
+--- logged explicitly.
+--- @param log_dir string Absolute logs folder (trailing slash optional).
 --- @param max_age_days integer Days to keep before purging (default 14).
 --- @return boolean usable False when a log-folder component could not be created.
 --- @return string|nil folder_error Exact unusable component and cause.
-function M.init_log_path(config_dir, max_age_days)
+function M.init_log_path(log_dir, max_age_days)
 	max_age_days = max_age_days or DEFAULT_LOG_RETENTION_DAYS
-	if type(config_dir) ~= "string" or config_dir == "" then
-		return false, "config_dir must be a non-empty string"
+	if type(log_dir) ~= "string" or log_dir == "" then
+		return false, "log_dir must be a non-empty string"
 	end
-	if not config_dir:match("[/\\]$") then config_dir = config_dir .. "/" end
-
-	local log_dir = config_dir .. "hammerspoon/logs/"
+	if not log_dir:match("[/\\]$") then log_dir = log_dir .. "/" end
 
 	-- Created in-process, not by forking /bin/sh.
 	--
@@ -556,7 +583,7 @@ function M.init_log_path(config_dir, max_age_days)
 		_last_log_path = nil
 	end
 
-	M.UNIFIED_LOG_FILE, M.ERRORS_LOG_FILE = _dated_log_paths(log_dir, os.date("%Y-%m-%d"))
+	_unified_path, _errors_path = _dated_log_paths(log_dir, os.date("%Y-%m-%d"))
 
 
 	-- Old-log purge is pure housekeeping — defer it off the boot critical path.
@@ -566,9 +593,16 @@ function M.init_log_path(config_dir, max_age_days)
 	return folder_error == nil, folder_error
 end
 
+--- Returns the logs folder the sink writes to: the early-boot fallback until
+--- init_log_path() runs, then the folder config_paths resolved.
+--- @return string folder With a trailing slash.
+function M.logs_dir()
+	return _log_dir
+end
+
 --- Returns today's unified log path in the chosen log folder. The date is read
---- per call: the native worker rolls files by each record's date, while
---- M.UNIFIED_LOG_FILE keeps the name chosen when the folder was set.
+--- per call: the native worker rolls files by each record's date, so a path
+--- chosen earlier names yesterday's file after midnight.
 --- @return string path
 function M.today_log_path()
 	local unified_path = _dated_log_paths(_log_dir, os.date("%Y-%m-%d"))
@@ -576,10 +610,17 @@ function M.today_log_path()
 end
 
 --- Returns today's errors-only log path (WARNING and ERROR lines), read per call.
+--- The file exists only once something warned that day.
 --- @return string path
 function M.today_errors_path()
 	local _, errors_path = _dated_log_paths(_log_dir, os.date("%Y-%m-%d"))
 	return errors_path
+end
+
+--- Returns the folder crash reports are written to, inside the logs folder.
+--- @return string folder With a trailing slash.
+function M.crash_reports_dir()
+	return _log_dir .. AppDirs.crash_reports_dir .. "/"
 end
 
 --- Removes one stale log and records any OS refusal without fabricating success.
@@ -657,9 +698,9 @@ function M._purge_old_logs(log_dir, max_age_days)
 		-- date immediately after "ErgoptiPlus_", so it can never match the "errors_"
 		-- infix. Missing that second pattern is exactly what let the errors file
 		-- escape every purge since the sink was introduced.
-		local year, month, day = name:match("^ErgoptiPlus_errors_(%d%d%d%d)%-(%d%d)%-(%d%d)%.log$")
+		local year, month, day = name:match(ERRORS_DATED_PATTERN)
 		if not year then
-			year, month, day = name:match("^ErgoptiPlus_(%d%d%d%d)%-(%d%d)%-(%d%d)%.log$")
+			year, month, day = name:match(UNIFIED_DATED_PATTERN)
 		end
 
 		if year then
@@ -855,27 +896,27 @@ end
 M.timestamp_fn = _timestamp
 
 --- Returns an open append handle to the current daily log file, re-opening on
---- day rollover or after init_log_path() re-points UNIFIED_LOG_FILE.
+--- day rollover or after init_log_path() re-points the folder.
 local function _ensure_log_file()
 	local today = os.date("%Y-%m-%d")
 	local previous_date = _last_log_date
 	-- Recompute the dated paths when the calendar date changes so midnight
 	-- rollovers write to the new day's file rather than reopening yesterday's.
-	if _log_dir and _last_log_date ~= today then
-		M.UNIFIED_LOG_FILE, M.ERRORS_LOG_FILE = _dated_log_paths(_log_dir, today)
+	if _unified_path == nil or _last_log_date ~= today then
+		_unified_path, _errors_path = _dated_log_paths(_log_dir, today)
 	end
-	if _file_handle and _last_log_date == today and _last_log_path == M.UNIFIED_LOG_FILE then
+	if _file_handle and _last_log_date == today and _last_log_path == _unified_path then
 		return _file_handle
 	end
 	if _file_handle then
 		pcall(function() _file_handle:close() end)
 		_file_handle = nil
 	end
-	local ok, fh = pcall(io.open, M.UNIFIED_LOG_FILE, "a")
+	local ok, fh = pcall(io.open, _unified_path, "a")
 	if not ok or not fh then return nil end
 	_file_handle   = fh
 	_last_log_date = today
-	_last_log_path = M.UNIFIED_LOG_FILE
+	_last_log_path = _unified_path
 	-- Session boundary marker so tailing reveals where HS restarted
 	pcall(function()
 		fh:write("\n===== " .. _timestamp() .. " — ErgoptiPlus session opened =====\n")
@@ -1066,7 +1107,7 @@ _driver_sink = function(line, variant)
 	if level >= Core.LEVELS.WARNING then
 		local err_full = line .. "\n"
 		pcall(function()
-			local f = io.open(M.ERRORS_LOG_FILE, "a")
+			local f = io.open(_errors_path, "a")
 			if f then
 				f:write(err_full)
 				f:close()

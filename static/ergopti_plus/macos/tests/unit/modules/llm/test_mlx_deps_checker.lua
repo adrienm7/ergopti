@@ -161,7 +161,7 @@ helpers.describe("mlx_deps_checker public API", function()
 	}
 
 	package.loaded["infra.logger"] = {
-		UNIFIED_LOG_FILE = "/tmp/ergopti_test.log",
+		today_log_path = function() return "/tmp/ergopti_test.log" end,
 		start = function() calls.start = calls.start + 1 end,
 		debug = function() calls.debug = calls.debug + 1 end,
 		info = function() calls.info = calls.info + 1 end,

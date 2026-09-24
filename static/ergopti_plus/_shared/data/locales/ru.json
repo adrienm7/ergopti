@@ -665,6 +665,7 @@
 	"menu.debug.list_vars": "Состояние переменных",
 	"menu.debug.log_level": "Уровень лога",
 	"menu.debug.open_error_log": "Open error log",
+	"menu.debug.no_errors_today": "Сегодня нет предупреждений и ошибок",
 	"menu.debug.open_logs": "Открыть папку журналов",
 	"menu.debug.open_today_log": "Открыть журнал за сегодня",
 	"menu.debug.title": "⚠ Отладка",

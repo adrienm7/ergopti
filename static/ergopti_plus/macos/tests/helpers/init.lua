@@ -690,6 +690,15 @@ function M.make_logger_stub()
 		build   = function() return noop end,
 		install_runtime_error_capture = noop,
 		init_log_path = noop,
+		-- The logs-folder resolver every consumer asks; a stub without it would
+		-- turn a production call into a nil-call the test never meant to probe.
+		FALLBACK_LOG_DIR = "/tmp/ergopti_plus_test_logs/",
+		logs_dir = function() return "/tmp/ergopti_plus_test_logs/" end,
+		today_log_path = function() return "/tmp/ergopti_plus_test_logs/ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log" end,
+		today_errors_path = function()
+			return "/tmp/ergopti_plus_test_logs/ErgoptiPlus_errors_" .. os.date("%Y-%m-%d") .. ".log"
+		end,
+		crash_reports_dir = function() return "/tmp/ergopti_plus_test_logs/crash_reports/" end,
 		start_async_sink = function() return true end,
 		classify_async_sink_boot_environment = function() return "standalone" end,
 		set_async_sink_failure_handler = function() return true end,

@@ -34,7 +34,7 @@ local function with_fixture(callback)
 			timers = {},
 		}
 		local logger_stub = helpers.make_logger_stub()
-		logger_stub.UNIFIED_LOG_FILE = "/tmp/ergopti-test.log"
+		logger_stub.today_log_path = function() return "/tmp/ergopti-test.log" end
 		package.loaded["infra.logger"] = logger_stub
 		package.loaded["infra.notifications"] = { notify = function() return true end }
 		package.loaded["infra.i18n"] = { get = function(key) return key end }

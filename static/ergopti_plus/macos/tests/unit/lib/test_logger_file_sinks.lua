@@ -10,7 +10,7 @@
 --- fan-out, the level-aware flush policy, and the print() tee.
 ---
 --- That half was guarded almost entirely by SOURCE SCANNING. A test asserting
---- that `_flush_dedup_summary` contains the substring "M.ERRORS_LOG_FILE" is not
+--- that `_flush_dedup_summary` contains the substring "M.today_errors_path()" is not
 --- checking that a suppressed error storm reaches the errors log; it is checking
 --- where a line of code currently sits. The two coincide until the day the code
 --- moves, at which point the grep goes red while the behaviour is untouched — and
@@ -150,12 +150,11 @@ end
 --- Path of the topical sub-file the routed tag is expected to reach.
 ---
 --- Derived from the unified log rather than from the directory handed to
---- init_log_path(): the logger appends "hammerspoon/logs/" to that argument, so a
---- path built from the argument alone points at a file nothing ever writes and
---- the assertion fails for a reason that has nothing to do with routing.
+--- init_log_path(): the logger normalizes that argument, so the folder the
+--- unified log actually lands in is the one the fan-out uses too.
 --- @return string
 local function routed_sub_file()
-	local log_dir = Logger.UNIFIED_LOG_FILE:match("^(.*/)") or ""
+	local log_dir = Logger.today_log_path():match("^(.*/)") or ""
 	return log_dir .. "ErgoptiPlus_" .. ROUTED_TAG .. ".log"
 end
 
@@ -176,7 +175,7 @@ helpers.describe("logger file sinks — the unified daily log", function()
 			Logger.info("probe_mod", "unified sink body")
 		end)
 
-		local unified = text_of(writes, Logger.UNIFIED_LOG_FILE)
+		local unified = text_of(writes, Logger.today_log_path())
 		helpers.assert_true(unified ~= "",
 			"the unified log received nothing at all — with no bytes captured every "
 			.. "assertion in this file would be vacuous")
@@ -204,7 +203,7 @@ helpers.describe("logger file sinks — the unified daily log", function()
 			Logger.error("probe_mod",   "v error")
 		end)
 
-		local unified = text_of(writes, Logger.UNIFIED_LOG_FILE)
+		local unified = text_of(writes, Logger.today_log_path())
 		local expected = {
 			{ "[DEBUG] [probe_mod] v debug",     "debug"   },
 			{ "[TRACE] [probe_mod] v trace",     "trace"   },
@@ -231,7 +230,7 @@ helpers.describe("logger file sinks — the unified daily log", function()
 			Logger.warn("probe_mod", "kept body")
 		end)
 
-		local unified = text_of(writes, Logger.UNIFIED_LOG_FILE)
+		local unified = text_of(writes, Logger.today_log_path())
 		helpers.assert_true(has(unified, "kept body"),
 			"a WARNING at threshold WARNING must still be written — otherwise this assertion "
 			.. "pair proves only that the capture is broken")
@@ -262,7 +261,7 @@ helpers.describe("logger file sinks — the errors-only mirror", function()
 			Logger.error("probe_mod", "mirror error body")
 		end)
 
-		local errors_log = text_of(writes, Logger.ERRORS_LOG_FILE)
+		local errors_log = text_of(writes, Logger.today_errors_path())
 		helpers.assert_true(errors_log ~= "",
 			"the errors-only log received nothing — the mirror is the recommended first place "
 			.. "to look when something goes wrong, and an empty one reads as \"no problems\"")
@@ -284,8 +283,8 @@ helpers.describe("logger file sinks — the errors-only mirror", function()
 			Logger.error("probe_mod", "shape check body")
 		end)
 
-		local unified    = text_of(writes, Logger.UNIFIED_LOG_FILE)
-		local errors_log = text_of(writes, Logger.ERRORS_LOG_FILE)
+		local unified    = text_of(writes, Logger.today_log_path())
+		local errors_log = text_of(writes, Logger.today_errors_path())
 
 		local pattern = "(%d%d%d%d%-%d%d%-%d%d %d%d:%d%d:%d%d:%d%d%d %[ERROR%] %[probe_mod%] shape check body)"
 		local from_unified = unified:match(pattern)
@@ -317,7 +316,7 @@ helpers.describe("logger file sinks — topical fan-out", function()
 			Logger.info(ROUTED_TAG, "routed body")
 		end)
 
-		local unified = text_of(writes, Logger.UNIFIED_LOG_FILE)
+		local unified = text_of(writes, Logger.today_log_path())
 		local sub     = text_of(writes, routed_sub_file())
 
 		helpers.assert_true(has(unified, "routed body"),
@@ -335,11 +334,11 @@ helpers.describe("logger file sinks — topical fan-out", function()
 			Logger.info(UNROUTED_TAG, "unrouted body")
 		end)
 
-		helpers.assert_true(has(text_of(writes, Logger.UNIFIED_LOG_FILE), "unrouted body"),
+		helpers.assert_true(has(text_of(writes, Logger.today_log_path()), "unrouted body"),
 			"the unrouted line must still reach the unified log")
 
 		for path, _ in pairs(writes) do
-			if path ~= Logger.UNIFIED_LOG_FILE and path ~= Logger.ERRORS_LOG_FILE then
+			if path ~= Logger.today_log_path() and path ~= Logger.today_errors_path() then
 				helpers.assert_true(not has(text_of(writes, path), "unrouted body"), string.format(
 					"a line matching no routing pattern reached the sub-file %s. A fan-out that "
 					.. "over-matches makes every topical log a copy of the main one, which costs "
@@ -368,7 +367,7 @@ helpers.describe("logger file sinks — level-aware flush policy", function()
 			Logger.info("probe_mod", "flush probe three")
 		end)
 
-		local count = flushes[Logger.UNIFIED_LOG_FILE] or 0
+		local count = flushes[Logger.today_log_path()] or 0
 		helpers.assert_true(count >= 3, string.format(
 			"three INFO lines must produce at least three flushes, got %d. These are the lines "
 			.. "that matter after a crash and they are rare enough to afford it — deferring them "
@@ -382,13 +381,13 @@ helpers.describe("logger file sinks — level-aware flush policy", function()
 			-- counter, so the DEBUG burst below is measured from a known state
 			-- rather than from whatever an earlier capture left behind.
 			Logger.info("probe_mod", "flush baseline")
-			local before = flushes[Logger.UNIFIED_LOG_FILE] or 0
+			local before = flushes[Logger.today_log_path()] or 0
 
 			for i = 1, DEBUG_FLUSH_THRESHOLD - 1 do
 				Logger.debug("probe_mod", "deferred debug line %d", i)
 			end
 
-			local after = flushes[Logger.UNIFIED_LOG_FILE] or 0
+			local after = flushes[Logger.today_log_path()] or 0
 			helpers.assert_eq(after, before, string.format(
 				"%d DEBUG lines under the threshold of %d must add no flush, got %d extra. The "
 				.. "default level is DEBUG and DEBUG lines are emitted from the keystroke path, "
@@ -402,13 +401,13 @@ helpers.describe("logger file sinks — level-aware flush policy", function()
 		local dir = "/tmp/ergopti_sinks_flush_valve/"
 		capture(dir, function(_writes, flushes)
 			Logger.info("probe_mod", "valve baseline")
-			local before = flushes[Logger.UNIFIED_LOG_FILE] or 0
+			local before = flushes[Logger.today_log_path()] or 0
 
 			for i = 1, DEBUG_FLUSH_THRESHOLD do
 				Logger.debug("probe_mod", "valve debug line %d", i)
 			end
 
-			local after = flushes[Logger.UNIFIED_LOG_FILE] or 0
+			local after = flushes[Logger.today_log_path()] or 0
 			helpers.assert_true(after > before, string.format(
 				"a burst of %d DEBUG lines must trigger the safety valve. Without it the "
 				.. "deferral is unbounded, and a burst of tracing is precisely when losing the "
@@ -439,7 +438,7 @@ helpers.describe("logger file sinks — the suppression summary", function()
 			Logger.error("probe_mod", "streak breaker")
 		end)
 
-		local unified = text_of(writes, Logger.UNIFIED_LOG_FILE)
+		local unified = text_of(writes, Logger.today_log_path())
 		local expected = string.format("%d identical lines suppressed", SUPPRESSED_COUNT)
 		helpers.assert_true(has(unified, expected), string.format(
 			"the summary must report %d. This is the assertion a source scan cannot make: it "
@@ -458,7 +457,7 @@ helpers.describe("logger file sinks — the suppression summary", function()
 			Logger.error("probe_mod", "mirrored breaker")
 		end)
 
-		local errors_log = text_of(writes, Logger.ERRORS_LOG_FILE)
+		local errors_log = text_of(writes, Logger.today_errors_path())
 		helpers.assert_true(has(errors_log, "identical lines suppressed"), string.format(
 			"a suppressed ERROR storm must have its summary mirrored into the errors-only log. "
 			.. "Without it that file shows the first occurrence and silently omits the repeat "
@@ -477,8 +476,8 @@ helpers.describe("logger file sinks — the suppression summary", function()
 			Logger.info("probe_mod", "quiet breaker")
 		end)
 
-		local unified    = text_of(writes, Logger.UNIFIED_LOG_FILE)
-		local errors_log = text_of(writes, Logger.ERRORS_LOG_FILE)
+		local unified    = text_of(writes, Logger.today_log_path())
+		local errors_log = text_of(writes, Logger.today_errors_path())
 
 		helpers.assert_true(has(unified, "identical lines suppressed"),
 			"the INFO streak's summary must still reach the unified log — otherwise this test "
@@ -540,7 +539,7 @@ helpers.describe("logger file sinks — the print() tee", function()
 		if _G.hs.fs then _G.hs.fs.attributes = saved_attrs end
 		if not ok then error(err, 0) end
 
-		local unified = text_of(writes, TeeLogger.UNIFIED_LOG_FILE)
+		local unified = text_of(writes, TeeLogger.today_log_path())
 
 		helpers.assert_true(has(unified, "[CONSOLE] [console] foreign traceback line"), string.format(
 			"a print() from outside the Logger must be teed into the unified file. Hammerspoon "

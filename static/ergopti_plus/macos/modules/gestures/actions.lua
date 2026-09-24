@@ -370,21 +370,6 @@ local function sg(name, label_or_fn, fn_arg)
 	SG[name] = { fn = fn }
 end
 
---- Resolves the driver's log directory, honouring a relocated config dir.
---- Mirrors the resolver in ui/menu/init.lua so the gesture actions and the menu
---- entries can never open two different folders. Falls back to hs.configdir,
---- which is where the driver lives when the config dir has not been moved.
---- @return string Absolute log directory, with a trailing slash.
-local function logs_dir()
-	local ok_mp, mp = pcall(require, "ui.menu.menu_paths")
-	local base = ok_mp and type(mp.get_config_dir) == "function" and mp.get_config_dir() or nil
-	if type(base) == "string" and base ~= "" then
-		if not base:match("[/\\]$") then base = base .. "/" end
-		return base .. "hammerspoon/logs/"
-	end
-	return hs.configdir .. "/logs/"
-end
-
 --- Calls `method` on a lazily required UI module, logging loudly on a miss.
 --- The plain `pcall(function() require(mod).method() end)` shape this replaces
 --- collapsed three distinct failures — module absent, method absent, method
@@ -1034,29 +1019,23 @@ sg("open_config",                    function()
 	return AuxOwner.open(hs.configdir .. "/config.toml",
 		"open config", nil, current_action_parent())
 end)
+-- The three log actions share the Debug menu's owner (ui/log_openers), which
+-- asks the logger for each path at the moment of the gesture; only the
+-- asynchronous opener, owned here by the gesture scope, differs.
+--- @param label string Opener label shown in the owner's diagnostics.
+--- @return function open_fn
+local function gesture_opener(label)
+	local parent = current_action_parent()
+	return function(target) return AuxOwner.open(target, label, nil, parent) end
+end
 sg("open_logs_folder",                function()
-	return AuxOwner.open(logs_dir(), "open logs folder", nil, current_action_parent())
+	return require("ui.log_openers").open_logs_folder(gesture_opener("open logs folder"))
 end)
 sg("open_today_log",                   function()
-	local ok_p, path = pcall(function()
-		return logs_dir() .. "ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log"
-	end)
-	-- The open is skipped rather than attempted with a nil path: the launcher
-	-- logs an ERROR for a nil target, which is the fail-fast we want, but only
-	-- when there was really a path to open.
-	if ok_p then return AuxOwner.open(path, "open today's log", nil, current_action_parent()) end
-	return false
+	return require("ui.log_openers").open_today_log(gesture_opener("open today's log"))
 end)
 sg("open_error_log",                   function()
-	local ok_p, path = pcall(function()
-		local ok_l, Logger = pcall(require, "infra.logger")
-		if ok_l and type(Logger) == "table" and type(Logger.ERRORS_LOG_FILE) == "string" and Logger.ERRORS_LOG_FILE ~= "" then
-			return Logger.ERRORS_LOG_FILE
-		end
-		return logs_dir() .. "ErgoptiPlus_errors_" .. os.date("%Y-%m-%d") .. ".log"
-	end)
-	if ok_p then return AuxOwner.open(path, "open error log", nil, current_action_parent()) end
-	return false
+	return require("ui.log_openers").open_today_errors(gesture_opener("open error log"))
 end)
 
 -- Parameterized actions read their value from the binding that invoked them.

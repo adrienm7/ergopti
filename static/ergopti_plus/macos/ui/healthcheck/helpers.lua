@@ -269,15 +269,16 @@ end
 function H.collect_keylogger_summary()
 	-- events_session / privacy_hits have no public accessor today, so they are
 	-- reported as "n/a" rather than probed against a nonexistent function. WPM is
-	-- live from the keylogger; the log paths are the logger's canonical constants.
+	-- live from the keylogger; the log paths come from the logger's resolver,
+	-- which reads the date on every call.
 	local sum = {
 		enabled = "unknown",
 		wpm = "n/a",
 		events_session = "n/a",
 		privacy_hits = "n/a",
-		today_log = Logger.UNIFIED_LOG_FILE or "",
-		errors_log = Logger.ERRORS_LOG_FILE or "",
-		notes = "High-severity (WARNING/ERROR) also written to dedicated ErgoptiPlus_errors_*.log (see Debug > Open Error Log)",
+		today_log = Logger.today_log_path(),
+		errors_log = Logger.today_errors_path(),
+		notes = "High-severity (WARNING/ERROR) lines are also written to today's errors file (see Debug > Open today's errors file)",
 	}
 	local ok_k, kl = pcall(require, "modules.keylogger")
 	if not ok_k then
@@ -392,16 +393,20 @@ end
 
 function H.collect_logs_info()
 	local info = {
+		logs_dir = "",
 		unified_today = "",
 		errors_today = "",
+		crash_reports_dir = "",
 		errors_sink_active = false,
 		ring_lines = 0,
 		note = "Dedicated errors sink (WARNING/ERROR only) keeps the main daily log smaller and easier to read.",
 	}
-	-- Canonical log file paths live on the logger module as public constants,
-	-- re-pointed at the dated files by Logger.init_log_path() during boot.
-	info.unified_today      = Logger.UNIFIED_LOG_FILE or ""
-	info.errors_today       = Logger.ERRORS_LOG_FILE or ""
+	-- The logger is the one resolver of the logs folder and of today's files;
+	-- it reads the date on every call, so these rows stay right past midnight.
+	info.logs_dir           = Logger.logs_dir()
+	info.unified_today      = Logger.today_log_path()
+	info.errors_today       = Logger.today_errors_path()
+	info.crash_reports_dir  = Logger.crash_reports_dir()
 	info.errors_sink_active = (info.errors_today ~= "")
 	-- Logger is already required at module level; re-require only to check ring_buffer_snapshot
 	if type(Logger.ring_buffer_snapshot) == "function" then

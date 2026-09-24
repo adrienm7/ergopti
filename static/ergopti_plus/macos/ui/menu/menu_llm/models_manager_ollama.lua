@@ -337,7 +337,7 @@ function M.new(deps, presets, ram_getter)
 		-- The shared foreground pipeline uses a `while read` loop because macOS'
 		-- default BWK awk lacks gawk's strftime() / fflush(file) builtins.
 		local launch_cmd, command_err = OllamaServerCommand.build(
-			ollama_bin, Logger.UNIFIED_LOG_FILE, OllamaEndpoint.get_port())
+			ollama_bin, Logger.today_log_path(), OllamaEndpoint.get_port())
 		if not launch_cmd then
 			Logger.error(LOG, "Could not build Ollama daemon command: %s", tostring(command_err))
 			return nil

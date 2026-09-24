@@ -49,7 +49,7 @@ helpers.describe("HS-025: MLX readiness timeout retirement", function()
 
 			package.loaded["infra.notifications"] = { notify = noop }
 			package.loaded["infra.logger"] = {
-				UNIFIED_LOG_FILE = "/tmp/ergopti-hs025.log",
+				today_log_path = function() return "/tmp/ergopti-hs025.log" end,
 				debug = noop,
 				info = noop,
 				warn = noop,

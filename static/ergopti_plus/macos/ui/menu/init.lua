@@ -43,6 +43,8 @@ local FactoryResetJournal = require("infra.factory_reset_journal")
 local DiagnosticSnapshot = require("infra.diagnostic_snapshot")
 local BootProfiler = require("infra.boot_profiler")
 local ConfigPaths = require("infra.config_paths")
+local LogOpeners = require("ui.log_openers")
+local ShellRunner = require("adapters.shell_runner")
 
 local LOG = "menu"
 local load_errors = {}
@@ -1125,9 +1127,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				end, "menu.open_config")
 			end,
 			open_logs = function()
-				return DeferredWork.after(0,
-					function() pcall(hs.execute, "open " .. text_utils.shell_quote(base_dir .. "logs")) end,
-					"menu.open_logs")
+				return LogOpeners.open_logs_folder(function(target) return (ShellRunner.open(target)) end)
 			end,
 		})
 
@@ -1162,11 +1162,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- ctx and actions are built once and reused across menu opens.
 	-- Fields that must reflect live state (paused) are read inside Builder.generate()
 	-- from upvalues (state, core_mods) which are always current.
-	local function logs_dir()
-		local d = MenuPaths.get_config_dir() or ""
-		if not d:match("[/\\]$") then d = d .. "/" end
-		return d .. "hammerspoon/logs/"
-	end
+	-- The Debug log rows open through one owner, shared with the gesture
+	-- actions, with the asynchronous Launch Services opener: never a blocking
+	-- hs.execute on the run loop that also services the typing event tap.
+	local function open_async(target) return (ShellRunner.open(target)) end
 
 	local function open_path_via_menu(key)
 		local p = MenuPaths.get(key)
@@ -1214,11 +1213,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			end
 			return accepted
 		end,
-		open_logs                 = function()
-			local dir = logs_dir()
-			pcall(hs.execute, "mkdir -p " .. text_utils.shell_quote(dir)
-				.. " && open " .. text_utils.shell_quote(dir))
-		end,
+		open_logs                 = function() return LogOpeners.open_logs_folder(open_async) end,
 		open_console              = function() pcall(hs.openConsole) end,
 		open_paths_editor         = function()
 			return DeferredWork.after(0.05, MenuPaths.open_editor, "menu.open_paths_editor")
@@ -1245,25 +1240,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		open_personal_hotstrings  = function() open_path_via_menu("PersonalTomlPath") end,
 		open_personal_info        = function() open_path_via_menu("PersonalInfoTomlPath") end,
 		open_config               = function() open_path_via_menu("ConfigTomlPath") end,
-		open_logs_folder          = function()
-			local dir = logs_dir()
-			pcall(hs.execute, "mkdir -p " .. text_utils.shell_quote(dir)
-				.. " && open " .. text_utils.shell_quote(dir))
-		end,
-		open_today_log            = function()
-			local path = require("infra.logger").UNIFIED_LOG_FILE
-			if type(path) ~= "string" or path == "" then
-				path = logs_dir() .. "ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log"
-			end
-			pcall(hs.execute, "open " .. text_utils.shell_quote(path))
-		end,
-		open_error_log            = function()
-			local path = require("infra.logger").ERRORS_LOG_FILE
-			if type(path) ~= "string" or path == "" then
-				path = logs_dir() .. "ErgoptiPlus_errors_" .. os.date("%Y-%m-%d") .. ".log"
-			end
-			pcall(hs.execute, "open " .. text_utils.shell_quote(path))
-		end,
+		open_logs_folder          = function() return LogOpeners.open_logs_folder(open_async) end,
+		open_today_log            = function() return LogOpeners.open_today_log(open_async) end,
+		open_error_log            = function() return LogOpeners.open_today_errors(open_async) end,
 		show_setup_wizard         = function()
 			local ok, ob = pcall(require, "ui.onboarding")
 			if ok and type(ob.run_from_menu) == "function" then

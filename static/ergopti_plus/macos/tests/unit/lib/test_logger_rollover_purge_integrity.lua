@@ -164,7 +164,7 @@ helpers.describe("logger rollover purge integrity", function()
 				"a delivered one-shot purge timer must be released rather than leaked")
 			Logger.info("logger_rollover_test", "Day A marker.")
 
-			local day_a_path = Logger.UNIFIED_LOG_FILE
+			local day_a_path = Logger.today_log_path()
 			local day_a_handle = (handles_by_path[day_a_path] or {})[1]
 			helpers.assert_true(day_a_handle ~= nil,
 				"the day-A write must open the day-A unified file")
@@ -172,9 +172,9 @@ helpers.describe("logger rollover purge integrity", function()
 			current_day = DAY_B
 			Logger.warn("logger_rollover_test", "Day B first marker.")
 
-			local day_b_path = TEST_CONFIG_DIR .. "hammerspoon/logs/ErgoptiPlus_" .. DAY_B .. ".log"
+			local day_b_path = TEST_CONFIG_DIR .. "ErgoptiPlus_" .. DAY_B .. ".log"
 			local day_b_errors_path = TEST_CONFIG_DIR
-				.. "hammerspoon/logs/ErgoptiPlus_errors_" .. DAY_B .. ".log"
+				.. "ErgoptiPlus_errors_" .. DAY_B .. ".log"
 			helpers.assert_true(day_a_handle.closed,
 				"the first day-B write must close the day-A unified handle")
 			helpers.assert_true(bytes_for(handles_by_path, day_a_path):find("Day B", 1, true) == nil,
@@ -206,9 +206,9 @@ helpers.describe("logger rollover purge integrity", function()
 			-- A failed remove is a warning, never a fabricated successful count
 			directory_entries = { "ErgoptiPlus_2000-01-01.log" }
 			failed_remove_path = TEST_CONFIG_DIR
-				.. "hammerspoon/logs/ErgoptiPlus_2000-01-01.log"
+				.. "ErgoptiPlus_2000-01-01.log"
 			captured = {}
-			Logger._purge_old_logs(TEST_CONFIG_DIR .. "hammerspoon/logs/", RETENTION_DAYS)
+			Logger._purge_old_logs(TEST_CONFIG_DIR, RETENTION_DAYS)
 			helpers.assert_true(any_line_contains(captured, "[WARNING]", "permission denied", failed_remove_path),
 				"os.remove returning nil must log the path and failure reason")
 			helpers.assert_true(not any_line_contains(captured, "Old-log purge removed 1 stale file(s)."),

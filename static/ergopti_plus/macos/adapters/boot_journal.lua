@@ -12,8 +12,8 @@
 ---    journal line is appended and closed before the stage continues.
 --- 2. Findable before the user folder exists: lines always reach the fallback
 ---    boot log, and reach launcher.log until the configured log folder is
----    committed, so a failure at config-path or logger setup is readable in
----    ~/Library/Logs/ErgoptiPlus.
+---    committed, both in ~/Library/Logs/ergopti_plus, so a failure at
+---    config-path or logger setup is readable there.
 --- 3. Privacy: callers pass stage names, paths and durations only.
 --- ==============================================================================
 

@@ -12,9 +12,12 @@
 local M = {}
 
 local text_utils = require("infra.text_utils")
+local AppDirs    = require("app_dirs")
 
-local DAILY_LOG_PREFIX = "ErgoptiPlus_"
-local DAILY_LOG_SUFFIX = ".log"
+-- The daemon appends to the same dated file the logger names, so the prefix
+-- and extension come from the one registry that names it.
+local DAILY_LOG_PREFIX = AppDirs.files.unified_prefix
+local DAILY_LOG_SUFFIX = AppDirs.files.extension
 local STAMP_FORMAT = "+%Y-%m-%d %H:%M:%S"
 local OLLAMA_HOST = "127.0.0.1"
 local OLLAMA_PORT_MIN, OLLAMA_PORT_MAX = 1024, 65535
@@ -22,7 +25,7 @@ local OLLAMA_PORT_MIN, OLLAMA_PORT_MAX = 1024, 65535
 --- Resolves a POSIX parent directory from the Logger's current unified path.
 --- Only the directory is retained by the daemon; the dated filename is rebuilt
 --- at write time inside the shell loop.
---- @param unified_log_file string Current Logger.UNIFIED_LOG_FILE value.
+--- @param unified_log_file string Logger.today_log_path() at launch.
 --- @return string|nil log_dir
 --- @return string|nil error_message
 local function resolve_log_dir(unified_log_file)
@@ -38,7 +41,7 @@ end
 
 --- Builds the foreground `ollama serve` pipeline.
 --- @param ollama_bin string Absolute Ollama executable path.
---- @param unified_log_file string Current Logger.UNIFIED_LOG_FILE value.
+--- @param unified_log_file string Logger.today_log_path() at launch.
 --- @param port integer Canonical configured Ollama port.
 --- @return string|nil command
 --- @return string|nil error_message
