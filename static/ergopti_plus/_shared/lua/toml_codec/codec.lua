@@ -190,6 +190,14 @@ function M.encode(tbl)
 	return table.concat(out, "\n")
 end
 
+--- Encode one value as the TOML literal a ``key = value`` line carries, with
+--- the escaping and ordering rules of M.encode.
+--- @param value any String, number, boolean, array or table.
+--- @return string The TOML literal.
+function M.encode_value(value)
+	return encode_value(value)
+end
+
 
 
 

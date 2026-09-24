@@ -49,7 +49,7 @@ const OPS = {
 	merge_into: { required: ['section', 'to_section'], optional: [] },
 	map_value: { required: ['section', 'key', 'map'], optional: [] },
 	delete: { required: ['section'], optional: ['key'] },
-	set_if_absent: { required: ['section', 'key', 'value'], optional: [] },
+	set_if_absent: { required: ['section', 'key', 'value'], optional: [] }
 };
 
 const failures = [];
@@ -62,10 +62,6 @@ const failures = [];
 function fail(where, message) {
 	failures.push(`${where}: ${message}`);
 }
-
-
-
-
 
 // ==================================
 // ==================================
@@ -98,15 +94,21 @@ function isSectionPath(value) {
  * @returns {boolean}
  */
 function sameValue(left, right) {
-	const kind = (value) => (typeof value === 'bigint' ? 'number' : Array.isArray(value) ? 'array' : typeof value);
+	const kind = (value) =>
+		typeof value === 'bigint' ? 'number' : Array.isArray(value) ? 'array' : typeof value;
 	if (kind(left) !== kind(right)) return false;
 	if (Array.isArray(left)) {
-		return left.length === right.length && left.every((item, index) => sameValue(item, right[index]));
+		return (
+			left.length === right.length && left.every((item, index) => sameValue(item, right[index]))
+		);
 	}
 	if (left !== null && typeof left === 'object') {
 		const keys = Object.keys(left).sort();
 		const otherKeys = Object.keys(right).sort();
-		return keys.length === otherKeys.length && keys.every((key, index) => key === otherKeys[index] && sameValue(left[key], right[key]));
+		return (
+			keys.length === otherKeys.length &&
+			keys.every((key, index) => key === otherKeys[index] && sameValue(left[key], right[key]))
+		);
 	}
 	if (typeof left === 'bigint' || typeof right === 'bigint') return Number(left) === Number(right);
 	return left === right;
@@ -118,9 +120,11 @@ function sameValue(left, right) {
  * @param {string} where
  */
 function validateOp(op, where) {
-	if (op === null || typeof op !== 'object' || Array.isArray(op)) return fail(where, 'an op must be an inline table');
+	if (op === null || typeof op !== 'object' || Array.isArray(op))
+		return fail(where, 'an op must be an inline table');
 	const spec = OPS[op.op];
-	if (!spec) return fail(where, `unknown op '${op.op}' (closed set: ${Object.keys(OPS).join(', ')})`);
+	if (!spec)
+		return fail(where, `unknown op '${op.op}' (closed set: ${Object.keys(OPS).join(', ')})`);
 	const allowed = new Set(['op', ...spec.required, ...spec.optional]);
 	for (const field of Object.keys(op)) {
 		if (!allowed.has(field)) fail(where, `${op.op} does not take '${field}'`);
@@ -129,7 +133,8 @@ function validateOp(op, where) {
 		if (op[field] === undefined) fail(where, `${op.op} needs '${field}'`);
 	}
 	for (const field of ['section', 'to_section']) {
-		if (op[field] !== undefined && !isSectionPath(op[field])) fail(where, `'${field}' must be a dotted path of bare segments`);
+		if (op[field] !== undefined && !isSectionPath(op[field]))
+			fail(where, `'${field}' must be a dotted path of bare segments`);
 	}
 	for (const field of ['key', 'to_key']) {
 		if (op[field] !== undefined && !(typeof op[field] === 'string' && BARE.test(op[field]))) {
@@ -137,7 +142,8 @@ function validateOp(op, where) {
 		}
 	}
 	if (op.op === 'rename') {
-		if (op.to_section === undefined && op.to_key === undefined) fail(where, 'rename needs to_section or to_key');
+		if (op.to_section === undefined && op.to_key === undefined)
+			fail(where, 'rename needs to_section or to_key');
 		if ((op.to_section ?? op.section) === op.section && (op.to_key ?? op.key) === op.key) {
 			fail(where, 'rename must change the section or the key');
 		}
@@ -153,18 +159,25 @@ function validateOp(op, where) {
 		}
 	}
 	if (op.op === 'map_value') {
-		if (!Array.isArray(op.map) || op.map.length === 0) return fail(where, 'map_value needs a non-empty map');
+		if (!Array.isArray(op.map) || op.map.length === 0)
+			return fail(where, 'map_value needs a non-empty map');
 		for (const pair of op.map) {
-			if (pair === null || typeof pair !== 'object' || Object.keys(pair).sort().join(',') !== 'from,to') {
+			if (
+				pair === null ||
+				typeof pair !== 'object' ||
+				Object.keys(pair).sort().join(',') !== 'from,to'
+			) {
 				fail(where, 'each map entry is exactly { from, to }');
 				continue;
 			}
-			if (!isScalar(pair.from) || !isScalar(pair.to)) fail(where, 'map_value compares scalars only');
+			if (!isScalar(pair.from) || !isScalar(pair.to))
+				fail(where, 'map_value compares scalars only');
 		}
 		const froms = op.map.map((pair) => pair && pair.from);
 		const tos = op.map.map((pair) => pair && pair.to);
 		froms.forEach((from, index) => {
-			if (froms.findIndex((other) => sameValue(other, from)) !== index) fail(where, 'map_value lists a from twice');
+			if (froms.findIndex((other) => sameValue(other, from)) !== index)
+				fail(where, 'map_value lists a from twice');
 			if (tos.some((to) => sameValue(to, from))) {
 				fail(where, 'map_value from and to sets must be disjoint, or a replay would map again');
 			}
@@ -191,13 +204,23 @@ function validateRegistry(doc, where) {
 	}
 	const current = registry.current_version;
 	const unstamped = registry.unstamped_version;
-	if (!Number.isInteger(current) || !Number.isInteger(unstamped) || unstamped < 1 || current < unstamped) {
-		fail(where, 'current_version and unstamped_version must be integers with 1 <= unstamped <= current');
+	if (
+		!Number.isInteger(current) ||
+		!Number.isInteger(unstamped) ||
+		unstamped < 1 ||
+		current < unstamped
+	) {
+		fail(
+			where,
+			'current_version and unstamped_version must be integers with 1 <= unstamped <= current'
+		);
 		return null;
 	}
 	const unknownRoot = Object.keys(doc).filter((key) => key !== 'registry' && key !== 'steps');
 	if (unknownRoot.length) fail(where, `unknown top-level tables: ${unknownRoot.join(', ')}`);
-	const unknownRegistry = Object.keys(registry).filter((key) => !['current_version', 'unstamped_version'].includes(key));
+	const unknownRegistry = Object.keys(registry).filter(
+		(key) => !['current_version', 'unstamped_version'].includes(key)
+	);
 	if (unknownRegistry.length) fail(where, `unknown [registry] keys: ${unknownRegistry.join(', ')}`);
 
 	const named = Object.entries(doc.steps || {});
@@ -205,31 +228,39 @@ function validateRegistry(doc, where) {
 	for (const [name, step] of named) {
 		const label = `${where} [steps.${name}]`;
 		const allowed = ['from', 'to', 'drivers', 'reason', 'ops'];
-		for (const field of Object.keys(step)) if (!allowed.includes(field)) fail(label, `unknown field '${field}'`);
-		if (!Number.isInteger(step.from) || step.to !== step.from + 1) fail(label, 'to must be from + 1');
-		if (name !== `v${step.from}_to_v${step.to}`) fail(label, `must be named v${step.from}_to_v${step.to}`);
-		if (!Array.isArray(step.drivers) || step.drivers.length === 0) fail(label, 'drivers must be a non-empty array');
+		for (const field of Object.keys(step))
+			if (!allowed.includes(field)) fail(label, `unknown field '${field}'`);
+		if (!Number.isInteger(step.from) || step.to !== step.from + 1)
+			fail(label, 'to must be from + 1');
+		if (name !== `v${step.from}_to_v${step.to}`)
+			fail(label, `must be named v${step.from}_to_v${step.to}`);
+		if (!Array.isArray(step.drivers) || step.drivers.length === 0)
+			fail(label, 'drivers must be a non-empty array');
 		else {
-			for (const driver of step.drivers) if (!DRIVERS.includes(driver)) fail(label, `unknown driver '${driver}'`);
-			if (new Set(step.drivers).size !== step.drivers.length) fail(label, 'drivers lists a driver twice');
+			for (const driver of step.drivers)
+				if (!DRIVERS.includes(driver)) fail(label, `unknown driver '${driver}'`);
+			if (new Set(step.drivers).size !== step.drivers.length)
+				fail(label, 'drivers lists a driver twice');
 		}
-		if (typeof step.reason !== 'string' || step.reason.trim() === '') fail(label, 'reason must be a non-empty string');
+		if (typeof step.reason !== 'string' || step.reason.trim() === '')
+			fail(label, 'reason must be a non-empty string');
 		if (!Array.isArray(step.ops)) fail(label, 'ops must be an array');
 		else step.ops.forEach((op, index) => validateOp(op, `${label} op ${index + 1}`));
 		steps.push(step);
 	}
 	steps.sort((left, right) => left.from - right.from);
 	const expectedCount = current - unstamped;
-	if (steps.length !== expectedCount) fail(where, `expected ${expectedCount} step(s) from v${unstamped} to v${current}, found ${steps.length}`);
+	if (steps.length !== expectedCount)
+		fail(
+			where,
+			`expected ${expectedCount} step(s) from v${unstamped} to v${current}, found ${steps.length}`
+		);
 	steps.forEach((step, index) => {
-		if (step.from !== unstamped + index) fail(where, `the chain has a gap or overlap at v${step.from}`);
+		if (step.from !== unstamped + index)
+			fail(where, `the chain has a gap or overlap at v${step.from}`);
 	});
 	return { current, unstamped, steps };
 }
-
-
-
-
 
 // ==========================================
 // ==========================================
@@ -249,7 +280,12 @@ function flatten(doc) {
 		const values = new Map();
 		let hasChildTable = false;
 		for (const [key, value] of Object.entries(node)) {
-			if (value !== null && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
+			if (
+				value !== null &&
+				typeof value === 'object' &&
+				!Array.isArray(value) &&
+				!(value instanceof Date)
+			) {
 				hasChildTable = true;
 				walk(value, prefix === '' ? key : `${prefix}.${key}`);
 			} else {
@@ -270,9 +306,13 @@ function flatten(doc) {
  */
 function normalized(model) {
 	const out = {};
-	for (const [section, values] of [...model.entries()].sort(([left], [right]) => left.localeCompare(right))) {
+	for (const [section, values] of [...model.entries()].sort(([left], [right]) =>
+		left.localeCompare(right)
+	)) {
 		if (values.size === 0) continue;
-		out[section] = Object.fromEntries([...values.entries()].sort(([left], [right]) => left.localeCompare(right)));
+		out[section] = Object.fromEntries(
+			[...values.entries()].sort(([left], [right]) => left.localeCompare(right))
+		);
 	}
 	return out;
 }
@@ -282,7 +322,9 @@ function cloneModel(model) {
 }
 
 function sectionsAtOrBelow(model, section) {
-	return [...model.keys()].filter((name) => name === section || name.startsWith(`${section}.`)).sort();
+	return [...model.keys()]
+		.filter((name) => name === section || name.startsWith(`${section}.`))
+		.sort();
 }
 
 function dropIfEmpty(model, section) {
@@ -319,7 +361,8 @@ function applyOp(model, op) {
 		case 'move_section': {
 			for (const name of sectionsAtOrBelow(model, op.section)) {
 				const suffix = name.slice(op.section.length);
-				for (const key of [...model.get(name).keys()].sort()) moveValue(model, name, key, op.to_section + suffix, key);
+				for (const key of [...model.get(name).keys()].sort())
+					moveValue(model, name, key, op.to_section + suffix, key);
 				model.delete(name);
 				dropIfEmpty(model, op.to_section + suffix);
 			}
@@ -327,7 +370,8 @@ function applyOp(model, op) {
 		}
 		case 'merge_into': {
 			if (!model.has(op.section)) break;
-			for (const key of [...model.get(op.section).keys()].sort()) moveValue(model, op.section, key, op.to_section, key);
+			for (const key of [...model.get(op.section).keys()].sort())
+				moveValue(model, op.section, key, op.to_section, key);
 			model.delete(op.section);
 			dropIfEmpty(model, op.to_section);
 			break;
@@ -384,10 +428,6 @@ function migrate(model, registry, driver) {
 	return { outcome: 'migrated', model: out, from: version };
 }
 
-
-
-
-
 // ======================================
 // ======================================
 // ======= 3/ Registry and corpus =======
@@ -409,7 +449,8 @@ function readToml(file) {
 }
 
 const shipped = validateRegistry(readToml(REGISTRY_PATH) || {}, 'migrations.toml');
-if (shipped && shipped.steps.length === 0) fail('migrations.toml', 'the registry must hold at least one step');
+if (shipped && shipped.steps.length === 0)
+	fail('migrations.toml', 'the registry must hold at least one step');
 
 const index = readToml(path.join(CORPUS_DIR, 'cases.toml'));
 const listed = index && index.corpus && Array.isArray(index.corpus.cases) ? index.corpus.cases : [];
@@ -422,7 +463,8 @@ if (JSON.stringify([...listed].sort()) !== JSON.stringify(onDisk)) {
 	fail('cases.toml', `lists [${listed.join(', ')}] but the directories are [${onDisk.join(', ')}]`);
 }
 const MIN_CASES = 12;
-if (onDisk.length < MIN_CASES) fail('corpus', `expected at least ${MIN_CASES} cases, found ${onDisk.length}`);
+if (onDisk.length < MIN_CASES)
+	fail('corpus', `expected at least ${MIN_CASES} cases, found ${onDisk.length}`);
 
 const seenOps = new Set();
 const seenOutcomes = new Set();
@@ -437,9 +479,14 @@ for (const name of onDisk) {
 		fail(name, 'case.toml needs a [case] table');
 		continue;
 	}
-	if (typeof meta.description !== 'string' || meta.description.trim() === '') fail(name, 'needs a description');
+	if (typeof meta.description !== 'string' || meta.description.trim() === '')
+		fail(name, 'needs a description');
 	if (!OUTCOMES.includes(meta.outcome)) fail(name, `unknown outcome '${meta.outcome}'`);
-	if (!Array.isArray(meta.drivers) || meta.drivers.length === 0 || meta.drivers.some((driver) => !DRIVERS.includes(driver))) {
+	if (
+		!Array.isArray(meta.drivers) ||
+		meta.drivers.length === 0 ||
+		meta.drivers.some((driver) => !DRIVERS.includes(driver))
+	) {
 		fail(name, 'drivers must be a non-empty subset of ahk, hs, linux');
 		continue;
 	}
@@ -453,7 +500,9 @@ for (const name of onDisk) {
 	}
 
 	const ownRegistryPath = path.join(dir, 'migrations.toml');
-	const registry = fs.existsSync(ownRegistryPath) ? validateRegistry(readToml(ownRegistryPath) || {}, `${name}/migrations.toml`) : shipped;
+	const registry = fs.existsSync(ownRegistryPath)
+		? validateRegistry(readToml(ownRegistryPath) || {}, `${name}/migrations.toml`)
+		: shipped;
 	if (!registry) continue;
 	for (const step of registry.steps) for (const op of step.ops || []) seenOps.add(op.op);
 
@@ -461,7 +510,8 @@ for (const name of onDisk) {
 	if (!input) continue;
 	const expectedPath = path.join(dir, 'expected.toml');
 	const hasExpected = fs.existsSync(expectedPath);
-	if ((meta.outcome === 'migrated') !== hasExpected) fail(name, 'expected.toml is required for, and only for, outcome "migrated"');
+	if ((meta.outcome === 'migrated') !== hasExpected)
+		fail(name, 'expected.toml is required for, and only for, outcome "migrated"');
 	const expected = hasExpected ? readToml(expectedPath) : null;
 
 	for (const driver of meta.drivers) {
@@ -474,31 +524,100 @@ for (const name of onDisk) {
 		if (result.outcome !== 'migrated' || !expected) continue;
 		seenDrivers.add(driver);
 		if (result.from !== meta.from_version || registry.current !== meta.to_version) {
-			fail(name, `${driver}: crosses v${result.from} to v${registry.current}, case says v${meta.from_version} to v${meta.to_version}`);
+			fail(
+				name,
+				`${driver}: crosses v${result.from} to v${registry.current}, case says v${meta.from_version} to v${meta.to_version}`
+			);
 		}
 		const actual = normalized(result.model);
 		const wanted = normalized(flatten(expected));
 		if (!sameValue(actual, wanted)) {
-			fail(name, `${driver}: migrated model differs from expected.toml\n    got      ${JSON.stringify(actual)}\n    expected ${JSON.stringify(wanted)}`);
+			fail(
+				name,
+				`${driver}: migrated model differs from expected.toml\n    got      ${JSON.stringify(actual)}\n    expected ${JSON.stringify(wanted)}`
+			);
 		}
 		const replayInput = cloneModel(result.model);
 		replayInput.get('_meta').set('schema_version', meta.from_version);
 		const replay = migrate(replayInput, registry, driver);
 		if (replay.outcome !== 'migrated' || !sameValue(normalized(replay.model), actual)) {
-			fail(name, `${driver}: replaying the steps on their own output changed it (ops must be idempotent)`);
+			fail(
+				name,
+				`${driver}: replaying the steps on their own output changed it (ops must be idempotent)`
+			);
 		}
 	}
 }
 
-for (const op of Object.keys(OPS)) if (!seenOps.has(op)) fail('corpus', `no case exercises op '${op}'`);
-for (const outcome of OUTCOMES) if (!seenOutcomes.has(outcome)) fail('corpus', `no case expects outcome '${outcome}'`);
-for (const driver of DRIVERS) if (!seenDrivers.has(driver)) fail('corpus', `no migrated case is replayed by driver '${driver}'`);
+for (const op of Object.keys(OPS))
+	if (!seenOps.has(op)) fail('corpus', `no case exercises op '${op}'`);
+for (const outcome of OUTCOMES)
+	if (!seenOutcomes.has(outcome)) fail('corpus', `no case expects outcome '${outcome}'`);
+for (const driver of DRIVERS)
+	if (!seenDrivers.has(driver))
+		fail('corpus', `no migrated case is replayed by driver '${driver}'`);
 const MIN_REPLAYS = 30;
-if (replays < MIN_REPLAYS) fail('corpus', `expected at least ${MIN_REPLAYS} driver replays, ran ${replays}`);
+if (replays < MIN_REPLAYS)
+	fail('corpus', `expected at least ${MIN_REPLAYS} driver replays, ran ${replays}`);
+
+// ======================================
+// ======================================
+// ======= 4/ Interpreter wiring =======
+// ======================================
+// ======================================
+
+const REGISTRY_RELATIVE = path.relative(shared(), REGISTRY_PATH).split(path.sep).join('/');
+
+/**
+ * Reads a repository file, recording a failure when it is missing.
+ * @param {string} file - Absolute path.
+ * @returns {string}
+ */
+function readSource(file) {
+	if (!fs.existsSync(file)) {
+		fail('wiring', `${path.relative(shared('..', '..', '..'), file)} is missing`);
+		return '';
+	}
+	return fs.readFileSync(file, 'utf8');
+}
+
+// The Lua engine names the registry the drivers load, and both Lua suites
+// replay the corpus through the shared contract with their own driver id.
+const luaEngine = readSource(shared('lua/config_migrate.lua'));
+if (!luaEngine.includes(`M.REGISTRY_PATH = "${REGISTRY_RELATIVE}"`)) {
+	fail('wiring', `_shared/lua/config_migrate.lua must name the registry as "${REGISTRY_RELATIVE}"`);
+}
+if (
+	!readSource(shared('lua/test/config_migrate_contract.lua')).includes(
+		'/tests/corpus/config_migrations'
+	)
+) {
+	fail('wiring', 'the shared Lua contract must replay tests/corpus/config_migrations');
+}
+for (const [driver, id] of [
+	['macos', 'hs'],
+	['linux', 'linux']
+]) {
+	const runner = readSource(
+		shared('..', driver, 'tests', 'unit', 'infra', 'test_config_migrate.lua')
+	);
+	if (
+		!runner.includes(
+			`require("test.config_migrate_contract").register(helpers, { driver = "${id}" })`
+		)
+	) {
+		fail(
+			'wiring',
+			`${driver}/tests/unit/infra/test_config_migrate.lua must register the contract for driver "${id}"`
+		);
+	}
+}
 
 if (failures.length) {
 	console.error(`Config migration gate: ${failures.length} failure(s)`);
 	for (const line of failures) console.error(`  - ${line}`);
 	process.exit(1);
 }
-console.log(`Config migration gate: registry v${shipped.unstamped}..v${shipped.current} (${shipped.steps.length} step(s)), ${onDisk.length} corpus case(s), ${replays} driver replay(s) — OK`);
+console.log(
+	`Config migration gate: registry v${shipped.unstamped}..v${shipped.current} (${shipped.steps.length} step(s)), ${onDisk.length} corpus case(s), ${replays} driver replay(s) — OK`
+);
