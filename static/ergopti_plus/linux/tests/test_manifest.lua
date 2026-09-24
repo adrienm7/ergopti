@@ -219,6 +219,7 @@ return {
 	"tests.unit.modules.shortcuts.test_script_actions",
 	"tests.unit.modules.shortcuts.test_text_case_vectors",
 	"tests.unit.modules.shortcuts.test_wrap_pair_parameter_vectors",
+	"tests.unit.modules.shortcuts.test_send_input_parameter_vectors",
 	"tests.unit.modules.shortcuts.test_wrap_on_type",
 	"tests.unit.modules.test_gesture_binding_transaction",
 	"tests.unit.modules.test_desktop_navigation_actions",

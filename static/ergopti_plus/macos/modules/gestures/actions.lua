@@ -25,6 +25,8 @@ local Sticky        = require("modules.gestures.sticky_modifiers")
 local AuxOwner      = require("modules.gestures.actions_aux_owner")
 local ScreenshotSave = require("modules.shortcuts.actions.screenshot_save")
 local WrapPair      = require("wrap_pair")
+local SendInput     = require("send_input")
+local JsonCodec     = require("adapters.json_codec")
 local LOG           = "gestures.actions"
 
 -- Explicit inter-key delay for every simulated keystroke. hs.eventtap.keyStroke()
@@ -998,6 +1000,57 @@ sg("wrap_selection", function(binding)
 	end
 	return Text.wrap_copied_selection(left, right, current_action_parent())
 end)
+
+--- Types a text through the synthetic-input adapter, which tags every event
+--- with its provenance so the keymap never reads it back as typing.
+--- @param text string
+--- @return boolean True when the text was queued.
+local function postKeyStrokes(text)
+	local ok, result = xpcall(function()
+		return SyntheticInput.emit_key_strokes(text)
+	end, debug.traceback)
+	if not ok or result ~= true then
+		Logger.error(LOG, "synthetic text was refused (%d byte(s)): %s", #text, tostring(result))
+		return false
+	end
+	return true
+end
+
+--- Types the binding's text, or presses its key or shortcut (send_text,
+--- send_key, send_shortcut). primary and super are both Command here and press
+--- once; a named key is its Hammerspoon name; a character on its own is typed
+--- as that character, and a character in a shortcut is the key the current
+--- input source carries it on.
+--- @param action string send_text, send_key or send_shortcut.
+--- @param binding string The binding whose parameter holds the value.
+--- @return boolean True when the input was sent.
+local function send_input_action(action, binding)
+	local kind = M.get_action_parameter_spec(action)
+	local vocabulary = M.send_vocabulary()
+	local parsed = SendInput.parse(kind, M.get_action_parameter(binding, action), vocabulary)
+	if not parsed then
+		Logger.warn(LOG, "%s ignored for binding '%s': no valid value is stored.", action, tostring(binding))
+		return false
+	end
+	if kind == "text" then return postKeyStrokes(parsed.text) end
+	local mods, held = {}, {}
+	for _, id in ipairs(parsed.mods or {}) do
+		local name = SendInput.entry(vocabulary, "modifiers", id).hs
+		if not held[name] then
+			held[name] = true
+			mods[#mods + 1] = name
+		end
+	end
+	if parsed.named then
+		return postKeyStroke(mods, SendInput.entry(vocabulary, "keys", parsed.named).hs)
+	end
+	if kind == "key" then return postKeyStrokes(parsed.char) end
+	return postKeyStroke(mods, parsed.char)
+end
+-- The value is the binding's own parameter, as for wrap_selection.
+sg("send_text", function(binding) return send_input_action("send_text", binding) end)
+sg("send_key", function(binding) return send_input_action("send_key", binding) end)
+sg("send_shortcut", function(binding) return send_input_action("send_shortcut", binding) end)
 sg("teleport_mouse", function()
 	local ok, Mouse = pcall(require, "modules.shortcuts.actions.system_mouse")
 	if ok and type(Mouse.teleport_mouse) == "function" then
@@ -1835,10 +1888,42 @@ function M.wrap_pair_for(value)
 	return WrapPair.parse(value, wrap_pair_list())
 end
 
+-- The vocabulary of the send_* parameters, read on first use.
+local SEND_KEYS_PATH = Paths.shared("modules/actions/send_keys.json")
+local _send_vocabulary = nil
+
+--- The decoded _shared/modules/actions/send_keys.json. A missing or malformed
+--- file raises: every send_* binding would otherwise refuse its value with no
+--- explanation.
+--- @return table
+function M.send_vocabulary()
+	if _send_vocabulary then return _send_vocabulary end
+	local raw = FileSystem.read(SEND_KEYS_PATH)
+	local decoded = raw and JsonCodec.decode(raw) or nil
+	if type(decoded) ~= "table" or type(decoded.keys) ~= "table"
+		or type(decoded.modifiers) ~= "table" or type(decoded.text_max_code_points) ~= "number" then
+		error("gestures/actions: the send-input vocabulary is unreadable at " .. tostring(SEND_KEYS_PATH))
+	end
+	_send_vocabulary = decoded
+	return decoded
+end
+
+--- Replaces the {1} of a localized template on plain indices: the detail may
+--- hold a % that gsub would read as a capture reference.
+--- @param template string
+--- @param detail string
+--- @return string
+local function fill_placeholder(template, detail)
+	local at = template:find("{1}", 1, true)
+	if not at then return template .. "\n" .. detail end
+	return template:sub(1, at - 1) .. detail .. template:sub(at + 3)
+end
+
 function M.validate_action_parameter(action, value)
 	local spec = M.get_action_parameter_spec(action)
 	if not spec then return true end
 	if spec == "wrap_pair" then return (M.wrap_pair_for(value)) ~= nil end
+	if SendInput.KINDS[spec] then return SendInput.parse(spec, value, M.send_vocabulary()) ~= nil end
 	if type(value) ~= "string" or not value:match("^https?://%S+$") then return false end
 	if spec == "search_url" then
 		local _, placeholders = value:gsub("%%s", "")
@@ -1858,6 +1943,14 @@ function M.parameter_prompt(action)
 	local spec = M.get_action_parameter_spec(action)
 	if spec == "search_url" then return i18n.get("dialog.gestures.param_search_url") end
 	if spec == "url" then return i18n.get("dialog.gestures.param_link") end
+	if spec == "text" then
+		return fill_placeholder(i18n.get("dialog.gestures.param_text"),
+			tostring(M.send_vocabulary().text_max_code_points))
+	end
+	if spec == "key" or spec == "shortcut" then
+		return fill_placeholder(i18n.get("dialog.gestures.param_" .. spec),
+			SendInput.describe_keys(M.send_vocabulary()))
+	end
 	if spec == "wrap_pair" then
 		local template = i18n.get("dialog.gestures.param_wrap_pair")
 		local samples = WrapPair.describe(wrap_pair_list())
@@ -1874,6 +1967,10 @@ end
 function M.parameter_error(action)
 	local spec = M.get_action_parameter_spec(action)
 	if spec == "wrap_pair" then return i18n.get("dialog.gestures.param_err_wrap_pair") end
+	if SendInput.KINDS[spec] then
+		return fill_placeholder(i18n.get("dialog.gestures.param_err_" .. spec),
+			tostring(M.send_vocabulary().text_max_code_points))
+	end
 	if spec == "search_url" then
 		return i18n.get("dialog.gestures.param_err_url") .. " "
 			.. i18n.get("dialog.gestures.param_err_many_placeholders")
