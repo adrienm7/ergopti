@@ -89,6 +89,10 @@ const GENERATORS = [
 		outputs: ['static/ergopti_plus/windows/_generated/update_schedule.ahk']
 	},
 	{
+		script: 'codegen/codegen-layer-editor-data-js.cjs',
+		outputs: ['static/ergopti_plus/_shared/ui/layer_editor/_generated/layer_data.js']
+	},
+	{
 		script: 'codegen/codegen-contracts-json.cjs',
 		outputs: ['static/ergopti_plus/_shared/core/ports/contracts.json']
 	},

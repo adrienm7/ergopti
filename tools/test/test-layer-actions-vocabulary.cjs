@@ -129,7 +129,7 @@ for (const [name, param] of Object.entries(vocabulary.parameters || {})) {
 // ===================================
 // ===================================
 
-const ACTION_FIELDS = new Set(['catalogue', 'catalogue_divergence', 'repeatable', 'reason_key', 'all', ...OSES]);
+const ACTION_FIELDS = new Set(['catalogue', 'catalogue_divergence', 'repeatable', 'reason_key', 'group', 'all', ...OSES]);
 const actions = vocabulary.actions || {};
 const usedHandlers = new Set();
 // action id -> os -> canonical chord text ("alt+shift+ArrowUp"), for section 3
@@ -373,6 +373,36 @@ for (const os of OSES) {
 	}
 }
 if (rawKeystrokes === 0) fail('the recommended layer yielded no raw keystroke on any OS: the preset was not read');
+
+
+
+
+
+// ================================================
+// ================================================
+// ======= 6/ The editor lists every action =======
+// ================================================
+// ================================================
+
+// The layer editor (_shared/ui/layer_editor) lists the vocabulary under the
+// headings [editor].groups names, in that order. An action without a group
+// would be bindable by hand and missing from the picker; a group without an
+// action would be an empty heading.
+const editorGroups = (vocabulary.editor || {}).groups;
+const groupSizes = new Map();
+if (!Array.isArray(editorGroups) || editorGroups.length === 0) fail('[editor].groups must list the picker groups in order');
+else {
+	for (const group of editorGroups) {
+		if (typeof group !== 'string' || !/^[a-z][a-z0-9_]*$/.test(group)) fail(`[editor].groups entry ${JSON.stringify(group)} is not a snake_case id`);
+		else if (groupSizes.has(group)) fail(`[editor].groups lists "${group}" twice`);
+		else groupSizes.set(group, 0);
+	}
+	for (const [id, action] of Object.entries(actions)) {
+		if (!groupSizes.has(action.group)) fail(`[actions.${id}].group = ${JSON.stringify(action.group)} is not one of [editor].groups`);
+		else groupSizes.set(action.group, groupSizes.get(action.group) + 1);
+	}
+	for (const [group, size] of groupSizes) if (size === 0) fail(`[editor].groups lists "${group}" and no action belongs to it`);
+}
 
 if (errors.length > 0) {
 	console.error('\x1b[31m[FAIL] the layer-action vocabulary is incomplete or disagrees with the action catalogue:\x1b[0m');
