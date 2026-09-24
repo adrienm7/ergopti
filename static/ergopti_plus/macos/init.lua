@@ -287,12 +287,13 @@ boot_note("Config dir resolved: %s (%s).", tostring(config_paths.get_config_dir(
 Boot.mark("Path: config dir + paths.toml (config_paths.init)")
 Boot.stage("Path: log file open (retention purge deferred)")
 
--- Re-point the logger to <config_dir>/logs/ErgoptiPlus_YYYY-MM-DD.log now that
--- the user config dir is known. Earlier boot lines went to the fallback file.
+-- Re-point the logger to the logs folder (LogsDirPath, or
+-- ~/Library/Logs/ergopti_plus/) now that paths.toml is read. Earlier boot lines
+-- went to the fallback file in the default folder.
 -- (The old-log retention purge is scheduled off the boot path inside this call.)
 do
-	local log_folder_usable, log_folder_err = Logger.init_log_path(config_paths.get_config_dir(), 14)
-	local log_folder = config_paths.get_config_dir():gsub("/*$", "/") .. "hammerspoon/logs"
+	local log_folder = config_paths.get_logs_dir()
+	local log_folder_usable, log_folder_err = Logger.init_log_path(log_folder, 14)
 	boot_note("Log folder chosen: %s (%s; usable: %s%s).", log_folder, BootJournal.describe_path(log_folder),
 		tostring(log_folder_usable == true), log_folder_err and (", " .. tostring(log_folder_err)) or "")
 end
@@ -334,7 +335,7 @@ end
 -- The native worker accepted the configured folder: the daily log there is now
 -- the readable trail, so launcher.log keeps only fatal lines from here on.
 BootJournal.set_user_log_ready(true)
-boot_note("Native logger handshake committed: the launcher worker owns %s.", tostring(Logger.UNIFIED_LOG_FILE))
+boot_note("Native logger handshake committed: the launcher worker owns %s.", Logger.logs_dir())
 
 -- Arm repeat collapsing (logger SPEC § 4.2) now that its summaries have a
 -- durable destination, and before any periodic source starts. Its flush tick is

@@ -172,7 +172,11 @@ helpers.describe("boot fatal reporter (silent-boot-abort)", function()
 
 	helpers.it("defaults to the logger's fallback boot log", function()
 		local Logger = require("infra.logger")
-		helpers.assert_eq(Logger.FALLBACK_BOOT_LOG_FILE, "/tmp/ErgoptiPlus_boot.log")
+		-- The default logs folder, beside launcher.log, never the shared /tmp root.
+		helpers.assert_eq(Logger.FALLBACK_BOOT_LOG_FILE, Logger.FALLBACK_LOG_DIR .. "ErgoptiPlus_boot.log")
+		helpers.assert_true(Logger.FALLBACK_LOG_DIR:find("Library/Logs/ergopti_plus/", 1, true) ~= nil
+			or Logger.FALLBACK_LOG_DIR == "/tmp/ergopti_plus/",
+			"the fallback boot log must live in the default logs folder: " .. Logger.FALLBACK_LOG_DIR)
 		local opened = {}
 		BootFatal.report("config_paths", "refused", "msg", {
 			getenv = function() return nil end,

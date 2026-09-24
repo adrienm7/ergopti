@@ -42,7 +42,7 @@ end
 
 --- Loads crash_reporter under stubs that make any modal call explode and record
 --- every notification dispatched.
---- @param config_dir string|nil Config dir the report should be written under.
+--- @param config_dir string|nil Logs folder the report should be written under.
 --- @return table, table, table The module, the modal tripwire state, the notifications.
 local function load_with_tripwires(config_dir)
 	local modal = { opened = false }
@@ -100,9 +100,8 @@ local function load_with_tripwires(config_dir)
 	}
 
 	if config_dir then
-		package.loaded["infra.config_paths"] = {
-			get_config_dir = function() return config_dir end,
-		}
+		-- The logger is the one resolver of the crash-reports folder.
+		require("infra.logger").crash_reports_dir = function() return config_dir .. "crash_reports/" end
 	end
 
 	return CrashReporter, modal, notifications
@@ -112,7 +111,7 @@ helpers.describe("crash_reporter — the outcome is announced without a blocking
 	helpers.it("notifies with the saved report path instead of opening an alert", function()
 		local unique     = tostring(os.time()) .. "_" .. tostring(math.random(100000))
 		local config_dir = "/tmp/ergopti_test_crash_no_modal_" .. unique .. "/"
-		pcall(function() mkdir_p(config_dir .. "hammerspoon/crash_reports/") end)
+		pcall(function() mkdir_p(config_dir .. "crash_reports/") end)
 
 		local CrashReporter, modal, notifications = load_with_tripwires(config_dir)
 

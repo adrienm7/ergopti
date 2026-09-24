@@ -3,10 +3,9 @@
 --- ==============================================================================
 --- MODULE: Logger today's log paths
 --- DESCRIPTION:
---- Logger.UNIFIED_LOG_FILE and ERRORS_LOG_FILE are fixed when the log folder is
---- chosen, while the native worker rolls its files by each record's date. A
---- fatal report written after midnight must name the files that hold today's
---- lines, so today_log_path() and today_errors_path() read the date per call.
+--- The native worker rolls its files by each record's date. A fatal report
+--- written after midnight must name the files that hold today's lines, so
+--- today_log_path() and today_errors_path() read the date per call.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -18,7 +17,7 @@ helpers.describe("logger: today's log paths", function()
 		Fixture.with_policy_logger(function(Logger)
 			-- Only the chosen folder matters here, not whether the stub can create it.
 			Logger.init_log_path("/tmp/ergopti_today_paths/", 14)
-			local folder = "/tmp/ergopti_today_paths/hammerspoon/logs/"
+			local folder = "/tmp/ergopti_today_paths/"
 			local boot_day = os.date("%Y-%m-%d")
 			helpers.assert_eq(Logger.today_log_path(), folder .. "ErgoptiPlus_" .. boot_day .. ".log")
 			helpers.assert_eq(Logger.today_errors_path(),

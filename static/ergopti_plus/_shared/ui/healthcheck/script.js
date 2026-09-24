@@ -270,8 +270,16 @@ window.renderHealthcheck = function (s) {
 			var errVal = lg.errors_today
 				? '<code>' + escapeHtml(String(lg.errors_today)) + '</code>'
 				: '<em>n/a</em>';
+			var dirVal = lg.logs_dir
+				? '<code>' + escapeHtml(String(lg.logs_dir)) + '</code>'
+				: '<em>n/a</em>';
+			var crashVal = lg.crash_reports_dir
+				? '<code>' + escapeHtml(String(lg.crash_reports_dir)) + '</code>'
+				: '<em>n/a</em>';
+			html += row('Logs folder', dirVal);
 			html += row('Log (unified)', logVal);
 			html += row('Log (errors)', errVal);
+			html += row('Crash reports', crashVal);
 			html += row('Ring buffer lines', escapeHtml(String(lg.ring_lines || 0)));
 		}
 

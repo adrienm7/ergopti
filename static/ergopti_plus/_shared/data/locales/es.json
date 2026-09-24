@@ -665,6 +665,7 @@
 	"menu.debug.list_vars": "Estado de variables",
 	"menu.debug.log_level": "Nivel de log",
 	"menu.debug.open_error_log": "Open error log",
+	"menu.debug.no_errors_today": "Ninguna advertencia ni error hoy",
 	"menu.debug.open_logs": "Abrir carpeta de registros",
 	"menu.debug.open_today_log": "Abrir registro de hoy",
 	"menu.debug.title": "⚠ Depuración",

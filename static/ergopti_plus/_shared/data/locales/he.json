@@ -665,6 +665,7 @@
 	"menu.debug.list_vars": "מצב משתנים",
 	"menu.debug.log_level": "רמת יומן",
 	"menu.debug.open_error_log": "Open error log",
+	"menu.debug.no_errors_today": "אין אזהרות או שגיאות היום",
 	"menu.debug.open_logs": "פתח תיקיית יומנים",
 	"menu.debug.open_today_log": "פתח קובץ יומן היום",
 	"menu.debug.title": "⚠ ניפוי שגיאות",

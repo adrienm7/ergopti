@@ -910,8 +910,10 @@ function M.format_plain(snapshot)
 	end
 	if s.logs then
 		local lg = s.logs
+		table.insert(lines, string.format("Logs folder      : %s", lg.logs_dir or "n/a"))
 		table.insert(lines, string.format("Logs (unified)   : %s", lg.unified_today or "n/a"))
 		table.insert(lines, string.format("Errors sink      : %s  (WARNING/ERROR only — keeps main log clean)", lg.errors_today or "n/a"))
+		table.insert(lines, string.format("Crash reports    : %s", lg.crash_reports_dir or "n/a"))
 	end
 	if s.keylogger then
 		local kl = s.keylogger

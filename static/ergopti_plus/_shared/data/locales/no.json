@@ -665,6 +665,7 @@
 	"menu.debug.list_vars": "Variabeltilstand",
 	"menu.debug.log_level": "Loggnivå",
 	"menu.debug.open_error_log": "Open error log",
+	"menu.debug.no_errors_today": "Ingen advarsler eller feil i dag",
 	"menu.debug.open_logs": "Åpne loggmappe",
 	"menu.debug.open_today_log": "Åpne dagens loggfil",
 	"menu.debug.title": "⚠ Feilsøking",

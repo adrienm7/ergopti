@@ -665,6 +665,7 @@
 	"menu.debug.list_vars": "Değişken durumu",
 	"menu.debug.log_level": "Günlük seviyesi",
 	"menu.debug.open_error_log": "Open error log",
+	"menu.debug.no_errors_today": "Bugün uyarı veya hata yok",
 	"menu.debug.open_logs": "Günlük klasörünü aç",
 	"menu.debug.open_today_log": "Bugünün günlük dosyasını aç",
 	"menu.debug.title": "⚠ Hata ayıklama",

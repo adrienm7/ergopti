@@ -28,7 +28,8 @@ local helpers = require("tests.helpers")
 -- The exact external surface ui/healthcheck/helpers.lua's collectors rely on.
 -- mod = require path; fns = functions that must exist; constants = fields read.
 local CONTRACT = {
-	{ mod = "infra.logger",                       constants = { "UNIFIED_LOG_FILE", "ERRORS_LOG_FILE" }, fns = { "ring_buffer_snapshot" } },
+	{ mod = "infra.logger",                       fns = { "ring_buffer_snapshot", "logs_dir", "today_log_path",
+		"today_errors_path", "crash_reports_dir" } },
 	{ mod = "modules.keylogger",                fns = { "get_live_stats" } },
 	{ mod = "modules.llm",                      fns = { "get_runtime_llm_enabled", "get_backend", "get_active_profile" } },
 	{ mod = "adapters.key_state",               fns = { "is_right_altgr_held", "isDown" } },

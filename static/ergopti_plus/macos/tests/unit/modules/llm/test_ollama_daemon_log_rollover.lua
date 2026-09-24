@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Exercises all real daemon-launch entry points and verifies that their
 --- long-lived output pipelines derive the daily filename when each line is
---- written. Capturing Logger.UNIFIED_LOG_FILE in the launch command pins a
+--- written. Capturing today's log path in the launch command pins a
 --- daemon started before midnight to yesterday's file for its whole lifetime.
 --- ==============================================================================
 
@@ -42,7 +42,7 @@ local function assert_runtime_daily_sink(command, owner, port)
 	helpers.assert_true(command:find("/tmp", 1, true) ~= nil,
 		owner .. " must retain the configured log directory")
 	helpers.assert_true(command:find(SENTINEL_LOG, 1, true) == nil,
-		owner .. " must not snapshot Logger.UNIFIED_LOG_FILE into a long-lived daemon")
+		owner .. " must not snapshot today's log file into a long-lived daemon")
 	helpers.assert_true(command:find("%Y-%m-%d", 1, true) ~= nil,
 		owner .. " must derive the destination date at write time")
 	helpers.assert_true(command:find("127.0.0.1:" .. tostring(port), 1, true) ~= nil,
@@ -91,7 +91,7 @@ helpers.describe("Ollama daemon log rollover", function()
 		local original_spawn = shell_runner.spawn
 		local original_after = scheduler.after
 		local original_resolve = binary_resolver and binary_resolver.resolve or nil
-		local original_log = logger.UNIFIED_LOG_FILE
+		local original_log = logger.today_log_path
 		local commands = {}
 		local kill_done
 		local launch_server
@@ -109,7 +109,7 @@ helpers.describe("Ollama daemon log rollover", function()
 			helpers.assert_true(set_upvalue(ensure_impl, name, nil), "missing startup owner: " .. name)
 		end
 
-		logger.UNIFIED_LOG_FILE = SENTINEL_LOG
+		logger.today_log_path = function() return SENTINEL_LOG end
 		if binary_resolver then
 			binary_resolver.resolve = function() return "/fixture/ollama", nil, true end
 		end
@@ -143,7 +143,7 @@ helpers.describe("Ollama daemon log rollover", function()
 		shell_runner.spawn = original_spawn
 		scheduler.after = original_after
 		if binary_resolver then binary_resolver.resolve = original_resolve end
-		logger.UNIFIED_LOG_FILE = original_log
+		logger.today_log_path = original_log
 		set_upvalue(ensure_impl, "_ollama_started", false)
 		set_upvalue(ensure_impl, "_ollama_starting", false)
 		set_upvalue(ensure_impl, "_ollama_kill_task", nil)
@@ -156,12 +156,12 @@ helpers.describe("Ollama daemon log rollover", function()
 	helpers.it("routes the menu-owned daemon through the same runtime daily sink", function()
 		local Logger = require("infra.logger")
 		local expected_port = 45679
-		local original_log = Logger.UNIFIED_LOG_FILE
+		local original_log = Logger.today_log_path
 		local previous_shell_runner = package.loaded["adapters.shell_runner"]
 		local previous_timer_scheduler = package.loaded["adapters.timer_scheduler"]
 		local previous_ollama_endpoint = package.loaded["modules.llm.ollama_endpoint"]
 		local commands = {}
-		Logger.UNIFIED_LOG_FILE = SENTINEL_LOG
+		Logger.today_log_path = function() return SENTINEL_LOG end
 		package.loaded["modules.llm.ollama_binary"] = {
 			resolve = function() return "/fixture/ollama", nil, true end,
 		}
@@ -209,7 +209,7 @@ helpers.describe("Ollama daemon log rollover", function()
 			assert_runtime_daily_sink(commands[2].args[2], "models_manager_ollama", expected_port)
 		end)
 
-		Logger.UNIFIED_LOG_FILE = original_log
+		Logger.today_log_path = original_log
 		package.loaded["modules.llm.ollama_binary"] = nil
 		package.loaded["adapters.shell_runner"] = previous_shell_runner
 		package.loaded["adapters.timer_scheduler"] = previous_timer_scheduler
@@ -219,7 +219,7 @@ helpers.describe("Ollama daemon log rollover", function()
 
 	helpers.it("delegates fresh-install daemon launch to ApiOllama ownership", function()
 		local Logger = require("infra.logger")
-		local original_log = Logger.UNIFIED_LOG_FILE
+		local original_log = Logger.today_log_path
 		local previous_progress = package.loaded["ui.download_window"]
 		local previous_api = package.loaded["modules.llm.api_ollama"]
 		local task_args
@@ -246,7 +246,7 @@ helpers.describe("Ollama daemon log rollover", function()
 			end,
 		}
 		package.loaded["adapters.task_lifecycle"] = nil
-		Logger.UNIFIED_LOG_FILE = SENTINEL_LOG
+		Logger.today_log_path = function() return SENTINEL_LOG end
 
 		local Checker = helpers.load_with_stubs("modules.llm.ollama_deps_checker", {
 			fs = { attributes = function() return "file" end },
@@ -277,7 +277,7 @@ helpers.describe("Ollama daemon log rollover", function()
 				"the checker must not detach its own unjoinable serve process")
 		end)
 
-		Logger.UNIFIED_LOG_FILE = original_log
+		Logger.today_log_path = original_log
 		package.loaded["ui.download_window"] = previous_progress
 		package.loaded["modules.llm.api_ollama"] = previous_api
 		package.loaded["modules.llm.ollama_binary"] = nil

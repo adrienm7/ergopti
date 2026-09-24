@@ -113,6 +113,7 @@ local function run_isolated(options, assertions)
 		end
 		function Logger.set_level() return true end
 		function Logger.init_log_path() return true end
+		function Logger.logs_dir() return "/virtual/logs/" end
 		function Logger.classify_async_sink_boot_environment() return "managed" end
 		function Logger.start_async_sink() return true end
 		function Logger.enable_repeat_collapsing() return true end
@@ -245,6 +246,7 @@ local function run_isolated(options, assertions)
 			["infra.config_paths"] = {
 				init = function() return true end,
 				get_config_dir = function() return "/virtual/config" end,
+				get_logs_dir = function() return "/virtual/logs/" end,
 				get = function(name) return "/virtual/" .. tostring(name) end,
 			},
 			["infra.factory_reset_journal"] = {

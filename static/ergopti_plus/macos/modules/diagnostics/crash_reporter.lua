@@ -19,8 +19,8 @@
 --- 3. Rich diagnostics: includes everything from the healthcheck (OS, HS version,
 ---    adapters, session counters) PLUS the full in-memory log ring buffer (up to
 ---    200 lines), the active window, and the stack trace.
---- 4. Driver-scoped directory: reports live under <config_dir>/crash_reports/
----    (Hammerspoon-specific, separate from any AHK reports).
+--- 4. Logs-scoped directory: reports live in <logs>/crash_reports/, beside the
+---    daily log that explains them (Logger.crash_reports_dir()).
 --- 5. Structured output: reports are written as JSON for easy machine and human
 ---    readability, one file per incident.
 --- ==============================================================================
@@ -41,11 +41,6 @@ local LOG = "crash_reporter"
 -- ======= 1/ Constants =======
 -- ============================
 -- ============================
-
--- Subdirectory under the user config dir that receives all Hammerspoon crash
--- report files. Nested under hammerspoon/ to mirror the driver folder layout
--- and stay separate from AHK reports.
-local CRASH_REPORTS_SUBDIR = "hammerspoon/crash_reports"
 
 -- A crash storm can legitimately fill many names within one timestamp second.
 -- The bound prevents corrupted or hostile directories from turning report
@@ -72,29 +67,12 @@ local COLLECT_SYSTEM_PROBES_DEFAULT = false
 -- ==========================
 -- ==========================
 
---- Resolves the absolute path to the crash_reports directory.
+--- Resolves the absolute path to the crash_reports directory: the logger's
+--- resolver, inside the logs folder, so a report lands next to the log that
+--- explains it and follows a relocated logs folder.
 --- @return string Absolute path ending with a directory separator.
 local function _reports_dir()
-	local base = nil
-
-	local ok_mp, mp = pcall(require, "infra.config_paths")
-	if ok_mp and mp and type(mp.get_config_dir) == "function" then
-		local dir = mp.get_config_dir()
-		if type(dir) == "string" and dir ~= "" then
-			base = dir
-		end
-	end
-
-	if not base then
-		local home = os.getenv("HOME") or "~"
-		base = home .. "/.config/ergopti_plus/"
-	end
-
-	if not base:match("[/\\]$") then
-		base = base .. "/"
-	end
-
-	return base .. CRASH_REPORTS_SUBDIR .. "/"
+	return Logger.crash_reports_dir()
 end
 
 --- Returns the ErgoptiPlus version the About menu shows. hs.processInfo.version

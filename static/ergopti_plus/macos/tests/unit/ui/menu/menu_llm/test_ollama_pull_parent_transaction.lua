@@ -91,7 +91,7 @@ local function with_fixture(save_results, callback)
 			local persisted = copy_identity(state)
 			local rendered = copy_identity(state)
 			local logger = helpers.make_logger_stub()
-			logger.UNIFIED_LOG_FILE = "/tmp/ergopti-hs032.log"
+			logger.today_log_path = function() return "/tmp/ergopti-hs032.log" end
 
 			local hs_fixture = {
 				execute = function() return "", true end,

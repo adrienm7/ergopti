@@ -778,7 +778,7 @@ local function ensure_ollama_running(options)
 						return
 					end
 					local launch_cmd, command_err = OllamaServerCommand.build(
-						ollama_bin, Logger.UNIFIED_LOG_FILE, resolve_ollama_port())
+						ollama_bin, Logger.today_log_path(), resolve_ollama_port())
 					if my_generation ~= _ollama_start_generation or not _ollama_starting then return end
 					if not launch_cmd then
 						fail_start("server command creation", command_err)
