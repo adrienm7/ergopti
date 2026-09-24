@@ -41,7 +41,8 @@ const SSOT_FILE = path.join(
 // Test files are excluded: asserting merged output legitimately names fields.
 const SHIPPED = [
 	'static/ergopti_plus/windows/modules/llm/api_remote.ahk',
-	'static/ergopti_plus/macos/modules/llm/api_remote.lua'
+	'static/ergopti_plus/macos/modules/llm/api_remote.lua',
+	'static/ergopti_plus/linux/modules/llm/api_remote.lua'
 ];
 
 let failed = false;

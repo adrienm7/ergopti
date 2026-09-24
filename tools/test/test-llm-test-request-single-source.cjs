@@ -45,6 +45,10 @@ const CONSUMERS = [
 		rel: 'static/ergopti_plus/macos/ui/menu/menu_llm/api_panel.lua',
 		refs: ['test_request'],
 	},
+	{
+		rel: 'static/ergopti_plus/linux/modules/llm/api_remote.lua',
+		refs: ['test_request'],
+	},
 ];
 
 let failed = false;

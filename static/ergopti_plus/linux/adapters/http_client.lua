@@ -428,10 +428,16 @@ end
 --- @param headers table
 --- @param body string
 --- @param callback function
-function M.post(url, headers, body, callback)
+--- @param options table|nil { timeout_ms?, owner?, max_body_bytes? }
+function M.post(url, headers, body, callback, options)
+	local request_options = {}
+	if type(options) == "table" then
+		for key, value in pairs(options) do request_options[key] = value end
+	end
+	request_options.buffered = true
+	request_options.method = "POST"
 	return start_request(url, type(headers) == "table" and headers or {},
-		type(body) == "string" and body or "",
-		{ buffered = true, method = "POST" }, nil, callback)
+		type(body) == "string" and body or "", request_options, nil, callback)
 end
 
 --- Sends a bounded buffered HTTP GET without blocking the event loop.
