@@ -293,6 +293,24 @@ _LCT_MismatchCase() {
 	} finally DirDelete(Dir, true)
 }
 
+Test("layout catalogue: a refused update keeps the installed layout the emulation reads (layout-catalogue)",
+	_LCT_RefusedUpdateCase)
+
+_LCT_RefusedUpdateCase() {
+	Dir := _LCT_TempDir()
+	try {
+		AssertTrue(_LCT_Install("ergol", Dir, _LCT_Transport(Map(), [], true), _LCT_Index(), _LCT_RegistryDir())[1])
+		Record := _LCT_Read(Dir . "installed.json")
+		Tampered := _LCT_Tamper(_LCT_LayoutText("ergol"), 'output="q"', 'output="z"')
+		Result := _LCT_Install("ergol", Dir, _LCT_Transport(_LCT_Served(Tampered), []))
+		AssertFalse(Result[1], "a download that does not match its index is refused")
+		AssertEqual(LAYOUT_CATALOGUE_FAILURE_DOWNLOAD, Result[2])
+		AssertEqual(_LCT_LayoutText("ergol"), LayoutRegistry_ReadLocal("ergol", Dir)["Text"],
+			"the verified copy the emulation boots from survives the refused update")
+		AssertEqual(Record, _LCT_Read(Dir . "installed.json"), "and so does its record")
+	} finally DirDelete(Dir, true)
+}
+
 Test("layout catalogue: a layout shipped with the driver installs offline (layout-catalogue)",
 	_LCT_OfflineCase)
 
