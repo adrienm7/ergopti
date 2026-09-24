@@ -108,6 +108,8 @@ global KEYBOARD_SHORTCUT_DEFAULTS := Map(
 		"win_u", "uppercase_selection",
 		"win_w", "titlecase_selection",
 		"win_x", "pick_color",
+		; Swallowed, so Win+Space no longer switches the input language.
+		"win_space", "llm_generate_prediction",
 		"ctrl_b", "microsoft_bold",
 		"ctrl_shift_v", "paste_plain",
 )

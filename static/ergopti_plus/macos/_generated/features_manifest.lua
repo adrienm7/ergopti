@@ -388,6 +388,9 @@ M.features = {
 		path = "shortcuts.chatgpt_url", id = "chatgpt_url", section = "shortcuts", default = "https://chat.openai.com", type = "string", description_key = "menu.shortcuts.chatgpt_url", platforms = { "ahk", "hs", "linux" },
 	},
 	{
+		path = "shortcuts.keyboard.hs_ctrl_space", id = "hs_ctrl_space", section = "shortcuts.keyboard", default = "llm_generate_prediction", type = "action", description_key = "menu.shortcuts.keyboard.hs_ctrl_space", platforms = { "hs" },
+	},
+	{
 		path = "shortcuts.tap_keys.number_row_left", id = "number_row_left", section = "shortcuts.tap_keys", default = "screen_capture", type = "action", description_key = "menu.shortcuts.tap_keys.number_row_left", platforms = { "ahk", "hs", "linux" },
 	},
 	{
@@ -1019,6 +1022,12 @@ M.unavailable = {
 	},
 	{
 		path = "shortcuts.keyboard.win_x", section = "shortcuts.keyboard", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.keyboard.win_space", section = "shortcuts.keyboard", reason_key = "", platforms = { "ahk" },
+	},
+	{
+		path = "shortcuts.keyboard.super_space", section = "shortcuts.keyboard", reason_key = "", platforms = { "linux" },
 	},
 	{
 		path = "layout.ergopti_base", section = "layout", reason_key = "", platforms = { "ahk" },

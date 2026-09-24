@@ -1871,6 +1871,34 @@ default = "pick_color"
 type = "action"
 description_key = "menu.shortcuts.keyboard.win_x"
 
+# "Generate an AI prediction" on the chord each OS leaves for it; the key is
+# swallowed so the OS never sees it (Win+Space no longer switches the input
+# language on Windows; macOS warns when its own input-source shortcut still
+# owns Ctrl+Space). They replace the AI menu's dedicated trigger shortcut.
+# TODO(recommended-defaults): these are Ergopti's recommended bindings; once the
+# manifest carries a separate recommended value per entry, move them there and
+# leave the default neutral ("none").
+[[features.shortcuts.keyboard]]
+id = "win_space"
+platforms = ["ahk"]
+default = "llm_generate_prediction"
+type = "action"
+description_key = "menu.shortcuts.keyboard.win_space"
+
+[[features.shortcuts.keyboard]]
+id = "hs_ctrl_space"
+platforms = ["hs"]
+default = "llm_generate_prediction"
+type = "action"
+description_key = "menu.shortcuts.keyboard.hs_ctrl_space"
+
+[[features.shortcuts.keyboard]]
+id = "super_space"
+platforms = ["linux"]
+default = "llm_generate_prediction"
+type = "action"
+description_key = "menu.shortcuts.keyboard.super_space"
+
 
 
 # ======================================

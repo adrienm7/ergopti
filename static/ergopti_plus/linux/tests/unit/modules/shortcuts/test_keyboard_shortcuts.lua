@@ -282,7 +282,7 @@ helpers.describe("keyboard shortcuts: matching a chord", function()
 		local fired = shortcuts.dispatch(chord("j", { ctrl = true }))
 		drop_storage()
 		helpers.assert_true(not fired,
-			"nothing is bound by default, because a desktop environment already "
+			"a general slot starts unbound, because a desktop environment already "
 				.. "owns most modifier chords and a binding the user did not ask for "
 				.. "fires alongside the one they expected")
 	end)
@@ -299,6 +299,47 @@ helpers.describe("keyboard shortcuts: matching a chord", function()
 		helpers.assert_eq(calls, 1,
 			"Linux captured Ctrl+G but left shortcuts.chatgpt_url unused; the default "
 				.. "binding must consume the persisted canonical preference")
+	end)
+
+end)
+
+
+
+
+helpers.describe("keyboard shortcuts: the manifest's shipped bindings", function()
+
+	helpers.it("binds Super+Space to the AI prediction on a fresh install", function()
+		local shortcuts = load_over_storage()
+		local action = shortcuts.get_action("super_space")
+		local super_slots = shortcuts.assigned_slots("super_")
+		drop_storage()
+		helpers.assert_eq(action, "llm_generate_prediction",
+			"the manifest's super_space default replaces the AI menu's own trigger shortcut")
+		helpers.assert_eq(#super_slots, 1)
+	end)
+
+	helpers.it("offers a Super group in the menu", function()
+		local shortcuts = load_over_storage()
+		local found = false
+		for _, group in ipairs(shortcuts.SLOT_GROUPS) do
+			if group.prefix == "super_" then found = true end
+		end
+		local slots = shortcuts.available_slots("super_")
+		drop_storage()
+		helpers.assert_true(found, "a default Super binding needs a group the user can see and change")
+		helpers.assert_true(#slots > 20)
+	end)
+
+	helpers.it("keeps a shipped binding the user cleared cleared after a restart", function()
+		local shortcuts, storage = load_over_storage()
+		helpers.assert_true(shortcuts.set_action("super_space", "none"))
+		local stored = storage.get("shortcuts.keyboard.super_space")
+		shortcuts._reset()
+		local action = shortcuts.get_action("super_space")
+		drop_storage()
+		helpers.assert_eq(stored, "none",
+			"deleting the entry would bring the default back at the next start")
+		helpers.assert_eq(action, "none")
 	end)
 
 end)
