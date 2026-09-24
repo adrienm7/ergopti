@@ -44,26 +44,19 @@ local MAX_TYPING_INTERVAL_MS = Timings.ms("keylogger", "max_keystroke_delay_ms")
 local MS_PER_SECOND = 1000
 
 -- Past this, a press was a HOLD rather than a tap. Read from the tap-hold
--- configuration the remap daemon actually runs, so this driver calls something
--- a hold exactly when kanata does — a number of its own here would let the
--- dashboard call a tap what the keyboard treated as a hold.
+-- configuration this daemon runs, so the metrics call something a hold exactly
+-- when the engine does — a number of its own here would let the dashboard call
+-- a tap what the keyboard treated as a hold. Asked each time: a change from the
+-- tray reloads the engine live.
 --
--- nil when the keys disagree or nothing could be read, and the split is then
+-- nil when the keys disagree or nothing is configured, and the split is then
 -- declined rather than made on a number nobody chose. The duration, the count
 -- and the maximum are still recorded: those need no threshold.
-local _tap_hold_threshold_ms = nil
-local _tap_hold_threshold_read = false
+local TapHold = require("platform.remap.tap_hold_manager")
 
 --- @return number|nil
 local function tap_hold_threshold_ms()
-	if _tap_hold_threshold_read then return _tap_hold_threshold_ms end
-	_tap_hold_threshold_read = true
-	local ok, Remap = pcall(require, "platform.remap.manager")
-	if ok and type(Remap.tap_hold_threshold_ms) == "function" then
-		local ok_value, value = pcall(Remap.tap_hold_threshold_ms)
-		if ok_value and type(value) == "number" then _tap_hold_threshold_ms = value end
-	end
-	return _tap_hold_threshold_ms
+	return TapHold.threshold_ms()
 end
 -- Metrics collector is optional — keylogger falls back gracefully without it.
 local Metrics  = nil
