@@ -436,3 +436,36 @@ Test_LLM_Regression_OpenSourceUrlReportsShellFailure() {
 }
 Test("[ahk-023] model source URL reports ShellExecute failures",
 	Test_LLM_Regression_OpenSourceUrlReportsShellFailure)
+
+; An invalid persisted modifier chord used to fall back to a literal "alt"
+; while the shared default is owned by defaults.json. The reset value must come
+; from LLM_Defaults, proven here with a sentinel no literal could match.
+Test_LLM_Regression_InvalidModifierFallsBackToSharedDefault() {
+	global _LLM_Menu, _LLM_Menu_Loaded, LLM_Defaults
+	SavedMenu := _LLM_Menu
+	SavedLoaded := _LLM_Menu_Loaded
+	HadDefaults := IsSet(LLM_Defaults)
+	SavedDefaults := HadDefaults ? LLM_Defaults : 0
+	try {
+		LLM_Defaults := Map("llm_val_modifiers", "ctrl+shift",
+			"llm_nav_modifiers", "")
+		_LLM_Menu := LLM_Menu_DeepClone(SavedMenu)
+		_LLM_Menu["val_modifiers"] := "alt++"
+		_LLM_Menu["nav_modifiers"] := "ctrl++"
+		_LLM_Menu_Loaded := false
+		AssertTrue(_LLM_Menu_RestoreSavedOptsOnce(Map()))
+		AssertEqual("ctrl+shift", _LLM_Menu["val_modifiers"],
+			"an invalid val_modifiers must reset to the shared default")
+		AssertEqual("", _LLM_Menu["nav_modifiers"],
+			"an invalid nav_modifiers must reset to the shared default")
+	} finally {
+		_LLM_Menu := SavedMenu
+		_LLM_Menu_Loaded := SavedLoaded
+		if HadDefaults
+			LLM_Defaults := SavedDefaults
+		else
+			LLM_Defaults := unset
+	}
+}
+Test("LLM regression: invalid persisted modifiers reset to the shared default",
+	Test_LLM_Regression_InvalidModifierFallsBackToSharedDefault)

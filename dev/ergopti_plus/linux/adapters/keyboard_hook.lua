@@ -121,6 +121,21 @@ local _forwarded_down = {}
 local _physical_down = {}
 local _release_forwarded_sources
 
+-- The tap-hold engine (platform/remap/tap_hold_engine), set by the daemon. It rewrites
+-- the grabbed stream before anything else reads it, and _on_tap runs the tap
+-- actions it hands back that are not a plain key.
+local _remapper = nil
+local _on_tap = nil
+local _release_remapped
+-- Physical keys whose press the engine took, and those it took whose engine
+-- is gone (swapped, removed or reset while they were held): the release of an
+-- orphan is swallowed whole, never sent as an up nothing went down for.
+local _remap_owned = {}
+local _remap_orphans = {}
+-- Test seam: the time the engine reads while _test_drive replays a stream
+-- whose events carry `at_ms`. nil in production.
+local _test_clock_ms = nil
+
 -- Only EV_KEY is forwarded. The uinput channel appends its own SYN_REPORT after
 -- each key, so forwarding the source stream's EV_SYN would double it; EV_MSC is
 -- duplicate scancode metadata the desktop derives from the key report itself;
@@ -254,6 +269,32 @@ local function _reset_capture_state()
 	return XkbCapture.reset_state()
 end
 
+--- Seeds the capture state's CapsLock from the keyboard's LED.
+---
+--- A fresh XKB state starts unlocked, and the capture state learns CapsLock only
+--- from key presses. Started (or re-acquired after a hotplug) while CapsLock was
+--- already on, the daemon therefore believed it off: typed triggers were read in
+--- the wrong case, and the injector — which releases a locked CapsLock around a
+--- replacement — typed it inverted. The LED is read at acquisition, before the
+--- grab can make it stale (the kernel drops the compositor's LED writes to a
+--- grabbed device), and matches what the desktop last set.
+--- @param path string|nil The keyboard source just acquired.
+--- @return boolean True when the state now matches the LED.
+local function _seed_caps_lock(path)
+	if not path then return false end
+	local leds, led_err = EvdevReader.active_leds(keyboard_slot(path), LED_CAPSL)
+	if not leds then
+		Logger.warn(LOG, "CapsLock state of %s unreadable — assuming off (%s).", path, tostring(led_err))
+		return false
+	end
+	if leds[LED_CAPSL] == true then
+		_capture(EvdevCodes.KEY_CAPSLOCK, InputEvent.VALUE_DOWN)
+		_capture(EvdevCodes.KEY_CAPSLOCK, InputEvent.VALUE_UP)
+		Logger.debug(LOG, "CapsLock is on at acquisition — capture state locked to match.")
+	end
+	return true
+end
+
 
 
 
@@ -355,6 +396,19 @@ local function _resynchronise(source)
 		pressed[source_key(source, code)] = { source = source, code = code }
 	end
 
+	-- The engine's keys are released and its physically held keys consumed:
+	-- replaying a held CapsLock as itself would toggle the lock, where the user
+	-- was holding it for Ctrl.
+	if _remapper then
+		_release_remapped()
+		for key, current in pairs(pressed) do
+			if _remapper:handles(current.code) then
+				_remap_orphans[key] = true
+				pressed[key] = nil
+			end
+		end
+		_remap_owned = {}
+	end
 	local consumed = _consumed_down
 	local reset_ok, reset_err = _reset_capture_state()
 	if not reset_ok then return false, tostring(reset_err) end
@@ -442,6 +496,33 @@ local function _dispatch_event(ev, source)
 		return
 	end
 	if _sync_dropped[source] or ev.type ~= EVDEV_TYPE_KEY then return end
+
+	-- Tap-holds first: what the engine hands back is dispatched as if the user
+	-- had pressed it, so the modifier state, the hotstring buffer and the
+	-- virtual keyboard all see one consistent stream.
+	local owned_key = source_key(source, ev.code)
+	if _remap_orphans[owned_key] and not ev.remapped then
+		if ev.value == InputEvent.VALUE_UP then _remap_orphans[owned_key] = nil end
+		return
+	end
+	if _remapper and _intercept and not ev.remapped then
+		local out, tap = _remapper:process(ev.code, ev.value, _test_clock_ms or Monotonic.now_ms())
+		if ev.value == InputEvent.VALUE_UP then
+			_remap_owned[owned_key] = nil
+		elseif out and ev.value == InputEvent.VALUE_DOWN then
+			_remap_owned[owned_key] = true
+		end
+		if out then
+			for _, remapped in ipairs(out) do
+				_dispatch_event({ type = EVDEV_TYPE_KEY, code = remapped.code, value = remapped.value,
+					remapped = true }, source)
+				if not _running then return end
+			end
+			if tap and _on_tap then _call_callback("tap action callback", _on_tap, tap) end
+			return
+		end
+	end
+
 	local physical_key = source_key(source, ev.code)
 	if ev.value == InputEvent.VALUE_DOWN then
 		_physical_down[physical_key] = { source = source, code = ev.code }
@@ -591,6 +672,24 @@ end
 
 
 
+--- Releases every key the tap-hold engine holds (a hold modifier, a layer
+--- chord, a one-shot Shift) through the normal path, so the virtual keyboard
+--- and the modifier state both see the key-ups.
+_release_remapped = function()
+	if not _remapper then return end
+	for _, released in ipairs(_remapper:release_all()) do
+		local source = _device
+		for _, entry in pairs(_forwarded_down) do
+			if entry.code == released.code then source = entry.source; break end
+		end
+		_dispatch_event({ type = EVDEV_TYPE_KEY, code = released.code, value = released.value,
+			remapped = true }, source)
+	end
+end
+
+
+
+
 -- =========================================
 -- =========================================
 -- ======= 4/ Context Helpers ==============
@@ -616,12 +715,19 @@ end
 -- =========================================
 -- =========================================
 
+local EVDEV_TYPE_REL = 2
+
 local function _dispatch_pointer(ev)
 	if ev.type == EVDEV_TYPE_KEY
 		and ev.code >= BTN_FIRST
 		and ev.value == InputEvent.VALUE_DOWN
 	then
+		-- A click while a tap-hold key is down makes it a chord (Shift+click).
+		if _remapper then _remapper:activity() end
 		_call_callback("pointer callback", _on_click, ev.code)
+	elseif ev.type == EVDEV_TYPE_REL and _remapper then
+		-- So does a wheel turn: Ctrl+wheel must not paste on release.
+		_remapper:activity()
 	end
 end
 
@@ -751,6 +857,41 @@ function M.held_text_modifier_codes()
 		if role == "shift" or role == "altgr" then held[#held + 1] = entry.code end
 	end
 	return held
+end
+
+--- Shortcut modifiers (Ctrl, Alt, Super) the user is holding, in press order.
+---
+--- Text never needs them, and typed while one is held each character becomes a
+--- shortcut: accepting a prediction with Alt+1 typed it as Alt+q, Alt+u, …
+--- @return table Ordered evdev keycodes.
+function M.held_shortcut_modifier_codes()
+	local held = {}
+	for _, entry in ipairs(_modifier_order) do
+		local role = _modifier_down[entry.key]
+		if role == "ctrl" or role == "alt" or role == "meta" then held[#held + 1] = entry.code end
+	end
+	return held
+end
+
+--- Non-modifier keys this daemon has forwarded as pressed and not yet released.
+---
+--- An expansion fires on the terminator's key-DOWN, which has already been
+--- forwarded, so during the injection that key is still pressed on the virtual
+--- keyboard. The kernel drops a key-down for a key that is already down: the
+--- replayed terminator (the space after "adn ") vanished, and every end-char
+--- expansion glued the next word onto the replacement. Measured through a real
+--- kernel by tests/hardware/run_daemon_live.lua.
+--- @return table Sorted evdev keycodes.
+function M.held_forwarded_keys()
+	local codes, seen = {}, {}
+	for _, entry in pairs(_forwarded_down) do
+		if not EvdevCodes.MODIFIER_OF[entry.code] and not seen[entry.code] then
+			seen[entry.code] = true
+			codes[#codes + 1] = entry.code
+		end
+	end
+	table.sort(codes)
+	return codes
 end
 
 --- Every modifier currently held, keyed by name.
@@ -1018,6 +1159,7 @@ function M.check_device()
 	end
 	local acquired, acquire_err = _acquire(keyboards, force_path)
 	if acquired then
+		_seed_caps_lock(_devices[1])
 		_reset_modifier_state()
 		_physical_down = {}
 		_sync_dropped = {}
@@ -1197,6 +1339,7 @@ function M.start(opts)
 		_device = nil
 		return
 	end
+	_seed_caps_lock(_devices[1])
 
 	-- The pointer is opened last and its failure is not fatal: a machine with no
 	-- pointer, or one whose node this user cannot read, still expands hotstrings.
@@ -1250,6 +1393,7 @@ end
 
 function M.stop()
 	if not _running and not _reacquiring then return end
+	_release_remapped()
 	local released, release_err = _release_forwarded_sources(_devices)
 	if not released then
 		M.emergency_stop("could not release virtual keys during stop: " .. tostring(release_err))
@@ -1265,6 +1409,8 @@ function M.stop()
 	_reacquiring = false
 	_running = false
 	_consumed_down = {}
+	_remap_owned = {}
+	_remap_orphans = {}
 	_sync_dropped = {}
 	_forwarded_down = {}
 	_physical_down = {}
@@ -1280,6 +1426,13 @@ end
 function M.emergency_stop(reason)
 	local message = tostring(reason or "keyboard output path failed")
 	Logger.error(LOG, "Emergency keyboard stop — %s.", message)
+	-- Best effort, before the descriptors close: a Ctrl the virtual keyboard
+	-- still holds would stay down in every application once nothing forwards
+	-- its release. The output path may be what failed, so nothing here throws.
+	if _remapper then pcall(function() _remapper:release_all() end) end
+	if type(_emit_raw) == "function" then
+		for _, entry in pairs(_forwarded_down) do pcall(_emit_raw, entry.code, InputEvent.VALUE_UP) end
+	end
 	_close_paths(_pointer_devices, pointer_slot)
 	_close_paths(_devices, keyboard_slot)
 	_pointer_devices = {}
@@ -1290,9 +1443,80 @@ function M.emergency_stop(reason)
 	_reacquiring = false
 	_running = false
 	_consumed_down = {}
+	_remap_owned = {}
+	_remap_orphans = {}
 	_sync_dropped = {}
 	_forwarded_down = {}
 	_physical_down = {}
+end
+
+--- Runs a blocking modal (a zenity dialog) with the keyboard handed back to
+--- the desktop, then takes it again.
+---
+--- The daemon forwards every grabbed key from its event loop, and a dialog run
+--- from a menu callback blocks that loop until it closes. Under the grab the
+--- dialog therefore never received a key: it could only be dismissed with the
+--- mouse, and no value (an API key, a delay) could be typed into it.
+--- Keys typed into the dialog are discarded on return, and keys still held
+--- then (the Enter that closed it) are treated as consumed, so neither reaches
+--- the hotstring buffer nor the application a second time.
+--- @param fn function The modal; its results are returned.
+--- @return any
+function M.while_released(fn)
+	if not _running or not _intercept then return fn() end
+	local paths = {}
+	for index, path in ipairs(_devices) do paths[index] = path end
+	_release_remapped()
+	local released, release_err = _release_forwarded_sources(paths)
+	if not released then
+		M.emergency_stop("could not release virtual keys before a dialog: " .. tostring(release_err))
+		return fn()
+	end
+	for _, path in ipairs(paths) do EvdevReader.ungrab(keyboard_slot(path)) end
+	Logger.debug(LOG, "Keyboard released to the desktop for a dialog.")
+
+	local results = { n = 0 }
+	local function keep(...) results = { n = select("#", ...), ... } end
+	local ok, err = pcall(function() keep(fn()) end)
+	if ok then err = nil end
+
+	for _, path in ipairs(paths) do
+		local slot = keyboard_slot(path)
+		repeat local drained = EvdevReader.drain(function() end, slot) until not drained or drained == 0
+		_pending_events[slot] = nil
+		if not EvdevReader.grab(slot) then
+			M.emergency_stop("could not take the keyboard back after a dialog: " .. path)
+			return (table.unpack or unpack)(results, 1, results.n)
+		end
+		local held = EvdevReader.pressed_keys(slot, KEY_MAX)
+		for code in pairs(held or {}) do _consumed_down[source_key(path, code)] = true end
+		local synced, sync_err = _resynchronise(path)
+		if not synced then
+			M.emergency_stop("could not resynchronise after a dialog: " .. tostring(sync_err))
+			return (table.unpack or unpack)(results, 1, results.n)
+		end
+	end
+	if _on_desync then _call_callback("input-desync callback", _on_desync) end
+	Logger.debug(LOG, "Keyboard taken back after a dialog.")
+	if err then error(err, 0) end
+	return (table.unpack or unpack)(results, 1, results.n)
+end
+
+--- Installs (or removes, with nil) the tap-hold engine. Whatever the previous
+--- engine held is released first.
+--- @param engine table|nil platform/remap/tap_hold_engine instance
+--- @param on_tap function|nil Runs a tap action the engine returns by name.
+function M.set_remapper(engine, on_tap)
+	_release_remapped()
+	for key in pairs(_remap_owned) do _remap_orphans[key] = true end
+	_remap_owned = {}
+	_remapper = engine
+	_on_tap = type(on_tap) == "function" and on_tap or nil
+end
+
+--- Releases every key the tap-hold engine holds (pause, feature switch).
+function M.release_remapped()
+	_release_remapped()
 end
 
 --- Returns true if the keyboard hook is currently active.
@@ -1348,11 +1572,19 @@ M.DEVICE_CHECK_TICKS = DEVICE_CHECK_TICKS
 
 --- @param intercept boolean Whether to run the pass-through branch.
 --- @return integer Number of events drained.
+--- Test seam: runs the CapsLock seeding against an already-open source.
+--- @param path string
+--- @return boolean
+function M._seed_caps_lock_for_test(path)
+	return _seed_caps_lock(path)
+end
+
 function M._test_drive(events, callbacks, intercept)
 	local size = InputEvent.native_size()
-	local queue = {}
+	local queue, times = {}, {}
 	for i, ev in ipairs(events or {}) do
 		queue[i] = InputEvent.encode(ev.type, ev.code, ev.value, size)
+		times[i] = ev.at_ms
 	end
 	local at = 0
 	local cb = callbacks or {}
@@ -1395,7 +1627,18 @@ function M._test_drive(events, callbacks, intercept)
 	local slot = keyboard_slot(test_path)
 	EvdevReader.open(test_path, slot)
 	_running = true
-	local drained = EvdevReader.drain(function(ev) _dispatch_event(ev, test_path) end, slot)
+	-- Drained to the end: one drain is bounded, and a long stream cut at the
+	-- bound reads as keys the daemon never released.
+	local drained, status = 0, "bounded"
+	while status == "bounded" do
+		local count
+		count, status = EvdevReader.drain(function(ev)
+			_test_clock_ms = times[at]
+			_dispatch_event(ev, test_path)
+		end, slot)
+		drained = drained + count
+	end
+	_test_clock_ms = nil
 	_running = false
 	_devices = {}
 	_device = nil

@@ -1765,13 +1765,14 @@ function M.handle_llm_keys(keyCode, flags, is_ignored)
 		return true
 	end
 
-	-- Modifier+digit selects a prediction by position (e.g., alt+2 → second prediction).
-	if #preds > 1 and core_llm.check_modifiers(flags, engine.get_validation_mods()) then
-		local n = KEYCODE_DIGITS[keyCode]
-		if n and n <= #preds then
-			Logger.debug(LOG, "Direct selection — prediction #%d.", n)
-			return M.apply_prediction(n)
-		end
+	-- The exact validation chord plus digit N selects prediction N (bare digits
+	-- when no modifier is configured). A matched digit is consumed even when the
+	-- injection fails, like Tab, so it can never reach the application instead.
+	local n = KEYCODE_DIGITS[keyCode]
+	if n and n <= #preds and core_llm.check_modifiers(flags, engine.get_validation_mods()) then
+		Logger.debug(LOG, "Direct selection — prediction #%d.", n)
+		if not M.apply_prediction(n) then M.reset_predictions() end
+		return true
 	end
 
 	return false

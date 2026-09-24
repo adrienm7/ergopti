@@ -29,9 +29,10 @@
 ---    gtk_main_iteration_do(FALSE), so pump() returns whether or not anything
 ---    happened — unlike the blocking pipe read it replaces, which stalled the
 ---    keystroke path until someone clicked the tray.
---- 2. Callbacks are pinned. A GCallback cast from a Lua function is collected
----    the moment nothing references it, and the crash lands inside GTK with no
----    Lua traceback. Every one is kept in a table for the life of the menu.
+--- 2. One callback for every row. LuaJIT never frees an FFI callback slot and
+---    has only a few hundred, so a callback per row per rebuild crashed the
+---    daemon at boot ("too many callbacks"). Rows carry an id as signal data;
+---    one process-wide handler dispatches it, and ids are never reused.
 --- 3. Rebuilt wholesale. A menu is discarded and re-created on every change
 ---    rather than mutated: mutation means tracking which widget corresponds to
 ---    which row, and the row set changes shape (categories appear, counts move)
@@ -97,7 +98,19 @@ local _lib = nil
 -- The live indicator, its current menu, and every callback keeping GTK alive.
 local _indicator = nil
 local _menu = nil
-local _pinned = {}
+
+-- Menu actions by id, and the one C callback that dispatches to them.
+--
+-- ONE callback for the whole process, never one per row: LuaJIT never
+-- garbage-collects FFI callback slots, and there are only a few hundred. The
+-- menu has hundreds of rows and is rebuilt on every toggle, so a callback per
+-- row exhausted the slots during boot and the daemon died with "too many
+-- callbacks" before the first keystroke — every packaged unit runs --tray.
+-- Ids are never reused, so a click on a row of a replaced menu finds no action
+-- instead of firing whatever the new menu put at the same position.
+local _actions = {}
+local _next_action = 0
+local _dispatcher = nil
 
 --- Loads the first of a list of sonames that resolves.
 --- @param ffi table The FFI module.
@@ -142,6 +155,7 @@ local function bind()
 		typedef int   gboolean;
 		typedef unsigned long gulong;
 		typedef void (*GCallback)(void);
+		typedef void (*ErgoptiActivateHandler)(void *item, void *data);
 
 		GtkWidget*   gtk_menu_new(void);
 		GtkWidget*   gtk_menu_item_new_with_label(const char *label);
@@ -215,22 +229,31 @@ end
 -- ==============================================
 -- ==============================================
 
---- Connects a Lua function to "activate", keeping the callback alive.
----
---- The pin is not defensive coding. `ffi.cast` returns a callback object owned
---- by Lua; the moment nothing references it, LuaJIT frees the trampoline and the
---- next click jumps into freed memory — inside GTK, with no Lua traceback and no
---- indication that a menu callback was involved.
+--- The process-wide "activate" handler, created on first use.
+--- @param lib table
+--- @return userdata GCallback
+local function dispatcher(lib)
+	if not _dispatcher then
+		local handler = lib.ffi.cast("ErgoptiActivateHandler", function(_, data)
+			local fn = _actions[tonumber(lib.ffi.cast("intptr_t", data))]
+			if not fn then return end
+			local ok, err = pcall(fn)
+			if not ok then Logger.error(LOG, "Menu action failed — %s", tostring(err)) end
+		end)
+		_dispatcher = { handler = handler, gcallback = lib.ffi.cast("GCallback", handler) }
+	end
+	return _dispatcher.gcallback
+end
+
+--- Connects a Lua function to "activate" through the shared dispatcher.
 --- @param lib table
 --- @param widget userdata
 --- @param fn function
 local function on_activate(lib, widget, fn)
-	local cb = lib.ffi.cast("GCallback", function()
-		local ok, err = pcall(fn)
-		if not ok then Logger.error(LOG, "Menu action failed — %s", tostring(err)) end
-	end)
-	_pinned[#_pinned + 1] = cb
-	lib.gobject.g_signal_connect_data(widget, "activate", cb, nil, nil, 0)
+	_next_action = _next_action + 1
+	_actions[_next_action] = fn
+	lib.gobject.g_signal_connect_data(widget, "activate", dispatcher(lib),
+		lib.ffi.cast("gpointer", _next_action), nil, 0)
 end
 
 --- Builds a GtkMenu from the neutral tree the renderer emits.
@@ -319,10 +342,9 @@ function M.set_menu(items)
 	local lib = bind()
 	if not lib or not _indicator then return false end
 
-	-- The pins are dropped with the menu they belonged to. Keeping them would
-	-- leak one trampoline per row per rebuild, and the menu is rebuilt on every
-	-- toggle.
-	_pinned = {}
+	-- The replaced menu's actions go with it; its ids are never reissued, so a
+	-- late click on an old row finds nothing to run.
+	_actions = {}
 	_menu = build_menu(lib, items)
 	lib.indicator.app_indicator_set_menu(_indicator, _menu)
 	return true
@@ -366,7 +388,7 @@ function M.destroy()
 	lib.indicator.app_indicator_set_status(_indicator, 0)
 	_indicator = nil
 	_menu = nil
-	_pinned = {}
+	_actions = {}
 	Logger.info(LOG, "Tray icon removed.")
 end
 

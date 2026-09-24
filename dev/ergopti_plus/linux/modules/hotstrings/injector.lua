@@ -37,6 +37,7 @@ local M = {}
 local Logger = require("logger.shim")
 local EvdevCodes = require("infra.evdev_codes")
 local KeyboardLayout = require("adapters.keyboard_layout")
+local XkbCapture = require("adapters.xkb_capture")
 local Clipboard = require("adapters.clipboard")
 local OutputTransaction = require("modules.hotstrings.output_transaction")
 
@@ -89,6 +90,24 @@ local function held_text_modifier_codes()
 	local ok, hook = pcall(require, "adapters.keyboard_hook")
 	if not ok or type(hook.held_text_modifier_codes) ~= "function" then return {} end
 	local ok_call, held = pcall(hook.held_text_modifier_codes)
+	return (ok_call and type(held) == "table") and held or {}
+end
+
+--- Shortcut modifiers (Ctrl, Alt, Super) the user is holding.
+--- @return table Ordered evdev keycodes.
+local function held_shortcut_modifier_codes()
+	local ok, hook = pcall(require, "adapters.keyboard_hook")
+	if not ok or type(hook.held_shortcut_modifier_codes) ~= "function" then return {} end
+	local ok_call, held = pcall(hook.held_shortcut_modifier_codes)
+	return (ok_call and type(held) == "table") and held or {}
+end
+
+--- Non-modifier keys the hook forwarded as pressed and not yet released.
+--- @return table evdev keycodes.
+local function held_forwarded_keys()
+	local ok, hook = pcall(require, "adapters.keyboard_hook")
+	if not ok or type(hook.held_forwarded_keys) ~= "function" then return {} end
+	local ok_call, held = pcall(hook.held_forwarded_keys)
 	return (ok_call and type(held) == "table") and held or {}
 end
 
@@ -198,18 +217,35 @@ local function send_text_native(tx, text)
 		return false
 	end
 
-	for _, step in ipairs(plan) do
-		for _, mod in ipairs(step.mods) do
-			must_emit(tx, MODIFIER_CODES[mod], EVDEV_VALUE_DOWN, "layout modifier down")
-		end
-		must_emit(tx, step.keycode, EVDEV_VALUE_DOWN, "replacement key down")
-		must_emit(tx, step.keycode, EVDEV_VALUE_UP, "replacement key up")
-		-- Released in reverse, and always: a modifier left held after an
-		-- interrupted injection turns every subsequent keystroke into a shortcut.
-		for i = #step.mods, 1, -1 do
-			must_emit(tx, MODIFIER_CODES[step.mods[i]], EVDEV_VALUE_UP, "layout modifier up")
-		end
+	-- The plan is the chord for each character with CapsLock OFF. Typed under a
+	-- locked CapsLock every letter inverts ("Bonjour" arrives as "bONJOUR"), and
+	-- on Ergopti, whose type maps Lock to its own level, other keys change too.
+	-- So the lock is released for the replacement and restored after it —
+	-- restored even when an emit fails, or the user is left with CapsLock off.
+	local caps = XkbCapture.caps_locked()
+	if caps then
+		must_emit(tx, EvdevCodes.KEY_CAPSLOCK, EVDEV_VALUE_DOWN, "capslock release down")
+		must_emit(tx, EvdevCodes.KEY_CAPSLOCK, EVDEV_VALUE_UP, "capslock release up")
 	end
+	local ok_typed, typed_err = pcall(function()
+		for _, step in ipairs(plan) do
+			for _, mod in ipairs(step.mods) do
+				must_emit(tx, MODIFIER_CODES[mod], EVDEV_VALUE_DOWN, "layout modifier down")
+			end
+			must_emit(tx, step.keycode, EVDEV_VALUE_DOWN, "replacement key down")
+			must_emit(tx, step.keycode, EVDEV_VALUE_UP, "replacement key up")
+			-- Released in reverse, and always: a modifier left held after an
+			-- interrupted injection turns every subsequent keystroke into a shortcut.
+			for i = #step.mods, 1, -1 do
+				must_emit(tx, MODIFIER_CODES[step.mods[i]], EVDEV_VALUE_UP, "layout modifier up")
+			end
+		end
+	end)
+	if caps then
+		must_emit(tx, EvdevCodes.KEY_CAPSLOCK, EVDEV_VALUE_DOWN, "capslock restore down")
+		must_emit(tx, EvdevCodes.KEY_CAPSLOCK, EVDEV_VALUE_UP, "capslock restore up")
+	end
+	if not ok_typed then error(typed_err, 0) end
 	return true
 end
 
@@ -295,6 +331,24 @@ local function run_transaction(label, body)
 	local tx = OutputTransaction.new(_uinput)
 	local ok, err = pcall(function()
 		if not tx.neutralize(held_text_modifier_codes()) then error(tx.error(), 0) end
+		-- Ctrl, Alt and Super are released for good: the chord that asked for
+		-- this text (Alt+1 on a prediction) is spent, and text typed under them
+		-- would be shortcuts. A masking tap comes first, so the release is not a
+		-- lone Alt tap that would move the focus to the application's menu bar.
+		local shortcut_modifiers = held_shortcut_modifier_codes()
+		if #shortcut_modifiers > 0 then
+			must_emit(tx, EvdevCodes.KEY_F24, EVDEV_VALUE_DOWN, "modifier mask")
+			must_emit(tx, EvdevCodes.KEY_F24, EVDEV_VALUE_UP, "modifier mask")
+			for _, code in ipairs(shortcut_modifiers) do
+				must_emit(tx, code, EVDEV_VALUE_UP, "shortcut modifier release")
+			end
+		end
+		-- Released, never restored: the key is the terminator the user already
+		-- typed, and pressing it again would type it twice. Its physical release
+		-- arrives later and is a harmless duplicate for the kernel.
+		for _, code in ipairs(held_forwarded_keys()) do
+			must_emit(tx, code, EVDEV_VALUE_UP, "held key release")
+		end
 		body(tx)
 	end)
 	if not ok and not tx.is_failed() then tx.fail(err, "unexpected exception") end

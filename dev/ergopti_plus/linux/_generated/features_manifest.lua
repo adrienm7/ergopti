@@ -350,7 +350,7 @@ M.features = {
 		path = "llm.trigger.url_bar_filter_enabled", id = "url_bar_filter_enabled", section = "llm.trigger", default = false, type = "boolean", description_key = "menu.llm.trigger.url_bar_filter_enabled", platforms = { "ahk", "hs", "linux" },
 	},
 	{
-		path = "llm.navigation.val_modifiers", id = "val_modifiers", section = "llm.navigation", default = { "alt" }, type = "array", description_key = "menu.llm.navigation.val_modifiers", platforms = { "ahk", "hs", "linux" },
+		path = "llm.navigation.val_modifiers", id = "val_modifiers", section = "llm.navigation", default = {  }, type = "array", description_key = "menu.llm.navigation.val_modifiers", platforms = { "ahk", "hs", "linux" },
 	},
 	{
 		path = "metrics.enabled", id = "enabled", section = "metrics", default = true, type = "boolean", description_key = "menu.metrics.enabled", platforms = { "ahk", "hs", "linux" },
@@ -378,6 +378,9 @@ M.features = {
 	},
 	{
 		path = "shortcuts.chatgpt_url", id = "chatgpt_url", section = "shortcuts", default = "https://chat.openai.com", type = "string", description_key = "menu.shortcuts.chatgpt_url", platforms = { "ahk", "hs", "linux" },
+	},
+	{
+		path = "shortcuts.wrap_text_if_selected", id = "wrap_text_if_selected", section = "shortcuts", default = true, type = "boolean", description_key = "shortcuts.label_wrap_text", platforms = { "ahk", "linux" },
 	},
 	{
 		path = "gestures.enabled", id = "enabled", section = "gestures", default = true, type = "boolean", description_key = "menu.gestures.enabled", platforms = { "ahk", "hs", "linux" },
@@ -579,9 +582,6 @@ M.unavailable = {
 	},
 	{
 		path = "shortcuts.teleport_mouse", section = "shortcuts", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.wrap_text_if_selected", section = "shortcuts", reason_key = "", platforms = { "ahk" },
 	},
 	{
 		path = "shortcuts.open_downloads", section = "shortcuts", reason_key = "", platforms = { "ahk" },

@@ -93,7 +93,9 @@ _MSG_InitMenuOnlyReadsSubMenus() {
 		if !InStr(Line, "SubMenus[")
 			continue
 		Reads += 1
-		Assert(RegExMatch(Line, "^\s*TrayMenuStage_Add\("),
+		; TrayMenuStage_AddFeature is the head-row form of the same staging call
+		; (it only records the row as a feature for pause greying).
+		Assert(RegExMatch(Line, "^\s*TrayMenuStage_Add(Feature)?\("),
 			"initMenu() must only READ a SubMenus entry (hand it to TrayMenuStage_Add) and never call "
 			. "anything that MUTATES one. _Updater_RebuildMenu calls initMenu() alone, so a mutation "
 			. "here is replayed on every updater tray refresh and never undone by a rebuild of the "

@@ -79,6 +79,16 @@ class KLWV {
 		static REBUILD_WATCH_MS := 1000
 		; Test seam; production arms the watch with SetTimer.
 		static rebuild_watch_timer_fn := 0
+		; Background sidecar warm-up (section 9). The first delay keeps the worker
+		; off the boot path; the idle delay is re-armed by every committed ingest,
+		; so a refresh starts only once typing has settled.
+		static WARM_START_DELAY_MS := 20000
+		static WARM_IDLE_DELAY_MS := 60000
+		static WARM_ORDER := ["typing", "apps"]
+		static warm_metrics_dir := ""
+		static warm_timer := 0
+		; Test seam; production arms the warm-up with SetTimer.
+		static warm_timer_fn := 0
 }
 
 
@@ -184,11 +194,10 @@ KLWV_Open(which, metrics_dir) {
 
 		; Do NOT build here — on a cold DB the full build takes 30-75 s and
 		; blocks the window from appearing at all. The window navigates first;
-		; KLWV_DelayedFirstPush (1.5 s after nav) pushes the freshest available
-		; blob from KLPF_LAST_JSON, which live ticks keep warm.
-		; If no live-tick blob exists yet (very first open after reload), the
-		; delayed push triggers a fast manifest-only build so the user sees
-		; KPIs within 2 s, and the first live tick (≤30 s) fills in n-grams.
+		; KLWV_DelayedFirstPush (on NavigationCompleted, with a 1.5 s timer as
+		; backstop) paints the published sidecar straight from disk, which the
+		; background warm-up (section 9) keeps current. Only when no sidecar
+		; exists does it start a manifest-only build.
 
 		title := (which = "typing") ? t("keylogger_ui.typing_metrics") : t("metrics_apps.window_title")
 		g := Gui("+Resize +MinSize800x600", title)
@@ -282,6 +291,15 @@ KLWV_Open(which, metrics_dir) {
 		; refcounting does not __Delete it and unsubscribe near-immediately.
 		Epoch := ++KLWV.epoch
 		msg_sub := webview.WebMessageReceived(KLWV_OnWebMessage.Bind(which, Epoch))
+		; The metrics pages post no "ready" message, so navigation completion is
+		; the earliest moment a push can land. Painting there, rather than on the
+		; fixed 1.5 s timer alone, is what makes a cached sidecar appear at once.
+		nav_sub := 0
+		try nav_sub := webview.NavigationCompleted(KLWV_OnNavigationCompleted.Bind(which, Epoch))
+		catch as err
+				try LoggerWarn("Keylogger",
+						"KLWV_Open: NavigationCompleted subscription failed ('{1}'); first paint waits for the backstop timer.",
+						err.Message)
 
 		; Inject i18n base URL and locale code before page scripts run so
 		; i18n.js can resolve locale files without relying on currentScript
@@ -334,6 +352,7 @@ KLWV_Open(which, metrics_dir) {
 				"webview", webview,
 				"udir", udir,
 				"msg_sub", msg_sub,
+				"nav_sub", nav_sub,
 				"pending_ingest_mode", "",
 				"ingest_drain_armed", false
 		)
@@ -388,6 +407,8 @@ KLWV_Close(which) {
 		; it after Close() raises against an invalid COM pointer and leaks the sink.
 		if entry.Has("msg_sub")
 				entry.Delete("msg_sub")
+		if entry.Has("nav_sub")
+				entry.Delete("nav_sub")
 		try entry["controller"].Close()
 		try entry["gui"].Destroy()
 		; BrowserProcessExited, not a fixed delay, proves the profile is unused.
@@ -952,6 +973,15 @@ KLWV_MonitorFromPoint(x, y) {
 		return 0
 }
 
+; NavigationCompleted arrives on the WebView2 STA callback. Leave that stack
+; before any bridge work (see KLWV_InjectI18n) and let the first-paint owner
+; decide; a repeat of this or of the backstop timer is inert once painted.
+KLWV_OnNavigationCompleted(which, Epoch, *) {
+		if !KLWV_IsCurrent(which, Epoch)
+				return false
+		return KLWV_ArmFirstPaintTimer(KLWV_DelayedFirstPush.Bind(which, Epoch), -1)
+}
+
 KLWV_DelayedFirstPush(which, Epoch, attempt := 0) {
 		try LoggerDebug("Keylogger", "KLWV_DelayedFirstPush: dashboard={1}, has_window={2}.",
 				which, KLWV.windows.Has(which) ? 1 : 0)
@@ -967,22 +997,31 @@ KLWV_DelayedFirstPush(which, Epoch, attempt := 0) {
 				KLWV_QueueFirstPaintRetry(which, Epoch, attempt, false)
 				return
 		}
-		; A superseding refresh owns first-paint recovery through its terminal.
-		; Never cancel that live replacement merely because this retry timer fired.
-		if KLPFWorker.jobs.Has(which)
-				return
 		global KLPF_LAST_JSON
 		; Inject i18n first — must happen before any DB build which can block
 		; for tens of seconds on a cold cache.
 		KLWV_InjectI18n(which, Epoch)
 		if !KLWV_IsCurrent(which, Epoch)
 				return false
-		; Only build if we have no cached blob yet.  Even a cold cache is safe:
+		path := KLPF_PrefetchPath(which, entry["metrics_dir"])
+		; The resident driver never fills KLPF_LAST_JSON (its builds run in the
+		; worker process), so the published sidecar on disk is the snapshot to
+		; paint. Checking RAM alone started a manifest build — which carries no
+		; tables — on every open and left « Calcul en cours » on screen.
+		snapshot_ready := (IsSet(KLPF_LAST_JSON) && KLPF_LAST_JSON.Has(path))
+				|| FileExist(path) != ""
+		; A superseding refresh (or the background warm-up) owns first-paint
+		; recovery through its terminal. Never cancel that live replacement merely
+		; because this timer fired, but show the sidecar already on disk meanwhile.
+		if KLPFWorker.jobs.Has(which) {
+				if snapshot_ready
+						KLWV_FirstPaintPush(which, Epoch)
+				return
+		}
+		; Only build if no snapshot exists at all. Even a cold cache is safe:
 		; KLPF_RequestBuild starts a detached /force worker, never SQLite work on
 		; this timer or the keyboard thread.
-		path := KLPF_PrefetchPath(which, entry["metrics_dir"])
-		need_manifest_build := !IsSet(KLPF_LAST_JSON) || !KLPF_LAST_JSON.Has(path)
-		if need_manifest_build {
+		if !snapshot_ready {
 				KLPF_RequestBuild(which, entry["metrics_dir"], "manifest", Epoch,
 						KLWV_OnFirstBuildTerminal.Bind(which, Epoch, attempt))
 				return
@@ -1575,4 +1614,100 @@ KLWV_DeliverRebuildFile(which, Entry, Epoch, Job, Path, Slot, Prefix, Suffix) {
 				return false
 		}
 		return true
+}
+
+
+
+
+
+; =============================================
+; =============================================
+; ======= 9/ Background sidecar warm-up =======
+; =============================================
+; =============================================
+
+; Only a finished FULL build publishes the sidecar a dashboard paints from, and
+; that build used to start 2 s after the window opened, so every first open (and
+; every open after a quit cancelled it) sat on « Calcul en cours » for the whole
+; cold projection. The warm-up publishes it in the background instead: once
+; after the keylogger starts, then whenever committed ingest has been idle for
+; WARM_IDLE_DELAY_MS. It never replaces a running build and leaves a key whose
+; dashboard is open to that window's own projections.
+
+; (Re)arms the one-shot warm-up. Re-arming resets the countdown, which is what
+; turns a stream of ingest commits into a single run once typing has settled.
+; @param MetricsDir {String} The metrics store to project.
+; @param DelayMs {Integer} Positive delay before the run.
+; @returns {Boolean} True when the timer is armed.
+KLWV_WarmSchedule(MetricsDir, DelayMs) {
+	if !(MetricsDir is String) || (MetricsDir = "")
+		throw ValueError("Metrics warm-up requires a metrics directory.")
+	if !(DelayMs is Integer) || DelayMs <= 0
+		throw ValueError("Metrics warm-up delay must be a positive integer.")
+	KLWV.warm_metrics_dir := MetricsDir
+	if !IsObject(KLWV.warm_timer)
+		KLWV.warm_timer := KLWV_WarmRun.Bind(1)
+	KLWV_ArmWarmTimer(KLWV.warm_timer, DelayMs)
+	try LoggerDebug("Keylogger", "Metrics sidecar warm-up armed in {1} ms.", DelayMs)
+	return true
+}
+
+; Committed ingest re-arms the idle warm-up, but only once the boot warm-up has
+; named the store: before that there is nothing to refresh.
+KLWV_WarmOnIngestCommitted() {
+	if (KLWV.warm_metrics_dir = "")
+		return false
+	return KLWV_WarmSchedule(KLWV.warm_metrics_dir, KLWV.WARM_IDLE_DELAY_MS)
+}
+
+KLWV_ArmWarmTimer(Callback, DelayMs) {
+	if IsObject(KLWV.warm_timer_fn)
+		return KLWV.warm_timer_fn.Call(Callback, -Abs(DelayMs))
+	SetTimer(Callback, -Abs(DelayMs))
+	return true
+}
+
+; Starts the warm-up build for the first eligible key from Index on. The keys
+; run one after another (the terminal chains the next) so two projections never
+; compete for the same SQLite ledger.
+; @returns {Boolean} True when a background build was started.
+KLWV_WarmRun(Index := 1, *) {
+	if A_IsSuspended {
+		try LoggerDebug("Keylogger", "Metrics sidecar warm-up skipped while suspended.")
+		return false
+	}
+	MetricsDir := KLWV.warm_metrics_dir
+	if (MetricsDir = "")
+		return false
+	while (Index <= KLWV.WARM_ORDER.Length) {
+		which := KLWV.WARM_ORDER[Index]
+		if KLWV.windows.Has(which) || KLPFWorker.jobs.Has(which) {
+			try LoggerDebug("Keylogger", "Metrics sidecar warm-up leaves '{1}' to its current owner.", which)
+			Index += 1
+			continue
+		}
+		try LoggerInfo("Keylogger", "Metrics sidecar warm-up started for '{1}'.", which)
+		return KLPF_RequestBuild(which, MetricsDir, "full", 0,
+			KLWV_OnWarmTerminal.Bind(which, Index), false)
+	}
+	return false
+}
+
+; A dashboard opened while this build ran defers to it (its first-paint and
+; full-build steps stand down while a job exists), so the result is delivered as
+; that window's full build. The next key starts one turn later, after this job
+; has retired from the registry.
+KLWV_OnWarmTerminal(which, Index, status, *) {
+	if (status = "ok") {
+		try LoggerInfo("Keylogger", "Metrics sidecar warm-up published '{1}'.", which)
+	} else {
+		try LoggerWarn("Keylogger", "Metrics sidecar warm-up for '{1}' ended: {2}.", which, status)
+	}
+	if KLWV.windows.Has(which) {
+		entry := KLWV.windows[which]
+		KLWV_OnFullBuildTerminal(which, entry.Get("epoch", 0), 0, status)
+	}
+	if (Index < KLWV.WARM_ORDER.Length)
+		KLWV_ArmWarmTimer(KLWV_WarmRun.Bind(Index + 1), 1)
+	return true
 }

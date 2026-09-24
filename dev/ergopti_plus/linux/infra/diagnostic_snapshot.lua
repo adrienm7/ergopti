@@ -79,6 +79,69 @@ local function os_release_value(text, key)
 	return nil
 end
 
+--- Reads one "Key:   value kB" entry of /proc/meminfo, in kilobytes.
+--- @param text string|nil
+--- @param key string
+--- @return number|nil
+local function meminfo_kb(text, key)
+	if type(text) ~= "string" then return nil end
+	return tonumber(text:match("\n" .. key .. ":%s+(%d+)") or text:match("^" .. key .. ":%s+(%d+)"))
+end
+
+--- Formats kilobytes as gigabytes with one decimal, the unit the page shows.
+--- @param kb number|nil
+--- @return string|nil
+local function format_gb(kb)
+	if not kb then return nil end
+	return string.format("%.1f GB", kb / (1024 * 1024))
+end
+
+--- The machine facts the boot snapshot and the healthcheck both report. One
+--- probe set, so the two surfaces cannot describe the same machine differently.
+--- Every value is nil when it could not be read; nothing is guessed.
+--- @param env table|nil { read = fn(path) } probe override.
+--- @return table { os_name, os_version_id, kernel, arch, runtime, display_server,
+---   desktop, cpu_model, cpu_cores, ram_total, ram_free, locale }
+function M.system_facts(env)
+	env = env or default_env()
+	local os_release = env.read("/etc/os-release")
+	local kernel = env.read("/proc/sys/kernel/osrelease")
+	kernel = type(kernel) == "string" and kernel:match("^%s*(.-)%s*$") or nil
+	if kernel == "" then kernel = nil end
+	local arch = (jit and jit.arch) or nil
+	if not arch then
+		local probed = env.read("/proc/sys/kernel/arch")
+		arch = type(probed) == "string" and probed:match("^%s*(.-)%s*$") or nil
+	end
+	local cpuinfo = env.read("/proc/cpuinfo")
+	local cpu_model, cpu_cores = nil, nil
+	if type(cpuinfo) == "string" then
+		cpu_model = cpuinfo:match("model name%s*:%s*([^\n]+)")
+		local count = 0
+		for _ in cpuinfo:gmatch("processor%s*:") do count = count + 1 end
+		if count > 0 then cpu_cores = count end
+	end
+	local meminfo = env.read("/proc/meminfo")
+	local desktop = DisplayServer.desktop()
+	local locale = os.getenv("LC_ALL")
+	if not locale or locale == "" then locale = os.getenv("LANG") end
+	return {
+		os_name        = os_release_value(os_release, "PRETTY_NAME") or os_release_value(os_release, "NAME"),
+		os_short_name  = os_release_value(os_release, "NAME"),
+		os_version_id  = os_release_value(os_release, "VERSION_ID"),
+		kernel         = kernel,
+		arch           = arch,
+		runtime        = (jit and jit.version) or _VERSION,
+		display_server = DisplayServer.kind(),
+		desktop        = desktop ~= "" and desktop or nil,
+		cpu_model      = cpu_model,
+		cpu_cores      = cpu_cores,
+		ram_total      = format_gb(meminfo_kb(meminfo, "MemTotal")),
+		ram_free       = format_gb(meminfo_kb(meminfo, "MemAvailable")),
+		locale         = locale ~= "" and locale or nil,
+	}
+end
+
 --- Reports whether the process runs with an effective uid of 0.
 --- @param status string|nil Content of /proc/self/status.
 --- @return string|nil "true", "false" or nil when unknown.
@@ -133,31 +196,23 @@ end
 function M.collect(ctx, env)
 	ctx = ctx or {}
 	env = env or default_env()
-	local os_release = env.read("/etc/os-release")
-	local kernel = env.read("/proc/sys/kernel/osrelease")
-	kernel = type(kernel) == "string" and kernel:match("^%s*(.-)%s*$") or nil
-	local version_id = os_release_value(os_release, "VERSION_ID")
+	local facts = M.system_facts(env)
+	local version_id = facts.os_version_id
 	local os_version = version_id
-	if kernel and kernel ~= "" then
-		os_version = (version_id and (version_id .. " ") or "") .. "kernel " .. kernel
+	if facts.kernel then
+		os_version = (version_id and (version_id .. " ") or "") .. "kernel " .. facts.kernel
 	end
-	local arch = (jit and jit.arch) or nil
-	if not arch then
-		local probed = env.read("/proc/sys/kernel/arch")
-		arch = type(probed) == "string" and probed:match("^%s*(.-)%s*$") or nil
-	end
-	local desktop = DisplayServer.desktop()
-	local display = DisplayServer.kind() .. ((desktop ~= "") and (" " .. desktop) or "")
+	local display = facts.display_server .. (facts.desktop and (" " .. facts.desktop) or "")
 	return {
 		driver           = M.DRIVER,
 		version          = Version.VERSION,
 		commit           = (M.resolve_commit({
 			env = env, shared_root = ctx.shared_root, source_dir = ctx.script_dir,
 		})),
-		os               = os_release_value(os_release, "NAME"),
+		os               = facts.os_short_name,
 		os_version       = os_version,
-		arch             = arch,
-		runtime          = (jit and jit.version) or _VERSION,
+		arch             = facts.arch,
+		runtime          = facts.runtime,
 		elevated         = elevated_from_status(env.read("/proc/self/status")),
 		locale           = ctx.locale,
 		keyboard_layout  = ctx.keyboard_layout,

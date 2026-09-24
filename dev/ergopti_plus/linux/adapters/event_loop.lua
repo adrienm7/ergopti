@@ -92,6 +92,9 @@ local _running    = false   -- Set by run(), cleared by stop() or on exit.
 local _idle_handle = nil    -- luv idle handle (only with luv).
 local _timer_handle = nil   -- luv timer handle for periodic callback (only with luv).
 local _idle_handlers = {}   -- Extra per-tick idle callbacks (e.g. GTK context pump).
+local _deferred = {}        -- One-shot { fn, due_ms } callbacks, see M.defer().
+
+local Monotonic = require("infra.monotonic")
 
 
 -- =========================================
@@ -119,6 +122,21 @@ local function _run_idle_handlers()
 		local ok, err = pcall(_idle_handlers[i])
 		if not ok then
 			Logger.error(LOG, "Idle handler #%d raised: %s", i, tostring(err))
+		end
+	end
+	if #_deferred == 0 then return end
+	-- Swapped out before running, so a callback that defers again lands in the
+	-- next tick instead of extending this one.
+	local now = Monotonic.now_ms()
+	local due, waiting = {}, {}
+	for _, entry in ipairs(_deferred) do
+		if now >= entry.due_ms then due[#due + 1] = entry else waiting[#waiting + 1] = entry end
+	end
+	_deferred = waiting
+	for _, entry in ipairs(due) do
+		local ok, err = pcall(entry.fn)
+		if not ok then
+			Logger.error(LOG, "Deferred callback raised: %s", tostring(err))
 		end
 	end
 end
@@ -337,6 +355,35 @@ function M.add_idle_handler(fn)
 	end
 	_idle_handlers[#_idle_handlers + 1] = fn
 	Logger.debug(LOG, "Idle handler registered (%d total).", #_idle_handlers)
+end
+
+--- Runs a callback once, on the first idle tick at least `delay_ms` from now.
+---
+--- For work that must not hold up what the current callback returns: a bridge
+--- answers a window with what it already has and refreshes it after the page
+--- has painted. Runs on the daemon's own loop, with or without luv, so it needs
+--- no timer backend. Fail-fast: a non-function or a negative delay is refused.
+--- @param fn function Zero-arity callback.
+--- @param delay_ms number|nil Minimum delay in milliseconds (default 0).
+--- @return boolean True when the callback was queued.
+function M.defer(fn, delay_ms)
+	if type(fn) ~= "function" then
+		Logger.error(LOG, "defer() requires a function — got %s; ignoring.", type(fn))
+		return false
+	end
+	local delay = delay_ms == nil and 0 or delay_ms
+	if type(delay) ~= "number" or delay < 0 then
+		Logger.error(LOG, "defer() delay must be a non-negative number — got %s; ignoring.", tostring(delay_ms))
+		return false
+	end
+	_deferred[#_deferred + 1] = { fn = fn, due_ms = Monotonic.now_ms() + delay }
+	return true
+end
+
+--- Runs the idle handlers and the due deferred callbacks once (test seam: the
+--- loops call the same function every tick).
+function M._run_idle_tick()
+	_run_idle_handlers()
 end
 
 return M

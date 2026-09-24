@@ -39,6 +39,7 @@ local M = {}
 local Logger = require("logger.shim")
 local Paths = require("infra.paths")
 local ChatGPT = require("modules.shortcuts.chatgpt")
+local ScriptActions = require("modules.shortcuts.script_actions")
 
 local LOG = "modules.shortcuts.keyboard_shortcuts"
 
@@ -328,10 +329,16 @@ end
 --- Called from the daemon's control-key callback with what the hook reported.
 --- Returns whether anything fired, so the caller can tell an unbound chord from
 --- a handled one — the difference matters for the metrics, not for the user.
+--- While the script is paused, and while the shortcuts feature is switched off,
+--- only the script-control actions (pause, reload, quit) may fire: they are how
+--- the user gets the script back, and every other binding firing through a pause
+--- is the pause not working.
 --- @param detail table|nil { key = string, mods = table } from the hook.
+--- @param opts table|nil { only_script = boolean }
 --- @return boolean fired, string|nil slot_id
-function M.dispatch(detail)
+function M.dispatch(detail, opts)
 	if type(detail) ~= "table" then return false, nil end
+	local only_script = type(opts) == "table" and opts.only_script == true
 	local key = detail.key
 	local held = type(detail.mods) == "table" and detail.mods or {}
 	if type(key) ~= "string" or key == "" then return false, nil end
@@ -348,6 +355,11 @@ function M.dispatch(detail)
 			local matches = true
 			for _, name in ipairs({ "ctrl", "shift", "alt", "meta" }) do
 				if (required[name] == true) ~= (held[name] == true) then matches = false end
+			end
+			if matches and only_script and not ScriptActions.is_script_action(action) then
+				Logger.debug(LOG, "Keyboard shortcut %s → %s held back: only script control runs now.",
+					slot, action)
+				return false, slot
 			end
 			if matches then
 				Logger.debug(LOG, "Keyboard shortcut fired: %s → %s.", slot, action)
@@ -367,7 +379,7 @@ function M.dispatch(detail)
 	-- this slot wins because the loop above returns first; otherwise the canonical
 	-- ChatGPT URL is useful immediately without claiming that every desktop-safe
 	-- chord can be chosen for the user.
-	if key == "g" and held.ctrl == true
+	if not only_script and key == "g" and held.ctrl == true
 		and held.shift ~= true and held.alt ~= true and held.meta ~= true then
 		Logger.debug(LOG, "Default keyboard shortcut fired: ctrl_g → ChatGPT.")
 		pcall(ChatGPT.open)

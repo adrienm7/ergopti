@@ -77,6 +77,10 @@ local _started = false
 -- a future second backend would need somewhere to say so.
 local _backend = nil
 
+-- Whether the paused logo is the one on screen, so a menu rebuild that does not
+-- change the state does not re-send the icon over D-Bus.
+local _paused = false
+
 
 
 
@@ -86,16 +90,18 @@ local _backend = nil
 -- =========================================
 -- =========================================
 
---- Resolves the icon to show: an installed file if there is one, else a themed
---- name. Never "" — an empty icon is an invisible, unclickable tray entry, which
---- is what the previous implementation produced on every machine.
+--- Resolves the icon to show: the bundled Ergopti logo if it is installed, else
+--- a themed name. Never "" — an empty icon is an invisible, unclickable tray
+--- entry, which is what the previous implementation produced on every machine.
+--- @param paused boolean|nil True for the greyed logo.
 --- @return string
-local function resolve_icon()
+local function resolve_icon(paused)
 	local ok_paths, Paths = pcall(require, "infra.paths")
-	if ok_paths and type(Protocol.resolve_tray_icon) == "function" then
-		local ok, icon = pcall(Protocol.resolve_tray_icon, Paths.driver_root and Paths.driver_root() or nil)
+	if ok_paths and type(Paths.shared_root) == "function" then
+		local ok, icon = pcall(Protocol.resolve_tray_icon, Paths.shared_root(), paused)
 		if ok and type(icon) == "string" and icon ~= "" then return icon end
 	end
+	Logger.warn(LOG, "Bundled tray logo not found — showing the themed '%s' icon.", FALLBACK_ICON)
 	return FALLBACK_ICON
 end
 
@@ -107,7 +113,7 @@ local function ensure_started()
 		_backend = nil
 		return false
 	end
-	if not Indicator.create(INDICATOR_ID, resolve_icon(), "Ergopti+") then
+	if not Indicator.create(INDICATOR_ID, resolve_icon(_paused), "Ergopti+") then
 		return false
 	end
 	_started = true
@@ -137,6 +143,24 @@ function M.setMenu(items)
 	Logger.debug(LOG, "Tray menu set (%d top-level row(s)).", #_items)
 end
 
+--- Shows the greyed logo while the daemon is paused, as the macOS menu bar and
+--- the Windows tray do; the normal one otherwise.
+--- @param paused boolean
+function M.setPaused(paused)
+	paused = paused == true
+	if paused == _paused then return end
+	_paused = paused
+	if not _started then return end
+	Indicator.set_icon(resolve_icon(paused))
+	Logger.debug(LOG, "Tray icon shows the %s logo.", paused and "paused" or "active")
+end
+
+--- The icon the tray shows (or would show) right now. Diagnostic and test seam.
+--- @return string
+function M.getIcon()
+	return resolve_icon(_paused)
+end
+
 --- Sets the hover tooltip.
 ---
 --- Not supported by libayatana's public API beyond the title, which is set at
@@ -155,6 +179,7 @@ function M.destroy()
 	_started = false
 	_backend = nil
 	_items = {}
+	_paused = false
 end
 
 --- Drains pending tray events. Never blocks.

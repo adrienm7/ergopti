@@ -259,3 +259,45 @@ helpers.describe("xkb_capture: Compose and atomic keymap reload", function()
 		helpers.assert_eq((capture.process(30, 1)), "a", "a new capture session starts clean")
 	end)
 end)
+
+helpers.describe("xkb_capture: the injection table comes from the loaded keymap", function()
+
+	helpers.it("refuses before a keymap is loaded", function()
+		local Capture = helpers.load_module("adapters.xkb_capture")
+		Capture._set_backend(oracle_backend())
+		local built, err = Capture.inverse_table()
+		helpers.assert_nil(built)
+		helpers.assert_contains(err, "not ready")
+		Capture._reset_backend()
+	end)
+
+	helpers.it("asks the backend that holds the loaded keymap", function()
+		-- The real enumeration presses chords on libxkbcommon states and is
+		-- proven against compiled fr and Ergopti keymaps by
+		-- tests/hardware/run_layout_resolution.lua; here, only the wiring.
+		local Capture = helpers.load_module("adapters.xkb_capture")
+		local backend = oracle_backend()
+		local seen = nil
+		backend.inverse = function(session)
+			seen = session
+			return { a = { keycode = 30, level = 1, mods = {} } }
+		end
+		Capture._set_backend(backend)
+		helpers.assert_true(Capture.load("keymap text", "C"))
+		local built = Capture.inverse_table()
+		helpers.assert_eq(built.a.keycode, 30)
+		helpers.assert_true(seen ~= nil, "the live session must be the one enumerated")
+		Capture._reset_backend()
+	end)
+
+	helpers.it("reports a backend that cannot enumerate instead of guessing", function()
+		local Capture = helpers.load_module("adapters.xkb_capture")
+		Capture._set_backend(oracle_backend())
+		helpers.assert_true(Capture.load("keymap text", "C"))
+		local built, err = Capture.inverse_table()
+		helpers.assert_nil(built)
+		helpers.assert_contains(err, "cannot enumerate")
+		Capture._reset_backend()
+	end)
+
+end)

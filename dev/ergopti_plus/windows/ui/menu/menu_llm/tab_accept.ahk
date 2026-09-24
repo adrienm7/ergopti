@@ -4,8 +4,8 @@
 ; MODULE: LLM Tray — Tab Accept + Nav hotkeys
 ; DESCRIPTION:
 ; Owns the context-sensitive Tab hotkey that accepts the visible prediction
-; and the slot-navigation hotkeys (~Up / ~Down / Alt+1..9) that move the
-; active slot when the tooltip shows multiple predictions. The hotkey
+; and the slot-navigation hotkeys (~Up / ~Down / val_modifiers + 1..9, 0) that
+; move the active slot when the tooltip shows multiple predictions. The hotkey
 ; context is gated by ``LLM_Tooltip_GetText() != ""`` via ``#HotIf`` so the
 ; Tab key reaches the underlying app unchanged whenever no prediction is on
 ; screen.
@@ -88,9 +88,10 @@ Tab:: {
 ; When the tooltip shows multiple predictions, the user can cycle the
 ; active slot with the configured modifier + Up / Down. The empty
 ; nav_modifiers case (default) binds bare Up / Down — matches the HS
-; default where llm_nav_modifiers = {}. Alt+1..9 jumps directly to a
-; slot, mirroring HS's val_modifiers = {"alt"}. Both bindings re-render
-; the tooltip in place so the ▶ marker moves without any flicker.
+; default where llm_nav_modifiers = {}. val_modifiers + digit N (bare digits
+; when val_modifiers is empty) is a consumed native jump that inserts slot N;
+; a digit beyond the shown slots passes through, like HS. Both bindings
+; re-render the tooltip in place so the ▶ marker moves without any flicker.
 global _LLM_Menu_NavHotkeysBound := []
 global _LLM_Menu_NavSlotPlans := Map(1, [], 2, [])
 global _LLM_Menu_NavActiveSlot := 0

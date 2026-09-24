@@ -169,6 +169,82 @@ _LNEO_RealNativeAbiRoundTripDoesNotStartHook() {
 Test("LLM nav event owner: real ABI round-trip never calls native Start",
 	_LNEO_RealNativeAbiRoundTripDoesNotStartHook)
 
+; Empty val_modifiers is the shared default: a bare digit N while a prediction
+; owner is committed must be suppressed (never typed) and target slot N, while
+; a modified digit or a digit beyond the shown slots stays application input.
+_LNEO_RealNativeAbiBareDigitValidation() {
+	global _LNEO_EVENT_UP
+	State := _LNEO_NewNativeState()
+	OwnerToken := 0xB0D1
+	try {
+		AssertTrue(_LLM_NavEventOwnerNativeStop(),
+			"native ABI reset must be harmless before Start")
+		Built := _LLM_Menu_BuildNavBindingPlan(
+			Map("nav_modifiers", "", "val_modifiers", ""))
+		AssertTrue(Built is Map,
+			"empty validation modifiers must build a navigation plan")
+		AssertEqual("", Built["val_prefix"],
+			"empty validation modifiers must bind bare digits")
+		Plan := Built["plan"]
+		AssertEqual("2", Plan[4]["spec"],
+			"the second jump route must be the bare digit 2")
+		AssertEqual(2, Plan[4]["jump_idx"])
+		AssertEqual("0", Plan[12]["spec"],
+			"digit 0 must select the tenth slot")
+		AssertTrue(_LLM_Menu_AttachPlanPhysicalIdentities(Plan,
+			_LNEO_ResolveUsPhysicalKey.Bind(State)),
+			"the ABI test must attach deterministic US physical descriptors")
+
+		Generation := _LLM_NavEventOwnerNativePreparePlan(Plan)
+		AssertTrue(Generation is Integer && Generation > 0,
+			"the native owner must accept a bare-digit plan")
+		AssertTrue(_LLM_NavEventOwnerNativeCommitPlan(Generation))
+		Ticket := _LLM_NavEventOwnerNativeBeginSwap(0, OwnerToken, 3, 1)
+		AssertTrue(Ticket is Integer && Ticket > 0)
+		AssertTrue(_LLM_NavEventOwnerNativeCommitSwap(Ticket))
+
+		_LNEO_AssertNativePassWithoutReceipt(
+			_LLM_NavEventOwnerNativeTestDispatch(
+				_LNEO_NativeEvent(0x32, 0x003, 0x02, 1)),
+			"Alt+2 is not the bare-digit validation chord")
+		_LNEO_AssertNativePassWithoutReceipt(
+			_LLM_NavEventOwnerNativeTestDispatch(
+				_LNEO_NativeEvent(0x32, 0x003, 0x02, _LNEO_EVENT_UP)),
+			"Alt+2 key-up after pass-through")
+		_LNEO_AssertNativePassWithoutReceipt(
+			_LLM_NavEventOwnerNativeTestDispatch(
+				_LNEO_NativeEvent(0x35, 0x006, 0x00, 1)),
+			"digit 5 beyond three shown slots")
+		_LNEO_AssertNativePassWithoutReceipt(
+			_LLM_NavEventOwnerNativeTestDispatch(
+				_LNEO_NativeEvent(0x35, 0x006, 0x00, _LNEO_EVENT_UP)),
+			"digit 5 key-up after pass-through")
+
+		DigitDecision := _LLM_NavEventOwnerNativeTestDispatch(
+			_LNEO_NativeEvent(0x32, 0x003, 0x00, 1))
+		AssertEqual(_LNEO_DISPOSITION_SUPPRESS,
+			DigitDecision["disposition"],
+			"a bare 2 must never reach the application while predictions show")
+		AssertEqual(1, DigitDecision["receipt_created"])
+		AssertEqual(_LNEO_DISPOSITION_SUPPRESS,
+			_LLM_NavEventOwnerNativeTestDispatch(
+				_LNEO_NativeEvent(0x32, 0x003, 0x00, _LNEO_EVENT_UP))["disposition"],
+			"the bare digit key-up must balance its suppressed key-down")
+		DigitReceipt := _LLM_NavEventOwnerNativePollReceipt()
+		AssertEqual(DigitDecision["seq"], DigitReceipt["seq"])
+		AssertEqual(2, DigitReceipt["target_idx"],
+			"a bare 2 must target prediction two")
+		AssertTrue(_LLM_NavEventOwnerNativeCompleteReceipt(
+			DigitReceipt["seq"], OwnerToken, 2))
+	} finally {
+		try _LLM_NavEventOwnerNativeStop()
+		finally _LLM_NavEventOwnerNativeUnload()
+	}
+}
+
+Test("LLM nav event owner: bare-digit validation suppresses and targets slot N",
+	_LNEO_RealNativeAbiBareDigitValidation)
+
 
 
 

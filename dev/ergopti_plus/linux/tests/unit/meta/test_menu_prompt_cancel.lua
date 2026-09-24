@@ -17,9 +17,9 @@
 ---
 --- Fixed by routing every zenity exit status through one succeeded() helper
 --- accepting `true` (Lua 5.2+) and 0 (LuaJIT). This test drives the real
---- tap-prompt row with a stubbed zenity: Cancel (close -> 1, the LuaJIT
---- numeric spelling) must leave the writer untouched, while confirming an
---- empty answer must still clear the tap action.
+--- tap-hold delay row with a stubbed zenity: Cancel (close -> 1, the LuaJIT
+--- numeric spelling) must leave the writer untouched, while a confirmed
+--- answer is written.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -28,19 +28,16 @@ local helpers = require("tests.helpers")
 local writer_calls = {}
 
 --- Installs a fake tap-hold writer through the package cache and returns the
---- previous entry for unconditional restore. _tap_hold_writer() requires the
---- module at click time, so the click reaches this spy instead of the
---- filesystem and kanata.
+--- previous entry for unconditional restore. The menu requires the module at
+--- build time, so the click reaches this spy instead of the filesystem.
 --- @return any Previous package.loaded entry (possibly nil).
 local function install_fake_writer()
 	local previous = package.loaded["platform.remap.tap_hold_writer"]
 	package.loaded["platform.remap.tap_hold_writer"] = {
-		set_field = function(...)
+		set_threshold = function(...)
 			writer_calls[#writer_calls + 1] = { ... }
 			return true
 		end,
-		clear_key = function(...) return true end,
-		is_overridden = function() return false end,
 	}
 	return previous
 end
@@ -86,34 +83,27 @@ local function callback_of(row)
 	return nil
 end
 
---- Finds the tap-prompt row's callback: the direct leaf row of a per-key
---- Kanata submenu whose click shells out to `zenity --entry`. Hold-option
---- rows live one level deeper and set the writer without prompting, so only
---- direct leaf rows are clicked here.
+--- Finds the delay row's callback: the one leaf of a per-key submenu, two
+--- levels down, whose click shells out to `zenity --entry`.
 --- @param mb table The loaded menu builder.
---- @return function|nil The tap-prompt callback, or nil when not found.
-local function find_tap_row(mb)
-	local items = mb.build({ _version = "test", on_quit = function() end })
-	local kanata = nil
+--- @param manager table An initialised tap-hold manager.
+--- @return function|nil
+local function find_delay_row(mb, manager)
+	local items = mb.build({ _version = "test", on_quit = function() end, tap_holds = manager })
+	local title = require("infra.i18n").get("menu.tapholds.title")
+	local section = nil
 	for _, item in ipairs(items) do
-		local title = item.title or item.label or ""
-		if type(title) == "string" and title:find("Kanata", 1, true) then
-			kanata = item
-			break
-		end
+		if item.title == title then section = item end
 	end
-	helpers.assert_true(kanata ~= nil, "Kanata section present in menu")
-	for _, sub in ipairs(children_of(kanata) or {}) do
-		local leafs = children_of(sub)
-		if type(leafs) == "table" then
-			for _, row in ipairs(leafs) do
+	helpers.assert_true(section ~= nil, "Tap-Holds section present in menu")
+	for _, key_row in ipairs(children_of(section) or {}) do
+		for _, sub in ipairs(children_of(key_row) or {}) do
+			for _, row in ipairs(children_of(sub) or {}) do
 				local cb = callback_of(row)
-				if cb and not row.disabled and children_of(row) == nil then
-					local commands = with_zenity("", 0, function() pcall(cb) end)
+				if cb and children_of(row) == nil then
+					local commands = with_zenity("", 1, function() pcall(cb) end)
 					for _, cmd in ipairs(commands) do
-						if cmd:find("zenity", 1, true) and cmd:find("--entry", 1, true) then
-							return cb
-						end
+						if cmd:find("zenity", 1, true) and cmd:find("--entry", 1, true) then return cb end
 					end
 				end
 			end
@@ -122,44 +112,56 @@ local function find_tap_row(mb)
 	return nil
 end
 
+--- A tap-hold manager on the shared defaults.
+local function manager()
+	local Manager = helpers.load_module("platform.remap.tap_hold_manager")
+	local user_path = os.tmpname()
+	os.remove(user_path)
+	Manager.init({
+		keyboard_hook = { set_remapper = function() end },
+		execute_action = function() end,
+		action_names = function() return {} end,
+		defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"),
+		user_path = user_path,
+	})
+	return Manager
+end
+
 helpers.describe("menu_builder: zenity Cancel changes nothing (prompt-cancel)", function()
 
-	helpers.it("prompt-cancel: cancelling the tap-hold prompt keeps the writer untouched", function()
+	helpers.it("prompt-cancel: cancelling the tap-hold delay prompt keeps the writer untouched", function()
 		local previous = install_fake_writer()
+		local th = manager()
 		local ok, err = pcall(function()
 			local mb = helpers.load_module("ui.menu.menu_builder")
-			local tap = find_tap_row(mb)
-			helpers.assert_true(tap ~= nil,
-				"a tap-prompt row shelling out to zenity --entry must exist — "
+			local delay = find_delay_row(mb, th)
+			helpers.assert_true(delay ~= nil,
+				"a delay row shelling out to zenity --entry must exist — "
 					.. "without it this test proves nothing")
 			-- Cancel on LuaJIT: close() returns the NUMBER 1, never false.
 			writer_calls = {}
-			with_zenity("", 1, function() pcall(tap) end)
+			with_zenity("", 1, function() pcall(delay) end)
 			helpers.assert_eq(#writer_calls, 0,
 				"Cancel is not an empty answer — it must change nothing")
 		end)
+		th._reset_for_test()
 		package.loaded["platform.remap.tap_hold_writer"] = previous
 		if not ok then error(err, 0) end
 	end)
 
-	helpers.it("prompt-cancel: confirming an empty answer still clears the tap action", function()
+	helpers.it("prompt-cancel: a confirmed delay is written in seconds", function()
 		local previous = install_fake_writer()
+		local th = manager()
 		local ok, err = pcall(function()
 			local mb = helpers.load_module("ui.menu.menu_builder")
-			local tap = find_tap_row(mb)
-			helpers.assert_true(tap ~= nil,
-				"a tap-prompt row shelling out to zenity --entry must exist — "
-					.. "without it this test proves nothing")
-			-- OK with empty output: the documented clear-the-tap-action path.
+			local delay = find_delay_row(mb, th)
+			helpers.assert_true(delay ~= nil, "a delay row must exist")
 			writer_calls = {}
-			with_zenity("", 0, function() pcall(tap) end)
-			helpers.assert_eq(#writer_calls, 1,
-				"an empty confirmed answer must clear the tap action exactly once")
-			helpers.assert_eq(writer_calls[1][2], "tap_action",
-				"the write must target the tap action field")
-			helpers.assert_true(writer_calls[1][3] == nil,
-				"an empty answer clears the field rather than storing a blank")
+			with_zenity("300\n", 0, function() pcall(delay) end)
+			helpers.assert_eq(#writer_calls, 1, "one write for one confirmed answer")
+			helpers.assert_eq(writer_calls[1][2], 0.3, "300 ms is 0.3 s in the file")
 		end)
+		th._reset_for_test()
 		package.loaded["platform.remap.tap_hold_writer"] = previous
 		if not ok then error(err, 0) end
 	end)

@@ -1,62 +1,42 @@
 --- tests/unit/meta/test_tap_hold_writer.lua
 
 --- ==============================================================================
---- MODULE: The Tap-Hold Menu Can Actually Change A Tap-Hold
+--- MODULE: The Tap-Hold Menu Writes What The Engine Reads
 --- DESCRIPTION:
---- This driver could READ its tap-hold configuration and not change it. The menu
---- listed every key's tap action and hold modifier greyed out, with a comment
---- explaining that a clickable row which cannot change anything is worse than a
---- greyed one — true of the row, and the wrong conclusion for the driver:
---- Windows has edited tap-holds from its tray since the feature existed, from
---- this same file format, and a Linux user had to open a TOML by hand and restart
---- the daemon.
----
---- WHAT THESE PIN:
----   1. a change reaches the user's file in the SHARED schema — `[tap_hold.keys.
----      <id>]` with tap_action / hold_modifier / hold_layer — because all three
----      drivers read that file and a private spelling would be invisible to two
----      of them;
----   2. only the keys the user changed are written, so every other key keeps
----      inheriting the shared default rather than being silently frozen;
----   3. hold_modifier and hold_layer never coexist, since the loader treats them
----      as mutually exclusive and the winner would otherwise depend on the reader;
----   4. the change is APPLIED — kanata's config is regenerated — because a menu
----      row that saves without reloading reads as a setting that did not take.
+--- Every tray change goes through this writer into the user's tap_hold.toml and
+--- is read back by the loader the engine runs on. The previous writer scanned
+--- lines by hand, wrote strings without escaping them (a `"` in a value broke
+--- the whole file), could not clear a default hold, had no « Disable all » and
+--- restarted kanata. Each case below writes, then reads back with the real
+--- loader: a writer that is right about its own file and wrong about what the
+--- engine sees is the bug this suite exists for.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local Loader = require("platform.remap.tap_hold_loader")
 
---- A manager stub recording what the writer asked it to do.
---- @param path string Where the override file should be written.
---- @return table manager, table calls
-local function make_manager(path)
-	local calls = { write_kbd = 0, restart = 0 }
-	return {
-		tap_hold_config_path = function() return path end,
-		write_kbd = function() calls.write_kbd = calls.write_kbd + 1; return true end,
-		restart   = function()
-			calls.restart = calls.restart + 1
-			calls.write_kbd = calls.write_kbd + 1
-			return true
-		end,
-		owns_process = function() return true end,
-	}, calls
-end
+local DEFAULTS = require("infra.paths").shared("tap_hold/defaults.toml")
 
 --- A writer bound to a throwaway file.
---- @return table writer, string path, table calls
-local function fresh_writer()
+--- @param reload_ok boolean|nil What the reload reports (true by default).
+--- @return table writer, string path, table state { reloads }
+local function fresh_writer(reload_ok)
 	local path = os.tmpname()
 	os.remove(path)
-	local manager, calls = make_manager(path)
+	local state = { reloads = 0 }
 	local writer = helpers.load_module("platform.remap.tap_hold_writer")
-	writer.init({ manager = manager })
-	return writer, path, calls
+	writer.init({
+		path = path,
+		reload = function() state.reloads = state.reloads + 1; return reload_ok ~= false end,
+		is_tap_action = function(id) return id == "copy" or id == "paste" or id == "enter" end,
+		is_hold_option = function(kind, id)
+			return (kind == "none" and id == "") or (kind == "modifier" and (id == "ctrl" or id == "ctrl+shift"))
+				or (kind == "layer" and id == "nav")
+		end,
+	})
+	return writer, path, state
 end
 
---- The whole override file as text ("" when it does not exist).
---- @param path string
---- @return string
 local function read_file(path)
 	local fh = io.open(path, "r")
 	if not fh then return "" end
@@ -65,184 +45,143 @@ local function read_file(path)
 	return content
 end
 
-helpers.describe("tap-hold writer: the Linux menu can change a tap-hold", function()
+local function write_file(path, text)
+	local fh = assert(io.open(path, "w"))
+	fh:write(text)
+	fh:close()
+end
 
-	helpers.it("writes the change in the schema all three drivers read", function()
+--- What the engine will run after the change.
+local function effective(path)
+	return Loader.load(DEFAULTS, path)
+end
+
+helpers.describe("tap-hold writer: a tray change reaches the engine", function()
+
+	helpers.it("sets a tap in the shared schema and reloads the engine", function()
+		local writer, path, state = fresh_writer()
+		helpers.assert_true(writer.set_tap("left_shift", "paste"))
+		helpers.assert_true(read_file(path):find("[tap_hold.keys.left_shift]", 1, true) ~= nil)
+		helpers.assert_eq(effective(path).keys.left_shift.tap_action, "paste")
+		helpers.assert_eq(effective(path).keys.left_shift.hold_modifier, "shift", "the default hold stays")
+		helpers.assert_eq(state.reloads, 1, "in force at once, no restart")
+		os.remove(path)
+	end)
+
+	helpers.it("writes only the keys the user changed, and keeps the earlier ones", function()
 		local writer, path = fresh_writer()
-		helpers.assert_true(writer.set_field("caps_lock", "hold_modifier", "shift"),
-			"set_field must report success")
-
+		writer.set_tap("left_shift", "paste")
+		writer.set_tap("left_ctrl", "copy")
 		local content = read_file(path)
-		helpers.assert_true(content:find("[tap_hold.keys.caps_lock]", 1, true) ~= nil,
-			"the section must be the shared one — a private spelling is invisible to the other two drivers")
-		helpers.assert_true(content:find('hold_modifier = "shift"', 1, true) ~= nil,
-			"the value must be written as the loader reads it")
+		helpers.assert_true(content:find("left_shift", 1, true) and content:find("left_ctrl", 1, true))
+		helpers.assert_true(not content:find("caps_lock", 1, true), "an untouched key keeps inheriting")
 		os.remove(path)
 	end)
 
-	helpers.it("writes ONLY the keys the user changed", function()
+	helpers.it("swaps a modifier hold for the navigation layer, and back", function()
 		local writer, path = fresh_writer()
-		writer.set_field("caps_lock", "hold_modifier", "shift")
-
-		local content = read_file(path)
-		helpers.assert_true(content:find("left_shift", 1, true) == nil,
-			"a key the user never touched must not appear: the driver merges this file OVER the shared "
-			.. "defaults key by key, so naming a key here freezes it at whatever was written")
+		writer.set_hold("caps_lock", "layer", "nav")
+		local keys = effective(path).keys
+		helpers.assert_eq(keys.caps_lock.hold_layer, "nav")
+		helpers.assert_nil(keys.caps_lock.hold_modifier, "CapsLock is the layer, no longer Ctrl")
+		writer.set_hold("caps_lock", "modifier", "ctrl+shift")
+		keys = effective(path).keys
+		helpers.assert_eq(keys.caps_lock.hold_modifier, "ctrl+shift")
+		helpers.assert_nil(keys.caps_lock.hold_layer)
 		os.remove(path)
 	end)
 
-	helpers.it("keeps an earlier change when a second one lands", function()
+	helpers.it("clears a default hold with the none option", function()
 		local writer, path = fresh_writer()
-		writer.set_field("caps_lock", "hold_modifier", "shift")
-		writer.set_field("left_shift", "tap_action", "copy")
-
-		local content = read_file(path)
-		helpers.assert_true(content:find('hold_modifier = "shift"', 1, true) ~= nil,
-			"the first change must survive the second — the file is re-read before every write")
-		helpers.assert_true(content:find('tap_action = "copy"', 1, true) ~= nil,
-			"and the second must be there too")
+		writer.set_hold("left_alt", "none", "")
+		local key = effective(path).keys.left_alt
+		helpers.assert_nil(key.hold_layer, "the default layer is gone")
+		helpers.assert_eq(key.hold_modifier, "", "and no modifier replaces it")
 		os.remove(path)
 	end)
 
-	helpers.it("never leaves a hold_modifier and a hold_layer on the same key", function()
+	helpers.it("makes a key native: its own tap and no hold", function()
 		local writer, path = fresh_writer()
-		writer.set_field("caps_lock", "hold_modifier", "ctrl")
-		writer.set_field("caps_lock", "hold_layer", "nav")
-
-		local content = read_file(path)
-		helpers.assert_true(content:find("hold_layer", 1, true) ~= nil, "the layer must be written")
-		helpers.assert_true(content:find("hold_modifier", 1, true) == nil,
-			"the modifier must be gone: the loader treats the two as mutually exclusive, so leaving both "
-			.. "makes which one wins depend on the reader")
+		writer.set_native("caps_lock")
+		local key = effective(path).keys.caps_lock
+		helpers.assert_eq(key.tap_action, "")
+		helpers.assert_eq(key.hold_modifier, "")
+		local Engine = require("platform.remap.tap_hold_engine")
+		local engine = Engine.new({ keys = effective(path).keys, tap_min_ms = 50, one_shot_timeout_ms = 2000 })
+		helpers.assert_true(not engine:handles(58), "the engine leaves CapsLock alone")
 		os.remove(path)
 	end)
 
-	helpers.it("regenerates kanata's config so the change is in force", function()
-		local writer, path, calls = fresh_writer()
-		writer.set_field("caps_lock", "hold_modifier", "shift")
-
-		helpers.assert_true(calls.write_kbd >= 1,
-			"write_kbd must run: a row that saves without regenerating reads as a setting that did not take")
-		helpers.assert_true(calls.restart >= 1,
-			"and kanata must be reloaded, since this driver owns the process here")
-		os.remove(path)
-	end)
-
-	helpers.it("reports failure when the supervisor cannot apply the saved change", function()
-		local path = os.tmpname()
-		os.remove(path)
-		local manager = {
-			tap_hold_config_path = function() return path end,
-			write_kbd = function() return true end,
-			restart = function() return false end,
-			owns_process = function() return false end,
-		}
-		local writer = helpers.load_module("platform.remap.tap_hold_writer")
-		writer.init({ manager = manager })
-
-		helpers.assert_true(not writer.set_field("caps_lock", "hold_modifier", "shift"),
-			"a persisted but unapplied binding must not be reported as live")
-		helpers.assert_true(read_file(path):find('hold_modifier = "shift"', 1, true) ~= nil,
-			"the durable choice remains available for a later successful reload")
-		os.remove(path)
-	end)
-
-	helpers.it("clearing a key removes it and leaves the others alone", function()
+	helpers.it("disables everything, and the defaults do not come back", function()
 		local writer, path = fresh_writer()
-		writer.set_field("caps_lock", "hold_modifier", "shift")
-		writer.set_field("left_shift", "tap_action", "copy")
-		writer.clear_key("caps_lock")
-
-		local content = read_file(path)
-		helpers.assert_true(content:find("caps_lock", 1, true) == nil,
-			"the cleared key must go back to the shared default, which is what its absence means")
-		helpers.assert_true(content:find("left_shift", 1, true) ~= nil,
-			"and the other key must be untouched")
+		writer.set_tap("left_shift", "paste")
+		writer.disable_all()
+		helpers.assert_nil(next(effective(path).keys), "no key at all")
 		os.remove(path)
 	end)
 
-	helpers.it("reports whether a key is overridden, for the menu's checkmark", function()
+	helpers.it("resets to the shared defaults by removing the file", function()
+		local writer, path, state = fresh_writer()
+		writer.disable_all()
+		helpers.assert_true(writer.reset_all())
+		helpers.assert_eq(read_file(path), "")
+		helpers.assert_eq(effective(path).keys.left_shift.tap_action, "copy")
+		helpers.assert_eq(state.reloads, 2)
+		os.remove(path)
+	end)
+
+	helpers.it("switches the feature off in the file", function()
 		local writer, path = fresh_writer()
-		helpers.assert_true(writer.is_overridden("caps_lock") == false,
-			"nothing is overridden before anything is written")
-		writer.set_field("caps_lock", "hold_modifier", "shift")
-		helpers.assert_true(writer.is_overridden("caps_lock") == true,
-			"and the key reads as overridden once it is")
+		writer.set_enabled(false)
+		helpers.assert_true(not effective(path).enabled)
+		writer.set_enabled(true)
+		helpers.assert_true(effective(path).enabled)
 		os.remove(path)
 	end)
 
-	helpers.it("refuses a field that is not part of the shared schema", function()
+	helpers.it("writes a delay the loader reads back, and refuses one out of range", function()
 		local writer, path = fresh_writer()
-		helpers.assert_true(writer.set_field("caps_lock", "colour", "red") == false,
-			"an unknown field must be refused: it would be written into a file all three drivers read")
+		helpers.assert_true(writer.set_threshold("caps_lock", 0.3))
+		helpers.assert_eq(effective(path).keys.caps_lock.time_activation_seconds, 0.3)
+		helpers.assert_true(not writer.set_threshold("caps_lock", 30))
+		helpers.assert_true(not writer.set_threshold("caps_lock", 0))
+		helpers.assert_eq(effective(path).keys.caps_lock.time_activation_seconds, 0.3)
 		os.remove(path)
 	end)
 
-	helpers.it("keeps foreign sections and comments when a change lands (foreign-preservation)", function()
-		-- Regression: every menu edit rewrote only [tap_hold.keys.*] and
-		-- deleted [tap_hold], [tap_hold.hold_picker] and user comments, even
-		-- though read_overrides() collected them as `foreign` for verbatim
-		-- re-emission. A user tuning the hold picker lost it by changing one key.
-		local path = os.tmpname()
-		os.remove(path)
-		local seed = assert(io.open(path, "w"))
-		seed:write("# my threshold\n"
-			.. "[tap_hold]\n"
-			.. 'note = "keep me"\n'
-			.. "\n"
-			.. "[tap_hold.hold_picker]\n"
-			.. 'style = "grid"\n'
-			.. "\n"
-			.. "[tap_hold.keys.caps_lock]\n"
-			.. 'hold_modifier = "shift"\n')
-		seed:close()
-		local manager = make_manager(path)
-		local writer = helpers.load_module("platform.remap.tap_hold_writer")
-		writer.init({ manager = manager })
-
-		helpers.assert_true(writer.set_field("left_shift", "tap_action", "copy"),
-			"set_field must report success")
-		local content = read_file(path)
-		helpers.assert_true(content:find('tap_action = "copy"', 1, true) ~= nil,
-			"the change itself must land")
-		helpers.assert_true(content:find("[tap_hold.hold_picker]", 1, true) ~= nil,
-			"the hold-picker section must survive a key edit")
-		helpers.assert_true(content:find('style = "grid"', 1, true) ~= nil,
-			"and so must its content")
-		helpers.assert_true(content:find("[tap_hold]", 1, true) ~= nil,
-			"and the top-level section")
-		helpers.assert_true(content:find("# my threshold", 1, true) ~= nil,
-			"and the user's comment")
-		helpers.assert_true(content:find('hold_modifier = "shift"', 1, true) ~= nil,
-			"and the earlier key change")
+	helpers.it("refuses an unknown key, tap or hold, and writes nothing", function()
+		local writer, path, state = fresh_writer()
+		helpers.assert_true(not writer.set_tap("not_a_key", "copy"))
+		helpers.assert_true(not writer.set_tap("left_shift", 'x" = 1'))
+		helpers.assert_true(not writer.set_hold("left_shift", "layer", "sym"))
+		helpers.assert_eq(read_file(path), "")
+		helpers.assert_eq(state.reloads, 0)
 		os.remove(path)
 	end)
 
-	helpers.it("keeps foreign sections when a key is cleared (foreign-preservation)", function()
-		local path = os.tmpname()
-		os.remove(path)
-		local seed = assert(io.open(path, "w"))
-		seed:write("[tap_hold.hold_picker]\n"
-			.. 'style = "grid"\n'
-			.. "\n"
-			.. "[tap_hold.keys.caps_lock]\n"
-			.. 'hold_modifier = "shift"\n'
-			.. "\n"
-			.. "[tap_hold.keys.left_shift]\n"
-			.. 'tap_action = "copy"\n')
-		seed:close()
-		local manager = make_manager(path)
-		local writer = helpers.load_module("platform.remap.tap_hold_writer")
-		writer.init({ manager = manager })
-
-		writer.clear_key("caps_lock")
-		local content = read_file(path)
-		helpers.assert_true(content:find("caps_lock", 1, true) == nil,
-			"the cleared key must be gone")
-		helpers.assert_true(content:find("[tap_hold.hold_picker]", 1, true) ~= nil,
-			"clearing a key must not take the foreign sections with it")
-		helpers.assert_true(content:find('tap_action = "copy"', 1, true) ~= nil,
-			"nor the other key")
+	helpers.it("never overwrites a file that does not parse", function()
+		local writer, path = fresh_writer()
+		local broken = "[tap_hold.keys.left_shift\ntap_action = \"paste\"\n"
+		write_file(path, broken)
+		helpers.assert_true(not writer.set_tap("left_shift", "copy"))
+		helpers.assert_eq(read_file(path), broken, "the user's text is left as it was")
 		os.remove(path)
 	end)
+
+	helpers.it("escapes what it writes and keeps data it does not own", function()
+		local writer, path = fresh_writer()
+		write_file(path, '[other]\nnote = "say \\"hi\\""\n[tap_hold.keys.left_shift]\ncustom = 3\n')
+		writer.set_tap("left_shift", "paste")
+		local parsed = require("toml_codec").decode(read_file(path))
+		helpers.assert_eq(parsed.other.note, 'say "hi"', "a quote survives the round trip")
+		helpers.assert_eq(parsed.tap_hold.keys.left_shift.custom, 3)
+		os.remove(path)
+	end)
+
+	helpers.it("reports a change the engine could not reload", function()
+		local writer, path = fresh_writer(false)
+		helpers.assert_true(not writer.set_tap("left_shift", "paste"))
+		os.remove(path)
+	end)
+
 end)

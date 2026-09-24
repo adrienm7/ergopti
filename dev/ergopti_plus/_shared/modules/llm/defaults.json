@@ -21,7 +21,7 @@
 	"llm_disable_url_bars": false,
 	"llm_disable_password_fields": true,
 	"llm_nav_modifiers": [],
-	"llm_val_modifiers": ["alt"],
+	"llm_val_modifiers": [],
 	"llm_ollama_port": 11434,
 	"llm_ollama_keep_alive": "30m",
 

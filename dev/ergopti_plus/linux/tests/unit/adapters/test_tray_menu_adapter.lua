@@ -159,3 +159,59 @@ helpers.describe("tray_menu: with no backend", function()
 	end)
 
 end)
+
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= The Ergopti logo, not a generic glyph ===================
+-- =================================================================
+-- =================================================================
+
+helpers.describe("tray_menu: the icon is the Ergopti logo", function()
+
+	helpers.it("shows the bundled logo from the shared tree", function()
+		-- The candidates used to hang off "<driver root>/../_shared/assets", a
+		-- directory that did not exist: every Linux user got the themed
+		-- "input-keyboard" glyph instead of the logo macOS and Windows show.
+		local Paths = helpers.load_module("infra.paths")
+		local expected = Paths.shared("assets/ergopti_tray.png")
+		local tray, log = with_indicator(true)
+		tray.setMenu({})
+		helpers.assert_eq(log.created.icon, expected,
+			"the tray must be created with the bundled Ergopti logo")
+		local fh = io.open(log.created.icon, "rb")
+		helpers.assert_true(fh ~= nil, "the logo must exist on disk: " .. tostring(log.created.icon))
+		local magic = fh:read(8)
+		fh:close()
+		helpers.assert_eq(magic, "\137PNG\r\n\26\n", "the logo must be a PNG a panel can load")
+	end)
+
+	helpers.it("greys the logo while paused and restores it on resume", function()
+		local tray, log = with_indicator(true)
+		tray.setMenu({})
+		tray.setPaused(true)
+		helpers.assert_contains(log.icons[#log.icons], "ergopti_tray_paused.png",
+			"a paused daemon shows the disabled logo, as on macOS and Windows")
+		tray.setPaused(true)
+		helpers.assert_eq(#log.icons, 1, "an unchanged state must not re-send the icon")
+		tray.setPaused(false)
+		helpers.assert_contains(log.icons[#log.icons], "ergopti_tray.png")
+		helpers.assert_true(not log.icons[#log.icons]:find("paused", 1, true),
+			"resuming must bring the normal logo back")
+	end)
+
+	helpers.it("resolves from the shared root, whichever layout found it", function()
+		-- /usr/lib/ergopti nests _shared INSIDE the driver root; the old
+		-- "<driver>/../_shared" candidate addressed /usr/lib/_shared there.
+		local Protocol = helpers.load_module("tray.protocol")
+		local Paths = helpers.load_module("infra.paths")
+		local root = Paths.shared_root()
+		helpers.assert_contains(Protocol.resolve_tray_icon(root, false), "/assets/ergopti_tray.png")
+		helpers.assert_eq(Protocol.resolve_tray_icon(nil, false), "",
+			"no shared tree means no file, and the caller falls back to a themed name")
+	end)
+
+end)

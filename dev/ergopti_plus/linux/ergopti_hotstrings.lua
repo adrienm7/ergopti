@@ -184,21 +184,6 @@ local secure_field_detector = RuntimeGuard.optional_require("adapters.secure_fie
 local webview_manager = RuntimeGuard.optional_require("ui.webview_manager")
 local input_capture_gate = nil
 
--- Kanata manager (optional — key remapping daemon lifecycle).
--- Handles .kbd generation and kanata process start/stop/restart.
-local kanata = RuntimeGuard.optional_require("platform.remap.manager")
-
--- Tap-hold writer (optional — persists a menu change to the user's tap_hold.toml
--- and reloads kanata). Initialised here because it needs the manager above: this
--- driver could READ its tap-hold configuration and not change it until
--- 2026-08-08, so every row of that submenu was greyed.
-if kanata then
-	local thw_mod = RuntimeGuard.optional_require("platform.remap.tap_hold_writer")
-	if thw_mod and type(thw_mod.init) == "function" then
-		thw_mod.init({ manager = kanata })
-	end
-end
-
 -- File watchers (optional — inotify-based TOML/.lua hot reload).
 -- When luv is present, uses native inotify via luv.new_fs_event();
 -- otherwise falls back to mtime polling driven by the event loop.
@@ -620,6 +605,16 @@ local function main()
 		print("Error: no keyboard device detected. Specify one with --device.")
 		os.exit(1)
 	end
+	-- Found but unreadable is the first launch after install.sh: the input group
+	-- it granted only applies from the next session. Say so on screen — the
+	-- console line below used to be the only trace — and exit with a status
+	-- the unit does not retry, since only a new session can fix it.
+	local InputAccess = require("infra.input_access")
+	if InputAccess.is_denied(device) then
+		Logger.error(LOG, "Keyboard device %s exists but this session may not read it.", device)
+		os.exit(InputAccess.report({ i18n = RuntimeGuard.optional_require("infra.i18n"), notifier = notifier },
+			device .. " is not readable (the input group applies from the next session)"))
+	end
 	Logger.info(LOG, "Using device: %s.", device)
 	BootProfiler.stage_done("input device", opts.device and "pinned by --device" or "auto-detected")
 
@@ -641,6 +636,30 @@ local function main()
 	-- same reason as the line above: the closure that reads it is below.
 	local _last_offered = nil
 
+	-- 8.3b) Tap-holds and the navigation layer, run by this process in the
+	-- keyboard hook. Required here rather than at file scope because main() is at
+	-- LuaJIT's 60-upvalue limit. Declared before the pause controller below,
+	-- whose closure reads it.
+	local TapHold = require("platform.remap.tap_hold_manager")
+	TapHold.init({
+		keyboard_hook = keyboard_hook,
+		execute_action = function(action, binding)
+			if not gestures then error("the action catalogue (gestures module) is not loaded") end
+			gestures.execute_action(action, binding)
+		end,
+		action_names = function() return gestures and gestures.get_action_names() or {} end,
+		defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"),
+		user_path = require("infra.config_paths").config("tap_hold.toml"),
+	})
+	-- The tray's tap-hold rows write the user's file through this and reload
+	-- the engine live.
+	require("platform.remap.tap_hold_writer").init({
+		path = TapHold.user_path(),
+		reload = TapHold.reload,
+		is_tap_action = TapHold.is_tap_action,
+		is_hold_option = TapHold.is_hold_option,
+	})
+
 	local script_actions = ScriptActions.new({
 		reset = function()
 			_undoable = nil
@@ -653,7 +672,73 @@ local function main()
 		hide_prediction = llm_overlay and function() llm_overlay.hide() end or nil,
 		cancel_prediction = prediction_engine and type(prediction_engine.cancel) == "function"
 			and function() prediction_engine.cancel() end or nil,
+		-- The tray greys every feature row while paused and its title row
+		-- resumes; without a rebuild here the menu kept showing the old state.
+		on_pause_change = function(paused)
+			-- A paused script remaps nothing: CapsLock is CapsLock again, and a
+			-- modifier held through the pause is released.
+			TapHold.set_paused(paused)
+			if rebuild_tray_menu then rebuild_tray_menu() end
+		end,
 	})
+
+	-- « Disable all » / « Enable all »: every feature switch, not only the
+	-- hotstrings, and Enable all restores what was on rather than everything.
+	-- The closures read the module handles at call time, so features initialised
+	-- later in the boot (gestures, shortcuts) are covered.
+	--- A feature whose on/off state is one boolean.
+	--- @param id string
+	--- @param is_on function
+	--- @param set function Receives the wanted boolean, returns whether it holds.
+	--- @param persistent boolean|nil false for a switch with no persisted state.
+	local function switch_feature(id, is_on, set, persistent)
+		return {
+			id = id,
+			persistent = persistent,
+			capture = function() return is_on() == true end,
+			disable = function() return set(false) end,
+			restore = function(value) return set(value == true) end,
+			enable = function() return set(true) end,
+		}
+	end
+	local global_features = {
+		{
+			id = "hotstrings",
+			capture = function() return hotstrings_config.closed_category_gates() end,
+			disable = function() return hotstrings_config.disable_all() ~= false end,
+			restore = function(closed) return hotstrings_config.restore_category_gates(closed or {}) end,
+			enable = function() return hotstrings_config.restore_category_gates({}) end,
+		},
+	}
+	if shortcuts then
+		global_features[#global_features + 1] = switch_feature("shortcuts", shortcuts.is_enabled,
+			function(want) return want == shortcuts.is_enabled() or shortcuts.set_enabled(want) end)
+	end
+	if gestures then
+		global_features[#global_features + 1] = switch_feature("gestures", gestures.is_enabled,
+			function(want) return want == gestures.is_enabled() or gestures.set_enabled(want) end)
+	end
+	if prediction_engine then
+		global_features[#global_features + 1] = switch_feature("llm", prediction_engine.is_enabled,
+			function(want)
+				if want == prediction_engine.is_enabled() then return true end
+				if want then return prediction_engine.enable() end
+				return prediction_engine.disable()
+			end)
+	end
+	global_features[#global_features + 1] = switch_feature("metrics", keylogger.is_enabled,
+		function(want) return want == keylogger.is_enabled() or keylogger.set_enabled(want) end)
+	if dyn_hotstrings then
+		global_features[#global_features + 1] = switch_feature("dynamic_hotstrings", dyn_hotstrings.is_enabled,
+			function(want) dyn_hotstrings.set_enabled(want) return dyn_hotstrings.is_enabled() == want end, false)
+	end
+	global_features[#global_features + 1] = switch_feature("tap_holds", TapHold.is_enabled,
+		TapHold.set_enabled, false)
+	-- Required here, not at file scope: main() is at LuaJIT's 60-upvalue limit
+	-- and a file-scope module would be one more upvalue of it.
+	local GlobalFeatureSwitch = require("ui.menu.global_feature_switch")
+	local global_switch = GlobalFeatureSwitch.new({ features = global_features,
+		storage = require("adapters.storage") })
 
 	-- A control can change while app ID and window title stay identical. Raw Tab
 	-- and pointer events therefore invalidate the AT-SPI verdict synchronously;
@@ -847,6 +932,9 @@ local function main()
 					_undoable = {
 						trigger     = result.trigger,
 						replacement = result.replacement,
+						-- The terminator typed back AFTER the replacement: it is the
+						-- character an immediate Backspace actually removes.
+						replayed    = replay_terminator,
 					}
 					-- Replay queued input only after output committed. On failure the
 					-- hook emergency-ungrabs and the logical text position is unknown.
@@ -1012,21 +1100,13 @@ local function main()
 			if value == InputEvent.VALUE_DOWN then capture_owned_scancodes[scancode] = true end
 		end)
 
-	-- 8.6) Initialise the LLM prediction engine if available.
-	-- Use the shared canonical DEFAULT_CONTEXT_LENGTH from the linux_bridge
-	-- (mirrors _shared/modules/llm/defaults.json llm_context_length = 500)
-	-- so all three drivers send the same context window.
+	-- 8.6) Initialise the LLM prediction engine if available. The context
+	-- length is read from its settings, which the menu writes.
 	if prediction_engine then
-		local canonical_ctx = 500  -- defensive fallback
-		local ok_lb, lb = pcall(require, "infra.llm_bridge")
-		if ok_lb and lb and lb.DEFAULT_CONTEXT_LENGTH then
-			canonical_ctx = lb.DEFAULT_CONTEXT_LENGTH
-		end
 		prediction_engine.init({
 			engine        = engine,
 			keyboard_hook = keyboard_hook,
 			triggers      = { "//", ";;", "--" },
-			max_context   = canonical_ctx,
 			overlay       = llm_overlay,
 			apply_prediction = function(candidate)
 				local result = injector.inject(candidate.deletes, candidate.to_type, false)
@@ -1043,7 +1123,6 @@ local function main()
 					type(context) == "table" and context.input_chars or 0)
 			end,
 		})
-		Logger.info(LOG, "LLM prediction engine initialised (max_context=%d).", canonical_ctx)
 	end
 
 	-- 8.6a) Initialise dynamic hotstrings (@-tag expansions).
@@ -1066,9 +1145,13 @@ local function main()
 			-- The same master switch gates CapsWord and every menu operation. It must
 			-- also gate modifier chords; otherwise "Shortcuts off" still opens ChatGPT
 			-- and runs the user's assignments while claiming the feature is disabled.
-			if shortcuts and shortcuts.is_enabled() then
-				pcall(keyboard_shortcuts.dispatch, detail)
-			end
+			-- A pause gates them the same way. The script-control actions pass
+			-- both gates: they are how the user resumes, including after « Disable
+			-- all », which switches the shortcuts feature off.
+			local shortcuts_on = shortcuts ~= nil and shortcuts.is_enabled()
+			pcall(keyboard_shortcuts.dispatch, detail, {
+				only_script = script_actions.is_paused() or not shortcuts_on,
+			})
 		end
 		if script_actions.is_paused() then return end
 		-- Modified Tab (Alt+Tab, Ctrl+Tab) reaches the control callback rather
@@ -1086,9 +1169,14 @@ local function main()
 		-- what is left. Counted in codepoints, not bytes: "N'T" is three
 		-- characters and four bytes, and erasing four would eat the character
 		-- before it.
+		--
+		-- An end-char expansion replays its terminator after the replacement
+		-- ("adn " → "ADN "), so THAT is what the Backspace removed, and the whole
+		-- replacement is still on screen. Counting the replacement alone left its
+		-- first character behind: "adn " then Backspace read "Aadn".
 		if key_name == "backspace" and _undoable and not opts.dry_run then
 			local remaining = 0
-			for _ in _undoable.replacement:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+			for _ in (_undoable.replacement .. (_undoable.replayed or "")):gmatch("[%z\1-\127\194-\244][\128-\191]*") do
 				remaining = remaining + 1
 			end
 			if remaining >= 1 then
@@ -1103,14 +1191,22 @@ local function main()
 		end
 		_undoable = nil
 
-		engine:reset()
-		-- Cancel any in-flight LLM prediction on Backspace or Escape.
+		-- Backspace edits the buffer as it edited the text; every other control
+		-- key moves or leaves the caret, so what follows is not known to start a
+		-- word. Escape alone leaves the caret where it was.
+		if key_name == "backspace" then
+			engine:backspace()
+		else
+			engine:reset(key_name == "escape")
+		end
+		-- Withdraw any LLM prediction on Backspace or Escape. Withdraw, not
+		-- cancel: the buffer was just edited above, and cancel resets it.
 		if key_name == "backspace" or key_name == "escape" then
 			if prediction_engine then
-				pcall(function() prediction_engine.cancel() end)
+				pcall(function() prediction_engine.withdraw() end)
 			end
 		end
-		Logger.debug(LOG, "Control key '%s' — buffer reset.", key_name)
+		Logger.debug(LOG, "Control key '%s' — buffer updated.", key_name)
 	end
 	local on_control = input_capture_gate.guard(handle_control)
 
@@ -1120,8 +1216,33 @@ local function main()
 	-- just left, so an expansion after a click would fire against a line that is
 	-- no longer under the cursor — and erase characters belonging to whatever is
 	-- there now. The pointer is watched, never grabbed.
+	-- Wrap the selection when a wrap symbol is typed over it. Decided in the
+	-- consumption callback below, so the symbol never reaches the application
+	-- when it wraps; see modules/shortcuts/wrap_on_type.lua for the probe.
+	local wrap_on_type = require("modules.shortcuts.wrap_on_type").new({
+		is_active = function()
+			return shortcuts ~= nil and shortcuts.is_enabled()
+				and shortcuts.is_wrap_on_type_enabled()
+				and not script_actions.is_paused()
+				and not secure_focus_guard.blocks_text()
+		end,
+		get_pair = function(char) return shortcuts and shortcuts.get_wrap_pair(char) or nil end,
+		read_primary = require("adapters.clipboard").read_primary,
+		type_text = function(text)
+			if opts.dry_run then return false end
+			local result = injector.inject(0, text, false)
+			if type(result) ~= "table" or result.ok ~= true then return false end
+			-- The caret moved over replaced text: what the engine buffered no longer
+			-- describes the line.
+			_undoable = nil
+			engine:reset()
+			return true
+		end,
+	})
+
 	local function on_click()
 		secure_focus_guard.invalidate()
+		wrap_on_type.on_pointer_down()
 		Logger.debug(LOG, "Pointer click — text privacy state invalidated.")
 	end
 
@@ -1266,10 +1387,8 @@ local function main()
 		-- uinput group and the module loaded. Silence used to be the answer to all
 		-- three of "wrong permissions", "module absent" and "no FFI".
 		Logger.error(LOG, "Cannot open /dev/uinput — refusing to grab the keyboard.")
-		print("Erreur : impossible d'ouvrir /dev/uinput.")
-		print("Le daemon a besoin d'y écrire pour rendre les touches qu'il intercepte.")
-		print("Corrigez les permissions (bash install.sh --setup-perms) ou lancez avec --no-grab.")
-		os.exit(1)
+		os.exit(require("infra.input_access").report({ i18n = RuntimeGuard.optional_require("infra.i18n"), notifier = notifier },
+			"/dev/uinput cannot be opened for writing (uinput group or module missing)"))
 	end
 
 	-- Resolve the OUTPUT layout before the first expansion can fire. This is the
@@ -1282,6 +1401,7 @@ local function main()
 		Logger.warn(LOG, "Layout unresolved — replacements will not be typed as keystrokes.")
 	end
 	local on_consume = input_capture_gate.guard(function(detail)
+		if wrap_on_type.on_key(detail) then return true end
 		return prediction_engine
 			and type(prediction_engine.handle_shortcut) == "function"
 			and prediction_engine.handle_shortcut(detail) == true
@@ -1331,15 +1451,11 @@ local function main()
 		tostring(keyboard_hook.get_mode and keyboard_hook.get_mode() or "unknown"),
 		keyboard_layout.is_ready() and "resolved" or "unresolved"))
 
-	-- The remap daemon is independent of this process but decides which keycodes
-	-- the grab sees; its state at boot is the first thing a remap bug report needs.
-	if kanata then
-		Logger.info(LOG, "Remap daemon: kanata running=%s owned=%s.",
-			tostring(kanata.is_running and kanata.is_running() or false),
-			tostring(kanata.owns_process and kanata.owns_process() or false))
-	else
-		Logger.info(LOG, "Remap daemon: kanata manager not loaded.")
-	end
+	-- Tap-holds rewrite the grabbed stream, so they need the grab: without it the
+	-- physical key already reached the desktop and there is nothing to rewrite.
+	Logger.info(LOG, "Tap-holds: %s.", not TapHold.is_active() and "inactive"
+		or (keyboard_hook.get_mode and keyboard_hook.get_mode() == "intercept") and "active"
+		or "configured, but inert without the keyboard grab (--no-grab)")
 
 	-- 8.8b) Initialise i18n (loads persisted locale, enables ★ substitution).
 	--
@@ -1379,6 +1495,10 @@ local function main()
 		local function _build_menu_ctx()
 			return {
 				_version      = Version.VERSION,
+				-- Read at every rebuild: the pause toggle rebuilds the menu, which
+				-- greys the feature rows and turns the title row into « resume ».
+				paused        = script_actions.is_paused(),
+				on_toggle_pause = script_actions.toggle_pause,
 				config        = hotstrings_config,
 				engine        = engine,
 				-- The dynamic-hotstrings manager, so its category can be a real row
@@ -1428,7 +1548,7 @@ local function main()
 		llm           = prediction_engine,
 		gestures      = gestures,
 		shortcuts     = shortcuts,
-		kanata        = kanata,
+		tap_holds     = TapHold,
 		updater       = updater,
 		webview       = webview_manager,
 			dry_run       = opts.dry_run,
@@ -1520,8 +1640,18 @@ local function main()
 			-- hotstrings_config.enable_all then`, and the functions did not exist —
 			-- so the guard was false, the row did nothing, and a click that did
 			-- nothing is indistinguishable from a click that missed.
-			on_enable_all  = function() hotstrings_config.enable_all() end,
-			on_disable_all = function() hotstrings_config.disable_all() end,
+			--
+			-- They moved the hotstrings only, and Enable all switched every bundled
+			-- section on instead of restoring. They now go through the global
+			-- feature switch, which works like a pause (see global_feature_switch).
+			on_enable_all  = function()
+				global_switch.enable_all()
+				if rebuild_tray_menu then rebuild_tray_menu() end
+			end,
+			on_disable_all = function()
+				global_switch.disable_all()
+				if rebuild_tray_menu then rebuild_tray_menu() end
+			end,
 			on_reset_defaults = function() hotstrings_config.reset_defaults() end,
 			on_set_log_level = function(lvl)
 				if not ScriptSettings.set(lvl) then return end
@@ -1533,21 +1663,14 @@ local function main()
 
 		rebuild_tray_menu = function()
 			local ctx = _build_menu_ctx()
-			-- Probed here rather than inside the builder. Answering truthfully means
-			-- asking the system whether ANY kanata is running — including one under
-			-- systemd — and that is a subprocess. Building a menu must not spawn
-			-- one, so the daemon does it at the moment it decides to rebuild and
-			-- hands the answer over as state.
-			if kanata then
-				local ok_state, running = pcall(kanata.is_running)
-				ctx.kanata_running = ok_state and running or false
-			end
 			local ok_build, items = pcall(menu_builder.build, ctx)
 			if not ok_build then
 				Logger.error(LOG, "Menu rebuild failed — %s", tostring(items))
 				return
 			end
 			tray_menu.setMenu(items)
+			-- Every pause toggle rebuilds the menu, so the logo follows here.
+			if type(tray_menu.setPaused) == "function" then tray_menu.setPaused(ctx.paused == true) end
 		end
 		rebuild_tray_menu()
 		else
@@ -1605,7 +1728,13 @@ local function main()
 					end
 				end,
 			})
-			if llm_overlay and not llm_overlay.init({ style = style }) then llm_overlay = nil end
+			-- Placed where the hotstring preview goes: without these the
+			-- suggestions were centred on an assumed 1920x1080 screen.
+			if llm_overlay and not llm_overlay.init({
+				style = style,
+				anchor_provider = tooltip_preview.resolve_anchor,
+				screen_provider = tooltip_preview.screen_frame,
+			}) then llm_overlay = nil end
 			Logger.info(LOG, "Preview tooltip initialised (renderer available: %s).",
 				tostring(require("adapters.graphics_renderer").is_available()))
 		else
@@ -1673,6 +1802,7 @@ local function main()
 		gestures.init({
 			persist = true,
 			action_handlers = script_actions.handlers,
+			is_paused = script_actions.is_paused,
 		})
 		Logger.info(LOG, "Gestures manager initialised.")
 	end
@@ -1682,6 +1812,10 @@ local function main()
 		shortcuts.init({ persist = true })
 		Logger.info(LOG, "Shortcuts manager initialised.")
 	end
+
+	-- 8.10d') « Disable all » survives a restart: the persisted switches already
+	-- read back off, and the runtime-only ones are switched off again here.
+	global_switch.reapply_after_boot()
 
 	-- 8.10e) Wire daemon state into the webview manager so bridge handlers
 	-- can query/control daemon modules (keylogger, LLM, config, engine).

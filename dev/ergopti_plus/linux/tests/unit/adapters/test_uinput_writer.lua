@@ -362,7 +362,10 @@ helpers.describe("uinput_writer: availability", function()
 		-- the caller uses that answer to keep its existing channel.
 		local U = helpers.load_module("adapters.uinput_writer")
 		U._reset_backend()
+		-- Never the real node: a root test run probing it used to create it.
+		U._set_path_for_test(os.tmpname() .. ".absent-uinput")
 		local available = U.is_available()
+		U._set_path_for_test(nil)
 		helpers.assert_eq(type(available), "boolean",
 			"is_available() must answer with a boolean rather than raising — the daemon calls it "
 			.. "during startup to choose a channel")
@@ -380,6 +383,59 @@ helpers.describe("uinput_writer: availability", function()
 		helpers.assert_eq(U.is_open(), false, "the probe must not leave the channel open")
 
 		U._reset_backend()
+	end)
+
+	helpers.it("never creates the node it probes for", function()
+		-- The failing shape: root, no uinput module loaded, so /dev/uinput is
+		-- absent and /dev is writable. A write-mode probe created a regular
+		-- file there, which then answered "available" to every later probe and
+		-- shadowed the character device the module creates when it loads.
+		local U = helpers.load_module("adapters.uinput_writer")
+		local rec = recorder()
+		U._set_backend(rec.backend)
+		local absent = os.tmpname()
+		os.remove(absent)
+		U._set_path_for_test(absent)
+
+		local available = U.is_available()
+		local leftover = io.open(absent, "r")
+		if leftover then leftover:close(); os.remove(absent) end
+		U._set_path_for_test(nil)
+		U._reset_backend()
+
+		helpers.assert_eq(leftover, nil,
+			"is_available() created " .. absent .. " — a probe must never create the node")
+		helpers.assert_eq(available, false, "an absent node is not an available channel")
+	end)
+
+	helpers.it("reports a present node as available", function()
+		local U = helpers.load_module("adapters.uinput_writer")
+		local rec = recorder()
+		U._set_backend(rec.backend)
+		local present = os.tmpname()
+		U._set_path_for_test(present)
+
+		local available = U.is_available()
+		U._set_path_for_test(nil)
+		U._reset_backend()
+		os.remove(present)
+
+		helpers.assert_eq(available, true, "a node this user can open is available")
+	end)
+
+	helpers.it("opens the probed node, not a hardcoded one", function()
+		local U = helpers.load_module("adapters.uinput_writer")
+		local rec = recorder()
+		U._set_backend(rec.backend)
+		U._set_path_for_test("/tmp/ergopti-test-uinput")
+
+		U.open()
+		U.close()
+		U._set_path_for_test(nil)
+		U._reset_backend()
+
+		helpers.assert_eq(rec.opened[1], "/tmp/ergopti-test-uinput",
+			"open() must target the same node is_available() answered for")
 	end)
 
 end)

@@ -201,6 +201,32 @@ function M.build_params(buffer, config)
 	}
 end
 
+--- Composes the chat messages for one request from a resolved system prompt.
+---
+--- The context goes in exactly one place. Profiles that describe a PREFIX and
+--- a TAIL receive them as the user turn, in the shape their examples show;
+--- every other profile receives the typed text as the user turn. The system
+--- prompt must therefore be resolved with an EMPTY {context}, as macOS does:
+--- substituting it there as well sent the text twice. An empty system prompt
+--- (the raw profile) is omitted.
+---
+--- @param system_prompt string|nil Resolved system prompt.
+--- @param full_text string The capped context.
+--- @param tail_text string|nil The last words of the context.
+--- @return table messages Array of { role, content }.
+function M.build_messages(system_prompt, full_text, tail_text)
+	local system = type(system_prompt) == "string" and system_prompt or ""
+	local context = type(full_text) == "string" and full_text or ""
+	local user = context
+	if system:find("PREFIX", 1, true) and system:find("TAIL", 1, true) then
+		user = string.format('PREFIX: "%s"\nTAIL: "%s"', context, type(tail_text) == "string" and tail_text or "")
+	end
+	local messages = {}
+	if system:find("%S") then messages[#messages + 1] = { role = "system", content = system } end
+	messages[#messages + 1] = { role = "user", content = user }
+	return messages
+end
+
 --- Returns cross-driver test vectors matching PromptBuilder.js:promptBuilderTestVectors().
 --- Every assertion in the JS reference must hold when executed against M.build_params().
 --- @return table vectors Array of test vector objects.

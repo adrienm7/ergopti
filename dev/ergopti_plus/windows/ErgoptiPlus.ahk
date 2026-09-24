@@ -1306,6 +1306,11 @@ if (MetricsShortcuts.enabled and WPMWidget.visible) {
 		SetTimer(WPMWidget_PrewarmGraph, -WPMWidgetConst.PREWARM_DELAY_MS)
 	SetTimer(WPMWidget_Show, -WPMWidgetConst.BOOT_SHOW_DELAY_MS)
 }
+; Publish the metrics dashboards' sidecars in a background worker once boot has
+; settled, so the first open paints from disk at once instead of waiting for a
+; cold projection (keylogger_webview.ahk, background sidecar warm-up).
+if MetricsShortcuts.enabled
+	KLWV_WarmSchedule(KL_MetricsDirFor(_ConfigDir), KLWV.WARM_START_DELAY_MS)
 
 global _LAYOUT_POLL_INTERVAL_MS := 1000
 global _LAST_KEYBOARD_HKL := GetForegroundKeyboardLayout()
