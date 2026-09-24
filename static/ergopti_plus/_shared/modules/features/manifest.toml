@@ -2852,6 +2852,25 @@ french_distancesreduction = "FrenchDistancesReduction"
 french_autocorrection = "FrenchAutocorrection"
 french_magickey = "FrenchMagicKey"
 
+# The order is the approved one and every driver builds it from here: the
+# keyboard and trackpad features, then layout, text and AI, then metrics and
+# the applications, then the configuration tail. A separator is drawn only
+# between two rows a platform shows.
+#
+# Every driver presents the same Tap-Holds row. Linux runs them inside its
+# daemon; the native engine is an implementation detail of each driver.
+[[menu.top_level]]
+id = "tap_holds"
+
+[[menu.top_level]]
+id = "shortcuts"
+
+[[menu.top_level]]
+id = "gestures"
+
+[[menu.top_level]]
+id = "---"
+
 [[menu.top_level]]
 id = "keyboard_layout"
 
@@ -2862,20 +2881,10 @@ id = "hotstrings"
 id = "llm"
 
 [[menu.top_level]]
+id = "---"
+
+[[menu.top_level]]
 id = "metrics"
-
-[[menu.top_level]]
-id = "shortcuts"
-
-# The same row, name and submenu on every driver. The engine behind it is an
-# implementation detail the user never has to know about: Windows runs the
-# tap-holds in its own process, macOS through Karabiner-Elements, Linux in its
-# daemon's keyboard hook (kanata, which it used before, needed a newer glibc
-# than Debian 12 and Ubuntu 22.04 ship and was never started by the daemon).
-[[menu.top_level]]
-id = "tap_holds"
-[[menu.top_level]]
-id = "gestures"
 
 # macOS only: it lists the applications bundled with the macOS app. Linux had
 # one too, holding a single config-folder row, and that row now lives under
@@ -2885,11 +2894,6 @@ id = "apps"
 platforms = ["hs"]
 reason_key = "platform_reason.tray_top_level_rows_are_each_drivers"
 
-# Linux uniquement : les deux autres drivers n'ont aucun menu de mise à jour.
-[[menu.top_level]]
-id = "updates"
-platforms = ["linux"]
-reason_key = "platform_reason.tray_top_level_rows_are_each_drivers"
 [[menu.top_level]]
 id = "---"
 
@@ -2901,6 +2905,13 @@ id = "configuration"
 [[menu.top_level]]
 id = "language"
 
+# Linux only: its updater is a submenu of its own, where the other two drivers
+# keep theirs under About. Both sit in the version-and-updates slot.
+[[menu.top_level]]
+id = "updates"
+platforms = ["linux"]
+reason_key = "platform_reason.tray_top_level_rows_are_each_drivers"
+
 [[menu.top_level]]
 id = "about"
 
@@ -2911,6 +2922,7 @@ id = "---"
 id = "suspend"
 platforms = ["ahk"]
 reason_key = "platform_reason.tray_top_level_rows_are_each_drivers"
+
 [[menu.top_level]]
 id = "reload"
 

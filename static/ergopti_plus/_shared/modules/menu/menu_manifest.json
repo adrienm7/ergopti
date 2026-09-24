@@ -75,6 +75,18 @@
 	},
 	"top_level": [
 		{
+			"id": "tap_holds"
+		},
+		{
+			"id": "shortcuts"
+		},
+		{
+			"id": "gestures"
+		},
+		{
+			"id": "---"
+		},
+		{
 			"id": "keyboard_layout"
 		},
 		{
@@ -84,28 +96,15 @@
 			"id": "llm"
 		},
 		{
+			"id": "---"
+		},
+		{
 			"id": "metrics"
-		},
-		{
-			"id": "shortcuts"
-		},
-		{
-			"id": "tap_holds"
-		},
-		{
-			"id": "gestures"
 		},
 		{
 			"id": "apps",
 			"platforms": [
 				"hs"
-			],
-			"reason_key": "platform_reason.tray_top_level_rows_are_each_drivers"
-		},
-		{
-			"id": "updates",
-			"platforms": [
-				"linux"
 			],
 			"reason_key": "platform_reason.tray_top_level_rows_are_each_drivers"
 		},
@@ -117,6 +116,13 @@
 		},
 		{
 			"id": "language"
+		},
+		{
+			"id": "updates",
+			"platforms": [
+				"linux"
+			],
+			"reason_key": "platform_reason.tray_top_level_rows_are_each_drivers"
 		},
 		{
 			"id": "about"
