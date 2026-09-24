@@ -22,6 +22,8 @@
 ; 5. Callbacks: a counted Send carries the live repeat count, a plain one does
 ;    not, repeat_count sets the count, and every call handler the vocabulary
 ;    declares for Windows is implemented.
+; 6. Boot: NavLayer_Init registers the layers.toml of the configuration folder
+;    it is given, and nothing without one.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -299,3 +301,89 @@ _NLT_ErrorsSayWhereTheyAre() {
 		"a file-level error names no key")
 }
 Test("nav layer table: a layer-file error in the log says where it sits", _NLT_ErrorsSayWhereTheyAre)
+
+
+
+
+
+; =======================================
+; =======================================
+; ======= 5/ Boot: NavLayer_Init ========
+; =======================================
+; =======================================
+
+; A fresh configuration folder of its own, so no other test's files are read.
+_NLT_MakeConfigDir() {
+	Dir := A_Temp . "\ergopti_nav_layer_init_" . A_TickCount . "_" . Random(1000, 9999)
+	DirCreate(Dir)
+	return Dir
+}
+
+; Resets the ring buffer and logs at DEBUG, so a test reads only its own lines.
+_NLT_ResetLog() {
+	global LOGGER_RING_BUFFER, LOGGER_RING_CURSOR, LOGGER_MIN_LEVEL
+	global _LOGGER_DEDUP_KEY, _LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT
+	LOGGER_RING_BUFFER := []
+	LOGGER_RING_CURSOR := 0
+	LOGGER_MIN_LEVEL := "DEBUG"
+	_LOGGER_DEDUP_KEY := ""
+	_LOGGER_DEDUP_LEVEL := ""
+	_LOGGER_DEDUP_COUNT := 0
+	_LoggerRefreshFastFlags()
+}
+
+; The NavLayer lines of the ring buffer, at one level.
+_NLT_LogLines(Level) {
+	Found := []
+	for _, Line in LoggerRingBufferSnapshot() {
+		if InStr(Line, "[" . Level . "] [NavLayer]")
+			Found.Push(Line)
+	}
+	return Found
+}
+
+; Runs NavLayer_Init on a configuration folder holding Text as layers.toml (none
+; when Text is unset) and returns what it registered and logged.
+_NLT_Init(Text?) {
+	global LOGGER_MIN_LEVEL
+	Dir := _NLT_MakeConfigDir()
+	SavedLevel := LOGGER_MIN_LEVEL
+	Names := []
+	HotkeyFn := (Name, Callback, Options) => Names.Push(Name)
+	HotIfFn := (Args*) => 0
+	_NLT_ResetRegistration()
+	try {
+		if IsSet(Text)
+			FileAppend(Text, Dir . "\layers.toml", "UTF-8-RAW")
+		_NLT_ResetLog()
+		Count := NavLayer_Init(_NLT_SharedDir(), Dir . "\", HotkeyFn, HotIfFn)
+		return Map("count", Count, "names", Names, "starts", _NLT_LogLines("START"),
+			"successes", _NLT_LogLines("SUCCESS"), "errors", _NLT_LogLines("ERROR"))
+	} finally {
+		_NLT_ResetRegistration()
+		LOGGER_MIN_LEVEL := SavedLevel
+		_LoggerRefreshFastFlags()
+		DirDelete(Dir, true)
+	}
+}
+
+_NLT_InitRegistersTheConfigFolderLayer() {
+	Golden := _NLT_GoldenRows()
+	Run := _NLT_Init(_NLT_RecommendedText())
+	AssertEqual(Golden.Length, Run["count"], "layers.toml in the configuration folder registers every hotkey of the preset")
+	AssertEqual(Golden.Length, Run["names"].Length, "each row goes through the registrar")
+	AssertEqual(1, Run["starts"].Length, "one START for the load")
+	AssertEqual(1, Run["successes"].Length, "the load closes with one SUCCESS")
+	AssertEqual(0, Run["errors"].Length, "a clean preset logs no error")
+}
+Test("nav layer boot: the layers.toml of the configuration folder is registered (nav-layer-generated)",
+	_NLT_InitRegistersTheConfigFolderLayer)
+
+_NLT_InitWithoutAFileRegistersNothing() {
+	Run := _NLT_Init()
+	AssertEqual(0, Run["count"], "no layers.toml, no hotkey")
+	AssertEqual(0, Run["names"].Length, "no layers.toml, no registration")
+	AssertEqual(1, Run["successes"].Length, "an absent file is no layer, not a failure")
+	AssertEqual(0, Run["errors"].Length, "an absent file is not an error")
+}
+Test("nav layer boot: no layers.toml registers nothing (nav-layer-generated)", _NLT_InitWithoutAFileRegistersNothing)
