@@ -752,7 +752,7 @@ final class LauncherEnvironmentTests: XCTestCase {
 		XCTAssertFalse(FileManager.default.fileExists(atPath: store.path))
 		XCTAssertEqual(childEnvironment[kFatalReportEnvironment], store.path)
 		XCTAssertEqual(childEnvironment[kLauncherLogEnvironment], LauncherLog.filePath)
-		XCTAssertTrue(LauncherLog.filePath.hasSuffix("/Library/Logs/ErgoptiPlus/launcher.log"))
+		XCTAssertTrue(LauncherLog.filePath.hasSuffix("/Library/Logs/ergopti_plus/launcher.log"))
 	}
 
 	/// The startup trail names every exported key but never logs the token value.

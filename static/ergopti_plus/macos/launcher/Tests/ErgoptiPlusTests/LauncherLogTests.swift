@@ -37,7 +37,7 @@ final class LauncherLogTests: XCTestCase {
 	// ================================================================
 
 	private var logPath: String {
-		return NSHomeDirectory() + "/Library/Logs/ErgoptiPlus/launcher.log"
+		return NSHomeDirectory() + "/Library/Logs/ergopti_plus/launcher.log"
 	}
 
 	#if ERGOPTI_GUARDIAN_TEST_SUPPORT
@@ -150,7 +150,7 @@ final class LauncherLogTests: XCTestCase {
 
 		XCTAssertTrue(
 			FileManager.default.fileExists(atPath: logPath),
-			"LauncherLog.write must create ~/Library/Logs/ErgoptiPlus/launcher.log on first use"
+			"LauncherLog.write must create ~/Library/Logs/ergopti_plus/launcher.log on first use"
 		)
 
 		let contents = try String(contentsOfFile: logPath, encoding: .utf8)

@@ -215,13 +215,16 @@ func writeLauncherLogData(
 }
 
 enum LauncherLog {
-	// Standard macOS per-app log location, readable by the user without special
-	// permissions. Every launch, every boot stage until the native logger
-	// commits and every slow native-logger reply append here, so the file is
-	// bounded: past maximumFileBytes it becomes launcher.1.log, which replaces
-	// the previous rotation.
-	private static let logDirectory = NSHomeDirectory() + "/Library/Logs/ErgoptiPlus"
-	private static let logFileName = "launcher.log"
+	// Standard macOS per-app log location (~/Library/Logs/ergopti_plus, from the
+	// shared application-folders registry), readable by the user without
+	// special permissions and the default folder of the Lua logs too. It is
+	// written before any configuration is read, so a LogsDirPath override never
+	// moves it. Every launch, every boot stage until the native logger commits
+	// and every slow native-logger reply append here, so the file is bounded:
+	// past maximumFileBytes it becomes launcher.1.log, which replaces the
+	// previous rotation.
+	private static let logDirectory = NSHomeDirectory() + "/" + kMacOSLogsHomeRelativePath
+	private static let logFileName = kLauncherLogFileName
 	private static let rotatedFileName = "launcher.1.log"
 	/// Size past which launcher.log is rotated before the next append.
 	static let maximumFileBytes: off_t = 1_048_576
@@ -235,7 +238,7 @@ enum LauncherLog {
 
 	/// Per-launch fatal report written by Lua before it exits (see
 	/// EmbeddedFatalReport.swift); kept beside launcher.log for the user.
-	static var fatalReportPath: String { return logDirectory + "/hammerspoon-fatal.txt" }
+	static var fatalReportPath: String { return logDirectory + "/" + kFatalReportFileName }
 
 	private static let dateFormatter: DateFormatter = {
 		let f = DateFormatter()
@@ -243,7 +246,7 @@ enum LauncherLog {
 		return f
 	}()
 
-	/// Appends one timestamped line to ~/Library/Logs/ErgoptiPlus/launcher.log.
+	/// Appends one timestamped line to ~/Library/Logs/ergopti_plus/launcher.log.
 	/// Best-effort: a logging failure must never prevent the launcher from
 	/// proceeding, so every step here is wrapped defensively.
 	static func write(_ message: String) {
