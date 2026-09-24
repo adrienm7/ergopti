@@ -14,6 +14,15 @@ stop parsing mid-file and look like missing tests; always run the encoding gate.
 Some UI modules are outside the headless unit include graph. Validate the real
 entry point or the dedicated startup/parse smoke after changing them.
 
+### project-ahk-shared-test-helper-must-resolve-in-every-runner
+
+`tests/test_framework.ahk` is included by `run_all.ahk`, `e2e/run_e2e.ahk`,
+fixtures and the child probes some tests write to `%TEMP%`. A helper there that
+names a function only `run_all.ahk` includes is an unset variable in the other
+runners, and AHK v2's default `#Warn VarUnset, MsgBox` raises a hidden load-time
+dialog: the child never exits and the suite hangs at the probe test with no
+error. Put such helpers in a test file that `run_all.ahk` includes.
+
 ### project-ahk-v2-semicolon-in-string
 
 In AHK v2, a space followed by `;` can start a comment even inside a quoted
