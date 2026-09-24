@@ -1071,8 +1071,12 @@ function M.process_prediction(full_text, tail_text, block, opts)
 		local to_type = nw
 		local deletes = 0
 		
-		if to_type ~= "" and tail_text ~= "" then
-			local t_last = utils.utf8_sub(tail_text, -1)
+		-- Spaced against the character before the caret, from the full text: the
+		-- tail is rebuilt from words and never keeps a trailing space, so a
+		-- context ending in one ("bonjour ") got a second one prepended.
+		local before_caret = full_text ~= "" and full_text or tail_text
+		if to_type ~= "" and before_caret ~= "" then
+			local t_last = utils.utf8_sub(before_caret, -1)
 			local is_space = is_spacing_character(t_last)
 			local is_apos  = is_apostrophe_character(t_last)
 			local type_start = utils.utf8_sub(to_type, 1, 1)
