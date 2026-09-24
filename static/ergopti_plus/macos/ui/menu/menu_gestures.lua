@@ -409,9 +409,12 @@ function M.build(ctx)
 	-- the declaration, so this supplies only what the click does.
 	local function cmd_disable_all()
 		local gestures_enabled = state.gestures == true
-		local all_slots = gestures_mod.SINGLE_SLOTS or {}
-		for _, slot in ipairs(all_slots) do
-			if type(gestures.set_action) == "function" then pcall(gestures.set_action, slot, DISABLED_GESTURE_ACTION) end
+		-- The axis slots too: clearing only the single slots left a horizontal
+		-- swipe bound, so the trackpad still answered Ergopti after « Tout effacer ».
+		for _, slots in ipairs({ gestures_mod.SINGLE_SLOTS or {}, gestures_mod.AXIS_SLOTS or {} }) do
+			for _, slot in ipairs(slots) do
+				if type(gestures.set_action) == "function" then pcall(gestures.set_action, slot, DISABLED_GESTURE_ACTION) end
+			end
 		end
 		state.gestures = gestures_enabled
 		if gestures_enabled then

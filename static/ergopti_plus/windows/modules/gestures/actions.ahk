@@ -821,19 +821,8 @@ _GestureLoadActionCatalog(*) {
 ; blank. -1 fires once ~1 ms after the auto-execute section finishes.
 SetTimer(_GestureLoadActionCatalog, -1)
 
-; Factory gesture slot actions — mirrors features_manifest.ahk defaults.
-global GESTURE_FACTORY_DEFAULTS := Map(
-		"tap_3", "left_click_toggle",
-		"swipe_3_up", "tab_new",
-		"swipe_3_down", "tab_close",
-		"swipe_3_left", "tab_prev",
-		"swipe_3_right", "tab_next",
-		"tap_4", "screenshot_window_clipboard",
-		"swipe_4_up", "win_app_next",
-		"swipe_4_down", "win_app_prev",
-		"swipe_4_left", "desktop_prev",
-		"swipe_4_right", "desktop_next",
-)
+; Factory gesture slot actions: the manifest's Windows values (constants.ahk).
+global GESTURE_FACTORY_DEFAULTS := GestureRecommendedActions()
 
 ; Current action assignments — read from config.toml or factory defaults.
 global GestureAssignments := Map()

@@ -54,52 +54,35 @@ local Conflicts = require("modules.gestures.conflicts")
 -- =======================================
 -- =======================================
 
-M.DEFAULT_GESTURES = {
-	tap_2                = "none",
-	tap_3                = "left_click_toggle",
-	tap_4                = "app_window_previous",
-	tap_5                = "none",
-
-	swipe_3_horiz        = "none",
-	swipe_4_horiz        = "none",
-	swipe_5_horiz        = "none",
-
-	swipe_2_left         = "none",
-	swipe_2_right        = "none",
-	swipe_2_up           = "none",
-	swipe_2_down         = "none",
-	swipe_2_left_up      = "none",
-	swipe_2_right_up     = "none",
-	swipe_2_left_down    = "none",
-	swipe_2_right_down   = "none",
-
-	swipe_3_left         = "sel_word_prev",
-	swipe_3_right        = "sel_word_next",
-	swipe_3_up           = "tab_prev",
-	swipe_3_down         = "tab_next",
-	swipe_3_left_up      = "none",
-	swipe_3_right_up     = "none",
-	swipe_3_left_down    = "none",
-	swipe_3_right_down   = "none",
-
-	swipe_4_left         = "none",
-	swipe_4_right        = "none",
-	swipe_4_up           = "none",
-	swipe_4_down         = "none",
-	swipe_4_left_up      = "none",
-	swipe_4_right_up     = "none",
-	swipe_4_left_down    = "none",
-	swipe_4_right_down   = "none",
-
-	swipe_5_left         = "none",
-	swipe_5_right        = "none",
-	swipe_5_up           = "none",
-	swipe_5_down         = "none",
-	swipe_5_left_up      = "none",
-	swipe_5_right_up     = "none",
-	swipe_5_left_down    = "none",
-	swipe_5_right_down   = "none",
+M.SINGLE_SLOTS = {
+	"tap_2", "tap_3", "tap_4", "tap_5",
+	"swipe_2_left", "swipe_2_right", "swipe_2_up", "swipe_2_down",
+	"swipe_2_left_up", "swipe_2_right_up", "swipe_2_left_down", "swipe_2_right_down",
+	"swipe_3_left", "swipe_3_right", "swipe_3_up", "swipe_3_down",
+	"swipe_3_left_up", "swipe_3_right_up", "swipe_3_left_down", "swipe_3_right_down",
+	"swipe_4_left", "swipe_4_right", "swipe_4_up", "swipe_4_down",
+	"swipe_4_left_up", "swipe_4_right_up", "swipe_4_left_down", "swipe_4_right_down",
+	"swipe_5_left", "swipe_5_right", "swipe_5_up", "swipe_5_down",
+	"swipe_5_left_up", "swipe_5_right_up", "swipe_5_left_down", "swipe_5_right_down",
 }
+
+M.AXIS_SLOTS = {
+	"swipe_3_horiz",
+	"swipe_4_horiz",
+	"swipe_5_horiz",
+}
+
+-- Ergopti's recommended action for every slot is the shared manifest's macOS
+-- value (gestures.<slot>), the only copy: a session starts from it, and the
+-- menu's « Restaurer les valeurs conseillées » and the factory reset put it back.
+-- The hand-written table this replaced had drifted from the manifest on four
+-- slots. Manifest.default_for raises on a slot the manifest does not declare.
+M.DEFAULT_GESTURES = {}
+for _, slots in ipairs({ M.SINGLE_SLOTS, M.AXIS_SLOTS }) do
+	for _, slot in ipairs(slots) do
+		M.DEFAULT_GESTURES[slot] = Manifest.default_for("gestures." .. slot)
+	end
+end
 
 M.DEFAULT_MODES = {
 }
@@ -134,23 +117,6 @@ for k, v in pairs(M.DEFAULT_GESTURES) do
 	end
 end
 
-M.SINGLE_SLOTS = {
-	"tap_2", "tap_3", "tap_4", "tap_5",
-	"swipe_2_left", "swipe_2_right", "swipe_2_up", "swipe_2_down",
-	"swipe_2_left_up", "swipe_2_right_up", "swipe_2_left_down", "swipe_2_right_down",
-	"swipe_3_left", "swipe_3_right", "swipe_3_up", "swipe_3_down",
-	"swipe_3_left_up", "swipe_3_right_up", "swipe_3_left_down", "swipe_3_right_down",
-	"swipe_4_left", "swipe_4_right", "swipe_4_up", "swipe_4_down",
-	"swipe_4_left_up", "swipe_4_right_up", "swipe_4_left_down", "swipe_4_right_down",
-	"swipe_5_left", "swipe_5_right", "swipe_5_up", "swipe_5_down",
-	"swipe_5_left_up", "swipe_5_right_up", "swipe_5_left_down", "swipe_5_right_down",
-}
-
-M.AXIS_SLOTS = {
-	"swipe_3_horiz",
-	"swipe_4_horiz",
-	"swipe_5_horiz",
-}
 
 
 
