@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Logger Scalars Single-Source Guard
  * DESCRIPTION:
- * Nine logger scalars are declared once per driver rather than once. This gate
+ * Ten logger scalars are declared once per driver rather than once. This gate
  * pins every copy to _shared/modules/timings/constants.toml [logger]:
  *
  *   retention_days         14      AHK LOGGER_RETENTION_DAYS · HS max_age_days (×2)
@@ -19,6 +19,8 @@
  *   ack_retry_ms           500     HS log_transport ACK_RETRY_SEC (seconds)
  *   ack_retry_cap_ms       4000    HS log_transport ACK_RETRY_CAP_SEC (seconds)
  *   stall_fatal_ms         30000   HS log_transport STALL_FATAL_SEC (seconds)
+ *   native_slow_batch_ms   500     Swift LoggerDatagramWorker
+ *                                  kLoggerSlowBatchThresholdMilliseconds
  *
  * ROOT CAUSE ENCODED — THE DEDUP WINDOW WAS THE BAD ONE:
  * It was not merely duplicated. It existed only as a BARE LITERAL on both
