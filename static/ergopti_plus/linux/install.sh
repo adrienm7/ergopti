@@ -314,6 +314,14 @@ _required_dependency_package() {
 		pacman:libatspi.so.0) echo "at-spi2-core" ;;
 		xbps:libatspi.so.0) echo "at-spi2-core" ;;
 		apk:libatspi.so.0) echo "at-spi2-core" ;;
+		# Typing metrics: the keylogger writes and the metrics windows read
+		# through the sqlite3 CLI; without it both fall back to nothing useful.
+		apt:sqlite3) echo "sqlite3" ;;
+		dnf:sqlite3) echo "sqlite" ;;
+		zypper:sqlite3) echo "sqlite3" ;;
+		pacman:sqlite3) echo "sqlite" ;;
+		xbps:sqlite3) echo "sqlite" ;;
+		apk:sqlite3) echo "sqlite" ;;
 		# The tray's dialogs: every prompt (a delay, a link, an API key) and
 		# every confirmation is a zenity window. KDE and minimal images lack it.
 		apt:zenity) echo "zenity" ;;
@@ -424,6 +432,7 @@ echo "=== Ergopti ${ERGOPTI_VERSION} — vérification des dépendances ==="
 _check_or_install luajit
 _check_or_install notify-send
 _check_or_install zenity
+_check_or_install sqlite3
 _check_or_install unzip
 _check_or_install sha256sum
 # The live keymap shared by capture and injection. The daemon now fails closed
