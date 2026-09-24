@@ -1122,6 +1122,20 @@ jobs:
           exit $STATUS
         timeout-minutes: 8
 
+      # The other direction: the metrics page posts its own {action: 'ready'}
+      # object and must get the daemon's data back. Both halves went through
+      # dkjson, which is not installed, so every tray window with a request of
+      # its own stayed empty while the push test above stayed green.
+      - name: A page's own request is answered in real WebKit
+        if: always()
+        working-directory: static/ergopti_plus/linux
+        run: |
+          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+          export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
+          export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
+          xvfb-run -a luajit tests/hardware/run_webview_roundtrip.lua
+        timeout-minutes: 5
+
       # window.setData is undefined in the settings window, so the host's
       # `if(window.setData)` guard discards every push. Seven explanations are
       # ruled out, and the informative one is the last: an explicit
@@ -1178,6 +1192,7 @@ jobs:
               --subject gesture-roundtrip=1 \
               --subject webview-settings=1 \
               --subject webview-editor=1 \
+              --subject webview-roundtrip=1 \
               --subject page-load-errors=1
 
       - name: Upload mandatory Linux test evidence

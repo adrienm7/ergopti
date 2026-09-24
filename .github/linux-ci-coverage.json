@@ -19,6 +19,7 @@
 				"gesture-roundtrip": 1,
 				"webview-settings": 1,
 				"webview-editor": 1,
+				"webview-roundtrip": 1,
 				"page-load-errors": 1
 			}
 		},
