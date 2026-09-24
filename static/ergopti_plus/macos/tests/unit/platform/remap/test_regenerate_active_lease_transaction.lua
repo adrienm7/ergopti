@@ -7,6 +7,11 @@
 --- PAUSED and that completion follows classifier publication. Atomic file safety
 --- is covered by the generator/filesystem suites; this harness deliberately does
 --- not pretend that its constant deploy stub is a Core Service reload ACK.
+---
+--- Every regeneration also reads the user's layers.toml from the configuration
+--- folder and hands the navigation layer to the generator: the last block pins
+--- that wiring, an edit applying with the next regeneration, and a layer that
+--- cannot be read failing the regeneration before anything is built.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -39,6 +44,7 @@ local function load_active_remap(options)
 		deploys = 0,
 		classifier_refreshes = 0,
 		build_tokens = {},
+		build_nav_layers = {},
 		resolve_phases = {},
 		build_phases = {},
 		deploy_phases = {},
@@ -91,6 +97,7 @@ local function load_active_remap(options)
 			calls.builds = calls.builds + 1
 			calls.build_phases[#calls.build_phases + 1] = calls.phase
 			calls.build_tokens[#calls.build_tokens + 1] = select(7, ...)
+			calls.build_nav_layers[#calls.build_nav_layers + 1] = (select(1, ...)).nav_layer
 			append("build")
 			return {}, nil, {}, {}
 		end,
@@ -192,11 +199,14 @@ local function load_active_remap(options)
 	package.loaded["modules.gestures.engine"] = {}
 	package.loaded["modules.shortcuts"] = { is_paused = function() return false end }
 	package.loaded["infra.timings"] = { sec = function() return 0.01 end }
-	-- layers.toml, read at every regeneration, lives in get_config_dir(); none here.
+	-- layers.toml, read at every regeneration, lives in get_config_dir(); none
+	-- unless the test hands a folder of its own.
 	package.loaded["infra.config_paths"] = {
 		get = function() return "tests/unit/platform/remap/active-regeneration.toml" end,
-		get_config_dir = function() return "tests/unit/platform/remap/no-layers-toml" end,
+		get_config_dir = function() return options.config_dir or "tests/unit/platform/remap/no-layers-toml" end,
 	}
+	-- The real layer reader, loaded afresh, unless the test replaces it.
+	package.loaded["platform.remap.nav_layer"] = options.nav_layer_module
 	package.loaded["hs.caffeinate.watcher"] = {
 		systemDidWake = 7,
 		screensDidUnlock = 8,
@@ -238,6 +248,7 @@ local function load_active_remap(options)
 	calls.deploys = 0
 	calls.classifier_refreshes = 0
 	calls.build_tokens = {}
+	calls.build_nav_layers = {}
 	calls.resolve_phases = {}
 	calls.build_phases = {}
 	calls.deploy_phases = {}
@@ -324,4 +335,72 @@ helpers.describe("karabiner active-lease regeneration", function()
 			helpers.assert_eq(calls.results[1].reason, "invalid-recovery-capability")
 		end)
 	end
+end)
+
+-- A layers.toml binding KeyT to one function key.
+local LAYER_FILE = '[_meta]\nschema_version = 1\n\n[layers.nav.all]\n"KeyT" = "keystroke:%s"\n'
+
+--- Writes a whole file; raises when it cannot.
+local function write_file(path, content)
+	local fh = assert(io.open(path, "wb"))
+	fh:write(content)
+	fh:close()
+end
+
+--- The key the layer sends for one physical key, nil when it is unbound.
+local function sent_key(nav_layer, code)
+	local binding = nav_layer and nav_layer.bindings[code]
+	return binding and binding.chords[1].key
+end
+
+helpers.describe("karabiner regeneration reads the navigation layer", function()
+	helpers.it("builds from the configuration folder's layers.toml, read again at every regeneration (nav-layer-generated)",
+		function()
+			local dir = helpers.temp_dir() .. "/ergopti_regenerate_nav_layer_" .. tostring(os.time()) .. "_"
+				.. tostring(math.random(100000, 999999))
+			local ok_mkdir = os.execute('mkdir "' .. dir .. '"')
+			helpers.assert_true(ok_mkdir == true or ok_mkdir == 0, "sandbox directory must exist")
+			local ok, err = pcall(function()
+				write_file(dir .. "/layers.toml", LAYER_FILE:format("F3"))
+				local remap, calls = load_active_remap({ config_dir = dir })
+				helpers.assert_true(remap.regenerate(calls.record_result))
+				helpers.assert_eq(sent_key(calls.build_nav_layers[1], "KeyT"), "F3",
+					"the generator must receive the layer of the configuration folder's layers.toml")
+				write_file(dir .. "/layers.toml", LAYER_FILE:format("F4"))
+				helpers.assert_true(remap.regenerate(calls.record_result))
+				helpers.assert_eq(sent_key(calls.build_nav_layers[2], "KeyT"), "F4",
+					"an edited layers.toml applies with the next regeneration")
+			end)
+			os.remove(dir .. "/layers.toml")
+			os.execute('rmdir "' .. dir .. '"')
+			if not ok then error(err, 0) end
+		end)
+
+	helpers.it("hands the generator an empty layer without a layers.toml (nav-layer-generated)", function()
+		local remap, calls = load_active_remap()
+		helpers.assert_true(remap.regenerate(calls.record_result))
+		local nav_layer = calls.build_nav_layers[1]
+		helpers.assert_not_nil(nav_layer, "the generator must receive the navigation layer")
+		helpers.assert_nil(next(nav_layer.bindings), "no layers.toml binds no key")
+	end)
+
+	helpers.it("fails before any build when the navigation layer cannot be read", function()
+		local reader = { fail = false }
+		function reader.load()
+			if reader.fail then error("the physical-key registry is unreadable") end
+			return { bindings = {}, registry = { keys = {} } }
+		end
+		local ok, err = pcall(function()
+			local remap, calls = load_active_remap({ nav_layer_module = reader })
+			reader.fail = true
+			helpers.assert_true(remap.regenerate(calls.record_result) == false)
+			helpers.assert_eq(calls.builds, 0, "a layer that cannot be read must not be built around")
+			helpers.assert_eq(calls.deploys, 0)
+			helpers.assert_eq(#calls.results, 1)
+			helpers.assert_eq(calls.results[1].reason, "nav-layer-unavailable")
+		end)
+		-- Later files load the real reader through the generator.
+		package.loaded["platform.remap.nav_layer"] = nil
+		if not ok then error(err, 0) end
+	end)
 end)
