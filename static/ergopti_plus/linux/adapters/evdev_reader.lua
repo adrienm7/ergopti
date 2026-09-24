@@ -33,11 +33,15 @@
 ---    LuaJIT FFI; tests bind a recorder. Without it, "the grab is taken before
 ---    the first read" could only ever be verified on hardware, and "the keyboard
 ---    still works" is not an assertion.
---- 3. The grab needs no unwind handler. EVIOCGRAB is bound to the open file
----    descriptor, and the kernel drops it when that descriptor closes — including
----    when the process dies, however it dies. So a crashed daemon cannot leave a
----    dead keyboard behind, and this module deliberately does not carry a
----    signal-handler or __gc mechanism that would only pretend to add safety.
+--- 3. The grab needs no unwind handler. EVIOCGRAB is bound to the open file,
+---    and the kernel drops it when the last descriptor on that file closes —
+---    including when the process dies, however it dies. That holds only while
+---    the daemon is the file's sole holder, so the device is opened O_CLOEXEC:
+---    otherwise every child the daemon starts (`xdg-open … &`, a gesture's
+---    application, the update relay) inherits a copy, and a daemon that dies
+---    while one runs leaves the keyboard grabbed by a process that never reads
+---    it. This module deliberately does not carry a signal-handler or __gc
+---    mechanism that would only pretend to add safety.
 --- 4. Decoding is not here. infra/input_event.lua owns the struct in both
 ---    directions, so the size comes from ffi.sizeof rather than from a comment
 ---    asserting 24 bytes.
@@ -59,8 +63,10 @@ local LOG = "adapters.evdev_reader"
 -- ===========================================
 -- ===========================================
 
--- open(2) flags. O_RDONLY is 0, so the value is the non-blocking bit alone.
+-- open(2) flags, asm-generic values (x86_64 and arm64). O_RDONLY is 0.
 local O_NONBLOCK = 0x0800
+-- Closes the descriptor in every child at exec, so no child can keep the grab.
+local O_CLOEXEC  = 0x80000
 
 -- EVIOCGRAB = _IOW('E', 0x90, int)
 --   (1 << 30) | (sizeof(int) << 16) | ('E' << 8) | 0x90
@@ -296,7 +302,7 @@ function M.open(path, slot)
 		return false
 	end
 
-	local fd, err = _backend.open(path, O_NONBLOCK)
+	local fd, err = _backend.open(path, O_NONBLOCK + O_CLOEXEC)
 	if not fd then
 		Logger.error(LOG, "open(): cannot open %s — %s.", path, tostring(err))
 		return false

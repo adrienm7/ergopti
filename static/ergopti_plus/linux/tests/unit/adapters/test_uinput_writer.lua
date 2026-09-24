@@ -30,10 +30,11 @@ local helpers = require("tests.helpers")
 --- @param opts table|nil { fail_on = "open"|"ioctl"|"write", fail_req = integer }
 local function recorder(opts)
 	opts = opts or {}
-	local rec = { opened = {}, ioctls = {}, writes = {}, closed = 0 }
+	local rec = { opened = {}, open_flags = {}, ioctls = {}, writes = {}, closed = 0 }
 	rec.backend = {
-		open = function(path)
+		open = function(path, flags)
 			rec.opened[#rec.opened + 1] = path
+			rec.open_flags[#rec.open_flags + 1] = flags
 			if opts.fail_on == "open" then return nil, "stubbed failure" end
 			return 42 -- a plausible fd
 		end,
@@ -222,6 +223,28 @@ helpers.describe("uinput_writer: device creation", function()
 		end
 		helpers.assert_eq(type(setup_arg), "string", "UI_DEV_SETUP takes a struct, not a scalar")
 		helpers.assert_eq(#setup_arg, 92, "the struct must be the size the ioctl number encodes")
+
+		U._reset_backend()
+	end)
+
+	helpers.it("opens /dev/uinput write-only, non-blocking and close-on-exec (cloexec-grab-outlives-daemon)", function()
+		-- The virtual keyboard lives exactly as long as its descriptor. A child the
+		-- daemon starts (`xdg-open … &`, the update relay) inherits a descriptor
+		-- opened without O_CLOEXEC and keeps the device alive after the daemon
+		-- dies, with any key the daemon had forwarded still held down on it: the
+		-- kernel releases held keys only when the device is destroyed. Literals
+		-- from fcntl.h, so a constant compared with itself cannot pass for 0.
+		local U = helpers.load_module("adapters.uinput_writer")
+		local rec = recorder()
+		U._set_backend(rec.backend)
+
+		helpers.assert_true(U.open(), "open() must succeed against a working backend")
+		helpers.assert_eq(#rec.opened, 1, "the device node is opened exactly once")
+		helpers.assert_eq(rec.opened[1], "/dev/uinput", "and it is the uinput node")
+		helpers.assert_eq(rec.open_flags[1], 0x80801,
+			"the flag word must be O_WRONLY (1) | O_NONBLOCK (0x800) | O_CLOEXEC (0x80000): "
+			.. "without O_CLOEXEC a child the daemon starts keeps the virtual keyboard alive "
+			.. "after the daemon dies")
 
 		U._reset_backend()
 	end)

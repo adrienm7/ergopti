@@ -10,6 +10,18 @@ Observe mode and `EVIOCGRAB` mode have different correctness contracts. A driver
 that does not grab cannot prevent a physical terminator from reaching the app;
 replay logic must reflect the active mode.
 
+### project-linux-device-descriptors-are-close-on-exec
+
+`EVIOCGRAB` and a uinput device belong to the open file, not to the daemon: the
+kernel drops them only when the last descriptor on that file closes. A child
+the daemon starts (`xdg-open … &`, a gesture's application, the update relay)
+inherits every descriptor opened without `O_CLOEXEC`. A daemon that dies while
+one runs leaves the keyboard grabbed by a process that never reads it, the
+restarted daemon's grab fails with EBUSY, and a forwarded key stays down on a
+virtual keyboard nobody destroys. Action: open every device descriptor
+`O_CLOEXEC`; `tests/hardware/run_grab_race.lua` section 7 kills a daemon that
+left a child running and checks the keyboard comes back.
+
 ### project-linux-a-field-must-be-named-at-every-boundary
 
 Linux input records cross evdev, resolver, injector, and Lua boundaries. Preserve

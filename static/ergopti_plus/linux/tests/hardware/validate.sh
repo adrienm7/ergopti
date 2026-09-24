@@ -234,11 +234,11 @@ if [ -z "$LUA_BIN" ]; then
 else
 	if ( cd "$DRIVER_DIR" && sudo env LUA_PATH="$HW_PATH" "$LUA_BIN" \
 		tests/hardware/run_grab_race.lua >>"$REPORT" 2>&1 ); then
-		ok "grab holds and an interleaved burst comes back in order (C4, HARDWARE.md §4)"
+		ok "grab holds, an interleaved burst comes back in order (C4, HARDWARE.md §4), and neither the grab nor the virtual keyboard outlives the daemon"
 	else
 		case $? in
 			2) skip "grab race: this machine cannot host it (no writable /dev/uinput)" ;;
-			*) no  "grab race FAILED — see $REPORT; this is the 'abcd' -> 'acd' corruption" ;;
+			*) no  "grab race FAILED — see $REPORT; the 'abcd' -> 'acd' corruption, or a grab left behind by a dead daemon" ;;
 		esac
 	fi
 

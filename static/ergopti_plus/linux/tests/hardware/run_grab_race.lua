@@ -6,7 +6,9 @@
 --- Asserts, against a real kernel, the two properties the whole Linux rewrite
 --- exists to obtain: that a grabbed device delivers its events to us and to
 --- nobody else, and that keystrokes arriving DURING an expansion come out after
---- it, in the order they were typed.
+--- it, in the order they were typed. Then the property that makes taking the
+--- grab safe at all: neither the grab nor the virtual keyboard outlives a daemon
+--- that dies while a child it started (`xdg-open … &`) is still running.
 ---
 --- WHY THIS IS THE CHECK THAT MATTERED MOST AND HAD NO TEST:
 --- The driver's one user-facing bug was `"abcd"` → `"acd"` — text scrambled when
@@ -65,6 +67,16 @@ local KEY_A = 30
 local KEY_B = 48
 local KEY_C = 46
 local KEY_D = 32
+
+-- The argument that re-runs this script as a daemon that dies without closing
+-- anything (section 7). A second process is the only faithful model: a daemon
+-- cannot observe its own death, and closing the descriptors by hand is exactly
+-- the cleanup a crash skips.
+local DYING_DAEMON_FLAG = "--dying-daemon"
+
+-- How long the dying daemon's child outlives it. Far longer than the checks
+-- that need it alive; the harness kills it as soon as they are done.
+local ORPHAN_CHILD_SECONDS = 30
 
 local _failures = 0
 local _checks   = 0
@@ -160,6 +172,85 @@ local function await_node(name)
 	return nil
 end
 
+--- Waits for a named device to disappear.
+--- @param name string
+--- @return boolean True when the kernel no longer lists it.
+local function await_gone(name)
+	for _ = 1, NODE_WAIT_ATTEMPTS do
+		if not node_for(name) then return true end
+		sleep(NODE_WAIT_SECONDS)
+	end
+	return false
+end
+
+--- Quotes one word for /bin/sh.
+--- @param word string
+--- @return string
+local function shell_quote(word)
+	return "'" .. (word:gsub("'", "'\\''")) .. "'"
+end
+
+--- Whether a process still exists.
+--- @param pid integer
+--- @return boolean
+local function is_alive(pid)
+	local result = os.execute(string.format("kill -0 %d 2>/dev/null", pid))
+	return result == true or result == 0
+end
+
+--- The daemon role: takes the device the way the daemon does, starts a child
+--- the way the daemon starts `xdg-open … &`, prints the child's pid and exits
+--- without closing anything, so the kernel is left to close what a crash
+--- leaves open.
+--- @param what string "grab" (the physical keyboard) or "uinput" (its own device).
+--- @param node string|nil The event node to grab, for "grab".
+local function run_as_dying_daemon(what, node)
+	if what == "grab" then
+		EvdevReader.use_ffi_backend()
+		if not (EvdevReader.open(node) and EvdevReader.grab()) then
+			abort("the dying daemon could not grab " .. tostring(node))
+		end
+	elseif what == "uinput" then
+		UinputWriter.use_ffi_backend()
+		if not UinputWriter.open() then
+			abort("the dying daemon could not create its virtual keyboard")
+		end
+		-- A forwarded key still down when the daemon dies: only destroying the
+		-- device makes the kernel release it.
+		UinputWriter.emit(KEY_A, 1)
+	else
+		abort("unknown dying-daemon role: " .. tostring(what))
+	end
+	local pipe = io.popen(string.format("sleep %d </dev/null >/dev/null 2>&1 & echo $!",
+		ORPHAN_CHILD_SECONDS))
+	if not pipe then abort("the dying daemon could not start its child") end
+	local pid = pipe:read("*l")
+	pipe:close()
+	io.write(tostring(pid), "\n")
+	io.stdout:flush()
+	os.exit(0)
+end
+
+--- Runs this script as a dying daemon and returns the pid of the child it left.
+--- @param what string See run_as_dying_daemon.
+--- @param node string|nil
+--- @return integer|nil
+local function run_dying_daemon(what, node)
+	local interpreter, script = arg and arg[-1], arg and arg[0]
+	if type(interpreter) ~= "string" or type(script) ~= "string" then
+		abort("cannot tell which interpreter runs this script, so it cannot be re-run as a daemon")
+	end
+	local command = table.concat({
+		shell_quote(interpreter), shell_quote(script), DYING_DAEMON_FLAG, shell_quote(what),
+		node and shell_quote(node) or "",
+	}, " ")
+	local pipe = io.popen(command, "r")
+	if not pipe then return nil end
+	local pid = tonumber(pipe:read("*l"))
+	pipe:close()
+	return pid
+end
+
 
 
 
@@ -169,6 +260,10 @@ end
 -- ======= 2/ Setting up the device =======
 -- ========================================
 -- ========================================
+
+if arg and arg[1] == DYING_DAEMON_FLAG then
+	run_as_dying_daemon(arg[2], arg[3])
+end
 
 print("=== grab + race, against a real kernel ===")
 
@@ -347,6 +442,69 @@ UinputWriter.close()
 sleep(0.2)
 local reborn = node_for(TEST_DEVICE_NAME)
 check(reborn == nil, "closing the writer removes the device node — no orphan keyboard is left behind")
+
+
+
+
+
+-- ==============================================
+-- ==============================================
+-- ======= 7/ Nothing outlives the daemon =======
+-- ==============================================
+-- ==============================================
+
+print("--- the daemon dies while a child it started is still running ---")
+
+-- EVIOCGRAB and the virtual keyboard belong to open FILES, not to the process.
+-- A child inherits every descriptor opened without O_CLOEXEC and keeps those
+-- files open after the daemon is gone: the keyboard stays grabbed by a process
+-- that never reads it, the restarted daemon's grab fails with EBUSY, and a key
+-- the daemon had forwarded stays down on a virtual keyboard nobody destroys.
+
+-- 7a. The physical keyboard, stood in for by a device this harness owns.
+if not UinputWriter.open() then
+	abort("could not create a second virtual keyboard on /dev/uinput.")
+end
+local keyboard_node = await_node(TEST_DEVICE_NAME)
+if not keyboard_node then
+	UinputWriter.close()
+	abort("the kernel created no /dev/input node for the stand-in keyboard.")
+end
+
+local grab_child = run_dying_daemon("grab", keyboard_node)
+check(grab_child ~= nil and is_alive(grab_child),
+	"the child the grabbing daemon started outlives it (the case under test)")
+
+EvdevReader.open(keyboard_node)
+UinputWriter.emit(KEY_C, 1)
+UinputWriter.emit(KEY_C, 0)
+local after_death = 0
+for _ = 1, 4 do
+	if after_death >= 2 then break end
+	if EvdevReader.wait_readable(READ_TIMEOUT_MS) then
+		EvdevReader.drain(function(ev)
+			if ev and ev.type == InputEvent.EV_KEY and ev.code == KEY_C then
+				after_death = after_death + 1
+			end
+		end)
+	end
+end
+check_eq(after_death, 2,
+	"a key typed after the daemon died reaches the desktop again (no orphaned grab)")
+check(EvdevReader.grab() == true, "and a restarted daemon can take the grab again")
+EvdevReader.close()
+UinputWriter.close()
+if grab_child then os.execute(string.format("kill %d 2>/dev/null", grab_child)) end
+check(await_gone(TEST_DEVICE_NAME), "the stand-in keyboard is removed before the next case")
+
+-- 7b. The daemon's own virtual keyboard.
+local uinput_child = run_dying_daemon("uinput")
+check(uinput_child ~= nil and is_alive(uinput_child),
+	"the child the daemon with a virtual keyboard started outlives it (the case under test)")
+check(await_gone(TEST_DEVICE_NAME),
+	"the daemon's virtual keyboard is destroyed with it, so the key it held is released")
+if uinput_child then os.execute(string.format("kill %d 2>/dev/null", uinput_child)) end
+await_gone(TEST_DEVICE_NAME)
 
 print(string.format("=== %d check(s), %d failure(s) ===", _checks, _failures))
 os.exit(_failures == 0 and 0 or 1)
