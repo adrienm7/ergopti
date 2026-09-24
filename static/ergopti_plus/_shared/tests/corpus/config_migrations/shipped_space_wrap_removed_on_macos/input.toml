@@ -1,0 +1,16 @@
+# _shared/tests/corpus/config_migrations/shipped_space_wrap_removed_on_macos/input.toml
+
+# Hammerspoon configuration — auto-generated. Hand-edits are
+# preserved across saves provided the file remains valid TOML.
+
+[gestures]
+enabled = true
+space_wrap = false
+swipe_3_left = "words"
+
+[hotstrings]
+enabled = true
+trigger_char = "★"
+
+[script]
+log_level = "INFO"

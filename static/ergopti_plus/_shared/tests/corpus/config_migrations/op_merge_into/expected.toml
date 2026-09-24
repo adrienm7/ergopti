@@ -1,0 +1,12 @@
+# _shared/tests/corpus/config_migrations/op_merge_into/expected.toml
+
+[_meta]
+schema_version = 2
+
+[hotstrings]
+enabled = true
+fr_accents = false
+fr_rolls = true
+
+[hotstrings.groups.extra]
+kept = true

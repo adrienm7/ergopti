@@ -1,0 +1,14 @@
+# _shared/tests/corpus/config_migrations/op_map_value/expected.toml
+
+[_meta]
+schema_version = 2
+
+[layout]
+variant = "custom"
+
+[metrics]
+legacy_flag = "1"
+metrics_encrypt = true
+
+[updater]
+channel = "main"

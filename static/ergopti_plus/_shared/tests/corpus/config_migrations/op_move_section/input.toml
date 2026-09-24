@@ -1,0 +1,18 @@
+# _shared/tests/corpus/config_migrations/op_move_section/input.toml
+
+[gestures]
+enabled = true
+tap_3 = "screenshot"
+
+[linux.gestures]
+swipe_3_up = "open_url"
+tap_3 = "left_click"
+
+[old]
+a = 1
+
+[old.child]
+b = "x"
+
+[old.child.deep]
+c = [1, 2]

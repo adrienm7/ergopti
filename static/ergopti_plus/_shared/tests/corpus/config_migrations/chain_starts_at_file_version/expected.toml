@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/chain_starts_at_file_version/expected.toml
+
+[_meta]
+note = "kept"
+schema_version = 4
+
+[t]
+a = "x"

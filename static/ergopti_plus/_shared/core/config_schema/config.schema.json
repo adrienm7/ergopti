@@ -8,6 +8,7 @@
 	"_comment_required": "Deliberately absent. Which top-level sections a config.toml must carry is per-driver, and the feature manifest's `platforms` list already says so — [sections.script] is [\"ahk\", \"hs\"] because Linux keeps its locale in its own XDG store. A hardcoded `required` here restated that in a second place, disagreed with the first, and the disagreement had to be pinned as a known gap. test-config-schema.cjs derives the presence rule from the manifest instead, per driver.",
 
 	"properties": {
+		"_meta": { "$ref": "#/$defs/meta" },
 		"script": { "$ref": "#/$defs/script" },
 		"hotstrings": { "$ref": "#/$defs/hotstrings" },
 		"llm": { "$ref": "#/$defs/llm" },
@@ -19,6 +20,15 @@
 	},
 
 	"$defs": {
+		"meta": {
+			"description": "File metadata. schema_version is the config version the drivers migrate from at boot (_shared/core/config_schema/migrations.toml; docs/adr/009-config-versioning.md). A file without it is the registry's unstamped_version.",
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"schema_version": { "type": "integer", "minimum": 1 }
+			}
+		},
+
 		"feature_toggle": {
 			"description": "Universal feature toggle. ``enabled`` is required; ``time_activation_seconds`` is optional (omission = instant activation).",
 			"type": "object",

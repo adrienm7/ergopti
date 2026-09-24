@@ -242,6 +242,7 @@ const CHECKS = [
 	{ name: 'untracked driver artifacts cannot contaminate commit-candidate gates', cmd: 'node', args: ['tools/test/test-untracked-driver-artifacts-do-not-affect-gates.cjs'], repro: 'node tools/test/test-untracked-driver-artifacts-do-not-affect-gates.cjs' },
 	{ name: 'driver config surface is declared in the manifest (ratchet)', cmd: 'node', args: ['tools/test/test-driver-config-surface-is-declared.cjs'], repro: 'node tools/test/test-driver-config-surface-is-declared.cjs' },
 	{ name: 'config schema (v2 TOML shape)', cmd: 'node', args: ['tools/test/test-config-schema.cjs'], repro: 'node tools/test/test-config-schema.cjs' },
+	{ name: 'config migrations (registry chain, closed op set, corpus replay)', cmd: 'node', args: ['tools/test/test-config-migrations.cjs'], repro: 'node tools/test/test-config-migrations.cjs' },
 	{ name: 'metrics heatmap translation coverage', cmd: 'node', args: ['tools/test/test-metrics-heatmap-translation.cjs'], repro: 'node tools/test/test-metrics-heatmap-translation.cjs' },
 	{ name: 'metrics rebuild banner (partial snapshots are labelled)', cmd: 'node', args: ['tools/test/test-metrics-rebuild-banner.cjs'], repro: 'npm run test:metrics-rebuild-banner' },
 	// CI verifies AHK encoding with an inline PowerShell step rather than this
