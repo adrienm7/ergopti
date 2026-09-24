@@ -138,22 +138,48 @@ function M.on_message(payload, state)
 		}
 	elseif action == "save" then
 		local config_paths = dependency(state, "config_paths", "infra.config_paths")
+		-- A page that sends no logs folder keeps the stored one. A folder it
+		-- does send is validated before anything is stored: refusing it after
+		-- the configuration folder was saved reported a failed save that had
+		-- half happened.
+		local logs_dir = nil
+		if type(payload.logsDir) == "string" then
+			if not config_paths or type(config_paths.normalize_logs_dir) ~= "function"
+				or type(config_paths.set_logs_dir) ~= "function" then
+				Logger.error(LOG, "The logs folder cannot be saved without its writer; editor remains open.")
+				return { saved = false }
+			end
+			local normalized, refusal = config_paths.normalize_logs_dir(payload.logsDir)
+			if normalized == nil then
+				Logger.error(LOG, "Logs folder '%s' was refused (%s); nothing was saved and the editor remains open.",
+					payload.logsDir, tostring(refusal))
+				return { saved = false }
+			end
+			logs_dir = payload.logsDir
+		end
 		local saved = config_paths and type(config_paths.set_config_dir) == "function"
 			and config_paths.set_config_dir(payload.configDir) == true
 		if not saved then
         Logger.error(LOG, "Configuration directory was not persisted; editor remains open.")
 			return { saved = false }
 		end
-		-- A page that sends no logs folder keeps the stored one.
-		if type(payload.logsDir) == "string" then
-			local logs_saved, logs_err = false, "config_paths.set_logs_dir is unavailable"
-			if type(config_paths.set_logs_dir) == "function" then
-				logs_saved, logs_err = config_paths.set_logs_dir(payload.logsDir)
-			end
+		if logs_dir ~= nil then
+			local logs_saved, logs_err = config_paths.set_logs_dir(logs_dir)
 			if logs_saved ~= true then
 				Logger.error(LOG, "Logs folder was not persisted (%s); editor remains open.", tostring(logs_err))
 				return { saved = false }
 			end
+			-- The daemon outlives this editor's reload, so the running sink is
+			-- moved now; until it is, every opener names the folder it writes.
+			local sink = dependency(state, "logger_sink", "infra.logger_sink")
+			local moved, move_err = false, "the logger sink cannot be moved"
+			if sink and type(sink.repoint) == "function" then moved, move_err = sink.repoint() end
+			if moved ~= true then
+				Logger.error(LOG, "Logs folder saved, but the logger could not move there (%s); editor remains open.",
+					tostring(move_err))
+				return { saved = false }
+			end
+			Logger.info(LOG, "Logs now written to %s.", config_paths.get_logs_dir())
 		end
 		local hidden = hide(state)
 		local reloaded = false

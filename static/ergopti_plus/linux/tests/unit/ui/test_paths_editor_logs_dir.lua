@@ -11,6 +11,12 @@
 --- 2. Browsing for the logs folder answers the logs field.
 --- 3. Saving stores the logs folder the resolver will use, and a page that
 ---    sends none keeps the stored one.
+--- 4. A refused logs folder saves nothing: validating it after the
+---    configuration folder was stored reported a failed save that had half
+---    happened.
+--- 5. A saved logs folder moves the running sink. The daemon outlives the
+---    editor's reload, so without the move the lines kept going to the old
+---    folder while every opener named the new one.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -39,6 +45,13 @@ local function with_bridge(stored, body)
 	local ok, err = pcall(function()
 		local handler = helpers.load_module("ui.paths_editor.bridge")
 		local pushed = {}
+		-- The running sink: a save must move it, since the daemon outlives
+		-- this editor's reload.
+		local sink = { moves = 0 }
+		function sink.repoint()
+			sink.moves = sink.moves + 1
+			return sink.repoint_result ~= false, "the folder is not writable"
+		end
 		local state = {
 			webview_manager = {
 				eval_js = function(_, code)
@@ -48,6 +61,7 @@ local function with_bridge(stored, body)
 				hide = function() return true end,
 			},
 			on_reload = function() return true end,
+			logger_sink = sink,
 		}
 		body(handler, state, values, pushed)
 	end)
@@ -93,6 +107,43 @@ helpers.describe("paths editor: logs folder (paths-editor-logs-dir)", function()
 			local result = handler.on_message({ action = "save", configDir = "" }, state)
 			helpers.assert_true(result.saved == true)
 			helpers.assert_eq(values["paths.logs_dir"], "/sync/ergopti_plus")
+		end)
+	end)
+
+	helpers.it("refuses a relative logs folder before saving the configuration folder", function()
+		with_bridge({}, function(handler, state, values)
+			local result = handler.on_message({
+				action = "save", configDir = "/tmp/ergopti-custom/", logsDir = "logs",
+			}, state)
+			helpers.assert_true(result.saved == false)
+			helpers.assert_nil(values["paths.config_dir"], "a refused save must not half happen")
+			helpers.assert_nil(values["paths.logs_dir"])
+			helpers.assert_eq(state.logger_sink.moves, 0)
+		end)
+	end)
+
+	helpers.it("moves the running sink to the saved logs folder", function()
+		with_bridge({}, function(handler, state, values)
+			local result = handler.on_message({ action = "save", configDir = "", logsDir = "/sync/logs" }, state)
+			helpers.assert_true(result.saved == true)
+			helpers.assert_eq(values["paths.logs_dir"], "/sync/logs/ergopti_plus")
+			helpers.assert_eq(state.logger_sink.moves, 1, "the sink must follow the saved folder")
+		end)
+	end)
+
+	helpers.it("keeps the editor open when the sink cannot move to the saved folder", function()
+		with_bridge({}, function(handler, state)
+			state.logger_sink.repoint_result = false
+			local result = handler.on_message({ action = "save", configDir = "", logsDir = "/sync/logs" }, state)
+			helpers.assert_true(result.saved == false)
+		end)
+	end)
+
+	helpers.it("leaves the sink alone when the page sends no logs folder", function()
+		with_bridge({ ["paths.logs_dir"] = "/sync/ergopti_plus" }, function(handler, state)
+			local result = handler.on_message({ action = "save", configDir = "" }, state)
+			helpers.assert_true(result.saved == true)
+			helpers.assert_eq(state.logger_sink.moves, 0)
 		end)
 	end)
 

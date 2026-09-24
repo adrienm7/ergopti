@@ -23,6 +23,7 @@ local Logger        = require("logger.shim")
 local Snapshot      = require("diagnostics.snapshot")
 local Version       = require("infra.version")
 local ConfigPaths   = require("infra.config_paths")
+local LoggerSink    = require("infra.logger_sink")
 local Paths         = require("infra.paths")
 local DisplayServer = require("infra.display_server")
 
@@ -220,8 +221,8 @@ function M.collect(ctx, env)
 		dpi              = nil,
 		display          = display,
 		config_dir       = Snapshot.redact_home(ConfigPaths.get_config_dir(), ConfigPaths.home()),
-		-- Where this report's own logs are, from the one logs-folder resolver.
-		logs_dir         = Snapshot.redact_home(ConfigPaths.get_logs_dir(), ConfigPaths.home()),
+		-- Where this report's own logs are: the folder the sink writes.
+		logs_dir         = Snapshot.redact_home(LoggerSink.log_dir(), ConfigPaths.home()),
 		log_level        = ctx.log_level,
 		features_enabled = Snapshot.features_ratio(ctx.features_enabled, ctx.features_total),
 		boot_ms          = ctx.boot_ms and string.format("%.0f", ctx.boot_ms) or nil,
