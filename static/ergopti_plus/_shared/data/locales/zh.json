@@ -2670,6 +2670,7 @@
 	"platform_reason.layer_repeat_count_is_windows_only": "目前仅限 Windows：重复次数需要层在下一个按键之前记住一个数字，Windows 层会自行完成这一点。macOS 上的 Karabiner-Elements 和 Linux 上的 kanata 单独处理每次按键，不会在两个按键之间保存计数。",
 	"platform_reason.layer_fn_modifier_is_macos": "仅限 macOS：Fn 只有在 Mac 上才是修饰键。PC 键盘在键盘内部处理 Fn，因此 Windows 和 Linux 永远收不到它，也无法发送它。",
 	"platform_reason.layer_spotlight_is_macos": "仅限 macOS：此操作打开 macOS 的搜索功能 Spotlight。在 Windows 或 Linux 上，请改为将桌面环境自带的搜索快捷键绑定为按键组合。",
+	"platform_reason.layer_wheel_source_is_not_macos": "仅限 Windows 和 Linux：在 macOS 上，该层运行于 Karabiner-Elements 中，而它无法接收鼠标滚轮输入。如需在 macOS 上用滚轮调节音量，请使用 Layer + Scroll 快捷键。",
 	"platform_reason.debug_surface_is_each_drivers_own": "每个驱动通过自己的运行时调试：AutoHotkey 提供 Window Spy、变量列表和按键历史，Hammerspoon 提供 Lua 控制台。其他运行时没有可打开的对应物。",
 	"platform_reason.chord_families_are_each_platforms": "驱动所绑定的组合键族属于它的平台：Windows 归拢 AltGr 和 CapsLock 组合并保有一份个人快捷键文件，macOS 归拢 Ctrl 和 Cmd 快捷键。每个驱动只列出自己绑定的那一族。",
 	"platform_reason.metrics_extras_are_not_on_linux": "Linux 上没有：该驱动没有按应用的排除名单，也无法从此菜单把度量窗口挂到键盘快捷键上。",

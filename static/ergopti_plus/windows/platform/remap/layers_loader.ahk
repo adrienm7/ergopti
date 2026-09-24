@@ -113,17 +113,24 @@ KeymapLayers_NewContext(Registry, Sections) {
 	}
 	Actions := Map()
 	Restricted := Map()
+	SourceKinds := Map()
 	for Name, Section in Sections {
 		if (SubStr(Name, 1, 8) == "actions.")
 			Actions[SubStr(Name, 9)] := Section
 		else if (SubStr(Name, 1, 10) == "modifiers.")
 			Restricted[SubStr(Name, 11)] := Section
+		else if (SubStr(Name, 1, 13) == "source_kinds.")
+			SourceKinds[SubStr(Name, 14)] := Section
 	}
 	if (Actions.Count == 0)
 		throw Error("The layer vocabulary declares no action.", -1)
 	for Modifier, Rule in Restricted {
 		if !Rule.Has("platforms") || !(Rule["platforms"] is Array)
 			throw Error("The layer vocabulary's [modifiers." . Modifier . "] has no platforms list.", -1)
+	}
+	for Kind, Rule in SourceKinds {
+		if !Rule.Has("platforms") || !(Rule["platforms"] is Array)
+			throw Error("The layer vocabulary's [source_kinds." . Kind . "] has no platforms list.", -1)
 	}
 	return Map(
 		"keys", Registry["keys"],
@@ -135,6 +142,7 @@ KeymapLayers_NewContext(Registry, Sections) {
 		"call_handlers", Handlers,
 		"repeat_count", RepeatCount,
 		"restricted_modifiers", Restricted,
+		"source_kinds", SourceKinds,
 		"actions", Actions
 	)
 }
@@ -279,7 +287,8 @@ _KL_LoadLayer(Result, LayerId, Layer, Os, Ctx) {
 	for Code, Entry in Effective {
 		if !(Entry["binding"] is Map)
 			continue
-		Resolved := _KL_ResolveBinding(Entry["binding"], Os, Ctx, &Unavailable)
+		Unavailable := _KL_SourceUnavailable(Code, Os, Ctx)
+		Resolved := (Unavailable is Map) ? "" : _KL_ResolveBinding(Entry["binding"], Os, Ctx, &Unavailable)
 		if (Resolved is Map)
 			Out[Code] := Resolved
 		else
@@ -427,6 +436,19 @@ _KL_ParseResolution(Text, Os, Ctx) {
 		return Map("kind", "keystroke", "chords", Chords)
 	}
 	throw Error("Vocabulary resolution '" . Text . "' is not keystroke:, call: or none.", -1)
+}
+
+; Says why a physical input cannot be a layer key on one OS: a Map of detail
+; and reason_key, or "" when it can.
+_KL_SourceUnavailable(Code, Os, Ctx) {
+	Kind := Ctx["keys"][Code]["kind"]
+	if !Ctx["source_kinds"].Has(Kind)
+		return ""
+	Rule := Ctx["source_kinds"][Kind]
+	if _KL_ListHas(Rule["platforms"], Os)
+		return ""
+	return Map("detail", "a " . Kind . " input cannot be a layer key on " . Os,
+		"reason_key", Rule.Get("reason_key", ""))
 }
 
 ; Resolves one syntactically valid binding on one OS. Returns the resolution,
