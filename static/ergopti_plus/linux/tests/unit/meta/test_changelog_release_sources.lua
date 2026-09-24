@@ -252,9 +252,41 @@ helpers.describe("changelog_bridge: native fetch push", function()
 		calls[1].callback(200, "[{\"tag_name\":\"v2.4.0\"}]", nil)
 		helpers.assert_eq(#pushed, 1)
 		helpers.assert_eq(pushed[1].action, "releases")
-		helpers.assert_eq(pushed[1].channel, "main")
 		helpers.assert_eq(pushed[1].json, "[{\"tag_name\":\"v2.4.0\"}]", "API text is pushed for the page to parse")
 		helpers.assert_nil(pushed[1].feed)
+		Bridge._reset()
+	end)
+
+	-- The window used to open on "main" whatever the user followed, so a dev
+	-- subscriber saw an empty stable list first.
+	for _, subscribed in ipairs({ "dev", "main" }) do
+		helpers.it("opens on the subscribed channel (" .. subscribed .. ")", function()
+			local calls, pushed = install()
+			local real = require("modules.updater.manager")
+			local previous = package.loaded["modules.updater.manager"]
+			package.loaded["modules.updater.manager"] = setmetatable({
+				get_channel = function() return subscribed end,
+				get_cached_release = function() return nil end,
+			}, { __index = real })
+			local ok, err = pcall(function()
+				local initial = Bridge.on_message("ready", {})
+				helpers.assert_eq(initial.channel, subscribed, "the first view is the subscribed channel")
+				calls[1].callback(200, "[]", nil)
+				helpers.assert_eq(pushed[1].channel, subscribed, "the fetched list is pushed for that channel")
+			end)
+			package.loaded["modules.updater.manager"] = previous
+			Bridge._reset()
+			if not ok then error(err, 0) end
+		end)
+	end
+
+	helpers.it("refuses a fetch for a channel outside the registry", function()
+		local calls = install()
+		for _, unknown in ipairs({ "stable", "beta", "Main" }) do
+			local answer = Bridge.on_message({ action = "fetch", channel = unknown }, {})
+			helpers.assert_eq(answer.action, "releases_error", unknown .. " must be refused")
+		end
+		helpers.assert_eq(#calls, 0, "no request may start for an unknown channel")
 		Bridge._reset()
 	end)
 

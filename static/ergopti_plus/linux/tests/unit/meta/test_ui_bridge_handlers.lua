@@ -1322,9 +1322,8 @@ helpers.describe("ui.bridge_handlers", function()
       local result = handler.on_message("ready", state)
       helpers.assert_true(type(result) == "table")
       helpers.assert_eq(result.action, "releases")
-      -- The channel the installation follows: "dev" for prereleases.
-      local followed = require("modules.updater.manager").get_channel() == "dev" and "dev" or "main"
-      helpers.assert_eq(result.channel, followed)
+      helpers.assert_eq(result.channel, require("modules.updater.manager").get_channel(),
+        "the page opens on the subscribed channel")
       helpers.assert_eq(type(result.cache_miss), "boolean")
       helpers.assert_true(type(result.releases) == "table")
       helpers.assert_true(type(result.repo_url) == "string")
@@ -1332,7 +1331,8 @@ helpers.describe("ui.bridge_handlers", function()
     end)
     helpers.it("returns cached releases in the exact schema the page renders (lnx-056)", function()
       local previous = package.loaded["modules.updater.manager"]
-      package.loaded["modules.updater.manager"] = {
+      local real = require("modules.updater.manager")
+      package.loaded["modules.updater.manager"] = setmetatable({
         get_channel = function() return "dev" end,
         get_cached_release = function()
           return {
@@ -1340,7 +1340,7 @@ helpers.describe("ui.bridge_handlers", function()
             published_at = "2026-08-31T12:00:00Z", prerelease = true,
           }
         end,
-      }
+      }, { __index = real })
       local result = handler.on_message({ action = "fetch", channel = "dev" }, state)
       package.loaded["modules.updater.manager"] = previous
       helpers.assert_eq(result.channel, "dev")

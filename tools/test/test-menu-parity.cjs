@@ -98,10 +98,9 @@ const OPENS_SUBMENU = {
 	// macOS and Linux — and each declaration inside is narrower than that, for the
 	// reason each carries.
 	apps: 'apps_menu',
-	// The About submenu, declared 2026-08-07. Visible on all three; the updater
-	// rows inside are narrower and say why.
+	// The About submenu, declared 2026-08-07. Visible on all three, with the same
+	// rows: Linux folded its top-level Updates submenu into it in 2026-09.
 	about: 'about_menu',
-	updates: 'updates_menu',
 	// The LLM submenu, which had no manifest tree at all until 2026-08-06: the
 	// top-level row has existed on all three drivers since the feature shipped
 	// and each built the submenu beneath it by hand, so the section and its six
@@ -541,7 +540,10 @@ if (unreasoned.length < UNREASONED_BASELINE) {
 // linux 14 → 13, and no loss: its Applications submenu is gone. It held one
 // row, the config folder, which moved to the Configuration submenu the three
 // drivers render (global_actions became configuration_menu on all of them).
-const RENDERED_THROUGH_SHARED = { hs: 13, linux: 13 };
+// linux 13 → 12 in 2026-09: the Updates submenu folded into About (about_menu
+// renders the same rows on all three drivers), so one menu key went away
+// without any row leaving the renderer.
+const RENDERED_THROUGH_SHARED = { hs: 13, linux: 12 };
 
 const DRIVER_ROOTS = { hs: path.join(SP, 'macos'), linux: path.join(SP, 'linux') };
 
