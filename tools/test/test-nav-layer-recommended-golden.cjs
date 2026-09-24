@@ -27,7 +27,8 @@
  * repeat_count:3, call:maximize_window — computed from its Send string alone.
  * nav_layer.ahk may only hold the activation special cases (CapsWord through
  * LAlt, the LAlt key-up fix, the swallowed Space); they are listed by name here,
- * so a hand-written binding cannot come back under another condition. The
+ * so a hand-written binding cannot come back under another condition, and it
+ * must call NavLayer_Init with the configuration folder once at boot. The
  * recommended file must also resolve with zero errors on every OS, and its layer
  * ids must be exactly the layers the tap-hold hold picker offers — while the
  * tap-hold defaults bind no layer key of their own.
@@ -228,6 +229,13 @@ for (let i = 0; i < lines.length; i++) {
 }
 for (const s of SPECIAL_CASES) if (!specialSeen.has(s.token)) fail(`the ${s.token} special case was not found in nav_layer.ahk — the parser or the file changed`);
 if (hotkeys !== SPECIAL_CASES.length) fail(`nav_layer.ahk declares ${hotkeys} hotkey(s); only the ${SPECIAL_CASES.length} activation fixes belong there`);
+
+// The table is registered at boot from the root of the configuration folder,
+// where layers.toml lives on every OS. Without this one top-level call the
+// Windows layer binds nothing while every table test stays green.
+const INIT_CALL = 'NavLayer_Init(_SharedDir, _ConfigDir)';
+const initCalls = lines.filter((line) => line.trimEnd() === INIT_CALL).length;
+if (initCalls !== 1) fail(`nav_layer.ahk must call ${INIT_CALL} once at the top level, found ${initCalls}`);
 
 
 

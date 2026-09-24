@@ -299,9 +299,11 @@ NavLayer_Register(Rows, HotkeyFn := Hotkey, HotIfFn := HotIf) {
  * at boot; an absent file registers nothing.
  * @param {string} SharedDir - The _shared folder.
  * @param {string} ConfigDir - The configuration folder holding layers.toml.
+ * @param {Func} HotkeyFn - Hotkey registrar; injectable for tests.
+ * @param {Func} HotIfFn - HotIf selector; injectable for tests.
  * @returns {Integer} The number of hotkeys registered, 0 when none could be.
  */
-NavLayer_Init(SharedDir, ConfigDir) {
+NavLayer_Init(SharedDir, ConfigDir, HotkeyFn := Hotkey, HotIfFn := HotIf) {
 	global NAV_LAYER_ID
 	LoggerStart("NavLayer", "Loading the navigation layer from '{1}'…", ConfigDir)
 	try {
@@ -319,7 +321,7 @@ NavLayer_Init(SharedDir, ConfigDir) {
 					LayerId, Result["path"], NAV_LAYER_ID)
 		}
 		Bindings := Result["layers"].Has(NAV_LAYER_ID) ? Result["layers"][NAV_LAYER_ID] : Map()
-		Registered := NavLayer_Register(NavLayer_BuildTable(Bindings, Ctx))
+		Registered := NavLayer_Register(NavLayer_BuildTable(Bindings, Ctx), HotkeyFn, HotIfFn)
 	} catch as Err {
 		LoggerError("NavLayer", "The navigation layer could not be registered: {1}.", Err.Message)
 		return 0
