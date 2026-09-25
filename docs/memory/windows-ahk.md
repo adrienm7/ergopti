@@ -142,6 +142,68 @@ actionable item goes through `RegisterMenuItem` and the menu dispatcher.
 Tests of injected input must prove provenance and destination, not merely that a
 key-shaped event appeared in a hook.
 
+## Tap-holds and synthetic modifiers
+
+### project-ahk-modifier-name-hotkey-shadows-scan-code
+
+`RAlt::` (also with `~ * $`, or as `vkA5`) is its own hotkey identity, hooked on
+the modifier's standard scan code. When none of its variants is eligible, AHK
+does not fall back to the `SC138` variants of the same key, so the Kana-layout
+AltGr tap-hold never fired (measured, v2.0.26). `$` and `~` do not form an
+identity; `*` does. Action: declare modifier-key hotkeys by scan code only;
+`test_modifier_hotkeys_single_identity.ahk` bans the name form.
+
+### project-ahk-a-priorkey-is-a-layout-name
+
+`A_PriorKey` is `GetKeyName` of the recorded vk and sc through the active
+layout: never `SCxxx`, `Backspace` rather than `BackSpace`, `^` for the Kana
+AltGr, and `==` compares it case-sensitively. Action: guard taps with
+`TapHoldPriorKeyIsSelf(KeyId)`, never a literal name.
+
+### project-ahk-send-lifts-modifiers-it-did-not-press
+
+Without `{Blind}`, a Send lifts every modifier held by another source (a
+physical key, a `~` pass-through hold) around its key, but keeps the ones this
+process pressed with `{X Down}` (measured). A bare tap output therefore dropped
+a held Shift while CapsLock held as Ctrl survived. Action: send keystroke taps
+through `TapHoldEmitKeyTap`, which adds `{Blind}` only when a modifier is down,
+so the bare `{BackSpace}` the hotstring buffer matches is unchanged. Keep
+`{Blind}` out of the shared gesture callbacks: gestures and shortcut slots fire
+them while their own carrier modifier is held.
+
+### project-ahk-hotkey-without-wildcard-ignores-held-modifiers
+
+A hotkey without `*` does not fire while any extra modifier is logically down,
+the script's own level-0 synthetic holds included (measured); the key then
+performs its native function and the tap and hold are lost. Action: every
+tap-hold variant on CapsLock and the modifier keys carries `*`
+(`test_tap_hold_hotkeys_admit_held_modifiers.ahk`). Tab, Space, Enter, Escape,
+Backspace and Delete stay the key itself under a held modifier on every driver
+(Linux `NATIVE_UNDER_MODIFIER`, the macOS rules); do not add `*` to their
+tap-only variants.
+
+### project-ahk-lone-alt-win-release-needs-a-mask
+
+Releasing a synthetic Alt or Win that no key followed puts classic windows in
+menu mode or opens Start, and the next tap output lands there. Action: send
+`TextSendMenuMask` (`{Blind}{vkff}`, the driver's `A_MenuMaskKey`) before the
+release, as `_TapHoldReleaseOwnedModifier` does; Linux masks with KEY_F24.
+
+### project-ahk-kana-altgr-is-sc138-not-ralt
+
+On Kana-style layouts VK_RMENU has no scan code: a synthetic RAlt is a plain Alt
+that enters menu mode, and the AltGr key is SC138. Action: resolve AltGr through
+`KS_AltGrKeyName()`, never a literal `RAlt`.
+
+### project-ahk-worker-processes-inherit-driver-identity
+
+AHK creates the tray icon, the main window and every load-time hotkey before a
+script's first statement, so a worker re-running the entry looked like a second
+driver and armed a second keyboard hook. Action: keep `#NoTrayIcon` at the
+entry and reveal the icon on the driver path only; a worker suspends and
+retitles itself first (`WinSetTitle` on the pure `A_ScriptHwnd` reaches the
+hidden window without a DllCall).
+
 ## Files, configuration, and UI hosts
 
 ### project-ahk-unreadable-config-persists-defaults

@@ -306,6 +306,33 @@ cost is observable typing latency.
 macOS touch-device readiness is gated by the kernel until first physical touch.
 Do not add repeated user-space probes that cannot change readiness.
 
+### project-karabiner-unlisted-held-modifier-blocks-the-rule
+
+Karabiner matches a rule only when every held modifier is mandatory or optional
+in its `from.modifiers`; `to_if_alone` then goes out with the modifiers held at
+key-down. Action: the modifier-type tap-hold keys and CapsLock accept
+`optional: ["any"]`, so their taps combine with held modifiers; Escape, Tab,
+Space, Return and Backspace accept only `caps_lock`, so a held modifier leaves
+them native (Cmd+Tab, Shift+Tab) as on Windows and Linux.
+
+### project-hs-f17-actions-are-told-apart-by-modifiers
+
+`alt_tab_windows`, `alt_tab_apps`, `alt_tab_monitor` and `cycle_windows_in_app`
+share F17 and differ only by modifiers, bound as exact-match Hammerspoon
+hotkeys. A modifier held while one is tapped is added to its trigger, which
+then runs another action or none. Action: a tap reached under a held modifier
+must not carry one of them unless the rule removes the held modifiers around the
+trigger.
+
+### project-sparkle-consent-is-plist-owned
+
+Sparkle 2.9 reads `SUAllowsAutomaticUpdates` from Info.plist only, and
+`automaticallyDownloadsUpdates` is that flag and `SUAutomaticallyUpdate`: one
+tick of the standard window's checkbox made every later check download
+silently. Action: keep the flag false in the bundle, prove
+`UpdateConsentPolicy` on the live updater before `start()`, and present updates
+through `CatalogUpdateUserDriver`; the standard driver is English-only.
+
 ## Clipboard, files, and privacy
 
 ### project-hs-clipboard-transaction-ownership
