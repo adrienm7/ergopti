@@ -71,7 +71,7 @@ local TEXT_CONTROL_CHAR = {
 
 -- Callbacks set by the caller via M.start().
 local _on_char      = nil   -- function(char_string, evdev_scancode)
-local _on_key       = nil   -- function(key_name_string)
+local _on_key       = nil   -- function(key_name_string, { mods = held_modifiers() } | shortcut detail)
 local _on_physical  = nil   -- function(evdev_scancode, key_name, char_or_nil, evdev_value)
 local _on_hold      = nil   -- function(evdev_scancode, held_ms)
 local _on_desync    = nil   -- function() invalidates text derived before SYN_DROPPED
@@ -646,7 +646,11 @@ local function _dispatch_event(ev, source)
 			-- remain controls so Alt+Tab and Ctrl+Enter never become text.
 			if _on_char then _call_callback("text-control callback", _on_char, text_char, ev.code) end
 		elseif _on_key then
-			_call_callback("control-key callback", _on_key, control)
+			-- The modifiers travel with the key. Ctrl+Backspace deletes a word and
+			-- Alt+Backspace undoes in some applications: reported as a bare
+			-- "backspace", the daemon undid the last expansion over a word already
+			-- gone, or dropped one character of a buffer that had lost a word.
+			_call_callback("control-key callback", _on_key, control, { mods = M.held_modifiers() })
 		end
 		return
 	end
@@ -1260,7 +1264,9 @@ end
 ---              layout    string    Physical family for metrics: "qwerty" or
 ---                                  "azerty". Text always follows live XKB.
 ---              onChar    function  Called with (char_string, evdev_scancode) for printable keys.
----              onKey     function  Called with (key_name) for control keys.
+---              onKey     function  Called with (key_name, { mods }) for control keys,
+---                                  mods being held_modifiers() at the press,
+---                                  and with ("shortcut", { key, mods }) for a chord.
 ---              onPhysical function  Called with (evdev_scancode, key_name, char_or_nil,
 ---                                  evdev_value) for every physical down/up transition.
 ---              onConsume function Called before pass-through with a key detail;

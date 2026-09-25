@@ -13,7 +13,8 @@
 --- Usage (from the driver root): luajit tests/e2e/daemon_keys_child.lua
 ---   <config.toml> <device-file> "<script>"
 --- Script tokens: plain characters are typed; {BS} {ESC} {LEFT} {ENTER} are
---- the control keys. The hook forwards every physical key to the application
+--- the control keys, and {CBS} is Ctrl+Backspace, which deletes the word
+--- before the caret. The hook forwards every physical key to the application
 --- BEFORE calling back, and the model does the same.
 --- Prints one line: SCREEN <quoted text>.
 --- ==============================================================================
@@ -146,7 +147,9 @@ package.preload["adapters.secure_field_detector"] = function()
 	}
 end
 
-local CONTROL = { BS = "backspace", ESC = "escape", LEFT = "left" }
+local CONTROL = { BS = "backspace", CBS = "backspace", ESC = "escape", LEFT = "left" }
+-- The shortcut modifiers the hook reports held with each control key.
+local CONTROL_MODS = { CBS = { ctrl = true } }
 
 package.preload["adapters.event_loop"] = function()
 	return {
@@ -157,11 +160,16 @@ package.preload["adapters.event_loop"] = function()
 				if token then
 					i = i + #token + 2
 					if token == "BS" then table.remove(screen) end
+					if token == "CBS" then
+						-- As GTK and Qt apply it: the spaces before the caret, then the word.
+						while screen[#screen] == " " do table.remove(screen) end
+						while #screen > 0 and screen[#screen] ~= " " do table.remove(screen) end
+					end
 					if token == "ENTER" then
 						screen[#screen + 1] = "\n"
 						callbacks.onChar("\n", Codes.KEY_ENTER)
 					else
-						callbacks.onKey(CONTROL[token])
+						callbacks.onKey(CONTROL[token], { mods = CONTROL_MODS[token] or {} })
 					end
 				else
 					local c = SCRIPT:match("^[%z\1-\127\194-\244][\128-\191]*", i)

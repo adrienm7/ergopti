@@ -404,6 +404,12 @@ local DAEMON_SCENARIOS = {
 	{ name = "a corrected typo still expands", keys = "adx{BS}n ", screen = "ADN " },
 	{ name = "a word-only trigger does not fire mid-word after a Backspace", keys = "xy{BS}adn ", screen = "xadn " },
 	{ name = "a word-only trigger does not fire after an arrow key", keys = "x{LEFT}adn ", screen = "xadn " },
+	-- Ctrl+Backspace deletes a word, not one character: it neither undoes the
+	-- expansion over text that is already gone nor leaves the rest of the word
+	-- in the buffer to complete a trigger (modified-backspace-2026-09-25).
+	{ name = "Ctrl+Backspace after an expansion deletes a word and undoes nothing",
+		keys = "hello adn {CBS}", screen = "hello " },
+	{ name = "Ctrl+Backspace drops the whole word from the buffer", keys = "hello adnx{CBS} ", screen = "hello  " },
 	-- The same edits with the AI prediction engine loaded, as in the demo
 	-- configuration: its cancel on Backspace reset the buffer behind the edit.
 	{ name = "with AI loaded, a corrected typo still expands", keys = "adx{BS}n ", screen = "ADN ", llm = true },
