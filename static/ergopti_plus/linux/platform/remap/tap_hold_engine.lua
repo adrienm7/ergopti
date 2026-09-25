@@ -13,7 +13,11 @@
 ---    process. The hold is taken at key-down, so a held modifier works for a
 ---    chord or a click at once. A release is a tap only when it comes within the
 ---    key's threshold, no sooner than the minimum tap duration, and with no
----    other key pressed or released, no click and no wheel in between.
+---    other key pressed or released, no click and no wheel in between. A key
+---    with a tap and no hold does what its Windows tap-only hotkey does: most
+---    fire at key-down and at each repeat, LShift, LCtrl and RShift stay
+---    themselves and AltGr holds nothing, all four tapping on a quick release
+---    (NO_HOLD_BY_KEY).
 --- 2. Pure: events in, events out. The keyboard hook dispatches what comes out
 ---    exactly as if the user had pressed it, so the hotstring buffer, the
 ---    modifier state and the virtual keyboard see one consistent stream.
@@ -57,6 +61,35 @@ local KEY_LEFTCTRL, KEY_LEFTALT, KEY_LEFTMETA = 29, 56, 125
 -- and the modifier keys stay tap-holds, so LShift and CapsLock held together
 -- are Ctrl+Shift.
 local NATIVE_UNDER_MODIFIER = { [1] = true, [14] = true, [15] = true, [28] = true, [57] = true, [111] = true }
+
+-- What a key with a tap and no hold does while it is down, as its Windows
+-- tap-only hotkey does (windows/platform/remap/<key>.ahk). Most fire the tap
+-- at key-down and at each repeat (see fire_instant). These keys, and these
+-- taps, wait for a quick release instead and hold meanwhile what the Windows
+-- hotkey holds:
+--   - LShift, LCtrl and RShift stay the modifier they are, a ~ hotkey that
+--     taps on a quick release (lshift_lctrl.ahk, rshift.ahk), and so does
+--     RCtrl with a Tab tap (rctrl.ahk 7.2); `own` holds the key itself;
+--   - AltGr holds nothing and taps on a quick release (altgr.ahk);
+--   - an alt_tab_monitor tap holds Alt for the switcher (tab.ahk 8.1,
+--     lalt.ahk 4.3), RCtrl's one-shot Shift holds Shift for a long press
+--     (rctrl.ahk 7.3, from key-down here as every hold is), and LAlt's Tab
+--     holds the navigation layer (lalt.ahk 4.2);
+--   - LAlt's one-shot Shift is armed at key-down and holds Shift until the
+--     key comes up (lalt.ahk 4.1): `tap_at_down`.
+local NO_HOLD_BY_KEY = {
+	left_shift = { own = true }, left_ctrl = { own = true }, right_shift = { own = true },
+	alt_gr = { mods = {} },
+}
+local NO_HOLD_BY_TAP = {
+	tab = { alt_tab_monitor = { mods = { KEY_LEFTALT } } },
+	left_alt = {
+		alt_tab_monitor = { mods = { KEY_LEFTALT } },
+		tab = { layer = "nav" },
+		one_shot_shift = { mods = { KEY_LEFTSHIFT }, tap_at_down = true },
+	},
+	right_ctrl = { tab = { own = true }, one_shot_shift = { mods = { KEY_LEFTSHIFT } } },
+}
 local KEY_HOME, KEY_END, KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT = 102, 107, 103, 108, 105, 106
 local KEY_ENTER, KEY_BACKSPACE, KEY_ESC = 28, 14, 1
 local KEY_F2, KEY_F12 = 60, 88
@@ -150,6 +183,7 @@ function M.new(opts)
 		one_shot_keys = {},  -- keys a one-shot Shift is wrapping (several can overlap)
 		one_shot_swallowed = {}, -- keys a one-shot Shift replaced by its result, until released
 		native_keys = {},    -- configured keys pressed under a modifier: themselves until released
+		instant_down = {},   -- keys with a tap and no hold, down since their tap fired
 		key_refs = {},       -- code -> how many of this engine's holders keep it down
 		passed_down = {},    -- keys that went through untouched and are down (the hand's)
 		modifiers_down = {}, -- modifier keys that went through untouched, and are down
@@ -181,12 +215,23 @@ function M.new(opts)
 			end
 			-- A native tap and no hold is the key itself: left alone, so it keeps
 			-- its autorepeat and its press is not delayed to its release.
-			if tap == "" and #mods == 0 and not layer then goto continue end
+			local no_hold = #mods == 0 and not layer
+			if tap == "" and no_hold then goto continue end
+			-- A tap and no hold follows the key's Windows hotkey (NO_HOLD_BY_KEY).
+			local rule = no_hold and ((NO_HOLD_BY_TAP[key_id] or {})[tap] or NO_HOLD_BY_KEY[key_id]) or nil
+			if rule then
+				mods = rule.own and { code } or rule.mods or {}
+				layer = rule.layer
+			end
 			self.by_code[code] = {
 				id = key_id,
 				tap = tap,
 				mods = layer and {} or mods,
 				layer = layer,
+				no_hold = no_hold,
+				-- A tap and no hold with no rule: nothing to wait for (see fire_instant).
+				instant = no_hold and not rule,
+				tap_at_down = rule and rule.tap_at_down or false,
 				threshold_ms = math.floor((tonumber(config.time_activation_seconds) or 0) * 1000 + 0.5),
 			}
 		end
@@ -418,6 +463,23 @@ local function type_tap(self, out, code, now_ms)
 	return nil
 end
 
+--- Fires the tap of a key that has no hold, at its key-down and at each of its
+--- repeats, as the Windows hotkey of such a key does (escape.ahk "Fire
+--- immediately on key-down"): there is no hold to tell it from, so waiting for
+--- the release only delayed it and lost the auto-repeat. Also LAlt's one-shot
+--- Shift at key-down (NO_HOLD_BY_TAP).
+--- @return table out, string|table|nil tap As M:process returns them.
+local function fire_instant(self, out, config, now_ms)
+	if config.tap == "none" then return out, nil end
+	if config.tap == "one_shot_shift" then
+		self.one_shot_until = now_ms + self.one_shot_timeout_ms
+		return out, nil
+	end
+	local typed = M.KEY_TAPS[config.tap]
+	if typed then return out, type_tap(self, out, typed, now_ms) end
+	return out, config.tap
+end
+
 --- Presses a layer chord for `code` and remembers it until the key comes up.
 local function press_layer_key(self, code, spec)
 	local out = {}
@@ -463,6 +525,11 @@ function M:process(code, value, now_ms)
 	end
 
 	if config then
+		if self.instant_down[code] then
+			if value == UP then self.instant_down[code] = nil end
+			if value == REPEAT then return fire_instant(self, out, config, now_ms) end
+			return out
+		end
 		if value == REPEAT then return out end
 		if value == DOWN then
 			if self.held[code] then return out end
@@ -472,10 +539,17 @@ function M:process(code, value, now_ms)
 				cancel_taps(self, nil)
 				return press_layer_key(self, code, spec)
 			end
-			if NATIVE_UNDER_MODIFIER[code] and modifier_held(self) then
+			-- On the layer, a key with no hold is itself, as the Windows tap-only
+			-- hotkeys are off while the layer is on.
+			if (NATIVE_UNDER_MODIFIER[code] and modifier_held(self)) or (config.no_hold and self.layer_depth > 0) then
 				cancel_taps(self, nil)
 				self.native_keys[code] = true
 				return pass(self, code, value)
+			end
+			if config.instant then
+				cancel_taps(self, nil)
+				self.instant_down[code] = true
+				return fire_instant(self, out, config, now_ms)
 			end
 			cancel_taps(self, code)
 			local state = { down_at = now_ms, cancelled = false, emitted = {} }
@@ -487,6 +561,10 @@ function M:process(code, value, now_ms)
 			for _, mod in ipairs(config.mods) do
 				press(self, out, mod)
 				state.emitted[#state.emitted + 1] = mod
+			end
+			if config.tap_at_down then
+				state.tapped = true
+				return fire_instant(self, out, config, now_ms)
 			end
 			return out
 		end
@@ -501,7 +579,7 @@ function M:process(code, value, now_ms)
 		if state.layer then self.layer_depth = math.max(0, self.layer_depth - 1) end
 		local elapsed = now_ms - state.down_at
 		local is_tap = not state.cancelled and elapsed <= config.threshold_ms and elapsed >= self.tap_min_ms
-		if not is_tap or config.tap == "none" then return out, nil end
+		if state.tapped or not is_tap or config.tap == "none" then return out, nil end
 		if config.tap == "one_shot_shift" then
 			self.one_shot_until = now_ms + self.one_shot_timeout_ms
 			return out, nil
@@ -568,7 +646,7 @@ function M:release_all()
 	end
 	self.held, self.layer_keys, self.layer_depth = {}, {}, 0
 	self.one_shot_until, self.one_shot_keys, self.key_refs = nil, {}, {}
-	self.one_shot_swallowed = {}
+	self.one_shot_swallowed, self.instant_down = {}, {}
 	self.native_keys, self.modifiers_down, self.passed_down = {}, {}, {}
 	return out
 end

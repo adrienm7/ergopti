@@ -165,6 +165,153 @@ helpers.describe("tap-hold engine: a modifier key", function()
 
 end)
 
+-- A key with a tap and no hold does what its Windows tap-only hotkey does.
+-- Most fire at key-down and again at each auto-repeat (escape.ahk "Fire
+-- immediately on key-down"); here they fired on a quick release only and never
+-- repeated, so a key set to Backspace deleted one character however long it
+-- was held (tap-no-hold-instant). LShift, LCtrl and RShift stay the modifier
+-- they are and tap on a quick release, AltGr taps on a quick release, and a
+-- few taps hold what their Windows block holds (tap-no-hold-per-key).
+helpers.describe("tap-hold engine: a tap with no hold", function()
+
+	local ESC = 1
+
+	helpers.it("runs its action at key-down and again with each repeat (tap-no-hold-instant)", function()
+		local e = engine({ escape = { tap_action = "copy", time_activation_seconds = 0.2 } })
+		local out, tap = e:process(ESC, DOWN, 0)
+		helpers.assert_eq(trail(out), "", "the key itself is swallowed")
+		helpers.assert_eq(tap, "copy", "at key-down, not at release")
+		out, tap = e:process(ESC, REPEAT, 500)
+		helpers.assert_eq(tap, "copy", "held, it repeats")
+		out, tap = e:process(ESC, UP, 5000)
+		helpers.assert_eq(trail(out), "")
+		helpers.assert_nil(tap, "the release, however late, adds nothing")
+	end)
+
+	helpers.it("types its key at key-down and again with each repeat (tap-no-hold-instant)", function()
+		local e = engine({ enter = { tap_action = "backspace", time_activation_seconds = 0.2 } })
+		helpers.assert_eq(trail((e:process(ENTER, DOWN, 0))), "14↓ 14↑")
+		helpers.assert_eq(trail((e:process(ENTER, REPEAT, 500))), "14↓ 14↑", "held, Backspace repeats")
+		helpers.assert_eq(trail((e:process(ENTER, UP, 600))), "")
+	end)
+
+	helpers.it("swallows a none tap (tap-no-hold-instant)", function()
+		local e = engine({ escape = { tap_action = "none", time_activation_seconds = 0.2 } })
+		local out, tap = e:process(ESC, DOWN, 0)
+		helpers.assert_eq(trail(out), "")
+		helpers.assert_nil(tap)
+		helpers.assert_eq(trail((e:process(ESC, UP, 50))), "")
+	end)
+
+	-- rctrl.ahk 7.3: RCtrl's one-shot Shift is a tap on a quick release, and a
+	-- long press holds Shift; it is never armed at key-down (tap-no-hold-per-key).
+	helpers.it("arms RCtrl's one-shot Shift on a quick release and holds Shift for a long press (tap-no-hold-per-key)", function()
+		local keys = { right_ctrl = { tap_action = "one_shot_shift", time_activation_seconds = 0.2 } }
+		local e = engine(keys)
+		helpers.assert_eq(trail((e:process(RCTRL, DOWN, 0))), "42↓", "Shift, not the one-shot, at key-down")
+		helpers.assert_eq(trail((e:process(RCTRL, UP, 100))), "42↑")
+		helpers.assert_eq(trail((e:process(KEY_A, DOWN, 150))), "42↓ 30↓", "the quick release armed the one-shot")
+		e = engine(keys)
+		e:process(RCTRL, DOWN, 0)
+		helpers.assert_nil(e:process(KEY_A, DOWN, 300), "held, it is Shift: A passes under it")
+		e:process(KEY_A, UP, 350)
+		helpers.assert_eq(trail((e:process(RCTRL, UP, 400))), "42↑")
+		helpers.assert_nil(e:process(KEY_A, DOWN, 450), "and a long press arms nothing")
+	end)
+
+	-- Each key's Windows tap-only hotkey, for a catalogue tap ("copy"):
+	-- "down" fires at key-down and at each repeat; "own" keeps the key the
+	-- modifier it is (a ~ hotkey) and taps on a quick release; "release" holds
+	-- nothing and taps on a quick release (tap-no-hold-per-key).
+	local WINDOWS_RULE = {
+		escape = "down", enter = "down", backspace = "down", delete = "down", space = "down",
+		win = "down", caps_lock = "down", tab = "down", left_alt = "down", right_ctrl = "down",
+		left_shift = "own", left_ctrl = "own", right_shift = "own", alt_gr = "release",
+	}
+
+	helpers.it("follows each key's Windows rule for a tap with no hold (tap-no-hold-per-key)", function()
+		for key_id in pairs(Engine.KEY_CODES) do
+			helpers.assert_not_nil(WINDOWS_RULE[key_id], key_id .. " needs its Windows rule in this test")
+		end
+		for key_id, rule in pairs(WINDOWS_RULE) do
+			local code = Engine.KEY_CODES[key_id]
+			local keys = { [key_id] = { tap_action = "copy", time_activation_seconds = 0.2 } }
+			local e = engine(keys)
+			local out, tap = e:process(code, DOWN, 0)
+			local repeat_out, repeat_tap = e:process(code, REPEAT, 500)
+			local up_out, up_tap = e:process(code, UP, 600)
+			if rule == "down" then
+				helpers.assert_eq({ trail(out), tap }, { "", "copy" }, key_id .. " fires at key-down")
+				helpers.assert_eq(repeat_tap, "copy", key_id .. " fires again at each repeat")
+				helpers.assert_eq({ trail(up_out), up_tap }, { "" }, key_id .. ": the release adds nothing")
+			else
+				local own = rule == "own" and tostring(code) or nil
+				helpers.assert_eq({ trail(out), tap }, { own and own .. "↓" or "" },
+					key_id .. (own and " is its own modifier at key-down" or " holds nothing"))
+				helpers.assert_eq({ trail(repeat_out), repeat_tap }, { "" }, key_id .. " does not fire on a repeat")
+				helpers.assert_eq({ trail(up_out), up_tap }, { own and own .. "↑" or "" },
+					key_id .. ": a long press is no tap")
+				e = engine(keys)
+				e:process(code, DOWN, 0)
+				out, tap = e:process(code, UP, 100)
+				helpers.assert_eq({ trail(out), tap }, { own and own .. "↑" or "", "copy" },
+					key_id .. " taps on a quick release")
+			end
+		end
+	end)
+
+	helpers.it("holds what the Windows block of a special tap holds (tap-no-hold-per-key)", function()
+		local F24 = require("infra.evdev_codes").KEY_F24
+		local masked_alt_up = F24 .. "↓ " .. F24 .. "↑ 56↑"
+		local cases = {
+			-- tab.ahk 8.1, lalt.ahk 4.3: Alt for the switcher, the monitor on a tap.
+			{ "tab", "alt_tab_monitor", "56↓", masked_alt_up, "alt_tab_monitor" },
+			{ "left_alt", "alt_tab_monitor", "56↓", masked_alt_up, "alt_tab_monitor" },
+			-- lalt.ahk 4.2: the navigation layer, Tab on a tap.
+			{ "left_alt", "tab", "", "15↓ 15↑", nil },
+			-- rctrl.ahk 7.2: RCtrl itself, Tab on a tap.
+			{ "right_ctrl", "tab", "97↓", "97↑ 15↓ 15↑", nil },
+			-- rctrl.ahk 7.1: Backspace at key-down.
+			{ "right_ctrl", "backspace", "14↓ 14↑", "", nil },
+		}
+		for _, case in ipairs(cases) do
+			local key_id, tap_action = case[1], case[2]
+			local code = Engine.KEY_CODES[key_id]
+			local e = engine({ [key_id] = { tap_action = tap_action, time_activation_seconds = 0.2 } })
+			helpers.assert_eq(trail((e:process(code, DOWN, 0))), case[3], key_id .. "/" .. tap_action .. " at key-down")
+			local out, tap = e:process(code, UP, 100)
+			helpers.assert_eq({ trail(out), tap }, { case[4], case[5] }, key_id .. "/" .. tap_action .. " on a quick release")
+		end
+		-- The layer is held: LAlt+J is Ctrl+Left.
+		local e = engine({ left_alt = { tap_action = "tab", time_activation_seconds = 0.2 } })
+		e:process(ALT, DOWN, 0)
+		helpers.assert_eq(trail((e:process(KEY_J, DOWN, 50))), "29↓ 105↓", "LAlt with a Tab tap holds the layer")
+	end)
+
+	-- lalt.ahk 4.1: LAlt's one-shot Shift is armed at key-down and Shift is held
+	-- until the key comes up (tap-no-hold-per-key).
+	helpers.it("arms LAlt's one-shot Shift at key-down and holds Shift until release (tap-no-hold-per-key)", function()
+		local e = engine({ left_alt = { tap_action = "one_shot_shift", time_activation_seconds = 0.2 } })
+		helpers.assert_eq(trail((e:process(ALT, DOWN, 0))), "42↓", "Shift held from key-down")
+		helpers.assert_eq(trail((e:process(ALT, REPEAT, 500))), "", "and no second arming on a repeat")
+		helpers.assert_eq(trail((e:process(ALT, UP, 900))), "42↑", "released with the key, however late")
+		helpers.assert_eq(trail((e:process(KEY_A, DOWN, 1000))), "42↓ 30↓", "the one-shot armed at key-down")
+	end)
+
+	helpers.it("is still the key itself under a modifier and a layer key on the layer (tap-no-hold-instant)", function()
+		local e = engine({ escape = { tap_action = "copy", time_activation_seconds = 0.2 },
+			left_alt = DEFAULTS.left_alt })
+		e:process(CTRL, DOWN, 0)
+		helpers.assert_nil(e:process(ESC, DOWN, 10), "Ctrl+Escape is Ctrl+Escape")
+		helpers.assert_nil(e:process(ESC, UP, 20))
+		e:process(CTRL, UP, 30)
+		e:process(ALT, DOWN, 100)
+		helpers.assert_nil(e:process(ESC, DOWN, 110), "on the layer Escape is Escape, as the Windows hotkey is off")
+		helpers.assert_nil(e:process(ESC, UP, 120))
+	end)
+
+end)
+
 helpers.describe("tap-hold engine: thresholds and holds", function()
 
 	helpers.it("counts a release exactly at the threshold or the minimum as a tap", function()
@@ -388,8 +535,9 @@ helpers.describe("tap-hold engine: what the one-shot Shift does with the next ke
 			local role = TAP_ROLE[name]
 			helpers.assert_true(role ~= nil, "no one-shot verdict for the key tap " .. name)
 			local e = armed(name)
-			e:process(CAPS, DOWN, 200)
-			local tapped = trail((e:process(CAPS, UP, 300)))
+			-- With no hold, the tap fires at key-down (tap-no-hold-instant).
+			local tapped = trail((e:process(CAPS, DOWN, 200)))
+			helpers.assert_eq(trail((e:process(CAPS, UP, 300))), "", name .. ": the release adds nothing")
 			-- Space's result is "-", KEY_MINUS on a US layout.
 			local expected = role == "shift" and string.format("42↓ %d↓ %d↑ 42↑", code, code)
 				or role == "result" and "12↓ 12↑" or string.format("%d↓ %d↑", code, code)
