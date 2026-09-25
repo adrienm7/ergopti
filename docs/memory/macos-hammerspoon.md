@@ -323,9 +323,41 @@ them native (Cmd+Tab, Shift+Tab) as on Windows and Linux.
 `alt_tab_windows`, `alt_tab_apps`, `alt_tab_monitor` and `cycle_windows_in_app`
 share F17 and differ only by modifiers, bound as exact-match Hammerspoon
 hotkeys. A modifier held while one is tapped is added to its trigger, which
-then runs another action or none. Action: a tap reached under a held modifier
-must not carry one of them unless the rule removes the held modifiers around the
-trigger.
+then runs another action or none. Action: mark any new action of that kind
+`exact_modifiers` in `platform/remap/data/actions.json`; the generator's
+`exact_modifier_manipulators` then splits every rule sending it into one
+manipulator per held hand flag plus a last `mandatory: ["any"]`, so Caps Lock
+is claimed only under two held flags, and `test_generator_typed_output.lua`
+replays the whole class.
+
+### project-karabiner-v16-rule-semantics
+
+Read from the pinned v16.0.0 source (`src/share/manipulator`) and modelled in
+`tests/support/karabiner_model.lua`. A mandatory `any` claims every pressed
+flag, Caps Lock too while the lock is on, and lifts it around `to`,
+`to_if_alone` and `to_after_key_up`, one press per flag, so a flag two keys
+hold stays down and a claimed Caps Lock is toggled for macOS. The lifted flags
+come back right after `to` only when its unfiltered last entry is not a
+modifier key, yet only the last posted entry stays held: end a modifier hold
+with a never-posted entry (`vk_none` under `expression_if "0"`), never an
+ordinary event. A physical key reaches the output only after every
+manipulator passed it, so a chord's own keys are never among the flags it
+tests: never list them as mandatory. A chord takes both key_downs, so it must
+restore the held state of the key pressed first itself (`held_key_state`: its
+held variable and layer), with one manipulator per press order (`strict`,
+`strict_inverse`) when either key may go first. That state is cleared by
+`simultaneous_options.to_after_key_up` only once both keys are up, so
+releasing the first key early leaves it on until the other is up. Only one
+`to` entry stays down: a modifier action keeps it; after one of the eight
+modifier keys a plain-key action goes out once and the key's held key keeps
+it (`key_up_when: "all"`); after any other key the action keeps it and
+repeats, the key's held modifier returns with its next press, and its
+hold-then-tap rules carry a manipulator without their mandatory modifiers.
+`from.modifiers` accepts and consumes `fn` like any other flag. A modifier
+held before a key never cancels its `to_if_alone`, but any later key_down
+does, so a key or combo with a tap and no hold sends its tap as `to`. Action:
+prove a generator rule change through the model, extending the model from the
+source.
 
 ### project-sparkle-consent-is-plist-owned
 
