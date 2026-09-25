@@ -416,6 +416,10 @@ local DAEMON_SCENARIOS = {
 	{ name = "with AI loaded, a word-only trigger does not fire mid-word after a Backspace",
 		keys = "xy{BS}adn ", screen = "xadn ", llm = true },
 	{ name = "with AI loaded, an end-char trigger expands", keys = "adn ", screen = "ADN ", llm = true },
+	-- A touchpad reader that fails stops the reader alone: the same module
+	-- still runs the tap actions (gesture-pump-keeps-actions).
+	{ name = "a failing touchpad pump leaves the tap actions running", keys = "{PUMP}{TAP}",
+		screen = "[reader stopped]<select_all>", gesture_pump = "fails" },
 }
 
 if package.config:sub(1, 1) == "\\" then
@@ -429,8 +433,9 @@ else
 	local device = os.tmpname()
 	for _, scenario in ipairs(DAEMON_SCENARIOS) do
 		local command = string.format(
-			"HOME='%s' ERGOPTI_E2E_LLM=%s %s tests/e2e/daemon_keys_child.lua tests/e2e/fixtures/daemon_keys.toml '%s' %q 2>/dev/null",
-			home, scenario.llm and "1" or "0", interpreter, device, scenario.keys)
+			"HOME='%s' ERGOPTI_E2E_LLM=%s ERGOPTI_E2E_GESTURE_PUMP=%s %s tests/e2e/daemon_keys_child.lua "
+				.. "tests/e2e/fixtures/daemon_keys.toml '%s' %q 2>/dev/null",
+			home, scenario.llm and "1" or "0", scenario.gesture_pump or "none", interpreter, device, scenario.keys)
 		local pipe = io.popen(command, "r")
 		local output = pipe and pipe:read("*a") or ""
 		if pipe then pipe:close() end
