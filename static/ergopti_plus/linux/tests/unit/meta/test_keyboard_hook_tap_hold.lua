@@ -139,3 +139,159 @@ helpers.describe("keyboard hook + tap-hold engine", function()
 	end)
 
 end)
+
+-- A click or a wheel turn during a hold makes it a chord (Ctrl+click,
+-- Ctrl+wheel), as on Windows and macOS. Every EV_REL counted, so a hand that
+-- merely moved the mouse while tapping CapsLock typed no Enter
+-- (pointer-motion-tap-2026-09-25).
+helpers.describe("keyboard hook + tap-hold engine: the pointer during a tap", function()
+
+	local InputEvent = require("infra.input_event")
+	-- Kernel ABI values (input-event-codes.h), spelled here rather than read
+	-- from the driver so a wrong driver constant cannot agree with itself.
+	local EV_REL, CAPS, CTRL, ENTER, BTN_LEFT = 2, 58, 29, 28, 0x110
+	local REL_AXES = {
+		[0] = "REL_X", [1] = "REL_Y", [2] = "REL_Z", [3] = "REL_RX", [4] = "REL_RY", [5] = "REL_RZ",
+		[6] = "REL_HWHEEL", [7] = "REL_DIAL", [8] = "REL_WHEEL", [9] = "REL_MISC",
+		[11] = "REL_WHEEL_HI_RES", [12] = "REL_HWHEEL_HI_RES",
+	}
+	local WHEELS = { REL_HWHEEL = true, REL_WHEEL = true, REL_WHEEL_HI_RES = true, REL_HWHEEL_HI_RES = true }
+
+	--- A readable file standing in for a device node.
+	local function fake_node(label)
+		local path = os.tmpname()
+		local fh = assert(io.open(path, "w"))
+		fh:write(label)
+		fh:close()
+		return path
+	end
+
+	--- Taps CapsLock on a keyboard while one pointer event arrives between its
+	--- press and release, through the real merge of the two sources.
+	--- @param clicks table|nil Collects the codes the click callback receives.
+	--- @return string What the virtual keyboard received.
+	local function tap_with_pointer(ev_type, code, value, clicks)
+		local keyboard, pointer = fake_node("keyboard"), fake_node("pointer")
+		local queues = {
+			[keyboard] = {
+				InputEvent.encode(EV_KEY, CAPS, InputEvent.VALUE_DOWN, nil, 1000),
+				InputEvent.encode(EV_KEY, CAPS, InputEvent.VALUE_UP, nil, 3000),
+			},
+			[pointer] = { InputEvent.encode(ev_type, code, value, nil, 2000) },
+		}
+		local saved = {}
+		for _, name in ipairs({ "modules.hotstrings.device_finder", "adapters.xkb_capture" }) do
+			saved[name] = package.loaded[name]
+		end
+		package.loaded["modules.hotstrings.device_finder"] = {
+			find_devices = function() return { keyboard }, { pointer } end,
+			is_key_device = function() return true, nil end,
+		}
+		package.loaded["adapters.xkb_capture"] = {
+			is_ready = function() return true end,
+			reset_state = function() return true end,
+			process = function() return nil, nil, nil end,
+		}
+		local reader = helpers.load_module("adapters.evdev_reader")
+		reader._set_backend({
+			open = function(path) return path end,
+			ioctl = function() return true end,
+			read = function(fd) return table.remove(queues[fd] or {}, 1) end,
+			poll = function() return false end,
+			close = function() end,
+		})
+		local kh = helpers.load_module("adapters.keyboard_hook")
+		local emitted = {}
+		local ok, err = pcall(function()
+			kh.set_remapper(Engine.new({ keys = KEYS, tap_min_ms = 0, one_shot_timeout_ms = 2000 }),
+				function() end)
+			kh.start({
+				intercept = true,
+				onEmitRaw = function(key, key_value) emitted[#emitted + 1] = key .. ":" .. key_value; return true end,
+				onClick = function(button) if clicks then clicks[#clicks + 1] = tostring(button) end end,
+			})
+			kh.pump()
+		end)
+		kh.set_remapper(nil)
+		kh.stop()
+		reader._reset_backend()
+		for name, module in pairs(saved) do package.loaded[name] = module end
+		os.remove(keyboard)
+		os.remove(pointer)
+		assert(ok, err)
+		return table.concat(emitted, " ")
+	end
+
+	local TAPPED = CTRL .. ":1 " .. CTRL .. ":0 " .. ENTER .. ":1 " .. ENTER .. ":0"
+	local CHORD = CTRL .. ":1 " .. CTRL .. ":0"
+
+	helpers.it("keeps the tap across pointer motion and cancels it on a wheel turn (pointer-motion-tap)", function()
+		for code, name in pairs(REL_AXES) do
+			local expected = WHEELS[name] and CHORD or TAPPED
+			helpers.assert_eq(tap_with_pointer(EV_REL, code, 1), expected,
+				name .. (WHEELS[name] and " is a wheel turn: Ctrl+wheel, no Enter"
+					or " is not a wheel: the CapsLock tap still types Enter"))
+		end
+	end)
+
+	-- Every button of a mouse (BTN_MISC 0x100 to 0x11f), and the codes a
+	-- touchpad reports for a finger or a tool landing (BTN_DIGI 0x140 and up).
+	local BUTTONS = {
+		[0x100] = "BTN_0", [0x109] = "BTN_9", [BTN_LEFT] = "BTN_LEFT", [0x111] = "BTN_RIGHT",
+		[0x112] = "BTN_MIDDLE", [0x113] = "BTN_SIDE", [0x114] = "BTN_EXTRA", [0x115] = "BTN_FORWARD",
+		[0x116] = "BTN_BACK", [0x117] = "BTN_TASK", [0x11f] = "the last button code",
+	}
+	local CONTACTS = {
+		[0x140] = "BTN_TOOL_PEN", [0x145] = "BTN_TOOL_FINGER", [0x14a] = "BTN_TOUCH",
+		[0x14d] = "BTN_TOOL_DOUBLETAP", [0x14e] = "BTN_TOOL_TRIPLETAP", [0x14f] = "BTN_TOOL_QUADTAP",
+	}
+
+	helpers.it("cancels the tap on a button press and on its release, as on Windows (pointer-motion-tap)", function()
+		for code, name in pairs(BUTTONS) do
+			helpers.assert_eq(tap_with_pointer(EV_KEY, code, InputEvent.VALUE_DOWN), CHORD,
+				name .. " pressed: Ctrl+click, no Enter")
+			-- Windows' hook cancels on every button's release too (_OnLUp ...
+			-- _OnX2Up): a click that began before the tap ends inside it.
+			helpers.assert_eq(tap_with_pointer(EV_KEY, code, InputEvent.VALUE_UP), CHORD,
+				name .. " released: a click ending inside the tap, no Enter")
+		end
+	end)
+
+	helpers.it("keeps the tap when a finger lands on or leaves a touchpad (pointer-motion-tap)", function()
+		for code, name in pairs(CONTACTS) do
+			for _, value in ipairs({ InputEvent.VALUE_DOWN, InputEvent.VALUE_UP }) do
+				helpers.assert_eq(tap_with_pointer(EV_KEY, code, value), TAPPED,
+					name .. " " .. value .. " is a contact, not a click: the CapsLock tap still types Enter")
+			end
+		end
+	end)
+
+	helpers.it("resets the typing buffer on a button press only, never on its release (pointer-motion-tap)", function()
+		for code, name in pairs(BUTTONS) do
+			local clicks = {}
+			tap_with_pointer(EV_KEY, code, InputEvent.VALUE_DOWN, clicks)
+			helpers.assert_eq(table.concat(clicks, " "), tostring(code), name .. " pressed is one click")
+			clicks = {}
+			tap_with_pointer(EV_KEY, code, InputEvent.VALUE_UP, clicks)
+			helpers.assert_eq(#clicks, 0, name .. " released is no second click")
+		end
+	end)
+
+	-- With tap-to-click the kernel reports a touch and no BTN_LEFT, and the
+	-- touch still moves the caret: the daemon's click callback invalidates the
+	-- password-field verdict and the typing buffer on it. Only the tap-hold
+	-- keeps its tap (touch-still-clicks).
+	helpers.it("still reports a touch as a click to the daemon while the tap survives it (touch-still-clicks)", function()
+		for code, name in pairs(CONTACTS) do
+			local clicks = {}
+			helpers.assert_eq(tap_with_pointer(EV_KEY, code, InputEvent.VALUE_DOWN, clicks), TAPPED,
+				name .. " pressed: the CapsLock tap still types Enter")
+			helpers.assert_eq(table.concat(clicks, " "), tostring(code),
+				name .. " pressed may be a tap-to-click: the click callback must run once")
+			clicks = {}
+			tap_with_pointer(EV_KEY, code, InputEvent.VALUE_UP, clicks)
+			helpers.assert_eq(#clicks, 0, name .. " released is no second click")
+		end
+	end)
+
+end)
