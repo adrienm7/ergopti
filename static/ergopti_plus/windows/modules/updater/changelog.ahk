@@ -48,8 +48,10 @@ Updater_GetUpdateMenuLabel() {
 	if (State == "available") {
 		global UPDATER_LATEST_RELEASE
 		Tag := UPDATER_LATEST_RELEASE.HasProp("Tag") ? UPDATER_LATEST_RELEASE.Tag : ""
+		; The catalogue names this placeholder {tag} (shared with Linux), and
+		; Format() fills numbered placeholders only.
 		if (Tag != "")
-			return Format(t("menu.about.update_now"), Tag)
+			return StrReplace(t("menu.about.update_now"), "{tag}", Tag)
 	}
 	return t("menu.about.check_for_updates")
 }

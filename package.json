@@ -98,6 +98,7 @@
 		"test:macos-sparkle-feed": "node ./tools/test/test-macos-sparkle-feed.cjs",
 		"test:macos-sparkle-disarmed-bundles": "node ./tools/test/test-macos-sparkle-disarmed-bundles.cjs",
 		"test:updater-copy-before-consent": "node ./tools/test/test-updater-copy-before-consent.cjs",
+		"test:ahk-format-placeholders": "node ./tools/test/test-ahk-format-placeholders.cjs",
 		"test:hs-editor-confirm": "node ./tools/test/test-hotstring-editor-confirm-wiring.cjs",
 		"test:hs-editor-strict-case": "node ./tools/test/test-hotstring-editor-strict-case.cjs",
 		"test:webview-teardown": "node ./tools/test/test-webview-teardown-order.cjs",
