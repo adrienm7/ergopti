@@ -47,8 +47,8 @@ end
 ---   - `kind = "modifier"` — `id` is the value stored in `hold_modifier`.
 ---   - `kind = "layer"`    — `id` is the value stored in `hold_layer`.
 ---
---- `i18n` is set only where a translated label exists; a modifier combination is
---- labelled from its own id, which is what every driver already displays.
+--- `i18n` is the label key of the sentinel and of a layer; a modifier
+--- combination is labelled from its modifiers' own keys (see M.label).
 --- @param catalogue table|nil The `[tap_hold.hold_picker]` table.
 --- @return table Array of option tables.
 function M.build(catalogue)
@@ -66,18 +66,36 @@ function M.build(catalogue)
 	return options
 end
 
+--- The label key of one modifier of a combination.
+--- @param modifier string A modifier id, e.g. "alt_gr".
+--- @return string
+function M.modifier_i18n(modifier)
+	return "tap_hold.hold." .. modifier
+end
+
 --- The label a driver shows for one option.
+---
+--- A modifier combination is its modifiers' translated labels joined with
+--- " + " ("Ctrl + Shift", "AltGr"), as the Windows menu shows it. The stored id
+--- ("ctrl+shift", "alt_gr") used to be shown as is, in every locale.
 --- @param option table One entry of M.build().
 --- @param translate function Takes an i18n key, returns the translated string.
 --- @return string
 function M.label(option, translate)
-	if type(option) ~= "table" then return "" end
-	if option.i18n ~= nil and option.i18n ~= "" and type(translate) == "function" then
-		return translate(option.i18n)
+	if type(option) ~= "table" then error("a hold option must be a table", 2) end
+	if type(translate) ~= "function" then error("a hold option label needs a translate function", 2) end
+	if option.kind == "modifier" then
+		local labels = {}
+		for modifier in tostring(option.id):gmatch("[^+]+") do
+			labels[#labels + 1] = translate(M.modifier_i18n(modifier))
+		end
+		if #labels == 0 then error("a modifier hold option has no modifier", 2) end
+		return table.concat(labels, " + ")
 	end
-	-- A modifier combination reads as itself: "ctrl+shift" is already the clearest
-	-- name it has, and it is what the TOML stores.
-	return tostring(option.id or "")
+	if type(option.i18n) ~= "string" or option.i18n == "" then
+		error(string.format("hold option '%s' has no label key", tostring(option.id)), 2)
+	end
+	return translate(option.i18n)
 end
 
 return M
