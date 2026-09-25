@@ -759,6 +759,52 @@ Test("AHK-15-persistence: refused paused Reload can reuse retained barrier "
 	. "(reload-terminal-retained-retry)",
 	_CPT_RefusedPausedReloadCanRetrySameTerminalBundle)
 
+; OnExit publishes the live marker at the terminal commit, and the updater's
+; FinalExit, swap and recovery gates can still refuse after it. The refusal
+; retracts the marker this reload published, through the strict adapters the
+; lifecycle wrappers use, but never one holding another transition's intent
+; (reload-refusal-retracts-marker).
+_CPT_RefusalAfterCommitRetractsOnlyItsMarker() {
+	for _, Foreign in [false, true] {
+		Path := _CPT_SuspendTempMarker(Foreign ? "late-foreign" : "late-own")
+		_CPT_SuspendTempCleanup(Path)
+		Content := "1 reload-test-" . (Foreign ? "foreign" : "own")
+		Bundle := _ConfigWriteTerminalTryAcquire(
+			["C:\ergopti-tests\suspend-late-refusal.toml"])
+		AssertTrue(Bundle is Object)
+		try {
+			AssertTrue(SuspendHandoffPrepare(Path, FSWriteDurable, FSRead,
+				FSAtomicMoveReplace, FSDeleteStrict, Content))
+			Record := _RTP_Pending(Bundle, _RTP_NewPort(), 0,
+				SuspendHandoffCommit.Bind(Path, FSRead, FSAtomicMoveReplace, Content),
+				SuspendHandoffAbort.Bind(Path, FSStrictExists, FSDeleteStrict), 0, 0,
+				SuspendHandoffRetract.Bind(Path, Content, FSStrictExists, FSRead,
+					FSDeleteStrict))
+			AssertEqual(Record, ReloadTerminalHandoffClaim("Reload"))
+			AssertTrue(ReloadTerminalHandoffCommit(Record))
+			AssertEqual(Content, FSRead(Path), "the accepted commit publishes this reload's intent")
+			if Foreign
+				AssertTrue(FSWriteDurable(Path, "1"), "another transition republishes the marker")
+			AssertTrue(ReloadTerminalHandoffRefuseForShutdown("Reload", "test"),
+				"a refusal after the commit must still refuse and clean up")
+			if Foreign {
+				AssertEqual("1", FSRead(Path),
+					"a marker holding another transition's intent is not this refusal's to retract")
+			} else {
+				AssertFalse(FSExists(Path),
+					"the refused reload must retract the pause intent its commit published")
+			}
+			AssertFalse(FSExists(Path . ".pending"))
+		} finally {
+			_RTP_Cleanup(Bundle)
+			_CPT_SuspendTempCleanup(Path)
+		}
+	}
+}
+Test("AHK-15-persistence: a refusal after the terminal commit retracts only its "
+	. "own pause marker (reload-refusal-retracts-marker)",
+	_CPT_RefusalAfterCommitRetractsOnlyItsMarker)
+
 _CPT_CriticalProbe(State, Name, Result := 1) {
 	State[Name] := A_IsCritical
 	return Result
