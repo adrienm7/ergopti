@@ -190,7 +190,9 @@ _THSB_EverySyntheticDownCallerConsumesTheVerdict() {
 	OwnerBody := _DriverFuncBody("TapHoldOwnImmediateModifier")
 	Assert(InStr(OwnerBody, "if !KeyDownFn.Call(ModKey)") > 0,
 		"the common immediate owner must stop before waiting/tapping when modifier Down is unproved")
-	Assert(CallCount >= 5,
+	; Four direct callers remain (Tab, RCtrl, two LAlt paths) since the CapsLock
+	; Ctrl wrapper was retired (synthetic-user-held-2026-09-25).
+	Assert(CallCount >= 4,
 		"the remaining direct synthetic-Down caller class plus the shared owner must stay enumerated")
 }
 Test("tap-holds AHK-03: every synthetic Down caller consumes the ownership verdict",
