@@ -118,6 +118,35 @@ require_cmd() {
 	command -v "$1" >/dev/null 2>&1 || fail "missing required command: $1"
 }
 
+# Strip Sparkle's self-update from a bundle the launcher's updater does not
+# drive: the embedded Hammerspoon and the Git-checkout helper. Sparkle reads
+# SUAllowsAutomaticUpdates from Info.plist only, while a feed can still come
+# back through the bundle's preferences domain, so the switch is pinned here
+# too. The feed and the check interval only have to be absent, so a bundle
+# that never declared one is already disarmed for that key. Every key is read
+# back from a plist that lints, in a format that reads any value type: a
+# switch that kept its value, or a feed that survived its removal, fails the
+# build instead of shipping a bundle that can update itself.
+disarm_bundle_sparkle() {
+	local plist="$1"
+	local key
+	plutil -lint "$plist" >/dev/null || fail "$plist is not a readable property list."
+	for key in SUFeedURL SUScheduledCheckInterval; do
+		if plutil -extract "$key" xml1 -o - "$plist" >/dev/null 2>&1; then
+			plutil -remove "$key" "$plist" || fail "$plist refused the removal of Sparkle's $key."
+		fi
+	done
+	for key in SUEnableAutomaticChecks SUAllowsAutomaticUpdates; do
+		plutil -replace "$key" -bool false "$plist"
+		[ "$(plutil -extract "$key" raw -o - "$plist")" = "false" ] \
+			|| fail "$plist kept Sparkle's $key enabled."
+	done
+	for key in SUFeedURL SUScheduledCheckInterval; do
+		! plutil -extract "$key" xml1 -o - "$plist" >/dev/null 2>&1 \
+			|| fail "$plist still declares $key."
+	done
+}
+
 clean_build_dir() {
 	log "Wiping $BUILD_DIR"
 	rm -rf "$BUILD_DIR"
@@ -401,8 +430,7 @@ assemble_app() {
 	# Disarm the embedded Hammerspoon's own Sparkle so it never tries to
 	# update itself behind our back. Updates are owned exclusively by the
 	# launcher's Sparkle instance, which targets the Ergopti release feed.
-	plutil -remove SUFeedURL "$hs_plist" 2>/dev/null || true
-	plutil -replace SUEnableAutomaticChecks -bool false "$hs_plist"
+	disarm_bundle_sparkle "$hs_plist"
 
 	assemble_native_runtime "$launcher_bin"
 
@@ -630,12 +658,11 @@ build_native_helper() {
 	generate_info_plist
 	local plist="$APP_PATH/Contents/Info.plist"
 	# The helper is invoked only for headless roles; the Git checkout owns updates.
-	for key in CFBundleIconFile CFBundleURLTypes SUFeedURL SUPublicEDKey SUScheduledCheckInterval; do
+	for key in CFBundleIconFile CFBundleURLTypes SUPublicEDKey; do
 		plutil -remove "$key" "$plist"
 	done
 	plutil -replace LSUIElement -bool true "$plist"
-	plutil -replace SUEnableAutomaticChecks -bool false "$plist"
-	plutil -replace SUAllowsAutomaticUpdates -bool false "$plist"
+	disarm_bundle_sparkle "$plist"
 	plutil -lint "$plist"
 	codesign_native_runtime
 	codesign --verify --strict --deep "$APP_PATH"
