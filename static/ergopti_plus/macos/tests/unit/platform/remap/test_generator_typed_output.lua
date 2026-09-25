@@ -108,11 +108,13 @@ helpers.with_fresh_modules({
 	--- Builds the shipped defaults with some assignments replaced.
 	--- @param tap_holds table|nil Key id → { tap, hold }.
 	--- @param mod_combos table|nil Combo id → { combo, tap, hold }.
+	--- @param symmetric boolean|nil Symmetric chord mode; nil keeps the default.
 	--- @return table rules The generated complex_modifications rules.
-	local function build(tap_holds, mod_combos)
+	local function build(tap_holds, mod_combos, symmetric)
 		local state = Config.build_default_state(keys, combos)
 		for id, slots in pairs(tap_holds or {}) do state.tap_hold_config[id] = copy(slots) end
 		for id, slots in pairs(mod_combos or {}) do state.mod_combos_config[id] = copy(slots) end
+		if symmetric ~= nil then state.combo_symmetric = symmetric end
 		local config, err = Generator.build_karabiner_json(
 			state, actions, keys, combos, non_canonical, DATA_DIR, TOKEN)
 		assert(config, "generation failed: " .. tostring(err))
@@ -395,6 +397,309 @@ helpers.with_fresh_modules({
 			engine:up("left_option", true)
 			helpers.assert_eq(table.concat(keys_posted(engine), ","), "delete_forward",
 				"a quick release must not delete a second word")
+		end)
+	end)
+
+
+
+	-- ======================
+	-- ===== 4) Chords =====
+	-- ======================
+
+	--- Gives every modifier combo the same three slots.
+	--- @param slots table { combo, tap, hold }.
+	--- @return table mod_combos Combo id → slots.
+	local function every_combo(slots)
+		local mod_combos = {}
+		for _, combo_def in ipairs(combos) do mod_combos[combo_def.id] = slots end
+		return mod_combos
+	end
+
+	--- Returns what an engine posted since its last clear, one line per key
+	--- event with the flags an application reads with it.
+	--- @param engine table Model engine.
+	--- @return string typed
+	local function typed(engine)
+		local lines = {}
+		for _, emission in ipairs(engine:emissions()) do
+			if emission.key_code ~= nil then
+				lines[#lines + 1] = emission.phase .. ":" .. emission.key_code .. "[" .. names(emission.flags) .. "]"
+			end
+		end
+		return table.concat(lines, " ")
+	end
+
+	helpers.describe("a chord fires, keeps its action down and leaves its first key held (chord-leaves-first-key-held)", function()
+		-- Each ordered pair has its own rules, so one graph serves every combo.
+		local chords = build(nil, every_combo({ combo = "delete_fwd", tap = "none", hold = "none" }))
+		-- A tap slot different from the chord, so what k2 types under a held k1
+		-- tells the hold-then-tap rule from k2's own rule.
+		local both = build(nil, every_combo({ combo = "opt_backspace", tap = "opt_delete_fwd", hold = "none" }))
+		local held_prefix = "ergopti_ke_held_"
+
+		--- Reports whether a key is one of the eight modifier keys (fn is not).
+		--- @param key_code string Physical key.
+		--- @return boolean modifier_key
+		local function is_modifier_key(key_code)
+			return KarabinerModel.MODIFIER_KEY_CODES[key_code] == true and key_code ~= "fn"
+		end
+
+		--- Returns the variable that marks a key as physically held.
+		--- @param key_code string Physical key.
+		--- @return string name
+		local function held_variable(key_code)
+			return held_prefix .. key_code .. "_" .. TOKEN
+		end
+
+		--- Returns what holding `first` then tapping `second` twice types the
+		--- second time, and what a letter then types, on the slow path.
+		--- @param rules table Generated rules.
+		--- @param first string Key held first.
+		--- @param second string Key tapped under it.
+		--- @return string second_typed
+		--- @return string letter_typed
+		--- @return boolean keeps_flags Whether holding `first` alone presses a flag.
+		local function slow_path(rules, first, second)
+			local slow = engine_for(rules)
+			slow:down(first)
+			local keeps_flags = next(slow:pressed()) ~= nil
+			slow:tap(second)
+			slow:clear()
+			slow:tap(second)
+			local second_typed = typed(slow)
+			slow:clear()
+			slow:tap("a")
+			return second_typed, typed(slow), keeps_flags
+		end
+
+		--- Asserts that releasing every chord key leaves nothing behind.
+		--- @param engine table Model engine with only `last` still down.
+		--- @param keys_pressed table Both chord keys.
+		--- @param last string Key released last.
+		--- @param context string Failure context.
+		local function assert_released(engine, keys_pressed, last, context)
+			engine:up(last, true)
+			for _, key_code in ipairs(keys_pressed) do
+				helpers.assert_eq(engine:variable(held_variable(key_code)), 0,
+					context .. ": releasing both keys must clear the held state of " .. key_code)
+			end
+			helpers.assert_eq(engine:variable("ergopti_layer_active_" .. TOKEN), 0,
+				context .. ": releasing both keys must leave no layer on")
+			helpers.assert_eq(names(engine:pressed()), "",
+				context .. ": releasing both keys must leave no modifier down")
+		end
+
+		helpers.it("every combo chord fires when its two keys go down together (chord-matches-its-own-modifier-keys)", function()
+			-- Karabiner tests a chord's modifiers on its first key's key_down, before
+			-- either chord key has reached the output, so the chord's own keys can
+			-- never be held there: requiring them made every modifier-key chord
+			-- unreachable.
+			for _, combo_def in ipairs(combos) do
+				if not combo_def.menu_hidden then
+					local first, second = combo_keys(combo_def)
+					local engine = engine_for(chords)
+					helpers.assert_not_nil(engine:chord({ first, second }),
+						combo_def.id .. ": pressing " .. first .. " then " .. second .. " together must fire the chord")
+					local actions_typed = {}
+					for _, emission in ipairs(engine:emissions()) do
+						if emission.key_code == "delete_forward" then
+							actions_typed[#actions_typed + 1] = names(emission.flags)
+						end
+					end
+					helpers.assert_eq(table.concat(actions_typed, "|"), "",
+						combo_def.id .. ": the chord must type its action once, with none of its own keys held")
+				end
+			end
+		end)
+
+		helpers.it("a chord keeps a modifier action held, and a key action down to repeat unless its first key is a held modifier key (chord-action-stays-down)", function()
+			local modifier_chords = build(nil, every_combo({ combo = "cmd_shift", tap = "none", hold = "none" }))
+			for _, combo_def in ipairs(combos) do
+				if not combo_def.menu_hidden then
+					local first, second = combo_keys(combo_def)
+					local held = engine_for(modifier_chords)
+					held:chord({ first, second })
+					helpers.assert_eq(names(held:pressed()), "left_command,left_shift",
+						combo_def.id .. ": a chord holding Cmd+Shift must keep both down, and nothing of its first key")
+
+					local first_flags = engine_for(chords)
+					first_flags:down(first)
+					local keeps_flags = next(first_flags:pressed()) ~= nil
+					local engine = engine_for(chords)
+					engine:chord({ first, second })
+					if is_modifier_key(first) and keeps_flags then
+						helpers.assert_true(engine:held().delete_forward ~= true,
+							combo_def.id .. ": after a held modifier key, the chord's key goes out once")
+						helpers.assert_eq(names(engine:pressed()), names(first_flags:pressed()),
+							combo_def.id .. ": the modifier key must keep what it holds down")
+					else
+						helpers.assert_true(engine:held().delete_forward == true,
+							combo_def.id .. ": a chord typing a key must keep it down, so it auto-repeats")
+					end
+				end
+			end
+		end)
+
+		helpers.it("Caps Lock or Tab first: a key chord repeats and a modifier chord holds (chord-plain-first-key-keeps-action)", function()
+			-- Caps Lock holds Cmd and Tab holds fn by default: their chords keep the
+			-- action down, and the held modifier comes back with the next press.
+			for _, combo_id in ipairs({ "caps_tab", "tab_esc" }) do
+				local combo_def = nil
+				for _, candidate in ipairs(combos) do
+					if candidate.id == combo_id then combo_def = candidate end
+				end
+				local first, second = combo_keys(assert(combo_def, combo_id))
+				local key_chord = engine_for(build(nil, { [combo_id] = { combo = "backspace", tap = "none", hold = "none" } }))
+				key_chord:chord({ first, second })
+				helpers.assert_eq(typed(key_chord), "down:delete_or_backspace[]",
+					combo_id .. ": the chord must type Backspace alone")
+				helpers.assert_true(key_chord:held().delete_or_backspace == true,
+					combo_id .. ": the chord's Backspace must stay down, so it auto-repeats")
+				local modifier_chord = engine_for(build(nil, { [combo_id] = { combo = "cmd_shift", tap = "none", hold = "none" } }))
+				modifier_chord:chord({ first, second })
+				helpers.assert_eq(names(modifier_chord:pressed()), "left_command,left_shift",
+					combo_id .. ": the chord must hold Cmd+Shift")
+			end
+		end)
+
+		helpers.it("after a chord, the second key again under the still-held first key types what holding it first types", function()
+			for _, combo_def in ipairs(combos) do
+				if not combo_def.menu_hidden then
+					local first, second = combo_keys(combo_def)
+					local context = combo_def.id .. " (" .. first .. " then " .. second .. ")"
+					local slow_second = slow_path(both, first, second)
+
+					local fast = engine_for(both)
+					helpers.assert_not_nil(fast:chord({ first, second }), context .. ": the chord must fire")
+					fast:up(second, true)
+					helpers.assert_eq(fast:variable(held_variable(first)), 1,
+						context .. ": the first key must read as held after the chord")
+					fast:clear()
+					fast:tap(second)
+					helpers.assert_eq(typed(fast), slow_second,
+						context .. ": pressing the second key again under the held first key")
+					assert_released(fast, { first, second }, first, context)
+				end
+			end
+		end)
+
+		helpers.it("after a chord, a letter under the still-held first key has its held modifiers unless the chord keeps its action down (chord-first-key-modifiers)", function()
+			-- Karabiner keeps one `to` entry down. A modifier key keeps it for its
+			-- held modifiers when the action is a plain key; any other first key
+			-- gives it to the action, and its held modifier comes back with its
+			-- next press. An action that keeps nothing down leaves it to them.
+			local leaves_room = build(nil, every_combo({ combo = "layer_off", tap = "opt_delete_fwd", hold = "none" }))
+			local checked = 0
+			for _, combo_def in ipairs(combos) do
+				if not combo_def.menu_hidden then
+					local first, second = combo_keys(combo_def)
+					local context = combo_def.id .. " (" .. first .. " then " .. second .. ")"
+					local _, slow_letter, keeps_flags = slow_path(both, first, second)
+
+					local fast = engine_for(both)
+					fast:chord({ first, second })
+					fast:up(second, true)
+					fast:clear()
+					fast:tap("a")
+					if keeps_flags and not is_modifier_key(first) then
+						helpers.assert_eq(typed(fast), "down:a[]",
+							context .. ": the chord's action took the place of the first key's held modifier")
+					else
+						helpers.assert_eq(typed(fast), slow_letter,
+							context .. ": a letter under the held first key types as on the slow path")
+					end
+
+					if keeps_flags then
+						checked = checked + 1
+						local room_second, room_letter = slow_path(leaves_room, first, second)
+						local room = engine_for(leaves_room)
+						helpers.assert_not_nil(room:chord({ first, second }), context .. ": the chord must fire")
+						room:up(second, true)
+						room:clear()
+						room:tap(second)
+						helpers.assert_eq(typed(room), room_second,
+							context .. ": the second key again, after a chord that keeps nothing down")
+						room:clear()
+						room:tap("a")
+						helpers.assert_eq(typed(room), room_letter,
+							context .. ": a letter keeps the first key's held modifiers after a chord that keeps nothing down")
+						assert_released(room, { first, second }, first, context)
+					end
+				end
+			end
+			helpers.assert_true(checked >= 100, "the matrix must reach first keys holding a modifier, reached " .. checked)
+		end)
+
+		helpers.it("a chord under AltGr keeps AltGr for the letters typed after it", function()
+			-- The reported case: right Command holds AltGr; after right Command +
+			-- Tab together, a letter typed with right Command still down is AltGr's.
+			local engine = engine_for(both)
+			engine:chord({ "right_command", "tab" })
+			engine:up("tab", true)
+			engine:clear()
+			engine:tap("a")
+			helpers.assert_eq(typed(engine), "down:a[right_option]",
+				"a letter typed under the still-held right Command must carry AltGr")
+		end)
+
+		helpers.it("in symmetric mode, a chord pressed in either order leaves the key pressed first held (chord-symmetric-restores-first-key)", function()
+			local symmetric = build(nil, every_combo({ combo = "opt_backspace", tap = "opt_delete_fwd", hold = "none" }), true)
+			local checked = 0
+			for _, combo_def in ipairs(combos) do
+				-- The canonical half of each pair owns the chord for both orders.
+				if not combo_def.menu_hidden and not non_canonical[combo_def.id] then
+					local k1, k2 = combo_keys(combo_def)
+					for _, order in ipairs({ { k1, k2 }, { k2, k1 } }) do
+						local first, second = order[1], order[2]
+						local context = combo_def.id .. " (" .. first .. " then " .. second .. ", symmetric)"
+						local slow_second = slow_path(symmetric, first, second)
+						local fast = engine_for(symmetric)
+						helpers.assert_not_nil(fast:chord(order), context .. ": the chord must fire")
+						fast:up(second, true)
+						helpers.assert_eq(fast:variable(held_variable(first)), 1,
+							context .. ": the key pressed first must read as held")
+						helpers.assert_eq(fast:variable(held_variable(second)), 0,
+							context .. ": the released key must not read as held")
+						fast:clear()
+						fast:tap(second)
+						helpers.assert_eq(typed(fast), slow_second,
+							context .. ": pressing the other key again under the key pressed first")
+						assert_released(fast, { first, second }, first, context)
+						checked = checked + 1
+					end
+				end
+			end
+			helpers.assert_true(checked >= 170, "the symmetric matrix must press both orders of every pair, reached " .. checked)
+		end)
+
+		helpers.it("the shipped defaults emit no chord the hold-then-tap rule already types (redundant-chord-skipped)", function()
+			-- A chord whose action is its combo's tap slot adds nothing when its first
+			-- key has a hold, but makes that key wait for a partner on every press.
+			local state = Config.build_default_state(keys, combos)
+			local hold_of = {}
+			for _, key_def in ipairs(keys) do
+				hold_of[key_def.from.key_code] = (state.tap_hold_config[key_def.id] or {}).hold or "none"
+			end
+			local rules = build()
+			local skipped = 0
+			for _, combo_def in ipairs(combos) do
+				local slots = state.mod_combos_config[combo_def.id] or {}
+				local first, second = combo_keys(combo_def)
+				if not combo_def.menu_hidden and slots.combo ~= nil and slots.combo ~= "none"
+					and slots.combo == slots.tap and hold_of[first] ~= "none" then
+					skipped = skipped + 1
+					helpers.assert_nil(engine_for(rules):chord({ first, second }),
+						combo_def.id .. ": the hold-then-tap rule already types " .. slots.combo)
+				end
+			end
+			helpers.assert_true(skipped >= 5, "expected the five right Command defaults, found " .. skipped)
+			for _, rule in ipairs(rules) do
+				for _, manipulator in ipairs(rule.manipulators or {}) do
+					local simultaneous = manipulator.from and manipulator.from.simultaneous
+					helpers.assert_true(type(simultaneous) ~= "table" or simultaneous[1].key_code ~= "right_command",
+						"right Command must not wait for a chord partner by default: " .. tostring(rule.description))
+				end
+			end
 		end)
 	end)
 end)
