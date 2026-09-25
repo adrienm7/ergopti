@@ -53,14 +53,20 @@ local ALWAYS_ON_RULES = {
 	"combos.json",      -- 2-letter combo mappings (e.g. Esc on R Cmd + R Ctrl)
 }
 
--- Actual modifier key_codes as a lookup set (fn and caps_lock excluded — they
--- are not held modifiers in KE's from-field sense).
+-- The eight modifier keys: Shift, Control, Option and Command on each side.
 local ACTUAL_MODIFIER_KEY_CODES = {
 	left_option  = true, right_option  = true,
 	left_command = true, right_command = true,
 	left_control = true, right_control = true,
 	left_shift   = true, right_shift   = true,
 }
+
+-- Key codes a `to` entry counts as a modifier key: every one that raises a
+-- flag, fn included (Karabiner's momentary_switch_event make_modifier_flag).
+-- from.modifiers accepts each of them, fn too, and consumes it when mandatory.
+-- Caps Lock is a lock, not one of them.
+local FLAG_KEY_CODES = { fn = true }
+for key_code in pairs(ACTUAL_MODIFIER_KEY_CODES) do FLAG_KEY_CODES[key_code] = true end
 
 -- Physical key and sentinel outputs for the script-control rules.
 -- These values must match the F13/F14/F15 sentinel constants consumed by
@@ -743,6 +749,23 @@ end
 -- ===== 3.1) Tap/Hold Slot Rule =====
 -- ===================================
 
+--- Returns the events a tap/hold key's own rule keeps down, without typing,
+--- while the key is held: its hold, or the key itself for a modifier key with
+--- neither slot, which its passthrough rule presses. A key whose rule types at
+--- key_down (its tap, or a native non-modifier key) keeps nothing down.
+--- @param key_code string Physical key.
+--- @param tap_action table Resolved action for the key's tap slot.
+--- @param hold_action table Resolved action for the key's hold slot.
+--- @return table events `to` events kept down, possibly empty.
+local function held_key_events(key_code, tap_action, hold_action)
+	local hold_to = hold_action.karabiner_to or {}
+	if #hold_to > 0 then return hold_to end
+	if #(tap_action.karabiner_to or {}) == 0 and FLAG_KEY_CODES[key_code] then
+		return { { key_code = key_code } }
+	end
+	return {}
+end
+
 --- Builds the variable-based rule for the tap / hold slots of a combo.
 --- Matches k2 physically while k1 is held (via ke_held_k1=1) and splits
 --- output by press duration (to_if_alone for tap, to for hold).
@@ -1134,19 +1157,24 @@ function M.build_karabiner_json(
 	end
 
 
-	-- Build a lookup: key_code → modifier key_codes held by its hold action.
-	-- When a key acts as k1 (holder) in a combo, its hold-action modifiers are
-	-- virtually held while the combo rule fires. Listing them as mandatory in the
-	-- rule's from matcher consumes them so they do not leak into output events.
+	-- Build a lookup: key_code → the modifier flags its own rule keeps down while
+	-- held (held_key_events): each entry's modifier key and every modifier it
+	-- carries (Cmd+Shift holds both), fn included. When a key acts as k1
+	-- (holder) in a combo, those flags are down while the combo rule fires.
+	-- Listing them as mandatory in the rule's from matcher consumes them so they
+	-- do not leak into output events.
 	local key_held_modifiers = {}
 	for _, key_def in ipairs(tap_hold_keys) do
 		local cfg       = state.tap_hold_config[key_def.id] or {}
-		local hold_id   = cfg.hold or "none"
-		local hold_act  = action_index[hold_id] or none_action
+		local hold_act  = action_index[cfg.hold or "none"] or none_action
+		local tap_act   = action_index[cfg.tap or "none"] or none_action
 		local held_mods = {}
-		for _, ev in ipairs(hold_act.karabiner_to or {}) do
-			if ev.key_code and ACTUAL_MODIFIER_KEY_CODES[ev.key_code] then
+		for _, ev in ipairs(held_key_events(key_def.from.key_code, tap_act, hold_act)) do
+			if ev.key_code and FLAG_KEY_CODES[ev.key_code] then
 				held_mods[#held_mods + 1] = ev.key_code
+				for _, modifier in ipairs(ev.modifiers or {}) do
+					if FLAG_KEY_CODES[modifier] then held_mods[#held_mods + 1] = modifier end
+				end
 			end
 		end
 		if #held_mods > 0 then
