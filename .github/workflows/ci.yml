@@ -15,7 +15,8 @@
 #              convention lint, ...).
 #   plan       Resolves the release metadata once, from git refs alone: whether
 #              this run publishes, and its tag, version, title and update
-#              channel. Only a push to main or dev whose next tag is still free
+#              channel. Only a push to main or dev of a commit that no tag of
+#              its series contains yet, and whose next tag is still free,
 #              publishes; every other run takes the CI profile.
 #   macOS      One reusable workflow per OS, each drawn as one group box. A box
 #   Windows    runs its tests and builds its package on every run. On a release
@@ -189,8 +190,10 @@ jobs:
           branch="${GITHUB_REF_NAME}"
 
           if [ "$branch" = "main" ]; then
-              last_stable=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname \
-                  | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)
+              series_glob='v[0-9]*.[0-9]*.[0-9]*'
+              series_re='^v[0-9]+\.[0-9]+\.[0-9]+$'
+              last_stable=$(git tag --list "$series_glob" --sort=-v:refname \
+                  | grep -E "$series_re" | head -1 || true)
               if [ -z "$last_stable" ]; then
                   last_stable="v0.0.0"
                   range="HEAD"
@@ -199,6 +202,10 @@ jobs:
               fi
               IFS='.' read -r maj min pat <<< "${last_stable#v}"
               bump="patch"
+              # --format=%s ends every subject with a newline. --pretty=format:
+              # left the last one, the oldest commit of the range, unterminated,
+              # so read dropped it: a range whose only feat was its oldest commit
+              # was bumped as a patch.
               while IFS= read -r subject; do
                   [ -z "$subject" ] && continue
                   if echo "$subject" | grep -qE '(BREAKING|!):'; then
@@ -206,7 +213,7 @@ jobs:
                   elif echo "$subject" | grep -qE '^feat(\([^)]+\))?!?:'; then
                       [ "$bump" != "major" ] && bump="minor"
                   fi
-              done < <(git log "$range" --no-merges --pretty=format:"%s")
+              done < <(git log "$range" --no-merges --format=%s)
               case "$bump" in
                   major) maj=$((maj+1)); min=0; pat=0 ;;
                   minor) min=$((min+1)); pat=0 ;;
@@ -217,7 +224,12 @@ jobs:
               title="Ergopti ${tag}"
           else
               # dev branch — v0.0.0-dev.N series
-              last_dev=$(git tag --list 'v0.0.0-dev.*' --sort=-v:refname | head -1 || true)
+              series_glob='v0.0.0-dev.*'
+              series_re='^v0\.0\.0-dev\.[0-9]+$'
+              # Filtered like the stable series: a tag such as v0.0.0-dev.4-hotfix
+              # matches the glob, and its number is not an integer.
+              last_dev=$(git tag --list "$series_glob" --sort=-v:refname \
+                  | grep -E "$series_re" | head -1 || true)
               if [ -z "$last_dev" ]; then
                   next_n=1
               else
@@ -230,6 +242,29 @@ jobs:
               # The sidebar of the repository home truncates long titles, and the
               # version is what a reader needs from it.
               title="Ergopti ${tag}"
+          fi
+
+          # A commit that a tag of its series already contains was published
+          # by an earlier run, as that tag or inside it. The number above only
+          # counts tags, so "Re-run all jobs" on an older run would otherwise
+          # publish that older code under the next number, and the updaters,
+          # which order tags by version, would offer it as the newest release.
+          # Every tag of the series is tested, not only the newest: after a
+          # force push the newest tag no longer descends from the old commits.
+          # The listing is captured first, so a failing git fails the step
+          # rather than reading as "never released".
+          listed=$(git tag --list "$series_glob" --contains HEAD --sort=v:refname)
+          covered=()
+          while IFS= read -r listed_tag; do
+              if [[ "$listed_tag" =~ $series_re ]]; then covered+=("$listed_tag"); fi
+          done <<< "$listed"
+          if [ "${#covered[@]}" -gt 0 ]; then
+              later=""
+              [ "${#covered[@]}" -gt 1 ] && later=" and $(( ${#covered[@]} - 1 )) later tag(s)"
+              echo "::notice::This commit is already part of ${covered[0]}${later}, which an earlier run published: CI profile, no release. A half-published release of it is finished with 'Re-run failed jobs' on the run that created that tag, before any 'Re-run all jobs' there, or by hand: delete an orphan tag, or write a published release's notes with gh release edit. The next push supersedes it either way."
+              emit release false
+              emit channel dev
+              exit 0
           fi
 
           # Skip if the tag already exists (duplicate push guard). The listing is
@@ -359,15 +394,31 @@ jobs:
       # the appcast and the checksum the Linux updater verifies the bundle
       # against. tools/test/test-release-notes-assets-are-uploaded.cjs fails
       # when the notes link a file this list does not require.
-      # The tag half turns a tag this run cannot create into a clear message:
-      # Re-run failed jobs reuses plan's outputs from the first attempt, so a
-      # newer run may own that tag by now, or the first attempt created it and
-      # then failed.
+      #
+      # The tag half decides where this attempt starts. "Re-run failed jobs"
+      # reuses plan's outputs from the first attempt, so the tag may exist:
+      # - on another commit: another run took that number. There is nothing
+      #   to publish, and the step fails; when that commit is an ancestor of
+      #   this one, "Re-run all jobs" publishes this commit under a new number.
+      # - on this commit: an earlier attempt of this run created it, then
+      #   stopped. With no release yet, this attempt skips "Create git tag".
+      #   With a published release, it also skips "Create release", and
+      #   resumes at the Sparkle feed, the changelog and the notes: the
+      #   release and its assets are immutable, its notes stay editable. A
+      #   draft left by an interrupted upload must be deleted by hand first,
+      #   because resuming over it would publish whatever it holds.
+      # A newer tag of the channel, published by a later run, stops any
+      # publication of this older one; a release already published only has
+      # its feed skipped (skip_feed), so the newer feed stays.
+      # Anything the step cannot read, the tag listing or the release, fails
+      # it rather than being taken as "free".
       - name: Refuse to publish an incomplete or already-taken release
+        id: preflight
         shell: bash
         env:
           TAG: ${{ needs.plan.outputs.tag }}
           CHANNEL: ${{ needs.plan.outputs.channel }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           missing=0
@@ -398,21 +449,81 @@ jobs:
           # as "tag free". The ^{} pattern lists the commit an annotated tag
           # peels to; a lightweight tag has only its own line.
           taken=$(git ls-remote --tags origin "refs/tags/$TAG" "refs/tags/$TAG^{}")
+          create_tag=true
+          create_release=true
           if [ -n "$taken" ]; then
               tagged=$(printf '%s\n' "$taken" | awk -v ref="refs/tags/$TAG" '
                   $2 == (ref "^{}") { peeled = $1 }
                   $2 == ref { plain = $1 }
                   END { print (peeled != "" ? peeled : plain) }')
               if [ "$tagged" = "$GITHUB_SHA" ]; then
-                  echo "::error::$TAG already points at this commit ($GITHUB_SHA): an earlier attempt of this run created it and failed before publishing. Delete that orphan tag and re-run the failed jobs, or finish the release by hand."
+                  create_tag=false
+                  view_err="$RUNNER_TEMP/release-view.err"
+                  rc=0
+                  draft=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft 2> "$view_err") || rc=$?
+                  if [ "$rc" -ne 0 ]; then
+                      if [ "$rc" -eq 1 ] && grep -qx 'release not found' "$view_err"; then
+                          echo "::notice::$TAG already points at this commit and has no release: an earlier attempt created the tag and stopped. Resuming at the release."
+                      else
+                          cat "$view_err" >&2
+                          echo "::error::could not read the release of $TAG (gh exit $rc); refusing to guess whether it exists."
+                          exit 1
+                      fi
+                  elif [ "$draft" = "false" ]; then
+                      echo "::notice::$TAG is already released from this commit: an earlier attempt stopped after publishing it. Resuming at the Sparkle feed, the changelog and the notes."
+                      create_release=false
+                  elif [ "$draft" = "true" ]; then
+                      echo "::error::$TAG has a draft release, left by an attempt that stopped while uploading. Delete that draft (keep the tag), then use 'Re-run failed jobs'."
+                      exit 1
+                  else
+                      echo "::error::gh reported isDraft='$draft' for $TAG; expected true or false."
+                      exit 1
+                  fi
+              elif [ -n "$tagged" ] && git merge-base --is-ancestor "$tagged" "$GITHUB_SHA" 2> /dev/null; then
+                  echo "::error::$TAG already exists on $tagged, an older commit than this run's $GITHUB_SHA: another run took the number this run planned. There is nothing to publish from this attempt. 'Re-run all jobs' publishes this commit under the next number; plan skips any commit a tag already contains, so that is safe."
+                  exit 1
               else
-                  echo "::error::$TAG already exists on ${tagged:-an unknown commit}, not on $GITHUB_SHA: a newer run published it. Use 'Re-run all jobs' so plan picks a fresh tag."
+                  echo "::error::$TAG already exists on ${tagged:-an unknown commit}, not on $GITHUB_SHA: a newer run superseded this one and published that tag. There is nothing to publish; do not re-run this run."
+                  exit 1
               fi
-              exit 1
           fi
-          echo "Publishing $TAG: every release asset is present and the tag is free."
 
+          # A newer tag of this channel on origin means a later run published
+          # after this one planned $TAG. Creating $TAG now would publish older
+          # code after it, and a stable release would become GitHub's latest,
+          # which the Windows and Linux updaters install; its feed would move
+          # every macOS user back to it. Only the notes of an already published
+          # $TAG may still be finished, without its feed.
+          case "$CHANNEL" in
+              dev) series='refs/tags/v0.0.0-dev.*'; series_re='^v0\.0\.0-dev\.[0-9]+$' ;;
+              main) series='refs/tags/v*'; series_re='^v[0-9]+\.[0-9]+\.[0-9]+$' ;;
+              *) echo "::error::plan's channel is '$CHANNEL', expected dev or main."; exit 1 ;;
+          esac
+          published=$(git ls-remote --tags --refs origin "$series")
+          names=("$TAG")
+          while read -r _ ref; do
+              if [[ "${ref#refs/tags/}" =~ $series_re ]]; then names+=("${ref#refs/tags/}"); fi
+          done <<< "$published"
+          newest=$(printf '%s\n' "${names[@]}" | sort -V | tail -n 1)
+          skip_feed=false
+          if [ "$newest" != "$TAG" ]; then
+              if [ "$create_release" = false ]; then
+                  echo "::notice::$newest was published after this run planned $TAG. Finishing the changelog and the notes of $TAG only: its feed would replace the newer one."
+                  skip_feed=true
+              else
+                  echo "::error::$newest was published after this run planned $TAG: publishing $TAG now would put older code after it. There is nothing to publish; do not re-run this run. An orphan $TAG tag left by an earlier attempt can be deleted by hand."
+                  exit 1
+              fi
+          fi
+          echo "create_tag=$create_tag" >> "$GITHUB_OUTPUT"
+          echo "create_release=$create_release" >> "$GITHUB_OUTPUT"
+          echo "skip_feed=$skip_feed" >> "$GITHUB_OUTPUT"
+          echo "Publishing $TAG: every release asset is present; create tag: $create_tag, create release: $create_release, skip feed: $skip_feed."
+
+      # Skipped only when the preflight found this commit's tag from an earlier
+      # attempt of this run.
       - name: Create git tag
+        if: steps.preflight.outputs.create_tag == 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.PAT_ERGOPTI }}
@@ -428,38 +539,61 @@ jobs:
 
       - name: Create release and upload all assets atomically
         # The release is created here — after all three build jobs have
-        # succeeded — so it is never in a half-baked state.
+        # succeeded — so it is never in a half-baked state. Skipped only when
+        # an earlier attempt of this run already published it; the steps below
+        # still run, so a re-run finishes the feed and the notes.
+        if: steps.preflight.outputs.create_release == 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.plan.outputs.tag }}
+          PRERELEASE: ${{ needs.plan.outputs.prerelease }}
+          TITLE: ${{ needs.plan.outputs.title }}
         run: |
           set -euo pipefail
-          tag="${{ needs.plan.outputs.tag }}"
-          prerelease="${{ needs.plan.outputs.prerelease }}"
-          title="${{ needs.plan.outputs.title }}"
-
           mapfile -t assets < <(find release-assets -type f)
           echo "Assets to attach (${#assets[@]}):"
           printf '  %s\n' "${assets[@]}"
 
+          # A dev build must stay a prerelease: GitHub makes every other
+          # published release the latest one, and the Windows and Linux stable
+          # updaters install /releases/latest.
           flags=()
-          [ "$prerelease" = "true" ] && flags+=("--prerelease")
+          case "$PRERELEASE" in
+              true) flags+=("--prerelease") ;;
+              false) ;;
+              *) echo "::error::plan's prerelease output is '$PRERELEASE', expected true or false."; exit 1 ;;
+          esac
 
-          gh release create "$tag" \
-              --target "${{ github.sha }}" \
-              --title "$title" \
+          gh release create "$TAG" \
+              --target "$GITHUB_SHA" \
+              --title "$TITLE" \
               "${flags[@]}" \
               "${assets[@]}"
 
+      # Skipped only when the preflight found a newer release of this channel:
+      # this older feed would replace the one that points at it.
       - name: Publish channel feed for Sparkle
+        if: steps.preflight.outputs.skip_feed != 'true'
         shell: bash
         env:
           ERGOPTI_CHANNEL: ${{ needs.plan.outputs.channel }}
+          TAG: ${{ needs.plan.outputs.tag }}
+          RESUMED: ${{ steps.preflight.outputs.create_release == 'false' }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           feed="release-assets/appcast-${ERGOPTI_CHANNEL}.xml"
           branch="sparkle-appcasts"
           worktree="$RUNNER_TEMP/sparkle-appcasts"
+          # The appcast carries the size and the EdDSA signature of one exact
+          # zip. When an earlier attempt already published the release, that
+          # zip is the release's, so its own appcast is published, never this
+          # attempt's artifact, which a rebuilt package would no longer match.
+          if [ "$RESUMED" = true ]; then
+              gh release download "$TAG" --repo "$GITHUB_REPOSITORY" \
+                  --pattern "appcast-${ERGOPTI_CHANNEL}.xml" --output "$feed" --clobber
+          fi
           test -s "$feed"
 
           # Published releases are immutable, so a permanent release asset
@@ -469,7 +603,7 @@ jobs:
           if git fetch origin "refs/heads/${branch}:refs/remotes/origin/${branch}"; then
               git worktree add --detach "$worktree" "refs/remotes/origin/${branch}"
           else
-              git worktree add --detach "$worktree" "${{ github.sha }}"
+              git worktree add --detach "$worktree" "$GITHUB_SHA"
               git -C "$worktree" checkout --orphan "$branch"
               git -C "$worktree" rm -rf --ignore-unmatch .
           fi
@@ -483,7 +617,7 @@ jobs:
               git -C "$worktree" push origin "HEAD:refs/heads/${branch}"
           fi
 
-          published="https://raw.githubusercontent.com/${{ github.repository }}/${branch}/appcast-${ERGOPTI_CHANNEL}.xml?release=${{ github.sha }}"
+          published="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${branch}/appcast-${ERGOPTI_CHANNEL}.xml?release=${GITHUB_SHA}"
           # The git ref becomes visible before raw.githubusercontent.com's edge
           # cache necessarily observes a newly-created branch. Retry every HTTP
           # failure for a bounded minute so that transient post-push 404s do not

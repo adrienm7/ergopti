@@ -151,7 +151,7 @@ if (!/git -C "\$worktree" push origin "HEAD:refs\/heads\/\$\{branch\}"/.test(fee
 	errors.push('finalization must commit and push the channel feed to its dedicated mutable branch');
 } else if (/gh release (?:create|upload) sparkle-feed/.test(feedPublishStep)) {
 	errors.push('an immutable GitHub release cannot own a channel feed that changes every release');
-} else if (!feedPublishStep.includes('raw.githubusercontent.com/${{ github.repository }}/${branch}/appcast-')) {
+} else if (!feedPublishStep.includes('raw.githubusercontent.com/${GITHUB_REPOSITORY}/${branch}/appcast-')) {
 	errors.push('publication verification must read the same raw branch URL stamped into SUFeedURL');
 } else if (!feedPublishStep.includes('--retry-all-errors') ||
 	!feedPublishStep.includes('--retry-max-time 90') ||
