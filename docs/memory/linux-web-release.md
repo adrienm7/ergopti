@@ -136,7 +136,6 @@ successful compilation alone does not establish picker discoverability.
 
 ### project-legacy-xkb-types-go-inside-the-section
 
-
 The legacy installer edits `types/extra`, a single
 `default partial xkb_types "default" { ... };` section that `complete`
 includes. A `type` block appended after the closing `};` is a syntax error:
