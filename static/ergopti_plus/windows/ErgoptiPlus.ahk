@@ -1,16 +1,25 @@
 ﻿; Last modified on 2026-04-23 at 00:00 (UTC+2)
 #Requires Autohotkey v2.0+
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
+; No process starts with a tray icon: the driver path reveals it once the custom
+; icon and the safe bootstrap menu are in place, and a detached worker never does.
+#NoTrayIcon
 
 ; The driver re-runs this entry (or its compiled executable) with a worker flag
-; for the detached keylogger-prefetch and UIA-selection workers. AutoHotkey gives
-; every process a tray icon, so each worker showed a second "ErgoptiPlus" entry
-; (the default green H icon in source mode) for as long as it lived. #NoTrayIcon
-; cannot be conditional, so the icon is hidden here, before any other statement.
-; Both predicates read only A_Args and are hoisted from their includes.
+; for the detached keylogger-prefetch and UIA-selection workers. AutoHotkey
+; creates a script's tray icon, main window and load-time hotkeys BEFORE its
+; first statement runs, so each worker looked like a second driver: an
+; "ErgoptiPlus" tray icon (the default green H in source mode), the driver's
+; exact window title, which Reload and #SingleInstance search to find the
+; instance they close, and every static hotkey armed in a second keyboard hook.
+; Before any other statement a worker therefore releases those hotkeys and takes
+; a title of its own. Both predicates read only A_Args and are hoisted.
 global _DriverIsDetachedWorker := KLPF_IsWorkerInvocation() || UIASW_IsWorkerInvocation()
-if _DriverIsDetachedWorker
-	A_IconHidden := true
+if _DriverIsDetachedWorker {
+	Suspend(true)
+	DllCall("User32\SetWindowTextW", "Ptr", A_ScriptHwnd,
+		"Str", "ErgoptiPlus detached worker " . DllCall("GetCurrentProcessId", "UInt"))
+}
 
 SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is located
 
@@ -179,7 +188,10 @@ global DRIVER_BASELINE_PRIORITY_CLASS := "AboveNormal"
 ; warnings even though this driver's own per-keystroke work is sub-millisecond.
 ; AboveNormal (not High) keeps this driver ahead of ordinary background work
 ; without contending with genuinely real-time OS/driver threads (hotpath-priority-starvation).
-try ProcessSetPriority(DRIVER_BASELINE_PRIORITY_CLASS)
+; A detached worker owns no hook and does background work: it keeps the default
+; class so a long projection never competes with the foreground.
+if !_DriverIsDetachedWorker
+	try ProcessSetPriority(DRIVER_BASELINE_PRIORITY_CLASS)
 
 ; Globals referenced by ``#HotIf`` expressions across the driver. They MUST
 ; be assigned before any code that pumps the message loop runs — otherwise
@@ -233,7 +245,10 @@ global DriverPid := DllCall("GetCurrentProcessId", "UInt")
 ; that prevents loading it this early — its Logger calls are try-wrapped and function
 ; definitions are hoisted across the whole #Include graph before auto-execute runs.
 #Include infra/error_net.ahk
-OnError(ErgoptiGlobalErrorHandler)
+if _DriverIsDetachedWorker
+	OnError(DetachedWorkerErrorHandler)
+else
+	OnError(ErgoptiGlobalErrorHandler)
 
 ; In compiled mode the .exe ships an embedded zip of every runtime asset
 ; (hotstrings TOMLs, locales, icons, _shared tree, vendor DLLs). The bundle
@@ -562,6 +577,9 @@ if !LLM_TriggerJournalRecoverAtBoot()
 ; a no-op, so this move is safe — and it closes the brief stock-menu window
 ; regardless of the boot path (normal OR first-run).
 _InstallSafeBootstrapTray()
+; #NoTrayIcon kept the icon hidden until now: it appears with the custom icon and
+; the safe menu, never with AutoHotkey's default icon and stock items.
+A_IconHidden := false
 if (_DriverStartupSmokeDir != "") {
 		; The real onboarding WebView pumps messages while startup is incomplete.
 		; Reproduce that hazard without an interactive window: the suspend watchdog
@@ -1249,6 +1267,10 @@ if (_DriverStartupSmokeDir != "") {
 		; active fixtures can require this deferred owner to publish immediately.
 		if !_StartupSmokeExpectedSuspend and !BuildTrayMenuDeferred()
 				throw Error("deferred tray-menu construction failed after ready")
+		; #NoTrayIcon hides every process's icon at load; the driver path alone
+		; reveals it. A driver that reaches ready without it has no tray at all.
+		if A_IconHidden
+				throw Error("the driver reached ready without revealing its tray icon")
 		try _LoggerFlush(true)
 		; This isolated probe has just materialised a deep native Menu tree and must
 		; not run the production OnExit teardown against test-only paths/owners. AHK's

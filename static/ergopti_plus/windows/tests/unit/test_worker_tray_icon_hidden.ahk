@@ -9,11 +9,16 @@
 ; "ErgoptiPlus" entry with the default green H icon appeared beside the real
 ; driver for as long as the worker lived (worker-tray-icon-2026-09-25).
 ;
-; The test launches the REAL entry as a UIA selection worker parented to this
-; runner, waits for the worker's ready message (proof that its main is running)
-; and asks the shell whether that process owns a notification-area icon. A
-; control script with an ordinary icon proves the probe can see icons at all,
-; so a hidden verdict can never come from a blind probe.
+; AutoHotkey creates a script's icon, main window and load-time hotkeys BEFORE
+; its first statement runs, so hiding the icon from a statement still flashed it
+; on every launch. A worker also kept the driver's exact window title, which is
+; what Reload and #SingleInstance search for, and raised itself to the driver's
+; AboveNormal priority.
+;
+; The tests launch the REAL entry as a worker and ask the shell whether that
+; process ever owns a notification-area icon. A control script with an ordinary
+; icon proves the probe can see icons at all, so a hidden verdict can never come
+; from a blind probe.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -40,6 +45,28 @@ _WTIH_ScriptWindow(Pid, TimeoutMs) {
 	DetectHiddenWindows(true)
 	try return WinWait("ahk_class AutoHotkey ahk_pid " . Pid, , TimeoutMs / 1000)
 	finally DetectHiddenWindows(PreviousDetect)
+}
+
+; The title AutoHotkey gives the entry's main window, which Reload and
+; #SingleInstance use to find the instance they close.
+_WTIH_DriverTitle(Entry) {
+	return Entry . " - AutoHotkey v" . A_AhkVersion
+}
+
+_WTIH_WindowTitle(Hwnd) {
+	PreviousDetect := A_DetectHiddenWindows
+	DetectHiddenWindows(true)
+	try return WinGetTitle("ahk_id " . Hwnd)
+	finally DetectHiddenWindows(PreviousDetect)
+}
+
+; Priority class of a live process, or 0 when it cannot be queried.
+_WTIH_PriorityClass(Pid) {
+	Handle := DllCall("OpenProcess", "UInt", 0x1000, "Int", false, "UInt", Pid, "Ptr")
+	if !Handle
+		return 0
+	try return DllCall("GetPriorityClass", "Ptr", Handle, "UInt")
+	finally DllCall("CloseHandle", "Ptr", Handle)
 }
 
 _WTIH_ControlProbeSeesAnOrdinaryIcon() {
@@ -102,6 +129,8 @@ _WTIH_WorkerShowsNoTrayIcon() {
 				"a detached worker must never show a tray icon of its own (it read as a second driver)")
 			Sleep(100)
 		}
+		Assert(_WTIH_WindowTitle(WorkerHwnd) != _WTIH_DriverTitle(Entry),
+			"a worker must not keep the driver's window title, or Reload can close it instead of the driver")
 	} finally {
 		OnMessage(0x004A, _WTIH_OnCopyData, 0)
 		if Pid
@@ -110,3 +139,50 @@ _WTIH_WorkerShowsNoTrayIcon() {
 }
 Test("boot: a detached worker re-running the entry shows no tray icon (worker-tray-icon-2026-09-25)",
 	_WTIH_WorkerShowsNoTrayIcon)
+
+; A prefetch worker launched without its payload runs the whole entry preamble,
+; then refuses and exits in about a second: short enough to watch its entire
+; life. Poll from launch to exit so even a momentary icon is caught.
+_WTIH_ShortWorkerNeverShowsDriverIdentity() {
+	_WTIH_ControlProbeSeesAnOrdinaryIcon()
+	SplitPath(A_ScriptDir, , &WindowsDir)
+	Entry := WindowsDir . "\ErgoptiPlus.ahk"
+	Pid := 0
+	IconSightings := 0
+	RaisedPriority := false
+	LastTitle := ""
+	try {
+		Run('"' . A_AhkPath . '" /force /ErrorStdOut "' . Entry
+			. '" --keylogger-prefetch-worker', , "Hide", &Pid)
+		PreviousDetect := A_DetectHiddenWindows
+		DetectHiddenWindows(true)
+		try {
+			Hwnd := 0
+			Started := A_TickCount
+			while ProcessExist(Pid) && (A_TickCount - Started) < 30000 {
+				if !Hwnd
+					Hwnd := WinExist("ahk_class AutoHotkey ahk_pid " . Pid)
+				if Hwnd {
+					if _WTIH_ShellHasIcon(Hwnd)
+						IconSightings++
+					try LastTitle := WinGetTitle("ahk_id " . Hwnd)
+				}
+				if (_WTIH_PriorityClass(Pid) = 0x8000)
+					RaisedPriority := true
+			}
+		} finally DetectHiddenWindows(PreviousDetect)
+		Assert(!ProcessExist(Pid), "the payload-less worker must refuse and exit on its own")
+		Assert(LastTitle != "", "the worker's main window must have been observed")
+		AssertEqual(0, IconSightings,
+			"a detached worker must never own a tray icon, not even for the first milliseconds")
+		Assert(LastTitle != _WTIH_DriverTitle(Entry),
+			"a worker must not keep the driver's window title, or Reload can close it instead of the driver")
+		Assert(!RaisedPriority,
+			"a background worker must not raise itself to the driver's AboveNormal priority")
+	} finally {
+		if Pid && ProcessExist(Pid)
+			try ProcessClose(Pid)
+	}
+}
+Test("boot: a detached worker never shows the driver's identity, from launch to exit (worker-tray-icon-2026-09-25)",
+	_WTIH_ShortWorkerNeverShowsDriverIdentity)

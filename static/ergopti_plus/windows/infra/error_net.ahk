@@ -32,6 +32,19 @@ global ERROR_NET_DEDUP_TTL_MS := 60000
 ; DISTINCT error signatures accumulate over a long-running session.
 global ERROR_NET_DEDUP_CACHE_CAP := 256
 
+; A detached worker (keylogger prefetch, UIA selection) owns no log file, no
+; tray and no dialog: the resident driver reads its captured standard output. An
+; uncaught error ends it with one structural line instead of the driver's fatal
+; startup dialog, crash report and log initialisation. The message is omitted:
+; it can carry typed text or paths.
+; @param Exc {Error} The uncaught error.
+; @param Mode {String} AutoHotkey's error mode, unused.
+; @returns {Integer} Never returns: the worker exits with code 1.
+DetachedWorkerErrorHandler(Exc, Mode) {
+		try FileAppend("detached-worker: uncaught " . Type(Exc) . ".`n", "*")
+		ExitApp(1)
+}
+
 ; Decides whether the error handler should force-release a modifier. A modifier
 ; is only RELEASED when it is LOGICALLY down (held by the driver / a failed
 ; callback) but the user is NOT physically holding it — i.e. genuinely stuck.
