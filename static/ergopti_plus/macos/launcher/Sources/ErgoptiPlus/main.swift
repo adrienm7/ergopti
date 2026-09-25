@@ -528,16 +528,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		// is the only UI affordance the user should see.
 		NSApp.setActivationPolicy(.accessory)
 
-		// Wire Sparkle. Standard controller starts checking automatically based
-		// on Info.plist's SUEnableAutomaticChecks / SUScheduledCheckInterval.
+		// Wire Sparkle. Automatic checks (Info.plist SUEnableAutomaticChecks /
+		// SUScheduledCheckInterval) only fetch the appcast; a download must wait
+		// for the user's install choice, which the consent policy proves on the
+		// live updater before it may start. A refusal leaves updates off rather
+		// than letting Sparkle download in the background.
 		let controller = SPUStandardUpdaterController(
-			startingUpdater: true,
+			startingUpdater: false,
 			updaterDelegate: nil,
 			userDriverDelegate: nil
 		)
-		updaterController = controller
-		updaterCommandRouter.bind(controller)
-		LauncherLog.write("launcher stage: Sparkle updater wired (+\(elapsedMilliseconds()) ms)")
+		if let refusal = UpdateConsentPolicy.refusal(for: controller.updater) {
+			LauncherLog.write("ERROR: Sparkle updater not started: \(refusal)")
+		} else {
+			controller.startUpdater()
+			updaterController = controller
+			updaterCommandRouter.bind(controller)
+			LauncherLog.write("launcher stage: Sparkle updater wired (+\(elapsedMilliseconds()) ms)")
+		}
 
 		// Tell the embedded Hammerspoon where to read its Lua config from.
 		seedConfigDirDefault()
