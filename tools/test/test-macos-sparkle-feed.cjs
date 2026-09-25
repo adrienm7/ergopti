@@ -62,6 +62,20 @@ if (!/<key>SUAllowsAutomaticUpdates<\/key>\s*<false\/>/.test(buildScript) ||
 	/<key>SUAutomaticallyUpdate<\/key>\s*<true\/>/.test(buildScript)) {
 	errors.push('the launcher bundle must declare SUAllowsAutomaticUpdates false: Sparkle must never download before consent');
 }
+// Sparkle's standard interface ships English windows that cannot follow the
+// driver's language (and modal alerts that stall the launcher's main queue):
+// the launcher must present every update window through its catalog driver.
+const launcherSourcesDir = path.join(root, 'static', 'ergopti_plus', 'macos', 'launcher', 'Sources', 'ErgoptiPlus');
+const launcherSwift = fs.readdirSync(launcherSourcesDir)
+	.filter((name) => name.endsWith('.swift'))
+	.map((name) => fs.readFileSync(path.join(launcherSourcesDir, name), 'utf8'))
+	.join('\n');
+if (/SPUStandardUpdaterController|SPUStandardUserDriver/.test(launcherSwift)) {
+	errors.push('the launcher must not use the standard Sparkle interface, which is English-only');
+}
+if (!launcherSource.includes('userDriver: userDriver') || !launcherSwift.includes('final class CatalogUpdateUserDriver')) {
+	errors.push('the launcher must drive Sparkle through the catalog-localized user driver');
+}
 const policyAt = launcherSource.indexOf('UpdateConsentPolicy.refusal(');
 const startAt = launcherSource.search(/\.(?:startUpdater|start)\(\)/);
 if (policyAt < 0 || startAt < 0 || policyAt > startAt) {
