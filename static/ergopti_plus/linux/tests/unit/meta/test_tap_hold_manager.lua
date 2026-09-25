@@ -100,10 +100,14 @@ helpers.describe("tap-hold manager", function()
 
 	helpers.it("offers every hold option and the catalogue as taps", function()
 		local Manager, _, _, user_path = manager()
-		helpers.assert_true(Manager.is_hold_option("layer", "nav"))
-		helpers.assert_true(Manager.is_hold_option("modifier", "ctrl+shift"))
-		helpers.assert_true(Manager.is_hold_option("none", ""))
-		helpers.assert_true(not Manager.is_hold_option("layer", "sym"))
+		helpers.assert_eq(Manager.canonical_hold("layer", "nav"), "nav")
+		helpers.assert_eq(Manager.canonical_hold("modifier", "ctrl+shift"), "ctrl+shift")
+		helpers.assert_eq(Manager.canonical_hold("modifier", "Shift + Ctrl"), "ctrl+shift",
+			"a reordered spelling is the same option")
+		helpers.assert_eq(Manager.canonical_hold("none", ""), "")
+		helpers.assert_nil(Manager.canonical_hold("layer", "sym"))
+		helpers.assert_nil(Manager.canonical_hold("modifier", ""), "a modifier hold needs a modifier")
+		helpers.assert_nil(Manager.canonical_hold("modifier", "hyper"))
 		for _, id in ipairs({ "copy", "paste", "enter", "one_shot_shift", "alt_tab_monitor", "open_url" }) do
 			helpers.assert_true(Manager.is_tap_action(id), id)
 		end

@@ -179,10 +179,14 @@ helpers.describe("tap-hold engine: thresholds and holds", function()
 		helpers.assert_eq(trail((e:process(CAPS, UP, 100))), "29↑ 58↓ 58↑")
 	end)
 
-	helpers.it("ignores an unknown modifier name rather than pressing anything", function()
-		local e = engine({ caps_lock = { tap_action = "enter", hold_modifier = "hyper", time_activation_seconds = 0.3 } })
-		helpers.assert_eq(trail(e:process(CAPS, DOWN, 0)), "")
-		helpers.assert_eq(trail((e:process(CAPS, UP, 100))), "28↓ 28↑")
+	helpers.it("refuses a hold modifier that is not a canonical id instead of dropping it", function()
+		-- The loader canonicalises every spelling and rejects the rest; one that
+		-- reaches the engine is a bug, and used to become a key with no hold.
+		for _, spelling in ipairs({ "hyper", "altgr", "Ctrl", "ctrl + shift" }) do
+			helpers.assert_throws(function()
+				engine({ caps_lock = { tap_action = "enter", hold_modifier = spelling, time_activation_seconds = 0.3 } })
+			end, spelling)
+		end
 	end)
 
 	helpers.it("types End then Enter for the layer's new-line key", function()

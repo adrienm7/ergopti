@@ -39,6 +39,11 @@ global TAPHOLD_DEFAULT_ACTIVATION_SECONDS := 0.2
 ; straight into a KeyWait timeout — so anything past it is rejected at the
 ; loader boundary instead of stalling a hotkey thread for minutes.
 global TAPHOLD_MAX_ACTIVATION_SECONDS := 10
+; The other spellings of a hold modifier (altgr, lctrl...), read here, at this
+; file's include position, and never from a #HotIf: those are live before the
+; auto-execute section runs, during Bundle_Init's message-pumping RunWait, and
+; the hold resolvers they call must not read a file (hotif-globals-boot-safe).
+global TAPHOLD_HOLD_MODIFIER_ALIASES := _TapHoldReadHoldModifierAliases()
 
 
 
@@ -280,6 +285,17 @@ _TapHold_ParseFileInto(FilePath, Result) {
 			} else if (Key == "hold_layer") and Result["keys"][KeyId].Has("hold_modifier") {
 				Result["keys"][KeyId].Delete("hold_modifier")
 			}
+			; Every hold-modifier variant tests only for a non-empty hold_modifier,
+			; so a value that names no modifier armed the hold branch with nothing
+			; to hold and swallowed the key, tap included. Refuse it here, as the
+			; Linux loader does: the entry holds the picker's "none" and keeps its
+			; tap, and the user's choice still replaces a default hold.
+			if (Key == "hold_modifier" and Value != "" and !_TapHoldHoldModifierIsKnown(Value)) {
+				try LoggerError("TapHoldLoader",
+					"Unknown hold_modifier '{1}' for tap-hold key '{2}' in [tap_hold.keys.{2}]; its hold is dropped and its tap kept (expected ctrl, shift, alt, alt_gr or win, or an alias of the hold picker).",
+					Value, KeyId)
+				Value := ""
+			}
 			Result["keys"][KeyId][Key] := Value
 			continue
 		}
@@ -494,17 +510,97 @@ _TapHoldOwnSideModifier(KeyId, Token) {
 	return LeftSide[Token]
 }
 
+; The other spellings of a hold modifier (altgr, lctrl...), from the two alias
+; tables of [tap_hold.hold_picker] in the shared defaults. The Linux loader
+; reads the same tables (_shared/lua/tap_hold/hold_options.lua): they were two
+; hand-kept lists, here as case labels, that agreed only by care. Called once,
+; for TAPHOLD_HOLD_MODIFIER_ALIASES; a table the file cannot give is logged
+; there, once, and its spellings are refused.
+; @returns {Map} "modifier_aliases" and "left_modifier_aliases", each a Map of
+;          lower-case alias -> modifier id.
+_TapHoldReadHoldModifierAliases() {
+	global _SharedDir
+	Path := _SharedDir . "\tap_hold\defaults.toml"
+	Sections := ParseTomlFile(Path)
+	Picker := Sections.Has("tap_hold.hold_picker") ? Sections["tap_hold.hold_picker"] : Map()
+	Tables := Map()
+	for Name in ["modifier_aliases", "left_modifier_aliases"] {
+		Table := Picker.Has(Name) ? Picker[Name] : ""
+		Aliases := Map()
+		if (Table is Map) {
+			for Alias, Id in Table
+				Aliases[StrLower(Alias)] := Id
+		} else {
+			try LoggerError("TapHoldLoader", "'{1}' declares no [tap_hold.hold_picker] {2} — those spellings of a hold are refused.",
+				Path, Name)
+		}
+		Tables[Name] := Aliases
+	}
+	return Tables
+}
+
+; The modifiers a hold_modifier value names. "ctrl", "Ctrl + Shift", "AltGr"
+; and "lctrl" are read without regard to case, with "+" or blanks between the
+; modifiers, and through the aliases of the shared hold picker.
+; @param ModifierValue {String} Raw hold_modifier value.
+; @param Invalid {VarRef} Receives the tokens that name no modifier.
+; @returns {Array} One [Id, LeftAlias] pair per modifier: its hold-picker id,
+;          and whether a left_ alias ("lctrl") named it.
+_TapHoldHoldModifierParts(ModifierValue, &Invalid) {
+	global TAPHOLD_HOLD_MODIFIER_ALIASES
+	Invalid := []
+	if !IsSet(TAPHOLD_HOLD_MODIFIER_ALIASES) {
+		; Only a #HotIf evaluated before this file's include position ran gets
+		; here, while TapHold is still the empty boot seed: say so, resolve none.
+		try LoggerError("TapHoldLoader", "Hold modifier '{1}' read before the hold aliases were loaded.",
+			ModifierValue)
+		Invalid.Push(ModifierValue)
+		return []
+	}
+	Normalized := StrReplace(Trim(String(ModifierValue)), " ", "+")
+	while (InStr(Normalized, "++") > 0)
+		Normalized := StrReplace(Normalized, "++", "+")
+	Parts := []
+	for _, Token in StrSplit(Trim(Normalized, "+"), "+") {
+		Lower := StrLower(Trim(Token))
+		if (Lower == "")
+			continue
+		if TAPHOLD_HOLD_MODIFIER_ALIASES["left_modifier_aliases"].Has(Lower) {
+			Parts.Push([TAPHOLD_HOLD_MODIFIER_ALIASES["left_modifier_aliases"][Lower], true])
+			continue
+		}
+		Id := TAPHOLD_HOLD_MODIFIER_ALIASES["modifier_aliases"].Get(Lower, Lower)
+		switch Id {
+			case "ctrl", "shift", "alt", "win", "alt_gr":
+				Parts.Push([Id, false])
+			default:
+				Invalid.Push(Token)
+		}
+	}
+	return Parts
+}
+
+; Whether a hold_modifier value names at least one modifier and nothing else.
+; @param ModifierValue {String}
+; @returns {Boolean}
+_TapHoldHoldModifierIsKnown(ModifierValue) {
+	Parts := _TapHoldHoldModifierParts(ModifierValue, &Invalid)
+	return Invalid.Length == 0 && Parts.Length > 0
+}
+
 ; Central hold_modifier -> AHK key-name resolver shared by every tap-holds
 ; module's per-key XxxHoldModKey() wrapper. Centralizing the switch means a
-; typo'd hold_modifier value (e.g. "contrl") — which passes the #HotIf
-; non-empty gate but matches no case here — is caught and logged in exactly
+; typo'd hold_modifier value (e.g. "contrl") is caught and logged in exactly
 ; one place instead of silently degrading to an empty ModKey in 9 separate
-; copies of this switch, each fed unguarded into TextPressKey.
+; copies of this switch, each fed unguarded into TextPressKey. The loader
+; already refuses such a value (_TapHold_ParseFileInto), since it would pass
+; the #HotIf non-empty gates; this is the last line for a map built otherwise.
 ; A generic token ("ctrl", "shift", ...) names the key's OWN side when the
 ; tap-hold key is that very modifier, so right_ctrl + "ctrl" is RCtrl and the
 ; identity gates can pass the physical key through. Any other key keeps the
-; left-side default: left_shift + "ctrl" is LCtrl, never LShift. Explicitly
-; sided tokens ("lctrl", "lshift", ...) are always taken literally.
+; left-side default: left_shift + "ctrl" is LCtrl, never LShift. The left_
+; aliases of the shared hold picker ("lctrl", "lshift", ...) always name the
+; left key.
 ; @param ModifierValue {String} Raw hold_modifier value, typically read via
 ;        TapHoldHoldModifier(TapHold, FieldLabel).
 ; @param FieldLabel {String} The tap-hold key id (e.g. "backspace"): selects
@@ -512,58 +608,27 @@ _TapHoldOwnSideModifier(KeyId, Token) {
 ; @returns {String|Array} An AHK key name, or array of AHK key names for
 ;        hold modifier combinations, or "" when ModifierValue is invalid.
 ResolveHoldModifierKey(ModifierValue, FieldLabel) {
-	Raw := Trim(String(ModifierValue))
-	if (Raw == "") {
+	if (Trim(String(ModifierValue)) == "") {
 		return ""
 	}
 
-	; Accept both legacy single token and combo forms, e.g. "ctrl",
-	; "ctrl+shift", or "Ctrl + Shift".
-	Normalized := StrReplace(Raw, " ", "+")
-	while (InStr(Normalized, "++") > 0) {
-		Normalized := StrReplace(Normalized, "++", "+")
-	}
-	Normalized := Trim(Normalized, "+")
-	Tokens := StrSplit(Normalized, "+")
-	if (Tokens.Length == 0) {
-		return ""
-	}
-
-	Resolved := []
-	Invalid := []
-	for _, Token in Tokens {
-		if (Token == "")
-			continue
-        NormalizedToken := StrLower(Trim(Token))
-        switch NormalizedToken {
-			case "ctrl", "shift", "alt", "win":
-				Resolved.Push(_TapHoldOwnSideModifier(FieldLabel, NormalizedToken))
-			case "lctrl":
-				Resolved.Push("LCtrl")
-			case "lshift":
-				Resolved.Push("LShift")
-			case "lalt":
-				Resolved.Push("LAlt")
-			case "alt_gr", "altgr", "ralt":
-				Resolved.Push(KS_AltGrKeyName())
-			case "lwin":
-				Resolved.Push("LWin")
-			case "":
-				continue
-			default:
-				Invalid.Push(Token)
-		}
-	}
-
+	Parts := _TapHoldHoldModifierParts(ModifierValue, &Invalid)
 	if (Invalid.Length > 0) {
 		try LoggerWarn("TapHoldLoader", "Unrecognized hold_modifier '{1}' for tap-hold key '{2}' — check tap_hold.toml for a typo; no modifier will be armed (expected one of ctrl/shift/alt/alt_gr/win).",
 			ModifierValue, FieldLabel)
 		return ""
 	}
-	if (Resolved.Length == 0) {
+	if (Parts.Length == 0) {
 		try LoggerWarn("TapHoldLoader", "No recognized hold_modifier in '{1}' for tap-hold key '{2}'.",
 			ModifierValue, FieldLabel)
 		return ""
+	}
+	Resolved := []
+	for _, Part in Parts {
+		if (Part[1] == "alt_gr")
+			Resolved.Push(KS_AltGrKeyName())
+		else ; A left_ alias names the left key even on right_ctrl or right_shift.
+			Resolved.Push(_TapHoldOwnSideModifier(Part[2] ? "" : FieldLabel, Part[1]))
 	}
 	if (Resolved.Length == 1) {
 		try LoggerDebug("TapHoldLoader", "Resolved hold_modifier '{1}' for tap-hold key '{2}' as '{3}'.",

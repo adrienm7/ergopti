@@ -252,15 +252,14 @@ function M.hold_options()
 	return HoldOptions.build(_loaded.hold_picker)
 end
 
---- Whether a hold option exists.
---- @param kind string
+--- The canonical id of a hold choice, as the writer stores it and the loader
+--- reads it back ("shift+ctrl" is "ctrl+shift").
+--- @param kind string "none", "modifier" or "layer".
 --- @param id string
---- @return boolean
-function M.is_hold_option(kind, id)
-	for _, option in ipairs(M.hold_options()) do
-		if option.kind == kind and option.id == id then return true end
-	end
-	return false
+--- @return string|nil canonical, string|nil err Why it is not a hold option.
+function M.canonical_hold(kind, id)
+	_require_init()
+	return HoldOptions.canonical(kind, id, _loaded.hold_picker)
 end
 
 --- The one tap/hold threshold of the configuration, in milliseconds, for the

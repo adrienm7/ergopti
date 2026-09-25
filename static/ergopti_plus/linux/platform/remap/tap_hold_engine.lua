@@ -141,8 +141,15 @@ function M.new(opts)
 		if code and type(config) == "table" and config.enabled ~= false then
 			local mods = {}
 			if type(config.hold_modifier) == "string" and config.hold_modifier ~= "" then
-				for part in config.hold_modifier:gmatch("[^+%s]+") do
-					if M.MODIFIER_CODES[part] then mods[#mods + 1] = M.MODIFIER_CODES[part] end
+				-- The loader hands over canonical ids only: anything else here is a
+				-- bug upstream, never a hold to drop without a word.
+				for part in config.hold_modifier:gmatch("[^+]+") do
+					local modifier_code = M.MODIFIER_CODES[part]
+					if not modifier_code then
+						error(string.format("tap-hold key '%s': '%s' is not a canonical hold modifier",
+							tostring(key_id), config.hold_modifier), 2)
+					end
+					mods[#mods + 1] = modifier_code
 				end
 			end
 			local layer = type(config.hold_layer) == "string" and config.hold_layer ~= "" and config.hold_layer or nil

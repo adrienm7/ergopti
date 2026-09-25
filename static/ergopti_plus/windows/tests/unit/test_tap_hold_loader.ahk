@@ -754,6 +754,39 @@ _TH_ResolveHoldModifierKeyOwnSide() {
 Test("ResolveHoldModifierKey: a token resolves to the key's own side only on that modifier (hold-modifier-own-side-2026-09-25)",
 	_TH_ResolveHoldModifierKeyOwnSide)
 
+; The other spellings come from [tap_hold.hold_picker] in the shared defaults,
+; which the Linux loader reads too. An alias means its id; a left_ alias names
+; the left key even on the right-hand modifier keys. AltGr follows the layout
+; on both a standard and a Kana AltGr (hold-alias-single-source).
+_TH_ResolveHoldModifierKeyReadsSharedAliases() {
+	global _ALTGR_KANA_FIXUP, _SharedDir
+	Picker := ParseTomlFile(_SharedDir . "\tap_hold\defaults.toml")["tap_hold.hold_picker"]
+	Aliases := Picker["modifier_aliases"]
+	LeftAliases := Picker["left_modifier_aliases"]
+	Assert(Aliases is Map && Aliases.Count >= 2, "the shared picker must declare modifier_aliases")
+	Assert(LeftAliases is Map && LeftAliases.Count >= 4, "the shared picker must declare left_modifier_aliases")
+	PreviousKana := _ALTGR_KANA_FIXUP
+	try {
+		for Kana in [true, false] {
+			_ALTGR_KANA_FIXUP := Kana
+			for Alias, Id in Aliases {
+				for KeyId in ["caps_lock", "right_ctrl"]
+					AssertEqual(ResolveHoldModifierKey(Id, KeyId), ResolveHoldModifierKey(StrUpper(Alias), KeyId),
+						"'" . Alias . "' on " . KeyId . " with Kana=" . Kana . " holds what '" . Id . "' holds")
+			}
+			for Alias, Id in LeftAliases {
+				for KeyId in ["caps_lock", "right_ctrl", "right_shift"]
+					AssertEqual(ResolveHoldModifierKey(Id, "caps_lock"), ResolveHoldModifierKey(Alias, KeyId),
+						"'" . Alias . "' on " . KeyId . " with Kana=" . Kana . " holds the left " . Id)
+			}
+		}
+	} finally {
+		_ALTGR_KANA_FIXUP := PreviousKana
+	}
+}
+Test("ResolveHoldModifierKey: resolves the aliases of the shared hold picker (hold-alias-single-source)",
+	_TH_ResolveHoldModifierKeyReadsSharedAliases)
+
 _TH_ResolveHoldModifierKeyUnknownReturnsEmpty() {
 	AssertEqual("", ResolveHoldModifierKey("contrl", "backspace"),
 		"an unrecognized hold_modifier (typo) must resolve to empty, never a garbage key name")
@@ -776,3 +809,62 @@ _TH_ResolveHoldModifierKeyUnknownLogsWarning() {
 	Assert(Found, "unrecognized hold_modifier must log a WARNING naming both the bad value and the affected tap-holds field so the config typo is easy to locate")
 }
 Test("ResolveHoldModifierKey: unrecognized value logs a WARNING naming the value and field", _TH_ResolveHoldModifierKeyUnknownLogsWarning)
+
+; A hold_modifier no spelling of the shared hold picker names is refused where
+; it is read, as the Linux loader refuses it: an error names it and the key,
+; the hold is stored as the picker's "none" and the tap is kept. Every
+; hold-modifier hotkey gates on the raw string, so "hyper" armed the hold
+; branch with no modifier and swallowed CapsLock, its Enter included, while the
+; tap-only branch that types Enter stayed off (unknown-hold-keeps-tap-2026-09-26).
+_TH_UnknownHoldModifierKeepsTheTap() {
+	global _ALTGR_KANA_FIXUP
+	Known :="[tap_hold.keys.alt_gr]`n" . 'hold_modifier = "AltGr"' . "`n"
+		. "[tap_hold.keys.space]`n" . 'hold_modifier = "Ctrl + lShift"' . "`n"
+	for Source, Unknown in Map("user", "hyper", "defaults", "fn") {
+		DefaultsText := "[tap_hold.keys.caps_lock]`n" . 'tap_action = "enter"' . "`n"
+			. 'hold_modifier = "' . (Source == "defaults" ? Unknown : "ctrl") . '"' . "`n"
+		UserText := Known
+		if (Source == "user")
+			UserText .= "[tap_hold.keys.caps_lock]`n" . 'hold_modifier = "' . Unknown . '"' . "`n"
+		DefaultsPath := _TH_WriteDefaults(DefaultsText)
+		Path := _TH_Write(UserText)
+		Captured := []
+		LoggerSetTestSink((Line) => Captured.Push(Line))
+		try {
+			TH := LoadTapHoldToml(Path, DefaultsPath)
+		} finally {
+			LoggerClearTestSink()
+			_TH_Clean()
+			_TH_CleanDefaults()
+		}
+		Entry := TH["keys"]["caps_lock"]
+		AssertEqual("", Entry.Get("hold_modifier", ""), Source . ": '" . Unknown . "' must hold nothing")
+		AssertEqual("enter", Entry["tap_action"], Source . ": the key must keep its tap")
+		; The tap-only gate of capslock.ahk 2.5; 2.3 needs a non-empty hold.
+		AssertTrue(Entry["tap_action"] != "" && Entry.Get("hold_modifier", "") == "" && Entry.Get("hold_layer", "") == "",
+			Source . ": the tap-only hotkey must own CapsLock")
+		Errors := 0
+		for _, Line in Captured {
+			if (InStr(Line, "[ERROR]") and InStr(Line, "'" . Unknown . "'") and InStr(Line, "caps_lock"))
+				Errors++
+		}
+		AssertEqual(1, Errors, Source . ": one ERROR must name '" . Unknown . "' and the key")
+		AssertEqual("AltGr", TH["keys"]["alt_gr"]["hold_modifier"], Source . ": an alias is a known hold")
+		AssertEqual("Ctrl + lShift", TH["keys"]["space"]["hold_modifier"], Source . ": so is a spelled-out combination")
+		PreviousKana := _ALTGR_KANA_FIXUP
+		try {
+			for Kana, AltGr in Map(true, "SC138", false, "RAlt") {
+				_ALTGR_KANA_FIXUP := Kana
+				AssertEqual(AltGr, ResolveHoldModifierKey(TH["keys"]["alt_gr"]["hold_modifier"], "alt_gr"),
+					Source . ": the AltGr hold with Kana=" . Kana)
+				Combo := ResolveHoldModifierKey(TH["keys"]["space"]["hold_modifier"], "space")
+				AssertTrue(Combo is Array && Combo.Length = 2 && Combo[1] == "LCtrl" && Combo[2] == "LShift",
+					Source . ": the Ctrl + lShift hold with Kana=" . Kana)
+			}
+		} finally {
+			_ALTGR_KANA_FIXUP := PreviousKana
+		}
+	}
+}
+Test("LoadTapHoldToml: an unknown hold_modifier drops the hold and keeps the tap (unknown-hold-keeps-tap-2026-09-26)",
+	_TH_UnknownHoldModifierKeepsTheTap)
