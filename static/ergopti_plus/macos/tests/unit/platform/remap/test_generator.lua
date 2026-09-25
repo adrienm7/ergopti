@@ -325,11 +325,15 @@ helpers.describe("Generator.build_karabiner_json: tap/hold rules", function()
 		end
 	end)
 
-	helpers.it("logs one physical press and release from every sticky companion", function()
+	helpers.it("gives a sticky key one rule that arms the tap and logs one press and release (sticky-tap-under-held-modifier)", function()
+		-- A manipulator gated on another key being held used to precede this rule
+		-- and send the plain modifier with no tap: under any held modifier key the
+		-- one-shot never armed, while the main rule's hold already sent the same
+		-- modifier. The key's own rule must be the only one that can take it.
 		local sticky_shift = {
 			id = "sticky_shift",
 			label = "Sticky Shift",
-			karabiner_to = { { set_variable = { name = "sticky_shift", value = 1 } } },
+			karabiner_to = { { sticky_modifier = { left_shift = "toggle" } } },
 		}
 		local shift = {
 			id = "shift",
@@ -362,46 +366,33 @@ helpers.describe("Generator.build_karabiner_json: tap/hold rules", function()
 			end
 		end
 		helpers.assert_not_nil(sticky_rule, "the sticky-equivalent rule must be generated")
-		helpers.assert_true(#sticky_rule.manipulators > 1,
-			"the fixture must exercise companion manipulators before the main rule")
+		helpers.assert_eq(#sticky_rule.manipulators, 1,
+			"a manipulator placed before the key's own rule would take its tap under a held key")
+
+		local manipulator = sticky_rule.manipulators[1]
+		for _, condition in ipairs(manipulator.conditions or {}) do
+			helpers.assert_true(not tostring(condition.name):find("ke_held_", 1, true),
+				"the sticky key's rule must not depend on another key being held: " .. tostring(condition.name))
+		end
+		helpers.assert_true(type(manipulator.to_if_alone) == "table"
+			and type(manipulator.to_if_alone[1]) == "table"
+			and type(manipulator.to_if_alone[1].sticky_modifier) == "table",
+			"the tap must arm the one-shot")
+		helpers.assert_eq(manipulator.to[#manipulator.to].key_code, "left_shift",
+			"the hold must send the plain modifier")
 
 		local press_command = "echo 'right_option' >> '/tmp/ergopti_test/metrics/karabiner_kc.log'"
 		local release_command = "echo 'U:right_option' >> '/tmp/ergopti_test/metrics/karabiner_kc.log'"
-		local press_events = {}
-		local release_events = {}
-		local held_left_command_covered = false
-		for index, manipulator in ipairs(sticky_rule.manipulators) do
-			local press_count = 0
-			for _, event in ipairs(manipulator.to or {}) do
-				if event.shell_command == press_command then
-					press_count = press_count + 1
-					helpers.assert_nil(press_events[event],
-						"each manipulator must own a fresh press event")
-					press_events[event] = true
-				end
-			end
-			local release_count = 0
-			for _, event in ipairs(manipulator.to_after_key_up or {}) do
-				if event.shell_command == release_command then
-					release_count = release_count + 1
-					helpers.assert_nil(release_events[event],
-						"each manipulator must own a fresh release event")
-					release_events[event] = true
-				end
-			end
-			helpers.assert_eq(press_count, 1,
-				"manipulator " .. index .. " must log one physical press")
-			helpers.assert_eq(release_count, 1,
-				"manipulator " .. index .. " must log one physical release")
-			for _, condition in ipairs(manipulator.conditions or {}) do
-				if condition.name == "ergopti_ke_held_left_command_" .. TEST_LEASE_TOKEN
-					and condition.value == 1 then
-					held_left_command_covered = true
-				end
-			end
+		local press_count = 0
+		for _, event in ipairs(manipulator.to or {}) do
+			if event.shell_command == press_command then press_count = press_count + 1 end
 		end
-		helpers.assert_true(held_left_command_covered,
-			"the regression must cover the live sticky-while-command companion")
+		local release_count = 0
+		for _, event in ipairs(manipulator.to_after_key_up or {}) do
+			if event.shell_command == release_command then release_count = release_count + 1 end
+		end
+		helpers.assert_eq(press_count, 1, "the rule must log one physical press")
+		helpers.assert_eq(release_count, 1, "the rule must log one physical release")
 	end)
 
 	helpers.it("emits a native Shift hold in Karabiner's immediate transaction", function()
@@ -905,7 +896,7 @@ helpers.describe("Generator — same_output uses deep structural equality (karab
 		-- Selected by a declaration unique to platform/remap/generator.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
-		local src = helpers.read_driver_source("local function build_sticky_companion_manipulators")
+		local src = helpers.read_driver_source("local function build_chord_combo_rule")
 		helpers.assert_true(src ~= nil, "platform/remap/generator.lua source must be locatable")
 		-- hs.json.encode on two logically identical Lua tables can return different
 		-- strings because Lua hash-table iteration order is non-deterministic.
@@ -919,7 +910,7 @@ helpers.describe("Generator — same_output uses deep structural equality (karab
 		-- Selected by a declaration unique to platform/remap/generator.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
-		local src = helpers.read_driver_source("local function build_sticky_companion_manipulators")
+		local src = helpers.read_driver_source("local function build_chord_combo_rule")
 		helpers.assert_true(src ~= nil, "platform/remap/generator.lua source must be locatable")
 		helpers.assert_true(
 			src:find("local function deep_equal", 1, true) ~= nil,

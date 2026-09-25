@@ -702,6 +702,19 @@ function M.graph_equal(actual, expected)
 	return compare_graph(actual, expected, {}, {})
 end
 
+--- Reports whether an action id selected the sticky companion rules these
+--- releases emitted: a sticky id or its plain equivalent changes their graph
+--- beyond the action payload, so it can never stand for an alias.
+--- @param action_id any Candidate action id.
+--- @return boolean selects Whether the id took part in companion selection.
+function M.selects_sticky_companions(action_id)
+	if STICKY_TO_BASE_ACTION[action_id] ~= nil then return true end
+	for _, base_id in pairs(STICKY_TO_BASE_ACTION) do
+		if action_id == base_id then return true end
+	end
+	return false
+end
+
 function M.is_exact_release_control_rule(rule, context)
 	for _, set in ipairs(M.script_control_rule_sets(context)) do
 		for _, release_rule in ipairs(set.rules) do
