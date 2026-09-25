@@ -17,10 +17,10 @@
 --- 2. Physical State Tracking: every tap/hold rule sets ke_held_<key_code>=1
 ---    on key_down and clears it on key_up, letting combo and sentinel rules
 ---    distinguish real physical presses from emulated tap outputs.
---- 3. Sticky-Equivalent Companions: when a key's tap/hold pair is
----    sticky_X/X, companion manipulators fire the base modifier immediately
----    whenever another modifier-class key is already held, so combined chords
----    like Cmd+(sticky-shift key) work without entering the sticky path.
+--- 3. One Rule Per Key: a tap/hold key has a single manipulator, whatever else
+---    is held. Its hold sends the hold action at key_down and its tap stays a
+---    tap, so a one-shot (sticky_X) tapped under a held modifier still arms;
+---    nothing gated on another held key may take the press before it.
 --- 4. Mode-Gated Merge: every manipulator carries one generation mode and one
 ---    irreversible revocation condition; regeneration replaces only exact
 ---    managed rule tags while preserving personal rules, parameters, profiles,
@@ -51,40 +51,6 @@ local LEGACY_PARAMETER_SIMULTANEOUS = "basic.simultaneous_threshold_milliseconds
 local ALWAYS_ON_RULES = {
 	"layer_keys.json",  -- Navigation mappings (letter→arrow, number→F-key…)
 	"combos.json",      -- 2-letter combo mappings (e.g. Esc on R Cmd + R Ctrl)
-}
-
--- Maps a sticky variant id to its plain base-modifier action id.
--- When a key's tap slot is sticky_X and hold slot is X (or vice-versa) the key
--- is "fully remapped to X" — companion manipulators emit the base modifier
--- immediately whenever another modifier-class key is physically held.
-local STICKY_TO_BASE_ACTION = {
-	sticky_shift             = "shift",
-	sticky_ctrl              = "ctrl",
-	sticky_cmd               = "cmd",
-	sticky_option            = "alt",
-	sticky_cmd_shift         = "cmd_shift",
-	sticky_cmd_option        = "cmd_option",
-	sticky_cmd_ctrl          = "cmd_ctrl",
-	sticky_option_shift      = "option_shift",
-	sticky_option_ctrl       = "option_ctrl",
-	sticky_ctrl_shift        = "ctrl_shift",
-	sticky_cmd_option_shift  = "cmd_option_shift",
-	sticky_cmd_option_ctrl   = "cmd_option_ctrl",
-	sticky_cmd_shift_ctrl    = "cmd_shift_ctrl",
-	sticky_option_shift_ctrl = "option_shift_ctrl",
-	sticky_hyper             = "hyper",
-}
-
--- Physical keys considered as "modifier carriers" for companion-manipulator
--- matching. When any of these is held (tracked via ke_held_<key_code>=1) and
--- the user presses a sticky-equivalent key, the base modifier fires immediately.
-local MODIFIER_CLASS_KEY_CODES = {
-	"left_command", "right_command",
-	"left_control",
-	"left_option",
-	"left_shift", "right_shift",
-	"fn",
-	"caps_lock",
 }
 
 -- Actual modifier key_codes as a lookup set (fn and caps_lock excluded — they
@@ -648,19 +614,6 @@ local function physical_kc_ledger_event(key_code, release)
 	}
 end
 
---- Detects a sticky-equivalent tap/hold pair and returns the base action id.
---- Pairs considered equivalent:
----   • STICKY_TO_BASE_ACTION[tap] == hold  (sticky tap, base hold)
----   • STICKY_TO_BASE_ACTION[hold] == tap  (base tap, sticky hold)
---- @param tap_id string Tap slot action id.
---- @param hold_id string Hold slot action id.
---- @return string|nil Base modifier action id or nil if the pair is not equivalent.
-local function detect_sticky_base(tap_id, hold_id)
-	if STICKY_TO_BASE_ACTION[tap_id]  == hold_id then return hold_id end
-	if STICKY_TO_BASE_ACTION[hold_id] == tap_id  then return tap_id  end
-	return nil
-end
-
 
 
 
@@ -670,57 +623,6 @@ end
 -- ======= 2/ Tap/Hold Rule Builder =======
 -- ========================================
 -- ========================================
-
-
-
--- ==============================================
--- ===== 2.1) Sticky Companion Manipulators =====
--- ==============================================
-
---- Builds the companion manipulators for a "fully remapped" sticky-equivalent key.
---- One manipulator per modifier-class tracked variable (except the key itself).
---- Each matches when its variable is 1 and fires `to = [set_var_self=1, base_to…]`
---- immediately (no to_if_alone), so the combined modifier chord appears the
---- instant the second key is pressed.
---- @param key_def table Entry from TAP_HOLD_KEYS.
---- @param base_to table karabiner_to events for the base modifier action.
---- @param var_name string Tracking variable name for the key itself.
---- @return table List of manipulators (may be empty if key is the only modifier-class key).
-local function build_sticky_companion_manipulators(key_def, base_to, var_name)
-	local manipulators = {}
-	local self_key     = key_def.from.key_code
-
-	for _, mod_key in ipairs(MODIFIER_CLASS_KEY_CODES) do
-		if mod_key ~= self_key then
-			local to_events = {
-				set_var_event(var_name, 1),
-				physical_kc_ledger_event(self_key, false),
-			}
-			for _, ev in ipairs(base_to) do to_events[#to_events + 1] = ev end
-
-			manipulators[#manipulators + 1] = {
-				type        = "basic",
-				from        = key_def.from,
-				conditions  = {
-					{ type = "variable_if", name = held_var_name(mod_key), value = 1 },
-				},
-				to              = to_events,
-				to_after_key_up = {
-					set_var_event(var_name, 0),
-					physical_kc_ledger_event(self_key, true),
-				},
-			}
-		end
-	end
-
-	return manipulators
-end
-
-
-
--- ===================================
--- ===== 2.2) Main Tap/Hold Rule =====
--- ===================================
 
 --- Builds a Karabiner rule table for a single tap / hold key.
 ---
@@ -732,16 +634,15 @@ end
 --- variable and re-emits the original key — keys used purely as combo triggers
 --- still get physical-press tracking without any user-visible behaviour change.
 ---
---- When tap/hold is sticky-equivalent (sticky_X paired with X), companion
---- manipulators are inserted BEFORE the main manipulator so that pressing the
---- key while another modifier is held emits the base modifier immediately.
+--- The rule holds exactly one manipulator. Karabiner runs the first manipulator
+--- that matches, so a second one gated on another held key would take every
+--- press made under that key and drop the tap, a one-shot included.
 --- @param key_def table Entry from TAP_HOLD_KEYS.
 --- @param tap_action table Resolved action definition for the tap slot.
 --- @param hold_action table Resolved action definition for the hold slot.
---- @param action_index table id → action map (required for sticky-equivalent companion rules).
 --- @param tap_timeout_ms number|nil Per-key tap/hold threshold override in ms; nil inherits the global.
 --- @return table Karabiner rule object.
-local function build_tap_hold_rule(key_def, tap_action, hold_action, action_index, tap_timeout_ms)
+local function build_tap_hold_rule(key_def, tap_action, hold_action, tap_timeout_ms)
 	local tap_to   = tap_action.karabiner_to  or {}
 	local hold_to  = hold_action.karabiner_to or {}
 	local key_code = key_def.from.key_code
@@ -807,35 +708,12 @@ local function build_tap_hold_rule(key_def, tap_action, hold_action, action_inde
 	end
 	manipulator.to_after_key_up = after_key_up_tail
 
-	-- Sticky-equivalent detection (sticky_X paired with X). When present, inject
-	-- companion manipulators that fire the base modifier immediately as soon as
-	-- another modifier-class key is held physically. KE picks the first matching
-	-- manipulator, so companions MUST come before the main manipulator.
-	local manipulators = { manipulator }
-	local base_id      = detect_sticky_base(tap_action.id, hold_action.id)
-	if base_id and action_index then
-		local base_action = action_index[base_id]
-		local base_to     = base_action and base_action.karabiner_to or nil
-		if base_to and #base_to > 0 then
-			local companions = build_sticky_companion_manipulators(key_def, base_to, var_name)
-			if #companions > 0 then
-				-- Prepend companions so they take priority over the main manipulator
-				local combined = {}
-				for _, m in ipairs(companions)   do combined[#combined + 1] = m end
-				for _, m in ipairs(manipulators) do combined[#combined + 1] = m end
-				manipulators = combined
-				Logger.debug(LOG, "Tap/hold '%s' sticky-equivalent to '%s' — %d companion(s) added.",
-					key_def.id, base_id, #companions)
-			end
-		end
-	end
-
 	return {
 		description  = string.format(
 			"%s: %s (tap) / %s (hold)",
 			key_def.label, tap_action.label, hold_action.label
 		),
-		manipulators = manipulators,
+		manipulators = { manipulator },
 	}
 end
 
@@ -1363,7 +1241,7 @@ function M.build_karabiner_json(
 			Logger.error(LOG, "Cannot build Karabiner config: %s.", err)
 			return nil, err
 		end
-		local rule = build_tap_hold_rule(key_def, tap_action, hold_action, action_index, per_key_ms)
+		local rule = build_tap_hold_rule(key_def, tap_action, hold_action, per_key_ms)
 		if rule then
 			all_rules[#all_rules + 1] = rule
 			if key_def.from.key_code ~= SCRIPT_CONTROL_HOLDER_KEY then
@@ -1705,16 +1583,13 @@ local function ends_with(value, suffix)
 end
 
 --- Reports whether an action id changes generated structure independently of
---- the action payload. Sticky/base ids participate in companion-rule selection;
---- `none` participates in combo emission, so neither may be canonicalised.
+--- the action payload. Sticky/base ids selected the companion rules historical
+--- releases emitted; `none` participates in combo emission, so neither may be
+--- canonicalised.
 --- @param action_id any Candidate action id.
 --- @return boolean semantic Whether identity itself affects generation.
 local function has_generator_semantic_action_id(action_id)
-	if action_id == "none" or STICKY_TO_BASE_ACTION[action_id] ~= nil then return true end
-	for _, base_id in pairs(STICKY_TO_BASE_ACTION) do
-		if action_id == base_id then return true end
-	end
-	return false
+	return action_id == "none" or LegacyReleaseFixtures.selects_sticky_companions(action_id)
 end
 
 --- Accepts a duplicate localised label only when both actions are exact output

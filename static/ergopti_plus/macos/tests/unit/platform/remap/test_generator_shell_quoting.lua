@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 -- Selected by a declaration unique to platform/remap/generator.lua rather than by
 -- path, so moving or splitting the module cannot turn this invariant
 -- into a path error.
-local src = helpers.read_driver_source("local function build_sticky_companion_manipulators")
+local src = helpers.read_driver_source("local function build_chord_combo_rule")
 helpers.assert_true(src ~= nil, "platform/remap/generator.lua source must be locatable")
 
 -- Test 1: The old unquoted format string must not appear.
