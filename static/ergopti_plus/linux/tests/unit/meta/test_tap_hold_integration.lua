@@ -200,7 +200,8 @@ helpers.describe("tap-holds end to end: the shipped defaults", function()
 
 	helpers.it("holds AltGr as AltGr and taps it as Tab", function()
 		with_session(nil, function(s)
-			helpers.assert_eq(s.drive({ tap(ALTGR, 0) }), "100:1 100:0 15:1 15:0")
+			helpers.assert_eq(s.drive({ tap(ALTGR, 0) }), "100:1 194:1 194:0 100:0 15:1 15:0",
+				"a lone AltGr is masked before its release, then Tab is typed")
 		end)
 	end)
 
