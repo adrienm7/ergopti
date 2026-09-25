@@ -76,23 +76,14 @@ SC039:: return ; Necessary to do this, otherwise Space keeps being sent while it
 		ActionLayer("{Volume_Down " . AppState_GetNumberOfRepetitions() . "}") ; Turn down the volume by scrolling down
 }
 
-SC01D & ~SC138:: ; RAlt
-RAlt:: ; RAlt on QWERTY
+; The AltGr key is declared by its scan code only: a "RAlt::" beside it is a
+; separate hotkey on the same scan code that swallowed the Kana-style AltGr and
+; lost this Escape (see platform/remap/altgr.ahk).
+SC01D & ~SC138:: ; AltGr on an AltGr layout arrives as LControl & RAlt
+SC138:: ; the AltGr key alone: RAlt on QWERTY, the Kana-style AltGr
 {
-		; Physical Kana AltGr is SC138 and has its own handler below. Do not let
-		; a virtual RAlt alias emit a second Escape for one physical tap.
-		if (_ALTGR_KANA_FIXUP && GetKeyState("SC138", "P"))
-				return
 		ActionLayer("{Escape " . AppState_GetNumberOfRepetitions() . "}")
 }
-
-#HotIf LayerEnabled and _ALTGR_KANA_FIXUP
-SC138:: {
-		ActionLayer("{Escape " . AppState_GetNumberOfRepetitions() . "}")
-}
-#HotIf
-
-#HotIf LayerEnabled
 
 ; === Number row ===
 SC002:: SetNumberOfRepetitions(1) ; On key 1
