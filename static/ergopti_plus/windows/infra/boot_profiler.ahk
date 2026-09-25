@@ -37,14 +37,15 @@ BootProfile_Begin() {
 	try LoggerInfo("BootProfile", "Boot timing started.")
 	; Everything BEFORE this line is invisible to the A_TickCount marks below:
 	; AHK tokenises every #Include'd file (~228 sources incl. UIA/WebView2/sqlite3)
-	; and creates the tray icon BEFORE the first auto-execute line runs. If the user
-	; reports "the tray icon takes 1-2s to even appear", the cost is almost always
-	; HERE, not in any logged phase — so surface it explicitly as the very first mark.
+	; BEFORE the first auto-execute line runs. The tray icon (hidden by #NoTrayIcon
+	; until the safe bootstrap tray is in place) cannot appear earlier than that, so
+	; when the user reports "the tray icon takes 1-2s to even appear", the cost is
+	; usually HERE, not in any logged phase — surface it as the very first mark.
 	try {
 		Uptime := BootProfile_ProcessUptimeMs()
 		if (Uptime >= 0)
 			LoggerInfo("BootProfile",
-				"Script parse + load (pre-boot, until tray icon appears): ~{1} ms.", Uptime)
+				"Script parse + load (pre-boot, until the first statement runs): ~{1} ms.", Uptime)
 		_BootProfileReplayStamps((Uptime >= 0) ? (_BOOT_PROFILE_START - Uptime) : 0)
 	}
 }
