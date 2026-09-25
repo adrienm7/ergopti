@@ -38,11 +38,11 @@ _USTX_OrdinaryQuitAfterAckTerminatesWithoutMutation(BeforeCleanup := 0) {
 			CurrentExe, TransactionId)
 		Assert(_Updater_ResumeSwapOwner(Owner),
 			"the ordinary-exit fixture must resume its exact swap child")
-		Assert(_USTX_WaitForEvent(Owner.Get("ReadyHandle", 0)),
+		Assert(_USTX_WaitForSwapSignal(Owner, "Ready"),
 			"positive control: the ordinary-exit fixture must reach Ready")
 		Assert(_Updater_SetSwapEvent(Owner.Get("CommitHandle", 0)),
 			"the fixture must authorize Commit before the ordinary exit race")
-		Assert(_USTX_WaitForEvent(Owner.Get("AckHandle", 0)),
+		Assert(_USTX_WaitForSwapSignal(Owner, "Ack"),
 			"positive control: ordinary exit must land after Ack but before guarded ExitApp")
 		ObservationHandle := DllCall("OpenProcess", "UInt", UPDATER_SWAP_SYNCHRONIZE,
 			"Int", false, "UInt", Owner.Get("ProcessId", 0), "Ptr")
@@ -126,7 +126,8 @@ _USTX_OrdinaryCleanupFailureIsNotGreen() {
 			_USTX_LockCanceledFixtureForCleanup.Bind(State))
 		catch as Err
 			Failure := Err
-		Assert(State.Handle and State.Handle != -1, "the completed transaction must reach the cleanup lock")
+		Assert(State.Handle and State.Handle != -1, "the completed transaction must reach the cleanup lock"
+			. (Failure is Error ? ": " . Failure.Message : ""))
 		Assert(Failure is Error, "ordinary-exit fixture cleanup failure must not report success")
 		AssertContains(Failure.Message, "Ordinary-exit fixture directory cleanup failed:")
 		Assert(_UpdaterSwapOwner == Saved[1] and _UpdaterExitIntent == Saved[2]

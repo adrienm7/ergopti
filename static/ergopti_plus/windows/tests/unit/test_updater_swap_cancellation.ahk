@@ -49,11 +49,11 @@ _USTX_ParentExitBeforeFinalExitAbandonsWithoutMutation(BeforeCleanup := 0) {
 			InheritedParentHandle)
 		Assert(_Updater_ResumeSwapOwner(Owner),
 			"the crash-before-FinalExit child must resume")
-		Assert(_USTX_WaitForEvent(Owner.Get("ReadyHandle", 0)),
+		Assert(_USTX_WaitForSwapSignal(Owner, "Ready"),
 			"the child must reach Ready before the simulated parent crash")
 		Assert(_Updater_SetSwapEvent(Owner.Get("CommitHandle", 0)),
 			"the test must authorize Commit")
-		Assert(_USTX_WaitForEvent(Owner.Get("AckHandle", 0)),
+		Assert(_USTX_WaitForSwapSignal(Owner, "Ack"),
 			"the child must Ack Commit before the simulated crash")
 
 		; Simulate AHK dying while the final hotstring gate is still running:
@@ -245,7 +245,8 @@ _USTX_CanceledFixtureCleanupFailureIsNotGreen() {
 		catch as Err
 			Failure := Err
 		Assert(State.Handle and State.Handle != -1,
-			"the transaction must reach its controlled cleanup lock")
+			"the transaction must reach its controlled cleanup lock"
+			. (Failure is Error ? ": " . Failure.Message : ""))
 		Assert(Failure is Error,
 			"a canceled fixture must not report success when directory cleanup fails")
 		AssertContains(Failure.Message, "Canceled fixture directory cleanup failed:",
