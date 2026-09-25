@@ -49,7 +49,7 @@ _BackspaceHoldModKey() {
 *$SC00E:: {
 	Result := TapHoldOwnImmediateModifier("backspace", "BackSpace",
 		_BackspaceHoldModKey(), TapHoldDuration(TapHold, "backspace"))
-	if (Result["tap"] and A_PriorKey == "BackSpace")
+	if (Result["tap"] and TapHoldPriorKeyIsSelf("backspace"))
 		_BackspaceDispatch()
 }
 #HotIf
@@ -69,7 +69,7 @@ _BackspaceHoldModKey() {
 #HotIf TapHoldHoldLayer(TapHold, "backspace") != "" and TapHoldHoldModifier(TapHold, "backspace") == "" and not LayerEnabled
 *$SC00E:: {
 	Result := TapHoldOwnImmediateLayer("BackSpace", TapHoldDuration(TapHold, "backspace"))
-	if (Result["tap"] and A_PriorKey == "BackSpace")
+	if (Result["tap"] and TapHoldPriorKeyIsSelf("backspace"))
 		_BackspaceDispatch()
 }
 #HotIf

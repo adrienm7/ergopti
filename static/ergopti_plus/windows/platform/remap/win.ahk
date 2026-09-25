@@ -47,7 +47,7 @@ _WinHoldModKey() {
 *$SC15B:: {
 	Result := TapHoldOwnImmediateModifier("win", "LWin",
 		_WinHoldModKey(), TapHoldDuration(TapHold, "win"))
-	if (Result["tap"] and A_PriorKey == "LWin")
+	if (Result["tap"] and TapHoldPriorKeyIsSelf("win"))
 		_WinDispatch()
 }
 #HotIf
@@ -67,7 +67,7 @@ _WinHoldModKey() {
 #HotIf TapHoldHoldLayer(TapHold, "win") != "" and TapHoldHoldModifier(TapHold, "win") == "" and not LayerEnabled
 *$SC15B:: {
 	Result := TapHoldOwnImmediateLayer("LWin", TapHoldDuration(TapHold, "win"))
-	if (Result["tap"] and A_PriorKey == "LWin")
+	if (Result["tap"] and TapHoldPriorKeyIsSelf("win"))
 		_WinDispatch()
 }
 #HotIf

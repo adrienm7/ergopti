@@ -100,7 +100,7 @@ SC11D::
 #HotIf TapHoldTapAction(TapHold, "right_ctrl") == "tab" and TapHoldHoldModifier(TapHold, "right_ctrl") == "" and TapHoldHoldLayer(TapHold, "right_ctrl") == "" and not LayerEnabled
 ~SC11D:: {
 	tap := KeyWait("RControl", "T" . TapHoldDuration(TapHold, "right_ctrl"))
-	if (tap and A_PriorKey == "RControl") {
+	if (tap and TapHoldPriorKeyIsSelf("right_ctrl")) {
 		if !TapHoldReleasePhysicalKey("RCtrl")
 			return
 		_RCtrlTabTap()
@@ -190,7 +190,7 @@ $SC11D:: {
 #HotIf TapHoldHoldLayer(TapHold, "right_ctrl") != "" and TapHoldHoldModifier(TapHold, "right_ctrl") == "" and not LayerEnabled
 $SC11D:: {
 	Result := TapHoldOwnImmediateLayer("SC11D", TapHoldDuration(TapHold, "right_ctrl"))
-	if (Result["tap"] and A_PriorKey == "RControl")
+	if (Result["tap"] and TapHoldPriorKeyIsSelf("right_ctrl"))
 		_RCtrlDispatchOwnedTap()
 }
 #HotIf

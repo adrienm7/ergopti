@@ -46,7 +46,7 @@ _EnterHoldModKey() {
 *$SC01C:: {
 	Result := TapHoldOwnImmediateModifier("enter", "Enter",
 		_EnterHoldModKey(), TapHoldDuration(TapHold, "enter"))
-	if (Result["tap"] and A_PriorKey == "Enter")
+	if (Result["tap"] and TapHoldPriorKeyIsSelf("enter"))
 		_EnterDispatch()
 }
 #HotIf
@@ -66,7 +66,7 @@ _EnterHoldModKey() {
 #HotIf TapHoldHoldLayer(TapHold, "enter") != "" and TapHoldHoldModifier(TapHold, "enter") == "" and not LayerEnabled
 *$SC01C:: {
 	Result := TapHoldOwnImmediateLayer("Enter", TapHoldDuration(TapHold, "enter"))
-	if (Result["tap"] and A_PriorKey == "Enter")
+	if (Result["tap"] and TapHoldPriorKeyIsSelf("enter"))
 		_EnterDispatch()
 }
 #HotIf

@@ -157,7 +157,7 @@ $SC00F:: {
 	if _TabAcceptVisiblePrediction()
 		return
 	Result := TapHoldOwnImmediateLayer("SC00F", TapHoldDuration(TapHold, "tab"))
-	if (Result["tap"] and A_PriorKey == "Tab")
+	if (Result["tap"] and TapHoldPriorKeyIsSelf("tab"))
 		_TabDispatch()
 }
 #HotIf
