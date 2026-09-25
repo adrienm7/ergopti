@@ -642,13 +642,17 @@ local function main()
 	-- LuaJIT's 60-upvalue limit. Declared before the pause controller below,
 	-- whose closure reads it.
 	local TapHold = require("platform.remap.tap_hold_manager")
+	-- The action catalogue, bound once. It shares a module with the touchpad
+	-- reader, whose lifecycle is its own: a reader that fails and stops must not
+	-- take the tap actions with it.
+	local action_catalogue = gestures
 	TapHold.init({
 		keyboard_hook = keyboard_hook,
 		execute_action = function(action, binding)
-			if not gestures then error("the action catalogue (gestures module) is not loaded") end
-			gestures.execute_action(action, binding)
+			if not action_catalogue then error("the action catalogue (gestures module) is not loaded") end
+			action_catalogue.execute_action(action, binding)
 		end,
-		action_names = function() return gestures and gestures.get_action_names() or {} end,
+		action_names = function() return action_catalogue and action_catalogue.get_action_names() or {} end,
 		defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"),
 		user_path = require("infra.config_paths").config("tap_hold.toml"),
 	})
@@ -2131,12 +2135,14 @@ local function main()
 			-- reading: gestures.pump() returns 0 immediately unless start_reading()
 			-- found a device and opened it, so a machine without a touchpad pays a
 			-- function call per tick and nothing else.
+			--
+			-- A failed pump stops the READER and nothing else. The same module is
+			-- the action catalogue every tap-hold, keyboard shortcut and tray row
+			-- runs its actions through; dropping the handle here used to turn one
+			-- touchpad error into dead tap actions until a restart.
 			if gestures and type(gestures.pump) == "function" then
 				local owner = gestures
-				RuntimeGuard.call("gesture pump", owner.pump, function()
-					if type(owner.stop_reading) == "function" then owner.stop_reading() end
-					gestures = nil
-				end)
+				RuntimeGuard.call("gesture pump", owner.pump, owner.stop_reading)
 			end
 		end,
 		onPeriodic = on_periodic,

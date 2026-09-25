@@ -134,3 +134,47 @@ helpers.describe("tap-hold manager", function()
 	end)
 
 end)
+
+-- The daemon wires the executor to the gestures module, which also owns the
+-- touchpad reader. The reader's failure path used to drop the daemon's handle
+-- to that module, and the tap-hold executor read the same handle: one touchpad
+-- error disabled every catalogue tap action until a restart.
+helpers.describe("tap-hold manager: the daemon's action executor", function()
+
+	local function daemon_source()
+		local fh = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "r"))
+		local src = fh:read("*a")
+		fh:close()
+		return src
+	end
+
+	helpers.it("never drops the action catalogue when the touchpad reader fails", function()
+		local src = daemon_source()
+		helpers.assert_true(src:find('local gestures = RuntimeGuard.optional_require("modules.gestures.manager")', 1, true)
+			~= nil, "the scan must find the handle's declaration, or it proves nothing")
+		local offenders = {}
+		for line in src:gmatch("[^\n]+") do
+			-- A statement, not a table field (`gestures = gestures,`).
+			if line:match("^%s*gestures%s*=[^=]") and not line:match(",%s*$") then
+				offenders[#offenders + 1] = line
+			end
+		end
+		helpers.assert_eq(offenders, {},
+			"the reader stops on its own failure; the module handle is the action catalogue "
+				.. "every tap, shortcut and tray row runs through")
+	end)
+
+	helpers.it("binds the tap-hold executor to the catalogue once, at init", function()
+		local src = daemon_source()
+		local start = src:find("TapHold.init({", 1, true)
+		helpers.assert_true(start ~= nil, "the daemon must initialise the tap-hold manager")
+		local block = src:sub(start, (src:find("\n\t})", start, true) or #src))
+		local executor = block:match("execute_action%s*=%s*function%b()(.-)\n\t\tend,")
+		helpers.assert_true(executor ~= nil and executor ~= "", "the executor's body must be found")
+		helpers.assert_nil(executor:find("[^%w_]gestures%."),
+			"the executor must not call through the reader's mutable module handle")
+		helpers.assert_nil(executor:find("not gestures[%s)]"),
+			"nor test that handle for presence")
+	end)
+
+end)
