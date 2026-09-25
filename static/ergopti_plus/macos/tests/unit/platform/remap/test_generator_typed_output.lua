@@ -341,6 +341,43 @@ helpers.with_fresh_modules({
 			end
 		end)
 
+		helpers.it("a combo tap carries none of the modifiers its holder keeps down (combo-consumes-every-hold-modifier)", function()
+			-- A hold such as Cmd+Shift keeps both flags down, a hold of fn keeps fn
+			-- down, and a modifier key with neither slot, fn included, keeps its own
+			-- flag down. The combo consumes what its holder keeps down, so its tap
+			-- must carry none of it.
+			local cases = {
+				{ holder = "left_option", hold = "none", combo = "lopt_esc" },
+				{ holder = "left_option", hold = "fn", combo = "lopt_esc" },
+				{ holder = "tab", hold = "fn", combo = "tab_esc" },
+				{ holder = "fn", hold = "none", combo = "fn_esc" },
+			}
+			local multi = 0
+			for _, hold in ipairs(actions) do
+				local events = hold.karabiner_to or {}
+				if hold.holdable == true and #events == 1 and KarabinerModel.MODIFIER_KEY_CODES[events[1].key_code]
+					and #(events[1].modifiers or {}) > 0 then
+					multi = multi + 1
+					cases[#cases + 1] = { holder = "left_option", hold = hold.id, combo = "lopt_esc" }
+				end
+			end
+			helpers.assert_true(multi >= 11, "expected the multi-modifier holds of the catalogue, found " .. multi)
+			for _, case in ipairs(cases) do
+				local rules = build({ [case.holder] = { tap = "none", hold = case.hold } },
+					{ [case.combo] = { combo = "none", tap = "delete_fwd", hold = "none" } })
+				local engine = engine_for(rules)
+				engine:down(case.holder)
+				engine:clear()
+				engine:tap("escape")
+				local carried = {}
+				for _, emission in ipairs(engine:emissions()) do
+					if emission.key_code == "delete_forward" then carried[#carried + 1] = names(emission.flags) end
+				end
+				helpers.assert_eq(table.concat(carried, "|"), "",
+					case.holder .. " holding " .. case.hold .. ", then Escape, must type the combo tap without its modifiers")
+			end
+		end)
+
 		helpers.it("the default right Command + left Option deletes words forward while held (default-delete-word-repeats)", function()
 			-- The default sets a tap and no hold, so the delete goes out at key down
 			-- and stays down while held.
