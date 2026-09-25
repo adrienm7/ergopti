@@ -108,7 +108,8 @@ SC138 Up:: {
 
 ; Dispatch the configured tap action for "alt_gr".
 ; AltGr is already released when this fires (tap=true means key-up occurred),
-; so no Blind prefix is needed — actions run clean without AltGr held.
+; so the tap never carries AltGr itself; a keystroke tap still carries the
+; modifiers held on other keys (TapHoldEmitKeyTap), Shift+Tab under Shift.
 AltGrTapHoldDispatchV2() {
 		_TapHoldFireAction("alt_gr")
 }

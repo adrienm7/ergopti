@@ -842,6 +842,7 @@ global _AhkSubDir := ""
 #Include ../platform/remap/constants.ahk
 #Include unit/test_tap_hold_activity_cancel.ahk
 #Include unit/test_tap_hold_prior_key.ahk
+#Include unit/test_tap_hold_tap_keeps_held_modifiers.ahk
 #Include unit/test_timings_config.ahk
 _LogBootProgress("keylogger modules + tests included")
 
@@ -881,6 +882,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_lalt_rctrl_accept_suspend_guard.ahk
 #Include meta/test_tap_hold_fire_action_suspend_guard.ahk
 #Include meta/test_tap_hold_native_dispatch_guard.ahk
+#Include meta/test_tap_hold_taps_use_held_modifier_emitter.ahk
 #Include meta/test_lshift_lctrl_rshift_bounded_keywait.ahk
 #Include meta/test_layout_poll_blacklist_guard.ahk
 #Include meta/test_layout_quiescence.ahk

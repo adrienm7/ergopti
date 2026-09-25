@@ -202,7 +202,7 @@ _TabDispatch() {
 	; SC00F with a hotkey that swallows the Tab keystroke entirely instead of
 	; passing it through.
 	if (action == "") {
-		TapHoldDispatchTap("tab", TextPressKey.Bind("Tab", []))
+		TapHoldDispatchTap("tab", TapHoldEmitKeyTap.Bind("Tab"))
 		return
 	}
 	_TapHoldFireAction("tab")

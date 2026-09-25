@@ -26,22 +26,35 @@ global GESTURE_ACTIONS := Map(
 		},
 		; --- Editing ---
 		; --- Keys ---
+		; Key and Mods name the keystroke an action types, so a tap-hold sends it
+		; under the held modifiers (TapHoldEmitKeyTap, which still routes a Tab
+		; through the LLM wrapper).
 		"tab", {
 				Fn: (*) => LLM_Tooltip_FireTabOrAccept([]),
+				Key: "Tab",
+				Mods: [],
 		},
 		; --- Tabs ---
 		"tab_prev", {
 				Fn: (*) => GestureSendShortcut("^+{Tab}"),
+				Key: "Tab",
+				Mods: ["Ctrl", "Shift"],
 		},
 		"tab_next", {
 				Fn: (*) => GestureSendShortcut("^{Tab}"),
+				Key: "Tab",
+				Mods: ["Ctrl"],
 		},
 		; --- Browser navigation ---
 		"nav_back", {
 				Fn: (*) => GestureSendShortcut("!{Left}"),
+				Key: "Left",
+				Mods: ["Alt"],
 		},
 		"nav_forward", {
 				Fn: (*) => GestureSendShortcut("!{Right}"),
+				Key: "Right",
+				Mods: ["Alt"],
 		},
 		; --- Windows & Desktops ---
 		"win_prev", {
@@ -233,7 +246,8 @@ for _EmitId, _Emit in GestureEmitActionsData() {
 				; Raw send sequence — no portable key/modifier form exists for it.
 				GESTURE_ACTIONS[_EmitId] := { Fn: _GestureMakeSeqEmitter(_Emit.Seq) }
 		} else {
-				GESTURE_ACTIONS[_EmitId] := { Fn: _GestureMakeKeyEmitter(_Emit.Key, _Emit.Mods) }
+				GESTURE_ACTIONS[_EmitId] := { Fn: _GestureMakeKeyEmitter(_Emit.Key, _Emit.Mods),
+						Key: _Emit.Key, Mods: _Emit.Mods }
 		}
 }
 
@@ -557,11 +571,16 @@ _GestureRegisterModifierChords() {
 				for _, KeyDef in Keys {
 						KeyId   := KeyDef["id"]
 						KeyCode := KeyDef.Has("windows_key") ? KeyDef["windows_key"] : KeyId
+						; The Send form may be braced ("{Space}"); the key a tap-hold
+						; types is the bare name, which the hotkey form always is.
+						BareKey := KeyDef.Has("windows_hotkey_key") ? KeyDef["windows_hotkey_key"] : KeyCode
 						ActionId := IdPrefix . "_" . KeyId
 						GESTURE_MODIFIER_ACTION_LABELS[ActionId] := LabelPrefix . " + " . KeyDef["label"]
 						Group.Actions.Push(ActionId)
 						GESTURE_ACTIONS[ActionId] := {
 								Fn: ((_keys) => (*) => GestureSendShortcut(_keys))(SendPrefix . KeyCode),
+								Key: BareKey,
+								Mods: IdParts.Clone(),
 						}
 				}
 				GESTURE_MODIFIER_ACTION_GROUPS.Push(Group)

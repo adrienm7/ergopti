@@ -71,12 +71,12 @@ SC11D::
 		TextPressKey("Right", "")
 		TextPressKey("BackSpace", "")
 	} else {
-		TextPressKey("BackSpace", "")
+		TapHoldEmitKeyTap("BackSpace")
 		Sleep(KEY_REPEAT_INITIAL_DELAY_MS)
 		while KS_IsDown("SC11D") { ; key-repeat loop while RCtrl physically held
 			if A_IsSuspended
 				break
-			TextPressKey("BackSpace", "")
+			TapHoldEmitKeyTap("BackSpace")
 			Sleep(KEY_REPEAT_INTERVAL_MS)
 		}
 	}
@@ -241,7 +241,7 @@ _RCtrlDispatchOwnedTap() {
 }
 
 _RCtrlTabTap() {
-	TapHoldDispatchTap("right_ctrl", LLM_Tooltip_FireTabOrAccept.Bind(""))
+	TapHoldDispatchTap("right_ctrl", TapHoldEmitKeyTap.Bind("Tab"))
 }
 
 _RCtrlBackspaceTap() {
@@ -252,6 +252,6 @@ _RCtrlBackspaceTap() {
 		TextPressKey("Right", "")
 		TextPressKey("BackSpace", "")
 	} else {
-		TextPressKey("BackSpace", "")
+		TapHoldEmitKeyTap("BackSpace")
 	}
 }

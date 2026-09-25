@@ -109,7 +109,7 @@ _BackspaceDispatch() {
 	local action := TapHoldTapAction(TapHold, "backspace")
 	; No tap configured or tap = backspace itself → native key behaviour.
 	if (action == "" or action == "backspace") {
-		TapHoldDispatchTap("backspace", TextPressKey.Bind("BackSpace", []))
+		TapHoldDispatchTap("backspace", TapHoldEmitKeyTap.Bind("BackSpace"))
 		return
 	}
 	_TapHoldFireAction("backspace")

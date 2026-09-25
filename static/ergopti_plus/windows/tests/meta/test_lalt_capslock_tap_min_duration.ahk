@@ -90,10 +90,10 @@ _TMDF_LAltTabLayerHasFloor() {
 	Src := _TMDF_ReadSource("platform/remap/lalt.ahk")
 	; Anchor on the unique 4.2 #HotIf directive (tap == "tab") so the slice starts
 	; at the top of the block and captures the tap-resolution lines (the
-	; TapMinDurationMs floor sits just above the LLM_Tooltip_FireTabOrAccept call).
+	; TapMinDurationMs floor sits just above the Tab tap dispatch).
 	Seg := _TMDF_BlockBody(Src, "#HotIf TapHoldTapAction(TapHold, " . Chr(34) . "left_alt" . Chr(34) . ") == " . Chr(34) . "tab" . Chr(34))
 	Assert(Seg != "", "lalt.ahk tab+layer block (4.2) must exist")
-	Assert(InStr(Seg, "LLM_Tooltip_FireTabOrAccept") > 0,
+	Assert(InStr(Seg, "TapHoldEmitKeyTap.Bind(") > 0,
 		"lalt.ahk 4.2 slice must reach the tab+layer dispatch")
 	Assert(InStr(Seg, "TapMinDurationMs()") > 0,
 		"lalt.ahk 4.2 (tab+layer) must apply the >= TapMinDurationMs() lower bound to suppress spurious taps on a fast brush")
