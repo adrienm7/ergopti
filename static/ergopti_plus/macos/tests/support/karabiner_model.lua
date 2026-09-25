@@ -20,8 +20,14 @@
 ---   - basic.hpp key_up: deferred releases, then to_if_alone with the key-down
 ---     flags restored and the claimed flags lifted around it, then
 ---     to_after_key_up. Any key_down ends every pending tap (unset_alone).
+---     Every key of a simultaneous chord belongs to one manipulation: the
+---     first release posts that half, or the last one under key_up_when
+---     "all", and the last release posts simultaneous_options.to_after_key_up.
 ---   - event_sender.hpp filter_and_replace_events: an entry whose own
 ---     conditions fail is dropped before anything is posted.
+---   - from_event_definition.hpp test_key_order: a chord's key_down_order
+---     `strict` takes its keys in the listed order, `strict_inverse` in the
+---     reverse one, and `insensitive` (the default) in any order.
 --- Lazy modifier dispatch, keyboard repeat, timers and sticky-modifier flag
 --- bookkeeping are not modelled: the flags recorded for a key are the
 --- modifier_flag_manager state an application reads at that key's key_down,
@@ -66,6 +72,11 @@ local MODIFIER_KEY_CODES = {
 	fn = true,
 }
 M.MODIFIER_KEY_CODES = MODIFIER_KEY_CODES
+
+-- simultaneous_options.hpp key_order: the chord key orders Karabiner accepts.
+-- from_event_definition.hpp test_key_order matches `strict` against the
+-- listed order, `strict_inverse` against the reverse one, and any order else.
+local KEY_DOWN_ORDERS = { insensitive = true, strict = true, strict_inverse = true }
 
 
 
@@ -434,10 +445,14 @@ function Engine:down(key_code)
 end
 
 --- Presses a simultaneous chord, its keys in the given order within the
---- threshold. Only the key-down half is modelled.
+--- threshold. Every chord key then belongs to one manipulation, which each
+--- key's release updates (see Engine:up).
 --- @param keys table Physical keys, in press order.
 --- @return table|nil manipulator The chord manipulator that took them.
 function Engine:chord(keys)
+	for _, key_code in ipairs(keys) do
+		assert(self.sessions[key_code] == nil, key_code .. " is already down")
+	end
 	for _, session in pairs(self.sessions) do session.alone = false end
 	local pressed = self:pressed()
 	for _, rule in ipairs(self.rules) do
@@ -446,18 +461,28 @@ function Engine:chord(keys)
 			local simultaneous = from.simultaneous
 			if type(simultaneous) == "table" and #simultaneous == #keys then
 				local options = from.simultaneous_options or {}
-				local strict = options.key_down_order == "strict"
+				local order = options.key_down_order or "insensitive"
+				assert(KEY_DOWN_ORDERS[order], "unmodelled Karabiner key_down_order '" .. tostring(order) .. "'")
 				local matches = true
 				for index, entry in ipairs(simultaneous) do
-					if strict then
+					if order == "strict" then
 						matches = matches and entry.key_code == keys[index]
+					elseif order == "strict_inverse" then
+						matches = matches and entry.key_code == keys[#keys + 1 - index]
 					else
 						matches = matches and contains(keys, entry.key_code)
 					end
 				end
 				local claimed = matches and M.test_modifiers(from.modifiers, pressed) or nil
 				if claimed ~= nil and conditions_hold(manipulator.conditions, self.variables) then
-					self.sessions[keys[1]] = start_session(self, manipulator, claimed)
+					local session = start_session(self, manipulator, claimed)
+					session.remaining = {}
+					session.key_up_when = options.key_up_when or "any"
+					session.to_after_all_up = options.to_after_key_up
+					for _, key_code in ipairs(keys) do
+						session.remaining[key_code] = true
+						self.sessions[key_code] = session
+					end
 					return manipulator
 				end
 			end
@@ -466,7 +491,50 @@ function Engine:chord(keys)
 	return nil
 end
 
---- Releases one physical key.
+--- Posts the key_up half of one manipulation, once.
+--- @param engine table Engine.
+--- @param session table Active manipulation.
+--- @param within_timeout boolean Released before the manipulator's to_if_alone timeout.
+local function post_key_up(engine, session, within_timeout)
+	local manipulator = session.manipulator
+	for _, key in ipairs(session.deferred) do
+		if MODIFIER_KEY_CODES[key] then change(engine, key, -1) end
+	end
+	session.deferred = {}
+	for _, flag in ipairs(session.deferred_flags) do change(engine, flag, -1) end
+	session.deferred_flags = {}
+	press_lifted(engine, session)
+
+	if manipulator.to_if_alone ~= nil and session.alone and within_timeout then
+		-- scoped_from_key_modifier_flags_state_restorer: the flags of key_down.
+		local restored = {}
+		for _, flag in ipairs(M.FLAGS) do
+			local count = engine.counts[flag] or 0
+			if session.key_down_flags[flag] and count <= 0 then
+				restored[flag] = 1 - count
+			elseif not session.key_down_flags[flag] and count > 0 then
+				restored[flag] = -count
+			end
+			if restored[flag] then change(engine, flag, restored[flag]) end
+		end
+		lift_claimed(engine, session)
+		post_extra(engine, "tap", manipulator.to_if_alone)
+		press_lifted(engine, session)
+		for flag, delta in pairs(restored) do change(engine, flag, -delta) end
+	end
+
+	if manipulator.to_after_key_up ~= nil then
+		lift_claimed(engine, session)
+		post_extra(engine, "up", manipulator.to_after_key_up)
+		press_lifted(engine, session)
+	end
+end
+
+--- Releases one physical key. A chord key's release follows basic.hpp for
+--- `simultaneous` manipulations: it is consumed; the first release posts the
+--- key_up half (held `to` entries, to_if_alone, to_after_key_up) unless
+--- key_up_when is "all" and a chord key is still down; the last release posts
+--- simultaneous_options.to_after_key_up.
 --- @param key_code string Physical key.
 --- @param within_timeout boolean Released before the manipulator's to_if_alone timeout.
 function Engine:up(key_code, within_timeout)
@@ -477,34 +545,19 @@ function Engine:up(key_code, within_timeout)
 		return
 	end
 
-	local manipulator = session.manipulator
-	for _, key in ipairs(session.deferred) do
-		if MODIFIER_KEY_CODES[key] then change(self, key, -1) end
+	local all_up = true
+	if session.remaining ~= nil then
+		session.remaining[key_code] = nil
+		all_up = next(session.remaining) == nil
+		if session.key_up_when == "all" and not all_up then return end
 	end
-	for _, flag in ipairs(session.deferred_flags) do change(self, flag, -1) end
-	press_lifted(self, session)
-
-	if manipulator.to_if_alone ~= nil and session.alone and within_timeout then
-		-- scoped_from_key_modifier_flags_state_restorer: the flags of key_down.
-		local restored = {}
-		for _, flag in ipairs(M.FLAGS) do
-			local count = self.counts[flag] or 0
-			if session.key_down_flags[flag] and count <= 0 then
-				restored[flag] = 1 - count
-			elseif not session.key_down_flags[flag] and count > 0 then
-				restored[flag] = -count
-			end
-			if restored[flag] then change(self, flag, restored[flag]) end
-		end
-		lift_claimed(self, session)
-		post_extra(self, "tap", manipulator.to_if_alone)
-		press_lifted(self, session)
-		for flag, delta in pairs(restored) do change(self, flag, -delta) end
+	if not session.key_up_posted then
+		session.key_up_posted = true
+		post_key_up(self, session, within_timeout)
 	end
-
-	if manipulator.to_after_key_up ~= nil then
+	if all_up and session.to_after_all_up ~= nil then
 		lift_claimed(self, session)
-		post_extra(self, "up", manipulator.to_after_key_up)
+		post_extra(self, "up", session.to_after_all_up)
 		press_lifted(self, session)
 	end
 end

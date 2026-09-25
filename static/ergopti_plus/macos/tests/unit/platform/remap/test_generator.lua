@@ -993,16 +993,13 @@ end)
 -- ==========================================================================================================
 
 helpers.describe("Generator — simultaneous chord rule permits incidental modifiers (modifier-pair-chord-optional-any)", function()
-	-- Root cause: build_chord_combo_rule emitted the KE `from` straight from the
-	-- mod_combos entry, which carries a `simultaneous` set but NO `modifiers`. For a
-	-- chord built from MODIFIER keys (right_command + left_command), the first key
-	-- down already raises its command flag, and KE by default rejects any undeclared
-	-- modifier — so the chord failed to match and fell through to left_command's own
-	-- single-key tap rule (a bare backspace). Every sibling rule builder declares
+	-- Karabiner v16 tests a chord's modifiers on its first key's key_down, before
+	-- either chord key reaches the output (manipulator_manager.hpp posts a key only
+	-- once every manipulator has passed it). Without a modifiers block the chord
+	-- matches only with nothing else held; every sibling rule builder declares
 	-- `modifiers.optional = {"any"}` (the tap/hold combo path, and every layer_keys
-	-- rule); the chord path alone did not. The fix adds it so a modifier-pair chord
-	-- matches regardless of the flags its own keys raise, restoring ⌥⌫ (delete word
-	-- left) instead of a lone backspace.
+	-- rule), so the chord accepts an unrelated held modifier too. The chord's own
+	-- keys are never among the tested flags: requiring them made it unreachable.
 	local OPT_BACKSPACE = {
 		id           = "opt_backspace",
 		label        = "opt_backspace",
@@ -1063,9 +1060,15 @@ helpers.describe("Generator — simultaneous chord rule permits incidental modif
 			combo_state(), { NONE_ACTION, OPT_BACKSPACE }, {}, { RCMD_LCMD }, {}, "/fake/data_dir/"
 		)
 		local m = chord_manipulator(result)
-		helpers.assert_true(m ~= nil and type(m.to) == "table" and m.to[1] ~= nil, "chord must carry a `to` output")
-		helpers.assert_eq(m.to[1].key_code, "delete_or_backspace", "chord output key must be delete_or_backspace")
-		helpers.assert_true(type(m.to[1].modifiers) == "table" and m.to[1].modifiers[1] == "left_option",
+		helpers.assert_true(m ~= nil and type(m.to) == "table", "chord must carry a `to` output")
+		-- The first key event: the chord also records its first key's held state.
+		local output = nil
+		for _, event in ipairs(m.to) do
+			if output == nil and event.key_code ~= nil then output = event end
+		end
+		helpers.assert_true(output ~= nil, "chord must send a key")
+		helpers.assert_eq(output.key_code, "delete_or_backspace", "chord output key must be delete_or_backspace")
+		helpers.assert_true(type(output.modifiers) == "table" and output.modifiers[1] == "left_option",
 			"chord output must carry left_option — the ⌥⌫ delete-word modifier that was being lost")
 	end)
 
@@ -1079,13 +1082,10 @@ helpers.describe("Generator — simultaneous chord rule permits incidental modif
 			"symmetric chord from.modifiers.optional must also contain 'any'")
 	end)
 
-	-- Regression (modifier-pair-chord-mandatory-consume): the previous fix made the
-	-- chord MATCH via optional:any, but KE passes optional modifiers THROUGH to the
-	-- output. A right_command+left_command chord whose output is ⌥⌫ then fires as
-	-- ⌘⌥⌫, and ⌘⌫ (delete-to-line-start) overrides ⌥⌫ (delete-word-left) — so
-	-- rcmd+lcmd did "nothing useful" while its rcmd+left_option sibling worked (a
-	-- leaked ⌘ is inert for ⌥⌦ delete-word-right). The chord's own modifier keys
-	-- must be declared mandatory so KE CONSUMES their flags.
+	-- Regression (chord-matches-its-own-modifier-keys): listing the chord's own
+	-- modifier keys as mandatory, meant to keep their ⌘ out of the ⌥⌫ output, made
+	-- the chord unreachable, since neither key is in the output flags Karabiner
+	-- tests at the first key's key_down, and there is no such ⌘ to remove.
 	local function mandatory_set(mods)
 		local set = {}
 		if type(mods) == "table" and type(mods.mandatory) == "table" then
@@ -1094,29 +1094,29 @@ helpers.describe("Generator — simultaneous chord rule permits incidental modif
 		return set
 	end
 
-	helpers.it("consumes the chord's own command flags as mandatory so ⌘ cannot leak into ⌥⌫", function()
+	helpers.it("never requires the chord's own command keys as mandatory (chord-matches-its-own-modifier-keys)", function()
 		local result = Generator.build_karabiner_json(
 			combo_state(), { NONE_ACTION, OPT_BACKSPACE }, {}, { RCMD_LCMD }, {}, "/fake/data_dir/"
 		)
 		local m = chord_manipulator(result)
 		helpers.assert_true(m ~= nil, "a [chord] rule must be generated for the rcmd_lcmd combo slot")
 		local mand = mandatory_set(m.from.modifiers)
-		helpers.assert_true(mand.right_command == true,
-			"right_command must be mandatory (consumed) so the chord's ⌘ flag is removed from the ⌥⌫ output")
-		helpers.assert_true(mand.left_command == true,
-			"left_command must be mandatory (consumed) so the chord's ⌘ flag is removed from the ⌥⌫ output")
+		helpers.assert_nil(mand.right_command,
+			"right_command cannot be held in the output when its own chord is tested")
+		helpers.assert_nil(mand.left_command,
+			"left_command cannot be held in the output when its own chord is tested")
 		helpers.assert_true(optional_has_any(m.from.modifiers),
 			"optional:any must remain so unrelated incidental modifiers still match")
 	end)
 
-	helpers.it("consumes the mandatory flags in symmetric mode too", function()
+	helpers.it("never requires the chord's own keys in symmetric mode either", function()
 		local result = Generator.build_karabiner_json(
 			combo_state({ combo_symmetric = true }), { NONE_ACTION, OPT_BACKSPACE }, {}, { RCMD_LCMD }, {}, "/fake/data_dir/"
 		)
 		local m = chord_manipulator(result)
 		local mand = mandatory_set(m.from.modifiers)
-		helpers.assert_true(mand.right_command == true and mand.left_command == true,
-			"both command keys must be consumed as mandatory in symmetric mode")
+		helpers.assert_true(mand.right_command == nil and mand.left_command == nil,
+			"neither command key may be mandatory in symmetric mode")
 	end)
 
 	-- A chord built from NON-modifier keys raises no modifier flags, so nothing must
