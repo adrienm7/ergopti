@@ -88,7 +88,7 @@ _WinHoldModKey() {
 ; there is no hold behaviour. No ~ needed: Win tap action suppresses Start menu
 ; by intercepting the key entirely (no passthrough required).
 #HotIf TapHoldTapAction(TapHold, "win") != "" and TapHoldHoldModifier(TapHold, "win") == "" and TapHoldHoldLayer(TapHold, "win") == "" and not LayerEnabled
-SC15B:: _WinDispatch()
+*SC15B:: _WinDispatch()
 #HotIf
 
 

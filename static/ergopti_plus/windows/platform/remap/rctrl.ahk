@@ -10,9 +10,10 @@
 ; Preserved subtleties:
 ; - backspace tap: key-repeat loop + LShift→Delete guard + LAlt(=OneShotShift)
 ;   guard to avoid triggering Ctrl+Alt+Delete via Delete key.
-; - tab tap: ~ prefix so RCtrl still reaches the OS during KeyWait; explicit
-;   pass-through hotkeys for +/^/^+/#SC11D so Shift+Tab, Ctrl+Tab, Win+Tab
-;   keep working despite the tap-hold intercepting the bare key.
+; - tab tap: ~ prefix so RCtrl still reaches the OS during KeyWait; a modifier
+;   held before RCtrl reaches the Tab it taps (Shift+Tab, Ctrl+Tab, Win+Tab).
+; - Every variant carries the * wildcard: a modifier held before RCtrl must not
+;   hand the key back to its native Ctrl, dropping the configured tap and hold.
 ; - one_shot_shift tap: pre-arms LShift for the hold phase.
 ; - Generic hold-modifier: pre-arms the configured modifier, releases on tap.
 ; - Generic hold-layer: activates nav layer on hold, tap action on release.
@@ -61,7 +62,7 @@ _RCtrlHoldModKey() {
 ; ===============================================
 
 #HotIf TapHoldTapAction(TapHold, "right_ctrl") == "backspace" and TapHoldHoldModifier(TapHold, "right_ctrl") == "" and TapHoldHoldLayer(TapHold, "right_ctrl") == "" and not LayerEnabled
-SC11D::
+*SC11D::
 {
 	if KS_IsDown("LShift") { ; LShift physically held → Delete
 		TextPressKey("Delete", "")
@@ -95,10 +96,11 @@ SC11D::
 ; ============================
 ; ============================
 
-; ~ prefix: RCtrl passthrough so the OS still sees Ctrl during KeyWait.
-; Explicit modifier pass-throughs so Shift+Tab, Ctrl+Tab, Win+Tab still work.
+; ~ prefix: RCtrl passthrough so the OS still sees Ctrl during KeyWait. The Tab
+; tap carries the modifiers held before RCtrl, so Shift+Tab, Ctrl+Tab and Win+Tab
+; need no hotkey of their own.
 #HotIf TapHoldTapAction(TapHold, "right_ctrl") == "tab" and TapHoldHoldModifier(TapHold, "right_ctrl") == "" and TapHoldHoldLayer(TapHold, "right_ctrl") == "" and not LayerEnabled
-~SC11D:: {
+~*SC11D:: {
 	tap := KeyWait("RControl", "T" . TapHoldDuration(TapHold, "right_ctrl"))
 	if (tap and TapHoldPriorKeyIsSelf("right_ctrl")) {
 		if !TapHoldReleasePhysicalKey("RCtrl")
@@ -106,11 +108,6 @@ SC11D::
 		_RCtrlTabTap()
 	}
 }
-
-+SC11D::  TextPressKey("Tab", "Shift")
-^SC11D::  TextPressKey("Tab", "Ctrl")
-^+SC11D:: TextPressKey("Tab", "Ctrl Shift")
-#SC11D::  TextPressKey("Tab", "Win") ; TextPressKey required — SendInput doesn't work here
 #HotIf
 
 
@@ -126,7 +123,7 @@ SC11D::
 ; =======================================
 
 #HotIf TapHoldTapAction(TapHold, "right_ctrl") == "one_shot_shift" and TapHoldHoldModifier(TapHold, "right_ctrl") == "" and TapHoldHoldLayer(TapHold, "right_ctrl") == "" and not LayerEnabled
-SC11D:: {
+*SC11D:: {
 	tap := KeyWait("SC11D", "T" . TapHoldDuration(TapHold, "right_ctrl"))
 	if tap {
 		TapHoldDispatchTap("right_ctrl", OneShotShift)
@@ -165,7 +162,7 @@ SC11D:: {
 ; did nothing. A hold must arm on the hold alone, as CapsLock, Space, Escape,
 ; Enter, Backspace, Delete and Win already do.
 #HotIf TapHoldHoldModifier(TapHold, "right_ctrl") != "" and not LayerEnabled
-$SC11D:: {
+*$SC11D:: {
 	Result := TapHoldOwnImmediateModifier("right_ctrl", "SC11D",
 		_RCtrlHoldModKey(), TapHoldDuration(TapHold, "right_ctrl"))
 	if Result["tap"]
@@ -188,7 +185,7 @@ $SC11D:: {
 ; No tap-action conjunct, for the reason given on block 7.4: a hold must arm on
 ; the hold alone or the picker offers a choice the driver silently ignores.
 #HotIf TapHoldHoldLayer(TapHold, "right_ctrl") != "" and TapHoldHoldModifier(TapHold, "right_ctrl") == "" and not LayerEnabled
-$SC11D:: {
+*$SC11D:: {
 	Result := TapHoldOwnImmediateLayer("SC11D", TapHoldDuration(TapHold, "right_ctrl"))
 	if (Result["tap"] and TapHoldPriorKeyIsSelf("right_ctrl"))
 		_RCtrlDispatchOwnedTap()
@@ -208,7 +205,7 @@ $SC11D:: {
 ; ===================================================
 
 #HotIf not _RCtrlIsSpecialTap() and TapHoldHoldModifier(TapHold, "right_ctrl") == "" and TapHoldHoldLayer(TapHold, "right_ctrl") == "" and TapHoldTapAction(TapHold, "right_ctrl") != "" and not LayerEnabled
-SC11D:: _RCtrlDispatch()
+*SC11D:: _RCtrlDispatch()
 #HotIf
 
 

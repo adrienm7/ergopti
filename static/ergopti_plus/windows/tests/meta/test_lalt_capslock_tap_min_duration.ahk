@@ -71,13 +71,11 @@ _TMDF_BlockBody(Src, HotkeyDef) {
 ; CapsLock hold-layer (2.4): must gate on TapMinDurationMs() AND its prior key.
 _TMDF_CapsLockLayerHasFloorAndPriorKey() {
 	; Move-resilient: scan the whole tap_holds module instead of a pinned path.
-	; The "`n$SC03A:: {" anchor is unique to capslock.ahk in this dir.
+	; The 2.3 hold-modifier and 2.4 hold-layer blocks both declare *$SC03A, so
+	; the slice starts at the 2.4 block's own #HotIf, unique in this dir.
 	Src := _DriverDirConcat("platform/remap")
-	; Newline-anchor the declaration so it matches the flush-left 2.4 hold-layer
-	; block ($SC03A) and NOT the 2.3 hold-modifier block (*$SC03A) which shares
-	; the trailing "$SC03A:: {" substring.
-	Seg := _TMDF_BlockBody(Src, "`n$SC03A:: {")
-	Assert(Seg != "", "capslock.ahk hold-layer block ($SC03A) must exist")
+	Seg := _TMDF_BlockBody(Src, "#HotIf _CapsLockHasHoldLayer() and not LayerEnabled")
+	Assert(Seg != "", "capslock.ahk hold-layer block (2.4) must exist")
 	Assert(InStr(Seg, "TapMinDurationMs()") > 0,
 		"capslock.ahk 2.4 must apply the >= TapMinDurationMs() lower bound so an ultra-fast chord brush is not counted as an intentional tap")
 	Assert(InStr(Seg, "TapHoldPriorKeyIsSelf(" . Chr(34) . "caps_lock" . Chr(34) . ")") > 0,

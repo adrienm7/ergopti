@@ -50,7 +50,7 @@ _RShiftHandleHold(PhysicalModifierPassthrough) {
 ; The hold behaviour (Shift staying Shift) is provided by the OS passthrough
 ; via the ~ prefix — no explicit hold logic is needed here.
 #HotIf TapHoldTapAction(TapHold, "right_shift") != "" and TapHoldHoldModifier(TapHold, "right_shift") == "" and TapHoldHoldLayer(TapHold, "right_shift") == "" and not LayerEnabled
-~$SC036::
+~*$SC036::
 {
 	; Bounded (unlike a bare KeyWait): a lost SC036 key-up can never wedge
 	; this hotkey's tap/hold discrimination forever (hold-keywait-whole-class).
