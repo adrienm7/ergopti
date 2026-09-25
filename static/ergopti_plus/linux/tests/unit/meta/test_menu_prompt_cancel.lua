@@ -118,7 +118,7 @@ local function manager()
 	local user_path = os.tmpname()
 	os.remove(user_path)
 	Manager.init({
-		keyboard_hook = { set_remapper = function() end },
+		keyboard_hook = { set_remapper = function() end, key_text = function() return nil end },
 		execute_action = function() end,
 		action_names = function() return {} end,
 		defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"),

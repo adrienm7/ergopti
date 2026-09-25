@@ -212,6 +212,23 @@ helpers.describe("xkb_capture: locks, levels and groups", function()
 		helpers.assert_eq(identity, "€", "the keysym identity is not a Ctrl transformation")
 	end)
 
+	-- The one-shot Shift asks what the next key types before it goes down: a
+	-- key that types nothing must leave it armed (one-shot-types-nothing).
+	helpers.it("tells what a key would type without pressing it (one-shot-types-nothing)", function()
+		local capture, calls = loaded("fr")
+		helpers.assert_eq(capture.peek_text(30), "q")
+		capture.process(42, 1)
+		local before = #calls
+		helpers.assert_eq(capture.peek_text(30), "Q", "with the levels held now")
+		helpers.assert_eq(capture.peek_text(30), "Q", "asking twice answers the same")
+		for index = before + 1, #calls do
+			helpers.assert_true(calls[index][1] == "utf8", "a peek commits nothing: " .. tostring(calls[index][1]))
+		end
+		helpers.assert_eq(capture.peek_text(40), "", "a dead key types nothing by itself")
+		helpers.assert_eq(capture.peek_text(99), "", "nor does a key without a character")
+		helpers.assert_eq((capture.process(30, 1)), "Q", "the press that follows is not disturbed")
+	end)
+
 	helpers.it("switches groups from the keymap action without reloading a table", function()
 		local capture = loaded("fr")
 		helpers.assert_eq((capture.process(30, 1)), "q", "group one is French")

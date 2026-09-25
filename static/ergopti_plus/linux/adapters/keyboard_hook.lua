@@ -842,6 +842,29 @@ function M.pump()
 	end
 end
 
+--- The text a key would type now, in the live layout and with the modifiers
+--- held now, without pressing it; nil for a key that types none. A key under
+--- Ctrl, Alt or Super is a shortcut, not text, whatever its level would type.
+--- The tap-hold engine's one-shot Shift asks it, as the Windows InputHook
+--- collects only keys that type text.
+--- @param code integer evdev keycode.
+--- @return string|nil text, string|nil error Why the layout could not answer.
+function M.key_text(code)
+	if _shortcut_modifier_held() then return nil end
+	local text, err
+	if _test_capture_event then
+		-- Under a capture double (tests) the double is the layout: it answers
+		-- as it would for the press.
+		text, _, err = _test_capture_event(code, InputEvent.VALUE_DOWN)
+	else
+		text, err = XkbCapture.peek_text(code)
+	end
+	if err then return nil, err end
+	local first = type(text) == "string" and text:byte(1) or nil
+	if not first or first < 32 or first == 127 then return nil end
+	return text
+end
+
 --- The layout-level modifiers the user is physically holding right now.
 ---
 --- Injection asks before it starts, and neutralises what it finds. Under a grab

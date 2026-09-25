@@ -26,6 +26,7 @@
 --- ==============================================================================
 
 local EvdevCodes = require("infra.evdev_codes")
+local UnicodeCase = require("infra.unicode_case")
 
 local M = {}
 
@@ -62,8 +63,15 @@ local KEY_F2, KEY_F12 = 60, 88
 
 -- Tap actions that are a single key. They are dispatched through the hook
 -- like the key itself, so an Enter tapped on CapsLock ends a hotstring as a
--- real Enter does.
+-- real Enter does, and an armed one-shot Shift treats them as that key.
 M.KEY_TAPS = { enter = 28, tab = 15, backspace = 14, escape = 1, delete = 111, space = 57, caps_lock = 58 }
+
+-- The keys that end an armed one-shot Shift and are typed unshifted, by
+-- control name, as on Windows (platform/remap/one_shot_shift.ahk): its
+-- InputHook ends on Backspace, Enter and Delete and sends them back, and
+-- collects Tab and Escape as text it sends back unchanged. Any other key is
+-- judged by the text it types (see take_one_shot).
+local ONE_SHOT_SPENT_UNSHIFTED = { backspace = true, enter = true, delete = true, tab = true, escape = true }
 
 --- A chord of the navigation layer.
 local function chord(mods, key) return { mods = mods, keys = { key } } end
@@ -107,6 +115,8 @@ M.NAV_LAYER = {
 --- @param opts table {
 ---   keys = { [key_id] = { tap_action, hold_modifier, hold_layer, time_activation_seconds, enabled } },
 ---   tap_min_ms = number, one_shot_timeout_ms = number,
+---   key_text = function(code) -> string|nil, the text a key would type now in
+---     the live layout, nil for none; required when a key taps the one-shot Shift,
 --- }
 --- @return table engine
 function M.new(opts)
@@ -115,6 +125,7 @@ function M.new(opts)
 		by_code = {},
 		tap_min_ms = assert(tonumber(options.tap_min_ms), "tap_min_ms is required"),
 		one_shot_timeout_ms = assert(tonumber(options.one_shot_timeout_ms), "one_shot_timeout_ms is required"),
+		key_text = options.key_text,
 		held = {},          -- code -> { down_at, cancelled, emitted = {codes}, layer = bool }
 		layer_depth = 0,     -- how many layer keys are down
 		layer_keys = {},     -- code -> chord emitted for a key pressed on the layer
@@ -136,6 +147,9 @@ function M.new(opts)
 			end
 			local layer = type(config.hold_layer) == "string" and config.hold_layer ~= "" and config.hold_layer or nil
 			local tap = type(config.tap_action) == "string" and config.tap_action or ""
+			if tap == "one_shot_shift" and type(options.key_text) ~= "function" then
+				error("a one-shot Shift needs key_text: which keys type text is the layout's to say", 2)
+			end
 			-- A native tap and no hold is the key itself: left alone, so it keeps
 			-- its autorepeat and its press is not delayed to its release.
 			if tap == "" and #mods == 0 and not layer then goto continue end
@@ -268,6 +282,41 @@ local function tap_key(self, out, code)
 	end
 end
 
+--- Decides what an armed one-shot Shift does with a key going down, and spends
+--- it when the key uses it up, as the Windows InputHook decides. A key that
+--- types no text in the live layout leaves it armed: a modifier, CapsLock, an
+--- arrow, Print, a volume key, NumLock, a keypad key with NumLock off, any key
+--- under Ctrl, Alt or Super. Backspace, Enter, Delete, Tab and Escape spend it
+--- unshifted. A character spends it, and is shifted only when it has a
+--- capital: Windows types it in title case, which leaves "1" and "," as they
+--- are, and Shift would have made them "!" and "?" (or KP_End for a keypad 1).
+--- @param code integer The key going down, pressed by hand or typed by a tap.
+--- @param now_ms number
+--- @return boolean True when the key must be wrapped in Shift.
+local function take_one_shot(self, code, now_ms)
+	if not self.one_shot_until then return false end
+	if MODIFIER_KEYS[code] or code == EvdevCodes.KEY_CAPSLOCK then return false end
+	local control = EvdevCodes.CONTROL_NAME_OF[code]
+	local text = nil
+	if not (control and ONE_SHOT_SPENT_UNSHIFTED[control]) then
+		text = self.key_text(code)
+		if type(text) ~= "string" or text == "" then return false end
+	end
+	local armed = now_ms <= self.one_shot_until
+	self.one_shot_until = nil
+	return armed and text ~= nil and UnicodeCase.has_lowercase(text)
+end
+
+--- Types the key a tap stands for, exactly as the same key pressed by hand
+--- would reach an armed one-shot Shift. A tap bypassing it typed its Enter
+--- unshifted and left the Shift for the next letter.
+local function type_tap(self, out, code, now_ms)
+	local shifted = take_one_shot(self, code, now_ms)
+	if shifted then press(self, out, KEY_LEFTSHIFT) end
+	tap_key(self, out, code)
+	if shifted then release(self, out, KEY_LEFTSHIFT) end
+end
+
 --- Presses a layer chord for `code` and remembers it until the key comes up.
 local function press_layer_key(self, code, spec)
 	local out = {}
@@ -351,19 +400,14 @@ function M:process(code, value, now_ms)
 		local elapsed = now_ms - state.down_at
 		local is_tap = not state.cancelled and elapsed <= config.threshold_ms and elapsed >= self.tap_min_ms
 		if not is_tap or config.tap == "none" then return out, nil end
-		if config.tap == "" then
-			-- The native key, as if nothing were configured on a tap.
-			out[#out + 1] = { code = code, value = DOWN }
-			out[#out + 1] = { code = code, value = UP }
-			return out, nil
-		end
 		if config.tap == "one_shot_shift" then
 			self.one_shot_until = now_ms + self.one_shot_timeout_ms
 			return out, nil
 		end
-		local key_tap = M.KEY_TAPS[config.tap]
-		if key_tap then
-			tap_key(self, out, key_tap)
+		-- The native key (as if nothing were configured on a tap) or a key tap.
+		local typed = config.tap == "" and code or M.KEY_TAPS[config.tap]
+		if typed then
+			type_tap(self, out, typed, now_ms)
 			return out, nil
 		end
 		return out, config.tap
@@ -385,15 +429,11 @@ function M:process(code, value, now_ms)
 		return out
 	end
 	-- A modifier pressed meanwhile (Ctrl for Ctrl+Shift+T) leaves it armed.
-	if self.one_shot_until and value == DOWN and not MODIFIER_KEYS[code] then
-		local armed = now_ms <= self.one_shot_until
-		self.one_shot_until = nil
-		if armed and not self.one_shot_keys[code] then
-			self.one_shot_keys[code] = true
-			press(self, out, KEY_LEFTSHIFT)
-			press(self, out, code)
-			return out
-		end
+	if value == DOWN and take_one_shot(self, code, now_ms) and not self.one_shot_keys[code] then
+		self.one_shot_keys[code] = true
+		press(self, out, KEY_LEFTSHIFT)
+		press(self, out, code)
+		return out
 	end
 	return pass(self, code, value)
 end

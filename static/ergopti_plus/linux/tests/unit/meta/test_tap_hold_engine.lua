@@ -23,8 +23,19 @@ local DEFAULTS = {
 	right_ctrl = { tap_action = "one_shot_shift", hold_modifier = "shift", time_activation_seconds = 0.2 },
 }
 
-local function engine(keys)
-	return Engine.new({ keys = keys or DEFAULTS, tap_min_ms = 50, one_shot_timeout_ms = 2000 })
+-- What each key types on a US layout with NumLock on, as the hook's key_text
+-- answers; a key absent here types nothing (the hook also answers nothing for
+-- a key under Ctrl, Alt or Super, and for Enter, Tab and their kind).
+local US_TEXT = {
+	[16] = "q", [30] = "a", [36] = "j", [48] = "b", [2] = "1", [51] = ",", [52] = ".", [57] = " ",
+	[79] = "1", -- KP_1
+}
+local function us_text(code) return US_TEXT[code] end
+
+--- An engine on `keys` (the defaults) reading the layout through `key_text`.
+local function engine(keys, key_text)
+	return Engine.new({ keys = keys or DEFAULTS, tap_min_ms = 50, one_shot_timeout_ms = 2000,
+		key_text = key_text or us_text })
 end
 
 -- The random session also runs a Tab tap-hold and a Ctrl nobody configured.
@@ -284,6 +295,7 @@ helpers.describe("tap-hold engine: tap sentinels and the one-shot Shift", functi
 		e:process(RCTRL, DOWN, 0)
 		helpers.assert_eq(trail((e:process(RCTRL, UP, 100))), "42↑", "the hold Shift is released")
 		helpers.assert_nil(e:process(CTRL, DOWN, 150), "Ctrl does not spend it")
+		helpers.assert_nil(e:process(CTRL, UP, 160))
 		helpers.assert_eq(trail(e:process(KEY_A, DOWN, 200)), "42↓ 30↓")
 		helpers.assert_eq(trail(e:process(KEY_A, UP, 250)), "30↑ 42↑")
 		helpers.assert_nil(e:process(KEY_A, DOWN, 300), "only once")
@@ -302,6 +314,149 @@ helpers.describe("tap-hold engine: tap sentinels and the one-shot Shift", functi
 			not_a_key = { tap_action = "enter", time_activation_seconds = 0.3 },
 		})
 		helpers.assert_true(not e:handles(CAPS))
+	end)
+
+end)
+
+-- What an armed one-shot Shift does with the next key, as on Windows, whose
+-- one-shot InputHook (platform/remap/one_shot_shift.ahk) ends on Backspace,
+-- Enter and Delete and sends them unshifted, collects Tab and Escape as text
+-- it sends back unchanged, and lets a key that types nothing (an arrow, a
+-- function key, CapsLock) through without spending itself. A tap-hold's tap
+-- that types a key is that key: it used to bypass the one-shot entirely, so
+-- CapsLock tapped for Enter typed a bare Enter and the NEXT letter came out
+-- capitalised (one-shot-next-key-2026-09-25).
+helpers.describe("tap-hold engine: what the one-shot Shift does with the next key", function()
+
+	local KEY_B = 48
+	-- The verdict per key tap. A key tap this table does not name fails the
+	-- first case, so a new one cannot ship without a decision.
+	local TAP_ROLE = {
+		enter = "spend", tab = "spend", backspace = "spend", escape = "spend", delete = "spend",
+		space = "spend", caps_lock = "keep",
+	}
+	local SPEND = { 28, 96, 14, 111, 15, 1 }
+	local KEEP = { 103, 108, 105, 106, 102, 107, 104, 109, 110, 58,
+		59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 87, 88 }
+
+	--- An engine with the one-shot armed at t=100 and, optionally, CapsLock
+	--- configured to tap `tap` and hold `hold`, reading `key_text`.
+	local function armed(tap, hold, key_text)
+		local keys = { right_ctrl = DEFAULTS.right_ctrl }
+		if tap then
+			keys.caps_lock = { tap_action = tap, hold_modifier = hold or "", time_activation_seconds = 0.3 }
+		end
+		local e = engine(keys, key_text)
+		e:process(RCTRL, DOWN, 0)
+		e:process(RCTRL, UP, 100)
+		return e
+	end
+
+	--- What a letter typed right after comes out as: shifted or not.
+	local function next_letter(e)
+		return trail(e:process(KEY_B, DOWN, 400) or { { code = KEY_B, value = DOWN } })
+	end
+
+	helpers.it("treats a key tapped by a tap-hold as the same key pressed by hand (one-shot-next-key)", function()
+		for name, code in pairs(Engine.KEY_TAPS) do
+			local role = TAP_ROLE[name]
+			helpers.assert_true(role ~= nil, "no one-shot verdict for the key tap " .. name)
+			local e = armed(name)
+			e:process(CAPS, DOWN, 200)
+			local tapped = trail((e:process(CAPS, UP, 300)))
+			local expected = role == "shift" and string.format("42↓ %d↓ %d↑ 42↑", code, code)
+				or string.format("%d↓ %d↑", code, code)
+			helpers.assert_eq(tapped, expected, name .. " tapped under a one-shot Shift")
+			helpers.assert_eq(next_letter(e), role == "keep" and "42↓ 48↓" or "48↓",
+				role == "keep" and name .. " types nothing, so the one-shot waits for the letter"
+					or name .. " spent the one-shot: the next letter is not capitalised")
+		end
+	end)
+
+	helpers.it("types the native key of a tap-hold as that key (one-shot-next-key)", function()
+		local caps = armed("", "ctrl")
+		helpers.assert_eq(trail(caps:process(CAPS, DOWN, 200)), "29↓", "a native-tap CapsLock that holds Ctrl")
+		helpers.assert_eq(trail((caps:process(CAPS, UP, 300))), "29↑ 58↓ 58↑", "CapsLock is typed unshifted")
+		helpers.assert_eq(next_letter(caps), "42↓ 48↓", "and leaves the one-shot for the letter")
+		local e = engine({ right_ctrl = DEFAULTS.right_ctrl,
+			enter = { tap_action = "", hold_modifier = "ctrl", time_activation_seconds = 0.3 } })
+		e:process(RCTRL, DOWN, 0)
+		e:process(RCTRL, UP, 100)
+		e:process(ENTER, DOWN, 200)
+		helpers.assert_eq(trail((e:process(ENTER, UP, 300))), "29↑ 28↓ 28↑", "a native Enter is typed unshifted")
+		helpers.assert_eq(next_letter(e), "48↓", "and spends the one-shot")
+	end)
+
+	helpers.it("ends on Enter, Backspace, Delete, Tab and Escape, typed unshifted (one-shot-next-key)", function()
+		for _, code in ipairs(SPEND) do
+			local e = armed()
+			helpers.assert_nil(e:process(code, DOWN, 200), code .. " passes through without Shift")
+			helpers.assert_nil(e:process(code, UP, 250))
+			helpers.assert_eq(next_letter(e), "48↓", code .. " spent the one-shot")
+		end
+	end)
+
+	helpers.it("lets a key that types nothing through and stays armed (one-shot-next-key)", function()
+		for _, code in ipairs(KEEP) do
+			local e = armed()
+			helpers.assert_nil(e:process(code, DOWN, 200), code .. " is not Shift+" .. code .. ": no selection")
+			helpers.assert_nil(e:process(code, UP, 250))
+			helpers.assert_eq(next_letter(e), "42↓ 48↓", code .. " left the one-shot for the letter")
+		end
+	end)
+
+	-- Whether a key types text is the layout's to say, not a list of control
+	-- names: Print, the volume keys, NumLock or F13 used to be shifted (Shift+
+	-- Print is a region screenshot) and spent the one-shot, where Windows'
+	-- InputHook never sees them (one-shot-types-nothing).
+	local TYPES_NOTHING = {
+		99, 119, 127, 69, 70,              -- Print, Pause, Menu, NumLock, ScrollLock
+		113, 114, 115, 163, 164, 165,      -- Mute, volume down and up, next, play, previous
+		183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, -- F13 to F24
+	}
+
+	helpers.it("lets Print, the volume keys, NumLock and F13 through, and stays armed (one-shot-types-nothing)", function()
+		for _, code in ipairs(TYPES_NOTHING) do
+			local e = armed()
+			helpers.assert_nil(e:process(code, DOWN, 200), code .. " passes unshifted")
+			helpers.assert_nil(e:process(code, UP, 250))
+			helpers.assert_eq(next_letter(e), "42↓ 48↓", code .. " left the one-shot for the letter")
+		end
+	end)
+
+	helpers.it("keeps the one-shot for a keypad key with NumLock off (one-shot-types-nothing)", function()
+		local e = armed(nil, nil, function(code) if code ~= 79 then return US_TEXT[code] end end)
+		helpers.assert_nil(e:process(79, DOWN, 200), "KP_End is not Shift+KP_End")
+		helpers.assert_nil(e:process(79, UP, 250))
+		helpers.assert_eq(next_letter(e), "42↓ 48↓")
+	end)
+
+	helpers.it("passes a shortcut unshifted and stays armed (one-shot-types-nothing)", function()
+		-- Under Ctrl the hook answers that a key types nothing: Ctrl+A selects
+		-- all and the one-shot waits for the letter, as on Windows.
+		local ctrl_held = true
+		local e = armed(nil, nil, function(code) if not ctrl_held then return US_TEXT[code] end end)
+		helpers.assert_nil(e:process(KEY_A, DOWN, 200), "Ctrl+A, not Ctrl+Shift+A")
+		helpers.assert_nil(e:process(KEY_A, UP, 250))
+		ctrl_held = false
+		helpers.assert_eq(next_letter(e), "42↓ 48↓")
+	end)
+
+	helpers.it("types a digit or a mark as it is and spends the one-shot (one-shot-types-nothing)", function()
+		-- Windows types the next character in title case: "1" and "," stay as
+		-- they are. Shift made them "!" and "?", and a keypad 1 KP_End.
+		for _, code in ipairs({ 2, 51, 79 }) do
+			local e = armed()
+			helpers.assert_nil(e:process(code, DOWN, 200), US_TEXT[code] .. " (" .. code .. ") is typed unshifted")
+			helpers.assert_nil(e:process(code, UP, 250))
+			helpers.assert_eq(next_letter(e), "48↓", code .. " spent the one-shot")
+		end
+	end)
+
+	helpers.it("needs the layout's text when a key taps the one-shot Shift (one-shot-types-nothing)", function()
+		local ok, err = pcall(Engine.new, { keys = DEFAULTS, tap_min_ms = 50, one_shot_timeout_ms = 2000 })
+		helpers.assert_true(not ok, "an engine that cannot tell a character from Print must not start")
+		helpers.assert_contains(tostring(err), "key_text")
 	end)
 
 end)

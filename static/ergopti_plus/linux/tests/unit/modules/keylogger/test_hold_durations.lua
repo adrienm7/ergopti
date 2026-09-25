@@ -190,7 +190,7 @@ helpers.describe("hold durations: tap or hold", function()
 		end
 		fh:close()
 		TapHold.init({
-			keyboard_hook = { set_remapper = function() end },
+			keyboard_hook = { set_remapper = function() end, key_text = function() return nil end },
 			execute_action = function() end,
 			action_names = function() return {} end,
 			defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"),
