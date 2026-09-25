@@ -12,7 +12,7 @@
 ; modules subscribe through this dispatcher.
 ;
 ; FEATURES & RATIONALE:
-; 1. Single InputHook — one InputHook("V L0") for the whole process. Avoids
+; 1. Single InputHook — one InputHook("V L0 I1") for the whole process. Avoids
 ;    the "multiple InputHook" contention that can cause AHK to silently drop
 ;    events when hooks race to grab the same key stream.
 ; 2. Single mouse-button set — LButton/RButton/MButton/Wheel hotkeys are
@@ -66,8 +66,15 @@
 
 class HookDispatcherConst {
 	; InputHook options: V = visible (events pass through to apps),
-	; L0 = no length cutoff so OnChar fires for every character.
-	static INPUT_HOOK_OPTS := "V L0"
+	; L0 = no length cutoff so OnChar fires for every character, I1 = ignore
+	; input sent at SendLevel 0. Without I the hook recorded the driver's own
+	; injected keys as user activity whenever SendInput fell back to SendEvent
+	; (another AutoHotkey keyboard hook running): a tap-hold's own synthetic
+	; Ctrl cancelled the tap of another held key and advanced the physical-input
+	; generation. TextSender sends at level 0 (TEXT_SENDER_SEND_LEVEL); the
+	; layout remap output, the only trace of the physical key its hotkey
+	; suppresses, is sent at level 2 and stays visible, as for the prefix watcher.
+	static INPUT_HOOK_OPTS := "V L0 I1"
 
 	; Event type string constants — callers import these or use the
 	; string literals directly; having them here prevents typos.

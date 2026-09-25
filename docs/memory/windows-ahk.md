@@ -163,6 +163,16 @@ paused. Recheck suspension at dispatch and completion boundaries.
 Raw AHK tray callbacks have historically dropped clicks on this driver. Every
 actionable item goes through `RegisterMenuItem` and the menu dispatcher.
 
+### project-ahk-sendinput-falls-back-to-sendevent
+
+SendInput removes the script's own keyboard hook only while no other AutoHotkey
+keyboard hook runs; with one, it falls back to SendEvent and the driver's own
+InputHooks see its keys (AHK `SystemHasAnotherKeybdHook`). A hotkey thread's
+SendLevel is its #InputLevel (2 for the tap-holds). Action: driver output that
+is not a stand-in for a physical key goes out at SendLevel 0
+(`TEXT_SENDER_SEND_LEVEL`), and observers use `I1`; the layout remap output
+stays at level 2 because it is the only trace of the key its hotkey suppresses.
+
 ### project-ahk-probing-synthetic-input
 
 Tests of injected input must prove provenance and destination, not merely that a

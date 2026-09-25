@@ -10,12 +10,13 @@
 ; existing flush / ingest tick handles persistence.
 ;
 ; FEATURES & RATIONALE:
-; 1. Passive observation: ``InputHook("V L0")`` runs visible (events
+; 1. Passive observation: ``InputHook("V L0 I1")`` runs visible (events
 ;    keep flowing to apps) and accepts every key (``L0`` = no length
-;    cutoff). We deliberately do NOT pass ``I0`` because the layout's
+;    cutoff). The minimum send level stays at 1 because the layout's
 ;    remap hotkeys (``*X::Send "y"``) consume the raw key — InputHook
-;    only sees the resolved ``Send`` output. ``I0`` would filter that
-;    out and we would capture nothing at all.
+;    only sees the resolved ``Send`` output, sent at level 2. A higher
+;    level would filter that out and we would capture nothing at all;
+;    level 0 is the driver's own TextSender output, which is not typing.
 ; 2. Two complementary callbacks:
 ;    - OnChar(ih, c)            — printable characters AFTER the layout
 ;                                  has resolved deadkeys / remaps. This
@@ -626,7 +627,7 @@ KL_Hook_Start() {
 
 		; Subscribe the keylogger's keyboard handlers to the shared HookDispatcher
 		; instead of opening a second InputHook. The dispatcher already owns the
-		; process-wide InputHook (identical "V L0" + KeyOpt {All} +N + NotifyNonText
+		; process-wide InputHook (identical "V L0 I1" + KeyOpt {All} +N + NotifyNonText
 		; options) and already carries the keylogger's mouse subscribers, so this
 		; collapses one per-keystroke hook callback into the shared fan-out.
 		; Dispatch gates on A_IsSuspended, so the handlers stay silent under pause
