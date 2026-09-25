@@ -122,29 +122,25 @@ function copyTooling() {
 	return destination;
 }
 
-function findPosixShell() {
-	// The child deliberately loses the parent's PATH. Resolve its shell while
-	// discovery still has access to that PATH, then retain the exact executable.
-	for (const directory of (process.env.PATH || '').split(path.delimiter)) {
-		if (!directory) continue;
-		const candidate = path.resolve(directory.replace(/^"|"$/g, ''), 'sh.exe');
-		if (!fs.existsSync(candidate)) continue;
-		const direct = spawnSync(candidate, ['-c', ':'], { encoding: 'utf8' });
-		if (direct.status === 0) return candidate;
-	}
-
+function gitForWindowsPosix() {
+	// Git for Windows ships two POSIX shell entry points. bin/sh.exe prepends
+	// the MSYS tool directories to PATH; usr/bin/sh.exe inherits PATH verbatim.
+	// Which one a PATH scan meets first depends on the caller's shell, so the
+	// launcher is exercised under every entry point with an explicit tool PATH.
 	const git = spawnSync('git', ['--exec-path'], { encoding: 'utf8' });
-	if (git.status !== 0 || !git.stdout.trim()) return null;
-	let ancestor = path.resolve(git.stdout.trim());
-	while (true) {
-		for (const relative of [path.join('bin', 'sh.exe'), path.join('usr', 'bin', 'sh.exe')]) {
-			const candidate = path.join(ancestor, relative);
-			if (fs.existsSync(candidate)) return candidate;
-		}
-		const parent = path.dirname(ancestor);
-		if (parent === ancestor) return null;
-		ancestor = parent;
+	assert.equal(git.status, 0, `git --exec-path failed: ${git.stderr || git.error}`);
+	const execPath = path.resolve(git.stdout.trim());
+	let root = execPath;
+	while (!fs.existsSync(path.join(root, 'usr', 'bin', 'sh.exe'))) {
+		const parent = path.dirname(root);
+		assert.notEqual(parent, root, `no Git for Windows MSYS shell above ${execPath}`);
+		root = parent;
 	}
+	const tools = path.join(root, 'usr', 'bin');
+	const shells = [path.join(tools, 'sh.exe'), path.join(root, 'bin', 'sh.exe')].filter((shell) =>
+		fs.existsSync(shell)
+	);
+	return { tools, shells };
 }
 
 try {
@@ -243,15 +239,35 @@ try {
 		);
 		assert.equal(result.status, 23, result.stderr || result.stdout);
 
-		const gitSh = findPosixShell();
-		if (gitSh !== null) {
-			assert.ok(path.isAbsolute(gitSh), 'the isolated child must retain an absolute shell path');
-			const posixResult = spawnSync(
-				gitSh,
-				[path.join(isolatedTooling, 'rtk.sh'), process.execPath, exitProbe],
-				{ encoding: 'utf8', env: environment }
+		// The POSIX launchers need the MSYS tools (dirname) but must not see rtk.
+		const posix = gitForWindowsPosix();
+		for (const tool of ['dirname', 'sh']) {
+			assert.ok(
+				fs.existsSync(path.join(posix.tools, `${tool}.exe`)),
+				`${posix.tools} lacks ${tool}`
 			);
-			assert.equal(posixResult.status, 23, posixResult.stderr || posixResult.stdout);
+		}
+		for (const rtk of ['rtk', 'rtk.exe']) {
+			assert.equal(
+				fs.existsSync(path.join(posix.tools, rtk)),
+				false,
+				`${posix.tools} provides ${rtk}`
+			);
+		}
+		const posixEnvironment = { ...environment, PATH: posix.tools };
+		for (const shell of posix.shells) {
+			result = spawnSync(shell, [path.join(isolatedTooling, 'bootstrap.sh'), 'verify'], {
+				encoding: 'utf8',
+				env: posixEnvironment
+			});
+			assert.equal(result.status, 3, `${shell}: ${result.stderr}`);
+
+			result = spawnSync(
+				shell,
+				[path.join(isolatedTooling, 'rtk.sh'), process.execPath, exitProbe],
+				{ encoding: 'utf8', env: posixEnvironment }
+			);
+			assert.equal(result.status, 23, `${shell}: ${result.stderr || result.stdout}`);
 		}
 	} else {
 		const privateBin = path.join(temporaryRoot, 'bin');
@@ -269,8 +285,8 @@ try {
 			[path.join(isolatedTooling, 'rtk.sh'), process.execPath, exitProbe],
 			{ encoding: 'utf8', env: environment }
 		);
+		assert.equal(result.status, 23, result.stderr || result.stdout);
 	}
-	assert.equal(result.status, 23, result.stderr || result.stdout);
 
 	console.log('project RTK integration: ok');
 } finally {
