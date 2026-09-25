@@ -44,6 +44,7 @@ local Manifest = require("infra.manifest_reader")
 local TomlCodec = require("toml_codec")
 local i18n = require("infra.i18n")
 local ScriptActions = require("modules.shortcuts.script_actions")
+local ShellRunner = require("adapters.shell_runner")
 local LOG = "modules.gestures.manager"
 local ENABLED_PATH = "gestures.enabled"
 local DEFAULT_ENABLED = Manifest.default_for(ENABLED_PATH)
@@ -376,6 +377,10 @@ local function primary_selection()
 	return (value:gsub("%s+$", ""))
 end
 
+-- Seconds each wmctrl call may take. The daemon waits for it while it holds
+-- the keyboard, so a hung X server must cost a second, not the keyboard.
+local WMCTRL_TIMEOUT_S = 1
+
 --- A shell command that switches to the workspace `delta` steps away.
 ---
 --- `wmctrl -s` takes an ABSOLUTE, zero-based desktop index and has no relative
@@ -385,21 +390,46 @@ end
 --- same wall and had to add its own ws_up/ws_down for exactly this reason.
 ---
 --- The neighbour is therefore computed from `wmctrl -d`, whose current desktop is
---- the row marked `*`, with wraparound at both ends. The keystroke fallback stays
---- for the case where wmctrl is absent, and it is the only thing that can work at
---- all under Wayland — where switching workspace from another process is not
---- expressible except as a combination the compositor already binds.
+--- the row marked `*`, with wraparound at both ends.
+---
+--- The command fails whenever no desktop was switched to. It used to end in
+--- `| xargs -r wmctrl -s`, which exits 0 on empty input, so a wmctrl that could
+--- list nothing (every Wayland session) reported success and its keystroke
+--- fallback never ran. Each wmctrl is bounded by WMCTRL_TIMEOUT_S.
 --- @param delta integer -1 for the previous workspace, 1 for the next.
---- @param fallback_keys string An xdotool key combination to try when wmctrl fails.
 --- @return string
-local function workspace_switch_command(delta, fallback_keys)
+local function workspace_switch_command(delta)
 	-- Single-quoted so the awk program reaches the shell intact; it contains no
 	-- single quotes of its own, which is what makes that safe here.
 	local awk = "awk -v d=" .. tostring(delta)
 		.. " '$2==\"*\"{cur=$1} END{n=NR; if(n>0){t=(cur+d)%n; if(t<0)t+=n; print t}}'"
-	return "{ wmctrl -d | " .. awk .. " | xargs -r wmctrl -s ; } 2>/dev/null"
-		.. " || xdotool key " .. fallback_keys
+	return "t=$(timeout " .. WMCTRL_TIMEOUT_S .. " wmctrl -d 2>/dev/null | " .. awk .. ")"
+		.. " && [ -n \"$t\" ] && timeout " .. WMCTRL_TIMEOUT_S .. " wmctrl -s \"$t\" 2>/dev/null"
 end
+
+-- The combination the desktops bind to the previous and the next workspace,
+-- pressed when wmctrl cannot switch. Under Wayland it is the only way another
+-- process can: no protocol lets it name a workspace.
+local WORKSPACE_COMBO = { ws_prev = "ctrl+alt+Left", ws_next = "ctrl+alt+Right" }
+
+-- How long a media tool may take before its key is pressed instead.
+local MEDIA_TOOL_TIMEOUT_S = 1
+
+-- The media and brightness actions: the tool that drives the system, and the
+-- media key the desktop binds to the same thing, pressed when the tool is
+-- missing or refuses. The fallback was `xdotool key XF86...`, which exits zero
+-- and presses nothing under Wayland, so a missing brightnessctl or playerctl
+-- left the action dead with no error.
+local MEDIA_ACTIONS = {
+	vol_up          = { tool = "pactl set-sink-volume @DEFAULT_SINK@ +5%", key = "XF86AudioRaiseVolume" },
+	vol_down        = { tool = "pactl set-sink-volume @DEFAULT_SINK@ -5%", key = "XF86AudioLowerVolume" },
+	mute            = { tool = "pactl set-sink-mute @DEFAULT_SINK@ toggle", key = "XF86AudioMute" },
+	brightness_up   = { tool = "brightnessctl set +5%", key = "XF86MonBrightnessUp" },
+	brightness_down = { tool = "brightnessctl set 5%-", key = "XF86MonBrightnessDown" },
+	track_play      = { tool = "playerctl play-pause", key = "XF86AudioPlay" },
+	track_next      = { tool = "playerctl next", key = "XF86AudioNext" },
+	track_prev      = { tool = "playerctl previous", key = "XF86AudioPrev" },
+}
 
 --- The webview window each `open_*` action raises, by action id.
 ---
@@ -494,6 +524,26 @@ local function _execute_action(action_name, go_next, binding)
 		pcall(function() os.execute(cmd .. " 2>/dev/null &") end)
 	end
 
+	--- Presses one combination: uinput first, xdotool only if it could not be
+	--- written.
+	---
+	--- `xdotool key` is X11 only, and under Wayland it talks to nothing: the
+	--- command succeeds, the shell exits zero, and the gesture does nothing.
+	--- That is the worst shape of failure, because there is no error to find.
+	--- uinput sits BELOW the display server, so the same chord reaches X11,
+	--- every Wayland compositor and a bare TTY alike.
+	---
+	--- The fallback stays for the case where the device could not be opened at
+	--- all — on X11 that still works, and losing it would trade a real failure
+	--- mode for a worse one.
+	--- @param combo string X keysym names joined by "+", as xdotool takes them.
+	local function _press_combo(combo)
+		local ok_emitter, Emitter = pcall(require, "modules.gestures.combo_emitter")
+		if ok_emitter and Emitter.press(combo) then return end
+		Logger.debug(LOG, "uinput unavailable for '%s' — falling back to xdotool (X11 only).", combo)
+		_run("xdotool key " .. combo)
+	end
+
 	--- Raises one of the driver's own windows, or reveals one of its files.
 	--- @param name string The action id.
 	--- @return boolean True when this action was handled here.
@@ -537,13 +587,8 @@ local function _execute_action(action_name, go_next, binding)
 		return true
 	end
 
-	local modifier_command = MODIFIER_ACTION_COMMANDS[action_name]
-	if modifier_command then
-		_run("xdotool key " .. modifier_command)
-		return
-	end
-
-	-- Actions the shared catalogue describes as one xdotool combo.
+	-- A modifier chord (Ctrl+A, the only Select All on Linux) and an action the
+	-- shared catalogue describes as one xdotool combo are both one keystroke.
 	--
 	-- 26 elseif branches used to sit here, each spelling out a combo that the
 	-- macOS and Windows registries also spelled out in their own vocabularies.
@@ -551,24 +596,11 @@ local function _execute_action(action_name, go_next, binding)
 	-- _generated/gesture_emit_actions.lua. The combos are X11 keysym syntax and
 	-- are Linux's own: Linux and Windows agree far more often than either agrees
 	-- with macOS (alt+F4 and ctrl+Right on both, against cmd+w and alt+right).
-	local emit_combo = _EMIT_ROWS[action_name]
+	-- The modifier chords used to run their own `xdotool key` in the background,
+	-- which did nothing under Wayland; they take the uinput path below as well.
+	local emit_combo = MODIFIER_ACTION_COMMANDS[action_name] or _EMIT_ROWS[action_name]
 	if emit_combo then
-		-- uinput first, xdotool only if it could not be written.
-		--
-		-- `xdotool key` is X11 only, and under Wayland it talks to nothing: the
-		-- command succeeds, the shell exits zero, and the gesture does nothing.
-		-- That is the worst shape of failure, because there is no error to find.
-		-- uinput sits BELOW the display server, so the same chord reaches X11,
-		-- every Wayland compositor and a bare TTY alike.
-		--
-		-- The fallback stays for the case where the device could not be opened at
-		-- all — on X11 that still works, and losing it would trade a real failure
-		-- mode for a worse one.
-		local ok_emitter, Emitter = pcall(require, "modules.gestures.combo_emitter")
-		if ok_emitter and Emitter.press(emit_combo) then return end
-		Logger.debug(LOG, "uinput unavailable for '%s' — falling back to xdotool (X11 only).",
-			emit_combo)
-		_run("xdotool key " .. emit_combo)
+		_press_combo(emit_combo)
 		return
 	end
 
@@ -629,26 +661,19 @@ local function _execute_action(action_name, go_next, binding)
 		_run(_click_toggle_command("1"))
 	elseif action_name == "right_click_toggle" then
 		_run(_click_toggle_command("3"))
-	elseif action_name == "ws_prev" then
-		_run(workspace_switch_command(-1, "ctrl+alt+Left"))
-	elseif action_name == "ws_next" then
-		_run(workspace_switch_command(1, "ctrl+alt+Right"))
-	elseif action_name == "vol_up" then
-		_run("pactl set-sink-volume @DEFAULT_SINK@ +5% 2>/dev/null || xdotool key XF86AudioRaiseVolume")
-	elseif action_name == "vol_down" then
-		_run("pactl set-sink-volume @DEFAULT_SINK@ -5% 2>/dev/null || xdotool key XF86AudioLowerVolume")
-	elseif action_name == "mute" then
-		_run("pactl set-sink-mute @DEFAULT_SINK@ toggle 2>/dev/null || xdotool key XF86AudioMute")
-	elseif action_name == "brightness_up" then
-		_run("brightnessctl set +5% 2>/dev/null || xdotool key XF86MonBrightnessUp")
-	elseif action_name == "brightness_down" then
-		_run("brightnessctl set 5%- 2>/dev/null || xdotool key XF86MonBrightnessDown")
-	elseif action_name == "track_play" then
-		_run("playerctl play-pause 2>/dev/null || xdotool key XF86AudioPlay")
-	elseif action_name == "track_next" then
-		_run("playerctl next 2>/dev/null || xdotool key XF86AudioNext")
-	elseif action_name == "track_prev" then
-		_run("playerctl previous 2>/dev/null || xdotool key XF86AudioPrev")
+	elseif WORKSPACE_COMBO[action_name] then
+		-- wmctrl on its own, and waited for: only its exit status says whether
+		-- the combination is still needed.
+		if not ShellRunner.run(workspace_switch_command(action_name == "ws_next" and 1 or -1)) then
+			_press_combo(WORKSPACE_COMBO[action_name])
+		end
+	elseif MEDIA_ACTIONS[action_name] then
+		-- The tool on its own, and waited for: only its exit status says whether
+		-- the media key is still needed.
+		local media = MEDIA_ACTIONS[action_name]
+		if not ShellRunner.run("timeout " .. MEDIA_TOOL_TIMEOUT_S .. " " .. media.tool .. " >/dev/null 2>&1") then
+			_press_combo(media.key)
+		end
 	elseif action_name == "lock_screen" then
 		_run("loginctl lock-session 2>/dev/null || xdg-screensaver lock")
 	else

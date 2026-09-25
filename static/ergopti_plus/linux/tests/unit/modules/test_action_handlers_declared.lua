@@ -280,7 +280,353 @@ end)
 
 -- =========================================================
 -- =========================================================
--- ======= 5/ Search needs something to search =============
+-- ======= 5/ Modifier chords go through uinput ============
+-- =========================================================
+-- =========================================================
+
+-- Every modifier chord the shared catalogue offers (Ctrl+A, the only Select
+-- All on Linux, down to Super+.) ran as a background `xdotool key`, which is
+-- X11 only: under Wayland it talks to nothing and exits zero, so the chord did
+-- nothing and nothing said so. They go through the uinput combo emitter like
+-- the catalogue's own combos (modifier-chord-uinput-2026-09-25).
+helpers.describe("linux actions: modifier chords", function()
+
+	-- Kernel ABI values (input-event-codes.h) at their US positions, spelled
+	-- here so a wrong table in the emitter cannot agree with itself.
+	local MODIFIER_CODE = { ctrl = 29, shift = 42, alt = 56, super = 125 }
+	local KEY_CODE = {
+		a = 30, b = 48, c = 46, d = 32, e = 18, f = 33, g = 34, h = 35, i = 23, j = 36, k = 37, l = 38,
+		m = 50, n = 49, o = 24, p = 25, q = 16, r = 19, s = 31, t = 20, u = 22, v = 47, w = 17, x = 45,
+		y = 21, z = 44,
+		["1"] = 2, ["2"] = 3, ["3"] = 4, ["4"] = 5, ["5"] = 6, ["6"] = 7, ["7"] = 8, ["8"] = 9,
+		["9"] = 10, ["0"] = 11,
+		space = 57, enter = 28, period = 52, comma = 51,
+	}
+
+	--- Every chord the shared catalogue declares for Linux, read from the
+	--- catalogue itself: { id, mods = {combo names}, key = key id }.
+	local function declared_chords()
+		local path = require("infra.paths").shared("modules/actions/modifier_chords.json")
+		local fh = assert(io.open(path, "r"), "the shared modifier chords must be readable")
+		local catalogue = require("json").decode(fh:read("*a"))
+		fh:close()
+		local modifiers = catalogue.platforms.linux.modifiers
+		local chords = {}
+		for mask = 1, 2 ^ #modifiers - 1 do
+			local ids, names = {}, {}
+			for index, modifier in ipairs(modifiers) do
+				if math.floor(mask / 2 ^ (index - 1)) % 2 == 1 then
+					ids[#ids + 1] = modifier.id
+					names[#names + 1] = modifier.xdotool
+				end
+			end
+			for _, key in ipairs(catalogue.keys) do
+				chords[#chords + 1] = { id = table.concat(ids, "_") .. "_" .. key.id, mods = names, key = key.id }
+			end
+		end
+		return chords
+	end
+
+	--- Runs `body` with a fake open uinput device, a hook holding nothing and
+	--- a layout answering `shortcut_keycode`, and restores all three.
+	local function with_fake_device(shortcut_keycode, body)
+		local names = { "adapters.uinput_writer", "adapters.keyboard_hook", "adapters.keyboard_layout" }
+		local saved = {}
+		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+		local writer = helpers.load_module("tests.fakes").uinput_writer()
+		writer.open()
+		package.loaded["adapters.uinput_writer"] = writer
+		package.loaded["adapters.keyboard_hook"] = {
+			held_text_modifier_codes = function() return {} end,
+			held_shortcut_modifier_codes = function() return {} end,
+		}
+		package.loaded["adapters.keyboard_layout"] = { shortcut_keycode = shortcut_keycode }
+		local ok, err = pcall(body, writer)
+		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+		if not ok then error(err, 0) end
+	end
+
+	local function us_position(_, us_code) return us_code end
+
+	local function trail(events)
+		local parts = {}
+		for _, ev in ipairs(events) do parts[#parts + 1] = ev.code .. ":" .. ev.value end
+		return table.concat(parts, " ")
+	end
+
+	helpers.it("emits every declared chord through uinput, never xdotool (modifier-chord-uinput)", function()
+		local chords = declared_chords()
+		helpers.assert_true(#chords >= 15 * 40, string.format(
+			"only %d chord(s) read from the catalogue; this check would prove nothing", #chords))
+		local Gestures = helpers.load_module("modules.gestures.manager")
+		for _, chord in ipairs(chords) do
+			with_fake_device(us_position, function(writer)
+				with_recorded_shell(function(commands)
+					Gestures.execute_action(chord.id, "tap_hold")
+					helpers.assert_eq(#commands, 0, chord.id .. " must not shell out: `xdotool key` "
+						.. "does nothing under Wayland; ran " .. joined(commands))
+				end)
+				local down, up = {}, {}
+				for _, name in ipairs(chord.mods) do down[#down + 1] = MODIFIER_CODE[name] .. ":1" end
+				for index = #chord.mods, 1, -1 do up[#up + 1] = MODIFIER_CODE[chord.mods[index]] .. ":0" end
+				local key = KEY_CODE[chord.key]
+				helpers.assert_true(key ~= nil, "no expected code for the catalogue key " .. chord.key)
+				helpers.assert_eq(trail(writer.events),
+					table.concat(down, " ") .. " " .. key .. ":1 " .. key .. ":0 " .. table.concat(up, " "),
+					chord.id .. " must hold its modifiers across the key on the uinput device")
+			end)
+		end
+	end)
+
+	helpers.it("falls back to xdotool with keysym names it accepts (modifier-chord-uinput)", function()
+		-- Only when the uinput device cannot be written. `xdotool key ctrl+.`
+		-- fails: xdotool takes X keysym names, and "." is `period`.
+		local Logger = require("logger.shim")
+		local Gestures = helpers.load_module("modules.gestures.manager")
+		local real_error = Logger.error
+		Logger.error = function() end
+		local ok, err = pcall(function()
+			for _, chord in ipairs(declared_chords()) do
+				local writer = helpers.load_module("tests.fakes").uinput_writer()
+				local saved = package.loaded["adapters.uinput_writer"]
+				package.loaded["adapters.uinput_writer"] = writer
+				with_recorded_shell(function(commands)
+					Gestures.execute_action(chord.id, "tap_hold")
+					package.loaded["adapters.uinput_writer"] = saved
+					helpers.assert_eq(#commands, 1, chord.id .. " with no uinput device runs xdotool once")
+					local keys = commands[1]:match("^xdotool key (%S+)")
+					helpers.assert_not_nil(keys, chord.id .. " falls back to `xdotool key`: " .. commands[1])
+					for part in keys:gmatch("[^+]+") do
+						helpers.assert_true(part:match("^[%w_]+$") ~= nil, string.format(
+							"%s: '%s' is no X keysym name, xdotool rejects it", chord.id, part))
+					end
+				end)
+			end
+		end)
+		Logger.error = real_error
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("presses a chord's character where the live layout types it (modifier-chord-uinput)", function()
+		-- Applications match Ctrl+A by the symbol the key types, so on Ergopti,
+		-- where KEY_V types a comma, Ctrl+, is Ctrl+KEY_V.
+		local LIVE = { a = 101, ["1"] = 102, ["."] = 103, [","] = 104 }
+		local Gestures = helpers.load_module("modules.gestures.manager")
+		for _, case in ipairs({ { "ctrl_a", "a" }, { "ctrl_1", "1" }, { "ctrl_period", "." }, { "ctrl_comma", "," } }) do
+			with_fake_device(function(char, us_code) return LIVE[char] or us_code end, function(writer)
+				Gestures.execute_action(case[1], "tap_hold")
+				helpers.assert_eq(trail(writer.events), string.format("29:1 %d:1 %d:0 29:0", LIVE[case[2]],
+					LIVE[case[2]]), case[1] .. " must press the key the layout types " .. case[2] .. " on")
+			end)
+		end
+	end)
+
+end)
+
+
+
+
+-- =========================================================
+-- =========================================================
+-- ======= 6/ Workspaces: wmctrl, then the keyboard ========
+-- =========================================================
+-- =========================================================
+
+helpers.describe("linux actions: workspace switch", function()
+
+	--- Runs a workspace action with wmctrl and the uinput emitter each
+	--- succeeding or not.
+	--- @return table commands The shell commands run.
+	--- @return table pressed The combos pressed on the virtual keyboard.
+	local function switch(action, wmctrl_ok, uinput_ok)
+		local saved = package.loaded["modules.gestures.combo_emitter"]
+		local pressed, commands = {}, {}
+		package.loaded["modules.gestures.combo_emitter"] = {
+			press = function(combo) pressed[#pressed + 1] = combo; return uinput_ok end,
+		}
+		local real = os.execute
+		os.execute = function(cmd)
+			commands[#commands + 1] = tostring(cmd)
+			if tostring(cmd):find("wmctrl", 1, true) and not wmctrl_ok then return nil, "exit", 1 end
+			return true
+		end
+		local ok, err = pcall(function()
+			helpers.load_module("modules.gestures.manager").execute_action(action, "tap_hold")
+		end)
+		os.execute = real
+		package.loaded["modules.gestures.combo_emitter"] = saved
+		if not ok then error(err, 0) end
+		return commands, pressed
+	end
+
+	local COMBO = { ws_prev = "ctrl+alt+Left", ws_next = "ctrl+alt+Right" }
+
+	helpers.it("asks wmctrl first, and presses nothing when it switched (workspace-uinput)", function()
+		for action in pairs(COMBO) do
+			local commands, pressed = switch(action, true, true)
+			helpers.assert_eq(#commands, 1, action .. " runs wmctrl alone")
+			helpers.assert_contains(commands[1], "wmctrl -s")
+			helpers.assert_nil(commands[1]:find("xdotool", 1, true), action .. ": " .. commands[1])
+			helpers.assert_eq(pressed, {}, action .. ": wmctrl switched, no keystroke on top")
+		end
+	end)
+
+	helpers.it("presses the desktop's combo through uinput when wmctrl cannot switch (workspace-uinput)", function()
+		-- Under Wayland wmctrl has no desktop to ask, and `xdotool key` talks to
+		-- nothing: the uinput device is the one path that reaches the compositor.
+		for action, combo in pairs(COMBO) do
+			local commands, pressed = switch(action, false, true)
+			helpers.assert_eq(pressed, { combo }, action .. " presses " .. combo .. " on the virtual keyboard")
+			for _, command in ipairs(commands) do
+				helpers.assert_nil(command:find("xdotool", 1, true), action .. " ran " .. command)
+			end
+		end
+	end)
+
+	helpers.it("uses xdotool only when the uinput device cannot be written either (workspace-uinput)", function()
+		for action, combo in pairs(COMBO) do
+			local commands = switch(action, false, false)
+			helpers.assert_contains(commands[#commands], "xdotool key " .. combo)
+		end
+	end)
+
+	helpers.it("fails the wmctrl command when wmctrl cannot list the desktops (workspace-uinput)", function()
+		-- The command used to end in `| xargs -r wmctrl -s`, which exits 0 on
+		-- empty input: a wmctrl that could not list anything reported success
+		-- and nothing ran after it. Run for real against stand-in wmctrls.
+		local commands = switch("ws_prev", true, true)
+		local dir = os.tmpname()
+		os.remove(dir)
+		os.execute("mkdir " .. dir)
+		local log = dir .. "/switched"
+		--- Writes an executable shell script.
+		local function script(path, body)
+			local fh = assert(io.open(path, "w"))
+			fh:write("#!/bin/sh\n", body, "\n")
+			fh:close()
+			os.execute("chmod +x " .. path)
+		end
+		local function stand_in(body) script(dir .. "/wmctrl", body) end
+		-- Run as a script file, the way the daemon's shell runs it: a quoted
+		-- script path is also what the Windows test mode hands to sh.
+		local function run()
+			script(dir .. "/switch.sh", "PATH=" .. dir .. ":$PATH; export PATH\n" .. commands[1])
+			local result = os.execute("'" .. dir .. "/switch.sh'")
+			return result == true or result == 0
+		end
+		stand_in("echo 'Cannot get current desktop properties.' >&2; exit 1")
+		helpers.assert_true(not run(), "wmctrl -d failing must fail the command, so the combo is pressed")
+		stand_in('if [ "$1" = -d ]; then printf "0  * DG: x\\n1  - DG: x\\n2  - DG: x\\n"; '
+			.. 'else echo "$2" > "$(dirname "$0")/switched"; fi')
+		helpers.assert_true(run(), "a listed desktop is switched to")
+		local fh = assert(io.open(log, "r"))
+		helpers.assert_eq(fh:read("*l"), "2", "the previous desktop of the first one wraps to the last")
+		fh:close()
+		os.execute("rm -rf " .. dir)
+	end)
+
+end)
+
+
+
+
+
+-- ===========================================================
+-- ===========================================================
+-- ======= 6b/ Media keys: the tool, then the keyboard =======
+-- ===========================================================
+-- ===========================================================
+
+-- Volume, brightness and track fell back to `xdotool key XF86...` when
+-- pactl, brightnessctl or playerctl was missing or refused, and under Wayland
+-- that exits zero and presses nothing: the action did nothing and no error
+-- said so. They fall back to the same key on the uinput device instead
+-- (media-keys-uinput-2026-09-26).
+helpers.describe("linux actions: media and brightness keys", function()
+
+	-- Kernel ABI values (input-event-codes.h), spelled here so a wrong table
+	-- in the emitter cannot agree with itself.
+	local MEDIA = {
+		vol_up = { tool = "pactl", key = "XF86AudioRaiseVolume", code = 115 },
+		vol_down = { tool = "pactl", key = "XF86AudioLowerVolume", code = 114 },
+		mute = { tool = "pactl", key = "XF86AudioMute", code = 113 },
+		brightness_up = { tool = "brightnessctl", key = "XF86MonBrightnessUp", code = 225 },
+		brightness_down = { tool = "brightnessctl", key = "XF86MonBrightnessDown", code = 224 },
+		track_play = { tool = "playerctl", key = "XF86AudioPlay", code = 164 },
+		track_next = { tool = "playerctl", key = "XF86AudioNext", code = 163 },
+		track_prev = { tool = "playerctl", key = "XF86AudioPrev", code = 165 },
+	}
+
+	--- Runs a media action with its tool and the uinput emitter each
+	--- succeeding or not.
+	--- @return table commands The shell commands run.
+	--- @return table pressed The combos pressed on the virtual keyboard.
+	local function run(action, tool_ok, uinput_ok)
+		local saved = package.loaded["modules.gestures.combo_emitter"]
+		local pressed, commands = {}, {}
+		package.loaded["modules.gestures.combo_emitter"] = {
+			press = function(combo) pressed[#pressed + 1] = combo; return uinput_ok end,
+		}
+		local real = os.execute
+		os.execute = function(cmd)
+			commands[#commands + 1] = tostring(cmd)
+			if tostring(cmd):find(MEDIA[action].tool, 1, true) and not tool_ok then return nil, "exit", 1 end
+			return true
+		end
+		local ok, err = pcall(function()
+			helpers.load_module("modules.gestures.manager").execute_action(action, "tap_hold")
+		end)
+		os.execute = real
+		package.loaded["modules.gestures.combo_emitter"] = saved
+		if not ok then error(err, 0) end
+		return commands, pressed
+	end
+
+	helpers.it("runs the tool alone and presses nothing when it worked (media-keys-uinput)", function()
+		for action, media in pairs(MEDIA) do
+			local commands, pressed = run(action, true, true)
+			helpers.assert_eq(#commands, 1, action .. " runs " .. media.tool .. " alone")
+			helpers.assert_contains(commands[1], media.tool)
+			helpers.assert_nil(commands[1]:find("xdotool", 1, true), action .. ": " .. commands[1])
+			helpers.assert_eq(pressed, {}, action .. ": the tool worked, no keystroke on top")
+		end
+	end)
+
+	helpers.it("presses the media key through uinput when the tool fails (media-keys-uinput)", function()
+		for action, media in pairs(MEDIA) do
+			local commands, pressed = run(action, false, true)
+			helpers.assert_eq(pressed, { media.key }, action .. " presses " .. media.key .. " on the virtual keyboard")
+			for _, command in ipairs(commands) do
+				helpers.assert_nil(command:find("xdotool", 1, true), action .. " ran " .. command)
+			end
+		end
+	end)
+
+	helpers.it("uses xdotool only when the uinput device cannot be written either (media-keys-uinput)", function()
+		for action, media in pairs(MEDIA) do
+			local commands = run(action, false, false)
+			helpers.assert_contains(commands[#commands], "xdotool key " .. media.key)
+		end
+	end)
+
+	helpers.it("knows the evdev key of every media keysym (media-keys-uinput)", function()
+		local Emitter = helpers.load_module("modules.gestures.combo_emitter")
+		for action, media in pairs(MEDIA) do
+			local parsed, unknown = Emitter.parse(media.key)
+			helpers.assert_true(parsed ~= nil, action .. ": " .. tostring(unknown))
+			helpers.assert_eq(parsed.keys, { media.code }, media.key .. " is evdev code " .. media.code)
+			helpers.assert_eq(parsed.mods, {}, media.key .. " is a lone key")
+		end
+	end)
+
+end)
+
+
+
+
+-- =========================================================
+-- =========================================================
+-- ======= 7/ Search needs something to search =============
 -- =========================================================
 -- =========================================================
 
