@@ -829,6 +829,7 @@ global _AhkSubDir := ""
 #Include unit/test_keylogger_app_category_projection.ahk
 #Include unit/test_keylogger_password_fail_closed.ahk
 #Include unit/test_single_instance_gate.ahk
+#Include unit/test_worker_tray_icon_hidden.ahk
 #Include unit/test_keylogger_network_transitions.ahk
 #Include ../infra/menu_command_origin.ahk
 #Include unit/test_menu_command_origin.ahk

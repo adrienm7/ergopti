@@ -1,6 +1,17 @@
 ﻿; Last modified on 2026-04-23 at 00:00 (UTC+2)
 #Requires Autohotkey v2.0+
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
+
+; The driver re-runs this entry (or its compiled executable) with a worker flag
+; for the detached keylogger-prefetch and UIA-selection workers. AutoHotkey gives
+; every process a tray icon, so each worker showed a second "ErgoptiPlus" entry
+; (the default green H icon in source mode) for as long as it lived. #NoTrayIcon
+; cannot be conditional, so the icon is hidden here, before any other statement.
+; Both predicates read only A_Args and are hoisted from their includes.
+global _DriverIsDetachedWorker := KLPF_IsWorkerInvocation() || UIASW_IsWorkerInvocation()
+if _DriverIsDetachedWorker
+	A_IconHidden := true
+
 SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is located
 
 ; The real-process startup smoke runs this exact entry point under a uniquely
@@ -81,13 +92,13 @@ if A_IsCompiled {
 ;
 ; EXEMPT: detached keylogger-prefetch and UIA-selection workers. The driver
 ; deliberately re-runs this entry with /force and a worker flag; those workers
-; register no hook, no log owner and no tray,
+; register no hook and no log owner, and hide their tray icon first thing,
 ; so it is not what this gate exists to prevent. But the gate is the FIRST
 ; auto-execute statement while the worker's own gate sits ~300 lines below, so
 ; every worker spawned while the driver is alive blocked the full wait on the
 ; live driver's mutex, timed out and ExitApp(0)'d before reaching its main —
-; the projection could never publish. KLPF_IsWorkerInvocation reads only
-; A_Args and its definition is hoisted, so it is callable here.
+; the projection could never publish. _DriverIsDetachedWorker, resolved at the
+; top of this file, is the single definition of a worker invocation.
 #Include infra/single_instance_gate.ahk
 global DRIVER_MUTEX_NAME := "Local\ErgoptiPlusDriver"
 global DRIVER_MUTEX_WAIT_MS := 3000 ; max boot delay while a previous instance exits
@@ -95,8 +106,7 @@ global _DriverMutexHandle := 0
 global _DriverMutexWait := 0xFFFFFFFF
 global _DriverMutexError := 0
 global _DriverMutexDecision := DRIVER_MUTEX_EXEMPT
-if !(KLPF_IsWorkerInvocation() || UIASW_IsWorkerInvocation()
-		|| _DriverStartupSmokeDir != "") {
+if !(_DriverIsDetachedWorker || _DriverStartupSmokeDir != "") {
 	_DriverMutexHandle := DllCall("CreateMutexW", "Ptr", 0, "Int", 0, "Str", DRIVER_MUTEX_NAME, "Ptr")
 	if !_DriverMutexHandle
 		_DriverMutexError := DllCall("kernel32\GetLastError", "UInt")
