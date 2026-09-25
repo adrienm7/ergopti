@@ -305,6 +305,26 @@ _TapHoldModifierIsSuspended() {
 	return A_IsSuspended
 }
 
+; Release the synthetic modifier a tap-hold owned, masking it first when it can
+; open a menu. A lone Alt or Win release puts the focused window's menu bar in
+; menu mode (or opens the Start menu), and the tap output that follows lands
+; there: the default Tab tap-hold holds Alt, so every Tab tap did this in classic
+; applications (measured with SendInput). The mask is harmless after a chord,
+; so it is sent whenever the held modifier includes Alt or Win.
+; @param ModKey {String|Array} The owned modifier key name, or a combination.
+; @return {Boolean} True when the release was proven.
+_TapHoldReleaseOwnedModifier(ModKey) {
+	static MenuModifiers := Map("LAlt", true, "RAlt", true, "LWin", true, "RWin", true)
+	for _, Name in _TH_SyntheticKeyList(ModKey) {
+		if MenuModifiers.Has(Name) {
+			if !TextSendMenuMask()
+				try LoggerError("TapHoldDispatch", "Menu mask before releasing '{1}' could not be sent.", _TH_SyntheticKeyLabel(ModKey))
+			break
+		}
+	}
+	return TapHoldSyntheticKeyUp(ModKey)
+}
+
 ; Own one configured synthetic-modifier gesture from physical key-down through
 ; release. The Down is published before the first interruptible wait, so the
 ; first chord belongs to the hold. Activity cancels only the eventual tap; it
@@ -322,7 +342,7 @@ TapHoldOwnImmediateModifier(KeyId, KeyName, ModKey, TapThresholdSec,
 	if !IsObject(KeyDownFn)
 		KeyDownFn := TapHoldSyntheticKeyDown
 	if !IsObject(KeyUpFn)
-		KeyUpFn := TapHoldSyntheticKeyUp
+		KeyUpFn := _TapHoldReleaseOwnedModifier
 	if !IsObject(CancelTapFn)
 		CancelTapFn := TapHoldShouldCancelTap
 	if !IsObject(IsSuspendedFn)
