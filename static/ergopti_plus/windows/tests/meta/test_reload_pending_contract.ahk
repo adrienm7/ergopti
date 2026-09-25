@@ -18,6 +18,9 @@
 ;   2. Every OnExit veto funnels through _LifecycleRefuseShutdown, so that one
 ;      site must hand a vetoed Reload back, and an ordinary exit that wins must
 ;      stop the successor it supersedes.
+;   3. The layout poll retries a refused reload on its own. Its retries must
+;      not reach the veto OnExit forces through, nor repeat the "save failed"
+;      notice meant for a user's own save (layout-poll-retry-bounded).
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -147,3 +150,41 @@ _RBL_EveryVetoHandsTheReloadBack() {
 }
 Test("reload: every OnExit veto hands the launched reload back (reload-returns-pending)",
 	_RBL_EveryVetoHandsTheReloadBack)
+
+
+
+
+
+; ============================================================
+; ============================================================
+; ======= 3/ The automatic reload stays within bounds ========
+; ============================================================
+; ============================================================
+
+; OnExit and the layout poll read the veto ceiling through one rule, and the
+; poll's port consults it; the reload core reports a refused stage through the
+; caller's reporter, so the poll's quiet one replaces the notice.
+_RBL_TheAutomaticReloadStaysWithinBounds() {
+	Rule := _StripFullLineComments(_DriverFuncBody("LifecycleShutdownVetoHonored"))
+	Refuse := _StripFullLineComments(_DriverFuncBody("_LifecycleRefuseShutdown"))
+	Assert(InStr(Rule, "LIFECYCLE_SHUTDOWN_VETO_MAX_ATTEMPTS") > 0
+		&& InStr(Refuse, "Honored := LifecycleShutdownVetoHonored()") > 0,
+		"OnExit must decide a veto through the rule the layout poll consults")
+	Port := _StripFullLineComments(_DriverFuncBody("LayoutPollPort"))
+	Assert(InStr(Port, '"veto_honored", LifecycleShutdownVetoHonored') > 0,
+		"the layout poll must ask whether OnExit could still refuse before reloading")
+	Core := _StripFullLineComments(_DriverFuncBody("_ReloadPreservingSuspendNonCritical"))
+	Assert(Core != "", "the reload core must be source-visible")
+	AssertEqual(0, _RBL_Count(Core, "_SuspendHandoffFailure("),
+		"every stage refused before launch must go through the caller's reporter, not the notice directly")
+	AssertEqual(3, _RBL_Count(Core, "ReportStage.Call("),
+		"the lease, owner and trigger-recovery refusals must each be reported")
+	Assert(InStr(Core, "ReadyFn, ReportStage,") > 0,
+		"the suspended hand-off's own stages must use the same reporter")
+}
+Test("reload: the layout poll's reload never forces a veto nor shows a save notice (layout-poll-retry-bounded)",
+	_RBL_TheAutomaticReloadStaysWithinBounds)
+
+_RBL_Count(Haystack, Needle) {
+	return (StrLen(Haystack) - StrLen(StrReplace(Haystack, Needle))) // StrLen(Needle)
+}

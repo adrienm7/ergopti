@@ -120,6 +120,12 @@ reload keeps the configuration barrier until someone dismisses that dialog; it
 is logged once after `RELOAD_SUCCESSOR_STALL_MS` and never killed, because its
 close request may already be queued. Action: when configuration writes stay
 blocked after a reload, look for that dialog before suspecting a barrier leak.
+A refused reload also spends one of the process's
+`LIFECYCLE_SHUTDOWN_VETO_MAX_ATTEMPTS` OnExit vetoes, and past the last honored
+one the exit goes through the gate that refuses it. Action: a reload nobody
+asked for (the layout poll) retries a refusal a few times with a doubling wait,
+starts only while `LifecycleShutdownVetoHonored()`, and reports a refused stage
+without the "save failed" notice.
 
 ## Input, suspension, and menus
 

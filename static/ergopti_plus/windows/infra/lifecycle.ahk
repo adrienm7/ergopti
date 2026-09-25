@@ -155,7 +155,12 @@ _SuspendMarkerPath() {
 ; release nor roll it back; RefusedFn gives it back and must release or retain
 ; it exactly as the caller's own synchronous refusal branch does. On 0 no
 ; successor was launched and the caller still owns the bundle.
-ReloadPreservingSuspend(SuccessFn := 0, ExistingBundle := 0, RefusedFn := 0) {
+;
+; A stage that refuses before launch is reported through StageFailureFn(Stage,
+; Path); by default _SuspendHandoffFailure, which also shows a "save failed"
+; notice. The layout poll, which no user asked for, passes a quieter one.
+ReloadPreservingSuspend(SuccessFn := 0, ExistingBundle := 0, RefusedFn := 0,
+		StageFailureFn := 0) {
 	; Twenty-five call sites reload through here and none said why. The caller's
 	; name is read from the call stack (-2 = whoever called this function), so the
 	; log answers "who asked" without threading a reason through every caller.
@@ -163,15 +168,17 @@ ReloadPreservingSuspend(SuccessFn := 0, ExistingBundle := 0, RefusedFn := 0) {
 		DiagCallerName(-2), A_IsSuspended ? "true" : "false")
 	PreviousCritical := Critical("Off")
 	try return _ReloadPreservingSuspendNonCritical(SuccessFn, ExistingBundle,
-		RefusedFn)
+		RefusedFn, StageFailureFn)
 	finally Critical(PreviousCritical)
 }
 
 
-_ReloadPreservingSuspendNonCritical(SuccessFn, ExistingBundle, RefusedFn) {
+_ReloadPreservingSuspendNonCritical(SuccessFn, ExistingBundle, RefusedFn,
+		StageFailureFn) {
 	global ConfigurationFile
 	if (ExistingBundle is Object) && !HasMethod(RefusedFn, "Call")
 		throw TypeError("A reload that borrows a configuration bundle needs a refusal callback to take it back.")
+	ReportStage := HasMethod(StageFailureFn, "Call") ? StageFailureFn : _SuspendHandoffFailure
 	Pending := ReloadTerminalHandoffPending()
 	if (Pending is Map) {
 		; The successor already launched will restart this instance on whatever
@@ -197,13 +204,13 @@ _ReloadPreservingSuspendNonCritical(SuccessFn, ExistingBundle, RefusedFn) {
 	}
 	if !(OwnerBundle is Object) {
 		try LoggerError("Lifecycle", "Reload refused because another configuration transaction owns config.toml.")
-		_SuspendHandoffFailure("config-lease", ConfigurationFile)
+		ReportStage.Call("config-lease", ConfigurationFile)
 		return false
 	}
 	if !(_ConfigWriteLeaseSelectOwner(OwnerBundle,
 			ConfigurationFile) is Object) {
 		try LoggerError("Lifecycle", "Reload refused because its borrowed configuration bundle is stale or does not own the active path.")
-		_SuspendHandoffFailure("config-owner", ConfigurationFile)
+		ReportStage.Call("config-owner", ConfigurationFile)
 		if OwnBundle
 			_ConfigWriteTerminalRelease(OwnerBundle)
 		return false
@@ -214,7 +221,7 @@ _ReloadPreservingSuspendNonCritical(SuccessFn, ExistingBundle, RefusedFn) {
 	try {
 		if !LLM_Menu_QuiesceTriggerForLifecycle(OwnerBundle) {
 			try LoggerError("Lifecycle", "Reload refused because LLM trigger recovery is incomplete.")
-			_SuspendHandoffFailure("llm-trigger-recovery", ConfigurationFile)
+			ReportStage.Call("llm-trigger-recovery", ConfigurationFile)
 			return false
 		}
 		Path := A_IsSuspended ? _SuspendMarkerPath() : ""
@@ -233,7 +240,7 @@ _ReloadPreservingSuspendNonCritical(SuccessFn, ExistingBundle, RefusedFn) {
 			_ReloadPreservingSuspendRefused.Bind(RefusedFn), ReleaseFn, RetractFn)
 		Launched := SuspendHandoffReload(A_IsSuspended, Path,
 			(MarkerPath) => _SuspendHandoffPrepareMarker(MarkerPath, Intent), ReloadFn,
-				ReadyFn, _SuspendHandoffFailure, _SuspendHandoffCancelMarker)
+				ReadyFn, ReportStage, _SuspendHandoffCancelMarker)
 		return Launched
 	} finally {
 		if OwnBundle && !Launched
@@ -754,18 +761,29 @@ _LifecycleForceReleaseHeldInput() {
 	return Released
 }
 
+; Whether OnExit would still honor one more veto. Past that one, the exit goes
+; through whatever gate refuses it, so an automatic reload, which nobody asked
+; to force, must not start once this is false (the layout poll).
+; @returns {Boolean} True while one more refusal would keep this process alive.
+LifecycleShutdownVetoHonored() {
+	global LIFECYCLE_SHUTDOWN_VETO_MAX_ATTEMPTS, _LifecycleShutdownVetoAttempts
+	return _LifecycleShutdownVetoAttempts + 1 < LIFECYCLE_SHUTDOWN_VETO_MAX_ATTEMPTS
+}
+
 ; Counts one refused exit and decides whether the driver may keep refusing.
 ;
 ; Every gate in Ergopti_OnShutdown funnels its veto through here so the ceiling
 ; covers the whole class, including gates added later — the recurring defect in
-; this repository is the one sibling site that kept the old behaviour.
+; this repository is the one sibling site that kept the old behaviour. The
+; ceiling, LIFECYCLE_SHUTDOWN_VETO_MAX_ATTEMPTS, is read through
+; LifecycleShutdownVetoHonored, the one rule the layout poll also consults.
 ; @param Gate {String} Short name of the refusing gate, for the exhaustion line.
 ; @returns {Integer} 1 to veto the exit, 0 to let it proceed regardless.
 _LifecycleRefuseShutdown(Gate) {
-	global LIFECYCLE_SHUTDOWN_VETO_MAX_ATTEMPTS, _LifecycleShutdownVetoAttempts
-	global _LifecycleShutdownReason
+	global _LifecycleShutdownVetoAttempts, _LifecycleShutdownReason
+	Honored := LifecycleShutdownVetoHonored()
 	_LifecycleShutdownVetoAttempts += 1
-	if (_LifecycleShutdownVetoAttempts < LIFECYCLE_SHUTDOWN_VETO_MAX_ATTEMPTS) {
+	if Honored {
 		; The successor that asked is now waiting on this window. Stop it and hand
 		; the transition back, or it prompts until someone answers.
 		try ReloadTerminalHandoffRefuseForShutdown(_LifecycleShutdownReason, Gate)
