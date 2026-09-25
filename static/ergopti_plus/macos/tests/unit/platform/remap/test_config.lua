@@ -379,21 +379,57 @@ end)
 -- from.modifiers, and left_option listed every modifier but Option: with an
 -- Option held, its rule never matched and the key went out as a bare Option,
 -- losing both its tap and its hold (held-modifier-tap-2026-09-25).
+--
+-- The keys that are themselves under a held modifier on every driver (the
+-- Windows hotkeys without a wildcard, Linux's NATIVE_UNDER_MODIFIER) are the
+-- exception: Cmd+Tab and Shift+Tab must stay the native keys. Their rules
+-- accepted any modifier too, so Cmd then Tab sent the default Tab tap, a
+-- Hammerspoon action on F17 told apart by its modifiers, with Cmd added: no
+-- action matched and the keystroke was lost. They accept only the Caps Lock
+-- state, so a held modifier leaves them to macOS.
+local NATIVE_UNDER_MODIFIER = {
+	escape = true, tab = true, spacebar = true, return_or_enter = true, delete_or_backspace = true,
+}
+
 helpers.describe("Config.load_tap_hold_keys: a modifier held before the key", function()
-	helpers.it("lets every tap-hold key's rule match whatever modifiers are held", function()
-		local path = helpers.driver_root() .. "platform/remap/data/tap_hold_keys.json"
-		local keys = Config.load_tap_hold_keys(path)
-		helpers.assert_true(type(keys) == "table" and #keys > 0, "the shipped tap-hold keys must load")
-		for _, key in ipairs(keys) do
-			local mods = type(key.from) == "table" and key.from.modifiers or nil
-			helpers.assert_true(type(mods) == "table", key.id .. " must declare its accepted modifiers")
-			helpers.assert_nil(mods.mandatory, key.id .. " must not require a modifier to be held")
-			local accepts_any = false
-			for _, name in ipairs(mods.optional or {}) do
-				if name == "any" then accepts_any = true end
-			end
-			helpers.assert_true(accepts_any,
-				key.id .. " must accept any held modifier, or its tap and hold vanish under one")
+	local path = helpers.driver_root() .. "platform/remap/data/tap_hold_keys.json"
+	local keys = Config.load_tap_hold_keys(path)
+
+	local function optional_set(key)
+		local mods = type(key.from) == "table" and key.from.modifiers or nil
+		helpers.assert_true(type(mods) == "table", key.id .. " must declare its accepted modifiers")
+		helpers.assert_nil(mods.mandatory, key.id .. " must not require a modifier to be held")
+		local set, count = {}, 0
+		for _, name in ipairs(mods.optional or {}) do
+			set[name] = true
+			count = count + 1
 		end
+		return set, count
+	end
+
+	helpers.it("keeps CapsLock and the modifier keys tap-holds whatever modifiers are held", function()
+		local checked = 0
+		for _, key in ipairs(keys) do
+			if not NATIVE_UNDER_MODIFIER[key.id] then
+				local set = optional_set(key)
+				helpers.assert_true(set.any == true,
+					key.id .. " must accept any held modifier, or its tap and hold vanish under one")
+				checked = checked + 1
+			end
+		end
+		helpers.assert_true(checked >= 9, "every modifier-type tap-hold key must be checked, got " .. checked)
+	end)
+
+	helpers.it("leaves Escape, Tab, Space, Return and Backspace native under a held modifier", function()
+		local found = 0
+		for _, key in ipairs(keys) do
+			if NATIVE_UNDER_MODIFIER[key.id] then
+				local set, count = optional_set(key)
+				helpers.assert_true(set.caps_lock == true and count == 1,
+					key.id .. " must accept only the Caps Lock state, so Cmd+" .. key.id .. " stays native")
+				found = found + 1
+			end
+		end
+		helpers.assert_eq(found, 5, "every native-under-modifier key must be in the shipped data")
 	end)
 end)
