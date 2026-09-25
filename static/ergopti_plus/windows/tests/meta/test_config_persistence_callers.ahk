@@ -294,7 +294,7 @@ _CPC_LifecycleRoutesThroughAtomicHandoff() {
 		"the Critical wrapper, lifecycle core, and restore entry must exist")
 	Assert(InStr(ReloadWrapper,
 		"_ReloadPreservingSuspendNonCritical(SuccessFn, ExistingBundle,") > 0
-		and InStr(ReloadWrapper, "RefusedFn)") > 0
+		and InStr(ReloadWrapper, "RefusedFn, StageFailureFn)") > 0
 		and InStr(ReloadWrapper, "Reload()") = 0,
 		"ReloadPreservingSuspend must only drop inherited Critical and delegate")
 	Assert(InStr(ReloadBody, "SuspendHandoffReload(") > 0

@@ -913,6 +913,13 @@ EnsurePersonalShortcutsFile(Path, AllowReload := true, WriterFn := 0,
 						return true
 				}
 				try LoggerInfo("ErgoptiPlus", "Reloading to pick up freshly-written personal shortcuts chain.")
+				; The one bare Reload left, and deliberately so: only the boot
+				; auto-execute thread gets here (a runtime caller passes
+				; AllowReload=false), before OnExit(Ergopti_OnShutdown) is
+				; registered, so no gate can refuse the successor's close request,
+				; before the process can be paused and before any reload can be
+				; pending. The terminal hand-off needs the configuration bundle and
+				; lifecycle state that do not exist yet here.
 				Reload
 				; Reload starts the replacement instance but returns to this
 				; auto-execute thread. Continuing would register the old instance's
@@ -1355,8 +1362,21 @@ global _PENDING_KEYBOARD_HKL := 0
 ; consumed here and by tests/meta/test_layout_quiescence.ahk.
 #Include modules/keymap/layout_poll_helper.ahk
 
+; The layout poll's seams onto the reload lifecycle (see LayoutPollTick). Its
+; reload reports a refused stage without the "save failed" notice, and it asks
+; whether OnExit could still refuse before starting one.
+LayoutPollPort() {
+		static Port := Map(
+				"reload", (RefusedFn) => ReloadPreservingSuspend(0, 0, RefusedFn, LayoutPollStageRefused),
+				"pending", ReloadTerminalHandoffPending,
+				"veto_honored", LifecycleShutdownVetoHonored,
+				"now", () => A_TickCount,
+				"notify", ReloadRefusedNotify)
+		return Port
+}
+
 CheckKeyboardLayoutChange() {
-		global _LAST_KEYBOARD_HKL, _PENDING_KEYBOARD_HKL, HSE_Suppressed, _PrefixWatcherSuppressed
+		global HSE_Suppressed, _PrefixWatcherSuppressed
 		
 		suspended := A_IsSuspended
 		isBlacklisted := false
@@ -1373,11 +1393,7 @@ CheckKeyboardLayoutChange() {
 		or SIHO_HasActive()
 		or GetKeyState("SC039", "P") or GetKeyState("SC038", "P") or GetKeyState("SC138", "P")
 		
-		if _ShouldReloadForHkl(curHkl, &_LAST_KEYBOARD_HKL, &_PENDING_KEYBOARD_HKL, suspended, isBlacklisted, hseSup, pwSup, A_TimeIdlePhysical, inputBusy) {
-				; The one reload nobody clicks: without this line a layout switch
-				; looked like a spontaneous restart in the log.
-				try LoggerInfo("ErgoptiPlus", "Keyboard layout changed to HKL 0x{1:X}; reloading to re-probe the layout.", curHkl)
-				Reload()
-		}
+		LayoutPollTick(curHkl, suspended, isBlacklisted, hseSup, pwSup, A_TimeIdlePhysical,
+				inputBusy, LayoutPollPort())
 }
 SetTimer(CheckKeyboardLayoutChange, _LAYOUT_POLL_INTERVAL_MS)

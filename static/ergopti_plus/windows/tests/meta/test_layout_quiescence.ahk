@@ -80,3 +80,166 @@ _T_LayoutPollBaselineAdoption() {
 	AssertEqual(res, false, "A confirmed same-as-baseline layout must never reload")
 }
 Test("ErgoptiPlus: _ShouldReloadForHkl adopts the first layout as baseline after an unknown (0) boot (spurious-reload)", _T_LayoutPollBaselineAdoption)
+
+; The poll's Reload was the last bare one reachable at runtime: a refused close
+; request left its successor on "Keep waiting?", and one fired while a hand-off
+; reload was pending let that successor's close request claim the pending
+; record, so both successors started (layout-poll-reload-handoff). It now goes
+; through ReloadPreservingSuspend, and a refusal re-arms the poll. That retry
+; first ran every second poll for ever: a refusal that persists relaunched a
+; successor each time, repeated a "save failed" notice, and the fifth OnExit
+; veto went through the gate that refused it (layout-poll-retry-bounded). The
+; cases below drive LayoutPollTick, the entry file's whole poll, through a fake
+; lifecycle port.
+global _T_LPR := Map()
+
+; Fresh fake lifecycle. Verdict picks what a reload does: "late" launches and
+; an OnExit gate refuses it on the next tick, spending one shutdown veto; "sync"
+; is refused before launch; "accept" stays pending, as when the process exits.
+; VetoBudget is the veto ceiling the fake OnExit applies, like
+; LIFECYCLE_SHUTDOWN_VETO_MAX_ATTEMPTS. The driver probed layout 0x100.
+_T_LPR_Begin(Verdict, VetoBudget) {
+	global _T_LPR, _LAST_KEYBOARD_HKL, _PENDING_KEYBOARD_HKL, _LayoutPollRetry
+	_T_LPR := Map("verdict", Verdict, "now", 100000, "pending", false,
+		"refused_fn", 0, "attempts", [], "vetoes", 0, "veto_budget", VetoBudget,
+		"notices", 0)
+	_LAST_KEYBOARD_HKL := 0x100
+	_PENDING_KEYBOARD_HKL := 0
+	Saved := _LayoutPollRetry
+	_LayoutPollRetry := _LayoutPollNewRetry(0)
+	return Saved
+}
+
+_T_LPR_End(Saved) {
+	global _LayoutPollRetry
+	_LayoutPollRetry := Saved
+}
+
+_T_LPR_Reload(RefusedFn) {
+	global _T_LPR
+	_T_LPR["attempts"].Push(_T_LPR["now"])
+	if (_T_LPR["verdict"] == "sync")
+		return false
+	_T_LPR["pending"] := true
+	_T_LPR["refused_fn"] := RefusedFn
+	return true
+}
+
+_T_LPR_Pending() {
+	global _T_LPR
+	return _T_LPR["pending"] ? Map("state", "pending") : false
+}
+
+_T_LPR_VetoHonored() {
+	global _T_LPR
+	return _T_LPR["vetoes"] + 1 < _T_LPR["veto_budget"]
+}
+
+_T_LPR_Now() {
+	global _T_LPR
+	return _T_LPR["now"]
+}
+
+_T_LPR_Notify(*) {
+	global _T_LPR
+	_T_LPR["notices"] += 1
+}
+
+_T_LPR_Port() {
+	return Map("reload", _T_LPR_Reload, "pending", _T_LPR_Pending,
+		"veto_honored", _T_LPR_VetoHonored, "now", _T_LPR_Now, "notify", _T_LPR_Notify)
+}
+
+; One second of the poll on foreground layout Hkl, idle and quiet.
+_T_LPR_Tick(Hkl) {
+	global _T_LPR
+	_T_LPR["now"] += 1000
+	if (_T_LPR["pending"] && _T_LPR["verdict"] == "late") {
+		_T_LPR["pending"] := false
+		_T_LPR["vetoes"] += 1
+		RefusedFn := _T_LPR["refused_fn"]
+		_T_LPR["refused_fn"] := 0
+		RefusedFn.Call("an OnExit gate vetoed")
+	}
+	return LayoutPollTick(Hkl, false, false, 0, 0, 5000, false, _T_LPR_Port())
+}
+
+_T_LPR_Ticks(Hkl, Count) {
+	Loop Count
+		_T_LPR_Tick(Hkl)
+}
+
+_T_LayoutPollRetriesARefusedReloadAFewTimes() {
+	global _T_LPR, _LAST_KEYBOARD_HKL, LAYOUT_POLL_RELOAD_MAX_ATTEMPTS
+	global LAYOUT_POLL_RELOAD_RETRY_BASE_MS
+	for _, Verdict in ["late", "sync"] {
+		Saved := _T_LPR_Begin(Verdict, 1000)
+		try {
+			_T_LPR_Ticks(0x200, 120)
+			Attempts := _T_LPR["attempts"]
+			AssertEqual(LAYOUT_POLL_RELOAD_MAX_ATTEMPTS, Attempts.Length,
+				Verdict . ": a refusal that persists must be retried a bounded number of times, not every second poll")
+			Loop Attempts.Length - 1 {
+				Wait := LAYOUT_POLL_RELOAD_RETRY_BASE_MS * (2 ** (A_Index - 1))
+				Assert(Attempts[A_Index + 1] - Attempts[A_Index] >= Wait,
+					Verdict . ": retry " . A_Index . " must wait at least " . Wait . " ms after the refusal")
+			}
+			AssertEqual(1, _T_LPR["notices"], Verdict . ": the user is told once, when the poll gives up")
+			AssertEqual(0x100, _LAST_KEYBOARD_HKL, Verdict . ": the tracker stays on the layout the driver probed")
+			; Switching back to the probed layout and away again is a new request.
+			_T_LPR_Ticks(0x100, 3)
+			_T_LPR_Ticks(0x200, 120)
+			AssertEqual(2 * LAYOUT_POLL_RELOAD_MAX_ATTEMPTS, _T_LPR["attempts"].Length,
+				Verdict . ": a new switch to the layout gets a fresh attempt budget")
+			AssertEqual(2, _T_LPR["notices"], Verdict . ": each abandoned switch is reported once")
+		} finally _T_LPR_End(Saved)
+	}
+}
+Test("ErgoptiPlus: a refused layout reload is retried with a doubling wait, a few times (layout-poll-retry-bounded)",
+	_T_LayoutPollRetriesARefusedReloadAFewTimes)
+
+; The fake OnExit honors vetoes below the budget and forces the next one through,
+; as _LifecycleRefuseShutdown does. However many switches ask for a reload, the
+; poll must stop before its own refusal would be that forced one.
+_T_LayoutPollNeverSpendsTheForcedVeto() {
+	global _T_LPR
+	Budget := 5
+	Saved := _T_LPR_Begin("late", Budget)
+	try {
+		Loop 4 {
+			_T_LPR_Ticks(0x100, 3)
+			_T_LPR_Ticks(0x200, 120)
+		}
+		Assert(_T_LPR["vetoes"] < Budget,
+			"the poll's refusals must never reach the forced veto; spent " . _T_LPR["vetoes"] . " of " . Budget)
+		AssertEqual(Budget - 1, _T_LPR["attempts"].Length,
+			"the poll may use every veto OnExit still honors, and no more")
+	} finally _T_LPR_End(Saved)
+}
+Test("ErgoptiPlus: the layout poll never spends the veto OnExit would force through (layout-poll-retry-bounded)",
+	_T_LayoutPollNeverSpendsTheForcedVeto)
+
+; A reload someone else launched must neither be raced nor count as this
+; switch's reload: if it is refused, the poll still owes the switch a reload.
+_T_LayoutPollWaitsForAPendingReload() {
+	global _T_LPR, _LAST_KEYBOARD_HKL
+	Saved := _T_LPR_Begin("accept", 1000)
+	try {
+		_T_LPR["pending"] := true
+		_T_LPR_Ticks(0x200, 6)
+		AssertEqual(0, _T_LPR["attempts"].Length, "a pending reload must be waited for, never raced")
+		AssertEqual(0x100, _LAST_KEYBOARD_HKL, "a pending reload must not count as the reload for the switch")
+		; That reload was refused: its record is gone and this process runs on.
+		_T_LPR["pending"] := false
+		_T_LPR_Ticks(0x200, 2)
+		AssertEqual(1, _T_LPR["attempts"].Length,
+			"once the other reload is refused, the next confirmed quiet poll reloads for the switch")
+		; The poll's own reload is under way: no second one while it is pending.
+		_T_LPR_Ticks(0x200, 10)
+		AssertEqual(1, _T_LPR["attempts"].Length, "the poll's own pending reload must not be started again")
+		AssertEqual(0x200, _LAST_KEYBOARD_HKL, "the poll's own reload under way counts as the reload for the switch")
+		AssertEqual(0, _T_LPR["notices"], "nothing was refused, so nothing is reported")
+	} finally _T_LPR_End(Saved)
+}
+Test("ErgoptiPlus: the layout poll waits for a pending reload and retries if it is refused (layout-poll-retry-bounded)",
+	_T_LayoutPollWaitsForAPendingReload)

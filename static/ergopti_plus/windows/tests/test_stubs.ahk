@@ -489,7 +489,7 @@ ToggleSuspend() {
 ; matters. Records the request so a test can assert the pause was carried.
 ; Models an accepted reload end to end: the success callback runs as OnExit
 ; would run it, and the process exit releases the bundle the caller lent.
-ReloadPreservingSuspend(BeforeReloadFn := 0, ExistingOwner := 0, RefusedFn := 0) {
+ReloadPreservingSuspend(BeforeReloadFn := 0, ExistingOwner := 0, RefusedFn := 0, StageFailureFn := 0) {
     global _Stub_SentText
     if (ExistingOwner is Object) && !HasMethod(RefusedFn, "Call")
         throw TypeError("A reload that borrows a configuration bundle needs a refusal callback to take it back.")
