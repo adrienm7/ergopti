@@ -925,7 +925,9 @@ function M._test_set_verified_archive(path)
 	_state = "available"
 end
 
---- Returns a user-facing label for the update menu item.
+--- Returns a user-facing label for the check row of the Updates submenu.
+--- The row always runs a check, so a found release never renames it: the
+--- separate "Download and install <tag>" row names and installs that release.
 --- @return string
 function M.get_menu_label()
 	local i18n = require("infra.i18n")
@@ -937,17 +939,6 @@ function M.get_menu_label()
 	end
 	if _state == "installing" then
 		return i18n.get("menu.about.update_installing")
-	end
-	if _state == "available" and _cached_release then
-		local tag = tostring(_cached_release.tag) ..
-			(_cached_release.prerelease and " (dev)" or "")
-		-- Plain-index substitution, not gsub: a tag is user-supplied data and a
-		-- "%" in it would be read as a capture reference in gsub's REPLACEMENT
-		-- string and raise "invalid use of '%'".
-		local template = i18n.get("menu.about.update_now")
-		local at = template:find("{tag}", 1, true)
-		if not at then return template .. " " .. tag end
-		return template:sub(1, at - 1) .. tag .. template:sub(at + 5)
 	end
 	-- "(dev)" is the channel's own name, the same token in every locale — see
 	-- changelog_window.channel_dev, which is "Dev" in English and in French.
