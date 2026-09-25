@@ -280,6 +280,7 @@ InstallSendNoOps()
 #Include unit/test_timer_scheduler.ahk
 #Include unit/test_tray_pause_greys_features.ahk
 #Include unit/test_hook_dispatcher.ahk
+#Include unit/test_own_injection_is_not_activity.ahk
 #Include unit/test_logger.ahk
 #Include unit/test_logger_shutdown_sinks.ahk
 #Include unit/test_wall_clock_snapshot.ahk

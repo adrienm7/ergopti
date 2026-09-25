@@ -60,6 +60,14 @@ global _TEXT_CLIPBOARD_BUSY := false
 global _TEXT_CLIPBOARD_OWNER_TOKEN := 0
 global TEXT_CLIPBOARD_NEXT_DELAY_MS := TEXT_CLIPBOARD_RESTORE_DELAY_MS + 20
 
+; SendLevel of every TextSender emission. SendInput hides a script's own keys
+; from its own hooks only while no other AutoHotkey keyboard hook runs; with one,
+; it falls back to SendEvent and the driver's InputHooks observe them. Level 0
+; is below the I1 threshold of the hook dispatcher and the prefix watcher, so
+; the output stays invisible to them either way, whatever SendLevel the calling
+; hotkey thread runs at (2 for the tap-holds).
+global TEXT_SENDER_SEND_LEVEL := 0
+
 ; Injectable send primitives — point at the real AHK built-ins by default.
 ; The test runner replaces these globals with no-op lambdas so no keystroke
 ; ever reaches the OS during a dry run (mirrors the _SendHook pattern).
@@ -358,7 +366,7 @@ _TextSenderRunAtomicOutput(SenderFn, Opts, Operation) {
 ; process-wide clipboard FIFO permanently busy; in a hold path it can also
 ; strand a partially applied modifier transaction.
 _TextSenderSendInput(Keys, Operation := "SendInput", LogFailure := true) {
-	global _AHK_SendInput
+	global _AHK_SendInput, TEXT_SENDER_SEND_LEVEL
 
 	; Every TextPressKey emission funnels through here at SendLevel 0, and the
 	; prefix watcher's InputHook is armed "V L0 I1" — so it filters these out by
@@ -377,6 +385,10 @@ _TextSenderSendInput(Keys, Operation := "SendInput", LogFailure := true) {
 	;     replacement, likewise already accounted for.
 	;   - the modifier Down/Up and rollback operations change modifier state
 	;     only; they touch neither the caret nor the document.
+	;
+	; The send runs at TEXT_SENDER_SEND_LEVEL, never at the caller's level.
+	PreviousSendLevel := A_SendLevel
+	SendLevel(TEXT_SENDER_SEND_LEVEL)
 	try {
 		; Declaration and OS output are one transaction. HS_DeclareSyntheticEffect
 		; used to restore Critical and run tooltip effects before this call, which
@@ -398,6 +410,8 @@ _TextSenderSendInput(Keys, Operation := "SendInput", LogFailure := true) {
 		if LogFailure
 			LoggerError("TextSender", "{1} failed for '{2}': {3}", Operation, Keys, Err.Message)
 		return false
+	} finally {
+		SendLevel(PreviousSendLevel)
 	}
 }
 
