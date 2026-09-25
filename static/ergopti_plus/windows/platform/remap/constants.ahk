@@ -97,6 +97,11 @@ global _TH_SyntheticHeldKeys := Map()
 ; from active reference counts. Lifecycle cleanup retries this ledger instead
 ; of forgetting an OS-level modifier that may still be logically down.
 global _TH_SyntheticReleasePendingKeys := Map()
+; Keys the user already held down, delivered to the system, when a synthetic
+; hold first pressed them. Windows keeps one down bit per key: releasing such a
+; key at the last owner's Up lifted it under the user (LCtrl held, a CapsLock
+; tap held as Ctrl, then C typed "c"). The user's own Up releases it instead.
+global _TH_SyntheticUserHeldKeys := Map()
 ; Tap-hold key id -> number of owners (TapHoldOwnImmediateModifier or
 ; TapHoldOwnImmediateLayer) resolving that key's suppressed physical press right
 ; now. Tab, Space, Enter, Escape, Backspace and Delete fire their tap-hold only
@@ -494,12 +499,46 @@ _TH_SyntheticKeyLabel(Key) {
 	return Label
 }
 
+; Whether key Name is down, logically (Mode "") or physically (Mode "P"). A
+; global holding a function, as _AHK_SendInput is, so tests can stand in for
+; the keyboard state.
+global _TapHoldKeyIsDown := (Name, Mode) => (Mode == "") ? GetKeyState(Name) : GetKeyState(Name, Mode)
+
+; Whether the user holds key Name down, delivered to the system. A key's
+; logical state only follows events that reached the system, so logically and
+; physically down before any synthetic owner pressed it means the user's press
+; went through, and so will the user's release. A press a hotkey suppressed (a
+; tap-hold key holding its own modifier, the LAlt one-shot Shift) is physically
+; down but logically up: its release is swallowed too.
+_TH_UserHoldsDeliveredKey(Name) {
+	global _TapHoldKeyIsDown
+	return _TapHoldKeyIsDown.Call(Name, "") and _TapHoldKeyIsDown.Call(Name, "P")
+}
+
+; Whether the last owner of Name must leave it down: the user held it down,
+; delivered, when the synthetic hold began, and still holds it physically.
+_TH_SyntheticReleaseStaysWithUser(Name) {
+	global _TH_SyntheticUserHeldKeys, _TapHoldKeyIsDown
+	return _TH_SyntheticUserHeldKeys.Has(Name) and _TapHoldKeyIsDown.Call(Name, "P")
+}
+
+; End the synthetic ownership of a key the user still holds, without an Up.
+_TH_ForgetSyntheticKeyForUser(Name) {
+	global _TH_SyntheticHeldKeys, _TH_SyntheticUserHeldKeys
+	if _TH_SyntheticHeldKeys.Has(Name)
+		_TH_SyntheticHeldKeys.Delete(Name)
+	if _TH_SyntheticUserHeldKeys.Has(Name)
+		_TH_SyntheticUserHeldKeys.Delete(Name)
+}
+
 ; Move a final active reference into the release-pending ledger before sending
 ; its Up. The OS transition is then owned even when injection fails.
 _TH_MarkSyntheticKeyReleasePending(Key) {
-	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys
+	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys, _TH_SyntheticUserHeldKeys
 	if _TH_SyntheticHeldKeys.Has(Key)
 		_TH_SyntheticHeldKeys.Delete(Key)
+	if _TH_SyntheticUserHeldKeys.Has(Key)
+		_TH_SyntheticUserHeldKeys.Delete(Key)
 	_TH_SyntheticReleasePendingKeys[Key] := true
 }
 
@@ -573,7 +612,7 @@ TapHoldReleasePhysicalKey(Key) {
 ; key another branch still owns; the physical Send happens only on the 0->1 and
 ; 1->0 transitions of each INDIVIDUAL key (see _TH_SyntheticKeyList).
 TapHoldSyntheticKeyDown(Key) {
-	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys
+	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys, _TH_SyntheticUserHeldKeys
 	Keys := _TH_SyntheticKeyList(Key)
 	if (Keys.Length = 0 or (Keys.Length = 1 and Keys[1] == "")) {
 		try LoggerError("TapHoldDispatch", "Cannot arm an empty synthetic modifier — the hold resolver must return a key name.")
@@ -611,6 +650,15 @@ TapHoldSyntheticKeyDown(Key) {
 					KeysToPress.Push(Name)
 			}
 
+			; Snapshot, before this owner presses them, the keys the user already
+			; holds down and delivered: the last owner leaves those to the user.
+			UserHeld := []
+			if Ok {
+				for _, Name in KeysToPress {
+					if _TH_UserHoldsDeliveredKey(Name)
+						UserHeld.Push(Name)
+				}
+			}
 			; TextPressKey's Array branch is the sender-owned transaction: a
 			; second Down failure rolls earlier Downs back in reverse order and
 			; reports any rollback Up that could not be proven. Those keys may
@@ -635,6 +683,8 @@ TapHoldSyntheticKeyDown(Key) {
 			if Ok {
 				for _, Name in Keys
 					_TH_SyntheticHeldKeys[Name] := _TH_SyntheticHeldKeys.Get(Name, 0) + 1
+				for _, Name in UserHeld
+					_TH_SyntheticUserHeldKeys[Name] := true
 			}
 		}
 	}
@@ -710,6 +760,12 @@ TapHoldSyntheticKeyUp(Key) {
 				_TH_SyntheticHeldKeys[Name] := Count
 				continue
 			}
+			; The user held this key before the hold and still does: their own
+			; release will reach the system, an Up now would lift it under them.
+			if _TH_SyntheticReleaseStaysWithUser(Name) {
+				_TH_ForgetSyntheticKeyForUser(Name)
+				continue
+			}
 			_TH_MarkSyntheticKeyReleasePending(Name)
 			if _TH_RetrySyntheticKeyRelease(Name) {
 				ReleasedKeys.Push(Name)
@@ -740,10 +796,18 @@ TapHoldReleaseSyntheticKeys() {
 	FailedKeys := []
 	PreviousCritical := Critical("On")
 	try {
+		UserKeys := []
 		for Name in _TH_SyntheticHeldKeys {
 			Seen[Name] := true
-			Keys.Push(Name)
+			; A key the user held before the hold and still holds is theirs to
+			; release, even when every owner is invalidated.
+			if _TH_SyntheticReleaseStaysWithUser(Name)
+				UserKeys.Push(Name)
+			else
+				Keys.Push(Name)
 		}
+		for _, Name in UserKeys
+			_TH_ForgetSyntheticKeyForUser(Name)
 		for Name in _TH_SyntheticReleasePendingKeys {
 			if Seen.Has(Name)
 				continue

@@ -217,6 +217,16 @@ swallower gated on that claim. AHK falls back to it even when the exact hotkey
 has no eligible variant, and it beats the layer's mapping of the same key only
 because `nav_layer.ahk` is included last (first eligible variant wins).
 
+### project-ahk-synthetic-hold-leaves-the-users-key
+
+Windows keeps one down bit per key, so a synthetic hold's Up also lifts the
+same key the user holds. A key logically and physically down before the first
+owner presses it was delivered, and so will its release be; a press a hotkey
+suppressed is physically down but logically up, and its Up is swallowed.
+Action: the last owner skips the Up only for a key snapshotted as delivered at
+acquire and still physically down (`_TH_SyntheticUserHeldKeys`); never skip on
+the physical state alone, or a suppressed own press stays stuck down.
+
 ### project-ahk-lone-alt-win-release-needs-a-mask
 
 Releasing a synthetic Alt or Win that no key followed puts classic windows in
