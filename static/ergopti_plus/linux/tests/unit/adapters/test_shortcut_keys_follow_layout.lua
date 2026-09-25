@@ -66,6 +66,29 @@ helpers.describe("shortcut keys: the live layout decides the key", function()
 			"on Ergopti evdev 47 types a comma: Ctrl+47 pastes nothing")
 	end)
 
+	helpers.it("presses the key and level that type a period on AZERTY, not KEY_DOT (shortcut-level)", function()
+		-- On AZERTY "." is Shift+KEY_COMMA and KEY_DOT types ":": Ctrl+KEY_DOT
+		-- was Ctrl+colon to every application.
+		local Layout = with_layout({
+			["."] = { keycode = 51, level = 2, mods = { "shift" } },
+			[","] = { keycode = 50, level = 1, mods = {} },
+			["1"] = { keycode = 2, level = 2, mods = { "shift" } },
+			[";"] = { keycode = 40, level = 3, mods = { "altgr" } },
+		})
+		local code, level_mods = Layout.shortcut_keycode(".", 52)
+		helpers.assert_eq({ code, level_mods }, { 51, { 42 } }, "Shift+KEY_COMMA types the period")
+		code, level_mods = Layout.shortcut_keycode(";", 39)
+		helpers.assert_eq({ code, level_mods }, { 40, { 100 } }, "AltGr selects level 3 on the virtual keyboard")
+		code, level_mods = Layout.shortcut_keycode("1", 2)
+		helpers.assert_eq({ code, level_mods }, { 2, {} },
+			"a digit on its own US key stays that key: toolkits read Ctrl+KEY_1 as Ctrl+1")
+		local Emitter = helpers.load_module("modules.gestures.combo_emitter")
+		helpers.assert_eq(Emitter.parse("ctrl+period"), { mods = { 29, 42 }, keys = { 51 } })
+		helpers.assert_eq(Emitter.parse("ctrl+shift+period"), { mods = { 29, 42 }, keys = { 51 } },
+			"a Shift the chord already holds is not pressed twice")
+		helpers.assert_eq(Emitter.parse("ctrl+comma"), { mods = { 29 }, keys = { 50 } })
+	end)
+
 	helpers.it("keeps the US key for a letter the layout has no plain key for", function()
 		-- GTK and Qt fall back to the US position for shortcuts on a non-Latin
 		-- layout, so that is the right key when the layout has no plain "c".

@@ -67,10 +67,7 @@ local EVDEV_VALUE_DOWN   = 1
 -- The keys a synthetic modifier maps to. Named by the level vocabulary the
 -- keymap uses ("shift", "altgr") rather than by keycode, so the layout table and
 -- the injector cannot disagree about which level means which key.
-local MODIFIER_CODES = {
-	shift = EvdevCodes.KEY_LEFTSHIFT,
-	altgr = EvdevCodes.KEY_RIGHTALT,
-}
+local MODIFIER_CODES = EvdevCodes.LEVEL_MODIFIER_CODE
 
 
 -- =========================================
