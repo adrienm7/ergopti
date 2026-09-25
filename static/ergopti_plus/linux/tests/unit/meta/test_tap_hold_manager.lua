@@ -139,6 +139,72 @@ helpers.describe("tap-hold manager", function()
 
 end)
 
+-- A tap set to an action Linux could not run (select_all, undo, redo and find
+-- were declared for Windows alone) held as configured, did nothing on a tap,
+-- and left one DEBUG line per press as the only trace.
+helpers.describe("tap-hold manager: taps this driver cannot run", function()
+
+	--- A manager on the real action catalogue, as the daemon wires it, and the
+	--- warnings its configuration load logged.
+	local function catalogue_manager(user_text)
+		local Gestures = helpers.load_module("modules.gestures.manager")
+		local Logger = require("logger.shim")
+		local real_warn, warnings = Logger.warn, {}
+		Logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
+		local Manager = helpers.load_module("platform.remap.tap_hold_manager")
+		local user_path = os.tmpname()
+		if user_text then write(user_path, user_text) else os.remove(user_path) end
+		local ok, err = pcall(Manager.init, {
+			keyboard_hook = fake_hook(),
+			execute_action = Gestures.execute_action,
+			action_names = Gestures.get_executable_action_names,
+			defaults_path = DEFAULTS,
+			user_path = user_path,
+		})
+		local function close()
+			Logger.warn = real_warn
+			Manager._reset_for_test()
+			os.remove(user_path)
+		end
+		if not ok then close(); error(err, 0) end
+		return Manager, warnings, Gestures, close, user_path
+	end
+
+	helpers.it("offers every action the shared catalogue declares for Linux as a tap", function()
+		local Manager, warnings, Gestures, close = catalogue_manager()
+		local ok, err = pcall(function()
+			helpers.assert_eq(warnings, {}, "the shipped defaults only tap what Linux runs")
+			helpers.assert_true(#Gestures.LINUX_DECLARED_ACTIONS > 70, "the catalogue must be read")
+			for _, id in ipairs(Gestures.LINUX_DECLARED_ACTIONS) do
+				helpers.assert_true(Manager.is_tap_action(id), id .. " is declared for Linux")
+			end
+			for _, id in ipairs({ "select_all", "undo", "redo", "find" }) do
+				helpers.assert_true(Manager.is_tap_action(id), id .. " taps on Linux too")
+			end
+		end)
+		close()
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("warns at configuration load about a tap it cannot run", function()
+		local Manager, warnings, _, close, user_path = catalogue_manager(
+			'[tap_hold.keys.caps_lock]\ntap_action = "microsoft_bold"\n'
+				.. '[tap_hold.keys.left_ctrl]\ntap_action = "select_all"\n')
+		local ok, err = pcall(function()
+			helpers.assert_eq(#warnings, 1, "one warning, for the one tap Linux cannot run")
+			helpers.assert_contains(warnings[1], "caps_lock")
+			helpers.assert_contains(warnings[1], "microsoft_bold")
+			write(user_path, '[tap_hold.keys.caps_lock]\ntap_action = "lookup"\n')
+			helpers.assert_true(Manager.reload())
+			helpers.assert_eq(#warnings, 2, "a reload is a configuration load too")
+			helpers.assert_contains(warnings[2], "lookup")
+		end)
+		close()
+		if not ok then error(err, 0) end
+	end)
+
+end)
+
 -- The daemon wires the executor to the gestures module, which also owns the
 -- touchpad reader. The reader's failure path used to drop the daemon's handle
 -- to that module, and the tap-hold executor read the same handle: one touchpad

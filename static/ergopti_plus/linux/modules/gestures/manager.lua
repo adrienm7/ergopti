@@ -148,9 +148,10 @@ local function load_slot_space()
 	return single, axis
 end
 
---- Reads parameter metadata from the same shared catalogue as the picker, so
---- future configurable actions do not require a Linux-specific allowlist.
-local function load_action_parameter_specs()
+--- Reads the [sg_actions] rows of the shared catalogue. A failure leaves them
+--- empty: load_slot_space() reads the same file and reports it loudly.
+--- @return table id -> row
+local function read_sg_actions()
 	local path = resolve_actions_toml_path()
 	local fh = path ~= "" and io.open(path, "r") or nil
 	if not fh then return {} end
@@ -159,16 +160,54 @@ local function load_action_parameter_specs()
 	if content:sub(1, 3) == UTF8_BOM then content = content:sub(4) end
 	local ok, data = pcall(TomlCodec.decode, content)
 	if not ok or type(data) ~= "table" or type(data.sg_actions) ~= "table" then return {} end
+	return data.sg_actions
+end
+
+--- Reads parameter metadata from the same shared catalogue as the picker, so
+--- future configurable actions do not require a Linux-specific allowlist.
+--- @param sg_actions table The catalogue rows.
+--- @return table id -> parameter kind
+local function load_action_parameter_specs(sg_actions)
 	local specs = {}
-	for name, meta in pairs(data.sg_actions) do
+	for name, meta in pairs(sg_actions) do
 		if type(meta) == "table" and type(meta.parameter) == "string" then specs[name] = meta.parameter end
 	end
 	return specs
 end
 
+--- Whether a catalogue `platform` field claims this driver: "all" (the
+--- default), "linux", or a comma-separated list naming it.
+--- @param platform string|nil
+--- @return boolean
+local function claims_linux(platform)
+	if platform == nil or platform == "all" then return true end
+	for driver in tostring(platform):gmatch("[^,%s]+") do
+		if driver == "linux" then return true end
+	end
+	return false
+end
+
+--- The catalogue rows declared for Linux: what the shared file promises this
+--- driver runs. Headers and "_" placeholders are picker layout, not actions.
+--- @param sg_actions table The catalogue rows.
+--- @return table Sorted action ids.
+local function load_linux_declared_actions(sg_actions)
+	local ids = {}
+	for id, meta in pairs(sg_actions) do
+		if type(meta) == "table" and meta.is_header ~= true and id:sub(1, 1) ~= "_" and id ~= "none"
+			and claims_linux(meta.platform) then
+			ids[#ids + 1] = id
+		end
+	end
+	table.sort(ids)
+	return ids
+end
+
 --- All single / axis gesture slots (derived from the shared [slots] section).
 M.SINGLE_SLOTS, M.AXIS_SLOTS = load_slot_space()
-M.ACTION_PARAMETER_SPECS = load_action_parameter_specs()
+local _SG_ACTIONS = read_sg_actions()
+M.ACTION_PARAMETER_SPECS = load_action_parameter_specs(_SG_ACTIONS)
+M.LINUX_DECLARED_ACTIONS = load_linux_declared_actions(_SG_ACTIONS)
 
 --- Linux ships NO default bindings. Every slot defaults to "none".
 ---
@@ -501,6 +540,12 @@ local function screenshot_path(kind)
 	return string.format("%s/ergopti_%s_%s.png", dir, kind, os.date("%Y-%m-%d_%H-%M-%S"))
 end
 
+--- Actions another module of this driver already implements, by action id:
+--- the catalogue runs them through that module rather than a second copy here.
+local MODULE_ACTIONS = {
+	["select_line"] = { module = "modules.shortcuts.manager", fn = "select_line" },
+}
+
 --- The tag each save action stamps into its filename.
 local SCREENSHOT_KIND = {
 	["screenshot_fullscreen_save"] = "full",
@@ -611,6 +656,19 @@ local function _execute_action(action_name, go_next, binding)
 	-- time; the user concludes the shortcut feature is broken.
 	if _open_driver_surface(action_name) then return end
 
+	local delegate = MODULE_ACTIONS[action_name]
+	if delegate then
+		local ok_module, Module = pcall(require, delegate.module)
+		if not ok_module or type(Module) ~= "table" or type(Module[delegate.fn]) ~= "function" then
+			Logger.error(LOG, "'%s' cannot run: %s is unavailable (%s).", action_name, delegate.module,
+				tostring(Module))
+			return
+		end
+		local ok, err = pcall(Module[delegate.fn])
+		if not ok then Logger.error(LOG, "Action '%s' failed: %s.", action_name, tostring(err)) end
+		return
+	end
+
 	local handler = _action_handlers[action_name]
 	if handler then
 		local ok, err = pcall(handler)
@@ -677,7 +735,11 @@ local function _execute_action(action_name, go_next, binding)
 	elseif action_name == "lock_screen" then
 		_run("loginctl lock-session 2>/dev/null || xdg-screensaver lock")
 	else
-		Logger.debug(LOG, "Unknown action: %s", action_name)
+		-- A warning, not DEBUG: whatever asked for this action (a gesture, a
+		-- tap-hold, a shortcut) now does nothing, and DEBUG is not where anyone
+		-- looks for why.
+		Logger.warn(LOG, "Unknown action '%s' (%s) — Linux has nothing to run for it.",
+			action_name, tostring(binding))
 	end
 end
 
@@ -691,6 +753,25 @@ function M.get_action_label(action_name)
 	local suffix = ACTION_I18N_KEYS[action_name]
 	if not suffix then return action_name end
 	return i18n.get("sg_actions." .. suffix)
+end
+
+--- Every action id execute_action() runs on this driver: the catalogue's rows
+--- declared for Linux, this driver's own names (ws_prev, ws_next) and the
+--- modifier chords. What a tap-hold key may be set to without doing nothing.
+--- @return table Sorted action ids.
+function M.get_executable_action_names()
+	local seen, names = { none = true }, {}
+	local function add(id)
+		if not seen[id] then
+			seen[id] = true
+			names[#names + 1] = id
+		end
+	end
+	for _, id in ipairs(M.LINUX_DECLARED_ACTIONS) do add(id) end
+	for id in pairs(ACTION_I18N_KEYS) do add(id) end
+	for id in pairs(ACTION_COMPUTED_LABELS) do add(id) end
+	table.sort(names)
+	return names
 end
 
 --- Returns the list of all available action names.

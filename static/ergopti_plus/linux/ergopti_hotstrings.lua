@@ -652,7 +652,11 @@ local function main()
 			if not action_catalogue then error("the action catalogue (gestures module) is not loaded") end
 			action_catalogue.execute_action(action, binding)
 		end,
-		action_names = function() return action_catalogue and action_catalogue.get_action_names() or {} end,
+		-- Every action the catalogue runs here, not only the gesture picker's
+		-- list: a tap set to one of the others must not read as unsupported.
+		action_names = function()
+			return action_catalogue and action_catalogue.get_executable_action_names() or {}
+		end,
 		defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"),
 		user_path = require("infra.config_paths").config("tap_hold.toml"),
 	})
