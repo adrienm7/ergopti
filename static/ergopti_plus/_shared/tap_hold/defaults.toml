@@ -414,8 +414,10 @@ space_bsp = { combo = "none", tap = "none", hold = "none" }
 #   rcmd + fn   : toggle CapsLock (combo = tap), same rationale.
 #   rcmd + lopt : word-level forward delete (combo = tap), using opt variant
 #                 to avoid conflict with Hammerspoon cmd+delete shortcut.
-#   rcmd + lcmd : word-level backward delete (combo = tap, repeatable on
-#                 key-repeat); hold = option+shift modifier so the combined
+#                 With no hold, the tap goes out at key down and repeats
+#                 while lopt is held.
+#   rcmd + lcmd : word-level backward delete (combo = tap), typed once on a
+#                 quick release; hold = option+shift modifier so the combined
 #                 hold works as a shift+option accelerator (no layer activation).
 rcmd_esc = { combo = "none", tap = "none", hold = "none" }
 rcmd_tab = { combo = "cycle_windows_in_app", tap = "cycle_windows_in_app", hold = "none" }

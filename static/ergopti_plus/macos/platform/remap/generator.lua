@@ -747,9 +747,13 @@ end
 --- Matches k2 physically while k1 is held (via ke_held_k1=1) and splits
 --- output by press duration (to_if_alone for tap, to for hold).
 ---
---- When only the tap slot is set, fires immediately on key_down (not via
---- to_if_alone) — this enables auto-repeat and avoids a KE edge case where
---- to_if_alone does not reliably fire when another modifier is already held.
+--- When only the tap slot is set, it fires at k2's key_down, as the tap of a
+--- key with no hold does (build_tap_hold_rule): there is nothing to wait for,
+--- it repeats while k2 is held, and no later key_down can drop it, as Karabiner
+--- v16 drops a pending to_if_alone (basic.hpp unset_alone_if_needed). A
+--- modifier held before k2, k1's included, would not cancel a to_if_alone:
+--- that source clears it only for a key_down arriving after k2's, and restores
+--- the key-down flags around it.
 ---
 --- Tap/hold slots are per-direction: symmetry is NOT auto-mirrored here because
 --- tap/hold behaviour is legitimately asymmetric (rcmd-first vs. lcmd-first).
@@ -806,7 +810,7 @@ local function build_tap_hold_combo_rule(combo_def, tap_to, hold_to, tap_action,
 			manip.to_after_key_up = hold_action.karabiner_to_after_key_up
 		end
 	else
-		-- Tap only: fire immediately on key_down for reliable auto-repeat
+		-- Tap only: nothing to wait for, so it fires at key_down and repeats
 		manip.to = tap_to
 	end
 

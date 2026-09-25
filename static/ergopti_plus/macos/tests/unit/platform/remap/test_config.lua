@@ -86,6 +86,34 @@ helpers.describe("Config.build_default_state", function()
 		local state = Config.build_default_state({}, {})
 		helpers.assert_eq(state.enabled, true)
 	end)
+
+	helpers.it("gives every hold slot an action the hold picker offers (default-holds-are-holdable)", function()
+		-- The menu's hold picker lists only holdable actions, so a shipped hold
+		-- outside that list shows no checked entry and cannot be picked back.
+		-- AltGr is right Command's internal hold: actions.json keeps it out of
+		-- every picker on purpose (neither tappable nor holdable).
+		local allowed = { right_command = "altgr" }
+		local data_dir = helpers.driver_root() .. "platform/remap/data/"
+		local holdable = {}
+		for _, action in ipairs(assert(Config.load_available_actions(data_dir .. "actions.json"))) do
+			if action.holdable == true then holdable[action.id] = true end
+		end
+		local keys = assert(Config.load_tap_hold_keys(data_dir .. "tap_hold_keys.json"))
+		local combos = assert(Config.load_mod_combos(data_dir .. "mod_combos.json"))
+		local state = Config.build_default_state(keys, combos)
+		local checked = 0
+		for id, slots in pairs(state.tap_hold_config) do
+			checked = checked + 1
+			helpers.assert_true(holdable[slots.hold] == true or allowed[id] == slots.hold,
+				"[hs_tap_hold] " .. id .. " holds '" .. tostring(slots.hold) .. "', which the hold picker does not offer")
+		end
+		for id, slots in pairs(state.mod_combos_config) do
+			checked = checked + 1
+			helpers.assert_true(holdable[slots.hold] == true,
+				"[hs_combos] " .. id .. " holds '" .. tostring(slots.hold) .. "', which the hold picker does not offer")
+		end
+		helpers.assert_eq(checked, 14 + 182, "every shipped key and combo must be checked")
+	end)
 end)
 
 helpers.describe("Config: the remap integration is not a user setting", function()
