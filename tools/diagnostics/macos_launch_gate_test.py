@@ -2,7 +2,11 @@
 """Prove the packaged launch verdict rejects every failure it exists to catch."""
 
 import importlib.util
+import json
+import os
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -148,9 +152,73 @@ class StateTests(unittest.TestCase):
             self.assertEqual(len(problems), 2)
             paths.write_text(f'ConfigDirPath = "{home}/gitcfg/ergopti_plus/"\n', encoding="utf-8")
             link = home / "link"
-            link.symlink_to(real, target_is_directory=True)
+            try:
+                link.symlink_to(real, target_is_directory=True)
+            except OSError as error:
+                # Only Windows refuses an unprivileged symbolic link. On the macOS
+                # job that runs this self-test, a failure here is a real error.
+                if sys.platform != "win32":
+                    raise
+                self.skipTest(f"symbolic links unavailable here: {error}")
             state["symlinks"] = [str(link)]
             self.assertEqual(gate.check_state("tilde_paths", state, home), [])
+
+
+# The nine scenarios the pull-request and plain-push gate launched before the
+# profiles moved into the script (the scenario list in ci.yml at ca1a4d64a).
+CI_PROFILE = [
+    "clean", "upgraded", "symlink_config", "symlink_hammerspoon", "symlink_logs",
+    "tilde_paths", "dangling_logs", "configured_symlink", "plain_open",
+]
+SCRIPT = Path(__file__).with_name("macos_launch_gate.py")
+
+
+def print_matrix(*arguments):
+    """Run the matrix mode the way the workflow does, outside GitHub Actions."""
+    env = {key: value for key, value in os.environ.items() if key != "GITHUB_ACTIONS"}
+    return subprocess.run([sys.executable, str(SCRIPT), *arguments], capture_output=True, text=True,
+        env=env, timeout=60)
+
+
+class ProfileTests(unittest.TestCase):
+    """The workflow's launch matrix comes from these profiles alone, so they must not drift."""
+
+    def test_ci_profile_keeps_the_nine_gated_scenarios(self):
+        self.assertEqual(list(gate.PROFILES["ci"]), CI_PROFILE,
+            "the CI launch profile changed; update CI_PROFILE only for a deliberate change")
+
+    def test_release_profile_launches_every_scenario(self):
+        self.assertEqual(gate.PROFILES["release"], gate.SCENARIOS)
+        self.assertEqual(len(gate.SCENARIOS), 11,
+            "the scenario count changed; update this pin only for a deliberate change")
+
+    def test_ci_profile_is_a_strict_subset_of_release(self):
+        self.assertLess(set(gate.PROFILES["ci"]), set(gate.PROFILES["release"]))
+        self.assertLessEqual(set(gate.RELEASE_ONLY_SCENARIOS), set(gate.SCENARIOS))
+
+    def test_print_matrix_emits_one_output_line_off_macos(self):
+        # GITHUB_ACTIONS is removed, so the launch guard would refuse this run
+        # on every host if the matrix mode reached it.
+        for profile in ("ci", "release"):
+            result = print_matrix("--print-matrix", profile)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            lines = result.stdout.splitlines()
+            self.assertEqual(len(lines), 1, result.stdout)
+            key, _, value = lines[0].partition("=")
+            self.assertEqual(key, "scenarios")
+            self.assertEqual(json.loads(value), list(gate.PROFILES[profile]))
+
+    def test_print_matrix_rejects_unknown_profiles_and_launch_arguments(self):
+        for arguments in (("--print-matrix", "nightly"), ("--print-matrix", "ci", "/Applications/ErgoptiPlus.app"),
+                ("--print-matrix", "release", "--seed-tag", "v0.0.0-dev.24")):
+            result = print_matrix(*arguments)
+            self.assertEqual(result.returncode, 2, arguments)
+            self.assertEqual(result.stdout, "", arguments)
+
+    def test_launch_mode_still_needs_all_its_arguments(self):
+        result = print_matrix("/Applications/ErgoptiPlus.app", "evidence")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("app, output and scenario", result.stderr)
 
 
 if __name__ == "__main__":

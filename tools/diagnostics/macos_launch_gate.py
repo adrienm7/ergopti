@@ -29,6 +29,10 @@ symlinked, Git-versioned folder) and requires the refusal the runner's missing
 Accessibility must now produce: a named launcher FATAL line and the fatal line
 in the fallback boot log, never a silent exit. plain_open launches the way a
 double-click does, without `open -n`.
+
+`--print-matrix {ci,release}` prints the scenario list of one gate profile as
+the GitHub Actions output line that feeds the workflow matrix. It takes no
+other argument and runs on any host, because it launches nothing.
 """
 
 import argparse
@@ -82,6 +86,18 @@ SCENARIOS = (
     "configured_symlink",
     "plain_open",
 )
+# The pull-request and plain-push gate has always launched every scenario but
+# these two on one runner. Each repeats a state that a CI scenario already
+# seeds (source-run logs: symlink_logs; a symlinked configuration root:
+# symlink_config), so they stay with the release gate, which launches every
+# scenario on Apple silicon and Intel. A new scenario joins both profiles.
+RELEASE_ONLY_SCENARIOS = ("source_logs", "symlink_config_documents")
+# The one source of the launch-gate matrix: ci-macos.yml reads a profile
+# through --print-matrix instead of repeating scenario names.
+PROFILES = {
+    "ci": tuple(name for name in SCENARIOS if name not in RELEASE_ONLY_SCENARIOS),
+    "release": SCENARIOS,
+}
 # Scenarios launched like a Finder double-click instead of `open -n`.
 PLAIN_OPEN_SCENARIOS = {"plain_open"}
 # A state that must be refused, and the launcher text that proves the refusal
@@ -437,14 +453,47 @@ def run(app, output, scenario, seed_tag):
     return report
 
 
-def main():
-    """Run one scenario on a disposable runner and exit non-zero on any failure."""
+
+
+
+# ===================================
+# ===================================
+# ======= 4/ Command line ===========
+# ===================================
+# ===================================
+
+def matrix_line(profile):
+    """Return the GitHub Actions output line that feeds the launch matrix of one profile."""
+    return "scenarios=" + json.dumps(list(PROFILES[profile]), separators=(",", ":"))
+
+
+def parse_arguments(argv):
+    """Parse either the matrix mode or the launch mode, rejecting any mix of the two."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("app")
-    parser.add_argument("output")
-    parser.add_argument("scenario", choices=SCENARIOS)
+    parser.add_argument("--print-matrix", choices=tuple(PROFILES),
+        help="print the scenarios=[...] output line of one profile and exit; takes no other argument "
+             "and runs on any host")
+    parser.add_argument("app", nargs="?", help="installed application to launch (launch mode)")
+    parser.add_argument("output", nargs="?", help="new evidence folder (launch mode)")
+    parser.add_argument("scenario", nargs="?", choices=SCENARIOS, metavar="scenario",
+        help="user state to seed (launch mode): " + ", ".join(SCENARIOS))
     parser.add_argument("--seed-tag", default="", help="older release whose files seed personal state")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
+    launch_arguments = (args.app, args.output, args.scenario)
+    if args.print_matrix is not None:
+        if any(value is not None for value in launch_arguments) or args.seed_tag:
+            parser.error("--print-matrix takes no launch argument")
+    elif any(value is None for value in launch_arguments):
+        parser.error("the launch mode needs app, output and scenario")
+    return args
+
+
+def main(argv=None):
+    """Print one matrix profile, or run one scenario and exit non-zero on any failure."""
+    args = parse_arguments(argv)
+    if args.print_matrix is not None:
+        print(matrix_line(args.print_matrix))
+        return 0
     if sys.platform != "darwin" or os.environ.get("GITHUB_ACTIONS") != "true":
         raise RuntimeError("The launch gate mutates the user profile and needs a disposable macOS runner")
     output = Path(args.output).resolve()
