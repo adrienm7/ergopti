@@ -15,6 +15,77 @@
 
 #Include ../support/logger_errors_sharing_denial.ahk
 
+; Every case below drives the process-wide logger the rest of the suite shares:
+; it resets the ring, blanks the sinks and sets a severity threshold. Each case
+; this file registers runs against a snapshot of that state which is put back
+; after it (_TLOG_IsolateEveryCase, the last statement of this file).
+global _TLOG_FIRST_CASE := TEST_REGISTRY.Length + 1
+
+_TLOG_CaptureLoggerState() {
+	global LOGGER_MIN_LEVEL, LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, LOGGER_PENDING_CAP
+	global LOGGER_RING_BUFFER, LOGGER_RING_CURSOR, LOGGER_SUB_FILES
+	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
+	global _LOGGER_DEDUP_KEY, _LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT, _LastErrTime
+	global _LOGGER_FLUSH_ACTIVE, _LOGGER_FORCE_FLUSH_PENDING, _LOGGER_DROPPED_LINES
+	return {
+		MinLevel: LOGGER_MIN_LEVEL, LogPath: LOGGER_LOG_PATH,
+		ErrorsLogPath: LOGGER_ERRORS_LOG_PATH, PendingCap: LOGGER_PENDING_CAP,
+		Ring: LOGGER_RING_BUFFER, RingCursor: LOGGER_RING_CURSOR, SubFiles: LOGGER_SUB_FILES,
+		Pending: _LOGGER_PENDING, PendingErrors: _LOGGER_PENDING_ERRORS,
+		SubPending: _LOGGER_SUB_PENDING, SubPaths: _LOGGER_SUB_PATHS,
+		DedupKey: _LOGGER_DEDUP_KEY, DedupLevel: _LOGGER_DEDUP_LEVEL,
+		DedupCount: _LOGGER_DEDUP_COUNT, LastErrTime: _LastErrTime,
+		FlushActive: _LOGGER_FLUSH_ACTIVE, ForceFlushPending: _LOGGER_FORCE_FLUSH_PENDING,
+		DroppedLines: _LOGGER_DROPPED_LINES
+	}
+}
+
+_TLOG_RestoreLoggerState(State) {
+	global LOGGER_MIN_LEVEL, LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, LOGGER_PENDING_CAP
+	global LOGGER_RING_BUFFER, LOGGER_RING_CURSOR, LOGGER_SUB_FILES
+	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
+	global _LOGGER_DEDUP_KEY, _LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT, _LastErrTime
+	global _LOGGER_FLUSH_ACTIVE, _LOGGER_FORCE_FLUSH_PENDING, _LOGGER_DROPPED_LINES
+	LOGGER_MIN_LEVEL := State.MinLevel
+	LOGGER_LOG_PATH := State.LogPath
+	LOGGER_ERRORS_LOG_PATH := State.ErrorsLogPath
+	LOGGER_PENDING_CAP := State.PendingCap
+	LOGGER_RING_BUFFER := State.Ring
+	LOGGER_RING_CURSOR := State.RingCursor
+	LOGGER_SUB_FILES := State.SubFiles
+	_LOGGER_PENDING := State.Pending
+	_LOGGER_PENDING_ERRORS := State.PendingErrors
+	_LOGGER_SUB_PENDING := State.SubPending
+	_LOGGER_SUB_PATHS := State.SubPaths
+	_LOGGER_DEDUP_KEY := State.DedupKey
+	_LOGGER_DEDUP_LEVEL := State.DedupLevel
+	_LOGGER_DEDUP_COUNT := State.DedupCount
+	_LastErrTime := State.LastErrTime
+	_LOGGER_FLUSH_ACTIVE := State.FlushActive
+	_LOGGER_FORCE_FLUSH_PENDING := State.ForceFlushPending
+	_LOGGER_DROPPED_LINES := State.DroppedLines
+	_LoggerRefreshFastFlags()
+}
+
+_TLOG_Isolated(Callback) {
+	State := _TLOG_CaptureLoggerState()
+	try
+		Callback.Call()
+	finally
+		_TLOG_RestoreLoggerState(State)
+}
+
+; Wrap every case registered since _TLOG_FIRST_CASE, bare Test( calls included.
+_TLOG_IsolateEveryCase() {
+	global TEST_REGISTRY, _TLOG_FIRST_CASE
+	Index := _TLOG_FIRST_CASE
+	while (Index <= TEST_REGISTRY.Length) {
+		Entry := TEST_REGISTRY[Index]
+		Entry.callback := _TLOG_Isolated.Bind(Entry.callback)
+		Index += 1
+	}
+}
+
 ; -- Setup: redirect logger output to a tests-only path --
 ; Use A_Temp so the CI antivirus (Windows Defender real-time scan) does not
 ; hold a file lock on a path inside the repo checkout and block FileOpen calls
@@ -1306,3 +1377,34 @@ TestLogger_ErrorsPathReinitMidRun() {
 }
 Test("Errors sink: changing LOGGER_ERRORS_LOG_PATH mid-run directs new errors to the new file",
 	TestLogger_ErrorsPathReinitMidRun)
+
+; The ERROR-threshold case once left the shared logger at "ERROR", which
+; dropped every WARNING logged after it: the tap-hold loader's typo warning and
+; the unnamed prior-key warning passed alone and failed under --only hold.
+TestLogger_CasesLeaveTheSharedLoggerAsFound() {
+	global TEST_REGISTRY, LOGGER_MIN_LEVEL, _LOGGER_WARN_ENABLED
+	Entry := ""
+	for _, Candidate in TEST_REGISTRY {
+		if (Candidate.name == "Level filter: ERROR threshold drops WARN and INFO")
+			Entry := Candidate
+	}
+	Assert(IsObject(Entry), "the ERROR threshold case must be registered")
+	LOGGER_MIN_LEVEL := "INFO"
+	_LoggerRefreshFastFlags()
+	Entry.callback.Call()
+	AssertEqual("INFO", LOGGER_MIN_LEVEL,
+		"a logger case must put the shared threshold back, or every later WARNING in the suite is dropped")
+	AssertTrue(_LOGGER_WARN_ENABLED, "the WARNING fast flag must follow the restored threshold")
+
+	Src := FileRead(A_LineFile, "UTF-8")
+	Call := "_TLOG_IsolateEveryCase()"
+	Tail := SubStr(Src, InStr(Src, "`n" . Call, , -1) + 1)
+	Assert(InStr(Tail, Call) = 1, "the isolation wrapper must be applied at the end of this file")
+	AssertEqual(0, RegExMatch(Tail, "m)^\s*Test\("),
+		"a case registered after the isolation wrapper would run against the shared logger unguarded")
+}
+Test("Logger: every case leaves the shared logger as it found it (logger-test-isolation)",
+	TestLogger_CasesLeaveTheSharedLoggerAsFound)
+
+; Must stay the last statement: a case registered below it would run unguarded.
+_TLOG_IsolateEveryCase()
