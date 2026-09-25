@@ -679,18 +679,27 @@ local function build_tap_hold_rule(key_def, tap_action, hold_action, tap_timeout
 	-- bridge's discriminator; bare "<key_code>" lines remain press events.
 	after_key_up_tail[#after_key_up_tail + 1] = physical_kc_ledger_event(key_code, true)
 
-	-- When one slot is "none", fall through to the original key for that slot
-	local passthrough       = { { key_code = key_code } }
-	local effective_tap_to  = (#tap_to  > 0) and tap_to  or passthrough
-	local effective_hold_to = (#hold_to > 0) and hold_to or passthrough
-
-	for _, ev in ipairs(effective_hold_to) do to_events[#to_events + 1] = ev end
-	manipulator.to = to_events
-
-	-- to_if_alone only when tap output differs from hold output
-	if not same_output(effective_tap_to, effective_hold_to) then
-		manipulator.to_if_alone = effective_tap_to
+	-- A key with a tap and no hold has nothing to wait for: it sends its tap at
+	-- key_down, where the last entry stays held and auto-repeats, like the
+	-- native key it replaces and like the Windows tap-only hotkeys. As a
+	-- to_if_alone it would type only on a release inside the tap timeout, and
+	-- any key_down arriving first would drop it (basic.hpp unset_alone_if_needed),
+	-- losing keys in fast typing. It never sends the physical key as well, which
+	-- typed two keys for one tap. A "none" tap under a hold stays the native key,
+	-- typed on release.
+	local key_down_action = hold_action
+	if #hold_to == 0 then
+		key_down_action = tap_action
+		for _, ev in ipairs(tap_to) do to_events[#to_events + 1] = ev end
+	else
+		for _, ev in ipairs(hold_to) do to_events[#to_events + 1] = ev end
+		local effective_tap_to = (#tap_to > 0) and tap_to or { { key_code = key_code } }
+		-- to_if_alone only when tap output differs from hold output
+		if not same_output(effective_tap_to, hold_to) then
+			manipulator.to_if_alone = effective_tap_to
+		end
 	end
+	manipulator.to = to_events
 
 	-- Per-key tap/hold threshold override. Karabiner honours
 	-- basic.to_if_alone_timeout_milliseconds at the manipulator level, overriding
@@ -700,9 +709,10 @@ local function build_tap_hold_rule(key_def, tap_action, hold_action, tap_timeout
 		manipulator.parameters = { ["basic.to_if_alone_timeout_milliseconds"] = tap_timeout_ms }
 	end
 
-	-- Merge hold action's own to_after_key_up (e.g. layer release) with set_variable=0
-	if hold_action.karabiner_to_after_key_up then
-		for _, ev in ipairs(hold_action.karabiner_to_after_key_up) do
+	-- Merge the key-down action's own to_after_key_up (e.g. layer release) with
+	-- set_variable=0
+	if key_down_action.karabiner_to_after_key_up then
+		for _, ev in ipairs(key_down_action.karabiner_to_after_key_up) do
 			after_key_up_tail[#after_key_up_tail + 1] = ev
 		end
 	end

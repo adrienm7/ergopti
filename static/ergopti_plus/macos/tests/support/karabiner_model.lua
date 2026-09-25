@@ -24,7 +24,8 @@
 ---     conditions fail is dropped before anything is posted.
 --- Lazy modifier dispatch, keyboard repeat, timers and sticky-modifier flag
 --- bookkeeping are not modelled: the flags recorded for a key are the
---- modifier_flag_manager state an application reads at that key's key_down.
+--- modifier_flag_manager state an application reads at that key's key_down,
+--- and Engine:held names the output keys left down, which macOS repeats.
 --- ==============================================================================
 
 local M = {}
@@ -229,6 +230,19 @@ function Engine:variable(name)
 	local value = self.variables[name]
 	if value == nil then return 0 end
 	return value
+end
+
+--- Returns the output keys held down until a physical key is released: the
+--- last posted `to` entry of each active manipulation and every key no
+--- manipulator took, which macOS auto-repeats while they stay down.
+--- @return table held Key code → true.
+function Engine:held()
+	local set = {}
+	for physical_key, session in pairs(self.sessions) do
+		if session.passthrough then set[physical_key] = true end
+		for _, key_code in ipairs(session.deferred or {}) do set[key_code] = true end
+	end
+	return set
 end
 
 --- Adds a signed amount to one flag's press count.

@@ -110,9 +110,20 @@ local function deep_copy(value)
 end
 
 
+--- Builds a one-key state whose graph today's generator emits exactly as the
+--- released pre-lease generators did, so the ungated build can stand in for an
+--- old deployed graph. The key holds Shift: for a key with a tap and no hold,
+--- the released generators sent the physical key at key down and the tap on
+--- release, where today's rule sends only the tap, at key down.
+--- @param physical_key_code string Physical key the layout gives the tap.
+--- @param tap_action_id string Tap action id (`logical_escape` or `none`).
+--- @return table state
+--- @return table actions
+--- @return table keys
 local function legacy_layout_scenario(physical_key_code, tap_action_id)
 	local actions = {
 		{ id = "none", label = "None", karabiner_to = {} },
+		{ id = "shift", label = "Shift", karabiner_to = { { key_code = "left_shift" } } },
 		{
 			id = "logical_escape",
 			label = "Logical escape",
@@ -136,7 +147,7 @@ local function legacy_layout_scenario(physical_key_code, tap_action_id)
 	}
 	local scenario_state = state({
 		tap_hold_config = {
-			left_shift = { tap = tap_action_id, hold = "none" },
+			left_shift = { tap = tap_action_id, hold = "shift" },
 		},
 	})
 	return scenario_state, actions, keys
