@@ -13,8 +13,8 @@
 //   2. Launch the embedded Hammerspoon app through Launch Services; forward its
 //      lifecycle so quitting Ergopti cleanly terminates Hammerspoon, and a
 //      Hammerspoon shutdown terminates Ergopti.
-//   3. Host Sparkle (SPUStandardUpdaterController) so the in-app updater can
-//      ship new releases over the configured appcast.
+//   3. Host Sparkle (SPUUpdater with a catalog-localized user driver) so the
+//      in-app updater can offer new releases from the configured appcast.
 //   4. Install a private inherited umask before Hammerspoon or a native helper
 //      can create configuration-bearing transaction sidecars.
 //
@@ -440,7 +440,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	private var hsBootstrapRecoveryUsed = false
 	private var hsLogFolderRefusal: LogDirectoryFailure?
 	private var loggerWorker: LoggerDatagramServing?
-	private var updaterController: SPUStandardUpdaterController?
+	private var updater: SPUUpdater?
 	private let updaterCommandRouter = UpdaterCommandRouter()
 	private let launcherIdentityReader: (String?) -> (device: String, inode: String)?
 	private let applicationLauncher: (
@@ -532,19 +532,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		// SUScheduledCheckInterval) only fetch the appcast; a download must wait
 		// for the user's install choice, which the consent policy proves on the
 		// live updater before it may start. A refusal leaves updates off rather
-		// than letting Sparkle download in the background.
-		let controller = SPUStandardUpdaterController(
-			startingUpdater: false,
-			updaterDelegate: nil,
-			userDriverDelegate: nil
+		// than letting Sparkle download in the background. The user driver
+		// speaks the shared locale catalog in the driver's chosen language.
+		let userDriver = CatalogUpdateUserDriver(
+			textsProvider: { LauncherLocalization.load().flatMap(UpdatePromptTexts.init(localization:)) },
+			presenter: UpdatePromptPanel(),
+			currentVersion: { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "" },
+			log: { LauncherLog.write($0) }
 		)
-		if let refusal = UpdateConsentPolicy.refusal(for: controller.updater) {
+		let sparkle = SPUUpdater(
+			hostBundle: Bundle.main,
+			applicationBundle: Bundle.main,
+			userDriver: userDriver,
+			delegate: nil
+		)
+		if let refusal = UpdateConsentPolicy.refusal(for: sparkle) {
 			LauncherLog.write("ERROR: Sparkle updater not started: \(refusal)")
 		} else {
-			controller.startUpdater()
-			updaterController = controller
-			updaterCommandRouter.bind(controller)
-			LauncherLog.write("launcher stage: Sparkle updater wired (+\(elapsedMilliseconds()) ms)")
+			do {
+				try sparkle.start()
+				updater = sparkle
+				updaterCommandRouter.bind(sparkle)
+				LauncherLog.write("launcher stage: Sparkle updater wired (+\(elapsedMilliseconds()) ms)")
+			} catch {
+				let failure = error as NSError
+				LauncherLog.write("ERROR: Sparkle updater could not start: \(failure.domain) \(failure.code)")
+			}
 		}
 
 		// Tell the embedded Hammerspoon where to read its Lua config from.
