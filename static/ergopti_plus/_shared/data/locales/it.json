@@ -1146,6 +1146,7 @@
 	"menu.metrics.reset_wpm_position": "    ↳ Reimposta posizione",
 	"menu.metrics.shortcut_apps_title": "Scorciatoia tempo app",
 	"menu.metrics.shortcut_item": "    ↳ Scorciatoia: %s",
+	"menu.metrics.shortcut_modifier_key": "«{1}» è un tasto modificatore e non può essere il tasto di una scorciatoia: macOS non lo segnala mai come pressione di un tasto. Scegli un altro tasto.",
 	"menu.metrics.shortcut_none": "Nessuna scorciatoia",
 	"menu.metrics.shortcut_prefix": "  ↳ Scorciatoia: ",
 	"menu.metrics.shortcut_prompt": "Formato: mod+tasto (es. ctrl+m)\nLascia vuoto per disabilitare",

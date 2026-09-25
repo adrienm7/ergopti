@@ -1146,6 +1146,7 @@
 	"menu.metrics.reset_wpm_position": "    ↳ Position zurücksetzen",
 	"menu.metrics.shortcut_apps_title": "App-Zeit-Kürzel",
 	"menu.metrics.shortcut_item": "    ↳ Kürzel: %s",
+	"menu.metrics.shortcut_modifier_key": "„{1}“ ist eine Modifikatortaste und kann nicht die Taste eines Kürzels sein: macOS meldet sie nie als Tastendruck. Wählen Sie eine andere Taste.",
 	"menu.metrics.shortcut_none": "Kein Kürzel",
 	"menu.metrics.shortcut_prefix": "  ↳ Tastenkürzel: ",
 	"menu.metrics.shortcut_prompt": "Format: Mods+Taste (z.B. ctrl+m)\nLeer lassen zum Deaktivieren",

@@ -1158,6 +1158,7 @@
 	"menu.metrics.reset_wpm_position": "    ↳ Reset position",
 	"menu.metrics.shortcut_apps_title": "App time shortcut",
 	"menu.metrics.shortcut_item": "    ↳ Shortcut: %s",
+	"menu.metrics.shortcut_modifier_key": "« {1} » is a modifier key and cannot be a shortcut's key: macOS never reports it as a key press. Choose another key.",
 	"menu.metrics.shortcut_none": "No shortcut",
 	"menu.metrics.shortcut_prefix": "  ↳ Shortcut: ",
 	"menu.metrics.shortcut_prompt": "Format: mods+key (e.g. ctrl+m)\nLeave empty to disable",

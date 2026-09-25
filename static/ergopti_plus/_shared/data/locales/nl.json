@@ -1146,6 +1146,7 @@
 	"menu.metrics.reset_wpm_position": "    ↳ Positie resetten",
 	"menu.metrics.shortcut_apps_title": "Sneltoets app-tijd",
 	"menu.metrics.shortcut_item": "    ↳ Sneltoets: %s",
+	"menu.metrics.shortcut_modifier_key": "‘{1}’ is een modificatietoets en kan niet de toets van een snelkoppeling zijn: macOS meldt hem nooit als toetsaanslag. Kies een andere toets.",
 	"menu.metrics.shortcut_none": "Geen sneltoets",
 	"menu.metrics.shortcut_prefix": "  ↳ Sneltoets: ",
 	"menu.metrics.shortcut_prompt": "Indeling: mod+toets (bijv. ctrl+m)\nLeeg laten om uit te schakelen",

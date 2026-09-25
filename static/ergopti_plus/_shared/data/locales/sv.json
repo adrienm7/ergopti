@@ -1146,6 +1146,7 @@
 	"menu.metrics.reset_wpm_position": "    ↳ Återställ position",
 	"menu.metrics.shortcut_apps_title": "Genvägstid per program",
 	"menu.metrics.shortcut_item": "    ↳ Genväg: %s",
+	"menu.metrics.shortcut_modifier_key": "”{1}” är en modifierartangent och kan inte vara tangenten i en genväg: macOS rapporterar den aldrig som en tangenttryckning. Välj en annan tangent.",
 	"menu.metrics.shortcut_none": "Ingen genväg",
 	"menu.metrics.shortcut_prefix": "  ↳ Genväg: ",
 	"menu.metrics.shortcut_prompt": "Format: mods+key (t.ex. ctrl+m)\nLämna tomt för att inaktivera",

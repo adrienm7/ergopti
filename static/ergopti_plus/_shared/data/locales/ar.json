@@ -1146,6 +1146,7 @@
 	"menu.metrics.reset_wpm_position": "    ↳ إعادة تعيين الموضع",
 	"menu.metrics.shortcut_apps_title": "اختصار وقت التطبيق",
 	"menu.metrics.shortcut_item": "    ↳ الاختصار: %s",
+	"menu.metrics.shortcut_modifier_key": "«{1}» مفتاح تعديل ولا يمكن أن يكون مفتاح اختصار: لا يُبلغ macOS عنه أبدًا كضغطة مفتاح. اختر مفتاحًا آخر.",
 	"menu.metrics.shortcut_none": "لا اختصار",
 	"menu.metrics.shortcut_prefix": "  ↳ الاختصار: ",
 	"menu.metrics.shortcut_prompt": "الصيغة: معدّلات+مفتاح (مثال: ctrl+m)\nاتركه فارغًا للتعطيل",

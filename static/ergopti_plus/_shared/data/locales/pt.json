@@ -1146,6 +1146,7 @@
 	"menu.metrics.reset_wpm_position": "    ↳ Redefinir posição",
 	"menu.metrics.shortcut_apps_title": "Atalho de tempo por app",
 	"menu.metrics.shortcut_item": "    ↳ Atalho: %s",
+	"menu.metrics.shortcut_modifier_key": "«{1}» é uma tecla modificadora e não pode ser a tecla de um atalho: o macOS nunca a comunica como um toque de tecla. Escolha outra tecla.",
 	"menu.metrics.shortcut_none": "Sem atalho",
 	"menu.metrics.shortcut_prefix": "  ↳ Atalho: ",
 	"menu.metrics.shortcut_prompt": "Formato: mods+tecla (ex.: ctrl+m)\nDeixe vazio para desativar",
