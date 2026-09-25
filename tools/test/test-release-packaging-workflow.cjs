@@ -10,6 +10,10 @@
  * and `open` provide and causing AppKit to terminate its embedded GUI child.
  * Early log creation subsequently masked a missing LuaSocket dependency: the
  * published app died immediately after the smoke test had declared success.
+ * The Windows compile step ran Ahk2Exe, a GUI-subsystem binary, through the
+ * call operator: PowerShell returned before the compiler finished and left
+ * $LASTEXITCODE unset, so `exit $LASTEXITCODE` exited 0 ahead of the output
+ * check and a failed compile passed.
  * These defects surfaced only after every functional CI job had passed.
  *
  * The pipeline now spans ci.yml and one reusable workflow per OS. Each step is
@@ -214,6 +218,104 @@ for (const [component, expected] of Object.entries({
 	}
 	if (!/^https:\/\/github\.com\/AutoHotkey\//.test(windowsToolchainContract[component]?.url)) {
 		errors.push(`the Windows ${component} contract must use an exact official GitHub URL`);
+	}
+}
+
+// The compile step as it stood before the fix: it exited 0 on a syntax error.
+const PRE_FIX_COMPILE_RUN = [
+	'          & $ahk2exe /in $in /out $out /base $runtime /icon $icon /silent',
+	'          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }',
+	'          if (-not (Test-Path $out)) {',
+	'              Write-Error "Ahk2Exe reported success but $out was not created."',
+	'              exit 1',
+	'          }',
+].join('\n');
+
+/**
+ * Lists every way a compile step body could report success for a failed
+ * compile; an empty list means the step fails whenever Ahk2Exe does.
+ * @param {string} stepBody Step body.
+ * @returns {string[]}
+ */
+function compileStepProblems(stepBody) {
+	const problems = [];
+	// Comments may name the forbidden forms to explain them; only code counts.
+	const body = stepBody.split('\n').filter((line) => !line.trimStart().startsWith('#')).join('\n');
+	if (/^ {8}(?:if|continue-on-error):/m.test(body)) {
+		problems.push('the compile step must be neither skippable nor allowed to fail');
+	}
+	if (/&\s*\$ahk2exe\b/.test(body)) {
+		problems.push('Ahk2Exe must not run through the call operator, which does not wait for a GUI binary');
+	}
+	if (body.includes('$LASTEXITCODE')) {
+		problems.push('the compile step must not read $LASTEXITCODE, which a GUI binary never sets');
+	}
+	const lines = body.split('\n');
+	const launchAt = lines.findIndex((line) => /\$\w+\s*=\s*Start-Process\s+-FilePath\s+\$ahk2exe\b/.test(line));
+	if (launchAt < 0) {
+		problems.push('Ahk2Exe must run through `$proc = Start-Process -FilePath $ahk2exe`');
+		return problems;
+	}
+	let launchEnd = launchAt;
+	while (launchEnd + 1 < lines.length && lines[launchEnd].trimEnd().endsWith('`')) launchEnd++;
+	const launch = lines.slice(launchAt, launchEnd + 1).join('\n');
+	for (const flag of ['-Wait', '-PassThru']) {
+		if (!new RegExp(`\\s${flag}\\b`).test(launch)) {
+			problems.push(`Start-Process must pass ${flag} so the step reads the compiler's real exit code`);
+		}
+	}
+	const proc = /\$(\w+)\s*=\s*Start-Process/.exec(launch)[1];
+	const after = lines.slice(launchEnd + 1).join('\n');
+	const exitAt = after.search(
+		new RegExp(`if\\s*\\(\\s*\\$${proc}\\.ExitCode\\s+-ne\\s+0\\s*\\)\\s*\\{[^}]*\\bexit\\s+[1-9]`));
+	if (exitAt < 0) problems.push(`a non-zero $${proc}.ExitCode must exit the step non-zero`);
+	const outputAt = after.search(
+		/if\s*\([^\n]*Test-Path\b[^\n]*\$out\b[^\n]*\.Length\s+-(?:eq\s+0|le\s+0|lt\s+1)[^\n]*\{[^}]*\bexit\s+[1-9]/);
+	if (outputAt < 0) {
+		problems.push('a missing or empty ErgoptiPlus.exe must exit the step non-zero');
+	} else if (exitAt >= 0 && outputAt < exitAt) {
+		problems.push('the output check must follow the exit-code check');
+	}
+	return problems;
+}
+
+/**
+ * Applies `replacement` to the first code line of `body` that matches
+ * `pattern`, leaving comments alone; returns `body` unchanged when none does.
+ * @param {string} body Step body.
+ * @param {RegExp} pattern Non-global pattern.
+ * @param {string} replacement
+ * @returns {string}
+ */
+function mutateCode(body, pattern, replacement) {
+	const lines = body.split('\n');
+	const at = lines.findIndex((line) => !line.trimStart().startsWith('#') && pattern.test(line));
+	if (at < 0) return body;
+	lines[at] = lines[at].replace(pattern, replacement);
+	return lines.join('\n');
+}
+
+const compileStep = releaseStep('Compile ErgoptiPlus.ahk', WINDOWS_BOX);
+if (compileStep !== null) {
+	const problems = compileStepProblems(compileStep);
+	for (const problem of problems) errors.push(`the Windows compile gate is unsafe: ${problem}`);
+	// The guard must be able to fail: the pre-fix step, and the real step with
+	// any one of its checks removed, has to be rejected.
+	if (problems.length === 0) {
+		for (const [what, mutated] of [
+			['the pre-fix call-operator step', PRE_FIX_COMPILE_RUN],
+			['dropping -Wait', mutateCode(compileStep, /\s-Wait\b/, '')],
+			['dropping -PassThru', mutateCode(compileStep, /\s-PassThru\b/, '')],
+			['dropping the exit-code check', mutateCode(compileStep, /\.ExitCode\s+-ne\s+0/, '.ExitCode -lt 0')],
+			['dropping the empty-output check',
+				mutateCode(compileStep, /\.Length\s+-(?:eq\s+0|le\s+0|lt\s+1)/, '.Length -lt 0')],
+		]) {
+			if (mutated === compileStep) {
+				errors.push(`self-check: ${what} changed nothing, so the compile step drifted`);
+			} else if (compileStepProblems(mutated).length === 0) {
+				errors.push(`self-check: ${what} went unnoticed, so this guard cannot fail`);
+			}
+		}
 	}
 }
 

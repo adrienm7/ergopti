@@ -467,23 +467,41 @@ jobs:
 
       - name: Compile ErgoptiPlus.ahk
         shell: pwsh
+        # Without it, -Wait below would hold a stuck compiler until the job's
+        # six-hour default timeout.
+        timeout-minutes: 5
         run: |
           $ahk2exe = "$env:TEMP\Ahk2Exe\Ahk2Exe.exe"
           $runtime = "$env:TEMP\AutoHotkey\AutoHotkey64.exe"
           $in   = "${{ github.workspace }}\static\ergopti_plus\windows\ErgoptiPlus.ahk"
           $out  = "${{ github.workspace }}\static\ergopti_plus\windows\ErgoptiPlus.exe"
           $icon = "${{ github.workspace }}\static\favicon.ico"
+          $stdout = "$env:RUNNER_TEMP\ahk2exe_stdout.txt"
+          $stderr = "$env:RUNNER_TEMP\ahk2exe_stderr.txt"
           # /silent suppresses any Ahk2Exe GUI dialogs that would block
           # indefinitely on a headless runner and cause a silent non-zero exit.
-          & $ahk2exe /in $in /out $out /base $runtime /icon $icon /silent
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          # Verify the EXE was actually produced — Ahk2Exe can exit 0 on a
-          # compilation warning without writing the output file.
-          if (-not (Test-Path $out)) {
-              Write-Error "Ahk2Exe reported success but $out was not created."
+          # Start-Process -Wait -PassThru, not the call operator: Ahk2Exe is a
+          # GUI-subsystem binary, so `& $ahk2exe` returned before it finished
+          # and left $LASTEXITCODE unset. The former `exit $LASTEXITCODE` guard
+          # then exited 0 before the output check below, so a failed compile
+          # passed. Both output streams are printed so a failure shows the
+          # compiler's own message.
+          $proc = Start-Process -FilePath $ahk2exe `
+              -ArgumentList @("/in", "`"$in`"", "/out", "`"$out`"", "/base", "`"$runtime`"", "/icon", "`"$icon`"", "/silent") `
+              -Wait -PassThru -NoNewWindow -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+          if (Test-Path -LiteralPath $stdout) { Get-Content -LiteralPath $stdout | Write-Host }
+          if (Test-Path -LiteralPath $stderr) { Get-Content -LiteralPath $stderr | Write-Host }
+          if ($proc.ExitCode -ne 0) {
+              Write-Error "Ahk2Exe failed with exit code $($proc.ExitCode)."
               exit 1
           }
-          Write-Host "Compiled: $out ($('{0:N0}' -f (Get-Item $out).Length) bytes)"
+          # Verify the EXE was actually produced — Ahk2Exe can exit 0 on a
+          # compilation warning without writing the output file.
+          if (-not (Test-Path -LiteralPath $out -PathType Leaf) -or (Get-Item -LiteralPath $out).Length -eq 0) {
+              Write-Error "Ahk2Exe exited 0 but $out is missing or empty."
+              exit 1
+          }
+          Write-Host "Compiled: $out ($('{0:N0}' -f (Get-Item -LiteralPath $out).Length) bytes)"
 
       - name: Sign and verify ErgoptiPlus.exe
         shell: pwsh
