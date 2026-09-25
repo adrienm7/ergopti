@@ -6,7 +6,10 @@
 // A found update is only offered: Sparkle downloads it after the user picks
 // Install, and every other answer (Later, Skip, closing the window) leaves it
 // on the server. Each reply is answered once; dismissUpdateInstallation drops
-// the pending ones without answering, as Sparkle requires.
+// the pending ones without answering, as Sparkle requires. Sparkle's installer
+// progress agent, shown after the launcher quits to install, is a separate
+// process no user driver reaches (project memory:
+// project-sparkle-installer-progress-is-outside-the-user-driver).
 
 import AppKit
 import Sparkle

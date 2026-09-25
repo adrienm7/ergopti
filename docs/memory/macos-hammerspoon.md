@@ -336,6 +336,25 @@ silently. Action: keep the flag false in the bundle, prove
 `UpdateConsentPolicy` on the live updater before `start()`, and present updates
 through `CatalogUpdateUserDriver`; the standard driver is English-only.
 
+### project-sparkle-installer-progress-is-outside-the-user-driver
+
+One Sparkle 2.9.2 window escapes `CatalogUpdateUserDriver`: after "Install
+and restart" quits the launcher, the Autoupdate installer asks its progress
+agent (`Updater.app`, id `org.sparkle-project.Sparkle.Updater`, shared by every
+Sparkle app) to show "Updating ErgoptiPlus", "Installing update…" and "Cancel
+Update" once the final swap takes over 0.7 s (`SUDisplayProgressTimeDelay` in
+`Autoupdate/AppInstaller.m`). `SPUUIBasedUpdateDriver.m` passes
+`displayingUserInterface:YES` for every user choice; only the automatic driver,
+which the consent policy forbids, passes NO, and no Info.plist key or delegate
+method changes it. `ShowInstallerProgress.m` loads the strings from the host's
+embedded Sparkle.framework inside the agent process, so they follow the macOS
+system languages among Sparkle's localizations (no `hi`, Norwegian only as
+`nb`/`nn`), never the driver's choice; a per-app `AppleLanguages` on that
+shared id would change every Sparkle app. "Install when ErgoptiPlus quits"
+sends no resume message, so no window appears, but nothing relaunches either.
+Action: do not re-investigate a configuration fix; only a patched Sparkle
+build or an owned relaunch helper can remove the window.
+
 ## Clipboard, files, and privacy
 
 ### project-hs-clipboard-transaction-ownership
