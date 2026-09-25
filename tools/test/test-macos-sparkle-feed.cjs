@@ -50,9 +50,22 @@ if (!buildScript.includes('<key>CFBundleURLTypes</key>') ||
 	errors.push('the outer bundle must register the private updater command URL scheme');
 }
 if (!buildScript.includes('<key>SUEnableAutomaticChecks</key>        <true/>') ||
-	!buildScript.includes('<key>SUScheduledCheckInterval</key>       <integer>86400</integer>') ||
-	!launcherSource.includes('startingUpdater: true')) {
+	!buildScript.includes('<key>SUScheduledCheckInterval</key>       <integer>86400</integer>')) {
 	errors.push('Sparkle must own automatic checks at the declared 24-hour cadence');
+}
+// A scheduled check may only fetch the appcast. With SUAllowsAutomaticUpdates
+// true, one tick of Sparkle's "Automatically download and install" checkbox
+// made every later check download silently and install on quit
+// (updater-consent-2026-09-25).
+if (!/<key>SUAllowsAutomaticUpdates<\/key>\s*<false\/>/.test(buildScript) ||
+	/<key>SUAllowsAutomaticUpdates<\/key>\s*<true\/>/.test(buildScript) ||
+	/<key>SUAutomaticallyUpdate<\/key>\s*<true\/>/.test(buildScript)) {
+	errors.push('the launcher bundle must declare SUAllowsAutomaticUpdates false: Sparkle must never download before consent');
+}
+const policyAt = launcherSource.indexOf('UpdateConsentPolicy.refusal(');
+const startAt = launcherSource.search(/\.(?:startUpdater|start)\(\)/);
+if (policyAt < 0 || startAt < 0 || policyAt > startAt) {
+	errors.push('the launcher must prove the consent-only policy on the live updater before starting it');
 }
 if (menuSource.includes('Updater.start_background_checks') ||
 	aboutSource.includes('menu.about.frequency_menu') ||
