@@ -17,8 +17,9 @@
 global _DriverIsDetachedWorker := KLPF_IsWorkerInvocation() || UIASW_IsWorkerInvocation()
 if _DriverIsDetachedWorker {
 	Suspend(true)
-	DllCall("User32\SetWindowTextW", "Ptr", A_ScriptHwnd,
-		"Str", "ErgoptiPlus detached worker " . DllCall("GetCurrentProcessId", "UInt"))
+	; A pure HWND reaches the hidden main window whatever DetectHiddenWindows
+	; says, and ProcessExist() with no argument is this process's own PID.
+	WinSetTitle("ErgoptiPlus detached worker " . ProcessExist(), A_ScriptHwnd)
 }
 
 SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is located

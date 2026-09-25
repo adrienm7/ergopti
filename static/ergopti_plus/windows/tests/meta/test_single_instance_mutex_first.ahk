@@ -127,7 +127,7 @@ _SIMF_WorkerHidesTrayIconFirst() {
 	Branch := SubStr(Code, BranchPos, InStr(Code, "`n}", , BranchPos) - BranchPos)
 	Assert(InStr(Branch, "Suspend(true)") > 0,
 		"a worker must release the hotkeys AutoHotkey armed at load")
-	Assert(InStr(Branch, "SetWindowTextW") > 0,
+	Assert(InStr(Branch, "WinSetTitle(") > 0 && InStr(Branch, "A_ScriptHwnd") > 0,
 		"a worker must retitle its main window so Reload can never close it instead of the driver")
 	for Later in ["SetWorkingDir(", "CreateMutexW", "Bundle_Init()",
 			"UIASW_WorkerMain()", "KLPF_WorkerMain()"]
