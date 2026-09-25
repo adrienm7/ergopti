@@ -260,4 +260,104 @@ helpers.with_fresh_modules({
 			end
 		end)
 	end)
+
+
+
+	-- ==============================
+	-- ===== 3) Combo tap slots =====
+	-- ==============================
+
+	--- Returns the two keys of a modifier combo, holder first.
+	--- @param combo_def table mod_combos.json entry.
+	--- @return string first
+	--- @return string second
+	local function combo_keys(combo_def)
+		local simultaneous = combo_def.from.simultaneous
+		return simultaneous[1].key_code, simultaneous[2].key_code
+	end
+
+	--- Reports whether a manipulator is the hold-then-tap rule of a combo whose
+	--- holder is `first`: only that rule reads the holder's held variable.
+	--- @param manipulator table|nil Manipulator the model ran.
+	--- @param first string Holder key.
+	--- @return boolean combo_rule
+	local function is_combo_rule(manipulator, first)
+		local held_name = "ergopti_ke_held_" .. first .. "_" .. TOKEN
+		for _, condition in ipairs(manipulator and manipulator.conditions or {}) do
+			if condition.type == "variable_if" and condition.name == held_name and condition.value == 1 then
+				return true
+			end
+		end
+		return false
+	end
+
+	helpers.describe("a combo with only a tap types it at key down, like a key with only a tap (combo-tap-only-types-at-key-down)", function()
+		helpers.it("every combo with only a tap types it alone at the second key's key down, keeps it down to repeat, and adds nothing on release", function()
+			local covered = 0
+			for _, combo_def in ipairs(combos) do
+				if not combo_def.menu_hidden then
+					local first, second = combo_keys(combo_def)
+					local rules = build(nil, { [combo_def.id] = { combo = "none", tap = "delete_fwd", hold = "none" } })
+					for _, within_timeout in ipairs({ true, false }) do
+						local engine = engine_for(rules)
+						engine:down(first)
+						engine:clear()
+						-- CapsWord's AltGr+CapsLock rule runs before every combo by design.
+						if is_combo_rule(engine:down(second), first) then
+							if within_timeout then covered = covered + 1 end
+							helpers.assert_eq(table.concat(keys_posted(engine), ","), "delete_forward",
+								combo_def.id .. ": a combo with no hold must type its tap when its second key goes down")
+							helpers.assert_true(engine:held().delete_forward == true,
+								combo_def.id .. ": a combo with no hold must keep its tap down while held, so it auto-repeats")
+							engine:up(second, within_timeout)
+							helpers.assert_eq(table.concat(keys_posted(engine), ","), "delete_forward",
+								combo_def.id .. ": a combo with no hold must type nothing more on release")
+						end
+					end
+				end
+			end
+			helpers.assert_true(covered >= 150,
+				"the combo matrix must reach the combo rule for nearly every pair, reached " .. covered)
+		end)
+
+		helpers.it("every combo with only a tap keeps it when the next key goes down before its release", function()
+			-- Karabiner drops a pending to_if_alone on any later key_down, so a combo
+			-- tap typed on release would be lost in fast typing.
+			for _, combo_def in ipairs(combos) do
+				if not combo_def.menu_hidden then
+					local first, second = combo_keys(combo_def)
+					local rules = build(nil, { [combo_def.id] = { combo = "none", tap = "delete_fwd", hold = "none" } })
+					local engine = engine_for(rules)
+					engine:down(first)
+					engine:clear()
+					if is_combo_rule(engine:down(second), first) then
+						engine:down("a")
+						engine:up(second, true)
+						engine:up("a", true)
+						helpers.assert_eq(keys_posted(engine)[1], "delete_forward",
+							combo_def.id .. ": a combo tap followed by an overlapping key must still be typed")
+					end
+				end
+			end
+		end)
+
+		helpers.it("the default right Command + left Option deletes words forward while held (default-delete-word-repeats)", function()
+			-- The default sets a tap and no hold, so the delete goes out at key down
+			-- and stays down while held.
+			local engine = engine_for(build())
+			engine:down("right_command")
+			engine:clear()
+			engine:down("left_option")
+			local posted = engine:emissions()
+			helpers.assert_eq(table.concat(keys_posted(engine), ","), "delete_forward",
+				"right Command + left Option must delete forward at key down")
+			helpers.assert_eq(names(posted[#posted].flags), "left_option",
+				"the forward delete must be the word-level Option variant, without AltGr")
+			helpers.assert_true(engine:held().delete_forward == true,
+				"the forward delete must stay down while held, so it auto-repeats")
+			engine:up("left_option", true)
+			helpers.assert_eq(table.concat(keys_posted(engine), ","), "delete_forward",
+				"a quick release must not delete a second word")
+		end)
+	end)
 end)
