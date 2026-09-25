@@ -237,6 +237,18 @@ helpers.describe("modules/updater/manager.lua", function()
 		helpers.assert_nil(M.get_cached_release(), "cached release should be nil after clear")
 	end)
 
+	helpers.it("refuses to download a release other than the one the user chose", function()
+		M._test_set_cached_release({ tag = "v2", download_url = "https://example.invalid/2.tar.gz",
+			checksum_url = "https://example.invalid/2.sha256" })
+		local answered = nil
+		local dispatched = M.download_update("https://example.invalid/1.tar.gz", function(path, err)
+			answered = { path = path, err = err }
+		end)
+		helpers.assert_true(dispatched == false, "a stale consent must not start a download")
+		helpers.assert_true(answered ~= nil and answered.path == nil, "the caller learns the download was refused")
+		M.clear_cached_release()
+	end)
+
 	helpers.it("get_menu_label returns a string for every state", function()
 		-- Should return a non-empty string even without having checked.
 		local label = M.get_menu_label()
