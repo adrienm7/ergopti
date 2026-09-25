@@ -6,17 +6,18 @@
  * DESCRIPTION:
  * Every file the release notes advertise as a release asset must be a file some
  * build job actually uploads. The download tables and the upload lists live in
- * two different jobs of `.github/workflows/ci.yml`, two hundred lines apart, and
- * nothing compared them.
+ * different workflows of the CI pipeline — the notes in the release job of
+ * `.github/workflows/ci.yml`, the uploads in each OS box it calls — and nothing
+ * compared them.
  *
  * ROOT CAUSE ENCODED:
  * The Linux table advertised `kanata.kbd`, linking to
- * `releases/download/<tag>/kanata.kbd`. The `build-linux` job's upload list only
- * ever held `Ergopti_xkb.zip` and `ergopti-plus-linux.tar.gz` — the kanata config
- * was packed *inside* the tarball and never attached on its own. Every published
- * release therefore shipped a table row pointing at a file the release does not
- * contain, and no job, test or lint pass could notice: the notes are a heredoc,
- * the uploads are a YAML list, and neither is derived from the other.
+ * `releases/download/<tag>/kanata.kbd`. The Linux release build's upload list
+ * only ever held `Ergopti_xkb.zip` and `ergopti-plus-linux.tar.gz` — the kanata
+ * config was packed *inside* the tarball and never attached on its own. Every
+ * published release therefore shipped a table row pointing at a file the release
+ * does not contain, and no job, test or lint pass could notice: the notes are a
+ * heredoc, the uploads are a YAML list, and neither is derived from the other.
  *
  * It is worse than a dead link in the notes. The website resolves its download
  * buttons through a STRICT asset-name lookup (`release.assets[name] ?? null` in
@@ -26,17 +27,23 @@
  * button renders as `href="#"`.
  *
  * FEATURES & RATIONALE:
- * 1. Both sides are derived from `ci.yml` after expanding the Linux bundle name
- *    from the shared updater contract. A hardcoded list of expected assets would
- *    rot exactly the way the thing it guards rotted — it would be one more copy
- *    nobody updates. The links come from the release-body heredoc, the uploads
- *    from every `actions/upload-artifact` step's `path:` list.
+ * 1. Both sides are derived from the pipeline (tools/test/ci-pipeline.cjs) after
+ *    expanding the Linux bundle name from the shared updater contract. A
+ *    hardcoded list of expected assets would rot exactly the way the thing it
+ *    guards rotted — it would be one more copy nobody updates. The links come
+ *    from the release job's heredoc, the uploads from the `path:` list of every
+ *    `actions/upload-artifact` step whose artifact is named `assets-*`: the
+ *    release downloads only that pattern, so an evidence upload cannot stand in.
  * 2. Floored parses. A regex that stopped matching would find zero links, and a
  *    guard over an empty set passes forever; both extractions assert a minimum.
- * 3. The premise is asserted too — the finalize job attaching exactly what the
- *    build jobs uploaded is what makes the upload lists an authoritative asset
- *    inventory, so a rewrite of that step fails here rather than silently
- *    invalidating the whole check.
+ * 3. The premise is asserted too — the release job attaching exactly what the
+ *    boxes uploaded as `assets-*` is what makes those upload lists an
+ *    authoritative asset inventory, so a rewrite of that step fails here rather
+ *    than silently invalidating the whole check.
+ * 4. An upload list only proves a file CAN be uploaded. The release preflight
+ *    refuses to publish when one is missing, so every linked asset, derived
+ *    from the same links, must be in its list, with the Sparkle signature, the
+ *    channel appcast and the Linux bundle checksum.
  * ==============================================================================
  */
 
@@ -44,13 +51,12 @@
 
 const fs = require('fs');
 const path = require('path');
+const pipeline = require('./ci-pipeline.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const WORKFLOW_REL = '.github/workflows/ci.yml';
-const WORKFLOW = path.join(ROOT, WORKFLOW_REL);
 
 // A link to an asset of THIS release. Anchoring on the literal `${TAG}` is what
-// scopes the scan to our own release: ci.yml also downloads third-party
+// scopes the scan to our own release: the workflows also download third-party
 // tarballs from `releases/download/v2.0.19/…` (AutoHotkey) and
 // `releases/download/${SPARKLE_VERSION}/…`, which are nobody's job to attach.
 const RELEASE_LINK = /releases\/download\/\$\{TAG\}\/([A-Za-z0-9._+-]+)/g;
@@ -59,21 +65,24 @@ const RELEASE_LINK = /releases\/download\/\$\{TAG\}\/([A-Za-z0-9._+-]+)/g;
 const UPLOAD_STEP = /^\s*(?:-\s+)?uses:\s*actions\/upload-artifact/;
 const ARTIFACT_NAME = /^\s*name:\s*(\S+)/;
 const PATH_KEY = /^(\s*)path:\s*(.*)$/;
+// Only these artifacts reach the release (its download pattern is assets-*).
+const RELEASE_ARTIFACT = /^assets-/;
 
 // A `path:` entry can be a glob. Basename equality cannot decide those, so they
 // are compiled to a matcher instead of being compared literally.
 const IS_GLOB = /[*?[\]]/;
 
-// The finalize job attaches whatever the build jobs uploaded. If that stops
-// being true, the upload lists stop being the asset inventory and this guard is
-// measuring the wrong thing.
+// The release job attaches whatever the boxes uploaded as assets-*. If that
+// stops being true, the upload lists stop being the asset inventory and this
+// guard is measuring the wrong thing.
 const ATTACHES_DOWNLOADED_ARTIFACTS = /find\s+release-assets\s+-type\s+f/;
-const DOWNLOADS_ARTIFACTS = /uses:\s*actions\/download-artifact/;
+const DOWNLOADS_RELEASE_ARTIFACTS = /uses:\s*actions\/download-artifact[\s\S]*?pattern:\s*assets-\*/;
 
-// Floors — today: 6 linked assets across 3 upload steps naming 8 files.
+// Floors — today: 10 linked assets across 3 assets-* upload steps naming 13
+// files (macOS 4, Windows 2, Linux 7).
 const MIN_LINKED_ASSETS = 5;
 const MIN_UPLOAD_STEPS = 3;
-const MIN_UPLOAD_PATHS = 6;
+const MIN_UPLOAD_PATHS = 13;
 
 const errors = [];
 
@@ -92,11 +101,6 @@ function indentOf(line) {
 // ====================================
 // ====================================
 
-if (!fs.existsSync(WORKFLOW)) {
-	console.error(`\x1b[31m[FAIL] ${WORKFLOW_REL} does not exist — the release pipeline cannot be checked.\x1b[0m`);
-	process.exit(1);
-}
-
 const updaterDefaults = JSON.parse(
 	fs.readFileSync(
 		path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'modules', 'updater', 'defaults.json'),
@@ -108,18 +112,27 @@ if (!/^[A-Za-z0-9._+-]+\.tar\.gz$/.test(linuxBundleAsset || '')) {
 	console.error('[ERROR] release_assets.linux_bundle is absent or unsafe in updater defaults.');
 	process.exit(1);
 }
-const lines = fs
-	.readFileSync(WORKFLOW, 'utf8')
-	.replaceAll('${{ env.LINUX_BUNDLE_ASSET }}', linuxBundleAsset)
-	.replaceAll('${LINUX_BUNDLE_ASSET}', linuxBundleAsset)
-	.split(/\r?\n/);
 
-if (!DOWNLOADS_ARTIFACTS.test(lines.join('\n')) || !ATTACHES_DOWNLOADED_ARTIFACTS.test(lines.join('\n'))) {
+/** Expands every spelling of the Linux bundle name the workflows use. */
+function expand(text) {
+	return text
+		.replaceAll('${{ env.LINUX_BUNDLE_ASSET }}', linuxBundleAsset)
+		.replaceAll('${LINUX_BUNDLE_ASSET}', linuxBundleAsset)
+		.replaceAll('$LINUX_BUNDLE_ASSET', linuxBundleAsset);
+}
+
+// locate() throws when the release job is missing, so the link scan below can
+// never run over an empty body.
+const release = pipeline.locate('release');
+const releaseLines = expand(release.body).split('\n');
+const releaseText = releaseLines.join('\n');
+
+if (!DOWNLOADS_RELEASE_ARTIFACTS.test(releaseText) || !ATTACHES_DOWNLOADED_ARTIFACTS.test(releaseText)) {
 	errors.push(
-		'the finalize job no longer downloads the build artifacts and attaches every file it finds ' +
-			'(`actions/download-artifact` + `find release-assets -type f`). That pairing is what makes the ' +
-			'upload-artifact `path:` lists the authoritative inventory of release assets, which is the ' +
-			'premise of this whole check — re-derive the upload side before trusting it again.'
+		'the release job no longer downloads the assets-* artifacts and attaches every file it finds ' +
+			'(`actions/download-artifact` with `pattern: assets-*` + `find release-assets -type f`). That ' +
+			'pairing is what makes the assets-* upload `path:` lists the authoritative inventory of release ' +
+			'assets, which is the premise of this whole check — re-derive the upload side before trusting it again.'
 	);
 }
 
@@ -136,15 +149,15 @@ if (!DOWNLOADS_ARTIFACTS.test(lines.join('\n')) || !ATTACHES_DOWNLOADED_ARTIFACT
 // reconciliation twice, and the first occurrence is the one to fix.
 const linked = new Map();
 
-lines.forEach((line, i) => {
+releaseLines.forEach((line, i) => {
 	for (const m of line.matchAll(RELEASE_LINK)) {
-		if (!linked.has(m[1])) linked.set(m[1], i + 1);
+		if (!linked.has(m[1])) linked.set(m[1], `${release.file}:${release.line + i + 1}`);
 	}
 });
 
 if (linked.size < MIN_LINKED_ASSETS) {
 	errors.push(
-		`parsed only ${linked.size} release-asset link(s) out of ${WORKFLOW_REL} (floor ${MIN_LINKED_ASSETS}). ` +
+		`parsed only ${linked.size} release-asset link(s) out of the release job (floor ${MIN_LINKED_ASSETS}). ` +
 			'The release-body heredoc changed shape and the extraction stopped matching — this guard would ' +
 			'then approve download tables it never read.'
 	);
@@ -159,50 +172,56 @@ if (linked.size < MIN_LINKED_ASSETS) {
 // =====================================================
 // =====================================================
 
-/** @type {Array<{artifact: string, line: number, files: string[]}>} */
+/** @type {Array<{artifact: string, where: string, files: string[]}>} */
 const uploads = [];
 
-for (let i = 0; i < lines.length; i++) {
-	if (!UPLOAD_STEP.test(lines[i])) continue;
+for (const { rel, text } of pipeline.files()) {
+	const lines = expand(text).split('\n');
+	for (let i = 0; i < lines.length; i++) {
+		if (!UPLOAD_STEP.test(lines[i])) continue;
 
-	const stepIndent = indentOf(lines[i]);
-	let artifact = '(unnamed)';
-	let pathLine = 0;
-	const files = [];
+		const stepIndent = indentOf(lines[i]);
+		let artifact = '(unnamed)';
+		let pathLine = 0;
+		const files = [];
 
-	// A step ends at the first non-blank line indented less than its own keys —
-	// the dash of the next list item, or the comment banner of the next job.
-	for (let j = i + 1; j < lines.length; j++) {
-		const ind = indentOf(lines[j]);
-		if (ind === -1) continue;
-		if (ind < stepIndent) break;
+		// A step ends at the first non-blank line indented less than its own keys —
+		// the dash of the next list item, or the comment banner of the next job.
+		for (let j = i + 1; j < lines.length; j++) {
+			const ind = indentOf(lines[j]);
+			if (ind === -1) continue;
+			if (ind < stepIndent) break;
 
-		const nameMatch = lines[j].match(ARTIFACT_NAME);
-		if (nameMatch && ind > stepIndent) artifact = nameMatch[1];
+			const nameMatch = lines[j].match(ARTIFACT_NAME);
+			if (nameMatch && ind > stepIndent) artifact = nameMatch[1];
 
-		const pathMatch = lines[j].match(PATH_KEY);
-		if (!pathMatch) continue;
-		pathLine = j + 1;
+			const pathMatch = lines[j].match(PATH_KEY);
+			if (!pathMatch) continue;
+			pathLine = j + 1;
 
-		// `path: build/foo.zip` — a single inline value rather than a block.
-		const inline = pathMatch[2].trim();
-		if (inline !== '' && inline !== '|' && inline !== '>' && !inline.startsWith('|-') && !inline.startsWith('>-')) {
-			files.push(inline);
-			continue;
+			// `path: build/foo.zip` — a single inline value rather than a block.
+			const inline = pathMatch[2].trim();
+			if (inline !== '' && inline !== '|' && inline !== '>' && !inline.startsWith('|-') && !inline.startsWith('>-')) {
+				files.push(inline);
+				continue;
+			}
+
+			const listIndent = pathMatch[1].length;
+			for (let k = j + 1; k < lines.length; k++) {
+				const entryIndent = indentOf(lines[k]);
+				if (entryIndent === -1) continue;
+				if (entryIndent <= listIndent) break;
+				const entry = lines[k].trim();
+				if (entry.startsWith('#')) continue;
+				files.push(entry.replace(/^-\s*/, ''));
+			}
 		}
 
-		const listIndent = pathMatch[1].length;
-		for (let k = j + 1; k < lines.length; k++) {
-			const entryIndent = indentOf(lines[k]);
-			if (entryIndent === -1) continue;
-			if (entryIndent <= listIndent) break;
-			const entry = lines[k].trim();
-			if (entry.startsWith('#')) continue;
-			files.push(entry.replace(/^-\s*/, ''));
-		}
+		// An evidence upload (launch-gate-*, linux-ci-evidence-*, ...) never
+		// reaches the release, so it cannot vouch for an advertised asset.
+		if (!RELEASE_ARTIFACT.test(artifact)) continue;
+		uploads.push({ artifact, where: `${rel}:${pathLine || i + 1}`, files });
 	}
-
-	uploads.push({ artifact, line: pathLine || i + 1, files });
 }
 
 const uploadedNames = new Set();
@@ -227,8 +246,8 @@ for (const step of uploads) {
 
 if (uploads.length < MIN_UPLOAD_STEPS) {
 	errors.push(
-		`found only ${uploads.length} upload-artifact step(s) (floor ${MIN_UPLOAD_STEPS}) — the step scan ` +
-			'broke, and an empty upload set makes every linked asset look missing (or, once someone ' +
+		`found only ${uploads.length} assets-* upload-artifact step(s) (floor ${MIN_UPLOAD_STEPS}) — the step ` +
+			'scan broke, and an empty upload set makes every linked asset look missing (or, once someone ' +
 			'"fixes" that, makes nothing look missing at all).'
 	);
 }
@@ -256,18 +275,18 @@ if (uploadedPathCount < MIN_UPLOAD_PATHS) {
 // names each asset after the file — so the basename is both the only token the
 // two lists share and exactly the key the published release is addressed by.
 const inventory = uploads
-	.map((u) => `${u.artifact} (${WORKFLOW_REL}:${u.line}): ${u.files.join(', ') || '(none)'}`)
+	.map((u) => `${u.artifact} (${u.where}): ${u.files.join(', ') || '(none)'}`)
 	.join('\n        ');
 
-for (const [name, line] of linked) {
+for (const [name, where] of linked) {
 	if (uploadedNames.has(name)) continue;
 	if (uploadedGlobs.some((re) => re.test(name))) continue;
 
 	errors.push(
 		`"${name}" is advertised as a release asset but no job uploads it.\n` +
 			`      Reconcile these two places:\n` +
-			`        1. the download table in the release body — ${WORKFLOW_REL}:${line}\n` +
-			`        2. the \`path:\` list of the \`actions/upload-artifact\` step in the job that builds it:\n` +
+			`        1. the download table in the release body — ${where}\n` +
+			`        2. the \`path:\` list of the assets-* \`actions/upload-artifact\` step in the box that builds it:\n` +
 			`        ${inventory}\n` +
 			`      Either attach the file or drop the row. Left as is, every published release carries a ` +
 			`dead link, and the site is worse off still: src/lib/js/getGitHubRelease.js looks assets up by ` +
@@ -275,7 +294,50 @@ for (const [name, line] of linked) {
 	);
 }
 
-const releaseBody = lines.join('\n');
+
+
+
+// ======================================================
+// ======================================================
+// ======= 5/ The Preflight Requires Every Asset ========
+// ======================================================
+// ======================================================
+
+// An upload list proves a box CAN upload a file, not that this run did:
+// upload-artifact's if-no-files-found only fires when every path of a step is
+// missing, and a skipped release step drops its file silently. The release
+// preflight is what refuses to publish without one, so every linked asset, the
+// Sparkle signature and appcast the feed step publishes, and the checksum the
+// Linux updater verifies the bundle against must be in its list.
+const PREFLIGHT = 'Refuse to publish an incomplete or already-taken release';
+const UNLINKED_REQUIRED = ['_ErgoptiPlus.app.zip.sig', 'appcast-${CHANNEL}.xml', `${linuxBundleAsset}.sha256`];
+const preflight = expand(pipeline.step(release.body, PREFLIGHT));
+const assetLoop = /^\s*for asset in ([^\n;]*(?:\\\n[^\n;]*)*); do\n([\s\S]*?)\n\s*done$/m.exec(preflight);
+const required = assetLoop
+	? assetLoop[1].split(/\s+/).filter((token) => token !== '' && token !== '\\').map((token) => token.replace(/^"(.*)"$/, '$1'))
+	: [];
+if (!assetLoop || !/if \[ ! -s "release-assets\/\$asset" \]; then/.test(assetLoop[2])) {
+	errors.push(`"${PREFLIGHT}" no longer loops over the required assets with [ ! -s "release-assets/$asset" ]`);
+} else if (!/if \[ "\$missing" -gt 0 \]; then\n[^\n]*\n\s*exit 1/.test(preflight)) {
+	errors.push(`"${PREFLIGHT}" must exit 1 when any required asset is missing`);
+}
+if (required.length < linked.size + UNLINKED_REQUIRED.length) {
+	errors.push(`"${PREFLIGHT}" requires ${required.length} asset(s), fewer than the ${linked.size} linked plus ` +
+		`${UNLINKED_REQUIRED.length} feed and checksum files; the list parse drifted or entries were dropped`);
+}
+for (const name of [...linked.keys(), ...UNLINKED_REQUIRED]) {
+	if (!required.includes(name)) {
+		errors.push(`"${name}" is not in the asset list of "${PREFLIGHT}" (${release.file}): a run whose box ` +
+			'skipped it would publish anyway. Add it to the loop.');
+	}
+}
+for (const name of required) {
+	if (!uploadedNames.has(name) && !uploadedGlobs.some((re) => re.test(name))) {
+		errors.push(`"${PREFLIGHT}" requires "${name}", which no assets-* upload step names: every release would stop there`);
+	}
+}
+
+const releaseBody = releaseText;
 // The downloads must be in view without a jump. A "skip to downloads" link
 // failed twice: the releases list page truncates long notes, which cut the
 // anchor placed after the changelog, and from the list GitHub opens a release
@@ -287,12 +349,12 @@ const changelogAt = releaseBody.search(/sed [^\n]*\$RUNNER_TEMP\/changelog\.md/)
 if (downloadsAt < 0 || foldAt < 0 || changelogAt < 0 || !(downloadsAt < foldAt && foldAt < changelogAt)) {
 	errors.push('the release downloads must come before the changelog, and the changelog must be folded in <details>');
 }
-if (/Skip to downloads|DOWNLOADS_ANCHOR/.test(releaseBody)) {
+if (/Skip to downloads|DOWNLOADS_ANCHOR/.test(pipeline.text())) {
 	errors.push('release notes must not rely on a jump link to the downloads (it cannot scroll on the first click)');
 }
 // The repository sidebar truncates long release titles, which hid the version.
-// The title is computed in shell once; later steps only forward it via ${{ }}.
-const titles = releaseBody.match(/^\s*title="(?!\$\{\{)[^"\n]*"/gm) || [];
+// The title is computed in shell once, in plan; later steps only forward it via ${{ }}.
+const titles = pipeline.text().match(/^\s*title="(?!\$\{\{)[^"\n]*"/gm) || [];
 if (titles.length === 0 || titles.some(line => line.trim() !== 'title="Ergopti ${tag}"')) {
 	errors.push(`every release title must be exactly "Ergopti \${tag}", got: ${titles.map(t => t.trim()).join(' | ')}`);
 }
@@ -308,7 +370,21 @@ if (errors.length > 0) {
 	process.exit(1);
 }
 
+/** Names the assets-* artifacts whose upload list holds `name`. */
+function providersOf(name) {
+	return uploads
+		.filter((u) => u.files.some((file) => {
+			const base = file.split('/').pop();
+			if (!IS_GLOB.test(base)) return base === name;
+			const pattern = base.replace(/[.+^${}()|\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.');
+			return new RegExp(`^${pattern}$`).test(name);
+		}))
+		.map((u) => u.artifact);
+}
+
 console.log(
 	`\x1b[32m[OK] all ${linked.size} asset(s) linked by the release notes are uploaded by one of the ` +
-		`${uploads.length} build job(s) (${uploadedPathCount} path(s) inventoried).\x1b[0m`
+		`${uploads.length} assets-* upload step(s) (${uploadedPathCount} path(s) inventoried), and the ` +
+		`release preflight requires all ${required.length} release file(s):\x1b[0m`
 );
+for (const name of required) console.log(`    ${name} <- ${providersOf(name).join(', ')}`);

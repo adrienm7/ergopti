@@ -1,43 +1,34 @@
 # .github/workflows/ci.yml
 #
-# Unified CI pipeline — one workflow per push to main or dev.
+# Unified CI pipeline — one run per push to main or dev, per pull request into
+# them, and per manual dispatch.
 #
 # Architecture:
 #
-#   ┌──────────────────────────────────────────────────────────┐
-#   │ validate-hotstrings · validate-domain · validate-js      │
-#   │            (validate-translations)                       │
-#   └──────────────┬───────────────┬───────────────┬───────────┘
-#                  │ (always runs — no path filter)
-#        ┌─────────┼──────────┐
-#        ▼         ▼          ▼
-#   ┌─────────┐ ┌──────────┐ ┌──────────┐
-#   │ macOS   │ │ Windows  │ │  Linux   │
-#   │  branch │ │  branch  │ │  branch  │
-#   │         │ │          │ │          │
-#   │ test-hs │ │ test-ahk │ │test-linux│
-#   │  e2e-hs │ │  e2e-ahk │ │ e2e-linux│
-#   └────┬────┘ └────┬─────┘
-#        │           │           │
-#        └─────────┬─┘───────────┘
-#                  ▼
-#          ┌───────────────────────┐
-#          │  resolve-release-meta │  (main + dev, all drivers green)
-#          │  compute tag/version  │
-#          └───────────┬───────────┘
-#             ┌────────┼────────┐
-#             ▼        ▼        ▼
-#        ┌────────┐ ┌──────┐ ┌───────┐
-#        │ build  │ │build │ │ build │
-#        │ macos  │ │ win  │ │ linux │
-#        └────────┘ └──────┘ └───────┘
-#             └────────┬────────┘
-#                      ▼
-#             ┌─────────────────┐
-#             │ finalize-release│
-#             │ create release  │
-#             │ + upload assets │
-#             └─────────────────┘
+#   validate ──┐        ┌── macOS   (ci-macos.yml)   ──┐
+#              ├──>─────┼── Windows (ci-windows.yml) ──┼──> release
+#   plan ──────┘        └── Linux   (ci-linux.yml)   ──┘
+#
+#   validate   Every repository-wide gate: hotstring TOML format, fast-check
+#              properties, Stryker on main, and the npm run test:js umbrella
+#              (domain drift, parity, port compliance, translations, strict
+#              convention lint, ...).
+#   plan       Resolves the release metadata once, from git refs alone: whether
+#              this run publishes, and its tag, version, title and update
+#              channel. Only a push to main or dev whose next tag is still free
+#              publishes; every other run takes the CI profile.
+#   macOS      One reusable workflow per OS, each drawn as one group box. A box
+#   Windows    runs its tests and builds its package on every run. On a release
+#   Linux      run it builds the release artifact once, gates those exact bytes,
+#              and uploads them as assets-<os>. A box's own result is its
+#              aggregate gate: it fails as soon as any of its jobs fails.
+#   release    Publishes. It needs all three boxes to succeed, downloads every
+#              assets-* artifact of the run, creates the tag and the release,
+#              and pushes the Sparkle channel feed.
+#
+# Only with: and secrets: cross a call. The boxes read plan's outputs as inputs,
+# and each signing secret is passed explicitly, never with `inherit`, and only
+# on a release run.
 #
 # bench.yml — perf benchmark (main only, independent cadence)
 
@@ -59,16 +50,22 @@ concurrency:
 
 # ========================================================
 # ========================================================
-# ======= 1/ Validation — fast gates, always run ========
+# ======= 1/ Validation and release plan — t=0 ==========
 # ========================================================
 # ========================================================
 
 jobs:
   # ─────────────────────────────────────────────────
-  # 1.1) Hotstring TOML format
+  # 1.1) Repository-wide validation
   # ─────────────────────────────────────────────────
-  validate-hotstrings:
-    name: 'Validate · hotstrings TOML'
+  # One job for what used to be four validate jobs: the domain pipeline and the
+  # translation audit already run inside npm run test:js, as do the port
+  # compliance, priority parity and strict convention lint steps. Each check
+  # after the setup runs under !cancelled(): the checks used to be separate
+  # jobs, and one failing check must still not hide the others. Any failure
+  # still fails the job.
+  validate:
+    name: 'Validate'
     runs-on: ubuntu-latest
 
     steps:
@@ -77,39 +74,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-
-      - name: Check hotstring TOML files are sorted and formatted
-        run: python tools/format_toml.py --hotstrings --all --check
-
-  # ─────────────────────────────────────────────────
-  # 1.2) Domain build pipeline + drift detection
-  # ─────────────────────────────────────────────────
-  validate-domain:
-    name: 'Validate · domain pipeline'
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: '.node-version'
-          cache: 'npm'
-
-      - run: npm ci
-
-      - name: Run domain build pipeline
-        run: npm run build:domain
-
-  # ─────────────────────────────────────────────────
-  # 1.3) JS shared layer — port compliance + PBT
-  # ─────────────────────────────────────────────────
-  validate-js:
-    name: 'Validate · JS ports + properties'
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
@@ -129,2274 +93,99 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y lua5.4 libxml2-utils
 
-      - name: Port compliance (all 20 ports covered by adapters)
-        run: npm run test:port-compliance
-
-      - name: Hotstring priority parity (shared JSON ↔ AHK + Lua constants)
-        run: npm run test:priority-parity
+      - name: Check hotstring TOML files are sorted and formatted
+        if: ${{ !cancelled() }}
+        run: python tools/format_toml.py --hotstrings --all --check
 
       - name: Property-based tests (fast-check, 27 × 1000 runs)
+        if: ${{ !cancelled() }}
         run: npm run test:properties
 
       - name: Mutation tests — domain layer (Stryker, break=25)
         # Guards the shared domain spec files (Registry, HotstringMatcher).
         # Stryker only mutates the JS domain specs, yet it's the most expensive
-        # step and validate-js is a `needs` of every driver job — so it gated the
+        # step and validate is a `needs` of every OS box — so it gated the
         # whole graph on every push. Run it on main only (TT-4); PRs/branches still
-        # get every other validate-js check, including the full test:js umbrella.
-        if: github.ref == 'refs/heads/main'
+        # get every other validate check, including the full test:js umbrella.
+        if: ${{ !cancelled() && github.ref == 'refs/heads/main' }}
         run: npm run test:mutation
-
-      - name: Convention lint (strict — banners, spacing, section headers)
-        run: npm run lint:conventions:strict
 
       - name: JS validation suite (umbrella — every run-js-suite check)
         # Gates the full run-js-suite (drift, parity, single-source ratchets,
         # bridge wiring, diagnostic-UI / focus / no-fallback §5.9 regressions, …).
         # Previously these ran only via the local `test:js` and never in CI (TT-3).
+        if: ${{ !cancelled() }}
         run: npm run test:js
 
   # ─────────────────────────────────────────────────
-  # 1.4) Translation consistency audit
+  # 1.2) Release plan: tag, version, title and channel
   # ─────────────────────────────────────────────────
-  validate-translations:
-    name: 'Validate · translations audit'
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: '.node-version'
-
-      - name: Run translation key consistency audit
-        run: node tools/lint/audit-translations.cjs
-
-  # ─────────────────────────────────────────────────
-  # 2.1) Hammerspoon unit tests
-  # ─────────────────────────────────────────────────
-  test-hs:
-    name: 'macOS · unit tests'
-    runs-on: ubuntu-latest
-    needs: [validate-hotstrings, validate-domain, validate-js, validate-translations]
-
-    steps:
-      # Enough history for test_no_coauthor_in_commits.lua, which scans
-      # HEAD~20..HEAD. The default checkout is a depth-1 clone, so that range does
-      # not exist and the test fails — correctly, and saying so: it refuses to
-      # report a clean history it could not read. Giving it the commits is the fix;
-      # letting it pass on an empty range would make the whole check ornamental.
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 25
-
-      - name: Install Lua 5.4 + luarocks
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y lua5.4 liblua5.4-dev luarocks
-
-      - name: Install luacheck + luafilesystem
-        # lfs is required by tests/run.lua for recursive test discovery;
-        # --lua-version 5.4 ensures luarocks links the correct runtime.
-        run: |
-          sudo luarocks --lua-version 5.4 install luacheck
-          sudo luarocks --lua-version 5.4 install luafilesystem
-
-      - name: Run luacheck (non-blocking)
-        # Surface warnings without failing — pre-existing style issues
-        # must not block the test step.
-        run: |
-          luacheck static/ergopti_plus/macos/tests static/ergopti_plus/macos/infra \
-            static/ergopti_plus/macos/modules || true
-
-      - name: Run unit + meta tests
-        working-directory: static/ergopti_plus/macos
-        # The focused-runner regression tests spawn child interpreters; pin
-        # the same binary as this job so runner-image defaults (which may
-        # resolve bare `lua` to an interpreter without package.searchpath)
-        # cannot change semantics under us.
-        env:
-          LUA: lua5.4
-        run: node ../../../tools/test/report.cjs --name macos-lua --json "${{ runner.temp }}/macos-lua.json" -- lua5.4 tests/run.lua
-
-  # ─────────────────────────────────────────────────
-  # 2.2) Hammerspoon virtual-keyboard harness (stubbed, NOT real macOS/HS)
-  # ─────────────────────────────────────────────────
-  # This job runs on ubuntu-latest against the same in-memory tests/stubs/hs.lua
-  # fake that tests/unit uses — no real Hammerspoon process, no WindowServer, no
-  # CGEventPost round-trip is ever exercised here. It is a corpus-driven
-  # virtual-keyboard replay of the Registry + Expander logic layer, not an
-  # OS-level end-to-end test. See tests/e2e/PLAN_E2E_REAL_HS.md for what a real
-  # macOS/Hammerspoon E2E run would require (a self-hosted GUI runner) and why
-  # it is not wired in today. Named/commented explicitly so a green check here
-  # never implies OS-level coverage it does not have (F-HIGH-30).
-  e2e-hs:
-    name: 'macOS · virtual-keyboard harness (stubbed, not real HS)'
-    runs-on: ubuntu-latest
-    needs: [test-hs]
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Lua 5.4 + luafilesystem
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y lua5.4 liblua5.4-dev luarocks
-          sudo luarocks --lua-version 5.4 install luafilesystem
-
-      - name: Run virtual-keyboard harness (stubbed hs.* — no real Hammerspoon)
-        # Exercises Registry + Expander via the stub layer against
-        # hardcoded scenarios and all corpus vectors.
-        # Exit 0 = all pass, 1 = at least one failure.
-        working-directory: static/ergopti_plus/macos
-        run: lua5.4 tests/e2e/run_e2e.lua
-        timeout-minutes: 5
-
-  # ─────────────────────────────────────────────────
-  # 2.3) Native launcher build + process-level XCTest on macOS
-  # ─────────────────────────────────────────────────
-  test-swift-launcher:
-    name: 'macOS · Swift launcher build + tests'
-    runs-on: macos-latest
-    needs: [validate-hotstrings, validate-domain, validate-js, validate-translations]
-    timeout-minutes: 20
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Cache SwiftPM dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/Library/Caches/org.swift.swiftpm
-            static/ergopti_plus/macos/launcher/.build/artifacts
-            static/ergopti_plus/macos/launcher/.build/checkouts
-            static/ergopti_plus/macos/launcher/.build/repositories
-          key: swiftpm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('static/ergopti_plus/macos/launcher/Package.swift') }}
-          restore-keys: |
-            swiftpm-${{ runner.os }}-${{ runner.arch }}-
-
-      - name: Report Swift toolchain
-        run: swift --version
-
-      - name: Lint remap guardian LaunchAgent
-        run: plutil -lint static/ergopti_plus/macos/launcher/com.ergoptiplus.remap-guardian.plist
-
-      - name: Build release launcher
-        run: swift build -c release --product ErgoptiPlus --package-path static/ergopti_plus/macos/launcher
-        timeout-minutes: 10
-
-      # Keep XCTest serial: the lease tests install process-wide signal handlers
-      # and fork/reap real children, so parallel workers would race each other.
-      - name: Run Swift launcher tests
-        env:
-          SWIFT_BACKTRACE: enable=yes
-        run: |
-          set -euo pipefail
-          xctest_log="$(mktemp)"
-          trap 'rm -f "$xctest_log"' EXIT
-          script -q /dev/null swift test --package-path static/ergopti_plus/macos/launcher 2>&1 | tee "$xctest_log"
-          if ! grep -Fq "Test Suite 'All tests' passed" "$xctest_log"; then
-              echo "::error::the XCTest process ended without its successful suite summary"
-              exit 1
-          fi
-        timeout-minutes: 10
-
-  # ─────────────────────────────────────────────────
-  # 2.4) Packaged application launch over real user states
-  # ─────────────────────────────────────────────────
-  # Unit suites never start the packaged app, and a pristine runner hides every
-  # failure that depends on what a user already has on disk (a symlinked config
-  # folder, a legacy paths.toml, logs left by a source run). Build the complete
-  # unreleased package once and launch it over those states on every push/PR.
-  package-macos:
-    name: 'macOS · package unreleased app'
-    runs-on: macos-latest
-    needs: [validate-hotstrings, validate-domain, validate-js, validate-translations]
-    timeout-minutes: 25
-
-    steps:
-      - uses: actions/checkout@v4
-
-      # The public EdDSA key must be embedded: without SUPublicEDKey, Sparkle
-      # opens an updater error at launch, and the launcher then never observes
-      # its child's logger readiness or exit, so every launch verdict is void.
-      # Pull requests from forks receive no secrets. This package is never
-      # published or offered as an update, so a throwaway key of the right
-      # shape keeps the launch gate meaningful for outside contributors
-      # instead of failing them for a secret they cannot have.
-      - name: Build ErgoptiPlus.app
-        env:
-          ERGOPTI_BUILD_COMMIT: ${{ github.sha }}
-          ERGOPTI_CHANNEL: dev
-          SPARKLE_PUBLIC_KEY: ${{ secrets.SPARKLE_PUBLIC_KEY }}
-          GH_OWNER: ${{ github.repository_owner }}
-          GH_REPO: ${{ github.event.repository.name }}
-        run: |
-          set -euo pipefail
-          if [ -z "$SPARKLE_PUBLIC_KEY" ]; then
-              echo "::notice title=Sparkle key::No SPARKLE_PUBLIC_KEY secret (pull request from a fork). Using a throwaway key: this package only feeds the launch gate and is never published."
-              SPARKLE_PUBLIC_KEY="$(head -c 32 /dev/urandom | base64)"
-              export SPARKLE_PUBLIC_KEY
-          fi
-          bash tools/build/build_macos_app.sh
-
-      - name: Retain the package for the launch gate
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-package-unreleased
-          retention-days: 1
-          path: build/macos/ErgoptiPlus.app.zip
-          if-no-files-found: error
-
-  launch-gate-macos:
-    name: 'macOS · packaged launch gate'
-    needs: [package-macos]
-    uses: ./.github/workflows/macos-launch-gate.yml
-    with:
-      label: unreleased
-      artifact: macos-package-unreleased
-      runners: '["macos-15"]'
-      scenarios: '["clean","upgraded","symlink_config","symlink_hammerspoon","symlink_logs","tilde_paths","dangling_logs","configured_symlink","plain_open"]'
-
-  # ─────────────────────────────────────────────────
-  # 2.5) Gate: macOS driver fully green
-  # ─────────────────────────────────────────────────
-  macos-ok:
-    name: 'macOS · ✅ all green'
-    runs-on: ubuntu-latest
-    needs: [test-hs, e2e-hs, test-swift-launcher, launch-gate-macos]
-    if: always()
-
-    steps:
-      - name: Assert all macOS jobs passed
-        env:
-          NEEDS: ${{ toJSON(needs) }}
-        run: |
-          set -euo pipefail
-          total=$(echo "$NEEDS" | jq -r 'length')
-          if [ "$total" -lt 4 ]; then
-              echo "::error::macos-ok read $total dependency result(s) — this gate is asserting too little."
-              exit 1
-          fi
-
-          failed=0
-          while read -r job result; do
-              printf '  %-24s: %s\n' "$job" "$result"
-              case "$result" in
-                  success) ;;
-                  *) failed=1 ;;
-              esac
-          done < <(echo "$NEEDS" | jq -r 'to_entries[] | "\(.key) \(.value.result)"')
-
-          if [ "$failed" -eq 1 ]; then
-              echo "macOS driver: one or more of the $total jobs did not succeed."
-              exit 1
-          fi
-          echo "macOS driver: all $total job(s) passed."
-
-  # =============================================
-  # =============================================
-  # ======= 3/ Windows driver branch ============
-  # =============================================
-  # =============================================
-
-  # ─────────────────────────────────────────────────
-  # 3.1) AHK unit tests
-  # ─────────────────────────────────────────────────
-  test-ahk:
-    name: 'Windows · unit tests'
-    runs-on: windows-latest
-    needs: [validate-hotstrings, validate-domain, validate-js, validate-translations]
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Build and test native navigation event owner
-        shell: pwsh
-        run: ./tools/build/build_windows_nav_owner.ps1
-
-      - name: Cache AutoHotkey runtime
-        id: cache-ahk
-        uses: actions/cache@v4
-        with:
-          path: C:\AutoHotkey
-          key: ahk-v2.0.19-windows
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: '.node-version'
-          cache: 'npm'
-
-      - run: npm ci
-        shell: pwsh
-
-      - name: Build features manifest
-        run: npm run build:manifest
-        shell: pwsh
-
-      - name: Manifest parity (AHK ↔ HS codegen equivalence)
-        run: npm run test:manifest-parity
-        shell: pwsh
-
-      - name: Download AutoHotkey v2 runtime
-        if: steps.cache-ahk.outputs.cache-hit != 'true'
-        shell: pwsh
-        run: |
-          Invoke-WebRequest `
-              -Uri "https://github.com/AutoHotkey/AutoHotkey/releases/download/v2.0.19/AutoHotkey_2.0.19.zip" `
-              -OutFile "$env:TEMP\AHK.zip" -UseBasicParsing
-          Expand-Archive -Path "$env:TEMP\AHK.zip" -DestinationPath "C:\AutoHotkey" -Force
-
-      - name: Verify AHK source encoding (UTF-8 BOM + LF)
-        # AHK v2 silently aborts mid-file on encoding drift — catch it
-        # before it causes silent test failures with no error message.
-        shell: pwsh
-        run: |
-          $ahkFiles = Get-ChildItem `
-              -Path "${{ github.workspace }}\static\ergopti_plus\windows" `
-              -Recurse -Filter "*.ahk" |
-              Where-Object { -not $_.FullName.Contains("vendor") }
-          $failures = @()
-          foreach ($file in $ahkFiles) {
-              $bytes = [System.IO.File]::ReadAllBytes($file.FullName)
-              if ($bytes.Length -lt 3 -or
-                  $bytes[0] -ne 0xEF -or $bytes[1] -ne 0xBB -or $bytes[2] -ne 0xBF) {
-                  $failures += "MISSING BOM : $($file.FullName)"; continue
-              }
-              $content = [System.IO.File]::ReadAllText(
-                  $file.FullName, [System.Text.Encoding]::UTF8)
-              if ($content -match "`r") {
-                  $failures += "CR BYTE : $($file.FullName)"
-              }
-          }
-          if ($failures.Count -gt 0) {
-              $failures | ForEach-Object { Write-Host "  $_" }
-              Write-Error "AHK encoding violations detected."
-              exit 1
-          }
-          Write-Host "Encoding OK — $($ahkFiles.Count) file(s) verified."
-
-      - name: Disable Windows Defender real-time scanning for AHK tests
-        shell: pwsh
-        run: |
-          # Defender holds intermittent exclusive scan locks on any file the AHK
-          # test suite writes — including temp files in A_Temp — causing FileRead /
-          # FileAppend calls to block for the full 240 s watchdog window.
-          # -DisableRealtimeMonitoring requires admin; add path exclusions as a
-          # belt-and-suspenders fallback that works even without that flag.
-          Set-MpPreference -DisableRealtimeMonitoring $true -ErrorAction SilentlyContinue
-          Add-MpPreference -ExclusionPath "$env:TEMP"           -ErrorAction SilentlyContinue
-          Add-MpPreference -ExclusionPath "${{ github.workspace }}" -ErrorAction SilentlyContinue
-          Add-MpPreference -ExclusionProcess "AutoHotkey64.exe" -ErrorAction SilentlyContinue
-          Write-Host "Defender exclusions applied."
-
-      - name: Run AHK test suite
-        shell: pwsh
-        timeout-minutes: 25
-        run: |
-          $ahk = Get-ChildItem "C:\AutoHotkey" -Filter "AutoHotkey64.exe" |
-              Select-Object -First 1 -ExpandProperty FullName
-          if (-not $ahk) { Write-Error "AutoHotkey64.exe not found."; exit 2 }
-          $runner = "${{ github.workspace }}\static\ergopti_plus\windows\tests\run_all.ahk"
-          if (-not (Test-Path $runner)) {
-              Write-Error "Test runner not found at $runner"; exit 2
-          }
-          $resultsFile = "$env:TEMP\ergopti_test_results.txt"
-          $env:ERGOPTI_AHK_RESULTS_FILE = $resultsFile
-          Remove-Item $resultsFile -Force -ErrorAction SilentlyContinue
-          Write-Host "AHK runtime : $ahk"
-          Write-Host "Test runner : $runner"
-          Write-Host "------------------------------------------------------------"
-          # AHK writes TAP output to test_results.txt (FileAppend to "*"/stdout
-          # blocks when AHK runs without an inherited console handle, so the
-          # file is the only reliable output channel in CI).
-          # Tail-read the results file while AHK runs for real-time CI log output.
-          # /ErrorStdOut routes load-time (parse / nonexistent-function / missing
-          # #Include) errors to stderr and exits non-zero instead of popping a modal
-          # dialog that no one can dismiss headlessly — which otherwise hangs the
-          # runner until the 15 min step timeout. Must precede the script path.
-          $proc = Start-Process -FilePath $ahk -ArgumentList "/ErrorStdOut `"$runner`"" -NoNewWindow -PassThru
-          $fstream = $null
-          $reader  = $null
-          $sw = [System.Diagnostics.Stopwatch]::StartNew()
-          while (-not $proc.HasExited) {
-              if ($null -eq $fstream -and (Test-Path $resultsFile)) {
-                  try {
-                      $fstream = [System.IO.FileStream]::new($resultsFile,
-                          [System.IO.FileMode]::Open,
-                          [System.IO.FileAccess]::Read,
-                          [System.IO.FileShare]::ReadWrite)
-                      $reader = [System.IO.StreamReader]::new($fstream)
-                  } catch {
-                      # AHK may still hold an exclusive write lock; retry next tick
-                      Start-Sleep -Milliseconds 100
-                  }
-              }
-              if ($null -ne $reader) {
-                  $line = $reader.ReadLine()
-                  if ($null -ne $line) { Write-Host $line } else { Start-Sleep -Milliseconds 100 }
-              } else {
-                  Start-Sleep -Milliseconds 100
-              }
-          }
-          if ($null -ne $reader) {
-              while ($null -ne ($line = $reader.ReadLine())) { Write-Host $line }
-              $reader.Close(); $fstream.Close()
-          }
-          $exit = $proc.ExitCode
-          Write-Host "------------------------------------------------------------"
-          Write-Host "AHK exit code: $exit"
-          if (-not (Test-Path $resultsFile)) {
-              Write-Error "test_results.txt not created — AHK may have crashed at startup."; exit 2
-          }
-          $summary = Get-Content $resultsFile | Select-String "^#" | Select-Object -Last 1
-          Write-Host $summary
-          $manifestFile = "$env:RUNNER_TEMP\windows-ahk-execution-manifest.json"
-          node "${{ github.workspace }}\tools\test\validate-ahk-suite-manifest.cjs" `
-              --input $resultsFile --json $manifestFile
-          $manifestExit = $LASTEXITCODE
-          if ($manifestExit -ne 0) {
-              Write-Error "AHK planned/executed manifest is incomplete."; exit $manifestExit
-          }
-          if ($exit -ne 0) {
-              Write-Error "Test suite failed (exit $exit)."; exit $exit
-          }
-
-      # The two isolated LLM suites. They cannot join run_all.ahk: each installs
-      # its own global stubs (a WebView2 stand-in, a fake model index) that would
-      # collide with the shared harness, which is why they were written as
-      # separate runners in the first place. They were then referenced by
-      # nothing, so their ten tests had never run and one of them had rotted out
-      # of the code it stubs. tools/test/test-ahk-runners-are-invoked.cjs now
-      # fails if a runner under tests/ is referenced by nothing at all.
-      - name: Run isolated AHK LLM suites
-        shell: pwsh
-        timeout-minutes: 10
-        run: |
-          $ahk = Get-ChildItem "C:\AutoHotkey" -Filter "AutoHotkey64.exe" |
-              Select-Object -First 1 -ExpandProperty FullName
-          if (-not $ahk) { Write-Error "AutoHotkey64.exe not found."; exit 2 }
-          $tests = "${{ github.workspace }}\static\ergopti_plus\windows\tests"
-          $failed = 0
-          foreach ($name in @("run_llm_model_browser.ahk", "run_llm_model_menu_disabled.ahk")) {
-              $runner = Join-Path $tests $name
-              if (-not (Test-Path $runner)) { Write-Error "Runner not found: $runner"; exit 2 }
-              $out = "$env:TEMP\$name.out"
-              $err = "$env:TEMP\$name.err"
-              # Start-Process, not the call operator: AutoHotkey is a GUI-subsystem
-              # binary, so a direct invocation returns neither the exit code nor
-              # stderr (PROJECT_MEMORY, feedback_ahk_ui_syntax_validation).
-              $proc = Start-Process -FilePath $ahk -ArgumentList @("/ErrorStdOut", $runner) `
-                  -Wait -PassThru -NoNewWindow -RedirectStandardOutput $out -RedirectStandardError $err
-              Write-Host "--- $name (exit $($proc.ExitCode)) ---"
-              if (Test-Path $out) { Get-Content $out | Write-Host }
-              if (Test-Path $err) { Get-Content $err | Write-Host }
-              if ($proc.ExitCode -ne 0) { $failed += 1 }
-          }
-          if ($failed -gt 0) { Write-Error "$failed isolated LLM suite(s) failed."; exit 1 }
-
-      # Emit GitHub annotations + a JSON summary from the captured TAP. Purely
-      # additive (continue-on-error): the step above remains the gate, so a
-      # reporter hiccup can never flip a red run green or vice-versa.
-      - name: Annotate AHK results
-        if: always()
-        continue-on-error: true
-        shell: pwsh
-        run: |
-          $resultsFile = "$env:TEMP\ergopti_test_results.txt"
-          if (Test-Path $resultsFile) {
-              node "${{ github.workspace }}\tools\test\report.cjs" --name windows-ahk --json "$env:RUNNER_TEMP\windows-ahk.json" -- PARSE_FILE $resultsFile
-          } else {
-              Write-Host "No AHK results file to annotate."
-          }
-
-      - name: Publish AHK execution manifest
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-ahk-execution-manifest
-          path: ${{ runner.temp }}/windows-ahk-execution-manifest.json
-          if-no-files-found: warn
-
-      - name: Check for AHK compiler warnings
-        shell: pwsh
-        timeout-minutes: 5
-        run: |
-          $ahk = Get-ChildItem "C:\AutoHotkey" -Filter "AutoHotkey64.exe" |
-              Select-Object -First 1 -ExpandProperty FullName
-          $runner = "${{ github.workspace }}\static\ergopti_plus\windows\tests\run_all.ahk"
-          # Pass --dry-run so AHK parses all files and emits warnings, then
-          # exits immediately without running any Test() callbacks. This keeps
-          # the warning check fast (~seconds) regardless of corpus size.
-          # /ErrorStdOut keeps a parse/load error from popping a modal dialog that
-          # would hang this step headlessly; the error text is captured via 2>&1.
-          $output = & cmd /c "`"$ahk`" /ErrorStdOut `"$runner`" --dry-run 2>&1"
-          $warnings = $output | Where-Object { $_ -match "^Warning:" }
-          $errors   = $output | Where-Object { $_ -match "^Error:" }
-          if ($errors) {
-              $errors | ForEach-Object { Write-Host "  $_" }
-              Write-Error "$($errors.Count) AHK load-time error(s) — fix before merging."
-              exit 1
-          }
-          if ($warnings) {
-              $warnings | ForEach-Object { Write-Host "  $_" }
-              Write-Error "$($warnings.Count) AHK compiler warning(s) — fix before merging."
-              exit 1
-          }
-          Write-Host "No AHK compiler warnings."
-
-  # ─────────────────────────────────────────────────
-  # 3.2) AHK E2E (pure engine injection, headless)
-  # ─────────────────────────────────────────────────
-  e2e-ahk:
-    name: 'Windows · E2E'
-    runs-on: windows-latest
-    needs: [test-ahk]
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Cache AutoHotkey runtime
-        id: cache-ahk
-        uses: actions/cache@v4
-        with:
-          path: C:\AutoHotkey
-          key: ahk-v2.0.19-windows
-
-      - name: Download AutoHotkey v2 runtime
-        if: steps.cache-ahk.outputs.cache-hit != 'true'
-        shell: pwsh
-        run: |
-          Invoke-WebRequest `
-              -Uri "https://github.com/AutoHotkey/AutoHotkey/releases/download/v2.0.19/AutoHotkey_2.0.19.zip" `
-              -OutFile "$env:TEMP\AHK.zip" -UseBasicParsing
-          Expand-Archive -Path "$env:TEMP\AHK.zip" -DestinationPath "C:\AutoHotkey" -Force
-
-      - name: Verify E2E runner encoding
-        shell: pwsh
-        run: |
-          $file = "${{ github.workspace }}\static\ergopti_plus\windows\tests\e2e\run_e2e.ahk"
-          $bytes = [System.IO.File]::ReadAllBytes($file)
-          if ($bytes[0] -ne 0xEF -or $bytes[1] -ne 0xBB -or $bytes[2] -ne 0xBF) {
-              Write-Error "run_e2e.ahk is missing UTF-8 BOM."; exit 1
-          }
-          $content = [System.IO.File]::ReadAllText($file, [System.Text.Encoding]::UTF8)
-          if ($content -match "`r") {
-              Write-Error "run_e2e.ahk contains CR line endings."; exit 1
-          }
-          Write-Host "Encoding OK: UTF-8 BOM + LF."
-
-      - name: Build features manifest
-        shell: pwsh
-        run: npm ci; npm run build:manifest
-
-      - name: Run E2E suite (Strategy A — pure engine injection)
-        shell: pwsh
-        timeout-minutes: 5
-        run: |
-          $ahk = Get-ChildItem "C:\AutoHotkey" -Filter "AutoHotkey64.exe" |
-              Select-Object -First 1 -ExpandProperty FullName
-          if (-not $ahk) { Write-Error "AutoHotkey64.exe not found."; exit 2 }
-          $runner = "${{ github.workspace }}\static\ergopti_plus\windows\tests\e2e\run_e2e.ahk"
-          $resultsFile = "${{ github.workspace }}\static\ergopti_plus\windows\tests\e2e\test_results.txt"
-          Remove-Item $resultsFile -Force -ErrorAction SilentlyContinue
-          Write-Host "AHK runtime : $ahk"
-          Write-Host "E2E runner  : $runner"
-          Write-Host "------------------------------------------------------------"
-          # Same approach as the unit test suite: AHK writes TAP output to
-          # test_results.txt (FileAppend to "*" blocks without a console handle).
-          # Tail-read the file for real-time CI log output.
-          # /ErrorStdOut: see unit-test step — fail fast on load errors instead of
-          # hanging on an undismissable modal dialog in the headless runner.
-          $proc = Start-Process -FilePath $ahk -ArgumentList "/ErrorStdOut `"$runner`"" -NoNewWindow -PassThru
-          $fstream = $null; $reader = $null
-          while (-not $proc.HasExited) {
-              if ($null -eq $fstream -and (Test-Path $resultsFile)) {
-                  try {
-                      $fstream = [System.IO.FileStream]::new($resultsFile,
-                          [System.IO.FileMode]::Open,
-                          [System.IO.FileAccess]::Read,
-                          [System.IO.FileShare]::ReadWrite)
-                      $reader = [System.IO.StreamReader]::new($fstream)
-                  } catch {
-                      # AHK may still hold an exclusive write lock; retry next tick
-                      Start-Sleep -Milliseconds 100
-                  }
-              }
-              if ($null -ne $reader) {
-                  $line = $reader.ReadLine()
-                  if ($null -ne $line) { Write-Host $line } else { Start-Sleep -Milliseconds 100 }
-              } else { Start-Sleep -Milliseconds 100 }
-          }
-          if ($null -ne $reader) {
-              while ($null -ne ($line = $reader.ReadLine())) { Write-Host $line }
-              $reader.Close(); $fstream.Close()
-          }
-          $exit = $proc.ExitCode
-          Write-Host "------------------------------------------------------------"
-          Write-Host "Exit code: $exit"
-          if (-not (Test-Path $resultsFile)) {
-              Write-Error "test_results.txt not created — AHK may have crashed at startup."; exit 2
-          }
-          if ($exit -ne 0) {
-              Write-Error "E2E suite failed (exit $exit)."; exit $exit
-          }
-
-  # ─────────────────────────────────────────────────
-  # 3.3) Gate: Windows driver fully green
-  # ─────────────────────────────────────────────────
-  windows-ok:
-    name: 'Windows · ✅ all green'
-    runs-on: ubuntu-latest
-    needs: [test-ahk, e2e-ahk]
-    if: always()
-
-    steps:
-      - name: Assert all Windows jobs passed
-        run: |
-          failed=0
-          for job_result in "${{ needs.test-ahk.result }}" "${{ needs.e2e-ahk.result }}"; do
-              if [[ "$job_result" == "failure" || "$job_result" == "cancelled" ]]; then
-                  failed=1
-              fi
-          done
-          if [[ $failed -eq 1 ]]; then
-              echo "Windows driver: one or more jobs failed."
-              echo "  test-ahk : ${{ needs.test-ahk.result }}"
-              echo "  e2e-ahk  : ${{ needs.e2e-ahk.result }}"
-              exit 1
-          fi
-          echo "Windows driver: all jobs passed (or skipped)."
-          echo "  test-ahk : ${{ needs.test-ahk.result }}"
-          echo "  e2e-ahk  : ${{ needs.e2e-ahk.result }}"
-
-  # ============================================
-  # ============================================
-  # ======= 4/ Linux driver branch =============
-  # ============================================
-  # ============================================
-
-  # ─────────────────────────────────────────────────
-  # 4.1) Linux Lua driver unit tests
-  # ─────────────────────────────────────────────────
-  test-linux:
-    name: 'Linux · unit tests'
-    runs-on: ubuntu-latest
-    needs: [validate-hotstrings, validate-domain, validate-js, validate-translations]
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install LuaJIT
-        # The test runner (tests/run.lua) uses LuaJIT. Test discovery falls
-        # back to io.popen("find") when lfs is unavailable — no luarocks needed.
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y luajit sqlite3
-
-      - name: Verify native metrics aggregation equivalence
-        run: python3 tools/test/test-linux-metrics-aggregation-native.py
-
-      - name: Verify native cross-driver histogram multiplicity
-        run: python3 tools/test/test-metrics-histogram-native.py
-
-      - name: Run Linux driver unit test suite
-        working-directory: static/ergopti_plus/linux
-        # Wrapped in the unified reporter: streams output unchanged, exits with the
-        # runner's code (CI gating preserved), and emits GitHub annotations + a JSON
-        # summary on failure. report.cjs lives at the repo root tools/.
-        run: node ../../../tools/test/report.cjs --name linux-lua --json "${{ runner.temp }}/linux-lua.json" -- luajit tests/run.lua
-
-      # The only step in this workflow that touches a real kernel input path.
-      # Every other test of the two FFI adapters runs against a recorded syscall
-      # backend, which is the right shape for asserting order and sequence and
-      # structurally incapable of asserting the one thing left: that the kernel
-      # accepts what we send it. Four values decide that and none is observable
-      # from a mock — the ioctl request numbers, the struct size, the field
-      # offsets, and the capability bits registered before UI_DEV_CREATE. Get any
-      # of them wrong and every test above still passes while a real machine gets
-      # nothing at all.
-      #
-      # A STEP and not a job, deliberately: as a job it would cost a whole runner
-      # (checkout + apt) for five seconds of work.
-      - name: Load the uinput module
-        run: |
-          sudo modprobe uinput
-          if [ ! -e /dev/uinput ]; then
-              echo "::error::/dev/uinput is absent after modprobe — the runner image cannot host this test."
-              echo "This is an ENVIRONMENT failure, not a driver failure. Check whether the"
-              echo "ubuntu-latest image still ships the uinput module before touching the driver."
-              exit 1
-          fi
-
-      - name: Round-trip real events through the kernel
-        working-directory: static/ergopti_plus/linux
-        # Root because /dev/uinput is root-owned until the udev rule that
-        # install.sh --setup-perms writes is in place. `sudo env` rather than
-        # `sudo -E` so the path is set explicitly and does not depend on which
-        # variables the runner sudoers happens to preserve.
-        run: |
-          sudo env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_uinput_roundtrip.lua
-        timeout-minutes: 2
-
-      # The property the whole Linux milestone is named after: keystrokes arriving
-      # DURING an expansion come out after it, in order. It was verified by reading
-      # only — a recorded backend can assert the order our code intends and is
-      # structurally incapable of asserting that the kernel agrees, and a grab in
-      # particular is invisible to a mock (ioctl returning 0 to a recorder says
-      # nothing about whether the desktop still sees the device).
-      - name: Hold the grab under an interleaved burst
-        working-directory: static/ergopti_plus/linux
-        run: |
-          sudo env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_grab_race.lua
-        timeout-minutes: 2
-
-      # No display server needed: `xkbcli compile-keymap --layout fr` produces the
-      # same text a live session dumps. The session decides WHICH layout is active
-      # and has nothing to do with what a layout contains — so "can the driver read
-      # a real French keymap" is checkable here, and only "is é right on YOUR
-      # keyboard" needs a person. Every layout test before this one parsed a keymap
-      # this repository wrote, which tests the parser against its author's
-      # assumptions.
-      - name: Resolve real system keymaps
-        working-directory: static/ergopti_plus/linux
-        run: |
-          sudo apt-get install -y --no-install-recommends libxkbcommon-tools xkb-data
-          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_layout_resolution.lua
-        timeout-minutes: 3
-
-      # "Needs a display server" sounded like "needs a desktop", and it does not.
-      # Xvfb is a real X server and sway --backend headless is a real Wayland
-      # compositor; both simply draw to nothing. Everything the driver does with a
-      # display server EXCEPT putting pixels on a screen is therefore checkable
-      # here — including the two things that actually broke: which server it thinks
-      # it is on, and whether it can read the keymap from it.
-      #
-      # Both run in ONE step, same binary, no configuration in between, which is
-      # the machine-checkable half of C2: log out of X11, log into Wayland, change
-      # nothing.
-      - name: Detect and read the keymap on a real X11 and a real Wayland
-        working-directory: static/ergopti_plus/linux
-        run: |
-          sudo apt-get install -y --no-install-recommends xvfb sway libxkbcommon-tools xkb-data x11-utils
-          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
-
-          echo "--- X11 (Xvfb) ---"
-          xvfb-run -a luajit tests/hardware/run_display_server.lua
-
-          echo "--- Wayland (sway, headless) ---"
-          export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp/xdg-$(id -u)}"
-          mkdir -p "$XDG_RUNTIME_DIR" && chmod 700 "$XDG_RUNTIME_DIR"
-          # A compositor with no config and no outputs. WLR_BACKENDS=headless is
-          # what lets it start without a seat or a GPU on a CI runner.
-          # French on purpose: a US answer is what a guessed table produces, so
-          # only a layout where "é" has its own key proves the keymap was read.
-          # sway honours XKB_DEFAULT_LAYOUT, and so does the driver's last
-          # fallback when libxkbcommon is too old to dump the compositor's map.
-          export XKB_DEFAULT_LAYOUT=fr ERGOPTI_EXPECT_LAYOUT=fr
-          WLR_BACKENDS=headless WLR_LIBINPUT_NO_DEVICES=1 sway --config /dev/null &
-          SWAY_PID=$!
-          # Poll for the socket rather than sleeping a fixed time: a loaded runner
-          # takes longer, and a fixed sleep turns that into a flake.
-          WAYLAND_SOCK=""
-          for _ in $(seq 1 40); do
-            WAYLAND_SOCK=$(ls "$XDG_RUNTIME_DIR" 2>/dev/null | grep -m1 '^wayland-[0-9]*$' || true)
-            [ -n "$WAYLAND_SOCK" ] && break
-            sleep 0.25
-          done
-          if [ -z "$WAYLAND_SOCK" ]; then
-            echo "::error::no Wayland socket appeared — mandatory Wayland coverage did not run"
-            kill "$SWAY_PID" 2>/dev/null || true
-            exit 1
-          fi
-          # DISPLAY is deliberately left set: a real Wayland session runs XWayland
-          # and sets it too, and that is exactly the case a detector reading DISPLAY
-          # first gets wrong on every Wayland desktop.
-          set +e
-          WAYLAND_DISPLAY="$WAYLAND_SOCK" DISPLAY=:99 luajit tests/hardware/run_display_server.lua
-          STATUS=$?
-          set -e
-          kill "$SWAY_PID" 2>/dev/null || true
-          exit $STATUS
-        timeout-minutes: 6
-
-      # An FFI binding is a set of NAMES — three sonames and thirteen symbols —
-      # and each is a claim about a library this project does not ship. A wrong
-      # soname, or a symbol that moved between releases, has exactly one symptom:
-      # no tray icon. Not an error, not a crash; the menu is simply absent while
-      # the daemon expands hotstrings perfectly, so nothing points at the cause.
-      #
-      # No unit test can catch it: with no libayatana to load it must stub, and a
-      # stub answers to whatever name the binding asks for.
-      - name: The tray binding names libraries and symbols that exist
-        working-directory: static/ergopti_plus/linux
-        run: |
-          sudo apt-get install -y --no-install-recommends libayatana-appindicator3-1 libgtk-3-0
-          env LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;' luajit tests/hardware/run_tray_symbols.lua
-        timeout-minutes: 4
-
-      # The symbols resolving is not the icon appearing. A panel shows a tray
-      # icon when an item registers with org.kde.StatusNotifierWatcher and then
-      # answers for its properties and its com.canonical.dbusmenu menu — the
-      # protocol KDE Plasma, GNOME's AppIndicator extension, waybar and
-      # xfce4-panel all speak. sni_host.py is that watcher and nothing else, so
-      # "the icon appears" is checked here with the production adapter: the item
-      # is Active, carries the Ergopti logo as an ABSOLUTE file path (the panel
-      # resolves it in its own working directory) and serves the menu rows.
-      - name: The tray icon registers with a StatusNotifier host
-        if: always()
-        working-directory: static/ergopti_plus/linux
-        run: |
-          sudo apt-get install -y --no-install-recommends python3-gi gir1.2-glib-2.0 dbus xvfb
-          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
-          dbus-run-session -- bash -c '
-            ready="$(mktemp -u)"
-            export ERGOPTI_TRAY_CLICK_FILE="$(mktemp -u)"
-            python3 tests/hardware/sni_host.py --ready-file "$ready" --timeout 30 --settle 1 \
-              --expect-label "Ergopti+ tray probe" --expect-icon-file \
-              --click-label "Click probe" > "$RUNNER_TEMP/sni.json" &
-            host=$!
-            for _ in $(seq 1 40); do [ -f "$ready" ] && break; sleep 0.25; done
-            [ -f "$ready" ] || { echo "::error::the StatusNotifier host never started"; exit 1; }
-            xvfb-run -a luajit tests/hardware/run_tray_icon.lua 10
-            probe=$?
-            wait "$host"; status=$?
-            cat "$RUNNER_TEMP/sni.json"
-            [ "$probe" = "0" ] || exit "$probe"
-            # The click went panel → dbusmenu → libdbusmenu → the shared
-            # dispatcher → the row: its marker is the proof.
-            [ -f "$ERGOPTI_TRAY_CLICK_FILE" ] || { echo "::error::a menu click never reached its row"; exit 1; }
-            exit "$status"'
-        timeout-minutes: 4
-
-      # The secure-field probe decides whether ANY expansion may fire (it fails
-      # closed), and its one real input is a desktop: an accessibility bus, a
-      # window manager and applications that keep FOCUSED on their last field.
-      # With two windows open the old desktop-wide search found two focused
-      # fields and blocked every expansion; only a real bus shows that.
-      - name: The secure-field probe on a real accessibility bus
-        if: always()
-        run: |
-          sudo apt-get install -y --no-install-recommends at-spi2-core openbox python3-gi gir1.2-gtk-3.0 dbus-x11 xvfb
-          bash static/ergopti_plus/linux/tests/hardware/run_atspi_focus.sh
-        timeout-minutes: 5
-
-      # The program a user starts, started: the real daemon with --tray on a
-      # keyboard created through uinput, under an X server, a session bus, the
-      # accessibility bus, a window manager and a focused GTK field (nothing
-      # expands without the privacy gate's answer). A trigger typed on that
-      # keyboard must reach the desktop expanded, through the grab and the
-      # daemon's own virtual keyboard, while sni_host.py checks the tray it shows:
-      # the logo, and a translated menu with no raw i18n key.
-      - name: The whole daemon, live — a trigger typed, a tray shown
-        if: always()
-        run: |
-          sudo modprobe uinput
-          # lua-luv as install.sh installs it: the daemon's timers and every
-          # HTTP request (the AI phase) run on it.
-          sudo apt-get install -y --no-install-recommends at-spi2-core openbox python3-gi gir1.2-gtk-3.0 \
-            dbus-x11 xvfb x11-xkb-utils libayatana-appindicator3-1 lua-luv
-          sudo bash static/ergopti_plus/linux/tests/hardware/run_daemon_live.sh
-        timeout-minutes: 6
-
-      # The updater a user runs, run: this tree built as an old release and
-      # installed with its own install.sh, then its updater finds the newest
-      # published release on GitHub, verifies and installs it, and restarts the
-      # daemon on it. An installed prerelease once asked the "stable" channel
-      # and never found an update; an installed update once waited for the
-      # next login.
-      - name: The Linux updater, live — update to the newest release and restart
-        if: always()
-        run: |
-          sudo apt-get install -y --no-install-recommends lua-luv
-          bash static/ergopti_plus/linux/tests/hardware/run_updater_live.sh
-        timeout-minutes: 10
-
-      # The AI a user runs locally, run: the official Ollama serving a small
-      # model, asked through the production modules and the real curl transport
-      # for its model list, a download, streamed predictions, and — on its
-      # OpenAI-compatible endpoint, the dialect Cerebras speaks — the remote
-      # backend and its connectivity probe.
-      - name: AI predictions against a real Ollama
-        if: always()
-        run: |
-          set -euo pipefail
-          sudo apt-get install -y --no-install-recommends lua-luv
-          curl -fsSL https://ollama.com/install.sh | sh
-          (ollama serve > "$RUNNER_TEMP/ollama.log" 2>&1 &) || true
-          for _ in $(seq 1 60); do curl -sf http://127.0.0.1:11434/api/tags >/dev/null && break; sleep 1; done
-          ollama pull qwen2.5:0.5b
-          cd static/ergopti_plus/linux
-          HOME="$(mktemp -d)" XDG_CONFIG_HOME= \
-            LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;' \
-            luajit tests/hardware/run_ollama_live.lua qwen2.5:0.5b
-        timeout-minutes: 12
-
-      # touchpad_finder reads capability bits out of a printed bitmap, and that
-      # rests on one thing the text cannot confirm: that the words are 64 bits
-      # wide, most significant first, with leading zero words omitted. Its unit
-      # tests use a fixture written by hand, so they prove the parser is
-      # self-consistent and nothing about the format the kernel actually emits.
-      #
-      # Here the device is declared through uinput, the KERNEL formats the
-      # bitmaps, and the parser has to agree with a text it did not see written.
-      # The same step settles the finger-count claim the whole "grey what this
-      # hardware cannot serve" design rests on: input_mt_init_slots() advertises
-      # QUINTTAP only at five slots, so a five-slot device must read back as five.
-      - name: A virtual touchpad, described by the kernel and read back
-        working-directory: static/ergopti_plus/linux
-        run: |
-          sudo modprobe uinput || true
-          sudo chmod 0666 /dev/uinput
-          env LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;' luajit tests/hardware/run_touchpad_capability.lua
-        timeout-minutes: 4
-
-      # test_mt_decoder feeds the decoder a table written by hand from the
-      # kernel's documentation. It proves the state machine agrees with MY
-      # reading of the protocol and nothing about what a kernel delivers — the
-      # plan records that as "the event trace is a reconstruction, not a
-      # capture".
-      #
-      # Here the events make a round trip: written to /dev/uinput, published on
-      # an input node, found by the driver's own finder, opened by its own
-      # reader, decoded by its own decoder. The struct layout, the ioctl numbers,
-      # the slot semantics and the non-blocking read are all the kernel's, and
-      # those are exactly what a hand-written table cannot check.
-      - name: A gesture written to uinput comes back as a gesture
-        # Not skipped when an earlier harness fails. These are independent
-        # diagnostics, and letting the first failure hide the others' answers is
-        # how a run comes back saying less than it measured — the page-error trap
-        # below was skipped on its first outing for exactly that reason, so its
-        # question went unanswered for a whole cycle.
-        if: always()
-        working-directory: static/ergopti_plus/linux
-        run: |
-          # sudo, like the grab harness: the event node the kernel publishes for a
-          # new uinput device belongs to root:input at 0660, and the runner's user
-          # is in neither. Creating the device needs only /dev/uinput; READING it
-          # back needs the node, which is the half this harness exists for.
-          sudo env LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;' luajit tests/hardware/run_gesture_roundtrip.lua
-        timeout-minutes: 4
-
-      # Both hotstrings bridges were changed from RETURNING their payload to
-      # PUSHING it, because makeHostBridge is fire-and-forget and only two of the
-      # fourteen shared pages define window.__hostBridgeResponse — a returned
-      # payload reached nobody, so the settings window drew an empty page and the
-      # editor sat on "Chargement…" for ever.
-      #
-      # Every unit test of that fix asserts the SHAPE of the JavaScript string
-      # handed to eval_js. None proves the string arrives, that the page defines
-      # the function it calls, or that the function survives a payload built by
-      # Lua. Three separate ways for the same fix to be wrong with the suite green.
-      # Its own step, and a generous budget, because it is a DOWNLOAD: WebKit2GTK
-      # pulls the whole GStreamer tree, and the first attempt at this spent eight
-      # minutes fetching packages and timed out before running a single
-      # assertion. A timeout that fires during dependency installation says
-      # nothing whatever about the code, so the two are separated and the test
-      # step below gets a budget sized for the test.
-      - name: Install WebKit2GTK and lgi
-        if: always()
-        run: |
-          sudo apt-get install -y --no-install-recommends \
-            xvfb lua-lgi gir1.2-webkit2-4.1 gir1.2-gtk-3.0
-        timeout-minutes: 20
-
-      - name: The webview push reaches a real WebKit page
-        if: always()
-        working-directory: static/ergopti_plus/linux
-        run: |
-          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
-          # lua-lgi installs for the distro's Lua, not for LuaJIT, so the module
-          # path has to be widened rather than assumed. Reported, not guessed at:
-          # the harness exits 2 when lgi is unreachable and the step says so.
-          export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
-          export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
-          # One page per invocation. Both in one process made the verdict move
-          # between them run to run — two webviews share a GTK loop, so pumping
-          # for one processes the other's events and a probe can land while the
-          # other page is still settling.
-          set +e
-          STATUS=0
-          for APP in hotstrings_config_window hotstring_editor; do
-            xvfb-run -a luajit tests/hardware/run_webview_push.lua "$APP"
-            CASE=$?
-            [ "$CASE" = "0" ] || STATUS=$CASE
-          done
-          set -e
-          # Status 2 means the runner could not host a mandatory subject. That is
-          # an environment failure, but linux-ok must remain red until the
-          # subject actually executes.
-          if [ "$STATUS" = "2" ]; then
-            echo "::error::WebKit/lgi unavailable — mandatory webview coverage did not run."
-            exit 1
-          fi
-          exit $STATUS
-        timeout-minutes: 8
-
-      # The other direction: the metrics page posts its own {action: 'ready'}
-      # object and must get the daemon's data back. Both halves went through
-      # dkjson, which is not installed, so every tray window with a request of
-      # its own stayed empty while the push test above stayed green.
-      - name: A page's own request is answered in real WebKit
-        if: always()
-        working-directory: static/ergopti_plus/linux
-        run: |
-          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
-          export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
-          export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
-          xvfb-run -a luajit tests/hardware/run_webview_roundtrip.lua
-        timeout-minutes: 5
-
-      # The release list a user opens from the tray, opened: real WebKit, the
-      # Linux bridge fetching GitHub's releases through its curl adapter. It
-      # opened on the stable channel, which hides prereleases, and every
-      # release is one: the window listed nothing.
-      - name: The release list window lists GitHub's releases in real WebKit
-        if: always()
-        working-directory: static/ergopti_plus/linux
-        run: |
-          sudo apt-get install -y --no-install-recommends lua-luv
-          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
-          export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
-          export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
-          xvfb-run -a luajit tests/hardware/run_changelog_live.lua
-        timeout-minutes: 5
-
-      # The typing-speed readouts, drawn: the floating pill through its real GTK
-      # surface (placed, painted in the source's colour, switched to the graph,
-      # dragged by a real pointer) and the tray readout registered with a
-      # StatusNotifier host. The widget called a renderer function that never
-      # existed and read stats with no speed in them: it drew nothing anywhere.
-      - name: The WPM widget and tray readout draw on a real display
-        if: always()
-        working-directory: static/ergopti_plus/linux
-        run: |
-          sudo apt-get install -y --no-install-recommends xdotool python3-gi gir1.2-glib-2.0 dbus xvfb
-          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
-          export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
-          export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
-          home="$(mktemp -d)"
-          export HOME="$home" XDG_CONFIG_HOME="$home/.config" XDG_DATA_HOME="$home/.local/share"
-          dbus-run-session -- bash -c '
-            ready="$(mktemp -u)"
-            python3 tests/hardware/sni_host.py --ready-file "$ready" --timeout 40 --settle 1 \
-              --expect-icon-file > "$RUNNER_TEMP/sni-wpm.json" &
-            host=$!
-            for _ in $(seq 1 40); do [ -f "$ready" ] && break; sleep 0.25; done
-            [ -f "$ready" ] || { echo "::error::the StatusNotifier host never started"; exit 1; }
-            xvfb-run -a luajit tests/hardware/run_wpm_readouts_live.lua 6
-            probe=$?
-            wait "$host"; status=$?
-            cat "$RUNNER_TEMP/sni-wpm.json"
-            [ "$probe" = "0" ] || exit "$probe"
-            grep -q "ergopti-plus-wpm" "$RUNNER_TEMP/sni-wpm.json" || { echo "::error::the readout item never registered"; exit 1; }
-            exit "$status"'
-        timeout-minutes: 5
-
-      # window.setData is undefined in the settings window, so the host's
-      # `if(window.setData)` guard discards every push. Seven explanations are
-      # ruled out, and the informative one is the last: an explicit
-      # `window.setData = setData` at the END of the file changed nothing. If the
-      # script ran to completion that line alone would be enough — so it throws.
-      #
-      # A throw during load is invisible to every probe run afterwards, because
-      # by then the page merely looks incomplete. window.onerror only catches
-      # what is raised after it is installed, and installing it with
-      # run_javascript is too late by the whole page load — so this harness
-      # builds the HTML itself and splices the trap in right after <head>.
-      - name: What each page raises while loading
-        if: always()
-        working-directory: static/ergopti_plus/linux
-        run: |
-          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
-          export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
-          export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
-          set +e
-          xvfb-run -a luajit tests/hardware/run_page_errors.lua
-          STATUS=$?
-          set -e
-          if [ "$STATUS" = "2" ]; then
-            echo "::error::WebKit/lgi unavailable — mandatory page-error coverage did not run."
-            exit 1
-          fi
-          exit $STATUS
-        timeout-minutes: 5
-
-      - name: Record mandatory Linux test evidence
-        run: |
-          set -euo pipefail
-          unit_assertions=$(jq -r '.passed' "$RUNNER_TEMP/linux-lua.json")
-          node tools/test/linux-ci-evidence.cjs record \
-              --job test-linux \
-              --output "$RUNNER_TEMP/linux-ci-evidence/test-linux.json" \
-              --sha "$GITHUB_SHA" \
-              --architecture "$RUNNER_ARCH" \
-              --distro ubuntu \
-              --session x11-wayland-headless \
-              --interpreter "$(luajit -v 2>&1 | head -1)" \
-              --subject "unit=$unit_assertions" \
-              --subject uinput-roundtrip=1 \
-              --subject grab-race=1 \
-              --subject system-keymaps=1 \
-              --subject x11-display=1 \
-              --subject wayland-display=1 \
-              --subject tray-symbols=1 \
-              --subject tray-sni-registration=1 \
-              --subject atspi-focus-probe=1 \
-              --subject daemon-live=1 \
-              --subject ollama-live=1 \
-              --subject touchpad-capability=1 \
-              --subject gesture-roundtrip=1 \
-              --subject webview-settings=1 \
-              --subject webview-editor=1 \
-              --subject webview-roundtrip=1 \
-              --subject page-load-errors=1
-
-      - name: Upload mandatory Linux test evidence
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-ci-evidence-test-linux
-          retention-days: 7
-          path: ${{ runner.temp }}/linux-ci-evidence/test-linux.json
-          if-no-files-found: error
-
-
-  # ─────────────────────────────────────────────────
-  # 4.1b) Linux install, per distribution family
-  # ─────────────────────────────────────────────────
-  # install.sh has to work on package managers this project's author does not
-  # run. Until 2026-08-05 that was a checklist line asking a person to find five
-  # machines, which is the kind of check that gets done once. Containers make it
-  # deterministic and repeatable: each image is the real package manager, the real
-  # shell and the real filesystem layout.
+  # Runs at t=0, beside validate, because its inputs are git refs only: the
+  # tag list, the commit subjects since the last stable tag and the remote
+  # tags. Nothing here depends on a test result, so the boxes can build the
+  # release artifact in their first pass instead of a second release column.
+  # "Publish only when all three OS are green" is release's job, through its
+  # needs. Kept apart from validate because it needs full history, and several
+  # test:js gates shell out to git: a deeper clone there would change what
+  # they see.
   #
-  # --no-deps is used deliberately. Installing every runtime dependency in five
-  # containers would test the distributions' package archives, which are not ours
-  # and go down; what is ours is whether the script RUNS to completion, detects
-  # the package manager, and lays the driver out where the daemon expects it. A
-  # dependency archive outage must not read as a broken installer.
-  install-linux-distros:
-    name: 'Linux · install (${{ matrix.distro }})'
+  # channel is the one copy of the prerelease-to-channel rule: every consumer
+  # (the macOS bundle and appcast, the Windows stamp, the published feed) reads
+  # it from here.
+  plan:
+    name: 'Release · plan'
     runs-on: ubuntu-latest
-    needs: [test-linux]
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - distro: debian
-            image: debian:stable-slim
-            prep: apt-get update && apt-get install -y --no-install-recommends bash coreutils findutils grep sed
-          - distro: fedora
-            image: fedora:latest
-            prep: dnf install -y bash coreutils findutils grep sed
-          - distro: arch
-            image: archlinux:latest
-            prep: pacman -Sy --noconfirm bash coreutils findutils grep sed
-          - distro: alpine
-            image: alpine:latest
-            prep: apk add --no-cache bash coreutils findutils grep sed
-          - distro: opensuse
-            image: opensuse/tumbleweed:latest
-            prep: sed -i 's|http://download.opensuse.org|https://downloadcontent.opensuse.org|g' /etc/zypp/repos.d/*.repo && zypper --non-interactive install bash coreutils findutils grep sed
-    container:
-      image: ${{ matrix.image }}
-    steps:
-      - name: Prepare the container
-        run: ${{ matrix.prep }}
-
-      - uses: actions/checkout@v4
-
-      - name: Install with no root and no network dependencies
-        working-directory: static/ergopti_plus/linux
-        # No sudo and no systemd inside a container, which is also the immutable
-        # -distribution case: everything must land under $HOME and the script must
-        # not abort when it cannot write /usr or reach systemctl.
-        run: |
-          export HOME=/tmp/ergopti-home
-          mkdir -p "$HOME"
-          bash install.sh --no-deps
-
-      - name: The installed tree is the one the daemon expects
-        run: |
-          export HOME=/tmp/ergopti-home
-          FAIL=0
-          # The wrapper is what a user types. Without it nothing else matters.
-          if [ ! -x "$HOME/.local/bin/ergopti-hotstrings" ]; then
-            echo "::error::no executable at ~/.local/bin/ergopti-hotstrings"
-            FAIL=1
-          fi
-          # The driver root and the shared tree must be SIBLINGS: infra/paths.lua
-          # resolves _shared as ../_shared from the driver root and probes it, so a
-          # layout that nests them differently boots to "shared tree not found".
-          for path in "$HOME/.local/lib/ergopti/linux/ergopti_hotstrings.lua" \
-                      "$HOME/.local/lib/ergopti/_shared/data/locales/en.json"; do
-            if [ ! -f "$path" ]; then
-              echo "::error::missing $path"
-              FAIL=1
-            fi
-          done
-          # A hotstring pack, because an install with no hotstrings is an install
-          # that runs and does nothing.
-          if ! ls "$HOME/.local/lib/ergopti/_shared/modules/hotstrings/"*.toml >/dev/null 2>&1; then
-            echo "::error::no hotstring packs were installed"
-            FAIL=1
-          fi
-          exit $FAIL
-        timeout-minutes: 5
-
-      # The whole unit suite, on THIS distribution's own LuaJIT.
-      #
-      # Everything else in this workflow runs on Ubuntu's build, so a difference
-      # that belongs to the interpreter or the C library is invisible to it —
-      # and those are the differences that actually bite here. Alpine is musl
-      # rather than glibc; Arch ships whatever LuaJIT released last; several
-      # distributions patch it. The driver is 1600 assertions of pure Lua plus a
-      # thin FFI layer, so running them where the interpreter differs is cheap
-      # certification of exactly the part that varies.
-      #
-      # LuaJIT is the production interpreter. A distribution lane without it is
-      # not evidence about the driver and therefore cannot satisfy this gate.
-      - name: The unit suite on this distribution's LuaJIT
-        working-directory: static/ergopti_plus/linux
-        run: |
-          set +e
-          case "${{ matrix.distro }}" in
-            debian)   apt-get install -y --no-install-recommends luajit ;;
-            fedora)   dnf install -y luajit ;;
-            arch)     pacman -Sy --noconfirm luajit ;;
-            alpine)   apk add --no-cache luajit ;;
-            opensuse) zypper --non-interactive install luajit ;;
-          esac
-          if ! command -v luajit >/dev/null 2>&1; then
-            echo "::error::${{ matrix.distro }} has no LuaJIT package — mandatory distro coverage did not run."
-            exit 1
-          fi
-          luajit -v
-          luajit tests/run.lua
-          STATUS=$?
-          set -e
-          exit $STATUS
-        timeout-minutes: 10
-
-      - name: Record mandatory distro evidence
-        run: |
-          set -euo pipefail
-          evidence_dir="$RUNNER_TEMP/linux-ci-evidence"
-          mkdir -p "$evidence_dir"
-          printf '%s\n' \
-            '{' \
-            '  "schema_version": 1,' \
-            '  "job": "install-linux-distros",' \
-            "  \"sha\": \"$GITHUB_SHA\"," \
-            "  \"architecture\": \"$RUNNER_ARCH\"," \
-            '  "distro": "${{ matrix.distro }}",' \
-            '  "session": "container",' \
-            '  "interpreter": "LuaJIT",' \
-            '  "subjects": { "distro-${{ matrix.distro }}": 1 }' \
-            '}' > "$evidence_dir/${{ matrix.distro }}.json"
-
-      - name: Upload mandatory distro evidence
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-ci-evidence-distro-${{ matrix.distro }}
-          retention-days: 7
-          path: ${{ runner.temp }}/linux-ci-evidence/${{ matrix.distro }}.json
-          if-no-files-found: error
-
-  # ─────────────────────────────────────────────────
-  # 4.1c) Linux first install, WITH dependencies, per distribution
-  # ─────────────────────────────────────────────────
-  # install-linux-distros runs --no-deps on purpose, and nothing ran the
-  # installer the way the README tells a user to: with its dependencies. That
-  # path is where the first-run failures lived — a remap binary needing glibc
-  # 2.39 aborting the whole install on Ubuntu 22.04 and Debian 12, the tray library
-  # never installed at all. tests/distro/e2e_install.sh runs install.sh as an
-  # unprivileged sudo user against each distribution's real archives, then
-  # checks the INSTALLED tree: the launcher, every FFI library, WebKit through
-  # lgi, and a tray icon registered with a StatusNotifierWatcher (the protocol
-  # KDE, GNOME's AppIndicator extension, waybar and xfce4-panel speak).
-  #
-  # The matrix spans what differs underneath: glibc and musl, libxkbcommon
-  # before and after 1.8, six package managers, LTS and rolling releases.
-  # Reproduce any entry locally with:
-  #   static/ergopti_plus/linux/tests/distro/run_in_docker.sh <image>
-  first-install-distros:
-    name: 'Linux · first install with deps (${{ matrix.distro }})'
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { distro: ubuntu-22.04, image: 'ubuntu:22.04' }
-          - { distro: ubuntu-24.04, image: 'ubuntu:24.04' }
-          - { distro: debian-12, image: 'debian:12' }
-          - { distro: debian-13, image: 'debian:13' }
-          # Fedora packages lgi for Lua 5.4 only: the tray works there, its
-          # WebKit windows cannot open under LuaJIT. Declared, and the entry
-          # fails if that ever stops being true.
-          - { distro: fedora-41, image: 'fedora:41', known: webkit }
-          - { distro: fedora-latest, image: 'fedora:latest', known: webkit }
-          - { distro: arch, image: 'archlinux:latest' }
-          - { distro: opensuse-tumbleweed, image: 'opensuse/tumbleweed:latest' }
-          - { distro: alpine, image: 'alpine:latest' }
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install on ${{ matrix.image }} and verify the first run
-        timeout-minutes: 25
-        run: |
-          set -euo pipefail
-          export ERGOPTI_E2E_DOCKER_ARGS="-e ERGOPTI_E2E_KNOWN_LIMITATIONS=${{ matrix.known || '' }}"
-          bash static/ergopti_plus/linux/tests/distro/run_in_docker.sh '${{ matrix.image }}' \
-            | tee "$RUNNER_TEMP/first-install.log"
-
-      - name: Record mandatory first-install evidence
-        run: |
-          set -euo pipefail
-          evidence_dir="$RUNNER_TEMP/linux-ci-evidence"
-          mkdir -p "$evidence_dir"
-          printf '%s\n' \
-            '{' \
-            '  "schema_version": 1,' \
-            '  "job": "first-install-distros",' \
-            "  \"sha\": \"$GITHUB_SHA\"," \
-            "  \"architecture\": \"$RUNNER_ARCH\"," \
-            '  "distro": "${{ matrix.distro }}",' \
-            '  "session": "container-first-install",' \
-            '  "interpreter": "LuaJIT",' \
-            '  "subjects": { "first-install-${{ matrix.distro }}": 1 }' \
-            '}' > "$evidence_dir/first-install-${{ matrix.distro }}.json"
-
-      - name: Upload mandatory first-install evidence
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-ci-evidence-first-install-${{ matrix.distro }}
-          retention-days: 7
-          path: ${{ runner.temp }}/linux-ci-evidence/first-install-${{ matrix.distro }}.json
-          if-no-files-found: error
-
-  # ─────────────────────────────────────────────────
-  # 4.2) Linux E2E — virtual-keyboard harness (stubbed, no real evdev/ytotool)
-  # ─────────────────────────────────────────────────
-  # This job runs on ubuntu-latest against the pure-Lua hotstring engine — no
-  # real evdev device, no ydotool injection. It is a corpus-driven replay of
-  # the engine's on_char() logic layer, not an OS-level end-to-end test.
-  e2e-linux:
-    name: 'Linux · E2E (virtual-keyboard, stubbed)'
-    runs-on: ubuntu-latest
-    needs: [test-linux]
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install LuaJIT
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y luajit
-
-      - name: Run virtual-keyboard E2E harness
-        # Exercises the hotstring engine against 8 hand-coded scenarios
-        # and all shared corpus vectors (vectors.json).
-        # Exit 0 = all pass, 1 = at least one failure.
-        working-directory: static/ergopti_plus/linux
-        run: |
-          set -euo pipefail
-          luajit tests/e2e/run_e2e.lua | tee "$RUNNER_TEMP/linux-e2e.log"
-        timeout-minutes: 5
-
-      - name: Record mandatory Linux E2E evidence
-        run: |
-          set -euo pipefail
-          assertions=$(sed -n 's/^1\.\.\([0-9][0-9]*\)$/\1/p' "$RUNNER_TEMP/linux-e2e.log" | tail -1)
-          node tools/test/linux-ci-evidence.cjs record \
-              --job e2e-linux \
-              --output "$RUNNER_TEMP/linux-ci-evidence/e2e-linux.json" \
-              --sha "$GITHUB_SHA" \
-              --architecture "$RUNNER_ARCH" \
-              --distro ubuntu \
-              --session virtual-keyboard \
-              --interpreter "$(luajit -v 2>&1 | head -1)" \
-              --subject "hotstring-e2e=$assertions"
-
-      - name: Upload mandatory Linux E2E evidence
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-ci-evidence-e2e-linux
-          retention-days: 7
-          path: ${{ runner.temp }}/linux-ci-evidence/e2e-linux.json
-          if-no-files-found: error
-
-  # ─────────────────────────────────────────────────
-  # 4.3) Build the .deb package, for real
-  # ─────────────────────────────────────────────────
-  # This job used to run build-linux-deb.sh --skip-deb, which returns BEFORE
-  # dpkg-deb. No .deb was ever produced, so DEBIAN/control, postinst and prerm
-  # shipped in release after release without dpkg once parsing them. The flag is
-  # gone: the package is really built, and it is handed to the install-and-launch
-  # job below so something finally opens it.
-  build-deb:
-    name: 'Linux · .deb package'
-    runs-on: ubuntu-latest
-    needs: [e2e-linux]
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: '.node-version'
-          cache: 'npm'
-
-      - name: Assemble Linux driver bundle
-        env:
-          ERGOPTI_BUILD_COMMIT: ${{ github.sha }}
-        run: bash tools/build/build-linux-driver.sh --skip-smoke
-
-      - name: Build the .deb
-        run: bash tools/build/build-linux-deb.sh
-
-      - name: Hand the package to the install-and-launch job
-        # Renamed, and NOT to the release asset name. tools/test/
-        # test-release-notes-assets-are-uploaded.cjs joins the release-note links
-        # against every upload-artifact path: list by basename; an artifact here
-        # sharing the published name would stand in for the release upload and
-        # let that guard pass while build-linux quietly stopped attaching the
-        # .deb. Same bytes either way — dpkg does not read the filename.
-        run: |
-          set -euo pipefail
-          built=$(find build/linux -maxdepth 1 -name '*.deb' -type f | head -1)
-          if [ -z "$built" ]; then
-              echo "::error::build-linux-deb.sh produced no .deb — dpkg-deb never ran."
-              exit 1
-          fi
-          mv "$built" build/linux/ergopti-smoke.deb
-          dpkg-deb --info build/linux/ergopti-smoke.deb
-
-      - name: Upload the .deb for the install-and-launch job
-        uses: actions/upload-artifact@v4
-        with:
-          name: ci-linux-deb
-          retention-days: 1
-          path: build/linux/ergopti-smoke.deb
-
-      - name: Record and upload mandatory .deb build evidence
-        run: |
-          node tools/test/linux-ci-evidence.cjs record \
-              --job build-deb --output "$RUNNER_TEMP/linux-ci-evidence/build-deb.json" \
-              --sha "$GITHUB_SHA" --architecture "$RUNNER_ARCH" --distro ubuntu \
-              --session packaging --interpreter "$(dpkg-deb --version | head -1)" \
-              --subject build-deb=1
-
-      - name: Upload mandatory .deb build evidence
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-ci-evidence-build-deb
-          retention-days: 7
-          path: ${{ runner.temp }}/linux-ci-evidence/build-deb.json
-          if-no-files-found: error
-
-  # ─────────────────────────────────────────────────
-  # 4.4) Build the .rpm package, for real
-  # ─────────────────────────────────────────────────
-  # Same story as the .deb: --skip-rpm returned before rpmbuild, so the generated
-  # spec — its %files list, its %post and %preun — had never been through rpm.
-  build-rpm:
-    name: 'Linux · .rpm package'
-    runs-on: ubuntu-latest
-    needs: [e2e-linux]
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: '.node-version'
-          cache: 'npm'
-
-      - name: Install rpmbuild
-        # Ubuntu's "rpm" package carries /usr/bin/rpmbuild. The version call is
-        # not decoration: without rpmbuild the packager exits 0 with only the
-        # spec staged, so a missing binary would read as a successful build.
-        run: |
-          set -euo pipefail
-          sudo apt-get update -qq
-          sudo apt-get install -y rpm
-          rpmbuild --version
-
-      - name: Assemble Linux driver bundle
-        env:
-          ERGOPTI_BUILD_COMMIT: ${{ github.sha }}
-        run: bash tools/build/build-linux-driver.sh --skip-smoke
-
-      - name: Build the .rpm
-        run: bash tools/build/build-linux-rpm.sh
-
-      - name: An .rpm was actually produced
-        # Demanding the file is what stops "rpmbuild was not there" from reading
-        # as a successful build, and -qip/-qlp put the metadata and the file list
-        # in the log where a wrong %files stanza is visible without a Fedora box.
-        run: |
-          set -euo pipefail
-          built=$(find build/linux/rpm/RPMS -name '*.rpm' -type f | head -1)
-          if [ -z "$built" ]; then
-              echo "::error::build-linux-rpm.sh produced no .rpm — rpmbuild never ran."
-              exit 1
-          fi
-          echo "RPM: $built ($(du -h "$built" | cut -f1))"
-          rpm -qip "$built"
-          rpm -qlp "$built" | head -20
-          cp "$built" build/linux/ergopti-smoke.rpm
-
-      - name: Upload the .rpm for the install-and-launch job
-        uses: actions/upload-artifact@v4
-        with:
-          name: ci-linux-rpm
-          retention-days: 1
-          path: build/linux/ergopti-smoke.rpm
-
-      - name: Record mandatory .rpm build evidence
-        run: |
-          node tools/test/linux-ci-evidence.cjs record \
-              --job build-rpm --output "$RUNNER_TEMP/linux-ci-evidence/build-rpm.json" \
-              --sha "$GITHUB_SHA" --architecture "$RUNNER_ARCH" --distro ubuntu \
-              --session packaging --interpreter "$(rpmbuild --version)" \
-              --subject build-rpm=1
-
-      - name: Upload mandatory .rpm build evidence
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-ci-evidence-build-rpm
-          retention-days: 7
-          path: ${{ runner.temp }}/linux-ci-evidence/build-rpm.json
-          if-no-files-found: error
-
-  # ─────────────────────────────────────────────────
-  # 4.5) Build the AppImage, for real
-  # ─────────────────────────────────────────────────
-  # The distribution-agnostic package: no root, no package manager, one file. It
-  # is the answer for every distribution the .deb and .rpm do not cover, so it is
-  # built here rather than only at release time.
-  build-appimage:
-    name: 'Linux · AppImage package'
-    runs-on: ubuntu-latest
-    needs: [e2e-linux]
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: '.node-version'
-          cache: 'npm'
-
-      - name: Install LuaJIT
-        # build-linux-appimage.sh copies the BUILD HOST's luajit into the image
-        # when there is one. Without this the AppImage is still produced, but it
-        # falls back to a luajit the target must already have.
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y luajit
-
-      - name: Install appimagetool
-        # appimagetool ships AS an AppImage, and an AppImage mounts itself with
-        # FUSE, which this runner does not have. Unpacking it once and putting
-        # its AppRun on PATH is the standard way around that.
-        run: |
-          set -euo pipefail
-          curl -fsSL --retry 3 --retry-delay 5 -o "$RUNNER_TEMP/appimagetool" \
-              https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
-          chmod +x "$RUNNER_TEMP/appimagetool"
-          (cd "$RUNNER_TEMP" && ./appimagetool --appimage-extract >/dev/null)
-          sudo ln -sf "$RUNNER_TEMP/squashfs-root/AppRun" /usr/local/bin/appimagetool
-          test -x /usr/local/bin/appimagetool
-
-      - name: Assemble Linux driver bundle
-        env:
-          ERGOPTI_BUILD_COMMIT: ${{ github.sha }}
-        run: bash tools/build/build-linux-driver.sh --skip-smoke
-
-      - name: Build the AppImage
-        run: bash tools/build/build-linux-appimage.sh
-
-      - name: An AppImage was actually produced
-        # The packager exits 0 with only the AppDir staged when appimagetool is
-        # missing. Demanding the file is what stops that from reading as a build.
-        run: |
-          set -euo pipefail
-          built=$(find build/linux -maxdepth 1 -name '*.AppImage' -type f | head -1)
-          if [ -z "$built" ]; then
-              echo "::error::build-linux-appimage.sh staged an AppDir but produced no AppImage."
-              exit 1
-          fi
-          echo "AppImage: $built ($(du -h "$built" | cut -f1))"
-          mv "$built" build/linux/ergopti-smoke.AppImage
-
-      - name: Upload the AppImage for the install-and-launch job
-        uses: actions/upload-artifact@v4
-        with:
-          name: ci-linux-appimage
-          retention-days: 1
-          path: build/linux/ergopti-smoke.AppImage
-
-      - name: Record mandatory AppImage build evidence
-        run: |
-          node tools/test/linux-ci-evidence.cjs record \
-              --job build-appimage --output "$RUNNER_TEMP/linux-ci-evidence/build-appimage.json" \
-              --sha "$GITHUB_SHA" --architecture "$RUNNER_ARCH" --distro ubuntu \
-              --session packaging --interpreter "$(luajit -v 2>&1 | head -1)" \
-              --subject build-appimage=1
-
-      - name: Upload mandatory AppImage build evidence
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-ci-evidence-build-appimage
-          retention-days: 7
-          path: ${{ runner.temp }}/linux-ci-evidence/build-appimage.json
-          if-no-files-found: error
-
-  # ─────────────────────────────────────────────────
-  # 4.6) Build the Flatpak bundle, for real
-  # ─────────────────────────────────────────────────
-  # This job used to run --skip-flatpak and validate the manifest without ever
-  # building it, on the reasoning that a stock runner could not: flatpak-builder
-  # needs unprivileged user namespaces, which Ubuntu 24.04 restricts through
-  # AppArmor on the runner image, and the build pulls the freedesktop runtime and
-  # SDK from Flathub before compiling LuaJIT from git inside the sandbox.
-  #
-  # The namespace restriction is one sysctl. The Flathub pull is slow, not
-  # impossible. So the bundle is built here, because "we validated the manifest"
-  # is exactly the claim the .deb and .rpm jobs were making right up until the
-  # first real install found a package that could not start.
-  build-flatpak:
-    name: 'Linux · Flatpak package'
-    runs-on: ubuntu-latest
-    needs: [e2e-linux]
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: '.node-version'
-          cache: 'npm'
-
-      - name: Install flatpak and lift the namespace restriction
-        # flatpak-builder sandboxes each build step with bubblewrap, which needs
-        # an unprivileged user namespace. Ubuntu 24.04 denies that by default
-        # through AppArmor, and the failure surfaces as an opaque bwrap error
-        # rather than as a permission decision — hence setting it explicitly, and
-        # tolerating a kernel that has no such knob.
-        run: |
-          set -euo pipefail
-          sudo apt-get update -qq
-          sudo apt-get install -y flatpak flatpak-builder
-          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 ||
-              echo "::notice::no apparmor_restrict_unprivileged_userns knob here — continuing"
-          flatpak --version
-          flatpak-builder --version
-
-      - name: Add Flathub and pull the runtime
-        # The one genuinely slow step: the runtime and SDK are a large download.
-        # A failure here is a real failure — better a red job naming a Flathub
-        # outage than a green one that quietly built nothing.
-        run: |
-          set -euo pipefail
-          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-          flatpak install --user -y flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
-          flatpak list --user
-
-      - name: Assemble Linux driver bundle
-        env:
-          ERGOPTI_BUILD_COMMIT: ${{ github.sha }}
-        run: bash tools/build/build-linux-driver.sh --skip-smoke
-
-      - name: Build the Flatpak
-        run: bash tools/build/build-linux-flatpak.sh
-
-      - name: The staged payload carries the driver and the shared data tree
-        # The packager checks its own manifest; this checks the payload, which is
-        # the part a copy that silently did nothing would leave empty.
-        run: |
-          set -euo pipefail
-          fail=0
-          for f in build/linux/flatpak/org.ergopti.Ergopti.yml \
-                   build/linux/flatpak/payload/bin/ergopti \
-                   build/linux/flatpak/payload/lib/ergopti/ergopti_hotstrings.lua \
-                   build/linux/flatpak/payload/lib/ergopti/infra/paths.lua \
-                   build/linux/flatpak/payload/lib/ergopti/_shared/lua/logger/shim.lua \
-                   build/linux/flatpak/payload/lib/ergopti/_shared/data/locales/en.json; do
-              if [ ! -f "$f" ]; then
-                  echo "::error::the Flatpak payload is missing $f"
-                  fail=1
-              fi
-          done
-          exit $fail
-
-      - name: A .flatpak bundle was actually produced
-        # The packager exits 0 with only the manifest staged when flatpak-builder
-        # is absent. Demanding the file is what stops that reading as a build.
-        run: |
-          set -euo pipefail
-          built=$(find build/linux -maxdepth 1 -name '*.flatpak' -type f | head -1)
-          if [ -z "$built" ]; then
-              echo "::error::build-linux-flatpak.sh staged a manifest but produced no bundle."
-              exit 1
-          fi
-          echo "Flatpak: $built ($(du -h "$built" | cut -f1))"
-          mv "$built" build/linux/ergopti-smoke.flatpak
-
-      - name: Upload the bundle for the install-and-launch job
-        uses: actions/upload-artifact@v4
-        with:
-          name: ci-linux-flatpak
-          retention-days: 1
-          path: build/linux/ergopti-smoke.flatpak
-
-      - name: Record mandatory Flatpak build evidence
-        run: |
-          node tools/test/linux-ci-evidence.cjs record \
-              --job build-flatpak --output "$RUNNER_TEMP/linux-ci-evidence/build-flatpak.json" \
-              --sha "$GITHUB_SHA" --architecture "$RUNNER_ARCH" --distro ubuntu \
-              --session packaging --interpreter "$(flatpak-builder --version)" \
-              --subject build-flatpak=1
-
-      - name: Upload mandatory Flatpak build evidence
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-ci-evidence-build-flatpak
-          retention-days: 7
-          path: ${{ runner.temp }}/linux-ci-evidence/build-flatpak.json
-          if-no-files-found: error
-
-  # ─────────────────────────────────────────────────
-  # 4.7) Install the .deb and launch what it installed
-  # ─────────────────────────────────────────────────
-  # The step the whole packaging chain existed to make possible: take the package
-  # a user would download, install it the way a user would, and run the binary it
-  # put on their PATH. Everything before this validates sources; this validates
-  # the INSTALLED layout, which is a different tree with different paths and is
-  # where the last shared-tree defect lived.
-  #
-  # There is no display on this runner, so the tray and the WebKit windows are
-  # deliberately not started — they cannot be, and pretending otherwise would
-  # make this job green for the wrong reason.
-  smoke-deb-install:
-    name: 'Linux · install the .deb and launch it'
-    runs-on: ubuntu-latest
-    needs: [build-deb]
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download the .deb built above
-        uses: actions/download-artifact@v4
-        with:
-          name: ci-linux-deb
-          path: pkg
-
-      - name: Install it the way a user would
-        # --no-install-recommends deliberately: the Recommends list names
-        # libayatana-appindicator3-1 among others, which are optional at
-        # runtime and not all in the Ubuntu archive. What is under test is that
-        # the Depends resolve and that DEBIAN/postinst — never once executed
-        # before this job existed — runs to completion, since apt fails the
-        # install when it exits non-zero.
-        run: |
-          set -euo pipefail
-          deb=$(find pkg -name '*.deb' -type f | head -1)
-          if [ -z "$deb" ]; then
-              echo "::error::the ci-linux-deb artifact contains no .deb."
-              exit 1
-          fi
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends "./$deb"
-          dpkg -s ergopti
-
-      - name: The package installed the files the daemon reads
-        run: |
-          set -euo pipefail
-          fail=0
-          for f in /usr/bin/ergopti \
-                   /usr/lib/ergopti/ergopti_hotstrings.lua \
-                   /usr/lib/ergopti/infra/paths.lua \
-                   /usr/lib/ergopti/_shared/lua/logger/shim.lua \
-                   /usr/lib/ergopti/_shared/data/locales/en.json \
-                   /usr/lib/systemd/user/ergopti-hotstrings.service; do
-              if [ ! -e "$f" ]; then
-                  echo "::error::the package did not install $f"
-                  fail=1
-              fi
-          done
-          exit $fail
-
-      - name: Launch the installed binary
-        # --help returns early, but only AFTER every file-scope require in the
-        # daemon has run — so this is a real check of the require graph against
-        # the INSTALLED layout, which the unit suite (run from the checkout)
-        # cannot see. A missing module or a wrapper with the wrong LUA_PATH
-        # fails here instead of on the user's machine.
-        timeout-minutes: 2
-        run: |
-          set -euo pipefail
-          /usr/bin/ergopti --help
-
-      - name: The installed shared data tree resolves and opens
-        # --help returns before doing any work, so it proves the require graph
-        # and nothing about the DATA tree — which is where the defect that
-        # motivated this whole job actually lived. The check is a tracked file
-        # rather than a heredoc because five formats run it.
-        #
-        # LUA_PATH is replayed from the INSTALLED wrapper rather than re-typed,
-        # so this cannot pass against a path the wrapper does not set.
-        run: |
-          set -euo pipefail
-          eval "$(grep -E '^(DRIVER_ROOT|SHARED_LUA)=|^export LUA_PATH=' /usr/bin/ergopti)"
-          if [ -z "${LUA_PATH:-}" ]; then
-              echo "::error::/usr/bin/ergopti no longer exports LUA_PATH — this check read nothing."
-              exit 1
-          fi
-          echo "LUA_PATH from the installed wrapper: $LUA_PATH"
-          luajit static/ergopti_plus/linux/tests/hardware/installed_layout_check.lua \
-              /usr/lib/ergopti/_shared
-
-      - name: Record mandatory .deb smoke evidence
-        run: |
-          node tools/test/linux-ci-evidence.cjs record \
-              --job smoke-deb-install --output "$RUNNER_TEMP/linux-ci-evidence/smoke-deb-install.json" \
-              --sha "$GITHUB_SHA" --architecture "$RUNNER_ARCH" --distro ubuntu \
-              --session installed-package --interpreter "$(luajit -v 2>&1 | head -1)" \
-              --subject smoke-deb-install=1
-
-      - name: Upload mandatory .deb smoke evidence
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-ci-evidence-smoke-deb-install
-          retention-days: 7
-          path: ${{ runner.temp }}/linux-ci-evidence/smoke-deb-install.json
-          if-no-files-found: error
-
-  # ─────────────────────────────────────────────────
-  # 4.8) Gate: Linux driver fully green
-  # ─────────────────────────────────────────────────
-  # The needs: list and the loop below name the same jobs twice on purpose —
-  # needs: decides what this job waits for, the loop decides what it fails on —
-  # and a job added to one but not the other runs and gates nothing. That is
-  # exactly what build-deb and build-rpm were: no job listed them, so a broken
-  # package still shipped a release. Anything added to section 4 goes in BOTH.
-  # ─────────────────────────────────────────────────
-  # 4.8) Install the .rpm and launch what it installed
-  # ─────────────────────────────────────────────────
-  # In a Fedora container, because ubuntu-latest cannot install an .rpm and a
-  # conversion through alien would be testing alien. dnf resolves the same
-  # dependencies a Fedora user's would.
-  smoke-rpm-install:
-    name: 'Linux · install the .rpm and launch it'
-    runs-on: ubuntu-latest
-    needs: [build-rpm]
-    container:
-      image: fedora:latest
-
-    steps:
-      - name: Tools the job itself needs
-        # Deliberately NOT luajit: the .rpm declares `Requires: luajit >= 2.1`,
-        # so letting dnf resolve it from the package is what proves that
-        # declaration is right. Pre-installing it would hide a wrong Requires.
-        # git is for actions/checkout, findutils for the `find` below.
-        run: dnf install -y git findutils
-
-      - uses: actions/checkout@v4
-
-      - name: Download the .rpm built above
-        uses: actions/download-artifact@v4
-        with:
-          name: ci-linux-rpm
-          path: pkg
-
-      - name: Install it the way a user would
-        run: |
-          set -euo pipefail
-          rpm=$(find pkg -name '*.rpm' -type f | head -1)
-          if [ -z "$rpm" ]; then
-              echo "::error::the ci-linux-rpm artifact contains no .rpm."
-              exit 1
-          fi
-          dnf install -y "./$rpm"
-          rpm -q ergopti
-
-      - name: Launch the installed binary
-        run: /usr/bin/ergopti --help
-
-      - name: The installed shared data tree resolves and opens
-        run: |
-          set -euo pipefail
-          eval "$(grep -E '^(DRIVER_ROOT|SHARED_LUA)=|^export LUA_PATH=' /usr/bin/ergopti)"
-          if [ -z "${LUA_PATH:-}" ]; then
-              echo "::error::/usr/bin/ergopti no longer exports LUA_PATH — this check read nothing."
-              exit 1
-          fi
-          luajit static/ergopti_plus/linux/tests/hardware/installed_layout_check.lua \
-              /usr/lib/ergopti/_shared
-
-      - name: Record mandatory .rpm smoke evidence
-        run: |
-          set -euo pipefail
-          evidence_dir="$RUNNER_TEMP/linux-ci-evidence"
-          mkdir -p "$evidence_dir"
-          printf '%s\n' \
-            '{' \
-            '  "schema_version": 1,' \
-            '  "job": "smoke-rpm-install",' \
-            "  \"sha\": \"$GITHUB_SHA\"," \
-            "  \"architecture\": \"$RUNNER_ARCH\"," \
-            '  "distro": "fedora",' \
-            '  "session": "installed-package",' \
-            '  "interpreter": "LuaJIT",' \
-            '  "subjects": { "smoke-rpm-install": 1 }' \
-            '}' > "$evidence_dir/smoke-rpm-install.json"
-
-      - name: Upload mandatory .rpm smoke evidence
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-ci-evidence-smoke-rpm-install
-          retention-days: 7
-          path: ${{ runner.temp }}/linux-ci-evidence/smoke-rpm-install.json
-          if-no-files-found: error
-
-  # ─────────────────────────────────────────────────
-  # 4.9) Run the AppImage
-  # ─────────────────────────────────────────────────
-  # An AppImage is not installed; running it IS the install. It mounts itself
-  # with FUSE, which this runner does not have, so it is unpacked with the
-  # --appimage-extract escape hatch the format provides for exactly this.
-  # AppRun is then the same entry point a user's double-click reaches.
-  smoke-appimage-run:
-    name: 'Linux · run the AppImage'
-    runs-on: ubuntu-latest
-    needs: [build-appimage]
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download the AppImage built above
-        uses: actions/download-artifact@v4
-        with:
-          name: ci-linux-appimage
-          path: pkg
-
-      - name: Unpack it (no FUSE on this runner)
-        run: |
-          set -euo pipefail
-          img=$(find pkg -name '*.AppImage' -type f | head -1)
-          if [ -z "$img" ]; then
-              echo "::error::the ci-linux-appimage artifact contains no .AppImage."
-              exit 1
-          fi
-          chmod +x "$img"
-          "./$img" --appimage-extract >/dev/null
-          test -x squashfs-root/AppRun
-
-      - name: Launch it
-        # Explicitly --help: AppRun appends --tray when given no arguments, and
-        # there is no display here for a tray to appear in.
-        run: ./squashfs-root/AppRun --help
-
-      - name: The bundled shared data tree resolves and opens
-        # The AppImage is relocatable, so its root is wherever it was unpacked —
-        # which is the point of checking it here rather than assuming a prefix.
-        #
-        # Run through the image's OWN luajit, not the runner's. There is no
-        # luajit on this runner at all, which is the situation an AppImage
-        # exists for: if the bundled interpreter is missing or unusable, that is
-        # a defect in the package and this step is where it should surface.
-        run: |
-          set -euo pipefail
-          root="$(pwd)/squashfs-root/usr/lib/ergopti"
-          luajit_bin="$(pwd)/squashfs-root/usr/bin/luajit"
-          if [ ! -x "$luajit_bin" ]; then
-              echo "::error::the AppImage bundles no runnable luajit at usr/bin/luajit — it would depend on the target having one."
-              exit 1
-          fi
-          export LUA_PATH="$root/?.lua;$root/?/init.lua;$root/_shared/lua/?.lua;$root/_shared/lua/?/init.lua;;"
-          "$luajit_bin" static/ergopti_plus/linux/tests/hardware/installed_layout_check.lua \
-              "$root/_shared"
-
-      - name: Record mandatory AppImage smoke evidence
-        run: |
-          node tools/test/linux-ci-evidence.cjs record \
-              --job smoke-appimage-run --output "$RUNNER_TEMP/linux-ci-evidence/smoke-appimage-run.json" \
-              --sha "$GITHUB_SHA" --architecture "$RUNNER_ARCH" --distro ubuntu \
-              --session unpacked-appimage --interpreter "$(./squashfs-root/usr/bin/luajit -v 2>&1 | head -1)" \
-              --subject smoke-appimage-run=1
-
-      - name: Upload mandatory AppImage smoke evidence
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-ci-evidence-smoke-appimage-run
-          retention-days: 7
-          path: ${{ runner.temp }}/linux-ci-evidence/smoke-appimage-run.json
-          if-no-files-found: error
-
-  # ─────────────────────────────────────────────────
-  # 4.10) Install the Flatpak and launch it
-  # ─────────────────────────────────────────────────
-  # The sandboxed path. `flatpak run` is what a user's launcher invokes, and it
-  # is the only one of the five that executes inside the confinement the
-  # manifest declares — so a permission the driver needs and the manifest forgot
-  # shows up here rather than on a user's machine.
-  smoke-flatpak-run:
-    name: 'Linux · install the Flatpak and launch it'
-    runs-on: ubuntu-latest
-    needs: [build-flatpak]
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install flatpak and lift the namespace restriction
-        run: |
-          set -euo pipefail
-          sudo apt-get update -qq
-          sudo apt-get install -y flatpak
-          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 ||
-              echo "::notice::no apparmor_restrict_unprivileged_userns knob here — continuing"
-
-      - name: Download the bundle built above
-        uses: actions/download-artifact@v4
-        with:
-          name: ci-linux-flatpak
-          path: pkg
-
-      - name: Install it the way a user would
-        run: |
-          set -euo pipefail
-          bundle=$(find pkg -name '*.flatpak' -type f | head -1)
-          if [ -z "$bundle" ]; then
-              echo "::error::the ci-linux-flatpak artifact contains no bundle."
-              exit 1
-          fi
-          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-          flatpak install --user -y flathub org.freedesktop.Platform//24.08
-          flatpak install --user -y --bundle "$bundle"
-          flatpak list --user --app
-
-      - name: Launch it
-        run: flatpak run --user org.ergopti.Ergopti --help
-
-      - name: The sandboxed shared data tree resolves and opens
-        # Run INSIDE the sandbox with --command, so this reads /app exactly as
-        # the daemon does. The check script is bound in read-only from the
-        # checkout because the package deliberately ships no tests.
-        run: |
-          set -euo pipefail
-          check_dir="$(pwd)/static/ergopti_plus/linux/tests/hardware"
-          flatpak run --user \
-              --filesystem="$check_dir:ro" \
-              --env=LUA_PATH="/app/lib/ergopti/?.lua;/app/lib/ergopti/?/init.lua;/app/lib/ergopti/_shared/lua/?.lua;/app/lib/ergopti/_shared/lua/?/init.lua;;" \
-              --command=luajit org.ergopti.Ergopti \
-              "$check_dir/installed_layout_check.lua" /app/lib/ergopti/_shared
-
-      - name: Record mandatory Flatpak smoke evidence
-        run: |
-          node tools/test/linux-ci-evidence.cjs record \
-              --job smoke-flatpak-run --output "$RUNNER_TEMP/linux-ci-evidence/smoke-flatpak-run.json" \
-              --sha "$GITHUB_SHA" --architecture "$RUNNER_ARCH" --distro ubuntu \
-              --session flatpak-sandbox --interpreter "$(flatpak --version)" \
-              --subject smoke-flatpak-run=1
-
-      - name: Upload mandatory Flatpak smoke evidence
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-ci-evidence-smoke-flatpak-run
-          retention-days: 7
-          path: ${{ runner.temp }}/linux-ci-evidence/smoke-flatpak-run.json
-          if-no-files-found: error
-
-  # ─────────────────────────────────────────────────
-  # 4.11) Install the tarball with install.sh and launch it
-  # ─────────────────────────────────────────────────
-  # The no-root path the release notes point every other distribution at. It is
-  # the only format whose installer is our own script rather than a package
-  # manager, so it is the only one where a broken install.sh is invisible
-  # everywhere else. --no-deps because the runner has what it needs and the
-  # dependency install is the distro matrix's job, not this one's.
-  smoke-tarball-install:
-    name: 'Linux · install the tarball and launch it'
-    runs-on: ubuntu-latest
-    needs: [e2e-linux]
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: '.node-version'
-          cache: 'npm'
-
-      - name: Install LuaJIT
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y luajit
-
-      - name: Assemble and pack the bundle exactly as the release does
-        env:
-          ERGOPTI_BUILD_COMMIT: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-          bash tools/build/build-linux-driver.sh --skip-smoke
-          bash tools/build/write_build_stamp.sh verify build/linux/_shared
-          bundle_asset=$(node -p "require('./static/ergopti_plus/_shared/modules/updater/defaults.json').release_assets.linux_bundle")
-          if [[ ! "$bundle_asset" =~ ^[A-Za-z0-9._+-]+\.tar\.gz$ ]]; then
-              echo "::error::unsafe Linux bundle asset name: $bundle_asset"
-              exit 1
-          fi
-          echo "LINUX_BUNDLE_ASSET=$bundle_asset" >> "$GITHUB_ENV"
-          bundle_path="$RUNNER_TEMP/$bundle_asset"
-          tar -czf "$bundle_path" \
-              -C build/linux linux _shared bin install.sh
-          (cd "$RUNNER_TEMP" && sha256sum "$bundle_asset" > "$bundle_asset.sha256")
-          (cd "$RUNNER_TEMP" && sha256sum --check "$bundle_asset.sha256")
-          tar -tzf "$bundle_path" | wc -l
-
-      - name: Unpack and install it the way a user would
-        # --no-deps because package installs are the distro matrix's job, and
-        # --no-service because a runner has no user session bus for a
-        # systemd --user unit to register with. The permission setup DOES run:
-        # it is the half every packaged format leaves to install.sh, so skipping
-        # it would leave the one script nobody else exercises unexercised.
-        run: |
-          set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/unpacked"
-          tar -xzf "$RUNNER_TEMP/$LINUX_BUNDLE_ASSET" -C "$RUNNER_TEMP/unpacked"
-          cd "$RUNNER_TEMP/unpacked"
-          test -f install.sh
-          bash install.sh --no-deps --no-service || {
-              echo "::error::install.sh failed on a clean unpack of the release tarball."
-              exit 1
-          }
-
-      - name: Launch what it installed
-        run: |
-          set -euo pipefail
-          launcher="$HOME/.local/bin/ergopti-hotstrings"
-          if [ ! -x "$launcher" ]; then
-              echo "::error::install.sh left no executable launcher at $launcher"
-              ls -la "$HOME/.local/bin" || true
-              exit 1
-          fi
-          "$launcher" --help
-
-      - name: The installed shared data tree resolves and opens
-        run: |
-          set -euo pipefail
-          root="$HOME/.local/lib/ergopti"
-          if [ ! -d "$root/linux" ]; then
-              echo "::error::no driver tree at $root/linux — install.sh moved its install root."
-              ls -la "$root" || true
-              exit 1
-          fi
-          export LUA_PATH="$root/linux/?.lua;$root/linux/?/init.lua;$root/_shared/lua/?.lua;$root/_shared/lua/?/init.lua;;"
-          luajit static/ergopti_plus/linux/tests/hardware/installed_layout_check.lua \
-              "$root/_shared"
-
-      - name: Record mandatory tarball smoke evidence
-        run: |
-          node tools/test/linux-ci-evidence.cjs record \
-              --job smoke-tarball-install --output "$RUNNER_TEMP/linux-ci-evidence/smoke-tarball-install.json" \
-              --sha "$GITHUB_SHA" --architecture "$RUNNER_ARCH" --distro ubuntu \
-              --session user-install --interpreter "$(luajit -v 2>&1 | head -1)" \
-              --subject smoke-tarball-install=1
-
-      - name: Upload mandatory tarball smoke evidence
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-ci-evidence-smoke-tarball-install
-          retention-days: 7
-          path: ${{ runner.temp }}/linux-ci-evidence/smoke-tarball-install.json
-          if-no-files-found: error
-
-  linux-ok:
-    name: 'Linux · ✅ all green'
-    runs-on: ubuntu-latest
-    needs:
-      - test-linux
-      - install-linux-distros
-      - first-install-distros
-      - e2e-linux
-      - build-deb
-      - build-rpm
-      - build-appimage
-      - build-flatpak
-      - smoke-deb-install
-      - smoke-rpm-install
-      - smoke-appimage-run
-      - smoke-flatpak-run
-      - smoke-tarball-install
-    if: always()
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: '.node-version'
-
-      - name: Download Linux assertion evidence
-        uses: actions/download-artifact@v4
-        with:
-          pattern: linux-ci-evidence-*
-          path: ${{ runner.temp }}/linux-ci-evidence
-          merge-multiple: true
-
-      - name: Assert all mandatory Linux subjects ran and passed
-        env:
-          NEEDS: ${{ toJSON(needs) }}
-        run: |
-          set -euo pipefail
-          node tools/test/linux-ci-evidence.cjs verify \
-              --manifest .github/linux-ci-coverage.json \
-              --needs "$NEEDS" \
-              --evidence-dir "$RUNNER_TEMP/linux-ci-evidence" \
-              --sha "$GITHUB_SHA"
-          echo "Linux driver: every mandatory job and evidence subject passed."
-
-  # =============================================================
-  # =============================================================
-  # ======= 5/ Resolve release metadata (main + dev) ============
-  # =============================================================
-  # =============================================================
-
-  resolve-release-meta:
-    name: 'Release · resolve tag + version'
-    runs-on: ubuntu-latest
-    needs: [macos-ok, windows-ok, linux-ok]
-    # Runs on push to main or dev — not on PRs
-    if: >
-      always() &&
-      github.event_name == 'push' &&
-      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') &&
-      needs.macos-ok.result   == 'success' &&
-      needs.windows-ok.result == 'success' &&
-      needs.linux-ok.result   == 'success'
-    permissions:
-      contents: write
     outputs:
+      release: ${{ steps.meta.outputs.release }}
       tag: ${{ steps.meta.outputs.tag }}
       version: ${{ steps.meta.outputs.version }}
       title: ${{ steps.meta.outputs.title }}
       prerelease: ${{ steps.meta.outputs.prerelease }}
-      skip: ${{ steps.meta.outputs.skip }}
+      channel: ${{ steps.meta.outputs.channel }}
+      linux_bundle: ${{ steps.contract.outputs.linux_bundle }}
 
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      # The Linux box names its tarball with it and release writes it into the
+      # notes, so it is resolved and validated once, on every run. A malformed
+      # name fails plan and therefore stops every box, macOS and Windows
+      # included, on purpose: it can only come from a checked-in bug in
+      # defaults.json, and failing fast at t=0 names it before any runner time
+      # is spent on a run that could never publish.
+      - name: Load the Linux release artifact contract
+        id: contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          asset_name=$(node -p "require('./static/ergopti_plus/_shared/modules/updater/defaults.json').release_assets.linux_bundle")
+          if [[ ! "$asset_name" =~ ^[A-Za-z0-9._+-]+\.tar\.gz$ ]]; then
+              echo "::error::unsafe Linux bundle asset name: $asset_name"
+              exit 1
+          fi
+          echo "linux_bundle=$asset_name" >> "$GITHUB_OUTPUT"
+
       - name: Compute tag and version
         id: meta
         shell: bash
         run: |
           set -euo pipefail
+          emit() { printf '%s=%s\n' "$1" "$2" >> "$GITHUB_OUTPUT"; }
+
+          # Only a push to main or dev publishes. A pull request or a manual
+          # dispatch takes the CI profile: every box still runs its tests and
+          # builds its package, and release is skipped. dev is the channel the
+          # CI packages have always been stamped with.
+          if [ "$GITHUB_EVENT_NAME" != "push" ] ||
+             { [ "$GITHUB_REF" != "refs/heads/main" ] && [ "$GITHUB_REF" != "refs/heads/dev" ]; }; then
+              echo "Not a push to main or dev: CI profile, no release."
+              emit release false
+              emit channel dev
+              exit 0
+          fi
+
           branch="${GITHUB_REF_NAME}"
 
           if [ "$branch" = "main" ]; then
@@ -2443,567 +232,105 @@ jobs:
               title="Ergopti ${tag}"
           fi
 
-          # Skip if the tag already exists (duplicate push guard)
-          if git ls-remote --tags origin "refs/tags/$tag" | grep -q "$tag"; then
-              echo "Tag '$tag' already exists — skipping release."
-              echo "skip=true" >> "$GITHUB_OUTPUT"
-              echo "tag=$tag"               >> "$GITHUB_OUTPUT"
-              echo "version=${tag#v}"       >> "$GITHUB_OUTPUT"
-              echo "title=$title"           >> "$GITHUB_OUTPUT"
-              echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+          # Skip if the tag already exists (duplicate push guard). The listing is
+          # captured before it is tested: piped into grep under pipefail, a
+          # failing ls-remote read as "tag free" and planned a release.
+          taken=$(git ls-remote --tags origin "refs/tags/$tag")
+          if [ -n "$taken" ]; then
+              echo "::notice::Tag '$tag' already exists: CI profile, no release."
+              emit release false
+              emit channel dev
               exit 0
           fi
 
           version="${tag#v}"
-          echo "tag=$tag"               >> "$GITHUB_OUTPUT"
-          echo "version=$version"       >> "$GITHUB_OUTPUT"
-          echo "title=$title"           >> "$GITHUB_OUTPUT"
-          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
-          echo "skip=false"             >> "$GITHUB_OUTPUT"
-          echo "Resolved: tag=$tag version=$version prerelease=$prerelease"
+          if [ "$prerelease" = "true" ]; then channel="dev"; else channel="main"; fi
+          emit release true
+          emit tag "$tag"
+          emit version "$version"
+          emit title "$title"
+          emit prerelease "$prerelease"
+          emit channel "$channel"
+          echo "Resolved: tag=$tag version=$version prerelease=$prerelease channel=$channel"
           echo "Title: $title"
 
-  # =========================================================
-  # =========================================================
-  # ======= 6/ Build release assets (all three platforms) ===
-  # =========================================================
-  # =========================================================
+  # ========================================================
+  # ========================================================
+  # ======= 2/ One box per OS — tests, package, gate =======
+  # ========================================================
+  # ========================================================
+
+  # A called workflow gets no caller env and no secrets beyond those listed
+  # here. version is empty outside a release, which keeps the CI build stamps.
+  # The private signing secrets are passed only on a release run, so no pull
+  # request or dispatch run, even from a branch of this repository, can read
+  # them; SPARKLE_PUBLIC_KEY is public and keeps every CI package launchable.
 
   # ─────────────────────────────────────────────────
-  # 6.1) macOS — ErgoptiPlus.app + Sparkle appcast
+  # 2.1) macOS — Hammerspoon, Swift launcher, ErgoptiPlus.app + launch gate
   # ─────────────────────────────────────────────────
-  build-macos:
-    name: 'Release · macOS build'
-    needs: resolve-release-meta
-    if: needs.resolve-release-meta.outputs.skip == 'false'
-    runs-on: macos-latest
-    env:
-      SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Build ErgoptiPlus.app
-        shell: bash
-        env:
-          ERGOPTI_BUILD_COMMIT: ${{ github.sha }}
-          ERGOPTI_VERSION: ${{ needs.resolve-release-meta.outputs.version }}
-          ERGOPTI_BUILD: ${{ github.run_number }}
-          ERGOPTI_CHANNEL: ${{ needs.resolve-release-meta.outputs.prerelease == 'true' && 'dev' || 'main' }}
-          SPARKLE_PUBLIC_KEY: ${{ secrets.SPARKLE_PUBLIC_KEY }}
-          GH_OWNER: ${{ github.repository_owner }}
-          GH_REPO: ${{ github.event.repository.name }}
-        run: bash tools/build/build_macos_app.sh
-
-      - name: Smoke test built ErgoptiPlus.app (crash-on-launch guard)
-        # Test the extracted release archive through the same Launch Services
-        # path as an installation. Early log creation is not startup readiness.
-        shell: bash
-        timeout-minutes: 3
-        run: |
-          python3 tools/diagnostics/macos_release_launch_test.py
-          test ! -e /Applications/ErgoptiPlus.app
-          ditto -x -k build/macos/ErgoptiPlus.app.zip /Applications
-          python3 tools/diagnostics/macos-release-launch.py /Applications/ErgoptiPlus.app "$RUNNER_TEMP/release-launch"
-
-      - name: Retain packaged application startup evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-package-startup-${{ github.run_id }}
-          path: ${{ runner.temp }}/release-launch
-          if-no-files-found: warn
-
-      - name: Install Sparkle signing tool
-        if: ${{ env.SPARKLE_ED_PRIVATE_KEY != '' }}
-        shell: bash
-        env:
-          SPARKLE_VERSION: '2.9.2'
-        run: |
-          set -euo pipefail
-          curl -fsSLo /tmp/Sparkle.tar.xz \
-              "https://github.com/sparkle-project/Sparkle/releases/download/${SPARKLE_VERSION}/Sparkle-${SPARKLE_VERSION}.tar.xz"
-          mkdir -p /tmp/sparkle-dist
-          tar -xJf /tmp/Sparkle.tar.xz -C /tmp/sparkle-dist
-          echo "SIGN_UPDATE=/tmp/sparkle-dist/bin/sign_update" >> "$GITHUB_ENV"
-
-      - name: Sign zip with Sparkle EdDSA key
-        if: ${{ env.SPARKLE_ED_PRIVATE_KEY != '' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          printf '%s' "$SPARKLE_ED_PRIVATE_KEY" > /tmp/sparkle_priv.key
-          "$SIGN_UPDATE" -f /tmp/sparkle_priv.key build/macos/ErgoptiPlus.app.zip \
-              > build/macos/_ErgoptiPlus.app.zip.sig
-          rm -f /tmp/sparkle_priv.key
-          echo "Sparkle EdDSA signature written to _ErgoptiPlus.app.zip.sig"
-
-      - name: Generate Sparkle appcast
-        if: ${{ env.SPARKLE_ED_PRIVATE_KEY != '' }}
-        shell: bash
-        env:
-          ERGOPTI_VERSION: ${{ needs.resolve-release-meta.outputs.version }}
-          ERGOPTI_BUILD: ${{ github.run_number }}
-          ERGOPTI_CHANNEL: ${{ needs.resolve-release-meta.outputs.prerelease == 'true' && 'dev' || 'main' }}
-          SPARKLE_SIG_FILE: build/macos/_ErgoptiPlus.app.zip.sig
-          ZIP_PATH: build/macos/ErgoptiPlus.app.zip
-          GH_OWNER: ${{ github.repository_owner }}
-          GH_REPO: ${{ github.event.repository.name }}
-          OUTPUT_PATH: build/macos/appcast-${{ needs.resolve-release-meta.outputs.prerelease == 'true' && 'dev' || 'main' }}.xml
-        run: bash tools/build/generate_appcast.sh
-
-      - name: Package latest keylayout bundle
-        shell: bash
-        # Released as Ergopti_macOS.zip — keyboard layout only, no app.
-        run: |
-          set -euo pipefail
-          latest=$(ls -d static/ergopti/macos/bundles/*.bundle | sort -V | tail -1)
-          bundle_name=$(basename "$latest")
-          (cd static/ergopti/macos/bundles && zip -r "../../../../build/macos/Ergopti_macOS.zip" "$bundle_name")
-          echo "Packaged keylayout: $bundle_name → Ergopti_macOS.zip"
-
-      - name: Upload macOS artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: assets-macos
-          retention-days: 1
-          path: |
-            build/macos/ErgoptiPlus.app.zip
-            build/macos/Ergopti_macOS.zip
-            build/macos/_ErgoptiPlus.app.zip.sig
-            build/macos/appcast-*.xml
-
-  # ─────────────────────────────────────────────────
-  # 6.2) Windows — ErgoptiPlus.exe + keyboard layout
-  # ─────────────────────────────────────────────────
-  build-windows:
-    name: 'Release · Windows build'
-    needs: resolve-release-meta
-    if: needs.resolve-release-meta.outputs.skip == 'false'
-    runs-on: windows-latest
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Build and test native navigation event owner
-        shell: pwsh
-        run: ./tools/build/build_windows_nav_owner.ps1
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: '.node-version'
-          cache: 'npm'
-
-      - name: Install Node dependencies
-        run: npm ci
-        shell: bash
-
-      - name: Generate features manifest
-        run: npm run build:manifest
-        shell: bash
-
-      - name: Build static asset bundle
-        run: python tools/build/build_static_bundle.py
-        shell: bash
-
-      - name: Stamp BUNDLE_VERSION, BUNDLE_RELEASE_URL, BUNDLE_CHANNEL
-        shell: pwsh
-        run: |
-          $version = "${{ needs.resolve-release-meta.outputs.version }}"
-          $tag     = "${{ needs.resolve-release-meta.outputs.tag }}"
-          if (-not $tag) { $tag = $version }
-          $prerelease = "${{ needs.resolve-release-meta.outputs.prerelease }}"
-          $channel = if ($prerelease -eq 'true') { 'dev' } else { 'main' }
-          $owner   = "${{ github.repository_owner }}"
-          $repo    = "${{ github.event.repository.name }}"
-          $releaseUrl = "https://github.com/$owner/$repo/releases/tag/$tag"
-          $bundlePath = "${{ github.workspace }}\static\ergopti_plus\windows\infra\bundle.ahk"
-          $text = Get-Content -Raw -Path $bundlePath
-          $text = $text.Replace("__BUNDLE_VERSION__",     $version)
-          $text = $text.Replace("__BUNDLE_RELEASE_URL__", $releaseUrl)
-          $text = $text.Replace("__BUNDLE_CHANNEL__",     $channel)
-          $text = $text.Replace("__BUNDLE_COMMIT__",      "${{ github.sha }}")
-          Set-Content -Path $bundlePath -Value $text -Encoding UTF8 -NoNewline
-          Write-Host "BUNDLE_COMMIT      stamped: ${{ github.sha }}"
-          Write-Host "BUNDLE_VERSION     stamped: $version"
-          Write-Host "BUNDLE_RELEASE_URL stamped: $releaseUrl"
-          Write-Host "BUNDLE_CHANNEL     stamped: $channel"
-
-      - name: Download authenticated Windows compiler toolchain
-        shell: pwsh
-        run: |
-          $contractPath = "${{ github.workspace }}\static\ergopti_plus\_shared\modules\updater\windows_release_toolchain.json"
-          $contract = Get-Content -LiteralPath $contractPath -Raw | ConvertFrom-Json
-          $runtimeUrl = $contract.runtime.url
-          $runtimeSha256 = $contract.runtime.sha256
-          $compilerTag = $contract.compiler.tag
-          $compilerAsset = $contract.compiler.asset
-          $compilerUrl = $contract.compiler.url
-          $compilerSha256 = $contract.compiler.sha256
-          $runtimeArchive = "$env:TEMP\$($contract.runtime.asset)"
-          $compilerArchive = "$env:TEMP\$compilerAsset"
-
-          Invoke-WebRequest -Uri $runtimeUrl -OutFile $runtimeArchive -UseBasicParsing
-          Invoke-WebRequest -Uri $compilerUrl -OutFile $compilerArchive -UseBasicParsing
-          $runtimeActual = (Get-FileHash -LiteralPath $runtimeArchive -Algorithm SHA256).Hash.ToLowerInvariant()
-          $compilerActual = (Get-FileHash -LiteralPath $compilerArchive -Algorithm SHA256).Hash.ToLowerInvariant()
-          if ($runtimeActual -cne $runtimeSha256) {
-              throw "AutoHotkey v$($contract.runtime.version) archive digest mismatch: $runtimeActual"
-          }
-          if ($compilerActual -cne $compilerSha256) {
-              throw "Ahk2Exe $compilerTag archive digest mismatch: $compilerActual"
-          }
-
-          Expand-Archive -LiteralPath $runtimeArchive -DestinationPath "$env:TEMP\AutoHotkey" -Force
-          Expand-Archive -LiteralPath $compilerArchive -DestinationPath "$env:TEMP\Ahk2Exe" -Force
-          if (-not (Test-Path -LiteralPath "$env:TEMP\AutoHotkey\AutoHotkey64.exe" -PathType Leaf)) {
-              throw "The authenticated AutoHotkey archive has no expected runtime."
-          }
-          if (-not (Test-Path -LiteralPath "$env:TEMP\Ahk2Exe\Ahk2Exe.exe" -PathType Leaf)) {
-              throw "The authenticated Ahk2Exe archive has no expected compiler."
-          }
-          Write-Host "Authenticated compiler toolchain: AutoHotkey v$($contract.runtime.version) + $compilerTag"
-
-      - name: Compile ErgoptiPlus.ahk
-        shell: pwsh
-        run: |
-          $ahk2exe = "$env:TEMP\Ahk2Exe\Ahk2Exe.exe"
-          $runtime = "$env:TEMP\AutoHotkey\AutoHotkey64.exe"
-          $in   = "${{ github.workspace }}\static\ergopti_plus\windows\ErgoptiPlus.ahk"
-          $out  = "${{ github.workspace }}\static\ergopti_plus\windows\ErgoptiPlus.exe"
-          $icon = "${{ github.workspace }}\static\favicon.ico"
-          # /silent suppresses any Ahk2Exe GUI dialogs that would block
-          # indefinitely on a headless runner and cause a silent non-zero exit.
-          & $ahk2exe /in $in /out $out /base $runtime /icon $icon /silent
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          # Verify the EXE was actually produced — Ahk2Exe can exit 0 on a
-          # compilation warning without writing the output file.
-          if (-not (Test-Path $out)) {
-              Write-Error "Ahk2Exe reported success but $out was not created."
-              exit 1
-          }
-          Write-Host "Compiled: $out ($('{0:N0}' -f (Get-Item $out).Length) bytes)"
-
-      - name: Sign and verify ErgoptiPlus.exe
-        shell: pwsh
-        env:
-          ERGOPTI_RELEASE_PRERELEASE: ${{ needs.resolve-release-meta.outputs.prerelease }}
-          WINDOWS_SIGNING_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_BASE64 }}
-          WINDOWS_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_PASSWORD }}
-          WINDOWS_SIGNER_SUBJECT: ${{ secrets.WINDOWS_SIGNER_SUBJECT }}
-        run: |
-          $required = @(
-              "WINDOWS_SIGNING_CERTIFICATE_BASE64",
-              "WINDOWS_SIGNING_CERTIFICATE_PASSWORD",
-              "WINDOWS_SIGNER_SUBJECT")
-          $missing = @($required | Where-Object {
-              [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($_))
-          })
-
-          if ($missing.Count -eq $required.Count) {
-              if ($env:ERGOPTI_RELEASE_PRERELEASE -ceq "true") {
-                  Write-Warning "Publishing an unsigned Windows artifact for the dev prerelease channel."
-                  exit 0
-              }
-              throw "Stable Windows releases require every signing secret."
-          }
-          if ($missing.Count -gt 0) {
-              throw "Partial Windows signing configuration; missing: $($missing -join ', ')."
-          }
-
-          $exe = "${{ github.workspace }}\static\ergopti_plus\windows\ErgoptiPlus.exe"
-          $pfx = "$env:RUNNER_TEMP\ergopti-windows-signing.pfx"
-          $signTools = @(Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" `
-              -Recurse -Filter "signtool.exe" -File |
-              Where-Object { $_.FullName -match '\\x64\\signtool\.exe$' } |
-              Sort-Object FullName -Descending)
-          if ($signTools.Count -eq 0) {
-              throw "No x64 signtool.exe was found on the Windows runner."
-          }
-          $signTool = $signTools[0].FullName
-
-          try {
-              [IO.File]::WriteAllBytes(
-                  $pfx,
-                  [Convert]::FromBase64String($env:WINDOWS_SIGNING_CERTIFICATE_BASE64))
-              & $signTool sign /fd SHA256 /td SHA256 `
-                  /tr "https://timestamp.digicert.com" `
-                  /f $pfx /p $env:WINDOWS_SIGNING_CERTIFICATE_PASSWORD $exe
-              if ($LASTEXITCODE -ne 0) {
-                  throw "signtool failed with exit code $LASTEXITCODE."
-              }
-          } finally {
-              Remove-Item -LiteralPath $pfx -Force -ErrorAction SilentlyContinue
-          }
-
-          $signature = Get-AuthenticodeSignature -LiteralPath $exe
-          if ($signature.Status -ne 'Valid') {
-              throw "ErgoptiPlus.exe Authenticode status is '$($signature.Status)', expected 'Valid'."
-          }
-          if ($null -eq $signature.SignerCertificate -or
-              $signature.SignerCertificate.Subject -cne $env:WINDOWS_SIGNER_SUBJECT) {
-              throw "Unexpected Authenticode publisher '$($signature.SignerCertificate.Subject)'."
-          }
-          Write-Host "Verified Authenticode publisher: $($signature.SignerCertificate.Subject)"
-
-      - name: Smoke test compiled ErgoptiPlus.exe (crash-on-launch guard)
-        # The unit test suite (test-ahk job) runs against source .ahk files with
-        # A_IsCompiled == false, so it never exercises compiled-mode-only code
-        # paths like Bundle_Init(). That gap let a 100%-reproducible startup
-        # crash (unassigned A_LocalAppData — not a real AHK v2 built-in) ship
-        # through fully-green CI. This step launches the actual compiled exe
-        # and proves it gets past first-launch bundle extraction instead of
-        # dying on the very first line of the auto-execute section.
-        shell: pwsh
-        timeout-minutes: 3
-        run: |
-          $exe = "${{ github.workspace }}\static\ergopti_plus\windows\ErgoptiPlus.exe"
-          $markerFile = "$env:LOCALAPPDATA\Ergopti\bundle\.bundle-version"
-          Remove-Item "$env:LOCALAPPDATA\Ergopti\bundle" -Recurse -Force -ErrorAction SilentlyContinue
-          $stdout = "$env:TEMP\ergopti_smoke_stdout.txt"
-          $stderr = "$env:TEMP\ergopti_smoke_stderr.txt"
-
-          # /ErrorStdOut only routes LOAD-time errors (parse / missing include)
-          # to stderr; a RUNTIME error like the one this step guards against
-          # still pops a blocking MsgBox, so the real signal below is
-          # behavioural (marker file written / early exit), not the exit code.
-          $proc = Start-Process -FilePath $exe -ArgumentList "/ErrorStdOut" -PassThru `
-              -RedirectStandardOutput $stdout -RedirectStandardError $stderr
-
-          $deadline = (Get-Date).AddSeconds(20)
-          $markerSeen = $false
-          while ((Get-Date) -lt $deadline) {
-              if ($proc.HasExited) { break }
-              if (Test-Path $markerFile) { $markerSeen = $true; break }
-              Start-Sleep -Milliseconds 250
-          }
-          $crashedEarly = $proc.HasExited
-          $exitCode = $null
-          if ($crashedEarly) { $exitCode = $proc.ExitCode }
-
-          # Always clean up — this is a resident tray app with a keyboard hook;
-          # never leave it running on the runner regardless of outcome.
-          if (-not $proc.HasExited) {
-              Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
-          }
-
-          if ($crashedEarly -or -not $markerSeen) {
-              Write-Host "---- stdout ----"; Get-Content $stdout -ErrorAction SilentlyContinue
-              Write-Host "---- stderr ----"; Get-Content $stderr -ErrorAction SilentlyContinue
-              if ($crashedEarly) {
-                  Write-Error "ErgoptiPlus.exe exited during startup (code $exitCode) — see output above."
-              } else {
-                  Write-Error "ErgoptiPlus.exe did not extract its runtime bundle within 20s — a blocking startup dialog is likely (crash-on-launch)."
-              }
-              exit 1
-          }
-          Write-Host "OK: ErgoptiPlus.exe survived startup and extracted its bundle to $markerFile"
-
-      - name: Rename Windows keyboard layout for upload
-        shell: bash
-        run: |
-          set -euo pipefail
-          latest_kbd=$(ls static/ergopti/windows/Ergopti_v*.exe | sort -V | tail -1)
-          cp "$latest_kbd" static/ergopti/windows/Ergopti_windows.exe
-
-      - name: Upload Windows artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: assets-windows
-          retention-days: 1
-          path: |
-            static/ergopti_plus/windows/ErgoptiPlus.exe
-            static/ergopti/windows/Ergopti_windows.exe
-
-  # ─────────────────────────────────────────────────
-  # 6.3) Linux — assemble driver, packages and XKB layouts
-  # ─────────────────────────────────────────────────
-  # The driver's own version comes from resolve-release-meta.outputs.version:
-  # ERGOPTI_BUILD_VERSION is stamped into build/linux/_shared/build_stamp.txt by
-  # build-linux-driver.sh, and every later verify in this job requires that same
-  # value, so the tray, the healthcheck and the updater report the published
-  # release. The package METADATA still takes its version from package.json, so
-  # the .deb "Version:" and the .rpm "Version:" can lag the release tag: on dev
-  # the version is 0.0.0-dev.N, and rpm rejects a hyphen in Version:, so the same
-  # value that a .deb accepts would abort rpmbuild. Every published package is
-  # therefore renamed below to a name that carries no version at all, so no asset
-  # can be misnamed and the website's exact-name lookup keeps working.
-  build-linux:
-    name: 'Release · Linux build'
-    needs: resolve-release-meta
-    if: needs.resolve-release-meta.outputs.skip == 'false'
-    runs-on: ubuntu-latest
-    env:
-      ERGOPTI_BUILD_VERSION: ${{ needs.resolve-release-meta.outputs.version }}
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Load the Linux release artifact contract
-        shell: bash
-        run: |
-          set -euo pipefail
-          asset_name=$(node -p "require('./static/ergopti_plus/_shared/modules/updater/defaults.json').release_assets.linux_bundle")
-          if [[ ! "$asset_name" =~ ^[A-Za-z0-9._+-]+\.tar\.gz$ ]]; then
-              echo "::error::unsafe Linux bundle asset name: $asset_name"
-              exit 1
-          fi
-          echo "LINUX_BUNDLE_ASSET=$asset_name" >> "$GITHUB_ENV"
-
-      - name: Install LuaJIT (for smoke test)
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y luajit
-
-      - name: Assemble Linux driver bundle
-        shell: bash
-        env:
-          ERGOPTI_BUILD_COMMIT: ${{ github.sha }}
-        run: bash tools/build/build-linux-driver.sh
-
-      - name: Package latest XKB files
-        shell: bash
-        run: |
-          set -euo pipefail
-          latest_dir=$(ls -d static/ergopti/linux/v*_* | sort -V | tail -1)
-          dir_name=$(basename "$latest_dir")
-          mkdir -p build/linux/xkb
-          (cd static/ergopti/linux && zip -r "../../../build/linux/xkb/Ergopti_xkb.zip" "$dir_name")
-          echo "Packaged XKB: $dir_name → Ergopti_xkb.zip"
-
-      # A tarball, because the release used to publish install.sh, one wrapper
-      # and ONE Lua file — so a user who downloaded it had an installer, no
-      # driver and no shared tree, and could not install anything. The daemon
-      # resolves _shared as a SIBLING of the driver, so the archive preserves
-      # that layout rather than flattening it.
-      - name: Package the installable bundle
-        shell: bash
-        run: |
-          set -euo pipefail
-          bash tools/build/write_build_stamp.sh verify build/linux/_shared
-          tar -czf "build/linux/$LINUX_BUNDLE_ASSET" -C build/linux linux _shared bin install.sh
-          (cd build/linux && sha256sum "$LINUX_BUNDLE_ASSET" > "$LINUX_BUNDLE_ASSET.sha256")
-          (cd build/linux && sha256sum --check "$LINUX_BUNDLE_ASSET.sha256")
-          echo "Bundle contents:"
-          tar -tzf "build/linux/$LINUX_BUNDLE_ASSET" | sed -n '1,20p'
-          bundle_entries=$(tar -tzf "build/linux/$LINUX_BUNDLE_ASSET" | wc -l)
-          echo "... $bundle_entries entries"
-
-      - name: Install the packaging toolchains
-        # rpmbuild is not on the runner image. appimagetool ships AS an AppImage,
-        # and an AppImage mounts itself through FUSE, which the runner does not
-        # have — so it is unpacked once and its AppRun is put on PATH instead.
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get install -y rpm
-          rpmbuild --version
-          curl -fsSL --retry 3 --retry-delay 5 -o "$RUNNER_TEMP/appimagetool" \
-              https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
-          chmod +x "$RUNNER_TEMP/appimagetool"
-          (cd "$RUNNER_TEMP" && ./appimagetool --appimage-extract >/dev/null)
-          sudo ln -sf "$RUNNER_TEMP/squashfs-root/AppRun" /usr/local/bin/appimagetool
-          test -x /usr/local/bin/appimagetool
-          sudo apt-get install -y flatpak flatpak-builder
-          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 ||
-              echo "::notice::no apparmor_restrict_unprivileged_userns knob here — continuing"
-          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-          flatpak install --user -y flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
-
-      - name: Build the .deb, the .rpm, the AppImage and the Flatpak
-        # No --skip-* flag anywhere: those return before dpkg-deb, rpmbuild,
-        # appimagetool and flatpak-builder respectively, which is how four
-        # packagers stayed unexercised while CI reported them green. The AppImage
-        # picks up the luajit installed above and bundles it; the Flatpak
-        # compiles its own inside the sandbox.
-        shell: bash
-        run: |
-          set -euo pipefail
-          bash tools/build/build-linux-deb.sh
-          bash tools/build/build-linux-rpm.sh
-          bash tools/build/build-linux-appimage.sh
-          bash tools/build/build-linux-flatpak.sh
-
-      - name: Rename the packages to their stable asset names
-        # Each packager names its output after the version in package.json, which
-        # is not the release tag. A published asset must keep ONE name across
-        # releases: the notes are static text and the website resolves its
-        # download buttons by exact asset name (getGitHubRelease.js).
-        #
-        # It also closes a silent-skip hole. build-linux-appimage.sh exits 0 with
-        # only the AppDir staged when appimagetool is absent, and the .rpm script
-        # does the same without rpmbuild — so demanding the file here is what
-        # turns "no package was produced" into a failure instead of a green run
-        # with one asset missing.
-        shell: bash
-        run: |
-          set -euo pipefail
-          rename_one() {
-              local found="$1" target="$2" kind="$3"
-              if [ -z "$found" ]; then
-                  echo "::error::the $kind packager produced no package — nothing to attach."
-                  exit 1
-              fi
-              mv "$found" "$target"
-              echo "  $kind -> $target ($(du -h "$target" | cut -f1))"
-          }
-          rename_one "$(find build/linux -maxdepth 1 -name '*.flatpak' -type f 2>/dev/null | head -1)" \
-              build/linux/ErgoptiPlus-linux-x86_64.flatpak "Flatpak"
-          rename_one "$(find build/linux -maxdepth 1 -name '*.deb' -type f 2>/dev/null | head -1)" \
-              build/linux/ErgoptiPlus-linux-amd64.deb ".deb"
-          rename_one "$(find build/linux/rpm/RPMS -name '*.rpm' -type f 2>/dev/null | head -1)" \
-              build/linux/ErgoptiPlus-linux-noarch.rpm ".rpm"
-          rename_one "$(find build/linux -maxdepth 1 -name '*.AppImage' -type f 2>/dev/null | head -1)" \
-              build/linux/ErgoptiPlus-linux-x86_64.AppImage "AppImage"
-
-      - name: Upload Linux artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: assets-linux
-          retention-days: 1
-          path: |
-            build/linux/xkb/Ergopti_xkb.zip
-            build/linux/${{ env.LINUX_BUNDLE_ASSET }}
-            build/linux/${{ env.LINUX_BUNDLE_ASSET }}.sha256
-            build/linux/ErgoptiPlus-linux-amd64.deb
-            build/linux/ErgoptiPlus-linux-noarch.rpm
-            build/linux/ErgoptiPlus-linux-x86_64.AppImage
-            build/linux/ErgoptiPlus-linux-x86_64.flatpak
-
-  # ============================================================
-  # ============================================================
-  # ======= 7/ Finalize release — create + upload assets =======
-  # ============================================================
-  # ============================================================
-
-  release-gate-macos:
-    name: 'Release · macOS launch gate'
-    needs: [build-macos]
-    uses: ./.github/workflows/macos-launch-gate.yml
+  macos:
+    name: 'macOS'
+    needs: [validate, plan]
+    uses: ./.github/workflows/ci-macos.yml
     with:
-      label: release
-      artifact: assets-macos
-      runners: '["macos-15","macos-15-intel"]'
+      release: ${{ needs.plan.outputs.release == 'true' }}
+      version: ${{ needs.plan.outputs.version }}
+      channel: ${{ needs.plan.outputs.channel }}
+    secrets:
+      SPARKLE_PUBLIC_KEY: ${{ secrets.SPARKLE_PUBLIC_KEY }}
+      SPARKLE_ED_PRIVATE_KEY: ${{ needs.plan.outputs.release == 'true' && secrets.SPARKLE_ED_PRIVATE_KEY || '' }}
 
-  finalize-release:
-    name: 'Release · finalize'
-    needs: [resolve-release-meta, build-macos, build-windows, build-linux, release-gate-macos]
-    if: needs.resolve-release-meta.outputs.skip == 'false'
+  # ─────────────────────────────────────────────────
+  # 2.2) Windows — AHK unit + E2E, release exe
+  # ─────────────────────────────────────────────────
+  windows:
+    name: 'Windows'
+    needs: [validate, plan]
+    uses: ./.github/workflows/ci-windows.yml
+    with:
+      release: ${{ needs.plan.outputs.release == 'true' }}
+      version: ${{ needs.plan.outputs.version }}
+      tag: ${{ needs.plan.outputs.tag }}
+      prerelease: ${{ needs.plan.outputs.prerelease }}
+      channel: ${{ needs.plan.outputs.channel }}
+    secrets:
+      WINDOWS_SIGNING_CERTIFICATE_BASE64: ${{ needs.plan.outputs.release == 'true' && secrets.WINDOWS_SIGNING_CERTIFICATE_BASE64 || '' }}
+      WINDOWS_SIGNING_CERTIFICATE_PASSWORD: ${{ needs.plan.outputs.release == 'true' && secrets.WINDOWS_SIGNING_CERTIFICATE_PASSWORD || '' }}
+      WINDOWS_SIGNER_SUBJECT: ${{ needs.plan.outputs.release == 'true' && secrets.WINDOWS_SIGNER_SUBJECT || '' }}
+
+  # ─────────────────────────────────────────────────
+  # 2.3) Linux — driver tests, distro installs, packages + evidence gate
+  # ─────────────────────────────────────────────────
+  linux:
+    name: 'Linux'
+    needs: [validate, plan]
+    uses: ./.github/workflows/ci-linux.yml
+    with:
+      release: ${{ needs.plan.outputs.release == 'true' }}
+      version: ${{ needs.plan.outputs.version }}
+      linux_bundle: ${{ needs.plan.outputs.linux_bundle }}
+
+  # ============================================================
+  # ============================================================
+  # ======= 3/ Publish the release — tag, assets, feed =========
+  # ============================================================
+  # ============================================================
+
+  # No status function in the if: the implicit success() over needs is the
+  # "all three OS are green" gate, and a box's result is failure as soon as
+  # any of its jobs failed. The event test repeats plan's rule on purpose: a
+  # regression in plan's script alone must not publish from a pull request or
+  # a dispatch run, where PAT_ERGOPTI is readable.
+  release:
+    name: 'Release · publish'
+    needs: [plan, macos, windows, linux]
+    if: github.event_name == 'push' && needs.plan.outputs.release == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      LINUX_BUNDLE_ASSET: ${{ needs.plan.outputs.linux_bundle }}
 
     steps:
       - uses: actions/checkout@v4
@@ -3013,27 +340,77 @@ jobs:
           # creation rule; only a PAT with admin bypass can push tags.
           token: ${{ secrets.PAT_ERGOPTI }}
 
-      - name: Load the Linux release artifact contract
-        shell: bash
-        run: |
-          set -euo pipefail
-          asset_name=$(node -p "require('./static/ergopti_plus/_shared/modules/updater/defaults.json').release_assets.linux_bundle")
-          if [[ ! "$asset_name" =~ ^[A-Za-z0-9._+-]+\.tar\.gz$ ]]; then
-              echo "::error::unsafe Linux bundle asset name: $asset_name"
-              exit 1
-          fi
-          echo "LINUX_BUNDLE_ASSET=$asset_name" >> "$GITHUB_ENV"
-
       - name: Download all build artifacts
-        # Restricted to assets-*: build-deb in section 4 also uploads its .deb,
-        # so smoke-deb-install can install and launch it. Without the filter that
-        # copy would land here too and be attached to the release as a stray
-        # asset nothing in the notes describes.
+        # Restricted to assets-*: the boxes also upload evidence (launch-gate-*,
+        # linux-ci-evidence-*, the AHK execution manifest, the packaged startup
+        # logs). Without the filter those files would land here too and be
+        # attached to the release as stray assets nothing in the notes describes.
         uses: actions/download-artifact@v4
         with:
           pattern: assets-*
           path: release-assets
           merge-multiple: true
+
+      # Before the first side effect. The asset half is the real guard: the
+      # release attaches whatever the boxes uploaded, so a box that skipped a
+      # file would publish, tag and all, a release whose notes link to nothing,
+      # or one without the Sparkle signature and appcast the feed step needs.
+      # The list is every file the notes below link to, plus the signature,
+      # the appcast and the checksum the Linux updater verifies the bundle
+      # against. tools/test/test-release-notes-assets-are-uploaded.cjs fails
+      # when the notes link a file this list does not require.
+      # The tag half turns a tag this run cannot create into a clear message:
+      # Re-run failed jobs reuses plan's outputs from the first attempt, so a
+      # newer run may own that tag by now, or the first attempt created it and
+      # then failed.
+      - name: Refuse to publish an incomplete or already-taken release
+        shell: bash
+        env:
+          TAG: ${{ needs.plan.outputs.tag }}
+          CHANNEL: ${{ needs.plan.outputs.channel }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for asset in \
+              ErgoptiPlus.exe \
+              Ergopti_windows.exe \
+              ErgoptiPlus.app.zip \
+              Ergopti_macOS.zip \
+              _ErgoptiPlus.app.zip.sig \
+              "appcast-${CHANNEL}.xml" \
+              Ergopti_xkb.zip \
+              ErgoptiPlus-linux-amd64.deb \
+              ErgoptiPlus-linux-noarch.rpm \
+              ErgoptiPlus-linux-x86_64.AppImage \
+              ErgoptiPlus-linux-x86_64.flatpak \
+              "$LINUX_BUNDLE_ASSET" \
+              "$LINUX_BUNDLE_ASSET.sha256"; do
+              if [ ! -s "release-assets/$asset" ]; then
+                  echo "::error::release-assets/$asset is missing or empty: the box that builds it did not upload it as an assets-* artifact."
+                  missing=$((missing + 1))
+              fi
+          done
+          if [ "$missing" -gt 0 ]; then
+              echo "::error::$missing release asset(s) missing; nothing was published."
+              exit 1
+          fi
+          # A network error fails the assignment under set -e; it never reads
+          # as "tag free". The ^{} pattern lists the commit an annotated tag
+          # peels to; a lightweight tag has only its own line.
+          taken=$(git ls-remote --tags origin "refs/tags/$TAG" "refs/tags/$TAG^{}")
+          if [ -n "$taken" ]; then
+              tagged=$(printf '%s\n' "$taken" | awk -v ref="refs/tags/$TAG" '
+                  $2 == (ref "^{}") { peeled = $1 }
+                  $2 == ref { plain = $1 }
+                  END { print (peeled != "" ? peeled : plain) }')
+              if [ "$tagged" = "$GITHUB_SHA" ]; then
+                  echo "::error::$TAG already points at this commit ($GITHUB_SHA): an earlier attempt of this run created it and failed before publishing. Delete that orphan tag and re-run the failed jobs, or finish the release by hand."
+              else
+                  echo "::error::$TAG already exists on ${tagged:-an unknown commit}, not on $GITHUB_SHA: a newer run published it. Use 'Re-run all jobs' so plan picks a fresh tag."
+              fi
+              exit 1
+          fi
+          echo "Publishing $TAG: every release asset is present and the tag is free."
 
       - name: Create git tag
         shell: bash
@@ -3041,7 +418,7 @@ jobs:
           GH_TOKEN: ${{ secrets.PAT_ERGOPTI }}
         run: |
           set -euo pipefail
-          tag="${{ needs.resolve-release-meta.outputs.tag }}"
+          tag="${{ needs.plan.outputs.tag }}"
           sha="${{ github.sha }}"
           gh api repos/${{ github.repository }}/git/refs \
               --method POST \
@@ -3057,9 +434,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          tag="${{ needs.resolve-release-meta.outputs.tag }}"
-          prerelease="${{ needs.resolve-release-meta.outputs.prerelease }}"
-          title="${{ needs.resolve-release-meta.outputs.title }}"
+          tag="${{ needs.plan.outputs.tag }}"
+          prerelease="${{ needs.plan.outputs.prerelease }}"
+          title="${{ needs.plan.outputs.title }}"
 
           mapfile -t assets < <(find release-assets -type f)
           echo "Assets to attach (${#assets[@]}):"
@@ -3077,7 +454,7 @@ jobs:
       - name: Publish channel feed for Sparkle
         shell: bash
         env:
-          ERGOPTI_CHANNEL: ${{ needs.resolve-release-meta.outputs.prerelease == 'true' && 'dev' || 'main' }}
+          ERGOPTI_CHANNEL: ${{ needs.plan.outputs.channel }}
         run: |
           set -euo pipefail
           feed="release-assets/appcast-${ERGOPTI_CHANNEL}.xml"
@@ -3122,7 +499,7 @@ jobs:
         shell: bash
         env:
           EVENT: ${{ github.event_name }}
-          TAG: ${{ needs.resolve-release-meta.outputs.tag }}
+          TAG: ${{ needs.plan.outputs.tag }}
           SHA: ${{ github.sha }}
         run: |
           # Fetch tags so git-describe can resolve the previous release tag.
@@ -3139,8 +516,8 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ needs.resolve-release-meta.outputs.tag }}
-          VERSION: ${{ needs.resolve-release-meta.outputs.version }}
+          TAG: ${{ needs.plan.outputs.tag }}
+          VERSION: ${{ needs.plan.outputs.version }}
         run: |
           set -euo pipefail
           body_file="$(mktemp)"

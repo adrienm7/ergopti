@@ -1,0 +1,618 @@
+# .github/workflows/ci-windows.yml
+#
+# Windows box of the CI pipeline. ci.yml calls it as its 'Windows' job, after
+# Validate and Release · plan, so the jobs below render as 'Windows / <name>'
+# inside one group box.
+#
+#   test-ahk ──> package-windows (release runs only)
+#
+# test-ahk runs the AHK unit, LLM, compiler-warning and E2E gates on every run.
+# package-windows runs only when ci.yml's plan resolved a free release tag: it
+# builds, signs and smokes the exe that Release · publish attaches, and uploads
+# it as assets-windows. The box declares no outputs; publish collects every
+# assets-* artifact of the run by pattern, and this box's own result gates it.
+#
+# No concurrency block: ci.yml's group already covers every called workflow,
+# and reusing that group here with cancel-in-progress would cancel this run.
+
+name: Windows
+
+on:
+  workflow_call:
+    inputs:
+      release:
+        description: True when ci.yml's plan resolved a free release tag
+        required: true
+        type: boolean
+      version:
+        description: Release version without the leading v; empty unless release
+        required: true
+        type: string
+      tag:
+        description: Release tag; empty unless release
+        required: true
+        type: string
+      prerelease:
+        description: "'true' for a dev prerelease; empty unless release"
+        required: true
+        type: string
+      channel:
+        description: Update channel stamped into the exe, main or dev
+        required: true
+        type: string
+    secrets:
+      WINDOWS_SIGNING_CERTIFICATE_BASE64:
+        description: Code-signing PFX, base64; passed on release runs only
+        required: false
+      WINDOWS_SIGNING_CERTIFICATE_PASSWORD:
+        description: Password of the code-signing PFX; passed on release runs only
+        required: false
+      WINDOWS_SIGNER_SUBJECT:
+        description: Expected Authenticode subject; passed on release runs only
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  # ─────────────────────────────────────────────────
+  # 1) AHK unit tests + E2E
+  # ─────────────────────────────────────────────────
+  test-ahk:
+    name: 'unit + E2E'
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and test native navigation event owner
+        shell: pwsh
+        run: ./tools/build/build_windows_nav_owner.ps1
+
+      - name: Cache AutoHotkey runtime
+        id: cache-ahk
+        uses: actions/cache@v4
+        with:
+          path: C:\AutoHotkey
+          key: ahk-v2.0.19-windows
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+          cache: 'npm'
+
+      - run: npm ci
+        shell: pwsh
+
+      - name: Build features manifest
+        run: npm run build:manifest
+        shell: pwsh
+
+      - name: Manifest parity (AHK ↔ HS codegen equivalence)
+        run: npm run test:manifest-parity
+        shell: pwsh
+
+      - name: Download AutoHotkey v2 runtime
+        if: steps.cache-ahk.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          Invoke-WebRequest `
+              -Uri "https://github.com/AutoHotkey/AutoHotkey/releases/download/v2.0.19/AutoHotkey_2.0.19.zip" `
+              -OutFile "$env:TEMP\AHK.zip" -UseBasicParsing
+          Expand-Archive -Path "$env:TEMP\AHK.zip" -DestinationPath "C:\AutoHotkey" -Force
+
+      - name: Verify AHK source encoding (UTF-8 BOM + LF)
+        # AHK v2 silently aborts mid-file on encoding drift — catch it
+        # before it causes silent test failures with no error message.
+        shell: pwsh
+        run: |
+          $ahkFiles = Get-ChildItem `
+              -Path "${{ github.workspace }}\static\ergopti_plus\windows" `
+              -Recurse -Filter "*.ahk" |
+              Where-Object { -not $_.FullName.Contains("vendor") }
+          $failures = @()
+          foreach ($file in $ahkFiles) {
+              $bytes = [System.IO.File]::ReadAllBytes($file.FullName)
+              if ($bytes.Length -lt 3 -or
+                  $bytes[0] -ne 0xEF -or $bytes[1] -ne 0xBB -or $bytes[2] -ne 0xBF) {
+                  $failures += "MISSING BOM : $($file.FullName)"; continue
+              }
+              $content = [System.IO.File]::ReadAllText(
+                  $file.FullName, [System.Text.Encoding]::UTF8)
+              if ($content -match "`r") {
+                  $failures += "CR BYTE : $($file.FullName)"
+              }
+          }
+          if ($failures.Count -gt 0) {
+              $failures | ForEach-Object { Write-Host "  $_" }
+              Write-Error "AHK encoding violations detected."
+              exit 1
+          }
+          Write-Host "Encoding OK — $($ahkFiles.Count) file(s) verified."
+
+      - name: Disable Windows Defender real-time scanning for AHK tests
+        shell: pwsh
+        run: |
+          # Defender holds intermittent exclusive scan locks on any file the AHK
+          # test suite writes — including temp files in A_Temp — causing FileRead /
+          # FileAppend calls to block for the full 240 s watchdog window.
+          # -DisableRealtimeMonitoring requires admin; add path exclusions as a
+          # belt-and-suspenders fallback that works even without that flag.
+          Set-MpPreference -DisableRealtimeMonitoring $true -ErrorAction SilentlyContinue
+          Add-MpPreference -ExclusionPath "$env:TEMP"           -ErrorAction SilentlyContinue
+          Add-MpPreference -ExclusionPath "${{ github.workspace }}" -ErrorAction SilentlyContinue
+          Add-MpPreference -ExclusionProcess "AutoHotkey64.exe" -ErrorAction SilentlyContinue
+          Write-Host "Defender exclusions applied."
+
+      - name: Run AHK test suite
+        shell: pwsh
+        timeout-minutes: 25
+        run: |
+          $ahk = Get-ChildItem "C:\AutoHotkey" -Filter "AutoHotkey64.exe" |
+              Select-Object -First 1 -ExpandProperty FullName
+          if (-not $ahk) { Write-Error "AutoHotkey64.exe not found."; exit 2 }
+          $runner = "${{ github.workspace }}\static\ergopti_plus\windows\tests\run_all.ahk"
+          if (-not (Test-Path $runner)) {
+              Write-Error "Test runner not found at $runner"; exit 2
+          }
+          $resultsFile = "$env:TEMP\ergopti_test_results.txt"
+          $env:ERGOPTI_AHK_RESULTS_FILE = $resultsFile
+          Remove-Item $resultsFile -Force -ErrorAction SilentlyContinue
+          Write-Host "AHK runtime : $ahk"
+          Write-Host "Test runner : $runner"
+          Write-Host "------------------------------------------------------------"
+          # AHK writes TAP output to test_results.txt (FileAppend to "*"/stdout
+          # blocks when AHK runs without an inherited console handle, so the
+          # file is the only reliable output channel in CI).
+          # Tail-read the results file while AHK runs for real-time CI log output.
+          # /ErrorStdOut routes load-time (parse / nonexistent-function / missing
+          # #Include) errors to stderr and exits non-zero instead of popping a modal
+          # dialog that no one can dismiss headlessly — which otherwise hangs the
+          # runner until the 15 min step timeout. Must precede the script path.
+          $proc = Start-Process -FilePath $ahk -ArgumentList "/ErrorStdOut `"$runner`"" -NoNewWindow -PassThru
+          $fstream = $null
+          $reader  = $null
+          $sw = [System.Diagnostics.Stopwatch]::StartNew()
+          while (-not $proc.HasExited) {
+              if ($null -eq $fstream -and (Test-Path $resultsFile)) {
+                  try {
+                      $fstream = [System.IO.FileStream]::new($resultsFile,
+                          [System.IO.FileMode]::Open,
+                          [System.IO.FileAccess]::Read,
+                          [System.IO.FileShare]::ReadWrite)
+                      $reader = [System.IO.StreamReader]::new($fstream)
+                  } catch {
+                      # AHK may still hold an exclusive write lock; retry next tick
+                      Start-Sleep -Milliseconds 100
+                  }
+              }
+              if ($null -ne $reader) {
+                  $line = $reader.ReadLine()
+                  if ($null -ne $line) { Write-Host $line } else { Start-Sleep -Milliseconds 100 }
+              } else {
+                  Start-Sleep -Milliseconds 100
+              }
+          }
+          if ($null -ne $reader) {
+              while ($null -ne ($line = $reader.ReadLine())) { Write-Host $line }
+              $reader.Close(); $fstream.Close()
+          }
+          $exit = $proc.ExitCode
+          Write-Host "------------------------------------------------------------"
+          Write-Host "AHK exit code: $exit"
+          if (-not (Test-Path $resultsFile)) {
+              Write-Error "test_results.txt not created — AHK may have crashed at startup."; exit 2
+          }
+          $summary = Get-Content $resultsFile | Select-String "^#" | Select-Object -Last 1
+          Write-Host $summary
+          $manifestFile = "$env:RUNNER_TEMP\windows-ahk-execution-manifest.json"
+          node "${{ github.workspace }}\tools\test\validate-ahk-suite-manifest.cjs" `
+              --input $resultsFile --json $manifestFile
+          $manifestExit = $LASTEXITCODE
+          if ($manifestExit -ne 0) {
+              Write-Error "AHK planned/executed manifest is incomplete."; exit $manifestExit
+          }
+          if ($exit -ne 0) {
+              Write-Error "Test suite failed (exit $exit)."; exit $exit
+          }
+
+      # The two isolated LLM suites. They cannot join run_all.ahk: each installs
+      # its own global stubs (a WebView2 stand-in, a fake model index) that would
+      # collide with the shared harness, which is why they were written as
+      # separate runners in the first place. They were then referenced by
+      # nothing, so their ten tests had never run and one of them had rotted out
+      # of the code it stubs. tools/test/test-ahk-runners-are-invoked.cjs now
+      # fails if a runner under tests/ is referenced by nothing at all.
+      - name: Run isolated AHK LLM suites
+        shell: pwsh
+        timeout-minutes: 10
+        run: |
+          $ahk = Get-ChildItem "C:\AutoHotkey" -Filter "AutoHotkey64.exe" |
+              Select-Object -First 1 -ExpandProperty FullName
+          if (-not $ahk) { Write-Error "AutoHotkey64.exe not found."; exit 2 }
+          $tests = "${{ github.workspace }}\static\ergopti_plus\windows\tests"
+          $failed = 0
+          foreach ($name in @("run_llm_model_browser.ahk", "run_llm_model_menu_disabled.ahk")) {
+              $runner = Join-Path $tests $name
+              if (-not (Test-Path $runner)) { Write-Error "Runner not found: $runner"; exit 2 }
+              $out = "$env:TEMP\$name.out"
+              $err = "$env:TEMP\$name.err"
+              # Start-Process, not the call operator: AutoHotkey is a GUI-subsystem
+              # binary, so a direct invocation returns neither the exit code nor
+              # stderr (PROJECT_MEMORY, feedback_ahk_ui_syntax_validation).
+              $proc = Start-Process -FilePath $ahk -ArgumentList @("/ErrorStdOut", $runner) `
+                  -Wait -PassThru -NoNewWindow -RedirectStandardOutput $out -RedirectStandardError $err
+              Write-Host "--- $name (exit $($proc.ExitCode)) ---"
+              if (Test-Path $out) { Get-Content $out | Write-Host }
+              if (Test-Path $err) { Get-Content $err | Write-Host }
+              if ($proc.ExitCode -ne 0) { $failed += 1 }
+          }
+          if ($failed -gt 0) { Write-Error "$failed isolated LLM suite(s) failed."; exit 1 }
+
+      # Emit GitHub annotations + a JSON summary from the captured TAP. Purely
+      # additive (continue-on-error): the step above remains the gate, so a
+      # reporter hiccup can never flip a red run green or vice-versa.
+      - name: Annotate AHK results
+        if: always()
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $resultsFile = "$env:TEMP\ergopti_test_results.txt"
+          if (Test-Path $resultsFile) {
+              node "${{ github.workspace }}\tools\test\report.cjs" --name windows-ahk --json "$env:RUNNER_TEMP\windows-ahk.json" -- PARSE_FILE $resultsFile
+          } else {
+              Write-Host "No AHK results file to annotate."
+          }
+
+      - name: Publish AHK execution manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-ahk-execution-manifest
+          path: ${{ runner.temp }}/windows-ahk-execution-manifest.json
+          if-no-files-found: warn
+
+      - name: Check for AHK compiler warnings
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          $ahk = Get-ChildItem "C:\AutoHotkey" -Filter "AutoHotkey64.exe" |
+              Select-Object -First 1 -ExpandProperty FullName
+          $runner = "${{ github.workspace }}\static\ergopti_plus\windows\tests\run_all.ahk"
+          # Pass --dry-run so AHK parses all files and emits warnings, then
+          # exits immediately without running any Test() callbacks. This keeps
+          # the warning check fast (~seconds) regardless of corpus size.
+          # /ErrorStdOut keeps a parse/load error from popping a modal dialog that
+          # would hang this step headlessly; the error text is captured via 2>&1.
+          $output = & cmd /c "`"$ahk`" /ErrorStdOut `"$runner`" --dry-run 2>&1"
+          $warnings = $output | Where-Object { $_ -match "^Warning:" }
+          $errors   = $output | Where-Object { $_ -match "^Error:" }
+          if ($errors) {
+              $errors | ForEach-Object { Write-Host "  $_" }
+              Write-Error "$($errors.Count) AHK load-time error(s) — fix before merging."
+              exit 1
+          }
+          if ($warnings) {
+              $warnings | ForEach-Object { Write-Host "  $_" }
+              Write-Error "$($warnings.Count) AHK compiler warning(s) — fix before merging."
+              exit 1
+          }
+          Write-Host "No AHK compiler warnings."
+
+      # The E2E suite used to be its own job with needs: [test-ahk]. As the last
+      # step it still runs only once every gate above passed. The recursive
+      # encoding check above already covers its runner, and the features
+      # manifest it reads was built at the top of this job.
+      - name: Run E2E suite (Strategy A — pure engine injection)
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          $ahk = Get-ChildItem "C:\AutoHotkey" -Filter "AutoHotkey64.exe" |
+              Select-Object -First 1 -ExpandProperty FullName
+          if (-not $ahk) { Write-Error "AutoHotkey64.exe not found."; exit 2 }
+          $runner = "${{ github.workspace }}\static\ergopti_plus\windows\tests\e2e\run_e2e.ahk"
+          $resultsFile = "${{ github.workspace }}\static\ergopti_plus\windows\tests\e2e\test_results.txt"
+          Remove-Item $resultsFile -Force -ErrorAction SilentlyContinue
+          Write-Host "AHK runtime : $ahk"
+          Write-Host "E2E runner  : $runner"
+          Write-Host "------------------------------------------------------------"
+          # Same approach as the unit test suite: AHK writes TAP output to
+          # test_results.txt (FileAppend to "*" blocks without a console handle).
+          # Tail-read the file for real-time CI log output.
+          # /ErrorStdOut: see unit-test step — fail fast on load errors instead of
+          # hanging on an undismissable modal dialog in the headless runner.
+          $proc = Start-Process -FilePath $ahk -ArgumentList "/ErrorStdOut `"$runner`"" -NoNewWindow -PassThru
+          $fstream = $null; $reader = $null
+          while (-not $proc.HasExited) {
+              if ($null -eq $fstream -and (Test-Path $resultsFile)) {
+                  try {
+                      $fstream = [System.IO.FileStream]::new($resultsFile,
+                          [System.IO.FileMode]::Open,
+                          [System.IO.FileAccess]::Read,
+                          [System.IO.FileShare]::ReadWrite)
+                      $reader = [System.IO.StreamReader]::new($fstream)
+                  } catch {
+                      # AHK may still hold an exclusive write lock; retry next tick
+                      Start-Sleep -Milliseconds 100
+                  }
+              }
+              if ($null -ne $reader) {
+                  $line = $reader.ReadLine()
+                  if ($null -ne $line) { Write-Host $line } else { Start-Sleep -Milliseconds 100 }
+              } else { Start-Sleep -Milliseconds 100 }
+          }
+          if ($null -ne $reader) {
+              while ($null -ne ($line = $reader.ReadLine())) { Write-Host $line }
+              $reader.Close(); $fstream.Close()
+          }
+          $exit = $proc.ExitCode
+          Write-Host "------------------------------------------------------------"
+          Write-Host "Exit code: $exit"
+          if (-not (Test-Path $resultsFile)) {
+              Write-Error "test_results.txt not created — AHK may have crashed at startup."; exit 2
+          }
+          if ($exit -ne 0) {
+              Write-Error "E2E suite failed (exit $exit)."; exit $exit
+          }
+
+  # ─────────────────────────────────────────────────
+  # 2) Release exe: compile, sign and smoke (release runs only)
+  # ─────────────────────────────────────────────────
+  # Its own job on a fresh checkout, never a tail of test-ahk: the unit and E2E
+  # suites write runtime caches next to tracked sources (locale .tsv files,
+  # generated_hotstrings.tsv, _generated/prefetch_*.json), and
+  # build_static_bundle.py bundles those directories, so a shared workspace
+  # would ship test leftovers inside the signed exe. A fresh runner also keeps
+  # the smoke on the image's own Defender configuration, which the test job
+  # alters; nothing here disables or restores Defender.
+  package-windows:
+    name: 'package, sign and smoke release exe'
+    needs: [test-ahk]
+    if: inputs.release
+    runs-on: windows-latest
+
+    steps:
+      # A shallow clone: no step of this job reads git history.
+      - uses: actions/checkout@v4
+
+      - name: Build and test native navigation event owner
+        shell: pwsh
+        run: ./tools/build/build_windows_nav_owner.ps1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+          cache: 'npm'
+
+      - name: Install Node dependencies
+        run: npm ci
+        shell: bash
+
+      - name: Generate features manifest
+        run: npm run build:manifest
+        shell: bash
+
+      - name: Build static asset bundle
+        run: python tools/build/build_static_bundle.py
+        shell: bash
+
+      - name: Stamp BUNDLE_VERSION, BUNDLE_RELEASE_URL, BUNDLE_CHANNEL
+        shell: pwsh
+        run: |
+          $version = "${{ inputs.version }}"
+          $tag     = "${{ inputs.tag }}"
+          if (-not $tag) { $tag = $version }
+          # ci.yml's plan owns the one prerelease-to-channel rule. The updater
+          # silently treats an empty or unknown channel as dev, so a bad input
+          # would put a stable exe on the dev feed without any error.
+          $channel = "${{ inputs.channel }}"
+          if ($channel -cne 'main' -and $channel -cne 'dev') {
+              throw "inputs.channel must be 'main' or 'dev', got '$channel'."
+          }
+          $owner   = "${{ github.repository_owner }}"
+          $repo    = "${{ github.event.repository.name }}"
+          $releaseUrl = "https://github.com/$owner/$repo/releases/tag/$tag"
+          $bundlePath = "${{ github.workspace }}\static\ergopti_plus\windows\infra\bundle.ahk"
+          $text = Get-Content -Raw -Path $bundlePath
+          $text = $text.Replace("__BUNDLE_VERSION__",     $version)
+          $text = $text.Replace("__BUNDLE_RELEASE_URL__", $releaseUrl)
+          $text = $text.Replace("__BUNDLE_CHANNEL__",     $channel)
+          $text = $text.Replace("__BUNDLE_COMMIT__",      "${{ github.sha }}")
+          Set-Content -Path $bundlePath -Value $text -Encoding UTF8 -NoNewline
+          Write-Host "BUNDLE_COMMIT      stamped: ${{ github.sha }}"
+          Write-Host "BUNDLE_VERSION     stamped: $version"
+          Write-Host "BUNDLE_RELEASE_URL stamped: $releaseUrl"
+          Write-Host "BUNDLE_CHANNEL     stamped: $channel"
+
+      - name: Download authenticated Windows compiler toolchain
+        shell: pwsh
+        run: |
+          $contractPath = "${{ github.workspace }}\static\ergopti_plus\_shared\modules\updater\windows_release_toolchain.json"
+          $contract = Get-Content -LiteralPath $contractPath -Raw | ConvertFrom-Json
+          $runtimeUrl = $contract.runtime.url
+          $runtimeSha256 = $contract.runtime.sha256
+          $compilerTag = $contract.compiler.tag
+          $compilerAsset = $contract.compiler.asset
+          $compilerUrl = $contract.compiler.url
+          $compilerSha256 = $contract.compiler.sha256
+          $runtimeArchive = "$env:TEMP\$($contract.runtime.asset)"
+          $compilerArchive = "$env:TEMP\$compilerAsset"
+
+          Invoke-WebRequest -Uri $runtimeUrl -OutFile $runtimeArchive -UseBasicParsing
+          Invoke-WebRequest -Uri $compilerUrl -OutFile $compilerArchive -UseBasicParsing
+          $runtimeActual = (Get-FileHash -LiteralPath $runtimeArchive -Algorithm SHA256).Hash.ToLowerInvariant()
+          $compilerActual = (Get-FileHash -LiteralPath $compilerArchive -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($runtimeActual -cne $runtimeSha256) {
+              throw "AutoHotkey v$($contract.runtime.version) archive digest mismatch: $runtimeActual"
+          }
+          if ($compilerActual -cne $compilerSha256) {
+              throw "Ahk2Exe $compilerTag archive digest mismatch: $compilerActual"
+          }
+
+          Expand-Archive -LiteralPath $runtimeArchive -DestinationPath "$env:TEMP\AutoHotkey" -Force
+          Expand-Archive -LiteralPath $compilerArchive -DestinationPath "$env:TEMP\Ahk2Exe" -Force
+          if (-not (Test-Path -LiteralPath "$env:TEMP\AutoHotkey\AutoHotkey64.exe" -PathType Leaf)) {
+              throw "The authenticated AutoHotkey archive has no expected runtime."
+          }
+          if (-not (Test-Path -LiteralPath "$env:TEMP\Ahk2Exe\Ahk2Exe.exe" -PathType Leaf)) {
+              throw "The authenticated Ahk2Exe archive has no expected compiler."
+          }
+          Write-Host "Authenticated compiler toolchain: AutoHotkey v$($contract.runtime.version) + $compilerTag"
+
+      - name: Compile ErgoptiPlus.ahk
+        shell: pwsh
+        run: |
+          $ahk2exe = "$env:TEMP\Ahk2Exe\Ahk2Exe.exe"
+          $runtime = "$env:TEMP\AutoHotkey\AutoHotkey64.exe"
+          $in   = "${{ github.workspace }}\static\ergopti_plus\windows\ErgoptiPlus.ahk"
+          $out  = "${{ github.workspace }}\static\ergopti_plus\windows\ErgoptiPlus.exe"
+          $icon = "${{ github.workspace }}\static\favicon.ico"
+          # /silent suppresses any Ahk2Exe GUI dialogs that would block
+          # indefinitely on a headless runner and cause a silent non-zero exit.
+          & $ahk2exe /in $in /out $out /base $runtime /icon $icon /silent
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # Verify the EXE was actually produced — Ahk2Exe can exit 0 on a
+          # compilation warning without writing the output file.
+          if (-not (Test-Path $out)) {
+              Write-Error "Ahk2Exe reported success but $out was not created."
+              exit 1
+          }
+          Write-Host "Compiled: $out ($('{0:N0}' -f (Get-Item $out).Length) bytes)"
+
+      - name: Sign and verify ErgoptiPlus.exe
+        shell: pwsh
+        env:
+          ERGOPTI_RELEASE_PRERELEASE: ${{ inputs.prerelease }}
+          WINDOWS_SIGNING_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_BASE64 }}
+          WINDOWS_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_PASSWORD }}
+          WINDOWS_SIGNER_SUBJECT: ${{ secrets.WINDOWS_SIGNER_SUBJECT }}
+        run: |
+          $required = @(
+              "WINDOWS_SIGNING_CERTIFICATE_BASE64",
+              "WINDOWS_SIGNING_CERTIFICATE_PASSWORD",
+              "WINDOWS_SIGNER_SUBJECT")
+          $missing = @($required | Where-Object {
+              [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($_))
+          })
+
+          if ($missing.Count -eq $required.Count) {
+              if ($env:ERGOPTI_RELEASE_PRERELEASE -ceq "true") {
+                  Write-Warning "Publishing an unsigned Windows artifact for the dev prerelease channel."
+                  exit 0
+              }
+              throw "Stable Windows releases require every signing secret."
+          }
+          if ($missing.Count -gt 0) {
+              throw "Partial Windows signing configuration; missing: $($missing -join ', ')."
+          }
+
+          $exe = "${{ github.workspace }}\static\ergopti_plus\windows\ErgoptiPlus.exe"
+          $pfx = "$env:RUNNER_TEMP\ergopti-windows-signing.pfx"
+          $signTools = @(Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" `
+              -Recurse -Filter "signtool.exe" -File |
+              Where-Object { $_.FullName -match '\\x64\\signtool\.exe$' } |
+              Sort-Object FullName -Descending)
+          if ($signTools.Count -eq 0) {
+              throw "No x64 signtool.exe was found on the Windows runner."
+          }
+          $signTool = $signTools[0].FullName
+
+          try {
+              [IO.File]::WriteAllBytes(
+                  $pfx,
+                  [Convert]::FromBase64String($env:WINDOWS_SIGNING_CERTIFICATE_BASE64))
+              & $signTool sign /fd SHA256 /td SHA256 `
+                  /tr "https://timestamp.digicert.com" `
+                  /f $pfx /p $env:WINDOWS_SIGNING_CERTIFICATE_PASSWORD $exe
+              if ($LASTEXITCODE -ne 0) {
+                  throw "signtool failed with exit code $LASTEXITCODE."
+              }
+          } finally {
+              Remove-Item -LiteralPath $pfx -Force -ErrorAction SilentlyContinue
+          }
+
+          $signature = Get-AuthenticodeSignature -LiteralPath $exe
+          if ($signature.Status -ne 'Valid') {
+              throw "ErgoptiPlus.exe Authenticode status is '$($signature.Status)', expected 'Valid'."
+          }
+          if ($null -eq $signature.SignerCertificate -or
+              $signature.SignerCertificate.Subject -cne $env:WINDOWS_SIGNER_SUBJECT) {
+              throw "Unexpected Authenticode publisher '$($signature.SignerCertificate.Subject)'."
+          }
+          Write-Host "Verified Authenticode publisher: $($signature.SignerCertificate.Subject)"
+
+      - name: Smoke test compiled ErgoptiPlus.exe (crash-on-launch guard)
+        # The unit test suite (test-ahk job) runs against source .ahk files with
+        # A_IsCompiled == false, so it never exercises compiled-mode-only code
+        # paths like Bundle_Init(). That gap let a 100%-reproducible startup
+        # crash (unassigned A_LocalAppData — not a real AHK v2 built-in) ship
+        # through fully-green CI. This step launches the actual compiled exe
+        # and proves it gets past first-launch bundle extraction instead of
+        # dying on the very first line of the auto-execute section.
+        shell: pwsh
+        timeout-minutes: 3
+        run: |
+          $exe = "${{ github.workspace }}\static\ergopti_plus\windows\ErgoptiPlus.exe"
+          $markerFile = "$env:LOCALAPPDATA\Ergopti\bundle\.bundle-version"
+          Remove-Item "$env:LOCALAPPDATA\Ergopti\bundle" -Recurse -Force -ErrorAction SilentlyContinue
+          $stdout = "$env:TEMP\ergopti_smoke_stdout.txt"
+          $stderr = "$env:TEMP\ergopti_smoke_stderr.txt"
+
+          # /ErrorStdOut only routes LOAD-time errors (parse / missing include)
+          # to stderr; a RUNTIME error like the one this step guards against
+          # still pops a blocking MsgBox, so the real signal below is
+          # behavioural (marker file written / early exit), not the exit code.
+          $proc = Start-Process -FilePath $exe -ArgumentList "/ErrorStdOut" -PassThru `
+              -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+
+          $deadline = (Get-Date).AddSeconds(20)
+          $markerSeen = $false
+          while ((Get-Date) -lt $deadline) {
+              if ($proc.HasExited) { break }
+              if (Test-Path $markerFile) { $markerSeen = $true; break }
+              Start-Sleep -Milliseconds 250
+          }
+          $crashedEarly = $proc.HasExited
+          $exitCode = $null
+          if ($crashedEarly) { $exitCode = $proc.ExitCode }
+
+          # Always clean up — this is a resident tray app with a keyboard hook;
+          # never leave it running on the runner regardless of outcome.
+          if (-not $proc.HasExited) {
+              Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+          }
+
+          if ($crashedEarly -or -not $markerSeen) {
+              Write-Host "---- stdout ----"; Get-Content $stdout -ErrorAction SilentlyContinue
+              Write-Host "---- stderr ----"; Get-Content $stderr -ErrorAction SilentlyContinue
+              if ($crashedEarly) {
+                  Write-Error "ErgoptiPlus.exe exited during startup (code $exitCode) — see output above."
+              } else {
+                  Write-Error "ErgoptiPlus.exe did not extract its runtime bundle within 20s — a blocking startup dialog is likely (crash-on-launch)."
+              }
+              exit 1
+          }
+          Write-Host "OK: ErgoptiPlus.exe survived startup and extracted its bundle to $markerFile"
+
+      - name: Rename Windows keyboard layout for upload
+        shell: bash
+        run: |
+          set -euo pipefail
+          latest_kbd=$(ls static/ergopti/windows/Ergopti_v*.exe | sort -V | tail -1)
+          cp "$latest_kbd" static/ergopti/windows/Ergopti_windows.exe
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: assets-windows
+          retention-days: 7
+          if-no-files-found: error
+          path: |
+            static/ergopti_plus/windows/ErgoptiPlus.exe
+            static/ergopti/windows/Ergopti_windows.exe

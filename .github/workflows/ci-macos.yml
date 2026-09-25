@@ -1,0 +1,395 @@
+# .github/workflows/ci-macos.yml
+#
+# macOS box of the CI pipeline. ci.yml calls it as its 'macOS' job, after
+# Validate and Release · plan, so the jobs below render as 'macOS / <name>'
+# inside one group box.
+#
+#   test-hs (ubuntu)
+#   test-swift-launcher (macos-latest)
+#   package-macos (macos-latest) ──> launch (matrix)
+#
+# package-macos builds ErgoptiPlus.app once per run and uploads it as
+# assets-macos. On a release run (ci.yml's plan resolved a free tag) the same
+# job stamps the release version, smokes the archive on macos-latest, signs it
+# and writes the Sparkle appcast. launch then installs that exact archive over
+# realistic user states: the CI profile of
+# tools/diagnostics/macos_launch_gate.py on macos-15, or its release profile on
+# macos-15 and macos-15-intel. The box declares no outputs; Release · publish
+# collects every assets-* artifact of the run by pattern, and this box's own
+# result gates it, which is why no job here has a job-level if.
+#
+# No concurrency block: ci.yml's group already covers every called workflow,
+# and reusing that group here with cancel-in-progress would cancel this run.
+
+name: macOS
+
+on:
+  workflow_call:
+    inputs:
+      release:
+        description: True when ci.yml's plan resolved a free release tag
+        required: true
+        type: boolean
+      version:
+        description: Release version without the leading v; empty unless release, so the build stamps 0.0.0-dev
+        required: true
+        type: string
+      channel:
+        description: Sparkle update channel stamped into the app and the appcast, main or dev
+        required: true
+        type: string
+    secrets:
+      SPARKLE_PUBLIC_KEY:
+        description: Sparkle EdDSA public key embedded as SUPublicEDKey; absent for fork pull requests
+        required: false
+      SPARKLE_ED_PRIVATE_KEY:
+        description: Sparkle EdDSA private key that signs the release zip; passed on release runs only
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  # ─────────────────────────────────────────────────
+  # 1) Hammerspoon unit tests + stubbed virtual-keyboard harness
+  # ─────────────────────────────────────────────────
+  test-hs:
+    name: 'unit tests + stubbed harness'
+    runs-on: ubuntu-latest
+
+    steps:
+      # Enough history for test_no_coauthor_in_commits.lua, which scans
+      # HEAD~20..HEAD. The default checkout is a depth-1 clone, so that range does
+      # not exist and the test fails — correctly, and saying so: it refuses to
+      # report a clean history it could not read. Giving it the commits is the fix;
+      # letting it pass on an empty range would make the whole check ornamental.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 25
+
+      - name: Install Lua 5.4 + luarocks
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lua5.4 liblua5.4-dev luarocks
+
+      - name: Install luacheck + luafilesystem
+        # lfs is required by tests/run.lua for recursive test discovery;
+        # --lua-version 5.4 ensures luarocks links the correct runtime.
+        run: |
+          sudo luarocks --lua-version 5.4 install luacheck
+          sudo luarocks --lua-version 5.4 install luafilesystem
+
+      - name: Run luacheck (non-blocking)
+        # Surface warnings without failing — pre-existing style issues
+        # must not block the test step.
+        run: |
+          luacheck static/ergopti_plus/macos/tests static/ergopti_plus/macos/infra \
+            static/ergopti_plus/macos/modules || true
+
+      - name: Run unit + meta tests
+        working-directory: static/ergopti_plus/macos
+        # The focused-runner regression tests spawn child interpreters; pin
+        # the same binary as this job so runner-image defaults (which may
+        # resolve bare `lua` to an interpreter without package.searchpath)
+        # cannot change semantics under us.
+        env:
+          LUA: lua5.4
+        run: node ../../../tools/test/report.cjs --name macos-lua --json "${{ runner.temp }}/macos-lua.json" -- lua5.4 tests/run.lua
+
+      # Hammerspoon virtual-keyboard harness (stubbed, NOT real macOS/HS).
+      # This step runs on ubuntu-latest against the same in-memory
+      # tests/stubs/hs.lua fake that tests/unit uses — no real Hammerspoon
+      # process, no WindowServer, no CGEventPost round-trip is ever exercised
+      # here. It is a corpus-driven virtual-keyboard replay of the Registry +
+      # Expander logic layer, not an OS-level end-to-end test. See
+      # tests/e2e/PLAN_E2E_REAL_HS.md for what a real macOS/Hammerspoon E2E run
+      # would require (a self-hosted GUI runner) and why it is not wired in
+      # today. Named/commented explicitly so a green check here never implies
+      # OS-level coverage it does not have (F-HIGH-30). It runs only after the
+      # unit step passed, as the former separate job did.
+      - name: Run virtual-keyboard harness (stubbed hs.* — no real Hammerspoon)
+        # Exercises Registry + Expander via the stub layer against
+        # hardcoded scenarios and all corpus vectors.
+        # Exit 0 = all pass, 1 = at least one failure.
+        working-directory: static/ergopti_plus/macos
+        run: lua5.4 tests/e2e/run_e2e.lua
+        timeout-minutes: 5
+
+  # ─────────────────────────────────────────────────
+  # 2) Native launcher build + process-level XCTest on macOS
+  # ─────────────────────────────────────────────────
+  test-swift-launcher:
+    name: 'Swift launcher build + tests'
+    runs-on: macos-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache SwiftPM dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/org.swift.swiftpm
+            static/ergopti_plus/macos/launcher/.build/artifacts
+            static/ergopti_plus/macos/launcher/.build/checkouts
+            static/ergopti_plus/macos/launcher/.build/repositories
+          key: swiftpm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('static/ergopti_plus/macos/launcher/Package.swift') }}
+          restore-keys: |
+            swiftpm-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Report Swift toolchain
+        run: swift --version
+
+      - name: Lint remap guardian LaunchAgent
+        run: plutil -lint static/ergopti_plus/macos/launcher/com.ergoptiplus.remap-guardian.plist
+
+      - name: Build release launcher
+        run: swift build -c release --product ErgoptiPlus --package-path static/ergopti_plus/macos/launcher
+        timeout-minutes: 10
+
+      # Keep XCTest serial: the lease tests install process-wide signal handlers
+      # and fork/reap real children, so parallel workers would race each other.
+      - name: Run Swift launcher tests
+        env:
+          SWIFT_BACKTRACE: enable=yes
+        run: |
+          set -euo pipefail
+          xctest_log="$(mktemp)"
+          trap 'rm -f "$xctest_log"' EXIT
+          script -q /dev/null swift test --package-path static/ergopti_plus/macos/launcher 2>&1 | tee "$xctest_log"
+          if ! grep -Fq "Test Suite 'All tests' passed" "$xctest_log"; then
+              echo "::error::the XCTest process ended without its successful suite summary"
+              exit 1
+          fi
+        timeout-minutes: 10
+
+  # ─────────────────────────────────────────────────
+  # 3) Build the app once: the package every launch judges and release ships
+  # ─────────────────────────────────────────────────
+  # Unit suites never start the packaged app, and a pristine runner hides every
+  # failure that depends on what a user already has on disk (a symlinked config
+  # folder, a legacy paths.toml, logs left by a source run). Build the complete
+  # package once and launch it over those states on every push/PR. On a release
+  # run this is also the release build: launch judges the very archive that
+  # Release · publish attaches. Signing writes a separate .sig and never changes
+  # the zip.
+  package-macos:
+    name: ${{ inputs.release && 'package, smoke and sign release app' || 'package unreleased app' }}
+    runs-on: macos-latest
+    timeout-minutes: 25
+    outputs:
+      scenarios: ${{ steps.profile.outputs.scenarios }}
+
+    steps:
+      # A depth-1 clone: the build reads tracked files and HEAD, never history.
+      - uses: actions/checkout@v4
+
+      # Once per run instead of once per launch leg: the verdict and the
+      # scenario profiles are plain Python, identical on every runner.
+      - name: Self-test the launch verdict
+        run: python3 tools/diagnostics/macos_launch_gate_test.py
+
+      # The only list of launch scenarios lives in macos_launch_gate.py; the
+      # launch matrix below reads it from this output.
+      - name: Resolve the launch-gate scenario profile
+        id: profile
+        env:
+          PROFILE: ${{ inputs.release && 'release' || 'ci' }}
+        run: python3 tools/diagnostics/macos_launch_gate.py --print-matrix "$PROFILE" >> "$GITHUB_OUTPUT"
+
+      # The public EdDSA key must be embedded: without SUPublicEDKey, Sparkle
+      # opens an updater error at launch, and the launcher then never observes
+      # its child's logger readiness or exit, so every launch verdict is void.
+      # Pull requests from forks receive no secrets. A package that is never
+      # published or offered as an update gets a throwaway key of the right
+      # shape, which keeps the launch gate meaningful for outside contributors
+      # instead of failing them for a secret they cannot have. A release build
+      # refuses that fallback first: a throwaway SUPublicEDKey matches no
+      # private key, so Sparkle would reject every later update of the
+      # installed copies.
+      - name: Build ErgoptiPlus.app
+        shell: bash
+        env:
+          ERGOPTI_BUILD_COMMIT: ${{ github.sha }}
+          ERGOPTI_VERSION: ${{ inputs.version }}
+          ERGOPTI_BUILD: ${{ inputs.release && github.run_number || '' }}
+          ERGOPTI_CHANNEL: ${{ inputs.channel }}
+          ERGOPTI_RELEASE: ${{ inputs.release }}
+          SPARKLE_PUBLIC_KEY: ${{ secrets.SPARKLE_PUBLIC_KEY }}
+          GH_OWNER: ${{ github.repository_owner }}
+          GH_REPO: ${{ github.event.repository.name }}
+        run: |
+          set -euo pipefail
+          if [ -z "$SPARKLE_PUBLIC_KEY" ]; then
+              if [ "$ERGOPTI_RELEASE" = true ]; then
+                  echo "::error::a release build needs the SPARKLE_PUBLIC_KEY secret; a throwaway key would orphan every installed copy from later updates."
+                  exit 1
+              fi
+              echo "::notice title=Sparkle key::No SPARKLE_PUBLIC_KEY secret (pull request from a fork). Using a throwaway key: this package only feeds the launch gate and is never published."
+              SPARKLE_PUBLIC_KEY="$(head -c 32 /dev/urandom | base64)"
+              export SPARKLE_PUBLIC_KEY
+          fi
+          bash tools/build/build_macos_app.sh
+
+      # The only launch on macos-latest (macOS 26): every launch leg runs on
+      # macos-15 or macos-15-intel.
+      - name: Smoke test built ErgoptiPlus.app (crash-on-launch guard)
+        # Test the extracted release archive through the same Launch Services
+        # path as an installation. Early log creation is not startup readiness.
+        if: inputs.release
+        shell: bash
+        timeout-minutes: 3
+        run: |
+          python3 tools/diagnostics/macos_release_launch_test.py
+          test ! -e /Applications/ErgoptiPlus.app
+          ditto -x -k build/macos/ErgoptiPlus.app.zip /Applications
+          python3 tools/diagnostics/macos-release-launch.py /Applications/ErgoptiPlus.app "$RUNNER_TEMP/release-launch"
+
+      - name: Retain packaged application startup evidence
+        if: always() && inputs.release
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-package-startup-${{ github.run_id }}
+          path: ${{ runner.temp }}/release-launch
+          if-no-files-found: warn
+
+      - name: Install Sparkle signing tool
+        if: inputs.release
+        shell: bash
+        env:
+          SPARKLE_VERSION: '2.9.2'
+        run: |
+          set -euo pipefail
+          curl -fsSLo /tmp/Sparkle.tar.xz \
+              "https://github.com/sparkle-project/Sparkle/releases/download/${SPARKLE_VERSION}/Sparkle-${SPARKLE_VERSION}.tar.xz"
+          mkdir -p /tmp/sparkle-dist
+          tar -xJf /tmp/Sparkle.tar.xz -C /tmp/sparkle-dist
+          echo "SIGN_UPDATE=/tmp/sparkle-dist/bin/sign_update" >> "$GITHUB_ENV"
+
+      # A release fails here rather than skipping the signature: without it no
+      # appcast is written, and Release · publish would otherwise have nothing
+      # to feed Sparkle. This is the only step that sees the private key.
+      - name: Sign zip with Sparkle EdDSA key
+        if: inputs.release
+        shell: bash
+        env:
+          SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "$SPARKLE_ED_PRIVATE_KEY" ]; then
+              echo "::error::a release build needs the SPARKLE_ED_PRIVATE_KEY secret: without a signature there is no appcast and no update for installed copies."
+              exit 1
+          fi
+          printf '%s' "$SPARKLE_ED_PRIVATE_KEY" > /tmp/sparkle_priv.key
+          "$SIGN_UPDATE" -f /tmp/sparkle_priv.key build/macos/ErgoptiPlus.app.zip \
+              > build/macos/_ErgoptiPlus.app.zip.sig
+          rm -f /tmp/sparkle_priv.key
+          echo "Sparkle EdDSA signature written to _ErgoptiPlus.app.zip.sig"
+
+      - name: Generate Sparkle appcast
+        if: inputs.release
+        shell: bash
+        env:
+          ERGOPTI_VERSION: ${{ inputs.version }}
+          ERGOPTI_BUILD: ${{ github.run_number }}
+          ERGOPTI_CHANNEL: ${{ inputs.channel }}
+          SPARKLE_SIG_FILE: build/macos/_ErgoptiPlus.app.zip.sig
+          ZIP_PATH: build/macos/ErgoptiPlus.app.zip
+          GH_OWNER: ${{ github.repository_owner }}
+          GH_REPO: ${{ github.event.repository.name }}
+          OUTPUT_PATH: build/macos/appcast-${{ inputs.channel }}.xml
+        run: bash tools/build/generate_appcast.sh
+
+      - name: Package latest keylayout bundle
+        if: inputs.release
+        shell: bash
+        # Released as Ergopti_macOS.zip — keyboard layout only, no app.
+        run: |
+          set -euo pipefail
+          latest=$(ls -d static/ergopti/macos/bundles/*.bundle | sort -V | tail -1)
+          bundle_name=$(basename "$latest")
+          (cd static/ergopti/macos/bundles && zip -r "../../../../build/macos/Ergopti_macOS.zip" "$bundle_name")
+          echo "Packaged keylayout: $bundle_name → Ergopti_macOS.zip"
+
+      # One artifact on every run: launch installs its zip, and on a release
+      # run Release · publish attaches all of it. Outside a release only the
+      # app zip exists. Seven days on a release run, so a next-day re-run of
+      # failed jobs still finds the archive this job gated.
+      - name: Upload the macOS package
+        uses: actions/upload-artifact@v4
+        with:
+          name: assets-macos
+          retention-days: ${{ inputs.release && 7 || 1 }}
+          if-no-files-found: error
+          path: |
+            build/macos/ErgoptiPlus.app.zip
+            build/macos/Ergopti_macOS.zip
+            build/macos/_ErgoptiPlus.app.zip.sig
+            build/macos/appcast-*.xml
+
+  # ─────────────────────────────────────────────────
+  # 4) Packaged application launch over real user states
+  # ─────────────────────────────────────────────────
+  # Launches the archive package-macos uploaded over one user state per leg.
+  # See tools/diagnostics/macos_launch_gate.py for the scenarios, the two
+  # profiles and the verdict.
+  launch:
+    name: 'launch · ${{ matrix.scenario }} · ${{ matrix.runner }}'
+    needs: package-macos
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: ${{ fromJSON(inputs.release && '["macos-15","macos-15-intel"]' || '["macos-15"]') }}
+        scenario: ${{ fromJSON(needs.package-macos.outputs.scenarios) }}
+    env:
+      # Older release whose shipped personal files seed upgraded states.
+      SEED_TAG: v0.0.0-dev.24
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch the older release whose files seed the user state
+        run: git fetch --no-tags --depth=1 origin "+refs/tags/$SEED_TAG:refs/tags/$SEED_TAG"
+
+      - name: Download the package built by this run
+        uses: actions/download-artifact@v4
+        with:
+          name: assets-macos
+          path: ${{ runner.temp }}/package
+
+      # Reproduce a browser download: the archive and everything unpacked from
+      # it carry com.apple.quarantine until the user runs the documented xattr
+      # command from the release notes.
+      - name: Install the package the way a user does
+        run: |
+          set -euo pipefail
+          zip="$RUNNER_TEMP/package/ErgoptiPlus.app.zip"
+          test -f "$zip"
+          test ! -e /Applications/ErgoptiPlus.app
+          stamp="0083;$(printf '%x' "$(date +%s)");Safari;$(uuidgen)"
+          xattr -w com.apple.quarantine "$stamp" "$zip"
+          ditto -x -k "$zip" /Applications
+          xattr -r -w com.apple.quarantine "$stamp" /Applications/ErgoptiPlus.app
+          xattr -dr com.apple.quarantine /Applications/ErgoptiPlus.app
+          if xattr -r /Applications/ErgoptiPlus.app | grep -q com.apple.quarantine; then
+              echo "::error::the documented quarantine removal left an attribute behind"
+              exit 1
+          fi
+          lipo -archs /Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus
+          echo "runner machine: $(uname -m)"
+
+      - name: Launch over the user state and judge it
+        run: >
+          python3 tools/diagnostics/macos_launch_gate.py /Applications/ErgoptiPlus.app
+          "$RUNNER_TEMP/launch-gate" "${{ matrix.scenario }}" --seed-tag "$SEED_TAG"
+
+      - name: Retain launch evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: launch-gate-${{ matrix.runner }}-${{ matrix.scenario }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/launch-gate
+          if-no-files-found: warn

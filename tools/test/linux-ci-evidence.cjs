@@ -5,7 +5,8 @@
  * MODULE: Linux CI Evidence Contract
  * DESCRIPTION:
  * Records machine-readable proof for Linux CI subjects and verifies that every
- * mandatory manifest subject both ran and passed before linux-ok can be green.
+ * mandatory manifest subject both ran and passed before linux-ok, the evidence
+ * gate of .github/workflows/ci-linux.yml, can be green.
  * ============================================================================
  */
 

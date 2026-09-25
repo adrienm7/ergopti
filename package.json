@@ -226,6 +226,8 @@
 		"test:linux-canonical-pack-upgrade": "node ./tools/test/test-linux-canonical-pack-upgrade.cjs",
 		"test:opensuse-ci-origin": "node ./tools/test/test-opensuse-ci-origin.cjs",
 		"test:release-packaging-workflow": "node ./tools/test/test-release-packaging-workflow.cjs",
+		"test:ci-pipeline": "node ./tools/test/test-ci-pipeline.cjs",
+		"test:ci-pipeline-wiring": "node ./tools/test/test-ci-pipeline-wiring.cjs",
 		"test:linux-launcher-deps": "node ./tools/test/test-linux-launcher-deps.cjs",
 		"test:extensions-path-resolves": "node ./tools/test/test-extensions-path-resolves.cjs",
 		"test:llm-no-prompt-content-in-logs": "node ./tools/test/test-llm-no-prompt-content-in-logs.cjs",

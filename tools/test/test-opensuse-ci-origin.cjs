@@ -12,18 +12,20 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
+const pipeline = require('./ci-pipeline.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const workflows = [
-	'.github/workflows/ci.yml',
-	'.github/workflows/linux-layout.yml',
+// Each source that installs packages in an openSUSE container. The Linux box is
+// read through the loader, which throws when its distro job is missing.
+const sources = [
+	['.github/workflows/ci-linux.yml (job install-linux-distros)', pipeline.job('install-linux-distros')],
+	['.github/workflows/linux-layout.yml', fs.readFileSync(path.join(ROOT, '.github/workflows/linux-layout.yml'), 'utf8')],
 ];
 const originRewrite =
 	"sed -i 's|http://download.opensuse.org|https://downloadcontent.opensuse.org|g' " +
 	'/etc/zypp/repos.d/*.repo && zypper --non-interactive install';
 
-for (const workflow of workflows) {
-	const source = fs.readFileSync(path.join(ROOT, workflow), 'utf8');
+for (const [workflow, source] of sources) {
 	const tumbleweed = source.match(
 		/image: opensuse\/tumbleweed:latest\r?\n\s+prep: ([^\r\n]+)/
 	);

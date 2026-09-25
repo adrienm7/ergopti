@@ -39,7 +39,10 @@ for (const workflowFile of workflowFiles) {
 	inlineVersionCount += (source.match(/node-version:\s*/g) ?? []).length;
 }
 
-if (setupCount < 10) {
+// Floor = today's exact count, so a scan that stops reading a workflow is
+// caught: ci.yml validate, ci-windows.yml test-ahk and package-windows,
+// ci-linux.yml linux-ok, bench.yml and deploy-site.yml.
+if (setupCount < 6) {
 	errors.push(`only ${setupCount} setup-node steps were found; the workflow scan is incomplete`);
 }
 if (filePinCount !== setupCount || inlineVersionCount !== 0) {
