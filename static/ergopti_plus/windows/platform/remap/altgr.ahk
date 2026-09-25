@@ -30,7 +30,7 @@ SC01D & SC138::
 RAlt:: {
 	Result := TapHoldOwnImmediateModifier("alt_gr", "RAlt",
 		_AltGrHoldModKey(), TapHoldDuration(TapHold, "alt_gr"))
-	if (Result["tap"] and (A_PriorKey == "RAlt" or A_PriorKey == "^")) {
+	if (Result["tap"] and TapHoldPriorKeyIsSelf("alt_gr")) {
 		DisableCapsWord()
 		AltGrTapHoldDispatchV2()
 	}
@@ -41,7 +41,7 @@ RAlt:: {
 *$SC138:: {
 	Result := TapHoldOwnImmediateModifier("alt_gr", "SC138",
 		_AltGrHoldModKey(), TapHoldDuration(TapHold, "alt_gr"))
-	if (Result["tap"] and A_PriorKey == "SC138") {
+	if (Result["tap"] and TapHoldPriorKeyIsSelf("alt_gr")) {
 		DisableCapsWord()
 		AltGrTapHoldDispatchV2()
 	}
@@ -65,7 +65,7 @@ RAlt:: ; Necessary to work on layouts like QWERTY
 		if (_ALTGR_KANA_FIXUP && GetKeyState("SC138", "P"))
 				return
 		tap := KeyWait("RAlt", "T" . TapHoldDuration(TapHold, "alt_gr"))
-		if (tap and (A_PriorKey == "RAlt" or A_PriorKey == "^")) {
+		if (tap and TapHoldPriorKeyIsSelf("alt_gr")) {
 				DisableCapsWord()
 				AltGrTapHoldDispatchV2()
 		}
@@ -83,7 +83,7 @@ RAlt Up:: {
 #HotIf _ALTGR_KANA_FIXUP and not LayerEnabled and not IsOnboardingActive() and TapHoldIsActive(TapHold, "alt_gr") and TapHoldHoldModifier(TapHold, "alt_gr") == "" and TapHoldHoldLayer(TapHold, "alt_gr") == ""
 SC138:: {
 		tap := KeyWait("SC138", "T" . TapHoldDuration(TapHold, "alt_gr"))
-		if (tap and A_PriorKey == "SC138") {
+		if (tap and TapHoldPriorKeyIsSelf("alt_gr")) {
 				DisableCapsWord()
 				AltGrTapHoldDispatchV2()
 		}

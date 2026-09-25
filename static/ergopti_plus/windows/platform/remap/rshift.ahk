@@ -36,7 +36,7 @@ _RShiftHandleHold(PhysicalModifierPassthrough) {
 	Result := TapHoldOwnImmediateModifier("right_shift", "SC036",
 		_RShiftHoldModKey(), TapHoldDuration(TapHold, "right_shift"),
 		,,,,,, PhysicalModifierPassthrough)
-	if (Result["tap"] and Result["elapsed_ms"] >= TapMinDurationMs() and A_PriorKey == "RShift")
+	if (Result["tap"] and Result["elapsed_ms"] >= TapMinDurationMs() and TapHoldPriorKeyIsSelf("right_shift"))
 		_RShiftDispatch()
 }
 
@@ -62,7 +62,7 @@ _RShiftHandleHold(PhysicalModifierPassthrough) {
 	if (
 		tap
 		and ElapsedMs >= TapMinDurationMs()
-		and A_PriorKey == "RShift"
+		and TapHoldPriorKeyIsSelf("right_shift")
 	) { ; A_PriorKey allows fast shortcuts under the tap threshold without triggering the tap action mid-combo
 		_RShiftDispatch()
 	}

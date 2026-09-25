@@ -841,6 +841,7 @@ global _AhkSubDir := ""
 ; registry reader plus the keylogger-walker and tap-hold reassign-at-boot loaders.
 #Include ../platform/remap/constants.ahk
 #Include unit/test_tap_hold_activity_cancel.ahk
+#Include unit/test_tap_hold_prior_key.ahk
 #Include unit/test_timings_config.ahk
 _LogBootProgress("keylogger modules + tests included")
 
@@ -1457,6 +1458,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_personal_shortcuts_atomic_bootstrap.ahk
 #Include meta/test_altgr_detect_hkl_fallback.ahk
 #Include meta/test_altgr_kana_taphold_entry.ahk
+#Include meta/test_prior_key_guards_use_helper.ahk
 #Include meta/test_spotlight_gdiplus_free_library.ahk
 #Include meta/test_case_transform_synthetic_mark.ahk
 #Include meta/test_color_dropdown_recompute_index.ahk

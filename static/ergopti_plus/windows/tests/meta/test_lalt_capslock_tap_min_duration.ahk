@@ -8,7 +8,7 @@
 ;
 ; The shift/ctrl tap-hold handlers (rshift.ahk, lshift_lctrl.ahk) gate the tap
 ; action on BOTH an upper bound (<= TapHoldDuration) and a lower bound
-; (>= TapMinDurationMs()) plus an A_PriorKey match. The layer-based handlers
+; (>= TapMinDurationMs()) plus a prior-key match (TapHoldPriorKeyIsSelf). The layer-based handlers
 ; for CapsLock (capslock.ahk 2.4) and LAlt (lalt.ahk 4.2 tab+layer, 4.8 generic
 ; hold-layer) previously gated on the upper bound only, so an ultra-fast chord
 ; brush — under the tap duration but also under the min-duration floor — was
@@ -17,7 +17,7 @@
 ;
 ; The fix applies the same guards uniformly:
 ;   - capslock.ahk 2.4: add `>= TapMinDurationMs()` floor AND
-;     `A_PriorKey == "CapsLock"`.
+;     `TapHoldPriorKeyIsSelf("caps_lock")`.
 ;   - lalt.ahk 4.2 / 4.8: add `>= TapMinDurationMs()` floor.
 ;
 ; This is a meta-static test (scans source text) because capslock.ahk and
@@ -68,7 +68,7 @@ _TMDF_BlockBody(Src, HotkeyDef) {
 ; ==================================================
 ; ==================================================
 
-; CapsLock hold-layer (2.4): must gate on TapMinDurationMs() AND A_PriorKey.
+; CapsLock hold-layer (2.4): must gate on TapMinDurationMs() AND its prior key.
 _TMDF_CapsLockLayerHasFloorAndPriorKey() {
 	; Move-resilient: scan the whole tap_holds module instead of a pinned path.
 	; The "`n$SC03A:: {" anchor is unique to capslock.ahk in this dir.
@@ -80,8 +80,8 @@ _TMDF_CapsLockLayerHasFloorAndPriorKey() {
 	Assert(Seg != "", "capslock.ahk hold-layer block ($SC03A) must exist")
 	Assert(InStr(Seg, "TapMinDurationMs()") > 0,
 		"capslock.ahk 2.4 must apply the >= TapMinDurationMs() lower bound so an ultra-fast chord brush is not counted as an intentional tap")
-	Assert(InStr(Seg, "A_PriorKey == " . Chr(34) . "CapsLock" . Chr(34)) > 0,
-		"capslock.ahk 2.4 must gate the tap on A_PriorKey == CapsLock so a layer key used mid-chord does not fire the tap action")
+	Assert(InStr(Seg, "TapHoldPriorKeyIsSelf(" . Chr(34) . "caps_lock" . Chr(34) . ")") > 0,
+		"capslock.ahk 2.4 must gate the tap on its own prior key so a layer key used mid-chord does not fire the tap action")
 }
 Test("tap_holds: capslock 2.4 hold-layer has TapMinDurationMs floor + A_PriorKey guard (lalt-altgr-capslock-no-priorkey-min-duration)", _TMDF_CapsLockLayerHasFloorAndPriorKey)
 
@@ -100,18 +100,19 @@ _TMDF_LAltTabLayerHasFloor() {
 }
 Test("tap_holds: lalt 4.2 tab+layer has TapMinDurationMs floor (lalt-altgr-capslock-no-priorkey-min-duration)", _TMDF_LAltTabLayerHasFloor)
 
-; LAlt generic hold-layer (4.8): must gate on TapMinDurationMs() AND A_PriorKey.
+; LAlt generic hold-layer (4.8): must gate on TapMinDurationMs() AND its prior key.
 _TMDF_LAltGenericLayerHasFloor() {
 	; Move-resilient: scan the whole tap_holds module instead of a pinned path.
-	; The A_PriorKey == "LAlt") { anchor is unique to lalt.ahk in this dir, and the
+	; The TapHoldPriorKeyIsSelf("left_alt")) { anchor is unique to lalt.ahk in this
+	; dir (the 4.5 guard ends its line with a comment instead), and the
 	; TapMinDurationMs() floor sits on the same line just before it.
 	Src := _DriverDirConcat("platform/remap")
 	; The generic hold-layer dispatch is the only call to _LAltDispatch() guarded
-	; by A_PriorKey == "LAlt"; isolate that statement and assert the floor is present.
-	Idx := InStr(Src, "A_PriorKey == " . Chr(34) . "LAlt" . Chr(34) . ") {")
+	; that way; isolate that statement and assert the floor is present.
+	Idx := InStr(Src, "TapHoldPriorKeyIsSelf(" . Chr(34) . "left_alt" . Chr(34) . ")) {")
 	Assert(Idx > 0, "lalt.ahk 4.8 generic hold-layer dispatch guard must exist")
 	Seg := SubStr(Src, Idx - 200, 260)
 	Assert(InStr(Seg, "TapMinDurationMs()") > 0,
-		"lalt.ahk 4.8 (generic hold-layer) must apply the >= TapMinDurationMs() lower bound alongside the A_PriorKey == LAlt guard")
+		"lalt.ahk 4.8 (generic hold-layer) must apply the >= TapMinDurationMs() lower bound alongside its prior-key guard")
 }
 Test("tap_holds: lalt 4.8 generic hold-layer has TapMinDurationMs floor (lalt-altgr-capslock-no-priorkey-min-duration)", _TMDF_LAltGenericLayerHasFloor)

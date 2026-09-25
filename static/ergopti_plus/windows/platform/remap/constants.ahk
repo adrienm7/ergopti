@@ -729,6 +729,51 @@ TapHoldResolveKeyIdFromVkSc(vk, sc) {
 	return ""
 }
 
+; Physical scan code of tap-hold key KeyId, the one its hotkeys are bound to.
+; @param KeyId {String} Canonical tap-hold key id.
+; @return {Integer} The scan code (extended keys carry 0x100).
+_TapHoldScanCodeOf(KeyId) {
+	global _TH_TapHoldScToKeyId
+	for Sc, Id in _TH_TapHoldScToKeyId {
+		if (Id == KeyId)
+			return Sc
+	}
+	throw ValueError("Unknown tap-hold key id for the prior-key guard.", -1, KeyId)
+}
+
+; Whether the last key pressed before this release was tap-hold key KeyId
+; itself, i.e. nothing else was pressed during the hold. A_PriorKey is the name
+; AHK derives from the recorded virtual key and scan code through the active
+; layout: never an "SCxxx" string, "Backspace" rather than "BackSpace", and "^"
+; for the Kana AltGr of the Ergopti layout. The expected name is therefore
+; derived by the same function from the key's own scan code at call time; a
+; hand-written name broke on AHK's spelling or on the layout.
+; When the layout puts the key on a virtual key with no name at all, AHK answers
+; "" here and an undocumented placeholder for A_PriorKey, so the name cannot
+; decide: the scan-code activity tracker that every tap dispatch also consults
+; stays the guard, and the situation is logged once per key.
+; @param KeyId {String} Canonical tap-hold key id.
+; @param PriorKey {String} Test seam; production reads A_PriorKey.
+; @param KeyNameFn {Func} Test seam; production uses GetKeyName.
+; @return {Boolean} True when the prior key is KeyId's own physical key.
+TapHoldPriorKeyIsSelf(KeyId, PriorKey := unset, KeyNameFn := 0) {
+	static UnnamedReported := Map()
+	Sc := _TapHoldScanCodeOf(KeyId)
+	if !IsSet(PriorKey)
+		PriorKey := A_PriorKey
+	if !IsObject(KeyNameFn)
+		KeyNameFn := GetKeyName
+	Expected := KeyNameFn.Call(Format("SC{:03X}", Sc))
+	if (Expected == "") {
+		if !UnnamedReported.Has(KeyId) {
+			UnnamedReported[KeyId] := true
+			try LoggerWarn("TapHoldTrack", "Tap-hold key '{1}' has no key name on this layout; its tap is guarded by the activity tracker only.", KeyId)
+		}
+		return PriorKey != ""
+	}
+	return PriorKey == Expected
+}
+
 ; Run any tap output through the single activity/suspend gate, then consume the
 ; tracked physical press. Native taps (Space, Enter, Backspace, Escape, Delete)
 ; must use this helper too; otherwise only GESTURE_ACTIONS-based taps are safe.

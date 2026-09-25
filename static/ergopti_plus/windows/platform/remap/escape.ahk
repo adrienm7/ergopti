@@ -45,7 +45,7 @@ _EscapeHoldModKey() {
 *$SC001:: {
 	Result := TapHoldOwnImmediateModifier("escape", "Escape",
 		_EscapeHoldModKey(), TapHoldDuration(TapHold, "escape"))
-	if (Result["tap"] and A_PriorKey == "Escape")
+	if (Result["tap"] and TapHoldPriorKeyIsSelf("escape"))
 		_EscapeDispatch()
 }
 #HotIf
@@ -65,7 +65,7 @@ _EscapeHoldModKey() {
 #HotIf TapHoldHoldLayer(TapHold, "escape") != "" and TapHoldHoldModifier(TapHold, "escape") == "" and not LayerEnabled
 *$SC001:: {
 	Result := TapHoldOwnImmediateLayer("Escape", TapHoldDuration(TapHold, "escape"))
-	if (Result["tap"] and A_PriorKey == "Escape")
+	if (Result["tap"] and TapHoldPriorKeyIsSelf("escape"))
 		_EscapeDispatch()
 }
 #HotIf

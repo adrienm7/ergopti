@@ -176,7 +176,7 @@ $SC03A:: {
 	if (
 		Result["tap"]
 		and Result["elapsed_ms"] >= TapMinDurationMs()
-		and A_PriorKey == "CapsLock"
+		and TapHoldPriorKeyIsSelf("caps_lock")
 	) { ; A_PriorKey + TapMinDurationMs floor suppress spurious taps when CapsLock is brushed mid-roll
 		_CapsLockDispatch(False)
 	}

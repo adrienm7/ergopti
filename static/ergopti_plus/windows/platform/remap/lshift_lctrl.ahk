@@ -42,7 +42,7 @@ _LShiftHandleHold(PhysicalModifierPassthrough) {
 	Result := TapHoldOwnImmediateModifier("left_shift", "SC02A",
 		_LShiftHoldModKey(), TapHoldDuration(TapHold, "left_shift"),
 		,,,,,, PhysicalModifierPassthrough)
-	if (Result["tap"] and Result["elapsed_ms"] >= TapMinDurationMs() and A_PriorKey == "LShift")
+	if (Result["tap"] and Result["elapsed_ms"] >= TapMinDurationMs() and TapHoldPriorKeyIsSelf("left_shift"))
 		_LShiftDispatch()
 }
 
@@ -78,7 +78,7 @@ _LShiftHandleHold(PhysicalModifierPassthrough) {
 	if (
 		tap
 		and ElapsedMs >= TapMinDurationMs()
-		and A_PriorKey == "LShift"
+		and TapHoldPriorKeyIsSelf("left_shift")
 	) { ; A_PriorKey allows fast shortcuts under the tap threshold without triggering the tap action mid-combo
 		_LShiftDispatch()
 	} else if (LoggerIsDebugEnabled()) {
@@ -117,7 +117,7 @@ _LCtrlHandleHold(PhysicalModifierPassthrough) {
 		_LCtrlHoldModKey(), TapHoldDuration(TapHold, "left_ctrl"),
 		,,,,,, PhysicalModifierPassthrough)
 	if (Result["tap"] and Result["elapsed_ms"] >= TapMinDurationMs()
-		and A_PriorKey == "LControl" and CapsUp and AltUp)
+		and TapHoldPriorKeyIsSelf("left_ctrl") and CapsUp and AltUp)
 		_LCtrlDispatch()
 }
 
@@ -158,7 +158,7 @@ _LCtrlHandleHold(PhysicalModifierPassthrough) {
 	if (
 		tap
 		and ElapsedMs >= TapMinDurationMs()
-		and A_PriorKey == "LControl"
+		and TapHoldPriorKeyIsSelf("left_ctrl")
 		and CapsUp ; CapsLock must not be physically held
 		and AltUp ; LAlt must not be physically held
 	) {

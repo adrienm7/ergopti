@@ -233,7 +233,7 @@ SC038::
 	Result := TapHoldOwnImmediateLayer("SC038", TapHoldDuration(TapHold, "left_alt"))
 	if (
 		Result["tap"]
-		and A_PriorKey == "LAlt" ; Prevents spurious BackSpace when layer key was actually used
+		and TapHoldPriorKeyIsSelf("left_alt") ; Prevents spurious BackSpace when layer key was actually used
 		and KS_IsUp("SC03A") ; Prevents spurious BackSpace on quick LAlt+CapsLock release
 	) {
 		TapHoldDispatchTap("left_alt", _LAltBackspaceTap)
@@ -318,7 +318,7 @@ $SC038:: {
 	UpdateLastSentCharacter("LAlt")
 
 	Result := TapHoldOwnImmediateLayer("SC038", TapHoldDuration(TapHold, "left_alt"))
-	if (Result["tap"] and Result["elapsed_ms"] >= TapMinDurationMs() and A_PriorKey == "LAlt") { ; TapMinDurationMs floor suppresses spurious taps when LAlt is brushed mid-roll
+	if (Result["tap"] and Result["elapsed_ms"] >= TapMinDurationMs() and TapHoldPriorKeyIsSelf("left_alt")) { ; TapMinDurationMs floor suppresses spurious taps when LAlt is brushed mid-roll
 		_LAltDispatch()
 	}
 }

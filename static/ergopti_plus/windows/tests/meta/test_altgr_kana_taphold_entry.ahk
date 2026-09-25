@@ -16,7 +16,7 @@ _AKTE_AltGrOwnsKanaTap() {
         "altgr.ahk must register a Kana-only SC138 tap-hold context")
     Assert(InStr(Src, "SC138::") > 0 && InStr(Src, 'KeyWait("SC138"') > 0,
         "Kana physical AltGr must wait for SC138 itself, not RAlt")
-    Assert(InStr(Src, 'A_PriorKey == "SC138"') > 0,
+    Assert(InStr(Src, 'TapHoldPriorKeyIsSelf("alt_gr")') > 0,
         "Kana SC138 tap must require its own physical prior key before dispatch")
     Assert(InStr(Src, '_ALTGR_KANA_FIXUP && GetKeyState("SC138", "P")') > 0,
         "virtual RAlt handler must defer to SC138 when the physical Kana key is down")

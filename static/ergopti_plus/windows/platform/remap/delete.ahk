@@ -50,7 +50,7 @@ _DeleteHoldModKey() {
 *$SC153:: {
 	Result := TapHoldOwnImmediateModifier("delete", "Delete",
 		_DeleteHoldModKey(), TapHoldDuration(TapHold, "delete"))
-	if (Result["tap"] and A_PriorKey == "Delete")
+	if (Result["tap"] and TapHoldPriorKeyIsSelf("delete"))
 		_DeleteDispatch()
 }
 #HotIf
@@ -70,7 +70,7 @@ _DeleteHoldModKey() {
 #HotIf TapHoldHoldLayer(TapHold, "delete") != "" and TapHoldHoldModifier(TapHold, "delete") == "" and not LayerEnabled
 *$SC153:: {
 	Result := TapHoldOwnImmediateLayer("Delete", TapHoldDuration(TapHold, "delete"))
-	if (Result["tap"] and A_PriorKey == "Delete")
+	if (Result["tap"] and TapHoldPriorKeyIsSelf("delete"))
 		_DeleteDispatch()
 }
 #HotIf
