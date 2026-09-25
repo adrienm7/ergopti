@@ -41,7 +41,8 @@ local function build(calls, picked, user_text)
 		fh:close()
 	end
 	Manager.init({
-		keyboard_hook = { set_remapper = function() end, key_text = function() return nil end },
+		keyboard_hook = { set_remapper = function() end, key_text = function() return nil end,
+			held_modifiers = function() return {} end },
 		execute_action = function() end,
 		action_names = function() return { "open_url" } end,
 		defaults_path = DEFAULTS,

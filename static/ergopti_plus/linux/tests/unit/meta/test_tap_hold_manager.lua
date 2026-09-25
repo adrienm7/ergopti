@@ -16,6 +16,7 @@ local DEFAULTS = require("infra.paths").shared("tap_hold/defaults.toml")
 local function fake_hook()
 	local hook = { engine = nil, on_tap = nil, calls = 0 }
 	function hook.key_text() return nil end
+	function hook.held_modifiers() return hook.mods or {} end
 	function hook.set_remapper(engine, on_tap)
 		hook.calls = hook.calls + 1
 		hook.engine, hook.on_tap = engine, on_tap
@@ -53,6 +54,21 @@ helpers.describe("tap-hold manager", function()
 		helpers.assert_true(hook.engine:handles(42), "left Shift is configured by default")
 		hook.on_tap("copy")
 		helpers.assert_eq(actions[1], "copy@tap_hold")
+		Manager._reset_for_test()
+		os.remove(user_path)
+	end)
+
+	-- The live layout says which keys are modifiers (ctrl:nocaps makes CapsLock
+	-- a Ctrl): the engine asks the hook, not its own list of the usual keys
+	-- (engine-live-modifiers).
+	helpers.it("tells the engine which modifiers the live layout holds (engine-live-modifiers)", function()
+		local Manager, hook, _, user_path = manager()
+		local TAB = require("platform.remap.tap_hold_engine").KEY_CODES.tab
+		hook.mods = { ctrl = true }
+		helpers.assert_nil(hook.engine:process(TAB, 1, 0), "Tab under a Ctrl only the layout knows is Ctrl+Tab")
+		hook.engine:process(TAB, 0, 50)
+		hook.mods = {}
+		helpers.assert_true(hook.engine:process(TAB, 1, 100) ~= nil, "with no modifier held, Tab is its tap-hold")
 		Manager._reset_for_test()
 		os.remove(user_path)
 	end)

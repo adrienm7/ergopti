@@ -249,6 +249,7 @@ helpers.describe("keyboard hook + tap-hold engine: the pointer during a tap", fu
 			is_ready = function() return true end,
 			reset_state = function() return true end,
 			process = function() return nil, nil, nil end,
+			modifier_role = function(code) return require("infra.evdev_codes").MODIFIER_OF[code], nil end,
 		}
 		local reader = helpers.load_module("adapters.evdev_reader")
 		reader._set_backend({
@@ -350,6 +351,70 @@ helpers.describe("keyboard hook + tap-hold engine: the pointer during a tap", fu
 			tap_with_pointer(EV_KEY, code, InputEvent.VALUE_UP, clicks)
 			helpers.assert_eq(#clicks, 0, name .. " released is no second click")
 		end
+	end)
+
+end)
+
+-- An XKB option can make a key that is no modifier key a modifier: under
+-- ctrl:nocaps CapsLock is a Ctrl, under caps:super a Super. The engine told a
+-- modifier by its usual keys, so with CapsLock not a tap-hold, CapsLock+Tab
+-- ran Tab's tap-hold (Alt held, the alt_tab_monitor tap) where Windows, whose
+-- Tab hotkey has no wildcard, leaves Ctrl+Tab native (engine-live-modifiers).
+helpers.describe("keyboard hook + tap-hold engine: a modifier the XKB options move", function()
+
+	local XKB, CAPS, TAB = 8, 58, 15
+	local SYM = { Control_L = 0xffe3, Super_L = 0xffeb, Alt_L = 0xffe9 }
+
+	--- Drives `events` through the live XKB adapter on a keymap whose CapsLock
+	--- is `caps_sym`, with Tab set as shipped (tap alt_tab_monitor, hold alt)
+	--- and the engine told of the modifiers as the tap-hold manager tells it.
+	local function drive_live(caps_sym, events)
+		local Capture = helpers.load_module("adapters.xkb_capture")
+		local syms = { [CAPS] = caps_sym, [29] = SYM.Control_L, [56] = SYM.Alt_L }
+		Capture._set_backend({
+			create = function() return { held = {} } end,
+			destroy = function() end,
+			key_sym = function(_, keycode) return syms[keycode - XKB] end,
+			key_utf8 = function() return nil end,
+			sym_utf8 = function() return nil end,
+			update_key = function(session, keycode, direction) session.held[keycode] = direction == 1 or nil end,
+			compose_feed = function() end,
+			compose_status = function() return "nothing" end,
+			compose_utf8 = function() return nil end,
+			compose_reset = function() end,
+		})
+		helpers.assert_true(Capture.load("keymap", "C"), "the double keymap loads")
+		local kh = helpers.load_module("adapters.keyboard_hook")
+		local taps, emitted = {}, {}
+		kh.set_remapper(Engine.new({
+			keys = { tab = { tap_action = "alt_tab_monitor", hold_modifier = "alt", time_activation_seconds = 10 } },
+			tap_min_ms = 0, one_shot_timeout_ms = 2000,
+			held_modifiers = function() return kh.held_modifiers() end,
+		}), function(action) taps[#taps + 1] = tostring(action) end)
+		local stream = {}
+		for index, pair in ipairs(events) do stream[index] = { type = EV_KEY, code = pair[1], value = pair[2] } end
+		local ok, err = pcall(kh._test_drive, stream, {
+			liveXkb = true,
+			onEmitRaw = function(code, value) emitted[#emitted + 1] = code .. ":" .. value; return true end,
+		}, true)
+		kh.set_remapper(nil)
+		Capture._reset_backend()
+		if not ok then error(err, 0) end
+		return table.concat(emitted, " "), taps
+	end
+
+	helpers.it("leaves Tab native under a CapsLock the layout makes Ctrl or Super (engine-live-modifiers)", function()
+		for name, sym in pairs({ ["ctrl:nocaps"] = SYM.Control_L, ["caps:super"] = SYM.Super_L }) do
+			local emitted, taps = drive_live(sym, { { CAPS, 1 }, { TAB, 1 }, { TAB, 0 }, { CAPS, 0 } })
+			helpers.assert_eq(emitted, "58:1 15:1 15:0 58:0", name .. ": CapsLock+Tab is the application's")
+			helpers.assert_eq(taps, {}, name .. ": no alt_tab_monitor")
+		end
+	end)
+
+	helpers.it("still runs Tab's tap-hold with no modifier held (engine-live-modifiers)", function()
+		local emitted, taps = drive_live(SYM.Control_L, { { TAB, 1 }, { TAB, 0 } })
+		helpers.assert_eq(taps, { "alt_tab_monitor" }, "a lone Tab tap is the configured action")
+		helpers.assert_true(emitted:find("15:1", 1, true) == nil, "and no Tab reaches the application: " .. emitted)
 	end)
 
 end)

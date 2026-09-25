@@ -191,6 +191,11 @@ local _reported_missing = false
 -- Called when a pointer button is pressed, if the caller asked for it.
 local _on_click = nil
 
+-- Set while XKB cannot tell the keys' roles or capture them, so that is
+-- logged once and not at every key event; the next press XKB answers in full
+-- clears it.
+local _xkb_failure_reported = false
+
 local function keyboard_slot(path)
 	return "keyboard:" .. path
 end
@@ -300,28 +305,73 @@ end
 -- =========================================
 -- =========================================
 
---- Updates the held-modifier flags from a key transition.
+--- Logs an XKB failure once, however many keys it hits: a keymap XKB cannot
+--- read fails every key event, and a line for each filled the log. The next
+--- press XKB answers in full clears it (_xkb_answered).
+--- @param fmt string Logger format.
+local function _xkb_failed(fmt, ...)
+	if _xkb_failure_reported then return end
+	_xkb_failure_reported = true
+	Logger.error(LOG, fmt, ...)
+end
+
+--- Clears a reported XKB failure once a key is answered in full, and says so.
+local function _xkb_answered()
+	if not _xkb_failure_reported then return end
+	_xkb_failure_reported = false
+	Logger.info(LOG, "XKB answers again: the keys' roles and text come from the layout.")
+end
+
+--- The role a physical key has in the ACTIVE layout, asked of XKB before its
+--- press is committed, for every key. The key alone does not say: Right Alt is
+--- AltGr (ISO_Level3_Shift, which types text) on a French or Ergopti layout
+--- and plain Alt_R (a shortcut) on a US one, and XKB options move modifiers to
+--- other keys (ctrl:nocaps makes CapsLock a Ctrl, lv3:menu_switch makes Menu
+--- an AltGr). Only a capture double (tests) is not a layout: there the key's
+--- usual role stands, and so it does, logged once, when XKB cannot answer.
+--- @param code integer evdev keycode.
+--- @return string|nil "shift", "altgr", "ctrl", "alt", "meta", or nil when the
+---   key is not a modifier in this layout.
+--- @return boolean True when XKB could not answer and the usual role stands.
+local function _modifier_role(code)
+	if _test_capture_event then return EvdevCodes.MODIFIER_OF[code], false end
+	local role, role_err = XkbCapture.modifier_role(code)
+	if role_err then
+		_xkb_failed("XKB cannot tell the role of key %d (%s) — each key keeps its usual role until it can.",
+			code, tostring(role_err))
+		return EvdevCodes.MODIFIER_OF[code], true
+	end
+	return role, false
+end
+
+--- Updates the held-modifier flags from a key transition. A release and a
+--- repeat keep the role the press was given, so the counts always balance.
 --- @param source string Source identity.
 --- @param code integer evdev keycode.
 --- @param value integer evdev value: 0 release, 1 press, 2 repeat.
---- @return boolean True when the code was a modifier and nothing else applies.
-local function _track_modifier(source, code, value)
-	local modifier = EvdevCodes.MODIFIER_OF[code]
-	if not modifier then return false end
+--- @param role string|nil For a press: the key's role from _modifier_role().
+--- @return boolean True when the key is a held modifier and nothing else applies.
+local function _track_modifier(source, code, value, role)
 	local key = source_key(source, code)
-	if value == InputEvent.VALUE_DOWN and not _modifier_down[key] then
-		_modifier_down[key] = modifier
-		_modifier_count[modifier] = _modifier_count[modifier] + 1
+	local held_role = _modifier_down[key]
+	if value == InputEvent.VALUE_DOWN then
+		if held_role then return true end
+		if not role then return false end
+		_modifier_down[key] = role
+		_modifier_count[role] = _modifier_count[role] + 1
 		_modifier_order[#_modifier_order + 1] = { key = key, code = code }
-	elseif value == InputEvent.VALUE_UP and _modifier_down[key] then
+	elseif value == InputEvent.VALUE_UP then
+		if not held_role then return false end
 		_modifier_down[key] = nil
-		_modifier_count[modifier] = math.max(0, _modifier_count[modifier] - 1)
+		_modifier_count[held_role] = math.max(0, _modifier_count[held_role] - 1)
 		for index = #_modifier_order, 1, -1 do
 			if _modifier_order[index].key == key then
 				table.remove(_modifier_order, index)
 				break
 			end
 		end
+	else
+		return held_role ~= nil
 	end
 	_shift_held = _modifier_count.shift > 0
 	_ctrl_held  = _modifier_count.ctrl > 0
@@ -422,11 +472,12 @@ local function _resynchronise(source)
 	end)
 	for _, current in ipairs(ordered) do
 		local key = current.key
+		local role = _modifier_role(current.code)
 		if current.code ~= EvdevCodes.KEY_CAPSLOCK then
 			local _, _, capture_err = _capture(current.code, InputEvent.VALUE_DOWN)
 			if capture_err then return false, tostring(capture_err) end
 		end
-		_track_modifier(current.source, current.code, InputEvent.VALUE_DOWN)
+		_track_modifier(current.source, current.code, InputEvent.VALUE_DOWN, role)
 		_pressed_at[key] = Monotonic.now_ms()
 		if consumed[key] then _consumed_down[key] = true end
 	end
@@ -540,13 +591,18 @@ local function _dispatch_event(ev, source)
 	end
 
 	local pressed = ev.value ~= InputEvent.VALUE_UP
+	-- A modifier's role is read from the state its own press is about to change.
+	local role, role_failed = nil, false
+	if ev.value == InputEvent.VALUE_DOWN then role, role_failed = _modifier_role(ev.code) end
 	-- Every key transition reaches XKB before any routing early-return. Modifier,
 	-- CapsLock and group-switch releases carry no text, but dropping them here
 	-- leaves the state machine permanently different from the desktop.
 	local char, identity, capture_err = _capture(ev.code, ev.value)
 	if capture_err then
-		Logger.error(LOG, "XKB capture failed (code=%d value=%d) — %s.",
-			ev.code, ev.value, tostring(capture_err))
+		_xkb_failed("XKB capture failed (code=%d value=%d) — %s.", ev.code, ev.value, tostring(capture_err))
+	elseif ev.value == InputEvent.VALUE_DOWN and not role_failed then
+		-- A press asks XKB both questions: answered, XKB is back.
+		_xkb_answered()
 	end
 
 	-- Publish physical identity before any interpretation branch can return.
@@ -565,7 +621,7 @@ local function _dispatch_event(ev, source)
 	-- XKB has already consumed the transition above. Modifiers still produce no
 	-- domain event; returning here prevents a test double or a malformed keymap
 	-- from inventing a typed character for a physical modifier.
-	local is_modifier = _track_modifier(source, ev.code, ev.value)
+	local is_modifier = _track_modifier(source, ev.code, ev.value, role)
 	if is_modifier then
 		_forward_raw(ev, source)
 		return
@@ -929,7 +985,7 @@ end
 function M.held_forwarded_keys()
 	local codes, seen = {}, {}
 	for _, entry in pairs(_forwarded_down) do
-		if not EvdevCodes.MODIFIER_OF[entry.code] and not seen[entry.code] then
+		if not _modifier_down[source_key(entry.source, entry.code)] and not seen[entry.code] then
 			seen[entry.code] = true
 			codes[#codes + 1] = entry.code
 		end
@@ -1611,7 +1667,8 @@ end
 --- the reader would have kept passing through the entire period in which capture
 --- produced nothing at all.
 --- @param events table Array of { type, code, value, at_ms?, timestamp_us? } tables, in arrival order.
---- @param callbacks table { onChar?, onKey?, onPhysical?, onHold?, onConsume?, onDesync?, onEmitRaw?, captureEvent?, keyState?, ledState? }.
+--- @param callbacks table { onChar?, onKey?, onPhysical?, onHold?, onConsume?, onDesync?, onEmitRaw?, captureEvent?,
+---   liveXkb?, keyState?, ledState? }.
 -- Exposed so the watchdog test can advance exactly as many ticks as the check
 -- needs, instead of hardcoding a number that silently stops matching.
 M.DEVICE_CHECK_TICKS = DEVICE_CHECK_TICKS
@@ -1660,8 +1717,14 @@ function M._test_drive(events, callbacks, intercept)
 	_on_desync   = cb.onDesync
 	_emit_raw    = cb.onEmitRaw
 	_intercept   = intercept and true or false
-	_test_capture_event = type(cb.captureEvent) == "function"
-		and cb.captureEvent or _legacy_capture_for_test
+	-- liveXkb drives the production path through adapters/xkb_capture, whose
+	-- backend and keymap the test has installed; otherwise a capture double.
+	if cb.liveXkb == true then
+		_test_capture_event = nil
+	else
+		_test_capture_event = type(cb.captureEvent) == "function"
+			and cb.captureEvent or _legacy_capture_for_test
+	end
 	_reset_modifier_state()
 	_sync_dropped = {}
 	_forwarded_down = {}

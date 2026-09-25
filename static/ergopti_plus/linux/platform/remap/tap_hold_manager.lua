@@ -121,6 +121,7 @@ local function _load()
 		tap_min_ms = Timings.ms("tap_hold", "tap_min_duration_ms"),
 		one_shot_timeout_ms = Timings.ms("tap_hold", "one_shot_shift_timeout_ms"),
 		key_text = function(code) return _hook.key_text(code) end,
+		held_modifiers = function() return _hook.held_modifiers() end,
 	})
 	Logger.info(LOG, "Tap-holds loaded: %d key(s), feature %s.", count, _loaded.enabled and "on" or "off")
 end
@@ -143,8 +144,9 @@ function M.init(opts)
 	if _initialized then error("tap-hold manager already initialised", 2) end
 	if type(opts) ~= "table" then error("tap-hold manager options must be a table", 2) end
 	if type(opts.keyboard_hook) ~= "table" or type(opts.keyboard_hook.set_remapper) ~= "function"
-		or type(opts.keyboard_hook.key_text) ~= "function" then
-		error("tap-hold manager requires a keyboard hook with set_remapper() and key_text()", 2)
+		or type(opts.keyboard_hook.key_text) ~= "function"
+		or type(opts.keyboard_hook.held_modifiers) ~= "function" then
+		error("tap-hold manager requires a keyboard hook with set_remapper(), key_text() and held_modifiers()", 2)
 	end
 	for _, name in ipairs({ "execute_action", "action_names" }) do
 		if type(opts[name]) ~= "function" then error("tap-hold manager requires " .. name, 2) end
