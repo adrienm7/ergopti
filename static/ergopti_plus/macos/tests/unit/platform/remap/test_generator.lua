@@ -164,7 +164,7 @@ helpers.describe("Generator.build_karabiner_json: structural skeleton", function
 		local state = make_state({
 			tap_hold_timeout_ms       = 175,
 			simultaneous_threshold_ms = 80,
-			tap_hold_config = { right_command = { tap = "cmd", hold = "none" } },
+			tap_hold_config = { right_command = { tap = "none", hold = "cmd" } },
 		})
 		local result = Generator.build_karabiner_json(
 			state, {NONE_ACTION, CMD_ACTION}, {RCMD_KEY_DEF}, {}, nil, "/fake/data_dir/"
@@ -279,24 +279,23 @@ helpers.describe("Generator.build_karabiner_json: tap/hold rules", function()
 		helpers.assert_true(found_passthrough, "expected a passthrough rule for none/none slots")
 	end)
 
-	helpers.it("uses to_if_alone for every delayed tap-hold key, including Space and Enter", function()
-		-- Karabiner's to_if_alone contract cancels the tap when another key,
-		-- pointing button, or scroll-wheel event occurs before key-up. Cover the
-		-- complete macOS key catalogue here so this safety never becomes specific
-		-- to modifiers or to one configured action.
+	--- Builds one tap-hold rule per catalogue key with the same two slots.
+	--- @param hold_action table|nil Hold action; nil leaves the hold empty.
+	--- @return table manipulators Key id → its single manipulator.
+	local function tap_hold_matrix(hold_action)
 		local ids = {
 			"escape", "tab", "caps_lock", "left_shift", "fn", "left_control",
 			"left_option", "left_command", "spacebar", "right_command",
 			"right_option", "right_shift", "return_or_enter", "delete_or_backspace",
 		}
-		local matrix_tap_action = {
-			id = "matrix_tap",
-			label = "Matrix tap",
-			karabiner_to = { { key_code = "f18" } },
+		local actions = {
+			NONE_ACTION,
+			{ id = "matrix_tap", label = "Matrix tap", karabiner_to = { { key_code = "f18" } } },
 		}
+		if hold_action then actions[#actions + 1] = hold_action end
 		local config, key_defs = {}, {}
 		for _, id in ipairs(ids) do
-			config[id] = { tap = "matrix_tap", hold = "none" }
+			config[id] = { tap = "matrix_tap", hold = hold_action and hold_action.id or "none" }
 			key_defs[#key_defs + 1] = {
 				id = id,
 				label = "matrix:" .. id,
@@ -306,7 +305,7 @@ helpers.describe("Generator.build_karabiner_json: tap/hold rules", function()
 
 		local result = Generator.build_karabiner_json(
 			make_state({ tap_hold_config = config }),
-			{NONE_ACTION, matrix_tap_action}, key_defs, {}, nil, "/fake/data_dir/"
+			actions, key_defs, {}, nil, "/fake/data_dir/"
 		)
 		local found = {}
 		for _, rule in ipairs(result.profiles[1].complex_modifications.rules) do
@@ -315,13 +314,40 @@ helpers.describe("Generator.build_karabiner_json: tap/hold rules", function()
 			if id then
 				local manip = rule.manipulators and rule.manipulators[1]
 				helpers.assert_true(type(manip) == "table", "missing manipulator for " .. id)
-				helpers.assert_true(type(manip.to_if_alone) == "table" and #manip.to_if_alone > 0,
-					"tap output must stay in to_if_alone for pointer cancellation: " .. id)
-				found[id] = true
+				found[id] = manip
 			end
 		end
 		for _, id in ipairs(ids) do
-			helpers.assert_true(found[id] == true, "missing tap-hold matrix rule for " .. id)
+			helpers.assert_true(found[id] ~= nil, "missing tap-hold matrix rule for " .. id)
+		end
+		return found
+	end
+
+	helpers.it("uses to_if_alone for every delayed tap-hold key, including Space and Enter", function()
+		-- Karabiner's to_if_alone contract cancels the tap when another key,
+		-- pointing button, or scroll-wheel event occurs before key-up. Cover the
+		-- complete macOS key catalogue here so this safety never becomes specific
+		-- to modifiers or to one configured action.
+		for id, manip in pairs(tap_hold_matrix(CMD_ACTION)) do
+			helpers.assert_true(type(manip.to_if_alone) == "table" and #manip.to_if_alone == 1
+				and manip.to_if_alone[1].key_code == "f18",
+				"tap output must stay in to_if_alone for pointer cancellation: " .. id)
+		end
+	end)
+
+	helpers.it("sends the tap of every key with no hold at key down, and only it (tap-only-key-types-its-tap)", function()
+		-- A key with nothing to hold has no tap to wait for: its tap goes out at
+		-- key down and repeats, like the native key. Sending the physical key
+		-- there and the tap at release typed two keys for one tap, and a tap
+		-- left in to_if_alone is lost whenever the next key goes down first.
+		for id, manip in pairs(tap_hold_matrix(nil)) do
+			helpers.assert_nil(manip.to_if_alone, "a key with no hold has no delayed tap: " .. id)
+			local sent = {}
+			for _, event in ipairs(manip.to or {}) do
+				if event.key_code ~= nil then sent[#sent + 1] = event.key_code end
+			end
+			helpers.assert_eq(table.concat(sent, ","), "f18",
+				"a key with no hold must send its tap, and only it, at key down: " .. id)
 		end
 	end)
 
@@ -456,7 +482,7 @@ helpers.describe("Generator.build_karabiner_json: per-key tap/hold timeout overr
 
 	helpers.it("emits per-manipulator basic.to_if_alone_timeout_milliseconds when timeout_ms is set", function()
 		local state = make_state({
-			tap_hold_config = { right_command = { tap = "cmd", hold = "none", timeout_ms = 333 } },
+			tap_hold_config = { right_command = { tap = "none", hold = "cmd", timeout_ms = 333 } },
 		})
 		local result = Generator.build_karabiner_json(
 			state, {NONE_ACTION, CMD_ACTION}, {RCMD_KEY_DEF}, {}, nil, "/fake/data_dir/"
@@ -470,7 +496,7 @@ helpers.describe("Generator.build_karabiner_json: per-key tap/hold timeout overr
 
 	helpers.it("copies the managed default when no per-key timeout is set", function()
 		local state = make_state({
-			tap_hold_config = { right_command = { tap = "cmd", hold = "none" } },
+			tap_hold_config = { right_command = { tap = "none", hold = "cmd" } },
 		})
 		local result = Generator.build_karabiner_json(
 			state, {NONE_ACTION, CMD_ACTION}, {RCMD_KEY_DEF}, {}, nil, "/fake/data_dir/"
@@ -483,7 +509,7 @@ helpers.describe("Generator.build_karabiner_json: per-key tap/hold timeout overr
 
 	helpers.it("treats a non-positive per-key timeout as the managed default", function()
 		local state = make_state({
-			tap_hold_config = { right_command = { tap = "cmd", hold = "none", timeout_ms = 0 } },
+			tap_hold_config = { right_command = { tap = "none", hold = "cmd", timeout_ms = 0 } },
 		})
 		local result = Generator.build_karabiner_json(
 			state, {NONE_ACTION, CMD_ACTION}, {RCMD_KEY_DEF}, {}, nil, "/fake/data_dir/"
@@ -496,7 +522,7 @@ helpers.describe("Generator.build_karabiner_json: per-key tap/hold timeout overr
 	helpers.it("does not emit a profile-global timeout beside a per-key override", function()
 		local state = make_state({
 			tap_hold_timeout_ms = 250,
-			tap_hold_config     = { right_command = { tap = "cmd", hold = "none", timeout_ms = 333 } },
+			tap_hold_config     = { right_command = { tap = "none", hold = "cmd", timeout_ms = 333 } },
 		})
 		local result = Generator.build_karabiner_json(
 			state, {NONE_ACTION, CMD_ACTION}, {RCMD_KEY_DEF}, {}, nil, "/fake/data_dir/"

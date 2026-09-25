@@ -193,4 +193,71 @@ helpers.with_fresh_modules({
 				"expected the fifteen sticky actions of actions.json, found " .. pairs_found)
 		end)
 	end)
+
+
+
+	-- =================================
+	-- ===== 2) Keys with one slot =====
+	-- =================================
+
+	--- Returns the key codes of the key events posted in one phase.
+	--- @param engine table Model engine.
+	--- @param phase string|nil Phase to keep; nil keeps every phase.
+	--- @return table key_codes In posting order.
+	local function keys_posted(engine, phase)
+		local posted = {}
+		for _, emission in ipairs(engine:emissions()) do
+			if emission.key_code ~= nil and (phase == nil or emission.phase == phase) then
+				posted[#posted + 1] = emission.key_code
+			end
+		end
+		return posted
+	end
+
+	helpers.describe("a key with only a tap types it at key down, like the native key (tap-only-key-types-its-tap)", function()
+		helpers.it("every tap-hold key types its tap alone at key down, keeps it down to repeat, and adds nothing on release", function()
+			for _, key_def in ipairs(keys) do
+				local key_code = key_def.from.key_code
+				local rules = build({ [key_def.id] = { tap = "delete_fwd", hold = "none" } })
+				for _, within_timeout in ipairs({ true, false }) do
+					local engine = engine_for(rules)
+					engine:down(key_code)
+					helpers.assert_eq(table.concat(keys_posted(engine), ","), "delete_forward",
+						key_code .. " with no hold must type its tap alone when pressed")
+					helpers.assert_true(engine:held().delete_forward == true,
+						key_code .. " must keep its tap down while held, so it auto-repeats")
+					engine:up(key_code, within_timeout)
+					helpers.assert_eq(table.concat(keys_posted(engine), ","), "delete_forward",
+						key_code .. " must type nothing more on release")
+				end
+			end
+		end)
+
+		helpers.it("every tap-hold key keeps its tap when the next key goes down before its release", function()
+			-- Fast typing overlaps presses. Karabiner drops a pending to_if_alone
+			-- on any later key_down, so a tap typed on release would be lost.
+			for _, key_def in ipairs(keys) do
+				local key_code = key_def.from.key_code
+				local rules = build({ [key_def.id] = { tap = "delete_fwd", hold = "none" } })
+				local engine = engine_for(rules)
+				engine:down(key_code)
+				engine:down("a")
+				engine:up(key_code, true)
+				engine:up("a", true)
+				helpers.assert_eq(table.concat(keys_posted(engine), ","), "delete_forward,a",
+					key_code .. " followed by an overlapping key must type both")
+			end
+		end)
+
+		helpers.it("a key with neither slot stays the native key", function()
+			for _, key_def in ipairs(keys) do
+				local key_code = key_def.from.key_code
+				local rules = build({ [key_def.id] = { tap = "none", hold = "none" } })
+				local engine = engine_for(rules)
+				engine:down(key_code)
+				helpers.assert_eq(table.concat(keys_posted(engine), ","), key_code,
+					key_code .. " with no assignment must go down as itself")
+			end
+		end)
+	end)
 end)
