@@ -189,12 +189,20 @@ _MRS_HelperPersistsBeforeReloading() {
 	Assert(PreparePos > 0 and ReloadPos > PreparePos
 		and InStr(Core, "return false") > PreparePos,
 		"the hand-off core must prepare inert state before ReloadFn and return without Reload on failure")
-	Assert(InStr(Body, "_SuspendHandoffCommitMarker.Bind(Path)") > 0
+	Assert(InStr(Body, "_SuspendHandoffCommitMarker.Bind(Path, Intent)") > 0
 		and InStr(Body, "_SuspendHandoffCancelMarker.Bind(Path)") > 0
 		and InStr(CommitWrapper,
 			"_ReloadTerminalHandoffCommitNonCritical(Record)") > 0
 		and InStr(Commit, "CommitFn.Call()") > 0,
 		"only the terminal OnExit commit may promote pending pause intent")
+	; A refusal after that commit retracts exactly the marker this reload
+	; published: prepare, commit and retract share one per-reload intent
+	; (reload-refusal-retracts-marker).
+	Assert(InStr(Body, "Intent := A_IsSuspended ? _SuspendHandoffNewIntent()") > 0
+		and InStr(Body, "_SuspendHandoffPrepareMarker(MarkerPath, Intent)") > 0
+		and InStr(Body, "_SuspendHandoffRetractMarker.Bind(Path, Intent)") > 0
+		and InStr(Body, "ReleaseFn, RetractFn)") > 0,
+		"the reload must hand the terminal record a retraction bound to the intent it prepares and commits")
 	Assert(InStr(MarkerPath, "_PathsFile") > 0
 		and InStr(MarkerPath, "ConfigurationFile") == 0,
 		"the marker must follow the stable paths.toml locator across config relocation")

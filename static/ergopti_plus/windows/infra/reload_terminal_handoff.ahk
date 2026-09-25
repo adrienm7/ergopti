@@ -39,11 +39,11 @@ global _ReloadTerminalHandoff := false
 global _ReloadTerminalHandoffNextId := 0
 
 ReloadTerminalHandoffPrepare(Bundle, SuccessFn := 0, CommitFn := 0,
-		AbortFn := 0, RefusedFn := 0, ReleaseFn := 0) {
+		AbortFn := 0, RefusedFn := 0, ReleaseFn := 0, RetractFn := 0) {
 	global _ReloadTerminalHandoff, _ReloadTerminalHandoffNextId
 	if !(Bundle is Object)
 		return false
-	for Callback in [SuccessFn, CommitFn, AbortFn, RefusedFn, ReleaseFn] {
+	for Callback in [SuccessFn, CommitFn, AbortFn, RefusedFn, ReleaseFn, RetractFn] {
 		if !((Callback is Integer) && Callback == 0)
 				&& !HasMethod(Callback, "Call")
 			return false
@@ -63,6 +63,7 @@ ReloadTerminalHandoffPrepare(Bundle, SuccessFn := 0, CommitFn := 0,
 			"abort", AbortFn,
 			"refused", RefusedFn,
 			"release", ReleaseFn,
+			"retract", RetractFn,
 			"port", 0,
 			"successor", 0,
 			"launch_tick", 0,
@@ -277,29 +278,30 @@ _ReloadTerminalHandoffRunAbort(Record) {
 ; Launches the successor and leaves the record pending. True means the reload
 ; is under way: the caller must neither release nor roll back Bundle, because
 ; durable commit, teardown and SuccessFn run later from OnExit. A refusal after
-; this point reaches RefusedFn(Reason) and then ReleaseFn. False means no
-; successor was launched and the caller still owns Bundle.
+; this point reaches RefusedFn(Reason) and then ReleaseFn; one that follows the
+; terminal commit first runs RetractFn, which withdraws what CommitFn published.
+; False means no successor was launched and the caller still owns Bundle.
 ;
 ; Port is a Map of the OS seams: alive(Successor) -> Boolean,
 ; terminate(Successor) -> Boolean, close(Successor), arm(Callback, DelayMs) for
 ; one-shot timers, and now() -> tick count. LaunchFn returns the successor, a
 ; Map holding at least its positive "pid".
 ReloadTerminalInvoke(Bundle, SuccessFn, LaunchFn, Port, CommitFn := 0,
-		AbortFn := 0, RefusedFn := 0, ReleaseFn := 0) {
+		AbortFn := 0, RefusedFn := 0, ReleaseFn := 0, RetractFn := 0) {
 	PreviousCritical := Critical("Off")
 	try return _ReloadTerminalInvokeNonCritical(Bundle, SuccessFn, LaunchFn,
-		Port, CommitFn, AbortFn, RefusedFn, ReleaseFn)
+		Port, CommitFn, AbortFn, RefusedFn, ReleaseFn, RetractFn)
 	finally Critical(PreviousCritical)
 }
 
 _ReloadTerminalInvokeNonCritical(Bundle, SuccessFn, LaunchFn, Port, CommitFn,
-		AbortFn, RefusedFn, ReleaseFn) {
+		AbortFn, RefusedFn, ReleaseFn, RetractFn) {
 	global _ReloadTerminalHandoff
 	if !HasMethod(LaunchFn, "Call")
 		throw TypeError("Reload terminal hand-off requires a successor launcher.")
 	_ReloadTerminalRequirePort(Port)
 	Record := ReloadTerminalHandoffPrepare(Bundle, SuccessFn, CommitFn, AbortFn,
-		RefusedFn, ReleaseFn)
+		RefusedFn, ReleaseFn, RetractFn)
 	if !(Record is Map)
 		return false
 	Record["port"] := Port
@@ -402,9 +404,13 @@ _ReloadTerminalHandoffWatch(Record, *) {
 
 ; Withdraws a launched reload. The successor is stopped first, while this code
 ; still runs before any rollback, so no close request of its own can race the
-; rollback. Durable pause intent is retracted here; the caller's RefusedFn and
-; the bundle release run on the next thread because a refusal can surface
-; inside OnExit, which must not block on caller UI.
+; rollback. Pause intent is withdrawn here: AbortFn removes what was only
+; prepared, and once the terminal commit may have published the live marker
+; (a later OnExit gate vetoed: the updater's FinalExit, swap or recovery
+; gates), RetractFn removes that marker too, or the next start would re-pause
+; a driver whose reload never happened. The caller's RefusedFn and the bundle
+; release run on the next thread because a refusal can surface inside OnExit,
+; which must not block on caller UI.
 ReloadTerminalHandoffRefuse(Record, Reason) {
 	PreviousCritical := Critical("Off")
 	try return _ReloadTerminalHandoffRefuseNonCritical(Record, Reason)
@@ -426,6 +432,8 @@ _ReloadTerminalHandoffRefuseNonCritical(Record, Reason) {
 	} finally Critical(PreviousCritical)
 	StopOk := _ReloadTerminalHandoffStopSuccessor(Record)
 	AbortOk := _ReloadTerminalHandoffRunAbort(Record)
+	RetractOk := (State == "committed" || State == "commit_failed")
+		? _ReloadTerminalHandoffRunRetract(Record) : true
 	RearmOk := false
 	PreviousCritical := Critical("On")
 	try {
@@ -445,7 +453,25 @@ _ReloadTerminalHandoffRefuseNonCritical(Record, Reason) {
 			Err.Message)
 		Deliver.Call()
 	}
-	return StopOk && AbortOk && RearmOk
+	return StopOk && AbortOk && RetractOk && RearmOk
+}
+
+; Runs RetractFn after a refusal that followed the terminal commit.
+_ReloadTerminalHandoffRunRetract(Record) {
+	RetractFn := Record["retract"]
+	if !HasMethod(RetractFn, "Call")
+		return true
+	try {
+		RetractResult := RetractFn.Call()
+		Retracted := (RetractResult is Integer) && RetractResult == 1
+	} catch as Err {
+		Retracted := false
+		try LoggerError("Lifecycle", "Reload retraction raised: {1}.", Err.Message)
+	}
+	if !Retracted
+		try LoggerError("Lifecycle",
+			"The pause intent published for the refused reload could not be retracted; the next start restores the pause.")
+	return Retracted
 }
 
 _ReloadTerminalHandoffDeliverRefusal(Record, Reason, *) {

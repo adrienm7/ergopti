@@ -36,20 +36,23 @@ SuspendHandoffMarkerPath(PathsFile, Filename := "suspend_restore.marker") {
 	return Dir . "\" . Filename
 }
 
-SuspendHandoffPrepare(Path, WriteFn, ReadFn, MoveFn, DeleteFn) {
+; @param Content {String} The intent written, "1" unless the publisher needs
+;        to recognise its own marker later (see SuspendHandoffRetract).
+SuspendHandoffPrepare(Path, WriteFn, ReadFn, MoveFn, DeleteFn, Content := "1") {
 	if !(HasMethod(WriteFn, "Call") and HasMethod(ReadFn, "Call")
 			and HasMethod(MoveFn, "Call") and HasMethod(DeleteFn, "Call"))
 		throw TypeError("Suspend hand-off preparation requires filesystem callbacks.")
+	_SuspendHandoffRequireContent(Content)
 	if !(Path is String) or Path == ""
 		return false
 	PendingPath := Path . ".pending"
 	StagePath := PendingPath . ".stage"
 	Prepared := false
 	try {
-		if !WriteFn.Call(StagePath, "1")
+		if !WriteFn.Call(StagePath, Content)
 			return false
-		Content := ReadFn.Call(StagePath)
-		if !(Content is String) or Content != "1"
+		Staged := ReadFn.Call(StagePath)
+		if !(Staged is String) or Staged != Content
 			return false
 		if !MoveFn.Call(StagePath, PendingPath)
 			return false
@@ -61,16 +64,46 @@ SuspendHandoffPrepare(Path, WriteFn, ReadFn, MoveFn, DeleteFn) {
 	}
 }
 
-SuspendHandoffCommit(Path, ReadFn, MoveFn) {
+; Publishes the prepared intent, which must still hold Content.
+SuspendHandoffCommit(Path, ReadFn, MoveFn, Content := "1") {
 	if !HasMethod(ReadFn, "Call") or !HasMethod(MoveFn, "Call")
 		throw TypeError("Suspend hand-off commit requires read and move callbacks.")
+	_SuspendHandoffRequireContent(Content)
 	if !(Path is String) or Path == ""
 		return false
 	PendingPath := Path . ".pending"
-	Content := ReadFn.Call(PendingPath)
-	if !(Content is String) or Content != "1"
+	Pending := ReadFn.Call(PendingPath)
+	if !(Pending is String) or Pending != Content
 		return false
 	return MoveFn.Call(PendingPath, Path) ? true : false
+}
+
+; Withdraws the live marker a transition published, when that transition is
+; refused after its commit (a Reload vetoed by a later OnExit gate). Only a
+; marker still holding Content is deleted: another transition's intent is not
+; this refusal's to revoke. The one consumer, the successor's boot, is stopped
+; before a refused Reload retracts, so nothing claims the marker in between.
+; @return {Boolean} True when no marker holding Content remains.
+SuspendHandoffRetract(Path, Content, ExistsFn, ReadFn, DeleteFn) {
+	if !(HasMethod(ExistsFn, "Call") and HasMethod(ReadFn, "Call")
+			and HasMethod(DeleteFn, "Call"))
+		throw TypeError("Suspend hand-off retraction requires filesystem callbacks.")
+	_SuspendHandoffRequireContent(Content)
+	if !(Path is String) or Path == ""
+		return true
+	if !ExistsFn.Call(Path)
+		return true
+	Live := ReadFn.Call(Path)
+	if !(Live is String)
+		return false
+	if (Live != Content)
+		return true
+	return DeleteFn.Call(Path) ? true : false
+}
+
+_SuspendHandoffRequireContent(Content) {
+	if !(Content is String) or Content == ""
+		throw ValueError("Suspend hand-off intent must be a non-empty string.")
 }
 
 ; Idempotently removes only inert preparation artifacts. It never deletes the

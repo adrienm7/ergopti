@@ -89,9 +89,9 @@ _RTP_LaunchRaises(*) {
 ; Launches a fake successor through the real hand-off and returns the pending
 ; record, as every production caller reaches it.
 _RTP_Pending(Bundle, Port, SuccessFn := 0, CommitFn := 0, AbortFn := 0,
-		RefusedFn := 0, ReleaseFn := 0) {
+		RefusedFn := 0, ReleaseFn := 0, RetractFn := 0) {
 	AssertTrue(ReloadTerminalInvoke(Bundle, SuccessFn, _RTP_LaunchReturnsAtOnce,
-		Port, CommitFn, AbortFn, RefusedFn, ReleaseFn),
+		Port, CommitFn, AbortFn, RefusedFn, ReleaseFn, RetractFn),
 		"a launched successor is a pending success, not a refusal")
 	Record := ReloadTerminalHandoffPending()
 	AssertTrue(Record is Map, "the launched reload must stay pending")
@@ -246,9 +246,13 @@ _RTP_SuccessorExitRefusesTheReload() {
 Test("reload terminal: a successor that exits before asking refuses "
 	. "(reload-successor-exit)", _RTP_SuccessorExitRefusesTheReload)
 
+; A veto after the terminal commit (the updater's FinalExit, swap and recovery
+; gates run later in OnExit) also retracts the pause intent that commit
+; published, or the next start re-pauses a driver whose reload never happened
+; (reload-refusal-retracts-marker).
 _RTP_OnExitVetoStopsTheWaitingSuccessor() {
 	global _RTP_Events
-	for Stage in ["pending", "claimed", "commit_failed"] {
+	for Stage in ["pending", "claimed", "committed", "commit_failed"] {
 		_RTP_Events := []
 		Bundle := _RTP_Acquire("veto-" . Stage)
 		Port := _RTP_NewPort()
@@ -256,10 +260,12 @@ _RTP_OnExitVetoStopsTheWaitingSuccessor() {
 			_RTP_Pending(Bundle, Port, _RTP_Record.Bind("success"),
 				_RTP_Record.Bind("commit", Stage == "commit_failed" ? 0 : 1),
 				_RTP_Record.Bind("abort"), _RTP_Record.Bind("refused"),
-				_RTP_Record.Bind("release"))
+				_RTP_Record.Bind("release"), _RTP_Record.Bind("retract"))
 			if (Stage != "pending") {
 				Claimed := ReloadTerminalHandoffClaim("Reload")
 				AssertTrue(Claimed is Map)
+				if (Stage == "committed")
+					AssertTrue(ReloadTerminalHandoffCommit(Claimed))
 				if (Stage == "commit_failed")
 					AssertFalse(ReloadTerminalHandoffCommit(Claimed))
 			}
@@ -270,11 +276,11 @@ _RTP_OnExitVetoStopsTheWaitingSuccessor() {
 			AssertEqual(1, Port["probe"]["terminated"],
 				Stage . ": the successor waiting on this window must be stopped")
 			_RTP_RunArmed(Port)
-			Expected := Stage == "commit_failed"
-				? "launch,commit,abort,refused,release"
+			Expected := (Stage == "committed" || Stage == "commit_failed")
+				? "launch,commit,abort,retract,refused,release"
 				: "launch,abort,refused,release"
 			AssertEqual(Expected, _RTP_Join(_RTP_Events),
-				Stage . ": a veto never reports success and hands the bundle back")
+				Stage . ": a veto never reports success, retracts only what the commit may have published, and hands the bundle back")
 			AssertFalse(ReloadTerminalHandoffPending())
 		} finally _RTP_Cleanup(Bundle)
 	}

@@ -218,17 +218,21 @@ _ReloadPreservingSuspendNonCritical(SuccessFn, ExistingBundle, RefusedFn) {
 			return false
 		}
 		Path := A_IsSuspended ? _SuspendMarkerPath() : ""
+		; The intent names this reload, so a refusal after the terminal commit
+		; retracts the marker it published and never another transition's.
+		Intent := A_IsSuspended ? _SuspendHandoffNewIntent() : ""
 		ReadyFn := _SuspendHandoffBeforeReload.Bind(Path)
-		CommitFn := A_IsSuspended ? _SuspendHandoffCommitMarker.Bind(Path) : 0
+		CommitFn := A_IsSuspended ? _SuspendHandoffCommitMarker.Bind(Path, Intent) : 0
 		AbortFn := A_IsSuspended ? _SuspendHandoffCancelMarker.Bind(Path) : 0
+		RetractFn := A_IsSuspended ? _SuspendHandoffRetractMarker.Bind(Path, Intent) : 0
 		; A bundle this call acquired belongs to the pending reload once the
 		; successor launched; a refusal releases it after the caller's callback.
 		ReleaseFn := OwnBundle ? _ConfigWriteTerminalRelease.Bind(OwnerBundle) : 0
 		ReloadFn := ReloadTerminalInvoke.Bind(OwnerBundle, SuccessFn,
 			LifecycleLaunchSuccessor, ReloadSuccessorPort(), CommitFn, AbortFn,
-			_ReloadPreservingSuspendRefused.Bind(RefusedFn), ReleaseFn)
+			_ReloadPreservingSuspendRefused.Bind(RefusedFn), ReleaseFn, RetractFn)
 		Launched := SuspendHandoffReload(A_IsSuspended, Path,
-			_SuspendHandoffPrepareMarker, ReloadFn,
+			(MarkerPath) => _SuspendHandoffPrepareMarker(MarkerPath, Intent), ReloadFn,
 				ReadyFn, _SuspendHandoffFailure, _SuspendHandoffCancelMarker)
 		return Launched
 	} finally {
@@ -266,13 +270,25 @@ _SuspendHandoffBeforeReload(Path) {
 				try LoggerInfo("Lifecycle", "Reloading while suspended — inert pause intent prepared for '{1}'.", Path)
 }
 
-_SuspendHandoffPrepareMarker(Path) {
+_SuspendHandoffPrepareMarker(Path, Intent := "1") {
 	return SuspendHandoffPrepare(Path, FSWriteDurable, FSRead,
-		FSAtomicMoveReplace, FSDeleteStrict)
+		FSAtomicMoveReplace, FSDeleteStrict, Intent)
 }
 
-_SuspendHandoffCommitMarker(Path) {
-	return SuspendHandoffCommit(Path, FSRead, FSAtomicMoveReplace)
+_SuspendHandoffCommitMarker(Path, Intent := "1") {
+	return SuspendHandoffCommit(Path, FSRead, FSAtomicMoveReplace, Intent)
+}
+
+_SuspendHandoffRetractMarker(Path, Intent) {
+	return SuspendHandoffRetract(Path, Intent, FSStrictExists, FSRead, FSDeleteStrict)
+}
+
+; Pause intent unique to one reload of this process: the leading "1" is the
+; intent, the rest tells this reload's marker from any other.
+_SuspendHandoffNewIntent() {
+	static Serial := 0
+	Serial += 1
+	return Format("1 {1}-{2}-{3}", ProcessExist(), A_TickCount, Serial)
 }
 
 _SuspendHandoffCancelMarker(Path) {
