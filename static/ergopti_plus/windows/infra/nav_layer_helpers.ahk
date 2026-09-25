@@ -87,8 +87,11 @@ _TapHoldLayerIsSuspended() {
 ; Own one hold-layer gesture from the physical key-down through release.  The
 ; layer is published before the first interruptible wait, so a second key that
 ; arrives immediately is routed by the layer.  A quick isolated release is
-; reported as a tap only after DisableLayer has run.
-TapHoldOwnImmediateLayer(KeyName, TapThresholdSec, WaitReleaseFn := 0,
+; reported as a tap only after DisableLayer has run.  The press stays claimed
+; (TapHoldPressIsOwned) for the whole gesture, so its auto-repeat is swallowed.
+; @param KeyId {String} Canonical tap-hold key id of the layer key.
+; @param KeyName {String} Key name the release wait watches.
+TapHoldOwnImmediateLayer(KeyId, KeyName, TapThresholdSec, WaitReleaseFn := 0,
 	KeyIsDownFn := 0, TickNowFn := 0, ActivateFn := 0, DisableFn := 0,
 	IsSuspendedFn := 0) {
 	if !IsObject(WaitReleaseFn)
@@ -104,37 +107,42 @@ TapHoldOwnImmediateLayer(KeyName, TapThresholdSec, WaitReleaseFn := 0,
 	if !IsObject(IsSuspendedFn)
 		IsSuspendedFn := _TapHoldLayerIsSuspended
 
-	StartedAt := TickNowFn.Call()
-	if !ActivateFn.Call()
-		return Map("activated", false, "tap", false, "elapsed_ms", 0)
-
-	Released := false
+	_TapHoldClaimPress(KeyId)
 	try {
-		loop {
-			if IsSuspendedFn.Call()
-				break
-			if WaitReleaseFn.Call(KeyName, STUCK_MODIFIER_RELEASE_TIMEOUT_SEC) {
-				Released := true
-				break
-			}
-			if IsSuspendedFn.Call()
-				break
-			if !KeyIsDownFn.Call(KeyName) {
-				Released := true
-				break
-			}
-		}
-	} finally {
-		DisableFn.Call()
-	}
+		StartedAt := TickNowFn.Call()
+		if !ActivateFn.Call()
+			return Map("activated", false, "tap", false, "elapsed_ms", 0)
 
-	ElapsedMs := TickElapsed(StartedAt, TickNowFn.Call())
-	Suspended := IsSuspendedFn.Call()
-	return Map(
-		"activated", true,
-		"tap", Released and !Suspended
-			and ElapsedMs <= TapThresholdSec * 1000,
-		"elapsed_ms", ElapsedMs)
+		Released := false
+		try {
+			loop {
+				if IsSuspendedFn.Call()
+					break
+				if WaitReleaseFn.Call(KeyName, STUCK_MODIFIER_RELEASE_TIMEOUT_SEC) {
+					Released := true
+					break
+				}
+				if IsSuspendedFn.Call()
+					break
+				if !KeyIsDownFn.Call(KeyName) {
+					Released := true
+					break
+				}
+			}
+		} finally {
+			DisableFn.Call()
+		}
+
+		ElapsedMs := TickElapsed(StartedAt, TickNowFn.Call())
+		Suspended := IsSuspendedFn.Call()
+		return Map(
+			"activated", true,
+			"tap", Released and !Suspended
+				and ElapsedMs <= TapThresholdSec * 1000,
+			"elapsed_ms", ElapsedMs)
+	} finally {
+		_TapHoldEndPressClaim(KeyId)
+	}
 }
 
 ResetNumberOfRepetitions() {

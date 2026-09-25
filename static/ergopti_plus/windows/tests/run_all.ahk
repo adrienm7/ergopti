@@ -843,6 +843,7 @@ global _AhkSubDir := ""
 ; registry reader plus the keylogger-walker and tap-hold reassign-at-boot loaders.
 #Include ../platform/remap/constants.ahk
 #Include unit/test_tap_hold_activity_cancel.ahk
+#Include unit/test_tap_hold_owned_press.ahk
 #Include unit/test_tap_hold_prior_key.ahk
 #Include unit/test_tap_hold_tap_keeps_held_modifiers.ahk
 #Include unit/test_timings_config.ahk

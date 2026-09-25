@@ -43,7 +43,7 @@ _EnterHoldModKey() {
 ; ==========================================
 
 #HotIf TapHoldHoldModifier(TapHold, "enter") != "" and not LayerEnabled
-*$SC01C:: {
+$SC01C:: {
 	Result := TapHoldOwnImmediateModifier("enter", "Enter",
 		_EnterHoldModKey(), TapHoldDuration(TapHold, "enter"))
 	if (Result["tap"] and TapHoldPriorKeyIsSelf("enter"))
@@ -64,8 +64,8 @@ _EnterHoldModKey() {
 ; =======================================
 
 #HotIf TapHoldHoldLayer(TapHold, "enter") != "" and TapHoldHoldModifier(TapHold, "enter") == "" and not LayerEnabled
-*$SC01C:: {
-	Result := TapHoldOwnImmediateLayer("Enter", TapHoldDuration(TapHold, "enter"))
+$SC01C:: {
+	Result := TapHoldOwnImmediateLayer("enter", "Enter", TapHoldDuration(TapHold, "enter"))
 	if (Result["tap"] and TapHoldPriorKeyIsSelf("enter"))
 		_EnterDispatch()
 }
@@ -77,9 +77,29 @@ _EnterHoldModKey() {
 
 
 
+; ====================================
+; ====================================
+; ======= 9.3) Own auto-repeat =======
+; ====================================
+; ====================================
+
+; The hold variants fire only with no modifier held, so the key stays itself
+; under a held modifier, as on every driver. Its own auto-repeat arrives under
+; the modifier or layer the hold owns and matches none of them: swallow it for
+; as long as the owner resolves the press (see TapHoldPressIsOwned).
+#HotIf TapHoldPressIsOwned("enter")
+*SC01C:: return
+#HotIf
+
+
+
+
+
+
+
 ; =========================================================
 ; =========================================================
-; ======= 9.3) Tap-only (hold=none, tap action set) =======
+; ======= 9.4) Tap-only (hold=none, tap action set) =======
 ; =========================================================
 ; =========================================================
 
@@ -97,7 +117,7 @@ $SC01C:: _EnterDispatch()
 
 ; =================================
 ; =================================
-; ======= 9.4) Tap dispatch =======
+; ======= 9.5) Tap dispatch =======
 ; =================================
 ; =================================
 

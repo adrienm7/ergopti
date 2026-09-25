@@ -58,14 +58,6 @@ SC03A:: {
 SC038:: TapHoldSyntheticKeyUp("LAlt") ; Necessary to do this, otherwise multicursor trigger in VSCode when scrolling in the layer and then leaving it
 #HotIf
 
-; Fix when Space triggers the layer
-#HotIf (
-		TapHoldHoldLayer(TapHold, "space") == "nav"
-		and LayerEnabled
-)
-SC039:: return ; Necessary to do this, otherwise Space keeps being sent while it is held to get the layer
-#HotIf
-
 #HotIf LayerEnabled
 ; The base layer will become this one when the navigation layer variable is set to True
 

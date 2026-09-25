@@ -47,7 +47,7 @@ _DeleteHoldModKey() {
 ; ===========================================
 
 #HotIf TapHoldHoldModifier(TapHold, "delete") != "" and not LayerEnabled
-*$SC153:: {
+$SC153:: {
 	Result := TapHoldOwnImmediateModifier("delete", "Delete",
 		_DeleteHoldModKey(), TapHoldDuration(TapHold, "delete"))
 	if (Result["tap"] and TapHoldPriorKeyIsSelf("delete"))
@@ -68,8 +68,8 @@ _DeleteHoldModKey() {
 ; ========================================
 
 #HotIf TapHoldHoldLayer(TapHold, "delete") != "" and TapHoldHoldModifier(TapHold, "delete") == "" and not LayerEnabled
-*$SC153:: {
-	Result := TapHoldOwnImmediateLayer("Delete", TapHoldDuration(TapHold, "delete"))
+$SC153:: {
+	Result := TapHoldOwnImmediateLayer("delete", "Delete", TapHoldDuration(TapHold, "delete"))
 	if (Result["tap"] and TapHoldPriorKeyIsSelf("delete"))
 		_DeleteDispatch()
 }
@@ -81,9 +81,29 @@ _DeleteHoldModKey() {
 
 
 
+; =====================================
+; =====================================
+; ======= 13.3) Own auto-repeat =======
+; =====================================
+; =====================================
+
+; The hold variants fire only with no modifier held, so the key stays itself
+; under a held modifier, as on every driver. Its own auto-repeat arrives under
+; the modifier or layer the hold owns and matches none of them: swallow it for
+; as long as the owner resolves the press (see TapHoldPressIsOwned).
+#HotIf TapHoldPressIsOwned("delete")
+*SC153:: return
+#HotIf
+
+
+
+
+
+
+
 ; ==============================================================================
 ; ==============================================================================
-; ======= 13.3) Tap-only (tap action set to something other than delete) =======
+; ======= 13.4) Tap-only (tap action set to something other than delete) =======
 ; ==============================================================================
 ; ==============================================================================
 
@@ -102,7 +122,7 @@ $SC153:: _DeleteDispatch()
 
 ; ==================================
 ; ==================================
-; ======= 13.4) Tap dispatch =======
+; ======= 13.5) Tap dispatch =======
 ; ==================================
 ; ==================================
 

@@ -97,6 +97,15 @@ global _TH_SyntheticHeldKeys := Map()
 ; from active reference counts. Lifecycle cleanup retries this ledger instead
 ; of forgetting an OS-level modifier that may still be logically down.
 global _TH_SyntheticReleasePendingKeys := Map()
+; Tap-hold key id -> number of owners (TapHoldOwnImmediateModifier or
+; TapHoldOwnImmediateLayer) resolving that key's physical press right now.
+; Tab, Space, Enter, Escape, Backspace and Delete fire their tap-hold only with
+; no modifier held, so their hotkeys carry no * wildcard; their own auto-repeat,
+; arriving under the modifier the owner holds, then matched no hotkey and
+; reached the application as that chord (Enter held as Ctrl typed Ctrl+Enter
+; repeatedly, measured with AutoHotkey 2.0.26). Each key's repeat swallower is
+; gated on TapHoldPressIsOwned.
+global _TH_OwnedPresses := Map()
 global _TH_TapHoldVkToKeyId := Map(
 	0x1B, "escape",
 	0x09, "tab",
@@ -325,10 +334,41 @@ _TapHoldReleaseOwnedModifier(ModKey) {
 	return TapHoldSyntheticKeyUp(ModKey)
 }
 
+; Whether a tap-hold owner is resolving KeyId's physical press: the key's
+; auto-repeat then belongs to that owner, never to the application.
+; @param KeyId {String} Canonical tap-hold key id.
+; @return {Boolean}
+TapHoldPressIsOwned(KeyId) {
+	global _TH_OwnedPresses
+	; Called from #HotIf criteria, which are live before this file's globals are
+	; assigned (a key pressed during the boot pump evaluates them).
+	return IsSet(_TH_OwnedPresses) and _TH_OwnedPresses.Has(KeyId)
+}
+
+; Claim KeyId's physical press for one owner, before its first wait.
+_TapHoldClaimPress(KeyId) {
+	global _TH_OwnedPresses
+	_TH_OwnedPresses[KeyId] := _TH_OwnedPresses.Get(KeyId, 0) + 1
+}
+
+; End one owner's claim on KeyId's press. Claims are paired by try/finally, so
+; a missing one is a broken invariant, not a condition to paper over.
+_TapHoldEndPressClaim(KeyId) {
+	global _TH_OwnedPresses
+	if !_TH_OwnedPresses.Has(KeyId)
+		throw Error("Ending a tap-hold press claim that was never made.", -1, KeyId)
+	Count := _TH_OwnedPresses[KeyId] - 1
+	if (Count > 0)
+		_TH_OwnedPresses[KeyId] := Count
+	else
+		_TH_OwnedPresses.Delete(KeyId)
+}
+
 ; Own one configured synthetic-modifier gesture from physical key-down through
 ; release. The Down is published before the first interruptible wait, so the
 ; first chord belongs to the hold. Activity cancels only the eventual tap; it
-; never retracts a hold after that hold has already owned an input event.
+; never retracts a hold after that hold has already owned an input event. The
+; press stays claimed (TapHoldPressIsOwned) for the whole gesture.
 TapHoldOwnImmediateModifier(KeyId, KeyName, ModKey, TapThresholdSec,
 	WaitReleaseFn := 0, KeyIsDownFn := 0, TickNowFn := 0,
 	KeyDownFn := 0, KeyUpFn := 0, CancelTapFn := 0,
@@ -348,58 +388,63 @@ TapHoldOwnImmediateModifier(KeyId, KeyName, ModKey, TapThresholdSec,
 	if !IsObject(IsSuspendedFn)
 		IsSuspendedFn := _TapHoldModifierIsSuspended
 
-	StartedAt := TickNowFn.Call()
-	if !PhysicalModifierPassthrough {
-		if !KeyDownFn.Call(ModKey) {
-			return Map("activated", false, "released", false,
-				"tap", false, "elapsed_ms", 0)
-		}
-	}
-
-	Released := false
-	ReleaseProved := false
+	_TapHoldClaimPress(KeyId)
 	try {
-		loop {
-			if IsSuspendedFn.Call()
-				break
-			if WaitReleaseFn.Call(KeyName, STUCK_MODIFIER_RELEASE_TIMEOUT_SEC) {
-				Released := true
-				break
-			}
-			if IsSuspendedFn.Call()
-				break
-			if !KeyIsDownFn.Call(KeyName) {
-				Released := true
-				break
+		StartedAt := TickNowFn.Call()
+		if !PhysicalModifierPassthrough {
+			if !KeyDownFn.Call(ModKey) {
+				return Map("activated", false, "released", false,
+					"tap", false, "elapsed_ms", 0)
 			}
 		}
-	} finally {
-		; A native modifier selected on its own physical key is already Down
-		; before a ~ hotkey thread starts and its physical Up ends KeyWait. A
-		; second synthetic Down would race the following key's hotkey admission.
-		ReleaseProved := PhysicalModifierPassthrough ? true : KeyUpFn.Call(ModKey)
-	}
 
-	ElapsedMs := TickElapsed(StartedAt, TickNowFn.Call())
-	GuardMs := TapThresholdSec * 1100
-	if (GuardMs < 250)
-		GuardMs := 250
-	Suspended := IsSuspendedFn.Call()
-	CancelReason := ""
-	if (Released and ReleaseProved and !Suspended and !A_IsSuspended)
-		CancelReason := CancelTapFn.Call(KeyId, GuardMs)
-	TapAllowed := Released and ReleaseProved and !Suspended and !A_IsSuspended
-		and ElapsedMs <= TapThresholdSec * 1000 and CancelReason == ""
-	if LoggerIsDebugEnabled() {
-		LoggerDebug("TapHoldModifier", "Ownership complete for key='{1}', modifier='{2}', source={3}, released={4}, elapsed_ms={5}, tap={6}.",
-			KeyId, _TH_SyntheticKeyLabel(ModKey), PhysicalModifierPassthrough ? "physical_passthrough" : "synthetic",
-			Released ? "true" : "false", ElapsedMs, TapAllowed ? "true" : "false")
+		Released := false
+		ReleaseProved := false
+		try {
+			loop {
+				if IsSuspendedFn.Call()
+					break
+				if WaitReleaseFn.Call(KeyName, STUCK_MODIFIER_RELEASE_TIMEOUT_SEC) {
+					Released := true
+					break
+				}
+				if IsSuspendedFn.Call()
+					break
+				if !KeyIsDownFn.Call(KeyName) {
+					Released := true
+					break
+				}
+			}
+		} finally {
+			; A native modifier selected on its own physical key is already Down
+			; before a ~ hotkey thread starts and its physical Up ends KeyWait. A
+			; second synthetic Down would race the following key's hotkey admission.
+			ReleaseProved := PhysicalModifierPassthrough ? true : KeyUpFn.Call(ModKey)
+		}
+
+		ElapsedMs := TickElapsed(StartedAt, TickNowFn.Call())
+		GuardMs := TapThresholdSec * 1100
+		if (GuardMs < 250)
+			GuardMs := 250
+		Suspended := IsSuspendedFn.Call()
+		CancelReason := ""
+		if (Released and ReleaseProved and !Suspended and !A_IsSuspended)
+			CancelReason := CancelTapFn.Call(KeyId, GuardMs)
+		TapAllowed := Released and ReleaseProved and !Suspended and !A_IsSuspended
+			and ElapsedMs <= TapThresholdSec * 1000 and CancelReason == ""
+		if LoggerIsDebugEnabled() {
+			LoggerDebug("TapHoldModifier", "Ownership complete for key='{1}', modifier='{2}', source={3}, released={4}, elapsed_ms={5}, tap={6}.",
+				KeyId, _TH_SyntheticKeyLabel(ModKey), PhysicalModifierPassthrough ? "physical_passthrough" : "synthetic",
+				Released ? "true" : "false", ElapsedMs, TapAllowed ? "true" : "false")
+		}
+		return Map(
+			"activated", true,
+			"released", ReleaseProved,
+			"tap", TapAllowed,
+			"elapsed_ms", ElapsedMs)
+	} finally {
+		_TapHoldEndPressClaim(KeyId)
 	}
-	return Map(
-		"activated", true,
-		"released", ReleaseProved,
-		"tap", TapAllowed,
-		"elapsed_ms", ElapsedMs)
 }
 
 ; Flatten a hold-modifier value into the list of individual key names it holds.
