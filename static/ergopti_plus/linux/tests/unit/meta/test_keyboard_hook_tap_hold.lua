@@ -140,6 +140,64 @@ helpers.describe("keyboard hook + tap-hold engine", function()
 
 end)
 
+-- Ctrl+Backspace deletes a word and Alt+Backspace undoes in some
+-- applications, but the hook reported both as a bare "backspace": the daemon
+-- then undid the last expansion over a word that was already gone, or edited
+-- its buffer by one character. The modifiers travel with every control key
+-- (modified-backspace-2026-09-25).
+helpers.describe("keyboard hook: the modifiers held with a control key", function()
+
+	local EvdevCodes = require("infra.evdev_codes")
+	local SHORTCUT_MODIFIERS = { ctrl = 29, alt = 56, meta = 125 }
+
+	--- Drives `events` through a fresh hook and returns every onKey call.
+	local function control_keys(events)
+		local kh = helpers.load_module("adapters.keyboard_hook")
+		local keys = {}
+		local stream = {}
+		for index, pair in ipairs(events) do stream[index] = { type = EV_KEY, code = pair[1], value = pair[2] } end
+		kh._test_drive(stream, {
+			captureEvent = function() return nil, nil, nil end,
+			onEmitRaw = function() return true end,
+			onChar = function() end,
+			onKey = function(name, detail) keys[#keys + 1] = { name = name, detail = detail } end,
+		}, true)
+		return keys
+	end
+
+	helpers.it("names the shortcut modifier held with every control key (modified-backspace)", function()
+		for code, name in pairs(EvdevCodes.CONTROL_NAME_OF) do
+			for role, modifier in pairs(SHORTCUT_MODIFIERS) do
+				local keys = control_keys({ { modifier, 1 }, { code, 1 }, { code, 0 }, { modifier, 0 } })
+				helpers.assert_eq(#keys, 1, role .. "+" .. name .. " reaches the control callback once")
+				helpers.assert_eq(keys[1].name, name)
+				local mods = type(keys[1].detail) == "table" and keys[1].detail.mods or {}
+				helpers.assert_true(mods[role] == true,
+					role .. "+" .. name .. " must say " .. role .. " is held, or it reads as the bare key")
+			end
+		end
+	end)
+
+	helpers.it("names no shortcut modifier with a bare Backspace (modified-backspace)", function()
+		local keys = control_keys({ { 14, 1 }, { 14, 0 } })
+		helpers.assert_eq(#keys, 1)
+		local mods = type(keys[1].detail) == "table" and keys[1].detail.mods or {}
+		helpers.assert_true(not mods.ctrl and not mods.alt and not mods.meta, "a bare Backspace is one character")
+	end)
+
+	helpers.it("says Ctrl for the Backspace tapped on the layer key while CapsLock holds Ctrl (modified-backspace)", function()
+		local keys = {}
+		drive({ { 58, 1 }, { 56, 1 }, { 56, 0 }, { 58, 0 } }, function()
+			return { onKey = function(name, detail) keys[#keys + 1] = { name = name, detail = detail } end }
+		end)
+		helpers.assert_eq(#keys, 1, "one Backspace")
+		helpers.assert_eq(keys[1].name, "backspace")
+		helpers.assert_true(type(keys[1].detail) == "table" and keys[1].detail.mods.ctrl == true,
+			"CapsLock's Ctrl is held: this Backspace deletes a word")
+	end)
+
+end)
+
 -- A click or a wheel turn during a hold makes it a chord (Ctrl+click,
 -- Ctrl+wheel), as on Windows and macOS. Every EV_REL counted, so a hand that
 -- merely moved the mouse while tapping CapsLock typed no Enter

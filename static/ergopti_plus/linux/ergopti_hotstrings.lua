@@ -1162,6 +1162,14 @@ local function main()
 			return
 		end
 
+		-- A Backspace under Ctrl, Alt or Super deletes a word (or undoes, in some
+		-- applications): how much text went is unknown. It must neither undo an
+		-- expansion, whose erase count assumes one character went, nor edit the
+		-- buffer by one character; it restarts the buffer at a position that is
+		-- not known to start a word, as Windows and macOS do.
+		local mods = type(detail) == "table" and type(detail.mods) == "table" and detail.mods or {}
+		local one_character = key_name == "backspace" and not (mods.ctrl or mods.alt or mods.meta)
+
 		-- Undo: a Backspace immediately after an expansion puts the trigger back.
 		--
 		-- The arithmetic is off by one on purpose. Under a grab the Backspace was
@@ -1175,7 +1183,7 @@ local function main()
 		-- ("adn " → "ADN "), so THAT is what the Backspace removed, and the whole
 		-- replacement is still on screen. Counting the replacement alone left its
 		-- first character behind: "adn " then Backspace read "Aadn".
-		if key_name == "backspace" and _undoable and not opts.dry_run then
+		if one_character and _undoable and not opts.dry_run then
 			local remaining = 0
 			for _ in (_undoable.replacement .. (_undoable.replayed or "")):gmatch("[%z\1-\127\194-\244][\128-\191]*") do
 				remaining = remaining + 1
@@ -1193,9 +1201,10 @@ local function main()
 		_undoable = nil
 
 		-- Backspace edits the buffer as it edited the text; every other control
-		-- key moves or leaves the caret, so what follows is not known to start a
-		-- word. Escape alone leaves the caret where it was.
-		if key_name == "backspace" then
+		-- key (and a word-deleting Backspace) moves or leaves the caret, so what
+		-- follows is not known to start a word. Escape alone leaves the caret
+		-- where it was.
+		if one_character then
 			engine:backspace()
 		else
 			engine:reset(key_name == "escape")
