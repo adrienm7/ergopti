@@ -84,11 +84,22 @@ _THSB_PreArmedSyntheticKeysAreSuspendOwned() {
 		RawTransitionCount++
 		Pos := Found + Match.Len
 	}
-	AssertEqual(3, RawTransitionCount,
-		"the complete driver may contain only the owner-internal transactional Down/retrying Up and the pass-through physical Up; every other sustained transition must route through an explicit owner")
+	; Six owner-internal transitions: the transactional Down, the retrying Up,
+	; the pass-through physical Up, and the owner's lift, re-press and
+	; unless-owned release around an output (kana-altgr-lift-owner-2026-09-25).
+	AssertEqual(6, RawTransitionCount,
+		"the complete driver may contain only the owner-internal sustained transitions; every other sustained transition must route through an explicit owner")
 	PhysicalRelease := _DriverFuncBody("TapHoldReleasePhysicalKey")
 	Assert(InStr(PhysicalRelease, 'Ok := TextPressKey(Key, "Up", false)') > 0,
 		"the sole untracked sustained transition must remain the status-bearing physical-key release helper")
+	for Owner, Transition in Map(
+			"TapHoldLiftKey", 'TextPressKey(Name, "Up", false)',
+			"TapHoldRepressOwnedKey", 'Ok := TextPressKey(Name, "Down", false)',
+			"TapHoldReleaseUnlessOwned", 'Ok := TextPressKey(Name, "Up", false)') {
+		Body := _DriverFuncBody(Owner)
+		Assert(Body != "" and InStr(Body, Transition) > 0,
+			Owner . " must own its sustained transition and report its verdict")
+	}
 	Assert(InStr(Src, "TapHoldSyntheticKeyDown") > 0 and InStr(Src, "TapHoldSyntheticKeyUp") > 0,
 		"tap-hold modules must use the synthetic-key ownership pair around every cross-KeyWait modifier")
 }

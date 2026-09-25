@@ -194,14 +194,6 @@ _HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, Fi
 		if HasMethod(Replacement)
 				Replacement := Replacement()
 
-		if _ALTGR_KANA_FIXUP {
-				; Only needed when AltGr (SC138) is remapped to Kana at the driver
-				; level — without that remap the Up is a wasted SendEvent on the
-				; hottest path. ``HotstringEngineInit`` sets the flag at boot.
-				if !SendNewResult("{SC138 Up}", false, false)
-						return false
-		}
-
 		; Mute the prefix watcher's InputHook for the duration of the send burst.
 		; SendEvent re-injects characters that the hook would otherwise observe
 		; in pass-through mode, polluting the buffer with our own replacement
@@ -226,34 +218,38 @@ _HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, Fi
 
 		Fired := false
 		try {
-				isNotepad := false
-				try {
-						Host := OutputHostResolve()
-						isNotepad := Host["Valid"]
-								&& (StrLower(Host["Exe"]) = "notepad.exe")
-				}
-				if isNotepad {
-						; Windows 11 Notepad mis-handles hotstrings (Windows bug, not AHK),
-						; so we route replacement through the clipboard. Keep the erase and
-						; Ctrl+V in one SendInput transaction: a separate SendEvent erase lets
-						; a physical key interleave before the clipboard paste.
-						_HsNotepadCritical := Critical("On")
-						try SendInstant(Replacement . EndChar, BackSpaceSeq)
-								? (Fired := true) : (Fired := false)
-						finally Critical(_HsNotepadCritical)
-				} else if FinalResult {
-						if !SendFinalResult(BackSpaceSeq, False)
-								return false
-						if !SendFinalResult(Replacement, OnlyText)
-								return false
-						Fired := SendFinalResult(EndChar, False)
-				} else {
+				; Nested so the whole output runs inside _HSE_SendWithAltGrUp, which
+				; lifts a Kana-style layout's AltGr for it; returns the send verdict.
+				SendOutput() {
+						isNotepad := false
+						try {
+								Host := OutputHostResolve()
+								isNotepad := Host["Valid"]
+										&& (StrLower(Host["Exe"]) = "notepad.exe")
+						}
+						if isNotepad {
+								; Windows 11 Notepad mis-handles hotstrings (Windows bug, not AHK),
+								; so we route replacement through the clipboard. Keep the erase and
+								; Ctrl+V in one SendInput transaction: a separate SendEvent erase lets
+								; a physical key interleave before the clipboard paste.
+								_HsNotepadCritical := Critical("On")
+								try Pasted := SendInstant(Replacement . EndChar, BackSpaceSeq)
+								finally Critical(_HsNotepadCritical)
+								return Pasted
+						} else if FinalResult {
+								if !SendFinalResult(BackSpaceSeq, False)
+										return false
+								if !SendFinalResult(Replacement, OnlyText)
+										return false
+								return SendFinalResult(EndChar, False)
+						}
 						if !SendNewResult(BackSpaceSeq, False, false)
 								return false
 						if !SendNewResult(Replacement, OnlyText)
 								return false
-						Fired := SendNewResult(EndChar, False)
+						return SendNewResult(EndChar, False)
 				}
+				Fired := _HSE_SendWithAltGrUp(SendOutput)
 		}
 		finally {
 				; 60 ms is enough margin for the OS to flush the SendEvent bursts

@@ -67,7 +67,7 @@ _EBA_AssertBurstIsAssembledWhole() {
 		"the assembled burst must reach exactly one SendInput — splitting the erase, replacement "
 		. "and terminator is what lets a physical key splice into an expansion")
 	Assert(InStr(Dispatch,
-		'Fired := _SendVerdictSucceeded(Hook("SendFinalResult", Burst, false))') > 0,
+		'return _SendVerdictSucceeded(Hook("SendFinalResult", Burst, false))') > 0,
 		"the recorder path must publish the same atomic burst only after its sender reports success")
 }
 Test("hotstrings: the expansion burst is one atomic SendInput (typing-order-atomicity)", _EBA_AssertBurstIsAssembledWhole)

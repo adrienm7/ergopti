@@ -75,11 +75,34 @@ _HSE_SetTerminalKeyDelay(DelayMs, DurationMs, DelayFn := 0) {
 		return true
 }
 
+; Run one expansion output. A Kana-style layout's AltGr modifies every
+; character typed while it is down, and a user or a tap-hold may hold it when a
+; trigger completes, so there the output goes out with it up: the tap-hold
+; owner lifts it (through TextSender's SendInput, which adds no hook-chain
+; latency) and afterwards presses a tap-hold's own hold again; a raw
+; "{SC138 Up}" ended that hold for good while its owner still counted it down.
+; Elsewhere AltGr is LCtrl+RAlt (or RAlt is Alt), modifiers a non-blind Send
+; already releases around its output, so nothing is lifted there. Every
+; expansion path sends through here.
+; @param SendFn {Func} Zero-argument sender; its result is returned.
+; @return The sender's result, or false when the lift failed and nothing was sent.
+_HSE_SendWithAltGrUp(SendFn) {
+		if !(IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP)
+				return SendFn.Call()
+		return TapHoldSendWithKeyUp(KS_AltGrKeyName(), SendFn)
+}
+
 ; One SendEvent call retains real SetKeyDelay pacing inside the terminal. The
 ; native keyboard arbiter owns physical edges for the whole call; BlockInput's
 ; Send mode is deliberately absent because it discards rather than buffers them.
 _HSE_SendTerminalPaced(BSCount, Tail, DelayMs, EmitFn := 0,
 		DelayFn := 0) {
+		return _HSE_SendWithAltGrUp(
+				_HSE_SendTerminalPacedBurst.Bind(BSCount, Tail, DelayMs, EmitFn, DelayFn))
+}
+
+; Body of _HSE_SendTerminalPaced, run with the Kana AltGr up.
+_HSE_SendTerminalPacedBurst(BSCount, Tail, DelayMs, EmitFn, DelayFn) {
 		Burst := _HSE_BuildTerminalBurst(BSCount, Tail)
 		PreviousKeyDelay := A_KeyDelay
 		PreviousKeyDuration := A_KeyDuration
@@ -872,28 +895,10 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 		try SyntheticOwner := KL_MarkSynthetic("hotstring",
 			Spec.HasOwnProp("IsPrivate") and Spec.IsPrivate)
 		try {
-				if _ALTGR_KANA_FIXUP {
-						; SendInput (not SendEvent) — non-blocking injection that does not
-						; yield the message loop. SendEvent was adding ~10-20 ms of latency
-						; on every expansion on AltGr-fixup keyboards by flushing through
-						; the hook chain synchronously. SendInput injects directly into the
-						; kernel input queue, clears the stuck AltGr state before the burst,
-						; and returns immediately — consistent with the SendInput burst below.
-						AltGrReleased := false
-						try {
-								if _SendHook {
-										Hook := _SendHook
-										AltGrReleased := _SendVerdictSucceeded(Hook("SendFinalResult", "{SC138 Up}", false))
-								} else {
-										SendInput("{SC138 Up}")
-										AltGrReleased := true
-								}
-						} catch as Err {
-								try LoggerError("HSE", "AltGr release injection failed: {1}", Err.Message)
-						}
-						if !AltGrReleased
-								return false
-				}
+				; A Kana-style layout's AltGr modifies every character typed while it is
+				; down, so each branch below sends through _HSE_SendWithAltGrUp: the
+				; tap-hold owner lifts it (through TextSender's SendInput, which adds no
+				; hook-chain latency) and presses a tap-hold's own hold again after.
 
 				; +1 for the NNBSP/NBSP that was stripped before matching when the
 				; end-char is a typographic punctuation (``:`` / `` ; ``).
@@ -934,7 +939,8 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 						try {
 								; BackSpaceSeq is a control sequence, not emitted text. The actual
 								; last character is recorded explicitly below after the atomic paste.
-								Fired := SendInstant(Replacement . EndCharEmitted, BackSpaceSeq)
+								Fired := _HSE_SendWithAltGrUp(
+										() => SendInstant(Replacement . EndCharEmitted, BackSpaceSeq))
 						} finally {
 								Critical(_NpCrit)
 						}
@@ -1027,13 +1033,17 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 						SendError := ""
 						_AtCrit := Critical("On")
 						try {
-								if _SendHook {
-										Hook := _SendHook
-										Fired := _SendVerdictSucceeded(Hook("SendFinalResult", Burst, false))
-								} else {
+								; Nested so the burst runs inside _HSE_SendWithAltGrUp; it reads the
+								; burst and the hook from this call.
+								SendAtomicBurst() {
+										if _SendHook {
+												Hook := _SendHook
+												return _SendVerdictSucceeded(Hook("SendFinalResult", Burst, false))
+										}
 										SendInput(Burst)
-										Fired := true
+										return true
 								}
+								Fired := _HSE_SendWithAltGrUp(SendAtomicBurst)
 						} catch as Err {
 								SendError := Err.Message
 						} finally {
