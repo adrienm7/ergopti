@@ -2438,7 +2438,7 @@
 	"updater.title_update": "ErgoptiPlus — עדכון",
 	"updater.title_update_available": "ErgoptiPlus — עדכון זמין",
 	"updater.title_version": "ErgoptiPlus — גרסה",
-	"updater.tray_new_version_body": "גרסה {1} מוכנה להתקנה. לחץ על הפריט \"Install update\" בתפריט מגש המערכת.",
+	"updater.tray_new_version_body": "גרסה {1} זמינה. היא תורד רק אם תבחר להתקין אותה.",
 	"updater.tray_new_version_title": "ErgoptiPlus — עדכון זמין",
 	"updater.up_to_date": "ErgoptiPlus מעודכן.\n\nגרסה נוכחית: {1}",
 	"updater.update_dialog_changelog": "מה חדש:",

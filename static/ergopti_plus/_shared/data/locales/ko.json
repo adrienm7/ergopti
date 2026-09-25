@@ -2438,7 +2438,7 @@
 	"updater.title_update": "ErgoptiPlus — 업데이트",
 	"updater.title_update_available": "ErgoptiPlus — 업데이트 사용 가능",
 	"updater.title_version": "ErgoptiPlus — 버전",
-	"updater.tray_new_version_body": "버전 {1}을(를) 설치할 준비가 되었습니다. 트레이 메뉴의 \"Install update\" 항목을 클릭하십시오.",
+	"updater.tray_new_version_body": "버전 {1}을(를) 사용할 수 있습니다. 설치를 선택한 경우에만 다운로드됩니다.",
 	"updater.tray_new_version_title": "ErgoptiPlus — 업데이트 사용 가능",
 	"updater.up_to_date": "ErgoptiPlus가 최신 상태입니다.\n\n현재 버전: {1}",
 	"updater.update_dialog_changelog": "새로운 내용:",

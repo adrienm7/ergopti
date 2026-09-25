@@ -2438,7 +2438,7 @@
 	"updater.title_update": "ErgoptiPlus — Aktualisierung",
 	"updater.title_update_available": "ErgoptiPlus — Aktualisierung verfügbar",
 	"updater.title_version": "ErgoptiPlus — Version",
-	"updater.tray_new_version_body": "Version {1} ist zur Installation bereit. Klicken Sie im Tray-Menü auf „Install update\".",
+	"updater.tray_new_version_body": "Version {1} ist verfügbar. Sie wird erst heruntergeladen, wenn Sie die Installation wählen.",
 	"updater.tray_new_version_title": "ErgoptiPlus — Update verfügbar",
 	"updater.up_to_date": "ErgoptiPlus ist aktuell.\n\nAktuelle Version: {1}",
 	"updater.update_dialog_changelog": "Neuerungen:",

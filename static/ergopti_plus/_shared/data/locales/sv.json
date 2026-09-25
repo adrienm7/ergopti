@@ -2438,7 +2438,7 @@
 	"updater.title_update": "ErgoptiPlus — Uppdatering",
 	"updater.title_update_available": "ErgoptiPlus — Uppdatering tillgänglig",
 	"updater.title_version": "ErgoptiPlus — Version",
-	"updater.tray_new_version_body": "Version {1} är redo att installeras. Klicka på posten »Install update« i aktivitetsfältsmenyn.",
+	"updater.tray_new_version_body": "Version {1} är tillgänglig. Den laddas bara ned om du väljer att installera den.",
 	"updater.tray_new_version_title": "ErgoptiPlus — Uppdatering tillgänglig",
 	"updater.up_to_date": "ErgoptiPlus är uppdaterad.\n\nAktuell version: {1}",
 	"updater.update_dialog_changelog": "Nyheter:",
