@@ -2424,6 +2424,7 @@
 	"updater.checking": "Leter etter oppdateringer i kanalen «{1}»…\n(Dette kan ta noen sekunder.)",
 	"updater.close": "Lukk",
 	"updater.install_error": "Oppdateringen kunne ikke installeres. Se loggene for detaljer.",
+	"updater.check_request_failed": "Søket etter oppdateringer kunne ikke startes. Se loggene for detaljer.",
 	"updater.installed_restarting": "Oppdatering {1} installert — ErgoptiPlus starter på nytt med den nye versjonen.",
 	"updater.install_error_download": "Nedlasting av oppdateringspakken mislyktes. Sjekk internettforbindelsen og prøv igjen.",
 	"updater.install_error_no_asset": "Denne utgivelsen inneholder ingen Windows-kjørbar fil. Åpne utgivelsessiden for å laste ned manuelt.",
