@@ -3884,6 +3884,12 @@ _UpdaterTest_RecordCrossChannelInstall(State, Release) {
 	return true
 }
 
+_UpdaterTest_RecordConsentOffer(State, Release, Request) {
+	State.Offers += 1
+	State.Tag := Release.Tag
+	return true
+}
+
 _UpdaterTest_RecordCrossChannelRebuild(State) {
 	State.Rebuilds += 1
 	return true
@@ -3924,18 +3930,18 @@ _UpdaterTest_ExplicitChannelTransitionUsesReleasePolicy() {
 		Request := _Updater_NewRequestContext(
 			UPDATER_REQUEST_ORIGIN_MANUAL, false, "dev")
 		Release := { Tag: DevCandidate, RawJson: "{}" }
-		State := { Rebuilds: 0, Installs: 0, Tag: "" }
+		State := { Rebuilds: 0, Offers: 0, Tag: "" }
 		AssertEqual(true, Publish.Call(
 			Release, Request, false,
 			_UpdaterTest_RecordCrossChannelRebuild.Bind(State),
-			0, _UpdaterTest_RecordCrossChannelInstall.Bind(State)),
-			"the selected dev candidate must cross publication into staging")
+			0, _UpdaterTest_RecordConsentOffer.Bind(State)),
+			"the selected dev candidate must cross publication into the consent prompt")
 		AssertEqual(1, State.Rebuilds,
 			"candidate publication must refresh the visible updater state once")
-		AssertEqual(1, State.Installs,
-			"the explicit channel migration must invoke staging exactly once")
+		AssertEqual(1, State.Offers,
+			"the explicit channel migration must offer the candidate exactly once")
 		AssertEqual(DevCandidate, State.Tag,
-			"staging must receive the exact CI-generated candidate")
+			"the prompt must offer the exact CI-generated candidate")
 	} finally {
 		_UpdaterTest_RestoreRequestState(Saved)
 		if HadLatest
@@ -4058,3 +4064,43 @@ _UpdaterTest_MarkdownPayloadCannotCloseScript() {
 }
 Test("Updater: release Markdown cannot escape its script or inject an active URL (updater-markdown-script-boundary)",
 	_UpdaterTest_MarkdownPayloadCannotCloseScript)
+
+; A "Check for updates" click that finds a newer release used to download,
+; swap and restart on it at once: the user had asked to check, never to
+; install. It must stop at the consent prompt, whose Install button is the only
+; place a download starts; nothing is staged before that click
+; (updater-consent-2026-09-25).
+_UpdaterTest_CheckStopsAtTheConsentPrompt() {
+	global UPDATER_LATEST_RELEASE, UPDATER_REQUEST_ORIGIN_MANUAL
+	Saved := _UpdaterTest_SaveRequestState()
+	HadLatest := IsSet(UPDATER_LATEST_RELEASE)
+	if HadLatest
+		SavedLatest := UPDATER_LATEST_RELEASE
+	try {
+		_UpdaterTest_ResetRequestState()
+		Request := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL, false)
+		Release := { Tag: "v9.9.9", RawJson: "{}" }
+		State := { Offers: 0, Tag: "", Request: 0 }
+		Offer(Candidate, OfferRequest) {
+			State.Offers += 1
+			State.Tag := Candidate.Tag
+			State.Request := OfferRequest
+			return true
+		}
+		AssertEqual(true, _Updater_PublishOneClickRelease(
+			Release, Request, false, (*) => true, 0, Offer),
+			"a newer release found by a check must be offered")
+		AssertEqual(1, State.Offers, "the check must open the consent prompt exactly once")
+		AssertEqual("v9.9.9", State.Tag, "the prompt must offer the release the check found")
+		Assert(State.Request == Request,
+			"the prompt must stay owned by the check's request generation")
+	} finally {
+		_UpdaterTest_RestoreRequestState(Saved)
+		if HadLatest
+			UPDATER_LATEST_RELEASE := SavedLatest
+		else
+			UPDATER_LATEST_RELEASE := unset
+	}
+}
+Test("Updater: a check stops at the consent prompt instead of downloading (updater-consent-2026-09-25)",
+	_UpdaterTest_CheckStopsAtTheConsentPrompt)

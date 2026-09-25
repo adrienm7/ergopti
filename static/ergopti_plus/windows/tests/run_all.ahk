@@ -1021,6 +1021,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_updater_cancel_fires_on_json.ahk
 #Include meta/test_updater_download_receive_timeout.ahk
 #Include meta/test_updater_download_reentrancy_guard.ahk
+#Include meta/test_updater_download_requires_consent.ahk
 #Include meta/test_personal_load_once.ahk
 #Include meta/test_menu_llm_actions_include.ahk
 #Include meta/test_llm_menu_suspend_bootstrap.ahk
