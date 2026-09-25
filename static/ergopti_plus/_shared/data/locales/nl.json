@@ -2438,7 +2438,7 @@
 	"updater.title_update": "ErgoptiPlus — Update",
 	"updater.title_update_available": "ErgoptiPlus — Update beschikbaar",
 	"updater.title_version": "ErgoptiPlus — Versie",
-	"updater.tray_new_version_body": "Versie {1} is klaar om te worden geïnstalleerd. Klik op het item «Install update» in het systeemvakmenu.",
+	"updater.tray_new_version_body": "Versie {1} is beschikbaar. Deze wordt pas gedownload als je ervoor kiest hem te installeren.",
 	"updater.tray_new_version_title": "ErgoptiPlus — Update beschikbaar",
 	"updater.up_to_date": "ErgoptiPlus is up-to-date.\n\nHuidige versie: {1}",
 	"updater.update_dialog_changelog": "Nieuw:",

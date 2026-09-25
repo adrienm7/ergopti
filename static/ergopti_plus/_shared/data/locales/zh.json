@@ -2438,7 +2438,7 @@
 	"updater.title_update": "ErgoptiPlus — 更新",
 	"updater.title_update_available": "ErgoptiPlus — 有可用更新",
 	"updater.title_version": "ErgoptiPlus — 版本",
-	"updater.tray_new_version_body": "版本 {1} 已准备好安装。请点击托盘菜单中的「Install update」项。",
+	"updater.tray_new_version_body": "版本 {1} 已可用。只有在您选择安装时才会下载。",
 	"updater.tray_new_version_title": "ErgoptiPlus — 有可用更新",
 	"updater.up_to_date": "ErgoptiPlus 已是最新版本。\n\n当前版本: {1}",
 	"updater.update_dialog_changelog": "更新内容:",

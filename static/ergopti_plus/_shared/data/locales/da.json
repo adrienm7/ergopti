@@ -2438,7 +2438,7 @@
 	"updater.title_update": "ErgoptiPlus — Opdatering",
 	"updater.title_update_available": "ErgoptiPlus — Opdatering tilgængelig",
 	"updater.title_version": "ErgoptiPlus — Version",
-	"updater.tray_new_version_body": "Version {1} er klar til at blive installeret. Klik på »Install update« i proceslinjemenuen.",
+	"updater.tray_new_version_body": "Version {1} er tilgængelig. Den hentes først, når du vælger at installere den.",
 	"updater.tray_new_version_title": "ErgoptiPlus — Opdatering tilgængelig",
 	"updater.up_to_date": "ErgoptiPlus er opdateret.\n\nNuværende version: {1}",
 	"updater.update_dialog_changelog": "Nyheder:",

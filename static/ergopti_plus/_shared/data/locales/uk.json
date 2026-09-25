@@ -2438,7 +2438,7 @@
 	"updater.title_update": "ErgoptiPlus — Оновлення",
 	"updater.title_update_available": "ErgoptiPlus — Доступне оновлення",
 	"updater.title_version": "ErgoptiPlus — Версія",
-	"updater.tray_new_version_body": "Версія {1} готова до встановлення. Натисніть «Install update» у меню області сповіщень.",
+	"updater.tray_new_version_body": "Доступна версія {1}. Її буде завантажено, лише якщо ви вирішите її встановити.",
 	"updater.tray_new_version_title": "ErgoptiPlus — Доступне оновлення",
 	"updater.up_to_date": "ErgoptiPlus має останню версію.\n\nПоточна версія: {1}",
 	"updater.update_dialog_changelog": "Що нового:",

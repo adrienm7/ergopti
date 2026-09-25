@@ -2438,7 +2438,7 @@
 	"updater.title_update": "ErgoptiPlus — التحديث",
 	"updater.title_update_available": "ErgoptiPlus — يتوفر تحديث",
 	"updater.title_version": "ErgoptiPlus — الإصدار",
-	"updater.tray_new_version_body": "الإصدار {1} جاهز للتثبيت. انقر على « تثبيت التحديث » في قائمة شريط النظام.",
+	"updater.tray_new_version_body": "الإصدار {1} متاح. لا يُنزَّل إلا إذا اخترت تثبيته.",
 	"updater.tray_new_version_title": "ErgoptiPlus — تحديث متاح",
 	"updater.up_to_date": "ErgoptiPlus محدّث.\n\nالإصدار الحالي: {1}",
 	"updater.update_dialog_changelog": "الجديد:",

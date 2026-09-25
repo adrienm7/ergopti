@@ -2438,7 +2438,7 @@
 	"updater.title_update": "ErgoptiPlus — アップデート",
 	"updater.title_update_available": "ErgoptiPlus — アップデートが利用可能です",
 	"updater.title_version": "ErgoptiPlus — バージョン",
-	"updater.tray_new_version_body": "バージョン {1} のインストール準備が整いました。トレイメニューの「Install update」項目をクリックしてください。",
+	"updater.tray_new_version_body": "バージョン {1} が利用可能です。インストールを選んだ場合にのみダウンロードされます。",
 	"updater.tray_new_version_title": "ErgoptiPlus — アップデート利用可能",
 	"updater.up_to_date": "ErgoptiPlus は最新です。\n\n現在のバージョン: {1}",
 	"updater.update_dialog_changelog": "更新内容:",
