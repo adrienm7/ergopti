@@ -29,7 +29,7 @@
 ; ==========================
 
 _RShiftHoldModKey() {
-	return ResolveHoldModifierKey(TapHoldHoldModifier(TapHold, "right_shift"), "right_shift", "RShift")
+	return ResolveHoldModifierKey(TapHoldHoldModifier(TapHold, "right_shift"), "right_shift")
 }
 
 _RShiftHandleHold(PhysicalModifierPassthrough) {

@@ -35,7 +35,7 @@
 ; ===================================
 
 _LShiftHoldModKey() {
-	return ResolveHoldModifierKey(TapHoldHoldModifier(TapHold, "left_shift"), "left_shift", "LShift")
+	return ResolveHoldModifierKey(TapHoldHoldModifier(TapHold, "left_shift"), "left_shift")
 }
 
 _LShiftHandleHold(PhysicalModifierPassthrough) {
@@ -106,7 +106,7 @@ _LShiftDispatch() {
 ; ==========================
 
 _LCtrlHoldModKey() {
-	return ResolveHoldModifierKey(TapHoldHoldModifier(TapHold, "left_ctrl"), "left_ctrl", "LCtrl")
+	return ResolveHoldModifierKey(TapHoldHoldModifier(TapHold, "left_ctrl"), "left_ctrl")
 }
 
 _LCtrlHandleHold(PhysicalModifierPassthrough) {

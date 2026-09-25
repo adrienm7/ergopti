@@ -641,11 +641,40 @@ _TH_ResolveHoldModifierKeyKnownValuesMap() {
 }
 Test("ResolveHoldModifierKey: maps every known hold_modifier value", _TH_ResolveHoldModifierKeyKnownValuesMap)
 
-_TH_ResolveHoldModifierKeyCtrlOverride() {
-	AssertEqual("RCtrl", ResolveHoldModifierKey("ctrl", "right_ctrl", "RCtrl"),
-		"rctrl.ahk must be able to override the ctrl-case key so its own hold-modifier arms RCtrl, not LCtrl")
+; A generic modifier token resolves to the tap-hold key's OWN side only when the
+; key is that very modifier; every other key keeps the left-side default. The
+; former positional "CtrlKeyName" override was read by left_shift, right_shift
+; and alt_gr as "my own key": left_shift + hold "ctrl" held Shift, right_shift +
+; "shift" synthesized LShift instead of passing RShift through, and alt_gr +
+; "ctrl" held AltGr (hold-modifier-own-side-2026-09-25).
+_TH_ResolveHoldModifierKeyOwnSide() {
+	Cases := [
+		["ctrl", "left_ctrl", "LCtrl"],
+		["ctrl", "right_ctrl", "RCtrl"],
+		["lctrl", "right_ctrl", "LCtrl"],
+		["shift", "right_ctrl", "LShift"],
+		["shift", "left_shift", "LShift"],
+		["ctrl", "left_shift", "LCtrl"],
+		["shift", "right_shift", "RShift"],
+		["lshift", "right_shift", "LShift"],
+		["ctrl", "right_shift", "LCtrl"],
+		["alt", "left_alt", "LAlt"],
+		["win", "win", "LWin"],
+		["ctrl", "alt_gr", "LCtrl"],
+		["shift", "alt_gr", "LShift"],
+	]
+	for Row in Cases
+		AssertEqual(Row[3], ResolveHoldModifierKey(Row[1], Row[2]),
+			"hold '" . Row[1] . "' on tap-hold key '" . Row[2] . "'")
+	Combo := ResolveHoldModifierKey("ctrl+shift", "left_shift")
+	Assert(Combo is Array && Combo.Length = 2 && Combo[1] == "LCtrl" && Combo[2] == "LShift",
+		"a ctrl+shift hold on left_shift must hold both LCtrl and LShift, never LShift twice")
+	Combo := ResolveHoldModifierKey("ctrl+shift", "right_shift")
+	Assert(Combo is Array && Combo.Length = 2 && Combo[1] == "LCtrl" && Combo[2] == "RShift",
+		"a ctrl+shift hold on right_shift must keep its own RShift side")
 }
-Test("ResolveHoldModifierKey: CtrlKeyName override maps ctrl to RCtrl for rctrl.ahk", _TH_ResolveHoldModifierKeyCtrlOverride)
+Test("ResolveHoldModifierKey: a token resolves to the key's own side only on that modifier (hold-modifier-own-side-2026-09-25)",
+	_TH_ResolveHoldModifierKeyOwnSide)
 
 _TH_ResolveHoldModifierKeyUnknownReturnsEmpty() {
 	AssertEqual("", ResolveHoldModifierKey("contrl", "backspace"),
