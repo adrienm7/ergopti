@@ -190,7 +190,7 @@ platform = "hs"
 platform = "hs"
 emit_linux = "alt+Escape"
 
-# --- Édition (Windows uniquement — macOS utilise Cmd+C/V/X dans cmd_*) ---
+# --- Editing (Windows and Linux; macOS uses Cmd+C/V/X in cmd_*) ---
 
 [sg_actions.copy]
 platform = "ahk,linux"
@@ -211,24 +211,30 @@ emit_ahk_mods = ["ctrl"]
 emit_linux = "ctrl+x"
 
 [sg_actions.undo]
-platform = "ahk"
+platform = "ahk,linux"
 emit_ahk_key = "z"
 emit_ahk_mods = ["ctrl"]
+emit_linux = "ctrl+z"
 
+# Ctrl+Shift+Z on Linux: it is the redo of GNOME, KDE and the browsers there,
+# while only some applications also accept Ctrl+Y.
 [sg_actions.redo]
-platform = "ahk"
+platform = "ahk,linux"
 emit_ahk_key = "y"
 emit_ahk_mods = ["ctrl"]
+emit_linux = "ctrl+shift+z"
 
 [sg_actions.select_all]
-platform = "ahk"
+platform = "ahk,linux"
 emit_ahk_key = "a"
 emit_ahk_mods = ["ctrl"]
+emit_linux = "ctrl+a"
 
 [sg_actions.find]
-platform = "ahk"
+platform = "ahk,linux"
 emit_ahk_key = "f"
 emit_ahk_mods = ["ctrl"]
+emit_linux = "ctrl+f"
 
 # --- Touches ---
 
@@ -244,6 +250,7 @@ emit_linux = "Return"
 platform = "all"
 emit_hs_key = "tab"
 emit_hs_mods = []
+emit_linux = "Tab"
 
 [sg_actions.escape]
 platform = "all"

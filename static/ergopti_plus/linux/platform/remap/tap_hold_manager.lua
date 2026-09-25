@@ -79,9 +79,39 @@ local function _apply()
 	end
 end
 
+--- The ids a tap can be set to, as a set: the key taps the engine types
+--- itself, the one-shot Shift, and every catalogue action this driver runs.
+--- @return table id -> true
+local function _tap_action_set()
+	local set = { one_shot_shift = true }
+	for id in pairs(Engine.KEY_TAPS) do set[id] = true end
+	for id in pairs(EmitActions) do set[id] = true end
+	for _, id in ipairs(_action_names()) do
+		if type(id) == "string" and id ~= "" then set[id] = true end
+	end
+	set.none = nil
+	return set
+end
+
+--- Warns about every tap the configuration asks for that this driver cannot
+--- run: the key would otherwise hold as configured and do nothing on a tap,
+--- with the only trace a DEBUG line at each press.
+local function _warn_unsupported_taps()
+	local supported = _tap_action_set()
+	for _, key_id in ipairs(Engine.KEY_ORDER) do
+		local key = _loaded.keys[key_id]
+		local tap = key and key.enabled ~= false and key.tap_action
+		if type(tap) == "string" and tap ~= "" and tap ~= "none" and not supported[tap] then
+			Logger.warn(LOG, "Tap-hold key '%s': tap action '%s' has no Linux implementation — its tap does nothing.",
+				key_id, tap)
+		end
+	end
+end
+
 --- Reads the files and builds a fresh engine; the old one stays until _apply().
 local function _load()
 	_loaded = Config.load(_defaults_path, _user_path)
+	_warn_unsupported_taps()
 	local count = 0
 	for _, key in pairs(_loaded.keys) do
 		if key.enabled ~= false then count = count + 1 end
@@ -218,18 +248,8 @@ end
 --- @return table
 function M.tap_actions()
 	_require_init()
-	local seen = { none = true }
 	local ids = {}
-	local function add(id)
-		if type(id) == "string" and id ~= "" and not seen[id] then
-			seen[id] = true
-			ids[#ids + 1] = id
-		end
-	end
-	for id in pairs(Engine.KEY_TAPS) do add(id) end
-	add("one_shot_shift")
-	for id in pairs(EmitActions) do add(id) end
-	for _, id in ipairs(_action_names()) do add(id) end
+	for id in pairs(_tap_action_set()) do ids[#ids + 1] = id end
 	table.sort(ids)
 	return ids
 end

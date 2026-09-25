@@ -60,6 +60,98 @@ end
 
 
 
+--- Runs every action in `ids` through the real dispatcher, with the shell, the
+--- uinput emitter and the webview recorded, and returns the ids that reached
+--- the "Unknown action" branch.
+--- @param Gestures table The gestures manager.
+--- @param ids table Action ids.
+--- @return table unknown, table pressed Chords sent, by action id.
+local function run_every_action(Gestures, ids)
+	local Logger = require("logger.shim")
+	local saved = {
+		debug = Logger.debug, warn = Logger.warn,
+		emitter = package.loaded["modules.gestures.combo_emitter"],
+		shortcuts = package.loaded["modules.shortcuts.manager"],
+		webview = package.loaded["ui.webview_manager"], popen = io.popen,
+	}
+	-- Loaded again under the recording emitter below, since it keeps its own.
+	package.loaded["modules.shortcuts.manager"] = nil
+	local unknown, pressed, current = {}, {}, nil
+	local function spy(fmt)
+		if type(fmt) == "string" and fmt:find("Unknown action", 1, true) then unknown[#unknown + 1] = current end
+	end
+	Logger.debug = function(_, fmt) spy(fmt) end
+	Logger.warn = function(_, fmt) spy(fmt) end
+	package.loaded["modules.gestures.combo_emitter"] = {
+		press = function(combo) pressed[current] = combo; return true end,
+	}
+	package.loaded["ui.webview_manager"] = { show = function() return true end }
+	io.popen = function()
+		return { read = function() return "selection" end, close = function() return true end }
+	end
+	local ok, err = pcall(with_recorded_shell, function()
+		for _, id in ipairs(ids) do
+			current = id
+			Gestures.execute_action(id, "test__slot")
+		end
+	end)
+	Logger.debug, Logger.warn = saved.debug, saved.warn
+	package.loaded["modules.gestures.combo_emitter"] = saved.emitter
+	package.loaded["modules.shortcuts.manager"] = saved.shortcuts
+	package.loaded["ui.webview_manager"] = saved.webview
+	io.popen = saved.popen
+	if not ok then error(err, 0) end
+	return unknown, pressed
+end
+
+helpers.describe("linux actions: every action this driver declares runs", function()
+
+	helpers.it("runs every action the catalogue declares for Linux, and every one it offers", function()
+		local Gestures = helpers.load_module("modules.gestures.manager")
+		local noop = function() end
+		Gestures.init({ enabled = false,
+			action_handlers = require("modules.shortcuts.script_actions").new({
+				reset = noop, reload = noop, quit = noop }).handlers })
+		local ids = Gestures.get_executable_action_names()
+		helpers.assert_true(#Gestures.LINUX_DECLARED_ACTIONS > 70,
+			"the shared catalogue must be read, or this loop proves nothing")
+		helpers.assert_true(#ids >= #Gestures.LINUX_DECLARED_ACTIONS)
+		local unknown = run_every_action(Gestures, ids)
+		helpers.assert_eq(unknown, {},
+			"declared or offered for Linux, and nothing runs: a tap, gesture or shortcut that does nothing")
+	end)
+
+	helpers.it("sends the edit chords Windows had alone", function()
+		local Gestures = helpers.load_module("modules.gestures.manager")
+		local chords = { select_all = "ctrl+a", undo = "ctrl+z", redo = "ctrl+shift+z", find = "ctrl+f" }
+		local ids = {}
+		for id in pairs(chords) do ids[#ids + 1] = id end
+		local unknown, pressed = run_every_action(Gestures, ids)
+		helpers.assert_eq(unknown, {})
+		helpers.assert_eq(pressed, chords, "each one is its chord, pressed on the virtual keyboard")
+		local Emitter = helpers.load_module("modules.gestures.combo_emitter")
+		for id, chord in pairs(chords) do
+			helpers.assert_not_nil(Emitter.parse(chord), id .. ": the emitter can press " .. chord)
+		end
+	end)
+
+	helpers.it("warns, not in DEBUG, when an action has nothing to run", function()
+		local Gestures = helpers.load_module("modules.gestures.manager")
+		local Logger = require("logger.shim")
+		local real_warn, warned = Logger.warn, {}
+		Logger.warn = function(_, fmt, ...) warned[#warned + 1] = string.format(fmt, ...) end
+		local ok, err = pcall(Gestures.execute_action, "microsoft_bold", "tap_hold")
+		Logger.warn = real_warn
+		if not ok then error(err, 0) end
+		helpers.assert_eq(#warned, 1, "one warning")
+		helpers.assert_contains(warned[1], "microsoft_bold")
+	end)
+
+end)
+
+
+
+
 -- =========================================================
 -- =========================================================
 -- ======= 2/ The driver's own windows and files ===========
