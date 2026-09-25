@@ -304,7 +304,7 @@ const PIPELINE = [
 	// -------------------------------------------------------
 	// -------------------------------------------------------
 	// The build:deb and build:rpm steps run in CI on ubuntu-latest
-	// (see ci.yml jobs build-deb / build-rpm). They require a real
+	// (see ci-linux.yml job package-linux). They require a real
 	// driver bundle assembled from static/ source files, which the
 	// cross-platform build:linux step already produces. Local dev on
 	// Windows/macOS skips these — the CI gate is sufficient.

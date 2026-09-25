@@ -1,0 +1,1406 @@
+# .github/workflows/ci-linux.yml
+#
+# The Linux box of the CI pipeline. ci.yml calls it once per run, after its
+# validate and plan jobs, as the job named "Linux", so every job below renders
+# as "Linux / <name>" inside one group of the run graph:
+#
+#   test-linux ──> install-linux-distros (5)  ┐
+#   first-install-distros (9)                 ├──> linux-ok (evidence gate)
+#   package-linux ──> smoke-deb-install       │
+#                 ├─> smoke-rpm-install       │
+#                 └─> smoke-appimage-run      ┘
+#
+# The driver is assembled and packaged ONCE per run, by package-linux, into the
+# artifact assets-linux. The .deb, .rpm and AppImage smokes install those exact
+# files on their own pristine hosts, and on a release run ci.yml's release job
+# publishes those same files. linux-ok checks every job's evidence against
+# .github/linux-ci-coverage.json. The box has no outputs: its own result is what
+# the release waits for, and the release collects assets-linux through its
+# assets-* download pattern.
+#
+# Inputs, all computed by ci.yml's plan job:
+#   release       true on a run that publishes; it only sets artifact retention.
+#   version       the release version, '' otherwise ('' writes a commit-only
+#                 build stamp, the CI behaviour).
+#   linux_bundle  the tarball asset name, resolved once from the updater
+#                 release contract (defaults.json) and validated there.
+#
+# No concurrency block: the caller's group already covers the whole run, and
+# reusing it here would cancel this workflow from inside its own run.
+
+name: Linux
+
+on:
+  workflow_call:
+    inputs:
+      release:
+        description: True when this run publishes a release; only sets artifact retention
+        required: true
+        type: boolean
+      version:
+        description: Release version stamped into the Linux tree, empty outside a release
+        required: true
+        type: string
+      linux_bundle:
+        description: Linux tarball asset name from the updater release contract
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  # ─────────────────────────────────────────────────
+  # 1) Linux Lua driver unit tests, hardware harnesses and stubbed E2E
+  # ─────────────────────────────────────────────────
+  test-linux:
+    name: 'unit, hardware + stubbed E2E'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install LuaJIT
+        # The test runner (tests/run.lua) uses LuaJIT. Test discovery falls
+        # back to io.popen("find") when lfs is unavailable — no luarocks needed.
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y luajit sqlite3
+
+      - name: Verify native metrics aggregation equivalence
+        run: python3 tools/test/test-linux-metrics-aggregation-native.py
+
+      - name: Verify native cross-driver histogram multiplicity
+        run: python3 tools/test/test-metrics-histogram-native.py
+
+      - name: Run Linux driver unit test suite
+        working-directory: static/ergopti_plus/linux
+        # Wrapped in the unified reporter: streams output unchanged, exits with the
+        # runner's code (CI gating preserved), and emits GitHub annotations + a JSON
+        # summary on failure. report.cjs lives at the repo root tools/.
+        run: node ../../../tools/test/report.cjs --name linux-lua --json "${{ runner.temp }}/linux-lua.json" -- luajit tests/run.lua
+
+      # The virtual-keyboard harness, stubbed: this step runs on ubuntu-latest
+      # against the pure-Lua hotstring engine — no real evdev device, no ydotool
+      # injection. It is a corpus-driven replay of the engine's on_char() logic
+      # layer, not an OS-level end-to-end test.
+      #
+      # A step and not a job, for the reason the uinput step below gives: ten
+      # seconds of work did not justify a runner, a checkout and an apt install.
+      # As a separate job its failure could not hide anything, so this step and
+      # every harness after it run with `if: ${{ !cancelled() }}`: a red E2E still
+      # lets the kernel, display and tray harnesses report what they measured,
+      # while a run cancelled by a newer push stops at once instead of spending
+      # minutes on results nobody reads, which `always()` did.
+      - name: Run virtual-keyboard E2E harness (stubbed)
+        if: ${{ !cancelled() }}
+        # Exercises the hotstring engine against 8 hand-coded scenarios
+        # and all shared corpus vectors (vectors.json).
+        # Exit 0 = all pass, 1 = at least one failure.
+        working-directory: static/ergopti_plus/linux
+        run: |
+          set -euo pipefail
+          luajit tests/e2e/run_e2e.lua | tee "$RUNNER_TEMP/linux-e2e.log"
+        timeout-minutes: 5
+
+      # The only step in this workflow that touches a real kernel input path.
+      # Every other test of the two FFI adapters runs against a recorded syscall
+      # backend, which is the right shape for asserting order and sequence and
+      # structurally incapable of asserting the one thing left: that the kernel
+      # accepts what we send it. Four values decide that and none is observable
+      # from a mock — the ioctl request numbers, the struct size, the field
+      # offsets, and the capability bits registered before UI_DEV_CREATE. Get any
+      # of them wrong and every test above still passes while a real machine gets
+      # nothing at all.
+      #
+      # A STEP and not a job, deliberately: as a job it would cost a whole runner
+      # (checkout + apt) for five seconds of work.
+      - name: Load the uinput module
+        if: ${{ !cancelled() }}
+        run: |
+          sudo modprobe uinput
+          if [ ! -e /dev/uinput ]; then
+              echo "::error::/dev/uinput is absent after modprobe — the runner image cannot host this test."
+              echo "This is an ENVIRONMENT failure, not a driver failure. Check whether the"
+              echo "ubuntu-latest image still ships the uinput module before touching the driver."
+              exit 1
+          fi
+
+      - name: Round-trip real events through the kernel
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        # Root because /dev/uinput is root-owned until the udev rule that
+        # install.sh --setup-perms writes is in place. `sudo env` rather than
+        # `sudo -E` so the path is set explicitly and does not depend on which
+        # variables the runner sudoers happens to preserve.
+        run: |
+          sudo env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_uinput_roundtrip.lua
+        timeout-minutes: 2
+
+      # The property the whole Linux milestone is named after: keystrokes arriving
+      # DURING an expansion come out after it, in order. It was verified by reading
+      # only — a recorded backend can assert the order our code intends and is
+      # structurally incapable of asserting that the kernel agrees, and a grab in
+      # particular is invisible to a mock (ioctl returning 0 to a recorder says
+      # nothing about whether the desktop still sees the device).
+      - name: Hold the grab under an interleaved burst
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          sudo env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_grab_race.lua
+        timeout-minutes: 2
+
+      # No display server needed: `xkbcli compile-keymap --layout fr` produces the
+      # same text a live session dumps. The session decides WHICH layout is active
+      # and has nothing to do with what a layout contains — so "can the driver read
+      # a real French keymap" is checkable here, and only "is é right on YOUR
+      # keyboard" needs a person. Every layout test before this one parsed a keymap
+      # this repository wrote, which tests the parser against its author's
+      # assumptions.
+      - name: Resolve real system keymaps
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          sudo apt-get install -y --no-install-recommends libxkbcommon-tools xkb-data
+          env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_layout_resolution.lua
+        timeout-minutes: 3
+
+      # "Needs a display server" sounded like "needs a desktop", and it does not.
+      # Xvfb is a real X server and sway --backend headless is a real Wayland
+      # compositor; both simply draw to nothing. Everything the driver does with a
+      # display server EXCEPT putting pixels on a screen is therefore checkable
+      # here — including the two things that actually broke: which server it thinks
+      # it is on, and whether it can read the keymap from it.
+      #
+      # Both run in ONE step, same binary, no configuration in between, which is
+      # the machine-checkable half of C2: log out of X11, log into Wayland, change
+      # nothing.
+      - name: Detect and read the keymap on a real X11 and a real Wayland
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          sudo apt-get install -y --no-install-recommends xvfb sway libxkbcommon-tools xkb-data x11-utils
+          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+
+          echo "--- X11 (Xvfb) ---"
+          xvfb-run -a luajit tests/hardware/run_display_server.lua
+
+          echo "--- Wayland (sway, headless) ---"
+          export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp/xdg-$(id -u)}"
+          mkdir -p "$XDG_RUNTIME_DIR" && chmod 700 "$XDG_RUNTIME_DIR"
+          # A compositor with no config and no outputs. WLR_BACKENDS=headless is
+          # what lets it start without a seat or a GPU on a CI runner.
+          # French on purpose: a US answer is what a guessed table produces, so
+          # only a layout where "é" has its own key proves the keymap was read.
+          # sway honours XKB_DEFAULT_LAYOUT, and so does the driver's last
+          # fallback when libxkbcommon is too old to dump the compositor's map.
+          export XKB_DEFAULT_LAYOUT=fr ERGOPTI_EXPECT_LAYOUT=fr
+          WLR_BACKENDS=headless WLR_LIBINPUT_NO_DEVICES=1 sway --config /dev/null &
+          SWAY_PID=$!
+          # Poll for the socket rather than sleeping a fixed time: a loaded runner
+          # takes longer, and a fixed sleep turns that into a flake.
+          WAYLAND_SOCK=""
+          for _ in $(seq 1 40); do
+            WAYLAND_SOCK=$(ls "$XDG_RUNTIME_DIR" 2>/dev/null | grep -m1 '^wayland-[0-9]*$' || true)
+            [ -n "$WAYLAND_SOCK" ] && break
+            sleep 0.25
+          done
+          if [ -z "$WAYLAND_SOCK" ]; then
+            echo "::error::no Wayland socket appeared — mandatory Wayland coverage did not run"
+            kill "$SWAY_PID" 2>/dev/null || true
+            exit 1
+          fi
+          # DISPLAY is deliberately left set: a real Wayland session runs XWayland
+          # and sets it too, and that is exactly the case a detector reading DISPLAY
+          # first gets wrong on every Wayland desktop.
+          set +e
+          WAYLAND_DISPLAY="$WAYLAND_SOCK" DISPLAY=:99 luajit tests/hardware/run_display_server.lua
+          STATUS=$?
+          set -e
+          kill "$SWAY_PID" 2>/dev/null || true
+          exit $STATUS
+        timeout-minutes: 6
+
+      # An FFI binding is a set of NAMES — three sonames and thirteen symbols —
+      # and each is a claim about a library this project does not ship. A wrong
+      # soname, or a symbol that moved between releases, has exactly one symptom:
+      # no tray icon. Not an error, not a crash; the menu is simply absent while
+      # the daemon expands hotstrings perfectly, so nothing points at the cause.
+      #
+      # No unit test can catch it: with no libayatana to load it must stub, and a
+      # stub answers to whatever name the binding asks for.
+      - name: The tray binding names libraries and symbols that exist
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          sudo apt-get install -y --no-install-recommends libayatana-appindicator3-1 libgtk-3-0
+          env LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;' luajit tests/hardware/run_tray_symbols.lua
+        timeout-minutes: 4
+
+      # The symbols resolving is not the icon appearing. A panel shows a tray
+      # icon when an item registers with org.kde.StatusNotifierWatcher and then
+      # answers for its properties and its com.canonical.dbusmenu menu — the
+      # protocol KDE Plasma, GNOME's AppIndicator extension, waybar and
+      # xfce4-panel all speak. sni_host.py is that watcher and nothing else, so
+      # "the icon appears" is checked here with the production adapter: the item
+      # is Active, carries the Ergopti logo as an ABSOLUTE file path (the panel
+      # resolves it in its own working directory) and serves the menu rows.
+      - name: The tray icon registers with a StatusNotifier host
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          sudo apt-get install -y --no-install-recommends python3-gi gir1.2-glib-2.0 dbus xvfb
+          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+          dbus-run-session -- bash -c '
+            ready="$(mktemp -u)"
+            export ERGOPTI_TRAY_CLICK_FILE="$(mktemp -u)"
+            python3 tests/hardware/sni_host.py --ready-file "$ready" --timeout 30 --settle 1 \
+              --expect-label "Ergopti+ tray probe" --expect-icon-file \
+              --click-label "Click probe" > "$RUNNER_TEMP/sni.json" &
+            host=$!
+            for _ in $(seq 1 40); do [ -f "$ready" ] && break; sleep 0.25; done
+            [ -f "$ready" ] || { echo "::error::the StatusNotifier host never started"; exit 1; }
+            xvfb-run -a luajit tests/hardware/run_tray_icon.lua 10
+            probe=$?
+            wait "$host"; status=$?
+            cat "$RUNNER_TEMP/sni.json"
+            [ "$probe" = "0" ] || exit "$probe"
+            # The click went panel → dbusmenu → libdbusmenu → the shared
+            # dispatcher → the row: its marker is the proof.
+            [ -f "$ERGOPTI_TRAY_CLICK_FILE" ] || { echo "::error::a menu click never reached its row"; exit 1; }
+            exit "$status"'
+        timeout-minutes: 4
+
+      # The secure-field probe decides whether ANY expansion may fire (it fails
+      # closed), and its one real input is a desktop: an accessibility bus, a
+      # window manager and applications that keep FOCUSED on their last field.
+      # With two windows open the old desktop-wide search found two focused
+      # fields and blocked every expansion; only a real bus shows that.
+      - name: The secure-field probe on a real accessibility bus
+        if: ${{ !cancelled() }}
+        run: |
+          sudo apt-get install -y --no-install-recommends at-spi2-core openbox python3-gi gir1.2-gtk-3.0 dbus-x11 xvfb
+          bash static/ergopti_plus/linux/tests/hardware/run_atspi_focus.sh
+        timeout-minutes: 5
+
+      # The program a user starts, started: the real daemon with --tray on a
+      # keyboard created through uinput, under an X server, a session bus, the
+      # accessibility bus, a window manager and a focused GTK field (nothing
+      # expands without the privacy gate's answer). A trigger typed on that
+      # keyboard must reach the desktop expanded, through the grab and the
+      # daemon's own virtual keyboard, while sni_host.py checks the tray it shows:
+      # the logo, and a translated menu with no raw i18n key.
+      - name: The whole daemon, live — a trigger typed, a tray shown
+        if: ${{ !cancelled() }}
+        run: |
+          sudo modprobe uinput
+          # lua-luv as install.sh installs it: the daemon's timers and every
+          # HTTP request (the AI phase) run on it.
+          sudo apt-get install -y --no-install-recommends at-spi2-core openbox python3-gi gir1.2-gtk-3.0 \
+            dbus-x11 xvfb x11-xkb-utils libayatana-appindicator3-1 lua-luv
+          sudo bash static/ergopti_plus/linux/tests/hardware/run_daemon_live.sh
+        timeout-minutes: 6
+
+      # The updater a user runs, run: this tree built as an old release and
+      # installed with its own install.sh, then its updater finds the newest
+      # published release on GitHub, verifies and installs it, and restarts the
+      # daemon on it. An installed prerelease once asked the "stable" channel
+      # and never found an update; an installed update once waited for the
+      # next login.
+      - name: The Linux updater, live — update to the newest release and restart
+        if: ${{ !cancelled() }}
+        run: |
+          sudo apt-get install -y --no-install-recommends lua-luv
+          bash static/ergopti_plus/linux/tests/hardware/run_updater_live.sh
+        timeout-minutes: 10
+
+      # The AI a user runs locally, run: the official Ollama serving a small
+      # model, asked through the production modules and the real curl transport
+      # for its model list, a download, streamed predictions, and — on its
+      # OpenAI-compatible endpoint, the dialect Cerebras speaks — the remote
+      # backend and its connectivity probe.
+      - name: AI predictions against a real Ollama
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y --no-install-recommends lua-luv
+          curl -fsSL https://ollama.com/install.sh | sh
+          (ollama serve > "$RUNNER_TEMP/ollama.log" 2>&1 &) || true
+          for _ in $(seq 1 60); do curl -sf http://127.0.0.1:11434/api/tags >/dev/null && break; sleep 1; done
+          ollama pull qwen2.5:0.5b
+          cd static/ergopti_plus/linux
+          HOME="$(mktemp -d)" XDG_CONFIG_HOME= \
+            LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;' \
+            luajit tests/hardware/run_ollama_live.lua qwen2.5:0.5b
+        timeout-minutes: 12
+
+      # touchpad_finder reads capability bits out of a printed bitmap, and that
+      # rests on one thing the text cannot confirm: that the words are 64 bits
+      # wide, most significant first, with leading zero words omitted. Its unit
+      # tests use a fixture written by hand, so they prove the parser is
+      # self-consistent and nothing about the format the kernel actually emits.
+      #
+      # Here the device is declared through uinput, the KERNEL formats the
+      # bitmaps, and the parser has to agree with a text it did not see written.
+      # The same step settles the finger-count claim the whole "grey what this
+      # hardware cannot serve" design rests on: input_mt_init_slots() advertises
+      # QUINTTAP only at five slots, so a five-slot device must read back as five.
+      - name: A virtual touchpad, described by the kernel and read back
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          sudo modprobe uinput || true
+          sudo chmod 0666 /dev/uinput
+          env LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;' luajit tests/hardware/run_touchpad_capability.lua
+        timeout-minutes: 4
+
+      # test_mt_decoder feeds the decoder a table written by hand from the
+      # kernel's documentation. It proves the state machine agrees with MY
+      # reading of the protocol and nothing about what a kernel delivers — the
+      # plan records that as "the event trace is a reconstruction, not a
+      # capture".
+      #
+      # Here the events make a round trip: written to /dev/uinput, published on
+      # an input node, found by the driver's own finder, opened by its own
+      # reader, decoded by its own decoder. The struct layout, the ioctl numbers,
+      # the slot semantics and the non-blocking read are all the kernel's, and
+      # those are exactly what a hand-written table cannot check.
+      - name: A gesture written to uinput comes back as a gesture
+        # Not skipped when an earlier harness fails. These are independent
+        # diagnostics, and letting the first failure hide the others' answers is
+        # how a run comes back saying less than it measured — the page-error trap
+        # below was skipped on its first outing for exactly that reason, so its
+        # question went unanswered for a whole cycle.
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          # sudo, like the grab harness: the event node the kernel publishes for a
+          # new uinput device belongs to root:input at 0660, and the runner's user
+          # is in neither. Creating the device needs only /dev/uinput; READING it
+          # back needs the node, which is the half this harness exists for.
+          sudo env LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;' luajit tests/hardware/run_gesture_roundtrip.lua
+        timeout-minutes: 4
+
+      # Both hotstrings bridges were changed from RETURNING their payload to
+      # PUSHING it, because makeHostBridge is fire-and-forget and only two of the
+      # fourteen shared pages define window.__hostBridgeResponse — a returned
+      # payload reached nobody, so the settings window drew an empty page and the
+      # editor sat on "Chargement…" for ever.
+      #
+      # Every unit test of that fix asserts the SHAPE of the JavaScript string
+      # handed to eval_js. None proves the string arrives, that the page defines
+      # the function it calls, or that the function survives a payload built by
+      # Lua. Three separate ways for the same fix to be wrong with the suite green.
+      # Its own step, and a generous budget, because it is a DOWNLOAD: WebKit2GTK
+      # pulls the whole GStreamer tree, and the first attempt at this spent eight
+      # minutes fetching packages and timed out before running a single
+      # assertion. A timeout that fires during dependency installation says
+      # nothing whatever about the code, so the two are separated and the test
+      # step below gets a budget sized for the test.
+      - name: Install WebKit2GTK and lgi
+        if: ${{ !cancelled() }}
+        run: |
+          sudo apt-get install -y --no-install-recommends \
+            xvfb lua-lgi gir1.2-webkit2-4.1 gir1.2-gtk-3.0
+        timeout-minutes: 20
+
+      - name: The webview push reaches a real WebKit page
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+          # lua-lgi installs for the distro's Lua, not for LuaJIT, so the module
+          # path has to be widened rather than assumed. Reported, not guessed at:
+          # the harness exits 2 when lgi is unreachable and the step says so.
+          export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
+          export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
+          # One page per invocation. Both in one process made the verdict move
+          # between them run to run — two webviews share a GTK loop, so pumping
+          # for one processes the other's events and a probe can land while the
+          # other page is still settling.
+          set +e
+          STATUS=0
+          for APP in hotstrings_config_window hotstring_editor; do
+            xvfb-run -a luajit tests/hardware/run_webview_push.lua "$APP"
+            CASE=$?
+            [ "$CASE" = "0" ] || STATUS=$CASE
+          done
+          set -e
+          # Status 2 means the runner could not host a mandatory subject. That is
+          # an environment failure, but linux-ok must remain red until the
+          # subject actually executes.
+          if [ "$STATUS" = "2" ]; then
+            echo "::error::WebKit/lgi unavailable — mandatory webview coverage did not run."
+            exit 1
+          fi
+          exit $STATUS
+        timeout-minutes: 8
+
+      # The other direction: the metrics page posts its own {action: 'ready'}
+      # object and must get the daemon's data back. Both halves went through
+      # dkjson, which is not installed, so every tray window with a request of
+      # its own stayed empty while the push test above stayed green.
+      - name: A page's own request is answered in real WebKit
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+          export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
+          export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
+          xvfb-run -a luajit tests/hardware/run_webview_roundtrip.lua
+        timeout-minutes: 5
+
+      # The release list a user opens from the tray, opened: real WebKit, the
+      # Linux bridge fetching GitHub's releases through its curl adapter. It
+      # opened on the stable channel, which hides prereleases, and every
+      # release is one: the window listed nothing.
+      - name: The release list window lists GitHub's releases in real WebKit
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          sudo apt-get install -y --no-install-recommends lua-luv
+          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+          export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
+          export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
+          xvfb-run -a luajit tests/hardware/run_changelog_live.lua
+        timeout-minutes: 5
+
+      # The typing-speed readouts, drawn: the floating pill through its real GTK
+      # surface (placed, painted in the source's colour, switched to the graph,
+      # dragged by a real pointer) and the tray readout registered with a
+      # StatusNotifier host. The widget called a renderer function that never
+      # existed and read stats with no speed in them: it drew nothing anywhere.
+      - name: The WPM widget and tray readout draw on a real display
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          sudo apt-get install -y --no-install-recommends xdotool python3-gi gir1.2-glib-2.0 dbus xvfb
+          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+          export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
+          export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
+          home="$(mktemp -d)"
+          export HOME="$home" XDG_CONFIG_HOME="$home/.config" XDG_DATA_HOME="$home/.local/share"
+          dbus-run-session -- bash -c '
+            ready="$(mktemp -u)"
+            python3 tests/hardware/sni_host.py --ready-file "$ready" --timeout 40 --settle 1 \
+              --expect-icon-file > "$RUNNER_TEMP/sni-wpm.json" &
+            host=$!
+            for _ in $(seq 1 40); do [ -f "$ready" ] && break; sleep 0.25; done
+            [ -f "$ready" ] || { echo "::error::the StatusNotifier host never started"; exit 1; }
+            xvfb-run -a luajit tests/hardware/run_wpm_readouts_live.lua 6
+            probe=$?
+            wait "$host"; status=$?
+            cat "$RUNNER_TEMP/sni-wpm.json"
+            [ "$probe" = "0" ] || exit "$probe"
+            grep -q "ergopti-plus-wpm" "$RUNNER_TEMP/sni-wpm.json" || { echo "::error::the readout item never registered"; exit 1; }
+            exit "$status"'
+        timeout-minutes: 5
+
+      # window.setData is undefined in the settings window, so the host's
+      # `if(window.setData)` guard discards every push. Seven explanations are
+      # ruled out, and the informative one is the last: an explicit
+      # `window.setData = setData` at the END of the file changed nothing. If the
+      # script ran to completion that line alone would be enough — so it throws.
+      #
+      # A throw during load is invisible to every probe run afterwards, because
+      # by then the page merely looks incomplete. window.onerror only catches
+      # what is raised after it is installed, and installing it with
+      # run_javascript is too late by the whole page load — so this harness
+      # builds the HTML itself and splices the trap in right after <head>.
+      - name: What each page raises while loading
+        if: ${{ !cancelled() }}
+        working-directory: static/ergopti_plus/linux
+        run: |
+          export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+          export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
+          export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
+          set +e
+          xvfb-run -a luajit tests/hardware/run_page_errors.lua
+          STATUS=$?
+          set -e
+          if [ "$STATUS" = "2" ]; then
+            echo "::error::WebKit/lgi unavailable — mandatory page-error coverage did not run."
+            exit 1
+          fi
+          exit $STATUS
+        timeout-minutes: 5
+
+      - name: Record mandatory Linux test evidence
+        run: |
+          set -euo pipefail
+          unit_assertions=$(jq -r '.passed' "$RUNNER_TEMP/linux-lua.json")
+          e2e_assertions=$(sed -n 's/^1\.\.\([0-9][0-9]*\)$/\1/p' "$RUNNER_TEMP/linux-e2e.log" | tail -1)
+          node tools/test/linux-ci-evidence.cjs record \
+              --job test-linux \
+              --output "$RUNNER_TEMP/linux-ci-evidence/test-linux.json" \
+              --sha "$GITHUB_SHA" \
+              --architecture "$RUNNER_ARCH" \
+              --distro ubuntu \
+              --session x11-wayland-headless \
+              --interpreter "$(luajit -v 2>&1 | head -1)" \
+              --subject "unit=$unit_assertions" \
+              --subject uinput-roundtrip=1 \
+              --subject grab-race=1 \
+              --subject system-keymaps=1 \
+              --subject x11-display=1 \
+              --subject wayland-display=1 \
+              --subject tray-symbols=1 \
+              --subject tray-sni-registration=1 \
+              --subject atspi-focus-probe=1 \
+              --subject daemon-live=1 \
+              --subject ollama-live=1 \
+              --subject touchpad-capability=1 \
+              --subject gesture-roundtrip=1 \
+              --subject webview-settings=1 \
+              --subject webview-editor=1 \
+              --subject webview-roundtrip=1 \
+              --subject page-load-errors=1 \
+              --subject "hotstring-e2e=$e2e_assertions"
+
+      - name: Upload mandatory Linux test evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-ci-evidence-test-linux
+          retention-days: 7
+          path: ${{ runner.temp }}/linux-ci-evidence/test-linux.json
+          if-no-files-found: error
+
+  # ─────────────────────────────────────────────────
+  # 2) Linux install, per distribution family
+  # ─────────────────────────────────────────────────
+  # install.sh has to work on package managers this project's author does not
+  # run. Until 2026-08-05 that was a checklist line asking a person to find five
+  # machines, which is the kind of check that gets done once. Containers make it
+  # deterministic and repeatable: each image is the real package manager, the real
+  # shell and the real filesystem layout.
+  #
+  # --no-deps is used deliberately. Installing every runtime dependency in five
+  # containers would test the distributions' package archives, which are not ours
+  # and go down; what is ours is whether the script RUNS to completion, detects
+  # the package manager, and lays the driver out where the daemon expects it. A
+  # dependency archive outage must not read as a broken installer.
+  install-linux-distros:
+    name: 'install (${{ matrix.distro }})'
+    runs-on: ubuntu-latest
+    needs: [test-linux]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: debian
+            image: debian:stable-slim
+            prep: apt-get update && apt-get install -y --no-install-recommends bash coreutils findutils grep sed
+          - distro: fedora
+            image: fedora:latest
+            prep: dnf install -y bash coreutils findutils grep sed
+          - distro: arch
+            image: archlinux:latest
+            prep: pacman -Sy --noconfirm bash coreutils findutils grep sed
+          - distro: alpine
+            image: alpine:latest
+            prep: apk add --no-cache bash coreutils findutils grep sed
+          - distro: opensuse
+            image: opensuse/tumbleweed:latest
+            prep: sed -i 's|http://download.opensuse.org|https://downloadcontent.opensuse.org|g' /etc/zypp/repos.d/*.repo && zypper --non-interactive install bash coreutils findutils grep sed
+    container:
+      image: ${{ matrix.image }}
+    steps:
+      - name: Prepare the container
+        run: ${{ matrix.prep }}
+
+      - uses: actions/checkout@v4
+
+      - name: Install with no root and no network dependencies
+        working-directory: static/ergopti_plus/linux
+        # No sudo and no systemd inside a container, which is also the immutable
+        # -distribution case: everything must land under $HOME and the script must
+        # not abort when it cannot write /usr or reach systemctl.
+        run: |
+          export HOME=/tmp/ergopti-home
+          mkdir -p "$HOME"
+          bash install.sh --no-deps
+
+      - name: The installed tree is the one the daemon expects
+        run: |
+          export HOME=/tmp/ergopti-home
+          FAIL=0
+          # The wrapper is what a user types. Without it nothing else matters.
+          if [ ! -x "$HOME/.local/bin/ergopti-hotstrings" ]; then
+            echo "::error::no executable at ~/.local/bin/ergopti-hotstrings"
+            FAIL=1
+          fi
+          # The driver root and the shared tree must be SIBLINGS: infra/paths.lua
+          # resolves _shared as ../_shared from the driver root and probes it, so a
+          # layout that nests them differently boots to "shared tree not found".
+          for path in "$HOME/.local/lib/ergopti/linux/ergopti_hotstrings.lua" \
+                      "$HOME/.local/lib/ergopti/_shared/data/locales/en.json"; do
+            if [ ! -f "$path" ]; then
+              echo "::error::missing $path"
+              FAIL=1
+            fi
+          done
+          # A hotstring pack, because an install with no hotstrings is an install
+          # that runs and does nothing.
+          if ! ls "$HOME/.local/lib/ergopti/_shared/modules/hotstrings/"*.toml >/dev/null 2>&1; then
+            echo "::error::no hotstring packs were installed"
+            FAIL=1
+          fi
+          exit $FAIL
+        timeout-minutes: 5
+
+      # The whole unit suite, on THIS distribution's own LuaJIT.
+      #
+      # Everything else in this workflow runs on Ubuntu's build, so a difference
+      # that belongs to the interpreter or the C library is invisible to it —
+      # and those are the differences that actually bite here. Alpine is musl
+      # rather than glibc; Arch ships whatever LuaJIT released last; several
+      # distributions patch it. The driver is 1600 assertions of pure Lua plus a
+      # thin FFI layer, so running them where the interpreter differs is cheap
+      # certification of exactly the part that varies.
+      #
+      # LuaJIT is the production interpreter. A distribution lane without it is
+      # not evidence about the driver and therefore cannot satisfy this gate.
+      - name: The unit suite on this distribution's LuaJIT
+        working-directory: static/ergopti_plus/linux
+        run: |
+          set +e
+          case "${{ matrix.distro }}" in
+            debian)   apt-get install -y --no-install-recommends luajit ;;
+            fedora)   dnf install -y luajit ;;
+            arch)     pacman -Sy --noconfirm luajit ;;
+            alpine)   apk add --no-cache luajit ;;
+            opensuse) zypper --non-interactive install luajit ;;
+          esac
+          if ! command -v luajit >/dev/null 2>&1; then
+            echo "::error::${{ matrix.distro }} has no LuaJIT package — mandatory distro coverage did not run."
+            exit 1
+          fi
+          luajit -v
+          luajit tests/run.lua
+          STATUS=$?
+          set -e
+          exit $STATUS
+        timeout-minutes: 10
+
+      - name: Record mandatory distro evidence
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/linux-ci-evidence"
+          mkdir -p "$evidence_dir"
+          printf '%s\n' \
+            '{' \
+            '  "schema_version": 1,' \
+            '  "job": "install-linux-distros",' \
+            "  \"sha\": \"$GITHUB_SHA\"," \
+            "  \"architecture\": \"$RUNNER_ARCH\"," \
+            '  "distro": "${{ matrix.distro }}",' \
+            '  "session": "container",' \
+            '  "interpreter": "LuaJIT",' \
+            '  "subjects": { "distro-${{ matrix.distro }}": 1 }' \
+            '}' > "$evidence_dir/${{ matrix.distro }}.json"
+
+      - name: Upload mandatory distro evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-ci-evidence-distro-${{ matrix.distro }}
+          retention-days: 7
+          path: ${{ runner.temp }}/linux-ci-evidence/${{ matrix.distro }}.json
+          if-no-files-found: error
+
+  # ─────────────────────────────────────────────────
+  # 3) Linux first install, WITH dependencies, per distribution
+  # ─────────────────────────────────────────────────
+  # install-linux-distros runs --no-deps on purpose, and nothing ran the
+  # installer the way the README tells a user to: with its dependencies. That
+  # path is where the first-run failures lived — a remap binary needing glibc
+  # 2.39 aborting the whole install on Ubuntu 22.04 and Debian 12, the tray library
+  # never installed at all. tests/distro/e2e_install.sh runs install.sh as an
+  # unprivileged sudo user against each distribution's real archives, then
+  # checks the INSTALLED tree: the launcher, every FFI library, WebKit through
+  # lgi, and a tray icon registered with a StatusNotifierWatcher (the protocol
+  # KDE, GNOME's AppIndicator extension, waybar and xfce4-panel speak).
+  #
+  # The matrix spans what differs underneath: glibc and musl, libxkbcommon
+  # before and after 1.8, six package managers, LTS and rolling releases.
+  # Reproduce any entry locally with:
+  #   static/ergopti_plus/linux/tests/distro/run_in_docker.sh <image>
+  first-install-distros:
+    name: 'first install with deps (${{ matrix.distro }})'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { distro: ubuntu-22.04, image: 'ubuntu:22.04' }
+          - { distro: ubuntu-24.04, image: 'ubuntu:24.04' }
+          - { distro: debian-12, image: 'debian:12' }
+          - { distro: debian-13, image: 'debian:13' }
+          # Fedora packages lgi for Lua 5.4 only: the tray works there, its
+          # WebKit windows cannot open under LuaJIT. Declared, and the entry
+          # fails if that ever stops being true.
+          - { distro: fedora-41, image: 'fedora:41', known: webkit }
+          - { distro: fedora-latest, image: 'fedora:latest', known: webkit }
+          - { distro: arch, image: 'archlinux:latest' }
+          - { distro: opensuse-tumbleweed, image: 'opensuse/tumbleweed:latest' }
+          - { distro: alpine, image: 'alpine:latest' }
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install on ${{ matrix.image }} and verify the first run
+        timeout-minutes: 25
+        run: |
+          set -euo pipefail
+          export ERGOPTI_E2E_DOCKER_ARGS="-e ERGOPTI_E2E_KNOWN_LIMITATIONS=${{ matrix.known || '' }}"
+          bash static/ergopti_plus/linux/tests/distro/run_in_docker.sh '${{ matrix.image }}' \
+            | tee "$RUNNER_TEMP/first-install.log"
+
+      - name: Record mandatory first-install evidence
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/linux-ci-evidence"
+          mkdir -p "$evidence_dir"
+          printf '%s\n' \
+            '{' \
+            '  "schema_version": 1,' \
+            '  "job": "first-install-distros",' \
+            "  \"sha\": \"$GITHUB_SHA\"," \
+            "  \"architecture\": \"$RUNNER_ARCH\"," \
+            '  "distro": "${{ matrix.distro }}",' \
+            '  "session": "container-first-install",' \
+            '  "interpreter": "LuaJIT",' \
+            '  "subjects": { "first-install-${{ matrix.distro }}": 1 }' \
+            '}' > "$evidence_dir/first-install-${{ matrix.distro }}.json"
+
+      - name: Upload mandatory first-install evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-ci-evidence-first-install-${{ matrix.distro }}
+          retention-days: 7
+          path: ${{ runner.temp }}/linux-ci-evidence/first-install-${{ matrix.distro }}.json
+          if-no-files-found: error
+
+  # ─────────────────────────────────────────────────
+  # 4) Assemble the driver once, build every package, smoke two of them
+  # ─────────────────────────────────────────────────
+  # One assembly and one packaging pass per run, CI and release alike: the files
+  # uploaded below as assets-linux are the ones the three smoke jobs install
+  # and, on a release run, the ones ci.yml's release job publishes. The assembly
+  # keeps its own smoke (no --skip-smoke), so the require checks that used to
+  # run only on a release now run on every push and pull request.
+  #
+  # The driver's own version comes from inputs.version, the version ci.yml's plan
+  # job computed ('' outside a release): ERGOPTI_BUILD_VERSION is stamped into
+  # build/linux/_shared/build_stamp.txt by build-linux-driver.sh, and every
+  # later verify in this job requires that same value, so the tray, the
+  # healthcheck and the updater report the published release. The package
+  # METADATA still takes its version from package.json, so the .deb "Version:"
+  # and the .rpm "Version:" can lag the release tag: on dev the version is
+  # 0.0.0-dev.N, and rpm rejects a hyphen in Version:, so the same value that a
+  # .deb accepts would abort rpmbuild. Every published package is therefore
+  # renamed below to a name that carries no version at all, so no asset can be
+  # misnamed and the website's exact-name lookup keeps working.
+  #
+  # Not a dependent of test-linux, deliberately: packaging in parallel shortens
+  # the Linux box by minutes on every run, at the price of a wasted packaging
+  # run on the rare push whose unit suite fails.
+  #
+  # The Flatpak and tarball smokes run here, on the build host, because neither
+  # needs a pristine machine: the build only runs `flatpak build-bundle`, so
+  # installing the bundle is still a first install, and the tarball installs
+  # under $HOME. The .deb, .rpm and AppImage smokes each prove a dependency the
+  # host must NOT already have, so they keep their own runners below.
+  package-linux:
+    name: 'packages + Flatpak and tarball smoke'
+    runs-on: ubuntu-latest
+    env:
+      ERGOPTI_BUILD_VERSION: ${{ inputs.version }}
+      LINUX_BUNDLE_ASSET: ${{ inputs.linux_bundle }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install LuaJIT
+        # Three readers: the assembly smoke below boots the driver with it,
+        # build-linux-appimage.sh copies the BUILD HOST's luajit into the image
+        # (without it the AppImage falls back to a luajit the target must
+        # already have), and the tarball smoke runs the installed tree with it.
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y luajit
+
+      - name: Assemble Linux driver bundle
+        shell: bash
+        env:
+          ERGOPTI_BUILD_COMMIT: ${{ github.sha }}
+        run: bash tools/build/build-linux-driver.sh
+
+      - name: Package latest XKB files
+        shell: bash
+        run: |
+          set -euo pipefail
+          latest_dir=$(ls -d static/ergopti/linux/v*_* | sort -V | tail -1)
+          dir_name=$(basename "$latest_dir")
+          mkdir -p build/linux/xkb
+          (cd static/ergopti/linux && zip -r "../../../build/linux/xkb/Ergopti_xkb.zip" "$dir_name")
+          echo "Packaged XKB: $dir_name → Ergopti_xkb.zip"
+
+      # A tarball, because the release used to publish install.sh, one wrapper
+      # and ONE Lua file — so a user who downloaded it had an installer, no
+      # driver and no shared tree, and could not install anything. The daemon
+      # resolves _shared as a SIBLING of the driver, so the archive preserves
+      # that layout rather than flattening it.
+      - name: Package the installable bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash tools/build/write_build_stamp.sh verify build/linux/_shared
+          tar -czf "build/linux/$LINUX_BUNDLE_ASSET" -C build/linux linux _shared bin install.sh
+          (cd build/linux && sha256sum "$LINUX_BUNDLE_ASSET" > "$LINUX_BUNDLE_ASSET.sha256")
+          (cd build/linux && sha256sum --check "$LINUX_BUNDLE_ASSET.sha256")
+          echo "Bundle contents:"
+          tar -tzf "build/linux/$LINUX_BUNDLE_ASSET" | sed -n '1,20p'
+          bundle_entries=$(tar -tzf "build/linux/$LINUX_BUNDLE_ASSET" | wc -l)
+          echo "... $bundle_entries entries"
+
+      - name: Install the packaging toolchains
+        # rpmbuild is not on the runner image. appimagetool ships AS an AppImage,
+        # and an AppImage mounts itself through FUSE, which the runner does not
+        # have — so it is unpacked once and its AppRun is put on PATH instead.
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y rpm
+          rpmbuild --version
+          curl -fsSL --retry 3 --retry-delay 5 -o "$RUNNER_TEMP/appimagetool" \
+              https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x "$RUNNER_TEMP/appimagetool"
+          (cd "$RUNNER_TEMP" && ./appimagetool --appimage-extract >/dev/null)
+          sudo ln -sf "$RUNNER_TEMP/squashfs-root/AppRun" /usr/local/bin/appimagetool
+          test -x /usr/local/bin/appimagetool
+          sudo apt-get install -y flatpak flatpak-builder
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 ||
+              echo "::notice::no apparmor_restrict_unprivileged_userns knob here — continuing"
+          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user -y flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
+
+      - name: Build the .deb, the .rpm, the AppImage and the Flatpak
+        # No --skip-* flag anywhere: those return before dpkg-deb, rpmbuild,
+        # appimagetool and flatpak-builder respectively, which is how four
+        # packagers stayed unexercised while CI reported them green. The AppImage
+        # picks up the luajit installed above and bundles it; the Flatpak
+        # compiles its own inside the sandbox.
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash tools/build/build-linux-deb.sh
+          bash tools/build/build-linux-rpm.sh
+          bash tools/build/build-linux-appimage.sh
+          bash tools/build/build-linux-flatpak.sh
+
+      - name: The staged payload carries the driver and the shared data tree
+        # The packager checks its own manifest; this checks the payload, which is
+        # the part a copy that silently did nothing would leave empty.
+        run: |
+          set -euo pipefail
+          fail=0
+          for f in build/linux/flatpak/org.ergopti.Ergopti.yml \
+                   build/linux/flatpak/payload/bin/ergopti \
+                   build/linux/flatpak/payload/lib/ergopti/ergopti_hotstrings.lua \
+                   build/linux/flatpak/payload/lib/ergopti/infra/paths.lua \
+                   build/linux/flatpak/payload/lib/ergopti/_shared/lua/logger/shim.lua \
+                   build/linux/flatpak/payload/lib/ergopti/_shared/data/locales/en.json; do
+              if [ ! -f "$f" ]; then
+                  echo "::error::the Flatpak payload is missing $f"
+                  fail=1
+              fi
+          done
+          exit $fail
+
+      - name: Rename the packages to their stable asset names
+        # Each packager names its output after the version in package.json, which
+        # is not the release tag. A published asset must keep ONE name across
+        # releases: the notes are static text and the website resolves its
+        # download buttons by exact asset name (getGitHubRelease.js).
+        #
+        # It also closes a silent-skip hole. build-linux-appimage.sh exits 0 with
+        # only the AppDir staged when appimagetool is absent, and the .rpm script
+        # does the same without rpmbuild — so demanding the file here is what
+        # turns "no package was produced" into a failure instead of a green run
+        # with one asset missing.
+        shell: bash
+        run: |
+          set -euo pipefail
+          rename_one() {
+              local found="$1" target="$2" kind="$3"
+              if [ -z "$found" ]; then
+                  echo "::error::the $kind packager produced no package — nothing to attach."
+                  exit 1
+              fi
+              mv "$found" "$target"
+              echo "  $kind -> $target ($(du -h "$target" | cut -f1))"
+          }
+          rename_one "$(find build/linux -maxdepth 1 -name '*.flatpak' -type f 2>/dev/null | head -1)" \
+              build/linux/ErgoptiPlus-linux-x86_64.flatpak "Flatpak"
+          rename_one "$(find build/linux -maxdepth 1 -name '*.deb' -type f 2>/dev/null | head -1)" \
+              build/linux/ErgoptiPlus-linux-amd64.deb ".deb"
+          rename_one "$(find build/linux/rpm/RPMS -name '*.rpm' -type f 2>/dev/null | head -1)" \
+              build/linux/ErgoptiPlus-linux-noarch.rpm ".rpm"
+          rename_one "$(find build/linux -maxdepth 1 -name '*.AppImage' -type f 2>/dev/null | head -1)" \
+              build/linux/ErgoptiPlus-linux-x86_64.AppImage "AppImage"
+
+      - name: Log the package metadata
+        # dpkg-deb --info, rpm -qip and rpm -qlp put the metadata and the file
+        # list in the log, where a wrong control field or %files stanza is
+        # visible without a Debian or Fedora box. sed rather than head: head
+        # exits after its lines, and under pipefail the SIGPIPE it leaves rpm
+        # with would fail a listing that succeeded.
+        shell: bash
+        run: |
+          set -euo pipefail
+          dpkg-deb --info build/linux/ErgoptiPlus-linux-amd64.deb
+          rpm -qip build/linux/ErgoptiPlus-linux-noarch.rpm
+          rpm -qlp build/linux/ErgoptiPlus-linux-noarch.rpm | sed -n '1,20p'
+
+      # The sandboxed path. `flatpak run` is what a user's launcher invokes, and
+      # it is the only one of the five formats that executes inside the
+      # confinement the manifest declares — so a permission the driver needs and
+      # the manifest forgot shows up here rather than on a user's machine. Flathub
+      # and the runtime are already installed by the toolchain step above.
+      - name: Install the Flatpak the way a user would
+        run: |
+          set -euo pipefail
+          bundle=build/linux/ErgoptiPlus-linux-x86_64.flatpak
+          if [ ! -f "$bundle" ]; then
+              echo "::error::no Flatpak bundle at $bundle — nothing to install."
+              exit 1
+          fi
+          flatpak install --user -y --bundle "$bundle"
+          flatpak list --user --app
+
+      - name: Launch the Flatpak
+        run: flatpak run --user org.ergopti.Ergopti --help
+
+      - name: The sandboxed shared data tree resolves and opens
+        # Run INSIDE the sandbox with --command, so this reads /app exactly as
+        # the daemon does. The check script is bound in read-only from the
+        # checkout because the package deliberately ships no tests.
+        run: |
+          set -euo pipefail
+          check_dir="$(pwd)/static/ergopti_plus/linux/tests/hardware"
+          flatpak run --user \
+              --filesystem="$check_dir:ro" \
+              --env=LUA_PATH="/app/lib/ergopti/?.lua;/app/lib/ergopti/?/init.lua;/app/lib/ergopti/_shared/lua/?.lua;/app/lib/ergopti/_shared/lua/?/init.lua;;" \
+              --command=luajit org.ergopti.Ergopti \
+              "$check_dir/installed_layout_check.lua" /app/lib/ergopti/_shared
+
+      # The no-root path the release notes point every other distribution at. It
+      # is the only format whose installer is our own script rather than a
+      # package manager, so it is the only one where a broken install.sh is
+      # invisible everywhere else. --no-deps because the runner has what it needs
+      # and the dependency install is the distro matrix's job, not this one's.
+      # The archive installed is the very file uploaded below, not a twin.
+      - name: Unpack and install the tarball the way a user would
+        # --no-deps because package installs are the distro matrix's job, and
+        # --no-service because a runner has no user session bus for a
+        # systemd --user unit to register with. The permission setup DOES run:
+        # it is the half every packaged format leaves to install.sh, so skipping
+        # it would leave the one script nobody else exercises unexercised.
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/unpacked"
+          tar -xzf "build/linux/$LINUX_BUNDLE_ASSET" -C "$RUNNER_TEMP/unpacked"
+          cd "$RUNNER_TEMP/unpacked"
+          test -f install.sh
+          bash install.sh --no-deps --no-service || {
+              echo "::error::install.sh failed on a clean unpack of the release tarball."
+              exit 1
+          }
+
+      - name: Launch what the tarball installed
+        run: |
+          set -euo pipefail
+          launcher="$HOME/.local/bin/ergopti-hotstrings"
+          if [ ! -x "$launcher" ]; then
+              echo "::error::install.sh left no executable launcher at $launcher"
+              ls -la "$HOME/.local/bin" || true
+              exit 1
+          fi
+          "$launcher" --help
+
+      - name: The installed shared data tree resolves and opens
+        run: |
+          set -euo pipefail
+          root="$HOME/.local/lib/ergopti"
+          if [ ! -d "$root/linux" ]; then
+              echo "::error::no driver tree at $root/linux — install.sh moved its install root."
+              ls -la "$root" || true
+              exit 1
+          fi
+          export LUA_PATH="$root/linux/?.lua;$root/linux/?/init.lua;$root/_shared/lua/?.lua;$root/_shared/lua/?/init.lua;;"
+          luajit static/ergopti_plus/linux/tests/hardware/installed_layout_check.lua \
+              "$root/_shared"
+
+      - name: Upload Linux artifacts
+        # The one Linux artifact of the run: the smoke jobs below install from
+        # it, and on a release run ci.yml's release job attaches every file in
+        # it. Kept 7 days on a release run so that a next-day "Re-run failed
+        # jobs" still finds it, 1 day otherwise.
+        uses: actions/upload-artifact@v4
+        with:
+          name: assets-linux
+          retention-days: ${{ inputs.release && 7 || 1 }}
+          if-no-files-found: error
+          path: |
+            build/linux/xkb/Ergopti_xkb.zip
+            build/linux/${{ env.LINUX_BUNDLE_ASSET }}
+            build/linux/${{ env.LINUX_BUNDLE_ASSET }}.sha256
+            build/linux/ErgoptiPlus-linux-amd64.deb
+            build/linux/ErgoptiPlus-linux-noarch.rpm
+            build/linux/ErgoptiPlus-linux-x86_64.AppImage
+            build/linux/ErgoptiPlus-linux-x86_64.flatpak
+
+      - name: Record mandatory package evidence
+        # One record for the six subjects this job proves. It is written only
+        # when every step above passed, so no subject can be claimed by a
+        # packaging run that stopped halfway.
+        run: |
+          set -euo pipefail
+          node tools/test/linux-ci-evidence.cjs record \
+              --job package-linux --output "$RUNNER_TEMP/linux-ci-evidence/package-linux.json" \
+              --sha "$GITHUB_SHA" --architecture "$RUNNER_ARCH" --distro ubuntu \
+              --session packaging --interpreter "$(luajit -v 2>&1 | head -1)" \
+              --subject build-deb=1 \
+              --subject build-rpm=1 \
+              --subject build-appimage=1 \
+              --subject build-flatpak=1 \
+              --subject smoke-flatpak-run=1 \
+              --subject smoke-tarball-install=1
+
+      - name: Upload mandatory package evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-ci-evidence-package-linux
+          retention-days: 7
+          path: ${{ runner.temp }}/linux-ci-evidence/package-linux.json
+          if-no-files-found: error
+
+  # ─────────────────────────────────────────────────
+  # 5) Install the .deb and launch what it installed
+  # ─────────────────────────────────────────────────
+  # The step the whole packaging chain existed to make possible: take the package
+  # a user would download, install it the way a user would, and run the binary it
+  # put on their PATH. Everything before this validates sources; this validates
+  # the INSTALLED layout, which is a different tree with different paths and is
+  # where the last shared-tree defect lived.
+  #
+  # There is no display on this runner, so the tray and the WebKit windows are
+  # deliberately not started — they cannot be, and pretending otherwise would
+  # make this job green for the wrong reason.
+  smoke-deb-install:
+    name: 'install the .deb and launch it'
+    runs-on: ubuntu-latest
+    needs: [package-linux]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download the .deb built above
+        # assets-linux holds every Linux file of this run under its release
+        # name; the find below picks its one .deb.
+        uses: actions/download-artifact@v4
+        with:
+          name: assets-linux
+          path: pkg
+
+      - name: Install it the way a user would
+        # --no-install-recommends deliberately: the Recommends list names
+        # libayatana-appindicator3-1 among others, which are optional at
+        # runtime and not all in the Ubuntu archive. What is under test is that
+        # the Depends resolve and that DEBIAN/postinst — never once executed
+        # before this job existed — runs to completion, since apt fails the
+        # install when it exits non-zero.
+        run: |
+          set -euo pipefail
+          deb=$(find pkg -name '*.deb' -type f | head -1)
+          if [ -z "$deb" ]; then
+              echo "::error::the assets-linux artifact contains no .deb."
+              exit 1
+          fi
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends "./$deb"
+          dpkg -s ergopti
+
+      - name: The package installed the files the daemon reads
+        run: |
+          set -euo pipefail
+          fail=0
+          for f in /usr/bin/ergopti \
+                   /usr/lib/ergopti/ergopti_hotstrings.lua \
+                   /usr/lib/ergopti/infra/paths.lua \
+                   /usr/lib/ergopti/_shared/lua/logger/shim.lua \
+                   /usr/lib/ergopti/_shared/data/locales/en.json \
+                   /usr/lib/systemd/user/ergopti-hotstrings.service; do
+              if [ ! -e "$f" ]; then
+                  echo "::error::the package did not install $f"
+                  fail=1
+              fi
+          done
+          exit $fail
+
+      - name: Launch the installed binary
+        # --help returns early, but only AFTER every file-scope require in the
+        # daemon has run — so this is a real check of the require graph against
+        # the INSTALLED layout, which the unit suite (run from the checkout)
+        # cannot see. A missing module or a wrapper with the wrong LUA_PATH
+        # fails here instead of on the user's machine.
+        timeout-minutes: 2
+        run: |
+          set -euo pipefail
+          /usr/bin/ergopti --help
+
+      - name: The installed shared data tree resolves and opens
+        # --help returns before doing any work, so it proves the require graph
+        # and nothing about the DATA tree — which is where the defect that
+        # motivated this whole job actually lived. The check is a tracked file
+        # rather than a heredoc because five formats run it.
+        #
+        # LUA_PATH is replayed from the INSTALLED wrapper rather than re-typed,
+        # so this cannot pass against a path the wrapper does not set.
+        run: |
+          set -euo pipefail
+          eval "$(grep -E '^(DRIVER_ROOT|SHARED_LUA)=|^export LUA_PATH=' /usr/bin/ergopti)"
+          if [ -z "${LUA_PATH:-}" ]; then
+              echo "::error::/usr/bin/ergopti no longer exports LUA_PATH — this check read nothing."
+              exit 1
+          fi
+          echo "LUA_PATH from the installed wrapper: $LUA_PATH"
+          luajit static/ergopti_plus/linux/tests/hardware/installed_layout_check.lua \
+              /usr/lib/ergopti/_shared
+
+      - name: Record mandatory .deb smoke evidence
+        run: |
+          node tools/test/linux-ci-evidence.cjs record \
+              --job smoke-deb-install --output "$RUNNER_TEMP/linux-ci-evidence/smoke-deb-install.json" \
+              --sha "$GITHUB_SHA" --architecture "$RUNNER_ARCH" --distro ubuntu \
+              --session installed-package --interpreter "$(luajit -v 2>&1 | head -1)" \
+              --subject smoke-deb-install=1
+
+      - name: Upload mandatory .deb smoke evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-ci-evidence-smoke-deb-install
+          retention-days: 7
+          path: ${{ runner.temp }}/linux-ci-evidence/smoke-deb-install.json
+          if-no-files-found: error
+
+  # ─────────────────────────────────────────────────
+  # 6) Install the .rpm and launch what it installed
+  # ─────────────────────────────────────────────────
+  # In a Fedora container, because ubuntu-latest cannot install an .rpm and a
+  # conversion through alien would be testing alien. dnf resolves the same
+  # dependencies a Fedora user's would.
+  smoke-rpm-install:
+    name: 'install the .rpm and launch it'
+    runs-on: ubuntu-latest
+    needs: [package-linux]
+    container:
+      image: fedora:latest
+
+    steps:
+      - name: Tools the job itself needs
+        # Deliberately NOT luajit: the .rpm declares `Requires: luajit >= 2.1`,
+        # so letting dnf resolve it from the package is what proves that
+        # declaration is right. Pre-installing it would hide a wrong Requires.
+        # git is for actions/checkout, findutils for the `find` below.
+        run: dnf install -y git findutils
+
+      - uses: actions/checkout@v4
+
+      - name: Download the .rpm built above
+        # assets-linux holds every Linux file of this run under its release
+        # name; the find below picks its one .rpm.
+        uses: actions/download-artifact@v4
+        with:
+          name: assets-linux
+          path: pkg
+
+      - name: Install it the way a user would
+        run: |
+          set -euo pipefail
+          rpm=$(find pkg -name '*.rpm' -type f | head -1)
+          if [ -z "$rpm" ]; then
+              echo "::error::the assets-linux artifact contains no .rpm."
+              exit 1
+          fi
+          dnf install -y "./$rpm"
+          rpm -q ergopti
+
+      - name: Launch the installed binary
+        run: /usr/bin/ergopti --help
+
+      - name: The installed shared data tree resolves and opens
+        run: |
+          set -euo pipefail
+          eval "$(grep -E '^(DRIVER_ROOT|SHARED_LUA)=|^export LUA_PATH=' /usr/bin/ergopti)"
+          if [ -z "${LUA_PATH:-}" ]; then
+              echo "::error::/usr/bin/ergopti no longer exports LUA_PATH — this check read nothing."
+              exit 1
+          fi
+          luajit static/ergopti_plus/linux/tests/hardware/installed_layout_check.lua \
+              /usr/lib/ergopti/_shared
+
+      - name: Record mandatory .rpm smoke evidence
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/linux-ci-evidence"
+          mkdir -p "$evidence_dir"
+          printf '%s\n' \
+            '{' \
+            '  "schema_version": 1,' \
+            '  "job": "smoke-rpm-install",' \
+            "  \"sha\": \"$GITHUB_SHA\"," \
+            "  \"architecture\": \"$RUNNER_ARCH\"," \
+            '  "distro": "fedora",' \
+            '  "session": "installed-package",' \
+            '  "interpreter": "LuaJIT",' \
+            '  "subjects": { "smoke-rpm-install": 1 }' \
+            '}' > "$evidence_dir/smoke-rpm-install.json"
+
+      - name: Upload mandatory .rpm smoke evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-ci-evidence-smoke-rpm-install
+          retention-days: 7
+          path: ${{ runner.temp }}/linux-ci-evidence/smoke-rpm-install.json
+          if-no-files-found: error
+
+  # ─────────────────────────────────────────────────
+  # 7) Run the AppImage
+  # ─────────────────────────────────────────────────
+  # An AppImage is not installed; running it IS the install. It mounts itself
+  # with FUSE, which this runner does not have, so it is unpacked with the
+  # --appimage-extract escape hatch the format provides for exactly this.
+  # AppRun is then the same entry point a user's double-click reaches.
+  smoke-appimage-run:
+    name: 'run the AppImage'
+    runs-on: ubuntu-latest
+    needs: [package-linux]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download the AppImage built above
+        # assets-linux holds every Linux file of this run under its release
+        # name; the find below picks its one .AppImage.
+        uses: actions/download-artifact@v4
+        with:
+          name: assets-linux
+          path: pkg
+
+      - name: Unpack it (no FUSE on this runner)
+        run: |
+          set -euo pipefail
+          img=$(find pkg -name '*.AppImage' -type f | head -1)
+          if [ -z "$img" ]; then
+              echo "::error::the assets-linux artifact contains no .AppImage."
+              exit 1
+          fi
+          chmod +x "$img"
+          "./$img" --appimage-extract >/dev/null
+          test -x squashfs-root/AppRun
+
+      - name: Launch it
+        # Explicitly --help: AppRun appends --tray when given no arguments, and
+        # there is no display here for a tray to appear in.
+        run: ./squashfs-root/AppRun --help
+
+      - name: The bundled shared data tree resolves and opens
+        # The AppImage is relocatable, so its root is wherever it was unpacked —
+        # which is the point of checking it here rather than assuming a prefix.
+        #
+        # Run through the image's OWN luajit, not the runner's. There is no
+        # luajit on this runner at all, which is the situation an AppImage
+        # exists for: if the bundled interpreter is missing or unusable, that is
+        # a defect in the package and this step is where it should surface.
+        run: |
+          set -euo pipefail
+          root="$(pwd)/squashfs-root/usr/lib/ergopti"
+          luajit_bin="$(pwd)/squashfs-root/usr/bin/luajit"
+          if [ ! -x "$luajit_bin" ]; then
+              echo "::error::the AppImage bundles no runnable luajit at usr/bin/luajit — it would depend on the target having one."
+              exit 1
+          fi
+          export LUA_PATH="$root/?.lua;$root/?/init.lua;$root/_shared/lua/?.lua;$root/_shared/lua/?/init.lua;;"
+          "$luajit_bin" static/ergopti_plus/linux/tests/hardware/installed_layout_check.lua \
+              "$root/_shared"
+
+      - name: Record mandatory AppImage smoke evidence
+        run: |
+          node tools/test/linux-ci-evidence.cjs record \
+              --job smoke-appimage-run --output "$RUNNER_TEMP/linux-ci-evidence/smoke-appimage-run.json" \
+              --sha "$GITHUB_SHA" --architecture "$RUNNER_ARCH" --distro ubuntu \
+              --session unpacked-appimage --interpreter "$(./squashfs-root/usr/bin/luajit -v 2>&1 | head -1)" \
+              --subject smoke-appimage-run=1
+
+      - name: Upload mandatory AppImage smoke evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-ci-evidence-smoke-appimage-run
+          retention-days: 7
+          path: ${{ runner.temp }}/linux-ci-evidence/smoke-appimage-run.json
+          if-no-files-found: error
+
+  # ─────────────────────────────────────────────────
+  # 8) Gate: every mandatory Linux subject ran and passed
+  # ─────────────────────────────────────────────────
+  # The needs: list below and .github/linux-ci-coverage.json name the same jobs
+  # twice on purpose — needs: decides what this job waits for, the manifest
+  # decides what it fails on — and a job added to one but not the other runs
+  # and gates nothing. That is exactly what build-deb and build-rpm once were:
+  # no job listed them, so a broken package still shipped a release.
+  # linux-ci-evidence.cjs verify rejects both halves of that drift at run time
+  # (a manifest job missing from needs, a needs entry the manifest does not
+  # classify). Anything added to this file goes in BOTH.
+  #
+  # It stays inside this workflow on purpose: toJSON(needs) only sees the jobs
+  # of its own workflow, so from ci.yml it would hold nothing but "linux".
+  # if: always() so that a failed or skipped lane is reported by name, from the
+  # evidence, instead of this job being skipped in silence.
+  linux-ok:
+    name: 'evidence gate'
+    runs-on: ubuntu-latest
+    needs:
+      - test-linux
+      - install-linux-distros
+      - first-install-distros
+      - package-linux
+      - smoke-deb-install
+      - smoke-rpm-install
+      - smoke-appimage-run
+    if: always()
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+
+      - name: Download Linux assertion evidence
+        uses: actions/download-artifact@v4
+        with:
+          pattern: linux-ci-evidence-*
+          path: ${{ runner.temp }}/linux-ci-evidence
+          merge-multiple: true
+
+      - name: Assert all mandatory Linux subjects ran and passed
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          set -euo pipefail
+          node tools/test/linux-ci-evidence.cjs verify \
+              --manifest .github/linux-ci-coverage.json \
+              --needs "$NEEDS" \
+              --evidence-dir "$RUNNER_TEMP/linux-ci-evidence" \
+              --sha "$GITHUB_SHA"
+          echo "Linux driver: every mandatory job and evidence subject passed."

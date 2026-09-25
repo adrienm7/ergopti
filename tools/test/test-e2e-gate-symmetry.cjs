@@ -13,8 +13,8 @@
  * in the file itself as "the e2e runner exercises the expansion pipeline end to
  * end", and no equivalent for macOS. The macOS "hs" gate ran the unit suite
  * alone. A keymap change therefore shipped with a fully green 3548/3548 local
- * suite while the macOS e2e harness — which CI does run, and which the
- * macos-ok gate depends on — failed 14 of 38 assertions. The two tiers are
+ * suite while the macOS e2e harness — which CI does run, and which gates the
+ * macOS box of the pipeline — failed 14 of 38 assertions. The two tiers are
  * disjoint, and only the one nobody ran locally could see the regression.
  *
  * FEATURES & RATIONALE:

@@ -20,7 +20,8 @@
 				"webview-settings": 1,
 				"webview-editor": 1,
 				"webview-roundtrip": 1,
-				"page-load-errors": 1
+				"page-load-errors": 1,
+				"hotstring-e2e": 100
 			}
 		},
 		"install-linux-distros": {
@@ -47,27 +48,16 @@
 				"first-install-alpine": 1
 			}
 		},
-		"e2e-linux": {
+		"package-linux": {
 			"classification": "mandatory",
 			"subjects": {
-				"hotstring-e2e": 100
+				"build-deb": 1,
+				"build-rpm": 1,
+				"build-appimage": 1,
+				"build-flatpak": 1,
+				"smoke-flatpak-run": 1,
+				"smoke-tarball-install": 1
 			}
-		},
-		"build-deb": {
-			"classification": "mandatory",
-			"subjects": { "build-deb": 1 }
-		},
-		"build-rpm": {
-			"classification": "mandatory",
-			"subjects": { "build-rpm": 1 }
-		},
-		"build-appimage": {
-			"classification": "mandatory",
-			"subjects": { "build-appimage": 1 }
-		},
-		"build-flatpak": {
-			"classification": "mandatory",
-			"subjects": { "build-flatpak": 1 }
 		},
 		"smoke-deb-install": {
 			"classification": "mandatory",
@@ -80,14 +70,6 @@
 		"smoke-appimage-run": {
 			"classification": "mandatory",
 			"subjects": { "smoke-appimage-run": 1 }
-		},
-		"smoke-flatpak-run": {
-			"classification": "mandatory",
-			"subjects": { "smoke-flatpak-run": 1 }
-		},
-		"smoke-tarball-install": {
-			"classification": "mandatory",
-			"subjects": { "smoke-tarball-install": 1 }
 		}
 	}
 }

@@ -4,8 +4,9 @@
  * ==============================================================================
  * MODULE: Package Build Commit Stamp Guard
  * DESCRIPTION:
- * Every package `.github/workflows/ci.yml` builds must carry the commit it was
- * built from, because an installed package has no .git to ask.
+ * Every package the CI pipeline builds (`.github/workflows/ci.yml` and the OS
+ * workflows it calls) must carry the commit it was built from, because an
+ * installed package has no .git to ask.
  *
  * ROOT CAUSE ENCODED:
  * The packaged ErgoptiPlus.app showed "Last git commit: unknown" in its
@@ -18,20 +19,25 @@
  * reads it — and this guard fails as soon as a build path stops stamping.
  *
  * FEATURES & RATIONALE:
- * 1. The workflow is parsed into jobs and steps, so the check follows the steps
- *    that really run a build entry point instead of trusting a text search.
+ * 1. Every pipeline workflow is parsed into jobs and steps, so the check follows
+ *    the steps that really run a build entry point instead of trusting a text
+ *    search. tools/test/ci-pipeline.cjs lists the files CI actually calls.
  * 2. Each build entry point must be handed the workflow's own commit, each
  *    Linux packager must verify the stamp in the tree it packages, and each
  *    tarball must be verified before it is packed.
  * 3. The stamp's file name and key are declared by the writer and by the Lua
  *    reader; they are compared here so they cannot drift apart.
- * 4. The guard proves it can fail: it is re-run on a copy of the workflow with
+ * 4. The guard proves it can fail: it is re-run on a copy of each workflow with
  *    one stamp removed and must report it.
- * 5. The release Linux build also stamps the release version: the Linux driver
- *    has no other version source (linux/infra/version.lua reads the stamp), and
- *    a fixed literal there once made every install report a release that never
- *    existed. Every release job that assembles the Linux tree must therefore hand
- *    ERGOPTI_BUILD_VERSION the version resolve-release-meta computed.
+ * 5. The Linux build also stamps the release version: the Linux driver has no
+ *    other version source (linux/infra/version.lua reads the stamp), and a fixed
+ *    literal there once made every install report a release that never existed.
+ *    One assembly serves CI and release, so every build-linux-driver.sh step
+ *    must hand ERGOPTI_BUILD_VERSION the version its box receives (empty outside
+ *    a release, which writes a commit-only stamp), and the macOS build its
+ *    ERGOPTI_VERSION the same way.
+ * 6. The version reaches the boxes only through ci.yml: each OS caller must pass
+ *    plan's version output, or a box would stamp an empty version on a release.
  * ==============================================================================
  */
 
@@ -39,9 +45,10 @@
 
 const fs = require('fs');
 const path = require('path');
+const pipeline = require('./ci-pipeline.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const WORKFLOW_REL = '.github/workflows/ci.yml';
+const WINDOWS_WORKFLOW_REL = '.github/workflows/ci-windows.yml';
 const WRITER_REL = 'tools/build/write_build_stamp.sh';
 const READER_REL = 'static/ergopti_plus/_shared/lua/diagnostics/snapshot.lua';
 const WINDOWS_BUNDLE_REL = 'static/ergopti_plus/windows/infra/bundle.ahk';
@@ -57,15 +64,17 @@ const PACKAGERS = ['deb', 'rpm', 'appimage', 'flatpak'].map((kind) => `tools/bui
 const PKGBUILD_REL = 'tools/build/PKGBUILD';
 
 const COMMIT_ENV = /^ERGOPTI_BUILD_COMMIT:\s*\$\{\{\s*github\.sha\s*\}\}\s*$/;
-const RELEASE_META_JOB = 'resolve-release-meta';
-const VERSION_ENV = /^ERGOPTI_BUILD_VERSION:\s*\$\{\{\s*needs\.resolve-release-meta\.outputs\.version\s*\}\}\s*$/;
+const VERSION_ENV = /^ERGOPTI_BUILD_VERSION:\s*\$\{\{\s*inputs\.version\s*\}\}\s*$/;
+const MACOS_VERSION_ENV = /^ERGOPTI_VERSION:\s*\$\{\{\s*inputs\.version\s*\}\}\s*$/;
+const CALLER_VERSION = /^ {6}version:\s*\$\{\{\s*needs\.plan\.outputs\.version\s*\}\}\s*$/m;
+const VERSIONED_BOXES = ['macos', 'windows', 'linux'];
 
-// Floors — today: 2 macOS builds and 6 Linux assemblies, 8 packager runs,
-// 2 tarballs. A parse that found fewer stopped reading the workflow.
-const MIN_STAMPING_STEPS = 8;
-const MIN_PACKAGER_STEPS = 8;
-const MIN_TARBALL_STEPS = 2;
-// Today: one release job assembles the Linux tree.
+// Floors — today: 1 macOS build and 1 Linux assembly, 4 packager runs,
+// 1 tarball. A parse that found fewer stopped reading the workflow.
+const MIN_STAMPING_STEPS = 2;
+const MIN_PACKAGER_STEPS = 4;
+const MIN_TARBALL_STEPS = 1;
+// Today: one job assembles the Linux tree, for CI and release alike.
 const MIN_RELEASE_LINUX_STEPS = 1;
 
 /** Returns the column of the first non-space character, or -1 for a blank line. */
@@ -109,7 +118,7 @@ function childLines(lines, start) {
 /**
  * Splits a workflow into jobs and their steps.
  * @param {string} text Workflow YAML.
- * @returns {Array<{name: string, needs: string, env: string[], steps: Array<{line: number, name: string, run: string, env: string[]}>}>}
+ * @returns {Array<{name: string, env: string[], steps: Array<{line: number, name: string, run: string, env: string[]}>}>}
  */
 function parseJobs(text) {
 	const lines = text.split(/\r?\n/);
@@ -123,14 +132,12 @@ function parseJobs(text) {
 		if (ind === 0) break;
 		const jobMatch = line.match(/^ {2}([A-Za-z0-9_-]+):\s*$/);
 		if (jobMatch) {
-			job = { name: jobMatch[1], needs: '', env: [], steps: [] };
+			job = { name: jobMatch[1], env: [], steps: [] };
 			jobs.push(job);
 			continue;
 		}
 		if (!job) continue;
 		if (/^ {4}env:\s*$/.test(line)) job.env = childLines(lines, i);
-		const needsMatch = line.match(/^ {4}needs:\s*(.*)$/);
-		if (needsMatch) job.needs = needsMatch[1];
 		const stepMatch = line.match(/^( {6})- /);
 		if (!stepMatch) continue;
 		const stepIndent = 6;
@@ -184,36 +191,39 @@ function parseJobs(text) {
 /**
  * Checks that every package build in a workflow stamps the commit.
  * @param {string} text Workflow YAML.
+ * @param {string} rel The workflow's repository-relative path, for messages.
  * @returns {{errors: string[], stamping: number, packagers: number, tarballs: number, releaseLinux: number}}
  */
-function checkWorkflow(text) {
+function checkWorkflow(text, rel) {
 	const errors = [];
 	let stamping = 0;
 	let packagers = 0;
 	let tarballs = 0;
 	let releaseLinux = 0;
 	for (const job of parseJobs(text)) {
-		const isRelease = job.needs.includes(RELEASE_META_JOB);
 		let assembledLinux = false;
 		for (const step of job.steps) {
-			const where = `${WORKFLOW_REL}:${step.line} (job ${job.name}, step "${step.name}")`;
+			const where = `${rel}:${step.line} (job ${job.name}, step "${step.name}")`;
+			const env = step.env.concat(job.env);
 			for (const [script, invocation] of Object.entries(STAMPING_BUILDS)) {
 				if (!invocation.test(step.run)) continue;
 				stamping++;
-				const hasCommit = step.env.concat(job.env).some((entry) => COMMIT_ENV.test(entry));
+				const hasCommit = env.some((entry) => COMMIT_ENV.test(entry));
 				if (!hasCommit) {
 					errors.push(`${where} runs ${script} without ERGOPTI_BUILD_COMMIT: \${{ github.sha }} — ` +
 						'the package it builds could not name the commit it was built from');
 				}
+				if (script.endsWith('build_macos_app.sh') && !env.some((entry) => MACOS_VERSION_ENV.test(entry))) {
+					errors.push(`${where} builds the macOS app without ERGOPTI_VERSION: \${{ inputs.version }} — ` +
+						'a release app would report the 0.0.0-dev placeholder');
+				}
 				if (script.endsWith('build-linux-driver.sh')) {
 					assembledLinux = true;
-					if (isRelease) {
-						releaseLinux++;
-						const hasVersion = step.env.concat(job.env).some((entry) => VERSION_ENV.test(entry));
-						if (!hasVersion) {
-							errors.push(`${where} assembles a release Linux tree without ERGOPTI_BUILD_VERSION ` +
-								'from resolve-release-meta — the driver would report no release version');
-						}
+					// The one assembly serves CI and release alike.
+					releaseLinux++;
+					if (!env.some((entry) => VERSION_ENV.test(entry))) {
+						errors.push(`${where} assembles the Linux tree without ERGOPTI_BUILD_VERSION: ` +
+							'${{ inputs.version }} — a release driver would report no release version');
 					}
 				}
 			}
@@ -240,6 +250,26 @@ function checkWorkflow(text) {
 	return { errors, stamping, packagers, tarballs, releaseLinux };
 }
 
+/**
+ * Checks that ci.yml hands plan's version to every OS box.
+ * @param {string} text ci.yml YAML.
+ * @returns {string[]} Errors.
+ */
+function checkVersionChain(text) {
+	const errors = [];
+	const jobs = pipeline.jobsOfText(text, pipeline.ENTRY_REL);
+	for (const box of VERSIONED_BOXES) {
+		const caller = jobs.find((job) => job.id === box);
+		if (!caller || pipeline.field(caller.body, 'uses') === null) {
+			errors.push(`${pipeline.ENTRY_REL} no longer calls the ${box} box as job \`${box}\``);
+		} else if (!CALLER_VERSION.test(caller.body)) {
+			errors.push(`${pipeline.ENTRY_REL}:${caller.line} (job ${box}) must pass ` +
+				'version: ${{ needs.plan.outputs.version }} — the box would stamp no release version');
+		}
+	}
+	return errors;
+}
+
 
 
 
@@ -250,9 +280,22 @@ function checkWorkflow(text) {
 // =================================
 
 const errors = [];
-const workflow = read(WORKFLOW_REL);
-const result = checkWorkflow(workflow);
+const workflows = pipeline.files();
+const result = { errors: [], stamping: 0, packagers: 0, tarballs: 0, releaseLinux: 0 };
+for (const { rel, text } of workflows) {
+	const found = checkWorkflow(text, rel);
+	result.errors.push(...found.errors);
+	for (const key of ['stamping', 'packagers', 'tarballs', 'releaseLinux']) result[key] += found[key];
+}
 errors.push(...result.errors);
+errors.push(...checkVersionChain(pipeline.file(pipeline.ENTRY_REL)));
+
+// plan is where the version comes from; the callers only forward it.
+const planMeta = pipeline.step(pipeline.job('plan'), 'Compute tag and version');
+if (!/^\s+version:\s*\$\{\{\s*steps\.meta\.outputs\.version\s*\}\}\s*$/m.test(pipeline.job('plan')) ||
+	!planMeta.includes('emit version "$version"')) {
+	errors.push(`${pipeline.ENTRY_REL}: plan no longer emits the release version its callers forward`);
+}
 
 if (result.stamping < MIN_STAMPING_STEPS) {
 	errors.push(`found only ${result.stamping} build step(s) (floor ${MIN_STAMPING_STEPS}) — the step parse drifted`);
@@ -268,23 +311,30 @@ if (result.tarballs < MIN_TARBALL_STEPS) {
 	errors.push(`found only ${result.tarballs} tarball step(s) (floor ${MIN_TARBALL_STEPS}) — the step parse drifted`);
 }
 
-// The guard must be able to fail: dropping one stamp has to be reported.
-const firstStamp = workflow.search(/^\s*ERGOPTI_BUILD_COMMIT:.*$/m);
-if (firstStamp < 0) {
-	errors.push('no ERGOPTI_BUILD_COMMIT entry in the workflow at all');
-} else {
-	const mutated = workflow.replace(/^\s*ERGOPTI_BUILD_COMMIT:.*\r?\n/m, '');
-	if (checkWorkflow(mutated).errors.length === 0) {
-		errors.push('self-check: removing an ERGOPTI_BUILD_COMMIT entry went unnoticed — this guard cannot fail');
+// The guard must be able to fail: dropping one stamp or one version, in every
+// workflow that carries one, has to be reported.
+for (const [key, owners] of [
+	['ERGOPTI_BUILD_COMMIT', 2],
+	['ERGOPTI_BUILD_VERSION', 1],
+	['ERGOPTI_VERSION', 1],
+]) {
+	const entry = new RegExp(`^\\s*${key}:.*\\r?\\n`, 'm');
+	const carriers = workflows.filter(({ text }) => entry.test(text));
+	if (carriers.length < owners) {
+		errors.push(`only ${carriers.length} pipeline workflow(s) set ${key} (floor ${owners}) — the build steps moved`);
+	}
+	for (const { rel, text } of carriers) {
+		if (checkWorkflow(text.replace(entry, ''), rel).errors.length === 0) {
+			errors.push(`self-check: removing the first ${key} entry of ${rel} went unnoticed — this guard cannot fail`);
+		}
 	}
 }
-
-// The same for the release version: dropping it from the release job must be reported.
-const versionMutated = workflow.replace(/^\s*ERGOPTI_BUILD_VERSION:.*\r?\n/m, '');
-if (versionMutated === workflow) {
-	errors.push('no ERGOPTI_BUILD_VERSION entry in the workflow at all');
-} else if (checkWorkflow(versionMutated).errors.length === 0) {
-	errors.push('self-check: removing the ERGOPTI_BUILD_VERSION entry went unnoticed — this guard cannot fail');
+const ciText = pipeline.file(pipeline.ENTRY_REL);
+const chainMutated = ciText.replace(CALLER_VERSION, "      version: ''");
+if (chainMutated === ciText) {
+	errors.push(`${pipeline.ENTRY_REL} passes plan's version to no box at all`);
+} else if (checkVersionChain(chainMutated).length === 0) {
+	errors.push('self-check: dropping plan\'s version from an OS caller went unnoticed — this guard cannot fail');
 }
 
 // Each build entry point writes the stamp; each packager verifies its copy.
@@ -331,8 +381,12 @@ for (const [shellName, luaName] of [
 if (!/BUNDLE_COMMIT := "__BUNDLE_COMMIT__"/.test(read(WINDOWS_BUNDLE_REL))) {
 	errors.push(`${WINDOWS_BUNDLE_REL} no longer declares the __BUNDLE_COMMIT__ placeholder`);
 }
-if (!/Replace\("__BUNDLE_COMMIT__",\s*"\$\{\{ github\.sha \}\}"\)/.test(workflow)) {
-	errors.push(`${WORKFLOW_REL} no longer stamps BUNDLE_COMMIT with github.sha in the Windows build`);
+if (!/Replace\("__BUNDLE_COMMIT__",\s*"\$\{\{ github\.sha \}\}"\)/.test(
+	pipeline.step(pipeline.job('package-windows'), 'Stamp BUNDLE_VERSION, BUNDLE_RELEASE_URL, BUNDLE_CHANNEL'))) {
+	errors.push(`${WINDOWS_WORKFLOW_REL} no longer stamps BUNDLE_COMMIT with github.sha in the Windows build`);
+}
+if (pipeline.locate('package-windows').file !== WINDOWS_WORKFLOW_REL) {
+	errors.push(`the Windows release build must live in ${WINDOWS_WORKFLOW_REL}`);
 }
 
 if (errors.length > 0) {

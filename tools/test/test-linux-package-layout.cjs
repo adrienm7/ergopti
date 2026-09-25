@@ -28,6 +28,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const pipeline = require('./ci-pipeline.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
@@ -542,8 +543,11 @@ if (!/export LUA_PATH=/.test(pkgbuildSrc)) {
 // root, so an archive that flattens them installs a tree the daemon cannot
 // navigate.
 
-const WORKFLOW = '.github/workflows/ci.yml';
-const workflowSrc = read(WORKFLOW);
+// The one job that packs, checks and uploads the tarball. The loader throws when
+// it is missing, so none of these checks can pass against an empty slice.
+const packageLinux = pipeline.locate('package-linux');
+const WORKFLOW = `${packageLinux.file} (job package-linux)`;
+const workflowSrc = packageLinux.body;
 
 // Tolerant of a shell line continuation: the archive command may be written on
 // one line or split across two, and the members are what matter either way.

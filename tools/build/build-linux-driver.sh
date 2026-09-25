@@ -3,7 +3,7 @@
 #
 # Assembles the Linux driver into a distributable bundle and runs a smoke test.
 #
-# This script is run by CI (build-linux job) after all validations pass. It:
+# This script is run by CI (ci-linux.yml job package-linux) after Validate. It:
 #   1. Copies the linux driver sources + _shared/ tree into build/linux/
 #   2. Copies install.sh
 #   3. Resolves the Lua module search path and generates a wrapper script
