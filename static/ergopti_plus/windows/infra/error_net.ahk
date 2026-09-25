@@ -190,8 +190,14 @@ ErgoptiGlobalErrorHandler(Exc, Mode) {
 				return true
 		}
 		; Release ONLY modifiers that are logically stuck (not physically held) after
-		; the failed callback — never yank a key the user is still pressing.
-		for _, ModKey in ["LControl", "RControl", "LShift", "RShift", "LAlt", "RAlt", "LWin", "RWin"] {
+		; the failed callback — never yank a key the user is still pressing. On a
+		; Kana-style layout an alt_gr hold presses SC138, not RAlt, so the sweep
+		; must also know the layout's AltGr key or a stranded hold would survive.
+		; _ALTGR_KANA_FIXUP is seeded before OnError registers this handler.
+		StuckCandidates := ["LControl", "RControl", "LShift", "RShift", "LAlt", "RAlt", "LWin", "RWin"]
+		if (KS_AltGrKeyName() != "RAlt")
+				StuckCandidates.Push(KS_AltGrKeyName())
+		for _, ModKey in StuckCandidates {
 				if _ShouldReleaseModifier(ModKey) {
 						; AHK-35: SendEvent can throw on a hook conflict or foreground-window race;
 						; guard it so a failure on one modifier doesn't abort releasing the others

@@ -197,6 +197,18 @@ KS_ProbeRightAltScancode(Hkl) {
 	}
 }
 
+; AHK key name that presses the active layout's AltGr. Standard AltGr layouts
+; put AltGr on VK_RMENU, so "RAlt" is AltGr there. Kana-style remaps
+; (_ALTGR_KANA_FIXUP, resolved at boot) move AltGr to another virtual key and
+; leave VK_RMENU without a scan code: a synthetic RAlt is then a plain Alt that
+; opens a window's menu bar on release and types nothing on a chord, while the
+; physical scan code SC138 still is the layout's AltGr.
+; @return {String} "SC138" on a Kana-style layout, otherwise "RAlt".
+KS_AltGrKeyName() {
+	global _ALTGR_KANA_FIXUP
+	return _ALTGR_KANA_FIXUP ? "SC138" : "RAlt"
+}
+
 ; Enumerates base scancodes 0x01-0x7F under Hkl and returns the first whose
 ; no-modifier output equals TargetChar. ToUnicodeEx is called with wFlags=0x4
 ; (UNICODE_NOCHAR) so the probe never corrupts pending Win32 dead-key state.

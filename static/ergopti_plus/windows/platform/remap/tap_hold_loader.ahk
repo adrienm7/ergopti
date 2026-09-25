@@ -515,7 +515,7 @@ ResolveHoldModifierKey(ModifierValue, FieldLabel) {
 			case "lalt":
 				Resolved.Push("LAlt")
 			case "alt_gr", "altgr", "ralt":
-				Resolved.Push("RAlt")
+				Resolved.Push(KS_AltGrKeyName())
 			case "lwin":
 				Resolved.Push("LWin")
 			case "":
