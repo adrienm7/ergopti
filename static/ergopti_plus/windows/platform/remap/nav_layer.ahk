@@ -45,7 +45,7 @@ A_MaxHotkeysPerInterval := NAV_LAYER_MAX_HOTKEYS_PER_INTERVAL
 		and TapHoldHoldLayer(TapHold, "left_alt") == "nav"
 		and _AnyShortcutEnabled("lalt_caps_lock"))
 ; Overrides the "BackSpace" shortcut on the layer
-SC03A:: {
+*SC03A:: {
 		DisableLayer() LAltCapsLockShortcut()
 }
 #HotIf
@@ -55,7 +55,7 @@ SC03A:: {
 		_LAltIsBackspaceLayer()
 		and LayerEnabled
 )
-SC038:: TapHoldSyntheticKeyUp("LAlt") ; Necessary to do this, otherwise multicursor trigger in VSCode when scrolling in the layer and then leaving it
+*SC038:: TapHoldSyntheticKeyUp("LAlt") ; Necessary to do this, otherwise multicursor trigger in VSCode when scrolling in the layer and then leaving it
 #HotIf
 
 #HotIf LayerEnabled
@@ -72,27 +72,27 @@ SC038:: TapHoldSyntheticKeyUp("LAlt") ; Necessary to do this, otherwise multicur
 ; separate hotkey on the same scan code that swallowed the Kana-style AltGr and
 ; lost this Escape (see platform/remap/altgr.ahk).
 SC01D & ~SC138:: ; AltGr on an AltGr layout arrives as LControl & RAlt
-SC138:: ; the AltGr key alone: RAlt on QWERTY, the Kana-style AltGr
+*SC138:: ; the AltGr key alone: RAlt on QWERTY, the Kana-style AltGr
 {
 		ActionLayer("{Escape " . AppState_GetNumberOfRepetitions() . "}")
 }
 
 ; === Number row ===
-SC002:: SetNumberOfRepetitions(1) ; On key 1
-SC003:: SetNumberOfRepetitions(2) ; On key 2
-SC004:: SetNumberOfRepetitions(3) ; On key 3
-SC005:: SetNumberOfRepetitions(4) ; On key 4
-SC006:: SetNumberOfRepetitions(5) ; On key 5
-SC007:: SetNumberOfRepetitions(6) ; On key 6
-SC008:: SetNumberOfRepetitions(7) ; On key 7
-SC009:: SetNumberOfRepetitions(8) ; On key 8
-SC00A:: SetNumberOfRepetitions(9) ; On key 9
+*SC002:: SetNumberOfRepetitions(1) ; On key 1
+*SC003:: SetNumberOfRepetitions(2) ; On key 2
+*SC004:: SetNumberOfRepetitions(3) ; On key 3
+*SC005:: SetNumberOfRepetitions(4) ; On key 4
+*SC006:: SetNumberOfRepetitions(5) ; On key 5
+*SC007:: SetNumberOfRepetitions(6) ; On key 6
+*SC008:: SetNumberOfRepetitions(7) ; On key 7
+*SC009:: SetNumberOfRepetitions(8) ; On key 8
+*SC00A:: SetNumberOfRepetitions(9) ; On key 9
 
 
 
 
 
-SC00B:: SetNumberOfRepetitions(10) ; On key 0
+*SC00B:: SetNumberOfRepetitions(10) ; On key 0
 
 
 
@@ -105,29 +105,29 @@ SC00B:: SetNumberOfRepetitions(10) ; On key 0
 ; =========================
 
 ; === Top row ===
-SC010:: ActionLayer("^+{Home}") ; Select to the beginning of the document
-SC011:: ActionLayer("^{Home}") ; Go to the beginning of the document
-SC012:: ActionLayer("^{End}") ; Go to the end of the document
-SC013:: ActionLayer("^+{End}") ; Select to the end of the document
-SC014:: ActionLayer("{F2}")
+*SC010:: ActionLayer("^+{Home}") ; Select to the beginning of the document
+*SC011:: ActionLayer("^{Home}") ; Go to the beginning of the document
+*SC012:: ActionLayer("^{End}") ; Go to the end of the document
+*SC013:: ActionLayer("^+{End}") ; Select to the end of the document
+*SC014:: ActionLayer("{F2}")
 
 ; === Middle row ===
 ; ``Format("{X {1}}", N)`` collapsed into direct concatenation -- the call
 ; ran on every navigation keystroke and ``Format`` parses its template each
 ; time. Concatenation produces the same string with zero parsing overhead.
-SC03A:: ActionLayer("{BackSpace " . AppState_GetNumberOfRepetitions() . "}") ; "CapsLock" becomes BackSpace
-SC01E:: ActionLayer("^+{Up " . AppState_GetNumberOfRepetitions() . "}")
-SC01F:: ActionLayer("{Up " . AppState_GetNumberOfRepetitions() . "}") ; Up arrow
-SC020:: ActionLayer("{Down " . AppState_GetNumberOfRepetitions() . "}") ; Down arrow
-SC021:: ActionLayer("^+{Down " . AppState_GetNumberOfRepetitions() . "}")
-SC022:: ActionLayer("{F12}")
+*SC03A:: ActionLayer("{BackSpace " . AppState_GetNumberOfRepetitions() . "}") ; "CapsLock" becomes BackSpace
+*SC01E:: ActionLayer("^+{Up " . AppState_GetNumberOfRepetitions() . "}")
+*SC01F:: ActionLayer("{Up " . AppState_GetNumberOfRepetitions() . "}") ; Up arrow
+*SC020:: ActionLayer("{Down " . AppState_GetNumberOfRepetitions() . "}") ; Down arrow
+*SC021:: ActionLayer("^+{Down " . AppState_GetNumberOfRepetitions() . "}")
+*SC022:: ActionLayer("{F12}")
 
 ; === Bottom row ===
-SC056:: ActionLayer("!+{Up " . AppState_GetNumberOfRepetitions() . "}")  ; Duplicate the line up
-SC02C:: ActionLayer("!{Up " . AppState_GetNumberOfRepetitions() . "}") ; Move the line up
-SC02D:: ActionLayer("!{Down " . AppState_GetNumberOfRepetitions() . "}") ; Move the line down
-SC02E:: ActionLayer("!+{Down " . AppState_GetNumberOfRepetitions() . "}") ; Duplicate the line down
-SC02F:: ActionLayer("{End}{Enter " . AppState_GetNumberOfRepetitions() . "}") ; Start a new line below the cursor
+*SC056:: ActionLayer("!+{Up " . AppState_GetNumberOfRepetitions() . "}")  ; Duplicate the line up
+*SC02C:: ActionLayer("!{Up " . AppState_GetNumberOfRepetitions() . "}") ; Move the line up
+*SC02D:: ActionLayer("!{Down " . AppState_GetNumberOfRepetitions() . "}") ; Move the line down
+*SC02E:: ActionLayer("!+{Down " . AppState_GetNumberOfRepetitions() . "}") ; Duplicate the line down
+*SC02F:: ActionLayer("{End}{Enter " . AppState_GetNumberOfRepetitions() . "}") ; Start a new line below the cursor
 
 
 
@@ -146,32 +146,32 @@ SC02F:: ActionLayer("{End}{Enter " . AppState_GetNumberOfRepetitions() . "}") ; 
 ; ==========================
 
 ; === Top row ===
-SC015:: ActionLayer("+{Home}") ; Select everything to the beginning of the line
-SC016:: ActionLayer("^+{Left " . AppState_GetNumberOfRepetitions() . "}") ; Select the previous word
-SC017:: ActionLayer("+{Left " . AppState_GetNumberOfRepetitions() . "}") ; Select the previous character
-SC018:: ActionLayer("+{Right " . AppState_GetNumberOfRepetitions() . "}") ; Select the next character
-SC019:: ActionLayer("^+{Right " . AppState_GetNumberOfRepetitions() . "}") ; Select the next word
-SC01A:: ActionLayer("+{End}") ; Select everything to the end of the line
+*SC015:: ActionLayer("+{Home}") ; Select everything to the beginning of the line
+*SC016:: ActionLayer("^+{Left " . AppState_GetNumberOfRepetitions() . "}") ; Select the previous word
+*SC017:: ActionLayer("+{Left " . AppState_GetNumberOfRepetitions() . "}") ; Select the previous character
+*SC018:: ActionLayer("+{Right " . AppState_GetNumberOfRepetitions() . "}") ; Select the next character
+*SC019:: ActionLayer("^+{Right " . AppState_GetNumberOfRepetitions() . "}") ; Select the next word
+*SC01A:: ActionLayer("+{End}") ; Select everything to the end of the line
 
 ; === Middle row ===
-SC023:: ActionLayer("#+{Left}") ; Move the window to the left screen
-SC024:: ActionLayer("^{Left " . AppState_GetNumberOfRepetitions() . "}") ; Move to the previous word
-SC025:: ActionLayer("{Left " . AppState_GetNumberOfRepetitions() . "}") ; Left arrow
-SC026:: ActionLayer("{Right " . AppState_GetNumberOfRepetitions() . "}") ; Right arrow
-SC027:: ActionLayer("^{Right " . AppState_GetNumberOfRepetitions() . "}") ; Move to the next word
-SC028:: ActionLayer("#+{Right}") ; Move the window to the right screen
+*SC023:: ActionLayer("#+{Left}") ; Move the window to the left screen
+*SC024:: ActionLayer("^{Left " . AppState_GetNumberOfRepetitions() . "}") ; Move to the previous word
+*SC025:: ActionLayer("{Left " . AppState_GetNumberOfRepetitions() . "}") ; Left arrow
+*SC026:: ActionLayer("{Right " . AppState_GetNumberOfRepetitions() . "}") ; Right arrow
+*SC027:: ActionLayer("^{Right " . AppState_GetNumberOfRepetitions() . "}") ; Move to the next word
+*SC028:: ActionLayer("#+{Right}") ; Move the window to the right screen
 
 ; === Bottom row ===
 ; Guarded: every other layer mapping goes through the send-based ActionLayer, but this
 ; one calls a window-management API directly — WinMaximize throws TargetError when no
 ; window is active (tray-only desktop, or the foreground window closing mid-press).
-SC031:: {
+*SC031:: {
 	try WinMaximize("A") ; Make the window fullscreen
 	catch
 		try LoggerDebug("NavLayer", "WinMaximize skipped — no active window.")
 }
-SC032:: ActionLayer("{Home}") ; Go to the beginning of the line
-SC033:: ActionLayer("#{Left}") ; Move the window to the left of the current screen
-SC034:: ActionLayer("#{Right}") ; Move the window to the right of the current screen
-SC035:: ActionLayer("{End}") ; Go to the end of the line
+*SC032:: ActionLayer("{Home}") ; Go to the beginning of the line
+*SC033:: ActionLayer("#{Left}") ; Move the window to the left of the current screen
+*SC034:: ActionLayer("#{Right}") ; Move the window to the right of the current screen
+*SC035:: ActionLayer("{End}") ; Go to the end of the line
 #HotIf

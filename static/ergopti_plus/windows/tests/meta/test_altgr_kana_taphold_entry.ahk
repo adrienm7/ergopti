@@ -69,7 +69,7 @@ Test("tap-holds: the Kana AltGr held as AltGr passes itself through (altgr-singl
 _AKTE_NavigationOwnsKanaEscape() {
     Src := _StripFullLineComments(_DriverDirConcat("platform/remap"))
     Q := Chr(34)
-    Label := RegExMatch(Src, "SC01D & ~SC138::[^\r\n]*\R\s*SC138::[^\r\n]*\R\{\R\s*ActionLayer\(" . Q . "\{Escape ")
+    Label := RegExMatch(Src, "SC01D & ~SC138::[^\r\n]*\R\s*\*SC138::[^\r\n]*\R\{\R\s*ActionLayer\(" . Q . "\{Escape ")
     Assert(Label > 0, "the navigation layer must emit Escape from one SC138 AltGr variant")
     Assert(_AKTE_GoverningHotIf(Src, Label) = "#HotIf LayerEnabled",
         "the navigation Escape must apply on every layout, Kana-style ones included")

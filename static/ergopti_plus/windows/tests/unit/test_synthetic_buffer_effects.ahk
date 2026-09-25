@@ -223,7 +223,8 @@ _SBE_ActionLayerUsesAtomicSender() {
 	Body := _DriverFuncBody("ActionLayer")
 	Assert(Body != "", "ActionLayer() must exist in the driver source")
 
-	Assert(InStr(Body, '_TextSenderSendInput(action, "key press")') > 0,
+	Assert(InStr(Body, '_TextSenderSendInput(Payload, "key press")') > 0
+		and InStr(Body, 'Payload := TapHoldAnyModifierHeld() ? "{Blind}" . action : action') > 0,
 		"ActionLayer must route its invisible SendInput through the canonical declared-send owner — separate HS_DeclareSyntheticEffect/SendInput statements let physical OnChar interleave between future buffer state and the real caret move")
 	Assert(InStr(Body, "HS_DeclareSyntheticEffect") == 0 and InStr(Body, "SendInput(action)") == 0,
 		"ActionLayer must not restore the former raw declaration/send pair")

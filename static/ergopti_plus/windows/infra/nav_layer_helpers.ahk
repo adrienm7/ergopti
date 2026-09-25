@@ -172,9 +172,15 @@ AppState_SetNumberOfRepetitions(N) {
 ; eight physical reset sites ever see it: without the declaration below the
 ; hotstring engine still believed the caret sat where the user stopped typing,
 ; and the next expansion backspaced over text at the NEW position.
+;
+; Every layer hotkey carries *, so it maps its key under a held modifier as the
+; Linux engine does, and the held modifiers combine with the action: Shift held
+; and the layer's Left select. A plain Send would lift them, hence {Blind}; with
+; nothing held the payload stays bare, the exact shape the buffers track.
 ActionLayer(action) {
+	Payload := TapHoldAnyModifierHeld() ? "{Blind}" . action : action
 	; The adapter's key-press path owns declaration + SendInput as one Critical
 	; transaction, then performs tooltip effects and error logging after release.
-	_TextSenderSendInput(action, "key press")
+	_TextSenderSendInput(Payload, "key press")
 	ResetNumberOfRepetitions()
 }

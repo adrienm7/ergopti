@@ -955,15 +955,24 @@ TapHoldEmitKeyTap(Key, Mods := []) {
 ; TextPressKey modifiers for a keystroke tap: "Blind" and Mods when any
 ; modifier is held, Mods unchanged otherwise.
 _TapHoldKeyTapModifiers(Mods) {
+	if !TapHoldAnyModifierHeld()
+		return Mods
+	Words := "Blind"
+	for _, Mod in Mods
+		Words .= " " . Mod
+	return Words
+}
+
+; Whether any modifier is logically down, whatever holds it: a physical key or
+; a tap-hold's synthetic hold. Synthetic output typed under it must then carry
+; {Blind}, or Send lifts the modifiers it did not press itself.
+; @return {Boolean}
+TapHoldAnyModifierHeld() {
 	global _TapHoldModifierIsHeld
 	static Modifiers := ["LCtrl", "RCtrl", "LShift", "RShift", "LAlt", "RAlt", "LWin", "RWin"]
 	for _, Name in Modifiers {
-		if _TapHoldModifierIsHeld.Call(Name) {
-			Words := "Blind"
-			for _, Mod in Mods
-				Words .= " " . Mod
-			return Words
-		}
+		if _TapHoldModifierIsHeld.Call(Name)
+			return true
 	}
-	return Mods
+	return false
 }
