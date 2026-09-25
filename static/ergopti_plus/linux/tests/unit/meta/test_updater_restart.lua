@@ -140,6 +140,29 @@ helpers.describe("updater restart: the tray tells and acts", function()
 		helpers.assert_eq(finished[2], "v0.0.0-dev.134")
 	end)
 
+	-- The user validates the release the row names. A background check that
+	-- replaced the cached release between the menu's rendering and the click
+	-- must not turn that consent into a download of another version
+	-- (updater-consent-2026-09-25).
+	helpers.it("downloads only the release the row showed", function()
+		local shown = { tag = "v0.0.0-dev.134", download_url = "https://example.invalid/134.tar.gz" }
+		local fake = fake_updater("available", shown)
+		local requested = "unset"
+		fake.download_update = function(url, callback)
+			requested = url
+			callback(nil, "stop here")
+			return false
+		end
+		fake.install_update = function() error("nothing to install") end
+		local rows = updates_rows(fake, { on_update_finished = function() end })
+		local label = require("infra.i18n").get("menu.updates.download_install"):gsub("{tag}", shown.tag)
+		for _, row in ipairs(rows) do
+			if row.title == label then row.fn() end
+		end
+		helpers.assert_eq(requested, shown.download_url,
+			"the click must name the rendered release so the manager can refuse a changed one")
+	end)
+
 	helpers.it("hands a failed download on, which is not installed", function()
 		local fake = fake_updater("available", { tag = "v0.0.0-dev.134" })
 		fake.download_update = function(_, callback) callback(nil, "offline"); return true end

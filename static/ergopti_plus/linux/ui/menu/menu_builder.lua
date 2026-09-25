@@ -3325,7 +3325,9 @@ local function _build_updates(ctx)
 				out[#out + 1] = {
 					label = _fill(i18n_safe("menu.updates.download_install"), "{tag}", rel.tag),
 					action = function()
-						up.download_update(nil, function(archive, err)
+						-- Consent names the release this row shows: the manager refuses
+						-- it if a background check replaced the cached release since.
+						up.download_update(rel.download_url, function(archive, err)
 							local installed = archive ~= nil and up.install_update(archive)
 							if not archive then
 								Logger.error(LOG, "Update download failed: %s.", tostring(err))
