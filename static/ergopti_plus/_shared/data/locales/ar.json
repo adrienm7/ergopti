@@ -1286,6 +1286,7 @@
 	"menu.updates.title": "🔄 Updates",
 	"metrics.shortcut_format_hint": "الصيغة : mods+مفتاح  (مثال : ctrl+alt+m)\nالمعدِلات المتاحة : ctrl, alt, shift, win\nاترك فارغًا للتعطيل.",
 	"metrics.shortcut_invalid_title": "اختصار غير صالح",
+	"metrics.shortcut_modifier_key": "«{1}» مفتاح تعديل، لذا لا يمكن أن يكون مفتاح اختصار. اختر مفتاحًا آخر.",
 	"metrics.shortcut_prompt_title": "اختصار — {1}",
 	"metrics.shortcut_register_error": "تعذّر تسجيل الاختصار « {1} » : {2}",
 	"metrics_apps.chooser_placeholder": "فئة لـ %s",

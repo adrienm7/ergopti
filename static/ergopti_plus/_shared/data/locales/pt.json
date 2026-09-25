@@ -1286,6 +1286,7 @@
 	"menu.updates.title": "🔄 Updates",
 	"metrics.shortcut_format_hint": "Formato : mods+tecla  (ex. : ctrl+alt+m)\nModificadores disponíveis : ctrl, alt, shift, win\nDeixar vazio para desativar.",
 	"metrics.shortcut_invalid_title": "Atalho inválido",
+	"metrics.shortcut_modifier_key": "«{1}» é uma tecla modificadora, por isso não pode ser a tecla de um atalho. Escolha outra tecla.",
 	"metrics.shortcut_prompt_title": "Atalho — {1}",
 	"metrics.shortcut_register_error": "O atalho « {1} » não pôde ser registado : {2}",
 	"metrics_apps.chooser_placeholder": "Categoria para %s",

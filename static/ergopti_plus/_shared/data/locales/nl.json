@@ -1286,6 +1286,7 @@
 	"menu.updates.title": "🔄 Updates",
 	"metrics.shortcut_format_hint": "Formaat : mods+toets  (bijv. : ctrl+alt+m)\nBeschikbare modifiers : ctrl, alt, shift, win\nLeeg laten om te deactiveren.",
 	"metrics.shortcut_invalid_title": "Ongeldige snelkoppeling",
+	"metrics.shortcut_modifier_key": "‘{1}’ is een modificatietoets en kan daarom niet de toets van een snelkoppeling zijn. Kies een andere toets.",
 	"metrics.shortcut_prompt_title": "Snelkoppeling — {1}",
 	"metrics.shortcut_register_error": "Snelkoppeling « {1} » kon niet worden geregistreerd : {2}",
 	"metrics_apps.chooser_placeholder": "Categorie voor %s",

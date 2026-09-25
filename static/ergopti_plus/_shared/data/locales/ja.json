@@ -1286,6 +1286,7 @@
 	"menu.updates.title": "🔄 Updates",
 	"metrics.shortcut_format_hint": "形式 : 修飾キー+キー  (例 : ctrl+alt+m)\n使用可能な修飾キー : ctrl, alt, shift, win\n無効にする場合は空のままにしてください。",
 	"metrics.shortcut_invalid_title": "無効なショートカット",
+	"metrics.shortcut_modifier_key": "「{1}」は修飾キーのため、ショートカットのキーにはできません。別のキーを選んでください。",
 	"metrics.shortcut_prompt_title": "ショートカット — {1}",
 	"metrics.shortcut_register_error": "ショートカット « {1} » を登録できませんでした : {2}",
 	"metrics_apps.chooser_placeholder": "%s のカテゴリ",

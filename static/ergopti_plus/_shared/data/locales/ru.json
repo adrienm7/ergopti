@@ -1286,6 +1286,7 @@
 	"menu.updates.title": "🔄 Updates",
 	"metrics.shortcut_format_hint": "Формат : модификаторы+клавиша  (напр. : ctrl+alt+m)\nДоступные модификаторы : ctrl, alt, shift, win\nОставьте пустым для отключения.",
 	"metrics.shortcut_invalid_title": "Недопустимое сочетание клавиш",
+	"metrics.shortcut_modifier_key": "«{1}» — клавиша-модификатор, поэтому она не может быть клавишей сочетания. Выберите другую клавишу.",
 	"metrics.shortcut_prompt_title": "Сочетание клавиш — {1}",
 	"metrics.shortcut_register_error": "Не удалось зарегистрировать сочетание « {1} » : {2}",
 	"metrics_apps.chooser_placeholder": "Категория для %s",

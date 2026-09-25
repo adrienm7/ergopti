@@ -1090,6 +1090,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include ../adapters/hotkey_registrar.ahk
 #Include meta/test_chord_notation.ahk
 #Include unit/test_hotkey_registrar_transactions.ahk
+#Include unit/test_hotkey_registrar_modifier_keys.ahk
 #Include unit/test_llm_trigger_shortcut_transactions.ahk
 #Include unit/test_llm_nav_event_owner.ahk
 #Include unit/test_llm_nav_hotkey_transaction.ahk

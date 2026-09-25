@@ -1286,6 +1286,7 @@
 	"menu.updates.title": "🔄 Updates",
 	"metrics.shortcut_format_hint": "प्रारूप: mods+कुंजी  (जैसे ctrl+alt+m)\nउपलब्ध mods: ctrl, alt, shift, win\nअक्षम करने के लिए खाली छोड़ें।",
 	"metrics.shortcut_invalid_title": "अमान्य शॉर्टकट",
+	"metrics.shortcut_modifier_key": "« {1} » एक संशोधक कुंजी है, इसलिए यह शॉर्टकट की कुंजी नहीं हो सकती। कोई दूसरी कुंजी चुनें।",
 	"metrics.shortcut_prompt_title": "शॉर्टकट — {1}",
 	"metrics.shortcut_register_error": "शॉर्टकट « {1} » पंजीकृत नहीं हो सका: {2}",
 	"metrics_apps.chooser_placeholder": "%s के लिए श्रेणी",

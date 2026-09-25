@@ -1286,6 +1286,7 @@
 	"menu.updates.title": "🔄 Updates",
 	"metrics.shortcut_format_hint": "Формат : модифікатори+клавіша  (напр. : ctrl+alt+m)\nДоступні модифікатори : ctrl, alt, shift, win\nЗалиште порожнім для вимкнення.",
 	"metrics.shortcut_invalid_title": "Недійсне скорочення",
+	"metrics.shortcut_modifier_key": "«{1}» — клавіша-модифікатор, тому вона не може бути клавішею сполучення. Виберіть іншу клавішу.",
 	"metrics.shortcut_prompt_title": "Скорочення — {1}",
 	"metrics.shortcut_register_error": "Не вдалося зареєструвати скорочення « {1} » : {2}",
 	"metrics_apps.chooser_placeholder": "Категорія для %s",

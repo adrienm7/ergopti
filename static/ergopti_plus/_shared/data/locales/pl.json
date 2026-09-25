@@ -1286,6 +1286,7 @@
 	"menu.updates.title": "🔄 Updates",
 	"metrics.shortcut_format_hint": "Format : modyfikatory+klawisz  (np. : ctrl+alt+m)\nDostępne modyfikatory : ctrl, alt, shift, win\nZostaw puste, aby wyłączyć.",
 	"metrics.shortcut_invalid_title": "Nieprawidłowy skrót",
+	"metrics.shortcut_modifier_key": "„{1}” to klawisz modyfikujący, więc nie może być klawiszem skrótu. Wybierz inny klawisz.",
 	"metrics.shortcut_prompt_title": "Skrót — {1}",
 	"metrics.shortcut_register_error": "Nie można zarejestrować skrótu « {1} » : {2}",
 	"metrics_apps.chooser_placeholder": "Kategoria dla %s",

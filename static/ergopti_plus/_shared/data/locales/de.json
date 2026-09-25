@@ -1286,6 +1286,7 @@
 	"menu.updates.title": "🔄 Updates",
 	"metrics.shortcut_format_hint": "Format : Modifikatoren+Taste  (z.B. : ctrl+alt+m)\nVerfügbare Modifikatoren : ctrl, alt, shift, win\nLeer lassen zum Deaktivieren.",
 	"metrics.shortcut_invalid_title": "Ungültiges Kürzel",
+	"metrics.shortcut_modifier_key": "„{1}“ ist eine Modifikatortaste und kann daher nicht die Taste eines Kürzels sein. Wählen Sie eine andere Taste.",
 	"metrics.shortcut_prompt_title": "Kürzel — {1}",
 	"metrics.shortcut_register_error": "Das Kürzel « {1} » konnte nicht registriert werden : {2}",
 	"metrics_apps.chooser_placeholder": "Kategorie für %s",
