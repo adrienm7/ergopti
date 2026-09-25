@@ -504,3 +504,33 @@ Test("taphold synthetic transaction AHK-03: shutdown preserves a failed release 
 	_TSRC_ShutdownRefusesToDestroyPendingReleaseOwner)
 Test("fatal startup input cleanup: tracked LShift and Caps modes are retired before exit (fatal-startup-synthetic-modifier-latch)",
 	_TSRC_FatalStartupDrainsSyntheticOwnerAndCapsModes)
+
+; On a Kana-style layout (KbdEdit/MSKLC remap moving AltGr to VK_OEM_8), VK_RMENU
+; has no scan code: a synthetic RAlt is a plain Alt that opens a window's menu
+; bar on release and types nothing on a chord (measured on the Ergopti Kana
+; layout). An alt_gr hold must hold the layout's own AltGr, the SC138 key, and
+; release that same key (kana-altgr-hold-2026-09-25).
+_TSRC_KanaAltGrHoldSendsTheLayoutAltGr() {
+	global _ALTGR_KANA_FIXUP
+	PreviousKana := _ALTGR_KANA_FIXUP
+	_TSRC_Begin()
+	try {
+		_ALTGR_KANA_FIXUP := true
+		ModKey := ResolveHoldModifierKey("alt_gr", "space")
+		TapHoldSyntheticKeyDown(ModKey)
+		AssertEqual(1, _TSRC_Count("{SC138 Down}"),
+			"a Kana alt_gr hold must press the layout's AltGr key (SC138)")
+		AssertEqual(0, _TSRC_Count("{RAlt Down}"),
+			"a Kana alt_gr hold must never press RAlt, a plain Alt on that layout")
+		TapHoldSyntheticKeyUp(ModKey)
+		AssertEqual(1, _TSRC_Count("{SC138 Up}"),
+			"the hold must release the same AltGr key it pressed")
+		AssertEqual(0, _TSRC_Count("{RAlt Up}"),
+			"a Kana alt_gr hold must never release RAlt either")
+	} finally {
+		_ALTGR_KANA_FIXUP := PreviousKana
+		_TSRC_End()
+	}
+}
+Test("taphold-synthetic: a Kana alt_gr hold presses and releases the layout's AltGr (kana-altgr-hold-2026-09-25)",
+	_TSRC_KanaAltGrHoldSendsTheLayoutAltGr)

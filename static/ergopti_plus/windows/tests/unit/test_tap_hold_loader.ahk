@@ -633,13 +633,43 @@ Test("LoadTapHoldToml: inherit_defaults=false skips shipped defaults", _TH_Inher
 ; =========================================================
 
 _TH_ResolveHoldModifierKeyKnownValuesMap() {
-	AssertEqual("LCtrl", ResolveHoldModifierKey("ctrl", "backspace"))
-	AssertEqual("LShift", ResolveHoldModifierKey("shift", "backspace"))
-	AssertEqual("LAlt", ResolveHoldModifierKey("alt", "backspace"))
-	AssertEqual("RAlt", ResolveHoldModifierKey("alt_gr", "backspace"))
-	AssertEqual("LWin", ResolveHoldModifierKey("win", "backspace"))
+	global _ALTGR_KANA_FIXUP
+	PreviousKana := _ALTGR_KANA_FIXUP
+	try {
+		_ALTGR_KANA_FIXUP := false
+		AssertEqual("LCtrl", ResolveHoldModifierKey("ctrl", "backspace"))
+		AssertEqual("LShift", ResolveHoldModifierKey("shift", "backspace"))
+		AssertEqual("LAlt", ResolveHoldModifierKey("alt", "backspace"))
+		AssertEqual("RAlt", ResolveHoldModifierKey("alt_gr", "backspace"))
+		AssertEqual("LWin", ResolveHoldModifierKey("win", "backspace"))
+	} finally {
+		_ALTGR_KANA_FIXUP := PreviousKana
+	}
 }
 Test("ResolveHoldModifierKey: maps every known hold_modifier value", _TH_ResolveHoldModifierKeyKnownValuesMap)
+
+; On a Kana-style layout VK_RMENU has no scan code, so RAlt is a plain Alt and
+; the layout's AltGr is the SC138 key. Every alt_gr spelling, alone or in a
+; combination, must follow the layout (kana-altgr-hold-2026-09-25).
+_TH_ResolveHoldModifierKeyAltGrFollowsLayout() {
+	global _ALTGR_KANA_FIXUP
+	PreviousKana := _ALTGR_KANA_FIXUP
+	try {
+		for Kana, Expected in Map(true, "SC138", false, "RAlt") {
+			_ALTGR_KANA_FIXUP := Kana
+			for Spelling in ["alt_gr", "altgr", "ralt"]
+				AssertEqual(Expected, ResolveHoldModifierKey(Spelling, "caps_lock"),
+					"hold '" . Spelling . "' with Kana=" . Kana)
+			Combo := ResolveHoldModifierKey("ctrl+alt_gr", "caps_lock")
+			Assert(Combo is Array && Combo.Length = 2 && Combo[1] == "LCtrl" && Combo[2] == Expected,
+				"a ctrl+alt_gr hold must hold LCtrl and the layout's AltGr " . Expected)
+		}
+	} finally {
+		_ALTGR_KANA_FIXUP := PreviousKana
+	}
+}
+Test("ResolveHoldModifierKey: alt_gr resolves to the layout's AltGr key (kana-altgr-hold-2026-09-25)",
+	_TH_ResolveHoldModifierKeyAltGrFollowsLayout)
 
 ; A generic modifier token resolves to the tap-hold key's OWN side only when the
 ; key is that very modifier; every other key keeps the left-side default. The
