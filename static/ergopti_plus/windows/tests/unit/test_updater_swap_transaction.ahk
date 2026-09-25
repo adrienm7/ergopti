@@ -11,6 +11,8 @@
 #Requires AutoHotkey v2.0
 
 global _USTX_TransactionCounter := 0
+; Allowance for the fixture's own steps only. A worker phase is bounded by the
+; production deadline that governs it, never by this shorter fixture guess.
 global USTX_WAIT_TIMEOUT_MS := 10000
 global USTX_FIXTURE_SETTLE_MS := 1400
 global USTX_PROCESS_TERMINATE := 0x0001
@@ -162,6 +164,37 @@ _USTX_WaitForProcessExit(Owner, TimeoutMs := unset) {
 	return _USTX_WaitForEvent(Owner.Get("ProcessHandle", 0), TimeoutMs)
 }
 
+; Ready and Ack get exactly the deadlines the updater itself grants the worker.
+_USTX_WaitForSwapSignal(Owner, Role) {
+	global UPDATER_SWAP_READY_TIMEOUT_MS, UPDATER_SWAP_ACK_TIMEOUT_MS
+	if Role = "Ready"
+		TimeoutMs := UPDATER_SWAP_READY_TIMEOUT_MS
+	else if Role = "Ack"
+		TimeoutMs := UPDATER_SWAP_ACK_TIMEOUT_MS
+	else
+		throw ValueError("Unknown swap worker signal: " . Role)
+	return _USTX_WaitForEvent(Owner.Get(Role . "Handle", 0), TimeoutMs)
+}
+
+; After the exact parent exits, the worker bounds its own relaunch: the driver
+; has the production boot-ready deadline, then probation. The fixture allowance
+; covers only the process start and file work outside those native waits.
+_USTX_WorkerCompletionTimeoutMs() {
+	global UPDATER_SWAP_BOOT_READY_TIMEOUT_MS, UPDATER_SWAP_PROBATION_MS, USTX_WAIT_TIMEOUT_MS
+	return UPDATER_SWAP_BOOT_READY_TIMEOUT_MS + UPDATER_SWAP_PROBATION_MS + USTX_WAIT_TIMEOUT_MS
+}
+
+_USTX_CreateFixtureEvent(Name) {
+	Handle := DllCall("CreateEventW", "Ptr", 0, "Int", true, "Int", false, "Str", Name, "Ptr")
+	if !Handle
+		throw OSError()
+	if A_LastError = 183 {
+		DllCall("CloseHandle", "Ptr", Handle, "Int")
+		throw Error("Updater fixture event already exists: " . Name)
+	}
+	return Handle
+}
+
 _USTX_GetExitCode(Owner) {
 	ExitCode := 0xFFFFFFFF
 	Handle := Owner.Get("ProcessHandle", 0)
@@ -176,24 +209,29 @@ _USTX_GetExitCode(Owner) {
 	return ExitCode
 }
 
-_USTX_WriteBatchFixture(Path, MarkerPath, Label, ExitAfterReady := false) {
+; The launch receipt is written before boot-ready, so a worker verdict that saw
+; boot-ready already proves which fixture ran. A nonempty ReleaseName holds the
+; child until the fixture signals that event, so the worker's probation check
+; never races a fixed child lifetime; the worker completion deadline only bounds
+; a child orphaned by a dead fixture. An empty ReleaseName exits after boot-ready.
+_USTX_WriteBatchFixture(Path, MarkerPath, Label, ReleaseName := "", BootDelayMs := 0) {
+	Hold := ReleaseName != ""
+	Command := (Hold ? "$h=[Threading.EventWaitHandle]::OpenExisting('" . ReleaseName . "');" : "")
+		. (BootDelayMs > 0 ? "Start-Sleep -Milliseconds " . BootDelayMs . ";" : "")
+		. "$e=[Threading.EventWaitHandle]::OpenExisting($env:ERGOPTI_UPDATER_BOOT_READY);$null=$e.Set();$e.Dispose()"
+		. (Hold ? ";$null=$h.WaitOne(" . _USTX_WorkerCompletionTimeoutMs() . ");$h.Dispose()" : "")
 	Script := '@echo off' . "`r`n"
-		. '"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -Command "$e=[Threading.EventWaitHandle]::OpenExisting($env:ERGOPTI_UPDATER_BOOT_READY);$null=$e.Set();$e.Dispose()"' . "`r`n"
 		. 'echo ' . Label . '>"' . MarkerPath . '"' . "`r`n"
-	if !ExitAfterReady
-		Script .= 'ping -n 2 127.0.0.1 >nul' . "`r`n"
+		. '"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -Command "'
+		. Command . '"' . "`r`n"
 	FileAppend(Script, Path, "UTF-8-RAW")
 	return Script
 }
 
 _USTX_StartParentGate(TestId, &ParentPid) {
 	Name := "Local\ErgoptiUpdaterFixtureParentExit_" . TestId
-	Handle := DllCall("CreateEventW", "Ptr", 0, "Int", true, "Int", false, "Str", Name, "Ptr")
-	if !Handle
-		throw OSError()
+	Handle := _USTX_CreateFixtureEvent(Name)
 	try {
-		if A_LastError = 183
-			throw Error("Updater parent fixture event already exists.")
 		Run('"' . A_AhkPath . '" /ErrorStdOut "' . A_ScriptDir
 			. '\support\updater_parent_gate.ahk" "' . Name . '"', , "Hide", &ParentPid)
 		return Handle
@@ -203,7 +241,7 @@ _USTX_StartParentGate(TestId, &ParentPid) {
 	}
 }
 
-_USTX_RunSwapCase(NewExists, CurrentStartsAsBak := false, ExitAfterReady := false, BeforeCleanup := 0) {
+_USTX_RunSwapCase(NewExists, CurrentStartsAsBak := false, ExitAfterReady := false, BeforeCleanup := 0, NewBootDelayMs := 0) {
 	global _USTX_TransactionCounter, USTX_FIXTURE_SETTLE_MS
 	global UPDATER_SWAP_SYNCHRONIZE, USTX_PROCESS_TERMINATE
 	Failure := 0
@@ -222,13 +260,17 @@ _USTX_RunSwapCase(NewExists, CurrentStartsAsBak := false, ExitAfterReady := fals
 	ParentCleanupHandle := 0
 	ParentPid := 0
 	TrackerJob := 0
+	ReleaseName := "Local\ErgoptiUpdaterFixtureRelease_" . TestId
+	ReleaseHandle := 0
 	DirCreate(TestDir)
 	try {
-		_USTX_WriteBatchFixture(CurrentExe, OldMarker, "OLD")
+		ReleaseHandle := _USTX_CreateFixtureEvent(ReleaseName)
+		_USTX_WriteBatchFixture(CurrentExe, OldMarker, "OLD", ReleaseName)
 		if CurrentStartsAsBak
 			FileMove(CurrentExe, BakExe)
 		if NewExists
-			_USTX_WriteBatchFixture(NewExe, NewMarker, "NEW", ExitAfterReady)
+			_USTX_WriteBatchFixture(NewExe, NewMarker, "NEW",
+				ExitAfterReady ? "" : ReleaseName, NewBootDelayMs)
 		FileAppend(_Updater_BuildSwapWorkerScript(), SwapScriptPath, "UTF-8-RAW")
 
 		ParentExitHandle := _USTX_StartParentGate(TestId, &ParentPid)
@@ -259,7 +301,7 @@ _USTX_RunSwapCase(NewExists, CurrentStartsAsBak := false, ExitAfterReady := fals
 			"Ptr", Owner["ProcessHandle"], "Int"), "the suspended worker must enter its fixture job")
 		Assert(_Updater_ResumeSwapOwner(Owner),
 			"the real PowerShell swap worker must resume from CREATE_SUSPENDED")
-		Assert(_USTX_WaitForEvent(Owner.Get("ReadyHandle", 0)),
+		Assert(_USTX_WaitForSwapSignal(Owner, "Ready"),
 			"the real swap worker must signal Ready after opening every event and the parent handle")
 		if CurrentStartsAsBak {
 			Assert(!FileExist(CurrentExe),
@@ -272,7 +314,7 @@ _USTX_RunSwapCase(NewExists, CurrentStartsAsBak := false, ExitAfterReady := fals
 
 		Assert(_Updater_SetSwapEvent(Owner.Get("CommitHandle", 0)),
 			"the test must be able to authorize Commit")
-		Assert(_USTX_WaitForEvent(Owner.Get("AckHandle", 0)),
+		Assert(_USTX_WaitForSwapSignal(Owner, "Ack"),
 			"the real swap worker must acknowledge Commit")
 		if CurrentStartsAsBak {
 			Assert(!FileExist(CurrentExe),
@@ -296,10 +338,12 @@ _USTX_RunSwapCase(NewExists, CurrentStartsAsBak := false, ExitAfterReady := fals
 				"FinalExit must not mutate files while the exact parent HANDLE is alive")
 		AssertEqual(0, _Updater_WaitHandleState(ParentCleanupHandle), "the parent must remain alive until signaled")
 		Assert(DllCall("SetEvent", "Ptr", ParentExitHandle, "Int"), "the parent exit must be authorized")
-		Assert(_USTX_WaitForProcessExit(Owner),
+		Assert(_USTX_WaitForProcessExit(Owner, _USTX_WorkerCompletionTimeoutMs()),
 			"the real swap worker must finish after the exact parent exits")
 		ExitCode := _USTX_GetExitCode(Owner)
 
+		; Each launch receipt precedes its boot-ready signal, so the worker's
+		; verdict already proves which fixture ran: observe markers without waiting.
 		if NewExists {
 			AssertEqual(0, ExitCode,
 				"a valid replacement must complete the real swap transaction")
@@ -307,7 +351,7 @@ _USTX_RunSwapCase(NewExists, CurrentStartsAsBak := false, ExitAfterReady := fals
 				"success must publish the replacement at Current")
 			Assert(!FileExist(BakExe),
 				"success may delete Bak only after the replacement survives probation")
-			Assert(_USTX_WaitForFile(NewMarker),
+			Assert(_USTX_WaitForFile(NewMarker, 0),
 				"success must relaunch the replacement fixture")
 			Assert(!FileExist(OldMarker),
 				"success must not relaunch the retired current fixture")
@@ -318,7 +362,7 @@ _USTX_RunSwapCase(NewExists, CurrentStartsAsBak := false, ExitAfterReady := fals
 				"rollback must restore the old Current after New is missing")
 			Assert(!FileExist(BakExe),
 				"rollback must consume Bak when restoring Current")
-			Assert(_USTX_WaitForFile(OldMarker),
+			Assert(_USTX_WaitForFile(OldMarker, 0),
 				"rollback must explicitly relaunch the restored old fixture")
 			Assert(!FileExist(NewMarker),
 				"rollback must never launch a missing replacement")
@@ -343,6 +387,13 @@ _USTX_RunSwapCase(NewExists, CurrentStartsAsBak := false, ExitAfterReady := fals
 		}
 		if ParentExitHandle
 			Assert(DllCall("CloseHandle", "Ptr", ParentExitHandle, "Int"))
+		; Released only after the worker verdict, so every probation check saw a
+		; live child; the tree wait below then observes the held child exiting.
+		if ReleaseHandle {
+			Assert(DllCall("SetEvent", "Ptr", ReleaseHandle, "Int"),
+				"the fixture must release its relaunched child")
+			Assert(DllCall("CloseHandle", "Ptr", ReleaseHandle, "Int"))
+		}
 		if TrackerJob {
 			if _USTX_CloseFixtureTree(TrackerJob, Failure)
 				_USTX_DeleteFixtureAfterCase(TestDir, Failure)
@@ -402,3 +453,27 @@ _USTX_InterruptedCurrentBakIsAdoptedForRecovery() {
 
 Test("updater swap transaction: interrupted Bak without Current is restored and relaunched",
 	_USTX_InterruptedCurrentBakIsAdoptedForRecovery)
+
+; A loaded host stretches worker phases without breaking the production
+; contract: boot-ready may outlast the fixture's own step allowance, and the
+; worker may observe the relaunched child long after it signaled. Both must
+; still complete, or the fixture fails where the updater would not.
+_USTX_SlowWorkerPhaseCompletes(Phase) {
+	global USTX_WAIT_TIMEOUT_MS, UPDATER_SWAP_BOOT_READY_TIMEOUT_MS, UPDATER_SWAP_PROBATION_MS
+	if Phase = "boot" {
+		BootDelayMs := USTX_WAIT_TIMEOUT_MS + 1000
+		Assert(BootDelayMs < UPDATER_SWAP_BOOT_READY_TIMEOUT_MS,
+			"positive control: the slow boot must stay inside the worker boot-ready deadline")
+		_USTX_RunSwapCase(true, false, false, 0, BootDelayMs)
+		return
+	}
+	if Phase != "probation"
+		throw ValueError("Unknown worker phase: " . Phase)
+	SavedProbationMs := UPDATER_SWAP_PROBATION_MS
+	UPDATER_SWAP_PROBATION_MS := SavedProbationMs * 3
+	try _USTX_RunSwapCase(true)
+	finally UPDATER_SWAP_PROBATION_MS := SavedProbationMs
+}
+for Phase in ["boot", "probation"]
+	Test("updater swap transaction: slow " . Phase . " phase completes inside the worker contract"
+		. " (updater-fixture-worker-deadline)", _USTX_SlowWorkerPhaseCompletes.Bind(Phase))
