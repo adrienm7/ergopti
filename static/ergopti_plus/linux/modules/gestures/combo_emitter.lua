@@ -154,12 +154,34 @@ end
 -- =========================================
 -- =========================================
 
+--- Modifier keycodes already down on the daemon's device: the hand's, or a
+--- tap-hold's hold (CapsLock held as Ctrl), both tracked by the keyboard hook.
+--- @return table Set of evdev keycodes.
+local function held_modifier_codes()
+	local held = {}
+	local ok, hook = pcall(require, "adapters.keyboard_hook")
+	if not ok or type(hook) ~= "table" then return held end
+	for _, accessor in ipairs({ "held_text_modifier_codes", "held_shortcut_modifier_codes" }) do
+		if type(hook[accessor]) == "function" then
+			local ok_call, codes = pcall(hook[accessor])
+			if ok_call and type(codes) == "table" then
+				for _, code in ipairs(codes) do held[code] = true end
+			end
+		end
+	end
+	return held
+end
+
 --- Presses a combo on the daemon's uinput device.
 ---
 --- Modifiers down, keys down, keys up, modifiers up in reverse — the order a
 --- physical hand produces, and the order every compositor expects. Releasing a
 --- modifier before the key it modifies leaves the application seeing a bare
 --- keystroke, which is the classic way a synthesised chord half-works.
+---
+--- A chord modifier whose exact key is already down is neither pressed nor
+--- released: the kernel keeps one bit per key, drops the second press, and the
+--- release would lift the modifier a hold or the hand still owns.
 --- @param combo string
 --- @return boolean True when every event was written.
 function M.press(combo)
@@ -201,7 +223,12 @@ function M.press(combo)
 		end
 		return clean
 	end
+	local already_down = held_modifier_codes()
+	local mods = {}
 	for _, code in ipairs(parsed.mods) do
+		if not already_down[code] then mods[#mods + 1] = code end
+	end
+	for _, code in ipairs(mods) do
 		if not emit(code, PRESS) then cleanup(); return false end
 	end
 	for _, code in ipairs(parsed.keys) do
@@ -210,8 +237,8 @@ function M.press(combo)
 	for i = #parsed.keys, 1, -1 do
 		if not emit(parsed.keys[i], RELEASE) then cleanup(); return false end
 	end
-	for i = #parsed.mods, 1, -1 do
-		if not emit(parsed.mods[i], RELEASE) then cleanup(); return false end
+	for i = #mods, 1, -1 do
+		if not emit(mods[i], RELEASE) then cleanup(); return false end
 	end
 
 	Logger.debug(LOG, "Emitted '%s' (%d modifier(s), %d key(s)).",
