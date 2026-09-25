@@ -208,9 +208,12 @@ Backspace and Delete stay the key itself under a held modifier on every driver
 (Linux `NATIVE_UNDER_MODIFIER`, the macOS rules); none of their tap-hold
 variants carries `*`. Their own auto-repeat then arrives under the modifier the
 hold owns, matches no variant and reaches the application as that chord
-(measured: Enter held as Ctrl typed Ctrl+Enter). Each owner claims its press
-(`TapHoldPressIsOwned`), and a `*` swallower gated on that claim takes the
-repeat; AHK falls back to it even when the exact hotkey has no eligible variant.
+(measured: Enter held as Ctrl typed Ctrl+Enter). Each owner claims its
+suppressed press (`TapHoldPressIsOwned`; never a `~` pass-through press, whose
+release a swallowed repeat would suppress), and every tap-hold key has a `*`
+swallower gated on that claim. AHK falls back to it even when the exact hotkey
+has no eligible variant, and it beats the layer's mapping of the same key only
+because `nav_layer.ahk` is included last (first eligible variant wins).
 
 ### project-ahk-lone-alt-win-release-needs-a-mask
 
