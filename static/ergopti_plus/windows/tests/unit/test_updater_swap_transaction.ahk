@@ -17,6 +17,10 @@ global USTX_WAIT_TIMEOUT_MS := 10000
 global USTX_FIXTURE_SETTLE_MS := 1400
 global USTX_PROCESS_TERMINATE := 0x0001
 global USTX_DIAGNOSTIC_CHAR_LIMIT := 2048
+; The FinalExit negative window: never shorter than the floor, otherwise this
+; many times the worker's measured reaction to Commit, within the step allowance.
+global USTX_FINAL_EXIT_WINDOW_FLOOR_MS := 150
+global USTX_FINAL_EXIT_WINDOW_FACTOR := 4
 
 _USTX_WaitForTreeExit(Job, TimeoutMs := unset) {
 	if !Job
@@ -184,6 +188,13 @@ _USTX_WorkerCompletionTimeoutMs() {
 	return UPDATER_SWAP_BOOT_READY_TIMEOUT_MS + UPDATER_SWAP_PROBATION_MS + USTX_WAIT_TIMEOUT_MS
 }
 
+; See USTX_FINAL_EXIT_WINDOW_FLOOR_MS.
+_USTX_FinalExitWindowMs(CommitReactionMs) {
+	global USTX_FINAL_EXIT_WINDOW_FLOOR_MS, USTX_FINAL_EXIT_WINDOW_FACTOR, USTX_WAIT_TIMEOUT_MS
+	return Min(USTX_WAIT_TIMEOUT_MS, Max(USTX_FINAL_EXIT_WINDOW_FLOOR_MS,
+		CommitReactionMs * USTX_FINAL_EXIT_WINDOW_FACTOR))
+}
+
 _USTX_CreateFixtureEvent(Name) {
 	Handle := DllCall("CreateEventW", "Ptr", 0, "Int", true, "Int", false, "Str", Name, "Ptr")
 	if !Handle
@@ -312,10 +323,12 @@ _USTX_RunSwapCase(NewExists, CurrentStartsAsBak := false, ExitAfterReady := fals
 			AssertContains(FileRead(CurrentExe, "UTF-8-RAW"), "OLD",
 				"Ready alone must not mutate the current executable")
 
+		CommitAt := A_TickCount
 		Assert(_Updater_SetSwapEvent(Owner.Get("CommitHandle", 0)),
 			"the test must be able to authorize Commit")
 		Assert(_USTX_WaitForSwapSignal(Owner, "Ack"),
 			"the real swap worker must acknowledge Commit")
+		CommitReactionMs := A_TickCount - CommitAt
 		if CurrentStartsAsBak {
 			Assert(!FileExist(CurrentExe),
 				"Commit and Ack must not recover Bak before FinalExit and exact-parent exit")
@@ -327,7 +340,11 @@ _USTX_RunSwapCase(NewExists, CurrentStartsAsBak := false, ExitAfterReady := fals
 
 		Assert(_Updater_SetSwapEvent(Owner.Get("FinalExitHandle", 0)),
 			"the test must be able to authorize FinalExit")
-		Sleep(150)
+		; Waking from a wait and acting took the worker CommitReactionMs just now;
+		; give it several times that to misbehave before checking it did not.
+		Sleep(_USTX_FinalExitWindowMs(CommitReactionMs))
+		AssertEqual(0, _Updater_WaitHandleState(Owner["ProcessHandle"]),
+			"the worker must still be alive, blocked on the parent, or the checks below prove nothing")
 		if CurrentStartsAsBak {
 			Assert(!FileExist(CurrentExe),
 				"FinalExit must not recover Bak while the exact parent HANDLE is alive")
@@ -477,3 +494,30 @@ _USTX_SlowWorkerPhaseCompletes(Phase) {
 for Phase in ["boot", "probation"]
 	Test("updater swap transaction: slow " . Phase . " phase completes inside the worker contract"
 		. " (updater-fixture-worker-deadline)", _USTX_SlowWorkerPhaseCompletes.Bind(Phase))
+
+; After FinalExit the worker must leave every file alone while the exact parent
+; lives. A fixed 150 ms was that check's whole window: on a loaded host the
+; worker had not even woken from its wait by then, so the check passed without
+; testing anything (updater-fixture-final-exit-window). The window now scales
+; with the worker's measured reaction to Commit, and the worker must still be
+; alive, blocked on the parent, when the window closes.
+_USTX_FinalExitWindowScalesWithTheWorker() {
+	global USTX_FINAL_EXIT_WINDOW_FLOOR_MS, USTX_FINAL_EXIT_WINDOW_FACTOR, USTX_WAIT_TIMEOUT_MS
+	AssertEqual(USTX_FINAL_EXIT_WINDOW_FLOOR_MS, _USTX_FinalExitWindowMs(0),
+		"a fast worker still gets the floor window")
+	AssertEqual(2000 * USTX_FINAL_EXIT_WINDOW_FACTOR, _USTX_FinalExitWindowMs(2000),
+		"a worker that took 2 s to react to Commit must be given several times that after FinalExit")
+	AssertEqual(USTX_WAIT_TIMEOUT_MS, _USTX_FinalExitWindowMs(USTX_WAIT_TIMEOUT_MS),
+		"the window stays inside the fixture's own step allowance")
+	Src := FileRead(A_LineFile, "UTF-8")
+	Start := InStr(Src, "`n_USTX_RunSwapCase(")
+	Body := Start ? _StripFullLineComments(SubStr(Src, Start, InStr(Src, "`n}`n", , Start) - Start)) : ""
+	Assert(Body != "", "the swap case runner must be readable")
+	Assert(InStr(Body,"Sleep(_USTX_FinalExitWindowMs(CommitReactionMs))") > 0
+			and InStr(Body, "Sleep(150)") = 0,
+		"the FinalExit negative check must wait the scaled window, not a fixed 150 ms")
+	Assert(InStr(Body, "_Updater_WaitHandleState(Owner[" . Chr(34) . "ProcessHandle" . Chr(34) . "])") > 0,
+		"the FinalExit negative check must prove the worker is still waiting on the parent")
+}
+Test("updater swap transaction: the FinalExit window scales with the worker"
+	. " (updater-fixture-final-exit-window)", _USTX_FinalExitWindowScalesWithTheWorker)
