@@ -866,10 +866,59 @@ _TapHoldInvokeConfiguredAction(KeyId) {
 		return
 	}
 	try LoggerDebug("TapHoldDispatch", "Dispatching tap action '{1}' for '{2}'.", ActionId, KeyId)
+	; A keystroke action is typed like the key it names, under the held
+	; modifiers. Its gesture callback stays modifier-free: a touchpad gesture
+	; or a shortcut slot fires it while its own carrier modifier is down.
+	Action := GESTURE_ACTIONS[ActionId]
+	if Action.HasOwnProp("Key") {
+		TapHoldEmitKeyTap(Action.Key, Action.Mods)
+		return
+	}
 	GestureInvokeAction(ActionId, GestureBindingId("tap_hold", KeyId))
 }
 
 ; Fire the configured generic tap action through the shared gate.
 _TapHoldFireAction(KeyId) {
 	return TapHoldDispatchTap(KeyId, _TapHoldInvokeConfiguredAction.Bind(KeyId))
+}
+
+; Whether modifier Name is logically down. A global holding a function, as
+; _AHK_SendInput is, so tests can stand in for the keyboard state.
+global _TapHoldModifierIsHeld := (Name) => GetKeyState(Name)
+
+; Send a tap-hold key's keystroke tap (Tab, Enter, an arrow, a shortcut) as the
+; key itself would be typed: under every modifier held when it is sent. A plain
+; Send lifts the modifiers the user holds on other keys, so Shift held then an
+; AltGr tap gave Tab instead of Shift+Tab, while a modifier held by another
+; tap-hold survived only because AHK never lifts the ones it pressed itself.
+; {Blind} keeps them all, whatever their source. The tapped key's own hold
+; modifier is released before its tap dispatches, so it is never among them.
+; With nothing held the payload stays the bare key, the exact "{BackSpace}"
+; the hotstring buffer recognizes as a plain edit.
+; @param Key {String} AHK key name.
+; @param Mods {Array} The keystroke's own modifiers ("Ctrl", "Shift", "Alt", "Win").
+; @return {Boolean} The sender's verdict.
+TapHoldEmitKeyTap(Key, Mods := []) {
+	Modifiers := _TapHoldKeyTapModifiers(Mods)
+	; Every Tab producer goes through the guarded LLM wrapper. A tap-hold's
+	; Tab is not a physical Tab, so the wrapper only types it.
+	if (Key = "Tab" and Mods.Length == 0)
+		return LLM_Tooltip_FireTabOrAccept(Modifiers)
+	return TextPressKey(Key, Modifiers)
+}
+
+; TextPressKey modifiers for a keystroke tap: "Blind" and Mods when any
+; modifier is held, Mods unchanged otherwise.
+_TapHoldKeyTapModifiers(Mods) {
+	global _TapHoldModifierIsHeld
+	static Modifiers := ["LCtrl", "RCtrl", "LShift", "RShift", "LAlt", "RAlt", "LWin", "RWin"]
+	for _, Name in Modifiers {
+		if _TapHoldModifierIsHeld.Call(Name) {
+			Words := "Blind"
+			for _, Mod in Mods
+				Words .= " " . Mod
+			return Words
+		}
+	}
+	return Mods
 }

@@ -127,7 +127,7 @@ SC038::
 
 	Result := TapHoldOwnImmediateLayer("SC038", TapHoldDuration(TapHold, "left_alt"))
 	if (Result["tap"] and Result["elapsed_ms"] >= TapMinDurationMs()) { ; TapMinDurationMs floor suppresses spurious taps when LAlt is brushed mid-roll
-		TapHoldDispatchTap("left_alt", LLM_Tooltip_FireTabOrAccept.Bind(""))
+		TapHoldDispatchTap("left_alt", TapHoldEmitKeyTap.Bind("Tab"))
 	}
 }
 
@@ -203,12 +203,12 @@ SC038::
 {
 	BackSpaceActionWithModifiers := BackSpaceLogic()
 	if not BackSpaceActionWithModifiers {
-		TextPressKey("BackSpace", "") ; Event keeps hotstring engine in sync
+		TapHoldEmitKeyTap("BackSpace") ; Event keeps hotstring engine in sync
 		Sleep(KEY_REPEAT_INITIAL_DELAY_MS)
 		while KS_IsDown("SC038") { ; key-repeat loop while LAlt physically held
 			if A_IsSuspended
 				break
-			TextPressKey("BackSpace", "")
+			TapHoldEmitKeyTap("BackSpace")
 			Sleep(KEY_REPEAT_INTERVAL_MS)
 		}
 	}
@@ -361,7 +361,7 @@ _LAltDispatch() {
 _LAltBackspaceTap() {
 	BackSpaceActionWithModifiers := BackSpaceLogic()
 	if not BackSpaceActionWithModifiers {
-		TextPressKey("BackSpace", "")
+		TapHoldEmitKeyTap("BackSpace")
 	}
 }
 
