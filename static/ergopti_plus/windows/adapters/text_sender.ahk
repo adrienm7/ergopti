@@ -75,52 +75,77 @@ global _AHK_SendInput := (Keys) => SendInput(Keys)
 ; =======================================================
 ; =======================================================
 
-; Maps the cross-platform modifier names from the spec to their AHK v2 prefix chars.
+; Maps the cross-platform modifier names from the spec to their AHK v2 prefix
+; chars. AltGr has none: see _TextSenderKeystroke.
 _TextSenderModifierPrefix(ModName) {
 	switch StrLower(Trim(ModName)) {
 		case "ctrl", "lctrl", "rctrl": return "^"
 		case "shift", "lshift", "rshift": return "+"
 		case "alt", "lalt", "ralt":       return "!"
-		; AltGr is Ctrl + right Alt, so it needs its own prefix: it previously fell
-		; through to default and returned "", dropping the modifier entirely. Kept
-		; separate from "ralt" on purpose — a caller asking for right Alt is not
-		; asking for AltGr, and changing that would alter existing behaviour.
-		case "altgr":                    return "<^>!"
 		case "cmd", "win", "lwin", "rwin": return "#"
-		case "blind":    return "{Blind}"
 		default:                  return ""
 	}
 }
 
-; Builds an AHK prefix from a space-delimited modifier STRING (the AHK-style form
-; that dozens of tap-hold / gesture call sites pass, e.g. "Shift", "Ctrl Shift",
-; "Blind"). Without this branch the modifiers were silently dropped and the bare
-; key was sent (back-Tab became a forward Tab; Ctrl+BackSpace word-delete degraded
-; to a single delete). "Blind" maps to the {Blind} prefix and is kept first so a
-; held modifier survives; unknown tokens are logged and skipped rather than
-; silently corrupting the emitted keystroke.
-_TextSenderModifierString(ModStr) {
-	Blind := ""
+; Send string for one keystroke of Key under the modifier names Mods. AltGr
+; is the layout's AltGr key (KS_AltGrKeyName): "<^>!" (LCtrl + right Alt)
+; where AltGr is right Alt, but on a Kana-style layout right Alt is a plain Alt
+; and "<^>!" typed Ctrl+Alt, so the keystroke is wrapped in a press of that
+; layout's AltGr key. A modifier name that is neither AltGr nor in the prefix
+; map is logged and skipped rather than corrupting the keystroke.
+; @param Mods {Array} Modifier names ("Ctrl", "Shift", "Alt", "Win", "AltGr").
+; @param Key {String} AHK key name.
+; @param Blind {Boolean} True to keep the modifiers held around the keystroke.
+; @return {String} The SendInput payload.
+_TextSenderKeystroke(Mods, Key, Blind := false) {
 	Prefix := ""
+	AltGr := false
+	for _, Mod in Mods {
+		if (StrLower(Trim(Mod)) == "altgr") {
+			AltGr := true
+			continue
+		}
+		Symbol := _TextSenderModifierPrefix(Mod)
+		if (Symbol == "") {
+			LoggerWarn("TextSender", "TextPressKey: unknown modifier token '{1}' for key '{2}' - ignored.", Mod, Key)
+			continue
+		}
+		Prefix .= Symbol
+	}
+	Stroke := Prefix . "{" . Key . "}"
+	if AltGr {
+		AltGrKey := KS_AltGrKeyName()
+		Stroke := (AltGrKey == "RAlt")
+			? "<^>!" . Stroke
+			: "{" . AltGrKey . " down}" . Stroke . "{" . AltGrKey . " up}"
+	}
+	return (Blind ? "{Blind}" : "") . Stroke
+}
+
+; Splits a space-delimited modifier STRING (the AHK-style form that dozens of
+; tap-hold / gesture call sites pass, e.g. "Shift", "Ctrl Shift", "Blind") into
+; its modifier names. Without this parsing the modifiers were silently dropped
+; and the bare key was sent (back-Tab became a forward Tab; Ctrl+BackSpace
+; word-delete degraded to a single delete). "Blind" is returned separately so a
+; held modifier survives.
+; @return {Array} The modifier names; Blind receives whether "Blind" appeared.
+_TextSenderModifierWords(ModStr, &Blind) {
+	Blind := false
+	Words := []
 	for Token in StrSplit(Trim(ModStr), " ") {
 		Token := Trim(Token)
 		if (Token = "")
 			continue
 		if (Token = "Blind") {
-			Blind := "{Blind}"
+			Blind := true
 			continue
 		}
-		P := _TextSenderModifierPrefix(Token)
-		if (P = "") {
-			LoggerWarn("TextSender", "TextPressKey: unknown modifier token '{1}' in '{2}' - ignored.", Token, ModStr)
-			continue
-		}
-		Prefix .= P
+		Words.Push(Token)
 	}
-	return Blind . Prefix
+	return Words
 }
 
-; Normalizes a modifier name (string or alias) to an AHK key name.
+; Normalizes a modifier name (string or alias) to a TextSender modifier name.
 ; Returns "" for unknown values so callers can skip them safely.
 _TextSenderNormalizeModifierKey(Token) {
 	switch StrLower(Trim(Token)) {
@@ -130,27 +155,14 @@ _TextSenderNormalizeModifierKey(Token) {
 			return "Shift"
 		case "alt", "lalt", "ralt":
 			return "Alt"
+		; AltGr is not right Alt: normalizing it to RAlt gave a plain Alt.
 		case "altgr":
-			return "RAlt"
+			return "AltGr"
 		case "win", "lwin", "rwin", "cmd":
 			return "LWin"
 		default:
 			return ""
 	}
-}
-
-; Builds the modifier down/up prefix set for SendInput from array input.
-; Useful for Space/one-shot style handlers that need to send the captured
-; character while modifiers are already pressed.
-_TextSenderModifierPrefixFromArray(Modifiers) {
-	Prefix := ""
-	for _, Token in Modifiers {
-		Norm := _TextSenderNormalizeModifierKey(Token)
-		if (Norm == "")
-			continue
-		Prefix .= _TextSenderModifierPrefix(Norm)
-	}
-	return Prefix
 }
 
 
@@ -794,17 +806,17 @@ TextPressKey(Key, Modifiers, LogFailure := true, Transaction := unset) {
 		; A one-modifier array is still a regular shortcut.  `{Ctrl c}` is
 		; parsed as a single brace token by AHK rather than as Ctrl+C; use the
 		; same prefix form as multi-modifier arrays (`^+{Tab}`) for every size.
-		Prefix := _TextSenderModifierPrefixFromArray(Mods)
-		return _TextSenderSendInput(Prefix . "{" . Key . "}", "modified key press")
+		return _TextSenderSendInput(_TextSenderKeystroke(Mods, Key), "modified key press")
 	}
-	Prefix := ""
+	Words := []
+	Blind := false
 	if (Modifiers is String) and (Modifiers != "") {
 		; AHK-style space-delimited modifier string ("Shift", "Ctrl Shift",
-		; "Blind", ...). Previously this fell through with Prefix "" and the bare
+		; "Blind", ...). Previously this fell through with no prefix and the bare
 		; key was emitted, silently dropping the modifier.
-		Prefix := _TextSenderModifierString(Modifiers)
+		Words := _TextSenderModifierWords(Modifiers, &Blind)
 	}
-	return _TextSenderSendInput(Prefix . "{" . Key . "}", "key press")
+	return _TextSenderSendInput(_TextSenderKeystroke(Words, Key, Blind), "key press")
 }
 
 ; Machine-readable contract map - consumed by the generic adapter compliance test

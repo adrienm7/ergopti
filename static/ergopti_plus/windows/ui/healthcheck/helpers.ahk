@@ -188,7 +188,8 @@ _HealthCheck_LayoutState() {
 		global Features
 		if IsSet(Features) && Features is Map
 			St["ergopti_base"] := Features["layout"]["ergopti_base"] ? "on" : "off"
-		St["altgr"] := GetKeyState("RAlt", "P") ? "active" : "off"
+		; RAlt is a plain Alt on a Kana-style layout, whose AltGr is SC138.
+		St["altgr"] := GetKeyState(KS_AltGrKeyName(), "P") ? "active" : "off"
 		St["shift"] := GetKeyState("Shift", "P") ? "active" : "off"
 		St["caps"] := GetKeyState("CapsLock", "T") ? "active" : "off"
 		if GetKeyState("SC138") && !GetKeyState("SC138", "P")

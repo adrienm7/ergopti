@@ -209,6 +209,14 @@ KS_AltGrKeyName() {
 	return _ALTGR_KANA_FIXUP ? "SC138" : "RAlt"
 }
 
+; Scan code of the key KS_AltGrKeyName presses. A key event is the AltGr key
+; when its scan code matches, whatever virtual key the layout gives it: VK_RMENU
+; on standard layouts, another one (VK_OEM_8, VK_KANA...) on Kana-style ones.
+; @return {Integer} The scan code, extended keys carrying 0x100.
+KS_AltGrScanCode() {
+	return GetKeySC(KS_AltGrKeyName())
+}
+
 ; Enumerates base scancodes 0x01-0x7F under Hkl and returns the first whose
 ; no-modifier output equals TargetChar. ToUnicodeEx is called with wFlags=0x4
 ; (UNICODE_NOCHAR) so the probe never corrupts pending Win32 dead-key state.

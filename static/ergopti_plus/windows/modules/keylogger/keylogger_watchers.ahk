@@ -364,20 +364,23 @@ KL_Watchers_IdleTick() {
 
 ; Build a HS-style shortcut label for a non-modifier keypress. Returns
 ; "" when the chord is not a shortcut (no useful modifier held, or the
-; combo looks like AltGr typing a layered character).
-KL_Watchers_DetectShortcut(vk) {
-		if KLHOOK_MODIFIER_VKS.Has(vk)
+; combo looks like AltGr typing a layered character). The AltGr key goes by
+; scan code and KS_AltGrKeyName: a Kana-style layout gives it a virtual key
+; other than VK_RMENU, and its RAlt is a plain Alt.
+KL_Watchers_DetectShortcut(vk, sc) {
+		if KLHOOK_MODIFIER_VKS.Has(vk) or sc == KS_AltGrScanCode()
 				return ""
 		Ctrl  := GetKeyState("LControl", "P") or GetKeyState("RControl", "P")
 		LAlt  := GetKeyState("LAlt", "P")
-		RAlt  := GetKeyState("RAlt", "P")
+		AltGr := GetKeyState(KS_AltGrKeyName(), "P")
 		Win   := GetKeyState("LWin", "P") or GetKeyState("RWin", "P")
 		Shift := GetKeyState("LShift", "P") or GetKeyState("RShift", "P")
 
-		; AltGr is RAlt + a synthetic LCtrl injected by Windows. When LAlt
-		; is NOT pressed, this Ctrl+Alt combo is the AltGr layer and the
-		; user is just typing a character — drop the « shortcut » framing.
-		if (RAlt and Ctrl and !LAlt)
+		; On a standard layout AltGr is RAlt + a synthetic LCtrl injected by
+		; Windows. When LAlt is NOT pressed, this Ctrl+Alt combo is the AltGr
+		; layer and the user is just typing a character — drop the « shortcut »
+		; framing.
+		if (AltGr and Ctrl and !LAlt)
 				return ""
 		; Plain Shift+letter is capitalisation, never a shortcut.
 		if (!Ctrl and !LAlt and !Win)
