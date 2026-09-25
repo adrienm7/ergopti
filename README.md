@@ -328,22 +328,45 @@ knowledge.
 
 ## CI and releases
 
-Every push to `main` or `dev` runs the unified [`ci.yml`](.github/workflows/ci.yml)
-pipeline: validation gates (hotstrings, domain, JS, translations), the three
-driver suites, then — once everything is green — automated SemVer release builds
-for all platforms with an auto-generated changelog.
+[`ci.yml`](.github/workflows/ci.yml) runs on every push to `main` or `dev`, on
+every pull request into them, and on manual dispatch:
 
-**Version bump** (from conventional commit types since the last tag):
+1. **Validate** and **Release · plan** start together. Validate runs the
+   repository-wide gates: hotstring TOML formatting, the property tests, the
+   mutation tests (on `main` only) and `npm run test:js`. Release · plan reads
+   the git tags and commit subjects and decides whether the run publishes, and
+   with which tag, version and update channel.
+2. Once both pass, three boxes run in parallel, one reusable workflow per OS:
+   **macOS** ([`ci-macos.yml`](.github/workflows/ci-macos.yml)), **Windows**
+   ([`ci-windows.yml`](.github/workflows/ci-windows.yml)) and **Linux**
+   ([`ci-linux.yml`](.github/workflows/ci-linux.yml)). Each box runs its
+   driver's tests; the macOS and Linux boxes also build and smoke-test their
+   packages on every run. On a release run, each box builds the files that will
+   be published, checks those exact files, and uploads them.
+3. **Release · publish** runs only when the plan says the run publishes and all
+   three boxes succeeded. It creates the tag and the GitHub release with every
+   platform's files and an auto-generated changelog, then publishes the macOS
+   Sparkle update feed.
 
-| Condition                                          | Bump  |
-| -------------------------------------------------- | ----- |
-| Subject contains `BREAKING` or uses `!` (`feat!:`) | Major |
-| At least one `feat:` commit                        | Minor |
-| Only `fix:`, `perf:`, `refactor:`, …               | Patch |
+**Channels:** a push to `main` publishes a stable release (`vX.Y.Z`); a push to
+`dev` publishes a pre-release, `v0.0.0-dev.N`, one past the last dev tag. If the
+tag already exists, or a tag of its branch already contains the commit (an older
+commit, a re-run of one that was published, or one a force push left behind),
+the run is a plain CI run and publishes nothing. When Release · publish fails
+part-way, _Re-run failed jobs_ on that run resumes it: it reuses a tag or a
+published release that an earlier attempt created and finishes the update feed
+and the release notes. If a newer release of the channel was published in the
+meantime, nothing more is published, except the notes of a release that already
+exists; the newer update feed stays.
 
-**Channels:** `main` cuts stable releases (`v0.6.7`); `dev` cuts pre-releases
-(`v0.7.0-dev.{run}`); a commit message containing `alpha`/`beta` selects those
-channels.
+**Version bump** on `main` (from conventional commit subjects since the last
+stable tag):
+
+| Condition                                       | Bump  |
+| ----------------------------------------------- | ----- |
+| Subject contains `BREAKING:` or `!:` (`feat!:`) | Major |
+| At least one `feat:` commit                     | Minor |
+| Only `fix:`, `perf:`, `refactor:`, …            | Patch |
 
 ---
 
