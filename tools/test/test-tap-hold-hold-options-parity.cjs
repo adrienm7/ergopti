@@ -132,6 +132,62 @@ if (modifiers && modifiers.length > 0) {
 	}
 }
 
+// The other spellings of a modifier (altgr, lctrl...) are data too. They were
+// two hand-kept lists, MODIFIER_ALIASES in the shared Lua module and the case
+// labels of ResolveHoldModifierKey, that agreed only because nobody had edited
+// one of them yet (hold-alias-single-source).
+/** Reads one inline table of strings from [tap_hold.hold_picker]. */
+function readInlineTable(field) {
+	const section = toml.split(/^\[/m).find((s) => s.startsWith('tap_hold.hold_picker]'));
+	const m = section && section.match(new RegExp('^' + field + '\\s*=\\s*\\{(.*)\\}', 'm'));
+	if (!m) return null;
+	const table = {};
+	for (const pair of m[1].split(',')) {
+		const kv = pair.match(/^\s*([A-Za-z0-9_]+)\s*=\s*"([^"]*)"\s*$/);
+		if (kv) table[kv[1]] = kv[2];
+	}
+	return table;
+}
+const AHK_LOADER = path.join(SP, 'windows', 'platform', 'remap', 'tap_hold_loader.ahk');
+const aliasTables = ['modifier_aliases', 'left_modifier_aliases'];
+const aliases = {};
+for (const field of aliasTables) {
+	const table = readInlineTable(field);
+	if (!table || Object.keys(table).length === 0) {
+		errors.push(`[tap_hold.hold_picker] declares no \`${field}\` table — the other spellings of a hold have no home.`);
+		continue;
+	}
+	for (const [alias, id] of Object.entries(table)) {
+		if (!(modifiers || []).includes(id)) {
+			errors.push(`[tap_hold.hold_picker] ${field}: '${alias}' means '${id}', which is no modifier of the picker.`);
+		}
+		aliases[alias] = id;
+	}
+}
+if (Object.keys(aliases).length > 0) {
+	const lua = fs.readFileSync(SHARED_LUA, 'utf8');
+	const ahkLoader = fs.readFileSync(AHK_LOADER, 'utf8');
+	const resolveStart = ahkLoader.indexOf('ResolveHoldModifierKey(ModifierValue, FieldLabel) {');
+	const resolveBody = resolveStart >= 0 ? ahkLoader.slice(resolveStart, ahkLoader.indexOf('\n}', resolveStart)) : '';
+	if (resolveBody === '') errors.push('windows/platform/remap/tap_hold_loader.ahk has no ResolveHoldModifierKey.');
+	for (const field of aliasTables) {
+		if (!lua.includes(field)) {
+			errors.push(`_shared/lua/tap_hold/hold_options.lua does not read \`${field}\` from the hold picker.`);
+		}
+		if (!ahkLoader.includes('"' + field + '"')) {
+			errors.push(`windows/platform/remap/tap_hold_loader.ahk does not read \`${field}\` from the hold picker.`);
+		}
+	}
+	for (const alias of Object.keys(aliases)) {
+		if (new RegExp(`\\b${alias}\\s*=\\s*"`).test(lua)) {
+			errors.push(`_shared/lua/tap_hold/hold_options.lua spells the alias '${alias}' itself again.`);
+		}
+		if (new RegExp(`case[^\\n]*"${alias}"`).test(resolveBody)) {
+			errors.push(`ResolveHoldModifierKey spells the alias '${alias}' in a case label again.`);
+		}
+	}
+}
+
 if (errors.length > 0) {
 	console.error('\x1b[31m[FAIL] the hold pickers do not agree:\x1b[0m');
 	for (const e of errors) console.error('    - ' + e);

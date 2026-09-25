@@ -81,3 +81,118 @@ helpers.describe("tap-hold config: the user file over the shared defaults", func
 	end)
 
 end)
+
+-- A hold spelled any other way than the picker's id used to reach the engine
+-- as is: 'altgr', 'AltGr' or 'Ctrl + Shift' matched no modifier and the key
+-- had no hold at all, without a word, and a valid but reordered combination
+-- held its modifiers while the tray showed no hold.
+helpers.describe("tap-hold config: the spellings of a hold", function()
+
+	local Engine = require("platform.remap.tap_hold_engine")
+	local HoldOptions = require("tap_hold.hold_options")
+
+	--- The modifier codes the engine presses when `key_id` goes down.
+	local function held_codes(keys, key_id)
+		local engine = Engine.new({ keys = keys, tap_min_ms = 50, one_shot_timeout_ms = 2000, key_text = function() return nil end })
+		local codes = {}
+		for _, event in ipairs(engine:process(Engine.KEY_CODES[key_id], 1, 0) or {}) do
+			codes[#codes + 1] = event.code
+		end
+		return codes
+	end
+
+	--- Loads `hold_modifier = value` on AltGr and captures the errors logged.
+	local function load_hold(field, value)
+		local Logger = require("logger.shim")
+		local real_error, errors = Logger.error, {}
+		Logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
+		local ok, loaded = pcall(load, '[tap_hold.keys.alt_gr]\n' .. field .. ' = "' .. value .. '"\n')
+		Logger.error = real_error
+		if not ok then error(loaded, 0) end
+		return loaded, errors
+	end
+
+	helpers.it("reads the other spellings of a modifier as its id", function()
+		for spelling, id in pairs({
+			altgr = "alt_gr", AltGr = "alt_gr", ALT_GR = "alt_gr", ralt = "alt_gr",
+			["Ctrl + Shift"] = "ctrl+shift", ["shift+ctrl"] = "ctrl+shift", ["ctrl shift"] = "ctrl+shift",
+			["Win + AltGr + Ctrl"] = "ctrl+alt_gr+win", LCtrl = "ctrl", [" + "] = "",
+		}) do
+			local loaded, errors = load_hold("hold_modifier", spelling)
+			helpers.assert_eq(loaded.keys.alt_gr.hold_modifier, id, "'" .. spelling .. "'")
+			helpers.assert_true(loaded.keys.alt_gr.enabled ~= false, "'" .. spelling .. "' is accepted")
+			helpers.assert_eq(errors, {}, "'" .. spelling .. "' is not an error")
+		end
+	end)
+
+	helpers.it("takes the other spellings from the shared picker alone (hold-alias-single-source)", function()
+		local bare = { modifiers = { "ctrl", "alt_gr" } }
+		helpers.assert_nil((HoldOptions.canonical_modifier("altgr", bare)), "no alias table, no alias")
+		helpers.assert_nil((HoldOptions.canonical_modifier("lctrl", bare)), "no alias table, no alias")
+		local picker = { modifiers = { "ctrl", "alt_gr" },
+			modifier_aliases = { gr = "alt_gr" }, left_modifier_aliases = { leftctrl = "ctrl" } }
+		helpers.assert_eq(HoldOptions.canonical_modifier("GR + LeftCtrl", picker), "ctrl+alt_gr",
+			"the picker's aliases are the ones read")
+		local shipped = Config.load(DEFAULTS, nil).hold_picker
+		helpers.assert_eq(shipped.modifier_aliases, { altgr = "alt_gr", ralt = "alt_gr" })
+		helpers.assert_eq(shipped.left_modifier_aliases, { lctrl = "ctrl", lshift = "shift", lalt = "alt", lwin = "win" })
+	end)
+
+	helpers.it("holds every picker option however it is ordered or cased", function()
+		local picker = Config.load(DEFAULTS, nil).hold_picker
+		local modifier_options = 0
+		for _, option in ipairs(HoldOptions.build(picker)) do
+			if option.kind == "modifier" then
+				modifier_options = modifier_options + 1
+				local parts = {}
+				for part in option.id:gmatch("[^+]+") do table.insert(parts, 1, part:upper()) end
+				local reversed = table.concat(parts, " + ")
+				local loaded = load_hold("hold_modifier", reversed)
+				helpers.assert_eq(loaded.keys.alt_gr.hold_modifier, option.id, "'" .. reversed .. "'")
+				local expected = {}
+				for part in option.id:gmatch("[^+]+") do
+					helpers.assert_not_nil(Engine.MODIFIER_CODES[part], "the engine can hold " .. part)
+					expected[#expected + 1] = Engine.MODIFIER_CODES[part]
+				end
+				helpers.assert_eq(held_codes(loaded.keys, "alt_gr"), expected, "'" .. reversed .. "' holds " .. option.id)
+			end
+		end
+		helpers.assert_eq(modifier_options, 31, "every combination of the five shipped modifiers")
+	end)
+
+	helpers.it("reads a layer in any case", function()
+		local loaded = load_hold("hold_layer", " NAV ")
+		helpers.assert_eq(loaded.keys.alt_gr.hold_layer, "nav")
+	end)
+
+	-- Windows (ResolveHoldModifierKey) drops such a hold and keeps the tap: a
+	-- CapsLock with an unknown hold still types Enter there, and here it went
+	-- back to toggling Caps Lock (unknown-hold-keeps-tap).
+	helpers.it("refuses an unknown modifier or layer loudly, and keeps the key's tap (unknown-hold-keeps-tap)", function()
+		for _, case in ipairs({
+			{ "hold_modifier", "hyper" }, { "hold_modifier", "ctrl+alt gr" }, { "hold_modifier", "none" },
+			{ "hold_layer", "sym" },
+		}) do
+			local Logger = require("logger.shim")
+			local real_error, errors = Logger.error, {}
+			Logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
+			local ok, loaded = pcall(load, '[tap_hold.keys.caps_lock]\n' .. case[1] .. ' = "' .. case[2] .. '"\n')
+			Logger.error = real_error
+			if not ok then error(loaded, 0) end
+			local caps = loaded.keys.caps_lock
+			helpers.assert_true(caps.enabled ~= false, case[2] .. " leaves the key on")
+			helpers.assert_eq(caps.tap_action, "enter", case[2] .. " keeps the tap")
+			helpers.assert_nil(caps.hold_modifier, case[2] .. " holds no modifier")
+			helpers.assert_nil(caps.hold_layer, case[2] .. " holds no layer")
+			helpers.assert_eq(#errors, 1, case[2] .. " is reported")
+			helpers.assert_contains(errors[1], case[2])
+			local engine = Engine.new({ keys = loaded.keys, tap_min_ms = 50, one_shot_timeout_ms = 2000,
+				key_text = function() return nil end })
+			helpers.assert_eq(#(engine:process(Engine.KEY_CODES.caps_lock, 1, 0) or {}), 0, case[2] .. " holds nothing")
+			local out = engine:process(Engine.KEY_CODES.caps_lock, 0, 100)
+			helpers.assert_eq(#out, 2, case[2] .. ": a tap still types Enter")
+			helpers.assert_eq(out[1].code, 28, case[2] .. ": a tap still types Enter")
+		end
+	end)
+
+end)

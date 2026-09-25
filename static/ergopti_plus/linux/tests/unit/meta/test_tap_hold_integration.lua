@@ -44,7 +44,7 @@ local function session(user_text)
 		path = path,
 		reload = Manager.reload,
 		is_tap_action = Manager.is_tap_action,
-		is_hold_option = Manager.is_hold_option,
+		canonical_hold = Manager.canonical_hold,
 	})
 	local s = { hook = Hook, manager = Manager, writer = Writer, actions = actions }
 

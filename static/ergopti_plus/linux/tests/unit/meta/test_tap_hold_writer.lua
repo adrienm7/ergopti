@@ -29,9 +29,9 @@ local function fresh_writer(reload_ok)
 		path = path,
 		reload = function() state.reloads = state.reloads + 1; return reload_ok ~= false end,
 		is_tap_action = function(id) return id == "copy" or id == "paste" or id == "enter" end,
-		is_hold_option = function(kind, id)
-			return (kind == "none" and id == "") or (kind == "modifier" and (id == "ctrl" or id == "ctrl+shift"))
-				or (kind == "layer" and id == "nav")
+		-- The shipped catalogue, through the same canonicaliser the manager uses.
+		canonical_hold = function(kind, id)
+			return require("tap_hold.hold_options").canonical(kind, id, Loader.load(DEFAULTS, nil).hold_picker)
 		end,
 	})
 	return writer, path, state
@@ -88,6 +88,18 @@ helpers.describe("tap-hold writer: a tray change reaches the engine", function()
 		keys = effective(path).keys
 		helpers.assert_eq(keys.caps_lock.hold_modifier, "ctrl+shift")
 		helpers.assert_nil(keys.caps_lock.hold_layer)
+		os.remove(path)
+	end)
+
+	helpers.it("stores a hold in the canonical spelling the loader reads back", function()
+		local writer, path = fresh_writer()
+		helpers.assert_true(writer.set_hold("caps_lock", "modifier", "Shift + Ctrl"))
+		helpers.assert_true(read_file(path):find('hold_modifier = "ctrl+shift"', 1, true) ~= nil,
+			"the file holds the picker's id, not the spelling it was given")
+		helpers.assert_true(writer.set_hold("right_ctrl", "modifier", "AltGr"))
+		helpers.assert_eq(effective(path).keys.right_ctrl.hold_modifier, "alt_gr")
+		helpers.assert_true(not writer.set_hold("caps_lock", "modifier", "hyper"), "an unknown modifier is refused")
+		helpers.assert_true(not writer.set_hold("caps_lock", "modifier", ""), "a modifier hold needs one")
 		os.remove(path)
 	end)
 

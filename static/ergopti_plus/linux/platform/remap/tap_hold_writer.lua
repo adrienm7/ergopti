@@ -50,7 +50,7 @@ local HEADER = {
 local _path = nil
 local _reload = nil
 local _is_tap_action = nil
-local _is_hold_option = nil
+local _canonical_hold = nil
 
 
 -- =========================================
@@ -202,19 +202,19 @@ end
 
 --- Binds the writer to the user's file and the engine's reload.
 --- @param opts table { path, reload() -> boolean, is_tap_action(id) -> boolean,
----   is_hold_option(kind, id) -> boolean }
+---   canonical_hold(kind, id) -> string|nil, string|nil }
 function M.init(opts)
 	if _path then error("tap-hold writer already initialised", 2) end
 	if type(opts) ~= "table" or type(opts.path) ~= "string" or opts.path == "" then
 		error("tap-hold writer requires a path", 2)
 	end
-	for _, name in ipairs({ "reload", "is_tap_action", "is_hold_option" }) do
+	for _, name in ipairs({ "reload", "is_tap_action", "canonical_hold" }) do
 		if type(opts[name]) ~= "function" then error("tap-hold writer requires " .. name, 2) end
 	end
 	_path = opts.path
 	_reload = opts.reload
 	_is_tap_action = opts.is_tap_action
-	_is_hold_option = opts.is_hold_option
+	_canonical_hold = opts.canonical_hold
 end
 
 --- Sets a key's tap: an action id, "" for the key itself, "none" for nothing.
@@ -235,24 +235,27 @@ function M.set_tap(key_id, action)
 end
 
 --- Sets a key's hold: kind "modifier" (id "ctrl", "ctrl+shift"…), "layer" (id
---- "nav") or "none".
+--- "nav") or "none". The id is written in the canonical form the loader
+--- reads back, whatever spelling it came in.
 --- @param key_id string
 --- @param kind string
 --- @param id string
 --- @return boolean
 function M.set_hold(key_id, kind, id)
 	if not valid_key(key_id, "set_hold") then return false end
-	if not _is_hold_option(kind, id) then
-		Logger.error(LOG, "set_hold: '%s:%s' is not a hold option — nothing written.", tostring(kind), tostring(id))
+	local canonical, err = _canonical_hold(kind, id)
+	if not canonical then
+		Logger.error(LOG, "set_hold: '%s:%s' is not a hold option (%s) — nothing written.",
+			tostring(kind), tostring(id), tostring(err))
 		return false
 	end
-	return commit(key_id .. " hold = " .. kind .. ":" .. tostring(id), function(document)
+	return commit(key_id .. " hold = " .. kind .. ":" .. canonical, function(document)
 		local entry = key_entry(document, key_id)
 		entry.hold_modifier, entry.hold_layer, entry.enabled = nil, nil, nil
 		if kind == "layer" then
-			entry.hold_layer = id
+			entry.hold_layer = canonical
 		elseif kind == "modifier" then
-			entry.hold_modifier = id
+			entry.hold_modifier = canonical
 		else
 			-- Empty, not absent: absent would inherit the default's hold.
 			entry.hold_modifier = ""
@@ -340,7 +343,7 @@ end
 
 --- Test seam: forgets the initialisation.
 function M._reset_for_test()
-	_path, _reload, _is_tap_action, _is_hold_option = nil, nil, nil, nil
+	_path, _reload, _is_tap_action, _canonical_hold = nil, nil, nil, nil
 end
 
 return M

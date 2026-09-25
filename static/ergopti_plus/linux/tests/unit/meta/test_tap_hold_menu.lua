@@ -31,10 +31,15 @@ end
 
 --- Builds the menu with a real tap-hold manager on the shared defaults, a fake
 --- writer and a fake picker, and returns the Tap-Holds section.
-local function build(calls, picked)
+local function build(calls, picked, user_text)
 	local Manager = helpers.load_module("platform.remap.tap_hold_manager")
 	local user_path = os.tmpname()
 	os.remove(user_path)
+	if user_text then
+		local fh = assert(io.open(user_path, "w"))
+		fh:write(user_text)
+		fh:close()
+	end
 	Manager.init({
 		keyboard_hook = { set_remapper = function() end, key_text = function() return nil end },
 		execute_action = function() end,
@@ -175,6 +180,25 @@ helpers.describe("Linux Tap-Holds menu", function()
 				helpers.assert_nil(row.title:find("[%w_]%+[%w_]"), "raw combination id: " .. row.title)
 				helpers.assert_nil(row.title:find("_", 1, true), "raw modifier id: " .. row.title)
 			end
+		end)
+		restore(Manager)
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("shows a reordered combination as the hold it is, not as none", function()
+		local calls, picked = {}, {}
+		local section, Manager = build(calls, picked, '[tap_hold.keys.caps_lock]\nhold_modifier = "Shift + Ctrl"\n')
+		local ok, err = pcall(function()
+			local i18n = require("infra.i18n")
+			local combo = i18n.get("tap_hold.hold.ctrl") .. " + " .. i18n.get("tap_hold.hold.shift")
+			local caps = find(key_rows(section), i18n.get("tap_hold.group.caps_lock"))
+			helpers.assert_contains(caps.title, "  /  " .. combo)
+			local hold = find(caps.menu, string.format(i18n.get("tap_hold.picker.hold"), ""):sub(1, 4))
+			local checked = {}
+			for _, row in ipairs(hold.menu) do
+				if row.checked then checked[#checked + 1] = row.title end
+			end
+			helpers.assert_eq(checked, { combo }, "the picker ticks the option in force")
 		end)
 		restore(Manager)
 		if not ok then error(err, 0) end

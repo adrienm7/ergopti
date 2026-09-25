@@ -662,7 +662,7 @@ local function main()
 		path = TapHold.user_path(),
 		reload = TapHold.reload,
 		is_tap_action = TapHold.is_tap_action,
-		is_hold_option = TapHold.is_hold_option,
+		canonical_hold = TapHold.canonical_hold,
 	})
 
 	local script_actions = ScriptActions.new({
