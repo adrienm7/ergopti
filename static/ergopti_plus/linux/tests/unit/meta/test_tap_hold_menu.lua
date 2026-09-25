@@ -156,6 +156,61 @@ helpers.describe("Linux Tap-Holds menu", function()
 		if not ok then error(err, 0) end
 	end)
 
+	helpers.it("names every hold by its translated label, never by its stored id", function()
+		local calls, picked = {}, {}
+		local section, Manager = build(calls, picked)
+		local ok, err = pcall(function()
+			local i18n = require("infra.i18n")
+			local alt_gr = find(key_rows(section), i18n.get("tap_hold.group.alt_gr"))
+			helpers.assert_true(alt_gr ~= nil, "an AltGr row")
+			helpers.assert_contains(alt_gr.title, "  /  " .. i18n.get("tap_hold.hold.alt_gr"),
+				"the row shows the hold's label")
+			helpers.assert_nil(alt_gr.title:find("alt_gr", 1, true), "not the id the file stores")
+			local hold = find(alt_gr.menu, string.format(i18n.get("tap_hold.picker.hold"), ""):sub(1, 4))
+			local combo = i18n.get("tap_hold.hold.ctrl") .. " + " .. i18n.get("tap_hold.hold.shift")
+			helpers.assert_true(find(hold.menu, combo) ~= nil, "the picker offers '" .. combo .. "'")
+			helpers.assert_true(#hold.menu > 30, "every hold option is a row")
+			for _, row in ipairs(hold.menu) do
+				helpers.assert_true(type(row.title) == "string", "every hold row has a title")
+				helpers.assert_nil(row.title:find("[%w_]%+[%w_]"), "raw combination id: " .. row.title)
+				helpers.assert_nil(row.title:find("_", 1, true), "raw modifier id: " .. row.title)
+			end
+		end)
+		restore(Manager)
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("has a label for every modifier of every hold in all 21 locales", function()
+		local HoldOptions = require("tap_hold.hold_options")
+		local Json = require("json")
+		local Paths = require("infra.paths")
+		local picker = require("platform.remap.tap_hold_loader").load(DEFAULTS, nil).hold_picker
+		local options = HoldOptions.build(picker)
+		helpers.assert_true(#options > #picker.modifiers, "the shipped picker must be read, or this proves nothing")
+		local order_fh = assert(io.open(Paths.shared("data/locale_order.json"), "r"))
+		local locales = Json.decode(order_fh:read("*a")).order
+		order_fh:close()
+		helpers.assert_eq(#locales, 21, "every shipped locale")
+		for _, code in ipairs(locales) do
+			local fh = assert(io.open(Paths.shared("data/locales/" .. code .. ".json"), "r"))
+			local strings = Json.decode(fh:read("*a"))
+			fh:close()
+			local function translate(key)
+				local value = strings[key]
+				if type(value) ~= "string" or value == "" then error(code .. ".json lacks " .. key, 0) end
+				return value
+			end
+			for _, option in ipairs(options) do
+				local label = HoldOptions.label(option, translate)
+				if option.kind == "modifier" then
+					local expected = {}
+					for modifier in option.id:gmatch("[^+]+") do expected[#expected + 1] = translate("tap_hold.hold." .. modifier) end
+					helpers.assert_eq(label, table.concat(expected, " + "), code .. ": " .. option.id)
+				end
+			end
+		end
+	end)
+
 	helpers.it("makes a key native again from its first row", function()
 		local calls, picked = {}, {}
 		local section, Manager = build(calls, picked)
