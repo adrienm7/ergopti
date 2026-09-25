@@ -87,6 +87,54 @@ _TH_ParsesHoldLayer() {
 }
 Test("LoadTapHoldToml: parses hold_layer", _TH_ParsesHoldLayer)
 
+; Every hold-layer variant tests TapHoldHoldLayer(...) != "", so any other
+; layer name, a typo included, held the navigation layer. A hold_layer outside
+; [tap_hold.hold_picker].layers is refused where it is read: the error names it,
+; the key's hold is dropped (a default hold_modifier with it: the user chose a
+; layer), and its tap is kept (tap-hold-unknown-layer-2026-09-25).
+_TH_UnknownHoldLayerDropsTheHoldOnly() {
+	DefaultsPath := A_ScriptDir . "\test_tap_hold_tmp_defaults.toml"
+	for _, Source in ["user", "defaults"] {
+		UserText := "[tap_hold.keys.space]`n" . 'hold_layer = "nav"' . "`n"
+		DefaultsText := "[tap_hold.keys.caps_lock]`n" . 'tap_action = "enter"' . "`n"
+			. 'hold_modifier = "ctrl"' . "`n"
+		if (Source == "user")
+			UserText .= "[tap_hold.keys.caps_lock]`n" . 'hold_layer = "navv"' . "`n"
+		else
+			DefaultsText := "[tap_hold.keys.caps_lock]`n" . 'tap_action = "enter"' . "`n"
+				. 'hold_layer = "navv"' . "`n"
+		Path := _TH_Write(UserText)
+		if FileExist(DefaultsPath)
+			FileDelete(DefaultsPath)
+		FileAppend(DefaultsText, DefaultsPath, "UTF-8")
+		Captured := []
+		LoggerSetTestSink((Line) => Captured.Push(Line))
+		try {
+			TH := LoadTapHoldToml(Path, DefaultsPath)
+		} finally {
+			LoggerClearTestSink()
+			_TH_Clean()
+			if FileExist(DefaultsPath)
+				FileDelete(DefaultsPath)
+			if _TomlFileCache.Has(DefaultsPath)
+				_TomlFileCache.Delete(DefaultsPath)
+		}
+		Entry := TH["keys"]["caps_lock"]
+		AssertFalse(Entry.Has("hold_layer"), Source . ": an unknown hold_layer must not reach the layer variants")
+		AssertEqual("", Entry.Get("hold_modifier", ""), Source . ": the key must hold nothing")
+		AssertEqual("enter", Entry["tap_action"], Source . ": the key's tap must be kept")
+		AssertEqual("nav", TH["keys"]["space"]["hold_layer"], Source . ": a known layer must still load")
+		Logged := false
+		for _, Line in Captured {
+			if (InStr(Line, "[ERROR]") and InStr(Line, "navv") and InStr(Line, "caps_lock"))
+				Logged := true
+		}
+		AssertTrue(Logged, Source . ": the refusal must be logged as an ERROR naming the layer and the key")
+	}
+}
+Test("LoadTapHoldToml: an unknown hold_layer drops the hold and keeps the tap (tap-hold-unknown-layer-2026-09-25)",
+	_TH_UnknownHoldLayerDropsTheHoldOnly)
+
 _TH_ParsesMultipleKeysIndependently() {
 	Path := _TH_Write(
 		"[tap_hold.keys.caps_lock]`r`n"

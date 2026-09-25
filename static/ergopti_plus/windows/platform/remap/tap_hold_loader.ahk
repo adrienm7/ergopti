@@ -256,6 +256,18 @@ _TapHold_ParseFileInto(FilePath, Result) {
 				InvalidKeys[KeyId] := true
 				continue
 			}
+			; Every hold-layer variant tests only for a non-empty hold_layer, so any
+			; other name, a typo included, would hold the navigation layer. Refuse
+			; it here; the entry keeps its tap and holds nothing, stored as the
+			; hold picker's own "none" (hold_modifier = ""), which also evicts a
+			; default hold below: the user chose a layer, not that default.
+			if (Key == "hold_layer" and Value != "" and !_TapHoldLayerIsKnown(Value)) {
+				try LoggerError("TapHoldLoader",
+					"Unknown hold_layer '{1}' for tap-hold key '{2}' in [tap_hold.keys.{2}]; its hold is dropped and its tap kept (expected one of {3}).",
+					Value, KeyId, _TapHoldKnownLayersLabel())
+				Key := "hold_modifier"
+				Value := ""
+			}
 			if !Result["keys"].Has(KeyId) {
 				Result["keys"][KeyId] := Map()
 			}
@@ -323,6 +335,24 @@ _TapHold_ParseFileInto(FilePath, Result) {
 ; ======= 3. Convenience accessors =======
 ; ========================================
 ; ========================================
+
+; Whether LayerId is a hold layer the hold picker offers; the shared
+; [tap_hold.hold_picker].layers list is the single source of layer ids.
+_TapHoldLayerIsKnown(LayerId) {
+	for _, Known in _TH_ReadHoldPickerArray("layers") {
+		if (Known == LayerId)
+			return true
+	}
+	return false
+}
+
+; The known hold layers, for a log line.
+_TapHoldKnownLayersLabel() {
+	Label := ""
+	for _, Known in _TH_ReadHoldPickerArray("layers")
+		Label .= (Label == "" ? "" : ", ") . Known
+	return Label == "" ? "<none>" : Label
+}
 
 ; Return true when an entry has no tap action, maps the key to itself, or names
 ; an action in the live gesture catalogue. The loader runs before the catalogue
