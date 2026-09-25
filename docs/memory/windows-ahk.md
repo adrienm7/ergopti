@@ -248,7 +248,14 @@ release, as `_TapHoldReleaseOwnedModifier` does; Linux masks with KEY_F24.
 
 On Kana-style layouts VK_RMENU has no scan code: a synthetic RAlt is a plain Alt
 that enters menu mode, and the AltGr key is SC138. Action: resolve AltGr through
-`KS_AltGrKeyName()`, never a literal `RAlt`.
+`KS_AltGrKeyName()`, never a literal `RAlt`. That SC138 is no modifier a
+non-blind Send releases, so it modifies every character sent while it is down.
+Action: send such output through `TapHoldSendWithKeyUp` (hotstrings through
+`_HSE_SendWithAltGrUp`), which lifts the key and gives it back to whoever held
+it, a tap-hold's synthetic hold or the user's own; a raw `{SC138 Up}` ends
+either hold for good. A cleanup of a latched SC138 (the script AltGr chords)
+releases it through `TapHoldReleaseUnlessOwned`, and only once the user has let
+go of it.
 
 ### project-ahk-worker-processes-inherit-driver-identity
 
