@@ -25,6 +25,8 @@
 ---    whole configuration on the first free-text action.
 --- ==============================================================================
 
+local EvdevCodes = require("infra.evdev_codes")
+
 local M = {}
 
 local UP, DOWN, REPEAT = 0, 1, 2
@@ -232,6 +234,27 @@ local function pass(self, code, value)
 	return nil
 end
 
+-- Modifiers whose lone release opens something: the menu bar of an
+-- application with access keys (Alt, and AltGr on a layout where Right Alt is
+-- plain Alt) or the desktop's launcher (Super).
+local MENU_MODIFIERS = { [56] = true, [100] = true, [125] = true, [126] = true }
+
+--- Masks a lone hold before its modifiers are released. A hold that saw no
+--- other key would otherwise be a lone Alt or Super tap, and the tap output
+--- that follows would land in the menu bar or the launcher. The masking tap is
+--- the injector's own (KEY_F24, bound to nothing), and is only needed when one
+--- of those modifiers really goes up now.
+local function mask_lone_release(self, out, state)
+	if state.cancelled then return end
+	for _, mod in ipairs(state.emitted) do
+		if MENU_MODIFIERS[mod] and (self.key_refs[mod] or 0) == 1 and not self.passed_down[mod] then
+			out[#out + 1] = { code = EvdevCodes.KEY_F24, value = DOWN }
+			out[#out + 1] = { code = EvdevCodes.KEY_F24, value = UP }
+			return
+		end
+	end
+end
+
 --- A key typed by a tap. Already held through (Enter held while CapsLock types
 --- Enter), it is lifted and pressed again: a keystroke all the same, and the
 --- kernel's one bit for it ends as the user's hand has it.
@@ -317,6 +340,7 @@ function M:process(code, value, now_ms)
 		-- installed: the hook decides, from what it forwarded, what it means.
 		if not state then return nil end
 		self.held[code] = nil
+		mask_lone_release(self, out, state)
 		for index = #state.emitted, 1, -1 do release(self, out, state.emitted[index]) end
 		if state.layer then self.layer_depth = math.max(0, self.layer_depth - 1) end
 		local elapsed = now_ms - state.down_at

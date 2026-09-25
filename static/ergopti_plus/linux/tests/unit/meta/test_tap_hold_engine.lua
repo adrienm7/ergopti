@@ -115,11 +115,12 @@ helpers.describe("tap-hold engine: thresholds and holds", function()
 			left_shift = { tap_action = "", hold_modifier = "ctrl+shift+alt", time_activation_seconds = 0.3 },
 		})
 		helpers.assert_eq(trail(e:process(CAPS, DOWN, 0)), "125↓")
-		helpers.assert_eq(trail(e:process(CAPS, UP, 500)), "125↑")
+		-- Lone holds: each Super, AltGr or Alt release is masked first.
+		helpers.assert_eq(trail(e:process(CAPS, UP, 500)), "194↓ 194↑ 125↑")
 		helpers.assert_eq(trail(e:process(15, DOWN, 1000)), "100↓")
-		helpers.assert_eq(trail(e:process(15, UP, 1500)), "100↑")
+		helpers.assert_eq(trail(e:process(15, UP, 1500)), "194↓ 194↑ 100↑")
 		helpers.assert_eq(trail(e:process(SHIFT, DOWN, 2000)), "29↓ 42↓ 56↓")
-		helpers.assert_eq(trail(e:process(SHIFT, UP, 2500)), "56↑ 42↑ 29↑", "released in reverse")
+		helpers.assert_eq(trail(e:process(SHIFT, UP, 2500)), "194↓ 194↑ 56↑ 42↑ 29↑", "released in reverse")
 	end)
 
 	helpers.it("types the key itself on a tap of a native-tap key that holds", function()
@@ -235,7 +236,8 @@ helpers.describe("tap-hold engine: tap sentinels and the one-shot Shift", functi
 		e:process(CAPS, DOWN, 0)
 		helpers.assert_eq(trail((e:process(CAPS, UP, 100))), "29↑ 58↓ 58↑", "native: CapsLock toggles as usual")
 		e:process(15, DOWN, 200)
-		helpers.assert_eq(trail((e:process(15, UP, 300))), "56↑", "none: swallowed")
+		helpers.assert_eq(trail((e:process(15, UP, 300))), "194↓ 194↑ 56↑",
+			"none: swallowed, the lone Alt released behind its mask")
 	end)
 
 	helpers.it("shifts the next key, once, and lets a modifier through while armed", function()
@@ -376,6 +378,55 @@ helpers.describe("tap-hold engine: nothing stays pressed", function()
 		for code, count in pairs(held) do
 			helpers.assert_eq(count, 0, "key " .. code .. " left down")
 		end
+	end)
+
+end)
+
+-- A hold of Alt, AltGr or Super released with nothing typed in between is a
+-- lone modifier tap: the focused application moves its focus to the menu bar
+-- (Firefox, LibreOffice and other apps with access keys) or the desktop opens
+-- its launcher, and the tap output that follows lands there. The default Tab
+-- tap-hold holds Alt. The injector already masks its own releases with F24; a
+-- lone release from this engine must be masked the same way
+-- (lone-modifier-mask-2026-09-25).
+helpers.describe("tap-hold engine: a lone Alt, AltGr or Super hold", function()
+	local TAB, WIN, ALTGR, F24 = 15, 125, 100, 194
+
+	helpers.it("masks the lone Alt of a tap before releasing it and typing the tap", function()
+		local e = engine({ tab = { tap_action = "", hold_modifier = "alt", time_activation_seconds = 0.2 } })
+		helpers.assert_eq(trail(e:process(TAB, DOWN, 0)), "56↓")
+		local out, tap = e:process(TAB, UP, 100)
+		helpers.assert_eq(trail(out), "194↓ 194↑ 56↑ 15↓ 15↑", "the mask comes before the Alt release")
+		helpers.assert_nil(tap)
+	end)
+
+	helpers.it("masks a lone long hold too, where no tap follows", function()
+		local e = engine({ tab = { tap_action = "", hold_modifier = "alt", time_activation_seconds = 0.2 } })
+		e:process(TAB, DOWN, 0)
+		helpers.assert_eq(trail(e:process(TAB, UP, 900)), "194↓ 194↑ 56↑")
+	end)
+
+	helpers.it("does not mask a chord, which opens no menu", function()
+		local e = engine({ tab = { tap_action = "", hold_modifier = "alt", time_activation_seconds = 0.2 } })
+		e:process(TAB, DOWN, 0)
+		e:process(KEY_J, DOWN, 20)
+		e:process(KEY_J, UP, 40)
+		helpers.assert_eq(trail(e:process(TAB, UP, 100)), "56↑")
+	end)
+
+	helpers.it("masks Super and AltGr, never Ctrl or Shift", function()
+		local e = engine({
+			tab = { tap_action = "", hold_modifier = "win", time_activation_seconds = 0.2 },
+			caps_lock = { tap_action = "", hold_modifier = "alt_gr", time_activation_seconds = 0.2 },
+			enter = { tap_action = "", hold_modifier = "ctrl", time_activation_seconds = 0.2 },
+		})
+		e:process(TAB, DOWN, 0)
+		helpers.assert_eq(trail(e:process(TAB, UP, 100)), "194↓ 194↑ 125↑ 15↓ 15↑")
+		e:process(CAPS, DOWN, 200)
+		helpers.assert_eq(trail(e:process(CAPS, UP, 300)), "194↓ 194↑ 100↑ 58↓ 58↑")
+		e:process(ENTER, DOWN, 400)
+		helpers.assert_eq(trail(e:process(ENTER, UP, 500)), "29↑ 28↓ 28↑")
+		helpers.assert_true(F24 == 194 and WIN == 125 and ALTGR == 100)
 	end)
 
 end)
