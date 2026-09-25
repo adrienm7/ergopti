@@ -11,6 +11,10 @@
 
 #Requires AutoHotkey v2.0
 
+; The registry range this file fills, from here to _LBLD_LAST_CASE at its end:
+; the isolation guard checks every case in it, a bare Test( registration too.
+global _LBLD_FIRST_CASE := TEST_REGISTRY.Length + 1
+
 _LBLD_Menu(Backend := "api", Enabled := true) {
 	return Map(
 		"backend", Backend,
@@ -397,31 +401,92 @@ _LBLD_ModelAbaKeepsOnlyFinalIntentCurrent() {
 		"the final A generation must remain live after an A-B-A cycle")
 }
 
-Test("[ahk-003] backend lifecycle dispatch is backend-specific and owned",
-	_LBLD_ApiNeverConsultsOllama)
-Test("[ahk-003] Ollama lifecycle remains dependency-gated",
-	_LBLD_OllamaRemainsDepsGated)
-Test("[ahk-019] Ollama readiness projection reaches one terminal lifecycle "
-	. "(backend-lifecycle-root-projection)",
-	_LBLD_InitialProjectionReachesTerminalLifecycle)
-Test("[ahk-003] stale Ollama lifecycle cannot mutate the API backend",
-	_LBLD_StaleOllamaWorkCannotMutateApi)
-Test("[ahk-003] A-B-A backend changes keep old lifecycle intents stale",
-	_LBLD_AbaBackendIntentStaysStale)
-Test("[ahk-003] invalid selected API entry fails closed",
-	_LBLD_InvalidApiFailsClosed)
-Test("[ahk-003] API waits for exact Ollama ownership retirement",
-	_LBLD_OllamaOwnershipMustRetireBeforeApiStarts)
-Test("[ahk-003] API admission uses the real selected-entry resolver",
-	_LBLD_SelectedApiEntryUsesRealResolver)
-Test("[ahk-003] prediction readiness is dispatched by backend",
-	_LBLD_PredictionReadinessIsBackendSpecific)
-Test("[ahk3-01] model changes reject captured dependency callbacks "
-	. "(ahk3-01-model-lifecycle-owner)",
-	_LBLD_ModelChangeRejectsCapturedCallbacks)
-Test("[ahk3-01] model apply retires and replaces lifecycle ownership "
-	. "(ahk3-01-model-lifecycle-owner)",
-	_LBLD_ApplyModelCommitRetiresAndReplacesIntent)
-Test("[ahk3-01] model A-B-A keeps only the final generation current "
-	. "(ahk3-01-model-lifecycle-owner)",
-	_LBLD_ModelAbaKeepsOnlyFinalIntentCurrent)
+; Every case replaces the shared _LLM_Menu and the lifecycle epoch. Left in
+; place, the fixture Map, which has no "trigger_shortcut", reached the next test
+; of the same run: the LLM trigger transaction tests failed with "Item has no
+; value" whenever a filter such as --only lifecycle ran them after these
+; (llm-backend-fixture-isolation).
+_LBLD_Isolated(TestFn) {
+	global _LLM_Menu, _LLM_BackendLifecycleEpoch
+	SavedMenu := _LLM_Menu
+	SavedEpoch := _LLM_BackendLifecycleEpoch
+	try TestFn.Call()
+	finally {
+		_LLM_Menu := SavedMenu
+		_LLM_BackendLifecycleEpoch := SavedEpoch
+	}
+}
+
+_LBLD_Cases() {
+	return [
+		["[ahk-003] backend lifecycle dispatch is backend-specific and owned",
+			_LBLD_ApiNeverConsultsOllama],
+		["[ahk-003] Ollama lifecycle remains dependency-gated",
+			_LBLD_OllamaRemainsDepsGated],
+		["[ahk-019] Ollama readiness projection reaches one terminal lifecycle "
+			. "(backend-lifecycle-root-projection)",
+			_LBLD_InitialProjectionReachesTerminalLifecycle],
+		["[ahk-003] stale Ollama lifecycle cannot mutate the API backend",
+			_LBLD_StaleOllamaWorkCannotMutateApi],
+		["[ahk-003] A-B-A backend changes keep old lifecycle intents stale",
+			_LBLD_AbaBackendIntentStaysStale],
+		["[ahk-003] invalid selected API entry fails closed",
+			_LBLD_InvalidApiFailsClosed],
+		["[ahk-003] API waits for exact Ollama ownership retirement",
+			_LBLD_OllamaOwnershipMustRetireBeforeApiStarts],
+		["[ahk-003] API admission uses the real selected-entry resolver",
+			_LBLD_SelectedApiEntryUsesRealResolver],
+		["[ahk-003] prediction readiness is dispatched by backend",
+			_LBLD_PredictionReadinessIsBackendSpecific],
+		["[ahk3-01] model changes reject captured dependency callbacks "
+			. "(ahk3-01-model-lifecycle-owner)",
+			_LBLD_ModelChangeRejectsCapturedCallbacks],
+		["[ahk3-01] model apply retires and replaces lifecycle ownership "
+			. "(ahk3-01-model-lifecycle-owner)",
+			_LBLD_ApplyModelCommitRetiresAndReplacesIntent],
+		["[ahk3-01] model A-B-A keeps only the final generation current "
+			. "(ahk3-01-model-lifecycle-owner)",
+			_LBLD_ModelAbaKeepsOnlyFinalIntentCurrent]]
+}
+
+for _LBLD_Spec in _LBLD_Cases()
+	Test(_LBLD_Spec[1], _LBLD_Isolated.Bind(_LBLD_Spec[2]))
+
+; Runs every case this file registered exactly as the runner does and requires
+; the shared LLM menu and lifecycle epoch to come back untouched. It walks the
+; registry range the file filled, not the _LBLD_Cases list: a case registered
+; with a bare Test( outside that list, the original leak, is checked too.
+_LBLD_EveryCaseRestoresSharedState() {
+	global TEST_REGISTRY, _LLM_Menu, _LLM_BackendLifecycleEpoch
+	global _LBLD_FIRST_CASE, _LBLD_LAST_CASE
+	Src := FileRead(A_LineFile, "UTF-8")
+	Marker := "`nglobal _LBLD_LAST_CASE := TEST_REGISTRY.Length"
+	Tail := SubStr(Src, InStr(Src, Marker, , -1) + 1)
+	Assert(InStr(Tail, SubStr(Marker, 2)) = 1, "the range end marker must close this file")
+	AssertEqual(0, RegExMatch(Tail, "m)^\s*Test\("),
+		"a case registered after the range end marker escapes this guard")
+	Checked := 0
+	Index := _LBLD_FIRST_CASE
+	while (Index <= _LBLD_LAST_CASE) {
+		Entry := TEST_REGISTRY[Index]
+		Index += 1
+		if (Entry.callback == _LBLD_EveryCaseRestoresSharedState)
+			continue
+		MenuBefore := _LLM_Menu
+		EpochBefore := _LLM_BackendLifecycleEpoch
+		Entry.callback.Call()
+		Checked += 1
+		Assert(_LLM_Menu == MenuBefore,
+			Entry.name . " must restore the shared LLM menu it replaced "
+			. "(llm-backend-fixture-isolation)")
+		AssertEqual(EpochBefore, _LLM_BackendLifecycleEpoch,
+			Entry.name . " must restore the backend lifecycle epoch")
+	}
+	AssertEqual(_LBLD_Cases().Length, Checked,
+		"every backend lifecycle case must be registered through _LBLD_Cases, which isolates it, and checked")
+}
+Test("[llm-backend-fixture-isolation] backend lifecycle cases restore shared LLM state",
+	_LBLD_EveryCaseRestoresSharedState)
+
+; Must stay the last statement: see _LBLD_FIRST_CASE.
+global _LBLD_LAST_CASE := TEST_REGISTRY.Length
