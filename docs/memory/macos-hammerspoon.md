@@ -24,12 +24,15 @@ test started from a pristine runner: an arm64-only launcher, a legacy
 in Git). The last one was an `O_NOFOLLOW` open of the final component in the
 native log sink; Hammerspoon reports exit code 0 even after Lua `os.exit(1)`,
 so the launcher could only say "stopped unexpectedly with exit code 0".
-`.github/workflows/macos-launch-gate.yml` with
-`tools/diagnostics/macos_launch_gate.py` now launches the installed archive
-over those user states on every push/PR (`launch-gate-macos`, gating
-`macos-ok`) and on the exact release archive on Apple silicon and Intel
-(`release-gate-macos`, gating `finalize-release`). Add a scenario there for
-every new launch failure that depends on existing user state. Hosted runners
+The `launch` job of `.github/workflows/ci-macos.yml` now runs
+`tools/diagnostics/macos_launch_gate.py` on the archive that `package-macos`
+built in the same run, installed over those user states. A run that does not
+publish uses the `ci` profile on macos-15; a release run uses the `release`
+profile on macos-15 and macos-15-intel, against the archive that ships. Either
+way a failed launch fails the macOS box, and `Release · publish` needs that box.
+Add a scenario to `SCENARIOS` there for every new launch failure that depends
+on existing user state: `--print-matrix` derives both profiles from it, and
+only `RELEASE_ONLY_SCENARIOS` stay out of the `ci` profile. Hosted runners
 cannot grant Accessibility without interactive approval, so healthy scenarios
 omit config.toml and complete at the first-run wizard; post-onboarding success
 and the menu Quit row remain outside the gate. v0.0.0-dev.128 passed them all

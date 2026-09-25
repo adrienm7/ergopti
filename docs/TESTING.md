@@ -7,19 +7,25 @@ the one command — the local output is byte-identical to CI.
 The test suite spans four independent layers. CI runs them as separate jobs; you
 only need the layer whose check failed.
 
-| Layer | One command | CI job | Needs |
-|---|---|---|---|
-| **JS / domain / codegen** | `npm run test:js` | `Validate · …` | Node 22 |
-| **Windows (AHK)** | see [§ Windows](#windows-ahk) | `Windows · unit tests` | AutoHotkey v2 |
-| **macOS (Hammerspoon/Lua)** | `npm run test:hs` | `macOS · unit tests` | Lua 5.4 |
-| **Linux (Lua)** | `npm run test:linux` | `Linux · unit tests` | LuaJIT |
+| Layer                       | One command                   | CI job                                 | Needs         |
+| --------------------------- | ----------------------------- | -------------------------------------- | ------------- |
+| **JS / domain / codegen**   | `npm run test:js`             | `Validate`                             | Node 22       |
+| **Windows (AHK)**           | see [§ Windows](#windows-ahk) | `Windows / unit + E2E`                 | AutoHotkey v2 |
+| **macOS (Hammerspoon/Lua)** | `npm run test:hs`             | `macOS / unit tests + stubbed harness` | Lua 5.4       |
+| **Linux (Lua)**             | `npm run test:linux`          | `Linux / unit, hardware + stubbed E2E` | LuaJIT        |
+
+`Validate` is a job of [`ci.yml`](../.github/workflows/ci.yml). A check named
+`<OS> / <job>` is a job of the workflow that `ci.yml` calls for that OS:
+[`ci-windows.yml`](../.github/workflows/ci-windows.yml),
+[`ci-macos.yml`](../.github/workflows/ci-macos.yml) or
+[`ci-linux.yml`](../.github/workflows/ci-linux.yml).
 
 ---
 
 ## JS / domain / codegen
 
 ```bash
-npm run test:js            # the everyday gate — mirrors the CI "Validate ·" jobs
+npm run test:js            # the everyday gate — mirrors the CI "Validate" job
 npm run test:js -- --full  # also runs the slow property + mutation tests
 ```
 
@@ -51,11 +57,11 @@ failure means:
 
 **Slow checks**, excluded from the default run: `npm run test:js -- --full` adds
 `test:properties` (fast-check) and `test:mutation` (Stryker). CI runs both in the
-`Validate · JS ports + properties` job, mutation on `main` only.
+`Validate` job, mutation on `main` only.
 
 **Not bundled at all**: `python tools/format_toml.py --hotstrings --all --check`
-(hotstring TOML sorting/formatting) is its own CI job, `Validate · hotstrings
-TOML`. Run it after touching any hotstring `.toml`.
+(hotstring TOML sorting/formatting) is its own step of the CI `Validate` job.
+Run it after touching any hotstring `.toml`.
 
 **Adding a feature flag?** Edit only `static/ergopti_plus/_shared/modules/features/manifest.toml`,
 then `npm run codegen`, then commit the regenerated `_generated/` files. If you

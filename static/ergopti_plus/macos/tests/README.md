@@ -78,9 +78,11 @@ Commit the fixture update only when the diff matches the intended change.
 
 ## CI
 
-GitHub Actions runs the full suite on every push/PR — see
-`.github/workflows/lua-tests.yml`. The workflow installs Lua 5.4 and luacheck,
-then runs `lua tests/run.lua`.
+GitHub Actions runs the full suite on every push/PR — see the `test-hs` job of
+`.github/workflows/ci-macos.yml`, which renders as
+`macOS / unit tests + stubbed harness`. The job installs Lua 5.4 and luacheck,
+runs `tests/run.lua` with Lua 5.4, then runs the stubbed E2E harness,
+`tests/e2e/run_e2e.lua`.
 
 ## Coverage status
 
