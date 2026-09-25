@@ -65,7 +65,7 @@
 		"from": {
 			"key_code": "left_option",
 			"modifiers": {
-				"optional": ["shift", "control", "command", "caps_lock", "fn"]
+				"optional": ["any"]
 			}
 		}
 	},

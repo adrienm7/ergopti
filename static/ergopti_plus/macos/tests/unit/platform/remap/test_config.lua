@@ -372,3 +372,28 @@ helpers.describe("Karabiner init.lua — tap/hold setters preserve per-key timeo
 			"set_hold_action must preserve timeout_ms when rebuilding the entry")
 	end)
 end)
+
+-- A tap on a tap-hold key must work with modifiers already held (Shift held,
+-- then a tap of the key whose tap is Tab, gives Shift+Tab). Karabiner refuses a
+-- rule outright when a held modifier is neither mandatory nor optional in its
+-- from.modifiers, and left_option listed every modifier but Option: with an
+-- Option held, its rule never matched and the key went out as a bare Option,
+-- losing both its tap and its hold (held-modifier-tap-2026-09-25).
+helpers.describe("Config.load_tap_hold_keys: a modifier held before the key", function()
+	helpers.it("lets every tap-hold key's rule match whatever modifiers are held", function()
+		local path = helpers.driver_root() .. "platform/remap/data/tap_hold_keys.json"
+		local keys = Config.load_tap_hold_keys(path)
+		helpers.assert_true(type(keys) == "table" and #keys > 0, "the shipped tap-hold keys must load")
+		for _, key in ipairs(keys) do
+			local mods = type(key.from) == "table" and key.from.modifiers or nil
+			helpers.assert_true(type(mods) == "table", key.id .. " must declare its accepted modifiers")
+			helpers.assert_nil(mods.mandatory, key.id .. " must not require a modifier to be held")
+			local accepts_any = false
+			for _, name in ipairs(mods.optional or {}) do
+				if name == "any" then accepts_any = true end
+			end
+			helpers.assert_true(accepts_any,
+				key.id .. " must accept any held modifier, or its tap and hold vanish under one")
+		end
+	end)
+end)
