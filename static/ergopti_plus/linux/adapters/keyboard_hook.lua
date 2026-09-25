@@ -191,10 +191,6 @@ local _reported_missing = false
 -- Called when a pointer button is pressed, if the caller asked for it.
 local _on_click = nil
 
--- evdev button codes start at BTN_MISC. Everything at or above it on a pointer
--- is a button; everything below is a keyboard key, and a pointer reports none.
-local BTN_FIRST = 0x100
-
 local function keyboard_slot(path)
 	return "keyboard:" .. path
 end
@@ -728,18 +724,26 @@ end
 -- =========================================
 -- =========================================
 
-local EVDEV_TYPE_REL = 2
-
 local function _dispatch_pointer(ev)
-	if ev.type == EVDEV_TYPE_KEY
-		and ev.code >= BTN_FIRST
-		and ev.value == InputEvent.VALUE_DOWN
-	then
-		-- A click while a tap-hold key is down makes it a chord (Shift+click).
-		if _remapper then _remapper:activity() end
-		_call_callback("pointer callback", _on_click, ev.code)
-	elseif ev.type == EVDEV_TYPE_REL and _remapper then
-		-- So does a wheel turn: Ctrl+wheel must not paste on release.
+	if ev.type == EVDEV_TYPE_KEY and ev.code >= InputEvent.POINTER_BUTTON_FIRST then
+		-- A click while a tap-hold key is down makes it a chord (Shift+click),
+		-- and so does the release of one, as on Windows (hook_dispatcher's
+		-- _OnLUp ... _OnX2Up): a click begun before the tap ends inside it.
+		-- A finger landing on a touchpad (BTN_TOUCH, BTN_TOOL_*) is neither.
+		if _remapper and InputEvent.is_pointer_button(ev.code) and ev.value ~= InputEvent.VALUE_REPEAT then
+			_remapper:activity()
+		end
+		-- The daemon hears of every press, the touch included: with tap-to-click
+		-- the kernel reports a touch and no BTN_LEFT, and that touch moves the
+		-- caret all the same, so the password-field verdict and the typing
+		-- buffer must be dropped as on a click.
+		if ev.value == InputEvent.VALUE_DOWN then
+			_call_callback("pointer callback", _on_click, ev.code)
+		end
+	elseif ev.type == InputEvent.EV_REL and InputEvent.REL_WHEEL_AXES[ev.code] and _remapper then
+		-- So does a wheel turn: Ctrl+wheel must not paste on release. Only the
+		-- wheel, as on Windows and macOS: every EV_REL used to count, so a hand
+		-- that merely moved the mouse while tapping CapsLock typed no Enter.
 		_remapper:activity()
 	end
 end

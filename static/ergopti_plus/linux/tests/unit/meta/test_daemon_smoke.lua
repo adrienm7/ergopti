@@ -92,6 +92,23 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
         "top-level focus changes must publish a fresh control-level privacy epoch")
     end)
 
+    -- The hook calls onClick for every pointer press, a touchpad touch included
+    -- (test_keyboard_hook_tap_hold, touch-still-clicks): a tap-to-click into a
+    -- password field of the same window must drop the "not secure" verdict.
+    helpers.it("hands every pointer press to the privacy invalidation (touch-still-clicks)", function()
+      local self_path = debug.getinfo(1, "S").source:gsub("^@", "")
+      local driver_root = (self_path:match("^(.*)[/\\]tests[/\\]") or "."):gsub("\\", "/")
+      local fh = io.open(driver_root .. "/ergopti_hotstrings.lua", "r")
+      helpers.assert_true(fh ~= nil, "daemon file is readable")
+      local src = fh:read("*a"); fh:close()
+      local click_start = assert(src:find("local function on_click()", 1, true))
+      local click_end = assert(src:find("\n\tend\n", click_start, true))
+      helpers.assert_true(src:sub(click_start, click_end):find("secure_focus_guard.invalidate()", 1, true) ~= nil,
+        "a pointer press must invalidate the privacy verdict")
+      helpers.assert_true(src:find("onClick = on_click,", click_end, true) ~= nil,
+        "the keyboard hook must report pointer presses to on_click")
+    end)
+
     helpers.it("invalidates same-window focus before handling Tab text", function()
       local self_path = debug.getinfo(1, "S").source:gsub("^@", "")
       local driver_root = (self_path:match("^(.*)[/\\]tests[/\\]") or "."):gsub("\\", "/")
