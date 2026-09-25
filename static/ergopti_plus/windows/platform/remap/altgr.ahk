@@ -35,7 +35,7 @@ _AltGrHoldModKey() {
 
 #HotIf not _ALTGR_KANA_FIXUP and not LayerEnabled and not IsOnboardingActive() and TapHoldHoldModifier(TapHold, "alt_gr") != ""
 SC01D & SC138:: ; AltGr on an AltGr layout arrives as LControl & RAlt
-SC138:: { ; RAlt alone, e.g. on QWERTY
+*SC138:: { ; RAlt alone, e.g. on QWERTY
 	Result := TapHoldOwnImmediateModifier("alt_gr", "SC138",
 		_AltGrHoldModKey(), TapHoldDuration(TapHold, "alt_gr"))
 	if (Result["tap"] and TapHoldPriorKeyIsSelf("alt_gr")) {
@@ -75,7 +75,7 @@ _AltGrKanaHandleHold(PhysicalModifierPassthrough) {
 #HotIf not _ALTGR_KANA_FIXUP and not LayerEnabled and not IsOnboardingActive() and TapHoldIsActive(TapHold, "alt_gr") and TapHoldHoldModifier(TapHold, "alt_gr") == "" and TapHoldHoldLayer(TapHold, "alt_gr") == ""
 ; Tap-hold on "AltGr"
 SC01D & ~SC138:: ; LControl & RAlt is the only way to make it fire on tap directly
-SC138:: ; RAlt alone, e.g. on QWERTY
+*SC138:: ; RAlt alone, e.g. on QWERTY
 {
 		tap := KeyWait("SC138", "T" . TapHoldDuration(TapHold, "alt_gr"))
 		if (tap and TapHoldPriorKeyIsSelf("alt_gr")) {
@@ -85,7 +85,7 @@ SC138:: ; RAlt alone, e.g. on QWERTY
 }
 
 SC01D & ~SC138 Up::
-SC138 Up:: {
+*SC138 Up:: {
 		UpdateLastSentCharacter("")
 }
 #HotIf
@@ -93,7 +93,7 @@ SC138 Up:: {
 ; Kana-style layouts: the physical AltGr key is SC138 with no LControl, so the
 ; plain SC138 variant alone owns the tap there.
 #HotIf _ALTGR_KANA_FIXUP and not LayerEnabled and not IsOnboardingActive() and TapHoldIsActive(TapHold, "alt_gr") and TapHoldHoldModifier(TapHold, "alt_gr") == "" and TapHoldHoldLayer(TapHold, "alt_gr") == ""
-SC138:: {
+*SC138:: {
 		tap := KeyWait("SC138", "T" . TapHoldDuration(TapHold, "alt_gr"))
 		if (tap and TapHoldPriorKeyIsSelf("alt_gr")) {
 				DisableCapsWord()
@@ -101,7 +101,7 @@ SC138:: {
 		}
 }
 
-SC138 Up:: {
+*SC138 Up:: {
 		UpdateLastSentCharacter("")
 }
 #HotIf

@@ -59,7 +59,7 @@ _LShiftHandleHold(PhysicalModifierPassthrough) {
 ; The hold behaviour (Shift staying Shift) is provided by the OS passthrough
 ; via the ~ prefix — no explicit hold logic is needed here.
 #HotIf TapHoldTapAction(TapHold, "left_shift") != "" and TapHoldHoldModifier(TapHold, "left_shift") == "" and TapHoldHoldLayer(TapHold, "left_shift") == "" and not LayerEnabled
-~$SC02A::
+~*$SC02A::
 {
 	DurationSec := TapHoldDuration(TapHold, "left_shift")
 	; Bounded (unlike a bare KeyWait): a lost SC02A key-up (focus stolen by a
@@ -130,14 +130,15 @@ _LCtrlHandleHold(PhysicalModifierPassthrough) {
 *$SC01D:: _LCtrlHandleHold(false)
 #HotIf
 
-; ~$SC01D: ~ passes LCtrl through to the OS during KeyWait so Ctrl+X combos
-; still work. $ prevents keyboard-hook re-entry. The AltGr (LCtrl+RAlt) case is
+; ~*$SC01D: ~ passes LCtrl through to the OS during KeyWait so Ctrl+X combos
+; still work. * keeps the tap under a modifier held before LCtrl. $ prevents
+; keyboard-hook re-entry. The AltGr (LCtrl+RAlt) case is
 ; handled by altgr.ahk which intercepts RAlt before this block fires.
 ; A_PriorKey == "LControl" guard: blocks the tap when another key was pressed
 ; during the hold window (combo use), while still allowing intentional taps.
 ; KS_IsUp guards: prevent spurious tap on CapsLock+LCtrl or LAlt+LCtrl release.
 #HotIf TapHoldTapAction(TapHold, "left_ctrl") != "" and TapHoldHoldModifier(TapHold, "left_ctrl") == "" and TapHoldHoldLayer(TapHold, "left_ctrl") == "" and not LayerEnabled
-~$SC01D::
+~*$SC01D::
 {
 	UpdateLastSentCharacter("LControl")
 	DurationSec := TapHoldDuration(TapHold, "left_ctrl")

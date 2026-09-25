@@ -165,7 +165,7 @@ SC03A:: {
 
 ; Mirrors the LAlt layer approach: activate layer on hold, tap action on release.
 #HotIf _CapsLockHasHoldLayer() and not LayerEnabled
-$SC03A:: {
+*$SC03A:: {
 	if (KS_IsDown("SC038")) { ; LAlt physically held
 		LAltCapsLockShortcut()
 		return
@@ -197,7 +197,7 @@ $SC03A:: {
 
 ; Simple gate: fire the tap action on every press (no hold behaviour).
 #HotIf TapHoldTapAction(TapHold, "caps_lock") != "" and not _CapsLockHasHoldModifier() and not _CapsLockHasHoldLayer() and not _CapsLockIsPlainBackspace() and not LayerEnabled
-SC03A:: {
+*SC03A:: {
 	if (KS_IsDown("SC038")) { ; LAlt physically held
 		LAltCapsLockShortcut()
 		return

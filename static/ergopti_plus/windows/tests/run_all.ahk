@@ -883,6 +883,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_tap_hold_fire_action_suspend_guard.ahk
 #Include meta/test_tap_hold_native_dispatch_guard.ahk
 #Include meta/test_tap_hold_taps_use_held_modifier_emitter.ahk
+#Include meta/test_tap_hold_hotkeys_admit_held_modifiers.ahk
 #Include meta/test_lshift_lctrl_rshift_bounded_keywait.ahk
 #Include meta/test_layout_poll_blacklist_guard.ahk
 #Include meta/test_layout_quiescence.ahk

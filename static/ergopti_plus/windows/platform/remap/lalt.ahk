@@ -16,7 +16,11 @@
 ; - one_shot_shift tap: 4-key guard prevents firing mid-shortcut when another
 ;   modifier is already held (RCtrl, CapsLock, LShift, LCtrl).
 ; - tab+layer: layer activated immediately on press, Tab emitted only if tap.
-;   SC02A&SC038 and SC11D&SC038 hotkeys for Shift+Tab via LShift/RCtrl hold.
+;   The Tab tap carries the modifiers held before LAlt (Shift+Tab under LShift);
+;   SC11D&SC038 keeps Shift+Tab when RCtrl is the one-shot Shift.
+; - Every variant but one_shot_shift carries the * wildcard: a modifier held
+;   before LAlt must not hand the key back to its native Alt, dropping the
+;   configured tap and hold. one_shot_shift deliberately stays Alt under one.
 ; - backspace plain: key-repeat loop with KEY_REPEAT_INITIAL_DELAY_MS / INTERVAL.
 ;   BackSpaceLogic() handles Ctrl+BS, Shift+BS, RCtrl-as-Shift combinations.
 ; - backspace+layer: same BackSpaceLogic(), but gated by A_PriorKey==LAlt and
@@ -121,7 +125,7 @@ SC038:: {
 ; ==================================
 
 #HotIf TapHoldTapAction(TapHold, "left_alt") == "tab" and TapHoldHoldModifier(TapHold, "left_alt") == "" and not LayerEnabled
-SC038::
+*SC038::
 {
 	UpdateLastSentCharacter("LAlt")
 
@@ -131,7 +135,6 @@ SC038::
 	}
 }
 
-SC02A & SC038:: TextPressKey("Tab", "Shift") ; LShift held
 ; RCtrl+LAlt emits Shift+Tab only when right_ctrl IS the one-shot-shift key. A
 ; runtime `if` around a `::` definition does NOT gate its registration in AHK v2
 ; (hotkeys are load-time constructs), so the old `if` here was dead and the combo
@@ -142,9 +145,6 @@ SC11D & SC038:: {
 	OneShotShiftFix()
 	TextPressKey("Tab", "Shift")
 }
-#HotIf TapHoldTapAction(TapHold, "left_alt") == "tab" and TapHoldHoldModifier(TapHold, "left_alt") == "" and not LayerEnabled
-#SC038:: TextPressKey("Tab", "Win") ; Doesn't fire when SendInput is used
-!SC038:: TextPressKey("Tab", "Alt")
 #HotIf
 
 
@@ -160,7 +160,7 @@ SC11D & SC038:: {
 ; ========================================
 
 #HotIf TapHoldTapAction(TapHold, "left_alt") == "alt_tab_monitor" and TapHoldHoldModifier(TapHold, "left_alt") == "" and TapHoldHoldLayer(TapHold, "left_alt") == "" and not LayerEnabled
-SC038::
+*SC038::
 {
 	if !TapHoldSyntheticKeyDown("LAlt")
 		return
@@ -262,7 +262,7 @@ SC038::
 ; instead of _LAltDispatch(), preserving the Ctrl+BS / Shift+Del tap semantics
 ; while honouring the configured hold modifier (CapsLock/Win already work this way).
 #HotIf TapHoldTapAction(TapHold, "left_alt") == "backspace" and TapHoldHoldModifier(TapHold, "left_alt") != "" and not LayerEnabled
-$SC038:: {
+*$SC038:: {
 	Result := TapHoldOwnImmediateModifier("left_alt", "SC038",
 		_LAltHoldModKey(), TapHoldDuration(TapHold, "left_alt"))
 	if Result["tap"]
@@ -291,7 +291,7 @@ $SC038:: {
 ; do. The tap branch below is safe with no action configured:
 ; _TapHoldInvokeConfiguredAction logs a native pass-through and returns.
 #HotIf TapHoldTapAction(TapHold, "left_alt") != "backspace" and TapHoldHoldModifier(TapHold, "left_alt") != "" and not LayerEnabled
-$SC038:: {
+*$SC038:: {
 	Result := TapHoldOwnImmediateModifier("left_alt", "SC038",
 		_LAltHoldModKey(), TapHoldDuration(TapHold, "left_alt"))
 	if Result["tap"]
@@ -314,7 +314,7 @@ $SC038:: {
 ; No tap-action conjunct, for the reason given on block 4.7: a hold must arm on
 ; the hold alone or the picker offers a choice the driver silently ignores.
 #HotIf TapHoldTapAction(TapHold, "left_alt") != "backspace" and TapHoldTapAction(TapHold, "left_alt") != "tab" and TapHoldHoldLayer(TapHold, "left_alt") != "" and TapHoldHoldModifier(TapHold, "left_alt") == "" and not LayerEnabled
-$SC038:: {
+*$SC038:: {
 	UpdateLastSentCharacter("LAlt")
 
 	Result := TapHoldOwnImmediateLayer("SC038", TapHoldDuration(TapHold, "left_alt"))
@@ -337,7 +337,7 @@ $SC038:: {
 ; ======================================================================
 
 #HotIf not _LAltIsSpecialTap() and TapHoldHoldModifier(TapHold, "left_alt") == "" and TapHoldHoldLayer(TapHold, "left_alt") == "" and TapHoldTapAction(TapHold, "left_alt") != "" and not LayerEnabled
-SC038:: _LAltDispatch()
+*SC038:: _LAltDispatch()
 #HotIf
 
 

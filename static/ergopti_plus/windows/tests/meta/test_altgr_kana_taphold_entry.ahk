@@ -42,8 +42,8 @@ _AKTE_AltGrOwnsKanaTap() {
     Assert(StandardTap > 0, "the standard AltGr tap-only variant must exist")
     Assert(InStr(_AKTE_GoverningHotIf(Src, StandardTap), "not _ALTGR_KANA_FIXUP") > 0,
         "the standard AltGr tap-only variant must be excluded on Kana-style layouts")
-    KanaTap := RegExMatch(Src, '#HotIf _ALTGR_KANA_FIXUP and [^\r\n]*TapHoldHoldModifier\(TapHold, "alt_gr"\) == ""[^\r\n]*\R\s*SC138:: \{')
-    Assert(KanaTap > 0, "the Kana AltGr tap-only variant must be the plain SC138 hotkey")
+    KanaTap := RegExMatch(Src, '#HotIf _ALTGR_KANA_FIXUP and [^\r\n]*TapHoldHoldModifier\(TapHold, "alt_gr"\) == ""[^\r\n]*\R\s*\*SC138:: \{')
+    Assert(KanaTap > 0, "the Kana AltGr tap-only variant must be the wildcard SC138 hotkey")
 }
 Test("tap-holds: Kana SC138 owns configured AltGr tap exactly once (altgr-single-identity-2026-09-25)",
     _AKTE_AltGrOwnsKanaTap)
