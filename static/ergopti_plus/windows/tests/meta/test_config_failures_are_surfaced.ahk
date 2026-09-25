@@ -231,12 +231,13 @@ _CFAS_LatentContractsAreConsistent() {
 	Assert(InStr(Body, "IsSet(_HSCategorySnapshot)") > 0,
 		"_HSRestoreCategory must IsSet-guard _HSCategorySnapshot as well as Features — it is declared outside infra/, so reading it first throws under the headless harness")
 
-	; AltGr is Ctrl + right Alt. Without its own case it fell through to the
-	; default and returned "", dropping the modifier from the sent keystroke.
-	Prefix := _DriverFuncBody("_TextSenderModifierPrefix")
-	Assert(Prefix != "", "_TextSenderModifierPrefix() must exist")
-	Assert(InStr(Prefix, '"altgr"') > 0,
-		"the modifier-prefix map must handle altgr — the sibling name map normalises to it, and without a case here it silently returns an empty prefix")
+	; AltGr has no prefix symbol on a Kana-style layout, so the keystroke
+	; composer owns it. Without its own case it fell through to the default and
+	; returned "", dropping the modifier from the sent keystroke.
+	Keystroke := _DriverFuncBody("_TextSenderKeystroke")
+	Assert(Keystroke != "", "_TextSenderKeystroke() must exist")
+	Assert(InStr(Keystroke, '"altgr"') > 0 and InStr(Keystroke, "KS_AltGrKeyName()") > 0,
+		"the keystroke composer must handle altgr through the layout's AltGr key — the sibling name map normalises to it, and without a case it silently drops the modifier")
 
 	; Every other path in this function returns a boolean, so a bare return
 	; would make a legitimate zero-count call read as a failure.

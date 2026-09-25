@@ -254,9 +254,11 @@ if Features["shortcuts"]["move"] {
 				; Ignore key presses with modifiers to prevent the trigger hotkey
 				; from instantly deactivating the keep-awake mode silently.
 				if Type(ih) == "InputHook" {
-						if Type(arg1) == "Integer" and AwakeIsIgnoredModifierKey(arg1)
+						if Type(arg1) == "Integer" and Type(arg2) == "Integer" and AwakeIsIgnoredModifierKey(arg1, arg2)
 								return
+						; A Kana-style layout's AltGr is neither Ctrl nor Alt.
 						if GetKeyState("Ctrl") or GetKeyState("Alt") or GetKeyState("LWin") or GetKeyState("RWin")
+								or GetKeyState(KS_AltGrKeyName())
 								return
 				}
 				global ActivitySimulation
@@ -275,11 +277,14 @@ if Features["shortcuts"]["move"] {
 				return Hook
 		}
 
-		AwakeIsIgnoredModifierKey(VirtualKey) {
+		; The AltGr key is matched by scan code: a Kana-style layout gives it a
+		; virtual key other than VK_RMENU.
+		AwakeIsIgnoredModifierKey(VirtualKey, ScanCode) {
 				return VirtualKey == GetKeyVK("Ctrl") or VirtualKey == GetKeyVK("Alt")
 						or VirtualKey == GetKeyVK("LWin") or VirtualKey == GetKeyVK("RWin")
 						or VirtualKey == GetKeyVK("LCtrl") or VirtualKey == GetKeyVK("RCtrl")
 						or VirtualKey == GetKeyVK("LAlt") or VirtualKey == GetKeyVK("RAlt")
+						or ScanCode == KS_AltGrScanCode()
 		}
 
 		SimulateActivity(ResetOnly := False) {

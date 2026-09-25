@@ -151,13 +151,7 @@ CrashReport_Build(ErrorObj) {
 
 	; ── Stuck modifiers ───────────────────────────────────────────────────────
 	StuckMods := []
-	try {
-		global _CrashReporter_Modifiers
-		for _, ModKey in _CrashReporter_Modifiers {
-			if GetKeyState(ModKey, "P")
-				StuckMods.Push(ModKey)
-		}
-	}
+	try StuckMods := _CrashReport_StuckModifiers()
 	StuckModsStr := (StuckMods.Length > 0) ? _CrashReport_JoinArr(StuckMods) : "none"
 
 	; ── Adapter / port status (mirrors the healthcheck adapter validation) ──────────
@@ -528,6 +522,22 @@ _CrashReport_JoinParts(Parts) {
 	for Idx, Item in Parts
 		Result .= (Idx > 1 ? ",`r`n" : "") . Item
 	return Result
+}
+
+; Modifier keys physically held when the report is built. A Kana-style
+; layout's AltGr is SC138, not RAlt, so the layout's AltGr key is inspected too.
+; @return {Array} The held modifier key names.
+_CrashReport_StuckModifiers() {
+	global _CrashReporter_Modifiers
+	Keys := _CrashReporter_Modifiers.Clone()
+	if (KS_AltGrKeyName() != "RAlt")
+		Keys.Push(KS_AltGrKeyName())
+	Held := []
+	for _, ModKey in Keys {
+		if GetKeyState(ModKey, "P")
+			Held.Push(ModKey)
+	}
+	return Held
 }
 
 ; Joins an array of strings with ", " separator for inline display.

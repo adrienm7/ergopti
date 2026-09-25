@@ -420,7 +420,7 @@ KL_Hook_OnChar(ih, c) {
 				Keylogger.buffer_events.Push([recorded, delay, meta])
 				Keylogger.buffer_text .= recorded
 				if !Keylogger.synth_active {
-						try KL_Ergo_OnKeystroke(delay, KLHook.last_vk)
+						try KL_Ergo_OnKeystroke(delay, KLHook.last_vk, KLHook.last_sc)
 						try KL_Roi_OnChar(c)
 						; Feed the real-time WPM widget with each accepted manual keystroke.
 						try WPMWidget_Push(false, false)
@@ -469,7 +469,7 @@ KL_Hook_OnKeyDown(ih, vk, sc) {
 				filtered := true
 				if Keylogger.initialized {
 						sk := ""
-						try sk := KL_Watchers_DetectShortcut(vk)
+						try sk := KL_Watchers_DetectShortcut(vk, sc)
 						if (sk != "") {
 								try filtered := MF_ShouldFilter()
 								catch as FilterErr
@@ -536,7 +536,7 @@ KL_Hook_OnKeyDown(ih, vk, sc) {
 				; rather than re-decided per call site.
 				Keylogger.buffer_events.Push([KL_Hook_RecordedChar(bracket), delay, meta])
 				if !Keylogger.synth_active {
-						try KL_Ergo_OnKeystroke(delay, vk, vk = 0x08)
+						try KL_Ergo_OnKeystroke(delay, vk, sc, vk = 0x08)
 				} else {
 						KLHook.last_tick := 0
 				}
