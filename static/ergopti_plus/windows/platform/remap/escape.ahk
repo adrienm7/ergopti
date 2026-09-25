@@ -42,7 +42,7 @@ _EscapeHoldModKey() {
 ; ===========================================
 
 #HotIf TapHoldHoldModifier(TapHold, "escape") != "" and not LayerEnabled
-*$SC001:: {
+$SC001:: {
 	Result := TapHoldOwnImmediateModifier("escape", "Escape",
 		_EscapeHoldModKey(), TapHoldDuration(TapHold, "escape"))
 	if (Result["tap"] and TapHoldPriorKeyIsSelf("escape"))
@@ -63,8 +63,8 @@ _EscapeHoldModKey() {
 ; ========================================
 
 #HotIf TapHoldHoldLayer(TapHold, "escape") != "" and TapHoldHoldModifier(TapHold, "escape") == "" and not LayerEnabled
-*$SC001:: {
-	Result := TapHoldOwnImmediateLayer("Escape", TapHoldDuration(TapHold, "escape"))
+$SC001:: {
+	Result := TapHoldOwnImmediateLayer("escape", "Escape", TapHoldDuration(TapHold, "escape"))
 	if (Result["tap"] and TapHoldPriorKeyIsSelf("escape"))
 		_EscapeDispatch()
 }
@@ -76,9 +76,29 @@ _EscapeHoldModKey() {
 
 
 
+; =====================================
+; =====================================
+; ======= 11.3) Own auto-repeat =======
+; =====================================
+; =====================================
+
+; The hold variants fire only with no modifier held, so the key stays itself
+; under a held modifier, as on every driver. Its own auto-repeat arrives under
+; the modifier or layer the hold owns and matches none of them: swallow it for
+; as long as the owner resolves the press (see TapHoldPressIsOwned).
+#HotIf TapHoldPressIsOwned("escape")
+*SC001:: return
+#HotIf
+
+
+
+
+
+
+
 ; ==============================================================================
 ; ==============================================================================
-; ======= 11.3) Tap-only (tap action set to something other than escape) =======
+; ======= 11.4) Tap-only (tap action set to something other than escape) =======
 ; ==============================================================================
 ; ==============================================================================
 
@@ -97,7 +117,7 @@ $SC001:: _EscapeDispatch()
 
 ; ==================================
 ; ==================================
-; ======= 11.4) Tap dispatch =======
+; ======= 11.5) Tap dispatch =======
 ; ==================================
 ; ==================================
 

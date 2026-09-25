@@ -40,8 +40,8 @@ global _SpaceHoldInputHook := ""
 ; Space down. The first following key therefore observes the configured hold,
 ; even when it arrives before the tap threshold. On release the owner is
 ; balanced first; only a quick, otherwise isolated press emits the tap action.
-; nav_layer.ahk already has SC039::return to silence Space auto-repeat while
-; the layer is active.
+; The owned-press swallower at the end of this file silences Space's own
+; auto-repeat while either hold is active.
 ;
 ; After sending Space on tap, HSE_FeedChar(" ") is called explicitly because
 ; SendInput bypasses the prefix-watcher InputHook.
@@ -54,7 +54,7 @@ SpaceTapHold() {
 }
 
 SpaceTapHoldLayer() {
-	Result := TapHoldOwnImmediateLayer("SC039", TapHoldDuration(TapHold, "space"))
+	Result := TapHoldOwnImmediateLayer("space", "SC039", TapHoldDuration(TapHold, "space"))
 	if Result["tap"] {
 		_SpaceTapOrDispatch()
 		return
@@ -148,4 +148,12 @@ SC039:: SpaceTapHoldLayer()
 
 #HotIf TapHoldHoldModifier(TapHold, "space") != "" and not LayerEnabled
 SC039:: SpaceTapHold()
+#HotIf
+
+; The hold variants fire only with no modifier held, so the key stays itself
+; under a held modifier, as on every driver. Its own auto-repeat arrives under
+; the modifier or layer the hold owns and matches none of them: swallow it for
+; as long as the owner resolves the press (see TapHoldPressIsOwned).
+#HotIf TapHoldPressIsOwned("space")
+*SC039:: return
 #HotIf

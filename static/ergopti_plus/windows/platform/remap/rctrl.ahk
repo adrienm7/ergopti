@@ -186,7 +186,7 @@ _RCtrlHoldModKey() {
 ; the hold alone or the picker offers a choice the driver silently ignores.
 #HotIf TapHoldHoldLayer(TapHold, "right_ctrl") != "" and TapHoldHoldModifier(TapHold, "right_ctrl") == "" and not LayerEnabled
 *$SC11D:: {
-	Result := TapHoldOwnImmediateLayer("SC11D", TapHoldDuration(TapHold, "right_ctrl"))
+	Result := TapHoldOwnImmediateLayer("right_ctrl", "SC11D", TapHoldDuration(TapHold, "right_ctrl"))
 	if (Result["tap"] and TapHoldPriorKeyIsSelf("right_ctrl"))
 		_RCtrlDispatchOwnedTap()
 }

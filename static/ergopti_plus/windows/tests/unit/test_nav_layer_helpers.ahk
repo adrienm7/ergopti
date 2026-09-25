@@ -116,7 +116,7 @@ _NL_ImmediateSuspendAfterFirstCheck() {
 _NL_ImmediateQuickTapDisablesBeforeTap() {
 	global _NL_ImmediateOrder, LayerEnabled := false
 	_NL_ImmediateReset([1000, 1050], [true])
-	Result := TapHoldOwnImmediateLayer("SC038", 0.2,
+	Result := TapHoldOwnImmediateLayer("left_alt", "SC038", 0.2,
 		_NL_ImmediateWait, _NL_ImmediateIsDown, _NL_ImmediateNow,
 		_NL_ImmediateActivate, _NL_ImmediateDisable)
 	if Result["tap"]
@@ -135,7 +135,7 @@ Test("tap-hold layer: key-down activates immediately and quick release taps afte
 _NL_ImmediateInterposedKeySeesLayer() {
 	global LayerEnabled := false
 	_NL_ImmediateReset([2000, 2300], [true])
-	Result := TapHoldOwnImmediateLayer("SC038", 0.2,
+	Result := TapHoldOwnImmediateLayer("left_alt", "SC038", 0.2,
 		_NL_ImmediateWait, _NL_ImmediateIsDown, _NL_ImmediateNow,
 		_NL_ImmediateActivate, _NL_ImmediateDisable)
 	AssertFalse(Result["tap"], "A key held past the threshold must never emit its tap")
@@ -146,7 +146,7 @@ Test("tap-hold layer: an interposed key before the threshold observes the active
 _NL_ImmediateReleaseWaitRearmsWhileHeld() {
 	global _NL_ImmediateOrder, LayerEnabled := false
 	_NL_ImmediateReset([3000, 5400], [false, true], [true])
-	Result := TapHoldOwnImmediateLayer("SC038", 0.2,
+	Result := TapHoldOwnImmediateLayer("left_alt", "SC038", 0.2,
 		_NL_ImmediateWait, _NL_ImmediateIsDown, _NL_ImmediateNow,
 		_NL_ImmediateActivate, _NL_ImmediateDisable)
 	AssertFalse(Result["tap"])
@@ -161,7 +161,7 @@ Test("tap-hold layer: bounded release waits re-arm while held (tap-hold-layer-im
 _NL_ImmediateSuspendStopsAStuckPhysicalWait() {
 	global _NL_ImmediateOrder, LayerEnabled := false
 	_NL_ImmediateReset([6000, 11000], [false], [true])
-	Result := TapHoldOwnImmediateLayer("SC038", 0.2,
+	Result := TapHoldOwnImmediateLayer("left_alt", "SC038", 0.2,
 		_NL_ImmediateWait, _NL_ImmediateIsDown, _NL_ImmediateNow,
 		_NL_ImmediateActivate, _NL_ImmediateDisable,
 		_NL_ImmediateSuspendAfterFirstCheck)
@@ -182,7 +182,7 @@ Test("tap-hold layer: Suspend ends a stuck physical release wait "
 _NL_ImmediateExceptionAlwaysDisables() {
 	global _NL_ImmediateOrder, LayerEnabled := false
 	_NL_ImmediateReset([4000], [])
-	AssertThrows(() => TapHoldOwnImmediateLayer("SC038", 0.2,
+	AssertThrows(() => TapHoldOwnImmediateLayer("left_alt", "SC038", 0.2,
 		_NL_ImmediateThrowingWait, _NL_ImmediateIsDown, _NL_ImmediateNow,
 		_NL_ImmediateActivate, _NL_ImmediateDisable),
 		"A release seam exception must propagate after cleanup")

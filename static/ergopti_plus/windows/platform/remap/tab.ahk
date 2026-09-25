@@ -156,7 +156,7 @@ $SC00F:: {
 $SC00F:: {
 	if _TabAcceptVisiblePrediction()
 		return
-	Result := TapHoldOwnImmediateLayer("SC00F", TapHoldDuration(TapHold, "tab"))
+	Result := TapHoldOwnImmediateLayer("tab", "SC00F", TapHoldDuration(TapHold, "tab"))
 	if (Result["tap"] and TapHoldPriorKeyIsSelf("tab"))
 		_TabDispatch()
 }
@@ -188,9 +188,29 @@ SC00F:: {
 
 
 
+; ====================================
+; ====================================
+; ======= 8.5) Own auto-repeat =======
+; ====================================
+; ====================================
+
+; The hold variants fire only with no modifier held, so the key stays itself
+; under a held modifier, as on every driver. Its own auto-repeat arrives under
+; the modifier or layer the hold owns and matches none of them: swallow it for
+; as long as the owner resolves the press (see TapHoldPressIsOwned).
+#HotIf TapHoldPressIsOwned("tab")
+*SC00F:: return
+#HotIf
+
+
+
+
+
+
+
 ; =================================
 ; =================================
-; ======= 8.5) Tap dispatch =======
+; ======= 8.6) Tap dispatch =======
 ; =================================
 ; =================================
 

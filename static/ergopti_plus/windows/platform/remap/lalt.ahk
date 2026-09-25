@@ -129,7 +129,7 @@ SC038:: {
 {
 	UpdateLastSentCharacter("LAlt")
 
-	Result := TapHoldOwnImmediateLayer("SC038", TapHoldDuration(TapHold, "left_alt"))
+	Result := TapHoldOwnImmediateLayer("left_alt", "SC038", TapHoldDuration(TapHold, "left_alt"))
 	if (Result["tap"] and Result["elapsed_ms"] >= TapMinDurationMs()) { ; TapMinDurationMs floor suppresses spurious taps when LAlt is brushed mid-roll
 		TapHoldDispatchTap("left_alt", TapHoldEmitKeyTap.Bind("Tab"))
 	}
@@ -230,7 +230,7 @@ SC11D & SC038:: {
 #HotIf _LAltIsBackspaceLayer() and not LayerEnabled
 *SC038::
 {
-	Result := TapHoldOwnImmediateLayer("SC038", TapHoldDuration(TapHold, "left_alt"))
+	Result := TapHoldOwnImmediateLayer("left_alt", "SC038", TapHoldDuration(TapHold, "left_alt"))
 	if (
 		Result["tap"]
 		and TapHoldPriorKeyIsSelf("left_alt") ; Prevents spurious BackSpace when layer key was actually used
@@ -317,7 +317,7 @@ SC11D & SC038:: {
 *$SC038:: {
 	UpdateLastSentCharacter("LAlt")
 
-	Result := TapHoldOwnImmediateLayer("SC038", TapHoldDuration(TapHold, "left_alt"))
+	Result := TapHoldOwnImmediateLayer("left_alt", "SC038", TapHoldDuration(TapHold, "left_alt"))
 	if (Result["tap"] and Result["elapsed_ms"] >= TapMinDurationMs() and TapHoldPriorKeyIsSelf("left_alt")) { ; TapMinDurationMs floor suppresses spurious taps when LAlt is brushed mid-roll
 		_LAltDispatch()
 	}

@@ -46,7 +46,7 @@ _BackspaceHoldModKey() {
 ; ===========================================
 
 #HotIf TapHoldHoldModifier(TapHold, "backspace") != "" and not LayerEnabled
-*$SC00E:: {
+$SC00E:: {
 	Result := TapHoldOwnImmediateModifier("backspace", "BackSpace",
 		_BackspaceHoldModKey(), TapHoldDuration(TapHold, "backspace"))
 	if (Result["tap"] and TapHoldPriorKeyIsSelf("backspace"))
@@ -67,8 +67,8 @@ _BackspaceHoldModKey() {
 ; ========================================
 
 #HotIf TapHoldHoldLayer(TapHold, "backspace") != "" and TapHoldHoldModifier(TapHold, "backspace") == "" and not LayerEnabled
-*$SC00E:: {
-	Result := TapHoldOwnImmediateLayer("BackSpace", TapHoldDuration(TapHold, "backspace"))
+$SC00E:: {
+	Result := TapHoldOwnImmediateLayer("backspace", "BackSpace", TapHoldDuration(TapHold, "backspace"))
 	if (Result["tap"] and TapHoldPriorKeyIsSelf("backspace"))
 		_BackspaceDispatch()
 }
@@ -80,9 +80,29 @@ _BackspaceHoldModKey() {
 
 
 
+; =====================================
+; =====================================
+; ======= 10.3) Own auto-repeat =======
+; =====================================
+; =====================================
+
+; The hold variants fire only with no modifier held, so the key stays itself
+; under a held modifier, as on every driver. Its own auto-repeat arrives under
+; the modifier or layer the hold owns and matches none of them: swallow it for
+; as long as the owner resolves the press (see TapHoldPressIsOwned).
+#HotIf TapHoldPressIsOwned("backspace")
+*SC00E:: return
+#HotIf
+
+
+
+
+
+
+
 ; =================================================================================
 ; =================================================================================
-; ======= 10.3) Tap-only (tap action set to something other than backspace) =======
+; ======= 10.4) Tap-only (tap action set to something other than backspace) =======
 ; =================================================================================
 ; =================================================================================
 
@@ -101,7 +121,7 @@ $SC00E:: _BackspaceDispatch()
 
 ; ==================================
 ; ==================================
-; ======= 10.4) Tap dispatch =======
+; ======= 10.5) Tap dispatch =======
 ; ==================================
 ; ==================================
 

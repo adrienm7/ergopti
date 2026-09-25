@@ -172,7 +172,7 @@ SC03A:: {
 	}
 
 	UpdateLastSentCharacter("CapsLock")
-	Result := TapHoldOwnImmediateLayer("CapsLock", TapHoldDuration(TapHold, "caps_lock"))
+	Result := TapHoldOwnImmediateLayer("caps_lock", "CapsLock", TapHoldDuration(TapHold, "caps_lock"))
 	if (
 		Result["tap"]
 		and Result["elapsed_ms"] >= TapMinDurationMs()

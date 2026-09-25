@@ -205,8 +205,12 @@ performs its native function and the tap and hold are lost. Action: every
 tap-hold variant on CapsLock and the modifier keys carries `*`
 (`test_tap_hold_hotkeys_admit_held_modifiers.ahk`). Tab, Space, Enter, Escape,
 Backspace and Delete stay the key itself under a held modifier on every driver
-(Linux `NATIVE_UNDER_MODIFIER`, the macOS rules); do not add `*` to their
-tap-only variants.
+(Linux `NATIVE_UNDER_MODIFIER`, the macOS rules); none of their tap-hold
+variants carries `*`. Their own auto-repeat then arrives under the modifier the
+hold owns, matches no variant and reaches the application as that chord
+(measured: Enter held as Ctrl typed Ctrl+Enter). Each owner claims its press
+(`TapHoldPressIsOwned`), and a `*` swallower gated on that claim takes the
+repeat; AHK falls back to it even when the exact hotkey has no eligible variant.
 
 ### project-ahk-lone-alt-win-release-needs-a-mask
 
