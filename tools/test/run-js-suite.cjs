@@ -244,6 +244,7 @@ const CHECKS = [
 	// which is the precondition for the mutation score meaning anything.
 	{ name: 'mutation-test harness passes un-mutated (Stryker precondition)', cmd: 'node', args: ['tools/test/test-mutation-targets.cjs'], repro: 'node tools/test/test-mutation-targets.cjs' },
 	{ name: 'macOS Sparkle feed, URL command, and sole-owner cadence', cmd: 'node', args: ['tools/test/test-macos-sparkle-feed.cjs'], repro: 'node tools/test/test-macos-sparkle-feed.cjs' },
+	{ name: 'macOS embedded Hammerspoon and native helper cannot update themselves', cmd: 'node', args: ['tools/test/test-macos-sparkle-disarmed-bundles.cjs'], repro: 'npm run test:macos-sparkle-disarmed-bundles' },
 	{ name: 'hotstring editor preserves strict-case state across the shared bridge', cmd: 'node', args: ['tools/test/test-hotstring-editor-strict-case.cjs'], repro: 'npm run test:hs-editor-strict-case' },
 	{ name: 'Karabiner package identity is shared and cached bytes are verified', cmd: 'node', args: ['tools/test/test-karabiner-package-manifest.cjs'], repro: 'node tools/test/test-karabiner-package-manifest.cjs' },
 	{ name: 'input-source Python supervisor enforces one bounded process group', cmd: 'node', args: ['tools/test/test-input-source-python-supervisor.cjs'], repro: 'npm run test:input-source-python-supervisor' },
