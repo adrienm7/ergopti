@@ -3,8 +3,8 @@
 ; ==============================================================================
 ; MODULE: Tap-Holds — One-Shot Shift
 ; DESCRIPTION:
-; OneShotShift() capitalises the next typed character (or maps punctuation
-; keys to their shifted equivalents) and resets immediately after. Also owns
+; OneShotShift() capitalises the next typed character (or types the result
+; _shared/tap_hold/one_shot_shift.json gives it) and resets immediately after. Also owns
 ; OneShotShiftFix() (disables the pending shift when used as a chord modifier)
 ; and ToggleCapsLock() (shared by CapsLock and AltGr tap-hold modules).
 ; ==============================================================================
@@ -23,7 +23,10 @@ OneShotShift() {
 				return
 		global OneShotShiftEnabled := True
 		TimeoutSec := (IsSet(ONE_SHOT_SHIFT_TIMEOUT_SEC) and ONE_SHOT_SHIFT_TIMEOUT_SEC > 0) ? ONE_SHOT_SHIFT_TIMEOUT_SEC : 2
-		ihvText := InputHook("L1 T" . TimeoutSec . " E", "=%$.', " . ScriptInformation["MagicKey"])
+		; The characters with a result of their own, and the magic key, end the
+		; capture: _shared/tap_hold/one_shot_shift.json, which Linux reads too.
+		MagicKey := ScriptInformation["MagicKey"]
+		ihvText := InputHook("L1 T" . TimeoutSec . " E", TapHoldOneShotEndKeys(MagicKey))
 		ihvText.KeyOpt("{BackSpace}{Enter}{Delete}", "E") ; End keys to not swallow
 		OwnerToken := SIHO_StartOwned(ihvText, "one-shot-shift", true)
 		if !OwnerToken {
@@ -41,25 +44,7 @@ OneShotShift() {
 				global OneShotShiftEnabled := False
 				return
 		}
-		SpecialCharacter := ""
-
-		if (ihvText.EndKey == "=") {
-				SpecialCharacter := Chr(0xBA) ; º (masculine ordinal indicator)
-		} else if (ihvText.EndKey == "%") {
-				SpecialCharacter := " %"
-		} else if (ihvText.EndKey == "$") {
-				SpecialCharacter := " " Chr(0x20AC) ; space + Euro sign
-		} else if (ihvText.EndKey == ".") {
-				SpecialCharacter := " :"
-		} else if (ihvText.EndKey == ScriptInformation["MagicKey"]) {
-				SpecialCharacter := "J" ; OneShotShift + magic-key gives J directly
-		} else if (ihvText.EndKey == ",") {
-				SpecialCharacter := " " Chr(0x3B) ; Chr avoids AHK parser misreading ";" as comment
-		} else if (ihvText.EndKey == "'") {
-				SpecialCharacter := " ?"
-		} else if (ihvText.EndKey == " ") {
-				SpecialCharacter := "-"
-		}
+		SpecialCharacter := TapHoldOneShotResult(ihvText.EndKey, MagicKey)
 
 		if (ihvText.EndReason == "Timeout") {
 				return

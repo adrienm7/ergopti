@@ -116,11 +116,20 @@ M.NAV_LAYER = {
 ---   keys = { [key_id] = { tap_action, hold_modifier, hold_layer, time_activation_seconds, enabled } },
 ---   tap_min_ms = number, one_shot_timeout_ms = number,
 ---   key_text = function(code) -> string|nil, the text a key would type now in
----     the live layout, nil for none; required when a key taps the one-shot Shift,
+---     the live layout, nil for none;
+---   plan_text = function(text) -> steps|nil, the keystrokes { keycode, mods }
+---     the live layout types `text` with, nil when it cannot;
+---   one_shot_result = function(char) -> string|nil, what the one-shot Shift
+---     types for `char` instead of its capital (Space gives "-");
+---   the three are required when a key taps the one-shot Shift,
 ---   held_modifiers = function() -> table, the modifiers down now, by role
 ---     ({ ctrl = true }), as the live layout names them (the keyboard hook's:
 ---     ctrl:nocaps makes CapsLock a Ctrl); without it, a caller with no layout
 ---     (the tests), the usual modifier keys the engine saw and its own holds,
+---   held_text_modifier_codes = function() -> { code }, the keys down now that
+---     select a level (Shift, AltGr), as the live layout names them (the
+---     hook's); without it, Shift and Right Alt when the hand or a hold has
+---     them down,
 --- }
 --- @return table engine
 function M.new(opts)
@@ -130,12 +139,16 @@ function M.new(opts)
 		tap_min_ms = assert(tonumber(options.tap_min_ms), "tap_min_ms is required"),
 		one_shot_timeout_ms = assert(tonumber(options.one_shot_timeout_ms), "one_shot_timeout_ms is required"),
 		key_text = options.key_text,
+		plan_text = options.plan_text,
+		one_shot_result = options.one_shot_result,
 		held_modifiers = options.held_modifiers,
+		held_text_modifier_codes = options.held_text_modifier_codes,
 		held = {},          -- code -> { down_at, cancelled, emitted = {codes}, layer = bool }
 		layer_depth = 0,     -- how many layer keys are down
 		layer_keys = {},     -- code -> chord emitted for a key pressed on the layer
 		one_shot_until = nil,
 		one_shot_keys = {},  -- keys a one-shot Shift is wrapping (several can overlap)
+		one_shot_swallowed = {}, -- keys a one-shot Shift replaced by its result, until released
 		native_keys = {},    -- configured keys pressed under a modifier: themselves until released
 		key_refs = {},       -- code -> how many of this engine's holders keep it down
 		passed_down = {},    -- keys that went through untouched and are down (the hand's)
@@ -159,8 +172,12 @@ function M.new(opts)
 			end
 			local layer = type(config.hold_layer) == "string" and config.hold_layer ~= "" and config.hold_layer or nil
 			local tap = type(config.tap_action) == "string" and config.tap_action or ""
-			if tap == "one_shot_shift" and type(options.key_text) ~= "function" then
-				error("a one-shot Shift needs key_text: which keys type text is the layout's to say", 2)
+			if tap == "one_shot_shift" then
+				for _, name in ipairs({ "key_text", "plan_text", "one_shot_result" }) do
+					if type(options[name]) ~= "function" then
+						error("a one-shot Shift needs " .. name .. ": what a key types is the layout's to say", 2)
+					end
+				end
 			end
 			-- A native tap and no hold is the key itself: left alone, so it keeps
 			-- its autorepeat and its press is not delayed to its release.
@@ -298,38 +315,107 @@ local function tap_key(self, out, code)
 end
 
 --- Decides what an armed one-shot Shift does with a key going down, and spends
---- it when the key uses it up, as the Windows InputHook decides. A key that
---- types no text in the live layout leaves it armed: a modifier, CapsLock, an
---- arrow, Print, a volume key, NumLock, a keypad key with NumLock off, any key
---- under Ctrl, Alt or Super. Backspace, Enter, Delete, Tab and Escape spend it
---- unshifted. A character spends it, and is shifted only when it has a
---- capital: Windows types it in title case, which leaves "1" and "," as they
---- are, and Shift would have made them "!" and "?" (or KP_End for a keypad 1).
+--- it when the key uses it up, as the Windows InputHook decides
+--- (platform/remap/one_shot_shift.ahk). A key that types no text in the live
+--- layout leaves it armed: a modifier, CapsLock, an arrow, Print, a volume key,
+--- NumLock, a keypad key with NumLock off, any key under Ctrl, Alt or Super.
+--- Backspace, Enter, Delete, Tab and Escape spend it and pass as they are. A
+--- character spends it and becomes what Windows types for it: the shared
+--- result when it has one (Space gives "-", "." gives " :"), otherwise its
+--- title case, which leaves "1" and "," as they are where Shift made them "!"
+--- and "?" (and a keypad 1 KP_End).
 --- @param code integer The key going down, pressed by hand or typed by a tap.
 --- @param now_ms number
---- @return boolean True when the key must be wrapped in Shift.
+--- @return string|nil verdict nil: the key passes as it is; "shift": wrap it
+---   in Shift, which types its capital; "text": type `text` instead of it.
+--- @return string|nil text
 local function take_one_shot(self, code, now_ms)
-	if not self.one_shot_until then return false end
-	if MODIFIER_KEYS[code] or code == EvdevCodes.KEY_CAPSLOCK then return false end
+	if not self.one_shot_until then return nil end
+	if MODIFIER_KEYS[code] or code == EvdevCodes.KEY_CAPSLOCK then return nil end
 	local control = EvdevCodes.CONTROL_NAME_OF[code]
-	local text = nil
-	if not (control and ONE_SHOT_SPENT_UNSHIFTED[control]) then
-		text = self.key_text(code)
-		if type(text) ~= "string" or text == "" then return false end
+	if control and ONE_SHOT_SPENT_UNSHIFTED[control] then
+		self.one_shot_until = nil
+		return nil
 	end
+	local text = self.key_text(code)
+	if type(text) ~= "string" or text == "" then return nil end
 	local armed = now_ms <= self.one_shot_until
 	self.one_shot_until = nil
-	return armed and text ~= nil and UnicodeCase.has_lowercase(text)
+	if not armed then return nil end
+	local result = self.one_shot_result(text)
+	if result then return "text", result end
+	local title = UnicodeCase.title(text)
+	if title == text then return nil end
+	-- The capital on the same key's Shift level is that key under Shift: a real
+	-- keystroke that repeats. Anywhere else ("É" on AZERTY), it is typed.
+	local steps = self.plan_text(title)
+	local step = steps and #steps == 1 and steps[1]
+	if step and step.keycode == code and #step.mods == 1 and step.mods[1] == "shift" then return "shift" end
+	return "text", title
+end
+
+-- The level keys the engine counts as held when no live layout names them.
+local USUAL_LEVEL_KEYS = { EvdevCodes.KEY_LEFTSHIFT, EvdevCodes.KEY_RIGHTSHIFT, EvdevCodes.KEY_RIGHTALT }
+
+--- The keys down now that select a level: the live layout's (the hook's),
+--- or Shift and Right Alt when the hand or a hold has them down.
+--- @return table codes, each once
+local function held_level_keys(self)
+	local codes, seen = {}, {}
+	local held = self.held_text_modifier_codes and self.held_text_modifier_codes() or nil
+	if not held then
+		held = {}
+		for _, code in ipairs(USUAL_LEVEL_KEYS) do
+			if self.passed_down[code] or self.key_refs[code] then held[#held + 1] = code end
+		end
+	end
+	for _, code in ipairs(held) do
+		if not seen[code] then
+			seen[code] = true
+			codes[#codes + 1] = code
+		end
+	end
+	return codes
+end
+
+--- Types `text` as the keystrokes the live layout has for it, each held on
+--- its level, so the hotstrings and the application see it typed. A text the
+--- layout cannot type ("€" on a US layout) is handed back for the injector.
+--- The steps choose their own level: a Shift or an AltGr still down, the
+--- hand's or a hold's, would put each on another one (AZERTY's " :" typed as
+--- " /" under Shift), so those are lifted around the text and pressed back
+--- after it, as Windows' SendEvent {Text} lifts them.
+--- @return table|nil tap { type_text = text } when the layout cannot type it.
+local function type_text(self, out, text)
+	local steps = self.plan_text(text)
+	if not steps then return { type_text = text } end
+	local lifted = held_level_keys(self)
+	for _, code in ipairs(lifted) do out[#out + 1] = { code = code, value = UP } end
+	for _, step in ipairs(steps) do
+		local mods = {}
+		for _, name in ipairs(step.mods or {}) do
+			mods[#mods + 1] = assert(EvdevCodes.LEVEL_MODIFIER_CODE[name], "no key for the level modifier " .. tostring(name))
+		end
+		-- Every level key is up here, whoever held it: each step presses its own.
+		for _, mod in ipairs(mods) do out[#out + 1] = { code = mod, value = DOWN } end
+		tap_key(self, out, step.keycode)
+		for index = #mods, 1, -1 do out[#out + 1] = { code = mods[index], value = UP } end
+	end
+	for index = #lifted, 1, -1 do out[#out + 1] = { code = lifted[index], value = DOWN } end
+	return nil
 end
 
 --- Types the key a tap stands for, exactly as the same key pressed by hand
 --- would reach an armed one-shot Shift. A tap bypassing it typed its Enter
 --- unshifted and left the Shift for the next letter.
+--- @return table|nil tap Text for the injector, as type_text returns it.
 local function type_tap(self, out, code, now_ms)
-	local shifted = take_one_shot(self, code, now_ms)
-	if shifted then press(self, out, KEY_LEFTSHIFT) end
+	local verdict, text = take_one_shot(self, code, now_ms)
+	if verdict == "text" then return type_text(self, out, text) end
+	if verdict == "shift" then press(self, out, KEY_LEFTSHIFT) end
 	tap_key(self, out, code)
-	if shifted then release(self, out, KEY_LEFTSHIFT) end
+	if verdict == "shift" then release(self, out, KEY_LEFTSHIFT) end
+	return nil
 end
 
 --- Presses a layer chord for `code` and remembers it until the key comes up.
@@ -345,7 +431,8 @@ end
 --- @param value integer 0 up, 1 down, 2 repeat
 --- @param now_ms number
 --- @return table|nil events to dispatch instead (nil = pass the event through unchanged)
---- @return string|nil tap action to run after them
+--- @return string|table|nil tap What to run after them: a catalogue action, or
+---   { type_text } for text the layout cannot type
 function M:process(code, value, now_ms)
 	local config = self.by_code[code]
 	local out = {}
@@ -422,10 +509,16 @@ function M:process(code, value, now_ms)
 		-- The native key (as if nothing were configured on a tap) or a key tap.
 		local typed = config.tap == "" and code or M.KEY_TAPS[config.tap]
 		if typed then
-			type_tap(self, out, typed, now_ms)
-			return out, nil
+			return out, type_tap(self, out, typed, now_ms)
 		end
 		return out, config.tap
+	end
+
+	-- A key the one-shot Shift replaced by its result: its repeats and its
+	-- release belong to the result, which is already typed.
+	if self.one_shot_swallowed[code] then
+		if value == UP then self.one_shot_swallowed[code] = nil end
+		return out
 	end
 
 	-- Any other key: a chord for every held tap-hold key.
@@ -443,12 +536,17 @@ function M:process(code, value, now_ms)
 		release(self, out, KEY_LEFTSHIFT)
 		return out
 	end
-	-- A modifier pressed meanwhile (Ctrl for Ctrl+Shift+T) leaves it armed.
-	if value == DOWN and take_one_shot(self, code, now_ms) and not self.one_shot_keys[code] then
-		self.one_shot_keys[code] = true
-		press(self, out, KEY_LEFTSHIFT)
-		press(self, out, code)
-		return out
+	if value == DOWN and not self.one_shot_keys[code] then
+		local verdict, text = take_one_shot(self, code, now_ms)
+		if verdict == "shift" then
+			self.one_shot_keys[code] = true
+			press(self, out, KEY_LEFTSHIFT)
+			press(self, out, code)
+			return out
+		elseif verdict == "text" then
+			self.one_shot_swallowed[code] = true
+			return out, type_text(self, out, text)
+		end
 	end
 	return pass(self, code, value)
 end
@@ -470,6 +568,7 @@ function M:release_all()
 	end
 	self.held, self.layer_keys, self.layer_depth = {}, {}, 0
 	self.one_shot_until, self.one_shot_keys, self.key_refs = nil, {}, {}
+	self.one_shot_swallowed = {}
 	self.native_keys, self.modifiers_down, self.passed_down = {}, {}, {}
 	return out
 end

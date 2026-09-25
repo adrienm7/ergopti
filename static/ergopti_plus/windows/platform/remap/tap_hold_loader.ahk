@@ -44,6 +44,9 @@ global TAPHOLD_MAX_ACTIVATION_SECONDS := 10
 ; auto-execute section runs, during Bundle_Init's message-pumping RunWait, and
 ; the hold resolvers they call must not read a file (hotif-globals-boot-safe).
 global TAPHOLD_HOLD_MODIFIER_ALIASES := _TapHoldReadHoldModifierAliases()
+; The one-shot Shift results, read at the first one-shot (_TapHoldOneShotTable):
+; json.ahk is included after this file, so they cannot be read here.
+global _TapHoldOneShotCache := ""
 
 
 
@@ -643,4 +646,68 @@ ResolveHoldModifierKey(ModifierValue, FieldLabel) {
 	try LoggerDebug("TapHoldLoader", "Resolved hold_modifier '{1}' for tap-hold key '{2}' as [{3}].",
 		ModifierValue, FieldLabel, Label)
 	return Resolved
+}
+
+
+
+
+; =========================================
+; =========================================
+; ======= 5. One-shot Shift results =======
+; =========================================
+; =========================================
+
+; What the one-shot Shift makes of the next character, read once from
+; _shared/tap_hold/one_shot_shift.json, which the Linux driver reads too. The
+; results were an if/else chain in one_shot_shift.ahk, so Linux had none of
+; them. A file that cannot be read is logged once and the failure kept: the
+; one-shot only capitalises until the next start, rather than reading the file
+; again, and logging again, at every tap.
+; @returns {Map} "results" -> Map(character -> result) and "magic_key_result";
+;          both empty when the file cannot be read.
+_TapHoldOneShotTable() {
+	global _SharedDir, _TapHoldOneShotCache
+	if (_TapHoldOneShotCache is Map)
+		return _TapHoldOneShotCache
+	Path := (IsSet(_SharedDir) ? _SharedDir : "") . "\tap_hold\one_shot_shift.json"
+	try {
+		Root := JsonParse(FileRead(Path, "UTF-8"))
+		Results := Map()
+		for Entry in Root["results"]
+			Results[Entry["char"]] := Entry["result"]
+		Table := Map("results", Results, "magic_key_result", Root["magic_key_result"])
+	} catch as Err {
+		try LoggerError("TapHoldLoader", "Cannot read the one-shot Shift results from '{1}': {2} — the one-shot only capitalises until the next start.",
+			Path, Err.Message)
+		Table := Map("results", Map(), "magic_key_result", "")
+	}
+	_TapHoldOneShotCache := Table
+	return Table
+}
+
+; The result the one-shot Shift types for the character typed after it, or ""
+; when it has none and the character is typed in title case.
+; @param EndKey {String} The character typed after the one-shot Shift.
+; @param MagicKey {String} The magic key's character.
+; @returns {String}
+TapHoldOneShotResult(EndKey, MagicKey) {
+	Table := _TapHoldOneShotTable()
+	; The magic key is the user's choice: it keeps its meaning on a character
+	; the table has a result for (the old chain checked it before "," "'" " ").
+	if (MagicKey != "" && EndKey == MagicKey)
+		return Table["magic_key_result"]
+	if Table["results"].Has(EndKey)
+		return Table["results"][EndKey]
+	return ""
+}
+
+; The characters that end the one-shot Shift's InputHook: every one that has a
+; result, and the magic key.
+; @param MagicKey {String} The magic key's character.
+; @returns {String}
+TapHoldOneShotEndKeys(MagicKey) {
+	Keys := ""
+	for Char in _TapHoldOneShotTable()["results"]
+		Keys .= Char
+	return Keys . MagicKey
 }

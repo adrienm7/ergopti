@@ -657,6 +657,12 @@ local function main()
 		action_names = function()
 			return action_catalogue and action_catalogue.get_executable_action_names() or {}
 		end,
+		-- A one-shot result the layout has no key for is typed by the injector,
+		-- which the engine never sees: its buffer no longer describes the line.
+		on_text_injected = function()
+			_undoable = nil
+			engine:reset()
+		end,
 		defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"),
 		user_path = require("infra.config_paths").config("tap_hold.toml"),
 	})
