@@ -413,3 +413,24 @@ BackSpaceLogic() {
 	}
 	return False
 }
+
+
+
+
+
+
+
+; =====================================
+; =====================================
+; ======= 4.11) Own auto-repeat =======
+; =====================================
+; =====================================
+
+; The key's own auto-repeat while an owner holds its suppressed press. Under
+; a layer hold no variant above is eligible any more, and the navigation layer
+; would map the repeat (CapsLock repeated its layer Backspace) or let it reach
+; the system. Declared before nav_layer.ahk, so this variant wins there
+; (see TapHoldPressIsOwned).
+#HotIf TapHoldPressIsOwned("left_alt")
+*SC038:: return
+#HotIf

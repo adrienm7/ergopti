@@ -30,10 +30,7 @@
 ; Scan codes of CapsLock and the modifier keys that carry a tap-hold.
 global _THAM_KEY_PATTERN := "SC(?:03A|01D|02A|038|15B|138|11D|036)"
 
-; Tap-hold key id -> scan code of the six keys that stay native under a held
-; modifier.
-global _THAM_NATIVE_KEYS := Map("tab", "SC00F", "space", "SC039", "enter", "SC01C",
-	"escape", "SC001", "backspace", "SC00E", "delete", "SC153")
+; Scan codes of the six keys that stay native under a held modifier.
 global _THAM_NATIVE_KEY_PATTERN := "SC(?:00F|039|01C|001|00E|153)"
 
 ; Every static hotkey label on a key matching Pattern, with its prefix symbols
@@ -181,12 +178,17 @@ _THAM_NativeKeysStayNativeUnderAHeldModifier() {
 Test("tap-hold admission: Tab, Space, Enter, Escape, Backspace and Delete stay native under a held modifier (native-under-modifier-parity-2026-09-25)",
 	_THAM_NativeKeysStayNativeUnderAHeldModifier)
 
-_THAM_NativeKeysSwallowTheirOwnedRepeat() {
-	global _THAM_NATIVE_KEYS
+; Every tap-hold key, not only the six native ones: under a layer hold none of a
+; modifier key's own variants is eligible any more, so its repeat fell to the
+; navigation layer's mapping of the same key (CapsLock held as the layer
+; repeated the layer's Backspace) or reached the system (owned-press-repeat-all-2026-09-25).
+_THAM_EveryTapHoldKeySwallowsItsOwnedRepeat() {
+	global _TH_TapHoldScToKeyId
 	Src := _StripFullLineComments(_DriverDirConcat("platform/remap"))
 	Assert(Src != "", "the tap-hold sources must be readable")
 	Checked := 0
-	for KeyId, ScanCode in _THAM_NATIVE_KEYS {
+	for Sc, KeyId in _TH_TapHoldScToKeyId {
+		ScanCode := Format("SC{:03X}", Sc)
 		Gate := '#HotIf TapHoldPressIsOwned("' . KeyId . '")'
 		Found := false
 		for _, Variant in _THAM_Variants(Src, ScanCode) {
@@ -194,10 +196,31 @@ _THAM_NativeKeysSwallowTheirOwnedRepeat() {
 				Found := true
 		}
 		Assert(Found, KeyId . " must swallow its own auto-repeat with a *" . ScanCode
-			. " hotkey under " . Gate . ", or the repeat reaches the application as the held modifier's chord")
+			. " hotkey under " . Gate . ", or the repeat reaches the application or the navigation layer")
 		Checked++
 	}
-	AssertEqual(6, Checked, "the six native keys must all be checked")
+	AssertEqual(14, Checked, "every tap-hold key must be checked")
 }
-Test("tap-hold admission: a native key's owned press swallows its own auto-repeat (owned-press-repeat-2026-09-25)",
-	_THAM_NativeKeysSwallowTheirOwnedRepeat)
+Test("tap-hold admission: every tap-hold key's owned press swallows its own auto-repeat (owned-press-repeat-all-2026-09-25)",
+	_THAM_EveryTapHoldKeySwallowsItsOwnedRepeat)
+
+; A swallower wins over the navigation layer's mapping of its key only because
+; AutoHotkey fires the first eligible variant in definition order.
+_THAM_SwallowersPrecedeTheLayerMappings() {
+	Src := _StripFullLineComments(_DriverSourceConcat())
+	Assert(Src != "", "the driver source must be readable")
+	LayerAt := InStr(Src, "#Include remap/nav_layer.ahk")
+	Assert(LayerAt > 0, "the tap-hold aggregate must include the navigation layer")
+	Modules := 0
+	Pos := 1
+	while (At := RegExMatch(Src, "m)^#Include remap/(\w+)\.ahk", &Include, Pos)) {
+		Pos := At + Include.Len
+		if (Include[1] == "nav_layer")
+			continue
+		Modules++
+		Assert(At < LayerAt, Include[1] . ".ahk must be included before nav_layer.ahk, or the layer maps its owned repeat")
+	}
+	Assert(Modules >= 14, "every tap-hold key module must be checked, got " . Modules)
+}
+Test("tap-hold admission: owned-repeat swallowers precede the layer mappings (owned-press-repeat-all-2026-09-25)",
+	_THAM_SwallowersPrecedeTheLayerMappings)

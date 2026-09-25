@@ -98,13 +98,15 @@ global _TH_SyntheticHeldKeys := Map()
 ; of forgetting an OS-level modifier that may still be logically down.
 global _TH_SyntheticReleasePendingKeys := Map()
 ; Tap-hold key id -> number of owners (TapHoldOwnImmediateModifier or
-; TapHoldOwnImmediateLayer) resolving that key's physical press right now.
-; Tab, Space, Enter, Escape, Backspace and Delete fire their tap-hold only with
-; no modifier held, so their hotkeys carry no * wildcard; their own auto-repeat,
-; arriving under the modifier the owner holds, then matched no hotkey and
-; reached the application as that chord (Enter held as Ctrl typed Ctrl+Enter
-; repeatedly, measured with AutoHotkey 2.0.26). Each key's repeat swallower is
-; gated on TapHoldPressIsOwned.
+; TapHoldOwnImmediateLayer) resolving that key's suppressed physical press right
+; now. Tab, Space, Enter, Escape, Backspace and Delete fire their tap-hold only
+; with no modifier held, so their hotkeys carry no * wildcard; their own
+; auto-repeat, arriving under the modifier the owner holds, then matched no
+; hotkey and reached the application as that chord (Enter held as Ctrl typed
+; Ctrl+Enter repeatedly, measured with AutoHotkey 2.0.26). Under a layer hold no
+; variant of any tap-hold key is eligible, so the repeat fell to the layer's
+; mapping of the same key. Every key's repeat swallower is gated on
+; TapHoldPressIsOwned.
 global _TH_OwnedPresses := Map()
 global _TH_TapHoldVkToKeyId := Map(
 	0x1B, "escape",
@@ -388,7 +390,13 @@ TapHoldOwnImmediateModifier(KeyId, KeyName, ModKey, TapThresholdSec,
 	if !IsObject(IsSuspendedFn)
 		IsSuspendedFn := _TapHoldModifierIsSuspended
 
-	_TapHoldClaimPress(KeyId)
+	; A pass-through press already reached the system, and so must its repeats:
+	; a swallowed repeat makes AHK suppress the physical release as well, which
+	; would leave the modifier down in the system. Only a suppressed press is
+	; claimed.
+	Claimed := !PhysicalModifierPassthrough
+	if Claimed
+		_TapHoldClaimPress(KeyId)
 	try {
 		StartedAt := TickNowFn.Call()
 		if !PhysicalModifierPassthrough {
@@ -443,7 +451,8 @@ TapHoldOwnImmediateModifier(KeyId, KeyName, ModKey, TapThresholdSec,
 			"tap", TapAllowed,
 			"elapsed_ms", ElapsedMs)
 	} finally {
-		_TapHoldEndPressClaim(KeyId)
+		if Claimed
+			_TapHoldEndPressClaim(KeyId)
 	}
 }
 

@@ -89,6 +89,24 @@ _THOP_ClaimsEndWhenTheOwnerThrows() {
 Test("tap-hold owned press: claims end even when the owner throws (owned-press-repeat-2026-09-25)",
 	_THOP_ClaimsEndWhenTheOwnerThrows)
 
+; A pass-through press (LShift held as LShift through ~) already reached the
+; system, and so must its repeats and release: a swallowed repeat would make AHK
+; suppress the physical release too and leave Shift down in the system
+; (owned-press-repeat-all-2026-09-25).
+_THOP_PassThroughPressIsNotClaimed() {
+	global _THOP_SeenOwned
+	_THOP_Reset()
+	TapHoldOwnImmediateModifier("left_shift", "SC02A", "LShift", 0.2,
+		_THOP_WaitRecordingOwnership.Bind("left_shift"), _THOP_KeyIsDown, _THOP_Tick,
+		_THOP_Accept, _THOP_Accept, _THOP_NoCancel, true, _THOP_NotSuspended)
+	AssertEqual(1, _THOP_SeenOwned.Length, "the release wait must run once")
+	AssertFalse(_THOP_SeenOwned[1],
+		"a pass-through press must never be claimed, or its repeat swallower strands the physical modifier down")
+	AssertFalse(TapHoldPressIsOwned("left_shift"), "no claim may remain after the press")
+}
+Test("tap-hold owned press: a pass-through press is never claimed (owned-press-repeat-all-2026-09-25)",
+	_THOP_PassThroughPressIsNotClaimed)
+
 _THOP_RefusedModifierDoesNotLeaveAClaim() {
 	_THOP_Reset()
 	Result := TapHoldOwnImmediateModifier("backspace", "BackSpace", "LCtrl", 0.2,

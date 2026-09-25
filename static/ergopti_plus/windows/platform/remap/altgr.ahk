@@ -113,3 +113,24 @@ SC01D & ~SC138 Up::
 AltGrTapHoldDispatchV2() {
 		_TapHoldFireAction("alt_gr")
 }
+
+
+
+
+
+
+
+; ====================================
+; ====================================
+; ======= 6.1) Own auto-repeat =======
+; ====================================
+; ====================================
+
+; The key's own auto-repeat while an owner holds its suppressed press. Under
+; a layer hold no variant above is eligible any more, and the navigation layer
+; would map the repeat (CapsLock repeated its layer Backspace) or let it reach
+; the system. Declared before nav_layer.ahk, so this variant wins there
+; (see TapHoldPressIsOwned).
+#HotIf TapHoldPressIsOwned("alt_gr")
+*SC138:: return
+#HotIf
