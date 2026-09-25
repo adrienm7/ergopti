@@ -91,6 +91,22 @@ helpers.describe("hotkey_registrar: bind", function()
 			"and must not reach Hammerspoon — a bind that got there would report success")
 	end)
 
+	helpers.it("refuses every modifier-key name as a chord's key without touching the OS (shortcut-key-is-modifier)", function()
+		-- macOS reports these keys only as flag changes, so Hammerspoon binds them
+		-- without complaint and the shortcut never fires. Windows refuses them too.
+		for _, key in ipairs({ "rightcmd", "rightalt", "rightctrl", "rightshift", "capslock" }) do
+			local adapter, hs_stub = fresh()
+			helpers.assert_true(adapter.key_is_modifier(key), key .. " must be reported as a modifier key")
+			helpers.assert_nil(adapter.bind("Ctrl+" .. key, function() end),
+				"a chord whose key is " .. key .. " must be refused")
+			helpers.assert_eq(#hs_stub.hotkey._bound, 0,
+				"and must not reach Hammerspoon, where it would register and never fire: " .. key)
+		end
+		local adapter = fresh()
+		helpers.assert_true(not adapter.key_is_modifier("m") and not adapter.key_is_modifier("f13"),
+			"an ordinary key is not a modifier key")
+	end)
+
 	helpers.it("refuses a non-function callback", function()
 		local adapter, hs_stub = fresh()
 

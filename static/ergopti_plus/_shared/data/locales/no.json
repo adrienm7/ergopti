@@ -1146,6 +1146,7 @@
 	"menu.metrics.reset_wpm_position": "    ↳ Tilbakestill posisjon",
 	"menu.metrics.shortcut_apps_title": "Snarvei for programtid",
 	"menu.metrics.shortcut_item": "    ↳ Snarvei: %s",
+	"menu.metrics.shortcut_modifier_key": "«{1}» er en modifikatortast og kan ikke være tasten i en snarvei: macOS melder den aldri som et tastetrykk. Velg en annen tast.",
 	"menu.metrics.shortcut_none": "Ingen snarvei",
 	"menu.metrics.shortcut_prefix": "  ↳ Snarvei: ",
 	"menu.metrics.shortcut_prompt": "Format: mods+key (f.eks ctrl+m)\nLat feltet stå tomt for å deaktivere",

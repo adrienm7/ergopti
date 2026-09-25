@@ -1146,6 +1146,7 @@
 	"menu.metrics.reset_wpm_position": "    ↳ 위치 재설정",
 	"menu.metrics.shortcut_apps_title": "앱 시간 단축키",
 	"menu.metrics.shortcut_item": "    ↳ 단축키: %s",
+	"menu.metrics.shortcut_modifier_key": "“{1}”은(는) 보조 키이므로 단축키의 키로 사용할 수 없습니다. macOS는 이 키를 키 입력으로 알리지 않습니다. 다른 키를 선택하세요.",
 	"menu.metrics.shortcut_none": "단축키 없음",
 	"menu.metrics.shortcut_prefix": "  ↳ 단축키: ",
 	"menu.metrics.shortcut_prompt": "형식: 수정키+키 (예: ctrl+m)\n비활성화하려면 비워두세요",

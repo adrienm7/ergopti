@@ -1146,6 +1146,7 @@
 	"menu.metrics.reset_wpm_position": "    ↳ אפס מיקום",
 	"menu.metrics.shortcut_apps_title": "קיצור זמן יישומים",
 	"menu.metrics.shortcut_item": "    ↳ קיצור: %s",
+	"menu.metrics.shortcut_modifier_key": "„{1}” הוא מקש שינוי ואינו יכול לשמש כמקש של קיצור דרך: macOS אף פעם אינו מדווח עליו כהקשה על מקש. בחרו מקש אחר.",
 	"menu.metrics.shortcut_none": "ללא קיצור",
 	"menu.metrics.shortcut_prefix": "  ↳ קיצור: ",
 	"menu.metrics.shortcut_prompt": "פורמט: mods+key (לדוגמה ctrl+m)\nהשאר ריק להשבתה",

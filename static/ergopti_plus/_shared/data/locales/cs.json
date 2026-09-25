@@ -1146,6 +1146,7 @@
 	"menu.metrics.reset_wpm_position": "    ↳ Resetovat pozici",
 	"menu.metrics.shortcut_apps_title": "Zkratka času aplikací",
 	"menu.metrics.shortcut_item": "    ↳ Zkratka: %s",
+	"menu.metrics.shortcut_modifier_key": "„{1}“ je modifikační klávesa a nemůže být klávesou zkratky: macOS ji nikdy nehlásí jako stisk klávesy. Zvolte jinou klávesu.",
 	"menu.metrics.shortcut_none": "Žádná zkratka",
 	"menu.metrics.shortcut_prefix": "  ↳ Zkratka: ",
 	"menu.metrics.shortcut_prompt": "Formát: modifikátory+klávesa (např. ctrl+m)\nPonechte prázdné pro deaktivaci",

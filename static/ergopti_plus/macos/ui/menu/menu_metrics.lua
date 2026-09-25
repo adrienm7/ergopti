@@ -26,6 +26,7 @@ local text_utils = require("infra.text_utils")
 
 local AppPickerLib  = require("infra.app_picker")
 local dialog        = require("infra.dialog_util")
+local Hotkeys       = require("adapters.hotkey_registrar")
 local kl_mod        = require("modules.keylogger")
 local i18n          = require("infra.i18n")
 local ManifestMenu  = require("infra.manifest_menu")
@@ -304,6 +305,19 @@ function M.build(ctx)
 		return {}
 	end
 
+	--- Refuses a shortcut whose key is a modifier key, telling the user why.
+	--- macOS never reports such a key as a key press, so the registrar refuses
+	--- it; without a reason the prompt closed and nothing changed.
+	--- @param key string Key the user typed.
+	--- @return boolean refused
+	local function refuse_modifier_key(key)
+		if not Hotkeys.key_is_modifier(key) then return false end
+		Logger.warn(LOG, "Refused shortcut key '%s': it is a modifier key.", key)
+		dialog.block_alert(i18n.get("metrics.shortcut_invalid_title"),
+			i18n.format("menu.metrics.shortcut_modifier_key", key), i18n.get("button.ok"))
+		return true
+	end
+
 	local function rows_shortcut_typing(_ctx)
 		local sc_label = i18n.get("menu.metrics.shortcut_none")
 		if type(state.metrics_shortcut) == "table" then
@@ -336,6 +350,7 @@ function M.build(ctx)
 				for part in raw:gmatch("[^+]+") do table.insert(parts, part) end
 				if #parts < 1 then return end
 				local key  = parts[#parts]
+				if refuse_modifier_key(key) then return end
 				local mods = {}
 				for i = 1, #parts - 1 do
 					local m = parts[i]
@@ -387,6 +402,7 @@ function M.build(ctx)
 				for part in raw:gmatch("[^+]+") do table.insert(parts, part) end
 				if #parts < 1 then return end
 				local key  = parts[#parts]
+				if refuse_modifier_key(key) then return end
 				local mods = {}
 				for i = 1, #parts - 1 do
 					local m = parts[i]

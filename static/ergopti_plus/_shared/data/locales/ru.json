@@ -1146,6 +1146,7 @@
 	"menu.metrics.reset_wpm_position": "    ↳ Сбросить позицию",
 	"menu.metrics.shortcut_apps_title": "Сочетание клавиш для времени приложений",
 	"menu.metrics.shortcut_item": "    ↳ Сочетание клавиш: %s",
+	"menu.metrics.shortcut_modifier_key": "«{1}» — клавиша-модификатор, она не может быть клавишей сочетания: macOS никогда не сообщает о ней как о нажатии клавиши. Выберите другую клавишу.",
 	"menu.metrics.shortcut_none": "Нет сочетания клавиш",
 	"menu.metrics.shortcut_prefix": "  ↳ Сочетание клавиш: ",
 	"menu.metrics.shortcut_prompt": "Формат: модификаторы+клавиша (напр. ctrl+m)\nОставьте пустым для отключения",

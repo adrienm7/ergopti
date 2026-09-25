@@ -1146,6 +1146,7 @@
 	"menu.metrics.reset_wpm_position": "    ↳ 位置をリセット",
 	"menu.metrics.shortcut_apps_title": "アプリ時間のショートカット",
 	"menu.metrics.shortcut_item": "    ↳ ショートカット: %s",
+	"menu.metrics.shortcut_modifier_key": "「{1}」は修飾キーのため、ショートカットのキーにはできません。macOS はこのキーをキー入力として通知しません。別のキーを選んでください。",
 	"menu.metrics.shortcut_none": "ショートカットなし",
 	"menu.metrics.shortcut_prefix": "  ↳ ショートカット: ",
 	"menu.metrics.shortcut_prompt": "形式: mods+キー (例: ctrl+m)\n無効にするには空白のまま",

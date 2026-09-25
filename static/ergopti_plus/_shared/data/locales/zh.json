@@ -1146,6 +1146,7 @@
 	"menu.metrics.reset_wpm_position": "    ↳ 重置位置",
 	"menu.metrics.shortcut_apps_title": "应用时间快捷键",
 	"menu.metrics.shortcut_item": "    ↳ 快捷键：%s",
+	"menu.metrics.shortcut_modifier_key": "“{1}”是修饰键，不能作为快捷键的按键：macOS 从不会将其报告为按键。请选择其他按键。",
 	"menu.metrics.shortcut_none": "无快捷键",
 	"menu.metrics.shortcut_prefix": "  ↳ 快捷键：",
 	"menu.metrics.shortcut_prompt": "格式：修饰键+按键（如 ctrl+m）\n留空以禁用",

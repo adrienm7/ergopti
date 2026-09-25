@@ -1158,6 +1158,7 @@
 	"menu.metrics.reset_wpm_position": "    ↳ Réinitialiser la position",
 	"menu.metrics.shortcut_apps_title": "Raccourci temps par app",
 	"menu.metrics.shortcut_item": "    ↳ Raccourci : %s",
+	"menu.metrics.shortcut_modifier_key": "« {1} » est une touche de modification et ne peut pas être la touche d’un raccourci : macOS ne la signale jamais comme une frappe. Choisissez une autre touche.",
 	"menu.metrics.shortcut_none": "Aucun raccourci",
 	"menu.metrics.shortcut_prefix": "  ↳ Raccourci : ",
 	"menu.metrics.shortcut_prompt": "Format : mods+touche (ex. ctrl+m)\nLaisser vide pour désactiver",

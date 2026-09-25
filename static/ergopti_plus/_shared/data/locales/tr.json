@@ -1146,6 +1146,7 @@
 	"menu.metrics.reset_wpm_position": "    ↳ Konumu sıfırla",
 	"menu.metrics.shortcut_apps_title": "Uygulama süresi kısayolu",
 	"menu.metrics.shortcut_item": "    ↳ Kısayol: %s",
+	"menu.metrics.shortcut_modifier_key": "“{1}” bir değiştirici tuştur ve bir kısayolun tuşu olamaz: macOS onu hiçbir zaman bir tuş basışı olarak bildirmez. Başka bir tuş seçin.",
 	"menu.metrics.shortcut_none": "Kısayol yok",
 	"menu.metrics.shortcut_prefix": "  ↳ Kısayol: ",
 	"menu.metrics.shortcut_prompt": "Biçim: mod+tuş (ör. ctrl+m)\nDevre dışı bırakmak için boş bırakın",

@@ -1146,6 +1146,7 @@
 	"menu.metrics.reset_wpm_position": "    ↳ स्थिति रीसेट करें",
 	"menu.metrics.shortcut_apps_title": "ऐप समय शॉर्टकट",
 	"menu.metrics.shortcut_item": "    ↳ शॉर्टकट: %s",
+	"menu.metrics.shortcut_modifier_key": "« {1} » एक संशोधक कुंजी है और शॉर्टकट की कुंजी नहीं हो सकती: macOS इसे कभी कुंजी दबाने के रूप में नहीं बताता। कोई दूसरी कुंजी चुनें।",
 	"menu.metrics.shortcut_none": "कोई शॉर्टकट नहीं",
 	"menu.metrics.shortcut_prefix": "  ↳ शॉर्टकट: ",
 	"menu.metrics.shortcut_prompt": "प्रारूप: mods+key (उदाहरण के लिए ctrl+m)\nअक्षम करने के लिए खाली छोड़ें",

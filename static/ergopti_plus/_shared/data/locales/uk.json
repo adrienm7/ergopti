@@ -1146,6 +1146,7 @@
 	"menu.metrics.reset_wpm_position": "    ↳ Скинути позицію",
 	"menu.metrics.shortcut_apps_title": "Скорочення для часу програм",
 	"menu.metrics.shortcut_item": "    ↳ Скорочення: %s",
+	"menu.metrics.shortcut_modifier_key": "«{1}» — клавіша-модифікатор, вона не може бути клавішею сполучення: macOS ніколи не повідомляє про неї як про натискання клавіші. Виберіть іншу клавішу.",
 	"menu.metrics.shortcut_none": "Немає скорочення",
 	"menu.metrics.shortcut_prefix": "  ↳ Скорочення: ",
 	"menu.metrics.shortcut_prompt": "Формат: модифікатори+клавіша (напр. ctrl+m)\nЗалиште порожнім для вимкнення",

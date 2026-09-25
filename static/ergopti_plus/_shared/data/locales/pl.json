@@ -1146,6 +1146,7 @@
 	"menu.metrics.reset_wpm_position": "    ↳ Zresetuj pozycję",
 	"menu.metrics.shortcut_apps_title": "Skrót czasu aplikacji",
 	"menu.metrics.shortcut_item": "    ↳ Skrót: %s",
+	"menu.metrics.shortcut_modifier_key": "„{1}” to klawisz modyfikujący i nie może być klawiszem skrótu: macOS nigdy nie zgłasza go jako naciśnięcia klawisza. Wybierz inny klawisz.",
 	"menu.metrics.shortcut_none": "Brak skrótu",
 	"menu.metrics.shortcut_prefix": "  ↳ Skrót: ",
 	"menu.metrics.shortcut_prompt": "Format: mod+klawisz (np. ctrl+m)\nZostaw puste, aby wyłączyć",
