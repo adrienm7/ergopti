@@ -74,6 +74,14 @@ one free-text action. No Linux release had been installed, so nothing
 migrates an old kanata unit. Action: do not reintroduce an external remapper or a `kanata.kbd` release asset; change
 tap-hold behaviour in the engine and its loader/writer, with Lua tests.
 
+### project-linux-uinput-drops-a-press-of-a-held-key
+
+The kernel keeps one bit per key: a press of a key already down is dropped, and
+its release lifts the key whoever held it. A chord tap written straight to
+uinput therefore released a Ctrl a tap-hold was still holding. Action:
+`combo_emitter` skips the chord modifiers `keyboard_hook` reports held, and the
+tap-hold engine masks a lone Alt or Super release with KEY_F24.
+
 ## Website and documentation
 
 ### project-site-i18n-gettext-french-key
