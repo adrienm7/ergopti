@@ -835,6 +835,76 @@ TapHoldReleaseSyntheticKeys() {
 	return true
 }
 
+; Run SendFn with key Name up, for output the key would otherwise modify: the
+; Kana-style layout's AltGr changes every character typed while it is down. A
+; tap-hold that holds Name synthetically keeps its hold: the key is pressed
+; again after the output, but only if an owner still holds it then, so an owner
+; that released meanwhile is never overridden and its count stays true.
+; @param Name {String} AHK key name, e.g. KS_AltGrKeyName().
+; @param SendFn {Func} Zero-argument sender; its result is returned.
+; @return The sender's result, or false when the lift could not be sent.
+TapHoldSendWithKeyUp(Name, SendFn) {
+	if !TapHoldLiftKey(Name)
+		return false
+	try
+		return SendFn.Call()
+	finally
+		TapHoldRepressOwnedKey(Name)
+}
+
+; Lift key Name for an output, whoever holds it. Pair with
+; TapHoldRepressOwnedKey once the output is sent.
+; @return {Boolean} False when the Up could not be sent; skip the output then.
+TapHoldLiftKey(Name) {
+	if TextPressKey(Name, "Up", false)
+		return true
+	try LoggerError("TapHoldDispatch", "Could not lift '{1}' before an output; the output was not sent.", Name)
+	return false
+}
+
+; Press Name again when a synthetic owner still holds it, after an output that
+; lifted it. The check and the Down share one Critical span so an owner cannot
+; release between them.
+TapHoldRepressOwnedKey(Name) {
+	global _TH_SyntheticHeldKeys
+	PreviousCritical := Critical("On")
+	try {
+		if !_TH_SyntheticHeldKeys.Has(Name)
+			return true
+		Ok := TextPressKey(Name, "Down", false)
+	} finally {
+		Critical(PreviousCritical)
+	}
+	if !Ok
+		try LoggerError("TapHoldDispatch", "Could not press '{1}' again for its tap-hold after an output; it stays up until the key is pressed again.", Name)
+	return Ok
+}
+
+; Release key Name unless a synthetic owner holds it; that owner's own release
+; ends it. Used to clear a key a chord may have left logically down.
+; @param ReleaseFn {Func} Optional sender taking Name and returning a verdict,
+;        for a caller whose Up must take another path; TextSender by default.
+; @return {Boolean} True when the key is released or left to its owner.
+TapHoldReleaseUnlessOwned(Name, ReleaseFn := 0) {
+	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys
+	PreviousCritical := Critical("On")
+	try {
+		if _TH_SyntheticHeldKeys.Has(Name)
+			return true
+		if _TH_SyntheticReleasePendingKeys.Has(Name)
+			Ok := _TH_RetrySyntheticKeyRelease(Name)
+		else if HasMethod(ReleaseFn, "Call")
+			Ok := ReleaseFn.Call(Name)
+		else
+			Ok := TextPressKey(Name, "Up", false)
+	} finally {
+		Critical(PreviousCritical)
+	}
+	if !Ok
+		try LoggerError("TapHoldDispatch", "Could not release '{1}'.", Name)
+	return Ok
+}
+
 ; OnExit must not destroy this process while a balancing Up is still owned by
 ; its release-pending ledger. The optional callback is a deterministic failure
 ; seam for the shutdown contract test; production uses the real bounded drain.

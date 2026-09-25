@@ -1700,13 +1700,26 @@ ReadScriptShortcutsConfig() {
 		}
 }
 
-ResetScriptComboKeys(SuffixSC) {
+; Clears the Kana AltGr a script chord may leave logically down, once the
+; chord's suffix key is up. A tap-hold that holds AltGr keeps it: its owner
+; releases it, and a raw Up here ended the hold while the owner still counted it.
+; @param ReleaseFn {Func} Test seam; production releases through the hook.
+ResetScriptComboKeys(SuffixSC, ReleaseFn := 0) {
 		global _ALTGR_KANA_FIXUP
 		if !(IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP)
 				return
 		KeyWait(SuffixSC, "T2")
 		if !GetKeyState(SuffixSC, "P")
-				SendEvent("{SC138 Up}")
+				TapHoldReleaseUnlessOwned(KS_AltGrKeyName(),
+						HasMethod(ReleaseFn, "Call") ? ReleaseFn : _ScriptComboReleaseThroughHook)
+}
+
+; The chord's Up goes out as SendEvent at the chord hotkey's own SendLevel (3),
+; which the driver's hook processes like a key event and so also clears its own
+; record of the key being down. A TextSender Up at level 0 is hidden from it.
+_ScriptComboReleaseThroughHook(Name) {
+		SendEvent("{" . Name . " Up}")
+		return true
 }
 
 ; The ONLY actions allowed to run while the driver is suspended. The script AltGr
