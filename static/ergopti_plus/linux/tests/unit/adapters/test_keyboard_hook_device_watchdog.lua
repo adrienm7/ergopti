@@ -44,6 +44,8 @@ local function load_hook()
 			local text = ({ [30] = "a", [31] = "s", [48] = "b" })[code]
 			return text, text, nil
 		end,
+		-- A layout whose modifier keys all play their usual role.
+		modifier_role = function(code) return require("infra.evdev_codes").MODIFIER_OF[code], nil end,
 	}
 	local hook = helpers.load_module("adapters.keyboard_hook")
 	package.loaded[name] = saved

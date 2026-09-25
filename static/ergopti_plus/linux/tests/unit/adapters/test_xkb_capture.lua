@@ -277,6 +277,31 @@ helpers.describe("xkb_capture: Compose and atomic keymap reload", function()
 	end)
 end)
 
+helpers.describe("xkb_capture: a modifier key's role comes from the live keymap", function()
+
+	helpers.it("names the role of the keysym the key carries, and refuses before a keymap", function()
+		local Capture = helpers.load_module("adapters.xkb_capture")
+		local backend = oracle_backend()
+		local ralt = 0xfe03
+		backend.key_sym = function(_, keycode)
+			if keycode == KEY_ALTGR then return ralt end
+			if keycode == KEY_A then return "a" end
+			return nil
+		end
+		Capture._set_backend(backend)
+		local role, err = Capture.modifier_role(100)
+		helpers.assert_nil(role)
+		helpers.assert_contains(err, "not ready")
+		helpers.assert_true(Capture.load("keymap text", "C"))
+		helpers.assert_eq(Capture.modifier_role(100), "altgr", "ISO_Level3_Shift selects a level")
+		ralt = 0xffea
+		helpers.assert_eq(Capture.modifier_role(100), "alt", "Alt_R starts a shortcut")
+		helpers.assert_nil((Capture.modifier_role(30)), "a letter is no modifier")
+		Capture._reset_backend()
+	end)
+
+end)
+
 helpers.describe("xkb_capture: the injection table comes from the loaded keymap", function()
 
 	helpers.it("refuses before a keymap is loaded", function()

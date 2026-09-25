@@ -100,7 +100,105 @@ end)
 
 -- =========================================
 -- =========================================
--- ======= 2/ Shortcut identity =============
+-- ======= 2/ Right Alt follows the layout ==
+-- =========================================
+-- =========================================
+
+-- Right Alt is AltGr (ISO_Level3_Shift) on a French or Ergopti layout and
+-- plain Alt_R on a US one. The hook used to call it AltGr whatever the layout,
+-- so on a US layout Alt_R+Q reached the hotstring buffer as the text "q" while
+-- the application received the Alt shortcut.
+helpers.describe("keyboard_hook: Right Alt follows the live layout", function()
+	local XKB = 8
+	local KEY_RIGHTALT, KEY_Q = 100, 16
+	local SYMS = { Alt_R = 0xffea, ISO_Level3_Shift = 0xfe03, Shift_L = 0xffe1 }
+
+	--- A stateful XKB double whose Right Alt carries `ralt_sym`: level 3 of Q
+	--- is "@" while an ISO_Level3_Shift is down.
+	local function backend(ralt_sym)
+		return {
+			create = function() return { held = {} } end,
+			destroy = function() end,
+			key_sym = function(session, keycode)
+				if keycode == KEY_RIGHTALT + XKB then return ralt_sym end
+				if keycode == 42 + XKB then return SYMS.Shift_L end
+				if keycode == KEY_Q + XKB then
+					return session.held[KEY_RIGHTALT + XKB] and ralt_sym == SYMS.ISO_Level3_Shift and "at" or "q"
+				end
+				return nil
+			end,
+			key_utf8 = function(session, keycode)
+				if keycode ~= KEY_Q + XKB then return nil end
+				return session.held[KEY_RIGHTALT + XKB] and ralt_sym == SYMS.ISO_Level3_Shift and "@" or "q"
+			end,
+			sym_utf8 = function(_, sym)
+				if sym == "at" then return "@" end
+				return type(sym) == "string" and sym or nil
+			end,
+			update_key = function(session, keycode, direction) session.held[keycode] = direction == 1 or nil end,
+			compose_feed = function() end,
+			compose_status = function() return "nothing" end,
+			compose_utf8 = function() return nil end,
+			compose_reset = function() end,
+		}
+	end
+
+	--- Drives Right Alt + Q through the live XKB adapter on a keymap whose
+	--- Right Alt is `ralt_sym`, and reports what the hook made of it.
+	local function drive(ralt_sym, events)
+		local Capture = helpers.load_module("adapters.xkb_capture")
+		Capture._set_backend(backend(ralt_sym))
+		helpers.assert_true(Capture.load("keymap", "C"), "the double keymap loads")
+		local hook = helpers.load_module("adapters.keyboard_hook")
+		local seen = { chars = {}, shortcuts = {} }
+		local ok, err = pcall(hook._test_drive, events, {
+			liveXkb = true,
+			onChar = function(char) seen.chars[#seen.chars + 1] = char end,
+			onKey = function(name, payload)
+				if name == "shortcut" then seen.shortcuts[#seen.shortcuts + 1] = payload end
+			end,
+			onEmitRaw = function() return true end,
+		}, true)
+		seen.text_modifiers = hook.held_text_modifiers()
+		seen.shortcut_codes = hook.held_shortcut_modifier_codes()
+		Capture._reset_backend()
+		if not ok then error(err, 0) end
+		return seen
+	end
+
+	helpers.it("is Alt on a layout where it is Alt_R: Alt+Q is a shortcut, not text", function()
+		local seen = drive(SYMS.Alt_R, { key(KEY_RIGHTALT, 1), key(KEY_Q, 1), key(KEY_Q, 0) })
+		helpers.assert_eq(seen.chars, {}, "Alt_R+Q must not reach the hotstring buffer as 'q'")
+		helpers.assert_eq(#seen.shortcuts, 1, "it is the shortcut the application receives")
+		helpers.assert_eq(seen.shortcuts[1].key, "q")
+		helpers.assert_true(seen.shortcuts[1].mods.alt == true and seen.shortcuts[1].mods.altgr == nil,
+			"held as Alt, not as AltGr")
+		helpers.assert_eq(seen.text_modifiers, {}, "Alt selects no level")
+		helpers.assert_eq(seen.shortcut_codes, { KEY_RIGHTALT }, "an injection releases it as a shortcut modifier")
+	end)
+
+	helpers.it("is AltGr on a layout where it is ISO_Level3_Shift: AltGr+Q is text", function()
+		local seen = drive(SYMS.ISO_Level3_Shift, { key(KEY_RIGHTALT, 1), key(KEY_Q, 1), key(KEY_Q, 0) })
+		helpers.assert_eq(seen.chars, { "@" }, "the level-3 character is typed text")
+		helpers.assert_eq(seen.shortcuts, {}, "and no shortcut")
+		helpers.assert_eq(seen.text_modifiers, { "altgr" })
+		helpers.assert_eq(seen.shortcut_codes, {})
+	end)
+
+	helpers.it("releases a Right Alt under the role it was pressed with", function()
+		local seen = drive(SYMS.Alt_R, { key(KEY_RIGHTALT, 1), key(KEY_RIGHTALT, 0), key(KEY_Q, 1) })
+		helpers.assert_eq(seen.chars, { "q" }, "a released Alt holds nothing: Q is text again")
+		helpers.assert_eq(seen.shortcut_codes, {})
+	end)
+end)
+
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 3/ Shortcut identity =============
 -- =========================================
 -- =========================================
 
@@ -126,5 +224,134 @@ helpers.describe("keyboard_hook: XKB shortcut identity", function()
 		helpers.assert_eq(shortcut.key, "s",
 			"xkb_state UTF-8 is a control byte; the keysym preserves shortcut identity")
 		helpers.assert_true(shortcut.mods.ctrl == true, "the physical Ctrl role remains attached")
+	end)
+end)
+
+
+
+
+
+-- =============================================
+-- =============================================
+-- ======= 4/ Modifiers the XKB options move ===
+-- =============================================
+-- =============================================
+
+-- XKB options put a modifier on another key: ctrl:nocaps makes CapsLock a
+-- Ctrl, caps:super a Super, lv3:caps_switch and lv3:menu_switch an AltGr, and
+-- ctrl:swapcaps trades Ctrl and CapsLock. The hook asked XKB about the eight
+-- usual modifier keys only, so under ctrl:nocaps CapsLock+C was the letter c
+-- in the hotstring buffer and never a shortcut (xkb-options-modifier-role).
+helpers.describe("keyboard_hook: a modifier the XKB options put on another key", function()
+	local XKB = 8
+	local KEY_LEFTCTRL, KEY_LEFTSHIFT, KEY_CAPSLOCK, KEY_COMPOSE, KEY_C, KEY_Q = 29, 42, 58, 127, 46, 16
+	local SYM = { Control_L = 0xffe3, Caps_Lock = 0xffe5, Super_L = 0xffeb, ISO_Level3_Shift = 0xfe03 }
+
+	--- A stateful keymap double: `syms` gives the keysym of each moved key, C
+	--- types "c" and Q types "q", or "@" while an ISO_Level3_Shift key is down.
+	local function backend(syms)
+		local function level3(session)
+			for keycode in pairs(session.held) do
+				if syms[keycode - XKB] == SYM.ISO_Level3_Shift then return true end
+			end
+			return false
+		end
+		return {
+			create = function() return { held = {} } end,
+			destroy = function() end,
+			key_sym = function(session, keycode)
+				local code = keycode - XKB
+				if syms[code] ~= nil then
+					if syms[code] == "fails" then error("keymap unavailable") end
+					return syms[code]
+				end
+				if code == KEY_C then return "c" end
+				if code == KEY_Q then return level3(session) and "at" or "q" end
+				return nil
+			end,
+			key_utf8 = function(session, keycode)
+				local code = keycode - XKB
+				if code == KEY_C then return "c" end
+				if code == KEY_Q then return level3(session) and "@" or "q" end
+				return nil
+			end,
+			sym_utf8 = function(_, sym)
+				if sym == "at" then return "@" end
+				return type(sym) == "string" and sym or nil
+			end,
+			update_key = function(session, keycode, direction) session.held[keycode] = direction == 1 or nil end,
+			compose_feed = function() end,
+			compose_status = function() return "nothing" end,
+			compose_utf8 = function() return nil end,
+			compose_reset = function() end,
+		}
+	end
+
+	--- Drives `events` through the live XKB adapter on a keymap with `syms`.
+	local function drive(syms, events)
+		local Capture = helpers.load_module("adapters.xkb_capture")
+		Capture._set_backend(backend(syms))
+		helpers.assert_true(Capture.load("keymap", "C"), "the double keymap loads")
+		local hook = helpers.load_module("adapters.keyboard_hook")
+		local seen = { chars = {}, shortcuts = {} }
+		local ok, err = pcall(hook._test_drive, events, {
+			liveXkb = true,
+			onChar = function(char) seen.chars[#seen.chars + 1] = char end,
+			onKey = function(name, payload)
+				if name == "shortcut" then seen.shortcuts[#seen.shortcuts + 1] = payload end
+			end,
+			onEmitRaw = function() return true end,
+		}, true)
+		seen.text_modifiers = hook.held_text_modifiers()
+		Capture._reset_backend()
+		if not ok then error(err, 0) end
+		return seen
+	end
+
+	helpers.it("reads CapsLock as Ctrl under ctrl:nocaps, and Super under caps:super", function()
+		for sym, mod in pairs({ [SYM.Control_L] = "ctrl", [SYM.Super_L] = "meta" }) do
+			local seen = drive({ [KEY_CAPSLOCK] = sym }, { key(KEY_CAPSLOCK, 1), key(KEY_C, 1), key(KEY_C, 0) })
+			helpers.assert_eq(seen.chars, {}, mod .. ": CapsLock+C must not reach the buffer as 'c'")
+			helpers.assert_eq(#seen.shortcuts, 1, mod .. ": CapsLock+C is a shortcut")
+			helpers.assert_eq(seen.shortcuts[1].key, "c")
+			helpers.assert_true(seen.shortcuts[1].mods[mod] == true, "held as " .. mod)
+		end
+	end)
+
+	helpers.it("types the level-3 character with CapsLock or Menu as AltGr (lv3:caps_switch, lv3:menu_switch)", function()
+		for _, code in ipairs({ KEY_CAPSLOCK, KEY_COMPOSE }) do
+			local seen = drive({ [code] = SYM.ISO_Level3_Shift }, { key(code, 1), key(KEY_Q, 1), key(KEY_Q, 0) })
+			helpers.assert_eq(seen.chars, { "@" }, code .. " selects level 3")
+			helpers.assert_eq(seen.shortcuts, {})
+			helpers.assert_eq(seen.text_modifiers, { "altgr" })
+		end
+	end)
+
+	helpers.it("trades Ctrl and CapsLock under ctrl:swapcaps", function()
+		local syms = { [KEY_CAPSLOCK] = SYM.Control_L, [KEY_LEFTCTRL] = SYM.Caps_Lock }
+		local seen = drive(syms, { key(KEY_LEFTCTRL, 1), key(KEY_C, 1), key(KEY_C, 0), key(KEY_LEFTCTRL, 0) })
+		helpers.assert_eq(seen.chars, { "c" }, "left Ctrl is the Caps Lock key there: C is text")
+		helpers.assert_eq(seen.shortcuts, {})
+		seen = drive(syms, { key(KEY_CAPSLOCK, 1), key(KEY_C, 1), key(KEY_C, 0) })
+		helpers.assert_eq(#seen.shortcuts, 1, "CapsLock is the Ctrl there: CapsLock+C is a shortcut")
+		helpers.assert_eq(seen.chars, {})
+	end)
+
+	-- The capture of each event failed as well, and said so at every event
+	-- next to the role's one line (xkb-failure-once).
+	helpers.it("says once, not at every key, that XKB cannot tell a role or capture a key (xkb-options-modifier-role)", function()
+		local Logger = require("logger.shim")
+		local real_error, errors = Logger.error, {}
+		Logger.error = function(_, fmt, ...)
+			local line = string.format(fmt, ...)
+			if line:find("XKB", 1, true) then errors[#errors + 1] = line end
+		end
+		local ok, err = pcall(drive, { [KEY_LEFTSHIFT] = "fails" }, {
+			key(KEY_LEFTSHIFT, 1), key(KEY_LEFTSHIFT, 0), key(KEY_LEFTSHIFT, 1), key(KEY_LEFTSHIFT, 0),
+			key(KEY_LEFTSHIFT, 1), key(KEY_LEFTSHIFT, 0),
+		})
+		Logger.error = real_error
+		if not ok then error(err, 0) end
+		helpers.assert_eq(#errors, 1, "three presses, one error: " .. table.concat(errors, " | "))
 	end)
 end)

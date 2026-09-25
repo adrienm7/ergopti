@@ -49,8 +49,8 @@ M.KEY_ORDER = {
 M.MODIFIER_CODES = { ctrl = 29, shift = 42, alt = 56, alt_gr = 100, win = 125 }
 
 local KEY_LEFTSHIFT = 42
--- Every modifier key, left and right.
-local MODIFIER_KEYS = { [29] = true, [42] = true, [54] = true, [56] = true, [97] = true, [100] = true, [125] = true, [126] = true }
+-- Every usual modifier key, left and right.
+local MODIFIER_KEYS = EvdevCodes.MODIFIER_OF
 local KEY_LEFTCTRL, KEY_LEFTALT, KEY_LEFTMETA = 29, 56, 125
 -- The keys that are themselves under a held modifier (Ctrl+Tab, Shift+Tab,
 -- Ctrl+Backspace), as the Windows hotkeys without a wildcard are. CapsLock
@@ -117,6 +117,10 @@ M.NAV_LAYER = {
 ---   tap_min_ms = number, one_shot_timeout_ms = number,
 ---   key_text = function(code) -> string|nil, the text a key would type now in
 ---     the live layout, nil for none; required when a key taps the one-shot Shift,
+---   held_modifiers = function() -> table, the modifiers down now, by role
+---     ({ ctrl = true }), as the live layout names them (the keyboard hook's:
+---     ctrl:nocaps makes CapsLock a Ctrl); without it, a caller with no layout
+---     (the tests), the usual modifier keys the engine saw and its own holds,
 --- }
 --- @return table engine
 function M.new(opts)
@@ -126,6 +130,7 @@ function M.new(opts)
 		tap_min_ms = assert(tonumber(options.tap_min_ms), "tap_min_ms is required"),
 		one_shot_timeout_ms = assert(tonumber(options.one_shot_timeout_ms), "one_shot_timeout_ms is required"),
 		key_text = options.key_text,
+		held_modifiers = options.held_modifiers,
 		held = {},          -- code -> { down_at, cancelled, emitted = {codes}, layer = bool }
 		layer_depth = 0,     -- how many layer keys are down
 		layer_keys = {},     -- code -> chord emitted for a key pressed on the layer
@@ -234,8 +239,11 @@ local function chord_events(self, out, spec, value)
 	end
 end
 
---- Whether a modifier is down: one passed through, or one a hold emitted.
+--- Whether a modifier is down. The live layout names the modifiers, so the
+--- hook is asked when there is one; otherwise, a usual modifier key passed
+--- through or one a hold emitted.
 local function modifier_held(self)
+	if self.held_modifiers then return next(self.held_modifiers()) ~= nil end
 	if next(self.modifiers_down) then return true end
 	for _, state in pairs(self.held) do
 		if #state.emitted > 0 then return true end

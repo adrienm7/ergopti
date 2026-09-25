@@ -66,6 +66,10 @@ M.LEVEL_MODIFIER_CODE = {
 --- Which modifier a code belongs to, or nil when it is not one.
 --- Keyed by code so the hook answers "is this a modifier" in one lookup instead
 --- of a chain of comparisons that has to be kept in sync in three places.
+--- The role is the key's USUAL one: the keyboard hook asks the live XKB keymap
+--- which role a modifier key really has (Right Alt is plain Alt_R on a US
+--- layout), and uses this table only under a capture double or, with an
+--- error logged, when XKB cannot answer.
 M.MODIFIER_OF = {
 	[M.KEY_LEFTSHIFT]  = "shift",
 	[M.KEY_RIGHTSHIFT] = "shift",
