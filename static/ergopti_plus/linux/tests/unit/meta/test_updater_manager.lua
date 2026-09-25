@@ -272,20 +272,20 @@ helpers.describe("modules/updater/manager.lua", function()
 			"an echoed key means the catalogue was never reached")
 	end)
 
-	helpers.it("the update-available label carries the tag through the catalogue template", function()
+	-- The row this label names runs check_for_updates. With a release cached it
+	-- read "Update to <tag>", so the user clicked what looked like the update and
+	-- only got another check, next to the "Download and install <tag>" row that
+	-- really installs it.
+	helpers.it("the check row still names a check while a release is available", function()
 		local i18n = require("infra.i18n")
-		-- A tag containing "%" is the reason the substitution is done on plain
-		-- indices: gsub would read it as a capture reference in the REPLACEMENT
-		-- string and raise "invalid use of '%'".
 		M._test_set_cached_release({ tag = "v9.9.9-100%", prerelease = false })
 		local label = M.get_menu_label()
-		helpers.assert_true(label:find("v9.9.9-100%", 1, true) ~= nil,
-			"the tag must appear verbatim in the label, percent signs included")
-		helpers.assert_true(label:find("{tag}", 1, true) == nil,
-			"the {tag} placeholder must be substituted, not rendered")
-		helpers.assert_true(label ~= i18n.get("menu.about.update_now"),
-			"the template must have been filled in, not returned as-is")
+		local expected = i18n.get("menu.about.check_for_updates") .. (M.get_channel() == "dev" and " (dev)" or "")
 		M.clear_cached_release()
+		helpers.assert_eq(label, expected,
+			"the row runs a check, so it must be labelled as one whatever the cached release")
+		helpers.assert_true(label:find("v9.9.9-100%", 1, true) == nil,
+			"the release belongs to the install row, not to the check row")
 	end)
 
 	helpers.it("stop_background_checks is safe to call even without active timers", function()
