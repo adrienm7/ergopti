@@ -1303,6 +1303,7 @@
 	"menu.updates.title": "🔄 Mises à jour",
 	"metrics.shortcut_format_hint": "Format : mods+touche  (ex : ctrl+alt+m)\nMods disponibles : ctrl, alt, shift, win\nLaisser vide pour désactiver.",
 	"metrics.shortcut_invalid_title": "Raccourci invalide",
+	"metrics.shortcut_modifier_key": "« {1} » est une touche de modification, elle ne peut donc pas être la touche d’un raccourci. Choisissez une autre touche.",
 	"metrics.shortcut_prompt_title": "Raccourci — {1}",
 	"metrics.shortcut_register_error": "Le raccourci « {1} » n’a pas pu être enregistré : {2}",
 	"metrics_apps.chooser_placeholder": "Catégorie pour %s",

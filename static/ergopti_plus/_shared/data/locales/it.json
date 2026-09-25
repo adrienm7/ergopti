@@ -1286,6 +1286,7 @@
 	"menu.updates.title": "🔄 Updates",
 	"metrics.shortcut_format_hint": "Formato : mod+tasto  (es. : ctrl+alt+m)\nModificatori disponibili : ctrl, alt, shift, win\nLasciare vuoto per disattivare.",
 	"metrics.shortcut_invalid_title": "Scorciatoia non valida",
+	"metrics.shortcut_modifier_key": "«{1}» è un tasto modificatore, quindi non può essere il tasto di una scorciatoia. Scegli un altro tasto.",
 	"metrics.shortcut_prompt_title": "Scorciatoia — {1}",
 	"metrics.shortcut_register_error": "La scorciatoia « {1} » non ha potuto essere registrata : {2}",
 	"metrics_apps.chooser_placeholder": "Categoria per %s",

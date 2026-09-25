@@ -1286,6 +1286,7 @@
 	"menu.updates.title": "🔄 Updates",
 	"metrics.shortcut_format_hint": "格式：修饰键+按键（例如：ctrl+alt+m）\n可用修饰键：ctrl, alt, shift, win\n留空以禁用。",
 	"metrics.shortcut_invalid_title": "无效的快捷键",
+	"metrics.shortcut_modifier_key": "“{1}”是修饰键，不能作为快捷键的按键。请选择其他按键。",
 	"metrics.shortcut_prompt_title": "快捷键 — {1}",
 	"metrics.shortcut_register_error": "快捷键 « {1} » 无法注册：{2}",
 	"metrics_apps.chooser_placeholder": "%s 的类别",

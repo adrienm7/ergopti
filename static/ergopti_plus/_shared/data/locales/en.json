@@ -1303,6 +1303,7 @@
 	"menu.updates.title": "🔄 Updates",
 	"metrics.shortcut_format_hint": "Format : mods+key  (e.g. : ctrl+alt+m)\nAvailable mods : ctrl, alt, shift, win\nLeave empty to disable.",
 	"metrics.shortcut_invalid_title": "Invalid Shortcut",
+	"metrics.shortcut_modifier_key": "« {1} » is a modifier key, so it cannot be the key of a shortcut. Choose another key.",
 	"metrics.shortcut_prompt_title": "Shortcut — {1}",
 	"metrics.shortcut_register_error": "The shortcut « {1} » could not be registered : {2}",
 	"metrics_apps.chooser_placeholder": "Category for %s",

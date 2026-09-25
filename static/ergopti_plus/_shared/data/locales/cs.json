@@ -1286,6 +1286,7 @@
 	"menu.updates.title": "🔄 Updates",
 	"metrics.shortcut_format_hint": "Formát : modifikátory+klávesa  (např. : ctrl+alt+m)\nDostupné modifikátory : ctrl, alt, shift, win\nNechte prázdné pro deaktivaci.",
 	"metrics.shortcut_invalid_title": "Neplatná zkratka",
+	"metrics.shortcut_modifier_key": "„{1}“ je modifikační klávesa, a proto nemůže být klávesou zkratky. Zvolte jinou klávesu.",
 	"metrics.shortcut_prompt_title": "Zkratka — {1}",
 	"metrics.shortcut_register_error": "Zkratku « {1} » se nepodařilo zaregistrovat : {2}",
 	"metrics_apps.chooser_placeholder": "Kategorie pro %s",

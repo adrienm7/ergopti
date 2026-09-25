@@ -91,6 +91,22 @@ global HOTKEY_NATIVE_SC_PRIMARY_KEYS := Map(
 	"pgdn", true
 )
 
+; Key names AutoHotkey resolves to a modifier key, and the modifiers' virtual
+; keys. A hotkey on one of them is its own identity, hooked on the modifier's
+; standard scan code: while it exists, even Off or under an ineligible #HotIf,
+; AutoHotkey does not fall back to the scan-code hotkeys of the same key, so the
+; tap-hold on that key stops firing (measured with AutoHotkey 2.0.26). The chord
+; grammar rejects only the neutral names, so the registrar refuses the rest for
+; every client. A scan-code key ("sc11d") joins the tap-hold's own identity and
+; stays bindable.
+global HOTKEY_MODIFIER_KEY_NAMES := Map(
+	"lctrl", true, "rctrl", true, "lcontrol", true, "rcontrol", true,
+	"ctrl", true, "control", true, "lalt", true, "ralt", true, "alt", true,
+	"lshift", true, "rshift", true, "shift", true, "lwin", true, "rwin", true)
+global HOTKEY_MODIFIER_VKS := Map(0x10, true, 0x11, true, 0x12, true,
+	0x5B, true, 0x5C, true, 0xA0, true, 0xA1, true, 0xA2, true, 0xA3, true,
+	0xA4, true, 0xA5, true)
+
 ; Live bindings keyed by handle token, each holding the native spec and the
 ; enabled state. The spec never leaves this file, so exactly one code path can
 ; turn a hotkey off
@@ -134,10 +150,29 @@ HotkeyRegistrarNativeKey(key) {
 	return StrLower(PhysicalKey)
 }
 
+/**
+ * Reports whether a chord key names a modifier key (see HOTKEY_MODIFIER_KEY_NAMES).
+ * @param {String} Key Chord key in any spelling.
+ * @returns {Boolean}
+ */
+HotkeyRegistrarKeyIsModifier(Key) {
+	global HOTKEY_MODIFIER_KEY_NAMES, HOTKEY_MODIFIER_VKS
+	if !(Key is String) || Key == ""
+		return false
+	Lower := StrLower(Key)
+	if HOTKEY_MODIFIER_KEY_NAMES.Has(Lower)
+		return true
+	if RegExMatch(Lower, "^vk([0-9a-f]{2})", &Vk)
+		return HOTKEY_MODIFIER_VKS.Has(Integer("0x" . Vk[1]))
+	return false
+}
+
 HotkeyRegistrarNativeSpec(mods, key) {
 	global HOTKEY_MOD_PREFIXES, HOTKEY_NATIVE_MOD_ORDER
 
 	if !(mods is Array)
+		return ""
+	if HotkeyRegistrarKeyIsModifier(key)
 		return ""
 	Present := Map()
 	for _, RawModName in mods {
@@ -588,6 +623,10 @@ _HotkeyRegistrarReserveOwned(chordString, callback, Owner := "anonymous",
 	}
 
 	PhysicalKey := HotkeyRegistrarPhysicalKey(parsed["key"])
+	if HotkeyRegistrarKeyIsModifier(PhysicalKey) {
+		LoggerWarn("adapters.hotkey_registrar", "bind(): refusing '" . chordString . "' — its key is a modifier key, whose tap-hold it would take over.")
+		return ""
+	}
 	DisplaySpec := HotkeyRegistrarNativeSpec(parsed["mods"], PhysicalKey)
 	if (DisplaySpec = "") {
 		LoggerWarn("adapters.hotkey_registrar", "bind(): '" . chordString . "' names a modifier Windows does not expose.")

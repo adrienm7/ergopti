@@ -1286,6 +1286,7 @@
 	"menu.updates.title": "🔄 Updates",
 	"metrics.shortcut_format_hint": "פורמט: mods+מקש  (לדוגמה ctrl+alt+m)\nMods זמינים: ctrl, alt, shift, win\nהשאר ריק להשבתה.",
 	"metrics.shortcut_invalid_title": "קיצור דרך לא תקין",
+	"metrics.shortcut_modifier_key": "„{1}” הוא מקש שינוי ולכן אינו יכול לשמש כמקש של קיצור דרך. בחרו מקש אחר.",
 	"metrics.shortcut_prompt_title": "קיצור דרך — {1}",
 	"metrics.shortcut_register_error": "קיצור הדרך « {1} » לא הצליח להירשם: {2}",
 	"metrics_apps.chooser_placeholder": "קטגוריה עבור %s",

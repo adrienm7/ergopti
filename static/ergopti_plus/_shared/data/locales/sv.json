@@ -1286,6 +1286,7 @@
 	"menu.updates.title": "🔄 Updates",
 	"metrics.shortcut_format_hint": "Format: mods+tangent  (t.ex. ctrl+alt+m)\nTillgängliga mods: ctrl, alt, shift, win\nLämna tomt för att inaktivera.",
 	"metrics.shortcut_invalid_title": "Ogiltig genväg",
+	"metrics.shortcut_modifier_key": "”{1}” är en modifierartangent och kan därför inte vara en genvägstangent. Välj en annan tangent.",
 	"metrics.shortcut_prompt_title": "Genväg — {1}",
 	"metrics.shortcut_register_error": "Genvägen « {1} » kunde inte registreras: {2}",
 	"metrics_apps.chooser_placeholder": "Kategori för %s",

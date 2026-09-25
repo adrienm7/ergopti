@@ -1286,6 +1286,7 @@
 	"menu.updates.title": "🔄 Updates",
 	"metrics.shortcut_format_hint": "Format: mods+tast  (f.eks. ctrl+alt+m)\nTilgængelige mods: ctrl, alt, shift, win\nLad stå tomt for at deaktivere.",
 	"metrics.shortcut_invalid_title": "Ugyldig genvej",
+	"metrics.shortcut_modifier_key": "»{1}« er en modifikatortast og kan derfor ikke være en genvejstast. Vælg en anden tast.",
 	"metrics.shortcut_prompt_title": "Genvej — {1}",
 	"metrics.shortcut_register_error": "Genvejen « {1} » kunne ikke registreres: {2}",
 	"metrics_apps.chooser_placeholder": "Kategori for %s",

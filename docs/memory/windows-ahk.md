@@ -177,7 +177,9 @@ the modifier's standard scan code. When none of its variants is eligible, AHK
 does not fall back to the `SC138` variants of the same key, so the Kana-layout
 AltGr tap-hold never fired (measured, v2.0.26). `$` and `~` do not form an
 identity; `*` does. Action: declare modifier-key hotkeys by scan code only;
-`test_modifier_hotkeys_single_identity.ahk` bans the name form.
+`test_modifier_hotkeys_single_identity.ahk` bans the name form, and the shared
+registrar refuses a user-configured chord whose key names a modifier
+(`HotkeyRegistrarKeyIsModifier`), since even an Off variant keeps the identity.
 
 ### project-ahk-a-priorkey-is-a-layout-name
 

@@ -1286,6 +1286,7 @@
 	"menu.updates.title": "🔄 Updates",
 	"metrics.shortcut_format_hint": "Format: mods+tast  (f.eks. ctrl+alt+m)\nTilgjengelige mods: ctrl, alt, shift, win\nLa stå tomt for å deaktivere.",
 	"metrics.shortcut_invalid_title": "Ugyldig snarvei",
+	"metrics.shortcut_modifier_key": "«{1}» er en modifikatortast og kan derfor ikke være tasten i en snarvei. Velg en annen tast.",
 	"metrics.shortcut_prompt_title": "Snarvei — {1}",
 	"metrics.shortcut_register_error": "Snarveien « {1} » kunne ikke registreres: {2}",
 	"metrics_apps.chooser_placeholder": "Kategori for %s",
