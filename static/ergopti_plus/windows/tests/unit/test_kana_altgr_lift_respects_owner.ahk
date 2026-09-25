@@ -14,19 +14,40 @@
 ; around the output and press it again only while a tap-hold still holds it,
 ; and the chord cleanup leaves an owned key to its owner. The cases below drive
 ; that production path, on a Kana layout and on a standard one.
+;
+; The same lift ended an AltGr the USER holds (AltGr held as AltGr passes the
+; key through, and AltGr with no tap-hold is the plain key): the owner only
+; pressed back a synthetic hold, so every expansion left the user's AltGr up
+; for the rest of the hold (kana-altgr-user-hold-2026-09-25). The owner now
+; also presses back a key the user held, delivered, before the lift and still
+; holds physically.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
 
 global _KALO_Sent := []
+global _KALO_Logical := false
+global _KALO_Physical := false
+
+; The AltGr key's state as the owner reads it, instead of the real keyboard.
+_KALO_KeyIsDown(Name, Mode) {
+	global _KALO_Logical, _KALO_Physical
+	if (Name != KS_AltGrKeyName())
+		return false
+	return (Mode == "P") ? _KALO_Physical : _KALO_Logical
+}
 
 ; Record the funnel sends and the expansion sends in one ordered list, with an
-; isolated synthetic ledger. Returns the globals it replaced, for _KALO_End.
-_KALO_Begin(Kana, Owned := false) {
-	global _AHK_SendInput, _KALO_Sent, _ALTGR_KANA_FIXUP
+; isolated synthetic ledger and key state. Holder is who holds AltGr: ""
+; (nobody), "tap-hold" (a synthetic hold: logically down only), "user" (a
+; delivered physical hold: logically and physically down) or "suppressed" (a
+; physical press a hotkey swallowed). Returns the globals it replaced.
+_KALO_Begin(Kana, Holder := "") {
+	global _AHK_SendInput, _KALO_Sent, _ALTGR_KANA_FIXUP, _TapHoldKeyIsDown
 	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys, _TH_SyntheticUserHeldKeys
+	global _KALO_Logical, _KALO_Physical
 	Saved := {
-		SendInput: _AHK_SendInput, Kana: _ALTGR_KANA_FIXUP,
+		SendInput: _AHK_SendInput, Kana: _ALTGR_KANA_FIXUP, KeyIsDown: _TapHoldKeyIsDown,
 		Held: _TH_SyntheticHeldKeys, Pending: _TH_SyntheticReleasePendingKeys,
 		UserHeld: _TH_SyntheticUserHeldKeys
 	}
@@ -35,17 +56,21 @@ _KALO_Begin(Kana, Owned := false) {
 	_TH_SyntheticHeldKeys := Map()
 	_TH_SyntheticReleasePendingKeys := Map()
 	_TH_SyntheticUserHeldKeys := Map()
-	if Owned
+	if (Holder == "tap-hold")
 		_TH_SyntheticHeldKeys[KS_AltGrKeyName()] := 1
+	_KALO_Logical := (Holder == "tap-hold" or Holder == "user")
+	_KALO_Physical := (Holder == "user" or Holder == "suppressed")
+	_TapHoldKeyIsDown := _KALO_KeyIsDown
 	_AHK_SendInput := (Keys) => _KALO_Sent.Push(Keys)
 	return Saved
 }
 
 _KALO_End(Saved) {
-	global _AHK_SendInput, _ALTGR_KANA_FIXUP
+	global _AHK_SendInput, _ALTGR_KANA_FIXUP, _TapHoldKeyIsDown
 	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys, _TH_SyntheticUserHeldKeys
 	_AHK_SendInput := Saved.SendInput
 	_ALTGR_KANA_FIXUP := Saved.Kana
+	_TapHoldKeyIsDown := Saved.KeyIsDown
 	_TH_SyntheticHeldKeys := Saved.Held
 	_TH_SyntheticReleasePendingKeys := Saved.Pending
 	_TH_SyntheticUserHeldKeys := Saved.UserHeld
@@ -69,8 +94,8 @@ _KALO_Burst() {
 	return true
 }
 
-; What an output leaves on the wire with a tap-hold holding AltGr: lifted and
-; pressed again around it on a Kana layout, untouched on a standard one.
+; What an output leaves on the wire with a tap-hold or the user holding AltGr:
+; lifted and pressed again around it on a Kana layout, untouched elsewhere.
 _KALO_AroundOwnedHold(Kana, Sends) {
 	return Kana ? "{SC138 Up}|" . Sends . "|{SC138 Down}" : Sends
 }
@@ -82,7 +107,7 @@ _KALO_LayoutName(Kana) {
 _KALO_OwnedHoldSurvivesTheOutput() {
 	global _TH_SyntheticHeldKeys
 	for _, Kana in [true, false] {
-		Saved := _KALO_Begin(Kana, true)
+		Saved := _KALO_Begin(Kana, "tap-hold")
 		try {
 			AssertTrue(_HSE_SendWithAltGrUp(_KALO_Burst), "the output must be sent")
 			AssertEqual(_KALO_AroundOwnedHold(Kana, "burst"), _KALO_Joined(),
@@ -96,7 +121,7 @@ Test("kana altgr lift: a tap-hold's AltGr survives an expansion (kana-altgr-lift
 
 _KALO_UnownedKeyStaysUp() {
 	for _, Kana in [true, false] {
-		Saved := _KALO_Begin(Kana, false)
+		Saved := _KALO_Begin(Kana)
 		try {
 			_HSE_SendWithAltGrUp(_KALO_Burst)
 			AssertEqual(Kana ? "{SC138 Up}|burst" : "burst", _KALO_Joined(),
@@ -109,7 +134,7 @@ Test("kana altgr lift: an unowned AltGr is lifted and left up (kana-altgr-lift-o
 
 _KALO_OwnerReleasingDuringOutputWins() {
 	global _TH_SyntheticHeldKeys
-	Saved := _KALO_Begin(true, true)
+	Saved := _KALO_Begin(true, "tap-hold")
 	try {
 		_HSE_SendWithAltGrUp(() => (TapHoldSyntheticKeyUp("SC138"), _KALO_Burst()))
 		AssertEqual(0, _TH_SyntheticHeldKeys.Count, "the owner released its hold")
@@ -120,6 +145,76 @@ _KALO_OwnerReleasingDuringOutputWins() {
 Test("kana altgr lift: a hold released during the output is not pressed again (kana-altgr-lift-owner-2026-09-25)",
 	_KALO_OwnerReleasingDuringOutputWins)
 
+; A Kana AltGr the user holds, delivered, is pressed again after the output
+; while the user still holds it; the user's own release passes through later.
+_KALO_UserHoldSurvivesTheOutput() {
+	for _, Kana in [true, false] {
+		Saved := _KALO_Begin(Kana, "user")
+		try {
+			AssertTrue(_HSE_SendWithAltGrUp(_KALO_Burst), "the output must be sent")
+			AssertEqual(_KALO_AroundOwnedHold(Kana, "burst"), _KALO_Joined(),
+				_KALO_LayoutName(Kana) . ": an AltGr the user holds must be lifted for the output and pressed again after it, only where it would modify the output")
+		} finally _KALO_End(Saved)
+	}
+}
+Test("kana altgr lift: an AltGr the user holds survives an expansion (kana-altgr-user-hold-2026-09-25)",
+	_KALO_UserHoldSurvivesTheOutput)
+
+_KALO_ReleasePhysically() {
+	global _KALO_Physical
+	_KALO_Physical := false
+	return _KALO_Burst()
+}
+
+_KALO_UserReleasingDuringOutputWins() {
+	for _, Kana in [true, false] {
+		Saved := _KALO_Begin(Kana, "user")
+		try {
+			_HSE_SendWithAltGrUp(_KALO_ReleasePhysically)
+			AssertEqual(Kana ? "{SC138 Up}|burst" : "burst", _KALO_Joined(),
+				_KALO_LayoutName(Kana) . ": an AltGr the user let go of during the output must stay up, or it is stuck down")
+		} finally _KALO_End(Saved)
+	}
+}
+Test("kana altgr lift: an AltGr the user releases during the output is not pressed again (kana-altgr-user-hold-2026-09-25)",
+	_KALO_UserReleasingDuringOutputWins)
+
+; The release reaches the keyboard state right after the re-press is decided.
+_KALO_RecordReleasingOnDown(Keys) {
+	global _KALO_Sent, _KALO_Physical
+	_KALO_Sent.Push(Keys)
+	if (Keys == "{SC138 Down}")
+		_KALO_Physical := false
+	return true
+}
+
+_KALO_UserReleaseRacingTheRepressIsUndone() {
+	global _AHK_SendInput
+	Saved := _KALO_Begin(true, "user")
+	try {
+		_AHK_SendInput := _KALO_RecordReleasingOnDown
+		_HSE_SendWithAltGrUp(_KALO_Burst)
+		AssertEqual("{SC138 Up}|burst|{SC138 Down}|{SC138 Up}", _KALO_Joined(),
+			"a release that lands between the check and the re-press must be undone, or AltGr stays down with nobody holding it")
+	} finally _KALO_End(Saved)
+}
+Test("kana altgr lift: a release racing the re-press is undone (kana-altgr-user-hold-2026-09-25)",
+	_KALO_UserReleaseRacingTheRepressIsUndone)
+
+; A press a hotkey swallowed never reached the system, so nothing is given back.
+_KALO_SuppressedPressIsNotPressedBack() {
+	for _, Kana in [true, false] {
+		Saved := _KALO_Begin(Kana, "suppressed")
+		try {
+			_HSE_SendWithAltGrUp(_KALO_Burst)
+			AssertEqual(Kana ? "{SC138 Up}|burst" : "burst", _KALO_Joined(),
+				_KALO_LayoutName(Kana) . ": a suppressed AltGr press must not be pressed on the user's behalf")
+		} finally _KALO_End(Saved)
+	}
+}
+Test("kana altgr lift: a suppressed AltGr press is not pressed back (kana-altgr-user-hold-2026-09-25)",
+	_KALO_SuppressedPressIsNotPressedBack)
+
 ; The recorder every expansion sender hands its payload to under a test hook.
 _KALO_RecordExpansionSend(Name, Args*) {
 	global _KALO_Sent
@@ -127,14 +222,16 @@ _KALO_RecordExpansionSend(Name, Args*) {
 	return true
 }
 
-; Every production expansion path, with a tap-hold holding AltGr. Runs inside
+; Every production expansion path, with a tap-hold or the user holding AltGr:
+; both are given their AltGr back after the output. Runs inside
 ; the send-failure suite's isolation (_AHK04_RunIsolated), which snapshots and
 ; restores the engine, preview, ring and hook state these paths commit.
 _KALO_EveryExpansionPathImpl() {
 	global _SendHook, HSE_Buffer, HSE_StartIsWordBoundary, _PrefixBuffer, _KALO_Sent
-	for _, Kana in [true, false] {
-		Layout := _KALO_LayoutName(Kana)
-		Saved := _KALO_Begin(Kana, true)
+	for _, Scenario in [[true, "tap-hold"], [false, "tap-hold"], [true, "user"], [false, "user"]] {
+		Kana := Scenario[1]
+		Layout := _KALO_LayoutName(Kana) . ", " . Scenario[2] . " hold"
+		Saved := _KALO_Begin(Kana, Scenario[2])
 		try {
 			_SendHook := _KALO_RecordExpansionSend
 			KLHook.prev_app := "kalo-test.exe"
@@ -190,13 +287,13 @@ _KALO_RecordRelease(Name) {
 }
 
 _KALO_ChordCleanupLeavesAnOwnedKey() {
-	Saved := _KALO_Begin(true, true)
+	Saved := _KALO_Begin(true, "tap-hold")
 	try {
 		ResetScriptComboKeys("SC01C", _KALO_RecordRelease)
 		AssertEqual("", _KALO_Joined(),
 			"the chord cleanup must not release an AltGr a tap-hold holds")
 	} finally _KALO_End(Saved)
-	Saved := _KALO_Begin(true, false)
+	Saved := _KALO_Begin(true)
 	try {
 		ResetScriptComboKeys("SC01C", _KALO_RecordRelease)
 		AssertEqual("release SC138", _KALO_Joined(),
@@ -205,6 +302,59 @@ _KALO_ChordCleanupLeavesAnOwnedKey() {
 }
 Test("kana altgr lift: the script chord cleanup leaves an owned AltGr (kana-altgr-lift-owner-2026-09-25)",
 	_KALO_ChordCleanupLeavesAnOwnedKey)
+
+; The chord cleanup released an AltGr the user still held, which ended the
+; layout's AltGr for the rest of that hold (kana-altgr-chord-user-hold). It now
+; leaves that key down and looks again once the user lets go, releasing the key
+; only if a swallowed release left it latched. A standard layout has nothing to
+; clear.
+global _KALO_Armed := []
+
+_KALO_Arm(Callback, DelayMs) {
+	global _KALO_Armed
+	_KALO_Armed.Push(Callback)
+	return true
+}
+
+; Runs the look the cleanup armed last, as its timer would.
+_KALO_RunArmed() {
+	global _KALO_Armed
+	AssertEqual(1, _KALO_Armed.Length, "exactly one next look must be armed")
+	Look := _KALO_Armed.Pop()
+	Look.Call()
+}
+
+_KALO_ChordCleanupWaitsForTheUser() {
+	global _ScriptComboArmFn, _KALO_Armed, _KALO_Logical, _KALO_Physical
+	SavedArm := _ScriptComboArmFn
+	_ScriptComboArmFn := _KALO_Arm
+	try {
+		for _, Kana in [true, false] {
+			for _, Latched in [true, false] {
+				Where := _KALO_LayoutName(Kana) . (Latched ? ", release swallowed" : ", release delivered")
+				Saved := _KALO_Begin(Kana, "user")
+				_KALO_Armed := []
+				try {
+					ResetScriptComboKeys("SC01C", _KALO_RecordRelease)
+					AssertEqual("", _KALO_Joined(),
+						Where . ": an AltGr the user still holds must stay down after the chord")
+					if Kana {
+						_KALO_RunArmed()
+						AssertEqual("", _KALO_Joined(), Where . ": still held on the next look, so still left alone")
+						_KALO_Physical := false
+						_KALO_Logical := Latched
+						_KALO_RunArmed()
+						AssertEqual(Latched ? "release SC138" : "", _KALO_Joined(),
+							Where . ": once the user lets go, only a key left latched is released")
+					}
+					AssertEqual(0, _KALO_Armed.Length, Where . ": nothing is left to look at")
+				} finally _KALO_End(Saved)
+			}
+		}
+	} finally _ScriptComboArmFn := SavedArm
+}
+Test("kana altgr lift: the script chord cleanup leaves the AltGr the user holds (kana-altgr-chord-user-hold)",
+	_KALO_ChordCleanupWaitsForTheUser)
 
 ; Every emitter of a raw AltGr release must go through the owner. The boot-time
 ; phantom release runs before any hold can exist.
@@ -234,13 +384,14 @@ _KALO_NoRawAltGrReleaseOutsideTheOwner() {
 	; each is called once in the driver, from TapHoldSendWithKeyUp.
 	Paired := _DriverFuncBody("TapHoldSendWithKeyUp")
 	Assert(Paired != "", "TapHoldSendWithKeyUp must exist")
-	for _, Step in ["TapHoldLiftKey", "TapHoldRepressOwnedKey"] {
+	for _, Step in ["TapHoldLiftKey", "TapHoldRestoreLiftedKey"] {
 		Calls := _KALO_Count(Src, Step . "(") - _KALO_Count(Src, "`n" . Step . "(")
 		AssertEqual(1, Calls, Step . " must be called only by TapHoldSendWithKeyUp, which pairs the lift with the re-press")
 		Assert(InStr(Paired, Step . "(") > 0, "TapHoldSendWithKeyUp must call " . Step)
 	}
 	Body := _DriverFuncBody("ResetScriptComboKeys")
-	Assert(Body != "" and InStr(Body, "TapHoldReleaseUnlessOwned(") > 0,
+	Clear := _DriverFuncBody("_ScriptComboClearAltGr")
+	Assert(InStr(Body, "_ScriptComboClearAltGr(") > 0 and InStr(Clear, "TapHoldReleaseUnlessOwned(") > 0,
 		"the script chord cleanup must release AltGr through the owner")
 }
 Test("kana altgr lift: no raw AltGr release bypasses the owner (kana-altgr-lift-owner-2026-09-25)",

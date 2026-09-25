@@ -84,17 +84,18 @@ _THSB_PreArmedSyntheticKeysAreSuspendOwned() {
 		RawTransitionCount++
 		Pos := Found + Match.Len
 	}
-	; Six owner-internal transitions: the transactional Down, the retrying Up,
-	; the pass-through physical Up, and the owner's lift, re-press and
-	; unless-owned release around an output (kana-altgr-lift-owner-2026-09-25).
-	AssertEqual(6, RawTransitionCount,
+	; Seven owner-internal transitions: the transactional Down, the retrying Up,
+	; the pass-through physical Up, and the owner's lift, re-press, raced-release
+	; Up and unless-owned release around an output (kana-altgr-lift-owner-2026-09-25,
+	; kana-altgr-user-hold-2026-09-25).
+	AssertEqual(7, RawTransitionCount,
 		"the complete driver may contain only the owner-internal sustained transitions; every other sustained transition must route through an explicit owner")
 	PhysicalRelease := _DriverFuncBody("TapHoldReleasePhysicalKey")
 	Assert(InStr(PhysicalRelease, 'Ok := TextPressKey(Key, "Up", false)') > 0,
 		"the sole untracked sustained transition must remain the status-bearing physical-key release helper")
 	for Owner, Transition in Map(
 			"TapHoldLiftKey", 'TextPressKey(Name, "Up", false)',
-			"TapHoldRepressOwnedKey", 'Ok := TextPressKey(Name, "Down", false)',
+			"TapHoldRestoreLiftedKey", 'Ok := TextPressKey(Name, "Down", false)',
 			"TapHoldReleaseUnlessOwned", 'Ok := TextPressKey(Name, "Up", false)') {
 		Body := _DriverFuncBody(Owner)
 		Assert(Body != "" and InStr(Body, Transition) > 0,

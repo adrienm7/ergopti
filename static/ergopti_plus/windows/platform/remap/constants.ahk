@@ -836,24 +836,29 @@ TapHoldReleaseSyntheticKeys() {
 }
 
 ; Run SendFn with key Name up, for output the key would otherwise modify: the
-; Kana-style layout's AltGr changes every character typed while it is down. A
-; tap-hold that holds Name synthetically keeps its hold: the key is pressed
-; again after the output, but only if an owner still holds it then, so an owner
-; that released meanwhile is never overridden and its count stays true.
+; Kana-style layout's AltGr changes every character typed while it is down.
+; Whoever held the key keeps it: a tap-hold that holds Name synthetically, and
+; the user holding it down themselves (AltGr held as AltGr passes the key
+; through; AltGr with no tap-hold is the plain key). The key is pressed again
+; after the output, but only if that holder still holds it then, so a hold that
+; ended meanwhile is never overridden and an owner's count stays true.
 ; @param Name {String} AHK key name, e.g. KS_AltGrKeyName().
 ; @param SendFn {Func} Zero-argument sender; its result is returned.
 ; @return The sender's result, or false when the lift could not be sent.
 TapHoldSendWithKeyUp(Name, SendFn) {
+	; Read before the lift: once the Up is sent the key is logically up, and a
+	; hold the system saw can no longer be told from a press a hotkey swallowed.
+	UserHeld := _TH_UserHoldsDeliveredKey(Name)
 	if !TapHoldLiftKey(Name)
 		return false
 	try
 		return SendFn.Call()
 	finally
-		TapHoldRepressOwnedKey(Name)
+		TapHoldRestoreLiftedKey(Name, UserHeld)
 }
 
 ; Lift key Name for an output, whoever holds it. Pair with
-; TapHoldRepressOwnedKey once the output is sent.
+; TapHoldRestoreLiftedKey once the output is sent.
 ; @return {Boolean} False when the Up could not be sent; skip the output then.
 TapHoldLiftKey(Name) {
 	if TextPressKey(Name, "Up", false)
@@ -862,21 +867,36 @@ TapHoldLiftKey(Name) {
 	return false
 }
 
-; Press Name again when a synthetic owner still holds it, after an output that
-; lifted it. The check and the Down share one Critical span so an owner cannot
-; release between them.
-TapHoldRepressOwnedKey(Name) {
-	global _TH_SyntheticHeldKeys
+; Press Name again after an output that lifted it, when a synthetic owner still
+; holds it, or when the user held it down before the lift (UserHeld) and still
+; holds it physically; the user's own release then passes through as usual.
+; The owner check and the Down share one Critical span so an owner cannot
+; release between them. The user's release is an OS event Critical cannot hold
+; back, so it is read again after the Down: one that landed in between would
+; otherwise leave the key logically down with nobody holding it.
+; @param UserHeld {Boolean} _TH_UserHoldsDeliveredKey(Name) before the lift.
+; @return {Boolean} False when a Down or Up could not be sent.
+TapHoldRestoreLiftedKey(Name, UserHeld := false) {
+	global _TH_SyntheticHeldKeys, _TapHoldKeyIsDown
 	PreviousCritical := Critical("On")
+	RacedRelease := false
 	try {
-		if !_TH_SyntheticHeldKeys.Has(Name)
+		Owned := _TH_SyntheticHeldKeys.Has(Name)
+		if !Owned and !(UserHeld and _TapHoldKeyIsDown.Call(Name, "P"))
 			return true
 		Ok := TextPressKey(Name, "Down", false)
+		if (Ok and !Owned and !_TapHoldKeyIsDown.Call(Name, "P")) {
+			RacedRelease := true
+			Ok := TextPressKey(Name, "Up", false)
+		}
 	} finally {
 		Critical(PreviousCritical)
 	}
-	if !Ok
-		try LoggerError("TapHoldDispatch", "Could not press '{1}' again for its tap-hold after an output; it stays up until the key is pressed again.", Name)
+	if (!Ok and RacedRelease) {
+		try LoggerError("TapHoldDispatch", "Could not release '{1}' after the user let go of it during its re-press; it stays down until the key is pressed again.", Name)
+	} else if !Ok {
+		try LoggerError("TapHoldDispatch", "Could not give '{1}' back to its holder after an output; it stays up until the key is pressed again.", Name)
+	}
 	return Ok
 }
 
