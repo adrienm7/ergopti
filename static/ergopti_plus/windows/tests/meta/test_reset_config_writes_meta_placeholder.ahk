@@ -73,7 +73,7 @@ _RCMP_PlaceholderAfterDeleteBeforeReload() {
 	IdxApi := InStr(Helper, "ConfigTransitionAbsentTarget(ApiEntriesPath)")
 	IdxBuild := InStr(Body, "_ConfigResetTransitionTargets(")
 	IdxCommit := InStr(Body, "ConfigTransitionCommitOwned(")
-	IdxReload := InStr(Body, "ReloadPreservingSuspend(0, OwnerBundle)")
+	IdxReload := InStr(Body, "ReloadPreservingSuspend(0, OwnerBundle,")
 	Assert(IdxPresent > 0 && IdxTapHold > IdxPresent && IdxApi > IdxTapHold,
 		"reset targets must declare placeholder first and both absent siblings after it")
 	Assert(IdxBuild > 0 && IdxCommit > IdxBuild && IdxReload > IdxCommit,

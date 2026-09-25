@@ -537,6 +537,8 @@
 	"init.reload_hotstrings": "Hotstrings gewijzigd — herladen…",
 	"init.reload_script": "Script gewijzigd — herladen…",
 	"init.reload_title": "Herladen",
+	"init.reload_refused_body": "Het herladen kon niet worden voltooid. ErgoptiPlus blijft draaien met de huidige instellingen. Zie het logboek voor details.",
+	"init.reload_refused_title": "Herladen mislukt",
 	"karabiner.guardian_approval_required": "🟡 ErgoptiPlus-toetstoewijzing vereist toestemming als achtergrondonderdeel (klik om instellingen te openen)",
 	"karabiner.guardian_settings_open_failed": "De instellingen voor inlogonderdelen konden niet worden geopend.",
 	"karabiner.download_failed": "Download mislukt: %s",

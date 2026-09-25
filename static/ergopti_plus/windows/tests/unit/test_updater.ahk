@@ -2294,10 +2294,16 @@ _UpdaterTest_RejectChannelReloadSchedule(State, Continuation, DelayMs) {
 	return false
 }
 
-_UpdaterTest_RunChannelReload(State) {
+; A launched reload owns the lent bundle until OnExit, and an accepted OnExit
+; ends the process, which releases it. The fake models that whole accepted path
+; so no test leaks the process-wide configuration barrier.
+_UpdaterTest_RunChannelReload(State, ConfigBundle := 0, RefusedFn := 0) {
 	State.ReloadCount += 1
+	State.RefusedFn := RefusedFn
 	if State.HasOwnProp("CriticalStates")
 		State.CriticalStates.Push({ Phase: "reload", Value: A_IsCritical })
+	if State.ReloadResult && (ConfigBundle is Object)
+		_ConfigWriteTerminalRelease(ConfigBundle)
 	return State.ReloadResult
 }
 
@@ -2749,7 +2755,7 @@ _UpdaterTest_ActiveSendLeaseBlocksDeferredReload() {
 Test("Updater AHK-31: active COM lease blocks deferred Reload (updater-channel-replacement-transaction)",
 	_UpdaterTest_ActiveSendLeaseBlocksDeferredReload)
 
-_UpdaterTest_ThrowChannelReload(State) {
+_UpdaterTest_ThrowChannelReload(State, *) {
 	State.ReloadCount += 1
 	throw Error("deterministic Reload failure")
 }
@@ -2832,6 +2838,58 @@ _UpdaterTest_ReloadAndRecoveryFailuresAreExact() {
 }
 Test("Updater AHK-31: Reload and recovery false/throw paths are exact (updater-channel-replacement-transaction)",
 	_UpdaterTest_ReloadAndRecoveryFailuresAreExact)
+
+; Models a launched Reload whose successor has not asked this instance to close
+; yet: the lent bundle stays owned by the reload.
+_UpdaterTest_LaunchPendingChannelReload(State, ConfigBundle := 0, RefusedFn := 0) {
+	State.ReloadCount += 1
+	State.RefusedFn := RefusedFn
+	return true
+}
+
+_UpdaterTest_RefusalAfterLaunchRecoversOnce() {
+	global _UpdaterAsyncActionLeases
+	Saved := _UpdaterTest_SaveRequestState()
+	ConfigBundle := 0
+	try {
+		_UpdaterTest_ResetRequestState()
+		State := _UpdaterTest_NewChannelReloadProbe()
+		BoundaryOwner := _Updater_BeginAsyncAdmissionBoundary("channel switch")
+		ConfigBundle := _UpdaterTest_AcquireChannelConfigBundle()
+		_Updater_BeginDeferredChannelReload(
+			BoundaryOwner,
+			_UpdaterTest_LaunchPendingChannelReload.Bind(State),
+			_UpdaterTest_RecordChannelReloadSchedule.Bind(State),
+			_UpdaterTest_RecordChannelReloadFailure.Bind(State),
+			_UpdaterTest_RecordChannelReloadRecovery.Bind(State),
+			A_TickCount, 10000, 0, ConfigBundle)
+		AssertEqual(true, State.Scheduled[1].Continuation.Call(),
+			"a launched channel Reload is a pending success")
+		AssertEqual(0, State.FailureCount,
+			"a launched Reload must not surface a failure (reload-returns-pending)")
+		AssertEqual(false, _Updater_AsyncAdmissionBoundaryActive(),
+			"the launched Reload ends channel admission")
+		AssertEqual(true, _ConfigWriteTerminalIsActive(),
+			"the launched Reload keeps the lent bundle until OnExit")
+		AssertEqual(true, HasMethod(State.RefusedFn, "Call"),
+			"the channel must hand the Reload a refusal callback")
+		State.RefusedFn.Call("test refusal")
+		AssertEqual(1, State.FailureCount,
+			"a refusal after launch must surface one failure")
+		AssertEqual(1, State.RecoverCount,
+			"a refusal after launch must recover the committed channel once")
+		AssertEqual(0, _UpdaterAsyncActionLeases.Count,
+			"recovery must release its exact action lease")
+		AssertEqual(false, _ConfigWriteTerminalIsActive(),
+			"recovery must release the bundle the refused Reload handed back")
+	} finally {
+		if (ConfigBundle is Object)
+			_ConfigWriteTerminalRelease(ConfigBundle)
+		_UpdaterTest_RestoreRequestState(Saved)
+	}
+}
+Test("Updater AHK-31: a channel Reload refused after launch recovers once (reload-returns-pending)",
+	_UpdaterTest_RefusalAfterLaunchRecoversOnce)
 
 _UpdaterTest_RecoveryEffect(State, Field, Mode, Args*) {
 	State[Field] += 1

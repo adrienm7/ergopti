@@ -537,6 +537,8 @@
 	"init.reload_hotstrings": "Hotstrings modificados — recargando…",
 	"init.reload_script": "Script modificado — recargando…",
 	"init.reload_title": "Recargando",
+	"init.reload_refused_body": "No se pudo completar la recarga. ErgoptiPlus sigue funcionando con su configuración actual. Consulta el registro para más detalles.",
+	"init.reload_refused_title": "Error al recargar",
 	"karabiner.guardian_approval_required": "🟡 El remapeo de ErgoptiPlus necesita permiso para ejecutarse en segundo plano (clic para abrir los ajustes)",
 	"karabiner.guardian_settings_open_failed": "No se pudieron abrir los ajustes de ítems de inicio.",
 	"karabiner.download_failed": "Descarga fallida: %s",

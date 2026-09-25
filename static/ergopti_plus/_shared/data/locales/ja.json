@@ -537,6 +537,8 @@
 	"init.reload_hotstrings": "ホットストリングが変更されました — 再読み込み中…",
 	"init.reload_script": "スクリプトが変更されました — 再読み込み中…",
 	"init.reload_title": "再読み込み中",
+	"init.reload_refused_body": "再読み込みを完了できませんでした。ErgoptiPlus は現在の設定のまま動作を続けます。詳細はログを確認してください。",
+	"init.reload_refused_title": "再読み込みに失敗しました",
 	"karabiner.guardian_approval_required": "🟡 ErgoptiPlusキーリマップにはバックグラウンド項目の許可が必要です（クリックして設定を開く）",
 	"karabiner.guardian_settings_open_failed": "ログイン項目の設定を開けませんでした。",
 	"karabiner.download_failed": "ダウンロード失敗：%s",

@@ -101,6 +101,26 @@ menu, or async completion path.
 Regression tests for cross-cutting guards must enumerate the whole callback
 class and assert a nonzero subject count.
 
+### project-ahk-reload-returns-before-onexit
+
+`Reload()` starts `/restart` and returns in the same tick (measured, v2.0.26);
+OnExit runs with reason "Reload" only once the successor has loaded (about a
+second for the driver) and asks this window to close. A returned Reload is
+therefore never a refusal: reading it as one logged "refused", rolled back the
+paths editor, onboarding and reset, and dropped the pause on every successful
+reload. If OnExit refuses, the successor keeps waiting and prompts "Could not
+close the previous instance of this script. Keep waiting?" until answered.
+`ExitApp` is the opposite: it runs OnExit before returning. Action: reload only
+through `ReloadPreservingSuspend`; its hand-off launches the successor with an
+owned handle, stays pending until OnExit claims it, and on a later refusal
+stops the successor and returns the bundle through the caller's `RefusedFn`.
+A successor that stops on a load-error dialog (a syntax error in the included
+personal shortcuts file) is alive and has not asked to close, so the pending
+reload keeps the configuration barrier until someone dismisses that dialog; it
+is logged once after `RELOAD_SUCCESSOR_STALL_MS` and never killed, because its
+close request may already be queued. Action: when configuration writes stay
+blocked after a reload, look for that dialog before suspecting a barrier leak.
+
 ## Input, suspension, and menus
 
 ### feedback-ahk-suspend-prefix-latch

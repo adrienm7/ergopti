@@ -293,13 +293,15 @@ _CPC_LifecycleRoutesThroughAtomicHandoff() {
 	Assert(ReloadWrapper != "" and ReloadBody != "" and RestoreBody != "",
 		"the Critical wrapper, lifecycle core, and restore entry must exist")
 	Assert(InStr(ReloadWrapper,
-		"_ReloadPreservingSuspendNonCritical(SuccessFn, ExistingBundle)") > 0
+		"_ReloadPreservingSuspendNonCritical(SuccessFn, ExistingBundle,") > 0
+		and InStr(ReloadWrapper, "RefusedFn)") > 0
 		and InStr(ReloadWrapper, "Reload()") = 0,
 		"ReloadPreservingSuspend must only drop inherited Critical and delegate")
 	Assert(InStr(ReloadBody, "SuspendHandoffReload(") > 0
 		and InStr(ReloadBody, "ReloadTerminalInvoke.Bind(") > 0
+		and InStr(ReloadBody, "LifecycleLaunchSuccessor") > 0
 		and InStr(ReloadBody, "Reload()") = 0,
-		"ReloadPreservingSuspend must let the tested helper gate the real Reload call")
+		"ReloadPreservingSuspend must let the tested helper launch the owned successor")
 	Assert(InStr(RestoreBody, "SuspendHandoffConsume(") > 0,
 		"marker restoration must route through the atomic rename/delete/toggle helper")
 	Assert(InStr(RestoreBody, "A_ScriptHwnd") = 0,

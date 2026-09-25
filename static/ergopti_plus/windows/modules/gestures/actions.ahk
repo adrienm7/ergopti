@@ -148,7 +148,7 @@ global GESTURE_ACTIONS := Map(
 				Fn: (*) => ToggleSuspend(),
 		},
 		"script_reload", {
-				Fn: (*) => (LoggerInfo("Gestures", "Reload requested by the script_reload action."), Reload()),
+				Fn: (*) => (LoggerInfo("Gestures", "Reload requested by the script_reload action."), ReloadPreservingSuspend()),
 		},
 		"script_save_reload", {
 				Fn: (*) => GestureSaveAndReload(),

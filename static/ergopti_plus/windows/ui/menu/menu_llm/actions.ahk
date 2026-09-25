@@ -159,27 +159,32 @@ LLM_Menu_SaveConfig() {
 	if (Resolution = CONFIG_SAVE_RESOLVE_RELOAD) {
 		try LoggerError("LLM_Menu", "The LLM settings could not be written to config.toml. Reloading so the menu, the engine and the file agree again — the exact failed generation was rejected rather than shown as saved.")
 		ReloadAccepted := false
-		try ReloadAccepted := ReloadPreservingSuspend()
+		try ReloadAccepted := ReloadPreservingSuspend(0, 0,
+			_LLM_Menu_ResumeAfterRefusedReload.Bind(RequestedGeneration))
 		catch as Err
 			try LoggerError("LLM_Menu", "Reload raised after the failed LLM save: {1}.", Err.Message)
-		if !ReloadAccepted {
-			; An OnExit gate kept this process alive, so disk authority was never
-			; completed. Reopen only this exact generation and retry it; otherwise
-			; every later setter would mutate RAM while the save coordinator stayed
-			; permanently sealed behind the returned Reload.
-			if _ConfigFullSaveResumeRejected(RequestedGeneration) {
-				try LoggerWarn("LLM_Menu", "Reload was refused; the rejected LLM save was restored as a pending obligation and its retry was re-armed.")
-				return true
-			} else {
-				try LoggerError("LLM_Menu", "Reload was refused and the exact LLM save could not be restored as a pending obligation.")
-				try ConfigReportPersistenceFailure(
-					"the LLM configuration save after a refused Reload")
-			}
-		}
+		if !ReloadAccepted
+			return _LLM_Menu_ResumeAfterRefusedReload(RequestedGeneration)
 		return false
 	}
 	try LoggerError("LLM_Menu", "The LLM settings could not be persisted or safely rejected because an older save remains pending and its retry could not be armed.")
 	try ConfigReportPersistenceFailure("the LLM configuration save")
+	return false
+}
+
+; The reload was refused, before or after launch, so disk authority was never
+; completed and this process keeps running. Reopen only this exact generation
+; and retry it; otherwise every later setter would mutate RAM while the save
+; coordinator stayed permanently sealed behind the refused Reload.
+; @returns {Boolean} True when the rejected save is pending again.
+_LLM_Menu_ResumeAfterRefusedReload(RequestedGeneration, *) {
+	if _ConfigFullSaveResumeRejected(RequestedGeneration) {
+		try LoggerWarn("LLM_Menu", "Reload was refused; the rejected LLM save was restored as a pending obligation and its retry was re-armed.")
+		return true
+	}
+	try LoggerError("LLM_Menu", "Reload was refused and the exact LLM save could not be restored as a pending obligation.")
+	try ConfigReportPersistenceFailure(
+		"the LLM configuration save after a refused Reload")
 	return false
 }
 

@@ -568,12 +568,14 @@ Test("config full save: rejected exact generation is never terminally retried "
 	. "(config-full-save-exact-reject)",
 	_CFGFS_RejectedExactGenerationIsNeverRetried)
 
+; Models the later OnExit(Reload) that claims the launched reload and then
+; meets a refusal gate: the hand-off must give control back to the live driver.
 _CFGFS_ClaimReloadWithoutFinishing() {
 	Claimed := ReloadTerminalHandoffClaim("Reload")
 	AssertTrue(Claimed is Map,
 		"the simulated OnExit path must claim the exact Reload authorization")
-	; Returning without Commit/Finish models any reachable refusal gate. The
-	; outer ReloadTerminalInvoke must cancel the inert hand-off and return false.
+	AssertTrue(ReloadTerminalHandoffRefuseForShutdown("Reload", "test gate"),
+		"a vetoed close request must refuse the launched reload")
 }
 
 _CFGFS_ReturnedReloadRestoresRejectedGeneration() {
@@ -597,8 +599,9 @@ _CFGFS_ReturnedReloadRestoresRejectedGeneration() {
 
 		Bundle := _ConfigWriteTerminalTryAcquire([Path])
 		AssertTrue(Bundle is Object)
-		AssertFalse(ReloadTerminalInvoke(Bundle, 0,
-			_CFGFS_ClaimReloadWithoutFinishing),
+		_RTP_Pending(Bundle, _RTP_NewPort())
+		_CFGFS_ClaimReloadWithoutFinishing()
+		AssertFalse(ReloadTerminalHandoffPending(),
 			"an OnExit refusal must return control to the live driver")
 		_ConfigWriteTerminalRelease(Bundle)
 		Bundle := false
@@ -631,7 +634,7 @@ _CFGFS_ReturnedReloadRestoresRejectedGeneration() {
 		AssertFalse(_ConfigFullSaveHasPending())
 	} finally {
 		if (Bundle is Object)
-			_ConfigWriteTerminalRelease(Bundle)
+			_RTP_Cleanup(Bundle)
 		_CFGFS_RestoreRuntime(Runtime)
 		_CFGFS_Reset()
 	}

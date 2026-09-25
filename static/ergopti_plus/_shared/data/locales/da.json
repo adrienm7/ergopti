@@ -537,6 +537,8 @@
 	"init.reload_hotstrings": "Hotstrings ændret — genindlæser…",
 	"init.reload_script": "Script ændret — genindlæser…",
 	"init.reload_title": "Genindlæser",
+	"init.reload_refused_body": "Genindlæsningen kunne ikke fuldføres. ErgoptiPlus kører videre med de nuværende indstillinger. Se loggen for detaljer.",
+	"init.reload_refused_title": "Genindlæsning mislykkedes",
 	"karabiner.guardian_approval_required": "🟡 ErgoptiPlus-tastetilknytning kræver godkendelse som baggrundsemne (klik for at åbne indstillinger)",
 	"karabiner.guardian_settings_open_failed": "Indstillinger for login-emner kunne ikke åbnes.",
 	"karabiner.download_failed": "Download mislykkedes: %s",

@@ -537,6 +537,8 @@
 	"init.reload_hotstrings": "Hotstrings změny — znovu načítám…",
 	"init.reload_script": "Skript změněn — znovu načítám…",
 	"init.reload_title": "Opětovné načítání",
+	"init.reload_refused_body": "Opětovné načtení se nepodařilo dokončit. ErgoptiPlus běží dál s aktuálním nastavením. Podrobnosti najdete v protokolu.",
+	"init.reload_refused_title": "Opětovné načtení selhalo",
 	"karabiner.guardian_approval_required": "🟡 Mapování ErgoptiPlus vyžaduje schválení položky na pozadí (kliknutím otevřete nastavení)",
 	"karabiner.guardian_settings_open_failed": "Nastavení přihlašovacích položek se nepodařilo otevřít.",
 	"karabiner.download_failed": "Stahování selhalo: %s",

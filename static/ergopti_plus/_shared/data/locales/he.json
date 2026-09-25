@@ -537,6 +537,8 @@
 	"init.reload_hotstrings": "הוטסטרינגים שונו — טוען מחדש…",
 	"init.reload_script": "סקריפט שונה — טוען מחדש…",
 	"init.reload_title": "טוען מחדש",
+	"init.reload_refused_body": "לא ניתן היה להשלים את הטעינה מחדש. ErgoptiPlus ממשיך לפעול עם ההגדרות הנוכחיות. הפרטים מופיעים ביומן.",
+	"init.reload_refused_title": "הטעינה מחדש נכשלה",
 	"karabiner.guardian_approval_required": "🟡 מיפוי המקשים של ErgoptiPlus דורש אישור לפריט רקע (לחץ לפתיחת ההגדרות)",
 	"karabiner.guardian_settings_open_failed": "לא ניתן לפתוח את הגדרות פריטי ההתחברות.",
 	"karabiner.download_failed": "ההורדה נכשלה: %s",

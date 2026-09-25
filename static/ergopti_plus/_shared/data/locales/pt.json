@@ -537,6 +537,8 @@
 	"init.reload_hotstrings": "Hotstrings modificados — recarregando…",
 	"init.reload_script": "Script modificado — recarregando…",
 	"init.reload_title": "Recarregando",
+	"init.reload_refused_body": "Não foi possível concluir o recarregamento. O ErgoptiPlus continua a funcionar com as definições atuais. Consulte o registo para mais detalhes.",
+	"init.reload_refused_title": "Falha ao recarregar",
 	"karabiner.guardian_approval_required": "🟡 O remapeamento ErgoptiPlus requer autorização como elemento em segundo plano (clique para abrir as definições)",
 	"karabiner.guardian_settings_open_failed": "Não foi possível abrir as definições dos elementos de início de sessão.",
 	"karabiner.download_failed": "Download falhou: %s",

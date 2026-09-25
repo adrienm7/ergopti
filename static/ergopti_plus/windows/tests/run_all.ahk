@@ -166,6 +166,7 @@ OnError(_FatalErrorHandler)
 #Include ../infra/hotstrings/hotstrings_config.ahk
 #Include ../infra/suspend_handoff.ahk
 #Include ../infra/reload_terminal_handoff.ahk
+#Include ../infra/reload_successor.ahk
 #Include ../infra/suppressive_inputhook_ownership.ahk
 #Include ../infra/lifecycle_transition.ahk
 #Include ../infra/config_transition.ahk
@@ -578,6 +579,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_gestures.ahk
 #Include unit/test_gesture_cycle_candidates.ahk
 #Include unit/test_config_persistence_transactions.ahk
+#Include unit/test_reload_terminal_pending.ahk
 #Include unit/test_config_recovery_transactions.ahk
 #Include unit/test_config_commit_gateway.ahk
 #Include unit/test_config_typed_updates.ahk
@@ -1754,6 +1756,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_llm_health_probe_constants.ahk
 #Include meta/test_menu_manifest_one_decoder.ahk
 #Include meta/test_menu_reload_preserves_suspend.ahk
+#Include meta/test_reload_pending_contract.ahk
 #Include meta/test_menu_shortcut_groups_spliced_once.ahk
 #Include meta/test_metrics_private_title_memo.ahk
 #Include meta/test_ollama_async_registry_is_curl_only.ahk

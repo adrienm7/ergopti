@@ -197,6 +197,19 @@ ConfigTransitionRetainedBarrier() {
 	finally Critical(PreviousCritical)
 }
 
+; Refusal callback for a transition that lent its bundle to a reload which was
+; refused after launch. The bundle comes back owned: RollbackFn(Bundle) restores
+; the old state and returns true only when it retained the barrier, exactly as
+; the caller's synchronous refusal branch; every other outcome releases it.
+ConfigTransitionSettleRefusedReload(RollbackFn, Bundle, *) {
+	Retained := false
+	try Retained := RollbackFn.Call(Bundle)
+	finally {
+		if !((Retained is Integer) && Retained == 1)
+			_ConfigWriteTerminalRelease(Bundle)
+	}
+}
+
 ; Classifies the resolution of a failed owned operation. Only an absent WAL or
 ; a verified all-old recovery lets the initiating process continue on its old
 ; RAM state. Any other outcome retains the global barrier and annotates the

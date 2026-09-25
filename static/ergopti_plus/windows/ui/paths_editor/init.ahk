@@ -289,25 +289,39 @@ _PathsFile_Write(N) {
 			return false
 		}
 		try LoggerInfo("PathsEditor", "Applying new config directory and reloading…")
-		Reloaded := ReloadPreservingSuspend(0, OwnerBundle)
-		if (Reloaded is Integer) && Reloaded == 1
+		; A launched reload owns OwnerBundle until OnExit; a later refusal hands it
+		; back to the same rollback this call runs when the launch is refused.
+		Reloaded := ReloadPreservingSuspend(0, OwnerBundle,
+			ConfigTransitionSettleRefusedReload.Bind(
+				_PathsFile_RollbackRefusedReload, OwnerBundle))
+		if (Reloaded is Integer) && Reloaded == 1 {
+			ReleaseBundle := false
 			return true
-		RollbackResult := ConfigTransitionRollbackOwned(_PathsFile,
-			OwnerBundle)
-		if !ConfigTransitionResultIs(RollbackResult, "recovered_old")
-				&& !ConfigTransitionResultIs(RollbackResult, "absent") {
-			ConfigTransitionLogFailure("PathsEditorRollback", RollbackResult)
-			if ConfigTransitionRetainBarrier(OwnerBundle)
-				ReleaseBundle := false
-			try MsgBox(t("paths_editor.save_failed"),
-				t("paths_editor.save_failed_title"), "Iconx")
 		}
+		if _PathsFile_RollbackRefusedReload(OwnerBundle)
+			ReleaseBundle := false
 		return false
 	} finally {
 		if ReleaseBundle
 			_ConfigWriteTerminalRelease(OwnerBundle)
 	}
 	} finally Critical(PreviousCritical)
+}
+
+; Restores the previous paths.toml after a refused reload.
+; @returns {Boolean} True when the rollback failed and the barrier stays
+;   retained around the unresolved transition, so the bundle must not be released.
+_PathsFile_RollbackRefusedReload(OwnerBundle) {
+	global _PathsFile
+	RollbackResult := ConfigTransitionRollbackOwned(_PathsFile, OwnerBundle)
+	if ConfigTransitionResultIs(RollbackResult, "recovered_old")
+			|| ConfigTransitionResultIs(RollbackResult, "absent")
+		return false
+	ConfigTransitionLogFailure("PathsEditorRollback", RollbackResult)
+	Retained := ConfigTransitionRetainBarrier(OwnerBundle)
+	try MsgBox(t("paths_editor.save_failed"),
+		t("paths_editor.save_failed_title"), "Iconx")
+	return Retained
 }
 
 

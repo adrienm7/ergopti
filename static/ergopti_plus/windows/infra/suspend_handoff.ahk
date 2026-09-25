@@ -109,8 +109,9 @@ SuspendHandoffAbort(Path, ExistsFn, DeleteFn) {
 }
 
 ; Prepares inert intent before invoking ReloadFn. ReloadTerminalInvoke owns the
-; terminal commit callback. If Reload returns, both layers may abort; AbortFn is
-; deliberately required to be idempotent.
+; terminal commit callback and returns 1 once the successor is launched and the
+; reload is pending. Any other result means no successor was launched; both
+; layers may then abort, so AbortFn is deliberately required to be idempotent.
 SuspendHandoffReload(IsSuspended, Path, PrepareFn, ReloadFn, BeforeReloadFn := 0,
 		FailureFn := 0, CancelFn := 0) {
 	if !HasMethod(PrepareFn, "Call") or !HasMethod(ReloadFn, "Call")
@@ -127,9 +128,9 @@ SuspendHandoffReload(IsSuspended, Path, PrepareFn, ReloadFn, BeforeReloadFn := 0
 	Reloaded := ReloadFn.Call()
 	if (Reloaded is Integer) && Reloaded == 1
 		return true
-	; A real accepted Reload never returns. A returned refusal cleans only inert
-	; pending state; the terminal layer may already have made the same idempotent
-	; call while canceling its record.
+	; No successor was launched. Clean only inert pending state; the terminal
+	; layer may already have made the same idempotent call while canceling its
+	; record.
 	if IsSuspended {
 		Canceled := false
 		if HasMethod(CancelFn, "Call") {
