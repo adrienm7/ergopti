@@ -82,9 +82,13 @@ _ONA_CommitPublishesOnlyAfterPersistence() {
 			'ConfigTransitionResultIs(CommitResult, "committed_new")')
 		PublishPos := InStr(Seg, "_ConfigDir := CandidateDir")
 		ReloadPos := InStr(Seg,
-			"ReloadPreservingSuspend(BeforeReloadFn, OwnerBundle)")
-		RollbackPos := InStr(Seg, "ConfigTransitionRollbackOwned(")
+			"ReloadPreservingSuspend(BeforeReloadFn, OwnerBundle,")
+		; One rollback helper serves a refused launch and a later refusal alike.
+		RollbackPos := InStr(Seg, "Rollback.Call(OwnerBundle)")
 		ReleasePos := InStr(Seg, "_ConfigWriteTerminalRelease(OwnerBundle)")
+		Assert(InStr(_DriverFuncBody("_Onboarding_RollbackRefusedReload"),
+			"ConfigTransitionRollbackOwned(") > 0,
+			"the onboarding rollback helper must restore the committed targets")
 		Assert(BuildPos > 0 && TargetsPos > BuildPos && LocatorPos > TargetsPos
 			&& CommitPos > LocatorPos && StrictPos > CommitPos,
 				"onboarding must render first, declare config before locator, and strictly commit one WAL")
@@ -111,7 +115,11 @@ Test("onboarding: commit persists transactionally before publishing or reloading
 ; on first boot. Every branch therefore passes a key and the display helper
 ; resolves it against the locale selected inside the wizard itself.
 _ONA_CommitErrorsUseSelectedLocale() {
+	; The refused-reload branch lives in the rollback helper both refusal paths
+	; share, so the enumerated class spans the commit and that helper.
 	CommitBody := _StripFullLineComments(_DriverFuncBody("_Onboarding_Commit"))
+		. _StripFullLineComments(
+			_DriverFuncBody("_Onboarding_RollbackRefusedReload"))
 	ErrorBody := _StripFullLineComments(
 		_DriverFuncBody("_Onboarding_CommitError"))
 	Assert(CommitBody != "" && ErrorBody != "",

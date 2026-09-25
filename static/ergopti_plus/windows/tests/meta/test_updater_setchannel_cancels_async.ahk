@@ -89,21 +89,27 @@ _USCA_DeferredReloadRequiresFullQuiescence() {
 		and Begin != "" and DefaultReload != "",
 		"the exact deferred Reload runner, quiescence predicate and failure path must exist")
 	Assert(InStr(DefaultReload,
-		"ReloadPreservingSuspend(0, ConfigBundle)") > 0
-		and InStr(Begin,
-			"_Updater_DefaultChannelReload.Bind(ConfigBundle)") > 0,
+		"ReloadPreservingSuspend(0, ConfigBundle, RefusedFn)") > 0
+		and InStr(Begin, "ReloadFn := _Updater_DefaultChannelReload") > 0,
 		"the live Reload helper must borrow rather than reacquire the retained global bundle")
 	Assert(InStr(Quiescent, "_UpdaterAsyncRequests.Count == 0") > 0
 		and InStr(Quiescent, "_UpdaterActiveSendLeaseCount == 0") > 0
 		and InStr(Quiescent, "_UpdaterActiveAsyncTerminalDeliveryCount == 0") > 0,
 		"Reload quiescence requires an empty registry plus zero COM leases and zero terminal callbacks")
 	QuiescentAt := InStr(RunBody, "_Updater_ChannelReloadQuiescent()")
-	ReloadAt := InStr(RunBody, "State.ReloadFn.Call()", , QuiescentAt)
+	ReloadAt := InStr(RunBody, "State.ReloadFn.Call(State.ConfigBundle,", ,
+		QuiescentAt)
 	Assert(QuiescentAt > 0 and ReloadAt > QuiescentAt,
 		"only the current timer continuation may Reload after full quiescence")
-	Assert(InStr(RunBody, "State.ConfigBundle", , ReloadAt) > ReloadAt
+	; A launched Reload keeps the lent bundle until OnExit; a later refusal
+	; hands it back to the same failure path through the refusal callback.
+	Refused := _DriverFuncBodyOrEmpty("_Updater_OnDeferredChannelReloadRefused")
+	Assert(InStr(RunBody, "_Updater_OnDeferredChannelReloadRefused.Bind(State)",
+			, ReloadAt) > ReloadAt
+		and InStr(RunBody, "_Updater_ReleaseChannelConfigBundle(") == 0
+		and InStr(Refused, "_Updater_FailDeferredChannelReload(State") > 0
 		and InStr(Fail, "State.ConfigBundle") > 0,
-		"both accepted Reload and refusal recovery must retain the exact global configuration bundle")
+		"a launched Reload must keep the exact global configuration bundle and a refusal must recover it")
 	Assert(InStr(RunBody, "TickExpired(") > 0
 		and InStr(RunBody, "channel reload quiescence timed out") > 0,
 		"the quiescence wait must have a wrap-safe bounded timeout")

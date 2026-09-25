@@ -537,6 +537,8 @@
 	"init.reload_hotstrings": "Hotstrings geändert — neu laden…",
 	"init.reload_script": "Skript geändert — neu laden…",
 	"init.reload_title": "Neuladen",
+	"init.reload_refused_body": "Das Neuladen konnte nicht abgeschlossen werden. ErgoptiPlus läuft mit den aktuellen Einstellungen weiter. Details stehen im Protokoll.",
+	"init.reload_refused_title": "Neuladen fehlgeschlagen",
 	"karabiner.guardian_approval_required": "🟡 Die ErgoptiPlus-Tastenbelegung benötigt die Freigabe als Hintergrundobjekt (zum Öffnen der Einstellungen klicken)",
 	"karabiner.guardian_settings_open_failed": "Die Einstellungen für Anmeldeobjekte konnten nicht geöffnet werden.",
 	"karabiner.download_failed": "Download fehlgeschlagen: %s",

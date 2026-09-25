@@ -537,6 +537,8 @@
 	"init.reload_hotstrings": "Hotstring'ler değişti — yeniden yükleniyor…",
 	"init.reload_script": "Betik değişti — yeniden yükleniyor…",
 	"init.reload_title": "Yeniden yükleniyor",
+	"init.reload_refused_body": "Yeniden yükleme tamamlanamadı. ErgoptiPlus mevcut ayarlarıyla çalışmaya devam ediyor. Ayrıntılar için günlüğe bakın.",
+	"init.reload_refused_title": "Yeniden yükleme başarısız",
 	"karabiner.guardian_approval_required": "🟡 ErgoptiPlus tuş eşlemesi için arka plan öğesi onayı gerekiyor (ayarları açmak için tıklayın)",
 	"karabiner.guardian_settings_open_failed": "Giriş Öğeleri ayarları açılamadı.",
 	"karabiner.download_failed": "İndirme başarısız: %s",

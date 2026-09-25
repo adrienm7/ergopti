@@ -537,6 +537,8 @@
 	"init.reload_hotstrings": "Hotstrings ändrade — laddar om…",
 	"init.reload_script": "Skript ändrat — laddar om…",
 	"init.reload_title": "Laddar om",
+	"init.reload_refused_body": "Omladdningen kunde inte slutföras. ErgoptiPlus fortsätter med de nuvarande inställningarna. Se loggen för detaljer.",
+	"init.reload_refused_title": "Omladdningen misslyckades",
 	"karabiner.guardian_approval_required": "🟡 ErgoptiPlus-tangentmappning behöver godkännas som bakgrundsobjekt (klicka för att öppna inställningar)",
 	"karabiner.guardian_settings_open_failed": "Det gick inte att öppna inställningarna för inloggningsobjekt.",
 	"karabiner.download_failed": "Nedladdning misslyckad: %s",

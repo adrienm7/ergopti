@@ -61,12 +61,15 @@
 ; =====================================================================
 ; =====================================================================
 
-; Count lines that are nothing but a bare Reload / Reload().
+; Count bare Reload statements and Reload() calls anywhere in an expression. The
+; statement-only form missed the gesture registry's script_reload action, whose
+; fat-arrow body called Reload() inline and dropped the pause.
 _MRS_CountBareReload(Src, &Offenders) {
 	Offenders := ""
 	Count := 0
 	for Line in StrSplit(Src, "`n", "`r") {
-		if RegExMatch(Line, "^\s*Reload\s*(\(\s*\))?\s*$") {
+		if RegExMatch(Line, "^\s*Reload\s*$")
+				|| RegExMatch(Line, "(?<![\w.])Reload\s*\(") {
 			Count += 1
 			Offenders .= (Offenders == "" ? "" : ", ") . Trim(Line)
 		}
@@ -98,18 +101,19 @@ _MRS_NoBareReloadAnywhereReachable() {
 	Offenders := ""
 	Count := _MRS_CountBareReload(Src, &Offenders)
 
-	; Reload is now injected into the tested hand-off core, so no production
-	; function needs a direct call. Pin both halves: zero bare calls and the real
-	; callback passed by the lifecycle wrapper.
+	; The successor launcher is injected into the tested hand-off core, so no
+	; production function needs a direct call. Pin both halves: zero bare calls
+	; and the real launcher passed by the lifecycle wrapper.
 	Wrapper := _DriverFuncBody("ReloadPreservingSuspend")
 	Helper := _DriverFuncBody("_ReloadPreservingSuspendNonCritical")
 	Assert(Wrapper != "" && Helper != "",
 		"ReloadPreservingSuspend() and its non-Critical core must exist")
 	Assert(InStr(Wrapper,
-		"_ReloadPreservingSuspendNonCritical(SuccessFn, ExistingBundle)") > 0
+		"_ReloadPreservingSuspendNonCritical(SuccessFn, ExistingBundle,") > 0
 		and InStr(Helper, "SuspendHandoffReload(") > 0
-		and InStr(Helper, "ReloadTerminalInvoke.Bind(") > 0,
-		"ReloadPreservingSuspend must pass the real Reload callback to the tested hand-off core")
+		and InStr(Helper, "ReloadTerminalInvoke.Bind(") > 0
+		and InStr(Helper, "LifecycleLaunchSuccessor") > 0,
+		"ReloadPreservingSuspend must pass the real successor launcher to the tested hand-off core")
 
 	Assert(Count == 0,
 		"no code a paused user can reach may call a bare Reload: native Suspend leaves the tray, every editor "
@@ -173,7 +177,7 @@ _MRS_HelperPersistsBeforeReloading() {
 		"ReloadPreservingSuspend() and its non-Critical core must exist")
 	Assert(Core != "", "SuspendHandoffReload() must exist in the driver source")
 	Assert(InStr(Wrapper,
-		"_ReloadPreservingSuspendNonCritical(SuccessFn, ExistingBundle)") > 0,
+		"_ReloadPreservingSuspendNonCritical(SuccessFn, ExistingBundle,") > 0,
 		"the public reload entry must delegate after dropping inherited Critical")
 
 	GuardPos  := InStr(Body, "A_IsSuspended")

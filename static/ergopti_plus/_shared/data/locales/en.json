@@ -532,6 +532,8 @@
 	"init.reload_hotstrings": "Hotstrings changed — reloading…",
 	"init.reload_script": "Script changed — reloading…",
 	"init.reload_title": "Reloading",
+	"init.reload_refused_body": "The reload could not complete. ErgoptiPlus keeps running with its current settings. See the log for details.",
+	"init.reload_refused_title": "Reload failed",
 	"karabiner.guardian_approval_required": "🟡 ErgoptiPlus remapping needs Background Items approval (click to open settings)",
 	"karabiner.guardian_settings_open_failed": "Could not open Login Items settings.",
 	"karabiner.download_failed": "Download failed: %s",

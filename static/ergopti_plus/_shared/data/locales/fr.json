@@ -532,6 +532,8 @@
 	"init.reload_hotstrings": "Hotstrings modifiés — rechargement…",
 	"init.reload_script": "Script modifié — rechargement…",
 	"init.reload_title": "Rechargement",
+	"init.reload_refused_body": "Le rechargement n’a pas pu aboutir. ErgoptiPlus continue avec ses réglages actuels. Consultez le journal pour plus de détails.",
+	"init.reload_refused_title": "Échec du rechargement",
 	"karabiner.guardian_approval_required": "🟡 Le remappage ErgoptiPlus requiert l’autorisation des éléments en arrière-plan (cliquer pour ouvrir les réglages)",
 	"karabiner.guardian_settings_open_failed": "Impossible d’ouvrir les réglages des éléments en arrière-plan.",
 	"karabiner.download_failed": "Téléchargement échoué : %s",

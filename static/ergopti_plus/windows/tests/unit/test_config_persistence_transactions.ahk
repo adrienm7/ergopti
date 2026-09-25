@@ -694,14 +694,14 @@ _CPT_SuspendTerminalCommitPublishesExactlyOnce() {
 	Bundle := _ConfigWriteTerminalTryAcquire(
 		["C:\ergopti-tests\suspend-terminal.toml"])
 	AssertTrue(Bundle is Object)
-	Record := false
 	try {
 		AssertTrue(SuspendHandoffPrepare(Path, FSWriteDurable, FSRead,
 			FSAtomicMoveReplace, FSDelete))
-		Record := ReloadTerminalHandoffPrepare(Bundle, 0,
+		Record := _RTP_Pending(Bundle, _RTP_NewPort(), 0,
 			SuspendHandoffCommit.Bind(Path, FSRead, FSAtomicMoveReplace),
 			SuspendHandoffAbort.Bind(Path, FSExists, FSDelete))
-		AssertTrue(Record is Map)
+		AssertFalse(FSExists(Path),
+			"a launched but unaccepted reload must not publish the live marker")
 		Claimed := ReloadTerminalHandoffClaim("Reload")
 		AssertEqual(Record, Claimed)
 		AssertTrue(ReloadTerminalHandoffCommit(Claimed))
@@ -712,8 +712,7 @@ _CPT_SuspendTerminalCommitPublishesExactlyOnce() {
 			"the same terminal record must not publish twice")
 		AssertTrue(ReloadTerminalHandoffFinish(Claimed))
 	} finally {
-		ReloadTerminalHandoffCancel(Record)
-		_ConfigWriteTerminalRelease(Bundle)
+		_RTP_Cleanup(Bundle)
 		_CPT_SuspendTempCleanup(Path)
 	}
 }
@@ -727,29 +726,24 @@ _CPT_RefusedPausedReloadCanRetrySameTerminalBundle() {
 	Bundle := _ConfigWriteTerminalTryAcquire(
 		["C:\ergopti-tests\suspend-terminal-retry.toml"])
 	AssertTrue(Bundle is Object)
-	First := false
-	Second := false
 	try {
 		AssertTrue(SuspendHandoffPrepare(Path, FSWriteDurable, FSRead,
 			FSAtomicMoveReplace, FSDelete))
-		First := ReloadTerminalHandoffPrepare(Bundle, 0,
+		First := _RTP_Pending(Bundle, _RTP_NewPort(), 0,
 			SuspendHandoffCommit.Bind(Path, FSRead, FSAtomicMoveReplace),
 			SuspendHandoffAbort.Bind(Path, FSExists, FSDelete))
-		AssertTrue(First is Map)
 		AssertEqual(First, ReloadTerminalHandoffClaim("Reload"))
-		AssertTrue(ReloadTerminalHandoffCancel(First),
-			"a late refusal must cancel the first terminal claim")
+		AssertTrue(ReloadTerminalHandoffRefuseForShutdown("Reload", "test"),
+			"a late refusal must refuse the first terminal claim")
 		AssertFalse(FSExists(Path))
 		AssertFalse(FSExists(Path . ".pending"),
 			"the refused paused attempt must leave no live or pending marker")
 
 		AssertTrue(SuspendHandoffPrepare(Path, FSWriteDurable, FSRead,
 			FSAtomicMoveReplace, FSDelete))
-		Second := ReloadTerminalHandoffPrepare(Bundle, 0,
+		Second := _RTP_Pending(Bundle, _RTP_NewPort(), 0,
 			SuspendHandoffCommit.Bind(Path, FSRead, FSAtomicMoveReplace),
 			SuspendHandoffAbort.Bind(Path, FSExists, FSDelete))
-		AssertTrue(Second is Map,
-			"the same retained terminal bundle must be preparable after refusal")
 		AssertEqual(Second, ReloadTerminalHandoffClaim("Reload"),
 			"the same retained bundle must be claimable on the second Reload")
 		AssertTrue(ReloadTerminalHandoffCommit(Second))
@@ -757,9 +751,7 @@ _CPT_RefusedPausedReloadCanRetrySameTerminalBundle() {
 			"the retried accepted Reload must publish pause intent")
 		AssertTrue(ReloadTerminalHandoffFinish(Second))
 	} finally {
-		ReloadTerminalHandoffCancel(Second)
-		ReloadTerminalHandoffCancel(First)
-		_ConfigWriteTerminalRelease(Bundle)
+		_RTP_Cleanup(Bundle)
 		_CPT_SuspendTempCleanup(Path)
 	}
 }
@@ -779,11 +771,12 @@ _CPT_TerminalCallbacksRunOutsideInheritedCritical() {
 	AssertTrue(Bundle is Object)
 	PreviousCritical := Critical("On")
 	try {
-		Record := ReloadTerminalHandoffPrepare(Bundle,
+		Record := _RTP_Pending(Bundle, _RTP_NewPort(),
 			_CPT_CriticalProbe.Bind(State, "success", 1),
 			_CPT_CriticalProbe.Bind(State, "commit", 1),
 			_CPT_CriticalProbe.Bind(State, "abort", 1))
-		AssertTrue(Record is Map)
+		AssertTrue(A_IsCritical != 0,
+			"the launch wrapper must restore inherited Critical")
 		AssertEqual(Record, ReloadTerminalHandoffClaim("Reload"))
 		AssertTrue(ReloadTerminalHandoffCommit(Record))
 		AssertTrue(ReloadTerminalHandoffFinish(Record,
@@ -802,13 +795,14 @@ _CPT_TerminalCallbacksRunOutsideInheritedCritical() {
 		AssertTrue(A_IsCritical != 0)
 
 		InvokeResult := ReloadTerminalInvoke(Bundle, 0,
-			_CPT_CriticalProbe.Bind(State, "invoke", 0))
-		AssertFalse(InvokeResult)
+			_CPT_CriticalProbe.Bind(State, "invoke", 0), _RTP_NewPort())
+		AssertFalse(InvokeResult,
+			"a launcher that returned no successor launched nothing")
 		AssertEqual(0, State["invoke"])
 		AssertTrue(A_IsCritical != 0)
 	} finally {
 		Critical(PreviousCritical)
-		_ConfigWriteTerminalRelease(Bundle)
+		_RTP_Cleanup(Bundle)
 	}
 }
 Test("AHK-15-persistence: terminal callbacks drop and restore inherited Critical "
@@ -874,32 +868,20 @@ _CPT_TerminalAbort() {
 	return 1
 }
 
-_CPT_TerminalLateRefusal() {
-	global _CPT_TerminalClaimCalls
-	Record := ReloadTerminalHandoffClaim("Reload")
-	if (Record is Map)
-		_CPT_TerminalClaimCalls += 1
-	; Models a later OnExit gate returning 1: ownership was claimed, but terminal
-	; success and UI teardown were never authorized.
-	return false
-}
-
-_CPT_TerminalAccepted() {
+; Models the later OnExit(Reload): the successor launched earlier asks this
+; instance to close, OnExit claims the pending record and either finishes or
+; one of its gates vetoes the request.
+_CPT_TerminalOnExit(Outcome) {
 	global _CPT_TerminalClaimCalls
 	Record := ReloadTerminalHandoffClaim("Reload")
 	if !(Record is Map)
 		return false
 	_CPT_TerminalClaimCalls += 1
-	return ReloadTerminalHandoffFinish(Record)
-}
-
-_CPT_TerminalCommitRefused() {
-	global _CPT_TerminalClaimCalls
-	Record := ReloadTerminalHandoffClaim("Reload")
-	if !(Record is Map)
-		return false
-	_CPT_TerminalClaimCalls += 1
-	return ReloadTerminalHandoffCommit(Record)
+	if (Outcome == "accept")
+		return ReloadTerminalHandoffFinish(Record)
+	if (Outcome == "commit")
+		ReloadTerminalHandoffCommit(Record)
+	return !ReloadTerminalHandoffRefuseForShutdown("Reload", "test gate")
 }
 
 _CPT_TerminalBundleBlocksEverySiblingPath() {
@@ -942,13 +924,11 @@ _CPT_UnrelatedExitCannotConsumeReloadAuthorization() {
 	Bundle := _ConfigWriteTerminalTryAcquire(
 		["C:\ergopti-tests\reason-bound-reload.toml"])
 	AssertTrue(Bundle is Object)
-	Record := false
 	try {
-		Record := ReloadTerminalHandoffPrepare(Bundle)
-		AssertTrue(Record is Map)
+		Record := _RTP_Pending(Bundle, _RTP_NewPort())
 		AssertFalse(ReloadTerminalHandoffClaim("Exit"),
 			"an ordinary ExitApp must not borrow a pending Reload transaction")
-		AssertEqual("authorized", Record["state"],
+		AssertEqual("pending", Record["state"],
 			"a wrong reason must leave the exact Reload retry claimable")
 		Claimed := ReloadTerminalHandoffClaim("Reload")
 		AssertTrue(Claimed is Map)
@@ -956,10 +936,7 @@ _CPT_UnrelatedExitCannotConsumeReloadAuthorization() {
 		AssertFalse(ReloadTerminalHandoffClaim("Reload"),
 			"the exact Reload reason may still claim only once")
 		AssertTrue(ReloadTerminalHandoffFinish(Claimed))
-	} finally {
-		ReloadTerminalHandoffCancel(Record)
-		_ConfigWriteTerminalRelease(Bundle)
-	}
+	} finally _RTP_Cleanup(Bundle)
 }
 Test("AHK-15-persistence: unrelated Exit cannot consume Reload authorization "
 	. "(reload-terminal-reason-bound)",
@@ -974,15 +951,20 @@ _CPT_LateShutdownRefusalCannotReportReloadSuccess() {
 	AssertTrue(Bundle is Object)
 	try {
 		TerminalReload := ReloadTerminalInvoke.Bind(Bundle,
-			_CPT_TerminalSuccess, _CPT_TerminalLateRefusal)
-		AssertFalse(SuspendHandoffReload(false, "", _CPT_HandoffPrepare,
-			TerminalReload, 0, _CPT_HandoffFailure, _CPT_HandoffCancel))
+			_CPT_TerminalSuccess, _RTP_LaunchReturnsAtOnce, _RTP_NewPort())
+		AssertTrue(SuspendHandoffReload(false, "", _CPT_HandoffPrepare,
+			TerminalReload, 0, _CPT_HandoffFailure, _CPT_HandoffCancel),
+			"the launched successor makes the reload pending")
+		AssertFalse(_CPT_TerminalOnExit("refuse"),
+			"the later OnExit gate vetoes the successor's close request")
 		AssertEqual(1, _CPT_TerminalClaimCalls)
 		AssertEqual(0, _CPT_TerminalSuccessCalls,
 			"late OnExit refusal must leave retry UI untouched")
-	} finally _ConfigWriteTerminalRelease(Bundle)
+		AssertFalse(ReloadTerminalHandoffPending(),
+			"the refused reload must hand the transition back")
+	} finally _RTP_Cleanup(Bundle)
 }
-Test("AHK-15-persistence: late OnExit refusal stays false and preserves retry UI "
+Test("AHK-15-persistence: late OnExit refusal never reports success "
 	. "(reload-terminal-late-refusal)",
 	_CPT_LateShutdownRefusalCannotReportReloadSuccess)
 
@@ -995,12 +977,15 @@ _CPT_TerminalSuccessRunsOnlyAfterClaimFinish() {
 	AssertTrue(Bundle is Object)
 	try {
 		TerminalReload := ReloadTerminalInvoke.Bind(Bundle,
-			_CPT_TerminalSuccess, _CPT_TerminalAccepted)
+			_CPT_TerminalSuccess, _RTP_LaunchReturnsAtOnce, _RTP_NewPort())
 		AssertTrue(SuspendHandoffReload(false, "", _CPT_HandoffPrepare,
 			TerminalReload, 0, _CPT_HandoffFailure, _CPT_HandoffCancel))
+		AssertEqual(0, _CPT_TerminalSuccessCalls,
+			"success belongs to OnExit, not to the launch")
+		AssertTrue(_CPT_TerminalOnExit("accept"))
 		AssertEqual(1, _CPT_TerminalClaimCalls)
 		AssertEqual(1, _CPT_TerminalSuccessCalls)
-	} finally _ConfigWriteTerminalRelease(Bundle)
+	} finally _RTP_Cleanup(Bundle)
 }
 Test("AHK-15-persistence: terminal callback follows the final shutdown gate "
 	. "(reload-terminal-success)",
@@ -1013,11 +998,9 @@ _CPT_TerminalCommitPrecedesSuccess() {
 	Bundle := _ConfigWriteTerminalTryAcquire(
 		["C:\ergopti-tests\terminal-commit-order.toml"])
 	AssertTrue(Bundle is Object)
-	Record := false
 	try {
-		Record := ReloadTerminalHandoffPrepare(Bundle, _CPT_TerminalSuccess,
+		Record := _RTP_Pending(Bundle, _RTP_NewPort(), _CPT_TerminalSuccess,
 			_CPT_TerminalCommit, _CPT_TerminalAbort)
-		AssertTrue(Record is Map)
 		Claimed := ReloadTerminalHandoffClaim("Reload")
 		AssertEqual(Record, Claimed)
 		AssertTrue(ReloadTerminalHandoffCommit(Claimed))
@@ -1032,10 +1015,7 @@ _CPT_TerminalCommitPrecedesSuccess() {
 			"destructive teardown must follow durable commit")
 		AssertEqual("success", _CPT_TerminalEvents[3],
 			"UI success must follow terminal teardown")
-	} finally {
-		ReloadTerminalHandoffCancel(Record)
-		_ConfigWriteTerminalRelease(Bundle)
-	}
+	} finally _RTP_Cleanup(Bundle)
 }
 Test("AHK-15-persistence: terminal commit precedes success "
 	. "(reload-terminal-commit-order)", _CPT_TerminalCommitPrecedesSuccess)
@@ -1051,19 +1031,20 @@ _CPT_TerminalCommitFailureAbortsWithoutSuccess() {
 		["C:\ergopti-tests\terminal-commit-failure.toml"])
 	AssertTrue(Bundle is Object)
 	try {
-		AssertFalse(ReloadTerminalInvoke(Bundle, _CPT_TerminalSuccess,
-			_CPT_TerminalCommitRefused, _CPT_TerminalCommit,
-			_CPT_TerminalAbort))
+		_RTP_Pending(Bundle, _RTP_NewPort(), _CPT_TerminalSuccess,
+			_CPT_TerminalCommit, _CPT_TerminalAbort)
+		AssertFalse(_CPT_TerminalOnExit("commit"),
+			"a failed terminal commit must make OnExit refuse")
 		AssertEqual(1, _CPT_TerminalClaimCalls)
 		AssertEqual(0, _CPT_TerminalSuccessCalls,
 			"a failed terminal commit must never report success")
 		AssertEqual(2, _CPT_TerminalEvents.Length)
 		AssertEqual("commit", _CPT_TerminalEvents[1])
 		AssertEqual("abort", _CPT_TerminalEvents[2],
-			"returned refusal must abort the inert transition")
+			"a refused commit must abort the inert transition")
 	} finally {
 		_CPT_TerminalCommitOk := true
-		_ConfigWriteTerminalRelease(Bundle)
+		_RTP_Cleanup(Bundle)
 	}
 }
 Test("AHK-15-persistence: failed terminal commit aborts without success "

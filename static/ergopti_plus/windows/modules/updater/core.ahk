@@ -477,8 +477,9 @@ _Updater_ChannelReloadQuiescent() {
 	finally Critical(PreviousCritical ? PreviousCritical : "Off")
 }
 
-_Updater_DefaultChannelReload(ConfigBundle := 0) {
-	return ReloadPreservingSuspend(0, ConfigBundle)
+; A launched reload owns ConfigBundle until OnExit; RefusedFn hands it back.
+_Updater_DefaultChannelReload(ConfigBundle, RefusedFn) {
+	return ReloadPreservingSuspend(0, ConfigBundle, RefusedFn)
 }
 
 _Updater_DefaultChannelReloadSchedule(Continuation, DelayMs) {
@@ -863,7 +864,7 @@ _Updater_BeginDeferredChannelReload(BoundaryOwner, ReloadFn := 0,
 			ConfigurationFile) is Object)
 		return 0
 	if !IsObject(ReloadFn)
-		ReloadFn := _Updater_DefaultChannelReload.Bind(ConfigBundle)
+		ReloadFn := _Updater_DefaultChannelReload
 	if !IsObject(ScheduleFn)
 		ScheduleFn := _Updater_DefaultChannelReloadSchedule
 	if !IsObject(FailureFn)
@@ -959,7 +960,8 @@ _Updater_RunDeferredChannelReload(State, ArmEpoch := unset, NowTick := unset) {
 		return false
 	ReloadErr := 0
 	ReloadResult := false
-	try ReloadResult := State.ReloadFn.Call()
+	try ReloadResult := State.ReloadFn.Call(State.ConfigBundle,
+		_Updater_OnDeferredChannelReloadRefused.Bind(State))
 	catch as Err
 		ReloadErr := Err
 	if IsObject(ReloadErr) {
@@ -971,15 +973,26 @@ _Updater_RunDeferredChannelReload(State, ArmEpoch := unset, NowTick := unset) {
 		_Updater_FailDeferredChannelReload(State, "Reload returned false")
 		return false
 	}
+	; The launched reload owns the configuration bundle until OnExit, so only
+	; the admission boundary ends here. A refusal after launch returns the
+	; bundle through _Updater_OnDeferredChannelReloadRefused and recovers under
+	; a fresh action lease, hence the cleared boundary owner.
 	BoundaryReleased := _Updater_EndAsyncAdmissionBoundary(
 		State.BoundaryOwner)
-	BundleReleased := _Updater_ReleaseChannelConfigBundle(
-		State.ConfigBundle)
-	if !BoundaryReleased || !BundleReleased {
-		try LoggerError("Updater", "Accepted channel Reload did not release both exact transition owners.")
+	State.BoundaryOwner := 0
+	if !BoundaryReleased {
+		try LoggerError("Updater", "Launched channel Reload did not release its exact admission boundary.")
 		return false
 	}
 	return true
+}
+
+; The launched channel Reload was refused, so this instance keeps running on
+; the channel it had in memory while config.toml holds the new one. The bundle
+; is owned again here; the ordinary failure path surfaces it and recovers.
+_Updater_OnDeferredChannelReloadRefused(State, Reason := "") {
+	_Updater_FailDeferredChannelReload(State,
+		"Reload was refused after launch: " . Reason)
 }
 
 _Updater_ScheduleDeferredChannelReloadIfReady() {

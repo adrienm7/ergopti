@@ -537,6 +537,8 @@
 	"init.reload_hotstrings": "Hotstrings endret — laster på nytt…",
 	"init.reload_script": "Skript endret — laster på nytt…",
 	"init.reload_title": "Laster på nytt",
+	"init.reload_refused_body": "Den nye innlastingen kunne ikke fullføres. ErgoptiPlus fortsetter med de gjeldende innstillingene. Se loggen for detaljer.",
+	"init.reload_refused_title": "Ny innlasting mislyktes",
 	"karabiner.guardian_approval_required": "🟡 ErgoptiPlus-tastetilordning trenger godkjenning som bakgrunnsobjekt (klikk for å åpne innstillinger)",
 	"karabiner.guardian_settings_open_failed": "Kunne ikke åpne innstillingene for påloggingsobjekter.",
 	"karabiner.download_failed": "Nedlasting mislyktes: %s",

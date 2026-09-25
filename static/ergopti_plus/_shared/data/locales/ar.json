@@ -537,6 +537,8 @@
 	"init.reload_hotstrings": "تم تعديل الهوتسترينغ — جارٍ إعادة التحميل…",
 	"init.reload_script": "تم تعديل البرنامج النصي — جارٍ إعادة التحميل…",
 	"init.reload_title": "إعادة التحميل",
+	"init.reload_refused_body": "تعذّر إكمال إعادة التحميل. يواصل ErgoptiPlus العمل بإعداداته الحالية. راجع السجل لمزيد من التفاصيل.",
+	"init.reload_refused_title": "فشلت إعادة التحميل",
 	"karabiner.guardian_approval_required": "🟡 تتطلب إعادة تعيين مفاتيح ErgoptiPlus الموافقة على عناصر الخلفية (انقر لفتح الإعدادات)",
 	"karabiner.guardian_settings_open_failed": "تعذّر فتح إعدادات عناصر تسجيل الدخول.",
 	"karabiner.download_failed": "فشل التنزيل: %s",

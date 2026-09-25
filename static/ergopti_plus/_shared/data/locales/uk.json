@@ -537,6 +537,8 @@
 	"init.reload_hotstrings": "Хотстринги змінено — перезавантаження…",
 	"init.reload_script": "Скрипт змінено — перезавантаження…",
 	"init.reload_title": "Перезавантаження",
+	"init.reload_refused_body": "Перезавантаження не вдалося завершити. ErgoptiPlus продовжує працювати з поточними налаштуваннями. Подробиці дивіться в журналі.",
+	"init.reload_refused_title": "Не вдалося перезавантажити",
 	"karabiner.guardian_approval_required": "🟡 Для перепризначення ErgoptiPlus потрібен дозвіл на фоновий об’єкт (натисніть, щоб відкрити параметри)",
 	"karabiner.guardian_settings_open_failed": "Не вдалося відкрити параметри об’єктів входу.",
 	"karabiner.download_failed": "Завантаження невдале: %s",

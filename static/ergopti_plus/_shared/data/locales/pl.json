@@ -537,6 +537,8 @@
 	"init.reload_hotstrings": "Hotstring zmodyfikowane — ponowne ładowanie…",
 	"init.reload_script": "Skrypt zmodyfikowany — ponowne ładowanie…",
 	"init.reload_title": "Ponowne ładowanie",
+	"init.reload_refused_body": "Nie udało się dokończyć ponownego wczytania. ErgoptiPlus działa dalej z bieżącymi ustawieniami. Szczegóły znajdziesz w dzienniku.",
+	"init.reload_refused_title": "Ponowne wczytanie nie powiodło się",
 	"karabiner.guardian_approval_required": "🟡 Mapowanie ErgoptiPlus wymaga zgody na działanie w tle (kliknij, aby otworzyć ustawienia)",
 	"karabiner.guardian_settings_open_failed": "Nie udało się otworzyć ustawień rzeczy otwieranych podczas logowania.",
 	"karabiner.download_failed": "Pobieranie nieudane: %s",

@@ -537,6 +537,8 @@
 	"init.reload_hotstrings": "हॉटस्ट्रिंग बदले गए — पुनः लोड हो रहा है…",
 	"init.reload_script": "स्क्रिप्ट बदली गई — पुनः लोड हो रहा है…",
 	"init.reload_title": "पुनः लोड हो रहा है",
+	"init.reload_refused_body": "पुनः लोड पूरा नहीं हो सका। ErgoptiPlus अपनी मौजूदा सेटिंग्स के साथ चलता रहेगा। विवरण के लिए लॉग देखें।",
+	"init.reload_refused_title": "पुनः लोड विफल",
 	"karabiner.guardian_approval_required": "🟡 ErgoptiPlus रीमैपिंग के लिए बैकग्राउंड आइटम की अनुमति चाहिए (सेटिंग्स खोलने के लिए क्लिक करें)",
 	"karabiner.guardian_settings_open_failed": "लॉगिन आइटम सेटिंग्स नहीं खोली जा सकीं।",
 	"karabiner.download_failed": "डाउनलोड विफल: %s",

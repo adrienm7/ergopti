@@ -537,6 +537,8 @@
 	"init.reload_hotstrings": "热字符串已修改 — 重新加载中…",
 	"init.reload_script": "脚本已修改 — 重新加载中…",
 	"init.reload_title": "正在重新加载",
+	"init.reload_refused_body": "无法完成重新加载。ErgoptiPlus 将继续使用当前设置运行。详情请查看日志。",
+	"init.reload_refused_title": "重新加载失败",
 	"karabiner.guardian_approval_required": "🟡 ErgoptiPlus 键盘映射需要后台项目批准（点击打开设置）",
 	"karabiner.guardian_settings_open_failed": "无法打开登录项设置。",
 	"karabiner.download_failed": "下载失败：%s",

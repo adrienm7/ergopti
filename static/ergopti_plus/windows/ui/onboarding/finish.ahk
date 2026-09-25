@@ -165,24 +165,21 @@ _Onboarding_Commit(BeforeReloadFn := 0) {
 
 			; Publish only the fully persisted state. The teardown callback runs from
 			; the reload hand-off only after every refusal gate accepts, so a failed
-			; reload keeps the existing wizard alive for retry.
+			; reload keeps the existing wizard alive for retry. A launched reload
+			; owns the bundle until OnExit; a later refusal hands it back to the
+			; same rollback a refused launch runs here.
 			_ConfigDir := CandidateDir
 			ConfigurationFile := CandidateConfig
-			Reloaded := ReloadPreservingSuspend(BeforeReloadFn, OwnerBundle)
-			if (Reloaded is Integer) && Reloaded == 1
+			Rollback := _Onboarding_RollbackRefusedReload.Bind(
+				PreviousConfigDir, PreviousConfigurationFile)
+			Reloaded := ReloadPreservingSuspend(BeforeReloadFn, OwnerBundle,
+				ConfigTransitionSettleRefusedReload.Bind(Rollback, OwnerBundle))
+			if (Reloaded is Integer) && Reloaded == 1 {
+				ReleaseBundle := false
 				return true
-			_ConfigDir := PreviousConfigDir
-			ConfigurationFile := PreviousConfigurationFile
-			RollbackResult := ConfigTransitionRollbackOwned(_PathsFile,
-				OwnerBundle)
-			if !ConfigTransitionResultIs(RollbackResult, "recovered_old")
-					&& !ConfigTransitionResultIs(RollbackResult, "absent") {
-				ConfigTransitionLogFailure("OnboardingRollback", RollbackResult)
-				if ConfigTransitionRetainBarrier(OwnerBundle)
-					ReleaseBundle := false
-				_Onboarding_CommitError(
-					"onboarding.error.commit_rollback")
 			}
+			if Rollback.Call(OwnerBundle)
+				ReleaseBundle := false
 			return false
 		} finally {
 			if ReleaseBundle
@@ -195,6 +192,25 @@ _Onboarding_Commit(BeforeReloadFn := 0) {
 		return false
 	}
 	} finally Critical(PreviousCritical)
+}
+
+; Restores the published directory and the files a wizard commit changed after
+; its reload was refused.
+; @returns {Boolean} True when the rollback failed and the barrier stays
+;   retained around the unresolved transition, so the bundle must not be released.
+_Onboarding_RollbackRefusedReload(PreviousConfigDir, PreviousConfigurationFile,
+		OwnerBundle) {
+	global _ConfigDir, ConfigurationFile, _PathsFile
+	_ConfigDir := PreviousConfigDir
+	ConfigurationFile := PreviousConfigurationFile
+	RollbackResult := ConfigTransitionRollbackOwned(_PathsFile, OwnerBundle)
+	if ConfigTransitionResultIs(RollbackResult, "recovered_old")
+			|| ConfigTransitionResultIs(RollbackResult, "absent")
+		return false
+	ConfigTransitionLogFailure("OnboardingRollback", RollbackResult)
+	Retained := ConfigTransitionRetainBarrier(OwnerBundle)
+	_Onboarding_CommitError("onboarding.error.commit_rollback")
+	return Retained
 }
 
 _Onboarding_CommitError(Key) {

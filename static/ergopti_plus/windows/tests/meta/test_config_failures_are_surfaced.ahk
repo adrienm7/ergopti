@@ -49,12 +49,18 @@ _CFAS_ResetReportsUndeletedFiles() {
 	CommitPos := InStr(Body, "ConfigTransitionCommitOwned(")
 	StrictPos := InStr(Body,
 		'ConfigTransitionResultIs(CommitResult, "committed_new")')
-	ReloadPos := InStr(Body, "ReloadPreservingSuspend(0, OwnerBundle)")
-	RollbackPos := InStr(Body, "ConfigTransitionRollbackOwned(")
+	ReloadPos := InStr(Body, "ReloadPreservingSuspend(0, OwnerBundle,")
+	; The rollback runs from one helper: synchronously when no successor
+	; launched, and from the refusal callback when a launched Reload is refused.
+	RefusedPos := InStr(Body, "ConfigTransitionSettleRefusedReload.Bind(")
+	RollbackPos := InStr(Body, "_ConfigResetRollbackRefusedReload(OwnerBundle)")
 	ReleasePos := InStr(Body, "_ConfigWriteTerminalRelease(OwnerBundle)")
+	RollbackBody := _DriverFuncBody("_ConfigResetRollbackRefusedReload")
 	Assert(AcquirePos > 0 && QuiescePos > AcquirePos && BuildPos > QuiescePos
 		&& CommitPos > BuildPos && StrictPos > CommitPos && ReloadPos > StrictPos
-		&& RollbackPos > ReloadPos && ReleasePos > RollbackPos,
+		&& RefusedPos > ReloadPos && RollbackPos > RefusedPos
+		&& ReleasePos > RollbackPos
+		&& InStr(RollbackBody, "ConfigTransitionRollbackOwned(") > 0,
 		"reset must hold one terminal owner from quiescence through strict commit, Reload, rollback, then release")
 	Assert(InStr(Body, "ConfigTransitionLogFailure") > 0
 		&& InStr(Body, "_ConfigResetShowFailure(") > 0
@@ -87,7 +93,11 @@ _CFAS_PlaceholderWriteIsChecked() {
 ; template still owns the sentence structure, while typed results contribute
 ; their exact status/kind instead of inheriting the old deletion-only text.
 _CFAS_ResetFailureMessagesCarryPreciseReasons() {
+	; The refused-reload branches live in the rollback helper both refusal paths
+	; share, so the enumerated class spans the entry point and that helper.
 	Body := _StripFullLineComments(_DriverFuncBody("ReloadWithDefaultConfig"))
+		. _StripFullLineComments(
+			_DriverFuncBody("_ConfigResetRollbackRefusedReload"))
 	Helper := _StripFullLineComments(
 		_DriverFuncBody("_ConfigResetShowFailure"))
 	Assert(Body != "" && Helper != "",

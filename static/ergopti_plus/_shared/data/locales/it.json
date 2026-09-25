@@ -537,6 +537,8 @@
 	"init.reload_hotstrings": "Hotstring modificati — ricaricamento…",
 	"init.reload_script": "Script modificato — ricaricamento…",
 	"init.reload_title": "Ricaricamento",
+	"init.reload_refused_body": "Non è stato possibile completare il ricaricamento. ErgoptiPlus continua con le impostazioni attuali. Consulta il registro per i dettagli.",
+	"init.reload_refused_title": "Ricaricamento non riuscito",
 	"karabiner.guardian_approval_required": "🟡 La rimappatura ErgoptiPlus richiede l’autorizzazione come elemento in background (clicca per aprire le impostazioni)",
 	"karabiner.guardian_settings_open_failed": "Impossibile aprire le impostazioni degli elementi di login.",
 	"karabiner.download_failed": "Download fallito: %s",

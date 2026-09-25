@@ -1646,27 +1646,42 @@ ReloadWithDefaultConfig(*) {
 		}
 		; Keep the destructive owner through Reload. Releasing here lets an
 		; interrupting trigger edit repopulate the reset file or leave a fresh WAL
-		; that makes Reload refuse after the user's files were already removed.
-		Reloaded := ReloadPreservingSuspend(0, OwnerBundle)
-		if (Reloaded is Integer) && Reloaded == 1
+		; that makes Reload refuse after the user's files were already removed. A
+		; launched reload owns the bundle until OnExit; a later refusal hands it
+		; back to the same rollback a refused launch runs here.
+		Reloaded := ReloadPreservingSuspend(0, OwnerBundle,
+			ConfigTransitionSettleRefusedReload.Bind(
+				_ConfigResetRollbackRefusedReload, OwnerBundle))
+		if (Reloaded is Integer) && Reloaded == 1 {
+			ReleaseBundle := false
 			return true
-		RollbackResult := ConfigTransitionRollbackOwned(_PathsFile, OwnerBundle)
-		if !ConfigTransitionResultIs(RollbackResult, "recovered_old")
-				&& !ConfigTransitionResultIs(RollbackResult, "absent") {
-			ConfigTransitionLogFailure("ConfigResetRollback", RollbackResult)
-			if ConfigTransitionRetainBarrier(OwnerBundle)
-				ReleaseBundle := false
-			_ConfigResetShowFailure(
-				"dialog.reset_defaults.reason.rollback", RollbackResult)
-		} else
-			_ConfigResetShowFailure(
-				"dialog.reset_defaults.reason.reload_refused")
+		}
+		if _ConfigResetRollbackRefusedReload(OwnerBundle)
+			ReleaseBundle := false
 		return false
 		} finally {
 			if ReleaseBundle
 				_ConfigWriteTerminalRelease(OwnerBundle)
 		}
 		} finally Critical(PreviousCritical)
+}
+
+; Restores the files a reset removed after its reload was refused.
+; @returns {Boolean} True when the rollback failed and the barrier stays
+;   retained around the unresolved transition, so the bundle must not be released.
+_ConfigResetRollbackRefusedReload(OwnerBundle) {
+	global _PathsFile
+	RollbackResult := ConfigTransitionRollbackOwned(_PathsFile, OwnerBundle)
+	if ConfigTransitionResultIs(RollbackResult, "recovered_old")
+			|| ConfigTransitionResultIs(RollbackResult, "absent") {
+		_ConfigResetShowFailure("dialog.reset_defaults.reason.reload_refused")
+		return false
+	}
+	ConfigTransitionLogFailure("ConfigResetRollback", RollbackResult)
+	Retained := ConfigTransitionRetainBarrier(OwnerBundle)
+	_ConfigResetShowFailure("dialog.reset_defaults.reason.rollback",
+		RollbackResult)
+	return Retained
 }
 
 ReadScriptShortcutsConfig() {
