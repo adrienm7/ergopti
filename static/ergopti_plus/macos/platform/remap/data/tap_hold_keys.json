@@ -5,7 +5,7 @@
 		"from": {
 			"key_code": "escape",
 			"modifiers": {
-				"optional": ["any"]
+				"optional": ["caps_lock"]
 			}
 		}
 	},
@@ -15,7 +15,7 @@
 		"from": {
 			"key_code": "tab",
 			"modifiers": {
-				"optional": ["any"]
+				"optional": ["caps_lock"]
 			}
 		}
 	},
@@ -85,7 +85,7 @@
 		"from": {
 			"key_code": "spacebar",
 			"modifiers": {
-				"optional": ["any"]
+				"optional": ["caps_lock"]
 			}
 		}
 	},
@@ -125,7 +125,7 @@
 		"from": {
 			"key_code": "return_or_enter",
 			"modifiers": {
-				"optional": ["any"]
+				"optional": ["caps_lock"]
 			}
 		}
 	},
@@ -135,7 +135,7 @@
 		"from": {
 			"key_code": "delete_or_backspace",
 			"modifiers": {
-				"optional": ["any"]
+				"optional": ["caps_lock"]
 			}
 		}
 	}
