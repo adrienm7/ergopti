@@ -25,6 +25,11 @@
 ---    irreversible revocation condition; regeneration replaces only exact
 ---    managed rule tags while preserving personal rules, parameters, profiles,
 ---    devices, mappings, virtual HID settings, and global Karabiner preferences.
+--- 5. Exact-Modifier Triggers: an action marked `exact_modifiers` in
+---    actions.json is a Hammerspoon trigger told apart only by its modifiers,
+---    so every rule sending one claims and lifts all held modifiers but Caps
+---    Lock around it (exact_modifier_manipulators), and a hold on the same key
+---    keeps them.
 --- ==============================================================================
 
 local M = {}
@@ -67,6 +72,29 @@ local ACTUAL_MODIFIER_KEY_CODES = {
 -- Caps Lock is a lock, not one of them.
 local FLAG_KEY_CODES = { fn = true }
 for key_code in pairs(ACTUAL_MODIFIER_KEY_CODES) do FLAG_KEY_CODES[key_code] = true end
+
+-- Karabiner's wildcard modifier name. In `optional` it lets any held modifier
+-- through; in `mandatory` it matches every state and claims every pressed flag,
+-- Caps Lock included, so Karabiner lifts them all around the rule's output.
+local ANY_MODIFIER = "any"
+
+-- Karabiner's name for the Caps Lock flag. modifier_flag_manager reports it
+-- pressed while the lock is on, and lifting a claimed Caps Lock posts Caps Lock
+-- key presses to macOS (base.hpp make_lazy_modifier_key_event, then
+-- key_event_dispatcher), toggling the lock around the rule.
+local CAPS_LOCK_MODIFIER = "caps_lock"
+
+-- Every other flag a hand can hold, each claimed by a manipulator of its own
+-- (see exact_modifier_manipulators), so no rule has to claim Caps Lock.
+local HAND_MODIFIER_FLAGS = {
+	"left_shift", "right_shift", "left_control", "right_control",
+	"left_option", "right_option", "left_command", "right_command", "fn",
+}
+
+-- Trailing `to` entry Karabiner never posts: its condition is always false.
+-- Its only effect is to make the unfiltered list end with a non-modifier key.
+local NEVER_POSTED_KEY_CODE   = "vk_none"
+local NEVER_POSTED_EXPRESSION = "0"
 
 -- Physical key and sentinel outputs for the script-control rules.
 -- These values must match the F13/F14/F15 sentinel constants consumed by
@@ -620,6 +648,105 @@ local function physical_kc_ledger_event(key_code, release)
 	}
 end
 
+--- Reports whether any given action is told apart from another only by its
+--- modifiers (actions.json `exact_modifiers`): Hammerspoon binds its trigger
+--- as an exact-match hotkey, so one added modifier runs another action.
+--- @param ... table Resolved action definitions.
+--- @return boolean exact Whether one of them is such an action.
+local function has_exact_modifier_action(...)
+	for index = 1, select("#", ...) do
+		local action = select(index, ...)
+		if type(action) == "table" and action.exact_modifiers == true then return true end
+	end
+	return false
+end
+
+--- Reports whether a `from.modifiers` lets any held modifier through.
+--- @param modifiers table|nil Karabiner from.modifiers.
+--- @return boolean open Whether `optional` contains "any".
+local function accepts_any_held_modifier(modifiers)
+	for _, name in ipairs(type(modifiers) == "table" and modifiers.optional or {}) do
+		if name == ANY_MODIFIER then return true end
+	end
+	return false
+end
+
+--- Returns the manipulators that replace one whose output is a trigger
+--- Hammerspoon tells apart only by its modifiers, removing every modifier the
+--- hand holds from that output.
+---
+--- Karabiner v16 sends a tap with the modifiers held at key_down, so a held
+--- Shift turned bare F17 (cycle_windows_in_app) into Shift+F17
+--- (alt_tab_windows). A mandatory modifier is claimed, and basic.hpp lifts the
+--- claimed flags around `to`, to_if_alone and to_after_key_up, so the trigger
+--- goes out with its own modifiers only. A mandatory "any" would claim every
+--- pressed flag, Caps Lock included while the lock is on, and lifting Caps Lock
+--- toggles it for macOS around every such rule. The rule therefore becomes one
+--- manipulator per held hand flag (mandatory that flag, optional Caps Lock),
+--- one for no held flag, and a mandatory "any" last for two flags or more, the
+--- only case left that still claims Caps Lock while it is on. Each keeps the
+--- flags the rule already claimed (a combo consuming its holder's AltGr).
+---
+--- basic.hpp presses the lifted flags again right after `to` only when the
+--- last `to` entry is not a modifier key (event_sender.hpp
+--- is_last_to_event_modifier_key_event), but only the last posted entry stays
+--- held. A hold sending a modifier would thus lose the hand's modifiers until
+--- release: Shift, then a key holding Cmd, then Z would type Cmd+Z. A trailing
+--- entry whose condition never holds settles both: filter_and_replace_events
+--- drops it before posting, so the modifier stays held, while the check reads
+--- the unfiltered list and the hand's modifiers come back at once.
+---
+--- A rule whose `from` already claims a modifier keeps it lifted through the
+--- hold by design and gets no trailer; the hand's other modifiers are lifted
+--- with it. A rule that lets only Caps Lock through never sees another held
+--- modifier and is left as is. Karabiner lifts one press per claimed flag, so
+--- a flag two held keys both press (CapsLock and Fn both holding Cmd) stays
+--- down once: no rule can remove it.
+--- @param manipulator table Manipulator; never mutated.
+--- @return table manipulators Replacement list, in match order.
+local function exact_modifier_manipulators(manipulator)
+	local from = manipulator.from
+	if not accepts_any_held_modifier(from.modifiers) then return { manipulator } end
+	local own = type(from.modifiers.mandatory) == "table" and from.modifiers.mandatory or {}
+
+	local to = manipulator.to
+	local last = type(to) == "table" and to[#to] or nil
+	if #own == 0 and type(last) == "table" and FLAG_KEY_CODES[last.key_code] then
+		local extended = {}
+		for _, event in ipairs(to) do extended[#extended + 1] = event end
+		extended[#extended + 1] = {
+			key_code   = NEVER_POSTED_KEY_CODE,
+			conditions = { { type = "expression_if", expression = NEVER_POSTED_EXPRESSION } },
+		}
+		to = extended
+	end
+
+	--- Builds one variant whose `from` requires the given modifiers.
+	--- @param modifiers table Karabiner from.modifiers.
+	--- @return table variant Fresh manipulator sharing no table with the others.
+	local function variant(modifiers)
+		local copy = deep_copy(manipulator)
+		copy.from.modifiers = modifiers
+		copy.to = deep_copy(to)
+		return copy
+	end
+
+	local owned = {}
+	for _, name in ipairs(own) do owned[name] = true end
+	local variants = {
+		variant({ mandatory = #own > 0 and deep_copy(own) or nil, optional = { CAPS_LOCK_MODIFIER } }),
+	}
+	for _, flag in ipairs(HAND_MODIFIER_FLAGS) do
+		if not owned[flag] then
+			local mandatory = deep_copy(own)
+			mandatory[#mandatory + 1] = flag
+			variants[#variants + 1] = variant({ mandatory = mandatory, optional = { CAPS_LOCK_MODIFIER } })
+		end
+	end
+	variants[#variants + 1] = variant({ mandatory = { ANY_MODIFIER } })
+	return variants
+end
+
 
 
 
@@ -723,13 +850,17 @@ local function build_tap_hold_rule(key_def, tap_action, hold_action, tap_timeout
 		end
 	end
 	manipulator.to_after_key_up = after_key_up_tail
+	local manipulators = { manipulator }
+	if has_exact_modifier_action(tap_action, hold_action) then
+		manipulators = exact_modifier_manipulators(manipulator)
+	end
 
 	return {
 		description  = string.format(
 			"%s: %s (tap) / %s (hold)",
 			key_def.label, tap_action.label, hold_action.label
 		),
-		manipulators = { manipulator },
+		manipulators = manipulators,
 	}
 end
 
@@ -840,9 +971,12 @@ local function build_tap_hold_combo_rule(combo_def, tap_to, hold_to, tap_action,
 	-- A chord whose action keeps a key down leaves k1 held without its held
 	-- keys (build_chord_manipulator), and a manipulator requiring them would let
 	-- k2 fall through to its own rule. The same manipulator without them takes
-	-- that press: with nothing of k1's down, there is nothing to consume.
+	-- that press: with nothing of k1's down, there is nothing to consume. The
+	-- last exact-modifier variant, a mandatory "any", already matches then.
 	local manipulators = { manip }
-	if k1_mandatory and #k1_mandatory > 0 then
+	if has_exact_modifier_action(tap_action, hold_action) then
+		manipulators = exact_modifier_manipulators(manip)
+	elseif k1_mandatory and #k1_mandatory > 0 then
 		local unheld = deep_copy(manip)
 		unheld.from.modifiers = { optional = { "any" } }
 		manipulators[#manipulators + 1] = unheld
@@ -1044,8 +1178,11 @@ local function build_chord_combo_rule(combo_def, tap_action, combo_action, combo
 		if not (order.first == k1 and chord_is_redundant(tap_action, combo_action, first_held)) then
 			local options = deep_copy(base)
 			options.key_down_order = order.key_down_order
-			manipulators[#manipulators + 1] = build_chord_manipulator(
+			local manip = build_chord_manipulator(
 				combo_def, combo_to, combo_action, options, order.first, first_held)
+			local variants = { manip }
+			if has_exact_modifier_action(combo_action) then variants = exact_modifier_manipulators(manip) end
+			for _, variant in ipairs(variants) do manipulators[#manipulators + 1] = variant end
 		end
 	end
 	if #manipulators == 0 then return nil end

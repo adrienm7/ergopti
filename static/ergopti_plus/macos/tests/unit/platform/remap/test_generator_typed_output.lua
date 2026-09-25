@@ -12,6 +12,7 @@
 
 local helpers        = require("tests.helpers")
 local KarabinerModel = require("tests.support.karabiner_model")
+local SourceFile     = require("tests.support.source_file")
 
 local TOKEN    = "0123456789abcdef0123456789abcdef"
 local DATA_DIR = helpers.driver_root() .. "platform/remap/data/"
@@ -94,6 +95,18 @@ helpers.with_fresh_modules({
 	local toml_stub = { encode = function() return "" end, decode = function() return {} end }
 	package.loaded["toml_codec"] = toml_stub
 	package.loaded["infra.toml.codec"] = toml_stub
+	-- Every build re-reads the three static rule files, and the adapter's safe
+	-- read cost more than the rest of a build: serve each file's real content,
+	-- read once.
+	local file_cache = {}
+	local function read_once(path)
+		if file_cache[path] == nil then file_cache[path] = SourceFile.read(path) end
+		return file_cache[path]
+	end
+	package.loaded["adapters.file_system"] = {
+		read = read_once,
+		read_with_status = function(path) return read_once(path), "ok" end,
+	}
 
 	local Config    = helpers.load_with_stubs("platform.remap.config")
 	local Generator = helpers.load_with_stubs("platform.remap.generator")
@@ -123,10 +136,12 @@ helpers.with_fresh_modules({
 
 	--- Starts a Karabiner model on an ACTIVE lease.
 	--- @param rules table Generated rules.
+	--- @param flags table|nil Modifier flags already held, from any source.
 	--- @return table engine
-	local function engine_for(rules)
+	local function engine_for(rules, flags)
 		return KarabinerModel.new(rules, {
 			variables = { [Generator.mode_variable_name(TOKEN)] = 1 },
+			flags = flags,
 		})
 	end
 
@@ -155,9 +170,9 @@ helpers.with_fresh_modules({
 				end
 				assert(base, "no plain action holds the flags of " .. sticky.id)
 				pairs_found = pairs_found + 1
+				local rules = build({ right_option = { tap = sticky.id, hold = base.id } })
 
 				helpers.it("tapping " .. sticky.id .. " under each held modifier key arms it", function()
-					local rules = build({ right_option = { tap = sticky.id, hold = base.id } })
 					for _, held in ipairs(MODIFIER_KEYS) do
 						local engine = engine_for(rules)
 						engine:down(held)
@@ -175,7 +190,6 @@ helpers.with_fresh_modules({
 				end)
 
 				helpers.it("holding the " .. sticky.id .. " key holds " .. base.id .. " under each held modifier key", function()
-					local rules = build({ right_option = { tap = sticky.id, hold = base.id } })
 					for _, held in ipairs(MODIFIER_KEYS) do
 						local engine = engine_for(rules)
 						engine:down(held)
@@ -216,13 +230,33 @@ helpers.with_fresh_modules({
 		return posted
 	end
 
+	--- Gives every tap-hold key the same two slots.
+	--- @param slots table { tap, hold }.
+	--- @return table tap_holds Key id → slots.
+	local function every_key(slots)
+		local tap_holds = {}
+		for _, key_def in ipairs(keys) do tap_holds[key_def.id] = slots end
+		return tap_holds
+	end
+
+	--- Gives every modifier combo the same three slots.
+	--- @param slots table { combo, tap, hold }.
+	--- @return table mod_combos Combo id → slots.
+	local function every_combo(slots)
+		local mod_combos = {}
+		for _, combo_def in ipairs(combos) do mod_combos[combo_def.id] = slots end
+		return mod_combos
+	end
+
 	helpers.describe("a key with only a tap types it at key down, like the native key (tap-only-key-types-its-tap)", function()
+		-- Each key is pressed alone, so one graph serves every key.
+		local tap_only = build(every_key({ tap = "delete_fwd", hold = "none" }))
+
 		helpers.it("every tap-hold key types its tap alone at key down, keeps it down to repeat, and adds nothing on release", function()
 			for _, key_def in ipairs(keys) do
 				local key_code = key_def.from.key_code
-				local rules = build({ [key_def.id] = { tap = "delete_fwd", hold = "none" } })
 				for _, within_timeout in ipairs({ true, false }) do
-					local engine = engine_for(rules)
+					local engine = engine_for(tap_only)
 					engine:down(key_code)
 					helpers.assert_eq(table.concat(keys_posted(engine), ","), "delete_forward",
 						key_code .. " with no hold must type its tap alone when pressed")
@@ -240,8 +274,7 @@ helpers.with_fresh_modules({
 			-- on any later key_down, so a tap typed on release would be lost.
 			for _, key_def in ipairs(keys) do
 				local key_code = key_def.from.key_code
-				local rules = build({ [key_def.id] = { tap = "delete_fwd", hold = "none" } })
-				local engine = engine_for(rules)
+				local engine = engine_for(tap_only)
 				engine:down(key_code)
 				engine:down("a")
 				engine:up(key_code, true)
@@ -252,10 +285,10 @@ helpers.with_fresh_modules({
 		end)
 
 		helpers.it("a key with neither slot stays the native key", function()
+			local native = build(every_key({ tap = "none", hold = "none" }))
 			for _, key_def in ipairs(keys) do
 				local key_code = key_def.from.key_code
-				local rules = build({ [key_def.id] = { tap = "none", hold = "none" } })
-				local engine = engine_for(rules)
+				local engine = engine_for(native)
 				engine:down(key_code)
 				helpers.assert_eq(table.concat(keys_posted(engine), ","), key_code,
 					key_code .. " with no assignment must go down as itself")
@@ -294,14 +327,16 @@ helpers.with_fresh_modules({
 	end
 
 	helpers.describe("a combo with only a tap types it at key down, like a key with only a tap (combo-tap-only-types-at-key-down)", function()
+		-- Each ordered pair has its own rules, so one graph serves every combo.
+		local tap_only = build(nil, every_combo({ combo = "none", tap = "delete_fwd", hold = "none" }))
+
 		helpers.it("every combo with only a tap types it alone at the second key's key down, keeps it down to repeat, and adds nothing on release", function()
 			local covered = 0
 			for _, combo_def in ipairs(combos) do
 				if not combo_def.menu_hidden then
 					local first, second = combo_keys(combo_def)
-					local rules = build(nil, { [combo_def.id] = { combo = "none", tap = "delete_fwd", hold = "none" } })
 					for _, within_timeout in ipairs({ true, false }) do
-						local engine = engine_for(rules)
+						local engine = engine_for(tap_only)
 						engine:down(first)
 						engine:clear()
 						-- CapsWord's AltGr+CapsLock rule runs before every combo by design.
@@ -328,8 +363,7 @@ helpers.with_fresh_modules({
 			for _, combo_def in ipairs(combos) do
 				if not combo_def.menu_hidden then
 					local first, second = combo_keys(combo_def)
-					local rules = build(nil, { [combo_def.id] = { combo = "none", tap = "delete_fwd", hold = "none" } })
-					local engine = engine_for(rules)
+					local engine = engine_for(tap_only)
 					engine:down(first)
 					engine:clear()
 					if is_combo_rule(engine:down(second), first) then
@@ -402,18 +436,9 @@ helpers.with_fresh_modules({
 
 
 
-	-- ======================
+	-- =====================
 	-- ===== 4) Chords =====
-	-- ======================
-
-	--- Gives every modifier combo the same three slots.
-	--- @param slots table { combo, tap, hold }.
-	--- @return table mod_combos Combo id → slots.
-	local function every_combo(slots)
-		local mod_combos = {}
-		for _, combo_def in ipairs(combos) do mod_combos[combo_def.id] = slots end
-		return mod_combos
-	end
+	-- =====================
 
 	--- Returns what an engine posted since its last clear, one line per key
 	--- event with the flags an application reads with it.
@@ -700,6 +725,222 @@ helpers.with_fresh_modules({
 						"right Command must not wait for a chord partner by default: " .. tostring(rule.description))
 				end
 			end
+		end)
+	end)
+
+
+
+	-- ==========================================================
+	-- ===== 5) Hammerspoon triggers told apart by modifiers =====
+	-- ==========================================================
+
+	-- Hammerspoon binds each of these triggers as an exact-match hotkey
+	-- (platform/remap/watchers.lua), so a modifier added by the hand turns one
+	-- action into another or into nothing.
+	local TRIGGER_KEY = "f17"
+
+	-- Every modifier flag a hand or a hold can have down when a rule fires.
+	local HELD_FLAGS = {
+		"left_shift", "right_shift", "left_control", "right_control", "left_option",
+		"right_option", "left_command", "right_command", "fn",
+	}
+
+	-- Every state a rule can fire under: each flag alone, Caps Lock on alone and
+	-- with each flag, and two flags at once.
+	local HELD_STATES = {}
+	for _, flag in ipairs(HELD_FLAGS) do HELD_STATES[#HELD_STATES + 1] = { flag } end
+	HELD_STATES[#HELD_STATES + 1] = { "caps_lock" }
+	for _, flag in ipairs(HELD_FLAGS) do HELD_STATES[#HELD_STATES + 1] = { "caps_lock", flag } end
+	HELD_STATES[#HELD_STATES + 1] = { "left_shift", "left_control" }
+
+	--- Returns the flags a trigger must carry under a held state: its own, and
+	--- Caps Lock while the lock is on, since no rule may claim it.
+	--- @param action table Trigger action.
+	--- @param state table Held flags.
+	--- @return string flags Sorted flag names.
+	local function expected_flags(action, state)
+		local flags = action_flags(action)
+		for _, flag in ipairs(state) do
+			if flag == "caps_lock" then flags.caps_lock = true end
+		end
+		return names(flags)
+	end
+
+	--- Reports whether an engine sent macOS a Caps Lock press.
+	--- @param engine table Model engine.
+	--- @return boolean toggled
+	local function toggled_caps_lock(engine)
+		for _, emission in ipairs(engine:emissions()) do
+			if emission.key_code == "caps_lock" then return true end
+		end
+		return false
+	end
+
+	-- Hold slots of each shape: nothing, a modifier key, a modifier key with its
+	-- own modifiers, and a layer.
+	local HOLDS = { "none", "shift", "cmd_shift", "layer" }
+
+	--- Returns the actions whose output is the shared trigger key.
+	--- @return table triggers Catalogue actions.
+	local function trigger_actions()
+		local found = {}
+		for _, action in ipairs(actions) do
+			for _, event in ipairs(action.karabiner_to or {}) do
+				if event.key_code == TRIGGER_KEY then found[#found + 1] = action end
+			end
+		end
+		return found
+	end
+
+	--- Returns the flags every trigger posted by an engine carried.
+	--- @param engine table Model engine.
+	--- @return table flags_list One flag-name string per trigger posted.
+	local function triggers_posted(engine)
+		local posted = {}
+		for _, emission in ipairs(engine:emissions()) do
+			if emission.key_code == TRIGGER_KEY then posted[#posted + 1] = names(emission.flags) end
+		end
+		return posted
+	end
+
+	--- Reports whether a manipulator is the tap-hold rule of `key_code` itself.
+	--- @param manipulator table|nil Manipulator the model ran.
+	--- @param key_code string Physical key.
+	--- @return boolean own
+	local function is_own_rule(manipulator, key_code)
+		local held_name = "ergopti_ke_held_" .. key_code .. "_" .. TOKEN
+		for _, event in ipairs(manipulator and manipulator.to or {}) do
+			local variable = event.set_variable
+			if type(variable) == "table" and variable.name == held_name and variable.value == 1 then
+				return true
+			end
+		end
+		return false
+	end
+
+	--- Returns whether a tap-hold key's rule accepts any held modifier.
+	--- @param key_def table tap_hold_keys.json entry.
+	--- @return boolean open
+	local function accepts_held_modifiers(key_def)
+		for _, modifier in ipairs(key_def.from.modifiers and key_def.from.modifiers.optional or {}) do
+			if modifier == "any" then return true end
+		end
+		return false
+	end
+
+	helpers.describe("a trigger told apart by modifiers carries only its own (exact-modifier-trigger)", function()
+		local triggers = trigger_actions()
+
+		helpers.it("marks every trigger action exact_modifiers in the catalogue", function()
+			helpers.assert_true(#triggers >= 4, "expected the four F17 actions, found " .. #triggers)
+			for _, action in ipairs(triggers) do
+				helpers.assert_true(action.exact_modifiers == true,
+					action.id .. " shares its trigger with other actions and must be marked exact_modifiers")
+			end
+		end)
+
+		helpers.it("a tap-hold key taps each trigger bare under any held modifier, and its hold keeps them (caps-lock-never-claimed)", function()
+			local covered = 0
+			for _, action in ipairs(triggers) do
+				for _, hold in ipairs(HOLDS) do
+					-- Each key is pressed under seeded flags alone: one graph per pair.
+					local rules = build(every_key({ tap = action.id, hold = hold }))
+					for _, key_def in ipairs(keys) do
+						if accepts_held_modifiers(key_def) then
+							local key_code = key_def.from.key_code
+							for _, state in ipairs(HELD_STATES) do
+								local context = action.id .. " on " .. key_code .. " (hold " .. hold .. ") under "
+									.. table.concat(state, "+")
+								local engine = engine_for(rules, state)
+								-- CapsWord's AltGr+CapsLock rule takes that chord first by design.
+								if is_own_rule(engine:down(key_code), key_code) then
+									covered = covered + 1
+									for _, held in ipairs(state) do
+										helpers.assert_true(engine:pressed()[held] == true,
+											context .. ": the hold must keep " .. held .. " (pressed: "
+												.. names(engine:pressed()) .. ")")
+									end
+									engine:up(key_code, true)
+									helpers.assert_eq(table.concat(triggers_posted(engine), "|"), expected_flags(action, state),
+										context .. ": the tap must send the trigger with its own modifiers only")
+									helpers.assert_true(not toggled_caps_lock(engine),
+										context .. ": the rule must never toggle Caps Lock")
+								end
+							end
+						end
+					end
+				end
+			end
+			helpers.assert_true(covered >= 900, "the matrix must reach the key's own rule, reached " .. covered)
+		end)
+
+		helpers.it("a combo taps each trigger bare under any held modifier", function()
+			-- Karabiner lifts one press per claimed flag. A flag the holder's own
+			-- hold also presses is down twice and stays down once: two keys holding
+			-- one modifier is a limit of the pinned core, not of these rules.
+			for _, action in ipairs(triggers) do
+				local rules = build(nil, every_combo({ combo = "none", tap = action.id, hold = "none" }))
+				local holder_flags = {}
+				for _, key_def in ipairs(keys) do
+					local holder = engine_for(rules)
+					holder:down(key_def.from.key_code)
+					holder_flags[key_def.from.key_code] = holder:pressed()
+				end
+				local covered = 0
+				for _, combo_def in ipairs(combos) do
+					if not combo_def.menu_hidden then
+						local first, second = combo_keys(combo_def)
+						for _, state in ipairs(HELD_STATES) do
+							local shared = false
+							for _, held in ipairs(state) do shared = shared or holder_flags[first][held] == true end
+							local context = action.id .. " on " .. combo_def.id .. " under " .. table.concat(state, "+")
+							local engine = engine_for(rules, state)
+							engine:down(first)
+							if not shared and is_combo_rule(engine:down(second), first) then
+								covered = covered + 1
+								engine:up(second, true)
+								helpers.assert_eq(table.concat(triggers_posted(engine), "|"), expected_flags(action, state),
+									context .. ": the tap must send the trigger with its own modifiers only")
+								helpers.assert_true(not toggled_caps_lock(engine),
+									context .. ": the rule must never toggle Caps Lock")
+							end
+						end
+					end
+				end
+				helpers.assert_true(covered >= 700, "the combo matrix reached only " .. covered .. " cases")
+			end
+		end)
+
+		helpers.it("a chord sends each trigger bare under any held modifier", function()
+			for _, action in ipairs(triggers) do
+				local rules = build(nil, every_combo({ combo = action.id, tap = "none", hold = "none" }))
+				for _, combo_def in ipairs(combos) do
+					if not combo_def.menu_hidden then
+						local first, second = combo_keys(combo_def)
+						for _, state in ipairs(HELD_STATES) do
+							local context = action.id .. " on " .. combo_def.id .. " under " .. table.concat(state, "+")
+							local engine = engine_for(rules, state)
+							helpers.assert_not_nil(engine:chord({ first, second }), context .. ": the chord must fire")
+							helpers.assert_eq(table.concat(triggers_posted(engine), "|"), expected_flags(action, state),
+								context .. ": the chord must send the trigger with its own modifiers only")
+							helpers.assert_true(not toggled_caps_lock(engine),
+								context .. ": the chord must never toggle Caps Lock")
+						end
+					end
+				end
+			end
+		end)
+
+		helpers.it("Shift held, then AltGr and a Tab tap cycles the app's windows (shift-altgr-tab)", function()
+			-- The shipped defaults: left Shift holds Shift, right Command holds
+			-- AltGr, and AltGr then a Tab tap is cycle_windows_in_app on bare F17.
+			local engine = engine_for(build())
+			engine:down("left_shift")
+			engine:down("right_command")
+			engine:clear()
+			engine:tap("tab")
+			helpers.assert_eq(table.concat(triggers_posted(engine), "|"), "",
+				"Shift+F17 is alt_tab_windows: the held Shift must not reach the trigger")
 		end)
 	end)
 end)

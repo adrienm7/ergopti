@@ -28,6 +28,11 @@
 ---   - from_event_definition.hpp test_key_order: a chord's key_down_order
 ---     `strict` takes its keys in the listed order, `strict_inverse` in the
 ---     reverse one, and `insensitive` (the default) in any order.
+---   - modifier_flag_manager.hpp is_pressed reports Caps Lock pressed while the
+---     lock is on (seed it through options.flags), and base.hpp turns lifting
+---     or pressing a claimed Caps Lock into a sticky Caps Lock change, which
+---     key_event_dispatcher.hpp sends to macOS as a Caps Lock key press: each
+---     is recorded as a "lock" emission of caps_lock.
 --- Lazy modifier dispatch, keyboard repeat, timers and sticky-modifier flag
 --- bookkeeping are not modelled: the flags recorded for a key are the
 --- modifier_flag_manager state an application reads at that key's key_down,
@@ -373,6 +378,7 @@ local function lift_claimed(engine, session)
 		if session.claimed[flag] and not session.lifted[flag] and (engine.counts[flag] or 0) > 0 then
 			change(engine, flag, -1)
 			session.lifted[flag] = true
+			if flag == "caps_lock" then record(engine, "lock", { key_code = flag }) end
 		end
 	end
 end
@@ -381,8 +387,36 @@ end
 --- @param engine table Engine.
 --- @param session table Active manipulation.
 local function press_lifted(engine, session)
-	for flag in pairs(session.lifted) do change(engine, flag, 1) end
+	for flag in pairs(session.lifted) do
+		change(engine, flag, 1)
+		if flag == "caps_lock" then record(engine, "lock", { key_code = flag }) end
+	end
 	session.lifted = {}
+end
+
+-- Manipulators by physical key, in rule order, for each rule graph, so find()
+-- scans only one key's candidates. Weak keys release an index with its graph.
+local KEY_INDEX = setmetatable({}, { __mode = "k" })
+
+--- Returns the per-key manipulator index of one rule graph.
+--- @param rules table The profile's complex_modifications rules.
+--- @return table index Key code → manipulators, in rule order.
+local function key_index(rules)
+	local index = KEY_INDEX[rules]
+	if index ~= nil then return index end
+	index = {}
+	for _, rule in ipairs(rules) do
+		for _, manipulator in ipairs(rule.manipulators or {}) do
+			local from = manipulator.from or {}
+			if from.key_code ~= nil and from.simultaneous == nil then
+				local list = index[from.key_code] or {}
+				list[#list + 1] = manipulator
+				index[from.key_code] = list
+			end
+		end
+	end
+	KEY_INDEX[rules] = index
+	return index
 end
 
 --- Finds the manipulator Karabiner runs for one key: the first, in rule order,
@@ -392,15 +426,10 @@ end
 --- @return table|nil claimed Flags it claims.
 function Engine:find(key_code)
 	local pressed = self:pressed()
-	for _, rule in ipairs(self.rules) do
-		for _, manipulator in ipairs(rule.manipulators or {}) do
-			local from = manipulator.from or {}
-			if from.key_code == key_code and from.simultaneous == nil then
-				local claimed = M.test_modifiers(from.modifiers, pressed)
-				if claimed ~= nil and conditions_hold(manipulator.conditions, self.variables) then
-					return manipulator, claimed
-				end
-			end
+	for _, manipulator in ipairs(key_index(self.rules)[key_code] or {}) do
+		local claimed = M.test_modifiers(manipulator.from.modifiers, pressed)
+		if claimed ~= nil and conditions_hold(manipulator.conditions, self.variables) then
+			return manipulator, claimed
 		end
 	end
 	return nil
