@@ -446,23 +446,42 @@ TapHoldHoldLayer(TapHold, KeyId) {
 ; ===========================================
 ; ===========================================
 
+; AHK key name of a generic modifier token held by tap-hold key KeyId. Only the
+; right-side modifier keys differ from the left-side default: they hold their
+; own side, which is what lets their identity gates pass the physical key
+; through. A function-local static keeps the table readable from a #HotIf that
+; may be evaluated before this file's include position runs.
+; @param KeyId {String} Tap-hold key id, e.g. "right_ctrl".
+; @param Token {String} One of "ctrl", "shift", "alt", "win".
+; @returns {String} The AHK key name to hold.
+_TapHoldOwnSideModifier(KeyId, Token) {
+	static OwnSide := Map(
+		"right_ctrl", Map("ctrl", "RCtrl"),
+		"right_shift", Map("shift", "RShift"))
+	static LeftSide := Map("ctrl", "LCtrl", "shift", "LShift", "alt", "LAlt", "win", "LWin")
+	if (OwnSide.Has(KeyId) && OwnSide[KeyId].Has(Token))
+		return OwnSide[KeyId][Token]
+	return LeftSide[Token]
+}
+
 ; Central hold_modifier -> AHK key-name resolver shared by every tap-holds
 ; module's per-key XxxHoldModKey() wrapper. Centralizing the switch means a
 ; typo'd hold_modifier value (e.g. "contrl") — which passes the #HotIf
 ; non-empty gate but matches no case here — is caught and logged in exactly
 ; one place instead of silently degrading to an empty ModKey in 9 separate
 ; copies of this switch, each fed unguarded into TextPressKey.
+; A generic token ("ctrl", "shift", ...) names the key's OWN side when the
+; tap-hold key is that very modifier, so right_ctrl + "ctrl" is RCtrl and the
+; identity gates can pass the physical key through. Any other key keeps the
+; left-side default: left_shift + "ctrl" is LCtrl, never LShift. Explicitly
+; sided tokens ("lctrl", "lshift", ...) are always taken literally.
 ; @param ModifierValue {String} Raw hold_modifier value, typically read via
 ;        TapHoldHoldModifier(TapHold, FieldLabel).
-; @param FieldLabel {String} The tap-holds field name (e.g. "backspace"),
-;        used only in the warning message so the log pinpoints the bad
-;        tap_hold.toml row.
-; @param CtrlKeyName {String} AHK key name for the "ctrl" case. Defaults to
-;        "LCtrl"; rctrl.ahk passes "RCtrl" so holding the physical Right Ctrl
-;        key as its own "ctrl" hold modifier arms the right-side key.
+; @param FieldLabel {String} The tap-hold key id (e.g. "backspace"): selects
+;        the key's own modifier side and names the tap_hold.toml row in logs.
 ; @returns {String|Array} An AHK key name, or array of AHK key names for
 ;        hold modifier combinations, or "" when ModifierValue is invalid.
-ResolveHoldModifierKey(ModifierValue, FieldLabel, CtrlKeyName := "LCtrl") {
+ResolveHoldModifierKey(ModifierValue, FieldLabel) {
 	Raw := Trim(String(ModifierValue))
 	if (Raw == "") {
 		return ""
@@ -487,15 +506,17 @@ ResolveHoldModifierKey(ModifierValue, FieldLabel, CtrlKeyName := "LCtrl") {
 			continue
         NormalizedToken := StrLower(Trim(Token))
         switch NormalizedToken {
-			case "ctrl", "lctrl":
-				Resolved.Push(CtrlKeyName)
-			case "shift", "lshift":
+			case "ctrl", "shift", "alt", "win":
+				Resolved.Push(_TapHoldOwnSideModifier(FieldLabel, NormalizedToken))
+			case "lctrl":
+				Resolved.Push("LCtrl")
+			case "lshift":
 				Resolved.Push("LShift")
-			case "alt", "lalt":
+			case "lalt":
 				Resolved.Push("LAlt")
 			case "alt_gr", "altgr", "ralt":
 				Resolved.Push("RAlt")
-			case "win", "lwin":
+			case "lwin":
 				Resolved.Push("LWin")
 			case "":
 				continue

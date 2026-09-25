@@ -45,7 +45,7 @@ _RCtrlIsSpecialTap() {
 ; RCtrl (not the shared default LCtrl) so holding the physical Right Ctrl as
 ; its own hold modifier arms the right-side key.
 _RCtrlHoldModKey() {
-	return ResolveHoldModifierKey(TapHoldHoldModifier(TapHold, "right_ctrl"), "right_ctrl", "RCtrl")
+	return ResolveHoldModifierKey(TapHoldHoldModifier(TapHold, "right_ctrl"), "right_ctrl")
 }
 
 
