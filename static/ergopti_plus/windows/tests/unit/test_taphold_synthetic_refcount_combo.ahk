@@ -534,3 +534,50 @@ _TSRC_KanaAltGrHoldSendsTheLayoutAltGr() {
 }
 Test("taphold-synthetic: a Kana alt_gr hold presses and releases the layout's AltGr (kana-altgr-hold-2026-09-25)",
 	_TSRC_KanaAltGrHoldSendsTheLayoutAltGr)
+
+; A synthetic Alt or Win released with nothing typed in between is a lone
+; modifier tap: Windows puts the focused window's menu bar in menu mode (or
+; opens the Start menu), and the tap output that follows lands there. Measured
+; with SendInput {LAlt Down}/{LAlt Up}: menu mode; with the menu mask key sent
+; in between: none. The default Tab tap-hold holds Alt, so every Tab tap opened
+; the menu bar of classic applications (lone-modifier-mask-2026-09-25).
+_TSRC_OwnerReleaseSequence(ModKey) {
+	global _TSRC_Sent
+	_TSRC_Begin()
+	try {
+		TapHoldOwnImmediateModifier("tab", "SC00F", ModKey, 0.2,
+			(*) => true, (*) => false, (*) => 1000, , , (*) => "")
+		Joined := ""
+		for _, Sent in _TSRC_Sent
+			Joined .= (Joined == "" ? "" : "|") . Sent
+		return Joined
+	} finally {
+		_TSRC_End()
+	}
+}
+
+_TSRC_LoneMenuModifierIsMaskedBeforeRelease() {
+	global _ALTGR_KANA_FIXUP
+	Mask := "{Blind}{" . A_MenuMaskKey . "}"
+	AssertEqual("{LAlt Down}|" . Mask . "|{LAlt Up}", _TSRC_OwnerReleaseSequence("LAlt"),
+		"a held Alt must be masked right before its release")
+	AssertEqual("{LWin Down}|" . Mask . "|{LWin Up}", _TSRC_OwnerReleaseSequence("LWin"),
+		"a held Win must be masked right before its release")
+	AssertEqual("{RAlt Down}|" . Mask . "|{RAlt Up}", _TSRC_OwnerReleaseSequence("RAlt"),
+		"RAlt is a plain Alt on layouts without AltGr and must be masked too")
+	AssertEqual("{LCtrl Down}|{LAlt Down}|" . Mask . "|{LCtrl Up}|{LAlt Up}",
+		_TSRC_OwnerReleaseSequence(["LCtrl", "LAlt"]),
+		"a combination holding Alt must be masked once before its release")
+	AssertEqual("{LCtrl Down}|{LCtrl Up}", _TSRC_OwnerReleaseSequence("LCtrl"),
+		"Ctrl opens no menu and must not be masked")
+	PreviousKana := _ALTGR_KANA_FIXUP
+	try {
+		_ALTGR_KANA_FIXUP := true
+		AssertEqual("{SC138 Down}|{SC138 Up}", _TSRC_OwnerReleaseSequence(KS_AltGrKeyName()),
+			"the Kana layout's AltGr opens no menu and must not be masked")
+	} finally {
+		_ALTGR_KANA_FIXUP := PreviousKana
+	}
+}
+Test("taphold-synthetic: a lone synthetic Alt or Win is masked before its release (lone-modifier-mask-2026-09-25)",
+	_TSRC_LoneMenuModifierIsMaskedBeforeRelease)

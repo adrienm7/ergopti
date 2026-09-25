@@ -697,6 +697,16 @@ TextEraseChars(Count) {
 	return true
 }
 
+; Sends the menu mask key (A_MenuMaskKey) without releasing held modifiers. A
+; lone Alt or Win tap makes Windows put the focused window's menu bar in menu
+; mode (or open the Start menu); a keystroke between the modifier's Down and Up
+; turns it into a chord that does nothing, which is how AutoHotkey masks its own
+; Alt and Win hotkeys. {Blind} keeps the held modifier down around the mask.
+; @return {Boolean} True when the mask was sent.
+TextSendMenuMask() {
+	return _TextSenderSendInput("{Blind}{" . A_MenuMaskKey . "}", "menu mask", false)
+}
+
 ; Emits a keystroke with optional modifiers, or a key-down/key-up event.
 ; @param Key       {String} Key name (e.g., "LCtrl", "Return", "Escape").
 ; @param Modifiers {Array|String} Array of modifier name strings for a full
