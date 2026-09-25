@@ -188,6 +188,24 @@ helpers.describe("tap-holds end to end: the shipped defaults", function()
 		end)
 	end)
 
+	-- The hook tells the engine what a key types. Ctrl+A under an armed one-
+	-- shot came out as Ctrl+Shift+A, Print as Shift+Print, and "1" as "!"
+	-- (one-shot-types-nothing).
+	helpers.it("lets a shortcut and Print through the one-shot, and types a digit as it is", function()
+		with_session(nil, function(s)
+			local d, u = tap(RCTRL, 0)
+			local emitted = s.drive({ d, u,
+				{ LCTRL, DOWN, 200 }, { KEY_A, DOWN, 210 }, { KEY_A, UP, 220 }, { LCTRL, UP, 230 },
+				{ 99, DOWN, 300 }, { 99, UP, 310 },
+				{ KEY_A, DOWN, 400 }, { KEY_A, UP, 410 } })
+			helpers.assert_eq(emitted, "42:1 42:0 29:1 30:1 30:0 29:0 99:1 99:0 42:1 30:1 30:0 42:0",
+				"Ctrl+A and Print pass as they are, and the letter after them is the capital")
+			d, u = tap(RCTRL, 1000)
+			emitted = s.drive({ d, u, { 2, DOWN, 1200 }, { 2, UP, 1210 }, { KEY_A, DOWN, 1300 }, { KEY_A, UP, 1310 } })
+			helpers.assert_eq(emitted, "42:1 42:0 2:1 2:0 30:1 30:0", "the 1 is a 1, and it spent the one-shot")
+		end)
+	end)
+
 	helpers.it("sends Alt+Tab for a Tab tap and Shift+Tab under Shift", function()
 		with_session(nil, function(s)
 			s.drive({ tap(TAB, 0) })

@@ -515,6 +515,21 @@ local function resolve_press(keycode)
 	return text, identity
 end
 
+--- The text a key would type in the live keymap and state, without pressing
+--- it: nothing is committed and no Compose sequence is fed. "" for a key that
+--- types nothing (an arrow, a function key, a keypad key with NumLock off).
+--- @param evdev_code integer Linux input-event keycode.
+--- @return string|nil text, string|nil error
+function M.peek_text(evdev_code)
+	if not _session then return nil, "XKB capture state is not ready" end
+	if type(evdev_code) ~= "number" or evdev_code < 0 or evdev_code % 1 ~= 0 then
+		return nil, "evdev keycode must be a non-negative integer"
+	end
+	local ok, text = pcall(_backend.key_utf8, _session, evdev_code + EVDEV_TO_XKB_OFFSET)
+	if not ok then return nil, tostring(text) end
+	return text or "", nil
+end
+
 --- Applies one evdev key transition and resolves its UTF-8 output.
 ---
 --- Resolution deliberately happens before committing a key-down. Modifier,

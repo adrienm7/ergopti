@@ -15,6 +15,7 @@ local DEFAULTS = require("infra.paths").shared("tap_hold/defaults.toml")
 --- A keyboard hook double that records what is installed.
 local function fake_hook()
 	local hook = { engine = nil, on_tap = nil, calls = 0 }
+	function hook.key_text() return nil end
 	function hook.set_remapper(engine, on_tap)
 		hook.calls = hook.calls + 1
 		hook.engine, hook.on_tap = engine, on_tap

@@ -36,7 +36,7 @@ local function build(calls, picked)
 	local user_path = os.tmpname()
 	os.remove(user_path)
 	Manager.init({
-		keyboard_hook = { set_remapper = function() end },
+		keyboard_hook = { set_remapper = function() end, key_text = function() return nil end },
 		execute_action = function() end,
 		action_names = function() return { "open_url" } end,
 		defaults_path = DEFAULTS,
