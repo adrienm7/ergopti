@@ -120,7 +120,7 @@ helpers.describe("tap-hold writer: a tray change reaches the engine", function()
 		helpers.assert_eq(key.hold_modifier, "")
 		local Engine = require("platform.remap.tap_hold_engine")
 		local engine = Engine.new({ keys = effective(path).keys, tap_min_ms = 50, one_shot_timeout_ms = 2000,
-			key_text = function() return nil end })
+			key_text = function() return nil end, plan_text = function() return nil end, one_shot_result = function() return nil end, })
 		helpers.assert_true(not engine:handles(58), "the engine leaves CapsLock alone")
 		os.remove(path)
 	end)

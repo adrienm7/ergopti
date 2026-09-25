@@ -787,6 +787,57 @@ _TH_ResolveHoldModifierKeyReadsSharedAliases() {
 Test("ResolveHoldModifierKey: resolves the aliases of the shared hold picker (hold-alias-single-source)",
 	_TH_ResolveHoldModifierKeyReadsSharedAliases)
 
+; The one-shot Shift's results come from _shared/tap_hold/one_shot_shift.json,
+; which the Linux driver reads too; they were an if/else chain in
+; one_shot_shift.ahk (one-shot-results-shared).
+_TH_OneShotResultsComeFromTheSharedTable() {
+	global _SharedDir
+	Root := JsonParse(FileRead(_SharedDir . "\tap_hold\one_shot_shift.json", "UTF-8"))
+	Assert(Root["results"].Length >= 7, "the shared table must declare the one-shot results")
+	EndKeys := TapHoldOneShotEndKeys("★")
+	for Entry in Root["results"] {
+		AssertEqual(Entry["result"], TapHoldOneShotResult(Entry["char"], "★"),
+			"the one-shot result of '" . Entry["char"] . "'")
+		Assert(InStr(EndKeys, Entry["char"], true) > 0, "'" . Entry["char"] . "' ends the one-shot capture")
+	}
+	AssertEqual(Root["magic_key_result"], TapHoldOneShotResult("★", "★"), "the magic key's result")
+	AssertEqual("", TapHoldOneShotResult("a", "★"), "a letter has no result: it is typed in title case")
+	AssertEqual("", TapHoldOneShotResult("", "★"), "a capture that ended on no character has no result")
+	Assert(SubStr(EndKeys, -1) == "★", "the magic key ends the one-shot capture")
+}
+Test("tap-holds: the one-shot Shift results come from the shared table (one-shot-results-shared)",
+	_TH_OneShotResultsComeFromTheSharedTable)
+
+; The magic key is the user's choice: it gives its result even on a character
+; the shared table has a result for, as the old chain gave it before ",", "'"
+; and " ", and as Linux does (one-shot-magic-first). A table the file cannot
+; give is logged and kept, so the one-shot capitalises until the next start
+; instead of reading the file again at every tap (one-shot-table-once).
+_TH_OneShotMagicKeyFirstAndFailureKept() {
+	global _SharedDir, _TapHoldOneShotCache
+	Root := JsonParse(FileRead(_SharedDir . "\tap_hold\one_shot_shift.json", "UTF-8"))
+	for Entry in Root["results"]
+		AssertEqual(Root["magic_key_result"], TapHoldOneShotResult(Entry["char"], Entry["char"]),
+			"a magic '" . Entry["char"] . "' gives the magic key's result")
+	PreviousShared := _SharedDir
+	Captured := []
+	LoggerSetTestSink((Line) => Captured.Push(Line))
+	try {
+		_TapHoldOneShotCache := ""
+		_SharedDir := A_Temp . "\ergopti_one_shot_no_shared_dir"
+		AssertEqual("", TapHoldOneShotResult(" ", "★"), "an unreadable table leaves the one-shot capitalising")
+		_SharedDir := PreviousShared
+		AssertEqual("", TapHoldOneShotResult(" ", "★"), "the failure is kept, not read again at every tap")
+	} finally {
+		LoggerClearTestSink()
+		_SharedDir := PreviousShared
+		_TapHoldOneShotCache := ""
+	}
+	AssertEqual("-", TapHoldOneShotResult(" ", "★"), "a fresh read gives the table again")
+}
+Test("tap-holds: the magic key's result comes first and an unreadable table is kept (one-shot-magic-first)",
+	_TH_OneShotMagicKeyFirstAndFailureKept)
+
 _TH_ResolveHoldModifierKeyUnknownReturnsEmpty() {
 	AssertEqual("", ResolveHoldModifierKey("contrl", "backspace"),
 		"an unrecognized hold_modifier (typo) must resolve to empty, never a garbage key name")

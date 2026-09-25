@@ -32,10 +32,32 @@ local US_TEXT = {
 }
 local function us_text(code) return US_TEXT[code] end
 
---- An engine on `keys` (the defaults) reading the layout through `key_text`.
-local function engine(keys, key_text)
+-- The keystrokes a US layout types the tests' characters with.
+local US_PLAN = {
+	["-"] = { keycode = 12, mods = {} }, [" "] = { keycode = 57, mods = {} }, [";"] = { keycode = 39, mods = {} },
+	[":"] = { keycode = 39, mods = { "shift" } }, ["?"] = { keycode = 53, mods = { "shift" } },
+	A = { keycode = 30, mods = { "shift" } }, B = { keycode = 48, mods = { "shift" } },
+	J = { keycode = 36, mods = { "shift" } }, Q = { keycode = 16, mods = { "shift" } },
+}
+local function us_plan(text)
+	local steps = {}
+	for char in text:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+		if not US_PLAN[char] then return nil end
+		steps[#steps + 1] = US_PLAN[char]
+	end
+	return steps
+end
+
+-- What the one-shot Shift types instead of a capital, as the shared table has
+-- it, with ★ as the magic key.
+local RESULTS = { [" "] = "-", ["."] = " :", [","] = " ;", ["="] = "º", ["★"] = "J" }
+local function one_shot_result(char) return RESULTS[char] end
+
+--- An engine on `keys` (the defaults) reading the layout through `key_text`
+--- and `plan_text`.
+local function engine(keys, key_text, plan_text)
 	return Engine.new({ keys = keys or DEFAULTS, tap_min_ms = 50, one_shot_timeout_ms = 2000,
-		key_text = key_text or us_text })
+		key_text = key_text or us_text, plan_text = plan_text or us_plan, one_shot_result = one_shot_result })
 end
 
 -- The random session also runs a Tab tap-hold and a Ctrl nobody configured.
@@ -337,7 +359,7 @@ helpers.describe("tap-hold engine: what the one-shot Shift does with the next ke
 	-- first case, so a new one cannot ship without a decision.
 	local TAP_ROLE = {
 		enter = "spend", tab = "spend", backspace = "spend", escape = "spend", delete = "spend",
-		space = "spend", caps_lock = "keep",
+		space = "result", caps_lock = "keep",
 	}
 	local SPEND = { 28, 96, 14, 111, 15, 1 }
 	local KEEP = { 103, 108, 105, 106, 102, 107, 104, 109, 110, 58,
@@ -368,8 +390,9 @@ helpers.describe("tap-hold engine: what the one-shot Shift does with the next ke
 			local e = armed(name)
 			e:process(CAPS, DOWN, 200)
 			local tapped = trail((e:process(CAPS, UP, 300)))
+			-- Space's result is "-", KEY_MINUS on a US layout.
 			local expected = role == "shift" and string.format("42↓ %d↓ %d↑ 42↑", code, code)
-				or string.format("%d↓ %d↑", code, code)
+				or role == "result" and "12↓ 12↑" or string.format("%d↓ %d↑", code, code)
 			helpers.assert_eq(tapped, expected, name .. " tapped under a one-shot Shift")
 			helpers.assert_eq(next_letter(e), role == "keep" and "42↓ 48↓" or "48↓",
 				role == "keep" and name .. " types nothing, so the one-shot waits for the letter"
@@ -446,10 +469,10 @@ helpers.describe("tap-hold engine: what the one-shot Shift does with the next ke
 		helpers.assert_eq(next_letter(e), "42↓ 48↓")
 	end)
 
-	helpers.it("types a digit or a mark as it is and spends the one-shot (one-shot-types-nothing)", function()
-		-- Windows types the next character in title case: "1" and "," stay as
-		-- they are. Shift made them "!" and "?", and a keypad 1 KP_End.
-		for _, code in ipairs({ 2, 51, 79 }) do
+	helpers.it("types a digit as it is and spends the one-shot (one-shot-types-nothing)", function()
+		-- Windows types the next character in title case: "1" stays as it is.
+		-- Shift made it "!", and a keypad 1 KP_End.
+		for _, code in ipairs({ 2, 79 }) do
 			local e = armed()
 			helpers.assert_nil(e:process(code, DOWN, 200), US_TEXT[code] .. " (" .. code .. ") is typed unshifted")
 			helpers.assert_nil(e:process(code, UP, 250))
@@ -461,6 +484,85 @@ helpers.describe("tap-hold engine: what the one-shot Shift does with the next ke
 		local ok, err = pcall(Engine.new, { keys = DEFAULTS, tap_min_ms = 50, one_shot_timeout_ms = 2000 })
 		helpers.assert_true(not ok, "an engine that cannot tell a character from Print must not start")
 		helpers.assert_contains(tostring(err), "key_text")
+	end)
+
+	-- Windows types "-" for Space, " :" for ".", " ;" for ",", "J" for the
+	-- magic key and so on (shared table); Linux shifted them: Shift+Space, ">",
+	-- "<" (one-shot-results-shared).
+	helpers.it("types the shared result for Space, a period, a comma and the magic key (one-shot-results-shared)", function()
+		local text = { [57] = " ", [52] = ".", [51] = ",", [41] = "★", [48] = "b" }
+		for code, expected in pairs({
+			[57] = "12↓ 12↑", [52] = "57↓ 57↑ 42↓ 39↓ 39↑ 42↑", [51] = "57↓ 57↑ 39↓ 39↑", [41] = "42↓ 36↓ 36↑ 42↑",
+		}) do
+			local e = armed(nil, nil, function(c) return text[c] end)
+			local out, tap = e:process(code, DOWN, 200)
+			helpers.assert_eq(trail(out), expected, text[code] .. " gives its result, typed on the layout")
+			helpers.assert_nil(tap)
+			helpers.assert_eq(trail(e:process(code, REPEAT, 600)), "", "its repeat is the result's")
+			helpers.assert_eq(trail(e:process(code, UP, 650)), "", "and so is its release")
+			helpers.assert_eq(trail(e:process(48, DOWN, 700) or {}), "", text[code] .. " spent the one-shot")
+		end
+	end)
+
+	helpers.it("hands the injector a result the layout cannot type (one-shot-results-shared)", function()
+		local e = armed(nil, nil, function(c) return c == 13 and "=" or nil end)
+		local out, tap = e:process(13, DOWN, 200)
+		helpers.assert_eq(trail(out), "", "no key of a US layout types º")
+		helpers.assert_eq(tap, { type_text = "º" })
+		helpers.assert_eq(trail(e:process(13, UP, 250)), "")
+	end)
+
+	helpers.it("types a capital the layout puts on another key or level (one-shot-results-shared)", function()
+		-- On AZERTY "é" is KEY_2, whose Shift level is "2": Windows types "É".
+		local key_text = function(c) return c == 3 and "é" or nil end
+		local e = armed(nil, nil, key_text)
+		local out, tap = e:process(3, DOWN, 200)
+		helpers.assert_eq(trail(out), "", "Shift+KEY_2 would type 2")
+		helpers.assert_eq(tap, { type_text = "É" }, "the layout has no É: the injector types it")
+		local on_altgr = function(text)
+			if text == "É" then return { { keycode = 18, mods = { "shift", "altgr" } } } end
+		end
+		e = engine({ right_ctrl = DEFAULTS.right_ctrl }, key_text, on_altgr)
+		e:process(RCTRL, DOWN, 0)
+		e:process(RCTRL, UP, 100)
+		out, tap = e:process(3, DOWN, 200)
+		helpers.assert_eq(trail(out), "42↓ 100↓ 18↓ 18↑ 100↑ 42↑", "the layout's É, on its level")
+		helpers.assert_nil(tap)
+	end)
+
+	-- Windows types a result with SendEvent {Text}, which lifts the modifiers
+	-- the hand holds. Here the layout's keys were pressed under them: on AZERTY,
+	-- one-shot then Shift+";" (".") typed " /" and not " :", KEY_DOT under the
+	-- hand's Shift (one-shot-lifts-levels).
+	helpers.it("lifts the Shift or AltGr the hand holds around a result (one-shot-lifts-levels)", function()
+		local RSHIFT, RALT = 54, 100
+		local az_text = function(code) return code == 51 and "." or nil end
+		local az_plan = function(text)
+			if text == " :" then return { { keycode = 57, mods = {} }, { keycode = 52, mods = {} } } end
+		end
+		local e = engine({ right_ctrl = DEFAULTS.right_ctrl }, az_text, az_plan)
+		e:process(RCTRL, DOWN, 0)
+		e:process(RCTRL, UP, 100)
+		helpers.assert_nil(e:process(RSHIFT, DOWN, 150), "the hand's Shift passes")
+		local out, tap = e:process(51, DOWN, 200)
+		helpers.assert_eq(trail(out), "54↑ 57↓ 57↑ 52↓ 52↑ 54↓", "\" :\" on its own level, Shift back after")
+		helpers.assert_nil(tap)
+		-- A step on the Shift level presses Shift itself, the hand's still lifted.
+		e = engine({ right_ctrl = DEFAULTS.right_ctrl }, function(code) return code == 52 and "." or nil end)
+		e:process(RCTRL, DOWN, 0)
+		e:process(RCTRL, UP, 100)
+		e:process(RALT, DOWN, 150)
+		helpers.assert_eq(trail((e:process(52, DOWN, 200))), "100↑ 57↓ 57↑ 42↓ 39↓ 39↑ 42↑ 100↓",
+			"a US \" :\" under a held AltGr")
+		-- The live layout says which keys select a level (the hook's, here
+		-- CapsLock as AltGr under lv3:caps_switch).
+		e = Engine.new({ keys = { right_ctrl = DEFAULTS.right_ctrl }, tap_min_ms = 50, one_shot_timeout_ms = 2000,
+			key_text = az_text, plan_text = az_plan, one_shot_result = one_shot_result,
+			held_text_modifier_codes = function() return { CAPS } end })
+		e:process(RCTRL, DOWN, 0)
+		e:process(RCTRL, UP, 100)
+		helpers.assert_eq(trail((e:process(51, DOWN, 200))), "58↑ 57↓ 57↑ 52↓ 52↑ 58↓",
+			"the level key the layout names is lifted")
 	end)
 
 end)
