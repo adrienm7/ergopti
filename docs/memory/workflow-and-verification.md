@@ -58,12 +58,45 @@ is reported but does not turn a passing scoped micro-change into a regression.
 ### project-build-linux-step-times-out-on-windows
 
 `build-domain.cjs` caps its `build:linux` step at 60 s. On a Windows checkout
-that step copies ~609 files through MSYS bash and takes ~89 s, so it aborts
-mid-copy and takes three `test:js` checks down with it: features-manifest
-no-drift, the drift-guard coverage test, and the generator registry. The step is
-green when run directly (`npm run build:linux`), integrity check included, and
-green in CI where it is fast. Confirm with a direct run before spending time on
-the three reds; they are environment, not drift.
+that step once copied ~609 files through MSYS bash in ~89 s, aborted mid-copy
+and took three `test:js` checks down with it: features-manifest no-drift, the
+drift-guard coverage test, and the generator registry. Measured 2026-09-26 the
+whole `build:domain` pipeline took 19 s there. Confirm with a direct run before
+spending time on those reds; a timeout is environment, not drift.
+
+### project-windows-bare-bash-is-wsl
+
+From PowerShell or cmd a bare `bash`, and Python's `shutil.which("bash")`, is
+WSL's launcher: the script runs inside Linux with `/mnt/<drive>` paths and a
+`.git` file naming a Windows path. From Git Bash the same name is Git's bash,
+so six JS checks were red from PowerShell only (2026-09-26). npm runs every
+script line through cmd.exe, so the same holds for a package.json script: the
+`test:linux` gates once ran the Linux suite inside WSL from PowerShell. Action:
+spawn bash through `tools/lib/git-bash.cjs` or `tools/lib/git_bash.py`, start
+a bash script from package.json with `node ./tools/lib/git-bash.cjs <script>`,
+and let node spawn any other program (`tools/test/run-linux-lua.cjs` picks the
+Lua runtime). `test-bash-resolution.cjs` rejects a bare bash or sh in a spawn,
+an exec command string, a Python argument list or a package.json script, a
+second resolver, and a PATH lookup. Off Windows the resolvers answer
+`/bin/bash`, the interpreter the `#!/bin/bash` scripts name (bash 3.2 on
+macOS).
+
+### project-linux-suite-windows-test-mode
+
+`linux/tests/win_compat.lua` lets the Linux unit suite and the E2E daemon
+children run on a Windows checkout: /tmp and HOME fixtures, an `os.tmpname`
+that creates its file, `mkdir -p`, and every command headed by a POSIX tool run
+whole through Git's sh (cmd.exe answers `date` with its own builtin and
+evaluates `&&`/`||` itself). A check that needs the Linux kernel (setsid,
+`/proc`, POSIX mode bits) is deferred on the Windows host only, as a
+`SKIP [CONF-LINUX-…]` case with a ledger row, and its logic stays runnable
+through a seam. Git's userland spells a path through its mount table:
+`/d/...` for a drive, and `/tmp/...` for a checkout under %TEMP%, which this
+Lua process resolves as `<drive>:\tmp\...`. So win_compat asks `pwd -W` for
+the Windows spelling instead of mapping prefixes back. Action: bridge a new gap
+in win_compat and prove it from a checkout under %TEMP% as well as from D:;
+never relax a Linux assertion, and never defer on a missing facility, which on
+Linux is a failure.
 
 ### project-plans-are-proportional
 
