@@ -1476,6 +1476,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_altgr_prefix_arms_on_press.ahk
 #Include unit/test_altgr_owner_matrix.ahk
 #Include unit/test_altgr_combos_stand_down.ahk
+#Include unit/test_altgr_layer_shift_from_hold.ahk
 #Include unit/test_ctrl_alt_numpad_gate.ahk
 #Include unit/test_user_lctrl_held.ahk
 #Include unit/test_altgr_takes_its_lctrl.ahk

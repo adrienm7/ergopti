@@ -298,13 +298,33 @@ AltGrShiftDispatch(SC, Table, *) {
     ; like Bépo’s `'`) therefore fall through to the regular *SC<key>/SC<key>
     ; remap hotkeys and produce the correct base-layer character.
     Entry := Table[SC]
-    Cb := GetKeyState("Shift", "P") ? Entry.Shifted : Entry.Plain
+    Cb := AltGrLayerEntryCallable(Entry)
     _AtCrit := Critical("On")   ; Serialize the AltGr emit like _RemapEmit
     try {
         AltGrLayerEmit(Cb)
     } finally {
         Critical(_AtCrit)
     }
+}
+
+; Whether Shift is held for an AltGr-layer output: physically, or by a
+; tap-hold's synthetic hold. The AltGr key held as Shift+AltGr presses its
+; Shift synthetically (so do a Space or RShift held as Shift): reading the
+; physical Shift alone typed the Plain entry where a physical Shift+AltGr
+; typed the Shifted one. Every AltGr-layer output that picks by Shift asks
+; this: the table entries, the two rolls and the AltGr+LAlt shortcut.
+; @return {Boolean}
+AltGrLayerShiftHeld() {
+    global _TapHoldKeyIsDown, _TH_SyntheticHeldKeys
+    return _TapHoldKeyIsDown.Call("Shift", "P")
+        or _TH_SyntheticHeldKeys.Has("LShift") or _TH_SyntheticHeldKeys.Has("RShift")
+}
+
+; The callable of an AltGr table entry for the current Shift state.
+; @param Entry {Object} A table entry with Plain and Shifted callables.
+; @return {Func} Entry.Shifted or Entry.Plain, not invoked.
+AltGrLayerEntryCallable(Entry) {
+    return AltGrLayerShiftHeld() ? Entry.Shifted : Entry.Plain
 }
 
 ; Run one AltGr-layer output (a table entry or a roll). An AltGr a tap-hold holds
