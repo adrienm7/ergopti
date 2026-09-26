@@ -90,19 +90,56 @@ global _SendHook := 0
 global _MAPVK_VK_TO_VSC_EX := 4
 global _VK_RMENU := 0xA5
 
-; Returns the HKL of the foreground window's thread, or 0 if the call chain
-; fails. Used by both DetectAltGrKanaRemap and the layout-change watcher in
-; ErgoptiPlus.ahk so both observe the same value.
-GetForegroundKeyboardLayout() {
-		HWND := DllCall("GetForegroundWindow", "Ptr")
+; Returns the HKL the user is typing with in the foreground window, or 0 when
+; there is no foreground window. That is the layout of the thread owning the
+; foreground window's focused control, which AutoHotkey's own Send and hook use
+; too (keyboard_mouse.cpp GetFocusedCtrlThread): in a UWP app the top-level
+; frame belongs to ApplicationFrameHost while the focused CoreWindow runs on the
+; app's own thread, so the frame's layout was read and the AltGr family could be
+; decided from the wrong layout. The top-level thread's layout is kept when the
+; thread reports no focused control. Used by the boot layout probe and the
+; layout-change watcher in ErgoptiPlus.ahk so both observe the same value.
+; @param Port {Map} Test seam: "foreground", "thread_of", "focus_of" and
+;        "layout_of" callables; production uses _ForegroundLayoutPort().
+; @return {Integer} The HKL, or 0.
+GetForegroundKeyboardLayout(Port := 0) {
+		if !IsObject(Port)
+				Port := _ForegroundLayoutPort()
+		HWND := Port["foreground"].Call()
 		if (HWND = 0) {
 				return 0
 		}
-		TID := DllCall("GetWindowThreadProcessId", "Ptr", HWND, "Ptr", 0, "UInt")
+		TID := Port["thread_of"].Call(HWND)
 		if (TID = 0) {
 				return 0
 		}
-		return DllCall("GetKeyboardLayout", "UInt", TID, "Ptr")
+		Focus := Port["focus_of"].Call(TID)
+		if (Focus != 0) {
+				FocusTID := Port["thread_of"].Call(Focus)
+				if (FocusTID != 0)
+						TID := FocusTID
+		}
+		return Port["layout_of"].Call(TID)
+}
+
+; The Win32 calls behind GetForegroundKeyboardLayout.
+_ForegroundLayoutPort() {
+		static Port := Map(
+				"foreground", () => DllCall("GetForegroundWindow", "Ptr"),
+				"thread_of", (Hwnd) => DllCall("GetWindowThreadProcessId", "Ptr", Hwnd, "Ptr", 0, "UInt"),
+				"focus_of", _ForegroundFocusedControl,
+				"layout_of", (Tid) => DllCall("GetKeyboardLayout", "UInt", Tid, "Ptr"))
+		return Port
+}
+
+; The focused control of thread Tid (GUITHREADINFO.hwndFocus), or 0 when the
+; thread has none or GetGUIThreadInfo fails.
+_ForegroundFocusedControl(Tid) {
+		Info := Buffer(8 + 6 * A_PtrSize + 16, 0)
+		NumPut("UInt", Info.Size, Info, 0)
+		if !DllCall("GetGUIThreadInfo", "UInt", Tid, "Ptr", Info)
+				return 0
+		return NumGet(Info, 8 + A_PtrSize, "Ptr")
 }
 
 ; Probe the active layout in REVERSE direction: does VK_RMENU have a scancode?
