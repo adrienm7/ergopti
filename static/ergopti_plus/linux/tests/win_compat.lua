@@ -39,9 +39,12 @@
 ---    the same drive-absolute tree Lua sees. The whole command line runs
 ---    through that sh, so quotes, &&, ||, pipes, redirections and echo mean
 ---    what they mean under /bin/sh, and cmd's own builtins (date) never
----    answer in a tool's place. The tools really run; only the platform gap
----    is bridged. Anything else reaches cmd.exe exactly as before, so
----    tool-absence verdicts (xclip, wl-copy, xdotool) are unchanged.
+---    answer in a tool's place. What mktemp prints is respelled to the
+---    fixture paths this process opens, and pwd is asked for the Windows
+---    spelling of the working directory (pwd -W). The tools really run; only
+---    the platform gap is bridged. Anything else reaches cmd.exe exactly as
+---    before, so tool-absence verdicts (xclip, wl-copy, xdotool) are
+---    unchanged.
 --- 6. /dev/urandom answers synthetic bytes. The nonce path (open, read(18),
 ---    base64, CSP authoring) is fully executed; only the kernel entropy
 ---    source itself is unavailable on this platform.
@@ -476,7 +479,17 @@ local function route_command(cmd)
 			return tool_path_prefix() .. "sh" .. tail, false
 		end
 		-- /dev/null stays: sh has one, while cmd's NUL means nothing to it.
-		return route_command_line(translate_tmp_tool(cmd)), head == "mktemp"
+		local line = translate_tmp_tool(cmd)
+		if head == "pwd" then
+			-- The userland's pwd names the working directory through its own
+			-- mount table: "/d/..." for a drive, and "/tmp/..." for a checkout
+			-- under %TEMP%. This process resolves either spelling against its
+			-- own drive ("D:\tmp\..."), so no prefix rewrite can undo it in
+			-- general. -W makes the same builtin print the Windows path it
+			-- resolved ("C:/Users/.../Temp/..."), which this process opens.
+			line = line:gsub("^(%s*pwd)", "%1 -W", 1)
+		end
+		return route_command_line(line), head == "mktemp"
 	end
 	return mapped, false
 end
