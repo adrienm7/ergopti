@@ -5,10 +5,11 @@
 --- pump-mode mtime polling — by creating a real temporary directory
 --- with .toml files and driving changes through M.pump().
 ---
---- When stat(1) is unavailable (e.g. Git Bash on Windows), the mtime-
---- dependent tests are skipped gracefully because _mtime() returns nil
---- and the pump backend silently no-ops. Lifecycle and API contract
---- tests always run.
+--- When stat(1) is unavailable, the mtime-dependent tests are skipped
+--- gracefully because _mtime() returns nil and the pump backend silently
+--- no-ops. On Windows the test mode runs the watcher's date, ls and test
+--- through Git's sh and coreutils, so they run there too. Lifecycle and
+--- API contract tests always run.
 ---
 --- NOTE: every test loads a FRESH module via helpers.load_module() so
 --- module-level state (_on_reload, _pump_entries, _reload_deadline)
