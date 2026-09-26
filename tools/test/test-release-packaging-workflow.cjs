@@ -232,6 +232,31 @@ try {
 	errors.push(`the AHK test runtime steps are missing: ${error.message}`);
 }
 
+// The AHK suite enforces that runtime itself, but only under CI: a developer's
+// self-updating AutoHotkey turned every local run red with nothing wrong in the
+// code (runtime-contract-local-2026-09-26). The test keys on GITHUB_ACTIONS,
+// which GitHub sets to "true" for every step, so the Windows box must never
+// set it, and the test must stay in the suite the test-ahk job runs.
+try {
+	const suiteStep = pipeline.findStep('Run AHK test suite');
+	if (suiteStep.file !== WINDOWS_BOX || suiteStep.job !== 'test-ahk') {
+		errors.push(`the AHK suite runs in ${suiteStep.file} (job ${suiteStep.job}); it belongs in test-ahk of ${WINDOWS_BOX}`);
+	}
+	if (/GITHUB_ACTIONS/.test(pipeline.file(WINDOWS_BOX))) {
+		errors.push(`${WINDOWS_BOX} must not set GITHUB_ACTIONS: the AHK runtime-contract test enforces the pinned runtime only when GitHub's own value ("true") reaches it`);
+	}
+	const testsDir = path.join(root, 'static', 'ergopti_plus', 'windows', 'tests');
+	const runtimeTest = fs.readFileSync(path.join(testsDir, 'unit', 'test_runtime_contract_version.ahk'), 'utf8');
+	if (!runtimeTest.includes('EnvGet("GITHUB_ACTIONS") = "true"') || !runtimeTest.includes('_RCV_CheckRuntime(_RCV_ContractRuntimeVersion(), A_AhkVersion, _RCV_IsCi())')) {
+		errors.push('the AHK runtime-contract test must hold the suite to the contract runtime whenever GITHUB_ACTIONS is "true"');
+	}
+	if (!/^#Include unit\/test_runtime_contract_version\.ahk$/m.test(fs.readFileSync(path.join(testsDir, 'run_all.ahk'), 'utf8'))) {
+		errors.push('run_all.ahk must include the AHK runtime-contract test');
+	}
+} catch (error) {
+	errors.push(`the AHK runtime-contract enforcement cannot be checked: ${error.message}`);
+}
+
 for (const [component, expected] of Object.entries({
 	runtime: {
 		version: '2.0.26',
