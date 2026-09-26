@@ -4,9 +4,13 @@
 ; MODULE: Shortcuts — AltGr Combos
 ; DESCRIPTION:
 ; AltGr-layer shortcuts: AltGr+LAlt and AltGr+CapsLock combos each dispatch
-; one of ten configurable actions. Both hotkeys are registered dynamically
-; (after onboarding) to prevent AHK from claiming SC138 as a prefix key at
-; parse time, which would silently break native AltGr for the wizard window.
+; one of ten configurable actions. Both hotkeys are registered dynamically,
+; after onboarding. SC138 is a prefix key from parse time all the same: the
+; always-eligible "~SC138 & ~F24" anchor (platform/remap/altgr.ahk) arms it on
+; every press, the first-run wizard's included. The wizard keeps the host
+; layout's native AltGr because that anchor carries ~ on the prefix, so
+; AutoHotkey never suppresses SC138, and every other SC138 combination is
+; false while the wizard is up (IsRealAltGrPress, IsOnboardingActive).
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -54,11 +58,10 @@ IsAltGrLAltEnabled() {
 }
 
 ; Dynamic registration of SC138 & SC038 -- see _RegisterAltGrShortcutsHotkeys
-; below. Defining this hotkey as a static ``SC138 & SC038::`` block would have
-; AHK claim SC138 as a prefix key at parse time, which breaks native AltGr
-; behaviour for the entire first-run wizard window. Registering at runtime
-; through _RegisterAltGrShortcutsHotkeys() -- called after Onboarding_Run
-; returns -- keeps SC138 a vanilla key until the wizard is done.
+; below, called after Onboarding_Run returns. SC138 is a prefix key from parse
+; time anyway (the "~SC138 & ~F24" anchor in platform/remap/altgr.ahk); the
+; wizard's native AltGr comes from that anchor's ~ and from IsRealAltGrPress
+; being false while the wizard is up (see the module header).
 
 AltGrLAltShortcut() {
 		global Features
@@ -168,11 +171,15 @@ AltGrCapsLockShortcut() {
 ; idempotence flag for an injected-dependency module-state guard.
 global _AltGrShortcutsRegistered := 0
 
-; Dynamic registration entry point -- called once Onboarding_Run() has returned
-; so the wizard never sees SC138 as a prefix key. Each Hotkey() pair below
-; mirrors the criterion of the previous static ``#HotIf`` block: AHK won't fire
-; the combo unless the feature is enabled AND the press came through a real
-; AltGr / Kana modifier.
+; Dynamic registration entry point -- called once Onboarding_Run() has returned.
+; This is not what keeps the wizard's AltGr native: the always-eligible
+; "~SC138 & ~F24" anchor (platform/remap/altgr.ahk) makes SC138 a prefix key
+; during the wizard too, and only its ~ on the prefix keeps AutoHotkey from
+; suppressing SC138 there; dropping that ~ would silently break the wizard's
+; AltGr characters (test_altgr_prefix_arms_on_press.ahk pins it). Each Hotkey()
+; pair below mirrors the criterion of the previous static ``#HotIf`` block: AHK
+; won't fire the combo unless the feature is enabled AND the press came through
+; a real AltGr / Kana modifier.
 _RegisterAltGrShortcutsHotkeys() {
 		global _AltGrShortcutsRegistered
 		; Single-call contract: re-running would orphan the prior HotIf criterion and
