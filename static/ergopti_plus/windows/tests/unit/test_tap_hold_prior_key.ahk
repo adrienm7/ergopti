@@ -84,6 +84,19 @@ _THPK_EmptyHistoryAndUnknownKeys() {
 Test("tap-hold prior key: empty history and unknown ids (tap-hold-prior-key-2026-09-25)",
 	_THPK_EmptyHistoryAndUnknownKeys)
 
+; On a standard AltGr layout every AltGr press starts with a fake LCtrl that
+; fires the left_ctrl tap-hold's hotkey before the RAlt arrives. That press's
+; tap is kept off by this guard: A_PriorKey is then "RAlt", never the LCtrl's
+; own name (altgr-fake-lctrl-comments-2026-09-26).
+_THPK_AltGrKeepsTheLCtrlTapOff() {
+	AssertFalse(TapHoldPriorKeyIsSelf("left_ctrl", "RAlt"),
+		"the fake LCtrl of an AltGr press must not tap: the key pressed last was RAlt")
+	AssertTrue(TapHoldPriorKeyIsSelf("left_ctrl", GetKeyName("SC01D")),
+		"a lone LCtrl press still taps")
+}
+Test("tap-hold prior key: an AltGr press keeps the fake LCtrl's tap off (altgr-fake-lctrl-comments-2026-09-26)",
+	_THPK_AltGrKeepsTheLCtrlTapOff)
+
 ; A layout can put a tap-hold key on a virtual key that has no name at all
 ; (VK_KANA-style AltGr remaps). AHK then reports an undocumented placeholder
 ; for A_PriorKey while GetKeyName answers "". The name cannot decide, so the
