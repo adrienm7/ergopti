@@ -78,18 +78,13 @@ global _LifecycleShutdownReason := ""
 ; trigger a suspend can call the same drain, and so a future native/external
 ; suspend hotkey cannot silently reintroduce the « AltGr/LAlt bloqué »
 ; regression by bypassing the wait. Safe no-op when entering from suspended
-; state, when a key's own feature gate is off (SC138 only arms as a prefix when
-; the Kana fixup is active), or when the key is not physically held.
+; state or when no prefix key is physically held. SC138 is waited for on every
+; layout: the always-eligible ~SC138 anchor in platform/remap/altgr.ahk arms it
+; on every AltGr press, not only on Kana-style layouts.
 _SuspendPrefixesAreClear() {
-		global _ALTGR_KANA_FIXUP
 		if A_IsSuspended
 				return
 		for PrefixKey in SUSPEND_CUSTOM_COMBO_PREFIX_KEYS {
-				; SC138 (AltGr/Kana) only behaves as an armed prefix when the Kana
-				; fixup is active on the current keyboard layout -- draining it
-				; unconditionally would KeyWait on a key that is not really latching.
-				if (PrefixKey = "SC138") and !(IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP)
-						continue
 				if GetKeyState(PrefixKey, "P")
 						return false
 		}
@@ -114,11 +109,8 @@ _ReleasePhantomModifiers() {
 ; Without this a wedged deferral says only "still waiting" — the user has no way
 ; to know WHICH key to cycle, which is the one thing that would fix it.
 _SuspendHeldPrefixKeys() {
-		global _ALTGR_KANA_FIXUP
 		Held := ""
 		for PrefixKey in SUSPEND_CUSTOM_COMBO_PREFIX_KEYS {
-				if (PrefixKey = "SC138") and !(IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP)
-						continue
 				if GetKeyState(PrefixKey, "P")
 						Held .= (Held == "" ? "" : ", ") . PrefixKey
 		}
