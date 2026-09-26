@@ -290,9 +290,11 @@ AltGr held as AltGr passes through (`altgr_criteria.ahk`), and so does a
 combination that holds AltGr (Shift+AltGr...) on such a layout, its owner
 pressing only the other members; a left_ctrl hold
 that took the fake LCtrl is handed back when the RAlt arrives
-(`TapHoldAltGrTakesItsLCtrl`, only where the boot probe found an AltGr level:
-QWERTY has no fake LCtrl); "LCtrl physically held" means
-`TapHoldUserLCtrlHeld()`. AHK keeps a modifier the driver pressed with
+(`TapHoldAltGrTakesItsLCtrl`); "LCtrl physically held" means
+`TapHoldUserLCtrlHeld()`. Only `KS_AltGrAddsFakeLCtrl()` layouts (not Kana,
+and the boot probe found an AltGr level) have the fake LCtrl: on QWERTY and
+Kana a physical LCtrl held with RAlt or SC138 is the user's Ctrl, so never read
+"RAlt down" as "the Ctrl is AltGr's" without that predicate. AHK keeps a modifier the driver pressed with
 `{X Down}` around later non-blind Sends, so a tap-hold's synthetic AltGr is
 lifted around output on every layout (`TapHoldSendWithOwnedKeyUp`).
 

@@ -384,12 +384,12 @@ KL_Watchers_DetectShortcut(vk, sc) {
 		Win   := GetKeyState("LWin", "P") or GetKeyState("RWin", "P")
 		Shift := GetKeyState("LShift", "P") or GetKeyState("RShift", "P")
 
-		; On a standard layout AltGr is RAlt + a synthetic LCtrl injected by
-		; Windows. When LAlt is NOT pressed, this Ctrl+Alt combo is the AltGr
+		; On a standard AltGr layout AltGr is RAlt + a synthetic LCtrl injected
+		; by Windows. When LAlt is NOT pressed, this Ctrl+Alt combo is the AltGr
 		; layer and the user is just typing a character — drop the « shortcut »
-		; framing. A Kana-style AltGr injects no Ctrl, so a Ctrl held with it is
-		; the user's own shortcut.
-		if (AltGr and Ctrl and !LAlt and !(IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP))
+		; framing. A Kana-style AltGr and QWERTY's plain right Alt inject no
+		; Ctrl, so a Ctrl held with them is the user's own shortcut.
+		if (AltGr and Ctrl and !LAlt and KS_AltGrAddsFakeLCtrl())
 				return ""
 		; Plain Shift+letter is capitalisation, never a shortcut.
 		if (!Ctrl and !LAlt and !Win)

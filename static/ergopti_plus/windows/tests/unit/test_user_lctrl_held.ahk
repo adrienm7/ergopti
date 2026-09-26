@@ -43,3 +43,19 @@ _ULH_AltGrLCtrlIsNotTheUsers() {
 }
 Test("user lctrl: AltGr's fake LCtrl is not the user's LCtrl (std-altgr-fake-lctrl-backspace-2026-09-26)",
 	_ULH_AltGrLCtrlIsNotTheUsers)
+
+; On QWERTY right Alt is a plain Alt with no fake LCtrl (the boot probe finds no
+; AltGr level), so a physical LCtrl held with it is the user's: LCtrl+RAlt then
+; LAlt tapped as Backspace must take the Ctrl+Backspace branch, not the
+; additive Ctrl+Alt+Backspace (qwerty-user-lctrl-2026-09-26).
+_ULH_QwertyLCtrlWithRAltIsTheUsers() {
+	Family := _TestSetAltGrFamily(false, false)
+	try {
+		AssertTrue(TapHoldUserLCtrlHeld(_ULH_Keys("SC01D", "RAlt")),
+			"QWERTY: a physical LCtrl held with the right Alt is the user's Ctrl")
+		AssertTrue(TapHoldUserLCtrlHeld(_ULH_Keys("SC01D")), "QWERTY: a real LCtrl alone is the user's")
+		AssertFalse(TapHoldUserLCtrlHeld(_ULH_Keys("RAlt")), "QWERTY: no LCtrl at all")
+	} finally _TestRestoreAltGrFamily(Family)
+}
+Test("user lctrl: on QWERTY an LCtrl held with right Alt is the user's (qwerty-user-lctrl-2026-09-26)",
+	_ULH_QwertyLCtrlWithRAltIsTheUsers)
