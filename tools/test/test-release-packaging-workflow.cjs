@@ -199,11 +199,44 @@ if (windowsToolchainStep !== null) {
 	}
 }
 
+// The AHK suites must run on the interpreter the exe ships with. They
+// downloaded a hardcoded 2.0.19 of their own, so a runtime bump in the contract
+// would have left every measured hook behaviour unchecked on the new base.
+// The test job reads the same contract, keys its cache on it and checks the
+// archive digest.
+try {
+	const contractStep = pipeline.findStep('Read AutoHotkey runtime contract');
+	const cacheStep = pipeline.findStep('Cache AutoHotkey runtime');
+	const downloadStep = pipeline.findStep('Download AutoHotkey v2 runtime');
+	for (const found of [contractStep, cacheStep, downloadStep]) {
+		if (found.file !== WINDOWS_BOX || found.job !== 'test-ahk') {
+			errors.push(`the AHK test runtime step runs in ${found.file} (job ${found.job}); it belongs in test-ahk of ${WINDOWS_BOX}`);
+		}
+	}
+	if (!contractStep.body.includes('windows_release_toolchain.json') || !contractStep.body.includes('ConvertFrom-Json')) {
+		errors.push('the AHK test job must read its runtime from the shared release contract');
+	}
+	const cacheKey = (/^\s+key:\s*(.*)$/m.exec(cacheStep.body) ?? [])[1] ?? '';
+	if (!cacheKey.includes('steps.ahk-contract.outputs.version') || !cacheKey.includes('steps.ahk-contract.outputs.sha256')) {
+		errors.push(`the AHK test runtime cache must be keyed on the contract version and digest, got: ${cacheKey}`);
+	}
+	for (const token of ['steps.ahk-contract.outputs.url', 'steps.ahk-contract.outputs.sha256', 'Get-FileHash']) {
+		if (!downloadStep.body.includes(token)) {
+			errors.push(`the AHK test runtime download is missing contract token ${token}`);
+		}
+	}
+	if (/releases\/download\/v\d/.test(downloadStep.body) || /ahk-v\d/.test(cacheKey)) {
+		errors.push('the AHK test runtime must not pin its own AutoHotkey version');
+	}
+} catch (error) {
+	errors.push(`the AHK test runtime steps are missing: ${error.message}`);
+}
+
 for (const [component, expected] of Object.entries({
 	runtime: {
-		version: '2.0.19',
-		asset: 'AutoHotkey_2.0.19.zip',
-		sha256: '4e0d0e65655066a646a210951320feaef0729a3597177131adaec4066bef5869',
+		version: '2.0.26',
+		asset: 'AutoHotkey_2.0.26.zip',
+		sha256: '43522aa3122a57784ac5db30abf85c2244475c36acd7796e2c993355f9e926ae',
 	},
 	compiler: {
 		tag: 'Ahk2Exe1.1.37.02a2',
