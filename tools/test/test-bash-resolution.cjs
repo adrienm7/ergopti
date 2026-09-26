@@ -12,7 +12,10 @@
  * launcher, so the scripts ran inside a Linux distribution with /mnt/<drive>
  * paths: six JS suite checks were red from PowerShell and green from Git Bash.
  * Nine other scripts carried resolvers of their own, whose fallbacks disagreed
- * (a bare "bash", "/bin/bash", a fixed C:\Program Files path).
+ * (a bare "bash", "/bin/bash", a fixed C:\Program Files path). The npm
+ * scripts test:linux, test:linux:e2e and build:linux started a bare "bash"
+ * too: npm hands a script line to cmd.exe on Windows, so from PowerShell
+ * verify-change ran the Linux suite inside WSL, never on the host.
  *
  * WHAT THIS PINS:
  * 1. The shared resolver, run for real: on Windows its bash is Git for
@@ -21,6 +24,9 @@
  * 2. No tool spawns a bare "bash" or "sh", no second resolver names a
  *    bash.exe, and no Python tool asks PATH for bash: each would reach WSL
  *    again from PowerShell. Floors keep a broken scan from passing.
+ * 3. No package.json script starts a bare "bash" or "sh" in any of its
+ *    commands. The detector is checked against each shape it rejects and each
+ *    replacement it accepts, so a detector that matches nothing fails.
  * ==============================================================================
  */
 
@@ -134,6 +140,55 @@ for (const file of scanned) {
 	if (JS_CONSUMER.test(text)) jsConsumers++;
 }
 
+// ==================================================
+// ==================================================
+// ======= 3/ No npm script starts a bare bash ======
+// ==================================================
+// ==================================================
+
+const MIN_NPM_SCRIPTS = 100;
+
+/**
+ * True when a shell command line starts a bare bash or sh in any of its
+ * commands: npm hands every script line to cmd.exe on Windows, where that name
+ * is WSL's launcher.
+ * @param {string} commandLine
+ * @returns {boolean}
+ */
+function runsBareShell(commandLine) {
+	return commandLine
+		.split(/&&|\|\||[;|&]/)
+		.some((command) => /^\s*(?:bash|sh)(?:\.exe)?(?:\s|$)/.test(command));
+}
+
+const COMMAND_LINE_CASES = [
+	['bash tools/build/build-linux-driver.sh --skip-smoke', true],
+	["cd static/ergopti_plus/linux && bash -c 'luajit tests/run.lua' --", true],
+	['sh ./tools/dev/install.sh', true],
+	['node ./tools/lib/git-bash.cjs tools/build/build-linux-driver.sh --skip-smoke', false],
+	['node ./tools/test/run-linux-lua.cjs tests/run.lua', false],
+	['shx rm -rf build && node ./tools/x.cjs', false],
+];
+for (const [commandLine, bare] of COMMAND_LINE_CASES) {
+	if (runsBareShell(commandLine) !== bare)
+		errors.push(
+			`runsBareShell(${JSON.stringify(commandLine)}) answered ${!bare}, expected ${bare}: the detector is broken`
+		);
+}
+
+const npmScripts = Object.entries(
+	JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).scripts || {}
+);
+for (const [name, commandLine] of npmScripts) {
+	if (runsBareShell(commandLine))
+		errors.push(
+			`package.json "${name}": starts a bare "bash"/"sh" through npm's shell, WSL's from PowerShell; ` +
+				'start a bash script with node ./tools/lib/git-bash.cjs, or spawn the program from a node script'
+		);
+}
+
+if (npmScripts.length < MIN_NPM_SCRIPTS)
+	errors.push(`read only ${npmScripts.length} package.json script(s) (floor ${MIN_NPM_SCRIPTS})`);
 if (scanned.length < MIN_SCANNED)
 	errors.push(`scanned only ${scanned.length} tools/ file(s) (floor ${MIN_SCANNED})`);
 if (jsConsumers < MIN_JS_CONSUMERS) {
@@ -154,5 +209,6 @@ if (errors.length > 0) {
 }
 console.log(
 	`\x1b[32m[OK] bash is ${bash} (${kernel}); ${jsConsumers} JS and ${pyConsumers} Python consumer(s) ` +
-		`of the shared resolver, no bare spawn in ${scanned.length} tools/ file(s).\x1b[0m`
+		`of the shared resolver, no bare spawn in ${scanned.length} tools/ file(s) ` +
+		`or ${npmScripts.length} npm script(s).\x1b[0m`
 );

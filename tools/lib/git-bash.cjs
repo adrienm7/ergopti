@@ -27,6 +27,10 @@
  *    here as it would for users, even when Homebrew's bash comes first on
  *    PATH. A host with no /bin/bash (NixOS) has no bash the shebangs could
  *    name, and takes PATH's bash.
+ * 4. Run as a script (`node tools/lib/git-bash.cjs <script.sh> [args...]`) it
+ *    runs that script with the same bash. npm hands every script line to
+ *    cmd.exe on Windows, so an npm script that starts a bare "bash" reaches
+ *    WSL from PowerShell; the npm scripts start their bash scripts this way.
  * ==============================================================================
  */
 
@@ -80,4 +84,30 @@ function bashExecutable() {
 	return bash;
 }
 
-module.exports = { SYSTEM_BASH, bashExecutable, gitForWindowsRoot };
+/**
+ * Runs a bash script with bashExecutable(), inheriting stdio.
+ * @param {string[]} argv The script path, then its arguments.
+ * @returns {number} Process exit code: the script's, or 1 when it could not
+ *   start or was killed by a signal.
+ */
+function runScript(argv) {
+	if (argv.length === 0) {
+		console.error('usage: node tools/lib/git-bash.cjs <script.sh> [args...]');
+		return 2;
+	}
+	const bash = bashExecutable();
+	const result = spawnSync(bash, argv, { stdio: 'inherit' });
+	if (result.error) {
+		console.error(`${bash} could not start: ${result.error.message}`);
+		return 1;
+	}
+	if (result.status === null) {
+		console.error(`${bash} ${argv[0]} was killed by ${result.signal}`);
+		return 1;
+	}
+	return result.status;
+}
+
+if (require.main === module) process.exitCode = runScript(process.argv.slice(2));
+
+module.exports = { SYSTEM_BASH, bashExecutable, gitForWindowsRoot, runScript };
