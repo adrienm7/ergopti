@@ -8,9 +8,10 @@
 ; after onboarding. SC138 is a prefix key from parse time all the same: the
 ; always-eligible "~SC138 & ~F24" anchor (platform/remap/altgr.ahk) arms it on
 ; every press, the first-run wizard's included. The wizard keeps the host
-; layout's native AltGr because that anchor carries ~ on the prefix, so
-; AutoHotkey never suppresses SC138, and every other SC138 combination is
-; false while the wizard is up (IsRealAltGrPress, IsOnboardingActive).
+; layout's native AltGr because every other SC138 combination is false while
+; it is up (IsRealAltGrPress, IsOnboardingActive) and AutoHotkey, which reads
+; SC138 as the RAlt modifier, never suppresses a modifier prefix that no
+; variant fires for (hook.cpp Case #1, "this_key.as_modifiersLR").
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -60,8 +61,9 @@ IsAltGrLAltEnabled() {
 ; Dynamic registration of SC138 & SC038 -- see _RegisterAltGrShortcutsHotkeys
 ; below, called after Onboarding_Run returns. SC138 is a prefix key from parse
 ; time anyway (the "~SC138 & ~F24" anchor in platform/remap/altgr.ahk); the
-; wizard's native AltGr comes from that anchor's ~ and from IsRealAltGrPress
-; being false while the wizard is up (see the module header).
+; wizard's native AltGr comes from IsRealAltGrPress being false while the
+; wizard is up, and from SC138 being a modifier AutoHotkey does not suppress
+; as an unused prefix (see the module header).
 
 AltGrLAltShortcut() {
 		global Features
@@ -174,9 +176,11 @@ global _AltGrShortcutsRegistered := 0
 ; Dynamic registration entry point -- called once Onboarding_Run() has returned.
 ; This is not what keeps the wizard's AltGr native: the always-eligible
 ; "~SC138 & ~F24" anchor (platform/remap/altgr.ahk) makes SC138 a prefix key
-; during the wizard too, and only its ~ on the prefix keeps AutoHotkey from
-; suppressing SC138 there; dropping that ~ would silently break the wizard's
-; AltGr characters (test_altgr_prefix_arms_on_press.ahk pins it). Each Hotkey()
+; during the wizard too, and the press still reaches the wizard because
+; AutoHotkey reads SC138 as the RAlt modifier and never suppresses a modifier
+; prefix that no variant fires for (hook.cpp Case #1, "this_key.as_modifiersLR").
+; The anchor's ~ fires the standalone SC138 hotkeys on the press instead
+; (test_altgr_prefix_arms_on_press.ahk pins it). Each Hotkey()
 ; pair below mirrors the criterion of the previous static ``#HotIf`` block: AHK
 ; won't fire the combo unless the feature is enabled AND the press came through
 ; a real AltGr / Kana modifier.

@@ -228,10 +228,11 @@ IsRealAltGrPress() {
     ; #HotIf that gates on IsRealAltGrPress(), which is the gate used by every
     ; static SC138 combo in the codebase. SC138 still stays an armed prefix:
     ; the always-eligible "~SC138 & ~F24" anchor (platform/remap/altgr.ahk)
-    ; has no criterion, and only the ~ on its prefix keeps AutoHotkey from
-    ; suppressing the key, so the native AltGr press reaches the wizard. The
-    ; flag flips back automatically when the wizard committed (Reload) or when
-    ; the user closed it (ExitApp).
+    ; has no criterion. AutoHotkey reads SC138 as the RAlt modifier and never
+    ; suppresses a modifier prefix that no variant fires for (hook.cpp Case #1,
+    ; "this_key.as_modifiersLR"), so the native AltGr press reaches the
+    ; wizard. The flag flips back automatically when the wizard committed
+    ; (Reload) or when the user closed it (ExitApp).
     if (IsSet(_OB_ALTGR_PASSTHROUGH) and _OB_ALTGR_PASSTHROUGH) {
         return false
     }
