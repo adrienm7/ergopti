@@ -10,9 +10,12 @@
 ;   SendEvent is synchronous: it flushes the event through the Windows message
 ;   queue and all active keyboard hooks before returning. On a system with the
 ;   AHK hook at input level 2, that round-trip adds ~10-20 ms to every hotstring
-;   expansion on AltGr-fixup keyboards. Since _ALTGR_KANA_FIXUP=true is the
-;   default for French AZERTY layouts, this hit every expansion — the 70 ms
-;   HSE.Dispatch warning for "l'" was partly caused by this.
+;   expansion on AltGr-fixup keyboards. _ALTGR_KANA_FIXUP is true on a
+;   Kana-style layout, where the AltGr key is moved off VK_RMENU (the Ergopti
+;   layout puts it on VK_OEM_8), or when the AltGr-is-Kana TOML override forces
+;   it; it is false on AZERTY, bépo and QWERTY, where VK_RMENU is mapped. On
+;   those Kana layouts this hit every expansion — the 70 ms HSE.Dispatch
+;   warning for "l'" was partly caused by this.
 ;   The lift now goes through the tap-hold owner (so a tap-hold's own AltGr
 ;   hold survives the expansion, kana-altgr-lift-owner-2026-09-25), whose
 ;   TapHoldLiftKey sends through TextSender, a SendInput funnel. Reverting

@@ -121,6 +121,26 @@ _THAC_WheelDoesNotFireConfiguredTapAction() {
 }
 Test("tap-hold: Ctrl+wheel does not dispatch the configured tap action (ctrl-wheel-no-dispatch)", _THAC_WheelDoesNotFireConfiguredTapAction)
 
+; An AltGr press on a standard AltGr layout reaches the left_ctrl tap-hold as
+; its fake LCtrl first, then as the RAlt. The RAlt the hook passes through is
+; activity during the LCtrl hold, so that press never taps
+; (altgr-fake-lctrl-comments-2026-09-26).
+_THAC_AltGrRAltCancelsTheFakeLCtrlTap() {
+	_THAC_ResetState()
+	try {
+		HookDispatcher._OnKeyDown(0, 0xA2, 0x01D)
+		HookDispatcher._OnKeyDown(0, 0xA5, 0x138)
+		HookDispatcher._OnKeyUp(0, 0xA5, 0x138)
+		HookDispatcher._OnKeyUp(0, 0xA2, 0x01D)
+		AssertTrue(TapHoldShouldCancelTap("left_ctrl", 500) != "",
+			"the RAlt of an AltGr press must cancel the tap of its fake LCtrl")
+	} finally {
+		_THAC_ResetState()
+	}
+}
+Test("tap-hold: an AltGr RAlt cancels the tap of its fake LCtrl (altgr-fake-lctrl-comments-2026-09-26)",
+	_THAC_AltGrRAltCancelsTheFakeLCtrlTap)
+
 
 
 
