@@ -1474,6 +1474,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_altgr_kana_taphold_entry.ahk
 #Include meta/test_altgr_prefix_arms_on_press.ahk
 #Include unit/test_altgr_owner_matrix.ahk
+#Include unit/test_altgr_combos_stand_down.ahk
 #Include meta/test_prior_key_guards_use_helper.ahk
 #Include meta/test_modifier_hotkeys_single_identity.ahk
 #Include meta/test_spotlight_gdiplus_free_library.ahk

@@ -85,7 +85,10 @@ _RegisterScriptAltGrHotkeys() {
 				Hotkey(_ScriptAltGrHookKey("^!Escape"), _ScriptAltGrEscapeHandler, opts)
 		}
 		if (IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP) {
-				HotIf((*) => GetKeyState("SC138", "P"))
+				; Stands down with the combinations when the AltGr key holds
+				; another modifier or a layer (AltGrKeyIsAltGr): AltGr+Enter
+				; held as Ctrl is Ctrl+Enter, not a script chord.
+				HotIf((*) => GetKeyState("SC138", "P") and AltGrKeyIsAltGr())
 				Hotkey(_ScriptAltGrHookKey("SC01C"), _ScriptAltGrEnterHandler, opts)
 				Hotkey(_ScriptAltGrHookKey("SC00E"), _ScriptAltGrBackSpaceHandler, opts)
 				Hotkey(_ScriptAltGrHookKey("SC153"), _ScriptAltGrDeleteHandler, opts)
