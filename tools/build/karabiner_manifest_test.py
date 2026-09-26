@@ -5,10 +5,11 @@ import json
 from pathlib import Path
 import re
 import shlex
-import shutil
 import subprocess
 from tempfile import TemporaryDirectory
 import unittest
+
+from karabiner_test_fixture import bash_executable
 
 
 class PackageBuildTests(unittest.TestCase):
@@ -30,7 +31,7 @@ class PackageBuildTests(unittest.TestCase):
                 "log() { :; }", 'fail() { printf "%s\\n" "$1" >&2; exit 19; }',
                 'shasum() { printf "%s  fixture\\n" ' + observed + '; }',
                 "hdiutil() { return 23; }", function.group(), "download_karabiner"))
-            return subprocess.run([shutil.which("bash") or "/bin/bash", "-c", script],
+            return subprocess.run([bash_executable(), "-c", script],
                                   capture_output=True, text=True, timeout=10)
 
     def test_cached_package_is_verified_even_if_extraction_already_exists(self):

@@ -46,6 +46,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const { bashExecutable } = require('../lib/git-bash.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const INSTALLER = path.join(ROOT, 'static', 'ergopti_plus', 'linux', 'install.sh');
@@ -54,17 +55,6 @@ function bashPath(value) {
 	const normalized = value.replaceAll('\\', '/');
 	if (process.platform !== 'win32') return normalized;
 	return normalized.replace(/^([A-Za-z]):/, (_, drive) => `/${drive.toLowerCase()}`);
-}
-
-function bashExecutable() {
-	if (process.platform !== 'win32') return 'bash';
-	const candidates = [
-		path.join(process.env.ProgramFiles || 'C:\\Program Files', 'Git', 'bin', 'bash.exe'),
-		path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Git', 'bin', 'bash.exe')
-	];
-	const found = candidates.find((candidate) => fs.existsSync(candidate));
-	if (!found) throw new Error('Git Bash is required to run the Linux installer sandbox');
-	return found;
 }
 
 /** Writes an executable stub. */

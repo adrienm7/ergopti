@@ -31,6 +31,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const { bashExecutable } = require('../lib/git-bash.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const BUILD_REL = 'tools/build/build_macos_app.sh';
@@ -97,7 +98,7 @@ function runPackaging(versions) {
 		fnMatch[0],
 		'bundle_keyboard_layout "$1"',
 	].join('\n');
-	const result = spawnSync('bash', ['-c', script, 'fixture', staticRoot.replace(/\\/g, '/')], {
+	const result = spawnSync(bashExecutable(), ['-c', script, 'fixture', staticRoot.replace(/\\/g, '/')], {
 		encoding: 'utf8',
 		env: { ...process.env, REPO_ROOT: path.join(fixture, 'repo').replace(/\\/g, '/') },
 	});

@@ -14,6 +14,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const pipeline = require('./ci-pipeline.cjs');
+const { bashExecutable } = require('../lib/git-bash.cjs');
 
 const root = path.resolve(__dirname, '..', '..');
 const workflow = pipeline.text();
@@ -173,11 +174,7 @@ try {
 	);
 
 	const toPosix = (value) => value.replace(/^([A-Za-z]):/, '/$1').replaceAll('\\', '/');
-	const bash =
-		process.platform === 'win32' && fs.existsSync('C:/Program Files/Git/bin/bash.exe')
-			? 'C:/Program Files/Git/bin/bash.exe'
-			: 'bash';
-	const generated = spawnSync(bash, [toPosix(path.join(root, 'tools', 'build', 'generate_appcast.sh'))], {
+	const generated = spawnSync(bashExecutable(), [toPosix(path.join(root, 'tools', 'build', 'generate_appcast.sh'))], {
 		encoding: 'utf8',
 		env: {
 			...process.env,

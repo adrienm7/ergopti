@@ -301,6 +301,7 @@
 		"test:repository-eol-policy": "node ./tools/test/test-repository-eol-policy.cjs",
 		"test:node-runtime-single-source": "node ./tools/test/test-node-runtime-single-source.cjs",
 		"test:project-rtk": "node ./tools/test/test-rtk-project-integration.cjs",
+		"test:bash-resolution": "node ./tools/test/test-bash-resolution.cjs",
 		"test:editor-format-on-save": "node ./tools/test/test-editor-format-on-save.cjs",
 		"check:agent-skills": "node ./tools/agents/sync-skills.cjs check",
 		"sync:agent-skills": "node ./tools/agents/sync-skills.cjs write"

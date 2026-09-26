@@ -7,28 +7,12 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const { bashExecutable } = require('../lib/git-bash.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const MACOS_ROOT = path.join(ROOT, 'static', 'ergopti_plus', 'macos');
 const SHARED_LUA_ROOT = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'lua');
 const PORT = 45678;
-
-function findBash() {
-	const candidates = [];
-	if (process.platform === 'win32') {
-		const git = spawnSync('git', ['--exec-path'], { encoding: 'utf8' });
-		if (git.status === 0 && git.stdout.trim()) {
-			candidates.push(path.resolve(git.stdout.trim(), '..', '..', '..', 'bin', 'bash.exe'));
-		}
-		candidates.push('C:\\Program Files\\Git\\bin\\bash.exe');
-	} else {
-		candidates.push('/bin/bash', 'bash');
-	}
-	for (const candidate of candidates) {
-		if (candidate === 'bash' || fs.existsSync(candidate)) return candidate;
-	}
-	throw new Error('bash is required for the Ollama daemon command regression');
-}
 
 function toBashPath(filePath) {
 	if (process.platform !== 'win32') return filePath;
@@ -65,7 +49,7 @@ function readOnlyLog(logDir) {
 	return fs.readFileSync(path.join(logDir, names[0]), 'utf8');
 }
 
-const bash = findBash();
+const bash = bashExecutable();
 const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-ollama-command-'));
 
 try {

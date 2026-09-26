@@ -16,6 +16,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const { bashExecutable } = require('../lib/git-bash.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const MACOS_ROOT = path.join(ROOT, 'static', 'ergopti_plus', 'macos');
@@ -45,24 +46,6 @@ function report() {
 	});
 	console.log(`# passed: ${passed}/${results.length}`);
 	if (failed > 0) process.exit(1);
-}
-
-function resolveBash() {
-	const candidates = [];
-	if (process.platform === 'win32') {
-		const git = spawnSync('git', ['--exec-path'], { encoding: 'utf8' });
-		if (!git.error && git.status === 0) {
-			candidates.push(path.resolve(git.stdout.trim(), '..', '..', '..', 'bin', 'bash.exe'));
-		}
-		candidates.push('C:\\Program Files\\Git\\bin\\bash.exe');
-	} else {
-		candidates.push('/bin/bash', 'bash');
-	}
-	for (const candidate of candidates) {
-		const probe = spawnSync(candidate, ['--version'], { encoding: 'utf8' });
-		if (!probe.error && probe.status === 0) return candidate;
-	}
-	return null;
 }
 
 function toBashPath(filePath) {
@@ -209,11 +192,7 @@ function cleanupFixture(fixture) {
 	}
 }
 
-const bash = resolveBash();
-if (!bash) {
-	console.error('No usable Bash interpreter found.');
-	process.exit(1);
-}
+const bash = bashExecutable();
 
 const flaky = createFixture('flaky', 'good');
 try {

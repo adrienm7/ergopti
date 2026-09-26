@@ -6,13 +6,12 @@ from contextlib import redirect_stderr
 import io
 import sys
 import plistlib
-import shutil
 import subprocess
 from tempfile import TemporaryDirectory
 import unittest
 
 from karabiner_candidate import BUILD_STEP, LAUNCHD_RESOURCES, PRODUCTS, SIGN_STEP, inspect_products, native, packaging_script
-from karabiner_test_fixture import make_products, signature_verifier
+from karabiner_test_fixture import bash_executable, make_products, signature_verifier
 
 
 class CandidateTests(unittest.TestCase):
@@ -110,7 +109,7 @@ class CandidateTests(unittest.TestCase):
             identity.write_bytes(b"exact candidate identity")
             source = "set -eu\nruby() { exit 98; }\n" + BUILD_STEP + "\n" + SIGN_STEP + "\n"
             script = packaging_script(source, identity.as_posix())
-            result = subprocess.run([shutil.which("bash") or "/bin/bash", "-c", script], cwd=root,
+            result = subprocess.run([bash_executable(), "-c", script], cwd=root,
                                     text=True, capture_output=True, timeout=10)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertEqual((root / target).read_bytes(), identity.read_bytes())

@@ -26,6 +26,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const { bashExecutable } = require('../lib/git-bash.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const build = fs.readFileSync(path.join(ROOT, 'tools/build/build_macos_app.sh'), 'utf8');
@@ -76,7 +77,7 @@ if (buildFunction && archStart >= 0 && archEnd > archStart) {
 	const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-launcher-archs-'));
 	try {
 		fs.writeFileSync(path.join(tmp, 'ErgoptiPlus'), 'product');
-		const replay = (lipoOutput) => spawnSync('bash', ['-c', `
+		const replay = (lipoOutput) => spawnSync(bashExecutable(), ['-c', `
 set -e
 LAUNCHER_DIR="$1"
 log() { :; }

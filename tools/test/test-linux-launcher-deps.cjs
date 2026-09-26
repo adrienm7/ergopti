@@ -56,6 +56,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const { bashExecutable } = require('../lib/git-bash.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const DRIVER = path.join(ROOT, 'static', 'ergopti_plus', 'linux');
@@ -221,10 +222,7 @@ if (
 	const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-linux-deps-'));
 	const fakeManager = path.join(fixtureRoot, 'apk');
 	const toPosix = (value) => value.replace(/^([A-Za-z]):/, '/$1').replaceAll('\\', '/');
-	const bash =
-		process.platform === 'win32' && fs.existsSync('C:/Program Files/Git/bin/bash.exe')
-			? 'C:/Program Files/Git/bin/bash.exe'
-			: '/bin/bash';
+	const bash = bashExecutable();
 	try {
 		fs.writeFileSync(
 			fakeManager,

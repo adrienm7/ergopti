@@ -15,7 +15,7 @@ from unittest.mock import patch
 
 from karabiner_candidate import PRODUCTS, inspect_products
 from karabiner_candidate_install import MARKER, configuration_snapshot, reference, verify_configuration, verify_download, verify_installed
-from karabiner_test_fixture import make_products, signature_verifier
+from karabiner_test_fixture import bash_executable, make_products, signature_verifier
 
 
 def installed_fixture(directory):
@@ -175,7 +175,7 @@ export -f uname hdiutil sudo
 bash "$1" "$2"
 """
                 helper = Path(__file__).with_name("karabiner_install_image.sh").resolve()
-                result = subprocess.run([shutil.which("bash") or "/bin/bash", "-c", script, "fixture",
+                result = subprocess.run([bash_executable(), "-c", script, "fixture",
                                          helper.as_posix(), image.as_posix()], env=environment,
                                         capture_output=True, text=True, timeout=10)
                 self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
