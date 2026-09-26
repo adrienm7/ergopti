@@ -24,7 +24,8 @@
 ---    they check on Linux. Windows resolves those paths drive-relative,
 ---    natively. The per-run stamp keeps one run's leftovers (os.remove
 ---    cannot delete directories here) from colliding with the next run's
----    fixtures.
+---    fixtures. Like the mkstemp(3) behind a POSIX os.tmpname(), it creates
+---    the empty file it names: a test may treat the name as an existing file.
 --- 3. os.rename() removes an existing destination first (POSIX replace).
 ---    Lua file calls are otherwise unwrapped: bytes on disk are real.
 --- 4. Bare "mkdir" commands are executed natively (cmd creates intermediate
@@ -566,9 +567,25 @@ function M.install()
 		return real_getenv(name)
 	end
 
+	-- A POSIX os.tmpname() takes its name from mkstemp(3), which creates the
+	-- file: a test may hand the name straight to code that probes for an
+	-- existing file. Answering a name with nothing behind it made such a probe
+	-- report "absent" on this host only. A name that already exists is refused,
+	-- as mkstemp refuses it, rather than handed out a second time.
 	os.tmpname = function()
 		tmp_counter = tmp_counter + 1
-		return "/tmp/ergopti-win-test/" .. RUN_TAG .. "-" .. tostring(tmp_counter)
+		local path = "/tmp/ergopti-win-test/" .. RUN_TAG .. "-" .. tostring(tmp_counter)
+		local existing = real_open(path, "rb")
+		if existing then
+			existing:close()
+			error("win_compat: os.tmpname() found " .. path .. " already present", 2)
+		end
+		local handle, open_error = real_open(path, "wb")
+		if not handle then
+			error("win_compat: os.tmpname() could not create " .. path .. ": " .. tostring(open_error), 2)
+		end
+		handle:close()
+		return path
 	end
 
 	os.rename = function(old_path, new_path)
