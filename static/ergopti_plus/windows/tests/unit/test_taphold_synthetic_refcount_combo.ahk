@@ -511,24 +511,25 @@ Test("fatal startup input cleanup: tracked LShift and Caps modes are retired bef
 ; layout). An alt_gr hold must hold the layout's own AltGr, the SC138 key, and
 ; release that same key (kana-altgr-hold-2026-09-25).
 _TSRC_KanaAltGrHoldSendsTheLayoutAltGr() {
-	global _ALTGR_KANA_FIXUP
-	PreviousKana := _ALTGR_KANA_FIXUP
+	Family := _TestSetAltGrFamily(true)
 	_TSRC_Begin()
 	try {
-		_ALTGR_KANA_FIXUP := true
 		ModKey := ResolveHoldModifierKey("alt_gr", "space")
+		AssertEqual("SC138", ModKey, "the hold's identity stays the physical AltGr key")
 		TapHoldSyntheticKeyDown(ModKey)
-		AssertEqual(1, _TSRC_Count("{SC138 Down}"),
-			"a Kana alt_gr hold must press the layout's AltGr key (SC138)")
+		AssertEqual(1, _TSRC_Count("{Blind}{vkDF Down}"),
+			"a Kana alt_gr hold must press the layout's AltGr key, by its virtual key")
+		AssertEqual(0, _TSRC_Count("{SC138 Down}"),
+			"a bare SC138 press makes AHK add a right Alt, a plain Alt there (kana-altgr-send-name-2026-09-26)")
 		AssertEqual(0, _TSRC_Count("{RAlt Down}"),
 			"a Kana alt_gr hold must never press RAlt, a plain Alt on that layout")
 		TapHoldSyntheticKeyUp(ModKey)
-		AssertEqual(1, _TSRC_Count("{SC138 Up}"),
+		AssertEqual(1, _TSRC_Count("{Blind}{vkDF Up}"),
 			"the hold must release the same AltGr key it pressed")
 		AssertEqual(0, _TSRC_Count("{RAlt Up}"),
 			"a Kana alt_gr hold must never release RAlt either")
 	} finally {
-		_ALTGR_KANA_FIXUP := PreviousKana
+		_TestRestoreAltGrFamily(Family)
 		_TSRC_End()
 	}
 }
@@ -557,7 +558,6 @@ _TSRC_OwnerReleaseSequence(ModKey) {
 }
 
 _TSRC_LoneMenuModifierIsMaskedBeforeRelease() {
-	global _ALTGR_KANA_FIXUP
 	Mask := "{Blind}{" . A_MenuMaskKey . "}"
 	AssertEqual("{LAlt Down}|" . Mask . "|{LAlt Up}", _TSRC_OwnerReleaseSequence("LAlt"),
 		"a held Alt must be masked right before its release")
@@ -570,13 +570,12 @@ _TSRC_LoneMenuModifierIsMaskedBeforeRelease() {
 		"a combination holding Alt must be masked once before its release")
 	AssertEqual("{LCtrl Down}|{LCtrl Up}", _TSRC_OwnerReleaseSequence("LCtrl"),
 		"Ctrl opens no menu and must not be masked")
-	PreviousKana := _ALTGR_KANA_FIXUP
+	Family := _TestSetAltGrFamily(true)
 	try {
-		_ALTGR_KANA_FIXUP := true
-		AssertEqual("{SC138 Down}|{SC138 Up}", _TSRC_OwnerReleaseSequence(KS_AltGrKeyName()),
+		AssertEqual("{Blind}{vkDF Down}|{Blind}{vkDF Up}", _TSRC_OwnerReleaseSequence(KS_AltGrKeyName()),
 			"the Kana layout's AltGr opens no menu and must not be masked")
 	} finally {
-		_ALTGR_KANA_FIXUP := PreviousKana
+		_TestRestoreAltGrFamily(Family)
 	}
 }
 Test("taphold-synthetic: a lone synthetic Alt or Win is masked before its release (lone-modifier-mask-2026-09-25)",

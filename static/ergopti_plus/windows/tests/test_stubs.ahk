@@ -390,6 +390,26 @@ global CapsWordEnabled := false
 ; below the first message pump; the headless harness never loads ErgoptiPlus.ahk, so
 ; it must seed the same sentinel here.
 global _ALTGR_KANA_FIXUP := false
+
+; Put the driver on a Kana-style layout (Kana true: VK_RMENU unmapped, the AltGr
+; key on VK_OEM_8, as on the Ergopti layout) or on a standard AltGr layout, as
+; the boot probe (HotstringEngineInit) would. Returns the state to hand to
+; _TestRestoreAltGrFamily.
+_TestSetAltGrFamily(Kana) {
+	global _ALTGR_KANA_FIXUP, _ALTGR_LAYOUT_PROBE
+	Saved := { Kana: _ALTGR_KANA_FIXUP, Probe: _ALTGR_LAYOUT_PROBE }
+	_ALTGR_KANA_FIXUP := Kana
+	_ALTGR_LAYOUT_PROBE := Map("hkl", Kana ? 0xFC06040C : 0x040C040C,
+		"rmenu_sc", Kana ? 0 : 0xE038, "altgr_vk", Kana ? 0xDF : 0xA5,
+		"valid", true, "kana", Kana, "source", "probe")
+	return Saved
+}
+
+_TestRestoreAltGrFamily(Saved) {
+	global _ALTGR_KANA_FIXUP, _ALTGR_LAYOUT_PROBE
+	_ALTGR_KANA_FIXUP := Saved.Kana
+	_ALTGR_LAYOUT_PROBE := Saved.Probe
+}
 global OneShotShiftEnabled := false
 global NumberOfRepetitions := 1
 global ActivitySimulation := false
