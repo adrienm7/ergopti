@@ -67,8 +67,10 @@ _RegisterScriptAltGrHotkeys() {
 		; were dead: the SC138 hotkeys route every right Alt event to the scan
 		; code's record, and the SC01C/SC00E/SC153/SC001 hotkeys below route
 		; those keys' events to theirs, so a twin named by a virtual key was never
-		; looked up (hook.cpp: sc_takes_precedence).
-		HotIf((*) => IsRealAltGrPress())
+		; looked up (hook.cpp: sc_takes_precedence). ScriptAltGrChordIsLive keeps
+		; them, running and paused, off a layout whose AltGr key is a plain Alt:
+		; on QWERTY RAlt+Esc must stay Alt+Esc, not quit the driver.
+		HotIf((*) => ScriptAltGrChordIsLive(IsRealAltGrPress()))
 		Hotkey(_ScriptAltGrHookKey("SC138 & SC01C"), _ScriptAltGrEnterHandler, opts)
 		Hotkey(_ScriptAltGrHookKey("SC138 & SC00E"), _ScriptAltGrBackSpaceHandler, opts)
 		Hotkey(_ScriptAltGrHookKey("SC138 & SC153"), _ScriptAltGrDeleteHandler, opts)
@@ -87,9 +89,9 @@ _RegisterScriptAltGrHotkeys() {
 		}
 		; While paused the AltGr combinations cannot arm (the prefix anchor is
 		; suspended with every hotkey), so the chords run from the suffix alone.
-		; With * they also match under the LCtrl+RAlt an AltGr layout holds, or
-		; the RAlt of QWERTY: without it, AltGr+Enter could not unpause there.
-		HotIf((*) => A_IsSuspended and GetKeyState("SC138", "P"))
+		; With * they also match under the LCtrl+RAlt an AltGr layout holds:
+		; without it, AltGr+Enter could not unpause there.
+		HotIf((*) => ScriptAltGrChordIsLive(A_IsSuspended and GetKeyState("SC138", "P")))
 		Hotkey(_ScriptAltGrHookKey("*SC01C"), _ScriptAltGrEnterHandler, opts)
 		Hotkey(_ScriptAltGrHookKey("*SC00E"), _ScriptAltGrBackSpaceHandler, opts)
 		Hotkey(_ScriptAltGrHookKey("*SC153"), _ScriptAltGrDeleteHandler, opts)
