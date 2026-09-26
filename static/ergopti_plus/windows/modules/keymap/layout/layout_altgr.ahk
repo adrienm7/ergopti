@@ -248,6 +248,19 @@ IsRealAltGrPress() {
     return GetKeyState("RAlt", "P")
 }
 
+; #HotIf of the script chords (AltGr+Escape quits, +Enter toggles the pause,
+; +BackSpace reloads, +Delete opens the personal shortcuts), running and paused
+; (infra/script_altgr_hotkeys.ahk). On QWERTY the AltGr key is a plain right
+; Alt, and the always-eligible prefix anchor arms SC138 on its first press:
+; RAlt+Esc, Windows' Alt+Esc, quit the driver. These chords are destructive, so
+; they need a layout whose AltGr key is an AltGr; on QWERTY those keys stay
+; native Alt chords.
+; @param AltGrPressed {Boolean} The chord's own AltGr check.
+; @return {Boolean}
+ScriptAltGrChordIsLive(AltGrPressed) {
+    return AltGrPressed and KS_LayoutHasAltGr()
+}
+
 ; Run the Plain or Shifted callable from ``Table[SC]`` depending on the
 ; current Shift state. The ``*`` parameter swallows the hotkey name that
 ; AHK passes when invoking a hotkey callback.

@@ -277,6 +277,16 @@ KS_AltGrAddsFakeLCtrl() {
 	return !_ALTGR_KANA_FIXUP and IsSet(_ALTGR_LAYOUT_PROBE) and _ALTGR_LAYOUT_PROBE["altgr_level"]
 }
 
+; Whether the layout's AltGr key is an AltGr: a Kana-style AltGr, or right Alt
+; on a layout where the boot probe found an AltGr level. On QWERTY right Alt is
+; a plain Alt. Read by #HotIf criteria, live before this file's globals are
+; assigned.
+; @return {Boolean}
+KS_LayoutHasAltGr() {
+	global _ALTGR_KANA_FIXUP, _ALTGR_LAYOUT_PROBE
+	return _ALTGR_KANA_FIXUP or (IsSet(_ALTGR_LAYOUT_PROBE) and _ALTGR_LAYOUT_PROBE["altgr_level"])
+}
+
 ; AHK key name that presses the active layout's AltGr. Standard AltGr layouts
 ; put AltGr on VK_RMENU, so "RAlt" is AltGr there. Kana-style remaps
 ; (_ALTGR_KANA_FIXUP, resolved at boot) move AltGr to another virtual key and
