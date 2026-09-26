@@ -376,4 +376,21 @@ helpers.describe("paths: the driver root is absolute", function()
 			"shared_root() must be absolute, got " .. tostring(shared))
 	end)
 
+	helpers.it("anchors to the working directory this process opens files in", function()
+		-- Absolute is not enough: the anchored root is where every shared file
+		-- is opened from. On Windows the working directory came back from the
+		-- Git userland's pwd as "/d/...", which this process resolves as
+		-- "D:\d\...", so the daemon started from a checkout found no shared tree.
+		local Paths = helpers.load_module("infra.paths")
+		local name = string.format("ergopti-cwd-probe-%d-%d.tmp", os.time(), math.random(1, 1000000))
+		local probe = assert(io.open(name, "w"))
+		probe:close()
+		local anchored = Paths._absolute_for_test("./" .. name)
+		local found = io.open(anchored, "r")
+		if found then found:close() end
+		os.remove(name)
+		helpers.assert_true(found ~= nil,
+			"'./" .. name .. "' was anchored to " .. anchored .. ", which names no file")
+	end)
+
 end)
