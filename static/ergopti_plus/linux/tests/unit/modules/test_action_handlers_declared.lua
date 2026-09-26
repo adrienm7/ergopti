@@ -488,10 +488,13 @@ helpers.describe("linux actions: modifier chords", function()
 					helpers.assert_eq(#commands, 1, chord.id .. " with no uinput device runs xdotool once")
 					local keys = commands[1]:match("^xdotool key (%S+)")
 					helpers.assert_not_nil(keys, chord.id .. " falls back to `xdotool key`: " .. commands[1])
+					local parts = 0
 					for part in keys:gmatch("[^+]+") do
+						parts = parts + 1
 						helpers.assert_true(part:match("^[%w_]+$") ~= nil, string.format(
 							"%s: '%s' is no X keysym name, xdotool rejects it", chord.id, part))
 					end
+					helpers.assert_true(parts >= 2, chord.id .. " sends a modifier and a key: " .. keys)
 				end)
 			end
 		end)
