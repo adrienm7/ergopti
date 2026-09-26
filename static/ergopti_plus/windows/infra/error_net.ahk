@@ -57,6 +57,18 @@ _ShouldReleaseModifier(ModKey) {
 		return GetKeyState(ModKey) and !GetKeyState(ModKey, "P")
 }
 
+; Whether releasing the stuck modifiers ModKeys needs the menu mask first: any
+; Alt or Win among them, whose lone release opens the window menu or Start.
+; @param ModKeys {Array} Key names about to be released.
+; @return {Boolean}
+_ErrorNetReleaseNeedsMenuMask(ModKeys) {
+		for _, ModKey in ModKeys {
+				if KS_IsMenuModifier(ModKey)
+						return true
+		}
+		return false
+}
+
 ; Retire input state that can already be owned while startup is still partial.
 ; This function is intentionally independent of the full OnExit transaction:
 ; OnExit is registered only after the keylogger starts, while parse-time hotkeys
@@ -210,13 +222,20 @@ ErgoptiGlobalErrorHandler(Exc, Mode) {
 		StuckCandidates := ["LControl", "RControl", "LShift", "RShift", "LAlt", "RAlt", "LWin", "RWin"]
 		if (KS_AltGrKeyName() != "RAlt")
 				StuckCandidates.Push(KS_AltGrKeyName())
+		Stuck := []
 		for _, ModKey in StuckCandidates {
-				if _ShouldReleaseModifier(ModKey) {
-						; AHK-35: SendEvent can throw on a hook conflict or foreground-window race;
-						; guard it so a failure on one modifier doesn't abort releasing the others
-						; or skip the deferred crash report + tray toast that follow
-						try SendEvent("{" ModKey " Up}")
-				}
+				if _ShouldReleaseModifier(ModKey)
+						Stuck.Push(ModKey)
+		}
+		; A stuck Alt or Win released with nothing typed after it opens the window
+		; menu or Start, where the next keys land: mask it first, once.
+		if _ErrorNetReleaseNeedsMenuMask(Stuck)
+				try SendEvent("{Blind}{" . A_MenuMaskKey . "}")
+		for _, ModKey in Stuck {
+				; AHK-35: SendEvent can throw on a hook conflict or foreground-window race;
+				; guard it so a failure on one modifier doesn't abort releasing the others
+				; or skip the deferred crash report + tray toast that follow
+				try SendEvent("{" ModKey " Up}")
 		}
 		; Best-effort logging — guarded because the logger may not be initialised
 		; yet when an early-boot error fires the handler.

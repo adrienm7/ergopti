@@ -343,9 +343,8 @@ _TapHoldReleaseOwnedModifier(ModKey) {
 ; @param Key {String|Array} Key name, or the key names about to be released.
 ; @return {Boolean} False only when a needed mask could not be sent.
 _TH_MaskMenuModifierRelease(Key) {
-	static MenuModifiers := Map("LAlt", true, "RAlt", true, "LWin", true, "RWin", true)
 	for _, Name in _TH_SyntheticKeyList(Key) {
-		if MenuModifiers.Has(Name)
+		if KS_IsMenuModifier(Name)
 			return TextSendMenuMask()
 	}
 	return true
@@ -804,6 +803,7 @@ TapHoldReleaseSyntheticKeys() {
 	Keys := []
 	Seen := Map()
 	FailedKeys := []
+	MaskSent := true
 	PreviousCritical := Critical("On")
 	try {
 		UserKeys := []
@@ -829,6 +829,13 @@ TapHoldReleaseSyntheticKeys() {
 		; release remains explicit until an Up is proven.
 		for _, Name in Keys
 			_TH_MarkSyntheticKeyReleasePending(Name)
+		; Suspend, shutdown and the fatal cleanup end a hold mid-press, usually
+		; with nothing typed under it: a lone Alt or Win released here put the
+		; focused window's menu bar in menu mode (or opened Start) exactly as the
+		; owner's own release would have without its mask, and the keys typed
+		; after the pause went to the menu. Mask once before the Ups; the owner's
+		; own masked release comes later, after these Ups, too late.
+		MaskSent := _TH_MaskMenuModifierRelease(Keys)
 		for _, Name in Keys {
 			if !_TH_RetrySyntheticKeyRelease(Name)
 				FailedKeys.Push(Name)
@@ -838,6 +845,8 @@ TapHoldReleaseSyntheticKeys() {
 		Critical(PreviousCritical)
 	}
 
+	if !MaskSent
+		try LoggerError("TapHoldDispatch", "Lifecycle cleanup could not mask the release of '{1}'; a menu may open.", _TH_SyntheticKeyLabel(Keys))
 	if (FailedKeys.Length > 0) {
 		try LoggerError("TapHoldDispatch", "Lifecycle cleanup retained release-pending synthetic key(s) '{1}' after bounded retries.", _TH_SyntheticKeyLabel(FailedKeys))
 		return false

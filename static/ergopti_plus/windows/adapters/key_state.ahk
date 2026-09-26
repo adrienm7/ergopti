@@ -262,6 +262,17 @@ KS_AltGrSendKey() {
 	return Vk ? Format("vk{:X}", Vk) : ""
 }
 
+; Whether releasing key Name with nothing typed under it opens a menu: an Alt
+; key puts the focused window's menu bar in menu mode, a Win key opens Start.
+; RAlt counts: it is a plain Alt wherever right Alt is not AltGr. Such a
+; release is masked first (TextSendMenuMask).
+; @param Name {String} AHK key name.
+; @return {Boolean}
+KS_IsMenuModifier(Name) {
+	static MenuModifiers := Map("LAlt", true, "RAlt", true, "LWin", true, "RWin", true)
+	return MenuModifiers.Has(Name)
+}
+
 ; Scan code of the key KS_AltGrKeyName presses. A key event is the AltGr key
 ; when its scan code matches, whatever virtual key the layout gives it: VK_RMENU
 ; on standard layouts, another one (VK_OEM_8, VK_KANA...) on Kana-style ones.
