@@ -247,15 +247,48 @@ release, as `_TapHoldReleaseOwnedModifier` does; Linux masks with KEY_F24.
 ### project-ahk-kana-altgr-is-sc138-not-ralt
 
 On Kana-style layouts VK_RMENU has no scan code: a synthetic RAlt is a plain Alt
-that enters menu mode, and the AltGr key is SC138. Action: resolve AltGr through
-`KS_AltGrKeyName()`, never a literal `RAlt`. That SC138 is no modifier a
-non-blind Send releases, so it modifies every character sent while it is down.
-Action: send such output through `TapHoldSendWithKeyUp` (hotstrings through
-`_HSE_SendWithAltGrUp`), which lifts the key and gives it back to whoever held
-it, a tap-hold's synthetic hold or the user's own; a raw `{SC138 Up}` ends
-either hold for good. A cleanup of a latched SC138 (the script AltGr chords)
-releases it through `TapHoldReleaseUnlessOwned`, and only once the user has let
-go of it.
+that enters menu mode, and the AltGr key is SC138 on another virtual key
+(VK_OEM_8 on Ergopti). Action: identify AltGr through `KS_AltGrKeyName()`
+(GetKeyState, KeyWait, hotkeys, the synthetic ledger), never a literal `RAlt`,
+but send it by `KS_AltGrSendKey()` (`{Blind}{vkDF Down}`, as `TextPressKey`
+does): Send reads a bare `SC138` as the right Alt modifier while it injects
+VK_OEM_8, then presses the "missing" right Alt at the end of a SendInput and
+leaves a plain Alt stuck (keyboard_mouse.cpp KeyToModifiersLR). The hook never
+counts VK_OEM_8 as a modifier either, so tap-hold hotkeys without `*` still
+match under it (`TapHoldKanaAltGrHeld` gates them), and a non-blind Send never
+lifts it, so it modifies every character sent while it is down: send such
+output through `TapHoldSendWithKeyUp` (hotstrings through
+`_HSE_SendWithAltGrUp`), which lifts a held key and gives it back to whoever
+held it; a raw `{SC138 Up}` ends a hold for good. A cleanup of a latched SC138
+(the script AltGr chords) releases it through `TapHoldReleaseUnlessOwned`, and
+only once the user has let go of it.
+
+### project-ahk-prefix-arms-before-physical-state
+
+AutoHotkey decides whether a custom-combination prefix is armed while it
+handles the prefix's own press (`PrefixHasEnabledSuffixes` evaluates the
+suffixes' #HotIf), before it has recorded a modifier's physical state, and it
+postpones a standalone variant without `~` of an armed, suppressed prefix to the
+release (hook.cpp Case #1). A combination gated on its prefix's own physical
+state never arms on a press, and a tap-hold on a prefix key fires on release.
+Action: never gate arming on the prefix's own state; the always-eligible
+`~SC138 & ~F24` anchor arms SC138 on every press and makes its standalone
+hotkeys fire on the press, and every `SC01D &` combination carries `~` on the
+prefix (`test_altgr_prefix_arms_on_press.ahk`, `test_altgr_takes_its_lctrl.ahk`).
+
+### project-ahk-altgr-fake-lctrl
+
+On an AltGr layout every AltGr press is a fake LCtrl (scan code 0x21D, read as
+SC01D and recorded as physical) then RAlt. Suppressing that RAlt in a hotkey
+makes AHK send a blocked RAlt-up, which Windows answers with the fake LCtrl-up:
+the SC01D prefix is cleared and every "SC138 & X" is dead for the hold. Action:
+AltGr held as AltGr passes through (`altgr_criteria.ahk`); a left_ctrl hold
+that took the fake LCtrl is handed back when the RAlt arrives
+(`TapHoldAltGrTakesItsLCtrl`, only where the boot probe found an AltGr level:
+QWERTY has no fake LCtrl); "LCtrl physically held" means
+`TapHoldUserLCtrlHeld()`. AHK keeps a modifier the driver pressed with
+`{X Down}` around later non-blind Sends, so a tap-hold's synthetic AltGr is
+lifted around output on every layout (`TapHoldSendWithOwnedKeyUp`).
 
 ### project-ahk-worker-processes-inherit-driver-identity
 
