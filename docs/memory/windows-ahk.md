@@ -298,7 +298,9 @@ that took the fake LCtrl is handed back when the RAlt arrives
 `TapHoldUserLCtrlHeld()`. Only `KS_AltGrAddsFakeLCtrl()` layouts (not Kana,
 and the boot probe found an AltGr level) have the fake LCtrl: on QWERTY and
 Kana a physical LCtrl held with RAlt or SC138 is the user's Ctrl, so never read
-"RAlt down" as "the Ctrl is AltGr's" without that predicate. AHK keeps a modifier the driver pressed with
+"RAlt down" as "the Ctrl is AltGr's" without that predicate. Where right Alt
+is a plain Alt (`!KS_LayoutHasAltGr()`), a physical RAlt held as itself is the
+Alt the application receives (`KL_Watchers_DetectShortcut`). AHK keeps a modifier the driver pressed with
 `{X Down}` around later non-blind Sends, so a tap-hold's synthetic AltGr is
 lifted around output on every layout (`TapHoldSendWithOwnedKeyUp`).
 
