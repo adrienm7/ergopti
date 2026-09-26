@@ -21,12 +21,15 @@
  * 1. The shared resolver, run for real: on Windows its bash is Git for
  *    Windows' own (an MSYS kernel name, not "Linux"); elsewhere it is the
  *    /bin/bash the scripts' shebangs name, and it runs.
- * 2. No tool spawns a bare "bash" or "sh", no second resolver names a
+ * 2. The detectors below, checked against each shape they reject and each
+ *    replacement they accept, so a detector that matches nothing fails.
+ * 3. No tool spawns a bare "bash" or "sh", whether as the program of a spawn
+ *    or execFile call or as a command string (exec, execSync, a spawn with
+ *    shell: true, a Python argument list), no second resolver names a
  *    bash.exe, and no Python tool asks PATH for bash: each would reach WSL
  *    again from PowerShell. Floors keep a broken scan from passing.
- * 3. No package.json script starts a bare "bash" or "sh" in any of its
- *    commands. The detector is checked against each shape it rejects and each
- *    replacement it accepts, so a detector that matches nothing fails.
+ * 4. No package.json script starts a bare "bash" or "sh" in any of its
+ *    commands.
  * ==============================================================================
  */
 
@@ -41,6 +44,8 @@ const { SYSTEM_BASH, bashExecutable, gitForWindowsRoot } = require('../lib/git-b
 const ROOT = path.resolve(__dirname, '..', '..');
 const TOOLS = path.join(ROOT, 'tools');
 const RESOLVERS = new Set(['tools/lib/git-bash.cjs', 'tools/lib/git_bash.py']);
+// This guard's own fixtures spell every rejected shape on purpose.
+const SELF = 'tools/test/test-bash-resolution.cjs';
 
 // Floors: the scripts migrated to the shared resolvers when this guard landed.
 const MIN_JS_CONSUMERS = 15;
@@ -75,7 +80,93 @@ if (process.platform === 'win32') {
 
 // ==================================================
 // ==================================================
-// ======= 2/ No tool resolves bash on its own ======
+// ======= 2/ The detectors, checked ================
+// ==================================================
+// ==================================================
+
+const errors = [];
+
+/**
+ * True when a shell command line starts a bare bash or sh in any of its
+ * commands: npm, exec and a spawn with shell: true hand the line to cmd.exe
+ * on Windows, where that name is WSL's launcher.
+ * @param {string} commandLine
+ * @returns {boolean}
+ */
+function runsBareShell(commandLine) {
+	return commandLine
+		.split(/&&|\|\||[;|&]/)
+		.some((command) => /^\s*(?:bash|sh)(?:\.exe)?(?:\s|$)/.test(command));
+}
+
+// The first argument of a child_process call when it is a string literal: the
+// program of spawn and execFile, the command line of exec and of a spawn with
+// shell: true. runsBareShell() reads both, since a program name is a one-word
+// command line.
+const JS_SPAWN_ARGUMENT =
+	/\b(?:spawnSync|spawn|execFileSync|execFile|execSync|exec)\s*\(\s*(['"`])((?:\\.|(?!\1)[^\\])*)\1/g;
+// The first element of a Python subprocess argument list, or its command string.
+const PY_SPAWN_ARGUMENT =
+	/\b(?:run|Popen|call|check_call|check_output)\s*\(\s*\[?\s*(['"])((?:\\.|(?!\1)[^\\])*)\1/g;
+
+/**
+ * True when source text hands a bare bash or sh to a spawn call.
+ * @param {string} text Source text without comments.
+ * @param {RegExp} pattern JS_SPAWN_ARGUMENT or PY_SPAWN_ARGUMENT.
+ * @returns {boolean}
+ */
+function spawnsBareShell(text, pattern) {
+	for (const match of text.matchAll(pattern)) if (runsBareShell(match[2])) return true;
+	return false;
+}
+
+const COMMAND_LINE_CASES = [
+	['bash tools/build/build-linux-driver.sh --skip-smoke', true],
+	["cd static/ergopti_plus/linux && bash -c 'luajit tests/run.lua' --", true],
+	['sh ./tools/dev/install.sh', true],
+	['node ./tools/lib/git-bash.cjs tools/build/build-linux-driver.sh --skip-smoke', false],
+	['node ./tools/test/run-linux-lua.cjs tests/run.lua', false],
+	['shx rm -rf build && node ./tools/x.cjs', false],
+];
+const JS_SPAWN_CASES = [
+	["spawnSync('bash', ['-c', 'true'])", true],
+	['spawn("sh", ["-c", "true"])', true],
+	["execFileSync('bash', [script])", true],
+	["execSync('bash tools/build/build-linux-driver.sh --skip-smoke')", true],
+	['exec(`cd ${dir} && bash x.sh`, done)', true],
+	["spawnSync('sh -c true', { shell: true })", true],
+	["spawnSync(bashExecutable(), ['-c', 'true'])", false],
+	["execSync('git ls-files', { cwd: ROOT })", false],
+	["execSync('shasum -a 256 file')", false],
+];
+const PY_SPAWN_CASES = [
+	['subprocess.run(["bash", "-c", script])', true],
+	["subprocess.check_output(['sh', path])", true],
+	['subprocess.run("bash x.sh", shell=True)', true],
+	['subprocess.run([bash_executable(), "-c", script])', false],
+	['subprocess.run(["git", "--exec-path"])', false],
+];
+for (const [commandLine, bare] of COMMAND_LINE_CASES) {
+	if (runsBareShell(commandLine) !== bare)
+		errors.push(
+			`runsBareShell(${JSON.stringify(commandLine)}) answered ${!bare}, expected ${bare}: the detector is broken`
+		);
+}
+for (const [cases, pattern] of [
+	[JS_SPAWN_CASES, JS_SPAWN_ARGUMENT],
+	[PY_SPAWN_CASES, PY_SPAWN_ARGUMENT],
+]) {
+	for (const [source, bare] of cases) {
+		if (spawnsBareShell(source, pattern) !== bare)
+			errors.push(
+				`spawnsBareShell(${JSON.stringify(source)}) answered ${!bare}, expected ${bare}: the detector is broken`
+			);
+	}
+}
+
+// ==================================================
+// ==================================================
+// ======= 3/ No tool resolves bash on its own ======
 // ==================================================
 // ==================================================
 
@@ -106,22 +197,22 @@ function code(file) {
 		.join('\n');
 }
 
-const SPAWN_BARE_SHELL = /\b(?:spawnSync|spawn|execFileSync|execFile)\s*\(\s*(['"`])(?:bash|sh)\1/;
 const BASH_EXE = /bash\.exe/;
 const PY_WHICH_BASH = /\bwhich\s*\(\s*(['"])bash\1/;
 const JS_CONSUMER = /require\(\s*['"][./]*(?:lib|tools\/lib)\/git-bash\.cjs['"]\s*\)/;
 const PY_CONSUMER = /\bbash_executable\s*\(\s*\)/;
 
-const errors = [];
 let jsConsumers = 0;
 let pyConsumers = 0;
 const scanned = sources(TOOLS, ['.cjs', '.js', '.mjs', '.py']);
 for (const file of scanned) {
-	if (RESOLVERS.has(file)) continue;
+	if (RESOLVERS.has(file) || file === SELF) continue;
 	const text = code(file);
 	if (file.endsWith('.py')) {
 		if (PY_WHICH_BASH.test(text))
 			errors.push(`${file}: asks PATH for bash; use tools.lib.git_bash.bash_executable()`);
+		if (spawnsBareShell(text, PY_SPAWN_ARGUMENT))
+			errors.push(`${file}: spawns a bare "bash"/"sh"; use tools.lib.git_bash.bash_executable()`);
 		if (BASH_EXE.test(text))
 			errors.push(
 				`${file}: names a bash executable itself; use tools.lib.git_bash.bash_executable()`
@@ -129,7 +220,7 @@ for (const file of scanned) {
 		if (PY_CONSUMER.test(text)) pyConsumers++;
 		continue;
 	}
-	if (SPAWN_BARE_SHELL.test(text))
+	if (spawnsBareShell(text, JS_SPAWN_ARGUMENT))
 		errors.push(
 			`${file}: spawns a bare "bash"/"sh"; use bashExecutable() from tools/lib/git-bash.cjs`
 		);
@@ -142,39 +233,11 @@ for (const file of scanned) {
 
 // ==================================================
 // ==================================================
-// ======= 3/ No npm script starts a bare bash ======
+// ======= 4/ No npm script starts a bare bash ======
 // ==================================================
 // ==================================================
 
 const MIN_NPM_SCRIPTS = 100;
-
-/**
- * True when a shell command line starts a bare bash or sh in any of its
- * commands: npm hands every script line to cmd.exe on Windows, where that name
- * is WSL's launcher.
- * @param {string} commandLine
- * @returns {boolean}
- */
-function runsBareShell(commandLine) {
-	return commandLine
-		.split(/&&|\|\||[;|&]/)
-		.some((command) => /^\s*(?:bash|sh)(?:\.exe)?(?:\s|$)/.test(command));
-}
-
-const COMMAND_LINE_CASES = [
-	['bash tools/build/build-linux-driver.sh --skip-smoke', true],
-	["cd static/ergopti_plus/linux && bash -c 'luajit tests/run.lua' --", true],
-	['sh ./tools/dev/install.sh', true],
-	['node ./tools/lib/git-bash.cjs tools/build/build-linux-driver.sh --skip-smoke', false],
-	['node ./tools/test/run-linux-lua.cjs tests/run.lua', false],
-	['shx rm -rf build && node ./tools/x.cjs', false],
-];
-for (const [commandLine, bare] of COMMAND_LINE_CASES) {
-	if (runsBareShell(commandLine) !== bare)
-		errors.push(
-			`runsBareShell(${JSON.stringify(commandLine)}) answered ${!bare}, expected ${bare}: the detector is broken`
-		);
-}
 
 const npmScripts = Object.entries(
 	JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).scripts || {}
