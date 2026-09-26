@@ -30,7 +30,8 @@
 ---    Lua file calls are otherwise unwrapped: bytes on disk are real.
 --- 4. Bare "mkdir" commands are executed natively (cmd creates intermediate
 ---    directories), because cmd's mkdir has no -p flag and would otherwise
----    create garbage directories while reporting success.
+---    create garbage directories while reporting success. With -p, an
+---    existing directory is success, as POSIX specifies.
 --- 5. Commands headed by a POSIX tool (sh, tar, rm, chmod, cp, mv, cat, grep,
 ---    mktemp, test, pwd) or by an existing script path are routed to the sh
 ---    and coreutils shipping with Git for Windows, with /tmp operands mapped
@@ -241,9 +242,21 @@ end
 -- =========================================
 -- =========================================
 
+--- True when a native path names an existing directory: cd succeeds on a
+--- directory only.
+--- @param native_path string Backslash-native path.
+--- @return boolean
+local function directory_exists(native_path)
+	local probe = real_execute('cd /d "' .. native_path .. '" >NUL 2>&1')
+	return probe == true or probe == 0
+end
+
 --- Runs a bare mkdir through cmd's own recursive directory creation.
 --- cmd's mkdir has no -p flag: passing one through would create literal
---- "-p" directories while reporting success.
+--- "-p" directories while reporting success. cmd's mkdir also refuses a
+--- directory that already exists, which POSIX mkdir -p accepts: a daemon
+--- that re-creates its data directory before every write then failed its
+--- second write on this host only.
 --- @param cmd string The full mkdir command.
 --- @return boolean|number Version-appropriate success signal, false on failure.
 local function emulate_mkdir(cmd)
@@ -254,8 +267,11 @@ local function emulate_mkdir(cmd)
 	local stripped = cmd:gsub("%d*>%s*%S+", "")
 	local words = split_words(stripped:match("^%s*mkdir%s*(.-)%s*$") or "")
 	local dirs = {}
+	local parents = false
 	for _, word in ipairs(words) do
-		if word ~= "" and word:sub(1, 1) ~= "-" then
+		if word:sub(1, 1) == "-" then
+			if word == "--parents" or word:match("^%-%a*p%a*$") then parents = true end
+		elseif word ~= "" then
 			dirs[#dirs + 1] = word
 		end
 	end
@@ -263,7 +279,8 @@ local function emulate_mkdir(cmd)
 	for _, dir in ipairs(dirs) do
 		local native = to_win(dir)
 		local first = real_execute('mkdir "' .. native .. '" >NUL 2>&1')
-		if not (first == true or first == 0) then return false end
+		local created = first == true or first == 0
+		if not created and not (parents and directory_exists(native)) then return false end
 	end
 	if _is_jit then return 0 end
 	return true
