@@ -1202,3 +1202,23 @@ TapHoldKanaAltGrHeld() {
 	return IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP
 		and IsSet(_TapHoldModifierIsHeld) and _TapHoldModifierIsHeld.Call(KS_AltGrKeyName())
 }
+
+; Whether the user physically holds LCtrl, AltGr's own LCtrl excluded. On a
+; standard AltGr layout Windows adds a fake LCtrl to every AltGr press, which
+; AutoHotkey records as physically down (hook.cpp: "For backward-compatibility,
+; fake LCtrl is marked as physical"): "LCtrl physically held" was then true
+; under AltGr alone, and AltGr+LAlt tapped as Backspace deleted a whole word
+; (Ctrl+Backspace) where the Kana layout, whose AltGr adds no Ctrl, deleted one
+; character. AutoHotkey keeps one physical LCtrl state for both, so a real LCtrl
+; held with the right Alt key reads as AltGr here: on QWERTY such a chord gets
+; the additive tap (Ctrl+Alt+Backspace) instead of the Ctrl+Backspace special.
+; @param KeyIsDownFn {Func} Test seam taking a key name, KS_IsDown by default.
+; @return {Boolean}
+TapHoldUserLCtrlHeld(KeyIsDownFn := 0) {
+	global _ALTGR_KANA_FIXUP
+	if !IsObject(KeyIsDownFn)
+		KeyIsDownFn := KS_IsDown
+	if !KeyIsDownFn.Call("SC01D")
+		return false
+	return (IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP) or !KeyIsDownFn.Call("RAlt")
+}

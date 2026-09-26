@@ -369,7 +369,7 @@ BackSpaceLogic() {
 	RCtrlIsOneShotShift := TapHoldTapAction(TapHold, "right_ctrl") == "one_shot_shift"
 
 	if (
-		KS_IsDown("SC01D") ; LCtrl physically held
+		TapHoldUserLCtrlHeld() ; LCtrl physically held
 		and KS_IsDown("Shift") ; Shift physically held
 	) {
 		TextPressKey("Delete", "Ctrl")
@@ -382,7 +382,7 @@ BackSpaceLogic() {
 		TextPressKey("Delete", "Ctrl")
 		return True
 	} else if (
-		KS_IsDown("SC01D") ; LCtrl physically held
+		TapHoldUserLCtrlHeld() ; LCtrl physically held
 		and RCtrlIsOneShotShift
 		and KS_IsDown("SC11D") ; RCtrl physically held (acting as Shift)
 	) {
@@ -401,7 +401,7 @@ BackSpaceLogic() {
 	} else if KS_IsDown("Shift") {
 		TextPressKey("Delete", "")
 		return True
-	} else if KS_IsDown("SC01D") { ; LCtrl physically held
+	} else if TapHoldUserLCtrlHeld() { ; LCtrl physically held
 		TextPressKey("BackSpace", "Ctrl")
 		return True
 	} else if (
