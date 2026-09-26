@@ -54,7 +54,7 @@ _AKTE_KanaAltGrHoldPassesThrough() {
     AssertEqual("#HotIf AltGrOwnerHolds(true)", _AKTE_GoverningHotIf(Src, Owned),
         "the suppressing variant must exclude the AltGr-as-AltGr hold")
     Body := _DriverFuncBody("_AltGrHandleHold")
-    Assert(RegExMatch(Body, ",\s*Passthrough\)") > 0,
+    Assert(RegExMatch(Body, ",\s*Passthrough \? KS_AltGrKeyName\(\) : false\)") > 0,
         "the AltGr owner must hand its pass-through decision to TapHoldOwnImmediateModifier")
 }
 Test("tap-holds: the Kana AltGr held as AltGr passes itself through (altgr-single-identity-2026-09-25)",

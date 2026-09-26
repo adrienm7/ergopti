@@ -63,9 +63,12 @@
 ; system to send LCtrl up"); that LCtrl-up cleared the SC01D prefix, so every
 ; "SC138 & X" combination of the AltGr layer, the rolls and the AltGr shortcuts
 ; was dead for the whole hold, and the key typed the host layout's AltGr level
-; of the Ergopti base character under the synthetic AltGr instead. A tap-only
-; AltGr suppressed the key on QWERTY and Kana layouts only: RAlt+F4 was plain F4
-; and the Kana layout's own AltGr level was lost.
+; of the Ergopti base character under the synthetic AltGr instead. The same
+; happened to a combination that holds AltGr (Shift+AltGr, Ctrl+AltGr...), so
+; on a standard AltGr layout it passes through too and its owner presses only
+; the other members (AltGrHoldIsNative). A tap-only AltGr suppressed the key on
+; QWERTY and Kana layouts only: RAlt+F4 was plain F4 and the Kana layout's own
+; AltGr level was lost.
 ; The ~ on the SC01D prefix keeps a left_ctrl tap-hold's own hotkey firing on
 ; the LCtrl press: without it, SC01D was a suppressed prefix with enabled
 ; suffixes, so AutoHotkey postponed that hotkey to the LCtrl release, and LCtrl
@@ -93,7 +96,8 @@
 
 ; Own one AltGr press from key-down to release, then dispatch its tap.
 ; @param Passthrough {Boolean} True for a pass-through variant: the key itself
-;        reached the system and is the hold (or the key holds nothing).
+;        reached the system and is the hold's AltGr (or the key holds nothing);
+;        the owner presses the rest of a combination.
 _AltGrHandleHold(Passthrough) {
 	; On an AltGr layout this press began with a fake LCtrl, which a left_ctrl
 	; tap-hold holding another modifier may have taken as its own press.
@@ -103,7 +107,7 @@ _AltGrHandleHold(Passthrough) {
 	else
 		Result := TapHoldOwnImmediateModifier("alt_gr", "SC138",
 			_AltGrHoldModKey(), TapHoldDuration(TapHold, "alt_gr"),
-			,,,,,, Passthrough)
+			,,,,,, Passthrough ? KS_AltGrKeyName() : false)
 	if (Result["tap"] and TapHoldPriorKeyIsSelf("alt_gr")) {
 		DisableCapsWord()
 		AltGrTapHoldDispatchV2()

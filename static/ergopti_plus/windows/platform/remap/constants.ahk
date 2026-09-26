@@ -395,6 +395,12 @@ _TapHoldEndPressClaim(KeyId) {
 ; first chord belongs to the hold. Activity cancels only the eventual tap; it
 ; never retracts a hold after that hold has already owned an input event. The
 ; press stays claimed (TapHoldPressIsOwned) for the whole gesture.
+; @param PhysicalModifierPassthrough {Boolean|String} false for a press the
+;        hotkey suppressed: the owner presses the whole ModKey. true for a
+;        press passed through (~) whose key is the whole hold: the owner
+;        presses nothing. The name of one member of ModKey for a press passed
+;        through whose key is that member (the AltGr key held as Shift+AltGr):
+;        the owner presses only the other members.
 TapHoldOwnImmediateModifier(KeyId, KeyName, ModKey, TapThresholdSec,
 	WaitReleaseFn := 0, KeyIsDownFn := 0, TickNowFn := 0,
 	KeyDownFn := 0, KeyUpFn := 0, CancelTapFn := 0,
@@ -419,11 +425,18 @@ TapHoldOwnImmediateModifier(KeyId, KeyName, ModKey, TapThresholdSec,
 	; would leave the modifier down in the system. Only a suppressed press is
 	; claimed.
 	Claimed := !PhysicalModifierPassthrough
+	; From here ModKey is what this owner presses itself: the whole hold,
+	; nothing, or the members of a combination the passed-through key is not.
+	OwnerPresses := !PhysicalModifierPassthrough
+	if (PhysicalModifierPassthrough is String) {
+		ModKey := _TH_HoldMembersBesides(ModKey, PhysicalModifierPassthrough)
+		OwnerPresses := ModKey.Length > 0
+	}
 	if Claimed
 		_TapHoldClaimPress(KeyId)
 	try {
 		StartedAt := TickNowFn.Call()
-		if !PhysicalModifierPassthrough {
+		if OwnerPresses {
 			if !KeyDownFn.Call(ModKey) {
 				return Map("activated", false, "released", false,
 					"tap", false, "elapsed_ms", 0)
@@ -457,7 +470,7 @@ TapHoldOwnImmediateModifier(KeyId, KeyName, ModKey, TapThresholdSec,
 			; A hold handed back mid-press was released then, and its press was
 			; AltGr's, never a tap; the LCtrl given to that AltGr ends with it.
 			Retracted := _TH_TakeRetractedOwner(KeyId)
-			if PhysicalModifierPassthrough or Retracted
+			if !OwnerPresses or Retracted
 				ReleaseProved := true
 			else
 				ReleaseProved := KeyUpFn.Call(ModKey)
@@ -520,6 +533,20 @@ _TH_SyntheticKeyList(Key) {
 		Names.Push(Name)
 	}
 	return Names
+}
+
+; The members of a hold other than Member, the one a passed-through key holds
+; itself. Empty names are dropped, so a key that holds nothing leaves nothing.
+; @param Key {String|Array} Resolved hold modifier.
+; @param Member {String} Key name the physical key already holds.
+; @return {Array} The key names its owner must press.
+_TH_HoldMembersBesides(Key, Member) {
+	Others := []
+	for _, Name in _TH_SyntheticKeyList(Key) {
+		if (Name != "" and Name != Member)
+			Others.Push(Name)
+	}
+	return Others
 }
 
 ; Human-readable label for a synthetic hold modifier, used in logs. Format()
@@ -1292,9 +1319,8 @@ _TH_TakeRetractedOwner(KeyId) {
 ;        AltGr key holds another modifier (its owner presses that one).
 ; @return {Boolean} True when the press was AltGr's.
 TapHoldAltGrTakesItsLCtrl(AsAltGr) {
-	global _ALTGR_KANA_FIXUP, _ALTGR_LAYOUT_PROBE, _TapHoldKeyIsDown
-	global _TH_OwnedModifiers, _TH_AltGrLCtrlOwners, _TH_AltGrPresses
-	if (_ALTGR_KANA_FIXUP or !_ALTGR_LAYOUT_PROBE["altgr_level"])
+	global _TapHoldKeyIsDown, _TH_OwnedModifiers, _TH_AltGrLCtrlOwners, _TH_AltGrPresses
+	if !KS_AltGrAddsFakeLCtrl()
 		return false
 	if !_TapHoldKeyIsDown.Call("SC01D", "P")
 		return false

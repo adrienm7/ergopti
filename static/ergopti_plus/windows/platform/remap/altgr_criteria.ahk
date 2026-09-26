@@ -37,15 +37,39 @@ _AltGrTapHoldIsLive() {
 	return not LayerEnabled and not IsOnboardingActive() and TapHoldIsActive(TapHold, "alt_gr")
 }
 
+; Whether a resolved hold (a key name or a combination) holds the layout's AltGr.
+; @param ModKey {String|Array} Resolved hold modifier.
+; @return {Boolean}
+_AltGrHoldHoldsAltGr(ModKey) {
+	for _, Name in _TH_SyntheticKeyList(ModKey) {
+		if (Name == KS_AltGrKeyName())
+			return true
+	}
+	return false
+}
+
 ; Whether the AltGr key keeps its native function under its tap-hold: it holds
 ; the layout's own AltGr, or nothing (a tap-only key). Such a press passes
 ; through, as LShift held as Shift does, and only its tap is the driver's; any
 ; other hold (a modifier, a combination, a layer) is owned by the driver.
+; On a standard AltGr layout a combination that holds AltGr (Shift+AltGr,
+; Ctrl+AltGr, Alt+AltGr, AltGr+Win) passes through as well, and its owner
+; presses only the other members: suppressing that press made AutoHotkey send
+; a blocked RAlt-up, Windows answered with the fake LCtrl-up, which cleared the
+; SC01D prefix, and every "SC138 & X" combination (the AltGr layer, the rolls,
+; the script chords) was dead for the whole hold (see altgr.ahk). QWERTY has no
+; fake LCtrl and a Kana AltGr is no RAlt, so their suppressing owner keeps
+; those combinations live and presses the whole combination.
 ; @return {Boolean}
 AltGrHoldIsNative() {
 	if (TapHoldHoldLayer(TapHold, "alt_gr") != "")
 		return false
-	return TapHoldHoldModifier(TapHold, "alt_gr") == "" or _AltGrHoldModKey() == KS_AltGrKeyName()
+	if (TapHoldHoldModifier(TapHold, "alt_gr") == "")
+		return true
+	ModKey := _AltGrHoldModKey()
+	if !(ModKey is Array)
+		return ModKey == KS_AltGrKeyName()
+	return KS_AltGrAddsFakeLCtrl() and _AltGrHoldHoldsAltGr(ModKey)
 }
 
 ; Whether the AltGr key acts as the layout's AltGr: it has no live tap-hold, or
@@ -59,11 +83,7 @@ AltGrKeyIsAltGr() {
 		return true
 	if AltGrHoldIsNative()
 		return true
-	for _, Name in _TH_SyntheticKeyList(_AltGrHoldModKey()) {
-		if (Name == KS_AltGrKeyName())
-			return true
-	}
-	return false
+	return _AltGrHoldHoldsAltGr(_AltGrHoldModKey())
 }
 
 ; #HotIf of the pass-through AltGr owner on one layout family.
