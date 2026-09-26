@@ -21,10 +21,6 @@
 ; ========================
 ; ========================
 
-_AltGrHoldModKey() {
-	return ResolveHoldModifierKey(TapHoldHoldModifier(TapHold, "alt_gr"), "alt_gr")
-}
-
 ; Every standalone AltGr hotkey below is declared by its scan code, SC138, and
 ; never by the modifier name RAlt. AutoHotkey hooks "RAlt::" on the same scan
 ; code as a separate hotkey, and when none of its variants is eligible it does
@@ -55,78 +51,65 @@ _AltGrHoldModKey() {
 #HotIf
 ~SC138 & ~F24:: return
 
-#HotIf not _ALTGR_KANA_FIXUP and not LayerEnabled and not IsOnboardingActive() and TapHoldHoldModifier(TapHold, "alt_gr") != ""
-SC01D & SC138:: ; AltGr on an AltGr layout arrives as LControl & RAlt
+; Each variant's criterion is a named function in altgr_criteria.ahk, where the
+; unit suite evaluates it: one AltGr press reaches exactly one owner.
+;
+; AltGr held as the layout's own AltGr, or holding nothing (a tap-only key),
+; keeps its native function on every layout, as LShift held as Shift does: the
+; press passes through (~), nothing is injected, and only the tap is the
+; driver's. On a standard AltGr layout the suppressing "SC01D & SC138" of an
+; AltGr hold made AHK send a blocked RAlt-up, which Windows answers with the
+; fake LCtrl-up (hook.cpp: "Sending RAlt up on a layout with AltGr causes the
+; system to send LCtrl up"); that LCtrl-up cleared the SC01D prefix, so every
+; "SC138 & X" combination of the AltGr layer, the rolls and the AltGr shortcuts
+; was dead for the whole hold, and the key typed the host layout's AltGr level
+; of the Ergopti base character under the synthetic AltGr instead. A tap-only
+; AltGr suppressed the key on QWERTY and Kana layouts only: RAlt+F4 was plain F4
+; and the Kana layout's own AltGr level was lost.
+#HotIf AltGrOwnerPassesThrough(false)
+SC01D & ~SC138:: _AltGrHandleHold(true) ; AltGr on an AltGr layout: the fake LCtrl, then RAlt
+~*SC138:: _AltGrHandleLonePassThrough() ; RAlt alone, e.g. on QWERTY, where it is a plain Alt
+#HotIf AltGrOwnerPassesThrough(true)
+~*$SC138:: _AltGrHandleHold(true) ; the Kana-style AltGr, SC138 alone
+#HotIf
+
+; Any other hold, a modifier, a combination or a layer, is the driver's: the
+; press is suppressed and the owner presses the hold.
+#HotIf AltGrOwnerHolds(false)
+SC01D & SC138:: ; AltGr on an AltGr layout
 *SC138:: { ; RAlt alone, e.g. on QWERTY
-	Result := TapHoldOwnImmediateModifier("alt_gr", "SC138",
-		_AltGrHoldModKey(), TapHoldDuration(TapHold, "alt_gr"))
+	_AltGrHandleHold(false)
+}
+#HotIf AltGrOwnerHolds(true)
+*$SC138:: _AltGrHandleHold(false)
+#HotIf
+
+; Own one AltGr press from key-down to release, then dispatch its tap.
+; @param Passthrough {Boolean} True for a pass-through variant: the key itself
+;        reached the system and is the hold (or the key holds nothing).
+_AltGrHandleHold(Passthrough) {
+	if (TapHoldHoldLayer(TapHold, "alt_gr") != "")
+		Result := TapHoldOwnImmediateLayer("alt_gr", "SC138", TapHoldDuration(TapHold, "alt_gr"))
+	else
+		Result := TapHoldOwnImmediateModifier("alt_gr", "SC138",
+			_AltGrHoldModKey(), TapHoldDuration(TapHold, "alt_gr"),
+			,,,,,, Passthrough)
 	if (Result["tap"] and TapHoldPriorKeyIsSelf("alt_gr")) {
 		DisableCapsWord()
 		AltGrTapHoldDispatchV2()
 	}
 }
-#HotIf
 
-; On a Kana-style layout the AltGr key held as AltGr is its own modifier, like
-; LShift held as Shift: the physical key passes through (~) and nothing is
-; injected, so the layout's AltGr and the driver's AltGr-layer combinations keep
-; working during the hold. The ~ also makes AHK fire this standalone on the
-; press although SC138 prefixes those combinations, so the tap is timed from the
-; real press. Any other hold keeps the suppressing variant and owns its modifier.
-_AltGrKanaHandleHold(PhysicalModifierPassthrough) {
-	Result := TapHoldOwnImmediateModifier("alt_gr", "SC138",
-		_AltGrHoldModKey(), TapHoldDuration(TapHold, "alt_gr"),
-		,,,,,, PhysicalModifierPassthrough)
-	if (Result["tap"] and TapHoldPriorKeyIsSelf("alt_gr")) {
-		DisableCapsWord()
-		AltGrTapHoldDispatchV2()
-	}
+; RAlt alone passed through, where right Alt is a plain Alt. Its release with
+; nothing typed would put the focused window's menu bar in menu mode, and the
+; tap output would land there; the hook passes that release before any thread
+; runs, so the menu mask goes out now, while RAlt is still down. The mask key is
+; ignored by the hooks and by A_PriorKey, so the tap guard is unchanged.
+_AltGrHandleLonePassThrough() {
+	if !TextSendMenuMask()
+		try LoggerError("TapHoldDispatch", "Menu mask for a lone right Alt could not be sent; its release may open the window menu.")
+	_AltGrHandleHold(true)
 }
-
-#HotIf _ALTGR_KANA_FIXUP and not LayerEnabled and not IsOnboardingActive() and _AltGrHoldModKey() == KS_AltGrKeyName()
-~*$SC138:: _AltGrKanaHandleHold(true)
-#HotIf _ALTGR_KANA_FIXUP and not LayerEnabled and not IsOnboardingActive() and TapHoldHoldModifier(TapHold, "alt_gr") != "" and _AltGrHoldModKey() != KS_AltGrKeyName()
-*$SC138:: _AltGrKanaHandleHold(false)
-#HotIf
-
-; A standalone AltGr hotkey consumes every AltGr press while it is active,
-; breaking native AltGr typing wherever the user expects the Windows layout to
-; handle the key. It is therefore gated on ``not IsOnboardingActive()`` so the
-; wizard's Edit fields (and anything else typed while the first-run wizard is
-; up) receive AltGr characters from the OS instead of the tap-hold consuming them.
-#HotIf not _ALTGR_KANA_FIXUP and not LayerEnabled and not IsOnboardingActive() and TapHoldIsActive(TapHold, "alt_gr") and TapHoldHoldModifier(TapHold, "alt_gr") == "" and TapHoldHoldLayer(TapHold, "alt_gr") == ""
-; Tap-hold on "AltGr"
-SC01D & ~SC138:: ; LControl & RAlt is the only way to make it fire on tap directly
-*SC138:: ; RAlt alone, e.g. on QWERTY
-{
-		tap := KeyWait("SC138", "T" . TapHoldDuration(TapHold, "alt_gr"))
-		if (tap and TapHoldPriorKeyIsSelf("alt_gr")) {
-				DisableCapsWord()
-				AltGrTapHoldDispatchV2()
-		}
-}
-
-SC01D & ~SC138 Up::
-*SC138 Up:: {
-		UpdateLastSentCharacter("")
-}
-#HotIf
-
-; Kana-style layouts: the physical AltGr key is SC138 with no LControl, so the
-; plain SC138 variant alone owns the tap there.
-#HotIf _ALTGR_KANA_FIXUP and not LayerEnabled and not IsOnboardingActive() and TapHoldIsActive(TapHold, "alt_gr") and TapHoldHoldModifier(TapHold, "alt_gr") == "" and TapHoldHoldLayer(TapHold, "alt_gr") == ""
-*SC138:: {
-		tap := KeyWait("SC138", "T" . TapHoldDuration(TapHold, "alt_gr"))
-		if (tap and TapHoldPriorKeyIsSelf("alt_gr")) {
-				DisableCapsWord()
-				AltGrTapHoldDispatchV2()
-		}
-}
-
-*SC138 Up:: {
-		UpdateLastSentCharacter("")
-}
-#HotIf
 
 ; Dispatch the configured tap action for "alt_gr".
 ; AltGr is already released when this fires (tap=true means key-up occurred),

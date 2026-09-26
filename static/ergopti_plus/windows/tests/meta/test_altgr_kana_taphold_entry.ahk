@@ -9,7 +9,8 @@
 ; identity on the same scan code silenced every SC138 hotkey whenever its own
 ; #HotIf was false, so the Kana AltGr tap-hold and the navigation Escape never
 ; fired (altgr-single-identity-2026-09-25). The AltGr key held as AltGr on a
-; Kana layout passes itself through like LShift held as Shift.
+; Kana layout passes itself through like LShift held as Shift. Which variant
+; owns which press is evaluated in tests/unit/test_altgr_owner_matrix.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -30,38 +31,31 @@ _AKTE_GoverningHotIf(Src, Pos) {
 _AKTE_AltGrOwnsKanaTap() {
     Src := _StripFullLineComments(_DriverDirConcat("platform/remap"))
     Assert(Src != "", "the tap-hold remap sources must be readable")
-    Assert(InStr(Src, 'KeyWait("SC138"') > 0 && !InStr(Src, 'KeyWait("RAlt"'),
-        "the AltGr tap must wait for the physical SC138 key on every layout")
-    Assert(InStr(Src, 'TapHoldPriorKeyIsSelf("alt_gr")') > 0,
+    Owner := _DriverFuncBody("_AltGrHandleHold")
+    StrReplace(Owner, '"alt_gr", "SC138"', , , &Waits)
+    AssertEqual(2, Waits, "both AltGr owners (modifier and layer) must wait for the physical SC138 key on every layout")
+    Assert(!InStr(Src, 'KeyWait("RAlt"'), "no AltGr owner may wait for RAlt, a plain Alt on a Kana layout")
+    Assert(InStr(Owner, 'TapHoldPriorKeyIsSelf("alt_gr")') > 0,
         "the AltGr tap must require its own physical prior key before dispatch")
     Assert(!InStr(Src, '_ALTGR_KANA_FIXUP && GetKeyState("SC138", "P")'),
         "no AltGr handler may bail out on a physical SC138: with one hotkey identity there is no second RAlt event to deduplicate")
-
-    ; Both tap-only variants exist and are exclusive on the Kana flag.
-    StandardTap := InStr(Src, "SC01D & ~SC138::")
-    Assert(StandardTap > 0, "the standard AltGr tap-only variant must exist")
-    Assert(InStr(_AKTE_GoverningHotIf(Src, StandardTap), "not _ALTGR_KANA_FIXUP") > 0,
-        "the standard AltGr tap-only variant must be excluded on Kana-style layouts")
-    KanaTap := RegExMatch(Src, '#HotIf _ALTGR_KANA_FIXUP and [^\r\n]*TapHoldHoldModifier\(TapHold, "alt_gr"\) == ""[^\r\n]*\R\s*\*SC138:: \{')
-    Assert(KanaTap > 0, "the Kana AltGr tap-only variant must be the wildcard SC138 hotkey")
 }
 Test("tap-holds: Kana SC138 owns configured AltGr tap exactly once (altgr-single-identity-2026-09-25)",
     _AKTE_AltGrOwnsKanaTap)
 
 _AKTE_KanaAltGrHoldPassesThrough() {
     Src := _StripFullLineComments(_DriverDirConcat("platform/remap"))
-    Identity := InStr(Src, "~*$SC138:: _AltGrKanaHandleHold(true)")
+    Identity := InStr(Src, "~*$SC138:: _AltGrHandleHold(true)")
     Assert(Identity > 0, "the Kana AltGr held as AltGr must pass the physical key through")
-    Assert(InStr(_AKTE_GoverningHotIf(Src, Identity), "_AltGrHoldModKey() == KS_AltGrKeyName()") > 0,
-        "the pass-through variant must apply exactly when the hold is the layout's own AltGr")
-    Owned := InStr(Src, "*$SC138:: _AltGrKanaHandleHold(false)")
+    AssertEqual("#HotIf AltGrOwnerPassesThrough(true)", _AKTE_GoverningHotIf(Src, Identity),
+        "the pass-through variant must apply exactly when the Kana AltGr holds itself or nothing")
+    Owned := InStr(Src, "*$SC138:: _AltGrHandleHold(false)")
     Assert(Owned > 0, "any other Kana AltGr hold must keep the suppressing owner")
-    Assert(InStr(_AKTE_GoverningHotIf(Src, Owned), "_AltGrHoldModKey() != KS_AltGrKeyName()") > 0,
+    AssertEqual("#HotIf AltGrOwnerHolds(true)", _AKTE_GoverningHotIf(Src, Owned),
         "the suppressing variant must exclude the AltGr-as-AltGr hold")
-    Body := _DriverFuncBody("_AltGrKanaHandleHold")
-    Assert(Body != "", "_AltGrKanaHandleHold must exist")
-    Assert(RegExMatch(Body, ",\s*PhysicalModifierPassthrough\)") > 0,
-        "the Kana AltGr owner must hand its pass-through decision to TapHoldOwnImmediateModifier")
+    Body := _DriverFuncBody("_AltGrHandleHold")
+    Assert(RegExMatch(Body, ",\s*Passthrough\)") > 0,
+        "the AltGr owner must hand its pass-through decision to TapHoldOwnImmediateModifier")
 }
 Test("tap-holds: the Kana AltGr held as AltGr passes itself through (altgr-single-identity-2026-09-25)",
     _AKTE_KanaAltGrHoldPassesThrough)

@@ -844,6 +844,7 @@ global _AhkSubDir := ""
 ; include here (unlike most modules/). test_timings_config exercises the shared
 ; registry reader plus the keylogger-walker and tap-hold reassign-at-boot loaders.
 #Include ../platform/remap/constants.ahk
+#Include ../platform/remap/altgr_criteria.ahk
 #Include unit/test_tap_hold_activity_cancel.ahk
 #Include unit/test_tap_hold_owned_press.ahk
 #Include unit/test_tap_hold_prior_key.ahk
@@ -1472,6 +1473,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_altgr_detection.ahk
 #Include meta/test_altgr_kana_taphold_entry.ahk
 #Include meta/test_altgr_prefix_arms_on_press.ahk
+#Include unit/test_altgr_owner_matrix.ahk
 #Include meta/test_prior_key_guards_use_helper.ahk
 #Include meta/test_modifier_hotkeys_single_identity.ahk
 #Include meta/test_spotlight_gdiplus_free_library.ahk

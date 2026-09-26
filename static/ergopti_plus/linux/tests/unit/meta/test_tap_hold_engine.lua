@@ -221,12 +221,13 @@ helpers.describe("tap-hold engine: a tap with no hold", function()
 
 	-- Each key's Windows tap-only hotkey, for a catalogue tap ("copy"):
 	-- "down" fires at key-down and at each repeat; "own" keeps the key the
-	-- modifier it is (a ~ hotkey) and taps on a quick release; "release" holds
-	-- nothing and taps on a quick release (tap-no-hold-per-key).
+	-- modifier it is (a ~ hotkey) and taps on a quick release, AltGr included
+	-- since a tap-only AltGr passes through on Windows too
+	-- (altgr-tap-only-passthrough-2026-09-26) (tap-no-hold-per-key).
 	local WINDOWS_RULE = {
 		escape = "down", enter = "down", backspace = "down", delete = "down", space = "down",
 		win = "down", caps_lock = "down", tab = "down", left_alt = "down", right_ctrl = "down",
-		left_shift = "own", left_ctrl = "own", right_shift = "own", alt_gr = "release",
+		left_shift = "own", left_ctrl = "own", right_shift = "own", alt_gr = "own",
 	}
 
 	helpers.it("follows each key's Windows rule for a tap with no hold (tap-no-hold-per-key)", function()
@@ -246,15 +247,18 @@ helpers.describe("tap-hold engine: a tap with no hold", function()
 				helpers.assert_eq({ trail(up_out), up_tap }, { "" }, key_id .. ": the release adds nothing")
 			else
 				local own = rule == "own" and tostring(code) or nil
+				-- Right Alt is a plain Alt on some layouts: its lone release is
+				-- masked with F24 (194), or it would open the window menu.
+				local release = own and ((key_id == "alt_gr") and "194↓ 194↑ " or "") .. own .. "↑" or ""
 				helpers.assert_eq({ trail(out), tap }, { own and own .. "↓" or "" },
 					key_id .. (own and " is its own modifier at key-down" or " holds nothing"))
 				helpers.assert_eq({ trail(repeat_out), repeat_tap }, { "" }, key_id .. " does not fire on a repeat")
-				helpers.assert_eq({ trail(up_out), up_tap }, { own and own .. "↑" or "" },
+				helpers.assert_eq({ trail(up_out), up_tap }, { release },
 					key_id .. ": a long press is no tap")
 				e = engine(keys)
 				e:process(code, DOWN, 0)
 				out, tap = e:process(code, UP, 100)
-				helpers.assert_eq({ trail(out), tap }, { own and own .. "↑" or "", "copy" },
+				helpers.assert_eq({ trail(out), tap }, { release, "copy" },
 					key_id .. " taps on a quick release")
 			end
 		end
