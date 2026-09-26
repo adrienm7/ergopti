@@ -288,10 +288,21 @@ AltGrShiftDispatch(SC, Table, *) {
     Cb := GetKeyState("Shift", "P") ? Entry.Shifted : Entry.Plain
     _AtCrit := Critical("On")   ; Serialize the AltGr emit like _RemapEmit
     try {
-        Cb()
+        AltGrLayerEmit(Cb)
     } finally {
         Critical(_AtCrit)
     }
+}
+
+; Run one AltGr-layer output (a table entry or a roll). An AltGr a tap-hold holds
+; synthetically is kept down by AutoHotkey around the output's non-blind Send,
+; as every modifier the driver pressed itself: where right Alt is a plain Alt
+; (QWERTY) the layer's text then went out under Alt, as menu mnemonics instead
+; of characters. That owned key is lifted around the output (masked) and given
+; back; an AltGr the user holds is lifted by the Send itself.
+; @param EmitFn {Func} Zero-argument output.
+AltGrLayerEmit(EmitFn) {
+    return TapHoldSendWithOwnedKeyUp(KS_AltGrKeyName(), EmitFn)
 }
 
 CtrlAltDispatch(Combo, *) {

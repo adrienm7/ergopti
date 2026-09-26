@@ -81,14 +81,17 @@ _HSE_SetTerminalKeyDelay(DelayMs, DurationMs, DelayFn := 0) {
 ; owner lifts it (through TextSender's SendInput, which adds no hook-chain
 ; latency) and afterwards presses a tap-hold's own hold again; a raw
 ; "{SC138 Up}" ended that hold for good while its owner still counted it down.
-; Elsewhere AltGr is LCtrl+RAlt (or RAlt is Alt), modifiers a non-blind Send
-; already releases around its output, so nothing is lifted there. Every
-; expansion path sends through here.
+; Elsewhere AltGr is LCtrl+RAlt (or RAlt is Alt). A non-blind Send lifts the
+; ones the user holds around its output, but keeps the ones the driver pressed
+; itself: a tap-hold holding AltGr (CapsLock held as AltGr) turned the
+; expansion's Backspaces into Ctrl+Alt+Backspace, or Alt+Backspace where right
+; Alt is a plain Alt, so its synthetic hold is lifted there too, masked.
+; Every expansion path sends through here.
 ; @param SendFn {Func} Zero-argument sender; its result is returned.
 ; @return The sender's result, or false when the lift failed and nothing was sent.
 _HSE_SendWithAltGrUp(SendFn) {
 		if !(IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP)
-				return SendFn.Call()
+				return TapHoldSendWithOwnedKeyUp(KS_AltGrKeyName(), SendFn)
 		return TapHoldSendWithKeyUp(KS_AltGrKeyName(), SendFn)
 }
 
