@@ -16,6 +16,7 @@ const childProcess = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { bashExecutable } = require('../lib/git-bash.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const DRIVER = path.join(ROOT, 'static', 'ergopti_plus', 'linux');
@@ -35,17 +36,6 @@ function bashPath(value) {
 	const normalized = path.resolve(value).replaceAll('\\', '/');
 	if (process.platform !== 'win32') return normalized;
 	return normalized.replace(/^([A-Za-z]):\//, (_, drive) => `/${drive.toLowerCase()}/`);
-}
-
-function bashExecutable() {
-	if (process.platform !== 'win32') return 'bash';
-	const candidates = [
-		path.join(process.env.ProgramFiles || 'C:\\Program Files', 'Git', 'bin', 'bash.exe'),
-		path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Git', 'bin', 'bash.exe'),
-	];
-	const found = candidates.find((candidate) => candidate && fs.existsSync(candidate));
-	if (!found) fail('Git Bash is required to replay the Linux standalone migration on Windows');
-	return found;
 }
 
 function write(file, content) {

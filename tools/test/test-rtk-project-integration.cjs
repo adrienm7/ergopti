@@ -13,6 +13,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const { gitForWindowsRoot } = require('../lib/git-bash.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const TOOL_ROOT = path.join(ROOT, 'tools', 'rtk');
@@ -127,15 +128,7 @@ function gitForWindowsPosix() {
 	// the MSYS tool directories to PATH; usr/bin/sh.exe inherits PATH verbatim.
 	// Which one a PATH scan meets first depends on the caller's shell, so the
 	// launcher is exercised under every entry point with an explicit tool PATH.
-	const git = spawnSync('git', ['--exec-path'], { encoding: 'utf8' });
-	assert.equal(git.status, 0, `git --exec-path failed: ${git.stderr || git.error}`);
-	const execPath = path.resolve(git.stdout.trim());
-	let root = execPath;
-	while (!fs.existsSync(path.join(root, 'usr', 'bin', 'sh.exe'))) {
-		const parent = path.dirname(root);
-		assert.notEqual(parent, root, `no Git for Windows MSYS shell above ${execPath}`);
-		root = parent;
-	}
+	const root = gitForWindowsRoot();
 	const tools = path.join(root, 'usr', 'bin');
 	const shells = [path.join(tools, 'sh.exe'), path.join(root, 'bin', 'sh.exe')].filter((shell) =>
 		fs.existsSync(shell)

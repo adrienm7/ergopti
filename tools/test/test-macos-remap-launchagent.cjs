@@ -36,6 +36,7 @@ const path = require('path');
 const os = require('node:os');
 const { spawnSync } = require('node:child_process');
 const { selectGates } = require('./verify-change.cjs');
+const { bashExecutable } = require('../lib/git-bash.cjs');
 const {
 	commandPlan: swiftLauncherCommandPlan,
 	run: runSwiftLauncherGate,
@@ -422,7 +423,7 @@ try {
 	fs.mkdirSync(path.join(temporaryBuild, 'selected'));
 	fs.writeFileSync(path.join(temporaryBuild, 'selected', 'ErgoptiPlus'), 'current product');
 	fs.writeFileSync(path.join(temporaryBuild, 'stale'), 'stale product');
-	const buildSelection = spawnSync('bash', ['-c', `
+	const buildSelection = spawnSync(bashExecutable(), ['-c', `
 set -e
 LAUNCHER_DIR="$1"
 log() { :; }
@@ -443,7 +444,7 @@ build_launcher
 
 // Running the real dispatcher with inert dependencies proves that helper mode
 // cannot fall through to downloading or rebuilding the complete application.
-const helperDispatch = spawnSync('bash', ['-c', `
+const helperDispatch = spawnSync(bashExecutable(), ['-c', `
 set -e
 log() { :; }
 fail() { exit 1; }

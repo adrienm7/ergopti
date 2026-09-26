@@ -30,6 +30,7 @@
 const { execSync, spawnSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const { bashExecutable } = require('../lib/git-bash.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const PASS_SYMBOL = '✓';
@@ -281,13 +282,14 @@ const PIPELINE = [
 	{
 		name: 'build:linux — assemble driver bundle + integrity check',
 		run() {
-			const result = spawnSync('bash', [
+			// Git for Windows' bash on Windows: through a shell, a bare "bash"
+			// reached WSL, which ran the build against /mnt/<drive> paths.
+			const result = spawnSync(bashExecutable(), [
 				'tools/build/build-linux-driver.sh',
 				'--skip-smoke'
 			], {
 				cwd: ROOT,
 				encoding: 'utf8',
-				shell: true,
 				timeout: 60000
 			});
 			const combined = (result.stdout || '') + (result.stderr || '');

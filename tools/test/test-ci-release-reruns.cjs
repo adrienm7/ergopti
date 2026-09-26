@@ -54,6 +54,8 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const pipeline = require('./ci-pipeline.cjs');
+// Throws without bash: this test must fail, never skip, without it.
+const { bashExecutable } = require('../lib/git-bash.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const PREFLIGHT = 'Refuse to publish an incomplete or already-taken release';
@@ -91,19 +93,6 @@ function bashPath(value) {
 	const normalized = value.replaceAll('\\', '/');
 	if (process.platform !== 'win32') return normalized;
 	return normalized.replace(/^([A-Za-z]):/, (_, drive) => `/${drive.toLowerCase()}`);
-}
-
-/** Finds bash, or throws: this test must fail, never skip, without it. */
-function bashExecutable() {
-	const candidates = process.platform === 'win32'
-		? [
-			path.join(process.env.ProgramFiles || 'C:\\Program Files', 'Git', 'bin', 'bash.exe'),
-			path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Git', 'bin', 'bash.exe'),
-		].filter((candidate) => fs.existsSync(candidate))
-		: ['bash'];
-	const found = candidates.find((candidate) => spawnSync(candidate, ['--version']).status === 0);
-	if (!found) throw new Error('bash is required to run the release scripts (Git Bash on Windows)');
-	return found;
 }
 
 

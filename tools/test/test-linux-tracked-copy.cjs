@@ -8,6 +8,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const { bashExecutable } = require('../lib/git-bash.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-tracked-copy-'));
@@ -41,7 +42,7 @@ try {
 		+ subject.slice(start, end)
 		+ '\ncopy_tree "${REPO_ROOT}/source/" "${REPO_ROOT}/output/" --exclude corpus --exclude vendor\n';
 	const began = performance.now();
-	const result = spawnSync('bash', ['-x', '-s', '--', scratch.replaceAll('\\', '/'),
+	const result = spawnSync(bashExecutable(), ['-x', '-s', '--', scratch.replaceAll('\\', '/'),
 		path.join(ROOT, 'tools/build').replaceAll('\\', '/')], {
 		input: script, encoding: 'utf8', timeout: 60000,
 	});

@@ -15,6 +15,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const { bashExecutable } = require('../lib/git-bash.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const RESOURCES = path.join(ROOT, 'static', 'ergopti_plus', 'macos', 'apps',
@@ -37,19 +38,6 @@ function resolveProgram(candidates) {
 	return null;
 }
 
-function resolveBash() {
-	const candidates = [];
-	if (process.platform === 'win32') {
-		const git = spawnSync('git', ['--exec-path'], { encoding: 'utf8' });
-		if (!git.error && git.status === 0)
-			candidates.push(path.resolve(git.stdout.trim(), '..', '..', '..', 'bin', 'bash.exe'));
-		candidates.push('C:\\Program Files\\Git\\bin\\bash.exe');
-	} else {
-		candidates.push('/bin/bash', 'bash');
-	}
-	return resolveProgram(candidates);
-}
-
 function toBashPath(filePath) {
 	const normalized = path.resolve(filePath).replace(/\\/g, '/');
 	if (process.platform !== 'win32') return normalized;
@@ -70,9 +58,9 @@ function decodeNulFields(buffer) {
 }
 
 const python = resolveProgram(PY_CANDIDATES);
-const bash = resolveBash();
-if (!python || !bash) {
-	console.error(`Required interpreters unavailable: python=${python}, bash=${bash}`);
+const bash = bashExecutable();
+if (!python) {
+	console.error(`Required interpreter unavailable: python=${python}`);
 	process.exit(1);
 }
 

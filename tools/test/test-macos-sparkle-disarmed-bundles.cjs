@@ -29,6 +29,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const { bashExecutable } = require('../lib/git-bash.cjs');
 
 const root = path.resolve(__dirname, '..', '..');
 const buildScript = fs.readFileSync(path.join(root, 'tools', 'build', 'build_macos_app.sh'), 'utf8');
@@ -117,10 +118,7 @@ const HAMMERSPOON_1_1_1_SPARKLE = [
 ];
 
 const toPosix = (value) => value.replace(/^([A-Za-z]):/, '/$1').replaceAll('\\', '/');
-const bash =
-	process.platform === 'win32' && fs.existsSync('C:/Program Files/Git/bin/bash.exe')
-		? 'C:/Program Files/Git/bin/bash.exe'
-		: 'bash';
+const bash = bashExecutable();
 
 /**
  * Runs disarm_bundle_sparkle on a plist double.

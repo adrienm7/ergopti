@@ -4,8 +4,14 @@
 from pathlib import Path
 import plistlib
 import subprocess
+import sys
 
 from karabiner_candidate import LAUNCHD_RESOURCES, PRODUCTS
+
+# The tests replay packaging scripts in bash: Git for Windows' own on Windows,
+# never the WSL launcher a PATH lookup finds there first.
+sys.path.append(str(Path(__file__).resolve().parents[2]))
+from tools.lib.git_bash import bash_executable  # noqa: E402  (re-exported for the tests)
 
 
 def make_products(directory, resources=True):
