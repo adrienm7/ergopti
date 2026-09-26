@@ -1131,13 +1131,13 @@ _PrefixEnsureInputContext(FocusToken := unset) {
 ; is AltGr typing a character. A Kana-style AltGr (SC138 on VK_OEM_8) adds no
 ; Ctrl at all: a Ctrl held with it is the user's, and Ctrl+AltGr+V pasted while
 ; the hotstring buffers kept a context no longer on screen, so a later
-; expansion could backspace over the pasted text.
-; @param KanaFixup {Boolean} _ALTGR_KANA_FIXUP.
+; expansion could backspace over the pasted text. QWERTY's right Alt is a
+; plain Alt and adds none either: a real Ctrl+RAlt+V is the user's Ctrl chord.
 ; @param RAltDown {Boolean} RAlt physically down.
 ; @param AltGrKeyDown {Boolean} SC138 physically down.
 ; @return {Boolean}
-_PrefixAltGrMasksCtrl(KanaFixup, RAltDown, AltGrKeyDown) {
-	return !KanaFixup and (RAltDown or AltGrKeyDown)
+_PrefixAltGrMasksCtrl(RAltDown, AltGrKeyDown) {
+	return KS_AltGrAddsFakeLCtrl() and (RAltDown or AltGrKeyDown)
 }
 
 ; Handle the two genuine Ctrl chords proven to relocate focus without OnChar.
@@ -1513,8 +1513,7 @@ _OnPrefixKeyDown(IH, VK, SC) {
 		; so Ctrl+A/X/V/Z/Y do not also fall through to (e.g.) the « no
 		; printable » case.
 		CtrlHeld := KS_IsDown("Control")
-		AltGrHeld := _PrefixAltGrMasksCtrl(IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP,
-			KS_IsDown("RAlt"), KS_IsDown("SC138"))
+		AltGrHeld := _PrefixAltGrMasksCtrl(KS_IsDown("RAlt"), KS_IsDown("SC138"))
 		if _PrefixHandleCtrlContextChord(VK, CtrlHeld, AltGrHeld)
 			return
 		if (CtrlHeld and !AltGrHeld) {

@@ -1267,18 +1267,20 @@ TapHoldKanaAltGrHeld() {
 ; fake LCtrl is marked as physical"): "LCtrl physically held" was then true
 ; under AltGr alone, and AltGr+LAlt tapped as Backspace deleted a whole word
 ; (Ctrl+Backspace) where the Kana layout, whose AltGr adds no Ctrl, deleted one
-; character. AutoHotkey keeps one physical LCtrl state for both, so a real LCtrl
-; held with the right Alt key reads as AltGr here: on QWERTY such a chord gets
-; the additive tap (Ctrl+Alt+Backspace) instead of the Ctrl+Backspace special.
+; character. AutoHotkey keeps one physical LCtrl state for the real LCtrl and
+; the fake one, so on such a layout a real LCtrl held with AltGr reads as
+; AltGr's. Only there: QWERTY's right Alt is a plain Alt and a Kana AltGr is no
+; RAlt, neither adds a fake LCtrl (KS_AltGrAddsFakeLCtrl), so a physical LCtrl
+; is always the user's and LCtrl+RAlt then LAlt tapped as Backspace is the
+; Ctrl+Backspace special.
 ; @param KeyIsDownFn {Func} Test seam taking a key name, KS_IsDown by default.
 ; @return {Boolean}
 TapHoldUserLCtrlHeld(KeyIsDownFn := 0) {
-	global _ALTGR_KANA_FIXUP
 	if !IsObject(KeyIsDownFn)
 		KeyIsDownFn := KS_IsDown
 	if !KeyIsDownFn.Call("SC01D")
 		return false
-	return (IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP) or !KeyIsDownFn.Call("RAlt")
+	return !KS_AltGrAddsFakeLCtrl() or !KeyIsDownFn.Call("RAlt")
 }
 
 ; Hand back the synthetic hold the owner of KeyId took for this press, now.
