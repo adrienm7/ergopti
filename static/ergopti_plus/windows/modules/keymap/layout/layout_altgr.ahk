@@ -305,6 +305,20 @@ AltGrLayerEmit(EmitFn) {
     return TapHoldSendWithOwnedKeyUp(KS_AltGrKeyName(), EmitFn)
 }
 
+; Whether a Ctrl+Alt chord is a real Ctrl+Alt, not the layout's AltGr key: the
+; physical AltGr key (KS_AltGrKeyName: RAlt, or SC138 on a Kana layout) is up.
+; A real AltGr press is taken first by the AltGr layer's "SC138 & X"
+; combinations anyway. While the first-run wizard is up every AltGr-looking
+; chord stays the host layout's, as IsRealAltGrPress keeps it.
+; @return {Boolean}
+IsCtrlAltNotAltGr() {
+    global _OB_ALTGR_PASSTHROUGH
+    if (IsSet(_OB_ALTGR_PASSTHROUGH) and _OB_ALTGR_PASSTHROUGH) {
+        return false
+    }
+    return !GetKeyState(KS_AltGrKeyName(), "P")
+}
+
 CtrlAltDispatch(Combo, *) {
     SendFinalResult(Combo)
 }
@@ -340,6 +354,10 @@ RegisterAltGrLayer() {
         for SC in ALTGR_NUMBER_ROW {
             Hotkey("SC138 & " . SC, AltGrShiftDispatch.Bind(SC, ALTGR_NUMBER_ROW), "I2")
         }
+        ; A real Ctrl+Alt chord, never the AltGr key: under the AltGr gate above
+        ; these needed the physical AltGr, which a Ctrl+Alt chord never holds,
+        ; so they were dead on standard layouts and QWERTY.
+        HotIf((*) => Features["layout"]["ergopti_alt_gr"] and IsCtrlAltNotAltGr())
         for SC, Combo in CTRL_ALT_NUMPAD {
             Hotkey("^!" . SC, CtrlAltDispatch.Bind(Combo), "I2")
         }
