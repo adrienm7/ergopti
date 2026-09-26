@@ -232,6 +232,7 @@ helpers.describe("Linux Tap-Holds menu", function()
 				if option.kind == "modifier" then
 					local expected = {}
 					for modifier in option.id:gmatch("[^+]+") do expected[#expected + 1] = translate("tap_hold.hold." .. modifier) end
+					helpers.assert_true(#expected >= 1, code .. ": " .. option.id .. " names at least one modifier")
 					helpers.assert_eq(label, table.concat(expected, " + "), code .. ": " .. option.id)
 				end
 			end

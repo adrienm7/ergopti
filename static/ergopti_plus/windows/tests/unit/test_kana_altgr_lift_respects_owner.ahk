@@ -362,16 +362,21 @@ _KALO_NoRawAltGrReleaseOutsideTheOwner() {
 	Src := _DriverSourceNoComments()
 	Assert(Src != "", "the driver source must be readable")
 	Offenders := ""
+	BootRelease := 0
 	Pos := 1
 	while (At := RegExMatch(Src, "i)\{SC138 up\}", &Match, Pos)) {
 		Pos := At + Match.Len
 		LineStart := InStr(SubStr(Src, 1, At), "`n", , -1) + 1
 		LineEnd := InStr(Src, "`n", , At)
 		Line := Trim(SubStr(Src, LineStart, (LineEnd ? LineEnd : StrLen(Src) + 1) - LineStart))
-		if InStr(Line, "{Blind}{LCtrl up}{RCtrl up}")
+		if InStr(Line, "{Blind}{LCtrl up}{RCtrl up}") {
+			BootRelease += 1
 			continue
+		}
 		Offenders .= (Offenders = "" ? "" : " | ") . Line
 	}
+	Assert(BootRelease >= 1,
+		"the scan must reach the boot-time phantom AltGr release it allows, or its pattern matches nothing")
 	AssertEqual("", Offenders,
 		"a raw {SC138 Up} bypasses the synthetic ledger and ends a tap-hold's AltGr; use TapHoldSendWithKeyUp or TapHoldReleaseUnlessOwned")
 	for Name, Outputs in Map("HSE_DispatchMatch", 2, "_HotstringDispatch", 1, "_HSE_SendTerminalPaced", 1) {
