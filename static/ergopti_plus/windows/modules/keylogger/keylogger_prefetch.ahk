@@ -1288,16 +1288,10 @@ KLPF_KeycodeLayout() {
 				return out
 		}
 
-		; Resolve the active layout for the foreground window. Falls back
-		; to the script thread’s layout if the lookup fails.
-		hkl := 0
-		try {
-				hwnd := DllCall("GetForegroundWindow", "ptr")
-				tid := DllCall("GetWindowThreadProcessId", "ptr", hwnd, "ptr", 0, "uint")
-				hkl := DllCall("GetKeyboardLayout", "uint", tid, "ptr")
-		}
-		if !hkl
-				try hkl := DllCall("GetKeyboardLayout", "uint", 0, "ptr")
+		; The layout the user types with in the foreground window, through the
+		; driver's one resolver (the focused control's thread, then the script
+		; thread's layout, then the system default).
+		hkl := KS_ResolveKeyboardLayout()
 
 		loop 87 {
 				sc := A_Index
