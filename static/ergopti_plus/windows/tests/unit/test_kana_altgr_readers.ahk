@@ -18,18 +18,21 @@ global _KAR_Sent := []
 
 ; Run Body on a standard (Kana false) or Kana-style (Kana true) layout with the
 ; SendInput primitive recorded.
-_KAR_WithLayout(Kana, Body) {
-	global _ALTGR_KANA_FIXUP, _AHK_SendInput, _KAR_Sent
-	SavedKana := _ALTGR_KANA_FIXUP
+; AltGrHeld is whether the layout's AltGr key reads logically down.
+_KAR_WithLayout(Kana, Body, AltGrHeld := false) {
+	global _AHK_SendInput, _KAR_Sent, _TextSenderKeyIsDown
+	SavedFamily := _TestSetAltGrFamily(Kana)
 	SavedSend := _AHK_SendInput
+	SavedKeyIsDown := _TextSenderKeyIsDown
 	_KAR_Sent := []
-	_ALTGR_KANA_FIXUP := Kana
 	_AHK_SendInput := (Keys) => _KAR_Sent.Push(Keys)
+	_TextSenderKeyIsDown := (Name) => AltGrHeld and Name == KS_AltGrKeyName()
 	try
 		Body.Call()
 	finally {
-		_ALTGR_KANA_FIXUP := SavedKana
+		_TestRestoreAltGrFamily(SavedFamily)
 		_AHK_SendInput := SavedSend
+		_TextSenderKeyIsDown := SavedKeyIsDown
 	}
 }
 
@@ -37,14 +40,71 @@ _KAR_TextSenderAltGrPressesTheKanaKey() {
 	global _KAR_Sent
 	_KAR_WithLayout(true, () => TextPressKey("e", "AltGr"))
 	AssertEqual(1, _KAR_Sent.Length, "one keystroke must be sent")
-	AssertEqual("{SC138 down}{e}{SC138 up}", _KAR_Sent[1],
-		"on a Kana-style layout AltGr is the SC138 key; <^>! is Ctrl+Alt there")
+	AssertEqual("{vkDF down}{e}{vkDF up}", _KAR_Sent[1],
+		"on a Kana-style layout AltGr is the layout's AltGr key, by its virtual key; <^>! is Ctrl+Alt there")
 	_KAR_WithLayout(true, () => TextPressKey("e", ["Shift", "AltGr"]))
-	AssertEqual("{SC138 down}+{e}{SC138 up}", _KAR_Sent[1],
+	AssertEqual("{vkDF down}+{e}{vkDF up}", _KAR_Sent[1],
 		"the array form must hold the same AltGr key around the other modifiers")
 }
 Test("kana altgr: the TextSender altgr modifier presses the Kana AltGr key (kana-altgr-readers-2026-09-25)",
 	_KAR_TextSenderAltGrPressesTheKanaKey)
+
+; AutoHotkey's Send reads a bare "SC138" as the right Alt modifier while it
+; injects the layout's VK_OEM_8, which is no modifier, so the keystroke went out
+; with a real right Alt added, a plain Alt on that layout: an Alt chord, no AltGr
+; character (kana-altgr-send-name-2026-09-26). No payload may name it so.
+_KAR_NoKanaPayloadNamesTheScanCode() {
+	global _KAR_Sent
+	for _, Mods in ["AltGr", ["AltGr"], ["Shift", "AltGr"], "Blind AltGr"] {
+		_KAR_WithLayout(true, TextPressKey.Bind("e", Mods))
+		AssertEqual(1, _KAR_Sent.Length, "one keystroke must be sent")
+		AssertFalse(RegExMatch(_KAR_Sent[1], "i)\{SC138 (down|up)\}") > 0,
+			"a Kana AltGr keystroke must never press SC138 by its scan code: " . _KAR_Sent[1])
+	}
+}
+Test("kana altgr: no AltGr keystroke names the Kana key by its scan code (kana-altgr-send-name-2026-09-26)",
+	_KAR_NoKanaPayloadNamesTheScanCode)
+
+; The send name is the virtual key the boot probe read for the AltGr scan code;
+; without one there is nothing safe to send, and the press is refused loudly.
+_KAR_SendNameComesFromTheProbe() {
+	global _KAR_Sent, _ALTGR_LAYOUT_PROBE
+	_KAR_WithLayout(true, () => AssertEqual("vkDF", KS_AltGrSendKey(), "the Kana AltGr is sent by the layout's virtual key"))
+	_KAR_WithLayout(false, () => AssertEqual("RAlt", KS_AltGrSendKey(), "a standard layout's AltGr is RAlt"))
+	_KAR_WithLayout(true, () => (
+		_ALTGR_LAYOUT_PROBE["altgr_vk"] := 0,
+		AssertFalse(TextPressKey(KS_AltGrKeyName(), "Down", false), "a Kana AltGr with no virtual key must not be pressed"),
+		AssertEqual(0, _KAR_Sent.Length, "nothing must be sent in its place")))
+}
+Test("kana altgr: the AltGr send name comes from the boot probe (kana-altgr-send-name-2026-09-26)",
+	_KAR_SendNameComesFromTheProbe)
+
+; A press of the AltGr key built from its identity (KS_AltGrKeyName, "SC138" on
+; a Kana layout) anywhere in the driver re-opens the stuck right Alt; presses go
+; through TextPressKey, which names the key by KS_AltGrSendKey.
+_KAR_NoDriverPressBuiltFromTheIdentity() {
+	Src := _DriverSourceNoComments()
+	Assert(StrLen(Src) > 100000, "the driver source must be readable")
+	Found := RegExMatch(Src, 'i)KS_AltGrKeyName\(\)\s*\.?\s*"\s+down\}|\{SC138 down\}', &Match)
+	AssertEqual(0, Found, "no Send may press the AltGr key by its identity: " . (Found ? Match[0] : ""))
+	Body := _DriverFuncBody("_TextSenderSustainedKey")
+	AssertTrue(InStr(Body, "KS_AltGrSendKey()") > 0 and InStr(Body, "{Blind}") > 0,
+		"a sustained AltGr Down/Up must be sent by its virtual key, blind")
+}
+Test("kana altgr: no driver Send presses the AltGr key by its identity (kana-altgr-send-name-2026-09-26)",
+	_KAR_NoDriverPressBuiltFromTheIdentity)
+
+; An AltGr the user or a tap-hold already holds must survive the keystroke: the
+; wrap's release ended that hold (kana-altgr-held-keystroke-2026-09-26).
+_KAR_HeldKanaAltGrIsNotWrapped() {
+	global _KAR_Sent
+	_KAR_WithLayout(true, () => TextPressKey("e", "AltGr"), true)
+	AssertEqual("{e}", _KAR_Sent[1], "a held Kana AltGr already modifies the keystroke and must not be released")
+	_KAR_WithLayout(true, () => TextPressKey("e", "Blind AltGr"), true)
+	AssertEqual("{Blind}{e}", _KAR_Sent[1], "the blind form must leave the held AltGr alone too")
+}
+Test("kana altgr: a held Kana AltGr survives an AltGr keystroke (kana-altgr-held-keystroke-2026-09-26)",
+	_KAR_HeldKanaAltGrIsNotWrapped)
 
 _KAR_TextSenderAltGrOnAStandardLayout() {
 	global _KAR_Sent

@@ -95,17 +95,26 @@ _TextSenderModifierPrefix(ModName) {
 	}
 }
 
+; Whether key Name is logically down. A global holding a function, as
+; _AHK_SendInput is, so tests can stand in for the keyboard state.
+global _TextSenderKeyIsDown := (Name) => GetKeyState(Name)
+
 ; Send string for one keystroke of Key under the modifier names Mods. AltGr
 ; is the layout's AltGr key (KS_AltGrKeyName): "<^>!" (LCtrl + right Alt)
 ; where AltGr is right Alt, but on a Kana-style layout right Alt is a plain Alt
 ; and "<^>!" typed Ctrl+Alt, so the keystroke is wrapped in a press of that
-; layout's AltGr key. A modifier name that is neither AltGr nor in the prefix
-; map is logged and skipped rather than corrupting the keystroke.
+; layout's AltGr key, by its virtual key (KS_AltGrSendKey): named "SC138", the
+; press made AHK add a real right Alt, a plain Alt there, to the keystroke. An
+; AltGr key already down (held by the user or a tap-hold) is left alone: the
+; wrap's release would end that hold. A modifier name that is neither AltGr
+; nor in the prefix map is logged and skipped rather than corrupting the
+; keystroke.
 ; @param Mods {Array} Modifier names ("Ctrl", "Shift", "Alt", "Win", "AltGr").
 ; @param Key {String} AHK key name.
 ; @param Blind {Boolean} True to keep the modifiers held around the keystroke.
-; @return {String} The SendInput payload.
+; @return {String} The SendInput payload, "" when AltGr has no send name.
 _TextSenderKeystroke(Mods, Key, Blind := false) {
+	global _TextSenderKeyIsDown
 	Prefix := ""
 	AltGr := false
 	for _, Mod in Mods {
@@ -123,11 +132,34 @@ _TextSenderKeystroke(Mods, Key, Blind := false) {
 	Stroke := Prefix . "{" . Key . "}"
 	if AltGr {
 		AltGrKey := KS_AltGrKeyName()
-		Stroke := (AltGrKey == "RAlt")
-			? "<^>!" . Stroke
-			: "{" . AltGrKey . " down}" . Stroke . "{" . AltGrKey . " up}"
+		if (AltGrKey == "RAlt") {
+			Stroke := "<^>!" . Stroke
+		} else if !_TextSenderKeyIsDown.Call(AltGrKey) {
+			SendKey := KS_AltGrSendKey()
+			if (SendKey == "") {
+				LoggerError("TextSender", "TextPressKey: the layout's AltGr key has no virtual key to send; '{1}' was not sent.", Key)
+				return ""
+			}
+			Stroke := "{" . SendKey . " down}" . Stroke . "{" . SendKey . " up}"
+		}
 	}
 	return (Blind ? "{Blind}" : "") . Stroke
+}
+
+; Send string for a sustained Down or Up of key Key. The layout's AltGr on a
+; Kana-style layout goes out by its virtual key (see KS_AltGrSendKey), with
+; {Blind}: AHK then treats it as an ordinary key, and without {Blind} it would
+; lift the modifiers the user holds around it.
+; @param Key {String} AHK key name.
+; @param Direction {String} "Down" or "Up".
+; @return {String} The SendInput payload, "" when AltGr has no send name (the
+;         caller refuses and logs: this can run under the synthetic ledger's Critical).
+_TextSenderSustainedKey(Key, Direction) {
+	if (IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP and Key == KS_AltGrKeyName()) {
+		SendKey := KS_AltGrSendKey()
+		return (SendKey == "") ? "" : "{Blind}{" . SendKey . " " . Direction . "}"
+	}
+	return "{" . Key . " " . Direction . "}"
 }
 
 ; Splits a space-delimited modifier STRING (the AHK-style form that dozens of
@@ -768,7 +800,10 @@ TextPressKey(Key, Modifiers, LogFailure := true, Transaction := unset) {
 			for _, ModKey in Key {
 				if (ModKey == "")
 					continue
-				if !_TextSenderSendInput("{" . ModKey . " " . Modifiers . "}", "modifier " . Modifiers, LogFailure) {
+				Payload := _TextSenderSustainedKey(ModKey, Modifiers)
+				if (Payload == "" and LogFailure)
+					LoggerError("TextSender", "TextPressKey: the layout's AltGr key has no virtual key to send; '{1}' {2} was not sent.", ModKey, Modifiers)
+				if (Payload == "" or !_TextSenderSendInput(Payload, "modifier " . Modifiers, LogFailure)) {
 					; A failed multi-key Down must not leave the keys already sent
 					; logically held by the driver.  Release them in reverse order;
 					; each release is guarded/logged independently because the
@@ -776,7 +811,8 @@ TextPressKey(Key, Modifiers, LogFailure := true, Transaction := unset) {
 					if (Modifiers == "Down") {
 						loop SentKeys.Length {
 							SentKey := SentKeys[SentKeys.Length - A_Index + 1]
-							if !_TextSenderSendInput("{" . SentKey . " Up}", "modifier rollback", LogFailure)
+							Rollback := _TextSenderSustainedKey(SentKey, "Up")
+							if (Rollback == "" or !_TextSenderSendInput(Rollback, "modifier rollback", LogFailure))
 								RollbackFailedKeys.Push(SentKey)
 						}
 					}
@@ -796,7 +832,13 @@ TextPressKey(Key, Modifiers, LogFailure := true, Transaction := unset) {
 			}
 			return true
 		}
-		return _TextSenderSendInput("{" . Key . " " . Modifiers . "}", "sustained key " . Modifiers, LogFailure)
+		Payload := _TextSenderSustainedKey(Key, Modifiers)
+		if (Payload == "") {
+			if LogFailure
+				LoggerError("TextSender", "TextPressKey: the layout's AltGr key has no virtual key to send; '{1}' {2} was not sent.", Key, Modifiers)
+			return false
+		}
+		return _TextSenderSendInput(Payload, "sustained key " . Modifiers, LogFailure)
 	}
 	if (Modifiers is Array) {
 		Mods := []
@@ -820,7 +862,8 @@ TextPressKey(Key, Modifiers, LogFailure := true, Transaction := unset) {
 		; A one-modifier array is still a regular shortcut.  `{Ctrl c}` is
 		; parsed as a single brace token by AHK rather than as Ctrl+C; use the
 		; same prefix form as multi-modifier arrays (`^+{Tab}`) for every size.
-		return _TextSenderSendInput(_TextSenderKeystroke(Mods, Key), "modified key press")
+		Stroke := _TextSenderKeystroke(Mods, Key)
+		return (Stroke == "") ? false : _TextSenderSendInput(Stroke, "modified key press")
 	}
 	Words := []
 	Blind := false
@@ -830,7 +873,8 @@ TextPressKey(Key, Modifiers, LogFailure := true, Transaction := unset) {
 		; key was emitted, silently dropping the modifier.
 		Words := _TextSenderModifierWords(Modifiers, &Blind)
 	}
-	return _TextSenderSendInput(_TextSenderKeystroke(Words, Key, Blind), "key press")
+	Stroke := _TextSenderKeystroke(Words, Key, Blind)
+	return (Stroke == "") ? false : _TextSenderSendInput(Stroke, "key press")
 }
 
 ; Machine-readable contract map - consumed by the generic adapter compliance test

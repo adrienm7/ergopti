@@ -680,6 +680,10 @@ if (_ALTGR_LAYOUT_PROBE["source"] == "unresolved") {
 		LoggerError("AltGrDetect",
 				"No keyboard layout could be read at boot; AltGr is handled as a standard AltGr layout until the next layout change, _ALTGR_KANA_FIXUP={1}.",
 				_ALTGR_KANA_FIXUP ? "true" : "false")
+} else if (_ALTGR_KANA_FIXUP and !_ALTGR_LAYOUT_PROBE["altgr_vk"]) {
+		LoggerError("AltGrDetect",
+				"HKL=0x{1:X}: a Kana-style AltGr is set (source={2}) but the layout gives the AltGr key no virtual key; every press or release of it the driver sends is refused.",
+				_ALTGR_LAYOUT_PROBE["hkl"], _ALTGR_LAYOUT_PROBE["source"])
 } else {
 		LoggerInfo("AltGrDetect",
 				"HKL=0x{1:X}, VK_RMENU→SC=0x{2:X}, AltGr VK=0x{3:X}, _ALTGR_KANA_FIXUP={4} (source={5}).",

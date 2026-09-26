@@ -241,6 +241,27 @@ KS_AltGrKeyName() {
 	return _ALTGR_KANA_FIXUP ? "SC138" : "RAlt"
 }
 
+; AHK key name a Send must use to press or release the layout's AltGr key.
+; KS_AltGrKeyName stays the key's identity for GetKeyState, KeyWait, the
+; hotkeys and the synthetic ledger, but on a Kana-style layout its "SC138" is
+; unfit for a Send: AutoHotkey reads a bare SC138 as the right Alt modifier
+; (KeyToModifiersLR, case SC_RALT) while it injects the layout's own virtual
+; key for that scan code (VK_OEM_8 on the Ergopti layout), which is no
+; modifier. At the end of a SendInput it then pressed the right Alt it believed
+; missing, a plain Alt on that layout, and left it down: Alt chords instead of
+; AltGr characters, and a stuck Alt after the hold. The virtual key the boot
+; probe read for the AltGr scan code ("vkDF") injects the same key without that
+; bookkeeping. On a layout where right Alt is AltGr, "RAlt" is correct as is.
+; @return {String} "vkXX" on a Kana-style layout, "" when the boot probe found
+;         no virtual key for it (a Send must then refuse), otherwise "RAlt".
+KS_AltGrSendKey() {
+	global _ALTGR_KANA_FIXUP, _ALTGR_LAYOUT_PROBE
+	if !_ALTGR_KANA_FIXUP
+		return "RAlt"
+	Vk := _ALTGR_LAYOUT_PROBE["altgr_vk"]
+	return Vk ? Format("vk{:X}", Vk) : ""
+}
+
 ; Scan code of the key KS_AltGrKeyName presses. A key event is the AltGr key
 ; when its scan code matches, whatever virtual key the layout gives it: VK_RMENU
 ; on standard layouts, another one (VK_OEM_8, VK_KANA...) on Kana-style ones.

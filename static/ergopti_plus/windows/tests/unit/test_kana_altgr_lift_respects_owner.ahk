@@ -43,16 +43,15 @@ _KALO_KeyIsDown(Name, Mode) {
 ; delivered physical hold: logically and physically down) or "suppressed" (a
 ; physical press a hotkey swallowed). Returns the globals it replaced.
 _KALO_Begin(Kana, Holder := "") {
-	global _AHK_SendInput, _KALO_Sent, _ALTGR_KANA_FIXUP, _TapHoldKeyIsDown
+	global _AHK_SendInput, _KALO_Sent, _TapHoldKeyIsDown
 	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys, _TH_SyntheticUserHeldKeys
 	global _KALO_Logical, _KALO_Physical
 	Saved := {
-		SendInput: _AHK_SendInput, Kana: _ALTGR_KANA_FIXUP, KeyIsDown: _TapHoldKeyIsDown,
+		SendInput: _AHK_SendInput, Family: _TestSetAltGrFamily(Kana), KeyIsDown: _TapHoldKeyIsDown,
 		Held: _TH_SyntheticHeldKeys, Pending: _TH_SyntheticReleasePendingKeys,
 		UserHeld: _TH_SyntheticUserHeldKeys
 	}
 	_KALO_Sent := []
-	_ALTGR_KANA_FIXUP := Kana
 	_TH_SyntheticHeldKeys := Map()
 	_TH_SyntheticReleasePendingKeys := Map()
 	_TH_SyntheticUserHeldKeys := Map()
@@ -66,10 +65,10 @@ _KALO_Begin(Kana, Holder := "") {
 }
 
 _KALO_End(Saved) {
-	global _AHK_SendInput, _ALTGR_KANA_FIXUP, _TapHoldKeyIsDown
+	global _AHK_SendInput, _TapHoldKeyIsDown
 	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys, _TH_SyntheticUserHeldKeys
 	_AHK_SendInput := Saved.SendInput
-	_ALTGR_KANA_FIXUP := Saved.Kana
+	_TestRestoreAltGrFamily(Saved.Family)
 	_TapHoldKeyIsDown := Saved.KeyIsDown
 	_TH_SyntheticHeldKeys := Saved.Held
 	_TH_SyntheticReleasePendingKeys := Saved.Pending
@@ -97,7 +96,7 @@ _KALO_Burst() {
 ; What an output leaves on the wire with a tap-hold or the user holding AltGr:
 ; lifted and pressed again around it on a Kana layout, untouched elsewhere.
 _KALO_AroundOwnedHold(Kana, Sends) {
-	return Kana ? "{SC138 Up}|" . Sends . "|{SC138 Down}" : Sends
+	return Kana ? "{Blind}{vkDF Up}|" . Sends . "|{Blind}{vkDF Down}" : Sends
 }
 
 _KALO_LayoutName(Kana) {
@@ -124,7 +123,7 @@ _KALO_UnownedKeyStaysUp() {
 		Saved := _KALO_Begin(Kana)
 		try {
 			_HSE_SendWithAltGrUp(_KALO_Burst)
-			AssertEqual(Kana ? "{SC138 Up}|burst" : "burst", _KALO_Joined(),
+			AssertEqual(Kana ? "{Blind}{vkDF Up}|burst" : "burst", _KALO_Joined(),
 				_KALO_LayoutName(Kana) . ": an AltGr nobody holds is lifted and left up on a Kana layout, and never touched elsewhere")
 		} finally _KALO_End(Saved)
 	}
@@ -138,7 +137,7 @@ _KALO_OwnerReleasingDuringOutputWins() {
 	try {
 		_HSE_SendWithAltGrUp(() => (TapHoldSyntheticKeyUp("SC138"), _KALO_Burst()))
 		AssertEqual(0, _TH_SyntheticHeldKeys.Count, "the owner released its hold")
-		AssertEqual(0, InStr(_KALO_Joined(), "{SC138 Down}"),
+		AssertEqual(0, InStr(_KALO_Joined(), "{Blind}{vkDF Down}"),
 			"a hold released during the output must not be pressed again, or AltGr stays stuck down")
 	} finally _KALO_End(Saved)
 }
@@ -171,7 +170,7 @@ _KALO_UserReleasingDuringOutputWins() {
 		Saved := _KALO_Begin(Kana, "user")
 		try {
 			_HSE_SendWithAltGrUp(_KALO_ReleasePhysically)
-			AssertEqual(Kana ? "{SC138 Up}|burst" : "burst", _KALO_Joined(),
+			AssertEqual(Kana ? "{Blind}{vkDF Up}|burst" : "burst", _KALO_Joined(),
 				_KALO_LayoutName(Kana) . ": an AltGr the user let go of during the output must stay up, or it is stuck down")
 		} finally _KALO_End(Saved)
 	}
@@ -183,7 +182,7 @@ Test("kana altgr lift: an AltGr the user releases during the output is not press
 _KALO_RecordReleasingOnDown(Keys) {
 	global _KALO_Sent, _KALO_Physical
 	_KALO_Sent.Push(Keys)
-	if (Keys == "{SC138 Down}")
+	if (Keys == "{Blind}{vkDF Down}")
 		_KALO_Physical := false
 	return true
 }
@@ -194,7 +193,7 @@ _KALO_UserReleaseRacingTheRepressIsUndone() {
 	try {
 		_AHK_SendInput := _KALO_RecordReleasingOnDown
 		_HSE_SendWithAltGrUp(_KALO_Burst)
-		AssertEqual("{SC138 Up}|burst|{SC138 Down}|{SC138 Up}", _KALO_Joined(),
+		AssertEqual("{Blind}{vkDF Up}|burst|{Blind}{vkDF Down}|{Blind}{vkDF Up}", _KALO_Joined(),
 			"a release that lands between the check and the re-press must be undone, or AltGr stays down with nobody holding it")
 	} finally _KALO_End(Saved)
 }
@@ -207,7 +206,7 @@ _KALO_SuppressedPressIsNotPressedBack() {
 		Saved := _KALO_Begin(Kana, "suppressed")
 		try {
 			_HSE_SendWithAltGrUp(_KALO_Burst)
-			AssertEqual(Kana ? "{SC138 Up}|burst" : "burst", _KALO_Joined(),
+			AssertEqual(Kana ? "{Blind}{vkDF Up}|burst" : "burst", _KALO_Joined(),
 				_KALO_LayoutName(Kana) . ": a suppressed AltGr press must not be pressed on the user's behalf")
 		} finally _KALO_End(Saved)
 	}
