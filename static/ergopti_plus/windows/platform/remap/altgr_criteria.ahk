@@ -48,6 +48,24 @@ AltGrHoldIsNative() {
 	return TapHoldHoldModifier(TapHold, "alt_gr") == "" or _AltGrHoldModKey() == KS_AltGrKeyName()
 }
 
+; Whether the AltGr key acts as the layout's AltGr: it has no live tap-hold, or
+; its tap-hold holds AltGr (alone or in a combination) or nothing. Held as
+; another modifier or a layer, the key is that modifier or layer: AltGr+C held
+; as Ctrl must be Ctrl+C, not the AltGr layer's character, so the AltGr
+; combinations (IsRealAltGrPress) stand down.
+; @return {Boolean}
+AltGrKeyIsAltGr() {
+	if !TapHoldIsActive(TapHold, "alt_gr")
+		return true
+	if AltGrHoldIsNative()
+		return true
+	for _, Name in _TH_SyntheticKeyList(_AltGrHoldModKey()) {
+		if (Name == KS_AltGrKeyName())
+			return true
+	}
+	return false
+}
+
 ; #HotIf of the pass-through AltGr owner on one layout family.
 ; @param Kana {Boolean} True for the Kana-style variants, false for the
 ;        standard AltGr and QWERTY ones.

@@ -233,6 +233,13 @@ IsRealAltGrPress() {
     if (IsSet(_OB_ALTGR_PASSTHROUGH) and _OB_ALTGR_PASSTHROUGH) {
         return false
     }
+    ; AltGr held as another modifier or a layer is that modifier or layer, on
+    ; every layout: AltGr+C held as Ctrl is Ctrl+C. On a Kana layout the combos
+    ; stayed eligible and took the key instead (the AltGr layer's character, or
+    ; a script chord for Enter).
+    if !AltGrKeyIsAltGr() {
+        return false
+    }
     if (IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP) {
         ; Kana remap: SC138 stands alone, no LCtrl/RAlt — no ghost to filter.
         return true
