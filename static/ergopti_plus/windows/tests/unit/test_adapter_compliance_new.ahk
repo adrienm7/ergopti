@@ -520,12 +520,13 @@ _KS_ResolveKeyboardLayout_ReturnsInteger() {
 }
 Test("KS_ResolveKeyboardLayout: callable, returns an Integer", _KS_ResolveKeyboardLayout_ReturnsInteger)
 
-_KS_ProbeRightAltScancode_ReturnsInteger() {
-	; A dummy HKL of 0 must not crash; the probe returns an Integer scancode (0 = unmapped).
-	local sc := KS_ProbeRightAltScancode(0)
-	AssertTrue(Type(sc) = "Integer", "KS_ProbeRightAltScancode must return an Integer scancode")
+_KS_ProbeAltGrLayout_ReturnsMap() {
+	; The probe refuses HKL 0 (HKL_PREV) and returns its record for a real layout.
+	local probe := KS_ProbeAltGrLayout(KS_ResolveKeyboardLayout())
+	AssertTrue(probe is Map and probe.Has("kana") and probe.Has("altgr_vk"), "KS_ProbeAltGrLayout must return its probe record")
+	AssertThrows(() => KS_ProbeAltGrLayout(0), "KS_ProbeAltGrLayout must refuse HKL 0")
 }
-Test("KS_ProbeRightAltScancode: callable with dummy HKL, returns an Integer", _KS_ProbeRightAltScancode_ReturnsInteger)
+Test("KS_ProbeAltGrLayout: callable on the active layout, refuses HKL 0", _KS_ProbeAltGrLayout_ReturnsMap)
 
 _KS_ScanScancodeForChar_ReturnsMap() {
 	; With a dummy HKL and an unfindable target the scan must complete and report a miss.

@@ -48,10 +48,12 @@ _ShouldReloadForHkl(curHkl, &lastHkl, &pendingHkl, suspended, isBlacklisted, hse
 	if isBlacklisted
 		return false
 	; Adopt the first observed real layout as the baseline. lastHkl == 0 means the
-	; baseline is UNKNOWN (a tray-only / no-foreground boot — logon autostart or RDP
-	; reconnect, where GetForegroundKeyboardLayout() returns 0), NOT that we booted on
-	; layout 0. So the first non-zero layout we see is the baseline, never a switch to
-	; reload for — otherwise the driver spuriously Reload()s a few seconds after boot.
+	; baseline is UNKNOWN, NOT that we booted on layout 0: the boot probe seeds it
+	; with the layout it decided the AltGr family on, through a cascade that falls
+	; back from the foreground window to the AHK thread's own layout, so 0 means
+	; no layout could be read at all (logged as an AltGrDetect error). The first
+	; non-zero layout we see is then the baseline, never a switch to reload for —
+	; otherwise the driver spuriously Reload()s a few seconds after boot.
 	if (lastHkl == 0 && curHkl != 0) {
 		lastHkl := curHkl
 		pendingHkl := 0

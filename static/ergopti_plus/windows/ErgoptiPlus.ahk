@@ -672,19 +672,20 @@ UiStyle_LoadSharedConst()
 ; and before the tray menu build / any HotstringsResolve.
 HotstringsConfigLoadLlmPredictionColor()
 
-; Log both the raw reverse-probe result (VK_RMENU → SC) and the resolved
-; Kana-remap flag so future regressions on exotic layouts surface immediately.
-; SC=0 means VK_RMENU is not mapped → Kana-like remap; non-zero means RAlt
-; exists on this layout → standard AltGr. The resolved flag also accounts for
-; any manual TOML override from [Script] AltGrIsKanaRemap.
-; HKL resolution + VK_RMENU reverse-probe live in adapters/key_state.ahk so the
-; layout-detection DllCalls are isolated there, not inlined in the boot sequence.
-_DetectHKL := KS_ResolveKeyboardLayout()
-_DetectSC := KS_ProbeRightAltScancode(_DetectHKL)
-LoggerInfo("AltGrDetect",
-		"HKL=0x{1:X}, VK_RMENU→SC=0x{2:X}, _ALTGR_KANA_FIXUP={3}.",
-		_DetectHKL, _DetectSC,
-		_ALTGR_KANA_FIXUP ? "true" : "false")
+; Log the probe that decided the AltGr family (HotstringEngineInit), not a
+; second read of the layout: the HKL, the raw reverse-probe result (VK_RMENU →
+; SC; 0 means a Kana-like remap), the AltGr key's virtual key, the resolved flag
+; and what decided it ("override" for the [Script] AltGrIsKanaRemap flag).
+if (_ALTGR_LAYOUT_PROBE["source"] == "unresolved") {
+		LoggerError("AltGrDetect",
+				"No keyboard layout could be read at boot; AltGr is handled as a standard AltGr layout until the next layout change, _ALTGR_KANA_FIXUP={1}.",
+				_ALTGR_KANA_FIXUP ? "true" : "false")
+} else {
+		LoggerInfo("AltGrDetect",
+				"HKL=0x{1:X}, VK_RMENU→SC=0x{2:X}, AltGr VK=0x{3:X}, _ALTGR_KANA_FIXUP={4} (source={5}).",
+				_ALTGR_LAYOUT_PROBE["hkl"], _ALTGR_LAYOUT_PROBE["rmenu_sc"], _ALTGR_LAYOUT_PROBE["altgr_vk"],
+				_ALTGR_KANA_FIXUP ? "true" : "false", _ALTGR_LAYOUT_PROBE["source"])
+}
 
 ; Under this text is the configuration of the features, especially whether or not they are enabled.
 ; It is advised to modify which features are enabled by using the ErgoptiPlus_Configuration.ini file.
@@ -785,15 +786,15 @@ BootProfile_StageEnd("configuration", Format("{1} config.toml value(s) applied, 
 ; the target character ("j") sits behind a driver-level remapping that the
 ; API cannot see.
 ;
-; HKL resolution cascade: at script startup there may be no foreground window
-; (AHK launches tray-only), so GetForegroundKeyboardLayout() returns 0.
-; Fallback 1: GetKeyboardLayout(GetCurrentThreadId()) — layout of the AHK thread itself.
-; Fallback 2: SystemParametersInfo(SPI_GETDEFAULTINPUTLANG) — system default.
-; HKL resolution + the no-modifier scancode scan live in adapters/key_state.ahk
-; so the layout-detection DllCalls (MapVirtualKeyExW / ToUnicodeEx) are isolated
-; there; this boot step only interprets the result and updates ScriptInformation.
+; The layout is the one the boot AltGr probe read (_ALTGR_LAYOUT_PROBE, through
+; the KS_ResolveKeyboardLayout cascade: foreground, then the AHK thread, then
+; the system default), so the scan and the AltGr family describe one layout and
+; the layout poll, seeded with the same HKL, reloads when the user switched.
+; The no-modifier scancode scan lives in adapters/key_state.ahk so the
+; layout-detection DllCalls (MapVirtualKeyExW / ToUnicodeEx) are isolated there;
+; this boot step only interprets the result and updates ScriptInformation.
 if !Features["layout"]["ergopti_base"] {
-	_HKL := KS_ResolveKeyboardLayout()
+	_HKL := _ALTGR_LAYOUT_PROBE["hkl"]
 	if _HKL != 0 {
 		_TargetChar := ScriptInformation["MagicKeySourceChar"]
 		_Found := KS_ScanScancodeForChar(_HKL, _TargetChar)
@@ -1353,7 +1354,11 @@ if MetricsShortcuts.enabled
 	KLWV_WarmSchedule(KL_MetricsDirFor(_ConfigDir), KLWV.WARM_START_DELAY_MS)
 
 global _LAYOUT_POLL_INTERVAL_MS := 1000
-global _LAST_KEYBOARD_HKL := GetForegroundKeyboardLayout()
+; The baseline is the layout the boot probe decided the AltGr family on, not a
+; second read: a switch made during the seconds of boot then shows up as a
+; change and reloads, instead of becoming the baseline of a family decided on
+; the previous layout.
+global _LAST_KEYBOARD_HKL := _ALTGR_LAYOUT_PROBE["hkl"]
 global _PENDING_KEYBOARD_HKL := 0
 
 ; The quiescence decision is a pure function extracted to infra/ so the headless
