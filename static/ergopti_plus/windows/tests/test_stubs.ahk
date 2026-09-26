@@ -410,6 +410,14 @@ _TestRestoreAltGrFamily(Saved) {
 	_ALTGR_KANA_FIXUP := Saved.Kana
 	_ALTGR_LAYOUT_PROBE := Saved.Probe
 }
+
+; ui/onboarding/core.ahk is not loaded by the harness; the AltGr criteria read
+; the wizard's pass-through switch through the same public check.
+global _OB_ALTGR_PASSTHROUGH := false
+IsOnboardingActive() {
+	global _OB_ALTGR_PASSTHROUGH
+	return IsSet(_OB_ALTGR_PASSTHROUGH) and _OB_ALTGR_PASSTHROUGH
+}
 global OneShotShiftEnabled := false
 global NumberOfRepetitions := 1
 global ActivitySimulation := false

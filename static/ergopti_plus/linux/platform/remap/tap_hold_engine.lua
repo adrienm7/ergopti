@@ -15,9 +15,8 @@
 ---    key's threshold, no sooner than the minimum tap duration, and with no
 ---    other key pressed or released, no click and no wheel in between. A key
 ---    with a tap and no hold does what its Windows tap-only hotkey does: most
----    fire at key-down and at each repeat, LShift, LCtrl and RShift stay
----    themselves and AltGr holds nothing, all four tapping on a quick release
----    (NO_HOLD_BY_KEY).
+---    fire at key-down and at each repeat, LShift, LCtrl, RShift and AltGr
+---    stay themselves, all four tapping on a quick release (NO_HOLD_BY_KEY).
 --- 2. Pure: events in, events out. The keyboard hook dispatches what comes out
 ---    exactly as if the user had pressed it, so the hotstring buffer, the
 ---    modifier state and the virtual keyboard see one consistent stream.
@@ -67,10 +66,11 @@ local NATIVE_UNDER_MODIFIER = { [1] = true, [14] = true, [15] = true, [28] = tru
 -- at key-down and at each repeat (see fire_instant). These keys, and these
 -- taps, wait for a quick release instead and hold meanwhile what the Windows
 -- hotkey holds:
---   - LShift, LCtrl and RShift stay the modifier they are, a ~ hotkey that
---     taps on a quick release (lshift_lctrl.ahk, rshift.ahk), and so does
---     RCtrl with a Tab tap (rctrl.ahk 7.2); `own` holds the key itself;
---   - AltGr holds nothing and taps on a quick release (altgr.ahk);
+--   - LShift, LCtrl, RShift and AltGr stay the modifier they are, a ~ hotkey
+--     that taps on a quick release (lshift_lctrl.ahk, rshift.ahk, altgr.ahk),
+--     and so does RCtrl with a Tab tap (rctrl.ahk 7.2); `own` holds the key
+--     itself, and a lone Right Alt, a plain Alt on some layouts, is masked
+--     before its release (mask_lone_release);
 --   - an alt_tab_monitor tap holds Alt for the switcher (tab.ahk 8.1,
 --     lalt.ahk 4.3), RCtrl's one-shot Shift holds Shift for a long press
 --     (rctrl.ahk 7.3, from key-down here as every hold is), and LAlt's Tab
@@ -79,7 +79,7 @@ local NATIVE_UNDER_MODIFIER = { [1] = true, [14] = true, [15] = true, [28] = tru
 --     key comes up (lalt.ahk 4.1): `tap_at_down`.
 local NO_HOLD_BY_KEY = {
 	left_shift = { own = true }, left_ctrl = { own = true }, right_shift = { own = true },
-	alt_gr = { mods = {} },
+	alt_gr = { own = true },
 }
 local NO_HOLD_BY_TAP = {
 	tab = { alt_tab_monitor = { mods = { KEY_LEFTALT } } },
