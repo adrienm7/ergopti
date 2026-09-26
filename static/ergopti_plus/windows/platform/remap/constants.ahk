@@ -120,6 +120,9 @@ global _TH_OwnedPresses := Map()
 global _TH_OwnedModifiers := Map()
 global _TH_RetractedOwners := Map()
 global _TH_AltGrLCtrlOwners := Map()
+; Tap-hold key id -> true once its current press was found to be AltGr's fake
+; LCtrl (TapHoldAltGrTakesItsLCtrl); read once with _TH_TakeAltGrPress.
+global _TH_AltGrPresses := Map()
 global _TH_TapHoldVkToKeyId := Map(
 	0x1B, "escape",
 	0x09, "tab",
@@ -1282,11 +1285,16 @@ _TH_TakeRetractedOwner(KeyId) {
 ; @return {Boolean} True when the press was AltGr's.
 TapHoldAltGrTakesItsLCtrl(AsAltGr) {
 	global _ALTGR_KANA_FIXUP, _ALTGR_LAYOUT_PROBE, _TapHoldKeyIsDown
-	global _TH_OwnedModifiers, _TH_AltGrLCtrlOwners
+	global _TH_OwnedModifiers, _TH_AltGrLCtrlOwners, _TH_AltGrPresses
 	if (_ALTGR_KANA_FIXUP or !_ALTGR_LAYOUT_PROBE["altgr_level"])
 		return false
-	if !_TH_OwnedModifiers.Has("left_ctrl") or !_TapHoldKeyIsDown.Call("SC01D", "P")
+	if !_TapHoldKeyIsDown.Call("SC01D", "P")
 		return false
+	; Whatever the left_ctrl tap-hold holds, this LCtrl press was AltGr's: it is
+	; no Ctrl the user typed (see _TH_TakeAltGrPress).
+	_TH_AltGrPresses["left_ctrl"] := true
+	if !_TH_OwnedModifiers.Has("left_ctrl")
+		return true
 	TapHoldRetractOwnedModifier("left_ctrl")
 	if (AsAltGr and !_TH_AltGrLCtrlOwners.Has("left_ctrl")) {
 		; An unproven Down leaves this AltGr press without its LCtrl; the
@@ -1296,6 +1304,32 @@ TapHoldAltGrTakesItsLCtrl(AsAltGr) {
 		_TH_AltGrLCtrlOwners["left_ctrl"] := true
 	}
 	return true
+}
+
+; Whether KeyId's current press was found to be AltGr's fake LCtrl; clears
+; the mark. Read once when the press ends, and once when it begins so a mark
+; left by a press that never reached its end cannot leak into the next one.
+; @param KeyId {String} Tap-hold key id.
+; @return {Boolean}
+_TH_TakeAltGrPress(KeyId) {
+	global _TH_AltGrPresses
+	if !_TH_AltGrPresses.Has(KeyId)
+		return false
+	_TH_AltGrPresses.Delete(KeyId)
+	return true
+}
+
+; Record a left_ctrl press in the typed stream once it has resolved: an LCtrl
+; press ends a roll or hotstring sequence as a typed key does (the last-sent
+; ring), unless it was the fake LCtrl an AltGr press begins with on an AltGr
+; layout. That one reached the left_ctrl hotkey on every AltGr press and pushed
+; "LControl", so a roll across AltGr characters ('<' then AltGr+the = key)
+; never completed there. By the time the press has resolved, the AltGr that
+; followed it has marked it (TapHoldAltGrTakesItsLCtrl), and no character has
+; been typed yet.
+TapHoldRecordLCtrlPress() {
+	if !_TH_TakeAltGrPress("left_ctrl")
+		UpdateLastSentCharacter("LControl")
 }
 
 ; End the LCtrl held for AltGr by KeyId's press, if any.
