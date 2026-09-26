@@ -330,15 +330,25 @@ _TapHoldModifierIsSuspended() {
 ; @param ModKey {String|Array} The owned modifier key name, or a combination.
 ; @return {Boolean} True when the release was proven.
 _TapHoldReleaseOwnedModifier(ModKey) {
-	static MenuModifiers := Map("LAlt", true, "RAlt", true, "LWin", true, "RWin", true)
-	for _, Name in _TH_SyntheticKeyList(ModKey) {
-		if MenuModifiers.Has(Name) {
-			if !TextSendMenuMask()
-				try LoggerError("TapHoldDispatch", "Menu mask before releasing '{1}' could not be sent.", _TH_SyntheticKeyLabel(ModKey))
-			break
-		}
-	}
+	if !_TH_MaskMenuModifierRelease(ModKey)
+		try LoggerError("TapHoldDispatch", "Menu mask before releasing '{1}' could not be sent.", _TH_SyntheticKeyLabel(ModKey))
 	return TapHoldSyntheticKeyUp(ModKey)
+}
+
+; Send the menu mask once when Key (a name or a combination) includes an Alt or
+; a Win key about to be released, the only releases that can open a menu. RAlt
+; counts: it is a plain Alt wherever right Alt is not AltGr, and the mask is
+; harmless under AltGr. The Kana AltGr (SC138) opens nothing. It never logs
+; (TextSendMenuMask does not), so it can run under the ledger's Critical.
+; @param Key {String|Array} Key name, or the key names about to be released.
+; @return {Boolean} False only when a needed mask could not be sent.
+_TH_MaskMenuModifierRelease(Key) {
+	static MenuModifiers := Map("LAlt", true, "RAlt", true, "LWin", true, "RWin", true)
+	for _, Name in _TH_SyntheticKeyList(Key) {
+		if MenuModifiers.Has(Name)
+			return TextSendMenuMask()
+	}
+	return true
 }
 
 ; Whether a tap-hold owner is resolving KeyId's physical press: the key's
@@ -858,13 +868,35 @@ TapHoldSendWithKeyUp(Name, SendFn) {
 }
 
 ; Lift key Name for an output, whoever holds it. Pair with
-; TapHoldRestoreLiftedKey once the output is sent.
+; TapHoldRestoreLiftedKey once the output is sent. A lifted Alt or Win is
+; masked first: RAlt is a plain Alt where right Alt is not AltGr, and its
+; release after nothing typed would open the window menu the output lands in.
 ; @return {Boolean} False when the Up could not be sent; skip the output then.
 TapHoldLiftKey(Name) {
+	if !_TH_MaskMenuModifierRelease(Name)
+		try LoggerError("TapHoldDispatch", "Menu mask before lifting '{1}' could not be sent.", Name)
 	if TextPressKey(Name, "Up", false)
 		return true
 	try LoggerError("TapHoldDispatch", "Could not lift '{1}' before an output; the output was not sent.", Name)
 	return false
+}
+
+; Run SendFn with key Name up only while a tap-hold holds it synthetically. A
+; modifier the driver pressed with {X Down} is one AutoHotkey keeps down
+; around every later non-blind Send (keyboard_mouse.cpp: "any modifiers
+; pressed down by the script itself ... are intended to stay down"), so a
+; synthetic AltGr (CapsLock held as AltGr) modified every expansion: Backspace
+; became Ctrl+Alt+Backspace on an AltGr layout and Alt+Backspace (Undo) where
+; right Alt is a plain Alt. A key the user holds is not the driver's: a
+; non-blind Send already lifts it around its output and restores it.
+; @param Name {String} AHK key name, e.g. KS_AltGrKeyName().
+; @param SendFn {Func} Zero-argument sender; its result is returned.
+; @return The sender's result, or false when the lift could not be sent.
+TapHoldSendWithOwnedKeyUp(Name, SendFn) {
+	global _TH_SyntheticHeldKeys
+	if !_TH_SyntheticHeldKeys.Has(Name)
+		return SendFn.Call()
+	return TapHoldSendWithKeyUp(Name, SendFn)
 }
 
 ; Press Name again after an output that lifted it, when a synthetic owner still

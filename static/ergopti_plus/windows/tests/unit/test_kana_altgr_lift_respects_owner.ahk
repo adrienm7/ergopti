@@ -93,10 +93,18 @@ _KALO_Burst() {
 	return true
 }
 
-; What an output leaves on the wire with a tap-hold or the user holding AltGr:
-; lifted and pressed again around it on a Kana layout, untouched elsewhere.
-_KALO_AroundOwnedHold(Kana, Sends) {
-	return Kana ? "{Blind}{vkDF Up}|" . Sends . "|{Blind}{vkDF Down}" : Sends
+; What an output leaves on the wire with a tap-hold or the user holding AltGr.
+; On a Kana layout both are lifted and pressed again around it. On a standard
+; layout a tap-hold's synthetic AltGr (RAlt, which AHK keeps down around a
+; non-blind Send because the driver pressed it) is lifted too, masked, since
+; right Alt is a plain Alt on some layouts (std-altgr-expansion-lift-2026-09-26);
+; the user's own AltGr is lifted by the Send itself and left alone.
+_KALO_AroundOwnedHold(Kana, Sends, Holder := "tap-hold") {
+	if Kana
+		return "{Blind}{vkDF Up}|" . Sends . "|{Blind}{vkDF Down}"
+	if (Holder == "tap-hold")
+		return "{Blind}{" . A_MenuMaskKey . "}|{RAlt Up}|" . Sends . "|{RAlt Down}"
+	return Sends
 }
 
 _KALO_LayoutName(Kana) {
@@ -110,13 +118,34 @@ _KALO_OwnedHoldSurvivesTheOutput() {
 		try {
 			AssertTrue(_HSE_SendWithAltGrUp(_KALO_Burst), "the output must be sent")
 			AssertEqual(_KALO_AroundOwnedHold(Kana, "burst"), _KALO_Joined(),
-				_KALO_LayoutName(Kana) . ": a tap-hold's AltGr must be lifted for the output and pressed again after it, only where it would modify the output")
+				_KALO_LayoutName(Kana) . ": a tap-hold's AltGr must be lifted for the output and pressed again after it")
 			AssertEqual(1, _TH_SyntheticHeldKeys[KS_AltGrKeyName()], "the owner's count must be untouched")
 		} finally _KALO_End(Saved)
 	}
 }
 Test("kana altgr lift: a tap-hold's AltGr survives an expansion (kana-altgr-lift-owner-2026-09-25)",
 	_KALO_OwnedHoldSurvivesTheOutput)
+
+; The AltGr layer's own output (a table entry or a roll) under an AltGr a
+; tap-hold holds: AutoHotkey kept that synthetic key down around the layer's
+; non-blind Send, so where right Alt is a plain Alt (QWERTY) the text went out
+; under Alt, as menu mnemonics (qwerty-altgr-layer-under-alt-2026-09-26). An
+; AltGr only the user holds is the Send's own business.
+_KALO_LayerOutputUnderAnOwnedAltGr() {
+	for _, Kana in [true, false] {
+		for _, Holder in ["tap-hold", "user"] {
+			Saved := _KALO_Begin(Kana, Holder)
+			try {
+				AltGrLayerEmit(_KALO_Burst)
+				Expected := (Holder == "tap-hold") ? _KALO_AroundOwnedHold(Kana, "burst") : "burst"
+				AssertEqual(Expected, _KALO_Joined(),
+					_KALO_LayoutName(Kana) . ", " . Holder . " hold: an AltGr-layer output is lifted out of a tap-hold's AltGr only")
+			} finally _KALO_End(Saved)
+		}
+	}
+}
+Test("kana altgr lift: the AltGr layer's output is lifted out of a tap-hold's AltGr (qwerty-altgr-layer-under-alt-2026-09-26)",
+	_KALO_LayerOutputUnderAnOwnedAltGr)
 
 _KALO_UnownedKeyStaysUp() {
 	for _, Kana in [true, false] {
@@ -151,7 +180,7 @@ _KALO_UserHoldSurvivesTheOutput() {
 		Saved := _KALO_Begin(Kana, "user")
 		try {
 			AssertTrue(_HSE_SendWithAltGrUp(_KALO_Burst), "the output must be sent")
-			AssertEqual(_KALO_AroundOwnedHold(Kana, "burst"), _KALO_Joined(),
+			AssertEqual(_KALO_AroundOwnedHold(Kana, "burst", "user"), _KALO_Joined(),
 				_KALO_LayoutName(Kana) . ": an AltGr the user holds must be lifted for the output and pressed again after it, only where it would modify the output")
 		} finally _KALO_End(Saved)
 	}
@@ -239,20 +268,20 @@ _KALO_EveryExpansionPathImpl() {
 			HSE_StartIsWordBoundary := true
 			_PrefixBuffer := "xxab"
 			AssertTrue(HSE_DispatchMatch(_AHK04_NormalSpec(), ""), Layout . ": the atomic expansion must fire")
-			AssertEqual(_KALO_AroundOwnedHold(Kana, "SendFinalResult"), _KALO_Joined(),
+			AssertEqual(_KALO_AroundOwnedHold(Kana, "SendFinalResult", Scenario[2]), _KALO_Joined(),
 				Layout . ": the atomic expansion burst must go out through the AltGr owner")
 
 			_KALO_Sent := []
 			AssertTrue(_HotstringDispatch("Z", " ", "{BackSpace 2}", "a", true, false, 0),
 				Layout . ": the recorder-path expansion must fire")
-			AssertEqual(_KALO_AroundOwnedHold(Kana, "SendNewResult|SendNewResult|SendNewResult"), _KALO_Joined(),
+			AssertEqual(_KALO_AroundOwnedHold(Kana, "SendNewResult|SendNewResult|SendNewResult", Scenario[2]), _KALO_Joined(),
 				Layout . ": the recorder-path erase, replacement and end-char must go out through the AltGr owner")
 
 			_KALO_Sent := []
 			AssertTrue(_HSE_SendTerminalPaced(2, "Z", 1,
 				(Payload) => (_KALO_Sent.Push("SendTerminalResult"), true), (*) => true),
 				Layout . ": the paced terminal burst must be sent")
-			AssertEqual(_KALO_AroundOwnedHold(Kana, "SendTerminalResult"), _KALO_Joined(),
+			AssertEqual(_KALO_AroundOwnedHold(Kana, "SendTerminalResult", Scenario[2]), _KALO_Joined(),
 				Layout . ": the paced terminal burst must go out through the AltGr owner")
 
 			KLHook.prev_app := "notepad.exe"
@@ -261,13 +290,13 @@ _KALO_EveryExpansionPathImpl() {
 			HSE_Buffer := "ab"
 			_PrefixBuffer := "ab"
 			AssertTrue(HSE_DispatchMatch(_AHK04_NormalSpec(), ""), Layout . ": the Notepad expansion must fire")
-			AssertEqual(_KALO_AroundOwnedHold(Kana, "SendInstant"), _KALO_Joined(),
+			AssertEqual(_KALO_AroundOwnedHold(Kana, "SendInstant", Scenario[2]), _KALO_Joined(),
 				Layout . ": the Notepad clipboard expansion must go out through the AltGr owner")
 
 			_KALO_Sent := []
 			AssertTrue(_HotstringDispatch("Z", " ", "{BackSpace 2}", "a", true, false, 0),
 				Layout . ": the recorder-path Notepad expansion must fire")
-			AssertEqual(_KALO_AroundOwnedHold(Kana, "SendInstant"), _KALO_Joined(),
+			AssertEqual(_KALO_AroundOwnedHold(Kana, "SendInstant", Scenario[2]), _KALO_Joined(),
 				Layout . ": the recorder-path Notepad paste must go out through the AltGr owner")
 		} finally _KALO_End(Saved)
 	}

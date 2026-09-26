@@ -1204,13 +1204,16 @@ _RollEmitCritical(Text) {
 _RollChevronEqualHandler(*) {
 	_AtCrit := Critical("On")
 	try {
-		if GetKeyState("Shift", "P") {
-			Features["layout"]["ergopti_plus"] ? _RollEmitCritical(" %") : _RollEmitCritical("Œ")
-		} else {
-			AddRollEqual()
-		}
+		AltGrLayerEmit(_RollChevronEqualEmit)
 	} finally {
 		Critical(_AtCrit)
+	}
+}
+_RollChevronEqualEmit() {
+	if GetKeyState("Shift", "P") {
+		Features["layout"]["ergopti_plus"] ? _RollEmitCritical(" %") : _RollEmitCritical("Œ")
+	} else {
+		AddRollEqual()
 	}
 }
 AddRollEqual() {
@@ -1234,13 +1237,16 @@ AddRollEqual() {
 _RollHashtagQuoteHandler(*) {
 	_AtCrit := Critical("On")
 	try {
-		if GetKeyState("Shift", "P") {
-			_RollEmitCritical("%")
-		} else {
-			HashtagOrQuote()
-		}
+		AltGrLayerEmit(_RollHashtagQuoteEmit)
 	} finally {
 		Critical(_AtCrit)
+	}
+}
+_RollHashtagQuoteEmit() {
+	if GetKeyState("Shift", "P") {
+		_RollEmitCritical("%")
+	} else {
+		HashtagOrQuote()
 	}
 }
 HashtagOrQuote() {

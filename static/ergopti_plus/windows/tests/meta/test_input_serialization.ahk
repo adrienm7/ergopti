@@ -218,8 +218,9 @@ _MIS_CheckAltGrShiftDispatchCritical() {
 
 	CritPos := InStr(Body, 'Critical("On")')
 	Assert(CritPos > 0, "AltGrShiftDispatch must call Critical(On) before its emit (HIGH-01)")
-	CbPos := InStr(Body, "Cb()")
-	Assert(CbPos > 0, "AltGrShiftDispatch must invoke the emit callback Cb()")
+	; The emit runs through AltGrLayerEmit, which lifts a tap-hold's AltGr around it.
+	CbPos := InStr(Body, "AltGrLayerEmit(Cb)")
+	Assert(CbPos > 0, "AltGrShiftDispatch must invoke the emit callback Cb through AltGrLayerEmit")
 	Assert(CritPos < CbPos,
 		"AltGrShiftDispatch must enter Critical(On) BEFORE Cb() so the AltGr emit serializes (HIGH-01)")
 }
@@ -246,7 +247,8 @@ _MIS_CheckRollHandlersCritical() {
 
 	; Each roll handler/builder must route its pure emit through _RollEmitCritical and
 	; contain NO bare SendNewResult( — a bare emit would be un-serialized (the bug).
-	for Fn in ["_RollChevronEqualHandler", "AddRollEqual", "_RollHashtagQuoteHandler", "HashtagOrQuote"] {
+	for Fn in ["_RollChevronEqualHandler", "_RollChevronEqualEmit", "AddRollEqual",
+		"_RollHashtagQuoteHandler", "_RollHashtagQuoteEmit", "HashtagOrQuote"] {
 		Body := _DriverFuncBody(Fn)
 		Assert(Body != "", Fn . " must exist in layout.ahk")
 		Assert(!InStr(Body, "SendNewResult("),
