@@ -1210,7 +1210,7 @@ _RollChevronEqualHandler(*) {
 	}
 }
 _RollChevronEqualEmit() {
-	if GetKeyState("Shift", "P") {
+	if AltGrLayerShiftHeld() {
 		Features["layout"]["ergopti_plus"] ? _RollEmitCritical(" %") : _RollEmitCritical("Œ")
 	} else {
 		AddRollEqual()
@@ -1243,7 +1243,7 @@ _RollHashtagQuoteHandler(*) {
 	}
 }
 _RollHashtagQuoteEmit() {
-	if GetKeyState("Shift", "P") {
+	if AltGrLayerShiftHeld() {
 		_RollEmitCritical("%")
 	} else {
 		HashtagOrQuote()

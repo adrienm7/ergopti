@@ -71,7 +71,7 @@ AltGrLAltShortcut() {
 				return
 		if Features["shortcuts"]["alt_gr_lalt"].Get("backspace", false) {
 				OneShotShiftFix()
-				if GetKeyState("Shift", "P") {
+				if AltGrLayerShiftHeld() {
 						; "Shift" + "AltGr" + "LAlt" = Ctrl + BackSpace (Can't use Ctrl because of AltGr = Ctrl + Alt)
 						TextPressKey("BackSpace", ["Ctrl"])
 				} else {
@@ -83,7 +83,7 @@ AltGrLAltShortcut() {
 				ToggleCapsWord()
 		} else if Features["shortcuts"]["alt_gr_lalt"].Get("ctrl_backspace", false) {
 				OneShotShiftFix()
-				if GetKeyState("Shift", "P") {
+				if AltGrLayerShiftHeld() {
 						; "Shift" + "AltGr" + "LAlt" = BackSpace (Can't use Ctrl because of AltGr = Ctrl + Alt)
 						TextPressKey("BackSpace", [])
 				} else {
@@ -92,7 +92,7 @@ AltGrLAltShortcut() {
 		} else if Features["shortcuts"]["alt_gr_lalt"].Get("ctrl_delete", false) {
 				; "Shift" + "AltGr" + "LAlt" = Delete (Can't use Ctrl because of AltGr = Ctrl + Alt)
 				OneShotShiftFix()
-				if GetKeyState("Shift", "P") {
+				if AltGrLayerShiftHeld() {
 						TextPressKey("Delete", [])
 				} else {
 						TextPressKey("Delete", ["Ctrl"])
@@ -100,7 +100,7 @@ AltGrLAltShortcut() {
 		} else if Features["shortcuts"]["alt_gr_lalt"].Get("delete", false) {
 				; "Shift" + "AltGr" + "LAlt" = Ctrl + Delete (Can't use Ctrl because of AltGr = Ctrl + Alt)
 				OneShotShiftFix()
-				if GetKeyState("Shift", "P") {
+				if AltGrLayerShiftHeld() {
 						TextPressKey("Delete", ["Ctrl"])
 				} else {
 						TextPressKey("Delete", [])
