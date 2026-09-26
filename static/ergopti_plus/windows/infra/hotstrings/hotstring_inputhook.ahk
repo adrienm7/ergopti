@@ -1126,9 +1126,23 @@ _PrefixEnsureInputContext(FocusToken := unset) {
 	return true
 }
 
+; Whether a held Ctrl is AltGr's own and not the user's. On a standard AltGr
+; layout Windows adds a fake LCtrl to every AltGr press, so Ctrl held with AltGr
+; is AltGr typing a character. A Kana-style AltGr (SC138 on VK_OEM_8) adds no
+; Ctrl at all: a Ctrl held with it is the user's, and Ctrl+AltGr+V pasted while
+; the hotstring buffers kept a context no longer on screen, so a later
+; expansion could backspace over the pasted text.
+; @param KanaFixup {Boolean} _ALTGR_KANA_FIXUP.
+; @param RAltDown {Boolean} RAlt physically down.
+; @param AltGrKeyDown {Boolean} SC138 physically down.
+; @return {Boolean}
+_PrefixAltGrMasksCtrl(KanaFixup, RAltDown, AltGrKeyDown) {
+	return !KanaFixup and (RAltDown or AltGrKeyDown)
+}
+
 ; Handle the two genuine Ctrl chords proven to relocate focus without OnChar.
-; AltGr synthesizes Ctrl on Windows, so RAlt/SC138 ownership is resolved by the
-; caller and explicitly excludes that path.
+; AltGr synthesizes Ctrl on a standard layout, so RAlt/SC138 ownership is
+; resolved by the caller (_PrefixAltGrMasksCtrl) and excludes that path.
 ; @return {Boolean} True when the chord consumed the context-reset decision.
 _PrefixHandleCtrlContextChord(VK, CtrlHeld, AltGrHeld) {
 	static RelocatingVKs := Map(
@@ -1499,7 +1513,8 @@ _OnPrefixKeyDown(IH, VK, SC) {
 		; so Ctrl+A/X/V/Z/Y do not also fall through to (e.g.) the « no
 		; printable » case.
 		CtrlHeld := KS_IsDown("Control")
-		AltGrHeld := KS_IsDown("RAlt") or KS_IsDown("SC138")
+		AltGrHeld := _PrefixAltGrMasksCtrl(IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP,
+			KS_IsDown("RAlt"), KS_IsDown("SC138"))
 		if _PrefixHandleCtrlContextChord(VK, CtrlHeld, AltGrHeld)
 			return
 		if (CtrlHeld and !AltGrHeld) {

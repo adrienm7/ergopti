@@ -1578,6 +1578,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_healthcheck_copy_receipt.ahk
 #Include unit/test_kana_altgr_readers.ahk
 #Include unit/test_kana_altgr_lift_respects_owner.ahk
+#Include unit/test_kana_altgr_ctrl_chords.ahk
 
 ; Guards the _HsEdWeb_Reset() idempotency fix for the live-log access-violation
 ; crash (double-unsubscribe against an already torn-down WebView2 controller).
