@@ -147,17 +147,29 @@ _KALO_LayerOutputUnderAnOwnedAltGr() {
 Test("kana altgr lift: the AltGr layer's output is lifted out of a tap-hold's AltGr (qwerty-altgr-layer-under-alt-2026-09-26)",
 	_KALO_LayerOutputUnderAnOwnedAltGr)
 
+; An AltGr nobody holds modifies nothing: the Kana layout lifted it before
+; every expansion anyway, one extra SendInput and an orphan release in front of
+; each burst (kana-altgr-lift-idle-2026-09-26). A key logically stuck down with
+; nobody holding it is still lifted, and not pressed again.
 _KALO_UnownedKeyStaysUp() {
+	global _KALO_Logical
 	for _, Kana in [true, false] {
 		Saved := _KALO_Begin(Kana)
 		try {
 			_HSE_SendWithAltGrUp(_KALO_Burst)
-			AssertEqual(Kana ? "{Blind}{vkDF Up}|burst" : "burst", _KALO_Joined(),
-				_KALO_LayoutName(Kana) . ": an AltGr nobody holds is lifted and left up on a Kana layout, and never touched elsewhere")
+			AssertEqual("burst", _KALO_Joined(),
+				_KALO_LayoutName(Kana) . ": an AltGr nobody holds is never lifted")
 		} finally _KALO_End(Saved)
 	}
+	Saved := _KALO_Begin(true)
+	try {
+		_KALO_Logical := true
+		_HSE_SendWithAltGrUp(_KALO_Burst)
+		AssertEqual("{Blind}{vkDF Up}|burst", _KALO_Joined(),
+			"a Kana AltGr stuck down with nobody holding it is lifted and left up")
+	} finally _KALO_End(Saved)
 }
-Test("kana altgr lift: an unowned AltGr is lifted and left up (kana-altgr-lift-owner-2026-09-25)",
+Test("kana altgr lift: an AltGr nobody holds is not lifted, a stuck one is (kana-altgr-lift-idle-2026-09-26)",
 	_KALO_UnownedKeyStaysUp)
 
 _KALO_OwnerReleasingDuringOutputWins() {
@@ -235,8 +247,8 @@ _KALO_SuppressedPressIsNotPressedBack() {
 		Saved := _KALO_Begin(Kana, "suppressed")
 		try {
 			_HSE_SendWithAltGrUp(_KALO_Burst)
-			AssertEqual(Kana ? "{Blind}{vkDF Up}|burst" : "burst", _KALO_Joined(),
-				_KALO_LayoutName(Kana) . ": a suppressed AltGr press must not be pressed on the user's behalf")
+			AssertEqual("burst", _KALO_Joined(),
+				_KALO_LayoutName(Kana) . ": a suppressed AltGr press, logically up, needs no lift and must not be pressed on the user's behalf")
 		} finally _KALO_End(Saved)
 	}
 }
