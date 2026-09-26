@@ -19,7 +19,12 @@
 ; - LCtrl: UpdateLastSentCharacter("LControl") keeps the hotstring engine in
 ;   sync with the physical key stream.
 ; - LCtrl: ~ IS used on SC01D so Ctrl+X combos still reach the OS during KeyWait.
-;   The AltGr collision (LCtrl+RAlt) is handled upstream by altgr.ahk.
+; - AltGr: on a standard AltGr layout every AltGr press starts with a fake LCtrl
+;   that reaches these SC01D hotkeys first, before the RAlt (the hook reads its
+;   scan code 0x21D as SC01D). Held as Ctrl it passes through and the tap is
+;   blocked by the prior-key guard (A_PriorKey is RAlt) and the activity
+;   tracker; held as anything else, the RAlt hands that hold back and holds
+;   LCtrl for AltGr (TapHoldAltGrTakesItsLCtrl).
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -132,8 +137,9 @@ _LCtrlHandleHold(PhysicalModifierPassthrough) {
 
 ; ~*$SC01D: ~ passes LCtrl through to the OS during KeyWait so Ctrl+X combos
 ; still work. * keeps the tap under a modifier held before LCtrl. $ prevents
-; keyboard-hook re-entry. The AltGr (LCtrl+RAlt) case is
-; handled by altgr.ahk which intercepts RAlt before this block fires.
+; keyboard-hook re-entry. AltGr's fake LCtrl reaches this block first on a
+; standard AltGr layout (see the header); the prior-key guard and the activity
+; tracker keep its tap from firing.
 ; A_PriorKey == "LControl" guard: blocks the tap when another key was pressed
 ; during the hold window (combo use), while still allowing intentional taps.
 ; KS_IsUp guards: prevent spurious tap on CapsLock+LCtrl or LAlt+LCtrl release.

@@ -686,8 +686,9 @@ if (_ALTGR_LAYOUT_PROBE["source"] == "unresolved") {
 				_ALTGR_LAYOUT_PROBE["hkl"], _ALTGR_LAYOUT_PROBE["source"])
 } else {
 		LoggerInfo("AltGrDetect",
-				"HKL=0x{1:X}, VK_RMENU→SC=0x{2:X}, AltGr VK=0x{3:X}, _ALTGR_KANA_FIXUP={4} (source={5}).",
+				"HKL=0x{1:X}, VK_RMENU→SC=0x{2:X}, AltGr VK=0x{3:X}, AltGr level={4}, _ALTGR_KANA_FIXUP={5} (source={6}).",
 				_ALTGR_LAYOUT_PROBE["hkl"], _ALTGR_LAYOUT_PROBE["rmenu_sc"], _ALTGR_LAYOUT_PROBE["altgr_vk"],
+				_ALTGR_LAYOUT_PROBE["altgr_level"] ? "true" : "false",
 				_ALTGR_KANA_FIXUP ? "true" : "false", _ALTGR_LAYOUT_PROBE["source"])
 }
 

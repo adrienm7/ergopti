@@ -179,7 +179,7 @@ HotstringEngineInit(ResolveFn := 0, ProbeFn := 0) {
 				Probe["source"] := Probe["valid"] ? "probe" : "unresolved"
 		} else {
 				Probe := Map("hkl", 0, "rmenu_sc", 0, "altgr_vk", 0,
-						"valid", false, "kana", false, "source", "unresolved")
+						"valid", false, "kana", false, "altgr_level", false, "source", "unresolved")
 		}
 		Override := _ReadKanaTomlOverride()
 		if (Override != "") {
