@@ -25,6 +25,11 @@ local CONFIG, DEVICE, SCRIPT = arg[1], arg[2], arg[3]
 arg = { "--device", DEVICE, "--config", CONFIG }
 package.path = "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;" .. package.path
 
+-- On a Windows checkout the daemon's POSIX edges (HOME, /tmp, mkdir -p, sh
+-- and coreutils) are emulated for this test process as tests/run.lua does for
+-- the unit suite; install() does nothing anywhere else.
+require("tests.win_compat").install()
+
 local Codes = require("infra.evdev_codes")
 
 --- @param text string

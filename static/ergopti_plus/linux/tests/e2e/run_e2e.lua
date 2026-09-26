@@ -422,20 +422,87 @@ local DAEMON_SCENARIOS = {
 		screen = "[reader stopped]<select_all>", gesture_pump = "fails" },
 }
 
-if package.config:sub(1, 1) == "\\" then
-	print("\n--- Daemon key scenarios: not run (a POSIX shell spawns each daemon) ---")
-else
+-- Each scenario runs in its own daemon child, started through the shell that
+-- io.popen and os.execute hand a command to: /bin/sh on Linux, cmd.exe on
+-- Windows. cmd.exe has no `NAME=value command` prefix, no single quotes and no
+-- /dev/null, so the same child is spelled once per shell; the child itself
+-- needs no POSIX shell, and on Windows it runs the daemon under the suite's
+-- Windows test mode, which also gives it an isolated HOME of its own.
+local ON_WINDOWS = require("tests.win_compat").is_windows()
+
+--- A value quoted for /bin/sh.
+--- @param value string
+--- @return string
+local function sh_quoted(value)
+	return "'" .. tostring(value):gsub("'", "'\\''") .. "'"
+end
+
+--- A value quoted for cmd.exe. Between double quotes cmd keeps & | < > ^
+--- literal but still expands %NAME% and cannot escape a quote, so a value
+--- carrying either is refused rather than sent altered.
+--- @param value string
+--- @return string
+local function cmd_quoted(value)
+	value = tostring(value)
+	if value:find('[%%"\r\n]') then
+		error(string.format("run_e2e: %q cannot cross cmd.exe unaltered", value), 2)
+	end
+	return '"' .. value .. '"'
+end
+
+--- The command that runs one daemon child.
+--- @param interpreter string The Lua interpreter running this harness.
+--- @param env table Ordered list of { name, value } for the child's environment.
+--- @param device string The device file the daemon is pointed at.
+--- @param keys string The child's key script.
+--- @param quiet boolean True to discard stdout as well as stderr.
+--- @return string
+local function daemon_child_command(interpreter, env, device, keys, quiet)
+	local parts = {}
+	if ON_WINDOWS then
+		for _, pair in ipairs(env) do
+			parts[#parts + 1] = "set " .. cmd_quoted(pair[1] .. "=" .. pair[2]) .. " &"
+		end
+		parts[#parts + 1] = cmd_quoted((interpreter:gsub("/", "\\")))
+		parts[#parts + 1] = "tests/e2e/daemon_keys_child.lua tests/e2e/fixtures/daemon_keys.toml"
+		parts[#parts + 1] = cmd_quoted(device)
+		parts[#parts + 1] = cmd_quoted(keys)
+		parts[#parts + 1] = quiet and ">NUL 2>&1" or "2>NUL"
+		return table.concat(parts, " ")
+	end
+	for _, pair in ipairs(env) do parts[#parts + 1] = pair[1] .. "=" .. sh_quoted(pair[2]) end
+	parts[#parts + 1] = sh_quoted(interpreter)
+	parts[#parts + 1] = "tests/e2e/daemon_keys_child.lua tests/e2e/fixtures/daemon_keys.toml"
+	parts[#parts + 1] = sh_quoted(device)
+	parts[#parts + 1] = sh_quoted(keys)
+	parts[#parts + 1] = quiet and ">/dev/null 2>&1" or "2>/dev/null"
+	return table.concat(parts, " ")
+end
+
+do
 	print("\n--- Daemon key scenarios (real main(), scripted keyboard) ---")
 	local interpreter = arg and arg[-1] or "luajit"
-	local home = os.tmpname()
-	os.remove(home)
-	os.execute("mkdir -p '" .. home .. "'")
+	-- On Windows the child's test mode supplies HOME; on Linux the scenarios
+	-- share one scratch HOME, created here.
+	local home_env = {}
+	local home = nil
+	if not ON_WINDOWS then
+		home = os.tmpname()
+		os.remove(home)
+		local made = os.execute("mkdir -p " .. sh_quoted(home))
+		if not (made == true or made == 0) then error("run_e2e: cannot create the scratch HOME " .. home) end
+		home_env = { { "HOME", home } }
+	end
+	-- POSIX os.tmpname() creates the file; the Windows one only names it.
 	local device = os.tmpname()
+	local device_fh = assert(io.open(device, "w"))
+	device_fh:close()
 	for _, scenario in ipairs(DAEMON_SCENARIOS) do
-		local command = string.format(
-			"HOME='%s' ERGOPTI_E2E_LLM=%s ERGOPTI_E2E_GESTURE_PUMP=%s %s tests/e2e/daemon_keys_child.lua "
-				.. "tests/e2e/fixtures/daemon_keys.toml '%s' %q 2>/dev/null",
-			home, scenario.llm and "1" or "0", scenario.gesture_pump or "none", interpreter, device, scenario.keys)
+		local env = {}
+		for _, pair in ipairs(home_env) do env[#env + 1] = pair end
+		env[#env + 1] = { "ERGOPTI_E2E_LLM", scenario.llm and "1" or "0" }
+		env[#env + 1] = { "ERGOPTI_E2E_GESTURE_PUMP", scenario.gesture_pump or "none" }
+		local command = daemon_child_command(interpreter, env, device, scenario.keys, false)
 		local pipe = io.popen(command, "r")
 		local output = pipe and pipe:read("*a") or ""
 		if pipe then pipe:close() end
@@ -455,9 +522,10 @@ else
 	-- rebuild, and a dbusmenu layout no panel can page through).
 	local MENU_ROW_CEILING = 3000
 	local rows_file = os.tmpname()
-	os.execute(string.format(
-		"HOME='%s' ERGOPTI_E2E_MENU_ROWS='%s' %s tests/e2e/daemon_keys_child.lua tests/e2e/fixtures/daemon_keys.toml '%s' %q >/dev/null 2>&1",
-		home, rows_file, interpreter, device, "a"))
+	local rows_env = {}
+	for _, pair in ipairs(home_env) do rows_env[#rows_env + 1] = pair end
+	rows_env[#rows_env + 1] = { "ERGOPTI_E2E_MENU_ROWS", rows_file }
+	os.execute(daemon_child_command(interpreter, rows_env, device, "a", true))
 	local rows_fh = io.open(rows_file, "r")
 	local rows = rows_fh and tonumber(rows_fh:read("*l")) or nil
 	if rows_fh then rows_fh:close() end
@@ -470,7 +538,7 @@ else
 	end
 
 	os.remove(device)
-	os.execute("rm -rf '" .. home .. "'")
+	if home then os.execute("rm -rf " .. sh_quoted(home)) end
 end
 
 -- Final summary.
