@@ -46,6 +46,10 @@
 ; key's key-down hotkey should fire immediately"), and each combination still
 ; checks the physical AltGr when its suffix fires, when that state is known. Its
 ; suffix, F24, is a key no keyboard here sends; its ~ passes it through anyway.
+; With no criterion it arms SC138 during the first-run wizard too, where every
+; other SC138 hotkey is false: the ~ on its prefix is then all that keeps
+; AutoHotkey from suppressing SC138, so the wizard's fields get the host
+; layout's native AltGr. Never drop it (test_altgr_prefix_arms_on_press.ahk).
 ; Suspend disables it with every hotkey, and the suspend drain waits for SC138
 ; on every layout since it now arms everywhere.
 #HotIf
