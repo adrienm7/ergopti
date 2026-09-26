@@ -3,8 +3,7 @@
 ; ==============================================================================
 ; MODULE: KeyState DllCall Fail-Safe Guard Tests
 ; DESCRIPTION:
-; KS_ResolveKeyboardLayout, KS_ProbeRightAltScancode, and KS_ScanScancodeForChar
-; had no try/catch around their Win32 DllCall probes, unlike this file's own
+; KS_ResolveKeyboardLayout and KS_ScanScancodeForChar had no try/catch around their Win32 DllCall probes, unlike this file's own
 ; documented FAIL-SAFE contract (KS_IsDown/KS_IsUp: "An unknown key name or
 ; any AHK error yields 0/1, never propagates"). Called unguarded at boot
 ; (ErgoptiPlus.ahk), an exception here would abort the entire boot sequence.
@@ -37,34 +36,31 @@ TestKeyState_ResolveKeyboardLayoutDoesNotThrow() {
 }
 Test("key_state: KS_ResolveKeyboardLayout does not throw (key-state-dllcall-uncaught)", TestKeyState_ResolveKeyboardLayoutDoesNotThrow)
 
-TestKeyState_ProbeRightAltScancodeDoesNotThrow() {
+TestKeyState_ProbeAltGrLayoutDoesNotThrow() {
 	Hkl := KS_ResolveKeyboardLayout()
 	Threw := false
-	Sc := 0
+	Probe := 0
 	try {
-		Sc := KS_ProbeRightAltScancode(Hkl)
+		Probe := KS_ProbeAltGrLayout(Hkl)
 	} catch {
 		Threw := true
 	}
-	AssertFalse(Threw, "KS_ProbeRightAltScancode must not throw on a real HKL")
-	AssertTrue(Sc is Integer, "KS_ProbeRightAltScancode must return an integer scancode (or 0)")
+	AssertFalse(Threw, "KS_ProbeAltGrLayout must not throw on a real HKL")
+	AssertTrue(Probe is Map and Probe["rmenu_sc"] is Integer and Probe["altgr_vk"] is Integer,
+		"KS_ProbeAltGrLayout must return both probe results")
+	AssertTrue(Probe["valid"], "the active layout must know its AltGr key one way or the other")
 }
-Test("key_state: KS_ProbeRightAltScancode does not throw (key-state-dllcall-uncaught)", TestKeyState_ProbeRightAltScancodeDoesNotThrow)
+Test("key_state: KS_ProbeAltGrLayout does not throw on a real layout (key-state-dllcall-uncaught)", TestKeyState_ProbeAltGrLayoutDoesNotThrow)
 
-TestKeyState_ProbeRightAltScancode_InvalidHklReturnsZero() {
-	; An invalid/garbage HKL must not throw -- MapVirtualKeyExW simply returns 0.
-	Threw := false
-	Sc := -1
-	try {
-		Sc := KS_ProbeRightAltScancode(0xDEADBEEF)
-	} catch {
-		Threw := true
-	}
-	AssertFalse(Threw, "KS_ProbeRightAltScancode must not throw on an invalid HKL")
-	AssertEqual(0, Sc, "KS_ProbeRightAltScancode must return 0 for an invalid HKL")
+; An invalid HKL answers 0 to both lookups. The reverse probe's 0 alone used to
+; mean a Kana layout (altgr-probe-invalid-hkl-2026-09-26).
+TestKeyState_ProbeAltGrLayout_InvalidHklIsNotKana() {
+	Probe := KS_ProbeAltGrLayout(0xDEADBEEF)
+	AssertFalse(Probe["valid"], "an invalid HKL must be reported as a layout the probe could not read")
+	AssertFalse(Probe["kana"], "an invalid HKL must never be taken for a Kana layout")
 }
-Test("key_state: KS_ProbeRightAltScancode degrades to 0 on an invalid HKL (key-state-dllcall-uncaught)",
-	TestKeyState_ProbeRightAltScancode_InvalidHklReturnsZero)
+Test("key_state: an invalid HKL is not taken for a Kana layout (altgr-probe-invalid-hkl-2026-09-26)",
+	TestKeyState_ProbeAltGrLayout_InvalidHklIsNotKana)
 
 TestKeyState_ScanScancodeForCharDoesNotThrow() {
 	Hkl := KS_ResolveKeyboardLayout()
@@ -101,7 +97,5 @@ _KSDG_CheckFunctionHasCatch(FuncName) {
 
 Test("key_state: KS_ResolveKeyboardLayout has a try/catch (key-state-dllcall-uncaught)",
 	() => _KSDG_CheckFunctionHasCatch("KS_ResolveKeyboardLayout"))
-Test("key_state: KS_ProbeRightAltScancode has a try/catch (key-state-dllcall-uncaught)",
-	() => _KSDG_CheckFunctionHasCatch("KS_ProbeRightAltScancode"))
 Test("key_state: KS_ScanScancodeForChar has a try/catch (key-state-dllcall-uncaught)",
 	() => _KSDG_CheckFunctionHasCatch("KS_ScanScancodeForChar"))

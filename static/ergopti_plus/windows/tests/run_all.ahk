@@ -1469,6 +1469,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_personal_shortcuts_reload_handoff.ahk
 #Include meta/test_personal_shortcuts_atomic_bootstrap.ahk
 #Include meta/test_altgr_detect_hkl_fallback.ahk
+#Include unit/test_altgr_detection.ahk
 #Include meta/test_altgr_kana_taphold_entry.ahk
 #Include meta/test_prior_key_guards_use_helper.ahk
 #Include meta/test_modifier_hotkeys_single_identity.ahk

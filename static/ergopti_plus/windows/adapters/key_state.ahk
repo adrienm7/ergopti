@@ -183,19 +183,51 @@ KS_ResolveKeyboardLayout() {
 	}
 }
 
-; Reverse-probes VK_RMENU (0xA5) into a scancode under the given layout
-; (MAPVK_VK_TO_VSC_EX = 4). SC = 0 means VK_RMENU is not mapped on this layout
-; (a Kana-like AltGr remap); a non-zero SC means a standard RAlt/AltGr exists.
-; @param Hkl {Integer} The keyboard layout handle to probe.
-; @return {Integer} The scancode for VK_RMENU, or 0 when it is unmapped.
-KS_ProbeRightAltScancode(Hkl) {
-	try {
-		return DllCall("MapVirtualKeyExW", "UInt", 0xA5, "UInt", 4, "Ptr", Hkl, "UInt")
-	} catch as e {
-		try LoggerError("KeyState", "KS_ProbeRightAltScancode failed: {1}.", e.Message)
-		return 0
-	}
+; Win32 names for the AltGr probe (MapVirtualKeyExW), defined once.
+global KS_VK_RMENU := 0xA5
+global KS_MAPVK_VK_TO_VSC_EX := 4
+global KS_MAPVK_VSC_TO_VK_EX := 3
+; Extended scan code of the physical AltGr key (right Alt position).
+global KS_SC_ALTGR_EXTENDED := 0xE038
+
+; Probes layout Hkl for the AltGr family, once, and returns what decided it.
+; VK_RMENU reverse-probes to a scan code (typically 0xE038) on a standard AltGr
+; layout (bépo, AZERTY, US-International) and on QWERTY; on a Kana-style
+; KbdEdit/MSKLC remap the AltGr key sits on another virtual key (VK_OEM_8,
+; VK_KANA, ...) and VK_RMENU has no scan code at all. The forward lookup of the
+; AltGr scan code gives the virtual key the layout puts that key on, which a
+; Send must name on a Kana layout (KS_AltGrSendKey). The reverse direction
+; proved more reliable than the forward one for the family itself: the forward
+; lookup behaved inconsistently across bépo HKLs.
+; Never probes HKL 0, which MapVirtualKeyExW reads as HKL_PREV (another loaded
+; layout), and a layout that maps neither direction (an invalid HKL answers 0
+; to both) is reported as unknown ("valid" false), never as a Kana layout: a
+; lone 0 from the reverse probe used to be enough to pick the Kana family.
+; @param Hkl {Integer} Keyboard layout handle; 0 is refused.
+; @param MapFn {Func} Test seam taking (Code, MapType, Hkl), MapVirtualKeyExW
+;        by default.
+; @return {Map} "hkl", "rmenu_sc" (0 = VK_RMENU unmapped), "altgr_vk", "valid"
+;         (the layout knows the AltGr key one way or the other) and "kana"
+;         (VK_RMENU unmapped while the AltGr key has a virtual key).
+KS_ProbeAltGrLayout(Hkl, MapFn := 0) {
+	global KS_VK_RMENU, KS_MAPVK_VK_TO_VSC_EX, KS_MAPVK_VSC_TO_VK_EX, KS_SC_ALTGR_EXTENDED
+	if (Hkl == 0)
+		throw ValueError("The AltGr layout probe needs a keyboard layout; HKL 0 is another loaded layout (HKL_PREV).", -1)
+	if !IsObject(MapFn)
+		MapFn := (Code, MapType, Layout) => DllCall("MapVirtualKeyExW", "UInt", Code, "UInt", MapType, "Ptr", Layout, "UInt")
+	RMenuSc := MapFn.Call(KS_VK_RMENU, KS_MAPVK_VK_TO_VSC_EX, Hkl)
+	AltGrVk := MapFn.Call(KS_SC_ALTGR_EXTENDED, KS_MAPVK_VSC_TO_VK_EX, Hkl)
+	return Map("hkl", Hkl, "rmenu_sc", RMenuSc, "altgr_vk", AltGrVk,
+		"valid", RMenuSc != 0 or AltGrVk != 0,
+		"kana", RMenuSc == 0 and AltGrVk != 0)
 }
+
+; The boot probe that decided the AltGr family (HotstringEngineInit): the
+; KS_ProbeAltGrLayout result plus "source" ("probe", "override" when the TOML
+; flag decided, "unresolved" when no layout could be read). Seeded here as
+; unresolved; HotstringEngineInit replaces it before the first hotstring fires.
+global _ALTGR_LAYOUT_PROBE := Map("hkl", 0, "rmenu_sc", 0, "altgr_vk", 0,
+	"valid", false, "kana", false, "source", "unresolved")
 
 ; AHK key name that presses the active layout's AltGr. Standard AltGr layouts
 ; put AltGr on VK_RMENU, so "RAlt" is AltGr there. Kana-style remaps

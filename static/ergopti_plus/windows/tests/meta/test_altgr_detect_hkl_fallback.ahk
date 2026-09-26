@@ -1,72 +1,71 @@
 ﻿; tests/meta/test_altgr_detect_hkl_fallback.ahk
 
 ; ==============================================================================
-; MODULE: AltGrDetect HKL Fallback Meta Test
+; MODULE: AltGrDetect single-probe meta test
 ; DESCRIPTION:
-; Regression guard ensuring the AltGrDetect log block in ErgoptiPlus.ahk does
-; not call GetForegroundKeyboardLayout() bare and use its return value directly
-; as the HKL argument. At startup with no foreground window the function returns
-; 0, causing MapVirtualKeyExW to use the wrong layout or fail silently.
+; The boot decided the AltGr family from one read of the keyboard layout, then
+; read the layout again for the AltGrDetect log line, again for the magic-key
+; scan and again for the layout poll's baseline, each through its own fallback
+; chain. A layout switch during the seconds of boot therefore left the family
+; decided on one layout while the poll's baseline held the next: the poll saw no
+; change and never reloaded, and the log named a layout that decided nothing
+; (altgr-single-probe-2026-09-26). Every boot consumer now reads the record
+; HotstringEngineInit keeps in _ALTGR_LAYOUT_PROBE, and the VK_RMENU probe
+; lives in adapters/key_state.ahk only.
 ;
-; The fix: the AltGrDetect block must apply the same HKL cascade used by the
-; magic-key scanner — fallback to GetKeyboardLayout(A_ThreadID), then to
-; SystemParametersInfo(SPI_GETDEFAULTINPUTLANG).
-;
-; SCOPE: source introspection of ErgoptiPlus.ahk.
+; SCOPE: source introspection of the entry and the driver tree.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
 
-
-
-
-; ===================================================
-; ===================================================
-; ======= 1/ Source scan helpers ====================
-; ===================================================
-; ===================================================
-
-_AGHF_ReadSource(RelPath) {
+_AGHF_EntrySource() {
 	SplitPath(A_ScriptDir, , &WindowsDir)
-	Path := WindowsDir . "\" . StrReplace(RelPath, "/", "\")
-	return FileRead(Path)
-}
-
-
-; ===================================================
-; ===================================================
-; ======= 2/ Test implementations ===================
-; ===================================================
-; ===================================================
-
-_AGHF_CheckNoDirectHKLArg() {
-	Src := _DriverSourceConcat()
+	Src := FileRead(WindowsDir . "\ErgoptiPlus.ahk", "UTF-8")
 	Assert(Src != "", "ErgoptiPlus.ahk must be readable")
-
-	; Detect the AltGrDetect log block by looking for its unique signature.
-	; The block must NOT pass GetForegroundKeyboardLayout() directly as the HKL
-	; argument to MapVirtualKeyExW — it must cache the resolved HKL first.
-	; We check that MapVirtualKeyExW is never called with GetForegroundKeyboardLayout()
-	; inline in the same expression.
-	BadPattern := '"Ptr", GetForegroundKeyboardLayout()'
-	Assert(!InStr(Src, BadPattern),
-		"AltGrDetect block must not pass GetForegroundKeyboardLayout() directly to MapVirtualKeyExW — cache HKL with fallback first")
+	return _StripFullLineComments(Src)
 }
 
-_AGHF_CheckHKLFallbackPresent() {
-	Src := _DriverSourceConcat()
-	Assert(Src != "", "ErgoptiPlus.ahk must be readable")
-
-	; The block must resolve HKL into a variable and apply thread-layout fallback
-	Assert(InStr(Src, "_DetectHKL"),
-		"AltGrDetect block must cache the resolved HKL in _DetectHKL")
-	Assert(InStr(Src, "GetKeyboardLayout") && InStr(Src, "GetCurrentThreadId"),
-		"AltGrDetect block must include GetKeyboardLayout(GetCurrentThreadId()) as first HKL fallback")
+_AGHF_BootConsumersReadTheProbe() {
+	Src := _AGHF_EntrySource()
+	AssertTrue(RegExMatch(Src, 'm)^global _LAST_KEYBOARD_HKL := _ALTGR_LAYOUT_PROBE\["hkl"\]') > 0,
+		"the layout poll's baseline must be the layout the boot probe decided the AltGr family on")
+	AssertTrue(InStr(Src, '_HKL := _ALTGR_LAYOUT_PROBE["hkl"]') > 0,
+		"the magic-key scan must scan the layout the boot probe read")
+	Detect := InStr(Src, 'LoggerInfo("AltGrDetect"')
+	AssertTrue(Detect > 0, "the AltGrDetect line must still be logged")
+	Block := SubStr(Src, Detect, 600)
+	AssertTrue(InStr(Block, '_ALTGR_LAYOUT_PROBE["hkl"]') > 0 and InStr(Block, '_ALTGR_LAYOUT_PROBE["source"]') > 0,
+		"the AltGrDetect line must log the probe that decided the family and what decided it")
+	for _, Second in ["KS_ResolveKeyboardLayout()", "KS_ProbeAltGrLayout("] {
+		AssertFalse(InStr(Src, Second) > 0,
+			"the entry must not read or probe the layout a second time at boot: " . Second)
+	}
+	; The poll's own tick is the one foreground read left in the entry.
+	StrReplace(Src, "GetForegroundKeyboardLayout()", , , &Reads)
+	AssertEqual(1, Reads, "the entry must read the foreground layout only in the poll's tick")
+	AssertTrue(InStr(_DriverFuncBody("CheckKeyboardLayoutChange"), "GetForegroundKeyboardLayout()") > 0,
+		"the poll's tick must read the foreground layout to notice a switch")
 }
+Test("meta altgr-detect: every boot consumer reads the one layout probe (altgr-single-probe-2026-09-26)",
+	_AGHF_BootConsumersReadTheProbe)
 
-
-Test("meta altgr-detect: does not pass GetForegroundKeyboardLayout() directly to MapVirtualKeyExW",
-	_AGHF_CheckNoDirectHKLArg)
-
-Test("meta altgr-detect: caches HKL in _DetectHKL with thread-layout fallback",
-	_AGHF_CheckHKLFallbackPresent)
+_AGHF_RMenuProbeLivesInKeyState() {
+	Found := []
+	SplitPath(A_ScriptDir, , &Root)
+	Loop Files, Root . "\*.ahk", "FR" {
+		P := StrReplace(A_LoopFileFullPath, "\", "/")
+		if (InStr(P, "/tests/") or InStr(P, "/vendor/") or InStr(P, "/_generated/"))
+			continue
+		Src := _StripFullLineComments(FileRead(A_LoopFileFullPath, "UTF-8"))
+		if RegExMatch(Src, 'i)MapVirtualKeyExW"\s*,\s*"UInt"\s*,\s*(0xA5|_?VK_RMENU|KS_VK_RMENU)\b')
+			Found.Push(P)
+	}
+	AssertEqual(0, Found.Length, "the VK_RMENU layout probe must be the adapter's KS_ProbeAltGrLayout only; found a copy in "
+		. (Found.Length ? Found[1] : ""))
+	Body := _DriverFuncBody("KS_ProbeAltGrLayout")
+	AssertTrue(InStr(Body, "KS_VK_RMENU") > 0, "KS_ProbeAltGrLayout must probe VK_RMENU through its named constant")
+	AssertFalse(_DriverFuncBodyOrEmpty("DetectAltGrKanaRemap") != "",
+		"the second probe DetectAltGrKanaRemap must stay deleted")
+}
+Test("meta altgr-detect: the VK_RMENU probe lives in the KeyState adapter only (altgr-single-probe-2026-09-26)",
+	_AGHF_RMenuProbeLivesInKeyState)
