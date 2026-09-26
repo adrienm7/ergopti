@@ -67,7 +67,8 @@ _THAM_Offenders(Src, &Subjects, &Exempt) {
 	Exempt := 0
 	Offenders := ""
 	for _, Variant in _THAM_Variants(Src, _THAM_KEY_PATTERN) {
-		if !InStr(Variant.HotIf, "not LayerEnabled")
+		; The AltGr owners' layer-off test lives in their named criteria.
+		if !(InStr(Variant.HotIf, "not LayerEnabled") or InStr(Variant.HotIf, "#HotIf AltGrOwner"))
 			continue
 		Subjects++
 		if InStr(Variant.Prefix, "*")
@@ -224,3 +225,67 @@ _THAM_SwallowersPrecedeTheLayerMappings() {
 }
 Test("tap-hold admission: owned-repeat swallowers precede the layer mappings (owned-press-repeat-all-2026-09-25)",
 	_THAM_SwallowersPrecedeTheLayerMappings)
+
+; The Kana layout's AltGr is VK_OEM_8, which AutoHotkey does not count as a
+; modifier: under it no modifier was down for the hook, the variants without *
+; matched, and AltGr+Tab ran the Tab tap action (the window switcher) instead of
+; the layout's AltGr+Tab (kana-altgr-native-keys-2026-09-26). Every tap-hold
+; variant of the six keys therefore asks TapHoldKanaAltGrHeld, and the owned
+; repeat swallowers do not: a press already owned keeps swallowing its repeat.
+_THAM_NativeKeysStayNativeUnderTheKanaAltGr() {
+	global _THAM_NATIVE_KEY_PATTERN
+	Src := _StripFullLineComments(_DriverDirConcat("platform/remap"))
+	Subjects := 0
+	Missing := ""
+	for _, Variant in _THAM_Variants(Src, _THAM_NATIVE_KEY_PATTERN) {
+		if InStr(Variant.HotIf, "TapHoldPressIsOwned(") {
+			AssertFalse(InStr(Variant.HotIf, "TapHoldKanaAltGrHeld()") > 0,
+				Variant.Label . ": an owned press must keep swallowing its repeat under AltGr")
+			continue
+		}
+		if !InStr(Variant.HotIf, "not LayerEnabled")
+			continue
+		Subjects++
+		if !InStr(Variant.HotIf, "not TapHoldKanaAltGrHeld()")
+			Missing .= (Missing = "" ? "" : ", ") . Variant.Label
+	}
+	AssertEqual("", Missing, "these native-key tap-holds still fire under the Kana AltGr")
+	Assert(Subjects >= 20, "every tap-hold variant of the six native keys must be scanned, got " . Subjects)
+}
+Test("tap-hold admission: the six native keys stay native under the Kana AltGr (kana-altgr-native-keys-2026-09-26)",
+	_THAM_NativeKeysStayNativeUnderTheKanaAltGr)
+
+; A stand-in for the logical key state where only the layout's AltGr is down,
+; when Down is true. (A closure over a for-loop variable is not captured.)
+_THAM_AltGrStateFn(Down) {
+	return (Name) => Down and Name == KS_AltGrKeyName()
+}
+
+_THAM_KanaAltGrHeldReadsTheLayoutAltGr() {
+	global _TapHoldModifierIsHeld
+	SavedHeld := _TapHoldModifierIsHeld
+	try {
+		for _, Kana in [true, false] {
+			Family := _TestSetAltGrFamily(Kana)
+			try {
+				for _, Down in [true, false] {
+					_TapHoldModifierIsHeld := _THAM_AltGrStateFn(Down)
+					AssertEqual(Kana and Down, TapHoldKanaAltGrHeld(),
+						(Kana ? "Kana" : "standard") . " layout, AltGr " . (Down ? "held" : "up")
+						. ": only a held Kana AltGr is a modifier AutoHotkey does not count")
+				}
+			} finally _TestRestoreAltGrFamily(Family)
+		}
+		; A tap under the Kana AltGr keeps it (Send never lifts VK_OEM_8), so its
+		; payload stays bare, the Backspace the hotstring buffer recognizes.
+		Family := _TestSetAltGrFamily(true)
+		try {
+			_TapHoldModifierIsHeld := (Name) => Name == KS_AltGrKeyName()
+			AssertFalse(TapHoldAnyModifierHeld(), "a tap under the Kana AltGr alone needs no {Blind}")
+		} finally _TestRestoreAltGrFamily(Family)
+	} finally {
+		_TapHoldModifierIsHeld := SavedHeld
+	}
+}
+Test("tap-hold admission: TapHoldKanaAltGrHeld is true for a held Kana AltGr only (kana-altgr-native-keys-2026-09-26)",
+	_THAM_KanaAltGrHeldReadsTheLayoutAltGr)

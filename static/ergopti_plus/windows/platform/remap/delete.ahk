@@ -46,7 +46,7 @@ _DeleteHoldModKey() {
 ; ===========================================
 ; ===========================================
 
-#HotIf TapHoldHoldModifier(TapHold, "delete") != "" and not LayerEnabled
+#HotIf TapHoldHoldModifier(TapHold, "delete") != "" and not LayerEnabled and not TapHoldKanaAltGrHeld()
 $SC153:: {
 	Result := TapHoldOwnImmediateModifier("delete", "Delete",
 		_DeleteHoldModKey(), TapHoldDuration(TapHold, "delete"))
@@ -67,7 +67,7 @@ $SC153:: {
 ; ========================================
 ; ========================================
 
-#HotIf TapHoldHoldLayer(TapHold, "delete") != "" and TapHoldHoldModifier(TapHold, "delete") == "" and not LayerEnabled
+#HotIf TapHoldHoldLayer(TapHold, "delete") != "" and TapHoldHoldModifier(TapHold, "delete") == "" and not LayerEnabled and not TapHoldKanaAltGrHeld()
 $SC153:: {
 	Result := TapHoldOwnImmediateLayer("delete", "Delete", TapHoldDuration(TapHold, "delete"))
 	if (Result["tap"] and TapHoldPriorKeyIsSelf("delete"))
@@ -110,7 +110,7 @@ $SC153:: {
 ; $ prevents re-entry. Fire immediately on key-down — no KeyWait or A_PriorKey
 ; guard needed since there is no hold behaviour. No ~ needed: the action replaces
 ; the native key entirely; ~ would send both Delete and the action.
-#HotIf TapHoldTapAction(TapHold, "delete") != "" and TapHoldTapAction(TapHold, "delete") != "delete" and TapHoldHoldModifier(TapHold, "delete") == "" and TapHoldHoldLayer(TapHold, "delete") == "" and not LayerEnabled
+#HotIf TapHoldTapAction(TapHold, "delete") != "" and TapHoldTapAction(TapHold, "delete") != "delete" and TapHoldHoldModifier(TapHold, "delete") == "" and TapHoldHoldLayer(TapHold, "delete") == "" and not LayerEnabled and not TapHoldKanaAltGrHeld()
 $SC153:: _DeleteDispatch()
 #HotIf
 

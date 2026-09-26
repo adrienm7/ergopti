@@ -42,7 +42,7 @@ _EnterHoldModKey() {
 ; ==========================================
 ; ==========================================
 
-#HotIf TapHoldHoldModifier(TapHold, "enter") != "" and not LayerEnabled
+#HotIf TapHoldHoldModifier(TapHold, "enter") != "" and not LayerEnabled and not TapHoldKanaAltGrHeld()
 $SC01C:: {
 	Result := TapHoldOwnImmediateModifier("enter", "Enter",
 		_EnterHoldModKey(), TapHoldDuration(TapHold, "enter"))
@@ -63,7 +63,7 @@ $SC01C:: {
 ; =======================================
 ; =======================================
 
-#HotIf TapHoldHoldLayer(TapHold, "enter") != "" and TapHoldHoldModifier(TapHold, "enter") == "" and not LayerEnabled
+#HotIf TapHoldHoldLayer(TapHold, "enter") != "" and TapHoldHoldModifier(TapHold, "enter") == "" and not LayerEnabled and not TapHoldKanaAltGrHeld()
 $SC01C:: {
 	Result := TapHoldOwnImmediateLayer("enter", "Enter", TapHoldDuration(TapHold, "enter"))
 	if (Result["tap"] and TapHoldPriorKeyIsSelf("enter"))
@@ -105,7 +105,7 @@ $SC01C:: {
 
 ; $ prevents re-entry. Fire immediately on key-down — no KeyWait needed since
 ; there is no hold behaviour. No ~ so the native Enter is not also sent.
-#HotIf TapHoldTapAction(TapHold, "enter") != "" and TapHoldTapAction(TapHold, "enter") != "enter" and TapHoldHoldModifier(TapHold, "enter") == "" and TapHoldHoldLayer(TapHold, "enter") == "" and not LayerEnabled
+#HotIf TapHoldTapAction(TapHold, "enter") != "" and TapHoldTapAction(TapHold, "enter") != "enter" and TapHoldHoldModifier(TapHold, "enter") == "" and TapHoldHoldLayer(TapHold, "enter") == "" and not LayerEnabled and not TapHoldKanaAltGrHeld()
 $SC01C:: _EnterDispatch()
 #HotIf
 

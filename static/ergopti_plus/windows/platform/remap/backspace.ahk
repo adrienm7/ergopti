@@ -45,7 +45,7 @@ _BackspaceHoldModKey() {
 ; ===========================================
 ; ===========================================
 
-#HotIf TapHoldHoldModifier(TapHold, "backspace") != "" and not LayerEnabled
+#HotIf TapHoldHoldModifier(TapHold, "backspace") != "" and not LayerEnabled and not TapHoldKanaAltGrHeld()
 $SC00E:: {
 	Result := TapHoldOwnImmediateModifier("backspace", "BackSpace",
 		_BackspaceHoldModKey(), TapHoldDuration(TapHold, "backspace"))
@@ -66,7 +66,7 @@ $SC00E:: {
 ; ========================================
 ; ========================================
 
-#HotIf TapHoldHoldLayer(TapHold, "backspace") != "" and TapHoldHoldModifier(TapHold, "backspace") == "" and not LayerEnabled
+#HotIf TapHoldHoldLayer(TapHold, "backspace") != "" and TapHoldHoldModifier(TapHold, "backspace") == "" and not LayerEnabled and not TapHoldKanaAltGrHeld()
 $SC00E:: {
 	Result := TapHoldOwnImmediateLayer("backspace", "BackSpace", TapHoldDuration(TapHold, "backspace"))
 	if (Result["tap"] and TapHoldPriorKeyIsSelf("backspace"))
@@ -109,7 +109,7 @@ $SC00E:: {
 ; $ prevents re-entry. Fire immediately on key-down — no KeyWait or A_PriorKey
 ; guard needed since there is no hold behaviour. No ~ needed: the action replaces
 ; the native key entirely; ~ would send both BackSpace and the action.
-#HotIf TapHoldTapAction(TapHold, "backspace") != "" and TapHoldTapAction(TapHold, "backspace") != "backspace" and TapHoldHoldModifier(TapHold, "backspace") == "" and TapHoldHoldLayer(TapHold, "backspace") == "" and not LayerEnabled
+#HotIf TapHoldTapAction(TapHold, "backspace") != "" and TapHoldTapAction(TapHold, "backspace") != "backspace" and TapHoldHoldModifier(TapHold, "backspace") == "" and TapHoldHoldLayer(TapHold, "backspace") == "" and not LayerEnabled and not TapHoldKanaAltGrHeld()
 $SC00E:: _BackspaceDispatch()
 #HotIf
 
