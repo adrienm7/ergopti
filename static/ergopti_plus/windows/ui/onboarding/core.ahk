@@ -105,21 +105,24 @@ global _ob_s1_debounce_ms := 120   ; delay after last ItemSelect before re-rende
 ; AND by ``IsOnboardingActive`` below. While it is set every AltGr combination
 ; and AltGr tap-hold owner is false, so the host Windows layout still produces
 ; its AltGr characters in the wizard's edit boxes (and anywhere else the user
-; types while it is up). That alone would not be enough: SC138 stays an armed
-; prefix key during the wizard, because the always-eligible "~SC138 & ~F24"
-; anchor in platform/remap/altgr.ahk has no criterion. Only the ~ on that
-; anchor's prefix keeps AutoHotkey from suppressing SC138 as a prefix, so the
-; native AltGr press reaches the wizard; that ~ must stay
-; (test_altgr_prefix_arms_on_press.ahk). The wizard always exits via Reload or
-; ExitApp so this flag never needs to be cleared by hand.
+; types while it is up). SC138 stays an armed prefix key during the wizard,
+; because the always-eligible "~SC138 & ~F24" anchor in platform/remap/altgr.ahk
+; has no criterion, and that costs the wizard nothing: AutoHotkey reads SC138
+; as the RAlt modifier on every layout and never suppresses a modifier prefix
+; that no variant fires for (hook.cpp Case #1, "this_key.as_modifiersLR"), so
+; the native AltGr press reaches the wizard. The anchor's ~ is there for the
+; standalone SC138 hotkeys, which it fires on the press rather than on the
+; release (test_altgr_prefix_arms_on_press.ahk). The wizard always exits via
+; Reload or ExitApp so this flag never needs to be cleared by hand.
 global _OB_ALTGR_PASSTHROUGH := false
 
 ; Public check used by other modules' #HotIf criteria to neutralise any
 ; AltGr-capturing hotkey (e.g. the AltGr tap-hold owners in
 ; platform/remap/altgr_criteria.ahk) while the wizard is on screen. Standalone
 ; hotkeys disappear cleanly when their #HotIf returns false; the SC138 prefix
-; itself stays armed by the "~SC138 & ~F24" anchor, whose ~ passes the press
-; through (see _OB_ALTGR_PASSTHROUGH above).
+; itself stays armed by the "~SC138 & ~F24" anchor, and AutoHotkey passes that
+; modifier's press through when no variant fires (see _OB_ALTGR_PASSTHROUGH
+; above).
 IsOnboardingActive() {
 	global _OB_ALTGR_PASSTHROUGH
 	return IsSet(_OB_ALTGR_PASSTHROUGH) and _OB_ALTGR_PASSTHROUGH

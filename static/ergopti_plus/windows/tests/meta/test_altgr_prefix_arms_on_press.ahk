@@ -54,13 +54,17 @@ _APAP_AnchorArmsThePrefixOnEveryPress() {
 Test("altgr prefix: an always-eligible pass-through combination arms SC138 on its press (qwerty-altgr-prefix-2026-09-26)",
 	_APAP_AnchorArmsThePrefixOnEveryPress)
 
-; The anchor has no criterion, so SC138 is an armed prefix during the first-run
-; wizard too, where every other SC138 hotkey is false. Only the ~ on the
-; anchor's prefix keeps AutoHotkey from suppressing SC138 (hook.cpp: an enabled
-; NO_SUPPRESS_PREFIX variant leaves suppress_this_prefix false), so the
-; wizard's fields get the host layout's native AltGr. The comments that said the
-; wizard never sees SC138 as a prefix were wrong (anchor-prefix-tilde-2026-09-26);
-; this pins the prefix itself, not the whole label.
+; The ~ on the anchor's prefix is what fires the standalone SC138 hotkeys on the
+; press: without it AutoHotkey postpones every one of them that lacks ~ (the
+; suppressing AltGr owners) to the release (hook.cpp: "Record the use of ~ on
+; this prefix even if it's a standard modifier which wouldn't normally be
+; suppressed, since this also affects whether the key's own hotkeys fire on
+; press vs. release"). The ~ does not decide the first-run wizard's AltGr: the
+; anchor arms SC138 there too, but AutoHotkey reads SC138 as the RAlt modifier
+; on every layout and never suppresses a modifier prefix that no variant fires
+; for (hook.cpp Case #1, "this_key.as_modifiersLR"), so the wizard's fields get
+; the host layout's native AltGr either way (anchor-prefix-tilde-2026-09-26).
+; This pins the prefix itself, not the whole label.
 _APAP_AnchorPrefixKeepsItsTilde() {
 	Src := _StripFullLineComments(_DriverDirConcat("platform/remap"))
 	Prefix := ""
@@ -76,9 +80,9 @@ _APAP_AnchorPrefixKeepsItsTilde() {
 	AssertEqual(1, Found, "exactly one combination must anchor the AltGr prefix on F24")
 	AssertEqual("SC138", LTrim(Prefix, "~*$"), "the anchor's prefix must be the AltGr key")
 	AssertEqual("~", SubStr(Prefix, 1, 1),
-		"the anchor's prefix must keep ~: without it AutoHotkey suppresses SC138 as an armed prefix and the first-run wizard loses its native AltGr")
+		"the anchor's prefix must keep ~: without it AutoHotkey postpones the standalone SC138 hotkeys that lack ~ to the key's release")
 }
-Test("altgr prefix: the anchor's SC138 prefix keeps ~ so the wizard's AltGr stays native (anchor-prefix-tilde-2026-09-26)",
+Test("altgr prefix: the anchor's SC138 prefix keeps ~ so the standalone AltGr hotkeys fire on the press (anchor-prefix-tilde-2026-09-26)",
 	_APAP_AnchorPrefixKeepsItsTilde)
 
 _APAP_SuspendDrainWaitsForAltGrOnEveryLayout() {

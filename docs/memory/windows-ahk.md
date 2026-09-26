@@ -275,6 +275,10 @@ Action: never gate arming on the prefix's own state; the always-eligible
 `~SC138 & ~F24` anchor arms SC138 on every press and makes its standalone
 hotkeys fire on the press, and every `SC01D &` combination carries `~` on the
 prefix (`test_altgr_prefix_arms_on_press.ahk`, `test_altgr_takes_its_lctrl.ahk`).
+That `~` never decided suppression: AHK reads SC138 as the RAlt modifier on
+every layout and lets a modifier prefix's press through when no variant fires
+(hook.cpp Case #1, `this_key.as_modifiersLR`), which is what keeps the
+first-run wizard's AltGr native.
 The anchor arms SC138 on QWERTY too, where it is a plain right Alt, so every
 "SC138 & X" is reachable from a first-press RAlt+X there: a chord that must not
 fire as an Alt chord (the script quit, reload and pause) also requires

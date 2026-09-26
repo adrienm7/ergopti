@@ -47,9 +47,15 @@
 ; checks the physical AltGr when its suffix fires, when that state is known. Its
 ; suffix, F24, is a key no keyboard here sends; its ~ passes it through anyway.
 ; With no criterion it arms SC138 during the first-run wizard too, where every
-; other SC138 hotkey is false: the ~ on its prefix is then all that keeps
-; AutoHotkey from suppressing SC138, so the wizard's fields get the host
-; layout's native AltGr. Never drop it (test_altgr_prefix_arms_on_press.ahk).
+; other SC138 hotkey is false. The wizard's fields still get the host layout's
+; native AltGr, with or without this ~: AutoHotkey reads SC138 as the RAlt
+; modifier on every layout, and a modifier prefix no variant fires for is never
+; suppressed (hook.cpp Case #1 allows the press when "this_key.as_modifiersLR").
+; The ~ on the prefix is what fires the standalone SC138 hotkeys on the press
+; (hook.cpp: "Record the use of ~ on this prefix even if it's a standard
+; modifier which wouldn't normally be suppressed, since this also affects
+; whether the key's own hotkeys fire on press vs. release"). Never drop it
+; (test_altgr_prefix_arms_on_press.ahk).
 ; Suspend disables it with every hotkey, and the suspend drain waits for SC138
 ; on every layout since it now arms everywhere.
 #HotIf
