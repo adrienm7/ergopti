@@ -99,6 +99,10 @@ global KLHOOK_MODIFIER_VKS := Map(
 		0x90, true               ; VK_NUMLOCK
 )
 
+; VK_PACKET: a character a Send typed as text ({Text}), not a key the user
+; pressed, so never the payload of a shortcut.
+global KLHOOK_VK_PACKET := 0xE7
+
 
 
 
@@ -370,6 +374,10 @@ KL_Watchers_IdleTick() {
 KL_Watchers_DetectShortcut(vk, sc) {
 		if KLHOOK_MODIFIER_VKS.Has(vk) or sc == KS_AltGrScanCode()
 				return ""
+		; VK_PACKET is text a Send typed ({Text}), such as an AltGr-layer
+		; character, not a key the user pressed with a modifier.
+		if (vk == KLHOOK_VK_PACKET)
+				return ""
 		Ctrl  := GetKeyState("LControl", "P") or GetKeyState("RControl", "P")
 		LAlt  := GetKeyState("LAlt", "P")
 		AltGr := GetKeyState(KS_AltGrKeyName(), "P")
@@ -379,8 +387,9 @@ KL_Watchers_DetectShortcut(vk, sc) {
 		; On a standard layout AltGr is RAlt + a synthetic LCtrl injected by
 		; Windows. When LAlt is NOT pressed, this Ctrl+Alt combo is the AltGr
 		; layer and the user is just typing a character — drop the « shortcut »
-		; framing.
-		if (AltGr and Ctrl and !LAlt)
+		; framing. A Kana-style AltGr injects no Ctrl, so a Ctrl held with it is
+		; the user's own shortcut.
+		if (AltGr and Ctrl and !LAlt and !(IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP))
 				return ""
 		; Plain Shift+letter is capitalisation, never a shortcut.
 		if (!Ctrl and !LAlt and !Win)
