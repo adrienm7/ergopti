@@ -33,6 +33,28 @@ _AltGrHoldModKey() {
 ; picks the eligible variant, so the standard and Kana criteria below only need
 ; to be mutually exclusive.
 
+; The AltGr key prefixes the AltGr layer, the rolls and the script chords
+; ("SC138 & X"), and AutoHotkey decides whether a prefix is armed while it
+; handles the key's own press (hook.cpp Case #1, PrefixHasEnabledSuffixes),
+; before it has recorded a modifier's physical state. Those combinations gate
+; on the physical AltGr (IsRealAltGrPress), so on a layout without the AltGr
+; fake LCtrl (QWERTY, or any AltGr layout while no "SC01D & SC138" is
+; eligible) the prefix never armed on a press and the layer only worked after
+; the key's auto-repeat. Where it did arm (every Kana press), AHK postponed each
+; standalone SC138 hotkey without ~ to the key's release and fired it only if
+; no other key was pressed: the held modifier never engaged, a 2 s hold still
+; typed its tap, the navigation Escape came on release. This combination is
+; always eligible and carries ~ on the prefix: the prefix now arms on every
+; press, a standalone SC138 hotkey fires on the press whether or not it passes
+; the key through (hook.cpp: "If suppress_this_prefix == false, this prefix
+; key's key-down hotkey should fire immediately"), and each combination still
+; checks the physical AltGr when its suffix fires, when that state is known. Its
+; suffix, F24, is a key no keyboard here sends; its ~ passes it through anyway.
+; Suspend disables it with every hotkey, and the suspend drain waits for SC138
+; on every layout since it now arms everywhere.
+#HotIf
+~SC138 & ~F24:: return
+
 #HotIf not _ALTGR_KANA_FIXUP and not LayerEnabled and not IsOnboardingActive() and TapHoldHoldModifier(TapHold, "alt_gr") != ""
 SC01D & SC138:: ; AltGr on an AltGr layout arrives as LControl & RAlt
 *SC138:: { ; RAlt alone, e.g. on QWERTY
