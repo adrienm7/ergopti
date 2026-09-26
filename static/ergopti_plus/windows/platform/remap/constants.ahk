@@ -888,6 +888,14 @@ TapHoldReleaseSyntheticKeys() {
 ; @param SendFn {Func} Zero-argument sender; its result is returned.
 ; @return The sender's result, or false when the lift could not be sent.
 TapHoldSendWithKeyUp(Name, SendFn) {
+	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys, _TapHoldKeyIsDown
+	; A key nobody holds needs no lift: logically up, owned by no tap-hold, with
+	; no release pending (a press a hotkey swallowed is logically up too). The
+	; Kana layout lifted AltGr before every expansion anyway, one extra
+	; SendInput and an orphan AltGr release in front of each burst.
+	if !(_TapHoldKeyIsDown.Call(Name, "") or _TH_SyntheticHeldKeys.Has(Name)
+			or _TH_SyntheticReleasePendingKeys.Has(Name))
+		return SendFn.Call()
 	; Read before the lift: once the Up is sent the key is logically up, and a
 	; hold the system saw can no longer be told from a press a hotkey swallowed.
 	UserHeld := _TH_UserHoldsDeliveredKey(Name)
