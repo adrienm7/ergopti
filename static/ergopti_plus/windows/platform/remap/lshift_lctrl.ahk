@@ -115,12 +115,13 @@ _LCtrlHoldModKey() {
 }
 
 _LCtrlHandleHold(PhysicalModifierPassthrough) {
-	UpdateLastSentCharacter("LControl")
+	_TH_TakeAltGrPress("left_ctrl") ; a mark an unfinished press left
 	CapsUp := KS_IsUp("SC03A")
 	AltUp := KS_IsUp("SC038")
 	Result := TapHoldOwnImmediateModifier("left_ctrl", "SC01D",
 		_LCtrlHoldModKey(), TapHoldDuration(TapHold, "left_ctrl"),
 		,,,,,, PhysicalModifierPassthrough)
+	TapHoldRecordLCtrlPress()
 	if (Result["tap"] and Result["elapsed_ms"] >= TapMinDurationMs()
 		and TapHoldPriorKeyIsSelf("left_ctrl") and CapsUp and AltUp)
 		_LCtrlDispatch()
@@ -144,9 +145,11 @@ _LCtrlHandleHold(PhysicalModifierPassthrough) {
 ; during the hold window (combo use), while still allowing intentional taps.
 ; KS_IsUp guards: prevent spurious tap on CapsLock+LCtrl or LAlt+LCtrl release.
 #HotIf TapHoldTapAction(TapHold, "left_ctrl") != "" and TapHoldHoldModifier(TapHold, "left_ctrl") == "" and TapHoldHoldLayer(TapHold, "left_ctrl") == "" and not LayerEnabled
-~*$SC01D::
-{
-	UpdateLastSentCharacter("LControl")
+~*$SC01D:: _LCtrlHandleTapOnly()
+#HotIf
+
+_LCtrlHandleTapOnly() {
+	_TH_TakeAltGrPress("left_ctrl") ; a mark an unfinished press left
 	DurationSec := TapHoldDuration(TapHold, "left_ctrl")
 	CapsUp := KS_IsUp("SC03A") ; CapsLock must not be physically held
 	AltUp := KS_IsUp("SC038") ; LAlt must not be physically held
@@ -156,6 +159,7 @@ _LCtrlHandleHold(PhysicalModifierPassthrough) {
 	Released := KeyWait("SC01D", "T" . DurationSec)
 	TimeAfter := A_TickCount
 	ElapsedMs := TickElapsed(TimeBefore, TimeAfter)
+	TapHoldRecordLCtrlPress()
 	GuardMs := DurationSec * 1000
 	tap := Released and (ElapsedMs <= GuardMs)
 	if LoggerIsDebugEnabled() {
@@ -174,7 +178,6 @@ _LCtrlHandleHold(PhysicalModifierPassthrough) {
 		LoggerDebug("TapHoldLCtrl", "LCtrl tap dispatch blocked after release on '{1}'.", A_PriorKey)
 	}
 }
-#HotIf
 
 ; Dispatch the configured tap action for LCtrl.
 _LCtrlDispatch() {
