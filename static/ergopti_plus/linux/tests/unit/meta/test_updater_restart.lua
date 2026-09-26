@@ -11,10 +11,18 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local WinCompat = require("tests.win_compat")
 local Restarter = require("modules.updater.restarter")
 
 local UNIT_CGROUP = "0::/user.slice/user-1000.slice/user@1000.service/app.slice/ergopti-hotstrings.service\n"
 local TERMINAL_CGROUP = "0::/user.slice/user-1000.slice/user@1000.service/app.slice/vte-spawn-1.scope\n"
+local SELF_STAT = "4242 (luajit) S 1 4242 4242 0 -1 4194560 812 0 0 0 3 1 0 0 20 0 1 0 1337\n"
+
+-- The relay and the process id need a Linux kernel's setsid(1) and /proc.
+-- A Windows checkout has neither: only there are those two cases deferred,
+-- and every decision the restarter makes is tested on text it is handed. On
+-- Linux a missing setsid or /proc is a failure.
+local ON_WINDOWS = WinCompat.is_windows()
 
 helpers.describe("updater restart: starting the installed version", function()
 
@@ -39,31 +47,38 @@ helpers.describe("updater restart: starting the installed version", function()
 			"the installed launcher, with the same arguments")
 	end)
 
-	helpers.it("really waits for the process and then runs the launcher", function()
-		local dir = os.tmpname()
-		os.remove(dir)
-		os.execute("mkdir -p '" .. dir .. "'")
-		local marker = dir .. "/started"
-		local launcher = dir .. "/launcher"
-		local fh = assert(io.open(launcher, "w"))
-		fh:write("#!/bin/sh\necho \"$@\" > '" .. marker .. "'\n")
-		fh:close()
-		os.execute("chmod +x '" .. launcher .. "'")
-		-- A stand-in daemon: a process that lives 0.5 s.
-		local pipe = assert(io.popen("sleep 0.5 & echo $!"))
-		local pid = tonumber(pipe:read("*l"))
-		pipe:close()
-		local how = Restarter.restart({ wrapper = launcher, args = { "--tray" }, cgroup = TERMINAL_CGROUP, pid = pid })
-		helpers.assert_eq(how, "relay")
-		local early = io.open(marker, "r")
-		helpers.assert_nil(early, "nothing starts while the old daemon lives")
-		os.execute("sleep 1.5")
-		local started = io.open(marker, "r")
-		helpers.assert_true(started ~= nil, "the launcher ran after the old process exited")
-		helpers.assert_eq(started:read("*l"), "--tray")
-		started:close()
-		os.execute("rm -rf '" .. dir .. "'")
-	end)
+	if ON_WINDOWS then
+		helpers.it("SKIP [CONF-LINUX-SETSID-RELAY] — a Windows host has no setsid(1) to detach the relay from", function()
+			helpers.assert_eq(package.config:sub(1, 1), "\\",
+				"this deferral runs only on a host whose separator is Windows'")
+		end)
+	else
+		helpers.it("really waits for the process and then runs the launcher", function()
+			local dir = os.tmpname()
+			os.remove(dir)
+			os.execute("mkdir -p '" .. dir .. "'")
+			local marker = dir .. "/started"
+			local launcher = dir .. "/launcher"
+			local fh = assert(io.open(launcher, "w"))
+			fh:write("#!/bin/sh\necho \"$@\" > '" .. marker .. "'\n")
+			fh:close()
+			os.execute("chmod +x '" .. launcher .. "'")
+			-- A stand-in daemon: a process that lives 0.5 s.
+			local pipe = assert(io.popen("sleep 0.5 & echo $!"))
+			local pid = tonumber(pipe:read("*l"))
+			pipe:close()
+			local how = Restarter.restart({ wrapper = launcher, args = { "--tray" }, cgroup = TERMINAL_CGROUP, pid = pid })
+			helpers.assert_eq(how, "relay")
+			local early = io.open(marker, "r")
+			helpers.assert_nil(early, "nothing starts while the old daemon lives")
+			os.execute("sleep 1.5")
+			local started = io.open(marker, "r")
+			helpers.assert_true(started ~= nil, "the launcher ran after the old process exited")
+			helpers.assert_eq(started:read("*l"), "--tray")
+			started:close()
+			os.execute("rm -rf '" .. dir .. "'")
+		end)
+	end
 
 	helpers.it("reports a restart it could not start", function()
 		helpers.assert_nil(Restarter.restart({ wrapper = "/x", cgroup = UNIT_CGROUP, run = function() return false end }))
@@ -71,11 +86,24 @@ helpers.describe("updater restart: starting the installed version", function()
 			run = function() return false end }))
 	end)
 
-	helpers.it("reads its own process id and cgroup", function()
-		helpers.assert_true(type(Restarter.own_pid()) == "number")
+	helpers.it("reads its process id from its stat line, and its unit from its cgroup", function()
+		helpers.assert_eq(Restarter.own_pid(SELF_STAT), 4242)
+		helpers.assert_nil(Restarter.own_pid("(luajit) S"), "a line without a leading id is no id")
 		helpers.assert_true(not Restarter.under_unit(TERMINAL_CGROUP))
 		helpers.assert_true(Restarter.under_unit(UNIT_CGROUP))
 	end)
+
+	if ON_WINDOWS then
+		helpers.it("SKIP [CONF-LINUX-PROC-SELF] — a Windows host has no /proc/self/stat to read its own process id from", function()
+			helpers.assert_eq(package.config:sub(1, 1), "\\",
+				"this deferral runs only on a host whose separator is Windows'")
+		end)
+	else
+		helpers.it("reads its own process id from the kernel", function()
+			local pid = Restarter.own_pid()
+			helpers.assert_true(type(pid) == "number" and pid > 0, "own_pid() is " .. tostring(pid))
+		end)
+	end
 
 end)
 

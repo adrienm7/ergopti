@@ -32,9 +32,10 @@ local function read_file(path)
 end
 
 --- This process's id, from the kernel.
+--- @param stat string|nil The text of /proc/self/stat (read when nil).
 --- @return integer|nil
-function M.own_pid()
-	local stat = read_file("/proc/self/stat")
+function M.own_pid(stat)
+	stat = stat or read_file("/proc/self/stat")
 	return stat and tonumber(stat:match("^(%d+)")) or nil
 end
 
