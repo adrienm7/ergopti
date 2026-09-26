@@ -38,6 +38,14 @@
 			"status": "environment",
 			"reason": "The watcher tests shell out to stat(1) to observe mtime changes. On a host without stat(1) the behaviour is untestable, not unimplemented — these skip conditionally and run everywhere stat(1) exists, including CI.",
 			"tracked": "none"
+		},
+		{
+			"id": "CONF-LINUX-POSIX-FILE-MODE",
+			"driver": "linux",
+			"subject": "modules/llm/api_entries.lua — the API key file created with mode 0600",
+			"status": "environment",
+			"reason": "The key file is created by open(2) with mode 0600 through LuaJIT's FFI, and the test reads the bits back with stat(1). A Windows checkout has no POSIX permission bits: only there is the mode test deferred, while every entry test runs on a primitive that creates the file without a mode. On Linux, CI included, a missing FFI or stat(1) fails the test.",
+			"tracked": "none"
 		}
 	]
 }
