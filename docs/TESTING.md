@@ -80,8 +80,13 @@ runner excludes tests registered with `Test(Name, Callback, true)` unless
 comments and do not count as executed or passed. `--only` does not override
 this admission rule. The runner calls `ExitApp` when execution finishes.
 
+Run the suite on the interpreter the release exe ships, named by
+`static/ergopti_plus/_shared/modules/updater/windows_release_toolchain.json`
+(`runtime.version`): the hook's prefix-key and key-up rules differ between
+AutoHotkey releases, and a runtime-contract case fails on any other version.
+
 ```bash
-AHK="C:/Program Files/AutoHotkey/v2.0.19/AutoHotkey64.exe"
+AHK="C:/Program Files/AutoHotkey/v2/AutoHotkey64.exe"  # the contract runtime (2.0.26)
 RUN="static/ergopti_plus/windows/tests/run_all.ahk"
 
 # Parse/load gate only (fast — proves the whole #Include graph parses):

@@ -69,12 +69,26 @@ jobs:
         shell: pwsh
         run: ./tools/build/build_windows_nav_owner.ps1
 
+      # The suites run on the interpreter the release exe ships with: its
+      # version, archive and digest come from the one release contract, so a
+      # runtime bump cannot leave the tests on the old interpreter (the hook's
+      # prefix and key-up rules changed between 2.0.19 and 2.0.23).
+      - name: Read AutoHotkey runtime contract
+        id: ahk-contract
+        shell: pwsh
+        run: |
+          $contractPath = "${{ github.workspace }}\static\ergopti_plus\_shared\modules\updater\windows_release_toolchain.json"
+          $contract = Get-Content -LiteralPath $contractPath -Raw | ConvertFrom-Json
+          "version=$($contract.runtime.version)" >> $env:GITHUB_OUTPUT
+          "url=$($contract.runtime.url)" >> $env:GITHUB_OUTPUT
+          "sha256=$($contract.runtime.sha256)" >> $env:GITHUB_OUTPUT
+
       - name: Cache AutoHotkey runtime
         id: cache-ahk
         uses: actions/cache@v4
         with:
           path: C:\AutoHotkey
-          key: ahk-v2.0.19-windows
+          key: ahk-${{ steps.ahk-contract.outputs.version }}-${{ steps.ahk-contract.outputs.sha256 }}-windows
 
       - uses: actions/setup-node@v4
         with:
@@ -97,8 +111,12 @@ jobs:
         shell: pwsh
         run: |
           Invoke-WebRequest `
-              -Uri "https://github.com/AutoHotkey/AutoHotkey/releases/download/v2.0.19/AutoHotkey_2.0.19.zip" `
+              -Uri "${{ steps.ahk-contract.outputs.url }}" `
               -OutFile "$env:TEMP\AHK.zip" -UseBasicParsing
+          $actual = (Get-FileHash -LiteralPath "$env:TEMP\AHK.zip" -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -cne "${{ steps.ahk-contract.outputs.sha256 }}") {
+              throw "AutoHotkey v${{ steps.ahk-contract.outputs.version }} archive digest mismatch: $actual"
+          }
           Expand-Archive -Path "$env:TEMP\AHK.zip" -DestinationPath "C:\AutoHotkey" -Force
 
       - name: Verify AHK source encoding (UTF-8 BOM + LF)

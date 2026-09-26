@@ -57,7 +57,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 
 // A link to an asset of THIS release. Anchoring on the literal `${TAG}` is what
 // scopes the scan to our own release: the workflows also download third-party
-// tarballs from `releases/download/v2.0.19/…` (AutoHotkey) and
+// tarballs from `releases/download/v2.0.26/…` (AutoHotkey) and
 // `releases/download/${SPARKLE_VERSION}/…`, which are nobody's job to attach.
 const RELEASE_LINK = /releases\/download\/\$\{TAG\}\/([A-Za-z0-9._+-]+)/g;
 

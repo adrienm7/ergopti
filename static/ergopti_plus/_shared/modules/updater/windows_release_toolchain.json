@@ -1,9 +1,9 @@
 {
 	"runtime": {
-		"version": "2.0.19",
-		"asset": "AutoHotkey_2.0.19.zip",
-		"url": "https://github.com/AutoHotkey/AutoHotkey/releases/download/v2.0.19/AutoHotkey_2.0.19.zip",
-		"sha256": "4e0d0e65655066a646a210951320feaef0729a3597177131adaec4066bef5869"
+		"version": "2.0.26",
+		"asset": "AutoHotkey_2.0.26.zip",
+		"url": "https://github.com/AutoHotkey/AutoHotkey/releases/download/v2.0.26/AutoHotkey_2.0.26.zip",
+		"sha256": "43522aa3122a57784ac5db30abf85c2244475c36acd7796e2c993355f9e926ae"
 	},
 	"compiler": {
 		"tag": "Ahk2Exe1.1.37.02a2",
