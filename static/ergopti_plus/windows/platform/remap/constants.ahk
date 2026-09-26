@@ -113,6 +113,13 @@ global _TH_SyntheticUserHeldKeys := Map()
 ; mapping of the same key. Every key's repeat swallower is gated on
 ; TapHoldPressIsOwned.
 global _TH_OwnedPresses := Map()
+; Tap-hold key id -> the modifier its owner holds synthetically right now, and
+; key id -> true once that hold was handed back mid-press, and key id -> true
+; while an LCtrl is held for the AltGr press the key's press turned out to be
+; (see TapHoldAltGrTakesItsLCtrl).
+global _TH_OwnedModifiers := Map()
+global _TH_RetractedOwners := Map()
+global _TH_AltGrLCtrlOwners := Map()
 global _TH_TapHoldVkToKeyId := Map(
 	0x1B, "escape",
 	0x09, "tab",
@@ -418,6 +425,9 @@ TapHoldOwnImmediateModifier(KeyId, KeyName, ModKey, TapThresholdSec,
 				return Map("activated", false, "released", false,
 					"tap", false, "elapsed_ms", 0)
 			}
+			; Published so the press can be handed back mid-hold when it turns
+			; out to be AltGr's fake LCtrl (TapHoldAltGrTakesItsLCtrl).
+			_TH_OwnedModifiers[KeyId] := ModKey
 		}
 
 		Released := false
@@ -441,7 +451,15 @@ TapHoldOwnImmediateModifier(KeyId, KeyName, ModKey, TapThresholdSec,
 			; A native modifier selected on its own physical key is already Down
 			; before a ~ hotkey thread starts and its physical Up ends KeyWait. A
 			; second synthetic Down would race the following key's hotkey admission.
-			ReleaseProved := PhysicalModifierPassthrough ? true : KeyUpFn.Call(ModKey)
+			; A hold handed back mid-press was released then, and its press was
+			; AltGr's, never a tap; the LCtrl given to that AltGr ends with it.
+			Retracted := _TH_TakeRetractedOwner(KeyId)
+			if PhysicalModifierPassthrough or Retracted
+				ReleaseProved := true
+			else
+				ReleaseProved := KeyUpFn.Call(ModKey)
+			if !_TH_ReleaseAltGrLCtrl(KeyId)
+				ReleaseProved := false
 		}
 
 		ElapsedMs := TickElapsed(StartedAt, TickNowFn.Call())
@@ -452,7 +470,7 @@ TapHoldOwnImmediateModifier(KeyId, KeyName, ModKey, TapThresholdSec,
 		CancelReason := ""
 		if (Released and ReleaseProved and !Suspended and !A_IsSuspended)
 			CancelReason := CancelTapFn.Call(KeyId, GuardMs)
-		TapAllowed := Released and ReleaseProved and !Suspended and !A_IsSuspended
+		TapAllowed := Released and ReleaseProved and !Suspended and !A_IsSuspended and !Retracted
 			and ElapsedMs <= TapThresholdSec * 1000 and CancelReason == ""
 		if LoggerIsDebugEnabled() {
 			LoggerDebug("TapHoldModifier", "Ownership complete for key='{1}', modifier='{2}', source={3}, released={4}, elapsed_ms={5}, tap={6}.",
@@ -465,6 +483,8 @@ TapHoldOwnImmediateModifier(KeyId, KeyName, ModKey, TapThresholdSec,
 			"tap", TapAllowed,
 			"elapsed_ms", ElapsedMs)
 	} finally {
+		if _TH_OwnedModifiers.Has(KeyId)
+			_TH_OwnedModifiers.Delete(KeyId)
 		if Claimed
 			_TapHoldEndPressClaim(KeyId)
 	}
@@ -1221,4 +1241,77 @@ TapHoldUserLCtrlHeld(KeyIsDownFn := 0) {
 	if !KeyIsDownFn.Call("SC01D")
 		return false
 	return (IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP) or !KeyIsDownFn.Call("RAlt")
+}
+
+; Hand back the synthetic hold the owner of KeyId took for this press, now.
+; Its owner then releases nothing more and dispatches no tap.
+; @param KeyId {String} Tap-hold key id.
+; @return {Boolean} True when a hold was handed back.
+TapHoldRetractOwnedModifier(KeyId) {
+	global _TH_OwnedModifiers, _TH_RetractedOwners
+	if !_TH_OwnedModifiers.Has(KeyId) or _TH_RetractedOwners.Has(KeyId)
+		return false
+	_TH_RetractedOwners[KeyId] := true
+	if !_TapHoldReleaseOwnedModifier(_TH_OwnedModifiers[KeyId])
+		try LoggerError("TapHoldDispatch", "Could not hand back the hold of '{1}'.", KeyId)
+	return true
+}
+
+; Whether KeyId's hold was handed back during this press; clears the mark.
+_TH_TakeRetractedOwner(KeyId) {
+	global _TH_RetractedOwners
+	if !_TH_RetractedOwners.Has(KeyId)
+		return false
+	_TH_RetractedOwners.Delete(KeyId)
+	return true
+}
+
+; On a standard AltGr layout every AltGr press starts with a fake LCtrl, which
+; the hook reads as SC01D (hook.cpp: "sc &= 0xFF") before it sees the RAlt. A
+; left_ctrl tap-hold holding anything but Ctrl suppressed that fake LCtrl and
+; pressed its own hold instead: the system then got the hold and RAlt without
+; LCtrl, which is not AltGr, so the layout's AltGr characters were lost (and a
+; lone RAlt opened the window menu). When the RAlt of that press arrives, the
+; hold is handed back and, where the AltGr key is AltGr, LCtrl is held for it,
+; so LCtrl+RAlt is AltGr again; the LCtrl ends with the left_ctrl press, which
+; the AltGr release ends. Only on a layout with an AltGr level (the boot probe's
+; "altgr_level"): on QWERTY right Alt is a plain Alt and LCtrl then RAlt is the
+; user's own chord. A Kana layout has no fake LCtrl at all.
+; @param AsAltGr {Boolean} True to give AltGr its LCtrl back, false when the
+;        AltGr key holds another modifier (its owner presses that one).
+; @return {Boolean} True when the press was AltGr's.
+TapHoldAltGrTakesItsLCtrl(AsAltGr) {
+	global _ALTGR_KANA_FIXUP, _ALTGR_LAYOUT_PROBE, _TapHoldKeyIsDown
+	global _TH_OwnedModifiers, _TH_AltGrLCtrlOwners
+	if (_ALTGR_KANA_FIXUP or !_ALTGR_LAYOUT_PROBE["altgr_level"])
+		return false
+	if !_TH_OwnedModifiers.Has("left_ctrl") or !_TapHoldKeyIsDown.Call("SC01D", "P")
+		return false
+	TapHoldRetractOwnedModifier("left_ctrl")
+	if (AsAltGr and !_TH_AltGrLCtrlOwners.Has("left_ctrl")) {
+		; An unproven Down leaves this AltGr press without its LCtrl; the
+		; sender has logged why, and the hold was handed back all the same.
+		if !TapHoldSyntheticKeyDown("LCtrl")
+			return true
+		_TH_AltGrLCtrlOwners["left_ctrl"] := true
+	}
+	return true
+}
+
+; End the LCtrl held for AltGr by KeyId's press, if any.
+; @return {Boolean} False only when its release could not be proven.
+_TH_ReleaseAltGrLCtrl(KeyId) {
+	global _TH_AltGrLCtrlOwners
+	if !_TH_AltGrLCtrlOwners.Has(KeyId)
+		return true
+	_TH_AltGrLCtrlOwners.Delete(KeyId)
+	return TapHoldSyntheticKeyUp("LCtrl")
+}
+
+; A key-down the hook passed to the system, seen by HookDispatcher: an AltGr
+; RAlt claims the fake LCtrl a left_ctrl tap-hold took (TapHoldAltGrTakesItsLCtrl).
+; The AltGr owner does the same when it suppresses that RAlt instead.
+TapHoldTrackAltGrLCtrl(vk, sc) {
+	if (TapHoldResolveKeyIdFromVkSc(vk, sc) == "alt_gr")
+		TapHoldAltGrTakesItsLCtrl(AltGrKeyIsAltGr())
 }

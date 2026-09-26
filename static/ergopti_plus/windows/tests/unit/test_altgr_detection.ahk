@@ -16,11 +16,11 @@
 
 #Requires AutoHotkey v2.0
 
-; A probe of HKL 0x123 answering RMenuSc to the reverse lookup and AltGrVk to
-; the forward one, through the real KS_ProbeAltGrLayout.
-_AGD_Probe(RMenuSc, AltGrVk) {
+; A probe answering RMenuSc to the reverse lookup, AltGrVk to the forward one
+; and AltGrLevel to the Ctrl+Alt level check, through the real KS_ProbeAltGrLayout.
+_AGD_Probe(RMenuSc, AltGrVk, AltGrLevel := false) {
 	Answers := Map(KS_VK_RMENU, RMenuSc, KS_SC_ALTGR_EXTENDED, AltGrVk)
-	return (Hkl) => KS_ProbeAltGrLayout(Hkl, (Code, MapType, Layout) => Answers[Code])
+	return (Hkl) => KS_ProbeAltGrLayout(Hkl, (Code, MapType, Layout) => Answers[Code], (Layout) => AltGrLevel)
 }
 
 ; Run HotstringEngineInit with the layout Hkl, the probe ProbeFn and the TOML
@@ -48,8 +48,11 @@ _AGD_Init(Hkl, ProbeFn, Override := "") {
 }
 
 _AGD_ProbeDecidesTheFamily() {
-	Standard := _AGD_Init(0x040C040C, _AGD_Probe(0xE038, 0xA5))
+	Standard := _AGD_Init(0x040C040C, _AGD_Probe(0xE038, 0xA5, true))
 	AssertFalse(Standard.Kana, "a layout with VK_RMENU on the AltGr key is a standard AltGr layout (or QWERTY)")
+	AssertTrue(Standard.Probe["altgr_level"], "the record keeps whether Ctrl+Alt types characters (an AltGr layout)")
+	Qwerty := _AGD_Init(0x04090409, _AGD_Probe(0xE038, 0xA5, false))
+	AssertFalse(Qwerty.Kana or Qwerty.Probe["altgr_level"], "QWERTY: standard family, right Alt a plain Alt")
 	AssertEqual("probe", Standard.Probe["source"], "the probe decided")
 	AssertEqual(0x040C040C, Standard.Probe["hkl"], "the record keeps the layout it probed")
 	Kana := _AGD_Init(0xFC06040C, _AGD_Probe(0, 0xDF))

@@ -203,13 +203,19 @@ global KS_SC_ALTGR_EXTENDED := 0xE038
 ; layout), and a layout that maps neither direction (an invalid HKL answers 0
 ; to both) is reported as unknown ("valid" false), never as a Kana layout: a
 ; lone 0 from the reverse probe used to be enough to pick the Kana family.
+; "altgr_level" tells an AltGr layout (AZERTY, bépo: Ctrl+Alt types characters,
+; and right Alt comes with a fake LCtrl) from one without (QWERTY: right Alt is
+; a plain Alt), which the family flag cannot: both keep VK_RMENU.
 ; @param Hkl {Integer} Keyboard layout handle; 0 is refused.
 ; @param MapFn {Func} Test seam taking (Code, MapType, Hkl), MapVirtualKeyExW
 ;        by default.
+; @param AltGrLevelFn {Func} Test seam taking Hkl, KS_LayoutHasAltGrLevel by
+;        default.
 ; @return {Map} "hkl", "rmenu_sc" (0 = VK_RMENU unmapped), "altgr_vk", "valid"
-;         (the layout knows the AltGr key one way or the other) and "kana"
-;         (VK_RMENU unmapped while the AltGr key has a virtual key).
-KS_ProbeAltGrLayout(Hkl, MapFn := 0) {
+;         (the layout knows the AltGr key one way or the other), "kana"
+;         (VK_RMENU unmapped while the AltGr key has a virtual key) and
+;         "altgr_level".
+KS_ProbeAltGrLayout(Hkl, MapFn := 0, AltGrLevelFn := 0) {
 	global KS_VK_RMENU, KS_MAPVK_VK_TO_VSC_EX, KS_MAPVK_VSC_TO_VK_EX, KS_SC_ALTGR_EXTENDED
 	if (Hkl == 0)
 		throw ValueError("The AltGr layout probe needs a keyboard layout; HKL 0 is another loaded layout (HKL_PREV).", -1)
@@ -217,9 +223,39 @@ KS_ProbeAltGrLayout(Hkl, MapFn := 0) {
 		MapFn := (Code, MapType, Layout) => DllCall("MapVirtualKeyExW", "UInt", Code, "UInt", MapType, "Ptr", Layout, "UInt")
 	RMenuSc := MapFn.Call(KS_VK_RMENU, KS_MAPVK_VK_TO_VSC_EX, Hkl)
 	AltGrVk := MapFn.Call(KS_SC_ALTGR_EXTENDED, KS_MAPVK_VSC_TO_VK_EX, Hkl)
+	if !IsObject(AltGrLevelFn)
+		AltGrLevelFn := KS_LayoutHasAltGrLevel
 	return Map("hkl", Hkl, "rmenu_sc", RMenuSc, "altgr_vk", AltGrVk,
 		"valid", RMenuSc != 0 or AltGrVk != 0,
-		"kana", RMenuSc == 0 and AltGrVk != 0)
+		"kana", RMenuSc == 0 and AltGrVk != 0,
+		"altgr_level", AltGrLevelFn.Call(Hkl))
+}
+
+; Whether Ctrl+Alt types something on layout Hkl: a character or a dead key on
+; one of the character keys (digits, letters, OEM punctuation), which is the
+; AltGr level of an AltGr layout. QWERTY has none (measured on this machine:
+; AZERTY 13 keys, bépo 45, the Ergopti Kana layout 0). ToUnicodeEx runs with
+; flag 0x4 so no dead-key state is left behind.
+; @param Hkl {Integer} Keyboard layout handle.
+; @return {Boolean}
+KS_LayoutHasAltGrLevel(Hkl) {
+	static CtrlAltVks := [0x11, 0x12, 0xA2, 0xA5] ; VK_CONTROL, VK_MENU, VK_LCONTROL, VK_RMENU
+	static KeyRanges := [[0x30, 0x39], [0x41, 0x5A], [0xBA, 0xC0], [0xDB, 0xDF], [0xE2, 0xE2]]
+	State := Buffer(256, 0)
+	for _, Vk in CtrlAltVks
+		NumPut("UChar", 0x80, State, Vk)
+	Chars := Buffer(32, 0)
+	for _, Range in KeyRanges {
+		Vk := Range[1]
+		while (Vk <= Range[2]) {
+			Sc := DllCall("MapVirtualKeyExW", "UInt", Vk, "UInt", 0, "Ptr", Hkl, "UInt")
+			if (Sc and DllCall("ToUnicodeEx", "UInt", Vk, "UInt", Sc, "Ptr", State,
+					"Ptr", Chars, "Int", 8, "UInt", 0x4, "Ptr", Hkl, "Int") != 0)
+				return true
+			Vk += 1
+		}
+	}
+	return false
 }
 
 ; The boot probe that decided the AltGr family (HotstringEngineInit): the
@@ -227,7 +263,7 @@ KS_ProbeAltGrLayout(Hkl, MapFn := 0) {
 ; flag decided, "unresolved" when no layout could be read). Seeded here as
 ; unresolved; HotstringEngineInit replaces it before the first hotstring fires.
 global _ALTGR_LAYOUT_PROBE := Map("hkl", 0, "rmenu_sc", 0, "altgr_vk", 0,
-	"valid", false, "kana", false, "source", "unresolved")
+	"valid", false, "kana", false, "altgr_level", false, "source", "unresolved")
 
 ; AHK key name that presses the active layout's AltGr. Standard AltGr layouts
 ; put AltGr on VK_RMENU, so "RAlt" is AltGr there. Kana-style remaps

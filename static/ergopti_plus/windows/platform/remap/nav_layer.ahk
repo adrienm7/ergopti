@@ -71,7 +71,7 @@ A_MaxHotkeysPerInterval := NAV_LAYER_MAX_HOTKEYS_PER_INTERVAL
 ; The AltGr key is declared by its scan code only: a "RAlt::" beside it is a
 ; separate hotkey on the same scan code that swallowed the Kana-style AltGr and
 ; lost this Escape (see platform/remap/altgr.ahk).
-SC01D & ~SC138:: ; AltGr on an AltGr layout arrives as LControl & RAlt
+~SC01D & ~SC138:: ; AltGr on an AltGr layout arrives as LControl & RAlt
 *SC138:: ; the AltGr key alone: RAlt on QWERTY, the Kana-style AltGr
 {
 		ActionLayer("{Escape " . AppState_GetNumberOfRepetitions() . "}")

@@ -313,6 +313,9 @@ class HookDispatcher {
 		try TapHoldTrackOtherKeyActivityByScancode(vk, sc)
 		catch as _thTrackErr
 			HookDispatcher._TrackFault("TapHoldTrackOtherKeyActivityByScancode", _thTrackErr)
+		try TapHoldTrackAltGrLCtrl(vk, sc)
+		catch as _thTrackErr
+			HookDispatcher._TrackFault("TapHoldTrackAltGrLCtrl", _thTrackErr)
 		HookDispatcher.Dispatch(HookDispatcherConst.EVT_KB_DOWN, ih, vk, sc)
 		HotPath_LogIfSlow("Hook.KeyDown", _hpKeyDown)
 	}

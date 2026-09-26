@@ -85,14 +85,14 @@ Test("altgr owners: every configuration has one owner on every layout family (al
 	_AOM_EveryConfigurationHasItsOwner)
 
 ; Each criterion governs the labels of its family and nothing else, with ~ on
-; the pass-through ones: a standard layout's AltGr arrives as "SC01D & SC138",
+; the pass-through ones and on every SC01D prefix (see test_altgr_takes_its_lctrl.ahk): a standard layout's AltGr arrives as "SC01D & SC138",
 ; QWERTY's RAlt and the Kana AltGr as "*SC138" alone.
 _AOM_CriteriaGovernTheirLabels() {
 	Src := _StripFullLineComments(_DriverDirConcat("platform/remap"))
 	Expected := Map(
-		"#HotIf AltGrOwnerPassesThrough(false)", ["SC01D & ~SC138::", "~*SC138::"],
+		"#HotIf AltGrOwnerPassesThrough(false)", ["~SC01D & ~SC138::", "~*SC138::"],
 		"#HotIf AltGrOwnerPassesThrough(true)", ["~*$SC138::"],
-		"#HotIf AltGrOwnerHolds(false)", ["SC01D & SC138::", "*SC138::"],
+		"#HotIf AltGrOwnerHolds(false)", ["~SC01D & SC138::", "*SC138::"],
 		"#HotIf AltGrOwnerHolds(true)", ["*$SC138::"])
 	for HotIf, Labels in Expected {
 		At := InStr(Src, HotIf . "`n")

@@ -66,8 +66,15 @@
 ; of the Ergopti base character under the synthetic AltGr instead. A tap-only
 ; AltGr suppressed the key on QWERTY and Kana layouts only: RAlt+F4 was plain F4
 ; and the Kana layout's own AltGr level was lost.
+; The ~ on the SC01D prefix keeps a left_ctrl tap-hold's own hotkey firing on
+; the LCtrl press: without it, SC01D was a suppressed prefix with enabled
+; suffixes, so AutoHotkey postponed that hotkey to the LCtrl release, and LCtrl
+; held as Alt then Tab gave Tab instead of Alt+Tab (hook.cpp: "Key-down is
+; eligible but lacks ~, so should postpone until release"). The fake LCtrl of
+; an AltGr press then reaches that hotkey too; the AltGr owner takes it back
+; (TapHoldAltGrTakesItsLCtrl).
 #HotIf AltGrOwnerPassesThrough(false)
-SC01D & ~SC138:: _AltGrHandleHold(true) ; AltGr on an AltGr layout: the fake LCtrl, then RAlt
+~SC01D & ~SC138:: _AltGrHandleHold(true) ; AltGr on an AltGr layout: the fake LCtrl, then RAlt
 ~*SC138:: _AltGrHandleLonePassThrough() ; RAlt alone, e.g. on QWERTY, where it is a plain Alt
 #HotIf AltGrOwnerPassesThrough(true)
 ~*$SC138:: _AltGrHandleHold(true) ; the Kana-style AltGr, SC138 alone
@@ -76,7 +83,7 @@ SC01D & ~SC138:: _AltGrHandleHold(true) ; AltGr on an AltGr layout: the fake LCt
 ; Any other hold, a modifier, a combination or a layer, is the driver's: the
 ; press is suppressed and the owner presses the hold.
 #HotIf AltGrOwnerHolds(false)
-SC01D & SC138:: ; AltGr on an AltGr layout
+~SC01D & SC138:: ; AltGr on an AltGr layout
 *SC138:: { ; RAlt alone, e.g. on QWERTY
 	_AltGrHandleHold(false)
 }
@@ -88,6 +95,9 @@ SC01D & SC138:: ; AltGr on an AltGr layout
 ; @param Passthrough {Boolean} True for a pass-through variant: the key itself
 ;        reached the system and is the hold (or the key holds nothing).
 _AltGrHandleHold(Passthrough) {
+	; On an AltGr layout this press began with a fake LCtrl, which a left_ctrl
+	; tap-hold holding another modifier may have taken as its own press.
+	TapHoldAltGrTakesItsLCtrl(Passthrough)
 	if (TapHoldHoldLayer(TapHold, "alt_gr") != "")
 		Result := TapHoldOwnImmediateLayer("alt_gr", "SC138", TapHoldDuration(TapHold, "alt_gr"))
 	else
