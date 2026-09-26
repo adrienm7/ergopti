@@ -48,6 +48,38 @@ _ACSD_CombosFollowWhatAltGrHolds() {
 Test("altgr combos: they stand down while AltGr holds another modifier or a layer (kana-altgr-hold-other-2026-09-26)",
 	_ACSD_CombosFollowWhatAltGrHolds)
 
+; The rule itself (AltGrKeyIsAltGr, which IsRealAltGrPress applies first) on
+; every family, with the owner each hold gets: a combination holding AltGr
+; keeps the combinations on a standard AltGr layout too, where it now passes
+; the key through (std-altgr-combo-passthrough-2026-09-26), so the layer is
+; reachable for the whole hold as on QWERTY and Kana.
+_ACSD_EveryFamilyKeepsTheCombosForAnAltGrHold() {
+	global TapHold
+	for _, Family in ["standard", "qwerty", "kana"] {
+		Saved := { TapHold: TapHold, Family: _TestSetAltGrFamily(Family == "kana", Family == "standard") }
+		try {
+			for _, Hold in ["alt_gr", "shift+alt_gr", "ctrl+alt_gr", "alt_gr+win"] {
+				TapHold := Map("keys", Map("alt_gr", _ACSD_Row(Hold)), "layers", Map())
+				AssertTrue(AltGrKeyIsAltGr(), Family . ": AltGr held as " . Hold . " keeps the AltGr combinations")
+				AssertTrue(AltGrOwnerPassesThrough(Family == "kana") or AltGrOwnerHolds(Family == "kana"),
+					Family . ": AltGr held as " . Hold . " has an owner")
+				if (Family == "standard")
+					AssertTrue(AltGrOwnerPassesThrough(false),
+						"standard: AltGr held as " . Hold . " passes the key through, or the fake LCtrl-up kills the combinations")
+			}
+			for _, Hold in ["ctrl", "shift+ctrl"] {
+				TapHold := Map("keys", Map("alt_gr", _ACSD_Row(Hold)), "layers", Map())
+				AssertFalse(AltGrKeyIsAltGr(), Family . ": AltGr held as " . Hold . " is not AltGr")
+			}
+		} finally {
+			TapHold := Saved.TapHold
+			_TestRestoreAltGrFamily(Saved.Family)
+		}
+	}
+}
+Test("altgr combos: an AltGr combination hold keeps them on every layout family (std-altgr-combo-passthrough-2026-09-26)",
+	_ACSD_EveryFamilyKeepsTheCombosForAnAltGrHold)
+
 ; The Kana script chords that need no prefix (Enter, BackSpace, Delete, Escape
 ; under the physical SC138) follow the same rule, and the standard family's
 ; gate applies it before the physical check.

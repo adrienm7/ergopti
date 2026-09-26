@@ -265,6 +265,18 @@ KS_LayoutHasAltGrLevel(Hkl) {
 global _ALTGR_LAYOUT_PROBE := Map("hkl", 0, "rmenu_sc", 0, "altgr_vk", 0,
 	"valid", false, "kana", false, "altgr_level", false, "source", "unresolved")
 
+; Whether every AltGr press reaches the hook as the layout's fake LCtrl (scan
+; code 0x21D, read as SC01D and recorded as physical) then RAlt: a standard
+; AltGr layout, where the boot probe found an AltGr level (AZERTY, bépo). On
+; QWERTY right Alt is a plain Alt and adds no LCtrl; a Kana-style AltGr is
+; SC138 on another virtual key and adds none either. Read by parse-time #HotIf
+; criteria, which are live before this file's globals are assigned.
+; @return {Boolean}
+KS_AltGrAddsFakeLCtrl() {
+	global _ALTGR_KANA_FIXUP, _ALTGR_LAYOUT_PROBE
+	return !_ALTGR_KANA_FIXUP and IsSet(_ALTGR_LAYOUT_PROBE) and _ALTGR_LAYOUT_PROBE["altgr_level"]
+}
+
 ; AHK key name that presses the active layout's AltGr. Standard AltGr layouts
 ; put AltGr on VK_RMENU, so "RAlt" is AltGr there. Kana-style remaps
 ; (_ALTGR_KANA_FIXUP, resolved at boot) move AltGr to another virtual key and

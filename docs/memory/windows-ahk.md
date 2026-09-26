@@ -282,7 +282,9 @@ On an AltGr layout every AltGr press is a fake LCtrl (scan code 0x21D, read as
 SC01D and recorded as physical) then RAlt. Suppressing that RAlt in a hotkey
 makes AHK send a blocked RAlt-up, which Windows answers with the fake LCtrl-up:
 the SC01D prefix is cleared and every "SC138 & X" is dead for the hold. Action:
-AltGr held as AltGr passes through (`altgr_criteria.ahk`); a left_ctrl hold
+AltGr held as AltGr passes through (`altgr_criteria.ahk`), and so does a
+combination that holds AltGr (Shift+AltGr...) on such a layout, its owner
+pressing only the other members; a left_ctrl hold
 that took the fake LCtrl is handed back when the RAlt arrives
 (`TapHoldAltGrTakesItsLCtrl`, only where the boot probe found an AltGr level:
 QWERTY has no fake LCtrl); "LCtrl physically held" means
