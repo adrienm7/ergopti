@@ -41,7 +41,7 @@ _EscapeHoldModKey() {
 ; ===========================================
 ; ===========================================
 
-#HotIf TapHoldHoldModifier(TapHold, "escape") != "" and not LayerEnabled
+#HotIf TapHoldHoldModifier(TapHold, "escape") != "" and not LayerEnabled and not TapHoldKanaAltGrHeld()
 $SC001:: {
 	Result := TapHoldOwnImmediateModifier("escape", "Escape",
 		_EscapeHoldModKey(), TapHoldDuration(TapHold, "escape"))
@@ -62,7 +62,7 @@ $SC001:: {
 ; ========================================
 ; ========================================
 
-#HotIf TapHoldHoldLayer(TapHold, "escape") != "" and TapHoldHoldModifier(TapHold, "escape") == "" and not LayerEnabled
+#HotIf TapHoldHoldLayer(TapHold, "escape") != "" and TapHoldHoldModifier(TapHold, "escape") == "" and not LayerEnabled and not TapHoldKanaAltGrHeld()
 $SC001:: {
 	Result := TapHoldOwnImmediateLayer("escape", "Escape", TapHoldDuration(TapHold, "escape"))
 	if (Result["tap"] and TapHoldPriorKeyIsSelf("escape"))
@@ -105,7 +105,7 @@ $SC001:: {
 ; $ prevents re-entry. Fire immediately on key-down — no KeyWait or A_PriorKey
 ; guard needed since there is no hold behaviour. No ~ needed: the action replaces
 ; the native key entirely; ~ would send both Escape and the action.
-#HotIf TapHoldTapAction(TapHold, "escape") != "" and TapHoldTapAction(TapHold, "escape") != "escape" and TapHoldHoldModifier(TapHold, "escape") == "" and TapHoldHoldLayer(TapHold, "escape") == "" and not LayerEnabled
+#HotIf TapHoldTapAction(TapHold, "escape") != "" and TapHoldTapAction(TapHold, "escape") != "escape" and TapHoldHoldModifier(TapHold, "escape") == "" and TapHoldHoldLayer(TapHold, "escape") == "" and not LayerEnabled and not TapHoldKanaAltGrHeld()
 $SC001:: _EscapeDispatch()
 #HotIf
 

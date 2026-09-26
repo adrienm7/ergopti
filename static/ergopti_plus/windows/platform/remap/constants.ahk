@@ -1169,7 +1169,11 @@ _TapHoldKeyTapModifiers(Mods) {
 
 ; Whether any modifier is logically down, whatever holds it: a physical key or
 ; a tap-hold's synthetic hold. Synthetic output typed under it must then carry
-; {Blind}, or Send lifts the modifiers it did not press itself.
+; {Blind}, or Send lifts the modifiers it did not press itself. The Kana
+; layout's AltGr (VK_OEM_8) is deliberately not asked: AutoHotkey's Send does
+; not treat it as a modifier and never lifts it, so a tap under it keeps it
+; either way, and the bare payload ("{BackSpace}") stays the one the hotstring
+; buffer recognizes as a plain edit.
 ; @return {Boolean}
 TapHoldAnyModifierHeld() {
 	global _TapHoldModifierIsHeld
@@ -1179,4 +1183,22 @@ TapHoldAnyModifierHeld() {
 			return true
 	}
 	return false
+}
+
+; Whether the layout's AltGr is held on a Kana-style layout, where it is a key
+; AutoHotkey does not count as a modifier (VK_OEM_8). Tab, Space, Enter,
+; Escape, Backspace and Delete stay the key itself under a held modifier on
+; every driver, which on Windows their tap-hold hotkeys without * give for
+; free: under a held Kana AltGr no modifier was down for AutoHotkey, so the
+; hotkey matched and AltGr+Tab ran the Tab tap action (the window switcher)
+; instead of the layout's AltGr+Tab. Their #HotIf asks this instead. The
+; logical state counts the user's pass-through AltGr and a tap-hold's synthetic
+; one. Elsewhere AltGr is LCtrl+RAlt or RAlt, modifiers AutoHotkey counts
+; already, so this is false there. Read by parse-time #HotIf criteria, which are
+; live before this file's globals exist.
+; @return {Boolean}
+TapHoldKanaAltGrHeld() {
+	global _ALTGR_KANA_FIXUP, _TapHoldModifierIsHeld
+	return IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP
+		and IsSet(_TapHoldModifierIsHeld) and _TapHoldModifierIsHeld.Call(KS_AltGrKeyName())
 }

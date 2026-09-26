@@ -69,7 +69,7 @@ _TabHoldModKey() {
 ; ========================================
 
 ; SC00F::LAlt remap so the OS hold phase sees Alt (enables Alt+Tab switching).
-#HotIf TapHoldTapAction(TapHold, "tab") == "alt_tab_monitor" and TapHoldHoldModifier(TapHold, "tab") == "" and TapHoldHoldLayer(TapHold, "tab") == "" and not LayerEnabled
+#HotIf TapHoldTapAction(TapHold, "tab") == "alt_tab_monitor" and TapHoldHoldModifier(TapHold, "tab") == "" and TapHoldHoldLayer(TapHold, "tab") == "" and not LayerEnabled and not TapHoldKanaAltGrHeld()
 SC00F::LAlt
 SC00F::
 {
@@ -127,7 +127,7 @@ SC00F Up:: TapHoldSyntheticKeyUp("LAlt")
 ; + hold=<modifier> match no variant at all, and the hold the user just picked
 ; did nothing. _TabDispatch below emits the native Tab when no action is
 ; configured, so the tap keeps working too.
-#HotIf TapHoldHoldModifier(TapHold, "tab") != "" and not LayerEnabled
+#HotIf TapHoldHoldModifier(TapHold, "tab") != "" and not LayerEnabled and not TapHoldKanaAltGrHeld()
 $SC00F:: {
 	if _TabAcceptVisiblePrediction()
 		return
@@ -152,7 +152,7 @@ $SC00F:: {
 
 ; No tap-action conjunct, for the reason given on block 8.2: a hold must arm on
 ; the hold alone or the picker offers a choice the driver silently ignores.
-#HotIf TapHoldHoldLayer(TapHold, "tab") != "" and TapHoldHoldModifier(TapHold, "tab") == "" and not LayerEnabled
+#HotIf TapHoldHoldLayer(TapHold, "tab") != "" and TapHoldHoldModifier(TapHold, "tab") == "" and not LayerEnabled and not TapHoldKanaAltGrHeld()
 $SC00F:: {
 	if _TabAcceptVisiblePrediction()
 		return
@@ -174,7 +174,7 @@ $SC00F:: {
 ; ===================================================
 ; ===================================================
 
-#HotIf TapHoldTapAction(TapHold, "tab") != "alt_tab_monitor" and TapHoldHoldModifier(TapHold, "tab") == "" and TapHoldHoldLayer(TapHold, "tab") == "" and TapHoldTapAction(TapHold, "tab") != "" and not LayerEnabled
+#HotIf TapHoldTapAction(TapHold, "tab") != "alt_tab_monitor" and TapHoldHoldModifier(TapHold, "tab") == "" and TapHoldHoldLayer(TapHold, "tab") == "" and TapHoldTapAction(TapHold, "tab") != "" and not LayerEnabled and not TapHoldKanaAltGrHeld()
 SC00F:: {
 	if _TabAcceptVisiblePrediction()
 		return
@@ -195,7 +195,9 @@ SC00F:: {
 ; ====================================
 
 ; The hold variants fire only with no modifier held, so the key stays itself
-; under a held modifier, as on every driver. Its own auto-repeat arrives under
+; under a held modifier, as on every driver; the Kana layout's AltGr, which
+; AutoHotkey does not count as a modifier, is excluded by their criteria
+; (TapHoldKanaAltGrHeld). Its own auto-repeat arrives under
 ; the modifier or layer the hold owns and matches none of them: swallow it for
 ; as long as the owner resolves the press (see TapHoldPressIsOwned).
 #HotIf TapHoldPressIsOwned("tab")

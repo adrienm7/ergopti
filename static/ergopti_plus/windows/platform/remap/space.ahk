@@ -138,15 +138,15 @@ _SpaceHoldModKey() {
 ; Tap-only (hold=none, tap action set to something other than space).
 ; No $ needed: AHK v2 defaults to #MaxThreadsPerHotkey 1 so auto-repeat
 ; cannot spawn a second thread while this handler is still executing.
-#HotIf TapHoldTapAction(TapHold, "space") != "" and TapHoldTapAction(TapHold, "space") != "space" and TapHoldHoldModifier(TapHold, "space") == "" and TapHoldHoldLayer(TapHold, "space") == "" and not LayerEnabled
+#HotIf TapHoldTapAction(TapHold, "space") != "" and TapHoldTapAction(TapHold, "space") != "space" and TapHoldHoldModifier(TapHold, "space") == "" and TapHoldHoldLayer(TapHold, "space") == "" and not LayerEnabled and not TapHoldKanaAltGrHeld()
 SC039:: _SpaceDispatch()
 #HotIf
 
-#HotIf TapHoldHoldLayer(TapHold, "space") == "nav" and not LayerEnabled
+#HotIf TapHoldHoldLayer(TapHold, "space") == "nav" and not LayerEnabled and not TapHoldKanaAltGrHeld()
 SC039:: SpaceTapHoldLayer()
 #HotIf
 
-#HotIf TapHoldHoldModifier(TapHold, "space") != "" and not LayerEnabled
+#HotIf TapHoldHoldModifier(TapHold, "space") != "" and not LayerEnabled and not TapHoldKanaAltGrHeld()
 SC039:: SpaceTapHold()
 #HotIf
 
