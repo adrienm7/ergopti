@@ -580,3 +580,57 @@ _TSRC_LoneMenuModifierIsMaskedBeforeRelease() {
 }
 Test("taphold-synthetic: a lone synthetic Alt or Win is masked before its release (lone-modifier-mask-2026-09-25)",
 	_TSRC_LoneMenuModifierIsMaskedBeforeRelease)
+
+; Suspend, shutdown and the fatal cleanup release every synthetic hold at once
+; through TapHoldReleaseSyntheticKeys, mid-press and usually with nothing typed
+; under it. That path sent a bare Up: a lone Alt or Win put the focused
+; window's menu bar in menu mode (or opened Start), and the keys typed after
+; the pause went to the menu; the owner's own masked release came later, after
+; the Up (teardown-menu-mask-2026-09-26).
+_TSRC_TeardownSequence(ModKey) {
+	global _TSRC_Sent
+	_TSRC_Begin()
+	try {
+		TapHoldSyntheticKeyDown(ModKey)
+		TapHoldReleaseSyntheticKeys()
+		Joined := ""
+		for _, Sent in _TSRC_Sent
+			Joined .= (Joined == "" ? "" : "|") . Sent
+		return Joined
+	} finally {
+		_TSRC_End()
+	}
+}
+
+_TSRC_TeardownMasksALoneMenuModifier() {
+	Mask := "{Blind}{" . A_MenuMaskKey . "}"
+	for _, Name in ["LAlt", "RAlt", "LWin"]
+		AssertEqual("{" . Name . " Down}|" . Mask . "|{" . Name . " Up}", _TSRC_TeardownSequence(Name),
+			"the teardown must mask a held " . Name . " before releasing it")
+	AssertEqual("{LCtrl Down}|{LAlt Down}|" . Mask . "|{LAlt Up}|{LCtrl Up}", _TSRC_TeardownSequence(["LCtrl", "LAlt"]),
+		"a combination holding Alt is masked once before its keys are released")
+	AssertEqual("{LCtrl Down}|{LCtrl Up}", _TSRC_TeardownSequence("LCtrl"), "Ctrl opens no menu and must not be masked")
+	Family := _TestSetAltGrFamily(true)
+	try {
+		AssertEqual("{Blind}{vkDF Down}|{Blind}{vkDF Up}", _TSRC_TeardownSequence(KS_AltGrKeyName()),
+			"the Kana layout's AltGr opens no menu and must not be masked")
+	} finally {
+		_TestRestoreAltGrFamily(Family)
+	}
+}
+Test("taphold-synthetic: the lifecycle teardown masks a lone Alt or Win before releasing it (teardown-menu-mask-2026-09-26)",
+	_TSRC_TeardownMasksALoneMenuModifier)
+
+; The error net releases logically stuck modifiers after an uncaught error, the
+; same lone release: it masks first when an Alt or Win is among them.
+_TSRC_ErrorNetMasksStuckMenuModifiers() {
+	AssertTrue(_ErrorNetReleaseNeedsMenuMask(["LControl", "RAlt"]), "a stuck RAlt must be masked")
+	AssertTrue(_ErrorNetReleaseNeedsMenuMask(["LWin"]), "a stuck Win must be masked")
+	AssertFalse(_ErrorNetReleaseNeedsMenuMask(["LControl", "LShift", "SC138"]), "Ctrl, Shift and the Kana AltGr open no menu")
+	Body := _DriverFuncBody("ErgoptiGlobalErrorHandler")
+	MaskAt := InStr(Body, "_ErrorNetReleaseNeedsMenuMask(Stuck)")
+	ReleaseAt := InStr(Body, 'try SendEvent("{" ModKey " Up}")')
+	AssertTrue(MaskAt > 0 and ReleaseAt > MaskAt, "the error net must mask before its first stuck-modifier release")
+}
+Test("taphold-synthetic: the error net masks a stuck Alt or Win before releasing it (teardown-menu-mask-2026-09-26)",
+	_TSRC_ErrorNetMasksStuckMenuModifiers)
