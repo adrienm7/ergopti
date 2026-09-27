@@ -2497,5 +2497,7 @@
 	"ui_metrics_rebuild.failed": "Återuppbyggnaden av statistiken stoppades oväntat. Nästa försök fortsätter där den stannade.",
 	"menu.global.uninstall": "Avinstallera Ergopti…",
 	"dialog.uninstall.confirm": "Vill du avinstallera Ergopti? Programmet stängs. Dina inställningar, hotstrings, mätvärden och inloggningsuppgifter behålls.",
-	"dialog.uninstall.failed": "Ergopti kunde inte avinstalleras. Dina personliga data har behållits."
+	"dialog.uninstall.failed": "Ergopti kunde inte avinstalleras. Dina personliga data har behållits.",
+	"menu.global.start_at_login": "Starta vid inloggning",
+	"dialog.start_at_login.failed": "Kunde inte ändra automatisk start. Kontrollera systemets startinställningar."
 }

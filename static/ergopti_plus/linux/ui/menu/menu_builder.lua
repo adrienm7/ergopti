@@ -3174,6 +3174,12 @@ local function _build_global_actions(ctx)
 		["enable_all"]     = call_ctx("on_enable_all"),
 		["disable_all"]    = call_ctx("on_disable_all"),
 		["reset_defaults"] = call_ctx("on_reset_defaults"),
+		["start_at_login"] = function()
+			if not require("ui.menu.start_at_login").toggle() then
+				show_error(i18n_safe("dialog.start_at_login.failed"), i18n_safe("menu.global.start_at_login"))
+			end
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		end,
 		["uninstall"] = function()
 			require("ui.menu.uninstall").run({
 				title = i18n_safe("menu.global.uninstall"),
@@ -3209,6 +3215,11 @@ local function _build_global_actions(ctx)
 		end,
 	}
 
+	render_ctx.state_getters = {}
+	for key, value in pairs(ctx.state_getters or {}) do render_ctx.state_getters[key] = value end
+	render_ctx.state_getters.start_at_login_enabled = function()
+		return require("ui.menu.start_at_login").enabled() == true
+	end
 	return {
 		label   = i18n_safe("menu.global.title"),
 		submenu = ManifestMenu.build("global_actions", "Global", nil, nil, render_ctx),

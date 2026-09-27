@@ -127,6 +127,13 @@ The installer detects apt/dnf/pacman, installs dependencies (luajit,
 libnotify-bin, …), copies files to `~/.local/lib/ergopti/`, and installs
 a systemd user service.
 
+### Automatic startup
+
+Use **Global actions → Start at login** to enable or disable automatic startup.
+Disabling it leaves Ergopti running in the current session and applies to the
+next login. Opening Ergopti manually does not turn automatic startup back on,
+and reinstalling or updating preserves the choice made in this menu.
+
 ### Uninstallation
 
 Choose **Global actions → Uninstall Ergopti…** in the tray menu and confirm.

@@ -367,9 +367,11 @@ _MI_BuildGlobalActionsMenu() {
 		"disable_all",    ToggleAllFeaturesOff,
 		"reset_defaults", ReloadWithDefaultConfig,
 		"clean_unused_keys", ShowUnusedConfigKeysCleanup,
-		"uninstall", ShowUninstallErgopti
+		"uninstall", ShowUninstallErgopti,
+		"start_at_login", ToggleStartAtLogin
 	)
-	return MenuRenderer_Build("global_actions", "Global", "", "", "", Commands)
+	StateGetters := Map("start_at_login_enabled", StartAtLoginEnabled)
+	return MenuRenderer_Build("global_actions", "Global", "", "", "", Commands, StateGetters)
 }
 
 
