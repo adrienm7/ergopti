@@ -32,7 +32,7 @@
 ---    directories), because cmd's mkdir has no -p flag and would otherwise
 ---    create garbage directories while reporting success. With -p, an
 ---    existing directory is success, as POSIX specifies.
---- 5. Commands headed by a POSIX tool (sh, tar, rm, chmod, cp, mv, cat, grep,
+--- 5. Commands headed by a POSIX tool (sh, bash, tar, rm, chmod, cp, mv, cat, grep,
 ---    mktemp, test, pwd, wc, date, ls, touch, stat, sleep, printf, and a
 ---    chained mkdir) or by an existing script path are routed to the sh and
 ---    coreutils shipping with Git for Windows, with /tmp operands mapped to
@@ -307,6 +307,8 @@ end
 --- Command heads routed to the Git userland instead of cmd.exe.
 local TOOL_HEADS = {
 	sh = true,
+	-- The ownership receipt uses Bash; PATH may otherwise resolve the WSL shim.
+	bash = true,
 	tar = true,
 	rm = true,
 	chmod = true,
