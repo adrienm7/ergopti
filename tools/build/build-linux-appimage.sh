@@ -9,7 +9,7 @@
 #   1. build/linux/AppDir/                            — the staged AppDir:
 #        AppDir/AppRun                                  entry point
 #        AppDir/ergopti.desktop                         desktop entry
-#        AppDir/ergopti.png                             icon (1x1 placeholder)
+#        AppDir/ergopti.png                             application icon
 #        AppDir/usr/bin/ergopti                         launcher, forwards to AppRun
 #        AppDir/usr/bin/luajit                          bundled runtime, when available
 #        AppDir/usr/lib/ergopti/                        driver tree, flat
@@ -234,14 +234,11 @@ DESKTOP_EOF
 echo "  Desktop entry: ergopti.desktop"
 
 # ----------------------------------------------------------------------
-# 8. Placeholder icon
+# 8. Application icon
 # ----------------------------------------------------------------------
-# Minimal but structurally valid 1x1 PNG. appimagetool validates the icon it
-# finds, so a zero-byte touch would fail packaging on a real Linux host while
-# looking fine here.
-printf '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82' \
-  > "$APPDIR/ergopti.png"
-echo "  Icon placeholder: ergopti.png"
+install -m 644 "$BUILD_DIR/_shared/assets/ergopti_tray.png" "$APPDIR/ergopti.png"
+
+echo "  Application icon: ergopti.png"
 
 # ----------------------------------------------------------------------
 # 9. Build the AppImage (Linux only)

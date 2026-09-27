@@ -43,7 +43,7 @@ mkdir -p "$DEB_ROOT/DEBIAN"
 mkdir -p "$DEB_ROOT/usr/lib/ergopti"
 mkdir -p "$DEB_ROOT/usr/bin"
 mkdir -p "$DEB_ROOT/usr/share/applications"
-mkdir -p "$DEB_ROOT/usr/share/icons/hicolor/128x128/apps"
+mkdir -p "$DEB_ROOT/usr/share/icons/hicolor/512x512/apps"
 mkdir -p "$DEB_ROOT/etc/ergopti"
 mkdir -p "$DEB_ROOT/usr/lib/systemd/user"
 
@@ -103,13 +103,11 @@ DESKTOP_EOF
 echo "  Desktop entry: ergopti.desktop"
 
 # ----------------------------------------------------------------------
-# 6. Placeholder icon
+# 6. Application icon
 # ----------------------------------------------------------------------
-# Generate a minimal 1x1 PNG as placeholder (valid PNG header)
-printf '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82' \
-  > "$DEB_ROOT/usr/share/icons/hicolor/128x128/apps/ergopti.png" 2>/dev/null || \
-  touch "$DEB_ROOT/usr/share/icons/hicolor/128x128/apps/ergopti.png"
-echo "  Icon placeholder: ergopti.png"
+install -m 644 "$BUILD_DIR/_shared/assets/ergopti_tray.png" "$DEB_ROOT/usr/share/icons/hicolor/512x512/apps/ergopti.png"
+
+echo "  Application icon: ergopti.png"
 
 # ----------------------------------------------------------------------
 # 7. Default config template
