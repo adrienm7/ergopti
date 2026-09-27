@@ -83,6 +83,23 @@ The debug submenu order lives in
 macOS does not yet consume every hotstrings/layout manifest key that Windows
 does. Treat the asymmetry as known scope, not proof that all menu parity exists.
 
+### project-layer-key-under-another-holder
+
+A tap-hold key whose own hold is the layer another key already holds follows
+one rule on every driver: the layer's mapping when the layer maps the key,
+otherwise the plain key (typed at once, auto-repeated), with one exception:
+the layer swallows the left-thumb key tapping Backspace (Windows LAlt, macOS
+left Command), which passed through puts a modifier under every layer chord
+(Alt+Up moves the line in VS Code, Cmd+Left jumps to the line start). Windows
+is the reference: `not LayerEnabled` on every tap-hold variant plus the
+nav_layer.ahk LAlt swallower. macOS follows it with a `variable_unless
+layer_active` condition on the key's Karabiner rule (layer_keys.json runs
+first) and a `SWALLOWED_ON_LAYER` manipulator; Linux in its tap-hold engine.
+Pins: `test_layer_key_under_another_holder.ahk`, `test_generator.lua`,
+`test_tap_hold_engine.lua`. Action: a new layer hold path on any driver must
+stand down while the layer is on, or a second holder's release turns the layer
+off under the first; change the swallow list on every driver at once.
+
 ### project-ui-dynamic-buttons
 
 Windows dialogs use `Gui_HarmoniseButtonWidths`; macOS web UIs size through CSS
