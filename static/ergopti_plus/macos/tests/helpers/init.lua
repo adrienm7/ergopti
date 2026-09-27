@@ -331,6 +331,7 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- cached instance bound to a previous test's hs. Same rationale as text_utils.
 	loaded["modules.keymap.layout_install"] = nil
 	loaded["modules.keymap.input_sources"]  = nil
+	loaded["adapters.one_shot_shift"] = nil
 
 	-- Drop every cached modules.keymap.registry* sub-module (registry.lua was split
 	-- into registry_groups.lua + registry_index.lua). All three capture `local hs = hs`

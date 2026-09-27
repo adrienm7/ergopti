@@ -81,6 +81,7 @@ graph TD
         MACOS_mouse_control["MouseControl.lua"]
         MACOS_network_info["NetworkInfo.lua"]
         MACOS_notifier["Notifier.lua"]
+        MACOS_one_shot_shift["OneShotShift.lua"]
         MACOS_process_lifecycle["ProcessLifecycle.lua"]
         MACOS_screen_capture["ScreenCapture.lua"]
         MACOS_secure_field_detector["SecureFieldDetector.lua"]

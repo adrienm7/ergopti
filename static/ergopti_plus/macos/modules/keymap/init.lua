@@ -164,6 +164,7 @@ local loopback_keyup_tap = nil
 local eventtap_is_enabled
 local start_eventtap
 local _started = false
+local _one_shot_shift = nil
 local _diagnostic_mailbox_started = false
 
 local ACTION_EPOCH_LISTENER_ID = "modules.keymap.action_epoch"
@@ -363,6 +364,7 @@ end
 --- the eventtap returns. The retained pending flag lets the watchdog retry if a
 --- timer allocation fails without performing file/canvas work on the HID path.
 local function invalidate_observed_context()
+	if _one_shot_shift then _one_shot_shift.disarm() end
 	CoreState.buffer = ""
 	CoreState.llm_buffer = ""
 	cancel_action_preview_recovery()
@@ -380,6 +382,7 @@ end
 --- Physical keys pass through while paused, so neither side of that boundary
 --- may reuse a buffer or word-start claim assembled in the other context.
 local function discard_paused_text_context()
+	if _one_shot_shift then _one_shot_shift.disarm() end
 	CoreState.buffer = ""
 	CoreState.llm_buffer = ""
 	CoreState.start_is_word_boundary = false
@@ -440,6 +443,19 @@ end
 --- @return string
 function M.get_trigger_char()
 	return CoreState.magic_key or M.DEFAULT_STATE.trigger_char
+end
+
+--- Arms the same one-shot owner for a Karabiner tap or a gesture action.
+--- @return boolean accepted
+function M.arm_one_shot_shift()
+	if not _started or CoreState.processing_paused == true or not SyntheticInput.admission_open() then return false end
+	local remap = package.loaded["platform.remap"]
+	assert(type(remap) == "table" and type(remap.get_sticky_timeout) == "function",
+		"one-shot Shift requires the initialized remap configuration")
+	local timeout_ms = remap.get_sticky_timeout()
+	assert(type(timeout_ms) == "number" and timeout_ms > 0, "invalid one-shot Shift timeout")
+	_one_shot_shift.arm(timeout_ms / 1000)
+	return true
 end
 
 --- Pauses eventtap processing — all keystrokes pass through unmodified.
@@ -1070,6 +1086,11 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- every replacement/action echo exits before the native getKeyCode call.
 	if provenance and not internal_loopback then return false end
 
+	-- A press already consumed before PAUSE still owns its repeats and release.
+	-- Ordinary paused keys retain the no-decode fast path below.
+	if provenance == nil and provenance_status == EventProvenance.STATUS_FOREIGN
+		and _one_shot_shift and _one_shot_shift.claim_repeat(e) then return true end
+
 	-- The pause transaction closes new synthetic admission immediately after the
 	-- global drain reaches idle and keeps it closed through PAUSED/rollback. Raw
 	-- physical keys remain pass-through in that acknowledgement window; letting
@@ -1119,7 +1140,9 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- The keymap taps own the Karabiner control sentinels (F20 layer entry):
 	-- delete them here, before ignored-window and secure-field pass-through, so
 	-- no application ever receives one, and publish the signal in-process.
-	if ControlSentinels.claim_key(keyCode, true) then return true end
+	if ControlSentinels.is_sentinel(keyCode)
+		and ControlSentinels.claim_key(keyCode, true, e:getFlags()) then return true end
+	if _one_shot_shift and _one_shot_shift.key_down(e, keyCode) then return true end
 
 	-- O(1) fast-exit for synthetic signals and Karabiner/layer sentinels.
 	-- This replaces both the old SYNTHETIC_SIGNAL_KEYCODES check and the
@@ -1471,6 +1494,13 @@ local function onKeyDown(e)
 		local abort_ok, _, consume_original = pcall(SyntheticInput.abort_callback)
 		abort_requires_consumption = abort_ok and consume_original == true
 	end
+	if _one_shot_shift then
+		local settled, settle_error = pcall(_one_shot_shift.finish, ok or abort_requires_consumption)
+		if not settled then
+			ok = false
+			result = settle_error
+		end
+	end
 	if t0 then Perf.sample("keymap_keydown", t0) end
 	-- Enrich the slow-keystroke detail with the per-stage breakdown when measured.
 	local hot_detail = _tc_chars
@@ -1532,6 +1562,15 @@ loopback_keyup_tap = eventtap.new({ eventtap.event.types.keyUp }, function(e)
 	if provenance == nil and status == EventProvenance.STATUS_FOREIGN then
 		local ok, keycode = pcall(e.getKeyCode, e)
 		if ok and ControlSentinels.claim_key(keycode, false) then return true, fence_events end
+		if ok and _one_shot_shift then
+			local settled, consumed = pcall(_one_shot_shift.key_up, e, keycode)
+			if not settled then
+				_one_shot_shift.reset()
+				SyntheticInput.defer_after_callback("one-shot Shift release failure", function()
+					Logger.error(LOG, "One-shot Shift release failed: %s.", tostring(consumed))
+				end)
+			elseif consumed then return true, fence_events end
+		end
 	end
 	return false, fence_events
 end)
@@ -1852,7 +1891,8 @@ tap_watchdog = function(timer, generation)
 		return false
 	end
 	local keydown_revived = revive("keyDown", tap)
-	revive("loopbackKeyUp", loopback_keyup_tap)
+	local keyup_revived = revive("loopbackKeyUp", loopback_keyup_tap)
+	if (keydown_revived or keyup_revived) and _one_shot_shift then _one_shot_shift.reset() end
 	revive("flagsChanged", shift_tap)
 	revive("mouse", mouse_tap)
 	-- Only the keyDown tap feeds the buffer, so only its outage invalidates it.
@@ -1882,6 +1922,12 @@ function M.start()
 			return false
 		end
 	end
+	if not _one_shot_shift then
+		_one_shot_shift = require("adapters.one_shot_shift").new({ magic = M.get_trigger_char })
+	end
+	ControlSentinels.set_listener("keymap.one_shot_shift", function(signal)
+		if signal == ControlSentinels.ONE_SHOT_SHIFT then M.arm_one_shot_shift() end
+	end)
 	local tracking_generation = km_utils.start_ignored_win_tracking(
 		CoreState.ignored_window_titles, CoreState.ignored_window_patterns)
 	if type(tracking_generation) ~= "number" then
@@ -1977,6 +2023,7 @@ function M.stop(teardown)
 	end
 	CoreState.lifecycle_generation = (CoreState.lifecycle_generation or 0) + 1
 	_started = false
+	if _one_shot_shift then _one_shot_shift.reset() end
 	local listener_stopped = true
 	if _action_listener_registered then
 		local ok, result = pcall(SyntheticInput.unregister_action_listener, ACTION_EPOCH_LISTENER_ID)

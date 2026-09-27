@@ -859,7 +859,10 @@ sg("capsword", function()
 	-- platform/remap/watchers.lua uses to switch CapsWord back off.
 end)
 
-sg("sticky_shift",             function() arm_sticky({ "shift" }) end)
+sg("sticky_shift", function()
+	local keymap = require("modules.keymap")
+	return keymap.arm_one_shot_shift()
+end)
 sg("sticky_ctrl",              function() arm_sticky({ "ctrl" }) end)
 sg("sticky_cmd",               function() arm_sticky({ "cmd" }) end)
 sg("sticky_option",            function() arm_sticky({ "alt" }) end)

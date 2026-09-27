@@ -471,10 +471,15 @@ helpers.describe("Generator.build_karabiner_json: tap/hold rules", function()
 			helpers.assert_true(not tostring(condition.name):find("ke_held_", 1, true),
 				"the sticky key's rule must not depend on another key being held: " .. tostring(condition.name))
 		end
+		local Keycodes = require("infra.keycodes")
 		helpers.assert_true(type(manipulator.to_if_alone) == "table"
 			and type(manipulator.to_if_alone[1]) == "table"
-			and type(manipulator.to_if_alone[1].sticky_modifier) == "table",
+			and manipulator.to_if_alone[1].key_code == Keycodes.to_name(Keycodes.F20_LAYER_NAV_ENTERED),
 			"the tap must arm the one-shot")
+		helpers.assert_eq(manipulator.to_if_alone[1].modifiers, { "left_control", "left_option" },
+			"the internal signal must carry the one-shot tag")
+		helpers.assert_eq(manipulator.to_if_alone[1]["repeat"], false,
+			"holding the signal must not repeatedly rearm the one-shot")
 		helpers.assert_eq(manipulator.to[#manipulator.to].key_code, "left_shift",
 			"the hold must send the plain modifier")
 

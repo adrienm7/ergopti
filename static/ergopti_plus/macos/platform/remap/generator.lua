@@ -41,6 +41,7 @@ local FileSystem = require("adapters.file_system")
 local LeaseContract = require("platform.remap.lease_contract")
 local LegacyReleaseFixtures = require("platform.remap.legacy_release_fixtures")
 local ActionCatalogue = require("platform.remap.action_catalogue")
+local ControlSignals = require("platform.remap.control_signals")
 
 local LOG = "karabiner"
 
@@ -763,6 +764,45 @@ end
 -- ======= 2/ Tap/Hold Rule Builder =======
 -- ========================================
 -- ========================================
+
+--- Rewrites deployed control output after historical migration snapshots exist.
+--- The simple sticky Shift payload becomes a tagged F20; compound stickies keep
+--- their native semantics. All F20 emitters claim hand modifiers so navigation
+--- can never inherit the one-shot tag from keys the user happens to hold.
+--- @param rules table Owned production rule graph.
+local function rewrite_control_output(rules)
+	local function rewrite(value)
+		local emits_control = value.key_code == LAYER_NAV_SENTINEL_NAME
+		if emits_control then value["repeat"] = false end
+		local sticky_index, sticky_count = nil, 0
+		for index, event in ipairs(value) do
+			if type(event) == "table" and event.sticky_modifier then
+				sticky_count = sticky_count + 1
+				if deep_equal(event.sticky_modifier, { left_shift = "toggle" }) then sticky_index = index end
+			end
+		end
+		if sticky_count == 1 and sticky_index then
+			local replacement = deep_copy(value[sticky_index])
+			replacement.sticky_modifier = nil
+			replacement.key_code = LAYER_NAV_SENTINEL_NAME
+			replacement.modifiers = ControlSignals.one_shot_modifiers()
+			value[sticky_index] = replacement
+		end
+		for _, nested in pairs(value) do
+			if type(nested) == "table" and rewrite(nested) then emits_control = true end
+		end
+		return emits_control
+	end
+	for _, rule in ipairs(rules) do
+		local manipulators = {}
+		for _, manipulator in ipairs(rule.manipulators or {}) do
+			local prepared = deep_copy(manipulator)
+			local variants = rewrite(prepared) and exact_modifier_manipulators(prepared) or { manipulator }
+			for _, variant in ipairs(variants) do manipulators[#manipulators + 1] = variant end
+		end
+		rule.manipulators = manipulators
+	end
+end
 
 local NATIVE_TAP_ONLY_KEYS = {
 	left_shift = true, left_control = true, right_shift = true, right_command = true, fn = true,
@@ -1653,6 +1693,8 @@ function M.build_karabiner_json(
 			#all_rules - #kept)
 		all_rules = kept
 	end
+
+	rewrite_control_output(all_rules)
 
 	-- A single deployed config contains both pause states. Pause and resume only
 	-- toggle the generation-scoped variable; they never rewrite karabiner.json

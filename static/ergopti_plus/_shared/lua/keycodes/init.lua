@@ -98,6 +98,9 @@ M.F20_LAYER_NAV_ENTERED = 90
 --- modules/shortcuts/script_control.lua.
 M.BACKSPACE = 51
 
+--- Forward Delete (keycode 117) — consumes one-shot Shift without shifting.
+M.FORWARD_DELETE = 117
+
 --- Return / Enter (keycode 36) — KE-paused fallback path counterpart.
 M.RETURN = 36
 

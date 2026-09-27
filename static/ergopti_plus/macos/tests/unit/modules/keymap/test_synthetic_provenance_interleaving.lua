@@ -159,6 +159,7 @@ local function physical_event(fixture, chars, keycode, flags, user_data, source_
 	event.getKeyCode = function() return keycode or KEYCODE_A end
 	event.getFlags = function() return flags or {} end
 	event.getCharacters = function() return chars end
+	event.rawFlags = function() return 0 end
 	event.getProperty = function(self, property)
 		if property == properties.eventSourceUserData then return user_data or 0 end
 		if property == properties.eventSourceUnixProcessID then
@@ -218,6 +219,53 @@ end
 
 
 helpers.describe("keymap synthetic provenance: explicit transactions under interleaving", function()
+	helpers.it("refuses one-shot activation without the configured timeout (one-shot-config)", function()
+		local fixture = load_fixture()
+		helpers.with_stub_scope({ "platform.remap" }, function()
+			package.loaded["platform.remap"] = { get_sticky_timeout = function() return nil end }
+			helpers.assert_true(fixture.keymap.start())
+			local ok, reason = pcall(fixture.keymap.arm_one_shot_shift)
+			helpers.assert_true(not ok and tostring(reason):find("invalid one%-shot Shift timeout") ~= nil)
+			local consumed, events = fixture.handle(physical_event(fixture, " ", 49))
+			helpers.assert_true(not consumed)
+			helpers.assert_nil(events, "an invalid timeout must not invent an armed interval")
+			fixture.keymap.stop(true)
+		end)
+	end)
+	helpers.it("releases the physical key after a refused one-shot handoff (one-shot-rollback)", function()
+		local fixture = load_fixture()
+		helpers.with_stub_scope({ "platform.remap" }, function()
+			package.loaded["platform.remap"] = { get_sticky_timeout = function() return 2000 end }
+			helpers.assert_true(fixture.keymap.start())
+			helpers.assert_true(fixture.handle(physical_event(fixture, "", KEYCODE_F20, { ctrl = true, alt = true })))
+			local leave_callback = fixture.synthetic.leave_callback
+			fixture.synthetic.leave_callback = function() error("Injected handoff refusal") end
+			local consumed, events = fixture.handle(physical_event(fixture, " ", 49))
+			fixture.synthetic.leave_callback = leave_callback
+			helpers.assert_true(not consumed, "the original key must pass through when output was refused")
+			helpers.assert_nil(events, "no replacement may escape the refused handoff")
+			helpers.assert_true(not fixture.handle_up(physical_event(fixture, " ", 49)),
+				"a refused key-down must not leave an owned release")
+			fixture.keymap.stop(true)
+		end)
+	end)
+	helpers.it("routes a tagged Karabiner tap through the real one-shot serializer (one-shot-integration)", function()
+		local fixture = load_fixture()
+		helpers.with_stub_scope({ "platform.remap" }, function()
+			package.loaded["platform.remap"] = { get_sticky_timeout = function() return 2000 end }
+			helpers.assert_true(fixture.keymap.start())
+			helpers.assert_true(fixture.handle(physical_event(fixture, "", KEYCODE_F20, { ctrl = true, alt = true })))
+			local consumed, events = fixture.handle(physical_event(fixture, " ", 49))
+			helpers.assert_true(consumed, "the physical space must be replaced")
+			helpers.assert_not_nil(events, "the serializer must return actual output events")
+			helpers.assert_eq(#events, 2)
+			helpers.assert_eq(events[1].unicode, "-")
+			fixture.handle(events[1])
+			fixture.handle_up(events[2])
+			helpers.assert_true(fixture.handle_up(physical_event(fixture, " ", 49)), "the owned release must be consumed")
+			fixture.keymap.stop(true)
+		end)
+	end)
 	helpers.it("keeps identical same-process physical input while filtering reordered owned echoes", function()
 		local physical_a = nil
 		local buffer = observed_buffer_after(function(fixture)
