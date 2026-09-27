@@ -317,6 +317,41 @@ helpers.describe("tap-hold engine: a tap with no hold", function()
 		helpers.assert_eq(trail((e:process(KEY_J, DOWN, 50))), "29↓ 105↓", "LAlt with a Tab tap holds the layer")
 	end)
 
+	-- lshift_lctrl.ahk 3.1: LCtrl taps only when CapsLock and LAlt were up at
+	-- its press (KS_IsUp SC03A and SC038, in its tap-only and its hold
+	-- variants), so CapsLock+LCtrl or LAlt+LCtrl let go quickly runs no tap.
+	-- LShift has no such guard (lctrl-tap-needs-caps-alt-up).
+	helpers.it("taps LCtrl only with CapsLock and LAlt up at its press (lctrl-tap-needs-caps-alt-up)", function()
+		local cases = {
+			{ CAPS, { caps_lock = DEFAULTS.caps_lock }, "CapsLock holding Ctrl" },
+			{ CAPS, {}, "a CapsLock nobody configured" },
+			{ ALT, {}, "a plain LAlt" },
+			{ ALT, { left_alt = { tap_action = "backspace", hold_modifier = "alt", time_activation_seconds = 0.2 } },
+				"LAlt holding Alt" },
+		}
+		for _, hold in ipairs({ "", "ctrl" }) do
+			for _, case in ipairs(cases) do
+				local other, keys, label = case[1], {}, case[3] .. " (LCtrl hold '" .. hold .. "')"
+				for key_id, config in pairs(case[2]) do keys[key_id] = config end
+				keys.left_ctrl = { tap_action = "paste", hold_modifier = hold, time_activation_seconds = 0.2 }
+				local e = engine(keys)
+				e:process(other, DOWN, 0)
+				e:process(CTRL, DOWN, 10)
+				local _, tap = e:process(CTRL, UP, 100)
+				helpers.assert_nil(tap, label .. " down at LCtrl's press: no tap")
+				e:process(other, UP, 150)
+				e:process(CTRL, DOWN, 200)
+				_, tap = e:process(CTRL, UP, 300)
+				helpers.assert_eq(tap, "paste", label .. " up again: LCtrl taps")
+			end
+		end
+		local e = engine({ left_shift = DEFAULTS.left_shift, caps_lock = DEFAULTS.caps_lock })
+		e:process(CAPS, DOWN, 0)
+		e:process(SHIFT, DOWN, 10)
+		local _, tap = e:process(SHIFT, UP, 100)
+		helpers.assert_eq(tap, "copy", "LShift taps under a held CapsLock, as on Windows")
+	end)
+
 	-- lalt.ahk 4.1: LAlt's one-shot Shift is armed at key-down and Shift is held
 	-- until the key comes up (tap-no-hold-per-key).
 	helpers.it("arms LAlt's one-shot Shift at key-down and holds Shift until release (tap-no-hold-per-key)", function()
