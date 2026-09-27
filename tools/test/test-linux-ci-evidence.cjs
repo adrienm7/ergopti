@@ -174,6 +174,15 @@ assert.throws(() => assertInstallMatrix(installJob.replace("            containe
 const prepare = pipeline.step(installJob, 'Prepare the container');
 assert.strictEqual(pipeline.stepField(prepare, 'shell'), 'sh', 'Alpine needs sh before bash is installed');
 assert.ok(installJob.indexOf(prepare) < installJob.indexOf('      - uses: actions/checkout@v4'));
+const installAsUser = pipeline.step(installJob, 'Install as an ordinary user without runtime dependencies');
+assert.deepStrictEqual(pipeline.runOf(installAsUser), [
+	'set -euo pipefail',
+	'# Model a login, not a nested sudo invocation whose SUDO_UID is root.',
+	'sudo -H -u ergopti-ci env -u SUDO_UID -u SUDO_GID -u SUDO_USER bash install.sh --no-deps',
+], 'the installer must configure a real desktop UID, never root with a substituted HOME');
+const createUser = pipeline.step(installJob, 'Create the installation user');
+assert.match(createUser, /test "\$\(id -u ergopti-ci\)" -ge 1000/);
+assert.ok(installJob.indexOf(createUser) < installJob.indexOf(installAsUser));
 for (const step of pipeline.steps(installJob)) {
 	if (pipeline.runOf(step.body) && step.name !== 'Prepare the container') {
 		assert.strictEqual(pipeline.stepField(step.body, 'shell'), 'bash', `${step.name} requires pipefail-capable bash`);
