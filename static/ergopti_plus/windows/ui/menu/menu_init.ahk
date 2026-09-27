@@ -366,7 +366,8 @@ _MI_BuildGlobalActionsMenu() {
 		"enable_all",     ToggleAllFeaturesOn,
 		"disable_all",    ToggleAllFeaturesOff,
 		"reset_defaults", ReloadWithDefaultConfig,
-		"clean_unused_keys", ShowUnusedConfigKeysCleanup
+		"clean_unused_keys", ShowUnusedConfigKeysCleanup,
+		"uninstall", ShowUninstallErgopti
 	)
 	return MenuRenderer_Build("global_actions", "Global", "", "", "", Commands)
 }

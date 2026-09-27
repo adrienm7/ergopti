@@ -61,6 +61,7 @@ linux/
   modules/                    11 feature folders — see modules/README.md for the measured table
   ui/                         webkit_host.lua (WebKitGTK page builder)
   install.sh                  Standalone installer (apt/dnf/pacman)
+  uninstall.sh                Removes an owned installation; preserves personal data
   ergopti-hotstrings.service  systemd user unit
   bin/
     ergopti-hotstrings        Shell wrapper (sets LUA_PATH, checks deps)
@@ -125,6 +126,34 @@ bash static/ergopti_plus/linux/install.sh
 The installer detects apt/dnf/pacman, installs dependencies (luajit,
 libnotify-bin, …), copies files to `~/.local/lib/ergopti/`, and installs
 a systemd user service.
+
+### Uninstallation
+
+Choose **Global actions → Uninstall Ergopti…** in the tray menu and confirm.
+Ergopti finishes saving its data and closes before removing the application.
+Native packages request administrator authorization through the desktop.
+
+For a standalone installation, the installed removal script is independent of
+the directory from which it is called:
+
+```bash
+bash "$HOME/.local/lib/ergopti/linux/uninstall.sh" --yes
+```
+
+If installation used `--prefix`, pass that same absolute prefix to
+`uninstall.sh --prefix "/your/prefix" --yes`. The script verifies its file
+ownership record before removing the runtime, launcher and startup entries.
+It retains unknown files and modified payload files, including personal files
+inside the installation directory. A modified service must be reviewed before
+removal, because it could now start a different application.
+
+For a `.deb` or `.rpm` installation, remove **ergopti** through the distribution's
+software manager. The command `bash /usr/lib/ergopti/uninstall.sh --yes` delegates
+to the owning package manager with graphical administrator authentication.
+
+Removal preserves configuration, hotstrings, metrics and credentials. It does
+not remove shared dependencies, input groups, or the separately installed Ergopti
+keyboard layout. Reinstalling the application can reuse the retained settings.
 
 ## Known limitations by feature
 

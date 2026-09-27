@@ -93,6 +93,10 @@ ASSET_FILES: list[tuple[str, str]] = [
 # directory from making a release silently green when its required DLL is absent.
 REQUIRED_ASSETS: tuple[tuple[str, str], ...] = (
 	(
+		"static/ergopti_plus/windows/vendor/ergopti_uninstall.ps1",
+		"vendor/ergopti_uninstall.ps1",
+	),
+	(
 		"static/ergopti_plus/windows/vendor/ergopti_nav_owner.dll",
 		"vendor/ergopti_nav_owner.dll",
 	),

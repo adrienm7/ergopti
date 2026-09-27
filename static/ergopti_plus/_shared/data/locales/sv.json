@@ -2494,5 +2494,8 @@
 	"ui_metrics_rebuild.eta": "cirka {eta} kvar",
 	"ui_metrics_rebuild.eta_unknown": "uppskattar återstående tid…",
 	"ui_metrics_rebuild.finalizing": "Sparar den återuppbyggda statistiken…",
-	"ui_metrics_rebuild.failed": "Återuppbyggnaden av statistiken stoppades oväntat. Nästa försök fortsätter där den stannade."
+	"ui_metrics_rebuild.failed": "Återuppbyggnaden av statistiken stoppades oväntat. Nästa försök fortsätter där den stannade.",
+	"menu.global.uninstall": "Avinstallera Ergopti…",
+	"dialog.uninstall.confirm": "Vill du avinstallera Ergopti? Programmet stängs. Dina inställningar, hotstrings, mätvärden och inloggningsuppgifter behålls.",
+	"dialog.uninstall.failed": "Ergopti kunde inte avinstalleras. Dina personliga data har behållits."
 }

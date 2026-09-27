@@ -66,6 +66,14 @@ CryptoSha256(Data) {
 	return _CryptoSha256WithProvider(Data, _CryptoSha256Cng)
 }
 
+; Windows-only binary hashing for exact executable identity. The shared text
+; port remains UTF-8; raw bytes must never pass through a string conversion.
+CryptoSha256Bytes(Data) {
+	if !(Data is Buffer)
+		throw TypeError("Binary SHA-256 requires a Buffer")
+	return _CryptoSha256WithProvider(Data, _CryptoSha256Cng)
+}
+
 _CryptoSha256WithProvider(Data, ProviderFn) {
 	try return ProviderFn.Call(Data)
 	catch as Err {
@@ -101,10 +109,15 @@ _CryptoSha256Cng(Data) {
 						throw Error("BCryptCreateHash failed")
 
 				; StrPut counts the terminating NUL; hashing it would change every digest.
-				ByteCount := StrPut(Data, "UTF-8") - 1
-				Utf8      := Buffer(ByteCount < 1 ? 1 : ByteCount, 0)
-				if (ByteCount > 0)
-						StrPut(Data, Utf8, ByteCount, "UTF-8")
+				if (Data is Buffer) {
+						ByteCount := Data.Size
+						Utf8 := Data
+				} else {
+						ByteCount := StrPut(Data, "UTF-8") - 1
+						Utf8 := Buffer(ByteCount < 1 ? 1 : ByteCount, 0)
+						if (ByteCount > 0)
+								StrPut(Data, Utf8, ByteCount, "UTF-8")
+				}
 				HashStatus := DllCall("bcrypt\BCryptHashData", "Ptr", hHash,
 						"Ptr", Utf8, "UInt", ByteCount, "UInt", 0, "UInt")
 				if HashStatus != 0

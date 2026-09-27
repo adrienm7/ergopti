@@ -222,6 +222,8 @@
 		"test:linux-package-layout": "node ./tools/test/test-linux-package-layout.cjs",
 		"test:linux-install-sandbox": "node ./tools/test/test-linux-install-sandbox.cjs",
 		"test:linux-package-setup": "node ./tools/test/test-linux-package-setup.cjs",
+		"test:linux-uninstall-sandbox": "node ./tools/test/test-linux-uninstall-sandbox.cjs",
+		"test:windows-uninstall": "node ./tools/test/test-windows-uninstall.cjs",
 		"test:linux-tracked-copy": "node ./tools/test/test-linux-tracked-copy.cjs",
 		"test:linux-tray-icon-assets": "node ./tools/test/test-linux-tray-icon-assets.cjs",
 		"test:metrics-apps-linux-poll": "node ./tools/test/test-metrics-apps-linux-poll.cjs",

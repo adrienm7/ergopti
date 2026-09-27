@@ -96,6 +96,8 @@ const CHECKS = [
 	{ name: 'every registered action resolves a label in all 21 locales', cmd: 'node', args: ['tools/test/test-action-labels-have-locale-keys.cjs'], repro: 'node tools/test/test-action-labels-have-locale-keys.cjs' },
 	{ name: 'Linux install.sh leaves a working first install (sandboxed real run)', cmd: 'node', args: ['tools/test/test-linux-install-sandbox.cjs'], repro: 'node tools/test/test-linux-install-sandbox.cjs' },
 	{ name: 'Linux native packages provision graphical input access', cmd: 'node', args: ['tools/test/test-linux-package-setup.cjs'], repro: 'npm run test:linux-package-setup' },
+	{ name: 'Linux uninstall preserves personal data and rejects unrelated installations', cmd: 'node', args: ['tools/test/test-linux-uninstall-sandbox.cjs'], repro: 'npm run test:linux-uninstall-sandbox' },
+	{ name: 'Windows uninstall requires terminal authorization and preserves replaced files', cmd: 'node', args: ['tools/test/test-windows-uninstall.cjs'], repro: 'npm run test:windows-uninstall' },
 	{ name: 'Linux tray icons mirror the Ergopti logo byte for byte', cmd: 'node', args: ['tools/test/test-linux-tray-icon-assets.cjs'], repro: 'node tools/test/test-linux-tray-icon-assets.cjs' },
 	{ name: 'the apps metrics window keeps its state across the Linux poll', cmd: 'node', args: ['tools/test/test-metrics-apps-linux-poll.cjs'], repro: 'node tools/test/test-metrics-apps-linux-poll.cjs' },
 	{ name: 'shared pages only call translators that exist', cmd: 'node', args: ['tools/test/test-shared-ui-translators-defined.cjs'], repro: 'node tools/test/test-shared-ui-translators-defined.cjs' },

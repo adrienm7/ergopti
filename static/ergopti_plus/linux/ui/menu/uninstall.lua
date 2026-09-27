@@ -1,0 +1,84 @@
+--- ui/menu/uninstall.lua
+
+--- ==============================================================================
+--- MODULE: Linux Menu Uninstallation
+--- DESCRIPTION:
+--- Hands a confirmed removal to an independent worker, then asks the daemon to
+--- finish its normal shutdown. The worker waits for that exact process before
+--- invoking the package manager or removing installer-owned standalone files.
+--- ==============================================================================
+
+local M = {}
+
+local ShellRunner = require("adapters.shell_runner")
+local Paths = require("infra.paths")
+
+--- Reads one complete file without treating a missing file as empty content.
+--- @param path string
+--- @return string|nil
+local function read_file(path)
+	local file = io.open(path, "rb")
+	if not file then return nil end
+	local value = file:read("*a")
+	file:close()
+	return value
+end
+
+--- Requests removal after the menu's own localized confirmation.
+--- @param opts table { confirm, fail, quit, title, confirmation, failure }
+--- @return boolean launched
+function M.run(opts)
+	local root = opts.root or Paths.driver_root()
+	local run = opts.run or ShellRunner.run
+	local read = opts.read or read_file
+	local getenv = opts.getenv or os.getenv
+	local quote = ShellRunner.quote
+	local prefix = root:match("^(.*)/lib/ergopti/linux$")
+	if root ~= "/usr/lib/ergopti" and not prefix then
+		opts.fail(opts.failure)
+		return false
+	end
+	local command = "/bin/bash " .. quote(root .. "/uninstall.sh")
+	if prefix then command = command .. " --prefix " .. quote(prefix) end
+	if not run(command .. " --check") then
+		opts.fail(opts.failure)
+		return false
+	end
+	if not opts.confirm(opts.title, opts.confirmation) then return false end
+	local stat = read("/proc/self/stat") or ""
+	local pid, fields = stat:match("^(%d+) %(.+%) (.+)$")
+	local values = {}
+	for value in (fields or ""):gmatch("%S+") do values[#values + 1] = value end
+	local started = values[20]
+	if not pid or not started or not started:match("^%d+$") then
+		opts.fail(opts.failure)
+		return false
+	end
+	command = command .. " --yes --wait-owner " .. quote(pid .. ":" .. started)
+		.. " --gui " .. quote(opts.title) .. " " .. quote(opts.failure)
+	if run("systemctl --user show-environment >/dev/null 2>&1") then
+		local launcher = "systemd-run --user --collect --quiet --service-type=exec --unit="
+			.. quote("ergopti-uninstall-" .. pid .. "-" .. started)
+		for _, key in ipairs({ "DISPLAY", "WAYLAND_DISPLAY", "XAUTHORITY", "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS" }) do
+			local value = getenv(key)
+			if value and value ~= "" then launcher = launcher .. " --setenv=" .. quote(key .. "=" .. value) end
+		end
+		command = launcher .. " " .. command
+	else
+		if not run("command -v setsid >/dev/null 2>&1") then
+			opts.fail(opts.failure)
+			return false
+		end
+		-- There is no service control group to escape on this desktop. setsid
+		-- keeps removal alive when the tray's session leader exits.
+		command = "setsid " .. command .. " </dev/null >/dev/null 2>&1 &"
+	end
+	if not run(command) then
+		opts.fail(opts.failure)
+		return false
+	end
+	opts.quit()
+	return true
+end
+
+return M
