@@ -39,6 +39,14 @@ map/key or object-own-property check appropriate to the value's representation.
 AHK coercion makes numeric-looking strings surprising in boolean comparisons.
 Use explicit string or numeric normalization at configuration boundaries.
 
+### project-ahk-dllcall-wstr-is-a-pointer
+
+`DllCall(..., "WStr", "1", ...)` passes the string's address. For a `WCHAR`
+parameter (VkKeyScanExW) the callee then reads the address's low bits as the
+character: the digit-row probe got -1 on every layout, whose high byte read
+as Shift. Action: pass a character as `"UShort", Ord(Char)` and treat -1 as
+"not on this layout" (`KS_LayoutDigitsAreShifted`).
+
 ### project-ahk-map-delete-raises-on-missing-key
 
 `Map.Delete` is not an idempotent cleanup operation. Check `Has` when absence is
