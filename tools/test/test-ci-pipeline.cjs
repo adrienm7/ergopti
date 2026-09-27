@@ -43,8 +43,8 @@ const BOX = '.github/workflows/ci-box.yml';
 
 // The five Linux install jobs share one matrix; its 17 mandatory rows are
 // pinned by test-linux-ci-evidence.cjs. Keep the loader floor at all 14 jobs.
-const MIN_REAL_JOBS = 14;
-const MIN_REAL_STEPS = 120;
+const MIN_REAL_JOBS = 21;
+const MIN_REAL_STEPS = 180;
 
 const ENTRY_TEXT = [
 	'name: CI',

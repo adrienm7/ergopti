@@ -1,25 +1,11 @@
 # .github/workflows/ci-macos.yml
 #
-# macOS lane of the CI pipeline. ci.yml calls it as its 'macOS' job, after
-# Validate and plan, so the jobs below render as 'macOS / <name>' in the run
-# graph, one lane with one entry job and one exit job:
-#
-#   test-hs (ubuntu) ──> package-macos (macos-latest) ──> launch (matrix)
-#
-# test-hs runs the Hammerspoon suites on Ubuntu first, so a red Lua suite
-# spends no macOS minutes. package-macos then builds and tests the Swift
-# launcher, and builds ErgoptiPlus.app once per run and uploads it as
-# assets-macos. On a release run (validate's plan resolved a free tag) the
-# same job stamps the release version, smokes the archive on macos-latest,
-# signs it and writes the Sparkle appcast. launch then installs that exact
-# archive over realistic user states: the CI profile of
-# tools/diagnostics/macos_launch_gate.py on macos-15, or its release profile on
-# macos-15 and macos-15-intel. The lane declares no outputs; Release collects
-# every assets-* artifact of the run by pattern, and this lane's own result
-# gates it, which is why no job here has a job-level if.
-#
-# No concurrency block: ci.yml's group already covers every called workflow,
-# and reusing that group here with cancel-in-progress would cancel this run.
+# macOS lane: unit tests -> E2E tests -> package -> install and launch -> verdict.
+# Lua unit and stubbed engine E2E tests run on Ubuntu. The Swift launcher tests
+# share the macOS packaging host. The launch matrix installs the exact uploaded
+# archive over the canonical user-state profile on Apple silicon and, for a
+# release, Intel. The verdict checks every expected runner/scenario and commit.
+# Parent ci.yml owns concurrency; this workflow must not cancel its caller.
 
 name: macOS
 
@@ -51,12 +37,12 @@ permissions:
 
 jobs:
   # ─────────────────────────────────────────────────
-  # 1) Hammerspoon unit tests + stubbed virtual-keyboard harness
+  # 1) Hammerspoon unit and contract tests
   # ─────────────────────────────────────────────────
   # The lane's entry job. Its name says "stubbed" because it is the check a
   # reviewer reads: no job of this lane runs the driver in real Hammerspoon.
   test-hs:
-    name: 'Tests (stubbed)'
+    name: 'Unit tests (stubbed)'
     runs-on: ubuntu-latest
 
     steps:
@@ -98,6 +84,18 @@ jobs:
           LUA: lua5.4
         run: node ../../../tools/test/report.cjs --name macos-lua --json "${{ runner.temp }}/macos-lua.json" -- lua5.4 tests/run.lua
 
+  e2e-hs:
+    name: 'E2E tests (stubbed)'
+    needs: test-hs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the E2E interpreter
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lua5.4
+
       # Hammerspoon virtual-keyboard harness (stubbed, NOT real macOS/HS).
       # This step runs on ubuntu-latest against the same in-memory
       # tests/stubs/hs.lua fake that tests/unit uses — no real Hammerspoon
@@ -118,7 +116,7 @@ jobs:
         timeout-minutes: 5
 
   # ─────────────────────────────────────────────────
-  # 2) Swift launcher tests, then the app built once
+  # 3) Swift launcher tests, then the app built once
   # ─────────────────────────────────────────────────
   # Unit suites never start the packaged app, and a pristine runner hides every
   # failure that depends on what a user already has on disk (a symlinked config
@@ -135,7 +133,7 @@ jobs:
   # never in a tree restored from an earlier run.
   package-macos:
     name: 'Package'
-    needs: test-hs
+    needs: e2e-hs
     runs-on: macos-latest
     timeout-minutes: 45
     outputs:
@@ -255,6 +253,7 @@ jobs:
         if: always() && inputs.release
         uses: actions/upload-artifact@v4
         with:
+          overwrite: true
           name: macos-package-startup-${{ github.run_id }}
           path: ${{ runner.temp }}/release-launch
           if-no-files-found: warn
@@ -324,6 +323,7 @@ jobs:
       - name: Upload the package
         uses: actions/upload-artifact@v4
         with:
+          overwrite: true
           name: assets-macos
           retention-days: ${{ inputs.release && 7 || 1 }}
           if-no-files-found: error
@@ -334,14 +334,13 @@ jobs:
             build/macos/appcast-*.xml
 
   # ─────────────────────────────────────────────────
-  # 3) Packaged application launch over real user states
+  # 4) Packaged application launch over real user states
   # ─────────────────────────────────────────────────
   # Launches the archive package-macos uploaded over one user state per leg.
   # See tools/diagnostics/macos_launch_gate.py for the scenarios, the two
-  # profiles and the verdict. The lane's exit job: no job of this file needs
-  # it.
+  # profiles and each scenario verdict. The final aggregate checks completeness.
   launch:
-    name: 'Launch · ${{ matrix.scenario }} · ${{ matrix.runner }}'
+    name: 'Install and launch · ${{ matrix.scenario }} · ${{ matrix.runner }}'
     needs: package-macos
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 12
@@ -392,10 +391,44 @@ jobs:
           python3 tools/diagnostics/macos_launch_gate.py /Applications/ErgoptiPlus.app
           "$RUNNER_TEMP/launch-gate" "${{ matrix.scenario }}" --seed-tag "$SEED_TAG"
 
+      - name: Record mandatory launch evidence
+        env:
+          MATRIX_RUNNER: ${{ matrix.runner }}
+        run: >
+          node tools/test/desktop-ci-evidence.cjs record-macos
+          "$RUNNER_TEMP/launch-gate/result.json"
+          "$RUNNER_TEMP/package/ErgoptiPlus.app.zip"
+          "$RUNNER_TEMP/launch-gate/evidence.json"
+
       - name: Retain launch evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: launch-gate-${{ matrix.runner }}-${{ matrix.scenario }}-${{ github.run_attempt }}
+          name: launch-gate-${{ inputs.release && 'release' || 'ci' }}-${{ matrix.runner }}-${{ matrix.scenario }}
+          overwrite: true
           path: ${{ runner.temp }}/launch-gate
           if-no-files-found: warn
+
+  macos-ok:
+    name: 'Verdict'
+    needs: [test-hs, e2e-hs, package-macos, launch]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+
+      - name: Download launch evidence
+        uses: actions/download-artifact@v4
+        with:
+          pattern: launch-gate-${{ inputs.release && 'release' || 'ci' }}-*
+          path: ${{ runner.temp }}/launch-evidence
+
+      - name: Verify mandatory jobs and launch scenarios
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+          RELEASE: ${{ inputs.release }}
+        run: node tools/test/desktop-ci-evidence.cjs verify macos "$RUNNER_TEMP/launch-evidence"

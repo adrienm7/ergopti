@@ -123,8 +123,8 @@ check(/^\s+runs-on:\s*macos-[A-Za-z0-9._-]+\s*$/m.test(swiftJob),
 check(!/^\s+continue-on-error:\s*true\s*$/m.test(swiftJob),
 	'`package-macos` must be gating, not continue-on-error');
 // Fail fast: a red Hammerspoon suite spends no macOS minutes.
-check(JSON.stringify(pipeline.needsOf(pipeline.job('package-macos'))) === JSON.stringify(['test-hs']),
-	`package-macos must need test-hs alone, got [${pipeline.needsOf(pipeline.job('package-macos')).join(', ')}]`);
+check(JSON.stringify(pipeline.needsOf(pipeline.job('package-macos'))) === JSON.stringify(['e2e-hs']),
+	`package-macos must need e2e-hs alone, got [${pipeline.needsOf(pipeline.job('package-macos')).join(', ')}]`);
 
 // The launcher build and XCTest precede the app build. LauncherLogTests append
 // to the real ~/Library/Logs/ErgoptiPlus/launcher.log, and the release smoke
@@ -265,7 +265,7 @@ const BOX_FILES = {
 	windows: '.github/workflows/ci-windows.yml',
 	linux: '.github/workflows/ci-linux.yml',
 };
-const ALLOWED_JOB_IFS = { 'package-windows': 'inputs.release', 'linux-ok': 'always()' };
+const ALLOWED_JOB_IFS = { 'windows-ok': 'always()', 'macos-ok': 'always()', 'linux-ok': 'always()' };
 for (const rel of Object.values(BOX_FILES)) {
 	for (const boxJob of pipeline.jobs(rel)) {
 		const condition = pipeline.field(boxJob.body, 'if');

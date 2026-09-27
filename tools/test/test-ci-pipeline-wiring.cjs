@@ -7,7 +7,7 @@
  * Pins how ci.yml wires its root, "Validate and plan", into the three OS lanes
  * and Release: the shape of the run graph, the plan's outputs, what each lane
  * caller passes and waits for, which secrets and permissions reach a job, how
- * the root runs its checks before it deepens the clone for the plan, and the
+ * the root validates inputs before it deepens the clone for the plan, and the
  * release preflight that runs before any side effect. It also proves that no
  * job of ci.yml and no step of the pipeline can be switched off, or have its
  * failure swallowed, while the run stays green.
@@ -46,17 +46,16 @@
  * 2. Private secrets reach a lane only on a release run, through one exact
  *    expression; the public Sparkle key is the only allow-listed exception.
  *    Every pipeline file reads contents only; release alone may write.
- * 3. The root runs exactly its four checks on the default shallow checkout,
- *    each with its exact command, so one red check does not hide the others
- *    (N2) and none can be narrowed; no step before them fetches history; then
- *    it deepens the clone with one exact script, which retries a failed fetch
- *    and fails on a clone still shallow, then runs the two plan steps.
+ * 3. The root checks TOML, then deepens its checkout with one exact script,
+ *    which retries a failed fetch and rejects a clone still shallow. The
+ *    parallel core matrix has a separate shallow checkout for its JS gates,
+ *    properties and main-only mutations, pinned by test-desktop-ci-evidence.
  * 4. One root, one lane per OS: ci.yml has exactly one job without needs, the
  *    root; each lane caller needs the root alone; release needs the root and
- *    the three lanes, nothing else; and each OS workflow has exactly one entry
- *    job (no needs) and one exit job (needed by no job of its file).
+ *    core and the three lanes, nothing else. Each OS exposes the same five
+ *    phases with exactly one entry and one final verdict.
  * 5. Only the steps in STEP_CONDITIONS set an `if`, each exactly its own, and
- *    test-linux's harnesses run under !cancelled(). No script swallows a test
+ *    e2e-linux's harnesses run under !cancelled(). No script swallows a test
  *    runner's failure with `|| true`, and every `| tee` runs under pipefail.
  * 6. The release preflight precedes the first step that writes to GitHub, the
  *    release steps keep their order, and both tag probes capture ls-remote
@@ -98,12 +97,9 @@ const MIN_PLAN_OUTPUTS = 7;
 const MIN_GATED_SECRETS = 4;
 
 // The root's checks after its setup, in order, with the one command each runs.
-const VALIDATE_SETUP = 'Install native validation tools';
+const VALIDATE_SETUP = 'Prepare plan validation';
 const VALIDATE_CHECKS = [
 	['Check hotstring TOML files are sorted and formatted', 'python tools/format_toml.py --hotstrings --all --check'],
-	['Property-based tests (fast-check, 27 × 1000 runs)', 'npm run test:properties'],
-	['Mutation tests — domain layer (Stryker, break=25)', 'npm run test:mutation'],
-	['JS validation suite (umbrella — every run-js-suite check)', 'npm run test:js'],
 ];
 // Then the plan: the clone is deepened only after every check, because
 // several test:js gates shell out to git and were written against the default
@@ -150,10 +146,6 @@ const PLAN_STEPS = ['Load the Linux release artifact contract', 'Compute tag and
 // skip a gate while its job stays green.
 const STEP_CONDITIONS = [
 	[ENTRY, 'validate', 'Check hotstring TOML files are sorted and formatted', NOT_CANCELLED],
-	[ENTRY, 'validate', 'Property-based tests (fast-check, 27 × 1000 runs)', NOT_CANCELLED],
-	[ENTRY, 'validate', 'Mutation tests — domain layer (Stryker, break=25)',
-		"${{ !cancelled() && github.ref == 'refs/heads/main' }}"],
-	[ENTRY, 'validate', 'JS validation suite (umbrella — every run-js-suite check)', NOT_CANCELLED],
 	[ENTRY, 'release', 'Create git tag', "steps.preflight.outputs.create_tag == 'true'"],
 	[ENTRY, 'release', 'Create release and upload all assets atomically', "steps.preflight.outputs.create_release == 'true'"],
 	[ENTRY, 'release', 'Publish channel feed for Sparkle', "steps.preflight.outputs.skip_feed != 'true'"],
@@ -165,6 +157,8 @@ const STEP_CONDITIONS = [
 	[MACOS_BOX, 'package-macos', 'Package latest keylayout bundle', 'inputs.release'],
 	[MACOS_BOX, 'launch', 'Retain launch evidence', 'always()'],
 	[WINDOWS_BOX, 'test-ahk', 'Download AutoHotkey v2 runtime', "steps.cache-ahk.outputs.cache-hit != 'true'"],
+	[WINDOWS_BOX, 'e2e-ahk', 'Download E2E runtime', "steps.cache-ahk.outputs.cache-hit != 'true'"],
+	[WINDOWS_BOX, 'package-windows', 'Sign and verify ErgoptiPlus.exe', 'inputs.release'],
 	[WINDOWS_BOX, 'test-ahk', 'Annotate AHK results', 'always()'],
 	[WINDOWS_BOX, 'test-ahk', 'Publish AHK execution manifest', 'always()'],
 	[LINUX_BOX, 'install-linux', "Prepare the container", "matrix.kind == 'install'"],
@@ -200,7 +194,7 @@ const STEP_CONDITIONS = [
 ];
 // test-linux runs each harness under !cancelled(), so a red one hides no other;
 // tools/test/test-linux-ci-evidence.cjs pins which of its steps those are.
-const HARNESS_JOB = 'test-linux';
+const HARNESS_JOB = 'e2e-linux';
 
 // A command whose exit status is a gate: a test runner, a verdict script, a
 // package build, an install or a launch. `|| true` after one turns its failure
@@ -433,8 +427,8 @@ for (const [what, from, to] of [
 		'    steps:\n      # A depth-1 clone without tags, which the checks below expect.\n      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 0\n'],
 	['a history fetch between the checkout and the setup', '      - uses: actions/checkout@v4\n\n      - uses: actions/setup-python@v5\n',
 		'      - uses: actions/checkout@v4\n\n      - name: Fetch all history\n        run: git fetch --depth=2147483647 --tags origin\n\n      - uses: actions/setup-python@v5\n'],
-	['a history fetch inside the setup step', '          sudo apt-get install -y lua5.4 libxml2-utils\n',
-		'          sudo apt-get install -y lua5.4 libxml2-utils\n          git pull --unshallow\n'],
+	['a history fetch inside the setup step', '      - name: Prepare plan validation\n',
+		'      - name: Fetch history\n        run: git pull --unshallow\n\n      - name: Prepare plan validation\n'],
 	['the deepening fetch without --unshallow', '        unshallow=(--unshallow)\n', '        unshallow=()\n'],
 	['the deepening fetch without --tags', ' --prune "${unshallow[@]}" --tags origin; then\n', ' --prune "${unshallow[@]}" origin; then\n'],
 	['the deepening fetch tried once', '          for attempt in 1 2 3; do\n', '          for attempt in 1; do\n'],
@@ -443,7 +437,6 @@ for (const [what, from, to] of [
 	['the completeness check dropped', '          if [ "$(git rev-parse --is-shallow-repository)" != false ]; then\n',
 		'          if false; then\n'],
 	['the deepening step dropped', DEEPEN_TEXT, ''],
-	['a narrowed test:js', '        run: npm run test:js\n', '        run: npm run test:js -- --only lint\n'],
 ]) {
 	mustCatch(what, ENTRY, from, to, rootProblems);
 }
@@ -581,7 +574,7 @@ function graphProblems(files) {
 	}
 	const release = topLevel.find((candidate) => candidate.id === 'release');
 	const releaseNeeds = release ? [...pipeline.needsOf(release.body)].sort() : [];
-	const expectedRelease = [ROOT, ...lanes.map((lane) => lane.id)].sort();
+	const expectedRelease = [ROOT, 'core', ...lanes.map((lane) => lane.id)].sort();
 	if (JSON.stringify(releaseNeeds) !== JSON.stringify(expectedRelease)) {
 		problems.push(`release must need exactly the root and the three lanes, [${expectedRelease.join(', ')}]; got [${releaseNeeds.join(', ')}]`);
 	}
@@ -592,6 +585,24 @@ function graphProblems(files) {
 			continue;
 		}
 		const jobs = pipeline.jobsOfText(entry.text, rel);
+		const sequence = {
+			[MACOS_BOX]: ['test-hs', 'e2e-hs', 'package-macos', 'launch', 'macos-ok'],
+			[WINDOWS_BOX]: ['test-ahk', 'e2e-ahk', 'package-windows', 'launch-windows', 'windows-ok'],
+			[LINUX_BOX]: ['test-linux', 'e2e-linux', 'package-linux', 'install-linux', 'linux-ok'],
+		}[rel];
+		if (JSON.stringify(jobs.map((job) => job.id)) !== JSON.stringify(sequence)) {
+			problems.push(`${rel} must expose unit tests, E2E, package, installed launch and verdict in order`);
+		}
+		for (const [index, id] of sequence.entries()) {
+			const job = jobs.find((candidate) => candidate.id === id);
+			const expected = index === 0 ? [] : index === 4 ? sequence.slice(0, 4) : [sequence[index - 1]];
+			if (!job || JSON.stringify(pipeline.needsOf(job.body)) !== JSON.stringify(expected)) {
+				problems.push(`${rel} ${id} must need exactly ${expected.join(', ')}`);
+			}
+			if (job && pipeline.field(job.body, 'if') !== (index === 4 ? 'always()' : null)) {
+				problems.push(`${rel} ${id} must run on every profile; only the verdict uses always()`);
+			}
+		}
 		const needsOfJob = new Map(jobs.map((candidate) => [candidate.id, pipeline.needsOf(candidate.body)]));
 		const entries = jobs.filter((candidate) => needsOfJob.get(candidate.id).length === 0).map((candidate) => candidate.id);
 		const needed = new Set([...needsOfJob.values()].flat());
@@ -618,14 +629,14 @@ for (const [what, rel, from, to] of [
 	['a caller that no longer needs the root', ENTRY, "    name: 'Linux'\n    needs: [validate]\n", "    name: 'Linux'\n"],
 	['a caller that also needs another lane', ENTRY, "    name: 'Windows'\n    needs: [validate]\n",
 		"    name: 'Windows'\n    needs: [validate, macos]\n"],
-	['release that no longer waits for a lane', ENTRY, '    needs: [validate, macos, windows, linux]\n',
+	['release that no longer waits for a lane', ENTRY, '    needs: [validate, core, macos, windows, linux]\n',
 		'    needs: [validate, macos, windows]\n'],
-	['release that stops reading the plan from the root', ENTRY, '    needs: [validate, macos, windows, linux]\n',
+	['release that stops reading the plan from the root', ENTRY, '    needs: [validate, core, macos, windows, linux]\n',
 		'    needs: [macos, windows, linux]\n'],
 	['a second entry in the macOS lane', MACOS_BOX, '    needs: test-hs\n', ''],
 	['a second entry in the Linux lane', LINUX_BOX,
-		"    name: 'Install and run · ${{ matrix.label }}'\n    runs-on: ubuntu-latest\n    needs: [package-linux]\n",
-		"    name: 'Install and run · ${{ matrix.label }}'\n    runs-on: ubuntu-latest\n"],
+		"    name: 'Install and launch · ${{ matrix.label }}'\n    runs-on: ubuntu-latest\n    needs: [package-linux]\n",
+		"    name: 'Install and launch · ${{ matrix.label }}'\n    runs-on: ubuntu-latest\n"],
 	['a second entry in the Windows lane', WINDOWS_BOX, '    needs: [test-ahk]\n', ''],
 	['a second exit in the macOS lane', MACOS_BOX, '    needs: package-macos\n', '    needs: test-hs\n'],
 	['a second exit in the Linux lane', LINUX_BOX, '      - install-linux\n    if: always()\n', '    if: always()\n'],
@@ -735,9 +746,9 @@ for (const [what, rel, from, to] of [
 // ============================================
 // ============================================
 
-// Every gate of test-ahk, which runs on every run. package-windows runs on a
-// release only, so a gate moved there stops running on pull requests and dev.
-// Each must keep the failing exit of its failure branch.
+// Unit/native gates belong to test-ahk and the engine harness to e2e-ahk.
+// Both run on every profile, before packaging in a fresh workspace. Each
+// must keep the failing exit of its failure branch.
 const WINDOWS_GATES = [
 	{ name: 'Install the shipped Kana layout for real probes', run: './tools/test/install-ci-kana-layout.ps1' },
 	{ name: 'Build and test native navigation event owner', run: './tools/build/build_windows_nav_owner.ps1' },
@@ -760,6 +771,7 @@ const WINDOWS_GATES = [
 	},
 	{
 		name: 'Run E2E suite (Strategy A — pure engine injection)',
+		job: 'e2e-ahk',
 		uses: ['tests\\e2e\\run_e2e.ahk'],
 		exits: [['if ($exit -ne 0) {', '$exit']],
 	},
@@ -770,7 +782,7 @@ if (testAhkAt !== null && testAhkAt.file !== WINDOWS_BOX) {
 	errors.push(`test-ahk must be a job of ${WINDOWS_BOX}, found in ${testAhkAt.file}`);
 }
 for (const gate of WINDOWS_GATES) {
-	const found = testAhkAt && attempt(() => pipeline.step(testAhkAt.body, gate.name));
+	const found = attempt(() => pipeline.step(pipeline.job(gate.job ?? 'test-ahk'), gate.name));
 	if (!found) {
 		errors.push(`"${gate.name}" must run in job test-ahk of ${WINDOWS_BOX}, which runs on every run`);
 		continue;
@@ -871,8 +883,6 @@ for (const [what, rel, from, to] of [
 	['if: false on the Linux evidence verdict', LINUX_BOX,
 		'      - name: Assert all mandatory subjects ran and passed\n',
 		'      - name: Assert all mandatory subjects ran and passed\n        if: false\n'],
-	['a Stryker ref that never matches', ENTRY,
-		"github.ref == 'refs/heads/main' }}\n", "github.ref == 'refs/heads/never' }}\n"],
 	['`|| true` after the Hammerspoon harness', MACOS_BOX,
 		'run: lua5.4 tests/e2e/run_e2e.lua\n', 'run: lua5.4 tests/e2e/run_e2e.lua || true\n'],
 	['`|| true` after the Linux unit suite', LINUX_BOX,
@@ -979,7 +989,8 @@ function namingProblems(files) {
 			const name = (pipeline.field(candidate.body, 'name') ?? '').replace(/^(['"])(.*)\1$/, '$2');
 			const caller = pipeline.field(candidate.body, 'uses') !== null;
 			const valid = entry.rel === ENTRY
-				? (caller ? ['macOS', 'Windows', 'Linux'].includes(name) : /^(Validate|Release) \/ [A-Z][^/]+$/.test(name))
+				? (caller ? ['macOS', 'Windows', 'Linux'].includes(name)
+					: name === 'Core / ${{ matrix.suite }}' || /^(Validate|Release) \/ [A-Z][^/]+$/.test(name))
 				: /^[A-Z]/.test(name) && !name.includes(' / ');
 			if (!valid) problems.push(`${entry.rel} job ${candidate.id} has an invalid display name: ${name}`);
 			for (const found of pipeline.steps(candidate.body)) {
@@ -998,7 +1009,7 @@ function namingProblems(files) {
 errors.push(...namingProblems(pipeline.files()));
 for (const [what, rel, from, to] of [
 	['an unqualified root name', ENTRY, "name: 'Validate / Checks and plan'", "name: 'Validate'"],
-	['a lowercase lane job', WINDOWS_BOX, "name: 'Tests'", "name: 'tests'"],
+	['a lowercase lane job', WINDOWS_BOX, "name: 'Unit tests'", "name: 'unit tests'"],
 	['a repeated lane prefix', MACOS_BOX, "name: 'Package'", "name: 'macOS / Package'"],
 	['a lowercase step', WINDOWS_BOX, 'name: Run AHK test suite', 'name: run AHK test suite'],
 	['an extra root separator', ENTRY, "name: 'Validate / Checks and plan'", "name: 'Validate / Checks / Plan'"],

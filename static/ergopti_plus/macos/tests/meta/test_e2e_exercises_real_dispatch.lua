@@ -27,7 +27,7 @@
 --- this is a stubbed virtual-keyboard replay and not real macOS/Hammerspoon
 --- coverage.
 ---
---- The harness is now the last step of the `test-hs` job in
+--- The harness runs in the separate `e2e-hs` job after unit tests in
 --- .github/workflows/ci-macos.yml, which ci.yml calls as its 'macOS' box, so
 --- its check reads 'macOS / <job name>'. This test is a source-invariant check
 --- on that file: the step that runs the harness and the job that owns it must
@@ -126,8 +126,8 @@ helpers.describe("F-HIGH-30: the macOS virtual-keyboard CI job no longer overcla
 
 	helpers.it("the harness step and its job flag themselves as stubbed / not real Hammerspoon", function()
 		local harness = locate_harness(read_repo_file(MACOS_BOX))
-		helpers.assert_true(harness.job_id == "test-hs",
-			"the stubbed harness must run in the Hammerspoon unit job test-hs (got: " .. harness.job_id .. ")")
+		helpers.assert_true(harness.job_id == "e2e-hs",
+			"the stubbed harness must run in the Hammerspoon E2E job e2e-hs (got: " .. harness.job_id .. ")")
 		helpers.assert_true(flags_stub(harness.step_name),
 			"the harness step name must flag that it is a stubbed harness, not real Hammerspoon coverage " ..
 			"(got: '" .. harness.step_name .. "')")
