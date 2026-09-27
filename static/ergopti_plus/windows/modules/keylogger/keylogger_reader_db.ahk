@@ -42,6 +42,11 @@ class KLReadConst {
 		; events remain the durable source of truth, while this cap keeps a large
 		; multi-month history from creating one enormous AHK Map / SQL string.
 		static REPLAY_FLUSH_ENTRIES := 500
+		; Page cache bound, in KiB, of a projection worker's private database
+		; (KLR_OpenCandidate). The candidate is the whole reader image, 650 MB on
+		; an 815 MB store; held in ":memory:" it made the worker use about 1 GB.
+		; On a bounded private disk database only this much of it is resident.
+		static WORKER_PAGE_CACHE_KIB := 65536
 }
 
 
@@ -127,6 +132,29 @@ KLR_ResetCache() {
 		KLRCache.saved_at := ""
 }
 
+; Opens the private database a projection builds or refreshes before it
+; publishes it. A disposable worker writes a whole reader image into it (a cold
+; build, a refresh of a file-backed image, an upgraded image), so it gets
+; SQLite's private on-disk database with a bounded page cache: in ":memory:"
+; the image was the worker's memory, 280 MB for a 234 MB image built from a
+; 20 MB ledger (measured), about 1 GB on the store the cache was built against.
+; The resident driver keeps its image in memory; its live walker drains into it
+; every tick. TEMP tables, where clear typing payloads live, stay in memory
+; either way (KLR_EnsureTypingProjectionTable sets temp_store=MEMORY).
+; @returns {Integer} The open handle, or 0.
+KLR_OpenCandidate() {
+		if KLRCache.disposable
+				return SQLite_OpenPrivateDisk(KLReadConst.WORKER_PAGE_CACHE_KIB)
+		return SQLite_Open(":memory:")
+}
+
+; Clones Source into a private candidate opened by KLR_OpenCandidate.
+; @param Source {Integer} Open handle of the published image.
+; @returns {Integer} The candidate handle, or 0.
+KLR_CloneCandidate(Source) {
+		return SQLite_CloneInto(Source, KLR_OpenCandidate)
+}
+
 ; Append a single diagnostic line to prefetch.log, but only when the logger
 ; is at DEBUG level. KLR_BuildDatabase runs on every ingest tick (every ~5 s
 ; while a dashboard is open) — sometimes on the keystroke-servicing thread —
@@ -159,7 +187,7 @@ KLR_BuildDatabase(metrics_dir) {
 				try LoggerError("KLReader", "Metrics DB build failed — SQLite module initialization failed ({1}). Dashboard shows no data.", err.Message)
 				return 0
 		}
-		KLR_PrefetchDebug(logPath, "KLR opening :memory:")
+		KLR_PrefetchDebug(logPath, "KLR opening its database (worker=" . KLRCache.disposable . ")")
 		; Each projection runs in its own disposable worker, so without this the
 		; cache is always empty and every dashboard open pays a full rebuild of
 		; the entire history. Restoring the previous worker's image turns that
@@ -227,7 +255,7 @@ KLR_BuildDatabase(metrics_dir) {
 				} else {
 						clone_tick := HotPath_Now()
 						try {
-								candidate := SQLite_CloneMemory(KLRCache.db)
+								candidate := KLR_CloneCandidate(KLRCache.db)
 						} finally {
 								HotPath_LogIfSlow("KLR.CandidateClone", clone_tick,
 										update["tails"].Count . " ledger tail(s)")
@@ -429,10 +457,10 @@ KLR_BuildColdCandidate(md, logPath) {
 				try LoggerError("KLReader", "Metrics ledger discovery failed: {1}", Failure.Message)
 				return Map("ok", false, "db", 0, "sizes", Map())
 		}
-		db := SQLite_Open(":memory:")
+		db := KLR_OpenCandidate()
 		KLR_PrefetchDebug(logPath, "KLR open returned db=" . db)
 		if !db {
-				try LoggerError("KLReader", "Metrics DB build failed — SQLite :memory: open returned null. Dashboard shows no data.")
+				try LoggerError("KLReader", "Metrics DB build failed — SQLite could not open the private candidate database. Dashboard shows no data.")
 				return Map("ok", false, "db", 0, "sizes", Map())
 		}
 		KLR_PrefetchDebug(logPath, "KLR loading schema...")

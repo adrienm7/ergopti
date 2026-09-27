@@ -311,11 +311,47 @@ SQLite_BackupInto(dest_db, source_db, before_call := 0) {
 		}
 }
 
+; Opens SQLite's private, temporary on-disk database (an empty file name). Its
+; pages live in a temporary file SQLite opens delete-on-close, so the file goes
+; with the handle even when the process is killed, and only CacheKiB of them
+; stay in memory: a candidate of hundreds of megabytes costs a bounded page
+; cache instead of its whole size in RAM, as ":memory:" does (measured: 150 MB
+; of rows held 16.7 MB with a 16 MB bound, 157 MB in memory). TEMP tables are
+; not moved: under temp_store=MEMORY they and the sorters stay in memory.
+; @param CacheKiB {Integer} Page cache bound, in KiB.
+; @returns {Integer} The open handle, or 0 when it cannot be opened or bounded.
+SQLite_OpenPrivateDisk(CacheKiB) {
+		if !(CacheKiB is Integer) || CacheKiB <= 0
+				throw ValueError("A private disk database needs a positive page cache bound in KiB.")
+		db := SQLite_Open("")
+		if !db
+				return 0
+		if !SQLite_Exec(db, "PRAGMA cache_size=-" . CacheKiB . ";") {
+				SQLite_Close(db)
+				return 0
+		}
+		return db
+}
+
 ; Clone a live in-memory database into a private candidate.  Callers may mutate
 ; the candidate freely and publish it only after every input has validated;
 ; sqlite3_backup copies the complete schema/data image without serialising it
 ; through SQL text or exposing a half-applied update to readers.
 SQLite_CloneMemory(source_db, before_call := 0, close_fn := 0) {
+		return SQLite_CloneInto(source_db, _SQLite_OpenMemory, before_call, close_fn)
+}
+
+_SQLite_OpenMemory() {
+		return SQLite_Open(":memory:")
+}
+
+; Clone a database into a private candidate that OpenFn opens: memory
+; (SQLite_CloneMemory) or a bounded private disk database
+; (SQLite_OpenPrivateDisk). Same ownership contract as SQLite_CloneMemory.
+; @param source_db {Integer} Open source handle.
+; @param OpenFn {Func} Opens the empty candidate and returns its handle, or 0.
+; @returns {Integer} The candidate handle, or 0.
+SQLite_CloneInto(source_db, OpenFn, before_call := 0, close_fn := 0) {
 		if !source_db
 				return 0
 
@@ -326,7 +362,7 @@ SQLite_CloneMemory(source_db, before_call := 0, close_fn := 0) {
 		candidate := 0
 		clone_succeeded := false
 		try {
-				candidate := SQLite_Open(":memory:")
+				candidate := OpenFn.Call()
 				if !candidate
 						return 0
 				if !SQLite_BackupInto(candidate, source_db, before_call)
@@ -334,7 +370,7 @@ SQLite_CloneMemory(source_db, before_call := 0, close_fn := 0) {
 				clone_succeeded := true
 				return candidate
 		} catch as err {
-				try LoggerError("sqlite3", "In-memory database clone failed: {1}", err.Message)
+				try LoggerError("sqlite3", "Private database clone failed: {1}", err.Message)
 				return 0
 		} finally {
 				; SQLite_BackupInto owns and finishes the backup object on every path,
@@ -346,7 +382,7 @@ SQLite_CloneMemory(source_db, before_call := 0, close_fn := 0) {
 								else
 										SQLite_Close(candidate)
 						} catch as cleanup_err {
-								try LoggerError("sqlite3", "In-memory database clone could not close its failed candidate: {1}", cleanup_err.Message)
+								try LoggerError("sqlite3", "Private database clone could not close its failed candidate: {1}", cleanup_err.Message)
 						}
 				}
 		}
