@@ -127,6 +127,13 @@ local LAYER_ACTIVE_VAR_NAME    = "layer_active"
 local LAYER_ACTIVE_ON_VALUE    = 1
 local LAYER_NAV_SENTINEL_NAME  = Keycodes.to_name(Keycodes.F20_LAYER_NAV_ENTERED)
 
+-- The tap-hold keys the navigation layer swallows while another key holds it,
+-- by key id, with the tap that makes them so (their hold being the layer):
+-- left Command tapping Backspace, the twin of Windows' LAlt (nav_layer.ahk,
+-- "Fix when LAlt triggers the layer") and Linux's. Passed through, it is a
+-- Command under every chord of the layer (J gives Cmd+Left).
+local SWALLOWED_ON_LAYER = { left_command = { tap = "backspace" } }
+
 -- Append-only log file consumed by modules/keylogger/kc_bridge.lua.
 -- Each line written by the shell_command is: "<physical_key_code_name>\n"
 -- so Hammerspoon can map the name back to a numeric kc and record true
@@ -767,9 +774,11 @@ end
 --- variable and re-emits the original key — keys used purely as combo triggers
 --- still get physical-press tracking without any user-visible behaviour change.
 ---
---- The rule holds exactly one manipulator. Karabiner runs the first manipulator
---- that matches, so a second one gated on another held key would take every
---- press made under that key and drop the tap, a one-shot included.
+--- The rule holds one manipulator. Karabiner runs the first manipulator that
+--- matches, so a second one gated on another held key would take every press
+--- made under that key and drop the tap, a one-shot included. The one exception
+--- is the navigation layer's swallower (SWALLOWED_ON_LAYER), gated on the layer
+--- that the tap-hold manipulator's own condition excludes.
 --- @param key_def table Entry from TAP_HOLD_KEYS.
 --- @param tap_action table Resolved action definition for the tap slot.
 --- @param hold_action table Resolved action definition for the hold slot.
@@ -834,6 +843,35 @@ local function build_tap_hold_rule(key_def, tap_action, hold_action, tap_timeout
 	end
 	manipulator.to = to_events
 
+	-- A key whose hold is the navigation layer stands down while the layer is
+	-- on, as every driver's does: pressed while another key holds the layer,
+	-- the layer's own mapping takes it (layer_keys.json runs before this rule),
+	-- the swallower below takes a key in SWALLOWED_ON_LAYER, and any other key
+	-- matches no rule, so macOS types it and repeats it. Matching here held the
+	-- layer a second time, typed the tap only on a quick release, and its
+	-- release switched the layer off under the key still holding it.
+	local swallower
+	if activates_nav_layer(hold_to) then
+		manipulator.conditions = {
+			{ type = "variable_unless", name = LAYER_ACTIVE_VAR_NAME, value = LAYER_ACTIVE_ON_VALUE },
+		}
+		local swallowed = SWALLOWED_ON_LAYER[key_def.id]
+		if swallowed and tap_action.id == swallowed.tap then
+			-- Only the physical press is recorded, for the heatmap: nothing is
+			-- held, typed or tracked as held, and Karabiner routes the release to
+			-- this manipulator too.
+			swallower = {
+				type            = "basic",
+				from            = deep_copy(key_def.from),
+				conditions      = {
+					{ type = "variable_if", name = LAYER_ACTIVE_VAR_NAME, value = LAYER_ACTIVE_ON_VALUE },
+				},
+				to              = { physical_kc_ledger_event(key_code, false) },
+				to_after_key_up = { physical_kc_ledger_event(key_code, true) },
+			}
+		end
+	end
+
 	-- Per-key tap/hold threshold override. Karabiner honours
 	-- basic.to_if_alone_timeout_milliseconds at the manipulator level, overriding
 	-- the complex_modifications global. nil/0 inherits the single global value, so
@@ -854,6 +892,7 @@ local function build_tap_hold_rule(key_def, tap_action, hold_action, tap_timeout
 	if has_exact_modifier_action(tap_action, hold_action) then
 		manipulators = exact_modifier_manipulators(manipulator)
 	end
+	if swallower then table.insert(manipulators, 1, swallower) end
 
 	return {
 		description  = string.format(
