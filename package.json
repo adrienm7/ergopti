@@ -232,6 +232,7 @@
 		"test:opensuse-ci-origin": "node ./tools/test/test-opensuse-ci-origin.cjs",
 		"test:release-packaging-workflow": "node ./tools/test/test-release-packaging-workflow.cjs",
 		"test:ci-pipeline": "node ./tools/test/test-ci-pipeline.cjs",
+		"test:ci-kana-install": "node ./tools/test/test-ci-kana-install.cjs",
 		"test:ci-pipeline-wiring": "node ./tools/test/test-ci-pipeline-wiring.cjs",
 		"test:ci-release-reruns": "node ./tools/test/test-ci-release-reruns.cjs",
 		"test:linux-launcher-deps": "node ./tools/test/test-linux-launcher-deps.cjs",

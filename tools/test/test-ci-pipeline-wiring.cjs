@@ -709,6 +709,7 @@ for (const [what, rel, from, to] of [
 // release only, so a gate moved there stops running on pull requests and dev.
 // Each must keep the failing exit of its failure branch.
 const WINDOWS_GATES = [
+	{ name: 'Install the shipped Kana layout for real probes', run: './tools/test/install-ci-kana-layout.ps1' },
 	{ name: 'Build and test native navigation event owner', run: './tools/build/build_windows_nav_owner.ps1' },
 	{ name: 'Manifest parity (AHK ↔ HS codegen equivalence)', run: 'npm run test:manifest-parity' },
 	{ name: 'Verify AHK source encoding (UTF-8 BOM + LF)', exits: [['if ($failures.Count -gt 0) {', '1']] },
