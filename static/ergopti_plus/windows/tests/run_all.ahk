@@ -895,6 +895,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_lshift_lctrl_rshift_bounded_keywait.ahk
 #Include meta/test_layout_poll_blacklist_guard.ahk
 #Include meta/test_layout_quiescence.ahk
+#Include meta/test_layer_key_under_another_holder.ahk
 #Include unit/test_foreground_keyboard_layout.ahk
 #Include meta/test_hse_register_atomic.ahk
 #Include meta/test_hse_rebuild_guard.ahk
