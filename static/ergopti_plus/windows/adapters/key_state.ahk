@@ -258,16 +258,18 @@ KS_LayoutHasAltGrLevel(Hkl) {
 	return false
 }
 
-; The boot probe that decided the AltGr family (HotstringEngineInit): the
-; KS_ProbeAltGrLayout result plus "source" ("probe", "override" when the TOML
-; flag decided, "unresolved" when no layout could be read). Seeded here as
-; unresolved; HotstringEngineInit replaces it before the first hotstring fires.
+; The probe record that decides the AltGr family now (infra/altgr_family.ahk):
+; the KS_ProbeAltGrLayout result of the current layout plus "source" ("probe",
+; "override" when the TOML flag decided, "unresolved" when no layout could be
+; read). Seeded here as unresolved; HotstringEngineInit replaces it before the
+; first hotstring fires, and it then follows the foreground window's layout
+; (AltGrFamilyFollow). Every reader below reads it on each call, never a copy.
 global _ALTGR_LAYOUT_PROBE := Map("hkl", 0, "rmenu_sc", 0, "altgr_vk", 0,
 	"valid", false, "kana", false, "altgr_level", false, "source", "unresolved")
 
 ; Whether every AltGr press reaches the hook as the layout's fake LCtrl (scan
 ; code 0x21D, read as SC01D and recorded as physical) then RAlt: a standard
-; AltGr layout, where the boot probe found an AltGr level (AZERTY, bépo). On
+; AltGr layout, where the layout probe found an AltGr level (AZERTY, bépo). On
 ; QWERTY right Alt is a plain Alt and adds no LCtrl; a Kana-style AltGr is
 ; SC138 on another virtual key and adds none either. Read by parse-time #HotIf
 ; criteria, which are live before this file's globals are assigned.
@@ -278,7 +280,7 @@ KS_AltGrAddsFakeLCtrl() {
 }
 
 ; Whether the layout's AltGr key is an AltGr: a Kana-style AltGr, or right Alt
-; on a layout where the boot probe found an AltGr level. On QWERTY right Alt is
+; on a layout where the layout probe found an AltGr level. On QWERTY right Alt is
 ; a plain Alt. Read by #HotIf criteria, live before this file's globals are
 ; assigned.
 ; @return {Boolean}
@@ -289,7 +291,7 @@ KS_LayoutHasAltGr() {
 
 ; AHK key name that presses the active layout's AltGr. Standard AltGr layouts
 ; put AltGr on VK_RMENU, so "RAlt" is AltGr there. Kana-style remaps
-; (_ALTGR_KANA_FIXUP, resolved at boot) move AltGr to another virtual key and
+; (_ALTGR_KANA_FIXUP, following the foreground layout) move AltGr to another virtual key and
 ; leave VK_RMENU without a scan code: a synthetic RAlt is then a plain Alt that
 ; opens a window's menu bar on release and types nothing on a chord, while the
 ; physical scan code SC138 still is the layout's AltGr.
@@ -307,10 +309,10 @@ KS_AltGrKeyName() {
 ; key for that scan code (VK_OEM_8 on the Ergopti layout), which is no
 ; modifier. At the end of a SendInput it then pressed the right Alt it believed
 ; missing, a plain Alt on that layout, and left it down: Alt chords instead of
-; AltGr characters, and a stuck Alt after the hold. The virtual key the boot
+; AltGr characters, and a stuck Alt after the hold. The virtual key the layout
 ; probe read for the AltGr scan code ("vkDF") injects the same key without that
 ; bookkeeping. On a layout where right Alt is AltGr, "RAlt" is correct as is.
-; @return {String} "vkXX" on a Kana-style layout, "" when the boot probe found
+; @return {String} "vkXX" on a Kana-style layout, "" when the layout probe found
 ;         no virtual key for it (a Send must then refuse), otherwise "RAlt".
 KS_AltGrSendKey() {
 	global _ALTGR_KANA_FIXUP, _ALTGR_LAYOUT_PROBE

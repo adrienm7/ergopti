@@ -73,12 +73,13 @@ global ACTIVATE_HOTSTRINGS_DELAY_MS := 50
 global _HotstringRegistrar := 0
 global _SendHook := 0
 
-; Boot-time resolution of whether AltGr needs the synthetic Up injection in
-; HotstringHandler — auto-detected via a reverse VK→SC probe
-; (KS_ProbeAltGrLayout), with a manual TOML override
-; (ScriptInformation["AltGrIsKanaRemap"]) that always wins.
-; Caching the resolved bool at boot lets the hot path skip a Map lookup and
-; a truthy test on every hotstring firing.
+; Whether AltGr needs the synthetic Up injection in HotstringHandler is the
+; AltGr family (infra/altgr_family.ahk) — auto-detected via a reverse VK→SC
+; probe (KS_ProbeAltGrLayout), with a manual TOML override
+; (ScriptInformation["AltGrIsKanaRemap"]) that always wins — decided at boot
+; and then following the foreground window's layout.
+; Keeping the resolved bool in a global lets the hot path skip a Map lookup
+; and a truthy test on every hotstring firing.
 ; The `global _ALTGR_KANA_FIXUP := False` initializer deliberately does NOT live
 ; here: a parse-time #HotIf (platform/remap/altgr.ahk) reads it in FIRST
 ; position, and this file's include position is far below the first message pump,
@@ -154,40 +155,25 @@ _ReadKanaTomlOverride() {
 		return ""  ; "auto" or unrecognised → defer to detection
 }
 
-; Decide the AltGr family once, from one layout read and one probe, and keep
-; the record of what decided it in _ALTGR_LAYOUT_PROBE. The AltGrDetect log
-; line, the magic-key scan, the layout poll's baseline and the Kana AltGr's
-; send name all read that record: each used to read the layout again, so a
-; layout switch during the seconds of boot left the family decided on one
-; layout while the poll's baseline already held the next one, and the poll
-; never reloaded for it. The TOML override still decides the family, but the
-; layout is read and probed all the same for the record. When no layout can be
-; read at all, nothing is probed (HKL 0 would probe another loaded layout), and
-; a layout that knows no AltGr key either way is not taken for a Kana one: the
-; family stays the standard one, recorded as "unresolved" for the boot log.
+; Decide the boot AltGr family from one layout read and one probe, and keep the
+; record of what decided it in _ALTGR_LAYOUT_PROBE (infra/altgr_family.ahk).
+; The AltGrDetect log line, the magic-key scan, the layout poll's baseline and
+; the Kana AltGr's send name all read that record: each used to read the layout
+; again, so a layout switch during the seconds of boot left the family decided
+; on one layout while the poll's baseline already held the next one. The TOML
+; override still decides the family, but the layout is read and probed all the
+; same for the record. When no layout can be read at all, nothing is probed
+; (HKL 0 would probe another loaded layout), and a layout that knows no AltGr
+; key either way is not taken for a Kana one: the family stays the standard
+; one, recorded as "unresolved" for the boot log. After boot the family follows
+; the foreground window's layout without a reload (AltGrFamilyFollow).
 ; @param ResolveFn {Func} Test seam, KS_ResolveKeyboardLayout by default.
 ; @param ProbeFn {Func} Test seam, KS_ProbeAltGrLayout by default.
 HotstringEngineInit(ResolveFn := 0, ProbeFn := 0) {
-		global _ALTGR_KANA_FIXUP, _ALTGR_LAYOUT_PROBE
 		if !IsObject(ResolveFn)
 				ResolveFn := KS_ResolveKeyboardLayout
-		if !IsObject(ProbeFn)
-				ProbeFn := KS_ProbeAltGrLayout
-		Hkl := ResolveFn.Call()
-		if (Hkl != 0) {
-				Probe := ProbeFn.Call(Hkl)
-				Probe["source"] := Probe["valid"] ? "probe" : "unresolved"
-		} else {
-				Probe := Map("hkl", 0, "rmenu_sc", 0, "altgr_vk", 0,
-						"valid", false, "kana", false, "altgr_level", false, "source", "unresolved")
-		}
-		Override := _ReadKanaTomlOverride()
-		if (Override != "") {
-				Probe["kana"] := (Override == "true")
-				Probe["source"] := "override"
-		}
-		_ALTGR_LAYOUT_PROBE := Probe
-		_ALTGR_KANA_FIXUP := Probe["kana"]
+		AltGrFamilyResetProbes(ProbeFn)
+		AltGrFamilyPublish(AltGrFamilyDecide(ResolveFn.Call()))
 }
 
 

@@ -89,8 +89,20 @@ _ACSD_EveryAltGrGateAppliesIt() {
 	AssertTrue(Gate > 0 and Gate < InStr(Body, 'GetKeyState("RAlt", "P")'),
 		"IsRealAltGrPress must stand down for a non-AltGr hold before its standard-layout physical check")
 	Script := _DriverFuncBody("_RegisterScriptAltGrHotkeys")
-	AssertTrue(InStr(Script, 'GetKeyState("SC138", "P") and AltGrKeyIsAltGr()') > 0,
-		"the Kana suffix-only script chords must stand down with the combinations")
+	AssertTrue(InStr(Script, 'ScriptAltGrKanaChordIsLive(GetKeyState("SC138", "P"))') > 0,
+		"the Kana suffix-only script chords must be gated by their criterion")
+	global TapHold
+	Saved := { TapHold: TapHold, Family: _TestSetAltGrFamily(true) }
+	try {
+		TapHold := Map("keys", Map("alt_gr", _ACSD_Row("ctrl")), "layers", Map())
+		AssertFalse(ScriptAltGrKanaChordIsLive(true),
+			"the Kana suffix-only script chords must stand down with the combinations")
+		TapHold := Map("keys", Map("alt_gr", _ACSD_Row("alt_gr")), "layers", Map())
+		AssertTrue(ScriptAltGrKanaChordIsLive(true), "AltGr held as AltGr keeps the Kana script chords")
+	} finally {
+		TapHold := Saved.TapHold
+		_TestRestoreAltGrFamily(Saved.Family)
+	}
 }
 Test("altgr combos: every AltGr gate applies the rule (kana-altgr-hold-other-2026-09-26)",
 	_ACSD_EveryAltGrGateAppliesIt)

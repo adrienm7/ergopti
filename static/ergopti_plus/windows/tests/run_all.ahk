@@ -136,6 +136,7 @@ OnError(_FatalErrorHandler)
 #Include ../infra/text_utils.ahk
 #Include ../infra/nav_layer_helpers.ahk
 #Include ../infra/hotstrings/hotstring_engine.ahk
+#Include ../infra/altgr_family.ahk
 #Include ../infra/hotstrings/hotstring_engine_main.ahk
 #Include ../infra/hotstrings/hotstring_buffer_effects.ahk
 #Include ../infra/hotstrings/hotstring_live_toggle.ahk
@@ -1471,6 +1472,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_personal_shortcuts_atomic_bootstrap.ahk
 #Include meta/test_altgr_detect_hkl_fallback.ahk
 #Include unit/test_altgr_detection.ahk
+#Include unit/test_altgr_family_follows_layout.ahk
 #Include unit/test_altgr_probe_real_layouts.ahk
 #Include unit/test_layout_digit_row_probe.ahk
 #Include meta/test_altgr_kana_taphold_entry.ahk

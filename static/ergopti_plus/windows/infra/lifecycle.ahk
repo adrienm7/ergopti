@@ -1076,6 +1076,13 @@ Ergopti_OnShutdown(reason, code) {
 			try LoggerError("Lifecycle", "Secure-field focus hook teardown failed: {1}.",
 				Err.Message)
 		}
+		try {
+			if !AltGrFamilyStopFollowing()
+				LoggerError("Lifecycle", "AltGr family foreground hook teardown failed.")
+		} catch as Err {
+			try LoggerError("Lifecycle", "AltGr family foreground hook teardown failed: {1}.",
+				Err.Message)
+		}
 		try LLM_NavEventOwner_Stop(false, true)
 		try TooltipReleaseRenderResources()
 		try CrashReportWorker_StopAll()
