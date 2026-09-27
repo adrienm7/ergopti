@@ -626,11 +626,11 @@ BootProfile_Stamp("Config parsed (TOML + i18n)")
 ; foreground window's layout without a reload (AltGrFamilyStartFollowing and
 ; the layout poll at the bottom of this file).
 HotstringEngineInit()
-; The layout every boot registration that reads the keyboard layout is built
-; for: the digit-row swap (_OsLayoutDigitsAreShifted, KS_LayoutDigitRowSymbols)
-; and the magic-key source scan. It is the layout the boot probe read, so those
-; registrations and the AltGr family describe one layout, and the layout poll
-; starts from it.
+; The layout the one boot registration that reads the keyboard layout is built
+; for: the magic-key source scan, without the Ergopti emulation (the digit-row
+; swap reads the foreground layout per press, DigitRowIsSwapped). It is the
+; layout the boot probe read, so that registration and the AltGr family
+; describe one layout, and the layout poll starts from it.
 global _LAYOUT_REMAP_HKL := _ALTGR_LAYOUT_PROBE["hkl"]
 BootProfile_Stamp("Hotstring engine initialised")
 

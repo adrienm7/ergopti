@@ -19,12 +19,12 @@
 ; is tested headlessly too: a refused reload is retried with a doubling wait, a
 ; few times per layout, and never when its refusal would be forced through.
 ;
-; Only a layout the boot registrations do not fit reloads: the digit-row swap
-; and the magic key's source key are registered at load for one layout
-; (LayoutRemapSignature). The AltGr family, which used to be the reason for
-; every layout reload, follows the foreground layout live instead
-; (infra/altgr_family.ahk), so a switch between layouts with the same
-; signature, as with Windows' per-window input methods, never reloads.
+; Only a layout the boot registrations do not fit reloads: without the Ergopti
+; emulation, the magic key's source key is registered at load on the key that
+; types its character on one layout (LayoutRemapSignature). The AltGr family
+; (infra/altgr_family.ahk) and the digit-row swap (DigitRowIsSwapped) follow the
+; foreground layout live instead, so with the emulation on (the default) no
+; switch reloads, as with Windows' per-window input methods.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -193,7 +193,7 @@ _LayoutPollReload(Hkl, PreviousHkl, Port) {
 	Retry["attempts"] += 1
 	; The one reload nobody clicks: without this line a layout switch looked like
 	; a spontaneous restart in the log.
-	try LoggerInfo("ErgoptiPlus", "Keyboard layout changed to HKL 0x{1:X}, whose digit row or magic key differs; reloading to register them again (attempt {2}/{3}).",
+	try LoggerInfo("ErgoptiPlus", "Keyboard layout changed to HKL 0x{1:X}, which types the magic key's source character on another key; reloading to register it again (attempt {2}/{3}).",
 		Hkl, Retry["attempts"], LAYOUT_POLL_RELOAD_MAX_ATTEMPTS)
 	Refused := _LayoutPollRefused.Bind(Retry, PreviousHkl, Port)
 	if Port["reload"].Call(Refused)
@@ -255,37 +255,23 @@ _LayoutPollRestore(PreviousHkl) {
 ; ===============================================
 
 ; What the boot registrations read from keyboard layout Hkl, as one comparable
-; string: while "Chiffres en accès direct" is on, whether the layout's digits
-; need Shift and, when they do, the symbols the digit-row swap types
-; (modules/keymap/layout.ahk); while the Ergopti emulation is off, the key the
-; magic-key scan finds for the magic key's source character (ErgoptiPlus.ahk),
-; or the default one when it finds none. Those hotkeys are registered at load
-; and cannot follow a layout switch, so they are what still reloads; everything
-; else the driver reads from the layout follows the foreground layout live (the
-; AltGr family, the accented-letter shortcuts).
+; string: while the Ergopti emulation is off, the key the magic-key scan finds
+; for the magic key's source character (ErgoptiPlus.ahk), or the default one
+; when it finds none. That key's hotkeys are registered at load on that scan
+; code, so a switch that moves it still reloads. The AltGr family, the
+; digit-row swap and the accented-letter shortcuts follow the foreground layout
+; live instead.
 ; @param Hkl {Integer} Keyboard layout handle; 0 (none read) probes nothing.
-; @param Port {Map} Test seam, _LayoutRemapPort() by default: "digits_enabled"(),
-;        "emulated"(), "digits_shifted"(Hkl), "digit_symbols"(Hkl),
+; @param Port {Map} Test seam, _LayoutRemapPort() by default: "emulated"(),
 ;        "magic_char"() and "magic_scan"(Hkl, Char), 0 when not found.
 ; @returns {String}
 LayoutRemapSignature(Hkl, Port := 0) {
 	if !(Port is Map)
 		Port := _LayoutRemapPort()
-	Digits := "off"
-	if Port["digits_enabled"].Call() {
-		Digits := "direct"
-		if (Hkl != 0 && Port["digits_shifted"].Call(Hkl)) {
-			Digits := "shifted"
-			for Sc, Symbol in Port["digit_symbols"].Call(Hkl)
-				Digits .= Format(" {:X}={}", Sc, Symbol)
-		}
-	}
-	Magic := "emulated"
-	if !Port["emulated"].Call() {
-		Scan := (Hkl != 0) ? Port["magic_scan"].Call(Hkl, Port["magic_char"].Call()) : 0
-		Magic := Scan ? Format("SC{:03X}", Scan) : "default"
-	}
-	return "digits=" . Digits . "|magic=" . Magic
+	if Port["emulated"].Call()
+		return "magic=emulated"
+	Scan := (Hkl != 0) ? Port["magic_scan"].Call(Hkl, Port["magic_char"].Call()) : 0
+	return "magic=" . (Scan ? Format("SC{:03X}", Scan) : "default")
 }
 
 ; Whether a switch to layout Hkl needs a reload: the boot registrations were
@@ -300,18 +286,10 @@ LayoutRemapNeedsReload(Hkl, Port := 0) {
 
 _LayoutRemapPort() {
 	static Port := Map(
-		"digits_enabled", _LayoutRemapDigitsEnabled,
 		"emulated", _LayoutRemapEmulated,
-		"digits_shifted", KS_LayoutDigitsAreShifted,
-		"digit_symbols", KS_LayoutDigitRowSymbols,
 		"magic_char", _LayoutRemapMagicChar,
 		"magic_scan", _LayoutRemapMagicScan)
 	return Port
-}
-
-_LayoutRemapDigitsEnabled() {
-	global Features
-	return Features["layout"]["direct_access_digits"]
 }
 
 _LayoutRemapEmulated() {

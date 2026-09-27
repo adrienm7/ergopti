@@ -20,13 +20,18 @@
 ;    by which override Map to consult.
 ; 4. Adding a key now means a single Map entry instead of two separate
 ;    ``+SCxxx::`` and ``SCxxx::`` blocks that have to be kept in sync by hand.
+; 5. The digit row of both layers stands down on a layout where "Chiffres en
+;    accès direct" swaps it (``DigitRowIsSwapped``), decided per press on the
+;    foreground window's layout, so a layout switch never needs a reload.
 ;
 ; DEPENDENCIES:
 ; References ``SendNewResult``, ``WrapTextIfSelected``, ``ActivateHotstrings``,
 ; ``DeadKey``, ``InDeadKeySequence``, ``DeadkeyMappingDiaresis``,
 ; ``DeadkeyMappingCircumflex`` defined in modules/keymap/layout.ahk and
-; ``GetCapsLockCondition`` in the same file. Lazy resolution at call time
-; means the include order does not matter.
+; ``GetCapsLockCondition`` in the same file, the digit-row probes of
+; adapters/key_state.ahk and ``GetForegroundKeyboardLayout``
+; (infra/hotstrings/hotstring_engine.ahk). Lazy resolution at call time means
+; the include order does not matter.
 ; ==============================================================================
 
 
@@ -160,12 +165,12 @@ LayerDispatch(SC, SymbolMap, SerializeSymbols := false, *) {
 ; Register both the Shift layer (``+SCxxx``) and the CapsLock layer
 ; (``SCxxx`` gated by ``GetCapsLockCondition``). Iterates the merged set of
 ; SCs (letters ∪ symbols) so every binding is created exactly once.
-; Scancodes for the digit row (1–0).  When direct_access_digits is enabled and
-; the OS layout puts digits behind Shift, modules/keymap/layout.ahk registers global
-; +SCxxx passthrough hotkeys for these positions.  Registering them again here
-; with an ergopti_base criterion would shadow the passthrough because AHK picks
-; a criterion variant over a global variant whenever the criterion is met.
-; Excluding these SCs from RegisterShiftLayer keeps the two sets disjoint.
+; Scancodes for the digit row (1–0). Where "Chiffres en accès direct" swaps the
+; digit row (DigitRowIsSwapped: the foreground layout puts its digits behind
+; Shift), modules/keymap/layout.ahk's +SCxxx swap hotkeys own these positions.
+; The Shift and CapsLock layers register them under a criterion that stands
+; down there, so the two variant sets are disjoint on every layout: of two
+; eligible variants, the one created first fires, not necessarily the swap.
 global _SHIFT_DIGIT_SCS := Map(
 	"SC002", true, "SC003", true, "SC004", true, "SC005", true, "SC006", true,
 	"SC007", true, "SC008", true, "SC009", true, "SC00A", true, "SC00B", true,
@@ -174,20 +179,14 @@ global _SHIFT_DIGIT_SCS := Map(
 RegisterShiftLayer() {
 	_BuildShiftCapsTables()
 	try LoggerStart("LayoutShift", "Registering Shift layer hotkeys…")
-	; When the OS-layout-shifted-digit passthrough is active, skip SC002..SC00B
-	; so the global passthrough variant is not shadowed by an ergopti_base variant.
-	SkipDigitRow := IsSet(Features)
-		&& Features["layout"]["direct_access_digits"]
-		&& IsSet(_OsLayoutDigitsAreShifted)
-		&& _OsLayoutDigitsAreShifted()
 	; try/finally: HotIf sets a PROCESS-WIDE criterion, so a throw before the
 	; reset leaks it into every later Hotkey() call in the driver — silently
 	; gating unrelated layers behind this condition.
 	try {
 		HotIf((*) => Features["layout"]["ergopti_base"])
 		for SC in SHIFTED_LETTERS {
-			if (SkipDigitRow && _SHIFT_DIGIT_SCS.Has(SC))
-				continue
+			if _SHIFT_DIGIT_SCS.Has(SC)
+				continue ; the digit row, registered below
 			Hotkey("+" . SC, LayerDispatch.Bind(SC, SHIFT_SYMBOLS, true), "I2")
 		}
 		for SC in SHIFT_SYMBOLS {
@@ -195,6 +194,12 @@ RegisterShiftLayer() {
 			; the loops cover disjoint sets, so re-binding is impossible here.
 			Hotkey("+" . SC, LayerDispatch.Bind(SC, SHIFT_SYMBOLS, true), "I2")
 		}
+		; The digit row stands down where the swap owns it, decided per press on
+		; the foreground window's layout, so no layout switch needs a reload.
+		HotIf((*) => Features["layout"]["ergopti_base"]
+			and !DigitRowIsSwapped(GetForegroundKeyboardLayout()))
+		for SC in _SHIFT_DIGIT_SCS
+			Hotkey("+" . SC, LayerDispatch.Bind(SC, SHIFT_SYMBOLS, true), "I2")
 	} finally {
 		HotIf() ; Reset to no condition
 	}
@@ -226,26 +231,82 @@ RegisterCapsLockLayer() {
 		Hotkey(ScriptInformation["MagicKeySourceScan"], ((*) => SendNewResult(ScriptInformation["MagicKey"])), "I2")
 
 		; --- Letters and symbols (registered last, highest precedence) ---
-		; Same OS-layout-shifted-digit exclusion as RegisterShiftLayer: without it,
-		; toggling CapsLock on shadows the global direct_access_digits passthrough
-		; hotkeys with an ergopti_base variant, silently regressing the
-		; auto-advance-skips-a-field fix for OTP/device-login digit boxes.
-		SkipDigitRow := IsSet(Features)
-			&& Features["layout"]["direct_access_digits"]
-			&& IsSet(_OsLayoutDigitsAreShifted)
-			&& _OsLayoutDigitsAreShifted()
 		HotIf((*) => GetCapsLockCondition() and Features["layout"]["ergopti_base"])
 		for SC in SHIFTED_LETTERS {
-			if (SkipDigitRow && _SHIFT_DIGIT_SCS.Has(SC))
-				continue
+			if _SHIFT_DIGIT_SCS.Has(SC)
+				continue ; the digit row, registered below
 			Hotkey(SC, LayerDispatch.Bind(SC, CAPSLOCK_SYMBOLS, true), "I2")
 		}
 		for SC in CAPSLOCK_SYMBOLS {
 			Hotkey(SC, LayerDispatch.Bind(SC, CAPSLOCK_SYMBOLS, true), "I2")
 		}
+		; Same digit-row exclusion as RegisterShiftLayer, per press on the
+		; foreground layout: without it, toggling CapsLock on shadows the
+		; direct_access_digits hotkeys with an ergopti_base variant, silently
+		; regressing the auto-advance-skips-a-field fix for OTP/device-login
+		; digit boxes.
+		HotIf((*) => GetCapsLockCondition() and Features["layout"]["ergopti_base"]
+			and !DigitRowIsSwapped(GetForegroundKeyboardLayout()))
+		for SC in _SHIFT_DIGIT_SCS
+			Hotkey(SC, LayerDispatch.Bind(SC, CAPSLOCK_SYMBOLS, true), "I2")
 	} finally {
 		HotIf() ; Reset to no condition
 	}
 	try LoggerSuccess("LayoutCaps", "CapsLock layer registered ({1} entries).",
 		SHIFTED_LETTERS.Count + CAPSLOCK_SYMBOLS.Count + 1)
+}
+
+
+
+
+
+; =========================================================
+; =========================================================
+; ======= 3/ The digit row on the foreground layout =======
+; =========================================================
+; =========================================================
+
+; HKL -> the digit row of that layout: "shifted" (its digits need Shift) and
+; "symbols" (scan code -> the character each key types unshifted). A layout's
+; digit row does not change while it is loaded, so each one is probed once.
+global _DigitRowProfiles := Map()
+
+; The digit row of layout Hkl, probed on first use through the adapter
+; (KS_LayoutDigitsAreShifted, KS_LayoutDigitRowSymbols), so the check and the
+; symbols always describe the same layout. HKL 0 (no foreground window) is not
+; shifted and types nothing.
+; @param Hkl {Integer} Keyboard layout handle.
+; @return {Map} "shifted" {Boolean} and "symbols" {Map}.
+_DigitRowProfile(Hkl) {
+	global _DigitRowProfiles
+	if !_DigitRowProfiles.Has(Hkl)
+		_DigitRowProfiles[Hkl] := Map("shifted", KS_LayoutDigitsAreShifted(Hkl),
+			"symbols", KS_LayoutDigitRowSymbols(Hkl))
+	return _DigitRowProfiles[Hkl]
+}
+
+; Whether "Chiffres en accès direct" swaps the digit row on layout Hkl: the
+; feature is on and the layout types its digits with Shift (AZERTY, bépo). The
+; digit keys then type the digits, Shift+digit key types the layout's own
+; unshifted symbol (modules/keymap/layout.ahk), and the Ergopti Shift and
+; CapsLock layers leave the row alone. The hotkeys ask it per press about the
+; foreground window's layout, which Windows' per-window input methods change
+; with every window switch.
+; @param Hkl {Integer} Keyboard layout handle.
+; @return {Boolean}
+DigitRowIsSwapped(Hkl) {
+	global Features
+	return Features["layout"]["direct_access_digits"] and _DigitRowProfile(Hkl)["shifted"]
+}
+
+; What Shift+digit key Sc types through the swap on layout Hkl: the key's
+; unshifted character there, or "" when the row is not swapped there or the key
+; types no character on that layout.
+; @param Sc {Integer} Scan code, 0x02 (the 1 key) to 0x0B (the 0 key).
+; @param Hkl {Integer} Keyboard layout handle.
+; @return {String}
+DigitRowSwapSymbol(Sc, Hkl) {
+	if !DigitRowIsSwapped(Hkl)
+		return ""
+	return _DigitRowProfile(Hkl)["symbols"].Get(Sc, "")
 }

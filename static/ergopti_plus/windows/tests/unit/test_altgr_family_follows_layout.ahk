@@ -225,9 +225,10 @@ _AFFL_OnlyARegistrationChangeReloads() {
 	Saved := { Last: IsSet(_LAST_KEYBOARD_HKL) ? _LAST_KEYBOARD_HKL : 0,
 		Pending: IsSet(_PENDING_KEYBOARD_HKL) ? _PENDING_KEYBOARD_HKL : 0, Retry: _LayoutPollRetry }
 	Bepo := 0xF0CF040C
-	; AZERTY, QWERTY and the Kana layout register the same digit row and magic
-	; key here (the digit-row swap off, the Ergopti emulation on); bépo's
-	; shifted digit row differs.
+	; Without the Ergopti emulation, AZERTY, QWERTY and the Kana layout type
+	; the magic key's source character on the same key here; bépo types it on
+	; another one. The real probes under the shipped defaults, where no switch
+	; reloads, are test_layout_digit_row_probe.ahk's.
 	Signatures := Map(_AFFL_AZERTY, "same", _AFFL_QWERTY, "same", _AFFL_KANA, "same", Bepo, "other")
 	Reloads := []
 	Port := _AFFL_PollPort(Signatures, Reloads)
@@ -253,14 +254,10 @@ _AFFL_OnlyARegistrationChangeReloads() {
 Test("layout poll: a switch between AltGr families never reloads; a layout the registrations do not fit does (altgr-family-live-2026-09-27)",
 	_AFFL_OnlyARegistrationChangeReloads)
 
-; A fake of what the registrations read from each layout: DigitsShifted and
-; Symbols per HKL, MagicScans per HKL.
-_AFFL_RemapPort(DigitsOn, Emulated, Shifted, Symbols, MagicScans) {
+; A fake of what the registrations read from each layout: MagicScans per HKL.
+_AFFL_RemapPort(Emulated, MagicScans) {
 	return Map(
-		"digits_enabled", () => DigitsOn,
 		"emulated", () => Emulated,
-		"digits_shifted", (Hkl) => Shifted.Get(Hkl, false),
-		"digit_symbols", (Hkl) => Symbols.Get(Hkl, Map()),
 		"magic_char", () => "j",
 		"magic_scan", (Hkl, Char) => MagicScans.Get(Hkl, 0))
 }
@@ -268,27 +265,19 @@ _AFFL_RemapPort(DigitsOn, Emulated, Shifted, Symbols, MagicScans) {
 _AFFL_SignatureNamesTheLayoutRegistrations() {
 	global _AFFL_AZERTY, _AFFL_QWERTY, _AFFL_KANA
 	Bepo := 0xF0CF040C
-	Shifted := Map(_AFFL_AZERTY, true, Bepo, true)
-	Symbols := Map(_AFFL_AZERTY, Map(0x02, "&", 0x0B, "à"), Bepo, Map(0x02, '"', 0x0B, "*"))
 	Magic := Map(_AFFL_AZERTY, 0x24, _AFFL_QWERTY, 0x24, _AFFL_KANA, 0x2E, Bepo, 0x13)
-	Sig := (Hkl, DigitsOn, Emulated) => LayoutRemapSignature(Hkl,
-		_AFFL_RemapPort(DigitsOn, Emulated, Shifted, Symbols, Magic))
-	; The digit-row swap on, the Ergopti emulation on (the shipped defaults).
-	AssertEqual(Sig(_AFFL_QWERTY, true, true), Sig(_AFFL_KANA, true, true),
-		"two layouts with direct digits register the same hotkeys")
-	AssertTrue(Sig(_AFFL_AZERTY, true, true) != Sig(_AFFL_KANA, true, true),
-		"a shifted digit row registers the swap, a direct one does not")
-	AssertTrue(Sig(_AFFL_AZERTY, true, true) != Sig(Bepo, true, true),
-		"two shifted digit rows with different symbols register different swaps")
-	; The swap off: only the magic key's source key can differ, and only
-	; without the emulation.
-	AssertEqual(Sig(_AFFL_AZERTY, false, true), Sig(Bepo, false, true),
-		"with the swap off and the emulation on, no registration reads the layout")
-	AssertEqual(Sig(_AFFL_AZERTY, false, false), Sig(_AFFL_QWERTY, false, false),
+	Sig := (Hkl, Emulated) => LayoutRemapSignature(Hkl, _AFFL_RemapPort(Emulated, Magic))
+	; The Ergopti emulation on (the shipped default): no registration reads the
+	; layout, the digit row included (it follows the foreground layout live).
+	for _, Hkl in [_AFFL_QWERTY, _AFFL_KANA, Bepo, 0]
+		AssertEqual(Sig(_AFFL_AZERTY, true), Sig(Hkl, true),
+			Format("with the emulation on, layout 0x{:X} registers what AZERTY does", Hkl))
+	; Without the emulation, only the magic key's source key can differ.
+	AssertEqual(Sig(_AFFL_AZERTY, false), Sig(_AFFL_QWERTY, false),
 		"the magic key's source on the same key registers the same hotkey")
-	AssertTrue(Sig(_AFFL_AZERTY, false, false) != Sig(_AFFL_KANA, false, false),
+	AssertTrue(Sig(_AFFL_AZERTY, false) != Sig(_AFFL_KANA, false),
 		"the magic key's source on another key must reload")
-	AssertTrue(InStr(Sig(0, true, false), "magic=default") > 0,
+	AssertTrue(InStr(Sig(0, false), "magic=default") > 0,
 		"no layout read (HKL 0) keeps the default magic key, as the boot scan does")
 }
 Test("layout poll: the remap signature names what the boot registrations read from a layout (altgr-family-live-2026-09-27)",

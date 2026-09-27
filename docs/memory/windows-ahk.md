@@ -273,9 +273,11 @@ while `AltGrFamilyIsBusy`). Action: read the family through its readers at
 the moment of use; a hotkey whose existence depends on the family is
 registered unconditionally with the family in its live criterion
 (`ScriptAltGrKanaChordIsLive`), never inside an `if` on the family
-(`test_altgr_family_follows_layout.ahk` scans every registration). The only
-layout reads still fixed at load are the digit-row swap and the magic key's
-source key; the layout poll reloads only when those differ
+(`test_altgr_family_follows_layout.ahk` scans every registration). The
+digit-row swap follows the same way, per press on the foreground layout
+(`DigitRowIsSwapped`, `test_layout_digit_row_probe.ahk`). The only layout
+read still fixed at load is the magic key's source key without the Ergopti
+emulation; the layout poll reloads only when it differs
 (`LayoutRemapSignature`).
 
 ### project-ahk-prefix-arms-before-physical-state

@@ -146,7 +146,8 @@ _T_LPR_Notify(*) {
 }
 
 ; Every layout here needs a reload: the boot registrations fit only 0x100, as
-; when layouts differ in their digit row (LayoutRemapNeedsReload).
+; when, without the Ergopti emulation, layouts type the magic key's source
+; character on different keys (LayoutRemapNeedsReload).
 _T_LPR_Port() {
 	return Map("needs_reload", (Hkl) => true, "reload", _T_LPR_Reload, "pending", _T_LPR_Pending,
 		"veto_honored", _T_LPR_VetoHonored, "now", _T_LPR_Now, "notify", _T_LPR_Notify)
