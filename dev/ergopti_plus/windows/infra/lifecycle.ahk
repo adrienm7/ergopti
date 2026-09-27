@@ -773,6 +773,9 @@ LifecycleShutdownVetoHonored() {
 ; @returns {Integer} 1 to veto the exit, 0 to let it proceed regardless.
 _LifecycleRefuseShutdown(Gate) {
 	global _LifecycleShutdownVetoAttempts, _LifecycleShutdownReason
+	try UninstallCancel()
+	catch as Err
+		try LoggerError("Lifecycle", "Removal cancellation failed during shutdown refusal: {1}.", Err.Message)
 	Honored := LifecycleShutdownVetoHonored()
 	_LifecycleShutdownVetoAttempts += 1
 	if Honored {
@@ -1054,6 +1057,9 @@ Ergopti_OnShutdown(reason, code) {
 			return _LifecycleRefuseShutdown("the recovery handoff failed before terminal teardown")
 		}
 		ShutdownTerminal := true
+		try UninstallCommit(reason)
+		catch as Err
+			try LoggerError("Lifecycle", "Removal authorization failed during terminal shutdown: {1}.", Err.Message)
 		; No code below this point may refuse shutdown. All fallible authority
 		; transfers have accepted while the live driver was still intact.
 		if (SupersededReload is Map)
@@ -1074,6 +1080,13 @@ Ergopti_OnShutdown(reason, code) {
 				LoggerError("Lifecycle", "Secure-field focus hook teardown failed.")
 		} catch as Err {
 			try LoggerError("Lifecycle", "Secure-field focus hook teardown failed: {1}.",
+				Err.Message)
+		}
+		try {
+			if !AltGrFamilyStopFollowing()
+				LoggerError("Lifecycle", "AltGr family foreground hook teardown failed.")
+		} catch as Err {
+			try LoggerError("Lifecycle", "AltGr family foreground hook teardown failed: {1}.",
 				Err.Message)
 		}
 		try LLM_NavEventOwner_Stop(false, true)

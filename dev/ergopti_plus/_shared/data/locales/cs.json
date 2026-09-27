@@ -1807,7 +1807,7 @@
 	"shortcuts.uppercase": "Win + U(ppercase) = Přepnout výběr velká/malá písmena",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
 	"startup.accessibility_required": "ErgoptiPlus potřebuje oprávnění Zpřístupnění, aby mohl číst klávesnici. V Nastavení systému > Soukromí a zabezpečení > Zpřístupnění zapněte položku Hammerspoon, která patří k ErgoptiPlus, a poté ErgoptiPlus znovu otevřete. Samostatně spouštěná aplikace Hammerspoon má vlastní položku.",
-	"startup.linux_input_access_body": "Ergopti+ zatím nemůže číst klávesnici ani zapisovat do /dev/uinput. Odhlaste se a znovu přihlaste (nebo restartujte), aby se projevily skupiny „input“ a „uinput“ přidané instalátorem. Pokud problém přetrvává, spusťte: bash install.sh --setup-perms",
+	"startup.linux_input_access_body": "Ergopti+ zatím nemůže číst klávesnici ani zapisovat do /dev/uinput. Odhlaste se a znovu přihlaste (nebo restartujte), aby se projevily skupiny „input“ a „uinput“ přidané instalátorem. Pokud problém přetrvává, spusťte: {1}",
 	"startup.linux_input_access_title": "Ergopti+ zatím nemůže používat klávesnici",
 	"startup.manifest_missing": "Chyba při spuštění: soubor _generated/features_manifest.ahk chybí nebo je poškozen.\n\nSpusťte `npm run build:manifest` z adresáře projektu a skript restartujte.",
 	"startup.manifest_title": "ErgoptiPlus — manifest chybí",
@@ -2494,5 +2494,11 @@
 	"ui_metrics_rebuild.eta": "zbývá asi {eta}",
 	"ui_metrics_rebuild.eta_unknown": "odhaduje se zbývající čas…",
 	"ui_metrics_rebuild.finalizing": "Ukládají se obnovené statistiky…",
-	"ui_metrics_rebuild.failed": "Obnova statistik se neočekávaně zastavila. Další pokus naváže tam, kde skončila."
+	"ui_metrics_rebuild.failed": "Obnova statistik se neočekávaně zastavila. Další pokus naváže tam, kde skončila.",
+	"menu.global.uninstall": "Odinstalovat Ergopti…",
+	"dialog.uninstall.confirm": "Odinstalovat Ergopti? Aplikace se zavře. Vaše nastavení, hotstringy, metriky a přihlašovací údaje zůstanou zachovány.",
+	"dialog.uninstall.failed": "Ergopti se nepodařilo odinstalovat. Vaše osobní data zůstala zachována.",
+	"menu.global.start_at_login": "Spustit při přihlášení",
+	"dialog.start_at_login.failed": "Automatické spouštění se nepodařilo změnit. Zkontrolujte nastavení spouštění systému.",
+	"onboarding.error.open_failed": "Průvodce nastavením se nepodařilo otevřít. Zkontrolujte protokoly a zkuste to znovu z nabídky."
 }

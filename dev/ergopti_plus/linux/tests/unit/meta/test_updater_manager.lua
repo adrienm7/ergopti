@@ -618,6 +618,7 @@ helpers.describe("modules/updater/manager.lua", function()
 			.. " " .. shell_quote(install_root .. "/_shared/lua")
 			.. " " .. shell_quote(prefix .. "/bin")
 			.. " " .. shell_quote(payload .. "/linux/infra")
+			.. " " .. shell_quote(payload .. "/linux/install")
 			.. " " .. shell_quote(payload .. "/_shared/lua")
 			.. " " .. shell_quote(payload .. "/_shared/data/locales")
 			.. " " .. shell_quote(payload .. "/bin")))
@@ -633,6 +634,8 @@ helpers.describe("modules/updater/manager.lua", function()
 		write_file(payload .. "/_shared/data/locales/en.json", "{}\n")
 		write_file(payload .. "/bin/ergopti-hotstrings", "#!/usr/bin/env bash\nexit 0\n")
 		write_file(payload .. "/install.sh", "#!/usr/bin/env bash\nexit 0\n")
+		write_file(payload .. "/linux/install/ownership.sh",
+			assert(read_file(helpers.driver_root() .. "/install/ownership.sh")))
 		write_file(wrapper, "#!/usr/bin/env bash\nset -euo pipefail\n"
 			.. "grep -q 'version=4.0.0' " .. shell_quote(install_root .. "/_shared/build_stamp.txt") .. "\n"
 			.. "grep -q 'new-shared' " .. shell_quote(install_root .. "/_shared/lua/sentinel.lua") .. "\n"
@@ -670,6 +673,7 @@ helpers.describe("modules/updater/manager.lua", function()
 		local old_version = read_file(install_root .. ".old/_shared/build_stamp.txt")
 		local nested = read_file(install_root .. "/linux/linux/ergopti_hotstrings.lua")
 		local archive_left = read_file(archive)
+		local ownership = read_file(install_root .. "/.ergopti-owned-files")
 		M.clear_cached_release()
 		command_ok("rm -rf -- " .. shell_quote(base))
 
@@ -680,6 +684,8 @@ helpers.describe("modules/updater/manager.lua", function()
 		helpers.assert_contains(old_version or "", "version=3.0.0")
 		helpers.assert_nil(nested, "the archive linux/ root must not become linux/linux")
 		helpers.assert_nil(archive_left, "a committed update retires its downloaded archive")
+		helpers.assert_contains(ownership or "", "linux/ergopti_hotstrings.lua",
+			"an updated installation must retain file ownership for uninstall")
 	end)
 
 	helpers.it("rolls back every fallible activation stage", function()
@@ -691,7 +697,7 @@ helpers.describe("modules/updater/manager.lua", function()
 		local stages = {
 			"validate_archive", "make_work_dir", "extract", "validate_layout",
 			"validate_version", "mkdir_candidate", "move_linux", "move_shared",
-			"remove_backup", "backup_current", "activate_candidate", "smoke",
+			"record_ownership", "remove_backup", "backup_current", "activate_candidate", "smoke",
 		}
 
 		for _, failed_stage in ipairs(stages) do
@@ -705,6 +711,7 @@ helpers.describe("modules/updater/manager.lua", function()
 				return work
 			end
 			function ops.extract() return failed_stage ~= "extract" end
+			function ops.record_ownership() return failed_stage ~= "record_ownership" end
 			function ops.is_file() return failed_stage ~= "validate_layout" end
 			function ops.is_dir() return true end
 			function ops.read()

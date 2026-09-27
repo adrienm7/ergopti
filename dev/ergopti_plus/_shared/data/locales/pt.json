@@ -1807,7 +1807,7 @@
 	"shortcuts.uppercase": "Win + U(ppercase) = Alternar seleção maiúsculas/minúsculas",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
 	"startup.accessibility_required": "O ErgoptiPlus precisa da permissão de Acessibilidade para ler o teclado. Em Ajustes do Sistema > Privacidade e Segurança > Acessibilidade, ative a entrada Hammerspoon que pertence ao ErgoptiPlus e abra o ErgoptiPlus novamente. Um app Hammerspoon que você executa separadamente tem sua própria entrada.",
-	"startup.linux_input_access_body": "O Ergopti+ ainda não consegue ler o teclado nem escrever em /dev/uinput. Termine a sessão e entre novamente (ou reinicie) para que os grupos «input» e «uinput» adicionados pelo instalador tenham efeito. Se persistir, execute: bash install.sh --setup-perms",
+	"startup.linux_input_access_body": "O Ergopti+ ainda não consegue ler o teclado nem escrever em /dev/uinput. Termine a sessão e entre novamente (ou reinicie) para que os grupos «input» e «uinput» adicionados pelo instalador tenham efeito. Se persistir, execute: {1}",
 	"startup.linux_input_access_title": "O Ergopti+ ainda não pode usar o teclado",
 	"startup.manifest_missing": "Erro de início: o arquivo _generated/features_manifest.ahk está ausente ou corrompido.\n\nExecute `npm run build:manifest` a partir do diretório do projeto e reinicie o script.",
 	"startup.manifest_title": "ErgoptiPlus — manifest ausente",
@@ -2494,5 +2494,11 @@
 	"ui_metrics_rebuild.eta": "faltam cerca de {eta}",
 	"ui_metrics_rebuild.eta_unknown": "estimando o tempo restante…",
 	"ui_metrics_rebuild.finalizing": "Salvando as estatísticas reconstruídas…",
-	"ui_metrics_rebuild.failed": "A reconstrução das estatísticas parou inesperadamente. A próxima tentativa continuará de onde parou."
+	"ui_metrics_rebuild.failed": "A reconstrução das estatísticas parou inesperadamente. A próxima tentativa continuará de onde parou.",
+	"menu.global.uninstall": "Desinstalar Ergopti…",
+	"dialog.uninstall.confirm": "Desinstalar o Ergopti? A aplicação será fechada. As definições, hotstrings, métricas e credenciais serão mantidas.",
+	"dialog.uninstall.failed": "Não foi possível desinstalar o Ergopti. Os seus dados pessoais foram mantidos.",
+	"menu.global.start_at_login": "Iniciar ao entrar na sessão",
+	"dialog.start_at_login.failed": "Não foi possível alterar o início automático. Verifique as definições de arranque do sistema.",
+	"onboarding.error.open_failed": "Não foi possível abrir o assistente de configuração. Consulte os registos e tente novamente pelo menu."
 }

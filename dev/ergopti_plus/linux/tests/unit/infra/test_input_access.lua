@@ -25,6 +25,19 @@ end
 
 helpers.describe("input_access: telling the user", function()
 
+	helpers.it("prints an absolute quoted repair command (input-access-repair-path)", function()
+		local Access = helpers.load_module("infra.input_access")
+		local lines = {}
+		Access.report({
+			i18n = { init = function() end, get = function(key)
+				return key == Access.BODY_KEY and "Repair: {1}" or "Title"
+			end },
+			script_dir = "/opt/Ergopti user's % directory",
+			print = function(line) lines[#lines + 1] = line end,
+		}, "denied")
+		helpers.assert_eq(lines[2], "Repair: bash '/opt/Ergopti user'\\''s % directory/install.sh' --setup-perms")
+	end)
+
 	helpers.it("notifies with the translated title and body", function()
 		local Access = helpers.load_module("infra.input_access")
 		local sent = {}

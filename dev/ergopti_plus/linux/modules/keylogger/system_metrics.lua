@@ -57,8 +57,15 @@ local SLEEP_GAP_MS = SAMPLE_INTERVAL_MS * 3
 -- BAT0 and BAT1 are both common, and a machine can have neither.
 local BATTERY_GLOB = "/sys/class/power_supply/BAT*/capacity"
 
+-- Where the kernel lists the wireless interfaces: two header lines, then one
+-- line per interface.
+local WIRELESS_PATH = "/proc/net/wireless"
+
 -- The accumulated day, or nil before the first sample.
 local _day = nil
+
+-- The wireless listing read now: WIRELESS_PATH, or a test's fixture.
+local _wireless_path = WIRELESS_PATH
 
 -- What the previous sample saw, for the transitions.
 local _last = { at_ms = nil, ssid = nil, locked = nil, muted = nil }
@@ -81,6 +88,23 @@ local function read_battery()
 	return value
 end
 
+--- The first wireless interface the kernel lists, as "wlan0:": the first field
+--- of the third line. Read here rather than with awk, which no package
+--- declares: an install without it never saw a network change.
+--- @return string|nil nil when nothing is listed or the file is absent (no
+---   wireless driver), which is no answer rather than a failure.
+local function read_wireless_interface()
+	local fh = io.open(_wireless_path, "r")
+	if not fh then return nil end
+	local line = nil
+	for _ = 1, 3 do
+		line = fh:read("*l")
+		if not line then break end
+	end
+	fh:close()
+	return line and line:match("^%s*(%S+)") or nil
+end
+
 --- The network the machine is on.
 ---
 --- Three readers because distributions disagree about which is installed. The
@@ -97,10 +121,7 @@ local function read_network()
 		local out = Shell.exec_line("iwgetid -r 2>/dev/null")
 		if out and out ~= "" then return out end
 	end
-	local out = Shell.exec_line(
-		"awk 'NR==3 {print $1}' /proc/net/wireless 2>/dev/null")
-	if out and out ~= "" then return out end
-	return nil
+	return read_wireless_interface()
 end
 
 --- Whether the session is locked.
@@ -225,10 +246,18 @@ function M.current()
 	return _day
 end
 
---- Test seam: forgets everything.
+--- Test seam: forgets everything, the wireless listing's path included.
 function M._reset()
 	_day = nil
 	_last = { at_ms = nil, ssid = nil, locked = nil, muted = nil }
+	_wireless_path = WIRELESS_PATH
+end
+
+--- Test seam: reads the wireless listing from `path` instead of the kernel's.
+--- @param path string
+function M._set_wireless_path(path)
+	if type(path) ~= "string" or path == "" then error("the wireless listing needs a path", 2) end
+	_wireless_path = path
 end
 
 --- Test seam: how often a sample is taken.

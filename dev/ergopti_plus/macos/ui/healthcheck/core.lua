@@ -347,6 +347,11 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.one_shot_shift",
+		contract = { "new" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.shell_runner",
 		contract = { "exec", "spawn" },
 		wired    = true,
@@ -361,7 +366,7 @@ local ADAPTER_SPECS = {
 		contract = {
 			"begin", "emit_key_stroke", "claim_tag", "claim_physical_fence",
 			"current_action_epoch", "register_action_listener", "enter_callback",
-			"leave_callback",
+			"leave_callback", "keyboard_characters",
 		},
 		wired    = true,
 	},

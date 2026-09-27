@@ -61,6 +61,7 @@ linux/
   modules/                    11 feature folders — see modules/README.md for the measured table
   ui/                         webkit_host.lua (WebKitGTK page builder)
   install.sh                  Standalone installer (apt/dnf/pacman)
+  uninstall.sh                Removes an owned installation; preserves personal data
   ergopti-hotstrings.service  systemd user unit
   bin/
     ergopti-hotstrings        Shell wrapper (sets LUA_PATH, checks deps)
@@ -108,6 +109,16 @@ Requires LuaJIT 2.x. Plain Lua 5.4 works for the meta tests (no luv dependency).
 
 ## Installation
 
+For Ubuntu, Zorin OS and Debian desktops, open the downloaded `.deb` in the
+software installer and choose **Install**, then open Ergopti from the application
+menu. The package installs its icon, dependencies, input permissions and startup
+entries. The first launch refreshes the application's input groups without
+requiring a terminal or a new login. If another desktop account launches it
+later, a graphical administrator prompt grants that account the required access.
+
+The `.rpm` provides the same permission setup on supported RPM desktops.
+For an installation from the standalone archive or a source checkout:
+
 ```bash
 bash static/ergopti_plus/linux/install.sh
 ```
@@ -115,6 +126,46 @@ bash static/ergopti_plus/linux/install.sh
 The installer detects apt/dnf/pacman, installs dependencies (luajit,
 libnotify-bin, …), copies files to `~/.local/lib/ergopti/`, and installs
 a systemd user service.
+
+### First use and automatic startup
+
+The first graphical launch opens the setup wizard. Completing it saves your
+choices; closing it without finishing offers it again at the next launch. You
+can also reopen **Setup wizard** from the menu. The `.deb` requires the WebKitGTK
+window dependencies so the wizard is available on a normal Zorin installation.
+
+Use **Global actions → Start at login** to enable or disable automatic startup.
+Disabling it leaves Ergopti running in the current session and applies to the
+next login. Opening Ergopti manually does not turn automatic startup back on,
+and reinstalling or updating preserves the choice made in this menu.
+
+### Uninstallation
+
+Choose **Global actions → Uninstall Ergopti…** in the tray menu and confirm.
+Ergopti finishes saving its data and closes before removing the application.
+Native packages request administrator authorization through the desktop.
+
+For a standalone installation, the installed removal script is independent of
+the directory from which it is called:
+
+```bash
+bash "$HOME/.local/lib/ergopti/linux/uninstall.sh" --yes
+```
+
+If installation used `--prefix`, pass that same absolute prefix to
+`uninstall.sh --prefix "/your/prefix" --yes`. The script verifies its file
+ownership record before removing the runtime, launcher and startup entries.
+It retains unknown files and modified payload files, including personal files
+inside the installation directory. A modified service must be reviewed before
+removal, because it could now start a different application.
+
+For a `.deb` or `.rpm` installation, remove **ergopti** through the distribution's
+software manager. The command `bash /usr/lib/ergopti/uninstall.sh --yes` delegates
+to the owning package manager with graphical administrator authentication.
+
+Removal preserves configuration, hotstrings, metrics and credentials. It does
+not remove shared dependencies, input groups, or the separately installed Ergopti
+keyboard layout. Reinstalling the application can reuse the retained settings.
 
 ## Known limitations by feature
 

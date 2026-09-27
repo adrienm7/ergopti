@@ -1910,6 +1910,22 @@ local function main()
 		Logger.info(LOG, "WebView manager daemon state wired.")
 	end
 
+	-- Completion belongs to the wizard's committed config, not to window creation.
+	-- Run only after every bridge dependency is ready and never in hardware probes.
+	require("ui.onboarding.startup").run({
+		graphical = opts.tray == true and not opts.dry_run,
+		path = require("infra.config_paths").config("config.toml"),
+		show = function(app) return webview_manager and webview_manager.show(app) == true end,
+		fail = function(reason)
+			Logger.error(LOG, "%s.", reason)
+			if notifier and ok_i18n and i18n_mod then
+				notifier.send(i18n_mod.get("onboarding.error.open_failed"), {
+					title = i18n_mod.get("onboarding.error.title"), level = "error",
+				})
+			end
+		end,
+	})
+
 	if updater then
 		-- The one release that has been notified, so a background check every few
 		-- hours does not re-announce the same version for as long as the user

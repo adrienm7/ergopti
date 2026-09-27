@@ -136,6 +136,7 @@ OnError(_FatalErrorHandler)
 #Include ../infra/text_utils.ahk
 #Include ../infra/nav_layer_helpers.ahk
 #Include ../infra/hotstrings/hotstring_engine.ahk
+#Include ../infra/altgr_family.ahk
 #Include ../infra/hotstrings/hotstring_engine_main.ahk
 #Include ../infra/hotstrings/hotstring_buffer_effects.ahk
 #Include ../infra/hotstrings/hotstring_live_toggle.ahk
@@ -200,6 +201,8 @@ OnError(_FatalErrorHandler)
 #Include ../modules/keymap/layout_poll_helper.ahk
 #Include ../ui/tooltip/init.ahk
 #Include ../modules/updater.ahk
+#Include ../infra/uninstall.ahk
+#Include ../infra/start_at_login.ahk
 ; json.ahk must precede locale.ahk — _I18nLoadLocaleMap delegates to JsonParse.
 #Include ../infra/registry.ahk
 #Include ../infra/json.ahk
@@ -386,6 +389,9 @@ InstallSendNoOps()
 #Include unit/test_capsword_taphold_unlatch.ahk
 #Include meta/test_tap_hold_suspend_boundary.ahk
 #Include unit/test_updater.ahk
+#Include unit/test_uninstall.ahk
+#Include unit/test_start_at_login.ahk
+#Include meta/test_uninstall_shutdown_gate.ahk
 #Include unit/test_updater_staging_transport.ahk
 #Include unit/test_updater_swap_transaction.ahk
 #Include unit/test_updater_swap_cancellation.ahk
@@ -786,6 +792,7 @@ global _AhkSubDir := ""
 #Include unit/test_klr_cold_projection_failure.ahk
 #Include unit/test_klr_cache_date_scope.ahk
 #Include unit/test_klr_projection_paging.ahk
+#Include unit/test_klr_worker_memory_bound.ahk
 #Include unit/test_klr_projection_cursor_int64.ahk
 #Include unit/test_klr_projection_page_work.ahk
 #Include unit/test_klr_projection_sql_failure.ahk
@@ -894,6 +901,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_lshift_lctrl_rshift_bounded_keywait.ahk
 #Include meta/test_layout_poll_blacklist_guard.ahk
 #Include meta/test_layout_quiescence.ahk
+#Include meta/test_layer_key_under_another_holder.ahk
 #Include unit/test_foreground_keyboard_layout.ahk
 #Include meta/test_hse_register_atomic.ahk
 #Include meta/test_hse_rebuild_guard.ahk
@@ -1471,7 +1479,9 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_personal_shortcuts_atomic_bootstrap.ahk
 #Include meta/test_altgr_detect_hkl_fallback.ahk
 #Include unit/test_altgr_detection.ahk
+#Include unit/test_altgr_family_follows_layout.ahk
 #Include unit/test_altgr_probe_real_layouts.ahk
+#Include unit/test_layout_digit_row_probe.ahk
 #Include meta/test_altgr_kana_taphold_entry.ahk
 #Include meta/test_altgr_prefix_arms_on_press.ahk
 #Include unit/test_altgr_owner_matrix.ahk

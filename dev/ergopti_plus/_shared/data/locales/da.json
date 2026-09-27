@@ -1807,7 +1807,7 @@
 	"shortcuts.uppercase": "Win + U(ppercase) = Slå valg versaler/gemener til/fra",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
 	"startup.accessibility_required": "ErgoptiPlus skal have tilladelsen Tilgængelighed for at kunne læse tastaturet. Slå Hammerspoon-emnet, der hører til ErgoptiPlus, til under Systemindstillinger > Anonymitet og sikkerhed > Tilgængelighed, og åbn derefter ErgoptiPlus igen. Et Hammerspoon, du kører separat, har sit eget emne.",
-	"startup.linux_input_access_body": "Ergopti+ kan endnu ikke læse tastaturet eller skrive til /dev/uinput. Log ud og ind igen (eller genstart), så grupperne “input” og “uinput”, som installationsprogrammet tilføjede, træder i kraft. Hvis problemet fortsætter, kør: bash install.sh --setup-perms",
+	"startup.linux_input_access_body": "Ergopti+ kan endnu ikke læse tastaturet eller skrive til /dev/uinput. Log ud og ind igen (eller genstart), så grupperne “input” og “uinput”, som installationsprogrammet tilføjede, træder i kraft. Hvis problemet fortsætter, kør: {1}",
 	"startup.linux_input_access_title": "Ergopti+ kan ikke bruge tastaturet endnu",
 	"startup.manifest_missing": "Opstartsfejl: filen _generated/features_manifest.ahk mangler eller er beskadiget.\n\nKør `npm run build:manifest` fra projektmappen og genstart scriptet.",
 	"startup.manifest_title": "ErgoptiPlus — manifest mangler",
@@ -2494,5 +2494,11 @@
 	"ui_metrics_rebuild.eta": "cirka {eta} tilbage",
 	"ui_metrics_rebuild.eta_unknown": "beregner resterende tid…",
 	"ui_metrics_rebuild.finalizing": "Gemmer de genopbyggede statistikker…",
-	"ui_metrics_rebuild.failed": "Genopbygningen af statistikker stoppede uventet. Næste forsøg fortsætter, hvor den slap."
+	"ui_metrics_rebuild.failed": "Genopbygningen af statistikker stoppede uventet. Næste forsøg fortsætter, hvor den slap.",
+	"menu.global.uninstall": "Afinstaller Ergopti…",
+	"dialog.uninstall.confirm": "Vil du afinstallere Ergopti? Programmet lukkes. Dine indstillinger, hotstrings, målinger og loginoplysninger bevares.",
+	"dialog.uninstall.failed": "Ergopti kunne ikke afinstalleres. Dine personlige data er bevaret.",
+	"menu.global.start_at_login": "Start ved login",
+	"dialog.start_at_login.failed": "Automatisk start kunne ikke ændres. Kontrollér systemets startindstillinger.",
+	"onboarding.error.open_failed": "Opsætningsguiden kunne ikke åbnes. Se logfilerne, og prøv igen fra menuen."
 }

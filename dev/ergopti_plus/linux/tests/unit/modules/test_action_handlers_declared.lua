@@ -602,21 +602,33 @@ helpers.describe("linux actions: workspace switch", function()
 			os.execute("chmod +x " .. path)
 		end
 		local function stand_in(body) script(dir .. "/wmctrl", body) end
+		-- The command may rely on wmctrl and timeout only: no package declares
+		-- anything else (it used awk, which a minimal openSUSE lacks). So the
+		-- PATH it runs under holds the stand-in wmctrl and a timeout that execs
+		-- the real one, and nothing more. The real timeout is looked up by the
+		-- shell itself, on the PATH the script started with.
+		script(dir .. "/timeout", "real=$(PATH=$HOST_PATH; command -v timeout) || exit 127\n"
+			.. "exec \"$real\" \"$@\"")
 		-- Run as a script file, the way the daemon's shell runs it: a quoted
 		-- script path is also what the Windows test mode hands to sh.
 		local function run()
-			script(dir .. "/switch.sh", "PATH=" .. dir .. ":$PATH; export PATH\n" .. commands[1])
+			script(dir .. "/switch.sh", "HOST_PATH=$PATH; export HOST_PATH; PATH=" .. dir
+				.. "; export PATH\n" .. commands[1])
 			local result = os.execute("'" .. dir .. "/switch.sh'")
 			return result == true or result == 0
 		end
 		stand_in("echo 'Cannot get current desktop properties.' >&2; exit 1")
 		helpers.assert_true(not run(), "wmctrl -d failing must fail the command, so the combo is pressed")
 		stand_in('if [ "$1" = -d ]; then printf "0  * DG: x\\n1  - DG: x\\n2  - DG: x\\n"; '
-			.. 'else echo "$2" > "$(dirname "$0")/switched"; fi')
-		helpers.assert_true(run(), "a listed desktop is switched to")
+			.. 'else echo "$2" > "${0%/*}/switched"; fi')
+		helpers.assert_true(run(), "a listed desktop is switched to with only wmctrl and timeout on the PATH")
 		local fh = assert(io.open(log, "r"))
 		helpers.assert_eq(fh:read("*l"), "2", "the previous desktop of the first one wraps to the last")
 		fh:close()
+		os.remove(log)
+		stand_in('if [ "$1" = -d ]; then printf "0  - DG: x\\n1  - DG: x\\n"; '
+			.. 'else echo "$2" > "${0%/*}/switched"; fi')
+		helpers.assert_true(not run(), "a listing with no current desktop must fail, so the combo is pressed")
 		os.execute("rm -rf " .. dir)
 	end)
 

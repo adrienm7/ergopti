@@ -36,17 +36,32 @@ TrayMenu.setIcon({ title = "Ergopti" })
 -- The clickable row proves the whole click path: the panel's dbusmenu Event,
 -- libdbusmenu's "activate", the shared dispatcher, and this row's function.
 local click_file = os.getenv("ERGOPTI_TRAY_CLICK_FILE")
+local rebuilds = 0
+local function clicked()
+	if click_file then
+		local fh = assert(io.open(click_file, "w"))
+		fh:write("clicked " .. tostring(rebuilds) .. "\n")
+		fh:close()
+	end
+end
 local rows = {
 	{ title = "Ergopti+ tray probe" },
 	{ title = "-" },
-	{ title = "Click probe", fn = function()
-		if click_file then
-			local fh = io.open(click_file, "w")
-			if fh then fh:write("clicked\n"); fh:close() end
-		end
-	end },
+	{ title = "Parent probe", menu = {
+		{ title = "Child probe", menu = {
+			{ title = "Click probe", fn = clicked },
+		} },
+	} },
+	{ title = "Checked probe", checked = true, menu = {
+		{ title = "Checked child probe", fn = function() error("wrong nested callback") end },
+	} },
 	{ title = "Quit probe", fn = function() os.exit(0) end },
 }
+rows[#rows + 1] = { title = "Rebuild probe", fn = function()
+	rebuilds = rebuilds + 1
+	rows[#rows + 1] = { title = "Rebuilt marker" }
+	TrayMenu.setMenu(rows)
+end }
 -- Rebuilt a few times first, as the daemon does at boot: the row's id must
 -- still reach the function of the CURRENT menu.
 for _ = 1, 3 do TrayMenu.setMenu(rows) end

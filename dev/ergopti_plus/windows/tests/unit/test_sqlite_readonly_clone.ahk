@@ -44,7 +44,17 @@ _SQLRC_WarmSource(Source) {
 	SQLite_Close(Control)
 }
 
-_SQLRC_ReadFailure(Source, Writer) {
+; Clones Source into a private candidate: "memory" or "disk", the bounded
+; private disk database a projection worker writes (KLR_OpenCandidate).
+_SQLRC_Clone(Source, Into) {
+	if (Into = "disk")
+		return SQLite_CloneInto(Source, SQLite_OpenPrivateDisk.Bind(1024))
+	return SQLite_CloneMemory(Source)
+}
+
+; Unreadable source pages reject the clone, into memory or into a bounded
+; private disk database.
+_SQLRC_ReadFailure(Source, Writer, Into := "memory") {
 	Path := _KLRDC_Root() . "source.sqlite"
 	PageSize := SQLite_Query(Source, "PRAGMA page_size;")[1]["page_size"]
 	Pages := SQLite_Query(Source, "PRAGMA page_count;")[1]["page_count"]
@@ -61,7 +71,7 @@ _SQLRC_ReadFailure(Source, Writer) {
 		Locked := DllCall("Kernel32\LockFileEx", "Ptr", File.Handle, "UInt", 3,
 			"UInt", 0, "UInt", PageSize, "UInt", 0, "Ptr", Overlap, "Int")
 		AssertTrue(Locked, "the last source page must be unreadable through other handles")
-		Candidate := SQLite_CloneMemory(ProbeSource)
+		Candidate := _SQLRC_Clone(ProbeSource, Into)
 		AssertEqual(0, Candidate, "a clone must not replace unreadable source pages with zero-filled successful data")
 	} finally {
 		SQLite_Close(Candidate)
@@ -77,7 +87,7 @@ _SQLRC_ReadFailure(Source, Writer) {
 	Candidate := 0
 	try {
 		AssertTrue(ProbeSource != 0)
-		Candidate := SQLite_CloneMemory(ProbeSource)
+		Candidate := _SQLRC_Clone(ProbeSource, Into)
 		AssertTrue(Candidate != 0, "the same file must become cloneable after unlocking")
 		AssertEqual(PageSize, SQLite_Query(Candidate, "PRAGMA page_size;")[1]["page_size"])
 		AssertEqual("ok", SQLite_Query(Candidate, "PRAGMA integrity_check;")[1]["integrity_check"])
@@ -93,6 +103,10 @@ Test("SQLite readonly clone: 16 KiB unreadable pages reject the candidate (sqlit
 	_KLRDC_CheckTeardown.Bind(_SQLRC_WithSource.Bind(_SQLRC_ReadFailure, 16384)))
 Test("SQLite readonly clone: 64 KiB unreadable pages reject the candidate (sqlite-readonly-clone-large-pages)",
 	_KLRDC_CheckTeardown.Bind(_SQLRC_WithSource.Bind(_SQLRC_ReadFailure, 65536)))
+for PageSize in [0, 16384, 65536]
+	Test("SQLite readonly clone: unreadable pages=" . (PageSize ? PageSize : "default")
+		. " reject a private disk candidate (sqlite-readonly-clone-read-failure)",
+		_KLRDC_CheckTeardown.Bind(_SQLRC_WithSource.Bind(_SQLRC_ReadFailure.Bind(, , "disk"), PageSize)))
 
 _SQLRC_GrowthAllocations(Source, Writer) {
 	PageSize := SQLite_Query(Source, "PRAGMA page_size;")[1]["page_size"]

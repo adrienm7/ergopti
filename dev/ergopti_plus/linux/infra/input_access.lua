@@ -56,7 +56,7 @@ function M.is_denied(path, open)
 end
 
 --- Reports an input-access failure to the user.
---- @param deps table { i18n = module|nil, notifier = module|nil, print = function|nil }
+--- @param deps table i18n, notifier, print; optional script_dir for an isolated caller.
 --- @param detail string What exactly could not be opened, for the console.
 --- @return integer The exit status the daemon must use.
 function M.report(deps, detail)
@@ -69,6 +69,11 @@ function M.report(deps, detail)
 		local ok_body, translated_body = pcall(i18n.get, M.BODY_KEY)
 		if ok_title and type(translated_title) == "string" then title = translated_title end
 		if ok_body and type(translated_body) == "string" then body = translated_body end
+	end
+	if body:find("{1}", 1, true) then
+		local root = deps.script_dir or require("infra.paths").driver_root()
+		local command = "bash " .. require("adapters.shell_runner").quote(root .. "/install.sh") .. " --setup-perms"
+		body = body:gsub("{1}", function() return command end)
 	end
 
 	local out = deps.print or print

@@ -232,6 +232,52 @@ helpers.describe("system metrics: network changes", function()
 		end)
 	end)
 
+	-- The last reader ran awk on /proc/net/wireless, and no package declares
+	-- awk: an install without it never saw a network change. The shell here has
+	-- an empty PATH, so only a reader that needs no tool passes; the stats move
+	-- between samples, so only the interface's name counts as the network.
+	helpers.it("reads the wireless interface with no tool on the PATH (wireless-without-awk)", function()
+		local real_shell = require("adapters.shell_runner")
+		local dir = os.tmpname()
+		os.remove(dir)
+		os.execute("mkdir " .. dir)
+		local listing = dir .. "/wireless"
+		local function listing_of(interface, quality)
+			local fh = assert(io.open(listing, "w"))
+			fh:write("Inter-| sta-|   Quality        |   Discarded packets               | Missed | WE\n",
+				" face | tus | link level noise |  nwid  crypt   frag  retry   misc | beacon | 22\n",
+				interface, ": 0000   ", quality, ".  -56.  -256        0      0      0      0     37        0\n")
+			fh:close()
+		end
+		with_shell({}, function(metrics)
+			local shell = package.loaded["adapters.shell_runner"]
+			shell.has_command = function() return false end
+			shell.exec_line = function(command)
+				if not command:find(listing, 1, true) then return "" end
+				return real_shell.exec_line("PATH=" .. dir .. "; export PATH; " .. command)
+			end
+			metrics._set_wireless_path(listing)
+			local step = metrics._sample_interval_ms()
+			listing_of("wlan0", 54)
+			metrics.sample(0, "2026-08-06")
+			listing_of("wlp2s0", 54)
+			metrics.sample(step, "2026-08-06")
+			helpers.assert_eq(metrics.current().wifi_changes, 1, "another interface is another network")
+			listing_of("wlp2s0", 31)
+			metrics.sample(step * 2, "2026-08-06")
+			helpers.assert_eq(metrics.current().wifi_changes, 1, "a weaker signal is the same network")
+			local fh = assert(io.open(listing, "w"))
+			fh:write("Inter-| sta-|   Quality\n face | tus | link level noise\n")
+			fh:close()
+			metrics.sample(step * 3, "2026-08-06")
+			os.remove(listing)
+			metrics.sample(step * 4, "2026-08-06")
+			helpers.assert_eq(metrics.current().wifi_changes, 1,
+				"no interface listed, then no listing at all, is no answer, not a network change")
+		end)
+		os.execute("rm -rf " .. dir)
+	end)
+
 	helpers.it("leaves the readings it cannot make at zero", function()
 		with_shell({ { match = "power_supply", out = "50" } }, function(metrics)
 			metrics.sample(0, "2026-08-06")

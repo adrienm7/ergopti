@@ -155,6 +155,31 @@ helpers.describe("tap-hold engine: a modifier key", function()
 		helpers.assert_eq(trail(out), "29↑", "Ctrl+Enter's Enter released during the CapsLock tap: no Enter")
 	end)
 
+	-- On Windows a tap fires only when the key itself was the last key pressed:
+	-- A_PriorKey (TapHoldPriorKeyIsSelf) counts every key-down in the key
+	-- history, auto-repeats included, and so does the InputHook tracker. Here a
+	-- key held on another keyboard kept repeating through a Shift tap, which
+	-- still copied (prior-key-repeat).
+	helpers.it("is a chord when another key auto-repeats in between (prior-key-repeat)", function()
+		local e = engine()
+		e:process(KEY_A, DOWN, 0)
+		e:process(SHIFT, DOWN, 10)
+		e:process(KEY_A, REPEAT, 40)
+		local _, tap = e:process(SHIFT, UP, 100)
+		helpers.assert_nil(tap, "A repeating during the Shift tap must not copy")
+		e = engine()
+		e:process(CAPS, DOWN, 0)
+		e:process(SHIFT, DOWN, 10)
+		e:process(CAPS, REPEAT, 40)
+		_, tap = e:process(SHIFT, UP, 100)
+		helpers.assert_nil(tap, "a tap-hold key repeating during the Shift tap must not copy")
+		e = engine()
+		e:process(SHIFT, DOWN, 0)
+		e:process(SHIFT, REPEAT, 60)
+		_, tap = e:process(SHIFT, UP, 100)
+		helpers.assert_eq(tap, "copy", "its own repeat is the key itself, still a tap")
+	end)
+
 	helpers.it("lets a click or a wheel turn make it a chord", function()
 		local e = engine()
 		e:process(SHIFT, DOWN, 0)
@@ -205,18 +230,45 @@ helpers.describe("tap-hold engine: a tap with no hold", function()
 
 	-- rctrl.ahk 7.3: RCtrl's one-shot Shift is a tap on a quick release, and a
 	-- long press holds Shift; it is never armed at key-down (tap-no-hold-per-key).
+	-- Shift goes down only when the KeyWait times out, past the threshold: here
+	-- it went down at key-down, so RCtrl then A within the threshold typed "A"
+	-- where Windows types "a" (rctrl-one-shot-hold-past-threshold).
 	helpers.it("arms RCtrl's one-shot Shift on a quick release and holds Shift for a long press (tap-no-hold-per-key)", function()
 		local keys = { right_ctrl = { tap_action = "one_shot_shift", time_activation_seconds = 0.2 } }
 		local e = engine(keys)
-		helpers.assert_eq(trail((e:process(RCTRL, DOWN, 0))), "42↓", "Shift, not the one-shot, at key-down")
-		helpers.assert_eq(trail((e:process(RCTRL, UP, 100))), "42↑")
-		helpers.assert_eq(trail((e:process(KEY_A, DOWN, 150))), "42↓ 30↓", "the quick release armed the one-shot")
+		helpers.assert_eq(trail((e:process(RCTRL, DOWN, 0))), "", "neither Shift nor the one-shot at key-down")
+		helpers.assert_eq(trail(e:tick(150)), "", "no Shift within the threshold")
+		helpers.assert_eq(trail((e:process(RCTRL, UP, 180))), "")
+		helpers.assert_eq(trail((e:process(KEY_A, DOWN, 190))), "42↓ 30↓", "the quick release armed the one-shot")
 		e = engine(keys)
 		e:process(RCTRL, DOWN, 0)
-		helpers.assert_nil(e:process(KEY_A, DOWN, 300), "held, it is Shift: A passes under it")
-		e:process(KEY_A, UP, 350)
-		helpers.assert_eq(trail((e:process(RCTRL, UP, 400))), "42↑")
-		helpers.assert_nil(e:process(KEY_A, DOWN, 450), "and a long press arms nothing")
+		helpers.assert_eq(trail(e:tick(200)), "", "at the threshold itself it is still a tap")
+		helpers.assert_eq(trail(e:tick(201)), "42↓", "past it, Shift is held")
+		helpers.assert_eq(trail(e:tick(500)), "", "once")
+		helpers.assert_nil(e:process(KEY_A, DOWN, 600), "held, it is Shift: A passes under it")
+		e:process(KEY_A, UP, 650)
+		helpers.assert_eq(trail((e:process(RCTRL, UP, 700))), "42↑")
+		helpers.assert_nil(e:process(KEY_A, DOWN, 750), "and a long press arms nothing")
+	end)
+
+	helpers.it("types a key pressed within RCtrl's threshold unshifted (rctrl-one-shot-hold-past-threshold)", function()
+		local e = engine({ right_ctrl = { tap_action = "one_shot_shift", time_activation_seconds = 0.2 } })
+		e:process(RCTRL, DOWN, 0)
+		helpers.assert_nil(e:process(KEY_A, DOWN, 50), "A within the threshold is a plain a")
+		helpers.assert_nil(e:process(KEY_A, UP, 80))
+		helpers.assert_eq(trail(e:tick(250)), "42↓", "RCtrl still down past the threshold holds Shift")
+		helpers.assert_nil(e:process(KEY_J, DOWN, 300), "J goes under that Shift")
+		e:process(KEY_J, UP, 320)
+		local out, tap = e:process(RCTRL, UP, 400)
+		helpers.assert_eq({ trail(out), tap }, { "42↑" })
+		helpers.assert_nil(e:process(KEY_A, DOWN, 450), "a used RCtrl arms nothing")
+		e = engine({ right_ctrl = { tap_action = "one_shot_shift", time_activation_seconds = 0.2 } })
+		e:process(RCTRL, DOWN, 0)
+		e:process(KEY_A, DOWN, 50)
+		e:process(KEY_A, UP, 80)
+		helpers.assert_eq(trail((e:process(RCTRL, UP, 150))), "", "released within the threshold: no Shift ever")
+		helpers.assert_nil(e:process(KEY_J, DOWN, 200), "and A made it a chord: nothing armed")
+		helpers.assert_eq(trail(e:release_all()), "", "nothing left to release")
 	end)
 
 	-- Each key's Windows tap-only hotkey, for a catalogue tap ("copy"):
@@ -292,6 +344,41 @@ helpers.describe("tap-hold engine: a tap with no hold", function()
 		helpers.assert_eq(trail((e:process(KEY_J, DOWN, 50))), "29↓ 105↓", "LAlt with a Tab tap holds the layer")
 	end)
 
+	-- lshift_lctrl.ahk 3.1: LCtrl taps only when CapsLock and LAlt were up at
+	-- its press (KS_IsUp SC03A and SC038, in its tap-only and its hold
+	-- variants), so CapsLock+LCtrl or LAlt+LCtrl let go quickly runs no tap.
+	-- LShift has no such guard (lctrl-tap-needs-caps-alt-up).
+	helpers.it("taps LCtrl only with CapsLock and LAlt up at its press (lctrl-tap-needs-caps-alt-up)", function()
+		local cases = {
+			{ CAPS, { caps_lock = DEFAULTS.caps_lock }, "CapsLock holding Ctrl" },
+			{ CAPS, {}, "a CapsLock nobody configured" },
+			{ ALT, {}, "a plain LAlt" },
+			{ ALT, { left_alt = { tap_action = "backspace", hold_modifier = "alt", time_activation_seconds = 0.2 } },
+				"LAlt holding Alt" },
+		}
+		for _, hold in ipairs({ "", "ctrl" }) do
+			for _, case in ipairs(cases) do
+				local other, keys, label = case[1], {}, case[3] .. " (LCtrl hold '" .. hold .. "')"
+				for key_id, config in pairs(case[2]) do keys[key_id] = config end
+				keys.left_ctrl = { tap_action = "paste", hold_modifier = hold, time_activation_seconds = 0.2 }
+				local e = engine(keys)
+				e:process(other, DOWN, 0)
+				e:process(CTRL, DOWN, 10)
+				local _, tap = e:process(CTRL, UP, 100)
+				helpers.assert_nil(tap, label .. " down at LCtrl's press: no tap")
+				e:process(other, UP, 150)
+				e:process(CTRL, DOWN, 200)
+				_, tap = e:process(CTRL, UP, 300)
+				helpers.assert_eq(tap, "paste", label .. " up again: LCtrl taps")
+			end
+		end
+		local e = engine({ left_shift = DEFAULTS.left_shift, caps_lock = DEFAULTS.caps_lock })
+		e:process(CAPS, DOWN, 0)
+		e:process(SHIFT, DOWN, 10)
+		local _, tap = e:process(SHIFT, UP, 100)
+		helpers.assert_eq(tap, "copy", "LShift taps under a held CapsLock, as on Windows")
+	end)
+
 	-- lalt.ahk 4.1: LAlt's one-shot Shift is armed at key-down and Shift is held
 	-- until the key comes up (tap-no-hold-per-key).
 	helpers.it("arms LAlt's one-shot Shift at key-down and holds Shift until release (tap-no-hold-per-key)", function()
@@ -300,6 +387,41 @@ helpers.describe("tap-hold engine: a tap with no hold", function()
 		helpers.assert_eq(trail((e:process(ALT, REPEAT, 500))), "", "and no second arming on a repeat")
 		helpers.assert_eq(trail((e:process(ALT, UP, 900))), "42↑", "released with the key, however late")
 		helpers.assert_eq(trail((e:process(KEY_A, DOWN, 1000))), "42↓ 30↓", "the one-shot armed at key-down")
+	end)
+
+	-- lalt.ahk 4.1: LAlt's one-shot hotkey is SC038 with no * wildcard, so
+	-- under a held modifier it does not fire and LAlt stays Alt; and it returns
+	-- without arming anything when RCtrl, CapsLock, LShift or LCtrl is
+	-- physically down. Here the one-shot was armed and Shift held under all of
+	-- them, so Ctrl+LAlt+A typed Ctrl+Shift+A (lalt-one-shot-skip).
+	helpers.it("skips LAlt's one-shot under a held modifier or a held RCtrl, CapsLock, LShift or LCtrl (lalt-one-shot-skip)", function()
+		local keys = { left_alt = { tap_action = "one_shot_shift", time_activation_seconds = 0.2 } }
+		local RSHIFT, WIN = 54, 125
+		for _, mod in ipairs({ CTRL, SHIFT, RCTRL, RSHIFT, WIN }) do
+			local e = engine(keys)
+			e:process(mod, DOWN, 0)
+			helpers.assert_nil(e:process(ALT, DOWN, 10), mod .. " held: LAlt is Alt, no Shift")
+			helpers.assert_nil(e:process(ALT, REPEAT, 500), mod .. " held: Alt repeats as itself")
+			helpers.assert_nil(e:process(ALT, UP, 600), mod .. " held: Alt comes up as itself")
+			e:process(mod, UP, 700)
+			helpers.assert_nil(e:process(KEY_A, DOWN, 800), mod .. " held: nothing was armed")
+		end
+		-- CapsLock is no modifier here, plain or tapping Enter at key-down: LAlt
+		-- then does nothing at all.
+		for _, caps in ipairs({ {}, { caps_lock = { tap_action = "enter", time_activation_seconds = 0.2 } } }) do
+			caps.left_alt = keys.left_alt
+			local e = engine(caps)
+			e:process(CAPS, DOWN, 0)
+			helpers.assert_eq(trail((e:process(ALT, DOWN, 10))), "", "CapsLock held: no Alt, no Shift")
+			helpers.assert_eq(trail((e:process(ALT, REPEAT, 500))), "")
+			helpers.assert_eq({ trail((e:process(ALT, UP, 600))) }, { "" })
+			e:process(CAPS, UP, 700)
+			helpers.assert_nil(e:process(KEY_A, DOWN, 800), "CapsLock held: nothing was armed")
+		end
+		-- Under a modifier a tap-hold holds, as a Ctrl CapsLock does, LAlt is Alt.
+		local e = engine({ left_alt = keys.left_alt, caps_lock = DEFAULTS.caps_lock })
+		e:process(CAPS, DOWN, 0)
+		helpers.assert_nil(e:process(ALT, DOWN, 10), "Ctrl held by CapsLock: LAlt is Alt")
 	end)
 
 	helpers.it("is still the key itself under a modifier and a layer key on the layer (tap-no-hold-instant)", function()
@@ -312,6 +434,146 @@ helpers.describe("tap-hold engine: a tap with no hold", function()
 		e:process(ALT, DOWN, 100)
 		helpers.assert_nil(e:process(ESC, DOWN, 110), "on the layer Escape is Escape, as the Windows hotkey is off")
 		helpers.assert_nil(e:process(ESC, UP, 120))
+	end)
+
+end)
+
+-- lalt.ahk 4.10: LAlt's Backspace tap goes through BackSpaceLogic, which reads
+-- the keys physically held and types in place of the plain Backspace, each
+-- keystroke with only its own modifiers (TextPressKey lifts the others):
+-- LCtrl+Shift, or an RCtrl that is not the one-shot Shift +Shift, give
+-- Ctrl+Delete; LCtrl with the one-shot RCtrl gives Ctrl+Right then
+-- Ctrl+Backspace; the one-shot RCtrl alone Right then Backspace (a Delete
+-- that cannot become Ctrl+Alt+Delete); Shift Delete; LCtrl or a plain RCtrl
+-- Ctrl+Backspace. With the layer as its hold, the tap also needs CapsLock up
+-- at its release (lalt.ahk 4.5). Linux typed Backspace under whatever was
+-- held: LShift then LAlt deleted backwards (lalt-backspace-logic).
+helpers.describe("tap-hold engine: LAlt's Backspace under held keys", function()
+
+	local LSHIFT, LCTRL, RSHIFT = 42, 29, 54
+
+	--- LAlt tapped as shipped (Backspace, the layer on hold) after `held` went
+	--- down, with `keys` configured too.
+	--- @return string What LAlt's release types.
+	local function lalt_tap(keys, held)
+		local all = { left_alt = DEFAULTS.left_alt }
+		for key_id, config in pairs(keys) do all[key_id] = config end
+		local e = engine(all)
+		for index, code in ipairs(held) do e:process(code, DOWN, index * 10) end
+		e:process(ALT, DOWN, 100)
+		local out, tap = e:process(ALT, UP, 180)
+		helpers.assert_nil(tap)
+		return trail(out)
+	end
+
+	helpers.it("types what Windows' BackSpaceLogic types for the keys held (lalt-backspace-logic)", function()
+		local cases = {
+			{ "LCtrl+LShift", {}, { LCTRL, LSHIFT }, "42↑ 111↓ 111↑ 42↓" },
+			{ "RCtrl+RShift", {}, { RCTRL, RSHIFT }, "54↑ 111↓ 111↑ 54↓" },
+			{ "LCtrl and the one-shot RCtrl", { right_ctrl = DEFAULTS.right_ctrl }, { LCTRL, RCTRL },
+				"42↑ 106↓ 106↑ 14↓ 14↑ 42↓" },
+			{ "the one-shot RCtrl", { right_ctrl = DEFAULTS.right_ctrl }, { RCTRL }, "42↑ 106↓ 106↑ 14↓ 14↑ 42↓" },
+			{ "LShift", {}, { LSHIFT }, "42↑ 111↓ 111↑ 42↓" },
+			{ "RShift", {}, { RSHIFT }, "54↑ 111↓ 111↑ 54↓" },
+			{ "LCtrl", {}, { LCTRL }, "14↓ 14↑" },
+			{ "a plain RCtrl", {}, { RCTRL }, "14↓ 14↑" },
+			{ "nothing", {}, {}, "14↓ 14↑" },
+		}
+		for _, case in ipairs(cases) do
+			helpers.assert_eq(lalt_tap(case[2], case[3]), case[4], case[1] .. " then LAlt tapped")
+		end
+	end)
+
+	helpers.it("types nothing when CapsLock is down at the release of its layer hold (lalt-backspace-logic)", function()
+		helpers.assert_eq(lalt_tap({ caps_lock = DEFAULTS.caps_lock }, { CAPS }), "",
+			"CapsLock+LAlt let go quickly: no Backspace")
+		helpers.assert_eq(lalt_tap({}, { CAPS }), "", "a plain CapsLock too")
+		local e = engine({ caps_lock = DEFAULTS.caps_lock,
+			left_alt = { tap_action = "backspace", hold_modifier = "alt", time_activation_seconds = 0.2 } })
+		e:process(CAPS, DOWN, 0)
+		e:process(ALT, DOWN, 10)
+		helpers.assert_eq(trail((e:process(ALT, UP, 100))), "194↓ 194↑ 56↑ 14↓ 14↑",
+			"no such guard with a modifier hold (its lone Alt masked first)")
+	end)
+
+	helpers.it("decides again at each repeat when LAlt has no hold (lalt-backspace-logic)", function()
+		local e = engine({ left_alt = { tap_action = "backspace", time_activation_seconds = 0.2 } })
+		e:process(LSHIFT, DOWN, 0)
+		helpers.assert_eq(trail((e:process(ALT, DOWN, 10))), "42↑ 111↓ 111↑ 42↓", "Delete at key-down")
+		helpers.assert_eq(trail((e:process(ALT, REPEAT, 510))), "42↑ 111↓ 111↑ 42↓", "and at each repeat")
+		e:process(LSHIFT, UP, 520)
+		helpers.assert_eq(trail((e:process(ALT, REPEAT, 540))), "14↓ 14↑", "Shift let go: Backspace again")
+		helpers.assert_eq(trail((e:process(ALT, UP, 600))), "")
+	end)
+
+	helpers.it("spends an armed one-shot Shift (lalt-backspace-logic)", function()
+		local e = engine({ left_alt = DEFAULTS.left_alt, right_ctrl = DEFAULTS.right_ctrl })
+		e:process(RCTRL, DOWN, 0)
+		e:process(RCTRL, UP, 100)
+		e:process(LSHIFT, DOWN, 200)
+		e:process(ALT, DOWN, 210)
+		helpers.assert_eq(trail((e:process(ALT, UP, 260))), "42↑ 111↓ 111↑ 42↓")
+		e:process(LSHIFT, UP, 270)
+		helpers.assert_nil(e:process(KEY_A, DOWN, 300), "the Delete spent the one-shot: a plain a")
+	end)
+
+	-- The keyboard hook names the modifiers down before this engine's own
+	-- events are dispatched: LAlt holding Alt had just released it, and lifting
+	-- it again then pressing it back left Alt down (lalt-backspace-logic).
+	helpers.it("keeps up a modifier its own release just lifted (lalt-backspace-logic)", function()
+		local e = Engine.new({ keys = { left_alt = { tap_action = "backspace", hold_modifier = "alt",
+				time_activation_seconds = 0.2 } },
+			tap_min_ms = 50, one_shot_timeout_ms = 2000,
+			held_text_modifier_codes = function() return { LSHIFT } end,
+			held_shortcut_modifier_codes = function() return { ALT } end })
+		e:process(LSHIFT, DOWN, 0)
+		e:process(ALT, DOWN, 10)
+		helpers.assert_eq(trail((e:process(ALT, UP, 100))), "194↓ 194↑ 56↑ 42↑ 111↓ 111↑ 42↓",
+			"Alt stays up, the hand's Shift is lifted around the Delete")
+	end)
+
+end)
+
+-- rctrl.ahk 7.1 and _RCtrlBackspaceTap: RCtrl's Backspace tap types Delete
+-- while LShift (only the left one) is physically down, and Right then
+-- Backspace, spending the one-shot, while LAlt tapping the one-shot Shift is
+-- down; otherwise a Backspace under the held modifiers. Linux typed
+-- Shift+Backspace and left the one-shot armed (rctrl-backspace-logic).
+helpers.describe("tap-hold engine: RCtrl's Backspace under held keys", function()
+
+	local LSHIFT, RSHIFT = 42, 54
+	local ONE_SHOT_LALT = { tap_action = "one_shot_shift", time_activation_seconds = 0.2 }
+
+	helpers.it("types Delete under LShift, at key-down and each repeat with no hold (rctrl-backspace-logic)", function()
+		local e = engine({ right_ctrl = { tap_action = "backspace", time_activation_seconds = 0.2 } })
+		e:process(LSHIFT, DOWN, 0)
+		helpers.assert_eq(trail((e:process(RCTRL, DOWN, 10))), "42↑ 111↓ 111↑ 42↓", "Delete at key-down")
+		helpers.assert_eq(trail((e:process(RCTRL, REPEAT, 510))), "42↑ 111↓ 111↑ 42↓", "and at each repeat")
+		e:process(RCTRL, UP, 520)
+		e:process(LSHIFT, UP, 530)
+		e:process(RSHIFT, DOWN, 600)
+		helpers.assert_eq(trail((e:process(RCTRL, DOWN, 610))), "14↓ 14↑", "RShift is no LShift here: Backspace")
+	end)
+
+	helpers.it("types Delete under LShift on the tap of a hold (rctrl-backspace-logic)", function()
+		local e = engine({ right_ctrl = { tap_action = "backspace", hold_modifier = "ctrl", time_activation_seconds = 0.2 } })
+		e:process(LSHIFT, DOWN, 0)
+		e:process(RCTRL, DOWN, 10)
+		helpers.assert_eq(trail((e:process(RCTRL, UP, 100))), "29↑ 42↑ 111↓ 111↑ 42↓")
+		e:process(LSHIFT, UP, 200)
+		e:process(RCTRL, DOWN, 300)
+		helpers.assert_eq(trail((e:process(RCTRL, UP, 400))), "29↑ 14↓ 14↑", "alone, a Backspace")
+	end)
+
+	helpers.it("types Right then Backspace under LAlt's one-shot Shift and spends it (rctrl-backspace-logic)", function()
+		local e = engine({ right_ctrl = { tap_action = "backspace", time_activation_seconds = 0.2 },
+			left_alt = ONE_SHOT_LALT })
+		helpers.assert_eq(trail((e:process(ALT, DOWN, 0))), "42↓", "LAlt holds Shift and arms the one-shot")
+		helpers.assert_eq(trail((e:process(RCTRL, DOWN, 10))), "42↑ 106↓ 106↑ 14↓ 14↑ 42↓",
+			"a Delete with LAlt's Shift lifted")
+		e:process(RCTRL, UP, 50)
+		e:process(ALT, UP, 60)
+		helpers.assert_nil(e:process(KEY_A, DOWN, 100), "the one-shot is spent: a plain a")
 	end)
 
 end)
@@ -449,6 +711,103 @@ helpers.describe("tap-hold engine: under a modifier and on the layer", function(
 		helpers.assert_eq(trail(e:process(CAPS, UP, 60)), "14↑")
 		local _, tap = e:process(ALT, UP, 90)
 		helpers.assert_nil(tap, "the layer was used")
+	end)
+
+	-- A key whose own hold is the layer another key already holds is not a
+	-- second layer key: it is the layer's key where the layer maps it, and
+	-- itself otherwise, with its auto-repeat, as on Windows (765f8ae4a), where
+	-- no tap-hold hotkey is eligible while the layer is on. Space held for the
+	-- layer under CapsLock's layer typed nothing, dropped its repeat and typed
+	-- one space on a quick release; CapsLock held for the layer under LAlt's
+	-- was a layer key tapping Enter, not the layer's Backspace (layer-under-layer).
+	helpers.it("is the layer's key or itself when its own hold is the layer another key holds (layer-under-layer)", function()
+		local SPACE = 57
+		local e = engine({
+			left_alt = DEFAULTS.left_alt,
+			caps_lock = { tap_action = "enter", hold_layer = "nav", time_activation_seconds = 0.35 },
+			space = { tap_action = "", hold_layer = "nav", time_activation_seconds = 0.2 },
+		})
+		e:process(ALT, DOWN, 0)
+		helpers.assert_nil(e:process(SPACE, DOWN, 30), "the layer maps no Space: Space is Space")
+		helpers.assert_nil(e:process(SPACE, REPEAT, 530), "and repeats as Space")
+		helpers.assert_nil(e:process(SPACE, UP, 560))
+		helpers.assert_eq(trail(e:process(CAPS, DOWN, 600)), "14↓", "the layer maps CapsLock: Backspace")
+		helpers.assert_eq(trail(e:process(CAPS, REPEAT, 1100)), "14⟳", "repeated as the layer's key")
+		local out, tap = e:process(CAPS, UP, 1120)
+		helpers.assert_eq({ trail(out), tap }, { "14↑" }, "and no Enter on its release")
+		helpers.assert_eq({ trail((e:process(ALT, UP, 1200))) }, { "" }, "the layer was used")
+		helpers.assert_eq(trail(e:process(CAPS, DOWN, 1300)), "", "off the layer CapsLock holds it again")
+		helpers.assert_eq(trail(e:process(KEY_J, DOWN, 1310)), "29↓ 105↓")
+		e:process(KEY_J, UP, 1320)
+		e:process(CAPS, UP, 1330)
+		-- Tapped quickly on the layer, Space types one space.
+		e:process(CAPS, DOWN, 2000)
+		helpers.assert_nil(e:process(SPACE, DOWN, 2010), "a quick Space on the layer is a space")
+		helpers.assert_nil(e:process(SPACE, UP, 2040))
+		local _, caps_tap = e:process(CAPS, UP, 2100)
+		helpers.assert_nil(caps_tap, "Space was typed on CapsLock's layer: no Enter")
+	end)
+
+	-- nav_layer.ahk swallows LAlt while the layer is on when LAlt taps
+	-- Backspace with the layer on hold ("Fix when LAlt triggers the layer").
+	-- Passed through as Alt, it put Alt under every chord of Space's layer: J
+	-- gave Ctrl+Alt+Left, a workspace switch on GNOME (layer-under-layer).
+	helpers.it("swallows LAlt tapping Backspace on another key's layer, as Windows does (layer-under-layer)", function()
+		local SPACE = 57
+		local e = engine({
+			left_alt = DEFAULTS.left_alt,
+			space = { tap_action = "", hold_layer = "nav", time_activation_seconds = 0.2 },
+		})
+		helpers.assert_eq(trail(e:process(SPACE, DOWN, 0)), "", "Space holds the layer")
+		local down = e:process(ALT, DOWN, 300)
+		helpers.assert_eq(down and trail(down), "", "LAlt is swallowed, not an Alt")
+		local repeated = e:process(ALT, REPEAT, 800)
+		helpers.assert_eq(repeated and trail(repeated), "", "and so is its repeat")
+		helpers.assert_eq(trail(e:process(KEY_J, DOWN, 820)), "29↓ 105↓", "J is Ctrl+Left, with no Alt")
+		e:process(KEY_J, UP, 840)
+		local out, tap = e:process(ALT, UP, 860)
+		helpers.assert_eq({ out and trail(out), tap }, { "" }, "its release too, with no Backspace")
+		e:process(ALT, DOWN, 900)
+		out, tap = e:process(ALT, UP, 960)
+		helpers.assert_eq({ out and trail(out), tap }, { "" }, "a quick LAlt there types no Backspace")
+		local _, space_tap = e:process(SPACE, UP, 1000)
+		helpers.assert_nil(space_tap, "LAlt was pressed on Space's layer: no space")
+		local plain = engine({
+			left_alt = { tap_action = "copy", hold_layer = "nav", time_activation_seconds = 0.2 },
+			space = { tap_action = "", hold_layer = "nav", time_activation_seconds = 0.2 },
+		})
+		plain:process(SPACE, DOWN, 0)
+		helpers.assert_nil(plain:process(ALT, DOWN, 300), "any other LAlt tap: no Windows hotkey, a plain Alt")
+		helpers.assert_nil(plain:process(ALT, UP, 360))
+	end)
+
+	-- Every Windows tap-hold variant needs the layer off (not LayerEnabled in
+	-- each #HotIf, AltGr's in altgr_criteria.ahk), and the layer maps none of
+	-- these keys, so they are native there. The shipped LShift still copied on
+	-- the layer, RCtrl still held Shift and armed the one-shot, and Tab still
+	-- held Alt (layer-tap-holds-off).
+	helpers.it("makes a key with a modifier hold itself on the layer (layer-tap-holds-off)", function()
+		local TAB = 15
+		local e = engine({
+			left_alt = DEFAULTS.left_alt, left_shift = DEFAULTS.left_shift,
+			right_ctrl = DEFAULTS.right_ctrl, tab = DEFAULTS.tab,
+		})
+		e:process(ALT, DOWN, 0)
+		helpers.assert_nil(e:process(SHIFT, DOWN, 300), "LShift is Shift")
+		local out, tap = e:process(SHIFT, UP, 400)
+		helpers.assert_eq({ out, tap }, {}, "its quick release passes and copies nothing")
+		helpers.assert_nil(e:process(RCTRL, DOWN, 500), "RCtrl is Right Ctrl, not Shift")
+		helpers.assert_nil(e:process(RCTRL, UP, 550), "its release passes")
+		helpers.assert_nil(e:process(TAB, DOWN, 600), "Tab is Tab, not Alt")
+		helpers.assert_nil(e:process(TAB, REPEAT, 1100), "and repeats as Tab")
+		out, tap = e:process(TAB, UP, 1120)
+		helpers.assert_eq({ out, tap }, {}, "with no window switcher on its release")
+		e:process(ALT, UP, 1200)
+		helpers.assert_nil(e:process(KEY_A, DOWN, 1300), "RCtrl armed no one-shot: a plain a")
+		e:process(KEY_A, UP, 1310)
+		helpers.assert_eq(trail(e:process(SHIFT, DOWN, 1400)), "42↓", "off the layer LShift holds again")
+		local _, copy = e:process(SHIFT, UP, 1450)
+		helpers.assert_eq(copy, "copy", "and copies on a tap")
 	end)
 
 end)

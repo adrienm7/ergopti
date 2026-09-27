@@ -1807,7 +1807,7 @@
 	"shortcuts.uppercase": "Win + U(ppercase) = चयन अपरकेस/लोअरकेस टॉगल करें",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
 	"startup.accessibility_required": "कीबोर्ड पढ़ने के लिए ErgoptiPlus को Accessibility अनुमति चाहिए। System Settings > Privacy & Security > Accessibility में ErgoptiPlus से जुड़ी Hammerspoon प्रविष्टि चालू करें, फिर ErgoptiPlus दोबारा खोलें। अलग से चलाए गए Hammerspoon ऐप की अपनी अलग प्रविष्टि होती है।",
-	"startup.linux_input_access_body": "Ergopti+ अभी कीबोर्ड पढ़ नहीं सकता या /dev/uinput में लिख नहीं सकता। इंस्टॉलर द्वारा जोड़े गए “input” और “uinput” समूह लागू हों, इसके लिए लॉग आउट करके फिर से लॉग इन करें (या रीस्टार्ट करें)। समस्या बनी रहे तो चलाएँ: bash install.sh --setup-perms",
+	"startup.linux_input_access_body": "Ergopti+ अभी कीबोर्ड पढ़ नहीं सकता या /dev/uinput में लिख नहीं सकता। इंस्टॉलर द्वारा जोड़े गए “input” और “uinput” समूह लागू हों, इसके लिए लॉग आउट करके फिर से लॉग इन करें (या रीस्टार्ट करें)। समस्या बनी रहे तो चलाएँ: {1}",
 	"startup.linux_input_access_title": "Ergopti+ अभी कीबोर्ड का उपयोग नहीं कर सकता",
 	"startup.manifest_missing": "स्टार्टअप त्रुटि: _generated/features_manifest.ahk फ़ाइल अनुपस्थित या दूषित है।\n\nप्रोजेक्ट डायरेक्टरी से `npm run build:manifest` चलाएं, फिर स्क्रिप्ट को पुनः प्रारंभ करें।",
 	"startup.manifest_title": "ErgoptiPlus — manifest अनुपस्थित",
@@ -2494,5 +2494,11 @@
 	"ui_metrics_rebuild.eta": "लगभग {eta} शेष",
 	"ui_metrics_rebuild.eta_unknown": "शेष समय का अनुमान लगाया जा रहा है…",
 	"ui_metrics_rebuild.finalizing": "पुनर्निर्मित आँकड़े सहेजे जा रहे हैं…",
-	"ui_metrics_rebuild.failed": "आँकड़ों का पुनर्निर्माण अप्रत्याशित रूप से रुक गया। अगला प्रयास वहीं से जारी रहेगा जहाँ यह रुका था।"
+	"ui_metrics_rebuild.failed": "आँकड़ों का पुनर्निर्माण अप्रत्याशित रूप से रुक गया। अगला प्रयास वहीं से जारी रहेगा जहाँ यह रुका था।",
+	"menu.global.uninstall": "Ergopti अनइंस्टॉल करें…",
+	"dialog.uninstall.confirm": "Ergopti अनइंस्टॉल करें? ऐप बंद हो जाएगा। आपकी सेटिंग, हॉटस्ट्रिंग, मेट्रिक और लॉगिन जानकारी सुरक्षित रहेंगी।",
+	"dialog.uninstall.failed": "Ergopti अनइंस्टॉल नहीं हो सका। आपका निजी डेटा सुरक्षित रखा गया है।",
+	"menu.global.start_at_login": "लॉगिन पर शुरू करें",
+	"dialog.start_at_login.failed": "स्वचालित स्टार्टअप नहीं बदला जा सका। सिस्टम की स्टार्टअप सेटिंग जाँचें।",
+	"onboarding.error.open_failed": "सेटअप विज़ार्ड नहीं खुल सका। लॉग जाँचें और मेनू से फिर प्रयास करें।"
 }

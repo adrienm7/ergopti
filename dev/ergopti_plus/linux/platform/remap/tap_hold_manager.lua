@@ -173,6 +173,7 @@ local function _load()
 		one_shot_result = _one_shot_result,
 		held_modifiers = function() return _hook.held_modifiers() end,
 		held_text_modifier_codes = function() return _hook.held_text_modifier_codes() end,
+		held_shortcut_modifier_codes = function() return _hook.held_shortcut_modifier_codes() end,
 	})
 	Logger.info(LOG, "Tap-holds loaded: %d key(s), feature %s.", count, _loaded.enabled and "on" or "off")
 end
@@ -198,9 +199,10 @@ function M.init(opts)
 	if type(opts.keyboard_hook) ~= "table" or type(opts.keyboard_hook.set_remapper) ~= "function"
 		or type(opts.keyboard_hook.key_text) ~= "function"
 		or type(opts.keyboard_hook.held_modifiers) ~= "function"
-		or type(opts.keyboard_hook.held_text_modifier_codes) ~= "function" then
-		error("tap-hold manager requires a keyboard hook with set_remapper(), key_text(), held_modifiers() "
-			.. "and held_text_modifier_codes()", 2)
+		or type(opts.keyboard_hook.held_text_modifier_codes) ~= "function"
+		or type(opts.keyboard_hook.held_shortcut_modifier_codes) ~= "function" then
+		error("tap-hold manager requires a keyboard hook with set_remapper(), key_text(), held_modifiers(), "
+			.. "held_text_modifier_codes() and held_shortcut_modifier_codes()", 2)
 	end
 	for _, name in ipairs({ "execute_action", "action_names", "on_text_injected" }) do
 		if type(opts[name]) ~= "function" then error("tap-hold manager requires " .. name, 2) end

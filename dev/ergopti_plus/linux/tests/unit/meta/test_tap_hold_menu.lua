@@ -43,7 +43,8 @@ local function build(calls, picked, user_text)
 	Manager.init({
 		keyboard_hook = { set_remapper = function() end, key_text = function() return nil end,
 			held_modifiers = function() return {} end,
-			held_text_modifier_codes = function() return {} end },
+			held_text_modifier_codes = function() return {} end,
+			held_shortcut_modifier_codes = function() return {} end },
 		execute_action = function() end,
 		on_text_injected = function() end,
 		action_names = function() return { "open_url" } end,

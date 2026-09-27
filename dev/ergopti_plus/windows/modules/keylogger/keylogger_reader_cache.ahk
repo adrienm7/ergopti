@@ -199,7 +199,8 @@ KLR_CacheAttach(md, logPath, BeforeDiscard := 0) {
 	; An image whose only defect is a leftover main-schema payload table is
 	; upgraded rather than rebuilt: every rollup in it is still exact, while a
 	; cold rebuild of a large store costs tens of minutes of blank dashboard.
-	; The table is dropped in a private memory copy, never in the shared file.
+	; The table is dropped in a private copy (KLR_OpenCandidate), never in the
+	; shared file.
 	Upgraded := false
 	SavedAt := ""
 	try {
@@ -247,9 +248,9 @@ KLR_CacheAttach(md, logPath, BeforeDiscard := 0) {
 			restored := stored
 			stored := 0
 		} else {
-			restored := SQLite_Open(":memory:")
+			restored := KLR_OpenCandidate()
 			if !restored {
-				KLR_PrefetchDebug(logPath, "KLR cache rejected: no memory database")
+				KLR_PrefetchDebug(logPath, "KLR cache rejected: no private candidate database")
 				return 0
 			}
 			if !SQLite_BackupInto(restored, stored) {
@@ -296,7 +297,9 @@ KLR_CacheAttach(md, logPath, BeforeDiscard := 0) {
 	}
 
 	KLRCache.db := restored
-	; Only a file-backed transfer is read-only; every copy is private memory.
+	; Only a file-backed transfer is read-only; every copy is private: a bounded
+	; private disk database in a worker, memory in the resident driver
+	; (KLR_OpenCandidate).
 	KLRCache.readonly := KLRCache.disposable && !Upgraded
 	KLRCache.last_sizes := Offsets
 	KLRCache.ledger_snapshots := Snapshots
