@@ -67,6 +67,13 @@ global TEST_RESULTS_FILE := A_ScriptDir . "\test_results.txt"
 #Include ../../infra/text_utils.ahk
 #Include ../../infra/hotstrings/hotstring_engine.ahk
 #Include ../../infra/hotstrings/hotstring_engine_main.ahk
+; Every expansion is sent through the tap-hold owner, which lifts an AltGr a
+; tap-hold holds around the output (_HSE_SendWithAltGrUp). Without these files
+; the call failed, the dispatch logged it and sent nothing, so the harness saw
+; an empty expansion. They load in run_all.ahk's order.
+#Include ../../adapters/text_sender.ahk
+#Include ../../adapters/key_state.ahk
+#Include ../../platform/remap/constants.ahk
 
 ; Intercept all Send* calls so they are captured rather than typed to the OS.
 InstallHotstringHooks()
