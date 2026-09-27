@@ -46,8 +46,8 @@ $shortcut.Arguments = ''
 $shortcut.Save()
 [void][Runtime.InteropServices.Marshal]::ReleaseComObject($shortcut)
 [void][Runtime.InteropServices.Marshal]::ReleaseComObject($shell)
-Remove-ErgoptiStartupShortcut $target $shortcutPath
-if (Test-Path -LiteralPath $shortcutPath) { throw 'Owned startup shortcut survived removal' }
+Remove-ErgoptiStartupShortcut ((Split-Path $target) + '\\.\\application.exe') $shortcutPath
+if (Test-Path -LiteralPath $shortcutPath) { throw 'Shell-normalized startup shortcut survived removal' }
 $script:recycled = @()
 $recycle = { param($Path) $script:recycled += $Path }
 $failed = $false
