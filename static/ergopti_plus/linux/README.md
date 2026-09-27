@@ -127,7 +127,12 @@ The installer detects apt/dnf/pacman, installs dependencies (luajit,
 libnotify-bin, …), copies files to `~/.local/lib/ergopti/`, and installs
 a systemd user service.
 
-### Automatic startup
+### First use and automatic startup
+
+The first graphical launch opens the setup wizard. Completing it saves your
+choices; closing it without finishing offers it again at the next launch. You
+can also reopen **Setup wizard** from the menu. The `.deb` requires the WebKitGTK
+window dependencies so the wizard is available on a normal Zorin installation.
 
 Use **Global actions → Start at login** to enable or disable automatic startup.
 Disabling it leaves Ergopti running in the current session and applies to the

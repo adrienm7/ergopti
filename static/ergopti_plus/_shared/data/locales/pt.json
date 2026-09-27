@@ -2499,5 +2499,6 @@
 	"dialog.uninstall.confirm": "Desinstalar o Ergopti? A aplicação será fechada. As definições, hotstrings, métricas e credenciais serão mantidas.",
 	"dialog.uninstall.failed": "Não foi possível desinstalar o Ergopti. Os seus dados pessoais foram mantidos.",
 	"menu.global.start_at_login": "Iniciar ao entrar na sessão",
-	"dialog.start_at_login.failed": "Não foi possível alterar o início automático. Verifique as definições de arranque do sistema."
+	"dialog.start_at_login.failed": "Não foi possível alterar o início automático. Verifique as definições de arranque do sistema.",
+	"onboarding.error.open_failed": "Não foi possível abrir o assistente de configuração. Consulte os registos e tente novamente pelo menu."
 }

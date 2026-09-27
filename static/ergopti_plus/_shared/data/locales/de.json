@@ -2499,5 +2499,6 @@
 	"dialog.uninstall.confirm": "Ergopti deinstallieren? Die Anwendung wird geschlossen. Einstellungen, Hotstrings, Metriken und Zugangsdaten bleiben erhalten.",
 	"dialog.uninstall.failed": "Ergopti konnte nicht deinstalliert werden. Ihre persönlichen Daten bleiben erhalten.",
 	"menu.global.start_at_login": "Bei der Anmeldung starten",
-	"dialog.start_at_login.failed": "Der automatische Start konnte nicht geändert werden. Prüfen Sie die Autostart-Einstellungen des Systems."
+	"dialog.start_at_login.failed": "Der automatische Start konnte nicht geändert werden. Prüfen Sie die Autostart-Einstellungen des Systems.",
+	"onboarding.error.open_failed": "Der Einrichtungsassistent konnte nicht geöffnet werden. Prüfen Sie die Protokolle und versuchen Sie es erneut über das Menü."
 }

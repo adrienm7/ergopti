@@ -2499,5 +2499,6 @@
 	"dialog.uninstall.confirm": "Vill du avinstallera Ergopti? Programmet stängs. Dina inställningar, hotstrings, mätvärden och inloggningsuppgifter behålls.",
 	"dialog.uninstall.failed": "Ergopti kunde inte avinstalleras. Dina personliga data har behållits.",
 	"menu.global.start_at_login": "Starta vid inloggning",
-	"dialog.start_at_login.failed": "Kunde inte ändra automatisk start. Kontrollera systemets startinställningar."
+	"dialog.start_at_login.failed": "Kunde inte ändra automatisk start. Kontrollera systemets startinställningar.",
+	"onboarding.error.open_failed": "Kunde inte öppna installationsguiden. Kontrollera loggarna och försök igen från menyn."
 }

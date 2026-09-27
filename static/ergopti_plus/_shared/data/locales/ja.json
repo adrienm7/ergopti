@@ -2499,5 +2499,6 @@
 	"dialog.uninstall.confirm": "Ergopti をアンインストールしますか？アプリケーションは終了します。設定、ホットストリング、統計情報、認証情報は保持されます。",
 	"dialog.uninstall.failed": "Ergopti をアンインストールできませんでした。個人データは保持されています。",
 	"menu.global.start_at_login": "ログイン時に起動",
-	"dialog.start_at_login.failed": "自動起動を変更できませんでした。システムの起動設定を確認してください。"
+	"dialog.start_at_login.failed": "自動起動を変更できませんでした。システムの起動設定を確認してください。",
+	"onboarding.error.open_failed": "設定ウィザードを開けませんでした。ログを確認し、メニューから再試行してください。"
 }

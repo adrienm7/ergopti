@@ -23,9 +23,8 @@ local Sandbox = Contract.sandbox
 -- of them visibly changes the driver state.
 local SHORTCUTS_NON_DEFAULT = not require("infra.manifest_reader").default_for("shortcuts.enabled")
 
--- One key of each shape the Linux readers take, and seven they never read,
--- including [script].onboarding_done: the wizard writes it and no Linux code
--- reads it back.
+-- One key of each shape the Linux readers take, and six they never read.
+-- First-use completion survives cleanup because graphical startup reads it.
 local FIXTURE = table.concat({
 	"[script]",
 	"onboarding_done = true",
@@ -61,7 +60,6 @@ local FIXTURE = table.concat({
 }, "\n")
 
 local EXPECTED = {
-	"script.onboarding_done=section",
 	"hotstrings.stale_toggle=leaf",
 	"metrics.metrics_encrypt=leaf",
 	"gestures.not_a_slot=leaf",
@@ -71,6 +69,7 @@ local EXPECTED = {
 }
 
 local SURVIVORS = {
+	{ { "script", "onboarding_done" }, true },
 	{ { "hotstrings", "trigger_char" }, "★" },
 	{ { "metrics", "enabled" }, true },
 	{ { "gestures", "tap_3" }, "open_url" },
@@ -117,6 +116,7 @@ local function driver_state(path)
 
 	local decoded = TomlCodec.decode(Sandbox.read_bytes(path))
 	return {
+		needs_onboarding = require("ui.onboarding.startup").should_show(decoded),
 		actions = actions,
 		parameter = gestures.get_action_parameter("tap_3", "open_url"),
 		gestures_enabled = enable_requested,

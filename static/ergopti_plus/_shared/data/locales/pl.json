@@ -2499,5 +2499,6 @@
 	"dialog.uninstall.confirm": "Odinstalować Ergopti? Aplikacja zostanie zamknięta. Ustawienia, hotstringi, statystyki i dane logowania zostaną zachowane.",
 	"dialog.uninstall.failed": "Nie udało się odinstalować Ergopti. Twoje dane osobiste zostały zachowane.",
 	"menu.global.start_at_login": "Uruchamiaj po zalogowaniu",
-	"dialog.start_at_login.failed": "Nie udało się zmienić automatycznego uruchamiania. Sprawdź ustawienia uruchamiania systemu."
+	"dialog.start_at_login.failed": "Nie udało się zmienić automatycznego uruchamiania. Sprawdź ustawienia uruchamiania systemu.",
+	"onboarding.error.open_failed": "Nie udało się otworzyć kreatora konfiguracji. Sprawdź dzienniki i spróbuj ponownie z menu."
 }

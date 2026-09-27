@@ -155,6 +155,13 @@ os.remove(home)
 os.execute("mkdir -p '" .. home .. "'")
 local log = home .. "/daemon.log"
 
+-- This fixture represents an already-configured desktop; the first-use window
+-- would otherwise take focus from the editor whose injected text is measured.
+os.execute("mkdir -p '" .. home .. "/.config/ergopti'")
+local setup = assert(io.open(home .. "/.config/ergopti/config.toml", "w"))
+setup:write("[script]\nonboarding_done = true\n")
+setup:close()
+
 -- The AI configured as a user would leave it after "Add an API": enabled, the
 -- API backend selected, one entry in the private keys file.
 if LLM_PORT then

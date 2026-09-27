@@ -2499,5 +2499,6 @@
 	"dialog.uninstall.confirm": "Odinstalovat Ergopti? Aplikace se zavře. Vaše nastavení, hotstringy, metriky a přihlašovací údaje zůstanou zachovány.",
 	"dialog.uninstall.failed": "Ergopti se nepodařilo odinstalovat. Vaše osobní data zůstala zachována.",
 	"menu.global.start_at_login": "Spustit při přihlášení",
-	"dialog.start_at_login.failed": "Automatické spouštění se nepodařilo změnit. Zkontrolujte nastavení spouštění systému."
+	"dialog.start_at_login.failed": "Automatické spouštění se nepodařilo změnit. Zkontrolujte nastavení spouštění systému.",
+	"onboarding.error.open_failed": "Průvodce nastavením se nepodařilo otevřít. Zkontrolujte protokoly a zkuste to znovu z nabídky."
 }

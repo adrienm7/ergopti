@@ -2499,5 +2499,6 @@
 	"dialog.uninstall.confirm": "Ergopti kaldırılsın mı? Uygulama kapanacak. Ayarlarınız, hotstring’leriniz, ölçümleriniz ve kimlik bilgileriniz korunacak.",
 	"dialog.uninstall.failed": "Ergopti kaldırılamadı. Kişisel verileriniz korundu.",
 	"menu.global.start_at_login": "Oturum açıldığında başlat",
-	"dialog.start_at_login.failed": "Otomatik başlatma değiştirilemedi. Sistemin başlangıç ayarlarını kontrol edin."
+	"dialog.start_at_login.failed": "Otomatik başlatma değiştirilemedi. Sistemin başlangıç ayarlarını kontrol edin.",
+	"onboarding.error.open_failed": "Kurulum sihirbazı açılamadı. Günlükleri kontrol edip menüden yeniden deneyin."
 }
