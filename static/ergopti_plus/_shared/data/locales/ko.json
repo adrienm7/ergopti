@@ -2499,5 +2499,6 @@
 	"dialog.uninstall.confirm": "Ergopti를 제거하시겠습니까? 애플리케이션이 종료됩니다. 설정, 핫스트링, 통계 및 인증 정보는 유지됩니다.",
 	"dialog.uninstall.failed": "Ergopti를 제거하지 못했습니다. 개인 데이터는 유지되었습니다.",
 	"menu.global.start_at_login": "로그인 시 시작",
-	"dialog.start_at_login.failed": "자동 시작을 변경하지 못했습니다. 시스템 시작 설정을 확인하세요."
+	"dialog.start_at_login.failed": "자동 시작을 변경하지 못했습니다. 시스템 시작 설정을 확인하세요.",
+	"onboarding.error.open_failed": "설정 마법사를 열지 못했습니다. 로그를 확인한 후 메뉴에서 다시 시도하세요."
 }

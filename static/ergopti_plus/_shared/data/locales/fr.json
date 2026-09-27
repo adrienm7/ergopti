@@ -2499,5 +2499,6 @@
 	"dialog.uninstall.confirm": "Désinstaller Ergopti ? L’application va se fermer. Vos réglages, hotstrings, métriques et identifiants seront conservés.",
 	"dialog.uninstall.failed": "Ergopti n’a pas pu être désinstallé. Vos données personnelles ont été conservées.",
 	"menu.global.start_at_login": "Démarrer à l’ouverture de session",
-	"dialog.start_at_login.failed": "Impossible de modifier le démarrage automatique. Vérifiez les réglages de démarrage du système."
+	"dialog.start_at_login.failed": "Impossible de modifier le démarrage automatique. Vérifiez les réglages de démarrage du système.",
+	"onboarding.error.open_failed": "L’assistant de configuration n’a pas pu s’ouvrir. Consultez les journaux, puis réessayez depuis le menu."
 }
