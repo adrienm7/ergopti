@@ -79,6 +79,7 @@ public sealed class KanaInstallerJob : IDisposable {
     [DllImport("user32")] static extern uint GetWindowThreadProcessId(IntPtr window, out uint pid);
     [DllImport("user32")] public static extern IntPtr GetDlgItem(IntPtr window, int id);
     [DllImport("user32")] public static extern bool IsWindowEnabled(IntPtr window);
+    [DllImport("user32")] static extern bool IsWindow(IntPtr window);
     [DllImport("user32")] static extern int GetDlgCtrlID(IntPtr control);
     [DllImport("user32")] static extern IntPtr GetParent(IntPtr control);
     [DllImport("user32", CharSet = CharSet.Unicode, SetLastError = true)]
@@ -185,6 +186,11 @@ public sealed class KanaInstallerJob : IDisposable {
         // WM_COMMAND / BN_CLICKED reaches the handler even for a hidden dialog.
         Check(PostMessage(window, 0x111, (IntPtr)id, control));
     }
+    public static bool IsResultPending(IntPtr main) {
+        // Confirming success can destroy the whole installer. A stale HWND is
+        // disabled too, but no longer means that a modal result is still open.
+        return IsWindow(main) && !IsWindowEnabled(main);
+    }
     public void Dispose() { if (job != IntPtr.Zero) { CloseHandle(job); job = IntPtr.Zero; } }
 }
 '@
@@ -255,11 +261,13 @@ try {
 	$klid = $registeredLayouts[0].PSChildName
 	$trace.Add(@{ klid = $klid; dllSha256 = (Get-FileHash -LiteralPath $dll.FullName).Hash })
 	$deadline.Restart()
-	while (-not [KanaInstallerJob]::IsWindowEnabled($main) -and $deadline.Elapsed.TotalSeconds -lt 5) {
+	while ([KanaInstallerJob]::IsResultPending($main) -and $deadline.Elapsed.TotalSeconds -lt 5) {
 		Start-Sleep -Milliseconds 100
 	}
-	if (-not [KanaInstallerJob]::IsWindowEnabled($main)) { throw 'The installation result dialog did not close.' }
-	[KanaInstallerJob]::Click($main, 2)
+	if ([KanaInstallerJob]::IsResultPending($main)) { throw 'The installation result dialog did not close.' }
+	# Some installer versions close their main dialog when success is confirmed.
+	# Only close a remaining window that still belongs to our process job.
+	if ($owner.Windows() -contains $main) { [KanaInstallerJob]::Click($main, 2) }
 	$deadline.Restart()
 	while ($owner.Windows().Count -gt 0 -and $deadline.Elapsed.TotalSeconds -lt 5) {
 		Start-Sleep -Milliseconds 100
