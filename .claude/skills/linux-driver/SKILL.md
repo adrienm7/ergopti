@@ -103,8 +103,23 @@ runner cannot answer.
 
 - **`tap_hold_engine.lua`** is pure: evdev events in, events out, with the
   Windows semantics (hold taken at key-down; a tap only within the key's
-  threshold, no sooner than the minimum tap duration, with no other key,
-  click or wheel in between). Keep it free of I/O so it stays testable.
+  threshold, no sooner than the minimum tap duration, with no other key
+  pressed, repeated or released, no click and no wheel in between). Keep it
+  free of I/O so it stays testable. Time reaches it only through `tick(now)`:
+  RCtrl's one-shot Shift is held only past its threshold, as on Windows, so
+  the keyboard hook ticks it before each key event, at that event's stamp,
+  and from its pump once every queued event is dispatched, on an estimate of
+  the events' clock that must never run ahead (the kernel stamps on the wall
+  clock, and without luv the daemon's clock counts whole seconds). While a
+  key holds the layer no other key is a tap-hold, as no Windows one is: each
+  is the layer's key, itself, or nothing for LAlt tapping Backspace. Per-key
+  Windows rules (a tap with no hold, the Backspace logic of LAlt and RCtrl)
+  are tables in the engine, each citing its `.ahk` block. The minimum tap
+  duration applies to every tap that waits for its release; Windows checks
+  it only for LShift, LCtrl, RShift, CapsLock holding the layer and LAlt
+  holding it with a tap other than Backspace. That difference is known and
+  not yet decided: do not copy either side to the other without the
+  maintainer.
 - **`tap_hold_loader.lua`** lays the user's `tap_hold.toml` over
   `_shared/tap_hold/defaults.toml` key by key and field by field (it used to
   replace them wholesale, which disabled every key the file did not name).
