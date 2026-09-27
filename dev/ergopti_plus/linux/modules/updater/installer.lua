@@ -225,7 +225,8 @@ end
 --- @param previous string Current installation whose launcher is retained.
 --- @return boolean success
 function DEFAULT_OPS.record_ownership(root, previous)
-	if not run_command("bash " .. shell_quote(root .. "/linux/install/ownership.sh")
+	-- The running updater owns the receipt format, not the selected release.
+	if not run_command("bash " .. shell_quote(previous .. "/linux/install/ownership.sh")
 		.. " " .. shell_quote(root .. "/linux") .. " " .. shell_quote(root .. "/_shared")
 		.. " " .. shell_quote(root)) then return false end
 	local manifest = previous .. "/.ergopti-owned-files"
@@ -371,7 +372,8 @@ function M.install(options)
 	local candidate = work_dir .. "/candidate"
 	if not ops.mkdir(candidate)
 		or not ops.move(work_dir .. "/linux", candidate .. "/linux")
-		or not ops.move(work_dir .. "/_shared", candidate .. "/_shared") then
+		or not ops.move(work_dir .. "/_shared", candidate .. "/_shared")
+		or not ops.move(work_dir .. "/bin", candidate .. "/bin") then
 		return fail("could not assemble the complete candidate root")
 	end
 	if not ops.record_ownership(candidate, context.install_root) then

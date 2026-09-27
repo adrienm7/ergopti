@@ -7,13 +7,9 @@
 ; user types again.
 ;
 ; PRIMARY ROOT CAUSE (graph mode): WPMWidget_PrewarmGraph warmed the layered window
-; by rendering a real "0" graph into it. Gui.Show("Hide") leaves WS_VISIBLE set on
-; the window (verified: IsWindowVisible == 1), and a layered window with a
-; non-transparent surface displays the instant WS_VISIBLE is applied. WPMWidget_Show
-; calls Gui.Show("Hide") AGAIN ~2500 ms in to reposition the window, re-applying
-; WS_VISIBLE -- so the opaque "0" surface from the pre-warm flashed/sat on screen at
-; the real position with no typing after every reload. (An off-screen warm did not
-; help: the reposition brought it back on-screen.)
+; by rendering a real "0" graph into it. The former geometry call combined Hide
+; with NoActivate, which selects a visible show mode. Repositioning then revealed
+; the opaque warm frame without typing. Hidden geometry now uses Hide alone.
 ; FIX: WPMWidget_PrewarmGraph uploads a FULLY TRANSPARENT surface (GR_DrawBitmap with
 ; a no-op draw callback), which still warms the DWM/UpdateLayeredWindow path but is
 ; invisible regardless of WS_VISIBLE. The tick uploads the real opaque content only
@@ -50,11 +46,10 @@ _WHUT_PrewarmWarmsTransparent() {
 	Body := _DriverFuncBody("WPMWidget_PrewarmGraph")
 	Assert(Body != "", "WPMWidget_PrewarmGraph must exist in the wpm widget module")
 	; The warm must NOT upload an opaque graph. WPMWidget_RenderGraph draws the "0"
-	; pill, and Gui.Show("Hide") keeps WS_VISIBLE set on the layered window, so an
-	; opaque warm surface flashes a "0" the moment WPMWidget_Show re-applies
-	; WS_VISIBLE to reposition the window.
+	; pill; preserving a transparent warm frame keeps the typing tick responsible
+	; for the first opaque upload, even if a future caller reveals the surface.
 	Assert(InStr(Body, "WPMWidget_RenderGraph(") = 0,
-		"WPMWidget_PrewarmGraph must NOT warm with WPMWidget_RenderGraph (opaque '0' surface) -- it flashes when WPMWidget_Show re-applies WS_VISIBLE")
+		"WPMWidget_PrewarmGraph must not leave opaque stale content before the first typing tick")
 	Assert(InStr(Body, "GR_DrawBitmap(") > 0,
 		"WPMWidget_PrewarmGraph must warm the layered/DWM upload path via GR_DrawBitmap")
 	Assert(InStr(Body, "_WPMWidget_WarmDrawTransparent") > 0,

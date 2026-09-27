@@ -427,6 +427,72 @@ final class LauncherLogTests: XCTestCase {
 	// ======= 4/ Real multiprocess append remains lossless ========
 	// ============================================================
 
+	func testConcurrentCreationLookupUsesOnlyOneExistingFileAttempt() throws {
+		let directory = try makeIsolatedLogDirectory()
+		defer { try? FileManager.default.removeItem(at: directory) }
+		let directoryFD = Darwin.open(directory.path, O_RDONLY | O_DIRECTORY)
+		XCTAssertGreaterThanOrEqual(directoryFD, 0)
+		defer { Darwin.close(directoryFD) }
+		let file = directory.appendingPathComponent("launcher.log")
+		try Data("winner\n".utf8).write(to: file)
+		var calls = [Int32]()
+		let descriptor = LauncherLog.openLogFile(
+			directoryDescriptor: directoryFD, onFailure: nil,
+			openFile: { directory, name, flags, mode in
+				calls.append(flags)
+				if calls.count == 1 { errno = ENOENT; return -1 }
+				return Darwin.openat(directory, name, flags, mode)
+			}
+		)
+		XCTAssertGreaterThanOrEqual(descriptor, 0)
+		if descriptor >= 0 { Darwin.close(descriptor) }
+		guard calls.count == 2 else {
+			return XCTFail("a creation ENOENT must try the existing winner exactly once")
+		}
+		XCTAssertNotEqual(calls[0] & O_CREAT, 0)
+		XCTAssertEqual(calls[1], calls[0] & ~O_CREAT)
+		XCTAssertEqual(try String(contentsOf: file, encoding: .utf8), "winner\n")
+		for failure in [ENOENT, EACCES, ELOOP] {
+			var attempts = 0
+			var reported: Int32?
+			let refused = LauncherLog.openLogFile(
+				directoryDescriptor: directoryFD, onFailure: { _, code in reported = code },
+				openFile: { _, _, _, _ in attempts += 1; errno = failure; return -1 }
+			)
+			XCTAssertEqual(refused, -1)
+			XCTAssertEqual(reported, failure)
+			XCTAssertEqual(attempts, failure == ENOENT ? 2 : 1)
+		}
+		try FileManager.default.removeItem(at: file)
+		try FileManager.default.createSymbolicLink(at: file, withDestinationURL: directory)
+		var attempts = 0
+		let refused = LauncherLog.openLogFile(
+			directoryDescriptor: directoryFD, onFailure: nil,
+			openFile: { directory, name, flags, mode in
+				attempts += 1
+				if attempts == 1 { errno = ENOENT; return -1 }
+				return Darwin.openat(directory, name, flags, mode)
+			}
+		)
+		XCTAssertEqual(refused, -1, "the existing-file attempt must still refuse symlinks")
+		try FileManager.default.removeItem(at: file)
+		let other = directory.appendingPathComponent("other.log")
+		try Data("shared inode".utf8).write(to: other)
+		try FileManager.default.linkItem(at: other, to: file)
+		attempts = 0
+		var stage: String?
+		let hardlink = LauncherLog.openLogFile(
+			directoryDescriptor: directoryFD, onFailure: { value, _ in stage = value },
+			openFile: { directory, name, flags, mode in
+				attempts += 1
+				if attempts == 1 { errno = ENOENT; return -1 }
+				return Darwin.openat(directory, name, flags, mode)
+			}
+		)
+		XCTAssertEqual(hardlink, -1)
+		XCTAssertEqual(stage, "validate-file", "the retry must retain inode ownership checks")
+	}
+
 	func testIndependentProcessesAppendEveryWholeRecordExactlyOnce() throws {
 		let directory = try makeIsolatedLogDirectory()
 		defer { try? FileManager.default.removeItem(at: directory) }
@@ -532,11 +598,10 @@ final class LauncherLogTests: XCTestCase {
 			expected.count,
 			"O_APPEND must not lose or duplicate any independently-written record"
 		)
-		XCTAssertEqual(
-			Set(observedRecords),
-			expected,
-			"every line must retain one complete writer/index/payload record"
-		)
+		let observed = Set(observedRecords)
+		XCTAssertTrue(observed == expected,
+			"complete records: missing=\(expected.subtracting(observed).count), "
+				+ "unexpected=\(observed.subtracting(expected).count)")
 	}
 	#endif
 }

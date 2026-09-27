@@ -32,6 +32,41 @@ if not Indicator.is_available() then
 	os.exit(2)
 end
 
+-- Warm the production pump with native events before its first Lua callback.
+-- A cold pump conceals LuaJIT's forbidden compiled-FFI-to-Lua transition.
+local ffi = require("ffi")
+ffi.cdef[[
+	typedef int (*ErgoptiProbeSource)(void*);
+	void *g_idle_source_new(void);
+	void g_source_set_callback(void*, ErgoptiProbeSource, void*, void*);
+	unsigned int g_source_attach(void*, void*);
+	unsigned int g_source_get_id(void*);
+	void g_source_destroy(void*);
+	void g_source_unref(void*);
+	unsigned int g_idle_add(ErgoptiProbeSource, void*);
+]]
+local glib = ffi.load("libglib-2.0.so.0")
+local source = glib.g_idle_source_new()
+-- A positive source ID keeps this entirely native callback pending.
+glib.g_source_set_callback(source,
+	ffi.cast("ErgoptiProbeSource", glib.g_source_get_id), source, nil)
+assert(glib.g_source_attach(source, nil) > 0)
+local function pump()
+	Indicator.pump(32)
+end
+for _ = 1, 1000 do pump() end
+glib.g_source_destroy(source)
+glib.g_source_unref(source)
+local called = 0
+local callback = ffi.cast("ErgoptiProbeSource", function()
+	called = called + 1
+	return 0
+end)
+assert(glib.g_idle_add(callback, nil) > 0)
+pump()
+assert(called == 1, "GTK must enter Lua after the pump becomes hot")
+callback:free()
+
 TrayMenu.setIcon({ title = "Ergopti" })
 -- The clickable row proves the whole click path: the panel's dbusmenu Event,
 -- libdbusmenu's "activate", the shared dispatcher, and this row's function.

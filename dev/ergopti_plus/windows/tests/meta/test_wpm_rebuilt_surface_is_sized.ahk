@@ -5,7 +5,7 @@
 ;         (wpm-rebuilt-surface-is-sized)
 ; DESCRIPTION:
 ; WPMWidget_Tick catches a render failure, logs it and rebuilds the widget Gui.
-; The builders only CONSTRUCT — geometry (`Show("Hide NoActivate x… y… w… h…")`)
+; The builders only CONSTRUCT — hidden geometry (`Show("Hide x… y… w… h…")`)
 ; lived inline in WPMWidget_Show and in WPMWidget_PrewarmGraph. So the recovery
 ; path produced a window in a state the render path cannot use: a Gui that was
 ; constructed but never Shown has a 0x0 client rect, GR_DrawBitmap early-returns
@@ -70,6 +70,8 @@ _WRSS_GeometryHasOneOwner() {
 		"_WPMWidget_ApplySurfaceGeometry must exist — the positioner every surface path shares")
 	Assert(InStr(Owner, 'Show("Hide') > 0,
 		"the positioner must be the one that applies size and position while the window is hidden")
+	Assert(InStr(_StripFullLineComments(Owner), "NoActivate") == 0,
+		"hidden geometry must not combine Hide with the mutually exclusive NoActivate show mode")
 	Assert(InStr(Owner, "WPMWidget_ShowPos(") > 0,
 		"the positioner must derive the mode's top-left from the shared compact anchor, or graph mode lands somewhere else than the user left it")
 

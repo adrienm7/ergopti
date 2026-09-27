@@ -104,7 +104,10 @@ if [ -L "$LIBRARY" ] || [ -L "$WRAPPER" ] || [ ! -f "$LIBRARY/linux/ergopti_hots
 	exit 1
 fi
 [ "$(cd -- "$LIBRARY" && pwd -P)" = "$LIBRARY" ] || { echo 'Installation path crosses a symbolic link.' >&2; exit 1; }
-if ! { grep -Fqx "DRIVER_ROOT=\"$LIBRARY/linux\"" "$WRAPPER" \
+if { grep -Fqx "INSTALL_ROOT=$(printf '%q' "$LIBRARY")" "$WRAPPER" \
+	&& grep -Fqx 'exec bash "${INSTALL_ROOT}/bin/ergopti-hotstrings" "$@"' "$WRAPPER"; }; then
+	:
+elif ! { grep -Fqx "DRIVER_ROOT=\"$LIBRARY/linux\"" "$WRAPPER" \
 		|| grep -Fqx "DRIVER_ROOT=$(printf '%q' "$LIBRARY/linux")" "$WRAPPER"; } \
 	|| ! { grep -Fqx 'exec bash "${DRIVER_ROOT}/install/launch.sh" --service "$@"' "$WRAPPER" \
 		|| grep -Fqx 'exec luajit "${DRIVER_ROOT}/ergopti_hotstrings.lua" "$@"' "$WRAPPER"; }; then
@@ -133,7 +136,7 @@ declare -A SEEN=()
 while IFS=$'\t' read -r digest relative; do
 	[[ "$digest" =~ ^[0-9a-f]{64}$ ]] || { echo 'Invalid ownership digest.' >&2; exit 1; }
 	case "$relative" in
-		linux/*|_shared/*) owned="$LIBRARY/$relative" ;;
+		linux/*|_shared/*|bin/ergopti-hotstrings) owned="$LIBRARY/$relative" ;;
 		@wrapper) owned="$WRAPPER" ;;
 		@unit) owned="$UNIT" ;;
 		@autostart) owned="$AUTOSTART" ;;

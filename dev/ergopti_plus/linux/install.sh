@@ -579,6 +579,8 @@ migrate_canonical_packs \
 # nest linux/, _shared/ and bin/ inside LIB_DIR/linux/.
 cp -r "${SRC_DRIVER}/." "${LIB_DIR}/linux/"
 cp -r "${SRC_SHARED}/." "${DEST_SHARED}/"
+install -d "${LIB_DIR}/bin"
+install -m 755 "${SRC_DRIVER}/install/standalone_launcher.sh" "${LIB_DIR}/bin/ergopti-hotstrings"
 bash "${SRC_DRIVER}/install/ownership.sh" "${SRC_DRIVER}" "${SRC_SHARED}" "${LIB_DIR}"
 
 # Create the wrapper script in ~/.local/bin/ that points to the installed libs.
@@ -586,12 +588,8 @@ cat > "${BIN_DIR}/ergopti-hotstrings" << WRAPPER
 #!/usr/bin/env bash
 # Auto-généré par install.sh — ne pas éditer manuellement.
 set -euo pipefail
-DRIVER_ROOT=$(printf '%q' "${LIB_DIR}/linux")
-SHARED_LUA=$(printf '%q' "${DEST_SHARED}/lua")
-export LUA_PATH="\${DRIVER_ROOT}/?.lua;\${DRIVER_ROOT}/?/init.lua;\${SHARED_LUA}/?.lua;\${SHARED_LUA}/?/init.lua;;"
-# The standalone installer already selected its startup owner. Acquire input
-# groups without redirecting this wrapper back into its own systemd unit.
-exec bash "\${DRIVER_ROOT}/install/launch.sh" --service "\$@"
+INSTALL_ROOT=$(printf '%q' "${LIB_DIR}")
+exec bash "\${INSTALL_ROOT}/bin/ergopti-hotstrings" "\$@"
 WRAPPER
 chmod +x "${BIN_DIR}/ergopti-hotstrings"
 echo "  ✔  lanceur : ${BIN_DIR}/ergopti-hotstrings"

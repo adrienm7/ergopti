@@ -25,4 +25,9 @@ for tree in linux _shared; do
 		printf '%s\t%s\n' "$digest" "$relative" >> "$manifest"
 	done
 done
+launcher="$INSTALL_ROOT/bin/ergopti-hotstrings"
+if [ -f "$launcher" ]; then
+	digest="$(sha256sum -- "$launcher")"
+	printf '%s\tbin/ergopti-hotstrings\n' "${digest%% *}" >> "$manifest"
+fi
 mv -- "$manifest" "$INSTALL_ROOT/.ergopti-owned-files"

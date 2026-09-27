@@ -7,10 +7,10 @@
 ; Startup folder. No executable is launched and no registry value is changed.
 ; ==============================================================================
 
-_TestStartupShortcutOwnership() {
+_TestStartupShortcutOwnership(Alias := false) {
 	Directory := A_Temp . "\ergopti-startup-test-" . DllCall("GetCurrentProcessId") . "-" . A_TickCount
 	DirCreate(Directory)
-	Target := Directory . "\application.exe"
+	Target := Directory . (Alias ? "\.\" : "\") . "application.exe"
 	Link := Directory . "\ErgoptiPlus.lnk"
 	FileAppend("fixture", Target)
 	try {
@@ -34,6 +34,7 @@ _TestStartupShortcutOwnership() {
 	}
 }
 Test("Startup: exact owned shortcut only (login-startup)", _TestStartupShortcutOwnership)
+Test("Startup: Shell-normalized path remains owned (login-startup)", _TestStartupShortcutOwnership.Bind(true))
 
 _TestStartupApprovalState() {
 	AssertTrue(StartupApprovalEnabled(""))
