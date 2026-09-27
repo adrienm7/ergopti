@@ -127,11 +127,21 @@ local _release_forwarded_sources
 local _remapper = nil
 local _on_tap = nil
 local _release_remapped
+local _tick_remapper
 -- Physical keys whose press the engine took, and those it took whose engine
 -- is gone (swapped, removed or reset while they were held): the release of an
 -- orphan is swallowed whole, never sent as an up nothing went down for.
 local _remap_owned = {}
 local _remap_orphans = {}
+-- The source each key the engine handles went down on, by code: a hold the
+-- engine presses later for that key (M:tick) goes out on the same keyboard as
+-- the release that lifts it.
+local _remap_source_of = {}
+-- The last key or pointer event's time on the clock the events carry, and the
+-- daemon's monotonic time when it was read: the pump tells the engine what
+-- time it is on the events' clock from these, with nothing to read in between.
+local _clock_event_ms = nil
+local _clock_read_ms = nil
 -- Test seam: the time the engine reads while _test_drive replays a stream
 -- whose events carry `at_ms` and no kernel timestamp. nil in production.
 local _test_clock_ms = nil
@@ -531,8 +541,31 @@ end
 --- @param ev table A decoded event.
 --- @return number
 local function _event_time_ms(ev)
-	if type(ev.timestamp_us) == "number" and ev.timestamp_us > 0 then return ev.timestamp_us / 1000 end
-	return _test_clock_ms or Monotonic.now_ms()
+	local at_ms
+	if type(ev.timestamp_us) == "number" and ev.timestamp_us > 0 then
+		at_ms = ev.timestamp_us / 1000
+	else
+		at_ms = _test_clock_ms or Monotonic.now_ms()
+	end
+	_clock_event_ms, _clock_read_ms = at_ms, Monotonic.now_ms()
+	return at_ms
+end
+
+--- The time now on the clock the events carry, from the last one read: the
+--- kernel's stamps are not the daemon's monotonic clock. Never ahead of the
+--- real time, or a hold would go down before a key typed within its
+--- threshold: two readings of the daemon's clock can overstate the time
+--- between them by its resolution (a whole second without luv), so that is
+--- taken off. An event read late leaves it behind by as long as that event
+--- waited, and a hold then goes down late, never early; an earlier estimate is
+--- not kept over it because the kernel stamps on the wall clock
+--- (CLOCK_REALTIME), which can step back, and a clock kept ahead of a step
+--- back would press every later hold at once.
+--- @return number|nil nil before any event.
+local function _event_clock_now_ms()
+	if not _clock_event_ms then return nil end
+	local since_read = Monotonic.now_ms() - _clock_read_ms - Monotonic.resolution_ms()
+	return _clock_event_ms + math.max(0, since_read)
 end
 
 local function _dispatch_event(ev, source)
@@ -566,11 +599,20 @@ local function _dispatch_event(ev, source)
 		return
 	end
 	if _remapper and _intercept and not ev.remapped then
-		local out, tap = _remapper:process(ev.code, ev.value, _event_time_ms(ev))
+		local at_ms = _event_time_ms(ev)
+		-- A hold due before this event goes down before it.
+		_tick_remapper(at_ms)
+		if not _running then return end
+		-- A callback of that hold may have taken the engine out: the event is
+		-- then the hand's, as with no engine.
+		local out, tap = nil, nil
+		if _remapper then out, tap = _remapper:process(ev.code, ev.value, at_ms) end
 		if ev.value == InputEvent.VALUE_UP then
 			_remap_owned[owned_key] = nil
-		elseif out and ev.value == InputEvent.VALUE_DOWN then
-			_remap_owned[owned_key] = true
+			_remap_source_of[ev.code] = nil
+		elseif ev.value == InputEvent.VALUE_DOWN then
+			if out then _remap_owned[owned_key] = true end
+			_remap_source_of[ev.code] = source
 		end
 		if out then
 			for _, remapped in ipairs(out) do
@@ -756,6 +798,19 @@ _release_remapped = function()
 	end
 end
 
+--- Tells the engine the time is `now_ms` on the events' clock and dispatches
+--- the holds that came due (RCtrl's one-shot Shift past its threshold), each
+--- on the keyboard its key went down on.
+--- @param now_ms number
+_tick_remapper = function(now_ms)
+	if not (_remapper and _intercept) then return end
+	for _, due in ipairs(_remapper:tick(now_ms)) do
+		_dispatch_event({ type = EVDEV_TYPE_KEY, code = due.code, value = due.value, remapped = true },
+			_remap_source_of[due.owner] or _device)
+		if not _running then return end
+	end
+end
+
 
 
 
@@ -843,6 +898,32 @@ local function _event_precedes(left_event, left_source, right_event, right_sourc
 	return left_source.path < right_source.path
 end
 
+--- Reads the next event of every source that has none pending.
+--- @param sources table The pump's sources.
+local function _read_empty_sources(sources)
+	for _, source in ipairs(sources) do
+		if not _pending_events[source.slot] then
+			_pending_events[source.slot] = _read_source(source)
+		end
+	end
+end
+
+--- The source whose pending event comes first, nil when none has one.
+--- @param sources table The pump's sources.
+--- @return table|nil source
+local function _earliest_pending(sources)
+	local selected = nil
+	for _, source in ipairs(sources) do
+		local event = _pending_events[source.slot]
+		if event and (not selected or _event_precedes(
+			event, source, _pending_events[selected.slot], selected))
+		then
+			selected = source
+		end
+	end
+	return selected
+end
+
 --- Drains ready events in global kernel-timestamp order and returns.
 ---
 --- Called from the daemon's idle callback. Nothing here blocks: the descriptor is
@@ -875,30 +956,41 @@ function M.pump()
 		end
 	end
 
-	for _, source in ipairs(sources) do
-		if not _pending_events[source.slot] then
-			_pending_events[source.slot] = _read_source(source)
-		end
-	end
+	_read_empty_sources(sources)
+	local drained = false
 	for _ = 1, EvdevReader.MAX_EVENTS_PER_DRAIN do
-		local selected = nil
-		for _, source in ipairs(sources) do
-			local event = _pending_events[source.slot]
-			if event and (not selected or _event_precedes(
-				event, source, _pending_events[selected.slot], selected))
-			then
-				selected = source
+		local selected = _earliest_pending(sources)
+		if not selected then
+			-- A source is read again only once its event is dispatched: one
+			-- empty at the start of the drain is read once more before the
+			-- queues count as empty.
+			_read_empty_sources(sources)
+			selected = _earliest_pending(sources)
+			if not selected then
+				drained = true
+				break
 			end
 		end
-		if not selected then break end
 		local selected_event = _pending_events[selected.slot]
 		_pending_events[selected.slot] = nil
 		if selected.keyboard then
 			_dispatch_event(selected_event, selected.path)
 		else
+			-- The pointer is not grabbed: its events reached the desktop when
+			-- they happened, and only keep the events' clock fresh here.
+			if _remapper and _intercept then _event_time_ms(selected_event) end
 			_dispatch_pointer(selected_event)
 		end
 		_pending_events[selected.slot] = _read_source(selected)
+	end
+
+	-- Time passes with no event: a hold that came due since the last one goes
+	-- down now. Only once every event read is dispatched, each after the holds
+	-- due at its own stamp: before them, a key stamped within the threshold
+	-- and read after it came out under the hold.
+	if drained and _running then
+		local now_ms = _event_clock_now_ms()
+		if now_ms then _tick_remapper(now_ms) end
 	end
 end
 
@@ -1513,6 +1605,8 @@ function M.stop()
 	_consumed_down = {}
 	_remap_owned = {}
 	_remap_orphans = {}
+	_remap_source_of = {}
+	_clock_event_ms, _clock_read_ms = nil, nil
 	_sync_dropped = {}
 	_forwarded_down = {}
 	_physical_down = {}
@@ -1547,6 +1641,8 @@ function M.emergency_stop(reason)
 	_consumed_down = {}
 	_remap_owned = {}
 	_remap_orphans = {}
+	_remap_source_of = {}
+	_clock_event_ms, _clock_read_ms = nil, nil
 	_sync_dropped = {}
 	_forwarded_down = {}
 	_physical_down = {}
@@ -1612,6 +1708,7 @@ function M.set_remapper(engine, on_tap)
 	_release_remapped()
 	for key in pairs(_remap_owned) do _remap_orphans[key] = true end
 	_remap_owned = {}
+	_remap_source_of = {}
 	_remapper = engine
 	_on_tap = type(on_tap) == "function" and on_tap or nil
 end
@@ -1748,6 +1845,8 @@ function M._test_drive(events, callbacks, intercept)
 		drained = drained + count
 	end
 	_test_clock_ms = nil
+	_clock_event_ms, _clock_read_ms = nil, nil
+	_remap_source_of = {}
 	_running = false
 	_devices = {}
 	_device = nil

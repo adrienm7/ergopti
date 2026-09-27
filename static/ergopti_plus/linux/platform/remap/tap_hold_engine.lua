@@ -18,7 +18,8 @@
 ---    no hold does what its Windows tap-only hotkey does: most fire at
 ---    key-down and at each repeat, LShift, LCtrl, RShift and AltGr stay
 ---    themselves, all four tapping on a quick release (NO_HOLD_BY_KEY).
---- 2. Pure: events in, events out. The keyboard hook dispatches what comes out
+--- 2. Pure: events in, events out, and the time in through M:tick for a hold
+---    that waits for its threshold. The keyboard hook dispatches what comes out
 ---    exactly as if the user had pressed it, so the hotstring buffer, the
 ---    modifier state and the virtual keyboard see one consistent stream.
 --- 3. Everything this engine presses, it can name and release: release_all()
@@ -73,9 +74,12 @@ local NATIVE_UNDER_MODIFIER = { [1] = true, [14] = true, [15] = true, [28] = tru
 --     itself, and a lone Right Alt, a plain Alt on some layouts, is masked
 --     before its release (mask_lone_release);
 --   - an alt_tab_monitor tap holds Alt for the switcher (tab.ahk 8.1,
---     lalt.ahk 4.3), RCtrl's one-shot Shift holds Shift for a long press
---     (rctrl.ahk 7.3, from key-down here as every hold is), and LAlt's Tab
---     holds the navigation layer (lalt.ahk 4.2);
+--     lalt.ahk 4.3), and LAlt's Tab holds the navigation layer (lalt.ahk
+--     4.2), from key-down as every hold is;
+--   - RCtrl's one-shot Shift holds Shift for a long press only once its
+--     threshold has passed, as rctrl.ahk 7.3 presses it when its KeyWait
+--     times out: a key typed sooner is typed unshifted (`hold_past_threshold`,
+--     pressed by M:tick);
 --   - LAlt's one-shot Shift is armed at key-down and holds Shift until the
 --     key comes up (lalt.ahk 4.1): `tap_at_down`. Its hotkey has no *
 --     wildcard, so under a held modifier LAlt stays Alt (`native_under_
@@ -95,7 +99,7 @@ local NO_HOLD_BY_TAP = {
 			skip_while_down = { EvdevCodes.KEY_RIGHTCTRL, EvdevCodes.KEY_CAPSLOCK, KEY_LEFTSHIFT, KEY_LEFTCTRL },
 		},
 	},
-	right_ctrl = { tab = { own = true }, one_shot_shift = { mods = { KEY_LEFTSHIFT } } },
+	right_ctrl = { tab = { own = true }, one_shot_shift = { mods = { KEY_LEFTSHIFT }, hold_past_threshold = true } },
 }
 -- The keys that must be up when a key goes down for its tap to fire, by key.
 -- LCtrl taps only with CapsLock and LAlt up (lshift_lctrl.ahk 3.1, in its
@@ -254,6 +258,7 @@ function M.new(opts)
 				instant = no_hold and not rule,
 				tap_at_down = rule and rule.tap_at_down or false,
 				native_under_modifier = rule and rule.native_under_modifier or false,
+				hold_past_threshold = rule and rule.hold_past_threshold or false,
 				skip_while_down = rule and rule.skip_while_down or nil,
 				tap_needs_up = TAP_NEEDS_UP[key_id],
 				threshold_ms = math.floor((tonumber(config.time_activation_seconds) or 0) * 1000 + 0.5),
@@ -615,6 +620,11 @@ function M:process(code, value, now_ms)
 				state.layer = true
 				self.layer_depth = self.layer_depth + 1
 			end
+			-- A hold taken only past the threshold is pressed by M:tick.
+			if config.hold_past_threshold then
+				state.hold_pending = true
+				return out
+			end
 			for _, mod in ipairs(config.mods) do
 				press(self, out, mod)
 				state.emitted[#state.emitted + 1] = mod
@@ -691,6 +701,32 @@ end
 --- chord.
 function M:activity()
 	cancel_taps(self, nil)
+end
+
+--- Lets time pass: presses the hold of every key held past its threshold
+--- whose hold waits for it (RCtrl's one-shot Shift, as rctrl.ahk 7.3 presses
+--- it when its KeyWait times out). The keyboard hook calls it before each key
+--- event, at that event's time, and from its pump once every event read is
+--- dispatched, so the hold is down for a key typed after the threshold and
+--- never for one typed sooner.
+--- @param now_ms number On the clock the key events carry.
+--- @return table events Key-downs to dispatch, each with `owner`, the code of
+---   the key whose hold it is.
+function M:tick(now_ms)
+	local out = {}
+	for code, state in pairs(self.held) do
+		local config = self.by_code[code]
+		if state.hold_pending and now_ms - state.down_at > config.threshold_ms then
+			state.hold_pending = nil
+			local first = #out + 1
+			for _, mod in ipairs(config.mods) do
+				press(self, out, mod)
+				state.emitted[#state.emitted + 1] = mod
+			end
+			for index = first, #out do out[index].owner = code end
+		end
+	end
+	return out
 end
 
 --- Releases everything this engine holds down and forgets its state.
