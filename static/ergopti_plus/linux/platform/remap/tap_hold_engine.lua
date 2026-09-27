@@ -13,10 +13,11 @@
 ---    process. The hold is taken at key-down, so a held modifier works for a
 ---    chord or a click at once. A release is a tap only when it comes within the
 ---    key's threshold, no sooner than the minimum tap duration, and with no
----    other key pressed or released, no click and no wheel in between. A key
----    with a tap and no hold does what its Windows tap-only hotkey does: most
----    fire at key-down and at each repeat, LShift, LCtrl, RShift and AltGr
----    stay themselves, all four tapping on a quick release (NO_HOLD_BY_KEY).
+---    other key pressed, repeated or released, no click and no wheel in
+---    between (Windows' A_PriorKey and activity tracker). A key with a tap and
+---    no hold does what its Windows tap-only hotkey does: most fire at
+---    key-down and at each repeat, LShift, LCtrl, RShift and AltGr stay
+---    themselves, all four tapping on a quick release (NO_HOLD_BY_KEY).
 --- 2. Pure: events in, events out. The keyboard hook dispatches what comes out
 ---    exactly as if the user had pressed it, so the hotstring buffer, the
 ---    modifier state and the virtual keyboard see one consistent stream.
@@ -516,9 +517,12 @@ function M:process(code, value, now_ms)
 	local out = {}
 
 	-- A release is activity too, as on Windows (hook_dispatcher's _OnKeyUp): a
-	-- key held before a tap-hold key and let go during it was used with it. The
-	-- key coming up is not activity for itself.
-	if value == UP then cancel_taps(self, code) end
+	-- key held before a tap-hold key and let go during it was used with it. So
+	-- is an auto-repeat: a Windows tap fires only when the key itself was the
+	-- last key pressed (A_PriorKey counts repeats, and the InputHook tracker
+	-- sees each repeated key-down), and a key held on another keyboard keeps
+	-- repeating through the tap. A key's own events are not activity for it.
+	if value == UP or value == REPEAT then cancel_taps(self, code) end
 
 	-- A key pressed on the layer keeps its chord until it is released, even if
 	-- the layer key comes up first.
