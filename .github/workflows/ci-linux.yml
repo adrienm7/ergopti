@@ -56,7 +56,7 @@ jobs:
   # ─────────────────────────────────────────────────
   # The lane's entry job: the only one of this file that needs nothing.
   test-linux:
-    name: 'tests'
+    name: 'Tests'
     runs-on: ubuntu-latest
 
     steps:
@@ -75,7 +75,7 @@ jobs:
       - name: Verify native cross-driver histogram multiplicity
         run: python3 tools/test/test-metrics-histogram-native.py
 
-      - name: Run Linux driver unit test suite
+      - name: Run the driver unit test suite
         working-directory: static/ergopti_plus/linux
         # Wrapped in the unified reporter: streams output unchanged, exits with the
         # runner's code (CI gating preserved), and emits GitHub annotations + a JSON
@@ -309,7 +309,7 @@ jobs:
       # daemon on it. An installed prerelease once asked the "stable" channel
       # and never found an update; an installed update once waited for the
       # next login.
-      - name: The Linux updater, live — update to the newest release and restart
+      - name: Update to the newest release and restart
         if: ${{ !cancelled() }}
         run: |
           sudo apt-get install -y --no-install-recommends lua-luv
@@ -527,7 +527,7 @@ jobs:
           exit $STATUS
         timeout-minutes: 5
 
-      - name: Record mandatory Linux test evidence
+      - name: Record mandatory test evidence
         run: |
           set -euo pipefail
           unit_assertions=$(jq -r '.passed' "$RUNNER_TEMP/linux-lua.json")
@@ -559,7 +559,7 @@ jobs:
               --subject page-load-errors=1 \
               --subject "hotstring-e2e=$e2e_assertions"
 
-      - name: Upload mandatory Linux test evidence
+      - name: Upload mandatory test evidence
         uses: actions/upload-artifact@v4
         with:
           name: linux-ci-evidence-test-linux
@@ -585,7 +585,7 @@ jobs:
   # After package-linux, like every lane job but the entry: a failing unit
   # suite or packaging run spends no container time.
   install-linux-distros:
-    name: 'install (${{ matrix.distro }})'
+    name: 'Install (${{ matrix.distro }})'
     runs-on: ubuntu-latest
     needs: [package-linux]
     strategy:
@@ -733,7 +733,7 @@ jobs:
   # After package-linux, so the lane keeps one entry job; it used to start at
   # t=0 beside test-linux.
   first-install-distros:
-    name: 'first install (${{ matrix.distro }})'
+    name: 'First install (${{ matrix.distro }})'
     runs-on: ubuntu-latest
     needs: [package-linux]
     strategy:
@@ -820,7 +820,7 @@ jobs:
   # under $HOME. The .deb, .rpm and AppImage smokes each prove a dependency the
   # host must NOT already have, so they keep their own runners below.
   package-linux:
-    name: 'package'
+    name: 'Package'
     runs-on: ubuntu-latest
     needs: [test-linux]
     env:
@@ -839,7 +839,7 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y luajit
 
-      - name: Assemble Linux driver bundle
+      - name: Assemble the driver bundle
         shell: bash
         env:
           ERGOPTI_BUILD_COMMIT: ${{ github.sha }}
@@ -1051,7 +1051,7 @@ jobs:
           luajit static/ergopti_plus/linux/tests/hardware/installed_layout_check.lua \
               "$root/_shared"
 
-      - name: Upload Linux artifacts
+      - name: Upload packages
         # The one Linux artifact of the run: the smoke jobs below install from
         # it, and on a release run ci.yml's release job attaches every file in
         # it. Kept 7 days on a release run so that a next-day "Re-run failed
@@ -1108,7 +1108,7 @@ jobs:
   # deliberately not started — they cannot be, and pretending otherwise would
   # make this job green for the wrong reason.
   smoke-deb-install:
-    name: 'run the .deb'
+    name: 'Run the .deb'
     runs-on: ubuntu-latest
     needs: [package-linux]
 
@@ -1211,7 +1211,7 @@ jobs:
   # conversion through alien would be testing alien. dnf resolves the same
   # dependencies a Fedora user's would.
   smoke-rpm-install:
-    name: 'run the .rpm'
+    name: 'Run the .rpm'
     runs-on: ubuntu-latest
     needs: [package-linux]
     container:
@@ -1293,7 +1293,7 @@ jobs:
   # --appimage-extract escape hatch the format provides for exactly this.
   # AppRun is then the same entry point a user's double-click reaches.
   smoke-appimage-run:
-    name: 'run the AppImage'
+    name: 'Run the AppImage'
     runs-on: ubuntu-latest
     needs: [package-linux]
 
@@ -1379,7 +1379,7 @@ jobs:
   # evidence, instead of this job being skipped in silence. The lane's exit
   # job: no job of this file needs it.
   linux-ok:
-    name: 'evidence gate'
+    name: 'Evidence gate'
     runs-on: ubuntu-latest
     needs:
       - test-linux
@@ -1398,14 +1398,14 @@ jobs:
         with:
           node-version-file: '.node-version'
 
-      - name: Download Linux assertion evidence
+      - name: Download assertion evidence
         uses: actions/download-artifact@v4
         with:
           pattern: linux-ci-evidence-*
           path: ${{ runner.temp }}/linux-ci-evidence
           merge-multiple: true
 
-      - name: Assert all mandatory Linux subjects ran and passed
+      - name: Assert all mandatory subjects ran and passed
         env:
           NEEDS: ${{ toJSON(needs) }}
         run: |

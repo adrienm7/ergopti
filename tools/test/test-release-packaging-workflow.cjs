@@ -95,15 +95,15 @@ function releaseStep(name, rel) {
 for (const name of [
 	'Build static asset bundle',
 	'Stamp BUNDLE_VERSION, BUNDLE_RELEASE_URL, BUNDLE_CHANNEL',
-	'Download authenticated Windows compiler toolchain',
+	'Download the authenticated compiler toolchain',
 	'Compile ErgoptiPlus.ahk',
 	'Sign and verify ErgoptiPlus.exe',
 	'Smoke test compiled ErgoptiPlus.exe (crash-on-launch guard)',
-	'Rename Windows keyboard layout for upload',
+	'Rename the keyboard layout for upload',
 ]) {
 	releaseStep(name, WINDOWS_BOX);
 }
-const windowsUpload = releaseStep('Upload Windows artifacts', WINDOWS_BOX);
+const windowsUpload = releaseStep('Upload the application and layout', WINDOWS_BOX);
 if (windowsUpload !== null && !/^\s+name:\s*assets-windows\s*$/m.test(windowsUpload)) {
 	errors.push('the Windows release exe must be uploaded as assets-windows, the artifact release attaches');
 }
@@ -135,16 +135,16 @@ const WINDOWS_ORDER = [
 	'Compile ErgoptiPlus.ahk',
 	'Sign and verify ErgoptiPlus.exe',
 	'Smoke test compiled ErgoptiPlus.exe (crash-on-launch guard)',
-	'Rename Windows keyboard layout for upload',
-	'Upload Windows artifacts',
+	'Rename the keyboard layout for upload',
+	'Upload the application and layout',
 ];
 const packageWindowsSteps = pipeline.steps(packageWindows).map((candidate) => candidate.name);
 const windowsOrder = WINDOWS_ORDER.map((name) => packageWindowsSteps.indexOf(name));
 if (windowsOrder.some((at, index) => at < 0 || (index > 0 && at <= windowsOrder[index - 1]))) {
 	errors.push(`${PACKAGE_JOB[WINDOWS_BOX]} must run ${WINDOWS_ORDER.join(' < ')}; got: ${packageWindowsSteps.join(' | ')}`);
 }
-if (!(packageWindowsSteps.indexOf('Download authenticated Windows compiler toolchain') >= 0 &&
-	packageWindowsSteps.indexOf('Download authenticated Windows compiler toolchain') <
+if (!(packageWindowsSteps.indexOf('Download the authenticated compiler toolchain') >= 0 &&
+	packageWindowsSteps.indexOf('Download the authenticated compiler toolchain') <
 		packageWindowsSteps.indexOf('Compile ErgoptiPlus.ahk'))) {
 	errors.push(`${PACKAGE_JOB[WINDOWS_BOX]} must download the authenticated toolchain before it compiles`);
 }
@@ -174,7 +174,7 @@ if (stampStep !== null) {
 	}
 }
 
-const windowsToolchainStep = releaseStep('Download authenticated Windows compiler toolchain', WINDOWS_BOX);
+const windowsToolchainStep = releaseStep('Download the authenticated compiler toolchain', WINDOWS_BOX);
 if (windowsToolchainStep !== null) {
 	const body = windowsToolchainStep;
 	if (
@@ -452,7 +452,7 @@ const MACOS_ORDER = [
 	'Install Sparkle signing tool',
 	'Sign zip with Sparkle EdDSA key',
 	'Generate Sparkle appcast',
-	'Upload the macOS package',
+	'Upload the package',
 ];
 const packageMacosSteps = pipeline.steps(pipeline.job(PACKAGE_JOB[MACOS_BOX])).map((candidate) => candidate.name);
 const macosOrder = MACOS_ORDER.map((name) => packageMacosSteps.indexOf(name));
@@ -460,7 +460,7 @@ if (macosOrder.some((at, index) => at < 0 || (index > 0 && at <= macosOrder[inde
 	errors.push(`${PACKAGE_JOB[MACOS_BOX]} must run ${MACOS_ORDER.join(' < ')}; got: ${packageMacosSteps.join(' | ')}`);
 }
 if (!(packageMacosSteps.indexOf('Package latest keylayout bundle') >= 0 &&
-	packageMacosSteps.indexOf('Package latest keylayout bundle') < packageMacosSteps.indexOf('Upload the macOS package'))) {
+	packageMacosSteps.indexOf('Package latest keylayout bundle') < packageMacosSteps.indexOf('Upload the package'))) {
 	errors.push(`${PACKAGE_JOB[MACOS_BOX]} must package the keylayout bundle before it uploads the macOS package`);
 }
 

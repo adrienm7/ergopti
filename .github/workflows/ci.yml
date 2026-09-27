@@ -93,7 +93,7 @@ jobs:
   # (the macOS bundle and appcast, the Windows stamp, the published feed) reads
   # it from here.
   validate:
-    name: 'Validate and plan'
+    name: 'Validate / Checks and plan'
     runs-on: ubuntu-latest
     outputs:
       release: ${{ steps.meta.outputs.release }}
@@ -410,7 +410,7 @@ jobs:
   # SKIP this job, not fail it: a half-published release would stop resuming
   # while the run turned green.
   release:
-    name: 'Release'
+    name: 'Release / Publish'
     needs: [validate, macos, windows, linux]
     if: github.event_name == 'push' && needs.validate.outputs.release == 'true'
     runs-on: ubuntu-latest

@@ -127,8 +127,8 @@ for (const subject of PACKAGE_SUBJECTS) {
 // E2E harness to the evidence record runs under !cancelled(); the record and
 // its upload run only when every harness passed.
 const testLinuxSteps = pipeline.steps(pipeline.job('test-linux'));
-const unitAt = testLinuxSteps.findIndex((candidate) => candidate.name === 'Run Linux driver unit test suite');
-const recordAt = testLinuxSteps.findIndex((candidate) => candidate.name === 'Record mandatory Linux test evidence');
+const unitAt = testLinuxSteps.findIndex((candidate) => candidate.name === 'Run the driver unit test suite');
+const recordAt = testLinuxSteps.findIndex((candidate) => candidate.name === 'Record mandatory test evidence');
 assert.ok(unitAt >= 0 && recordAt > unitAt + 1, 'test-linux must run its harnesses between the unit suite and the record');
 assert.strictEqual(testLinuxSteps[unitAt + 1].name, 'Run virtual-keyboard E2E harness (stubbed)',
 	'the stubbed E2E harness must run right after the unit suite');
@@ -154,13 +154,13 @@ for (const boxJob of pipeline.jobs(LINUX_BOX)) {
 // without pipefail, is pinned pipeline-wide by
 // tools/test/test-ci-pipeline-wiring.cjs.
 const testLinux = pipeline.job('test-linux');
-assert.match(pipeline.stepField(pipeline.step(testLinux, 'Run Linux driver unit test suite'), 'run') ?? '',
+assert.match(pipeline.stepField(pipeline.step(testLinux, 'Run the driver unit test suite'), 'run') ?? '',
 	/^node \.\.\/\.\.\/\.\.\/tools\/test\/report\.cjs --name linux-lua --json "\$\{\{ runner\.temp \}\}\/linux-lua\.json" -- luajit tests\/run\.lua$/,
 	'the unit suite must write the report its evidence counts');
 assert.ok((pipeline.runOf(pipeline.step(testLinux, 'Run virtual-keyboard E2E harness (stubbed)')) ?? [])
 	.includes('luajit tests/e2e/run_e2e.lua | tee "$RUNNER_TEMP/linux-e2e.log"'),
 'the stubbed E2E harness must keep the log its evidence counts');
-const recordScript = pipeline.runOf(pipeline.step(testLinux, 'Record mandatory Linux test evidence')) ?? [];
+const recordScript = pipeline.runOf(pipeline.step(testLinux, 'Record mandatory test evidence')) ?? [];
 for (const line of [
 	'unit_assertions=$(jq -r \'.passed\' "$RUNNER_TEMP/linux-lua.json")',
 	'e2e_assertions=$(sed -n \'s/^1\\.\\.\\([0-9][0-9]*\\)$/\\1/p\' "$RUNNER_TEMP/linux-e2e.log" | tail -1)',
