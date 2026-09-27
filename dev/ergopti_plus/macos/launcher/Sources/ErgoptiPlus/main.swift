@@ -323,17 +323,27 @@ enum LauncherLog {
 	}
 
 	/// Opens only `launcher.log` relative to the already-validated directory.
-	private static func openLogFile(
+	static func openLogFile(
 		directoryDescriptor: Int32,
-		onFailure: ((String, Int32) -> Void)?
+		onFailure: ((String, Int32) -> Void)?,
+		openFile: (Int32, UnsafePointer<CChar>, Int32, mode_t) -> Int32 = {
+			Darwin.openat($0, $1, $2, $3)
+		}
 	) -> Int32 {
 		let (descriptor, openError) = logFileName.withCString { name in
-			let result = Darwin.openat(
+			let flags = O_WRONLY | O_APPEND | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK
+			var result = openFile(
 				directoryDescriptor,
 				name,
-				O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK,
+				flags | O_CREAT,
 				S_IRUSR | S_IWUSR
 			)
+			// Concurrent first writers can lose the creation lookup with ENOENT.
+			// Open only the winner's existing file once; retain every ownership
+			// check below and propagate any failure of that lookup.
+			if result < 0 && errno == ENOENT {
+				result = openFile(directoryDescriptor, name, flags, S_IRUSR | S_IWUSR)
+			}
 			return (result, result < 0 ? errno : 0)
 		}
 		guard descriptor >= 0 else {

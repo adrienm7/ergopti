@@ -615,6 +615,7 @@ helpers.describe("modules/updater/manager.lua", function()
 		local payload = base .. "/payload"
 		local archive = base .. "/release.tar.gz"
 		helpers.assert_true(command_ok("mkdir -p " .. shell_quote(install_root .. "/linux/infra")
+			.. " " .. shell_quote(install_root .. "/linux/install")
 			.. " " .. shell_quote(install_root .. "/_shared/lua")
 			.. " " .. shell_quote(prefix .. "/bin")
 			.. " " .. shell_quote(payload .. "/linux/infra")
@@ -634,12 +635,14 @@ helpers.describe("modules/updater/manager.lua", function()
 		write_file(payload .. "/_shared/data/locales/en.json", "{}\n")
 		write_file(payload .. "/bin/ergopti-hotstrings", "#!/usr/bin/env bash\nexit 0\n")
 		write_file(payload .. "/install.sh", "#!/usr/bin/env bash\nexit 0\n")
-		write_file(payload .. "/linux/install/ownership.sh",
+		-- The target need not ship the running updater's receipt implementation.
+		write_file(install_root .. "/linux/install/ownership.sh",
 			assert(read_file(helpers.driver_root() .. "/install/ownership.sh")))
 		write_file(wrapper, "#!/usr/bin/env bash\nset -euo pipefail\n"
 			.. "grep -q 'version=4.0.0' " .. shell_quote(install_root .. "/_shared/build_stamp.txt") .. "\n"
 			.. "grep -q 'new-shared' " .. shell_quote(install_root .. "/_shared/lua/sentinel.lua") .. "\n"
-			.. "test ! -e " .. shell_quote(install_root .. "/linux/linux") .. "\n")
+			.. "test ! -e " .. shell_quote(install_root .. "/linux/linux") .. "\n"
+			.. "exec bash " .. shell_quote(install_root .. "/bin/ergopti-hotstrings") .. "\n")
 		helpers.assert_true(command_ok("chmod +x " .. shell_quote(wrapper)
 			.. " " .. shell_quote(payload .. "/bin/ergopti-hotstrings")
 			.. " " .. shell_quote(payload .. "/install.sh")))
@@ -686,6 +689,8 @@ helpers.describe("modules/updater/manager.lua", function()
 		helpers.assert_nil(archive_left, "a committed update retires its downloaded archive")
 		helpers.assert_contains(ownership or "", "linux/ergopti_hotstrings.lua",
 			"an updated installation must retain file ownership for uninstall")
+		helpers.assert_contains(ownership or "", "bin/ergopti-hotstrings",
+			"the versioned launcher must be recorded with its payload")
 	end)
 
 	helpers.it("rolls back every fallible activation stage", function()
@@ -696,7 +701,7 @@ helpers.describe("modules/updater/manager.lua", function()
 		local backup = root .. ".old"
 		local stages = {
 			"validate_archive", "make_work_dir", "extract", "validate_layout",
-			"validate_version", "mkdir_candidate", "move_linux", "move_shared",
+			"validate_version", "mkdir_candidate", "move_linux", "move_shared", "move_bin",
 			"record_ownership", "remove_backup", "backup_current", "activate_candidate", "smoke",
 		}
 
@@ -730,6 +735,7 @@ helpers.describe("modules/updater/manager.lua", function()
 			function ops.move(source_path, destination_path)
 				if source_path == work .. "/linux" then return failed_stage ~= "move_linux" end
 				if source_path == work .. "/_shared" then return failed_stage ~= "move_shared" end
+				if source_path == work .. "/bin" then return failed_stage ~= "move_bin" end
 				if source_path == root and destination_path == backup then
 					if failed_stage == "backup_current" then return false end
 					state.root, state.backup = nil, "old"

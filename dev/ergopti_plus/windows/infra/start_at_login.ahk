@@ -13,9 +13,19 @@ StartupShortcutOwned(Link, Target) {
 	if !FileExist(Link)
 		return false
 	FileGetShortcut(Link, &Actual, , &Args)
-	if StrLower(Actual) != StrLower(Target) || Args != ""
+	if Args != "" || _StartupExecutablePath(Actual) != _StartupExecutablePath(Target)
 		throw Error("Startup shortcut belongs to a different command")
 	return true
+}
+
+; The Shell expands short names and dot segments when reading a shortcut.
+; Resolve both existing files identically without accepting wildcard matches.
+_StartupExecutablePath(Path) {
+	if InStr(Path, "*") || InStr(Path, "?")
+		throw Error("Startup executable path contains a wildcard")
+	loop files Path, "F"
+		return StrLower(A_LoopFileFullPath)
+	throw Error("Startup executable cannot be resolved")
 }
 
 ; Windows may suppress a valid shortcut in Settings > Apps > Startup. Unknown
