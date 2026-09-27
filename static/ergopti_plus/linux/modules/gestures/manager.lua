@@ -435,14 +435,18 @@ local WMCTRL_TIMEOUT_S = 1
 --- `| xargs -r wmctrl -s`, which exits 0 on empty input, so a wmctrl that could
 --- list nothing (every Wayland session) reported success and its keystroke
 --- fallback never ran. Each wmctrl is bounded by WMCTRL_TIMEOUT_S.
+---
+--- The row is picked with shell builtins only. It used awk, which no package
+--- declares as a dependency and a minimal openSUSE lacks: the pick then printed
+--- nothing and every switch fell through to the keystroke. A listing with no
+--- current desktop also fails now, instead of counting from desktop 0.
 --- @param delta integer -1 for the previous workspace, 1 for the next.
 --- @return string
 local function workspace_switch_command(delta)
-	-- Single-quoted so the awk program reaches the shell intact; it contains no
-	-- single quotes of its own, which is what makes that safe here.
-	local awk = "awk -v d=" .. tostring(delta)
-		.. " '$2==\"*\"{cur=$1} END{n=NR; if(n>0){t=(cur+d)%n; if(t<0)t+=n; print t}}'"
-	return "t=$(timeout " .. WMCTRL_TIMEOUT_S .. " wmctrl -d 2>/dev/null | " .. awk .. ")"
+	local pick = "{ n=0; cur=; while read -r id mark rest; do"
+		.. " [ \"$mark\" = \"*\" ] && cur=$id; n=$((n + 1)); done;"
+		.. " [ -n \"$cur\" ] && echo $(( ((cur + (" .. tostring(delta) .. ")) % n + n) % n )); }"
+	return "t=$(timeout " .. WMCTRL_TIMEOUT_S .. " wmctrl -d 2>/dev/null | " .. pick .. ")"
 		.. " && [ -n \"$t\" ] && timeout " .. WMCTRL_TIMEOUT_S .. " wmctrl -s \"$t\" 2>/dev/null"
 end
 
