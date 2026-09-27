@@ -51,7 +51,7 @@ rm -rf "$INSTALL_ROOT"
 mkdir -p "$INSTALL_ROOT/usr/lib/ergopti"
 mkdir -p "$INSTALL_ROOT/usr/bin"
 mkdir -p "$INSTALL_ROOT/usr/share/applications"
-mkdir -p "$INSTALL_ROOT/usr/share/icons/hicolor/128x128/apps"
+mkdir -p "$INSTALL_ROOT/usr/share/icons/hicolor/512x512/apps"
 mkdir -p "$INSTALL_ROOT/etc/ergopti"
 mkdir -p "$INSTALL_ROOT/usr/lib/systemd/user"
 
@@ -102,8 +102,11 @@ Categories=Utility;
 X-GNOME-Autostart-enabled=true
 DESKTOP_EOF
 
-# Placeholder icon
-touch "$INSTALL_ROOT/usr/share/icons/hicolor/128x128/apps/ergopti.png"
+# Application icon
+# ----------------------------------------------------------------------
+install -m 644 "$BUILD_DIR/_shared/assets/ergopti_tray.png" "$INSTALL_ROOT/usr/share/icons/hicolor/512x512/apps/ergopti.png"
+
+echo "  Application icon: ergopti.png"
 
 # ----------------------------------------------------------------------
 # 6. Default config
@@ -197,7 +200,7 @@ cp -r %{_builddir}/ergopti-%{version}/* %{buildroot}/
 /usr/lib/ergopti/
 /usr/bin/ergopti
 /usr/share/applications/ergopti.desktop
-/usr/share/icons/hicolor/128x128/apps/ergopti.png
+/usr/share/icons/hicolor/512x512/apps/ergopti.png
 /usr/lib/systemd/user/ergopti-hotstrings.service
 %config(noreplace) /etc/ergopti/config.toml
 

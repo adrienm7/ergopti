@@ -21,6 +21,9 @@
 
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
+const { spawnSync } = require('child_process');
+const { bashExecutable } = require('../lib/git-bash.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const PAIRS = [
@@ -44,6 +47,39 @@ for (const [copy, original] of PAIRS) {
 	if (!bytes.equals(fs.readFileSync(originalPath))) {
 		failures.push(`${copy} differs from ${original} — re-copy the logo`);
 	}
+}
+
+// Execute each actual packaging icon section in an isolated staging tree. File
+// presence alone accepted both an empty RPM icon and the invisible 1x1 PNGs.
+const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-launcher-icons-'));
+try {
+	const logo = fs.readFileSync(path.join(ROOT, PAIRS[0][0]));
+	fs.mkdirSync(path.join(sandbox, '_shared', 'assets'), { recursive: true });
+	fs.writeFileSync(path.join(sandbox, '_shared', 'assets', 'ergopti_tray.png'), logo);
+	for (const format of ['deb', 'rpm', 'appimage']) {
+		const source = fs.readFileSync(path.join(ROOT, `tools/build/build-linux-${format}.sh`), 'utf8');
+		const section = source.match(/^# (?:\d+\. )?(?:Placeholder|Application) icon\n(?:# -+\n)?([\s\S]*?)(?=\n# -{10,})/m);
+		if (!section) throw new Error(`Missing ${format} icon packaging section`);
+		const stage = path.join(sandbox, format);
+		for (const size of ['128x128', '512x512']) {
+			fs.mkdirSync(path.join(stage, 'usr/share/icons/hicolor', size, 'apps'), { recursive: true });
+		}
+		const script = path.join(sandbox, `${format}.sh`);
+		fs.writeFileSync(script, section[1]);
+		const result = spawnSync(bashExecutable(), ['-eu', script.replaceAll('\\', '/')], {
+			encoding: 'utf8', env: { ...process.env, BUILD_DIR: sandbox.replaceAll('\\', '/'),
+				DEB_ROOT: stage.replaceAll('\\', '/'), INSTALL_ROOT: stage.replaceAll('\\', '/'),
+				APPDIR: stage.replaceAll('\\', '/') },
+		});
+		if (result.status !== 0) throw new Error(`${format} icon staging failed: ${result.error || result.stderr}`);
+		const icon = format === 'appimage' ? path.join(stage, 'ergopti.png')
+			: path.join(stage, 'usr/share/icons/hicolor/512x512/apps/ergopti.png');
+		if (!fs.existsSync(icon) || !fs.readFileSync(icon).equals(logo)) {
+			failures.push(`${format} launcher must ship the real 512x512 Ergopti logo`);
+		}
+	}
+} finally {
+	fs.rmSync(sandbox, { recursive: true, force: true });
 }
 
 if (failures.length > 0) {
