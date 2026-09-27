@@ -451,6 +451,103 @@ helpers.describe("tap-hold engine: under a modifier and on the layer", function(
 		helpers.assert_nil(tap, "the layer was used")
 	end)
 
+	-- A key whose own hold is the layer another key already holds is not a
+	-- second layer key: it is the layer's key where the layer maps it, and
+	-- itself otherwise, with its auto-repeat, as on Windows (765f8ae4a), where
+	-- no tap-hold hotkey is eligible while the layer is on. Space held for the
+	-- layer under CapsLock's layer typed nothing, dropped its repeat and typed
+	-- one space on a quick release; CapsLock held for the layer under LAlt's
+	-- was a layer key tapping Enter, not the layer's Backspace (layer-under-layer).
+	helpers.it("is the layer's key or itself when its own hold is the layer another key holds (layer-under-layer)", function()
+		local SPACE = 57
+		local e = engine({
+			left_alt = DEFAULTS.left_alt,
+			caps_lock = { tap_action = "enter", hold_layer = "nav", time_activation_seconds = 0.35 },
+			space = { tap_action = "", hold_layer = "nav", time_activation_seconds = 0.2 },
+		})
+		e:process(ALT, DOWN, 0)
+		helpers.assert_nil(e:process(SPACE, DOWN, 30), "the layer maps no Space: Space is Space")
+		helpers.assert_nil(e:process(SPACE, REPEAT, 530), "and repeats as Space")
+		helpers.assert_nil(e:process(SPACE, UP, 560))
+		helpers.assert_eq(trail(e:process(CAPS, DOWN, 600)), "14↓", "the layer maps CapsLock: Backspace")
+		helpers.assert_eq(trail(e:process(CAPS, REPEAT, 1100)), "14⟳", "repeated as the layer's key")
+		local out, tap = e:process(CAPS, UP, 1120)
+		helpers.assert_eq({ trail(out), tap }, { "14↑" }, "and no Enter on its release")
+		helpers.assert_eq({ trail((e:process(ALT, UP, 1200))) }, { "" }, "the layer was used")
+		helpers.assert_eq(trail(e:process(CAPS, DOWN, 1300)), "", "off the layer CapsLock holds it again")
+		helpers.assert_eq(trail(e:process(KEY_J, DOWN, 1310)), "29↓ 105↓")
+		e:process(KEY_J, UP, 1320)
+		e:process(CAPS, UP, 1330)
+		-- Tapped quickly on the layer, Space types one space.
+		e:process(CAPS, DOWN, 2000)
+		helpers.assert_nil(e:process(SPACE, DOWN, 2010), "a quick Space on the layer is a space")
+		helpers.assert_nil(e:process(SPACE, UP, 2040))
+		local _, caps_tap = e:process(CAPS, UP, 2100)
+		helpers.assert_nil(caps_tap, "Space was typed on CapsLock's layer: no Enter")
+	end)
+
+	-- nav_layer.ahk swallows LAlt while the layer is on when LAlt taps
+	-- Backspace with the layer on hold ("Fix when LAlt triggers the layer").
+	-- Passed through as Alt, it put Alt under every chord of Space's layer: J
+	-- gave Ctrl+Alt+Left, a workspace switch on GNOME (layer-under-layer).
+	helpers.it("swallows LAlt tapping Backspace on another key's layer, as Windows does (layer-under-layer)", function()
+		local SPACE = 57
+		local e = engine({
+			left_alt = DEFAULTS.left_alt,
+			space = { tap_action = "", hold_layer = "nav", time_activation_seconds = 0.2 },
+		})
+		helpers.assert_eq(trail(e:process(SPACE, DOWN, 0)), "", "Space holds the layer")
+		local down = e:process(ALT, DOWN, 300)
+		helpers.assert_eq(down and trail(down), "", "LAlt is swallowed, not an Alt")
+		local repeated = e:process(ALT, REPEAT, 800)
+		helpers.assert_eq(repeated and trail(repeated), "", "and so is its repeat")
+		helpers.assert_eq(trail(e:process(KEY_J, DOWN, 820)), "29↓ 105↓", "J is Ctrl+Left, with no Alt")
+		e:process(KEY_J, UP, 840)
+		local out, tap = e:process(ALT, UP, 860)
+		helpers.assert_eq({ out and trail(out), tap }, { "" }, "its release too, with no Backspace")
+		e:process(ALT, DOWN, 900)
+		out, tap = e:process(ALT, UP, 960)
+		helpers.assert_eq({ out and trail(out), tap }, { "" }, "a quick LAlt there types no Backspace")
+		local _, space_tap = e:process(SPACE, UP, 1000)
+		helpers.assert_nil(space_tap, "LAlt was pressed on Space's layer: no space")
+		local plain = engine({
+			left_alt = { tap_action = "copy", hold_layer = "nav", time_activation_seconds = 0.2 },
+			space = { tap_action = "", hold_layer = "nav", time_activation_seconds = 0.2 },
+		})
+		plain:process(SPACE, DOWN, 0)
+		helpers.assert_nil(plain:process(ALT, DOWN, 300), "any other LAlt tap: no Windows hotkey, a plain Alt")
+		helpers.assert_nil(plain:process(ALT, UP, 360))
+	end)
+
+	-- Every Windows tap-hold variant needs the layer off (not LayerEnabled in
+	-- each #HotIf, AltGr's in altgr_criteria.ahk), and the layer maps none of
+	-- these keys, so they are native there. The shipped LShift still copied on
+	-- the layer, RCtrl still held Shift and armed the one-shot, and Tab still
+	-- held Alt (layer-tap-holds-off).
+	helpers.it("makes a key with a modifier hold itself on the layer (layer-tap-holds-off)", function()
+		local TAB = 15
+		local e = engine({
+			left_alt = DEFAULTS.left_alt, left_shift = DEFAULTS.left_shift,
+			right_ctrl = DEFAULTS.right_ctrl, tab = DEFAULTS.tab,
+		})
+		e:process(ALT, DOWN, 0)
+		helpers.assert_nil(e:process(SHIFT, DOWN, 300), "LShift is Shift")
+		local out, tap = e:process(SHIFT, UP, 400)
+		helpers.assert_eq({ out, tap }, {}, "its quick release passes and copies nothing")
+		helpers.assert_nil(e:process(RCTRL, DOWN, 500), "RCtrl is Right Ctrl, not Shift")
+		helpers.assert_nil(e:process(RCTRL, UP, 550), "its release passes")
+		helpers.assert_nil(e:process(TAB, DOWN, 600), "Tab is Tab, not Alt")
+		helpers.assert_nil(e:process(TAB, REPEAT, 1100), "and repeats as Tab")
+		out, tap = e:process(TAB, UP, 1120)
+		helpers.assert_eq({ out, tap }, {}, "with no window switcher on its release")
+		e:process(ALT, UP, 1200)
+		helpers.assert_nil(e:process(KEY_A, DOWN, 1300), "RCtrl armed no one-shot: a plain a")
+		e:process(KEY_A, UP, 1310)
+		helpers.assert_eq(trail(e:process(SHIFT, DOWN, 1400)), "42↓", "off the layer LShift holds again")
+		local _, copy = e:process(SHIFT, UP, 1450)
+		helpers.assert_eq(copy, "copy", "and copies on a tap")
+	end)
+
 end)
 
 helpers.describe("tap-hold engine: tap sentinels and the one-shot Shift", function()
