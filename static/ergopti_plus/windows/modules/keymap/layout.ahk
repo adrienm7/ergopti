@@ -929,15 +929,6 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
 ; =============================
 
 
-; Returns true when digit keys 1-0 require Shift on the layout the boot
-; registrations are built for (_LAYOUT_REMAP_HKL, e.g. AZERTY, bépo). The
-; digit-row swap below reads its symbols on that same layout, so the check and
-; the symbols can never describe two different layouts.
-_OsLayoutDigitsAreShifted() {
-	global _LAYOUT_REMAP_HKL
-	return KS_LayoutDigitsAreShifted(_LAYOUT_REMAP_HKL)
-}
-
 #HotIf IsSet(Features) and Features["layout"]["direct_access_digits"]
 ; We need to use SendEvent for symbols, otherwise it may trigger and lock AltGr. This issue happens on AZERTY at least.
 ; For digits, it is better to remap with sending the down event instead of using the RemapKey function.
@@ -999,15 +990,35 @@ _DigitRowUp(Digit, *) {
 ; the layers: Shift+digit-key produces the OS native symbol (passthrough),
 ; while the unshifted key already sends the digit via the block above.
 ; SC029, SC00C, SC00D (outside the 1-0 run) are intentionally left alone.
-if Features["layout"]["direct_access_digits"] and _OsLayoutDigitsAreShifted() {
-	; The symbol each key types unshifted on the layout the check above read
-	; (KS_LayoutDigitRowSymbols). GetKeyName("vkXXscYYY") read the same table,
-	; but on the script thread's own layout, which need not be that one.
-	for SC, Symbol in KS_LayoutDigitRowSymbols(_LAYOUT_REMAP_HKL) {
-		; {Text} sends the Unicode character directly, bypassing the AHK
-		; keyboard hook — so the SC002–SC00B digit remaps never fire again.
-		Hotkey("+" Format("SC{:03X}", SC), _DigitShiftSend.Bind(Symbol), "I2")
+; Registered on every layout and decided per press on the foreground window's
+; layout (DigitRowSwapSymbol, layout_shift_caps.ahk): with Windows' per-window
+; input methods a window switch can change the layout, and a swap fixed at
+; load for one layout cost a reload per switch.
+try {
+	for _DigitSwapScName in _SHIFT_DIGIT_SCS {
+		_DigitSwapSc := Integer("0x" . SubStr(_DigitSwapScName, 3))
+		HotIf(_DigitRowSwapIsLive.Bind(_DigitSwapSc))
+		Hotkey("+" . _DigitSwapScName, _DigitRowSwapSend.Bind(_DigitSwapSc), "I2")
 	}
+} finally {
+	HotIf()
+}
+
+_DigitRowSwapIsLive(Sc, *) {
+	return DigitRowSwapSymbol(Sc, GetForegroundKeyboardLayout()) != ""
+}
+
+; The symbol is read again on the layout of the press: a layout switch between
+; the criterion and this thread leaves nothing to type, which is logged.
+_DigitRowSwapSend(Sc, *) {
+	Symbol := DigitRowSwapSymbol(Sc, GetForegroundKeyboardLayout())
+	if (Symbol == "") {
+		try LoggerWarn("Layout", "Shift+SC{1:03X}: the foreground layout changed during the press; nothing typed.", Sc)
+		return
+	}
+	; {Text} sends the Unicode character directly, bypassing the AHK
+	; keyboard hook — so the SC002–SC00B digit remaps never fire again.
+	_DigitShiftSend(Symbol)
 }
 
 ; Top-level helper for the shifted-symbol send — must be at module scope so

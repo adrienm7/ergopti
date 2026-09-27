@@ -6,16 +6,17 @@
 ; Regression guard ensuring RegisterShiftLayer does not shadow the OS-shifted-
 ; digit passthrough hotkeys when direct_access_digits is active.
 ;
-; The bug: modules/keymap/layout.ahk registers global (no-criterion) +SC002..+SC00B
-; hotkeys as passthrough for OS layouts where digits are behind Shift (AZERTY,
-; bépo, etc.). RegisterShiftLayer then registers the same +SCxxx chords under
-; an ergopti_base criterion.  AHK picks a criterion variant over a global one
+; The bug: modules/keymap/layout.ahk registers +SC002..+SC00B hotkeys as
+; passthrough for OS layouts where digits are behind Shift (AZERTY, bépo,
+; etc.). RegisterShiftLayer then registers the same +SCxxx chords under an
+; ergopti_base criterion. AHK picks a criterion variant over a global one
 ; whenever the criterion is met, so the passthrough was unreachable on those
 ; layouts even though it was registered first.
 ;
-; The fix: RegisterShiftLayer skips SC002..SC00B when direct_access_digits is
-; active and the OS layout has shifted digits, keeping the two variant sets
-; disjoint so the global passthrough owns the digit row.
+; The fix: RegisterShiftLayer registers SC002..SC00B apart, under a criterion
+; that stands down where direct_access_digits swaps the row on the foreground
+; layout (DigitRowIsSwapped), keeping the two variant sets disjoint so the
+; passthrough owns the digit row there.
 ;
 ; SCOPE: source introspection of modules/keymap/layout/layout_shift_caps.ahk.
 ; ==============================================================================
@@ -69,8 +70,8 @@ _SDPS_CheckRegisterShiftHasSkipGuard() {
 	Assert(InStr(Body, "SkipDigitRow") || InStr(Body, "_SHIFT_DIGIT_SCS"),
 		"RegisterShiftLayer must check for digit-row exclusion to avoid shadowing the passthrough")
 
-	Assert(InStr(Body, "direct_access_digits"),
-		"RegisterShiftLayer must gate the exclusion on Features[layout][direct_access_digits]")
+	Assert(InStr(Body, "DigitRowIsSwapped(GetForegroundKeyboardLayout())"),
+		"RegisterShiftLayer must gate the exclusion on the swap of the foreground layout (DigitRowIsSwapped)")
 }
 
 _SDPS_CheckSkipUsedInsideLoop() {
@@ -120,8 +121,8 @@ _SDPS_CheckRegisterCapsLockHasSkipGuard() {
 	Assert(InStr(Body, "SkipDigitRow") || InStr(Body, "_SHIFT_DIGIT_SCS"),
 		"RegisterCapsLockLayer must check for digit-row exclusion to avoid shadowing the passthrough, mirroring RegisterShiftLayer")
 
-	Assert(InStr(Body, "direct_access_digits"),
-		"RegisterCapsLockLayer must gate the exclusion on Features[layout][direct_access_digits]")
+	Assert(InStr(Body, "DigitRowIsSwapped(GetForegroundKeyboardLayout())"),
+		"RegisterCapsLockLayer must gate the exclusion on the swap of the foreground layout (DigitRowIsSwapped)")
 }
 Test("meta shift-digit-passthrough: RegisterCapsLockLayer has skip guard for direct_access_digits (caps-digit-passthrough-shadow)",
 	_SDPS_CheckRegisterCapsLockHasSkipGuard)
