@@ -95,6 +95,7 @@ const CHECKS = [
 	{ name: 'every macOS/Linux package build stamps the commit its diagnostics report (no "unknown" in a release)', cmd: 'node', args: ['tools/test/test-package-builds-stamp-commit.cjs'], repro: 'node tools/test/test-package-builds-stamp-commit.cjs' },
 	{ name: 'every registered action resolves a label in all 21 locales', cmd: 'node', args: ['tools/test/test-action-labels-have-locale-keys.cjs'], repro: 'node tools/test/test-action-labels-have-locale-keys.cjs' },
 	{ name: 'Linux install.sh leaves a working first install (sandboxed real run)', cmd: 'node', args: ['tools/test/test-linux-install-sandbox.cjs'], repro: 'node tools/test/test-linux-install-sandbox.cjs' },
+	{ name: 'Linux native packages provision graphical input access', cmd: 'node', args: ['tools/test/test-linux-package-setup.cjs'], repro: 'npm run test:linux-package-setup' },
 	{ name: 'Linux tray icons mirror the Ergopti logo byte for byte', cmd: 'node', args: ['tools/test/test-linux-tray-icon-assets.cjs'], repro: 'node tools/test/test-linux-tray-icon-assets.cjs' },
 	{ name: 'the apps metrics window keeps its state across the Linux poll', cmd: 'node', args: ['tools/test/test-metrics-apps-linux-poll.cjs'], repro: 'node tools/test/test-metrics-apps-linux-poll.cjs' },
 	{ name: 'shared pages only call translators that exist', cmd: 'node', args: ['tools/test/test-shared-ui-translators-defined.cjs'], repro: 'node tools/test/test-shared-ui-translators-defined.cjs' },

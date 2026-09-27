@@ -108,6 +108,16 @@ Requires LuaJIT 2.x. Plain Lua 5.4 works for the meta tests (no luv dependency).
 
 ## Installation
 
+For Ubuntu, Zorin OS and Debian desktops, open the downloaded `.deb` in the
+software installer and choose **Install**, then open Ergopti from the application
+menu. The package installs its icon, dependencies, input permissions and startup
+entries. The first launch refreshes the application's input groups without
+requiring a terminal or a new login. If another desktop account launches it
+later, a graphical administrator prompt grants that account the required access.
+
+The `.rpm` provides the same permission setup on supported RPM desktops.
+For an installation from the standalone archive or a source checkout:
+
 ```bash
 bash static/ergopti_plus/linux/install.sh
 ```
