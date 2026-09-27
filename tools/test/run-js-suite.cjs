@@ -116,6 +116,7 @@ const CHECKS = [
 	{ name: 'AHK parse coverage (Ahk2Exe compiles the whole #Include graph — Windows only, self-validating)', cmd: 'node', args: ['tools/test/test-ahk-parse-coverage.cjs'], repro: 'node tools/test/test-ahk-parse-coverage.cjs' },
 	{ name: 'AHK startup contract (early globals + actionable fatal diagnostics)', cmd: 'node', args: ['tools/test/test-ahk-startup-contract.cjs'], repro: 'node tools/test/test-ahk-startup-contract.cjs' },
 	{ name: 'full AHK startup smoke (real auto-execute to ready, isolated config)', cmd: 'node', args: ['tools/test/test-ahk-full-startup-smoke.cjs'], repro: 'node tools/test/test-ahk-full-startup-smoke.cjs' },
+	{ name: 'Kana installer refuses local execution and owns its native helper', cmd: 'node', args: ['tools/test/test-ci-kana-install.cjs'], repro: 'node tools/test/test-ci-kana-install.cjs' },
 	{ name: 'AHK runners are invoked (no run_*/bench_* file referenced by nothing)', cmd: 'node', args: ['tools/test/test-ahk-runners-are-invoked.cjs'], repro: 'node tools/test/test-ahk-runners-are-invoked.cjs' },
 	{ name: 'AHK runner references stream without retaining the full text corpus', cmd: 'node', args: ['tools/test/test-ahk-runner-scan-streaming.cjs'], repro: 'node tools/test/test-ahk-runner-scan-streaming.cjs' },
 	{ name: 'AHK runner rejects malformed filters before loading tests', cmd: 'node', args: ['tools/test/test-ahk-runner-arguments.cjs'], repro: 'npm run test:ahk-runner-arguments' },

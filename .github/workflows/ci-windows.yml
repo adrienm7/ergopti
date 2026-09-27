@@ -163,6 +163,11 @@ jobs:
           Add-MpPreference -ExclusionProcess "AutoHotkey64.exe" -ErrorAction SilentlyContinue
           Write-Host "Defender exclusions applied."
 
+      - name: Install the shipped Kana layout for real probes
+        shell: pwsh
+        timeout-minutes: 3
+        run: ./tools/test/install-ci-kana-layout.ps1
+
       - name: Run AHK test suite
         shell: pwsh
         timeout-minutes: 25
