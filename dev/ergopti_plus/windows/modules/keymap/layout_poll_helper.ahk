@@ -13,6 +13,11 @@
 ; refs. Reloading is deferred until the new layout is stable across two consecutive
 ; polls AND the user is physically idle AND no expansion is in flight, turning a
 ; transient flicker into a no-op while still adapting to a genuine layout switch.
+;
+; LayoutPollTick runs one poll through that decision and reloads through the
+; terminal hand-off, with every lifecycle call behind a port so the retry policy
+; is tested headlessly too: a refused reload is retried with a doubling wait, a
+; few times per layout, and never when its refusal would be forced through.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -43,10 +48,12 @@ _ShouldReloadForHkl(curHkl, &lastHkl, &pendingHkl, suspended, isBlacklisted, hse
 	if isBlacklisted
 		return false
 	; Adopt the first observed real layout as the baseline. lastHkl == 0 means the
-	; baseline is UNKNOWN (a tray-only / no-foreground boot — logon autostart or RDP
-	; reconnect, where GetForegroundKeyboardLayout() returns 0), NOT that we booted on
-	; layout 0. So the first non-zero layout we see is the baseline, never a switch to
-	; reload for — otherwise the driver spuriously Reload()s a few seconds after boot.
+	; baseline is UNKNOWN, NOT that we booted on layout 0: the boot probe seeds it
+	; with the layout it decided the AltGr family on, through a cascade that falls
+	; back from the foreground window to the AHK thread's own layout, so 0 means
+	; no layout could be read at all (logged as an AltGrDetect error). The first
+	; non-zero layout we see is then the baseline, never a switch to reload for —
+	; otherwise the driver spuriously Reload()s a few seconds after boot.
 	if (lastHkl == 0 && curHkl != 0) {
 		lastHkl := curHkl
 		pendingHkl := 0
@@ -76,4 +83,146 @@ _ShouldReloadForHkl(curHkl, &lastHkl, &pendingHkl, suspended, isBlacklisted, hse
 		return false
 	lastHkl := curHkl
 	return true
+}
+
+
+
+
+
+; =================================================
+; =================================================
+; ======= 2/ Reload through the hand-off ==========
+; =================================================
+; =================================================
+
+; Automatic reload attempts for one stay on a foreground layout. Each refused
+; attempt launches and stops a whole successor, and one an OnExit gate refuses
+; spends one of the process's LIFECYCLE_SHUTDOWN_VETO_MAX_ATTEMPTS vetoes, so a
+; refusal that persists (a malformed trigger WAL keeps every reload strict) must
+; not be retried for ever: after this many the poll gives up on that layout.
+global LAYOUT_POLL_RELOAD_MAX_ATTEMPTS := 3
+; Wait after the first refused attempt before the next; each refusal doubles it.
+global LAYOUT_POLL_RELOAD_RETRY_BASE_MS := 5000
+; The retry state of the foreground layout: its "hkl", the "attempts" started
+; for it, the tick count of the last refusal ("refused_at") and the wait after
+; it ("wait_ms"), and whether the poll "gave_up" on it. A new one starts when
+; the layout changes.
+global _LayoutPollRetry := _LayoutPollNewRetry(0)
+
+; One tick of the layout poll: decides whether a confirmed, quiet layout switch
+; warrants a reload and starts it through the terminal hand-off. The arguments
+; after Hkl are _ShouldReloadForHkl's; the tracking refs are the entry file's
+; _LAST_KEYBOARD_HKL and _PENDING_KEYBOARD_HKL.
+; @param Port {Map} The lifecycle seams: "reload"(RefusedFn) starts the poll's
+;   own reload and returns whether it launched; "pending"() returns the pending
+;   reload record or false; "veto_honored"() says whether OnExit could still
+;   refuse one more exit; "now"() returns the tick count; "notify"() tells the
+;   user a reload failed.
+; @returns {Boolean} True when this tick started a reload.
+LayoutPollTick(Hkl, Suspended, IsBlacklisted, HseSuppressed, PwSuppressed, IdleMs,
+		InputBusy, Port) {
+	global _LAST_KEYBOARD_HKL, _PENDING_KEYBOARD_HKL
+	_LayoutPollObserve(Hkl)
+	PreviousHkl := _LAST_KEYBOARD_HKL
+	if !_ShouldReloadForHkl(Hkl, &_LAST_KEYBOARD_HKL, &_PENDING_KEYBOARD_HKL,
+			Suspended, IsBlacklisted, HseSuppressed, PwSuppressed, IdleMs, InputBusy)
+		return false
+	return _LayoutPollReload(Hkl, PreviousHkl, Port)
+}
+
+; Reports a reload stage that refused before any successor launched, for the
+; poll's reload only. The default reporter shows a "save failed" notice that
+; means nothing to a user who only switched layouts, and would repeat on every
+; retry; the poll tells the user once, when it gives up.
+LayoutPollStageRefused(Stage, Path) {
+	try LoggerWarn("ErgoptiPlus", "Layout reload stage '{1}' refused for '{2}'.", Stage, Path)
+}
+
+; Starts a new retry state when the foreground layout is no longer the one being
+; retried: switching away and back is a new request with a fresh attempt budget.
+_LayoutPollObserve(Hkl) {
+	global _LayoutPollRetry
+	if (Hkl != 0 && Hkl != _LayoutPollRetry["hkl"])
+		_LayoutPollRetry := _LayoutPollNewRetry(Hkl)
+}
+
+_LayoutPollNewRetry(Hkl) {
+	return Map("hkl", Hkl, "attempts", 0, "refused_at", 0, "wait_ms", 0, "gave_up", false)
+}
+
+; Reloads for a confirmed layout switch through the terminal hand-off, like
+; every other reload: a bare Reload left a successor whose close request was
+; refused on "Could not close the previous instance", and one fired while a
+; hand-off reload was pending let that successor claim the pending record, so
+; two drivers started. _ShouldReloadForHkl has advanced the tracker to Hkl;
+; every path that leaves no reload of the poll's own under way puts it back, so
+; a later quiet poll decides again.
+_LayoutPollReload(Hkl, PreviousHkl, Port) {
+	global _LayoutPollRetry, LAYOUT_POLL_RELOAD_MAX_ATTEMPTS
+	Retry := _LayoutPollRetry
+	; A reload someone else launched restarts on whatever layout its successor
+	; boots on. Joining it would count as this switch's reload, and nothing would
+	; tell the poll if it were refused: wait for it to end either way.
+	if (Port["pending"].Call() is Map)
+		return _LayoutPollRestore(PreviousHkl)
+	if (Retry["gave_up"]
+			|| ((Port["now"].Call() - Retry["refused_at"]) & 0xFFFFFFFF) < Retry["wait_ms"])
+		return _LayoutPollRestore(PreviousHkl)
+	; Past the last honored veto, OnExit lets the exit through whatever gate
+	; refuses it. A user's quit may cross it; an automatic reload never does.
+	if !Port["veto_honored"].Call()
+		return _LayoutPollGiveUp(Retry, PreviousHkl, Port,
+			"one more refusal would exhaust the shutdown veto budget")
+	Retry["attempts"] += 1
+	; The one reload nobody clicks: without this line a layout switch looked like
+	; a spontaneous restart in the log.
+	try LoggerInfo("ErgoptiPlus", "Keyboard layout changed to HKL 0x{1:X}; reloading to re-probe the layout (attempt {2}/{3}).",
+		Hkl, Retry["attempts"], LAYOUT_POLL_RELOAD_MAX_ATTEMPTS)
+	Refused := _LayoutPollRefused.Bind(Retry, PreviousHkl, Port)
+	if Port["reload"].Call(Refused)
+		return true
+	Refused.Call("the reload could not start")
+	return false
+}
+
+; A refused layout reload did not happen, so the driver still runs on the probe
+; of PreviousHkl: restore the tracker, then wait twice as long as after the
+; previous refusal, or give up once the attempts are spent. A refusal that
+; lands after the user left that layout only restores the tracker.
+_LayoutPollRefused(Retry, PreviousHkl, Port, Reason) {
+	global _LayoutPollRetry, LAYOUT_POLL_RELOAD_MAX_ATTEMPTS
+	global LAYOUT_POLL_RELOAD_RETRY_BASE_MS
+	_LayoutPollRestore(PreviousHkl)
+	if (Retry != _LayoutPollRetry) {
+		try LoggerWarn("ErgoptiPlus", "Reload for keyboard layout HKL 0x{1:X} refused ({2}) after the layout changed again.",
+			Retry["hkl"], Reason)
+		return
+	}
+	if (Retry["attempts"] >= LAYOUT_POLL_RELOAD_MAX_ATTEMPTS)
+		return _LayoutPollGiveUp(Retry, PreviousHkl, Port, Format(
+			"{1} attempts were refused, the last because {2}", Retry["attempts"], Reason))
+	Retry["refused_at"] := Port["now"].Call()
+	Retry["wait_ms"] := LAYOUT_POLL_RELOAD_RETRY_BASE_MS * (2 ** (Retry["attempts"] - 1))
+	try LoggerWarn("ErgoptiPlus", "Reload for keyboard layout HKL 0x{1:X} refused ({2}); retrying in {3} ms.",
+		Retry["hkl"], Reason, Retry["wait_ms"])
+}
+
+; Stops retrying Retry's layout until the foreground layout changes. The driver
+; keeps the previous layout's probe, so the user is told once.
+_LayoutPollGiveUp(Retry, PreviousHkl, Port, Reason) {
+	_LayoutPollRestore(PreviousHkl)
+	Retry["gave_up"] := true
+	try LoggerError("ErgoptiPlus", "Reload for keyboard layout HKL 0x{1:X} abandoned: {2}. The driver keeps the previous layout until the layout changes again or a manual reload.",
+		Retry["hkl"], Reason)
+	Port["notify"].Call()
+	return false
+}
+
+; Puts the tracker back on the layout the driver probed, so the next confirmed
+; quiet poll decides again.
+_LayoutPollRestore(PreviousHkl) {
+	global _LAST_KEYBOARD_HKL, _PENDING_KEYBOARD_HKL
+	_LAST_KEYBOARD_HKL := PreviousHkl
+	_PENDING_KEYBOARD_HKL := 0
+	return false
 }

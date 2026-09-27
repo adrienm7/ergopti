@@ -218,9 +218,33 @@ helpers.describe("changelog_bridge: native fetch push", function()
 		return calls, pushed
 	end
 
+	--- Runs `body` with the updater following `channel`.
+	local function following(channel, body)
+		local previous = package.loaded["modules.updater.manager"]
+		package.loaded["modules.updater.manager"] = { get_channel = function() return channel end }
+		local ok, err = pcall(body)
+		package.loaded["modules.updater.manager"] = previous
+		if not ok then error(err, 0) end
+	end
+
+	helpers.it("opens on the prerelease channel when the installation follows it", function()
+		following("dev", function()
+			local calls, pushed = install()
+			local initial = Bridge.on_message("ready", {})
+			helpers.assert_eq(initial.channel, "dev",
+				"on 'main' the page hides every prerelease: the window opened on an empty list")
+			calls[1].callback(200, "[{\"tag_name\":\"v0.0.0-dev.134\",\"prerelease\":true}]", nil)
+			helpers.assert_eq(pushed[1].channel, "dev")
+			Bridge._reset()
+		end)
+	end)
+
 	helpers.it("starts a bounded API fetch when the page is ready", function()
 		local calls, pushed = install()
+		local restore = package.loaded["modules.updater.manager"]
+		package.loaded["modules.updater.manager"] = { get_channel = function() return "stable" end }
 		local initial = Bridge.on_message("ready", {})
+		package.loaded["modules.updater.manager"] = restore
 		helpers.assert_eq(initial.action, "releases", "the cached fast path keeps its response shape")
 		helpers.assert_eq(#calls, 1)
 		helpers.assert_eq(calls[1].url, "https://api.github.com/repos/adrienm7/ergopti/releases?per_page=20")

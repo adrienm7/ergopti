@@ -2128,6 +2128,19 @@ local function _manifest_metrics_rows(ctx, k)
 			local ok, widget = pcall(require, "ui.wpm.widget")
 			return ok and widget.is_running() or false
 		end,
+		-- The tray readout: the Linux counterpart of the macOS menu bar one.
+		metrics_menubar_wpm    = function()
+			local ok, readout = pcall(require, "ui.wpm.tray_readout")
+			return ok and readout.is_running() or false
+		end,
+		metrics_menubar_colors = function()
+			local ok, readout = pcall(require, "ui.wpm.tray_readout")
+			return ok and readout.uses_source_colors() or false
+		end,
+		wpm_menubar_visible    = function()
+			local ok, readout = pcall(require, "ui.wpm.tray_readout")
+			return ok and readout.is_running() or false
+		end,
 	}
 
 	--- One manifest row, with its disabled state resolved from the manifest.
@@ -2204,6 +2217,17 @@ local function _manifest_metrics_rows(ctx, k)
 					if changed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 				end)
 		end,
+		-- The real-time graph in place of the pill, as on macOS.
+		include_realtime = function(items)
+			local widget = wpm_widget()
+			items[#items + 1] = row("include_realtime", i18n_safe("menu.metrics.include_realtime"),
+				widget ~= nil and widget.uses_graph(),
+				function()
+					if not widget then return end
+					local changed = widget.set_graph(not widget.uses_graph())
+					if changed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				end)
+		end,
 		-- The three privacy filters are gone from this table on purpose: their
 		-- manifest rows are `type = "check"` now, so the SHARED renderer builds
 		-- them from the declaration and this driver supplies only the behaviour,
@@ -2261,6 +2285,29 @@ local function _manifest_metrics_rows(ctx, k)
 			if k.is_suppressed() then k.unsuppress() else k.suppress() end
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		end,
+		["reset_wpm_position"] = function()
+			local widget = wpm_widget()
+			if not widget then
+				Logger.error(LOG, "No WPM widget module — its place cannot be reset.")
+				return
+			end
+			widget.reset_position()
+		end,
+		["wpm_menubar"] = function()
+			local ok, readout = pcall(require, "ui.wpm.tray_readout")
+			if not ok then
+				Logger.error(LOG, "No WPM tray readout module — the row cannot toggle anything.")
+				return
+			end
+			local changed = readout.is_running() and readout.stop() or readout.start()
+			if changed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		end,
+		["menubar_colors"] = function()
+			local ok, readout = pcall(require, "ui.wpm.tray_readout")
+			if not ok then return end
+			local changed = readout.set_use_source_colors(not readout.uses_source_colors())
+			if changed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		end,
 		["metrics_reset_session"] = function()
 			if type(k.reset_session) ~= "function" then
 				Logger.error(LOG, "Keylogger exposes no reset_session — the row does nothing.")
@@ -2292,7 +2339,7 @@ end
 --- `checked_when` predicates resolved declaratively rather than re-derived here.
 --- Seven others were removed from this driver's projection in the same pass,
 --- because they configure features the FEATURE manifest already declares
---- elsewhere: the WPM widget (`ui/wpm` exists on macOS and Windows and not here),
+--- elsewhere: the WPM widget (it has since come back, see ui/wpm),
 --- the two metrics-window shortcuts, and the app-exclusion list, for which this
 --- driver's keylogger exposes no setter. A row that cannot be rendered is a
 --- promise the manifest makes on this driver's behalf and the driver breaks.
@@ -3261,6 +3308,11 @@ local function _build_updates(ctx)
 					else
 						Logger.info(LOG, "No update available (current: %s).", up.current_version())
 					end
+					-- Told, and the menu redrawn: the install row appears only on a
+					-- rebuild, so a found update stayed invisible until the next one.
+					if type(ctx.on_update_checked) == "function" then
+						ctx.on_update_checked(available, release, err)
+					end
 				end)
 			end,
 		}
@@ -3273,11 +3325,16 @@ local function _build_updates(ctx)
 				out[#out + 1] = {
 					label = _fill(i18n_safe("menu.updates.download_install"), "{tag}", rel.tag),
 					action = function()
-						up.download_update(nil, function(archive, err)
-							if archive then
-								up.install_update(archive)
-							elseif err then
+						-- Consent names the release this row shows: the manager refuses
+						-- it if a background check replaced the cached release since.
+						up.download_update(rel.download_url, function(archive, err)
+							local installed = archive ~= nil and up.install_update(archive)
+							if not archive then
 								Logger.error(LOG, "Update download failed: %s.", tostring(err))
+							end
+							-- The daemon restarts on the new version, or tells why not.
+							if type(ctx.on_update_finished) == "function" then
+								ctx.on_update_finished(installed, rel.tag, archive and "install" or "download")
 							end
 						end)
 					end,

@@ -59,3 +59,20 @@ _ENDT_DedupGuardsSetTimerAndNotifier() {
 		. "tray toast on every occurrence (error-handler-no-dedup-throttle)")
 }
 Test("meta error-net: dedup cache check gates both the deferred crash report and the toast (error-handler-no-dedup-throttle)", _ENDT_DedupGuardsSetTimerAndNotifier)
+
+; An alt_gr tap-hold presses SC138, not RAlt, on a Kana-style layout. The crash
+; net releases logically stuck modifiers after an uncaught error; a sweep that
+; only names RAlt would leave that layout's AltGr hold stranded
+; (kana-altgr-hold-2026-09-25).
+_ENDT_StuckSweepKnowsTheLayoutAltGr() {
+	Body := _DriverFuncBody("ErgoptiGlobalErrorHandler")
+	Assert(Body != "", "ErgoptiGlobalErrorHandler() must exist in infra/error_net.ahk")
+	AltGrPos := InStr(Body, "StuckCandidates.Push(KS_AltGrKeyName())")
+	SweepPos := InStr(Body, "for _, ModKey in StuckCandidates")
+	Assert(AltGrPos > 0,
+		"the stuck-modifier sweep must add the layout's AltGr key when it is not RAlt")
+	Assert(SweepPos > AltGrPos,
+		"the sweep must iterate the candidate list that includes the layout's AltGr key")
+}
+Test("meta error-net: the stuck-modifier sweep releases the layout's AltGr (kana-altgr-hold-2026-09-25)",
+	_ENDT_StuckSweepKnowsTheLayoutAltGr)

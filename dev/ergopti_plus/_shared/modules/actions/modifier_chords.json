@@ -64,7 +64,7 @@
       "chord_key": ".",
       "windows_key": ".",
       "macos_key": ".",
-      "linux_key": ".",
+      "linux_key": "period",
       "karabiner_key": "period"
     },
     {
@@ -73,7 +73,7 @@
       "chord_key": ",",
       "windows_key": ",",
       "macos_key": ",",
-      "linux_key": ",",
+      "linux_key": "comma",
       "karabiner_key": "comma"
     }
   ],

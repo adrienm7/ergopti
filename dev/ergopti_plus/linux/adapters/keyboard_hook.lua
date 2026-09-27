@@ -71,7 +71,7 @@ local TEXT_CONTROL_CHAR = {
 
 -- Callbacks set by the caller via M.start().
 local _on_char      = nil   -- function(char_string, evdev_scancode)
-local _on_key       = nil   -- function(key_name_string)
+local _on_key       = nil   -- function(key_name_string, { mods = held_modifiers() } | shortcut detail)
 local _on_physical  = nil   -- function(evdev_scancode, key_name, char_or_nil, evdev_value)
 local _on_hold      = nil   -- function(evdev_scancode, held_ms)
 local _on_desync    = nil   -- function() invalidates text derived before SYN_DROPPED
@@ -133,7 +133,7 @@ local _release_remapped
 local _remap_owned = {}
 local _remap_orphans = {}
 -- Test seam: the time the engine reads while _test_drive replays a stream
--- whose events carry `at_ms`. nil in production.
+-- whose events carry `at_ms` and no kernel timestamp. nil in production.
 local _test_clock_ms = nil
 
 -- Only EV_KEY is forwarded. The uinput channel appends its own SYN_REPORT after
@@ -191,9 +191,10 @@ local _reported_missing = false
 -- Called when a pointer button is pressed, if the caller asked for it.
 local _on_click = nil
 
--- evdev button codes start at BTN_MISC. Everything at or above it on a pointer
--- is a button; everything below is a keyboard key, and a pointer reports none.
-local BTN_FIRST = 0x100
+-- Set while XKB cannot tell the keys' roles or capture them, so that is
+-- logged once and not at every key event; the next press XKB answers in full
+-- clears it.
+local _xkb_failure_reported = false
 
 local function keyboard_slot(path)
 	return "keyboard:" .. path
@@ -304,28 +305,73 @@ end
 -- =========================================
 -- =========================================
 
---- Updates the held-modifier flags from a key transition.
+--- Logs an XKB failure once, however many keys it hits: a keymap XKB cannot
+--- read fails every key event, and a line for each filled the log. The next
+--- press XKB answers in full clears it (_xkb_answered).
+--- @param fmt string Logger format.
+local function _xkb_failed(fmt, ...)
+	if _xkb_failure_reported then return end
+	_xkb_failure_reported = true
+	Logger.error(LOG, fmt, ...)
+end
+
+--- Clears a reported XKB failure once a key is answered in full, and says so.
+local function _xkb_answered()
+	if not _xkb_failure_reported then return end
+	_xkb_failure_reported = false
+	Logger.info(LOG, "XKB answers again: the keys' roles and text come from the layout.")
+end
+
+--- The role a physical key has in the ACTIVE layout, asked of XKB before its
+--- press is committed, for every key. The key alone does not say: Right Alt is
+--- AltGr (ISO_Level3_Shift, which types text) on a French or Ergopti layout
+--- and plain Alt_R (a shortcut) on a US one, and XKB options move modifiers to
+--- other keys (ctrl:nocaps makes CapsLock a Ctrl, lv3:menu_switch makes Menu
+--- an AltGr). Only a capture double (tests) is not a layout: there the key's
+--- usual role stands, and so it does, logged once, when XKB cannot answer.
+--- @param code integer evdev keycode.
+--- @return string|nil "shift", "altgr", "ctrl", "alt", "meta", or nil when the
+---   key is not a modifier in this layout.
+--- @return boolean True when XKB could not answer and the usual role stands.
+local function _modifier_role(code)
+	if _test_capture_event then return EvdevCodes.MODIFIER_OF[code], false end
+	local role, role_err = XkbCapture.modifier_role(code)
+	if role_err then
+		_xkb_failed("XKB cannot tell the role of key %d (%s) — each key keeps its usual role until it can.",
+			code, tostring(role_err))
+		return EvdevCodes.MODIFIER_OF[code], true
+	end
+	return role, false
+end
+
+--- Updates the held-modifier flags from a key transition. A release and a
+--- repeat keep the role the press was given, so the counts always balance.
 --- @param source string Source identity.
 --- @param code integer evdev keycode.
 --- @param value integer evdev value: 0 release, 1 press, 2 repeat.
---- @return boolean True when the code was a modifier and nothing else applies.
-local function _track_modifier(source, code, value)
-	local modifier = EvdevCodes.MODIFIER_OF[code]
-	if not modifier then return false end
+--- @param role string|nil For a press: the key's role from _modifier_role().
+--- @return boolean True when the key is a held modifier and nothing else applies.
+local function _track_modifier(source, code, value, role)
 	local key = source_key(source, code)
-	if value == InputEvent.VALUE_DOWN and not _modifier_down[key] then
-		_modifier_down[key] = modifier
-		_modifier_count[modifier] = _modifier_count[modifier] + 1
+	local held_role = _modifier_down[key]
+	if value == InputEvent.VALUE_DOWN then
+		if held_role then return true end
+		if not role then return false end
+		_modifier_down[key] = role
+		_modifier_count[role] = _modifier_count[role] + 1
 		_modifier_order[#_modifier_order + 1] = { key = key, code = code }
-	elseif value == InputEvent.VALUE_UP and _modifier_down[key] then
+	elseif value == InputEvent.VALUE_UP then
+		if not held_role then return false end
 		_modifier_down[key] = nil
-		_modifier_count[modifier] = math.max(0, _modifier_count[modifier] - 1)
+		_modifier_count[held_role] = math.max(0, _modifier_count[held_role] - 1)
 		for index = #_modifier_order, 1, -1 do
 			if _modifier_order[index].key == key then
 				table.remove(_modifier_order, index)
 				break
 			end
 		end
+	else
+		return held_role ~= nil
 	end
 	_shift_held = _modifier_count.shift > 0
 	_ctrl_held  = _modifier_count.ctrl > 0
@@ -426,11 +472,12 @@ local function _resynchronise(source)
 	end)
 	for _, current in ipairs(ordered) do
 		local key = current.key
+		local role = _modifier_role(current.code)
 		if current.code ~= EvdevCodes.KEY_CAPSLOCK then
 			local _, _, capture_err = _capture(current.code, InputEvent.VALUE_DOWN)
 			if capture_err then return false, tostring(capture_err) end
 		end
-		_track_modifier(current.source, current.code, InputEvent.VALUE_DOWN)
+		_track_modifier(current.source, current.code, InputEvent.VALUE_DOWN, role)
 		_pressed_at[key] = Monotonic.now_ms()
 		if consumed[key] then _consumed_down[key] = true end
 	end
@@ -475,6 +522,19 @@ end
 --- into the domain callbacks.
 --- @param ev table { type = integer, code = integer, value = integer }.
 --- @param source string|nil Stable source identity.
+--- When a key event happened, in milliseconds, for telling a tap from a hold.
+--- The kernel's stamp, not the time the daemon reads the event: a daemon busy
+--- for a moment reads a 100 ms tap's release late, and timed on reading it
+--- measured a hold (a Shift tap that never copied). Every evdev device stamps
+--- on the same clock, so stamps compare across keyboards; only an event the
+--- kernel did not stamp (a replayed test stream) is timed on reading it.
+--- @param ev table A decoded event.
+--- @return number
+local function _event_time_ms(ev)
+	if type(ev.timestamp_us) == "number" and ev.timestamp_us > 0 then return ev.timestamp_us / 1000 end
+	return _test_clock_ms or Monotonic.now_ms()
+end
+
 local function _dispatch_event(ev, source)
 	-- Intercept mode grabbed the device, so nothing reaches the application
 	-- except through here: put the raw event back BEFORE doing anything else.
@@ -506,7 +566,7 @@ local function _dispatch_event(ev, source)
 		return
 	end
 	if _remapper and _intercept and not ev.remapped then
-		local out, tap = _remapper:process(ev.code, ev.value, _test_clock_ms or Monotonic.now_ms())
+		local out, tap = _remapper:process(ev.code, ev.value, _event_time_ms(ev))
 		if ev.value == InputEvent.VALUE_UP then
 			_remap_owned[owned_key] = nil
 		elseif out and ev.value == InputEvent.VALUE_DOWN then
@@ -531,13 +591,18 @@ local function _dispatch_event(ev, source)
 	end
 
 	local pressed = ev.value ~= InputEvent.VALUE_UP
+	-- A modifier's role is read from the state its own press is about to change.
+	local role, role_failed = nil, false
+	if ev.value == InputEvent.VALUE_DOWN then role, role_failed = _modifier_role(ev.code) end
 	-- Every key transition reaches XKB before any routing early-return. Modifier,
 	-- CapsLock and group-switch releases carry no text, but dropping them here
 	-- leaves the state machine permanently different from the desktop.
 	local char, identity, capture_err = _capture(ev.code, ev.value)
 	if capture_err then
-		Logger.error(LOG, "XKB capture failed (code=%d value=%d) — %s.",
-			ev.code, ev.value, tostring(capture_err))
+		_xkb_failed("XKB capture failed (code=%d value=%d) — %s.", ev.code, ev.value, tostring(capture_err))
+	elseif ev.value == InputEvent.VALUE_DOWN and not role_failed then
+		-- A press asks XKB both questions: answered, XKB is back.
+		_xkb_answered()
 	end
 
 	-- Publish physical identity before any interpretation branch can return.
@@ -556,7 +621,7 @@ local function _dispatch_event(ev, source)
 	-- XKB has already consumed the transition above. Modifiers still produce no
 	-- domain event; returning here prevents a test double or a malformed keymap
 	-- from inventing a typed character for a physical modifier.
-	local is_modifier = _track_modifier(source, ev.code, ev.value)
+	local is_modifier = _track_modifier(source, ev.code, ev.value, role)
 	if is_modifier then
 		_forward_raw(ev, source)
 		return
@@ -637,7 +702,11 @@ local function _dispatch_event(ev, source)
 			-- remain controls so Alt+Tab and Ctrl+Enter never become text.
 			if _on_char then _call_callback("text-control callback", _on_char, text_char, ev.code) end
 		elseif _on_key then
-			_call_callback("control-key callback", _on_key, control)
+			-- The modifiers travel with the key. Ctrl+Backspace deletes a word and
+			-- Alt+Backspace undoes in some applications: reported as a bare
+			-- "backspace", the daemon undid the last expansion over a word already
+			-- gone, or dropped one character of a buffer that had lost a word.
+			_call_callback("control-key callback", _on_key, control, { mods = M.held_modifiers() })
 		end
 		return
 	end
@@ -715,18 +784,26 @@ end
 -- =========================================
 -- =========================================
 
-local EVDEV_TYPE_REL = 2
-
 local function _dispatch_pointer(ev)
-	if ev.type == EVDEV_TYPE_KEY
-		and ev.code >= BTN_FIRST
-		and ev.value == InputEvent.VALUE_DOWN
-	then
-		-- A click while a tap-hold key is down makes it a chord (Shift+click).
-		if _remapper then _remapper:activity() end
-		_call_callback("pointer callback", _on_click, ev.code)
-	elseif ev.type == EVDEV_TYPE_REL and _remapper then
-		-- So does a wheel turn: Ctrl+wheel must not paste on release.
+	if ev.type == EVDEV_TYPE_KEY and ev.code >= InputEvent.POINTER_BUTTON_FIRST then
+		-- A click while a tap-hold key is down makes it a chord (Shift+click),
+		-- and so does the release of one, as on Windows (hook_dispatcher's
+		-- _OnLUp ... _OnX2Up): a click begun before the tap ends inside it.
+		-- A finger landing on a touchpad (BTN_TOUCH, BTN_TOOL_*) is neither.
+		if _remapper and InputEvent.is_pointer_button(ev.code) and ev.value ~= InputEvent.VALUE_REPEAT then
+			_remapper:activity()
+		end
+		-- The daemon hears of every press, the touch included: with tap-to-click
+		-- the kernel reports a touch and no BTN_LEFT, and that touch moves the
+		-- caret all the same, so the password-field verdict and the typing
+		-- buffer must be dropped as on a click.
+		if ev.value == InputEvent.VALUE_DOWN then
+			_call_callback("pointer callback", _on_click, ev.code)
+		end
+	elseif ev.type == InputEvent.EV_REL and InputEvent.REL_WHEEL_AXES[ev.code] and _remapper then
+		-- So does a wheel turn: Ctrl+wheel must not paste on release. Only the
+		-- wheel, as on Windows and macOS: every EV_REL used to count, so a hand
+		-- that merely moved the mouse while tapping CapsLock typed no Enter.
 		_remapper:activity()
 	end
 end
@@ -825,6 +902,29 @@ function M.pump()
 	end
 end
 
+--- The text a key would type now, in the live layout and with the modifiers
+--- held now, without pressing it; nil for a key that types none. A key under
+--- Ctrl, Alt or Super is a shortcut, not text, whatever its level would type.
+--- The tap-hold engine's one-shot Shift asks it, as the Windows InputHook
+--- collects only keys that type text.
+--- @param code integer evdev keycode.
+--- @return string|nil text, string|nil error Why the layout could not answer.
+function M.key_text(code)
+	if _shortcut_modifier_held() then return nil end
+	local text, err
+	if _test_capture_event then
+		-- Under a capture double (tests) the double is the layout: it answers
+		-- as it would for the press.
+		text, _, err = _test_capture_event(code, InputEvent.VALUE_DOWN)
+	else
+		text, err = XkbCapture.peek_text(code)
+	end
+	if err then return nil, err end
+	local first = type(text) == "string" and text:byte(1) or nil
+	if not first or first < 32 or first == 127 then return nil end
+	return text
+end
+
 --- The layout-level modifiers the user is physically holding right now.
 ---
 --- Injection asks before it starts, and neutralises what it finds. Under a grab
@@ -885,7 +985,7 @@ end
 function M.held_forwarded_keys()
 	local codes, seen = {}, {}
 	for _, entry in pairs(_forwarded_down) do
-		if not EvdevCodes.MODIFIER_OF[entry.code] and not seen[entry.code] then
+		if not _modifier_down[source_key(entry.source, entry.code)] and not seen[entry.code] then
 			seen[entry.code] = true
 			codes[#codes + 1] = entry.code
 		end
@@ -1220,7 +1320,9 @@ end
 ---              layout    string    Physical family for metrics: "qwerty" or
 ---                                  "azerty". Text always follows live XKB.
 ---              onChar    function  Called with (char_string, evdev_scancode) for printable keys.
----              onKey     function  Called with (key_name) for control keys.
+---              onKey     function  Called with (key_name, { mods }) for control keys,
+---                                  mods being held_modifiers() at the press,
+---                                  and with ("shortcut", { key, mods }) for a chord.
 ---              onPhysical function  Called with (evdev_scancode, key_name, char_or_nil,
 ---                                  evdev_value) for every physical down/up transition.
 ---              onConsume function Called before pass-through with a key detail;
@@ -1564,8 +1666,9 @@ end
 --- the descriptor, the drain and the dispatch are joined — a seam that skipped
 --- the reader would have kept passing through the entire period in which capture
 --- produced nothing at all.
---- @param events table Array of { type, code, value } tables, in arrival order.
---- @param callbacks table { onChar?, onKey?, onPhysical?, onHold?, onConsume?, onDesync?, onEmitRaw?, captureEvent?, keyState?, ledState? }.
+--- @param events table Array of { type, code, value, at_ms?, timestamp_us? } tables, in arrival order.
+--- @param callbacks table { onChar?, onKey?, onPhysical?, onHold?, onConsume?, onDesync?, onEmitRaw?, captureEvent?,
+---   liveXkb?, keyState?, ledState? }.
 -- Exposed so the watchdog test can advance exactly as many ticks as the check
 -- needs, instead of hardcoding a number that silently stops matching.
 M.DEVICE_CHECK_TICKS = DEVICE_CHECK_TICKS
@@ -1583,7 +1686,7 @@ function M._test_drive(events, callbacks, intercept)
 	local size = InputEvent.native_size()
 	local queue, times = {}, {}
 	for i, ev in ipairs(events or {}) do
-		queue[i] = InputEvent.encode(ev.type, ev.code, ev.value, size)
+		queue[i] = InputEvent.encode(ev.type, ev.code, ev.value, size, ev.timestamp_us)
 		times[i] = ev.at_ms
 	end
 	local at = 0
@@ -1614,8 +1717,14 @@ function M._test_drive(events, callbacks, intercept)
 	_on_desync   = cb.onDesync
 	_emit_raw    = cb.onEmitRaw
 	_intercept   = intercept and true or false
-	_test_capture_event = type(cb.captureEvent) == "function"
-		and cb.captureEvent or _legacy_capture_for_test
+	-- liveXkb drives the production path through adapters/xkb_capture, whose
+	-- backend and keymap the test has installed; otherwise a capture double.
+	if cb.liveXkb == true then
+		_test_capture_event = nil
+	else
+		_test_capture_event = type(cb.captureEvent) == "function"
+			and cb.captureEvent or _legacy_capture_for_test
+	end
 	_reset_modifier_state()
 	_sync_dropped = {}
 	_forwarded_down = {}

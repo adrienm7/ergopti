@@ -74,8 +74,9 @@ global _HotstringRegistrar := 0
 global _SendHook := 0
 
 ; Boot-time resolution of whether AltGr needs the synthetic Up injection in
-; HotstringHandler — auto-detected via a reverse VK→SC probe, with a manual
-; TOML override (ScriptInformation["AltGrIsKanaRemap"]) that always wins.
+; HotstringHandler — auto-detected via a reverse VK→SC probe
+; (KS_ProbeAltGrLayout), with a manual TOML override
+; (ScriptInformation["AltGrIsKanaRemap"]) that always wins.
 ; Caching the resolved bool at boot lets the hot path skip a Map lookup and
 ; a truthy test on every hotstring firing.
 ; The `global _ALTGR_KANA_FIXUP := False` initializer deliberately does NOT live
@@ -85,49 +86,56 @@ global _SendHook := 0
 ; the pre-pump block of ErgoptiPlus.ahk instead (single source, §5.2);
 ; HotstringEngineInit() resolves the real value later.
 
-; Win32 constants for MapVirtualKeyEx — see learn.microsoft.com/en-us/
-; windows/win32/api/winuser/nf-winuser-mapvirtualkeyexw.
-global _MAPVK_VK_TO_VSC_EX := 4
-global _VK_RMENU := 0xA5
-
-; Returns the HKL of the foreground window's thread, or 0 if the call chain
-; fails. Used by both DetectAltGrKanaRemap and the layout-change watcher in
-; ErgoptiPlus.ahk so both observe the same value.
-GetForegroundKeyboardLayout() {
-		HWND := DllCall("GetForegroundWindow", "Ptr")
+; Returns the HKL the user is typing with in the foreground window, or 0 when
+; there is no foreground window. That is the layout of the thread owning the
+; foreground window's focused control, which AutoHotkey's own Send and hook use
+; too (keyboard_mouse.cpp GetFocusedCtrlThread): in a UWP app the top-level
+; frame belongs to ApplicationFrameHost while the focused CoreWindow runs on the
+; app's own thread, so the frame's layout was read and the AltGr family could be
+; decided from the wrong layout. The top-level thread's layout is kept when the
+; thread reports no focused control. Used by the boot layout probe and the
+; layout-change watcher in ErgoptiPlus.ahk so both observe the same value.
+; @param Port {Map} Test seam: "foreground", "thread_of", "focus_of" and
+;        "layout_of" callables; production uses _ForegroundLayoutPort().
+; @return {Integer} The HKL, or 0.
+GetForegroundKeyboardLayout(Port := 0) {
+		if !IsObject(Port)
+				Port := _ForegroundLayoutPort()
+		HWND := Port["foreground"].Call()
 		if (HWND = 0) {
 				return 0
 		}
-		TID := DllCall("GetWindowThreadProcessId", "Ptr", HWND, "Ptr", 0, "UInt")
+		TID := Port["thread_of"].Call(HWND)
 		if (TID = 0) {
 				return 0
 		}
-		return DllCall("GetKeyboardLayout", "UInt", TID, "Ptr")
+		Focus := Port["focus_of"].Call(TID)
+		if (Focus != 0) {
+				FocusTID := Port["thread_of"].Call(Focus)
+				if (FocusTID != 0)
+						TID := FocusTID
+		}
+		return Port["layout_of"].Call(TID)
 }
 
-; Probe the active layout in REVERSE direction: does VK_RMENU have a scancode?
-;
-; On vanilla AltGr layouts (bépo, US-International, AZERTY, …) the RAlt key
-; is mapped to VK_RMENU, so MapVirtualKeyExW(VK_RMENU, VK_TO_VSC_EX) returns
-; the RAlt extended scancode (typically 0xE038). On custom KbdEdit/MSKLC
-; remaps where AltGr is reassigned to a different VK (VK_KANA, VK_OEM_8,
-; VK_LMENU, …), VK_RMENU has no scancode → the probe returns 0.
-;
-; The reverse direction proves more reliable than the SC→VK probe used in
-; earlier revisions: that one needed an E0-encoded scancode and behaved
-; inconsistently across bépo HKLs (returning VK_LMENU or 0 instead of
-; VK_RMENU), wrongly flagging bépo as a Kana layout.
-DetectAltGrKanaRemap() {
-		HKL := GetForegroundKeyboardLayout()
-		if (HKL = 0) {
-				HKL := DllCall("GetKeyboardLayout", "UInt", 0, "Ptr")
-		}
-		SC := DllCall("MapVirtualKeyExW",
-				"UInt", _VK_RMENU,
-				"UInt", _MAPVK_VK_TO_VSC_EX,
-				"Ptr", HKL,
-				"UInt")
-		return (SC == 0)
+; The Win32 calls behind GetForegroundKeyboardLayout.
+_ForegroundLayoutPort() {
+		static Port := Map(
+				"foreground", () => DllCall("GetForegroundWindow", "Ptr"),
+				"thread_of", (Hwnd) => DllCall("GetWindowThreadProcessId", "Ptr", Hwnd, "Ptr", 0, "UInt"),
+				"focus_of", _ForegroundFocusedControl,
+				"layout_of", (Tid) => DllCall("GetKeyboardLayout", "UInt", Tid, "Ptr"))
+		return Port
+}
+
+; The focused control of thread Tid (GUITHREADINFO.hwndFocus), or 0 when the
+; thread has none or GetGUIThreadInfo fails.
+_ForegroundFocusedControl(Tid) {
+		Info := Buffer(8 + 6 * A_PtrSize + 16, 0)
+		NumPut("UInt", Info.Size, Info, 0)
+		if !DllCall("GetGUIThreadInfo", "UInt", Tid, "Ptr", Info)
+				return 0
+		return NumGet(Info, 8 + A_PtrSize, "Ptr")
 }
 
 ; Read the manual TOML override from ScriptInformation. Returns "" when the
@@ -146,18 +154,40 @@ _ReadKanaTomlOverride() {
 		return ""  ; "auto" or unrecognised → defer to detection
 }
 
-HotstringEngineInit() {
-		global _ALTGR_KANA_FIXUP
+; Decide the AltGr family once, from one layout read and one probe, and keep
+; the record of what decided it in _ALTGR_LAYOUT_PROBE. The AltGrDetect log
+; line, the magic-key scan, the layout poll's baseline and the Kana AltGr's
+; send name all read that record: each used to read the layout again, so a
+; layout switch during the seconds of boot left the family decided on one
+; layout while the poll's baseline already held the next one, and the poll
+; never reloaded for it. The TOML override still decides the family, but the
+; layout is read and probed all the same for the record. When no layout can be
+; read at all, nothing is probed (HKL 0 would probe another loaded layout), and
+; a layout that knows no AltGr key either way is not taken for a Kana one: the
+; family stays the standard one, recorded as "unresolved" for the boot log.
+; @param ResolveFn {Func} Test seam, KS_ResolveKeyboardLayout by default.
+; @param ProbeFn {Func} Test seam, KS_ProbeAltGrLayout by default.
+HotstringEngineInit(ResolveFn := 0, ProbeFn := 0) {
+		global _ALTGR_KANA_FIXUP, _ALTGR_LAYOUT_PROBE
+		if !IsObject(ResolveFn)
+				ResolveFn := KS_ResolveKeyboardLayout
+		if !IsObject(ProbeFn)
+				ProbeFn := KS_ProbeAltGrLayout
+		Hkl := ResolveFn.Call()
+		if (Hkl != 0) {
+				Probe := ProbeFn.Call(Hkl)
+				Probe["source"] := Probe["valid"] ? "probe" : "unresolved"
+		} else {
+				Probe := Map("hkl", 0, "rmenu_sc", 0, "altgr_vk", 0,
+						"valid", false, "kana", false, "altgr_level", false, "source", "unresolved")
+		}
 		Override := _ReadKanaTomlOverride()
-		if (Override == "true") {
-				_ALTGR_KANA_FIXUP := True
-				return
+		if (Override != "") {
+				Probe["kana"] := (Override == "true")
+				Probe["source"] := "override"
 		}
-		if (Override == "false") {
-				_ALTGR_KANA_FIXUP := False
-				return
-		}
-		_ALTGR_KANA_FIXUP := DetectAltGrKanaRemap()
+		_ALTGR_LAYOUT_PROBE := Probe
+		_ALTGR_KANA_FIXUP := Probe["kana"]
 }
 
 

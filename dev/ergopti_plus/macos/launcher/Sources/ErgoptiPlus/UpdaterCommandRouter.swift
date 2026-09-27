@@ -1,7 +1,7 @@
 // static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/UpdaterCommandRouter.swift
 //
 // Routes the embedded Hammerspoon menu command to the one retained Sparkle
-// controller. Strict URL matching keeps the external scheme from becoming a
+// updater. Strict URL matching keeps the external scheme from becoming a
 // general command surface.
 
 import Foundation
@@ -9,10 +9,10 @@ import Sparkle
 
 @MainActor
 protocol UpdateChecking: AnyObject {
-	func checkForUpdates(_ sender: Any?)
+	func checkForUpdates()
 }
 
-extension SPUStandardUpdaterController: UpdateChecking {}
+extension SPUUpdater: UpdateChecking {}
 
 @MainActor
 final class UpdaterCommandRouter {
@@ -27,7 +27,7 @@ final class UpdaterCommandRouter {
 		self.updateChecker = updateChecker
 		guard hasPendingCheck else { return }
 		hasPendingCheck = false
-		updateChecker.checkForUpdates(nil)
+		updateChecker.checkForUpdates()
 	}
 
 	/// Accepts only `ergoptiplus://updater/check`, with no authority modifiers.
@@ -45,7 +45,7 @@ final class UpdaterCommandRouter {
 		}
 
 		if let updateChecker {
-			updateChecker.checkForUpdates(nil)
+			updateChecker.checkForUpdates()
 		} else {
 			hasPendingCheck = true
 		}

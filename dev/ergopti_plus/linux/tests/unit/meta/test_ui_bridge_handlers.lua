@@ -1322,7 +1322,9 @@ helpers.describe("ui.bridge_handlers", function()
       local result = handler.on_message("ready", state)
       helpers.assert_true(type(result) == "table")
       helpers.assert_eq(result.action, "releases")
-      helpers.assert_eq(result.channel, "main")
+      -- The channel the installation follows: "dev" for prereleases.
+      local followed = require("modules.updater.manager").get_channel() == "dev" and "dev" or "main"
+      helpers.assert_eq(result.channel, followed)
       helpers.assert_eq(type(result.cache_miss), "boolean")
       helpers.assert_true(type(result.releases) == "table")
       helpers.assert_true(type(result.repo_url) == "string")

@@ -13,6 +13,7 @@
 
 #Include suspend_handoff.ahk
 #Include reload_terminal_handoff.ahk
+#Include reload_successor.ahk
 #Include lifecycle_transition.ahk
 
 ActivateEdit(*) {
@@ -65,6 +66,9 @@ global _SuspendWatchdogStarted := false
 ; (lifecycle-shutdown-veto-unbounded).
 global LIFECYCLE_SHUTDOWN_VETO_MAX_ATTEMPTS := 5
 global _LifecycleShutdownVetoAttempts := 0
+; Reason of the OnExit call in progress. A veto of a "Reload" close request
+; refuses the pending reload whose successor sent it.
+global _LifecycleShutdownReason := ""
 
 ; Drains every registered custom-combination prefix key (see
 ; SUSPEND_CUSTOM_COMBO_PREFIX_KEYS) BEFORE a suspend flips. AHK prefix flags
@@ -74,18 +78,13 @@ global _LifecycleShutdownVetoAttempts := 0
 ; trigger a suspend can call the same drain, and so a future native/external
 ; suspend hotkey cannot silently reintroduce the « AltGr/LAlt bloqué »
 ; regression by bypassing the wait. Safe no-op when entering from suspended
-; state, when a key's own feature gate is off (SC138 only arms as a prefix when
-; the Kana fixup is active), or when the key is not physically held.
+; state or when no prefix key is physically held. SC138 is waited for on every
+; layout: the always-eligible ~SC138 anchor in platform/remap/altgr.ahk arms it
+; on every AltGr press, not only on Kana-style layouts.
 _SuspendPrefixesAreClear() {
-		global _ALTGR_KANA_FIXUP
 		if A_IsSuspended
 				return
 		for PrefixKey in SUSPEND_CUSTOM_COMBO_PREFIX_KEYS {
-				; SC138 (AltGr/Kana) only behaves as an armed prefix when the Kana
-				; fixup is active on the current keyboard layout -- draining it
-				; unconditionally would KeyWait on a key that is not really latching.
-				if (PrefixKey = "SC138") and !(IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP)
-						continue
 				if GetKeyState(PrefixKey, "P")
 						return false
 		}
@@ -110,11 +109,8 @@ _ReleasePhantomModifiers() {
 ; Without this a wedged deferral says only "still waiting" — the user has no way
 ; to know WHICH key to cycle, which is the one thing that would fix it.
 _SuspendHeldPrefixKeys() {
-		global _ALTGR_KANA_FIXUP
 		Held := ""
 		for PrefixKey in SUSPEND_CUSTOM_COMBO_PREFIX_KEYS {
-				if (PrefixKey = "SC138") and !(IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP)
-						continue
 				if GetKeyState(PrefixKey, "P")
 						Held .= (Held == "" ? "" : ", ") . PrefixKey
 		}
@@ -142,20 +138,53 @@ _SuspendMarkerPath() {
 ; cannot be written or consumed is reported as an ERROR rather than swallowed:
 ; silently resuming a driver the user paused is exactly the failure this exists
 ; to remove.
-ReloadPreservingSuspend(SuccessFn := 0, ExistingBundle := 0) {
+;
+; The successor starts at once but this instance only exits later, when the
+; successor asks it to close (see infra/reload_terminal_handoff.ahk). So 1 means
+; "reload under way", never "reload finished": SuccessFn runs from OnExit, and
+; RefusedFn(Reason) runs if the reload is refused after launch. A caller that
+; lends ExistingBundle hands it to the pending reload on 1 and must neither
+; release nor roll it back; RefusedFn gives it back and must release or retain
+; it exactly as the caller's own synchronous refusal branch does. On 0 no
+; successor was launched and the caller still owns the bundle.
+;
+; A stage that refuses before launch is reported through StageFailureFn(Stage,
+; Path); by default _SuspendHandoffFailure, which also shows a "save failed"
+; notice. The layout poll, which no user asked for, passes a quieter one.
+ReloadPreservingSuspend(SuccessFn := 0, ExistingBundle := 0, RefusedFn := 0,
+		StageFailureFn := 0) {
 	; Twenty-five call sites reload through here and none said why. The caller's
 	; name is read from the call stack (-2 = whoever called this function), so the
 	; log answers "who asked" without threading a reason through every caller.
 	try LoggerInfo("Lifecycle", "Reload requested by {1} (suspended={2}).",
 		DiagCallerName(-2), A_IsSuspended ? "true" : "false")
 	PreviousCritical := Critical("Off")
-	try return _ReloadPreservingSuspendNonCritical(SuccessFn, ExistingBundle)
+	try return _ReloadPreservingSuspendNonCritical(SuccessFn, ExistingBundle,
+		RefusedFn, StageFailureFn)
 	finally Critical(PreviousCritical)
 }
 
 
-_ReloadPreservingSuspendNonCritical(SuccessFn, ExistingBundle) {
+_ReloadPreservingSuspendNonCritical(SuccessFn, ExistingBundle, RefusedFn,
+		StageFailureFn) {
 	global ConfigurationFile
+	if (ExistingBundle is Object) && !HasMethod(RefusedFn, "Call")
+		throw TypeError("A reload that borrows a configuration bundle needs a refusal callback to take it back.")
+	ReportStage := HasMethod(StageFailureFn, "Call") ? StageFailureFn : _SuspendHandoffFailure
+	Pending := ReloadTerminalHandoffPending()
+	if (Pending is Map) {
+		; The successor already launched will restart this instance on whatever
+		; is on disk. A plain request joins it; one with its own completion or
+		; refusal duties cannot be attached to a record it did not create.
+		if HasMethod(SuccessFn, "Call") || HasMethod(RefusedFn, "Call") {
+			try LoggerError("Lifecycle", "Reload refused because successor pid {1} is already pending and this request carries its own callbacks.",
+				Pending["successor"]["pid"])
+			return false
+		}
+		try LoggerInfo("Lifecycle", "Reload already under way (successor pid {1}); this request joins it.",
+			Pending["successor"]["pid"])
+		return true
+	}
 	OwnBundle := false
 	OwnerBundle := ExistingBundle
 	if !(OwnerBundle is Object) {
@@ -167,38 +196,69 @@ _ReloadPreservingSuspendNonCritical(SuccessFn, ExistingBundle) {
 	}
 	if !(OwnerBundle is Object) {
 		try LoggerError("Lifecycle", "Reload refused because another configuration transaction owns config.toml.")
-		_SuspendHandoffFailure("config-lease", ConfigurationFile)
+		ReportStage.Call("config-lease", ConfigurationFile)
 		return false
 	}
 	if !(_ConfigWriteLeaseSelectOwner(OwnerBundle,
 			ConfigurationFile) is Object) {
 		try LoggerError("Lifecycle", "Reload refused because its borrowed configuration bundle is stale or does not own the active path.")
-		_SuspendHandoffFailure("config-owner", ConfigurationFile)
+		ReportStage.Call("config-owner", ConfigurationFile)
 		if OwnBundle
 			_ConfigWriteTerminalRelease(OwnerBundle)
 		return false
 	}
 	; Quiesce retained native handles before reconciling stable shortcut
 	; authority. A refused recovery aborts with no new hand-off debris.
+	Launched := false
 	try {
 		if !LLM_Menu_QuiesceTriggerForLifecycle(OwnerBundle) {
 			try LoggerError("Lifecycle", "Reload refused because LLM trigger recovery is incomplete.")
-			_SuspendHandoffFailure("llm-trigger-recovery", ConfigurationFile)
+			ReportStage.Call("llm-trigger-recovery", ConfigurationFile)
 			return false
 		}
 		Path := A_IsSuspended ? _SuspendMarkerPath() : ""
+		; The intent names this reload, so a refusal after the terminal commit
+		; retracts the marker it published and never another transition's.
+		Intent := A_IsSuspended ? _SuspendHandoffNewIntent() : ""
 		ReadyFn := _SuspendHandoffBeforeReload.Bind(Path)
-		CommitFn := A_IsSuspended ? _SuspendHandoffCommitMarker.Bind(Path) : 0
+		CommitFn := A_IsSuspended ? _SuspendHandoffCommitMarker.Bind(Path, Intent) : 0
 		AbortFn := A_IsSuspended ? _SuspendHandoffCancelMarker.Bind(Path) : 0
-		ReloadFn := ReloadTerminalInvoke.Bind(OwnerBundle, SuccessFn, Reload,
-			CommitFn, AbortFn)
-		return SuspendHandoffReload(A_IsSuspended, Path,
-			_SuspendHandoffPrepareMarker, ReloadFn,
-				ReadyFn, _SuspendHandoffFailure, _SuspendHandoffCancelMarker)
+		RetractFn := A_IsSuspended ? _SuspendHandoffRetractMarker.Bind(Path, Intent) : 0
+		; A bundle this call acquired belongs to the pending reload once the
+		; successor launched; a refusal releases it after the caller's callback.
+		ReleaseFn := OwnBundle ? _ConfigWriteTerminalRelease.Bind(OwnerBundle) : 0
+		ReloadFn := ReloadTerminalInvoke.Bind(OwnerBundle, SuccessFn,
+			LifecycleLaunchSuccessor, ReloadSuccessorPort(), CommitFn, AbortFn,
+			_ReloadPreservingSuspendRefused.Bind(RefusedFn), ReleaseFn, RetractFn)
+		Launched := SuspendHandoffReload(A_IsSuspended, Path,
+			(MarkerPath) => _SuspendHandoffPrepareMarker(MarkerPath, Intent), ReloadFn,
+				ReadyFn, ReportStage, _SuspendHandoffCancelMarker)
+		return Launched
 	} finally {
-		if OwnBundle
+		if OwnBundle && !Launched
 			_ConfigWriteTerminalRelease(OwnerBundle)
 	}
+}
+
+; A launched reload refused later leaves this instance running on its previous
+; in-memory settings: the caller repairs its own state and tells the user, or,
+; without a refusal callback, the generic notice does (ReloadRefusalDeliver).
+_ReloadPreservingSuspendRefused(CallerRefusedFn, Reason) {
+	ReloadRefusalDeliver(CallerRefusedFn, Reason)
+}
+
+; Starts the replacement instance exactly as AutoHotkey's Reload does: the
+; interpreter (or the compiled executable) with /restart, from the initial
+; working directory. Reload itself returns nothing, so a successor whose close
+; request was refused stayed anonymous and prompted "Could not close the
+; previous instance" forever. The owned handle lets the hand-off notice a
+; successor that died while loading and stop one whose request was refused.
+; @returns {Map} The successor's "pid" and owned process "handle".
+LifecycleLaunchSuccessor() {
+	Target := A_IsCompiled
+		? '"' . A_ScriptFullPath . '" /restart'
+		: '"' . A_AhkPath . '" /restart "' . A_ScriptFullPath . '"'
+	return ReloadSuccessorLaunch(Target, A_InitialWorkingDir)
 }
 
 ; Logs successful publication immediately before Reload. Destructive UI cleanup
@@ -209,13 +269,25 @@ _SuspendHandoffBeforeReload(Path) {
 				try LoggerInfo("Lifecycle", "Reloading while suspended — inert pause intent prepared for '{1}'.", Path)
 }
 
-_SuspendHandoffPrepareMarker(Path) {
+_SuspendHandoffPrepareMarker(Path, Intent := "1") {
 	return SuspendHandoffPrepare(Path, FSWriteDurable, FSRead,
-		FSAtomicMoveReplace, FSDeleteStrict)
+		FSAtomicMoveReplace, FSDeleteStrict, Intent)
 }
 
-_SuspendHandoffCommitMarker(Path) {
-	return SuspendHandoffCommit(Path, FSRead, FSAtomicMoveReplace)
+_SuspendHandoffCommitMarker(Path, Intent := "1") {
+	return SuspendHandoffCommit(Path, FSRead, FSAtomicMoveReplace, Intent)
+}
+
+_SuspendHandoffRetractMarker(Path, Intent) {
+	return SuspendHandoffRetract(Path, Intent, FSStrictExists, FSRead, FSDeleteStrict)
+}
+
+; Pause intent unique to one reload of this process: the leading "1" is the
+; intent, the rest tells this reload's marker from any other.
+_SuspendHandoffNewIntent() {
+	static Serial := 0
+	Serial += 1
+	return Format("1 {1}-{2}-{3}", ProcessExist(), A_TickCount, Serial)
 }
 
 _SuspendHandoffCancelMarker(Path) {
@@ -681,18 +753,37 @@ _LifecycleForceReleaseHeldInput() {
 	return Released
 }
 
+; Whether OnExit would still honor one more veto. Past that one, the exit goes
+; through whatever gate refuses it, so an automatic reload, which nobody asked
+; to force, must not start once this is false (the layout poll).
+; @returns {Boolean} True while one more refusal would keep this process alive.
+LifecycleShutdownVetoHonored() {
+	global LIFECYCLE_SHUTDOWN_VETO_MAX_ATTEMPTS, _LifecycleShutdownVetoAttempts
+	return _LifecycleShutdownVetoAttempts + 1 < LIFECYCLE_SHUTDOWN_VETO_MAX_ATTEMPTS
+}
+
 ; Counts one refused exit and decides whether the driver may keep refusing.
 ;
 ; Every gate in Ergopti_OnShutdown funnels its veto through here so the ceiling
 ; covers the whole class, including gates added later — the recurring defect in
-; this repository is the one sibling site that kept the old behaviour.
+; this repository is the one sibling site that kept the old behaviour. The
+; ceiling, LIFECYCLE_SHUTDOWN_VETO_MAX_ATTEMPTS, is read through
+; LifecycleShutdownVetoHonored, the one rule the layout poll also consults.
 ; @param Gate {String} Short name of the refusing gate, for the exhaustion line.
 ; @returns {Integer} 1 to veto the exit, 0 to let it proceed regardless.
 _LifecycleRefuseShutdown(Gate) {
-	global LIFECYCLE_SHUTDOWN_VETO_MAX_ATTEMPTS, _LifecycleShutdownVetoAttempts
+	global _LifecycleShutdownVetoAttempts, _LifecycleShutdownReason
+	Honored := LifecycleShutdownVetoHonored()
 	_LifecycleShutdownVetoAttempts += 1
-	if (_LifecycleShutdownVetoAttempts < LIFECYCLE_SHUTDOWN_VETO_MAX_ATTEMPTS)
+	if Honored {
+		; The successor that asked is now waiting on this window. Stop it and hand
+		; the transition back, or it prompts until someone answers.
+		try ReloadTerminalHandoffRefuseForShutdown(_LifecycleShutdownReason, Gate)
+		catch as Err
+			try LoggerError("Lifecycle",
+				"Refused reload could not be handed back: {1}.", Err.Message)
 		return 1
+	}
 	Released := _LifecycleForceReleaseHeldInput()
 	try LoggerError("Lifecycle",
 		"Shutdown veto budget exhausted after {1} refusals (last gate: {2}); "
@@ -703,6 +794,8 @@ _LifecycleRefuseShutdown(Gate) {
 }
 
 Ergopti_OnShutdown(reason, code) {
+		global _LifecycleShutdownReason
+		_LifecycleShutdownReason := reason
 		; Button holds are OS state, so release them before any gate may keep this
 		; process alive. Do not free the WinEvent hook yet: a refused OnExit must
 		; return to a fully functional gesture subsystem.
@@ -736,12 +829,21 @@ Ergopti_OnShutdown(reason, code) {
 		ShutdownTerminal := false
 		try {
 		TerminalHandoff := ReloadTerminalHandoffClaim(reason)
-		RetainedTransition := (TerminalHandoff is Map)
+		; Any other exit while a launched successor still loads supersedes that
+		; reload. It borrows the pending bundle, which blocks every fresh
+		; acquisition, and stops the successor only after the last refusal gate.
+		SupersededReload := ((TerminalHandoff is Map)
+				|| StrCompare(reason, "Reload", true) == 0)
+			? false : ReloadTerminalHandoffPending()
+		RetainedTransition := ((TerminalHandoff is Map)
+				|| (SupersededReload is Map))
 			? false : ConfigTransitionRetainedBarrier()
 		ShutdownOwners := (TerminalHandoff is Map)
 			? TerminalHandoff["bundle"]
-			: ((RetainedTransition is Object)
-				? RetainedTransition : LLM_Menu_AcquireLifecycleBundle())
+			: ((SupersededReload is Map)
+				? SupersededReload["bundle"]
+				: ((RetainedTransition is Object)
+					? RetainedTransition : LLM_Menu_AcquireLifecycleBundle()))
 		if !(ShutdownOwners is Object) {
 			try LoggerError("Lifecycle", "Shutdown refused because another configuration transaction is still active.")
 			try _Updater_DeferExitIntentRetry()
@@ -749,6 +851,7 @@ Ergopti_OnShutdown(reason, code) {
 			return _LifecycleRefuseShutdown("another configuration transaction is still active")
 		}
 		OwnShutdownBundle := !(TerminalHandoff is Map)
+			&& !(SupersededReload is Map)
 			&& !(RetainedTransition is Object)
 		try {
 		SyntheticReleased := false
@@ -906,8 +1009,8 @@ Ergopti_OnShutdown(reason, code) {
 			return _LifecycleRefuseShutdown("diagnostic records are not durable yet")
 		}
 		; The reload-specific durable commit is still allowed to refuse. It must
-		; precede every producer stop; ReloadTerminalInvoke will run the matching
-		; abort callback when this OnExit returns nonzero later in the preflight.
+		; precede every producer stop; a later veto refuses the pending reload
+		; through _LifecycleRefuseShutdown, which runs the matching abort callback.
 		if (TerminalHandoff is Map) {
 			TerminalCommitted := false
 			try TerminalCommitted := ReloadTerminalHandoffCommit(TerminalHandoff)
@@ -922,7 +1025,7 @@ Ergopti_OnShutdown(reason, code) {
 		}
 		; FinalExit and ownership transfer remain refusal gates, but all live
 		; producers are still installed. A refusal rolls back the terminal handoff
-		; in ReloadTerminalInvoke and withdraws the keylogger lease below.
+		; through _LifecycleRefuseShutdown and withdraws the keylogger lease below.
 		FinalExitAuthorized := false
 		try FinalExitAuthorized := _Updater_SignalFinalExitForIntent()
 		catch as Err
@@ -953,6 +1056,8 @@ Ergopti_OnShutdown(reason, code) {
 		ShutdownTerminal := true
 		; No code below this point may refuse shutdown. All fallible authority
 		; transfers have accepted while the live driver was still intact.
+		if (SupersededReload is Map)
+			try ReloadTerminalHandoffAbandon(SupersededReload, reason)
 		try GestureScreenshotCancelAll("shutdown")
 		try HotstringPrefixWatcherStop()
 		try HotstringPrefixWatcherOnShutdown()

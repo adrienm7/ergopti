@@ -2429,11 +2429,14 @@ _Updater_ShowDeferredSwapFailureNotice(*) {
 	try MsgBox(t("updater.install_error"), t("updater.title_update"), "Icon!")
 }
 
-; A successful Reload destroys this process and therefore its pre-armed timer.
-; If Reload returns because OnExit refused again, or the suspend marker could
-; not be published, Pending remains the sole recovery owner and the timer tries
-; again with a capped backoff. There is deliberately no in-place "success"
-; state: KL_BeginShutdown and watcher teardown are terminal in this process.
+; A launched Reload returns at once and destroys this process only when its
+; successor asks it to close, so the retry is armed only for a refusal: at once
+; when no successor was launched, or from the refusal callback when OnExit later
+; refused it. Arming before every attempt launched one more /restart successor
+; per backoff tick while the first was still loading. Pending remains the sole
+; recovery owner until the process ends. There is deliberately no in-place
+; "success" state: KL_BeginShutdown and watcher teardown are terminal in this
+; process.
 _Updater_AttemptLifecycleRecovery(NotifyFn, ArmRetryFn, ReloadFn) {
 	global _UpdaterLifecycleRecoveryPending, _UpdaterLifecycleRecoveryNoticeShown
 	global _UpdaterLifecycleRecoveryNoticeRequested
@@ -2463,13 +2466,20 @@ _Updater_AttemptLifecycleRecovery(NotifyFn, ArmRetryFn, ReloadFn) {
 	}
 	if ShowRecoveryNotice
 		try NotifyFn.Call()
+	ArmRetry := _Updater_ArmLifecycleRecoveryRetry.Bind(ArmRetryFn, RetryDelayMs)
+	Launched := false
+	try Launched := ReloadFn.Call(0, 0, ArmRetry)
+	catch as Err
+		try LoggerError("Updater", "Lifecycle recovery Reload failed after swap cancellation: {1}.", Err.Message)
+	if !((Launched is Integer) && Launched == 1)
+		ArmRetry.Call()
+	return true
+}
+
+_Updater_ArmLifecycleRecoveryRetry(ArmRetryFn, RetryDelayMs, *) {
 	try ArmRetryFn.Call(RetryDelayMs)
 	catch as Err
 		try LoggerError("Updater", "Lifecycle recovery retry could not be armed: {1}.", Err.Message)
-	try ReloadFn.Call()
-	catch as Err
-		try LoggerError("Updater", "Lifecycle recovery Reload failed after swap cancellation: {1}.", Err.Message)
-	return true
 }
 
 _Updater_ScheduleLifecycleRecoveryReload(ShowUpdaterFailureNotice := false) {

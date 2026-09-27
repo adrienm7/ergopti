@@ -504,3 +504,133 @@ Test("taphold synthetic transaction AHK-03: shutdown preserves a failed release 
 	_TSRC_ShutdownRefusesToDestroyPendingReleaseOwner)
 Test("fatal startup input cleanup: tracked LShift and Caps modes are retired before exit (fatal-startup-synthetic-modifier-latch)",
 	_TSRC_FatalStartupDrainsSyntheticOwnerAndCapsModes)
+
+; On a Kana-style layout (KbdEdit/MSKLC remap moving AltGr to VK_OEM_8), VK_RMENU
+; has no scan code: a synthetic RAlt is a plain Alt that opens a window's menu
+; bar on release and types nothing on a chord (measured on the Ergopti Kana
+; layout). An alt_gr hold must hold the layout's own AltGr, the SC138 key, and
+; release that same key (kana-altgr-hold-2026-09-25).
+_TSRC_KanaAltGrHoldSendsTheLayoutAltGr() {
+	Family := _TestSetAltGrFamily(true)
+	_TSRC_Begin()
+	try {
+		ModKey := ResolveHoldModifierKey("alt_gr", "space")
+		AssertEqual("SC138", ModKey, "the hold's identity stays the physical AltGr key")
+		TapHoldSyntheticKeyDown(ModKey)
+		AssertEqual(1, _TSRC_Count("{Blind}{vkDF Down}"),
+			"a Kana alt_gr hold must press the layout's AltGr key, by its virtual key")
+		AssertEqual(0, _TSRC_Count("{SC138 Down}"),
+			"a bare SC138 press makes AHK add a right Alt, a plain Alt there (kana-altgr-send-name-2026-09-26)")
+		AssertEqual(0, _TSRC_Count("{RAlt Down}"),
+			"a Kana alt_gr hold must never press RAlt, a plain Alt on that layout")
+		TapHoldSyntheticKeyUp(ModKey)
+		AssertEqual(1, _TSRC_Count("{Blind}{vkDF Up}"),
+			"the hold must release the same AltGr key it pressed")
+		AssertEqual(0, _TSRC_Count("{RAlt Up}"),
+			"a Kana alt_gr hold must never release RAlt either")
+	} finally {
+		_TestRestoreAltGrFamily(Family)
+		_TSRC_End()
+	}
+}
+Test("taphold-synthetic: a Kana alt_gr hold presses and releases the layout's AltGr (kana-altgr-hold-2026-09-25)",
+	_TSRC_KanaAltGrHoldSendsTheLayoutAltGr)
+
+; A synthetic Alt or Win released with nothing typed in between is a lone
+; modifier tap: Windows puts the focused window's menu bar in menu mode (or
+; opens the Start menu), and the tap output that follows lands there. Measured
+; with SendInput {LAlt Down}/{LAlt Up}: menu mode; with the menu mask key sent
+; in between: none. The default Tab tap-hold holds Alt, so every Tab tap opened
+; the menu bar of classic applications (lone-modifier-mask-2026-09-25).
+_TSRC_OwnerReleaseSequence(ModKey) {
+	global _TSRC_Sent
+	_TSRC_Begin()
+	try {
+		TapHoldOwnImmediateModifier("tab", "SC00F", ModKey, 0.2,
+			(*) => true, (*) => false, (*) => 1000, , , (*) => "")
+		Joined := ""
+		for _, Sent in _TSRC_Sent
+			Joined .= (Joined == "" ? "" : "|") . Sent
+		return Joined
+	} finally {
+		_TSRC_End()
+	}
+}
+
+_TSRC_LoneMenuModifierIsMaskedBeforeRelease() {
+	Mask := "{Blind}{" . A_MenuMaskKey . "}"
+	AssertEqual("{LAlt Down}|" . Mask . "|{LAlt Up}", _TSRC_OwnerReleaseSequence("LAlt"),
+		"a held Alt must be masked right before its release")
+	AssertEqual("{LWin Down}|" . Mask . "|{LWin Up}", _TSRC_OwnerReleaseSequence("LWin"),
+		"a held Win must be masked right before its release")
+	AssertEqual("{RAlt Down}|" . Mask . "|{RAlt Up}", _TSRC_OwnerReleaseSequence("RAlt"),
+		"RAlt is a plain Alt on layouts without AltGr and must be masked too")
+	AssertEqual("{LCtrl Down}|{LAlt Down}|" . Mask . "|{LCtrl Up}|{LAlt Up}",
+		_TSRC_OwnerReleaseSequence(["LCtrl", "LAlt"]),
+		"a combination holding Alt must be masked once before its release")
+	AssertEqual("{LCtrl Down}|{LCtrl Up}", _TSRC_OwnerReleaseSequence("LCtrl"),
+		"Ctrl opens no menu and must not be masked")
+	Family := _TestSetAltGrFamily(true)
+	try {
+		AssertEqual("{Blind}{vkDF Down}|{Blind}{vkDF Up}", _TSRC_OwnerReleaseSequence(KS_AltGrKeyName()),
+			"the Kana layout's AltGr opens no menu and must not be masked")
+	} finally {
+		_TestRestoreAltGrFamily(Family)
+	}
+}
+Test("taphold-synthetic: a lone synthetic Alt or Win is masked before its release (lone-modifier-mask-2026-09-25)",
+	_TSRC_LoneMenuModifierIsMaskedBeforeRelease)
+
+; Suspend, shutdown and the fatal cleanup release every synthetic hold at once
+; through TapHoldReleaseSyntheticKeys, mid-press and usually with nothing typed
+; under it. That path sent a bare Up: a lone Alt or Win put the focused
+; window's menu bar in menu mode (or opened Start), and the keys typed after
+; the pause went to the menu; the owner's own masked release came later, after
+; the Up (teardown-menu-mask-2026-09-26).
+_TSRC_TeardownSequence(ModKey) {
+	global _TSRC_Sent
+	_TSRC_Begin()
+	try {
+		TapHoldSyntheticKeyDown(ModKey)
+		TapHoldReleaseSyntheticKeys()
+		Joined := ""
+		for _, Sent in _TSRC_Sent
+			Joined .= (Joined == "" ? "" : "|") . Sent
+		return Joined
+	} finally {
+		_TSRC_End()
+	}
+}
+
+_TSRC_TeardownMasksALoneMenuModifier() {
+	Mask := "{Blind}{" . A_MenuMaskKey . "}"
+	for _, Name in ["LAlt", "RAlt", "LWin"]
+		AssertEqual("{" . Name . " Down}|" . Mask . "|{" . Name . " Up}", _TSRC_TeardownSequence(Name),
+			"the teardown must mask a held " . Name . " before releasing it")
+	AssertEqual("{LCtrl Down}|{LAlt Down}|" . Mask . "|{LAlt Up}|{LCtrl Up}", _TSRC_TeardownSequence(["LCtrl", "LAlt"]),
+		"a combination holding Alt is masked once before its keys are released")
+	AssertEqual("{LCtrl Down}|{LCtrl Up}", _TSRC_TeardownSequence("LCtrl"), "Ctrl opens no menu and must not be masked")
+	Family := _TestSetAltGrFamily(true)
+	try {
+		AssertEqual("{Blind}{vkDF Down}|{Blind}{vkDF Up}", _TSRC_TeardownSequence(KS_AltGrKeyName()),
+			"the Kana layout's AltGr opens no menu and must not be masked")
+	} finally {
+		_TestRestoreAltGrFamily(Family)
+	}
+}
+Test("taphold-synthetic: the lifecycle teardown masks a lone Alt or Win before releasing it (teardown-menu-mask-2026-09-26)",
+	_TSRC_TeardownMasksALoneMenuModifier)
+
+; The error net releases logically stuck modifiers after an uncaught error, the
+; same lone release: it masks first when an Alt or Win is among them.
+_TSRC_ErrorNetMasksStuckMenuModifiers() {
+	AssertTrue(_ErrorNetReleaseNeedsMenuMask(["LControl", "RAlt"]), "a stuck RAlt must be masked")
+	AssertTrue(_ErrorNetReleaseNeedsMenuMask(["LWin"]), "a stuck Win must be masked")
+	AssertFalse(_ErrorNetReleaseNeedsMenuMask(["LControl", "LShift", "SC138"]), "Ctrl, Shift and the Kana AltGr open no menu")
+	Body := _DriverFuncBody("ErgoptiGlobalErrorHandler")
+	MaskAt := InStr(Body, "_ErrorNetReleaseNeedsMenuMask(Stuck)")
+	ReleaseAt := InStr(Body, 'try SendEvent("{" ModKey " Up}")')
+	AssertTrue(MaskAt > 0 and ReleaseAt > MaskAt, "the error net must mask before its first stuck-modifier release")
+}
+Test("taphold-synthetic: the error net masks a stuck Alt or Win before releasing it (teardown-menu-mask-2026-09-26)",
+	_TSRC_ErrorNetMasksStuckMenuModifiers)

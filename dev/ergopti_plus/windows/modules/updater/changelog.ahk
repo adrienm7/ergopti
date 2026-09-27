@@ -48,8 +48,10 @@ Updater_GetUpdateMenuLabel() {
 	if (State == "available") {
 		global UPDATER_LATEST_RELEASE
 		Tag := UPDATER_LATEST_RELEASE.HasProp("Tag") ? UPDATER_LATEST_RELEASE.Tag : ""
+		; The catalogue names this placeholder {tag} (shared with Linux), and
+		; Format() fills numbered placeholders only.
 		if (Tag != "")
-			return Format(t("menu.about.update_now"), Tag)
+			return StrReplace(t("menu.about.update_now"), "{tag}", Tag)
 	}
 	return t("menu.about.check_for_updates")
 }
@@ -84,8 +86,11 @@ Updater_ShowVersion(*) {
 ; One-click update entry point wired to the dynamic tray menu item.
 ;
 ; State machine:
-;   idle      → fetch latest, compare, cache if newer, rebuild menu, then install
-;   available → install immediately from cache (no extra network call)
+;   idle      → fetch latest, compare, cache if newer, rebuild menu, then open
+;               the update prompt: the row read "Check for updates", so nothing
+;               is downloaded before the prompt's Install button
+;   available → install from cache: the row itself named the release
+;               ("Update to vX"), so the click is the user's consent
 ;   checking  → no-op (item is disabled in the menu, but guard here too)
 ;
 ; The item is always enabled when state == "idle" or "available"; disabled when
@@ -106,7 +111,7 @@ Updater_OneClickUpdate(*) {
 	if (State == "checking" or State == "downloading")
 		return
 
-	; Fast path: update already cached by background poller — install straight away.
+	; The row named the cached release ("Update to vX"): install it.
 	if (State == "available") {
 		_Updater_ActivateCachedRelease(UPDATER_LATEST_RELEASE, Request)
 		return
@@ -180,10 +185,16 @@ _Updater_OneClickUpdateCallback(Json, Current, Request, Terminal := 0) {
 		Prerelease:  _Updater_ParsePrerelease(Json)
 	}
 	if !_Updater_PublishOneClickRelease(Release, Request)
-		try LoggerDone("Updater", "One-click update check completed without starting staging.")
+		try LoggerDone("Updater", "One-click update check completed without offering the release.")
 }
 
-_Updater_PublishOneClickRelease(Release, Request, IsSuspended := unset, RebuildFn := 0, NotifyFn := 0, InstallFn := 0) {
+; Publish a release that a "Check for updates" click found and offer it in the
+; update prompt. The user asked to check, not to install: the download starts
+; only from the prompt's Install button.
+; @param OfferFn {Func} Test seam called as (Release, Request); production
+;        opens Updater_ShowUpdatePrompt.
+; @return {Boolean} True when the release was published and offered.
+_Updater_PublishOneClickRelease(Release, Request, IsSuspended := unset, RebuildFn := 0, NotifyFn := 0, OfferFn := 0) {
 	HasSuspendOverride := IsSet(IsSuspended)
 	if HasSuspendOverride {
 		if !_Updater_TryPublishRelease(Request, Release, IsSuspended)
@@ -198,12 +209,15 @@ _Updater_PublishOneClickRelease(Release, Request, IsSuspended := unset, RebuildF
 	if HasSuspendOverride {
 		if !_Updater_RequestMayPublish(Request, IsSuspended)
 			return false
-		return _Updater_ActivateCachedRelease(
-			Release, Request, IsSuspended, NotifyFn, InstallFn)
-	}
-	if !_Updater_RequestMayPublish(Request)
+	} else if !_Updater_RequestMayPublish(Request) {
 		return false
-	return _Updater_ActivateCachedRelease(Release, Request)
+	}
+	try LoggerInfo("Updater", "One-click check: new version {1} found — offering it before any download.", Release.Tag)
+	if IsObject(OfferFn)
+		OfferFn.Call(Release, Request)
+	else
+		Updater_ShowUpdatePrompt(Release, Request)
+	return true
 }
 
 _Updater_ActivateCachedRelease(Release, Request, IsSuspended := unset, NotifyFn := 0, InstallFn := 0, SuccessFn := 0) {

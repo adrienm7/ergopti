@@ -42,11 +42,11 @@ _EnterHoldModKey() {
 ; ==========================================
 ; ==========================================
 
-#HotIf TapHoldHoldModifier(TapHold, "enter") != "" and not LayerEnabled
-*$SC01C:: {
+#HotIf TapHoldHoldModifier(TapHold, "enter") != "" and not LayerEnabled and not TapHoldKanaAltGrHeld()
+$SC01C:: {
 	Result := TapHoldOwnImmediateModifier("enter", "Enter",
 		_EnterHoldModKey(), TapHoldDuration(TapHold, "enter"))
-	if (Result["tap"] and A_PriorKey == "Enter")
+	if (Result["tap"] and TapHoldPriorKeyIsSelf("enter"))
 		_EnterDispatch()
 }
 #HotIf
@@ -63,10 +63,10 @@ _EnterHoldModKey() {
 ; =======================================
 ; =======================================
 
-#HotIf TapHoldHoldLayer(TapHold, "enter") != "" and TapHoldHoldModifier(TapHold, "enter") == "" and not LayerEnabled
-*$SC01C:: {
-	Result := TapHoldOwnImmediateLayer("Enter", TapHoldDuration(TapHold, "enter"))
-	if (Result["tap"] and A_PriorKey == "Enter")
+#HotIf TapHoldHoldLayer(TapHold, "enter") != "" and TapHoldHoldModifier(TapHold, "enter") == "" and not LayerEnabled and not TapHoldKanaAltGrHeld()
+$SC01C:: {
+	Result := TapHoldOwnImmediateLayer("enter", "Enter", TapHoldDuration(TapHold, "enter"))
+	if (Result["tap"] and TapHoldPriorKeyIsSelf("enter"))
 		_EnterDispatch()
 }
 #HotIf
@@ -77,15 +77,35 @@ _EnterHoldModKey() {
 
 
 
+; ====================================
+; ====================================
+; ======= 9.3) Own auto-repeat =======
+; ====================================
+; ====================================
+
+; The hold variants fire only with no modifier held, so the key stays itself
+; under a held modifier, as on every driver. Its own auto-repeat arrives under
+; the modifier or layer the hold owns and matches none of them: swallow it for
+; as long as the owner resolves the press (see TapHoldPressIsOwned).
+#HotIf TapHoldPressIsOwned("enter")
+*SC01C:: return
+#HotIf
+
+
+
+
+
+
+
 ; =========================================================
 ; =========================================================
-; ======= 9.3) Tap-only (hold=none, tap action set) =======
+; ======= 9.4) Tap-only (hold=none, tap action set) =======
 ; =========================================================
 ; =========================================================
 
 ; $ prevents re-entry. Fire immediately on key-down — no KeyWait needed since
 ; there is no hold behaviour. No ~ so the native Enter is not also sent.
-#HotIf TapHoldTapAction(TapHold, "enter") != "" and TapHoldTapAction(TapHold, "enter") != "enter" and TapHoldHoldModifier(TapHold, "enter") == "" and TapHoldHoldLayer(TapHold, "enter") == "" and not LayerEnabled
+#HotIf TapHoldTapAction(TapHold, "enter") != "" and TapHoldTapAction(TapHold, "enter") != "enter" and TapHoldHoldModifier(TapHold, "enter") == "" and TapHoldHoldLayer(TapHold, "enter") == "" and not LayerEnabled and not TapHoldKanaAltGrHeld()
 $SC01C:: _EnterDispatch()
 #HotIf
 
@@ -97,7 +117,7 @@ $SC01C:: _EnterDispatch()
 
 ; =================================
 ; =================================
-; ======= 9.4) Tap dispatch =======
+; ======= 9.5) Tap dispatch =======
 ; =================================
 ; =================================
 
@@ -105,7 +125,7 @@ _EnterDispatch() {
 	local action := TapHoldTapAction(TapHold, "enter")
 	; No tap configured or tap = enter itself → native key behaviour.
 	if (action == "" or action == "enter") {
-		TapHoldDispatchTap("enter", TextPressKey.Bind("Enter", []))
+		TapHoldDispatchTap("enter", TapHoldEmitKeyTap.Bind("Enter"))
 		return
 	}
 	_TapHoldFireAction("enter")

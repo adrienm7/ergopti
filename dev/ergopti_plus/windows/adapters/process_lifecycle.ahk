@@ -58,6 +58,12 @@ global PLC_POLL_MS         := 250
 ; Injectable native seam used only by ownership regression tests.
 global PLC_TIMER_DRIVER    := 0
 
+; Win32 process rights and wait results for callers that own a child process.
+global PLC_PROCESS_TERMINATE := 0x0001
+global PLC_SYNCHRONIZE       := 0x00100000
+global PLC_WAIT_OBJECT_0     := 0x00000000
+global PLC_WAIT_TIMEOUT      := 0x00000102
+
 
 
 
@@ -261,6 +267,18 @@ PLC_OpenCurrentProcessHandle(DesiredAccess) {
 		return 0
 	try return DllCall("Kernel32\OpenProcess", "UInt", DesiredAccess,
 		"Int", true, "UInt", ProcessId, "Ptr")
+	catch
+		return 0
+}
+
+; Opens a non-inheritable handle to one process by id. A caller that has just
+; created that process owns it through the handle, so a later probe or
+; termination can never reach an unrelated process that reused the id.
+PLC_OpenProcessHandle(ProcessId, DesiredAccess) {
+	if !(ProcessId is Integer) or ProcessId <= 0 or !IsNumber(DesiredAccess)
+		return 0
+	try return DllCall("Kernel32\OpenProcess", "UInt", DesiredAccess,
+		"Int", false, "UInt", ProcessId, "Ptr")
 	catch
 		return 0
 }

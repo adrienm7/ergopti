@@ -19,7 +19,12 @@
 ; - LCtrl: UpdateLastSentCharacter("LControl") keeps the hotstring engine in
 ;   sync with the physical key stream.
 ; - LCtrl: ~ IS used on SC01D so Ctrl+X combos still reach the OS during KeyWait.
-;   The AltGr collision (LCtrl+RAlt) is handled upstream by altgr.ahk.
+; - AltGr: on a standard AltGr layout every AltGr press starts with a fake LCtrl
+;   that reaches these SC01D hotkeys first, before the RAlt (the hook reads its
+;   scan code 0x21D as SC01D). Held as Ctrl it passes through and the tap is
+;   blocked by the prior-key guard (A_PriorKey is RAlt) and the activity
+;   tracker; held as anything else, the RAlt hands that hold back and holds
+;   LCtrl for AltGr (TapHoldAltGrTakesItsLCtrl).
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -35,14 +40,14 @@
 ; ===================================
 
 _LShiftHoldModKey() {
-	return ResolveHoldModifierKey(TapHoldHoldModifier(TapHold, "left_shift"), "left_shift", "LShift")
+	return ResolveHoldModifierKey(TapHoldHoldModifier(TapHold, "left_shift"), "left_shift")
 }
 
 _LShiftHandleHold(PhysicalModifierPassthrough) {
 	Result := TapHoldOwnImmediateModifier("left_shift", "SC02A",
 		_LShiftHoldModKey(), TapHoldDuration(TapHold, "left_shift"),
 		,,,,,, PhysicalModifierPassthrough)
-	if (Result["tap"] and Result["elapsed_ms"] >= TapMinDurationMs() and A_PriorKey == "LShift")
+	if (Result["tap"] and Result["elapsed_ms"] >= TapMinDurationMs() and TapHoldPriorKeyIsSelf("left_shift"))
 		_LShiftDispatch()
 }
 
@@ -59,7 +64,7 @@ _LShiftHandleHold(PhysicalModifierPassthrough) {
 ; The hold behaviour (Shift staying Shift) is provided by the OS passthrough
 ; via the ~ prefix — no explicit hold logic is needed here.
 #HotIf TapHoldTapAction(TapHold, "left_shift") != "" and TapHoldHoldModifier(TapHold, "left_shift") == "" and TapHoldHoldLayer(TapHold, "left_shift") == "" and not LayerEnabled
-~$SC02A::
+~*$SC02A::
 {
 	DurationSec := TapHoldDuration(TapHold, "left_shift")
 	; Bounded (unlike a bare KeyWait): a lost SC02A key-up (focus stolen by a
@@ -78,7 +83,7 @@ _LShiftHandleHold(PhysicalModifierPassthrough) {
 	if (
 		tap
 		and ElapsedMs >= TapMinDurationMs()
-		and A_PriorKey == "LShift"
+		and TapHoldPriorKeyIsSelf("left_shift")
 	) { ; A_PriorKey allows fast shortcuts under the tap threshold without triggering the tap action mid-combo
 		_LShiftDispatch()
 	} else if (LoggerIsDebugEnabled()) {
@@ -106,18 +111,19 @@ _LShiftDispatch() {
 ; ==========================
 
 _LCtrlHoldModKey() {
-	return ResolveHoldModifierKey(TapHoldHoldModifier(TapHold, "left_ctrl"), "left_ctrl", "LCtrl")
+	return ResolveHoldModifierKey(TapHoldHoldModifier(TapHold, "left_ctrl"), "left_ctrl")
 }
 
 _LCtrlHandleHold(PhysicalModifierPassthrough) {
-	UpdateLastSentCharacter("LControl")
+	_TH_TakeAltGrPress("left_ctrl") ; a mark an unfinished press left
 	CapsUp := KS_IsUp("SC03A")
 	AltUp := KS_IsUp("SC038")
 	Result := TapHoldOwnImmediateModifier("left_ctrl", "SC01D",
 		_LCtrlHoldModKey(), TapHoldDuration(TapHold, "left_ctrl"),
 		,,,,,, PhysicalModifierPassthrough)
+	TapHoldRecordLCtrlPress()
 	if (Result["tap"] and Result["elapsed_ms"] >= TapMinDurationMs()
-		and A_PriorKey == "LControl" and CapsUp and AltUp)
+		and TapHoldPriorKeyIsSelf("left_ctrl") and CapsUp and AltUp)
 		_LCtrlDispatch()
 }
 
@@ -130,16 +136,20 @@ _LCtrlHandleHold(PhysicalModifierPassthrough) {
 *$SC01D:: _LCtrlHandleHold(false)
 #HotIf
 
-; ~$SC01D: ~ passes LCtrl through to the OS during KeyWait so Ctrl+X combos
-; still work. $ prevents keyboard-hook re-entry. The AltGr (LCtrl+RAlt) case is
-; handled by altgr.ahk which intercepts RAlt before this block fires.
+; ~*$SC01D: ~ passes LCtrl through to the OS during KeyWait so Ctrl+X combos
+; still work. * keeps the tap under a modifier held before LCtrl. $ prevents
+; keyboard-hook re-entry. AltGr's fake LCtrl reaches this block first on a
+; standard AltGr layout (see the header); the prior-key guard and the activity
+; tracker keep its tap from firing.
 ; A_PriorKey == "LControl" guard: blocks the tap when another key was pressed
 ; during the hold window (combo use), while still allowing intentional taps.
 ; KS_IsUp guards: prevent spurious tap on CapsLock+LCtrl or LAlt+LCtrl release.
 #HotIf TapHoldTapAction(TapHold, "left_ctrl") != "" and TapHoldHoldModifier(TapHold, "left_ctrl") == "" and TapHoldHoldLayer(TapHold, "left_ctrl") == "" and not LayerEnabled
-~$SC01D::
-{
-	UpdateLastSentCharacter("LControl")
+~*$SC01D:: _LCtrlHandleTapOnly()
+#HotIf
+
+_LCtrlHandleTapOnly() {
+	_TH_TakeAltGrPress("left_ctrl") ; a mark an unfinished press left
 	DurationSec := TapHoldDuration(TapHold, "left_ctrl")
 	CapsUp := KS_IsUp("SC03A") ; CapsLock must not be physically held
 	AltUp := KS_IsUp("SC038") ; LAlt must not be physically held
@@ -149,6 +159,7 @@ _LCtrlHandleHold(PhysicalModifierPassthrough) {
 	Released := KeyWait("SC01D", "T" . DurationSec)
 	TimeAfter := A_TickCount
 	ElapsedMs := TickElapsed(TimeBefore, TimeAfter)
+	TapHoldRecordLCtrlPress()
 	GuardMs := DurationSec * 1000
 	tap := Released and (ElapsedMs <= GuardMs)
 	if LoggerIsDebugEnabled() {
@@ -158,7 +169,7 @@ _LCtrlHandleHold(PhysicalModifierPassthrough) {
 	if (
 		tap
 		and ElapsedMs >= TapMinDurationMs()
-		and A_PriorKey == "LControl"
+		and TapHoldPriorKeyIsSelf("left_ctrl")
 		and CapsUp ; CapsLock must not be physically held
 		and AltUp ; LAlt must not be physically held
 	) {
@@ -167,10 +178,34 @@ _LCtrlHandleHold(PhysicalModifierPassthrough) {
 		LoggerDebug("TapHoldLCtrl", "LCtrl tap dispatch blocked after release on '{1}'.", A_PriorKey)
 	}
 }
-#HotIf
 
 ; Dispatch the configured tap action for LCtrl.
 _LCtrlDispatch() {
 	try LoggerDebug("TapHoldDispatch", "LCtrl dispatch wrapper entered.")
 	_TapHoldFireAction("left_ctrl")
 }
+
+
+
+
+
+
+
+; ====================================
+; ====================================
+; ======= 3.2) Own auto-repeat =======
+; ====================================
+; ====================================
+
+; The key's own auto-repeat while an owner holds its suppressed press. Under
+; a layer hold no variant above is eligible any more, and the navigation layer
+; would map the repeat (CapsLock repeated its layer Backspace) or let it reach
+; the system. Declared before nav_layer.ahk, so this variant wins there
+; (see TapHoldPressIsOwned).
+#HotIf TapHoldPressIsOwned("left_shift")
+*SC02A:: return
+#HotIf
+
+#HotIf TapHoldPressIsOwned("left_ctrl")
+*SC01D:: return
+#HotIf

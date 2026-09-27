@@ -224,16 +224,26 @@ I18nSetLocale(Code, WriterFn := 0, NotifyFn := 0, TimerFn := 0) {
 ; logging the start at the call site emitted one unpaired START per superseded
 ; intermediate switch (F51). Logging it right before the SUCCESS it always
 ; pairs with guarantees exactly one START per reload attempt that completes.
+; A launched reload ends the START from OnExit or, when refused after launch,
+; from _I18nReloadRefused.
 _I18nDoReload() {
 	global _I18nLocale
 	try LoggerStart("i18n", "Switching locale to '{1}'…", _I18nLocale)
-	if !ReloadPreservingSuspend(_I18nReloadReady.Bind(_I18nLocale))
-		try LoggerError("i18n", "Locale '{1}' was saved, but reload was aborted because suspend state could not be handed off.", _I18nLocale)
+	if !ReloadPreservingSuspend(_I18nReloadReady.Bind(_I18nLocale), 0,
+			_I18nReloadRefused.Bind(_I18nLocale))
+		try LoggerError("i18n", "Locale '{1}' was saved, but the reload was refused before it started.", _I18nLocale)
 }
 
 ; Completes the locale lifecycle immediately before the successful Reload.
 _I18nReloadReady(Locale, *) {
 	try LoggerSuccess("i18n", "Locale set to '{1}' — reloading script.", Locale)
+}
+
+; Closes the locale lifecycle when the launched reload was refused. The saved
+; locale shows only after the next reload, so the user is told this one failed.
+_I18nReloadRefused(Locale, Reason) {
+	try LoggerError("i18n", "Locale '{1}' was saved, but the reload was refused: {2}.", Locale, Reason)
+	ReloadRefusedNotify()
 }
 
 ; Return the locale code of the active locale.

@@ -45,11 +45,11 @@ _BackspaceHoldModKey() {
 ; ===========================================
 ; ===========================================
 
-#HotIf TapHoldHoldModifier(TapHold, "backspace") != "" and not LayerEnabled
-*$SC00E:: {
+#HotIf TapHoldHoldModifier(TapHold, "backspace") != "" and not LayerEnabled and not TapHoldKanaAltGrHeld()
+$SC00E:: {
 	Result := TapHoldOwnImmediateModifier("backspace", "BackSpace",
 		_BackspaceHoldModKey(), TapHoldDuration(TapHold, "backspace"))
-	if (Result["tap"] and A_PriorKey == "BackSpace")
+	if (Result["tap"] and TapHoldPriorKeyIsSelf("backspace"))
 		_BackspaceDispatch()
 }
 #HotIf
@@ -66,10 +66,10 @@ _BackspaceHoldModKey() {
 ; ========================================
 ; ========================================
 
-#HotIf TapHoldHoldLayer(TapHold, "backspace") != "" and TapHoldHoldModifier(TapHold, "backspace") == "" and not LayerEnabled
-*$SC00E:: {
-	Result := TapHoldOwnImmediateLayer("BackSpace", TapHoldDuration(TapHold, "backspace"))
-	if (Result["tap"] and A_PriorKey == "BackSpace")
+#HotIf TapHoldHoldLayer(TapHold, "backspace") != "" and TapHoldHoldModifier(TapHold, "backspace") == "" and not LayerEnabled and not TapHoldKanaAltGrHeld()
+$SC00E:: {
+	Result := TapHoldOwnImmediateLayer("backspace", "BackSpace", TapHoldDuration(TapHold, "backspace"))
+	if (Result["tap"] and TapHoldPriorKeyIsSelf("backspace"))
 		_BackspaceDispatch()
 }
 #HotIf
@@ -80,16 +80,36 @@ _BackspaceHoldModKey() {
 
 
 
+; =====================================
+; =====================================
+; ======= 10.3) Own auto-repeat =======
+; =====================================
+; =====================================
+
+; The hold variants fire only with no modifier held, so the key stays itself
+; under a held modifier, as on every driver. Its own auto-repeat arrives under
+; the modifier or layer the hold owns and matches none of them: swallow it for
+; as long as the owner resolves the press (see TapHoldPressIsOwned).
+#HotIf TapHoldPressIsOwned("backspace")
+*SC00E:: return
+#HotIf
+
+
+
+
+
+
+
 ; =================================================================================
 ; =================================================================================
-; ======= 10.3) Tap-only (tap action set to something other than backspace) =======
+; ======= 10.4) Tap-only (tap action set to something other than backspace) =======
 ; =================================================================================
 ; =================================================================================
 
 ; $ prevents re-entry. Fire immediately on key-down — no KeyWait or A_PriorKey
 ; guard needed since there is no hold behaviour. No ~ needed: the action replaces
 ; the native key entirely; ~ would send both BackSpace and the action.
-#HotIf TapHoldTapAction(TapHold, "backspace") != "" and TapHoldTapAction(TapHold, "backspace") != "backspace" and TapHoldHoldModifier(TapHold, "backspace") == "" and TapHoldHoldLayer(TapHold, "backspace") == "" and not LayerEnabled
+#HotIf TapHoldTapAction(TapHold, "backspace") != "" and TapHoldTapAction(TapHold, "backspace") != "backspace" and TapHoldHoldModifier(TapHold, "backspace") == "" and TapHoldHoldLayer(TapHold, "backspace") == "" and not LayerEnabled and not TapHoldKanaAltGrHeld()
 $SC00E:: _BackspaceDispatch()
 #HotIf
 
@@ -101,7 +121,7 @@ $SC00E:: _BackspaceDispatch()
 
 ; ==================================
 ; ==================================
-; ======= 10.4) Tap dispatch =======
+; ======= 10.5) Tap dispatch =======
 ; ==================================
 ; ==================================
 
@@ -109,7 +129,7 @@ _BackspaceDispatch() {
 	local action := TapHoldTapAction(TapHold, "backspace")
 	; No tap configured or tap = backspace itself → native key behaviour.
 	if (action == "" or action == "backspace") {
-		TapHoldDispatchTap("backspace", TextPressKey.Bind("BackSpace", []))
+		TapHoldDispatchTap("backspace", TapHoldEmitKeyTap.Bind("BackSpace"))
 		return
 	}
 	_TapHoldFireAction("backspace")

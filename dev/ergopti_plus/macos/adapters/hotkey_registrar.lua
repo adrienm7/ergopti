@@ -34,6 +34,16 @@ local Logger = require("infra.logger")
 
 local LOG = "adapters.hotkey_registrar"
 
+-- Key names hs.keycodes.map gives the modifier keys and Caps Lock. macOS reports
+-- these keys only as flag changes, never as a key down, so a hotkey whose key is
+-- one of them registers without complaint and can never fire. The chord grammar
+-- already refuses the neutral modifier names; the lateral ones reach this set.
+local MODIFIER_KEY_NAMES = {
+	cmd = true, rightcmd = true, alt = true, rightalt = true,
+	ctrl = true, rightctrl = true, shift = true, rightshift = true,
+	fn = true, capslock = true,
+}
+
 
 
 
@@ -75,6 +85,13 @@ end
 -- ==================================
 -- ==================================
 
+--- Reports whether a chord key names a modifier key, which never fires a hotkey.
+--- @param key any Chord key in any spelling.
+--- @return boolean modifier
+function M.key_is_modifier(key)
+	return type(key) == "string" and MODIFIER_KEY_NAMES[key:lower()] == true
+end
+
 --- Registers a system-wide chord against a callback.
 --- @param chord string Canonical chord string, e.g. "Ctrl+Shift+S".
 --- @param callback function Invoked with no arguments on each press.
@@ -88,6 +105,11 @@ function M.bind(chord, callback)
 	local parsed, err = Chord.parse(chord)
 	if not parsed then
 		Logger.error(LOG, "bind(): refusing '%s' — %s.", tostring(chord), tostring(err))
+		return nil
+	end
+	if M.key_is_modifier(parsed.key) then
+		Logger.error(LOG, "bind(): refusing '%s' — its key is a modifier key, which never fires a hotkey.",
+			tostring(chord))
 		return nil
 	end
 

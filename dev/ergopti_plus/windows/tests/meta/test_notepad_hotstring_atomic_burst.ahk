@@ -30,7 +30,7 @@ _NHAB_NotepadEraseAndPasteAreOneBurst() {
         "Notepad output must pass erase and paste to one SendInstant transaction")
     Assert(InStr(Branch, "SendNewResult(BackSpaceSeq") = 0,
         "Notepad output must not emit the erase through a separate SendEvent")
-    Assert(InStr(LegacyBranch, "try SendInstant(Replacement . EndChar, BackSpaceSeq)") > 0
+    Assert(InStr(LegacyBranch, "try Pasted := SendInstant(Replacement . EndChar, BackSpaceSeq)") > 0
         and InStr(LegacyBranch, "SendNewResult(BackSpaceSeq") = 0,
         "legacy native hotstring callbacks must use the same indivisible Notepad clipboard transaction")
     Assert(InStr(SendBody, 'SendInput(Prefix . "^v")') > 0,

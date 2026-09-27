@@ -16,35 +16,45 @@ _USTX_LifecycleRecoveryRetriesWithoutBlocking() {
 	SavedNoticeRequested := _UpdaterLifecycleRecoveryNoticeRequested
 	SavedAttemptCount := _UpdaterLifecycleRecoveryAttemptCount
 	Events := []
+	Refusals := []
 	NotifyFn := (*) => Events.Push("notify")
 	ArmRetryFn := (DelayMs) => Events.Push("arm:" . DelayMs)
-	ReloadFn := (*) => (Events.Push("reload"), false)
+	; ReloadPreservingSuspend(SuccessFn, ExistingBundle, RefusedFn): 0 when no
+	; successor was launched, 1 when the launched reload is pending.
+	RefusedReloadFn := (SuccessFn, Bundle, RefusedFn) => (Events.Push("reload"), 0)
+	LaunchedReloadFn := (SuccessFn, Bundle, RefusedFn) => (Events.Push("reload"), Refusals.Push(RefusedFn), 1)
 	try {
 		_UpdaterLifecycleRecoveryPending := true
 		_UpdaterLifecycleRecoveryNoticeShown := false
 		_UpdaterLifecycleRecoveryNoticeRequested := true
 		_UpdaterLifecycleRecoveryAttemptCount := 0
 		Assert(_Updater_AttemptLifecycleRecovery(
-			NotifyFn, ArmRetryFn, ReloadFn),
+			NotifyFn, ArmRetryFn, RefusedReloadFn),
 			"a pending torn-down lifecycle must own the recovery attempt")
 		AssertEqual("notify", Events[1],
 			"the first recovery attempt must publish one nonblocking notice")
-		AssertContains(Events[2], "arm:",
-			"the next attempt must be armed before Reload can enter OnExit")
-		AssertEqual("reload", Events[3],
-			"Reload must run only after the retry owner is durable")
+		AssertEqual("reload", Events[2],
+			"the Reload attempt must run without a modal wait")
+		AssertContains(Events[3], "arm:",
+			"a Reload refused before launch must arm the next attempt")
 		Assert(_UpdaterLifecycleRecoveryPending,
-			"a returned Reload must retain recovery ownership")
+			"a refused Reload must retain recovery ownership")
 
+		Events.Length := 0
 		Assert(_Updater_AttemptLifecycleRecovery(
-			NotifyFn, ArmRetryFn, ReloadFn),
-			"a refused Reload must remain retryable")
-		AssertEqual(5, Events.Length,
-			"later attempts must coalesce the notice and perform only arm plus reload")
-		AssertContains(Events[4], "arm:",
-			"the refused Reload must pre-arm another retry")
-		AssertEqual("reload", Events[5],
-			"the retry must reach Reload without a modal wait")
+			NotifyFn, ArmRetryFn, LaunchedReloadFn),
+			"a launched Reload must remain owned by the recovery")
+		AssertEqual(1, Events.Length,
+			"a launched Reload must not arm a retry that would launch a second successor (reload-returns-pending)")
+		AssertEqual("reload", Events[1],
+			"later attempts must coalesce the notice")
+		AssertEqual(1, Refusals.Length)
+		Assert(HasMethod(Refusals[1], "Call"),
+			"the recovery must hand the Reload a refusal callback")
+		Refusals[1].Call("test refusal")
+		AssertEqual(2, Events.Length)
+		AssertContains(Events[2], "arm:",
+			"a Reload refused after launch must arm the next attempt")
 		Assert(_UpdaterLifecycleRecoveryPending,
 			"no in-process return may claim that terminal teardown recovered")
 
@@ -53,14 +63,14 @@ _USTX_LifecycleRecoveryRetriesWithoutBlocking() {
 		_UpdaterLifecycleRecoveryNoticeRequested := false
 		_UpdaterLifecycleRecoveryAttemptCount := 0
 		Assert(_Updater_AttemptLifecycleRecovery(
-			NotifyFn, ArmRetryFn, ReloadFn),
+			NotifyFn, ArmRetryFn, RefusedReloadFn),
 			"ordinary terminal teardown must use the same durable recovery owner")
 		AssertEqual(2, Events.Length,
-			"ordinary Exit/Reload recovery must arm and reload without a false updater-error notice")
-		AssertContains(Events[1], "arm:",
-			"silent lifecycle recovery must still pre-arm its retry")
-		AssertEqual("reload", Events[2],
+			"ordinary Exit/Reload recovery must reload and re-arm without a false updater-error notice")
+		AssertEqual("reload", Events[1],
 			"silent lifecycle recovery must still replace the half-driver")
+		AssertContains(Events[2], "arm:",
+			"silent lifecycle recovery must still re-arm after a refusal")
 	} finally {
 		_UpdaterLifecycleRecoveryPending := SavedPending
 		_UpdaterLifecycleRecoveryNoticeShown := SavedNoticeShown

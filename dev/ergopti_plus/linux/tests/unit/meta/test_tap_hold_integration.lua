@@ -33,10 +33,18 @@ local function session(user_text)
 		os.remove(path)
 	end
 	local actions = {}
+	-- The capitals the scenarios type, where a US layout has them: the one-shot
+	-- Shift presses Shift on a key whose Shift level is the capital.
+	local Layout = helpers.load_module("adapters.keyboard_layout")
+	Layout._set_table_for_test({
+		A = { keycode = KEY_A, level = 2, mods = { "shift" } },
+		J = { keycode = KEY_J, level = 2, mods = { "shift" } },
+	})
 	Manager.init({
 		keyboard_hook = Hook,
 		execute_action = function(action) actions[#actions + 1] = action end,
 		action_names = function() return { "open_url" } end,
+		on_text_injected = function() end,
 		defaults_path = DEFAULTS,
 		user_path = path,
 	})
@@ -44,7 +52,7 @@ local function session(user_text)
 		path = path,
 		reload = Manager.reload,
 		is_tap_action = Manager.is_tap_action,
-		is_hold_option = Manager.is_hold_option,
+		canonical_hold = Manager.canonical_hold,
 	})
 	local s = { hook = Hook, manager = Manager, writer = Writer, actions = actions }
 
@@ -63,6 +71,7 @@ local function session(user_text)
 	end
 
 	function s.close()
+		Layout._set_table_for_test(nil)
 		Manager._reset_for_test()
 		Writer._reset_for_test()
 		os.remove(path)
@@ -188,6 +197,55 @@ helpers.describe("tap-holds end to end: the shipped defaults", function()
 		end)
 	end)
 
+	-- The hook tells the engine what a key types. Ctrl+A under an armed one-
+	-- shot came out as Ctrl+Shift+A, Print as Shift+Print, and "1" as "!"
+	-- (one-shot-types-nothing).
+	helpers.it("lets a shortcut and Print through the one-shot, and types a digit as it is", function()
+		with_session(nil, function(s)
+			local d, u = tap(RCTRL, 0)
+			local emitted = s.drive({ d, u,
+				{ LCTRL, DOWN, 200 }, { KEY_A, DOWN, 210 }, { KEY_A, UP, 220 }, { LCTRL, UP, 230 },
+				{ 99, DOWN, 300 }, { 99, UP, 310 },
+				{ KEY_A, DOWN, 400 }, { KEY_A, UP, 410 } })
+			helpers.assert_eq(emitted, "42:1 42:0 29:1 30:1 30:0 29:0 99:1 99:0 42:1 30:1 30:0 42:0",
+				"Ctrl+A and Print pass as they are, and the letter after them is the capital")
+			d, u = tap(RCTRL, 1000)
+			emitted = s.drive({ d, u, { 2, DOWN, 1200 }, { 2, UP, 1210 }, { KEY_A, DOWN, 1300 }, { KEY_A, UP, 1310 } })
+			helpers.assert_eq(emitted, "42:1 42:0 2:1 2:0 30:1 30:0", "the 1 is a 1, and it spent the one-shot")
+		end)
+	end)
+
+	-- The results come from _shared/tap_hold/one_shot_shift.json, which the
+	-- Windows one-shot reads too (one-shot-results-shared).
+	helpers.it("types the shared one-shot results, and hands the injector what the layout lacks", function()
+		with_session(nil, function(s)
+			local Layout = require("adapters.keyboard_layout")
+			Layout._set_table_for_test({
+				["-"] = { keycode = 12, level = 1, mods = {} }, [" "] = { keycode = 57, level = 1, mods = {} },
+				[":"] = { keycode = 39, level = 2, mods = { "shift" } },
+			})
+			local saved = package.loaded["modules.hotstrings.injector"]
+			local injected = {}
+			package.loaded["modules.hotstrings.injector"] = {
+				inject = function(erase, text) injected[#injected + 1] = erase .. ":" .. text; return { ok = true } end,
+			}
+			local ok, err = pcall(function()
+				local d, u = tap(RCTRL, 0)
+				helpers.assert_eq(s.drive({ d, u, { 57, DOWN, 200 }, { 57, UP, 250 } }), "42:1 42:0 12:1 12:0",
+					"one-shot Shift then Space types -")
+				d, u = tap(RCTRL, 1000)
+				helpers.assert_eq(s.drive({ d, u, { 52, DOWN, 1200 }, { 52, UP, 1250 } }),
+					"42:1 42:0 57:1 57:0 42:1 39:1 39:0 42:0", "then a period types a space and a colon")
+				d, u = tap(RCTRL, 2000)
+				helpers.assert_eq(s.drive({ d, u, { 13, DOWN, 2200 }, { 13, UP, 2250 } }), "42:1 42:0",
+					"then = types nothing on the keyboard")
+				helpers.assert_eq(injected, { "0:º" }, "the injector types º, which the layout has no key for")
+			end)
+			package.loaded["modules.hotstrings.injector"] = saved
+			if not ok then error(err, 0) end
+		end)
+	end)
+
 	helpers.it("sends Alt+Tab for a Tab tap and Shift+Tab under Shift", function()
 		with_session(nil, function(s)
 			s.drive({ tap(TAB, 0) })
@@ -200,7 +258,8 @@ helpers.describe("tap-holds end to end: the shipped defaults", function()
 
 	helpers.it("holds AltGr as AltGr and taps it as Tab", function()
 		with_session(nil, function(s)
-			helpers.assert_eq(s.drive({ tap(ALTGR, 0) }), "100:1 100:0 15:1 15:0")
+			helpers.assert_eq(s.drive({ tap(ALTGR, 0) }), "100:1 194:1 194:0 100:0 15:1 15:0",
+				"a lone AltGr is masked before its release, then Tab is typed")
 		end)
 	end)
 

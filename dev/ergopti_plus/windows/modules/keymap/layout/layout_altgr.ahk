@@ -226,11 +226,21 @@ IsRealAltGrPress() {
     ; any Ergopti feature, so every SC138-prefixed hotkey in the driver must
     ; defer to the host Windows layout. Returning false here neutralises every
     ; #HotIf that gates on IsRealAltGrPress(), which is the gate used by every
-    ; static SC138 combo in the codebase. AHK’s "all variants false → prefix
-    ; reverts to native function" rule then restores native AltGr behaviour
-    ; for the duration of the wizard. The flag flips back automatically when
-    ; the wizard committed (Reload) or when the user closed it (ExitApp).
+    ; static SC138 combo in the codebase. SC138 still stays an armed prefix:
+    ; the always-eligible "~SC138 & ~F24" anchor (platform/remap/altgr.ahk)
+    ; has no criterion. AutoHotkey reads SC138 as the RAlt modifier and never
+    ; suppresses a modifier prefix that no variant fires for (hook.cpp Case #1,
+    ; "this_key.as_modifiersLR"), so the native AltGr press reaches the
+    ; wizard. The flag flips back automatically when the wizard committed
+    ; (Reload) or when the user closed it (ExitApp).
     if (IsSet(_OB_ALTGR_PASSTHROUGH) and _OB_ALTGR_PASSTHROUGH) {
+        return false
+    }
+    ; AltGr held as another modifier or a layer is that modifier or layer, on
+    ; every layout: AltGr+C held as Ctrl is Ctrl+C. On a Kana layout the combos
+    ; stayed eligible and took the key instead (the AltGr layer's character, or
+    ; a script chord for Enter).
+    if !AltGrKeyIsAltGr() {
         return false
     }
     if (IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP) {
@@ -239,6 +249,19 @@ IsRealAltGrPress() {
     }
     ; Vanilla AltGr: real press keeps RAlt physically held; ghost releases it.
     return GetKeyState("RAlt", "P")
+}
+
+; #HotIf of the script chords (AltGr+Escape quits, +Enter toggles the pause,
+; +BackSpace reloads, +Delete opens the personal shortcuts), running and paused
+; (infra/script_altgr_hotkeys.ahk). On QWERTY the AltGr key is a plain right
+; Alt, and the always-eligible prefix anchor arms SC138 on its first press:
+; RAlt+Esc, Windows' Alt+Esc, quit the driver. These chords are destructive, so
+; they need a layout whose AltGr key is an AltGr; on QWERTY those keys stay
+; native Alt chords.
+; @param AltGrPressed {Boolean} The chord's own AltGr check.
+; @return {Boolean}
+ScriptAltGrChordIsLive(AltGrPressed) {
+    return AltGrPressed and KS_LayoutHasAltGr()
 }
 
 ; Run the Plain or Shifted callable from ``Table[SC]`` depending on the
@@ -278,13 +301,58 @@ AltGrShiftDispatch(SC, Table, *) {
     ; like Bépo’s `'`) therefore fall through to the regular *SC<key>/SC<key>
     ; remap hotkeys and produce the correct base-layer character.
     Entry := Table[SC]
-    Cb := GetKeyState("Shift", "P") ? Entry.Shifted : Entry.Plain
+    Cb := AltGrLayerEntryCallable(Entry)
     _AtCrit := Critical("On")   ; Serialize the AltGr emit like _RemapEmit
     try {
-        Cb()
+        AltGrLayerEmit(Cb)
     } finally {
         Critical(_AtCrit)
     }
+}
+
+; Whether Shift is held for an AltGr-layer output: physically, or by a
+; tap-hold's synthetic hold. The AltGr key held as Shift+AltGr presses its
+; Shift synthetically (so do a Space or RShift held as Shift): reading the
+; physical Shift alone typed the Plain entry where a physical Shift+AltGr
+; typed the Shifted one. Every AltGr-layer output that picks by Shift asks
+; this: the table entries, the two rolls and the AltGr+LAlt shortcut.
+; @return {Boolean}
+AltGrLayerShiftHeld() {
+    global _TapHoldKeyIsDown, _TH_SyntheticHeldKeys
+    return _TapHoldKeyIsDown.Call("Shift", "P")
+        or _TH_SyntheticHeldKeys.Has("LShift") or _TH_SyntheticHeldKeys.Has("RShift")
+}
+
+; The callable of an AltGr table entry for the current Shift state.
+; @param Entry {Object} A table entry with Plain and Shifted callables.
+; @return {Func} Entry.Shifted or Entry.Plain, not invoked.
+AltGrLayerEntryCallable(Entry) {
+    return AltGrLayerShiftHeld() ? Entry.Shifted : Entry.Plain
+}
+
+; Run one AltGr-layer output (a table entry or a roll). An AltGr a tap-hold holds
+; synthetically is kept down by AutoHotkey around the output's non-blind Send,
+; as every modifier the driver pressed itself: where right Alt is a plain Alt
+; (QWERTY) the layer's text then went out under Alt, as menu mnemonics instead
+; of characters. That owned key is lifted around the output (masked) and given
+; back; an AltGr the user holds is lifted by the Send itself.
+; @param EmitFn {Func} Zero-argument output.
+AltGrLayerEmit(EmitFn) {
+    return TapHoldSendWithOwnedKeyUp(KS_AltGrKeyName(), EmitFn)
+}
+
+; Whether a Ctrl+Alt chord is a real Ctrl+Alt, not the layout's AltGr key: the
+; physical AltGr key (KS_AltGrKeyName: RAlt, or SC138 on a Kana layout) is up.
+; A real AltGr press is taken first by the AltGr layer's "SC138 & X"
+; combinations anyway. While the first-run wizard is up every AltGr-looking
+; chord stays the host layout's, as IsRealAltGrPress keeps it.
+; @return {Boolean}
+IsCtrlAltNotAltGr() {
+    global _OB_ALTGR_PASSTHROUGH
+    if (IsSet(_OB_ALTGR_PASSTHROUGH) and _OB_ALTGR_PASSTHROUGH) {
+        return false
+    }
+    return !GetKeyState(KS_AltGrKeyName(), "P")
 }
 
 CtrlAltDispatch(Combo, *) {
@@ -322,6 +390,10 @@ RegisterAltGrLayer() {
         for SC in ALTGR_NUMBER_ROW {
             Hotkey("SC138 & " . SC, AltGrShiftDispatch.Bind(SC, ALTGR_NUMBER_ROW), "I2")
         }
+        ; A real Ctrl+Alt chord, never the AltGr key: under the AltGr gate above
+        ; these needed the physical AltGr, which a Ctrl+Alt chord never holds,
+        ; so they were dead on standard layouts and QWERTY.
+        HotIf((*) => Features["layout"]["ergopti_alt_gr"] and IsCtrlAltNotAltGr())
         for SC, Combo in CTRL_ALT_NUMPAD {
             Hotkey("^!" . SC, CtrlAltDispatch.Bind(Combo), "I2")
         }

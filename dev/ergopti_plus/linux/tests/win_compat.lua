@@ -24,18 +24,27 @@
 ---    they check on Linux. Windows resolves those paths drive-relative,
 ---    natively. The per-run stamp keeps one run's leftovers (os.remove
 ---    cannot delete directories here) from colliding with the next run's
----    fixtures.
+---    fixtures. Like the mkstemp(3) behind a POSIX os.tmpname(), it creates
+---    the empty file it names: a test may treat the name as an existing file.
 --- 3. os.rename() removes an existing destination first (POSIX replace).
 ---    Lua file calls are otherwise unwrapped: bytes on disk are real.
 --- 4. Bare "mkdir" commands are executed natively (cmd creates intermediate
 ---    directories), because cmd's mkdir has no -p flag and would otherwise
----    create garbage directories while reporting success.
+---    create garbage directories while reporting success. With -p, an
+---    existing directory is success, as POSIX specifies.
 --- 5. Commands headed by a POSIX tool (sh, tar, rm, chmod, cp, mv, cat, grep,
----    mktemp, test, pwd) or by an existing script path are routed to the sh
----    and coreutils shipping with Git for Windows, with /tmp operands mapped
----    to the same drive-absolute tree Lua sees. The tools really run; only
+---    mktemp, test, pwd, wc, date, ls, touch, stat, sleep, printf, and a
+---    chained mkdir) or by an existing script path are routed to the sh and
+---    coreutils shipping with Git for Windows, with /tmp operands mapped to
+---    the same drive-absolute tree Lua sees. The whole command line runs
+---    through that sh, so quotes, &&, ||, pipes, redirections and echo mean
+---    what they mean under /bin/sh, and cmd's own builtins (date) never
+---    answer in a tool's place. What mktemp prints is respelled to the
+---    fixture paths this process opens, and pwd is asked for the Windows
+---    spelling of the working directory (pwd -W). The tools really run; only
 ---    the platform gap is bridged. Anything else reaches cmd.exe exactly as
----    before, so tool-absence verdicts (xclip, wl-copy, xdotool) are unchanged.
+---    before, so tool-absence verdicts (xclip, wl-copy, xdotool) are
+---    unchanged.
 --- 6. /dev/urandom answers synthetic bytes. The nonce path (open, read(18),
 ---    base64, CSP authoring) is fully executed; only the kernel entropy
 ---    source itself is unavailable on this platform.
@@ -240,21 +249,40 @@ end
 -- =========================================
 -- =========================================
 
+--- True when a command line chains, pipes or backgrounds commands. Such a
+--- line needs sh to mean what it means on Linux (section 5).
+--- @param cmd string
+--- @return boolean
+local function is_compound(cmd)
+	return cmd:find("[&|;\r\n]") ~= nil
+end
+
+--- True when a native path names an existing directory: cd succeeds on a
+--- directory only.
+--- @param native_path string Backslash-native path.
+--- @return boolean
+local function directory_exists(native_path)
+	local probe = real_execute('cd /d "' .. native_path .. '" >NUL 2>&1')
+	return probe == true or probe == 0
+end
+
 --- Runs a bare mkdir through cmd's own recursive directory creation.
 --- cmd's mkdir has no -p flag: passing one through would create literal
---- "-p" directories while reporting success.
---- @param cmd string The full mkdir command.
+--- "-p" directories while reporting success. cmd's mkdir also refuses a
+--- directory that already exists, which POSIX mkdir -p accepts: a daemon
+--- that re-creates its data directory before every write then failed its
+--- second write on this host only.
+--- @param cmd string The full mkdir command, with nothing chained to it.
 --- @return boolean|number Version-appropriate success signal, false on failure.
 local function emulate_mkdir(cmd)
-	if cmd:find("&&", 1, true) or cmd:find("||", 1, true)
-		or cmd:find("|", 1, true) or cmd:find(";", 1, true) then
-		return real_execute(cmd)
-	end
 	local stripped = cmd:gsub("%d*>%s*%S+", "")
 	local words = split_words(stripped:match("^%s*mkdir%s*(.-)%s*$") or "")
 	local dirs = {}
+	local parents = false
 	for _, word in ipairs(words) do
-		if word ~= "" and word:sub(1, 1) ~= "-" then
+		if word:sub(1, 1) == "-" then
+			if word == "--parents" or word:match("^%-%a*p%a*$") then parents = true end
+		elseif word ~= "" then
 			dirs[#dirs + 1] = word
 		end
 	end
@@ -262,7 +290,8 @@ local function emulate_mkdir(cmd)
 	for _, dir in ipairs(dirs) do
 		local native = to_win(dir)
 		local first = real_execute('mkdir "' .. native .. '" >NUL 2>&1')
-		if not (first == true or first == 0) then return false end
+		local created = first == true or first == 0
+		if not created and not (parents and directory_exists(native)) then return false end
 	end
 	if _is_jit then return 0 end
 	return true
@@ -289,6 +318,16 @@ local TOOL_HEADS = {
 	test = true,
 	pwd = true,
 	wc = true,
+	-- The file watcher polls mtimes with `date -r`, lists with `ls` and tests
+	-- directories with `test -d`; its suite drives it with touch and sleep.
+	date = true,
+	ls = true,
+	touch = true,
+	stat = true,
+	sleep = true,
+	printf = true,
+	-- A bare mkdir is emulated natively (section 4); a chained one needs sh.
+	mkdir = true,
 }
 
 --- Splits `sh -c 'SCRIPT' args...` into the script (honouring the '\''
@@ -360,14 +399,26 @@ local function route_sh_c(tail)
 	return tool_path_prefix() .. 'sh -s < "' .. to_win(path) .. '"'
 end
 
---- Converts simply-quoted operands ('...') to double-quoted ones for a
---- direct tool call. cmd.exe and the MSVCRT splitter honour double quotes;
---- single quotes would reach the tool as literal characters.
---- Not applied to sh scripts: sh parses its own quoting.
---- @param tail string Command tail after the tool head.
---- @return string
-local function double_quote_operands(tail)
-	return (tail:gsub("'([^'\r\n]*)'", '"%1"'))
+--- Runs a whole POSIX command line through the Git userland's sh, from a
+--- script file. Handed to cmd.exe instead, the line meant something else:
+--- cmd kept single quotes as literal characters, evaluated && and || with
+--- its own echo (which keeps the space before the operator, so
+--- `test -d X && echo 1 || echo 0` printed "1 "), and answered `date` with
+--- its own builtin, which prompts for a new system date. `sh FILE` rather
+--- than `sh -s < FILE` leaves the caller's stdin to the command, so a pipe
+--- opened for writing still feeds it.
+--- @param command string Command line, /tmp operands in the MSYS spelling.
+--- @return string Command for cmd.exe.
+local function route_command_line(command)
+	tmp_counter = tmp_counter + 1
+	local path = WIN_TMP .. "/cmd-" .. tostring(tmp_counter) .. ".sh"
+	local handle, open_error = real_open(path, "wb")
+	if not handle then
+		error("win_compat: cannot write the routed command file " .. path .. ": " .. tostring(open_error), 3)
+	end
+	handle:write(command, "\n")
+	handle:close()
+	return tool_path_prefix() .. 'sh "' .. translate_tmp_tool(path) .. '"'
 end
 
 --- Rewrites one command for execution on this box. Returns the rewritten
@@ -427,8 +478,18 @@ local function route_command(cmd)
 			tail = tail:gsub("[\r\n]+", "; ")
 			return tool_path_prefix() .. "sh" .. tail, false
 		end
-		tail = double_quote_operands(tail)
-		return tool_path_prefix() .. head .. tail, head == "mktemp"
+		-- /dev/null stays: sh has one, while cmd's NUL means nothing to it.
+		local line = translate_tmp_tool(cmd)
+		if head == "pwd" then
+			-- The userland's pwd names the working directory through its own
+			-- mount table: "/d/..." for a drive, and "/tmp/..." for a checkout
+			-- under %TEMP%. This process resolves either spelling against its
+			-- own drive ("D:\tmp\..."), so no prefix rewrite can undo it in
+			-- general. -W makes the same builtin print the Windows path it
+			-- resolved ("C:/Users/.../Temp/..."), which this process opens.
+			line = line:gsub("^(%s*pwd)", "%1 -W", 1)
+		end
+		return route_command_line(line), head == "mktemp"
 	end
 	return mapped, false
 end
@@ -566,9 +627,25 @@ function M.install()
 		return real_getenv(name)
 	end
 
+	-- A POSIX os.tmpname() takes its name from mkstemp(3), which creates the
+	-- file: a test may hand the name straight to code that probes for an
+	-- existing file. Answering a name with nothing behind it made such a probe
+	-- report "absent" on this host only. A name that already exists is refused,
+	-- as mkstemp refuses it, rather than handed out a second time.
 	os.tmpname = function()
 		tmp_counter = tmp_counter + 1
-		return "/tmp/ergopti-win-test/" .. RUN_TAG .. "-" .. tostring(tmp_counter)
+		local path = "/tmp/ergopti-win-test/" .. RUN_TAG .. "-" .. tostring(tmp_counter)
+		local existing = real_open(path, "rb")
+		if existing then
+			existing:close()
+			error("win_compat: os.tmpname() found " .. path .. " already present", 2)
+		end
+		local handle, open_error = real_open(path, "wb")
+		if not handle then
+			error("win_compat: os.tmpname() could not create " .. path .. ": " .. tostring(open_error), 2)
+		end
+		handle:close()
+		return path
 	end
 
 	os.rename = function(old_path, new_path)
@@ -585,7 +662,7 @@ function M.install()
 
 	os.execute = function(cmd)
 		if type(cmd) ~= "string" then return real_execute(cmd) end
-		if cmd:match("^%s*mkdir[%s]") then return emulate_mkdir(cmd) end
+		if cmd:match("^%s*mkdir[%s]") and not is_compound(cmd) then return emulate_mkdir(cmd) end
 		return real_execute(route_command(cmd))
 	end
 

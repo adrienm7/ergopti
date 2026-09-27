@@ -294,14 +294,16 @@ _TLTSH_EveryTabProducerUsesTheGuardedWrapper() {
 		"physical Tab HotIf must be the sole wrapper caller that declares physical provenance")
 	Assert(InStr(GestureSrc, "LLM_Tooltip_FireTabOrAccept([])") > 0,
 		"gesture Tab must pass through the same wrapper and fail physical-Tab validation")
-	Assert(InStr(RemapSrc, 'TapHoldDispatchTap("left_alt", LLM_Tooltip_FireTabOrAccept.Bind(""))') > 0,
+	Assert(InStr(RemapSrc, "return LLM_Tooltip_FireTabOrAccept(Modifiers)") > 0,
+		"the tap-hold keystroke tap must send a Tab through canonical physical-Tab validation")
+	Assert(InStr(RemapSrc, 'TapHoldDispatchTap("left_alt", TapHoldEmitKeyTap.Bind("Tab"))') > 0,
 		"LAlt Tab remap must pass through canonical physical-Tab validation")
-	Assert(InStr(RemapSrc, 'TapHoldDispatchTap("right_ctrl", LLM_Tooltip_FireTabOrAccept.Bind(""))') > 0,
+	Assert(InStr(RemapSrc, 'TapHoldDispatchTap("right_ctrl", TapHoldEmitKeyTap.Bind("Tab"))') > 0,
 		"RCtrl Tab remap must pass through canonical physical-Tab validation")
 
 	WrapperRefs := _TLTSH_Count(DriverSrc, "LLM_Tooltip_FireTabOrAccept")
-	AssertEqual(5, WrapperRefs,
-		"the guarded Tab wrapper must have one definition plus exactly the four enumerated menu/gesture/LAlt/RCtrl references; inspect every new reference before updating this count")
+	AssertEqual(4, WrapperRefs,
+		"the guarded Tab wrapper must have one definition plus exactly the three enumerated menu/gesture/tap-hold references; inspect every new reference before updating this count")
 	AssertEqual(1, _TLTSH_Count(DriverSrc, "LLM_Tooltip_FireTabOrAccept([], true)"),
 		"only the physical Tab HotIf may opt the shared wrapper into physical-event acceptance")
 	AssertEqual(4, _TLTSH_Count(DriverSrc, "LLM_Bridge_FeedKeyDownIfActive("),

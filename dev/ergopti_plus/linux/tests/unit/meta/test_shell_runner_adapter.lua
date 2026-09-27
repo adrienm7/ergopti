@@ -8,8 +8,9 @@
 --- string and executes none of it". Pinning the spelling would pass for a
 --- broken escape that happens to contain the right characters, so the corpus
 --- is decoded twice: once by an independent single-quote parser written from
---- the sh grammar (runs on every interpreter, including Windows dev boxes),
---- and once by a real /bin/sh on POSIX hosts.
+--- the sh grammar, and once by a real POSIX shell: /bin/sh on Linux, and
+--- the sh shipping with Git for Windows on a Windows checkout, where the
+--- suite's Windows test mode routes the printf line through it.
 ---
 --- The exit-code cases run for real on purpose: os.execute() reports success
 --- as 0 under Lua 5.1/LuaJIT and as `true` from 5.2 on, and CI runs LuaJIT
@@ -134,13 +135,7 @@ helpers.describe("shell_runner adapter", function()
 
 
 	helpers.describe("quote() — real shell round-trip", function()
-		local is_posix = package.config:sub(1, 1) == "/"
-
 		helpers.it("a real POSIX shell reads back exactly what was quoted", function()
-			if not is_posix then
-				print("  WARN: skipped — no POSIX shell on this host (Windows dev box); CI runs Linux")
-				return
-			end
 			local checked = 0
 			for _, sample in ipairs(HOSTILE_CORPUS) do
 				-- printf '%s' is the only echo-like builtin that does not

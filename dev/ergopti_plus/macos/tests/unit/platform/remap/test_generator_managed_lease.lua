@@ -360,11 +360,17 @@ helpers.describe("Karabiner generator managed lease gates", function()
 				label = "Combo action",
 				karabiner_to = { { key_code = "f19" } },
 			}
+			-- Only a key with a hold waits for its tap, so only it has a tap timeout.
+			local hold_action = {
+				id = "hold_action",
+				label = "Hold action",
+				karabiner_to = { { key_code = "left_shift" } },
+			}
 			local custom_state = state({
 				tap_hold_timeout_ms = 345,
 				simultaneous_threshold_ms = 67,
 				tap_hold_config = {
-					right_command = { tap = "tap_action", hold = "none" },
+					right_command = { tap = "tap_action", hold = "hold_action" },
 				},
 				mod_combos_config = {
 					pair = { tap = "none", hold = "none", combo = "combo_action" },
@@ -376,6 +382,7 @@ helpers.describe("Karabiner generator managed lease gates", function()
 					{ id = "none", label = "None", karabiner_to = {} },
 					tap_action,
 					combo_action,
+					hold_action,
 				},
 				{
 					{

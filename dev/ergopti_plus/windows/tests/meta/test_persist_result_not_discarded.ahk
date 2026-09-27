@@ -161,7 +161,10 @@ _PRND_LlmSaveSurfacesAndRecovers() {
 	; ReloadPreservingSuspend(), which re-synchronises exactly the same way and
 	; additionally carries the user's pause state across the restart — a strictly
 	; better answer that the old spelling-based assertion called a regression.
-	Assert(InStr(Body, "Reload()") > 0 or InStr(Body, "ReloadPreservingSuspend()") > 0,
+	; It now also passes a refusal callback, because a launched reload can still
+	; be refused after the call returns.
+	Assert(RegExMatch(Body, "(?<![\w.])Reload\(\)")
+			or RegExMatch(Body, "\bReloadPreservingSuspend\("),
 		"a failed LLM persist must re-synchronise from disk. Without it memory, engine and menu keep agreeing on a state that exists nowhere, which is a lie the user only discovers at the next restart")
 }
 

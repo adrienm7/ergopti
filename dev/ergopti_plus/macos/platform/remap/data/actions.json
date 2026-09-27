@@ -326,6 +326,7 @@
 		"label": "Alt+Tab — Aller à l'app précédente",
 		"holdable": false,
 		"category": "Navigation",
+		"exact_modifiers": true,
 		"karabiner_to": [
 			{
 				"key_code": "f17",
@@ -339,6 +340,7 @@
 		"label": "Alt+Tab — Aller à la fenêtre précédente",
 		"holdable": false,
 		"category": "Navigation",
+		"exact_modifiers": true,
 		"karabiner_to": [
 			{
 				"key_code": "f17",
@@ -352,6 +354,7 @@
 		"label": "Alt+Tab — Fenêtre précédente sur l'écran sous le curseur",
 		"holdable": false,
 		"category": "Navigation",
+		"exact_modifiers": true,
 		"karabiner_to": [
 			{
 				"key_code": "f17",
@@ -499,6 +502,7 @@
 		"label": "⌘` — Fenêtres de l'app courante",
 		"holdable": false,
 		"category": "Navigation",
+		"exact_modifiers": true,
 		"karabiner_to": [
 			{
 				"key_code": "f17"

@@ -71,7 +71,12 @@ Test("config transition integration: recovery precedes paths.toml read "
 ; ==============================================
 ; ==============================================
 
-_CTIM_AssertCommonCaller(Name, CommitNeedle, ReloadNeedle) {
+; A launched Reload is refused, if ever, only after the caller returned (see
+; infra/reload_terminal_handoff.ahk). So the rollback lives in one helper that
+; runs both when no successor launched and from the refusal callback, and a
+; pending Reload keeps the bundle instead of the caller releasing it.
+_CTIM_AssertCommonCaller(Name, CommitNeedle, ReloadNeedle, RollbackName,
+		SyncRollbackNeedle) {
 	Body := _StripFullLineComments(_DriverFuncBody(Name))
 	Assert(Body != "", Name . " must exist")
 	CriticalOff := InStr(Body, 'Critical("Off")', true)
@@ -81,8 +86,9 @@ _CTIM_AssertCommonCaller(Name, CommitNeedle, ReloadNeedle) {
 	Strict := InStr(Body,
 		'ConfigTransitionResultIs(CommitResult, "committed_new")', true)
 	Reload := InStr(Body, ReloadNeedle, true)
-	Rollback := InStr(Body, "ConfigTransitionRollbackOwned(", true)
-	Retain := InStr(Body, "ConfigTransitionRetainBarrier(OwnerBundle)", true)
+	Settle := InStr(Body, "ConfigTransitionSettleRefusedReload.Bind(", true)
+	Handoff := Reload ? InStr(Body, "ReleaseBundle := false", true, Reload) : 0
+	SyncRollback := Reload ? InStr(Body, SyncRollbackNeedle, true, Reload) : 0
 	BarrierFlag := InStr(Body, 'CommitResult.Has("barrier_retained")', true)
 	Release := InStr(Body, "_ConfigWriteTerminalRelease(OwnerBundle)", true)
 	Assert(CriticalOff > 0 && Acquire > CriticalOff,
@@ -90,9 +96,24 @@ _CTIM_AssertCommonCaller(Name, CommitNeedle, ReloadNeedle) {
 	Assert(Acquire > 0 && Quiesce > Acquire && Commit > Quiesce,
 		Name . " must acquire globally, quiesce native/WAL state, then commit")
 	Assert(Strict > Commit && BarrierFlag > Strict && Reload > BarrierFlag
-		&& Rollback > Reload && Retain > Rollback && Release > Retain,
-		Name . " must strictly validate commit, Reload under the same bundle, "
-		. "retain unsafe rollback authority, then release only when safe")
+		&& Settle > Reload && Handoff > Settle && SyncRollback > Handoff
+		&& Release > SyncRollback,
+		Name . " must strictly validate commit, lend the bundle to Reload with "
+		. "its rollback, keep it on launch, roll back on refusal, then release")
+	RollbackBody := _StripFullLineComments(_DriverFuncBody(RollbackName))
+	Assert(RollbackBody != "", RollbackName . " must exist")
+	Rollback := InStr(RollbackBody, "ConfigTransitionRollbackOwned(", true)
+	Retain := InStr(RollbackBody, "ConfigTransitionRetainBarrier(OwnerBundle)",
+		true)
+	Assert(Rollback > 0 && Retain > Rollback
+		&& InStr(RollbackBody, "return Retained", true) > Retain,
+		RollbackName . " must retain unsafe rollback authority and say so")
+	SettleBody := _StripFullLineComments(
+		_DriverFuncBody("ConfigTransitionSettleRefusedReload"))
+	Assert(InStr(SettleBody, "RollbackFn.Call(Bundle)", true) > 0
+		&& InStr(SettleBody, "_ConfigWriteTerminalRelease(Bundle)", true)
+			> InStr(SettleBody, "finally", true),
+		"a refusal after launch must release the bundle unless the rollback retained it")
 	Assert(InStr(Body, "ConfigTransitionLogFailure(", true) > 0,
 		Name . " must log transition refusal with typed detail")
 	DirectNotice := InStr(Body, "MsgBox(", true) > 0
@@ -114,7 +135,9 @@ _CTIM_AssertCommonCaller(Name, CommitNeedle, ReloadNeedle) {
 _CTIM_PathsEditorUsesOneTransition() {
 	_CTIM_AssertCommonCaller("_PathsFile_Write",
 		"ConfigTransitionCommitOwned(",
-		"ReloadPreservingSuspend(0, OwnerBundle)")
+		"ReloadPreservingSuspend(0, OwnerBundle,",
+		"_PathsFile_RollbackRefusedReload",
+		"_PathsFile_RollbackRefusedReload(OwnerBundle)")
 	Body := _StripFullLineComments(_DriverFuncBody("_PathsFile_Write"))
 	Normalize := InStr(Body, "ConfigTransitionNormalizeConfigDir(N)", true)
 	Acquire := InStr(Body, "ConfigTransitionAcquireLifecycleBundle(", true)
@@ -136,7 +159,9 @@ Test("config transition integration: paths editor holds one terminal WAL "
 _CTIM_OnboardingOrdersConfigBeforeLocator() {
 	_CTIM_AssertCommonCaller("_Onboarding_Commit",
 		"ConfigTransitionCommitOwned(",
-		"ReloadPreservingSuspend(BeforeReloadFn, OwnerBundle)")
+		"ReloadPreservingSuspend(BeforeReloadFn, OwnerBundle,",
+		"_Onboarding_RollbackRefusedReload",
+		"Rollback.Call(OwnerBundle)")
 	Body := _StripFullLineComments(_DriverFuncBody("_Onboarding_Commit"))
 	Assert(Body != "", "the onboarding transaction implementation must be available")
 	Normalize := InStr(Body,
@@ -168,7 +193,9 @@ Test("config transition integration: onboarding orders config before locator "
 _CTIM_ResetUsesThreeTargetIntention() {
 	_CTIM_AssertCommonCaller("ReloadWithDefaultConfig",
 		"ConfigTransitionCommitOwned(",
-		"ReloadPreservingSuspend(0, OwnerBundle)")
+		"ReloadPreservingSuspend(0, OwnerBundle,",
+		"_ConfigResetRollbackRefusedReload",
+		"_ConfigResetRollbackRefusedReload(OwnerBundle)")
 	Body := _StripFullLineComments(_DriverFuncBody("ReloadWithDefaultConfig"))
 	Build := InStr(Body, "_ConfigResetTransitionTargets(", true)
 	Commit := InStr(Body, "ConfigTransitionCommitOwned(", true)

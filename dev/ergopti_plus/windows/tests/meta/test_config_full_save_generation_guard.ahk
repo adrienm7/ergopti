@@ -60,12 +60,20 @@ _CFGFM_CallersClassifyTypedOutcomes() {
 			FuncName . " must distinguish durable, deferred and failed outcomes")
 	}
 	LlmBody := _DriverFuncBody("LLM_Menu_SaveConfig")
+	ResumeBody := _DriverFuncBody("_LLM_Menu_ResumeAfterRefusedReload")
+	Assert(ResumeBody != "", "the refused-reload resume must exist")
+	; A launched Reload is refused only later, so the same resume must run both
+	; when no successor launched and from the refusal callback after launch.
 	Assert(InStr(LlmBody, "&RequestedGeneration") > 0
 		and InStr(LlmBody, "_ConfigFullSaveResolveFailure(") > 0
-		and InStr(LlmBody, "try ReloadAccepted := ReloadPreservingSuspend()") > 0
-		and RegExMatch(LlmBody,
+		and InStr(LlmBody, "try ReloadAccepted := ReloadPreservingSuspend(0, 0,") > 0
+		and InStr(LlmBody,
+			"_LLM_Menu_ResumeAfterRefusedReload.Bind(RequestedGeneration)") > 0
+		and InStr(LlmBody,
+			"return _LLM_Menu_ResumeAfterRefusedReload(RequestedGeneration)") > 0
+		and RegExMatch(ResumeBody,
 			"s)if\s+_ConfigFullSaveResumeRejected\(RequestedGeneration\)\s*\{.*?return\s+true") > 0,
-		"LLM failures must resolve the exact generation before Reload and restore it when Reload returns")
+		"LLM failures must resolve the exact generation before Reload and restore it whenever Reload is refused")
 }
 
 Test("config full save meta: callers classify all outcomes (config-full-save-generation-meta)",

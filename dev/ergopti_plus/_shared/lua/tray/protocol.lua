@@ -52,16 +52,19 @@ local ICONS = {
 --- packages (the shared tree is a CHILD of /usr/lib/ergopti there), and the
 --- assets directory did not exist anyway: every Linux user saw a generic
 --- keyboard glyph instead of the logo the other two drivers show.
+---
+--- The path keeps the shared root's own spelling. It used to be rewritten to
+--- backslashes whenever package.config named "\" as the separator, so the same
+--- root produced a path that differed from infra.paths' spelling of it; every
+--- host opens forward slashes, and the panel receiving the path is on Linux.
 --- @param shared_root string|nil Absolute path to the shared tree.
 --- @param paused boolean|nil True for the greyed logo shown while paused.
 --- @return string Absolute path to an existing icon file, or "".
 function M.resolve_tray_icon(shared_root, paused)
 	if type(shared_root) ~= "string" or shared_root == "" then return "" end
-	local sep = package.config:sub(1, 1)
 	local order = paused and { ICONS.paused, ICONS.active } or { ICONS.active }
 	for _, suffix in ipairs(order) do
 		local path = shared_root .. suffix
-		if sep == "\\" then path = path:gsub("/", "\\") end
 		local fh = io.open(path, "r")
 		if fh then
 			fh:close()

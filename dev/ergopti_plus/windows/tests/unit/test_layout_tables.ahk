@@ -391,9 +391,8 @@ TestLT_AltGrDispatchShiftedBaseRows() {
 	ResetStubRecorders()
 	for SC, Entry in ALTGR_BASE_ROWS {
 		try {
-			; Call with a non-existing shifted param: AltGrShiftDispatch uses
-			; GetKeyState("Shift","P") internally. Since we are not in a hotkey
-			; context, Shift is always reported as up — Plain fires.
+			; AltGrShiftDispatch picks the entry through AltGrLayerShiftHeld
+			; (test_altgr_layer_shift_from_hold.ahk covers that choice).
 			; We explicitly exercise Shifted by calling the callable directly.
 			Cb := Entry.Shifted
 			Cb()

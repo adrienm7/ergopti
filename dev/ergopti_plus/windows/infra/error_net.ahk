@@ -32,6 +32,19 @@ global ERROR_NET_DEDUP_TTL_MS := 60000
 ; DISTINCT error signatures accumulate over a long-running session.
 global ERROR_NET_DEDUP_CACHE_CAP := 256
 
+; A detached worker (keylogger prefetch, UIA selection) owns no log file, no
+; tray and no dialog: the resident driver reads its captured standard output. An
+; uncaught error ends it with one structural line instead of the driver's fatal
+; startup dialog, crash report and log initialisation. The message is omitted:
+; it can carry typed text or paths.
+; @param Exc {Error} The uncaught error.
+; @param Mode {String} AutoHotkey's error mode, unused.
+; @returns {Integer} Never returns: the worker exits with code 1.
+DetachedWorkerErrorHandler(Exc, Mode) {
+		try FileAppend("detached-worker: uncaught " . Type(Exc) . ".`n", "*")
+		ExitApp(1)
+}
+
 ; Decides whether the error handler should force-release a modifier. A modifier
 ; is only RELEASED when it is LOGICALLY down (held by the driver / a failed
 ; callback) but the user is NOT physically holding it — i.e. genuinely stuck.
@@ -42,6 +55,18 @@ global ERROR_NET_DEDUP_CACHE_CAP := 256
 _ShouldReleaseModifier(ModKey) {
 		; "P" = physical key state; the default state is the logical state AHK reports.
 		return GetKeyState(ModKey) and !GetKeyState(ModKey, "P")
+}
+
+; Whether releasing the stuck modifiers ModKeys needs the menu mask first: any
+; Alt or Win among them, whose lone release opens the window menu or Start.
+; @param ModKeys {Array} Key names about to be released.
+; @return {Boolean}
+_ErrorNetReleaseNeedsMenuMask(ModKeys) {
+		for _, ModKey in ModKeys {
+				if KS_IsMenuModifier(ModKey)
+						return true
+		}
+		return false
 }
 
 ; Retire input state that can already be owned while startup is still partial.
@@ -190,14 +215,27 @@ ErgoptiGlobalErrorHandler(Exc, Mode) {
 				return true
 		}
 		; Release ONLY modifiers that are logically stuck (not physically held) after
-		; the failed callback — never yank a key the user is still pressing.
-		for _, ModKey in ["LControl", "RControl", "LShift", "RShift", "LAlt", "RAlt", "LWin", "RWin"] {
-				if _ShouldReleaseModifier(ModKey) {
-						; AHK-35: SendEvent can throw on a hook conflict or foreground-window race;
-						; guard it so a failure on one modifier doesn't abort releasing the others
-						; or skip the deferred crash report + tray toast that follow
-						try SendEvent("{" ModKey " Up}")
-				}
+		; the failed callback — never yank a key the user is still pressing. On a
+		; Kana-style layout an alt_gr hold presses SC138, not RAlt, so the sweep
+		; must also know the layout's AltGr key or a stranded hold would survive.
+		; _ALTGR_KANA_FIXUP is seeded before OnError registers this handler.
+		StuckCandidates := ["LControl", "RControl", "LShift", "RShift", "LAlt", "RAlt", "LWin", "RWin"]
+		if (KS_AltGrKeyName() != "RAlt")
+				StuckCandidates.Push(KS_AltGrKeyName())
+		Stuck := []
+		for _, ModKey in StuckCandidates {
+				if _ShouldReleaseModifier(ModKey)
+						Stuck.Push(ModKey)
+		}
+		; A stuck Alt or Win released with nothing typed after it opens the window
+		; menu or Start, where the next keys land: mask it first, once.
+		if _ErrorNetReleaseNeedsMenuMask(Stuck)
+				try SendEvent("{Blind}{" . A_MenuMaskKey . "}")
+		for _, ModKey in Stuck {
+				; AHK-35: SendEvent can throw on a hook conflict or foreground-window race;
+				; guard it so a failure on one modifier doesn't abort releasing the others
+				; or skip the deferred crash report + tray toast that follow
+				try SendEvent("{" ModKey " Up}")
 		}
 		; Best-effort logging — guarded because the logger may not be initialised
 		; yet when an early-boot error fires the handler.

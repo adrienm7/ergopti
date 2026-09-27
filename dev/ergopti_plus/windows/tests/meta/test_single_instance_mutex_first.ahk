@@ -19,16 +19,19 @@
 
 #Requires AutoHotkey v2.0
 
-_SIMF_MutexEstablishedBeforeHookAndPump() {
+; The entry point is the one source every test below orders statements in. Full-
+; line comments are stripped so the many prose mentions of Bundle_Init() and the
+; worker predicates do not shadow the real statements when positions are compared.
+_SIMF_EntryCode() {
 	SplitPath(A_ScriptDir, , &WindowsDir)
-	EntryFile := WindowsDir . "\ErgoptiPlus.ahk"
 	Src := ""
-	try Src := FileRead(EntryFile)
-	Assert(Src != "", "ErgoptiPlus.ahk must be readable for the single-instance mutex meta-test")
+	try Src := FileRead(WindowsDir . "\ErgoptiPlus.ahk")
+	Assert(Src != "", "ErgoptiPlus.ahk must be readable for the single-instance meta-tests")
+	return _StripFullLineComments(Src)
+}
 
-	; Strip full-line comments so the several comment mentions of Bundle_Init() do
-	; not shadow the actual call site when we compare source positions.
-	Code := _StripFullLineComments(Src)
+_SIMF_MutexEstablishedBeforeHookAndPump() {
+	Code := _SIMF_EntryCode()
 	MutexPos := InStr(Code, "CreateMutexW")
 	BundlePos := InStr(Code, "Bundle_Init()")
 	HookPos := InStr(Code, "HookDispatcher.Start()")
@@ -72,11 +75,7 @@ Test("boot: single-owner mutex is acquired before the message pump and hook regi
 ; The exemption must be tested BEFORE the mutex is created, not merely present
 ; somewhere in the file, so the ordering is what this asserts.
 _SIMF_WorkerInvocationIsExemptFromTheGate() {
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	Src := ""
-	try Src := FileRead(WindowsDir . "\ErgoptiPlus.ahk")
-	Assert(Src != "", "ErgoptiPlus.ahk must be readable")
-	Code := _StripFullLineComments(Src)
+	Code := _SIMF_EntryCode()
 
 	MutexPos := InStr(Code, "CreateMutexW")
 	Assert(MutexPos > 0, "the entry must still acquire the single-owner mutex")
@@ -96,3 +95,64 @@ _SIMF_WorkerInvocationIsExemptFromTheGate() {
 }
 Test("boot: every detached worker is exempt from the single-owner mutex before it is created",
 	_SIMF_WorkerInvocationIsExemptFromTheGate)
+
+; A detached worker re-runs this entry, and AutoHotkey creates a script's tray
+; icon, main window and load-time hotkeys BEFORE its first statement runs. A
+; worker therefore showed a second "ErgoptiPlus" entry with the default green H
+; icon, kept the driver's exact window title (what Reload and #SingleInstance
+; search for) and armed every static hotkey in a second keyboard hook
+; (worker-tray-icon-2026-09-25). The entry must declare #NoTrayIcon, reveal the
+; icon only on the driver path after the safe bootstrap tray, and make a worker
+; release its hotkeys and retitle itself before any other statement. The
+; real-process twin is tests/unit/test_worker_tray_icon_hidden.ahk.
+_SIMF_WorkerHidesTrayIconFirst() {
+	Code := _SIMF_EntryCode()
+	Assert(RegExMatch(Code, "m)^#NoTrayIcon\b") > 0,
+		"the entry must declare #NoTrayIcon: a statement runs too late to stop the icon")
+
+	DefinePos := InStr(Code, "global _DriverIsDetachedWorker :=")
+	Assert(DefinePos > 0, "the entry must resolve one detached-worker predicate")
+	Definition := SubStr(Code, DefinePos, InStr(Code, "`n", , DefinePos) - DefinePos)
+	for Predicate in ["KLPF_IsWorkerInvocation()", "UIASW_IsWorkerInvocation()"]
+		Assert(InStr(Definition, Predicate) > 0,
+			"the detached-worker predicate must cover " . Predicate)
+	for Line in StrSplit(SubStr(Code, 1, DefinePos - 1), "`n", "`r") {
+		Line := Trim(Line)
+		Assert(Line = "" || SubStr(Line, 1, 1) = "#",
+			"only directives may run before the worker predicate, found: " . Line)
+	}
+
+	BranchPos := InStr(Code, "if _DriverIsDetachedWorker {")
+	Assert(BranchPos > DefinePos, "the worker branch must follow the predicate directly")
+	Branch := SubStr(Code, BranchPos, InStr(Code, "`n}", , BranchPos) - BranchPos)
+	Assert(InStr(Branch, "Suspend(true)") > 0,
+		"a worker must release the hotkeys AutoHotkey armed at load")
+	Assert(InStr(Branch, "WinSetTitle(") > 0 && InStr(Branch, "A_ScriptHwnd") > 0,
+		"a worker must retitle its main window so Reload can never close it instead of the driver")
+	for Later in ["SetWorkingDir(", "CreateMutexW", "Bundle_Init()",
+			"UIASW_WorkerMain()", "KLPF_WorkerMain()"]
+		Assert(InStr(Code, Later) > BranchPos,
+			"the worker branch must run before " . Later)
+
+	RevealPos := InStr(Code, "A_IconHidden := false")
+	Assert(RevealPos > 0, "the driver path must reveal its tray icon")
+	Assert(InStr(Code, "A_IconHidden := false", , RevealPos + 1) = 0,
+		"the tray icon must be revealed in exactly one place")
+	TrayPos := InStr(Code, "_InstallSafeBootstrapTray()")
+	Assert(TrayPos > 0 && RevealPos > TrayPos,
+		"the icon must appear only after the safe bootstrap tray replaced the stock menu")
+	for WorkerMain in ["UIASW_WorkerMain()", "KLPF_WorkerMain()"]
+		Assert(InStr(Code, WorkerMain) < RevealPos,
+			"a worker must leave through " . WorkerMain . " before the driver reveals its icon")
+
+	Assert(RegExMatch(Code, "if !_DriverIsDetachedWorker\R\s*try ProcessSetPriority\(") > 0,
+		"a worker must keep the default priority class instead of the driver's AboveNormal")
+	Assert(RegExMatch(Code, "if _DriverIsDetachedWorker\R\s*OnError\(DetachedWorkerErrorHandler\)") > 0,
+		"a worker must not install the driver's fatal-startup error handler")
+
+	GatePos := InStr(Code, "if !(_DriverIsDetachedWorker")
+	Assert(GatePos > BranchPos && GatePos < InStr(Code, "CreateMutexW"),
+		"the single-owner mutex exemption must reuse the same detached-worker predicate")
+}
+Test("boot: a detached worker never takes the driver's identity (worker-tray-icon-2026-09-25)",
+	_SIMF_WorkerHidesTrayIconFirst)

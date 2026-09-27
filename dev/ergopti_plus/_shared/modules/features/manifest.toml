@@ -1202,10 +1202,26 @@ description_key = "menu.metrics.wpm_widget_colors"
 
 [[features.metrics]]
 id = "wpm_widget_graph"
-platforms = ["ahk"]
+platforms = ["ahk", "linux"]
 default = false
 type = "boolean"
 description_key = "menu.metrics.wpm_widget_graph"
+
+# The typing-speed readout in the Linux tray, the equivalent of the macOS
+# menu bar item. Same shipped answers as macOS: off, coloured by source once on.
+[[features.metrics]]
+id = "wpm_menubar_visible"
+platforms = ["linux"]
+default = false
+type = "boolean"
+description_key = "menu.metrics.show_wpm_menubar"
+
+[[features.metrics]]
+id = "wpm_menubar_colors"
+platforms = ["linux"]
+default = true
+type = "boolean"
+description_key = "menu.metrics.colors_by_source"
 
 
 
@@ -3469,17 +3485,17 @@ type = "check"
 id = "wpm_menubar"
 i18n = "menu.metrics.show_wpm_menubar"
 checked_when = ["metrics_menubar_wpm"]
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 disabled_when = ["keylogger_enabled"]
-reason_key = "platform_reason.wpm_readout_is_a_macos_menubar_item"
+reason_key = "platform_reason.wpm_readout_needs_a_menubar"
 [[menu.metrics_menu]]
 type = "check"
 id = "menubar_colors"
 i18n = "menu.metrics.colors_by_source"
 checked_when = ["metrics_menubar_colors"]
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 disabled_when = ["keylogger_enabled", "wpm_menubar_visible"]
-reason_key = "platform_reason.wpm_readout_is_a_macos_menubar_item"
+reason_key = "platform_reason.wpm_readout_needs_a_menubar"
 
 # Linux joined on 2026-08-06. The restriction was accurate when written — that
 # driver had no floating widget at all — and is not any more: ui/wpm/widget.lua
@@ -3512,8 +3528,6 @@ disabled_when = ["keylogger_enabled", "wpm_widget_visible"]
 type = "dynamic"
 id = "include_realtime"
 disabled_when = ["keylogger_enabled", "wpm_widget_visible"]
-platforms = ["ahk", "hs"]
-reason_key = "platform_reason.metrics_extras_are_not_on_linux"
 # `command` since 2026-08-07: a button with a label, a greying rule and a click.
 # Its two neighbours stay `dynamic` for the reason written above wpm_widget —
 # they mutate the live menu — but this one sets nothing on it.
@@ -3522,8 +3536,6 @@ type = "command"
 id = "reset_wpm_position"
 i18n = "menu.metrics.reset_wpm_position"
 disabled_when = ["keylogger_enabled", "wpm_widget_visible"]
-platforms = ["ahk", "hs"]
-reason_key = "platform_reason.metrics_extras_are_not_on_linux"
 [[menu.metrics_menu]]
 type = "---"
 

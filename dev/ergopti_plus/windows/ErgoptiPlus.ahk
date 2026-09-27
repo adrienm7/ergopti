@@ -1,6 +1,27 @@
 ﻿; Last modified on 2026-04-23 at 00:00 (UTC+2)
 #Requires Autohotkey v2.0+
 #SingleInstance Force ; Ensure that only one instance of the script can run at once
+; No process starts with a tray icon: the driver path reveals it once the custom
+; icon and the safe bootstrap menu are in place, and a detached worker never does.
+#NoTrayIcon
+
+; The driver re-runs this entry (or its compiled executable) with a worker flag
+; for the detached keylogger-prefetch and UIA-selection workers. AutoHotkey
+; creates a script's tray icon, main window and load-time hotkeys BEFORE its
+; first statement runs, so each worker looked like a second driver: an
+; "ErgoptiPlus" tray icon (the default green H in source mode), the driver's
+; exact window title, which Reload and #SingleInstance search to find the
+; instance they close, and every static hotkey armed in a second keyboard hook.
+; Before any other statement a worker therefore releases those hotkeys and takes
+; a title of its own. Both predicates read only A_Args and are hoisted.
+global _DriverIsDetachedWorker := KLPF_IsWorkerInvocation() || UIASW_IsWorkerInvocation()
+if _DriverIsDetachedWorker {
+	Suspend(true)
+	; A pure HWND reaches the hidden main window whatever DetectHiddenWindows
+	; says, and ProcessExist() with no argument is this process's own PID.
+	WinSetTitle("ErgoptiPlus detached worker " . ProcessExist(), A_ScriptHwnd)
+}
+
 SetWorkingDir(A_ScriptDir) ; Set the working directory where the script is located
 
 ; The real-process startup smoke runs this exact entry point under a uniquely
@@ -81,13 +102,13 @@ if A_IsCompiled {
 ;
 ; EXEMPT: detached keylogger-prefetch and UIA-selection workers. The driver
 ; deliberately re-runs this entry with /force and a worker flag; those workers
-; register no hook, no log owner and no tray,
+; register no hook and no log owner, and hide their tray icon first thing,
 ; so it is not what this gate exists to prevent. But the gate is the FIRST
 ; auto-execute statement while the worker's own gate sits ~300 lines below, so
 ; every worker spawned while the driver is alive blocked the full wait on the
 ; live driver's mutex, timed out and ExitApp(0)'d before reaching its main —
-; the projection could never publish. KLPF_IsWorkerInvocation reads only
-; A_Args and its definition is hoisted, so it is callable here.
+; the projection could never publish. _DriverIsDetachedWorker, resolved at the
+; top of this file, is the single definition of a worker invocation.
 #Include infra/single_instance_gate.ahk
 global DRIVER_MUTEX_NAME := "Local\ErgoptiPlusDriver"
 global DRIVER_MUTEX_WAIT_MS := 3000 ; max boot delay while a previous instance exits
@@ -95,8 +116,7 @@ global _DriverMutexHandle := 0
 global _DriverMutexWait := 0xFFFFFFFF
 global _DriverMutexError := 0
 global _DriverMutexDecision := DRIVER_MUTEX_EXEMPT
-if !(KLPF_IsWorkerInvocation() || UIASW_IsWorkerInvocation()
-		|| _DriverStartupSmokeDir != "") {
+if !(_DriverIsDetachedWorker || _DriverStartupSmokeDir != "") {
 	_DriverMutexHandle := DllCall("CreateMutexW", "Ptr", 0, "Int", 0, "Str", DRIVER_MUTEX_NAME, "Ptr")
 	if !_DriverMutexHandle
 		_DriverMutexError := DllCall("kernel32\GetLastError", "UInt")
@@ -169,7 +189,10 @@ global DRIVER_BASELINE_PRIORITY_CLASS := "AboveNormal"
 ; warnings even though this driver's own per-keystroke work is sub-millisecond.
 ; AboveNormal (not High) keeps this driver ahead of ordinary background work
 ; without contending with genuinely real-time OS/driver threads (hotpath-priority-starvation).
-try ProcessSetPriority(DRIVER_BASELINE_PRIORITY_CLASS)
+; A detached worker owns no hook and does background work: it keeps the default
+; class so a long projection never competes with the foreground.
+if !_DriverIsDetachedWorker
+	try ProcessSetPriority(DRIVER_BASELINE_PRIORITY_CLASS)
 
 ; Globals referenced by ``#HotIf`` expressions across the driver. They MUST
 ; be assigned before any code that pumps the message loop runs — otherwise
@@ -223,7 +246,10 @@ global DriverPid := DllCall("GetCurrentProcessId", "UInt")
 ; that prevents loading it this early — its Logger calls are try-wrapped and function
 ; definitions are hoisted across the whole #Include graph before auto-execute runs.
 #Include infra/error_net.ahk
-OnError(ErgoptiGlobalErrorHandler)
+if _DriverIsDetachedWorker
+	OnError(DetachedWorkerErrorHandler)
+else
+	OnError(ErgoptiGlobalErrorHandler)
 
 ; In compiled mode the .exe ships an embedded zip of every runtime asset
 ; (hotstrings TOMLs, locales, icons, _shared tree, vendor DLLs). The bundle
@@ -552,6 +578,9 @@ if !LLM_TriggerJournalRecoverAtBoot()
 ; a no-op, so this move is safe — and it closes the brief stock-menu window
 ; regardless of the boot path (normal OR first-run).
 _InstallSafeBootstrapTray()
+; #NoTrayIcon kept the icon hidden until now: it appears with the custom icon and
+; the safe menu, never with AutoHotkey's default icon and stock items.
+A_IconHidden := false
 if (_DriverStartupSmokeDir != "") {
 		; The real onboarding WebView pumps messages while startup is incomplete.
 		; Reproduce that hazard without an interactive window: the suspend watchdog
@@ -643,19 +672,25 @@ UiStyle_LoadSharedConst()
 ; and before the tray menu build / any HotstringsResolve.
 HotstringsConfigLoadLlmPredictionColor()
 
-; Log both the raw reverse-probe result (VK_RMENU → SC) and the resolved
-; Kana-remap flag so future regressions on exotic layouts surface immediately.
-; SC=0 means VK_RMENU is not mapped → Kana-like remap; non-zero means RAlt
-; exists on this layout → standard AltGr. The resolved flag also accounts for
-; any manual TOML override from [Script] AltGrIsKanaRemap.
-; HKL resolution + VK_RMENU reverse-probe live in adapters/key_state.ahk so the
-; layout-detection DllCalls are isolated there, not inlined in the boot sequence.
-_DetectHKL := KS_ResolveKeyboardLayout()
-_DetectSC := KS_ProbeRightAltScancode(_DetectHKL)
-LoggerInfo("AltGrDetect",
-		"HKL=0x{1:X}, VK_RMENU→SC=0x{2:X}, _ALTGR_KANA_FIXUP={3}.",
-		_DetectHKL, _DetectSC,
-		_ALTGR_KANA_FIXUP ? "true" : "false")
+; Log the probe that decided the AltGr family (HotstringEngineInit), not a
+; second read of the layout: the HKL, the raw reverse-probe result (VK_RMENU →
+; SC; 0 means a Kana-like remap), the AltGr key's virtual key, the resolved flag
+; and what decided it ("override" for the [Script] AltGrIsKanaRemap flag).
+if (_ALTGR_LAYOUT_PROBE["source"] == "unresolved") {
+		LoggerError("AltGrDetect",
+				"No keyboard layout could be read at boot; AltGr is handled as a standard AltGr layout until the next layout change, _ALTGR_KANA_FIXUP={1}.",
+				_ALTGR_KANA_FIXUP ? "true" : "false")
+} else if (_ALTGR_KANA_FIXUP and !_ALTGR_LAYOUT_PROBE["altgr_vk"]) {
+		LoggerError("AltGrDetect",
+				"HKL=0x{1:X}: a Kana-style AltGr is set (source={2}) but the layout gives the AltGr key no virtual key; every press or release of it the driver sends is refused.",
+				_ALTGR_LAYOUT_PROBE["hkl"], _ALTGR_LAYOUT_PROBE["source"])
+} else {
+		LoggerInfo("AltGrDetect",
+				"HKL=0x{1:X}, VK_RMENU→SC=0x{2:X}, AltGr VK=0x{3:X}, AltGr level={4}, _ALTGR_KANA_FIXUP={5} (source={6}).",
+				_ALTGR_LAYOUT_PROBE["hkl"], _ALTGR_LAYOUT_PROBE["rmenu_sc"], _ALTGR_LAYOUT_PROBE["altgr_vk"],
+				_ALTGR_LAYOUT_PROBE["altgr_level"] ? "true" : "false",
+				_ALTGR_KANA_FIXUP ? "true" : "false", _ALTGR_LAYOUT_PROBE["source"])
+}
 
 ; Under this text is the configuration of the features, especially whether or not they are enabled.
 ; It is advised to modify which features are enabled by using the ErgoptiPlus_Configuration.ini file.
@@ -756,15 +791,15 @@ BootProfile_StageEnd("configuration", Format("{1} config.toml value(s) applied, 
 ; the target character ("j") sits behind a driver-level remapping that the
 ; API cannot see.
 ;
-; HKL resolution cascade: at script startup there may be no foreground window
-; (AHK launches tray-only), so GetForegroundKeyboardLayout() returns 0.
-; Fallback 1: GetKeyboardLayout(GetCurrentThreadId()) — layout of the AHK thread itself.
-; Fallback 2: SystemParametersInfo(SPI_GETDEFAULTINPUTLANG) — system default.
-; HKL resolution + the no-modifier scancode scan live in adapters/key_state.ahk
-; so the layout-detection DllCalls (MapVirtualKeyExW / ToUnicodeEx) are isolated
-; there; this boot step only interprets the result and updates ScriptInformation.
+; The layout is the one the boot AltGr probe read (_ALTGR_LAYOUT_PROBE, through
+; the KS_ResolveKeyboardLayout cascade: foreground, then the AHK thread, then
+; the system default), so the scan and the AltGr family describe one layout and
+; the layout poll, seeded with the same HKL, reloads when the user switched.
+; The no-modifier scancode scan lives in adapters/key_state.ahk so the
+; layout-detection DllCalls (MapVirtualKeyExW / ToUnicodeEx) are isolated there;
+; this boot step only interprets the result and updates ScriptInformation.
 if !Features["layout"]["ergopti_base"] {
-	_HKL := KS_ResolveKeyboardLayout()
+	_HKL := _ALTGR_LAYOUT_PROBE["hkl"]
 	if _HKL != 0 {
 		_TargetChar := ScriptInformation["MagicKeySourceChar"]
 		_Found := KS_ScanScancodeForChar(_HKL, _TargetChar)
@@ -884,6 +919,13 @@ EnsurePersonalShortcutsFile(Path, AllowReload := true, WriterFn := 0,
 						return true
 				}
 				try LoggerInfo("ErgoptiPlus", "Reloading to pick up freshly-written personal shortcuts chain.")
+				; The one bare Reload left, and deliberately so: only the boot
+				; auto-execute thread gets here (a runtime caller passes
+				; AllowReload=false), before OnExit(Ergopti_OnShutdown) is
+				; registered, so no gate can refuse the successor's close request,
+				; before the process can be paused and before any reload can be
+				; pending. The terminal hand-off needs the configuration bundle and
+				; lifecycle state that do not exist yet here.
 				Reload
 				; Reload starts the replacement instance but returns to this
 				; auto-execute thread. Continuing would register the old instance's
@@ -1239,6 +1281,10 @@ if (_DriverStartupSmokeDir != "") {
 		; active fixtures can require this deferred owner to publish immediately.
 		if !_StartupSmokeExpectedSuspend and !BuildTrayMenuDeferred()
 				throw Error("deferred tray-menu construction failed after ready")
+		; #NoTrayIcon hides every process's icon at load; the driver path alone
+		; reveals it. A driver that reaches ready without it has no tray at all.
+		if A_IconHidden
+				throw Error("the driver reached ready without revealing its tray icon")
 		try _LoggerFlush(true)
 		; This isolated probe has just materialised a deep native Menu tree and must
 		; not run the production OnExit teardown against test-only paths/owners. AHK's
@@ -1313,7 +1359,11 @@ if MetricsShortcuts.enabled
 	KLWV_WarmSchedule(KL_MetricsDirFor(_ConfigDir), KLWV.WARM_START_DELAY_MS)
 
 global _LAYOUT_POLL_INTERVAL_MS := 1000
-global _LAST_KEYBOARD_HKL := GetForegroundKeyboardLayout()
+; The baseline is the layout the boot probe decided the AltGr family on, not a
+; second read: a switch made during the seconds of boot then shows up as a
+; change and reloads, instead of becoming the baseline of a family decided on
+; the previous layout.
+global _LAST_KEYBOARD_HKL := _ALTGR_LAYOUT_PROBE["hkl"]
 global _PENDING_KEYBOARD_HKL := 0
 
 ; The quiescence decision is a pure function extracted to infra/ so the headless
@@ -1322,8 +1372,21 @@ global _PENDING_KEYBOARD_HKL := 0
 ; consumed here and by tests/meta/test_layout_quiescence.ahk.
 #Include modules/keymap/layout_poll_helper.ahk
 
+; The layout poll's seams onto the reload lifecycle (see LayoutPollTick). Its
+; reload reports a refused stage without the "save failed" notice, and it asks
+; whether OnExit could still refuse before starting one.
+LayoutPollPort() {
+		static Port := Map(
+				"reload", (RefusedFn) => ReloadPreservingSuspend(0, 0, RefusedFn, LayoutPollStageRefused),
+				"pending", ReloadTerminalHandoffPending,
+				"veto_honored", LifecycleShutdownVetoHonored,
+				"now", () => A_TickCount,
+				"notify", ReloadRefusedNotify)
+		return Port
+}
+
 CheckKeyboardLayoutChange() {
-		global _LAST_KEYBOARD_HKL, _PENDING_KEYBOARD_HKL, HSE_Suppressed, _PrefixWatcherSuppressed
+		global HSE_Suppressed, _PrefixWatcherSuppressed
 		
 		suspended := A_IsSuspended
 		isBlacklisted := false
@@ -1340,11 +1403,7 @@ CheckKeyboardLayoutChange() {
 		or SIHO_HasActive()
 		or GetKeyState("SC039", "P") or GetKeyState("SC038", "P") or GetKeyState("SC138", "P")
 		
-		if _ShouldReloadForHkl(curHkl, &_LAST_KEYBOARD_HKL, &_PENDING_KEYBOARD_HKL, suspended, isBlacklisted, hseSup, pwSup, A_TimeIdlePhysical, inputBusy) {
-				; The one reload nobody clicks: without this line a layout switch
-				; looked like a spontaneous restart in the log.
-				try LoggerInfo("ErgoptiPlus", "Keyboard layout changed to HKL 0x{1:X}; reloading to re-probe the layout.", curHkl)
-				Reload()
-		}
+		LayoutPollTick(curHkl, suspended, isBlacklisted, hseSup, pwSup, A_TimeIdlePhysical,
+				inputBusy, LayoutPollPort())
 }
 SetTimer(CheckKeyboardLayoutChange, _LAYOUT_POLL_INTERVAL_MS)

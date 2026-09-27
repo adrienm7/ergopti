@@ -9,7 +9,7 @@ final class UpdaterCommandRouterTests: XCTestCase {
 	private final class UpdateCheckerSpy: UpdateChecking {
 		private(set) var calls = 0
 
-		func checkForUpdates(_ sender: Any?) {
+		func checkForUpdates() {
 			XCTAssertTrue(Thread.isMainThread)
 			calls += 1
 		}

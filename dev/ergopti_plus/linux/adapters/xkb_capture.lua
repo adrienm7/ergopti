@@ -69,6 +69,24 @@ local XKB_RIGHTALT = EvdevCodes.KEY_RIGHTALT + EVDEV_TO_XKB_OFFSET
 -- KEY_CODE_MAX); a character on a higher key could never be typed.
 local UINPUT_KEY_MAX = 0x2FF
 
+-- The keysyms (keysymdef.h) that make a key a modifier, by the role the
+-- keyboard hook gives it: shift and altgr select a level of the layout and so
+-- produce text, ctrl, alt and meta start a shortcut. A physical key has no
+-- role of its own: Right Alt is ISO_Level3_Shift (AltGr) on a French or
+-- Ergopti layout and plain Alt_R on a US one, and XKB options move roles
+-- between keys.
+local MODIFIER_ROLE_OF_KEYSYM = {
+	[0xffe1] = "shift", [0xffe2] = "shift", -- Shift_L, Shift_R
+	[0xffe3] = "ctrl",  [0xffe4] = "ctrl",  -- Control_L, Control_R
+	[0xffe7] = "alt",   [0xffe8] = "alt",   -- Meta_L, Meta_R
+	[0xffe9] = "alt",   [0xffea] = "alt",   -- Alt_L, Alt_R
+	[0xffeb] = "meta",  [0xffec] = "meta",  -- Super_L, Super_R
+	[0xffed] = "meta",  [0xffee] = "meta",  -- Hyper_L, Hyper_R
+	[0xfe03] = "altgr",                     -- ISO_Level3_Shift
+	[0xfe11] = "altgr",                     -- ISO_Level5_Shift
+	[0xff7e] = "altgr",                     -- Mode_switch
+}
+
 
 
 
@@ -513,6 +531,36 @@ local function resolve_press(keycode)
 		error("invalid Compose status: " .. tostring(status))
 	end
 	return text, identity
+end
+
+--- The text a key would type in the live keymap and state, without pressing
+--- it: nothing is committed and no Compose sequence is fed. "" for a key that
+--- types nothing (an arrow, a function key, a keypad key with NumLock off).
+--- @param evdev_code integer Linux input-event keycode.
+--- @return string|nil text, string|nil error
+function M.peek_text(evdev_code)
+	if not _session then return nil, "XKB capture state is not ready" end
+	if type(evdev_code) ~= "number" or evdev_code < 0 or evdev_code % 1 ~= 0 then
+		return nil, "evdev keycode must be a non-negative integer"
+	end
+	local ok, text = pcall(_backend.key_utf8, _session, evdev_code + EVDEV_TO_XKB_OFFSET)
+	if not ok then return nil, tostring(text) end
+	return text or "", nil
+end
+
+--- The modifier role a key has in the live keymap and state: "shift",
+--- "altgr", "ctrl", "alt" or "meta", or nil when its keysym is no modifier.
+--- Asked before the key's own press is committed, like its text.
+--- @param evdev_code integer Linux input-event keycode.
+--- @return string|nil role, string|nil error
+function M.modifier_role(evdev_code)
+	if not _session then return nil, "XKB capture state is not ready" end
+	if type(evdev_code) ~= "number" or evdev_code < 0 or evdev_code % 1 ~= 0 then
+		return nil, "evdev keycode must be a non-negative integer"
+	end
+	local ok, sym = pcall(_backend.key_sym, _session, evdev_code + EVDEV_TO_XKB_OFFSET)
+	if not ok then return nil, tostring(sym) end
+	return MODIFIER_ROLE_OF_KEYSYM[sym], nil
 end
 
 --- Applies one evdev key transition and resolves its UTF-8 output.

@@ -65,9 +65,19 @@
 # menu_manifest.json hold_options" — a key that has never existed in that file.
 # So the canonical list was a copy pointing at nothing, and the two Lua drivers
 # offered no hold picker at all.
+#
+# The aliases are the other spellings a hand-written tap_hold.toml may give a
+# modifier, matched without regard to case like the ids, and the id each one
+# means. Both the Windows loader (ResolveHoldModifierKey) and the Linux one
+# (_shared/lua/tap_hold/hold_options.lua) read them here, so one file holds the
+# same keys on either. The left_ ones name the left key: Windows holds that
+# side even on right_ctrl and right_shift, where a plain "ctrl" or "shift"
+# holds the key's own side. Linux always holds the left key.
 [tap_hold.hold_picker]
 modifiers = ["ctrl", "shift", "alt", "alt_gr", "win"]
 layers = ["nav"]
+modifier_aliases = { altgr = "alt_gr", ralt = "alt_gr" }
+left_modifier_aliases = { lctrl = "ctrl", lshift = "shift", lalt = "alt", lwin = "win" }
 
 
 
@@ -414,8 +424,10 @@ space_bsp = { combo = "none", tap = "none", hold = "none" }
 #   rcmd + fn   : toggle CapsLock (combo = tap), same rationale.
 #   rcmd + lopt : word-level forward delete (combo = tap), using opt variant
 #                 to avoid conflict with Hammerspoon cmd+delete shortcut.
-#   rcmd + lcmd : word-level backward delete (combo = tap, repeatable on
-#                 key-repeat); hold = option+shift modifier so the combined
+#                 With no hold, the tap goes out at key down and repeats
+#                 while lopt is held.
+#   rcmd + lcmd : word-level backward delete (combo = tap), typed once on a
+#                 quick release; hold = option+shift modifier so the combined
 #                 hold works as a shift+option accelerator (no layer activation).
 rcmd_esc = { combo = "none", tap = "none", hold = "none" }
 rcmd_tab = { combo = "cycle_windows_in_app", tap = "cycle_windows_in_app", hold = "none" }

@@ -28,7 +28,10 @@ _KLRCS_ReapDeadProducer(Mode := "normal") {
 		AssertTrue(RegExMatch(DeadStage, "\.stage\.(\d+)\.\d+$", &Owner))
 		AssertFalse(DllCall("User32\IsWindow", "Ptr", Integer(Owner[1]), "Int"),
 			"the actual hidden producer must have terminated")
-		AliveStage := CachePath . ".stage." . A_ScriptHwnd . "." . A_TickCount
+		; Another live producer: a window that exists and is not this process's.
+		; Named after A_ScriptHwnd, it was the name this process's own cold
+		; rebuild stages under, and the save replaced it within one tick.
+		AliveStage := CachePath . ".stage." . DllCall("User32\GetDesktopWindow", "Ptr") . "." . A_TickCount
 		FileCopy(CachePath, AliveStage)
 		Lookalike := DeadStage . ".keep"
 		FileAppend("foreign fixture", Lookalike, "UTF-8-RAW")

@@ -37,16 +37,17 @@
 ; back ARMED. A test scoped to the directory of the fix cannot see that, which is
 ; the failure shape recorded as project-ahk-invariant-incomplete-application.
 ;
-; TWO SITES ARE DELIBERATELY OUT OF SCOPE, both in the entry file:
-;   * ErgoptiPlus.ahk's keyboard-layout poll. _ShouldReloadForHkl returns false
-;     when `suspended` is true (modules/keymap/layout_poll_helper.ahk), so that
-;     Reload is provably unreachable while paused; routing it through the helper
-;     would be dead code. Section 4 pins that guard, so the exemption stays tied
-;     to the code that justifies it.
-;   * ErgoptiPlus.ahk's personal-shortcuts chain reload, which runs in the boot
-;     auto-execute thread before the marker restore timer has fired, i.e. before
-;     the process can be suspended at all. (Its runtime caller opts out of
-;     reloading entirely.)
+; ONE SITE IS DELIBERATELY OUT OF SCOPE: ErgoptiPlus.ahk's personal-shortcuts
+; chain reload. It runs in the boot auto-execute thread and exits at once
+; (ExitApp), before the marker restore timer has fired, so the process cannot be
+; suspended yet; before OnExit(Ergopti_OnShutdown) is registered, so no gate can
+; refuse the successor's close request; and before any reload can be pending.
+; The terminal hand-off also needs lifecycle state that does not exist yet.
+; (Its runtime caller opts out of reloading entirely.) Section 1.1 pins those
+; facts. The keyboard-layout poll, once also exempt because it never reloads
+; while paused, reloads through ReloadPreservingSuspend like every other site:
+; a bare Reload there stranded a refused successor on "Keep waiting?" and raced
+; a pending hand-off reload (layout-poll-reload-handoff).
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -61,12 +62,19 @@
 ; =====================================================================
 ; =====================================================================
 
-; Count lines that are nothing but a bare Reload / Reload().
+; Count bare Reload statements and Reload() calls anywhere in an expression. The
+; statement-only form missed the gesture registry's script_reload action, whose
+; fat-arrow body called Reload() inline and dropped the pause.
 _MRS_CountBareReload(Src, &Offenders) {
 	Offenders := ""
 	Count := 0
 	for Line in StrSplit(Src, "`n", "`r") {
-		if RegExMatch(Line, "^\s*Reload\s*(\(\s*\))?\s*$") {
+		; String literals are prose, not calls: a log line saying "skipping Reload
+		; (caller opted out)" is not a Reload.
+		Code := RegExReplace(Line, '"(?:[^"``]|``.)*"', '""')
+		Code := RegExReplace(Code, "'(?:[^'``]|``.)*'", "''")
+		if RegExMatch(Code, "^\s*Reload\s*$")
+				|| RegExMatch(Code, "(?<![\w.])Reload\s*\(") {
 			Count += 1
 			Offenders .= (Offenders == "" ? "" : ", ") . Trim(Line)
 		}
@@ -98,18 +106,19 @@ _MRS_NoBareReloadAnywhereReachable() {
 	Offenders := ""
 	Count := _MRS_CountBareReload(Src, &Offenders)
 
-	; Reload is now injected into the tested hand-off core, so no production
-	; function needs a direct call. Pin both halves: zero bare calls and the real
-	; callback passed by the lifecycle wrapper.
+	; The successor launcher is injected into the tested hand-off core, so no
+	; production function needs a direct call. Pin both halves: zero bare calls
+	; and the real launcher passed by the lifecycle wrapper.
 	Wrapper := _DriverFuncBody("ReloadPreservingSuspend")
 	Helper := _DriverFuncBody("_ReloadPreservingSuspendNonCritical")
 	Assert(Wrapper != "" && Helper != "",
 		"ReloadPreservingSuspend() and its non-Critical core must exist")
 	Assert(InStr(Wrapper,
-		"_ReloadPreservingSuspendNonCritical(SuccessFn, ExistingBundle)") > 0
+		"_ReloadPreservingSuspendNonCritical(SuccessFn, ExistingBundle,") > 0
 		and InStr(Helper, "SuspendHandoffReload(") > 0
-		and InStr(Helper, "ReloadTerminalInvoke.Bind(") > 0,
-		"ReloadPreservingSuspend must pass the real Reload callback to the tested hand-off core")
+		and InStr(Helper, "ReloadTerminalInvoke.Bind(") > 0
+		and InStr(Helper, "LifecycleLaunchSuccessor") > 0,
+		"ReloadPreservingSuspend must pass the real successor launcher to the tested hand-off core")
 
 	Assert(Count == 0,
 		"no code a paused user can reach may call a bare Reload: native Suspend leaves the tray, every editor "
@@ -128,28 +137,44 @@ Test("menu: no reachable action calls a bare Reload (reload-drops-suspend-outsid
 
 
 
-; =============================================================
-; ===== 1.1) The layout-poll exemption is still justified =====
-; =============================================================
+; =====================================================================
+; ======== 1.1) Only the boot Reload stays bare, before OnExit ========
+; =====================================================================
 
-; The keyboard-layout poll keeps a bare Reload in the entry file. That is only
-; acceptable because its decision function refuses while suspended, so the site
-; is unreachable from the paused state. Pin that guard here: if it is ever
-; removed, the exemption must not survive it silently.
-_MRS_LayoutPollDeclinesWhileSuspended() {
-	Body := _DriverFuncBody("_ShouldReloadForHkl")
-	Assert(Body != "", "_ShouldReloadForHkl() must exist in the driver source")
-	SuspendPos := InStr(Body, "if suspended")
-	Assert(SuspendPos > 0,
-		'_ShouldReloadForHkl must still test "suspended" — the entry file keyboard-layout Reload is exempted '
-		. 'from section 1 ONLY because this function refuses while paused')
-	ReturnPos := InStr(Body, "return false", , SuspendPos)
-	Assert(ReturnPos > SuspendPos,
-		"_ShouldReloadForHkl must return false when suspended. Without that, the entry file's bare Reload becomes "
-		. "reachable from the paused state and must be routed through ReloadPreservingSuspend() instead")
+; The entry file is outside section 1's scan, so pin it here: its only bare
+; Reload is the boot personal-shortcuts one, which exits at once and precedes
+; the OnExit registration; the layout poll reloads through the hand-off.
+_MRS_EntryFileKeepsOnlyTheBootReload() {
+	SplitPath(A_ScriptDir, , &Root)
+	Src := _StripFullLineComments(FileRead(Root . "\ErgoptiPlus.ahk", "UTF-8"))
+	Assert(StrLen(Src) > 20000, "the entry file must be readable")
+	Offenders := ""
+	AssertEqual(1, _MRS_CountBareReload(Src, &Offenders),
+		"the entry file may keep only the boot personal-shortcuts Reload; found: " . Offenders)
+	At := RegExMatch(Src, "m)^\s*Reload\s*$")
+	OnExitAt := InStr(Src, "OnExit(Ergopti_OnShutdown")
+	Assert(At > 0 and OnExitAt > At,
+		"the boot Reload must run before the refusal-capable OnExit handler is registered")
+	ExitAt := InStr(Src, "ExitApp(0)", , At)
+	Statements := ""
+	if (ExitAt > At) {
+		for Line in StrSplit(SubStr(Src, At, ExitAt - At), "`n", "`r") {
+			Line := Trim(Line)
+			if (Line != "" && SubStr(Line, 1, 1) != ";")
+				Statements .= (Statements == "" ? "" : "|") . Line
+		}
+	}
+	AssertEqual("Reload", Statements, "the boot Reload must be followed at once by ExitApp(0)")
+	Poll := _DriverFuncBody("CheckKeyboardLayoutChange")
+	Assert(InStr(Poll, "LayoutPollTick(") > 0 && InStr(Poll, "LayoutPollPort()") > 0,
+		"the layout poll must run LayoutPollTick, the tested poll, on its lifecycle port")
+	Port := _StripFullLineComments(_DriverFuncBody("LayoutPollPort"))
+	Assert(InStr(Port, "ReloadPreservingSuspend(0, 0, RefusedFn, LayoutPollStageRefused)") > 0
+		&& InStr(Port, '"pending", ReloadTerminalHandoffPending') > 0,
+		"the layout poll must reload through the hand-off, with its refusal callback and its quiet stage reporter")
 }
-Test("menu: the layout poll still refuses to reload while suspended (reload-drops-suspend-outside-the-menu-layer)",
-	_MRS_LayoutPollDeclinesWhileSuspended)
+Test("menu: the entry file keeps only the boot Reload and the layout poll uses the hand-off (layout-poll-reload-handoff)",
+	_MRS_EntryFileKeepsOnlyTheBootReload)
 
 
 
@@ -173,7 +198,7 @@ _MRS_HelperPersistsBeforeReloading() {
 		"ReloadPreservingSuspend() and its non-Critical core must exist")
 	Assert(Core != "", "SuspendHandoffReload() must exist in the driver source")
 	Assert(InStr(Wrapper,
-		"_ReloadPreservingSuspendNonCritical(SuccessFn, ExistingBundle)") > 0,
+		"_ReloadPreservingSuspendNonCritical(SuccessFn, ExistingBundle,") > 0,
 		"the public reload entry must delegate after dropping inherited Critical")
 
 	GuardPos  := InStr(Body, "A_IsSuspended")
@@ -185,12 +210,20 @@ _MRS_HelperPersistsBeforeReloading() {
 	Assert(PreparePos > 0 and ReloadPos > PreparePos
 		and InStr(Core, "return false") > PreparePos,
 		"the hand-off core must prepare inert state before ReloadFn and return without Reload on failure")
-	Assert(InStr(Body, "_SuspendHandoffCommitMarker.Bind(Path)") > 0
+	Assert(InStr(Body, "_SuspendHandoffCommitMarker.Bind(Path, Intent)") > 0
 		and InStr(Body, "_SuspendHandoffCancelMarker.Bind(Path)") > 0
 		and InStr(CommitWrapper,
 			"_ReloadTerminalHandoffCommitNonCritical(Record)") > 0
 		and InStr(Commit, "CommitFn.Call()") > 0,
 		"only the terminal OnExit commit may promote pending pause intent")
+	; A refusal after that commit retracts exactly the marker this reload
+	; published: prepare, commit and retract share one per-reload intent
+	; (reload-refusal-retracts-marker).
+	Assert(InStr(Body, "Intent := A_IsSuspended ? _SuspendHandoffNewIntent()") > 0
+		and InStr(Body, "_SuspendHandoffPrepareMarker(MarkerPath, Intent)") > 0
+		and InStr(Body, "_SuspendHandoffRetractMarker.Bind(Path, Intent)") > 0
+		and InStr(Body, "ReleaseFn, RetractFn)") > 0,
+		"the reload must hand the terminal record a retraction bound to the intent it prepares and commits")
 	Assert(InStr(MarkerPath, "_PathsFile") > 0
 		and InStr(MarkerPath, "ConfigurationFile") == 0,
 		"the marker must follow the stable paths.toml locator across config relocation")

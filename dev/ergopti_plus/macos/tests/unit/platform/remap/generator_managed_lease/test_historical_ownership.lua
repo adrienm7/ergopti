@@ -299,8 +299,12 @@ helpers.describe("Karabiner generator historical ownership", function()
 			local Generator = fixture.Generator
 			local install_legacy_static_fixtures = fixture.install_legacy_static_fixtures
 			install_legacy_static_fixtures()
+			-- Each key holds Shift so today's graph still carries its tap in
+			-- to_if_alone, as the released generators emitted it: a key with a tap
+			-- and no hold now sends its tap at key down instead.
 			local actions = {
 				{ id = "none", label = "None", karabiner_to = {} },
+				{ id = "shift", label = "Shift", karabiner_to = { { key_code = "left_shift" } } },
 				{
 					id = "logical_x",
 					label = "Logical X",
@@ -322,8 +326,8 @@ helpers.describe("Karabiner generator historical ownership", function()
 			}
 			local old_state = state({
 				tap_hold_config = {
-					left_shift = { tap = "logical_x", hold = "none" },
-					right_shift = { tap = "logical_y", hold = "none" },
+					left_shift = { tap = "logical_x", hold = "shift" },
+					right_shift = { tap = "logical_y", hold = "shift" },
 				},
 			})
 			local generated, build_err, legacy_rules, migration_context = Generator.build_karabiner_json(

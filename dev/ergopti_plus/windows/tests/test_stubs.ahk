@@ -390,6 +390,35 @@ global CapsWordEnabled := false
 ; below the first message pump; the headless harness never loads ErgoptiPlus.ahk, so
 ; it must seed the same sentinel here.
 global _ALTGR_KANA_FIXUP := false
+
+; Put the driver on a Kana-style layout (Kana true: VK_RMENU unmapped, the AltGr
+; key on VK_OEM_8, as on the Ergopti layout) or on a standard AltGr layout, as
+; the boot probe (HotstringEngineInit) would; AltGrLevel false with Kana false
+; is QWERTY (right Alt a plain Alt). Returns the state to hand to
+; _TestRestoreAltGrFamily.
+_TestSetAltGrFamily(Kana, AltGrLevel := !Kana) {
+	global _ALTGR_KANA_FIXUP, _ALTGR_LAYOUT_PROBE
+	Saved := { Kana: _ALTGR_KANA_FIXUP, Probe: _ALTGR_LAYOUT_PROBE }
+	_ALTGR_KANA_FIXUP := Kana
+	_ALTGR_LAYOUT_PROBE := Map("hkl", Kana ? 0xFC06040C : 0x040C040C,
+		"rmenu_sc", Kana ? 0 : 0xE038, "altgr_vk", Kana ? 0xDF : 0xA5,
+		"valid", true, "kana", Kana, "altgr_level", AltGrLevel, "source", "probe")
+	return Saved
+}
+
+_TestRestoreAltGrFamily(Saved) {
+	global _ALTGR_KANA_FIXUP, _ALTGR_LAYOUT_PROBE
+	_ALTGR_KANA_FIXUP := Saved.Kana
+	_ALTGR_LAYOUT_PROBE := Saved.Probe
+}
+
+; ui/onboarding/core.ahk is not loaded by the harness; the AltGr criteria read
+; the wizard's pass-through switch through the same public check.
+global _OB_ALTGR_PASSTHROUGH := false
+IsOnboardingActive() {
+	global _OB_ALTGR_PASSTHROUGH
+	return IsSet(_OB_ALTGR_PASSTHROUGH) and _OB_ALTGR_PASSTHROUGH
+}
 global OneShotShiftEnabled := false
 global NumberOfRepetitions := 1
 global ActivitySimulation := false
@@ -487,11 +516,17 @@ ToggleSuspend() {
 ; call sites so production keeps ONE reload rule with no silent fallback — a
 ; guarded call would degrade to a bare Reload exactly where the guarantee
 ; matters. Records the request so a test can assert the pause was carried.
-ReloadPreservingSuspend(BeforeReloadFn := 0, ExistingOwner := 0) {
+; Models an accepted reload end to end: the success callback runs as OnExit
+; would run it, and the process exit releases the bundle the caller lent.
+ReloadPreservingSuspend(BeforeReloadFn := 0, ExistingOwner := 0, RefusedFn := 0, StageFailureFn := 0) {
     global _Stub_SentText
+    if (ExistingOwner is Object) && !HasMethod(RefusedFn, "Call")
+        throw TypeError("A reload that borrows a configuration bundle needs a refusal callback to take it back.")
     if HasMethod(BeforeReloadFn, "Call")
         BeforeReloadFn.Call()
     _Stub_SentText.Push({ kind: "reload_preserving_suspend" })
+    if (ExistingOwner is Object)
+        _ConfigWriteTerminalRelease(ExistingOwner)
     return true
 }
 

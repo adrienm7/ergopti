@@ -9,10 +9,35 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local WinCompat = require("tests.win_compat")
 
 local DIR = os.tmpname()
 os.remove(DIR)
 local PATH = DIR .. "/api_keys.json"
+
+-- A Windows checkout has no POSIX permission bits and no open(2) with a mode
+-- to set them: the store's logic runs there on a primitive that creates the
+-- file with the same refusal of an existing path, and only the mode test is
+-- deferred. On Linux the store keeps its libc primitive, and a missing FFI or
+-- stat(1) is a failure.
+local ON_WINDOWS = WinCompat.is_windows()
+
+--- Creates a new file, refusing an existing one as O_EXCL does.
+--- @param path string
+--- @param text string
+--- @return boolean ok, string|nil err
+local function create_without_mode(path, text)
+	local existing = io.open(path, "rb")
+	if existing then
+		existing:close()
+		return false, "cannot create " .. path
+	end
+	local fh, open_error = io.open(path, "wb")
+	if not fh then return false, tostring(open_error) end
+	fh:write(text)
+	fh:close()
+	return true
+end
 
 --- A fresh store on the test file.
 --- @param keep boolean|nil Keep the file from the previous load.
@@ -21,6 +46,7 @@ local function fresh(keep)
 	if not keep then os.execute("rm -rf '" .. DIR .. "'") end
 	local entries = helpers.load_module("modules.llm.api_entries")
 	entries._set_path_for_test(PATH)
+	if ON_WINDOWS then entries._set_private_create_for_test(create_without_mode) end
 	return entries
 end
 
@@ -36,11 +62,20 @@ end
 
 helpers.describe("api_entries: a private, durable store", function()
 
-	helpers.it("creates the file readable by its owner only", function()
-		local entries = fresh()
-		helpers.assert_true(entries.add({ provider = "cerebras", token = "csk-secret", label = "Cerebras" }) ~= nil)
-		helpers.assert_eq(mode_of(PATH), "600")
-	end)
+	if ON_WINDOWS then
+		helpers.it("SKIP [CONF-LINUX-POSIX-FILE-MODE] — a Windows host has no POSIX mode bits for the 0600 key file", function()
+			-- Deferred on Windows only: the branch must never be the one a
+			-- Linux run takes, where the mode is the point of the file.
+			helpers.assert_eq(package.config:sub(1, 1), "\\",
+				"this deferral runs only on a host whose separator is Windows'")
+		end)
+	else
+		helpers.it("creates the file readable by its owner only", function()
+			local entries = fresh()
+			helpers.assert_true(entries.add({ provider = "cerebras", token = "csk-secret", label = "Cerebras" }) ~= nil)
+			helpers.assert_eq(mode_of(PATH), "600")
+		end)
+	end
 
 	helpers.it("keeps the entries and the selection across a restart", function()
 		local entries = fresh()
@@ -74,6 +109,24 @@ helpers.describe("api_entries: a private, durable store", function()
 		local entries = fresh()
 		helpers.assert_nil(entries.add({ provider = "cerebras", token = "", label = "Cerebras" }))
 		helpers.assert_eq(#entries.list(), 0)
+	end)
+
+	helpers.it("loads without the FFI, which only its libc primitive needs", function()
+		-- The FFI exists under LuaJIT alone. Required at load, it kept the whole
+		-- store, its logic included, out of reach of every other interpreter.
+		os.execute("rm -rf '" .. DIR .. "'")
+		local saved_loaded, saved_preload = package.loaded.ffi, package.preload.ffi
+		package.loaded.ffi = nil
+		package.preload.ffi = function() error("no FFI on this interpreter") end
+		local loaded, entries = pcall(helpers.load_module, "modules.llm.api_entries")
+		package.preload.ffi = saved_preload
+		package.loaded.ffi = saved_loaded
+		helpers.assert_true(loaded, "the store must load without the FFI: " .. tostring(entries))
+		entries._set_path_for_test(PATH)
+		entries._set_private_create_for_test(create_without_mode)
+		local entry = entries.add({ provider = "cerebras", token = "a", label = "Cerebras" })
+		helpers.assert_eq(entry and entry.label, "Cerebras")
+		helpers.assert_eq(fresh(true).active().id, entry.id, "the entry reached the file")
 	end)
 
 	helpers.it("keeps a malformed file aside instead of overwriting it", function()
