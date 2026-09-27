@@ -386,6 +386,31 @@ jobs:
           path: release-assets
           merge-multiple: true
 
+      # upload-artifact stores each file below the deepest directory common to
+      # the paths its step lists, so ErgoptiPlus.exe arrives as
+      # ergopti_plus/windows/ErgoptiPlus.exe and Ergopti_xkb.zip as
+      # xkb/Ergopti_xkb.zip. A release names each asset by its file name alone,
+      # so every file is brought to the top here, and two files with one name
+      # stop the release: GitHub would keep only one of them.
+      - name: Bring every downloaded asset to the top of release-assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' file; do
+              name=${file##*/}
+              if [ -e "release-assets/$name" ]; then
+                  echo "::error::two downloaded assets are named $name (one is ${file#release-assets/}); the release would attach only one of them."
+                  exit 1
+              fi
+              mv -- "$file" "release-assets/$name"
+          done < <(find release-assets -mindepth 2 -type f -print0)
+          find release-assets -mindepth 1 -type d -empty -delete
+          leftover=$(find release-assets -mindepth 1 -type d)
+          if [ -n "$leftover" ]; then
+              echo "::error::release-assets still holds directories after bringing every file up: $leftover"
+              exit 1
+          fi
+
       # Before the first side effect. The asset half is the real guard: the
       # release attaches whatever the boxes uploaded, so a box that skipped a
       # file would publish, tag and all, a release whose notes link to nothing,
