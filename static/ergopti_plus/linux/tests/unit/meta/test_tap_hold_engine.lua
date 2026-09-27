@@ -362,6 +362,41 @@ helpers.describe("tap-hold engine: a tap with no hold", function()
 		helpers.assert_eq(trail((e:process(KEY_A, DOWN, 1000))), "42↓ 30↓", "the one-shot armed at key-down")
 	end)
 
+	-- lalt.ahk 4.1: LAlt's one-shot hotkey is SC038 with no * wildcard, so
+	-- under a held modifier it does not fire and LAlt stays Alt; and it returns
+	-- without arming anything when RCtrl, CapsLock, LShift or LCtrl is
+	-- physically down. Here the one-shot was armed and Shift held under all of
+	-- them, so Ctrl+LAlt+A typed Ctrl+Shift+A (lalt-one-shot-skip).
+	helpers.it("skips LAlt's one-shot under a held modifier or a held RCtrl, CapsLock, LShift or LCtrl (lalt-one-shot-skip)", function()
+		local keys = { left_alt = { tap_action = "one_shot_shift", time_activation_seconds = 0.2 } }
+		local RSHIFT, WIN = 54, 125
+		for _, mod in ipairs({ CTRL, SHIFT, RCTRL, RSHIFT, WIN }) do
+			local e = engine(keys)
+			e:process(mod, DOWN, 0)
+			helpers.assert_nil(e:process(ALT, DOWN, 10), mod .. " held: LAlt is Alt, no Shift")
+			helpers.assert_nil(e:process(ALT, REPEAT, 500), mod .. " held: Alt repeats as itself")
+			helpers.assert_nil(e:process(ALT, UP, 600), mod .. " held: Alt comes up as itself")
+			e:process(mod, UP, 700)
+			helpers.assert_nil(e:process(KEY_A, DOWN, 800), mod .. " held: nothing was armed")
+		end
+		-- CapsLock is no modifier here, plain or tapping Enter at key-down: LAlt
+		-- then does nothing at all.
+		for _, caps in ipairs({ {}, { caps_lock = { tap_action = "enter", time_activation_seconds = 0.2 } } }) do
+			caps.left_alt = keys.left_alt
+			local e = engine(caps)
+			e:process(CAPS, DOWN, 0)
+			helpers.assert_eq(trail((e:process(ALT, DOWN, 10))), "", "CapsLock held: no Alt, no Shift")
+			helpers.assert_eq(trail((e:process(ALT, REPEAT, 500))), "")
+			helpers.assert_eq({ trail((e:process(ALT, UP, 600))) }, { "" })
+			e:process(CAPS, UP, 700)
+			helpers.assert_nil(e:process(KEY_A, DOWN, 800), "CapsLock held: nothing was armed")
+		end
+		-- Under a modifier a tap-hold holds, as a Ctrl CapsLock does, LAlt is Alt.
+		local e = engine({ left_alt = keys.left_alt, caps_lock = DEFAULTS.caps_lock })
+		e:process(CAPS, DOWN, 0)
+		helpers.assert_nil(e:process(ALT, DOWN, 10), "Ctrl held by CapsLock: LAlt is Alt")
+	end)
+
 	helpers.it("is still the key itself under a modifier and a layer key on the layer (tap-no-hold-instant)", function()
 		local e = engine({ escape = { tap_action = "copy", time_activation_seconds = 0.2 },
 			left_alt = DEFAULTS.left_alt })
