@@ -29,7 +29,13 @@ The `launch` job of `.github/workflows/ci-macos.yml` now runs
 built in the same run, installed over those user states. A run that does not
 publish uses the `ci` profile on macos-15; a release run uses the `release`
 profile on macos-15 and macos-15-intel, against the archive that ships. Either
-way a failed launch fails the macOS box, and `Release · publish` needs that box.
+way a failed launch fails the macOS lane, and `Release` needs that lane.
+The launcher XCTest runs in `package-macos` before the app build and appends to
+the real `~/Library/Logs/ErgoptiPlus/launcher.log`, while
+`macos-release-launch.py` refuses to judge a launch over an existing launcher
+log; that job therefore removes `~/Library/Logs/ErgoptiPlus` before building.
+Any new step that runs launcher code on a runner that later launches the
+packaged app must leave that folder absent as well.
 Add a scenario to `SCENARIOS` there for every new launch failure that depends
 on existing user state: `--print-matrix` derives both profiles from it, and
 only `RELEASE_ONLY_SCENARIOS` stay out of the `ci` profile. Hosted runners

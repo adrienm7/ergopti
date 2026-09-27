@@ -59,11 +59,13 @@ npm run dev
 
 Each driver and the shared layer have their own headless suite. The same suites
 run in CI: [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs the
-shared validation and calls one workflow per OS,
+shared validation and the release plan in one root job, `Validate and plan`,
+then calls one workflow per OS,
 [`ci-macos.yml`](.github/workflows/ci-macos.yml),
 [`ci-windows.yml`](.github/workflows/ci-windows.yml) and
-[`ci-linux.yml`](.github/workflows/ci-linux.yml). Run them locally before
-opening a PR.
+[`ci-linux.yml`](.github/workflows/ci-linux.yml). Each draws one lane in the
+run graph: its `tests` job first, then its `package` job and whatever checks
+that package. Run the suites locally before opening a PR.
 
 | Command                            | What it covers                                                        |
 | ---------------------------------- | --------------------------------------------------------------------- |
