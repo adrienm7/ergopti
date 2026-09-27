@@ -4,11 +4,12 @@
  * ==============================================================================
  * MODULE: CI Pipeline Wiring Guard
  * DESCRIPTION:
- * Pins how ci.yml wires Validate and Release · plan into the three OS boxes and
- * Release · publish: plan's outputs, what each box caller passes and waits for,
- * which secrets and permissions reach a job, how Validate runs its checks, and
- * the release preflight that runs before any side effect. It also proves that
- * no job of ci.yml and no step of the pipeline can be switched off, or have its
+ * Pins how ci.yml wires its root, "Validate and plan", into the three OS lanes
+ * and Release: the shape of the run graph, the plan's outputs, what each lane
+ * caller passes and waits for, which secrets and permissions reach a job, how
+ * the root runs its checks before it deepens the clone for the plan, and the
+ * release preflight that runs before any side effect. It also proves that no
+ * job of ci.yml and no step of the pipeline can be switched off, or have its
  * failure swallowed, while the run stays green.
  *
  * ROOT CAUSE ENCODED:
@@ -29,28 +30,41 @@
  * gate itself), `|| true` after a test runner, or a `| tee` without pipefail
  * turned a failure green; and the Windows compiler-warning and LLM gates could
  * drop their failing exit or move into the release-only job.
+ * The run graph then became hard to read: two roots each wired to every first
+ * job, lanes that started with two or three jobs, and several leaf jobs per
+ * lane wired to the release. GitHub flattens a called workflow into the run's
+ * graph, so only its entry and exit jobs decide what the graph shows. The plan
+ * job merged into validate, which deepens its clone for the plan only after
+ * the checks, since several test:js gates shell out to git.
  *
  * FEATURES & RATIONALE:
  * 1. Derived, not listed: every plan output must come from a plan step that
- *    writes it, every caller input must be plan's output of the same name, and
- *    release must wait, directly or through a box, on every other job of
+ *    writes it, every caller input must be the plan output of the same name,
+ *    and release must wait, directly or through a lane, on every other job of
  *    ci.yml. No job of ci.yml sets continue-on-error, and only release sets a
  *    job-level if, exactly its own.
- * 2. Private secrets reach a box only on a release run, through one exact
+ * 2. Private secrets reach a lane only on a release run, through one exact
  *    expression; the public Sparkle key is the only allow-listed exception.
  *    Every pipeline file reads contents only; release alone may write.
- * 3. Validate runs exactly its four checks, each with its exact command, so
- *    one red check does not hide the others (N2) and none can be narrowed.
- * 4. Only the steps in STEP_CONDITIONS set an `if`, each exactly its own, and
+ * 3. The root runs exactly its four checks on the default shallow checkout,
+ *    each with its exact command, so one red check does not hide the others
+ *    (N2) and none can be narrowed; no step before them fetches history; then
+ *    it deepens the clone with one exact script, which retries a failed fetch
+ *    and fails on a clone still shallow, then runs the two plan steps.
+ * 4. One root, one lane per OS: ci.yml has exactly one job without needs, the
+ *    root; each lane caller needs the root alone; release needs the root and
+ *    the three lanes, nothing else; and each OS workflow has exactly one entry
+ *    job (no needs) and one exit job (needed by no job of its file).
+ * 5. Only the steps in STEP_CONDITIONS set an `if`, each exactly its own, and
  *    test-linux's harnesses run under !cancelled(). No script swallows a test
  *    runner's failure with `|| true`, and every `| tee` runs under pipefail.
- * 5. The release preflight precedes the first step that writes to GitHub, the
+ * 6. The release preflight precedes the first step that writes to GitHub, the
  *    release steps keep their order, and both tag probes capture ls-remote
  *    before testing it (N5). Every assets-* upload fails on a missing file and
  *    outlives a next-day re-run, and release merges them into one folder. The
  *    asset list of the preflight is derived from the release notes by
  *    tools/test/test-release-notes-assets-are-uploaded.cjs.
- * 6. Each rule is also run on a mutated copy of the real workflow, for every
+ * 7. Each rule is also run on a mutated copy of the real workflow, for every
  *    form a review used, and must report it: a rule that cannot fail is
  *    reported as broken.
  * ==============================================================================
@@ -64,8 +78,12 @@ const ENTRY = pipeline.ENTRY_REL;
 const MACOS_BOX = '.github/workflows/ci-macos.yml';
 const WINDOWS_BOX = '.github/workflows/ci-windows.yml';
 const LINUX_BOX = '.github/workflows/ci-linux.yml';
-const RELEASE_INPUT = "${{ needs.plan.outputs.release == 'true' }}";
-const RELEASE_IF = "github.event_name == 'push' && needs.plan.outputs.release == 'true'";
+const BOXES = [MACOS_BOX, WINDOWS_BOX, LINUX_BOX];
+// The run graph's single root: the repository-wide checks, then the release
+// plan every lane and release read.
+const ROOT = 'validate';
+const RELEASE_INPUT = `\${{ needs.${ROOT}.outputs.release == 'true' }}`;
+const RELEASE_IF = `github.event_name == 'push' && needs.${ROOT}.outputs.release == 'true'`;
 const NOT_CANCELLED = '${{ !cancelled() }}';
 // Public by design: SUPublicEDKey ships inside every app, and a CI package
 // without it cannot pass the launch gate.
@@ -79,7 +97,7 @@ const SIDE_EFFECT = /\bgh api\b|\bgh release (?:create|edit|upload|delete)\b|\bg
 const MIN_PLAN_OUTPUTS = 7;
 const MIN_GATED_SECRETS = 4;
 
-// Validate's checks after its setup, in order, with the one command each runs.
+// The root's checks after its setup, in order, with the one command each runs.
 const VALIDATE_SETUP = 'Install native validation tools';
 const VALIDATE_CHECKS = [
 	['Check hotstring TOML files are sorted and formatted', 'python tools/format_toml.py --hotstrings --all --check'],
@@ -87,6 +105,45 @@ const VALIDATE_CHECKS = [
 	['Mutation tests — domain layer (Stryker, break=25)', 'npm run test:mutation'],
 	['JS validation suite (umbrella — every run-js-suite check)', 'npm run test:js'],
 ];
+// Then the plan: the clone is deepened only after every check, because
+// several test:js gates shell out to git and were written against the default
+// depth-1 clone. --unshallow gives the plan the full history of every shallow
+// commit, HEAD included, and --tags every tag; the plan steps follow it. The
+// fetch is tried three times, as actions/checkout tried the fetch-depth: 0
+// fetch the plan used to get from it, since one network error here stops
+// every lane; --unshallow is passed only while the clone is still shallow,
+// because an attempt can fail after completing it and --unshallow refuses a
+// complete clone. A third failure, or a clone still shallow, fails the step.
+const DEEPEN_STEP = 'Deepen history for the release plan';
+const DEEPEN_SCRIPT = [
+	'set -euo pipefail',
+	'for attempt in 1 2 3; do',
+	'    unshallow=()',
+	'    if [ "$(git rev-parse --is-shallow-repository)" = true ]; then',
+	'        unshallow=(--unshallow)',
+	'    fi',
+	'    if git fetch --prune "${unshallow[@]}" --tags origin; then',
+	'        break',
+	'    fi',
+	'    if [ "$attempt" = 3 ]; then',
+	'        echo "::error::git fetch failed 3 times: the release plan needs the full history and every tag."',
+	'        exit 1',
+	'    fi',
+	'    echo "::warning::git fetch failed (attempt $attempt of 3), retrying in 15 s."',
+	'    sleep 15',
+	'done',
+	'if [ "$(git rev-parse --is-shallow-repository)" != false ]; then',
+	'    echo "::error::the clone is still shallow after the fetch: the release plan would number a tag from a partial history."',
+	'    exit 1',
+	'fi',
+];
+// The deepening step exactly as ci.yml writes it, for the self-check fixtures.
+const DEEPEN_TEXT = `      - name: ${DEEPEN_STEP}\n        shell: bash\n        run: |\n` +
+	DEEPEN_SCRIPT.map((line) => `          ${line}\n`).join('');
+// Any other way to deepen the clone: a step before the deepening one that runs
+// it would hand the checks a clone deeper than the one they were written for.
+const HISTORY_FETCH = /\bgit\b.*\b(?:fetch|pull|clone)\b|--(?:unshallow|deepen|depth|shallow-since|shallow-exclude)\b/;
+const PLAN_STEPS = ['Load the Linux release artifact contract', 'Compute tag and version'];
 
 // The only steps of the pipeline that may set an `if`, each with its only
 // accepted value. Every other step runs whenever its job runs, so no edit can
@@ -252,46 +309,132 @@ function mustCatch(what, rel, from, to, problemsOf) {
 
 
 
-// ====================================
-// ====================================
-// ======= 1/ Plan's Outputs ==========
-// ====================================
-// ====================================
+// ========================================
+// ========================================
+// ======= 1/ The Root And Its Plan =======
+// ========================================
+// ========================================
 
-const plan = pipeline.job('plan');
+const plan = pipeline.job(ROOT);
 const planSteps = pipeline.steps(plan);
-const planOutputs = mappingOf(plan, 'outputs', 'plan') ?? new Map();
+const planOutputs = mappingOf(plan, 'outputs', ROOT) ?? new Map();
 if (planOutputs.size < MIN_PLAN_OUTPUTS) {
-	errors.push(`plan declares ${planOutputs.size} output(s) (floor ${MIN_PLAN_OUTPUTS}); the outputs block moved`);
+	errors.push(`${ROOT} declares ${planOutputs.size} plan output(s) (floor ${MIN_PLAN_OUTPUTS}); the outputs block moved`);
 }
 for (const [key, value] of planOutputs) {
 	const source = new RegExp(`^\\$\\{\\{ steps\\.([A-Za-z0-9_-]+)\\.outputs\\.${key} \\}\\}$`).exec(value);
 	if (!source) {
-		errors.push(`plan output ${key} must forward \${{ steps.<id>.outputs.${key} }}, got: ${value}`);
+		errors.push(`${ROOT} output ${key} must forward \${{ steps.<id>.outputs.${key} }}, got: ${value}`);
 		continue;
 	}
 	const owner = planSteps.find((candidate) => pipeline.stepField(candidate.body, 'id') === source[1]);
 	if (!owner) {
-		errors.push(`plan output ${key} reads step '${source[1]}', which plan does not have`);
+		errors.push(`${ROOT} output ${key} reads step '${source[1]}', which ${ROOT} does not have`);
 	} else if (!new RegExp(`\\bemit ${key} |"${key}=`).test(codeOf(owner.body))) {
-		errors.push(`plan output ${key} reads step '${source[1]}', which never writes ${key}`);
+		errors.push(`${ROOT} output ${key} reads step '${source[1]}', which never writes ${key}`);
 	}
 }
-for (const match of pipeline.text().matchAll(/needs\.plan\.outputs\.([A-Za-z0-9_-]+)/g)) {
-	if (!planOutputs.has(match[1])) errors.push(`needs.plan.outputs.${match[1]} is read but plan declares no such output`);
+for (const match of pipeline.text().matchAll(/needs\.([A-Za-z0-9_-]+)\.outputs\.([A-Za-z0-9_-]+)/g)) {
+	// Only the root publishes a plan; a lane's own jobs read their scenarios
+	// from package-macos, which test-macos-swift-launcher-ci.cjs pins.
+	if (match[1] === 'package-macos') continue;
+	if (match[1] !== ROOT) {
+		errors.push(`needs.${match[1]}.outputs.${match[2]} is read, but the plan lives in ${ROOT} alone`);
+	} else if (!planOutputs.has(match[2])) {
+		errors.push(`needs.${ROOT}.outputs.${match[2]} is read but ${ROOT} declares no such output`);
+	}
 }
 
-// plan numbers the next tag from the local tag list and the commits since the
-// last stable tag. A depth-1 clone has neither: every run would plan dev.1 or
-// v0.0.1, find it taken and publish nothing, silently.
-const planCheckouts = planSteps.filter((candidate) =>
-	/^actions\/checkout@/.test(pipeline.stepField(candidate.body, 'uses') ?? ''));
-if (planCheckouts.length !== 1 || !/^ {10}fetch-depth: 0$/m.test(planCheckouts[0].body)) {
-	errors.push('plan must check out once with fetch-depth: 0: it reads every tag and the commits since the last one');
+/**
+ * Lists how the root could stop running its checks as written, or plan from a
+ * partial history: it checks out once, at the default depth, and no step
+ * before the deepening one fetches history; after its setup it runs exactly
+ * the four checks, each with its exact command, then the deepening step with
+ * its exact script, then the two plan steps.
+ * @param {Array<{rel: string, text: string}>} files The pipeline.
+ * @returns {string[]}
+ */
+function rootProblems(files) {
+	const problems = [];
+	const root = pipeline.jobsOfText(files.find((entry) => entry.rel === ENTRY).text, ENTRY)
+		.find((candidate) => candidate.id === ROOT);
+	if (!root) return [`ci.yml has no ${ROOT} job`];
+	const rootSteps = pipeline.steps(root.body);
+	// The checks were written against a depth-1 clone without tags; a deeper
+	// checkout changes what the test:js gates that shell out to git see.
+	const checkouts = rootSteps.filter((candidate) =>
+		/^actions\/checkout@/.test(pipeline.stepField(candidate.body, 'uses') ?? ''));
+	if (checkouts.length !== 1 || pipeline.stepField(checkouts[0].body, 'with') !== null) {
+		problems.push(`${ROOT} must check out once, with no with: block: its checks run on the default depth-1 clone`);
+	}
+	const deepenAt = rootSteps.findIndex((candidate) => candidate.name === DEEPEN_STEP);
+	for (const earlier of deepenAt < 0 ? rootSteps : rootSteps.slice(0, deepenAt)) {
+		const fetching = logicalLines(earlier.body).find((line) => HISTORY_FETCH.test(line));
+		if (fetching !== undefined) {
+			problems.push(`${ROOT} step "${earlier.name || earlier.body.trim().split('\n')[0]}" fetches history before ` +
+				`"${DEEPEN_STEP}", so the checks would not run on the depth-1 clone: ${fetching}`);
+		}
+	}
+	const setupAt = rootSteps.findIndex((candidate) => candidate.name === VALIDATE_SETUP);
+	const after = setupAt < 0 ? [] : rootSteps.slice(setupAt + 1);
+	const expected = [...VALIDATE_CHECKS.map(([name]) => name), DEEPEN_STEP, ...PLAN_STEPS];
+	if (JSON.stringify(after.map((candidate) => candidate.name)) !== JSON.stringify(expected)) {
+		problems.push(`${ROOT} must run exactly, after "${VALIDATE_SETUP}": ${expected.join(' | ')}; ` +
+			`got: ${after.map((candidate) => candidate.name).join(' | ')}`);
+		return problems;
+	}
+	for (const [index, [name, command]] of VALIDATE_CHECKS.entries()) {
+		const run = pipeline.stepField(after[index].body, 'run');
+		if (run !== command) problems.push(`${ROOT} step "${name}" must run exactly \`${command}\`, got: ${run}`);
+	}
+	const deepen = pipeline.runOf(after[VALIDATE_CHECKS.length].body) ?? [];
+	if (JSON.stringify(deepen) !== JSON.stringify(DEEPEN_SCRIPT)) {
+		const differs = deepen.findIndex((line, index) => line !== DEEPEN_SCRIPT[index]);
+		problems.push(`${ROOT} step "${DEEPEN_STEP}" must run exactly its pinned script; first difference at line ` +
+			`${(differs < 0 ? Math.min(deepen.length, DEEPEN_SCRIPT.length) : differs) + 1}: ` +
+			`${deepen[differs] ?? '(missing)'}`);
+	}
+	return problems;
 }
 
-// The Linux box names its tarball with this output and release writes it into
-// the notes and a shell command, so an unsafe name must fail plan.
+errors.push(...rootProblems(pipeline.files()));
+for (const [what, from, to] of [
+	['fetch-depth: 0 on the root checkout', '    steps:\n      # A depth-1 clone without tags, which the checks below expect.\n      - uses: actions/checkout@v4\n',
+		'    steps:\n      # A depth-1 clone without tags, which the checks below expect.\n      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 0\n'],
+	['a history fetch between the checkout and the setup', '      - uses: actions/checkout@v4\n\n      - uses: actions/setup-python@v5\n',
+		'      - uses: actions/checkout@v4\n\n      - name: Fetch all history\n        run: git fetch --depth=2147483647 --tags origin\n\n      - uses: actions/setup-python@v5\n'],
+	['a history fetch inside the setup step', '          sudo apt-get install -y lua5.4 libxml2-utils\n',
+		'          sudo apt-get install -y lua5.4 libxml2-utils\n          git pull --unshallow\n'],
+	['the deepening fetch without --unshallow', '        unshallow=(--unshallow)\n', '        unshallow=()\n'],
+	['the deepening fetch without --tags', ' --prune "${unshallow[@]}" --tags origin; then\n', ' --prune "${unshallow[@]}" origin; then\n'],
+	['the deepening fetch tried once', '          for attempt in 1 2 3; do\n', '          for attempt in 1; do\n'],
+	['a failed deepening fetch forgiven', '                  exit 1\n              fi\n              echo "::warning::',
+		'                  exit 0\n              fi\n              echo "::warning::'],
+	['the completeness check dropped', '          if [ "$(git rev-parse --is-shallow-repository)" != false ]; then\n',
+		'          if false; then\n'],
+	['the deepening step dropped', DEEPEN_TEXT, ''],
+	['a narrowed test:js', '        run: npm run test:js\n', '        run: npm run test:js -- --only lint\n'],
+]) {
+	mustCatch(what, ENTRY, from, to, rootProblems);
+}
+// Moving the fetch ahead of the checks is two edits, so it gets its own copy.
+{
+	const text = pipeline.file(ENTRY);
+	const deepen = `${DEEPEN_TEXT}\n`;
+	const setup = `      - name: ${VALIDATE_SETUP}\n`;
+	if (text.split(deepen).length !== 2 || text.split(setup).length !== 2) {
+		errors.push('self-check "the deepening fetch before the checks": re-derive the fixture');
+	} else {
+		const moved = text.replace(deepen, '').replace(setup, () => `${deepen}${setup}`);
+		const files = pipeline.files().map((entry) => (entry.rel === ENTRY ? { rel: ENTRY, text: moved } : entry));
+		if (rootProblems(files).length === 0) {
+			errors.push('self-check "the deepening fetch before the checks" went unnoticed, so this rule cannot fail');
+		}
+	}
+}
+
+// The Linux lane names its tarball with this output and release writes it into
+// the notes and a shell command, so an unsafe name must fail the plan.
 const contract = attempt(() => pipeline.runOf(pipeline.step(plan, 'Load the Linux release artifact contract')));
 if (contract !== null) {
 	const at = (pattern) => contract.findIndex((line) => pattern.test(line.trim()));
@@ -308,29 +451,26 @@ if (contract !== null) {
 
 // ======================================
 // ======================================
-// ======= 2/ The Box Callers ===========
+// ======= 2/ The Lane Callers ==========
 // ======================================
 // ======================================
 
+// What each caller needs is pinned with the graph shape in section 3.
 const callers = pipeline.calls();
-if (callers.length !== 3) errors.push(`ci.yml must call the three OS boxes, found ${callers.length} call(s)`);
+if (callers.length !== 3) errors.push(`ci.yml must call the three OS lanes, found ${callers.length} call(s)`);
 let gatedSecrets = 0;
 for (const call of callers) {
 	const body = pipeline.job(call.id);
-	const needs = pipeline.needsOf(body);
-	for (const needed of ['validate', 'plan']) {
-		if (!needs.includes(needed)) errors.push(`caller ${call.id} must need ${needed}, got [${needs.join(', ')}]`);
-	}
 	// The release input is the only computed one: a false value on a release
-	// run skips the box's release build while the box still succeeds.
+	// run skips the lane's release build while the lane still succeeds.
 	const inputs = mappingOf(body, 'with', call.id) ?? new Map();
 	if (inputs.get('release') !== RELEASE_INPUT) {
 		errors.push(`caller ${call.id} must pass release: ${RELEASE_INPUT}, got: ${inputs.get('release')}`);
 	}
 	for (const [key, value] of inputs) {
 		if (key === 'release') continue;
-		if (value !== `\${{ needs.plan.outputs.${key} }}`) {
-			errors.push(`caller ${call.id} must pass ${key}: \${{ needs.plan.outputs.${key} }}, got: ${value}`);
+		if (value !== `\${{ needs.${ROOT}.outputs.${key} }}`) {
+			errors.push(`caller ${call.id} must pass ${key}: \${{ needs.${ROOT}.outputs.${key} }}, got: ${value}`);
 		}
 	}
 	const inlineSecrets = /^ {4}secrets:[ \t]*([^\s#].*)$/m.exec(body);
@@ -343,21 +483,21 @@ for (const call of callers) {
 			continue;
 		}
 		gatedSecrets++;
-		const gated = `\${{ needs.plan.outputs.release == 'true' && secrets.${key} || '' }}`;
+		const gated = `\${{ needs.${ROOT}.outputs.release == 'true' && secrets.${key} || '' }}`;
 		if (value !== gated) {
 			errors.push(`caller ${call.id} passes the private ${key} outside a release run; it must be exactly ${gated}, got: ${value}`);
 		}
 	}
 }
 if (gatedSecrets < MIN_GATED_SECRETS) {
-	errors.push(`found ${gatedSecrets} release-only secret(s) passed to the boxes (floor ${MIN_GATED_SECRETS}); the secrets parse drifted`);
+	errors.push(`found ${gatedSecrets} release-only secret(s) passed to the lanes (floor ${MIN_GATED_SECRETS}); the secrets parse drifted`);
 }
 if (/^\s*secrets:\s*inherit\b/m.test(pipeline.text())) {
 	errors.push('no job may use secrets: inherit, which hands every secret, PAT_ERGOPTI included, to the called workflow');
 }
 
 // Release publishes only when every other job of ci.yml succeeded, reached
-// directly or through a box's needs.
+// directly or through a lane's needs.
 const topJobs = pipeline.jobs(ENTRY);
 const needsById = new Map(topJobs.map((candidate) => [candidate.id, pipeline.needsOf(candidate.body)]));
 const awaited = new Set();
@@ -377,14 +517,103 @@ for (const candidate of topJobs) {
 
 
 
+// ============================================
+// ============================================
+// ======= 3/ One Root, One Lane Per OS =======
+// ============================================
+// ============================================
+
+/**
+ * Lists every way the run graph could stop reading as one root, one lane per
+ * OS and one release. GitHub draws no box around a called workflow: it
+ * flattens its jobs into the run's graph, so a second job without needs in a
+ * lane is a second edge from the root, and a second job nothing needs is a
+ * second edge into the release. Release still needs the root: it reads the
+ * plan from it, and a plan handed through the lanes' outputs would depend on
+ * those outputs surviving "Re-run failed jobs", where a lost value skips the
+ * release instead of failing it.
+ * @param {Array<{rel: string, text: string}>} files The pipeline.
+ * @returns {string[]}
+ */
+function graphProblems(files) {
+	const problems = [];
+	const topLevel = pipeline.jobsOfText(files.find((entry) => entry.rel === ENTRY).text, ENTRY);
+	const roots = topLevel.filter((candidate) => pipeline.needsOf(candidate.body).length === 0).map((candidate) => candidate.id);
+	if (JSON.stringify(roots) !== JSON.stringify([ROOT])) {
+		problems.push(`ci.yml must have exactly one root job, ${ROOT}, that needs nothing; got [${roots.join(', ')}]`);
+	}
+	const lanes = topLevel.filter((candidate) => pipeline.field(candidate.body, 'uses') !== null);
+	for (const lane of lanes) {
+		const needs = pipeline.needsOf(lane.body);
+		if (JSON.stringify(needs) !== JSON.stringify([ROOT])) {
+			problems.push(`caller ${lane.id} must need the root alone, [${ROOT}], so the root fans out to one job per lane; got [${needs.join(', ')}]`);
+		}
+	}
+	const release = topLevel.find((candidate) => candidate.id === 'release');
+	const releaseNeeds = release ? [...pipeline.needsOf(release.body)].sort() : [];
+	const expectedRelease = [ROOT, ...lanes.map((lane) => lane.id)].sort();
+	if (JSON.stringify(releaseNeeds) !== JSON.stringify(expectedRelease)) {
+		problems.push(`release must need exactly the root and the three lanes, [${expectedRelease.join(', ')}]; got [${releaseNeeds.join(', ')}]`);
+	}
+	for (const rel of BOXES) {
+		const entry = files.find((candidate) => candidate.rel === rel);
+		if (!entry) {
+			problems.push(`${rel} is not part of the pipeline`);
+			continue;
+		}
+		const jobs = pipeline.jobsOfText(entry.text, rel);
+		const needsOfJob = new Map(jobs.map((candidate) => [candidate.id, pipeline.needsOf(candidate.body)]));
+		const entries = jobs.filter((candidate) => needsOfJob.get(candidate.id).length === 0).map((candidate) => candidate.id);
+		const needed = new Set([...needsOfJob.values()].flat());
+		const exits = jobs.filter((candidate) => !needed.has(candidate.id)).map((candidate) => candidate.id);
+		if (entries.length !== 1) {
+			problems.push(`${rel} must have exactly one entry job, which needs no job of its file; got [${entries.join(', ')}]`);
+		}
+		if (exits.length !== 1) {
+			problems.push(`${rel} must have exactly one exit job, which no job of its file needs; got [${exits.join(', ')}]`);
+		}
+		for (const [id, needs] of needsOfJob) {
+			for (const need of needs) {
+				if (!needsOfJob.has(need)) problems.push(`${rel} job ${id} needs ${need}, which is not a job of its file`);
+			}
+		}
+	}
+	return problems;
+}
+
+errors.push(...graphProblems(pipeline.files()));
+for (const [what, rel, from, to] of [
+	['a second root in ci.yml', ENTRY, '\njobs:\n',
+		'\njobs:\n  lint:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo lint\n'],
+	['a caller that no longer needs the root', ENTRY, "    name: 'Linux'\n    needs: [validate]\n", "    name: 'Linux'\n"],
+	['a caller that also needs another lane', ENTRY, "    name: 'Windows'\n    needs: [validate]\n",
+		"    name: 'Windows'\n    needs: [validate, macos]\n"],
+	['release that no longer waits for a lane', ENTRY, '    needs: [validate, macos, windows, linux]\n',
+		'    needs: [validate, macos, windows]\n'],
+	['release that stops reading the plan from the root', ENTRY, '    needs: [validate, macos, windows, linux]\n',
+		'    needs: [macos, windows, linux]\n'],
+	['a second entry in the macOS lane', MACOS_BOX, '    needs: test-hs\n', ''],
+	['a second entry in the Linux lane', LINUX_BOX,
+		"    name: 'first install (${{ matrix.distro }})'\n    runs-on: ubuntu-latest\n    needs: [package-linux]\n",
+		"    name: 'first install (${{ matrix.distro }})'\n    runs-on: ubuntu-latest\n"],
+	['a second entry in the Windows lane', WINDOWS_BOX, '    needs: [test-ahk]\n', ''],
+	['a second exit in the macOS lane', MACOS_BOX, '    needs: package-macos\n', '    needs: test-hs\n'],
+	['a second exit in the Linux lane', LINUX_BOX, '      - smoke-appimage-run\n    if: always()\n', '    if: always()\n'],
+]) {
+	mustCatch(what, rel, from, to, graphProblems);
+}
+
+
+
+
 // ==========================================
 // ==========================================
-// ======= 3/ Every Job Gates The Run =======
+// ======= 4/ Every Job Gates The Run =======
 // ==========================================
 // ==========================================
 
 /**
- * Lists how a job of ci.yml could skip or forgive a lane. A skipped box skips
+ * Lists how a job of ci.yml could skip or forgive a lane. A skipped lane skips
  * release too, so a pull request shows green without that OS and a push to
  * dev or main silently publishes nothing; a forgiven job lets the run pass red.
  * @param {Array<{rel: string, text: string}>} files The pipeline.
@@ -453,7 +682,7 @@ for (const [what, from, to] of [
 	['always() on the macOS caller', '  macos:\n', '  macos:\n    if: always()\n'],
 	['if: false on validate', '  validate:\n', '  validate:\n    if: false\n'],
 	['continue-on-error on validate', '  validate:\n', '  validate:\n    continue-on-error: true\n'],
-	['continue-on-error on plan', '  plan:\n', '  plan:\n    continue-on-error: true\n'],
+	['continue-on-error on the Windows caller', '  windows:\n', '  windows:\n    continue-on-error: true\n'],
 	['continue-on-error on release', '  release:\n', '  release:\n    continue-on-error: true\n'],
 	['a status function in release.if', `    if: ${RELEASE_IF}\n`, `    if: \${{ always() && ${RELEASE_IF} }}\n`],
 ]) {
@@ -461,7 +690,7 @@ for (const [what, from, to] of [
 }
 for (const [what, rel, from, to] of [
 	['write-all at the top of ci.yml', ENTRY, 'permissions:\n  contents: read\n', 'permissions: write-all\n'],
-	['contents: write for a box', LINUX_BOX, 'permissions:\n  contents: read\n', 'permissions:\n  contents: write\n'],
+	['contents: write for a lane', LINUX_BOX, 'permissions:\n  contents: read\n', 'permissions:\n  contents: write\n'],
 	['a write grant on a caller', ENTRY, "    name: 'macOS'\n", "    name: 'macOS'\n    permissions:\n      contents: write\n"],
 ]) {
 	mustCatch(what, rel, from, to, permissionProblems);
@@ -470,36 +699,11 @@ for (const [what, rel, from, to] of [
 
 
 
-// ===========================================
-// ===========================================
-// ======= 4/ Validate Runs Every Check ======
-// ===========================================
-// ===========================================
-
-// Each check's condition is pinned in STEP_CONDITIONS; its command here, so a
-// narrower script or a swallowed failure cannot keep the name.
-const validateSteps = pipeline.steps(pipeline.job('validate'));
-const setupAt = validateSteps.findIndex((candidate) => candidate.name === VALIDATE_SETUP);
-const validateChecks = setupAt < 0 ? [] : validateSteps.slice(setupAt + 1);
-if (JSON.stringify(validateChecks.map((candidate) => candidate.name)) !==
-	JSON.stringify(VALIDATE_CHECKS.map(([name]) => name))) {
-	errors.push(`validate must run exactly ${VALIDATE_CHECKS.length} checks after "${VALIDATE_SETUP}", in order: ` +
-		`${VALIDATE_CHECKS.map(([name]) => name).join(' | ')}; got: ${validateChecks.map((candidate) => candidate.name).join(' | ')}`);
-} else {
-	VALIDATE_CHECKS.forEach(([name, command], index) => {
-		const run = pipeline.stepField(validateChecks[index].body, 'run');
-		if (run !== command) errors.push(`validate step "${name}" must run exactly \`${command}\`, got: ${run}`);
-	});
-}
-
-
-
-
-// =========================================
-// =========================================
-// ======= 5/ The Windows Gating Suites ====
-// =========================================
-// =========================================
+// ============================================
+// ============================================
+// ======= 5/ The Windows Gating Suites =======
+// ============================================
+// ============================================
 
 // Every gate of test-ahk, which runs on every run. package-windows runs on a
 // release only, so a gate moved there stops running on pull requests and dev.
@@ -732,11 +936,11 @@ for (const line of ['          pattern: assets-*', '          path: release-asse
 }
 
 if (errors.length > 0) {
-	console.error('[FAIL] the CI pipeline wiring can skip a gate or publish a wrong or partial release:');
+	console.error('[FAIL] the CI pipeline wiring can skip a gate, publish a wrong or partial release, or draw a tangled graph:');
 	for (const error of errors) console.error(`  - ${error}`);
 	process.exit(1);
 }
 
-console.log(`[OK] ${planOutputs.size} plan outputs, ${callers.length} box callers and ${gatedSecrets} release-only ` +
-	`secrets are wired as designed, ${CONDITIONS.size} conditional steps are the only ones, and the release ` +
-	'preflight runs before any side effect.');
+console.log(`[OK] one root (${ROOT}) with ${planOutputs.size} plan outputs, ${callers.length} lane callers with one ` +
+	`entry and one exit job each, and ${gatedSecrets} release-only secrets are wired as designed, ` +
+	`${CONDITIONS.size} conditional steps are the only ones, and the release preflight runs before any side effect.`);

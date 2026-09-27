@@ -36,8 +36,9 @@
  *    must hand ERGOPTI_BUILD_VERSION the version its box receives (empty outside
  *    a release, which writes a commit-only stamp), and the macOS build its
  *    ERGOPTI_VERSION the same way.
- * 6. The version reaches the boxes only through ci.yml: each OS caller must pass
- *    plan's version output, or a box would stamp an empty version on a release.
+ * 6. The version reaches the lanes only through ci.yml: each OS caller must
+ *    pass the version output of validate's plan, or a lane would stamp an empty
+ *    version on a release.
  * ==============================================================================
  */
 
@@ -66,7 +67,7 @@ const PKGBUILD_REL = 'tools/build/PKGBUILD';
 const COMMIT_ENV = /^ERGOPTI_BUILD_COMMIT:\s*\$\{\{\s*github\.sha\s*\}\}\s*$/;
 const VERSION_ENV = /^ERGOPTI_BUILD_VERSION:\s*\$\{\{\s*inputs\.version\s*\}\}\s*$/;
 const MACOS_VERSION_ENV = /^ERGOPTI_VERSION:\s*\$\{\{\s*inputs\.version\s*\}\}\s*$/;
-const CALLER_VERSION = /^ {6}version:\s*\$\{\{\s*needs\.plan\.outputs\.version\s*\}\}\s*$/m;
+const CALLER_VERSION = /^ {6}version:\s*\$\{\{\s*needs\.validate\.outputs\.version\s*\}\}\s*$/m;
 const VERSIONED_BOXES = ['macos', 'windows', 'linux'];
 
 // Floors — today: 1 macOS build and 1 Linux assembly, 4 packager runs,
@@ -251,7 +252,7 @@ function checkWorkflow(text, rel) {
 }
 
 /**
- * Checks that ci.yml hands plan's version to every OS box.
+ * Checks that ci.yml hands the plan's version to every OS lane.
  * @param {string} text ci.yml YAML.
  * @returns {string[]} Errors.
  */
@@ -264,7 +265,7 @@ function checkVersionChain(text) {
 			errors.push(`${pipeline.ENTRY_REL} no longer calls the ${box} box as job \`${box}\``);
 		} else if (!CALLER_VERSION.test(caller.body)) {
 			errors.push(`${pipeline.ENTRY_REL}:${caller.line} (job ${box}) must pass ` +
-				'version: ${{ needs.plan.outputs.version }} — the box would stamp no release version');
+				'version: ${{ needs.validate.outputs.version }} — the lane would stamp no release version');
 		}
 	}
 	return errors;
@@ -290,11 +291,11 @@ for (const { rel, text } of workflows) {
 errors.push(...result.errors);
 errors.push(...checkVersionChain(pipeline.file(pipeline.ENTRY_REL)));
 
-// plan is where the version comes from; the callers only forward it.
-const planMeta = pipeline.step(pipeline.job('plan'), 'Compute tag and version');
-if (!/^\s+version:\s*\$\{\{\s*steps\.meta\.outputs\.version\s*\}\}\s*$/m.test(pipeline.job('plan')) ||
+// validate's plan is where the version comes from; the callers only forward it.
+const planMeta = pipeline.step(pipeline.job('validate'), 'Compute tag and version');
+if (!/^\s+version:\s*\$\{\{\s*steps\.meta\.outputs\.version\s*\}\}\s*$/m.test(pipeline.job('validate')) ||
 	!planMeta.includes('emit version "$version"')) {
-	errors.push(`${pipeline.ENTRY_REL}: plan no longer emits the release version its callers forward`);
+	errors.push(`${pipeline.ENTRY_REL}: validate's plan no longer emits the release version its callers forward`);
 }
 
 if (result.stamping < MIN_STAMPING_STEPS) {
@@ -332,9 +333,9 @@ for (const [key, owners] of [
 const ciText = pipeline.file(pipeline.ENTRY_REL);
 const chainMutated = ciText.replace(CALLER_VERSION, "      version: ''");
 if (chainMutated === ciText) {
-	errors.push(`${pipeline.ENTRY_REL} passes plan's version to no box at all`);
+	errors.push(`${pipeline.ENTRY_REL} passes the plan's version to no lane at all`);
 } else if (checkVersionChain(chainMutated).length === 0) {
-	errors.push('self-check: dropping plan\'s version from an OS caller went unnoticed — this guard cannot fail');
+	errors.push('self-check: dropping the plan\'s version from an OS caller went unnoticed — this guard cannot fail');
 }
 
 // Each build entry point writes the stamp; each packager verifies its copy.

@@ -1,24 +1,25 @@
 # .github/workflows/ci-linux.yml
 #
-# The Linux box of the CI pipeline. ci.yml calls it once per run, after its
-# validate and plan jobs, as the job named "Linux", so every job below renders
-# as "Linux / <name>" inside one group of the run graph:
+# The Linux lane of the CI pipeline. ci.yml calls it once per run, after its
+# validate job, as the job named "Linux", so every job below renders as
+# "Linux / <name>" in the run graph, one lane with one entry job and one exit
+# job:
 #
-#   test-linux ──> install-linux-distros (5)  ┐
-#   first-install-distros (9)                 ├──> linux-ok (evidence gate)
-#   package-linux ──> smoke-deb-install       │
-#                 ├─> smoke-rpm-install       │
-#                 └─> smoke-appimage-run      ┘
+#   test-linux ──> package-linux ──┬─> smoke-deb-install          ┐
+#                                  ├─> smoke-rpm-install          │
+#                                  ├─> smoke-appimage-run         ├──> linux-ok
+#                                  ├─> install-linux-distros (5)  │    (evidence
+#                                  └─> first-install-distros (9)  ┘     gate)
 #
 # The driver is assembled and packaged ONCE per run, by package-linux, into the
 # artifact assets-linux. The .deb, .rpm and AppImage smokes install those exact
 # files on their own pristine hosts, and on a release run ci.yml's release job
 # publishes those same files. linux-ok checks every job's evidence against
-# .github/linux-ci-coverage.json. The box has no outputs: its own result is what
-# the release waits for, and the release collects assets-linux through its
+# .github/linux-ci-coverage.json. The lane has no outputs: its own result is
+# what the release waits for, and the release collects assets-linux through its
 # assets-* download pattern.
 #
-# Inputs, all computed by ci.yml's plan job:
+# Inputs, all computed by the plan steps of ci.yml's validate job:
 #   release       true on a run that publishes; it only sets artifact retention.
 #   version       the release version, '' otherwise ('' writes a commit-only
 #                 build stamp, the CI behaviour).
@@ -53,8 +54,9 @@ jobs:
   # ─────────────────────────────────────────────────
   # 1) Linux Lua driver unit tests, hardware harnesses and stubbed E2E
   # ─────────────────────────────────────────────────
+  # The lane's entry job: the only one of this file that needs nothing.
   test-linux:
-    name: 'unit, hardware + stubbed E2E'
+    name: 'tests'
     runs-on: ubuntu-latest
 
     steps:
@@ -579,10 +581,13 @@ jobs:
   # and go down; what is ours is whether the script RUNS to completion, detects
   # the package manager, and lays the driver out where the daemon expects it. A
   # dependency archive outage must not read as a broken installer.
+  #
+  # After package-linux, like every lane job but the entry: a failing unit
+  # suite or packaging run spends no container time.
   install-linux-distros:
     name: 'install (${{ matrix.distro }})'
     runs-on: ubuntu-latest
-    needs: [test-linux]
+    needs: [package-linux]
     strategy:
       fail-fast: false
       matrix:
@@ -724,9 +729,13 @@ jobs:
   # before and after 1.8, six package managers, LTS and rolling releases.
   # Reproduce any entry locally with:
   #   static/ergopti_plus/linux/tests/distro/run_in_docker.sh <image>
+  #
+  # After package-linux, so the lane keeps one entry job; it used to start at
+  # t=0 beside test-linux.
   first-install-distros:
-    name: 'first install with deps (${{ matrix.distro }})'
+    name: 'first install (${{ matrix.distro }})'
     runs-on: ubuntu-latest
+    needs: [package-linux]
     strategy:
       fail-fast: false
       matrix:
@@ -800,9 +809,10 @@ jobs:
   # renamed below to a name that carries no version at all, so no asset can be
   # misnamed and the website's exact-name lookup keeps working.
   #
-  # Not a dependent of test-linux, deliberately: packaging in parallel shortens
-  # the Linux box by minutes on every run, at the price of a wasted packaging
-  # run on the rare push whose unit suite fails.
+  # After test-linux: a push whose unit suite fails spends nothing on
+  # packaging, and every other job of the lane starts from here, so the lane
+  # has one entry. Packaging used to run in parallel with the tests, which
+  # saved a few minutes but drew a second entry into the run graph.
   #
   # The Flatpak and tarball smokes run here, on the build host, because neither
   # needs a pristine machine: the build only runs `flatpak build-bundle`, so
@@ -810,8 +820,9 @@ jobs:
   # under $HOME. The .deb, .rpm and AppImage smokes each prove a dependency the
   # host must NOT already have, so they keep their own runners below.
   package-linux:
-    name: 'packages + Flatpak and tarball smoke'
+    name: 'package'
     runs-on: ubuntu-latest
+    needs: [test-linux]
     env:
       ERGOPTI_BUILD_VERSION: ${{ inputs.version }}
       LINUX_BUNDLE_ASSET: ${{ inputs.linux_bundle }}
@@ -1097,7 +1108,7 @@ jobs:
   # deliberately not started — they cannot be, and pretending otherwise would
   # make this job green for the wrong reason.
   smoke-deb-install:
-    name: 'install the .deb and launch it'
+    name: 'run the .deb'
     runs-on: ubuntu-latest
     needs: [package-linux]
 
@@ -1200,7 +1211,7 @@ jobs:
   # conversion through alien would be testing alien. dnf resolves the same
   # dependencies a Fedora user's would.
   smoke-rpm-install:
-    name: 'install the .rpm and launch it'
+    name: 'run the .rpm'
     runs-on: ubuntu-latest
     needs: [package-linux]
     container:
@@ -1364,8 +1375,9 @@ jobs:
   #
   # It stays inside this workflow on purpose: toJSON(needs) only sees the jobs
   # of its own workflow, so from ci.yml it would hold nothing but "linux".
-  # if: always() so that a failed or skipped lane is reported by name, from the
-  # evidence, instead of this job being skipped in silence.
+  # if: always() so that a failed or skipped job is reported by name, from the
+  # evidence, instead of this job being skipped in silence. The lane's exit
+  # job: no job of this file needs it.
   linux-ok:
     name: 'evidence gate'
     runs-on: ubuntu-latest

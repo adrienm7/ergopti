@@ -353,7 +353,7 @@ if (/Skip to downloads|DOWNLOADS_ANCHOR/.test(pipeline.text())) {
 	errors.push('release notes must not rely on a jump link to the downloads (it cannot scroll on the first click)');
 }
 // The repository sidebar truncates long release titles, which hid the version.
-// The title is computed in shell once, in plan; later steps only forward it via ${{ }}.
+// The title is computed in shell once, in validate's plan; later steps only forward it via ${{ }}.
 const titles = pipeline.text().match(/^\s*title="(?!\$\{\{)[^"\n]*"/gm) || [];
 if (titles.length === 0 || titles.some(line => line.trim() !== 'title="Ergopti ${tag}"')) {
 	errors.push(`every release title must be exactly "Ergopti \${tag}", got: ${titles.map(t => t.trim()).join(' | ')}`);
