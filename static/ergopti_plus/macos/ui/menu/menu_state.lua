@@ -242,8 +242,10 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 					-- re-applied here and not by the terminator_states loop above,
 					-- because that loop runs before add_custom_terminator has created
 					-- the key it would be setting.
-					local enabled_ct = type(saved.terminator_states) == "table"
-						and saved.terminator_states[ct.key] or nil
+					local enabled_ct
+					if type(saved.terminator_states) == "table" then
+						enabled_ct = saved.terminator_states[ct.key]
+					end
 					if enabled_ct ~= nil and not try_exact("hotstrings", "keymap.set_terminator_enabled",
 						keymap.set_terminator_enabled, ct.key, enabled_ct) then
 						custom_runtime_failed = true

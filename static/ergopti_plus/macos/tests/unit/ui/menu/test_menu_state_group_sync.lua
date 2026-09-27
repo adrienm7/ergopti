@@ -76,6 +76,47 @@ helpers.describe("menu_state: hotstring group sync applies only the delta", func
 end)
 
 helpers.describe("menu_state: custom terminator restore quarantines rejected rows", function()
+	for _, wanted in ipairs({ false, true }) do
+		helpers.it("restores the saved " .. tostring(wanted)
+			.. " after registration (custom-terminator-restore-state)", function()
+			local runtime_enabled
+			local restored = 0
+			local state = {
+				hotstrings = {},
+				custom_terminators = {
+					{ key = "custom_ok", char = "@", label = "valid", consume = false },
+				},
+				terminator_states = { custom_ok = wanted },
+			}
+			local committed = MenuState.sync_state_to_modules(state,
+				{ terminator_states = { custom_ok = wanted } }, false, {
+					keymap = {
+						set_llm_model = function() return true end,
+						get_terminator_defs = function() return {} end,
+						remove_custom_terminator = function() return true end,
+						validate_custom_terminator = function() return true end,
+						add_custom_terminator = function()
+							runtime_enabled = true
+							return true
+						end,
+						set_terminator_enabled = function(_, enabled)
+							-- Before registration the real registry cannot find this key.
+							if runtime_enabled == nil then return false end
+							runtime_enabled = enabled
+							restored = restored + 1
+							return true
+						end,
+					},
+					core_mods = {}, hotstring_editor = {},
+				})
+			helpers.assert_eq(committed, true)
+			helpers.assert_eq(runtime_enabled, wanted,
+				"registration must not replace the saved OFF with its default ON")
+			helpers.assert_eq(restored, 1,
+				"the preference must reach the registered key exactly once")
+		end)
+	end
+
 	helpers.it("retains only exact committed custom definitions and reports the repair", function()
 		local add_calls = {}
 		local save_calls = 0
