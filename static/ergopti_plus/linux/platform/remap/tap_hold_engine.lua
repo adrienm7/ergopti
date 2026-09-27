@@ -77,7 +77,10 @@ local NATIVE_UNDER_MODIFIER = { [1] = true, [14] = true, [15] = true, [28] = tru
 --     (rctrl.ahk 7.3, from key-down here as every hold is), and LAlt's Tab
 --     holds the navigation layer (lalt.ahk 4.2);
 --   - LAlt's one-shot Shift is armed at key-down and holds Shift until the
---     key comes up (lalt.ahk 4.1): `tap_at_down`.
+--     key comes up (lalt.ahk 4.1): `tap_at_down`. Its hotkey has no *
+--     wildcard, so under a held modifier LAlt stays Alt (`native_under_
+--     modifier`), and it does nothing at all while RCtrl, CapsLock, LShift or
+--     LCtrl is physically down (`skip_while_down`).
 local NO_HOLD_BY_KEY = {
 	left_shift = { own = true }, left_ctrl = { own = true }, right_shift = { own = true },
 	alt_gr = { own = true },
@@ -87,7 +90,10 @@ local NO_HOLD_BY_TAP = {
 	left_alt = {
 		alt_tab_monitor = { mods = { KEY_LEFTALT } },
 		tab = { layer = "nav" },
-		one_shot_shift = { mods = { KEY_LEFTSHIFT }, tap_at_down = true },
+		one_shot_shift = {
+			mods = { KEY_LEFTSHIFT }, tap_at_down = true, native_under_modifier = true,
+			skip_while_down = { EvdevCodes.KEY_RIGHTCTRL, EvdevCodes.KEY_CAPSLOCK, KEY_LEFTSHIFT, KEY_LEFTCTRL },
+		},
 	},
 	right_ctrl = { tab = { own = true }, one_shot_shift = { mods = { KEY_LEFTSHIFT } } },
 }
@@ -247,6 +253,8 @@ function M.new(opts)
 				-- A tap and no hold with no rule: nothing to wait for (see fire_instant).
 				instant = no_hold and not rule,
 				tap_at_down = rule and rule.tap_at_down or false,
+				native_under_modifier = rule and rule.native_under_modifier or false,
+				skip_while_down = rule and rule.skip_while_down or nil,
 				tap_needs_up = TAP_NEEDS_UP[key_id],
 				threshold_ms = math.floor((tonumber(config.time_activation_seconds) or 0) * 1000 + 0.5),
 			}
@@ -580,10 +588,17 @@ function M:process(code, value, now_ms)
 				self.native_keys[code] = true
 				return pass(self, code, value)
 			end
-			if NATIVE_UNDER_MODIFIER[code] and modifier_held(self) then
+			local native_under_modifier = NATIVE_UNDER_MODIFIER[code] or config.native_under_modifier
+			if native_under_modifier and modifier_held(self) then
 				cancel_taps(self, nil)
 				self.native_keys[code] = true
 				return pass(self, code, value)
+			end
+			for _, blocker in ipairs(config.skip_while_down or {}) do
+				if self.physical_down[blocker] then
+					cancel_taps(self, code)
+					return swallow_until_release(self, code, now_ms)
+				end
 			end
 			if config.instant then
 				cancel_taps(self, nil)
