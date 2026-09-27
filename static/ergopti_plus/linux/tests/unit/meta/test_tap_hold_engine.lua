@@ -534,6 +534,50 @@ helpers.describe("tap-hold engine: LAlt's Backspace under held keys", function()
 
 end)
 
+-- rctrl.ahk 7.1 and _RCtrlBackspaceTap: RCtrl's Backspace tap types Delete
+-- while LShift (only the left one) is physically down, and Right then
+-- Backspace, spending the one-shot, while LAlt tapping the one-shot Shift is
+-- down; otherwise a Backspace under the held modifiers. Linux typed
+-- Shift+Backspace and left the one-shot armed (rctrl-backspace-logic).
+helpers.describe("tap-hold engine: RCtrl's Backspace under held keys", function()
+
+	local LSHIFT, RSHIFT = 42, 54
+	local ONE_SHOT_LALT = { tap_action = "one_shot_shift", time_activation_seconds = 0.2 }
+
+	helpers.it("types Delete under LShift, at key-down and each repeat with no hold (rctrl-backspace-logic)", function()
+		local e = engine({ right_ctrl = { tap_action = "backspace", time_activation_seconds = 0.2 } })
+		e:process(LSHIFT, DOWN, 0)
+		helpers.assert_eq(trail((e:process(RCTRL, DOWN, 10))), "42↑ 111↓ 111↑ 42↓", "Delete at key-down")
+		helpers.assert_eq(trail((e:process(RCTRL, REPEAT, 510))), "42↑ 111↓ 111↑ 42↓", "and at each repeat")
+		e:process(RCTRL, UP, 520)
+		e:process(LSHIFT, UP, 530)
+		e:process(RSHIFT, DOWN, 600)
+		helpers.assert_eq(trail((e:process(RCTRL, DOWN, 610))), "14↓ 14↑", "RShift is no LShift here: Backspace")
+	end)
+
+	helpers.it("types Delete under LShift on the tap of a hold (rctrl-backspace-logic)", function()
+		local e = engine({ right_ctrl = { tap_action = "backspace", hold_modifier = "ctrl", time_activation_seconds = 0.2 } })
+		e:process(LSHIFT, DOWN, 0)
+		e:process(RCTRL, DOWN, 10)
+		helpers.assert_eq(trail((e:process(RCTRL, UP, 100))), "29↑ 42↑ 111↓ 111↑ 42↓")
+		e:process(LSHIFT, UP, 200)
+		e:process(RCTRL, DOWN, 300)
+		helpers.assert_eq(trail((e:process(RCTRL, UP, 400))), "29↑ 14↓ 14↑", "alone, a Backspace")
+	end)
+
+	helpers.it("types Right then Backspace under LAlt's one-shot Shift and spends it (rctrl-backspace-logic)", function()
+		local e = engine({ right_ctrl = { tap_action = "backspace", time_activation_seconds = 0.2 },
+			left_alt = ONE_SHOT_LALT })
+		helpers.assert_eq(trail((e:process(ALT, DOWN, 0))), "42↓", "LAlt holds Shift and arms the one-shot")
+		helpers.assert_eq(trail((e:process(RCTRL, DOWN, 10))), "42↑ 106↓ 106↑ 14↓ 14↑ 42↓",
+			"a Delete with LAlt's Shift lifted")
+		e:process(RCTRL, UP, 50)
+		e:process(ALT, UP, 60)
+		helpers.assert_nil(e:process(KEY_A, DOWN, 100), "the one-shot is spent: a plain a")
+	end)
+
+end)
+
 helpers.describe("tap-hold engine: thresholds and holds", function()
 
 	helpers.it("counts a release exactly at the threshold or the minimum as a tap", function()
