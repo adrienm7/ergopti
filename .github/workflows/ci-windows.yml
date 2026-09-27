@@ -1,20 +1,12 @@
 # .github/workflows/ci-windows.yml
 #
-# Windows lane of the CI pipeline. ci.yml calls it as its 'Windows' job, after
-# Validate and plan, so the jobs below render as 'Windows / <name>' in the run
-# graph, one lane with one entry job and one exit job:
-#
-#   test-ahk ──> package-windows (release runs only)
-#
-# test-ahk runs the AHK unit, LLM, compiler-warning and E2E gates on every run.
-# package-windows runs only when validate's plan resolved a free release tag:
-# it builds, signs and smokes the exe that Release attaches, and uploads it as
-# assets-windows. On any other run it is skipped, which leaves the lane green.
-# The lane declares no outputs; Release collects every assets-* artifact of the
-# run by pattern, and this lane's own result gates it.
-#
-# No concurrency block: ci.yml's group already covers every called workflow,
-# and reusing that group here with cancel-in-progress would cancel this run.
+# Windows lane: unit tests -> E2E tests -> package -> install and launch -> verdict.
+# The two suites have independent runtimes and fresh checkouts. Packaging never
+# consumes their generated caches. Every run compiles the application; release
+# runs additionally sign it. The launch job downloads assets-windows and runs
+# that exact executable on a fresh host with its normal Defender settings.
+# The verdict requires all four jobs and a successful launch of this commit.
+# Parent ci.yml owns concurrency; this workflow must not cancel its caller.
 
 name: Windows
 
@@ -57,10 +49,10 @@ permissions:
 
 jobs:
   # ─────────────────────────────────────────────────
-  # 1) AHK unit tests + E2E
+  # 1) AHK unit, native and contract tests
   # ─────────────────────────────────────────────────
   test-ahk:
-    name: 'Tests'
+    name: 'Unit tests'
     runs-on: windows-latest
 
     steps:
@@ -292,6 +284,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
+          overwrite: true
           name: windows-ahk-execution-manifest
           path: ${{ runner.temp }}/windows-ahk-execution-manifest.json
           if-no-files-found: warn
@@ -323,10 +316,55 @@ jobs:
           }
           Write-Host "No AHK compiler warnings."
 
-      # The E2E suite used to be its own job with needs: [test-ahk]. As the last
-      # step it still runs only once every gate above passed. The recursive
-      # encoding check above already covers its runner, and the features
-      # manifest it reads was built at the top of this job.
+  e2e-ahk:
+    name: 'E2E tests (engine)'
+    needs: [test-ahk]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read E2E runtime contract
+        id: ahk-contract
+        shell: pwsh
+        run: |
+          $contractPath = "${{ github.workspace }}\static\ergopti_plus\_shared\modules\updater\windows_release_toolchain.json"
+          $contract = Get-Content -LiteralPath $contractPath -Raw | ConvertFrom-Json
+          "version=$($contract.runtime.version)" >> $env:GITHUB_OUTPUT
+          "url=$($contract.runtime.url)" >> $env:GITHUB_OUTPUT
+          "sha256=$($contract.runtime.sha256)" >> $env:GITHUB_OUTPUT
+
+      - name: Cache E2E runtime
+        id: cache-ahk
+        uses: actions/cache@v4
+        with:
+          path: C:\AutoHotkey
+          key: ahk-${{ steps.ahk-contract.outputs.version }}-${{ steps.ahk-contract.outputs.sha256 }}-windows
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+          cache: 'npm'
+
+      - run: npm ci
+        shell: pwsh
+
+      - name: Build E2E features manifest
+        run: npm run build:manifest
+        shell: pwsh
+
+      - name: Download E2E runtime
+        if: steps.cache-ahk.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          Invoke-WebRequest `
+              -Uri "${{ steps.ahk-contract.outputs.url }}" `
+              -OutFile "$env:TEMP\AHK.zip" -UseBasicParsing
+          $actual = (Get-FileHash -LiteralPath "$env:TEMP\AHK.zip" -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -cne "${{ steps.ahk-contract.outputs.sha256 }}") {
+              throw "AutoHotkey v${{ steps.ahk-contract.outputs.version }} archive digest mismatch: $actual"
+          }
+          Expand-Archive -Path "$env:TEMP\AHK.zip" -DestinationPath "C:\AutoHotkey" -Force
+
       - name: Run E2E suite (Strategy A — pure engine injection)
         shell: pwsh
         timeout-minutes: 5
@@ -380,19 +418,18 @@ jobs:
           }
 
   # ─────────────────────────────────────────────────
-  # 2) Release exe: compile, sign and smoke (release runs only)
+  # 3) Build the executable once; sign releases
   # ─────────────────────────────────────────────────
   # Its own job on a fresh checkout, never a tail of test-ahk: the unit and E2E
   # suites write runtime caches next to tracked sources (locale .tsv files,
   # generated_hotstrings.tsv, _generated/prefetch_*.json), and
   # build_static_bundle.py bundles those directories, so a shared workspace
   # would ship test leftovers inside the signed exe. A fresh runner also keeps
-  # the smoke on the image's own Defender configuration, which the test job
+  # the launch on the image's own Defender configuration, which the test job
   # alters; nothing here disables or restores Defender.
   package-windows:
     name: 'Package'
-    needs: [test-ahk]
-    if: inputs.release
+    needs: [e2e-ahk]
     runs-on: windows-latest
 
     steps:
@@ -429,7 +466,7 @@ jobs:
       - name: Stamp BUNDLE_VERSION, BUNDLE_RELEASE_URL, BUNDLE_CHANNEL
         shell: pwsh
         run: |
-          $version = "${{ inputs.version }}"
+          $version = "${{ inputs.version || '0.0.0-dev' }}"
           $tag     = "${{ inputs.tag }}"
           if (-not $tag) { $tag = $version }
           # ci.yml's plan owns the one prerelease-to-channel rule. The updater
@@ -528,6 +565,7 @@ jobs:
           Write-Host "Compiled: $out ($('{0:N0}' -f (Get-Item -LiteralPath $out).Length) bytes)"
 
       - name: Sign and verify ErgoptiPlus.exe
+        if: inputs.release
         shell: pwsh
         env:
           ERGOPTI_RELEASE_PRERELEASE: ${{ inputs.prerelease }}
@@ -589,6 +627,37 @@ jobs:
           }
           Write-Host "Verified Authenticode publisher: $($signature.SignerCertificate.Subject)"
 
+      - name: Rename the keyboard layout for upload
+        shell: bash
+        run: |
+          set -euo pipefail
+          latest_kbd=$(ls static/ergopti/windows/Ergopti_v*.exe | sort -V | tail -1)
+          cp "$latest_kbd" static/ergopti/windows/Ergopti_windows.exe
+
+      - name: Upload the application and layout
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: assets-windows
+          retention-days: 7
+          if-no-files-found: error
+          path: |
+            static/ergopti_plus/windows/ErgoptiPlus.exe
+            static/ergopti/windows/Ergopti_windows.exe
+
+  launch-windows:
+    name: 'Install and launch'
+    needs: [package-windows]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download the compiled application
+        uses: actions/download-artifact@v4
+        with:
+          name: assets-windows
+          path: ${{ runner.temp }}/package
+
       - name: Smoke test compiled ErgoptiPlus.exe (crash-on-launch guard)
         # The unit test suite (test-ahk job) runs against source .ahk files with
         # A_IsCompiled == false, so it never exercises compiled-mode-only code
@@ -600,7 +669,7 @@ jobs:
         shell: pwsh
         timeout-minutes: 3
         run: |
-          $exe = "${{ github.workspace }}\static\ergopti_plus\windows\ErgoptiPlus.exe"
+          $exe = "$env:RUNNER_TEMP\package\ergopti_plus\windows\ErgoptiPlus.exe"
           $markerFile = "$env:LOCALAPPDATA\Ergopti\bundle\.bundle-version"
           Remove-Item "$env:LOCALAPPDATA\Ergopti\bundle" -Recurse -Force -ErrorAction SilentlyContinue
           $stdout = "$env:TEMP\ergopti_smoke_stdout.txt"
@@ -610,7 +679,7 @@ jobs:
           # to stderr; a RUNTIME error like the one this step guards against
           # still pops a blocking MsgBox, so the real signal below is
           # behavioural (marker file written / early exit), not the exit code.
-          $proc = Start-Process -FilePath $exe -ArgumentList "/ErrorStdOut" -PassThru `
+          $proc = Start-Process -FilePath $exe -ArgumentList "/ErrorStdOut" -WindowStyle Hidden -PassThru `
               -RedirectStandardOutput $stdout -RedirectStandardError $stderr
 
           $deadline = (Get-Date).AddSeconds(20)
@@ -641,20 +710,48 @@ jobs:
               exit 1
           }
           Write-Host "OK: ErgoptiPlus.exe survived startup and extracted its bundle to $markerFile"
+          $evidence = @{
+              schema_version = 1
+              platform = 'windows'
+              sha = $env:GITHUB_SHA
+              runner = 'windows-latest'
+              scenario = 'startup'
+              package_sha256 = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant()
+              marker_seen = $markerSeen
+              crashed_early = $crashedEarly
+              failures = @()
+          }
+          $evidence | ConvertTo-Json | Set-Content -LiteralPath "$env:RUNNER_TEMP/evidence.json" -Encoding utf8
 
-      - name: Rename the keyboard layout for upload
-        shell: bash
-        run: |
-          set -euo pipefail
-          latest_kbd=$(ls static/ergopti/windows/Ergopti_v*.exe | sort -V | tail -1)
-          cp "$latest_kbd" static/ergopti/windows/Ergopti_windows.exe
-
-      - name: Upload the application and layout
+      - name: Upload mandatory launch evidence
         uses: actions/upload-artifact@v4
         with:
-          name: assets-windows
+          name: windows-launch-evidence
+          overwrite: true
+          path: ${{ runner.temp }}/evidence.json
           retention-days: 7
           if-no-files-found: error
-          path: |
-            static/ergopti_plus/windows/ErgoptiPlus.exe
-            static/ergopti/windows/Ergopti_windows.exe
+
+  windows-ok:
+    name: 'Verdict'
+    needs: [test-ahk, e2e-ahk, package-windows, launch-windows]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+
+      - name: Download launch evidence
+        uses: actions/download-artifact@v4
+        with:
+          pattern: windows-launch-evidence
+          path: ${{ runner.temp }}/launch-evidence
+
+      - name: Verify mandatory jobs and launch scenarios
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+          RELEASE: ${{ inputs.release }}
+        run: node tools/test/desktop-ci-evidence.cjs verify windows "$RUNNER_TEMP/launch-evidence"

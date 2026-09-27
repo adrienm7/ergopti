@@ -70,7 +70,7 @@ const releaseSteps = new Map();
  */
 function releaseStep(name, rel) {
 	if (releaseSteps.has(name)) return releaseSteps.get(name);
-	const job = PACKAGE_JOB[rel];
+	const job = name === 'Smoke test compiled ErgoptiPlus.exe (crash-on-launch guard)' ? 'launch-windows' : PACKAGE_JOB[rel];
 	let body = null;
 	try {
 		const found = pipeline.findStep(name);
@@ -108,11 +108,11 @@ if (windowsUpload !== null && !/^\s+name:\s*assets-windows\s*$/m.test(windowsUpl
 	errors.push('the Windows release exe must be uploaded as assets-windows, the artifact release attaches');
 }
 const packageWindows = pipeline.job(PACKAGE_JOB[WINDOWS_BOX]);
-if (!pipeline.needsOf(packageWindows).includes('test-ahk')) {
-	errors.push(`${PACKAGE_JOB[WINDOWS_BOX]} must need test-ahk: a release exe is built only after the suites passed`);
+if (!pipeline.needsOf(packageWindows).includes('e2e-ahk')) {
+	errors.push(`${PACKAGE_JOB[WINDOWS_BOX]} must need e2e-ahk: a release exe is built only after the suites passed`);
 }
 const codeOf = (body) => body.split('\n').filter((line) => !line.trimStart().startsWith('#')).join('\n');
-const testAhkCode = codeOf(pipeline.job('test-ahk'));
+const testAhkCode = codeOf(pipeline.job('test-ahk')) + codeOf(pipeline.job('e2e-ahk'));
 for (const token of ['run_all.ahk', 'run_e2e.ahk', 'MpPreference']) {
 	// The token must still exist where it belongs, so the ban reads live text.
 	if (!testAhkCode.includes(token)) {
@@ -134,7 +134,6 @@ const WINDOWS_ORDER = [
 	'Stamp BUNDLE_VERSION, BUNDLE_RELEASE_URL, BUNDLE_CHANNEL',
 	'Compile ErgoptiPlus.ahk',
 	'Sign and verify ErgoptiPlus.exe',
-	'Smoke test compiled ErgoptiPlus.exe (crash-on-launch guard)',
 	'Rename the keyboard layout for upload',
 	'Upload the application and layout',
 ];

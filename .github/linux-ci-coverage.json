@@ -4,7 +4,12 @@
 		"test-linux": {
 			"classification": "mandatory",
 			"subjects": {
-				"unit": 1,
+				"unit": 1
+			}
+		},
+		"e2e-linux": {
+			"classification": "mandatory",
+			"subjects": {
 				"uinput-roundtrip": 1,
 				"grab-race": 1,
 				"system-keymaps": 1,

@@ -164,7 +164,7 @@ const installJob = pipeline.job('install-linux');
 assertInstallMatrix(installJob);
 assert.deepStrictEqual(Object.keys(MANIFEST.jobs['install-linux'].subjects).sort(), INSTALL_ROWS.map((row) => row[0]).sort());
 assert.deepStrictEqual(pipeline.jobs(LINUX_BOX).map((job) => job.id).sort(),
-	['install-linux', 'linux-ok', 'package-linux', 'test-linux']);
+	['e2e-linux', 'install-linux', 'linux-ok', 'package-linux', 'test-linux']);
 for (const [id] of INSTALL_ROWS) {
 	rejects(({ evidence }) => { evidence.splice(evidence.findIndex((doc) => id in doc.subjects), 1); },
 		/has no evidence for/);
@@ -201,9 +201,9 @@ for (const subject of PACKAGE_SUBJECTS) {
 // must not keep them running for minutes (always() did). Every step from the
 // E2E harness to the evidence record runs under !cancelled(); the record and
 // its upload run only when every harness passed.
-const testLinuxSteps = pipeline.steps(pipeline.job('test-linux'));
-const unitAt = testLinuxSteps.findIndex((candidate) => candidate.name === 'Run the driver unit test suite');
-const recordAt = testLinuxSteps.findIndex((candidate) => candidate.name === 'Record mandatory test evidence');
+const testLinuxSteps = pipeline.steps(pipeline.job('e2e-linux'));
+const unitAt = testLinuxSteps.findIndex((candidate) => candidate.name === 'Install LuaJIT');
+const recordAt = testLinuxSteps.findIndex((candidate) => candidate.name === 'Record mandatory E2E evidence');
 assert.ok(unitAt >= 0 && recordAt > unitAt + 1, 'test-linux must run its harnesses between the unit suite and the record');
 assert.strictEqual(testLinuxSteps[unitAt + 1].name, 'Run virtual-keyboard E2E harness (stubbed)',
 	'the stubbed E2E harness must run right after the unit suite');
@@ -232,10 +232,12 @@ const testLinux = pipeline.job('test-linux');
 assert.match(pipeline.stepField(pipeline.step(testLinux, 'Run the driver unit test suite'), 'run') ?? '',
 	/^node \.\.\/\.\.\/\.\.\/tools\/test\/report\.cjs --name linux-lua --json "\$\{\{ runner\.temp \}\}\/linux-lua\.json" -- luajit tests\/run\.lua$/,
 	'the unit suite must write the report its evidence counts');
-assert.ok((pipeline.runOf(pipeline.step(testLinux, 'Run virtual-keyboard E2E harness (stubbed)')) ?? [])
+assert.ok((pipeline.runOf(pipeline.step(pipeline.job('e2e-linux'), 'Run virtual-keyboard E2E harness (stubbed)')) ?? [])
 	.includes('luajit tests/e2e/run_e2e.lua | tee "$RUNNER_TEMP/linux-e2e.log"'),
 'the stubbed E2E harness must keep the log its evidence counts');
-const recordScript = pipeline.runOf(pipeline.step(testLinux, 'Record mandatory test evidence')) ?? [];
+const unitRecord = pipeline.runOf(pipeline.step(testLinux, 'Record mandatory unit evidence')) ?? [];
+const e2eRecord = pipeline.runOf(pipeline.step(pipeline.job('e2e-linux'), 'Record mandatory E2E evidence')) ?? [];
+const recordScript = [...unitRecord, ...e2eRecord];
 for (const line of [
 	'unit_assertions=$(jq -r \'.passed\' "$RUNNER_TEMP/linux-lua.json")',
 	'e2e_assertions=$(sed -n \'s/^1\\.\\.\\([0-9][0-9]*\\)$/\\1/p\' "$RUNNER_TEMP/linux-e2e.log" | tail -1)',
@@ -243,7 +245,7 @@ for (const line of [
 	assert.ok(recordScript.includes(line), `the test-linux evidence must read its count with: ${line}`);
 }
 const recorded = [...recordScript.join('\n').matchAll(/--subject "?([a-z0-9-]+)=([^\s"]+)"?/g)];
-assert.deepStrictEqual(recorded.map((match) => match[1]).sort(), Object.keys(MANIFEST.jobs['test-linux'].subjects).sort(),
+assert.deepStrictEqual(recorded.map((match) => match[1]).sort(), [...Object.keys(MANIFEST.jobs['test-linux'].subjects), ...Object.keys(MANIFEST.jobs['e2e-linux'].subjects)].sort(),
 	'the test-linux record must name exactly the manifest subjects of test-linux');
 for (const [, subject, value] of recorded) {
 	const expected = { unit: '$unit_assertions', 'hotstring-e2e': '$e2e_assertions' }[subject] ?? '1';

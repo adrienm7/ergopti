@@ -5,7 +5,7 @@
 # "Linux / <name>" in the run graph, one lane with one entry job and one exit
 # job:
 #
-#   test-linux ──> package-linux ──> install-linux (17) ──> linux-ok
+#   unit tests -> E2E tests -> package -> install and launch (17) -> verdict
 #                                  5 archive installs     (evidence gate)
 #                                  9 first installs
 #                                  3 package runs
@@ -51,11 +51,11 @@ permissions:
 
 jobs:
   # ─────────────────────────────────────────────────
-  # 1) Linux Lua driver unit tests, hardware harnesses and stubbed E2E
+  # 1) Linux Lua driver unit and native contract tests
   # ─────────────────────────────────────────────────
   # The lane's entry job: the only one of this file that needs nothing.
   test-linux:
-    name: 'Tests'
+    name: 'Unit tests'
     runs-on: ubuntu-latest
 
     steps:
@@ -81,14 +81,49 @@ jobs:
         # summary on failure. report.cjs lives at the repo root tools/.
         run: node ../../../tools/test/report.cjs --name linux-lua --json "${{ runner.temp }}/linux-lua.json" -- luajit tests/run.lua
 
+      - name: Record mandatory unit evidence
+        run: |
+          set -euo pipefail
+          unit_assertions=$(jq -r '.passed' "$RUNNER_TEMP/linux-lua.json")
+          node tools/test/linux-ci-evidence.cjs record \
+              --job test-linux \
+              --output "$RUNNER_TEMP/linux-ci-evidence/test-linux.json" \
+              --sha "$GITHUB_SHA" \
+              --architecture "$RUNNER_ARCH" \
+              --distro ubuntu \
+              --session x11-wayland-headless \
+              --interpreter "$(luajit -v 2>&1 | head -1)" \
+              --subject "unit=$unit_assertions"
+
+      - name: Upload mandatory unit evidence
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: linux-ci-evidence-test-linux
+          retention-days: 7
+          path: ${{ runner.temp }}/linux-ci-evidence/test-linux.json
+          if-no-files-found: error
+
+  e2e-linux:
+    name: 'E2E tests'
+    needs: [test-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install LuaJIT
+        # The test runner (tests/run.lua) uses LuaJIT. Test discovery falls
+        # back to io.popen("find") when lfs is unavailable — no luarocks needed.
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y luajit sqlite3
+
       # The virtual-keyboard harness, stubbed: this step runs on ubuntu-latest
       # against the pure-Lua hotstring engine — no real evdev device, no ydotool
       # injection. It is a corpus-driven replay of the engine's on_char() logic
       # layer, not an OS-level end-to-end test.
       #
-      # A step and not a job, for the reason the uinput step below gives: ten
-      # seconds of work did not justify a runner, a checkout and an apt install.
-      # As a separate job its failure could not hide anything, so this step and
+      # Unit tests have already passed. Within this E2E job, this step and
       # every harness after it run with `if: ${{ !cancelled() }}`: a red E2E still
       # lets the kernel, display and tray harnesses report what they measured,
       # while a run cancelled by a newer push stops at once instead of spending
@@ -530,20 +565,18 @@ jobs:
           exit $STATUS
         timeout-minutes: 5
 
-      - name: Record mandatory test evidence
+      - name: Record mandatory E2E evidence
         run: |
           set -euo pipefail
-          unit_assertions=$(jq -r '.passed' "$RUNNER_TEMP/linux-lua.json")
           e2e_assertions=$(sed -n 's/^1\.\.\([0-9][0-9]*\)$/\1/p' "$RUNNER_TEMP/linux-e2e.log" | tail -1)
           node tools/test/linux-ci-evidence.cjs record \
-              --job test-linux \
-              --output "$RUNNER_TEMP/linux-ci-evidence/test-linux.json" \
+              --job e2e-linux \
+              --output "$RUNNER_TEMP/linux-ci-evidence/e2e-linux.json" \
               --sha "$GITHUB_SHA" \
               --architecture "$RUNNER_ARCH" \
               --distro ubuntu \
               --session x11-wayland-headless \
               --interpreter "$(luajit -v 2>&1 | head -1)" \
-              --subject "unit=$unit_assertions" \
               --subject uinput-roundtrip=1 \
               --subject grab-race=1 \
               --subject system-keymaps=1 \
@@ -562,16 +595,17 @@ jobs:
               --subject page-load-errors=1 \
               --subject "hotstring-e2e=$e2e_assertions"
 
-      - name: Upload mandatory test evidence
+      - name: Upload mandatory E2E evidence
         uses: actions/upload-artifact@v4
         with:
-          name: linux-ci-evidence-test-linux
+          overwrite: true
+          name: linux-ci-evidence-e2e-linux
           retention-days: 7
-          path: ${{ runner.temp }}/linux-ci-evidence/test-linux.json
+          path: ${{ runner.temp }}/linux-ci-evidence/e2e-linux.json
           if-no-files-found: error
 
   # ─────────────────────────────────────────────────
-  # 2) Assemble the driver once, build every package, smoke two of them
+  # 3) Assemble the driver once, build every package, smoke two of them
   # ─────────────────────────────────────────────────
   # One assembly and one packaging pass per run, CI and release alike: the files
   # uploaded below as assets-linux are the ones the three package smoke rows install
@@ -591,7 +625,7 @@ jobs:
   # renamed below to a name that carries no version at all, so no asset can be
   # misnamed and the website's exact-name lookup keeps working.
   #
-  # After test-linux: a push whose unit suite fails spends nothing on
+  # After e2e-linux: a push whose unit or E2E suite fails spends nothing on
   # packaging, and every other job of the lane starts from here, so the lane
   # has one entry. Packaging used to run in parallel with the tests, which
   # saved a few minutes but drew a second entry into the run graph.
@@ -604,7 +638,7 @@ jobs:
   package-linux:
     name: 'Package'
     runs-on: ubuntu-latest
-    needs: [test-linux]
+    needs: [e2e-linux]
     env:
       ERGOPTI_BUILD_VERSION: ${{ inputs.version }}
       LINUX_BUNDLE_ASSET: ${{ inputs.linux_bundle }}
@@ -840,6 +874,7 @@ jobs:
         # jobs" still finds it, 1 day otherwise.
         uses: actions/upload-artifact@v4
         with:
+          overwrite: true
           name: assets-linux
           retention-days: ${{ inputs.release && 7 || 1 }}
           if-no-files-found: error
@@ -872,6 +907,7 @@ jobs:
       - name: Upload mandatory package evidence
         uses: actions/upload-artifact@v4
         with:
+          overwrite: true
           name: linux-ci-evidence-package-linux
           retention-days: 7
           path: ${{ runner.temp }}/linux-ci-evidence/package-linux.json
@@ -888,7 +924,7 @@ jobs:
   # LuaJIT, so dependency resolution and the bundled interpreter remain tested.
   # An empty scalar container means a host job in the GitHub runner.
   install-linux:
-    name: 'Install and run · ${{ matrix.label }}'
+    name: 'Install and launch · ${{ matrix.label }}'
     runs-on: ubuntu-latest
     needs: [package-linux]
     strategy:
@@ -1132,6 +1168,7 @@ jobs:
         if: matrix.kind == 'install'
         uses: actions/upload-artifact@v4
         with:
+          overwrite: true
           name: linux-ci-evidence-distro-${{ matrix.distro }}
           retention-days: 7
           path: ${{ runner.temp }}/linux-ci-evidence/${{ matrix.distro }}.json
@@ -1170,6 +1207,7 @@ jobs:
         if: matrix.kind == 'first'
         uses: actions/upload-artifact@v4
         with:
+          overwrite: true
           name: linux-ci-evidence-first-install-${{ matrix.distro }}
           retention-days: 7
           path: ${{ runner.temp }}/linux-ci-evidence/first-install-${{ matrix.distro }}.json
@@ -1271,6 +1309,7 @@ jobs:
         if: matrix.kind == 'deb'
         uses: actions/upload-artifact@v4
         with:
+          overwrite: true
           name: linux-ci-evidence-smoke-deb-install
           retention-days: 7
           path: ${{ runner.temp }}/linux-ci-evidence/smoke-deb-install.json
@@ -1339,6 +1378,7 @@ jobs:
         if: matrix.kind == 'rpm'
         uses: actions/upload-artifact@v4
         with:
+          overwrite: true
           name: linux-ci-evidence-smoke-rpm-install
           retention-days: 7
           path: ${{ runner.temp }}/linux-ci-evidence/smoke-rpm-install.json
@@ -1410,13 +1450,14 @@ jobs:
         if: matrix.kind == 'appimage'
         uses: actions/upload-artifact@v4
         with:
+          overwrite: true
           name: linux-ci-evidence-smoke-appimage-run
           retention-days: 7
           path: ${{ runner.temp }}/linux-ci-evidence/smoke-appimage-run.json
           if-no-files-found: error
 
   # ─────────────────────────────────────────────────
-  # 4) Gate: every mandatory Linux subject ran and passed
+  # 5) Verdict: every mandatory Linux subject ran and passed
   # ─────────────────────────────────────────────────
   # The needs: list below and .github/linux-ci-coverage.json name the same jobs
   # twice on purpose — needs: decides what this job waits for, the manifest
@@ -1433,10 +1474,11 @@ jobs:
   # evidence, instead of this job being skipped in silence. The lane's exit
   # job: no job of this file needs it.
   linux-ok:
-    name: 'Evidence gate'
+    name: 'Verdict'
     runs-on: ubuntu-latest
     needs:
       - test-linux
+      - e2e-linux
       - package-linux
       - install-linux
     if: always()

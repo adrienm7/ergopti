@@ -1,54 +1,19 @@
 # .github/workflows/ci.yml
 #
-# Unified CI pipeline — one run per push to main or dev, per pull request into
-# them, and per manual dispatch.
+# One root resolves the release plan, then fans out to the shared-core matrix
+# and three OS lanes. The core matrix exposes JS contracts/parity, properties,
+# and (on main) mutation tests independently, each on a fresh shallow checkout.
 #
-# Architecture: one root, one lane per OS, one release.
+# Every OS follows the same visible sequence:
+#   unit tests -> E2E tests -> package -> install and launch -> verdict
+# Installation variants stay inside one matrix. Each verdict rejects missing
+# mandatory work. The release waits for core and all three verdicts, and keeps
+# its direct dependency on validate so reruns cannot lose the release plan.
 #
-#                   ┌──> macOS   (ci-macos.yml)   ──┐
-#   validate ───────┼──> Windows (ci-windows.yml) ──┼──> release
-#      │            └──> Linux   (ci-linux.yml)   ──┘       ▲
-#      └────────────────── the release plan ────────────────┘
-#
-#   macOS    tests ──> package ──> launch (matrix)
-#   Windows  tests ──> package (release runs only)
-#   Linux    tests ──> package ──> run the .deb, run the .rpm, run the AppImage,
-#                                  install (matrix), first install (matrix)
-#                              ──> evidence gate
-#
-# GitHub's run graph draws no box around a called workflow: it flattens its
-# jobs into the run's one graph as "<OS> / <job>" and groups them only in the
-# sidebar. So each OS workflow has exactly one entry job, which needs nothing
-# else in its file, and exactly one exit job, which no job of its file needs:
-# the root fans out to three jobs and the release fans in from three lanes.
-# tools/test/test-ci-pipeline-wiring.cjs pins that shape.
-#
-#   validate   The single root. Every repository-wide gate first, on the
-#              default shallow clone: hotstring TOML format, fast-check
-#              properties, Stryker on main, and the npm run test:js umbrella
-#              (domain drift, parity, port compliance, translations, strict
-#              convention lint, ...). Then it deepens the clone and resolves the
-#              release plan once, from git refs alone: whether this run
-#              publishes, and its tag, version, title and update channel. Only a
-#              push to main or dev of a commit that no tag of its series
-#              contains yet, and whose next tag is still free, publishes; every
-#              other run takes the CI profile.
-#   macOS      One reusable workflow per OS, each one lane of the graph. A lane
-#   Windows    runs its tests, then builds its package, on every run (Windows
-#   Linux      on a release run only). On a release run it builds the release
-#              artifact once, gates those exact bytes, and uploads them as
-#              assets-<os>. A lane's own result is its aggregate gate: it fails
-#              as soon as any of its jobs fails.
-#   release    Publishes. It needs all three lanes to succeed, reads the plan
-#              from validate, downloads every assets-* artifact of the run,
-#              creates the tag and the release, and pushes the Sparkle channel
-#              feed.
-#
-# Only with: and secrets: cross a call. The lanes read validate's plan outputs
-# as inputs, and each signing secret is passed explicitly, never with
-# `inherit`, and only on a release run.
-#
-# bench.yml — perf benchmark (main only, independent cadence)
+# Each package is built once; launch checks consume those same bytes and the
+# release publishes them. Only release receives write permission. Signing
+# secrets reach the OS workflows only on release runs, never through inherit.
+# bench.yml remains independent.
 
 name: CI
 
@@ -74,24 +39,11 @@ concurrency:
 
 jobs:
   # ─────────────────────────────────────────────────
-  # 1.1) Repository-wide validation, then the release plan
+  # 1.1) Validate the release inputs and resolve the plan
   # ─────────────────────────────────────────────────
-  # One job for what used to be four validate jobs and the plan job: the
-  # domain pipeline and the translation audit already run inside npm run
-  # test:js, as do the port compliance, priority parity and strict convention
-  # lint steps. Each check after the setup runs under !cancelled(): the checks
-  # used to be separate jobs, and one failing check must still not hide the
-  # others. Any failure still fails the job.
-  #
-  # The plan steps come last, after "Deepen history for the release plan".
-  # Several test:js gates shell out to git, so the checks run on the default
-  # depth-1 clone they were written against: a deeper clone would change what
-  # they see. The plan steps keep the default success() condition: a red check
-  # has already failed the job, and the lanes that read the plan never start.
-  #
-  # channel is the one copy of the prerelease-to-channel rule: every consumer
-  # (the macOS bundle and appcast, the Windows stamp, the published feed) reads
-  # it from here.
+  # Resolve the plan once, retaining bounded fetch retries and strict tag checks.
+  # The shared JS suites use their own depth-1 checkout in core, so deepening
+  # this checkout never changes the history those tests inspect.
   validate:
     name: 'Validate / Checks and plan'
     runs-on: ubuntu-latest
@@ -112,47 +64,15 @@ jobs:
         with:
           python-version: '3.12'
 
-      - uses: actions/setup-node@v4
+      - name: Prepare plan validation
+        uses: actions/setup-node@v4
         with:
           node-version-file: '.node-version'
           cache: 'npm'
 
-      - run: npm ci
-
-      - name: Install native validation tools
-        # test-shared-root-resolvers.cjs EXECUTES each driver's lib/paths.lua
-        # rather than reading it — a resolver that returns nil is invisible to
-        # static inspection, which is how the language menu came to offer 2
-        # locales of 21. The gate fails rather than skips when no interpreter is
-        # present, so this job needs one. The Sparkle appcast fixture is parsed
-        # with xmllint so malformed release metadata cannot pass by string shape.
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y lua5.4 libxml2-utils
-
       - name: Check hotstring TOML files are sorted and formatted
         if: ${{ !cancelled() }}
         run: python tools/format_toml.py --hotstrings --all --check
-
-      - name: Property-based tests (fast-check, 27 × 1000 runs)
-        if: ${{ !cancelled() }}
-        run: npm run test:properties
-
-      - name: Mutation tests — domain layer (Stryker, break=25)
-        # Guards the shared domain spec files (Registry, HotstringMatcher).
-        # Stryker only mutates the JS domain specs, yet it's the most expensive
-        # step and validate is a `needs` of every OS lane — so it gated the
-        # whole graph on every push. Run it on main only (TT-4); PRs/branches still
-        # get every other validate check, including the full test:js umbrella.
-        if: ${{ !cancelled() && github.ref == 'refs/heads/main' }}
-        run: npm run test:mutation
-
-      - name: JS validation suite (umbrella — every run-js-suite check)
-        # Gates the full run-js-suite (drift, parity, single-source ratchets,
-        # bridge wiring, diagnostic-UI / focus / no-fallback §5.9 regressions, …).
-        # Previously these ran only via the local `test:js` and never in CI (TT-3).
-        if: ${{ !cancelled() }}
-        run: npm run test:js
 
       # The release plan starts here: tag, version, title and channel. It
       # numbers the next tag from every tag of its series and the commit
@@ -347,6 +267,42 @@ jobs:
   # ─────────────────────────────────────────────────
   # 2.1) macOS — Hammerspoon, Swift launcher, ErgoptiPlus.app + launch gate
   # ─────────────────────────────────────────────────
+  core:
+    name: 'Core / ${{ matrix.suite }}'
+    needs: [validate]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: ${{ fromJSON(github.ref == 'refs/heads/main' && '["js","properties","mutation"]' || '["js","properties"]') }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+          cache: 'npm'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: npm ci
+
+      - name: Install native validation tools
+        # test-shared-root-resolvers.cjs EXECUTES each driver's lib/paths.lua
+        # rather than reading it — a resolver that returns nil is invisible to
+        # static inspection, which is how the language menu came to offer 2
+        # locales of 21. The gate fails rather than skips when no interpreter is
+        # present, so this job needs one. The Sparkle appcast fixture is parsed
+        # with xmllint so malformed release metadata cannot pass by string shape.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lua5.4 libxml2-utils
+
+      - name: Run shared validation suite
+        run: npm run test:${{ matrix.suite }}
+
   macos:
     name: 'macOS'
     needs: [validate]
@@ -378,7 +334,7 @@ jobs:
       WINDOWS_SIGNER_SUBJECT: ${{ needs.validate.outputs.release == 'true' && secrets.WINDOWS_SIGNER_SUBJECT || '' }}
 
   # ─────────────────────────────────────────────────
-  # 2.3) Linux — driver tests, distro installs, packages + evidence gate
+  # 2.3) Linux — unit tests, E2E, package, installations and verdict
   # ─────────────────────────────────────────────────
   linux:
     name: 'Linux'
@@ -411,7 +367,7 @@ jobs:
   # while the run turned green.
   release:
     name: 'Release / Publish'
-    needs: [validate, macos, windows, linux]
+    needs: [validate, core, macos, windows, linux]
     if: github.event_name == 'push' && needs.validate.outputs.release == 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -811,22 +767,15 @@ jobs:
           - Flatpak → \`ErgoptiPlus-linux-x86_64.flatpak\`, installed with \`flatpak install --bundle\`. It requests \`--device=all\`, which is the only permission that reaches \`/dev/input\` and \`/dev/uinput\`; the sandbox still cannot grant access your user does not have on the host, so the udev rule in step 2 is required either way
           - Any other distribution, an immutable one, or no root access → \`ErgoptiPlus-linux-x86_64.AppImage\` or \`$LINUX_BUNDLE_ASSET\`
 
-          > **Alpha.** The Linux driver has never been validated on real hardware. Every asset above is installed and launched in CI, and the installed layout is checked from inside it — but a runner has no keyboard to grab, no /dev/uinput to write and no display, so capture, injection, the tray and the settings windows are all unproven.
+          > **Alpha.** CI exercises virtual input devices, display sessions and package launches. Physical keyboard behavior and desktop-shell integration still need validation on the target distribution.
 
           **Installation — app:**
-          1. Install the package for your distribution:
-          \`\`\`bash
-          sudo apt install ./ErgoptiPlus-linux-amd64.deb       # Debian, Ubuntu, Mint
-          sudo dnf install ./ErgoptiPlus-linux-noarch.rpm      # Fedora, RHEL, openSUSE
-          flatpak install --bundle ./ErgoptiPlus-linux-x86_64.flatpak   # sandboxed
-          chmod +x ErgoptiPlus-linux-x86_64.AppImage           # anywhere else, then run it
-          \`\`\`
-          2. Give the daemon access to the keyboard. It reads \`/dev/input/event*\` and writes \`/dev/uinput\`, and a normal user is refused both until a udev rule and the \`input\` and \`uinput\` group memberships exist. Unpack \`$LINUX_BUNDLE_ASSET\` and run:
-          \`\`\`bash
-          bash install.sh --setup-perms
-          \`\`\`
-          3. Log out and back in so the new group memberships take effect. Skip this and the daemon starts, logs one line and captures nothing — the most common first experience.
-          4. Start it with \`systemctl --user start ergopti-hotstrings.service\` (\`.deb\` and \`.rpm\`), or by running the AppImage directly.
+          1. Open the downloaded package with your distribution's software installer and install it.
+          2. Open **Ergopti Plus** from the applications menu. Input permissions are prepared by the package; if additional authorization is needed, Ergopti opens a graphical administrator prompt.
+          3. Follow the first-use window. If group membership changed, sign out and back in when prompted.
+          4. Choose **Global actions → Start at login** to enable or disable automatic startup.
+
+          **Removal:** choose **Global actions → Uninstall Ergopti**, or remove the package through your software manager. The standalone archive also includes an ownership-checked uninstall script. Personal settings are preserved.
           EOF
 
           # The changelog is folded so the downloads above stay in view; its own

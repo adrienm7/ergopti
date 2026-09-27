@@ -230,6 +230,7 @@
 		"test:metrics-apps-linux-poll": "node ./tools/test/test-metrics-apps-linux-poll.cjs",
 		"test:shared-ui-translators-defined": "node ./tools/test/test-shared-ui-translators-defined.cjs",
 		"test:linux-ci-evidence": "node ./tools/test/test-linux-ci-evidence.cjs",
+		"test:desktop-ci-evidence": "node ./tools/test/test-desktop-ci-evidence.cjs",
 		"test:linux-webview-security": "node ./tools/test/test-linux-webview-security.cjs",
 		"test:linux-metrics-webview-lifecycle": "node ./tools/test/test-linux-metrics-webview-lifecycle.cjs",
 		"test:linux-canonical-pack-upgrade": "node ./tools/test/test-linux-canonical-pack-upgrade.cjs",

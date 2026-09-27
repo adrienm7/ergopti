@@ -166,6 +166,7 @@ const CHECKS = [
 	{ name: 'Linux package layout (.deb/.rpm install into /usr/lib/ergopti; wrapper boots the same bundle entry)', cmd: 'node', args: ['tools/test/test-linux-package-layout.cjs'], repro: 'node tools/test/test-linux-package-layout.cjs' },
 	{ name: 'Linux bundle copies tracked bytes without per-file shell processes', cmd: 'node', args: ['tools/test/test-linux-tracked-copy.cjs'], repro: 'node tools/test/test-linux-tracked-copy.cjs' },
 	{ name: 'Linux CI requires successful mandatory jobs and assertion evidence', cmd: 'node', args: ['tools/test/test-linux-ci-evidence.cjs'], repro: 'npm run test:linux-ci-evidence' },
+	{ name: 'Desktop verdicts and parallel shared-core gates', cmd: 'node', args: ['tools/test/test-desktop-ci-evidence.cjs'], repro: 'npm run test:desktop-ci-evidence' },
 	{ name: 'Linux WebViews use pinned offline code and one bridge per page', cmd: 'node', args: ['tools/test/test-linux-webview-security.cjs'], repro: 'npm run test:linux-webview-security' },
 	{ name: 'Linux metrics polling follows native and document visibility lifecycles', cmd: 'node', args: ['tools/test/test-linux-metrics-webview-lifecycle.cjs'], repro: 'npm run test:linux-metrics-webview-lifecycle' },
 	{ name: 'Linux standalone upgrades refresh intact canonical packs and preserve explicit overrides', cmd: 'node', args: ['tools/test/test-linux-canonical-pack-upgrade.cjs'], repro: 'npm run test:linux-canonical-pack-upgrade' },
