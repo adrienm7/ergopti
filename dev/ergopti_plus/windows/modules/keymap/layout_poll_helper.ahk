@@ -18,6 +18,13 @@
 ; terminal hand-off, with every lifecycle call behind a port so the retry policy
 ; is tested headlessly too: a refused reload is retried with a doubling wait, a
 ; few times per layout, and never when its refusal would be forced through.
+;
+; Only a layout the boot registrations do not fit reloads: without the Ergopti
+; emulation, the magic key's source key is registered at load on the key that
+; types its character on one layout (LayoutRemapSignature). The AltGr family
+; (infra/altgr_family.ahk) and the digit-row swap (DigitRowIsSwapped) follow the
+; foreground layout live instead, so with the emulation on (the default) no
+; switch reloads, as with Windows' per-window input methods.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -113,16 +120,26 @@ global _LayoutPollRetry := _LayoutPollNewRetry(0)
 ; warrants a reload and starts it through the terminal hand-off. The arguments
 ; after Hkl are _ShouldReloadForHkl's; the tracking refs are the entry file's
 ; _LAST_KEYBOARD_HKL and _PENDING_KEYBOARD_HKL.
-; @param Port {Map} The lifecycle seams: "reload"(RefusedFn) starts the poll's
-;   own reload and returns whether it launched; "pending"() returns the pending
-;   reload record or false; "veto_honored"() says whether OnExit could still
-;   refuse one more exit; "now"() returns the tick count; "notify"() tells the
-;   user a reload failed.
+; @param Port {Map} The lifecycle seams: "needs_reload"(Hkl) says whether the
+;   boot registrations do not fit layout Hkl (LayoutRemapNeedsReload);
+;   "reload"(RefusedFn) starts the poll's own reload and returns whether it
+;   launched; "pending"() returns the pending reload record or false;
+;   "veto_honored"() says whether OnExit could still refuse one more exit;
+;   "now"() returns the tick count; "notify"() tells the user a reload failed.
 ; @returns {Boolean} True when this tick started a reload.
 LayoutPollTick(Hkl, Suspended, IsBlacklisted, HseSuppressed, PwSuppressed, IdleMs,
 		InputBusy, Port) {
 	global _LAST_KEYBOARD_HKL, _PENDING_KEYBOARD_HKL
 	_LayoutPollObserve(Hkl)
+	; A layout the boot registrations already fit becomes the baseline at once:
+	; the AltGr family follows it without a reload, and nothing else would
+	; change. An unknown baseline (0) is still adopted by _ShouldReloadForHkl.
+	if (Hkl != 0 && _LAST_KEYBOARD_HKL != 0 && Hkl != _LAST_KEYBOARD_HKL
+			&& !Port["needs_reload"].Call(Hkl)) {
+		_LAST_KEYBOARD_HKL := Hkl
+		_PENDING_KEYBOARD_HKL := 0
+		return false
+	}
 	PreviousHkl := _LAST_KEYBOARD_HKL
 	if !_ShouldReloadForHkl(Hkl, &_LAST_KEYBOARD_HKL, &_PENDING_KEYBOARD_HKL,
 			Suspended, IsBlacklisted, HseSuppressed, PwSuppressed, IdleMs, InputBusy)
@@ -176,7 +193,7 @@ _LayoutPollReload(Hkl, PreviousHkl, Port) {
 	Retry["attempts"] += 1
 	; The one reload nobody clicks: without this line a layout switch looked like
 	; a spontaneous restart in the log.
-	try LoggerInfo("ErgoptiPlus", "Keyboard layout changed to HKL 0x{1:X}; reloading to re-probe the layout (attempt {2}/{3}).",
+	try LoggerInfo("ErgoptiPlus", "Keyboard layout changed to HKL 0x{1:X}, which types the magic key's source character on another key; reloading to register it again (attempt {2}/{3}).",
 		Hkl, Retry["attempts"], LAYOUT_POLL_RELOAD_MAX_ATTEMPTS)
 	Refused := _LayoutPollRefused.Bind(Retry, PreviousHkl, Port)
 	if Port["reload"].Call(Refused)
@@ -225,4 +242,66 @@ _LayoutPollRestore(PreviousHkl) {
 	_LAST_KEYBOARD_HKL := PreviousHkl
 	_PENDING_KEYBOARD_HKL := 0
 	return false
+}
+
+
+
+
+
+; ===============================================
+; ===============================================
+; ======= 3/ What a layout switch reloads =======
+; ===============================================
+; ===============================================
+
+; What the boot registrations read from keyboard layout Hkl, as one comparable
+; string: while the Ergopti emulation is off, the key the magic-key scan finds
+; for the magic key's source character (ErgoptiPlus.ahk), or the default one
+; when it finds none. That key's hotkeys are registered at load on that scan
+; code, so a switch that moves it still reloads. The AltGr family, the
+; digit-row swap and the accented-letter shortcuts follow the foreground layout
+; live instead.
+; @param Hkl {Integer} Keyboard layout handle; 0 (none read) probes nothing.
+; @param Port {Map} Test seam, _LayoutRemapPort() by default: "emulated"(),
+;        "magic_char"() and "magic_scan"(Hkl, Char), 0 when not found.
+; @returns {String}
+LayoutRemapSignature(Hkl, Port := 0) {
+	if !(Port is Map)
+		Port := _LayoutRemapPort()
+	if Port["emulated"].Call()
+		return "magic=emulated"
+	Scan := (Hkl != 0) ? Port["magic_scan"].Call(Hkl, Port["magic_char"].Call()) : 0
+	return "magic=" . (Scan ? Format("SC{:03X}", Scan) : "default")
+}
+
+; Whether a switch to layout Hkl needs a reload: the boot registrations were
+; built for _LAYOUT_REMAP_HKL and do not fit Hkl.
+; @param Hkl {Integer} The foreground layout.
+; @param Port {Map} As for LayoutRemapSignature.
+; @returns {Boolean}
+LayoutRemapNeedsReload(Hkl, Port := 0) {
+	global _LAYOUT_REMAP_HKL
+	return LayoutRemapSignature(Hkl, Port) != LayoutRemapSignature(_LAYOUT_REMAP_HKL, Port)
+}
+
+_LayoutRemapPort() {
+	static Port := Map(
+		"emulated", _LayoutRemapEmulated,
+		"magic_char", _LayoutRemapMagicChar,
+		"magic_scan", _LayoutRemapMagicScan)
+	return Port
+}
+
+_LayoutRemapEmulated() {
+	global Features
+	return Features["layout"]["ergopti_base"]
+}
+
+_LayoutRemapMagicChar() {
+	global ScriptInformation
+	return ScriptInformation["MagicKeySourceChar"]
+}
+
+_LayoutRemapMagicScan(Hkl, Char) {
+	return KS_ScanScancodeForChar(Hkl, Char)["scan"]
 }

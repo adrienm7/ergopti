@@ -1807,7 +1807,7 @@
 	"shortcuts.uppercase": "Win + U(ppercase) = Seçimde büyük/küçük harf arasında geçiş yap",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
 	"startup.accessibility_required": "ErgoptiPlus’ın klavyeyi okuyabilmesi için Erişilebilirlik izni gerekir. Sistem Ayarları > Gizlilik ve Güvenlik > Erişilebilirlik bölümünde ErgoptiPlus’a ait Hammerspoon girişini açın, ardından ErgoptiPlus’ı yeniden açın. Ayrı olarak çalıştırdığınız bir Hammerspoon uygulamasının kendi girişi vardır.",
-	"startup.linux_input_access_body": "Ergopti+ klavyeyi henüz okuyamıyor veya /dev/uinput’a yazamıyor. Yükleyicinin eklediği “input” ve “uinput” gruplarının geçerli olması için oturumu kapatıp yeniden açın (veya yeniden başlatın). Sorun sürerse şunu çalıştırın: bash install.sh --setup-perms",
+	"startup.linux_input_access_body": "Ergopti+ klavyeyi henüz okuyamıyor veya /dev/uinput’a yazamıyor. Yükleyicinin eklediği “input” ve “uinput” gruplarının geçerli olması için oturumu kapatıp yeniden açın (veya yeniden başlatın). Sorun sürerse şunu çalıştırın: {1}",
 	"startup.linux_input_access_title": "Ergopti+ klavyeyi henüz kullanamıyor",
 	"startup.manifest_missing": "Başlangıç hatası: _generated/features_manifest.ahk dosyası eksik veya bozuk.\n\nProje dizininden `npm run build:manifest` komutunu çalıştırın ve betiği yeniden başlatın.",
 	"startup.manifest_title": "ErgoptiPlus — manifest eksik",
@@ -2494,5 +2494,11 @@
 	"ui_metrics_rebuild.eta": "yaklaşık {eta} kaldı",
 	"ui_metrics_rebuild.eta_unknown": "kalan süre hesaplanıyor…",
 	"ui_metrics_rebuild.finalizing": "Yeniden oluşturulan istatistikler kaydediliyor…",
-	"ui_metrics_rebuild.failed": "İstatistiklerin yeniden oluşturulması beklenmedik şekilde durdu. Bir sonraki deneme kaldığı yerden devam edecek."
+	"ui_metrics_rebuild.failed": "İstatistiklerin yeniden oluşturulması beklenmedik şekilde durdu. Bir sonraki deneme kaldığı yerden devam edecek.",
+	"menu.global.uninstall": "Ergopti’yi kaldır…",
+	"dialog.uninstall.confirm": "Ergopti kaldırılsın mı? Uygulama kapanacak. Ayarlarınız, hotstring’leriniz, ölçümleriniz ve kimlik bilgileriniz korunacak.",
+	"dialog.uninstall.failed": "Ergopti kaldırılamadı. Kişisel verileriniz korundu.",
+	"menu.global.start_at_login": "Oturum açıldığında başlat",
+	"dialog.start_at_login.failed": "Otomatik başlatma değiştirilemedi. Sistemin başlangıç ayarlarını kontrol edin.",
+	"onboarding.error.open_failed": "Kurulum sihirbazı açılamadı. Günlükleri kontrol edip menüden yeniden deneyin."
 }

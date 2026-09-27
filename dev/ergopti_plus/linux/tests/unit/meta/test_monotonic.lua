@@ -59,4 +59,11 @@ describe("infra.monotonic", function()
 			"has_hires must agree with the reported backend")
 	end)
 
+	-- The keyboard hook takes it off an elapsed time it must not overstate
+	-- (rctrl-one-shot-hold-past-threshold).
+	it("reports the resolution of its backend", function()
+		assert_eq(Monotonic.resolution_ms(), Monotonic.has_hires() and 0 or 1000,
+			"luv.hrtime counts nanoseconds, the os.time fallback whole seconds")
+	end)
+
 end)

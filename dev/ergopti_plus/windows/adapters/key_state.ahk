@@ -258,16 +258,18 @@ KS_LayoutHasAltGrLevel(Hkl) {
 	return false
 }
 
-; The boot probe that decided the AltGr family (HotstringEngineInit): the
-; KS_ProbeAltGrLayout result plus "source" ("probe", "override" when the TOML
-; flag decided, "unresolved" when no layout could be read). Seeded here as
-; unresolved; HotstringEngineInit replaces it before the first hotstring fires.
+; The probe record that decides the AltGr family now (infra/altgr_family.ahk):
+; the KS_ProbeAltGrLayout result of the current layout plus "source" ("probe",
+; "override" when the TOML flag decided, "unresolved" when no layout could be
+; read). Seeded here as unresolved; HotstringEngineInit replaces it before the
+; first hotstring fires, and it then follows the foreground window's layout
+; (AltGrFamilyFollow). Every reader below reads it on each call, never a copy.
 global _ALTGR_LAYOUT_PROBE := Map("hkl", 0, "rmenu_sc", 0, "altgr_vk", 0,
 	"valid", false, "kana", false, "altgr_level", false, "source", "unresolved")
 
 ; Whether every AltGr press reaches the hook as the layout's fake LCtrl (scan
 ; code 0x21D, read as SC01D and recorded as physical) then RAlt: a standard
-; AltGr layout, where the boot probe found an AltGr level (AZERTY, bépo). On
+; AltGr layout, where the layout probe found an AltGr level (AZERTY, bépo). On
 ; QWERTY right Alt is a plain Alt and adds no LCtrl; a Kana-style AltGr is
 ; SC138 on another virtual key and adds none either. Read by parse-time #HotIf
 ; criteria, which are live before this file's globals are assigned.
@@ -278,7 +280,7 @@ KS_AltGrAddsFakeLCtrl() {
 }
 
 ; Whether the layout's AltGr key is an AltGr: a Kana-style AltGr, or right Alt
-; on a layout where the boot probe found an AltGr level. On QWERTY right Alt is
+; on a layout where the layout probe found an AltGr level. On QWERTY right Alt is
 ; a plain Alt. Read by #HotIf criteria, live before this file's globals are
 ; assigned.
 ; @return {Boolean}
@@ -289,7 +291,7 @@ KS_LayoutHasAltGr() {
 
 ; AHK key name that presses the active layout's AltGr. Standard AltGr layouts
 ; put AltGr on VK_RMENU, so "RAlt" is AltGr there. Kana-style remaps
-; (_ALTGR_KANA_FIXUP, resolved at boot) move AltGr to another virtual key and
+; (_ALTGR_KANA_FIXUP, following the foreground layout) move AltGr to another virtual key and
 ; leave VK_RMENU without a scan code: a synthetic RAlt is then a plain Alt that
 ; opens a window's menu bar on release and types nothing on a chord, while the
 ; physical scan code SC138 still is the layout's AltGr.
@@ -307,10 +309,10 @@ KS_AltGrKeyName() {
 ; key for that scan code (VK_OEM_8 on the Ergopti layout), which is no
 ; modifier. At the end of a SendInput it then pressed the right Alt it believed
 ; missing, a plain Alt on that layout, and left it down: Alt chords instead of
-; AltGr characters, and a stuck Alt after the hold. The virtual key the boot
+; AltGr characters, and a stuck Alt after the hold. The virtual key the layout
 ; probe read for the AltGr scan code ("vkDF") injects the same key without that
 ; bookkeeping. On a layout where right Alt is AltGr, "RAlt" is correct as is.
-; @return {String} "vkXX" on a Kana-style layout, "" when the boot probe found
+; @return {String} "vkXX" on a Kana-style layout, "" when the layout probe found
 ;         no virtual key for it (a Send must then refuse), otherwise "RAlt".
 KS_AltGrSendKey() {
 	global _ALTGR_KANA_FIXUP, _ALTGR_LAYOUT_PROBE
@@ -394,6 +396,48 @@ KS_DirectScanCodeForChar(Hkl, Char) {
 		try LoggerError("KeyState", "KS_DirectScanCodeForChar failed: {1}.", e.Message)
 		return 0
 	}
+}
+
+; The digit-row keys, 1 to 0: virtual key (VK_1..VK_9, VK_0) and scan code.
+global KS_DIGIT_ROW_KEYS := [[0x31, 0x02], [0x32, 0x03], [0x33, 0x04], [0x34, 0x05],
+	[0x35, 0x06], [0x36, 0x07], [0x37, 0x08], [0x38, 0x09], [0x39, 0x0A], [0x30, 0x0B]]
+; MapVirtualKeyExW map type: virtual key to its unshifted character.
+global KS_MAPVK_VK_TO_CHAR := 2
+
+; Whether layout Hkl types the digit 1 only with Shift (AZERTY, bépo), so its
+; digit row types symbols unshifted. VkKeyScanExW takes the character itself:
+; passed as a string, it read the low bits of the string's address, found no
+; such character (-1) on every layout, and the -1's high byte read as Shift, so
+; QWERTY and the Ergopti Kana layout counted as shifted too.
+; @param Hkl {Integer} Keyboard layout handle; 0 (none read) is not shifted.
+; @return {Boolean}
+KS_LayoutDigitsAreShifted(Hkl) {
+	if (Hkl == 0)
+		return false
+	Result := DllCall("VkKeyScanExW", "UShort", Ord("1"), "Ptr", Hkl, "Short")
+	return Result != -1 and ((Result >> 8) & 0x01) != 0
+}
+
+; The character each digit-row key types unshifted on layout Hkl: "&" to "à"
+; on AZERTY, the digits themselves on QWERTY. MapVirtualKeyExW (MAPVK_VK_TO_CHAR)
+; is what AutoHotkey's GetKeyName reads for these keys, but on the script's own
+; thread layout, which need not be the layout the digit row was probed on; this
+; reads the probed one. ToUnicodeEx is not used: it answered the digit on
+; KbdEdit layouts.
+; @param Hkl {Integer} Keyboard layout handle; 0 gives an empty map.
+; @return {Map} Scan code -> one-character string; a key with no character is
+;         left out.
+KS_LayoutDigitRowSymbols(Hkl) {
+	global KS_DIGIT_ROW_KEYS, KS_MAPVK_VK_TO_CHAR
+	Symbols := Map()
+	if (Hkl == 0)
+		return Symbols
+	for _, Key in KS_DIGIT_ROW_KEYS {
+		Char := DllCall("MapVirtualKeyExW", "UInt", Key[1], "UInt", KS_MAPVK_VK_TO_CHAR, "Ptr", Hkl, "UInt") & 0xFFFF
+		if (Char >= 0x20)
+			Symbols[Key[2]] := Chr(Char)
+	}
+	return Symbols
 }
 
 ; Lists the keyboard layouts installed for the user (GetKeyboardLayoutList).

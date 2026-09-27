@@ -409,6 +409,9 @@ if UIASW_IsWorkerInvocation()
 ; FoldAsciiLower) extracted into dedicated submodules so the main file
 ; stays focused on ErgoptiPlus-specific logic.
 #Include infra/hotstrings/hotstring_engine.ahk
+; The AltGr family HotstringEngineInit decides at boot and that then follows
+; the foreground window's layout (AltGrFamilyStartFollowing, below).
+#Include infra/altgr_family.ahk
 #Include infra/hotstrings/hotstring_engine_main.ahk
 #Include infra/hotstrings/hotstring_buffer_effects.ahk
 #Include infra/hotstrings/hotstring_live_toggle.ahk
@@ -443,6 +446,8 @@ if UIASW_IsWorkerInvocation()
 #Include infra/manifest_menu.ahk
 #Include infra/llm_defaults.ahk
 #Include modules/updater.ahk
+#Include infra/uninstall.ahk
+#Include infra/start_at_login.ahk
 #Include ui/changelog/init.ahk
 #Include ui/healthcheck/init.ahk
 #Include modules/diagnostics/crash_reporter.ahk
@@ -619,10 +624,16 @@ BootProfile_Stamp("Config parsed (TOML + i18n)")
 
 ; Resolve _ALTGR_KANA_FIXUP: TOML override (ScriptInformation["AltGrIsKanaRemap"])
 ; wins when set; otherwise auto-detect via the reverse VK_RMENU→SC probe. Must
-; run before the first hotstring fires. The layout-poll timer at the bottom of
-; this file triggers a full Reload() on layout switch, so this re-runs and
-; adapts to the new layout automatically.
+; run before the first hotstring fires. After boot the family follows the
+; foreground window's layout without a reload (AltGrFamilyStartFollowing and
+; the layout poll at the bottom of this file).
 HotstringEngineInit()
+; The layout the one boot registration that reads the keyboard layout is built
+; for: the magic-key source scan, without the Ergopti emulation (the digit-row
+; swap reads the foreground layout per press, DigitRowIsSwapped). It is the
+; layout the boot probe read, so that registration and the AltGr family
+; describe one layout, and the layout poll starts from it.
+global _LAYOUT_REMAP_HKL := _ALTGR_LAYOUT_PROBE["hkl"]
 BootProfile_Stamp("Hotstring engine initialised")
 
 ; Initialise the logger now that the ini cache is built and ScriptInformation
@@ -791,7 +802,7 @@ BootProfile_StageEnd("configuration", Format("{1} config.toml value(s) applied, 
 ; the target character ("j") sits behind a driver-level remapping that the
 ; API cannot see.
 ;
-; The layout is the one the boot AltGr probe read (_ALTGR_LAYOUT_PROBE, through
+; The layout is _LAYOUT_REMAP_HKL, the one the boot AltGr probe read (through
 ; the KS_ResolveKeyboardLayout cascade: foreground, then the AHK thread, then
 ; the system default), so the scan and the AltGr family describe one layout and
 ; the layout poll, seeded with the same HKL, reloads when the user switched.
@@ -799,7 +810,7 @@ BootProfile_StageEnd("configuration", Format("{1} config.toml value(s) applied, 
 ; layout-detection DllCalls (MapVirtualKeyExW / ToUnicodeEx) are isolated there;
 ; this boot step only interprets the result and updates ScriptInformation.
 if !Features["layout"]["ergopti_base"] {
-	_HKL := _ALTGR_LAYOUT_PROBE["hkl"]
+	_HKL := _LAYOUT_REMAP_HKL
 	if _HKL != 0 {
 		_TargetChar := ScriptInformation["MagicKeySourceChar"]
 		_Found := KS_ScanScancodeForChar(_HKL, _TargetChar)
@@ -1359,11 +1370,11 @@ if MetricsShortcuts.enabled
 	KLWV_WarmSchedule(KL_MetricsDirFor(_ConfigDir), KLWV.WARM_START_DELAY_MS)
 
 global _LAYOUT_POLL_INTERVAL_MS := 1000
-; The baseline is the layout the boot probe decided the AltGr family on, not a
-; second read: a switch made during the seconds of boot then shows up as a
-; change and reloads, instead of becoming the baseline of a family decided on
-; the previous layout.
-global _LAST_KEYBOARD_HKL := _ALTGR_LAYOUT_PROBE["hkl"]
+; The baseline is the layout the boot registrations were built for, the one the
+; boot probe decided the AltGr family on, not a second read: a switch made
+; during the seconds of boot then shows up as a change, and reloads when those
+; registrations do not fit the new layout (LayoutRemapNeedsReload).
+global _LAST_KEYBOARD_HKL := _LAYOUT_REMAP_HKL
 global _PENDING_KEYBOARD_HKL := 0
 
 ; The quiescence decision is a pure function extracted to infra/ so the headless
@@ -1377,6 +1388,7 @@ global _PENDING_KEYBOARD_HKL := 0
 ; whether OnExit could still refuse before starting one.
 LayoutPollPort() {
 		static Port := Map(
+				"needs_reload", LayoutRemapNeedsReload,
 				"reload", (RefusedFn) => ReloadPreservingSuspend(0, 0, RefusedFn, LayoutPollStageRefused),
 				"pending", ReloadTerminalHandoffPending,
 				"veto_honored", LifecycleShutdownVetoHonored,
@@ -1396,6 +1408,11 @@ CheckKeyboardLayoutChange() {
 		}
 		
 		curHkl := GetForegroundKeyboardLayout()
+		; The AltGr family follows the foreground layout without a reload. The
+		; foreground hook switches it with the window; this catches what that
+		; hook cannot see: a layout switched inside one window (Win+Space), or a
+		; UWP app whose focused control settles on its own thread after the event.
+		AltGrFamilyFollow(curHkl)
 		hseSup := (IsSet(HSE_Suppressed)) ? HSE_Suppressed : 0
 		pwSup := (IsSet(_PrefixWatcherSuppressed)) ? _PrefixWatcherSuppressed : 0
 	inputBusy := (IsSet(InDeadKeySequence) and InDeadKeySequence)
@@ -1406,4 +1423,5 @@ CheckKeyboardLayoutChange() {
 		LayoutPollTick(curHkl, suspended, isBlacklisted, hseSup, pwSup, A_TimeIdlePhysical,
 				inputBusy, LayoutPollPort())
 }
+AltGrFamilyStartFollowing()
 SetTimer(CheckKeyboardLayoutChange, _LAYOUT_POLL_INTERVAL_MS)

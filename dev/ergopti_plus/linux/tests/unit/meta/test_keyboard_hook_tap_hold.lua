@@ -185,15 +185,17 @@ helpers.describe("keyboard hook: the modifiers held with a control key", functio
 		helpers.assert_true(not mods.ctrl and not mods.alt and not mods.meta, "a bare Backspace is one character")
 	end)
 
-	helpers.it("says Ctrl for the Backspace tapped on the layer key while CapsLock holds Ctrl (modified-backspace)", function()
+	-- LCtrl, not CapsLock: LAlt's layer tap types nothing while CapsLock is
+	-- down, as on Windows (lalt.ahk 4.5, lalt-backspace-logic).
+	helpers.it("says Ctrl for the Backspace tapped on the layer key while LCtrl is held (modified-backspace)", function()
 		local keys = {}
-		drive({ { 58, 1 }, { 56, 1 }, { 56, 0 }, { 58, 0 } }, function()
+		drive({ { 29, 1 }, { 56, 1 }, { 56, 0 }, { 29, 0 } }, function()
 			return { onKey = function(name, detail) keys[#keys + 1] = { name = name, detail = detail } end }
 		end)
 		helpers.assert_eq(#keys, 1, "one Backspace")
 		helpers.assert_eq(keys[1].name, "backspace")
 		helpers.assert_true(type(keys[1].detail) == "table" and keys[1].detail.mods.ctrl == true,
-			"CapsLock's Ctrl is held: this Backspace deletes a word")
+			"LCtrl is held: this Backspace deletes a word")
 	end)
 
 end)
@@ -415,6 +417,225 @@ helpers.describe("keyboard hook + tap-hold engine: a modifier the XKB options mo
 		local emitted, taps = drive_live(SYM.Control_L, { { TAB, 1 }, { TAB, 0 } })
 		helpers.assert_eq(taps, { "alt_tab_monitor" }, "a lone Tab tap is the configured action")
 		helpers.assert_true(emitted:find("15:1", 1, true) == nil, "and no Tab reaches the application: " .. emitted)
+	end)
+
+end)
+
+-- rctrl.ahk 7.3 holds Shift for RCtrl's one-shot only when its KeyWait times
+-- out, past the threshold; the engine presses that hold when told the time
+-- has come (M:tick). The hook tells it before each key event, at the event's
+-- kernel time, and from its pump once every queued event is dispatched, so the
+-- Shift is down for a key typed after the threshold and never for one typed
+-- sooner (rctrl-one-shot-hold-past-threshold).
+helpers.describe("keyboard hook + tap-hold engine: a hold taken past the threshold", function()
+
+	local InputEvent = require("infra.input_event")
+	local RCTRL, KEY_A = 97, 30
+	-- Kernel ABI values (input-event-codes.h).
+	local EV_REL, REL_X, BTN_LEFT = 2, 0, 0x110
+	local ONE_SHOT_KEYS = { right_ctrl = { tap_action = "one_shot_shift", time_activation_seconds = 0.2 } }
+
+	--- An engine running RCtrl's one-shot Shift with no hold.
+	local function one_shot_engine()
+		return Engine.new({ keys = ONE_SHOT_KEYS, tap_min_ms = 50, one_shot_timeout_ms = 2000,
+			key_text = function(code) return code == KEY_A and "a" or nil end,
+			plan_text = function() return nil end,
+			one_shot_result = function() return nil end })
+	end
+
+	--- Drives { code, value, kernel ms } events through the hook.
+	--- @return string What the virtual keyboard received.
+	local function drive_stamped(events)
+		local kh = helpers.load_module("adapters.keyboard_hook")
+		local emitted = {}
+		kh.set_remapper(one_shot_engine(), function() end)
+		local stream = {}
+		for index, ev in ipairs(events) do
+			stream[index] = { type = EV_KEY, code = ev[1], value = ev[2], timestamp_us = ev[3] * 1000 }
+		end
+		local ok, err = pcall(kh._test_drive, stream, {
+			onEmitRaw = function(code, value) emitted[#emitted + 1] = code .. ":" .. value; return true end,
+		}, true)
+		kh.set_remapper(nil)
+		if not ok then error(err, 0) end
+		return table.concat(emitted, " ")
+	end
+
+	helpers.it("holds Shift before a key typed past the threshold, and not before one typed sooner", function()
+		helpers.assert_eq(drive_stamped({
+			{ RCTRL, 1, 1000 }, { KEY_A, 1, 1300 }, { KEY_A, 0, 1350 }, { RCTRL, 0, 1400 },
+		}), "42:1 30:1 30:0 42:0", "A 300 ms into the press is typed under Shift")
+		helpers.assert_eq(drive_stamped({
+			{ RCTRL, 1, 1000 }, { KEY_A, 1, 1050 }, { KEY_A, 0, 1080 }, { RCTRL, 0, 1100 },
+		}), "30:1 30:0", "A 50 ms into the press is a plain a, and no Shift ever goes down")
+	end)
+
+	--- Runs the real pump over a keyboard and a mouse, with RCtrl's one-shot
+	--- engine installed and a stand-in for the daemon's monotonic clock, which
+	--- the kernel's stamps are not.
+	--- @param drive function(h) Gets h.push(device, code, value, stamp_ms,
+	---   ev_type) for the "keyboard" or the "mouse" (EV_KEY by default),
+	---   h.at(clock_ms) and h.pump(), which
+	---   returns all the virtual keyboard and the click callback got so far
+	---   ("42:1 click").
+	--- @param resolution_ms number|nil The clock's resolution, none by default.
+	--- @param on_click function|nil Also run by the click callback, with h.
+	local function with_pump(drive, resolution_ms, on_click)
+		local nodes, queues = {}, {}
+		for _, name in ipairs({ "keyboard", "mouse" }) do
+			local path = os.tmpname()
+			local fh = assert(io.open(path, "w"))
+			fh:write(name)
+			fh:close()
+			nodes[name], queues[path] = path, {}
+		end
+		local clock_ms = 0
+		local stubbed = { "modules.hotstrings.device_finder", "adapters.xkb_capture", "infra.monotonic" }
+		local saved = {}
+		for _, name in ipairs(stubbed) do saved[name] = package.loaded[name] end
+		package.loaded["modules.hotstrings.device_finder"] = {
+			find_devices = function() return { nodes.keyboard }, { nodes.mouse } end,
+			is_key_device = function() return true, nil end,
+		}
+		package.loaded["adapters.xkb_capture"] = {
+			is_ready = function() return true end,
+			reset_state = function() return true end,
+			process = function() return nil, nil, nil end,
+			modifier_role = function(code) return require("infra.evdev_codes").MODIFIER_OF[code], nil end,
+		}
+		package.loaded["infra.monotonic"] = {
+			now_ms = function() return clock_ms end,
+			now_sec = function() return clock_ms / 1000 end,
+			backend = function() return "test" end,
+			has_hires = function() return (resolution_ms or 0) == 0 end,
+			resolution_ms = function() return resolution_ms or 0 end,
+		}
+		local reader = helpers.load_module("adapters.evdev_reader")
+		reader._set_backend({
+			open = function(path) return path end,
+			ioctl = function() return true end,
+			read = function(fd) return table.remove(queues[fd] or {}, 1) end,
+			poll = function() return false end,
+			close = function() end,
+		})
+		local kh = helpers.load_module("adapters.keyboard_hook")
+		local log = {}
+		local h = {
+			push = function(device, code, value, stamp_ms, ev_type)
+				local queue = queues[nodes[device]]
+				queue[#queue + 1] = InputEvent.encode(ev_type or EV_KEY, code, value, nil, stamp_ms * 1000)
+			end,
+			at = function(ms) clock_ms = ms end,
+			pump = function()
+				kh.pump()
+				return table.concat(log, " ")
+			end,
+		}
+		local ok, err = pcall(function()
+			kh.set_remapper(one_shot_engine(), function() end)
+			kh.start({
+				intercept = true,
+				onEmitRaw = function(key, key_value) log[#log + 1] = key .. ":" .. key_value; return true end,
+				onClick = function()
+					log[#log + 1] = "click"
+					if on_click then on_click(h) end
+				end,
+			})
+			drive(h)
+		end)
+		kh.set_remapper(nil)
+		kh.stop()
+		reader._reset_backend()
+		for _, name in ipairs(stubbed) do package.loaded[name] = saved[name] end
+		-- The hook loaded here holds the stand-in clock.
+		package.loaded["adapters.keyboard_hook"] = nil
+		for _, path in pairs(nodes) do os.remove(path) end
+		assert(ok, err)
+	end
+
+	helpers.it("holds Shift from the pump once the threshold passes with no event read", function()
+		with_pump(function(h)
+			h.push("keyboard", RCTRL, 1, 1000)
+			h.at(5000)
+			helpers.assert_eq(h.pump(), "", "nothing at the press")
+			h.at(5150)
+			helpers.assert_eq(h.pump(), "", "nor 150 ms in")
+			h.at(5250)
+			helpers.assert_eq(h.pump(), "42:1", "Shift 250 ms in, with no event read")
+			h.push("keyboard", RCTRL, 0, 1400)
+			h.at(5400)
+			helpers.assert_eq(h.pump(), "42:1 42:0", "released with RCtrl")
+		end)
+	end)
+
+	-- The pump told the engine the time before reading what was queued, so a
+	-- key stamped within the threshold and read after it, as a daemon busy
+	-- with an injection reads it, came out under the Shift Windows never
+	-- presses for it (rctrl-one-shot-hold-past-threshold).
+	helpers.it("types a key stamped within the threshold and read after it unshifted (rctrl-one-shot-hold-past-threshold)", function()
+		with_pump(function(h)
+			h.push("keyboard", RCTRL, 1, 1000)
+			h.at(5000)
+			h.pump()
+			h.push("keyboard", KEY_A, 1, 1100)
+			h.push("keyboard", KEY_A, 0, 1130)
+			h.at(5300)
+			helpers.assert_eq(h.pump(), "30:1 30:0", "A, 100 ms into the press and read 300 ms in, is a plain a")
+			h.at(5400)
+			helpers.assert_eq(h.pump(), "30:1 30:0 42:1", "then the Shift, late by as long as A waited")
+		end)
+	end)
+
+	-- A keyboard empty when the pump read it is not read again until its next
+	-- event is dispatched: a key it got meanwhile, while the pump dispatched a
+	-- click for 60 ms, was still unread when the queues counted as empty, and
+	-- came out under the Shift (rctrl-one-shot-hold-past-threshold).
+	helpers.it("reads every source again before telling the time (rctrl-one-shot-hold-past-threshold)", function()
+		local pushed = false
+		with_pump(function(h)
+			h.push("keyboard", RCTRL, 1, 1000)
+			h.at(5000)
+			h.pump()
+			h.push("mouse", BTN_LEFT, 1, 1190)
+			h.at(5190)
+			helpers.assert_eq(h.pump(), "click 30:1 30:0", "A, 195 ms into the press, is a plain a")
+			h.at(5300)
+			helpers.assert_eq(h.pump(), "click 30:1 30:0 42:1", "then the Shift")
+		end, nil, function(h)
+			if pushed then return end
+			pushed = true
+			h.push("keyboard", KEY_A, 1, 1195)
+			h.push("keyboard", KEY_A, 0, 1198)
+			h.at(5250)
+		end)
+	end)
+
+	-- The pointer is not grabbed, but its events carry the same clock: read on
+	-- time, they correct an estimate a late key read left behind.
+	helpers.it("keeps its clock fresh from the pointer (rctrl-one-shot-hold-past-threshold)", function()
+		with_pump(function(h)
+			h.push("keyboard", RCTRL, 1, 1000)
+			h.at(5250)
+			helpers.assert_eq(h.pump(), "", "RCtrl read 250 ms late")
+			h.push("mouse", REL_X, 5, 1255, EV_REL)
+			h.at(5255)
+			helpers.assert_eq(h.pump(), "42:1", "the mouse moved 255 ms into the press: Shift")
+		end)
+	end)
+
+	-- Without luv the daemon's clock counts whole seconds: two readings a
+	-- millisecond apart can differ by a second, and the pump pressed the Shift
+	-- a millisecond after RCtrl went down (rctrl-one-shot-hold-past-threshold).
+	helpers.it("never takes a coarse clock's step for time passed (rctrl-one-shot-hold-past-threshold)", function()
+		with_pump(function(h)
+			h.push("keyboard", RCTRL, 1, 1000)
+			h.at(5000)
+			h.pump()
+			h.at(6000)
+			helpers.assert_eq(h.pump(), "", "the clock stepped a second, maybe a millisecond passed: no Shift")
+			h.at(7000)
+			helpers.assert_eq(h.pump(), "42:1", "two steps: a second at least has passed")
+		end, 1000)
 	end)
 
 end)

@@ -1807,7 +1807,7 @@
 	"shortcuts.uppercase": "Win + U(ppercase) = Auswahl in Groß-/Kleinbuchstaben umwandeln",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
 	"startup.accessibility_required": "ErgoptiPlus benötigt die Berechtigung „Bedienungshilfen“, um die Tastatur zu lesen. Aktiviere unter Systemeinstellungen > Datenschutz & Sicherheit > Bedienungshilfen den Hammerspoon-Eintrag, der zu ErgoptiPlus gehört, und öffne ErgoptiPlus dann erneut. Ein separat gestartetes Hammerspoon hat einen eigenen Eintrag.",
-	"startup.linux_input_access_body": "Ergopti+ kann die Tastatur noch nicht lesen oder nicht in /dev/uinput schreiben. Melden Sie sich ab und wieder an (oder starten Sie neu), damit die vom Installationsprogramm hinzugefügten Gruppen „input“ und „uinput“ wirksam werden. Falls das Problem bleibt, führen Sie aus: bash install.sh --setup-perms",
+	"startup.linux_input_access_body": "Ergopti+ kann die Tastatur noch nicht lesen oder nicht in /dev/uinput schreiben. Melden Sie sich ab und wieder an (oder starten Sie neu), damit die vom Installationsprogramm hinzugefügten Gruppen „input“ und „uinput“ wirksam werden. Falls das Problem bleibt, führen Sie aus: {1}",
 	"startup.linux_input_access_title": "Ergopti+ kann die Tastatur noch nicht verwenden",
 	"startup.manifest_missing": "Startfehler: die Datei _generated/features_manifest.ahk fehlt oder ist beschädigt.\n\nFühre `npm run build:manifest` im Projektverzeichnis aus und starte das Skript neu.",
 	"startup.manifest_title": "ErgoptiPlus — Manifest fehlt",
@@ -2494,5 +2494,11 @@
 	"ui_metrics_rebuild.eta": "noch etwa {eta}",
 	"ui_metrics_rebuild.eta_unknown": "verbleibende Zeit wird geschätzt…",
 	"ui_metrics_rebuild.finalizing": "Neu aufgebaute Statistik wird gespeichert…",
-	"ui_metrics_rebuild.failed": "Der Statistikaufbau wurde unerwartet beendet. Der nächste Versuch setzt dort fort, wo er aufgehört hat."
+	"ui_metrics_rebuild.failed": "Der Statistikaufbau wurde unerwartet beendet. Der nächste Versuch setzt dort fort, wo er aufgehört hat.",
+	"menu.global.uninstall": "Ergopti deinstallieren…",
+	"dialog.uninstall.confirm": "Ergopti deinstallieren? Die Anwendung wird geschlossen. Einstellungen, Hotstrings, Metriken und Zugangsdaten bleiben erhalten.",
+	"dialog.uninstall.failed": "Ergopti konnte nicht deinstalliert werden. Ihre persönlichen Daten bleiben erhalten.",
+	"menu.global.start_at_login": "Bei der Anmeldung starten",
+	"dialog.start_at_login.failed": "Der automatische Start konnte nicht geändert werden. Prüfen Sie die Autostart-Einstellungen des Systems.",
+	"onboarding.error.open_failed": "Der Einrichtungsassistent konnte nicht geöffnet werden. Prüfen Sie die Protokolle und versuchen Sie es erneut über das Menü."
 }

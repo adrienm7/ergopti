@@ -368,6 +368,22 @@
 			"type": "command",
 			"id": "clean_unused_keys",
 			"i18n": "menu.global.clean_unused_keys"
+		},
+		{
+			"type": "check",
+			"id": "start_at_login",
+			"i18n": "menu.global.start_at_login",
+			"checked_when": [
+				"start_at_login_enabled"
+			]
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "command",
+			"id": "uninstall",
+			"i18n": "menu.global.uninstall"
 		}
 	],
 	"debug_menu": [

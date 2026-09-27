@@ -3163,6 +3163,20 @@ type = "command"
 id = "clean_unused_keys"
 i18n = "menu.global.clean_unused_keys"
 
+[[menu.global_actions]]
+type = "check"
+id = "start_at_login"
+i18n = "menu.global.start_at_login"
+checked_when = ["start_at_login_enabled"]
+
+[[menu.global_actions]]
+type = "---"
+
+[[menu.global_actions]]
+type = "command"
+id = "uninstall"
+i18n = "menu.global.uninstall"
+
 # These four carried an id and nothing else until 2026-08-07 — no type, no label
 # key — so every driver that drew one spelled its label out in its own source.
 # They are `command` now, like the four rows below them, and the label is the

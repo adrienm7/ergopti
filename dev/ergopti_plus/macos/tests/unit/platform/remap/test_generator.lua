@@ -281,7 +281,7 @@ helpers.describe("Generator.build_karabiner_json: tap/hold rules", function()
 
 	--- Builds one tap-hold rule per catalogue key with the same two slots.
 	--- @param hold_action table|nil Hold action; nil leaves the hold empty.
-	--- @return table manipulators Key id → its single manipulator.
+	--- @return table manipulators Key id → its unblocked manipulator.
 	local function tap_hold_matrix(hold_action)
 		local ids = {
 			"escape", "tab", "caps_lock", "left_shift", "fn", "left_control",
@@ -312,7 +312,16 @@ helpers.describe("Generator.build_karabiner_json: tap/hold rules", function()
 			local id = type(rule.description) == "string"
 				and rule.description:match("matrix:([^:]+):") or nil
 			if id then
-				local manip = rule.manipulators and rule.manipulators[1]
+				local manip
+				for _, candidate in ipairs(rule.manipulators or {}) do
+					local blocked = false
+					for _, condition in ipairs(candidate.conditions or {}) do
+						if condition.type == "variable_if" and condition.name:find("ke_held_", 1, true) then
+							blocked = true
+						end
+					end
+					if not blocked and not manip then manip = candidate end
+				end
 				helpers.assert_true(type(manip) == "table", "missing manipulator for " .. id)
 				found[id] = manip
 			end
@@ -322,6 +331,61 @@ helpers.describe("Generator.build_karabiner_json: tap/hold rules", function()
 		end
 		return found
 	end
+
+	helpers.it("keeps no-hold modifier chords native and suppresses taps interrupted by typing", function()
+		local Model = require("tests.support.karabiner_model")
+		for _, id in ipairs({ "left_shift", "left_control", "right_shift", "right_command", "fn" }) do
+			local manip = tap_hold_matrix(nil)[id]
+			local model = Model.new({ { manipulators = { manip } } }, {
+				variables = { ["ergopti_mode_" .. TEST_LEASE_TOKEN] = 1 },
+			})
+			model:down(id)
+			helpers.assert_true(model:pressed()[id], "the physical modifier stays held: " .. id)
+			model:down("a")
+			model:up("a", true)
+			model:up(id, true)
+			for _, event in ipairs(model:emissions()) do
+				helpers.assert_true(event.key_code ~= "f18", "a shortcut must not also fire the tap: " .. id)
+			end
+			helpers.assert_nil(next(model:pressed()), "release every owned modifier")
+			model:clear()
+			model:tap(id)
+			local taps = 0
+			for _, event in ipairs(model:emissions()) do
+				if event.key_code == "f18" then taps = taps + 1 end
+			end
+			helpers.assert_eq(taps, 1, "a quick lone release fires exactly one tap: " .. id)
+		end
+	end)
+
+	helpers.it("blocks the Fn tap at the Windows Control position when a thumb or CapsLock was held at press (ctrl-tap-blockers)", function()
+		local Model = require("tests.support.karabiner_model")
+		local keys = {}
+		for _, id in ipairs({ "fn", "left_command", "caps_lock" }) do
+			keys[#keys + 1] = { id = id, label = id,
+				from = { key_code = id, modifiers = { optional = { "any" } } } }
+		end
+		for _, hold in ipairs({ "none", "cmd" }) do
+			local config = Generator.build_karabiner_json(make_state({ tap_hold_config = {
+				fn = { tap = "probe", hold = hold },
+			} }), { NONE_ACTION, CMD_ACTION,
+				{ id = "probe", label = "Probe", karabiner_to = { { key_code = "f18" } } },
+			}, keys, {}, nil, "/fake/data_dir/")
+			for _, blocker in ipairs({ "left_command", "caps_lock" }) do
+				local model = Model.new(config.profiles[1].complex_modifications.rules, {
+					variables = { ["ergopti_mode_" .. TEST_LEASE_TOKEN] = 1 },
+				})
+				model:down(blocker)
+				model:down("fn")
+				model:up(blocker, true)
+				model:up("fn", true)
+				for _, event in ipairs(model:emissions()) do
+					helpers.assert_true(event.key_code ~= "f18", "the blocker at press cancels the tap: " .. blocker)
+				end
+				helpers.assert_nil(next(model:pressed()), "the blocked tap must still release its hold")
+			end
+		end
+	end)
 
 	helpers.it("uses to_if_alone for every delayed tap-hold key, including Space and Enter", function()
 		-- Karabiner's to_if_alone contract cancels the tap when another key,
@@ -335,19 +399,26 @@ helpers.describe("Generator.build_karabiner_json: tap/hold rules", function()
 		end
 	end)
 
-	helpers.it("sends the tap of every key with no hold at key down, and only it (tap-only-key-types-its-tap)", function()
+	helpers.it("keeps native modifier holds and immediate ordinary taps without a configured hold (tap-only-key-types-its-tap)", function()
 		-- A key with nothing to hold has no tap to wait for: its tap goes out at
 		-- key down and repeats, like the native key. Sending the physical key
 		-- there and the tap at release typed two keys for one tap, and a tap
 		-- left in to_if_alone is lost whenever the next key goes down first.
 		for id, manip in pairs(tap_hold_matrix(nil)) do
-			helpers.assert_nil(manip.to_if_alone, "a key with no hold has no delayed tap: " .. id)
+			local native = id == "left_shift" or id == "left_control"
+				or id == "right_shift" or id == "right_command" or id == "fn"
+			if native then
+				helpers.assert_not_nil(manip.to_if_alone, "native modifier taps wait for release: " .. id)
+				helpers.assert_eq(manip.to_if_alone[1].key_code, "f18")
+			else
+				helpers.assert_nil(manip.to_if_alone, "ordinary tap-only keys type at press: " .. id)
+			end
 			local sent = {}
 			for _, event in ipairs(manip.to or {}) do
 				if event.key_code ~= nil then sent[#sent + 1] = event.key_code end
 			end
-			helpers.assert_eq(table.concat(sent, ","), "f18",
-				"a key with no hold must send its tap, and only it, at key down: " .. id)
+			helpers.assert_eq(table.concat(sent, ","), native and id or "f18",
+				"modifier hold versus ordinary immediate tap: " .. id)
 		end
 	end)
 
@@ -400,10 +471,15 @@ helpers.describe("Generator.build_karabiner_json: tap/hold rules", function()
 			helpers.assert_true(not tostring(condition.name):find("ke_held_", 1, true),
 				"the sticky key's rule must not depend on another key being held: " .. tostring(condition.name))
 		end
+		local Keycodes = require("infra.keycodes")
 		helpers.assert_true(type(manipulator.to_if_alone) == "table"
 			and type(manipulator.to_if_alone[1]) == "table"
-			and type(manipulator.to_if_alone[1].sticky_modifier) == "table",
+			and manipulator.to_if_alone[1].key_code == Keycodes.to_name(Keycodes.F20_LAYER_NAV_ENTERED),
 			"the tap must arm the one-shot")
+		helpers.assert_eq(manipulator.to_if_alone[1].modifiers, { "left_control", "left_option" },
+			"the internal signal must carry the one-shot tag")
+		helpers.assert_eq(manipulator.to_if_alone[1]["repeat"], false,
+			"holding the signal must not repeatedly rearm the one-shot")
 		helpers.assert_eq(manipulator.to[#manipulator.to].key_code, "left_shift",
 			"the hold must send the plain modifier")
 
@@ -645,6 +721,151 @@ helpers.describe("Generator.build_karabiner_json: navigation-layer sentinel", fu
 		helpers.assert_true(gated > 0, "the configured layer hold must emit the sentinel")
 		helpers.assert_true(not emits_key(Generator.build_paused_script_control_rules(), F20_NAME),
 			"the PAUSED graph must never emit the navigation-layer sentinel")
+	end)
+end)
+
+-- The cross-driver rule for a key whose own hold is the navigation layer while
+-- another key already holds it (layer-key-under-another-holder-2026-09-27):
+-- the layer's mapping when the layer maps the key, otherwise the plain key,
+-- whose tap types it and whose hold auto-repeats, as on Windows and Linux,
+-- except left Command tapping Backspace, which the layer swallows as Windows
+-- swallows LAlt. The key's tap/hold rule matched under the layer: it held the
+-- layer a second time, typed its tap only on a quick release, and its release
+-- switched the layer off under the key still holding it. The cases replay
+-- Karabiner's first-match over the generated rules, with no modifier held.
+helpers.describe("Generator.build_karabiner_json: a layer key on a layer another key holds", function()
+	local LAYER_ACTION = {
+		id = "layer",
+		label = "Layer",
+		karabiner_to = { { set_variable = { name = "layer_active", value = 1 } } },
+		karabiner_to_after_key_up = { { set_variable = { name = "layer_active", value = 0 } } },
+	}
+	local BACKSPACE_ACTION = { id = "backspace", label = "Backspace",
+		karabiner_to = { { key_code = "delete_or_backspace" } } }
+	local RETURN_ACTION = { id = "return", label = "Return",
+		karabiner_to = { { key_code = "return_or_enter" } } }
+	local KEYS = {
+		{ id = "left_command", label = "Left Command", from = { key_code = "left_command" } },
+		{ id = "caps_lock", label = "Caps Lock", from = { key_code = "caps_lock" } },
+		{ id = "spacebar", label = "Space", from = { key_code = "spacebar" } },
+	}
+	-- The layer maps Space (Spotlight, as layer_keys.json does) and not CapsLock.
+	local LAYER_KEYS_PATH = "/fake/data_dir/layer_keys.json"
+	local LAYER_KEYS = {
+		description = "Navigation layer",
+		manipulators = { {
+			type = "basic",
+			conditions = { { type = "variable_if", name = "layer_active", value = 1 } },
+			from = { key_code = "spacebar", modifiers = { optional = { "any" } } },
+			to = { { key_code = "spacebar", modifiers = { "left_command" } } },
+		} },
+	}
+
+	--- @param left_command_tap string|nil Left Command's tap; Backspace by default.
+	local function build(left_command_tap)
+		_fs_data[LAYER_KEYS_PATH] = _G.hs.json.encode(LAYER_KEYS)
+		local ok, result = pcall(Generator.build_karabiner_json, make_state({
+			tap_hold_config = {
+				left_command = { tap = left_command_tap or "backspace", hold = "layer" },
+				caps_lock = { tap = "return", hold = "layer" },
+				spacebar = { tap = "none", hold = "layer" },
+			},
+		}), { NONE_ACTION, BACKSPACE_ACTION, RETURN_ACTION, LAYER_ACTION }, KEYS, {}, nil, "/fake/data_dir/")
+		_fs_data[LAYER_KEYS_PATH] = nil
+		assert(ok, result)
+		return result.profiles[1].complex_modifications.rules
+	end
+
+	--- The generated name of the layer variable (the lease scopes it).
+	local function layer_variable(rules)
+		local found
+		local function walk(node)
+			if type(node) ~= "table" or found then return end
+			local variable = node.set_variable
+			if type(variable) == "table" and tostring(variable.name):find("layer_active", 1, true) then
+				found = variable.name
+				return
+			end
+			for _, child in pairs(node) do walk(child) end
+		end
+		walk(rules)
+		return found
+	end
+
+	local function conditions_hold(conditions, variables)
+		for _, condition in ipairs(conditions or {}) do
+			local value = variables[condition.name] or 0
+			if condition.type == "variable_if" and value ~= condition.value then return false end
+			if condition.type == "variable_unless" and value == condition.value then return false end
+		end
+		return true
+	end
+
+	--- The manipulator Karabiner runs for a lone press of `key_code`, or nil
+	--- when none matches and the key reaches macOS as itself.
+	local function first_match(rules, key_code, variables)
+		for _, rule in ipairs(rules) do
+			for _, manipulator in ipairs(rule.manipulators) do
+				local modifiers = manipulator.from.modifiers
+				local needs_modifier = type(modifiers) == "table" and type(modifiers.mandatory) == "table"
+					and #modifiers.mandatory > 0
+				if manipulator.from.key_code == key_code and not needs_modifier
+					and conditions_hold(manipulator.conditions, variables) then
+					return manipulator, rule
+				end
+			end
+		end
+		return nil
+	end
+
+	local function variables(rules, layer_on)
+		return {
+			["ergopti_mode_" .. TEST_LEASE_TOKEN] = 1,
+			[layer_variable(rules)] = layer_on and 1 or 0,
+		}
+	end
+
+	helpers.it("types a key held as the layer plainly when the layer does not map it", function()
+		local rules = build()
+		helpers.assert_not_nil(layer_variable(rules), "the layer holds must set the layer variable")
+		helpers.assert_nil(first_match(rules, "caps_lock", variables(rules, true)),
+			"on a layer another key holds, CapsLock matches no rule: macOS types it and repeats it")
+		local own = first_match(rules, "caps_lock", variables(rules, false))
+		helpers.assert_not_nil(own, "alone, CapsLock is its own tap/hold rule")
+		helpers.assert_true(layer_variable(own.to) ~= nil, "which holds the layer as configured")
+		local plain = build("return")
+		helpers.assert_nil(first_match(plain, "left_command", variables(plain, true)),
+			"left Command tapping anything but Backspace is the plain Command key there")
+	end)
+
+	-- Windows' nav_layer.ahk swallows LAlt tapping Backspace with the layer on
+	-- hold, and Linux's engine its LAlt: passed through, it is a modifier under
+	-- every chord of the layer (J gives Cmd+Left here).
+	helpers.it("swallows left Command tapping Backspace on a layer another key holds", function()
+		local rules = build()
+		local on_layer = first_match(rules, "left_command", variables(rules, true))
+		helpers.assert_not_nil(on_layer, "on the layer, left Command must not reach macOS as Command")
+		for _, event in ipairs(on_layer.to or {}) do
+			helpers.assert_nil(event.key_code, "it posts no key")
+			helpers.assert_nil(event.set_variable, "nor holds the layer or anything else")
+		end
+		helpers.assert_nil(on_layer.to_if_alone, "its release types no Backspace")
+		for _, event in ipairs(on_layer.to_after_key_up or {}) do
+			helpers.assert_nil(event.set_variable, "its release leaves the other key's layer on")
+		end
+		local alone = first_match(rules, "left_command", variables(rules, false))
+		helpers.assert_true(layer_variable(alone.to) ~= nil, "alone, left Command holds the layer as configured")
+		helpers.assert_eq(alone.to_if_alone[1].key_code, "delete_or_backspace", "and taps Backspace")
+	end)
+
+	helpers.it("applies the layer's mapping to a key held as the layer when the layer maps it", function()
+		local rules = build()
+		local on_layer, rule = first_match(rules, "spacebar", variables(rules, true))
+		helpers.assert_not_nil(on_layer, "on the layer, Space matches the layer's mapping")
+		helpers.assert_true(tostring(rule.description):find("Navigation layer", 1, true) ~= nil,
+			"the layer's rule, not Space's own tap/hold")
+		local alone = first_match(rules, "spacebar", variables(rules, false))
+		helpers.assert_true(layer_variable(alone.to) ~= nil, "alone, Space holds the layer as configured")
 	end)
 end)
 

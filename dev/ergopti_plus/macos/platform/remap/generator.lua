@@ -41,6 +41,7 @@ local FileSystem = require("adapters.file_system")
 local LeaseContract = require("platform.remap.lease_contract")
 local LegacyReleaseFixtures = require("platform.remap.legacy_release_fixtures")
 local ActionCatalogue = require("platform.remap.action_catalogue")
+local ControlSignals = require("platform.remap.control_signals")
 
 local LOG = "karabiner"
 
@@ -126,6 +127,13 @@ local SCRIPT_CONTROL_SENTINEL_SLOTS = {
 local LAYER_ACTIVE_VAR_NAME    = "layer_active"
 local LAYER_ACTIVE_ON_VALUE    = 1
 local LAYER_NAV_SENTINEL_NAME  = Keycodes.to_name(Keycodes.F20_LAYER_NAV_ENTERED)
+
+-- The tap-hold keys the navigation layer swallows while another key holds it,
+-- by key id, with the tap that makes them so (their hold being the layer):
+-- left Command tapping Backspace, the twin of Windows' LAlt (nav_layer.ahk,
+-- "Fix when LAlt triggers the layer") and Linux's. Passed through, it is a
+-- Command under every chord of the layer (J gives Cmd+Left).
+local SWALLOWED_ON_LAYER = { left_command = { tap = "backspace" } }
 
 -- Append-only log file consumed by modules/keylogger/kc_bridge.lua.
 -- Each line written by the shell_command is: "<physical_key_code_name>\n"
@@ -757,6 +765,62 @@ end
 -- ========================================
 -- ========================================
 
+--- Rewrites deployed control output after historical migration snapshots exist.
+--- The simple sticky Shift payload becomes a tagged F20; compound stickies keep
+--- their native semantics. All F20 emitters claim hand modifiers so navigation
+--- can never inherit the one-shot tag from keys the user happens to hold.
+--- @param rules table Owned production rule graph.
+local function rewrite_control_output(rules)
+	local function rewrite(value)
+		local emits_control = value.key_code == LAYER_NAV_SENTINEL_NAME
+		if emits_control then value["repeat"] = false end
+		local sticky_index, sticky_count = nil, 0
+		for index, event in ipairs(value) do
+			if type(event) == "table" and event.sticky_modifier then
+				sticky_count = sticky_count + 1
+				if deep_equal(event.sticky_modifier, { left_shift = "toggle" }) then sticky_index = index end
+			end
+		end
+		if sticky_count == 1 and sticky_index then
+			local replacement = deep_copy(value[sticky_index])
+			replacement.sticky_modifier = nil
+			replacement.key_code = LAYER_NAV_SENTINEL_NAME
+			replacement.modifiers = ControlSignals.one_shot_modifiers()
+			value[sticky_index] = replacement
+		end
+		for _, nested in pairs(value) do
+			if type(nested) == "table" and rewrite(nested) then emits_control = true end
+		end
+		return emits_control
+	end
+	for _, rule in ipairs(rules) do
+		local manipulators = {}
+		for _, manipulator in ipairs(rule.manipulators or {}) do
+			local prepared = deep_copy(manipulator)
+			local variants = rewrite(prepared) and exact_modifier_manipulators(prepared) or { manipulator }
+			for _, variant in ipairs(variants) do manipulators[#manipulators + 1] = variant end
+		end
+		rule.manipulators = manipulators
+	end
+end
+
+local NATIVE_TAP_ONLY_KEYS = {
+	left_shift = true, left_control = true, right_shift = true, right_command = true, fn = true,
+}
+
+--- Keeps native modifier chords available when only their tap is configured.
+--- @param key_code string Physical key.
+--- @param tap_action table Configured tap.
+--- @param hold_action table Configured hold, never mutated.
+--- @return table effective_hold Runtime hold with the original configuration identity.
+local function native_tap_only_hold(key_code, tap_action, hold_action)
+	if NATIVE_TAP_ONLY_KEYS[key_code] and #(tap_action.karabiner_to or {}) > 0
+		and #(hold_action.karabiner_to or {}) == 0 then
+		return { id = hold_action.id, label = hold_action.label, karabiner_to = { { key_code = key_code } } }
+	end
+	return hold_action
+end
+
 --- Builds a Karabiner rule table for a single tap / hold key.
 ---
 --- The manipulator ALWAYS tracks physical state via ke_held_<key_code>:
@@ -767,15 +831,15 @@ end
 --- variable and re-emits the original key — keys used purely as combo triggers
 --- still get physical-press tracking without any user-visible behaviour change.
 ---
---- The rule holds exactly one manipulator. Karabiner runs the first manipulator
---- that matches, so a second one gated on another held key would take every
---- press made under that key and drop the tap, a one-shot included.
+--- Priority variants suppress only taps explicitly blocked by the Windows
+--- contract. Their hold and physical tracking still follow the normal rule.
 --- @param key_def table Entry from TAP_HOLD_KEYS.
 --- @param tap_action table Resolved action definition for the tap slot.
 --- @param hold_action table Resolved action definition for the hold slot.
 --- @param tap_timeout_ms number|nil Per-key tap/hold threshold override in ms; nil inherits the global.
 --- @return table Karabiner rule object.
 local function build_tap_hold_rule(key_def, tap_action, hold_action, tap_timeout_ms)
+	hold_action = native_tap_only_hold(key_def.from.key_code, tap_action, hold_action)
 	local tap_to   = tap_action.karabiner_to  or {}
 	local hold_to  = hold_action.karabiner_to or {}
 	local key_code = key_def.from.key_code
@@ -834,6 +898,35 @@ local function build_tap_hold_rule(key_def, tap_action, hold_action, tap_timeout
 	end
 	manipulator.to = to_events
 
+	-- A key whose hold is the navigation layer stands down while the layer is
+	-- on, as every driver's does: pressed while another key holds the layer,
+	-- the layer's own mapping takes it (layer_keys.json runs before this rule),
+	-- the swallower below takes a key in SWALLOWED_ON_LAYER, and any other key
+	-- matches no rule, so macOS types it and repeats it. Matching here held the
+	-- layer a second time, typed the tap only on a quick release, and its
+	-- release switched the layer off under the key still holding it.
+	local swallower
+	if activates_nav_layer(hold_to) then
+		manipulator.conditions = {
+			{ type = "variable_unless", name = LAYER_ACTIVE_VAR_NAME, value = LAYER_ACTIVE_ON_VALUE },
+		}
+		local swallowed = SWALLOWED_ON_LAYER[key_def.id]
+		if swallowed and tap_action.id == swallowed.tap then
+			-- Only the physical press is recorded, for the heatmap: nothing is
+			-- held, typed or tracked as held, and Karabiner routes the release to
+			-- this manipulator too.
+			swallower = {
+				type            = "basic",
+				from            = deep_copy(key_def.from),
+				conditions      = {
+					{ type = "variable_if", name = LAYER_ACTIVE_VAR_NAME, value = LAYER_ACTIVE_ON_VALUE },
+				},
+				to              = { physical_kc_ledger_event(key_code, false) },
+				to_after_key_up = { physical_kc_ledger_event(key_code, true) },
+			}
+		end
+	end
+
 	-- Per-key tap/hold threshold override. Karabiner honours
 	-- basic.to_if_alone_timeout_milliseconds at the manipulator level, overriding
 	-- the complex_modifications global. nil/0 inherits the single global value, so
@@ -854,6 +947,25 @@ local function build_tap_hold_rule(key_def, tap_action, hold_action, tap_timeout
 	if has_exact_modifier_action(tap_action, hold_action) then
 		manipulators = exact_modifier_manipulators(manipulator)
 	end
+	-- Fn is the Windows left-Control position (Paste); the macOS Control
+	-- key has its own Cut action and must not inherit these thumb blockers.
+	if key_code == "fn" and manipulator.to_if_alone then
+		local blocked = {}
+		for _, blocker in ipairs({ "caps_lock", "left_command" }) do
+			for _, variant in ipairs(manipulators) do
+				local copy = deep_copy(variant)
+				copy.to_if_alone = nil
+				copy.conditions = copy.conditions or {}
+				copy.conditions[#copy.conditions + 1] = {
+					type = "variable_if", name = held_var_name(blocker), value = 1,
+				}
+				blocked[#blocked + 1] = copy
+			end
+		end
+		for _, variant in ipairs(manipulators) do blocked[#blocked + 1] = variant end
+		manipulators = blocked
+	end
+	if swallower then table.insert(manipulators, 1, swallower) end
 
 	return {
 		description  = string.format(
@@ -1025,6 +1137,7 @@ local KEY_ORDER_STRICT_INVERSE = "strict_inverse"
 --- @param hold_action table Resolved action for the key's hold slot.
 --- @return table held { to = events at key_down, after = events at key_up, has_hold = boolean }
 local function held_key_state(key_code, tap_action, hold_action)
+	hold_action = native_tap_only_hold(key_code, tap_action, hold_action)
 	local has_hold = #(hold_action.karabiner_to or {}) > 0
 	return {
 		to       = held_key_events(key_code, tap_action, hold_action),
@@ -1580,6 +1693,8 @@ function M.build_karabiner_json(
 			#all_rules - #kept)
 		all_rules = kept
 	end
+
+	rewrite_control_output(all_rules)
 
 	-- A single deployed config contains both pause states. Pause and resume only
 	-- toggle the generation-scoped variable; they never rewrite karabiner.json

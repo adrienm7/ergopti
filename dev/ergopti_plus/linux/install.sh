@@ -173,9 +173,6 @@ _detect_pkg_manager() {
 # module is loaded, so a rule without it applies to nothing on a fresh boot and
 # the permissions appear not to have been set at all.
 
-UDEV_RULE_PATH="/etc/udev/rules.d/99-ergopti-uinput.rules"
-MODULES_LOAD_PATH="/etc/modules-load.d/ergopti-uinput.conf"
-
 _setup_permissions() {
 	echo ""
 	echo "=== Permissions d'entrée (nécessite sudo) ==="
@@ -187,76 +184,15 @@ _setup_permissions() {
 	echo "     hotstrings, et c'est ce que font keyd et xremap."
 	echo ""
 
-	if ! command -v sudo >/dev/null 2>&1; then
-		echo "  ⚠  sudo introuvable — configurez les permissions manuellement :" >&2
-		echo "     groupes 'input' et 'uinput', règle udev, chargement du module." >&2
-		return 0
+	local target_uid
+	target_uid="${SUDO_UID:-$(id -u)}"
+	if [ "$(id -u)" = 0 ]; then
+		bash "${SRC_DRIVER}/install/setup_permissions.sh" --user "$target_uid"
+	elif command -v sudo >/dev/null 2>&1; then
+		sudo bash "${SRC_DRIVER}/install/setup_permissions.sh" --user "$target_uid"
+	else
+		pkexec /bin/bash "${SRC_DRIVER}/install/setup_permissions.sh" --user "$target_uid"
 	fi
-
-	# The uinput group is ours to create; input already exists on every distro
-	# that ships udev, but creating it is harmless and covers the ones that do not.
-	# groupadd/usermod are shadow-utils; BusyBox systems (Alpine) ship
-	# addgroup instead, and an unguarded usermod aborted the install there.
-	sudo groupadd -f uinput 2>/dev/null || sudo addgroup -S uinput 2>/dev/null || true
-	sudo groupadd -f input  2>/dev/null || sudo addgroup -S input  2>/dev/null || true
-
-	# `id -un` rather than $USER. This script runs under `set -u`, and $USER is set
-	# by a login shell — not by a container, a systemd unit, a cron job or
-	# `su -c`. Fedora and Arch containers proved it: the installer aborted here
-	# with "USER: unbound variable" after having already copied every file, so the
-	# user was left with a half-installed driver and a shell error. `id -un` asks
-	# the kernel, which always answers.
-	local target_user
-	target_user="$(id -un)"
-	local group
-	for group in input uinput; do
-		if ! sudo usermod -aG "${group}" "${target_user}" 2>/dev/null \
-			&& ! sudo addgroup "${target_user}" "${group}" 2>/dev/null; then
-			echo "  ✗  Impossible d'ajouter ${target_user} au groupe ${group}." >&2
-			return 1
-		fi
-	done
-	echo "  ✔  ${target_user} ajouté aux groupes input et uinput"
-
-	# The directory is created first, and its absence is not fatal. A Fedora
-	# container aborted here — no udev installed, so /etc/udev/rules.d does not
-	# exist — after the files were already copied and the groups already changed.
-	# A missing udev is a real configuration (minimal images, some immutable
-	# systems): the rule simply has nothing to configure there, and saying so beats
-	# stopping halfway.
-	if ! sudo install -d "$(dirname "${UDEV_RULE_PATH}")" 2>/dev/null; then
-		echo "  ⚠  $(dirname "${UDEV_RULE_PATH}") introuvable — pas d'udev sur ce système."
-		echo "     /dev/uinput devra être rendu accessible autrement."
-		return 0
-	fi
-
-	sudo tee "${UDEV_RULE_PATH}" >/dev/null << 'UDEV_EOF'
-# Ergopti — write access to /dev/uinput for the uinput group.
-#
-# static_node is what makes this work on a fresh boot: /dev/uinput does not
-# exist until the module is loaded, so a rule without it matches nothing and the
-# permissions look as though they were never applied.
-#
-# uaccess is deliberately NOT used here or on /dev/input: systemd's udev
-# guidance forbids it for input devices, because an unprivileged process able to
-# read raw keyboard events can keylog every application on the seat.
-KERNEL=="uinput", MODE="0660", GROUP="uinput", OPTIONS+="static_node=uinput"
-UDEV_EOF
-	echo "  ✔  règle udev : ${UDEV_RULE_PATH}"
-
-	sudo install -d "$(dirname "${MODULES_LOAD_PATH}")" 2>/dev/null || true
-	sudo tee "${MODULES_LOAD_PATH}" >/dev/null << 'MODULES_EOF'
-# Ergopti — load the uinput module at boot so /dev/uinput exists before the
-# user session (and therefore before the daemon) starts.
-uinput
-MODULES_EOF
-	echo "  ✔  chargement du module : ${MODULES_LOAD_PATH}"
-
-	# Now, so the current session does not have to reboot to test.
-	sudo modprobe uinput 2>/dev/null || true
-	sudo udevadm control --reload-rules 2>/dev/null || true
-	sudo udevadm trigger 2>/dev/null || true
-
 	echo ""
 	echo "  ⚠  Déconnectez-vous et reconnectez-vous pour que les groupes"
 	echo "     prennent effet — l'appartenance à un groupe n'est lue qu'à"
@@ -643,16 +579,19 @@ migrate_canonical_packs \
 # nest linux/, _shared/ and bin/ inside LIB_DIR/linux/.
 cp -r "${SRC_DRIVER}/." "${LIB_DIR}/linux/"
 cp -r "${SRC_SHARED}/." "${DEST_SHARED}/"
+bash "${SRC_DRIVER}/install/ownership.sh" "${SRC_DRIVER}" "${SRC_SHARED}" "${LIB_DIR}"
 
 # Create the wrapper script in ~/.local/bin/ that points to the installed libs.
 cat > "${BIN_DIR}/ergopti-hotstrings" << WRAPPER
 #!/usr/bin/env bash
 # Auto-généré par install.sh — ne pas éditer manuellement.
 set -euo pipefail
-DRIVER_ROOT="${LIB_DIR}/linux"
-SHARED_LUA="${DEST_SHARED}/lua"
+DRIVER_ROOT=$(printf '%q' "${LIB_DIR}/linux")
+SHARED_LUA=$(printf '%q' "${DEST_SHARED}/lua")
 export LUA_PATH="\${DRIVER_ROOT}/?.lua;\${DRIVER_ROOT}/?/init.lua;\${SHARED_LUA}/?.lua;\${SHARED_LUA}/?/init.lua;;"
-exec luajit "\${DRIVER_ROOT}/ergopti_hotstrings.lua" "\$@"
+# The standalone installer already selected its startup owner. Acquire input
+# groups without redirecting this wrapper back into its own systemd unit.
+exec bash "\${DRIVER_ROOT}/install/launch.sh" --service "\$@"
 WRAPPER
 chmod +x "${BIN_DIR}/ergopti-hotstrings"
 echo "  ✔  lanceur : ${BIN_DIR}/ergopti-hotstrings"
@@ -673,7 +612,7 @@ _setup_permissions
 if $INSTALL_SERVICE; then
 	echo ""
 	echo "=== Création des services systemd utilisateur ==="
-	AUTOSTART_DIR="${HOME}/.config/autostart"
+	AUTOSTART_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/autostart"
 	AUTOSTART_FILE="${AUTOSTART_DIR}/ergopti-hotstrings.desktop"
 	STARTUP_OWNER="xdg"
 
@@ -687,9 +626,14 @@ if $INSTALL_SERVICE; then
 	#
 	# Only the ExecStart differs between install roots, so that one line is
 	# rewritten and everything else is taken verbatim.
-	sed "s|^ExecStart=.*|ExecStart=${BIN_DIR}/ergopti-hotstrings --tray|" \
-		"${SRC_DRIVER}/ergopti-hotstrings.service" \
-		> "${SYSTEMD_DIR}/ergopti-hotstrings.service"
+	source "${SRC_DRIVER}/install/desktop_entry.sh"
+	SERVICE_EXEC="$(ergopti_systemd_exec "${BIN_DIR}/ergopti-hotstrings")"
+	while IFS= read -r service_line || [ -n "$service_line" ]; do
+		case "$service_line" in
+			ExecStart=*) printf '%s\n' "$SERVICE_EXEC" ;;
+			*) printf '%s\n' "$service_line" ;;
+		esac
+	done < "${SRC_DRIVER}/ergopti-hotstrings.service" > "${SYSTEMD_DIR}/ergopti-hotstrings.service"
 
 	# Guarded, because systemd is not universal: Alpine runs OpenRC, Void runs
 	# runit, and Gentoo may run either. Those systems get the XDG autostart entry
@@ -702,7 +646,17 @@ if $INSTALL_SERVICE; then
 	# and treat "no" as "install the unit, enable it later", never as a failure:
 	# the unit file is written above either way, and the XDG autostart entry below
 	# starts the daemon on any desktop regardless of init.
-	if command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1; then
+	if [ -f "$AUTOSTART_FILE" ] && grep -Fxq 'X-Ergopti-Startup=true' "$AUTOSTART_FILE"; then
+		# Updates preserve an explicit menu choice; installation is not consent
+		# to re-enable a startup entry the user disabled.
+		STARTUP_CHOICE="$(bash "$LIB_DIR/linux/install/start_at_login.sh" status)"
+		case "$STARTUP_CHOICE" in
+			enabled) bash "$LIB_DIR/linux/install/start_at_login.sh" enable ;;
+			disabled) bash "$LIB_DIR/linux/install/start_at_login.sh" disable ;;
+			*) echo 'The startup choice could not be read.' >&2; exit 1 ;;
+		esac
+		STARTUP_OWNER="user-choice"
+	elif command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1; then
 		# Retire a previous non-systemd fallback before enabling the unit. Leaving
 		# both files active starts two daemons at the next graphical login, and both
 		# compete for the same evdev grab.
@@ -736,7 +690,7 @@ if $INSTALL_SERVICE; then
 Type=Application
 Name=Ergopti+
 Comment=Expansion de texte et métriques clavier
-Exec=${BIN_DIR}/ergopti-hotstrings --tray
+$(ergopti_desktop_exec "${BIN_DIR}/ergopti-hotstrings")
 Terminal=false
 X-GNOME-Autostart-enabled=true
 AUTOSTART
@@ -750,6 +704,21 @@ fi
 # ======= 7/ Post-Install Summary =======
 # =======================================
 # =======================================
+
+for kind in wrapper unit autostart; do
+	case "$kind" in
+		wrapper) owned="${BIN_DIR}/ergopti-hotstrings" ;;
+		unit) owned="${SYSTEMD_DIR}/ergopti-hotstrings.service" ;;
+		autostart) owned="${XDG_CONFIG_HOME:-$HOME/.config}/autostart/ergopti-hotstrings.desktop" ;;
+	esac
+	if [ "$kind" != wrapper ] && ! $INSTALL_SERVICE; then continue; fi
+	if [ -f "$owned" ]; then
+		# The startup-choice helper may already have recorded the new desktop.
+		if grep -q $'\t@'"$kind"'$' "${LIB_DIR}/.ergopti-owned-files"; then continue; fi
+		digest="$(sha256sum -- "$owned")"
+		printf '%s\t@%s\n' "${digest%% *}" "$kind" >> "${LIB_DIR}/.ergopti-owned-files"
+	fi
+done
 
 echo ""
 echo "=== Installation terminée ==="

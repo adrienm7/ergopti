@@ -1782,6 +1782,24 @@ private func legacyGuardianPlistMatches(
 	return observed == expected
 }
 
+/// Removes only the legacy agent whose bytes identify this exact application.
+func removeLegacyRemapGuardian(
+	executablePath: String,
+	runner: GuardianLaunchctlRunning = PosixGuardianLaunchctlRunner(),
+	homeDirectory: String = NSHomeDirectory()
+) -> Bool {
+	let path = homeDirectory + "/Library/LaunchAgents/" + kRemapGuardianPlistName
+	var attributes = stat()
+	if Darwin.lstat(path, &attributes) != 0 { return errno == ENOENT }
+	let expected = Data(legacyGuardianPlist(executablePath: executablePath).utf8)
+	guard legacyGuardianPlistMatches(expected, path: path) else { return false }
+	let target = "gui/\(getuid())/" + kRemapGuardianLabel
+	if runner.run(arguments: ["print", target]),
+		!runner.run(arguments: ["bootout", target]) { return false }
+	guard legacyGuardianPlistMatches(expected, path: path) else { return false }
+	return Darwin.unlink(path) == 0
+}
+
 /// Performs one side-effect-free exact health observation.
 func legacyGuardianIsHealthy(_ paths: LeaseGuardianPaths) -> Bool {
 	let singleton = Darwin.open(

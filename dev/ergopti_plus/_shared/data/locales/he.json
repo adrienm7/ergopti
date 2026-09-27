@@ -1807,7 +1807,7 @@
 	"shortcuts.uppercase": "Win + U(ppercase) = החלף בחירה אותיות גדולות/קטנות",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
 	"startup.accessibility_required": "ErgoptiPlus זקוק להרשאת נגישות כדי לקרוא את המקלדת. בהגדרות המערכת > פרטיות ואבטחה > נגישות, הפעל את הפריט Hammerspoon השייך ל־ErgoptiPlus, ואז פתח שוב את ErgoptiPlus. ליישום Hammerspoon שאתה מפעיל בנפרד יש פריט משלו.",
-	"startup.linux_input_access_body": "Ergopti+ עדיין לא יכול לקרוא את המקלדת או לכתוב אל ‎/dev/uinput. התנתקו והתחברו מחדש (או הפעילו מחדש) כדי שהקבוצות „input” ו־„uinput” שהמתקין הוסיף ייכנסו לתוקף. אם הבעיה נמשכת, הריצו: bash install.sh --setup-perms",
+	"startup.linux_input_access_body": "Ergopti+ עדיין לא יכול לקרוא את המקלדת או לכתוב אל ‎/dev/uinput. התנתקו והתחברו מחדש (או הפעילו מחדש) כדי שהקבוצות „input” ו־„uinput” שהמתקין הוסיף ייכנסו לתוקף. אם הבעיה נמשכת, הריצו: {1}",
 	"startup.linux_input_access_title": "Ergopti+ עדיין לא יכול להשתמש במקלדת",
 	"startup.manifest_missing": "שגיאת הפעלה: הקובץ _generated/features_manifest.ahk חסר או פגום.\n\nהפעל `npm run build:manifest` מתיקיית הפרויקט ולאחר מכן הפעל מחדש את הסקריפט.",
 	"startup.manifest_title": "ErgoptiPlus — manifest חסר",
@@ -2494,5 +2494,11 @@
 	"ui_metrics_rebuild.eta": "נותרו כ-{eta}",
 	"ui_metrics_rebuild.eta_unknown": "מעריך את הזמן שנותר…",
 	"ui_metrics_rebuild.finalizing": "שומר את הסטטיסטיקה שנבנתה מחדש…",
-	"ui_metrics_rebuild.failed": "הבנייה מחדש של הסטטיסטיקה נעצרה באופן בלתי צפוי. הניסיון הבא ימשיך מהמקום שבו נעצרה."
+	"ui_metrics_rebuild.failed": "הבנייה מחדש של הסטטיסטיקה נעצרה באופן בלתי צפוי. הניסיון הבא ימשיך מהמקום שבו נעצרה.",
+	"menu.global.uninstall": "הסרת Ergopti…",
+	"dialog.uninstall.confirm": "להסיר את Ergopti? היישום ייסגר. ההגדרות, קיצורי הטקסט, המדדים ופרטי ההתחברות יישמרו.",
+	"dialog.uninstall.failed": "לא ניתן היה להסיר את Ergopti. הנתונים האישיים שלך נשמרו.",
+	"menu.global.start_at_login": "הפעלה בעת הכניסה למערכת",
+	"dialog.start_at_login.failed": "לא ניתן לשנות את ההפעלה האוטומטית. יש לבדוק את הגדרות ההפעלה של המערכת.",
+	"onboarding.error.open_failed": "לא ניתן לפתוח את אשף ההגדרה. יש לבדוק את היומנים ולנסות שוב מהתפריט."
 }

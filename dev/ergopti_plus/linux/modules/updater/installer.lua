@@ -220,6 +220,28 @@ function DEFAULT_OPS.extract(archive_path, work_dir)
 		.. " --no-same-owner --no-same-permissions 2>/dev/null")
 end
 
+--- Records the new payload before it can replace the user's installation.
+--- @param root string Validated staging root containing only release files.
+--- @param previous string Current installation whose launcher is retained.
+--- @return boolean success
+function DEFAULT_OPS.record_ownership(root, previous)
+	if not run_command("bash " .. shell_quote(root .. "/linux/install/ownership.sh")
+		.. " " .. shell_quote(root .. "/linux") .. " " .. shell_quote(root .. "/_shared")
+		.. " " .. shell_quote(root)) then return false end
+	local manifest = previous .. "/.ergopti-owned-files"
+	if not default_probe(manifest, "file") then return true end
+	local old = Fs.read(manifest)
+	if not old then return false end
+	local retained = {}
+	for line in old:gmatch("[^\r\n]+") do
+		local digest, kind = line:match("^(%x+)\t@(%a+)$")
+		if digest and #digest == 64 and (kind == "wrapper" or kind == "unit" or kind == "autostart") then
+			retained[#retained + 1] = line .. "\n"
+		end
+	end
+	return #retained == 0 or Fs.append(root .. "/.ergopti-owned-files", table.concat(retained))
+end
+
 function DEFAULT_OPS.mkdir(path)
 	return run_command("mkdir -- " .. shell_quote(path) .. " 2>/dev/null")
 end
@@ -351,6 +373,9 @@ function M.install(options)
 		or not ops.move(work_dir .. "/linux", candidate .. "/linux")
 		or not ops.move(work_dir .. "/_shared", candidate .. "/_shared") then
 		return fail("could not assemble the complete candidate root")
+	end
+	if not ops.record_ownership(candidate, context.install_root) then
+		return fail("could not record the new installation's file ownership")
 	end
 
 	local backup = context.install_root .. ".old"

@@ -1807,7 +1807,7 @@
 	"shortcuts.uppercase": "Win + U(ppercase) = 選択範囲の大文字/小文字を切り替え",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
 	"startup.accessibility_required": "ErgoptiPlus がキーボードを読み取るには「アクセシビリティ」の許可が必要です。システム設定 > プライバシーとセキュリティ > アクセシビリティで、ErgoptiPlus に属する Hammerspoon の項目をオンにしてから、ErgoptiPlus をもう一度開いてください。別に実行している Hammerspoon アプリには独自の項目があります。",
-	"startup.linux_input_access_body": "Ergopti+ はまだキーボードを読み取れないか、/dev/uinput に書き込めません。インストーラーが追加した「input」と「uinput」グループを有効にするため、ログアウトして再ログイン（または再起動）してください。解決しない場合は次を実行してください: bash install.sh --setup-perms",
+	"startup.linux_input_access_body": "Ergopti+ はまだキーボードを読み取れないか、/dev/uinput に書き込めません。インストーラーが追加した「input」と「uinput」グループを有効にするため、ログアウトして再ログイン（または再起動）してください。解決しない場合は次を実行してください: {1}",
 	"startup.linux_input_access_title": "Ergopti+ はまだキーボードを使用できません",
 	"startup.manifest_missing": "起動エラー：_generated/features_manifest.ahk ファイルが見つからないか破損しています。\n\nプロジェクトディレクトリで `npm run build:manifest` を実行し、スクリプトを再起動してください。",
 	"startup.manifest_title": "ErgoptiPlus — manifest が見つかりません",
@@ -2494,5 +2494,11 @@
 	"ui_metrics_rebuild.eta": "残り約 {eta}",
 	"ui_metrics_rebuild.eta_unknown": "残り時間を推定中…",
 	"ui_metrics_rebuild.finalizing": "再構築した統計を保存中…",
-	"ui_metrics_rebuild.failed": "統計の再構築が予期せず停止しました。次回の試行は停止した箇所から再開します。"
+	"ui_metrics_rebuild.failed": "統計の再構築が予期せず停止しました。次回の試行は停止した箇所から再開します。",
+	"menu.global.uninstall": "Ergopti をアンインストール…",
+	"dialog.uninstall.confirm": "Ergopti をアンインストールしますか？アプリケーションは終了します。設定、ホットストリング、統計情報、認証情報は保持されます。",
+	"dialog.uninstall.failed": "Ergopti をアンインストールできませんでした。個人データは保持されています。",
+	"menu.global.start_at_login": "ログイン時に起動",
+	"dialog.start_at_login.failed": "自動起動を変更できませんでした。システムの起動設定を確認してください。",
+	"onboarding.error.open_failed": "設定ウィザードを開けませんでした。ログを確認し、メニューから再試行してください。"
 }

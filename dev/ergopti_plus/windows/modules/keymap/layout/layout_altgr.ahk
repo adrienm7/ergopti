@@ -216,10 +216,11 @@ _BuildAltGrTables() {
 ;      Kana virtual key, which sends SC138 with no LCtrl/RAlt modifiers.
 ;      Physical RAlt is never down, so the gate must accept SC138 directly.
 ;
-; The discriminator is _ALTGR_KANA_FIXUP, auto-detected at boot via a reverse
-; VK_RMENU→SC probe in infra/hotstring_engine.ahk (re-evaluated on layout switch
-; through the watcher’s Reload). Manual TOML override available via
-; ScriptInformation["AltGrIsKanaRemap"] in case the probe ever misfires.
+; The discriminator is _ALTGR_KANA_FIXUP, auto-detected via a reverse
+; VK_RMENU→SC probe (infra/altgr_family.ahk), at boot and then on every change
+; of the foreground window's layout, without a reload. Manual TOML override
+; available via ScriptInformation["AltGrIsKanaRemap"] in case the probe ever
+; misfires.
 IsRealAltGrPress() {
     global _ALTGR_KANA_FIXUP, _OB_ALTGR_PASSTHROUGH
     ; While the onboarding wizard is on screen the user has not yet committed
@@ -262,6 +263,21 @@ IsRealAltGrPress() {
 ; @return {Boolean}
 ScriptAltGrChordIsLive(AltGrPressed) {
     return AltGrPressed and KS_LayoutHasAltGr()
+}
+
+; #HotIf of the script chords' suffix-only twins on a Kana-style layout
+; (infra/script_altgr_hotkeys.ahk): there the chord runs from Enter, BackSpace,
+; Delete or Escape alone while SC138 is physically down. They are registered on
+; every layout and read the family here, per press: the family follows the
+; foreground window's layout, so a registration decided at boot would miss a
+; Kana window opened later or keep firing in a standard one. They stand down
+; with the combinations when the AltGr key holds another modifier or a layer
+; (AltGrKeyIsAltGr): AltGr+Enter held as Ctrl is Ctrl+Enter, not a script chord.
+; @param AltGrDown {Boolean} SC138 physically down.
+; @return {Boolean}
+ScriptAltGrKanaChordIsLive(AltGrDown) {
+    global _ALTGR_KANA_FIXUP
+    return AltGrDown and IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP and AltGrKeyIsAltGr()
 }
 
 ; Run the Plain or Shifted callable from ``Table[SC]`` depending on the

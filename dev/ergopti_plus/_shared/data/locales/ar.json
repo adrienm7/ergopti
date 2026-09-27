@@ -1807,7 +1807,7 @@
 	"shortcuts.uppercase": "Win + U(ppercase) = تبديل التحديد بين الأحرف الكبيرة والصغيرة",
 	"shortcuts.wincapslock": "Win + \"CapsLock\" = CapsLock",
 	"startup.accessibility_required": "يحتاج ErgoptiPlus إلى إذن تسهيلات الاستخدام لقراءة لوحة المفاتيح. في إعدادات النظام > الخصوصية والأمان > تسهيلات الاستخدام، فعّل عنصر Hammerspoon التابع لـ ErgoptiPlus، ثم افتح ErgoptiPlus مرة أخرى. تطبيق Hammerspoon الذي تشغّله بشكل منفصل له عنصر خاص به.",
-	"startup.linux_input_access_body": "لا يستطيع Ergopti+ بعدُ قراءة لوحة المفاتيح أو الكتابة في ‎/dev/uinput. سجّل الخروج ثم الدخول من جديد (أو أعد التشغيل) حتى تسري المجموعتان «input» و«uinput» اللتان أضافهما المثبّت. إذا استمرت المشكلة، نفّذ: bash install.sh --setup-perms",
+	"startup.linux_input_access_body": "لا يستطيع Ergopti+ بعدُ قراءة لوحة المفاتيح أو الكتابة في ‎/dev/uinput. سجّل الخروج ثم الدخول من جديد (أو أعد التشغيل) حتى تسري المجموعتان «input» و«uinput» اللتان أضافهما المثبّت. إذا استمرت المشكلة، نفّذ: {1}",
 	"startup.linux_input_access_title": "لا يستطيع Ergopti+ استخدام لوحة المفاتيح بعد",
 	"startup.manifest_missing": "خطأ في بدء التشغيل: الملف _generated/features_manifest.ahk مفقود أو تالف.\n\nشغّل `npm run build:manifest` من مجلد المشروع، ثم أعد تشغيل السكريبت.",
 	"startup.manifest_title": "ErgoptiPlus — ملف manifest مفقود",
@@ -2494,5 +2494,11 @@
 	"ui_metrics_rebuild.eta": "يتبقى نحو {eta}",
 	"ui_metrics_rebuild.eta_unknown": "جارٍ تقدير الوقت المتبقي…",
 	"ui_metrics_rebuild.finalizing": "جارٍ حفظ الإحصائيات المعاد بناؤها…",
-	"ui_metrics_rebuild.failed": "توقفت إعادة بناء الإحصائيات بشكل غير متوقع. ستستأنف المحاولة التالية من حيث توقفت."
+	"ui_metrics_rebuild.failed": "توقفت إعادة بناء الإحصائيات بشكل غير متوقع. ستستأنف المحاولة التالية من حيث توقفت.",
+	"menu.global.uninstall": "إلغاء تثبيت Ergopti…",
+	"dialog.uninstall.confirm": "هل تريد إلغاء تثبيت Ergopti؟ سيُغلق التطبيق. ستُحفظ إعداداتك واختصارات النص والمقاييس وبيانات الاعتماد.",
+	"dialog.uninstall.failed": "تعذّر إلغاء تثبيت Ergopti. تم الاحتفاظ ببياناتك الشخصية.",
+	"menu.global.start_at_login": "التشغيل عند تسجيل الدخول",
+	"dialog.start_at_login.failed": "تعذر تغيير التشغيل التلقائي. تحقق من إعدادات بدء التشغيل في النظام.",
+	"onboarding.error.open_failed": "تعذر فتح معالج الإعداد. تحقق من السجلات ثم حاول مجددًا من القائمة."
 }

@@ -3174,6 +3174,25 @@ local function _build_global_actions(ctx)
 		["enable_all"]     = call_ctx("on_enable_all"),
 		["disable_all"]    = call_ctx("on_disable_all"),
 		["reset_defaults"] = call_ctx("on_reset_defaults"),
+		["start_at_login"] = function()
+			if not require("ui.menu.start_at_login").toggle() then
+				show_error(i18n_safe("dialog.start_at_login.failed"), i18n_safe("menu.global.start_at_login"))
+			end
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		end,
+		["uninstall"] = function()
+			require("ui.menu.uninstall").run({
+				title = i18n_safe("menu.global.uninstall"),
+				confirmation = i18n_safe("dialog.uninstall.confirm"),
+				failure = i18n_safe("dialog.uninstall.failed"),
+				confirm = function(title, text)
+					return ask_yes_no(title, zenity_plain(text),
+						i18n_safe("button.remove"), i18n_safe("button.cancel"))
+				end,
+				fail = function(text) show_error(zenity_plain(text), i18n_safe("menu.global.uninstall")) end,
+				quit = call_ctx("on_quit"),
+			})
+		end,
 		-- The cleanup needs no daemon state: it reads config.toml itself and
 		-- asks through this tray's own zenity dialogs.
 		["clean_unused_keys"] = function()
@@ -3196,6 +3215,11 @@ local function _build_global_actions(ctx)
 		end,
 	}
 
+	render_ctx.state_getters = {}
+	for key, value in pairs(ctx.state_getters or {}) do render_ctx.state_getters[key] = value end
+	render_ctx.state_getters.start_at_login_enabled = function()
+		return require("ui.menu.start_at_login").enabled() == true
+	end
 	return {
 		label   = i18n_safe("menu.global.title"),
 		submenu = ManifestMenu.build("global_actions", "Global", nil, nil, render_ctx),

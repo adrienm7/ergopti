@@ -1314,7 +1314,7 @@ _TH_TakeRetractedOwner(KeyId) {
 ; lone RAlt opened the window menu). When the RAlt of that press arrives, the
 ; hold is handed back and, where the AltGr key is AltGr, LCtrl is held for it,
 ; so LCtrl+RAlt is AltGr again; the LCtrl ends with the left_ctrl press, which
-; the AltGr release ends. Only on a layout with an AltGr level (the boot probe's
+; the AltGr release ends. Only on a layout with an AltGr level (the layout probe's
 ; "altgr_level"): on QWERTY right Alt is a plain Alt and LCtrl then RAlt is the
 ; user's own chord. A Kana layout has no fake LCtrl at all.
 ; @param AsAltGr {Boolean} True to give AltGr its LCtrl back, false when the

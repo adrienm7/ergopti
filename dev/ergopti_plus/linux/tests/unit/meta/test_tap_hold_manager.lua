@@ -18,6 +18,7 @@ local function fake_hook()
 	function hook.key_text() return nil end
 	function hook.held_modifiers() return hook.mods or {} end
 	function hook.held_text_modifier_codes() return hook.text_mods or {} end
+	function hook.held_shortcut_modifier_codes() return hook.shortcut_mods or {} end
 	function hook.set_remapper(engine, on_tap)
 		hook.calls = hook.calls + 1
 		hook.engine, hook.on_tap = engine, on_tap
@@ -161,6 +162,27 @@ helpers.describe("tap-hold manager", function()
 				"the hand's right Shift is lifted around the result")
 		end)
 		package.loaded["adapters.keyboard_layout"] = saved
+		Manager._reset_for_test()
+		os.remove(user_path)
+		if not ok then error(err, 0) end
+	end)
+
+	-- LAlt's Backspace logic types its keystrokes with only their own
+	-- modifiers, lifting every one the hook says is down, as the live layout
+	-- names them (lalt-backspace-logic).
+	helpers.it("lets the engine lift the shortcut keys the hook says are held (lalt-backspace-logic)", function()
+		local Manager, hook, _, user_path = manager()
+		hook.text_mods = { 42 }
+		hook.shortcut_mods = { 126 }
+		local ok, err = pcall(function()
+			hook.engine:process(42, 1, 0)
+			hook.engine:process(56, 1, 10)
+			local out = hook.engine:process(56, 0, 100)
+			local parts = {}
+			for _, ev in ipairs(out or {}) do parts[#parts + 1] = ev.code .. ":" .. ev.value end
+			helpers.assert_eq(table.concat(parts, " "), "42:0 126:0 111:1 111:0 126:1 42:1",
+				"LShift then LAlt is a Delete, with the Super the hook names lifted too")
+		end)
 		Manager._reset_for_test()
 		os.remove(user_path)
 		if not ok then error(err, 0) end

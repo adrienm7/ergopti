@@ -79,10 +79,11 @@ Commit the fixture update only when the diff matches the intended change.
 ## CI
 
 GitHub Actions runs the full suite on every push/PR — see the `test-hs` job of
-`.github/workflows/ci-macos.yml`, which renders as
-`macOS / unit tests + stubbed harness`. The job installs Lua 5.4 and luacheck,
-runs `tests/run.lua` with Lua 5.4, then runs the stubbed E2E harness,
-`tests/e2e/run_e2e.lua`.
+`.github/workflows/ci-macos.yml`, which renders as `macOS / tests (stubbed)`,
+the entry job of the macOS lane. The job installs Lua 5.4 and luacheck, runs
+`tests/run.lua` with Lua 5.4, then runs the stubbed E2E harness,
+`tests/e2e/run_e2e.lua`. The macOS package job needs it, so a red suite spends
+no macOS runner time.
 
 ## Coverage status
 
