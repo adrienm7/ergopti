@@ -31,7 +31,7 @@
 --- ==============================================================================
 
 local EvdevCodes = require("infra.evdev_codes")
-local UnicodeCase = require("unicode_case")
+local OneShotShift = require("tap_hold.one_shot_shift")
 
 local M = {}
 
@@ -117,13 +117,6 @@ local KEY_F2, KEY_F12 = 60, 88
 -- like the key itself, so an Enter tapped on CapsLock ends a hotstring as a
 -- real Enter does, and an armed one-shot Shift treats them as that key.
 M.KEY_TAPS = { enter = 28, tab = 15, backspace = 14, escape = 1, delete = 111, space = 57, caps_lock = 58 }
-
--- The keys that end an armed one-shot Shift and are typed unshifted, by
--- control name, as on Windows (platform/remap/one_shot_shift.ahk): its
--- InputHook ends on Backspace, Enter and Delete and sends them back, and
--- collects Tab and Escape as text it sends back unchanged. Any other key is
--- judged by the text it types (see take_one_shot).
-local ONE_SHOT_SPENT_UNSHIFTED = { backspace = true, enter = true, delete = true, tab = true, escape = true }
 
 --- A chord of the navigation layer.
 local function chord(mods, key) return { mods = mods, keys = { key } } end
@@ -416,7 +409,7 @@ local function take_one_shot(self, code, now_ms)
 	if not self.one_shot_until then return nil end
 	if MODIFIER_KEYS[code] or code == EvdevCodes.KEY_CAPSLOCK then return nil end
 	local control = EvdevCodes.CONTROL_NAME_OF[code]
-	if control and ONE_SHOT_SPENT_UNSHIFTED[control] then
+	if OneShotShift.spends_unshifted(control) then
 		self.one_shot_until = nil
 		return nil
 	end
@@ -425,16 +418,13 @@ local function take_one_shot(self, code, now_ms)
 	local armed = now_ms <= self.one_shot_until
 	self.one_shot_until = nil
 	if not armed then return nil end
-	local result = self.one_shot_result(text)
-	if result then return "text", result end
-	local title = UnicodeCase.title(text)
-	if title == text then return nil end
 	-- The capital on the same key's Shift level is that key under Shift: a real
 	-- keystroke that repeats. Anywhere else ("É" on AZERTY), it is typed.
-	local steps = self.plan_text(title)
-	local step = steps and #steps == 1 and steps[1]
-	if step and step.keycode == code and #step.mods == 1 and step.mods[1] == "shift" then return "shift" end
-	return "text", title
+	return OneShotShift.resolve(text, self.one_shot_result, function(title)
+		local steps = self.plan_text(title)
+		local step = steps and #steps == 1 and steps[1]
+		return step and step.keycode == code and #step.mods == 1 and step.mods[1] == "shift"
+	end)
 end
 
 -- The level keys the engine counts as held when no live layout names them.

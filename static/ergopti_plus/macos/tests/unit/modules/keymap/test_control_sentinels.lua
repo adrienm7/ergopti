@@ -51,6 +51,15 @@ end
 
 
 helpers.describe("control sentinels: one owner claims the Karabiner F20", function()
+	helpers.it("decodes one-shot Shift without confusing a bare navigation edge (one-shot-sentinel)", function()
+		local Sentinels = load_owner()
+		local signals = {}
+		Sentinels.set_listener("test.observer", function(signal) signals[#signals + 1] = signal end)
+		helpers.assert_true(Sentinels.claim_key(KEYCODE_F20, true, { ctrl = true, alt = true }))
+		helpers.assert_true(Sentinels.claim_key(KEYCODE_F20, false, { ctrl = true, alt = true }))
+		helpers.assert_true(Sentinels.claim_key(KEYCODE_F20, true, {}))
+		helpers.assert_eq(signals, { Sentinels.ONE_SHOT_SHIFT, Sentinels.NAV_LAYER_ENTERED })
+	end)
 	helpers.it("(sentinel-never-reaches-app) claims both F20 phases and publishes once per press", function()
 		local Sentinels = load_owner()
 		local signals = {}

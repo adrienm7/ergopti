@@ -2133,6 +2133,18 @@ function M.loopbackKeyStroke(batch, modifiers, key)
 end
 
 
+--- Reads a fresh native translation without publishing or returning the event.
+--- Keeping probes here preserves the single raw keyboard-construction owner.
+--- @param code number Physical keycode.
+--- @param raw_flags number Native modifier mask.
+--- @return string characters
+function M.keyboard_characters(code, raw_flags)
+	local probe = assert(new_key_event({}, code, true), "keyboard translation probe construction failed")
+	probe:rawFlags(raw_flags)
+	return probe:getCharacters(false)
+end
+
+
 --- Appends UTF-8 text as tagged key pairs, atomically for the whole string.
 --- @param batch table Batch.
 --- @param value string UTF-8 text.

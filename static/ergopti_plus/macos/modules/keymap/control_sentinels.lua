@@ -27,11 +27,13 @@ local M = {}
 local Keycodes       = require("keycodes")
 local Logger         = require("infra.logger")
 local SyntheticInput = require("adapters.synthetic_input")
+local ControlSignals = require("platform.remap.control_signals")
 
 local LOG = "keymap.control_sentinels"
 
 --- Signal published when Karabiner enters the navigation layer (F20 sentinel).
 M.NAV_LAYER_ENTERED = "nav_layer_entered"
+M.ONE_SHOT_SHIFT = "one_shot_shift"
 
 -- Reserved keycode → published signal. Karabiner prepends F20 to every action
 -- that activates the navigation layer (platform/remap/generator.lua).
@@ -98,10 +100,12 @@ end
 --- release reaches the application either.
 --- @param keycode number Keycode already read by the calling tap.
 --- @param is_down boolean True for key-down, false for key-up.
+--- @param flags table|nil Modifier flags, read only for a reserved key-down.
 --- @return boolean consumed True when the caller must delete the event.
-function M.claim_key(keycode, is_down)
+function M.claim_key(keycode, is_down, flags)
 	local signal = SIGNAL_BY_KEYCODE[keycode]
 	if signal == nil then return false end
+	if ControlSignals.is_one_shot(flags) then signal = M.ONE_SHOT_SHIFT end
 	if is_down then publish(signal) end
 	return true
 end

@@ -147,6 +147,34 @@ helpers.with_fresh_modules({
 
 
 
+	helpers.describe("one-shot Shift control output", function()
+		helpers.it("emits a distinct tag while navigation stays bare under held Control+Option (one-shot-sentinel)", function()
+			local rules = build()
+			local nav = engine_for(rules, { "left_control", "left_option" })
+			nav:down("left_command")
+			local saw_nav = false
+			for _, emission in ipairs(nav:emissions()) do
+				if emission.key_code == "key_90" then
+					saw_nav = true
+					helpers.assert_eq(names(emission.flags), "", "navigation must not inherit the one-shot tag")
+					helpers.assert_eq(emission.event["repeat"], false)
+				end
+			end
+			helpers.assert_true(saw_nav)
+			local shifted = engine_for(build({ right_option = { tap = "sticky_shift", hold = "shift" } }))
+			shifted:tap("right_option")
+			local saw_shift = false
+			for _, emission in ipairs(shifted:emissions()) do
+				if emission.key_code == "key_90" then
+					saw_shift = true
+					helpers.assert_eq(names(emission.flags), "left_control,left_option")
+					helpers.assert_eq(emission.event["repeat"], false)
+				end
+			end
+			helpers.assert_true(saw_shift)
+		end)
+	end)
+
 	-- =============================================
 	-- ===== 1) One-shot modifiers under holds =====
 	-- =============================================
@@ -180,7 +208,11 @@ helpers.with_fresh_modules({
 						engine:tap("right_option")
 						local armed = false
 						for _, emission in ipairs(engine:emissions()) do
-							if emission.phase == "tap" and type(emission.event.sticky_modifier) == "table" then
+							if sticky.id == "sticky_shift" then
+								if emission.key_code == "key_90" then
+									armed = emission.flags.left_control == true and emission.flags.left_option == true
+								end
+							elseif emission.phase == "tap" and type(emission.event.sticky_modifier) == "table" then
 								armed = true
 							end
 						end

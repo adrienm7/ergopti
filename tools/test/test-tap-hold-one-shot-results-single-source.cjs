@@ -29,6 +29,8 @@ const AHK_ONE_SHOT = path.join(SP, 'windows', 'platform', 'remap', 'one_shot_shi
 const AHK_LOADER = path.join(SP, 'windows', 'platform', 'remap', 'tap_hold_loader.ahk');
 const LINUX_MANAGER = path.join(SP, 'linux', 'platform', 'remap', 'tap_hold_manager.lua');
 const LINUX_ENGINE = path.join(SP, 'linux', 'platform', 'remap', 'tap_hold_engine.lua');
+const MACOS_ADAPTER = path.join(SP, 'macos', 'adapters', 'one_shot_shift.lua');
+const MACOS_OWNER = path.join(SP, 'macos', 'modules', 'keymap', 'one_shot_shift.lua');
 
 const errors = [];
 const data = JSON.parse(fs.readFileSync(DATA, 'utf8'));
@@ -66,15 +68,28 @@ if (!fs.readFileSync(AHK_LOADER, 'utf8').includes('one_shot_shift.json')) {
 if (!fs.readFileSync(LINUX_MANAGER, 'utf8').includes('tap_hold/one_shot_shift.json')) {
 	errors.push('linux/platform/remap/tap_hold_manager.lua does not read _shared/tap_hold/one_shot_shift.json.');
 }
+if (!fs.readFileSync(MACOS_ADAPTER, 'utf8').includes('tap_hold/one_shot_shift.json')) {
+	errors.push('macOS must load the same one-shot result table.');
+}
+for (const file of [LINUX_ENGINE, MACOS_OWNER]) {
+	if (!fs.readFileSync(file, 'utf8').includes('require("tap_hold.one_shot_shift")')) {
+		errors.push(`${path.relative(SP, file)} must consume the shared one-shot key and Unicode policy.`);
+	}
+}
 // Code only: the engine's comments may quote a result to explain it.
 const engine = fs
 	.readFileSync(LINUX_ENGINE, 'utf8')
 	.split('\n')
 	.map((line) => line.replace(/--.*$/, ''))
 	.join('\n');
-for (const entry of results) {
-	if (engine.includes(JSON.stringify(entry.result))) {
-		errors.push(`linux/platform/remap/tap_hold_engine.lua spells the result ${JSON.stringify(entry.result)} itself.`);
+
+for (const file of [LINUX_ENGINE, MACOS_ADAPTER, MACOS_OWNER]) {
+	const source = file === LINUX_ENGINE ? engine : fs.readFileSync(file, 'utf8')
+		.split('\n').map((line) => line.replace(/--.*$/, '')).join('\n');
+	for (const entry of results) {
+		if (source.includes(JSON.stringify(entry.result))) {
+			errors.push(`${path.relative(SP, file)} spells the result ${JSON.stringify(entry.result)} itself.`);
+		}
 	}
 }
 
@@ -84,6 +99,6 @@ if (errors.length > 0) {
 	process.exit(1);
 }
 console.log(
-	`\x1b[32m[OK] one-shot Shift: ${results.length} result(s) and the magic key's, read by Windows and Linux ` +
+	`\x1b[32m[OK] one-shot Shift: ${results.length} result(s) and the magic key's, read by all three drivers ` +
 		'from one shared table.\x1b[0m'
 );

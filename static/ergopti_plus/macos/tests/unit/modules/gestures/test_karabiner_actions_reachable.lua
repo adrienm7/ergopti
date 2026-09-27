@@ -18,8 +18,8 @@
 ---   keystrokes        — callback-returned exact-tag action pairs
 ---   Karabiner writes  — layer_on / layer_off / capsword go out over
 ---                       the serialized Karabiner variable bridge
----   sticky modifiers  — the 15 sticky_* arm the injector, since
----                       `sticky_modifier` has no IPC at all
+---   sticky modifiers  — compound modifiers arm the injector; simple Shift
+---                       uses the same one-shot owner as remapped keys
 ---
 --- HOLD-ONLY ACTIONS ARE ABSENT ON PURPOSE. The 19 remaining catalogue entries
 --- (`layer`, the bare modifiers, their combinations) are `tappable: false`. A
@@ -270,7 +270,18 @@ helpers.describe("Karabiner catalogue actions: sticky modifiers", function()
 		helpers.assert_eq(mods_of(seen.sticky[1].modifiers), expected_mods, action .. " modifiers")
 	end
 
-	helpers.it("sticky_shift arms Shift", function() assert_sticky("sticky_shift", "shift") end)
+	helpers.it("sticky_shift arms the shared one-shot owner", function()
+		local Actions, seen = fresh_registry()
+		helpers.with_stub_scope({ "modules.keymap" }, function()
+			local calls = 0
+			package.loaded["modules.keymap"] = {
+				arm_one_shot_shift = function() calls = calls + 1; return true end,
+			}
+			helpers.assert_true(Actions.execute_single("sticky_shift"))
+			helpers.assert_eq(calls, 1)
+			helpers.assert_eq(#seen.sticky, 0, "simple Shift must not also arm the compound injector")
+		end)
+	end)
 	helpers.it("sticky_option arms Option, spelled alt", function()
 		-- The catalogue calls it Option and a key event calls the flag "alt".
 		-- Passing "option" through would arm a flag nothing carries.
@@ -295,7 +306,7 @@ helpers.describe("Karabiner catalogue actions: sticky modifiers", function()
 	helpers.it("refuses to arm when the remap layer cannot supply a delay", function()
 		local Actions, seen = fresh_registry()
 		package.loaded["platform.remap"] = { get_sticky_timeout = function() return nil end }
-		Actions.execute_single("sticky_shift")
+		Actions.execute_single("sticky_cmd")
 		helpers.assert_eq(#seen.sticky, 0,
 			"no fallback delay: the value is the user's, and inventing one here would override "
 			.. "their choice on exactly the boot where the configuration failed to load")
