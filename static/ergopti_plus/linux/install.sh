@@ -646,7 +646,17 @@ if $INSTALL_SERVICE; then
 	# and treat "no" as "install the unit, enable it later", never as a failure:
 	# the unit file is written above either way, and the XDG autostart entry below
 	# starts the daemon on any desktop regardless of init.
-	if command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1; then
+	if [ -f "$AUTOSTART_FILE" ] && grep -Fxq 'X-Ergopti-Startup=true' "$AUTOSTART_FILE"; then
+		# Updates preserve an explicit menu choice; installation is not consent
+		# to re-enable a startup entry the user disabled.
+		STARTUP_CHOICE="$(bash "$LIB_DIR/linux/install/start_at_login.sh" status)"
+		case "$STARTUP_CHOICE" in
+			enabled) bash "$LIB_DIR/linux/install/start_at_login.sh" enable ;;
+			disabled) bash "$LIB_DIR/linux/install/start_at_login.sh" disable ;;
+			*) echo 'The startup choice could not be read.' >&2; exit 1 ;;
+		esac
+		STARTUP_OWNER="user-choice"
+	elif command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1; then
 		# Retire a previous non-systemd fallback before enabling the unit. Leaving
 		# both files active starts two daemons at the next graphical login, and both
 		# compete for the same evdev grab.

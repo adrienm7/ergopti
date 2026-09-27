@@ -44,6 +44,7 @@ local function make_actions(fired)
 		reload            = function() end,
 		quit              = function() end,
 		uninstall         = function() fired[#fired + 1] = "uninstall" end,
+		start_at_login    = function() fired[#fired + 1] = "start_at_login" end,
 		enable_all        = function() fired[#fired + 1] = "enable_all" end,
 		disable_all       = function() fired[#fired + 1] = "disable_all" end,
 		reset_defaults    = function() fired[#fired + 1] = "reset_defaults" end,
@@ -107,6 +108,15 @@ helpers.describe("global actions: nothing global is actionable during a pause", 
 		item.fn()
 		helpers.assert_eq(#fired, 1)
 		helpers.assert_eq(fired[1], "uninstall")
+	end)
+	helpers.it("login startup remains available without resuming keyboard features (login-startup)", function()
+		local fired = {}
+		local found = by_title(global_actions_items(true, fired))
+		local item = found["menu.global.start_at_login"]
+		helpers.assert_true(item ~= nil and not item.disabled)
+		helpers.assert_eq(type(item.fn), "function")
+		item.fn()
+		helpers.assert_eq(fired, { "start_at_login" })
 	end)
 	helpers.it("every global action is disabled while paused", function()
 		local fired = {}

@@ -1107,6 +1107,11 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	end
 
 	local actions = {
+		start_at_login            = function()
+			return require("ui.menu.start_at_login").request("toggle", function()
+				if type(updateMenu) == "function" then updateMenu() end
+			end)
+		end,
 		uninstall                 = function()
 			return run_global_exclusive("Uninstall", function()
 				return require("ui.menu.uninstall").run()
@@ -1277,6 +1282,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	end
 
 	local function rebuild_menu_cache()
+		require("ui.menu.start_at_login").request("status", function()
+			if type(updateMenu) == "function" then updateMenu() end
+		end)
 		local t0 = hs.timer.secondsSinceEpoch()
 		local ok_b, items = pcall(Builder.generate, ctx, menu_mods, actions)
 		local elapsed_ms = (hs.timer.secondsSinceEpoch() - t0) * 1000

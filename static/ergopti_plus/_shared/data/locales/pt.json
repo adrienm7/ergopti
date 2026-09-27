@@ -2497,5 +2497,7 @@
 	"ui_metrics_rebuild.failed": "A reconstrução das estatísticas parou inesperadamente. A próxima tentativa continuará de onde parou.",
 	"menu.global.uninstall": "Desinstalar Ergopti…",
 	"dialog.uninstall.confirm": "Desinstalar o Ergopti? A aplicação será fechada. As definições, hotstrings, métricas e credenciais serão mantidas.",
-	"dialog.uninstall.failed": "Não foi possível desinstalar o Ergopti. Os seus dados pessoais foram mantidos."
+	"dialog.uninstall.failed": "Não foi possível desinstalar o Ergopti. Os seus dados pessoais foram mantidos.",
+	"menu.global.start_at_login": "Iniciar ao entrar na sessão",
+	"dialog.start_at_login.failed": "Não foi possível alterar o início automático. Verifique as definições de arranque do sistema."
 }

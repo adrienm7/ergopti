@@ -2497,5 +2497,7 @@
 	"ui_metrics_rebuild.failed": "Het opnieuw opbouwen van de statistieken is onverwacht gestopt. De volgende poging gaat verder waar deze stopte.",
 	"menu.global.uninstall": "Ergopti verwijderen…",
 	"dialog.uninstall.confirm": "Ergopti verwijderen? De toepassing wordt gesloten. Je instellingen, hotstrings, statistieken en inloggegevens blijven behouden.",
-	"dialog.uninstall.failed": "Ergopti kon niet worden verwijderd. Je persoonlijke gegevens zijn behouden."
+	"dialog.uninstall.failed": "Ergopti kon niet worden verwijderd. Je persoonlijke gegevens zijn behouden.",
+	"menu.global.start_at_login": "Starten bij aanmelden",
+	"dialog.start_at_login.failed": "Automatisch starten kon niet worden gewijzigd. Controleer de opstartinstellingen van het systeem."
 }

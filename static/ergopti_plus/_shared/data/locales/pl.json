@@ -2497,5 +2497,7 @@
 	"ui_metrics_rebuild.failed": "Odbudowa statystyk nieoczekiwanie się zatrzymała. Następna próba wznowi ją od miejsca przerwania.",
 	"menu.global.uninstall": "Odinstaluj Ergopti…",
 	"dialog.uninstall.confirm": "Odinstalować Ergopti? Aplikacja zostanie zamknięta. Ustawienia, hotstringi, statystyki i dane logowania zostaną zachowane.",
-	"dialog.uninstall.failed": "Nie udało się odinstalować Ergopti. Twoje dane osobiste zostały zachowane."
+	"dialog.uninstall.failed": "Nie udało się odinstalować Ergopti. Twoje dane osobiste zostały zachowane.",
+	"menu.global.start_at_login": "Uruchamiaj po zalogowaniu",
+	"dialog.start_at_login.failed": "Nie udało się zmienić automatycznego uruchamiania. Sprawdź ustawienia uruchamiania systemu."
 }

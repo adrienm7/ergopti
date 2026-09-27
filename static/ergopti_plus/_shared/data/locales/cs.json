@@ -2497,5 +2497,7 @@
 	"ui_metrics_rebuild.failed": "Obnova statistik se neočekávaně zastavila. Další pokus naváže tam, kde skončila.",
 	"menu.global.uninstall": "Odinstalovat Ergopti…",
 	"dialog.uninstall.confirm": "Odinstalovat Ergopti? Aplikace se zavře. Vaše nastavení, hotstringy, metriky a přihlašovací údaje zůstanou zachovány.",
-	"dialog.uninstall.failed": "Ergopti se nepodařilo odinstalovat. Vaše osobní data zůstala zachována."
+	"dialog.uninstall.failed": "Ergopti se nepodařilo odinstalovat. Vaše osobní data zůstala zachována.",
+	"menu.global.start_at_login": "Spustit při přihlášení",
+	"dialog.start_at_login.failed": "Automatické spouštění se nepodařilo změnit. Zkontrolujte nastavení spouštění systému."
 }

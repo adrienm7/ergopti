@@ -2497,5 +2497,7 @@
 	"ui_metrics_rebuild.failed": "הבנייה מחדש של הסטטיסטיקה נעצרה באופן בלתי צפוי. הניסיון הבא ימשיך מהמקום שבו נעצרה.",
 	"menu.global.uninstall": "הסרת Ergopti…",
 	"dialog.uninstall.confirm": "להסיר את Ergopti? היישום ייסגר. ההגדרות, קיצורי הטקסט, המדדים ופרטי ההתחברות יישמרו.",
-	"dialog.uninstall.failed": "לא ניתן היה להסיר את Ergopti. הנתונים האישיים שלך נשמרו."
+	"dialog.uninstall.failed": "לא ניתן היה להסיר את Ergopti. הנתונים האישיים שלך נשמרו.",
+	"menu.global.start_at_login": "הפעלה בעת הכניסה למערכת",
+	"dialog.start_at_login.failed": "לא ניתן לשנות את ההפעלה האוטומטית. יש לבדוק את הגדרות ההפעלה של המערכת."
 }

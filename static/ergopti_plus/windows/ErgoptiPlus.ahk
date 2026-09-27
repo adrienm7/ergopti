@@ -447,6 +447,7 @@ if UIASW_IsWorkerInvocation()
 #Include infra/llm_defaults.ahk
 #Include modules/updater.ahk
 #Include infra/uninstall.ahk
+#Include infra/start_at_login.ahk
 #Include ui/changelog/init.ahk
 #Include ui/healthcheck/init.ahk
 #Include modules/diagnostics/crash_reporter.ahk

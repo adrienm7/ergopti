@@ -328,6 +328,26 @@ const errors = [];
 	}
 }
 
+// An update must preserve a choice already made through the startup menu.
+{
+	const run = runInstaller({ desktopProvided: true, seed(home) {
+		const directory = path.join(home, '.config/autostart');
+		fs.mkdirSync(directory, { recursive: true });
+		fs.writeFileSync(path.join(directory, 'ergopti-hotstrings.desktop'),
+			`[Desktop Entry]\nType=Application\nName=Ergopti\nExec=${bashPath(home)}/.local/bin/ergopti-hotstrings --tray\nHidden=true\nX-Ergopti-Startup=true\n`);
+	} });
+	try {
+		if (run.status !== 0) errors.push(`install with disabled startup failed: ${run.output.slice(-1800)}`);
+		const desktop = fs.readFileSync(path.join(run.home, '.config/autostart/ergopti-hotstrings.desktop'), 'utf8');
+		if (!/^Hidden=true$/m.test(desktop)) errors.push('installation re-enabled an explicit startup refusal');
+		if (run.calls.some((call) => /systemctl .* (enable|restart|start) /.test(call))) {
+			errors.push('installation activated a service despite the disabled startup choice');
+		}
+		const receipt = fs.readFileSync(path.join(run.home, '.local/lib/ergopti/.ergopti-owned-files'), 'utf8');
+		if ((receipt.match(/\t@autostart\n/g) || []).length !== 1) errors.push('startup receipt must have exactly one owner row');
+	} finally { run.cleanup(); }
+}
+
 if (errors.length > 0) {
 	console.error('\x1b[31m[FAIL] install.sh does not leave a working first install:\x1b[0m');
 	for (const error of errors) console.error(`  - ${error}`);

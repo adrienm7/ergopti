@@ -2497,5 +2497,7 @@
 	"ui_metrics_rebuild.failed": "The statistics rebuild stopped unexpectedly. The next attempt resumes where it stopped.",
 	"menu.global.uninstall": "Uninstall Ergopti…",
 	"dialog.uninstall.confirm": "Uninstall Ergopti? The application will close. Your settings, hotstrings, metrics and credentials will be kept.",
-	"dialog.uninstall.failed": "Ergopti could not be uninstalled. Your personal data has been kept."
+	"dialog.uninstall.failed": "Ergopti could not be uninstalled. Your personal data has been kept.",
+	"menu.global.start_at_login": "Start at login",
+	"dialog.start_at_login.failed": "Could not change automatic startup. Check the system startup settings."
 }

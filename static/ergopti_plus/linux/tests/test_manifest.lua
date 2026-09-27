@@ -230,6 +230,7 @@ return {
 	"tests.unit.ui.test_menu_languages_and_global_separator",
 	"tests.unit.ui.test_menu_pause_greys_features",
 	"tests.unit.ui.test_menu_uninstall",
+	"tests.unit.ui.test_start_at_login",
 	"tests.unit.ui.test_unused_keys_cleanup",
 	"tests.unit.ui.test_wpm_readouts",
 }
