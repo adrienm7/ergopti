@@ -371,6 +371,10 @@ wpm_window_ms = 15000
 # HS: keylogger/init.lua WPM_MIN_DURATION_MS.
 wpm_min_duration_ms = 2000
 
+# Silence after which the live WPM reads 0 rather than the speed of the last
+# burst. HS: keylogger/init.lua get_live_stats(); Linux: keylogger.lua.
+wpm_idle_reset_ms = 5000
+
 # System load poll interval (CPU / RAM sampling).
 # HS: keylogger/init.lua SYSTEM_LOAD_POLL_INTERVAL_MS.
 system_load_poll_ms = 300000
@@ -551,23 +555,21 @@ layout_poll_ms = 2000
 # HS: lib/ui_restore.lua POLL_INTERVAL_SEC.
 ui_restore_poll_ms = 1000
 
-# WPM widget update interval.
-# HS: ui/wpm/wpm_widget.lua 0.2 s timer.
+# WPM widget update interval, and the graph's sample period.
+# HS: ui/wpm/wpm_widget.lua timer. Linux: ui/wpm/widget.lua. AHK: wpm_display.ahk tick.
 wpm_widget_update_ms = 200
 
 # Inactivity duration before the WPM widget hides itself.
-# AHK: lib/metrics/wpm_widget.ahk WPMWidgetConst.IDLE_HIDE_MS.
-# HS:  ui/wpm/wpm_widget.lua IDLE_HIDE_MS.
+# AHK: ui/wpm/wpm_config.ahk. HS: ui/wpm/wpm_widget.lua. Linux: ui/wpm/widget.lua.
 wpm_widget_idle_hide_ms = 3000
 
 # How long the WPM widget keeps showing the hotstring source color after the
 # last expansion before fading back to the manual-keystroke color.
-# AHK: lib/metrics/wpm_widget.ahk WPMWidgetConst.COLOR_HOLD_MS.
-# HS:  ui/wpm/wpm_widget.lua COLOR_HOLD_S (converted from ms at load time).
+# AHK: ui/wpm/wpm_config.ahk. HS and Linux: the shared wpm_widget model.
 wpm_color_hold_ms = 1000
 
-# WPM menubar update interval.
-# HS: ui/wpm/wpm_menubar.lua 0.5 s timer.
+# Menu bar (macOS) / tray (Linux) readout update interval.
+# HS: ui/wpm/wpm_menubar.lua. Linux: ui/wpm/tray_readout.lua.
 wpm_menubar_update_ms = 500
 
 # Hammerspoon reload debounce after a config file change.

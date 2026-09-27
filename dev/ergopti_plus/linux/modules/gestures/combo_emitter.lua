@@ -14,15 +14,20 @@
 --- the same keystroke reaches X11, every Wayland compositor and a bare TTY
 --- alike; it is the same reason the hotstring injector was moved off ydotool.
 ---
---- WHY A TABLE OF EIGHTEEN NAMES AND NOT ALL OF X11:
---- The combos are not arbitrary user input — they come from
---- `_shared/modules/actions/actions.toml` through the generated table, and the
---- whole catalogue uses eighteen distinct key names. Mapping those is bounded and
---- checkable; mapping "all of X11" would be a hundred entries written blind, most
---- of them never used, and no way to tell a wrong one from an unused one.
+--- WHY A BOUNDED TABLE AND NOT ALL OF X11:
+--- The combos are not arbitrary user input. They come from
+--- `_shared/modules/actions/actions.toml` through the generated table, and from
+--- the modifier chords of `_shared/modules/actions/modifier_chords.json` (Ctrl+A,
+--- Super+1, Alt+.), which name the letters, the digits, Space, Return, the
+--- period and the comma, and from the media keys the volume, brightness and
+--- track actions fall back to. Mapping those is bounded and checkable; mapping "all of
+--- X11" would be a hundred entries written blind, most of them never used, and
+--- no way to tell a wrong one from an unused one.
 --- `tests/unit/modules/test_combo_emitter.lua` asserts that EVERY combo the
---- generated catalogue contains resolves, so the bound is enforced rather than
---- assumed — add an action with a new key name and the suite says so.
+--- generated catalogue contains resolves, and
+--- `tests/unit/modules/test_action_handlers_declared.lua` presses every declared
+--- modifier chord, so the bound is enforced rather than assumed: add an action
+--- or a chord key with a new name and the suite says so.
 ---
 --- WHAT IT STILL CANNOT DO:
 --- A keystroke is all uinput can express. "Switch to workspace 3" or "focus that
@@ -79,18 +84,33 @@ local KEYSYM_TO_CODE = {
 	F4        = 62,  -- KEY_F4
 	F11       = 87,  -- KEY_F11
 
-	-- The letters the catalogue and selection pipeline use: ctrl+c/v to copy or
-	-- paste, ctrl+t to open a tab and
-	-- ctrl+w to close one. Added as the catalogue gained an emit_linux column for
-	-- the two tab actions — the parity test caught them the same commit, which is
-	-- what a table checked against the generated rows is for.
-	-- US positions: parse() moves each letter to where the live layout has it.
-	c         = 46,  -- KEY_C
-	t         = 20,  -- KEY_T
-	v         = 47,  -- KEY_V
-	w         = 17,  -- KEY_W
-	x         = 45,  -- KEY_X
+	-- Every letter and digit, the period and the comma: the catalogue's own
+	-- combos (ctrl+c, ctrl+v, ctrl+t, ctrl+w, ctrl+x) and every modifier chord.
+	-- US positions: parse() moves each character to where the live layout has it.
+	a = 30, b = 48, c = 46, d = 32, e = 18, f = 33, g = 34, h = 35, i = 23,  -- KEY_A..KEY_I
+	j = 36, k = 37, l = 38, m = 50, n = 49, o = 24, p = 25, q = 16, r = 19,  -- KEY_J..KEY_R
+	s = 31, t = 20, u = 22, v = 47, w = 17, x = 45, y = 21, z = 44,          -- KEY_S..KEY_Z
+	["1"] = 2, ["2"] = 3, ["3"] = 4, ["4"] = 5, ["5"] = 6,                     -- KEY_1..KEY_5
+	["6"] = 7, ["7"] = 8, ["8"] = 9, ["9"] = 10, ["0"] = 11,                   -- KEY_6..KEY_0
+	period    = 52,  -- KEY_DOT
+	comma     = 51,  -- KEY_COMMA
+
+	-- The media keys the volume, brightness and track actions press when their
+	-- tool (pactl, brightnessctl, playerctl) cannot do it.
+	XF86AudioMute         = 113, -- KEY_MUTE
+	XF86AudioLowerVolume  = 114, -- KEY_VOLUMEDOWN
+	XF86AudioRaiseVolume  = 115, -- KEY_VOLUMEUP
+	XF86AudioNext         = 163, -- KEY_NEXTSONG
+	XF86AudioPlay         = 164, -- KEY_PLAYPAUSE
+	XF86AudioPrev         = 165, -- KEY_PREVIOUSSONG
+	XF86MonBrightnessDown = 224, -- KEY_BRIGHTNESSDOWN
+	XF86MonBrightnessUp   = 225, -- KEY_BRIGHTNESSUP
 }
+
+-- The character each shortcut key types, looked up in the live layout: a
+-- letter or a digit is its own keysym name, and the two marks are named as X
+-- spells them, which is also what the xdotool fallback accepts.
+local SHORTCUT_CHAR = { period = ".", comma = "," }
 
 -- Which names are modifiers. A combo presses its modifiers first and releases
 -- them last, so the order matters and cannot be read off the string alone.
@@ -119,14 +139,19 @@ M.IS_MODIFIER = IS_MODIFIER
 function M.parse(combo)
 	if type(combo) ~= "string" or combo == "" then return nil, "empty combo" end
 
-	local mods, keys = {}, {}
+	local mods, keys, level_mods = {}, {}, {}
 	local ok_layout, KeyboardLayout = pcall(require, "adapters.keyboard_layout")
 	for part in combo:gmatch("[^+%s]+") do
 		local code = KEYSYM_TO_CODE[part]
-		-- A letter is pressed where the live layout puts it, not where US does:
-		-- ctrl+w as KEY_W is Ctrl+Z (undo) on AZERTY.
-		if code and part:match("^%l$") and ok_layout then
-			code = KeyboardLayout.shortcut_keycode(part, code)
+		-- A character is pressed where the live layout types it, not where US
+		-- does: ctrl+w as KEY_W is Ctrl+Z (undo) on AZERTY, and ctrl+comma as
+		-- KEY_COMMA is no comma on Ergopti. Every one-character name and the
+		-- two marks are characters; the named keys (Return, Left, F4) are keys.
+		local char = #part == 1 and part or SHORTCUT_CHAR[part]
+		if code and char and ok_layout then
+			local extra
+			code, extra = KeyboardLayout.shortcut_keycode(char, code)
+			for _, mod in ipairs(extra or {}) do level_mods[#level_mods + 1] = mod end
 		end
 		if not code then
 			-- Named, not swallowed. An unmapped key name means the action
@@ -139,6 +164,13 @@ function M.parse(combo)
 		else
 			keys[#keys + 1] = code
 		end
+	end
+	-- The level the layout types a character on (Shift for "." on AZERTY) is
+	-- held with the chord's own modifiers, once.
+	for _, mod in ipairs(level_mods) do
+		local held = false
+		for _, existing in ipairs(mods) do held = held or existing == mod end
+		if not held then mods[#mods + 1] = mod end
 	end
 
 	if #keys == 0 then return nil, "combo has no non-modifier key" end
@@ -154,12 +186,34 @@ end
 -- =========================================
 -- =========================================
 
+--- Modifier keycodes already down on the daemon's device: the hand's, or a
+--- tap-hold's hold (CapsLock held as Ctrl), both tracked by the keyboard hook.
+--- @return table Set of evdev keycodes.
+local function held_modifier_codes()
+	local held = {}
+	local ok, hook = pcall(require, "adapters.keyboard_hook")
+	if not ok or type(hook) ~= "table" then return held end
+	for _, accessor in ipairs({ "held_text_modifier_codes", "held_shortcut_modifier_codes" }) do
+		if type(hook[accessor]) == "function" then
+			local ok_call, codes = pcall(hook[accessor])
+			if ok_call and type(codes) == "table" then
+				for _, code in ipairs(codes) do held[code] = true end
+			end
+		end
+	end
+	return held
+end
+
 --- Presses a combo on the daemon's uinput device.
 ---
 --- Modifiers down, keys down, keys up, modifiers up in reverse — the order a
 --- physical hand produces, and the order every compositor expects. Releasing a
 --- modifier before the key it modifies leaves the application seeing a bare
 --- keystroke, which is the classic way a synthesised chord half-works.
+---
+--- A chord modifier whose exact key is already down is neither pressed nor
+--- released: the kernel keeps one bit per key, drops the second press, and the
+--- release would lift the modifier a hold or the hand still owns.
 --- @param combo string
 --- @return boolean True when every event was written.
 function M.press(combo)
@@ -201,7 +255,12 @@ function M.press(combo)
 		end
 		return clean
 	end
+	local already_down = held_modifier_codes()
+	local mods = {}
 	for _, code in ipairs(parsed.mods) do
+		if not already_down[code] then mods[#mods + 1] = code end
+	end
+	for _, code in ipairs(mods) do
 		if not emit(code, PRESS) then cleanup(); return false end
 	end
 	for _, code in ipairs(parsed.keys) do
@@ -210,8 +269,8 @@ function M.press(combo)
 	for i = #parsed.keys, 1, -1 do
 		if not emit(parsed.keys[i], RELEASE) then cleanup(); return false end
 	end
-	for i = #parsed.mods, 1, -1 do
-		if not emit(parsed.mods[i], RELEASE) then cleanup(); return false end
+	for i = #mods, 1, -1 do
+		if not emit(mods[i], RELEASE) then cleanup(); return false end
 	end
 
 	Logger.debug(LOG, "Emitted '%s' (%d modifier(s), %d key(s)).",

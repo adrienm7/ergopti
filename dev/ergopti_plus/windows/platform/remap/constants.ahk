@@ -97,6 +97,32 @@ global _TH_SyntheticHeldKeys := Map()
 ; from active reference counts. Lifecycle cleanup retries this ledger instead
 ; of forgetting an OS-level modifier that may still be logically down.
 global _TH_SyntheticReleasePendingKeys := Map()
+; Keys the user already held down, delivered to the system, when a synthetic
+; hold first pressed them. Windows keeps one down bit per key: releasing such a
+; key at the last owner's Up lifted it under the user (LCtrl held, a CapsLock
+; tap held as Ctrl, then C typed "c"). The user's own Up releases it instead.
+global _TH_SyntheticUserHeldKeys := Map()
+; Tap-hold key id -> number of owners (TapHoldOwnImmediateModifier or
+; TapHoldOwnImmediateLayer) resolving that key's suppressed physical press right
+; now. Tab, Space, Enter, Escape, Backspace and Delete fire their tap-hold only
+; with no modifier held, so their hotkeys carry no * wildcard; their own
+; auto-repeat, arriving under the modifier the owner holds, then matched no
+; hotkey and reached the application as that chord (Enter held as Ctrl typed
+; Ctrl+Enter repeatedly, measured with AutoHotkey 2.0.26). Under a layer hold no
+; variant of any tap-hold key is eligible, so the repeat fell to the layer's
+; mapping of the same key. Every key's repeat swallower is gated on
+; TapHoldPressIsOwned.
+global _TH_OwnedPresses := Map()
+; Tap-hold key id -> the modifier its owner holds synthetically right now, and
+; key id -> true once that hold was handed back mid-press, and key id -> true
+; while an LCtrl is held for the AltGr press the key's press turned out to be
+; (see TapHoldAltGrTakesItsLCtrl).
+global _TH_OwnedModifiers := Map()
+global _TH_RetractedOwners := Map()
+global _TH_AltGrLCtrlOwners := Map()
+; Tap-hold key id -> true once its current press was found to be AltGr's fake
+; LCtrl (TapHoldAltGrTakesItsLCtrl); read once with _TH_TakeAltGrPress.
+global _TH_AltGrPresses := Map()
 global _TH_TapHoldVkToKeyId := Map(
 	0x1B, "escape",
 	0x09, "tab",
@@ -305,10 +331,76 @@ _TapHoldModifierIsSuspended() {
 	return A_IsSuspended
 }
 
+; Release the synthetic modifier a tap-hold owned, masking it first when it can
+; open a menu. A lone Alt or Win release puts the focused window's menu bar in
+; menu mode (or opens the Start menu), and the tap output that follows lands
+; there: the default Tab tap-hold holds Alt, so every Tab tap did this in classic
+; applications (measured with SendInput). The mask is harmless after a chord,
+; so it is sent whenever the held modifier includes Alt or Win.
+; @param ModKey {String|Array} The owned modifier key name, or a combination.
+; @return {Boolean} True when the release was proven.
+_TapHoldReleaseOwnedModifier(ModKey) {
+	if !_TH_MaskMenuModifierRelease(ModKey)
+		try LoggerError("TapHoldDispatch", "Menu mask before releasing '{1}' could not be sent.", _TH_SyntheticKeyLabel(ModKey))
+	return TapHoldSyntheticKeyUp(ModKey)
+}
+
+; Send the menu mask once when Key (a name or a combination) includes an Alt or
+; a Win key about to be released, the only releases that can open a menu. RAlt
+; counts: it is a plain Alt wherever right Alt is not AltGr, and the mask is
+; harmless under AltGr. The Kana AltGr (SC138) opens nothing. It never logs
+; (TextSendMenuMask does not), so it can run under the ledger's Critical.
+; @param Key {String|Array} Key name, or the key names about to be released.
+; @return {Boolean} False only when a needed mask could not be sent.
+_TH_MaskMenuModifierRelease(Key) {
+	for _, Name in _TH_SyntheticKeyList(Key) {
+		if KS_IsMenuModifier(Name)
+			return TextSendMenuMask()
+	}
+	return true
+}
+
+; Whether a tap-hold owner is resolving KeyId's physical press: the key's
+; auto-repeat then belongs to that owner, never to the application.
+; @param KeyId {String} Canonical tap-hold key id.
+; @return {Boolean}
+TapHoldPressIsOwned(KeyId) {
+	global _TH_OwnedPresses
+	; Called from #HotIf criteria, which are live before this file's globals are
+	; assigned (a key pressed during the boot pump evaluates them).
+	return IsSet(_TH_OwnedPresses) and _TH_OwnedPresses.Has(KeyId)
+}
+
+; Claim KeyId's physical press for one owner, before its first wait.
+_TapHoldClaimPress(KeyId) {
+	global _TH_OwnedPresses
+	_TH_OwnedPresses[KeyId] := _TH_OwnedPresses.Get(KeyId, 0) + 1
+}
+
+; End one owner's claim on KeyId's press. Claims are paired by try/finally, so
+; a missing one is a broken invariant, not a condition to paper over.
+_TapHoldEndPressClaim(KeyId) {
+	global _TH_OwnedPresses
+	if !_TH_OwnedPresses.Has(KeyId)
+		throw Error("Ending a tap-hold press claim that was never made.", -1, KeyId)
+	Count := _TH_OwnedPresses[KeyId] - 1
+	if (Count > 0)
+		_TH_OwnedPresses[KeyId] := Count
+	else
+		_TH_OwnedPresses.Delete(KeyId)
+}
+
 ; Own one configured synthetic-modifier gesture from physical key-down through
 ; release. The Down is published before the first interruptible wait, so the
 ; first chord belongs to the hold. Activity cancels only the eventual tap; it
-; never retracts a hold after that hold has already owned an input event.
+; never retracts a hold after that hold has already owned an input event. The
+; press stays claimed (TapHoldPressIsOwned) for the whole gesture.
+; @param PhysicalModifierPassthrough {Boolean|String} false for a press the
+;        hotkey suppressed: the owner presses the whole ModKey. true for a
+;        press passed through (~) whose key is the whole hold: the owner
+;        presses nothing. The name of one member of ModKey for a press passed
+;        through whose key is that member (the AltGr key held as Shift+AltGr):
+;        the owner presses only the other members.
 TapHoldOwnImmediateModifier(KeyId, KeyName, ModKey, TapThresholdSec,
 	WaitReleaseFn := 0, KeyIsDownFn := 0, TickNowFn := 0,
 	KeyDownFn := 0, KeyUpFn := 0, CancelTapFn := 0,
@@ -322,64 +414,96 @@ TapHoldOwnImmediateModifier(KeyId, KeyName, ModKey, TapThresholdSec,
 	if !IsObject(KeyDownFn)
 		KeyDownFn := TapHoldSyntheticKeyDown
 	if !IsObject(KeyUpFn)
-		KeyUpFn := TapHoldSyntheticKeyUp
+		KeyUpFn := _TapHoldReleaseOwnedModifier
 	if !IsObject(CancelTapFn)
 		CancelTapFn := TapHoldShouldCancelTap
 	if !IsObject(IsSuspendedFn)
 		IsSuspendedFn := _TapHoldModifierIsSuspended
 
-	StartedAt := TickNowFn.Call()
-	if !PhysicalModifierPassthrough {
-		if !KeyDownFn.Call(ModKey) {
-			return Map("activated", false, "released", false,
-				"tap", false, "elapsed_ms", 0)
-		}
+	; A pass-through press already reached the system, and so must its repeats:
+	; a swallowed repeat makes AHK suppress the physical release as well, which
+	; would leave the modifier down in the system. Only a suppressed press is
+	; claimed.
+	Claimed := !PhysicalModifierPassthrough
+	; From here ModKey is what this owner presses itself: the whole hold,
+	; nothing, or the members of a combination the passed-through key is not.
+	OwnerPresses := !PhysicalModifierPassthrough
+	if (PhysicalModifierPassthrough is String) {
+		ModKey := _TH_HoldMembersBesides(ModKey, PhysicalModifierPassthrough)
+		OwnerPresses := ModKey.Length > 0
 	}
-
-	Released := false
-	ReleaseProved := false
+	if Claimed
+		_TapHoldClaimPress(KeyId)
 	try {
-		loop {
-			if IsSuspendedFn.Call()
-				break
-			if WaitReleaseFn.Call(KeyName, STUCK_MODIFIER_RELEASE_TIMEOUT_SEC) {
-				Released := true
-				break
+		StartedAt := TickNowFn.Call()
+		if OwnerPresses {
+			if !KeyDownFn.Call(ModKey) {
+				return Map("activated", false, "released", false,
+					"tap", false, "elapsed_ms", 0)
 			}
-			if IsSuspendedFn.Call()
-				break
-			if !KeyIsDownFn.Call(KeyName) {
-				Released := true
-				break
-			}
+			; Published so the press can be handed back mid-hold when it turns
+			; out to be AltGr's fake LCtrl (TapHoldAltGrTakesItsLCtrl).
+			_TH_OwnedModifiers[KeyId] := ModKey
 		}
-	} finally {
-		; A native modifier selected on its own physical key is already Down
-		; before a ~ hotkey thread starts and its physical Up ends KeyWait. A
-		; second synthetic Down would race the following key's hotkey admission.
-		ReleaseProved := PhysicalModifierPassthrough ? true : KeyUpFn.Call(ModKey)
-	}
 
-	ElapsedMs := TickElapsed(StartedAt, TickNowFn.Call())
-	GuardMs := TapThresholdSec * 1100
-	if (GuardMs < 250)
-		GuardMs := 250
-	Suspended := IsSuspendedFn.Call()
-	CancelReason := ""
-	if (Released and ReleaseProved and !Suspended and !A_IsSuspended)
-		CancelReason := CancelTapFn.Call(KeyId, GuardMs)
-	TapAllowed := Released and ReleaseProved and !Suspended and !A_IsSuspended
-		and ElapsedMs <= TapThresholdSec * 1000 and CancelReason == ""
-	if LoggerIsDebugEnabled() {
-		LoggerDebug("TapHoldModifier", "Ownership complete for key='{1}', modifier='{2}', source={3}, released={4}, elapsed_ms={5}, tap={6}.",
-			KeyId, _TH_SyntheticKeyLabel(ModKey), PhysicalModifierPassthrough ? "physical_passthrough" : "synthetic",
-			Released ? "true" : "false", ElapsedMs, TapAllowed ? "true" : "false")
+		Released := false
+		ReleaseProved := false
+		try {
+			loop {
+				if IsSuspendedFn.Call()
+					break
+				if WaitReleaseFn.Call(KeyName, STUCK_MODIFIER_RELEASE_TIMEOUT_SEC) {
+					Released := true
+					break
+				}
+				if IsSuspendedFn.Call()
+					break
+				if !KeyIsDownFn.Call(KeyName) {
+					Released := true
+					break
+				}
+			}
+		} finally {
+			; A native modifier selected on its own physical key is already Down
+			; before a ~ hotkey thread starts and its physical Up ends KeyWait. A
+			; second synthetic Down would race the following key's hotkey admission.
+			; A hold handed back mid-press was released then, and its press was
+			; AltGr's, never a tap; the LCtrl given to that AltGr ends with it.
+			Retracted := _TH_TakeRetractedOwner(KeyId)
+			if !OwnerPresses or Retracted
+				ReleaseProved := true
+			else
+				ReleaseProved := KeyUpFn.Call(ModKey)
+			if !_TH_ReleaseAltGrLCtrl(KeyId)
+				ReleaseProved := false
+		}
+
+		ElapsedMs := TickElapsed(StartedAt, TickNowFn.Call())
+		GuardMs := TapThresholdSec * 1100
+		if (GuardMs < 250)
+			GuardMs := 250
+		Suspended := IsSuspendedFn.Call()
+		CancelReason := ""
+		if (Released and ReleaseProved and !Suspended and !A_IsSuspended)
+			CancelReason := CancelTapFn.Call(KeyId, GuardMs)
+		TapAllowed := Released and ReleaseProved and !Suspended and !A_IsSuspended and !Retracted
+			and ElapsedMs <= TapThresholdSec * 1000 and CancelReason == ""
+		if LoggerIsDebugEnabled() {
+			LoggerDebug("TapHoldModifier", "Ownership complete for key='{1}', modifier='{2}', source={3}, released={4}, elapsed_ms={5}, tap={6}.",
+				KeyId, _TH_SyntheticKeyLabel(ModKey), PhysicalModifierPassthrough ? "physical_passthrough" : "synthetic",
+				Released ? "true" : "false", ElapsedMs, TapAllowed ? "true" : "false")
+		}
+		return Map(
+			"activated", true,
+			"released", ReleaseProved,
+			"tap", TapAllowed,
+			"elapsed_ms", ElapsedMs)
+	} finally {
+		if _TH_OwnedModifiers.Has(KeyId)
+			_TH_OwnedModifiers.Delete(KeyId)
+		if Claimed
+			_TapHoldEndPressClaim(KeyId)
 	}
-	return Map(
-		"activated", true,
-		"released", ReleaseProved,
-		"tap", TapAllowed,
-		"elapsed_ms", ElapsedMs)
 }
 
 ; Flatten a hold-modifier value into the list of individual key names it holds.
@@ -411,6 +535,20 @@ _TH_SyntheticKeyList(Key) {
 	return Names
 }
 
+; The members of a hold other than Member, the one a passed-through key holds
+; itself. Empty names are dropped, so a key that holds nothing leaves nothing.
+; @param Key {String|Array} Resolved hold modifier.
+; @param Member {String} Key name the physical key already holds.
+; @return {Array} The key names its owner must press.
+_TH_HoldMembersBesides(Key, Member) {
+	Others := []
+	for _, Name in _TH_SyntheticKeyList(Key) {
+		if (Name != "" and Name != Member)
+			Others.Push(Name)
+	}
+	return Others
+}
+
 ; Human-readable label for a synthetic hold modifier, used in logs. Format()
 ; cannot stringify an Array, so a combo would otherwise silently lose its log.
 _TH_SyntheticKeyLabel(Key) {
@@ -420,12 +558,46 @@ _TH_SyntheticKeyLabel(Key) {
 	return Label
 }
 
+; Whether key Name is down, logically (Mode "") or physically (Mode "P"). A
+; global holding a function, as _AHK_SendInput is, so tests can stand in for
+; the keyboard state.
+global _TapHoldKeyIsDown := (Name, Mode) => (Mode == "") ? GetKeyState(Name) : GetKeyState(Name, Mode)
+
+; Whether the user holds key Name down, delivered to the system. A key's
+; logical state only follows events that reached the system, so logically and
+; physically down before any synthetic owner pressed it means the user's press
+; went through, and so will the user's release. A press a hotkey suppressed (a
+; tap-hold key holding its own modifier, the LAlt one-shot Shift) is physically
+; down but logically up: its release is swallowed too.
+_TH_UserHoldsDeliveredKey(Name) {
+	global _TapHoldKeyIsDown
+	return _TapHoldKeyIsDown.Call(Name, "") and _TapHoldKeyIsDown.Call(Name, "P")
+}
+
+; Whether the last owner of Name must leave it down: the user held it down,
+; delivered, when the synthetic hold began, and still holds it physically.
+_TH_SyntheticReleaseStaysWithUser(Name) {
+	global _TH_SyntheticUserHeldKeys, _TapHoldKeyIsDown
+	return _TH_SyntheticUserHeldKeys.Has(Name) and _TapHoldKeyIsDown.Call(Name, "P")
+}
+
+; End the synthetic ownership of a key the user still holds, without an Up.
+_TH_ForgetSyntheticKeyForUser(Name) {
+	global _TH_SyntheticHeldKeys, _TH_SyntheticUserHeldKeys
+	if _TH_SyntheticHeldKeys.Has(Name)
+		_TH_SyntheticHeldKeys.Delete(Name)
+	if _TH_SyntheticUserHeldKeys.Has(Name)
+		_TH_SyntheticUserHeldKeys.Delete(Name)
+}
+
 ; Move a final active reference into the release-pending ledger before sending
 ; its Up. The OS transition is then owned even when injection fails.
 _TH_MarkSyntheticKeyReleasePending(Key) {
-	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys
+	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys, _TH_SyntheticUserHeldKeys
 	if _TH_SyntheticHeldKeys.Has(Key)
 		_TH_SyntheticHeldKeys.Delete(Key)
+	if _TH_SyntheticUserHeldKeys.Has(Key)
+		_TH_SyntheticUserHeldKeys.Delete(Key)
 	_TH_SyntheticReleasePendingKeys[Key] := true
 }
 
@@ -499,7 +671,7 @@ TapHoldReleasePhysicalKey(Key) {
 ; key another branch still owns; the physical Send happens only on the 0->1 and
 ; 1->0 transitions of each INDIVIDUAL key (see _TH_SyntheticKeyList).
 TapHoldSyntheticKeyDown(Key) {
-	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys
+	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys, _TH_SyntheticUserHeldKeys
 	Keys := _TH_SyntheticKeyList(Key)
 	if (Keys.Length = 0 or (Keys.Length = 1 and Keys[1] == "")) {
 		try LoggerError("TapHoldDispatch", "Cannot arm an empty synthetic modifier — the hold resolver must return a key name.")
@@ -537,6 +709,15 @@ TapHoldSyntheticKeyDown(Key) {
 					KeysToPress.Push(Name)
 			}
 
+			; Snapshot, before this owner presses them, the keys the user already
+			; holds down and delivered: the last owner leaves those to the user.
+			UserHeld := []
+			if Ok {
+				for _, Name in KeysToPress {
+					if _TH_UserHoldsDeliveredKey(Name)
+						UserHeld.Push(Name)
+				}
+			}
 			; TextPressKey's Array branch is the sender-owned transaction: a
 			; second Down failure rolls earlier Downs back in reverse order and
 			; reports any rollback Up that could not be proven. Those keys may
@@ -561,6 +742,8 @@ TapHoldSyntheticKeyDown(Key) {
 			if Ok {
 				for _, Name in Keys
 					_TH_SyntheticHeldKeys[Name] := _TH_SyntheticHeldKeys.Get(Name, 0) + 1
+				for _, Name in UserHeld
+					_TH_SyntheticUserHeldKeys[Name] := true
 			}
 		}
 	}
@@ -636,6 +819,12 @@ TapHoldSyntheticKeyUp(Key) {
 				_TH_SyntheticHeldKeys[Name] := Count
 				continue
 			}
+			; The user held this key before the hold and still does: their own
+			; release will reach the system, an Up now would lift it under them.
+			if _TH_SyntheticReleaseStaysWithUser(Name) {
+				_TH_ForgetSyntheticKeyForUser(Name)
+				continue
+			}
 			_TH_MarkSyntheticKeyReleasePending(Name)
 			if _TH_RetrySyntheticKeyRelease(Name) {
 				ReleasedKeys.Push(Name)
@@ -664,12 +853,21 @@ TapHoldReleaseSyntheticKeys() {
 	Keys := []
 	Seen := Map()
 	FailedKeys := []
+	MaskSent := true
 	PreviousCritical := Critical("On")
 	try {
+		UserKeys := []
 		for Name in _TH_SyntheticHeldKeys {
 			Seen[Name] := true
-			Keys.Push(Name)
+			; A key the user held before the hold and still holds is theirs to
+			; release, even when every owner is invalidated.
+			if _TH_SyntheticReleaseStaysWithUser(Name)
+				UserKeys.Push(Name)
+			else
+				Keys.Push(Name)
 		}
+		for _, Name in UserKeys
+			_TH_ForgetSyntheticKeyForUser(Name)
 		for Name in _TH_SyntheticReleasePendingKeys {
 			if Seen.Has(Name)
 				continue
@@ -681,6 +879,13 @@ TapHoldReleaseSyntheticKeys() {
 		; release remains explicit until an Up is proven.
 		for _, Name in Keys
 			_TH_MarkSyntheticKeyReleasePending(Name)
+		; Suspend, shutdown and the fatal cleanup end a hold mid-press, usually
+		; with nothing typed under it: a lone Alt or Win released here put the
+		; focused window's menu bar in menu mode (or opened Start) exactly as the
+		; owner's own release would have without its mask, and the keys typed
+		; after the pause went to the menu. Mask once before the Ups; the owner's
+		; own masked release comes later, after these Ups, too late.
+		MaskSent := _TH_MaskMenuModifierRelease(Keys)
 		for _, Name in Keys {
 			if !_TH_RetrySyntheticKeyRelease(Name)
 				FailedKeys.Push(Name)
@@ -690,11 +895,133 @@ TapHoldReleaseSyntheticKeys() {
 		Critical(PreviousCritical)
 	}
 
+	if !MaskSent
+		try LoggerError("TapHoldDispatch", "Lifecycle cleanup could not mask the release of '{1}'; a menu may open.", _TH_SyntheticKeyLabel(Keys))
 	if (FailedKeys.Length > 0) {
 		try LoggerError("TapHoldDispatch", "Lifecycle cleanup retained release-pending synthetic key(s) '{1}' after bounded retries.", _TH_SyntheticKeyLabel(FailedKeys))
 		return false
 	}
 	return true
+}
+
+; Run SendFn with key Name up, for output the key would otherwise modify: the
+; Kana-style layout's AltGr changes every character typed while it is down.
+; Whoever held the key keeps it: a tap-hold that holds Name synthetically, and
+; the user holding it down themselves (AltGr held as AltGr passes the key
+; through; AltGr with no tap-hold is the plain key). The key is pressed again
+; after the output, but only if that holder still holds it then, so a hold that
+; ended meanwhile is never overridden and an owner's count stays true.
+; @param Name {String} AHK key name, e.g. KS_AltGrKeyName().
+; @param SendFn {Func} Zero-argument sender; its result is returned.
+; @return The sender's result, or false when the lift could not be sent.
+TapHoldSendWithKeyUp(Name, SendFn) {
+	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys, _TapHoldKeyIsDown
+	; A key nobody holds needs no lift: logically up, owned by no tap-hold, with
+	; no release pending (a press a hotkey swallowed is logically up too). The
+	; Kana layout lifted AltGr before every expansion anyway, one extra
+	; SendInput and an orphan AltGr release in front of each burst.
+	if !(_TapHoldKeyIsDown.Call(Name, "") or _TH_SyntheticHeldKeys.Has(Name)
+			or _TH_SyntheticReleasePendingKeys.Has(Name))
+		return SendFn.Call()
+	; Read before the lift: once the Up is sent the key is logically up, and a
+	; hold the system saw can no longer be told from a press a hotkey swallowed.
+	UserHeld := _TH_UserHoldsDeliveredKey(Name)
+	if !TapHoldLiftKey(Name)
+		return false
+	try
+		return SendFn.Call()
+	finally
+		TapHoldRestoreLiftedKey(Name, UserHeld)
+}
+
+; Lift key Name for an output, whoever holds it. Pair with
+; TapHoldRestoreLiftedKey once the output is sent. A lifted Alt or Win is
+; masked first: RAlt is a plain Alt where right Alt is not AltGr, and its
+; release after nothing typed would open the window menu the output lands in.
+; @return {Boolean} False when the Up could not be sent; skip the output then.
+TapHoldLiftKey(Name) {
+	if !_TH_MaskMenuModifierRelease(Name)
+		try LoggerError("TapHoldDispatch", "Menu mask before lifting '{1}' could not be sent.", Name)
+	if TextPressKey(Name, "Up", false)
+		return true
+	try LoggerError("TapHoldDispatch", "Could not lift '{1}' before an output; the output was not sent.", Name)
+	return false
+}
+
+; Run SendFn with key Name up only while a tap-hold holds it synthetically. A
+; modifier the driver pressed with {X Down} is one AutoHotkey keeps down
+; around every later non-blind Send (keyboard_mouse.cpp: "any modifiers
+; pressed down by the script itself ... are intended to stay down"), so a
+; synthetic AltGr (CapsLock held as AltGr) modified every expansion: Backspace
+; became Ctrl+Alt+Backspace on an AltGr layout and Alt+Backspace (Undo) where
+; right Alt is a plain Alt. A key the user holds is not the driver's: a
+; non-blind Send already lifts it around its output and restores it.
+; @param Name {String} AHK key name, e.g. KS_AltGrKeyName().
+; @param SendFn {Func} Zero-argument sender; its result is returned.
+; @return The sender's result, or false when the lift could not be sent.
+TapHoldSendWithOwnedKeyUp(Name, SendFn) {
+	global _TH_SyntheticHeldKeys
+	if !_TH_SyntheticHeldKeys.Has(Name)
+		return SendFn.Call()
+	return TapHoldSendWithKeyUp(Name, SendFn)
+}
+
+; Press Name again after an output that lifted it, when a synthetic owner still
+; holds it, or when the user held it down before the lift (UserHeld) and still
+; holds it physically; the user's own release then passes through as usual.
+; The owner check and the Down share one Critical span so an owner cannot
+; release between them. The user's release is an OS event Critical cannot hold
+; back, so it is read again after the Down: one that landed in between would
+; otherwise leave the key logically down with nobody holding it.
+; @param UserHeld {Boolean} _TH_UserHoldsDeliveredKey(Name) before the lift.
+; @return {Boolean} False when a Down or Up could not be sent.
+TapHoldRestoreLiftedKey(Name, UserHeld := false) {
+	global _TH_SyntheticHeldKeys, _TapHoldKeyIsDown
+	PreviousCritical := Critical("On")
+	RacedRelease := false
+	try {
+		Owned := _TH_SyntheticHeldKeys.Has(Name)
+		if !Owned and !(UserHeld and _TapHoldKeyIsDown.Call(Name, "P"))
+			return true
+		Ok := TextPressKey(Name, "Down", false)
+		if (Ok and !Owned and !_TapHoldKeyIsDown.Call(Name, "P")) {
+			RacedRelease := true
+			Ok := TextPressKey(Name, "Up", false)
+		}
+	} finally {
+		Critical(PreviousCritical)
+	}
+	if (!Ok and RacedRelease) {
+		try LoggerError("TapHoldDispatch", "Could not release '{1}' after the user let go of it during its re-press; it stays down until the key is pressed again.", Name)
+	} else if !Ok {
+		try LoggerError("TapHoldDispatch", "Could not give '{1}' back to its holder after an output; it stays up until the key is pressed again.", Name)
+	}
+	return Ok
+}
+
+; Release key Name unless a synthetic owner holds it; that owner's own release
+; ends it. Used to clear a key a chord may have left logically down.
+; @param ReleaseFn {Func} Optional sender taking Name and returning a verdict,
+;        for a caller whose Up must take another path; TextSender by default.
+; @return {Boolean} True when the key is released or left to its owner.
+TapHoldReleaseUnlessOwned(Name, ReleaseFn := 0) {
+	global _TH_SyntheticHeldKeys, _TH_SyntheticReleasePendingKeys
+	PreviousCritical := Critical("On")
+	try {
+		if _TH_SyntheticHeldKeys.Has(Name)
+			return true
+		if _TH_SyntheticReleasePendingKeys.Has(Name)
+			Ok := _TH_RetrySyntheticKeyRelease(Name)
+		else if HasMethod(ReleaseFn, "Call")
+			Ok := ReleaseFn.Call(Name)
+		else
+			Ok := TextPressKey(Name, "Up", false)
+	} finally {
+		Critical(PreviousCritical)
+	}
+	if !Ok
+		try LoggerError("TapHoldDispatch", "Could not release '{1}'.", Name)
+	return Ok
 }
 
 ; OnExit must not destroy this process while a balancing Up is still owned by
@@ -727,6 +1054,51 @@ TapHoldResolveKeyIdFromVkSc(vk, sc) {
 	if _TH_TapHoldVkToKeyId.Has(vk)
 		return _TH_TapHoldVkToKeyId[vk]
 	return ""
+}
+
+; Physical scan code of tap-hold key KeyId, the one its hotkeys are bound to.
+; @param KeyId {String} Canonical tap-hold key id.
+; @return {Integer} The scan code (extended keys carry 0x100).
+_TapHoldScanCodeOf(KeyId) {
+	global _TH_TapHoldScToKeyId
+	for Sc, Id in _TH_TapHoldScToKeyId {
+		if (Id == KeyId)
+			return Sc
+	}
+	throw ValueError("Unknown tap-hold key id for the prior-key guard.", -1, KeyId)
+}
+
+; Whether the last key pressed before this release was tap-hold key KeyId
+; itself, i.e. nothing else was pressed during the hold. A_PriorKey is the name
+; AHK derives from the recorded virtual key and scan code through the active
+; layout: never an "SCxxx" string, "Backspace" rather than "BackSpace", and "^"
+; for the Kana AltGr of the Ergopti layout. The expected name is therefore
+; derived by the same function from the key's own scan code at call time; a
+; hand-written name broke on AHK's spelling or on the layout.
+; When the layout puts the key on a virtual key with no name at all, AHK answers
+; "" here and an undocumented placeholder for A_PriorKey, so the name cannot
+; decide: the scan-code activity tracker that every tap dispatch also consults
+; stays the guard, and the situation is logged once per key.
+; @param KeyId {String} Canonical tap-hold key id.
+; @param PriorKey {String} Test seam; production reads A_PriorKey.
+; @param KeyNameFn {Func} Test seam; production uses GetKeyName.
+; @return {Boolean} True when the prior key is KeyId's own physical key.
+TapHoldPriorKeyIsSelf(KeyId, PriorKey := unset, KeyNameFn := 0) {
+	static UnnamedReported := Map()
+	Sc := _TapHoldScanCodeOf(KeyId)
+	if !IsSet(PriorKey)
+		PriorKey := A_PriorKey
+	if !IsObject(KeyNameFn)
+		KeyNameFn := GetKeyName
+	Expected := KeyNameFn.Call(Format("SC{:03X}", Sc))
+	if (Expected == "") {
+		if !UnnamedReported.Has(KeyId) {
+			UnnamedReported[KeyId] := true
+			try LoggerWarn("TapHoldTrack", "Tap-hold key '{1}' has no key name on this layout; its tap is guarded by the activity tracker only.", KeyId)
+		}
+		return PriorKey != ""
+	}
+	return PriorKey == Expected
 }
 
 ; Run any tap output through the single activity/suspend gate, then consume the
@@ -801,10 +1173,215 @@ _TapHoldInvokeConfiguredAction(KeyId) {
 		return
 	}
 	try LoggerDebug("TapHoldDispatch", "Dispatching tap action '{1}' for '{2}'.", ActionId, KeyId)
+	; A keystroke action is typed like the key it names, under the held
+	; modifiers. Its gesture callback stays modifier-free: a touchpad gesture
+	; or a shortcut slot fires it while its own carrier modifier is down.
+	Action := GESTURE_ACTIONS[ActionId]
+	if Action.HasOwnProp("Key") {
+		TapHoldEmitKeyTap(Action.Key, Action.Mods)
+		return
+	}
 	GestureInvokeAction(ActionId, GestureBindingId("tap_hold", KeyId))
 }
 
 ; Fire the configured generic tap action through the shared gate.
 _TapHoldFireAction(KeyId) {
 	return TapHoldDispatchTap(KeyId, _TapHoldInvokeConfiguredAction.Bind(KeyId))
+}
+
+; Whether modifier Name is logically down. A global holding a function, as
+; _AHK_SendInput is, so tests can stand in for the keyboard state.
+global _TapHoldModifierIsHeld := (Name) => GetKeyState(Name)
+
+; Send a tap-hold key's keystroke tap (Tab, Enter, an arrow, a shortcut) as the
+; key itself would be typed: under every modifier held when it is sent. A plain
+; Send lifts the modifiers the user holds on other keys, so Shift held then an
+; AltGr tap gave Tab instead of Shift+Tab, while a modifier held by another
+; tap-hold survived only because AHK never lifts the ones it pressed itself.
+; {Blind} keeps them all, whatever their source. The tapped key's own hold
+; modifier is released before its tap dispatches, so it is never among them.
+; With nothing held the payload stays the bare key, the exact "{BackSpace}"
+; the hotstring buffer recognizes as a plain edit.
+; @param Key {String} AHK key name.
+; @param Mods {Array} The keystroke's own modifiers ("Ctrl", "Shift", "Alt", "Win").
+; @return {Boolean} The sender's verdict.
+TapHoldEmitKeyTap(Key, Mods := []) {
+	Modifiers := _TapHoldKeyTapModifiers(Mods)
+	; Every Tab producer goes through the guarded LLM wrapper. A tap-hold's
+	; Tab is not a physical Tab, so the wrapper only types it.
+	if (Key = "Tab" and Mods.Length == 0)
+		return LLM_Tooltip_FireTabOrAccept(Modifiers)
+	return TextPressKey(Key, Modifiers)
+}
+
+; TextPressKey modifiers for a keystroke tap: "Blind" and Mods when any
+; modifier is held, Mods unchanged otherwise.
+_TapHoldKeyTapModifiers(Mods) {
+	if !TapHoldAnyModifierHeld()
+		return Mods
+	Words := "Blind"
+	for _, Mod in Mods
+		Words .= " " . Mod
+	return Words
+}
+
+; Whether any modifier is logically down, whatever holds it: a physical key or
+; a tap-hold's synthetic hold. Synthetic output typed under it must then carry
+; {Blind}, or Send lifts the modifiers it did not press itself. The Kana
+; layout's AltGr (VK_OEM_8) is deliberately not asked: AutoHotkey's Send does
+; not treat it as a modifier and never lifts it, so a tap under it keeps it
+; either way, and the bare payload ("{BackSpace}") stays the one the hotstring
+; buffer recognizes as a plain edit.
+; @return {Boolean}
+TapHoldAnyModifierHeld() {
+	global _TapHoldModifierIsHeld
+	static Modifiers := ["LCtrl", "RCtrl", "LShift", "RShift", "LAlt", "RAlt", "LWin", "RWin"]
+	for _, Name in Modifiers {
+		if _TapHoldModifierIsHeld.Call(Name)
+			return true
+	}
+	return false
+}
+
+; Whether the layout's AltGr is held on a Kana-style layout, where it is a key
+; AutoHotkey does not count as a modifier (VK_OEM_8). Tab, Space, Enter,
+; Escape, Backspace and Delete stay the key itself under a held modifier on
+; every driver, which on Windows their tap-hold hotkeys without * give for
+; free: under a held Kana AltGr no modifier was down for AutoHotkey, so the
+; hotkey matched and AltGr+Tab ran the Tab tap action (the window switcher)
+; instead of the layout's AltGr+Tab. Their #HotIf asks this instead. The
+; logical state counts the user's pass-through AltGr and a tap-hold's synthetic
+; one. Elsewhere AltGr is LCtrl+RAlt or RAlt, modifiers AutoHotkey counts
+; already, so this is false there. Read by parse-time #HotIf criteria, which are
+; live before this file's globals exist.
+; @return {Boolean}
+TapHoldKanaAltGrHeld() {
+	global _ALTGR_KANA_FIXUP, _TapHoldModifierIsHeld
+	return IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP
+		and IsSet(_TapHoldModifierIsHeld) and _TapHoldModifierIsHeld.Call(KS_AltGrKeyName())
+}
+
+; Whether the user physically holds LCtrl, AltGr's own LCtrl excluded. On a
+; standard AltGr layout Windows adds a fake LCtrl to every AltGr press, which
+; AutoHotkey records as physically down (hook.cpp: "For backward-compatibility,
+; fake LCtrl is marked as physical"): "LCtrl physically held" was then true
+; under AltGr alone, and AltGr+LAlt tapped as Backspace deleted a whole word
+; (Ctrl+Backspace) where the Kana layout, whose AltGr adds no Ctrl, deleted one
+; character. AutoHotkey keeps one physical LCtrl state for the real LCtrl and
+; the fake one, so on such a layout a real LCtrl held with AltGr reads as
+; AltGr's. Only there: QWERTY's right Alt is a plain Alt and a Kana AltGr is no
+; RAlt, neither adds a fake LCtrl (KS_AltGrAddsFakeLCtrl), so a physical LCtrl
+; is always the user's and LCtrl+RAlt then LAlt tapped as Backspace is the
+; Ctrl+Backspace special.
+; @param KeyIsDownFn {Func} Test seam taking a key name, KS_IsDown by default.
+; @return {Boolean}
+TapHoldUserLCtrlHeld(KeyIsDownFn := 0) {
+	if !IsObject(KeyIsDownFn)
+		KeyIsDownFn := KS_IsDown
+	if !KeyIsDownFn.Call("SC01D")
+		return false
+	return !KS_AltGrAddsFakeLCtrl() or !KeyIsDownFn.Call("RAlt")
+}
+
+; Hand back the synthetic hold the owner of KeyId took for this press, now.
+; Its owner then releases nothing more and dispatches no tap.
+; @param KeyId {String} Tap-hold key id.
+; @return {Boolean} True when a hold was handed back.
+TapHoldRetractOwnedModifier(KeyId) {
+	global _TH_OwnedModifiers, _TH_RetractedOwners
+	if !_TH_OwnedModifiers.Has(KeyId) or _TH_RetractedOwners.Has(KeyId)
+		return false
+	_TH_RetractedOwners[KeyId] := true
+	if !_TapHoldReleaseOwnedModifier(_TH_OwnedModifiers[KeyId])
+		try LoggerError("TapHoldDispatch", "Could not hand back the hold of '{1}'.", KeyId)
+	return true
+}
+
+; Whether KeyId's hold was handed back during this press; clears the mark.
+_TH_TakeRetractedOwner(KeyId) {
+	global _TH_RetractedOwners
+	if !_TH_RetractedOwners.Has(KeyId)
+		return false
+	_TH_RetractedOwners.Delete(KeyId)
+	return true
+}
+
+; On a standard AltGr layout every AltGr press starts with a fake LCtrl, which
+; the hook reads as SC01D (hook.cpp: "sc &= 0xFF") before it sees the RAlt. A
+; left_ctrl tap-hold holding anything but Ctrl suppressed that fake LCtrl and
+; pressed its own hold instead: the system then got the hold and RAlt without
+; LCtrl, which is not AltGr, so the layout's AltGr characters were lost (and a
+; lone RAlt opened the window menu). When the RAlt of that press arrives, the
+; hold is handed back and, where the AltGr key is AltGr, LCtrl is held for it,
+; so LCtrl+RAlt is AltGr again; the LCtrl ends with the left_ctrl press, which
+; the AltGr release ends. Only on a layout with an AltGr level (the boot probe's
+; "altgr_level"): on QWERTY right Alt is a plain Alt and LCtrl then RAlt is the
+; user's own chord. A Kana layout has no fake LCtrl at all.
+; @param AsAltGr {Boolean} True to give AltGr its LCtrl back, false when the
+;        AltGr key holds another modifier (its owner presses that one).
+; @return {Boolean} True when the press was AltGr's.
+TapHoldAltGrTakesItsLCtrl(AsAltGr) {
+	global _TapHoldKeyIsDown, _TH_OwnedModifiers, _TH_AltGrLCtrlOwners, _TH_AltGrPresses
+	if !KS_AltGrAddsFakeLCtrl()
+		return false
+	if !_TapHoldKeyIsDown.Call("SC01D", "P")
+		return false
+	; Whatever the left_ctrl tap-hold holds, this LCtrl press was AltGr's: it is
+	; no Ctrl the user typed (see _TH_TakeAltGrPress).
+	_TH_AltGrPresses["left_ctrl"] := true
+	if !_TH_OwnedModifiers.Has("left_ctrl")
+		return true
+	TapHoldRetractOwnedModifier("left_ctrl")
+	if (AsAltGr and !_TH_AltGrLCtrlOwners.Has("left_ctrl")) {
+		; An unproven Down leaves this AltGr press without its LCtrl; the
+		; sender has logged why, and the hold was handed back all the same.
+		if !TapHoldSyntheticKeyDown("LCtrl")
+			return true
+		_TH_AltGrLCtrlOwners["left_ctrl"] := true
+	}
+	return true
+}
+
+; Whether KeyId's current press was found to be AltGr's fake LCtrl; clears
+; the mark. Read once when the press ends, and once when it begins so a mark
+; left by a press that never reached its end cannot leak into the next one.
+; @param KeyId {String} Tap-hold key id.
+; @return {Boolean}
+_TH_TakeAltGrPress(KeyId) {
+	global _TH_AltGrPresses
+	if !_TH_AltGrPresses.Has(KeyId)
+		return false
+	_TH_AltGrPresses.Delete(KeyId)
+	return true
+}
+
+; Record a left_ctrl press in the typed stream once it has resolved: an LCtrl
+; press ends a roll or hotstring sequence as a typed key does (the last-sent
+; ring), unless it was the fake LCtrl an AltGr press begins with on an AltGr
+; layout. That one reached the left_ctrl hotkey on every AltGr press and pushed
+; "LControl", so a roll across AltGr characters ('<' then AltGr+the = key)
+; never completed there. By the time the press has resolved, the AltGr that
+; followed it has marked it (TapHoldAltGrTakesItsLCtrl), and no character has
+; been typed yet.
+TapHoldRecordLCtrlPress() {
+	if !_TH_TakeAltGrPress("left_ctrl")
+		UpdateLastSentCharacter("LControl")
+}
+
+; End the LCtrl held for AltGr by KeyId's press, if any.
+; @return {Boolean} False only when its release could not be proven.
+_TH_ReleaseAltGrLCtrl(KeyId) {
+	global _TH_AltGrLCtrlOwners
+	if !_TH_AltGrLCtrlOwners.Has(KeyId)
+		return true
+	_TH_AltGrLCtrlOwners.Delete(KeyId)
+	return TapHoldSyntheticKeyUp("LCtrl")
+}
+
+; A key-down the hook passed to the system, seen by HookDispatcher: an AltGr
+; RAlt claims the fake LCtrl a left_ctrl tap-hold took (TapHoldAltGrTakesItsLCtrl).
+; The AltGr owner does the same when it suppresses that RAlt instead.
+TapHoldTrackAltGrLCtrl(vk, sc) {
+	if (TapHoldResolveKeyIdFromVkSc(vk, sc) == "alt_gr")
+		TapHoldAltGrTakesItsLCtrl(AltGrKeyIsAltGr())
 }

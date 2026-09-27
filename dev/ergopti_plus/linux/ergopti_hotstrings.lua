@@ -118,6 +118,7 @@ local system_metrics = RuntimeGuard.optional_require("modules.keylogger.system_m
 
 -- The typing-speed pill (optional — needs a graphics renderer and a display).
 local wpm_widget = RuntimeGuard.optional_require("ui.wpm.widget")
+local wpm_tray_readout = RuntimeGuard.optional_require("ui.wpm.tray_readout")
 
 -- Desktop notifications (optional — needs notify-send and a session bus). The
 -- adapter degrades to a log line on a headless machine, so a missing one is not
@@ -641,13 +642,27 @@ local function main()
 	-- LuaJIT's 60-upvalue limit. Declared before the pause controller below,
 	-- whose closure reads it.
 	local TapHold = require("platform.remap.tap_hold_manager")
+	-- The action catalogue, bound once. It shares a module with the touchpad
+	-- reader, whose lifecycle is its own: a reader that fails and stops must not
+	-- take the tap actions with it.
+	local action_catalogue = gestures
 	TapHold.init({
 		keyboard_hook = keyboard_hook,
 		execute_action = function(action, binding)
-			if not gestures then error("the action catalogue (gestures module) is not loaded") end
-			gestures.execute_action(action, binding)
+			if not action_catalogue then error("the action catalogue (gestures module) is not loaded") end
+			action_catalogue.execute_action(action, binding)
 		end,
-		action_names = function() return gestures and gestures.get_action_names() or {} end,
+		-- Every action the catalogue runs here, not only the gesture picker's
+		-- list: a tap set to one of the others must not read as unsupported.
+		action_names = function()
+			return action_catalogue and action_catalogue.get_executable_action_names() or {}
+		end,
+		-- A one-shot result the layout has no key for is typed by the injector,
+		-- which the engine never sees: its buffer no longer describes the line.
+		on_text_injected = function()
+			_undoable = nil
+			engine:reset()
+		end,
 		defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"),
 		user_path = require("infra.config_paths").config("tap_hold.toml"),
 	})
@@ -657,7 +672,7 @@ local function main()
 		path = TapHold.user_path(),
 		reload = TapHold.reload,
 		is_tap_action = TapHold.is_tap_action,
-		is_hold_option = TapHold.is_hold_option,
+		canonical_hold = TapHold.canonical_hold,
 	})
 
 	local script_actions = ScriptActions.new({
@@ -1161,6 +1176,14 @@ local function main()
 			return
 		end
 
+		-- A Backspace under Ctrl, Alt or Super deletes a word (or undoes, in some
+		-- applications): how much text went is unknown. It must neither undo an
+		-- expansion, whose erase count assumes one character went, nor edit the
+		-- buffer by one character; it restarts the buffer at a position that is
+		-- not known to start a word, as Windows and macOS do.
+		local mods = type(detail) == "table" and type(detail.mods) == "table" and detail.mods or {}
+		local one_character = key_name == "backspace" and not (mods.ctrl or mods.alt or mods.meta)
+
 		-- Undo: a Backspace immediately after an expansion puts the trigger back.
 		--
 		-- The arithmetic is off by one on purpose. Under a grab the Backspace was
@@ -1174,7 +1197,7 @@ local function main()
 		-- ("adn " → "ADN "), so THAT is what the Backspace removed, and the whole
 		-- replacement is still on screen. Counting the replacement alone left its
 		-- first character behind: "adn " then Backspace read "Aadn".
-		if key_name == "backspace" and _undoable and not opts.dry_run then
+		if one_character and _undoable and not opts.dry_run then
 			local remaining = 0
 			for _ in (_undoable.replacement .. (_undoable.replayed or "")):gmatch("[%z\1-\127\194-\244][\128-\191]*") do
 				remaining = remaining + 1
@@ -1192,9 +1215,10 @@ local function main()
 		_undoable = nil
 
 		-- Backspace edits the buffer as it edited the text; every other control
-		-- key moves or leaves the caret, so what follows is not known to start a
-		-- word. Escape alone leaves the caret where it was.
-		if key_name == "backspace" then
+		-- key (and a word-deleting Backspace) moves or leaves the caret, so what
+		-- follows is not known to start a word. Escape alone leaves the caret
+		-- where it was.
+		if one_character then
 			engine:backspace()
 		else
 			engine:reset(key_name == "escape")
@@ -1570,6 +1594,47 @@ local function main()
 			on_menu_changed = function()
 				if rebuild_tray_menu then rebuild_tray_menu() end
 			end,
+			-- A check asked from the tray: its answer is told, and the menu redrawn
+			-- so an install row appears for a found release.
+			on_update_checked = function(available, release, err)
+				if notifier and ok_i18n and i18n_mod then
+					local body
+					if available and release then
+						body = i18n_mod.get("updater.tray_new_version_body")
+							:gsub("{1}", (tostring(release.tag):gsub("%%", "%%%%")))
+					elseif err then
+						body = i18n_mod.get("updater.no_connection")
+					else
+						body = i18n_mod.get("updater.up_to_date")
+							:gsub("{1}", (tostring(updater.current_version()):gsub("%%", "%%%%")))
+					end
+					notifier.send(body, { title = i18n_mod.get("updater.title_update"), level = "info" })
+				end
+				if rebuild_tray_menu then rebuild_tray_menu() end
+			end,
+			-- An update downloaded and installed: the daemon restarts on it.
+			on_update_finished = function(installed, tag, stage)
+				local title = ok_i18n and i18n_mod and i18n_mod.get("updater.title_update") or nil
+				if not installed then
+					if notifier and title then
+						notifier.send(i18n_mod.get(stage == "download" and "updater.install_error_download"
+							or "updater.install_error"), { title = title, level = "error" })
+					end
+					if rebuild_tray_menu then rebuild_tray_menu() end
+					return
+				end
+				if notifier and title then
+					notifier.send(i18n_mod.get("updater.installed_restarting")
+						:gsub("{1}", (tostring(tag):gsub("%%", "%%%%"))), { title = title, level = "info" })
+				end
+				local launch_args = {}
+				for index = 1, #arg do launch_args[index] = arg[index] end
+				local how = require("modules.updater.restarter").restart({
+					wrapper = updater.installed_launcher(),
+					args = launch_args,
+				})
+				if how == "relay" then shutdown.request("update installed") end
+			end,
 			-- Adding a delimiter needs a text field, and this driver's only text
 			-- field is the settings window. Opening it is honest; a native prompt
 			-- would mean a second dialog toolkit for one input.
@@ -1794,6 +1859,13 @@ local function main()
 		local ok_restore, err_restore = pcall(wpm_widget.restore)
 		if not ok_restore then
 			Logger.error(LOG, "WPM widget state could not be restored: %s.", tostring(err_restore))
+		end
+	end
+	-- The tray readout needs a tray: without --tray there is no panel item to sit beside.
+	if wpm_tray_readout and opts.tray and tray_menu then
+		local ok_restore, err_restore = pcall(wpm_tray_readout.restore)
+		if not ok_restore then
+			Logger.error(LOG, "WPM tray readout state could not be restored: %s.", tostring(err_restore))
 		end
 	end
 
@@ -2029,22 +2101,29 @@ local function main()
 			end, function() system_metrics = nil end)
 		end
 
-		-- The WPM widget's only clock. `ui/wpm/widget.lua` was complete — it
-		-- computes the frame, picks the colour from the keystroke source, throttles
-		-- redraws to what a user could actually see — and `tick` had no caller
-		-- anywhere in the driver, so the whole surface was inert on every desktop.
-		-- The same shape the preview bubble had.
-		--
-		-- Driven from here rather than from its own timer: a widget with a private
-		-- clock is a second thing to stop on shutdown and a second thing to leak.
-		if wpm_widget then
-			local owner = wpm_widget
-			RuntimeGuard.call("WPM widget tick", function()
-				wpm_widget.tick(keylogger.get_session_stats(), tick_count * PERIODIC_TICK_MS / 1000)
-			end, function()
-				if type(owner.stop) == "function" then owner.stop() end
-				wpm_widget = nil
-			end)
+		-- The WPM readouts' clock: the floating widget and the tray readout each
+		-- redraw at their shared rate however often this runs, from the live
+		-- stats — the speed of the text reaching the page, and its source.
+		if wpm_widget or wpm_tray_readout then
+			local now_ms = Monotonic.now_ms()
+			local live = keylogger.get_live_stats(now_ms)
+			if wpm_widget then
+				local owner = wpm_widget
+				RuntimeGuard.call("WPM widget tick", function()
+					owner.tick(live, now_ms / 1000)
+				end, function()
+					if type(owner.stop) == "function" then owner.stop() end
+					wpm_widget = nil
+				end)
+			end
+			if wpm_tray_readout then
+				local owner = wpm_tray_readout
+				RuntimeGuard.call("WPM tray readout tick", function()
+					owner.tick(live, now_ms / 1000)
+				end, function()
+					wpm_tray_readout = nil
+				end)
+			end
 		end
 	end
 
@@ -2066,12 +2145,14 @@ local function main()
 			-- reading: gestures.pump() returns 0 immediately unless start_reading()
 			-- found a device and opened it, so a machine without a touchpad pays a
 			-- function call per tick and nothing else.
+			--
+			-- A failed pump stops the READER and nothing else. The same module is
+			-- the action catalogue every tap-hold, keyboard shortcut and tray row
+			-- runs its actions through; dropping the handle here used to turn one
+			-- touchpad error into dead tap actions until a restart.
 			if gestures and type(gestures.pump) == "function" then
 				local owner = gestures
-				RuntimeGuard.call("gesture pump", owner.pump, function()
-					if type(owner.stop_reading) == "function" then owner.stop_reading() end
-					gestures = nil
-				end)
+				RuntimeGuard.call("gesture pump", owner.pump, owner.stop_reading)
 			end
 		end,
 		onPeriodic = on_periodic,

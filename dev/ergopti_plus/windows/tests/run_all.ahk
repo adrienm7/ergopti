@@ -166,6 +166,7 @@ OnError(_FatalErrorHandler)
 #Include ../infra/hotstrings/hotstrings_config.ahk
 #Include ../infra/suspend_handoff.ahk
 #Include ../infra/reload_terminal_handoff.ahk
+#Include ../infra/reload_successor.ahk
 #Include ../infra/suppressive_inputhook_ownership.ahk
 #Include ../infra/lifecycle_transition.ahk
 #Include ../infra/config_transition.ahk
@@ -279,6 +280,7 @@ InstallSendNoOps()
 #Include unit/test_timer_scheduler.ahk
 #Include unit/test_tray_pause_greys_features.ahk
 #Include unit/test_hook_dispatcher.ahk
+#Include unit/test_own_injection_is_not_activity.ahk
 #Include unit/test_logger.ahk
 #Include unit/test_logger_shutdown_sinks.ahk
 #Include unit/test_wall_clock_snapshot.ahk
@@ -363,6 +365,7 @@ InstallSendNoOps()
 #Include ../ui/wpm/wpm_widget.ahk
 #Include unit/test_wpm_gdiplus_ownership.ahk
 #Include unit/test_wpm_drag_admission.ahk
+#Include unit/test_wpm_canon.ahk
 #Include unit/test_features_manifest.ahk
 #Include unit/test_config_io_feature_section_resolution.ahk
 #Include unit/test_global_disable_all_preserves_assignments.ahk
@@ -391,6 +394,7 @@ InstallSendNoOps()
 #Include unit/test_updater_swap_cleanup.ahk
 #Include unit/test_gesture_emit_actions.ahk
 #Include unit/test_updater_constants_single_source.ahk
+#Include unit/test_runtime_contract_version.ahk
 #Include meta/test_updater_load_interval_guard.ahk
 
 ; Shortcuts modules — dispatcher logic is testable without real hotkeys firing;
@@ -577,6 +581,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_gestures.ahk
 #Include unit/test_gesture_cycle_candidates.ahk
 #Include unit/test_config_persistence_transactions.ahk
+#Include unit/test_reload_terminal_pending.ahk
 #Include unit/test_config_recovery_transactions.ahk
 #Include unit/test_config_commit_gateway.ahk
 #Include unit/test_config_typed_updates.ahk
@@ -828,6 +833,7 @@ global _AhkSubDir := ""
 #Include unit/test_keylogger_app_category_projection.ahk
 #Include unit/test_keylogger_password_fail_closed.ahk
 #Include unit/test_single_instance_gate.ahk
+#Include unit/test_worker_tray_icon_hidden.ahk
 #Include unit/test_keylogger_network_transitions.ahk
 #Include ../infra/menu_command_origin.ahk
 #Include unit/test_menu_command_origin.ahk
@@ -838,7 +844,11 @@ global _AhkSubDir := ""
 ; include here (unlike most modules/). test_timings_config exercises the shared
 ; registry reader plus the keylogger-walker and tap-hold reassign-at-boot loaders.
 #Include ../platform/remap/constants.ahk
+#Include ../platform/remap/altgr_criteria.ahk
 #Include unit/test_tap_hold_activity_cancel.ahk
+#Include unit/test_tap_hold_owned_press.ahk
+#Include unit/test_tap_hold_prior_key.ahk
+#Include unit/test_tap_hold_tap_keeps_held_modifiers.ahk
 #Include unit/test_timings_config.ahk
 _LogBootProgress("keylogger modules + tests included")
 
@@ -878,9 +888,13 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_lalt_rctrl_accept_suspend_guard.ahk
 #Include meta/test_tap_hold_fire_action_suspend_guard.ahk
 #Include meta/test_tap_hold_native_dispatch_guard.ahk
+#Include meta/test_tap_hold_taps_use_held_modifier_emitter.ahk
+#Include meta/test_tap_hold_hotkeys_admit_held_modifiers.ahk
+#Include meta/test_nav_layer_admits_held_modifiers.ahk
 #Include meta/test_lshift_lctrl_rshift_bounded_keywait.ahk
 #Include meta/test_layout_poll_blacklist_guard.ahk
 #Include meta/test_layout_quiescence.ahk
+#Include unit/test_foreground_keyboard_layout.ahk
 #Include meta/test_hse_register_atomic.ahk
 #Include meta/test_hse_rebuild_guard.ahk
 #Include meta/test_hse_rebuild_prefix_buffer_reset.ahk
@@ -1018,6 +1032,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_updater_cancel_fires_on_json.ahk
 #Include meta/test_updater_download_receive_timeout.ahk
 #Include meta/test_updater_download_reentrancy_guard.ahk
+#Include meta/test_updater_download_requires_consent.ahk
 #Include meta/test_personal_load_once.ahk
 #Include meta/test_menu_llm_actions_include.ahk
 #Include meta/test_llm_menu_suspend_bootstrap.ahk
@@ -1079,6 +1094,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include ../adapters/hotkey_registrar.ahk
 #Include meta/test_chord_notation.ahk
 #Include unit/test_hotkey_registrar_transactions.ahk
+#Include unit/test_hotkey_registrar_modifier_keys.ahk
 #Include unit/test_llm_trigger_shortcut_transactions.ahk
 #Include unit/test_llm_nav_event_owner.ahk
 #Include unit/test_llm_nav_hotkey_transaction.ahk
@@ -1454,7 +1470,19 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_personal_shortcuts_reload_handoff.ahk
 #Include meta/test_personal_shortcuts_atomic_bootstrap.ahk
 #Include meta/test_altgr_detect_hkl_fallback.ahk
+#Include unit/test_altgr_detection.ahk
+#Include unit/test_altgr_probe_real_layouts.ahk
 #Include meta/test_altgr_kana_taphold_entry.ahk
+#Include meta/test_altgr_prefix_arms_on_press.ahk
+#Include unit/test_altgr_owner_matrix.ahk
+#Include unit/test_altgr_combos_stand_down.ahk
+#Include unit/test_altgr_layer_shift_from_hold.ahk
+#Include unit/test_ctrl_alt_numpad_gate.ahk
+#Include unit/test_user_lctrl_held.ahk
+#Include unit/test_altgr_takes_its_lctrl.ahk
+#Include unit/test_altgr_lctrl_not_typed.ahk
+#Include meta/test_prior_key_guards_use_helper.ahk
+#Include meta/test_modifier_hotkeys_single_identity.ahk
 #Include meta/test_spotlight_gdiplus_free_library.ahk
 #Include meta/test_case_transform_synthetic_mark.ahk
 #Include meta/test_color_dropdown_recompute_index.ahk
@@ -1553,6 +1581,9 @@ _LogBootProgress("keylogger modules + tests included")
 #Include ../ui/healthcheck/helpers.ahk
 #Include meta/test_healthcheck_format_helpers.ahk
 #Include unit/test_healthcheck_copy_receipt.ahk
+#Include unit/test_kana_altgr_readers.ahk
+#Include unit/test_kana_altgr_lift_respects_owner.ahk
+#Include unit/test_kana_altgr_ctrl_chords.ahk
 
 ; Guards the _HsEdWeb_Reset() idempotency fix for the live-log access-violation
 ; crash (double-unsubscribe against an already torn-down WebView2 controller).
@@ -1733,6 +1764,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_crash_worker_deadline.ahk
 #Include unit/test_taphold_inherit_defaults_roundtrip.ahk
 #Include unit/test_taphold_synthetic_refcount_combo.ahk
+#Include unit/test_taphold_synthetic_user_held.ahk
 #Include unit/test_taphold_unreadable_blocks_rewrite.ahk
 #Include unit/test_tap_hold_global_transaction_20260813.ahk
 #Include unit/test_tooltip_row_band_elision.ahk
@@ -1745,6 +1777,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_llm_health_probe_constants.ahk
 #Include meta/test_menu_manifest_one_decoder.ahk
 #Include meta/test_menu_reload_preserves_suspend.ahk
+#Include meta/test_reload_pending_contract.ahk
 #Include meta/test_menu_shortcut_groups_spliced_once.ahk
 #Include meta/test_metrics_private_title_memo.ahk
 #Include meta/test_ollama_async_registry_is_curl_only.ahk

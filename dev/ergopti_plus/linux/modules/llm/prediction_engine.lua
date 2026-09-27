@@ -519,9 +519,10 @@ end
 --- Consumes the validation chord (a digit, with the configured modifiers —
 --- none by default) while an offer is on screen.
 ---
---- Consumed whatever happens next: a digit pressed at a shown prediction is
---- the instruction to insert it, never text. A slot that does not exist, or an
---- insertion that fails, types nothing either.
+--- A digit that numbers a shown prediction is the instruction to insert it,
+--- never text, even when the insertion fails. A digit beyond the predictions
+--- on offer (5 with three shown) is text and reaches the application, as on
+--- Windows and macOS.
 --- @param detail table { key, mods }
 --- @return boolean True when the key was the chord and must not reach the app.
 function M.handle_shortcut(detail)
@@ -531,10 +532,7 @@ function M.handle_shortcut(detail)
 	local digit = key:match("^([0-9])$") or key:match("^[Kk][Pp]_?([0-9])$")
 	if not digit then return false end
 	local index = digit == "0" and 10 or tonumber(digit)
-	if not _suggestions[index] then
-		Logger.debug(LOG, "Prediction %d is not on offer — the key is swallowed, nothing typed.", index)
-		return true
-	end
+	if not _suggestions[index] then return false end
 	if not M.accept(index) then
 		Logger.warn(LOG, "Prediction %d could not be inserted — the key is swallowed, nothing typed.", index)
 	end

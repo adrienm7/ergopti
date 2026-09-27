@@ -19,8 +19,8 @@
 ; - "no remapping" fallback: when CapsLock has no tap action AND no hold action,
 ;   and LAlt is remapped to one_shot_shift, the LAltCapsLockShortcut must still
 ;   be reachable — handled by the dedicated first #HotIf block.
-; - CtrlActivated guard: when LCtrl is physically held while CapsLock fires,
-;   the tap action is sent inside Ctrl so shortcuts like Ctrl+CapsLock still work.
+; - A Ctrl the user holds while tapping CapsLock stays down: the synthetic owner
+;   leaves a key the user holds to the user, so Ctrl+CapsLock gives Ctrl+tap.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -136,8 +136,6 @@ SC03A:: {
 ; itself runs clean (e.g. Enter without Ctrl).
 #HotIf _CapsLockHasHoldModifier() and not LayerEnabled
 *$SC03A:: {
-	CtrlActivated := KS_IsDown("SC01D") ; LCtrl physically held at press time
-
 	if (KS_IsDown("SC038")) { ; LAlt physically held — shortcut intercept
 		LAltCapsLockShortcut()
 		return
@@ -147,7 +145,7 @@ SC03A:: {
 	Result := TapHoldOwnImmediateModifier("caps_lock", "CapsLock", ModKey,
 		TapHoldDuration(TapHold, "caps_lock"))
 	if Result["tap"]
-		_CapsLockDispatch(CtrlActivated)
+		_CapsLockDispatch()
 }
 #HotIf
 
@@ -165,20 +163,20 @@ SC03A:: {
 
 ; Mirrors the LAlt layer approach: activate layer on hold, tap action on release.
 #HotIf _CapsLockHasHoldLayer() and not LayerEnabled
-$SC03A:: {
+*$SC03A:: {
 	if (KS_IsDown("SC038")) { ; LAlt physically held
 		LAltCapsLockShortcut()
 		return
 	}
 
 	UpdateLastSentCharacter("CapsLock")
-	Result := TapHoldOwnImmediateLayer("CapsLock", TapHoldDuration(TapHold, "caps_lock"))
+	Result := TapHoldOwnImmediateLayer("caps_lock", "CapsLock", TapHoldDuration(TapHold, "caps_lock"))
 	if (
 		Result["tap"]
 		and Result["elapsed_ms"] >= TapMinDurationMs()
-		and A_PriorKey == "CapsLock"
+		and TapHoldPriorKeyIsSelf("caps_lock")
 	) { ; A_PriorKey + TapMinDurationMs floor suppress spurious taps when CapsLock is brushed mid-roll
-		_CapsLockDispatch(False)
+		_CapsLockDispatch()
 	}
 }
 #HotIf
@@ -197,12 +195,12 @@ $SC03A:: {
 
 ; Simple gate: fire the tap action on every press (no hold behaviour).
 #HotIf TapHoldTapAction(TapHold, "caps_lock") != "" and not _CapsLockHasHoldModifier() and not _CapsLockHasHoldLayer() and not _CapsLockIsPlainBackspace() and not LayerEnabled
-SC03A:: {
+*SC03A:: {
 	if (KS_IsDown("SC038")) { ; LAlt physically held
 		LAltCapsLockShortcut()
 		return
 	}
-	_CapsLockDispatch(False)
+	_CapsLockDispatch()
 }
 #HotIf
 
@@ -219,34 +217,43 @@ SC03A:: {
 ; =================================
 
 ; Dispatch the configured tap action for CapsLock.
-; CtrlActivated: true when LCtrl was physically held at key-down time — the
-; tap action is then wrapped in LCtrl so Ctrl+CapsLock combos still work.
-_CapsLockDispatch(CtrlActivated) {
-	TapHoldDispatchTap("caps_lock", _CapsLockInvokeTap.Bind(CtrlActivated))
+_CapsLockDispatch() {
+	TapHoldDispatchTap("caps_lock", _CapsLockInvokeTap)
 }
 
 ; Emit CapsLock's special tap variants after the shared activity gate has
-; accepted the physical press. Keep the optional Ctrl wrapper balanced even if
-; a configured action throws.
-_CapsLockInvokeTap(CtrlActivated) {
-	if CtrlActivated {
-		if !TapHoldSyntheticKeyDown("LCtrl")
-			return false
-	}
-	try {
-		; Special cases that cannot be handled by GESTURE_ACTIONS.Fn.Call() directly.
-		local action := TapHoldTapAction(TapHold, "caps_lock")
-		if (action == "backspace") {
-			TextPressKey("BackSpace", "Blind")
-		} else if (action == "caps_lock" or action == "toggle_capslock") {
-			ToggleCapsLock()
-		} else {
-			_TapHoldInvokeConfiguredAction("caps_lock")
-		}
-	} finally {
-		if CtrlActivated {
-			TapHoldSyntheticKeyUp("LCtrl")
-		}
+; accepted the physical press. A Ctrl the user holds is still down here, so the
+; tap carries it without any wrapper of its own.
+_CapsLockInvokeTap() {
+	; Special cases that cannot be handled by GESTURE_ACTIONS.Fn.Call() directly.
+	local action := TapHoldTapAction(TapHold, "caps_lock")
+	if (action == "backspace") {
+		TextPressKey("BackSpace", "Blind")
+	} else if (action == "caps_lock" or action == "toggle_capslock") {
+		ToggleCapsLock()
+	} else {
+		_TapHoldInvokeConfiguredAction("caps_lock")
 	}
 	return true
 }
+
+
+
+
+
+
+
+; ====================================
+; ====================================
+; ======= 2.7) Own auto-repeat =======
+; ====================================
+; ====================================
+
+; The key's own auto-repeat while an owner holds its suppressed press. Under
+; a layer hold no variant above is eligible any more, and the navigation layer
+; would map the repeat (CapsLock repeated its layer Backspace) or let it reach
+; the system. Declared before nav_layer.ahk, so this variant wins there
+; (see TapHoldPressIsOwned).
+#HotIf TapHoldPressIsOwned("caps_lock")
+*SC03A:: return
+#HotIf

@@ -75,10 +75,13 @@ _PFSW_WriterFailsLoudly() {
 		"a failed paths.toml write must be shown to the user — they are standing in front of the dialog, and the following Reload() erases the evidence")
 	Assert(InStr(Body, "return false") > 0,
 		"_PathsFile_Write must report failure to its caller so the Reload() is skipped")
-	ReloadPos := InStr(Body, "ReloadPreservingSuspend(0, OwnerBundle)")
-	RollbackPos := InStr(Body, "ConfigTransitionRollbackOwned(")
+	ReloadPos := InStr(Body, "ReloadPreservingSuspend(0, OwnerBundle,")
+	; One rollback helper serves a refused launch and a later refusal alike.
+	RollbackPos := InStr(Body, "_PathsFile_RollbackRefusedReload(OwnerBundle)")
 	ReleasePos := InStr(Body, "_ConfigWriteTerminalRelease(OwnerBundle)")
-	Assert(ReloadPos > 0 && RollbackPos > ReloadPos && ReleasePos > RollbackPos,
+	Assert(ReloadPos > 0 && RollbackPos > ReloadPos && ReleasePos > RollbackPos
+		&& InStr(_DriverFuncBody("_PathsFile_RollbackRefusedReload"),
+			"ConfigTransitionRollbackOwned(") > 0,
 		"a refused Reload must restore all-old while the same terminal owner is still held")
 	Assert(InStr(Body, "FileOpen(") == 0,
 		"the shared writer must not bypass its WAL with a raw FileOpen")

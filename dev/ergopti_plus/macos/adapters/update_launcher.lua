@@ -33,7 +33,8 @@ function M.request_check()
 	Logger.error(LOG, "Native Sparkle update command failed: %s.",
 		ok and "Launch Services refused the URL" or tostring(accepted_or_error))
 	local title = i18n.get("common.error_title")
-	local message = i18n.get("menu.about.update.install_error")
+	-- Only the request failed: nothing was downloaded or installed yet.
+	local message = i18n.get("updater.check_request_failed")
 	local dialog_ok = pcall(dialog.block_alert, title, message, i18n.get("button.ok"))
 	if not dialog_ok then
 		Notifier.send(title, { body = message, kind = "error" })

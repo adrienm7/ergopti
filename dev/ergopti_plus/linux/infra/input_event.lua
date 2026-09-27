@@ -52,6 +52,33 @@ M.SIZE_64BIT = 24
 -- Linux input event types (input-event-codes.h).
 M.EV_SYN = 0x00
 M.EV_KEY = 0x01
+M.EV_REL = 0x02
+
+-- The EV_REL axes that are a wheel turn, vertical and horizontal, in both the
+-- classic and the high-resolution reports. Every other axis (REL_X, REL_Y,
+-- REL_DIAL...) is pointer motion or a knob, not a scroll.
+M.REL_WHEEL_AXES = {
+	[0x06] = true, -- REL_HWHEEL
+	[0x08] = true, -- REL_WHEEL
+	[0x0b] = true, -- REL_WHEEL_HI_RES
+	[0x0c] = true, -- REL_HWHEEL_HI_RES
+}
+
+-- The EV_KEY codes of a mouse's buttons: BTN_MISC (0x100) up to the last code
+-- before BTN_JOYSTICK (0x120), which spans BTN_0..BTN_9 and BTN_LEFT..BTN_TASK.
+-- A touchpad also reports EV_KEY codes from BTN_DIGI (0x140) up: BTN_TOUCH and
+-- the BTN_TOOL_* codes when a finger lands. For a tap-hold those are a contact,
+-- not a click, and neither is the pointer motion they come with; a tap-to-click
+-- is still a touch that moves the caret, which the daemon hears of.
+M.POINTER_BUTTON_FIRST = 0x100
+M.POINTER_BUTTON_LAST  = 0x11f
+
+--- Whether an EV_KEY code from a pointer is one of its buttons.
+--- @param code integer
+--- @return boolean
+function M.is_pointer_button(code)
+	return code >= M.POINTER_BUTTON_FIRST and code <= M.POINTER_BUTTON_LAST
+end
 
 -- SYN_REPORT: the marker that makes everything written before it visible to the
 -- application. Without it the kernel buffers the event and nothing happens,

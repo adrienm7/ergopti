@@ -761,7 +761,13 @@ M.unavailable = {
 		path = "metrics.wpm_widget_colors", section = "metrics", reason_key = "", platforms = { "ahk", "linux" },
 	},
 	{
-		path = "metrics.wpm_widget_graph", section = "metrics", reason_key = "", platforms = { "ahk" },
+		path = "metrics.wpm_widget_graph", section = "metrics", reason_key = "", platforms = { "ahk", "linux" },
+	},
+	{
+		path = "metrics.wpm_menubar_visible", section = "metrics", reason_key = "", platforms = { "linux" },
+	},
+	{
+		path = "metrics.wpm_menubar_colors", section = "metrics", reason_key = "", platforms = { "linux" },
 	},
 	{
 		path = "shortcuts.get_hex_value", section = "shortcuts", reason_key = "", platforms = { "ahk" },

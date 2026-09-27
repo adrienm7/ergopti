@@ -16,7 +16,11 @@
 ; - one_shot_shift tap: 4-key guard prevents firing mid-shortcut when another
 ;   modifier is already held (RCtrl, CapsLock, LShift, LCtrl).
 ; - tab+layer: layer activated immediately on press, Tab emitted only if tap.
-;   SC02A&SC038 and SC11D&SC038 hotkeys for Shift+Tab via LShift/RCtrl hold.
+;   The Tab tap carries the modifiers held before LAlt (Shift+Tab under LShift);
+;   SC11D&SC038 keeps Shift+Tab when RCtrl is the one-shot Shift.
+; - Every variant but one_shot_shift carries the * wildcard: a modifier held
+;   before LAlt must not hand the key back to its native Alt, dropping the
+;   configured tap and hold. one_shot_shift deliberately stays Alt under one.
 ; - backspace plain: key-repeat loop with KEY_REPEAT_INITIAL_DELAY_MS / INTERVAL.
 ;   BackSpaceLogic() handles Ctrl+BS, Shift+BS, RCtrl-as-Shift combinations.
 ; - backspace+layer: same BackSpaceLogic(), but gated by A_PriorKey==LAlt and
@@ -121,17 +125,16 @@ SC038:: {
 ; ==================================
 
 #HotIf TapHoldTapAction(TapHold, "left_alt") == "tab" and TapHoldHoldModifier(TapHold, "left_alt") == "" and not LayerEnabled
-SC038::
+*SC038::
 {
 	UpdateLastSentCharacter("LAlt")
 
-	Result := TapHoldOwnImmediateLayer("SC038", TapHoldDuration(TapHold, "left_alt"))
+	Result := TapHoldOwnImmediateLayer("left_alt", "SC038", TapHoldDuration(TapHold, "left_alt"))
 	if (Result["tap"] and Result["elapsed_ms"] >= TapMinDurationMs()) { ; TapMinDurationMs floor suppresses spurious taps when LAlt is brushed mid-roll
-		TapHoldDispatchTap("left_alt", LLM_Tooltip_FireTabOrAccept.Bind(""))
+		TapHoldDispatchTap("left_alt", TapHoldEmitKeyTap.Bind("Tab"))
 	}
 }
 
-SC02A & SC038:: TextPressKey("Tab", "Shift") ; LShift held
 ; RCtrl+LAlt emits Shift+Tab only when right_ctrl IS the one-shot-shift key. A
 ; runtime `if` around a `::` definition does NOT gate its registration in AHK v2
 ; (hotkeys are load-time constructs), so the old `if` here was dead and the combo
@@ -142,9 +145,6 @@ SC11D & SC038:: {
 	OneShotShiftFix()
 	TextPressKey("Tab", "Shift")
 }
-#HotIf TapHoldTapAction(TapHold, "left_alt") == "tab" and TapHoldHoldModifier(TapHold, "left_alt") == "" and not LayerEnabled
-#SC038:: TextPressKey("Tab", "Win") ; Doesn't fire when SendInput is used
-!SC038:: TextPressKey("Tab", "Alt")
 #HotIf
 
 
@@ -160,7 +160,7 @@ SC11D & SC038:: {
 ; ========================================
 
 #HotIf TapHoldTapAction(TapHold, "left_alt") == "alt_tab_monitor" and TapHoldHoldModifier(TapHold, "left_alt") == "" and TapHoldHoldLayer(TapHold, "left_alt") == "" and not LayerEnabled
-SC038::
+*SC038::
 {
 	if !TapHoldSyntheticKeyDown("LAlt")
 		return
@@ -203,12 +203,12 @@ SC038::
 {
 	BackSpaceActionWithModifiers := BackSpaceLogic()
 	if not BackSpaceActionWithModifiers {
-		TextPressKey("BackSpace", "") ; Event keeps hotstring engine in sync
+		TapHoldEmitKeyTap("BackSpace") ; Event keeps hotstring engine in sync
 		Sleep(KEY_REPEAT_INITIAL_DELAY_MS)
 		while KS_IsDown("SC038") { ; key-repeat loop while LAlt physically held
 			if A_IsSuspended
 				break
-			TextPressKey("BackSpace", "")
+			TapHoldEmitKeyTap("BackSpace")
 			Sleep(KEY_REPEAT_INTERVAL_MS)
 		}
 	}
@@ -230,10 +230,10 @@ SC038::
 #HotIf _LAltIsBackspaceLayer() and not LayerEnabled
 *SC038::
 {
-	Result := TapHoldOwnImmediateLayer("SC038", TapHoldDuration(TapHold, "left_alt"))
+	Result := TapHoldOwnImmediateLayer("left_alt", "SC038", TapHoldDuration(TapHold, "left_alt"))
 	if (
 		Result["tap"]
-		and A_PriorKey == "LAlt" ; Prevents spurious BackSpace when layer key was actually used
+		and TapHoldPriorKeyIsSelf("left_alt") ; Prevents spurious BackSpace when layer key was actually used
 		and KS_IsUp("SC03A") ; Prevents spurious BackSpace on quick LAlt+CapsLock release
 	) {
 		TapHoldDispatchTap("left_alt", _LAltBackspaceTap)
@@ -262,7 +262,7 @@ SC038::
 ; instead of _LAltDispatch(), preserving the Ctrl+BS / Shift+Del tap semantics
 ; while honouring the configured hold modifier (CapsLock/Win already work this way).
 #HotIf TapHoldTapAction(TapHold, "left_alt") == "backspace" and TapHoldHoldModifier(TapHold, "left_alt") != "" and not LayerEnabled
-$SC038:: {
+*$SC038:: {
 	Result := TapHoldOwnImmediateModifier("left_alt", "SC038",
 		_LAltHoldModKey(), TapHoldDuration(TapHold, "left_alt"))
 	if Result["tap"]
@@ -291,7 +291,7 @@ $SC038:: {
 ; do. The tap branch below is safe with no action configured:
 ; _TapHoldInvokeConfiguredAction logs a native pass-through and returns.
 #HotIf TapHoldTapAction(TapHold, "left_alt") != "backspace" and TapHoldHoldModifier(TapHold, "left_alt") != "" and not LayerEnabled
-$SC038:: {
+*$SC038:: {
 	Result := TapHoldOwnImmediateModifier("left_alt", "SC038",
 		_LAltHoldModKey(), TapHoldDuration(TapHold, "left_alt"))
 	if Result["tap"]
@@ -314,11 +314,11 @@ $SC038:: {
 ; No tap-action conjunct, for the reason given on block 4.7: a hold must arm on
 ; the hold alone or the picker offers a choice the driver silently ignores.
 #HotIf TapHoldTapAction(TapHold, "left_alt") != "backspace" and TapHoldTapAction(TapHold, "left_alt") != "tab" and TapHoldHoldLayer(TapHold, "left_alt") != "" and TapHoldHoldModifier(TapHold, "left_alt") == "" and not LayerEnabled
-$SC038:: {
+*$SC038:: {
 	UpdateLastSentCharacter("LAlt")
 
-	Result := TapHoldOwnImmediateLayer("SC038", TapHoldDuration(TapHold, "left_alt"))
-	if (Result["tap"] and Result["elapsed_ms"] >= TapMinDurationMs() and A_PriorKey == "LAlt") { ; TapMinDurationMs floor suppresses spurious taps when LAlt is brushed mid-roll
+	Result := TapHoldOwnImmediateLayer("left_alt", "SC038", TapHoldDuration(TapHold, "left_alt"))
+	if (Result["tap"] and Result["elapsed_ms"] >= TapMinDurationMs() and TapHoldPriorKeyIsSelf("left_alt")) { ; TapMinDurationMs floor suppresses spurious taps when LAlt is brushed mid-roll
 		_LAltDispatch()
 	}
 }
@@ -337,7 +337,7 @@ $SC038:: {
 ; ======================================================================
 
 #HotIf not _LAltIsSpecialTap() and TapHoldHoldModifier(TapHold, "left_alt") == "" and TapHoldHoldLayer(TapHold, "left_alt") == "" and TapHoldTapAction(TapHold, "left_alt") != "" and not LayerEnabled
-SC038:: _LAltDispatch()
+*SC038:: _LAltDispatch()
 #HotIf
 
 
@@ -361,7 +361,7 @@ _LAltDispatch() {
 _LAltBackspaceTap() {
 	BackSpaceActionWithModifiers := BackSpaceLogic()
 	if not BackSpaceActionWithModifiers {
-		TextPressKey("BackSpace", "")
+		TapHoldEmitKeyTap("BackSpace")
 	}
 }
 
@@ -369,7 +369,7 @@ BackSpaceLogic() {
 	RCtrlIsOneShotShift := TapHoldTapAction(TapHold, "right_ctrl") == "one_shot_shift"
 
 	if (
-		KS_IsDown("SC01D") ; LCtrl physically held
+		TapHoldUserLCtrlHeld() ; LCtrl physically held
 		and KS_IsDown("Shift") ; Shift physically held
 	) {
 		TextPressKey("Delete", "Ctrl")
@@ -382,7 +382,7 @@ BackSpaceLogic() {
 		TextPressKey("Delete", "Ctrl")
 		return True
 	} else if (
-		KS_IsDown("SC01D") ; LCtrl physically held
+		TapHoldUserLCtrlHeld() ; LCtrl physically held
 		and RCtrlIsOneShotShift
 		and KS_IsDown("SC11D") ; RCtrl physically held (acting as Shift)
 	) {
@@ -401,7 +401,7 @@ BackSpaceLogic() {
 	} else if KS_IsDown("Shift") {
 		TextPressKey("Delete", "")
 		return True
-	} else if KS_IsDown("SC01D") { ; LCtrl physically held
+	} else if TapHoldUserLCtrlHeld() { ; LCtrl physically held
 		TextPressKey("BackSpace", "Ctrl")
 		return True
 	} else if (
@@ -413,3 +413,24 @@ BackSpaceLogic() {
 	}
 	return False
 }
+
+
+
+
+
+
+
+; =====================================
+; =====================================
+; ======= 4.11) Own auto-repeat =======
+; =====================================
+; =====================================
+
+; The key's own auto-repeat while an owner holds its suppressed press. Under
+; a layer hold no variant above is eligible any more, and the navigation layer
+; would map the repeat (CapsLock repeated its layer Backspace) or let it reach
+; the system. Declared before nav_layer.ahk, so this variant wins there
+; (see TapHoldPressIsOwned).
+#HotIf TapHoldPressIsOwned("left_alt")
+*SC038:: return
+#HotIf

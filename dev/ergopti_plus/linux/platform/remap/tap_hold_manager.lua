@@ -26,6 +26,8 @@ local Engine = require("platform.remap.tap_hold_engine")
 local Timings = require("infra.timings")
 local HoldOptions = require("tap_hold.hold_options")
 local EmitActions = require("_generated.gesture_emit_actions")
+local Json = require("json")
+local Paths = require("infra.paths")
 
 local LOG = "platform.remap.tap_hold_manager"
 local MS_PER_SECOND = 1000
@@ -41,10 +43,12 @@ local _initialized = false
 local _hook = nil            -- The keyboard hook the engine is installed in.
 local _execute_action = nil  -- Runs a catalogue action by name.
 local _action_names = nil    -- The action catalogue's ids.
+local _on_text_injected = nil -- Told of text the injector typed for a one-shot.
 local _defaults_path = nil
 local _user_path = nil
 local _loaded = nil          -- Config.load() result.
 local _engine = nil          -- Built from _loaded; nil when there is nothing to run.
+local _one_shot = nil        -- The shared one-shot Shift results, read with _loaded.
 local _enabled = true        -- The runtime feature switch (« Disable all »).
 local _paused = false        -- The daemon's pause.
 
@@ -56,12 +60,55 @@ local _paused = false        -- The daemon's pause.
 -- =========================================
 
 --- Runs one tap action: the engine returns the catalogue actions it cannot
---- express as key events of its own.
---- @param action string
+--- express as key events of its own, and the one-shot Shift's results the
+--- layout has no key for, which the injector types. The injector's text never
+--- reaches the hotstring engine, so the daemon is told to reset its buffer, as
+--- after its other injections.
+--- @param action string|table A catalogue action id, or { type_text }.
 local function _run_tap(action)
+	if type(action) == "table" then
+		local ok, result = pcall(function()
+			return require("modules.hotstrings.injector").inject(0, action.type_text)
+		end)
+		if not ok or type(result) ~= "table" or not result.ok then
+			Logger.error(LOG, "The one-shot Shift could not type its result: %s.",
+				tostring(ok and type(result) == "table" and result.error or result))
+			return
+		end
+		_on_text_injected(action.type_text)
+		return
+	end
 	Logger.debug(LOG, "Tap action '%s'.", action)
 	local ok, err = pcall(_execute_action, action, "tap_hold")
 	if not ok then Logger.error(LOG, "Tap action '%s' failed: %s.", action, tostring(err)) end
+end
+
+--- Reads what the one-shot Shift types for a character, from the table the
+--- Windows driver reads too (_shared/tap_hold/one_shot_shift.json).
+--- @return table { results = { [char] = result }, magic_key_result = string }
+local function _read_one_shot()
+	local path = Paths.shared("tap_hold/one_shot_shift.json")
+	local fh = io.open(path, "r")
+	if not fh then error("the one-shot Shift results are unreadable: " .. tostring(path), 0) end
+	local raw = fh:read("*a")
+	fh:close()
+	local ok, data = pcall(Json.decode, raw)
+	if not ok or type(data) ~= "table" or type(data.results) ~= "table" or type(data.magic_key_result) ~= "string" then
+		error("the one-shot Shift results are malformed: " .. tostring(path), 0)
+	end
+	local results = {}
+	for _, entry in ipairs(data.results) do results[entry.char] = entry.result end
+	return { results = results, magic_key_result = data.magic_key_result }
+end
+
+--- What the one-shot Shift types for `char` instead of its capital, if
+--- anything: the magic key's result, before any result the character has (the
+--- magic key is the user's choice), or its shared result.
+--- @param char string
+--- @return string|nil
+local function _one_shot_result(char)
+	if char == require("modules.hotstrings.magic_key").get() then return _one_shot.magic_key_result end
+	return _one_shot.results[char]
 end
 
 --- Whether the engine should be in the hook now.
@@ -79,9 +126,40 @@ local function _apply()
 	end
 end
 
+--- The ids a tap can be set to, as a set: the key taps the engine types
+--- itself, the one-shot Shift, and every catalogue action this driver runs.
+--- @return table id -> true
+local function _tap_action_set()
+	local set = { one_shot_shift = true }
+	for id in pairs(Engine.KEY_TAPS) do set[id] = true end
+	for id in pairs(EmitActions) do set[id] = true end
+	for _, id in ipairs(_action_names()) do
+		if type(id) == "string" and id ~= "" then set[id] = true end
+	end
+	set.none = nil
+	return set
+end
+
+--- Warns about every tap the configuration asks for that this driver cannot
+--- run: the key would otherwise hold as configured and do nothing on a tap,
+--- with the only trace a DEBUG line at each press.
+local function _warn_unsupported_taps()
+	local supported = _tap_action_set()
+	for _, key_id in ipairs(Engine.KEY_ORDER) do
+		local key = _loaded.keys[key_id]
+		local tap = key and key.enabled ~= false and key.tap_action
+		if type(tap) == "string" and tap ~= "" and tap ~= "none" and not supported[tap] then
+			Logger.warn(LOG, "Tap-hold key '%s': tap action '%s' has no Linux implementation — its tap does nothing.",
+				key_id, tap)
+		end
+	end
+end
+
 --- Reads the files and builds a fresh engine; the old one stays until _apply().
 local function _load()
 	_loaded = Config.load(_defaults_path, _user_path)
+	_one_shot = _read_one_shot()
+	_warn_unsupported_taps()
 	local count = 0
 	for _, key in pairs(_loaded.keys) do
 		if key.enabled ~= false then count = count + 1 end
@@ -90,6 +168,11 @@ local function _load()
 		keys = _loaded.keys,
 		tap_min_ms = Timings.ms("tap_hold", "tap_min_duration_ms"),
 		one_shot_timeout_ms = Timings.ms("tap_hold", "one_shot_shift_timeout_ms"),
+		key_text = function(code) return _hook.key_text(code) end,
+		plan_text = function(text) return (require("adapters.keyboard_layout").plan(text)) end,
+		one_shot_result = _one_shot_result,
+		held_modifiers = function() return _hook.held_modifiers() end,
+		held_text_modifier_codes = function() return _hook.held_text_modifier_codes() end,
 	})
 	Logger.info(LOG, "Tap-holds loaded: %d key(s), feature %s.", count, _loaded.enabled and "on" or "off")
 end
@@ -107,14 +190,19 @@ end
 
 --- Loads the configuration and installs the engine.
 --- @param opts table { keyboard_hook, execute_action(action, binding),
----   action_names() -> ids, defaults_path, user_path }
+---   action_names() -> ids, on_text_injected(text), told of each one-shot
+---   result the injector typed, defaults_path, user_path }
 function M.init(opts)
 	if _initialized then error("tap-hold manager already initialised", 2) end
 	if type(opts) ~= "table" then error("tap-hold manager options must be a table", 2) end
-	if type(opts.keyboard_hook) ~= "table" or type(opts.keyboard_hook.set_remapper) ~= "function" then
-		error("tap-hold manager requires a keyboard hook with set_remapper()", 2)
+	if type(opts.keyboard_hook) ~= "table" or type(opts.keyboard_hook.set_remapper) ~= "function"
+		or type(opts.keyboard_hook.key_text) ~= "function"
+		or type(opts.keyboard_hook.held_modifiers) ~= "function"
+		or type(opts.keyboard_hook.held_text_modifier_codes) ~= "function" then
+		error("tap-hold manager requires a keyboard hook with set_remapper(), key_text(), held_modifiers() "
+			.. "and held_text_modifier_codes()", 2)
 	end
-	for _, name in ipairs({ "execute_action", "action_names" }) do
+	for _, name in ipairs({ "execute_action", "action_names", "on_text_injected" }) do
 		if type(opts[name]) ~= "function" then error("tap-hold manager requires " .. name, 2) end
 	end
 	for _, name in ipairs({ "defaults_path", "user_path" }) do
@@ -126,6 +214,7 @@ function M.init(opts)
 	_hook = opts.keyboard_hook
 	_execute_action = opts.execute_action
 	_action_names = opts.action_names
+	_on_text_injected = opts.on_text_injected
 	_defaults_path = opts.defaults_path
 	_user_path = opts.user_path
 	_enabled, _paused = true, false
@@ -216,18 +305,8 @@ end
 --- @return table
 function M.tap_actions()
 	_require_init()
-	local seen = { none = true }
 	local ids = {}
-	local function add(id)
-		if type(id) == "string" and id ~= "" and not seen[id] then
-			seen[id] = true
-			ids[#ids + 1] = id
-		end
-	end
-	for id in pairs(Engine.KEY_TAPS) do add(id) end
-	add("one_shot_shift")
-	for id in pairs(EmitActions) do add(id) end
-	for _, id in ipairs(_action_names()) do add(id) end
+	for id in pairs(_tap_action_set()) do ids[#ids + 1] = id end
 	table.sort(ids)
 	return ids
 end
@@ -250,15 +329,14 @@ function M.hold_options()
 	return HoldOptions.build(_loaded.hold_picker)
 end
 
---- Whether a hold option exists.
---- @param kind string
+--- The canonical id of a hold choice, as the writer stores it and the loader
+--- reads it back ("shift+ctrl" is "ctrl+shift").
+--- @param kind string "none", "modifier" or "layer".
 --- @param id string
---- @return boolean
-function M.is_hold_option(kind, id)
-	for _, option in ipairs(M.hold_options()) do
-		if option.kind == kind and option.id == id then return true end
-	end
-	return false
+--- @return string|nil canonical, string|nil err Why it is not a hold option.
+function M.canonical_hold(kind, id)
+	_require_init()
+	return HoldOptions.canonical(kind, id, _loaded.hold_picker)
 end
 
 --- The one tap/hold threshold of the configuration, in milliseconds, for the
@@ -285,6 +363,7 @@ end
 function M._reset_for_test()
 	if _hook then _hook.set_remapper(nil) end
 	_initialized, _hook, _execute_action, _action_names, _loaded, _engine = false, nil, nil, nil, nil, nil
+	_on_text_injected = nil
 	_enabled, _paused = true, false
 end
 

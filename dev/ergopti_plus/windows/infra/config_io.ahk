@@ -1646,27 +1646,42 @@ ReloadWithDefaultConfig(*) {
 		}
 		; Keep the destructive owner through Reload. Releasing here lets an
 		; interrupting trigger edit repopulate the reset file or leave a fresh WAL
-		; that makes Reload refuse after the user's files were already removed.
-		Reloaded := ReloadPreservingSuspend(0, OwnerBundle)
-		if (Reloaded is Integer) && Reloaded == 1
+		; that makes Reload refuse after the user's files were already removed. A
+		; launched reload owns the bundle until OnExit; a later refusal hands it
+		; back to the same rollback a refused launch runs here.
+		Reloaded := ReloadPreservingSuspend(0, OwnerBundle,
+			ConfigTransitionSettleRefusedReload.Bind(
+				_ConfigResetRollbackRefusedReload, OwnerBundle))
+		if (Reloaded is Integer) && Reloaded == 1 {
+			ReleaseBundle := false
 			return true
-		RollbackResult := ConfigTransitionRollbackOwned(_PathsFile, OwnerBundle)
-		if !ConfigTransitionResultIs(RollbackResult, "recovered_old")
-				&& !ConfigTransitionResultIs(RollbackResult, "absent") {
-			ConfigTransitionLogFailure("ConfigResetRollback", RollbackResult)
-			if ConfigTransitionRetainBarrier(OwnerBundle)
-				ReleaseBundle := false
-			_ConfigResetShowFailure(
-				"dialog.reset_defaults.reason.rollback", RollbackResult)
-		} else
-			_ConfigResetShowFailure(
-				"dialog.reset_defaults.reason.reload_refused")
+		}
+		if _ConfigResetRollbackRefusedReload(OwnerBundle)
+			ReleaseBundle := false
 		return false
 		} finally {
 			if ReleaseBundle
 				_ConfigWriteTerminalRelease(OwnerBundle)
 		}
 		} finally Critical(PreviousCritical)
+}
+
+; Restores the files a reset removed after its reload was refused.
+; @returns {Boolean} True when the rollback failed and the barrier stays
+;   retained around the unresolved transition, so the bundle must not be released.
+_ConfigResetRollbackRefusedReload(OwnerBundle) {
+	global _PathsFile
+	RollbackResult := ConfigTransitionRollbackOwned(_PathsFile, OwnerBundle)
+	if ConfigTransitionResultIs(RollbackResult, "recovered_old")
+			|| ConfigTransitionResultIs(RollbackResult, "absent") {
+		_ConfigResetShowFailure("dialog.reset_defaults.reason.reload_refused")
+		return false
+	}
+	ConfigTransitionLogFailure("ConfigResetRollback", RollbackResult)
+	Retained := ConfigTransitionRetainBarrier(OwnerBundle)
+	_ConfigResetShowFailure("dialog.reset_defaults.reason.rollback",
+		RollbackResult)
+	return Retained
 }
 
 ReadScriptShortcutsConfig() {
@@ -1685,13 +1700,65 @@ ReadScriptShortcutsConfig() {
 		}
 }
 
-ResetScriptComboKeys(SuffixSC) {
+; How often the chord cleanup looks again for the release of an AltGr the user
+; still held when the chord ended.
+global SCRIPT_COMBO_ALTGR_RELEASE_POLL_MS := 50
+; Arms that next look. A global holding a function, as _TapHoldKeyIsDown is, so
+; tests arm no real timer. It names a wrapper in this file: the timer adapter is
+; not included where this file is loaded alone (the feature-state boot smoke).
+global _ScriptComboArmFn := _ScriptComboArmTimer
+
+_ScriptComboArmTimer(Callback, DelayMs) {
+		return TimerArmOneShotMs(Callback, DelayMs)
+}
+
+; Clears the Kana AltGr a script chord may leave logically down, once the
+; chord's suffix key is up. A tap-hold that holds AltGr keeps it: its owner
+; releases it, and a raw Up here ended the hold while the owner still counted it.
+; A user still holding AltGr keeps it too: an Up now ended the layout's AltGr for
+; the rest of that hold. Their release normally lifts the key, but one a hotkey
+; swallowed would leave it latched, so the cleanup looks again once they let go.
+; @param ReleaseFn {Func} Test seam; production releases through the hook.
+ResetScriptComboKeys(SuffixSC, ReleaseFn := 0) {
 		global _ALTGR_KANA_FIXUP
 		if !(IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP)
 				return
 		KeyWait(SuffixSC, "T2")
-		if !GetKeyState(SuffixSC, "P")
-				SendEvent("{SC138 Up}")
+		if GetKeyState(SuffixSC, "P")
+				return
+		_ScriptComboClearAltGr(KS_AltGrKeyName(), A_SendLevel,
+				HasMethod(ReleaseFn, "Call") ? ReleaseFn : _ScriptComboReleaseThroughHook, false)
+}
+
+; Releases Name unless its tap-hold owner holds it, once the user no longer
+; holds it physically; until then it looks again every
+; SCRIPT_COMBO_ALTGR_RELEASE_POLL_MS. After such a wait (Waited) only a key the
+; user's release left logically down is released: one that went through needs
+; no second Up, which could land on their next press. Level is the chord
+; hotkey's SendLevel, kept for the Up sent from a timer thread.
+_ScriptComboClearAltGr(Name, Level, ReleaseFn, Waited) {
+		global _TapHoldKeyIsDown, _ScriptComboArmFn, SCRIPT_COMBO_ALTGR_RELEASE_POLL_MS
+		if _TapHoldKeyIsDown.Call(Name, "P") {
+				_ScriptComboArmFn.Call(_ScriptComboClearAltGr.Bind(Name, Level, ReleaseFn, true),
+						SCRIPT_COMBO_ALTGR_RELEASE_POLL_MS)
+				return
+		}
+		if (Waited and !_TapHoldKeyIsDown.Call(Name, ""))
+				return
+		PreviousLevel := A_SendLevel
+		SendLevel(Level)
+		try
+				TapHoldReleaseUnlessOwned(Name, ReleaseFn)
+		finally
+				SendLevel(PreviousLevel)
+}
+
+; The chord's Up goes out as SendEvent at the chord hotkey's own SendLevel (3),
+; which the driver's hook processes like a key event and so also clears its own
+; record of the key being down. A TextSender Up at level 0 is hidden from it.
+_ScriptComboReleaseThroughHook(Name) {
+		SendEvent("{" . Name . " Up}")
+		return true
 }
 
 ; The ONLY actions allowed to run while the driver is suspended. The script AltGr

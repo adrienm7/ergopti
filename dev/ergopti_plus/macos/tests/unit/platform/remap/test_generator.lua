@@ -164,7 +164,7 @@ helpers.describe("Generator.build_karabiner_json: structural skeleton", function
 		local state = make_state({
 			tap_hold_timeout_ms       = 175,
 			simultaneous_threshold_ms = 80,
-			tap_hold_config = { right_command = { tap = "cmd", hold = "none" } },
+			tap_hold_config = { right_command = { tap = "none", hold = "cmd" } },
 		})
 		local result = Generator.build_karabiner_json(
 			state, {NONE_ACTION, CMD_ACTION}, {RCMD_KEY_DEF}, {}, nil, "/fake/data_dir/"
@@ -279,24 +279,23 @@ helpers.describe("Generator.build_karabiner_json: tap/hold rules", function()
 		helpers.assert_true(found_passthrough, "expected a passthrough rule for none/none slots")
 	end)
 
-	helpers.it("uses to_if_alone for every delayed tap-hold key, including Space and Enter", function()
-		-- Karabiner's to_if_alone contract cancels the tap when another key,
-		-- pointing button, or scroll-wheel event occurs before key-up. Cover the
-		-- complete macOS key catalogue here so this safety never becomes specific
-		-- to modifiers or to one configured action.
+	--- Builds one tap-hold rule per catalogue key with the same two slots.
+	--- @param hold_action table|nil Hold action; nil leaves the hold empty.
+	--- @return table manipulators Key id → its single manipulator.
+	local function tap_hold_matrix(hold_action)
 		local ids = {
 			"escape", "tab", "caps_lock", "left_shift", "fn", "left_control",
 			"left_option", "left_command", "spacebar", "right_command",
 			"right_option", "right_shift", "return_or_enter", "delete_or_backspace",
 		}
-		local matrix_tap_action = {
-			id = "matrix_tap",
-			label = "Matrix tap",
-			karabiner_to = { { key_code = "f18" } },
+		local actions = {
+			NONE_ACTION,
+			{ id = "matrix_tap", label = "Matrix tap", karabiner_to = { { key_code = "f18" } } },
 		}
+		if hold_action then actions[#actions + 1] = hold_action end
 		local config, key_defs = {}, {}
 		for _, id in ipairs(ids) do
-			config[id] = { tap = "matrix_tap", hold = "none" }
+			config[id] = { tap = "matrix_tap", hold = hold_action and hold_action.id or "none" }
 			key_defs[#key_defs + 1] = {
 				id = id,
 				label = "matrix:" .. id,
@@ -306,7 +305,7 @@ helpers.describe("Generator.build_karabiner_json: tap/hold rules", function()
 
 		local result = Generator.build_karabiner_json(
 			make_state({ tap_hold_config = config }),
-			{NONE_ACTION, matrix_tap_action}, key_defs, {}, nil, "/fake/data_dir/"
+			actions, key_defs, {}, nil, "/fake/data_dir/"
 		)
 		local found = {}
 		for _, rule in ipairs(result.profiles[1].complex_modifications.rules) do
@@ -315,21 +314,52 @@ helpers.describe("Generator.build_karabiner_json: tap/hold rules", function()
 			if id then
 				local manip = rule.manipulators and rule.manipulators[1]
 				helpers.assert_true(type(manip) == "table", "missing manipulator for " .. id)
-				helpers.assert_true(type(manip.to_if_alone) == "table" and #manip.to_if_alone > 0,
-					"tap output must stay in to_if_alone for pointer cancellation: " .. id)
-				found[id] = true
+				found[id] = manip
 			end
 		end
 		for _, id in ipairs(ids) do
-			helpers.assert_true(found[id] == true, "missing tap-hold matrix rule for " .. id)
+			helpers.assert_true(found[id] ~= nil, "missing tap-hold matrix rule for " .. id)
+		end
+		return found
+	end
+
+	helpers.it("uses to_if_alone for every delayed tap-hold key, including Space and Enter", function()
+		-- Karabiner's to_if_alone contract cancels the tap when another key,
+		-- pointing button, or scroll-wheel event occurs before key-up. Cover the
+		-- complete macOS key catalogue here so this safety never becomes specific
+		-- to modifiers or to one configured action.
+		for id, manip in pairs(tap_hold_matrix(CMD_ACTION)) do
+			helpers.assert_true(type(manip.to_if_alone) == "table" and #manip.to_if_alone == 1
+				and manip.to_if_alone[1].key_code == "f18",
+				"tap output must stay in to_if_alone for pointer cancellation: " .. id)
 		end
 	end)
 
-	helpers.it("logs one physical press and release from every sticky companion", function()
+	helpers.it("sends the tap of every key with no hold at key down, and only it (tap-only-key-types-its-tap)", function()
+		-- A key with nothing to hold has no tap to wait for: its tap goes out at
+		-- key down and repeats, like the native key. Sending the physical key
+		-- there and the tap at release typed two keys for one tap, and a tap
+		-- left in to_if_alone is lost whenever the next key goes down first.
+		for id, manip in pairs(tap_hold_matrix(nil)) do
+			helpers.assert_nil(manip.to_if_alone, "a key with no hold has no delayed tap: " .. id)
+			local sent = {}
+			for _, event in ipairs(manip.to or {}) do
+				if event.key_code ~= nil then sent[#sent + 1] = event.key_code end
+			end
+			helpers.assert_eq(table.concat(sent, ","), "f18",
+				"a key with no hold must send its tap, and only it, at key down: " .. id)
+		end
+	end)
+
+	helpers.it("gives a sticky key one rule that arms the tap and logs one press and release (sticky-tap-under-held-modifier)", function()
+		-- A manipulator gated on another key being held used to precede this rule
+		-- and send the plain modifier with no tap: under any held modifier key the
+		-- one-shot never armed, while the main rule's hold already sent the same
+		-- modifier. The key's own rule must be the only one that can take it.
 		local sticky_shift = {
 			id = "sticky_shift",
 			label = "Sticky Shift",
-			karabiner_to = { { set_variable = { name = "sticky_shift", value = 1 } } },
+			karabiner_to = { { sticky_modifier = { left_shift = "toggle" } } },
 		}
 		local shift = {
 			id = "shift",
@@ -362,46 +392,33 @@ helpers.describe("Generator.build_karabiner_json: tap/hold rules", function()
 			end
 		end
 		helpers.assert_not_nil(sticky_rule, "the sticky-equivalent rule must be generated")
-		helpers.assert_true(#sticky_rule.manipulators > 1,
-			"the fixture must exercise companion manipulators before the main rule")
+		helpers.assert_eq(#sticky_rule.manipulators, 1,
+			"a manipulator placed before the key's own rule would take its tap under a held key")
+
+		local manipulator = sticky_rule.manipulators[1]
+		for _, condition in ipairs(manipulator.conditions or {}) do
+			helpers.assert_true(not tostring(condition.name):find("ke_held_", 1, true),
+				"the sticky key's rule must not depend on another key being held: " .. tostring(condition.name))
+		end
+		helpers.assert_true(type(manipulator.to_if_alone) == "table"
+			and type(manipulator.to_if_alone[1]) == "table"
+			and type(manipulator.to_if_alone[1].sticky_modifier) == "table",
+			"the tap must arm the one-shot")
+		helpers.assert_eq(manipulator.to[#manipulator.to].key_code, "left_shift",
+			"the hold must send the plain modifier")
 
 		local press_command = "echo 'right_option' >> '/tmp/ergopti_test/metrics/karabiner_kc.log'"
 		local release_command = "echo 'U:right_option' >> '/tmp/ergopti_test/metrics/karabiner_kc.log'"
-		local press_events = {}
-		local release_events = {}
-		local held_left_command_covered = false
-		for index, manipulator in ipairs(sticky_rule.manipulators) do
-			local press_count = 0
-			for _, event in ipairs(manipulator.to or {}) do
-				if event.shell_command == press_command then
-					press_count = press_count + 1
-					helpers.assert_nil(press_events[event],
-						"each manipulator must own a fresh press event")
-					press_events[event] = true
-				end
-			end
-			local release_count = 0
-			for _, event in ipairs(manipulator.to_after_key_up or {}) do
-				if event.shell_command == release_command then
-					release_count = release_count + 1
-					helpers.assert_nil(release_events[event],
-						"each manipulator must own a fresh release event")
-					release_events[event] = true
-				end
-			end
-			helpers.assert_eq(press_count, 1,
-				"manipulator " .. index .. " must log one physical press")
-			helpers.assert_eq(release_count, 1,
-				"manipulator " .. index .. " must log one physical release")
-			for _, condition in ipairs(manipulator.conditions or {}) do
-				if condition.name == "ergopti_ke_held_left_command_" .. TEST_LEASE_TOKEN
-					and condition.value == 1 then
-					held_left_command_covered = true
-				end
-			end
+		local press_count = 0
+		for _, event in ipairs(manipulator.to or {}) do
+			if event.shell_command == press_command then press_count = press_count + 1 end
 		end
-		helpers.assert_true(held_left_command_covered,
-			"the regression must cover the live sticky-while-command companion")
+		local release_count = 0
+		for _, event in ipairs(manipulator.to_after_key_up or {}) do
+			if event.shell_command == release_command then release_count = release_count + 1 end
+		end
+		helpers.assert_eq(press_count, 1, "the rule must log one physical press")
+		helpers.assert_eq(release_count, 1, "the rule must log one physical release")
 	end)
 
 	helpers.it("emits a native Shift hold in Karabiner's immediate transaction", function()
@@ -465,7 +482,7 @@ helpers.describe("Generator.build_karabiner_json: per-key tap/hold timeout overr
 
 	helpers.it("emits per-manipulator basic.to_if_alone_timeout_milliseconds when timeout_ms is set", function()
 		local state = make_state({
-			tap_hold_config = { right_command = { tap = "cmd", hold = "none", timeout_ms = 333 } },
+			tap_hold_config = { right_command = { tap = "none", hold = "cmd", timeout_ms = 333 } },
 		})
 		local result = Generator.build_karabiner_json(
 			state, {NONE_ACTION, CMD_ACTION}, {RCMD_KEY_DEF}, {}, nil, "/fake/data_dir/"
@@ -479,7 +496,7 @@ helpers.describe("Generator.build_karabiner_json: per-key tap/hold timeout overr
 
 	helpers.it("copies the managed default when no per-key timeout is set", function()
 		local state = make_state({
-			tap_hold_config = { right_command = { tap = "cmd", hold = "none" } },
+			tap_hold_config = { right_command = { tap = "none", hold = "cmd" } },
 		})
 		local result = Generator.build_karabiner_json(
 			state, {NONE_ACTION, CMD_ACTION}, {RCMD_KEY_DEF}, {}, nil, "/fake/data_dir/"
@@ -492,7 +509,7 @@ helpers.describe("Generator.build_karabiner_json: per-key tap/hold timeout overr
 
 	helpers.it("treats a non-positive per-key timeout as the managed default", function()
 		local state = make_state({
-			tap_hold_config = { right_command = { tap = "cmd", hold = "none", timeout_ms = 0 } },
+			tap_hold_config = { right_command = { tap = "none", hold = "cmd", timeout_ms = 0 } },
 		})
 		local result = Generator.build_karabiner_json(
 			state, {NONE_ACTION, CMD_ACTION}, {RCMD_KEY_DEF}, {}, nil, "/fake/data_dir/"
@@ -505,7 +522,7 @@ helpers.describe("Generator.build_karabiner_json: per-key tap/hold timeout overr
 	helpers.it("does not emit a profile-global timeout beside a per-key override", function()
 		local state = make_state({
 			tap_hold_timeout_ms = 250,
-			tap_hold_config     = { right_command = { tap = "cmd", hold = "none", timeout_ms = 333 } },
+			tap_hold_config     = { right_command = { tap = "none", hold = "cmd", timeout_ms = 333 } },
 		})
 		local result = Generator.build_karabiner_json(
 			state, {NONE_ACTION, CMD_ACTION}, {RCMD_KEY_DEF}, {}, nil, "/fake/data_dir/"
@@ -905,7 +922,7 @@ helpers.describe("Generator — same_output uses deep structural equality (karab
 		-- Selected by a declaration unique to platform/remap/generator.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
-		local src = helpers.read_driver_source("local function build_sticky_companion_manipulators")
+		local src = helpers.read_driver_source("local function build_chord_combo_rule")
 		helpers.assert_true(src ~= nil, "platform/remap/generator.lua source must be locatable")
 		-- hs.json.encode on two logically identical Lua tables can return different
 		-- strings because Lua hash-table iteration order is non-deterministic.
@@ -919,7 +936,7 @@ helpers.describe("Generator — same_output uses deep structural equality (karab
 		-- Selected by a declaration unique to platform/remap/generator.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
-		local src = helpers.read_driver_source("local function build_sticky_companion_manipulators")
+		local src = helpers.read_driver_source("local function build_chord_combo_rule")
 		helpers.assert_true(src ~= nil, "platform/remap/generator.lua source must be locatable")
 		helpers.assert_true(
 			src:find("local function deep_equal", 1, true) ~= nil,
@@ -976,16 +993,13 @@ end)
 -- ==========================================================================================================
 
 helpers.describe("Generator — simultaneous chord rule permits incidental modifiers (modifier-pair-chord-optional-any)", function()
-	-- Root cause: build_chord_combo_rule emitted the KE `from` straight from the
-	-- mod_combos entry, which carries a `simultaneous` set but NO `modifiers`. For a
-	-- chord built from MODIFIER keys (right_command + left_command), the first key
-	-- down already raises its command flag, and KE by default rejects any undeclared
-	-- modifier — so the chord failed to match and fell through to left_command's own
-	-- single-key tap rule (a bare backspace). Every sibling rule builder declares
+	-- Karabiner v16 tests a chord's modifiers on its first key's key_down, before
+	-- either chord key reaches the output (manipulator_manager.hpp posts a key only
+	-- once every manipulator has passed it). Without a modifiers block the chord
+	-- matches only with nothing else held; every sibling rule builder declares
 	-- `modifiers.optional = {"any"}` (the tap/hold combo path, and every layer_keys
-	-- rule); the chord path alone did not. The fix adds it so a modifier-pair chord
-	-- matches regardless of the flags its own keys raise, restoring ⌥⌫ (delete word
-	-- left) instead of a lone backspace.
+	-- rule), so the chord accepts an unrelated held modifier too. The chord's own
+	-- keys are never among the tested flags: requiring them made it unreachable.
 	local OPT_BACKSPACE = {
 		id           = "opt_backspace",
 		label        = "opt_backspace",
@@ -1046,9 +1060,15 @@ helpers.describe("Generator — simultaneous chord rule permits incidental modif
 			combo_state(), { NONE_ACTION, OPT_BACKSPACE }, {}, { RCMD_LCMD }, {}, "/fake/data_dir/"
 		)
 		local m = chord_manipulator(result)
-		helpers.assert_true(m ~= nil and type(m.to) == "table" and m.to[1] ~= nil, "chord must carry a `to` output")
-		helpers.assert_eq(m.to[1].key_code, "delete_or_backspace", "chord output key must be delete_or_backspace")
-		helpers.assert_true(type(m.to[1].modifiers) == "table" and m.to[1].modifiers[1] == "left_option",
+		helpers.assert_true(m ~= nil and type(m.to) == "table", "chord must carry a `to` output")
+		-- The first key event: the chord also records its first key's held state.
+		local output = nil
+		for _, event in ipairs(m.to) do
+			if output == nil and event.key_code ~= nil then output = event end
+		end
+		helpers.assert_true(output ~= nil, "chord must send a key")
+		helpers.assert_eq(output.key_code, "delete_or_backspace", "chord output key must be delete_or_backspace")
+		helpers.assert_true(type(output.modifiers) == "table" and output.modifiers[1] == "left_option",
 			"chord output must carry left_option — the ⌥⌫ delete-word modifier that was being lost")
 	end)
 
@@ -1062,13 +1082,10 @@ helpers.describe("Generator — simultaneous chord rule permits incidental modif
 			"symmetric chord from.modifiers.optional must also contain 'any'")
 	end)
 
-	-- Regression (modifier-pair-chord-mandatory-consume): the previous fix made the
-	-- chord MATCH via optional:any, but KE passes optional modifiers THROUGH to the
-	-- output. A right_command+left_command chord whose output is ⌥⌫ then fires as
-	-- ⌘⌥⌫, and ⌘⌫ (delete-to-line-start) overrides ⌥⌫ (delete-word-left) — so
-	-- rcmd+lcmd did "nothing useful" while its rcmd+left_option sibling worked (a
-	-- leaked ⌘ is inert for ⌥⌦ delete-word-right). The chord's own modifier keys
-	-- must be declared mandatory so KE CONSUMES their flags.
+	-- Regression (chord-matches-its-own-modifier-keys): listing the chord's own
+	-- modifier keys as mandatory, meant to keep their ⌘ out of the ⌥⌫ output, made
+	-- the chord unreachable, since neither key is in the output flags Karabiner
+	-- tests at the first key's key_down, and there is no such ⌘ to remove.
 	local function mandatory_set(mods)
 		local set = {}
 		if type(mods) == "table" and type(mods.mandatory) == "table" then
@@ -1077,29 +1094,29 @@ helpers.describe("Generator — simultaneous chord rule permits incidental modif
 		return set
 	end
 
-	helpers.it("consumes the chord's own command flags as mandatory so ⌘ cannot leak into ⌥⌫", function()
+	helpers.it("never requires the chord's own command keys as mandatory (chord-matches-its-own-modifier-keys)", function()
 		local result = Generator.build_karabiner_json(
 			combo_state(), { NONE_ACTION, OPT_BACKSPACE }, {}, { RCMD_LCMD }, {}, "/fake/data_dir/"
 		)
 		local m = chord_manipulator(result)
 		helpers.assert_true(m ~= nil, "a [chord] rule must be generated for the rcmd_lcmd combo slot")
 		local mand = mandatory_set(m.from.modifiers)
-		helpers.assert_true(mand.right_command == true,
-			"right_command must be mandatory (consumed) so the chord's ⌘ flag is removed from the ⌥⌫ output")
-		helpers.assert_true(mand.left_command == true,
-			"left_command must be mandatory (consumed) so the chord's ⌘ flag is removed from the ⌥⌫ output")
+		helpers.assert_nil(mand.right_command,
+			"right_command cannot be held in the output when its own chord is tested")
+		helpers.assert_nil(mand.left_command,
+			"left_command cannot be held in the output when its own chord is tested")
 		helpers.assert_true(optional_has_any(m.from.modifiers),
 			"optional:any must remain so unrelated incidental modifiers still match")
 	end)
 
-	helpers.it("consumes the mandatory flags in symmetric mode too", function()
+	helpers.it("never requires the chord's own keys in symmetric mode either", function()
 		local result = Generator.build_karabiner_json(
 			combo_state({ combo_symmetric = true }), { NONE_ACTION, OPT_BACKSPACE }, {}, { RCMD_LCMD }, {}, "/fake/data_dir/"
 		)
 		local m = chord_manipulator(result)
 		local mand = mandatory_set(m.from.modifiers)
-		helpers.assert_true(mand.right_command == true and mand.left_command == true,
-			"both command keys must be consumed as mandatory in symmetric mode")
+		helpers.assert_true(mand.right_command == nil and mand.left_command == nil,
+			"neither command key may be mandatory in symmetric mode")
 	end)
 
 	-- A chord built from NON-modifier keys raises no modifier flags, so nothing must

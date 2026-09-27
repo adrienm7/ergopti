@@ -10,12 +10,13 @@
 ; existing flush / ingest tick handles persistence.
 ;
 ; FEATURES & RATIONALE:
-; 1. Passive observation: ``InputHook("V L0")`` runs visible (events
+; 1. Passive observation: ``InputHook("V L0 I1")`` runs visible (events
 ;    keep flowing to apps) and accepts every key (``L0`` = no length
-;    cutoff). We deliberately do NOT pass ``I0`` because the layout's
+;    cutoff). The minimum send level stays at 1 because the layout's
 ;    remap hotkeys (``*X::Send "y"``) consume the raw key — InputHook
-;    only sees the resolved ``Send`` output. ``I0`` would filter that
-;    out and we would capture nothing at all.
+;    only sees the resolved ``Send`` output, sent at level 2. A higher
+;    level would filter that out and we would capture nothing at all;
+;    level 0 is the driver's own TextSender output, which is not typing.
 ; 2. Two complementary callbacks:
 ;    - OnChar(ih, c)            — printable characters AFTER the layout
 ;                                  has resolved deadkeys / remaps. This
@@ -420,7 +421,7 @@ KL_Hook_OnChar(ih, c) {
 				Keylogger.buffer_events.Push([recorded, delay, meta])
 				Keylogger.buffer_text .= recorded
 				if !Keylogger.synth_active {
-						try KL_Ergo_OnKeystroke(delay, KLHook.last_vk)
+						try KL_Ergo_OnKeystroke(delay, KLHook.last_vk, KLHook.last_sc)
 						try KL_Roi_OnChar(c)
 						; Feed the real-time WPM widget with each accepted manual keystroke.
 						try WPMWidget_Push(false, false)
@@ -469,7 +470,7 @@ KL_Hook_OnKeyDown(ih, vk, sc) {
 				filtered := true
 				if Keylogger.initialized {
 						sk := ""
-						try sk := KL_Watchers_DetectShortcut(vk)
+						try sk := KL_Watchers_DetectShortcut(vk, sc)
 						if (sk != "") {
 								try filtered := MF_ShouldFilter()
 								catch as FilterErr
@@ -536,7 +537,7 @@ KL_Hook_OnKeyDown(ih, vk, sc) {
 				; rather than re-decided per call site.
 				Keylogger.buffer_events.Push([KL_Hook_RecordedChar(bracket), delay, meta])
 				if !Keylogger.synth_active {
-						try KL_Ergo_OnKeystroke(delay, vk, vk = 0x08)
+						try KL_Ergo_OnKeystroke(delay, vk, sc, vk = 0x08)
 				} else {
 						KLHook.last_tick := 0
 				}
@@ -626,7 +627,7 @@ KL_Hook_Start() {
 
 		; Subscribe the keylogger's keyboard handlers to the shared HookDispatcher
 		; instead of opening a second InputHook. The dispatcher already owns the
-		; process-wide InputHook (identical "V L0" + KeyOpt {All} +N + NotifyNonText
+		; process-wide InputHook (identical "V L0 I1" + KeyOpt {All} +N + NotifyNonText
 		; options) and already carries the keylogger's mouse subscribers, so this
 		; collapses one per-keystroke hook callback into the shared fan-out.
 		; Dispatch gates on A_IsSuspended, so the handlers stay silent under pause

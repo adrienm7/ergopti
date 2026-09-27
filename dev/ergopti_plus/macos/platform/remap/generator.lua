@@ -17,14 +17,19 @@
 --- 2. Physical State Tracking: every tap/hold rule sets ke_held_<key_code>=1
 ---    on key_down and clears it on key_up, letting combo and sentinel rules
 ---    distinguish real physical presses from emulated tap outputs.
---- 3. Sticky-Equivalent Companions: when a key's tap/hold pair is
----    sticky_X/X, companion manipulators fire the base modifier immediately
----    whenever another modifier-class key is already held, so combined chords
----    like Cmd+(sticky-shift key) work without entering the sticky path.
+--- 3. One Rule Per Key: a tap/hold key has a single manipulator, whatever else
+---    is held. Its hold sends the hold action at key_down and its tap stays a
+---    tap, so a one-shot (sticky_X) tapped under a held modifier still arms;
+---    nothing gated on another held key may take the press before it.
 --- 4. Mode-Gated Merge: every manipulator carries one generation mode and one
 ---    irreversible revocation condition; regeneration replaces only exact
 ---    managed rule tags while preserving personal rules, parameters, profiles,
 ---    devices, mappings, virtual HID settings, and global Karabiner preferences.
+--- 5. Exact-Modifier Triggers: an action marked `exact_modifiers` in
+---    actions.json is a Hammerspoon trigger told apart only by its modifiers,
+---    so every rule sending one claims and lifts all held modifiers but Caps
+---    Lock around it (exact_modifier_manipulators), and a hold on the same key
+---    keeps them.
 --- ==============================================================================
 
 local M = {}
@@ -53,48 +58,43 @@ local ALWAYS_ON_RULES = {
 	"combos.json",      -- 2-letter combo mappings (e.g. Esc on R Cmd + R Ctrl)
 }
 
--- Maps a sticky variant id to its plain base-modifier action id.
--- When a key's tap slot is sticky_X and hold slot is X (or vice-versa) the key
--- is "fully remapped to X" — companion manipulators emit the base modifier
--- immediately whenever another modifier-class key is physically held.
-local STICKY_TO_BASE_ACTION = {
-	sticky_shift             = "shift",
-	sticky_ctrl              = "ctrl",
-	sticky_cmd               = "cmd",
-	sticky_option            = "alt",
-	sticky_cmd_shift         = "cmd_shift",
-	sticky_cmd_option        = "cmd_option",
-	sticky_cmd_ctrl          = "cmd_ctrl",
-	sticky_option_shift      = "option_shift",
-	sticky_option_ctrl       = "option_ctrl",
-	sticky_ctrl_shift        = "ctrl_shift",
-	sticky_cmd_option_shift  = "cmd_option_shift",
-	sticky_cmd_option_ctrl   = "cmd_option_ctrl",
-	sticky_cmd_shift_ctrl    = "cmd_shift_ctrl",
-	sticky_option_shift_ctrl = "option_shift_ctrl",
-	sticky_hyper             = "hyper",
-}
-
--- Physical keys considered as "modifier carriers" for companion-manipulator
--- matching. When any of these is held (tracked via ke_held_<key_code>=1) and
--- the user presses a sticky-equivalent key, the base modifier fires immediately.
-local MODIFIER_CLASS_KEY_CODES = {
-	"left_command", "right_command",
-	"left_control",
-	"left_option",
-	"left_shift", "right_shift",
-	"fn",
-	"caps_lock",
-}
-
--- Actual modifier key_codes as a lookup set (fn and caps_lock excluded — they
--- are not held modifiers in KE's from-field sense).
+-- The eight modifier keys: Shift, Control, Option and Command on each side.
 local ACTUAL_MODIFIER_KEY_CODES = {
 	left_option  = true, right_option  = true,
 	left_command = true, right_command = true,
 	left_control = true, right_control = true,
 	left_shift   = true, right_shift   = true,
 }
+
+-- Key codes a `to` entry counts as a modifier key: every one that raises a
+-- flag, fn included (Karabiner's momentary_switch_event make_modifier_flag).
+-- from.modifiers accepts each of them, fn too, and consumes it when mandatory.
+-- Caps Lock is a lock, not one of them.
+local FLAG_KEY_CODES = { fn = true }
+for key_code in pairs(ACTUAL_MODIFIER_KEY_CODES) do FLAG_KEY_CODES[key_code] = true end
+
+-- Karabiner's wildcard modifier name. In `optional` it lets any held modifier
+-- through; in `mandatory` it matches every state and claims every pressed flag,
+-- Caps Lock included, so Karabiner lifts them all around the rule's output.
+local ANY_MODIFIER = "any"
+
+-- Karabiner's name for the Caps Lock flag. modifier_flag_manager reports it
+-- pressed while the lock is on, and lifting a claimed Caps Lock posts Caps Lock
+-- key presses to macOS (base.hpp make_lazy_modifier_key_event, then
+-- key_event_dispatcher), toggling the lock around the rule.
+local CAPS_LOCK_MODIFIER = "caps_lock"
+
+-- Every other flag a hand can hold, each claimed by a manipulator of its own
+-- (see exact_modifier_manipulators), so no rule has to claim Caps Lock.
+local HAND_MODIFIER_FLAGS = {
+	"left_shift", "right_shift", "left_control", "right_control",
+	"left_option", "right_option", "left_command", "right_command", "fn",
+}
+
+-- Trailing `to` entry Karabiner never posts: its condition is always false.
+-- Its only effect is to make the unfiltered list end with a non-modifier key.
+local NEVER_POSTED_KEY_CODE   = "vk_none"
+local NEVER_POSTED_EXPRESSION = "0"
 
 -- Physical key and sentinel outputs for the script-control rules.
 -- These values must match the F13/F14/F15 sentinel constants consumed by
@@ -648,17 +648,103 @@ local function physical_kc_ledger_event(key_code, release)
 	}
 end
 
---- Detects a sticky-equivalent tap/hold pair and returns the base action id.
---- Pairs considered equivalent:
----   • STICKY_TO_BASE_ACTION[tap] == hold  (sticky tap, base hold)
----   • STICKY_TO_BASE_ACTION[hold] == tap  (base tap, sticky hold)
---- @param tap_id string Tap slot action id.
---- @param hold_id string Hold slot action id.
---- @return string|nil Base modifier action id or nil if the pair is not equivalent.
-local function detect_sticky_base(tap_id, hold_id)
-	if STICKY_TO_BASE_ACTION[tap_id]  == hold_id then return hold_id end
-	if STICKY_TO_BASE_ACTION[hold_id] == tap_id  then return tap_id  end
-	return nil
+--- Reports whether any given action is told apart from another only by its
+--- modifiers (actions.json `exact_modifiers`): Hammerspoon binds its trigger
+--- as an exact-match hotkey, so one added modifier runs another action.
+--- @param ... table Resolved action definitions.
+--- @return boolean exact Whether one of them is such an action.
+local function has_exact_modifier_action(...)
+	for index = 1, select("#", ...) do
+		local action = select(index, ...)
+		if type(action) == "table" and action.exact_modifiers == true then return true end
+	end
+	return false
+end
+
+--- Reports whether a `from.modifiers` lets any held modifier through.
+--- @param modifiers table|nil Karabiner from.modifiers.
+--- @return boolean open Whether `optional` contains "any".
+local function accepts_any_held_modifier(modifiers)
+	for _, name in ipairs(type(modifiers) == "table" and modifiers.optional or {}) do
+		if name == ANY_MODIFIER then return true end
+	end
+	return false
+end
+
+--- Returns the manipulators that replace one whose output is a trigger
+--- Hammerspoon tells apart only by its modifiers, removing every modifier the
+--- hand holds from that output.
+---
+--- Karabiner v16 sends a tap with the modifiers held at key_down, so a held
+--- Shift turned bare F17 (cycle_windows_in_app) into Shift+F17
+--- (alt_tab_windows). A mandatory modifier is claimed, and basic.hpp lifts the
+--- claimed flags around `to`, to_if_alone and to_after_key_up, so the trigger
+--- goes out with its own modifiers only. A mandatory "any" would claim every
+--- pressed flag, Caps Lock included while the lock is on, and lifting Caps Lock
+--- toggles it for macOS around every such rule. The rule therefore becomes one
+--- manipulator per held hand flag (mandatory that flag, optional Caps Lock),
+--- one for no held flag, and a mandatory "any" last for two flags or more, the
+--- only case left that still claims Caps Lock while it is on. Each keeps the
+--- flags the rule already claimed (a combo consuming its holder's AltGr).
+---
+--- basic.hpp presses the lifted flags again right after `to` only when the
+--- last `to` entry is not a modifier key (event_sender.hpp
+--- is_last_to_event_modifier_key_event), but only the last posted entry stays
+--- held. A hold sending a modifier would thus lose the hand's modifiers until
+--- release: Shift, then a key holding Cmd, then Z would type Cmd+Z. A trailing
+--- entry whose condition never holds settles both: filter_and_replace_events
+--- drops it before posting, so the modifier stays held, while the check reads
+--- the unfiltered list and the hand's modifiers come back at once.
+---
+--- A rule whose `from` already claims a modifier keeps it lifted through the
+--- hold by design and gets no trailer; the hand's other modifiers are lifted
+--- with it. A rule that lets only Caps Lock through never sees another held
+--- modifier and is left as is. Karabiner lifts one press per claimed flag, so
+--- a flag two held keys both press (CapsLock and Fn both holding Cmd) stays
+--- down once: no rule can remove it.
+--- @param manipulator table Manipulator; never mutated.
+--- @return table manipulators Replacement list, in match order.
+local function exact_modifier_manipulators(manipulator)
+	local from = manipulator.from
+	if not accepts_any_held_modifier(from.modifiers) then return { manipulator } end
+	local own = type(from.modifiers.mandatory) == "table" and from.modifiers.mandatory or {}
+
+	local to = manipulator.to
+	local last = type(to) == "table" and to[#to] or nil
+	if #own == 0 and type(last) == "table" and FLAG_KEY_CODES[last.key_code] then
+		local extended = {}
+		for _, event in ipairs(to) do extended[#extended + 1] = event end
+		extended[#extended + 1] = {
+			key_code   = NEVER_POSTED_KEY_CODE,
+			conditions = { { type = "expression_if", expression = NEVER_POSTED_EXPRESSION } },
+		}
+		to = extended
+	end
+
+	--- Builds one variant whose `from` requires the given modifiers.
+	--- @param modifiers table Karabiner from.modifiers.
+	--- @return table variant Fresh manipulator sharing no table with the others.
+	local function variant(modifiers)
+		local copy = deep_copy(manipulator)
+		copy.from.modifiers = modifiers
+		copy.to = deep_copy(to)
+		return copy
+	end
+
+	local owned = {}
+	for _, name in ipairs(own) do owned[name] = true end
+	local variants = {
+		variant({ mandatory = #own > 0 and deep_copy(own) or nil, optional = { CAPS_LOCK_MODIFIER } }),
+	}
+	for _, flag in ipairs(HAND_MODIFIER_FLAGS) do
+		if not owned[flag] then
+			local mandatory = deep_copy(own)
+			mandatory[#mandatory + 1] = flag
+			variants[#variants + 1] = variant({ mandatory = mandatory, optional = { CAPS_LOCK_MODIFIER } })
+		end
+	end
+	variants[#variants + 1] = variant({ mandatory = { ANY_MODIFIER } })
+	return variants
 end
 
 
@@ -671,57 +757,6 @@ end
 -- ========================================
 -- ========================================
 
-
-
--- ==============================================
--- ===== 2.1) Sticky Companion Manipulators =====
--- ==============================================
-
---- Builds the companion manipulators for a "fully remapped" sticky-equivalent key.
---- One manipulator per modifier-class tracked variable (except the key itself).
---- Each matches when its variable is 1 and fires `to = [set_var_self=1, base_to…]`
---- immediately (no to_if_alone), so the combined modifier chord appears the
---- instant the second key is pressed.
---- @param key_def table Entry from TAP_HOLD_KEYS.
---- @param base_to table karabiner_to events for the base modifier action.
---- @param var_name string Tracking variable name for the key itself.
---- @return table List of manipulators (may be empty if key is the only modifier-class key).
-local function build_sticky_companion_manipulators(key_def, base_to, var_name)
-	local manipulators = {}
-	local self_key     = key_def.from.key_code
-
-	for _, mod_key in ipairs(MODIFIER_CLASS_KEY_CODES) do
-		if mod_key ~= self_key then
-			local to_events = {
-				set_var_event(var_name, 1),
-				physical_kc_ledger_event(self_key, false),
-			}
-			for _, ev in ipairs(base_to) do to_events[#to_events + 1] = ev end
-
-			manipulators[#manipulators + 1] = {
-				type        = "basic",
-				from        = key_def.from,
-				conditions  = {
-					{ type = "variable_if", name = held_var_name(mod_key), value = 1 },
-				},
-				to              = to_events,
-				to_after_key_up = {
-					set_var_event(var_name, 0),
-					physical_kc_ledger_event(self_key, true),
-				},
-			}
-		end
-	end
-
-	return manipulators
-end
-
-
-
--- ===================================
--- ===== 2.2) Main Tap/Hold Rule =====
--- ===================================
-
 --- Builds a Karabiner rule table for a single tap / hold key.
 ---
 --- The manipulator ALWAYS tracks physical state via ke_held_<key_code>:
@@ -732,16 +767,15 @@ end
 --- variable and re-emits the original key — keys used purely as combo triggers
 --- still get physical-press tracking without any user-visible behaviour change.
 ---
---- When tap/hold is sticky-equivalent (sticky_X paired with X), companion
---- manipulators are inserted BEFORE the main manipulator so that pressing the
---- key while another modifier is held emits the base modifier immediately.
+--- The rule holds exactly one manipulator. Karabiner runs the first manipulator
+--- that matches, so a second one gated on another held key would take every
+--- press made under that key and drop the tap, a one-shot included.
 --- @param key_def table Entry from TAP_HOLD_KEYS.
 --- @param tap_action table Resolved action definition for the tap slot.
 --- @param hold_action table Resolved action definition for the hold slot.
---- @param action_index table id → action map (required for sticky-equivalent companion rules).
 --- @param tap_timeout_ms number|nil Per-key tap/hold threshold override in ms; nil inherits the global.
 --- @return table Karabiner rule object.
-local function build_tap_hold_rule(key_def, tap_action, hold_action, action_index, tap_timeout_ms)
+local function build_tap_hold_rule(key_def, tap_action, hold_action, tap_timeout_ms)
 	local tap_to   = tap_action.karabiner_to  or {}
 	local hold_to  = hold_action.karabiner_to or {}
 	local key_code = key_def.from.key_code
@@ -778,18 +812,27 @@ local function build_tap_hold_rule(key_def, tap_action, hold_action, action_inde
 	-- bridge's discriminator; bare "<key_code>" lines remain press events.
 	after_key_up_tail[#after_key_up_tail + 1] = physical_kc_ledger_event(key_code, true)
 
-	-- When one slot is "none", fall through to the original key for that slot
-	local passthrough       = { { key_code = key_code } }
-	local effective_tap_to  = (#tap_to  > 0) and tap_to  or passthrough
-	local effective_hold_to = (#hold_to > 0) and hold_to or passthrough
-
-	for _, ev in ipairs(effective_hold_to) do to_events[#to_events + 1] = ev end
-	manipulator.to = to_events
-
-	-- to_if_alone only when tap output differs from hold output
-	if not same_output(effective_tap_to, effective_hold_to) then
-		manipulator.to_if_alone = effective_tap_to
+	-- A key with a tap and no hold has nothing to wait for: it sends its tap at
+	-- key_down, where the last entry stays held and auto-repeats, like the
+	-- native key it replaces and like the Windows tap-only hotkeys. As a
+	-- to_if_alone it would type only on a release inside the tap timeout, and
+	-- any key_down arriving first would drop it (basic.hpp unset_alone_if_needed),
+	-- losing keys in fast typing. It never sends the physical key as well, which
+	-- typed two keys for one tap. A "none" tap under a hold stays the native key,
+	-- typed on release.
+	local key_down_action = hold_action
+	if #hold_to == 0 then
+		key_down_action = tap_action
+		for _, ev in ipairs(tap_to) do to_events[#to_events + 1] = ev end
+	else
+		for _, ev in ipairs(hold_to) do to_events[#to_events + 1] = ev end
+		local effective_tap_to = (#tap_to > 0) and tap_to or { { key_code = key_code } }
+		-- to_if_alone only when tap output differs from hold output
+		if not same_output(effective_tap_to, hold_to) then
+			manipulator.to_if_alone = effective_tap_to
+		end
 	end
+	manipulator.to = to_events
 
 	-- Per-key tap/hold threshold override. Karabiner honours
 	-- basic.to_if_alone_timeout_milliseconds at the manipulator level, overriding
@@ -799,35 +842,17 @@ local function build_tap_hold_rule(key_def, tap_action, hold_action, action_inde
 		manipulator.parameters = { ["basic.to_if_alone_timeout_milliseconds"] = tap_timeout_ms }
 	end
 
-	-- Merge hold action's own to_after_key_up (e.g. layer release) with set_variable=0
-	if hold_action.karabiner_to_after_key_up then
-		for _, ev in ipairs(hold_action.karabiner_to_after_key_up) do
+	-- Merge the key-down action's own to_after_key_up (e.g. layer release) with
+	-- set_variable=0
+	if key_down_action.karabiner_to_after_key_up then
+		for _, ev in ipairs(key_down_action.karabiner_to_after_key_up) do
 			after_key_up_tail[#after_key_up_tail + 1] = ev
 		end
 	end
 	manipulator.to_after_key_up = after_key_up_tail
-
-	-- Sticky-equivalent detection (sticky_X paired with X). When present, inject
-	-- companion manipulators that fire the base modifier immediately as soon as
-	-- another modifier-class key is held physically. KE picks the first matching
-	-- manipulator, so companions MUST come before the main manipulator.
 	local manipulators = { manipulator }
-	local base_id      = detect_sticky_base(tap_action.id, hold_action.id)
-	if base_id and action_index then
-		local base_action = action_index[base_id]
-		local base_to     = base_action and base_action.karabiner_to or nil
-		if base_to and #base_to > 0 then
-			local companions = build_sticky_companion_manipulators(key_def, base_to, var_name)
-			if #companions > 0 then
-				-- Prepend companions so they take priority over the main manipulator
-				local combined = {}
-				for _, m in ipairs(companions)   do combined[#combined + 1] = m end
-				for _, m in ipairs(manipulators) do combined[#combined + 1] = m end
-				manipulators = combined
-				Logger.debug(LOG, "Tap/hold '%s' sticky-equivalent to '%s' — %d companion(s) added.",
-					key_def.id, base_id, #companions)
-			end
-		end
+	if has_exact_modifier_action(tap_action, hold_action) then
+		manipulators = exact_modifier_manipulators(manipulator)
 	end
 
 	return {
@@ -855,13 +880,34 @@ end
 -- ===== 3.1) Tap/Hold Slot Rule =====
 -- ===================================
 
+--- Returns the events a tap/hold key's own rule keeps down, without typing,
+--- while the key is held: its hold, or the key itself for a modifier key with
+--- neither slot, which its passthrough rule presses. A key whose rule types at
+--- key_down (its tap, or a native non-modifier key) keeps nothing down.
+--- @param key_code string Physical key.
+--- @param tap_action table Resolved action for the key's tap slot.
+--- @param hold_action table Resolved action for the key's hold slot.
+--- @return table events `to` events kept down, possibly empty.
+local function held_key_events(key_code, tap_action, hold_action)
+	local hold_to = hold_action.karabiner_to or {}
+	if #hold_to > 0 then return hold_to end
+	if #(tap_action.karabiner_to or {}) == 0 and FLAG_KEY_CODES[key_code] then
+		return { { key_code = key_code } }
+	end
+	return {}
+end
+
 --- Builds the variable-based rule for the tap / hold slots of a combo.
 --- Matches k2 physically while k1 is held (via ke_held_k1=1) and splits
 --- output by press duration (to_if_alone for tap, to for hold).
 ---
---- When only the tap slot is set, fires immediately on key_down (not via
---- to_if_alone) — this enables auto-repeat and avoids a KE edge case where
---- to_if_alone does not reliably fire when another modifier is already held.
+--- When only the tap slot is set, it fires at k2's key_down, as the tap of a
+--- key with no hold does (build_tap_hold_rule): there is nothing to wait for,
+--- it repeats while k2 is held, and no later key_down can drop it, as Karabiner
+--- v16 drops a pending to_if_alone (basic.hpp unset_alone_if_needed). A
+--- modifier held before k2, k1's included, would not cancel a to_if_alone:
+--- that source clears it only for a key_down arriving after k2's, and restores
+--- the key-down flags around it.
 ---
 --- Tap/hold slots are per-direction: symmetry is NOT auto-mirrored here because
 --- tap/hold behaviour is legitimately asymmetric (rcmd-first vs. lcmd-first).
@@ -918,8 +964,22 @@ local function build_tap_hold_combo_rule(combo_def, tap_to, hold_to, tap_action,
 			manip.to_after_key_up = hold_action.karabiner_to_after_key_up
 		end
 	else
-		-- Tap only: fire immediately on key_down for reliable auto-repeat
+		-- Tap only: nothing to wait for, so it fires at key_down and repeats
 		manip.to = tap_to
+	end
+
+	-- A chord whose action keeps a key down leaves k1 held without its held
+	-- keys (build_chord_manipulator), and a manipulator requiring them would let
+	-- k2 fall through to its own rule. The same manipulator without them takes
+	-- that press: with nothing of k1's down, there is nothing to consume. The
+	-- last exact-modifier variant, a mandatory "any", already matches then.
+	local manipulators = { manip }
+	if has_exact_modifier_action(tap_action, hold_action) then
+		manipulators = exact_modifier_manipulators(manip)
+	elseif k1_mandatory and #k1_mandatory > 0 then
+		local unheld = deep_copy(manip)
+		unheld.from.modifiers = { optional = { "any" } }
+		manipulators[#manipulators + 1] = unheld
 	end
 
 	return {
@@ -927,7 +987,7 @@ local function build_tap_hold_combo_rule(combo_def, tap_to, hold_to, tap_action,
 			"%s (%s→%s): %s (tap) / %s (hold) [var-based]",
 			combo_def.label, k1, k2, tap_action.label, hold_action.label
 		),
-		manipulators = { manip },
+		manipulators = manipulators,
 	}
 end
 
@@ -937,84 +997,199 @@ end
 -- ===== 3.2) Chord Slot Rule =====
 -- ================================
 
---- Builds the chord rule for the combo slot of a modifier combo.
---- Uses KE's simultaneous matcher with the global
---- basic.simultaneous_threshold_milliseconds window. key_down_order: strict
---- requires k1 before k2 unless symmetric mode is on, in which case the order
---- is stripped so A+B and B+A match identically.
+--- Returns the simultaneous_options a chord rule starts from: a copy of the
+--- combo's own, without key_down_order in symmetric mode so A+B and B+A both
+--- match.
+--- @param combo_def table Entry from MOD_COMBOS.
+--- @param combo_symmetric boolean Whether A+B == B+A for this config.
+--- @return table options Fresh table the caller may extend.
+local function chord_simultaneous_options(combo_def, combo_symmetric)
+	local options = {}
+	for k, v in pairs(combo_def.from.simultaneous_options or {}) do
+		if not (combo_symmetric and k == "key_down_order") then options[k] = v end
+	end
+	return options
+end
+
+-- Karabiner's simultaneous key_down_order values that fix which chord key goes
+-- down first: `strict` the listed order, `strict_inverse` the reverse one
+-- (from_event_definition.hpp test_key_order).
+local KEY_ORDER_STRICT         = "strict"
+local KEY_ORDER_STRICT_INVERSE = "strict_inverse"
+
+--- Returns the state a tap/hold key's own rule gives the key while it is
+--- held: the events it keeps down (held_key_events), the events its key_up
+--- sends to undo them, and whether the key has a hold.
+--- @param key_code string Physical key.
+--- @param tap_action table Resolved action for the key's tap slot.
+--- @param hold_action table Resolved action for the key's hold slot.
+--- @return table held { to = events at key_down, after = events at key_up, has_hold = boolean }
+local function held_key_state(key_code, tap_action, hold_action)
+	local has_hold = #(hold_action.karabiner_to or {}) > 0
+	return {
+		to       = held_key_events(key_code, tap_action, hold_action),
+		after    = has_hold and hold_action.karabiner_to_after_key_up or {},
+		has_hold = has_hold,
+	}
+end
+
+-- A key without a tap/hold rule keeps nothing down when pressed.
+local NOTHING_HELD = { to = {}, after = {}, has_hold = false }
+
+--- Reports whether a `to` list leaves a key down: Karabiner keeps only the last
+--- posted entry down, and only when it is a key.
+--- @param events table To-event list.
+--- @return boolean keeps
+local function keeps_key_down(events)
+	local last = events[#events]
+	return type(last) == "table" and last.key_code ~= nil
+end
+
+--- Builds the chord manipulator for one press order of a modifier combo.
+---
+--- The chord takes the key_down of both keys, so the own tap/hold rule of the
+--- key pressed first never runs for that press. While that key stays down, it
+--- must still read as held: the manipulator sets its held variable, which the
+--- hold-then-tap rules starting on it test, and sends its hold's momentary
+--- events (a layer). simultaneous_options.to_after_key_up undoes both once
+--- both keys are up, so releasing the first key while the other stays down
+--- leaves them on until that one is released too.
+---
+--- Karabiner keeps only the last `to` entry down. When the first key keeps
+--- nothing down (no hold, or a layer), the chord's action takes that place,
+--- so a key repeats and a modifier stays held while the chord is held. When
+--- the action keeps nothing down, the first key's held key (its modifier
+--- hold, or itself as a bare modifier key) goes last, and key_up_when "all"
+--- keeps it down until that key is released too. When both keep a key down:
+---   - a modifier action (Cmd+Shift) stays held; pressed once, it would do
+---     nothing;
+---   - a plain-key action after one of the eight modifier keys goes out once,
+---     and that key stays the modifier it is held for, its held key last under
+---     key_up_when "all", as when it is held first;
+---   - a plain-key action after any other key (Escape, Tab, Caps Lock, fn,
+---     Space, Return, Backspace) stays down and repeats, as those chords did
+---     before chords of modifier keys could fire.
+--- In the last two cases the first key's held key comes back only with its
+--- next press; until then its held variable alone marks it held, which the
+--- hold-then-tap rules starting on it still answer (build_tap_hold_combo_rule).
 --- @param combo_def table Entry from MOD_COMBOS.
 --- @param combo_to table Combo (chord) output events.
 --- @param combo_action table Combo action definition.
---- @param combo_symmetric boolean Whether A+B == B+A for this config.
---- @return table|nil Karabiner rule object, or nil when combo_to is empty.
-local function build_chord_combo_rule(combo_def, combo_to, combo_action, combo_symmetric)
-	if #combo_to == 0 then return nil end
+--- @param options table simultaneous_options of this order; extended here.
+--- @param first_key string Key this order presses first.
+--- @param first_held table held_key_state of first_key.
+--- @return table manipulator
+local function build_chord_manipulator(combo_def, combo_to, combo_action, options, first_key, first_held)
+	local to = { set_var_event(held_var_name(first_key), 1) }
+	local action_last = combo_to[#combo_to]
+	local action_is_modifier = keeps_key_down(combo_to) and FLAG_KEY_CODES[action_last.key_code] == true
+	if not keeps_key_down(first_held.to) then
+		for _, ev in ipairs(first_held.to) do to[#to + 1] = ev end
+		for _, ev in ipairs(combo_to) do to[#to + 1] = ev end
+	elseif not keeps_key_down(combo_to)
+		or (ACTUAL_MODIFIER_KEY_CODES[first_key] and not action_is_modifier) then
+		for _, ev in ipairs(combo_to) do to[#to + 1] = ev end
+		for _, ev in ipairs(first_held.to) do to[#to + 1] = ev end
+		options.key_up_when = "all"
+	else
+		for _, ev in ipairs(first_held.to) do
+			if ev.key_code == nil then to[#to + 1] = ev end
+		end
+		for _, ev in ipairs(combo_to) do to[#to + 1] = ev end
+	end
+
+	local after_both_up = { set_var_event(held_var_name(first_key), 0) }
+	for _, ev in ipairs(first_held.after) do after_both_up[#after_both_up + 1] = ev end
+	options.to_after_key_up = after_both_up
 
 	-- Shallow-copy the combo's `from` so the shared MOD_COMBOS entry is never
 	-- mutated by the adjustments below.
 	local from = {}
 	for k, v in pairs(combo_def.from) do from[k] = v end
+	from.simultaneous_options = options
 
-	if combo_symmetric and type(from.simultaneous_options) == "table" then
-		-- Symmetric config: strip key_down_order so A+B and B+A match identically.
-		local opts = {}
-		for k, v in pairs(from.simultaneous_options) do
-			if k ~= "key_down_order" then opts[k] = v end
-		end
-		from.simultaneous_options = next(opts) and opts or nil
-	end
-
-	-- KE gotcha: a `simultaneous` trigger made of MODIFIER keys (e.g. right_command
-	-- + left_command) raises those keys' own modifier flags the instant the first
-	-- key goes down. KE rejects any undeclared modifier by default, so without an
-	-- `optional: any` allowance the chord fails to match and silently falls through
-	-- to the single-key tap rule (left_command tap → a bare backspace), degrading
-	-- ⌥⌫ "delete word left" to one backspace. Allow any incidental modifier —
-	-- exactly what the tap/hold sibling rule already does — while preserving any
-	-- explicit modifiers the combo declared.
-	--
-	-- `optional` alone only fixes MATCHING: KE passes optional modifiers THROUGH to
-	-- the output, so a chord's own held flags leak into the emitted event. For a
-	-- command-pair chord (right_command + left_command) whose output is ⌥⌫
-	-- (option+backspace), the leaked ⌘ turns it into ⌘⌥⌫ — and ⌘⌫
-	-- "delete-to-line-start" overrides ⌥⌫ "delete-word-left", so the chord does
-	-- nothing useful. Its right_command+left_option sibling escaped the bug only
-	-- because a leaked ⌘ is inert for ⌥⌦ "delete-word-right". Declare the chord's
-	-- OWN modifier keys as `mandatory` so KE CONSUMES their flags (removing them
-	-- from the output) — the very mechanism the k1_mandatory tap/hold path already
-	-- relies on — while `optional: any` still absorbs unrelated incidental flags.
-	local chord_mandatory = {}
-	if type(from.simultaneous) == "table" then
-		for _, sk in ipairs(from.simultaneous) do
-			if sk.key_code and ACTUAL_MODIFIER_KEY_CODES[sk.key_code] then
-				chord_mandatory[#chord_mandatory + 1] = sk.key_code
-			end
-		end
-	end
-
+	-- Karabiner v16 tests a chord's modifiers on its first key's key_down, before
+	-- either chord key reaches the output: manipulator_manager.hpp posts a key
+	-- only once every manipulator has passed it. The chord's own keys are thus
+	-- never among the flags it tests, and never leak into what it sends, so
+	-- requiring them as mandatory made every chord of a modifier key unreachable.
+	-- `optional: any` lets the chord fire under an unrelated held modifier, as its
+	-- tap/hold sibling does; modifiers the combo declares itself are kept.
 	local modifiers = { optional = { "any" } }
-	if #chord_mandatory > 0 then
-		modifiers.mandatory = chord_mandatory
-	end
 	if type(from.modifiers) == "table" then
 		for k, v in pairs(from.modifiers) do modifiers[k] = v end
 		modifiers.optional = { "any" }
-		-- A combo that declares its own mandatory modifiers wins over the computed
-		-- set; otherwise keep the chord-key flags we just gathered.
-		if not from.modifiers.mandatory and #chord_mandatory > 0 then
-			modifiers.mandatory = chord_mandatory
-		end
 	end
 	from.modifiers = modifiers
 
-	local manip = { type = "basic", from = from, to = combo_to }
+	local manip = { type = "basic", from = from, to = to }
 	if combo_action.karabiner_to_after_key_up then
 		manip.to_after_key_up = combo_action.karabiner_to_after_key_up
 	end
+	return manip
+end
+
+--- Reports whether holding k1 then tapping k2 already types what a chord
+--- pressed k1 first would, so its manipulator would add nothing but its wait:
+--- the combo action is the tap slot's action and k1 has a hold, so its own rule
+--- types nothing at key_down (a key with no hold types its tap or itself
+--- there). The hold-then-tap rule only reads k1 first, so a chord pressed k2
+--- first is never redundant. Without the manipulator, pressing k1 no longer
+--- waits the simultaneous threshold for a partner.
+--- @param tap_action table Resolved action for the tap slot.
+--- @param combo_action table Resolved action for the combo slot.
+--- @param k1_held table held_key_state of k1.
+--- @return boolean redundant
+local function chord_is_redundant(tap_action, combo_action, k1_held)
+	if tap_action.id == nil or tap_action.id ~= combo_action.id then return false end
+	return k1_held.has_hold
+end
+
+--- Builds the chord rule for the combo slot of a modifier combo, on KE's
+--- simultaneous matcher and the global basic.simultaneous_threshold_milliseconds
+--- window. The combo's own key_down_order (strict: k1 first) holds unless
+--- symmetric mode strips it; either key may then go first, and the key pressed
+--- first is the one left held, so each order gets a manipulator of its own
+--- (strict, strict_inverse) restoring that key.
+--- @param combo_def table Entry from MOD_COMBOS.
+--- @param tap_action table Resolved action for the tap slot.
+--- @param combo_action table Combo action definition.
+--- @param combo_symmetric boolean Whether A+B == B+A for this config.
+--- @param k1 string First key of the combo.
+--- @param k2 string Second key of the combo.
+--- @param held_of table Key code → held_key_state.
+--- @return table|nil Karabiner rule object, or nil when no manipulator is left.
+local function build_chord_combo_rule(combo_def, tap_action, combo_action, combo_symmetric, k1, k2, held_of)
+	local combo_to = combo_action.karabiner_to or {}
+	if #combo_to == 0 then return nil end
+
+	local base = chord_simultaneous_options(combo_def, combo_symmetric)
+	local orders = {}
+	if base.key_down_order ~= KEY_ORDER_STRICT_INVERSE then
+		orders[#orders + 1] = { key_down_order = KEY_ORDER_STRICT, first = k1 }
+	end
+	if base.key_down_order ~= KEY_ORDER_STRICT then
+		orders[#orders + 1] = { key_down_order = KEY_ORDER_STRICT_INVERSE, first = k2 }
+	end
+
+	local manipulators = {}
+	for _, order in ipairs(orders) do
+		local first_held = held_of[order.first] or NOTHING_HELD
+		if not (order.first == k1 and chord_is_redundant(tap_action, combo_action, first_held)) then
+			local options = deep_copy(base)
+			options.key_down_order = order.key_down_order
+			local manip = build_chord_manipulator(
+				combo_def, combo_to, combo_action, options, order.first, first_held)
+			local variants = { manip }
+			if has_exact_modifier_action(combo_action) then variants = exact_modifier_manipulators(manip) end
+			for _, variant in ipairs(variants) do manipulators[#manipulators + 1] = variant end
+		end
+	end
+	if #manipulators == 0 then return nil end
 
 	return {
 		description  = string.format("%s: %s [chord]", combo_def.label, combo_action.label),
-		manipulators = { manip },
+		manipulators = manipulators,
 	}
 end
 
@@ -1033,11 +1208,11 @@ end
 --- @param combo_action table Resolved action for combo slot.
 --- @param k1_mandatory table|nil Modifier key_codes held by k1.
 --- @param combo_symmetric boolean Whether A+B == B+A.
+--- @param held_of table Key code → held_key_state.
 --- @return table List of zero, one, or two Karabiner rule objects.
-local function build_combo_rules(combo_def, tap_action, hold_action, combo_action, k1_mandatory, combo_symmetric)
+local function build_combo_rules(combo_def, tap_action, hold_action, combo_action, k1_mandatory, combo_symmetric, held_of)
 	local tap_to   = tap_action.karabiner_to   or {}
 	local hold_to  = hold_action.karabiner_to  or {}
-	local combo_to = combo_action.karabiner_to or {}
 
 	local sim = combo_def.from and combo_def.from.simultaneous
 	local k1  = sim and sim[1] and sim[1].key_code
@@ -1046,7 +1221,8 @@ local function build_combo_rules(combo_def, tap_action, hold_action, combo_actio
 
 	local rules = {}
 	-- Chord rule first: a simultaneous press wins over the hold-then-tap path
-	local chord_rule = build_chord_combo_rule(combo_def, combo_to, combo_action, combo_symmetric)
+	local chord_rule = build_chord_combo_rule(
+		combo_def, tap_action, combo_action, combo_symmetric, k1, k2, held_of)
 	if chord_rule then rules[#rules + 1] = chord_rule end
 
 	local th_rule = build_tap_hold_combo_rule(combo_def, tap_to, hold_to, tap_action, hold_action, k1, k2, k1_mandatory)
@@ -1242,19 +1418,29 @@ function M.build_karabiner_json(
 	end
 
 
-	-- Build a lookup: key_code → modifier key_codes held by its hold action.
-	-- When a key acts as k1 (holder) in a combo, its hold-action modifiers are
-	-- virtually held while the combo rule fires. Listing them as mandatory in the
-	-- rule's from matcher consumes them so they do not leak into output events.
+	-- Build a lookup: key_code → the modifier flags its own rule keeps down while
+	-- held (held_key_events): each entry's modifier key and every modifier it
+	-- carries (Cmd+Shift holds both), fn included. When a key acts as k1
+	-- (holder) in a combo, those flags are down while the combo rule fires.
+	-- Listing them as mandatory in the rule's from matcher consumes them so they
+	-- do not leak into output events. The whole state each key's rule gives a
+	-- held key is recorded too: a chord that takes a key's key_down restores
+	-- what it can of it.
 	local key_held_modifiers = {}
+	local key_held_state = {}
 	for _, key_def in ipairs(tap_hold_keys) do
 		local cfg       = state.tap_hold_config[key_def.id] or {}
-		local hold_id   = cfg.hold or "none"
-		local hold_act  = action_index[hold_id] or none_action
+		local hold_act  = action_index[cfg.hold or "none"] or none_action
+		local tap_act   = action_index[cfg.tap or "none"] or none_action
+		local held      = held_key_state(key_def.from.key_code, tap_act, hold_act)
+		key_held_state[key_def.from.key_code] = held
 		local held_mods = {}
-		for _, ev in ipairs(hold_act.karabiner_to or {}) do
-			if ev.key_code and ACTUAL_MODIFIER_KEY_CODES[ev.key_code] then
+		for _, ev in ipairs(held.to) do
+			if ev.key_code and FLAG_KEY_CODES[ev.key_code] then
 				held_mods[#held_mods + 1] = ev.key_code
+				for _, modifier in ipairs(ev.modifiers or {}) do
+					if FLAG_KEY_CODES[modifier] then held_mods[#held_mods + 1] = modifier end
+				end
 			end
 		end
 		if #held_mods > 0 then
@@ -1297,7 +1483,7 @@ function M.build_karabiner_json(
 
 		local generated = build_combo_rules(
 			combo_def, tap_action, hold_action, combo_action,
-			k1_mandatory, state.combo_symmetric
+			k1_mandatory, state.combo_symmetric, key_held_state
 		)
 		for _, rule in ipairs(generated) do
 			all_rules[#all_rules + 1] = rule
@@ -1363,7 +1549,7 @@ function M.build_karabiner_json(
 			Logger.error(LOG, "Cannot build Karabiner config: %s.", err)
 			return nil, err
 		end
-		local rule = build_tap_hold_rule(key_def, tap_action, hold_action, action_index, per_key_ms)
+		local rule = build_tap_hold_rule(key_def, tap_action, hold_action, per_key_ms)
 		if rule then
 			all_rules[#all_rules + 1] = rule
 			if key_def.from.key_code ~= SCRIPT_CONTROL_HOLDER_KEY then
@@ -1705,16 +1891,13 @@ local function ends_with(value, suffix)
 end
 
 --- Reports whether an action id changes generated structure independently of
---- the action payload. Sticky/base ids participate in companion-rule selection;
---- `none` participates in combo emission, so neither may be canonicalised.
+--- the action payload. Sticky/base ids selected the companion rules historical
+--- releases emitted; `none` participates in combo emission, so neither may be
+--- canonicalised.
 --- @param action_id any Candidate action id.
 --- @return boolean semantic Whether identity itself affects generation.
 local function has_generator_semantic_action_id(action_id)
-	if action_id == "none" or STICKY_TO_BASE_ACTION[action_id] ~= nil then return true end
-	for _, base_id in pairs(STICKY_TO_BASE_ACTION) do
-		if action_id == base_id then return true end
-	end
-	return false
+	return action_id == "none" or LegacyReleaseFixtures.selects_sticky_companions(action_id)
 end
 
 --- Accepts a duplicate localised label only when both actions are exact output

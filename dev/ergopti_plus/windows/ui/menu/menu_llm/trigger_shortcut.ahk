@@ -45,14 +45,14 @@ _LLM_Menu_TriggerKeyUsesNativeSyntax(Key) {
 	; The shared chord grammar deliberately accepts physical VK/SC names for
 	; low-level driver shortcuts. The LLM trigger cannot safely accept raw AHK
 	; syntax: VK/SC aliases overlap named contextual variants, wildcard variants
-	; cover additional modifiers, lateral modifier keys split one chord into two
-	; actions, and an " Up" suffix adds a release action to the same physical
-	; press. Keep that syntax out of this setting while leaving the shared
-	; registrar contract unchanged.
+	; cover additional modifiers, and an " Up" suffix adds a release action to
+	; the same physical press. Keep that syntax out of this setting. Modifier
+	; keys are refused by the shared registrar for every client
+	; (HotkeyRegistrarKeyIsModifier).
 	if RegExMatch(Key,
 			"i)^(?:vk[0-9a-f]+(?:sc[0-9a-f]+)?|sc[0-9a-f]+)$")
 		return true
-	if RegExMatch(Key, "i)^(?:l|r)(?:ctrl|control|alt|shift|win)$")
+	if HotkeyRegistrarKeyIsModifier(Key)
 		return true
 	return RegExMatch(Key, "[\s*~$<>^!#&]") != 0
 }

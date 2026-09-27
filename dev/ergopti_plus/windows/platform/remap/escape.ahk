@@ -41,11 +41,11 @@ _EscapeHoldModKey() {
 ; ===========================================
 ; ===========================================
 
-#HotIf TapHoldHoldModifier(TapHold, "escape") != "" and not LayerEnabled
-*$SC001:: {
+#HotIf TapHoldHoldModifier(TapHold, "escape") != "" and not LayerEnabled and not TapHoldKanaAltGrHeld()
+$SC001:: {
 	Result := TapHoldOwnImmediateModifier("escape", "Escape",
 		_EscapeHoldModKey(), TapHoldDuration(TapHold, "escape"))
-	if (Result["tap"] and A_PriorKey == "Escape")
+	if (Result["tap"] and TapHoldPriorKeyIsSelf("escape"))
 		_EscapeDispatch()
 }
 #HotIf
@@ -62,10 +62,10 @@ _EscapeHoldModKey() {
 ; ========================================
 ; ========================================
 
-#HotIf TapHoldHoldLayer(TapHold, "escape") != "" and TapHoldHoldModifier(TapHold, "escape") == "" and not LayerEnabled
-*$SC001:: {
-	Result := TapHoldOwnImmediateLayer("Escape", TapHoldDuration(TapHold, "escape"))
-	if (Result["tap"] and A_PriorKey == "Escape")
+#HotIf TapHoldHoldLayer(TapHold, "escape") != "" and TapHoldHoldModifier(TapHold, "escape") == "" and not LayerEnabled and not TapHoldKanaAltGrHeld()
+$SC001:: {
+	Result := TapHoldOwnImmediateLayer("escape", "Escape", TapHoldDuration(TapHold, "escape"))
+	if (Result["tap"] and TapHoldPriorKeyIsSelf("escape"))
 		_EscapeDispatch()
 }
 #HotIf
@@ -76,16 +76,36 @@ _EscapeHoldModKey() {
 
 
 
+; =====================================
+; =====================================
+; ======= 11.3) Own auto-repeat =======
+; =====================================
+; =====================================
+
+; The hold variants fire only with no modifier held, so the key stays itself
+; under a held modifier, as on every driver. Its own auto-repeat arrives under
+; the modifier or layer the hold owns and matches none of them: swallow it for
+; as long as the owner resolves the press (see TapHoldPressIsOwned).
+#HotIf TapHoldPressIsOwned("escape")
+*SC001:: return
+#HotIf
+
+
+
+
+
+
+
 ; ==============================================================================
 ; ==============================================================================
-; ======= 11.3) Tap-only (tap action set to something other than escape) =======
+; ======= 11.4) Tap-only (tap action set to something other than escape) =======
 ; ==============================================================================
 ; ==============================================================================
 
 ; $ prevents re-entry. Fire immediately on key-down — no KeyWait or A_PriorKey
 ; guard needed since there is no hold behaviour. No ~ needed: the action replaces
 ; the native key entirely; ~ would send both Escape and the action.
-#HotIf TapHoldTapAction(TapHold, "escape") != "" and TapHoldTapAction(TapHold, "escape") != "escape" and TapHoldHoldModifier(TapHold, "escape") == "" and TapHoldHoldLayer(TapHold, "escape") == "" and not LayerEnabled
+#HotIf TapHoldTapAction(TapHold, "escape") != "" and TapHoldTapAction(TapHold, "escape") != "escape" and TapHoldHoldModifier(TapHold, "escape") == "" and TapHoldHoldLayer(TapHold, "escape") == "" and not LayerEnabled and not TapHoldKanaAltGrHeld()
 $SC001:: _EscapeDispatch()
 #HotIf
 
@@ -97,7 +117,7 @@ $SC001:: _EscapeDispatch()
 
 ; ==================================
 ; ==================================
-; ======= 11.4) Tap dispatch =======
+; ======= 11.5) Tap dispatch =======
 ; ==================================
 ; ==================================
 
@@ -105,7 +125,7 @@ _EscapeDispatch() {
 	local action := TapHoldTapAction(TapHold, "escape")
 	; No tap configured or tap = escape itself → native key behaviour.
 	if (action == "" or action == "escape") {
-		TapHoldDispatchTap("escape", TextPressKey.Bind("Escape", []))
+		TapHoldDispatchTap("escape", TapHoldEmitKeyTap.Bind("Escape"))
 		return
 	}
 	_TapHoldFireAction("escape")

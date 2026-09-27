@@ -99,6 +99,10 @@ global KLHOOK_MODIFIER_VKS := Map(
 		0x90, true               ; VK_NUMLOCK
 )
 
+; VK_PACKET: a character a Send typed as text ({Text}), not a key the user
+; pressed, so never the payload of a shortcut.
+global KLHOOK_VK_PACKET := 0xE7
+
 
 
 
@@ -364,29 +368,50 @@ KL_Watchers_IdleTick() {
 
 ; Build a HS-style shortcut label for a non-modifier keypress. Returns
 ; "" when the chord is not a shortcut (no useful modifier held, or the
-; combo looks like AltGr typing a layered character).
-KL_Watchers_DetectShortcut(vk) {
-		if KLHOOK_MODIFIER_VKS.Has(vk)
+; combo looks like AltGr typing a layered character). The AltGr key goes by
+; scan code and KS_AltGrKeyName: a Kana-style layout gives it a virtual key
+; other than VK_RMENU, and its RAlt is a plain Alt.
+; @param vk {Integer} Virtual key of the key-down.
+; @param sc {Integer} Scan code of the key-down, extended keys carrying 0x100.
+; @param KeyIsDownFn {Func} Test seam taking a key name, KS_IsDown (physical
+;        state) by default.
+; @return {String} The label, such as "Ctrl+Alt+V", or "".
+KL_Watchers_DetectShortcut(vk, sc, KeyIsDownFn := 0) {
+		if KLHOOK_MODIFIER_VKS.Has(vk) or sc == KS_AltGrScanCode()
 				return ""
-		Ctrl  := GetKeyState("LControl", "P") or GetKeyState("RControl", "P")
-		LAlt  := GetKeyState("LAlt", "P")
-		RAlt  := GetKeyState("RAlt", "P")
-		Win   := GetKeyState("LWin", "P") or GetKeyState("RWin", "P")
-		Shift := GetKeyState("LShift", "P") or GetKeyState("RShift", "P")
+		; VK_PACKET is text a Send typed ({Text}), such as an AltGr-layer
+		; character, not a key the user pressed with a modifier.
+		if (vk == KLHOOK_VK_PACKET)
+				return ""
+		if !IsObject(KeyIsDownFn)
+				KeyIsDownFn := KS_IsDown
+		Ctrl  := KeyIsDownFn.Call("LControl") or KeyIsDownFn.Call("RControl")
+		LAlt  := KeyIsDownFn.Call("LAlt")
+		AltGr := KeyIsDownFn.Call(KS_AltGrKeyName())
+		Win   := KeyIsDownFn.Call("LWin") or KeyIsDownFn.Call("RWin")
+		Shift := KeyIsDownFn.Call("LShift") or KeyIsDownFn.Call("RShift")
 
-		; AltGr is RAlt + a synthetic LCtrl injected by Windows. When LAlt
-		; is NOT pressed, this Ctrl+Alt combo is the AltGr layer and the
-		; user is just typing a character — drop the « shortcut » framing.
-		if (RAlt and Ctrl and !LAlt)
+		; On a standard AltGr layout AltGr is RAlt + a synthetic LCtrl injected
+		; by Windows. When LAlt is NOT pressed, this Ctrl+Alt combo is the AltGr
+		; layer and the user is just typing a character — drop the « shortcut »
+		; framing. A Kana-style AltGr and QWERTY's plain right Alt inject no
+		; Ctrl, so a Ctrl held with them is the user's own shortcut.
+		if (AltGr and Ctrl and !LAlt and KS_AltGrAddsFakeLCtrl())
 				return ""
+		; Where the AltGr key is a plain right Alt (QWERTY: the boot probe found
+		; no AltGr level), a key the AltGr layer leaves alone reaches the
+		; application under that Alt: LCtrl+RAlt+V is Windows' Ctrl+Alt+V. Held
+		; as another modifier or a layer by its tap-hold (AltGrKeyIsAltGr), the
+		; key is suppressed and the application sees no Alt.
+		Alt := LAlt or (AltGr and !KS_LayoutHasAltGr() and AltGrKeyIsAltGr())
 		; Plain Shift+letter is capitalisation, never a shortcut.
-		if (!Ctrl and !LAlt and !Win)
+		if (!Ctrl and !Alt and !Win)
 				return ""
 
 		parts := []
 		if Ctrl
 				parts.Push("Ctrl")
-		if LAlt
+		if Alt
 				parts.Push("Alt")
 		if Win
 				parts.Push("Win")

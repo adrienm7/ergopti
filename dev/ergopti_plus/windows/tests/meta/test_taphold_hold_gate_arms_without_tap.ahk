@@ -97,7 +97,7 @@ _THG_KeySourceFiles() {
 		"caps_lock", "capslock.ahk", "left_shift", "lshift_lctrl.ahk",
 		"left_ctrl", "lshift_lctrl.ahk", "win", "win.ahk",
 		"left_alt", "lalt.ahk", "space", "space.ahk",
-		"alt_gr", "altgr.ahk", "right_ctrl", "rctrl.ahk",
+		"alt_gr", "altgr.ahk|altgr_criteria.ahk", "right_ctrl", "rctrl.ahk",
 		"right_shift", "rshift.ahk", "enter", "enter.ahk",
 		"backspace", "backspace.ahk", "delete", "delete.ahk")
 }
@@ -123,7 +123,10 @@ _THG_EveryPickerKeyUsesTheImmediateModifierOwner() {
 		"the immediate-modifier source inventory must name every picker key")
 	for _, Id in Ids {
 		Assert(Files.Has(Id), "missing source inventory for picker key '" . Id . "'")
-		KeySrc := _StripFullLineComments(FileRead(DriverRoot . "\platform\remap\" . Files[Id], "UTF-8"))
+		; A key whose criteria live apart (altgr_criteria.ahk) lists both files.
+		KeySrc := ""
+		for _, File in StrSplit(Files[Id], "|")
+			KeySrc .= _StripFullLineComments(FileRead(DriverRoot . "\platform\remap\" . File, "UTF-8"))
 		Assert(InStr(KeySrc, 'TapHoldHoldModifier(TapHold, "' . Id . '")') > 0,
 			"key '" . Id . "' offers modifier holds but never reads the configured modifier")
 		Assert(InStr(KeySrc, 'TapHoldOwnImmediateModifier("' . Id . '",') > 0,
@@ -213,7 +216,7 @@ Test("tap-holds: native modifier holds preserve their physical chord edge (nativ
 _THG_TabDispatchFallsBackToNative() {
 	Body := _DriverFuncBody("_TabDispatch")
 	Assert(Body != "", "_TabDispatch must exist in platform/remap/tab.ahk")
-	Assert(InStr(Body, "TextPressKey") > 0,
+	Assert(InStr(Body, "TapHoldEmitKeyTap") > 0,
 		"_TabDispatch must emit the native Tab when no tap action is configured — its hold gates arm on the hold alone, so an unhandled empty action turns the tap into a silent no-op instead of a Tab (taphold-hold-option-unreachable)")
 	Assert(InStr(Body, "_TapHoldFireAction") > 0,
 		"_TabDispatch must still route a configured tap action through the shared dispatcher")

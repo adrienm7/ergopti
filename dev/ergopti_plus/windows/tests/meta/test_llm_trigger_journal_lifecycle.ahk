@@ -200,8 +200,14 @@ _LLMJG_LifecycleAndPathWritersDrainStableAuthority() {
 	DestructivePrepare := InStr(ResetBody,
 		"LLM_TriggerJournalPrepareDestructive(", true)
 	ResetCommit := InStr(ResetBody, "ConfigTransitionCommitOwned(", true)
+	; A launched Reload is refused only later, so both refusal paths share one
+	; rollback helper that owns the WAL rollback call.
 	ResetReload := InStr(ResetBody, "ReloadPreservingSuspend(", true)
-	ResetRollback := InStr(ResetBody, "ConfigTransitionRollbackOwned(", true)
+	ResetRollback := InStr(ResetBody,
+		"_ConfigResetRollbackRefusedReload(OwnerBundle)", true)
+	AssertContains(_DriverFuncBody("_ConfigResetRollbackRefusedReload"),
+		"ConfigTransitionRollbackOwned(",
+		"the reset rollback helper must restore the committed targets")
 	ResetRelease := InStr(ResetBody,
 		"_ConfigWriteTerminalRelease(OwnerBundle)", true)
 	Assert(ResetLease > 0 && ResetDrain > ResetLease
@@ -218,15 +224,19 @@ _LLMJG_LifecycleAndPathWritersDrainStableAuthority() {
 		"LLM_Menu_QuiesceTriggerForLifecycle(", true)
 	PathsWrite := InStr(PathsBody, "ConfigTransitionCommitOwned(", true)
 	PathsReload := InStr(PathsBody, "ReloadPreservingSuspend(", true)
-	PathsRollback := InStr(PathsBody, "ConfigTransitionRollbackOwned(", true)
+	PathsRollback := InStr(PathsBody,
+		"_PathsFile_RollbackRefusedReload(OwnerBundle)", true)
 	PathsRelease := InStr(PathsBody,
 		"_ConfigWriteTerminalRelease(OwnerBundle)", true)
 	Assert(PathsLease > 0 && PathsDrain > PathsLease
 		&& PathsWrite > PathsDrain && PathsReload > PathsWrite
 		&& PathsRollback > PathsReload && PathsRelease > PathsRollback,
 		"paths.toml must hold config ownership from quiescence through reload")
-	AssertContains(PathsBody, "ReloadPreservingSuspend(0, OwnerBundle)",
+	AssertContains(PathsBody, "ReloadPreservingSuspend(0, OwnerBundle,",
 		"the paths writer must lend its exact bundle to reload")
+	AssertContains(_DriverFuncBody("_PathsFile_RollbackRefusedReload"),
+		"ConfigTransitionRollbackOwned(",
+		"the paths rollback helper must restore the previous locator")
 	Assert(InStr(PathsBody, "FileOpen(", true) = 0,
 		"paths.toml publication must not bypass the transition WAL")
 
@@ -241,9 +251,12 @@ _LLMJG_LifecycleAndPathWritersDrainStableAuthority() {
 	GlobalPublish := InStr(OnboardingBody,
 		"_ConfigDir := CandidateDir", true)
 	OnboardingReload := InStr(OnboardingBody,
-		"ReloadPreservingSuspend(BeforeReloadFn, OwnerBundle)", true)
+		"ReloadPreservingSuspend(BeforeReloadFn, OwnerBundle,", true)
 	OnboardingRollback := InStr(OnboardingBody,
-		"ConfigTransitionRollbackOwned(", true)
+		"Rollback.Call(OwnerBundle)", true)
+	AssertContains(_DriverFuncBody("_Onboarding_RollbackRefusedReload"),
+		"ConfigTransitionRollbackOwned(",
+		"the onboarding rollback helper must restore the committed targets")
 	OnboardingRelease := InStr(OnboardingBody,
 		"_ConfigWriteTerminalRelease(OwnerBundle)", true)
 	Assert(OnboardingLease > 0 && OnboardingDrain > OnboardingLease

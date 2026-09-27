@@ -179,6 +179,35 @@ helpers.describe("gesture pump: a dead touchpad descriptor", function()
 		if not ok then error(failure, 0) end
 	end)
 
+	helpers.it("stops only the reader when the pump throws, and keeps running actions", function()
+		-- The daemon's guard around the pump hands its failure to stop_reading()
+		-- and keeps the module: the same module runs every tap-hold and shortcut
+		-- action, which must not die with the touchpad.
+		local reader = Fakes.evdev_reader({ events = gesture_events(3, 0, -600) })
+		package.loaded["adapters.evdev_reader"] = reader
+
+		local M = helpers.load_module("modules.gestures.manager")
+		local ran = 0
+		M.init({ enabled = false, persist = false,
+			action_handlers = { script_reload = function() ran = ran + 1 end } })
+		reader.open("/dev/input/event-fake", reader.TOUCHPAD)
+		M._test_begin_reading({ feed = function() error("decoder bug", 0) end })
+		helpers.assert_true(M.enable())
+
+		local ok, failure = xpcall(function()
+			local RuntimeGuard = require("infra.runtime_guard")
+			helpers.assert_true(not RuntimeGuard.call("gesture pump", M.pump, M.stop_reading),
+				"the fixture must make the pump throw")
+			helpers.assert_true(not M.is_reading(), "the failed reader is stopped")
+			helpers.assert_eq(M.pump(), 0, "and a stopped reader throws no more")
+			helpers.assert_true(M.execute_action("script_reload", "tap_hold"))
+			helpers.assert_eq(ran, 1, "the action catalogue still runs its actions")
+		end, debug.traceback)
+
+		package.loaded["adapters.evdev_reader"] = nil
+		if not ok then error(failure, 0) end
+	end)
+
 	helpers.it("keeps reading when the drain reports only an empty queue", function()
 		local reader = Fakes.evdev_reader({ events = {} })
 		package.loaded["adapters.evdev_reader"] = reader

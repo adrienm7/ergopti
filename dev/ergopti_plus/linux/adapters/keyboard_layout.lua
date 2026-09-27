@@ -46,6 +46,7 @@ local Keysym = require("infra.keysym")
 local XkbCapture = require("adapters.xkb_capture")
 local XkbRmlvo = require("infra.xkb_rmlvo")
 local ConfigPaths = require("infra.config_paths")
+local EvdevCodes = require("infra.evdev_codes")
 
 local LOG = "adapters.keyboard_layout"
 
@@ -309,21 +310,37 @@ function M.source()
 	return _table and _source or nil
 end
 
---- The key a Ctrl shortcut on `letter` must press in the live layout.
+--- The key a shortcut on `char` (Ctrl+V, Super+1, Alt+.) must press in the
+--- live layout.
 ---
 --- Applications match Ctrl+V by the SYMBOL the key produces, so the physical key
 --- depends on the layout: the same on QWERTY and AZERTY for c, v and t, but not
 --- for w (Ctrl+KEY_W is Ctrl+Z, undo, on AZERTY), and different for nearly every
---- letter on Ergopti, where KEY_V types a comma. A letter the layout has no
---- unmodified key for (a Cyrillic layout) keeps `us_code`: that is exactly the
---- key GTK and Qt fall back to for shortcuts on a non-Latin layout.
---- @param letter string A single lowercase ASCII letter.
---- @param us_code integer The letter's evdev code on a US layout.
---- @return integer
-function M.shortcut_keycode(letter, us_code)
-	local hit = _table and _table[letter]
-	if hit and #hit.mods == 0 then return hit.keycode end
-	return us_code
+--- letter on Ergopti, where KEY_V types a comma.
+---
+--- A mark the layout types only on a higher level is pressed on that key and
+--- level: "." is Shift+KEY_COMMA on AZERTY, where KEY_DOT types ":" and
+--- Ctrl+KEY_DOT reached every application as Ctrl+colon. Two cases keep
+--- `us_code` instead: a character the layout cannot type at all (a Cyrillic
+--- layout), which is exactly the key GTK and Qt fall back to, and a letter or
+--- a digit on a level of its own US key (a digit on AZERTY), which toolkits
+--- read as the plain shortcut while Shift would make it another one (Ctrl+V
+--- against Ctrl+Shift+V).
+--- @param char string A single ASCII letter, digit or punctuation mark.
+--- @param us_code integer The character's evdev code on a US layout.
+--- @return integer keycode
+--- @return table level_mods The evdev codes to hold with it for its level, often none.
+function M.shortcut_keycode(char, us_code)
+	local hit = _table and _table[char]
+	if not hit then return us_code, {} end
+	if #hit.mods == 0 then return hit.keycode, {} end
+	if char:match("^%w$") then return us_code, {} end
+	local level_mods = {}
+	for _, name in ipairs(hit.mods) do
+		level_mods[#level_mods + 1] = assert(EvdevCodes.LEVEL_MODIFIER_CODE[name],
+			"no key for the level modifier " .. tostring(name))
+	end
+	return hit.keycode, level_mods
 end
 
 --- True when a layout table is loaded.

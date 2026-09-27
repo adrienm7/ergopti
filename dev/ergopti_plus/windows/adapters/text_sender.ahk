@@ -60,6 +60,14 @@ global _TEXT_CLIPBOARD_BUSY := false
 global _TEXT_CLIPBOARD_OWNER_TOKEN := 0
 global TEXT_CLIPBOARD_NEXT_DELAY_MS := TEXT_CLIPBOARD_RESTORE_DELAY_MS + 20
 
+; SendLevel of every TextSender emission. SendInput hides a script's own keys
+; from its own hooks only while no other AutoHotkey keyboard hook runs; with one,
+; it falls back to SendEvent and the driver's InputHooks observe them. Level 0
+; is below the I1 threshold of the hook dispatcher and the prefix watcher, so
+; the output stays invisible to them either way, whatever SendLevel the calling
+; hotkey thread runs at (2 for the tap-holds).
+global TEXT_SENDER_SEND_LEVEL := 0
+
 ; Injectable send primitives — point at the real AHK built-ins by default.
 ; The test runner replaces these globals with no-op lambdas so no keystroke
 ; ever reaches the OS during a dry run (mirrors the _SendHook pattern).
@@ -75,52 +83,109 @@ global _AHK_SendInput := (Keys) => SendInput(Keys)
 ; =======================================================
 ; =======================================================
 
-; Maps the cross-platform modifier names from the spec to their AHK v2 prefix chars.
+; Maps the cross-platform modifier names from the spec to their AHK v2 prefix
+; chars. AltGr has none: see _TextSenderKeystroke.
 _TextSenderModifierPrefix(ModName) {
 	switch StrLower(Trim(ModName)) {
 		case "ctrl", "lctrl", "rctrl": return "^"
 		case "shift", "lshift", "rshift": return "+"
 		case "alt", "lalt", "ralt":       return "!"
-		; AltGr is Ctrl + right Alt, so it needs its own prefix: it previously fell
-		; through to default and returned "", dropping the modifier entirely. Kept
-		; separate from "ralt" on purpose — a caller asking for right Alt is not
-		; asking for AltGr, and changing that would alter existing behaviour.
-		case "altgr":                    return "<^>!"
 		case "cmd", "win", "lwin", "rwin": return "#"
-		case "blind":    return "{Blind}"
 		default:                  return ""
 	}
 }
 
-; Builds an AHK prefix from a space-delimited modifier STRING (the AHK-style form
-; that dozens of tap-hold / gesture call sites pass, e.g. "Shift", "Ctrl Shift",
-; "Blind"). Without this branch the modifiers were silently dropped and the bare
-; key was sent (back-Tab became a forward Tab; Ctrl+BackSpace word-delete degraded
-; to a single delete). "Blind" maps to the {Blind} prefix and is kept first so a
-; held modifier survives; unknown tokens are logged and skipped rather than
-; silently corrupting the emitted keystroke.
-_TextSenderModifierString(ModStr) {
-	Blind := ""
+; Whether key Name is logically down. A global holding a function, as
+; _AHK_SendInput is, so tests can stand in for the keyboard state.
+global _TextSenderKeyIsDown := (Name) => GetKeyState(Name)
+
+; Send string for one keystroke of Key under the modifier names Mods. AltGr
+; is the layout's AltGr key (KS_AltGrKeyName): "<^>!" (LCtrl + right Alt)
+; where AltGr is right Alt, but on a Kana-style layout right Alt is a plain Alt
+; and "<^>!" typed Ctrl+Alt, so the keystroke is wrapped in a press of that
+; layout's AltGr key, by its virtual key (KS_AltGrSendKey): named "SC138", the
+; press made AHK add a real right Alt, a plain Alt there, to the keystroke. An
+; AltGr key already down (held by the user or a tap-hold) is left alone: the
+; wrap's release would end that hold. A modifier name that is neither AltGr
+; nor in the prefix map is logged and skipped rather than corrupting the
+; keystroke.
+; @param Mods {Array} Modifier names ("Ctrl", "Shift", "Alt", "Win", "AltGr").
+; @param Key {String} AHK key name.
+; @param Blind {Boolean} True to keep the modifiers held around the keystroke.
+; @return {String} The SendInput payload, "" when AltGr has no send name.
+_TextSenderKeystroke(Mods, Key, Blind := false) {
+	global _TextSenderKeyIsDown
 	Prefix := ""
+	AltGr := false
+	for _, Mod in Mods {
+		if (StrLower(Trim(Mod)) == "altgr") {
+			AltGr := true
+			continue
+		}
+		Symbol := _TextSenderModifierPrefix(Mod)
+		if (Symbol == "") {
+			LoggerWarn("TextSender", "TextPressKey: unknown modifier token '{1}' for key '{2}' - ignored.", Mod, Key)
+			continue
+		}
+		Prefix .= Symbol
+	}
+	Stroke := Prefix . "{" . Key . "}"
+	if AltGr {
+		AltGrKey := KS_AltGrKeyName()
+		if (AltGrKey == "RAlt") {
+			Stroke := "<^>!" . Stroke
+		} else if !_TextSenderKeyIsDown.Call(AltGrKey) {
+			SendKey := KS_AltGrSendKey()
+			if (SendKey == "") {
+				LoggerError("TextSender", "TextPressKey: the layout's AltGr key has no virtual key to send; '{1}' was not sent.", Key)
+				return ""
+			}
+			Stroke := "{" . SendKey . " down}" . Stroke . "{" . SendKey . " up}"
+		}
+	}
+	return (Blind ? "{Blind}" : "") . Stroke
+}
+
+; Send string for a sustained Down or Up of key Key. The layout's AltGr on a
+; Kana-style layout goes out by its virtual key (see KS_AltGrSendKey), with
+; {Blind}: AHK then treats it as an ordinary key, and without {Blind} it would
+; lift the modifiers the user holds around it.
+; @param Key {String} AHK key name.
+; @param Direction {String} "Down" or "Up".
+; @return {String} The SendInput payload, "" when AltGr has no send name (the
+;         caller refuses and logs: this can run under the synthetic ledger's Critical).
+_TextSenderSustainedKey(Key, Direction) {
+	if (IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP and Key == KS_AltGrKeyName()) {
+		SendKey := KS_AltGrSendKey()
+		return (SendKey == "") ? "" : "{Blind}{" . SendKey . " " . Direction . "}"
+	}
+	return "{" . Key . " " . Direction . "}"
+}
+
+; Splits a space-delimited modifier STRING (the AHK-style form that dozens of
+; tap-hold / gesture call sites pass, e.g. "Shift", "Ctrl Shift", "Blind") into
+; its modifier names. Without this parsing the modifiers were silently dropped
+; and the bare key was sent (back-Tab became a forward Tab; Ctrl+BackSpace
+; word-delete degraded to a single delete). "Blind" is returned separately so a
+; held modifier survives.
+; @return {Array} The modifier names; Blind receives whether "Blind" appeared.
+_TextSenderModifierWords(ModStr, &Blind) {
+	Blind := false
+	Words := []
 	for Token in StrSplit(Trim(ModStr), " ") {
 		Token := Trim(Token)
 		if (Token = "")
 			continue
 		if (Token = "Blind") {
-			Blind := "{Blind}"
+			Blind := true
 			continue
 		}
-		P := _TextSenderModifierPrefix(Token)
-		if (P = "") {
-			LoggerWarn("TextSender", "TextPressKey: unknown modifier token '{1}' in '{2}' - ignored.", Token, ModStr)
-			continue
-		}
-		Prefix .= P
+		Words.Push(Token)
 	}
-	return Blind . Prefix
+	return Words
 }
 
-; Normalizes a modifier name (string or alias) to an AHK key name.
+; Normalizes a modifier name (string or alias) to a TextSender modifier name.
 ; Returns "" for unknown values so callers can skip them safely.
 _TextSenderNormalizeModifierKey(Token) {
 	switch StrLower(Trim(Token)) {
@@ -130,27 +195,14 @@ _TextSenderNormalizeModifierKey(Token) {
 			return "Shift"
 		case "alt", "lalt", "ralt":
 			return "Alt"
+		; AltGr is not right Alt: normalizing it to RAlt gave a plain Alt.
 		case "altgr":
-			return "RAlt"
+			return "AltGr"
 		case "win", "lwin", "rwin", "cmd":
 			return "LWin"
 		default:
 			return ""
 	}
-}
-
-; Builds the modifier down/up prefix set for SendInput from array input.
-; Useful for Space/one-shot style handlers that need to send the captured
-; character while modifiers are already pressed.
-_TextSenderModifierPrefixFromArray(Modifiers) {
-	Prefix := ""
-	for _, Token in Modifiers {
-		Norm := _TextSenderNormalizeModifierKey(Token)
-		if (Norm == "")
-			continue
-		Prefix .= _TextSenderModifierPrefix(Norm)
-	}
-	return Prefix
 }
 
 
@@ -346,7 +398,7 @@ _TextSenderRunAtomicOutput(SenderFn, Opts, Operation) {
 ; process-wide clipboard FIFO permanently busy; in a hold path it can also
 ; strand a partially applied modifier transaction.
 _TextSenderSendInput(Keys, Operation := "SendInput", LogFailure := true) {
-	global _AHK_SendInput
+	global _AHK_SendInput, TEXT_SENDER_SEND_LEVEL
 
 	; Every TextPressKey emission funnels through here at SendLevel 0, and the
 	; prefix watcher's InputHook is armed "V L0 I1" — so it filters these out by
@@ -365,6 +417,10 @@ _TextSenderSendInput(Keys, Operation := "SendInput", LogFailure := true) {
 	;     replacement, likewise already accounted for.
 	;   - the modifier Down/Up and rollback operations change modifier state
 	;     only; they touch neither the caret nor the document.
+	;
+	; The send runs at TEXT_SENDER_SEND_LEVEL, never at the caller's level.
+	PreviousSendLevel := A_SendLevel
+	SendLevel(TEXT_SENDER_SEND_LEVEL)
 	try {
 		; Declaration and OS output are one transaction. HS_DeclareSyntheticEffect
 		; used to restore Critical and run tooltip effects before this call, which
@@ -386,6 +442,8 @@ _TextSenderSendInput(Keys, Operation := "SendInput", LogFailure := true) {
 		if LogFailure
 			LoggerError("TextSender", "{1} failed for '{2}': {3}", Operation, Keys, Err.Message)
 		return false
+	} finally {
+		SendLevel(PreviousSendLevel)
 	}
 }
 
@@ -697,6 +755,16 @@ TextEraseChars(Count) {
 	return true
 }
 
+; Sends the menu mask key (A_MenuMaskKey) without releasing held modifiers. A
+; lone Alt or Win tap makes Windows put the focused window's menu bar in menu
+; mode (or open the Start menu); a keystroke between the modifier's Down and Up
+; turns it into a chord that does nothing, which is how AutoHotkey masks its own
+; Alt and Win hotkeys. {Blind} keeps the held modifier down around the mask.
+; @return {Boolean} True when the mask was sent.
+TextSendMenuMask() {
+	return _TextSenderSendInput("{Blind}{" . A_MenuMaskKey . "}", "menu mask", false)
+}
+
 ; Emits a keystroke with optional modifiers, or a key-down/key-up event.
 ; @param Key       {String} Key name (e.g., "LCtrl", "Return", "Escape").
 ; @param Modifiers {Array|String} Array of modifier name strings for a full
@@ -732,7 +800,10 @@ TextPressKey(Key, Modifiers, LogFailure := true, Transaction := unset) {
 			for _, ModKey in Key {
 				if (ModKey == "")
 					continue
-				if !_TextSenderSendInput("{" . ModKey . " " . Modifiers . "}", "modifier " . Modifiers, LogFailure) {
+				Payload := _TextSenderSustainedKey(ModKey, Modifiers)
+				if (Payload == "" and LogFailure)
+					LoggerError("TextSender", "TextPressKey: the layout's AltGr key has no virtual key to send; '{1}' {2} was not sent.", ModKey, Modifiers)
+				if (Payload == "" or !_TextSenderSendInput(Payload, "modifier " . Modifiers, LogFailure)) {
 					; A failed multi-key Down must not leave the keys already sent
 					; logically held by the driver.  Release them in reverse order;
 					; each release is guarded/logged independently because the
@@ -740,7 +811,8 @@ TextPressKey(Key, Modifiers, LogFailure := true, Transaction := unset) {
 					if (Modifiers == "Down") {
 						loop SentKeys.Length {
 							SentKey := SentKeys[SentKeys.Length - A_Index + 1]
-							if !_TextSenderSendInput("{" . SentKey . " Up}", "modifier rollback", LogFailure)
+							Rollback := _TextSenderSustainedKey(SentKey, "Up")
+							if (Rollback == "" or !_TextSenderSendInput(Rollback, "modifier rollback", LogFailure))
 								RollbackFailedKeys.Push(SentKey)
 						}
 					}
@@ -760,7 +832,13 @@ TextPressKey(Key, Modifiers, LogFailure := true, Transaction := unset) {
 			}
 			return true
 		}
-		return _TextSenderSendInput("{" . Key . " " . Modifiers . "}", "sustained key " . Modifiers, LogFailure)
+		Payload := _TextSenderSustainedKey(Key, Modifiers)
+		if (Payload == "") {
+			if LogFailure
+				LoggerError("TextSender", "TextPressKey: the layout's AltGr key has no virtual key to send; '{1}' {2} was not sent.", Key, Modifiers)
+			return false
+		}
+		return _TextSenderSendInput(Payload, "sustained key " . Modifiers, LogFailure)
 	}
 	if (Modifiers is Array) {
 		Mods := []
@@ -784,17 +862,19 @@ TextPressKey(Key, Modifiers, LogFailure := true, Transaction := unset) {
 		; A one-modifier array is still a regular shortcut.  `{Ctrl c}` is
 		; parsed as a single brace token by AHK rather than as Ctrl+C; use the
 		; same prefix form as multi-modifier arrays (`^+{Tab}`) for every size.
-		Prefix := _TextSenderModifierPrefixFromArray(Mods)
-		return _TextSenderSendInput(Prefix . "{" . Key . "}", "modified key press")
+		Stroke := _TextSenderKeystroke(Mods, Key)
+		return (Stroke == "") ? false : _TextSenderSendInput(Stroke, "modified key press")
 	}
-	Prefix := ""
+	Words := []
+	Blind := false
 	if (Modifiers is String) and (Modifiers != "") {
 		; AHK-style space-delimited modifier string ("Shift", "Ctrl Shift",
-		; "Blind", ...). Previously this fell through with Prefix "" and the bare
+		; "Blind", ...). Previously this fell through with no prefix and the bare
 		; key was emitted, silently dropping the modifier.
-		Prefix := _TextSenderModifierString(Modifiers)
+		Words := _TextSenderModifierWords(Modifiers, &Blind)
 	}
-	return _TextSenderSendInput(Prefix . "{" . Key . "}", "key press")
+	Stroke := _TextSenderKeystroke(Words, Key, Blind)
+	return (Stroke == "") ? false : _TextSenderSendInput(Stroke, "key press")
 }
 
 ; Machine-readable contract map - consumed by the generic adapter compliance test

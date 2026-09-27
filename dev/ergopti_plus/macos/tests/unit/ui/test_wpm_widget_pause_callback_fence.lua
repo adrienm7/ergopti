@@ -120,6 +120,8 @@ helpers.describe("WPM widget callbacks are fenced by a real ScriptControl PAUSE"
 				get_source_color = function(_, alpha)
 					return { hex = "#336699", alpha = alpha }
 				end,
+				resolve_group_hex = function() return nil end,
+				unit_label = function() return "MPM" end,
 			}
 			package.loaded["adapters.timer_scheduler"] = {
 				every = function(_, callback)

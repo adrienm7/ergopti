@@ -374,6 +374,15 @@ M.features = {
 		path = "metrics.wpm_widget_colors", id = "wpm_widget_colors", section = "metrics", default = true, type = "boolean", description_key = "menu.metrics.wpm_widget_colors", platforms = { "ahk", "linux" },
 	},
 	{
+		path = "metrics.wpm_widget_graph", id = "wpm_widget_graph", section = "metrics", default = false, type = "boolean", description_key = "menu.metrics.wpm_widget_graph", platforms = { "ahk", "linux" },
+	},
+	{
+		path = "metrics.wpm_menubar_visible", id = "wpm_menubar_visible", section = "metrics", default = false, type = "boolean", description_key = "menu.metrics.show_wpm_menubar", platforms = { "linux" },
+	},
+	{
+		path = "metrics.wpm_menubar_colors", id = "wpm_menubar_colors", section = "metrics", default = true, type = "boolean", description_key = "menu.metrics.colors_by_source", platforms = { "linux" },
+	},
+	{
 		path = "shortcuts.enabled", id = "enabled", section = "shortcuts", default = true, type = "boolean", description_key = "menu.shortcuts.enabled", platforms = { "hs", "linux" },
 	},
 	{
@@ -543,9 +552,6 @@ M.unavailable = {
 	},
 	{
 		path = "metrics.wpm_widget_y", section = "metrics", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "metrics.wpm_widget_graph", section = "metrics", reason_key = "", platforms = { "ahk" },
 	},
 	{
 		path = "shortcuts.get_hex_value", section = "shortcuts", reason_key = "", platforms = { "ahk" },

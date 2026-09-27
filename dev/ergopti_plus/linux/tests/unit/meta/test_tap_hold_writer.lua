@@ -29,9 +29,9 @@ local function fresh_writer(reload_ok)
 		path = path,
 		reload = function() state.reloads = state.reloads + 1; return reload_ok ~= false end,
 		is_tap_action = function(id) return id == "copy" or id == "paste" or id == "enter" end,
-		is_hold_option = function(kind, id)
-			return (kind == "none" and id == "") or (kind == "modifier" and (id == "ctrl" or id == "ctrl+shift"))
-				or (kind == "layer" and id == "nav")
+		-- The shipped catalogue, through the same canonicaliser the manager uses.
+		canonical_hold = function(kind, id)
+			return require("tap_hold.hold_options").canonical(kind, id, Loader.load(DEFAULTS, nil).hold_picker)
 		end,
 	})
 	return writer, path, state
@@ -91,6 +91,18 @@ helpers.describe("tap-hold writer: a tray change reaches the engine", function()
 		os.remove(path)
 	end)
 
+	helpers.it("stores a hold in the canonical spelling the loader reads back", function()
+		local writer, path = fresh_writer()
+		helpers.assert_true(writer.set_hold("caps_lock", "modifier", "Shift + Ctrl"))
+		helpers.assert_true(read_file(path):find('hold_modifier = "ctrl+shift"', 1, true) ~= nil,
+			"the file holds the picker's id, not the spelling it was given")
+		helpers.assert_true(writer.set_hold("right_ctrl", "modifier", "AltGr"))
+		helpers.assert_eq(effective(path).keys.right_ctrl.hold_modifier, "alt_gr")
+		helpers.assert_true(not writer.set_hold("caps_lock", "modifier", "hyper"), "an unknown modifier is refused")
+		helpers.assert_true(not writer.set_hold("caps_lock", "modifier", ""), "a modifier hold needs one")
+		os.remove(path)
+	end)
+
 	helpers.it("clears a default hold with the none option", function()
 		local writer, path = fresh_writer()
 		writer.set_hold("left_alt", "none", "")
@@ -107,7 +119,8 @@ helpers.describe("tap-hold writer: a tray change reaches the engine", function()
 		helpers.assert_eq(key.tap_action, "")
 		helpers.assert_eq(key.hold_modifier, "")
 		local Engine = require("platform.remap.tap_hold_engine")
-		local engine = Engine.new({ keys = effective(path).keys, tap_min_ms = 50, one_shot_timeout_ms = 2000 })
+		local engine = Engine.new({ keys = effective(path).keys, tap_min_ms = 50, one_shot_timeout_ms = 2000,
+			key_text = function() return nil end, plan_text = function() return nil end, one_shot_result = function() return nil end, })
 		helpers.assert_true(not engine:handles(58), "the engine leaves CapsLock alone")
 		os.remove(path)
 	end)

@@ -176,3 +176,55 @@ helpers.describe("combo press: when it must not write", function()
 	end)
 
 end)
+
+-- =================================================================
+-- =================================================================
+-- ======= 2/ A modifier already down ==============================
+-- =================================================================
+-- =================================================================
+
+-- A catalogue chord tapped while a modifier is held (CapsLock held as Ctrl,
+-- then a left Ctrl tap that pastes) shares one kernel bit per key with that
+-- hold. Pressing Ctrl again is dropped by the kernel and releasing it lifted
+-- the Ctrl CapsLock still held: every later key under CapsLock lost its Ctrl
+-- while the hook still reported it down (held-modifier-tap-2026-09-25).
+helpers.describe("combo press: a modifier the hand or a hold already has down", function()
+
+	--- Presses a combo while the hook reports `held` modifier codes down.
+	local function press_holding(combo, held)
+		local hook = {
+			held_text_modifier_codes = function() return {} end,
+			held_shortcut_modifier_codes = function() return held end,
+		}
+		package.loaded["adapters.keyboard_hook"] = hook
+		local ok_press, events, ok = pcall(press, combo)
+		package.loaded["adapters.keyboard_hook"] = nil
+		assert(ok_press, events)
+		return events, ok
+	end
+
+	local function trail(events)
+		local parts = {}
+		for _, ev in ipairs(events) do parts[#parts + 1] = ev.code .. ":" .. ev.value end
+		return table.concat(parts, " ")
+	end
+
+	helpers.it("neither presses nor releases a modifier already down", function()
+		local events, ok = press_holding("ctrl+v", { KEY_LEFTCTRL })
+		helpers.assert_true(ok)
+		helpers.assert_eq(trail(events), "47:1 47:0",
+			"releasing Ctrl here would lift the Ctrl a hold still owns")
+	end)
+
+	helpers.it("still presses the modifiers the held one does not cover", function()
+		local events = press_holding("ctrl+shift+Tab", { KEY_LEFTCTRL })
+		helpers.assert_eq(trail(events), "42:1 15:1 15:0 42:0")
+	end)
+
+	helpers.it("presses a right-hand-held modifier's left twin normally", function()
+		local events = press_holding("ctrl+v", { 97 })
+		helpers.assert_eq(trail(events), "29:1 47:1 47:0 29:0",
+			"the kernel keeps one bit per key: a held Right Ctrl does not own Left Ctrl")
+	end)
+
+end)

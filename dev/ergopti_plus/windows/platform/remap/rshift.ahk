@@ -29,14 +29,14 @@
 ; ==========================
 
 _RShiftHoldModKey() {
-	return ResolveHoldModifierKey(TapHoldHoldModifier(TapHold, "right_shift"), "right_shift", "RShift")
+	return ResolveHoldModifierKey(TapHoldHoldModifier(TapHold, "right_shift"), "right_shift")
 }
 
 _RShiftHandleHold(PhysicalModifierPassthrough) {
 	Result := TapHoldOwnImmediateModifier("right_shift", "SC036",
 		_RShiftHoldModKey(), TapHoldDuration(TapHold, "right_shift"),
 		,,,,,, PhysicalModifierPassthrough)
-	if (Result["tap"] and Result["elapsed_ms"] >= TapMinDurationMs() and A_PriorKey == "RShift")
+	if (Result["tap"] and Result["elapsed_ms"] >= TapMinDurationMs() and TapHoldPriorKeyIsSelf("right_shift"))
 		_RShiftDispatch()
 }
 
@@ -50,7 +50,7 @@ _RShiftHandleHold(PhysicalModifierPassthrough) {
 ; The hold behaviour (Shift staying Shift) is provided by the OS passthrough
 ; via the ~ prefix — no explicit hold logic is needed here.
 #HotIf TapHoldTapAction(TapHold, "right_shift") != "" and TapHoldHoldModifier(TapHold, "right_shift") == "" and TapHoldHoldLayer(TapHold, "right_shift") == "" and not LayerEnabled
-~$SC036::
+~*$SC036::
 {
 	; Bounded (unlike a bare KeyWait): a lost SC036 key-up can never wedge
 	; this hotkey's tap/hold discrimination forever (hold-keywait-whole-class).
@@ -62,7 +62,7 @@ _RShiftHandleHold(PhysicalModifierPassthrough) {
 	if (
 		tap
 		and ElapsedMs >= TapMinDurationMs()
-		and A_PriorKey == "RShift"
+		and TapHoldPriorKeyIsSelf("right_shift")
 	) { ; A_PriorKey allows fast shortcuts under the tap threshold without triggering the tap action mid-combo
 		_RShiftDispatch()
 	}
@@ -73,3 +73,24 @@ _RShiftHandleHold(PhysicalModifierPassthrough) {
 _RShiftDispatch() {
 	_TapHoldFireAction("right_shift")
 }
+
+
+
+
+
+
+
+; =====================================
+; =====================================
+; ======= 14.1) Own auto-repeat =======
+; =====================================
+; =====================================
+
+; The key's own auto-repeat while an owner holds its suppressed press. Under
+; a layer hold no variant above is eligible any more, and the navigation layer
+; would map the repeat (CapsLock repeated its layer Backspace) or let it reach
+; the system. Declared before nav_layer.ahk, so this variant wins there
+; (see TapHoldPressIsOwned).
+#HotIf TapHoldPressIsOwned("right_shift")
+*SC036:: return
+#HotIf

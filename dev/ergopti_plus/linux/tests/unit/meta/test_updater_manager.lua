@@ -237,6 +237,18 @@ helpers.describe("modules/updater/manager.lua", function()
 		helpers.assert_nil(M.get_cached_release(), "cached release should be nil after clear")
 	end)
 
+	helpers.it("refuses to download a release other than the one the user chose", function()
+		M._test_set_cached_release({ tag = "v2", download_url = "https://example.invalid/2.tar.gz",
+			checksum_url = "https://example.invalid/2.sha256" })
+		local answered = nil
+		local dispatched = M.download_update("https://example.invalid/1.tar.gz", function(path, err)
+			answered = { path = path, err = err }
+		end)
+		helpers.assert_true(dispatched == false, "a stale consent must not start a download")
+		helpers.assert_true(answered ~= nil and answered.path == nil, "the caller learns the download was refused")
+		M.clear_cached_release()
+	end)
+
 	helpers.it("get_menu_label returns a string for every state", function()
 		-- Should return a non-empty string even without having checked.
 		local label = M.get_menu_label()
@@ -252,26 +264,28 @@ helpers.describe("modules/updater/manager.lua", function()
 		local i18n = require("infra.i18n")
 		M.clear_cached_release()
 		local label = M.get_menu_label()
-		helpers.assert_eq(label, i18n.get("menu.about.check_for_updates"),
+		-- "(dev)" names the prerelease channel, the same token in every locale.
+		local expected = i18n.get("menu.about.check_for_updates") .. (M.get_channel() == "dev" and " (dev)" or "")
+		helpers.assert_eq(label, expected,
 			"the idle label must be whatever the catalogue says for the active locale")
 		helpers.assert_true(label ~= "menu.about.check_for_updates",
 			"an echoed key means the catalogue was never reached")
 	end)
 
-	helpers.it("the update-available label carries the tag through the catalogue template", function()
+	-- The row this label names runs check_for_updates. With a release cached it
+	-- read "Update to <tag>", so the user clicked what looked like the update and
+	-- only got another check, next to the "Download and install <tag>" row that
+	-- really installs it.
+	helpers.it("the check row still names a check while a release is available", function()
 		local i18n = require("infra.i18n")
-		-- A tag containing "%" is the reason the substitution is done on plain
-		-- indices: gsub would read it as a capture reference in the REPLACEMENT
-		-- string and raise "invalid use of '%'".
 		M._test_set_cached_release({ tag = "v9.9.9-100%", prerelease = false })
 		local label = M.get_menu_label()
-		helpers.assert_true(label:find("v9.9.9-100%", 1, true) ~= nil,
-			"the tag must appear verbatim in the label, percent signs included")
-		helpers.assert_true(label:find("{tag}", 1, true) == nil,
-			"the {tag} placeholder must be substituted, not rendered")
-		helpers.assert_true(label ~= i18n.get("menu.about.update_now"),
-			"the template must have been filled in, not returned as-is")
+		local expected = i18n.get("menu.about.check_for_updates") .. (M.get_channel() == "dev" and " (dev)" or "")
 		M.clear_cached_release()
+		helpers.assert_eq(label, expected,
+			"the row runs a check, so it must be labelled as one whatever the cached release")
+		helpers.assert_true(label:find("v9.9.9-100%", 1, true) == nil,
+			"the release belongs to the install row, not to the check row")
 	end)
 
 	helpers.it("stop_background_checks is safe to call even without active timers", function()
@@ -325,10 +339,11 @@ helpers.describe("modules/updater/manager.lua", function()
 	end)
 
 	helpers.it("init loads persisted settings and initialises", function()
-		local orig_channel = M.get_channel()
+		local persisted = require("adapters.storage").get("updater.channel", nil)
+		local expected = (persisted == "stable" or persisted == "dev") and persisted or M.default_channel()
 		-- init() should work without opts.
 		M.init({})
-		helpers.assert_eq(M.get_channel(), orig_channel,
+		helpers.assert_eq(M.get_channel(), expected,
 			"init with no opts must not silently move the user off their release channel")
 		-- Channel should still be the same.
 		local ch = M.get_channel()

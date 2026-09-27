@@ -31,13 +31,21 @@ end
 
 --- Builds the menu with a real tap-hold manager on the shared defaults, a fake
 --- writer and a fake picker, and returns the Tap-Holds section.
-local function build(calls, picked)
+local function build(calls, picked, user_text)
 	local Manager = helpers.load_module("platform.remap.tap_hold_manager")
 	local user_path = os.tmpname()
 	os.remove(user_path)
+	if user_text then
+		local fh = assert(io.open(user_path, "w"))
+		fh:write(user_text)
+		fh:close()
+	end
 	Manager.init({
-		keyboard_hook = { set_remapper = function() end },
+		keyboard_hook = { set_remapper = function() end, key_text = function() return nil end,
+			held_modifiers = function() return {} end,
+			held_text_modifier_codes = function() return {} end },
 		execute_action = function() end,
+		on_text_injected = function() end,
 		action_names = function() return { "open_url" } end,
 		defaults_path = DEFAULTS,
 		user_path = user_path,
@@ -154,6 +162,81 @@ helpers.describe("Linux Tap-Holds menu", function()
 		end)
 		restore(Manager)
 		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("names every hold by its translated label, never by its stored id", function()
+		local calls, picked = {}, {}
+		local section, Manager = build(calls, picked)
+		local ok, err = pcall(function()
+			local i18n = require("infra.i18n")
+			local alt_gr = find(key_rows(section), i18n.get("tap_hold.group.alt_gr"))
+			helpers.assert_true(alt_gr ~= nil, "an AltGr row")
+			helpers.assert_contains(alt_gr.title, "  /  " .. i18n.get("tap_hold.hold.alt_gr"),
+				"the row shows the hold's label")
+			helpers.assert_nil(alt_gr.title:find("alt_gr", 1, true), "not the id the file stores")
+			local hold = find(alt_gr.menu, string.format(i18n.get("tap_hold.picker.hold"), ""):sub(1, 4))
+			local combo = i18n.get("tap_hold.hold.ctrl") .. " + " .. i18n.get("tap_hold.hold.shift")
+			helpers.assert_true(find(hold.menu, combo) ~= nil, "the picker offers '" .. combo .. "'")
+			helpers.assert_true(#hold.menu > 30, "every hold option is a row")
+			for _, row in ipairs(hold.menu) do
+				helpers.assert_true(type(row.title) == "string", "every hold row has a title")
+				helpers.assert_nil(row.title:find("[%w_]%+[%w_]"), "raw combination id: " .. row.title)
+				helpers.assert_nil(row.title:find("_", 1, true), "raw modifier id: " .. row.title)
+			end
+		end)
+		restore(Manager)
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("shows a reordered combination as the hold it is, not as none", function()
+		local calls, picked = {}, {}
+		local section, Manager = build(calls, picked, '[tap_hold.keys.caps_lock]\nhold_modifier = "Shift + Ctrl"\n')
+		local ok, err = pcall(function()
+			local i18n = require("infra.i18n")
+			local combo = i18n.get("tap_hold.hold.ctrl") .. " + " .. i18n.get("tap_hold.hold.shift")
+			local caps = find(key_rows(section), i18n.get("tap_hold.group.caps_lock"))
+			helpers.assert_contains(caps.title, "  /  " .. combo)
+			local hold = find(caps.menu, string.format(i18n.get("tap_hold.picker.hold"), ""):sub(1, 4))
+			local checked = {}
+			for _, row in ipairs(hold.menu) do
+				if row.checked then checked[#checked + 1] = row.title end
+			end
+			helpers.assert_eq(checked, { combo }, "the picker ticks the option in force")
+		end)
+		restore(Manager)
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("has a label for every modifier of every hold in all 21 locales", function()
+		local HoldOptions = require("tap_hold.hold_options")
+		local Json = require("json")
+		local Paths = require("infra.paths")
+		local picker = require("platform.remap.tap_hold_loader").load(DEFAULTS, nil).hold_picker
+		local options = HoldOptions.build(picker)
+		helpers.assert_true(#options > #picker.modifiers, "the shipped picker must be read, or this proves nothing")
+		local order_fh = assert(io.open(Paths.shared("data/locale_order.json"), "r"))
+		local locales = Json.decode(order_fh:read("*a")).order
+		order_fh:close()
+		helpers.assert_eq(#locales, 21, "every shipped locale")
+		for _, code in ipairs(locales) do
+			local fh = assert(io.open(Paths.shared("data/locales/" .. code .. ".json"), "r"))
+			local strings = Json.decode(fh:read("*a"))
+			fh:close()
+			local function translate(key)
+				local value = strings[key]
+				if type(value) ~= "string" or value == "" then error(code .. ".json lacks " .. key, 0) end
+				return value
+			end
+			for _, option in ipairs(options) do
+				local label = HoldOptions.label(option, translate)
+				if option.kind == "modifier" then
+					local expected = {}
+					for modifier in option.id:gmatch("[^+]+") do expected[#expected + 1] = translate("tap_hold.hold." .. modifier) end
+					helpers.assert_true(#expected >= 1, code .. ": " .. option.id .. " names at least one modifier")
+					helpers.assert_eq(label, table.concat(expected, " + "), code .. ": " .. option.id)
+				end
+			end
+		end
 	end)
 
 	helpers.it("makes a key native again from its first row", function()

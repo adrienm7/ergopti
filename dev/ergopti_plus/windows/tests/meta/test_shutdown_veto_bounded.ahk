@@ -94,7 +94,12 @@ _SVB_TheRefusalHasARealEscape() {
 		. "asserting about a function that never runs")
 	Stripped := _StripFullLineComments(Body)
 
-	AssertContains(Stripped, "LIFECYCLE_SHUTDOWN_VETO_MAX_ATTEMPTS",
+	; The ceiling is read through the one rule the layout poll also consults
+	; before an automatic reload, so the two cannot disagree.
+	AssertContains(Stripped, "Honored := LifecycleShutdownVetoHonored()",
+		"the refusal must decide through the shared veto-budget rule")
+	Rule := _StripFullLineComments(_DriverFuncBody("LifecycleShutdownVetoHonored"))
+	AssertContains(Rule, "LIFECYCLE_SHUTDOWN_VETO_MAX_ATTEMPTS",
 		"the ceiling must come from the declared constant, so it is greppable and "
 		. "cannot drift into an inline literal")
 	AssertContains(Stripped, "_LifecycleShutdownVetoAttempts += 1",

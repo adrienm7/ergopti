@@ -8,7 +8,7 @@
 ;
 ; Before the fix, every call to _WPMWidget_ReadTomlColor() did a full FileRead
 ; of the hotstring category TOML file. The WPM tick fires every ~100 ms and
-; calls WPMWidget_ResolveBgColor / WPMWidget_CategoryBgColor / CategoryGraphColor
+; calls WPMWidget_ResolveBgColor / WPMWidget_CategoryBgColor
 ; on every tick, each of which may call _WPMWidget_ReadTomlColor. On a typical
 ; session this means dozens of file reads per second for a value that changes
 ; at most when the user edits a hotstring config in the config window.

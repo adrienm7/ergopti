@@ -214,4 +214,20 @@ helpers.describe("tray_menu: the icon is the Ergopti logo", function()
 			"no shared tree means no file, and the caller falls back to a themed name")
 	end)
 
+	helpers.it("keeps the shared root's spelling whatever separator the host declares", function()
+		-- The icon path was rewritten to backslashes wherever package.config
+		-- declared "\": the tray then announced a path infra.paths never spells,
+		-- and on Linux the rewritten path names no file. Declaring that separator
+		-- here reproduces it on every host.
+		local Protocol = helpers.load_module("tray.protocol")
+		local Paths = helpers.load_module("infra.paths")
+		local real_config = package.config
+		package.config = "\\" .. real_config:sub(2)
+		local ok, icon = pcall(Protocol.resolve_tray_icon, Paths.shared_root(), false)
+		package.config = real_config
+		helpers.assert_true(ok, tostring(icon))
+		helpers.assert_eq(icon, Paths.shared("assets/ergopti_tray.png"),
+			"the icon is the shared root's own path to the logo")
+	end)
+
 end)

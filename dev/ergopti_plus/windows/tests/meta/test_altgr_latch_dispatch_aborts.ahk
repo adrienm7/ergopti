@@ -82,8 +82,8 @@ _ALDA_AbortPathSendsNativeAndReturns() {
 		"_ScriptAltGrDispatch must still call RunScriptShortcutAction(Slot) on the physical path — the abort only applies to non-physical presses")
 	Assert(SendNativePos < ActionPos,
 		"SendFinalResult(NativeSend) abort path must appear BEFORE RunScriptShortcutAction(Slot) in _ScriptAltGrDispatch — the abort must be able to fire without ever reaching the action call")
-	Assert(InStr(Body, 'SendFinalResult("^!{" . CtrlAltSuffixKey . "}")') > 0,
-		"the Ctrl+Alt fallback must also use the guarded common send primitive")
+	; The Ctrl+Alt twins it once served were dead (script-altgr-scan-codes-2026-09-26).
+	Assert(!InStr(Body, "^!"), "no Ctrl+Alt twin may be dispatched any more")
 }
 
 Test("script_altgr: non-physical abort path appears before RunScriptShortcutAction (altgr-latch-dispatch-aborts)",

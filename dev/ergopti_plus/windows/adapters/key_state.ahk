@@ -183,18 +183,160 @@ KS_ResolveKeyboardLayout() {
 	}
 }
 
-; Reverse-probes VK_RMENU (0xA5) into a scancode under the given layout
-; (MAPVK_VK_TO_VSC_EX = 4). SC = 0 means VK_RMENU is not mapped on this layout
-; (a Kana-like AltGr remap); a non-zero SC means a standard RAlt/AltGr exists.
-; @param Hkl {Integer} The keyboard layout handle to probe.
-; @return {Integer} The scancode for VK_RMENU, or 0 when it is unmapped.
-KS_ProbeRightAltScancode(Hkl) {
-	try {
-		return DllCall("MapVirtualKeyExW", "UInt", 0xA5, "UInt", 4, "Ptr", Hkl, "UInt")
-	} catch as e {
-		try LoggerError("KeyState", "KS_ProbeRightAltScancode failed: {1}.", e.Message)
-		return 0
+; Win32 names for the AltGr probe (MapVirtualKeyExW), defined once.
+global KS_VK_RMENU := 0xA5
+global KS_MAPVK_VK_TO_VSC_EX := 4
+global KS_MAPVK_VSC_TO_VK_EX := 3
+; Extended scan code of the physical AltGr key (right Alt position).
+global KS_SC_ALTGR_EXTENDED := 0xE038
+
+; Probes layout Hkl for the AltGr family, once, and returns what decided it.
+; VK_RMENU reverse-probes to a scan code (typically 0xE038) on a standard AltGr
+; layout (bépo, AZERTY, US-International) and on QWERTY; on a Kana-style
+; KbdEdit/MSKLC remap the AltGr key sits on another virtual key (VK_OEM_8,
+; VK_KANA, ...) and VK_RMENU has no scan code at all. The forward lookup of the
+; AltGr scan code gives the virtual key the layout puts that key on, which a
+; Send must name on a Kana layout (KS_AltGrSendKey). The reverse direction
+; proved more reliable than the forward one for the family itself: the forward
+; lookup behaved inconsistently across bépo HKLs.
+; Never probes HKL 0, which MapVirtualKeyExW reads as HKL_PREV (another loaded
+; layout), and a layout that maps neither direction (an invalid HKL answers 0
+; to both) is reported as unknown ("valid" false), never as a Kana layout: a
+; lone 0 from the reverse probe used to be enough to pick the Kana family.
+; "altgr_level" tells an AltGr layout (AZERTY, bépo: Ctrl+Alt types characters,
+; and right Alt comes with a fake LCtrl) from one without (QWERTY: right Alt is
+; a plain Alt), which the family flag cannot: both keep VK_RMENU.
+; @param Hkl {Integer} Keyboard layout handle; 0 is refused.
+; @param MapFn {Func} Test seam taking (Code, MapType, Hkl), MapVirtualKeyExW
+;        by default.
+; @param AltGrLevelFn {Func} Test seam taking Hkl, KS_LayoutHasAltGrLevel by
+;        default.
+; @return {Map} "hkl", "rmenu_sc" (0 = VK_RMENU unmapped), "altgr_vk", "valid"
+;         (the layout knows the AltGr key one way or the other), "kana"
+;         (VK_RMENU unmapped while the AltGr key has a virtual key) and
+;         "altgr_level".
+KS_ProbeAltGrLayout(Hkl, MapFn := 0, AltGrLevelFn := 0) {
+	global KS_VK_RMENU, KS_MAPVK_VK_TO_VSC_EX, KS_MAPVK_VSC_TO_VK_EX, KS_SC_ALTGR_EXTENDED
+	if (Hkl == 0)
+		throw ValueError("The AltGr layout probe needs a keyboard layout; HKL 0 is another loaded layout (HKL_PREV).", -1)
+	if !IsObject(MapFn)
+		MapFn := (Code, MapType, Layout) => DllCall("MapVirtualKeyExW", "UInt", Code, "UInt", MapType, "Ptr", Layout, "UInt")
+	RMenuSc := MapFn.Call(KS_VK_RMENU, KS_MAPVK_VK_TO_VSC_EX, Hkl)
+	AltGrVk := MapFn.Call(KS_SC_ALTGR_EXTENDED, KS_MAPVK_VSC_TO_VK_EX, Hkl)
+	if !IsObject(AltGrLevelFn)
+		AltGrLevelFn := KS_LayoutHasAltGrLevel
+	return Map("hkl", Hkl, "rmenu_sc", RMenuSc, "altgr_vk", AltGrVk,
+		"valid", RMenuSc != 0 or AltGrVk != 0,
+		"kana", RMenuSc == 0 and AltGrVk != 0,
+		"altgr_level", AltGrLevelFn.Call(Hkl))
+}
+
+; Whether Ctrl+Alt types something on layout Hkl: a character or a dead key on
+; one of the character keys (digits, letters, OEM punctuation), which is the
+; AltGr level of an AltGr layout. QWERTY has none (measured on this machine:
+; AZERTY 13 keys, bépo 45, the Ergopti Kana layout 0). ToUnicodeEx runs with
+; flag 0x4 so no dead-key state is left behind.
+; @param Hkl {Integer} Keyboard layout handle.
+; @return {Boolean}
+KS_LayoutHasAltGrLevel(Hkl) {
+	static CtrlAltVks := [0x11, 0x12, 0xA2, 0xA5] ; VK_CONTROL, VK_MENU, VK_LCONTROL, VK_RMENU
+	static KeyRanges := [[0x30, 0x39], [0x41, 0x5A], [0xBA, 0xC0], [0xDB, 0xDF], [0xE2, 0xE2]]
+	State := Buffer(256, 0)
+	for _, Vk in CtrlAltVks
+		NumPut("UChar", 0x80, State, Vk)
+	Chars := Buffer(32, 0)
+	for _, Range in KeyRanges {
+		Vk := Range[1]
+		while (Vk <= Range[2]) {
+			Sc := DllCall("MapVirtualKeyExW", "UInt", Vk, "UInt", 0, "Ptr", Hkl, "UInt")
+			if (Sc and DllCall("ToUnicodeEx", "UInt", Vk, "UInt", Sc, "Ptr", State,
+					"Ptr", Chars, "Int", 8, "UInt", 0x4, "Ptr", Hkl, "Int") != 0)
+				return true
+			Vk += 1
+		}
 	}
+	return false
+}
+
+; The boot probe that decided the AltGr family (HotstringEngineInit): the
+; KS_ProbeAltGrLayout result plus "source" ("probe", "override" when the TOML
+; flag decided, "unresolved" when no layout could be read). Seeded here as
+; unresolved; HotstringEngineInit replaces it before the first hotstring fires.
+global _ALTGR_LAYOUT_PROBE := Map("hkl", 0, "rmenu_sc", 0, "altgr_vk", 0,
+	"valid", false, "kana", false, "altgr_level", false, "source", "unresolved")
+
+; Whether every AltGr press reaches the hook as the layout's fake LCtrl (scan
+; code 0x21D, read as SC01D and recorded as physical) then RAlt: a standard
+; AltGr layout, where the boot probe found an AltGr level (AZERTY, bépo). On
+; QWERTY right Alt is a plain Alt and adds no LCtrl; a Kana-style AltGr is
+; SC138 on another virtual key and adds none either. Read by parse-time #HotIf
+; criteria, which are live before this file's globals are assigned.
+; @return {Boolean}
+KS_AltGrAddsFakeLCtrl() {
+	global _ALTGR_KANA_FIXUP, _ALTGR_LAYOUT_PROBE
+	return !_ALTGR_KANA_FIXUP and IsSet(_ALTGR_LAYOUT_PROBE) and _ALTGR_LAYOUT_PROBE["altgr_level"]
+}
+
+; Whether the layout's AltGr key is an AltGr: a Kana-style AltGr, or right Alt
+; on a layout where the boot probe found an AltGr level. On QWERTY right Alt is
+; a plain Alt. Read by #HotIf criteria, live before this file's globals are
+; assigned.
+; @return {Boolean}
+KS_LayoutHasAltGr() {
+	global _ALTGR_KANA_FIXUP, _ALTGR_LAYOUT_PROBE
+	return _ALTGR_KANA_FIXUP or (IsSet(_ALTGR_LAYOUT_PROBE) and _ALTGR_LAYOUT_PROBE["altgr_level"])
+}
+
+; AHK key name that presses the active layout's AltGr. Standard AltGr layouts
+; put AltGr on VK_RMENU, so "RAlt" is AltGr there. Kana-style remaps
+; (_ALTGR_KANA_FIXUP, resolved at boot) move AltGr to another virtual key and
+; leave VK_RMENU without a scan code: a synthetic RAlt is then a plain Alt that
+; opens a window's menu bar on release and types nothing on a chord, while the
+; physical scan code SC138 still is the layout's AltGr.
+; @return {String} "SC138" on a Kana-style layout, otherwise "RAlt".
+KS_AltGrKeyName() {
+	global _ALTGR_KANA_FIXUP
+	return _ALTGR_KANA_FIXUP ? "SC138" : "RAlt"
+}
+
+; AHK key name a Send must use to press or release the layout's AltGr key.
+; KS_AltGrKeyName stays the key's identity for GetKeyState, KeyWait, the
+; hotkeys and the synthetic ledger, but on a Kana-style layout its "SC138" is
+; unfit for a Send: AutoHotkey reads a bare SC138 as the right Alt modifier
+; (KeyToModifiersLR, case SC_RALT) while it injects the layout's own virtual
+; key for that scan code (VK_OEM_8 on the Ergopti layout), which is no
+; modifier. At the end of a SendInput it then pressed the right Alt it believed
+; missing, a plain Alt on that layout, and left it down: Alt chords instead of
+; AltGr characters, and a stuck Alt after the hold. The virtual key the boot
+; probe read for the AltGr scan code ("vkDF") injects the same key without that
+; bookkeeping. On a layout where right Alt is AltGr, "RAlt" is correct as is.
+; @return {String} "vkXX" on a Kana-style layout, "" when the boot probe found
+;         no virtual key for it (a Send must then refuse), otherwise "RAlt".
+KS_AltGrSendKey() {
+	global _ALTGR_KANA_FIXUP, _ALTGR_LAYOUT_PROBE
+	if !_ALTGR_KANA_FIXUP
+		return "RAlt"
+	Vk := _ALTGR_LAYOUT_PROBE["altgr_vk"]
+	return Vk ? Format("vk{:X}", Vk) : ""
+}
+
+; Whether releasing key Name with nothing typed under it opens a menu: an Alt
+; key puts the focused window's menu bar in menu mode, a Win key opens Start.
+; RAlt counts: it is a plain Alt wherever right Alt is not AltGr. Such a
+; release is masked first (TextSendMenuMask).
+; @param Name {String} AHK key name.
+; @return {Boolean}
+KS_IsMenuModifier(Name) {
+	static MenuModifiers := Map("LAlt", true, "RAlt", true, "LWin", true, "RWin", true)
+	return MenuModifiers.Has(Name)
+}
+
+; Scan code of the key KS_AltGrKeyName presses. A key event is the AltGr key
+; when its scan code matches, whatever virtual key the layout gives it: VK_RMENU
+; on standard layouts, another one (VK_OEM_8, VK_KANA...) on Kana-style ones.
+; @return {Integer} The scan code, extended keys carrying 0x100.
+KS_AltGrScanCode() {
+	return GetKeySC(KS_AltGrKeyName())
 }
 
 ; Enumerates base scancodes 0x01-0x7F under Hkl and returns the first whose

@@ -26,7 +26,8 @@ _USCL_RefusedCleanup(Mode, PrimaryFailure := false) {
 		} catch as Err {
 			Failure := Err
 		}
-		Assert(State.Handle and State.Handle != -1, "the real transaction must reach the cleanup lock")
+		Assert(State.Handle and State.Handle != -1, "the real transaction must reach the cleanup lock"
+			. (Failure is Error ? ": " . Failure.Message : ""))
 		Assert(Failure is Error, "a locked fixture must not report successful cleanup")
 		AssertContains(Failure.Message, "Updater fixture directory cleanup failed:")
 		if PrimaryFailure

@@ -247,12 +247,15 @@ _A0720WV_PathsEditorSurfacesWriteFailure() {
 	CommitPos := InStr(Writer, "ConfigTransitionCommitOwned(")
 	StrictPos := InStr(Writer,
 		'ConfigTransitionResultIs(CommitResult, "committed_new")')
-	ReloadPos := InStr(Writer, "ReloadPreservingSuspend(0, OwnerBundle)")
-	RollbackPos := InStr(Writer, "ConfigTransitionRollbackOwned(")
+	ReloadPos := InStr(Writer, "ReloadPreservingSuspend(0, OwnerBundle,")
+	; One rollback helper serves a refused launch and a later refusal alike.
+	RollbackPos := InStr(Writer, "_PathsFile_RollbackRefusedReload(OwnerBundle)")
+	RollbackBody := _DriverFuncBody("_PathsFile_RollbackRefusedReload")
 	Assert(ReloadPos > 0,
 		"the shared writer must own the success-path reload so its config lease cannot be released between paths.toml and Reload")
 	Assert(CommitPos > 0 && StrictPos > CommitPos && ReloadPos > StrictPos
-		&& RollbackPos > ReloadPos,
+		&& RollbackPos > ReloadPos
+		&& InStr(RollbackBody, "ConfigTransitionRollbackOwned(") > 0,
 		"the paths editor must strictly commit its WAL before Reload and roll all-old on a refused Reload")
 	Assert(InStr(Writer, "ConfigTransitionLogFailure") > 0,
 		"a refused transition must be logged with its typed evidence")

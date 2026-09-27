@@ -53,9 +53,23 @@ M.KEY_CAPSLOCK   = 58
 -- bar in Firefox and other apps with access keys).
 M.KEY_F24        = 194
 
+--- The key a synthetic keystroke holds to reach a layout level, by the level
+--- vocabulary of the keymap (infra/xkb_keymap LEVEL_MODIFIERS): Shift for
+--- level 2, AltGr for 3, both for 4. The injector and the shortcut chords
+--- press the same keys, so a level cannot mean one key to one and another to
+--- the other.
+M.LEVEL_MODIFIER_CODE = {
+	shift = M.KEY_LEFTSHIFT,
+	altgr = M.KEY_RIGHTALT,
+}
+
 --- Which modifier a code belongs to, or nil when it is not one.
 --- Keyed by code so the hook answers "is this a modifier" in one lookup instead
 --- of a chain of comparisons that has to be kept in sync in three places.
+--- The role is the key's USUAL one: the keyboard hook asks the live XKB keymap
+--- which role a modifier key really has (Right Alt is plain Alt_R on a US
+--- layout), and uses this table only under a capture double or, with an
+--- error logged, when XKB cannot answer.
 M.MODIFIER_OF = {
 	[M.KEY_LEFTSHIFT]  = "shift",
 	[M.KEY_RIGHTSHIFT] = "shift",

@@ -13,14 +13,22 @@
 --- Usage (from the driver root): luajit tests/e2e/daemon_keys_child.lua
 ---   <config.toml> <device-file> "<script>"
 --- Script tokens: plain characters are typed; {BS} {ESC} {LEFT} {ENTER} are
---- the control keys. The hook forwards every physical key to the application
---- BEFORE calling back, and the model does the same.
+--- the control keys, and {CBS} is Ctrl+Backspace, which deletes the word
+--- before the caret. The hook forwards every physical key to the application
+--- BEFORE calling back, and the model does the same. {PUMP} runs one idle tick
+--- of the daemon's loop and {TAP} runs the tap action "select_all" through the
+--- tap-hold manager's action runner.
 --- Prints one line: SCREEN <quoted text>.
 --- ==============================================================================
 
 local CONFIG, DEVICE, SCRIPT = arg[1], arg[2], arg[3]
 arg = { "--device", DEVICE, "--config", CONFIG }
 package.path = "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;" .. package.path
+
+-- On a Windows checkout the daemon's POSIX edges (HOME, /tmp, mkdir -p, sh
+-- and coreutils) are emulated for this test process as tests/run.lua does for
+-- the unit suite; install() does nothing anywhere else.
+require("tests.win_compat").install()
 
 local Codes = require("infra.evdev_codes")
 
@@ -83,6 +91,8 @@ hook.isRunning = function() return true end
 hook.get_mode = function() return "scripted" end
 hook.held_text_modifier_codes = function() return {} end
 hook.emergency_stop = function(why) print("EMERGENCY STOP: " .. tostring(why)) end
+-- The script is the keyboard: an idle tick of the loop has no device to read.
+hook.pump = function() return 0 end
 
 -- ERGOPTI_E2E_MENU_ROWS=<file>: build the REAL tray menu with every module
 -- loaded, count its rows through a recording indicator (no GTK needed), and
@@ -133,6 +143,36 @@ if not MENU_ROWS_FILE and not WITH_LLM then
 	package.preload["modules.llm.prediction_engine"] = function() error("disabled for the daemon key scenarios") end
 end
 
+-- ERGOPTI_E2E_GESTURE_PUMP=fails: a touchpad reader whose pump throws. The
+-- same module is the action catalogue the tap-holds run their actions
+-- through, and it types "<action>" on the screen for each one it runs. The
+-- daemon's loop guard once dropped the whole module when the pump failed, and
+-- every tap action died with the reader (gesture-pump-keeps-actions).
+if os.getenv("ERGOPTI_E2E_GESTURE_PUMP") == "fails" then
+	package.preload["modules.gestures.manager"] = function()
+		return {
+			init = function() return true end,
+			is_enabled = function() return true end,
+			set_enabled = function() return true end,
+			pump = function() error("touchpad read failed") end,
+			stop_reading = function() screen[#screen + 1] = "[reader stopped]" end,
+			get_action_names = function() return { "select_all" } end,
+			get_executable_action_names = function() return { "select_all" } end,
+			execute_action = function(action) screen[#screen + 1] = "<" .. action .. ">" end,
+		}
+	end
+end
+
+-- The action runner the daemon hands the tap-hold manager, kept so {TAP} can
+-- run a tap action through it exactly as a tap would.
+local tap_executor = nil
+local TapHold = require("platform.remap.tap_hold_manager")
+local real_tap_hold_init = TapHold.init
+TapHold.init = function(options)
+	tap_executor = options.execute_action
+	return real_tap_hold_init(options)
+end
+
 -- A focused ordinary text field, conclusively.
 package.preload["adapters.secure_field_detector"] = function()
 	return {
@@ -146,22 +186,37 @@ package.preload["adapters.secure_field_detector"] = function()
 	}
 end
 
-local CONTROL = { BS = "backspace", ESC = "escape", LEFT = "left" }
+local CONTROL = { BS = "backspace", CBS = "backspace", ESC = "escape", LEFT = "left" }
+-- The shortcut modifiers the hook reports held with each control key.
+local CONTROL_MODS = { CBS = { ctrl = true } }
 
 package.preload["adapters.event_loop"] = function()
 	return {
-		run = function()
+		run = function(loop)
 			local i = 1
 			while i <= #SCRIPT do
 				local token = SCRIPT:match("^{(%u+)}", i)
-				if token then
+				if token == "PUMP" then
+					-- One idle tick of the daemon's own loop.
+					i = i + #token + 2
+					loop.onIdle()
+				elseif token == "TAP" then
+					i = i + #token + 2
+					local ran = pcall(tap_executor, "select_all", "tap_hold")
+					if not ran then screen[#screen + 1] = "[tap failed]" end
+				elseif token then
 					i = i + #token + 2
 					if token == "BS" then table.remove(screen) end
+					if token == "CBS" then
+						-- As GTK and Qt apply it: the spaces before the caret, then the word.
+						while screen[#screen] == " " do table.remove(screen) end
+						while #screen > 0 and screen[#screen] ~= " " do table.remove(screen) end
+					end
 					if token == "ENTER" then
 						screen[#screen + 1] = "\n"
 						callbacks.onChar("\n", Codes.KEY_ENTER)
 					else
-						callbacks.onKey(CONTROL[token])
+						callbacks.onKey(CONTROL[token], { mods = CONTROL_MODS[token] or {} })
 					end
 				else
 					local c = SCRIPT:match("^[%z\1-\127\194-\244][\128-\191]*", i)

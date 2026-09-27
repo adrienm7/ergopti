@@ -27,11 +27,12 @@ helpers.assert_eq(0.40, c.compact_unit_darken, "compact_unit_darken must be sour
 -- Colors — _shared/modules/wpm_widget/constants.toml [colors]
 helpers.assert_eq("#0055cc", c.color_bg_manual, "color_bg_manual must be sourced from the shared TOML")
 helpers.assert_eq("#1a1a2e", c.color_bg_idle, "color_bg_idle must be sourced from the shared TOML")
-helpers.assert_eq(0.40, c.widget_hsl_l, "widget_hsl_l must be sourced from the shared TOML")
-helpers.assert_eq(1.00, c.widget_hsl_s, "widget_hsl_s must be sourced from the shared TOML")
+helpers.assert_true(type(c.canon) == "table" and c.canon.graph.history_samples == 60,
+	"the graph's shape must come from the shared canon's [graph]")
 
 -- Timings — _shared/modules/timings/constants.toml [ui] (ms -> s)
 helpers.assert_eq(3.0, c.idle_hide_s, "idle_hide_s must be sourced from the timings TOML (3000 ms)")
 helpers.assert_eq(1.0, c.source_color_duration, "source_color_duration must be sourced from the timings TOML (1000 ms)")
+helpers.assert_eq(0.2, c.update_s, "update_s must be sourced from the timings TOML (200 ms)")
 
 print("[PASS] test_wpm_shared_constants")

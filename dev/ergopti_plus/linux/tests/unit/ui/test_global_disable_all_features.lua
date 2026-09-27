@@ -177,8 +177,11 @@ helpers.describe("global disable all (linux): the tap-hold switch", function()
 		local user_path = os.tmpname()
 		os.remove(user_path)
 		Manager.init({
-			keyboard_hook = { set_remapper = function(engine) installed = engine end },
+			keyboard_hook = { set_remapper = function(engine) installed = engine end,
+				key_text = function() return nil end, held_modifiers = function() return {} end,
+				held_text_modifier_codes = function() return {} end },
 			execute_action = function() end,
+			on_text_injected = function() end,
 			action_names = function() return {} end,
 			defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"),
 			user_path = user_path,

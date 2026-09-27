@@ -76,3 +76,42 @@ helpers.describe("update_launcher: exact native updater command", function()
 		helpers.assert_eq(#notifications, 1)
 	end)
 end)
+
+-- A refused check command used to tell the user that "the update installation
+-- failed": nothing had been downloaded or installed, only the request to look
+-- for an update never reached the launcher. Every surface of that failure must
+-- name the check. The unit environment has no catalogue, so the stub echoes
+-- the requested key; translation parity is the JS catalogue gates' job.
+local CHECK_FAILED_KEY = "updater.check_request_failed"
+
+--- Runs one refused check under an i18n double that echoes each key.
+--- @param open_url function URL opener double.
+--- @param alert function|nil Modal alert double.
+--- @return table dialogs, table notifications
+local function refuse_with_echoed_keys(open_url, alert)
+	return helpers.with_fresh_modules({ "infra.i18n", "adapters.update_launcher" }, function()
+		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		local subject, _, dialogs, notifications = load_subject(open_url, alert)
+		helpers.assert_eq(subject.request_check(), false)
+		return dialogs, notifications
+	end)
+end
+
+helpers.describe("update_launcher: a refused check names the check", function()
+	helpers.it("shows the check-failure text in the modal alert", function()
+		local dialogs = refuse_with_echoed_keys(function() return false end)
+
+		helpers.assert_eq(#dialogs, 1)
+		helpers.assert_eq(dialogs[1][2], CHECK_FAILED_KEY)
+	end)
+
+	helpers.it("shows the check-failure text in the fallback notification", function()
+		local _, notifications = refuse_with_echoed_keys(
+			function() error("launch failed") end,
+			function() error("dialog unavailable") end
+		)
+
+		helpers.assert_eq(#notifications, 1)
+		helpers.assert_eq(notifications[1][2].body, CHECK_FAILED_KEY)
+	end)
+end)

@@ -36,6 +36,7 @@
 #Include remap/lshift_lctrl.ahk
 #Include remap/lalt.ahk
 #Include remap/space.ahk
+#Include remap/altgr_criteria.ahk
 #Include remap/altgr.ahk
 #Include remap/rctrl.ahk
 #Include remap/rshift.ahk

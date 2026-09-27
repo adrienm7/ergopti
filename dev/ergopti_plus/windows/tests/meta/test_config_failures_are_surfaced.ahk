@@ -49,12 +49,18 @@ _CFAS_ResetReportsUndeletedFiles() {
 	CommitPos := InStr(Body, "ConfigTransitionCommitOwned(")
 	StrictPos := InStr(Body,
 		'ConfigTransitionResultIs(CommitResult, "committed_new")')
-	ReloadPos := InStr(Body, "ReloadPreservingSuspend(0, OwnerBundle)")
-	RollbackPos := InStr(Body, "ConfigTransitionRollbackOwned(")
+	ReloadPos := InStr(Body, "ReloadPreservingSuspend(0, OwnerBundle,")
+	; The rollback runs from one helper: synchronously when no successor
+	; launched, and from the refusal callback when a launched Reload is refused.
+	RefusedPos := InStr(Body, "ConfigTransitionSettleRefusedReload.Bind(")
+	RollbackPos := InStr(Body, "_ConfigResetRollbackRefusedReload(OwnerBundle)")
 	ReleasePos := InStr(Body, "_ConfigWriteTerminalRelease(OwnerBundle)")
+	RollbackBody := _DriverFuncBody("_ConfigResetRollbackRefusedReload")
 	Assert(AcquirePos > 0 && QuiescePos > AcquirePos && BuildPos > QuiescePos
 		&& CommitPos > BuildPos && StrictPos > CommitPos && ReloadPos > StrictPos
-		&& RollbackPos > ReloadPos && ReleasePos > RollbackPos,
+		&& RefusedPos > ReloadPos && RollbackPos > RefusedPos
+		&& ReleasePos > RollbackPos
+		&& InStr(RollbackBody, "ConfigTransitionRollbackOwned(") > 0,
 		"reset must hold one terminal owner from quiescence through strict commit, Reload, rollback, then release")
 	Assert(InStr(Body, "ConfigTransitionLogFailure") > 0
 		&& InStr(Body, "_ConfigResetShowFailure(") > 0
@@ -87,7 +93,11 @@ _CFAS_PlaceholderWriteIsChecked() {
 ; template still owns the sentence structure, while typed results contribute
 ; their exact status/kind instead of inheriting the old deletion-only text.
 _CFAS_ResetFailureMessagesCarryPreciseReasons() {
+	; The refused-reload branches live in the rollback helper both refusal paths
+	; share, so the enumerated class spans the entry point and that helper.
 	Body := _StripFullLineComments(_DriverFuncBody("ReloadWithDefaultConfig"))
+		. _StripFullLineComments(
+			_DriverFuncBody("_ConfigResetRollbackRefusedReload"))
 	Helper := _StripFullLineComments(
 		_DriverFuncBody("_ConfigResetShowFailure"))
 	Assert(Body != "" && Helper != "",
@@ -221,12 +231,13 @@ _CFAS_LatentContractsAreConsistent() {
 	Assert(InStr(Body, "IsSet(_HSCategorySnapshot)") > 0,
 		"_HSRestoreCategory must IsSet-guard _HSCategorySnapshot as well as Features — it is declared outside infra/, so reading it first throws under the headless harness")
 
-	; AltGr is Ctrl + right Alt. Without its own case it fell through to the
-	; default and returned "", dropping the modifier from the sent keystroke.
-	Prefix := _DriverFuncBody("_TextSenderModifierPrefix")
-	Assert(Prefix != "", "_TextSenderModifierPrefix() must exist")
-	Assert(InStr(Prefix, '"altgr"') > 0,
-		"the modifier-prefix map must handle altgr — the sibling name map normalises to it, and without a case here it silently returns an empty prefix")
+	; AltGr has no prefix symbol on a Kana-style layout, so the keystroke
+	; composer owns it. Without its own case it fell through to the default and
+	; returned "", dropping the modifier from the sent keystroke.
+	Keystroke := _DriverFuncBody("_TextSenderKeystroke")
+	Assert(Keystroke != "", "_TextSenderKeystroke() must exist")
+	Assert(InStr(Keystroke, '"altgr"') > 0 and InStr(Keystroke, "KS_AltGrKeyName()") > 0,
+		"the keystroke composer must handle altgr through the layout's AltGr key — the sibling name map normalises to it, and without a case it silently drops the modifier")
 
 	; Every other path in this function returns a boolean, so a bare return
 	; would make a legitimate zero-count call read as a failure.

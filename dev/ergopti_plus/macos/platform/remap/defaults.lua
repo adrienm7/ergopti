@@ -128,7 +128,8 @@ end
 -- ----- Modifier combos ([hs_combos]) -----
 -- combo_id = { combo_action_id, tap_action_id, hold_action_id } (positional).
 --   combo : press k1 then k2 within simultaneous_threshold_ms → chord-style fire.
---   tap   : hold k1 + briefly tap k2              → fires once on short release.
+--   tap   : hold k1 + briefly tap k2              → fires once on short release;
+--           with no hold, fires at k2's key down and repeats while k2 is held.
 --   hold  : hold k1 + hold k2 past tap_hold delay → fires after long press.
 D.combos = {}
 for id, slots in pairs(require_section(sections, "hs_combos")) do

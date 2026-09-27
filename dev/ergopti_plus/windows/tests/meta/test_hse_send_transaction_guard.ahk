@@ -75,13 +75,17 @@ _AHK04M_AllDispatchCallersConsumeTheVerdict() {
 _AHK04M_NormalDispatchCommitsAfterOutput() {
 	Body := _StripFullLineComments(_DriverFuncBody("HSE_DispatchMatch"))
 	Assert(Body != "", "HSE_DispatchMatch must exist in the driver source")
-	NotepadSend := InStr(Body, "Fired := SendInstant")
-	HookVerdict := InStr(Body, 'Fired := _SendVerdictSucceeded(Hook("SendFinalResult", Burst, false))')
+	; Both branches run their sender inside _HSE_SendWithAltGrUp (the Kana AltGr
+	; owner) and publish Fired from the verdict it returns.
+	NotepadSend := InStr(Body, "Fired := _HSE_SendWithAltGrUp(")
+	NotepadSend := (NotepadSend > 0 and InStr(Body, "() => SendInstant(", , NotepadSend) > NotepadSend) ? NotepadSend : 0
+	HookVerdict := InStr(Body, 'return _SendVerdictSucceeded(Hook("SendFinalResult", Burst, false))')
 	AtomicSend := InStr(Body, "SendInput(Burst)")
-	DirectCommit := InStr(Body, "Fired := true", , AtomicSend)
+	DirectVerdict := InStr(Body, "return true", , AtomicSend)
+	DirectCommit := InStr(Body, "Fired := _HSE_SendWithAltGrUp(SendAtomicBurst)", , DirectVerdict)
 	Apply := InStr(Body, "HSE_ApplyExpansion")
 	Assert(NotepadSend > 0 and HookVerdict > 0 and AtomicSend > HookVerdict
-		and DirectCommit > AtomicSend,
+		and DirectVerdict > AtomicSend and DirectCommit > DirectVerdict,
 		"both normal fire branches must publish success only after their atomic sender succeeds")
 	Assert(Apply > NotepadSend and Apply > AtomicSend,
 		"HSE_ApplyExpansion must run only after the selected output branch succeeds")

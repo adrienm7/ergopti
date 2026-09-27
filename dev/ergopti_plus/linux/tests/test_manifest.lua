@@ -137,6 +137,8 @@ return {
 	"tests.unit.meta.test_ui_bridge_handlers",
 	"tests.unit.meta.test_updater_constants_single_source",
 	"tests.unit.meta.test_updater_manager",
+	"tests.unit.meta.test_updater_channel_and_recheck",
+	"tests.unit.meta.test_updater_restart",
 	"tests.unit.meta.test_updater_version_shared",
 	"tests.unit.meta.test_webkit_host",
 	"tests.unit.meta.test_webkit_host_asset_query",
@@ -228,5 +230,5 @@ return {
 	"tests.unit.ui.test_menu_languages_and_global_separator",
 	"tests.unit.ui.test_menu_pause_greys_features",
 	"tests.unit.ui.test_unused_keys_cleanup",
-	"tests.unit.ui.test_wpm_widget_frame",
+	"tests.unit.ui.test_wpm_readouts",
 }

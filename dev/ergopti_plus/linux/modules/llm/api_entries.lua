@@ -19,7 +19,6 @@
 
 local M = {}
 
-local ffi = require("ffi")
 local Logger = require("logger.shim")
 local Json = require("json")
 local ConfigPaths = require("infra.config_paths")
@@ -27,20 +26,15 @@ local ConfigPaths = require("infra.config_paths")
 local LOG = "modules.llm.api_entries"
 local VERSION = 1
 local PRIVATE_MODE = tonumber("600", 8)
-
--- Private names: evdev_reader and uinput_writer declare open() without its
--- mode argument, and a second declaration of the same name is refused.
-ffi.cdef([[
-	int ergopti_private_open(const char *pathname, int flags, int mode) __asm__("open");
-	long ergopti_private_write(int fd, const void *buf, unsigned long count) __asm__("write");
-	int ergopti_private_close(int fd) __asm__("close");
-	int ergopti_private_fsync(int fd) __asm__("fsync");
-]])
 local O_WRONLY, O_CREAT, O_EXCL = 1, 64, 128
 
 local _path_override = nil
 local _state = nil
 local _sequence = 0
+
+-- Creates a new file only its owner can read: libc through LuaJIT's FFI,
+-- built on first use, or the primitive a test installed.
+local _create_private = nil
 
 
 
@@ -57,6 +51,36 @@ function M.path()
 	return _path_override or (ConfigPaths.config_home() .. "/ergopti_plus/api_keys.json")
 end
 
+--- The libc primitive: open(2) with O_CREAT | O_EXCL and mode 0600, so the
+--- file is private from its first byte, then write, fsync and close.
+---
+--- Built on first use rather than at load. The FFI exists only under LuaJIT,
+--- the one interpreter the daemon runs on, where this changes nothing; on any
+--- other interpreter the first save raises "module 'ffi' not found" instead of
+--- the whole module refusing to load, so the entry logic stays reachable by a
+--- test that installs its own primitive.
+--- @return function (path, text) -> ok, err
+local function libc_create_private()
+	local ffi = require("ffi")
+	-- Private names: evdev_reader and uinput_writer declare open() without its
+	-- mode argument, and a second declaration of the same name is refused.
+	ffi.cdef([[
+		int ergopti_private_open(const char *pathname, int flags, int mode) __asm__("open");
+		long ergopti_private_write(int fd, const void *buf, unsigned long count) __asm__("write");
+		int ergopti_private_close(int fd) __asm__("close");
+		int ergopti_private_fsync(int fd) __asm__("fsync");
+	]])
+	return function(path, text)
+		local fd = ffi.C.ergopti_private_open(path, O_WRONLY + O_CREAT + O_EXCL, PRIVATE_MODE)
+		if fd < 0 then return false, "cannot create " .. path end
+		local written = tonumber(ffi.C.ergopti_private_write(fd, text, #text))
+		local synced = ffi.C.ergopti_private_fsync(fd)
+		ffi.C.ergopti_private_close(fd)
+		if written ~= #text or synced ~= 0 then return false, "short write to " .. path end
+		return true
+	end
+end
+
 --- Writes text to a new file only its owner can read, then renames it over path.
 --- @param path string
 --- @param text string
@@ -66,14 +90,11 @@ local function write_private(path, text)
 	if dir then os.execute("mkdir -p '" .. (dir:gsub("'", "'\\''")) .. "'") end
 	local tmp = path .. ".tmp"
 	os.remove(tmp)
-	local fd = ffi.C.ergopti_private_open(tmp, O_WRONLY + O_CREAT + O_EXCL, PRIVATE_MODE)
-	if fd < 0 then return false, "cannot create " .. tmp end
-	local written = tonumber(ffi.C.ergopti_private_write(fd, text, #text))
-	local synced = ffi.C.ergopti_private_fsync(fd)
-	ffi.C.ergopti_private_close(fd)
-	if written ~= #text or synced ~= 0 then
+	_create_private = _create_private or libc_create_private()
+	local created, create_err = _create_private(tmp, text)
+	if not created then
 		os.remove(tmp)
-		return false, "short write to " .. tmp
+		return false, create_err
 	end
 	local renamed, rename_err = os.rename(tmp, path)
 	if not renamed then
@@ -247,6 +268,13 @@ end
 function M._set_path_for_test(path)
 	_path_override = path
 	_state = nil
+end
+
+--- Replaces the private-file primitive (tests on a host without POSIX
+--- permission bits). nil restores the libc one.
+--- @param create function|nil (path, text) -> ok, err; must refuse an existing path.
+function M._set_private_create_for_test(create)
+	_create_private = create
 end
 
 return M

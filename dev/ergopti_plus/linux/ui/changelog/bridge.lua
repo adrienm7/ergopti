@@ -215,16 +215,26 @@ end
 --- @param payload any  String or table from host_bridge.js.
 --- @param state  table Daemon state.
 --- @return any|nil  Response to send back to JS.
+--- The page channel of the release feed the installation follows: "dev" for
+--- prereleases, "main" for stable. It opened on "main" always, which hides
+--- prereleases, and every release is one: the window opened on an empty list.
+--- @return string "main" | "dev"
+local function followed_channel()
+	local ok, updater = pcall(require, "modules.updater.manager")
+	if ok and type(updater) == "table" and type(updater.get_channel) == "function"
+		and updater.get_channel() == "dev" then
+		return "dev"
+	end
+	return "main"
+end
+
 function M.on_message(payload, state)
 	if type(payload) == "string" then
-		if payload == "ready" then
-			Logger.info(LOG, "Changelog UI ready.")
-			M.start_fetch("main")
-			return _build_initial_payload(state, "main")
-		end
-		if payload == "refresh" then
-			M.start_fetch("main")
-			return _build_initial_payload(state, "main")
+		if payload == "ready" or payload == "refresh" then
+			if payload == "ready" then Logger.info(LOG, "Changelog UI ready.") end
+			local channel = followed_channel()
+			M.start_fetch(channel)
+			return _build_initial_payload(state, channel)
 		end
 		if payload == "close" then
 			Logger.info(LOG, "Changelog close requested.")

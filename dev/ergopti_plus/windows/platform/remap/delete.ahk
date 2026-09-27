@@ -46,11 +46,11 @@ _DeleteHoldModKey() {
 ; ===========================================
 ; ===========================================
 
-#HotIf TapHoldHoldModifier(TapHold, "delete") != "" and not LayerEnabled
-*$SC153:: {
+#HotIf TapHoldHoldModifier(TapHold, "delete") != "" and not LayerEnabled and not TapHoldKanaAltGrHeld()
+$SC153:: {
 	Result := TapHoldOwnImmediateModifier("delete", "Delete",
 		_DeleteHoldModKey(), TapHoldDuration(TapHold, "delete"))
-	if (Result["tap"] and A_PriorKey == "Delete")
+	if (Result["tap"] and TapHoldPriorKeyIsSelf("delete"))
 		_DeleteDispatch()
 }
 #HotIf
@@ -67,10 +67,10 @@ _DeleteHoldModKey() {
 ; ========================================
 ; ========================================
 
-#HotIf TapHoldHoldLayer(TapHold, "delete") != "" and TapHoldHoldModifier(TapHold, "delete") == "" and not LayerEnabled
-*$SC153:: {
-	Result := TapHoldOwnImmediateLayer("Delete", TapHoldDuration(TapHold, "delete"))
-	if (Result["tap"] and A_PriorKey == "Delete")
+#HotIf TapHoldHoldLayer(TapHold, "delete") != "" and TapHoldHoldModifier(TapHold, "delete") == "" and not LayerEnabled and not TapHoldKanaAltGrHeld()
+$SC153:: {
+	Result := TapHoldOwnImmediateLayer("delete", "Delete", TapHoldDuration(TapHold, "delete"))
+	if (Result["tap"] and TapHoldPriorKeyIsSelf("delete"))
 		_DeleteDispatch()
 }
 #HotIf
@@ -81,16 +81,36 @@ _DeleteHoldModKey() {
 
 
 
+; =====================================
+; =====================================
+; ======= 13.3) Own auto-repeat =======
+; =====================================
+; =====================================
+
+; The hold variants fire only with no modifier held, so the key stays itself
+; under a held modifier, as on every driver. Its own auto-repeat arrives under
+; the modifier or layer the hold owns and matches none of them: swallow it for
+; as long as the owner resolves the press (see TapHoldPressIsOwned).
+#HotIf TapHoldPressIsOwned("delete")
+*SC153:: return
+#HotIf
+
+
+
+
+
+
+
 ; ==============================================================================
 ; ==============================================================================
-; ======= 13.3) Tap-only (tap action set to something other than delete) =======
+; ======= 13.4) Tap-only (tap action set to something other than delete) =======
 ; ==============================================================================
 ; ==============================================================================
 
 ; $ prevents re-entry. Fire immediately on key-down — no KeyWait or A_PriorKey
 ; guard needed since there is no hold behaviour. No ~ needed: the action replaces
 ; the native key entirely; ~ would send both Delete and the action.
-#HotIf TapHoldTapAction(TapHold, "delete") != "" and TapHoldTapAction(TapHold, "delete") != "delete" and TapHoldHoldModifier(TapHold, "delete") == "" and TapHoldHoldLayer(TapHold, "delete") == "" and not LayerEnabled
+#HotIf TapHoldTapAction(TapHold, "delete") != "" and TapHoldTapAction(TapHold, "delete") != "delete" and TapHoldHoldModifier(TapHold, "delete") == "" and TapHoldHoldLayer(TapHold, "delete") == "" and not LayerEnabled and not TapHoldKanaAltGrHeld()
 $SC153:: _DeleteDispatch()
 #HotIf
 
@@ -102,7 +122,7 @@ $SC153:: _DeleteDispatch()
 
 ; ==================================
 ; ==================================
-; ======= 13.4) Tap dispatch =======
+; ======= 13.5) Tap dispatch =======
 ; ==================================
 ; ==================================
 
@@ -110,7 +130,7 @@ _DeleteDispatch() {
 	local action := TapHoldTapAction(TapHold, "delete")
 	; No tap configured or tap = delete itself → native key behaviour.
 	if (action == "" or action == "delete") {
-		TapHoldDispatchTap("delete", TextPressKey.Bind("Delete", []))
+		TapHoldDispatchTap("delete", TapHoldEmitKeyTap.Bind("Delete"))
 		return
 	}
 	_TapHoldFireAction("delete")

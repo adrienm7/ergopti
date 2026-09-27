@@ -36,7 +36,7 @@
 ;    cognitive signal for the hotstring suggestion engine.
 ;
 ; INTEGRATION:
-; KL_Ergo_OnKeystroke(char, delay_ms, vk) is called from
+; KL_Ergo_OnKeystroke(delay_ms, vk, sc, is_bs) is called from
 ; KL_Hook_OnChar / KL_Hook_OnKeyDown in keylogger_hook.ahk immediately
 ; after the event is pushed to the buffer. This adds a single O(1) call
 ; per keystroke with no allocations on the fast path.
@@ -144,7 +144,7 @@ class KLErgo {
 ; Entry point called from KL_Hook_OnChar and KL_Hook_OnKeyDown.
 ; ``is_bs`` is true only for the backspace VK (0x08) so we can
 ; maintain the bs_run counter without disturbing the block tracker.
-KL_Ergo_OnKeystroke(delay_ms, vk, is_bs := false) {
+KL_Ergo_OnKeystroke(delay_ms, vk, sc, is_bs := false) {
     if !Keylogger.initialized
         return
     now := A_TickCount
@@ -152,7 +152,7 @@ KL_Ergo_OnKeystroke(delay_ms, vk, is_bs := false) {
 
     KL_Ergo_CheckHesitation(delay_ms, now, app)
     KL_Ergo_UpdateBlock(delay_ms, now, app, is_bs)
-    KL_Ergo_UpdatePinky(vk, now, app)
+    KL_Ergo_UpdatePinky(vk, sc, now, app)
     if is_bs {
         KLErgo.bs_run += 1
         KLErgo.bs_burst_app := app
@@ -327,13 +327,16 @@ KL_Ergo_CheckBsBurst(now) {
 ; ===========================================
 ; ===========================================
 
-KL_Ergo_UpdatePinky(vk, now, app) {
-    ; Modifier keys don't break a physical pinky streak — skip them
+KL_Ergo_UpdatePinky(vk, sc, now, app) {
+    ; Modifier keys don't break a physical pinky streak — skip them. The AltGr
+    ; key goes by scan code: a Kana-style layout gives it a virtual key other
+    ; than VK_RMENU.
     if (vk == 0x10 or vk == 0x11 or vk == 0x12   ; generic Shift/Ctrl/Alt
      or vk == 0xA0 or vk == 0xA1                  ; LShift, RShift
      or vk == 0xA2 or vk == 0xA3                  ; LCtrl, RCtrl
      or vk == 0xA4 or vk == 0xA5                  ; LAlt, RAlt
-     or vk == 0x5B or vk == 0x5C)                 ; LWin, RWin
+     or vk == 0x5B or vk == 0x5C                  ; LWin, RWin
+     or sc == KS_AltGrScanCode())                 ; the layout's AltGr
         return
     if !KLErgoConst.PINKY_VKS.Has(vk) {
         KLErgo.pinky_run := 0

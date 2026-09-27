@@ -155,6 +155,11 @@ MS_ToAhkSyntax(human) {
 						human, Parsed["err"])
 				return ""
 		}
+		if HotkeyRegistrarKeyIsModifier(Parsed["key"]) {
+				try LoggerWarn("MetricsShortcuts",
+						"Rejected shortcut '{1}': its key is a modifier key, whose tap-hold it would take over.", human)
+				return ""
+		}
 		Native := HotkeyRegistrarNativeSpec(Parsed["mods"], Parsed["key"])
 		if (Native = "")
 				try LoggerWarn("MetricsShortcuts",
@@ -589,6 +594,20 @@ MS_CommitShortcutCandidate(which, raw, ToggleFn, WriterFn := 0, NotifyFn := 0,
 			&& Outcome.Get("accepted", false)
 }
 
+; The user-facing reason a shortcut is refused because its key is a modifier
+; key, or "" when it is not. The registrar refuses such a key for every client;
+; without a reason the prompt reported only a generic save failure.
+; @param raw {String} The trimmed, lower-cased user input.
+; @returns {String} The localized reason, or "".
+MS_ModifierKeyRefusal(raw) {
+		if (raw = "")
+				return ""
+		Parsed := ChordParse(raw)
+		if !Parsed["ok"] || !HotkeyRegistrarKeyIsModifier(Parsed["key"])
+				return ""
+		return Format(t("metrics.shortcut_modifier_key"), Parsed["key"])
+}
+
 MS_PromptShortcut(which, ToggleFn) {
 		; Shows an InputBox to capture the new shortcut. ``which`` ∈
 		; {"typing", "apps"}. Empty string clears the binding.
@@ -599,6 +618,12 @@ MS_PromptShortcut(which, ToggleFn) {
 		if (ib.Result != "OK")
 				return
 		raw := Trim(StrLower(ib.Value))
+		Refusal := MS_ModifierKeyRefusal(raw)
+		if (Refusal != "") {
+				NotifierSend(Refusal, Map("title", t("metrics.shortcut_invalid_title"),
+						"level", "warning"))
+				return false
+		}
 		return MS_CommitShortcutCandidate(which, raw, ToggleFn)
 }
 

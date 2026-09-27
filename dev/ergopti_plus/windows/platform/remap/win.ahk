@@ -47,7 +47,7 @@ _WinHoldModKey() {
 *$SC15B:: {
 	Result := TapHoldOwnImmediateModifier("win", "LWin",
 		_WinHoldModKey(), TapHoldDuration(TapHold, "win"))
-	if (Result["tap"] and A_PriorKey == "LWin")
+	if (Result["tap"] and TapHoldPriorKeyIsSelf("win"))
 		_WinDispatch()
 }
 #HotIf
@@ -66,8 +66,8 @@ _WinHoldModKey() {
 
 #HotIf TapHoldHoldLayer(TapHold, "win") != "" and TapHoldHoldModifier(TapHold, "win") == "" and not LayerEnabled
 *$SC15B:: {
-	Result := TapHoldOwnImmediateLayer("LWin", TapHoldDuration(TapHold, "win"))
-	if (Result["tap"] and A_PriorKey == "LWin")
+	Result := TapHoldOwnImmediateLayer("win", "LWin", TapHoldDuration(TapHold, "win"))
+	if (Result["tap"] and TapHoldPriorKeyIsSelf("win"))
 		_WinDispatch()
 }
 #HotIf
@@ -88,7 +88,7 @@ _WinHoldModKey() {
 ; there is no hold behaviour. No ~ needed: Win tap action suppresses Start menu
 ; by intercepting the key entirely (no passthrough required).
 #HotIf TapHoldTapAction(TapHold, "win") != "" and TapHoldHoldModifier(TapHold, "win") == "" and TapHoldHoldLayer(TapHold, "win") == "" and not LayerEnabled
-SC15B:: _WinDispatch()
+*SC15B:: _WinDispatch()
 #HotIf
 
 
@@ -106,3 +106,24 @@ SC15B:: _WinDispatch()
 _WinDispatch() {
 	_TapHoldFireAction("win")
 }
+
+
+
+
+
+
+
+; =====================================
+; =====================================
+; ======= 12.5) Own auto-repeat =======
+; =====================================
+; =====================================
+
+; The key's own auto-repeat while an owner holds its suppressed press. Under
+; a layer hold no variant above is eligible any more, and the navigation layer
+; would map the repeat (CapsLock repeated its layer Backspace) or let it reach
+; the system. Declared before nav_layer.ahk, so this variant wins there
+; (see TapHoldPressIsOwned).
+#HotIf TapHoldPressIsOwned("win")
+*SC15B:: return
+#HotIf

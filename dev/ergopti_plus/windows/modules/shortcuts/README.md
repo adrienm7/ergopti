@@ -36,4 +36,4 @@ No domain spec directly consumed. The module reads its enabled state from the sh
 ; …etc.
 ```
 
-AltGr bindings are registered dynamically after onboarding (not at parse time) to prevent AHK from claiming `SC138` as a prefix key during the wizard window, which would silently break native AltGr for non-keyboard users. Non-ASCII glyphs in string literals use `Chr(0xNNNN)` to avoid encoding regressions.
+AltGr bindings are registered dynamically after onboarding (not at parse time). That is not what keeps native AltGr in the wizard window: the `~SC138 & ~F24` anchor in `platform/remap/altgr.ahk` makes `SC138` a prefix key from parse time, every AltGr combination is false while the wizard is up (`IsRealAltGrPress`), and AutoHotkey, which reads `SC138` as the RAlt modifier, never suppresses a modifier prefix that no variant fires for. Non-ASCII glyphs in string literals use `Chr(0xNNNN)` to avoid encoding regressions.
