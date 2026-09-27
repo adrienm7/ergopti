@@ -252,6 +252,7 @@ jobs:
         working-directory: static/ergopti_plus/linux
         run: |
           sudo apt-get install -y --no-install-recommends python3-gi gir1.2-glib-2.0 dbus xvfb
+          dbus-run-session -- python3 tests/hardware/test_startup_desktop.py
           export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
           dbus-run-session -- bash -c '
             ready="$(mktemp -u)"

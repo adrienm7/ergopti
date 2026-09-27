@@ -71,6 +71,8 @@ cp -r "$BUILD_DIR/_shared/." "$INSTALL_ROOT/usr/lib/ergopti/_shared/"
 # The stamp build-linux-driver.sh wrote is how the installed daemon names its
 # commit; a package without it would report "unknown".
 bash "$SCRIPT_DIR/write_build_stamp.sh" verify "$INSTALL_ROOT/usr/lib/ergopti/_shared"
+install -D -m 644 "$BUILD_DIR/linux/install/99-ergopti-uinput.rules" "$INSTALL_ROOT/etc/udev/rules.d/99-ergopti-uinput.rules"
+install -D -m 644 "$BUILD_DIR/linux/install/ergopti-uinput.conf" "$INSTALL_ROOT/etc/modules-load.d/ergopti-uinput.conf"
 
 chmod -R 755 "$INSTALL_ROOT/usr/lib/ergopti"
 echo "  $(find "$INSTALL_ROOT/usr/lib/ergopti" -type f | wc -l) files"
@@ -83,7 +85,7 @@ cat > "$INSTALL_ROOT/usr/bin/ergopti" << 'WRAPPER_EOF'
 DRIVER_ROOT="/usr/lib/ergopti"
 SHARED_LUA="$DRIVER_ROOT/_shared/lua"
 export LUA_PATH="$DRIVER_ROOT/?.lua;$DRIVER_ROOT/?/init.lua;$SHARED_LUA/?.lua;$SHARED_LUA/?/init.lua;;"
-exec luajit /usr/lib/ergopti/ergopti_hotstrings.lua "$@"
+exec bash "$DRIVER_ROOT/install/launch.sh" "$@"
 WRAPPER_EOF
 chmod 755 "$INSTALL_ROOT/usr/bin/ergopti"
 
@@ -101,6 +103,10 @@ Terminal=false
 Categories=Utility;
 X-GNOME-Autostart-enabled=true
 DESKTOP_EOF
+mkdir -p "$INSTALL_ROOT/etc/xdg/autostart"
+sed 's|^Exec=.*|Exec=ergopti --session-start --tray|' \
+  "$INSTALL_ROOT/usr/share/applications/ergopti.desktop" \
+  > "$INSTALL_ROOT/etc/xdg/autostart/ergopti.desktop"
 
 # Application icon
 # ----------------------------------------------------------------------
@@ -132,29 +138,9 @@ fi
 # ----------------------------------------------------------------------
 # 7. systemd user service
 # ----------------------------------------------------------------------
-cat > "$INSTALL_ROOT/usr/lib/systemd/user/ergopti-hotstrings.service" << 'SERVICE_EOF'
-[Unit]
-Description=Ergopti — ergonomic keyboard optimizer
-Documentation=https://github.com/adrienm7/ergopti
-# PartOf, not just After: without it the daemon outlives the session it belongs
-# to, and logging back in under the other display server finds a daemon that
-# probed the old one at startup.
-After=graphical-session.target
-PartOf=graphical-session.target
-
-[Service]
-Type=simple
-ExecStart=/usr/bin/ergopti --tray
-Restart=on-failure
-RestartSec=5
-# No Environment=DISPLAY: the daemon probes the session at runtime, and a pinned
-# :0 is wrong on a second seat and under Wayland.
-
-[Install]
-# graphical-session, not default: the daemon needs a session to read input from
-# and a tray to draw into, and default.target starts it on a TTY login too.
-WantedBy=graphical-session.target
-SERVICE_EOF
+sed 's|^ExecStart=.*|ExecStart=/usr/bin/ergopti --service --tray|' \
+  "$BUILD_DIR/linux/ergopti-hotstrings.service" \
+  > "$INSTALL_ROOT/usr/lib/systemd/user/ergopti-hotstrings.service"
 
 # ----------------------------------------------------------------------
 # 8. SPEC file
@@ -177,6 +163,13 @@ Requires:       curl
 Requires:       libxkbcommon
 Requires:       libxkbcommon-utils
 Requires:       at-spi2-core
+Requires:       polkit
+Requires:       kmod
+Requires:       systemd-udev
+Requires:       libayatana-appindicator-gtk3
+Requires:       zenity
+Requires:       shadow-utils
+Requires:       util-linux
 Recommends:     lua-luv
 Recommends:     lua-filesystem
 Recommends:     openssl
@@ -202,25 +195,18 @@ cp -r %{_builddir}/ergopti-%{version}/* %{buildroot}/
 /usr/share/applications/ergopti.desktop
 /usr/share/icons/hicolor/512x512/apps/ergopti.png
 /usr/lib/systemd/user/ergopti-hotstrings.service
+/etc/xdg/autostart/ergopti.desktop
 %config(noreplace) /etc/ergopti/config.toml
+%config(noreplace) /etc/udev/rules.d/99-ergopti-uinput.rules
+%config(noreplace) /etc/modules-load.d/ergopti-uinput.conf
 
 %post
-# Reload and enable the systemd user service for all human users
-for uid in \$(awk -F: '\$3 >= 1000 && \$3 < 65534 {print \$1}' /etc/passwd); do
-  homedir=\$(eval echo ~"\$uid")
-  if [ -d "\$homedir" ]; then
-    su - "\$uid" -c "systemctl --user daemon-reload" 2>/dev/null || true
-    su - "\$uid" -c "systemctl --user enable ergopti-hotstrings.service" 2>/dev/null || true
-  fi
-done
-echo "ergopti: user service enabled. Start with: systemctl --user start ergopti-hotstrings.service"
+bash /usr/lib/ergopti/install/setup_permissions.sh --active-sessions
 
 %preun
-# Stop and disable before removal
-for uid in \$(awk -F: '\$3 >= 1000 && \$3 < 65534 {print \$1}' /etc/passwd); do
-  su - "\$uid" -c "systemctl --user stop ergopti-hotstrings.service" 2>/dev/null || true
-  su - "\$uid" -c "systemctl --user disable ergopti-hotstrings.service" 2>/dev/null || true
-done
+if [ "\$1" -eq 0 ]; then
+  bash /usr/lib/ergopti/install/stop_sessions.sh
+fi
 
 %changelog
 * $(date +"%a %b %d %Y") Ergopti Contributors <ergopti@example.com> - $VERSION-$RELEASE

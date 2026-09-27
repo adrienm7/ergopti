@@ -97,7 +97,9 @@ for (const pkg of PACKAGERS) {
 	// only form available to a relocatable image that learns its root at run time.
 	const entryLiteral = `${pkg.root}/ergopti_hotstrings.lua`;
 	const entryViaVar  = '$DRIVER_ROOT/ergopti_hotstrings.lua';
-	if (!src.includes(entryLiteral) && !src.includes(entryViaVar)) {
+	const graphicalLauncher = src.includes('exec bash "$DRIVER_ROOT/install/launch.sh" "$@"')
+		&& read('static/ergopti_plus/linux/install/launch.sh').includes('exec luajit "$DRIVER_ROOT/ergopti_hotstrings.lua" "$@"');
+	if (!src.includes(entryLiteral) && !src.includes(entryViaVar) && !graphicalLauncher) {
 		errors.push(`${tag}: wrapper must exec ${entryLiteral} (or the same path via $DRIVER_ROOT) — install dir must be boot dir.`);
 	}
 	// ...and it roots the shared Lua tree on LUA_PATH relative to that root.
@@ -306,7 +308,8 @@ if (daemonExecStartsFound === 0) {
 // whose AppRun injects --tray for an argument-free launch, these wrappers pass
 // their arguments through verbatim and therefore need the flag in the entry.
 const EXPLICIT_TRAY_DESKTOP_SOURCES = [
-	'static/ergopti_plus/linux/install.sh',
+	// The standalone installer emits through desktop_entry.sh; its real output
+	// is asserted by test-linux-install-sandbox.cjs, including quoted prefixes.
 	'tools/build/build-linux-deb.sh',
 	'tools/build/build-linux-rpm.sh',
 	'tools/build/build-linux-flatpak.sh',

@@ -92,7 +92,10 @@ function runInstaller(scenario) {
 			(scenario.busybox ? 'case "$1" in usermod|groupadd) exit 127 ;; esac\n' : '') +
 			'exit 0'
 	);
-	stub(stubs, 'systemctl', `${log}\nexit 1`);
+	stub(stubs, 'systemctl', `${log}\n[ "$4" = list-unit-files ] && { echo 'ergopti-hotstrings.service disabled enabled'; exit 0; }\n[ "$2 $3" = '--no-reload disable' ] && exit 0\nexit 1`);
+	if (process.platform === 'win32') {
+		stub(stubs, 'install', 'if [ "$1 $2 $3" = "-d -m 700" ]; then shift 3; exec mkdir -p -- "$@"; fi\nexec /usr/bin/install "$@"');
+	}
 	// The package manager "installs" by dropping a marker the probes read.
 	// A package named in scenario.absentPackages is not in the archive: the
 	// manager fails, as apt/pacman/zypper do for an unknown name.
@@ -141,7 +144,14 @@ function runInstaller(scenario) {
 		TMPDIR: bashPath(sandbox),
 		LANG: 'C.UTF-8'
 	};
-	const result = spawnSync(bashExecutable(), [bashPath(INSTALLER)], { env, encoding: 'utf8', timeout: 60000 });
+	// Git Bash may reconstruct PATH when a child Bash starts. Keep the same
+	// inert command boundary in the installer and its newly installed helpers.
+	const bashEnvironment = path.join(sandbox, 'bash-environment');
+	fs.writeFileSync(bashEnvironment, 'export PATH="$TEST_STUBS:/usr/bin:/bin"\n');
+	env.TEST_STUBS = bashPath(stubs);
+	env.BASH_ENV = bashPath(bashEnvironment);
+	const installArgs = scenario.prefixName ? ['--prefix', bashPath(path.join(home, scenario.prefixName))] : [];
+	const result = spawnSync(bashExecutable(), [bashPath(INSTALLER), ...installArgs], { env, encoding: 'utf8', timeout: 60000 });
 	const calls = fs.existsSync(callLog) ? fs.readFileSync(callLog, 'utf8').split('\n').filter(Boolean) : [];
 	return {
 		status: result.status,
@@ -154,6 +164,20 @@ function runInstaller(scenario) {
 }
 
 const errors = [];
+
+// Both startup formats must quote the same installed wrapper, even on a fresh
+// install where no menu-generated Desktop entry exists yet.
+{
+	const run = runInstaller({ desktopProvided: true, prefixName: 'Applications Ergopti' });
+	try {
+		if (run.status !== 0) errors.push(`install with spaces failed: ${run.output.slice(-1800)}`);
+		const wrapper = `${bashPath(run.home)}/Applications Ergopti/bin/ergopti-hotstrings`;
+		const unit = fs.readFileSync(path.join(run.home, '.config/systemd/user/ergopti-hotstrings.service'), 'utf8');
+		const desktop = fs.readFileSync(path.join(run.home, '.config/autostart/ergopti-hotstrings.desktop'), 'utf8');
+		if (!unit.includes(`ExecStart=/bin/bash "${wrapper}" --tray\n`)) errors.push('unit does not quote the installed wrapper');
+		if (!desktop.includes(`Exec=/bin/bash "${wrapper}" --session-start --tray\n`)) errors.push('Desktop entry does not quote the installed wrapper');
+	} finally { run.cleanup(); }
+}
 
 // ── A first install, with no remapper to fetch ─────────────────────────────
 {
@@ -230,10 +254,11 @@ const errors = [];
 					run.output.split('\n').slice(-6).join('\n')
 			);
 		}
-		for (const group of ['input', 'uinput']) {
-			if (!run.calls.some((call) => new RegExp(`^sudo addgroup \\S+ ${group}$`).test(call))) {
-				errors.push(`the user was not added to ${group} through BusyBox's addgroup`);
-			}
+		// The shared privileged helper now owns BusyBox enrollment; its actual
+		// addgroup branch runs in test-linux-package-setup.cjs. This sandbox
+		// refuses elevation, and verifies the delegation rather than faking it.
+		if (!run.calls.some((call) => /^sudo bash .*\/install\/setup_permissions\.sh --user \d+$/.test(call))) {
+			errors.push('the installer did not delegate account enrollment to the shared permission owner');
 		}
 	} finally {
 		run.cleanup();
