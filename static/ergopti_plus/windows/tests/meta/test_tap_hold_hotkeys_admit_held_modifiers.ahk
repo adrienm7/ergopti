@@ -141,12 +141,11 @@ Test("tap-hold admission: the scanner flags a native key's wildcard variant (nat
 	_THAM_NativeScannerFindsTheWildcardShape)
 
 ; Space stays Space while another key holds the navigation layer, even when its
-; own hold is that layer: the layer maps no Space. A quick tap types a space, as
-; on Linux; held, it auto-repeats here, where Linux's engine runs that Space as
-; its own layer tap-hold and types nothing, a known parity gap this does not
-; pin. A Space-only swallower once ate every Space the layer saw; only Space's
-; own owned press is swallowed now, so its auto-repeat still types nothing while
-; it holds the layer. CapsWord's Space is its own feature and ends CapsWord
+; own hold is that layer: the layer maps no Space. A quick tap types a space and
+; a held one auto-repeats, as on Linux, whose engine pins the same rule
+; (layer-under-layer). A Space-only swallower once ate every Space the layer
+; saw; only Space's own owned press is swallowed now, so its auto-repeat still
+; types nothing while it holds the layer. CapsWord's Space is its own feature and ends CapsWord
 ; (nav-layer-space-2026-09-25).
 _THAM_SpaceStaysItselfUnderAnotherLayerHolder() {
 	Src := _StripFullLineComments(_DriverSourceConcat())
@@ -167,6 +166,26 @@ _THAM_SpaceStaysItselfUnderAnotherLayerHolder() {
 }
 Test("tap-hold admission: Space stays itself while another key holds the navigation layer (nav-layer-space-2026-09-25)",
 	_THAM_SpaceStaysItselfUnderAnotherLayerHolder)
+
+; LAlt tapping Backspace with the layer on hold is the one key the navigation
+; layer swallows while another key holds it: passed through as Alt, it would
+; put Alt under every chord of the layer. Linux's engine pins the same rule
+; (layer-under-layer), which it had lost.
+_THAM_LAltSwallowedUnderAnotherLayerHolder() {
+	Src := _StripFullLineComments(_DriverSourceConcat())
+	Assert(Src != "", "the driver source must be readable")
+	Swallowers := 0
+	for _, Variant in _THAM_Variants(Src, "SC038") {
+		if (InStr(Variant.HotIf, "_LAltIsBackspaceLayer()")
+				and RegExMatch(Variant.HotIf, "(?<!not )LayerEnabled")
+				and Variant.Prefix == "*")
+			Swallowers++
+	}
+	AssertEqual(1, Swallowers,
+		"LAlt tapping Backspace with the layer on hold must be swallowed, without ~, while the layer is on")
+}
+Test("tap-hold admission: LAlt tapping Backspace is swallowed while another key holds the navigation layer (layer-under-layer)",
+	_THAM_LAltSwallowedUnderAnotherLayerHolder)
 
 _THAM_NativeKeysStayNativeUnderAHeldModifier() {
 	Src := _StripFullLineComments(_DriverDirConcat("platform/remap"))

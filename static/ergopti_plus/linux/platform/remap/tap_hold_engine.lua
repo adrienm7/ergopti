@@ -135,6 +135,12 @@ M.NAV_LAYER = {
 	[100] = chord({}, KEY_ESC),
 }
 
+-- The keys the layer swallows while another key holds it, by key, with the tap
+-- and the hold that make them so: LAlt tapping Backspace with the layer on hold
+-- (nav_layer.ahk, "Fix when LAlt triggers the layer"). Passed through, it was
+-- an Alt under every chord of the layer (J gave Ctrl+Alt+Left).
+local SWALLOWED_ON_LAYER = { left_alt = { tap = "backspace", layer = "nav" } }
+
 
 
 
@@ -206,6 +212,8 @@ function M.new(opts)
 			end
 			local layer = type(config.hold_layer) == "string" and config.hold_layer ~= "" and config.hold_layer or nil
 			local tap = type(config.tap_action) == "string" and config.tap_action or ""
+			local swallowed = SWALLOWED_ON_LAYER[key_id]
+			local swallowed_on_layer = swallowed ~= nil and tap == swallowed.tap and layer == swallowed.layer
 			if tap == "one_shot_shift" then
 				for _, name in ipairs({ "key_text", "plan_text", "one_shot_result" }) do
 					if type(options[name]) ~= "function" then
@@ -228,7 +236,7 @@ function M.new(opts)
 				tap = tap,
 				mods = layer and {} or mods,
 				layer = layer,
-				no_hold = no_hold,
+				swallowed_on_layer = swallowed_on_layer,
 				-- A tap and no hold with no rule: nothing to wait for (see fire_instant).
 				instant = no_hold and not rule,
 				tap_at_down = rule and rule.tap_at_down or false,
@@ -488,6 +496,14 @@ local function press_layer_key(self, code, spec)
 	return out
 end
 
+--- Swallows a key's press, its repeats and its release: held with nothing to
+--- hold and no tap.
+--- @return table out No events.
+local function swallow_until_release(self, code, now_ms)
+	self.held[code] = { down_at = now_ms, cancelled = true, emitted = {}, tapped = true }
+	return {}
+end
+
 --- Processes one physical key event.
 --- @param code integer evdev code
 --- @param value integer 0 up, 1 down, 2 repeat
@@ -533,15 +549,22 @@ function M:process(code, value, now_ms)
 		if value == REPEAT then return out end
 		if value == DOWN then
 			if self.held[code] then return out end
-			-- On the layer, a configured key is a layer key like any other.
-			local spec = self.layer_depth > 0 and not config.layer and M.NAV_LAYER[code]
-			if spec then
+			-- Another key holds the layer (this one is not down), and no tap-hold
+			-- is on there, as every Windows tap-hold hotkey needs the layer off:
+			-- a key the layer maps is the layer's key, its own hold the layer
+			-- included (CapsLock is its Backspace); LAlt tapping Backspace is
+			-- swallowed (SWALLOWED_ON_LAYER); any other key is itself, with its
+			-- auto-repeat (Space types a space, LShift is a Shift that copies
+			-- nothing, RCtrl a Ctrl, Tab a Tab).
+			if self.layer_depth > 0 then
 				cancel_taps(self, nil)
-				return press_layer_key(self, code, spec)
+				local spec = M.NAV_LAYER[code]
+				if spec then return press_layer_key(self, code, spec) end
+				if config.swallowed_on_layer then return swallow_until_release(self, code, now_ms) end
+				self.native_keys[code] = true
+				return pass(self, code, value)
 			end
-			-- On the layer, a key with no hold is itself, as the Windows tap-only
-			-- hotkeys are off while the layer is on.
-			if (NATIVE_UNDER_MODIFIER[code] and modifier_held(self)) or (config.no_hold and self.layer_depth > 0) then
+			if NATIVE_UNDER_MODIFIER[code] and modifier_held(self) then
 				cancel_taps(self, nil)
 				self.native_keys[code] = true
 				return pass(self, code, value)
