@@ -438,6 +438,102 @@ helpers.describe("tap-hold engine: a tap with no hold", function()
 
 end)
 
+-- lalt.ahk 4.10: LAlt's Backspace tap goes through BackSpaceLogic, which reads
+-- the keys physically held and types in place of the plain Backspace, each
+-- keystroke with only its own modifiers (TextPressKey lifts the others):
+-- LCtrl+Shift, or an RCtrl that is not the one-shot Shift +Shift, give
+-- Ctrl+Delete; LCtrl with the one-shot RCtrl gives Ctrl+Right then
+-- Ctrl+Backspace; the one-shot RCtrl alone Right then Backspace (a Delete
+-- that cannot become Ctrl+Alt+Delete); Shift Delete; LCtrl or a plain RCtrl
+-- Ctrl+Backspace. With the layer as its hold, the tap also needs CapsLock up
+-- at its release (lalt.ahk 4.5). Linux typed Backspace under whatever was
+-- held: LShift then LAlt deleted backwards (lalt-backspace-logic).
+helpers.describe("tap-hold engine: LAlt's Backspace under held keys", function()
+
+	local LSHIFT, LCTRL, RSHIFT = 42, 29, 54
+
+	--- LAlt tapped as shipped (Backspace, the layer on hold) after `held` went
+	--- down, with `keys` configured too.
+	--- @return string What LAlt's release types.
+	local function lalt_tap(keys, held)
+		local all = { left_alt = DEFAULTS.left_alt }
+		for key_id, config in pairs(keys) do all[key_id] = config end
+		local e = engine(all)
+		for index, code in ipairs(held) do e:process(code, DOWN, index * 10) end
+		e:process(ALT, DOWN, 100)
+		local out, tap = e:process(ALT, UP, 180)
+		helpers.assert_nil(tap)
+		return trail(out)
+	end
+
+	helpers.it("types what Windows' BackSpaceLogic types for the keys held (lalt-backspace-logic)", function()
+		local cases = {
+			{ "LCtrl+LShift", {}, { LCTRL, LSHIFT }, "42↑ 111↓ 111↑ 42↓" },
+			{ "RCtrl+RShift", {}, { RCTRL, RSHIFT }, "54↑ 111↓ 111↑ 54↓" },
+			{ "LCtrl and the one-shot RCtrl", { right_ctrl = DEFAULTS.right_ctrl }, { LCTRL, RCTRL },
+				"42↑ 106↓ 106↑ 14↓ 14↑ 42↓" },
+			{ "the one-shot RCtrl", { right_ctrl = DEFAULTS.right_ctrl }, { RCTRL }, "42↑ 106↓ 106↑ 14↓ 14↑ 42↓" },
+			{ "LShift", {}, { LSHIFT }, "42↑ 111↓ 111↑ 42↓" },
+			{ "RShift", {}, { RSHIFT }, "54↑ 111↓ 111↑ 54↓" },
+			{ "LCtrl", {}, { LCTRL }, "14↓ 14↑" },
+			{ "a plain RCtrl", {}, { RCTRL }, "14↓ 14↑" },
+			{ "nothing", {}, {}, "14↓ 14↑" },
+		}
+		for _, case in ipairs(cases) do
+			helpers.assert_eq(lalt_tap(case[2], case[3]), case[4], case[1] .. " then LAlt tapped")
+		end
+	end)
+
+	helpers.it("types nothing when CapsLock is down at the release of its layer hold (lalt-backspace-logic)", function()
+		helpers.assert_eq(lalt_tap({ caps_lock = DEFAULTS.caps_lock }, { CAPS }), "",
+			"CapsLock+LAlt let go quickly: no Backspace")
+		helpers.assert_eq(lalt_tap({}, { CAPS }), "", "a plain CapsLock too")
+		local e = engine({ caps_lock = DEFAULTS.caps_lock,
+			left_alt = { tap_action = "backspace", hold_modifier = "alt", time_activation_seconds = 0.2 } })
+		e:process(CAPS, DOWN, 0)
+		e:process(ALT, DOWN, 10)
+		helpers.assert_eq(trail((e:process(ALT, UP, 100))), "194↓ 194↑ 56↑ 14↓ 14↑",
+			"no such guard with a modifier hold (its lone Alt masked first)")
+	end)
+
+	helpers.it("decides again at each repeat when LAlt has no hold (lalt-backspace-logic)", function()
+		local e = engine({ left_alt = { tap_action = "backspace", time_activation_seconds = 0.2 } })
+		e:process(LSHIFT, DOWN, 0)
+		helpers.assert_eq(trail((e:process(ALT, DOWN, 10))), "42↑ 111↓ 111↑ 42↓", "Delete at key-down")
+		helpers.assert_eq(trail((e:process(ALT, REPEAT, 510))), "42↑ 111↓ 111↑ 42↓", "and at each repeat")
+		e:process(LSHIFT, UP, 520)
+		helpers.assert_eq(trail((e:process(ALT, REPEAT, 540))), "14↓ 14↑", "Shift let go: Backspace again")
+		helpers.assert_eq(trail((e:process(ALT, UP, 600))), "")
+	end)
+
+	helpers.it("spends an armed one-shot Shift (lalt-backspace-logic)", function()
+		local e = engine({ left_alt = DEFAULTS.left_alt, right_ctrl = DEFAULTS.right_ctrl })
+		e:process(RCTRL, DOWN, 0)
+		e:process(RCTRL, UP, 100)
+		e:process(LSHIFT, DOWN, 200)
+		e:process(ALT, DOWN, 210)
+		helpers.assert_eq(trail((e:process(ALT, UP, 260))), "42↑ 111↓ 111↑ 42↓")
+		e:process(LSHIFT, UP, 270)
+		helpers.assert_nil(e:process(KEY_A, DOWN, 300), "the Delete spent the one-shot: a plain a")
+	end)
+
+	-- The keyboard hook names the modifiers down before this engine's own
+	-- events are dispatched: LAlt holding Alt had just released it, and lifting
+	-- it again then pressing it back left Alt down (lalt-backspace-logic).
+	helpers.it("keeps up a modifier its own release just lifted (lalt-backspace-logic)", function()
+		local e = Engine.new({ keys = { left_alt = { tap_action = "backspace", hold_modifier = "alt",
+				time_activation_seconds = 0.2 } },
+			tap_min_ms = 50, one_shot_timeout_ms = 2000,
+			held_text_modifier_codes = function() return { LSHIFT } end,
+			held_shortcut_modifier_codes = function() return { ALT } end })
+		e:process(LSHIFT, DOWN, 0)
+		e:process(ALT, DOWN, 10)
+		helpers.assert_eq(trail((e:process(ALT, UP, 100))), "194↓ 194↑ 56↑ 42↑ 111↓ 111↑ 42↓",
+			"Alt stays up, the hand's Shift is lifted around the Delete")
+	end)
+
+end)
+
 helpers.describe("tap-hold engine: thresholds and holds", function()
 
 	helpers.it("counts a release exactly at the threshold or the minimum as a tap", function()

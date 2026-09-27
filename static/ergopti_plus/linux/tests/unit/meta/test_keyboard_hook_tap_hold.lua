@@ -185,15 +185,17 @@ helpers.describe("keyboard hook: the modifiers held with a control key", functio
 		helpers.assert_true(not mods.ctrl and not mods.alt and not mods.meta, "a bare Backspace is one character")
 	end)
 
-	helpers.it("says Ctrl for the Backspace tapped on the layer key while CapsLock holds Ctrl (modified-backspace)", function()
+	-- LCtrl, not CapsLock: LAlt's layer tap types nothing while CapsLock is
+	-- down, as on Windows (lalt.ahk 4.5, lalt-backspace-logic).
+	helpers.it("says Ctrl for the Backspace tapped on the layer key while LCtrl is held (modified-backspace)", function()
 		local keys = {}
-		drive({ { 58, 1 }, { 56, 1 }, { 56, 0 }, { 58, 0 } }, function()
+		drive({ { 29, 1 }, { 56, 1 }, { 56, 0 }, { 29, 0 } }, function()
 			return { onKey = function(name, detail) keys[#keys + 1] = { name = name, detail = detail } end }
 		end)
 		helpers.assert_eq(#keys, 1, "one Backspace")
 		helpers.assert_eq(keys[1].name, "backspace")
 		helpers.assert_true(type(keys[1].detail) == "table" and keys[1].detail.mods.ctrl == true,
-			"CapsLock's Ctrl is held: this Backspace deletes a word")
+			"LCtrl is held: this Backspace deletes a word")
 	end)
 
 end)

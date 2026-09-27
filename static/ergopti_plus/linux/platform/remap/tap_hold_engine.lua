@@ -106,8 +106,11 @@ local NO_HOLD_BY_TAP = {
 -- tap-only and its hold variants), so CapsLock+LCtrl or LAlt+LCtrl let go
 -- quickly runs no tap. Physical keys, whatever the layout makes of them.
 local TAP_NEEDS_UP = { left_ctrl = { EvdevCodes.KEY_CAPSLOCK, KEY_LEFTALT } }
+-- LAlt tapping Backspace with the layer on hold taps only with CapsLock up at
+-- its release (lalt.ahk 4.5), against a Backspace on a quick LAlt+CapsLock.
+local LAYER_BACKSPACE_TAP_NEEDS_UP_AT_RELEASE = { left_alt = { EvdevCodes.KEY_CAPSLOCK } }
 local KEY_HOME, KEY_END, KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT = 102, 107, 103, 108, 105, 106
-local KEY_ENTER, KEY_BACKSPACE, KEY_ESC = 28, 14, 1
+local KEY_ENTER, KEY_BACKSPACE, KEY_ESC, KEY_DELETE = 28, 14, 1, 111
 local KEY_F2, KEY_F12 = 60, 88
 
 -- Tap actions that are a single key. They are dispatched through the hook
@@ -185,6 +188,9 @@ local SWALLOWED_ON_LAYER = { left_alt = { tap = "backspace", layer = "nav" } }
 ---     select a level (Shift, AltGr), as the live layout names them (the
 ---     hook's); without it, Shift and Right Alt when the hand or a hold has
 ---     them down,
+---   held_shortcut_modifier_codes = function() -> { code }, the same for Ctrl,
+---     Alt and Super; without it, the usual Ctrl, Alt and Super keys the hand
+---     or a hold has down,
 --- }
 --- @return table engine
 function M.new(opts)
@@ -198,6 +204,7 @@ function M.new(opts)
 		one_shot_result = options.one_shot_result,
 		held_modifiers = options.held_modifiers,
 		held_text_modifier_codes = options.held_text_modifier_codes,
+		held_shortcut_modifier_codes = options.held_shortcut_modifier_codes,
 		held = {},          -- code -> { down_at, cancelled, emitted = {codes}, layer = bool }
 		layer_depth = 0,     -- how many layer keys are down
 		layer_keys = {},     -- code -> chord emitted for a key pressed on the layer
@@ -261,6 +268,8 @@ function M.new(opts)
 				hold_past_threshold = rule and rule.hold_past_threshold or false,
 				skip_while_down = rule and rule.skip_while_down or nil,
 				tap_needs_up = TAP_NEEDS_UP[key_id],
+				tap_needs_up_at_release = (tap == "backspace" and layer)
+					and LAYER_BACKSPACE_TAP_NEEDS_UP_AT_RELEASE[key_id] or nil,
 				threshold_ms = math.floor((tonumber(config.time_activation_seconds) or 0) * 1000 + 0.5),
 			}
 		end
@@ -492,6 +501,103 @@ local function type_tap(self, out, code, now_ms)
 	return nil
 end
 
+-- The usual shortcut modifier keys, counted when no live layout names them.
+local USUAL_SHORTCUT_KEYS = {
+	KEY_LEFTCTRL, EvdevCodes.KEY_RIGHTCTRL, KEY_LEFTALT, KEY_LEFTMETA, EvdevCodes.KEY_RIGHTMETA,
+}
+
+--- Every modifier key down now: the level keys (held_level_keys) and the
+--- shortcut ones, as the live layout names them (the hook's), or the usual
+--- keys the hand or a hold has down. The hook answers before `out` reaches
+--- it: a key `out` already lifts (the tapped key's own hold) is up.
+--- @param out table The events this call dispatches so far.
+--- @return table codes, each once
+local function held_modifier_codes(self, out)
+	local codes = held_level_keys(self)
+	local shortcut = self.held_shortcut_modifier_codes and self.held_shortcut_modifier_codes() or nil
+	if not shortcut then
+		shortcut = {}
+		for _, code in ipairs(USUAL_SHORTCUT_KEYS) do
+			if self.passed_down[code] or self.key_refs[code] then shortcut[#shortcut + 1] = code end
+		end
+	end
+	for _, code in ipairs(shortcut) do codes[#codes + 1] = code end
+	local last = {}
+	for _, ev in ipairs(out) do last[ev.code] = ev.value end
+	local held, seen = {}, {}
+	for _, code in ipairs(codes) do
+		if last[code] ~= UP and not seen[code] then
+			seen[code] = true
+			held[#held + 1] = code
+		end
+	end
+	return held
+end
+
+--- Types keystrokes with only their own modifiers, as Windows' TextPressKey
+--- sends them: every modifier down now is lifted around them and pressed back
+--- after, except a Ctrl when every keystroke is a Ctrl chord anyway.
+--- @param chords table { { ctrl = boolean, key = code } }, typed in order.
+local function type_chords(self, out, chords)
+	local all_ctrl = true
+	for _, chord in ipairs(chords) do all_ctrl = all_ctrl and chord.ctrl end
+	local kept_ctrl, lifted = false, {}
+	for _, code in ipairs(held_modifier_codes(self, out)) do
+		if all_ctrl and MODIFIER_KEYS[code] == "ctrl" then
+			kept_ctrl = true
+		else
+			lifted[#lifted + 1] = code
+		end
+	end
+	for _, code in ipairs(lifted) do out[#out + 1] = { code = code, value = UP } end
+	for _, chord in ipairs(chords) do
+		local press_ctrl = chord.ctrl and not kept_ctrl
+		if press_ctrl then out[#out + 1] = { code = KEY_LEFTCTRL, value = DOWN } end
+		tap_key(self, out, chord.key)
+		if press_ctrl then out[#out + 1] = { code = KEY_LEFTCTRL, value = UP } end
+	end
+	for index = #lifted, 1, -1 do out[#out + 1] = { code = lifted[index], value = DOWN } end
+end
+
+--- What LAlt's Backspace tap types instead of a plain Backspace under the keys
+--- physically down now, as Windows' BackSpaceLogic decides (lalt.ahk 4.10).
+--- @return table|nil chords As type_chords takes them; nil for the plain key.
+local function lalt_backspace_chords(self)
+	local down = self.physical_down
+	local lctrl, rctrl = down[KEY_LEFTCTRL], down[EvdevCodes.KEY_RIGHTCTRL]
+	local shift = down[KEY_LEFTSHIFT] or down[EvdevCodes.KEY_RIGHTSHIFT]
+	local rctrl_config = self.by_code[EvdevCodes.KEY_RIGHTCTRL]
+	-- RCtrl tapping the one-shot Shift is a Shift, never a Ctrl, to this logic.
+	local rctrl_one_shot = rctrl_config ~= nil and rctrl_config.tap == "one_shot_shift"
+	local rctrl_ctrl = rctrl and not rctrl_one_shot
+	if (lctrl or rctrl_ctrl) and shift then return { { ctrl = true, key = KEY_DELETE } } end
+	-- Right then Backspace: a Delete that LAlt, still Alt to some, cannot turn
+	-- into Ctrl+Alt+Delete.
+	if rctrl and rctrl_one_shot then
+		return { { ctrl = lctrl or false, key = KEY_RIGHT }, { ctrl = lctrl or false, key = KEY_BACKSPACE } }
+	end
+	if shift then return { { ctrl = false, key = KEY_DELETE } } end
+	if lctrl or rctrl_ctrl then return { { ctrl = true, key = KEY_BACKSPACE } } end
+	return nil
+end
+
+-- The keys whose Backspace tap Windows types through a logic of its own.
+local BACKSPACE_CHORDS = { left_alt = lalt_backspace_chords }
+
+--- Types the key a tap stands for (type_tap), or what the key's Windows
+--- Backspace logic types in its place under the keys held now. That logic's
+--- keystrokes all end in a Delete or a Backspace, which spend an armed
+--- one-shot Shift, as its OneShotShiftFix does.
+--- @return table|nil tap Text for the injector, as type_tap returns it.
+local function type_key_tap(self, out, config, typed, now_ms)
+	local logic = typed == KEY_BACKSPACE and BACKSPACE_CHORDS[config.id]
+	local chords = logic and logic(self)
+	if not chords then return type_tap(self, out, typed, now_ms) end
+	self.one_shot_until = nil
+	type_chords(self, out, chords)
+	return nil
+end
+
 --- Fires the tap of a key that has no hold, at its key-down and at each of its
 --- repeats, as the Windows hotkey of such a key does (escape.ahk "Fire
 --- immediately on key-down"): there is no hold to tell it from, so waiting for
@@ -505,7 +611,7 @@ local function fire_instant(self, out, config, now_ms)
 		return out, nil
 	end
 	local typed = M.KEY_TAPS[config.tap]
-	if typed then return out, type_tap(self, out, typed, now_ms) end
+	if typed then return out, type_key_tap(self, out, config, typed, now_ms) end
 	return out, config.tap
 end
 
@@ -647,6 +753,9 @@ function M:process(code, value, now_ms)
 		local elapsed = now_ms - state.down_at
 		local is_tap = not state.cancelled and not state.tap_blocked
 			and elapsed <= config.threshold_ms and elapsed >= self.tap_min_ms
+		for _, needed_up in ipairs(config.tap_needs_up_at_release or {}) do
+			if self.physical_down[needed_up] then is_tap = false end
+		end
 		if state.tapped or not is_tap or config.tap == "none" then return out, nil end
 		if config.tap == "one_shot_shift" then
 			self.one_shot_until = now_ms + self.one_shot_timeout_ms
@@ -655,7 +764,7 @@ function M:process(code, value, now_ms)
 		-- The native key (as if nothing were configured on a tap) or a key tap.
 		local typed = config.tap == "" and code or M.KEY_TAPS[config.tap]
 		if typed then
-			return out, type_tap(self, out, typed, now_ms)
+			return out, type_key_tap(self, out, config, typed, now_ms)
 		end
 		return out, config.tap
 	end
