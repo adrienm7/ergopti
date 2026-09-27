@@ -581,8 +581,23 @@ local function lalt_backspace_chords(self)
 	return nil
 end
 
+--- What RCtrl's Backspace tap types instead of a plain Backspace under the
+--- keys physically down now, as rctrl.ahk decides (7.1 and _RCtrlBackspaceTap):
+--- Delete under the left Shift, Right then Backspace under LAlt tapping the
+--- one-shot Shift, whose Delete would be Ctrl+Alt+Delete.
+--- @return table|nil chords As type_chords takes them; nil for the plain key.
+local function rctrl_backspace_chords(self)
+	local down = self.physical_down
+	if down[KEY_LEFTSHIFT] then return { { ctrl = false, key = KEY_DELETE } } end
+	local lalt_config = self.by_code[KEY_LEFTALT]
+	if down[KEY_LEFTALT] and lalt_config ~= nil and lalt_config.tap == "one_shot_shift" then
+		return { { ctrl = false, key = KEY_RIGHT }, { ctrl = false, key = KEY_BACKSPACE } }
+	end
+	return nil
+end
+
 -- The keys whose Backspace tap Windows types through a logic of its own.
-local BACKSPACE_CHORDS = { left_alt = lalt_backspace_chords }
+local BACKSPACE_CHORDS = { left_alt = lalt_backspace_chords, right_ctrl = rctrl_backspace_chords }
 
 --- Types the key a tap stands for (type_tap), or what the key's Windows
 --- Backspace logic types in its place under the keys held now. That logic's
