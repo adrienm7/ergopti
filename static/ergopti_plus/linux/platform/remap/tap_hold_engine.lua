@@ -91,6 +91,11 @@ local NO_HOLD_BY_TAP = {
 	},
 	right_ctrl = { tab = { own = true }, one_shot_shift = { mods = { KEY_LEFTSHIFT } } },
 }
+-- The keys that must be up when a key goes down for its tap to fire, by key.
+-- LCtrl taps only with CapsLock and LAlt up (lshift_lctrl.ahk 3.1, in its
+-- tap-only and its hold variants), so CapsLock+LCtrl or LAlt+LCtrl let go
+-- quickly runs no tap. Physical keys, whatever the layout makes of them.
+local TAP_NEEDS_UP = { left_ctrl = { EvdevCodes.KEY_CAPSLOCK, KEY_LEFTALT } }
 local KEY_HOME, KEY_END, KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT = 102, 107, 103, 108, 105, 106
 local KEY_ENTER, KEY_BACKSPACE, KEY_ESC = 28, 14, 1
 local KEY_F2, KEY_F12 = 60, 88
@@ -194,6 +199,7 @@ function M.new(opts)
 		key_refs = {},       -- code -> how many of this engine's holders keep it down
 		passed_down = {},    -- keys that went through untouched and are down (the hand's)
 		modifiers_down = {}, -- modifier keys that went through untouched, and are down
+		physical_down = {},  -- every physical key down now, whatever this engine made of it
 	}
 	for key_id, config in pairs(type(options.keys) == "table" and options.keys or {}) do
 		local code = M.KEY_CODES[key_id]
@@ -241,6 +247,7 @@ function M.new(opts)
 				-- A tap and no hold with no rule: nothing to wait for (see fire_instant).
 				instant = no_hold and not rule,
 				tap_at_down = rule and rule.tap_at_down or false,
+				tap_needs_up = TAP_NEEDS_UP[key_id],
 				threshold_ms = math.floor((tonumber(config.time_activation_seconds) or 0) * 1000 + 0.5),
 			}
 		end
@@ -515,6 +522,11 @@ end
 function M:process(code, value, now_ms)
 	local config = self.by_code[code]
 	local out = {}
+	if value == DOWN then
+		self.physical_down[code] = true
+	elseif value == UP then
+		self.physical_down[code] = nil
+	end
 
 	-- A release is activity too, as on Windows (hook_dispatcher's _OnKeyUp): a
 	-- key held before a tap-hold key and let go during it was used with it. So
@@ -580,6 +592,9 @@ function M:process(code, value, now_ms)
 			end
 			cancel_taps(self, code)
 			local state = { down_at = now_ms, cancelled = false, emitted = {} }
+			for _, needed_up in ipairs(config.tap_needs_up or {}) do
+				if self.physical_down[needed_up] then state.tap_blocked = true end
+			end
 			self.held[code] = state
 			if config.layer then
 				state.layer = true
@@ -605,7 +620,8 @@ function M:process(code, value, now_ms)
 		for index = #state.emitted, 1, -1 do release(self, out, state.emitted[index]) end
 		if state.layer then self.layer_depth = math.max(0, self.layer_depth - 1) end
 		local elapsed = now_ms - state.down_at
-		local is_tap = not state.cancelled and elapsed <= config.threshold_ms and elapsed >= self.tap_min_ms
+		local is_tap = not state.cancelled and not state.tap_blocked
+			and elapsed <= config.threshold_ms and elapsed >= self.tap_min_ms
 		if state.tapped or not is_tap or config.tap == "none" then return out, nil end
 		if config.tap == "one_shot_shift" then
 			self.one_shot_until = now_ms + self.one_shot_timeout_ms
@@ -675,6 +691,9 @@ function M:release_all()
 	self.one_shot_until, self.one_shot_keys, self.key_refs = nil, {}, {}
 	self.one_shot_swallowed, self.instant_down = {}, {}
 	self.native_keys, self.modifiers_down, self.passed_down = {}, {}, {}
+	-- The hook swallows the rest of every key it took from this engine, so
+	-- their releases never come back here.
+	self.physical_down = {}
 	return out
 end
 
