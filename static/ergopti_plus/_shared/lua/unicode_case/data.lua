@@ -1,12 +1,12 @@
---- _generated/unicode_case_data.lua
+--- _shared/lua/unicode_case/data.lua
 --- AUTO-GENERATED from Unicode default case conversion in Node 22.
 --- DO NOT EDIT BY HAND — run `npm run codegen:unicode-case:linux` to refresh.
 
 --- ==============================================================================
---- MODULE: Unicode Case Data (Linux)
+--- MODULE: Unicode Case Data (shared)
 --- DESCRIPTION:
 --- Complete Unicode 17.0 default case mappings consumed by
---- infra/unicode_case.lua. Multi-codepoint mappings are retained verbatim.
+--- unicode_case/init.lua. Multi-codepoint mappings are retained verbatim.
 --- ==============================================================================
 
 return {

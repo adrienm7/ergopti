@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local UnicodeCase = helpers.load_module("infra.unicode_case")
+local UnicodeCase = helpers.load_module("unicode_case")
 
 helpers.describe("Unicode case conversion", function()
 	helpers.it("uses the pinned complete Unicode dataset", function()

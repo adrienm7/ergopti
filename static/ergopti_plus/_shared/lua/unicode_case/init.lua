@@ -1,7 +1,7 @@
---- infra/unicode_case.lua
+--- _shared/lua/unicode_case/init.lua
 
 --- ==============================================================================
---- MODULE: Unicode Case Conversion (Linux)
+--- MODULE: Unicode Case Conversion (shared)
 --- DESCRIPTION:
 --- Applies complete generated Unicode case mappings without locale-dependent
 --- subprocesses. LuaJIT string.upper/string.lower are byte-oriented and leave
@@ -10,7 +10,7 @@
 
 local M = {}
 
-local Data = require("_generated.unicode_case_data")
+local Data = require("unicode_case.data")
 
 local UTF8_CHARACTER = "[%z\1-\127\194-\244][\128-\191]*"
 
