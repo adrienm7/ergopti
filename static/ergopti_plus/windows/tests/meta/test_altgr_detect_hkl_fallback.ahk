@@ -27,9 +27,11 @@ _AGHF_EntrySource() {
 
 _AGHF_BootConsumersReadTheProbe() {
 	Src := _AGHF_EntrySource()
-	AssertTrue(RegExMatch(Src, 'm)^global _LAST_KEYBOARD_HKL := _ALTGR_LAYOUT_PROBE\["hkl"\]') > 0,
-		"the layout poll's baseline must be the layout the boot probe decided the AltGr family on")
-	AssertTrue(InStr(Src, '_HKL := _ALTGR_LAYOUT_PROBE["hkl"]') > 0,
+	AssertTrue(RegExMatch(Src, 'm)^global _LAYOUT_REMAP_HKL := _ALTGR_LAYOUT_PROBE\["hkl"\]') > 0,
+		"the layout the boot registrations are built for must be the layout the boot probe decided the AltGr family on")
+	AssertTrue(RegExMatch(Src, 'm)^global _LAST_KEYBOARD_HKL := _LAYOUT_REMAP_HKL') > 0,
+		"the layout poll's baseline must be the layout the boot registrations are built for")
+	AssertTrue(InStr(Src, '_HKL := _LAYOUT_REMAP_HKL') > 0,
 		"the magic-key scan must scan the layout the boot probe read")
 	Detect := InStr(Src, 'LoggerInfo("AltGrDetect"')
 	AssertTrue(Detect > 0, "the AltGrDetect line must still be logged")

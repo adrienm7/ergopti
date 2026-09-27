@@ -623,6 +623,12 @@ BootProfile_Stamp("Config parsed (TOML + i18n)")
 ; this file triggers a full Reload() on layout switch, so this re-runs and
 ; adapts to the new layout automatically.
 HotstringEngineInit()
+; The layout every boot registration that reads the keyboard layout is built
+; for: the digit-row swap (_OsLayoutDigitsAreShifted, KS_LayoutDigitRowSymbols)
+; and the magic-key source scan. It is the layout the boot probe read, so those
+; registrations and the AltGr family describe one layout, and the layout poll
+; starts from it.
+global _LAYOUT_REMAP_HKL := _ALTGR_LAYOUT_PROBE["hkl"]
 BootProfile_Stamp("Hotstring engine initialised")
 
 ; Initialise the logger now that the ini cache is built and ScriptInformation
@@ -791,7 +797,7 @@ BootProfile_StageEnd("configuration", Format("{1} config.toml value(s) applied, 
 ; the target character ("j") sits behind a driver-level remapping that the
 ; API cannot see.
 ;
-; The layout is the one the boot AltGr probe read (_ALTGR_LAYOUT_PROBE, through
+; The layout is _LAYOUT_REMAP_HKL, the one the boot AltGr probe read (through
 ; the KS_ResolveKeyboardLayout cascade: foreground, then the AHK thread, then
 ; the system default), so the scan and the AltGr family describe one layout and
 ; the layout poll, seeded with the same HKL, reloads when the user switched.
@@ -799,7 +805,7 @@ BootProfile_StageEnd("configuration", Format("{1} config.toml value(s) applied, 
 ; layout-detection DllCalls (MapVirtualKeyExW / ToUnicodeEx) are isolated there;
 ; this boot step only interprets the result and updates ScriptInformation.
 if !Features["layout"]["ergopti_base"] {
-	_HKL := _ALTGR_LAYOUT_PROBE["hkl"]
+	_HKL := _LAYOUT_REMAP_HKL
 	if _HKL != 0 {
 		_TargetChar := ScriptInformation["MagicKeySourceChar"]
 		_Found := KS_ScanScancodeForChar(_HKL, _TargetChar)
@@ -1363,7 +1369,7 @@ global _LAYOUT_POLL_INTERVAL_MS := 1000
 ; second read: a switch made during the seconds of boot then shows up as a
 ; change and reloads, instead of becoming the baseline of a family decided on
 ; the previous layout.
-global _LAST_KEYBOARD_HKL := _ALTGR_LAYOUT_PROBE["hkl"]
+global _LAST_KEYBOARD_HKL := _LAYOUT_REMAP_HKL
 global _PENDING_KEYBOARD_HKL := 0
 
 ; The quiescence decision is a pure function extracted to infra/ so the headless
