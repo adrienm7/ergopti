@@ -31,6 +31,8 @@ if not ok_luv then luv = nil end
 
 -- Nanoseconds per millisecond — luv.hrtime() reports nanoseconds.
 local NS_PER_MS = 1e6
+-- The os.time() fallback counts whole seconds.
+local OS_TIME_RESOLUTION_MS = 1000
 
 
 
@@ -72,6 +74,16 @@ end
 --- @return boolean
 function M.has_hires()
 	return luv ~= nil and luv.hrtime ~= nil
+end
+
+--- Returns how far the difference of two readings can overstate the time
+--- that passed between them: nothing that counts for luv.hrtime, a whole
+--- second for the os.time() fallback, whose two readings a millisecond apart
+--- can differ by a second.
+--- @return number Milliseconds.
+function M.resolution_ms()
+	if M.has_hires() then return 0 end
+	return OS_TIME_RESOLUTION_MS
 end
 
 return M

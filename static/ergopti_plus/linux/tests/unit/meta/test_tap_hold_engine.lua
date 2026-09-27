@@ -230,18 +230,45 @@ helpers.describe("tap-hold engine: a tap with no hold", function()
 
 	-- rctrl.ahk 7.3: RCtrl's one-shot Shift is a tap on a quick release, and a
 	-- long press holds Shift; it is never armed at key-down (tap-no-hold-per-key).
+	-- Shift goes down only when the KeyWait times out, past the threshold: here
+	-- it went down at key-down, so RCtrl then A within the threshold typed "A"
+	-- where Windows types "a" (rctrl-one-shot-hold-past-threshold).
 	helpers.it("arms RCtrl's one-shot Shift on a quick release and holds Shift for a long press (tap-no-hold-per-key)", function()
 		local keys = { right_ctrl = { tap_action = "one_shot_shift", time_activation_seconds = 0.2 } }
 		local e = engine(keys)
-		helpers.assert_eq(trail((e:process(RCTRL, DOWN, 0))), "42↓", "Shift, not the one-shot, at key-down")
-		helpers.assert_eq(trail((e:process(RCTRL, UP, 100))), "42↑")
-		helpers.assert_eq(trail((e:process(KEY_A, DOWN, 150))), "42↓ 30↓", "the quick release armed the one-shot")
+		helpers.assert_eq(trail((e:process(RCTRL, DOWN, 0))), "", "neither Shift nor the one-shot at key-down")
+		helpers.assert_eq(trail(e:tick(150)), "", "no Shift within the threshold")
+		helpers.assert_eq(trail((e:process(RCTRL, UP, 180))), "")
+		helpers.assert_eq(trail((e:process(KEY_A, DOWN, 190))), "42↓ 30↓", "the quick release armed the one-shot")
 		e = engine(keys)
 		e:process(RCTRL, DOWN, 0)
-		helpers.assert_nil(e:process(KEY_A, DOWN, 300), "held, it is Shift: A passes under it")
-		e:process(KEY_A, UP, 350)
-		helpers.assert_eq(trail((e:process(RCTRL, UP, 400))), "42↑")
-		helpers.assert_nil(e:process(KEY_A, DOWN, 450), "and a long press arms nothing")
+		helpers.assert_eq(trail(e:tick(200)), "", "at the threshold itself it is still a tap")
+		helpers.assert_eq(trail(e:tick(201)), "42↓", "past it, Shift is held")
+		helpers.assert_eq(trail(e:tick(500)), "", "once")
+		helpers.assert_nil(e:process(KEY_A, DOWN, 600), "held, it is Shift: A passes under it")
+		e:process(KEY_A, UP, 650)
+		helpers.assert_eq(trail((e:process(RCTRL, UP, 700))), "42↑")
+		helpers.assert_nil(e:process(KEY_A, DOWN, 750), "and a long press arms nothing")
+	end)
+
+	helpers.it("types a key pressed within RCtrl's threshold unshifted (rctrl-one-shot-hold-past-threshold)", function()
+		local e = engine({ right_ctrl = { tap_action = "one_shot_shift", time_activation_seconds = 0.2 } })
+		e:process(RCTRL, DOWN, 0)
+		helpers.assert_nil(e:process(KEY_A, DOWN, 50), "A within the threshold is a plain a")
+		helpers.assert_nil(e:process(KEY_A, UP, 80))
+		helpers.assert_eq(trail(e:tick(250)), "42↓", "RCtrl still down past the threshold holds Shift")
+		helpers.assert_nil(e:process(KEY_J, DOWN, 300), "J goes under that Shift")
+		e:process(KEY_J, UP, 320)
+		local out, tap = e:process(RCTRL, UP, 400)
+		helpers.assert_eq({ trail(out), tap }, { "42↑" })
+		helpers.assert_nil(e:process(KEY_A, DOWN, 450), "a used RCtrl arms nothing")
+		e = engine({ right_ctrl = { tap_action = "one_shot_shift", time_activation_seconds = 0.2 } })
+		e:process(RCTRL, DOWN, 0)
+		e:process(KEY_A, DOWN, 50)
+		e:process(KEY_A, UP, 80)
+		helpers.assert_eq(trail((e:process(RCTRL, UP, 150))), "", "released within the threshold: no Shift ever")
+		helpers.assert_nil(e:process(KEY_J, DOWN, 200), "and A made it a chord: nothing armed")
+		helpers.assert_eq(trail(e:release_all()), "", "nothing left to release")
 	end)
 
 	-- Each key's Windows tap-only hotkey, for a catalogue tap ("copy"):
