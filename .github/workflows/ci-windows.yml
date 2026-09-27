@@ -1,16 +1,17 @@
 # .github/workflows/ci-windows.yml
 #
-# Windows box of the CI pipeline. ci.yml calls it as its 'Windows' job, after
-# Validate and Release · plan, so the jobs below render as 'Windows / <name>'
-# inside one group box.
+# Windows lane of the CI pipeline. ci.yml calls it as its 'Windows' job, after
+# Validate and plan, so the jobs below render as 'Windows / <name>' in the run
+# graph, one lane with one entry job and one exit job:
 #
 #   test-ahk ──> package-windows (release runs only)
 #
 # test-ahk runs the AHK unit, LLM, compiler-warning and E2E gates on every run.
-# package-windows runs only when ci.yml's plan resolved a free release tag: it
-# builds, signs and smokes the exe that Release · publish attaches, and uploads
-# it as assets-windows. The box declares no outputs; publish collects every
-# assets-* artifact of the run by pattern, and this box's own result gates it.
+# package-windows runs only when validate's plan resolved a free release tag:
+# it builds, signs and smokes the exe that Release attaches, and uploads it as
+# assets-windows. On any other run it is skipped, which leaves the lane green.
+# The lane declares no outputs; Release collects every assets-* artifact of the
+# run by pattern, and this lane's own result gates it.
 #
 # No concurrency block: ci.yml's group already covers every called workflow,
 # and reusing that group here with cancel-in-progress would cancel this run.
@@ -59,7 +60,7 @@ jobs:
   # 1) AHK unit tests + E2E
   # ─────────────────────────────────────────────────
   test-ahk:
-    name: 'unit + E2E'
+    name: 'tests'
     runs-on: windows-latest
 
     steps:
@@ -384,7 +385,7 @@ jobs:
   # the smoke on the image's own Defender configuration, which the test job
   # alters; nothing here disables or restores Defender.
   package-windows:
-    name: 'package, sign and smoke release exe'
+    name: 'package'
     needs: [test-ahk]
     if: inputs.release
     runs-on: windows-latest

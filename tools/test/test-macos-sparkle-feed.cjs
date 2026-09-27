@@ -45,12 +45,13 @@ if (channelAssignments.length !== 2) {
 	errors.push(`the macOS package job must stamp exactly two channel consumers, found ${channelAssignments.length}`);
 }
 if (channelAssignments.some((value) => value !== channelExpression)) {
-	errors.push('both the macOS bundle and appcast must stamp the channel the box receives from plan');
+	errors.push('both the macOS bundle and appcast must stamp the channel the lane receives from the plan');
 }
 
-// One channel rule, in plan. Every other consumer receives its result, so the
-// bundle, the appcast, the Windows stamp and the published feed cannot disagree.
-const planMeta = pipeline.step(pipeline.job('plan'), 'Compute tag and version');
+// One channel rule, in validate's plan. Every other consumer receives its
+// result, so the bundle, the appcast, the Windows stamp and the published feed
+// cannot disagree.
+const planMeta = pipeline.step(pipeline.job('validate'), 'Compute tag and version');
 const channelRule = 'if [ "$prerelease" = "true" ]; then channel="dev"; else channel="main"; fi';
 if (!planMeta.includes(channelRule) || !planMeta.includes('emit channel "$channel"')) {
 	errors.push('plan must derive the update channel from the prerelease flag and emit it');
@@ -62,16 +63,16 @@ if (workflow.includes("prerelease == 'true' && 'dev' || 'main'") || /\$channel\s
 	errors.push('a job re-derives the channel from prerelease instead of reading plan\'s channel output');
 }
 for (const caller of ['macos', 'windows']) {
-	if (!/^\s+channel:\s*\$\{\{\s*needs\.plan\.outputs\.channel\s*\}\}\s*$/m.test(pipeline.job(caller))) {
-		errors.push(`ci.yml's ${caller} caller must pass channel: \${{ needs.plan.outputs.channel }}`);
+	if (!/^\s+channel:\s*\$\{\{\s*needs\.validate\.outputs\.channel\s*\}\}\s*$/m.test(pipeline.job(caller))) {
+		errors.push(`ci.yml's ${caller} caller must pass channel: \${{ needs.validate.outputs.channel }}`);
 	}
 }
 for (const [label, value] of [
 	...[...workflow.matchAll(/ERGOPTI_CHANNEL:\s*(.+)/g)].map((match) => ['ERGOPTI_CHANNEL', match[1].trim()]),
 	...[...workflow.matchAll(/\$channel\s*=\s*(.+)/g)].map((match) => ['$channel', match[1].trim()]),
 ]) {
-	if (!/^"?\$\{\{\s*(?:inputs\.channel|needs\.plan\.outputs\.channel)\s*\}\}"?$/.test(value)) {
-		errors.push(`${label} must read inputs.channel or needs.plan.outputs.channel, got ${value}`);
+	if (!/^"?\$\{\{\s*(?:inputs\.channel|needs\.validate\.outputs\.channel)\s*\}\}"?$/.test(value)) {
+		errors.push(`${label} must read inputs.channel or needs.validate.outputs.channel, got ${value}`);
 	}
 }
 
@@ -145,8 +146,8 @@ if (!pipeline.step(macosJob, 'Upload the macOS package').includes('build/macos/a
 	errors.push('the macOS artifact must preserve the exact appcast-{channel}.xml basename');
 }
 const feedPublishStep = pipeline.step(pipeline.job('release'), 'Publish channel feed for Sparkle');
-if (!/^\s+ERGOPTI_CHANNEL:\s*\$\{\{\s*needs\.plan\.outputs\.channel\s*\}\}\s*$/m.test(feedPublishStep)) {
-	errors.push('the published feed must be the channel plan resolved');
+if (!/^\s+ERGOPTI_CHANNEL:\s*\$\{\{\s*needs\.validate\.outputs\.channel\s*\}\}\s*$/m.test(feedPublishStep)) {
+	errors.push('the published feed must be the channel the plan resolved');
 }
 if (!/git -C "\$worktree" push origin "HEAD:refs\/heads\/\$\{branch\}"/.test(feedPublishStep)) {
 	errors.push('finalization must commit and push the channel feed to its dedicated mutable branch');

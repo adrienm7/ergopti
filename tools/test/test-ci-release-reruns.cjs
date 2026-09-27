@@ -4,8 +4,9 @@
  * ==============================================================================
  * MODULE: Release Re-run Guard
  * DESCRIPTION:
- * Executes the real scripts of ci.yml's plan and release jobs with bash,
- * against temporary git repositories: plan's `Compute tag and version`, the
+ * Executes the real scripts of ci.yml's release plan (the last steps of its
+ * validate job) and of its release job with bash, against temporary git
+ * repositories: the plan's `Compute tag and version`, the
  * release preflight, `Create release` and the Sparkle feed publication. It
  * proves which tag a push plans, and what each re-run of a release does.
  *
@@ -273,7 +274,7 @@ function linesOf(file) {
 // ======================================
 // ======================================
 
-const planScript = scriptOf(pipeline.step(pipeline.job('plan'), 'Compute tag and version'), 'Compute tag and version');
+const planScript = scriptOf(pipeline.step(pipeline.job('validate'), 'Compute tag and version'), 'Compute tag and version');
 
 /** Runs plan's script for a push of `ref`, with HEAD at `sha`. */
 function plan(repo, sha, ref, event = 'push') {
@@ -908,25 +909,25 @@ check('each script\'s env carries the plan output or preflight decision it reads
 	const envOf = (name) => pipeline.step(releaseJob, name).split('\n');
 	for (const [name, lines] of [
 		[CREATE_RELEASE, [
-			'          TAG: ${{ needs.plan.outputs.tag }}',
-			'          PRERELEASE: ${{ needs.plan.outputs.prerelease }}',
-			'          TITLE: ${{ needs.plan.outputs.title }}',
+			'          TAG: ${{ needs.validate.outputs.tag }}',
+			'          PRERELEASE: ${{ needs.validate.outputs.prerelease }}',
+			'          TITLE: ${{ needs.validate.outputs.title }}',
 			'          GH_TOKEN: ${{ github.token }}',
 		]],
 		[PUBLISH_FEED, [
-			'          ERGOPTI_CHANNEL: ${{ needs.plan.outputs.channel }}',
-			'          TAG: ${{ needs.plan.outputs.tag }}',
+			'          ERGOPTI_CHANNEL: ${{ needs.validate.outputs.channel }}',
+			'          TAG: ${{ needs.validate.outputs.tag }}',
 			"          RESUMED: ${{ steps.preflight.outputs.create_release == 'false' }}",
 			'          GH_TOKEN: ${{ github.token }}',
 		]],
 		[PREFLIGHT, [
-			'          TAG: ${{ needs.plan.outputs.tag }}',
-			'          CHANNEL: ${{ needs.plan.outputs.channel }}',
+			'          TAG: ${{ needs.validate.outputs.tag }}',
+			'          CHANNEL: ${{ needs.validate.outputs.channel }}',
 		]],
 	]) {
 		for (const line of lines) assert.ok(envOf(name).includes(line), `"${name}" must set ${line.trim()}`);
 	}
-	assert.match(pipeline.job('release'), /^ {6}LINUX_BUNDLE_ASSET: \$\{\{ needs\.plan\.outputs\.linux_bundle \}\}$/m,
+	assert.match(pipeline.job('release'), /^ {6}LINUX_BUNDLE_ASSET: \$\{\{ needs\.validate\.outputs\.linux_bundle \}\}$/m,
 		'the release job must give the preflight and the notes the bundle name plan resolved');
 });
 

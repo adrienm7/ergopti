@@ -19,17 +19,25 @@
  * supplied exit 0. XCTest-created guardian runtimes also inherited the production
  * `Darwin.exit` boundary, so asynchronous cleanup could kill the whole runner.
  * The workflow needs an independent verdict and tests need explicit termination.
- * Since the pipeline became one reusable workflow per OS, the macOS box's own
+ * Since the pipeline became one reusable workflow per OS, the macOS lane's own
  * result replaces that aggregate job: it fails as soon as any of its jobs fails,
- * and Release · publish runs only when every box succeeded.
+ * and Release runs only when every lane succeeded. The launcher build and its
+ * XCTest then moved into the package job, before the app build, so the lane
+ * uses one macOS runner before its launch legs; the tests append to the real
+ * ~/Library/Logs/ErgoptiPlus/launcher.log, which the release smoke refuses to
+ * launch over, and the app that ships must not build in their cached tree.
  *
  * FEATURES & RATIONALE:
- * 1. Requires release compilation and XCTest execution on `macos-*`; an Ubuntu
- *    source grep cannot substitute for Darwin process and signal semantics.
- * 2. Requires every job of an OS box to gate its box: no job-level `if:` beyond
- *    the two allow-listed ones and no `continue-on-error`, the release job
- *    waiting on the three boxes through its implicit `success()` (no status
- *    function), and ci.yml calling the box that holds the Swift job. No step
+ * 1. Requires release compilation and XCTest execution on `macos-*`, in the
+ *    package job after the Hammerspoon suites and before the app build; an
+ *    Ubuntu source grep cannot substitute for Darwin process and signal
+ *    semantics. The launcher log the tests leave is removed before the app is
+ *    built, and the tests build in a scratch path of their own, the only
+ *    SwiftPM tree the cache restores.
+ * 2. Requires every job of an OS lane to gate its lane: no job-level `if:`
+ *    beyond the two allow-listed ones and no `continue-on-error`, the release
+ *    job waiting on the three lanes through its implicit `success()` (no status
+ *    function), and ci.yml calling the lane that holds the Swift steps. No step
  *    of the pipeline may set `continue-on-error` beyond the report-only AHK
  *    annotator, and the launch verdict step must run the gate script.
  * 3. Requires the test step to capture line-buffered XCTest output and reject a
@@ -102,16 +110,56 @@ function withoutFullLineComments(source) {
 }
 
 check(PIPELINE.length > 10000, 'the CI pipeline is missing or truncated; refusing to inspect an empty workflow');
-// locate() throws unless exactly one `test-swift-launcher` job exists.
-check(pipeline.locate('test-swift-launcher').file === MACOS_BOX,
-	`the \`test-swift-launcher\` job must live in the macOS box, ${MACOS_BOX}`);
+// locate() throws unless exactly one `package-macos` job exists.
+check(pipeline.locate('package-macos').file === MACOS_BOX,
+	`the \`package-macos\` job, which builds and tests the launcher, must live in the macOS lane, ${MACOS_BOX}`);
+check(!/^ {2}test-swift-launcher:/m.test(pipeline.file(MACOS_BOX)),
+	'the launcher build and XCTest live in package-macos; a second macOS job for them would add a second lane entry');
 
-const swiftJob = withoutFullLineComments(pipeline.job('test-swift-launcher'));
-check(swiftJob.length > 100, '`test-swift-launcher` is absent or empty');
+const swiftJob = withoutFullLineComments(pipeline.job('package-macos'));
+check(swiftJob.length > 100, '`package-macos` is absent or empty');
 check(/^\s+runs-on:\s*macos-[A-Za-z0-9._-]+\s*$/m.test(swiftJob),
-	'`test-swift-launcher` must run on a real macOS runner');
+	'`package-macos` must run the launcher build and XCTest on a real macOS runner');
 check(!/^\s+continue-on-error:\s*true\s*$/m.test(swiftJob),
-	'`test-swift-launcher` must be gating, not continue-on-error');
+	'`package-macos` must be gating, not continue-on-error');
+// Fail fast: a red Hammerspoon suite spends no macOS minutes.
+check(JSON.stringify(pipeline.needsOf(pipeline.job('package-macos'))) === JSON.stringify(['test-hs']),
+	`package-macos must need test-hs alone, got [${pipeline.needsOf(pipeline.job('package-macos')).join(', ')}]`);
+
+// The launcher build and XCTest precede the app build. LauncherLogTests append
+// to the real ~/Library/Logs/ErgoptiPlus/launcher.log, and the release smoke
+// refuses a launcher log it did not start fresh, so the log goes in between.
+const PACKAGE_ORDER = [
+	'Build release launcher',
+	'Run Swift launcher tests',
+	'Remove the launcher log the Swift tests wrote',
+	'Build ErgoptiPlus.app',
+	'Smoke test built ErgoptiPlus.app (crash-on-launch guard)',
+];
+const packageStepNames = pipeline.steps(pipeline.job('package-macos')).map((candidate) => candidate.name);
+const packageOrder = PACKAGE_ORDER.map((name) => packageStepNames.indexOf(name));
+check(!packageOrder.some((at, index) => at < 0 || (index > 0 && at <= packageOrder[index - 1])),
+	`package-macos must run ${PACKAGE_ORDER.join(' < ')}; got: ${packageStepNames.join(' | ')}`);
+const logCleanup = pipeline.step(pipeline.job('package-macos'), 'Remove the launcher log the Swift tests wrote');
+check(pipeline.stepField(logCleanup, 'run') === 'rm -rf -- "$HOME/Library/Logs/ErgoptiPlus"'
+	&& pipeline.stepField(logCleanup, 'if') === null,
+	'package-macos must always remove ~/Library/Logs/ErgoptiPlus, the log the launcher tests write, before the app build');
+check(/if launcher_log\.exists\(\):\s*\n\s*raise RuntimeError\("Release launch requires a fresh launcher log"\)/
+	.test(fs.readFileSync(path.join(ROOT, 'tools', 'diagnostics', 'macos-release-launch.py'), 'utf8')),
+	'the release smoke no longer refuses a stale launcher log; re-derive why package-macos removes it');
+
+// The tests build in a scratch path of their own, the only SwiftPM tree the
+// cache restores, so the app build resolves its dependencies into a clean
+// .build as it did on a runner of its own: no cached tree reaches a shipped app.
+const SWIFT_SCRATCH = '--scratch-path "$RUNNER_TEMP/swift-launcher-ci"';
+const swiftCache = pipeline.step(pipeline.job('package-macos'), 'Cache SwiftPM dependencies');
+const cacheLines = swiftCache.split('\n');
+const pathAt = cacheLines.indexOf('          path: |');
+const pathEnd = cacheLines.findIndex((line, index) => index > pathAt && !/^ {12}\S/.test(line));
+const cachedPaths = pathAt < 0 ? [] : cacheLines.slice(pathAt + 1, pathEnd < 0 ? undefined : pathEnd).map((line) => line.trim());
+check(cachedPaths.length === 3 && cachedPaths.every((line) =>
+	/^\$\{\{ runner\.temp \}\}\/swift-launcher-ci\/(?:artifacts|checkouts|repositories)$/.test(line)),
+	`the SwiftPM cache must restore only the launcher tests' scratch path, got: ${cachedPaths.join(', ')}`);
 
 const plistLintLine = swiftJob.split(/\r?\n/).find((line) =>
 	/\brun:\s*plutil\s+-lint\b/.test(line)) || '';
@@ -124,6 +172,8 @@ check(!plistLintLine.includes('|| true'),
 const buildLine = swiftJob.split(/\r?\n/).find((line) => /\brun:\s*swift build\b/.test(line)) || '';
 check(buildLine.includes('--package-path static/ergopti_plus/macos/launcher'),
 	'the Swift build step must compile the packaged launcher directory');
+check(buildLine.endsWith(SWIFT_SCRATCH),
+	`the Swift build step must build in the tests' own scratch path, ${SWIFT_SCRATCH}`);
 check(/(?:^|\s)(?:-c|--configuration)\s+release(?:\s|$)/.test(buildLine),
 	'the Swift build step must compile the release configuration that ships');
 check(/(?:^|\s)--product\s+ErgoptiPlus(?:\s|$)/.test(buildLine),
@@ -137,6 +187,8 @@ check(/script -q \/dev\/null swift test\b/.test(testStep),
 	'the Swift test step must use a pseudo-terminal so the last completed XCTest is visible');
 check(testStep.includes('--package-path static/ergopti_plus/macos/launcher'),
 	'the Swift test step must execute the packaged launcher test target');
+check(testStep.includes(`swift test --package-path static/ergopti_plus/macos/launcher ${SWIFT_SCRATCH} `),
+	`the Swift test step must build in the tests' own scratch path, ${SWIFT_SCRATCH}`);
 check(!testStep.includes('|| true'), 'the Swift test step must not swallow XCTest failure');
 check(/set -euo pipefail/.test(testStep),
 	'the Swift test step must propagate failures through its log-capture pipeline');
@@ -181,8 +233,8 @@ check(
 );
 check(!/hashFiles\([^\r\n)]*Package\.resolved/.test(PIPELINE),
 	'the SwiftPM cache key must not pretend an ignored Package.resolved is tracked input');
-check(/SWIFT_BACKTRACE:\s*enable=yes/.test(swiftJob),
-	'the Swift XCTest job must emit an actionable backtrace after a native crash');
+check(/SWIFT_BACKTRACE:\s*enable=yes/.test(testStep),
+	'the Swift XCTest step must emit an actionable backtrace after a native crash');
 check(/func duplicateProcessEnvironment\s*\(/.test(SWIFT_SOURCES),
 	'the Swift launcher must retain its owned posix_spawn environment builder');
 check(/let kPOSIXTestHelperFlag\s*=\s*"--posix-test-helper"/.test(SWIFT_SOURCES),
@@ -202,8 +254,8 @@ check(guardianRuntimeTestCalls >= 25,
 check(explicitTestTerminations === guardianRuntimeTestCalls,
 	'(macos-xctest-explicit-termination-2026-08-27) every XCTest guardian runtime must replace process exit');
 
-// The box result is the aggregate gate. A job-level `if:` or `continue-on-error`
-// is how a job becomes skipped or ignored while its box still reports success,
+// The lane result is the aggregate gate. A job-level `if:` or `continue-on-error`
+// is how a job becomes skipped or ignored while its lane still reports success,
 // which is what the old aggregate's "skipped counts as green" bug did. Only two
 // jobs may carry one: the release-only Windows packaging, which must not run
 // outside a release, and the Linux evidence gate, which must run after a
@@ -247,29 +299,30 @@ for (const [name, value] of Object.entries(ALLOWED_STEP_CONTINUE_ON_ERROR)) {
 		`the allow-listed step "${name}" must keep exactly continue-on-error: ${value}`);
 }
 
-// ci.yml calls each box by its file, and release waits on all three.
+// ci.yml calls each lane by its file, and release waits on all three and on
+// the root, where it reads the plan.
 const callers = pipeline.calls();
 check(
 	JSON.stringify(callers.map((call) => [call.id, call.uses]).sort()) === JSON.stringify(
 		Object.entries(BOX_FILES).map(([id, rel]) => [id, `./${rel}`]).sort()),
-	`ci.yml must call exactly the three OS boxes, got ${JSON.stringify(callers)}`
+	`ci.yml must call exactly the three OS lanes, got ${JSON.stringify(callers)}`
 );
 const release = pipeline.job('release');
 const releaseNeeds = pipeline.needsOf(release);
-for (const needed of ['plan', ...Object.keys(BOX_FILES)]) {
+for (const needed of ['validate', ...Object.keys(BOX_FILES)]) {
 	check(releaseNeeds.includes(needed), `release must need \`${needed}\`, got [${releaseNeeds.join(', ')}]`);
 	// locate() throws when the needed job no longer exists under that id.
 	check(pipeline.locate(needed).file === pipeline.ENTRY_REL,
 		`release's need \`${needed}\` must be a job of ${pipeline.ENTRY_REL}`);
 }
 // No status function: the implicit success() over needs is the "all three OS
-// are green" gate. The event test keeps a regression in plan's script alone
+// are green" gate. The event test keeps a regression in the plan script alone
 // from publishing a pull request or a dispatch run, where PAT_ERGOPTI is read.
 const releaseIf = pipeline.field(release, 'if');
 check(!/\b(?:always|success|failure|cancelled)\s*\(/.test(releaseIf || ''),
 	`release.if must hold no status function, got: ${releaseIf}`);
-check(releaseIf === "github.event_name == 'push' && needs.plan.outputs.release == 'true'",
-	`release.if must be exactly github.event_name == 'push' && needs.plan.outputs.release == 'true', got: ${releaseIf}`);
+check(releaseIf === "github.event_name == 'push' && needs.validate.outputs.release == 'true'",
+	`release.if must be exactly github.event_name == 'push' && needs.validate.outputs.release == 'true', got: ${releaseIf}`);
 
 // Forks receive no secrets: without a stand-in key their package opens a
 // Sparkle error and the launch gate fails every outside contribution. A
@@ -337,4 +390,4 @@ if (failures.length > 0) {
 	process.exit(1);
 }
 
-console.log('[OK] macOS CI requires a completed XCTest summary, and every OS box gates the release success-only.');
+console.log('[OK] macOS CI requires a completed XCTest summary before the app build, and every OS lane gates the release success-only.');

@@ -3,33 +3,50 @@
 # Unified CI pipeline — one run per push to main or dev, per pull request into
 # them, and per manual dispatch.
 #
-# Architecture:
+# Architecture: one root, one lane per OS, one release.
 #
-#   validate ──┐        ┌── macOS   (ci-macos.yml)   ──┐
-#              ├──>─────┼── Windows (ci-windows.yml) ──┼──> release
-#   plan ──────┘        └── Linux   (ci-linux.yml)   ──┘
+#                   ┌──> macOS   (ci-macos.yml)   ──┐
+#   validate ───────┼──> Windows (ci-windows.yml) ──┼──> release
+#      │            └──> Linux   (ci-linux.yml)   ──┘       ▲
+#      └────────────────── the release plan ────────────────┘
 #
-#   validate   Every repository-wide gate: hotstring TOML format, fast-check
+#   macOS    tests ──> package ──> launch (matrix)
+#   Windows  tests ──> package (release runs only)
+#   Linux    tests ──> package ──> run the .deb, run the .rpm, run the AppImage,
+#                                  install (matrix), first install (matrix)
+#                              ──> evidence gate
+#
+# GitHub's run graph draws no box around a called workflow: it flattens its
+# jobs into the run's one graph as "<OS> / <job>" and groups them only in the
+# sidebar. So each OS workflow has exactly one entry job, which needs nothing
+# else in its file, and exactly one exit job, which no job of its file needs:
+# the root fans out to three jobs and the release fans in from three lanes.
+# tools/test/test-ci-pipeline-wiring.cjs pins that shape.
+#
+#   validate   The single root. Every repository-wide gate first, on the
+#              default shallow clone: hotstring TOML format, fast-check
 #              properties, Stryker on main, and the npm run test:js umbrella
 #              (domain drift, parity, port compliance, translations, strict
-#              convention lint, ...).
-#   plan       Resolves the release metadata once, from git refs alone: whether
-#              this run publishes, and its tag, version, title and update
-#              channel. Only a push to main or dev of a commit that no tag of
-#              its series contains yet, and whose next tag is still free,
-#              publishes; every other run takes the CI profile.
-#   macOS      One reusable workflow per OS, each drawn as one group box. A box
-#   Windows    runs its tests and builds its package on every run. On a release
-#   Linux      run it builds the release artifact once, gates those exact bytes,
-#              and uploads them as assets-<os>. A box's own result is its
-#              aggregate gate: it fails as soon as any of its jobs fails.
-#   release    Publishes. It needs all three boxes to succeed, downloads every
-#              assets-* artifact of the run, creates the tag and the release,
-#              and pushes the Sparkle channel feed.
+#              convention lint, ...). Then it deepens the clone and resolves the
+#              release plan once, from git refs alone: whether this run
+#              publishes, and its tag, version, title and update channel. Only a
+#              push to main or dev of a commit that no tag of its series
+#              contains yet, and whose next tag is still free, publishes; every
+#              other run takes the CI profile.
+#   macOS      One reusable workflow per OS, each one lane of the graph. A lane
+#   Windows    runs its tests, then builds its package, on every run (Windows
+#   Linux      on a release run only). On a release run it builds the release
+#              artifact once, gates those exact bytes, and uploads them as
+#              assets-<os>. A lane's own result is its aggregate gate: it fails
+#              as soon as any of its jobs fails.
+#   release    Publishes. It needs all three lanes to succeed, reads the plan
+#              from validate, downloads every assets-* artifact of the run,
+#              creates the tag and the release, and pushes the Sparkle channel
+#              feed.
 #
-# Only with: and secrets: cross a call. The boxes read plan's outputs as inputs,
-# and each signing secret is passed explicitly, never with `inherit`, and only
-# on a release run.
+# Only with: and secrets: cross a call. The lanes read validate's plan outputs
+# as inputs, and each signing secret is passed explicitly, never with
+# `inherit`, and only on a release run.
 #
 # bench.yml — perf benchmark (main only, independent cadence)
 
@@ -57,19 +74,38 @@ concurrency:
 
 jobs:
   # ─────────────────────────────────────────────────
-  # 1.1) Repository-wide validation
+  # 1.1) Repository-wide validation, then the release plan
   # ─────────────────────────────────────────────────
-  # One job for what used to be four validate jobs: the domain pipeline and the
-  # translation audit already run inside npm run test:js, as do the port
-  # compliance, priority parity and strict convention lint steps. Each check
-  # after the setup runs under !cancelled(): the checks used to be separate
-  # jobs, and one failing check must still not hide the others. Any failure
-  # still fails the job.
+  # One job for what used to be four validate jobs and the plan job: the
+  # domain pipeline and the translation audit already run inside npm run
+  # test:js, as do the port compliance, priority parity and strict convention
+  # lint steps. Each check after the setup runs under !cancelled(): the checks
+  # used to be separate jobs, and one failing check must still not hide the
+  # others. Any failure still fails the job.
+  #
+  # The plan steps come last, after "Deepen history for the release plan".
+  # Several test:js gates shell out to git, so the checks run on the default
+  # depth-1 clone they were written against: a deeper clone would change what
+  # they see. The plan steps keep the default success() condition: a red check
+  # has already failed the job, and the lanes that read the plan never start.
+  #
+  # channel is the one copy of the prerelease-to-channel rule: every consumer
+  # (the macOS bundle and appcast, the Windows stamp, the published feed) reads
+  # it from here.
   validate:
-    name: 'Validate'
+    name: 'Validate and plan'
     runs-on: ubuntu-latest
+    outputs:
+      release: ${{ steps.meta.outputs.release }}
+      tag: ${{ steps.meta.outputs.tag }}
+      version: ${{ steps.meta.outputs.version }}
+      title: ${{ steps.meta.outputs.title }}
+      prerelease: ${{ steps.meta.outputs.prerelease }}
+      channel: ${{ steps.meta.outputs.channel }}
+      linux_bundle: ${{ steps.contract.outputs.linux_bundle }}
 
     steps:
+      # A depth-1 clone without tags, which the checks below expect.
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
@@ -105,7 +141,7 @@ jobs:
       - name: Mutation tests — domain layer (Stryker, break=25)
         # Guards the shared domain spec files (Registry, HotstringMatcher).
         # Stryker only mutates the JS domain specs, yet it's the most expensive
-        # step and validate is a `needs` of every OS box — so it gated the
+        # step and validate is a `needs` of every OS lane — so it gated the
         # whole graph on every push. Run it on main only (TT-4); PRs/branches still
         # get every other validate check, including the full test:js umbrella.
         if: ${{ !cancelled() && github.ref == 'refs/heads/main' }}
@@ -118,44 +154,50 @@ jobs:
         if: ${{ !cancelled() }}
         run: npm run test:js
 
-  # ─────────────────────────────────────────────────
-  # 1.2) Release plan: tag, version, title and channel
-  # ─────────────────────────────────────────────────
-  # Runs at t=0, beside validate, because its inputs are git refs only: the
-  # tag list, the commit subjects since the last stable tag and the remote
-  # tags. Nothing here depends on a test result, so the boxes can build the
-  # release artifact in their first pass instead of a second release column.
-  # "Publish only when all three OS are green" is release's job, through its
-  # needs. Kept apart from validate because it needs full history, and several
-  # test:js gates shell out to git: a deeper clone there would change what
-  # they see.
-  #
-  # channel is the one copy of the prerelease-to-channel rule: every consumer
-  # (the macOS bundle and appcast, the Windows stamp, the published feed) reads
-  # it from here.
-  plan:
-    name: 'Release · plan'
-    runs-on: ubuntu-latest
-    outputs:
-      release: ${{ steps.meta.outputs.release }}
-      tag: ${{ steps.meta.outputs.tag }}
-      version: ${{ steps.meta.outputs.version }}
-      title: ${{ steps.meta.outputs.title }}
-      prerelease: ${{ steps.meta.outputs.prerelease }}
-      channel: ${{ steps.meta.outputs.channel }}
-      linux_bundle: ${{ steps.contract.outputs.linux_bundle }}
+      # The release plan starts here: tag, version, title and channel. It
+      # numbers the next tag from every tag of its series and the commit
+      # subjects since the last stable tag, so it needs what a fetch-depth: 0
+      # checkout gives: every branch and tag with full history. --unshallow
+      # deepens every shallow commit of the clone, HEAD included even when no
+      # branch reaches it any more, and --tags adds every tag to the branches
+      # of the default refspec. The fetch used to come from actions/checkout,
+      # which tries it three times, 10 to 20 s apart; this step keeps that
+      # retry, since one network error here stops every lane. An attempt can
+      # fail after it has completed the clone, and --unshallow refuses a
+      # complete clone, so it is passed only while the clone is still shallow.
+      # A third failure, or a clone still shallow afterwards, fails the step
+      # rather than planning from a partial history, which would number a tag
+      # that is already taken and publish nothing, silently.
+      - name: Deepen history for the release plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+              unshallow=()
+              if [ "$(git rev-parse --is-shallow-repository)" = true ]; then
+                  unshallow=(--unshallow)
+              fi
+              if git fetch --prune "${unshallow[@]}" --tags origin; then
+                  break
+              fi
+              if [ "$attempt" = 3 ]; then
+                  echo "::error::git fetch failed 3 times: the release plan needs the full history and every tag."
+                  exit 1
+              fi
+              echo "::warning::git fetch failed (attempt $attempt of 3), retrying in 15 s."
+              sleep 15
+          done
+          if [ "$(git rev-parse --is-shallow-repository)" != false ]; then
+              echo "::error::the clone is still shallow after the fetch: the release plan would number a tag from a partial history."
+              exit 1
+          fi
 
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      # The Linux box names its tarball with it and release writes it into the
+      # The Linux lane names its tarball with it and release writes it into the
       # notes, so it is resolved and validated once, on every run. A malformed
-      # name fails plan and therefore stops every box, macOS and Windows
+      # name fails validate and therefore stops every lane, macOS and Windows
       # included, on purpose: it can only come from a checked-in bug in
-      # defaults.json, and failing fast at t=0 names it before any runner time
-      # is spent on a run that could never publish.
+      # defaults.json, and failing fast in the root names it before any runner
+      # time is spent on a run that could never publish.
       - name: Load the Linux release artifact contract
         id: contract
         shell: bash
@@ -176,7 +218,7 @@ jobs:
           emit() { printf '%s=%s\n' "$1" "$2" >> "$GITHUB_OUTPUT"; }
 
           # Only a push to main or dev publishes. A pull request or a manual
-          # dispatch takes the CI profile: every box still runs its tests and
+          # dispatch takes the CI profile: every lane still runs its tests and
           # builds its package, and release is skipped. dev is the channel the
           # CI packages have always been stamped with.
           if [ "$GITHUB_EVENT_NAME" != "push" ] ||
@@ -291,7 +333,7 @@ jobs:
 
   # ========================================================
   # ========================================================
-  # ======= 2/ One box per OS — tests, package, gate =======
+  # ======= 2/ One lane per OS: tests, package, gate =======
   # ========================================================
   # ========================================================
 
@@ -300,51 +342,52 @@ jobs:
   # The private signing secrets are passed only on a release run, so no pull
   # request or dispatch run, even from a branch of this repository, can read
   # them; SPARKLE_PUBLIC_KEY is public and keeps every CI package launchable.
+  # Each caller needs the root alone, so the root fans out to three jobs.
 
   # ─────────────────────────────────────────────────
   # 2.1) macOS — Hammerspoon, Swift launcher, ErgoptiPlus.app + launch gate
   # ─────────────────────────────────────────────────
   macos:
     name: 'macOS'
-    needs: [validate, plan]
+    needs: [validate]
     uses: ./.github/workflows/ci-macos.yml
     with:
-      release: ${{ needs.plan.outputs.release == 'true' }}
-      version: ${{ needs.plan.outputs.version }}
-      channel: ${{ needs.plan.outputs.channel }}
+      release: ${{ needs.validate.outputs.release == 'true' }}
+      version: ${{ needs.validate.outputs.version }}
+      channel: ${{ needs.validate.outputs.channel }}
     secrets:
       SPARKLE_PUBLIC_KEY: ${{ secrets.SPARKLE_PUBLIC_KEY }}
-      SPARKLE_ED_PRIVATE_KEY: ${{ needs.plan.outputs.release == 'true' && secrets.SPARKLE_ED_PRIVATE_KEY || '' }}
+      SPARKLE_ED_PRIVATE_KEY: ${{ needs.validate.outputs.release == 'true' && secrets.SPARKLE_ED_PRIVATE_KEY || '' }}
 
   # ─────────────────────────────────────────────────
   # 2.2) Windows — AHK unit + E2E, release exe
   # ─────────────────────────────────────────────────
   windows:
     name: 'Windows'
-    needs: [validate, plan]
+    needs: [validate]
     uses: ./.github/workflows/ci-windows.yml
     with:
-      release: ${{ needs.plan.outputs.release == 'true' }}
-      version: ${{ needs.plan.outputs.version }}
-      tag: ${{ needs.plan.outputs.tag }}
-      prerelease: ${{ needs.plan.outputs.prerelease }}
-      channel: ${{ needs.plan.outputs.channel }}
+      release: ${{ needs.validate.outputs.release == 'true' }}
+      version: ${{ needs.validate.outputs.version }}
+      tag: ${{ needs.validate.outputs.tag }}
+      prerelease: ${{ needs.validate.outputs.prerelease }}
+      channel: ${{ needs.validate.outputs.channel }}
     secrets:
-      WINDOWS_SIGNING_CERTIFICATE_BASE64: ${{ needs.plan.outputs.release == 'true' && secrets.WINDOWS_SIGNING_CERTIFICATE_BASE64 || '' }}
-      WINDOWS_SIGNING_CERTIFICATE_PASSWORD: ${{ needs.plan.outputs.release == 'true' && secrets.WINDOWS_SIGNING_CERTIFICATE_PASSWORD || '' }}
-      WINDOWS_SIGNER_SUBJECT: ${{ needs.plan.outputs.release == 'true' && secrets.WINDOWS_SIGNER_SUBJECT || '' }}
+      WINDOWS_SIGNING_CERTIFICATE_BASE64: ${{ needs.validate.outputs.release == 'true' && secrets.WINDOWS_SIGNING_CERTIFICATE_BASE64 || '' }}
+      WINDOWS_SIGNING_CERTIFICATE_PASSWORD: ${{ needs.validate.outputs.release == 'true' && secrets.WINDOWS_SIGNING_CERTIFICATE_PASSWORD || '' }}
+      WINDOWS_SIGNER_SUBJECT: ${{ needs.validate.outputs.release == 'true' && secrets.WINDOWS_SIGNER_SUBJECT || '' }}
 
   # ─────────────────────────────────────────────────
   # 2.3) Linux — driver tests, distro installs, packages + evidence gate
   # ─────────────────────────────────────────────────
   linux:
     name: 'Linux'
-    needs: [validate, plan]
+    needs: [validate]
     uses: ./.github/workflows/ci-linux.yml
     with:
-      release: ${{ needs.plan.outputs.release == 'true' }}
-      version: ${{ needs.plan.outputs.version }}
-      linux_bundle: ${{ needs.plan.outputs.linux_bundle }}
+      release: ${{ needs.validate.outputs.release == 'true' }}
+      version: ${{ needs.validate.outputs.version }}
+      linux_bundle: ${{ needs.validate.outputs.linux_bundle }}
 
   # ============================================================
   # ============================================================
@@ -353,19 +396,28 @@ jobs:
   # ============================================================
 
   # No status function in the if: the implicit success() over needs is the
-  # "all three OS are green" gate, and a box's result is failure as soon as
-  # any of its jobs failed. The event test repeats plan's rule on purpose: a
-  # regression in plan's script alone must not publish from a pull request or
-  # a dispatch run, where PAT_ERGOPTI is readable.
+  # "all three OS are green" gate, and a lane's result is failure as soon as
+  # any of its jobs failed. The event test repeats the plan's rule on purpose:
+  # a regression in the plan script alone must not publish from a pull request
+  # or a dispatch run, where PAT_ERGOPTI is readable.
+  #
+  # release reads the plan from validate itself, which draws one edge from the
+  # root to it. Handing the plan through the lanes instead (each exit job
+  # exporting its inputs as on.workflow_call.outputs) would remove that edge
+  # but make this if and every value below depend on a called workflow's
+  # outputs surviving "Re-run failed jobs", which GitHub does not document
+  # and which open reports show going stale or missing. A missing value would
+  # SKIP this job, not fail it: a half-published release would stop resuming
+  # while the run turned green.
   release:
-    name: 'Release · publish'
-    needs: [plan, macos, windows, linux]
-    if: github.event_name == 'push' && needs.plan.outputs.release == 'true'
+    name: 'Release'
+    needs: [validate, macos, windows, linux]
+    if: github.event_name == 'push' && needs.validate.outputs.release == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     env:
-      LINUX_BUNDLE_ASSET: ${{ needs.plan.outputs.linux_bundle }}
+      LINUX_BUNDLE_ASSET: ${{ needs.validate.outputs.linux_bundle }}
 
     steps:
       - uses: actions/checkout@v4
@@ -376,7 +428,7 @@ jobs:
           token: ${{ secrets.PAT_ERGOPTI }}
 
       - name: Download all build artifacts
-        # Restricted to assets-*: the boxes also upload evidence (launch-gate-*,
+        # Restricted to assets-*: the lanes also upload evidence (launch-gate-*,
         # linux-ci-evidence-*, the AHK execution manifest, the packaged startup
         # logs). Without the filter those files would land here too and be
         # attached to the release as stray assets nothing in the notes describes.
@@ -412,7 +464,7 @@ jobs:
           fi
 
       # Before the first side effect. The asset half is the real guard: the
-      # release attaches whatever the boxes uploaded, so a box that skipped a
+      # release attaches whatever the lanes uploaded, so a lane that skipped a
       # file would publish, tag and all, a release whose notes link to nothing,
       # or one without the Sparkle signature and appcast the feed step needs.
       # The list is every file the notes below link to, plus the signature,
@@ -421,7 +473,8 @@ jobs:
       # when the notes link a file this list does not require.
       #
       # The tag half decides where this attempt starts. "Re-run failed jobs"
-      # reuses plan's outputs from the first attempt, so the tag may exist:
+      # reuses validate's plan outputs from the first attempt, so the tag may
+      # exist:
       # - on another commit: another run took that number. There is nothing
       #   to publish, and the step fails; when that commit is an ancestor of
       #   this one, "Re-run all jobs" publishes this commit under a new number.
@@ -441,8 +494,8 @@ jobs:
         id: preflight
         shell: bash
         env:
-          TAG: ${{ needs.plan.outputs.tag }}
-          CHANNEL: ${{ needs.plan.outputs.channel }}
+          TAG: ${{ needs.validate.outputs.tag }}
+          CHANNEL: ${{ needs.validate.outputs.channel }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
@@ -462,7 +515,7 @@ jobs:
               "$LINUX_BUNDLE_ASSET" \
               "$LINUX_BUNDLE_ASSET.sha256"; do
               if [ ! -s "release-assets/$asset" ]; then
-                  echo "::error::release-assets/$asset is missing or empty: the box that builds it did not upload it as an assets-* artifact."
+                  echo "::error::release-assets/$asset is missing or empty: the lane that builds it did not upload it as an assets-* artifact."
                   missing=$((missing + 1))
               fi
           done
@@ -554,7 +607,7 @@ jobs:
           GH_TOKEN: ${{ secrets.PAT_ERGOPTI }}
         run: |
           set -euo pipefail
-          tag="${{ needs.plan.outputs.tag }}"
+          tag="${{ needs.validate.outputs.tag }}"
           sha="${{ github.sha }}"
           gh api repos/${{ github.repository }}/git/refs \
               --method POST \
@@ -571,9 +624,9 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ needs.plan.outputs.tag }}
-          PRERELEASE: ${{ needs.plan.outputs.prerelease }}
-          TITLE: ${{ needs.plan.outputs.title }}
+          TAG: ${{ needs.validate.outputs.tag }}
+          PRERELEASE: ${{ needs.validate.outputs.prerelease }}
+          TITLE: ${{ needs.validate.outputs.title }}
         run: |
           set -euo pipefail
           mapfile -t assets < <(find release-assets -type f)
@@ -602,8 +655,8 @@ jobs:
         if: steps.preflight.outputs.skip_feed != 'true'
         shell: bash
         env:
-          ERGOPTI_CHANNEL: ${{ needs.plan.outputs.channel }}
-          TAG: ${{ needs.plan.outputs.tag }}
+          ERGOPTI_CHANNEL: ${{ needs.validate.outputs.channel }}
+          TAG: ${{ needs.validate.outputs.tag }}
           RESUMED: ${{ steps.preflight.outputs.create_release == 'false' }}
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -658,7 +711,7 @@ jobs:
         shell: bash
         env:
           EVENT: ${{ github.event_name }}
-          TAG: ${{ needs.plan.outputs.tag }}
+          TAG: ${{ needs.validate.outputs.tag }}
           SHA: ${{ github.sha }}
         run: |
           # Fetch tags so git-describe can resolve the previous release tag.
@@ -675,8 +728,8 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ needs.plan.outputs.tag }}
-          VERSION: ${{ needs.plan.outputs.version }}
+          TAG: ${{ needs.validate.outputs.tag }}
+          VERSION: ${{ needs.validate.outputs.version }}
         run: |
           set -euo pipefail
           body_file="$(mktemp)"

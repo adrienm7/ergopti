@@ -17,12 +17,12 @@
 # package can never ship a stamp its readers would reject.
 #
 # A release build also stamps the release version (BUILD_STAMP_VERSION_KEY) from
-# ERGOPTI_BUILD_VERSION, the version the workflow's plan job computed (ci.yml
-# hands it to the Linux box). The Linux driver has no other version source:
-# infra/version.lua reports this entry, or "local" for a checkout. Build
-# metadata ("+...") is refused, so it can never be shown. verify requires the
-# same version when ERGOPTI_BUILD_VERSION is set, and a well-formed one whenever
-# it is present.
+# ERGOPTI_BUILD_VERSION, the version the plan steps of ci.yml's validate job
+# computed (ci.yml hands it to the Linux lane). The Linux driver has no other
+# version source: infra/version.lua reports this entry, or "local" for a
+# checkout. Build metadata ("+...") is refused, so it can never be shown. verify
+# requires the same version when ERGOPTI_BUILD_VERSION is set, and a well-formed
+# one whenever it is present.
 #
 # Usage:
 #   bash tools/build/write_build_stamp.sh write  <shared tree directory>

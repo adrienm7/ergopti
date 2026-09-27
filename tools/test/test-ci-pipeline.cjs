@@ -41,7 +41,7 @@ const pipeline = require('./ci-pipeline.cjs');
 const ENTRY = '.github/workflows/ci.yml';
 const BOX = '.github/workflows/ci-box.yml';
 
-// Floors for the real pipeline: 20 jobs and 163 steps today.
+// Floors for the real pipeline: 18 jobs and 165 steps today.
 const MIN_REAL_JOBS = 15;
 const MIN_REAL_STEPS = 120;
 
