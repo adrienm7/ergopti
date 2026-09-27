@@ -901,35 +901,35 @@ jobs:
             distro: debian
             container: debian:stable-slim
             image: debian:stable-slim
-            prep: apt-get update && apt-get install -y --no-install-recommends bash coreutils findutils grep sed
+            prep: apt-get update && apt-get install -y --no-install-recommends bash coreutils findutils grep sed sudo passwd
           - id: distro-fedora
             kind: install
             label: 'Install · fedora'
             distro: fedora
             container: fedora:latest
             image: fedora:latest
-            prep: dnf install -y bash coreutils findutils grep sed
+            prep: dnf install -y bash coreutils findutils grep sed sudo shadow-utils
           - id: distro-arch
             kind: install
             label: 'Install · arch'
             distro: arch
             container: archlinux:latest
             image: archlinux:latest
-            prep: pacman -Sy --noconfirm bash coreutils findutils grep sed
+            prep: pacman -Sy --noconfirm bash coreutils findutils grep sed sudo shadow
           - id: distro-alpine
             kind: install
             label: 'Install · alpine'
             distro: alpine
             container: alpine:latest
             image: alpine:latest
-            prep: apk add --no-cache bash coreutils findutils grep sed
+            prep: apk add --no-cache bash coreutils findutils grep sed sudo
           - id: distro-opensuse
             kind: install
             label: 'Install · opensuse'
             distro: opensuse
             container: opensuse/tumbleweed:latest
             image: opensuse/tumbleweed:latest
-            prep: sed -i 's|http://download.opensuse.org|https://downloadcontent.opensuse.org|g' /etc/zypp/repos.d/*.repo && zypper --non-interactive install bash coreutils findutils grep sed
+            prep: sed -i 's|http://download.opensuse.org|https://downloadcontent.opensuse.org|g' /etc/zypp/repos.d/*.repo && zypper --non-interactive install bash coreutils findutils grep sed sudo shadow
           - id: first-install-ubuntu-22.04
             kind: first
             label: 'First install · ubuntu-22.04'
@@ -1016,17 +1016,32 @@ jobs:
 
       - uses: actions/checkout@v4
 
-      - name: Install with no root and no network dependencies
+      - name: Create the installation user
         if: matrix.kind == 'install'
-        working-directory: static/ergopti_plus/linux
-        # No sudo and no systemd inside a container, which is also the immutable
-        # -distribution case: everything must land under $HOME and the script must
-        # not abort when it cannot write /usr or reach systemctl.
         shell: bash
         run: |
-          export HOME=/tmp/ergopti-home
-          mkdir -p "$HOME"
-          bash install.sh --no-deps
+          set -euo pipefail
+          if command -v useradd >/dev/null 2>&1; then
+            useradd -m -d /tmp/ergopti-home -s /bin/bash ergopti-ci
+          else
+            adduser -D -h /tmp/ergopti-home -s /bin/bash ergopti-ci
+          fi
+          test "$(id -u ergopti-ci)" -ge 1000
+          install -d -m 0750 /etc/sudoers.d
+          printf '%s\n' 'ergopti-ci ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/ergopti-ci
+          chmod 0440 /etc/sudoers.d/ergopti-ci
+
+      - name: Install as an ordinary user without runtime dependencies
+        if: matrix.kind == 'install'
+        working-directory: static/ergopti_plus/linux
+        # The installer owns user files; only its real permission helper gets
+        # sudo. There is no user session bus, so startup must use XDG autostart.
+        # Running as root with a different HOME is not an ordinary user install.
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Model a login, not a nested sudo invocation whose SUDO_UID is root.
+          sudo -H -u ergopti-ci env -u SUDO_UID -u SUDO_GID -u SUDO_USER bash install.sh --no-deps
 
       - name: The installed tree is the one the daemon expects
         if: matrix.kind == 'install'
