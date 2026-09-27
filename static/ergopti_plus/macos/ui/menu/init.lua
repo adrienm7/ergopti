@@ -1107,6 +1107,11 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	end
 
 	local actions = {
+		uninstall                 = function()
+			return run_global_exclusive("Uninstall", function()
+				return require("ui.menu.uninstall").run()
+			end)
+		end,
 		enable_all                = function() return set_all_enabled(true) end,
 		disable_all               = function() return set_all_enabled(false) end,
 		reset_defaults            = function() return reset_all_defaults() end,

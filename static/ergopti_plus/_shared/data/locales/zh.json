@@ -2494,5 +2494,8 @@
 	"ui_metrics_rebuild.eta": "剩余约 {eta}",
 	"ui_metrics_rebuild.eta_unknown": "正在估算剩余时间…",
 	"ui_metrics_rebuild.finalizing": "正在保存重建的统计…",
-	"ui_metrics_rebuild.failed": "统计重建意外停止。下次尝试将从停止处继续。"
+	"ui_metrics_rebuild.failed": "统计重建意外停止。下次尝试将从停止处继续。",
+	"menu.global.uninstall": "卸载 Ergopti…",
+	"dialog.uninstall.confirm": "要卸载 Ergopti 吗？应用程序将关闭。您的设置、热字串、统计数据和凭据将被保留。",
+	"dialog.uninstall.failed": "无法卸载 Ergopti。您的个人数据已保留。"
 }

@@ -3174,6 +3174,19 @@ local function _build_global_actions(ctx)
 		["enable_all"]     = call_ctx("on_enable_all"),
 		["disable_all"]    = call_ctx("on_disable_all"),
 		["reset_defaults"] = call_ctx("on_reset_defaults"),
+		["uninstall"] = function()
+			require("ui.menu.uninstall").run({
+				title = i18n_safe("menu.global.uninstall"),
+				confirmation = i18n_safe("dialog.uninstall.confirm"),
+				failure = i18n_safe("dialog.uninstall.failed"),
+				confirm = function(title, text)
+					return ask_yes_no(title, zenity_plain(text),
+						i18n_safe("button.remove"), i18n_safe("button.cancel"))
+				end,
+				fail = function(text) show_error(zenity_plain(text), i18n_safe("menu.global.uninstall")) end,
+				quit = call_ctx("on_quit"),
+			})
+		end,
 		-- The cleanup needs no daemon state: it reads config.toml itself and
 		-- asks through this tray's own zenity dialogs.
 		["clean_unused_keys"] = function()

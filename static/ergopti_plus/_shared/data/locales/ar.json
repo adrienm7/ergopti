@@ -2494,5 +2494,8 @@
 	"ui_metrics_rebuild.eta": "يتبقى نحو {eta}",
 	"ui_metrics_rebuild.eta_unknown": "جارٍ تقدير الوقت المتبقي…",
 	"ui_metrics_rebuild.finalizing": "جارٍ حفظ الإحصائيات المعاد بناؤها…",
-	"ui_metrics_rebuild.failed": "توقفت إعادة بناء الإحصائيات بشكل غير متوقع. ستستأنف المحاولة التالية من حيث توقفت."
+	"ui_metrics_rebuild.failed": "توقفت إعادة بناء الإحصائيات بشكل غير متوقع. ستستأنف المحاولة التالية من حيث توقفت.",
+	"menu.global.uninstall": "إلغاء تثبيت Ergopti…",
+	"dialog.uninstall.confirm": "هل تريد إلغاء تثبيت Ergopti؟ سيُغلق التطبيق. ستُحفظ إعداداتك واختصارات النص والمقاييس وبيانات الاعتماد.",
+	"dialog.uninstall.failed": "تعذّر إلغاء تثبيت Ergopti. تم الاحتفاظ ببياناتك الشخصية."
 }

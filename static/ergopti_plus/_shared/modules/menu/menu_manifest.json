@@ -368,6 +368,14 @@
 			"type": "command",
 			"id": "clean_unused_keys",
 			"i18n": "menu.global.clean_unused_keys"
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "command",
+			"id": "uninstall",
+			"i18n": "menu.global.uninstall"
 		}
 	],
 	"debug_menu": [

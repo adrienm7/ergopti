@@ -579,6 +579,7 @@ migrate_canonical_packs \
 # nest linux/, _shared/ and bin/ inside LIB_DIR/linux/.
 cp -r "${SRC_DRIVER}/." "${LIB_DIR}/linux/"
 cp -r "${SRC_SHARED}/." "${DEST_SHARED}/"
+bash "${SRC_DRIVER}/install/ownership.sh" "${SRC_DRIVER}" "${SRC_SHARED}" "${LIB_DIR}"
 
 # Create the wrapper script in ~/.local/bin/ that points to the installed libs.
 cat > "${BIN_DIR}/ergopti-hotstrings" << WRAPPER
@@ -693,6 +694,21 @@ fi
 # ======= 7/ Post-Install Summary =======
 # =======================================
 # =======================================
+
+for kind in wrapper unit autostart; do
+	case "$kind" in
+		wrapper) owned="${BIN_DIR}/ergopti-hotstrings" ;;
+		unit) owned="${SYSTEMD_DIR}/ergopti-hotstrings.service" ;;
+		autostart) owned="${XDG_CONFIG_HOME:-$HOME/.config}/autostart/ergopti-hotstrings.desktop" ;;
+	esac
+	if [ "$kind" != wrapper ] && ! $INSTALL_SERVICE; then continue; fi
+	if [ -f "$owned" ]; then
+		# The startup-choice helper may already have recorded the new desktop.
+		if grep -q $'\t@'"$kind"'$' "${LIB_DIR}/.ergopti-owned-files"; then continue; fi
+		digest="$(sha256sum -- "$owned")"
+		printf '%s\t@%s\n' "${digest%% *}" "$kind" >> "${LIB_DIR}/.ergopti-owned-files"
+	fi
+done
 
 echo ""
 echo "=== Installation terminée ==="

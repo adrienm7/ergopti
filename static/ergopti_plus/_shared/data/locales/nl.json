@@ -2494,5 +2494,8 @@
 	"ui_metrics_rebuild.eta": "nog ongeveer {eta}",
 	"ui_metrics_rebuild.eta_unknown": "resterende tijd wordt geschat…",
 	"ui_metrics_rebuild.finalizing": "Opnieuw opgebouwde statistieken worden opgeslagen…",
-	"ui_metrics_rebuild.failed": "Het opnieuw opbouwen van de statistieken is onverwacht gestopt. De volgende poging gaat verder waar deze stopte."
+	"ui_metrics_rebuild.failed": "Het opnieuw opbouwen van de statistieken is onverwacht gestopt. De volgende poging gaat verder waar deze stopte.",
+	"menu.global.uninstall": "Ergopti verwijderen…",
+	"dialog.uninstall.confirm": "Ergopti verwijderen? De toepassing wordt gesloten. Je instellingen, hotstrings, statistieken en inloggegevens blijven behouden.",
+	"dialog.uninstall.failed": "Ergopti kon niet worden verwijderd. Je persoonlijke gegevens zijn behouden."
 }

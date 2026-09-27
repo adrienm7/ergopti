@@ -2494,5 +2494,8 @@
 	"ui_metrics_rebuild.eta": "circa {eta} rimanenti",
 	"ui_metrics_rebuild.eta_unknown": "stima del tempo rimanente…",
 	"ui_metrics_rebuild.finalizing": "Salvataggio delle statistiche ricostruite…",
-	"ui_metrics_rebuild.failed": "La ricostruzione delle statistiche si è interrotta inaspettatamente. Il prossimo tentativo riprenderà da dove si è fermata."
+	"ui_metrics_rebuild.failed": "La ricostruzione delle statistiche si è interrotta inaspettatamente. Il prossimo tentativo riprenderà da dove si è fermata.",
+	"menu.global.uninstall": "Disinstalla Ergopti…",
+	"dialog.uninstall.confirm": "Disinstallare Ergopti? L’applicazione verrà chiusa. Impostazioni, hotstring, metriche e credenziali verranno conservate.",
+	"dialog.uninstall.failed": "Impossibile disinstallare Ergopti. I dati personali sono stati conservati."
 }

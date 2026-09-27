@@ -642,9 +642,11 @@ function M.generate(ctx, menu_mods, actions)
 					["disable_all"]     = actions.disable_all,
 					["reset_defaults"]  = actions.reset_defaults,
 					["clean_unused_keys"] = actions.clean_unused_keys,
+					["uninstall"] = actions.uninstall,
 				}
 				for _, row in ipairs(ManifestMenu.build("global_actions", "Global", nil, nil, ga_ctx) or {}) do
-					if ctx.paused then
+					local independent = (type(actions.uninstall) == "function" and row.fn == actions.uninstall)
+					if ctx.paused and not independent then
 						-- Greyed AND stripped of its handler, not merely greyed. A
 						-- disabled row whose fn survives still fires the moment the
 						-- greying is rendered wrong somewhere else, and these three move

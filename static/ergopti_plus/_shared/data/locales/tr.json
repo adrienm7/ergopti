@@ -2494,5 +2494,8 @@
 	"ui_metrics_rebuild.eta": "yaklaşık {eta} kaldı",
 	"ui_metrics_rebuild.eta_unknown": "kalan süre hesaplanıyor…",
 	"ui_metrics_rebuild.finalizing": "Yeniden oluşturulan istatistikler kaydediliyor…",
-	"ui_metrics_rebuild.failed": "İstatistiklerin yeniden oluşturulması beklenmedik şekilde durdu. Bir sonraki deneme kaldığı yerden devam edecek."
+	"ui_metrics_rebuild.failed": "İstatistiklerin yeniden oluşturulması beklenmedik şekilde durdu. Bir sonraki deneme kaldığı yerden devam edecek.",
+	"menu.global.uninstall": "Ergopti’yi kaldır…",
+	"dialog.uninstall.confirm": "Ergopti kaldırılsın mı? Uygulama kapanacak. Ayarlarınız, hotstring’leriniz, ölçümleriniz ve kimlik bilgileriniz korunacak.",
+	"dialog.uninstall.failed": "Ergopti kaldırılamadı. Kişisel verileriniz korundu."
 }

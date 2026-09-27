@@ -201,6 +201,7 @@ OnError(_FatalErrorHandler)
 #Include ../modules/keymap/layout_poll_helper.ahk
 #Include ../ui/tooltip/init.ahk
 #Include ../modules/updater.ahk
+#Include ../infra/uninstall.ahk
 ; json.ahk must precede locale.ahk — _I18nLoadLocaleMap delegates to JsonParse.
 #Include ../infra/registry.ahk
 #Include ../infra/json.ahk
@@ -387,6 +388,8 @@ InstallSendNoOps()
 #Include unit/test_capsword_taphold_unlatch.ahk
 #Include meta/test_tap_hold_suspend_boundary.ahk
 #Include unit/test_updater.ahk
+#Include unit/test_uninstall.ahk
+#Include meta/test_uninstall_shutdown_gate.ahk
 #Include unit/test_updater_staging_transport.ahk
 #Include unit/test_updater_swap_transaction.ahk
 #Include unit/test_updater_swap_cancellation.ahk
