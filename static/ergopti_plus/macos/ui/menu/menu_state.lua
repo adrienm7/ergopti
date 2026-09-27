@@ -676,9 +676,22 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 			_n_enable, _n_disable, (hs.timer.secondsSinceEpoch() - _t_sync) * 1000)
 	end
 	if core_mods.shortcuts_mod and type(saved) == "table" and type(saved.shortcut_keys) == "table" then
-		if type(core_mods.shortcuts_mod.enable) == "function" and type(core_mods.shortcuts_mod.disable) == "function" then
-			for id, enabled in pairs(saved.shortcut_keys) do
-				if enabled then try("shortcuts", "shortcuts.enable", core_mods.shortcuts_mod.enable, id) else try("shortcuts", "shortcuts.disable", core_mods.shortcuts_mod.disable, id) end
+		local shortcuts = core_mods.shortcuts_mod
+		for id, enabled in pairs(saved.shortcut_keys) do
+			local apply = enabled and shortcuts.enable or shortcuts.disable
+			local label = (enabled and "shortcuts.enable " or "shortcuts.disable ") .. id
+			if not try_exact("shortcuts", label, apply, id) then
+				local query_ok, actual = pcall(shortcuts.is_enabled, id)
+				if query_ok and type(actual) == "boolean" then
+					if actual ~= enabled then
+						report.demotions[#report.demotions + 1] = {
+							feature = "shortcuts", key = "shortcut_keys", subkey = id,
+							persisted = enabled, demoted = actual,
+						}
+					end
+				else
+					unsettled("shortcuts", "shortcuts.is_enabled " .. id, actual)
+				end
 			end
 		end
 	end

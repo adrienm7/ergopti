@@ -50,6 +50,7 @@ local function sync(bindings, shortcuts_on, keys)
 			enable = bindings.enable,
 			disable = bindings.disable,
 			list_shortcuts = bindings.list_shortcuts,
+			is_enabled = bindings.is_enabled,
 		}
 		return menu_state.sync_state_to_modules(
 			{ shortcuts = shortcuts_on, hotstrings = {} },
@@ -82,6 +83,23 @@ end
 -- ========================================================
 
 helpers.describe("menu_state: [shortcuts.keys] replay behind the fence (shortcut-preference-vs-binding)", function()
+	helpers.it("reports a refused enable without replacing its saved preference (shortcut-replay-refusal)", function()
+		Fixture.with_bindings(function(bindings, ctx)
+			helpers.assert_eq(bindings.start(), true)
+			helpers.assert_eq(bindings.disable("at_hash"), true)
+			ctx.refuse.at_hash = true
+			local committed, report = sync(bindings, true, { at_hash = true })
+			helpers.assert_eq(committed, false)
+			helpers.assert_eq(#report.failures, 1)
+			helpers.assert_eq(report.demotions, {
+				{ feature = "shortcuts", key = "shortcut_keys", subkey = "at_hash",
+					persisted = true, demoted = false },
+			})
+			helpers.assert_eq(#report.unsettled, 0)
+			helpers.assert_eq(bindings.is_enabled("at_hash"), false)
+		end)
+	end)
+
 	helpers.it("records every saved key while Shortcuts is OFF and binds them when it turns ON", function()
 		Fixture.with_bindings(function(bindings, ctx)
 			-- init.lua starts the bindings before the menu applies config.toml.

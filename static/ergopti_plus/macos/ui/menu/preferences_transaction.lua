@@ -47,18 +47,18 @@ function M.restore_table(target, snapshot)
 end
 
 --- Creates a save wrapper with rollback snapshots already seeded from boot.
---- `opts.persisted_view(state)`, when given, returns the table a save must
---- serialise instead of the live state (session demotions keep the saved value
---- of a feature whose runtime refused it); the rollback snapshot stays the live
---- state either way. `opts.read_only_reason()`, when it returns a string, makes
+--- `opts.snapshot_view(snapshot)`, when given, transforms the complete runtime
+--- snapshot after module-owned preferences have been collected. Session-only
+--- refusals stay out of the disk view; rollback retains the actual runtime.
+--- `opts.read_only_reason()`, when it returns a string, makes
 --- every save refuse to write and roll the unsaved change back.
 --- @param preferences table Preferences module or test double.
 --- @param opts table Transaction dependencies and initial snapshots.
 --- @return function save Transactional save function.
 function M.bind(preferences, opts)
 	if type(opts) ~= "table" then error("preferences transaction options are required", 2) end
-	if opts.persisted_view ~= nil and type(opts.persisted_view) ~= "function" then
-		error("persisted_view must be a function", 2)
+	if opts.snapshot_view ~= nil and type(opts.snapshot_view) ~= "function" then
+		error("snapshot_view must be a function", 2)
 	end
 	if opts.read_only_reason ~= nil and type(opts.read_only_reason) ~= "function" then
 		error("read_only_reason must be a function", 2)
@@ -100,22 +100,28 @@ function M.bind(preferences, opts)
 			end
 			return false
 		end
-		local persisted_state = state
-		if opts.persisted_view then persisted_state = opts.persisted_view(state) end
 		local committed, snapshot = M.commit(
 			preferences,
 			opts.path,
-			persisted_state,
+			state,
 			opts.hotfiles,
 			opts.core_modules,
 			opts.builder,
 			opts.hot_counter,
-			function(saved_snapshot)
+			function(saved_snapshot, runtime_snapshot)
 				committed_state = clone_value(state)
-				committed_preferences = clone_value(saved_snapshot)
-				if type(opts.on_commit) == "function" then opts.on_commit(saved_snapshot) end
+				if opts.snapshot_view then
+					if type(runtime_snapshot) ~= "table" then
+						error("a transformed save must acknowledge its runtime snapshot", 2)
+					end
+					committed_preferences = clone_value(runtime_snapshot)
+				else
+					committed_preferences = clone_value(saved_snapshot)
+				end
+				if type(opts.on_commit) == "function" then opts.on_commit(saved_snapshot, runtime_snapshot) end
 			end,
-			rollback
+			rollback,
+			opts.snapshot_view
 		)
 		return committed, snapshot
 	end
@@ -131,6 +137,7 @@ end
 --- @param hot_counter table Hotstring-count cache owner.
 --- @param on_commit function|nil Callback receiving the committed preference snapshot.
 --- @param on_rollback function|nil Callback restoring the last committed state.
+--- @param snapshot_view function|nil Transforms the complete snapshot for disk.
 --- @return boolean committed
 --- @return table|nil snapshot Complete preference snapshot acknowledged by save().
 function M.commit(
@@ -142,15 +149,17 @@ function M.commit(
 	builder,
 	hot_counter,
 	on_commit,
-	on_rollback
+	on_rollback,
+	snapshot_view
 )
 	if type(preferences) ~= "table" or type(preferences.save) ~= "function" then return false end
-	local call_ok, committed, snapshot = pcall(
+	local call_ok, committed, snapshot, runtime_snapshot = pcall(
 		preferences.save,
 		path,
 		state,
 		hotfiles,
-		core_modules
+		core_modules,
+		snapshot_view
 	)
 	if not call_ok or committed ~= true then
 		Logger.error(LOG, "Preference save did not commit; success-only cache updates were skipped.")
@@ -168,7 +177,7 @@ function M.commit(
 	if type(hot_counter) == "table" and type(hot_counter.invalidate_cache) == "function" then
 		hot_counter.invalidate_cache()
 	end
-	if type(on_commit) == "function" then on_commit(snapshot) end
+	if type(on_commit) == "function" then on_commit(snapshot, runtime_snapshot) end
 	return true, snapshot
 end
 
