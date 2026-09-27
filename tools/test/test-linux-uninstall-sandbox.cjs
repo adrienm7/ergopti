@@ -92,6 +92,17 @@ try {
 	fs.writeFileSync(ownershipPath, manifest + `${newWrapperHash}\t@wrapper\n${unitHash}\t@unit\n${desktopHash}\t@autostart\n`);
 	const currentPreflight = run('--check');
 	assert.equal(currentPreflight.status, 0, currentPreflight.stderr);
+	const quotedInstall = spawnSync(bashExecutable(), ['-c', 'printf "%q" "$1"', 'wrapper-owner', bashPath(library)], { encoding: 'utf8' });
+	assert.equal(quotedInstall.status, 0);
+	fs.writeFileSync(wrapper, `#!/bin/bash\nINSTALL_ROOT=${quotedInstall.stdout}\nexec bash "\${INSTALL_ROOT}/bin/ergopti-hotstrings" "$@"\n`);
+	const innerLauncher = path.join(library, 'bin/ergopti-hotstrings');
+	fs.mkdirSync(path.dirname(innerLauncher), { recursive: true });
+	fs.writeFileSync(innerLauncher, '#!/bin/bash\nexit 0\n');
+	const versionedHash = createHash('sha256').update(fs.readFileSync(innerLauncher)).digest('hex');
+	const forwardingHash = createHash('sha256').update(fs.readFileSync(wrapper)).digest('hex');
+	fs.writeFileSync(ownershipPath, manifest + `${forwardingHash}\t@wrapper\n${unitHash}\t@unit\n${desktopHash}\t@autostart\n${versionedHash}\tbin/ergopti-hotstrings\n`);
+	const forwardingPreflight = run('--check');
+	assert.equal(forwardingPreflight.status, 0, forwardingPreflight.stderr);
 	const personalInside = path.join(library, 'linux/personal.toml');
 	fs.writeFileSync(personalInside, 'personal-inside');
 	fs.writeFileSync(path.join(library, '_shared/data/locales/en.json'), 'user-modified');
@@ -103,6 +114,7 @@ try {
 	assert.equal(fs.readFileSync(personalInside, 'utf8'), 'personal-inside', 'unlisted personal files inside runtime survive');
 	assert.equal(fs.readFileSync(path.join(library, '_shared/data/locales/en.json'), 'utf8'), 'user-modified', 'modified shipped files survive');
 	assert.ok(!fs.existsSync(wrapper), 'owned launcher removed');
+	assert.ok(!fs.existsSync(innerLauncher), 'versioned launcher removed with its payload');
 	assert.ok(!fs.existsSync(desktop), 'menu-created startup entry removed');
 	assert.ok(!fs.existsSync(unit), 'quoted service entry removed');
 	assert.equal(fs.readFileSync(config, 'utf8'), 'sentinel', 'personal data preserved');
