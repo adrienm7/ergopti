@@ -481,16 +481,84 @@ const head = commit(runner, 'chore: the commit being released');
 const newer = commit(runner, 'chore: a newer commit');
 git(runner, 'push', '--quiet', 'origin', 'dev');
 
+const FLATTEN = 'Bring every downloaded asset to the top of release-assets';
+const flattenScript = scriptOf(pipeline.step(releaseJob, FLATTEN), FLATTEN);
+
+/** The `path:` list of one upload-artifact step, one entry per line. */
+function uploadPaths(stepBody) {
+	const lines = stepBody.split('\n');
+	const at = lines.findIndex((line) => /^ {10}path:/.test(line));
+	if (at < 0) throw new Error('an assets-* upload step lists no path');
+	const inline = lines[at].replace(/^ {10}path:\s*/, '').trim();
+	if (inline !== '|') return [inline];
+	const listed = [];
+	for (let index = at + 1; index < lines.length; index++) {
+		if (indentOf(lines[index]) !== -1 && indentOf(lines[index]) <= 10) break;
+		if (lines[index].trim() !== '') listed.push(lines[index].trim());
+	}
+	return listed;
+}
+
+/**
+ * Where each required asset lands in release-assets, as the real upload steps
+ * lay it out: upload-artifact keeps a file's path below the deepest directory
+ * common to every path its step lists, and merge-multiple pours every assets-*
+ * artifact into one directory. A listed name may be a glob or an expression.
+ * @returns {Map<string, string>} Asset name to its path inside release-assets.
+ */
+function uploadedLayout(channel) {
+	const layout = new Map();
+	for (const entry of pipeline.files()) {
+		for (const job of pipeline.jobs(entry.rel)) {
+			for (const candidate of pipeline.steps(job.body)) {
+				if (!/uses:\s*actions\/upload-artifact/.test(candidate.body)) continue;
+				if (!/^ {10}name:\s*assets-/m.test(candidate.body)) continue;
+				const listed = uploadPaths(candidate.body);
+				const dirs = listed.map((listedPath) => listedPath.split('/').slice(0, -1));
+				const common = [];
+				for (let depth = 0; dirs.every((dir) => depth < dir.length && dir[depth] === dirs[0][depth]); depth++) {
+					common.push(dirs[0][depth]);
+				}
+				for (const listedPath of listed) {
+					const below = listedPath.split('/').slice(common.length);
+					const leaf = below[below.length - 1].replace(/\$\{\{\s*([^}]*?)\s*\}\}/g, (whole, expression) => {
+						if (expression === 'inputs.linux_bundle' || expression === 'env.LINUX_BUNDLE_ASSET') return LINUX_BUNDLE;
+						if (expression === 'inputs.channel') return channel;
+						throw new Error(`an assets-* upload path uses ${whole}, which this test cannot resolve`);
+					});
+					const pattern = new RegExp(`^${leaf.replace(/[.+?^$(){}|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*')}$`);
+					for (const name of requiredAssets(channel)) {
+						if (!pattern.test(name)) continue;
+						if (layout.has(name)) throw new Error(`two assets-* upload paths match ${name}`);
+						layout.set(name, [...below.slice(0, -1), name].join('/'));
+					}
+				}
+			}
+		}
+	}
+	return layout;
+}
+
 /**
  * Runs the preflight in `cwd` for `tag`, with every asset but `missingAsset`
- * present and gh answering `ghMode`.
+ * present and gh answering `ghMode`. With `uploaded`, the assets are laid out
+ * the way the real upload steps store them and the release job's flattening
+ * step runs first.
  */
-function preflight(tag, { ghMode = 'none', missingAsset = null, cwd = runner, channel = 'dev', sha = head } = {}) {
+function preflight(tag, { ghMode = 'none', missingAsset = null, cwd = runner, channel = 'dev', sha = head, uploaded = false } = {}) {
 	const assets = path.join(cwd, 'release-assets');
 	fs.rmSync(assets, { recursive: true, force: true });
 	fs.mkdirSync(assets);
+	const layout = uploaded ? uploadedLayout(channel) : new Map();
 	for (const name of requiredAssets(channel)) {
-		if (name !== missingAsset) fs.writeFileSync(path.join(assets, name), `${name}\n`);
+		if (name === missingAsset) continue;
+		const target = path.join(assets, ...(layout.get(name) || name).split('/'));
+		fs.mkdirSync(path.dirname(target), { recursive: true });
+		fs.writeFileSync(target, `${name}\n`);
+	}
+	if (uploaded) {
+		const flattened = runScript(flattenScript, cwd, {});
+		if (flattened.status !== 0) return { ...flattened, ghCalls: [] };
 	}
 	const ghLog = stubLog('gh');
 	const result = runScript(preflightScript, cwd, {
@@ -521,6 +589,34 @@ check('a free tag publishes from the start', () => {
 	assert.equal(result.status, 0, result.stdout + result.stderr);
 	assert.deepEqual(result.outputs, { create_tag: 'true', create_release: 'true', skip_feed: 'false' });
 	assert.deepEqual(result.ghCalls, [], 'a free tag needs no release lookup');
+});
+
+check('assets stored below a common directory by upload-artifact still publish (release-assets-layout-2026-09-27)', () => {
+	const layout = uploadedLayout('dev');
+	for (const name of requiredAssets('dev')) {
+		assert.ok(layout.has(name), `no assets-* upload step lists ${name}`);
+	}
+	// The layout that failed the first release of the grouped pipeline: the
+	// Windows exes and the XKB zip arrived in subdirectories.
+	assert.ok([...layout.values()].some((placed) => placed.includes('/')),
+		'no asset lands in a subdirectory, so this case no longer exercises the flattening');
+	const result = preflight('v0.0.0-dev.10', { uploaded: true });
+	assert.equal(result.status, 0, result.stdout + result.stderr);
+	assert.deepEqual(result.outputs, { create_tag: 'true', create_release: 'true', skip_feed: 'false' });
+	const top = fs.readdirSync(path.join(runner, 'release-assets'), { withFileTypes: true });
+	assert.deepEqual(top.filter((dirent) => !dirent.isFile()).map((dirent) => dirent.name), [],
+		'release-assets must hold files only once flattened');
+});
+
+check('two downloaded assets with one name stop the release', () => {
+	const assets = path.join(runner, 'release-assets');
+	fs.rmSync(assets, { recursive: true, force: true });
+	fs.mkdirSync(path.join(assets, 'windows'), { recursive: true });
+	fs.writeFileSync(path.join(assets, 'ErgoptiPlus.exe'), 'one\n');
+	fs.writeFileSync(path.join(assets, 'windows', 'ErgoptiPlus.exe'), 'two\n');
+	const result = runScript(flattenScript, runner, {});
+	assert.equal(result.status, 1, result.stdout + result.stderr);
+	assert.match(result.stdout, /::error::two downloaded assets are named ErgoptiPlus\.exe/);
 });
 
 check('a missing asset stops the release before anything is created', () => {
