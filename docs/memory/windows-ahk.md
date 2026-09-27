@@ -379,6 +379,18 @@ seconds and let a worker killed by a driver reload resume. A leftover
 main-schema payload table is dropped from a private copy (upgrade), never a
 reason to rebuild.
 
+A worker's writable candidate (cold build, refresh of the file-backed image,
+upgrade copy, newest-first rebuild) is SQLite's private on-disk database with
+a bounded page cache (`KLR_OpenCandidate`, `WORKER_PAGE_CACHE_KIB`), never
+`:memory:`: there the whole image was the worker's memory (280 MB for a
+234 MB image built from a 20 MB synthetic ledger, about 1 GB live).
+`test_klr_worker_memory_bound.ahk` bounds SQLite's high-water mark on every
+one of those paths. `temp_store=MEMORY` also keeps statement journals in
+memory: one statement writing many rows under the newest-first build's
+first-wins triggers journaled them all (63 MB for a 57 MB image), where the
+ledger's one INSERT per row stays at the bound. Action: keep ledger writers at
+one row per statement, and give memory fixtures that shape.
+
 Clear ordered typing events belong only to the reader's MEMORY-only TEMP table,
 which main-database backup excludes. Cache format 4 persists per-event numeric
 character counts instead; SQL rollups can reuse them without decrypting old

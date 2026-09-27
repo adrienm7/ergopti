@@ -165,10 +165,10 @@ KLR_BuildColdSegmented(md, logPath, LedgerPaths) {
 		FSCloseExclusiveGuard(Guard)
 		return Map("ok", false, "db", 0, "sizes", Map(), "peer_published", true)
 	}
-	db := SQLite_Open(":memory:")
+	db := KLR_OpenCandidate()
 	if !db {
 		FSCloseExclusiveGuard(Guard)
-		try LoggerError("KLReader", "Newest-first metrics rebuild could not open its memory database.")
+		try LoggerError("KLReader", "Newest-first metrics rebuild could not open its private database.")
 		return Failed
 	}
 	Owned := true

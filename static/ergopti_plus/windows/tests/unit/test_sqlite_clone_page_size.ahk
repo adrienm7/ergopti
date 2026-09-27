@@ -2,12 +2,22 @@
 
 ; ==============================================================================
 ; MODULE: SQLite Clone Page Size Tests
-; DESCRIPTION: Private memory clones preserve valid source page geometry and data.
+; DESCRIPTION: Private clones preserve valid source page geometry and data, in
+; memory (the resident driver's candidate) and in a bounded private disk
+; database (a projection worker's, KLR_OpenCandidate), where sqlite3_backup
+; takes the source's page size instead of refusing a different one.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
 
-_SQLPS_Clone(PageSize, Readonly) {
+; Clones Source into a private candidate: "memory" or "disk".
+_SQLPS_CloneInto(Source, Candidate) {
+	if (Candidate = "disk")
+		return SQLite_CloneInto(Source, SQLite_OpenPrivateDisk.Bind(1024))
+	return SQLite_CloneMemory(Source)
+}
+
+_SQLPS_Clone(PageSize, Readonly, Into := "memory") {
 	Path := Readonly ? _FSWL_Path() : ""
 	Source := Readonly ? SQLite_Open(Path) : _KLRSQL_OpenMemory()
 	Candidate := 0
@@ -24,7 +34,7 @@ _SQLPS_Clone(PageSize, Readonly) {
 			AssertTrue(Source != 0)
 			AssertEqual(1, DllCall(SQLiteConst.DLL . "\sqlite3_db_readonly", "Ptr", Source, "AStr", "main", "Int"))
 		}
-		Candidate := SQLite_CloneMemory(Source)
+		Candidate := _SQLPS_CloneInto(Source, Into)
 		AssertTrue(Candidate != 0, "a valid source page size must not prevent a private clone")
 		AssertEqual(PageSize, SQLite_Query(Candidate, "PRAGMA page_size;")[1]["page_size"])
 		AssertEqual(70000, SQLite_Query(Candidate, "SELECT length(payload) AS n FROM page_probe WHERE id=1;")[1]["n"])
@@ -43,7 +53,10 @@ _SQLPS_Clone(PageSize, Readonly) {
 }
 
 for PageSize in [512, 4096, 65536] {
-	for Readonly in [false, true]
+	for Readonly in [false, true] {
 		Test("SQLite clone: source pages=" . PageSize . " readonly=" . Readonly
 			. " preserve private growth (sqlite-clone-page-size)", _SQLPS_Clone.Bind(PageSize, Readonly))
+		Test("SQLite clone into a private disk database: source pages=" . PageSize . " readonly=" . Readonly
+			. " preserve private growth (sqlite-clone-page-size)", _SQLPS_Clone.Bind(PageSize, Readonly, "disk"))
+	}
 }
