@@ -167,6 +167,35 @@ const STEP_CONDITIONS = [
 	[WINDOWS_BOX, 'test-ahk', 'Download AutoHotkey v2 runtime', "steps.cache-ahk.outputs.cache-hit != 'true'"],
 	[WINDOWS_BOX, 'test-ahk', 'Annotate AHK results', 'always()'],
 	[WINDOWS_BOX, 'test-ahk', 'Publish AHK execution manifest', 'always()'],
+	[LINUX_BOX, 'install-linux', "Prepare the container", "matrix.kind == 'install'"],
+	[LINUX_BOX, 'install-linux', "Install with no root and no network dependencies", "matrix.kind == 'install'"],
+	[LINUX_BOX, 'install-linux', "The installed tree is the one the daemon expects", "matrix.kind == 'install'"],
+	[LINUX_BOX, 'install-linux', "The unit suite on this distribution's LuaJIT", "matrix.kind == 'install'"],
+	[LINUX_BOX, 'install-linux', "Record mandatory distro evidence", "matrix.kind == 'install'"],
+	[LINUX_BOX, 'install-linux', "Upload mandatory distro evidence", "matrix.kind == 'install'"],
+	[LINUX_BOX, 'install-linux', "Install on ${{ matrix.image }} and verify the first run", "matrix.kind == 'first'"],
+	[LINUX_BOX, 'install-linux', "Record mandatory first-install evidence", "matrix.kind == 'first'"],
+	[LINUX_BOX, 'install-linux', "Upload mandatory first-install evidence", "matrix.kind == 'first'"],
+	[LINUX_BOX, 'install-linux', "Download the .deb built above (deb)", "matrix.kind == 'deb'"],
+	[LINUX_BOX, 'install-linux', "Install it the way a user would (deb)", "matrix.kind == 'deb'"],
+	[LINUX_BOX, 'install-linux', "The package installed the files the daemon reads (deb)", "matrix.kind == 'deb'"],
+	[LINUX_BOX, 'install-linux', "Launch the installed binary (deb)", "matrix.kind == 'deb'"],
+	[LINUX_BOX, 'install-linux', "The installed shared data tree resolves and opens (deb)", "matrix.kind == 'deb'"],
+	[LINUX_BOX, 'install-linux', "Record mandatory .deb smoke evidence (deb)", "matrix.kind == 'deb'"],
+	[LINUX_BOX, 'install-linux', "Upload mandatory .deb smoke evidence (deb)", "matrix.kind == 'deb'"],
+	[LINUX_BOX, 'install-linux', "Tools the job itself needs (rpm)", "matrix.kind == 'rpm'"],
+	[LINUX_BOX, 'install-linux', "Download the .rpm built above (rpm)", "matrix.kind == 'rpm'"],
+	[LINUX_BOX, 'install-linux', "Install it the way a user would (rpm)", "matrix.kind == 'rpm'"],
+	[LINUX_BOX, 'install-linux', "Launch the installed binary (rpm)", "matrix.kind == 'rpm'"],
+	[LINUX_BOX, 'install-linux', "The installed shared data tree resolves and opens (rpm)", "matrix.kind == 'rpm'"],
+	[LINUX_BOX, 'install-linux', "Record mandatory .rpm smoke evidence (rpm)", "matrix.kind == 'rpm'"],
+	[LINUX_BOX, 'install-linux', "Upload mandatory .rpm smoke evidence (rpm)", "matrix.kind == 'rpm'"],
+	[LINUX_BOX, 'install-linux', "Download the AppImage built above", "matrix.kind == 'appimage'"],
+	[LINUX_BOX, 'install-linux', "Unpack it (no FUSE on this runner)", "matrix.kind == 'appimage'"],
+	[LINUX_BOX, 'install-linux', "Launch it", "matrix.kind == 'appimage'"],
+	[LINUX_BOX, 'install-linux', "The bundled shared data tree resolves and opens", "matrix.kind == 'appimage'"],
+	[LINUX_BOX, 'install-linux', "Record mandatory AppImage smoke evidence", "matrix.kind == 'appimage'"],
+	[LINUX_BOX, 'install-linux', "Upload mandatory AppImage smoke evidence", "matrix.kind == 'appimage'"],
 ];
 // test-linux runs each harness under !cancelled(), so a red one hides no other;
 // tools/test/test-linux-ci-evidence.cjs pins which of its steps those are.
@@ -594,11 +623,11 @@ for (const [what, rel, from, to] of [
 		'    needs: [macos, windows, linux]\n'],
 	['a second entry in the macOS lane', MACOS_BOX, '    needs: test-hs\n', ''],
 	['a second entry in the Linux lane', LINUX_BOX,
-		"    name: 'First install (${{ matrix.distro }})'\n    runs-on: ubuntu-latest\n    needs: [package-linux]\n",
-		"    name: 'first install (${{ matrix.distro }})'\n    runs-on: ubuntu-latest\n"],
+		"    name: 'Install and run · ${{ matrix.label }}'\n    runs-on: ubuntu-latest\n    needs: [package-linux]\n",
+		"    name: 'Install and run · ${{ matrix.label }}'\n    runs-on: ubuntu-latest\n"],
 	['a second entry in the Windows lane', WINDOWS_BOX, '    needs: [test-ahk]\n', ''],
 	['a second exit in the macOS lane', MACOS_BOX, '    needs: package-macos\n', '    needs: test-hs\n'],
-	['a second exit in the Linux lane', LINUX_BOX, '      - smoke-appimage-run\n    if: always()\n', '    if: always()\n'],
+	['a second exit in the Linux lane', LINUX_BOX, '      - install-linux\n    if: always()\n', '    if: always()\n'],
 ]) {
 	mustCatch(what, rel, from, to, graphProblems);
 }
@@ -820,6 +849,11 @@ function stepProblems(files) {
 }
 
 errors.push(...stepProblems(pipeline.files()));
+for (const condition of ['false', "matrix.kind == 'deb'"]) {
+	mustCatch(`an AppImage launch routed through ${condition}`, LINUX_BOX,
+		"      - name: Launch it\n        if: matrix.kind == 'appimage'\n",
+		`      - name: Launch it\n        if: ${condition}\n`, stepProblems);
+}
 for (const [what, rel, from, to] of [
 	['if: false on the Swift XCTest step', MACOS_BOX,
 		'      - name: Run Swift launcher tests\n', '      - name: Run Swift launcher tests\n        if: false\n'],

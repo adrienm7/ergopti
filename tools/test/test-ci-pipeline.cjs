@@ -41,8 +41,9 @@ const pipeline = require('./ci-pipeline.cjs');
 const ENTRY = '.github/workflows/ci.yml';
 const BOX = '.github/workflows/ci-box.yml';
 
-// Floors for the real pipeline: 18 jobs and 165 steps today.
-const MIN_REAL_JOBS = 15;
+// The five Linux install jobs share one matrix; its 17 mandatory rows are
+// pinned by test-linux-ci-evidence.cjs. Keep the loader floor at all 14 jobs.
+const MIN_REAL_JOBS = 14;
 const MIN_REAL_STEPS = 120;
 
 const ENTRY_TEXT = [

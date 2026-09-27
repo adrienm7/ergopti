@@ -37,7 +37,7 @@ function fixtures() {
 	const evidence = [];
 	for (const [job, contract] of Object.entries(MANIFEST.jobs)) {
 		needs[job] = { result: 'success' };
-		evidence.push({
+		for (const [subject, count] of Object.entries(contract.subjects)) evidence.push({
 			schema_version: 1,
 			job,
 			sha: SHA,
@@ -45,7 +45,7 @@ function fixtures() {
 			distro: 'test-distro',
 			session: 'headless',
 			interpreter: 'LuaJIT 2.1',
-			subjects: { ...contract.subjects },
+			subjects: { [subject]: count },
 		});
 	}
 	return { needs, evidence };
@@ -64,8 +64,10 @@ function rejects(mutate, pattern) {
 
 verifyAggregate({ manifest: MANIFEST, ...fixtures(), expectedSha: SHA });
 
-for (const result of ['failure', 'cancelled', 'skipped', null]) {
-	rejects(({ needs }) => { needs['test-linux'].result = result; }, /mandatory job test-linux concluded/);
+for (const job of Object.keys(MANIFEST.jobs)) {
+	for (const result of ['failure', 'cancelled', 'skipped', null]) {
+		rejects(({ needs }) => { needs[job].result = result; }, /mandatory job .* concluded/);
+	}
 }
 rejects(({ needs }) => { delete needs['test-linux']; }, /mandatory job test-linux is missing/);
 rejects(({ evidence }) => { evidence[0].subjects.unit = 0; }, /no positive executed assertion count/);
@@ -114,6 +116,70 @@ assert.ok(subjectCount >= MIN_SUBJECTS,
 const PACKAGE_SUBJECTS = [
 	'build-appimage', 'build-deb', 'build-flatpak', 'build-rpm', 'smoke-flatpak-run', 'smoke-tarball-install',
 ];
+
+// One graph block still owns every former installation and package-run row.
+// Pin both the subjects and their execution environments: Docker first-run
+// tests need a host runner, while rpm must resolve its own LuaJIT dependency.
+const INSTALL_ROWS = [
+	['distro-debian', 'install', 'debian:stable-slim'],
+	['distro-fedora', 'install', 'fedora:latest'],
+	['distro-arch', 'install', 'archlinux:latest'],
+	['distro-alpine', 'install', 'alpine:latest'],
+	['distro-opensuse', 'install', 'opensuse/tumbleweed:latest'],
+	['first-install-ubuntu-22.04', 'first', 'ubuntu:22.04'],
+	['first-install-ubuntu-24.04', 'first', 'ubuntu:24.04'],
+	['first-install-debian-12', 'first', 'debian:12'],
+	['first-install-debian-13', 'first', 'debian:13'],
+	['first-install-fedora-41', 'first', 'fedora:41'],
+	['first-install-fedora-latest', 'first', 'fedora:latest'],
+	['first-install-arch', 'first', 'archlinux:latest'],
+	['first-install-opensuse-tumbleweed', 'first', 'opensuse/tumbleweed:latest'],
+	['first-install-alpine', 'first', 'alpine:latest'],
+	['smoke-deb-install', 'deb', ''],
+	['smoke-rpm-install', 'rpm', 'fedora:latest'],
+	['smoke-appimage-run', 'appimage', ''],
+];
+
+/**
+ * Assert the single matrix retains every scenario and its host/container split.
+ * @param {string} body Installation job body.
+ */
+function assertInstallMatrix(body) {
+	assert.strictEqual(pipeline.field(body, 'container'), '${{ matrix.container }}');
+	assert.deepStrictEqual(pipeline.needsOf(body), ['package-linux']);
+	assert.match(body, /^      fail-fast: false$/m);
+	const rows = [...body.matchAll(/^          - id: ([^\n]+)\n((?:            [^\n]*\n)+)/gm)];
+	assert.deepStrictEqual(rows.map((row) => row[1]).sort(), INSTALL_ROWS.map((row) => row[0]).sort());
+	for (const [id, kind, image] of INSTALL_ROWS) {
+		const row = rows.find((candidate) => candidate[1] === id)[2];
+		const value = (key) => row.match(new RegExp(`^            ${key}: (.*)$`, 'm'))?.[1].replace(/^'(.*)'$/, '$1');
+		assert.strictEqual(value('kind'), kind, `${id} scenario`);
+		assert.strictEqual(value('container'), ['install', 'rpm'].includes(kind) ? image : '', `${id} container`);
+		if (['install', 'first'].includes(kind)) assert.strictEqual(value('image'), image, `${id} image`);
+		if (id.startsWith('first-install-fedora-')) assert.strictEqual(value('known'), 'webkit');
+	}
+}
+
+const installJob = pipeline.job('install-linux');
+assertInstallMatrix(installJob);
+assert.deepStrictEqual(Object.keys(MANIFEST.jobs['install-linux'].subjects).sort(), INSTALL_ROWS.map((row) => row[0]).sort());
+assert.deepStrictEqual(pipeline.jobs(LINUX_BOX).map((job) => job.id).sort(),
+	['install-linux', 'linux-ok', 'package-linux', 'test-linux']);
+for (const [id] of INSTALL_ROWS) {
+	rejects(({ evidence }) => { evidence.splice(evidence.findIndex((doc) => id in doc.subjects), 1); },
+		/has no evidence for/);
+	assert.throws(() => assertInstallMatrix(installJob.replace(`          - id: ${id}\n`, `          - id: lost-${id}\n`)));
+}
+assert.throws(() => assertInstallMatrix(installJob.replace("            container: ''", '            container: ubuntu:24.04')));
+const prepare = pipeline.step(installJob, 'Prepare the container');
+assert.strictEqual(pipeline.stepField(prepare, 'shell'), 'sh', 'Alpine needs sh before bash is installed');
+assert.ok(installJob.indexOf(prepare) < installJob.indexOf('      - uses: actions/checkout@v4'));
+for (const step of pipeline.steps(installJob)) {
+	if (pipeline.runOf(step.body) && step.name !== 'Prepare the container') {
+		assert.strictEqual(pipeline.stepField(step.body, 'shell'), 'bash', `${step.name} requires pipefail-capable bash`);
+	}
+}
+
 assert.deepStrictEqual(Object.keys(MANIFEST.jobs['package-linux']?.subjects ?? {}).sort(), PACKAGE_SUBJECTS,
 	'package-linux must be the mandatory owner of the six packaging subjects');
 const packageRecord = pipeline.step(pipeline.job('package-linux'), 'Record mandatory package evidence');

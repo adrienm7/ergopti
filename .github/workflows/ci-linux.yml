@@ -5,11 +5,10 @@
 # "Linux / <name>" in the run graph, one lane with one entry job and one exit
 # job:
 #
-#   test-linux ──> package-linux ──┬─> smoke-deb-install          ┐
-#                                  ├─> smoke-rpm-install          │
-#                                  ├─> smoke-appimage-run         ├──> linux-ok
-#                                  ├─> install-linux-distros (5)  │    (evidence
-#                                  └─> first-install-distros (9)  ┘     gate)
+#   test-linux ──> package-linux ──> install-linux (17) ──> linux-ok
+#                                  5 archive installs     (evidence gate)
+#                                  9 first installs
+#                                  3 package runs
 #
 # The driver is assembled and packaged ONCE per run, by package-linux, into the
 # artifact assets-linux. The .deb, .rpm and AppImage smokes install those exact
@@ -572,231 +571,10 @@ jobs:
           if-no-files-found: error
 
   # ─────────────────────────────────────────────────
-  # 2) Linux install, per distribution family
-  # ─────────────────────────────────────────────────
-  # install.sh has to work on package managers this project's author does not
-  # run. Until 2026-08-05 that was a checklist line asking a person to find five
-  # machines, which is the kind of check that gets done once. Containers make it
-  # deterministic and repeatable: each image is the real package manager, the real
-  # shell and the real filesystem layout.
-  #
-  # --no-deps is used deliberately. Installing every runtime dependency in five
-  # containers would test the distributions' package archives, which are not ours
-  # and go down; what is ours is whether the script RUNS to completion, detects
-  # the package manager, and lays the driver out where the daemon expects it. A
-  # dependency archive outage must not read as a broken installer.
-  #
-  # After package-linux, like every lane job but the entry: a failing unit
-  # suite or packaging run spends no container time.
-  install-linux-distros:
-    name: 'Install (${{ matrix.distro }})'
-    runs-on: ubuntu-latest
-    needs: [package-linux]
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - distro: debian
-            image: debian:stable-slim
-            prep: apt-get update && apt-get install -y --no-install-recommends bash coreutils findutils grep sed
-          - distro: fedora
-            image: fedora:latest
-            prep: dnf install -y bash coreutils findutils grep sed
-          - distro: arch
-            image: archlinux:latest
-            prep: pacman -Sy --noconfirm bash coreutils findutils grep sed
-          - distro: alpine
-            image: alpine:latest
-            prep: apk add --no-cache bash coreutils findutils grep sed
-          - distro: opensuse
-            image: opensuse/tumbleweed:latest
-            prep: sed -i 's|http://download.opensuse.org|https://downloadcontent.opensuse.org|g' /etc/zypp/repos.d/*.repo && zypper --non-interactive install bash coreutils findutils grep sed
-    container:
-      image: ${{ matrix.image }}
-    steps:
-      - name: Prepare the container
-        run: ${{ matrix.prep }}
-
-      - uses: actions/checkout@v4
-
-      - name: Install with no root and no network dependencies
-        working-directory: static/ergopti_plus/linux
-        # No sudo and no systemd inside a container, which is also the immutable
-        # -distribution case: everything must land under $HOME and the script must
-        # not abort when it cannot write /usr or reach systemctl.
-        run: |
-          export HOME=/tmp/ergopti-home
-          mkdir -p "$HOME"
-          bash install.sh --no-deps
-
-      - name: The installed tree is the one the daemon expects
-        run: |
-          export HOME=/tmp/ergopti-home
-          FAIL=0
-          # The wrapper is what a user types. Without it nothing else matters.
-          if [ ! -x "$HOME/.local/bin/ergopti-hotstrings" ]; then
-            echo "::error::no executable at ~/.local/bin/ergopti-hotstrings"
-            FAIL=1
-          fi
-          # The driver root and the shared tree must be SIBLINGS: infra/paths.lua
-          # resolves _shared as ../_shared from the driver root and probes it, so a
-          # layout that nests them differently boots to "shared tree not found".
-          for path in "$HOME/.local/lib/ergopti/linux/ergopti_hotstrings.lua" \
-                      "$HOME/.local/lib/ergopti/_shared/data/locales/en.json"; do
-            if [ ! -f "$path" ]; then
-              echo "::error::missing $path"
-              FAIL=1
-            fi
-          done
-          # A hotstring pack, because an install with no hotstrings is an install
-          # that runs and does nothing.
-          if ! ls "$HOME/.local/lib/ergopti/_shared/modules/hotstrings/"*.toml >/dev/null 2>&1; then
-            echo "::error::no hotstring packs were installed"
-            FAIL=1
-          fi
-          exit $FAIL
-        timeout-minutes: 5
-
-      # The whole unit suite, on THIS distribution's own LuaJIT.
-      #
-      # Everything else in this workflow runs on Ubuntu's build, so a difference
-      # that belongs to the interpreter or the C library is invisible to it —
-      # and those are the differences that actually bite here. Alpine is musl
-      # rather than glibc; Arch ships whatever LuaJIT released last; several
-      # distributions patch it. The driver is 1600 assertions of pure Lua plus a
-      # thin FFI layer, so running them where the interpreter differs is cheap
-      # certification of exactly the part that varies.
-      #
-      # LuaJIT is the production interpreter. A distribution lane without it is
-      # not evidence about the driver and therefore cannot satisfy this gate.
-      - name: The unit suite on this distribution's LuaJIT
-        working-directory: static/ergopti_plus/linux
-        run: |
-          set +e
-          case "${{ matrix.distro }}" in
-            debian)   apt-get install -y --no-install-recommends luajit ;;
-            fedora)   dnf install -y luajit ;;
-            arch)     pacman -Sy --noconfirm luajit ;;
-            alpine)   apk add --no-cache luajit ;;
-            opensuse) zypper --non-interactive install luajit ;;
-          esac
-          if ! command -v luajit >/dev/null 2>&1; then
-            echo "::error::${{ matrix.distro }} has no LuaJIT package — mandatory distro coverage did not run."
-            exit 1
-          fi
-          luajit -v
-          luajit tests/run.lua
-          STATUS=$?
-          set -e
-          exit $STATUS
-        timeout-minutes: 10
-
-      - name: Record mandatory distro evidence
-        run: |
-          set -euo pipefail
-          evidence_dir="$RUNNER_TEMP/linux-ci-evidence"
-          mkdir -p "$evidence_dir"
-          printf '%s\n' \
-            '{' \
-            '  "schema_version": 1,' \
-            '  "job": "install-linux-distros",' \
-            "  \"sha\": \"$GITHUB_SHA\"," \
-            "  \"architecture\": \"$RUNNER_ARCH\"," \
-            '  "distro": "${{ matrix.distro }}",' \
-            '  "session": "container",' \
-            '  "interpreter": "LuaJIT",' \
-            '  "subjects": { "distro-${{ matrix.distro }}": 1 }' \
-            '}' > "$evidence_dir/${{ matrix.distro }}.json"
-
-      - name: Upload mandatory distro evidence
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-ci-evidence-distro-${{ matrix.distro }}
-          retention-days: 7
-          path: ${{ runner.temp }}/linux-ci-evidence/${{ matrix.distro }}.json
-          if-no-files-found: error
-
-  # ─────────────────────────────────────────────────
-  # 3) Linux first install, WITH dependencies, per distribution
-  # ─────────────────────────────────────────────────
-  # install-linux-distros runs --no-deps on purpose, and nothing ran the
-  # installer the way the README tells a user to: with its dependencies. That
-  # path is where the first-run failures lived — a remap binary needing glibc
-  # 2.39 aborting the whole install on Ubuntu 22.04 and Debian 12, the tray library
-  # never installed at all. tests/distro/e2e_install.sh runs install.sh as an
-  # unprivileged sudo user against each distribution's real archives, then
-  # checks the INSTALLED tree: the launcher, every FFI library, WebKit through
-  # lgi, and a tray icon registered with a StatusNotifierWatcher (the protocol
-  # KDE, GNOME's AppIndicator extension, waybar and xfce4-panel speak).
-  #
-  # The matrix spans what differs underneath: glibc and musl, libxkbcommon
-  # before and after 1.8, six package managers, LTS and rolling releases.
-  # Reproduce any entry locally with:
-  #   static/ergopti_plus/linux/tests/distro/run_in_docker.sh <image>
-  #
-  # After package-linux, so the lane keeps one entry job; it used to start at
-  # t=0 beside test-linux.
-  first-install-distros:
-    name: 'First install (${{ matrix.distro }})'
-    runs-on: ubuntu-latest
-    needs: [package-linux]
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { distro: ubuntu-22.04, image: 'ubuntu:22.04' }
-          - { distro: ubuntu-24.04, image: 'ubuntu:24.04' }
-          - { distro: debian-12, image: 'debian:12' }
-          - { distro: debian-13, image: 'debian:13' }
-          # Fedora packages lgi for Lua 5.4 only: the tray works there, its
-          # WebKit windows cannot open under LuaJIT. Declared, and the entry
-          # fails if that ever stops being true.
-          - { distro: fedora-41, image: 'fedora:41', known: webkit }
-          - { distro: fedora-latest, image: 'fedora:latest', known: webkit }
-          - { distro: arch, image: 'archlinux:latest' }
-          - { distro: opensuse-tumbleweed, image: 'opensuse/tumbleweed:latest' }
-          - { distro: alpine, image: 'alpine:latest' }
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install on ${{ matrix.image }} and verify the first run
-        timeout-minutes: 25
-        run: |
-          set -euo pipefail
-          export ERGOPTI_E2E_DOCKER_ARGS="-e ERGOPTI_E2E_KNOWN_LIMITATIONS=${{ matrix.known || '' }}"
-          bash static/ergopti_plus/linux/tests/distro/run_in_docker.sh '${{ matrix.image }}' \
-            | tee "$RUNNER_TEMP/first-install.log"
-
-      - name: Record mandatory first-install evidence
-        run: |
-          set -euo pipefail
-          evidence_dir="$RUNNER_TEMP/linux-ci-evidence"
-          mkdir -p "$evidence_dir"
-          printf '%s\n' \
-            '{' \
-            '  "schema_version": 1,' \
-            '  "job": "first-install-distros",' \
-            "  \"sha\": \"$GITHUB_SHA\"," \
-            "  \"architecture\": \"$RUNNER_ARCH\"," \
-            '  "distro": "${{ matrix.distro }}",' \
-            '  "session": "container-first-install",' \
-            '  "interpreter": "LuaJIT",' \
-            '  "subjects": { "first-install-${{ matrix.distro }}": 1 }' \
-            '}' > "$evidence_dir/first-install-${{ matrix.distro }}.json"
-
-      - name: Upload mandatory first-install evidence
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-ci-evidence-first-install-${{ matrix.distro }}
-          retention-days: 7
-          path: ${{ runner.temp }}/linux-ci-evidence/first-install-${{ matrix.distro }}.json
-          if-no-files-found: error
-
-  # ─────────────────────────────────────────────────
-  # 4) Assemble the driver once, build every package, smoke two of them
+  # 2) Assemble the driver once, build every package, smoke two of them
   # ─────────────────────────────────────────────────
   # One assembly and one packaging pass per run, CI and release alike: the files
-  # uploaded below as assets-linux are the ones the three smoke jobs install
+  # uploaded below as assets-linux are the ones the three package smoke rows install
   # and, on a release run, the ones ci.yml's release job publishes. The assembly
   # keeps its own smoke (no --skip-smoke), so the require checks that used to
   # run only on a release now run on every push and pull request.
@@ -1100,26 +878,290 @@ jobs:
           if-no-files-found: error
 
   # ─────────────────────────────────────────────────
-  # 5) Install the .deb and launch what it installed
+  # 3) Install and run every Linux distribution and package
   # ─────────────────────────────────────────────────
-  # The step the whole packaging chain existed to make possible: take the package
-  # a user would download, install it the way a user would, and run the binary it
-  # put on their PATH. Everything before this validates sources; this validates
-  # the INSTALLED layout, which is a different tree with different paths and is
-  # where the last shared-tree defect lived.
-  #
-  # There is no display on this runner, so the tray and the WebKit windows are
-  # deliberately not started — they cannot be, and pretending otherwise would
-  # make this job green for the wrong reason.
-  smoke-deb-install:
-    name: 'Run the .deb'
+  # One matrix gives the Linux lane one install block in GitHub's run graph.
+  # Archive installs use each distribution's container and LuaJIT. First-run
+  # checks use Docker from the host, with all installer dependencies enabled.
+  # Fedora's first-run rows declare its LuaJIT/lgi WebKit limitation explicitly.
+  # deb and AppImage run on the host; rpm uses Fedora without preinstalled
+  # LuaJIT, so dependency resolution and the bundled interpreter remain tested.
+  # An empty scalar container means a host job in the GitHub runner.
+  install-linux:
+    name: 'Install and run · ${{ matrix.label }}'
     runs-on: ubuntu-latest
     needs: [package-linux]
-
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: distro-debian
+            kind: install
+            label: 'Install · debian'
+            distro: debian
+            container: debian:stable-slim
+            image: debian:stable-slim
+            prep: apt-get update && apt-get install -y --no-install-recommends bash coreutils findutils grep sed
+          - id: distro-fedora
+            kind: install
+            label: 'Install · fedora'
+            distro: fedora
+            container: fedora:latest
+            image: fedora:latest
+            prep: dnf install -y bash coreutils findutils grep sed
+          - id: distro-arch
+            kind: install
+            label: 'Install · arch'
+            distro: arch
+            container: archlinux:latest
+            image: archlinux:latest
+            prep: pacman -Sy --noconfirm bash coreutils findutils grep sed
+          - id: distro-alpine
+            kind: install
+            label: 'Install · alpine'
+            distro: alpine
+            container: alpine:latest
+            image: alpine:latest
+            prep: apk add --no-cache bash coreutils findutils grep sed
+          - id: distro-opensuse
+            kind: install
+            label: 'Install · opensuse'
+            distro: opensuse
+            container: opensuse/tumbleweed:latest
+            image: opensuse/tumbleweed:latest
+            prep: sed -i 's|http://download.opensuse.org|https://downloadcontent.opensuse.org|g' /etc/zypp/repos.d/*.repo && zypper --non-interactive install bash coreutils findutils grep sed
+          - id: first-install-ubuntu-22.04
+            kind: first
+            label: 'First install · ubuntu-22.04'
+            distro: ubuntu-22.04
+            container: ''
+            image: 'ubuntu:22.04'
+          - id: first-install-ubuntu-24.04
+            kind: first
+            label: 'First install · ubuntu-24.04'
+            distro: ubuntu-24.04
+            container: ''
+            image: 'ubuntu:24.04'
+          - id: first-install-debian-12
+            kind: first
+            label: 'First install · debian-12'
+            distro: debian-12
+            container: ''
+            image: 'debian:12'
+          - id: first-install-debian-13
+            kind: first
+            label: 'First install · debian-13'
+            distro: debian-13
+            container: ''
+            image: 'debian:13'
+          - id: first-install-fedora-41
+            kind: first
+            label: 'First install · fedora-41'
+            distro: fedora-41
+            container: ''
+            image: 'fedora:41'
+            known: webkit
+          - id: first-install-fedora-latest
+            kind: first
+            label: 'First install · fedora-latest'
+            distro: fedora-latest
+            container: ''
+            image: 'fedora:latest'
+            known: webkit
+          - id: first-install-arch
+            kind: first
+            label: 'First install · arch'
+            distro: arch
+            container: ''
+            image: 'archlinux:latest'
+          - id: first-install-opensuse-tumbleweed
+            kind: first
+            label: 'First install · opensuse-tumbleweed'
+            distro: opensuse-tumbleweed
+            container: ''
+            image: 'opensuse/tumbleweed:latest'
+          - id: first-install-alpine
+            kind: first
+            label: 'First install · alpine'
+            distro: alpine
+            container: ''
+            image: 'alpine:latest'
+          - id: smoke-deb-install
+            kind: deb
+            label: 'Run · .deb'
+            container: ''
+          - id: smoke-rpm-install
+            kind: rpm
+            label: 'Run · .rpm'
+            container: fedora:latest
+          - id: smoke-appimage-run
+            kind: appimage
+            label: 'Run · AppImage'
+            container: ''
+    container: ${{ matrix.container }}
     steps:
+      - name: Prepare the container
+        if: matrix.kind == 'install'
+        shell: sh
+        run: ${{ matrix.prep }}
+
+      - name: Tools the job itself needs (rpm)
+        if: matrix.kind == 'rpm'
+        # Deliberately NOT luajit: the .rpm declares `Requires: luajit >= 2.1`,
+        # so letting dnf resolve it from the package is what proves that
+        # declaration is right. Pre-installing it would hide a wrong Requires.
+        # git is for actions/checkout, findutils for the `find` below.
+        shell: bash
+        run: dnf install -y git findutils
+
       - uses: actions/checkout@v4
 
-      - name: Download the .deb built above
+      - name: Install with no root and no network dependencies
+        if: matrix.kind == 'install'
+        working-directory: static/ergopti_plus/linux
+        # No sudo and no systemd inside a container, which is also the immutable
+        # -distribution case: everything must land under $HOME and the script must
+        # not abort when it cannot write /usr or reach systemctl.
+        shell: bash
+        run: |
+          export HOME=/tmp/ergopti-home
+          mkdir -p "$HOME"
+          bash install.sh --no-deps
+
+      - name: The installed tree is the one the daemon expects
+        if: matrix.kind == 'install'
+        shell: bash
+        run: |
+          export HOME=/tmp/ergopti-home
+          FAIL=0
+          # The wrapper is what a user types. Without it nothing else matters.
+          if [ ! -x "$HOME/.local/bin/ergopti-hotstrings" ]; then
+            echo "::error::no executable at ~/.local/bin/ergopti-hotstrings"
+            FAIL=1
+          fi
+          # The driver root and the shared tree must be SIBLINGS: infra/paths.lua
+          # resolves _shared as ../_shared from the driver root and probes it, so a
+          # layout that nests them differently boots to "shared tree not found".
+          for path in "$HOME/.local/lib/ergopti/linux/ergopti_hotstrings.lua" \
+                      "$HOME/.local/lib/ergopti/_shared/data/locales/en.json"; do
+            if [ ! -f "$path" ]; then
+              echo "::error::missing $path"
+              FAIL=1
+            fi
+          done
+          # A hotstring pack, because an install with no hotstrings is an install
+          # that runs and does nothing.
+          if ! ls "$HOME/.local/lib/ergopti/_shared/modules/hotstrings/"*.toml >/dev/null 2>&1; then
+            echo "::error::no hotstring packs were installed"
+            FAIL=1
+          fi
+          exit $FAIL
+        timeout-minutes: 5
+
+      # The whole unit suite, on THIS distribution's own LuaJIT.
+      #
+      # Everything else in this workflow runs on Ubuntu's build, so a difference
+      # that belongs to the interpreter or the C library is invisible to it —
+      # and those are the differences that actually bite here. Alpine is musl
+      # rather than glibc; Arch ships whatever LuaJIT released last; several
+      # distributions patch it. The driver is 1600 assertions of pure Lua plus a
+      # thin FFI layer, so running them where the interpreter differs is cheap
+      # certification of exactly the part that varies.
+      #
+      # LuaJIT is the production interpreter. A distribution lane without it is
+      # not evidence about the driver and therefore cannot satisfy this gate.
+      - name: The unit suite on this distribution's LuaJIT
+        if: matrix.kind == 'install'
+        working-directory: static/ergopti_plus/linux
+        shell: bash
+        run: |
+          set +e
+          case "${{ matrix.distro }}" in
+            debian)   apt-get install -y --no-install-recommends luajit ;;
+            fedora)   dnf install -y luajit ;;
+            arch)     pacman -Sy --noconfirm luajit ;;
+            alpine)   apk add --no-cache luajit ;;
+            opensuse) zypper --non-interactive install luajit ;;
+          esac
+          if ! command -v luajit >/dev/null 2>&1; then
+            echo "::error::${{ matrix.distro }} has no LuaJIT package — mandatory distro coverage did not run."
+            exit 1
+          fi
+          luajit -v
+          luajit tests/run.lua
+          STATUS=$?
+          set -e
+          exit $STATUS
+        timeout-minutes: 10
+
+      - name: Record mandatory distro evidence
+        if: matrix.kind == 'install'
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/linux-ci-evidence"
+          mkdir -p "$evidence_dir"
+          printf '%s\n' \
+            '{' \
+            '  "schema_version": 1,' \
+            '  "job": "install-linux",' \
+            "  \"sha\": \"$GITHUB_SHA\"," \
+            "  \"architecture\": \"$RUNNER_ARCH\"," \
+            '  "distro": "${{ matrix.distro }}",' \
+            '  "session": "container",' \
+            '  "interpreter": "LuaJIT",' \
+            '  "subjects": { "distro-${{ matrix.distro }}": 1 }' \
+            '}' > "$evidence_dir/${{ matrix.distro }}.json"
+
+      - name: Upload mandatory distro evidence
+        if: matrix.kind == 'install'
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-ci-evidence-distro-${{ matrix.distro }}
+          retention-days: 7
+          path: ${{ runner.temp }}/linux-ci-evidence/${{ matrix.distro }}.json
+          if-no-files-found: error
+
+      - name: Install on ${{ matrix.image }} and verify the first run
+        if: matrix.kind == 'first'
+        timeout-minutes: 25
+        shell: bash
+        run: |
+          set -euo pipefail
+          export ERGOPTI_E2E_DOCKER_ARGS="-e ERGOPTI_E2E_KNOWN_LIMITATIONS=${{ matrix.known || '' }}"
+          bash static/ergopti_plus/linux/tests/distro/run_in_docker.sh '${{ matrix.image }}' \
+            | tee "$RUNNER_TEMP/first-install.log"
+
+      - name: Record mandatory first-install evidence
+        if: matrix.kind == 'first'
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/linux-ci-evidence"
+          mkdir -p "$evidence_dir"
+          printf '%s\n' \
+            '{' \
+            '  "schema_version": 1,' \
+            '  "job": "install-linux",' \
+            "  \"sha\": \"$GITHUB_SHA\"," \
+            "  \"architecture\": \"$RUNNER_ARCH\"," \
+            '  "distro": "${{ matrix.distro }}",' \
+            '  "session": "container-first-install",' \
+            '  "interpreter": "LuaJIT",' \
+            '  "subjects": { "first-install-${{ matrix.distro }}": 1 }' \
+            '}' > "$evidence_dir/first-install-${{ matrix.distro }}.json"
+
+      - name: Upload mandatory first-install evidence
+        if: matrix.kind == 'first'
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-ci-evidence-first-install-${{ matrix.distro }}
+          retention-days: 7
+          path: ${{ runner.temp }}/linux-ci-evidence/first-install-${{ matrix.distro }}.json
+          if-no-files-found: error
+
+      - name: Download the .deb built above (deb)
+        if: matrix.kind == 'deb'
         # assets-linux holds every Linux file of this run under its release
         # name; the find below picks its one .deb.
         uses: actions/download-artifact@v4
@@ -1127,13 +1169,15 @@ jobs:
           name: assets-linux
           path: pkg
 
-      - name: Install it the way a user would
+      - name: Install it the way a user would (deb)
+        if: matrix.kind == 'deb'
         # --no-install-recommends deliberately: the Recommends list names
         # libayatana-appindicator3-1 among others, which are optional at
         # runtime and not all in the Ubuntu archive. What is under test is that
         # the Depends resolve and that DEBIAN/postinst — never once executed
         # before this job existed — runs to completion, since apt fails the
         # install when it exits non-zero.
+        shell: bash
         run: |
           set -euo pipefail
           deb=$(find pkg -name '*.deb' -type f | head -1)
@@ -1145,7 +1189,9 @@ jobs:
           sudo apt-get install -y --no-install-recommends "./$deb"
           dpkg -s ergopti
 
-      - name: The package installed the files the daemon reads
+      - name: The package installed the files the daemon reads (deb)
+        if: matrix.kind == 'deb'
+        shell: bash
         run: |
           set -euo pipefail
           fail=0
@@ -1162,18 +1208,21 @@ jobs:
           done
           exit $fail
 
-      - name: Launch the installed binary
+      - name: Launch the installed binary (deb)
+        if: matrix.kind == 'deb'
         # --help returns early, but only AFTER every file-scope require in the
         # daemon has run — so this is a real check of the require graph against
         # the INSTALLED layout, which the unit suite (run from the checkout)
         # cannot see. A missing module or a wrapper with the wrong LUA_PATH
         # fails here instead of on the user's machine.
         timeout-minutes: 2
+        shell: bash
         run: |
           set -euo pipefail
           /usr/bin/ergopti --help
 
-      - name: The installed shared data tree resolves and opens
+      - name: The installed shared data tree resolves and opens (deb)
+        if: matrix.kind == 'deb'
         # --help returns before doing any work, so it proves the require graph
         # and nothing about the DATA tree — which is where the defect that
         # motivated this whole job actually lived. The check is a tracked file
@@ -1181,6 +1230,7 @@ jobs:
         #
         # LUA_PATH is replayed from the INSTALLED wrapper rather than re-typed,
         # so this cannot pass against a path the wrapper does not set.
+        shell: bash
         run: |
           set -euo pipefail
           eval "$(grep -E '^(DRIVER_ROOT|SHARED_LUA)=|^export LUA_PATH=' /usr/bin/ergopti)"
@@ -1192,15 +1242,18 @@ jobs:
           luajit static/ergopti_plus/linux/tests/hardware/installed_layout_check.lua \
               /usr/lib/ergopti/_shared
 
-      - name: Record mandatory .deb smoke evidence
+      - name: Record mandatory .deb smoke evidence (deb)
+        if: matrix.kind == 'deb'
+        shell: bash
         run: |
           node tools/test/linux-ci-evidence.cjs record \
-              --job smoke-deb-install --output "$RUNNER_TEMP/linux-ci-evidence/smoke-deb-install.json" \
+              --job install-linux --output "$RUNNER_TEMP/linux-ci-evidence/smoke-deb-install.json" \
               --sha "$GITHUB_SHA" --architecture "$RUNNER_ARCH" --distro ubuntu \
               --session installed-package --interpreter "$(luajit -v 2>&1 | head -1)" \
               --subject smoke-deb-install=1
 
-      - name: Upload mandatory .deb smoke evidence
+      - name: Upload mandatory .deb smoke evidence (deb)
+        if: matrix.kind == 'deb'
         uses: actions/upload-artifact@v4
         with:
           name: linux-ci-evidence-smoke-deb-install
@@ -1208,30 +1261,8 @@ jobs:
           path: ${{ runner.temp }}/linux-ci-evidence/smoke-deb-install.json
           if-no-files-found: error
 
-  # ─────────────────────────────────────────────────
-  # 6) Install the .rpm and launch what it installed
-  # ─────────────────────────────────────────────────
-  # In a Fedora container, because ubuntu-latest cannot install an .rpm and a
-  # conversion through alien would be testing alien. dnf resolves the same
-  # dependencies a Fedora user's would.
-  smoke-rpm-install:
-    name: 'Run the .rpm'
-    runs-on: ubuntu-latest
-    needs: [package-linux]
-    container:
-      image: fedora:latest
-
-    steps:
-      - name: Tools the job itself needs
-        # Deliberately NOT luajit: the .rpm declares `Requires: luajit >= 2.1`,
-        # so letting dnf resolve it from the package is what proves that
-        # declaration is right. Pre-installing it would hide a wrong Requires.
-        # git is for actions/checkout, findutils for the `find` below.
-        run: dnf install -y git findutils
-
-      - uses: actions/checkout@v4
-
-      - name: Download the .rpm built above
+      - name: Download the .rpm built above (rpm)
+        if: matrix.kind == 'rpm'
         # assets-linux holds every Linux file of this run under its release
         # name; the find below picks its one .rpm.
         uses: actions/download-artifact@v4
@@ -1239,7 +1270,9 @@ jobs:
           name: assets-linux
           path: pkg
 
-      - name: Install it the way a user would
+      - name: Install it the way a user would (rpm)
+        if: matrix.kind == 'rpm'
+        shell: bash
         run: |
           set -euo pipefail
           rpm=$(find pkg -name '*.rpm' -type f | head -1)
@@ -1250,10 +1283,14 @@ jobs:
           dnf install -y "./$rpm"
           rpm -q ergopti
 
-      - name: Launch the installed binary
+      - name: Launch the installed binary (rpm)
+        if: matrix.kind == 'rpm'
+        shell: bash
         run: /usr/bin/ergopti --help
 
-      - name: The installed shared data tree resolves and opens
+      - name: The installed shared data tree resolves and opens (rpm)
+        if: matrix.kind == 'rpm'
+        shell: bash
         run: |
           set -euo pipefail
           eval "$(grep -E '^(DRIVER_ROOT|SHARED_LUA)=|^export LUA_PATH=' /usr/bin/ergopti)"
@@ -1264,7 +1301,9 @@ jobs:
           luajit static/ergopti_plus/linux/tests/hardware/installed_layout_check.lua \
               /usr/lib/ergopti/_shared
 
-      - name: Record mandatory .rpm smoke evidence
+      - name: Record mandatory .rpm smoke evidence (rpm)
+        if: matrix.kind == 'rpm'
+        shell: bash
         run: |
           set -euo pipefail
           evidence_dir="$RUNNER_TEMP/linux-ci-evidence"
@@ -1272,7 +1311,7 @@ jobs:
           printf '%s\n' \
             '{' \
             '  "schema_version": 1,' \
-            '  "job": "smoke-rpm-install",' \
+            '  "job": "install-linux",' \
             "  \"sha\": \"$GITHUB_SHA\"," \
             "  \"architecture\": \"$RUNNER_ARCH\"," \
             '  "distro": "fedora",' \
@@ -1281,7 +1320,8 @@ jobs:
             '  "subjects": { "smoke-rpm-install": 1 }' \
             '}' > "$evidence_dir/smoke-rpm-install.json"
 
-      - name: Upload mandatory .rpm smoke evidence
+      - name: Upload mandatory .rpm smoke evidence (rpm)
+        if: matrix.kind == 'rpm'
         uses: actions/upload-artifact@v4
         with:
           name: linux-ci-evidence-smoke-rpm-install
@@ -1289,22 +1329,8 @@ jobs:
           path: ${{ runner.temp }}/linux-ci-evidence/smoke-rpm-install.json
           if-no-files-found: error
 
-  # ─────────────────────────────────────────────────
-  # 7) Run the AppImage
-  # ─────────────────────────────────────────────────
-  # An AppImage is not installed; running it IS the install. It mounts itself
-  # with FUSE, which this runner does not have, so it is unpacked with the
-  # --appimage-extract escape hatch the format provides for exactly this.
-  # AppRun is then the same entry point a user's double-click reaches.
-  smoke-appimage-run:
-    name: 'Run the AppImage'
-    runs-on: ubuntu-latest
-    needs: [package-linux]
-
-    steps:
-      - uses: actions/checkout@v4
-
       - name: Download the AppImage built above
+        if: matrix.kind == 'appimage'
         # assets-linux holds every Linux file of this run under its release
         # name; the find below picks its one .AppImage.
         uses: actions/download-artifact@v4
@@ -1313,6 +1339,8 @@ jobs:
           path: pkg
 
       - name: Unpack it (no FUSE on this runner)
+        if: matrix.kind == 'appimage'
+        shell: bash
         run: |
           set -euo pipefail
           img=$(find pkg -name '*.AppImage' -type f | head -1)
@@ -1325,11 +1353,14 @@ jobs:
           test -x squashfs-root/AppRun
 
       - name: Launch it
+        if: matrix.kind == 'appimage'
         # Explicitly --help: AppRun appends --tray when given no arguments, and
         # there is no display here for a tray to appear in.
+        shell: bash
         run: ./squashfs-root/AppRun --help
 
       - name: The bundled shared data tree resolves and opens
+        if: matrix.kind == 'appimage'
         # The AppImage is relocatable, so its root is wherever it was unpacked —
         # which is the point of checking it here rather than assuming a prefix.
         #
@@ -1337,6 +1368,7 @@ jobs:
         # luajit on this runner at all, which is the situation an AppImage
         # exists for: if the bundled interpreter is missing or unusable, that is
         # a defect in the package and this step is where it should surface.
+        shell: bash
         run: |
           set -euo pipefail
           root="$(pwd)/squashfs-root/usr/lib/ergopti"
@@ -1350,14 +1382,17 @@ jobs:
               "$root/_shared"
 
       - name: Record mandatory AppImage smoke evidence
+        if: matrix.kind == 'appimage'
+        shell: bash
         run: |
           node tools/test/linux-ci-evidence.cjs record \
-              --job smoke-appimage-run --output "$RUNNER_TEMP/linux-ci-evidence/smoke-appimage-run.json" \
+              --job install-linux --output "$RUNNER_TEMP/linux-ci-evidence/smoke-appimage-run.json" \
               --sha "$GITHUB_SHA" --architecture "$RUNNER_ARCH" --distro ubuntu \
               --session unpacked-appimage --interpreter "$(./squashfs-root/usr/bin/luajit -v 2>&1 | head -1)" \
               --subject smoke-appimage-run=1
 
       - name: Upload mandatory AppImage smoke evidence
+        if: matrix.kind == 'appimage'
         uses: actions/upload-artifact@v4
         with:
           name: linux-ci-evidence-smoke-appimage-run
@@ -1366,7 +1401,7 @@ jobs:
           if-no-files-found: error
 
   # ─────────────────────────────────────────────────
-  # 8) Gate: every mandatory Linux subject ran and passed
+  # 4) Gate: every mandatory Linux subject ran and passed
   # ─────────────────────────────────────────────────
   # The needs: list below and .github/linux-ci-coverage.json name the same jobs
   # twice on purpose — needs: decides what this job waits for, the manifest
@@ -1387,12 +1422,8 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - test-linux
-      - install-linux-distros
-      - first-install-distros
       - package-linux
-      - smoke-deb-install
-      - smoke-rpm-install
-      - smoke-appimage-run
+      - install-linux
     if: always()
 
     steps:
