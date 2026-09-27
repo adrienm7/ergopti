@@ -929,21 +929,13 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
 ; =============================
 
 
-; Returns true when digit keys 1-0 require Shift on the active OS keyboard
-; layout (e.g. AZERTY, bépo). Uses VkKeyScanExW to probe the virtual-key
-; binding for the character "1": a non-zero Shift bit in the high byte
-; confirms that the OS layout places digits behind Shift.
+; Returns true when digit keys 1-0 require Shift on the layout the boot
+; registrations are built for (_LAYOUT_REMAP_HKL, e.g. AZERTY, bépo). The
+; digit-row swap below reads its symbols on that same layout, so the check and
+; the symbols can never describe two different layouts.
 _OsLayoutDigitsAreShifted() {
-	HKL := GetForegroundKeyboardLayout()
-	if (HKL = 0) {
-		return false
-	}
-	; VkKeyScanExW returns a WORD: low byte = VK code, high byte = modifier
-	; flags (bit 0 = Shift, bit 1 = Ctrl, bit 2 = Alt). A high byte of 1
-	; means Shift is required to produce the character "1".
-	Result := DllCall("VkKeyScanExW", "WStr", "1", "Ptr", HKL, "Short")
-	HighByte := (Result >> 8) & 0xFF
-	return (HighByte & 0x01) != 0
+	global _LAYOUT_REMAP_HKL
+	return KS_LayoutDigitsAreShifted(_LAYOUT_REMAP_HKL)
 }
 
 #HotIf IsSet(Features) and Features["layout"]["direct_access_digits"]
@@ -1008,28 +1000,13 @@ _DigitRowUp(Digit, *) {
 ; while the unshifted key already sends the digit via the block above.
 ; SC029, SC00C, SC00D (outside the 1-0 run) are intentionally left alone.
 if Features["layout"]["direct_access_digits"] and _OsLayoutDigitsAreShifted() {
-	; VK codes for digits 1–0 (0x31–0x39 then 0x30) paired with scancodes SC002–SC00B.
-	; ToUnicodeEx does not work on KbdEdit/custom layouts (returns the digit, not the
-	; shifted symbol). GetKeyName("vkXXscYYY") queries the active layout correctly
-	; and returns a single-character string for printable keys — we use that instead.
-	_DIGIT_VK_SC := [
-		[0x31, 0x02], [0x32, 0x03], [0x33, 0x04], [0x34, 0x05], [0x35, 0x06],
-		[0x36, 0x07], [0x37, 0x08], [0x38, 0x09], [0x39, 0x0A], [0x30, 0x0B]
-	]
-	for _, Pair in _DIGIT_VK_SC {
-		VK := Pair[1]
-		SC := Pair[2]
-		; GetKeyName with the "vkXXscYYY" form queries whatever character the
-		; active layout assigns to this VK+SC combination under Shift.
-		Symbol := GetKeyName("vk" . Format("{:02X}", VK) . "sc" . Format("{:03X}", SC))
-		; Only bind when we got exactly one printable character back — a longer
-		; string means Windows returned a key name ("F1", "Enter"…) which would
-		; mean the layout does not assign a printable symbol here.
-		if (StrLen(Symbol) = 1) {
-			; {Text} sends the Unicode character directly, bypassing the AHK
-			; keyboard hook — so the SC002–SC00B digit remaps never fire again.
-			Hotkey("+" Format("SC{:03X}", SC), _DigitShiftSend.Bind(Symbol), "I2")
-		}
+	; The symbol each key types unshifted on the layout the check above read
+	; (KS_LayoutDigitRowSymbols). GetKeyName("vkXXscYYY") read the same table,
+	; but on the script thread's own layout, which need not be that one.
+	for SC, Symbol in KS_LayoutDigitRowSymbols(_LAYOUT_REMAP_HKL) {
+		; {Text} sends the Unicode character directly, bypassing the AHK
+		; keyboard hook — so the SC002–SC00B digit remaps never fire again.
+		Hotkey("+" Format("SC{:03X}", SC), _DigitShiftSend.Bind(Symbol), "I2")
 	}
 }
 

@@ -396,6 +396,48 @@ KS_DirectScanCodeForChar(Hkl, Char) {
 	}
 }
 
+; The digit-row keys, 1 to 0: virtual key (VK_1..VK_9, VK_0) and scan code.
+global KS_DIGIT_ROW_KEYS := [[0x31, 0x02], [0x32, 0x03], [0x33, 0x04], [0x34, 0x05],
+	[0x35, 0x06], [0x36, 0x07], [0x37, 0x08], [0x38, 0x09], [0x39, 0x0A], [0x30, 0x0B]]
+; MapVirtualKeyExW map type: virtual key to its unshifted character.
+global KS_MAPVK_VK_TO_CHAR := 2
+
+; Whether layout Hkl types the digit 1 only with Shift (AZERTY, bépo), so its
+; digit row types symbols unshifted. VkKeyScanExW takes the character itself:
+; passed as a string, it read the low bits of the string's address, found no
+; such character (-1) on every layout, and the -1's high byte read as Shift, so
+; QWERTY and the Ergopti Kana layout counted as shifted too.
+; @param Hkl {Integer} Keyboard layout handle; 0 (none read) is not shifted.
+; @return {Boolean}
+KS_LayoutDigitsAreShifted(Hkl) {
+	if (Hkl == 0)
+		return false
+	Result := DllCall("VkKeyScanExW", "UShort", Ord("1"), "Ptr", Hkl, "Short")
+	return Result != -1 and ((Result >> 8) & 0x01) != 0
+}
+
+; The character each digit-row key types unshifted on layout Hkl: "&" to "à"
+; on AZERTY, the digits themselves on QWERTY. MapVirtualKeyExW (MAPVK_VK_TO_CHAR)
+; is what AutoHotkey's GetKeyName reads for these keys, but on the script's own
+; thread layout, which need not be the layout the digit row was probed on; this
+; reads the probed one. ToUnicodeEx is not used: it answered the digit on
+; KbdEdit layouts.
+; @param Hkl {Integer} Keyboard layout handle; 0 gives an empty map.
+; @return {Map} Scan code -> one-character string; a key with no character is
+;         left out.
+KS_LayoutDigitRowSymbols(Hkl) {
+	global KS_DIGIT_ROW_KEYS, KS_MAPVK_VK_TO_CHAR
+	Symbols := Map()
+	if (Hkl == 0)
+		return Symbols
+	for _, Key in KS_DIGIT_ROW_KEYS {
+		Char := DllCall("MapVirtualKeyExW", "UInt", Key[1], "UInt", KS_MAPVK_VK_TO_CHAR, "Ptr", Hkl, "UInt") & 0xFFFF
+		if (Char >= 0x20)
+			Symbols[Key[2]] := Chr(Char)
+	}
+	return Symbols
+}
+
 ; Lists the keyboard layouts installed for the user (GetKeyboardLayoutList).
 ; @return {Array} HKL handles; empty when the list cannot be read.
 KS_InstalledKeyboardLayouts() {
