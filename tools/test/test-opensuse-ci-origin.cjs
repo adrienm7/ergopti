@@ -18,7 +18,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 // Each source that installs packages in an openSUSE container. The Linux box is
 // read through the loader, which throws when its distro job is missing.
 const sources = [
-	['.github/workflows/ci-linux.yml (job install-linux-distros)', pipeline.job('install-linux-distros')],
+	['.github/workflows/ci-linux.yml (job install-linux)', pipeline.job('install-linux')],
 	['.github/workflows/linux-layout.yml', fs.readFileSync(path.join(ROOT, '.github/workflows/linux-layout.yml'), 'utf8')],
 ];
 const originRewrite =

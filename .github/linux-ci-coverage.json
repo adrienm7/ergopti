@@ -24,30 +24,6 @@
 				"hotstring-e2e": 100
 			}
 		},
-		"install-linux-distros": {
-			"classification": "mandatory",
-			"subjects": {
-				"distro-debian": 1,
-				"distro-fedora": 1,
-				"distro-arch": 1,
-				"distro-alpine": 1,
-				"distro-opensuse": 1
-			}
-		},
-		"first-install-distros": {
-			"classification": "mandatory",
-			"subjects": {
-				"first-install-ubuntu-22.04": 1,
-				"first-install-ubuntu-24.04": 1,
-				"first-install-debian-12": 1,
-				"first-install-debian-13": 1,
-				"first-install-fedora-41": 1,
-				"first-install-fedora-latest": 1,
-				"first-install-arch": 1,
-				"first-install-opensuse-tumbleweed": 1,
-				"first-install-alpine": 1
-			}
-		},
 		"package-linux": {
 			"classification": "mandatory",
 			"subjects": {
@@ -59,17 +35,27 @@
 				"smoke-tarball-install": 1
 			}
 		},
-		"smoke-deb-install": {
+		"install-linux": {
 			"classification": "mandatory",
-			"subjects": { "smoke-deb-install": 1 }
-		},
-		"smoke-rpm-install": {
-			"classification": "mandatory",
-			"subjects": { "smoke-rpm-install": 1 }
-		},
-		"smoke-appimage-run": {
-			"classification": "mandatory",
-			"subjects": { "smoke-appimage-run": 1 }
+			"subjects": {
+				"distro-debian": 1,
+				"distro-fedora": 1,
+				"distro-arch": 1,
+				"distro-alpine": 1,
+				"distro-opensuse": 1,
+				"first-install-ubuntu-22.04": 1,
+				"first-install-ubuntu-24.04": 1,
+				"first-install-debian-12": 1,
+				"first-install-debian-13": 1,
+				"first-install-fedora-41": 1,
+				"first-install-fedora-latest": 1,
+				"first-install-arch": 1,
+				"first-install-opensuse-tumbleweed": 1,
+				"first-install-alpine": 1,
+				"smoke-deb-install": 1,
+				"smoke-rpm-install": 1,
+				"smoke-appimage-run": 1
+			}
 		}
 	}
 }
