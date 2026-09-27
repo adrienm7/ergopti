@@ -259,7 +259,9 @@ jobs:
             export ERGOPTI_TRAY_CLICK_FILE="$(mktemp -u)"
             python3 tests/hardware/sni_host.py --ready-file "$ready" --timeout 30 --settle 1 \
               --expect-label "Ergopti+ tray probe" --expect-icon-file \
-              --click-label "Click probe" > "$RUNNER_TEMP/sni.json" &
+              --expect-submenu "Parent probe" --expect-submenu "Child probe" \
+              --expect-submenu "Checked probe" --click-label "Click probe" \
+              --rebuild-label "Rebuild probe" --expect-rebuilt-label "Rebuilt marker" > "$RUNNER_TEMP/sni.json" &
             host=$!
             for _ in $(seq 1 40); do [ -f "$ready" ] && break; sleep 0.25; done
             [ -f "$ready" ] || { echo "::error::the StatusNotifier host never started"; exit 1; }
@@ -271,6 +273,7 @@ jobs:
             # The click went panel → dbusmenu → libdbusmenu → the shared
             # dispatcher → the row: its marker is the proof.
             [ -f "$ERGOPTI_TRAY_CLICK_FILE" ] || { echo "::error::a menu click never reached its row"; exit 1; }
+            [ "$(cat "$ERGOPTI_TRAY_CLICK_FILE")" = "clicked 1" ] || { echo "::error::the replacement submenu click never reached its row"; exit 1; }
             exit "$status"'
         timeout-minutes: 4
 
