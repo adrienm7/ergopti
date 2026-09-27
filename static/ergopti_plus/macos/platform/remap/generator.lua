@@ -764,6 +764,23 @@ end
 -- ========================================
 -- ========================================
 
+local NATIVE_TAP_ONLY_KEYS = {
+	left_shift = true, left_control = true, right_shift = true, right_command = true, fn = true,
+}
+
+--- Keeps native modifier chords available when only their tap is configured.
+--- @param key_code string Physical key.
+--- @param tap_action table Configured tap.
+--- @param hold_action table Configured hold, never mutated.
+--- @return table effective_hold Runtime hold with the original configuration identity.
+local function native_tap_only_hold(key_code, tap_action, hold_action)
+	if NATIVE_TAP_ONLY_KEYS[key_code] and #(tap_action.karabiner_to or {}) > 0
+		and #(hold_action.karabiner_to or {}) == 0 then
+		return { id = hold_action.id, label = hold_action.label, karabiner_to = { { key_code = key_code } } }
+	end
+	return hold_action
+end
+
 --- Builds a Karabiner rule table for a single tap / hold key.
 ---
 --- The manipulator ALWAYS tracks physical state via ke_held_<key_code>:
@@ -774,17 +791,15 @@ end
 --- variable and re-emits the original key — keys used purely as combo triggers
 --- still get physical-press tracking without any user-visible behaviour change.
 ---
---- The rule holds one manipulator. Karabiner runs the first manipulator that
---- matches, so a second one gated on another held key would take every press
---- made under that key and drop the tap, a one-shot included. The one exception
---- is the navigation layer's swallower (SWALLOWED_ON_LAYER), gated on the layer
---- that the tap-hold manipulator's own condition excludes.
+--- Priority variants suppress only taps explicitly blocked by the Windows
+--- contract. Their hold and physical tracking still follow the normal rule.
 --- @param key_def table Entry from TAP_HOLD_KEYS.
 --- @param tap_action table Resolved action definition for the tap slot.
 --- @param hold_action table Resolved action definition for the hold slot.
 --- @param tap_timeout_ms number|nil Per-key tap/hold threshold override in ms; nil inherits the global.
 --- @return table Karabiner rule object.
 local function build_tap_hold_rule(key_def, tap_action, hold_action, tap_timeout_ms)
+	hold_action = native_tap_only_hold(key_def.from.key_code, tap_action, hold_action)
 	local tap_to   = tap_action.karabiner_to  or {}
 	local hold_to  = hold_action.karabiner_to or {}
 	local key_code = key_def.from.key_code
@@ -891,6 +906,24 @@ local function build_tap_hold_rule(key_def, tap_action, hold_action, tap_timeout
 	local manipulators = { manipulator }
 	if has_exact_modifier_action(tap_action, hold_action) then
 		manipulators = exact_modifier_manipulators(manipulator)
+	end
+	-- Fn is the Windows left-Control position (Paste); the macOS Control
+	-- key has its own Cut action and must not inherit these thumb blockers.
+	if key_code == "fn" and manipulator.to_if_alone then
+		local blocked = {}
+		for _, blocker in ipairs({ "caps_lock", "left_command" }) do
+			for _, variant in ipairs(manipulators) do
+				local copy = deep_copy(variant)
+				copy.to_if_alone = nil
+				copy.conditions = copy.conditions or {}
+				copy.conditions[#copy.conditions + 1] = {
+					type = "variable_if", name = held_var_name(blocker), value = 1,
+				}
+				blocked[#blocked + 1] = copy
+			end
+		end
+		for _, variant in ipairs(manipulators) do blocked[#blocked + 1] = variant end
+		manipulators = blocked
 	end
 	if swallower then table.insert(manipulators, 1, swallower) end
 
@@ -1064,6 +1097,7 @@ local KEY_ORDER_STRICT_INVERSE = "strict_inverse"
 --- @param hold_action table Resolved action for the key's hold slot.
 --- @return table held { to = events at key_down, after = events at key_up, has_hold = boolean }
 local function held_key_state(key_code, tap_action, hold_action)
+	hold_action = native_tap_only_hold(key_code, tap_action, hold_action)
 	local has_hold = #(hold_action.karabiner_to or {}) > 0
 	return {
 		to       = held_key_events(key_code, tap_action, hold_action),
