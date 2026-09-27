@@ -458,3 +458,11 @@ to physical pixels only at placement (`_TooltipPlaceOnScreen`).
 
 Metrics UI snapshots must project the currently open foreground interval; disk
 state alone lags the user's live session.
+
+### project-gui-hidden-show-mode
+
+AutoHotkey Gui.Show accepts one visibility mode: combining `Hide NoActivate`
+selects a visible mode (`IsWindowVisible` returns 1). Use `Hide` alone when
+sizing a prepared surface; keep the reveal explicit. A source assertion that
+only finds `Show("Hide` cannot prove invisibility. Check the native window after
+construction and after repositioning, as in the tooltip hidden-surface test.
