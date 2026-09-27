@@ -538,7 +538,8 @@ _WPMWidget_ApplySurfaceGeometry(gui_ref) {
     w := WPMWidget.show_graph ? WPMWidgetConst.GRAPH_W : WPMWidgetConst.W
     h := WPMWidget.show_graph ? WPMWidgetConst.GRAPH_H : WPMWidgetConst.H
     WPMWidget_ShowPos(&show_x, &show_y)
-    gui_ref.Show("Hide NoActivate x" . show_x . " y" . show_y . " w" . w . " h" . h)
+    ; Hide alone sizes without revealing; adding NoActivate selects a visible show mode.
+    gui_ref.Show("Hide x" . show_x . " y" . show_y . " w" . w . " h" . h)
 }
 
 ; No-op draw callback for GR_DrawBitmap: leaves the freshly created DIB untouched.
@@ -547,8 +548,7 @@ _WPMWidget_ApplySurfaceGeometry(gui_ref) {
 ; ever flashing: see WPMWidget_PrewarmGraph.
 _WPMWidget_WarmDrawTransparent(MemDC, W, H) {
     ; Intentionally draws nothing: the zero-filled DIB uploads as a fully
-    ; transparent layered surface. Adding any paint here would defeat the warm
-    ; (an opaque surface flashes when Show("Hide") re-applies WS_VISIBLE).
+    ; transparent layered surface, so prewarming never leaves opaque stale content.
 }
 
 ; Pre-create the graph window + warm GDI+ and the layered/DWM upload path during a
@@ -557,14 +557,10 @@ _WPMWidget_WarmDrawTransparent(MemDC, W, H) {
 ; that cost was absorbed by the first render after the widget appeared, surfacing as
 ; a ~110 ms blip (message-pump reentrancy while DWM composited the brand-new window).
 ;
-; The warm MUST upload a TRANSPARENT surface, not a real "0" graph. Gui.Show("Hide")
-; leaves WS_VISIBLE set on the window (verified: IsWindowVisible == 1), and a layered
-; window with a non-transparent surface displays the instant WS_VISIBLE is applied.
-; WPMWidget_Show calls Gui.Show("Hide") AGAIN to reposition the window, re-applying
-; WS_VISIBLE — so any opaque surface left here would flash a "0" graph at the real
-; position then (an earlier off-screen warm did not help: the reposition brought it
-; back on-screen). A transparent surface is invisible regardless of WS_VISIBLE; the
-; tick uploads the real opaque content only once the user types.
+; The warm uploads a TRANSPARENT surface, not a real "0" graph. The former geometry
+; call combined Hide with NoActivate, selecting a visible show mode and revealing
+; any opaque prewarmed content. Geometry now uses Hide alone. Keep the transparent
+; warm frame so only the typing tick owns the first opaque upload and reveal.
 WPMWidget_PrewarmGraph() {
     if (!WPMWidget.visible or !WPMWidget.show_graph or A_IsSuspended)
         return
@@ -575,9 +571,8 @@ WPMWidget_PrewarmGraph() {
         return
     try {
         ; Size the layered window, start GDI+, then upload one TRANSPARENT frame to
-        ; warm the CreateDIBSection -> UpdateLayeredWindow -> DWM path. Nothing is ever
-        ; visible (transparent surface), so the WS_VISIBLE that Show("Hide") sets is
-        ; harmless. GR_Hide leaves it in the clean SW_HIDE resting state.
+        ; warm the CreateDIBSection -> UpdateLayeredWindow -> DWM path without opaque
+        ; content. GR_Hide leaves it in the clean SW_HIDE resting state.
         _WPMWidget_ApplySurfaceGeometry(g)
         WPMWidget_EnsureGdip()
         GR_DrawBitmap(g.Hwnd, _WPMWidget_WarmDrawTransparent)

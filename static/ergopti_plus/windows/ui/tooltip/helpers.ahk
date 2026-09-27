@@ -1007,7 +1007,8 @@ _TooltipPrepareContent(Row) {
 				throw TypeError("Tooltip row must be an object.")
 		if (Row.HasOwnProp("ContentPrepared") && Row.ContentPrepared)
 				return true
-		Row.Gui.Show(Format("Hide NoActivate w{1} h{2} x0 y0", Row.W, Row.H))
+		; Hide and NoActivate are mutually exclusive modes: the latter reveals the window.
+		Row.Gui.Show(Format("Hide w{1} h{2} x0 y0", Row.W, Row.H))
 		_TooltipDisableDwmRounding(Row.Gui.Hwnd)
 		_TooltipApplyStackedCorners(Row)
 		Row.ContentPrepared := true
