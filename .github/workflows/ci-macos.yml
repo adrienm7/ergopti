@@ -56,7 +56,7 @@ jobs:
   # The lane's entry job. Its name says "stubbed" because it is the check a
   # reviewer reads: no job of this lane runs the driver in real Hammerspoon.
   test-hs:
-    name: 'tests (stubbed)'
+    name: 'Tests (stubbed)'
     runs-on: ubuntu-latest
 
     steps:
@@ -134,7 +134,7 @@ jobs:
   # compiles its launcher in a clean .build, as it did on a runner of its own,
   # never in a tree restored from an earlier run.
   package-macos:
-    name: 'package'
+    name: 'Package'
     needs: test-hs
     runs-on: macos-latest
     timeout-minutes: 45
@@ -321,7 +321,7 @@ jobs:
       # run Release attaches all of it. Outside a release only the app zip
       # exists. Seven days on a release run, so a next-day re-run of failed
       # jobs still finds the archive this job gated.
-      - name: Upload the macOS package
+      - name: Upload the package
         uses: actions/upload-artifact@v4
         with:
           name: assets-macos
@@ -341,7 +341,7 @@ jobs:
   # profiles and the verdict. The lane's exit job: no job of this file needs
   # it.
   launch:
-    name: 'launch · ${{ matrix.scenario }} · ${{ matrix.runner }}'
+    name: 'Launch · ${{ matrix.scenario }} · ${{ matrix.runner }}'
     needs: package-macos
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 12

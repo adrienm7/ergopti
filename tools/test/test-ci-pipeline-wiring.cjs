@@ -594,7 +594,7 @@ for (const [what, rel, from, to] of [
 		'    needs: [macos, windows, linux]\n'],
 	['a second entry in the macOS lane', MACOS_BOX, '    needs: test-hs\n', ''],
 	['a second entry in the Linux lane', LINUX_BOX,
-		"    name: 'first install (${{ matrix.distro }})'\n    runs-on: ubuntu-latest\n    needs: [package-linux]\n",
+		"    name: 'First install (${{ matrix.distro }})'\n    runs-on: ubuntu-latest\n    needs: [package-linux]\n",
 		"    name: 'first install (${{ matrix.distro }})'\n    runs-on: ubuntu-latest\n"],
 	['a second entry in the Windows lane', WINDOWS_BOX, '    needs: [test-ahk]\n', ''],
 	['a second exit in the macOS lane', MACOS_BOX, '    needs: package-macos\n', '    needs: test-hs\n'],
@@ -833,8 +833,8 @@ for (const [what, rel, from, to] of [
 		`      - name: Round-trip real events through the kernel\n        if: ${NOT_CANCELLED}\n`,
 		'      - name: Round-trip real events through the kernel\n        if: false\n'],
 	['if: false on the Linux evidence verdict', LINUX_BOX,
-		'      - name: Assert all mandatory Linux subjects ran and passed\n',
-		'      - name: Assert all mandatory Linux subjects ran and passed\n        if: false\n'],
+		'      - name: Assert all mandatory subjects ran and passed\n',
+		'      - name: Assert all mandatory subjects ran and passed\n        if: false\n'],
 	['a Stryker ref that never matches', ENTRY,
 		"github.ref == 'refs/heads/main' }}\n", "github.ref == 'refs/heads/never' }}\n"],
 	['`|| true` after the Hammerspoon harness', MACOS_BOX,
@@ -933,6 +933,42 @@ for (const line of ['          pattern: assets-*', '          path: release-asse
 	if (!download || !download.body.split('\n').includes(line)) {
 		errors.push(`"Download all build artifacts" must set ${line.trim()}`);
 	}
+}
+
+/** Checks the names GitHub renders after flattening each OS workflow. */
+function namingProblems(files) {
+	const problems = [];
+	for (const entry of files) {
+		for (const candidate of pipeline.jobsOfText(entry.text, entry.rel)) {
+			const name = (pipeline.field(candidate.body, 'name') ?? '').replace(/^(['"])(.*)\1$/, '$2');
+			const caller = pipeline.field(candidate.body, 'uses') !== null;
+			const valid = entry.rel === ENTRY
+				? (caller ? ['macOS', 'Windows', 'Linux'].includes(name) : /^(Validate|Release) \/ [A-Z][^/]+$/.test(name))
+				: /^[A-Z]/.test(name) && !name.includes(' / ');
+			if (!valid) problems.push(`${entry.rel} job ${candidate.id} has an invalid display name: ${name}`);
+			for (const found of pipeline.steps(candidate.body)) {
+				if (found.name && !/^[A-Z]/.test(found.name)) {
+					problems.push(`${entry.rel} job ${candidate.id} has a lowercase step: ${found.name}`);
+				}
+				if (entry.rel !== ENTRY && /\b(?:macOS|Linux|Windows(?! Defender))\b/.test(found.name)) {
+					problems.push(`${entry.rel} job ${candidate.id} repeats its zone in a step: ${found.name}`);
+				}
+			}
+		}
+	}
+	return problems;
+}
+
+errors.push(...namingProblems(pipeline.files()));
+for (const [what, rel, from, to] of [
+	['an unqualified root name', ENTRY, "name: 'Validate / Checks and plan'", "name: 'Validate'"],
+	['a lowercase lane job', WINDOWS_BOX, "name: 'Tests'", "name: 'tests'"],
+	['a repeated lane prefix', MACOS_BOX, "name: 'Package'", "name: 'macOS / Package'"],
+	['a lowercase step', WINDOWS_BOX, 'name: Run AHK test suite', 'name: run AHK test suite'],
+	['an extra root separator', ENTRY, "name: 'Validate / Checks and plan'", "name: 'Validate / Checks / Plan'"],
+	['a repeated step zone', LINUX_BOX, 'name: Run the driver unit test suite', 'name: Run Linux driver unit test suite'],
+]) {
+	mustCatch(what, rel, from, to, namingProblems);
 }
 
 if (errors.length > 0) {

@@ -142,7 +142,7 @@ if (/Rename appcast|_appcast-(?:main|dev)|build\/macos\/_appcast/.test(workflow)
 if (!macosJob.includes('OUTPUT_PATH: build/macos/appcast-${{ inputs.channel }}.xml')) {
 	errors.push('appcast output must use the same resolved channel as the bundle');
 }
-if (!pipeline.step(macosJob, 'Upload the macOS package').includes('build/macos/appcast-*.xml')) {
+if (!pipeline.step(macosJob, 'Upload the package').includes('build/macos/appcast-*.xml')) {
 	errors.push('the macOS artifact must preserve the exact appcast-{channel}.xml basename');
 }
 const feedPublishStep = pipeline.step(pipeline.job('release'), 'Publish channel feed for Sparkle');

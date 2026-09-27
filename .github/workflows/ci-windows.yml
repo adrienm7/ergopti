@@ -60,7 +60,7 @@ jobs:
   # 1) AHK unit tests + E2E
   # ─────────────────────────────────────────────────
   test-ahk:
-    name: 'tests'
+    name: 'Tests'
     runs-on: windows-latest
 
     steps:
@@ -385,7 +385,7 @@ jobs:
   # the smoke on the image's own Defender configuration, which the test job
   # alters; nothing here disables or restores Defender.
   package-windows:
-    name: 'package'
+    name: 'Package'
     needs: [test-ahk]
     if: inputs.release
     runs-on: windows-latest
@@ -449,7 +449,7 @@ jobs:
           Write-Host "BUNDLE_RELEASE_URL stamped: $releaseUrl"
           Write-Host "BUNDLE_CHANNEL     stamped: $channel"
 
-      - name: Download authenticated Windows compiler toolchain
+      - name: Download the authenticated compiler toolchain
         shell: pwsh
         run: |
           $contractPath = "${{ github.workspace }}\static\ergopti_plus\_shared\modules\updater\windows_release_toolchain.json"
@@ -637,14 +637,14 @@ jobs:
           }
           Write-Host "OK: ErgoptiPlus.exe survived startup and extracted its bundle to $markerFile"
 
-      - name: Rename Windows keyboard layout for upload
+      - name: Rename the keyboard layout for upload
         shell: bash
         run: |
           set -euo pipefail
           latest_kbd=$(ls static/ergopti/windows/Ergopti_v*.exe | sort -V | tail -1)
           cp "$latest_kbd" static/ergopti/windows/Ergopti_windows.exe
 
-      - name: Upload Windows artifacts
+      - name: Upload the application and layout
         uses: actions/upload-artifact@v4
         with:
           name: assets-windows
