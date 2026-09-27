@@ -385,6 +385,10 @@ function M.pump(budget)
 	return done
 end
 
+-- GTK can enter a Lua callback during any iteration. LuaJIT forbids that
+-- transition from compiled FFI calls, even after many callback-free iterations.
+if jit then jit.off(M.pump) end
+
 --- Hides the icon and releases the menu.
 function M.destroy()
 	local lib = bind()
