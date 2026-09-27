@@ -79,6 +79,10 @@ public sealed class KanaInstallerJob : IDisposable {
     [DllImport("user32")] static extern uint GetWindowThreadProcessId(IntPtr window, out uint pid);
     [DllImport("user32")] public static extern IntPtr GetDlgItem(IntPtr window, int id);
     [DllImport("user32")] public static extern bool IsWindowEnabled(IntPtr window);
+    [DllImport("user32")] static extern int GetDlgCtrlID(IntPtr control);
+    [DllImport("user32")] static extern IntPtr GetParent(IntPtr control);
+    [DllImport("user32", CharSet = CharSet.Unicode, SetLastError = true)]
+    static extern int GetClassName(IntPtr control, StringBuilder name, int capacity);
     [DllImport("user32", CharSet = CharSet.Unicode, SetLastError = true)]
     static extern IntPtr SendMessageTimeout(IntPtr window, uint message, IntPtr wParam, StringBuilder text,
         uint flags, uint timeout, out UIntPtr result);
@@ -159,6 +163,22 @@ public sealed class KanaInstallerJob : IDisposable {
         Check(SendMessageTimeout(control, 0xF0, IntPtr.Zero, IntPtr.Zero, 2, 1000, out result) != IntPtr.Zero);
         if (result.ToUInt64() != 0) throw new InvalidOperationException("Language-bar checkbox stayed checked");
     }
+    public static int ButtonId(IntPtr window, string caption) {
+        var matches = new List<int>();
+        Exception callbackError = null;
+        EnumChildWindows(window, (child, state) => {
+            try {
+                if (GetParent(child) != window) return true;
+                var name = new StringBuilder(256);
+                Check(GetClassName(child, name, name.Capacity) != 0);
+                if (name.ToString() == "Button" && Text(child) == caption) matches.Add(GetDlgCtrlID(child));
+                return true;
+            } catch (Exception error) { callbackError = error; return false; }
+        }, IntPtr.Zero);
+        if (callbackError != null) throw new InvalidOperationException("Installer button discovery failed", callbackError);
+        if (matches.Count != 1 || matches[0] <= 0) throw new InvalidOperationException("Expected exactly one identified installer button: " + caption);
+        return matches[0];
+    }
     public static void Click(IntPtr window, int id) {
         IntPtr control = GetDlgItem(window, id);
         if (control == IntPtr.Zero || !IsWindowEnabled(control)) throw new InvalidOperationException("Missing or disabled installer button");
@@ -209,14 +229,14 @@ try {
 	while ($deadline.Elapsed.TotalSeconds -lt 60 -and -not $installed) {
 		foreach ($window in $owner.Windows()) {
 			if ($window -eq $main) { continue }
-			$button = [KanaInstallerJob]::GetDlgItem($window, 1)
-			if ($button -eq [IntPtr]::Zero) { continue }
 			$texts = [KanaInstallerJob]::ChildTexts($window)
+			if ($texts.Count -eq 0) { continue }
 			$trace.Add(@{ dialog = [KanaInstallerJob]::Text($window); texts = $texts })
 			if (-not ($texts -match '^Layout successfully installed\.?$')) {
 				throw "Unexpected installer result: $($texts -join ' | ')"
 			}
-			[KanaInstallerJob]::Click($window, 1)
+			# KbdEdit's success dialog has a private control ID, not Win32 IDOK.
+			[KanaInstallerJob]::Click($window, [KanaInstallerJob]::ButtonId($window, 'OK'))
 			$installed = $true
 		}
 		if (-not $installed) { Start-Sleep -Milliseconds 100 }

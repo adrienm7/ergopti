@@ -56,6 +56,41 @@ try {
 	});
 	assert.equal(compiled.error, undefined, String(compiled.error));
 	assert.equal(compiled.status, 0, `${compiled.stdout}\n${compiled.stderr}`);
+	// Use hidden, inert native controls: no installer, activation or keyboard
+	// input. The real success dialog does not use the standard IDOK value 1.
+	const controls = `
+public static class KanaButtonFixture {
+    [System.Runtime.InteropServices.DllImport("user32", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    static extern System.IntPtr CreateWindowEx(uint extra, string type, string title, uint style,
+        int x, int y, int width, int height, System.IntPtr parent, System.IntPtr id, System.IntPtr module, System.IntPtr data);
+    [System.Runtime.InteropServices.DllImport("user32")] static extern bool DestroyWindow(System.IntPtr window);
+    static System.IntPtr Create(string type, System.IntPtr parent, int id) {
+        var window = CreateWindowEx(0, type, "OK", parent == System.IntPtr.Zero ? 0u : 0x40000000u,
+            0, 0, 1, 1, parent, (System.IntPtr)id, System.IntPtr.Zero, System.IntPtr.Zero);
+        if (window == System.IntPtr.Zero) throw new System.Exception("Hidden fixture creation failed");
+        return window;
+    }
+    public static void Run() {
+        var parent = Create("STATIC", System.IntPtr.Zero, 0);
+        try {
+            Create("BUTTON", parent, 7042);
+            Create("STATIC", parent, 7043);
+            if (KanaInstallerJob.ButtonId(parent, "OK") != 7042) throw new System.Exception("Private button ID was not discovered");
+            Create("BUTTON", parent, 7044);
+            bool refused = false;
+            try { KanaInstallerJob.ButtonId(parent, "OK"); }
+            catch (System.InvalidOperationException) { refused = true; }
+            if (!refused) throw new System.Exception("Ambiguous confirmation was accepted");
+        } finally { DestroyWindow(parent); }
+    }
+}
+`;
+	fs.writeFileSync(script, `$ErrorActionPreference = 'Stop'\nAdd-Type -TypeDefinition @'\n${native[1]}\n${controls}\n'@\n[KanaButtonFixture]::Run()\n`);
+	const buttons = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-File', script], {
+		encoding: 'utf8', timeout: 30000,
+	});
+	assert.equal(buttons.error, undefined, String(buttons.error));
+	assert.equal(buttons.status, 0, `${buttons.stdout}\n${buttons.stderr}`);
 } finally {
 	fs.rmSync(scratch, { recursive: true, force: true });
 }
