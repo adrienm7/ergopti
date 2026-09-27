@@ -31,7 +31,7 @@
 --- ==============================================================================
 
 local EvdevCodes = require("infra.evdev_codes")
-local UnicodeCase = require("infra.unicode_case")
+local UnicodeCase = require("unicode_case")
 
 local M = {}
 

@@ -110,7 +110,7 @@ const GENERATORS = [
 	},
 	{
 		script: 'codegen/codegen-unicode-case-linux.cjs',
-		outputs: ['static/ergopti_plus/linux/_generated/unicode_case_data.lua']
+		outputs: ['static/ergopti_plus/_shared/lua/unicode_case/data.lua']
 	},
 	{
 		script: 'codegen/gen-architecture-diagram.cjs',

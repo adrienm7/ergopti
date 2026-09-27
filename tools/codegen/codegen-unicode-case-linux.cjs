@@ -2,10 +2,10 @@
 
 /**
  * ==============================================================================
- * MODULE: Unicode Case Data Codegen (Linux)
+ * MODULE: Unicode Case Data Codegen (shared)
  * DESCRIPTION:
  * Emits complete default Unicode upper-, lower-, and title-case mappings for the
- * LuaJIT Linux driver. Lua's byte-oriented string.upper/string.lower only handle
+ * Lua drivers. Lua's byte-oriented string.upper/string.lower only handle
  * ASCII, so runtime selection transforms consume this generated lookup instead.
  *
  * REPRODUCIBILITY:
@@ -26,9 +26,10 @@ const OUT = path.join(
 	ROOT,
 	'static',
 	'ergopti_plus',
-	'linux',
-	'_generated',
-	'unicode_case_data.lua'
+	'_shared',
+	'lua',
+	'unicode_case',
+	'data.lua'
 );
 
 if (process.versions.unicode !== EXPECTED_UNICODE_VERSION) {
@@ -99,15 +100,15 @@ function quote(value) {
 }
 
 const lines = [
-	'--- _generated/unicode_case_data.lua',
+	'--- _shared/lua/unicode_case/data.lua',
 	'--- AUTO-GENERATED from Unicode default case conversion in Node 22.',
 	'--- DO NOT EDIT BY HAND — run `npm run codegen:unicode-case:linux` to refresh.',
 	'',
 	'--- ==============================================================================',
-	'--- MODULE: Unicode Case Data (Linux)',
+	'--- MODULE: Unicode Case Data (shared)',
 	'--- DESCRIPTION:',
 	`--- Complete Unicode ${EXPECTED_UNICODE_VERSION} default case mappings consumed by`,
-	'--- infra/unicode_case.lua. Multi-codepoint mappings are retained verbatim.',
+	'--- unicode_case/init.lua. Multi-codepoint mappings are retained verbatim.',
 	'--- ==============================================================================',
 	'',
 	'return {',
