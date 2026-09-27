@@ -145,8 +145,10 @@ _T_LPR_Notify(*) {
 	_T_LPR["notices"] += 1
 }
 
+; Every layout here needs a reload: the boot registrations fit only 0x100, as
+; when layouts differ in their digit row (LayoutRemapNeedsReload).
 _T_LPR_Port() {
-	return Map("reload", _T_LPR_Reload, "pending", _T_LPR_Pending,
+	return Map("needs_reload", (Hkl) => true, "reload", _T_LPR_Reload, "pending", _T_LPR_Pending,
 		"veto_honored", _T_LPR_VetoHonored, "now", _T_LPR_Now, "notify", _T_LPR_Notify)
 }
 

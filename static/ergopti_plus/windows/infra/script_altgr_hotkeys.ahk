@@ -76,17 +76,15 @@ _RegisterScriptAltGrHotkeys() {
 		Hotkey(_ScriptAltGrHookKey("SC138 & SC153"), _ScriptAltGrDeleteHandler, opts)
 		Hotkey(_ScriptAltGrHookKey("SC138 & SC001"), _ScriptAltGrEscapeHandler, opts)
 		HotIf()
-		if (IsSet(_ALTGR_KANA_FIXUP) and _ALTGR_KANA_FIXUP) {
-				; Stands down with the combinations when the AltGr key holds
-				; another modifier or a layer (AltGrKeyIsAltGr): AltGr+Enter
-				; held as Ctrl is Ctrl+Enter, not a script chord.
-				HotIf((*) => GetKeyState("SC138", "P") and AltGrKeyIsAltGr())
-				Hotkey(_ScriptAltGrHookKey("SC01C"), _ScriptAltGrEnterHandler, opts)
-				Hotkey(_ScriptAltGrHookKey("SC00E"), _ScriptAltGrBackSpaceHandler, opts)
-				Hotkey(_ScriptAltGrHookKey("SC153"), _ScriptAltGrDeleteHandler, opts)
-				Hotkey(_ScriptAltGrHookKey("SC001"), _ScriptAltGrEscapeHandler, opts)
-				HotIf()
-		}
+		; The Kana-style twins, registered on every layout: the AltGr family
+		; follows the foreground window's layout (infra/altgr_family.ahk), so
+		; the criterion decides per press whether this layout is a Kana one.
+		HotIf((*) => ScriptAltGrKanaChordIsLive(GetKeyState("SC138", "P")))
+		Hotkey(_ScriptAltGrHookKey("SC01C"), _ScriptAltGrEnterHandler, opts)
+		Hotkey(_ScriptAltGrHookKey("SC00E"), _ScriptAltGrBackSpaceHandler, opts)
+		Hotkey(_ScriptAltGrHookKey("SC153"), _ScriptAltGrDeleteHandler, opts)
+		Hotkey(_ScriptAltGrHookKey("SC001"), _ScriptAltGrEscapeHandler, opts)
+		HotIf()
 		; While paused the AltGr combinations cannot arm (the prefix anchor is
 		; suspended with every hotkey), so the chords run from the suffix alone.
 		; With * they also match under the LCtrl+RAlt an AltGr layout holds:

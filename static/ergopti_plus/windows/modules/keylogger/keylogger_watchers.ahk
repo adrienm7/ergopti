@@ -398,7 +398,7 @@ KL_Watchers_DetectShortcut(vk, sc, KeyIsDownFn := 0) {
 		; Ctrl, so a Ctrl held with them is the user's own shortcut.
 		if (AltGr and Ctrl and !LAlt and KS_AltGrAddsFakeLCtrl())
 				return ""
-		; Where the AltGr key is a plain right Alt (QWERTY: the boot probe found
+		; Where the AltGr key is a plain right Alt (QWERTY: the layout probe found
 		; no AltGr level), a key the AltGr layer leaves alone reaches the
 		; application under that Alt: LCtrl+RAlt+V is Windows' Ctrl+Alt+V. Held
 		; as another modifier or a layer by its tap-hold (AltGrKeyIsAltGr), the

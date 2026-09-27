@@ -27,7 +27,9 @@ _AGD_Probe(RMenuSc, AltGrVk, AltGrLevel := false) {
 ; override Override ("" for none), and return the flag and the record.
 _AGD_Init(Hkl, ProbeFn, Override := "") {
 	global _ALTGR_KANA_FIXUP, _ALTGR_LAYOUT_PROBE, ScriptInformation
+	global _AltGrFamilyProbeCache, _AltGrFamilyProbeFn
 	Saved := { Kana: _ALTGR_KANA_FIXUP, Probe: _ALTGR_LAYOUT_PROBE,
+		Cache: _AltGrFamilyProbeCache, ProbeFn: _AltGrFamilyProbeFn,
 		HadOverride: ScriptInformation.Has("AltGrIsKanaRemap"),
 		Override: ScriptInformation.Get("AltGrIsKanaRemap", "") }
 	try {
@@ -40,6 +42,8 @@ _AGD_Init(Hkl, ProbeFn, Override := "") {
 	} finally {
 		_ALTGR_KANA_FIXUP := Saved.Kana
 		_ALTGR_LAYOUT_PROBE := Saved.Probe
+		_AltGrFamilyProbeCache := Saved.Cache
+		_AltGrFamilyProbeFn := Saved.ProbeFn
 		if Saved.HadOverride
 			ScriptInformation["AltGrIsKanaRemap"] := Saved.Override
 		else

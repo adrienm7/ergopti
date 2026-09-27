@@ -263,6 +263,21 @@ held it; a raw `{SC138 Up}` ends a hold for good. A cleanup of a latched SC138
 (the script AltGr chords) releases it through `TapHoldReleaseUnlessOwned`, and
 only once the user has let go of it.
 
+### project-ahk-altgr-family-follows-the-foreground-layout
+
+The AltGr family (`_ALTGR_KANA_FIXUP`, `_ALTGR_LAYOUT_PROBE`) is not a boot
+constant: with Windows' per-window input methods it follows the foreground
+window's layout without a reload (`infra/altgr_family.ahk`: a foreground
+WinEvent hook plus the one-second layout poll, one probe per HKL, held back
+while `AltGrFamilyIsBusy`). Action: read the family through its readers at
+the moment of use; a hotkey whose existence depends on the family is
+registered unconditionally with the family in its live criterion
+(`ScriptAltGrKanaChordIsLive`), never inside an `if` on the family
+(`test_altgr_family_follows_layout.ahk` scans every registration). The only
+layout reads still fixed at load are the digit-row swap and the magic key's
+source key; the layout poll reloads only when those differ
+(`LayoutRemapSignature`).
+
 ### project-ahk-prefix-arms-before-physical-state
 
 AutoHotkey decides whether a custom-combination prefix is armed while it
