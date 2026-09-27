@@ -281,7 +281,7 @@ helpers.describe("Generator.build_karabiner_json: tap/hold rules", function()
 
 	--- Builds one tap-hold rule per catalogue key with the same two slots.
 	--- @param hold_action table|nil Hold action; nil leaves the hold empty.
-	--- @return table manipulators Key id → its single manipulator.
+	--- @return table manipulators Key id → its unblocked manipulator.
 	local function tap_hold_matrix(hold_action)
 		local ids = {
 			"escape", "tab", "caps_lock", "left_shift", "fn", "left_control",
@@ -312,7 +312,16 @@ helpers.describe("Generator.build_karabiner_json: tap/hold rules", function()
 			local id = type(rule.description) == "string"
 				and rule.description:match("matrix:([^:]+):") or nil
 			if id then
-				local manip = rule.manipulators and rule.manipulators[1]
+				local manip
+				for _, candidate in ipairs(rule.manipulators or {}) do
+					local blocked = false
+					for _, condition in ipairs(candidate.conditions or {}) do
+						if condition.type == "variable_if" and condition.name:find("ke_held_", 1, true) then
+							blocked = true
+						end
+					end
+					if not blocked and not manip then manip = candidate end
+				end
 				helpers.assert_true(type(manip) == "table", "missing manipulator for " .. id)
 				found[id] = manip
 			end
@@ -322,6 +331,61 @@ helpers.describe("Generator.build_karabiner_json: tap/hold rules", function()
 		end
 		return found
 	end
+
+	helpers.it("keeps no-hold modifier chords native and suppresses taps interrupted by typing", function()
+		local Model = require("tests.support.karabiner_model")
+		for _, id in ipairs({ "left_shift", "left_control", "right_shift", "right_command", "fn" }) do
+			local manip = tap_hold_matrix(nil)[id]
+			local model = Model.new({ { manipulators = { manip } } }, {
+				variables = { ["ergopti_mode_" .. TEST_LEASE_TOKEN] = 1 },
+			})
+			model:down(id)
+			helpers.assert_true(model:pressed()[id], "the physical modifier stays held: " .. id)
+			model:down("a")
+			model:up("a", true)
+			model:up(id, true)
+			for _, event in ipairs(model:emissions()) do
+				helpers.assert_true(event.key_code ~= "f18", "a shortcut must not also fire the tap: " .. id)
+			end
+			helpers.assert_nil(next(model:pressed()), "release every owned modifier")
+			model:clear()
+			model:tap(id)
+			local taps = 0
+			for _, event in ipairs(model:emissions()) do
+				if event.key_code == "f18" then taps = taps + 1 end
+			end
+			helpers.assert_eq(taps, 1, "a quick lone release fires exactly one tap: " .. id)
+		end
+	end)
+
+	helpers.it("blocks the Fn tap at the Windows Control position when a thumb or CapsLock was held at press (ctrl-tap-blockers)", function()
+		local Model = require("tests.support.karabiner_model")
+		local keys = {}
+		for _, id in ipairs({ "fn", "left_command", "caps_lock" }) do
+			keys[#keys + 1] = { id = id, label = id,
+				from = { key_code = id, modifiers = { optional = { "any" } } } }
+		end
+		for _, hold in ipairs({ "none", "cmd" }) do
+			local config = Generator.build_karabiner_json(make_state({ tap_hold_config = {
+				fn = { tap = "probe", hold = hold },
+			} }), { NONE_ACTION, CMD_ACTION,
+				{ id = "probe", label = "Probe", karabiner_to = { { key_code = "f18" } } },
+			}, keys, {}, nil, "/fake/data_dir/")
+			for _, blocker in ipairs({ "left_command", "caps_lock" }) do
+				local model = Model.new(config.profiles[1].complex_modifications.rules, {
+					variables = { ["ergopti_mode_" .. TEST_LEASE_TOKEN] = 1 },
+				})
+				model:down(blocker)
+				model:down("fn")
+				model:up(blocker, true)
+				model:up("fn", true)
+				for _, event in ipairs(model:emissions()) do
+					helpers.assert_true(event.key_code ~= "f18", "the blocker at press cancels the tap: " .. blocker)
+				end
+				helpers.assert_nil(next(model:pressed()), "the blocked tap must still release its hold")
+			end
+		end
+	end)
 
 	helpers.it("uses to_if_alone for every delayed tap-hold key, including Space and Enter", function()
 		-- Karabiner's to_if_alone contract cancels the tap when another key,
@@ -335,19 +399,26 @@ helpers.describe("Generator.build_karabiner_json: tap/hold rules", function()
 		end
 	end)
 
-	helpers.it("sends the tap of every key with no hold at key down, and only it (tap-only-key-types-its-tap)", function()
+	helpers.it("keeps native modifier holds and immediate ordinary taps without a configured hold (tap-only-key-types-its-tap)", function()
 		-- A key with nothing to hold has no tap to wait for: its tap goes out at
 		-- key down and repeats, like the native key. Sending the physical key
 		-- there and the tap at release typed two keys for one tap, and a tap
 		-- left in to_if_alone is lost whenever the next key goes down first.
 		for id, manip in pairs(tap_hold_matrix(nil)) do
-			helpers.assert_nil(manip.to_if_alone, "a key with no hold has no delayed tap: " .. id)
+			local native = id == "left_shift" or id == "left_control"
+				or id == "right_shift" or id == "right_command" or id == "fn"
+			if native then
+				helpers.assert_not_nil(manip.to_if_alone, "native modifier taps wait for release: " .. id)
+				helpers.assert_eq(manip.to_if_alone[1].key_code, "f18")
+			else
+				helpers.assert_nil(manip.to_if_alone, "ordinary tap-only keys type at press: " .. id)
+			end
 			local sent = {}
 			for _, event in ipairs(manip.to or {}) do
 				if event.key_code ~= nil then sent[#sent + 1] = event.key_code end
 			end
-			helpers.assert_eq(table.concat(sent, ","), "f18",
-				"a key with no hold must send its tap, and only it, at key down: " .. id)
+			helpers.assert_eq(table.concat(sent, ","), native and id or "f18",
+				"modifier hold versus ordinary immediate tap: " .. id)
 		end
 	end)
 

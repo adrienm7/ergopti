@@ -248,28 +248,67 @@ helpers.with_fresh_modules({
 		return mod_combos
 	end
 
-	helpers.describe("a key with only a tap types it at key down, like the native key (tap-only-key-types-its-tap)", function()
+	-- Windows preserves the native Shift, Control and AltGr modifiers even
+	-- when their hold slot is empty. right_command is the macOS AltGr position.
+	local native_tap_only = {
+		left_shift = true, right_shift = true, left_control = true, right_command = true, fn = true,
+	}
+
+	helpers.describe("tap-only keys preserve native modifier chords and immediate ordinary taps (tap-only-key-types-its-tap)", function()
 		-- Each key is pressed alone, so one graph serves every key.
 		local tap_only = build(every_key({ tap = "delete_fwd", hold = "none" }))
 
-		helpers.it("every tap-hold key types its tap alone at key down, keeps it down to repeat, and adds nothing on release", function()
+		helpers.it("keeps the Fn tap blocked by the physical thumb state at press (tap-only-thumb-blocker)", function()
+			local paste_key = assert(by_id.paste.karabiner_to[1].key_code, "Paste must resolve to a physical key")
+			local disabled_combos = {}
+			for _, combo in ipairs(combos) do
+				disabled_combos[combo.id] = { combo = "none", tap = "none", hold = "none" }
+			end
+			for _, blocker in ipairs({ "caps_lock", "left_command" }) do
+				local rules = build({
+					fn = { tap = "paste", hold = "none" },
+					[blocker] = { tap = "none", hold = "cmd" },
+				}, disabled_combos)
+				local engine = engine_for(rules)
+				engine:down(blocker)
+				engine:down("fn")
+				helpers.assert_true(engine:held().fn == true, "the blocked tap must retain the native Fn hold")
+				engine:up(blocker, true)
+				engine:up("fn", true)
+				for _, emission in ipairs(engine:emissions()) do
+					helpers.assert_true(emission.key_code ~= paste_key, "releasing the blocker first must not resurrect Paste")
+				end
+				local alone = engine_for(rules)
+				alone:tap("fn")
+				local pasted = false
+				for _, emission in ipairs(alone:emissions()) do
+					if emission.key_code == paste_key then pasted = true end
+				end
+				helpers.assert_true(pasted, "an unblocked lone Fn must still paste")
+			end
+		end)
+
+		helpers.it("ordinary taps repeat from key down while native modifiers reserve a quick lone release for the tap", function()
 			for _, key_def in ipairs(keys) do
 				local key_code = key_def.from.key_code
 				for _, within_timeout in ipairs({ true, false }) do
 					local engine = engine_for(tap_only)
 					engine:down(key_code)
-					helpers.assert_eq(table.concat(keys_posted(engine), ","), "delete_forward",
-						key_code .. " with no hold must type its tap alone when pressed")
-					helpers.assert_true(engine:held().delete_forward == true,
-						key_code .. " must keep its tap down while held, so it auto-repeats")
+					local held_key = native_tap_only[key_code] and key_code or "delete_forward"
+					helpers.assert_eq(table.concat(keys_posted(engine), ","), held_key,
+						key_code .. " must preserve its Windows-equivalent down behavior")
+					helpers.assert_true(engine:held()[held_key] == true,
+						key_code .. " must retain its exact native modifier or repeating tap")
 					engine:up(key_code, within_timeout)
-					helpers.assert_eq(table.concat(keys_posted(engine), ","), "delete_forward",
-						key_code .. " must type nothing more on release")
+					local expected = held_key
+					if native_tap_only[key_code] and within_timeout then expected = expected .. ",delete_forward" end
+					helpers.assert_eq(table.concat(keys_posted(engine), ","), expected,
+						key_code .. " must emit only a qualifying native modifier tap on release")
 				end
 			end
 		end)
 
-		helpers.it("every tap-hold key keeps its tap when the next key goes down before its release", function()
+		helpers.it("overlap keeps ordinary taps but uses native modifier chords without an extra tap", function()
 			-- Fast typing overlaps presses. Karabiner drops a pending to_if_alone
 			-- on any later key_down, so a tap typed on release would be lost.
 			for _, key_def in ipairs(keys) do
@@ -279,8 +318,9 @@ helpers.with_fresh_modules({
 				engine:down("a")
 				engine:up(key_code, true)
 				engine:up("a", true)
-				helpers.assert_eq(table.concat(keys_posted(engine), ","), "delete_forward,a",
-					key_code .. " followed by an overlapping key must type both")
+				local expected = native_tap_only[key_code] and (key_code .. ",a") or "delete_forward,a"
+				helpers.assert_eq(table.concat(keys_posted(engine), ","), expected,
+					key_code .. " must preserve its native chord or both ordinary taps")
 			end
 		end)
 
