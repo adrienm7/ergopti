@@ -64,6 +64,7 @@ public static class KanaButtonFixture {
     static extern System.IntPtr CreateWindowEx(uint extra, string type, string title, uint style,
         int x, int y, int width, int height, System.IntPtr parent, System.IntPtr id, System.IntPtr module, System.IntPtr data);
     [System.Runtime.InteropServices.DllImport("user32")] static extern bool DestroyWindow(System.IntPtr window);
+    [System.Runtime.InteropServices.DllImport("user32")] static extern bool EnableWindow(System.IntPtr window, bool enabled);
     static System.IntPtr Create(string type, System.IntPtr parent, int id) {
         var window = CreateWindowEx(0, type, "OK", parent == System.IntPtr.Zero ? 0u : 0x40000000u,
             0, 0, 1, 1, parent, (System.IntPtr)id, System.IntPtr.Zero, System.IntPtr.Zero);
@@ -73,6 +74,10 @@ public static class KanaButtonFixture {
     public static void Run() {
         var parent = Create("STATIC", System.IntPtr.Zero, 0);
         try {
+            if (KanaInstallerJob.IsResultPending(parent)) throw new System.Exception("Enabled main is not modal");
+            EnableWindow(parent, false);
+            if (!KanaInstallerJob.IsResultPending(parent)) throw new System.Exception("Disabled live main still has a modal result");
+            EnableWindow(parent, true);
             Create("BUTTON", parent, 7042);
             Create("STATIC", parent, 7043);
             if (KanaInstallerJob.ButtonId(parent, "OK") != 7042) throw new System.Exception("Private button ID was not discovered");
@@ -82,6 +87,8 @@ public static class KanaButtonFixture {
             catch (System.InvalidOperationException) { refused = true; }
             if (!refused) throw new System.Exception("Ambiguous confirmation was accepted");
         } finally { DestroyWindow(parent); }
+        if (KanaInstallerJob.IsWindowEnabled(parent)) throw new System.Exception("Destroyed fixture unexpectedly enabled");
+        if (KanaInstallerJob.IsResultPending(parent)) throw new System.Exception("Closed installer was mistaken for a pending result");
     }
 }
 `;
@@ -91,6 +98,18 @@ public static class KanaButtonFixture {
 	});
 	assert.equal(buttons.error, undefined, String(buttons.error));
 	assert.equal(buttons.status, 0, `${buttons.stdout}\n${buttons.stderr}`);
+	// Replay the old predicate against the same destroyed HWND. This must fail
+	// for the reported defect, not for a compilation or fixture setup error.
+	const stalePredicate = native[1].replace('return IsWindow(main) && !IsWindowEnabled(main);',
+		'return !IsWindowEnabled(main);');
+	assert.notEqual(stalePredicate, native[1], 'the old-predicate mutation must change the native helper');
+	fs.writeFileSync(script, `$ErrorActionPreference = 'Stop'\nAdd-Type -TypeDefinition @'\n${stalePredicate}\n${controls}\n'@\n[KanaButtonFixture]::Run()\n`);
+	const staleWindow = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-File', script], {
+		encoding: 'utf8', timeout: 30000,
+	});
+	assert.equal(staleWindow.error, undefined, String(staleWindow.error));
+	assert.equal(staleWindow.status, 1, `${staleWindow.stdout}\n${staleWindow.stderr}`);
+	assert.match(staleWindow.stderr, /Closed installer was mistaken for a pending result/);
 } finally {
 	fs.rmSync(scratch, { recursive: true, force: true });
 }
