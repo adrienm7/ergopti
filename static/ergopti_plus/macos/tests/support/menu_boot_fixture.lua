@@ -131,13 +131,15 @@ function M.boot(opts)
 			for key, value in pairs(saved) do live[key] = clone(value) end
 		end,
 		snapshot = function(live) return clone(live) end,
-		save = function(_path, live)
+		save = function(_path, live, _hotfiles, _core, snapshot_view)
 			if refused_saves > 0 then
 				refused_saves = refused_saves - 1
 				return false
 			end
-			saves[#saves + 1] = clone(live)
-			return true, clone(live)
+			local snapshot = clone(live)
+			if snapshot_view then snapshot = snapshot_view(snapshot) end
+			saves[#saves + 1] = clone(snapshot)
+			return true, snapshot, clone(live)
 		end,
 		get_group_name = function() return "common" end,
 	}

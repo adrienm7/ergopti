@@ -957,7 +957,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		hot_counter         = HotCounter,
 		initial_state       = state,
 		initial_preferences = initial_preferences,
-		persisted_view      = session_demotions.persisted_view,
+		snapshot_view       = session_demotions.persisted_view,
 		read_only_reason    = function() return read_only_reason end,
 		restore_runtime     = function(snapshot)
 			if sync_state_to_modules(snapshot, false, true) ~= true then return false end
@@ -967,10 +967,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			end
 			return true
 		end,
-		on_commit           = function()
+		on_commit           = function(_, runtime_snapshot)
 			_menu_dirty = true
 			-- Only a written change ends a demotion; a refused write rolls it back.
-			session_demotions.settle(state)
+			session_demotions.settle(runtime_snapshot)
 		end,
 		on_rollback         = function()
 			_menu_dirty = true

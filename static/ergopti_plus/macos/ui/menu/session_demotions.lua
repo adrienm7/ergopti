@@ -50,6 +50,17 @@ local function same_value(left, right)
 	return true
 end
 
+--- Reads a whole preference or one independently editable child preference.
+--- @param state table Complete preference snapshot.
+--- @param entry table Demotion address.
+--- @return any value
+local function value_at(state, entry)
+	if entry.subkey == nil then return state[entry.key] end
+	local parent = state[entry.key]
+	if type(parent) == "table" then return parent[entry.subkey] end
+	return nil
+end
+
 
 
 
@@ -69,18 +80,26 @@ function M.new()
 	--- Records one demotion reported by the preference synchronisation.
 	--- The first recorded saved value wins: a later demotion of the same key
 	--- must not replace the user's file value with an earlier demoted one.
-	--- @param record table { feature, key, persisted, demoted }.
+	--- @param record table { feature, key, subkey?, persisted, demoted }.
 	function registry.record(record)
 		if type(record) ~= "table" or type(record.key) ~= "string" or record.key == ""
 			or type(record.feature) ~= "string" or record.feature == "" then
 			error("a session demotion needs a feature and a state key", 2)
 		end
+		if record.subkey ~= nil and (type(record.subkey) ~= "string" or record.subkey == "") then
+			error("a child preference demotion needs a nonempty subkey", 2)
+		end
+		-- Length framing keeps a whole key distinct from every child address.
+		local identity = #record.key .. ":" .. record.key
+		if record.subkey ~= nil then identity = identity .. ":" .. record.subkey end
 		-- Explicit branch: `existing and existing.persisted or ...` would drop a
 		-- saved `false` and keep the later value instead.
 		local persisted = clone(record.persisted)
-		local existing = entries[record.key]
+		local existing = entries[identity]
 		if existing then persisted = existing.persisted end
-		entries[record.key] = {
+		entries[identity] = {
+			key = record.key,
+			subkey = record.subkey,
 			feature = record.feature,
 			persisted = persisted,
 			demoted = clone(record.demoted),
@@ -98,18 +117,18 @@ function M.new()
 	--- @return table view The live table itself when no demotion applies.
 	function registry.persisted_view(state)
 		if type(state) ~= "table" then error("persisted_view needs the live state", 2) end
-		local overrides = nil
-		for key, entry in pairs(entries) do
-			if same_value(state[key], entry.demoted) then
-				overrides = overrides or {}
-				overrides[key] = clone(entry.persisted)
+		local view
+		for _, entry in pairs(entries) do
+			if same_value(value_at(state, entry), entry.demoted) then
+				view = view or clone(state)
+				if entry.subkey == nil then
+					view[entry.key] = clone(entry.persisted)
+				else
+					view[entry.key][entry.subkey] = clone(entry.persisted)
+				end
 			end
 		end
-		if not overrides then return state end
-		local view = {}
-		for key, value in pairs(state) do view[key] = value end
-		for key, value in pairs(overrides) do view[key] = value end
-		return view
+		return view or state
 	end
 
 	--- Ends every demotion whose key the user changed, once a save has written
@@ -118,7 +137,7 @@ function M.new()
 	function registry.settle(state)
 		if type(state) ~= "table" then error("settle needs the live state", 2) end
 		for key, entry in pairs(entries) do
-			if not same_value(state[key], entry.demoted) then
+			if not same_value(value_at(state, entry), entry.demoted) then
 				entries[key] = nil
 				Logger.info(LOG, "Feature '%s' was changed; its session demotion ended.",
 					entry.feature)
@@ -150,15 +169,19 @@ function M.new()
 	--- @return table list Sorted { key, feature, persisted, demoted } records.
 	function registry.list()
 		local list = {}
-		for key, entry in pairs(entries) do
+		for _, entry in pairs(entries) do
 			list[#list + 1] = {
-				key = key,
+				key = entry.key,
+				subkey = entry.subkey,
 				feature = entry.feature,
 				persisted = clone(entry.persisted),
 				demoted = clone(entry.demoted),
 			}
 		end
-		table.sort(list, function(left, right) return left.key < right.key end)
+		table.sort(list, function(left, right)
+			if left.key ~= right.key then return left.key < right.key end
+			return (left.subkey or "") < (right.subkey or "")
+		end)
 		return list
 	end
 

@@ -335,16 +335,20 @@ local function with_menu_fixture(options, callback)
 			snapshot.shortcut_keys = listed_shortcut_keys()
 			return snapshot
 		end,
-		save = function(_, candidate)
+		save = function(_, candidate, _hotfiles, _core, snapshot_view)
+			local runtime = clone(candidate)
+			runtime.gesture_actions = clone(observations.gestures)
+			runtime.shortcut_keys = listed_shortcut_keys()
+			local snapshot = clone(runtime)
+			if snapshot_view then snapshot = snapshot_view(snapshot) end
 			local result = perform(observations, "preferences", function()
-				observations.persisted = clone(candidate)
-				observations.persisted_shortcut_keys = listed_shortcut_keys()
+				-- State and module-owned shortcuts have separate observations below.
+				observations.persisted = {}
+				for key in pairs(candidate) do observations.persisted[key] = clone(snapshot[key]) end
+				observations.persisted_shortcut_keys = clone(snapshot.shortcut_keys)
 			end)
 			if result ~= true then return result end
-			local snapshot = clone(candidate)
-			snapshot.gesture_actions = clone(observations.gestures)
-			snapshot.shortcut_keys = listed_shortcut_keys()
-			return true, snapshot
+			return true, snapshot, runtime
 		end,
 	}
 	package.loaded["ui.menu.builder"] = {

@@ -31,6 +31,27 @@ end
 -- ==========================================
 
 helpers.describe("session demotions keep config.toml values", function()
+	helpers.it("preserves independent child values without aliasing their runtime snapshot", function()
+		local registry = load_subject().new()
+		registry.record({ feature = "shortcuts", key = "shortcut_keys", subkey = "first",
+			persisted = false, demoted = true })
+		registry.record({ feature = "shortcuts", key = "shortcut_keys", subkey = "second",
+			persisted = true, demoted = false })
+		local live = { shortcut_keys = { first = true, second = false, other = true } }
+		local view = registry.persisted_view(live)
+		helpers.assert_eq(view.shortcut_keys, { first = false, second = true, other = true })
+		helpers.assert_eq(live.shortcut_keys, { first = true, second = false, other = true })
+		local released = registry.release_all()
+		helpers.assert_true(rawequal(registry.persisted_view(live), live))
+		registry.readopt(released)
+		helpers.assert_eq(#registry.list(), 2)
+		live.shortcut_keys.first = false
+		registry.settle(live)
+		helpers.assert_eq(#registry.list(), 1)
+		helpers.assert_eq(registry.list()[1].subkey, "second")
+		helpers.assert_eq(registry.persisted_view(live).shortcut_keys.second, true)
+	end)
+
 	helpers.it("serialises the saved value while the state holds the demoted one", function()
 		local registry = load_subject().new()
 		local state = { gestures = false, shortcuts = true }

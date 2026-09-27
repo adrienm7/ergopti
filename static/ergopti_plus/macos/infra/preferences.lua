@@ -677,7 +677,14 @@ end
 --- @param state table The current global state.
 --- @param hotfiles table List of hotstring files.
 --- @param core_mods table Loaded core modules.
-function M.save(prefs_file, state, hotfiles, core_mods)
+--- @param snapshot_view function|nil Transforms the complete runtime snapshot for disk.
+--- @return boolean committed
+--- @return table|nil persisted Snapshot written to disk.
+--- @return table|nil runtime Snapshot before session-only preservation.
+function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view)
+	if snapshot_view ~= nil and type(snapshot_view) ~= "function" then
+		error("snapshot_view must be a function", 2)
+	end
 	if type(prefs_file) ~= "string" or prefs_file == "" then
 		Logger.error(LOG, "Cannot save preferences without a destination path.")
 		return false
@@ -690,7 +697,12 @@ function M.save(prefs_file, state, hotfiles, core_mods)
 			prefs_file, refusal)
 		return false
 	end
-	local existing = M.snapshot(state, hotfiles, core_mods)
+	local runtime = M.snapshot(state, hotfiles, core_mods)
+	local existing = runtime
+	if snapshot_view then
+		existing = snapshot_view(clone_value(runtime))
+		if type(existing) ~= "table" then error("snapshot_view must return a table", 2) end
+	end
 	local expected_source = _source_snapshots[prefs_file]
 	if type(expected_source) ~= "table" then
 		expected_source = classify_source(prefs_file)
@@ -735,7 +747,7 @@ function M.save(prefs_file, state, hotfiles, core_mods)
 		return false
 	end
 	_source_snapshots[prefs_file] = { status = "ok", content = encoded }
-	return true, existing
+	return true, existing, runtime
 end
 
 --- Merges the saved disk state into the current memory state.
