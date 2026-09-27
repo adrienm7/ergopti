@@ -155,6 +155,31 @@ helpers.describe("tap-hold engine: a modifier key", function()
 		helpers.assert_eq(trail(out), "29↑", "Ctrl+Enter's Enter released during the CapsLock tap: no Enter")
 	end)
 
+	-- On Windows a tap fires only when the key itself was the last key pressed:
+	-- A_PriorKey (TapHoldPriorKeyIsSelf) counts every key-down in the key
+	-- history, auto-repeats included, and so does the InputHook tracker. Here a
+	-- key held on another keyboard kept repeating through a Shift tap, which
+	-- still copied (prior-key-repeat).
+	helpers.it("is a chord when another key auto-repeats in between (prior-key-repeat)", function()
+		local e = engine()
+		e:process(KEY_A, DOWN, 0)
+		e:process(SHIFT, DOWN, 10)
+		e:process(KEY_A, REPEAT, 40)
+		local _, tap = e:process(SHIFT, UP, 100)
+		helpers.assert_nil(tap, "A repeating during the Shift tap must not copy")
+		e = engine()
+		e:process(CAPS, DOWN, 0)
+		e:process(SHIFT, DOWN, 10)
+		e:process(CAPS, REPEAT, 40)
+		_, tap = e:process(SHIFT, UP, 100)
+		helpers.assert_nil(tap, "a tap-hold key repeating during the Shift tap must not copy")
+		e = engine()
+		e:process(SHIFT, DOWN, 0)
+		e:process(SHIFT, REPEAT, 60)
+		_, tap = e:process(SHIFT, UP, 100)
+		helpers.assert_eq(tap, "copy", "its own repeat is the key itself, still a tap")
+	end)
+
 	helpers.it("lets a click or a wheel turn make it a chord", function()
 		local e = engine()
 		e:process(SHIFT, DOWN, 0)
