@@ -35,6 +35,7 @@ local TomlCodec = require("infra.toml.codec")
 local TomlWriter = require("toml_codec.writer")
 local Logger    = require("infra.logger")
 local FileSystem = require("adapters.file_system")
+local Manifest = require("infra.manifest_reader")
 local LOG       = "preferences"
 
 
@@ -56,6 +57,7 @@ local KEY_MAP = {
 
 	-- ── Hotstrings ─────────────────────────────────────────────────────────
 	keymap                               = { sec = "hotstrings", key = "enabled"                      },
+	repeat_key_enabled                   = { sec = "hotstrings", key = "repeat_key_enabled"           },
 	expansion_delay                      = { sec = "hotstrings"                                        },
 	personal_info                        = { sec = "hotstrings", path = "modules", key = "personal_info" },
 	preview_ai_enabled                   = { sec = "hotstrings"                                        },
@@ -266,6 +268,34 @@ local function group_for_disk(flat)
 	return grouped
 end
 
+--- Builds leaf updates without claiming ownership of neighboring disk values.
+--- @param flat table Complete desired preference snapshot.
+--- @return table updates Explicit set/delete batch.
+local function sparse_updates(flat)
+	local updates = {}
+	local table_paths = {}
+	for _, spec in pairs(NESTED_KEY_MAP) do
+		if not spec.merge_into_sec then table_paths[spec.sec .. "." .. spec.key] = true end
+	end
+	local function visit(node, path)
+		for key, value in pairs(node) do
+			local leaf = path == "" and key or path .. "." .. key
+			if type(value) == "table" and #value == 0 and next(value) ~= nil then
+				visit(value, leaf)
+			elseif type(value) ~= "table" or next(value) ~= nil or table_paths[leaf] then
+				if Manifest.has_default(leaf) then
+					updates[#updates + 1] = Manifest.sparse_operation(leaf, value)
+				else
+					updates[#updates + 1] = { section = path, key = key, value = value }
+				end
+			end
+		end
+	end
+	visit(group_for_disk(flat), "")
+	table.sort(updates, function(a, b) return a.section .. "." .. a.key < b.section .. "." .. b.key end)
+	return updates
+end
+
 
 --- Flattens a grouped (sectioned) dict back into the flat layout the
 --- in-memory state expects. Translates all disk keys back to flat state
@@ -303,12 +333,8 @@ local function flatten_from_disk(grouped, mark)
 					elseif top_scalar_fk then
 						-- Already handled above — skip sub-path processing
 					elseif sec_name == "gestures" then
-						-- Defensive: a table inside [gestures] is treated as gesture_actions
-						if not flat.gesture_actions then flat.gesture_actions = {} end
-						for slot, action in pairs(disk_val) do
-							flat.gesture_actions[slot] = action
-						end
-						take(sec_name, disk_key)
+						-- Unknown nested tables belong to their own reader. They must
+						-- survive sparse saves without becoming native gesture slots.
 					else
 						-- Sub-path table (e.g. hotstrings.dynamic, hotstrings.editor):
 						-- walk each inner key through the reverse scalar and nested maps.
@@ -360,12 +386,13 @@ local function flatten_from_disk(grouped, mark)
 						local fk     = _reverse_scalar[lookup]
 						if fk then
 							flat[fk] = disk_val
-						else
+							take(sec_name, disk_key)
+						elseif Manifest.has_default("gestures." .. disk_key) then
 							-- Gesture action slot (tap_2, pinch_2, etc.) merged into [gestures]
 							if not flat.gesture_actions then flat.gesture_actions = {} end
 							flat.gesture_actions[disk_key] = disk_val
+							take(sec_name, disk_key)
 						end
-						take(sec_name, disk_key)
 					else
 						local lookup = sec_name .. ":" .. disk_key
 						local fk     = _reverse_scalar[lookup]
@@ -417,7 +444,7 @@ function M.build_initial_state(hotfiles, menu_mods, core_mods)
 
 	for _, f in ipairs(type(hotfiles) == "table" and hotfiles or {}) do
 		local name = M.get_group_name(f)
-		if name ~= "" then state.hotstrings[name] = true end
+		if name ~= "" then state.hotstrings[name] = false end
 	end
 
 	return state
@@ -619,6 +646,9 @@ function M.snapshot(state, hotfiles, core_mods)
 
 	local section_states = {}
 	local keymap = core_mods.keymap
+	if keymap and type(keymap.is_repeat_feature_enabled) == "function" then
+		existing.repeat_key_enabled = keymap.is_repeat_feature_enabled()
+	end
 	for _, f in ipairs(type(hotfiles) == "table" and hotfiles or {}) do
 		local name = M.get_group_name(f)
 		local secs = keymap and type(keymap.get_sections) == "function" and keymap.get_sections(name) or nil
@@ -717,26 +747,19 @@ function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view)
 		_source_snapshots[prefs_file] = expected_source
 	end
 
-	local grouped = group_for_disk(existing)
-	local unowned, unowned_err = unowned_tables(prefs_file, expected_source)
-	if not unowned then
-		Logger.error(LOG, "Preferences NOT saved: %s.", unowned_err)
-		return false
-	end
-	for name, value in pairs(unowned) do grouped[name] = value end
-
-	local ok, encoded = pcall(TomlCodec.encode, grouped)
-	if not ok or type(encoded) ~= "string" then
+	local ok, updates = pcall(sparse_updates, existing)
+	if not ok then
 		-- A silent return here looks exactly like a successful save until the next
 		-- reload restores the previous file and the user's change is simply gone.
-		Logger.error(LOG, "Cannot encode preferences — settings NOT saved: %s.", tostring(encoded))
+		Logger.error(LOG, "Cannot prepare preferences — settings NOT saved: %s.", tostring(updates))
 		return false
 	end
 
-	local write_ok, written = pcall(
-		FileSystem.write_if_unchanged,
+	local write_ok, written, detail, encoded = pcall(
+		TomlWriter.batch_write,
 		prefs_file,
-		encoded,
+		updates,
+		FileSystem,
 		expected_source
 	)
 	if not write_ok or written ~= true then

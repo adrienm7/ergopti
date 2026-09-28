@@ -15,6 +15,7 @@ local MODULES = {
 	"infra.dialog_util",
 	"infra.i18n",
 	"infra.logger",
+	"infra.manifest_reader",
 	"infra.manifest_menu",
 	"infra.text_utils",
 	"modules.keylogger",
@@ -90,6 +91,7 @@ local function with_filter(filter, options, callback)
 			observations.errors[#observations.errors + 1] = string.format(message, ...)
 		end,
 		warn = function() end,
+		done = function() end,
 	}
 	package.loaded["infra.manifest_menu"] = {
 		build = function(_, _, _, _, ctx)

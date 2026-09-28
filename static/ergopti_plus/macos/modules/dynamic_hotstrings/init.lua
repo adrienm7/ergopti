@@ -36,8 +36,7 @@ local _started_keymap = nil
 
 -- Per-category dynamic-hotstring defaults come from the shared features manifest
 -- (single cross-driver source); each entry there is a feature toggle, so we read
--- its `.enabled` flag. Only dynamichotstrings_enabled has no manifest path (it is
--- a macOS-local master switch), so it stays a literal.
+-- its `.enabled` flag. The master switch has its own neutral manifest value.
 local function feat_enabled(path)
 	return Manifest.default_for(path).enabled
 end
@@ -81,7 +80,7 @@ end
 
 M.DEFAULT_STATE = {
 	personal_info                    = feat_enabled("hotstrings.dynamic.text_expansion_personal_information"),
-	dynamichotstrings_enabled        = true,
+	dynamichotstrings_enabled        = Manifest.default_for("hotstrings.dynamic.enabled"),
 	dynamichotstrings_datefr         = feat_enabled("hotstrings.dynamic.date_fr"),
 	dynamichotstrings_datelongfr     = feat_enabled("hotstrings.dynamic.date_long_fr"),
 	dynamichotstrings_date           = feat_enabled("hotstrings.dynamic.date"),

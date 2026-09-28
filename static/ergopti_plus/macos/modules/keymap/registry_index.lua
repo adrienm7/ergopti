@@ -21,6 +21,7 @@ local Languages = require("hotstrings.languages")
 local LOG    = "keymap.registry"
 
 local _state = nil
+local _repeat_enabled = ManifestReader.default_for("hotstrings.repeat_key_enabled")
 
 --- Guard: verifies that M.setup() was called before any state-dependent public
 --- function. Mirrors registry_groups.lua's require_state verbatim (section 5.8).
@@ -183,21 +184,22 @@ end
 --- when the setting has never been written (opt-out, not opt-in).
 --- @return boolean
 function M.is_repeat_feature_enabled()
-	return Storage.get("magickey_repeat_enabled") ~= false
+	return _repeat_enabled
 end
 
 --- Enable or disable the magic-key repeat engine and persist the choice.
 --- @param enabled boolean
 function M.set_repeat_feature_enabled(enabled)
-	if enabled then
-		Storage.delete("magickey_repeat_enabled")
-	else
-		Storage.set("magickey_repeat_enabled", false)
+	if type(enabled) ~= "boolean" then
+		Logger.error(LOG, "Magic-key repeat state must be a boolean.")
+		return false
 	end
+	_repeat_enabled = enabled
 	-- A user-facing feature toggle with no log line leaves the repeat engine's
 	-- state unrecoverable from the logs, which is where every other setting's
 	-- applied value can be read back.
 	Logger.debug(LOG, "Magic-key repeat engine: %s.", enabled and "on" or "off")
+	return true
 end
 
 --- Builds the persistent settings key for one section.

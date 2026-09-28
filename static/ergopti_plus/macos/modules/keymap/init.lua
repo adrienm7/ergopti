@@ -86,7 +86,8 @@ M.DELAY_KEY_TO_CATEGORY = {
 --- builds its whole `Features` map from the same manifest). `default_for` fails
 --- fast if a path is missing, so a renamed feature never silently becomes nil.
 M.DEFAULT_STATE = {
-	keymap                      = true,   -- Module on/off toggle (no manifest entry)
+	keymap                      = Manifest.default_for("hotstrings.enabled"),
+	repeat_key_enabled          = Manifest.default_for("hotstrings.repeat_key_enabled"),
 	expansion_delay             = Manifest.default_for("hotstrings.expansion_delay"),
 	delays                      = {},     -- Per-group overrides; empty = use DELAYS_DEFAULT
 	trigger_char                = Manifest.default_for("hotstrings.trigger_char"),

@@ -416,6 +416,7 @@ InstallSendNoOps()
 #Include unit/test_wpm_drag_admission.ahk
 #Include unit/test_wpm_canon.ahk
 #Include unit/test_features_manifest.ahk
+#Include unit/test_neutral_config_manifest.ahk
 #Include unit/test_config_io_feature_section_resolution.ahk
 #Include unit/test_hotstrings_full.ahk
 #Include unit/test_tap_hold_loader.ahk

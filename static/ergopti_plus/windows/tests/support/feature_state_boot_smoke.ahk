@@ -1,4 +1,4 @@
-﻿; static/ergopti_plus/windows/tests/startup/feature_state_boot_smoke.ahk
+﻿; static/ergopti_plus/windows/tests/support/feature_state_boot_smoke.ahk
 
 ; ============================================================================
 ; MODULE: Feature-State Boot Smoke Harness
@@ -16,9 +16,20 @@ SetWorkingDir(A_ScriptDir)
 #Warn All, StdOut
 #Warn VarUnset, Off
 
+; Initialization failures must fail the headless harness instead of opening a
+; modal dialog before the fixture's own exception boundary is reached.
+_FeatureStateSmokeFatal(Err, Mode) {
+	FileAppend("feature-state initialization failed: " . Err.Message . "`n" . Err.Stack . "`n", "*")
+	ExitApp(1)
+	return 1
+}
+OnError(_FeatureStateSmokeFatal)
+
 ; The feature-state module derives these paths at include time in production.
 global _ConfigDir := A_Temp . "\ergopti_feature_state_boot\"
 global _AhkSubDir := ""
+global _DriverDir := A_ScriptDir . "\..\.."
+global _SharedDir := A_ScriptDir . "\..\..\..\_shared"
 global HSE_RepeatEnabled := true
 
 ; This is the production boot dependency order: canonical config helpers,
@@ -27,6 +38,7 @@ global HSE_RepeatEnabled := true
 #Include ..\..\infra\manifest_reader.ahk
 #Include ..\..\infra\feature_state.ahk
 #Include ..\..\infra\config_io.ahk
+#Include ..\..\infra\first_boot.ahk
 
 try {
     if (A_Args.Length != 1)
@@ -36,6 +48,10 @@ try {
             _FeatureStateSmokeParsedConfig()
         case "missing":
             _FeatureStateSmokeMissingSections()
+		case "neutral":
+			_FeatureStateSmokeNeutral()
+		case "neutral_first_boot":
+			_FeatureStateSmokeNeutralFirstBoot()
 		case "manifest_defaults":
 			_FeatureStateSmokeManifestDefaults()
         case "malformed":
@@ -99,8 +115,44 @@ _FeatureStateSmokeMissingSections() {
     ReadScriptConfig(Map())
     ReadCategoryEnabled(Map())
     _FeatureStateSmokeAssert(DefaultMagicKey, ScriptInformation["MagicKey"], "missing hotstrings default")
-    _FeatureStateSmokeAssert(true, HSE_RepeatEnabled, "missing repeat_key_enabled default")
-    _FeatureStateSmokeAssert(true, CategoryEnabled["Hotstrings"], "missing category default")
+    _FeatureStateSmokeAssert(false, HSE_RepeatEnabled, "missing repeat_key_enabled default")
+    _FeatureStateSmokeAssert(false, CategoryEnabled["Hotstrings"], "missing category default")
+}
+
+_FeatureStateSmokeNeutral() {
+	global ScriptInformation, CategoryEnabled, ScriptShortcutAssignments, KEYBOARD_SHORTCUT_DEFAULTS, HSE_RepeatEnabled
+	ReadScriptConfig(Map())
+	ReadCategoryEnabled(Map())
+	_FeatureStateSmokeAssert(false, HSE_RepeatEnabled, "empty repeat-key fallback")
+	for Category, Enabled in CategoryEnabled
+		_FeatureStateSmokeAssert(false, Enabled, "empty master: " . Category)
+	CategoryEnabled.Delete("Hotstrings")
+	_FeatureStateSmokeAssert(false, IsCategoryGated("Hotstrings"), "missing master stays neutral")
+	_FeatureStateSmokeAssert(false, IsCategoryGated("Personal"), "missing inherited master stays neutral")
+	CategoryEnabled["Hotstrings"] := true
+	_FeatureStateSmokeAssert(true, IsCategoryGated("Personal"), "explicit inherited master remains enabled")
+	for Slot, Action in ScriptShortcutAssignments
+		_FeatureStateSmokeAssert("none", Action, "empty script shortcut: " . Slot)
+	for Slot, Action in KEYBOARD_SHORTCUT_DEFAULTS
+		_FeatureStateSmokeAssert("none", Action, "empty keyboard shortcut: " . Slot)
+	_FeatureStateSmokeAssert(false, ScriptInformation["AltGrIsKanaRemap"], "empty layout remap")
+}
+
+_FeatureStateSmokeNeutralFirstBoot() {
+	global _ConfigDir
+	_ConfigDir := A_Temp . "\ergopti_neutral_first_boot_" . DllCall("GetCurrentProcessId") . "\"
+	try {
+		EnsureUserConfigsExist()
+		if FileExist(_ConfigDir . "autohotkey\tap_hold.toml")
+			throw Error("first boot imported the recommended tap-hold preset")
+		if FileExist(_ConfigDir . "autohotkey\config.toml")
+			throw Error("first boot persisted neutral defaults as explicit overrides")
+	} finally {
+		for Name in ["tap_hold.toml", "config.toml"]
+			try FileDelete(_ConfigDir . "autohotkey\" . Name)
+		try DirDelete(_ConfigDir . "autohotkey")
+		try DirDelete(_ConfigDir)
+	}
 }
 
 _FeatureStateSmokeManifestDefaults() {
@@ -123,8 +175,8 @@ _FeatureStateSmokeMalformedCache() {
     ReadScriptConfig(Cache)
     ReadCategoryEnabled(Cache)
     _FeatureStateSmokeAssert(DefaultMagicKey, ScriptInformation["MagicKey"], "malformed hotstrings default")
-    _FeatureStateSmokeAssert(true, HSE_RepeatEnabled, "malformed repeat_key_enabled default")
-    _FeatureStateSmokeAssert(true, CategoryEnabled["Hotstrings"], "malformed category default")
+    _FeatureStateSmokeAssert(false, HSE_RepeatEnabled, "malformed repeat_key_enabled default")
+    _FeatureStateSmokeAssert(false, CategoryEnabled["Hotstrings"], "malformed category default")
 }
 
 _FeatureStateSmokeNonMapCache() {
@@ -133,8 +185,8 @@ _FeatureStateSmokeNonMapCache() {
     ReadScriptConfig("not-a-cache")
     ReadCategoryEnabled("not-a-cache")
     _FeatureStateSmokeAssert(DefaultMagicKey, ScriptInformation["MagicKey"], "non-Map hotstrings default")
-    _FeatureStateSmokeAssert(true, HSE_RepeatEnabled, "non-Map repeat_key_enabled default")
-    _FeatureStateSmokeAssert(true, CategoryEnabled["Hotstrings"], "non-Map category default")
+    _FeatureStateSmokeAssert(false, HSE_RepeatEnabled, "non-Map repeat_key_enabled default")
+    _FeatureStateSmokeAssert(false, CategoryEnabled["Hotstrings"], "non-Map category default")
 }
 
 _FeatureStateSmokeInvalidTrigger(Value) {

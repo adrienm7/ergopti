@@ -70,7 +70,7 @@ end
 --- @param context string Diagnostic context.
 local function assert_keys(bindings, keys, context)
 	for id in pairs(Fixture.index(bindings)) do
-		helpers.assert_eq(keys[id], id ~= DISABLED_ID,
+		helpers.assert_eq(keys[id], id ~= DISABLED_ID and true or nil,
 			context .. ": [shortcuts.keys] " .. id)
 	end
 end
@@ -89,7 +89,7 @@ helpers.describe("preferences: [shortcuts.keys] survive a paused save (shortcut-
 	for _, edge in ipairs({ "pause", "stop", "pause_hotkeys_only" }) do
 		helpers.it("persists the preference, not the binding, after " .. edge, function()
 			with_preferences(function(preferences)
-				Fixture.with_bindings(function(bindings, ctx)
+				Fixture.with_recommended_bindings(function(bindings, ctx)
 					helpers.assert_eq(bindings.start(), true, table.concat(ctx.errors, "\n"))
 					helpers.assert_eq(bindings.disable(DISABLED_ID), true)
 					helpers.assert_eq(bindings[edge](), true)
@@ -116,7 +116,7 @@ end)
 helpers.describe("preferences: saved keys re-apply while paused (shortcut-preference-vs-binding)", function()
 	helpers.it("reproduces the same keys without an ERROR and binds them on resume", function()
 		with_preferences(function(preferences)
-			Fixture.with_bindings(function(bindings, ctx)
+			Fixture.with_recommended_bindings(function(bindings, ctx)
 				helpers.assert_eq(bindings.start(), true, table.concat(ctx.errors, "\n"))
 				helpers.assert_eq(bindings.disable(DISABLED_ID), true)
 				-- Saved while the layer runs, so this set is right even before the
@@ -156,7 +156,7 @@ helpers.describe("preferences: refused shortcut replay (shortcut-replay-refusal)
 			with_preferences(function(preferences, disk, control)
 				disk[CONFIG_PATH] = "[shortcuts]\nenabled = true\n[shortcuts.keys]\nctrl_d = false\n"
 				local saved = preferences.load(CONFIG_PATH)
-				Fixture.with_bindings(function(bindings, ctx)
+				Fixture.with_recommended_bindings(function(bindings, ctx)
 					helpers.assert_eq(bindings.start(), true, table.concat(ctx.errors, "\n"))
 					local denied_handle
 					for handle in pairs(ctx.live) do
@@ -196,7 +196,7 @@ helpers.describe("preferences: refused shortcut replay (shortcut-replay-refusal)
 						end,
 					})
 					helpers.assert_eq(save(), true)
-					helpers.assert_eq(preferences.load(CONFIG_PATH).shortcut_keys.ctrl_d, false)
+					helpers.assert_eq(preferences.load(CONFIG_PATH).shortcut_keys.ctrl_d, nil)
 					helpers.assert_eq(bindings.is_enabled(DISABLED_ID), true,
 						"the saved view must not pretend native teardown succeeded")
 					local other
@@ -207,8 +207,8 @@ helpers.describe("preferences: refused shortcut replay (shortcut-replay-refusal)
 					helpers.assert_eq(bindings.disable(other), true)
 					helpers.assert_eq(save(), true)
 					local reloaded = preferences.load(CONFIG_PATH)
-					helpers.assert_eq(reloaded.shortcut_keys[other], false)
-					helpers.assert_eq(reloaded.shortcut_keys.ctrl_d, false,
+					helpers.assert_eq(reloaded.shortcut_keys[other], nil)
+					helpers.assert_eq(reloaded.shortcut_keys.ctrl_d, nil,
 						"editing a sibling must not end the refused leaf's preservation")
 					helpers.assert_eq(#registry.list(), 1)
 					denied_handle.delete = real_delete

@@ -31,14 +31,14 @@ end
 
 helpers.describe("hotstrings config: sections are opt-in", function()
 
-	helpers.it("(hs-opt-in-linux) an untouched bundled section is off, a personal one is on", function()
+	helpers.it("(hs-opt-in-linux) bundled and personal sections require explicit activation", function()
 		local Config = fresh_config()
 		helpers.assert_eq(Config.is_section_checked("french_autocorrection", "accents"), false,
 			"the manifest ships every bundled section disabled")
 		helpers.assert_eq(Config.is_section_checked("distancesreduction", "qu"), false,
 			"the file-stem spelling of a manifest category must find its row")
-		helpers.assert_eq(Config.is_section_checked("personal", "anything"), true,
-			"a pack the manifest does not declare is the user's own")
+		helpers.assert_eq(Config.is_section_checked("personal", "anything"), false,
+			"loading a personal pack does not grant activation")
 	end)
 
 	helpers.it("(hs-opt-in-linux) the language bulk action switches every French section on, then off", function()

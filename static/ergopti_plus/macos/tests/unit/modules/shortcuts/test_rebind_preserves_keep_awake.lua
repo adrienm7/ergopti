@@ -120,6 +120,7 @@ local function load_bindings_with_system_spy(options)
 			bind = function() return { delete = function() return true end } end,
 		},
 	})
+	require("tests.support.shortcut_bindings_fixture").prefer_all(bindings)
 	return bindings, spy
 end
 

@@ -64,10 +64,17 @@ try {
 		if (!eqOrdered(luaSlotArray(src, 'AXIS_SLOTS', file), axis)) {
 			errors.push('macos AXIS_SLOTS != actions.toml [slots].axis');
 		}
-		// DEFAULT_GESTURES is built over exactly these two lists, so its key-space
-		// is single + axis by construction (the Lua suite checks the built table).
-		if (!/for _, slots in ipairs\(\{ M\.SINGLE_SLOTS, M\.AXIS_SLOTS \}\) do/.test(src)) {
-			errors.push('macos DEFAULT_GESTURES must be built over SINGLE_SLOTS and AXIS_SLOTS');
+		if (!/for _, slots in ipairs\(\{ M\.SINGLE_SLOTS, M\.AXIS_SLOTS \}\) do/.test(src)
+			|| !src.includes('M.DEFAULT_GESTURES[slot] = Manifest.default_for("gestures." .. slot)')) {
+			errors.push('macos must project both complete slot lists through the manifest');
+		}
+		for (const driver of ['macos', 'linux']) {
+			const manifest = read(`${driver}/_generated/features_manifest.lua`);
+			for (const slot of union) {
+				if (!manifest.includes(`path = "gestures.${slot}"`)) {
+					errors.push(`${driver} manifest has no owned default for ${slot}`);
+				}
+			}
 		}
 	}
 

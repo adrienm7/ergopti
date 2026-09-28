@@ -133,6 +133,8 @@ helpers.describe("hotstring priority overrides", function()
 			local config = require("modules.hotstrings.hotstrings_config")
 			local engine = Engine.new()
 			config.init(engine, "/virtual/catalogue.toml")
+			config.load_all()
+			helpers.assert_true(config.set_categories_sections({ "first", "second" }, true))
 			helpers.assert_eq(config.load_all(), 2,
 				"both colliding mappings must reach the shared engine")
 			helpers.assert_eq(winner(engine), "FIRST",

@@ -35,6 +35,7 @@ local FileSystem = require("adapters.file_system")
 
 local Defaults = require("platform.remap.defaults")
 local ActionCatalogue = require("platform.remap.action_catalogue")
+local Manifest = require("infra.manifest_reader")
 
 local LOG = "karabiner"
 
@@ -349,11 +350,11 @@ end
 --- @param tap_hold_keys table List from load_tap_hold_keys.
 --- @param mod_combos table List from load_mod_combos.
 --- @return table Full default state: {enabled, tap_hold_config, mod_combos_config, timeouts…}
-function M.build_default_state(tap_hold_keys, mod_combos)
+local function build_state(tap_hold_keys, mod_combos, recommended)
 	local tap_hold_config = {}
 	for _, key_def in ipairs(tap_hold_keys or {}) do
-		local d = Defaults.tap_hold[key_def.id]
-		if not d then
+		local d = recommended and Defaults.tap_hold[key_def.id] or nil
+		if recommended and not d then
 			Logger.warn(LOG, "No default entry for key '%s' in the shared tap-hold defaults (defaults.toml) — using none/none.", key_def.id)
 		end
 		tap_hold_config[key_def.id] = {
@@ -364,8 +365,8 @@ function M.build_default_state(tap_hold_keys, mod_combos)
 
 	local mod_combos_config = {}
 	for _, combo_def in ipairs(mod_combos or {}) do
-		local d = Defaults.combos[combo_def.id]
-		if not d then
+		local d = recommended and Defaults.combos[combo_def.id] or nil
+		if recommended and not d then
 			Logger.warn(LOG, "No default entry for combo '%s' in the shared tap-hold defaults (defaults.toml) — using none/none/none.", combo_def.id)
 		end
 		mod_combos_config[combo_def.id] = {
@@ -379,7 +380,8 @@ function M.build_default_state(tap_hold_keys, mod_combos)
 		-- Always on: the remap integration is an implementation detail of this
 		-- driver, not a user setting. There is no persisted flag to seed.
 		enabled                   = true,
-		tap_holds_enabled         = true,
+		tap_holds_enabled         = recommended and Manifest.recommended_for("tap_holds.enabled")
+			or Manifest.default_for("tap_holds.enabled"),
 		tap_hold_config           = tap_hold_config,
 		mod_combos_config         = mod_combos_config,
 		tap_hold_timeout_ms       = TAP_HOLD_TIMEOUT_MS_DEFAULT,
@@ -387,6 +389,22 @@ function M.build_default_state(tap_hold_keys, mod_combos)
 		simultaneous_threshold_ms = SIMULTANEOUS_THRESHOLD_MS_DEFAULT,
 		combo_symmetric           = COMBO_SYMMETRIC_DEFAULT,
 	}
+end
+
+--- Builds a neutral state without importing any recommended input bindings.
+--- @param tap_hold_keys table Available key definitions.
+--- @param mod_combos table Available combo definitions.
+--- @return table state Neutral desired state with parameter defaults.
+function M.build_default_state(tap_hold_keys, mod_combos)
+	return build_state(tap_hold_keys, mod_combos, false)
+end
+
+--- Projects the shipped preset for an explicit scoped restore only.
+--- @param tap_hold_keys table Available key definitions.
+--- @param mod_combos table Available combo definitions.
+--- @return table state Recommended desired state.
+function M.build_recommended_state(tap_hold_keys, mod_combos)
+	return build_state(tap_hold_keys, mod_combos, true)
 end
 
 
@@ -432,12 +450,7 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 		-- Seed any tap/hold keys missing from the persisted config (new keys added after save)
 		for _, key_def in ipairs(tap_hold_keys) do
 			if not tap_holds.config[key_def.id] then
-				local d = Defaults.tap_hold[key_def.id]
-				Logger.info(LOG, "New tap/hold key '%s' not in saved config — seeding from defaults.", key_def.id)
-				tap_holds.config[key_def.id] = {
-					tap  = d and d[1] or "none",
-					hold = d and d[2] or "none",
-				}
+				tap_holds.config[key_def.id] = defaults.tap_hold_config[key_def.id]
 			end
 		end
 	end
@@ -458,13 +471,7 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 		-- Seed any combos that are missing from the persisted config (new combos added after save)
 		for _, combo_def in ipairs(mod_combos) do
 			if not combos.config[combo_def.id] then
-				local d = Defaults.combos[combo_def.id]
-				Logger.info(LOG, "New combo '%s' not in saved config — seeding from defaults.", combo_def.id)
-				combos.config[combo_def.id] = {
-					combo = d and d[1] or "none",
-					tap   = d and d[2] or "none",
-					hold  = d and d[3] or "none",
-				}
+				combos.config[combo_def.id] = defaults.mod_combos_config[combo_def.id]
 			end
 		end
 	end
@@ -500,9 +507,8 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 		combo_symmetric = combos.symmetric == true
 	end
 
-	-- The Tap-Holds feature switch. Absent in saves older than the switch, which
-	-- always generated every tap-hold: absent therefore means on.
-	local tap_holds_enabled = tap_holds.enabled ~= false
+	-- Absence is neutral even when other explicit remap preferences are present.
+	local tap_holds_enabled = tap_holds.enabled == true
 
 	Logger.info(LOG, "User config loaded.")
 	-- A `[karabiner] enabled` written by an earlier version is ignored on

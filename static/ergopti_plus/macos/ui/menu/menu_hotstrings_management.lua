@@ -509,10 +509,16 @@ function M.build_management(ctx)
 	params_ctx.commands = {}
 	for key, value in pairs(ctx.commands or {}) do params_ctx.commands[key] = value end
 	params_ctx.commands["repeat_key"] = function()
-		if ctx and ctx.keymap and type(ctx.keymap.set_repeat_feature_enabled) == "function" then
-			pcall(ctx.keymap.set_repeat_feature_enabled, not repeat_enabled)
+		if not ctx.keymap or type(ctx.keymap.set_repeat_feature_enabled) ~= "function" then return false end
+		local wanted = not repeat_enabled
+		local ok, committed = pcall(ctx.keymap.set_repeat_feature_enabled, wanted)
+		if not ok or committed ~= true then
+			Logger.error(LOG, "Magic-key repeat toggle was refused: %s.", tostring(committed))
+			return false
 		end
-		ctx.do_reload("menu")
+		ctx.state.repeat_key_enabled = wanted
+		if ctx.save_prefs() ~= true then return false end
+		return ctx.do_reload("menu")
 	end
 	params_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do params_ctx.state_getters[key] = value end

@@ -286,6 +286,7 @@ helpers.describe("ngram walker: a real flush writes every family", function()
 		local ok, err = pcall(function()
 			local kl = require(logger_name)
 			kl.init({ sqlite_path = "/tmp/ergopti_ngram_probe.sqlite" })
+			require("tests.support.metrics_consent_fixture").enable(kl)
 			kl.reset_session()
 			kl.on_app_focus("app.test", 1000)
 			local at = 1000
@@ -345,6 +346,7 @@ helpers.describe("ngram walker: each character is stored once", function()
 		local ok, err = pcall(function()
 			local kl = require(logger_name)
 			kl.init({ sqlite_path = "/tmp/ergopti_ngram_once.sqlite" })
+			require("tests.support.metrics_consent_fixture").enable(kl)
 			kl.reset_session()
 			kl.on_app_focus("app.test", 1000)
 			local at = 1000
@@ -379,6 +381,7 @@ helpers.describe("keylogger: the JSON fallback does not hoard raw events", funct
 		local ok, err = pcall(function()
 			local kl = require(logger_name)
 			kl.init({ sqlite_path = "/tmp/ergopti_fallback.sqlite", log_dir = dir })
+			require("tests.support.metrics_consent_fixture").enable(kl)
 			kl.reset_session()
 			kl.on_app_focus("app.test", 1000)
 			for index, char in ipairs({ "s", "a", "l", "u", "t" }) do kl.on_keydown(char, 1000 + index * 100, "app.test") end

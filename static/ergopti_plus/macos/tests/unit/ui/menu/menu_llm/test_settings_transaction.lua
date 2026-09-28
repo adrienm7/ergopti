@@ -10,6 +10,7 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
+	"infra.manifest_reader",
 	"adapters.storage",
 	"ui.menu.menu_llm",
 	"ui.menu.menu_llm.settings_manager",
@@ -177,6 +178,7 @@ local function with_fixture(options, callback)
 	end
 
 	local Logger = {
+		done = function() end,
 		debug = function() end,
 		info = function() end,
 		warn = function() end,

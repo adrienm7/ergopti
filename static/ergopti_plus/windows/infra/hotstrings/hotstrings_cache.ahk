@@ -205,7 +205,7 @@ HotstringsLanguageCategories() {
 }
 
 ; Give every language-pack category its own gate in ``GateTarget`` (the
-; CategoryEnabled Map), defaulting open like the neutral five. Called once at boot
+; CategoryEnabled Map), using the declared neutral default. Called once at boot
 ; before the gates are read from config.toml; a gate already present is kept.
 HotstringsSeedLanguageCategoryGates(GateTarget) {
 	global HS_LANGUAGE_GATE_KEYS
@@ -215,7 +215,7 @@ HotstringsSeedLanguageCategoryGates(GateTarget) {
 		for _, Cat in Pack["categories"] {
 			HS_LANGUAGE_GATE_KEYS[Cat["v1"]] := Cat["v2"]
 			if !GateTarget.Has(Cat["v1"])
-				GateTarget[Cat["v1"]] := true
+				GateTarget[Cat["v1"]] := ManifestDefaultFor("category_enabled." . Cat["v2"])
 		}
 	}
 }

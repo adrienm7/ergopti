@@ -165,6 +165,12 @@ function resolveDefault(feature, platform) {
 	);
 }
 
+function resolveRecommended(feature, platform) {
+	const value = feature.recommended_per_platform?.[platform] ?? feature.recommended;
+	if (value === undefined) throw new Error(`feature ${feature.path} has no recommended value for ${platform}`);
+	return value;
+}
+
 function validate(features) {
 	// A feature is addressed by its dotted path, so two blocks sharing one is a
 	// silent overwrite, not a merge. This was unenforceable while every driver
@@ -185,6 +191,10 @@ function validate(features) {
 		seen.set(key, f);
 	}
 	for (const f of features) {
+		if ((f.recommended !== undefined) === (f.recommended_per_platform !== undefined)
+			|| typeof f.input_altering !== 'boolean') {
+			throw new Error(`feature ${f.path} needs one recommended source and an input_altering classification`);
+		}
 		const hasDefault = f.default !== undefined;
 		const hasDefaultPerPlatform = f.default_per_platform !== undefined;
 		if (hasDefault === hasDefaultPerPlatform) {
@@ -293,6 +303,7 @@ function renderAhkManifest(manifest, sections, features) {
 
 	const topOrder = (manifest.sections && manifest.sections.order) || [];
 	lines.push(`    "section_order", ${ahkLiteral(topOrder)},`);
+	lines.push(`    "scopes", ${ahkLiteral(manifest.scopes)},`);
 
 	lines.push('    "sections", Map(');
 	const sectionLines = sections.map((s) => {
@@ -316,7 +327,9 @@ function renderAhkManifest(manifest, sections, features) {
 			default: resolveDefault(f, 'ahk'),
 			type: f.type || '',
 			description_key: f.description_key || '',
-			platforms: f.platforms
+			platforms: f.platforms,
+			recommended: resolveRecommended(f, 'ahk'),
+			input_altering: f.input_altering
 		};
 		if (f.enum_values) entry.enum_values = f.enum_values;
 		if (f.superseded_reason_key) entry.superseded_reason_key = f.superseded_reason_key;
@@ -397,6 +410,7 @@ function renderLuaManifest(manifest, sections, features, platform) {
 	lines.push('');
 	const topOrder = (manifest.sections && manifest.sections.order) || [];
 	lines.push(`M.section_order = ${luaLiteral(topOrder)}`);
+	lines.push(`M.scopes = ${luaLiteral(manifest.scopes)}`);
 	lines.push('');
 	lines.push('M.sections = {');
 	for (const s of sections) {
@@ -420,7 +434,9 @@ function renderLuaManifest(manifest, sections, features, platform) {
 			default: resolveDefault(f, platform),
 			type: f.type || '',
 			description_key: f.description_key || '',
-			platforms: f.platforms
+			platforms: f.platforms,
+			recommended: resolveRecommended(f, platform),
+			input_altering: f.input_altering
 		};
 		if (f.enum_values) entry.enum_values = f.enum_values;
 		// Emit each feature compactly: opening brace, all fields on one line, then

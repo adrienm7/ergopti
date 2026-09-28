@@ -289,7 +289,7 @@ helpers.describe("modules/shortcuts/manager.lua", function()
 
 	helpers.it("init with empty opts applies the shared enabled default", function()
 		M.init({})
-		helpers.assert_eq(M.is_enabled(), true,
+		helpers.assert_eq(M.is_enabled(), false,
 			"Linux must apply the same shared shortcut default as macOS")
 	end)
 

@@ -147,21 +147,17 @@ local NAV_KEY_CODES = {
 -- ================================
 -- ================================
 
--- The privacy filter toggles and the encrypt flag are cross-driver metrics
--- settings sourced from the shared features manifest (single source, same as the
--- AHK driver) via Manifest.default_for. keylogger_enabled stays false here: the
--- macOS keylogger is opt-in by design (privacy), deliberately diverging from the
--- AHK metrics.enabled default; the remaining keys are HS-only UI toggles with no
--- manifest entry.
+-- All preferences come from the shared manifest. Metrics activation remains
+-- neutral on every host; visualization parameters do not grant consent.
 M.DEFAULT_STATE = {
-	keylogger_enabled                = false,
-	keylogger_disabled_apps          = {},
+	keylogger_enabled                = Manifest.default_for("metrics.enabled"),
+	keylogger_disabled_apps          = Manifest.default_for("metrics.disabled_apps"),
 	keylogger_encrypt                = Manifest.default_for("metrics.encrypt"),
-	keylogger_menubar_wpm            = false,
-	keylogger_menubar_colors         = true,
-	keylogger_float_wpm              = true,
-	keylogger_float_graph            = true,
-	keylogger_float_colors           = true,
+	keylogger_menubar_wpm            = Manifest.default_for("metrics.menubar_wpm"),
+	keylogger_menubar_colors         = Manifest.default_for("metrics.menubar_colors"),
+	keylogger_float_wpm              = Manifest.default_for("metrics.float_wpm"),
+	keylogger_float_graph            = Manifest.default_for("metrics.float_graph"),
+	keylogger_float_colors           = Manifest.default_for("metrics.float_colors"),
 	keylogger_private_filter_enabled      = Manifest.default_for("metrics.private_filter_enabled"),
 	keylogger_secure_filter_enabled       = Manifest.default_for("metrics.secure_filter_enabled"),
 	keylogger_system_auth_filter_enabled  = Manifest.default_for("metrics.system_auth_filter_enabled"),

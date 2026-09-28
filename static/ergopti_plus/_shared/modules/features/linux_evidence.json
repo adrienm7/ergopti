@@ -12,8 +12,42 @@
 		"evidence": []
 	},
 	"evidence_groups": {
+		"dynamic_master": {
+			"members": ["hotstrings.dynamic.enabled"],
+			"registered": "yes",
+			"production_caller": "yes",
+			"persisted": "no",
+			"applied": "yes",
+			"hardware_proven": "no",
+			"proof_tier": "unit",
+			"intentional": true,
+			"evidence": [
+				"static/ergopti_plus/linux/modules/dynamic_hotstrings/manager.lua",
+				"static/ergopti_plus/linux/tests/unit/meta/test_empty_config_neutral.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_dynamic_rule_families.lua"
+			]
+		},
+		"tap_hold_master": {
+			"members": ["tap_holds.enabled"],
+			"registered": "yes",
+			"production_caller": "yes",
+			"persisted": "yes",
+			"applied": "yes",
+			"hardware_proven": "no",
+			"proof_tier": "integration",
+			"intentional": true,
+			"evidence": [
+				"static/ergopti_plus/linux/platform/remap/tap_hold_loader.lua",
+				"static/ergopti_plus/linux/platform/remap/tap_hold_writer.lua",
+				"static/ergopti_plus/linux/tests/unit/meta/test_tap_hold_integration.lua"
+			]
+		},
 		"gestures": {
 			"members": [
+				"gestures.swipe_2_left",
+				"gestures.swipe_3_horiz",
+				"gestures.swipe_4_horiz",
+				"gestures.swipe_5_horiz",
 				"gestures.enabled",
 				"gestures.swipe_3_down",
 				"gestures.swipe_3_left",

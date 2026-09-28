@@ -67,7 +67,7 @@ global _TapHoldOneShotCache := ""
 LoadTapHoldToml(FilePath, DefaultsFilePath := "") {
 	try LoggerDebug("TapHoldLoader", "LoadTapHoldToml start: user='{1}', defaults='{2}'.", FilePath, DefaultsFilePath)
 	Result := Map("keys", Map())
-	InheritDefaults := true
+	InheritDefaults := false
 
 	; Parse the user file once into UserData. Extract inherit_defaults from
 	; the result so we do not need a second pre-flight read of the same file.

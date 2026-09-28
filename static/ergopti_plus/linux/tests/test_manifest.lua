@@ -88,6 +88,7 @@ return {
 	"tests.unit.meta.test_injector_terminator_contract",
 	"tests.unit.meta.test_tap_hold_engine",
 	"tests.unit.meta.test_tap_hold_loader",
+	"tests.unit.meta.test_empty_config_neutral",
 	"tests.unit.meta.test_tap_hold_manager",
 	"tests.unit.meta.test_nav_layer_native",
 	"tests.unit.meta.test_nav_layer_reload",

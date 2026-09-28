@@ -72,11 +72,8 @@ M.AXIS_SLOTS = {
 	"swipe_5_horiz",
 }
 
--- Ergopti's recommended action for every slot is the shared manifest's macOS
--- value (gestures.<slot>), the only copy: a session starts from it, and the
--- menu's « Restaurer les valeurs conseillées » and the factory reset put it back.
--- The hand-written table this replaced had drifted from the manifest on four
--- slots. Manifest.default_for raises on a slot the manifest does not declare.
+-- Neutral bindings come from the shared manifest; recommendations are applied
+-- only by an explicit scoped restore.
 M.DEFAULT_GESTURES = {}
 for _, slots in ipairs({ M.SINGLE_SLOTS, M.AXIS_SLOTS }) do
 	for _, slot in ipairs(slots) do
@@ -90,11 +87,8 @@ M.DEFAULT_MODES = {
 -- Default sensitivity (step) for incremental mode
 M.DEFAULT_SENSITIVITY = 3.5
 
--- space_wrap is the one cross-driver gesture default in the shared manifest, so
--- it is sourced from there; the `gestures` enabled flag has no manifest path,
--- modes are computed per swipe slot below and sensitivities read per slot.
 M.DEFAULT_STATE = {
-	gestures = false,
+	gestures = Manifest.default_for("gestures.enabled"),
 	modes = {},
 	sensitivities = {},
 	space_wrap = Manifest.default_for("gestures.space_wrap"),

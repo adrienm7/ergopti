@@ -60,7 +60,10 @@ _HLP_GatesAreSeededAndKeyed() {
 	Gates := Map("Hotstrings", true)
 	HotstringsSeedLanguageCategoryGates(Gates)
 	AssertTrue(Gates.Has("FrenchAutocorrection"), "each language category owns a gate")
-	AssertEqual(true, Gates["FrenchAutocorrection"], "gates default open; sections carry the opt-in")
+	AssertEqual(false, Gates["FrenchAutocorrection"], "language gates remain neutral until explicitly chosen")
+	Gates["FrenchAutocorrection"] := true
+	HotstringsSeedLanguageCategoryGates(Gates)
+	AssertEqual(true, Gates["FrenchAutocorrection"], "seeding preserves existing desired state")
 	AssertEqual("french_autocorrection", _CategoryEnabledKey("FrenchAutocorrection"),
 		"the gate persists under the group id config.toml uses")
 }

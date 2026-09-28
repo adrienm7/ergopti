@@ -53,10 +53,15 @@ end
 
 --- A manager initialised with the date rules registered.
 --- @return table
-local function manager()
+local function manager(import_families)
 	local dh = helpers.load_module("modules.dynamic_hotstrings.manager")
 	dh.init({ trigger_char = "\\" })
 	dh.set_enabled(true)
+	if import_families then
+		for _, family in ipairs(dh.RULE_FAMILIES) do
+			if family.section then assert(dh.set_rule_enabled(family.section, true)) end
+		end
+	end
 	return dh
 end
 
@@ -76,7 +81,7 @@ helpers.describe("dynamic rule families: the switch reaches the engine", functio
 
 	helpers.it("previews every family while they are all on", function()
 		with_storage()
-		local dh = manager()
+		local dh = manager(true)
 		for section, trigger in pairs(TRIGGER_FOR) do
 			helpers.assert_not_nil(dh.preview(trigger .. "\\"),
 				section .. " expands before anything is switched off")
@@ -86,7 +91,7 @@ helpers.describe("dynamic rule families: the switch reaches the engine", functio
 
 	helpers.it("stops previewing the family that was switched off", function()
 		with_storage()
-		local dh = manager()
+		local dh = manager(true)
 		dh.set_rule_enabled("datefr", false)
 
 		helpers.assert_nil(dh.preview("dt\\"),
@@ -99,7 +104,7 @@ helpers.describe("dynamic rule families: the switch reaches the engine", functio
 
 	helpers.it("stops INJECTING the family that was switched off", function()
 		with_storage()
-		local dh = manager()
+		local dh = manager(true)
 		dh.set_rule_enabled("date", false)
 
 		local previous = package.loaded["modules.hotstrings.injector"]
@@ -154,25 +159,25 @@ helpers.describe("dynamic rule families: persistence", function()
 		dh.rule_families()
 		helpers.assert_eq(#storage.keys(), 0,
 			"writing the default would freeze today's default for anyone who had "
-				.. "already run the driver once, so only the OFF state is persisted")
+				.. "already run the driver once, so neutral absence stays absent")
 		drop_storage()
 	end)
 
 	helpers.it("uses the same preference path macOS uses", function()
 		local storage = with_storage()
 		local dh = manager()
-		dh.set_rule_enabled("datefr", false)
-		helpers.assert_eq(storage.get("hotstrings.dynamic.datefr"), false,
+		dh.set_rule_enabled("datefr", true)
+		helpers.assert_eq(storage.get("hotstrings.dynamic.datefr"), true,
 			"macos/infra/preferences.lua maps dynamichotstrings_datefr to "
 				.. "hotstrings.dynamic.datefr; a driver-local spelling would make the "
 				.. "same user's choice mean nothing on the other platform")
 		drop_storage()
 	end)
 
-	helpers.it("clears the key rather than storing true", function()
-		local storage = with_storage({ ["hotstrings.dynamic.date"] = false })
+	helpers.it("clears the key rather than storing the neutral false", function()
+		local storage = with_storage({ ["hotstrings.dynamic.date"] = true })
 		local dh = manager()
-		dh.set_rule_enabled("date", true)
+		dh.set_rule_enabled("date", false)
 		helpers.assert_true(not storage.has("hotstrings.dynamic.date"),
 			"back to the default means back to no entry")
 		drop_storage()
@@ -188,28 +193,28 @@ helpers.describe("dynamic rule families: persistence", function()
 	end)
 
 	helpers.it("reports failed writes and keeps the durable family state", function()
-		local storage = with_storage({ ["hotstrings.dynamic.date"] = false }, true)
+		local storage = with_storage({ ["hotstrings.dynamic.date"] = false, ["hotstrings.dynamic.datefr"] = true }, true)
 		local dh = manager()
 		helpers.assert_eq(dh.set_rule_enabled("date", true), false)
 		helpers.assert_eq(dh.is_rule_enabled(nil, "date"), false,
-			"a failed delete must not make the family appear enabled")
+			"a failed write must not make the family appear enabled")
 		helpers.assert_eq(dh.set_rule_enabled("datefr", false), false)
 		helpers.assert_eq(dh.is_rule_enabled(nil, "datefr"), true,
-			"a failed write must not make the family appear disabled")
+			"a failed delete must not make the family appear disabled")
 		helpers.assert_eq(storage.get("hotstrings.dynamic.date"), false)
 		drop_storage()
 	end)
 
 	helpers.it("does not turn a failed delete into a write of the opposite state", function()
-		local storage = with_storage({ ["hotstrings.dynamic.date"] = false })
+		local storage = with_storage({ ["hotstrings.dynamic.date"] = true })
 		local writes = 0
 		storage.delete = function() return false end
 		storage.set = function() writes = writes + 1 ; return true end
 		local dh = manager()
-		helpers.assert_eq(dh.set_rule_enabled("date", true), false)
+		helpers.assert_eq(dh.set_rule_enabled("date", false), false)
 		helpers.assert_eq(writes, 0,
 			"Lua's and/or idiom must not fall through from a failed delete into the false-state writer")
-		helpers.assert_eq(storage.get("hotstrings.dynamic.date"), false)
+		helpers.assert_eq(storage.get("hotstrings.dynamic.date"), true)
 		drop_storage()
 	end)
 
@@ -268,7 +273,8 @@ end
 helpers.describe("dynamic rule families: the rows", function()
 
 	helpers.it("offers one row per family, ticked from storage", function()
-		with_storage({ ["hotstrings.dynamic.datefr"] = false })
+		with_storage({ ["hotstrings.dynamic.datefr"] = false, ["hotstrings.dynamic.date"] = true,
+			["hotstrings.dynamic.datelongfr"] = true, ["hotstrings.dynamic.personal_info"] = true })
 		local dh = manager()
 		local sub = dynamic_submenu(dh)
 		helpers.assert_not_nil(sub, "the dynamic category has a submenu")
@@ -283,7 +289,7 @@ helpers.describe("dynamic rule families: the rows", function()
 		end
 
 		helpers.assert_eq(ticks.datefr, false, "the family switched off is unticked")
-		helpers.assert_eq(ticks.date, true, "the ones left alone are ticked")
+		helpers.assert_eq(ticks.date, true, "explicitly enabled families remain ticked")
 		helpers.assert_eq(ticks.datelongfr, true)
 		helpers.assert_eq(ticks.personal_info, true,
 			"the @-tag family is a family too, and Windows renders it last with a "
@@ -304,7 +310,7 @@ helpers.describe("dynamic rule families: the rows", function()
 			if row.title == label then row.fn() end
 		end
 
-		helpers.assert_eq(storage.get("hotstrings.dynamic.datelongfr"), false,
+		helpers.assert_eq(storage.get("hotstrings.dynamic.datelongfr"), true,
 			"a row bound to the wrong section is invisible in the tray and only "
 				.. "shows up as the wrong expansion disappearing")
 		drop_storage()

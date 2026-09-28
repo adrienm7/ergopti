@@ -134,7 +134,13 @@ TomlConfigSectionSkipKind(Header) {
 ; keys the cleanup offers to remove are exactly the ones boot reports as unknown.
 ; The walk never mutates Features.
 TomlConfigUnknownKind(Features, SectionPath, Key, &ForeignOwner := "") {
+	; Declaring a neutral default must not transfer a key to the Features owner.
 	ForeignOwner := ""
+	Registry := TomlConfigForeignOwnershipRegistry()
+	if Registry.Has(SectionPath) && Registry[SectionPath].Has(Key) {
+		ForeignOwner := Registry[SectionPath][Key]
+		return ""
+	}
 	if TomlSectionIsDynamicPersonalNamespace(SectionPath)
 		return ""
 	Node := Features
@@ -158,6 +164,7 @@ TomlConfigUnknownKind(Features, SectionPath, Key, &ForeignOwner := "") {
 		return ""
 	if Known
 		return ""
+	; Dynamic keyboard slots belong to ConfigIO only outside the manifest tree.
 	ForeignOwner := TomlConfigForeignOwner(SectionPath, Key)
 	return ForeignOwner != "" ? "" : "leaf"
 }

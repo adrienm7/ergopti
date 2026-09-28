@@ -988,6 +988,8 @@ Boot.stage("Config schema migration")
 -- (_shared/lua/config_migrate.lua, docs/adr/009-config-versioning.md).
 do
 	local ConfigMigrate = require("config_migrate")
+	require("toml_codec.writer").set_sparse_defaults(
+		config_paths.get("ConfigTomlPath"), require("infra.manifest_reader"))
 	ConfigMigrate.boot({
 		path          = config_paths.get("ConfigTomlPath"),
 		driver        = "hs",

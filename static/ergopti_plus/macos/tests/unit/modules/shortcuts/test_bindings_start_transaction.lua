@@ -94,6 +94,7 @@ local function load_subject()
 	local subject = helpers.load_with_stubs("modules.shortcuts.bindings", {
 		hotkey = {bind = function() return handle() end},
 	})
+	require("tests.support.shortcut_bindings_fixture").prefer_all(subject)
 	return subject, controls, counters
 end
 

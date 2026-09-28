@@ -97,20 +97,20 @@ helpers.describe("metrics toggles: what gets written", function()
 				.. "new installs and nobody else")
 	end)
 
-	helpers.it("stores the master switch when it is turned off", function()
+	helpers.it("stores explicit consent when collection is turned on", function()
 		local keylogger, storage = load_over_storage()
-		keylogger.set_enabled(false)
+		helpers.assert_true(keylogger.set_enabled(true))
 		local stored = storage.get("metrics.enabled")
 		drop_storage()
-		helpers.assert_eq(stored, false,
+		helpers.assert_eq(stored, true,
 			"this is the one that reverts in the dangerous direction — a user who "
 				.. "switched metrics off had them back after a reboot, recording "
 				.. "again without being asked twice")
 	end)
 
 	helpers.it("clears the key when a switch returns to its default", function()
-		local keylogger, storage = load_over_storage({ ["metrics.enabled"] = false })
-		keylogger.set_enabled(true)
+		local keylogger, storage = load_over_storage({ ["metrics.enabled"] = true })
+		helpers.assert_true(keylogger.set_enabled(false))
 		local has = storage.has("metrics.enabled")
 		drop_storage()
 		helpers.assert_true(not has,

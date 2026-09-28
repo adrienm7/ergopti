@@ -37,6 +37,8 @@ package.loaded["infra.i18n"] = {
 
 local Bindings = helpers.load_with_stubs("modules.shortcuts.bindings")
 
+require("tests.support.shortcut_bindings_fixture").prefer_all(Bindings)
+
 -- ULTIMATE encore plus: pause on bindings registry + volume + bad input.
 -- Bindings are declarative; real hotkey dispatch must be gated by script_control.
 
@@ -102,6 +104,7 @@ end)
 helpers.describe("bindings: pause-owner lifecycle (project_suspend_pause_invariant)", function()
 	helpers.it("settles start, pause, resume-after-pause, and stop literally", function()
 		local B = helpers.load_with_stubs("modules.shortcuts.bindings")
+		require("tests.support.shortcut_bindings_fixture").prefer_all(B)
 		helpers.assert_eq(B.is_started(), false)
 		helpers.assert_eq(B.start(), true,
 			"positive control must acquire the real hotkey registry")
@@ -126,6 +129,7 @@ helpers.describe("bindings: pause-owner lifecycle (project_suspend_pause_invaria
 		-- native hotkey, and the public API cannot release it without also
 		-- rewriting the preference, so the shared `Bindings` must stay untouched.
 		local B = helpers.load_with_stubs("modules.shortcuts.bindings")
+		require("tests.support.shortcut_bindings_fixture").prefer_all(B)
 		local names = {}
 		for _, s in ipairs(B.list_shortcuts()) do names[#names + 1] = s.name or s.id end
 		helpers.assert_true(#names > 0, "the registry must list something, or this proves nothing")
@@ -286,6 +290,7 @@ end)
 helpers.describe("shortcuts.bindings: enable/disable", function()
 	-- Reload the module so the per-test bookkeeping starts fresh.
 	local B = helpers.load_with_stubs("modules.shortcuts.bindings")
+	require("tests.support.shortcut_bindings_fixture").prefer_all(B)
 
 	helpers.it("is_bound is false before enable(), while the preference is on", function()
 		helpers.assert_eq(B.is_bound("ctrl_a"), false)
@@ -329,6 +334,7 @@ end)
 
 helpers.describe("shortcuts.bindings: argument validation", function()
 	local B = helpers.load_with_stubs("modules.shortcuts.bindings")
+	require("tests.support.shortcut_bindings_fixture").prefer_all(B)
 
 	helpers.it("enable() rejects a non-string name without crashing", function()
 		B.enable(nil)
@@ -412,12 +418,14 @@ helpers.describe("shortcuts.bindings: set_chatgpt_url (shortcuts-ctrl-g-ignores-
 			},
 		})
 
+		require("tests.support.shortcut_bindings_fixture").prefer_all(B)
 		B.start()
 		return B, captured_ctrl_g, opened_urls
 	end
 
 	helpers.it("exposes set_chatgpt_url as a function", function()
 		local B = helpers.load_with_stubs("modules.shortcuts.bindings")
+		require("tests.support.shortcut_bindings_fixture").prefer_all(B)
 		helpers.assert_eq(type(B.set_chatgpt_url), "function")
 	end)
 
@@ -464,6 +472,7 @@ end)
 
 helpers.describe("shortcuts.bindings: start/stop lifecycle", function()
 	local B = helpers.load_with_stubs("modules.shortcuts.bindings")
+	require("tests.support.shortcut_bindings_fixture").prefer_all(B)
 
 	helpers.it("start() activates every defined shortcut", function()
 		B.start()
@@ -619,6 +628,7 @@ local function load_bindings_with_pixel_owner(options)
 	package.loaded["modules.shortcuts.actions.text"] = text
 	package.loaded["modules.shortcuts.actions.apps"] = apps
 	local subject = helpers.load_with_stubs("modules.shortcuts.bindings")
+	require("tests.support.shortcut_bindings_fixture").prefer_all(subject)
 	package.loaded["modules.shortcuts.actions.system"] = old_system
 	package.loaded["modules.shortcuts.actions.text"] = old_text
 	package.loaded["modules.shortcuts.actions.apps"] = old_apps

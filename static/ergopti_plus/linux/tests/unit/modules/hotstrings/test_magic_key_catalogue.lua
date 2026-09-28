@@ -68,6 +68,9 @@ helpers.describe("magic key: static catalogue ownership", function()
 			Config.init({ load_mappings = function(_, mappings) loaded = mappings end }, path, nil)
 			helpers.assert_true(Config.set_magic_key("§", "★"))
 			Config.load_all()
+			for category in pairs(Config.get_categories()) do
+				helpers.assert_true(Config.set_all_sections(category, true))
+			end
 			helpers.assert_eq(loaded[1].trigger, "alpha§", "startup must use the configured key")
 			helpers.assert_eq(loaded[2].trigger, "plain", "unowned triggers must stay unchanged")
 

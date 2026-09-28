@@ -393,6 +393,12 @@ hotkey_defs.cmd_star   = function()
 	return sys_acts.bind_cmd_star(log_shortcut, delivery_admitted)
 end
 
+-- A master enable is not a preset import. Each child starts from its own
+-- neutral desired value and may later be enabled explicitly behind any fence.
+for name in pairs(hotkey_defs) do
+	_disabled_set[name] = not Manifest.default_for("shortcuts.keys." .. name)
+end
+
 
 
 

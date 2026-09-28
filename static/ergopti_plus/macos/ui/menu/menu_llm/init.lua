@@ -11,6 +11,7 @@
 --- ==============================================================================
 
 local M = {}
+local Manifest = require("infra.manifest_reader")
 
 local hs            = hs
 local llm_mod       = require("modules.llm")
@@ -165,16 +166,11 @@ M.DEFAULT_STATE = {
 		llm_active_profile    = llm_mod.DEFAULT_STATE.llm_active_profile,
 		llm_user_models       = {},
 		llm_disabled_apps          = {},
-		llm_url_bar_filter_enabled        = true,
-		llm_secure_field_filter_enabled   = true,
+		llm_url_bar_filter_enabled        = Manifest.default_for("llm.trigger.url_bar_filter_enabled"),
+		llm_secure_field_filter_enabled   = Manifest.default_for("llm.trigger.secure_filter_enabled"),
 		llm_user_profiles     = {},
 		llm_profile_shortcuts = {},
-		-- On-demand prediction shortcut. Defaults to Ctrl+Space (real Ctrl,
-		-- not Cmd — on macOS the Cmd+Space slot is owned by Spotlight and
-		-- system-wide search, so it's a poor default for an editor cue).
-		-- The user can rebind it from the trigger settings submenu or set
-		-- the value to false to disable.
-		llm_trigger_shortcut  = { mods = { "ctrl" }, key = "space" },
+		llm_trigger_shortcut  = Manifest.default_for("llm.trigger.shortcut"),
 		llm_after_hotstring   = llm_mod.DEFAULT_STATE.llm_after_hotstring,
 		llm_auto_raise_temp   = llm_mod.DEFAULT_STATE.llm_auto_raise_temp,
 		llm_min_words         = llm_mod.DEFAULT_STATE.llm_min_words,

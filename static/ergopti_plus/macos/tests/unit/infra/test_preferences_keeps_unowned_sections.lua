@@ -84,15 +84,15 @@ helpers.describe("Preferences.save keeps what it does not own (preferences-unown
 			"a table another reader owns survives with its sub-tables")
 	end)
 
-	helpers.it("still rewrites the sections it owns from the state", function()
+	helpers.it("updates owned leaves without discarding unknown siblings", function()
 		local disk = { [PATH] = SOURCE }
 		local preferences = load_preferences(disk)
 		preferences.load(PATH)
 		helpers.assert_eq(preferences.save(PATH, { gestures = false }, {}, {}), true)
 		local decoded = TomlCodec.decode(disk[PATH])
-		helpers.assert_eq(decoded.gestures.enabled, false, "the owned section takes the state")
-		helpers.assert_nil(decoded.gestures.stale_owned_key,
-			"an owned section is the state's projection, not a merge with the old file")
+		helpers.assert_nil(decoded.gestures.enabled, "neutral absence represents the desired false value")
+		helpers.assert_eq(decoded.gestures.stale_owned_key, "x",
+			"owning a feature does not authorize deleting an unknown sibling")
 	end)
 
 	helpers.it("never replaces a file it can no longer decode with its own sections alone", function()

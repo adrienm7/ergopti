@@ -28,6 +28,7 @@ local M = {}
 local Logger = require("logger.shim")
 local TomlCodec = require("toml_codec")
 local HoldOptions = require("tap_hold.hold_options")
+local Manifest = require("infra.manifest_reader")
 
 local LOG = "platform.remap.tap_hold_loader"
 
@@ -117,13 +118,13 @@ function M.load(defaults_path, user_path)
 	if user_path then
 		user, user_err = read_toml(user_path)
 		if user_err == "absent" then user_err = nil end
-		if user_err then Logger.error(LOG, "User tap_hold.toml '%s' is %s — shared defaults used.", user_path, user_err) end
+		if user_err then Logger.error(LOG, "User tap_hold.toml '%s' is %s — tap-holds remain neutral.", user_path, user_err) end
 	end
 	local section = user and type(user.tap_hold) == "table" and user.tap_hold or {}
 	local overrides = type(section.keys) == "table" and section.keys or {}
 
 	local keys = {}
-	if section.inherit_defaults ~= false then
+	if section.inherit_defaults == true then
 		for key_id, fields in pairs(base) do
 			if type(fields) == "table" then
 				keys[key_id] = {}
@@ -148,7 +149,7 @@ function M.load(defaults_path, user_path)
 	for key_id, fields in pairs(keys) do keys[key_id] = validated(key_id, fields, hold_picker) end
 
 	return {
-		enabled = section.enabled ~= false,
+		enabled = section.enabled == true or (section.enabled == nil and Manifest.default_for("tap_holds.enabled")),
 		keys = keys,
 		user_error = user_err,
 		hold_picker = hold_picker,

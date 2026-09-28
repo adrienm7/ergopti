@@ -1124,9 +1124,11 @@ function M.is_section_checked(category, section)
 	if _disabled_groups[key] then return false end
 	if _disabled_groups[ENABLED_MARK .. key] then return true end
 	-- Untouched: the feature manifest's shipped default. A section it does not
-	-- declare belongs to a personal or extension pack, which is the user's own.
+	-- declare belongs to a personal or extension pack and remains opt-in too.
 	local shipped = Languages.section_default(ManifestReader.features(), category, section)
-	if shipped == nil then return true end
+	if shipped == nil then
+		return ManifestReader.default_for("hotstrings.modules." .. category .. "." .. section)
+	end
 	return shipped
 end
 

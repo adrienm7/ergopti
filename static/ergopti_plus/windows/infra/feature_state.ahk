@@ -35,7 +35,7 @@ global ScriptInformation := Map(
 		; explicitly set to "true" or "false"; "auto" (or absent) defers to the
 		; probe. Kept as an escape hatch in case the probe ever misfires on an
 		; exotic layout.
-		"AltGrIsKanaRemap", "auto",
+		"AltGrIsKanaRemap", _FeatureStateRequireManifestDefault("script.alt_gr_is_kana_remap"),
 		; Configurable file paths — all derived from _ConfigDir set above.
 		; AHK-specific files (.ahk, AHK config.toml) go under ``autohotkey/`` so
 		; the folder can be safely shared with the Hammerspoon driver via cloud
@@ -52,6 +52,14 @@ _FeatureStateRequireManifestDefault(Path) {
 	if !(Entry is Map) || !Entry.Has("default")
 		throw Error("Missing required feature manifest default: " . Path)
 	return Entry["default"]
+}
+
+; Builds detached assignments from the canonical platform section.
+_FeatureStateDefaultsForSection(Section) {
+	Values := Map()
+	for Entry in ManifestFeaturesForSection(Section)
+		Values[Entry["id"]] := ManifestDefaultFor(Entry["path"])
+	return Values
 }
 
 ; Script-management hotkey slots. Each AltGr+key combo dispatches to an action
@@ -73,12 +81,7 @@ global SCRIPT_SHORTCUT_LABELS := Map(
 		"script_altgr_delete",    "sg_labels.script_altgr_delete",
 		"script_altgr_escape",    "sg_labels.script_altgr_escape",
 )
-global SCRIPT_SHORTCUT_DEFAULTS := Map(
-		"script_altgr_enter", "script_pause_toggle",
-		"script_altgr_backspace", "script_reload",
-		"script_altgr_delete", "open_personal_shortcuts",
-		"script_altgr_escape", "script_quit",
-)
+global SCRIPT_SHORTCUT_DEFAULTS := _FeatureStateDefaultsForSection("shortcuts.script_control")
 global SCRIPT_SHORTCUT_FALLBACKS := Map(
 		"script_altgr_enter", "{Enter}",
 		"script_altgr_backspace", "{BackSpace}",
@@ -94,25 +97,7 @@ for _FeatureStateIndex, _FeatureStateSlot in SCRIPT_SHORTCUT_SLOTS {
 ; Each slot id matches a GESTURE_ACTIONS key (e.g. "win_a", "ctrl_b").
 ; Defaults below mirror the legacy hard-coded shortcuts so a fresh install
 ; behaves identically to before while giving the user full control via the menu.
-global KEYBOARD_SHORTCUT_DEFAULTS := Map(
-		"win_a", "select_line",
-		"win_d", "open_hotstrings_editor",
-		"win_g", "open_url",
-		"win_c", "ocr_screenshot",
-		"win_h", "screen_capture",
-		"win_m", "activity_simulation",
-		"win_n", "take_note",
-		"win_o", "surround_parens",
-		"win_s", "search_web",
-		"win_t", "teleport_mouse",
-		"win_u", "uppercase_selection",
-		"win_w", "titlecase_selection",
-		"win_x", "pick_color",
-		; Swallowed, so Win+Space no longer switches the input language.
-		"win_space", "llm_generate_prediction",
-		"ctrl_b", "microsoft_bold",
-		"ctrl_shift_v", "paste_plain",
-)
+global KEYBOARD_SHORTCUT_DEFAULTS := _FeatureStateDefaultsForSection("shortcuts.keyboard")
 global KeyboardShortcutAssignments := Map()
 
 ; ParseTomlFile / IniCacheGet / ResolveConfigPath are defined in
@@ -133,25 +118,24 @@ global KeyboardShortcutAssignments := Map()
 ; level, but the underlying per-feature choices persisted on disk are
 ; preserved for when the user re-enables the master.
 ;
-; Defaults all true so a fresh install (or a user who hasn't touched
-; the master) sees no behavior change. Loaded from the [CategoryEnabled]
-; section of config.toml; default-on when the section is absent.
+; Missing gates inherit the manifest's neutral defaults. Explicit user choices
+; are loaded from [category_enabled] without importing recommendations.
 global CategoryEnabled := Map(
-		"Layout",     true,
-		"Shortcuts",  true,
-		"Hotstrings", true,
-		"TapHolds",   true,
+		"Layout", _FeatureStateRequireManifestDefault("category_enabled." . _FeatureStateCategoryKey("Layout")),
+		"Shortcuts", _FeatureStateRequireManifestDefault("category_enabled." . _FeatureStateCategoryKey("Shortcuts")),
+		"Hotstrings", _FeatureStateRequireManifestDefault("category_enabled." . _FeatureStateCategoryKey("Hotstrings")),
+		"TapHolds", _FeatureStateRequireManifestDefault("category_enabled." . _FeatureStateCategoryKey("TapHolds")),
 		; Per-TOML-file hotstring sub-category gates. Independent of the top
 		; Hotstrings master above: a category file can be switched off while the
 		; rest of the hotstrings stay live. The parent menu checkmark for each
 		; category follows ITS gate (not whether every section is checked), and
 		; ApplyMasterGatesToFeatures zeroes only that category's features when off.
-		; Default on so existing configs and fresh installs are unchanged.
-		"Autocorrection",     true,
-		"DistancesReduction", true,
-		"SFBsReduction",      true,
-		"Rolls",              true,
-		"MagicKey",           true,
+		; Absent subordinate gates remain neutral too.
+		"Autocorrection", _FeatureStateRequireManifestDefault("category_enabled." . _FeatureStateCategoryKey("Autocorrection")),
+		"DistancesReduction", _FeatureStateRequireManifestDefault("category_enabled." . _FeatureStateCategoryKey("DistancesReduction")),
+		"SFBsReduction", _FeatureStateRequireManifestDefault("category_enabled." . _FeatureStateCategoryKey("SFBsReduction")),
+		"Rolls", _FeatureStateRequireManifestDefault("category_enabled." . _FeatureStateCategoryKey("Rolls")),
+		"MagicKey", _FeatureStateRequireManifestDefault("category_enabled." . _FeatureStateCategoryKey("MagicKey")),
 )
 
 ; Hotstring categories that deliberately have NO dedicated gate above: they follow the
@@ -185,14 +169,9 @@ IsCategoryGated(Category) {
 		; master's state instead of crying schema drift — that warning fired on every
 		; menu build and every boot, drowning the must-investigate WARNING log.
 		if CATEGORY_FOLLOWS_HOTSTRINGS_MASTER.Has(Category)
-				return CategoryEnabled.Has("Hotstrings") ? CategoryEnabled["Hotstrings"] : true
-		if !CategoryEnabled.Has(Category) {
-				; true here means the gate is ON (category ENABLED), not suspended — the old
-				; "defaulting to gated" wording read as the opposite. A genuinely unknown
-				; category IS schema drift between menu_manifest.json and CategoryEnabled.
-				try LoggerWarn("MasterGates", "IsCategoryGated: unknown category '{1}' — treating as ENABLED (schema drift).", Category)
-				return true
-		}
+				Category := "Hotstrings"
+		if !CategoryEnabled.Has(Category)
+				return ManifestDefaultFor("category_enabled." . _FeatureStateCategoryKey(Category))
 		return CategoryEnabled[Category]
 }
 
@@ -220,15 +199,16 @@ ReadScriptConfig(Cache) {
 		if RawKana != "_"
 				ScriptInformation["AltGrIsKanaRemap"] :=
 					_FeatureStateValidateKanaOverride(RawKana)
-		; Restore the engine-level repeat-key toggle (defaults to enabled when absent).
+		; Missing repeat-key intent restores the same neutral baseline as first boot.
 		global HSE_RepeatEnabled
 		RawRepeat := _FeatureStateIniGet(Cache, "hotstrings", "repeat_key_enabled")
-		if RawRepeat != "_" {
+		if RawRepeat != "_"
 				HSE_RepeatEnabled := _FeatureStateValidateBoolean(
 					RawRepeat, "hotstrings.repeat_key_enabled")
-				if IsSet(HSE_AdvanceRuntimeDecisionGeneration)
-						HSE_AdvanceRuntimeDecisionGeneration()
-		}
+		else
+				HSE_RepeatEnabled := ManifestDefaultFor("hotstrings.repeat_key_enabled")
+		if IsSet(HSE_AdvanceRuntimeDecisionGeneration)
+				HSE_AdvanceRuntimeDecisionGeneration()
 		; Paths are always derived from _ConfigDir at startup and are never persisted.
 }
 

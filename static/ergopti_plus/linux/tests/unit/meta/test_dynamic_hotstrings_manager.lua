@@ -5,6 +5,7 @@
 --- on_trigger callback contract, and daemon integration.
 
 local helpers = require("tests.helpers")
+local restore_family_preferences = require("tests.support.dynamic_hotstrings_fixture").install()
 local dh      = helpers.load_module("modules.dynamic_hotstrings.manager")
 
 helpers.describe("dynamic hotstrings manager", function()
@@ -43,8 +44,8 @@ helpers.describe("dynamic hotstrings manager", function()
         string.format("at least 3 rules registered (got %d)", count))
     end)
 
-    helpers.it("is_enabled returns true after successful init", function()
-      helpers.assert_true(dh.is_enabled() == true, "module is enabled after init")
+    helpers.it("is_enabled remains false until explicit activation", function()
+      helpers.assert_true(dh.is_enabled() == false, "rule registration does not enable the master")
     end)
 
     helpers.it("get_trigger_char returns the configured trigger", function()
@@ -488,3 +489,5 @@ helpers.describe("dynamic hotstrings manager", function()
   end)
 
 end)
+
+restore_family_preferences()

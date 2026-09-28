@@ -4,7 +4,7 @@
  * ==============================================================================
  * MODULE: Feature-State Boot Smoke Runner
  * DESCRIPTION:
- * Runs windows/tests/startup/feature_state_boot_smoke.ahk once per fixture and
+ * Runs windows/tests/support/feature_state_boot_smoke.ahk once per fixture and
  * requires a zero exit code from each.
  *
  * WHY THIS RUNNER EXISTS:
@@ -38,7 +38,7 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const HARNESS_DIR = path.join(ROOT, 'static', 'ergopti_plus', 'windows', 'tests', 'startup');
+const HARNESS_DIR = path.join(ROOT, 'static', 'ergopti_plus', 'windows', 'tests', 'support');
 const HARNESS = path.join(HARNESS_DIR, 'feature_state_boot_smoke.ahk');
 
 // The fixtures the harness dispatches on. Kept here rather than discovered, so

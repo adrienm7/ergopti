@@ -16,6 +16,11 @@
 		"shortcuts": { "$ref": "#/$defs/shortcuts" },
 		"gestures": { "$ref": "#/$defs/gestures" },
 		"layout": { "$ref": "#/$defs/layout" },
+		"tap_holds": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": { "enabled": { "type": "boolean" } }
+		},
 		"category_enabled": { "$ref": "#/$defs/category_enabled" },
 		"ui": { "$ref": "#/$defs/ui" }
 	},
@@ -78,6 +83,7 @@
 				"^[a-z]+_(distancesreduction|sfbsreduction|rolls|autocorrection|magickey)$": { "$ref": "#/$defs/feature_group" }
 			},
 			"properties": {
+				"enabled": { "type": "boolean" },
 				"trigger_char": { "type": "string", "minLength": 1, "maxLength": 1 },
 				"magic_key_source_scan": { "type": "string", "pattern": "^[Ss][Cc](?!000$)[0-9A-Fa-f]{3}$" },
 				"magic_key_source_char": { "type": "string", "minLength": 1, "maxLength": 1 },
@@ -99,6 +105,7 @@
 					"type": "object",
 					"additionalProperties": false,
 					"properties": {
+						"enabled": { "type": "boolean" },
 						"date": { "$ref": "#/$defs/feature_toggle" },
 						"date_fr": { "$ref": "#/$defs/feature_toggle" },
 						"date_long_fr": { "$ref": "#/$defs/feature_toggle" },
@@ -228,7 +235,8 @@
 					}
 				},
 				"disabled_apps": {
-					"type": "object",
+					"type": ["object", "array"],
+					"items": { "type": "string" },
 					"properties": {
 						"list": { "type": "array", "items": { "type": "string" } }
 					}
@@ -271,6 +279,9 @@
 			"type": "object",
 			"additionalProperties": false,
 			"properties": {
+				"pause_switch_enabled": { "type": "boolean" },
+				"on_pause": { "type": ["boolean", "string"] },
+				"on_resume": { "type": ["boolean", "string"] },
 				"ergopti_base": { "type": "boolean" },
 				"direct_access_digits": { "type": "boolean" },
 				"ergopti_alt_gr": { "type": "boolean" },

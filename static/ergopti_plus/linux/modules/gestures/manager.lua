@@ -191,16 +191,14 @@ local CONFIG_SECTION_PARAMS = "gesture_parameters"
 local LEGACY_SECTION = "linux.gestures"
 local LEGACY_SECTION_PARAMS = "linux.action_parameters"
 
-local DEFAULT_ACTIONS = {}
-
 --- Default gesture-to-action mapping. The key-space is the union of the derived
---- single and axis slots; each value is the Linux default (or "none").
+--- single and axis slots; neutral values come from the shared manifest.
 M.DEFAULT_GESTURES = {}
 for _, slot in ipairs(M.SINGLE_SLOTS) do
-	M.DEFAULT_GESTURES[slot] = DEFAULT_ACTIONS[slot] or "none"
+	M.DEFAULT_GESTURES[slot] = Manifest.default_for("gestures." .. slot)
 end
 for _, slot in ipairs(M.AXIS_SLOTS) do
-	M.DEFAULT_GESTURES[slot] = DEFAULT_ACTIONS[slot] or "none"
+	M.DEFAULT_GESTURES[slot] = Manifest.default_for("gestures." .. slot)
 end
 
 -- =========================================

@@ -31,10 +31,10 @@ local STAR = "★" -- magic key trigger (UTF-8 literal, as used across the .lua 
 local KEYMAP_WIRED = {
 	["hotstrings.expansion_delay"]             = 0.75,
 	["hotstrings.trigger_char"]                   = STAR,
-	["hotstrings.preview_star_enabled"]        = true,
-	["hotstrings.preview_autocorrect_enabled"] = true,
-	["hotstrings.preview_ai_enabled"]          = true,
-	["hotstrings.preview_colored_tooltips"]    = true,
+	["hotstrings.preview_star_enabled"]        = false,
+	["hotstrings.preview_autocorrect_enabled"] = false,
+	["hotstrings.preview_ai_enabled"]          = false,
+	["hotstrings.preview_colored_tooltips"]    = false,
 }
 
 
@@ -73,7 +73,7 @@ helpers.describe("manifest_reader: default_for", function()
 	helpers.it("returns the declared default for a known path", function()
 		helpers.assert_eq(Manifest.default_for("hotstrings.trigger_char"), STAR, "trigger_char default")
 		helpers.assert_eq(Manifest.default_for("hotstrings.expansion_delay"), 0.75, "expansion_delay default")
-		helpers.assert_eq(Manifest.default_for("hotstrings.preview_star_enabled"), true, "preview default")
+		helpers.assert_eq(Manifest.default_for("hotstrings.preview_star_enabled"), false, "preview default")
 	end)
 
 	helpers.it("fails fast on an unknown path", function()
