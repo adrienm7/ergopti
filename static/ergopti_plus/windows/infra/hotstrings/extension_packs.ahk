@@ -8,6 +8,52 @@
 ; a separate plan so disabling the master never rewrites those choices.
 ; ==============================================================================
 
+global _HotstringExtensionPacks := []
+global _HotstringExtensionPaths := Map()
+
+/**
+ * Reads the existing roots in bundled, installed, then user precedence order.
+ * @param {String} ConfigDir Configuration directory.
+ * @param {String} BundledRoot Shipped extension root.
+ * @returns {Array} Discovery roots.
+ */
+HotstringExtensions_Roots(ConfigDir, BundledRoot) {
+	Roots := [BundledRoot]
+	for Root in LayoutExtension_Roots(LayoutRegistry_LocalDir(ConfigDir))
+		Roots.Push(Root)
+	Roots.Push(RTrim(ConfigDir, "\/") . "\extensions")
+	return Roots
+}
+
+/**
+ * Seeds discovered leaves before the boot config loader resolves user choices.
+ * @param {Map} Target Desired features before configuration projection.
+ * @param {Array} Roots Ordered extension roots.
+ * @returns {Array} Complete discovered packs.
+ */
+HotstringExtensions_Prepare(Target, Roots) {
+	Packs := HotstringExtensions_Scan(Roots)
+	HotstringExtensions_Seed(Target, Packs, ManifestDefaultFor)
+	return Packs
+}
+
+/**
+ * Registers only effective sections through the existing TOML loader.
+ * @param {Map} Target Desired or effective feature tree.
+ * @param {Array} Packs Discovered packs.
+ * @param {Integer} MasterOn Effective hotstring master.
+ * @returns {Integer} Number of source entries registered.
+ */
+HotstringExtensions_Register(Target, Packs, MasterOn) {
+	global _HotstringExtensionPaths
+	Loaded := 0
+	for Request in HotstringExtensions_RegistrationPlan(Target, Packs, MasterOn) {
+		_HotstringExtensionPaths[Request.category] := Request.path
+		Loaded += LoadExtTomlFile(Request.path, Request.category, Request.section)
+	}
+	return Loaded
+}
+
 /**
  * Discovers existing-format hotstring packs; later roots replace earlier packs.
  * @param {Array} Roots - Absolute roots in overlay order.

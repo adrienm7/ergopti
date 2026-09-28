@@ -817,6 +817,8 @@ try {
 		}
 	}
 }
+_HotstringExtensionPacks := HotstringExtensions_Prepare(Features,
+	HotstringExtensions_Roots(_ConfigDir, _ExtensionsDir))
 _BootConfigApplied := ApplyBootConfigToml(Features, _ConfigDir . _AhkSubDir . "config.toml")
 global TapHold := LoadTapHoldToml(_ConfigDir . _AhkSubDir . "tap_hold.toml",
 	_SharedDir . "\tap_hold\defaults.toml")
@@ -1333,6 +1335,10 @@ if (_DriverStartupSmokeDir != "") {
 		; reveals it. A driver that reaches ready without it has no tray at all.
 		if A_IconHidden
 				throw Error("the driver reached ready without revealing its tray icon")
+		; The isolated wrapper can inspect the ready registry before ExitProcess
+		; deliberately bypasses production teardown and OnExit callbacks.
+		if IsSet(_DriverStartupSmokeInspect)
+				_DriverStartupSmokeInspect.Call()
 		try _LoggerFlush(true)
 		; This isolated probe has just materialised a deep native Menu tree and must
 		; not run the production OnExit teardown against test-only paths/owners. AHK's

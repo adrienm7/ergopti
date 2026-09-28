@@ -551,6 +551,7 @@ _LogBootProgress("loading LLM modules")
 #Include unit/test_accented_shortcuts.ahk
 #Include unit/test_keylayout_emulation.ahk
 #Include unit/test_layout_catalogue.ahk
+#Include unit/test_layout_extension_runtime.ahk
 #Include ../ui/layout_manager/init.ahk
 #Include unit/test_layout_manager_host.ahk
 #Include unit/test_ergopti_keylayout_tables.ahk
@@ -1930,3 +1931,4 @@ SetTimer(_WatchdogFire, -_SUITE_TIMEOUT_MS)
 ; Drive everything. RunTests prints a TAP-style report to stdout and exits
 ; with the appropriate code — control never returns from this call.
 RunTests()
+
