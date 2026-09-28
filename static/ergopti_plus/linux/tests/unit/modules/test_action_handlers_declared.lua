@@ -65,8 +65,9 @@ end
 --- the "Unknown action" branch.
 --- @param Gestures table The gestures manager.
 --- @param ids table Action ids.
+--- @param configure function|nil Installs daemon handlers after native doubles.
 --- @return table unknown, table pressed Chords sent, by action id.
-local function run_every_action(Gestures, ids)
+local function run_every_action(Gestures, ids, configure)
 	local Logger = require("logger.shim")
 	local saved = {
 		debug = Logger.debug, warn = Logger.warn,
@@ -90,6 +91,7 @@ local function run_every_action(Gestures, ids)
 		return { read = function() return "selection" end, close = function() return true end }
 	end
 	local ok, err = pcall(with_recorded_shell, function()
+		if configure then configure() end
 		for _, id in ipairs(ids) do
 			current = id
 			Gestures.execute_action(id, "test__slot")
@@ -108,15 +110,17 @@ helpers.describe("linux actions: every action this driver declares runs", functi
 
 	helpers.it("runs every action the catalogue declares for Linux, and every one it offers", function()
 		local Gestures = helpers.load_module("modules.gestures.manager")
-		local noop = function() end
-		Gestures.init({ enabled = false,
-			action_handlers = require("modules.shortcuts.script_actions").new({
-				reset = noop, reload = noop, quit = noop }).handlers })
 		local ids = Gestures.get_executable_action_names()
 		helpers.assert_true(#Gestures.LINUX_DECLARED_ACTIONS > 70,
 			"the shared catalogue must be read, or this loop proves nothing")
 		helpers.assert_true(#ids >= #Gestures.LINUX_DECLARED_ACTIONS)
-		local unknown = run_every_action(Gestures, ids)
+		local unknown = run_every_action(Gestures, ids, function()
+			local noop = function() end
+			local script = require("modules.shortcuts.script_actions").new({ reset = noop, reload = noop, quit = noop })
+			local handlers = require("modules.shortcuts.action_handlers").compose(script.handlers,
+				require("modules.shortcuts.manager"), require("modules.llm.prediction_engine"))
+			Gestures.init({ enabled = false, persist = false, action_handlers = handlers })
+		end)
 		helpers.assert_eq(unknown, {},
 			"declared or offered for Linux, and nothing runs: a tap, gesture or shortcut that does nothing")
 	end)

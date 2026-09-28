@@ -439,12 +439,6 @@ local function screenshot_path(kind)
 	return string.format("%s/ergopti_%s_%s.png", dir, kind, os.date("%Y-%m-%d_%H-%M-%S"))
 end
 
---- Actions another module of this driver already implements, by action id:
---- the catalogue runs them through that module rather than a second copy here.
-local MODULE_ACTIONS = {
-	["select_line"] = { module = "modules.shortcuts.manager", fn = "select_line" },
-}
-
 --- The tag each save action stamps into its filename.
 local SCREENSHOT_KIND = {
 	["screenshot_fullscreen_save"] = "full",
@@ -624,19 +618,6 @@ local function _execute_action(action_name, go_next, binding)
 	-- time; the user concludes the shortcut feature is broken.
 	if _open_driver_surface(action_name) then return end
 
-	local delegate = MODULE_ACTIONS[action_name]
-	if delegate then
-		local ok_module, Module = pcall(require, delegate.module)
-		if not ok_module or type(Module) ~= "table" or type(Module[delegate.fn]) ~= "function" then
-			Logger.error(LOG, "'%s' cannot run: %s is unavailable (%s).", action_name, delegate.module,
-				tostring(Module))
-			return
-		end
-		local ok, err = pcall(Module[delegate.fn])
-		if not ok then Logger.error(LOG, "Action '%s' failed: %s.", action_name, tostring(err)) end
-		return
-	end
-
 	local handler = _action_handlers[action_name]
 	if handler then
 		-- A parameterized action receives the value stored for its binding, checked
@@ -762,7 +743,6 @@ function M.is_runnable(action_name)
 		or OPEN_WINDOW[action_name] ~= nil
 		or OPEN_PATH[action_name] ~= nil
 		or OPEN_LOG[action_name] ~= nil
-		or MODULE_ACTIONS[action_name] ~= nil
 		or WORKSPACE_COMBO[action_name] ~= nil
 		or MEDIA_ACTIONS[action_name] ~= nil
 		or _action_handlers[action_name] ~= nil
@@ -778,7 +758,7 @@ end
 function M.runnable_action_ids()
 	local seen, out = { none = true }, { "none" }
 	for _, source in ipairs({ MODIFIER_ACTION_COMMANDS, _EMIT_ROWS, OPEN_WINDOW, OPEN_PATH,
-		OPEN_LOG, MODULE_ACTIONS, WORKSPACE_COMBO, MEDIA_ACTIONS,
+		OPEN_LOG, WORKSPACE_COMBO, MEDIA_ACTIONS,
 		_action_handlers, SCREENSHOT_COMMANDS, DIRECT_COMMANDS, BUILTIN_HANDLERS }) do
 		for action_name in pairs(source) do
 			if not seen[action_name] then
@@ -791,13 +771,16 @@ function M.runnable_action_ids()
 	return out
 end
 
---- Returns runnable action ids for the daemon's configurable keyboard bindings.
+--- Returns declared action ids for the daemon's configurable keyboard bindings.
+--- Tap-holds load before daemon handlers are registered, so this admission list
+--- follows the catalogue rather than the executor's current registrations.
 --- @return table Sorted action ids, excluding the no-op binding.
 function M.get_executable_action_names()
 	local names = {}
-	for _, id in ipairs(M.runnable_action_ids()) do
+	for _, id in ipairs(M.get_action_names()) do
 		if id ~= "none" then names[#names + 1] = id end
 	end
+	table.sort(names)
 	return names
 end
 
