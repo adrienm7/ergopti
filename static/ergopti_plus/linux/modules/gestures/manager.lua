@@ -878,8 +878,22 @@ local _config_path   = nil
 local _persist       = false
 local _actions       = {}   -- slot → action_name
 local _reading       = false -- the touchpad's evdev node is open and being drained
+local _reader_stop_error = nil -- an unacknowledged close must fence reacquisition
 local _decoder       = nil   -- the multitouch frame decoder for that device
 local _touchpad      = nil   -- what touchpad_finder chose, and what it can express
+local _scope_owner   = nil   -- retains refused runtime compensation
+local _scope_native = false -- admits only the scope's synchronous native inverse
+local _scope_sequence = 0
+
+--- Keeps captured preferences exclusively owned until compensation completes.
+--- @return boolean admitted
+local function admit_mutation()
+	if _scope_owner and _scope_owner.pending() then
+		Logger.error(LOG, "Gesture configuration remains owned by a pending scope transaction.")
+		return false
+	end
+	return true
+end
 
 --- Copies one flat state map for a persistence-before-publication transaction.
 --- @param source table
@@ -910,6 +924,7 @@ end
 --- Enables gesture processing after the touchpad reader is live.
 --- @return boolean True when gestures are enabled and readable.
 function M.enable()
+	if not admit_mutation() then return false end
 	if not M.start_reading() then
 		_enabled = false
 		Logger.error(LOG, "Gestures remain disabled because the touchpad reader could not start.")
@@ -922,39 +937,49 @@ end
 
 --- Disables gesture processing.
 function M.disable()
+	if not admit_mutation() then return false end
+	if M.stop_reading() ~= true then return false end
 	_enabled = false
-	M.stop_reading()
 	Logger.info(LOG, "Gestures disabled.")
+	return true
 end
 
 --- Persists and applies the master gesture state as one transaction.
 --- @param enabled boolean
 --- @return boolean True when the requested state was committed.
 function M.set_enabled(enabled)
+	if not admit_mutation() then return false end
 	if type(enabled) ~= "boolean" then
 		Logger.error(LOG, "Gesture state must be a boolean — nothing changed.")
 		return false
 	end
 
-	if enabled then
-		local was_enabled = _enabled
-		if not was_enabled and not M.enable() then return false end
-		if not M._persist_updates({ { section = CONFIG_SECTION, key = "enabled", value = true } }) then
-			if not was_enabled then M.disable() end
-			Logger.error(LOG, "Gesture state was not persisted — activation was rolled back.")
-			return false
-		end
+	local snapshot = M.capture_scope_state()
+	if not snapshot then return false end
+	local candidate = M.capture_scope_state()
+	candidate.enabled, candidate.reading = enabled, enabled
+	local applied = M.apply_scope_state(candidate)
+	if applied == true and M._persist_updates({ { section = CONFIG_SECTION, key = "enabled", value = enabled } }) then
 		return true
 	end
-
-	-- Persist first: disabling the reader cannot fail, whereas publishing a
-	-- session-only off state after a failed write would lie until restart.
-	if not M._persist_updates({ { section = CONFIG_SECTION, key = "enabled", value = false } }) then
-		Logger.error(LOG, "Gesture state was not persisted — nothing changed.")
-		return false
+	-- The native boundary can fail after releasing ownership. Keep the exact
+	-- inverse admitted until it succeeds; a later setter must not supersede it.
+	local debt = snapshot
+	local owner = {}
+	function owner.pending() return debt ~= nil end
+	function owner.retry_restore()
+		if debt == nil then return true end
+		if M.apply_scope_state(debt) ~= true then return false end
+		debt = nil
+		return true
 	end
-	if _enabled then M.disable() end
-	return true
+	_scope_owner = owner
+	if owner.retry_restore() then
+		Logger.error(LOG, "Gesture state was refused — the previous runtime was restored.")
+	else
+		Logger.error(LOG, "Gesture state was refused — runtime rollback remains pending.")
+	end
+	return false
 end
 
 --- Toggles gestures on/off.
@@ -975,6 +1000,7 @@ end
 --- @param action_name string Action identifier.
 --- @return boolean True only after the assignment is durable when persistence is enabled.
 function M.set_action(slot, action_name)
+	if not admit_mutation() then return false end
 	if type(slot) ~= "string" or type(action_name) ~= "string" then
 		Logger.error(LOG, "Gesture slot and action must be strings — nothing changed.")
 		return false
@@ -1160,6 +1186,7 @@ function M.get_picker_parameter_fields(items, binding)
 end
 
 function M.set_action_parameter(binding, action_name, value)
+	if not admit_mutation() then return false end
 	if not M.validate_action_parameter(action_name, value) then return false end
 	local key = parameter_key(binding, action_name)
 	local staged = copy_state(_action_params)
@@ -1191,6 +1218,73 @@ function M.get_all_actions()
 	local t = {}
 	for k, v in pairs(_actions) do t[k] = v end
 	return t
+end
+
+--- Captures detached preferences and the acknowledged touchpad reader state.
+--- @return table|nil snapshot Nil when the current master has no live reader.
+function M.capture_scope_state()
+	if _reader_stop_error or (_enabled and not _reading) then return nil end
+	return {
+		enabled = _enabled, reading = _reading,
+		actions = copy_state(_actions), parameters = copy_state(_action_params),
+	}
+end
+
+--- Applies a complete validated runtime snapshot without writing preferences.
+--- A failed native transition belongs to the caller's retained compensation.
+--- @param candidate table Detached scope runtime snapshot.
+--- @return boolean acknowledged
+function M.apply_scope_state(candidate)
+	if type(candidate) ~= "table" or type(candidate.enabled) ~= "boolean"
+		or type(candidate.reading) ~= "boolean" or (candidate.enabled and not candidate.reading)
+		or type(candidate.actions) ~= "table" or type(candidate.parameters) ~= "table" then return false end
+	local actions, parameters = {}, {}
+	for slot in pairs(M.DEFAULT_GESTURES) do
+		local action = candidate.actions[slot]
+		if type(action) ~= "string" or not M.is_assignable(action) then return false end
+		actions[slot] = action
+	end
+	for slot in pairs(candidate.actions) do
+		if M.DEFAULT_GESTURES[slot] == nil then return false end
+	end
+	for key, value in pairs(candidate.parameters) do
+		local binding, action = M.split_action_parameter_key(key)
+		if not binding or not action or not M.validate_action_parameter(action, value) then return false end
+		parameters[key] = value
+	end
+	_scope_native = true
+	local called, acknowledged = pcall(function()
+		if candidate.reading then return M.start_reading() == true and M.is_reading() end
+		return M.stop_reading() == true and not M.is_reading()
+	end)
+	_scope_native = false
+	if not called or acknowledged ~= true then return false end
+	_enabled = candidate.enabled
+	_actions, _action_params = actions, parameters
+	return true
+end
+
+--- Restores or clears all gesture-owned preferences and native reader state.
+--- @param mode string `recommended` or `clear`.
+--- @return boolean committed
+--- @return string|nil detail
+function M.apply_scope(mode)
+	if mode ~= "recommended" and mode ~= "clear" then return false, "invalid gesture scope mode" end
+	if _is_paused() then return false, "gesture configuration is paused" end
+	if not _persist or type(_config_path) ~= "string" then return false, "gesture persistence is not initialized" end
+	if _scope_owner and _scope_owner.pending() then
+		if not _scope_owner.retry_restore() then return false, "gesture runtime rollback remains pending" end
+	end
+	_scope_sequence = _scope_sequence + 1
+	local backup = _config_path .. ".gestures-" .. os.date("%Y%m%d-%H%M%S") .. "-" .. _scope_sequence .. ".bak"
+	_scope_owner = require("infra.gesture_scope").new({
+		path = _config_path,
+		backup_path = backup,
+		gestures = M,
+	})
+	local committed, detail = _scope_owner.apply(mode)
+	if not committed then Logger.error(LOG, "Gesture scope '%s' was refused: %s.", mode, tostring(detail)) end
+	return committed, detail, backup
 end
 
 --- Resets all gesture actions to defaults.
@@ -1332,6 +1426,8 @@ end
 --- multi-finger taps never leave it at all.
 --- @return boolean True when a touchpad was found and opened.
 function M.start_reading()
+	if not _scope_native and not admit_mutation() then return false end
+	if _reader_stop_error then return false end
 	if _reading then return true end
 
 	local ok_finder, Finder = pcall(require, "modules.gestures.touchpad_finder")
@@ -1373,7 +1469,7 @@ end
 --- events consumed so a caller can tell a quiet tick from a stalled reader.
 --- @return integer
 function M.pump()
-	if not _reading or not _decoder then return 0 end
+	if not _reading or not _decoder or _reader_stop_error then return 0 end
 
 	local ok_reader, Reader = pcall(require, "adapters.evdev_reader")
 	if not ok_reader then return 0 end
@@ -1391,20 +1487,30 @@ function M.pump()
 end
 
 --- Stops reading the touchpad.
+--- @return boolean True only when the reader acknowledges closure.
 function M.stop_reading()
+	if not _scope_native and not admit_mutation() then return false end
 	if _reading then
 		local ok_reader, Reader = pcall(require, "adapters.evdev_reader")
-		if ok_reader and type(Reader.close) == "function" then
-			pcall(Reader.close, Reader.TOUCHPAD)
+		local called, acknowledged, detail = false, nil, "reader close is unavailable"
+		if ok_reader and type(Reader) == "table" and type(Reader.close) == "function" then
+			called, acknowledged, detail = pcall(Reader.close, Reader.TOUCHPAD)
+		end
+		if not called or acknowledged ~= true then
+			_reader_stop_error = tostring(not called and acknowledged or detail or "reader did not acknowledge close")
+			Logger.error(LOG, "Touchpad stop is not acknowledged: %s.", _reader_stop_error)
+			return false
 		end
 	end
 	-- Dropping the decoder IS the reset: it holds the slot state and the latched
 	-- finger count, so a half-finished gesture cannot survive into the next
 	-- reader. There is no separate tracking state left to clear.
 	_reading = false
+	_reader_stop_error = nil
 	_decoder = nil
 	_touchpad = nil
 	Logger.info(LOG, "Touchpad reader stopped.")
+	return true
 end
 
 --- The touchpad being read, or nil.
@@ -1437,6 +1543,7 @@ end
 -- =========================================
 
 function M._persist_updates(updates)
+	if not admit_mutation() then return false end
 	if not _persist then return true end
 	if type(updates) ~= "table" or #updates == 0 then
 		Logger.error(LOG, "Could not persist gesture configuration: update batch is empty or invalid.")
@@ -1511,6 +1618,27 @@ local function walk_user_config(config, visit)
 	end
 end
 
+--- Removes only legacy leaves consumed by the gesture scope's runtime reader.
+--- @param config table Decoded configuration before a scoped transaction.
+--- @return table operations Explicit deletions preserving other owners.
+function M.scope_legacy_operations(config)
+	local operations = {}
+	walk_user_config(config, {
+		action = function(section, slot)
+			if section == LEGACY_SECTION then
+				operations[#operations + 1] = { section = section, key = slot, delete = true }
+			end
+		end,
+		param = function(section, key)
+			local binding = M.split_action_parameter_key(key)
+			if section == LEGACY_SECTION_PARAMS and M.DEFAULT_GESTURES[binding] ~= nil then
+				operations[#operations + 1] = { section = section, key = key, delete = true }
+			end
+		end,
+	})
+	return operations
+end
+
 --- Marks every config.toml path the gesture loader takes.
 --- @param config table Decoded config.toml.
 --- @param mark function mark(...segments) from config_unused_keys.
@@ -1573,6 +1701,7 @@ end
 ---   injects a wall-clock source (seconds) for tests; production uses the
 ---   monotonic clock. action_handlers owns daemon lifecycle operations.
 function M.init(opts)
+	if not admit_mutation() then return false end
 	opts = type(opts) == "table" and opts or {}
 	if opts.action_handlers ~= nil and type(opts.action_handlers) ~= "table" then
 		error("gestures action_handlers must be a table")
