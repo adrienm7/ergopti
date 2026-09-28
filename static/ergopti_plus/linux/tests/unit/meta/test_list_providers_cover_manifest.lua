@@ -33,7 +33,7 @@ local function declared_lists()
 	local body = handle:read("*a")
 	handle:close()
 
-	local Json = helpers.load_module("json")
+	local Json = require("json")
 	local manifest = Json.decode(body)
 	helpers.assert_eq(type(manifest), "table", "the built menu manifest must decode")
 
