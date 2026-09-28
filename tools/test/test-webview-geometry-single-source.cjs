@@ -213,6 +213,74 @@ const LINUX_MANAGER = 'ui/webview_manager.lua';
 const errors = [];
 const apps = readManifest();
 
+// Native consoles share ratios rather than fixed webview dimensions. Linux has
+// no native debug console; it deliberately has no opener or geometry consumer.
+const consoleGeometry = JSON.parse(fs.readFileSync(MANIFEST, 'utf8')).native_windows?.console;
+assert.ok(consoleGeometry, 'the native console geometry must exist');
+for (const dimension of ['width_ratio', 'height_ratio']) {
+	assert.ok(typeof consoleGeometry[dimension] === 'number'
+		&& consoleGeometry[dimension] > 0 && consoleGeometry[dimension] <= 1,
+		`native console ${dimension} must be a finite screen ratio`);
+}
+
+/** Removes quoted examples and comments before finding native console references. */
+function consoleCode(source, language) {
+	if (language === 'lua') {
+		return (source.match(/--\[(=*)\[[\s\S]*?\]\1\]|--[^\r\n]*|\[(=*)\[[\s\S]*?\]\2\]|"(?:\\[\s\S]|[^"\\])*"|'(?:\\[\s\S]|[^'\\])*'|[A-Za-z_]\w*|[^\s]/g) || [])
+			.filter(token => !token.startsWith('--') && !/^["'\[]/.test(token)).join(' ');
+	}
+	return source.replace(/\/\*[\s\S]*?\*\/|;[^\r\n]*|"(?:`[\s\S]|[^"`])*"|'(?:`[\s\S]|[^'`])*'/g, ' ');
+}
+
+/** Counts live native API references, including protected calls and aliases. */
+function consoleReferences(source, language) {
+	const pattern = language === 'lua' ? /\bhs\s*\.\s*openConsole\b/g : /\b(?:ListVars|KeyHistory)\b/g;
+	return [...consoleCode(source, language).matchAll(pattern)].length;
+}
+
+for (const [language, source, count] of [
+	['lua', 'hs.openConsole(true)', 1],
+	['lua', 'pcall(hs.openConsole, true)', 1],
+	['lua', 'local open = hs.openConsole', 1],
+	['lua', '-- hs.openConsole(true)\nlocal text = "hs.openConsole(true)"', 0],
+	['lua', '--[=[hs.openConsole(true)]=]\nlocal text = [=[hs.openConsole(true)]=]', 0],
+	['ahk', 'ListVars()\nKeyHistory()', 2],
+	['ahk', 'Open := ListVars', 1],
+	['ahk', '; ListVars()\nText := "KeyHistory()"\n/* ListVars() */', 0],
+]) {
+	assert.equal(consoleReferences(source, language), count, `native console scanner fixture: ${source}`);
+}
+
+/** Visits production source files, excluding tests and external/generated code. */
+function productionSources(directory, extension) {
+	return fs.readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
+		if (['tests', 'vendor', '_generated'].includes(entry.name)) return [];
+		const absolute = path.join(directory, entry.name);
+		if (entry.isDirectory()) return productionSources(absolute, extension);
+		return entry.name.endsWith(extension) ? [absolute] : [];
+	});
+}
+
+for (const [driver, language, owner, expected] of [
+	['macos', 'lua', 'ui/console_window.lua', 1],
+	['windows', 'ahk', 'adapters/console_window.ahk', 2],
+]) {
+	const directory = path.join(ROOT, SP, driver);
+	const files = productionSources(directory, `.${language}`);
+	assert.ok(files.length > 100, `${driver} console guard must scan the production tree`);
+	let owned = 0;
+	for (const absolute of files) {
+		const count = consoleReferences(fs.readFileSync(absolute, 'utf8'), language);
+		const relative = path.relative(directory, absolute).replace(/\\/g, '/');
+		if (relative === owner) owned += count;
+		else if (count) errors.push(`${driver}/${relative}: native console access must use the console window owner`);
+	}
+	assert.equal(owned, expected, `${driver} console owner must exercise the native APIs`);
+	const source = fs.readFileSync(path.join(directory, 'ui/console_window.' + language), 'utf8');
+	assert.ok(source.includes('apps.manifest.json') && source.includes('native_windows'),
+		`${driver} console owner must read the shared geometry`);
+}
+
 // ---- macOS defer checks --------------------------------------------------
 for (const [id, rel] of Object.entries(MACOS_MODULES)) {
 	if (!apps[id]) {

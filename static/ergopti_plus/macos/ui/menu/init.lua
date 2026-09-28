@@ -1155,7 +1155,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			return accepted
 		end,
 		open_logs                 = function() return LogOpeners.open_logs_folder(open_async) end,
-		open_console              = function() pcall(hs.openConsole) end,
+		open_console              = function() return require("ui.console_window").open() end,
 		open_paths_editor         = function()
 			return DeferredWork.after(0.05, MenuPaths.open_editor, "menu.open_paths_editor")
 		end,

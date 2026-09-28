@@ -507,6 +507,7 @@ if UIASW_IsWorkerInvocation()
 #Include vendor/Promise.ahk
 #Include vendor/WebView2.ahk
 #Include infra/webview_utils.ahk
+#Include ui/console_window.ahk
 #Include modules/keylogger/keylogger_app_categories.ahk
 #Include modules/keylogger/keylogger.ahk
 #Include modules/keylogger/keylogger_hotstring_log.ahk

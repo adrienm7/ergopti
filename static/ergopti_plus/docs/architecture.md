@@ -107,6 +107,7 @@ graph TD
     subgraph WINDOWS_Adapters["Windows (AutoHotkey) Adapters — windows/adapters/"]
         WINDOWS_app_launcher["AppLauncher.ahk"]
         WINDOWS_clipboard["Clipboard.ahk"]
+        WINDOWS_console_window["ConsoleWindow.ahk"]
         WINDOWS_crash_report_worker["CrashReportWorker.ahk"]
         WINDOWS_crypto["Crypto.ahk"]
         WINDOWS_file_system["FileSystem.ahk"]

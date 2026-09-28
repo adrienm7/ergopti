@@ -166,6 +166,13 @@ applying it works. Test the complete user transaction.
 The debug submenu order lives in
 `_shared/modules/menu/menu_manifest.json`; both desktop drivers consume it.
 
+Native debug consoles use each driver's `ui/console_window` owner for menu and
+gesture actions. Minimum geometry lives in `native_windows.console` in the
+shared UI manifest. Windows targets `A_ScriptHwnd`, never the foreground
+application. macOS places the console after its native window is created.
+Linux has no native console; these actions remain excluded by platform instead
+of opening or resizing an unrelated terminal.
+
 ### project-menu-manifest-macos-hotstrings-layout-gap
 
 macOS does not yet consume every hotstrings/layout manifest key that Windows
