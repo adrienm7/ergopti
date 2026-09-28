@@ -129,6 +129,10 @@ if (!launcherSource.includes('userDriver: userDriver') || !launcherSwift.include
 }
 const policyAt = launcherSource.indexOf('UpdateConsentPolicy.refusal(');
 const startAt = launcherSource.search(/\.(?:startUpdater|start)\(\)/);
+const schedulerOffAt = launcherSource.indexOf('sparkle.automaticallyChecksForUpdates = false');
+if (schedulerOffAt < 0 || schedulerOffAt > policyAt || schedulerOffAt > startAt) {
+	errors.push('the live Sparkle scheduler must be disabled before policy validation and start, including stored user defaults');
+}
 if (policyAt < 0 || startAt < 0 || policyAt > startAt) {
 	errors.push('the launcher must prove the consent-only policy on the live updater before starting it');
 }
