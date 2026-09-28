@@ -9,8 +9,8 @@
 ; FEATURES & RATIONALE:
 ; 1. One rule. A key is unused exactly when TomlConfigUnknownKind says so for
 ;    the manifest-built tree the boot loader applies the file onto. There is no
-;    second schema here, so the list matches the "unknown leaf" and "unknown
-;    section path" errors of the boot log. Sections the loader skips on purpose
+;    second schema here, so the list matches the unused-key warning at startup.
+;    Sections the loader skips on purpose
 ;    (``[_*]`` metadata, ``[updater]``, the obsolete ``[ahk.*]`` silo) and the
 ;    dynamic personal namespaces are never offered for removal.
 ; 2. Backup before change. The removal holds the config.toml write lease, copies
@@ -230,6 +230,30 @@ ConfigUnusedKeysRemove(FilePath, Keys, Stamp := "", BackupFn := 0, WriterFn := 0
 ; removing them, and reports the backup path or the reason nothing changed.
 ShowUnusedConfigKeysCleanup(*) {
 	global ConfigurationFile
+	return ConfigUnusedKeysShow(ConfigurationFile)
+}
+
+/**
+ * Offers the cleanup tool after startup only when a fresh scan finds unused keys.
+ * @param {String} FilePath - The configuration file applied during startup.
+ * @param {Func} ScanFn - Fresh unused-key collector.
+ * @param {Func} ShowFn - Existing interactive cleanup workflow.
+ * @returns {Boolean} Whether the cleanup workflow was offered.
+ */
+ConfigUnusedKeysOffer(FilePath, ScanFn := ConfigUnusedKeysFind, ShowFn := ConfigUnusedKeysShow) {
+	Scan := ScanFn.Call(FilePath)
+	if (Scan["status"] != "ok" || Scan["keys"].Length == 0)
+		return false
+	ShowFn.Call(FilePath)
+	return true
+}
+
+/**
+ * Shows the existing confirmation and backup workflow for one configuration file.
+ * @param {String} ConfigurationFile - The exact file inspected by the caller.
+ * @returns {Boolean} Whether inspection or the confirmed cleanup succeeded.
+ */
+ConfigUnusedKeysShow(ConfigurationFile) {
 	Title := t("dialog.unused_keys.title")
 	try LoggerStart("ConfigUnusedKeys", "Checking '{1}' for unused keys…",
 		ConfigurationFile)

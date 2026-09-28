@@ -1369,6 +1369,9 @@ if Features.Has("shortcuts") && Features["shortcuts"].Has("wrap_text_if_selected
 ; already true here, so the deferred initMenu builds the language submenu inline (no
 ; separate _LangMenuBuildPending pass needed on this boot path).
 SetTimer(BuildTrayMenuDeferred, -MENU_BUILD_DEFER_MS)
+; Obsolete configuration keys are a maintenance task, not a runtime error.
+; Offer the existing backed-up cleanup only after the driver is ready.
+SetTimer(ConfigUnusedKeysOffer.Bind(ConfigurationFile), -MENU_BUILD_DEFER_MS)
 if _LangMenuBuildPending
 	SetTimer(BuildLanguageMenuDeferred, -LANG_MENU_DEFER_MS)
 ; The deferred boot worker owns the OFF-state IA population. It arms that

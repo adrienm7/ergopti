@@ -18,10 +18,9 @@
 ;    and silently ignored the second. Both are gone, which means an unrecognised
 ;    header is now unambiguously a mistake and gets the loud treatment in (3)
 ;    instead of being written off as another driver's business.
-; 3. Unknown sections (not present in the post-manifest Features Map) trigger an
-;    ERROR at boot but never abort — the driver still applies every valid key so
-;    a single typo or stale section does not wipe the user's configuration. The
-;    ERROR level ensures the problem is impossible to miss during log review.
+; 3. Unknown sections and keys produce one cleanup warning per file. They do
+;    not represent a runtime failure: valid overrides still apply, and the
+;    post-ready startup task offers the existing configuration cleanup tool.
 ; 4. Dormant until cut-over: written ahead of the migration so the disruptive
 ;    PR can be focused on call-site rewrites only.
 ; 5. ``hotstrings.personal.<user-chosen-name>`` and ``personal_editor`` are
@@ -375,8 +374,7 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 	CurrentSection := ""
 	SkippingForeign := false
 	ObsoleteDriverSections := 0
-	; Counted for the summary line: each is logged where it happens, but a boot
-	; log with twenty scattered errors never said how much of the file was ignored.
+	; Unknown entries share one warning and one post-ready cleanup proposal.
 	UnknownKeys := 0
 	ForeignOwnedKeys := 0
 	IgnoredSectionKeys := 0
@@ -450,23 +448,13 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 
 		; The manifest defines the universe of valid paths. An unknown section
 		; path or leaf is a typo or a stale key left over from an older schema
-		; version: surface it as an error so it is impossible to miss in the
-		; logs, but do not abort the driver (the remaining valid keys are still
-		; applied). TomlConfigUnknownKind owns that rule; the menu's unused-key
+		; version. Apply the remaining valid keys and summarize unused entries
+		; once below. TomlConfigUnknownKind owns that rule; the menu's unused-key
 		; cleanup offers to remove exactly these keys.
 		UnknownKind := TomlConfigUnknownKind(Features, CurrentSection, Key,
 			&ForeignOwner)
-		if (UnknownKind == "section") {
+		if (UnknownKind != "") {
 			UnknownKeys += 1
-			try LoggerError("TomlConfigLoader",
-				"v2 override skipped — unknown section path '[{1}]' not found in the manifest.", CurrentSection)
-			continue
-		}
-		if (UnknownKind == "leaf") {
-			UnknownKeys += 1
-			try LoggerError("TomlConfigLoader",
-				"v2 override skipped — unknown leaf '[{1}].{2}' not found in the manifest.",
-				CurrentSection, Key)
 			continue
 		}
 		if (ForeignOwner != "") {
@@ -553,6 +541,11 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 		try LoggerWarn("TomlConfigLoader",
 			"Ignored {1} obsolete [ahk.*] section(s); the next canonical save removes them.",
 			ObsoleteDriverSections)
+	}
+	if UnknownKeys > 0 {
+		try LoggerWarn("TomlConfigLoader",
+			"Ignored {1} unused configuration key(s) in '{2}'; the configuration cleanup tool is available.",
+			UnknownKeys, FilePath)
 	}
 	if RejectedOverrides {
 		try LoggerError("TomlConfigLoader",
