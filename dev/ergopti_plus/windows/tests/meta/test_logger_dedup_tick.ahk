@@ -10,9 +10,10 @@
 ; The original error deduplication only compared the tag and body strings, so a
 ; recurring error that was silent for more than a minute would be suppressed
 ; forever once it had fired once. The fix adds a _LastErrTime static (storing
-; A_TickCount) and only suppresses a repeat if the same tag+body occurred within
-; the last 5000 ms, so identical errors are de-bounced rather than permanently
-; silenced.
+; the tick count) and only suppresses a repeat if the same tag+body occurred
+; within the last 5000 ms, so identical errors are de-bounced rather than
+; permanently silenced. The tick is read through _LoggerNowMs(), which is
+; A_TickCount outside the tests that drive the clock of the corpus replay.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -49,8 +50,14 @@ _TLDT_DedupTickTime() {
 	Assert(InStr(Src, "5000") > 0,
 		"infra/logger.ahk must use a 5000 ms suppression window for error deduplication (logger-dedup-tick)")
 
-	; A_TickCount must be used in the dedup logic
-	Assert(InStr(Src, "A_TickCount - _LastErrTime") > 0,
-		"infra/logger.ahk must compare (A_TickCount - _LastErrTime) to enforce the 5000 ms dedup window")
+	; The elapsed time since the streak started must be what the window bounds
+	Assert(InStr(Src, "Now - _LastErrTime") > 0,
+		"infra/logger.ahk must compare (Now - _LastErrTime) to enforce the 5000 ms dedup window")
+
+	; And that clock must be the tick count in production
+	NowBody := _TLDT_StripLineComments(_DriverFuncBody("_LoggerNowMs"))
+	Assert(NowBody != "", "infra/logger.ahk must define _LoggerNowMs()")
+	Assert(InStr(NowBody, "A_TickCount") > 0,
+		"_LoggerNowMs() must read A_TickCount when no test clock is installed")
 }
 Test("logger: error deduplication uses _LastErrTime tick-time with 5000 ms window", _TLDT_DedupTickTime)

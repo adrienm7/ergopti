@@ -1,0 +1,712 @@
+﻿; infra/config_migrate.ahk
+
+; ==============================================================================
+; MODULE: Config Migration
+; DESCRIPTION:
+; Versions config.toml at boot, before anything applies or saves it. It reads
+; ``[_meta] schema_version``, runs the shared registry's steps for the ``ahk``
+; driver in order, and publishes the migrated file once, after a verified
+; byte-exact backup. The Windows counterpart of _shared/lua/config_migrate.lua;
+; the registry is _shared/core/config_schema/migrations.toml and the decision
+; record docs/adr/009-config-versioning.md.
+;
+; FEATURES & RATIONALE:
+; 1. Data-only steps, read at runtime with the driver's own TOML reader. A
+;    step is a list of ops from a closed set (rename, move_section, merge_into,
+;    map_value, delete, set_if_absent) and this file holds their only Windows
+;    semantics. The corpus under _shared/tests/corpus/config_migrations is
+;    replayed here, by the Lua engine and by the JS reference, so the three
+;    cannot drift; _shared/tests/corpus/config_migration_registries pins which
+;    registries all three accept.
+; 2. The loader's model. A section is a ``[header]`` path and a key one entry
+;    inside it, exactly as the typed TOML parse returns them. Booleans stay
+;    TOML_Bool, so map_value tells ``true`` from ``1`` like the other drivers.
+; 3. The writer's layout. The candidate is rendered from the exact bytes the
+;    backup holds by the canonical writer every Windows save uses, read back,
+;    and must equal the migrated model before it may replace the file. The
+;    stamp is set after every op; the publication refuses when the file
+;    changed since it was read.
+; 4. A newer, invalid or unparsable file, or any failure, is never written:
+;    TOML_RefuseWrites makes every later TOML write to it refuse for the
+;    session, and ConfigFullStateCanPersist keeps full saves disarmed.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+
+
+
+
+; ===========================
+; ===========================
+; ======= 1/ Registry =======
+; ===========================
+; ===========================
+
+; The shipped registry. Its path relative to _shared/ is pinned to the Lua
+; engine's REGISTRY_PATH by tools/test/test-config-migrations.cjs. Constants
+; live in function statics so no include order can leave them unset.
+ConfigMigrateRegistryPath() {
+	global _SharedDir
+	static Relative := "core/config_schema/migrations.toml"
+	return _SharedDir . "\" . StrReplace(Relative, "/", "\")
+}
+
+; Required and optional fields of each op of the closed set.
+_ConfigMigrateOpFields() {
+	static Fields := Map(
+		"rename", [["section", "key"], ["to_section", "to_key"]],
+		"move_section", [["section", "to_section"], []],
+		"merge_into", [["section", "to_section"], []],
+		"map_value", [["section", "key", "map"], []],
+		"delete", [["section"], ["key"]],
+		"set_if_absent", [["section", "key", "value"], []]
+	)
+	return Fields
+}
+
+; A positive integral number; a TOML 3.0 counts as 3 on every interpreter.
+_ConfigMigrateIsVersion(Value) {
+	if (Value is Integer)
+		return Value >= 1
+	return (Value is Float) && Value >= 1 && Value == Floor(Value)
+}
+
+_ConfigMigrateIsSectionPath(Text) {
+	return (Text is String) && RegExMatch(Text, "^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*$")
+}
+
+_ConfigMigrateIsBareKey(Text) {
+	return (Text is String) && RegExMatch(Text, "^[A-Za-z0-9_-]+$")
+}
+
+_ConfigMigrateIsScalar(Value) {
+	return (Value is String) || (Value is Integer) || (Value is Float) || (Value is TOML_Bool)
+}
+
+; Parses TOML text with the typed reader. Label names the text in errors and
+; is never read as a file.
+_ConfigMigrateParse(Source, Label) {
+	Sections := _ParseTomlFileImpl("config-migration:" . Label, false, false, Source,
+		true, &Discarded)
+	if Discarded
+		throw Error(Label . " has " . Discarded . " unterminated array(s)")
+	return Sections
+}
+
+; Throws an Error naming the first reason Op is not a valid member of the set.
+_ConfigMigrateValidateOp(Op, Where) {
+	if !(Op is Map) || !Op.Has("op") || !(Op["op"] is String)
+		throw Error(Where . ": an op must be an inline table with an op name")
+	Fields := _ConfigMigrateOpFields()
+	if !Fields.Has(Op["op"])
+		throw Error(Where . ": unknown op '" . Op["op"] . "'")
+	Allowed := Map("op", true)
+	for Field in Fields[Op["op"]][1] {
+		Allowed[Field] := true
+		if !Op.Has(Field)
+			throw Error(Where . ": " . Op["op"] . " needs '" . Field . "'")
+	}
+	for Field in Fields[Op["op"]][2]
+		Allowed[Field] := true
+	for Field in Op {
+		if !Allowed.Has(Field)
+			throw Error(Where . ": " . Op["op"] . " does not take '" . Field . "'")
+	}
+	for Field in ["section", "to_section"] {
+		if Op.Has(Field) && !_ConfigMigrateIsSectionPath(Op[Field])
+			throw Error(Where . ": '" . Field . "' must be a dotted path of bare segments")
+	}
+	for Field in ["key", "to_key"] {
+		if Op.Has(Field) && !_ConfigMigrateIsBareKey(Op[Field])
+			throw Error(Where . ": '" . Field . "' must be one bare segment")
+	}
+	if (Op["op"] == "rename" && !Op.Has("to_section") && !Op.Has("to_key"))
+		throw Error(Where . ": rename needs to_section or to_key")
+	if (Op["op"] == "map_value") {
+		if !(Op["map"] is Array) || Op["map"].Length == 0
+			throw Error(Where . ": map_value needs a non-empty map")
+		for Pair in Op["map"] {
+			if !(Pair is Map) || Pair.Count != 2 || !Pair.Has("from") || !Pair.Has("to")
+					|| !_ConfigMigrateIsScalar(Pair["from"]) || !_ConfigMigrateIsScalar(Pair["to"])
+				throw Error(Where . ": each map entry is { from, to } with scalar values")
+		}
+	}
+	if (Op["op"] == "set_if_absent" && !_ConfigMigrateIsScalar(Op["value"])) {
+		if !(Op["value"] is Array)
+			throw Error(Where . ": set_if_absent writes a scalar or an array")
+		for Item in Op["value"] {
+			if !_ConfigMigrateIsScalar(Item)
+				throw Error(Where . ": set_if_absent arrays hold scalars only")
+		}
+	}
+}
+
+; Validates parsed registry sections and returns Map("current", "unstamped",
+; "steps") with the steps in execution order, each a Map of "from", "to",
+; "drivers" (a set), "reason" and "ops". Throws on the first defect.
+ConfigMigrateValidateRegistry(Sections) {
+	if !(Sections is Map) || !Sections.Has("registry")
+		throw Error("the registry has no [registry] table")
+	Head := Sections["registry"]
+	for Field in Head {
+		if !(Field == "current_version" || Field == "unstamped_version")
+			throw Error("[registry] has an unknown key '" . Field . "'")
+	}
+	Current := Head.Get("current_version", "")
+	Unstamped := Head.Get("unstamped_version", "")
+	if !_ConfigMigrateIsVersion(Current) || !_ConfigMigrateIsVersion(Unstamped)
+			|| Unstamped > Current
+		throw Error("current_version and unstamped_version must be integers with 1 <= unstamped <= current")
+	Current := Integer(Current)
+	Unstamped := Integer(Unstamped)
+	Steps := []
+	for Name, Step in Sections {
+		if (Name == "registry")
+			continue
+		; An empty [steps] header next to its sub-tables is valid TOML; the Lua
+		; and JS decoders cannot even tell it from an implicit one.
+		if (Name == "steps" && (Step is Map) && Step.Count == 0)
+			continue
+		if (SubStr(Name, 1, 6) != "steps.")
+			throw Error("the registry has an unknown table [" . Name . "]")
+		Id := SubStr(Name, 7)
+		for Field in Step {
+			if !(Field == "from" || Field == "to" || Field == "drivers" || Field == "reason"
+					|| Field == "ops")
+				throw Error("step '" . Id . "' has an unknown field '" . Field . "'")
+		}
+		From := Step.Get("from", "")
+		if !_ConfigMigrateIsVersion(From) || !_ConfigMigrateIsVersion(Step.Get("to", ""))
+				|| Step["to"] != From + 1
+			throw Error("step '" . Id . "' must go from N to N + 1")
+		From := Integer(From)
+		if (Id !== "v" . From . "_to_v" . (From + 1))
+			throw Error("step '" . Id . "' is misnamed")
+		Drivers := Step.Get("drivers", "")
+		if !(Drivers is Array) || Drivers.Length == 0
+			throw Error("step '" . Id . "' names no driver")
+		DriverSet := Map()
+		for Driver in Drivers {
+			if !(Driver is String) || !(Driver == "ahk" || Driver == "hs" || Driver == "linux")
+				throw Error("step '" . Id . "' names an unknown driver")
+			DriverSet[Driver] := true
+		}
+		Reason := Step.Get("reason", "")
+		if !(Reason is String) || Trim(Reason) == ""
+			throw Error("step '" . Id . "' has no reason")
+		Ops := Step.Get("ops", "")
+		if !(Ops is Array)
+			throw Error("step '" . Id . "' has no ops array")
+		for Index, Op in Ops
+			_ConfigMigrateValidateOp(Op, "step '" . Id . "' op " . Index)
+		Steps.Push(Map("from", From, "to", From + 1, "drivers", DriverSet,
+			"reason", Reason, "ops", Ops))
+	}
+	if (Steps.Length != Current - Unstamped)
+		throw Error("the steps do not chain v" . Unstamped . " to v" . Current)
+	Ordered := []
+	loop Steps.Length {
+		Wanted := Unstamped + A_Index - 1
+		Found := 0
+		for Step in Steps {
+			if (Step["from"] == Wanted) {
+				Found := Step
+				break
+			}
+		}
+		if !(Found is Map)
+			throw Error("the chain has a gap at v" . Wanted)
+		Ordered.Push(Found)
+	}
+	return Map("current", Current, "unstamped", Unstamped, "steps", Ordered)
+}
+
+; Reads and validates a registry file. Throws on any defect.
+ConfigMigrateLoadRegistry(Path) {
+	if !FileExist(Path)
+		throw Error("the registry '" . Path . "' does not exist")
+	Source := FSReadUtf8Exact(Path)
+	if !(Source is String)
+		throw Error("the registry '" . Path . "' could not be read")
+	return ConfigMigrateValidateRegistry(_ConfigMigrateParse(Source, "the registry '" . Path . "'"))
+}
+
+; The shipped registry, validated once per process. Throws when it is broken:
+; a build that cannot name its own config version must not stamp one.
+ConfigMigrateShippedRegistry() {
+	static Registry := 0
+	if !(Registry is Map)
+		Registry := ConfigMigrateLoadRegistry(ConfigMigrateRegistryPath())
+	return Registry
+}
+
+; The version every file this build writes carries.
+ConfigMigrateCurrentVersion() {
+	return ConfigMigrateShippedRegistry()["current"]
+}
+
+; Adds the schema stamp to a writer's Updates when Path does not exist yet: a
+; file this build creates carries this build's version, so a later boot never
+; migrates it as an unstamped, older one. An existing file keeps the stamp the
+; boot migration gave it; stamping it here would skip the steps it still needs.
+ConfigMigrateStampNewFile(Updates, Path) {
+	if !FileExist(Path)
+		Updates.Push({ Section: "_meta", Key: "schema_version", Value: ConfigMigrateCurrentVersion() })
+	return Updates
+}
+
+
+
+
+
+; ======================
+; ======================
+; ======= 2/ Ops =======
+; ======================
+; ======================
+
+; The comparison class of a typed value: integers and floats compare by value,
+; every other value only within its own kind.
+_ConfigMigrateKind(Value) {
+	if (Value is TOML_Bool)
+		return "boolean"
+	if (Value is String)
+		return "string"
+	if (Value is Integer) || (Value is Float)
+		return "number"
+	if (Value is Array)
+		return "array"
+	if (Value is Map)
+		return "table"
+	return "unknown"
+}
+
+; Type-strict deep equality, the Lua engine's same_value; strings compare with
+; their case.
+ConfigMigrateSameValue(Left, Right) {
+	Kind := _ConfigMigrateKind(Left)
+	if (Kind != _ConfigMigrateKind(Right))
+		return false
+	switch Kind {
+		case "boolean":
+			return !!Left.Value == !!Right.Value
+		case "string":
+			return StrCompare(Left, Right, true) == 0
+		case "number":
+			return Left = Right
+		case "array":
+			if (Left.Length != Right.Length)
+				return false
+			for Index, Item in Left {
+				if !ConfigMigrateSameValue(Item, Right[Index])
+					return false
+			}
+			return true
+		case "table":
+			if (Left.Count != Right.Count)
+				return false
+			for Key, Item in Left {
+				if !Right.Has(Key) || !ConfigMigrateSameValue(Item, Right[Key])
+					return false
+			}
+			return true
+	}
+	return false
+}
+
+; Whether two models hold the same configuration: a section without keys and
+; an absent one are the same.
+ConfigMigrateSameModel(Left, Right) {
+	for Section, Entries in Left {
+		if (Entries.Count == 0)
+			continue
+		if !Right.Has(Section) || !ConfigMigrateSameValue(Entries, Right[Section])
+			return false
+	}
+	for Section, Entries in Right {
+		if (Entries.Count > 0) && (!Left.Has(Section) || Left[Section].Count == 0)
+			return false
+	}
+	return true
+}
+
+; A copy of the model with its own section Maps; values are shared.
+_ConfigMigrateClone(Model) {
+	Copy := Map()
+	for Section, Entries in Model
+		Copy[Section] := Entries.Clone()
+	return Copy
+}
+
+; Name and every dotted child, in the Map's sorted order.
+_ConfigMigrateSectionsAtOrBelow(Model, Name) {
+	Out := []
+	Prefix := Name . "."
+	for Section in Model {
+		if (Section == Name || SubStr(Section, 1, StrLen(Prefix)) == Prefix)
+			Out.Push(Section)
+	}
+	return Out
+}
+
+_ConfigMigrateDropIfEmpty(Model, Name) {
+	if Model.Has(Name) && Model[Name].Count == 0
+		Model.Delete(Name)
+}
+
+; The keys of a section, captured before a loop moves them.
+_ConfigMigrateKeys(Entries) {
+	Keys := []
+	for Key in Entries
+		Keys.Push(Key)
+	return Keys
+}
+
+; Moves one value; an existing target keeps its value.
+_ConfigMigrateMove(Model, Section, Key, ToSection, ToKey) {
+	if !Model.Has(Section) || !Model[Section].Has(Key)
+		return
+	Value := Model[Section][Key]
+	Model[Section].Delete(Key)
+	if !Model.Has(ToSection)
+		Model[ToSection] := Map()
+	if !Model[ToSection].Has(ToKey) {
+		Model[ToSection][ToKey] := Value
+		return
+	}
+	try LoggerInfo("ConfigMigrate", "[{1}] {2} already holds a value; the old [{3}] {4} is dropped.",
+		ToSection, ToKey, Section, Key)
+}
+
+; Applies one validated op to the model.
+_ConfigMigrateApplyOp(Model, Op) {
+	Section := Op["section"]
+	switch Op["op"] {
+		case "rename":
+			ToSection := Op.Get("to_section", Section)
+			_ConfigMigrateMove(Model, Section, Op["key"], ToSection, Op.Get("to_key", Op["key"]))
+			_ConfigMigrateDropIfEmpty(Model, Section)
+			_ConfigMigrateDropIfEmpty(Model, ToSection)
+		case "move_section":
+			for Name in _ConfigMigrateSectionsAtOrBelow(Model, Section) {
+				Target := Op["to_section"] . SubStr(Name, StrLen(Section) + 1)
+				for Key in _ConfigMigrateKeys(Model[Name])
+					_ConfigMigrateMove(Model, Name, Key, Target, Key)
+				Model.Delete(Name)
+				_ConfigMigrateDropIfEmpty(Model, Target)
+			}
+		case "merge_into":
+			if !Model.Has(Section)
+				return
+			for Key in _ConfigMigrateKeys(Model[Section])
+				_ConfigMigrateMove(Model, Section, Key, Op["to_section"], Key)
+			Model.Delete(Section)
+			_ConfigMigrateDropIfEmpty(Model, Op["to_section"])
+		case "map_value":
+			if !Model.Has(Section) || !Model[Section].Has(Op["key"])
+				return
+			for Pair in Op["map"] {
+				if ConfigMigrateSameValue(Pair["from"], Model[Section][Op["key"]]) {
+					Model[Section][Op["key"]] := Pair["to"]
+					return
+				}
+			}
+		case "delete":
+			if !Op.Has("key") {
+				for Name in _ConfigMigrateSectionsAtOrBelow(Model, Section)
+					Model.Delete(Name)
+			} else if Model.Has(Section) {
+				if Model[Section].Has(Op["key"])
+					Model[Section].Delete(Op["key"])
+				_ConfigMigrateDropIfEmpty(Model, Section)
+			}
+		case "set_if_absent":
+			if !Model.Has(Section)
+				Model[Section] := Map()
+			if !Model[Section].Has(Op["key"])
+				Model[Section][Op["key"]] := Op["value"]
+		default:
+			throw Error("unknown config migration op '" . Op["op"] . "'")
+	}
+}
+
+; Reads a model's version against a registry: "current", "migrate", "newer",
+; "invalid" or "unsupported". Version receives the file's version (the
+; unstamped version when the file carries none).
+ConfigMigrateClassify(Model, Registry, &Version) {
+	Version := Registry["unstamped"]
+	if Model.Has("_meta") && Model["_meta"].Has("schema_version") {
+		Version := Model["_meta"]["schema_version"]
+		if !_ConfigMigrateIsVersion(Version)
+			return "invalid"
+		Version := Integer(Version)
+	}
+	if (Version > Registry["current"])
+		return "newer"
+	if (Version == Registry["current"])
+		return "current"
+	if (Version < Registry["unstamped"])
+		return "unsupported"
+	return "migrate"
+}
+
+; Runs every step at or above FromVersion that names Driver, then stamps the
+; registry's current version. Mutates and returns Model.
+ConfigMigrateApplySteps(Model, Registry, Driver, FromVersion) {
+	for Step in Registry["steps"] {
+		if (Step["from"] < FromVersion) || !Step["drivers"].Has(Driver)
+			continue
+		for Op in Step["ops"]
+			_ConfigMigrateApplyOp(Model, Op)
+	}
+	if !Model.Has("_meta")
+		Model["_meta"] := Map()
+	Model["_meta"]["schema_version"] := Registry["current"]
+	return Model
+}
+
+
+
+
+
+; ============================
+; ============================
+; ======= 3/ Candidate =======
+; ============================
+; ============================
+
+; The batch-writer image of After over Before: a value for every new or
+; changed key, a deletion for every vanished key, and a dropped header for a
+; section that vanished with nothing surviving below it. A deletion alone
+; would leave an empty header, and a drop over a surviving child would take
+; the child too; the writer compares section names without case.
+_ConfigMigrateWriterBatch(Before, After, &DropSections) {
+	Updates := []
+	DropSections := []
+	for Section, Entries in After {
+		for Key, Value in Entries {
+			if !(Before.Has(Section) && Before[Section].Has(Key)
+					&& ConfigMigrateSameValue(Before[Section][Key], Value))
+				Updates.Push({ Section: Section, Key: Key, Value: Value })
+		}
+	}
+	for Section in Before {
+		if After.Has(Section)
+			continue
+		Survivor := false
+		for Name in After {
+			if (Name = Section || InStr(Name, Section . ".") == 1) {
+				Survivor := true
+				break
+			}
+		}
+		if !Survivor
+			DropSections.Push(Section)
+	}
+	for Section, Entries in Before {
+		Dropped := false
+		for Name in DropSections {
+			if (Section = Name || InStr(Section, Name . ".") == 1) {
+				Dropped := true
+				break
+			}
+		}
+		if Dropped
+			continue
+		for Key in Entries {
+			if !(After.Has(Section) && After[Section].Has(Key))
+				Updates.Push({ Section: Section, Key: Key, Delete: 1 })
+		}
+	}
+	return Updates
+}
+
+; Plans the migration of Source for Driver without I/O. Returns Map("outcome",
+; "version", "detail") where outcome is "current", "migrated", "newer",
+; "invalid", "unsupported" or "failed"; a "migrated" plan also carries the
+; "candidate" text and the migrated "model".
+ConfigMigratePlan(Source, Registry, Driver) {
+	Plan := Map("outcome", "failed", "version", "", "detail", "")
+	try Before := _ConfigMigrateParse(Source, "config.toml")
+	catch as Err {
+		Plan["detail"] := "the file is not valid TOML: " . Err.Message
+		return Plan
+	}
+	Outcome := ConfigMigrateClassify(Before, Registry, &Version)
+	Plan["version"] := Version
+	if (Outcome != "migrate") {
+		Plan["outcome"] := Outcome
+		return Plan
+	}
+	After := ConfigMigrateApplySteps(_ConfigMigrateClone(Before), Registry, Driver, Version)
+	Updates := _ConfigMigrateWriterBatch(Before, After, &DropSections)
+	Built := _TOML_BatchWriteImpl("config-migration:candidate", Updates, DropSections,
+		"build", Source)
+	if !(Built is Map) || Built.Get("status", "") != "ok" || !(Built.Get("content", 0) is String) {
+		Plan["detail"] := "the canonical writer refused the migrated configuration"
+		return Plan
+	}
+	try Reread := _ConfigMigrateParse(Built["content"], "the migrated candidate")
+	catch as Err {
+		Plan["detail"] := "the migrated candidate does not parse: " . Err.Message
+		return Plan
+	}
+	if !ConfigMigrateSameModel(Reread, After) {
+		Plan["detail"] := "the rewritten file would not read back as the migrated configuration"
+		return Plan
+	}
+	Plan["outcome"] := "migrated"
+	Plan["candidate"] := Built["content"]
+	Plan["model"] := After
+	return Plan
+}
+
+
+
+
+
+; =======================
+; =======================
+; ======= 4/ Boot =======
+; =======================
+; =======================
+
+; ``config.toml`` + 3 + "20260924-101500" -> ``config.pre-v3-20260924-101500.toml``
+; in the same directory: the bytes as they were before version 3.
+ConfigMigrateBackupPath(FilePath, Version, Stamp) {
+	SplitPath(FilePath, , &Dir, &Ext, &NameNoExt)
+	return Dir . "\" . NameNoExt . ".pre-v" . Version . "-" . Stamp . (Ext != "" ? "." . Ext : "")
+}
+
+; Replaces FilePath with Candidate while it still holds exactly Source,
+; through a verified same-directory stage. Returns "" on success, else why not.
+_ConfigMigratePublish(FilePath, Candidate, Source) {
+	global _ParseTomlCache
+	static Sequence := 0
+	Sequence += 1
+	StagePath := FilePath . "." . A_ScriptHwnd . "-migration-" . Sequence . ".stage"
+	if !FSWriteDurable(StagePath, Candidate) || !FSUtf8ExactMatches(StagePath, Candidate) {
+		try FSDelete(StagePath)
+		return "the staging file could not be written and verified"
+	}
+	if !FSUtf8ExactMatches(FilePath, Source) {
+		try FSDelete(StagePath)
+		return "the file changed after it was read"
+	}
+	if !FSAtomicMoveReplace(StagePath, FilePath) {
+		try FSDelete(StagePath)
+		return "the atomic replace was refused"
+	}
+	if _ParseTomlCache.Has(FilePath)
+		_ParseTomlCache.Delete(FilePath)
+	return ""
+}
+
+; Migrates FilePath for the Windows driver. Returns Map("status", "read_only",
+; "from", "to", "backup", "detail"); status is "absent", "current",
+; "migrated", "newer", "invalid", "unsupported" or "failed", and only
+; "migrated" changes the file. Every status but "absent", "current" and
+; "migrated" refuses every later TOML write to FilePath for the session
+; (read_only = 1). Registry (a validated Map; the shipped one by default),
+; Stamp, BackupFn(Path, Content) -> 1 (must refuse an existing path) and
+; PublishFn(Path, Candidate, Source) -> "" are test seams.
+ConfigMigrateRun(FilePath, Registry := 0, Stamp := "", BackupFn := 0, PublishFn := 0) {
+	Result := Map("status", "failed", "read_only", 0, "from", "", "to", "",
+		"backup", "", "detail", "")
+	try LoggerStart("ConfigMigrate", "Checking the config schema version of '{1}' (ahk driver)…",
+		FilePath)
+
+	Refuse(Status, Detail) {
+		Result["status"] := Status
+		Result["detail"] := Detail
+		Result["read_only"] := 1
+		TOML_RefuseWrites(FilePath, Detail)
+		try LoggerError("ConfigMigrate", "Config migration of '{1}' refused ({2}): {3}. The file is left "
+			. "untouched and this session will not write it.", FilePath, Status, Detail)
+		return Result
+	}
+
+	if !(Registry is Map) {
+		try Registry := ConfigMigrateShippedRegistry()
+		catch as Err
+			return Refuse("failed", Err.Message)
+	}
+	Result["to"] := Registry["current"]
+	if !FileExist(FilePath) {
+		Result["status"] := "absent"
+		try LoggerSuccess("ConfigMigrate", "No config file at '{1}' yet; nothing to migrate.", FilePath)
+		return Result
+	}
+
+	Owner := _ConfigWriteLeaseTryAcquire(FilePath, "migration")
+	if !(Owner is Object)
+		return Refuse("failed", "another configuration transaction owns the file")
+	try {
+		; The loader's own lenient read decides the version, so a current file
+		; the loader can read never needs the exact bytes a backup does.
+		Before := TOML_ParseFreshFileTyped(FilePath, &Discarded)
+		if TOML_ReadFailed(FilePath)
+			return Refuse("failed", "the file could not be read")
+		if Discarded
+			return Refuse("failed", "the file has " . Discarded . " unterminated array(s)")
+		Outcome := ConfigMigrateClassify(Before, Registry, &Version)
+		Result["from"] := Version
+		switch Outcome {
+			case "current":
+				Result["status"] := "current"
+				try LoggerSuccess("ConfigMigrate", "'{1}' is at schema v{2}; nothing to migrate.",
+					FilePath, Registry["current"])
+				return Result
+			case "newer":
+				return Refuse("newer", "the file declares schema v" . Version
+					. ", newer than this build's v" . Registry["current"])
+			case "invalid":
+				return Refuse("invalid", "[_meta] schema_version is not a positive integer")
+			case "unsupported":
+				return Refuse("unsupported", "no migration path from schema v" . Version)
+		}
+
+		Source := FSReadUtf8Exact(FilePath)
+		if !(Source is String)
+			return Refuse("failed", "the file is not exact UTF-8, so it cannot be backed up byte for byte")
+		Plan := ConfigMigratePlan(Source, Registry, "ahk")
+		if (Plan["outcome"] != "migrated")
+			return Refuse("failed", Plan["detail"] != "" ? Plan["detail"]
+				: "the file changed while it was classified")
+
+		BackupPath := ConfigMigrateBackupPath(FilePath, Registry["current"],
+			Stamp != "" ? Stamp : FormatTime(A_Now, "yyyyMMdd-HHmmss"))
+		Result["backup"] := BackupPath
+		Written := HasMethod(BackupFn, "Call") ? BackupFn.Call(BackupPath, Source)
+			: FSWriteCreateDurable(BackupPath, Source)
+		if !((Written is Integer) && Written == 1) || !FSUtf8ExactMatches(BackupPath, Source)
+			return Refuse("failed", "the backup '" . BackupPath . "' could not be written and verified")
+		Published := HasMethod(PublishFn, "Call") ? PublishFn.Call(FilePath, Plan["candidate"], Source)
+			: _ConfigMigratePublish(FilePath, Plan["candidate"], Source)
+		if (Published != "")
+			return Refuse("failed", "publication failed: " . Published)
+	} finally {
+		_ConfigWriteLeaseRelease(Owner)
+	}
+
+	Result["status"] := "migrated"
+	try LoggerSuccess("ConfigMigrate", "Migrated '{1}' from schema v{2} to v{3}; backup at '{4}'.",
+		FilePath, Result["from"], Registry["current"], Result["backup"])
+	return Result
+}
+
+; The boot entry point: ConfigMigrateRun with a raise turned into the same
+; refusal, so a defect in the engine can never leave the session writing a
+; file it did not version.
+ConfigMigrateBoot(FilePath) {
+	try return ConfigMigrateRun(FilePath)
+	catch as Err {
+		Detail := "the config migration raised: " . Err.Message
+		TOML_RefuseWrites(FilePath, Detail)
+		try LoggerError("ConfigMigrate", "Config migration of '{1}' refused (failed): {2}. The file is "
+			. "left untouched and this session will not write it.", FilePath, Detail)
+		return Map("status", "failed", "read_only", 1, "from", "", "to", "", "backup", "",
+			"detail", Detail)
+	}
+}

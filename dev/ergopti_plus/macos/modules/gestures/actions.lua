@@ -24,6 +24,9 @@ local Click         = require("modules.gestures.actions_click")
 local Sticky        = require("modules.gestures.sticky_modifiers")
 local AuxOwner      = require("modules.gestures.actions_aux_owner")
 local ScreenshotSave = require("modules.shortcuts.actions.screenshot_save")
+local WrapPair      = require("wrap_pair")
+local SendInput     = require("send_input")
+local JsonCodec     = require("adapters.json_codec")
 local LOG           = "gestures.actions"
 
 -- Explicit inter-key delay for every simulated keystroke. hs.eventtap.keyStroke()
@@ -93,12 +96,14 @@ local function is_script_control_plane_action(name, binding)
 		and (name == "script_reload" or name == "script_quit")
 end
 
---- Maps a configurable keyboard binding to the shortcut parent while every
---- engine and direct gesture dispatch remains in the gesture parent.
+--- Maps a configurable keyboard binding (a keyboard slot or a number-row tap
+--- key) to the shortcut parent while every engine and direct gesture dispatch
+--- remains in the gesture parent.
 --- @param binding any Binding identity supplied by execute_single().
 --- @return string parent
 local function parent_for_binding(binding)
-	if type(binding) == "string" and binding:match("^keyboard__") then
+	if type(binding) == "string"
+		and (binding:match("^keyboard__") or binding:match("^tap_key__")) then
 		return SHORTCUT_ACTION_PARENT
 	end
 	return GESTURE_ACTION_PARENT
@@ -368,21 +373,6 @@ end
 local function sg(name, label_or_fn, fn_arg)
 	local fn = type(fn_arg) == "function" and fn_arg or label_or_fn
 	SG[name] = { fn = fn }
-end
-
---- Resolves the driver's log directory, honouring a relocated config dir.
---- Mirrors the resolver in ui/menu/init.lua so the gesture actions and the menu
---- entries can never open two different folders. Falls back to hs.configdir,
---- which is where the driver lives when the config dir has not been moved.
---- @return string Absolute log directory, with a trailing slash.
-local function logs_dir()
-	local ok_mp, mp = pcall(require, "ui.menu.menu_paths")
-	local base = ok_mp and type(mp.get_config_dir) == "function" and mp.get_config_dir() or nil
-	if type(base) == "string" and base ~= "" then
-		if not base:match("[/\\]$") then base = base .. "/" end
-		return base .. "hammerspoon/logs/"
-	end
-	return hs.configdir .. "/logs/"
 end
 
 --- Calls `method` on a lazily required UI module, logging loudly on a miss.
@@ -961,12 +951,121 @@ end)
 -- Required lazily, inside the closure: these modules pull in the whole shortcuts
 -- tree, and requiring it at gesture-registry load time would drag it into boot
 -- for users who never bind one of these.
-sg("select_line", function()
-	local ok, Text = pcall(require, "modules.shortcuts.actions.text")
-	if ok and type(Text.select_line) == "function" then
-		return Text.select_line(current_action_parent())
+--- Builds a gesture action that runs one function of a parent-scoped owner of
+--- the shortcut layer under the dispatching parent, so PAUSE of that parent
+--- fences it and a sibling parent's PAUSE does not.
+--- @param module_name string The owner module.
+--- @param method string Public function taking the parent as its last argument.
+--- @return function
+local function owner_action(module_name, method)
+	return function()
+		local ok, Owner = pcall(require, module_name)
+		if not ok or type(Owner) ~= "table" or type(Owner[method]) ~= "function" then
+			Logger.error(LOG, "Action '%s.%s' is unavailable: %s.", module_name, method, tostring(Owner))
+			return false
+		end
+		return Owner[method](current_action_parent())
 	end
-	return false
+end
+
+--- @param method string Public function of modules.shortcuts.actions.text.
+--- @return function
+local function text_action(method)
+	return owner_action("modules.shortcuts.actions.text", method)
+end
+
+sg("select_line", text_action("select_line"))
+sg("select_word", text_action("select_word"))
+sg("paste_plain", text_action("paste_as_plain_text"))
+-- The case actions: the two toggles and the three explicit conversions, all
+-- through the shared Unicode table (unicode_case), pinned by the shared corpus.
+sg("uppercase_selection", text_action("toggle_uppercase"))
+sg("titlecase_selection", text_action("toggle_titlecase"))
+sg("selection_uppercase", text_action("selection_uppercase"))
+sg("selection_lowercase", text_action("selection_lowercase"))
+sg("selection_titlecase", text_action("selection_titlecase"))
+-- Wraps the current LINE (Cmd+Left, "(", Cmd+Right, ")"), like Windows.
+sg("surround_parens", text_action("surround_with_parens"))
+-- The pair is the binding's own parameter: two bindings may wrap with two pairs.
+sg("wrap_selection", function(binding)
+	local value = M.get_action_parameter(binding, "wrap_selection")
+	local left, right = M.wrap_pair_for(value)
+	if not left then
+		Logger.warn(LOG, "wrap_selection ignored for binding '%s': no valid pair is stored ('%s').",
+			tostring(binding), tostring(value))
+		return false
+	end
+	local ok, Text = pcall(require, "modules.shortcuts.actions.text")
+	if not ok or type(Text.wrap_copied_selection) ~= "function" then
+		Logger.error(LOG, "Text action 'wrap_copied_selection' is unavailable: %s.", tostring(Text))
+		return false
+	end
+	return Text.wrap_copied_selection(left, right, current_action_parent())
+end)
+
+--- Types a text through the synthetic-input adapter, which tags every event
+--- with its provenance so the keymap never reads it back as typing.
+--- @param text string
+--- @return boolean True when the text was queued.
+local function postKeyStrokes(text)
+	local ok, result = xpcall(function()
+		return SyntheticInput.emit_key_strokes(text)
+	end, debug.traceback)
+	if not ok or result ~= true then
+		Logger.error(LOG, "synthetic text was refused (%d byte(s)): %s", #text, tostring(result))
+		return false
+	end
+	return true
+end
+
+--- Types the binding's text, or presses its key or shortcut (send_text,
+--- send_key, send_shortcut). primary and super are both Command here and press
+--- once; a named key is its Hammerspoon name; a character on its own is typed
+--- as that character, and a character in a shortcut is the key the current
+--- input source carries it on.
+--- @param action string send_text, send_key or send_shortcut.
+--- @param binding string The binding whose parameter holds the value.
+--- @return boolean True when the input was sent.
+local function send_input_action(action, binding)
+	local kind = M.get_action_parameter_spec(action)
+	local vocabulary = M.send_vocabulary()
+	local parsed = SendInput.parse(kind, M.get_action_parameter(binding, action), vocabulary)
+	if not parsed then
+		Logger.warn(LOG, "%s ignored for binding '%s': no valid value is stored.", action, tostring(binding))
+		return false
+	end
+	if kind == "text" then return postKeyStrokes(parsed.text) end
+	local mods, held = {}, {}
+	for _, id in ipairs(parsed.mods or {}) do
+		local name = SendInput.entry(vocabulary, "modifiers", id).hs
+		if not held[name] then
+			held[name] = true
+			mods[#mods + 1] = name
+		end
+	end
+	if parsed.named then
+		return postKeyStroke(mods, SendInput.entry(vocabulary, "keys", parsed.named).hs)
+	end
+	if kind == "key" then return postKeyStrokes(parsed.char) end
+	return postKeyStroke(mods, parsed.char)
+end
+-- The value is the binding's own parameter, as for wrap_selection.
+sg("send_text", function(binding) return send_input_action("send_text", binding) end)
+sg("send_key", function(binding) return send_input_action("send_key", binding) end)
+sg("send_shortcut", function(binding) return send_input_action("send_shortcut", binding) end)
+-- A prediction now, from the text typed so far. The keymap bridge owns the
+-- prediction engine, which logs and shows every refusal (paused, AI off,
+-- backend not ready, nothing typed). Required at dispatch: the keymap loads
+-- after this registry.
+sg("llm_generate_prediction", function()
+	local ok_keymap, keymap = pcall(require, "modules.keymap")
+	if not ok_keymap or type(keymap) ~= "table"
+		or type(keymap.request_manual_prediction) ~= "function" then
+		Logger.error(LOG, "llm_generate_prediction: the keymap bridge is unavailable: %s.",
+			tostring(keymap))
+		return false
+	end
+	return keymap.request_manual_prediction()
 end)
 sg("teleport_mouse", function()
 	local ok, Mouse = pcall(require, "modules.shortcuts.actions.system_mouse")
@@ -985,6 +1084,39 @@ end)
 sg("toggle_capslock", function()
 	local ok, Sys = pcall(require, "modules.shortcuts.actions.system")
 	if ok and type(Sys.toggle_capslock) == "function" then Sys.toggle_capslock() end
+end)
+
+--- @param method string Public function of modules.shortcuts.actions.system_mouse.
+--- @return function
+local function mouse_action(method)
+	return owner_action("modules.shortcuts.actions.system_mouse", method)
+end
+
+-- Formerly fixed hotkeys only (Ctrl+., Ctrl+P): no gesture or slot could bind them.
+sg("open_emoji_picker", mouse_action("open_emoji_picker"))
+sg("display_mirror_toggle", mouse_action("toggle_display_mirror"))
+-- Formerly fixed hotkeys only (Ctrl+D, Ctrl+E, Ctrl+I, Ctrl+S, Ctrl+X). The
+-- app-navigation and pixel owners are parent-scoped like the text and mouse
+-- ones, and joined to this module's lifecycle in scoped_action_children().
+-- The frontmost window saved to the screenshots folder, under the dispatching
+-- parent's screenshot owner: what the key left of 1 ran before it became a tap key.
+sg("screen_capture_instant", owner_action("modules.shortcuts.actions.system", "capture_frontmost_window"))
+sg("open_downloads", owner_action("modules.shortcuts.actions.apps", "open_downloads"))
+sg("open_file_manager", owner_action("modules.shortcuts.actions.apps", "open_finder"))
+sg("open_system_settings", owner_action("modules.shortcuts.actions.apps", "open_settings"))
+sg("copy_selected_path", owner_action("modules.shortcuts.actions.apps", "copy_or_open_path"))
+sg("pick_color", owner_action("modules.shortcuts.actions.system_pixel", "copy_pixel_color"))
+-- Keep-awake is one session for the machine, whoever starts it: the shortcut
+-- layer owns it (its Bindings lifecycle pauses and resumes it) and it stops by
+-- itself at the first physical input, so a gesture leaves nothing that outlives
+-- the user's next action.
+sg("activity_simulation", function()
+	local ok, Sys = pcall(require, "modules.shortcuts.actions.system")
+	if not ok or type(Sys.toggle_awake) ~= "function" then
+		Logger.error(LOG, "Keep-awake is unavailable: %s.", tostring(Sys))
+		return false
+	end
+	return Sys.toggle_awake()
 end)
 
 sg("lock_screen", function()
@@ -1034,29 +1166,23 @@ sg("open_config",                    function()
 	return AuxOwner.open(hs.configdir .. "/config.toml",
 		"open config", nil, current_action_parent())
 end)
+-- The three log actions share the Debug menu's owner (ui/log_openers), which
+-- asks the logger for each path at the moment of the gesture; only the
+-- asynchronous opener, owned here by the gesture scope, differs.
+--- @param label string Opener label shown in the owner's diagnostics.
+--- @return function open_fn
+local function gesture_opener(label)
+	local parent = current_action_parent()
+	return function(target) return AuxOwner.open(target, label, nil, parent) end
+end
 sg("open_logs_folder",                function()
-	return AuxOwner.open(logs_dir(), "open logs folder", nil, current_action_parent())
+	return require("ui.log_openers").open_logs_folder(gesture_opener("open logs folder"))
 end)
 sg("open_today_log",                   function()
-	local ok_p, path = pcall(function()
-		return logs_dir() .. "ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log"
-	end)
-	-- The open is skipped rather than attempted with a nil path: the launcher
-	-- logs an ERROR for a nil target, which is the fail-fast we want, but only
-	-- when there was really a path to open.
-	if ok_p then return AuxOwner.open(path, "open today's log", nil, current_action_parent()) end
-	return false
+	return require("ui.log_openers").open_today_log(gesture_opener("open today's log"))
 end)
 sg("open_error_log",                   function()
-	local ok_p, path = pcall(function()
-		local ok_l, Logger = pcall(require, "infra.logger")
-		if ok_l and type(Logger) == "table" and type(Logger.ERRORS_LOG_FILE) == "string" and Logger.ERRORS_LOG_FILE ~= "" then
-			return Logger.ERRORS_LOG_FILE
-		end
-		return logs_dir() .. "ErgoptiPlus_errors_" .. os.date("%Y-%m-%d") .. ".log"
-	end)
-	if ok_p then return AuxOwner.open(path, "open error log", nil, current_action_parent()) end
-	return false
+	return require("ui.log_openers").open_today_errors(gesture_opener("open error log"))
 end)
 
 -- Parameterized actions read their value from the binding that invoked them.
@@ -1444,10 +1570,14 @@ end)
 local function scoped_action_children()
 	local text_ok, Text = pcall(require, "modules.shortcuts.actions.text")
 	local mouse_ok, Mouse = pcall(require, "modules.shortcuts.actions.system_mouse")
+	local apps_ok, Apps = pcall(require, "modules.shortcuts.actions.apps")
+	local pixel_ok, Pixel = pcall(require, "modules.shortcuts.actions.system_pixel")
 	if not text_ok or type(Text) ~= "table"
-		or not mouse_ok or type(Mouse) ~= "table" then
-		Logger.error(LOG, "Shared action lifecycle modules could not be loaded: %s / %s.",
-			tostring(Text), tostring(Mouse))
+		or not mouse_ok or type(Mouse) ~= "table"
+		or not apps_ok or type(Apps) ~= "table"
+		or not pixel_ok or type(Pixel) ~= "table" then
+		Logger.error(LOG, "Shared action lifecycle modules could not be loaded: %s / %s / %s / %s.",
+			tostring(Text), tostring(Mouse), tostring(Apps), tostring(Pixel))
 		return nil
 	end
 	return {
@@ -1460,6 +1590,12 @@ local function scoped_action_children()
 		{id = "mouse", subject = Mouse,
 			pause = "pause_mouse_actions", resume = "resume_mouse_actions",
 			query = "is_mouse_actions_paused", pending = "has_pending_mouse_action"},
+		{id = "apps", subject = Apps,
+			pause = "pause_apps_actions", resume = "resume_apps_actions",
+			query = "is_apps_actions_paused", pending = "has_pending_apps_action"},
+		{id = "pixel", subject = Pixel,
+			pause = "pause_pixel_actions", resume = "resume_pixel_actions",
+			query = "is_pixel_actions_paused", pending = "has_pending_pixel_action"},
 		{id = "screenshot", subject = ScreenshotSave,
 			pause = "pause_screenshot_actions", resume = "resume_screenshot_actions",
 			query = "has_screenshot_pause_claim",
@@ -1679,7 +1815,7 @@ sg("script_quit",                         function()
 end)
 
 -- Debug
-sg("open_console",                        function() pcall(hs.openConsole) end)
+sg("open_console",                        function() return require("ui.console_window").open() end)
 
 
 
@@ -1702,108 +1838,30 @@ sg("open_console",                        function() pcall(hs.openConsole) end)
 -- tools/test/test-action-labels-have-locale-keys.cjs fails if any registered
 -- action lacks a label key in any of the 21 locales.
 
--- Path to the shared actions.toml, resolved through the single shared-tree
--- resolver (Paths.shared) so the shared root lives in exactly one place.
-local _shared_toml = Paths.shared("modules/actions/actions.toml")
 local _modifier_chords_json = Paths.shared("modules/actions/modifier_chords.json")
 
---- Parses the shared actions.toml using a lightweight line-by-line reader.
---- Returns { sg_order = [...], ax_order = [...], sg_actions = {name={platform=...}},
---- ax_actions = {name={platform=...}}, karabiner_aliases = {karabiner_id = shared_id} }
-local function load_shared_actions(path)
-	local result = { sg_order = {}, ax_order = {}, sg_actions = {}, ax_actions = {}, karabiner_aliases = {} }
-	local ok, f = pcall(io.open, path, "r")
-	if not ok or not f then
-		Logger.warn("gestures.actions", "Shared actions TOML not found: %s — using fallback.", tostring(path))
-		return nil
-	end
-
-	local current_section = nil
-	local current_key     = nil
-	local in_array        = false
-	local array_buf       = {}
-	local current_action  = nil  -- e.g. "sg_actions.left_click_toggle"
-
-	for line in f:lines() do
-		local trimmed = line:match("^%s*(.-)%s*$")
-
-		-- Skip blank lines and comments
-		if trimmed == "" or trimmed:sub(1, 1) == "#" then goto continue end
-
-		-- Multi-line array continuation
-		if in_array then
-			if trimmed:sub(1, 1) == "]" then
-				-- End of array
-				if current_section == "sg_order" then
-					result.sg_order = array_buf
-				elseif current_section == "ax_order" then
-					result.ax_order = array_buf
-				end
-				in_array  = false
-				array_buf = {}
-			else
-				-- Collect array items: strip trailing comma and quotes
-				local item = trimmed:match('^"(.-)"')
-				if item then array_buf[#array_buf + 1] = item end
-			end
-			goto continue
-		end
-
-		-- Section header [name] or [name.subkey]
-		local section = trimmed:match("^%[([^%[%]]+)%]$")
-		if section then
-			current_section = section
-			current_action  = nil
-			-- Pre-create entry for known action sections
-			local kind, name = section:match("^(sg_actions)%.(.+)$")
-			if not kind then kind, name = section:match("^(ax_actions)%.(.+)$") end
-			if kind and name then
-				current_action = section
-				result[kind][name] = result[kind][name] or {}
-			end
-			goto continue
-		end
-
-		-- Key = value
-		local key, val = trimmed:match("^([%w_]+)%s*=%s*(.+)$")
-		if key and val then
-			-- Unquote string values
-			local str_val = val:match('^"(.-)"$') or val
-			-- Array opening without closing on same line
-			if val:sub(1, 1) == "[" and not val:find("]", 2, true) then
-				current_key = key
-				in_array    = true
-				array_buf   = {}
-			elseif current_action then
-				-- Store attribute of current [sg_actions.X] or [ax_actions.X]
-				local kind, name = current_action:match("^(sg_actions)%.(.+)$")
-				if not kind then kind, name = current_action:match("^(ax_actions)%.(.+)$") end
-				if kind and name then
-					result[kind][name][key] = str_val
-				end
-			elseif current_section == "karabiner_aliases" then
-				-- A flat id = "target" table, not an action block: without this
-				-- branch the reader silently drops it and the remap picker shows
-				-- the raw Karabiner identifier for every aliased action.
-				result.karabiner_aliases[key] = str_val
-			end
-		end
-
-		::continue::
-	end
-	f:close()
-	return result
+-- The macOS action catalogue, generated from _shared/modules/actions/actions.toml
+-- by tools/codegen/codegen-action-catalogue.cjs and already filtered to this
+-- platform: picker order, heading levels and locale keys, per-action metadata
+-- and the Karabiner aliases. It replaces a hand-written line reader that only
+-- understood `key = "string"` and stored anything else as a raw string without
+-- an error. Missing is a broken install, not an empty picker.
+local ok_catalogue, Catalogue = pcall(require, "_generated.action_catalogue")
+if not ok_catalogue or type(Catalogue) ~= "table" or type(Catalogue.actions) ~= "table"
+	or type(Catalogue.sg_items) ~= "table" or type(Catalogue.ax_items) ~= "table" then
+	error("gestures/actions: _generated/action_catalogue.lua is missing or invalid — "
+		.. "the action picker would be empty. Run `npm run gen`: " .. tostring(Catalogue))
 end
-
-local _shared = load_shared_actions(_shared_toml)
 
 --- Karabiner ids that name an action the catalogue already carries under another
 --- name, as { karabiner_id = shared_id }. The remap picker is indexed on
 --- Karabiner ids, so it resolves a label through this rather than carrying a
 --- second copy of the same translated string in twenty-one locale files.
---- @return table
+--- @return table A copy, so a caller cannot edit the catalogue.
 function M.karabiner_aliases()
-	return (_shared and _shared.karabiner_aliases) or {}
+	local out = {}
+	for alias, target in pairs(Catalogue.karabiner_aliases or {}) do out[alias] = target end
+	return out
 end
 
 local function parameter_key(binding, action)
@@ -1815,8 +1873,8 @@ end
 --- first delimiter would restore the parameter under the wrong binding.
 function M.split_action_parameter_key(key)
 	if type(key) ~= "string" then return nil, nil end
-	for action, meta in pairs((_shared and _shared.sg_actions) or {}) do
-		if type(meta) == "table" and type(meta.parameter) == "string" then
+	for action, meta in pairs(Catalogue.actions) do
+		if type(meta.parameter) == "string" then
 			local suffix = "__" .. action
 			if key:sub(-#suffix) == suffix then return key:sub(1, #key - #suffix), action end
 		end
@@ -1825,19 +1883,118 @@ function M.split_action_parameter_key(key)
 end
 
 function M.get_action_parameter_spec(action)
-	local meta = _shared and _shared.sg_actions and _shared.sg_actions[action]
+	local meta = Catalogue.actions[action]
 	return meta and meta.parameter or nil
+end
+
+--- The built-in wrap pairs in catalogue order, from the text module that loads
+--- _shared/modules/wrap_symbols/wrap_symbols.json.
+--- @return table Array of { left, right }.
+local function wrap_pair_list()
+	local ok, Text = pcall(require, "modules.shortcuts.actions.text")
+	if not ok or type(Text) ~= "table" or type(Text.wrap_pair_list) ~= "function" then
+		Logger.error(LOG, "The wrap-pair catalogue is unavailable: %s.", tostring(Text))
+		return {}
+	end
+	return Text.wrap_pair_list()
+end
+
+--- The left and right symbols a wrap_selection parameter names.
+--- @param value any The stored parameter.
+--- @return string|nil left
+--- @return string|nil right Both nil when the value names no pair.
+function M.wrap_pair_for(value)
+	return WrapPair.parse(value, wrap_pair_list())
+end
+
+-- The vocabulary of the send_* parameters, read on first use.
+local SEND_KEYS_PATH = Paths.shared("modules/actions/send_keys.json")
+local _send_vocabulary = nil
+
+--- The decoded _shared/modules/actions/send_keys.json. A missing or malformed
+--- file raises: every send_* binding would otherwise refuse its value with no
+--- explanation.
+--- @return table
+function M.send_vocabulary()
+	if _send_vocabulary then return _send_vocabulary end
+	local raw = FileSystem.read(SEND_KEYS_PATH)
+	local decoded = raw and JsonCodec.decode(raw) or nil
+	if type(decoded) ~= "table" or type(decoded.keys) ~= "table"
+		or type(decoded.modifiers) ~= "table" or type(decoded.text_max_code_points) ~= "number" then
+		error("gestures/actions: the send-input vocabulary is unreadable at " .. tostring(SEND_KEYS_PATH))
+	end
+	_send_vocabulary = decoded
+	return decoded
+end
+
+--- Replaces the {1} of a localized template on plain indices: the detail may
+--- hold a % that gsub would read as a capture reference.
+--- @param template string
+--- @param detail string
+--- @return string
+local function fill_placeholder(template, detail)
+	local at = template:find("{1}", 1, true)
+	if not at then return template .. "\n" .. detail end
+	return template:sub(1, at - 1) .. detail .. template:sub(at + 3)
 end
 
 function M.validate_action_parameter(action, value)
 	local spec = M.get_action_parameter_spec(action)
 	if not spec then return true end
+	if spec == "wrap_pair" then return (M.wrap_pair_for(value)) ~= nil end
+	if SendInput.KINDS[spec] then return SendInput.parse(spec, value, M.send_vocabulary()) ~= nil end
 	if type(value) ~= "string" or not value:match("^https?://%S+$") then return false end
 	if spec == "search_url" then
 		local _, placeholders = value:gsub("%%s", "")
 		return placeholders == 1
 	end
-	return true
+	if spec == "url" then return true end
+	error("gestures/actions: no validator for parameter kind '" .. tostring(spec) .. "'.")
+end
+
+--- The text a binding editor shows to ask for an action's parameter. The
+--- search-URL prompt holds a LITERAL %s the user has to type, so no text here
+--- goes through string.format; {1} is replaced by plain indices for the same
+--- reason.
+--- @param action string Action id with a parameter.
+--- @return string
+function M.parameter_prompt(action)
+	local spec = M.get_action_parameter_spec(action)
+	if spec == "search_url" then return i18n.get("dialog.gestures.param_search_url") end
+	if spec == "url" then return i18n.get("dialog.gestures.param_link") end
+	if spec == "text" then
+		return fill_placeholder(i18n.get("dialog.gestures.param_text"),
+			tostring(M.send_vocabulary().text_max_code_points))
+	end
+	if spec == "key" or spec == "shortcut" then
+		return fill_placeholder(i18n.get("dialog.gestures.param_" .. spec),
+			SendInput.describe_keys(M.send_vocabulary()))
+	end
+	if spec == "wrap_pair" then
+		local template = i18n.get("dialog.gestures.param_wrap_pair")
+		local samples = WrapPair.describe(wrap_pair_list())
+		local at = template:find("{1}", 1, true)
+		if not at then return template .. "\n" .. samples end
+		return template:sub(1, at - 1) .. samples .. template:sub(at + 3)
+	end
+	error("gestures/actions: no prompt for parameter kind '" .. tostring(spec) .. "'.")
+end
+
+--- The text shown when a typed parameter is refused.
+--- @param action string Action id with a parameter.
+--- @return string
+function M.parameter_error(action)
+	local spec = M.get_action_parameter_spec(action)
+	if spec == "wrap_pair" then return i18n.get("dialog.gestures.param_err_wrap_pair") end
+	if SendInput.KINDS[spec] then
+		return fill_placeholder(i18n.get("dialog.gestures.param_err_" .. spec),
+			tostring(M.send_vocabulary().text_max_code_points))
+	end
+	if spec == "search_url" then
+		return i18n.get("dialog.gestures.param_err_url") .. " "
+			.. i18n.get("dialog.gestures.param_err_many_placeholders")
+	end
+	return i18n.get("dialog.gestures.param_err_url")
 end
 
 function M.get_action_parameter(binding, action)
@@ -1849,6 +2006,23 @@ function M.set_action_parameter(binding, action, value)
 	if not _state or not M.validate_action_parameter(action, value) then return false end
 	_state.action_params = _state.action_params or {}
 	_state.action_params[parameter_key(binding, action)] = value
+	return true
+end
+
+--- Replaces one detached parameter snapshot after complete validation.
+--- Used by scoped preference transactions and their exact compensation owner.
+--- @param parameters table Complete parameter snapshot.
+--- @return boolean committed
+function M.replace_action_parameters(parameters)
+	if not _state or type(parameters) ~= "table" then return false end
+	local staged = {}
+	for key, value in pairs(parameters) do
+		if type(key) ~= "string" or type(value) ~= "string" then return false end
+		local _, action = M.split_action_parameter_key(key)
+		if action and not M.validate_action_parameter(action, value) then return false end
+		staged[key] = value
+	end
+	_state.action_params = staged
 	return true
 end
 
@@ -1920,146 +2094,81 @@ end
 
 register_modifier_chords(load_modifier_chords(_modifier_chords_json))
 
--- The driver key this build of the catalogue answers to.
-local THIS_PLATFORM = "hs"
-
---- True when a catalogue `platform` field claims this driver.
----
---- The field is "all", one driver key, or a comma-separated list of them. The
---- list form exists because the field could not previously say "two drivers out
---- of three": the two window cyclers ship on macOS and Windows and not on
---- Linux, and both single-value answers were false — "all" put dead rows in the
---- Linux picker, "hs" or "ahk" hid half the feature.
---- @param platform string|nil The declared field, or nil for the "all" default.
---- @return boolean
-local function claims_this_platform(platform)
-	if type(platform) ~= "string" or platform == "" or platform == "all" then return true end
-	for key in platform:gmatch("[^,%s]+") do
-		if key == THIS_PLATFORM then return true end
-	end
-	return false
+--- The translated text of one picker heading. Older header values carry a
+--- leading "#" from when the level was spelled inside the text; the level now
+--- comes only from the catalogue, so the marker is stripped.
+--- @param key string Locale key of the heading.
+--- @return string
+local function heading_text(key)
+	return (i18n.get(key):gsub("^#+", ""))
 end
 
---- Builds a picker-order list from the shared TOML, keeping only entries
---- matching the given platform ("hs") plus sentinels ("--", "#…").
---- The modifier-chord placeholder is expanded from modifier_chords.json.
-local function build_sg_names(shared)
-	if not shared then
-		-- The shared action-order catalogue is unavailable: omit picker entries
-		-- rather than exposing an unsynchronised fallback list.
-		return nil
-	end
-	local out = {}
-	for _, item in ipairs(shared.sg_order) do
-		-- Sentinels and headers always pass through (TOML uses "--" and "#…")
-		if item == "--" then
-			out[#out + 1] = "-"
-		elseif item:sub(1, 1) == "#" then
-			-- Header from TOML: the number of leading "#" encodes the heading
-			-- level ("#grp_input" = h1, "##mouse_nav" = h2). Re-emit with the
-			-- SAME marker so the picker can render the hierarchy. The locale value
-			-- carries a legacy "#" prefix — strip it so the level comes only from
-			-- the TOML marker, not the translated text.
-			local hashes     = item:match("^#+")
-			local key_suffix = item:sub(#hashes + 1)
-			local i18n_key   = "sg_actions.sg_order.header." .. key_suffix
-			local translated = i18n.get(i18n_key)
-			local title      = (translated ~= i18n_key) and translated or key_suffix
-			title            = (title:gsub("^#+", ""))
-			out[#out + 1] = hashes .. title
-		elseif item == "_modifier_chords_placeholder" then
-			for _, group in ipairs(MODIFIER_ACTION_GROUPS) do
-				out[#out + 1] = "##Raccourcis " .. group.label
-				for _, action_id in ipairs(group.actions) do out[#out + 1] = action_id end
-			end
-		elseif item:sub(1, 1) == "_" then
-			-- Driver-specific placeholders are ignored deliberately.
-		else
-			local meta = shared.sg_actions[item]
-			if claims_this_platform(meta and meta.platform) then
-				out[#out + 1] = item
-			end
-		end
-	end
-	return out
-end
-
-local function build_ax_names(shared)
-	if not shared then return nil end
-	-- "none" is the disabled-axis sentinel; always first, never in the TOML order list
-	local out = {"none"}
-	for _, item in ipairs(shared.ax_order) do
-		local meta = shared.ax_actions[item]
-		if claims_this_platform(meta and meta.platform) then
-			out[#out + 1] = item
-		end
-	end
-	return out
-end
-
-M.AX_NAMES = build_ax_names(_shared) or {
-	"none", "char", "char_sel", "words", "words_sel",
-	"line_arrow", "line_sel", "lines", "paragraphs", "line_bounds", "document",
-	"tabs", "windows", "spaces", "volume", "brightness", "tracks",
-}
+--- Ordered axis names for the picker, "none" first (the disabled-axis sentinel
+--- the picker shows as its own row). Only macOS dispatches an axis, so this is
+--- the one catalogue that lists any.
+M.AX_NAMES = { "none" }
+for _, name in ipairs(Catalogue.ax_items) do M.AX_NAMES[#M.AX_NAMES + 1] = name end
 
 -- Static export so callers (script_control, tests) can read SG_NAMES directly
 -- without calling get_sg_names(); mirrors the AX_NAMES pattern above.
--- Built once at module load time using the fallback list when _shared is absent.
 M.SG_NAMES = nil  -- populated below after get_sg_names() is defined
 
---- Returns the ordered list of SG action names with translated section headers.
+--- Returns the ordered SG names with translated section headers: action ids,
+--- and headings as "#" (level 1) or "##" (level 2) followed by their text. The
+--- modifier-chord block expands into one sub-heading per modifier combination,
+--- built from the localized group key and the language-neutral combination
+--- label; it used to be a hardcoded French heading in every locale.
 --- Called at menu-build time so headers always reflect the active locale.
 function M.get_sg_names()
-	local names = build_sg_names(_shared)
-	if names then return names end
-	-- Fallback when the shared TOML could not be loaded
-	local h = function(key) return "#" .. i18n.get(key) end
-	return {
-		"none", "-",
-		h("sg_actions.sg_order.header.mouse_nav"),
-		"left_click_toggle", "right_click_toggle", "lookup",
-		"app_switcher", "app_previous", "app_window_previous",
-		"-", h("sg_actions.sg_order.header.keys"),
-		"enter", "tab", "escape", "backspace", "delete",
-		"-", h("sg_actions.sg_order.header.tabs"),
-		"tab_new", "tab_close", "tab_prev", "tab_next",
-		"-", h("sg_actions.sg_order.header.windows"),
-		"win_prev", "win_next", "close_window", "fullscreen",
-		"snap_left", "snap_right", "maximize",
-		"-", h("sg_actions.sg_order.header.spaces"),
-		"space_prev", "space_next", "mission_control", "app_expose",
-		"-", h("sg_actions.sg_order.header.cursor"),
-		"arrow_up", "arrow_down", "arrow_left", "arrow_right",
-		"word_prev", "word_next",
-		"line_up", "line_down", "line_start", "line_end",
-		"para_prev", "para_next", "doc_start", "doc_end",
-		"-", h("sg_actions.sg_order.header.selection"),
-		"sel_up", "sel_down", "sel_left", "sel_right",
-		"sel_word_prev", "sel_word_next",
-		"-", h("sg_actions.sg_order.header.media"),
-		"vol_up", "vol_down", "mute", "brightness_up", "brightness_down",
-		"track_play", "track_next", "track_prev",
-		"-", h("sg_actions.sg_order.header.screenshot"),
-		"screenshot_window_clipboard", "screenshot_window_save",
-		"screenshot_region_clipboard", "screenshot_region_save",
-		"screenshot_fullscreen_clipboard", "screenshot_fullscreen_save",
-		"-", h("sg_actions.sg_order.header.system"),
-		"lock_screen", "notification_center",
-		"-", h("sg_actions.sg_order.header.ui"),
-		"open_metrics_typing", "open_metrics_apps",
-		"open_hotstrings_editor", "open_paths_editor",
-		"-", h("sg_actions.sg_order.header.files"),
-		"open_script_source", "open_personal_shortcuts",
-		"open_personal_hotstrings", "open_personal_info",
-		"open_config", "open_logs_folder", "open_today_log", "open_error_log",
-		"-", h("sg_actions.sg_order.header.script"),
-		"script_pause_toggle", "script_reload", "script_save_reload", "script_quit",
-		"-", h("sg_actions.sg_order.header.debug"),
-		"open_console",
-		"-", h("sg_actions.sg_order.header.cmd"),
-		"-", h("sg_actions.sg_order.header.cmd_shift"),
-	}
+	local out = {}
+	for _, item in ipairs(Catalogue.sg_items) do
+		if item.kind == "action" then
+			out[#out + 1] = item.id
+		elseif item.kind == "heading" then
+			out[#out + 1] = string.rep("#", item.level) .. heading_text(item.key)
+		elseif item.kind == "modifier_chords" then
+			for _, group in ipairs(MODIFIER_ACTION_GROUPS) do
+				out[#out + 1] = string.rep("#", item.level) .. i18n.format(item.group_key, group.label)
+				for _, action_id in ipairs(group.actions) do out[#out + 1] = action_id end
+			end
+		else
+			error("gestures/actions: unknown catalogue item kind '" .. tostring(item.kind) .. "'.")
+		end
+	end
+	return out
+end
+
+--- Every id a binding may name: the listed single actions (modifier chords
+--- included), the axis actions and "none". Built once — the catalogue and the
+--- chord matrix are fixed for the life of the process.
+local ASSIGNABLE = { none = true }
+for _, item in ipairs(Catalogue.sg_items) do
+	if item.kind == "action" then ASSIGNABLE[item.id] = true end
+end
+for _, group in ipairs(MODIFIER_ACTION_GROUPS) do
+	for _, action_id in ipairs(group.actions) do ASSIGNABLE[action_id] = true end
+end
+for _, name in ipairs(Catalogue.ax_items) do ASSIGNABLE[name] = true end
+
+--- True when `name` is an action the catalogue offers on macOS. Bindings are
+--- validated against this, as Windows validates against its registry, so an id
+--- that no longer exists is refused at assignment instead of being stored and
+--- dispatched as a silent no-op.
+--- @param name any
+--- @return boolean
+function M.is_assignable(name)
+	return type(name) == "string" and ASSIGNABLE[name] == true
+end
+
+--- The ids this driver can actually run, for the catalogue parity test.
+--- @return table { sg = {id...}, ax = {id...} }, each sorted.
+function M.registered_action_ids()
+	local out = { sg = {}, ax = {} }
+	for name in pairs(SG) do out.sg[#out.sg + 1] = name end
+	for name in pairs(AX) do out.ax[#out.ax + 1] = name end
+	table.sort(out.sg)
+	table.sort(out.ax)
+	return out
 end
 
 function M.get_label(name)
@@ -2067,17 +2176,17 @@ function M.get_label(name)
 		return i18n.get("sg_actions.none")
 	end
 	if MODIFIER_ACTION_LABELS[name] then return MODIFIER_ACTION_LABELS[name] end
-	-- Prefer locale JSON so the label is translated for the active language
-	local key_sg = "sg_actions." .. name
-	local s = i18n.get(key_sg)
-	if s ~= key_sg then return s end
-	local key_ax = "ax_actions." .. name
-	local s_ax = i18n.get(key_ax)
-	if s_ax ~= key_ax then return s_ax end
-	-- No hardcoded fallback: an action without a label key is a gate failure
-	-- (test-action-labels-have-locale-keys.cjs), not something to paper over with
-	-- a second copy of the English strings. Returning the id makes the omission
-	-- visible if one ever slips past.
+	-- The label key the generated catalogue declares. An id this platform does
+	-- not offer (a binding written on another OS) still resolves through the
+	-- conventional keys. No hardcoded fallback: an action without a label key is
+	-- a gate failure (test-action-catalogue-codegen.cjs), not something to paper
+	-- over with a second copy of the English strings; the id is shown as-is.
+	local meta = Catalogue.actions[name]
+	local keys = meta and { meta.label_key } or { "sg_actions." .. name, "ax_actions." .. name }
+	for _, key in ipairs(keys) do
+		local s = i18n.get(key)
+		if s ~= key then return s end
+	end
 	return name
 end
 

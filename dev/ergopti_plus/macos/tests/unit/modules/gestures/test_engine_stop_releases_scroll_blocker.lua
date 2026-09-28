@@ -178,20 +178,27 @@ helpers.describe("gestures init M.stop(): tears down engine", function()
 		local source = helpers.read_driver_source("local function schedule_emergency_recycle")
 		helpers.assert_true(source ~= nil and source ~= "",
 			"modules/gestures/init.lua source must be locatable")
+		-- The teardown delegates every native owner, Engine included, to the
+		-- release helper that Gestures OFF shares.
+		local release_pos = source:find("release_native_runtime = function", 1, true)
 		local teardown_pos = source:find("teardown_gesture_runtime = function", 1, true)
 		local teardown_end = teardown_pos
 			and source:find("\nlocal function reject_gesture_start", teardown_pos, true)
 		local m_stop_pos = source:find("function M.stop()", 1, true)
 		local m_stop_end = m_stop_pos and source:find("\nfunction M.diagnose()", m_stop_pos, true)
-		helpers.assert_true(teardown_pos ~= nil and teardown_end ~= nil
-			and m_stop_pos ~= nil and m_stop_end ~= nil,
-			"the shared teardown and public stop entry point must remain bounded")
+		helpers.assert_true(release_pos ~= nil and teardown_pos ~= nil and teardown_end ~= nil
+			and release_pos < teardown_pos and m_stop_pos ~= nil and m_stop_end ~= nil,
+			"the native release, the shared teardown and public stop must remain bounded")
 
+		local release = source:sub(release_pos, teardown_pos - 1)
 		local teardown = source:sub(teardown_pos, teardown_end - 1)
 		local stop_body = source:sub(m_stop_pos, m_stop_end - 1)
 		helpers.assert_true(
-			teardown:find("xpcall(Engine.stop, debug.traceback)", 1, true) ~= nil,
-			"the shared gesture teardown must stop Engine to release the scroll blocker")
+			release:find("xpcall(Engine.stop, debug.traceback)", 1, true) ~= nil,
+			"the native release must stop Engine to release the scroll blocker")
+		helpers.assert_true(
+			teardown:find("release_native_runtime()", 1, true) ~= nil,
+			"the shared gesture teardown must route through the native release")
 		helpers.assert_true(
 			stop_body:find("teardown_gesture_runtime(false)", 1, true) ~= nil,
 			"M.stop() must route through the exact teardown that owns Engine.stop")

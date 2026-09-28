@@ -106,6 +106,7 @@ OnError(_FatalErrorHandler)
 #Include ../infra/tick_count.ahk
 #Include ../vendor/Promise.ahk
 #Include ../infra/webview_utils.ahk
+#Include ../ui/console_window.ahk
 #Include ../infra/wall_clock.ahk
 ; Compiled-mode bundle bootstrapper — included this early (matching its real
 ; position right after app_state.ahk in ErgoptiPlus.ahk) so its functions are
@@ -120,11 +121,21 @@ OnError(_FatalErrorHandler)
 #Include ../ui/menu/menu_llm/menu_build_coordinator.ahk
 #Include ../infra/ui_style.ahk
 #Include ../_generated/logger_sub_files.ahk
+#Include ../_generated/app_dirs.ahk
 #Include ../infra/logger.ahk
+; The logs folder every logger test writes to: a private temp folder, never the
+; user's real %LOCALAPPDATA%\ergopti_plus\logs\ (boot.ahk sets it in the driver).
+global _LogsDir := A_Temp . "\ergopti_test_logs\ergopti_plus\"
+global _DefaultLogsDir := _LogsDir
 ; Boot stage profiler and the cross-driver diagnostic snapshot: definitions and
 ; two counters only, exercised by unit/test_diagnostic_logging.ahk.
 #Include ../infra/boot_profiler.ahk
 #Include ../infra/diagnostic_snapshot.ahk
+#Include ../infra/issue_link.ahk
+#Include ../infra/redact.ahk
+#Include ../infra/issue_report.ahk
+#Include ../infra/error_policy.ahk
+#Include ../infra/error_report.ahk
 #Include ../infra/toml/toml_helpers.ahk
 ; Shared timing registry reader (TimingsLoadShared / TimingsGet) — needs
 ; ParseTomlFile above; exercised by test_timings_config.ahk.
@@ -134,6 +145,10 @@ OnError(_FatalErrorHandler)
 #Include ../infra/external_url_policy.ahk
 #Include ../ui/tooltip/position_receipt.ahk
 #Include ../infra/text_utils.ahk
+#Include ../infra/text_case.ahk
+#Include ../infra/wrap_pair.ahk
+#Include ../infra/send_input_parameter.ahk
+#Include ../infra/tap_keys.ahk
 #Include ../infra/nav_layer_helpers.ahk
 #Include ../infra/hotstrings/hotstring_engine.ahk
 #Include ../infra/altgr_family.ahk
@@ -147,11 +162,28 @@ OnError(_FatalErrorHandler)
 ; test_terminators.ahk and consumed by the tray / config-window delimiter menus.
 #Include ../_generated/terminators.ahk
 #Include ../infra/toml/toml_loader.ahk
+#Include ../infra/hotstrings/extension_packs.ahk
 #Include ../infra/hotstrings/hotstrings_cache.ahk
 #Include ../infra/toml/toml_config_loader.ahk
+#Include ../infra/config_migrate.ahk
 #Include ../platform/remap/tap_hold_loader.ahk
 #Include ../platform/remap/tap_hold_writer.ahk
+; The layer-file loader reads _shared/keymap and the physical-key registry at run
+; time; meta/test_corpus_keymap_layers.ahk replays the cross-driver corpus through it.
+#Include ../platform/remap/layers_loader.ahk
+; The navigation layer's hotkey table, built from layer files; registration is
+; injectable, so unit/test_nav_layer_table.ahk drives it without a live hook.
+#Include ../platform/remap/nav_layer_table.ahk
+; The layer editor host: validation, the atomic save and the page's messages,
+; driven by unit/test_layer_editor_host.ahk without a WebView.
+#Include ../ui/layer_editor/init.ahk
 #Include ../ui/menu/menu_taphold.ahk
+; The hotstring gate and « all sections » rows, built over the live Features.
+#Include ../ui/menu/menu_hotstring_switches.ahk
+; The whole tree's path collector and tick, which the bulk hotstring writer in
+; infra/config_io.ahk calls. Definitions only; the category tables they read are
+; declared by ui/tray_menu.ahk, which is not loaded, so a test supplies them.
+#Include ../ui/menu/menu_submenus.ahk
 #Include ../_generated/features_manifest.ahk
 #Include ../infra/manifest_reader.ahk
 ; The dynamic-hotstring module, for its pure helpers (SpacedPrefix, the three
@@ -172,13 +204,15 @@ OnError(_FatalErrorHandler)
 #Include ../infra/lifecycle_transition.ahk
 #Include ../infra/config_transition.ahk
 #Include ../infra/config_transition_runtime.ahk
-; _CollectFeatureUpdates / _CollectFeatureFlipUpdates are exercised directly by
-; the section-resolution regression tests
-; (test_config_io_feature_section_resolution.ahk).
-; ToggleAllFeatures/SaveFullConfig themselves are never invoked here (they
-; depend on numerous boot-only globals, and the successful bulk path reloads),
-; so including this file is safe — only function definitions at top level.
+; _CollectFeatureUpdates is exercised directly by the section-resolution
+; regression tests (test_config_io_feature_section_resolution.ahk).
+; SaveFullConfig itself is never invoked here (it depends on numerous
+; boot-only globals), so including this file is safe — only function
+; definitions at top level.
 #Include ../infra/config_io.ahk
+#Include ../infra/config_scope.ahk
+#Include ../infra/hotstrings/hotstrings_scope.ahk
+#Include ../infra/config_global_scope.ahk
 #Include ../ui/personal_toml_editor.ahk
 #Include ../ui/personal_toml_editor_webview.ahk
 ; Pure helpers (no boot-time side effects) — CountDynamicSection is exercised
@@ -196,6 +230,14 @@ OnError(_FatalErrorHandler)
 #Include ../modules/keymap/layout/layout_ergopti.ahk
 #Include ../modules/keymap/layout/accented_shortcuts.ahk
 #Include ../modules/keymap/layout/layout_shift_caps.ahk
+; Registry layout emulation: definitions only (the hotkeys are registered by
+; KeylayoutEmulation_Register, which the tests call with injected registrars).
+#Include ../modules/keymap/keylayout/keylayout_parser.ahk
+#Include ../modules/keymap/keylayout/keylayout_tables.ahk
+#Include ../modules/keymap/keylayout/keylayout_emulation.ahk
+#Include ../modules/keymap/keylayout/layout_registry.ahk
+#Include ../modules/keymap/keylayout/layout_catalogue.ahk
+#Include ../modules/keymap/keylayout/layout_extension.ahk
 ; Pure layout-poll quiescence decision (no OS deps, no top-level hotkeys) —
 ; exercised by meta/test_layout_quiescence.ahk and consumed by ErgoptiPlus.ahk.
 #Include ../modules/keymap/layout_poll_helper.ahk
@@ -212,6 +254,7 @@ OnError(_FatalErrorHandler)
 ; management) follows it and calls into the loaders/state it declares.
 #Include ../infra/locale.ahk
 #Include ../_generated/gesture_emit_actions.ahk
+#Include ../_generated/action_catalogue.ahk
 #Include ../_generated/locale_table.ahk
 #Include ../infra/i18n.ahk
 _LogBootProgress("i18n included (t() available)")
@@ -277,6 +320,7 @@ InstallSendNoOps()
 ; top-level ExitApp would end the suite.
 #Include unit/test_siho_boot_window.ahk
 #Include unit/test_window_manager_force_foreground.ahk
+#Include unit/test_console_window.ahk
 #Include unit/test_spotlight_ownership.ahk
 #Include unit/test_take_note_async_job.ahk
 #Include unit/test_text_sender_modifiers.ahk
@@ -294,6 +338,15 @@ InstallSendNoOps()
 #Include unit/test_build_commit.ahk
 #Include unit/test_version_display_strips_build_metadata.ahk
 #Include unit/test_logger_daily_rotation.ahk
+; The logs-folder resolver and the Debug menu log openers built on it
+; (logs-dir-resolver). log_openers.ahk is definitions only.
+#Include ../ui/log_openers.ahk
+#Include unit/test_logs_dir_resolver.ahk
+#Include meta/test_logs_dir_single_resolver.ahk
+; The folders editor host: definitions only until a window is opened; its
+; initData builder and logs-folder save are exercised headlessly.
+#Include ../ui/paths_editor/init.ahk
+#Include unit/test_paths_editor_logs_dir.ahk
 #Include unit/test_healthcheck_core.ahk
 #Include unit/test_healthcheck_owner_snapshots.ahk
 #Include unit/test_tooltip_tint_contract.ahk
@@ -370,8 +423,16 @@ InstallSendNoOps()
 #Include unit/test_wpm_drag_admission.ahk
 #Include unit/test_wpm_canon.ahk
 #Include unit/test_features_manifest.ahk
+#Include unit/test_neutral_config_manifest.ahk
+#Include unit/test_config_scope_manifest.ahk
+#Include unit/test_config_scope_menus.ahk
+#Include unit/test_config_scope_shortcuts.ahk
+#Include unit/test_personal_shortcut_neutral_seed.ahk
+#Include unit/test_hotstrings_scope.ahk
+#Include unit/test_global_config_scope.ahk
+#Include unit/test_gesture_clear_boot_marker.ahk
+#Include unit/test_tap_hold_scope.ahk
 #Include unit/test_config_io_feature_section_resolution.ahk
-#Include unit/test_global_disable_all_preserves_assignments.ahk
 #Include unit/test_hotstrings_full.ahk
 #Include unit/test_tap_hold_loader.ahk
 #Include unit/test_i18n.ahk
@@ -383,6 +444,8 @@ InstallSendNoOps()
 #Include unit/test_personal_toml_io.ahk
 #Include unit/test_personal_info_persistence_transaction_20260813.ahk
 #Include unit/test_nav_layer_helpers.ahk
+#Include unit/test_nav_layer_table.ahk
+#Include unit/test_layer_editor_host.ahk
 #Include unit/test_synthetic_buffer_effects.ahk
 #Include unit/test_prefix_finalizer_generation.ahk
 #Include unit/test_synthetic_sends_declare_buffer_effect.ahk
@@ -392,6 +455,17 @@ InstallSendNoOps()
 #Include unit/test_uninstall.ahk
 #Include unit/test_start_at_login.ahk
 #Include meta/test_uninstall_shutdown_gate.ahk
+#Include unit/test_updater_channel_registry.ahk
+#Include unit/test_updater_schedule_vectors.ahk
+#Include unit/test_updater_check_interval_snap.ahk
+#Include unit/test_updater_check_schedule.ahk
+#Include unit/test_updater_balloon_click_ownership.ahk
+#Include unit/test_updater_channel_selection.ahk
+; The About row actions; menu_init.ahk is included with the tray root below.
+#Include ../ui/menu/menu_actions.ahk
+#Include unit/test_about_menu_channel_rows.ahk
+#Include unit/test_changelog_subscribe_channel.ahk
+#Include unit/test_updater_release_notes.ahk
 #Include unit/test_updater_staging_transport.ahk
 #Include unit/test_updater_swap_transaction.ahk
 #Include unit/test_updater_swap_cancellation.ahk
@@ -484,6 +558,15 @@ _LogBootProgress("loading LLM modules")
 #Include unit/test_llm_pointer_watch_transaction.ahk
 #Include unit/test_llm_tab_accept_policy.ahk
 #Include unit/test_accented_shortcuts.ahk
+#Include unit/test_keylayout_emulation.ahk
+#Include unit/test_layout_catalogue.ahk
+#Include unit/test_layout_extension_runtime.ahk
+#Include unit/test_layout_extension_menu.ahk
+#Include unit/test_layout_extension_refresh.ahk
+#Include ../ui/layout_manager/init.ahk
+#Include unit/test_layout_manager_host.ahk
+#Include unit/test_ergopti_keylayout_tables.ahk
+#Include unit/test_layout_supersession.ahk
 ; parser.ahk (the AHK semantic-diff parser) was previously exercised by no suite,
 ; which let a crash in its Levenshtein helper survive — include it + its tests.
 #Include ../modules/llm/parser.ahk
@@ -541,6 +624,7 @@ _LogBootProgress("loading menu_llm/persist")
 #Include ../infra/menu_dispatcher.ahk
 #Include ../ui/menu/menu_llm/menu_settings.ahk
 #Include unit/test_llm_backend_lifecycle_dispatch.ahk
+#Include unit/test_llm_generate_prediction_feedback.ahk
 #Include unit/test_llm_menu_persistence.ahk
 #Include unit/test_llm_temperature_boundary.ahk
 #Include unit/test_llm_numeric_option_ranges.ahk
@@ -585,7 +669,12 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_onboarding_finish_payload.ahk
 #Include unit/test_onboarding_metrics_path.ahk
 #Include unit/test_gestures.ahk
+#Include unit/test_text_case_vectors.ahk
+#Include unit/test_wrap_selection_action.ahk
+#Include unit/test_send_input_actions.ahk
+#Include unit/test_tap_keys.ahk
 #Include unit/test_gesture_cycle_candidates.ahk
+#Include unit/test_gesture_recommended_actions.ahk
 #Include unit/test_config_persistence_transactions.ahk
 #Include unit/test_reload_terminal_pending.ahk
 #Include unit/test_config_recovery_transactions.ahk
@@ -593,6 +682,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_config_typed_updates.ahk
 #Include unit/test_config_typed_transactions.ahk
 #Include unit/test_config_unused_keys.ahk
+#Include unit/test_config_migrate.ahk
 #Include unit/test_config_partial_load_persistence.ahk
 #Include unit/test_config_partial_load_llm.ahk
 #Include unit/test_toml_numeric_strings.ahk
@@ -1041,6 +1131,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_updater_download_receive_timeout.ahk
 #Include meta/test_updater_download_reentrancy_guard.ahk
 #Include meta/test_updater_download_requires_consent.ahk
+#Include meta/test_updater_prompt_uses_shared_notes.ahk
 #Include meta/test_personal_load_once.ahk
 #Include meta/test_menu_llm_actions_include.ahk
 #Include meta/test_llm_menu_suspend_bootstrap.ahk
@@ -1048,20 +1139,26 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_llm_menu_disabled_greyed.ahk
 #Include meta/test_language_menu_deferred_publication.ahk
 #Include meta/test_llm_menu_layout_shared.ahk
-; MenuManifest_LoadTopLevelTail/LoadGlobalActions/LoadDebugMenu — needed so
-; the gestures-actions-separator regression test can exercise the real
-; production loader (not a source-scan) against the real shared manifest.
+; MenuManifest_LoadTopLevel/LoadGlobalActions/LoadDebugMenu — needed so the
+; top-level drift gate stages the root from the real shared manifest.
 #Include ../infra/menu_manifest.ahk
 ; The generic manifest walker. Pure function definitions — no top-level
 ; statements, no includes — so pulling it in is side-effect free, and it lets
 ; disabled_when tests exercise the real resolver instead of scanning its source.
 #Include ../infra/manifest_menu.ahk
-; Drift gate: manifest top_level tail (from global_actions) must match the AHK dispatch table.
+; The tray root builder: its top-level dispatcher and the id → builder table.
+; Function definitions only, and the table names only its own _MI_ builders,
+; so pulling it in stages nothing and resolves no menu dependency at load.
+#Include ../ui/menu/menu_init.ahk
+; Drift gate: the staged tray root follows the manifest's top level, separators included.
 #Include meta/test_menu_top_level_drift_gate.ahk
-; Regression: the separator between Gestures and "Actions globales" must survive the tail loader.
-#Include meta/test_menu_gestures_actions_separator.ahk
-; Regression: a category toggle's own separator absorbs the manifest "---" after it.
+; Regression: no separator doubles up in any manifest menu.
 #Include unit/test_manifest_menu_no_double_separator.ahk
+; Regression: every category switch is a first-row checkbox with one label.
+#Include unit/test_category_toggle_checkbox.ahk
+#Include unit/test_menu_choice_row.ahk
+; Regression: each hotstring « tout activer » / « tout désactiver » pair is one checkbox.
+#Include unit/test_hotstring_bulk_checkboxes.ahk
 ; Regression: Shortcuts submenu block separator and screenshot key label.
 #Include unit/test_shortcuts_menu_blocks.ahk
 #Include unit/test_shortcuts_menu_groups_unique.ahk
@@ -1085,6 +1182,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_corpus_dynamic_hotstrings_prefix.ahk
 #Include meta/test_corpus_hotstrings_config_resolve.ahk
 #Include meta/test_corpus_tap_hold.ahk
+#Include meta/test_corpus_keymap_layers.ahk
 #Include meta/test_corpus_hotstring_matcher.ahk
 ; LLM parser corpus -- tests LLM_ParseOllamaResponse and _LLMRemoteParseResponse
 ; against the shared cross-driver vectors (already included above via api_ollama/api_remote).
@@ -1103,6 +1201,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_chord_notation.ahk
 #Include unit/test_hotkey_registrar_transactions.ahk
 #Include unit/test_hotkey_registrar_modifier_keys.ahk
+#Include unit/test_keyboard_slot_win_space.ahk
 #Include unit/test_llm_trigger_shortcut_transactions.ahk
 #Include unit/test_llm_nav_event_owner.ahk
 #Include unit/test_llm_nav_hotkey_transaction.ahk
@@ -1265,6 +1364,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_updater_setchannel_cancels_async.ahk
 #Include meta/test_updater_setchannel_blocks_during_download.ahk
 #Include meta/test_updater_setcheckinterval_coerces.ahk
+#Include meta/test_updater_scheduler_off_typing_path.ahk
 #Include meta/test_webview_temp_dir_and_com_leak_on_reload.ahk
 #Include meta/test_win_l_lock_resets_context.ahk
 #Include meta/test_winhttp_no_abort_on_poll_timeout.ahk
@@ -1560,6 +1660,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_updater_loadchannel_try_wrap.ahk
 #Include meta/test_crash_report_sysinfo_dedup.ahk
 #Include meta/test_logger_dedup_exit_flush.ahk
+#Include meta/test_logger_repeat_collapsing.ahk
 #Include meta/test_shell_runner_boot_crash_and_quoting.ahk
 #Include meta/test_hotpath_priority_starvation.ahk
 #Include meta/test_priority_baseline_single_source.ahk
@@ -1584,16 +1685,22 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_dpapi_blob_size.ahk
 #Include meta/test_llm_diff_french_accents.ahk
 #Include unit/test_audit_v5_fixes.ahk
-; Healthcheck pure formatters (uptime / HTML-escape) — coverage preserved from
-; the deleted P5-stale test_session_regressions orphan. helpers.ahk is
-; headless-safe (function definitions only, no top-level side effects).
+; The diagnostics window's sources are headless-safe: function definitions and
+; their globals only, no top-level side effects.
 #Include ../ui/healthcheck/core.ahk
 #Include ../ui/healthcheck/helpers.ahk
-#Include meta/test_healthcheck_format_helpers.ahk
-#Include unit/test_healthcheck_copy_receipt.ahk
+#Include ../ui/healthcheck/probes.ahk
+#Include ../ui/healthcheck/report.ahk
+#Include ../ui/healthcheck/actions.ahk
 #Include unit/test_kana_altgr_readers.ahk
 #Include unit/test_kana_altgr_lift_respects_owner.ahk
 #Include unit/test_kana_altgr_ctrl_chords.ahk
+#Include ../ui/error_dialog/init.ahk
+#Include unit/test_error_dialog.ahk
+#Include unit/test_healthcheck_os_name_windows11.ahk
+#Include unit/test_healthcheck_issues_from_errors_file.ahk
+#Include unit/test_healthcheck_report_issue.ahk
+#Include meta/test_corpus_diagnostics.ahk
 
 ; Guards the _HsEdWeb_Reset() idempotency fix for the live-log access-violation
 ; crash (double-unsubscribe against an already torn-down WebView2 controller).
@@ -1835,3 +1942,4 @@ SetTimer(_WatchdogFire, -_SUITE_TIMEOUT_MS)
 ; Drive everything. RunTests prints a TAP-style report to stdout and exits
 ; with the appropriate code — control never returns from this call.
 RunTests()
+

@@ -71,7 +71,7 @@ local function load_bindings_with_system_spy(options)
 			spy.resume_awake = spy.resume_awake + 1
 			return controlled(options.resume_awake_mode)
 		end,
-		bind_instant_screenshot    = fake_factory,
+		bind_tap_keys              = fake_factory,
 		bind_layer_scroll          = fake_factory,
 		bind_wrap_text_if_selected = fake_factory,
 		bind_cmd_star              = fake_factory,
@@ -120,6 +120,7 @@ local function load_bindings_with_system_spy(options)
 			bind = function() return { delete = function() return true end } end,
 		},
 	})
+	require("tests.support.shortcut_bindings_fixture").prefer_all(bindings)
 	return bindings, spy
 end
 

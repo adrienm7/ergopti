@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fakes = helpers.load_module("tests.fakes")
+local PreferencesFixture = require("tests.support.llm_preferences_fixture")
 
 helpers.describe("prediction_engine integration", function()
 
@@ -15,7 +15,7 @@ helpers.describe("prediction_engine integration", function()
   -- 1. Module loads with no mock
   -- ==========================================================================
 
-  helpers.it("prediction_engine module loads without error", function()
+  PreferencesFixture.it("prediction_engine module loads without error", function()
     local ok, pe = pcall(require, "modules.llm.prediction_engine")
     helpers.assert_true(ok, "require should succeed")
     helpers.assert_true(type(pe) == "table", "should return a table")
@@ -52,11 +52,11 @@ helpers.describe("prediction_engine integration", function()
     pe.init({ engine = {}, keyboard_hook = {} })
     teardown_mocks()
 
-    helpers.it("is_enabled returns boolean", function()
+    PreferencesFixture.it("is_enabled returns boolean", function()
       helpers.assert_true(type(pe.is_enabled()) == "boolean")
     end)
 
-    helpers.it("enable/disable round-trip", function()
+    PreferencesFixture.it("enable/disable round-trip", function()
       pe.enable()
       helpers.assert_true(pe.is_enabled(), "should be enabled after enable()")
       pe.disable()
@@ -64,7 +64,7 @@ helpers.describe("prediction_engine integration", function()
       pe.enable()
     end)
 
-    helpers.it("toggle flips state", function()
+    PreferencesFixture.it("toggle flips state", function()
       pe.enable()
       pe.toggle()
       helpers.assert_eq(pe.is_enabled(), false)
@@ -72,7 +72,7 @@ helpers.describe("prediction_engine integration", function()
       helpers.assert_true(pe.is_enabled())
     end)
 
-    helpers.it("get_models delegates to profiles", function()
+    PreferencesFixture.it("get_models delegates to profiles", function()
       setup_mocks()
       local pe2 = helpers.load_module("modules.llm.prediction_engine")
       pe2.init({ engine = {}, keyboard_hook = {} })
@@ -82,7 +82,7 @@ helpers.describe("prediction_engine integration", function()
       helpers.assert_eq(#models, 3)
     end)
 
-    helpers.it("get_current_model delegates to profiles", function()
+    PreferencesFixture.it("get_current_model delegates to profiles", function()
       setup_mocks()
       local pe2 = helpers.load_module("modules.llm.prediction_engine")
       pe2.init({ engine = {}, keyboard_hook = {} })
@@ -91,7 +91,7 @@ helpers.describe("prediction_engine integration", function()
       helpers.assert_eq(model, "codellama")
     end)
 
-    helpers.it("get_models returns empty when profiles absent", function()
+    PreferencesFixture.it("get_models returns empty when profiles absent", function()
       local pe2 = helpers.load_module("modules.llm.prediction_engine")
       -- Don't mock profiles — get_models should return {}.
       local models = pe2.get_models()
@@ -99,39 +99,39 @@ helpers.describe("prediction_engine integration", function()
       helpers.assert_eq(#models, 0)
     end)
 
-    helpers.it("get_max_tokens returns a positive number", function()
+    PreferencesFixture.it("get_max_tokens returns a positive number", function()
       local t = pe.get_max_tokens()
       helpers.assert_true(type(t) == "number")
       helpers.assert_true(t > 0, "max_tokens should be positive")
     end)
 
-    helpers.it("get_temperature returns a number in [0, 2]", function()
+    PreferencesFixture.it("get_temperature returns a number in [0, 2]", function()
       local t = pe.get_temperature()
       helpers.assert_true(type(t) == "number")
       helpers.assert_true(t >= 0 and t <= 2, "temperature in range")
     end)
 
-    helpers.it("get_triggers returns the configured triggers", function()
+    PreferencesFixture.it("get_triggers returns the configured triggers", function()
       local triggers = pe.get_triggers()
       helpers.assert_true(type(triggers) == "table")
       helpers.assert_true(#triggers >= 2, "should have at least 2 default triggers")
     end)
 
-    helpers.it("is_auto_inject is a boolean", function()
+    PreferencesFixture.it("is_auto_inject is a boolean", function()
       helpers.assert_true(type(pe.is_auto_inject()) == "boolean")
     end)
 
-    helpers.it("is_predicting returns false when idle", function()
+    PreferencesFixture.it("is_predicting returns false when idle", function()
       helpers.assert_eq(pe.is_predicting(), false)
     end)
 
-    helpers.it("get_max_context returns the configured value", function()
+    PreferencesFixture.it("get_max_context returns the configured value", function()
       local ctx = pe.get_max_context()
       helpers.assert_true(type(ctx) == "number")
       helpers.assert_true(ctx > 0)
     end)
 
-    helpers.it("set_max_context changes the value", function()
+    PreferencesFixture.it("set_max_context changes the value", function()
       pe.set_max_context(1000)
       helpers.assert_eq(pe.get_max_context(), 1000)
       pe.set_max_context(500)  -- restore
@@ -145,13 +145,13 @@ helpers.describe("prediction_engine integration", function()
   -- ==========================================================================
 
   helpers.describe("profiles persistence", function()
-    helpers.it("profiles module loads without error", function()
+    PreferencesFixture.it("profiles module loads without error", function()
       local ok, pf = pcall(require, "modules.llm.profiles")
       helpers.assert_true(ok, "require should succeed")
       helpers.assert_true(type(pf) == "table", "should return a table")
     end)
 
-    helpers.it("profiles.init with empty opts sets defaults", function()
+    PreferencesFixture.it("profiles.init with empty opts sets defaults", function()
       local pf = helpers.load_module("modules.llm.profiles")
       pf.init({})
       helpers.assert_true(type(pf.is_enabled) == "function")
@@ -162,7 +162,7 @@ helpers.describe("prediction_engine integration", function()
         "profiles own an origin, never an operation endpoint")
     end)
 
-    helpers.it("profiles query the exact /api/tags endpoint", function()
+    PreferencesFixture.it("profiles query the exact /api/tags endpoint", function()
       local previous_popen = io.popen
       local command = nil
       io.popen = function(value)
@@ -188,7 +188,7 @@ helpers.describe("prediction_engine integration", function()
         "the chat path must never prefix the tags operation")
     end)
 
-    helpers.it("profiles.toggle toggles enabled state", function()
+    PreferencesFixture.it("profiles.toggle toggles enabled state", function()
       local pf = helpers.load_module("modules.llm.profiles")
       pf.init({})
       local initial = pf.is_enabled()
@@ -198,7 +198,7 @@ helpers.describe("prediction_engine integration", function()
       helpers.assert_eq(pf.is_enabled(), initial)
     end)
 
-    helpers.it("profiles.set_model changes current model", function()
+    PreferencesFixture.it("profiles.set_model changes current model", function()
       local pf = helpers.load_module("modules.llm.profiles")
       pf.init({ model = "codellama" })
       helpers.assert_eq(pf.get_current_model(), "codellama")
@@ -206,15 +206,15 @@ helpers.describe("prediction_engine integration", function()
       helpers.assert_eq(pf.get_current_model(), "llama3")
     end)
 
-    helpers.it("profiles and prediction state stay durable when storage fails", function()
-      local previous_storage = package.loaded["adapters.storage"]
+    PreferencesFixture.it("profiles and prediction state stay durable when storage fails", function()
+      local previous_storage = package.loaded["infra.llm_preferences"]
       local previous_profiles = package.loaded["modules.llm.profiles"]
       local previous_prediction = package.loaded["modules.llm.prediction_engine"]
-      local storage = Fakes.storage({
-        initial = { ["llm.model"] = "codellama", ["llm.enabled"] = false },
+      local storage = PreferencesFixture.new({
+        initial = { ["llm.models.ollama"] = "codellama", ["llm.enabled"] = false },
         writes_fail = true,
       })
-      package.loaded["adapters.storage"] = storage
+      package.loaded["infra.llm_preferences"] = storage
       package.loaded["modules.llm.profiles"] = nil
       local profiles = require("modules.llm.profiles")
       profiles.init({})
@@ -233,7 +233,7 @@ helpers.describe("prediction_engine integration", function()
       helpers.assert_eq(prediction.is_enabled(), false,
         "the engine must not diverge from the profile that refused persistence")
 
-      package.loaded["adapters.storage"] = previous_storage
+      package.loaded["infra.llm_preferences"] = previous_storage
       package.loaded["modules.llm.profiles"] = previous_profiles
       package.loaded["modules.llm.prediction_engine"] = previous_prediction
     end)

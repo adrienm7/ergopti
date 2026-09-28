@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Unused Configuration Keys Contract
 --- DESCRIPTION:
---- The behaviour every Lua driver's "Clean up unused settings…" row must keep,
+--- The behaviour every Lua driver's « Nettoyer config.toml » row must keep,
 --- registered once per driver suite so the macOS runner (Lua 5.4) and the
 --- Linux runner (LuaJIT in CI) both prove it: detection by the driver's own
 --- rule, a verified byte-exact backup before any change, a refusal that leaves
@@ -456,6 +456,14 @@ local function register_engine(h, driver)
 			h.assert_eq(scan.status, "ok")
 			h.assert_eq(#scan.keys, 0,
 				"only records whose exact removal can be proven by text are offered")
+		end)
+
+		h.it("metadata tables such as the [_meta] schema stamp are never offered", function()
+			local source = "[_meta]\nschema_version = 3\n[_meta.sections]\nx = 1\n[stale]\nk = 1\n"
+			local scan = Engine.find_in_source(source, marking({}))
+			h.assert_eq(scan.status, "ok")
+			h.assert_eq(ids(scan.keys), { "stale.k=section" },
+				"the boot migration reads [_meta] before any reader; every [_*] table is metadata, as on Windows")
 		end)
 
 		h.it("an unterminated value is malformed, not cleanable", function()

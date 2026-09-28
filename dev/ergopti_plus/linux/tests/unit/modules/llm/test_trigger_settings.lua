@@ -9,6 +9,7 @@
 
 local helpers = require("tests.helpers")
 local Fakes = helpers.load_module("tests.fakes")
+local PreferencesFixture = require("tests.support.llm_preferences_fixture")
 
 local held = {}
 
@@ -23,8 +24,8 @@ local function restore()
 end
 
 local function load_settings(initial, writes_fail)
-	local storage = Fakes.storage({ initial = initial, writes_fail = writes_fail })
-	replace("adapters.storage", storage)
+	local storage = PreferencesFixture.new({ initial = initial, writes_fail = writes_fail })
+	replace("infra.llm_preferences", storage)
 	package.loaded["modules.llm.trigger_settings"] = nil
 	local settings = require("modules.llm.trigger_settings")
 	settings._reset()

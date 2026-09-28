@@ -85,8 +85,10 @@ Test("menu: Menu.Insert duplicates rows on a repeated splice (menu-shortcut-grou
 ; =========================================================
 
 _MSG_InitMenuOnlyReadsSubMenus() {
-	Body := _DriverFuncBody("initMenu")
-	Assert(Body != "", "initMenu() must exist in the driver source")
+	; initMenu dispatches every top-level row to a builder, so the SubMenus reads
+	; live in those builders; _Updater_RebuildMenu reaches all of them.
+	Body := _TrayRootBuilderBodies()
+	Assert(Body != "", "the tray-root builders must exist in the driver source")
 
 	Reads := 0
 	for Line in StrSplit(Body, "`n", "`r") {

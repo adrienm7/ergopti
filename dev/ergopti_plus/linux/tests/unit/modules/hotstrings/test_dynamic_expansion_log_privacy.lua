@@ -24,6 +24,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local restore_family_preferences = require("tests.support.dynamic_hotstrings_fixture").install()
 
 -- Real-shaped, nobody's data. Distinctive enough that a substring search cannot
 -- match it by accident.
@@ -165,6 +166,7 @@ helpers.describe("dynamic expansion failure-log privacy", function()
 			local ok, err = pcall(function()
 				local Manager = require("modules.dynamic_hotstrings.manager")
 				assert(Manager.init({ trigger_char = "★", personal_info_path = path }))
+				assert(Manager.set_enabled(true))
 				Manager.on_trigger("@i★", "★")
 				Manager.on_trigger("@in★", "★")
 			end)
@@ -196,3 +198,5 @@ helpers.describe("dynamic expansion failure-log privacy", function()
 	end)
 
 end)
+
+restore_family_preferences()

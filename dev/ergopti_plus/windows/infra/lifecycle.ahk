@@ -1238,10 +1238,10 @@ WindowSpy(*) {
 				MsgBox(Format(t("ergopti.windowspy_not_found"), spyPath))
 }
 ActivateListVars(*) {
-		ListVars()
+		return ConsoleWindow_Open("list_vars")
 }
 ActivateKeyHistory(*) {
-		KeyHistory()
+		return ConsoleWindow_Open("key_history")
 }
 ShowHealthCheck(*) {
 		HealthCheck_ShowWindow()

@@ -1,0 +1,246 @@
+﻿; ui/healthcheck/report.ahk
+
+; ==============================================================================
+; MODULE: Healthcheck / Exports And GitHub Forms
+; DESCRIPTION:
+; What the diagnostics page's buttons do on this machine once
+; HealthCheck_ValidateAction accepted them: copy the report, save it as a
+; Markdown file under the logs folder and select it in Explorer, report it on
+; GitHub (copy, save, select, then open the bug form with a short summary
+; prefilled) and open a folder. Also the Debug menu's "Report a bug", which
+; opens the diagnostics window at its preview, and "Suggest a feature".
+;
+; FEATURES & RATIONALE:
+; 1. Every text that leaves the machine goes through Redact_Apply again here,
+;    whatever the page did: the profile folder, the account name and
+;    token-like secrets are removed from the clipboard, the file and the URL.
+; 2. GitHub cannot receive a file through a URL and answers 414 a little above
+;    8 KB, which is why the full report travels through the clipboard and the
+;    saved file, and the form gets a summary.
+; 3. Paths come from the snapshot the host collected, by field id; a folder
+;    that does not exist yet is created before it is opened; a file that does
+;    not exist yet (today's errors file before the day's first warning) is
+;    said to the page, not logged as a failure.
+; 4. Side effects are one Map so a test can observe each of them; the browser
+;    opens last, after the clipboard holds what it asks for.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+; The path fields that name a folder: created when missing, then opened
+global HC_FOLDER_IDS := Map("config_dir", true, "logs_dir", true, "crash_dir", true, "diagnostics_dir", true,
+	"app_dir", true)
+
+
+
+
+
+; ===============================
+; ===============================
+; ======= 1/ Side Effects =======
+; ===============================
+; ===============================
+
+; Saves the report in Dir, creating the folder when it is missing.
+; @returns {String} The saved file's path.
+; @throws {Error} When the folder or the file cannot be written.
+_HCReport_Save(Dir, Name, Text) {
+	DirCreate(Dir)
+	Path := Dir . "\" . Name
+	File := FileOpen(Path, "w", "UTF-8-RAW")
+	try File.Write(Text)
+	finally File.Close()
+	return Path
+}
+
+; Starts a command line through the shell's file associations.
+; @param CommandLine {String}
+; @returns {Boolean} False when it could not be started (logged).
+_HCReport_Start(CommandLine) {
+	try {
+		Run(CommandLine)
+	} catch as Err {
+		LoggerWarn("HealthCheckReport", "{1} could not be started: {2}", CommandLine, Err.Message)
+		return false
+	}
+	return true
+}
+
+; Selects the saved report in Explorer.
+; @returns {Boolean} False when Explorer could not be started.
+_HCReport_Reveal(Path) {
+	return _HCReport_Start('explorer.exe /select,"' . Path . '"')
+}
+
+; Opens a folder in Explorer, or a file with its default program.
+; @returns {Boolean}
+_HCReport_Open(Path) {
+	return _HCReport_Start(InStr(FileExist(Path), "D") ? 'explorer.exe "' . Path . '"' : '"' . Path . '"')
+}
+
+; Shows a system notification through the notifier adapter.
+_HCReport_Notify(Title, Body, Kind) {
+	NotifierSend(Body, Map("title", Title, "level", Kind))
+	return true
+}
+
+; The production side effects; a test replaces any of them.
+; @param Overrides {Map|Integer} Replacement effects, or 0.
+; @returns {Map}
+_HCReport_Effects(Overrides := 0) {
+	Effects := Map(
+		"copy",     CB_Write,
+		"save",     _HCReport_Save,
+		"reveal",   _HCReport_Reveal,
+		"make_dir", (Dir) => (DirCreate(Dir), true),
+		"exists",   (Path) => FileExist(Path) != "",
+		"open",     _HCReport_Open,
+		"open_url", ExternalUrl_OpenHttp,
+		"notify",   _HCReport_Notify,
+		"identity", () => Map("home", EnvGet("USERPROFILE"), "user", A_UserName))
+	if (Overrides is Map) {
+		for Name, Fn in Overrides
+			Effects[Name] := Fn
+	}
+	return Effects
+}
+
+; What identifies this machine in paths and text, for redaction. Windows paths
+; compare case-insensitively.
+; @param Overrides {Map|Integer} Replacement side effects (tests only).
+; @returns {Map} { home, user, case_insensitive }
+HealthCheck_RedactionContext(Overrides := 0) {
+	Identity := _HCReport_Effects(Overrides)["identity"].Call()
+	; Without the profile folder nothing would remove it, and every path under
+	; it would be published
+	if (Identity["home"] == "")
+		throw Error("The profile folder is unknown, so nothing could be redacted.")
+	return Map("home", Identity["home"], "user", Identity["user"], "case_insensitive", true)
+}
+
+
+
+
+
+; ===============================
+; ===============================
+; ======= 2/ Page Actions =======
+; ===============================
+; ===============================
+
+; Saves the report under the diagnostics folder and selects it in Explorer.
+; @returns {String} The saved file's path.
+_HCReport_SaveAndReveal(Effects, Paths, Name, Text) {
+	if !Paths.Has("diagnostics_dir")
+		throw Error("The diagnostics folder is unknown.")
+	Path := Effects["save"].Call(Paths["diagnostics_dir"], Name, Text)
+	if !Effects["reveal"].Call(Path)
+		LoggerWarn("HealthCheckReport", "The saved report could not be selected in Explorer.")
+	return Path
+}
+
+; Performs one action of the diagnostics page, already validated.
+; @param Action {Map} From HealthCheck_ValidateAction (copy, save, report, open_path).
+; @param Paths {Map} The snapshot's paths section.
+; @param Config {Map} From HealthCheck_Config().
+; @param Overrides {Map|Integer} Replacement side effects (tests only).
+; @returns {Map} { ok: Boolean, path?: String, missing?: true }
+HealthCheck_PerformAction(Action, Paths, Config, Overrides := 0) {
+	Name := Action["action"]
+	LoggerStart("HealthCheckReport", "Diagnostics action '{1}'…", Name)
+	Effects := _HCReport_Effects(Overrides)
+	Outcome := Map("ok", true)
+	; A file not created yet, such as today's errors file before the day's
+	; first warning: nothing to open, and no failure of ours
+	Missing := ""
+	try {
+		Context := HealthCheck_RedactionContext(Overrides)
+		Rules := Config["redaction"]
+		switch Name {
+			case "copy":
+				if !Effects["copy"].Call(Redact_Apply(Action["text"], Rules, Context))
+					throw Error("The clipboard refused the report.")
+			case "save":
+				Outcome["path"] := _HCReport_SaveAndReveal(Effects, Paths, Action["name"],
+					Redact_Apply(Action["text"], Rules, Context))
+			case "report":
+				Text := Redact_Apply(Action["text"], Rules, Context)
+				if !Effects["copy"].Call(Text)
+					throw Error("The clipboard refused the report.")
+				Outcome["path"] := _HCReport_SaveAndReveal(Effects, Paths, Action["name"], Text)
+				Fields := Map()
+				for Id, Value in Action["fields"]
+					Fields[Id] := Redact_Apply(Value, Rules, Context)
+				Url := IssueLink_BuildUrl(Config["templates"], Config["repository"], "bug", Fields)
+				if !Effects["open_url"].Call(Url)
+					throw Error("The browser could not be opened.")
+			case "open_path":
+				Id := Action["id"]
+				if !Paths.Has(Id)
+					throw Error("The path " . Id . " is unknown.")
+				Path := Paths[Id]
+				if HC_FOLDER_IDS.Has(Id)
+					Effects["make_dir"].Call(Path)
+				if !Effects["exists"].Call(Path) {
+					if HC_FOLDER_IDS.Has(Id)
+						throw Error(Path . " does not exist.")
+					Missing := Path
+				} else if !Effects["open"].Call(Path) {
+					throw Error(Path . " could not be opened.")
+				}
+			default:
+				throw Error("No handler for the action " . Name . ".")
+		}
+	} catch as Err {
+		LoggerError("HealthCheckReport", "Diagnostics action '{1}' failed: {2}", Name, Err.Message)
+		return Map("ok", false)
+	}
+	if (Missing != "") {
+		LoggerInfo("HealthCheckReport", "Diagnostics action '{1}': {2} does not exist yet.", Name, Missing)
+		return Map("ok", false, "missing", true)
+	}
+	LoggerSuccess("HealthCheckReport", "Diagnostics action '{1}' done.", Name)
+	return Outcome
+}
+
+
+
+
+
+; =============================
+; =============================
+; ======= 3/ Debug Menu =======
+; =============================
+; =============================
+
+; Opens the diagnostics window at its preview: the user reviews exactly what
+; is shared before the report button copies, saves and opens GitHub.
+HealthCheck_ReportBug() {
+	HealthCheck_ShowWindow("report")
+}
+
+; Opens the GitHub feature form with the version and the system prefilled.
+; @param Overrides {Map|Integer} Replacement side effects (tests only).
+; @returns {Boolean}
+HealthCheck_SuggestFeature(Overrides := 0) {
+	LoggerStart("HealthCheckReport", "Opening the feature request form…")
+	Effects := _HCReport_Effects(Overrides)
+	try {
+		Config := HealthCheck_Config()
+		Rules := Config["redaction"]
+		Context := HealthCheck_RedactionContext(Overrides)
+		Sections := HealthCheck_Run()["sections"]
+		Url := IssueLink_BuildUrl(Config["templates"], Config["repository"], "feature", Map(
+			"version", Redact_Apply(String(Sections["versions"].Get("ergopti_version", "unknown")), Rules, Context),
+			"os",      Redact_Apply(String(Sections["system"].Get("os", "unknown")), Rules, Context),
+			"driver",  "windows"))
+		if !Effects["open_url"].Call(Url)
+			throw Error("The browser could not be opened.")
+	} catch as Err {
+		LoggerError("HealthCheckReport", "Feature request failed: {1}", Err.Message)
+		Effects["notify"].Call(t("menu.debug.suggest_feature"), t("notify.github_report_failed"), "error")
+		return false
+	}
+	LoggerSuccess("HealthCheckReport", "Feature request form opened.")
+	return true
+}

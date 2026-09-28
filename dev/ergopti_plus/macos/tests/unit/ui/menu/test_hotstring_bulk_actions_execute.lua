@@ -9,10 +9,10 @@
 --- function, and therefore rendered two healthy-looking rows that never reached
 --- the provider callback.
 ---
---- This test drives the complete provider -> builder -> manifest renderer path
---- and clicks both rendered rows.  Merely scanning for either field would be a
---- false green: both spellings can exist while the bridge still reads the wrong
---- one.
+--- The two rows are one « all sections » checkbox now. This test drives the
+--- complete provider -> builder -> manifest renderer path and clicks the
+--- rendered checkbox.  Merely scanning for either field would be a false green:
+--- both spellings can exist while the bridge still reads the wrong one.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -61,16 +61,10 @@ helpers.describe("hotstring whole-tree commands: provider actions reach clicks",
 		}
 		local menu_mods = {
 			hotstrings = {
-				build_bulk_actions = function()
+				all_sections_switch = function()
 					return {
-						{
-							label = "menu.hotstrings.enable_all",
-							action = function() fired[#fired + 1] = "enable" end,
-						},
-						{
-							label = "menu.hotstrings.disable_all",
-							action = function() fired[#fired + 1] = "disable" end,
-						},
+						checked = true,
+						action = function() fired[#fired + 1] = "switch" end,
 					}
 				end,
 			},
@@ -80,17 +74,16 @@ helpers.describe("hotstring whole-tree commands: provider actions reach clicks",
 		helpers.assert_true(ok, "building the user-visible menu must not raise")
 		helpers.assert_eq(type(menu), "table", "builder.generate must return menu rows")
 
-		local enable_row = find_row(menu, "menu.hotstrings.enable_all")
-		local disable_row = find_row(menu, "menu.hotstrings.disable_all")
-		helpers.assert_eq(type(enable_row and enable_row.fn), "function",
-			"the rendered enable-all row must carry the provider action")
-		helpers.assert_eq(type(disable_row and disable_row.fn), "function",
-			"the rendered disable-all row must carry the provider action")
+		local row = find_row(menu, "menu.hotstrings.enable_all_sections")
+		helpers.assert_eq(type(row and row.fn), "function",
+			"the rendered all-sections checkbox must carry the provider action")
+		helpers.assert_eq(row.checked, true, "the rendered checkbox carries the provider's tick")
+		helpers.assert_nil(find_row(menu, "menu.hotstrings.enable_all"), "the retired enable-all row is gone")
+		helpers.assert_nil(find_row(menu, "menu.hotstrings.disable_all"), "the retired disable-all row is gone")
 
-		enable_row.fn()
-		disable_row.fn()
-		helpers.assert_eq(table.concat(fired, ","), "enable,disable",
-			"clicking both rendered commands must execute the provider callbacks; "
+		row.fn()
+		helpers.assert_eq(table.concat(fired, ","), "switch",
+			"clicking the rendered checkbox must execute the provider callback; "
 				.. "an empty fallback function is a silent user-visible no-op")
 	end)
 
@@ -99,6 +92,7 @@ helpers.describe("hotstring whole-tree commands: provider actions reach clicks",
 		local enabled_sections = {}
 		local disabled_sections = {}
 		local enabled_groups = {}
+		local section_on = {}
 		local starts, saves, rebuilds = 0, 0, 0
 		local sections = {
 			alpha = {
@@ -116,11 +110,13 @@ helpers.describe("hotstring whole-tree commands: provider actions reach clicks",
 			state = { hotstrings = {}, keymap = false },
 			keymap = {
 				get_sections = function(group) return sections[group] end,
+				is_section_enabled = function(group, section) return section_on[group .. "/" .. section] == true end,
 				set_groups_sections_enabled = function(changes, enabled)
 					for _, change in ipairs(changes) do
 						for _, section in ipairs(change.sections) do
 							local target = enabled and enabled_sections or disabled_sections
 							target[#target + 1] = change.name .. "/" .. section
+							section_on[change.name .. "/" .. section] = enabled
 						end
 						if change.enable_group then
 							enabled_groups[#enabled_groups + 1] = change.name
@@ -134,13 +130,12 @@ helpers.describe("hotstring whole-tree commands: provider actions reach clicks",
 			updateMenu = function() rebuilds = rebuilds + 1 end,
 		}
 
-		local rows = hotstrings.build_bulk_actions(ctx)
-		helpers.assert_eq(type(rows[1] and rows[1].action), "function",
-			"the enabled provider row must expose an action")
-		helpers.assert_eq(type(rows[2] and rows[2].action), "function",
-			"the disabled provider row must expose an action")
+		-- Every section is off, so the switch is unticked and its click enables.
+		local switch = hotstrings.all_sections_switch(ctx)
+		helpers.assert_eq(switch.checked, false, "nothing is on yet")
+		helpers.assert_eq(type(switch.action), "function", "the switch must expose an action")
 
-		rows[1].action()
+		switch.action()
 		helpers.assert_eq(table.concat(enabled_sections, ","),
 			"alpha/one,alpha/two,beta/three",
 			"enable-all must visit every real section and skip separators/placeholders")
@@ -153,7 +148,10 @@ helpers.describe("hotstring whole-tree commands: provider actions reach clicks",
 		helpers.assert_eq(saves, 1, "one bulk click must persist exactly once")
 		helpers.assert_eq(rebuilds, 1, "one bulk click must rebuild the menu exactly once")
 
-		rows[2].action()
+		-- Rebuilt, as the menu is after every click: now ticked, so it disables.
+		switch = hotstrings.all_sections_switch(ctx)
+		helpers.assert_eq(switch.checked, true, "every group and section is on after the enabling click")
+		switch.action()
 		helpers.assert_eq(table.concat(disabled_sections, ","),
 			"alpha/one,alpha/two,beta/three",
 			"disable-all must visit the same real-section set as enable-all")
@@ -180,7 +178,12 @@ helpers.describe("hotstring whole-tree commands: provider actions reach clicks",
 			updateMenu = function() rebuilds = rebuilds + 1 end,
 		}
 
-		hotstrings.build_bulk_actions(ctx)[1].action()
+		-- Building the switch reads the sections for its tick; only what the click
+		-- does afterwards is under test.
+		local switch = hotstrings.all_sections_switch(ctx)
+		helpers.assert_eq(switch.checked, false, "nothing is on, so the click enables")
+		mutations = 0
+		switch.action()
 		helpers.assert_eq(starts, 1, "the user action must attempt exactly one strict start")
 		helpers.assert_eq(mutations, 0,
 			"sections and groups must remain untouched when no typing tap owns them")

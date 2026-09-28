@@ -83,16 +83,35 @@ GestureSetActionParameter(BindingId, ActionName, Value, WriterFn := 0, NotifyFn 
 		return true
 }
 
+; The parameter kind the generated catalogue declares for an action ("url",
+; "search_url", "wrap_pair", "text", "key", "shortcut"), or "" when it takes none.
 GestureActionParameterSpec(ActionName) {
-		global GESTURE_ACTION_PARAMETER_SPECS
-		return GESTURE_ACTION_PARAMETER_SPECS.Has(ActionName) ? GESTURE_ACTION_PARAMETER_SPECS[ActionName] : ""
+		global GESTURE_ACTION_CATALOGUE
+		return GESTURE_ACTION_CATALOGUE.Actions.Has(ActionName)
+				? GESTURE_ACTION_CATALOGUE.Actions[ActionName].Parameter : ""
 }
 
 GestureValidateActionParameter(ActionName, Value, &ErrorText := "") {
 		Spec := GestureActionParameterSpec(ActionName)
-		Value := Trim(Value)
 		if (Spec = "")
 				return true
+		; Checked before the trim below: the spaces of a text to type are part of it,
+		; and the key and shortcut rules trim for themselves.
+		if (Spec = "text" || Spec = "key" || Spec = "shortcut") {
+				if (SendInputParse(Spec, Value) is Map)
+						return true
+				ErrorText := GestureSendInputErrorText(Spec)
+				return false
+		}
+		Value := Trim(Value)
+		if (Spec = "wrap_pair") {
+				if (GestureWrapPairFor(Value) is Map)
+						return true
+				ErrorText := t("dialog.gestures.param_err_wrap_pair")
+				return false
+		}
+		if (Spec != "url" && Spec != "search_url")
+				throw ValueError("No validator for parameter kind '" . Spec . "'.")
 		if !RegExMatch(Value, "i)^https?://[^\s]+$") {
 				ErrorText := t("dialog.gestures.param_err_url")
 				return false
@@ -109,25 +128,90 @@ GestureValidateActionParameter(ActionName, Value, &ErrorText := "") {
 		return true
 }
 
+; The text a binding editor shows to ask for an action's parameter. The %s
+; inside the search-URL prompt is LITERAL — it is the placeholder the user has
+; to type — so no prompt is run through a formatter; the title and the
+; wrap-pair list use {1} so the two can never be confused.
+; @param {String} ActionName An action that takes a parameter.
+; @returns {String}
+GestureActionParameterPrompt(ActionName) {
+		global _WS_BUILTIN_PAIRS
+		switch GestureActionParameterSpec(ActionName) {
+				case "search_url":
+						return t("dialog.gestures.param_search_url")
+				case "url":
+						return t("dialog.gestures.param_link")
+				case "wrap_pair":
+						return StrReplace(t("dialog.gestures.param_wrap_pair"), "{1}",
+								WrapPairDescribe(_WS_BUILTIN_PAIRS))
+				case "text":
+						return StrReplace(t("dialog.gestures.param_text"), "{1}",
+								SendInputVocabulary()["text_max_code_points"])
+				case "key", "shortcut":
+						return StrReplace(t("dialog.gestures.param_" . GestureActionParameterSpec(ActionName)),
+								"{1}", SendInputDescribeKeys())
+		}
+		throw ValueError("No prompt for the parameter of action '" . ActionName . "'.")
+}
+
+; A value the action picker's own editor collected for the action it just
+; confirmed (send_text, send_key, send_shortcut), held for the next parameter
+; prompt of that action only: the picker's confirm callback runs the same
+; assignment as a native pick, and this is how its value reaches it.
+global _GesturePickedParameter := ""
+
+; @param {String} ActionName The action the picker confirmed.
+; @param {String} Value The value its editor collected.
+GestureOfferPickedParameter(ActionName, Value) {
+		global _GesturePickedParameter
+		_GesturePickedParameter := Map("action", ActionName, "value", Value)
+}
+
+GestureClearPickedParameter() {
+		global _GesturePickedParameter
+		_GesturePickedParameter := ""
+}
+
+; The refusal of a send_text, send_key or send_shortcut value. The action
+; picker's own editor shows the same text as the native prompt.
+; @param {String} Spec "text", "key" or "shortcut".
+; @returns {String}
+GestureSendInputErrorText(Spec) {
+		return StrReplace(t("dialog.gestures.param_err_" . Spec), "{1}",
+				SendInputVocabulary()["text_max_code_points"])
+}
+
 ; Builds a detached action-parameter candidate. Cancel is represented by false;
-; a Map always means the user accepted and no persistence happened yet.
+; a Map always means the user accepted and no persistence happened yet. A value
+; the picker's editor collected for this action is used without a prompt when it
+; validates, and prefills the prompt when it does not.
 GesturePromptActionParameter(BindingId, ActionName) {
+		global _GesturePickedParameter
 		Spec := GestureActionParameterSpec(ActionName)
 		if (Spec = "")
 				return Map("has_value", false)
 		Existing := GestureGetActionParameter(BindingId, ActionName)
-		; The %s inside the search-URL prompt is LITERAL — it is the placeholder the
-		; user has to type — so this string is never run through a formatter. The
-		; title uses {1} precisely so the two can never be confused.
-		Prompt := (Spec = "search_url")
-				? t("dialog.gestures.param_search_url")
-				: t("dialog.gestures.param_link")
+		if (_GesturePickedParameter is Map) && (_GesturePickedParameter["action"] == ActionName) {
+				Picked := _GesturePickedParameter["value"]
+				GestureClearPickedParameter()
+				if GestureValidateActionParameter(ActionName, Picked)
+						return Map("has_value", true,
+								"key", GestureActionParameterKey(BindingId, ActionName),
+								"value", Picked)
+				LoggerWarn("gestures", "The picker's value for '{1}' was refused — asking again.", ActionName)
+				Existing := Picked
+		}
+		Prompt := GestureActionParameterPrompt(ActionName)
 		Title  := StrReplace(t("dialog.gestures.param_title"), "{1}", _GestureActionLabel(ActionName))
 		loop {
-				Result := InputBox(Prompt, Title, "w680 h160", Existing)
+				; The wrap-pair and shortcut prompts list a catalogue under their text.
+				Result := InputBox(Prompt, Title,
+						(Spec = "wrap_pair" || Spec = "shortcut") ? "w680 h300"
+						: (Spec = "key") ? "w680 h220" : "w680 h160", Existing)
 				if (Result.Result != "OK")
 						return false
-				Value := Trim(Result.Value)
+				; A text to type keeps its spaces; every other kind is trimmed.
+				Value := (Spec = "text") ? Result.Value : Trim(Result.Value)
 				ErrorText := ""
 				if GestureValidateActionParameter(ActionName, Value, &ErrorText)
 						return Map("has_value", true,
@@ -205,7 +289,11 @@ GestureActionDisplayLabel(ActionName, BindingId := "") {
 		if (BindingId = "")
 				return Label
 		Value := GestureGetActionParameter(BindingId, ActionName)
-		return (Value != "") ? Label . " (" . Value . ")" : Label
+		if (Value = "")
+				return Label
+		if !RegExMatch(Label, "\[[^\[\]]*\]$", &Marker)
+				throw ValueError("Parameterized action label has no configurable marker: " . ActionName)
+		return SubStr(Label, 1, Marker.Pos - 1) . "[" . Value . "]"
 }
 
 ; Preserve the zero-argument contract for ordinary actions (including user
@@ -254,6 +342,18 @@ GestureSaveAllAssignments(ActionNameBySlot, WriterFn := 0, NotifyFn := 0) {
 				return false
 		GestureAssignments := CandidateAssignments
 		return true
+}
+
+/** Clear cancels pending native setup; recommendations preserve explicit intent. */
+GestureScopeResetOperations(ScopeId, Mode) {
+	if ScopeId != "gestures" || !(Mode == "recommended" || Mode == "clear")
+		throw ValueError("Gesture persistence cannot reset another configuration scope.")
+	if Mode == "recommended"
+		return []
+	Section := "gestures", Key := "auto_configure_on_next_start"
+	if TomlConfigForeignOwner(Section, Key) != "Gestures"
+		throw Error("The queued native setup marker has no matching gesture owner.")
+	return [{ Section: Section, Key: Key, Delete: true }]
 }
 
 ; Consumes the onboarding marker before arming any elevated/PnP side effect.
@@ -600,7 +700,13 @@ GestureShowManualTutorialDialog() {
 ; Opens Windows Settings to the touchpad page. Used both by the tutorial
 ; dialog's "Open settings" button and by the onboarding wizard.
 GestureOpenTouchpadSettings() {
-		try Run("ms-settings:devices-touchpad")
+		try {
+			Run("ms-settings:devices-touchpad")
+			return true
+		} catch as Err {
+			LoggerError("gestures", "Touchpad settings could not open: {1}.", Err.Message)
+			return false
+		}
 }
 
 ; One-shot SetTimer target used by the post-Reload AutoConfigureOnNextStart

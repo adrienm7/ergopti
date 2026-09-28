@@ -1,0 +1,264 @@
+--- tests/unit/ui/test_healthcheck_bridge_actions.lua
+
+--- ==============================================================================
+--- MODULE: Diagnostics Window Bridge (macOS)
+--- DESCRIPTION:
+--- Drives the real diagnostics window through its usercontent message handler,
+--- the way the shared page posts to it:
+--- 1. "ready" answers with the page's configuration and the first snapshot,
+---    and starts the probes;
+--- 2. an action the allowlist refuses changes nothing and is logged;
+--- 3. copy writes the redacted report, and a refused clipboard keeps the
+---    window open and says so to the page;
+--- 4. a message of a closed window is inert, and closing releases the handler
+---    and cancels the probes;
+--- 5. no timer polls the page: the old copy button was a 200 ms poll of a JS
+---    flag, which leaked a timer per reopen more than once.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+
+local HOME = "/Users/jdoe"
+
+--- Loads the real window over controlled natives and collaborators.
+--- @param controls table|nil { clipboard = boolean }
+--- @return table core, table context
+local function load_window(controls)
+	controls = controls or {}
+	for _, name in ipairs({
+		"ui.healthcheck.core", "ui.healthcheck.helpers", "ui.healthcheck.probes", "ui.healthcheck.report",
+		"infra.logger", "infra.i18n", "infra.locale", "ui.ui_builder", "adapters.timer_scheduler",
+		"adapters.clipboard", "adapters.webview_result",
+	}) do package.loaded[name] = nil end
+	package.loaded["tests.stubs.hs"] = nil
+	local hs_stub = require("tests.stubs.hs")
+	hs_stub.__reset()
+	_G.hs = hs_stub
+	package.loaded["hs"] = hs_stub
+
+	local context = {
+		scripts = {}, deleted = 0, released = 0, every = 0, cancelled_probes = 0, started_probes = 0,
+		copied = {}, warnings = {}, errors = {},
+	}
+	local logger = helpers.make_logger_stub()
+	logger.warn = function(_, message, ...) context.warnings[#context.warnings + 1] = string.format(message, ...) end
+	logger.error = function(_, message, ...) context.errors[#context.errors + 1] = string.format(message, ...) end
+	logger.ring_buffer_snapshot = function() return {} end
+	logger.session_issues = function() return { warn_count = 0, err_count = 0 } end
+	logger.ERRORS_LOG_FILE = HOME .. "/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-09-24.log"
+	logger.UNIFIED_LOG_FILE = HOME .. "/Library/Logs/ergopti_plus/ErgoptiPlus_2026-09-24.log"
+	package.loaded["infra.logger"] = logger
+	package.loaded["infra.i18n"] = { get = function(key) return key end, get_locale = function() return "en" end }
+	package.loaded["infra.locale"] = { all = function() return { ["menu.debug.healthcheck"] = "Diagnostics" } end }
+	package.loaded["adapters.timer_scheduler"] = {
+		every = function() context.every = context.every + 1; return { timer = {} }, true end,
+		after = function() return { timer = {} }, true end,
+		cancel = function() return true end,
+	}
+	package.loaded["adapters.clipboard"] = {
+		write = function(text)
+			context.copied[#context.copied + 1] = text
+			return controls.clipboard ~= false
+		end,
+	}
+	package.loaded["ui.healthcheck.probes"] = {
+		start = function(_, snapshot)
+			context.started_probes = context.started_probes + 1
+			context.probe_snapshot = snapshot
+			return { cancel = function() context.cancelled_probes = context.cancelled_probes + 1 end }
+		end,
+	}
+	package.loaded["ui.ui_builder"] = {
+		build_injected_html = function() return "<html></html>" end,
+		window_chrome_steps = function() return {} end,
+		window_title = function(title) return "ErgoptiPlus — " .. tostring(title) end,
+		get_app_geometry = function() return { width = 860, height = 720 } end,
+		force_focus = function() return true end,
+		open_http_url = function() return true end,
+	}
+
+	local webview = {}
+	for _, method in ipairs({
+		"windowStyle", "windowTitle", "allowTextEntry", "allowNewWindows", "allowGestures", "level", "html",
+		"show", "shadow",
+	}) do webview[method] = function(self) return self end end
+	webview.windowCallback = function(self, callback) context.window_callback = callback; return self end
+	webview.navigationCallback = function(self, callback) context.navigation_callback = callback; return self end
+	webview.evaluateJavaScript = function(self, script, callback)
+		context.scripts[#context.scripts + 1] = script
+		if callback then callback(nil, nil) end
+		return self
+	end
+	webview.delete = function() context.deleted = context.deleted + 1 end
+	hs_stub.webview.new = function(_, _, controller)
+		context.new_controller = controller
+		return webview
+	end
+	hs_stub.webview.usercontent.new = function(name)
+		context.handler_name = name
+		return {
+			setCallback = function(self, callback)
+				if callback == nil then context.released = context.released + 1 end
+				context.page = callback
+				return self
+			end,
+		}
+	end
+	hs_stub.webview.windowMasks = { titled = 1, closable = 2, miniaturizable = 4, resizable = 8 }
+	package.loaded["ui.healthcheck.report"] = nil
+
+	local core = require("ui.healthcheck.core")
+	core.run = function(opts)
+		return {
+			schema_version = 2, driver = "macos", generated_at = "2026-09-24T10:00:00Z",
+			detailed = type(opts) == "table" and opts.detailed == true or false,
+			sections = { paths = { diagnostics_dir = HOME .. "/Library/Logs/ergopti_plus/diagnostics" } },
+			probes = { github_api = { state = "pending" } },
+		}
+	end
+	return core, context
+end
+
+--- The messages the host evaluated in the page, decoded.
+--- @param context table
+--- @return table
+local function page_messages(context)
+	local messages = {}
+	for _, script in ipairs(context.scripts) do
+		local json = script:match("window%.receiveDiagnostics%((.*)%)$")
+		if json then messages[#messages + 1] = hs.json.decode(json) end
+	end
+	return messages
+end
+
+--- Runs a body with HOME and USER set to the fixture's account.
+--- @param body function
+local function as_jdoe(body)
+	local getenv = os.getenv
+	os.getenv = function(name)
+		if name == "HOME" then return HOME end
+		if name == "USER" then return "jdoe" end
+		return getenv(name)
+	end
+	local ok, err = xpcall(body, debug.traceback)
+	os.getenv = getenv
+	if not ok then error(err, 0) end
+end
+
+helpers.describe("diagnostics window: the page's bridge (macOS)", function()
+	helpers.it("registers the handler host_bridge.js posts to, and polls nothing", function()
+		local core, context = load_window()
+		helpers.assert_true(core.show_window())
+		helpers.assert_eq(context.handler_name, "healthcheck")
+		helpers.assert_true(context.new_controller ~= nil, "the webview must be created with its controller")
+		helpers.assert_type(context.page, "function")
+		helpers.assert_eq(context.every, 0, "no recurring timer may poll the page")
+	end)
+
+	helpers.it("answers ready with the configuration and the snapshot, then starts the probes", function()
+		as_jdoe(function()
+			local core, context = load_window()
+			core.show_window({ mode = "report" })
+			context.page({ body = "ready" })
+			local messages = page_messages(context)
+			helpers.assert_eq(#messages, 1)
+			helpers.assert_eq(messages[1].type, "init")
+			helpers.assert_eq(messages[1].config.mode, "report")
+			helpers.assert_eq(messages[1].config.schema.schema_version, 2)
+			helpers.assert_eq(messages[1].config.context.home, HOME)
+			helpers.assert_eq(messages[1].config.context.case_insensitive, true)
+			helpers.assert_eq(messages[1].snapshot.driver, "macos")
+			helpers.assert_eq(context.started_probes, 1)
+			-- The probes complete the snapshot the page shows: its paths, its
+			-- peripherals and whether details are included (bluetooth-peripherals)
+			helpers.assert_true(type(context.probe_snapshot) == "table"
+				and type(context.probe_snapshot.sections) == "table"
+				and context.probe_snapshot.sections.paths ~= nil,
+				"the probes must receive the window's snapshot")
+		end)
+	end)
+
+	helpers.it("refuses and logs an action outside the allowlist, doing nothing", function()
+		local core, context = load_window()
+		core.show_window()
+		context.page({ body = { action = "open_path", id = "/etc/passwd" } })
+		context.page({ body = { action = "run", command = "rm -rf ~" } })
+		helpers.assert_eq(#page_messages(context), 0, "a refused action must not reach the page")
+		helpers.assert_eq(context.deleted, 0)
+		helpers.assert_eq(#context.warnings, 2)
+		helpers.assert_contains(context.warnings[1], "unknown_path")
+		helpers.assert_contains(context.warnings[2], "unknown_action")
+	end)
+
+	helpers.it("copies the redacted report and tells the page", function()
+		as_jdoe(function()
+			local core, context = load_window()
+			core.show_window()
+			context.page({ body = { action = "copy", text = "log at /Users/jdoe/Library/Logs by jdoe" } })
+			helpers.assert_eq(context.copied, { "log at ~/Library/Logs by <user>" })
+			local messages = page_messages(context)
+			helpers.assert_eq(messages[#messages].type, "action")
+			helpers.assert_eq(messages[#messages].action, "copy")
+			helpers.assert_eq(messages[#messages].ok, true)
+		end)
+	end)
+
+	helpers.it("keeps the window open when the clipboard refuses, and says so (healthcheck-copy-receipt)", function()
+		as_jdoe(function()
+			local core, context = load_window({ clipboard = false })
+			core.show_window()
+			context.page({ body = { action = "copy", text = "report" } })
+			helpers.assert_eq(context.deleted, 0, "a refused copy must not close the only copy source")
+			local messages = page_messages(context)
+			helpers.assert_eq(messages[#messages].ok, false)
+			helpers.assert_true(#context.errors > 0, "the refusal must reach the log")
+		end)
+	end)
+
+	helpers.it("ignores a message of a closed window and releases its handler", function()
+		local core, context = load_window()
+		core.show_window()
+		local stale = context.page
+		context.window_callback("closing")
+		helpers.assert_eq(context.released, 1, "closing must release the message handler")
+		stale({ body = "ready" })
+		helpers.assert_eq(#page_messages(context), 0, "a closed window's page must reach nothing")
+	end)
+
+	helpers.it("closes on the page's close button, cancelling its probes", function()
+		as_jdoe(function()
+			local core, context = load_window()
+			core.show_window()
+			context.page({ body = "ready" })
+			context.page({ body = { action = "close" } })
+			helpers.assert_eq(context.deleted, 1)
+			helpers.assert_eq(context.cancelled_probes, 1)
+			helpers.assert_eq(context.released, 1)
+		end)
+	end)
+
+	helpers.it("reopening releases the previous window's handler before the new one exists", function()
+		local core, context = load_window()
+		core.show_window()
+		local first = context.page
+		core.show_window()
+		helpers.assert_eq(context.deleted, 1)
+		helpers.assert_eq(context.released, 1)
+		first({ body = "ready" })
+		helpers.assert_eq(#page_messages(context), 0, "the first window's page must be inert")
+	end)
+
+	helpers.it("refresh collects again with details and restarts the probes", function()
+		as_jdoe(function()
+			local core, context = load_window()
+			core.show_window()
+			context.page({ body = "ready" })
+			context.page({ body = { action = "refresh", detailed = true } })
+			local messages = page_messages(context)
+			helpers.assert_eq(messages[#messages].type, "snapshot")
+			helpers.assert_eq(messages[#messages].snapshot.detailed, true)
+			helpers.assert_eq(context.started_probes, 2)
+			helpers.assert_eq(context.cancelled_probes, 1)
+		end)
+	end)
+end)

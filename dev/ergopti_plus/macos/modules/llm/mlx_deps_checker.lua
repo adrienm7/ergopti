@@ -1090,7 +1090,7 @@ function M.check_and_install_deps(on_complete, replay_token)
 		else
 			if not owner_is_current() then return false end
 			local tail = tail_for_error(combined)
-			if tail == "" then tail = "Cause inconnue. Consultez " .. Logger.UNIFIED_LOG_FILE .. "." end
+			if tail == "" then tail = "Cause inconnue. Consultez " .. Logger.today_log_path() .. "." end
 			Logger.error(LOG, "MLX bootstrap failed (exit=%d) — %s",
 				tonumber(exit_code) or -1, tail:gsub("\n", " | "))
 			-- Make sure the UI is visible so the error is surfaced even when

@@ -76,7 +76,48 @@ helpers.describe("menu_state: hotstring group sync applies only the delta", func
 end)
 
 helpers.describe("menu_state: custom terminator restore quarantines rejected rows", function()
-	helpers.it("retains only exact committed custom definitions and persists the repair", function()
+	for _, wanted in ipairs({ false, true }) do
+		helpers.it("restores the saved " .. tostring(wanted)
+			.. " after registration (custom-terminator-restore-state)", function()
+			local runtime_enabled
+			local restored = 0
+			local state = {
+				hotstrings = {},
+				custom_terminators = {
+					{ key = "custom_ok", char = "@", label = "valid", consume = false },
+				},
+				terminator_states = { custom_ok = wanted },
+			}
+			local committed = MenuState.sync_state_to_modules(state,
+				{ terminator_states = { custom_ok = wanted } }, false, {
+					keymap = {
+						set_llm_model = function() return true end,
+						get_terminator_defs = function() return {} end,
+						remove_custom_terminator = function() return true end,
+						validate_custom_terminator = function() return true end,
+						add_custom_terminator = function()
+							runtime_enabled = true
+							return true
+						end,
+						set_terminator_enabled = function(_, enabled)
+							-- Before registration the real registry cannot find this key.
+							if runtime_enabled == nil then return false end
+							runtime_enabled = enabled
+							restored = restored + 1
+							return true
+						end,
+					},
+					core_mods = {}, hotstring_editor = {},
+				})
+			helpers.assert_eq(committed, true)
+			helpers.assert_eq(runtime_enabled, wanted,
+				"registration must not replace the saved OFF with its default ON")
+			helpers.assert_eq(restored, 1,
+				"the preference must reach the registered key exactly once")
+		end)
+	end
+
+	helpers.it("retains only exact committed custom definitions and reports the repair", function()
 		local add_calls = {}
 		local save_calls = 0
 		local state = {
@@ -90,7 +131,7 @@ helpers.describe("menu_state: custom terminator restore quarantines rejected row
 		local saved = {
 			terminator_states = { custom_ok = false, custom_bad = true },
 		}
-		local committed = MenuState.sync_state_to_modules(state, saved, false, {
+		local committed, report = MenuState.sync_state_to_modules(state, saved, false, {
 			keymap = {
 				set_llm_model = function() return true end,
 				get_terminator_defs = function() return {} end,
@@ -119,8 +160,10 @@ helpers.describe("menu_state: custom terminator restore quarantines rejected row
 		helpers.assert_eq(#state.custom_terminators, 1)
 		helpers.assert_eq(state.custom_terminators[1].key, "custom_ok")
 		helpers.assert_nil(state.terminator_states.custom_bad)
-		helpers.assert_eq(save_calls, 1,
-			"the repaired state must replace the invalid persisted row")
+		helpers.assert_eq(save_calls, 0,
+			"the sync never persists: at boot it runs before the save transaction exists")
+		helpers.assert_eq(report.repairs, { "custom_terminators" },
+			"the caller must learn that the repaired rows still have to be saved")
 	end)
 
 	for _, outcome in ipairs({ "false", "nil", "throw" }) do
@@ -178,7 +221,7 @@ helpers.describe("menu_state: gesture boot restore requires an exact lifecycle c
 					error("synthetic gesture boot refusal")
 				end
 				local state = { gestures = desired, hotstrings = {} }
-				local committed = MenuState.sync_state_to_modules(state, {}, false, {
+				local committed, report = MenuState.sync_state_to_modules(state, {}, false, {
 					keymap = {}, hotstring_editor = {}, core_mods = {},
 					gestures = {
 						enable_all = desired and lifecycle or function() return true end,
@@ -194,8 +237,14 @@ helpers.describe("menu_state: gesture boot restore requires an exact lifecycle c
 				helpers.assert_eq(lifecycle_calls, 1)
 				helpers.assert_eq(state.gestures, runtime_enabled,
 					"the restored state must describe the exact surviving runtime")
-				helpers.assert_eq(save_calls, 1,
-					"the corrected runtime posture must replace the rejected preference")
+				helpers.assert_eq(save_calls, 0,
+					"a runtime refusal must not rewrite config.toml, nor save before seeding")
+				helpers.assert_eq(#report.demotions, 1)
+				helpers.assert_eq(report.demotions[1].key, "gestures")
+				helpers.assert_eq(report.demotions[1].persisted, desired,
+					"the demotion must carry the saved value for the caller to keep on disk")
+				helpers.assert_eq(report.demotions[1].demoted, runtime_enabled)
+				helpers.assert_eq(#report.unsettled, 0)
 			end)
 		end
 	end
@@ -260,9 +309,10 @@ helpers.describe("menu_state: keylogger start is deferred off the boot path", fu
 			"a failed enable rolled back to disabled must fence its deferred keylogger start")
 	end)
 
-	helpers.it("rolls persisted enabled state back when deferred start is rejected", function()
+	helpers.it("demotes Metrics in memory only when deferred start is rejected", function()
 		local deferred = {}
 		local save_calls = 0
+		local demotions = {}
 		DeferredWork.after = function(_delay, callback)
 			deferred[#deferred + 1] = callback
 			return true
@@ -271,6 +321,7 @@ helpers.describe("menu_state: keylogger start is deferred off the boot path", fu
 		MenuState.sync_state_to_modules(state, {}, false, {
 			keymap = {}, hotstring_editor = {},
 			save_prefs = function() save_calls = save_calls + 1; return true end,
+			on_runtime_demotion = function(record) demotions[#demotions + 1] = record end,
 			core_mods = { keylogger = {
 				set_options = function() end,
 				set_disabled_apps = function() end,
@@ -281,14 +332,19 @@ helpers.describe("menu_state: keylogger start is deferred off the boot path", fu
 		for _, fn in ipairs(deferred) do fn() end
 		helpers.assert_eq(false, state.keylogger_enabled,
 			"a rejected deferred start must not leave the restored checkmark enabled")
-		helpers.assert_eq(1, save_calls,
-			"the compensating disabled state must be persisted for the next boot")
+		helpers.assert_eq(0, save_calls,
+			"a missing permission must not rewrite the saved Metrics ON")
+		helpers.assert_eq(#demotions, 1, "the late demotion must reach its session owner")
+		helpers.assert_eq(demotions[1].key, "keylogger_enabled")
+		helpers.assert_eq(demotions[1].persisted, true)
+		helpers.assert_eq(demotions[1].demoted, false)
 	end)
 
-	helpers.it("contains rollback persistence refusal and exceptions", function()
-		for _, outcome in ipairs({ "false", "throw" }) do
+	helpers.it("contains a raising demotion owner inside the guarded timer callback", function()
+		for _, outcome in ipairs({ "start_false", "start_throw" }) do
 			local deferred = {}
 			local save_calls = 0
+			local recorder_calls = 0
 			DeferredWork.after = function(_delay, callback)
 				deferred[#deferred + 1] = callback
 				return true
@@ -296,15 +352,18 @@ helpers.describe("menu_state: keylogger start is deferred off the boot path", fu
 			local state = { hotstrings = {}, keylogger_enabled = true }
 			MenuState.sync_state_to_modules(state, {}, false, {
 				keymap = {}, hotstring_editor = {},
-				save_prefs = function()
-					save_calls = save_calls + 1
-					if outcome == "throw" then error("injected persistence failure") end
-					return false
+				save_prefs = function() save_calls = save_calls + 1; return true end,
+				on_runtime_demotion = function()
+					recorder_calls = recorder_calls + 1
+					error("injected demotion owner failure")
 				end,
 				core_mods = { keylogger = {
 					set_options = function() end,
 					set_disabled_apps = function() end,
-					start = function() return false end,
+					start = function()
+						if outcome == "start_throw" then error("injected start refusal") end
+						return false
+					end,
 				} },
 			})
 
@@ -314,10 +373,11 @@ helpers.describe("menu_state: keylogger start is deferred off the boot path", fu
 				if not fired then callback_ok, callback_err = false, fire_err end
 			end
 			helpers.assert_eq(true, callback_ok,
-				"a " .. outcome .. " rollback persistence result must remain inside the guarded timer callback: "
+				"a " .. outcome .. " demotion must remain inside the guarded timer callback: "
 					.. tostring(callback_err))
 			helpers.assert_eq(false, state.keylogger_enabled)
-			helpers.assert_eq(1, save_calls)
+			helpers.assert_eq(1, recorder_calls)
+			helpers.assert_eq(0, save_calls)
 		end
 	end)
 end)

@@ -47,8 +47,9 @@ local function fake_config(opts)
 		toggle_section = function(id, section)
 			log.sections[#log.sections + 1] = id .. "." .. section
 		end,
-		set_all_sections = function(id, on)
-			log.bulk[#log.bulk + 1] = id .. "=" .. tostring(on)
+		set_categories_sections = function(ids, on)
+			log.bulk[#log.bulk + 1] = table.concat(ids, ",") .. "=" .. tostring(on)
+			return true
 		end,
 		get_category = function(id)
 			if id ~= "rolls" then return nil end
@@ -218,20 +219,27 @@ helpers.describe("category submenu: its rows", function()
 		end
 	end)
 
-	helpers.it("offers check-all and uncheck-all for the sections", function()
-		local config, log = fake_config({})
-		local row = rolls_row(config)
-		for _, item in ipairs(row.menu) do
-			if type(item.title) == "string"
-				and (item.title:find("all", 1, true) or item.title:find("tout", 1, true)
-					or item.title:find("Tout", 1, true)) then
-				item.fn()
+	-- One checkbox since the « tout activer » / « tout désactiver » pair became
+	-- one control: ticked when every section is on, and a click flips them all.
+	for _, case in ipairs({
+		{ sections = {}, ticked = true, sent = "rolls=false" },
+		{ sections = { sx = false }, ticked = false, sent = "rolls=true" },
+	}) do
+		helpers.it("offers one « all sections » checkbox, ticked " .. tostring(case.ticked), function()
+			local i18n = require("infra.i18n")
+			local label = i18n.get("menu.hotstrings.enable_all_sections")
+			local config, log = fake_config({ sections_enabled = case.sections })
+			local row = rolls_row(config)
+			local found = {}
+			for _, item in ipairs(row.menu) do
+				if item.title == label then found[#found + 1] = item end
 			end
-		end
-		helpers.assert_eq(log.bulk, { "rolls=true", "rolls=false" },
-			"a pack with thirty sections is unusable without them, and the order is "
-				.. "check then uncheck")
-	end)
+			helpers.assert_eq(#found, 1, "a pack with thirty sections is unusable without one control for all")
+			helpers.assert_eq(found[1].checked, case.ticked, "the tick says whether every section is on")
+			found[1].fn()
+			helpers.assert_eq(log.bulk, { case.sent }, "one click, one write, to the other side")
+		end)
+	end
 
 end)
 

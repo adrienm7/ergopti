@@ -172,6 +172,52 @@ body {
 	overflow: hidden;
 }
 
+/* Shown while the page lists a channel the user does not receive updates from. */
+#subscribe-banner {
+	align-items: center;
+	background: rgba(10, 132, 255, 0.08);
+	border-bottom: 1px solid rgba(10, 132, 255, 0.3);
+	color: #c8c8cc;
+	flex-shrink: 0;
+	flex-wrap: wrap;
+	font-size: 12px;
+	gap: 10px;
+	padding: 8px 20px;
+}
+
+#subscribe-text,
+#subscribe-confirm-text {
+	flex: 1;
+	min-width: 0;
+}
+
+#subscribe-confirm {
+	align-items: center;
+	flex-basis: 100%;
+	gap: 8px;
+}
+
+#subscribe-banner button {
+	background: rgba(10, 132, 255, 0.18);
+	border: 1px solid rgba(10, 132, 255, 0.55);
+	border-radius: 6px;
+	color: #4da6ff;
+	cursor: pointer;
+	font-size: 12px;
+	font-weight: 500;
+	padding: 4px 10px;
+	white-space: nowrap;
+}
+
+#subscribe-banner button:hover {
+	background: rgba(10, 132, 255, 0.28);
+}
+
+#subscribe-banner button:disabled {
+	cursor: default;
+	opacity: 0.5;
+}
+
 #content-header {
 	align-items: center;
 	background: #1c1c1e;
@@ -384,6 +430,50 @@ body {
 	font-size: 13px;
 	font-style: italic;
 	margin-top: 8px;
+}
+
+/* ================================= */
+/* ===== 3.2) Release Sections ====== */
+/* ================================= */
+
+#release-body .release-section {
+	margin-bottom: 18px;
+}
+
+#release-body .release-section > summary {
+	border-bottom: 1px solid #2c2c2e;
+	color: #fff;
+	cursor: pointer;
+	font-size: 16px;
+	font-weight: 600;
+	margin-bottom: 12px;
+	padding-bottom: 6px;
+}
+
+#release-body .release-section-body > :first-child {
+	margin-top: 0;
+}
+
+#release-body .release-footer {
+	color: #666;
+	font-size: 12px;
+}
+
+#release-body .release-footer p {
+	color: #666;
+	font-size: 12px;
+}
+
+#release-body details:not(.release-section) {
+	margin: 10px 0;
+}
+
+#release-body details:not(.release-section) > summary {
+	color: #d0d0d4;
+	cursor: pointer;
+	font-size: 13px;
+	font-weight: 600;
+	margin-bottom: 6px;
 }
 
 /* ========================================= */

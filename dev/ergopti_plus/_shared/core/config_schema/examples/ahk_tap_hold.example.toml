@@ -37,28 +37,3 @@ enabled = false
 time_activation_seconds = 0.20
 tap_action = "tab"
 hold_modifier = "alt_gr"
-
-
-
-
-
-# ======================================
-# ======================================
-# ======= 2. Layer customization =======
-# ======================================
-# ======================================
-
-# Adds an entry to the ``nav`` layer: pressing ``n`` while space is held emits
-# the screenshot action.
-
-[tap_hold.layers.nav]
-description_key = "tap_hold.layer.nav"
-
-[tap_hold.layers.nav.mappings]
-h = "arrow_left"
-j = "arrow_down"
-k = "arrow_up"
-l = "arrow_right"
-backspace = "ctrl_backspace"
-delete = "ctrl_delete"
-n = "screenshot"

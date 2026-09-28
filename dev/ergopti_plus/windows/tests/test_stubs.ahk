@@ -97,6 +97,7 @@ global Features := Map(
         "direct_access_digits", true,
         "ergopti_alt_gr",       true,
         "ergopti_plus",         false,
+        "emulated_layout",      "",
     ),
     "gestures", Map(
         "enabled", false,
@@ -118,7 +119,6 @@ global Features := Map(
         "open_downloads",           false,
         "move",                     false,
         "screen",                   false,
-        "screen_instant",           false,
         "win_caps_lock",            false,
         ; Modélisation α — Map per feature with { enabled, <extra props> }.
         "gpt", Map(
@@ -141,6 +141,12 @@ global Features := Map(
         "e_circ",   Map("enabled", true, "letter", "x"),
         "e_acute",  Map("enabled", true, "letter", "c"),
         "a_grave",  Map("enabled", true, "letter", "v"),
+        ; The number-row tap keys: an action id per key, "none" when unassigned.
+        "tap_keys", Map(
+            "number_row_left",    "screen_capture",
+            "number_row_right_1", "none",
+            "number_row_right_2", "none",
+        ),
         ; Sub-Maps — 10 entries each (same key set as the v1 Maps).
         ; A later refactor migrated the individual reads in modules/shortcuts.ahk
         ; (AltGrLAlt) and platform/remap.ahk (LAltCapsLock); phase 10
@@ -323,7 +329,7 @@ global Features := Map(
 ; user's tap_hold.toml. Tests don't exercise tap-hold logic but the symbol
 ; must exist so the per-key TapHoldIsConfigured(KeyId) lookups return
 ; cleanly.
-global TapHold := Map("keys", Map(), "layers", Map())
+global TapHold := Map("keys", Map())
 
 ; Master category gating state. Production initialises this in
 ; ErgoptiPlus.ahk and reloads it from the [category_enabled] TOML
@@ -335,6 +341,8 @@ global CategoryEnabled := Map(
     "Hotstrings", true,
     "TapHolds",   true,
 )
+; Production feature_state is loaded only by the isolated boot smoke harness.
+global CATEGORY_FOLLOWS_HOTSTRINGS_MASTER := Map("DynamicHotstrings", true, "Personal", true)
 IsCategoryGated(Category) {
     global CategoryEnabled
     return CategoryEnabled.Has(Category) ? CategoryEnabled[Category] : true
@@ -359,9 +367,8 @@ global SpaceAroundSymbols := ""
 ; Points at the real ``static/`` tree (three levels up from the tests folder)
 ; so:
 ;   - i18n.ahk resolves real locale JSONs and t() returns translated strings
-;   - modules/gestures.ahk parses the bundled ``_shared/actions.toml`` and
-;     populates GESTURE_ACTION_NAMES with the production gesture catalog
-;     (the gesture tests would otherwise see an empty registry).
+;   - the gesture tests resolve the production catalogue's labels and
+;     headings (_generated/action_catalogue.ahk) through t().
 ;
 ; The hotstrings-config tests guard against picking up the bundled
 ; rolls.toml / autocorrection.toml metadata by pre-caching empty entries in
@@ -423,15 +430,6 @@ global OneShotShiftEnabled := false
 global NumberOfRepetitions := 1
 global ActivitySimulation := false
 
-; Dummy deadkey Maps so layout_altgr.ahk's _BuildAltGrTables can run.
-global DeadkeyMappingCircumflex := Map()
-global DeadkeyMappingDiaresis := Map()
-global DeadkeyMappingSuperscript := Map()
-global DeadkeyMappingSubscript := Map()
-global DeadkeyMappingGreek := Map()
-global DeadkeyMappingR := Map()
-global DeadkeyMappingCurrency := Map()
-
 
 
 
@@ -483,6 +481,14 @@ UpdateLastSentCharacter(Character) {
 DeadKey(Mapping) {
     global _Stub_DeadKeyCalls
     _Stub_DeadKeyCalls.Push(Mapping)
+}
+
+; modules/keymap/layout.ahk reads the Ergopti layout tables at boot, and the
+; runner does not include it: every test that builds a layer loads them through
+; here, once per run, from the registry folder the driver ships.
+_TestEnsureErgoptiLayout() {
+    if !ErgoptiLayout_IsLoaded()
+        ErgoptiLayout_Init(LayoutRegistry_BundledDir())
 }
 
 ; UpdateCapsLockLED lives in modules/shortcuts/capsword.ahk (not included).

@@ -1,0 +1,32 @@
+# _shared/tests/corpus/config_migrations/cases.toml
+# Index of the config.toml migration corpus, replayed by the Windows, macOS and
+# Linux interpreters and by tools/test/test-config-migrations.cjs.
+#
+# Every case is a directory holding:
+#   case.toml        [case] description, drivers (the interpreters that replay
+#                    it), outcome ("migrated" | "current" | "newer" |
+#                    "invalid" | "unsupported"), and for "migrated" the
+#                    from_version and to_version the migration crosses;
+#   input.toml       the config.toml a driver finds at boot;
+#   expected.toml    the migrated file, for outcome "migrated" only;
+#   migrations.toml  optional: a registry replacing the shipped one, so every
+#                    op of the closed set is exercised on its own.
+# The JS gate fails when this list and the case directories differ.
+
+[corpus]
+cases = [
+	"chain_runs_every_step_in_order",
+	"chain_starts_at_file_version",
+	"current_version_untouched",
+	"invalid_version_refused",
+	"newer_version_refused",
+	"op_delete",
+	"op_map_value",
+	"op_merge_into",
+	"op_move_section",
+	"op_rename",
+	"op_set_if_absent",
+	"shipped_space_wrap_removed_on_macos",
+	"shipped_stamp_only_on_windows_and_linux",
+	"unsupported_version_refused",
+]

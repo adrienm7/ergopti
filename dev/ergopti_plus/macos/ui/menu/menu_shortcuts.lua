@@ -13,6 +13,7 @@
 --- ==============================================================================
 
 local M = {}
+local ParameterLabel = require("action_parameter_label")
 local hs = hs
 local Logger        = require("infra.logger")
 local DeferredWork  = require("infra.deferred_work")
@@ -25,6 +26,7 @@ local MenuUtils     = require("ui.menu.menu_utils")
 local ManifestMenu  = require("infra.manifest_menu")
 local ShortcutUtils = require("ui.menu.shortcut_utils")
 local KeyboardSlots = require("ui.menu.menu_keyboard_slots")
+local TapKeysMenu   = require("ui.menu.menu_tap_keys")
 local ManifestReader = require("infra.manifest_reader")
 local utf8_lib      = (type(utf8) == "table" and type(utf8.len) == "function")
 	and utf8 or require("compat.utf8")
@@ -32,6 +34,12 @@ local LOG           = "menu_shortcuts"
 local SHORTCUT_TOGGLE_CLAIM = "feature_toggle"
 local shortcut_toggle_debt = nil
 local shortcut_row_debt = {}
+
+--- Reports whether previous menu mutations have no retained inverse.
+--- @return boolean idle
+function M.scope_idle()
+	return shortcut_toggle_debt == nil and next(shortcut_row_debt) == nil
+end
 
 
 
@@ -67,7 +75,6 @@ M.DEFAULT_STATE = {
 --- @param state table The current state table (used for trigger_char substitution).
 --- @return string Display label for the trigger key(s).
 local function pretty_key(id, state)
-	if id == "at_hash" then return i18n.get("menu.shortcuts.key_at_hash") end
 	if id == "layer_scroll" or id == "layer+scroll" then return i18n.get("menu.shortcuts.key_layer_scroll") end
 	if id == "wrap_text_if_selected" then return i18n.get("menu.shortcuts.altgr_symbol") end
 
@@ -100,7 +107,9 @@ local function exact_unicode_scalar(value)
 	return value
 end
 
---- Reads one shortcut's live posture without trusting the menu snapshot.
+--- Reads one shortcut's current preference without trusting the menu snapshot.
+--- `is_enabled` is the preference, not the native binding, so a row toggle
+--- flips what the user chose even while the layer holds no hotkey.
 --- @param shortcuts table Shortcut lifecycle owner.
 --- @param id string Shortcut identifier.
 --- @param fallback boolean|nil Descriptor posture for legacy providers.
@@ -164,14 +173,16 @@ local function rollback_shortcut_row(shortcuts, id, enabled)
 end
 
 --- Builds a toggle menu item for a named shortcut.
---- @param s table Shortcut descriptor {id, label, enabled}.
+--- @param s table Shortcut descriptor {id, label, enabled, bound}.
 --- @param shortcuts table The shortcuts module reference.
 --- @param ctx table The menu context.
 --- @return table hs.menubar-compatible item table.
 local function make_shortcut_item(s, shortcuts, ctx)
 	local state  = ctx.state
 	local paused = ctx.paused
-	local is_on  = type(shortcuts.is_enabled) == "function" and shortcuts.is_enabled(s.id) or s.enabled
+	-- The checkmark is the preference: with the layer off or paused no hotkey is
+	-- bound, and a binding-based mark hid which shortcuts will come back.
+	local is_on  = s.enabled == true
 	local desc   = ctx.applyTriggerChar((s.label or ""):gsub("^%s*(.-)%s*$", "%1"))
 	local pk     = pretty_key(s.id, state)
 	-- Provider data since 2026-08-07: the shared renderer's `group` branch
@@ -267,7 +278,7 @@ local function build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
 		end or nil,
 	}
 	sub[#sub + 1] = {
-		label    = i18n.get("menu.global.reset_defaults"),
+		label    = i18n.get("common.restore_recommended"),
 		disabled = paused or nil,
 		action       = not paused and function()
 			state.wrap_symbol_states  = {}
@@ -475,42 +486,54 @@ function M.build(ctx)
 		return true
 	end
 
-	local item = {
-		label   = i18n.get("menu.shortcuts.title"),
-		checked = state.shortcuts or nil,
-		-- Pause owns the bindings axis until resume: pause_all() snapshots
-		-- is_bindings_started() and resume_all() restores from that snapshot, so a
-		-- toggle made mid-pause is silently discarded at resume — and enabling would
-		-- bind every hotkey while « tout est éteint ». Gate it like the wrap-symbols
-		-- submenu above, which is pause-gated for exactly this reason. `checked` is
-		-- deliberately left alone: it must keep reporting the stored preference.
-		disabled = paused or nil,
-		action   = (not paused) and function()
-			if settle_shortcut_toggle_debt() ~= true then return false end
-			local previous = state.shortcuts == true
-			local desired = not previous
-			-- Toggle ONLY the user-facing bindings + keyboard shortcuts. We must NOT
-			-- call shortcuts.start/stop here: stop() also tears down the script-control
-			-- eventtap (AltGr+Enter/Backspace/Escape pause/reload/quit) and start() is a
-			-- Bindings-only proxy that never revives it, so the feature toggle would
-			-- permanently kill the panic shortcuts. resume_bindings/pause_bindings are
-			-- the symmetric pair that leave the script-control tap untouched.
-			if commit_shortcuts_runtime(desired, previous) ~= true then return false end
-			state.shortcuts = desired
-			local save_ok, save_result = xpcall(ctx.save_prefs, debug.traceback)
-			if not save_ok or save_result ~= true then
-				state.shortcuts = previous
-				if apply_shortcut_posture(previous, "preference rollback") ~= true then
-					shortcut_toggle_debt = { restore_enabled = previous }
-				end
-				Logger.error(LOG, "Shortcut preference publication did not commit: %s.",
-					tostring(save_result))
-				return false
+	--- The category switch: the shortcuts submenu's first row (the manifest's
+	--- shortcuts_toggle). It used to be the parent row's action, which AppKit
+	--- never sends for an item that opens a submenu, so Shortcuts could not be
+	--- switched on from the menu bar at all.
+	---
+	--- Refused while the script is paused. Pause owns the bindings axis until
+	--- resume: pause_all() snapshots is_bindings_started() and resume_all()
+	--- restores from that snapshot, so a toggle made mid-pause is silently
+	--- discarded at resume — and enabling would bind every hotkey while « tout est
+	--- éteint ».
+	--- @return boolean committed
+	local function toggle_shortcuts()
+		if paused then
+			Logger.warn(LOG, "Shortcuts switch refused: the script is paused.")
+			return false
+		end
+		if settle_shortcut_toggle_debt() ~= true then return false end
+		local previous = state.shortcuts == true
+		local desired = not previous
+		-- Toggle ONLY the user-facing bindings + keyboard shortcuts. We must NOT
+		-- call shortcuts.start/stop here: stop() also tears down the script-control
+		-- eventtap (AltGr+Enter/Backspace/Escape pause/reload/quit) and start() is a
+		-- Bindings-only proxy that never revives it, so the feature toggle would
+		-- permanently kill the panic shortcuts. resume_bindings/pause_bindings are
+		-- the symmetric pair that leave the script-control tap untouched.
+		if commit_shortcuts_runtime(desired, previous) ~= true then return false end
+		state.shortcuts = desired
+		local save_ok, save_result = xpcall(ctx.save_prefs, debug.traceback)
+		if not save_ok or save_result ~= true then
+			state.shortcuts = previous
+			if apply_shortcut_posture(previous, "preference rollback") ~= true then
+				shortcut_toggle_debt = { restore_enabled = previous }
 			end
-			ctx.notify_feature(i18n.get("menu.shortcuts.title"), state.shortcuts)
-			ctx.updateMenu()
-			return true
-		end,
+			Logger.error(LOG, "Shortcut preference publication did not commit: %s.",
+				tostring(save_result))
+			return false
+		end
+		ctx.notify_feature(i18n.get("menu.shortcuts.title"), state.shortcuts)
+		ctx.updateMenu()
+		return true
+	end
+
+	-- The parent carries the stored preference as its tick and is greyed while
+	-- paused; it has no action, since a row that opens a submenu is never clicked.
+	local item = {
+		label    = i18n.get("menu.shortcuts.title"),
+		checked  = state.shortcuts or nil,
+		disabled = paused or nil,
 	}
 
 
@@ -519,7 +542,7 @@ function M.build(ctx)
 	-- ==============================================
 
 	-- Build shortcut item buckets by iterating the shortcuts module list once.
-	local TOP_ORDER = { "at_hash", "layer_scroll" }
+	local TOP_ORDER = { "layer_scroll" }
 	local top_map   = {}
 	local wrap_item = nil
 	local ctrl_items = {}
@@ -531,7 +554,7 @@ function M.build(ctx)
 			for _, s in ipairs(list) do
 				if type(s) == "table" and s.id then
 					local mi = make_shortcut_item(s, shortcuts, ctx)
-					if s.id == "at_hash" or s.id == "layer_scroll" then
+					if s.id == "layer_scroll" then
 						top_map[s.id] = mi
 					elseif s.id == "wrap_text_if_selected" then
 						wrap_item = mi
@@ -581,11 +604,13 @@ function M.build(ctx)
 		local enabled = state.script_control_enabled
 		local actions = type(script_control.ACTIONS) == "table" and script_control.ACTIONS or {}
 
-		local function get_label(act)
+		local function get_label(act, keyname)
 			if not act or act == "-" or act == "--" then return "-" end
 			if act:match("^#") then return act:sub(2) end
 			if ctx.gestures and type(ctx.gestures.get_action_label) == "function" then
-				return ctx.gestures.get_action_label(act)
+				local binding = keyname and act ~= "none" and type(ctx.gestures.get_action_parameter) == "function"
+					and script_control.BINDING_PREFIX .. keyname or nil
+				return ParameterLabel.for_binding(ctx.gestures.get_action_label(act), ctx.gestures, binding, act)
 			end
 			return act
 		end
@@ -596,7 +621,7 @@ function M.build(ctx)
 			local current = state.script_control_shortcuts[keyname] or "none"
 			local sub = {}
 			for _, act in ipairs(actions) do
-				local label = get_label(act)
+				local label = get_label(act, keyname)
 				if label == "-" then
 					table.insert(sub, { separator = true })
 				elseif act:match("^#") then
@@ -669,17 +694,17 @@ function M.build(ctx)
 			disabled = not enabled or paused or nil,
 			items    = ({
 				{
-					label    = string.format(i18n.get("menu.shortcuts.right_opt_return"), get_label(cur_return)),
+					label    = string.format(i18n.get("menu.shortcuts.right_opt_return"), get_label(cur_return, "return_key")),
 					disabled = not enabled or paused or nil,
 					items    = key_submenu_rows("return_key"),
 				},
 				{
-					label    = string.format(i18n.get("menu.shortcuts.right_opt_back"), get_label(cur_back)),
+					label    = string.format(i18n.get("menu.shortcuts.right_opt_back"), get_label(cur_back, "backspace")),
 					disabled = not enabled or paused or nil,
 					items    = key_submenu_rows("backspace"),
 				},
 				{
-					label    = string.format(i18n.get("menu.shortcuts.right_opt_escape"), get_label(cur_escape)),
+					label    = string.format(i18n.get("menu.shortcuts.right_opt_escape"), get_label(cur_escape, "escape")),
 					disabled = not enabled or paused or nil,
 					items    = key_submenu_rows("escape"),
 				},
@@ -781,7 +806,7 @@ function M.build(ctx)
 		end
 	end
 
-	-- The feature toggles (at_hash, layer_scroll, the wrap-text toggle) open the
+	-- The feature toggles (layer_scroll, the wrap-text toggle) open the
 	-- submenu. They are row DATA handed over by the wrap-symbols list provider,
 	-- which the manifest places first, so the renderer draws them like every
 	-- other row: prepended after rendering, the wrap-text toggle reached the tray
@@ -834,20 +859,24 @@ function M.build(ctx)
 				cmd_     = cmd_items,
 			})
 		end,
+		-- The number-row tap keys, named by what each types under the current
+		-- input source. Greyed only by a pause: with the category off they stay
+		-- editable, so a key can be set up before shortcuts are switched on.
+		tap_keys = function(_ctx)
+			return TapKeysMenu.provide_rows(ctx, paused or nil)
+		end,
 		["script_control_shortcuts"] = dyn_script_control,
 		["extensions_shortcuts"] = extension_shortcut_rows,
 	}
 
-	-- The category gate's state key. This driver registers no command for that
-	-- row — its tray PARENT carries the toggle, which hs.menubar can bind and the
-	-- Linux tray cannot — so the renderer builds nothing here and this getter is
-	-- never read. It is named anyway: the declaration promises the key to every
-	-- platform the row is visible on, and a key with no getter is an ERROR at
-	-- render time rather than a silently wrong row.
+	-- The category switch is the manifest's first row, drawn by the renderer from
+	-- this command and the state getter below. A tray parent cannot carry it:
+	-- AppKit never sends the action of an item that opens a submenu.
 	local sc_ctx = {}
 	for key, value in pairs(ctx) do sc_ctx[key] = value end
 	sc_ctx.commands = {}
 	for key, value in pairs(ctx.commands or {}) do sc_ctx.commands[key] = value end
+	sc_ctx.commands["shortcuts_toggle"] = toggle_shortcuts
 	sc_ctx.commands["edit_shortcuts"] = cmd_edit_shortcuts
 	sc_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do sc_ctx.state_getters[key] = value end

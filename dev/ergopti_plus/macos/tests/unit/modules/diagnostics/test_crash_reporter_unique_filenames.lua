@@ -36,13 +36,13 @@ local function with_fixture(callback)
 				return true, "created"
 			end,
 		}
-		package.loaded["infra.config_paths"] = {
-			get_config_dir = function() return "/virtual/config/" end,
-		}
 		package.loaded["infra.i18n"] = {
 			get = function(key) return key end,
 		}
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		local logger_stub = helpers.make_logger_stub()
+		-- The logger is the one resolver of the crash-reports folder.
+		logger_stub.crash_reports_dir = function() return "/virtual/logs/crash_reports/" end
+		package.loaded["infra.logger"] = logger_stub
 
 		-- The legacy implementation writes directly with mode "w". Model that
 		-- faithfully so the pre-fix code overwrites the same in-memory path and
@@ -86,10 +86,10 @@ helpers.describe("crash_reporter preserves same-second reports", function()
 			})
 
 			helpers.assert_eq(first_path,
-				"/virtual/config/hammerspoon/crash_reports/2026-08-27T01-23-45Z.json",
+				"/virtual/logs/crash_reports/2026-08-27T01-23-45Z.json",
 				"the first report keeps the timestamp-only canonical name")
 			helpers.assert_eq(second_path,
-				"/virtual/config/hammerspoon/crash_reports/2026-08-27T01-23-45Z-2.json",
+				"/virtual/logs/crash_reports/2026-08-27T01-23-45Z-2.json",
 				"the colliding report must reserve the first deterministic suffix")
 			helpers.assert_true(first_path ~= second_path,
 				"same-second reports must never share a truncating destination")

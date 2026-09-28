@@ -22,20 +22,21 @@
 ; =========================================
 
 _CTFP_CategoryProducersRetainBooleanIntent() {
-	for Name in ["ToggleAllFeatures", "ToggleAllHotstrings", "ToggleCategoryAllFeatures",
-		"ToggleCategoryAllSections", "HS_TogglePersonalAllSections", "_ConfigCollectFullSaveUpdates"] {
-		Body := _StripFullLineComments(_DriverFuncBody(Name))
-		Assert(Body != "", "category producer must exist: " . Name)
-		Position := 1
-		Count := 0
-		while Position := RegExMatch(Body, 'Section:\s*"category_enabled"[^\r\n]+', &Record, Position) {
-			Count += 1
-			AssertTrue(RegExMatch(Record[0], 'Value:\s*TOML_Bool\('),
-				"foreign category Boolean intent must be explicit in " . Name)
-			Position += StrLen(Record[0])
-		}
-		AssertTrue(Count > 0, "the producer's category updates must be inspected: " . Name)
+	Builder := _StripFullLineComments(_DriverFuncBody("_ConfigBuildCategoryIntentPlan"))
+	Collector := _StripFullLineComments(_DriverFuncBody("_ConfigCollectFullSaveUpdates"))
+	Assert(Builder != "" && Collector != "", "both category persistence producers must exist")
+	Assert(InStr(Builder, '_ConfigSparseOperation("category_enabled",') > 0,
+		"category writes use the canonical sparse baseline before typed serialization")
+	Assert(RegExMatch(Collector, 'Section:\s*"category_enabled"[^\r\n]+Value:\s*TOML_Bool\(') > 0,
+		"full-save category values retain Boolean intent until sparse normalization")
+	for Name in ["ToggleAllHotstrings", "ToggleCategoryAllSections", "HS_TogglePersonalAllSections"] {
+		Body := _DriverFuncBody(Name)
+		Assert(Body != "" && InStr(Body, "_ConfigCommitHotstringIntent(") > 0,
+			"section selection must use its independent transaction: " . Name)
 	}
+	Sections := _DriverFuncBody("_ConfigBuildHotstringIntentPlan")
+	Assert(Sections != "" && InStr(Sections, '"category_enabled"') == 0,
+		"selecting children must not write their master gates")
 }
 Test("config: every category producer retains foreign Boolean intent "
 	. "(config-typed-foreign-categories)", _CTFP_CategoryProducersRetainBooleanIntent)

@@ -86,4 +86,43 @@ helpers.describe("logger — runtime error capture", function()
 		end
 		helpers.assert_true(found, "the timer-callback error must be logged so it reaches the file log")
 	end)
+
+	-- An uncaught error is an ERROR like any other for the error window: it used
+	-- to be written through the private dispatcher, which skipped the handler, so
+	-- the one error class a user can never see in a log opened no window either
+	helpers.it("hands an uncaught timer error to the error handler, with its template (error-dialog-template)", function()
+		package.loaded["infra.logger"] = nil
+		local Fresh = require("infra.logger")
+		local hs = _G.hs
+		local saved = {
+			doAfter     = hs.timer.doAfter,
+			doEvery     = hs.timer.doEvery,
+			new         = hs.timer.new,
+			delayed_new = hs.timer.delayed and hs.timer.delayed.new or nil,
+			print       = _G.print,
+		}
+		hs.timer.doAfter = function(_delay, fn) if type(fn) == "function" then fn() end end
+		local calls = {}
+		Fresh.set_sink(function() end)
+		Fresh.set_level("DEBUG")
+		Fresh.set_error_notification_handler(function(module_name, message, template)
+			calls[#calls + 1] = { module = module_name, message = message, template = template }
+			return true
+		end)
+		Fresh.install_runtime_error_capture()
+		pcall(function() hs.timer.doAfter(0, function() error("boom-for-the-window") end) end)
+		Fresh.set_error_notification_handler(nil)
+		Fresh.set_sink(nil)
+		hs.timer.doAfter = saved.doAfter
+		hs.timer.doEvery = saved.doEvery
+		hs.timer.new     = saved.new
+		if hs.timer.delayed then hs.timer.delayed.new = saved.delayed_new end
+		_G.print = saved.print
+		package.loaded["infra.logger"] = nil
+
+		helpers.assert_eq(#calls, 1, "the uncaught timer error must reach the error handler")
+		helpers.assert_eq(calls[1].module, "runtime")
+		helpers.assert_eq(calls[1].template, "Uncaught error in hs.timer.%s callback: %s")
+		helpers.assert_true(calls[1].message:find("boom-for-the-window", 1, true) ~= nil)
+	end)
 end)

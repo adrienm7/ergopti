@@ -238,6 +238,11 @@ function M.new(options)
 
 	local controller = {}
 
+	--- @return boolean idle No accepted activation or resume work remains.
+	function controller.scope_idle()
+		return current == nil and resume_stage == nil and requirement_join_settled == true
+	end
+
 	function controller.is_registered() return registered end
 
 	function controller.begin(resume)

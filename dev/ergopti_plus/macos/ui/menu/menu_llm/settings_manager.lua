@@ -250,6 +250,7 @@ end
 function M.new(deps)
 	local obj = { deps = deps }
 	local setting_recovery_debt = nil
+	function obj.scope_idle() return setting_recovery_debt == nil end
 
 	--- Restores every boundary reached by a rejected setting transition.
 	--- @param debt table Mutable per-boundary compensation ledger.

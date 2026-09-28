@@ -32,6 +32,9 @@
 --- 6. Never fatal. A directory that cannot be created degrades to stdout-only and
 ---    says so; a broken handle degrades to stdout. The daemon must not die
 ---    because logging failed.
+--- 7. The logger boot. install() is also where this driver arms the core's
+---    repeat collapsing (logger SPEC § 4.2), once; the daemon's periodic callback
+---    and exit paths own its flushes.
 --- ==============================================================================
 
 local M = {}
@@ -45,20 +48,17 @@ local M = {}
 -- ===============================
 -- ===============================
 
---- Environment variable that overrides the XDG data root.
-local XDG_DATA_HOME_ENV = "XDG_DATA_HOME"
-
---- Fallback data root when XDG_DATA_HOME is unset, relative to $HOME.
-local DEFAULT_DATA_HOME_REL = "/.local/share"
-
---- Log directory relative to the data root. Matches the path the tray menu opens.
-local LOG_SUBDIR = "/ergopti/logs"
+--- Application folder and log file names, generated from
+--- _shared/modules/paths/app_dirs.toml. The folder itself is resolved by
+--- infra/config_paths (LogsDirPath, or ${XDG_STATE_HOME:-~/.local/state}/
+--- ergopti_plus/logs).
+local AppDirs = require("app_dirs")
 
 --- Basename prefixes for the two files. The date suffix is the day the line was
 --- written, not the day the daemon started, so a long-running daemon rolls over.
-local MAIN_PREFIX   = "ErgoptiPlus_"
-local ERRORS_PREFIX = "ErgoptiPlus_errors_"
-local LOG_EXT       = ".log"
+local MAIN_PREFIX   = AppDirs.files.unified_prefix
+local ERRORS_PREFIX = AppDirs.files.errors_prefix
+local LOG_EXT       = AppDirs.files.extension
 
 --- Variants that are additionally mirrored into the errors-only file.
 local ERROR_VARIANTS = { warn = true, error = true }
@@ -132,15 +132,21 @@ end
 
 --- Resolves the canonical log directory for this driver.
 --- This is the single source: every consumer that needs the log path calls it
---- rather than re-deriving $HOME.
+--- rather than re-deriving $HOME. Once the sink is installed it names the
+--- folder the lines actually reach: a LogsDirPath saved in bootstrap storage
+--- only takes effect when M.repoint() moves the sink there, and an opener or a
+--- health check naming the saved folder before that would point at files
+--- nobody writes. Before install it resolves the configured folder.
 --- @return string Absolute path, no trailing slash.
 function M.log_dir()
-	local data_home = os.getenv(XDG_DATA_HOME_ENV)
-	if not data_home or data_home == "" then
-		local home = require("infra.config_paths").home()
-		data_home = home .. DEFAULT_DATA_HOME_REL
-	end
-	return data_home .. LOG_SUBDIR
+	if _installed and _dir then return _dir end
+	return require("infra.config_paths").get_logs_dir()
+end
+
+--- The folder crash dumps are written to, inside the logs folder.
+--- @return string Absolute path, no trailing slash.
+function M.crash_reports_dir()
+	return M.log_dir() .. "/" .. AppDirs.crash_reports_dir
 end
 
 --- Returns today's date stamp used in the log basenames.
@@ -298,8 +304,9 @@ end
 --- @return boolean True when a durable file sink is active, false when the sink
 ---   is installed but degraded to stdout-only.
 function M.install(logger, opts)
-	if type(logger) ~= "table" or type(logger.set_sink) ~= "function" then
-		io.stderr:write("[logger_sink] install(): logger has no set_sink — no output installed.\n")
+	if type(logger) ~= "table" or type(logger.set_sink) ~= "function"
+		or type(logger.enable_repeat_collapsing) ~= "function" then
+		io.stderr:write("[logger_sink] install(): logger is not the shared core — no output installed.\n")
 		return false
 	end
 	if _installed then return not _stdout_only end
@@ -323,6 +330,10 @@ function M.install(logger, opts)
 	end
 
 	logger.set_sink(sink)
+	-- Armed here, behind the _installed guard, so a repeated install() stays the
+	-- no-op it is documented to be instead of tripping the core's refusal of a
+	-- second arming.
+	logger.enable_repeat_collapsing()
 	_installed = true
 
 	if _stdout_only then
@@ -335,12 +346,72 @@ function M.install(logger, opts)
 	return true
 end
 
+--- Creates a logs folder and proves it writable before anything names it: the
+--- paths editor calls this before storing LogsDirPath, since install() at the
+--- next start would otherwise fall back to stdout for a folder it cannot use.
+--- @param dir string Absolute folder, no trailing slash.
+--- @return boolean ready
+--- @return string|nil error_message
+function M.prepare_dir(dir)
+	if type(dir) ~= "string" or dir:sub(1, 1) ~= "/" then
+		return false, "the logs folder must be an absolute path"
+	end
+	if not ensure_dir(dir) then
+		return false, "the logs folder '" .. dir .. "' could not be created"
+	end
+	-- ensure_dir() trusts a zero mkdir status when its probe fails, which an
+	-- existing read-only folder returns: prove the write here.
+	local probe_path = dir .. "/.write_probe"
+	local probe = io.open(probe_path, "a")
+	if not probe then
+		return false, "the logs folder '" .. dir .. "' is not writable"
+	end
+	probe:close()
+	os.remove(probe_path)
+	return true
+end
+
+--- Moves the installed file sink to the logs folder infra/config_paths now
+--- resolves. The paths editor saves LogsDirPath while the daemon keeps running
+--- (its reload re-reads the hotstrings, it does not restart the process), so
+--- this is where a saved folder takes effect. The old folder keeps its files;
+--- a folder that cannot be created or written leaves the sink where it was.
+--- @return boolean moved True when the sink writes to the resolved folder, or
+---   when no sink is installed yet (install() will resolve the same folder).
+--- @return string|nil error_message Why the sink stayed where it was.
+function M.repoint()
+	if not _installed then return true end
+	local target = require("infra.config_paths").get_logs_dir()
+	if target == _dir and not _stdout_only then return true end
+	if not ensure_dir(target) then
+		return false, "the logs folder '" .. target .. "' could not be created"
+	end
+	local previous, previous_stdout_only = _dir, _stdout_only
+	close_handles()
+	_dir = target
+	open_handles(today())
+	if not _main_handle then
+		-- Back to the folder that worked: a sink with no file loses every line.
+		close_handles()
+		_dir = previous
+		open_handles(today())
+		_stdout_only = previous_stdout_only
+		return false, "the logs folder '" .. target .. "' is not writable"
+	end
+	_stdout_only = false
+	purge_old()
+	return true
+end
+
 --- Removes the sink and closes the handles. Exists for the test suite; production
 --- installs once and keeps it for the process lifetime.
 --- @param logger table|nil The logger module, to clear its sink.
 function M.uninstall(logger)
 	if type(logger) == "table" and type(logger.set_sink) == "function" then
 		logger.set_sink(nil)
+	end
+	if type(logger) == "table" and type(logger.disable_repeat_collapsing) == "function" then
+		logger.disable_repeat_collapsing()
 	end
 	close_handles()
 	_dir         = nil

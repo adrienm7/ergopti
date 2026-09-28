@@ -41,52 +41,21 @@ OpenPersonalShortcuts(*) {
 	}
 }
 
-; Opens the per-user log directory (under <ConfigDir>/autohotkey/logs/) in Explorer.
-; Creates it on first use so the user never sees an "introuvable" dialog
+; The three log rows of the Debug menu, shared with the gesture and shortcut
+; actions. The work lives in ui/log_openers.ahk, which asks the logger for every
+; path at the moment of the click; three copies of the old
+; <ConfigDir>\autohotkey\logs\ formula used to live here.
+
 OpenLogsFolder(*) {
-	global _AhkSubDir
-	LogDir := (IsSet(_ConfigDir) and _ConfigDir != "")
-		? _ConfigDir . _AhkSubDir . "logs\"
-		: A_ScriptDir . "\logs\"
-	if !DirExist(LogDir) {
-		try DirCreate(LogDir)
-	}
-	Run('explorer.exe "' . LogDir . '"')
+	return LogOpeners_OpenFolder()
 }
 
-; Opens today's rolling log file in Notepad. LOGGER_LOG_PATH is refreshed by
-; LoggerInit() at every menu rebuild, so the path follows day rollover.
 OpenTodayLog(*) {
-	global LOGGER_LOG_PATH
-	Path := (IsSet(LOGGER_LOG_PATH) and LOGGER_LOG_PATH != "")
-		? LOGGER_LOG_PATH
-		: ""
-	if Path = "" or !FileExist(Path) {
-		; Fall back to the day-stamped path under <ConfigDir>/autohotkey/logs/ when the
-		; logger hasn't initialised yet (very early boot, edge case)
-		LogDir := (IsSet(_ConfigDir) and _ConfigDir != "")
-			? _ConfigDir . _AhkSubDir . "logs\"
-			: A_ScriptDir . "\logs\"
-		Path := LogDir . "ErgoptiPlus_" . FormatTime(, "yyyy-MM-dd") . ".log"
-	}
-	Run('notepad.exe "' . Path . '"')
+	return LogOpeners_OpenTodayLog()
 }
 
-; Opens today's errors-only log (WARNING + ERROR lines) in Notepad.
-; LOGGER_ERRORS_LOG_PATH is maintained by the logger (daily, driver-scoped).
-; Falls back to computing the path under the logs dir if the global is not set yet.
 OpenErrorLog(*) {
-	global LOGGER_ERRORS_LOG_PATH, _AhkSubDir
-	Path := (IsSet(LOGGER_ERRORS_LOG_PATH) and LOGGER_ERRORS_LOG_PATH != "")
-		? LOGGER_ERRORS_LOG_PATH
-		: ""
-	if Path = "" or !FileExist(Path) {
-		LogDir := (IsSet(_ConfigDir) and _ConfigDir != "")
-			? _ConfigDir . _AhkSubDir . "logs\"
-			: A_ScriptDir . "\logs\"
-		Path := LogDir . "ErgoptiPlus_errors_" . FormatTime(, "yyyy-MM-dd") . ".log"
-	}
-	Run('notepad.exe "' . Path . '"')
+	return LogOpeners_OpenTodayErrors()
 }
 
 ; Minimal template for personal_shortcuts.ahk — created on first launch so the

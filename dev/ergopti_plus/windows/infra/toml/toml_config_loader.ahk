@@ -18,10 +18,9 @@
 ;    and silently ignored the second. Both are gone, which means an unrecognised
 ;    header is now unambiguously a mistake and gets the loud treatment in (3)
 ;    instead of being written off as another driver's business.
-; 3. Unknown sections (not present in the post-manifest Features Map) trigger an
-;    ERROR at boot but never abort — the driver still applies every valid key so
-;    a single typo or stale section does not wipe the user's configuration. The
-;    ERROR level ensures the problem is impossible to miss during log review.
+; 3. Unknown sections and keys produce one cleanup warning per file. They do
+;    not represent a runtime failure: valid overrides still apply, and the
+;    post-ready startup task offers the existing configuration cleanup tool.
 ; 4. Dormant until cut-over: written ahead of the migration so the disruptive
 ;    PR can be focused on call-site rewrites only.
 ; 5. ``hotstrings.personal.<user-chosen-name>`` and ``personal_editor`` are
@@ -36,6 +35,12 @@
 ;    deliberately never cleared: nothing re-applies the config in-process, so
 ;    the tree stays untrustworthy until the driver restarts.
 ; ==============================================================================
+
+
+
+
+
+#Include ../../_generated/action_catalogue.ahk
 
 
 
@@ -58,12 +63,58 @@
 ; Both would otherwise fail the "every segment must already exist in the
 ; manifest" walk below on every single boot, since neither can be declared
 ; ahead of time in manifest.toml.
-TomlSectionIsDynamicPersonalNamespace(SectionPath) {
-	if (SectionPath == "personal_editor") {
-		return true
+/**
+ * Decodes a dotted TOML section without splitting dots inside quoted keys.
+ * @param {String} Header - Section contents without brackets.
+ * @returns {Array|Integer} Semantic key segments, or false for malformed input.
+ */
+TomlConfigSectionParts(Header) {
+	if !(Header is String)
+		return false
+	Rest := Trim(Header)
+	Parts := []
+	Pattern := "^(?:([A-Za-z0-9_-]+)|" . Chr(34) . "((?:[^" . Chr(34) . "\\]|\\.)*)" . Chr(34) . "|'([^']*)')"
+	while (Rest != "") {
+		if !RegExMatch(Rest, Pattern, &TokenMatch)
+			return false
+		Token := TokenMatch[0]
+		if SubStr(Token, 1, 1) == Chr(34)
+			Part := UnescapeTomlString(SubStr(Token, 2, -1))
+		else if SubStr(Token, 1, 1) == "'"
+			Part := SubStr(Token, 2, -1)
+		else
+			Part := Token
+		Parts.Push(Part)
+		Rest := Trim(SubStr(Rest, StrLen(Token) + 1))
+		if Rest == ""
+			return Parts
+		if SubStr(Rest, 1, 1) != "."
+			return false
+		Rest := Trim(SubStr(Rest, 2))
+		if Rest == ""
+			return false
 	}
-	return (StrLen(SectionPath) >= 19 and SubStr(SectionPath, 1, 19) == "hotstrings.personal")
-		and (SectionPath == "hotstrings.personal" or SubStr(SectionPath, 20, 1) == ".")
+	return false
+}
+
+; Manifest paths use semantic names; quotes belong only to TOML serialization.
+TomlConfigManifestPath(Header) {
+	Parts := TomlConfigSectionParts(Header)
+	if !(Parts is Array)
+		return ""
+	Path := ""
+	for Part in Parts
+		Path .= (Path == "" ? "" : ".") . Part
+	return Path
+}
+
+TomlSectionIsDynamicPersonalNamespace(SectionPath) {
+	Parts := TomlConfigSectionParts(SectionPath)
+	if !(Parts is Array)
+		return false
+	if (Parts.Length == 1 && Parts[1] == "personal_editor")
+		return true
+	return Parts.Length >= 2 && Parts[1] == "hotstrings" && Parts[2] == "personal"
 }
 
 ; Keys stored in config.toml but deliberately loaded by a subsystem other than
@@ -88,16 +139,34 @@ TomlConfigForeignOwnershipRegistry() {
 			"nav_modifiers", "LLMMenu"),
 		"llm.trigger", Map(
 			"disabled_apps", "LLMMenu"))
+	; Language packs add category gates through the same catalog FeatureState
+	; seeds at boot. These are owned settings, never unused configuration keys.
+	for _, Pack in HotstringsLanguageCategories() {
+		for _, Category in Pack["categories"]
+			Registry["category_enabled"][Category["v2"]] := "FeatureState"
+	}
 	return Registry
 }
 
+; Action parameters use the binding grammar written by the gesture, shortcut
+; and tap-hold owners. Only actions declaring a parameter can consume a value.
+TomlConfigActionParameterIsOwned(Key) {
+	static Actions := GestureActionCatalogueData().Actions
+	if !RegExMatch(Key, "^(?:gesture|keyboard|script|tap_hold|tap_key)__[a-z0-9]+(?:_[a-z0-9]+)*__([a-z0-9]+(?:_[a-z0-9]+)*)$", &Match)
+		return false
+	return Actions.Has(Match[1]) && Actions[Match[1]].Parameter != ""
+}
+
 TomlConfigForeignOwner(SectionPath, Key) {
+	SectionPath := TomlConfigManifestPath(SectionPath)
 	Registry := TomlConfigForeignOwnershipRegistry()
 	if Registry.Has(SectionPath) {
 		Section := Registry[SectionPath]
 		if Section.Has(Key)
 			return Section[Key]
 	}
+	if SectionPath == "action_parameters" && TomlConfigActionParameterIsOwned(Key)
+		return "Gestures"
 	; The keyboard picker persists slots outside the shipped-default manifest.
 	; Admit exactly the prefixes and keys that ShowKeyboardSlotPicker can create;
 	; a broad section exemption would hide misspellings such as win_cc forever.
@@ -129,19 +198,30 @@ TomlConfigSectionSkipKind(Header) {
 ; keys the cleanup offers to remove are exactly the ones boot reports as unknown.
 ; The walk never mutates Features.
 TomlConfigUnknownKind(Features, SectionPath, Key, &ForeignOwner := "") {
+	; Declaring a neutral default must not transfer a key to the Features owner.
 	ForeignOwner := ""
+	Registry := TomlConfigForeignOwnershipRegistry()
+	if Registry.Has(SectionPath) && Registry[SectionPath].Has(Key) {
+		ForeignOwner := Registry[SectionPath][Key]
+		return ""
+	}
 	if TomlSectionIsDynamicPersonalNamespace(SectionPath)
 		return ""
 	Node := Features
-	for _, Part in StrSplit(SectionPath, ".") {
+	Parts := TomlConfigSectionParts(SectionPath)
+	if !(Parts is Array)
+		return "section"
+	for _, Part in Parts {
 		if (Part == "")
 			continue
 		if (Type(Node) == "Map" and Node.Has(Part))
 			Node := Node[Part]
 		else if (IsObject(Node) and Node.HasOwnProp(Part))
 			Node := Node.%Part%
-		else
-			return "section"
+		else {
+			ForeignOwner := TomlConfigForeignOwner(SectionPath, Key)
+			return ForeignOwner != "" ? "" : "section"
+		}
 	}
 	if (Type(Node) == "Map")
 		Known := Node.Has(Key)
@@ -153,6 +233,7 @@ TomlConfigUnknownKind(Features, SectionPath, Key, &ForeignOwner := "") {
 		return ""
 	if Known
 		return ""
+	; Dynamic keyboard slots belong to ConfigIO only outside the manifest tree.
 	ForeignOwner := TomlConfigForeignOwner(SectionPath, Key)
 	return ForeignOwner != "" ? "" : "leaf"
 }
@@ -223,6 +304,7 @@ TomlConfigEnumUsesBooleanLiterals(Entry) {
 
 /** Resolves the same schema owner for configuration reads and writes. */
 TomlConfigExpectedType(CurrentSection, Key, &Entry) {
+	CurrentSection := TomlConfigManifestPath(CurrentSection)
 	ExpectedType := ""
 	Entry := ManifestFindEntryByPath(CurrentSection . "." . Key)
 	if !(Entry is Map) {
@@ -369,8 +451,7 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 	CurrentSection := ""
 	SkippingForeign := false
 	ObsoleteDriverSections := 0
-	; Counted for the summary line: each is logged where it happens, but a boot
-	; log with twenty scattered errors never said how much of the file was ignored.
+	; Unknown entries share one warning and one post-ready cleanup proposal.
 	UnknownKeys := 0
 	ForeignOwnedKeys := 0
 	IgnoredSectionKeys := 0
@@ -444,23 +525,13 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 
 		; The manifest defines the universe of valid paths. An unknown section
 		; path or leaf is a typo or a stale key left over from an older schema
-		; version: surface it as an error so it is impossible to miss in the
-		; logs, but do not abort the driver (the remaining valid keys are still
-		; applied). TomlConfigUnknownKind owns that rule; the menu's unused-key
+		; version. Apply the remaining valid keys and summarize unused entries
+		; once below. TomlConfigUnknownKind owns that rule; the menu's unused-key
 		; cleanup offers to remove exactly these keys.
 		UnknownKind := TomlConfigUnknownKind(Features, CurrentSection, Key,
 			&ForeignOwner)
-		if (UnknownKind == "section") {
+		if (UnknownKind != "") {
 			UnknownKeys += 1
-			try LoggerError("TomlConfigLoader",
-				"v2 override skipped — unknown section path '[{1}]' not found in the manifest.", CurrentSection)
-			continue
-		}
-		if (UnknownKind == "leaf") {
-			UnknownKeys += 1
-			try LoggerError("TomlConfigLoader",
-				"v2 override skipped — unknown leaf '[{1}].{2}' not found in the manifest.",
-				CurrentSection, Key)
 			continue
 		}
 		if (ForeignOwner != "") {
@@ -477,7 +548,7 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 		; TomlSectionIsDynamicPersonalNamespace): missing segments are
 		; auto-vivified as empty Maps instead of being rejected.
 		IsDynamicPersonalNamespace := TomlSectionIsDynamicPersonalNamespace(CurrentSection)
-		Parts := StrSplit(CurrentSection, ".")
+		Parts := TomlConfigSectionParts(CurrentSection)
 		Node := Features
 		Failed := false
 		for _, Part in Parts {
@@ -547,6 +618,11 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 		try LoggerWarn("TomlConfigLoader",
 			"Ignored {1} obsolete [ahk.*] section(s); the next canonical save removes them.",
 			ObsoleteDriverSections)
+	}
+	if UnknownKeys > 0 {
+		try LoggerWarn("TomlConfigLoader",
+			"Ignored {1} unused configuration key(s) in '{2}'; the configuration cleanup tool is available.",
+			UnknownKeys, FilePath)
 	}
 	if RejectedOverrides {
 		try LoggerError("TomlConfigLoader",

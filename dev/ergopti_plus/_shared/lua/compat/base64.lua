@@ -35,4 +35,32 @@ function M.encode(value)
 	return table.concat(encoded)
 end
 
+--- Decodes canonical padded RFC 4648 bytes, refusing malformed or ambiguous input.
+--- @param value string Encoded bytes.
+--- @return string|nil decoded
+function M.decode(value)
+	if type(value) ~= "string" or #value % 4 ~= 0 then return nil end
+	local output = {}
+	for offset = 1, #value, 4 do
+		local combined, padding = 0, 0
+		for index = 0, 3 do
+			local character = value:sub(offset + index, offset + index)
+			local digit = ALPHABET:find(character, 1, true)
+			if character == "=" then
+				if offset + 3 ~= #value or index < 2 then return nil end
+				padding = padding + 1
+			elseif not digit or padding > 0 then
+				return nil
+			end
+			combined = combined * 64 + (digit and digit - 1 or 0)
+		end
+		output[#output + 1] = string.char(math.floor(combined / 65536) % 256)
+		if padding < 2 then output[#output + 1] = string.char(math.floor(combined / 256) % 256) end
+		if padding == 0 then output[#output + 1] = string.char(combined % 256) end
+	end
+	local decoded = table.concat(output)
+	if M.encode(decoded) ~= value then return nil end
+	return decoded
+end
+
 return M

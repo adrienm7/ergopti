@@ -1,100 +1,160 @@
 --- tests/unit/modules/shortcuts/test_chatgpt.lua
 
 --- ==============================================================================
---- MODULE: ChatGPT Shortcut Preference Tests
+--- MODULE: Canonical ChatGPT Shortcut Preference Tests
 --- DESCRIPTION:
---- Proves that Linux reads, validates, persists, and opens the canonical
---- `shortcuts.chatgpt_url` value instead of carrying an unused parity claim.
+--- Exercises the actual configuration writer and fresh reader, including sparse
+--- scope operations, exact-source refusal and cleanup ownership.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fakes = helpers.load_module("tests.fakes")
+local Sandbox = require("test.config_unused_keys_contract").sandbox
+local Writer = require("toml_codec.writer")
+local Codec = require("toml_codec")
+local Manifest = require("infra.manifest_reader")
+local SOURCE = '[shortcuts]\nchatgpt_url = "https://old.example/chat"\nunknown = "keep"\n[other]\nvalue = 42\n'
 
-local displaced = {}
-
---- Loads the subject over isolated storage and shell seams.
---- @param initial table|nil
---- @param writes_fail boolean|nil
---- @return table subject, table storage, table commands
-local function load_subject(initial, writes_fail)
-	displaced.storage = package.loaded["adapters.storage"]
-	displaced.shell = package.loaded["adapters.shell_runner"]
-	displaced.subject = package.loaded["modules.shortcuts.chatgpt"]
-
-	local storage = Fakes.storage({ initial = initial, writes_fail = writes_fail })
-	local commands = {}
-	local shell = {
-		has_command = function(binary) return binary == "xdg-open" end,
-		quote = function(value)
-			return "'" .. tostring(value):gsub("'", "'\\''") .. "'"
-		end,
-		run = function(command)
-			commands[#commands + 1] = command
-			return true
-		end,
-	}
-	package.loaded["adapters.storage"] = storage
-	package.loaded["adapters.shell_runner"] = shell
-	package.loaded["modules.shortcuts.chatgpt"] = nil
-	return require("modules.shortcuts.chatgpt"), storage, commands
+--- Runs a real canonical reader/writer over an exclusive temporary file.
+--- @param source string|nil Initial configuration bytes.
+--- @param body function Test body.
+local function with_subject(source, body)
+	local loaded = {}
+	for name, value in pairs(package.loaded) do loaded[name] = value end
+	local batch = Writer.batch_write
+	local ok, err = pcall(function()
+		Sandbox.with_config(source, function(path)
+			local controls = { commands = {}, legacy_writes = 0, legacy_url = "https://legacy.example" }
+			package.loaded["infra.config_paths"] = { config = function() return path end }
+			package.loaded["adapters.storage"] = {
+				get = function(_, default) return controls.legacy_url or default end,
+				set = function() controls.legacy_writes = controls.legacy_writes + 1; return true end,
+			}
+			package.loaded["adapters.shell_runner"] = {
+				has_command = function(binary) return binary == "xdg-open" end,
+				quote = function(value) return "'" .. tostring(value):gsub("'", "'\\''") .. "'" end,
+				run = function(command) controls.commands[#controls.commands + 1] = command; return true end,
+			}
+			Writer.batch_write = function(target, operations, files, expected)
+				if controls.external then Sandbox.write_bytes(target, controls.external) end
+				if controls.refuse then return false, "injected refusal" end
+				return batch(target, operations, files, expected)
+			end
+			local function reload()
+				package.loaded["modules.shortcuts.chatgpt"] = nil
+				return require("modules.shortcuts.chatgpt")
+			end
+			body(reload(), controls, path, reload)
+		end)
+	end)
+	Writer.batch_write = batch
+	for name in pairs(package.loaded) do if loaded[name] == nil then package.loaded[name] = nil end end
+	for name, value in pairs(loaded) do package.loaded[name] = value end
+	if not ok then error(err, 0) end
 end
 
-local function restore()
-	package.loaded["adapters.storage"] = displaced.storage
-	package.loaded["adapters.shell_runner"] = displaced.shell
-	package.loaded["modules.shortcuts.chatgpt"] = displaced.subject
-end
-
-helpers.describe("ChatGPT shortcut preference", function()
-
-	helpers.it("uses the shared manifest default when nothing was stored", function()
-		local subject = load_subject()
-		local actual = subject.get_url()
-		local expected = require("infra.manifest_reader").default_for("shortcuts.chatgpt_url")
-		restore()
-		helpers.assert_eq(actual, expected)
+helpers.describe("Canonical ChatGPT shortcut preference", function()
+	helpers.it("uses the manifest default for absence without importing legacy storage", function()
+		with_subject(nil, function(subject, _, path)
+			helpers.assert_eq(subject.get_url(), Manifest.default_for("shortcuts.chatgpt_url"))
+			helpers.assert_eq(Sandbox.read_bytes(path), nil)
+		end)
 	end)
 
-	helpers.it("restores a valid persisted URL", function()
-		local subject = load_subject({ ["shortcuts.chatgpt_url"] = "https://example.invalid/chat" })
-		local actual = subject.get_url()
-		restore()
-		helpers.assert_eq(actual, "https://example.invalid/chat")
+	helpers.it("reads the actual canonical file before and after a fresh module load", function()
+		with_subject(SOURCE, function(subject, _, _, reload)
+			helpers.assert_eq(subject.get_url(), "https://old.example/chat")
+			helpers.assert_eq(reload().get_url(), "https://old.example/chat")
+		end)
 	end)
 
-	helpers.it("rejects unsafe schemes and falls back from corrupt storage", function()
-		local subject = load_subject({ ["shortcuts.chatgpt_url"] = "file:///etc/passwd" })
-		local actual = subject.get_url()
-		local accepted = subject.set_url("javascript:alert(1)")
-		restore()
-		helpers.assert_eq(actual, subject.DEFAULT_URL)
-		helpers.assert_true(not accepted)
+	helpers.it("publishes a sparse URL and preserves unknown neighbors across restart", function()
+		with_subject(SOURCE, function(subject, controls, path, reload)
+			helpers.assert_true(subject.set_url("https://new.example/chat"))
+			local config = Codec.decode(Sandbox.read_bytes(path))
+			helpers.assert_eq(config.shortcuts.chatgpt_url, "https://new.example/chat")
+			helpers.assert_eq(config.shortcuts.unknown, "keep")
+			helpers.assert_eq(config.other.value, 42)
+			helpers.assert_eq(reload().get_url(), "https://new.example/chat")
+			helpers.assert_eq(controls.legacy_writes, 0)
+		end)
 	end)
 
-	helpers.it("publishes a new value only after durable storage succeeds", function()
-		local subject, storage = load_subject({
-			["shortcuts.chatgpt_url"] = "https://old.example",
-		}, true)
-		local changed = subject.set_url("https://new.example")
-		local active = subject.get_url()
-		local durable = storage.get("shortcuts.chatgpt_url")
-		restore()
-		helpers.assert_true(not changed)
-		helpers.assert_eq(active, "https://old.example")
-		helpers.assert_eq(durable, "https://old.example")
+	helpers.it("removes an explicit neutral value rather than materializing the default", function()
+		with_subject(SOURCE, function(subject, _, path, reload)
+			helpers.assert_true(subject.set_url(subject.DEFAULT_URL))
+			helpers.assert_eq(Codec.decode(Sandbox.read_bytes(path)).shortcuts.chatgpt_url, nil)
+			helpers.assert_eq(reload().get_url(), subject.DEFAULT_URL)
+		end)
 	end)
 
-	helpers.it("opens the persisted URL as one quoted shell argument", function()
-		local subject, _, commands = load_subject({
-			["shortcuts.chatgpt_url"] = "https://example.invalid/a?value=$(touch%20no)",
-		})
-		local opened = subject.open()
-		restore()
-		helpers.assert_true(opened)
-		helpers.assert_eq(#commands, 1)
-		helpers.assert_contains(commands[1],
-			"'https://example.invalid/a?value=$(touch%20no)'",
-			"the URL must be one inert shell word; command substitutions in query data must never execute")
+	helpers.it("refuses invalid setter values without changing the configuration", function()
+		with_subject(SOURCE, function(subject, controls, path)
+			for _, value in ipairs({ false, 4, "file:///etc/passwd", "javascript:alert(1)", "https://bad url" }) do
+				helpers.assert_eq(subject.set_url(value), false)
+			end
+			helpers.assert_eq(Sandbox.read_bytes(path), SOURCE)
+			helpers.assert_eq(controls.legacy_writes, 0)
+		end)
 	end)
 
+	helpers.it("refuses malformed canonical values without overwriting or falling back", function()
+		with_subject('[shortcuts]\nchatgpt_url = false\n', function(subject, _, path)
+			local before = Sandbox.read_bytes(path)
+			local reason = helpers.assert_throws(subject.get_url, "malformed canonical URL must be refused")
+			helpers.assert_contains(tostring(reason), "ChatGPT shortcut URL")
+			helpers.assert_eq(subject.set_url("https://new.example"), false)
+			helpers.assert_eq(Sandbox.read_bytes(path), before)
+		end)
+	end)
+
+	helpers.it("publishes no new state when the actual writer refuses", function()
+		with_subject(SOURCE, function(subject, controls, path, reload)
+			controls.refuse = true
+			helpers.assert_eq(subject.set_url("https://new.example"), false)
+			helpers.assert_eq(Sandbox.read_bytes(path), SOURCE)
+			helpers.assert_eq(reload().get_url(), "https://old.example/chat")
+		end)
+	end)
+
+	helpers.it("preserves an external edit arriving between validated read and publication", function()
+		with_subject(SOURCE, function(subject, controls, path, reload)
+			controls.external = '[shortcuts]\nchatgpt_url = "https://external.example"\n[foreign]\nvalue = 19\n'
+			helpers.assert_eq(subject.set_url("https://new.example"), false)
+			helpers.assert_eq(Sandbox.read_bytes(path), controls.external)
+			helpers.assert_eq(reload().get_url(), "https://external.example")
+		end)
+	end)
+
+	for _, mode in ipairs({ "clear", "recommended" }) do
+		helpers.it("consumes the actual " .. mode .. " scope candidate after publication", function()
+			with_subject(SOURCE, function(subject, _, path, reload)
+				local operations = Manifest.scope_operations("shortcuts", mode)
+				helpers.assert_true(Writer.batch_write(path, operations))
+				local expected = mode == "clear" and Manifest.default_for("shortcuts.chatgpt_url")
+					or Manifest.recommended_for("shortcuts.chatgpt_url")
+				helpers.assert_eq(reload().get_url(), expected)
+				helpers.assert_eq(Codec.decode(Sandbox.read_bytes(path)).shortcuts.unknown, "keep")
+			end)
+		end)
+	end
+
+	helpers.it("retains the consumed URL during actual unused-key detection", function()
+		with_subject(SOURCE, function(_, _, path)
+			package.loaded["ui.menu.unused_keys_cleanup"] = nil
+			local scan = require("ui.menu.unused_keys_cleanup").find(path)
+			helpers.assert_eq(scan.status, "ok")
+			local found = {}
+			for _, entry in ipairs(scan.keys) do found[table.concat(entry.path, ".")] = true end
+			helpers.assert_eq(found["shortcuts.chatgpt_url"], nil)
+			helpers.assert_true(found["shortcuts.unknown"])
+		end)
+	end)
+
+	helpers.it("opens the canonical URL as one inert shell argument", function()
+		with_subject('[shortcuts]\nchatgpt_url = "https://example.invalid/a?value=$(touch%20no)"\n', function(subject, controls)
+			helpers.assert_true(subject.open())
+			helpers.assert_eq(#controls.commands, 1)
+			helpers.assert_contains(controls.commands[1], "'https://example.invalid/a?value=$(touch%20no)'")
+		end)
+	end)
 end)

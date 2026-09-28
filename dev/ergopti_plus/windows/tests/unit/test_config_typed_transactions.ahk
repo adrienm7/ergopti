@@ -67,7 +67,9 @@ _CTT_RealCollector(OnboardingSeen) {
 		AssertEqual(CONFIG_SAVE_OK, SaveFullConfig(0, (*) => true),
 			"the real full-save collector must produce valid typed updates")
 		Target := ManifestBuildFeaturesMap()
-		Target["llm"]["onboarding_seen"] := !OnboardingSeen
+		if !OnboardingSeen
+			AssertEqual("absent", TOML_Read(Path, "llm", "onboarding_seen", "absent"),
+				"a neutral onboarding value is persisted as deletion")
 		ApplyConfigToml(Target, Path)
 		AssertEqual(OnboardingSeen, Target["llm"]["onboarding_seen"],
 			"the final collector override must preserve the loaded onboarding Boolean")

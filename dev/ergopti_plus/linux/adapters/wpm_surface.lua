@@ -275,17 +275,35 @@ function M.draw(frame, x, y)
 	local window = ensure_window()
 	if not window then return false end
 	_frame = frame
-	window:resize(frame.width, frame.height)
-	if not _drag then window:move(math.floor(x + 0.5), math.floor(y + 0.5)) end
-	if not window:get_visible() then window:show_all() end
-	window:queue_draw()
+	local called, drawn = pcall(function()
+		if window:resize(frame.width, frame.height) == false then return false end
+		if not _drag and window:move(math.floor(x + 0.5), math.floor(y + 0.5)) == false then return false end
+		if not window:get_visible() and window:show_all() == false then return false end
+		if window:queue_draw() == false then return false end
+		return window:get_visible() == true
+	end)
+	if not called or drawn ~= true then
+		Logger.error(LOG, "The WPM window did not acknowledge its visible state.")
+		return false
+	end
 	return true
 end
 
---- Hides the widget.
+--- Hides the widget and verifies the native window's terminal visibility.
+--- @return boolean acknowledged
 function M.hide()
+	if _window then
+		local called, hidden = pcall(function()
+			local result = _window:hide()
+			return result ~= false and _window:get_visible() == false
+		end)
+		if not called or hidden ~= true then
+			Logger.error(LOG, "The WPM window did not acknowledge its hidden state.")
+			return false
+		end
+	end
 	_drag = nil
-	if _window then pcall(function() _window:hide() end) end
+	return true
 end
 
 --- @return boolean

@@ -26,7 +26,11 @@
 ---    with a command that failed before producing output.
 --- 4. has_command(): availability probe built on run(), so backend detection
 ---    cannot regress into the "== 0 only" form again.
---- 5. Test seam: composed commands can be captured instead of executed. io.popen
+--- 5. run_async(): runs a program without a shell and without blocking the
+---    event loop that reads the grabbed keyboard; libuv owns the child, its
+---    pipes and its deadline. Without libuv it refuses rather than falling
+---    back to a blocking call.
+--- 6. Test seam: composed commands can be captured instead of executed. io.popen
 ---    never RAISES on unescaped input — it EXECUTES it — so a test that only
 ---    checks "nothing crashed" passes whether or not the quoting exists. Handing
 ---    the command over is the only way a test can assert the quoting at all.
@@ -124,6 +128,7 @@ function M.validate_spawn_args(executable, args)
 	end
 	return ""
 end
+
 
 
 
@@ -280,6 +285,7 @@ end
 
 
 
+
 -- ========================================
 -- ========================================
 -- ======= 3/ Environment Probing =========
@@ -293,6 +299,7 @@ function M.has_command(binary)
 	if type(binary) ~= "string" or binary == "" then return false end
 	return M.run("command -v " .. M.quote(binary) .. " >/dev/null 2>&1")
 end
+
 
 
 
@@ -352,9 +359,145 @@ end
 
 
 
+
+-- ==========================================
+-- ==========================================
+-- ======= 5/ Asynchronous Execution ========
+-- ==========================================
+-- ==========================================
+
+-- libuv owns the child, its pipes and its deadline; without it there is no
+-- asynchronous child at all, and callers must not fall back to a blocking one
+local ok_luv, luv = pcall(require, "luv")
+if not ok_luv then luv = nil end
+M.HAS_ASYNC = luv ~= nil
+
+-- What an asynchronous child may print before it is stopped: the callers read
+-- a version line or a df row, never a stream
+local ASYNC_MAX_OUTPUT_BYTES = 65536
+
+--- Closes one libuv handle at most once.
+--- @param handle any
+local function close_handle(handle)
+	if not handle then return end
+	local ok, closing = pcall(luv.is_closing, handle)
+	if not (ok and closing == true) then pcall(luv.close, handle) end
+end
+
+--- Stops a child's whole process group.
+--- @param request table
+local function stop_group(request)
+	if request.exited or not request.pid then return end
+	local ok = pcall(luv.kill, -request.pid, "sigterm")
+	if not ok then Logger.error(LOG, "run_async(): could not stop pid %s.", tostring(request.pid)) end
+end
+
+--- Publishes one terminal result and releases every handle.
+--- @param request table
+--- @param result table { ok, code, stdout, stderr, error }
+local function finish_async(request, result)
+	if request.terminal then return end
+	request.terminal = true
+	pcall(luv.timer_stop, request.timer)
+	close_handle(request.timer)
+	for _, field in ipairs({ "stdout", "stderr" }) do
+		if request[field] then
+			pcall(luv.read_stop, request[field])
+			close_handle(request[field])
+		end
+	end
+	if request.exited then close_handle(request.process) end
+	_record_exit(request.name, result.code or -1, Monotonic.now_ms() - request.started)
+	if request.silent then return end
+	local ok, err = pcall(request.callback, result)
+	if not ok then Logger.error(LOG, "run_async() callback for %s raised: %s.", request.name, tostring(err)) end
+end
+
+--- Completes once the child has exited and both pipes have ended.
+--- @param request table
+local function maybe_finish(request)
+	if request.terminal or not request.exited or not request.stdout_eof or not request.stderr_eof then return end
+	finish_async(request, {
+		ok     = request.code == 0,
+		code   = request.code,
+		stdout = request.stdout_text,
+		stderr = request.stderr_text,
+		error  = request.code ~= 0 and ("exit code " .. tostring(request.code)) or nil,
+	})
+end
+
+--- Runs a program without a shell and without blocking the event loop.
+--- @param executable string Program name or absolute path.
+--- @param args table Array of string arguments.
+--- @param options table|nil { timeout_ms }
+--- @param callback function Receives { ok, code, stdout, stderr, error } once.
+--- @return table|nil handle { cancel = function() } — nil when nothing started.
+--- @return string|nil error Why nothing started.
+function M.run_async(executable, args, options, callback)
+	if not luv then return nil, "asynchronous execution needs libuv" end
+	local refusal = M.validate_spawn_args(executable, args)
+	if refusal ~= "" then return nil, refusal end
+	if type(callback) ~= "function" then return nil, "a callback is required" end
+	local timeout_ms = type(options) == "table" and tonumber(options.timeout_ms) or nil
+	if not timeout_ms or timeout_ms <= 0 then return nil, "a positive timeout_ms is required" end
+	local request = {
+		name = executable, callback = callback, started = Monotonic.now_ms(),
+		stdout_text = "", stderr_text = "", stdout_eof = false, stderr_eof = false,
+		exited = false, terminal = false, silent = false,
+	}
+	request.stdout, request.stderr, request.timer = luv.new_pipe(false), luv.new_pipe(false), luv.new_timer()
+	luv.timer_start(request.timer, timeout_ms, 0, function()
+		stop_group(request)
+		finish_async(request, { ok = false, error = "timeout" })
+	end)
+	local spawned, process, pid = pcall(luv.spawn, executable, {
+		args = args, stdio = { nil, request.stdout, request.stderr }, detached = true,
+	}, function(code)
+		request.exited = true
+		request.code = tonumber(code) or -1
+		maybe_finish(request)
+		if request.terminal then close_handle(request.process) end
+	end)
+	if not spawned or not process then
+		finish_async(request, { ok = false, error = "spawn failed: " .. tostring(pid or process) })
+		return nil, "spawn failed"
+	end
+	request.process, request.pid = process, pid
+	for _, stream in ipairs({ { "stdout", "stdout_text", "stdout_eof" }, { "stderr", "stderr_text", "stderr_eof" } }) do
+		local field, text, eof = stream[1], stream[2], stream[3]
+		luv.read_start(request[field], function(err, chunk)
+			if request.terminal then return end
+			if err then
+				stop_group(request)
+				finish_async(request, { ok = false, error = tostring(err) })
+			elseif chunk == nil then
+				request[eof] = true
+				maybe_finish(request)
+			elseif #request[text] + #chunk > ASYNC_MAX_OUTPUT_BYTES then
+				stop_group(request)
+				finish_async(request, { ok = false, error = "output over " .. ASYNC_MAX_OUTPUT_BYTES .. " bytes" })
+			else
+				request[text] = request[text] .. chunk
+			end
+		end)
+	end
+	return {
+		cancel = function()
+			if request.terminal then return end
+			request.silent = true
+			stop_group(request)
+			finish_async(request, { ok = false, error = "cancelled" })
+		end,
+	}
+end
+
+
+
+
+
 -- ==============================
 -- ==============================
--- ======= 5/ Test Seam =========
+-- ======= 6/ Test Seam =========
 -- ==============================
 -- ==============================
 

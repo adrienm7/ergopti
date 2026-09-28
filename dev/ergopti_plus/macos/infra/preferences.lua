@@ -32,13 +32,15 @@
 local M = {}
 local hs        = hs
 local TomlCodec = require("infra.toml.codec")
+local TomlWriter = require("toml_codec.writer")
 local Logger    = require("infra.logger")
 local FileSystem = require("adapters.file_system")
+local Manifest = require("infra.manifest_reader")
 local LOG       = "preferences"
 
 
 --- Top-level TOML section names in the order they appear on disk.
-local SECTIONS = { "gestures", "hotstrings", "metrics", "llm", "shortcuts", "layout", "updater" }
+local SECTIONS = { "gestures", "hotstrings", "metrics", "llm", "shortcuts", "layout", "updater", "ui" }
 
 --- Maps every flat state key (as used in memory throughout the codebase) to
 --- its on-disk location. Fields:
@@ -55,6 +57,7 @@ local KEY_MAP = {
 
 	-- ── Hotstrings ─────────────────────────────────────────────────────────
 	keymap                               = { sec = "hotstrings", key = "enabled"                      },
+	repeat_key_enabled                   = { sec = "hotstrings", key = "repeat_key_enabled"           },
 	expansion_delay                      = { sec = "hotstrings"                                        },
 	personal_info                        = { sec = "hotstrings", path = "modules", key = "personal_info" },
 	preview_ai_enabled                   = { sec = "hotstrings"                                        },
@@ -96,7 +99,7 @@ local KEY_MAP = {
 	llm_active_profile                   = { sec = "llm", path = "profiles", key = "active"        },
 	llm_num_predictions                  = { sec = "llm", path = "profiles", key = "num_predictions" },
 	llm_trigger_shortcut                 = { sec = "llm", path = "trigger", key = "shortcut"       },
-	llm_debounce                         = { sec = "llm", path = "trigger", key = "debounce"       },
+	llm_debounce                         = { sec = "llm", path = "trigger", key = "debounce_ms", units_per_state = 1000 },
 	llm_instant_on_word_end              = { sec = "llm", path = "trigger", key = "instant_on_word_end" },
 	llm_after_hotstring                  = { sec = "llm", path = "trigger", key = "after_hotstring" },
 	llm_url_bar_filter_enabled           = { sec = "llm", path = "trigger", key = "url_bar_filter_enabled" },
@@ -128,6 +131,9 @@ local KEY_MAP = {
 	-- ── Updater ────────────────────────────────────────────────────────────
 	update_channel                       = { sec = "updater",  key = "channel"               },
 	update_check_interval_seconds        = { sec = "updater",  key = "check_interval_seconds" },
+
+	-- ── Interface ──────────────────────────────────────────────────────────
+	menubar_icon                         = { sec = "ui"                                        },
 }
 
 --- Maps nested-table flat state keys to their on-disk location.
@@ -190,6 +196,38 @@ for flat_key, spec in pairs(NESTED_KEY_MAP) do
 	end
 end
 
+--- Resolves an owned persisted scalar to its existing menu-state key.
+--- @param path string Canonical configuration path.
+--- @return string|nil key Existing owner key, or nil for an unknown path.
+function M.flat_key_for(path)
+	local section, key = path:match("^([^.]+)%.(.+)$")
+	if not section then return nil end
+	return _reverse_scalar[section .. ":" .. key] or _reverse_nested[section .. ":" .. key]
+end
+
+--- Converts a scalar at its persistence boundary, preserving native units in memory.
+--- @param spec table Existing scalar ownership declaration.
+--- @param value any Scalar value.
+--- @param reading boolean True when reading canonical disk units.
+--- @return any converted Native or persisted representation.
+local function scalar_units(spec, value, reading)
+	if not spec or not spec.units_per_state then return value end
+	assert(type(value) == "number" and value == value and value >= 0 and value < math.huge,
+		"configuration duration must be a finite non-negative number")
+	local result = reading and value / spec.units_per_state or value * spec.units_per_state
+	assert(result < math.huge, "configuration duration overflows its canonical units")
+	return result
+end
+
+--- Resolves canonical defaults/operations into the units used by their native owner.
+--- @param path string Canonical configuration path.
+--- @param value any Value expressed in persisted units.
+--- @return any converted Native state value.
+function M.state_value_for(path, value)
+	local key = assert(M.flat_key_for(path), "configuration path has no preference owner: " .. path)
+	return scalar_units(KEY_MAP[key], value, true)
+end
+
 
 
 
@@ -249,6 +287,7 @@ local function group_for_disk(flat)
 				set_path(grouped[nested.sec], nested.key, v)
 			end
 		elseif scalar then
+			v = scalar_units(scalar, v, false)
 			local disk_key = scalar.key or k
 			if scalar.path then
 				local sub = grouped[scalar.sec]
@@ -260,6 +299,34 @@ local function group_for_disk(flat)
 		end
 	end
 	return grouped
+end
+
+--- Builds leaf updates without claiming ownership of neighboring disk values.
+--- @param flat table Complete desired preference snapshot.
+--- @return table updates Explicit set/delete batch.
+local function sparse_updates(flat)
+	local updates = {}
+	local table_paths = {}
+	for _, spec in pairs(NESTED_KEY_MAP) do
+		if not spec.merge_into_sec then table_paths[spec.sec .. "." .. spec.key] = true end
+	end
+	local function visit(node, path)
+		for key, value in pairs(node) do
+			local leaf = path == "" and key or path .. "." .. key
+			if type(value) == "table" and #value == 0 and next(value) ~= nil then
+				visit(value, leaf)
+			elseif type(value) ~= "table" or next(value) ~= nil or table_paths[leaf] then
+				if Manifest.has_default(leaf) then
+					updates[#updates + 1] = Manifest.sparse_operation(leaf, value)
+				else
+					updates[#updates + 1] = { section = path, key = key, value = value }
+				end
+			end
+		end
+	end
+	visit(group_for_disk(flat), "")
+	table.sort(updates, function(a, b) return a.section .. "." .. a.key < b.section .. "." .. b.key end)
+	return updates
 end
 
 
@@ -299,12 +366,8 @@ local function flatten_from_disk(grouped, mark)
 					elseif top_scalar_fk then
 						-- Already handled above — skip sub-path processing
 					elseif sec_name == "gestures" then
-						-- Defensive: a table inside [gestures] is treated as gesture_actions
-						if not flat.gesture_actions then flat.gesture_actions = {} end
-						for slot, action in pairs(disk_val) do
-							flat.gesture_actions[slot] = action
-						end
-						take(sec_name, disk_key)
+						-- Unknown nested tables belong to their own reader. They must
+						-- survive sparse saves without becoming native gesture slots.
 					else
 						-- Sub-path table (e.g. hotstrings.dynamic, hotstrings.editor):
 						-- walk each inner key through the reverse scalar and nested maps.
@@ -356,12 +419,13 @@ local function flatten_from_disk(grouped, mark)
 						local fk     = _reverse_scalar[lookup]
 						if fk then
 							flat[fk] = disk_val
-						else
+							take(sec_name, disk_key)
+						elseif Manifest.has_default("gestures." .. disk_key) then
 							-- Gesture action slot (tap_2, pinch_2, etc.) merged into [gestures]
 							if not flat.gesture_actions then flat.gesture_actions = {} end
 							flat.gesture_actions[disk_key] = disk_val
+							take(sec_name, disk_key)
 						end
-						take(sec_name, disk_key)
 					else
 						local lookup = sec_name .. ":" .. disk_key
 						local fk     = _reverse_scalar[lookup]
@@ -374,6 +438,7 @@ local function flatten_from_disk(grouped, mark)
 			end
 		end
 	end
+	for key, value in pairs(flat) do flat[key] = scalar_units(KEY_MAP[key], value, true) end
 	return flat
 end
 
@@ -413,7 +478,7 @@ function M.build_initial_state(hotfiles, menu_mods, core_mods)
 
 	for _, f in ipairs(type(hotfiles) == "table" and hotfiles or {}) do
 		local name = M.get_group_name(f)
-		if name ~= "" then state.hotstrings[name] = true end
+		if name ~= "" then state.hotstrings[name] = false end
 	end
 
 	return state
@@ -433,6 +498,7 @@ end
 -- full-document model long after boot. A last-moment check inside the adapter
 -- cannot detect an external edit that landed before save() was called.
 local _source_snapshots = {}
+local _owned_publications = {}
 
 --- Classifies one preference source without interpreting its contents.
 --- @param prefs_file string Destination path.
@@ -455,6 +521,41 @@ local function same_source(left, right)
 		and type(right) == "table"
 		and left.status == right.status
 		and (left.status ~= "ok" or left.content == right.content)
+end
+
+--- The top-level tables and values of the current file that Preferences does
+--- not own: [_meta] (the schema version the boot migration stamps), the expert
+--- [script] and [features] layers config_overrides reads, and any table another
+--- reader keeps here. A save carries them over unchanged; replacing the file
+--- with the owned sections alone erased them at the first menu change. A file
+--- the save creates gets the rows its creators must write instead (the schema
+--- stamp the boot migration registered through toml_codec.writer).
+--- @param prefs_file string Destination path.
+--- @param source table Exact source classification `{ status, content? }`.
+--- @return table|nil tables `{ [name] = value }`, nil when the file is not TOML.
+--- @return string|nil detail
+local function unowned_tables(prefs_file, source)
+	if source.status ~= "ok" then
+		local out = {}
+		for _, row in ipairs(TomlWriter.create_rows(prefs_file) or {}) do
+			local node = out
+			for segment in row.section:gmatch("[^%.]+") do
+				if type(node[segment]) ~= "table" then node[segment] = {} end
+				node = node[segment]
+			end
+			node[row.key] = row.value
+		end
+		return out
+	end
+	local ok, decoded = pcall(TomlCodec.decode, source.content)
+	if not ok or type(decoded) ~= "table" then
+		return nil, "the current config.toml is not valid TOML, so the tables it holds cannot be kept"
+	end
+	local out = {}
+	for name, value in pairs(decoded) do
+		if not _known_sections[name] then out[name] = value end
+	end
+	return out
 end
 
 --- Adopts a demonstrably changed, valid external source as the baseline for a
@@ -498,6 +599,7 @@ end
 --- @return table The decoded preferences (empty when the file is absent or invalid).
 --- @return string "ok" | "absent" | "corrupt"
 function M.load(prefs_file)
+	assert(not _owned_publications[prefs_file], "preference publication is still active")
 	local content, read_status = FileSystem.read_with_status(prefs_file)
 	if read_status ~= "ok" then
 		if read_status == "absent" then
@@ -523,8 +625,14 @@ function M.load(prefs_file)
 		return {}, "corrupt"
 	end
 
+	local flattened, values = pcall(flatten_from_disk, tbl)
+	if not flattened then
+		_source_snapshots[prefs_file] = nil
+		Logger.error(LOG, "config.toml contains an invalid owned setting; keeping its source untouched.")
+		return {}, "corrupt"
+	end
 	_source_snapshots[prefs_file] = { status = "ok", content = content }
-	return flatten_from_disk(tbl), "ok"
+	return values, "ok"
 end
 
 --- Marks every config.toml path load() takes into the flat state, through the
@@ -546,12 +654,40 @@ end
 --- @param content string Bytes the cleanup published.
 --- @return boolean adopted
 function M.adopt_cleanup(prefs_file, previous, content)
+	if _owned_publications[prefs_file] then return false end
 	local baseline = _source_snapshots[prefs_file]
 	if type(baseline) ~= "table" or baseline.status ~= "ok" or baseline.content ~= previous
 		or type(content) ~= "string" then
 		return false
 	end
 	_source_snapshots[prefs_file] = { status = "ok", content = content }
+	return true
+end
+
+--- Captures the exact source acknowledged by load or the last publication.
+--- @param path string Configuration path.
+--- @return table|nil snapshot Classified source snapshot.
+function M.source_snapshot(path)
+	local source = _source_snapshots[path]
+	return source and { status = source.status, content = source.content } or nil
+end
+
+--- Exchanges the acknowledged source under the shared writer admission fence.
+--- The caller retains the inverse until its conditional publication commits.
+--- @param path string Configuration path.
+--- @param expected table Exact previous classified source.
+--- @param replacement table Classified candidate or rollback source.
+--- @return boolean exchanged
+function M.replace_source(path, expected, replacement)
+	if _owned_publications[path] then return false end
+	local current = _source_snapshots[path]
+	local function valid(source)
+		return type(source) == "table" and ((source.status == "absent" and source.content == nil)
+			or (source.status == "ok" and type(source.content) == "string"))
+	end
+	if not valid(expected) or not valid(replacement) or not valid(current)
+		or current.status ~= expected.status or current.content ~= expected.content then return false end
+	_source_snapshots[path] = { status = replacement.status, content = replacement.content }
 	return true
 end
 
@@ -565,6 +701,188 @@ local function clone_value(value)
 	for key, child in pairs(value) do clone[clone_value(key)] = clone_value(child) end
 	return clone
 end
+
+--- Reconciles leaf operations with existing inline gesture tables without
+--- replacing unknown neighbors. Both ordinary saves and scopes use this owner.
+--- @param source table Exact classified source snapshot.
+--- @param updates table Owned set/delete leaf operations.
+--- @return table updates Equivalent strict-writer operations.
+function M.prepare_gesture_updates(source, updates)
+	local scanned, detail = require("toml_codec.record_scanner").scan_records(source.content or "", { quoted_headers = true })
+	if not scanned then return false, detail end
+	local decoded = TomlCodec.decode(source.content or "")
+	local disk_gestures = decoded.gestures or {}
+	local inline, candidates, rows = {}, {}, {}
+	for _, record in ipairs(scanned.records) do
+		if record.addressable and record.section == "gestures"
+			and (record.key == "action_parameters" or record.key == "modes" or record.key == "sensitivities") then
+			inline["gestures." .. record.key] = record.key
+		end
+	end
+	for _, row in ipairs(updates) do
+		local key = inline[row.section]
+		local empty_runtime_table = row.section == "gestures" and type(row.value) == "table"
+			and next(row.value) == nil and (row.key == "action_parameters" or row.key == "modes" or row.key == "sensitivities")
+		if empty_runtime_table then
+			-- Empty runtime ownership cannot authorize replacing an entire source
+			-- table: unknown or other-domain neighbors may still be stored there.
+		elseif key then
+			assert(type(disk_gestures[key]) == "table", "scope owned table is malformed")
+			local candidate = candidates[key] or clone_value(disk_gestures[key])
+			candidates[key] = candidate
+			if row.delete then candidate[row.key] = nil else candidate[row.key] = clone_value(row.value) end
+		else rows[#rows + 1] = row end
+	end
+	for key, candidate in pairs(candidates) do
+		rows[#rows + 1] = next(candidate) == nil and { section = "gestures", key = key, delete = true }
+			or { section = "gestures", key = key, value = candidate }
+	end
+	return rows
+end
+
+--- Rewrites only declared LLM leaves inside existing inline preference tables.
+--- The scanner owns TOML syntax; this owner clones parsed values and preserves
+--- neighboring fields before handing one complete inline value to the writer.
+--- @param source table Exact classified source snapshot.
+--- @param updates table Manifest-owned leaf operations.
+--- @return table rows Addressable operations with inline tables retained.
+local function prepare_inline_updates(source, updates, root)
+	local scanned, detail = require("toml_codec.record_scanner").scan_records(source.content or "", { quoted_headers = true })
+	assert(scanned, detail)
+	local decoded = TomlCodec.decode(source.content or "")
+	local inline, candidates, rows = {}, {}, {}
+	local function parts(path)
+		local result = {}
+		for key in path:gmatch("[^.]+") do result[#result + 1] = key end
+		return result
+	end
+	for _, record in ipairs(scanned.records) do
+		if record.addressable then
+			local path = record.section == "" and record.key or record.section .. "." .. record.key
+			if path == root or path:sub(1, #root + 1) == root .. "." then
+				local value = decoded
+				for _, key in ipairs(parts(path)) do value = type(value) == "table" and value[key] or nil end
+				if type(value) == "table" then inline[path] = { record = record, value = value } end
+			end
+		end
+	end
+	for _, row in ipairs(updates) do
+		local path = row.section .. "." .. row.key
+		local parent = row.section
+		while parent ~= "" and not inline[parent] do parent = parent:match("^(.*)%.[^.]+$") or "" end
+		if path == "llm.profiles.shortcuts" and type(row.value) == "table" and next(row.value) == nil then
+			-- An empty runtime dictionary owns no unknown profile leaves on disk.
+		elseif inline[parent] then
+			local candidate = candidates[parent] or clone_value(inline[parent].value)
+			candidates[parent] = candidate
+			local keys, target = parts(path:sub(#parent + 2)), candidate
+			local missing, ancestry = false, {}
+			for index = 1, #keys - 1 do
+				local child = target[keys[index]]
+				assert(child == nil or type(child) == "table", "inline preference ownership crosses a scalar")
+				if child == nil and row.delete then missing = true; break end
+				if child == nil then child = {}; target[keys[index]] = child end
+				ancestry[#ancestry + 1] = { parent = target, key = keys[index] }
+				target = child
+			end
+			if not missing then
+				if row.delete then target[keys[#keys]] = nil else target[keys[#keys]] = clone_value(row.value) end
+				for index = #ancestry, 1, -1 do
+					local node = ancestry[index]
+					if next(node.parent[node.key]) == nil then node.parent[node.key] = nil else break end
+				end
+			end
+		else rows[#rows + 1] = row end
+	end
+	for path, candidate in pairs(candidates) do
+		local record = inline[path].record
+		rows[#rows + 1] = next(candidate) == nil and { section = record.section, key = record.key, delete = true }
+			or { section = record.section, key = record.key, value = candidate }
+	end
+	return rows
+end
+
+--- Prepares declared LLM leaves while preserving inline neighbors.
+--- @param source table Classified source.
+--- @param updates table Owned leaf operations.
+--- @return table Prepared writer operations.
+function M.prepare_llm_updates(source, updates)
+	return prepare_inline_updates(source, updates, "llm")
+end
+
+--- Prepares declared shortcut leaves while preserving inline neighbors.
+--- @param source table Classified source.
+--- @param updates table Owned leaf operations.
+--- @return table Prepared writer operations.
+function M.prepare_shortcut_updates(source, updates)
+	return prepare_inline_updates(source, updates, "shortcuts")
+end
+
+--- Preserves unowned hotstring neighbors while changing declared inline leaves.
+--- @param source table Exact classified source.
+--- @param updates table Owned leaf operations.
+--- @return table Prepared writer operations.
+function M.prepare_hotstring_updates(source, updates)
+	return prepare_inline_updates(source, updates, "hotstrings")
+end
+
+--- Publishes a domain owner's exact batch and advances the ordinary save baseline.
+--- @param path string Canonical configuration path.
+--- @param updates table Already validated owned operations.
+--- @param source table Exact classified source used by the domain owner.
+--- @return boolean committed
+function M.publish_owned(path, updates, source)
+	if _owned_publications[path] then return false end
+	local baseline = _source_snapshots[path]
+	if baseline and not same_source(baseline, source) then return false end
+	_owned_publications[path] = true
+	local called, committed, detail, encoded = pcall(TomlWriter.batch_write, path, updates, FileSystem, source)
+	_owned_publications[path] = nil
+	if not called or committed ~= true then
+		Logger.error(LOG, "Owned preferences were not published: %s.", tostring(called and detail or committed))
+		return false
+	end
+	_source_snapshots[path] = { status = "ok", content = encoded }
+	return true
+end
+
+--- Projects canonical preferences onto the actual registered hotstring inventory.
+--- Disk-only neighbors and UI placeholders acquire no runtime ownership.
+--- @param saved table Flat values returned by this preferences reader.
+--- @param groups table Registered group names and their current enabled posture.
+--- @param get_sections function Returns each group's registered section descriptors.
+--- @return table desired Complete group and section posture, with neutral absence.
+function M.project_hotstring_preferences(saved, groups, get_sections)
+	assert(type(saved) == "table" and type(groups) == "table" and type(get_sections) == "function",
+		"hotstring projection needs canonical preferences and a registered inventory")
+	assert(saved.hotstrings == nil or type(saved.hotstrings) == "table", "hotstring groups must be a table")
+	assert(saved.section_states == nil or type(saved.section_states) == "table", "hotstring sections must be a table")
+	local desired = { hotstrings = {}, section_states = {} }
+	for name in pairs(groups) do
+		assert(type(name) == "string" and name ~= "", "hotstring group identity is invalid")
+		local enabled = saved.hotstrings and saved.hotstrings[name]
+		if enabled == nil then enabled = Manifest.default_for("hotstrings.groups." .. name) end
+		assert(type(enabled) == "boolean", "hotstring group preference must be boolean")
+		desired.hotstrings[name] = enabled
+		local supplied = saved.section_states and saved.section_states[name]
+		assert(supplied == nil or type(supplied) == "table", "hotstring section preferences must be a table")
+		local sections = get_sections(name)
+		assert(sections == nil or type(sections) == "table", "hotstring section inventory is malformed")
+		local projected = {}
+		for _, section in ipairs(sections or {}) do
+			assert(type(section) == "table" and type(section.name) == "string", "hotstring section descriptor is invalid")
+			if section.name ~= "-" and not section.is_module_placeholder then
+				local selected = supplied and supplied[section.name]
+				if selected == nil then selected = Manifest.default_for("hotstrings.modules." .. name .. "." .. section.name) end
+				assert(type(selected) == "boolean", "hotstring section preference must be boolean")
+				projected[section.name] = selected
+			end
+		end
+		desired.section_states[name] = projected
+	end
+	return desired
+end
+
 
 --- Captures the complete flat preference snapshot represented by memory and
 --- runtime-owned registries. This is the exact payload save() serializes and the
@@ -580,6 +898,9 @@ function M.snapshot(state, hotfiles, core_mods)
 
 	local section_states = {}
 	local keymap = core_mods.keymap
+	if keymap and type(keymap.is_repeat_feature_enabled) == "function" then
+		existing.repeat_key_enabled = keymap.is_repeat_feature_enabled()
+	end
 	for _, f in ipairs(type(hotfiles) == "table" and hotfiles or {}) do
 		local name = M.get_group_name(f)
 		local secs = keymap and type(keymap.get_sections) == "function" and keymap.get_sections(name) or nil
@@ -623,7 +944,10 @@ function M.snapshot(state, hotfiles, core_mods)
 		local ok, list = pcall(shortcuts_mod.list_shortcuts)
 		if ok and type(list) == "table" then
 			for _, shortcut in ipairs(list) do
-				if type(shortcut) == "table" and shortcut.id then
+				-- Runtime dispatchers derive their state from assignments; only
+				-- manifest-declared preferences belong in the saved key map.
+				if type(shortcut) == "table" and type(shortcut.id) == "string"
+					and Manifest.has_default("shortcuts.keys." .. shortcut.id) then
 					existing.shortcut_keys[shortcut.id] = shortcut.enabled
 				end
 			end
@@ -635,17 +959,39 @@ end
 
 --- Save the current state to the TOML configuration file. Atomic via
 --- .tmp + rename so a crash mid-write cannot leave a half-written
---- file on disk.
+--- file on disk. The sections Preferences owns come from the state; every
+--- other top-level table of the file it replaces is carried over unchanged.
 --- @param prefs_file string Path to the config.toml file.
 --- @param state table The current global state.
 --- @param hotfiles table List of hotstring files.
 --- @param core_mods table Loaded core modules.
-function M.save(prefs_file, state, hotfiles, core_mods)
+--- @param snapshot_view function|nil Transforms the complete runtime snapshot for disk.
+--- @return boolean committed
+--- @return table|nil persisted Snapshot written to disk.
+--- @return table|nil runtime Snapshot before session-only preservation.
+function M.save(prefs_file, state, hotfiles, core_mods, snapshot_view)
+	if _owned_publications[prefs_file] then return false end
+	if snapshot_view ~= nil and type(snapshot_view) ~= "function" then
+		error("snapshot_view must be a function", 2)
+	end
 	if type(prefs_file) ~= "string" or prefs_file == "" then
 		Logger.error(LOG, "Cannot save preferences without a destination path.")
 		return false
 	end
-	local existing = M.snapshot(state, hotfiles, core_mods)
+	-- The boot migration could not version this file (a newer schema, a failed
+	-- migration): this session never writes it.
+	local refusal = TomlWriter.write_refusal(prefs_file)
+	if refusal then
+		Logger.error(LOG, "Preferences NOT saved: writes to '%s' are refused for this session (%s).",
+			prefs_file, refusal)
+		return false
+	end
+	local runtime = M.snapshot(state, hotfiles, core_mods)
+	local existing = runtime
+	if snapshot_view then
+		existing = snapshot_view(clone_value(runtime))
+		if type(existing) ~= "table" then error("snapshot_view must return a table", 2) end
+	end
 	local expected_source = _source_snapshots[prefs_file]
 	if type(expected_source) ~= "table" then
 		expected_source = classify_source(prefs_file)
@@ -657,18 +1003,21 @@ function M.save(prefs_file, state, hotfiles, core_mods)
 		_source_snapshots[prefs_file] = expected_source
 	end
 
-	local ok, encoded = pcall(TomlCodec.encode, group_for_disk(existing))
-	if not ok or type(encoded) ~= "string" then
+	local ok, updates = pcall(function()
+		return M.prepare_hotstring_updates(expected_source, M.prepare_shortcut_updates(expected_source, M.prepare_llm_updates(expected_source, M.prepare_gesture_updates(expected_source, sparse_updates(existing)))))
+	end)
+	if not ok then
 		-- A silent return here looks exactly like a successful save until the next
 		-- reload restores the previous file and the user's change is simply gone.
-		Logger.error(LOG, "Cannot encode preferences — settings NOT saved: %s.", tostring(encoded))
+		Logger.error(LOG, "Cannot prepare preferences — settings NOT saved: %s.", tostring(updates))
 		return false
 	end
 
-	local write_ok, written = pcall(
-		FileSystem.write_if_unchanged,
+	local write_ok, written, detail, encoded = pcall(
+		TomlWriter.batch_write,
 		prefs_file,
-		encoded,
+		updates,
+		FileSystem,
 		expected_source
 	)
 	if not write_ok or written ~= true then
@@ -682,7 +1031,7 @@ function M.save(prefs_file, state, hotfiles, core_mods)
 		return false
 	end
 	_source_snapshots[prefs_file] = { status = "ok", content = encoded }
-	return true, existing
+	return true, existing, runtime
 end
 
 --- Merges the saved disk state into the current memory state.

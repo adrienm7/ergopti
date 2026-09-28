@@ -1,0 +1,5 @@
+{
+	"_comment": "Bounds of the diagnostic window's recent warnings and errors, read by all three drivers. They come from the tail of today's ErgoptiPlus_errors_YYYY-MM-DD.log (WARNING and ERROR only), so a busy DEBUG session can no longer push them out; the in-memory ring is used only when that file does not exist yet. errors_tail_max_bytes caps what is read from the end of the file (the read never walks the whole day), max_entries caps the newest entries shown. Parsed by _shared/lua/healthcheck/snapshot.lua and windows/ui/healthcheck/helpers.ahk, both replaying _shared/tests/corpus/healthcheck/errors_tail_vectors.json.",
+	"errors_tail_max_bytes": 65536,
+	"max_entries": 50
+}

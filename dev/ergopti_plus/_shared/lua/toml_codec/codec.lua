@@ -9,6 +9,7 @@
 -- runner for exactly that reason while working from the daemon and the unit
 -- runner, both of which install one.
 local RecordScanner = require("toml_codec.record_scanner")
+local KeyPath = require("toml_codec.key_path")
 local Bom = require("toml_codec.bom")
 local BasicString = require("toml_codec.basic_string")
 --- MODULE: TOML Codec (shared)
@@ -190,6 +191,14 @@ function M.encode(tbl)
 	return table.concat(out, "\n")
 end
 
+--- Encode one value as the TOML literal a ``key = value`` line carries, with
+--- the escaping and ordering rules of M.encode.
+--- @param value any String, number, boolean, array or table.
+--- @return string The TOML literal.
+function M.encode_value(value)
+	return encode_value(value)
+end
+
 
 
 
@@ -205,41 +214,7 @@ local function trim(s) return (s:match("^%s*(.-)%s*$") or s) end
 --- that may contain dots themselves. e.g.
 ---   `parent."with.dot".child` → { "parent", "with.dot", "child" }.
 local function split_section_path(s)
-	local parts = {}
-	local i, n = 1, #s
-	while i <= n do
-		local c = s:sub(i, i)
-		if c == '"' then
-			local j = i + 1
-			local buf = {}
-			while j <= n do
-				local cj = s:sub(j, j)
-				if cj == "\\" and j < n then
-					buf[#buf + 1] = s:sub(j + 1, j + 1)
-					j = j + 2
-				elseif cj == '"' then
-					break
-				else
-					buf[#buf + 1] = cj
-					j = j + 1
-				end
-			end
-			parts[#parts + 1] = table.concat(buf)
-			i = j + 1
-			-- Swallow trailing dot
-			if i <= n and s:sub(i, i) == "." then i = i + 1 end
-		else
-			local dot = s:find("%.", i)
-			if dot then
-				parts[#parts + 1] = trim(s:sub(i, dot - 1))
-				i = dot + 1
-			else
-				parts[#parts + 1] = trim(s:sub(i))
-				i = n + 1
-			end
-		end
-	end
-	return parts
+	return KeyPath.parse(s)
 end
 
 -- Forward declarations — implementations follow in the section below.
@@ -642,10 +617,19 @@ split_kv = function(line)
 	return nil, nil
 end
 
---- Parse a key — either a bare identifier or a quoted string.
+--- Parse a key — a bare identifier, a basic string or a literal string.
+--- A literal-string key ('KeyL') used to come back with its quotes, so it named
+--- a different key from "KeyL" and a layer file written with single quotes
+--- bound nothing on macOS and Linux while every other parser read it.
 parse_key = function(raw)
 	if raw:sub(1, 1) == '"' and raw:sub(-1) == '"' then
 		return BasicString.unescape_body(raw:sub(2, -2))
+	end
+	if #raw >= 2 and raw:sub(1, 1) == "'" and raw:sub(-1) == "'" then
+		local body = raw:sub(2, -2)
+		-- A literal string has no escapes, so a quote inside it ends it early.
+		if body:find("'", 1, true) then return nil end
+		return body
 	end
 	return raw
 end
@@ -770,7 +754,7 @@ function M.decode(content)
 				if aot_path == "" then return nil end
 				-- Array-of-tables: append a new owner under the latest parent element.
 				local segments = split_section_path(aot_path)
-				if #segments == 0 then return nil end
+				if not segments or #segments == 0 then return nil end
 				local parent = resolve_container(segments, #segments - 1)
 				if not parent then return nil end
 				local last = segments[#segments]
@@ -792,7 +776,7 @@ function M.decode(content)
 			-- Empty section name → error
 			if path == "" then return nil end
 			local segments = split_section_path(path)
-			if #segments == 0 then return nil end
+			if not segments or #segments == 0 then return nil end
 			local parent = resolve_container(segments, #segments - 1)
 			if not parent then return nil end
 			local last = segments[#segments]

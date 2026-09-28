@@ -20,83 +20,93 @@
 --- fired its notification — every visible signal reported success. Only the
 --- resume, seconds or minutes later, quietly undid it.
 ---
---- Every other pause-sensitive item in this file already carries the
---- `disabled = paused or nil` / `fn = (not paused) and function` pair; the master
---- toggle was the one that did not.
----
---- WHY A SOURCE GUARD:
---- build() needs a full menu context (i18n, ctx.save_prefs, ctx.updateMenu, a
---- live shortcuts module) plus a menubar to render into. What is decidable, and
---- what was actually wrong, is that the toggle's own item table carries the gate.
---- `checked` is asserted to stay ungated on purpose — it must keep reporting the
---- stored preference, and test_pause_checked_state.lua forbids `not paused` there.
+--- The switch is the command registered for the manifest's `shortcuts_toggle`
+--- row since the parent row stopped carrying it (a row that opens a submenu is
+--- never clicked). So this builds the real menu module over doubles and calls
+--- that command, rather than scanning the parent's item table: the guard is on
+--- what the click does. `checked` must keep reporting the stored preference.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
-
-
-
-
--- ===================================================
--- ===================================================
--- ======= 1/ The Master Toggle Carries A Gate =======
--- ===================================================
--- ===================================================
-
---- Returns the source slice covering the Shortcuts master toggle's item table.
---- @return string
-local function toggle_item_source()
-	-- Selected by a declaration unique to ui/menu/menu_shortcuts.lua rather than by
-	-- path, so moving or splitting the module cannot turn this invariant into a
-	-- path error.
-	local src = helpers.read_driver_source("menu.shortcuts.title")
-	helpers.assert_true(src ~= nil, "ui/menu/menu_shortcuts.lua source must be locatable")
-	if not src then return "" end
-
-	-- The runtime transaction helper is unique to the master item and survives
-	-- changing how the desired boolean is computed. Anchoring on the old assignment
-	-- made this pause guard red when the toggle became transactional.
-	local owner_at = src:find("local function commit_shortcuts_runtime", 1, true)
-	helpers.assert_true(owner_at ~= nil, "the Shortcuts master toggle owner must be locatable")
-	if not owner_at then return "" end
-
-	local item_at = src:find("local item = {", owner_at, true)
-	helpers.assert_true(item_at ~= nil, "the toggle's item table must be locatable")
-	if not item_at then return "" end
-	local end_at = src:find("-- ===== 2.1) Shortcut Item Factory Helpers =====", item_at, true)
-	helpers.assert_true(end_at ~= nil, "the master item must end before subsection 2.1")
-	if not end_at then return "" end
-
-	return src:sub(item_at, end_at - 1)
+--- Builds the Shortcuts submenu for a paused script and returns what matters.
+--- @return table item, function|nil toggle, table state, table calls
+local function build_paused()
+	local calls = { pause = 0, resume = 0 }
+	local shortcuts = {
+		pause_bindings = function() calls.pause = calls.pause + 1; return true end,
+		resume_bindings = function() calls.resume = calls.resume + 1; return true end,
+	}
+	local render_ctx = nil
+	helpers.load_with_stubs("infra.logger")
+	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["infra.fs_dir"] = { entries = function() return {} end }
+	package.loaded["infra.dialog_util"] = {}
+	package.loaded["modules.shortcuts"] = {
+		DEFAULT_STATE = { chatgpt_url = "https://example.test", shortcuts = true },
+	}
+	package.loaded["modules.shortcuts.actions.text"] = {
+		WRAP_GROUPS = {},
+		build_active_wrap_pairs = function() return {} end,
+	}
+	package.loaded["infra.i18n"] = {
+		get = function(key) return key end,
+		decorate_section = function(value) return value end,
+	}
+	package.loaded["ui.menu.menu_utils"] = {}
+	package.loaded["infra.manifest_menu"] = { build = function(_, _, _, _, ctx)
+		render_ctx = ctx
+		return {}
+	end }
+	package.loaded["ui.menu.shortcut_utils"] = {}
+	package.loaded["ui.menu.menu_keyboard_slots"] = { provide_rows = function() return {} end }
+	package.loaded["infra.manifest_reader"] = { default_for = function() return "★" end }
+	package.loaded["ui.menu.menu_shortcuts"] = nil
+	local MenuShortcuts = require("ui.menu.menu_shortcuts")
+	local state = {
+		shortcuts = true,
+		chatgpt_url = "https://example.test",
+		wrap_symbol_states = {},
+		custom_wrap_symbols = {},
+	}
+	local item = MenuShortcuts.build({
+		shortcuts = shortcuts,
+		state = state,
+		paused = true,
+		applyTriggerChar = function(value) return value end,
+		save_prefs = function() return true end,
+		notify_feature = function() end,
+		updateMenu = function() end,
+		commands = {},
+		state_getters = {},
+	})
+	local toggle = render_ctx and render_ctx.commands and render_ctx.commands["shortcuts_toggle"]
+	return item, toggle, state, calls
 end
 
 helpers.describe("the Shortcuts master toggle is pause-gated like its siblings", function()
-	helpers.it("greys the item out while the script is paused", function()
-		local item = toggle_item_source()
-		helpers.assert_true(item:find("disabled%s*=%s*paused") ~= nil,
-			"the master toggle must set `disabled = paused or nil`. Left enabled, a mid-pause "
-			.. "toggle is silently overwritten at resume — resume_all() restores bindings from "
-			.. "the snapshot pause_all() took, so the user's choice never survives")
+	helpers.it("greys the parent row out while the script is paused", function()
+		local item = build_paused()
+		helpers.assert_eq(item.disabled, true,
+			"the Shortcuts row must be greyed while paused. Left enabled, a mid-pause toggle is "
+			.. "silently overwritten at resume — resume_all() restores bindings from the snapshot "
+			.. "pause_all() took, so the user's choice never survives")
+		helpers.assert_nil(item.action, "the parent opens a submenu and carries no action")
 	end)
 
-	helpers.it("refuses to run its handler while paused", function()
-		local item = toggle_item_source()
-		-- `action`, the provider field, since the tray root became row data on
-		-- 2026-08-07. The rule is the one that matters and it did not change: the
-		-- CALLBACK — whatever the field holding it is called — must not exist while
-		-- paused.
-		helpers.assert_true(item:find("action%s*=%s*%(not paused%)") ~= nil,
-			"the handler must be gated with `action = (not paused) and function`. `disabled` "
-			.. "alone is a rendering hint: enabling the feature mid-pause would bind every hotkey "
-			.. "while the script is supposed to be entirely off (« pause = tout éteint »)")
+	helpers.it("refuses to run the switch while paused", function()
+		local _, toggle, state, calls = build_paused()
+		helpers.assert_type(toggle, "function", "the switch must be registered even while paused")
+		helpers.assert_eq(toggle(), false, "the switch must refuse while paused")
+		helpers.assert_eq(state.shortcuts, true, "the stored preference must not move")
+		helpers.assert_eq(calls.pause + calls.resume, 0,
+			"enabling the feature mid-pause would bind every hotkey while the script is supposed to "
+			.. "be entirely off (« pause = tout éteint »)")
 	end)
 
 	helpers.it("leaves `checked` reporting the stored preference", function()
-		local item = toggle_item_source()
-		local checked = item:match("checked%s*=%s*([^,]+),")
-		helpers.assert_true(checked ~= nil, "the toggle must still expose a `checked` field")
-		helpers.assert_true(not checked:find("paused", 1, true),
+		local item = build_paused()
+		helpers.assert_eq(item.checked, true,
 			"`checked` must NOT consult the pause state — a paused script still has a stored "
 			.. "Shortcuts preference, and blanking the checkmark would misreport it as off")
 	end)

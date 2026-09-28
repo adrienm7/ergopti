@@ -11,8 +11,8 @@ helpers.describe("linux/infra/locale.lua", function()
 
 	helpers.it("locale.get returns a non-empty string for a known key", function()
 		local locale = require("infra.locale")
-		-- The default locale is 'fr', so "menu.global.enable_all" should exist
-		local s = locale.get("menu.global.enable_all")
+		-- The default locale is 'fr', so "menu.global.quit" should exist
+		local s = locale.get("menu.global.quit")
 		helpers.assert_true(type(s) == "string" and #s > 0, "should return non-empty string")
 	end)
 
@@ -25,7 +25,7 @@ helpers.describe("linux/infra/locale.lua", function()
 	helpers.it("locale.set_locale switches language", function()
 		local locale = require("infra.locale")
 		locale.set_locale("en")
-		local s_en = locale.get("menu.global.enable_all")
+		local s_en = locale.get("menu.global.quit")
 		locale.set_locale("fr")
 		helpers.assert_true(type(s_en) == "string" and #s_en > 0, "en locale should resolve")
 	end)
@@ -49,9 +49,9 @@ helpers.describe("linux/infra/i18n.lua", function()
 
 	helpers.it("i18n.get returns translated string", function()
 		local i18n = require("infra.i18n")
-		local s = i18n.get("menu.global.enable_all")
+		local s = i18n.get("menu.global.quit")
 		helpers.assert_true(type(s) == "string" and #s > 0, "should return non-empty")
-		helpers.assert_true(s ~= "menu.global.enable_all", "should NOT return the key itself")
+		helpers.assert_true(s ~= "menu.global.quit", "should NOT return the key itself")
 	end)
 
 	helpers.it("i18n.get falls back to key name on missing", function()

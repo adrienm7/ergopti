@@ -91,11 +91,11 @@ _CRNS_BuilderToleratesADegradedHealthcheck() {
 	Body := _DriverFuncBody("CrashReport_Build")
 	Assert(Body != "", "CrashReport_Build() must exist")
 
-	; _HealthCheck_Collect substitutes an EMPTY Map when a collector throws, and
-	; the healthcheck result always carries the "sys" key — so a .Has() test
-	; alone is always true and the fallback probe below it was dead code.
-	Assert(InStr(Body, 'HC["sys"].Count > 0') > 0,
-		"the sys fallback must test the Map is non-EMPTY, not merely present — _HealthCheck_Collect degrades a failed collector to Map(), which .Has() cannot distinguish, leaving the fallback unreachable and every Sys read about to throw")
+	; _HealthCheck_Collect substitutes an EMPTY Map when a collector throws, so
+	; the snapshot's sections are read with .Get and a default: a raw read of a
+	; degraded section would throw and take the whole report with it.
+	Assert(InStr(Body, 'Sections.Get("hardware", Map())') > 0,
+		"the snapshot's sections must be read with .Get and an empty default — _HealthCheck_Collect degrades a failed collector to Map(), and a raw read of its absent key aborts the report")
 
 	; A partially-populated Sys must degrade one field, not abort the report.
 	Assert(RegExMatch(Body, 'Sys\["(os_name|cpu_name|locale)"\]') == 0,

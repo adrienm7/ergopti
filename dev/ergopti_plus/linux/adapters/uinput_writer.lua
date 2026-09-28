@@ -109,6 +109,16 @@ local EACCES = 13
 -- real node from a root test run is how a stray regular file came to sit there.
 local _uinput_path = UINPUT_PATH
 
+-- open(2) flags, asm-generic values (x86_64 and arm64): write-only, non-blocking
+-- and close-on-exec. The device lives as long as the last descriptor on its
+-- file, so a child that inherited one (`xdg-open … &`, the update relay) would
+-- keep it alive after the daemon died, with any key it had forwarded still held
+-- down: the kernel releases held keys only when the device is destroyed.
+local O_WRONLY   = 0x0001
+local O_NONBLOCK = 0x0800
+local O_CLOEXEC  = 0x80000
+local OPEN_FLAGS = O_WRONLY + O_NONBLOCK + O_CLOEXEC
+
 
 
 
@@ -202,7 +212,7 @@ local _fd = nil
 --- Replaces the syscall backend. Test seam.
 ---
 --- A backend implements:
----   open(path)          → handle|nil, err
+---   open(path, flags)       → handle|nil, err
 ---   ioctl(handle, req, arg) → boolean          (arg: integer or string)
 ---   write(handle, bytes)    → boolean
 ---   close(handle)
@@ -245,12 +255,9 @@ local function build_ffi_backend()
 		return nil, "ffi.cdef failed: " .. tostring(cdef_err)
 	end
 
-	local O_WRONLY   = 0x0001
-	local O_NONBLOCK = 0x0800
-
 	return {
-		open = function(path)
-			local fd = ffi.C.open(path, O_WRONLY + O_NONBLOCK)
+		open = function(path, flags)
+			local fd = ffi.C.open(path, flags)
 			if fd < 0 then return nil, "open failed" end
 			return fd
 		end,
@@ -345,7 +352,7 @@ function M.open()
 		return false
 	end
 
-	local fd, err = _backend.open(_uinput_path)
+	local fd, err = _backend.open(_uinput_path, OPEN_FLAGS)
 	if not fd then
 		Logger.warn(LOG, "open(): cannot open %s (%s).", _uinput_path, tostring(err))
 		return false

@@ -69,7 +69,7 @@ helpers.describe("logger — sub-file routing falls back instead of vanishing", 
 		-- call, reproducing exactly what a stripped or bytecode-compiled build does.
 		local saved_getinfo = debug.getinfo
 		debug.getinfo = function() return { source = "=[C]" } end
-		local ok_init, init_err = pcall(L.init_log_path, test_base, RETENTION_DAYS)
+		local ok_init, init_err = pcall(L.init_log_path, logs_dir, RETENTION_DAYS)
 		debug.getinfo = saved_getinfo
 		-- Re-raised rather than asserted as a boolean: pcall is here only to make
 		-- sure debug.getinfo is restored before anything else runs, so surfacing

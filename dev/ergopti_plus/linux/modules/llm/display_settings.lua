@@ -66,7 +66,7 @@ function M.get(name)
 	if _values[name] ~= nil then return _values[name] end
 	local shipped = default_for(name)
 	if shipped == nil then return nil end
-	local ok, Storage = pcall(require, "adapters.storage")
+	local ok, Storage = pcall(require, "infra.llm_preferences")
 	if ok and Storage then
 		local stored = Storage.get(PREF_PREFIX .. name, nil)
 		if valid(name, stored) then
@@ -90,14 +90,12 @@ function M.set(name, value)
 		Logger.error(LOG, "Refused invalid display setting %s=%s.", tostring(name), tostring(value))
 		return false
 	end
-	local ok, Storage = pcall(require, "adapters.storage")
+	local ok, Storage = pcall(require, "infra.llm_preferences")
 	if not ok or not Storage then
 		Logger.error(LOG, "No storage; display setting '%s' was not changed.", name)
 		return false
 	end
-	local persisted = value == shipped
-		and Storage.delete(PREF_PREFIX .. name)
-		or Storage.set(PREF_PREFIX .. name, value)
+	local persisted = Storage.set(PREF_PREFIX .. name, value)
 	if persisted ~= true then
 		Logger.error(LOG, "Display setting '%s' could not be persisted; live state is unchanged.", name)
 		return false
@@ -130,6 +128,37 @@ end
 function M._reset()
 	_defaults = {}
 	_values = {}
+end
+
+--- Marks only display leaves consumed by this owner.
+--- @param document table Parsed canonical configuration.
+--- @param mark function Consumed-key collector.
+function M.mark_config_reads(document, mark)
+	local preferences = require("infra.llm_preferences")
+	for _, definition in pairs(DEFINITIONS) do preferences.mark_config_read(document, definition.path, mark) end
+end
+
+--- Captures the current cache without reading or publishing preferences.
+--- @return table snapshot
+function M.configuration_snapshot()
+	return { values = _values, defaults = _defaults }
+end
+
+--- Restores the exact cache after a refused configuration transaction.
+--- @param snapshot table Owner-issued snapshot.
+--- @return boolean restored
+function M.restore_configuration(snapshot)
+	_values = snapshot.values
+	_defaults = snapshot.defaults
+	return true
+end
+
+--- Resolves the detached configuration through this owner's validation rules.
+--- @return boolean applied
+function M.reload_configuration()
+	_values = {}
+	for name in pairs(DEFINITIONS) do if not valid(name, M.get(name)) then return false end end
+	return true
 end
 
 return M

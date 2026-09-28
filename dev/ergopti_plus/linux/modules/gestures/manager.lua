@@ -23,8 +23,9 @@
 --- had already been removed from the keyboard path for four documented defects.
 ---
 --- FEATURES & RATIONALE:
---- 1. Slot key-space shared with macOS, derived from
----    `_shared/modules/actions/actions.toml` so the two cannot drift.
+--- 1. Slot key-space and action catalogue shared with the other drivers,
+---    generated from `_shared/modules/actions/actions.toml` into
+---    `_generated/action_catalogue.lua` so none of them can drift.
 --- 2. NO default bindings on this driver. The desktop acts on the same gesture —
 ---    every compositor claims 3- and 4-finger swipes, and two-finger motion is
 ---    scrolling everywhere — so a shipped binding fires twice with nothing on
@@ -41,6 +42,7 @@ local Paths = require("infra.paths")
 local Timings = require("infra.timings")
 local Monotonic = require("infra.monotonic")
 local Manifest = require("infra.manifest_reader")
+local ParameterLabel = require("action_parameter_label")
 local TomlCodec = require("toml_codec")
 local i18n = require("infra.i18n")
 local ScriptActions = require("modules.shortcuts.script_actions")
@@ -68,6 +70,23 @@ if not _ok_emit or type(_EMIT_ROWS) ~= "table" then
 end
 local _writer_ok, TomlWriter = pcall(require, "toml_codec.writer")
 if not _writer_ok then TomlWriter = nil end
+
+-- The Linux action catalogue, generated from _shared/modules/actions/actions.toml
+-- by tools/codegen/codegen-action-catalogue.cjs and already filtered to this
+-- platform: the slot key-space, the picker order with heading levels and locale
+-- keys, and per-action metadata (label key, parameter kind, requirements).
+--
+-- It replaces a hard-coded table of 42 ids that the picker listed
+-- alphabetically, without a heading and without the platform filter, so it hid
+-- 38 actions this driver runs and offered none of the catalogue's structure.
+-- Missing is a broken install: failing here names the cause, where an empty
+-- table would leave every gesture binding silently doing nothing.
+local _ok_catalogue, Catalogue = pcall(require, "_generated.action_catalogue")
+if not _ok_catalogue or type(Catalogue) ~= "table" or type(Catalogue.actions) ~= "table"
+	or type(Catalogue.sg_items) ~= "table" or type(Catalogue.slots) ~= "table" then
+	error("_generated/action_catalogue.lua is missing or invalid — run `npm run gen`: "
+		.. tostring(Catalogue))
+end
 
 -- Wall-clock source (seconds) for gesture tap/swipe timing. Defaults to the
 -- monotonic clock and is injectable via M.init for tests. Deliberately NOT
@@ -100,114 +119,38 @@ end
 
 -- The gesture slot key-space (tap/swipe slot names) is the SINGLE SOURCE shared
 -- with the macOS driver, declared once in _shared/modules/actions/actions.toml
--- under [slots]. This driver derives SINGLE_SLOTS / AXIS_SLOTS and the
--- DEFAULT_GESTURES key-space from that file at load time so the two drivers can
--- never drift. Only the default action VALUES below stay Linux-specific.
-local ACTIONS_TOML_REL_PATH = "modules/actions/actions.toml"
-local UTF8_BOM = "\239\187\191"
+-- under [slots] and carried into this driver's generated catalogue. Only the
+-- default action VALUES below stay Linux-specific.
 
---- Resolves the absolute path to the shared gesture actions TOML.
----
---- Through infra.paths, not by counting four path components up from this file.
---- The component count is the checkout layout written down: a system package
---- stages the driver flat under /usr/lib/ergopti, so four levels up leaves the
---- install entirely and every gesture silently falls back to its default.
---- @return string The absolute path, or "" when it cannot be resolved.
-local function resolve_actions_toml_path()
-	return Paths.shared(ACTIONS_TOML_REL_PATH) or ""
+--- Copies one string list out of the generated catalogue, so a caller that
+--- edits the result cannot edit the catalogue.
+--- @param list table
+--- @return table
+local function copy_list(list)
+	local out = {}
+	for i, value in ipairs(list) do out[i] = value end
+	return out
 end
 
---- Reads the ordered [slots].single / [slots].axis lists from the shared actions
---- TOML. Fails loud with an ERROR log and returns empty lists on any
---- resolve/read/parse failure — the slot-space is a shipped resource, so a
---- failure is a broken install, never a reason to duplicate a hardcoded list.
---- @return table, table The ordered single-slot and axis-slot name lists.
-local function load_slot_space()
-	local path = resolve_actions_toml_path()
-	if path == "" then
-		Logger.error(LOG, "Could not resolve the shared gesture actions TOML path — slot-space not loaded.")
-		return {}, {}
-	end
-	local fh = io.open(path, "r")
-	if not fh then
-		Logger.error(LOG, "Shared gesture actions TOML unreadable at '%s'.", path)
-		return {}, {}
-	end
-	local content = fh:read("*a")
-	fh:close()
-	if type(content) == "string" and content:sub(1, 3) == UTF8_BOM then
-		content = content:sub(4)
-	end
-	local ok, data = pcall(TomlCodec.decode, content)
-	if not ok or type(data) ~= "table" or type(data.slots) ~= "table" then
-		Logger.error(LOG, "Shared gesture actions TOML failed to parse — slot-space not loaded.")
-		return {}, {}
-	end
-	local single = type(data.slots.single) == "table" and data.slots.single or {}
-	local axis   = type(data.slots.axis) == "table"   and data.slots.axis   or {}
-	return single, axis
-end
+--- All single / axis gesture slots (the shared [slots] section).
+M.SINGLE_SLOTS = copy_list(Catalogue.slots.single)
+M.AXIS_SLOTS = copy_list(Catalogue.slots.axis)
 
---- Reads the [sg_actions] rows of the shared catalogue. A failure leaves them
---- empty: load_slot_space() reads the same file and reports it loudly.
---- @return table id -> row
-local function read_sg_actions()
-	local path = resolve_actions_toml_path()
-	local fh = path ~= "" and io.open(path, "r") or nil
-	if not fh then return {} end
-	local content = fh:read("*a")
-	fh:close()
-	if content:sub(1, 3) == UTF8_BOM then content = content:sub(4) end
-	local ok, data = pcall(TomlCodec.decode, content)
-	if not ok or type(data) ~= "table" or type(data.sg_actions) ~= "table" then return {} end
-	return data.sg_actions
-end
-
---- Reads parameter metadata from the same shared catalogue as the picker, so
---- future configurable actions do not require a Linux-specific allowlist.
---- @param sg_actions table The catalogue rows.
---- @return table id -> parameter kind
-local function load_action_parameter_specs(sg_actions)
-	local specs = {}
-	for name, meta in pairs(sg_actions) do
-		if type(meta) == "table" and type(meta.parameter) == "string" then specs[name] = meta.parameter end
+-- Exclude picker headings and modifier groups from the declared action rows.
+M.LINUX_DECLARED_ACTIONS = {}
+for _, item in ipairs(Catalogue.sg_items) do
+	if item.kind == "action" and item.id ~= "none" then
+		M.LINUX_DECLARED_ACTIONS[#M.LINUX_DECLARED_ACTIONS + 1] = item.id
 	end
-	return specs
 end
+table.sort(M.LINUX_DECLARED_ACTIONS)
 
---- Whether a catalogue `platform` field claims this driver: "all" (the
---- default), "linux", or a comma-separated list naming it.
---- @param platform string|nil
---- @return boolean
-local function claims_linux(platform)
-	if platform == nil or platform == "all" then return true end
-	for driver in tostring(platform):gmatch("[^,%s]+") do
-		if driver == "linux" then return true end
-	end
-	return false
+--- action id -> parameter kind ("url", "search_url"), from the same catalogue
+--- as the picker, so a configurable action needs no Linux-specific allowlist.
+M.ACTION_PARAMETER_SPECS = {}
+for action_name, meta in pairs(Catalogue.actions) do
+	if meta.parameter then M.ACTION_PARAMETER_SPECS[action_name] = meta.parameter end
 end
-
---- The catalogue rows declared for Linux: what the shared file promises this
---- driver runs. Headers and "_" placeholders are picker layout, not actions.
---- @param sg_actions table The catalogue rows.
---- @return table Sorted action ids.
-local function load_linux_declared_actions(sg_actions)
-	local ids = {}
-	for id, meta in pairs(sg_actions) do
-		if type(meta) == "table" and meta.is_header ~= true and id:sub(1, 1) ~= "_" and id ~= "none"
-			and claims_linux(meta.platform) then
-			ids[#ids + 1] = id
-		end
-	end
-	table.sort(ids)
-	return ids
-end
-
---- All single / axis gesture slots (derived from the shared [slots] section).
-M.SINGLE_SLOTS, M.AXIS_SLOTS = load_slot_space()
-local _SG_ACTIONS = read_sg_actions()
-M.ACTION_PARAMETER_SPECS = load_action_parameter_specs(_SG_ACTIONS)
-M.LINUX_DECLARED_ACTIONS = load_linux_declared_actions(_SG_ACTIONS)
 
 --- Linux ships NO default bindings. Every slot defaults to "none".
 ---
@@ -249,16 +192,17 @@ local CONFIG_SECTION_PARAMS = "gesture_parameters"
 local LEGACY_SECTION = "linux.gestures"
 local LEGACY_SECTION_PARAMS = "linux.action_parameters"
 
-local DEFAULT_ACTIONS = {}
-
 --- Default gesture-to-action mapping. The key-space is the union of the derived
---- single and axis slots; each value is the Linux default (or "none").
+--- single and axis slots; neutral values come from the shared manifest.
 M.DEFAULT_GESTURES = {}
+M.RECOMMENDED_GESTURES = {}
 for _, slot in ipairs(M.SINGLE_SLOTS) do
-	M.DEFAULT_GESTURES[slot] = DEFAULT_ACTIONS[slot] or "none"
+	M.DEFAULT_GESTURES[slot] = Manifest.default_for("gestures." .. slot)
+	M.RECOMMENDED_GESTURES[slot] = Manifest.recommended_for("gestures." .. slot)
 end
 for _, slot in ipairs(M.AXIS_SLOTS) do
-	M.DEFAULT_GESTURES[slot] = DEFAULT_ACTIONS[slot] or "none"
+	M.DEFAULT_GESTURES[slot] = Manifest.default_for("gestures." .. slot)
+	M.RECOMMENDED_GESTURES[slot] = Manifest.recommended_for("gestures." .. slot)
 end
 
 -- =========================================
@@ -266,64 +210,6 @@ end
 -- ======= 2/ Action Registry ==============
 -- =========================================
 -- =========================================
-
---- The registry of supported action ids, mapped to their suffix in the shared
---- `sg_actions.*` catalogue.
----
---- This table used to hold hardcoded FRENCH labels, described as a "fallback
---- when i18n is absent" — but nothing ever replaced them, so every user of the
---- other 20 locales read French gesture names. The catalogue they belong in
---- already existed, already carried all 21 translations, and was already
---- consumed by the two other drivers; only Linux was not reading it.
----
---- Two ids differ from their catalogue name: this driver calls a virtual desktop
---- a "workspace", the shared catalogue calls it a desktop. The mapping lives
---- here rather than in a rename so the persisted config.toml of existing users
---- keeps resolving.
-local ACTION_I18N_KEYS = {
-	open_url                    = "open_url",
-	search_web                  = "search_web",
-	none                        = "none",
-	left_click_toggle           = "left_click_toggle",
-	right_click_toggle          = "right_click_toggle",
-	ws_prev                     = "desktop_prev",
-	ws_next                     = "desktop_next",
-	tab_prev                    = "tab_prev",
-	tab_next                    = "tab_next",
-	vol_up                      = "vol_up",
-	vol_down                    = "vol_down",
-	mute                        = "mute",
-	brightness_up               = "brightness_up",
-	brightness_down             = "brightness_down",
-	track_play                  = "track_play",
-	track_next                  = "track_next",
-	track_prev                  = "track_prev",
-	app_switcher                = "app_switcher",
-	app_window_previous         = "app_window_previous",
-	close_window                = "close_window",
-	maximize                    = "maximize",
-	snap_left                   = "snap_left",
-	snap_right                  = "snap_right",
-	fullscreen                  = "fullscreen",
-	word_prev                   = "word_prev",
-	word_next                   = "word_next",
-	line_up                     = "line_up",
-	line_down                   = "line_down",
-	line_start                  = "line_start",
-	line_end                    = "line_end",
-	doc_start                   = "doc_start",
-	doc_end                     = "doc_end",
-	enter                       = "enter",
-	escape                      = "escape",
-	backspace                   = "backspace",
-	delete                      = "delete",
-	arrow_up                    = "arrow_up",
-	arrow_down                  = "arrow_down",
-	arrow_left                  = "arrow_left",
-	arrow_right                 = "arrow_right",
-	lock_screen                 = "lock_screen",
-	notification_center         = "notification_center",
-}
 
 --- Labels COMPUTED at registration time for the modifier-chord actions
 --- ("Ctrl + Shift + A"). They are language-neutral by construction — modifier
@@ -336,16 +222,16 @@ local ACTION_COMPUTED_LABELS = {}
 -- "Ctrl + A") and therefore bypass the locale layer entirely.
 local MODIFIER_ACTION_COMMANDS = {}
 
+-- The chord matrix in picker order: one { label, actions } group per modifier
+-- combination, as the other two drivers build it.
+local MODIFIER_ACTION_GROUPS = {}
+
 local function load_modifier_chords()
-	-- The JSON path is derived by rewriting the FILENAME of actions.toml, so the
-	-- two files must stay siblings. That is not obvious from either end, and it
-	-- broke exactly once: moving actions.toml to _shared/modules/actions/ while
-	-- modifier_chords.json stayed behind made this resolve to a file that does not
-	-- exist, and the only symptom was the modifier-chord labels quietly going
-	-- missing from the action picker.
-	local actions_path = resolve_actions_toml_path()
-	local path = actions_path:gsub("actions%.toml$", "modifier_chords.json")
-	if path == actions_path then return nil end
+	local path = Paths.shared("modules/actions/modifier_chords.json")
+	if type(path) ~= "string" or path == "" then
+		Logger.error(LOG, "Could not resolve the shared modifier chords JSON path.")
+		return nil
+	end
 	local fh = io.open(path, "r")
 	if not fh then
 		Logger.warn(LOG, "Shared modifier chords JSON unreadable at '%s'.", path)
@@ -384,20 +270,26 @@ local function register_modifier_chords(catalogue)
 		end
 		local id_prefix = table.concat(ids, "_")
 		local label_prefix = table.concat(labels, " + ")
+		local group = { label = label_prefix, actions = {} }
 		for _, key_def in ipairs(keys) do
 			local action_id = id_prefix .. "_" .. key_def.id
 			local key = key_def.linux_key or key_def.id
 			ACTION_COMPUTED_LABELS[action_id] = label_prefix .. " + " .. key_def.label
 			MODIFIER_ACTION_COMMANDS[action_id] = table.concat(native_modifiers, "+") .. "+" .. key
+			group.actions[#group.actions + 1] = action_id
 		end
+		MODIFIER_ACTION_GROUPS[#MODIFIER_ACTION_GROUPS + 1] = group
 	end
 end
 
 register_modifier_chords(load_modifier_chords())
 
---- Executes a gesture action via xdotool/ytool on Linux.
---- @param action_name string The action identifier.
---- @param go_next boolean|nil Direction for axis actions (true = next, false/nil = prev).
+--- Runs a shell command in the background, discarding its output.
+--- @param cmd string A fully composed command.
+local function run_background(cmd)
+	pcall(function() os.execute(cmd .. " 2>/dev/null &") end)
+end
+
 local function shell_quote(value)
 	return "'" .. tostring(value or ""):gsub("'", "'\\''") .. "'"
 end
@@ -453,7 +345,7 @@ end
 -- The combination the desktops bind to the previous and the next workspace,
 -- pressed when wmctrl cannot switch. Under Wayland it is the only way another
 -- process can: no protocol lets it name a workspace.
-local WORKSPACE_COMBO = { ws_prev = "ctrl+alt+Left", ws_next = "ctrl+alt+Right" }
+local WORKSPACE_COMBO = { desktop_prev = "ctrl+alt+Left", desktop_next = "ctrl+alt+Right" }
 
 -- How long a media tool may take before its key is pressed instead.
 local MEDIA_TOOL_TIMEOUT_S = 1
@@ -487,18 +379,23 @@ local OPEN_WINDOW = {
 
 --- The user-editable file each `open_*` action reveals, as a path resolver.
 ---
---- Resolvers rather than strings: the paths depend on $XDG_CONFIG_HOME and on
---- today's date, and freezing them at load would open yesterday's log after
---- midnight and the wrong directory under a changed environment.
+--- Resolvers rather than strings: the paths depend on $XDG_CONFIG_HOME, and
+--- freezing them at load would open the wrong directory under a changed
+--- environment.
 local OPEN_PATH = {
 	["open_script_source"]      = function() return require("infra.paths").driver_root() .. "/ergopti_hotstrings.lua" end,
 	["open_config"]             = function(Paths) return Paths.config("config.toml") end,
 	["open_personal_info"]      = function(Paths) return Paths.config("personal_info.toml") end,
 	["open_personal_hotstrings"] = function(Paths) return Paths.config("personal_hotstrings.toml") end,
 	["open_personal_shortcuts"] = function(Paths) return Paths.config("personal_shortcuts.toml") end,
-	["open_logs_folder"]        = function() return require("infra.logger_sink").log_dir() end,
-	["open_today_log"]          = function() return require("infra.logger_sink").main_log_path() end,
-	["open_error_log"]          = function() return require("infra.logger_sink").errors_log_path() end,
+}
+
+--- The three log actions, by ui/log_openers function: shared with the tray, so
+--- a missing errors file is announced there and here alike.
+local OPEN_LOG = {
+	["open_logs_folder"] = "open_logs_folder",
+	["open_today_log"]   = "open_today_log",
+	["open_error_log"]   = "open_today_errors",
 }
 
 --- The screenshot command for each capture action, one shell cascade per id.
@@ -544,18 +441,75 @@ local function screenshot_path(kind)
 	return string.format("%s/ergopti_%s_%s.png", dir, kind, os.date("%Y-%m-%d_%H-%M-%S"))
 end
 
---- Actions another module of this driver already implements, by action id:
---- the catalogue runs them through that module rather than a second copy here.
-local MODULE_ACTIONS = {
-	["select_line"] = { module = "modules.shortcuts.manager", fn = "select_line" },
-}
-
 --- The tag each save action stamps into its filename.
 local SCREENSHOT_KIND = {
 	["screenshot_fullscreen_save"] = "full",
 	["screenshot_region_save"]     = "reg",
 	["screenshot_window_save"]     = "win",
 }
+
+--- Actions this driver performs as one fixed shell command, by action id.
+---
+--- Data rather than an elseif chain, so the set of ids the executor answers is
+--- enumerable and the catalogue parity test can compare it with the catalogue:
+--- a chain of branches has no length, and an id falling off its end reached
+--- "Unknown action" at DEBUG, the silent failure this table replaces.
+local DIRECT_COMMANDS = {
+	["lock_screen"] = "loginctl lock-session 2>/dev/null || xdg-screensaver lock",
+	-- The user's own XDG Downloads directory (localised, relocatable), never a
+	-- guessed ~/Downloads.
+	["open_downloads"]    = 'xdg-open "$(xdg-user-dir DOWNLOAD)"',
+	["open_file_manager"] = 'xdg-open "$HOME"',
+}
+
+--- The settings applications open_system_settings tries, in order: GNOME, KDE,
+--- Xfce, Cinnamon, MATE, LXQt. Data, so the order is visible and testable.
+local SETTINGS_APPLICATIONS = {
+	"gnome-control-center", "systemsettings", "xfce4-settings-manager",
+	"cinnamon-settings", "mate-control-center", "lxqt-config",
+}
+
+--- Actions that need more than one fixed command, by action id. Each receives
+--- the binding that fired it, which parameterized actions read their value by.
+local BUILTIN_HANDLERS = {
+	["open_system_settings"] = function()
+		local Shell = require("adapters.shell_runner")
+		for _, application in ipairs(SETTINGS_APPLICATIONS) do
+			if Shell.has_command(application) then
+				run_background(shell_quote(application))
+				return
+			end
+		end
+		Logger.error(LOG, "open_system_settings: none of %s is installed — nothing opened.",
+			table.concat(SETTINGS_APPLICATIONS, ", "))
+	end,
+	["left_click_toggle"] = function() run_background(_click_toggle_command("1")) end,
+	["right_click_toggle"] = function() run_background(_click_toggle_command("3")) end,
+	["open_chatgpt"] = function()
+		return require("modules.shortcuts.chatgpt").open()
+	end,
+	["open_url"] = function(binding)
+		local url = M.get_action_parameter(binding, "open_url")
+		if M.validate_action_parameter("open_url", url) then
+			run_background("xdg-open " .. shell_quote(url))
+		end
+	end,
+	["search_web"] = function(binding)
+		local template = M.get_action_parameter(binding, "search_web")
+		if not M.validate_action_parameter("search_web", template) then return end
+		local query = primary_selection()
+		if query == "" then
+			Logger.warn(LOG, "search_web: no primary selection to search for — nothing opened.")
+			return
+		end
+		-- Function replacement: the encoded query carries %XX sequences and a
+		-- string replacement would read them as capture references ("invalid
+		-- capture index" on the first space).
+		local encoded = url_encode_query(query)
+		run_background("xdg-open " .. shell_quote((template:gsub("%%s", function() return encoded end))))
+	end,
+}
+
 
 -- Daemon-owned actions are injected during initialisation. Keeping lifecycle
 -- operations out of this module prevents the gesture layer from owning reload
@@ -611,6 +565,15 @@ local function _execute_action(action_name, go_next, binding)
 			return true
 		end
 
+		local log_opener = OPEN_LOG[name]
+		if log_opener then
+			require("ui.log_openers")[log_opener](function(target)
+				_run("xdg-open " .. shell_quote(target))
+				return true
+			end)
+			return true
+		end
+
 		local resolver = OPEN_PATH[name]
 		if not resolver then return false end
 		local ok_paths, Paths = pcall(require, "infra.config_paths")
@@ -632,7 +595,7 @@ local function _execute_action(action_name, go_next, binding)
 		elseif not target:match("/$") then
 			Logger.warn(LOG, "'%s' points at '%s', which does not exist yet.", name, target)
 		end
-		_run("xdg-open " .. shell_quote(target))
+		run_background("xdg-open " .. shell_quote(target))
 		return true
 	end
 
@@ -660,22 +623,20 @@ local function _execute_action(action_name, go_next, binding)
 	-- time; the user concludes the shortcut feature is broken.
 	if _open_driver_surface(action_name) then return end
 
-	local delegate = MODULE_ACTIONS[action_name]
-	if delegate then
-		local ok_module, Module = pcall(require, delegate.module)
-		if not ok_module or type(Module) ~= "table" or type(Module[delegate.fn]) ~= "function" then
-			Logger.error(LOG, "'%s' cannot run: %s is unavailable (%s).", action_name, delegate.module,
-				tostring(Module))
-			return
-		end
-		local ok, err = pcall(Module[delegate.fn])
-		if not ok then Logger.error(LOG, "Action '%s' failed: %s.", action_name, tostring(err)) end
-		return
-	end
-
 	local handler = _action_handlers[action_name]
 	if handler then
-		local ok, err = pcall(handler)
+		-- A parameterized action receives the value stored for its binding, checked
+		-- here once for every provider rather than by each handler.
+		local parameter = nil
+		if M.ACTION_PARAMETER_SPECS[action_name] then
+			parameter = M.get_action_parameter(binding, action_name)
+			if not M.validate_action_parameter(action_name, parameter) then
+				Logger.warn(LOG, "'%s' ignored for binding '%s': its parameter is missing or invalid.",
+					action_name, tostring(binding))
+				return
+			end
+		end
+		local ok, err = pcall(handler, binding, parameter)
 		if not ok then
 			Logger.error(LOG, "Action '%s' failed: %s.", action_name, tostring(err))
 		end
@@ -693,42 +654,23 @@ local function _execute_action(action_name, go_next, binding)
 			-- all four of them.
 			shot = shot:gsub("%%s", (shell_quote(screenshot_path(kind)):gsub("%%", "%%%%")))
 		end
-		_run(shot)
+		run_background(shot)
 		return
 	end
 
-	if action_name == "open_url" then
-		local url = M.get_action_parameter(binding, action_name)
-		if M.validate_action_parameter(action_name, url) then _run("xdg-open " .. shell_quote(url)) end
-		return
-	elseif action_name == "search_web" then
-		local template = M.get_action_parameter(binding, action_name)
-		if M.validate_action_parameter(action_name, template) then
-			local query = primary_selection()
-			if query == "" then
-				Logger.warn(LOG, "search_web: no primary selection to search for ÔÇö nothing opened.")
-				return
-			end
-			-- Function replacement: the encoded query carries %XX sequences
-			-- and a string replacement would read them as capture references
-			-- ("invalid capture index" on the first space).
-			local encoded = url_encode_query(query)
-			_run("xdg-open " .. shell_quote((template:gsub("%%s", function() return encoded end))))
-		end
+	local direct = DIRECT_COMMANDS[action_name]
+	if direct then
+		run_background(direct)
 		return
 	end
 
-	if action_name == "left_click_toggle" then
-		-- Toggle mouse button hold via xdotool.
-		_run(_click_toggle_command("1"))
-	elseif action_name == "right_click_toggle" then
-		_run(_click_toggle_command("3"))
-	elseif WORKSPACE_COMBO[action_name] then
+	if WORKSPACE_COMBO[action_name] then
 		-- wmctrl on its own, and waited for: only its exit status says whether
 		-- the combination is still needed.
-		if not ShellRunner.run(workspace_switch_command(action_name == "ws_next" and 1 or -1)) then
+		if not ShellRunner.run(workspace_switch_command(action_name == "desktop_next" and 1 or -1)) then
 			_press_combo(WORKSPACE_COMBO[action_name])
 		end
+		return
 	elseif MEDIA_ACTIONS[action_name] then
 		-- The tool on its own, and waited for: only its exit status says whether
 		-- the media key is still needed.
@@ -736,15 +678,19 @@ local function _execute_action(action_name, go_next, binding)
 		if not ShellRunner.run("timeout " .. MEDIA_TOOL_TIMEOUT_S .. " " .. media.tool .. " >/dev/null 2>&1") then
 			_press_combo(media.key)
 		end
-	elseif action_name == "lock_screen" then
-		_run("loginctl lock-session 2>/dev/null || xdg-screensaver lock")
+		return
 	else
-		-- A warning, not DEBUG: whatever asked for this action (a gesture, a
-		-- tap-hold, a shortcut) now does nothing, and DEBUG is not where anyone
-		-- looks for why.
-		Logger.warn(LOG, "Unknown action '%s' (%s) — Linux has nothing to run for it.",
-			action_name, tostring(binding))
+		local builtin = BUILTIN_HANDLERS[action_name]
+		if builtin then
+			builtin(binding)
+			return
+		end
 	end
+
+	-- WARN, not DEBUG: set_action refuses an id the catalogue does not offer, so
+	-- reaching this line means a caller bypassed it or the catalogue lists an id
+	-- no table here answers — the parity test's job, and worth seeing in a log.
+	Logger.warn(LOG, "Unknown action: %s", action_name)
 end
 
 --- Returns a human-readable label for an action.
@@ -754,43 +700,174 @@ function M.get_action_label(action_name)
 	if not action_name or action_name == "" then return "∅" end
 	local computed = ACTION_COMPUTED_LABELS[action_name]
 	if computed then return computed end
-	local suffix = ACTION_I18N_KEYS[action_name]
-	if not suffix then return action_name end
-	return i18n.get("sg_actions." .. suffix)
+	local meta = Catalogue.actions[action_name]
+	if not meta then return action_name end
+	return i18n.get(meta.label_key)
 end
 
---- Every action id execute_action() runs on this driver: the catalogue's rows
---- declared for Linux, this driver's own names (ws_prev, ws_next) and the
---- modifier chords. What a tap-hold key may be set to without doing nothing.
---- @return table Sorted action ids.
-function M.get_executable_action_names()
-	local seen, names = { none = true }, {}
-	local function add(id)
-		if not seen[id] then
-			seen[id] = true
-			names[#names + 1] = id
-		end
-	end
-	for _, id in ipairs(M.LINUX_DECLARED_ACTIONS) do add(id) end
-	for id in pairs(ACTION_I18N_KEYS) do add(id) end
-	for id in pairs(ACTION_COMPUTED_LABELS) do add(id) end
-	table.sort(names)
-	return names
-end
-
---- Returns the list of all available action names.
+--- Returns the action ids the picker lists, in catalogue order, the
+--- modifier-chord block expanded. "none" is included: it is a valid binding.
 --- @return table
 function M.get_action_names()
 	local names = {}
-	for k in pairs(ACTION_I18N_KEYS) do
-		names[#names + 1] = k
+	for _, item in ipairs(Catalogue.sg_items) do
+		if item.kind == "action" then
+			names[#names + 1] = item.id
+		elseif item.kind == "modifier_chords" then
+			for _, group in ipairs(MODIFIER_ACTION_GROUPS) do
+				for _, action_id in ipairs(group.actions) do names[#names + 1] = action_id end
+			end
+		elseif item.kind ~= "heading" then
+			error("unknown action catalogue item kind '" .. tostring(item.kind) .. "'")
+		end
 	end
-	for k in pairs(ACTION_COMPUTED_LABELS) do
-		names[#names + 1] = k
+	return names
+end
+
+--- Every id a binding may name: the listed actions and "none". Built once — the
+--- catalogue and the chord matrix are fixed for the life of the daemon.
+local ASSIGNABLE = {}
+for _, action_name in ipairs(M.get_action_names()) do ASSIGNABLE[action_name] = true end
+ASSIGNABLE["none"] = true
+
+--- True when `action_name` is an action the catalogue offers on Linux.
+--- @param action_name any
+--- @return boolean
+function M.is_assignable(action_name)
+	return type(action_name) == "string" and ASSIGNABLE[action_name] == true
+end
+
+--- True when the executor has something that runs `action_name`. The same
+--- tables _execute_action walks, so this cannot drift from the dispatch.
+--- @param action_name string
+--- @return boolean
+function M.is_runnable(action_name)
+	if action_name == "none" then return true end
+	return MODIFIER_ACTION_COMMANDS[action_name] ~= nil
+		or _EMIT_ROWS[action_name] ~= nil
+		or OPEN_WINDOW[action_name] ~= nil
+		or OPEN_PATH[action_name] ~= nil
+		or OPEN_LOG[action_name] ~= nil
+		or WORKSPACE_COMBO[action_name] ~= nil
+		or MEDIA_ACTIONS[action_name] ~= nil
+		or _action_handlers[action_name] ~= nil
+		or SCREENSHOT_COMMANDS[action_name] ~= nil
+		or DIRECT_COMMANDS[action_name] ~= nil
+		or BUILTIN_HANDLERS[action_name] ~= nil
+end
+
+--- Every id the executor can run, for the catalogue parity test's reverse
+--- direction: a handler the catalogue does not list is a feature nobody can
+--- bind. Daemon-injected handlers count only once init() has them.
+--- @return table Sorted ids.
+function M.runnable_action_ids()
+	local seen, out = { none = true }, { "none" }
+	for _, source in ipairs({ MODIFIER_ACTION_COMMANDS, _EMIT_ROWS, OPEN_WINDOW, OPEN_PATH,
+		OPEN_LOG, WORKSPACE_COMBO, MEDIA_ACTIONS,
+		_action_handlers, SCREENSHOT_COMMANDS, DIRECT_COMMANDS, BUILTIN_HANDLERS }) do
+		for action_name in pairs(source) do
+			if not seen[action_name] then
+				seen[action_name] = true
+				out[#out + 1] = action_name
+			end
+		end
+	end
+	table.sort(out)
+	return out
+end
+
+--- Returns declared action ids for the daemon's configurable keyboard bindings.
+--- Tap-holds load before daemon handlers are registered, so this admission list
+--- follows the catalogue rather than the executor's current registrations.
+--- @return table Sorted action ids, excluding the no-op binding.
+function M.get_executable_action_names()
+	local names = {}
+	for _, id in ipairs(M.get_action_names()) do
+		if id ~= "none" then names[#names + 1] = id end
 	end
 	table.sort(names)
 	return names
 end
+
+--- Whether one requirement token from the catalogue holds on this machine.
+--- @param token string "tool:<binary>" or "session:x11".
+--- @return boolean|nil True/false when proven, nil when it cannot be told —
+---   a probe that could not read the machine must never take a binding away.
+--- @return string|nil hint Localized reason when the requirement is absent.
+local function requirement_holds(token)
+	local tool = token:match("^tool:(.+)$")
+	if tool then
+		local ok, Shell = pcall(require, "adapters.shell_runner")
+		if not ok or type(Shell.has_command) ~= "function" then return nil, nil end
+		if Shell.has_command(tool) then return true, nil end
+		local hint = i18n.get("dialog.action_picker.requires_tool"):gsub("{1}", function() return tool end)
+		return false, hint
+	end
+	if token == "session:x11" then
+		local ok, Display = pcall(require, "infra.display_server")
+		if not ok or type(Display.kind) ~= "function" then return nil, nil end
+		local kind = Display.kind()
+		if kind == Display.X11 then return true, nil end
+		if kind == Display.WAYLAND then return false, i18n.get("dialog.action_picker.requires_x11") end
+		return nil, nil
+	end
+	error("unknown action requirement token '" .. tostring(token) .. "'")
+end
+
+--- Ordered picker items for the active language: headings with their level
+--- and translated text, actions with their label, and — when a requirement the
+--- catalogue declares is proven absent — `disabled` plus the reason as `hint`.
+--- Greyed rather than hidden: a row that vanishes reads as a bug, and the user
+--- cannot tell "this session cannot" from "this driver forgot". "none" is left
+--- out because the page adds its own translated row for it.
+--- @return table
+function M.get_picker_items()
+	local items, probed = {}, {}
+	--- Resolves one action's availability, probing each token once per build.
+	local function availability(action_name)
+		local meta = Catalogue.actions[action_name]
+		for _, token in ipairs(meta and meta.requires or {}) do
+			if probed[token] == nil then
+				local holds, hint = requirement_holds(token)
+				probed[token] = { holds = holds, hint = hint }
+			end
+			if probed[token].holds == false then return false, probed[token].hint end
+		end
+		return true, nil
+	end
+	local function push_action(action_name)
+		local available, hint = availability(action_name)
+		items[#items + 1] = {
+			type = "action",
+			id = action_name,
+			label = M.get_action_label(action_name),
+			disabled = not available or nil,
+			hint = hint,
+		}
+	end
+	for _, item in ipairs(Catalogue.sg_items) do
+		if item.kind == "heading" then
+			items[#items + 1] = {
+				type = "heading", level = item.level, text = (i18n.get(item.key):gsub("^#+", "")),
+			}
+		elseif item.kind == "action" then
+			if item.id ~= "none" then push_action(item.id) end
+		elseif item.kind == "modifier_chords" then
+			local template = i18n.get(item.group_key)
+			for _, group in ipairs(MODIFIER_ACTION_GROUPS) do
+				items[#items + 1] = {
+					type = "heading", level = item.level,
+					text = (template:gsub("{1}", function() return group.label end)),
+				}
+				for _, action_name in ipairs(group.actions) do push_action(action_name) end
+			end
+		else
+			error("unknown action catalogue item kind '" .. tostring(item.kind) .. "'")
+		end
+	end
+	return items
+end
+
 
 -- =========================================
 -- =========================================
@@ -804,8 +881,24 @@ local _config_path   = nil
 local _persist       = false
 local _actions       = {}   -- slot → action_name
 local _reading       = false -- the touchpad's evdev node is open and being drained
+local _reader_stop_error = nil -- an unacknowledged close must fence reacquisition
 local _decoder       = nil   -- the multitouch frame decoder for that device
 local _touchpad      = nil   -- what touchpad_finder chose, and what it can express
+local _parameter_configuration_owner = nil
+local _scope_owner   = nil   -- retains refused runtime compensation
+local _scope_native = false -- admits only the scope's synchronous native inverse
+local _scope_sequence = 0
+
+--- Keeps captured preferences exclusively owned until compensation completes.
+--- @return boolean admitted
+local function admit_mutation()
+	if _parameter_configuration_owner ~= nil then return false end
+	if _scope_owner and _scope_owner.pending() then
+		Logger.error(LOG, "Gesture configuration remains owned by a pending scope transaction.")
+		return false
+	end
+	return true
+end
 
 --- Copies one flat state map for a persistence-before-publication transaction.
 --- @param source table
@@ -836,6 +929,7 @@ end
 --- Enables gesture processing after the touchpad reader is live.
 --- @return boolean True when gestures are enabled and readable.
 function M.enable()
+	if not admit_mutation() then return false end
 	if not M.start_reading() then
 		_enabled = false
 		Logger.error(LOG, "Gestures remain disabled because the touchpad reader could not start.")
@@ -848,39 +942,49 @@ end
 
 --- Disables gesture processing.
 function M.disable()
+	if not admit_mutation() then return false end
+	if M.stop_reading() ~= true then return false end
 	_enabled = false
-	M.stop_reading()
 	Logger.info(LOG, "Gestures disabled.")
+	return true
 end
 
 --- Persists and applies the master gesture state as one transaction.
 --- @param enabled boolean
 --- @return boolean True when the requested state was committed.
 function M.set_enabled(enabled)
+	if not admit_mutation() then return false end
 	if type(enabled) ~= "boolean" then
 		Logger.error(LOG, "Gesture state must be a boolean — nothing changed.")
 		return false
 	end
 
-	if enabled then
-		local was_enabled = _enabled
-		if not was_enabled and not M.enable() then return false end
-		if not M._persist_updates({ { section = CONFIG_SECTION, key = "enabled", value = true } }) then
-			if not was_enabled then M.disable() end
-			Logger.error(LOG, "Gesture state was not persisted — activation was rolled back.")
-			return false
-		end
+	local snapshot = M.capture_scope_state()
+	if not snapshot then return false end
+	local candidate = M.capture_scope_state()
+	candidate.enabled, candidate.reading = enabled, enabled
+	local applied = M.apply_scope_state(candidate)
+	if applied == true and M._persist_updates({ { section = CONFIG_SECTION, key = "enabled", value = enabled } }) then
 		return true
 	end
-
-	-- Persist first: disabling the reader cannot fail, whereas publishing a
-	-- session-only off state after a failed write would lie until restart.
-	if not M._persist_updates({ { section = CONFIG_SECTION, key = "enabled", value = false } }) then
-		Logger.error(LOG, "Gesture state was not persisted — nothing changed.")
-		return false
+	-- The native boundary can fail after releasing ownership. Keep the exact
+	-- inverse admitted until it succeeds; a later setter must not supersede it.
+	local debt = snapshot
+	local owner = {}
+	function owner.pending() return debt ~= nil end
+	function owner.retry_restore()
+		if debt == nil then return true end
+		if M.apply_scope_state(debt) ~= true then return false end
+		debt = nil
+		return true
 	end
-	if _enabled then M.disable() end
-	return true
+	_scope_owner = owner
+	if owner.retry_restore() then
+		Logger.error(LOG, "Gesture state was refused — the previous runtime was restored.")
+	else
+		Logger.error(LOG, "Gesture state was refused — runtime rollback remains pending.")
+	end
+	return false
 end
 
 --- Toggles gestures on/off.
@@ -901,6 +1005,7 @@ end
 --- @param action_name string Action identifier.
 --- @return boolean True only after the assignment is durable when persistence is enabled.
 function M.set_action(slot, action_name)
+	if not admit_mutation() then return false end
 	if type(slot) ~= "string" or type(action_name) ~= "string" then
 		Logger.error(LOG, "Gesture slot and action must be strings — nothing changed.")
 		return false
@@ -909,9 +1014,13 @@ function M.set_action(slot, action_name)
 		Logger.warn(LOG, "Unknown gesture slot: %s", tostring(slot))
 		return false
 	end
-	if action_name ~= "none" and not (ACTION_I18N_KEYS[action_name] or ACTION_COMPUTED_LABELS[action_name]) then
-		Logger.warn(LOG, "Unknown action '%s' for slot '%s' — will be a no-op.",
+	-- Refused like Windows refuses it. This used to warn and commit anyway, so an
+	-- id the catalogue does not offer here was stored and then dispatched as a
+	-- no-op on every gesture — no error at bind time and none at fire time.
+	if not M.is_assignable(action_name) then
+		Logger.warn(LOG, "Refusing unknown action '%s' for slot '%s'.",
 			tostring(action_name), tostring(slot))
+		return false
 	end
 	local staged = copy_state(_actions)
 	staged[slot] = action_name
@@ -928,15 +1037,103 @@ function M.get_action_parameter_spec(action_name)
 	return M.ACTION_PARAMETER_SPECS[action_name]
 end
 
+-- The parameter kinds the shortcuts manager parses (_shared/lua/send_input).
+local SEND_INPUT_KINDS = { text = true, key = true, shortcut = true }
+
+--- Replaces the {1} of a localized template on plain indices: the detail may
+--- hold a % that gsub would read as a capture reference.
+--- @param template string
+--- @param detail string
+--- @return string
+local function fill_placeholder(template, detail)
+	local at = template:find("{1}", 1, true)
+	if not at then return template end
+	return template:sub(1, at - 1) .. detail .. template:sub(at + 3)
+end
+
+--- The shortcuts manager, which owns the wrap-pair catalogue. Required lazily:
+--- the daemon loads it after this module.
+--- @return table|nil
+local function shortcuts_manager()
+	local ok, Shortcuts = pcall(require, "modules.shortcuts.manager")
+	if not ok or type(Shortcuts) ~= "table" or type(Shortcuts.resolve_wrap_pair) ~= "function" then
+		Logger.error(LOG, "The wrap-pair catalogue is unavailable: %s.", tostring(Shortcuts))
+		return nil
+	end
+	return Shortcuts
+end
+
+--- The send-input vocabulary the shortcuts manager reads. Raises when that
+--- manager is unavailable: a prompt or refusal without it would name no key.
+--- @return table
+local function send_vocabulary()
+	local Shortcuts = shortcuts_manager()
+	if not Shortcuts then error("the send-input vocabulary is unavailable: no shortcuts manager") end
+	return Shortcuts.send_vocabulary()
+end
+
 function M.validate_action_parameter(action_name, value)
 	local spec = M.get_action_parameter_spec(action_name)
 	if not spec then return true end
+	if spec == "wrap_pair" then
+		local Shortcuts = shortcuts_manager()
+		return Shortcuts ~= nil and (Shortcuts.resolve_wrap_pair(value)) ~= nil
+	end
+	if SEND_INPUT_KINDS[spec] then
+		local Shortcuts = shortcuts_manager()
+		return Shortcuts ~= nil and Shortcuts.parse_send_input(spec, value) ~= nil
+	end
 	if type(value) ~= "string" or not value:match("^https?://%S+$") then return false end
 	if spec == "search_url" then
 		local _, placeholders = value:gsub("%%s", "")
 		return placeholders == 1
 	end
-	return true
+	if spec == "url" then return true end
+	error("no validator for parameter kind '" .. tostring(spec) .. "'")
+end
+
+--- The text a binding editor shows to ask for an action's parameter. The
+--- search-URL prompt holds a LITERAL %s the user types, and a wrap-pair sample
+--- may hold a %, so {1} is replaced by plain indices, never gsub.
+--- @param action_name string Action id with a parameter.
+--- @return string
+function M.get_action_parameter_prompt(action_name)
+	local spec = M.get_action_parameter_spec(action_name)
+	if spec == "search_url" then return i18n.get("dialog.gestures.param_search_url") end
+	if spec == "url" then return i18n.get("dialog.gestures.param_link") end
+	if spec == "wrap_pair" then
+		local Shortcuts = shortcuts_manager()
+		local WrapPair = require("wrap_pair")
+		local samples = WrapPair.describe(Shortcuts and Shortcuts.get_wrap_pair_list() or {})
+		local template = i18n.get("dialog.gestures.param_wrap_pair")
+		local at = template:find("{1}", 1, true)
+		if not at then return template .. "\n" .. samples end
+		return template:sub(1, at - 1) .. samples .. template:sub(at + 3)
+	end
+	if SEND_INPUT_KINDS[spec] then
+		local vocabulary = send_vocabulary()
+		local detail = spec == "text" and tostring(vocabulary.text_max_code_points)
+			or require("send_input").describe_keys(vocabulary)
+		return fill_placeholder(i18n.get("dialog.gestures.param_" .. spec), detail)
+	end
+	error("no prompt for parameter kind '" .. tostring(spec) .. "'")
+end
+
+--- The text shown when a typed parameter is refused.
+--- @param action_name string Action id with a parameter.
+--- @return string
+function M.get_action_parameter_error(action_name)
+	local spec = M.get_action_parameter_spec(action_name)
+	if spec == "wrap_pair" then return i18n.get("dialog.gestures.param_err_wrap_pair") end
+	if SEND_INPUT_KINDS[spec] then
+		return fill_placeholder(i18n.get("dialog.gestures.param_err_" .. spec),
+			tostring(send_vocabulary().text_max_code_points))
+	end
+	if spec == "search_url" then
+		return i18n.get("dialog.gestures.param_err_url") .. " "
+			.. i18n.get("dialog.gestures.param_err_many_placeholders")
+	end
+	return i18n.get("dialog.gestures.param_err_url")
 end
 
 local function parameter_key(binding, action_name)
@@ -961,7 +1158,40 @@ function M.get_action_parameter(binding, action_name)
 	return _action_params[parameter_key(binding, action_name)] or ""
 end
 
+--- Readies picker items for the picker's own parameter editor: each action whose
+--- parameter is a text, a key or a shortcut is marked with its kind and the value
+--- `binding` holds for it, and the returned fields give the page the send-input
+--- vocabulary and the same prompts and refusals as the zenity prompt.
+--- @param items table get_picker_items() output, marked in place.
+--- @param binding string|nil The binding the pick is for; nil marks no value.
+--- @return table { send_vocabulary, parameter_strings }, the options the picker
+---   bridge's open() reads.
+function M.get_picker_parameter_fields(items, binding)
+	local prompts, errors = {}, {}
+	for _, item in ipairs(items) do
+		local kind = item.type == "action" and M.get_action_parameter_spec(item.id) or nil
+		if SEND_INPUT_KINDS[kind] then
+			item.parameter = kind
+			item.parameterValue = binding and M.get_action_parameter(binding, item.id) or ""
+			prompts[kind] = M.get_action_parameter_prompt(item.id)
+			errors[kind] = M.get_action_parameter_error(item.id)
+		end
+	end
+	return {
+		send_vocabulary = send_vocabulary(),
+		parameter_strings = {
+			save = i18n.get("button.save"),
+			back = i18n.get("dialog.action_picker.back"),
+			captureKey = i18n.get("dialog.action_picker.capture_key"),
+			captureShortcut = i18n.get("dialog.action_picker.capture_shortcut"),
+			prompts = prompts,
+			errors = errors,
+		},
+	}
+end
+
 function M.set_action_parameter(binding, action_name, value)
+	if not admit_mutation() then return false end
 	if not M.validate_action_parameter(action_name, value) then return false end
 	local key = parameter_key(binding, action_name)
 	local staged = copy_state(_action_params)
@@ -984,7 +1214,7 @@ function M.get_action_display_label(slot)
 	local action = M.get_action(slot) or "none"
 	local label = M.get_action_label(action)
 	local value = M.get_action_parameter(slot, action)
-	return value ~= "" and (label .. " (" .. value .. ")") or label
+	return ParameterLabel.format(label, value)
 end
 
 --- Returns all gesture actions.
@@ -995,12 +1225,81 @@ function M.get_all_actions()
 	return t
 end
 
+--- Captures detached preferences and the acknowledged touchpad reader state.
+--- @return table|nil snapshot Nil when the current master has no live reader.
+function M.capture_scope_state()
+	if _reader_stop_error or (_enabled and not _reading) then return nil end
+	return {
+		enabled = _enabled, reading = _reading,
+		actions = copy_state(_actions), parameters = copy_state(_action_params),
+	}
+end
+
+--- Applies a complete validated runtime snapshot without writing preferences.
+--- A failed native transition belongs to the caller's retained compensation.
+--- @param candidate table Detached scope runtime snapshot.
+--- @return boolean acknowledged
+function M.apply_scope_state(candidate)
+	if _parameter_configuration_owner ~= nil then return false end
+	if type(candidate) ~= "table" or type(candidate.enabled) ~= "boolean"
+		or type(candidate.reading) ~= "boolean" or (candidate.enabled and not candidate.reading)
+		or type(candidate.actions) ~= "table" or type(candidate.parameters) ~= "table" then return false end
+	local actions, parameters = {}, {}
+	for slot in pairs(M.DEFAULT_GESTURES) do
+		local action = candidate.actions[slot]
+		if type(action) ~= "string" or not M.is_assignable(action) then return false end
+		actions[slot] = action
+	end
+	for slot in pairs(candidate.actions) do
+		if M.DEFAULT_GESTURES[slot] == nil then return false end
+	end
+	for key, value in pairs(candidate.parameters) do
+		local binding, action = M.split_action_parameter_key(key)
+		if not binding or not action or not M.validate_action_parameter(action, value) then return false end
+		parameters[key] = value
+	end
+	_scope_native = true
+	local called, acknowledged = pcall(function()
+		if candidate.reading then return M.start_reading() == true and M.is_reading() end
+		return M.stop_reading() == true and not M.is_reading()
+	end)
+	_scope_native = false
+	if not called or acknowledged ~= true then return false end
+	_enabled = candidate.enabled
+	_actions, _action_params = actions, parameters
+	return true
+end
+
+--- Restores or clears all gesture-owned preferences and native reader state.
+--- @param mode string `recommended` or `clear`.
+--- @return boolean committed
+--- @return string|nil detail
+function M.apply_scope(mode)
+	if _parameter_configuration_owner ~= nil then return false end
+	if mode ~= "recommended" and mode ~= "clear" then return false, "invalid gesture scope mode" end
+	if _is_paused() then return false, "gesture configuration is paused" end
+	if not _persist or type(_config_path) ~= "string" then return false, "gesture persistence is not initialized" end
+	if _scope_owner and _scope_owner.pending() then
+		if not _scope_owner.retry_restore() then return false, "gesture runtime rollback remains pending" end
+	end
+	_scope_sequence = _scope_sequence + 1
+	local backup = _config_path .. ".gestures-" .. os.date("%Y%m%d-%H%M%S") .. "-" .. _scope_sequence .. ".bak"
+	_scope_owner = require("infra.gesture_scope").new({
+		path = _config_path,
+		backup_path = backup,
+		gestures = M,
+	})
+	local committed, detail = _scope_owner.apply(mode)
+	if not committed then Logger.error(LOG, "Gesture scope '%s' was refused: %s.", mode, tostring(detail)) end
+	return committed, detail, backup
+end
+
 --- Resets all gesture actions to defaults.
 --- @return boolean True only after every default is durable when persistence is enabled.
 function M.reset_defaults()
 	local staged = copy_state(_actions)
 	local updates = {}
-	for k, v in pairs(M.DEFAULT_GESTURES) do
+	for k, v in pairs(M.RECOMMENDED_GESTURES) do
 		staged[k] = v
 		updates[#updates + 1] = { section = CONFIG_SECTION, key = k, value = v }
 	end
@@ -1134,6 +1433,8 @@ end
 --- multi-finger taps never leave it at all.
 --- @return boolean True when a touchpad was found and opened.
 function M.start_reading()
+	if not _scope_native and not admit_mutation() then return false end
+	if _reader_stop_error then return false end
 	if _reading then return true end
 
 	local ok_finder, Finder = pcall(require, "modules.gestures.touchpad_finder")
@@ -1175,7 +1476,7 @@ end
 --- events consumed so a caller can tell a quiet tick from a stalled reader.
 --- @return integer
 function M.pump()
-	if not _reading or not _decoder then return 0 end
+	if not _reading or not _decoder or _reader_stop_error then return 0 end
 
 	local ok_reader, Reader = pcall(require, "adapters.evdev_reader")
 	if not ok_reader then return 0 end
@@ -1193,20 +1494,30 @@ function M.pump()
 end
 
 --- Stops reading the touchpad.
+--- @return boolean True only when the reader acknowledges closure.
 function M.stop_reading()
+	if not _scope_native and not admit_mutation() then return false end
 	if _reading then
 		local ok_reader, Reader = pcall(require, "adapters.evdev_reader")
-		if ok_reader and type(Reader.close) == "function" then
-			pcall(Reader.close, Reader.TOUCHPAD)
+		local called, acknowledged, detail = false, nil, "reader close is unavailable"
+		if ok_reader and type(Reader) == "table" and type(Reader.close) == "function" then
+			called, acknowledged, detail = pcall(Reader.close, Reader.TOUCHPAD)
+		end
+		if not called or acknowledged ~= true then
+			_reader_stop_error = tostring(not called and acknowledged or detail or "reader did not acknowledge close")
+			Logger.error(LOG, "Touchpad stop is not acknowledged: %s.", _reader_stop_error)
+			return false
 		end
 	end
 	-- Dropping the decoder IS the reset: it holds the slot state and the latched
 	-- finger count, so a half-finished gesture cannot survive into the next
 	-- reader. There is no separate tracking state left to clear.
 	_reading = false
+	_reader_stop_error = nil
 	_decoder = nil
 	_touchpad = nil
 	Logger.info(LOG, "Touchpad reader stopped.")
+	return true
 end
 
 --- The touchpad being read, or nil.
@@ -1239,6 +1550,7 @@ end
 -- =========================================
 
 function M._persist_updates(updates)
+	if not admit_mutation() then return false end
 	if not _persist then return true end
 	if type(updates) ~= "table" or #updates == 0 then
 		Logger.error(LOG, "Could not persist gesture configuration: update batch is empty or invalid.")
@@ -1313,6 +1625,27 @@ local function walk_user_config(config, visit)
 	end
 end
 
+--- Removes only legacy leaves consumed by the gesture scope's runtime reader.
+--- @param config table Decoded configuration before a scoped transaction.
+--- @return table operations Explicit deletions preserving other owners.
+function M.scope_legacy_operations(config)
+	local operations = {}
+	walk_user_config(config, {
+		action = function(section, slot)
+			if section == LEGACY_SECTION then
+				operations[#operations + 1] = { section = section, key = slot, delete = true }
+			end
+		end,
+		param = function(section, key)
+			local binding = M.split_action_parameter_key(key)
+			if section == LEGACY_SECTION_PARAMS and M.DEFAULT_GESTURES[binding] ~= nil then
+				operations[#operations + 1] = { section = section, key = key, delete = true }
+			end
+		end,
+	})
+	return operations
+end
+
 --- Marks every config.toml path the gesture loader takes.
 --- @param config table Decoded config.toml.
 --- @param mark function mark(...segments) from config_unused_keys.
@@ -1346,13 +1679,13 @@ local function load_user_config(path)
 	local configured = nil
 	walk_user_config(config, {
 		action = function(_section_name, slot, action)
-			if not (action == "none" or ACTION_I18N_KEYS[action] or ACTION_COMPUTED_LABELS[action]) then
-				-- Kept, not dropped: set_action() persisted it and reported
-				-- success, so dropping it here would silently revert a save.
-				-- An action no catalogue knows (removed, or written by a newer
-				-- version) stays bound and dispatches as a no-op until rebound.
-				Logger.warn(LOG, "Unknown action '%s' for slot '%s' — kept, dispatches as a no-op.",
+			if not M.is_assignable(action) then
+				-- set_action refuses such an id, so it can only come from a hand edit
+				-- or a config written by another OS. Kept out, loudly: binding it
+				-- would dispatch a no-op on every gesture.
+				Logger.warn(LOG, "Unknown action '%s' for slot '%s' in config.toml — ignored.",
 					tostring(action), tostring(slot))
+				return
 			end
 			_actions[slot] = action
 		end,
@@ -1375,6 +1708,7 @@ end
 ---   injects a wall-clock source (seconds) for tests; production uses the
 ---   monotonic clock. action_handlers owns daemon lifecycle operations.
 function M.init(opts)
+	if not admit_mutation() then return false end
 	opts = type(opts) == "table" and opts or {}
 	if opts.action_handlers ~= nil and type(opts.action_handlers) ~= "table" then
 		error("gestures action_handlers must be a table")
@@ -1405,6 +1739,73 @@ function M.init(opts)
 	if enabled then M.enable() end
 
 	Logger.info(LOG, "Gestures manager initialised (enabled=%s).", tostring(_enabled))
+	require("ui.gesture_conflicts").notify_boot(M)
+end
+
+
+--- Acquires only the shared parameter map, without touching the touchpad reader.
+--- @param owner table Exact transaction token.
+--- @return boolean acquired
+function M.acquire_parameter_configuration(owner)
+	if type(owner) ~= "table" or not admit_mutation() then return false end
+	_parameter_configuration_owner = owner
+	return true
+end
+
+--- Releases exact parameter ownership after acknowledged completion.
+--- @param owner table Exact transaction token.
+--- @return boolean released
+function M.release_parameter_configuration(owner)
+	if type(owner) ~= "table" or _parameter_configuration_owner ~= owner then return false end
+	_parameter_configuration_owner = nil
+	return true
+end
+
+--- Captures parameters independently from evdev acquisition and close state.
+--- @param owner table Exact transaction token.
+--- @return table|nil parameters
+function M.parameter_configuration_snapshot(owner)
+	if _parameter_configuration_owner ~= owner then return nil end
+	return M.get_all_action_parameters()
+end
+
+--- Applies a detached parameter map without changing gesture actions or devices.
+--- @param owner table Exact transaction token.
+--- @param parameters table Validated candidate or exact prior state.
+--- @return boolean acknowledged
+function M.apply_parameter_configuration(owner, parameters)
+	if _parameter_configuration_owner ~= owner or type(parameters) ~= "table" then return false end
+	local copy = {}
+	for key, value in pairs(parameters) do
+		local binding, action = M.split_action_parameter_key(key)
+		if not binding or not M.validate_action_parameter(action, value) then return false end
+		copy[key] = value
+	end
+	_action_params = copy
+	return true
+end
+
+--- Enumerates only recognized parameter bindings consumed by this loader.
+--- @param document table Decoded configuration.
+--- @param recognizes function Binding domain resolver supplied by the runtime owner.
+--- @return table paths Canonical dynamic paths.
+--- @return table legacy Explicit legacy deletions for the same bindings.
+function M.parameter_configuration_inventory(document, recognizes)
+	local paths, legacy = {}, {}
+	walk_user_config(document, {
+		param = function(section, key)
+			local binding = M.split_action_parameter_key(key)
+			if recognizes(binding) then
+				if section == CONFIG_SECTION_PARAMS then paths[#paths + 1] = section .. "." .. key end
+				if section == LEGACY_SECTION_PARAMS then legacy[#legacy + 1] = { section = section, key = key, delete = true } end
+			end
+		end,
+	})
+	for key in pairs(_action_params) do
+		local binding = M.split_action_parameter_key(key)
+		if recognizes(binding) then paths[#paths + 1] = CONFIG_SECTION_PARAMS .. "." .. key end
+	end
+	return paths, legacy
 end
 
 return M

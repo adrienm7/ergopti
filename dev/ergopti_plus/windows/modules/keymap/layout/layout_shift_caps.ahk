@@ -3,35 +3,34 @@
 ; ==============================================================================
 ; MODULE: Shift and CapsLock Layer Tables
 ; DESCRIPTION:
-; Single source of truth for the Shift and CapsLock layers of the emulated
-; Ergopti layout. Both layers share the same physical key set and produce
-; identical uppercase letters and digits — only the punctuation row differs.
+; The Shift and CapsLock layers of the emulated Ergopti layout, built from the
+; Ergopti .keylayout (layout_ergopti.ahk) and registered here. Both layers share
+; the same physical key set and produce identical uppercase letters and digits;
+; only the punctuation differs.
 ;
 ; FEATURES & RATIONALE:
 ; 1. ``SHIFTED_LETTERS`` is the shared portion (uppercase letters, digits,
 ;    single-char output). Registered against both ``+SCxxx`` (Shift) and
 ;    ``SCxxx`` (CapsLock-gated) hotkey patterns.
-; 2. ``SHIFT_SYMBOLS`` and ``CAPSLOCK_SYMBOLS`` carry the per-layer overrides
+; 2. ``SHIFT_SYMBOLS`` and ``CAPSLOCK_SYMBOLS`` carry the per-layer entries
 ;    for keys whose output diverges between the two layers — typically
 ;    French-typography punctuation that gets a thin non-breaking space prefix
 ;    on Shift but is plain on CapsLock.
 ; 3. ``LayerDispatch`` consults the symbol overrides first then falls back to
 ;    the shared letters table. Single dispatcher for both layers, parameterised
 ;    by which override Map to consult.
-; 4. Adding a key now means a single Map entry instead of two separate
-;    ``+SCxxx::`` and ``SCxxx::`` blocks that have to be kept in sync by hand.
+; 4. No character is written here: the tables follow the .keylayout, so a
+;    layout change is a new .keylayout, not an edit of this file.
 ; 5. The digit row of both layers stands down on a layout where "Chiffres en
 ;    accès direct" swaps it (``DigitRowIsSwapped``), decided per press on the
 ;    foreground window's layout, so a layout switch never needs a reload.
 ;
 ; DEPENDENCIES:
-; References ``SendNewResult``, ``WrapTextIfSelected``, ``ActivateHotstrings``,
-; ``DeadKey``, ``InDeadKeySequence``, ``DeadkeyMappingDiaresis``,
-; ``DeadkeyMappingCircumflex`` defined in modules/keymap/layout.ahk and
-; ``GetCapsLockCondition`` in the same file, the digit-row probes of
-; adapters/key_state.ahk and ``GetForegroundKeyboardLayout``
-; (infra/hotstrings/hotstring_engine.ahk). Lazy resolution at call time means
-; the include order does not matter.
+; The callables come from ``ErgoptiLayout_Action`` (layout_ergopti.ahk), which
+; binds ``SendNewResult``, ``WrapTextIfSelected``, ``ActivateHotstrings`` and
+; ``DeadKey`` (modules/keymap/layout.ahk); ``GetCapsLockCondition`` is in the
+; same file. Lazy resolution at call time means the include order does not
+; matter.
 ; ==============================================================================
 
 
@@ -48,63 +47,41 @@ global SHIFTED_LETTERS := ""
 global SHIFT_SYMBOLS := ""
 global CAPSLOCK_SYMBOLS := ""
 
+; Builds the three tables from the Ergopti layout tables read from the
+; .keylayout (layout_ergopti.ahk). A key typing the same thing with Shift and
+; with CapsLock (letters, digits) joins SHIFTED_LETTERS; any other key gets its
+; own entry on each layer it types on. The Shift entries carry the French
+; typography (a no-break space before « : ; ! ? € % », committing the pending
+; hotstring first) and Shift+Space wraps the selection with hyphens.
 _BuildShiftCapsTables() {
 	global SHIFTED_LETTERS, SHIFT_SYMBOLS, CAPSLOCK_SYMBOLS
 
-	; Uppercase letters and digits — identical on the Shift and CapsLock layers.
-	SHIFTED_LETTERS := Map(
-		; Number row digits
-		"SC002", "1", "SC003", "2", "SC004", "3", "SC005", "4", "SC006", "5",
-		"SC007", "6", "SC008", "7", "SC009", "8", "SC00A", "9", "SC00B", "0",
+	Spec := ErgoptiLayout_Spec()
+	Shift := Spec["levels"]["shift"]
+	Caps := Spec["levels"]["caps"]
+	DeadTables := Spec["dead_keys"]
+	Letters := Map()
+	ShiftSymbols := Map()
+	CapsSymbols := Map()
+	for SC, Descriptor in Shift {
+		if Caps.Has(SC) && _ShiftCapsIsPlainText(Descriptor)
+			&& _ShiftCapsIsPlainText(Caps[SC]) && (Descriptor["text"] == Caps[SC]["text"])
+			Letters[SC] := Descriptor["text"]
+		else
+			ShiftSymbols[SC] := ErgoptiLayout_Action(Descriptor, DeadTables)
+	}
+	for SC, Descriptor in Caps {
+		if !Letters.Has(SC)
+			CapsSymbols[SC] := ErgoptiLayout_Action(Descriptor, DeadTables)
+	}
+	SHIFTED_LETTERS := Letters
+	SHIFT_SYMBOLS := ShiftSymbols
+	CAPSLOCK_SYMBOLS := CapsSymbols
+}
 
-		; Top row uppercase letters
-		"SC010", "È", "SC011", "Y", "SC012", "O", "SC013", "W", "SC014", "B",
-		"SC015", "F", "SC016", "G", "SC017", "H", "SC018", "C", "SC019", "X",
-		"SC01A", "Z",
-
-		; Middle row uppercase letters
-		"SC01E", "A", "SC01F", "I", "SC020", "E", "SC021", "U",
-		"SC023", "V", "SC024", "S", "SC025", "N", "SC026", "T",
-		"SC027", "R", "SC028", "Q",
-
-		; Bottom row uppercase letters
-		"SC056", "Ê", "SC02C", "É", "SC02D", "À", "SC02E", "J",
-		"SC030", "K", "SC031", "M", "SC032", "D", "SC033", "L", "SC034", "P",
-	)
-
-	; Shift-layer symbol overrides. The French-typography keys get a
-	; non-breaking space prefix and an ``ActivateHotstrings`` poke so the
-	; pending hotstring buffer is committed before the new symbol arrives.
-	; The space TYPE follows the French typographic rule and differs per
-	; punctuation: ":" takes a full no-break space (NBSP, U+00A0) while ";",
-	; "!" and "?" take a NARROW no-break space (NNBSP, U+202F). Getting this
-	; wrong is not cosmetic — downstream hotstring matching keys off the exact
-	; prefix the layout emits (see _BuildUppercasedSymbols / UPPER_TRIGGERS).
-	SHIFT_SYMBOLS := Map(
-		"SC039", () => WrapTextIfSelected("-", "-", "-"),
-		"SC029", () => (ActivateHotstrings(), SendNewResult(Chr(0x202F) "€")),
-		"SC00C", () => (ActivateHotstrings(), SendNewResult(Chr(0x202F) "%")),
-		"SC00D", SendNewResult.Bind("º"),
-		"SC01B", SendNewResult.Bind("_"),
-		"SC022", () => (ActivateHotstrings(), SendNewResult(Chr(0xA0) ":")),
-		"SC02B", () => (ActivateHotstrings(), SendNewResult(Chr(0x202F) "!")),
-		"SC02F", () => (ActivateHotstrings(), SendNewResult(Chr(0x202F) Chr(0x3B))),
-		"SC035", () => (ActivateHotstrings(), SendNewResult(Chr(0x202F) "?")),
-	)
-
-	; CapsLock-layer symbol overrides. The deadkey-bearing keys (SC01B, SC02B)
-	; check ``InDeadKeySequence`` so a chained dead-key sequence still
-	; produces the bare deadkey character instead of recursing.
-	CAPSLOCK_SYMBOLS := Map(
-		"SC029", SendNewResult.Bind("$"),
-		"SC00C", SendNewResult.Bind("%"),
-		"SC00D", SendNewResult.Bind("="),
-		"SC01B", () => (InDeadKeySequence ? SendNewResult("¨") : DeadKey(DeadkeyMappingDiaresis)),
-		"SC022", SendNewResult.Bind("."),
-		"SC02B", () => (InDeadKeySequence ? SendNewResult("^") : DeadKey(DeadkeyMappingCircumflex)),
-		"SC02F", SendNewResult.Bind(","),
-		"SC035", SendNewResult.Bind("'"),
-	)
+; A descriptor that only types its text, with no overlay behaviour.
+_ShiftCapsIsPlainText(Descriptor) {
+	return Descriptor.Has("text") && (Descriptor.Count == 1)
 }
 
 

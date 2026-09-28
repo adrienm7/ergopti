@@ -23,6 +23,7 @@ local Logger        = require("logger.shim")
 local Snapshot      = require("diagnostics.snapshot")
 local Version       = require("infra.version")
 local ConfigPaths   = require("infra.config_paths")
+local LoggerSink    = require("infra.logger_sink")
 local Paths         = require("infra.paths")
 local DisplayServer = require("infra.display_server")
 
@@ -88,12 +89,12 @@ local function meminfo_kb(text, key)
 	return tonumber(text:match("\n" .. key .. ":%s+(%d+)") or text:match("^" .. key .. ":%s+(%d+)"))
 end
 
---- Formats kilobytes as gigabytes with one decimal, the unit the page shows.
+--- Converts kilobytes to bytes: the diagnostics page formats every size itself.
 --- @param kb number|nil
---- @return string|nil
-local function format_gb(kb)
+--- @return number|nil
+local function kb_to_bytes(kb)
 	if not kb then return nil end
-	return string.format("%.1f GB", kb / (1024 * 1024))
+	return kb * 1024
 end
 
 --- The machine facts the boot snapshot and the healthcheck both report. One
@@ -101,7 +102,7 @@ end
 --- Every value is nil when it could not be read; nothing is guessed.
 --- @param env table|nil { read = fn(path) } probe override.
 --- @return table { os_name, os_version_id, kernel, arch, runtime, display_server,
----   desktop, cpu_model, cpu_cores, ram_total, ram_free, locale }
+---   desktop, cpu_model, cpu_cores, ram_total, ram_free (bytes), locale }
 function M.system_facts(env)
 	env = env or default_env()
 	local os_release = env.read("/etc/os-release")
@@ -136,8 +137,8 @@ function M.system_facts(env)
 		desktop        = desktop ~= "" and desktop or nil,
 		cpu_model      = cpu_model,
 		cpu_cores      = cpu_cores,
-		ram_total      = format_gb(meminfo_kb(meminfo, "MemTotal")),
-		ram_free       = format_gb(meminfo_kb(meminfo, "MemAvailable")),
+		ram_total      = kb_to_bytes(meminfo_kb(meminfo, "MemTotal")),
+		ram_free       = kb_to_bytes(meminfo_kb(meminfo, "MemAvailable")),
 		locale         = locale ~= "" and locale or nil,
 	}
 end
@@ -220,6 +221,8 @@ function M.collect(ctx, env)
 		dpi              = nil,
 		display          = display,
 		config_dir       = Snapshot.redact_home(ConfigPaths.get_config_dir(), ConfigPaths.home()),
+		-- Where this report's own logs are: the folder the sink writes.
+		logs_dir         = Snapshot.redact_home(LoggerSink.log_dir(), ConfigPaths.home()),
 		log_level        = ctx.log_level,
 		features_enabled = Snapshot.features_ratio(ctx.features_enabled, ctx.features_total),
 		boot_ms          = ctx.boot_ms and string.format("%.0f", ctx.boot_ms) or nil,

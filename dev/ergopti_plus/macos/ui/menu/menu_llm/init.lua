@@ -11,6 +11,7 @@
 --- ==============================================================================
 
 local M = {}
+local Manifest = require("infra.manifest_reader")
 
 local hs            = hs
 local llm_mod       = require("modules.llm")
@@ -148,7 +149,7 @@ local is_apple_silicon = BackendPanel.is_apple_silicon()
 
 M.DEFAULT_STATE = {
 		llm_enabled           = llm_mod.DEFAULT_STATE.llm_enabled,
-		llm_backend           = is_apple_silicon and "mlx" or "ollama",
+		llm_backend           = Manifest.default_for("llm.models.selected"),
 		llm_debounce          = llm_mod.DEFAULT_STATE.llm_debounce,
 		llm_model             = is_apple_silicon and llm_mod.DEFAULT_STATE.llm_model_mlx or llm_mod.DEFAULT_STATE.llm_model_ollama,
 		llm_model_ollama      = llm_mod.DEFAULT_STATE.llm_model_ollama,
@@ -165,16 +166,11 @@ M.DEFAULT_STATE = {
 		llm_active_profile    = llm_mod.DEFAULT_STATE.llm_active_profile,
 		llm_user_models       = {},
 		llm_disabled_apps          = {},
-		llm_url_bar_filter_enabled        = true,
-		llm_secure_field_filter_enabled   = true,
+		llm_url_bar_filter_enabled        = Manifest.default_for("llm.trigger.url_bar_filter_enabled"),
+		llm_secure_field_filter_enabled   = Manifest.default_for("llm.trigger.secure_filter_enabled"),
 		llm_user_profiles     = {},
 		llm_profile_shortcuts = {},
-		-- On-demand prediction shortcut. Defaults to Ctrl+Space (real Ctrl,
-		-- not Cmd — on macOS the Cmd+Space slot is owned by Spotlight and
-		-- system-wide search, so it's a poor default for an editor cue).
-		-- The user can rebind it from the trigger settings submenu or set
-		-- the value to false to disable.
-		llm_trigger_shortcut  = { mods = { "ctrl" }, key = "space" },
+		llm_trigger_shortcut  = Manifest.default_for("llm.trigger.shortcut"),
 		llm_after_hotstring   = llm_mod.DEFAULT_STATE.llm_after_hotstring,
 		llm_auto_raise_temp   = llm_mod.DEFAULT_STATE.llm_auto_raise_temp,
 		llm_min_words         = llm_mod.DEFAULT_STATE.llm_min_words,
@@ -849,7 +845,7 @@ local function create_menu(deps)
 		-- ===== 2.4) Lifecycle & Main Build =======
 		-- =========================================
 
-		local check_startup
+		local check_startup, startup_scope_idle
 		local activation_generation = 0
 		local activation_requirement_owner = nil
 		if deps.script_control
@@ -1245,10 +1241,21 @@ local function create_menu(deps)
 				-- action, so the checked parent row alone left no way to switch the
 				-- suggestions on: the manifest's `llm_toggle` row is registered below and
 				-- drawn inside the submenu, as on Windows and Linux.
-				local toggle_action = not paused
+				--
+				-- Always registered. While paused, or before the activation owner
+				-- exists, the switch cannot run its transaction: the row is greyed
+				-- through the declared `llm_toggle_ready` key and a click is refused
+				-- with a log line, rather than the row vanishing from the submenu.
+				local toggle_ready = not paused
 					and activation_requirement_owner ~= nil
 					and type(models_mgr.pause_requirements) == "function"
-					and activation_controller.is_registered() and function()
+					and activation_controller.is_registered()
+				local function refuse_toggle()
+						Logger.warn(LOG, "IA switch refused: %s.", paused and "the script is paused"
+							or "the activation owner is not ready")
+						return false
+				end
+				local toggle_action = toggle_ready and function()
 						activation_generation = activation_generation + 1
 						local my_generation = activation_generation
 						local activation_backend = state.llm_backend
@@ -1549,7 +1556,7 @@ local function create_menu(deps)
 						if commit_enabled(false) ~= true then return false end
 						publish_toggle()
 						return true
-				end or nil
+				end or refuse_toggle
 
 				local main_menu = {}
 				do
@@ -1570,11 +1577,22 @@ local function create_menu(deps)
 												end
 										end
 								end
-								-- No command while paused or before the activation owner exists:
-								-- the renderer then draws no gate rather than one that does nothing.
 								local render_ctx = {
-										commands      = { llm_toggle = toggle_action },
-										state_getters = { llm_enabled = function() return state.llm_enabled == true end },
+										commands      = {
+											llm_toggle = toggle_action,
+											["scope_restore"] = function()
+												if paused or type(deps.apply_preference_scope) ~= "function" then return false end
+												return deps.apply_preference_scope("llm", "recommended") == true
+											end,
+											["scope_clear"] = function()
+												if paused or type(deps.apply_preference_scope) ~= "function" then return false end
+												return deps.apply_preference_scope("llm", "clear") == true
+											end,
+										},
+										state_getters = {
+												llm_enabled      = function() return state.llm_enabled == true end,
+												llm_toggle_ready = function() return toggle_ready == true end,
+										},
 								}
 								main_menu = ManifestMenu.build("llm_menu", "LLM", handlers, nil, render_ctx, {}) or {}
 						else
@@ -1582,15 +1600,16 @@ local function create_menu(deps)
 						end
 				end
 
+				-- The tick mirrors the switch; the parent has no action, since a row
+				-- that opens a submenu is never clicked.
 				return {
 						label   = i18n.get("menu.llm.title"),
 						checked = state.llm_enabled or nil,
-						action  = toggle_action,
 						submenu = main_menu
 				}
 		end
 
-		check_startup = StartupCtrl.new({
+		check_startup, startup_scope_idle = StartupCtrl.new({
 				state                      = state,
 				keymap                     = keymap,
 				models_mgr                 = models_mgr,
@@ -1632,7 +1651,21 @@ local function create_menu(deps)
 				}
 		end
 
+		local scope_runtime = require("ui.menu.menu_llm.scope_runtime").new({
+			state = state, core = llm_mod, keymap = keymap, shortcuts = trigger_orch,
+			idle = function()
+				for _, owner in ipairs({ prediction_locks, activation_controller, switcher, BackendPanel, settings_mgr, profiles_mgr }) do
+					if type(owner.scope_idle) ~= "function" or owner.scope_idle() ~= true then return false end
+				end
+				return type(startup_scope_idle) == "function" and startup_scope_idle() == true
+					and llm_mod.configuration_idle() == true
+			end,
+			display_model = switcher.get_display_model_name, model_power = switcher.get_model_power_level,
+			backend_label = BackendPanel.runtime_label, reset_health = M.reset_llm_health_status,
+		})
 		return {
+				scope_runtime = scope_runtime,
+				scope_profiles = llm_mod.get_all_profiles,
 				build_item          = build_item,
 				build_download_item = build_download_item,
 				check_startup       = check_startup,

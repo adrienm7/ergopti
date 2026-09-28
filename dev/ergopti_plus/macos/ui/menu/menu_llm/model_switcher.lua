@@ -1584,6 +1584,10 @@ function M.new(ctx)
 	end
 
 	return {
+		scope_idle = function()
+			return model_boundary_depth == 0 and model_recovery_debt == nil and profile_recovery_debt == nil
+				and prediction_lock == nil and requirement_intent == nil and requirement_replay_stage == nil
+		end,
 		switch_model                      = switch_model,
 		disable_model                     = disable_model,
 		set_llm_profile                   = set_llm_profile,

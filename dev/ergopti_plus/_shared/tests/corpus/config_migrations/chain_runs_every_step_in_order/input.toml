@@ -1,0 +1,4 @@
+# _shared/tests/corpus/config_migrations/chain_runs_every_step_in_order/input.toml
+
+[s]
+a = "x"

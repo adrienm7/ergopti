@@ -3,8 +3,9 @@
 --- ==============================================================================
 --- MODULE: Packaged updater identity regression
 --- DESCRIPTION:
---- Proves the About facade reads the launcher version and immutable feed channel
---- while running inside the exact nested bundle produced by packaging.
+--- Proves the About facade reads the launcher version and the installed build's
+--- registry channel while running inside the exact nested bundle produced by
+--- packaging.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -31,7 +32,7 @@ helpers.describe("updater: packaged launcher identity", function()
 				"the packaged nested Hammerspoon process must expose launcher metadata")
 			helpers.assert_eq(updater.current_version(), OUTER_VERSION,
 				"the About menu must use the outer ErgoptiPlus version")
-			helpers.assert_eq(updater.default_channel(), "dev",
+			helpers.assert_eq(updater.installed_channel(), "dev",
 				"a packaged prerelease must select the prerelease feed")
 		end, debug.traceback)
 
@@ -53,7 +54,7 @@ helpers.describe("updater: packaged launcher identity", function()
 			})
 			helpers.assert_eq(updater.current_version(), OUTER_VERSION,
 				"the CI run number is Sparkle's build order, not part of the release id")
-			helpers.assert_eq(updater.default_channel(), "dev")
+			helpers.assert_eq(updater.installed_channel(), "dev")
 		end, debug.traceback)
 
 		os.getenv = real_getenv
@@ -72,7 +73,7 @@ helpers.describe("updater: packaged launcher identity", function()
 			local updater = helpers.load_with_stubs("modules.updater", {
 				processInfo = { bundleID = INNER_BUNDLE_ID, version = "1.1.1" },
 			})
-			helpers.assert_eq(updater.default_channel(), "main")
+			helpers.assert_eq(updater.installed_channel(), "main")
 		end, debug.traceback)
 
 		os.getenv = real_getenv

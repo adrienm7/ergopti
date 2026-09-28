@@ -6,7 +6,7 @@
 ; Win-layer shortcuts: CapsLock toggle, line selection, screenshot, GPT link,
 ; hex color picker, note-taking, keep-awake simulation, surround-with-parens,
 ; search/regedit/path navigation, title-case, uppercase, mouse teleport,
-; spotlight overlay, Downloads opener, and the screen-instant SC029 hotkey.
+; spotlight overlay and Downloads opener.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -547,43 +547,9 @@ if Features["shortcuts"]["title_case"] {
 		; Win + W (TitleCase)
 		AddShortcut("#", "w", ConvertToTitleCase)
 
+		; The same transform as the titlecase_selection action (infra/text_case.ahk).
 		ConvertToTitleCase(*) {
-				GetSelectionAsync(_ConvertToTitleCaseSelection)
-		}
-
-		_ConvertToTitleCaseSelection(Text) {
-				; No-op on an empty/failed capture: an async timeout/cancellation must
-				; never turn into a stale SendInstant paste.
-				if (Text = "")
-						return
-
-				; Pattern to detect if text is already in title case:
-				; Each word starts with an uppercase letter (including accented),
-				; followed by lowercase letters (including accented) or digits or allowed symbols.
-				; Words are separated by spaces, tabs or returns ([ \t\r\n]).
-				TitleCasePattern :=
-						"^(?:[A-ZÉÈÀÙÂÊÎÔÛÇ][a-zéèàùâêîôûç0-9''\(\),.\-:;!?\-]*[ \t\r\n]+)*[A-ZÉÈÀÙÂÊÎÔÛÇ][a-zéèàùâêîôûç0-9''\(\),.\-:;!?\-]*$"
-				; Pattern to detect if text is all uppercase (including accented), digits, spaces, and allowed symbols
-				UpperCasePattern := "^[A-ZÉÈÀÙÂÊÎÔÛÇ0-9''\(\),.\-:;!?\s]+$"
-
-				SyntheticOwner := 0
-				try SyntheticOwner := KL_MarkSynthetic("case-transform")
-				try {
-						if RegExMatch(Text, TitleCasePattern) {
-								; Text is Title Case -> convert to lowercase
-								SendInstant(Format("{:L}", Text))
-						} else if RegExMatch(Text, UpperCasePattern) {
-								; Text is UPPERCASE -> convert to TitleCase
-								SendInstant(Format("{:T}", Text))
-						} else {
-								; Otherwise, convert to TitleCase
-								SendInstant(Format("{:T}", Text))
-						}
-						SetTimer((*) => KL_ClearSynthetic(SyntheticOwner), -300)
-				} catch {
-						KL_ClearSynthetic(SyntheticOwner)
-						throw
-				}
+				GestureTransformSelection(TextCaseToggleTitle)
 		}
 }
 
@@ -591,29 +557,9 @@ if Features["shortcuts"]["uppercase"] {
 		; Win + U (Uppercase)
 		AddShortcut("#", "u", ConvertToUppercase)
 
+		; The same transform as the uppercase_selection action (infra/text_case.ahk).
 		ConvertToUppercase(*) {
-				GetSelectionAsync(_ConvertToUppercaseSelection)
-		}
-
-		_ConvertToUppercaseSelection(Text) {
-				; No-op on an empty/failed capture: an async timeout/cancellation must
-				; never turn into a stale SendInstant paste.
-				if (Text = "")
-						return
-				; Check if the selected text contains at least one lowercase letter
-				SyntheticOwner := 0
-				try SyntheticOwner := KL_MarkSynthetic("case-transform")
-				try {
-						if RegExMatch(Text, "[a-zà-ÿ]") {
-								SendInstant(Format("{:U}", Text)) ; Convert to uppercase
-						} else {
-								SendInstant(Format("{:L}", Text)) ; Convert to lowercase
-						}
-						SetTimer((*) => KL_ClearSynthetic(SyntheticOwner), -300)
-				} catch {
-						KL_ClearSynthetic(SyntheticOwner)
-						throw
-				}
+				GestureTransformSelection(TextCaseToggleUpper)
 		}
 }
 
@@ -660,16 +606,6 @@ if Features["shortcuts"]["spotlight_mouse"] {
 		; Win + '
 		AddShortcut("#", "'", (*) => (MouseGetPos(&Mx, &My), SpotlightMouseAt(Mx, My, 5000)))
 }
-
-#HotIf IsSet(Features) and Features["shortcuts"]["screen_instant"]
-; SC029 (²/$ -- key left of 1) -- instant screenshot of the active window, saved to Pictures
-SC029:: {
-		; The gesture entry owns the shared staged worker and contains every OS
-		; boundary. Keeping the hotkey as a pure delegate prevents a future sibling
-		; PowerShell process from escaping suspend and shutdown cancellation.
-		GestureScreenshotInstant()
-}
-#HotIf
 
 ; SpotlightMouseAt is defined in infra/spotlight.ahk and included globally before this module.
 

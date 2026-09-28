@@ -71,7 +71,8 @@ local PERSONAL_SECTION = "personal_info"
 -- is the only place the default lives — and overridden by init() when the user
 -- has chosen another one.
 local _trigger_char = ManifestReader.default_for("hotstrings.trigger_char")
-local _enabled      = true         -- master enable/disable toggle
+local _desired_enabled = ManifestReader.default_for("hotstrings.dynamic.enabled")
+local _enabled      = false        -- native availability and desired master
 local _rules_count  = 0            -- how many rules were registered
 local _info         = {}           -- parsed [info] table
 local _letters      = {}           -- parsed [letters] map
@@ -231,7 +232,7 @@ function M.init(opts)
 	local info_field_count = 0
 	for _ in pairs(_info) do info_field_count = info_field_count + 1 end
 
-	_enabled = _rules_count > 0
+	_enabled = _desired_enabled and _rules_count > 0
 	Logger.info(LOG, "Dynamic hotstrings initialised: %d rule(s), trigger='%s', info=%d field(s).",
 		_rules_count, _trigger_char, info_field_count)
 	return true
@@ -318,7 +319,13 @@ end
 --- Enables/disables the module at runtime.
 --- @param state boolean
 function M.set_enabled(state)
-	_enabled = state and true or false
+	if type(state) ~= "boolean" then
+		Logger.error(LOG, "Dynamic hotstring activation requires a boolean preference.")
+		return false
+	end
+	_desired_enabled = state
+	_enabled = state and _rules_count > 0
+	return _enabled == state
 end
 
 
@@ -722,10 +729,8 @@ local RULE_FAMILIES = {
 	  label_key = "dynamichotstrings.textexpansionpersonalinformation" },
 }
 
--- Where a family's OFF state lives, matching the `hotstrings.dynamic.<key>`
--- path macOS stores under (infra/preferences.lua). Only the OFF state is
--- written: every family ships enabled, so persisting the default would freeze
--- today's default for anyone who had already run the driver once.
+-- Family preference keys match the macOS preferences owner. Only a departure
+-- from the manifest's neutral leaf needs an explicit stored value.
 local RULE_PREF_PREFIX = "hotstrings.dynamic."
 
 -- Which live date each label's "{date}" placeholder stands for. The label
@@ -821,10 +826,18 @@ end
 --- @param section string
 --- @return boolean
 function M.is_rule_enabled(_group, section)
-	if type(section) ~= "string" then return true end
+	local family_id = nil
+	for _, family in ipairs(RULE_FAMILIES) do
+		if family.section == section then family_id = family.id; break end
+	end
+	if not family_id then return false end
 	local ok, Storage = pcall(require, "adapters.storage")
-	if not ok or not Storage then return true end
-	return Storage.get(RULE_PREF_PREFIX .. section, nil) ~= false
+	if not ok or not Storage then
+		Logger.error(LOG, "Dynamic rule preferences are unavailable; activation refused.")
+		return false
+	end
+	local neutral = ManifestReader.default_for("hotstrings.dynamic." .. family_id .. ".enabled")
+	return Storage.get(RULE_PREF_PREFIX .. section, neutral) == true
 end
 
 --- Turns one family on or off, persisting the choice.
@@ -832,11 +845,11 @@ end
 --- @param enabled boolean
 --- @return boolean True when the choice was recorded.
 function M.set_rule_enabled(section, enabled)
-	local known = false
+	local family_id = nil
 	for _, family in ipairs(RULE_FAMILIES) do
-		if family.section == section then known = true ; break end
+		if family.section == section then family_id = family.id ; break end
 	end
-	if not known then
+	if not family_id or type(enabled) ~= "boolean" then
 		Logger.error(LOG, "set_rule_enabled(): '%s' is not a rule family.", tostring(section))
 		return false
 	end
@@ -847,10 +860,10 @@ function M.set_rule_enabled(section, enabled)
 		return false
 	end
 	local persisted
-	if enabled then
+	if enabled == ManifestReader.default_for("hotstrings.dynamic." .. family_id .. ".enabled") then
 		persisted = Storage.delete(RULE_PREF_PREFIX .. section)
 	else
-		persisted = Storage.set(RULE_PREF_PREFIX .. section, false)
+		persisted = Storage.set(RULE_PREF_PREFIX .. section, enabled)
 	end
 	if not persisted then
 		Logger.error(LOG, "set_rule_enabled(): could not persist '%s'.", section)

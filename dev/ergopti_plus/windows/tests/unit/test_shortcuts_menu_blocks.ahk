@@ -1,7 +1,7 @@
 ﻿; static/ergopti_plus/windows/tests/unit/test_shortcuts_menu_blocks.ahk
 
 ; ==============================================================================
-; MODULE: Shortcuts Menu Blocks And Screenshot Label
+; MODULE: Shortcuts Menu Blocks And Tap Keys
 ; DESCRIPTION:
 ; Two reported defects of the Shortcuts submenu.
 ;
@@ -9,8 +9,8 @@
 ;    symbol) ran straight into the user's Alt / Ctrl / Ctrl+Shift / Win groups
 ;    with no separator: the "---" between them was declared for Linux only.
 ; 2. The instant-screenshot row read « Capture d'ecran instantanee » without
-;    naming its key. Its legend differs per layout, so the label names it by
-;    position, and it no longer shares the macOS at_hash hotkey label.
+;    naming its key. The key left of 1 is one of three tap keys now, each row
+;    named by the character the key types under the layout in use.
 ; ==============================================================================
 
 _SMB_SeparatorBeforeModifierGroups() {
@@ -31,11 +31,25 @@ _SMB_SeparatorBeforeModifierGroups() {
 Test("shortcuts menu: a separator splits text rows from modifier groups (shortcuts-menu-blocks)",
 	_SMB_SeparatorBeforeModifierGroups)
 
-_SMB_ScreenshotLabelNamesItsKey() {
-	Entry := ManifestFindEntryByPath("shortcuts.screen_instant")
-	Assert(Entry is Map, "shortcuts.screen_instant must be declared in the features manifest")
-	Assert(Entry["description_key"] == "menu.shortcuts.screen_instant",
-		"the screenshot row needs its own label naming the key, not the shared at_hash label")
+; The key left of 1 used to be one fixed row, "instant screenshot", labelled by
+; a legend written for two layouts. It is one of three tap keys now: the
+; manifest lists them, and the provider names each by what it types (see
+; unit/test_tap_keys.ahk for the labels themselves).
+_SMB_TapKeysReplaceTheScreenshotRow() {
+	Assert(!(ManifestFindEntryByPath("shortcuts.screen_instant") is Map),
+		"the fixed instant-screenshot feature must be gone: the key is a tap key")
+	for _, Id in ["number_row_left", "number_row_right_1", "number_row_right_2"] {
+		Entry := ManifestFindEntryByPath("shortcuts.tap_keys." . Id)
+		Assert(Entry is Map, "shortcuts.tap_keys." . Id . " must be declared in the features manifest")
+		Assert(Entry["type"] == "action", "a tap key holds an action")
+	}
+	Def := _MR_GetMenuDef("shortcuts_menu")
+	Found := false
+	for _, Row in Def {
+		if (_MR_Get(Row, "type") == "list" && _MR_Get(Row, "id") == "tap_keys")
+			Found := true
+	}
+	Assert(Found, "the shortcuts menu must list the tap keys through a provider")
 }
-Test("shortcuts menu: the instant screenshot row names its key (shortcuts-menu-blocks)",
-	_SMB_ScreenshotLabelNamesItsKey)
+Test("shortcuts menu: the tap keys replace the fixed screenshot row (shortcuts-menu-blocks)",
+	_SMB_TapKeysReplaceTheScreenshotRow)

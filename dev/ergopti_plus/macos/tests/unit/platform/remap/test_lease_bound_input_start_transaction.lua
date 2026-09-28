@@ -241,8 +241,10 @@ local function load_remap(options)
 		rebind_for_layout = function() return true end,
 	}
 	package.loaded["infra.timings"] = { sec = function() return 0.01 end }
+	-- layers.toml, read at every regeneration, lives in get_config_dir(); none here.
 	package.loaded["infra.config_paths"] = {
 		get = function() return "tests/unit/platform/remap/activation.toml" end,
+		get_config_dir = function() return "tests/unit/platform/remap/no-layers-toml" end,
 	}
 	package.loaded["hs.caffeinate.watcher"] = {
 		systemDidWake = 7,

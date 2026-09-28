@@ -13,7 +13,12 @@
 ;
 ; The fix: !(BaseDir ~= "[/\\]$") — NOT applied to the full match expression.
 ;
-; SCOPE: source introspection of modules/diagnostics/crash_reporter.ahk.
+; The crash reporter no longer builds its folder: LoggerCrashReportsDir() in
+; infra/logger.ahk resolves it inside the logs folder. The invariant moved with
+; it and is now checked behaviourally: whatever separator the logs folder was
+; stored with, the crash-reports folder ends in exactly one backslash.
+;
+; SCOPE: source introspection of modules/diagnostics/ plus the logger resolver.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -38,17 +43,25 @@ _CRSP_CheckNoBadPrecedence() {
 		'crash_reporter must not use if (!BaseDir ~= ...) — wrong precedence; use if !(BaseDir ~= ...) instead')
 }
 
-_CRSP_CheckCorrectPrecedence() {
-	Src := _DriverDirConcat("modules/diagnostics")
-
-	; The correct form: !(BaseDir ~= "[/\\]$")
-	Assert(InStr(Src, "if !(BaseDir ~="),
-		'crash_reporter must use if !(BaseDir ~= ...) to apply NOT to the full regex match result')
+_CRSP_CrashFolderEndsInOneSeparator() {
+	global _LogsDir
+	Saved := _LogsDir
+	try {
+		for Stored in ["C:\Logs\ergopti_plus", "C:\Logs\ergopti_plus\", "C:\Logs\ergopti_plus/"] {
+			_LogsDir := Stored
+			AssertEqual("C:\Logs\ergopti_plus\", LoggerLogsDir(),
+				"the logs folder must end in exactly one backslash whatever it was stored with")
+			AssertEqual("C:\Logs\ergopti_plus\crash_reports\", LoggerCrashReportsDir(),
+				"crash reports must land in <logs>\crash_reports\, never beside it")
+		}
+	} finally {
+		_LogsDir := Saved
+	}
 }
 
 
 Test("meta crash-reporter: trailing-slash check does not use wrong !expr precedence",
 	_CRSP_CheckNoBadPrecedence)
 
-Test("meta crash-reporter: trailing-slash check uses !(BaseDir ~= ...) with correct precedence",
-	_CRSP_CheckCorrectPrecedence)
+Test("meta crash-reporter: the crash-reports folder always ends in one separator",
+	_CRSP_CrashFolderEndsInOneSeparator)

@@ -37,7 +37,7 @@ global _CLW_Controller := unset
 global _CLW_MsgSub     := unset
 global _CLW_Ready      := false
 global _CLW_Queue      := []
-global _CLW_Channel    := "dev"
+global _CLW_Channel    := ""
 global _CLW_Request    := unset
 global _CLW_BridgeSessionToken := ""
 global _CLW_BridgeRejectionReported := false
@@ -91,9 +91,9 @@ global _CLW_FeedStarter := 0
 
 /**
  * Opens (or brings to front) the shared changelog webview window.
- * @param {string} Channel - "main" or "dev" (default "dev").
+ * @param {string} Channel - Registry channel shown first (the subscribed one).
  */
-Changelog_Open(Channel := "dev") {
+Changelog_Open(Channel) {
 	global UPDATER_REQUEST_ORIGIN_MANUAL
 	if A_IsSuspended
 		return _Updater_RefuseManualWhileSuspended()
@@ -244,7 +244,9 @@ _CLW_BuildWindow(Channel, Request) {
 	try _CLW_WebView.SetVirtualHostNameToFolderMapping(CHANGELOG_VHOST, _SharedDir, CHANGELOG_HOST_ACCESS_ALLOW)
 
 	; Inject i18n base URL and active locale BEFORE the page scripts run,
-	; exactly as ollama_webview.ahk does. Also inject repo config and channel.
+	; exactly as ollama_webview.ahk does. Also inject repo config, the channel
+	; shown first and the subscribed one. A channel change reloads the driver,
+	; so the page asks the user to confirm before it requests one.
 	locales_url := _CLW_LocalesUrl()
 	locale_code := _I18nLocale
 	gh_owner    := UPDATER_GH_OWNER
@@ -254,7 +256,9 @@ _CLW_BuildWindow(Channel, Request) {
 		. "window._i18n_locale='" . locale_code . "';"
 		. "window.__changelog_gh_owner='" . gh_owner . "';"
 		. "window.__changelog_gh_repo='"  . gh_repo  . "';"
-		. "window.__changelog_channel='"  . Channel  . "';"
+		. "window.__changelog_channel="  . _CLW_JsStr(Channel)  . ";"
+		. "window.__subscribed_channel=" . _CLW_JsStr(UPDATER_CHANNEL) . ";"
+		. "window.__channel_switch_restarts=true;"
 		. "window.__changelog_session=" . _CLW_JsStr(session) . ";"
 	try _CLW_WebView.AddScriptToExecuteOnDocumentCreated(seed)
 
@@ -464,7 +468,8 @@ _CLW_SafetyFlush(ExpectedWindowEpoch) {
  * Receives messages from the page via chrome.webview.postMessage.
  * Expected payloads (JSON strings), each carrying the injected session token:
  *   {"action":"ready","session":"…"}
- *   {"action":"fetch","channel":"dev","session":"…"}
+ *   {"action":"fetch","channel":"<registry channel id>","session":"…"}
+ *   {"action":"set_channel","channel":"<registry channel id>","session":"…"}
  *   {"action":"open_url","url":"…","session":"…"}
  */
 _CLW_OnWebMessage(ExpectedWindowEpoch, ExpectedSession, ExpectedSource, Handler, Args) {
@@ -519,8 +524,14 @@ _CLW_OnWebMessage(ExpectedWindowEpoch, ExpectedSession, ExpectedSource, Handler,
 
 	if (Action == "fetch") {
 		Ch := Payload.Has("channel") ? Payload["channel"] : _CLW_Channel
+		if !UpdateChannels_IsKnown(Ch) {
+			try LoggerWarn("Changelog", "Refused a fetch for a channel outside the registry.")
+			return
+		}
 		_CLW_Channel := Ch
 		_CLW_FetchAndInject(Ch, Request)
+	} else if (Action == "set_channel") {
+		_CLW_SubscribeChannel(Payload.Has("channel") ? Payload["channel"] : "", Request)
 	} else if (Action == "open_url") {
 		Url := Payload.Has("url") ? Payload["url"] : ""
 		if !ExternalUrl_IsHttp(Url) {
@@ -530,6 +541,38 @@ _CLW_OnWebMessage(ExpectedWindowEpoch, ExpectedSession, ExpectedSource, Handler,
 		if (Url != "")
 			_Updater_OpenManualUrl(() => Url, Request)
 	}
+}
+
+/**
+ * Subscribes to the channel the page asked for through the one channel owner,
+ * Updater_SetChannel, which persists it and reloads the driver. The page asked
+ * the user to confirm the restart before posting. A refused request reports
+ * the unchanged subscription back so the page shows the failure instead of
+ * waiting.
+ * @param {string} Channel - Registry channel id from the page.
+ * @param {object} Request - Manual request context of the bridge message.
+ * @param {func} SetChannelFn - Test seam replacing Updater_SetChannel.
+ * @param {func} EvalFn - Test seam replacing _CLW_Eval.
+ * @returns {boolean} Whether the channel owner accepted the change.
+ */
+_CLW_SubscribeChannel(Channel, Request, SetChannelFn := 0, EvalFn := 0) {
+	global UPDATER_CHANNEL
+	Accepted := false
+	if (Channel is String) && UpdateChannels_IsKnown(Channel) {
+		Accepted := IsObject(SetChannelFn)
+			? SetChannelFn.Call(Channel, Request)
+			: Updater_SetChannel(Channel, Request)
+	} else {
+		try LoggerWarn("Changelog", "Refused a subscription to a channel outside the registry.")
+	}
+	Accepted := Accepted == true
+	Script := "setSubscribedChannel(" . _CLW_JsStr(Accepted ? Channel : UPDATER_CHANNEL) . ","
+		. (Accepted ? "true" : "false") . ")"
+	if IsObject(EvalFn)
+		EvalFn.Call(Script)
+	else
+		_CLW_Eval(Script)
+	return Accepted
 }
 
 
@@ -546,7 +589,7 @@ _CLW_OnWebMessage(ExpectedWindowEpoch, ExpectedSession, ExpectedSource, Handler,
 /**
  * Fetches releases from GitHub in a tree-owned curl child and injects them via JS.
  * Defers to next message-loop tick; every network phase stays off the AHK thread.
- * @param {string} Channel - "main" or "dev".
+ * @param {string} Channel - Registry channel id.
  */
 _CLW_FetchAndInject(Channel, Request := unset, ExpectedWindowEpoch := 0) {
 	global UPDATER_REQUEST_ORIGIN_MANUAL
@@ -754,7 +797,7 @@ _CLW_PollFetch(Req, Context, Polls) {
 
 	; The text crosses into the page as a JS string literal and is parsed there
 	; (JSON.parse or the Atom reader); a response is never evaluated as script.
-	; injectReleases* filters pre-releases for the "main" channel.
+	; injectReleases* keeps what the channel's view lists (shared registry).
 	if (Context.Stage == "feed") {
 		try LoggerDone("Changelog", "Injecting releases from the Atom feed (channel={1}; API failed: {2})…",
 			Channel, Context.ApiFailure)
@@ -864,7 +907,7 @@ _CLW_InvalidateWindowSession() {
 /**
  * Allocates immutable provenance for one channel request and aborts its
  * superseded predecessor outside Critical.
- * @param {string} Channel - "main" or "dev".
+ * @param {string} Channel - Registry channel id.
  * @returns {object} Bound window/request epochs and channel.
  */
 _CLW_BeginFetchRequest(Channel, Request := unset, ExpectedWindowEpoch := 0) {

@@ -11,15 +11,15 @@
 ; user file exists, satisfying the cross-driver consistency goal.
 ;
 ; FEATURES & RATIONALE:
-; 1. Single-pass TOML parser tailored to the tap_hold schema — supports
-;    ``[tap_hold.keys.<id>]`` and ``[tap_hold.layers.<id>.mappings]`` sections
-;    only. The full TOML grammar is intentionally NOT supported here: this is
-;    a narrow file format produced by the codegen pipeline.
+; 1. Single-pass TOML parser tailored to the tap_hold schema — supports the
+;    ``[tap_hold]`` root flag and ``[tap_hold.keys.<id>]`` sections only. The
+;    full TOML grammar is intentionally NOT supported here: this is a narrow
+;    file format produced by the codegen pipeline. What a held layer DOES is
+;    not tap-hold data: it lives in layers.toml (platform/remap/layers_loader.ahk).
 ; 2. Returns a hierarchical Map with the shape:
 ;        TapHold["keys"]["caps_lock"]["tap_action"]        = "enter"
 ;        TapHold["keys"]["caps_lock"]["hold_modifier"]     = "ctrl"
 ;        TapHold["keys"]["caps_lock"]["time_activation_seconds"] = 0.35
-;        TapHold["layers"]["nav"]["mappings"]["h"]         = "arrow_left"
 ; 3. Runtime overlay: when DefaultsFilePath is given, defaults are loaded
 ;    first and user values are merged on top. Absent user keys inherit the
 ;    default so ``time_activation_seconds`` changes in defaults.toml take
@@ -66,14 +66,14 @@ global _TapHoldOneShotCache := ""
 ; as-is so a fresh install still gets working defaults after first boot.
 LoadTapHoldToml(FilePath, DefaultsFilePath := "") {
 	try LoggerDebug("TapHoldLoader", "LoadTapHoldToml start: user='{1}', defaults='{2}'.", FilePath, DefaultsFilePath)
-	Result := Map("keys", Map(), "layers", Map())
-	InheritDefaults := true
+	Result := Map("keys", Map())
+	InheritDefaults := false
 
 	; Parse the user file once into UserData. Extract inherit_defaults from
 	; the result so we do not need a second pre-flight read of the same file.
 	; The data is later merged on top of the defaults overlay so the final
 	; order is still: defaults → user (user wins per-key).
-	UserData := Map("keys", Map(), "layers", Map())
+	UserData := Map("keys", Map())
 	if FileExist(FilePath)
 		_TapHold_ParseFileInto(FilePath, UserData)
 	else
@@ -90,8 +90,8 @@ LoadTapHoldToml(FilePath, DefaultsFilePath := "") {
 		Result["inherit_defaults"] := InheritDefaults
 	}
 
-	try LoggerDebug("TapHoldLoader", "Parsed user tap-hold: {1} key(s), {2} layer(s), inherit_defaults={3}.",
-		UserData["keys"].Count, UserData["layers"].Count, InheritDefaults)
+	try LoggerDebug("TapHoldLoader", "Parsed user tap-hold: {1} key(s), inherit_defaults={2}.",
+		UserData["keys"].Count, InheritDefaults)
 
 	; Load shared defaults first when the caller supplies the path. Missing
 	; defaults file is non-fatal (logs a debug notice and continues).
@@ -108,8 +108,8 @@ LoadTapHoldToml(FilePath, DefaultsFilePath := "") {
 
 	if !FileExist(FilePath) {
 		try LoggerDebug("TapHoldLoader", "tap_hold.toml not found at '{1}' — skipping.", FilePath)
-		try LoggerSuccess("TapHoldLoader", "Tap-hold config loaded ({1} key(s), {2} layer(s)) — defaults only.",
-			Result["keys"].Count, Result["layers"].Count)
+		try LoggerSuccess("TapHoldLoader", "Tap-hold config loaded ({1} key(s)) — defaults only.",
+			Result["keys"].Count)
 		return Result
 	}
 	try LoggerStart("TapHoldLoader", "Loading tap-hold config from '{1}'…", FilePath)
@@ -140,21 +140,6 @@ LoadTapHoldToml(FilePath, DefaultsFilePath := "") {
 			UserData["keys"]["left_ctrl"].Has("hold_modifier") ? UserData["keys"]["left_ctrl"]["hold_modifier"] : "<unset>",
 			UserData["keys"]["left_ctrl"].Has("hold_layer") ? UserData["keys"]["left_ctrl"]["hold_layer"] : "<unset>")
 	}
-	for k, v in UserData["layers"] {
-		if !Result["layers"].Has(k)
-			Result["layers"][k] := Map("mappings", Map())
-		for field, val in v {
-			if (field == "mappings") {
-				if !Result["layers"][k].Has("mappings")
-					Result["layers"][k]["mappings"] := Map()
-				for mk, mv in val
-					Result["layers"][k]["mappings"][mk] := mv
-			} else {
-				Result["layers"][k][field] := val
-			}
-		}
-	}
-
 	if Result["keys"].Has("left_ctrl") {
 		LCfg := Result["keys"]["left_ctrl"]
 		try LoggerDebug("TapHoldLoader", "Resolved left_ctrl after merge: tap_action='{1}', hold_modifier='{2}', hold_layer='{3}', inherit_defaults={4}.",
@@ -185,8 +170,8 @@ LoadTapHoldToml(FilePath, DefaultsFilePath := "") {
 		try LoggerError("TapHoldLoader", "Cannot read '{1}': the tap-hold config in memory is the shipped defaults, not the user's. Writes are blocked until the file is readable again.",
 			FilePath)
 	} else {
-		try LoggerSuccess("TapHoldLoader", "Tap-hold config loaded ({1} key(s), {2} layer(s)).",
-			Result["keys"].Count, Result["layers"].Count)
+		try LoggerSuccess("TapHoldLoader", "Tap-hold config loaded ({1} key(s)).",
+			Result["keys"].Count)
 	}
 	return Result
 }
@@ -205,9 +190,9 @@ LoadTapHoldToml(FilePath, DefaultsFilePath := "") {
 ; Existing entries are overwritten field-by-field so a user file that only
 ; specifies some fields of a key still inherits the rest from a prior pass.
 _TapHold_ParseFileInto(FilePath, Result) {
-	; Track the current section header path (e.g. "tap_hold.keys.caps_lock" or
-	; "tap_hold.layers.nav.mappings"). Empty when outside any recognised section
-	; so unrelated TOML headers are skipped silently.
+	; Track the current section header path (e.g. "tap_hold.keys.caps_lock").
+	; Empty when outside any recognised section so unrelated TOML headers are
+	; skipped silently.
 	CurrentPath := ""
 	InvalidKeys := Map()
 
@@ -251,12 +236,7 @@ _TapHold_ParseFileInto(FilePath, Result) {
 		; tap_hold.keys.<id>
 		if RegExMatch(CurrentPath, "^tap_hold\.keys\.([A-Za-z0-9_]+)$", &KeyMatch) {
 			KeyId := KeyMatch[1]
-			ExpectedKind := Map(
-				"enabled", "boolean",
-				"time_activation_seconds", "number",
-				"tap_action", "string",
-				"hold_modifier", "string",
-				"hold_layer", "string").Get(Key, "")
+			ExpectedKind := TapHoldFieldKinds().Get(Key, "")
 			if (ExpectedKind == "" || LiteralKind != ExpectedKind) {
 				try LoggerError("TapHoldLoader",
 					"Field '[{1}].{2}' violates tap-hold schema type '{3}'; key disabled.",
@@ -300,41 +280,6 @@ _TapHold_ParseFileInto(FilePath, Result) {
 				Value := ""
 			}
 			Result["keys"][KeyId][Key] := Value
-			continue
-		}
-
-		; tap_hold.layers.<id> (description_key etc.)
-		if RegExMatch(CurrentPath, "^tap_hold\.layers\.([A-Za-z0-9_]+)$", &LayerMatch) {
-			if (Key != "description_key" || LiteralKind != "string") {
-				try LoggerError("TapHoldLoader",
-					"Field '[{1}].{2}' violates the tap-hold layer schema; value rejected.",
-					CurrentPath, Key)
-				continue
-			}
-			LayerId := LayerMatch[1]
-			if !Result["layers"].Has(LayerId) {
-				Result["layers"][LayerId] := Map("mappings", Map())
-			}
-			Result["layers"][LayerId][Key] := Value
-			continue
-		}
-
-		; tap_hold.layers.<id>.mappings
-		if RegExMatch(CurrentPath, "^tap_hold\.layers\.([A-Za-z0-9_]+)\.mappings$", &MapMatch) {
-			if (LiteralKind != "string") {
-				try LoggerError("TapHoldLoader",
-					"Field '[{1}].{2}' must be a TOML string; mapping rejected.",
-					CurrentPath, Key)
-				continue
-			}
-			LayerId := MapMatch[1]
-			if !Result["layers"].Has(LayerId) {
-				Result["layers"][LayerId] := Map("mappings", Map())
-			}
-			if !Result["layers"][LayerId].Has("mappings") {
-				Result["layers"][LayerId]["mappings"] := Map()
-			}
-			Result["layers"][LayerId]["mappings"][Key] := Value
 			continue
 		}
 	}
@@ -710,4 +655,10 @@ TapHoldOneShotEndKeys(MagicKey) {
 	for Char in _TapHoldOneShotTable()["results"]
 		Keys .= Char
 	return Keys . MagicKey
+}
+
+/** Returns the per-key fields consumed by the tap-hold loader and preset owner. */
+TapHoldFieldKinds() {
+	return Map("enabled", "boolean", "time_activation_seconds", "number",
+		"tap_action", "string", "hold_modifier", "string", "hold_layer", "string")
 }

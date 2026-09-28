@@ -20,13 +20,13 @@ local Logger           = require("infra.logger")
 local text_utils = require("infra.text_utils")
 local i18n             = require("infra.i18n")
 local ui_restore       = require("infra.ui_restore")
+local Manifest         = require("infra.manifest_reader")
 
 local Preferences   = require("infra.preferences")
 local Builder       = require("ui.menu.builder")
 local HotCounter    = require("ui.menu.hotstring_counter")
 local MenuPaths     = require("ui.menu.menu_paths")
 local MenuState     = require("ui.menu.menu_state")
-local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
 local MenuWatchers  = require("ui.menu.menu_watchers")
 local TrayMenu      = require("adapters.tray_menu")
 local Storage       = require("adapters.storage")
@@ -36,12 +36,15 @@ local TimerScheduler = require("adapters.timer_scheduler")
 local DeferredWork = require("infra.deferred_work")
 local TerminationCoordinator = require("infra.termination_coordinator")
 local PreferencesTransaction = require("ui.menu.preferences_transaction")
+local SessionDemotions = require("ui.menu.session_demotions")
 local GlobalActionsTransaction = require("ui.menu.global_actions_transaction")
 local RecoverableFileMoves = require("ui.menu.recoverable_file_moves")
 local FactoryResetJournal = require("infra.factory_reset_journal")
 local DiagnosticSnapshot = require("infra.diagnostic_snapshot")
 local BootProfiler = require("infra.boot_profiler")
 local ConfigPaths = require("infra.config_paths")
+local LogOpeners = require("ui.log_openers")
+local ShellRunner = require("adapters.shell_runner")
 
 local LOG = "menu"
 local load_errors = {}
@@ -64,6 +67,14 @@ local MENU_CACHE_PRIME_DELAY_SEC = 2
 -- rebuild per change. Short enough to feel immediate, long enough to collapse
 -- the rapid updateMenu() calls a single user action can fan out into.
 local MENU_REFRESH_COALESCE_SEC = 0.05
+
+-- config.toml [ui] menubar_icon: its variants and its default are the
+-- manifest's. v1 draws the simple glyph, v2 the detailed Ergopti logo.
+local MENUBAR_ICON_DEFAULT = Manifest.default_for("ui.menubar_icon")
+local MENUBAR_ICON_VARIANTS = {}
+for _, variant in ipairs(Manifest.find_entry_by_path("ui.menubar_icon").enum_values) do
+	MENUBAR_ICON_VARIANTS[variant] = true
+end
 
 --- Safely loads a module and logs any loading failure.
 --- @param module_id string Lua module path.
@@ -119,12 +130,26 @@ local function bind_managed_hotkey(mods, key, callback)
 	end
 	local handle = Hotkeys.bind(chord, callback)
 	if not handle then return nil end
+	local posture = true
+	local function set_enabled(value)
+		local result = Hotkeys.setEnabled(handle, value)
+		if result == true then posture = value else posture = nil end
+		return result
+	end
+	local saved_mods = {}
+	for index, value in ipairs(mods) do saved_mods[index] = value end
 	return {
-		enable = function() return Hotkeys.setEnabled(handle, true) end,
-		disable = function() return Hotkeys.setEnabled(handle, false) end,
+		enable = function() return set_enabled(true) end,
+		disable = function() return set_enabled(false) end,
+		snapshot = function()
+			if posture == nil then return nil end
+			local copy = {}
+			for index, value in ipairs(saved_mods) do copy[index] = value end
+			return { mods = copy, key = key, enabled = posture }
+		end,
 		delete = function()
 			if not handle then return true end
-			if Hotkeys.unbind(handle) ~= true then return false end
+			if Hotkeys.unbind(handle) ~= true then posture = nil; return false end
 			handle = nil
 			return true
 		end,
@@ -252,7 +277,9 @@ function M.stop_watchers()
 
 	local config_stopped = stop_owned("_watcher", "Menubar config watcher")
 	local theme_stopped = stop_owned("_theme_watcher", "Menubar theme watcher")
-	if config_stopped and theme_stopped then
+	-- The automatic update checks own a timer and a wake watcher.
+	local checks_stopped = stop_owned("_update_checks", "Automatic update checks")
+	if config_stopped and theme_stopped and checks_stopped then
 		Logger.debug(LOG, "Menubar watchers stopped.")
 		return true
 	end
@@ -322,17 +349,28 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		return (text:gsub("★", text_utils.escape_gsub_replacement(state.trigger_char)))
 	end
 
-	-- Inputs the menubar icon was last rendered for. Declared above update_icon:
-	-- a local below the closure would bind the nil global instead.
+	-- Inputs the menubar icon was last rendered for, and whether an unknown
+	-- stored variant was already reported. Declared above update_icon: a local
+	-- below the closure would bind the nil global instead.
 	local _last_icon_key = nil
+	local _unknown_icon_reported = false
 
 
 	local function update_icon(custom_text)
 		local shortcuts = core_mods.shortcuts_mod
 		local paused    = shortcuts and type(shortcuts.is_paused) == "function" and shortcuts.is_paused() or false
 
-		-- Logo variant is persisted via hs.settings; default is "simple"
-		local variant = Storage.get("menubar_logo_variant") or "simple"
+		-- config.toml [ui] menubar_icon, merged into the menu state. A value the
+		-- manifest does not list is reported once and drawn as its default.
+		local variant = state.menubar_icon
+		if not MENUBAR_ICON_VARIANTS[variant] then
+			if not _unknown_icon_reported then
+				_unknown_icon_reported = true
+				Logger.error(LOG, "config.toml [ui] menubar_icon is '%s', not a known variant — drawing %s.",
+					tostring(variant), MENUBAR_ICON_DEFAULT)
+			end
+			variant = MENUBAR_ICON_DEFAULT
+		end
 
 		-- Skip the whole rebuild when nothing that determines the icon changed.
 		--
@@ -351,7 +389,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		-- static/ergopti_plus/macos, where base_dir points)
 		local logo_dir = base_dir .. "../../img/logo/"
 		local logo_file
-		if variant == "simple" then
+		if variant == "v1" then
 			-- A dedicated disabled simple logo may not yet exist — fall back to logo_simple.png
 			if paused then
 				local disabled_path = logo_dir .. "logo_simple_disabled.png"
@@ -382,7 +420,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			-- legible. Keep both constants here so future tweaks live in one spot
 			local TARGET_SIMPLE  = 19
 			local TARGET_COMPLEX = 26
-			local TARGET = (variant == "complex") and TARGET_COMPLEX or TARGET_SIMPLE
+			local TARGET = (variant == "v2") and TARGET_COMPLEX or TARGET_SIMPLE
 			local scaled = ico
 			pcall(function()
 				local sz = ico.size and ico:size() or nil
@@ -461,14 +499,22 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- raised writer failure can reverse the whole user action in place.
 	local sync_state_to_modules
 	local transactional_save_prefs = nil
+	local preference_checkpoint = nil
 	local llm_handler = nil
+	local apply_preference_scope
+	-- Features whose runtime refused the saved value this session: their state
+	-- shows the real posture while saves keep the value config.toml holds.
+	local session_demotions = SessionDemotions.new()
+	-- Set when this session only holds defaults in place of a present config.toml
+	-- (corrupt file, or a boot rollback): saving would overwrite the user's file.
+	local read_only_reason = nil
 
 	local function save_prefs()
 		if type(transactional_save_prefs) ~= "function" then
 			Logger.error(LOG, "Preference transaction used before its boot snapshot was seeded.")
 			return false
 		end
-		return transactional_save_prefs()
+		return run_global_exclusive("Preference save", transactional_save_prefs)
 	end
 
 
@@ -563,7 +609,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- capture them as upvalues at definition time.)
 
 	sync_state_to_modules = function(saved, config_absent, restoring)
-		return MenuState.sync_state_to_modules(state, saved, config_absent, {
+		local committed, report = MenuState.sync_state_to_modules(state, saved, config_absent, {
 			keymap                   = keymap,
 			apply_llm_enabled         = function(enabled)
 				if type(llm_handler) == "table"
@@ -578,13 +624,22 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			gestures                 = gestures,
 			hotstring_editor         = hotstring_editor,
 			core_mods                = core_mods,
-			save_prefs               = save_prefs,
 			apply_metrics_shortcut   = apply_metrics_shortcut,
 			apply_apps_time_shortcut = apply_apps_time_shortcut,
 			_metrics_hk              = _metrics_hk_box,
 			_apps_time_hk            = _apps_time_hk_box,
 			restoring                 = restoring == true,
+			-- A deferred engine refusal (keylogger start) lands after this sync
+			-- returned; it keeps the acknowledged value on disk like a boot one.
+			on_runtime_demotion      = session_demotions.record,
 		})
+		-- A rollback re-applies what config.toml already holds, so a feature its
+		-- runtime refused on the way back keeps that value on disk, exactly like a
+		-- boot refusal. A candidate sync never records: its values are not saved.
+		if restoring == true and type(report) == "table" and type(report.demotions) == "table" then
+			for _, record in ipairs(report.demotions) do session_demotions.record(record) end
+		end
+		return committed, report
 	end
 
 	local gestures_core_mod = safe_require("modules.gestures", "gestures core")
@@ -612,94 +667,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	end
 	table.sort(global_gesture_slots)
 
-	--- Applies the keymap-backed portion of one detached Enable All snapshot.
-	--- Section and preview setters require exact true; terminator setters retain
-	--- their established nil-on-success contract while still rejecting false.
-	--- @param snapshot table Detached preference candidate or inverse.
-	--- @return boolean committed
-	local function apply_enable_feature_snapshot(snapshot)
-		if type(snapshot) ~= "table" or type(keymap) ~= "table" then return false end
-		local function call_feature(label, fn, nil_is_success, ...)
-			if type(fn) ~= "function" then
-				Logger.error(LOG, "Enable All %s is unavailable.", label)
-				return false
-			end
-			local call_ok, result = xpcall(function(...) return fn(...) end,
-				debug.traceback, ...)
-			local committed = call_ok and (result == true or (nil_is_success and result == nil))
-			if not committed then
-				Logger.error(LOG, "Enable All %s did not commit: %s.", label, tostring(result))
-			end
-			return committed
-		end
-
-		local section_batches = { enabled = {}, disabled = {} }
-		for group_name, sections in pairs(snapshot.section_states or {}) do
-			if type(sections) == "table" then
-				local enabled_sections = {}
-				local disabled_sections = {}
-				for section_name, enabled in pairs(sections) do
-					local target = enabled == false and disabled_sections or enabled_sections
-					target[#target + 1] = section_name
-				end
-				table.sort(enabled_sections)
-				table.sort(disabled_sections)
-				if #enabled_sections > 0 then
-					section_batches.enabled[#section_batches.enabled + 1] = {
-						name = group_name, sections = enabled_sections, enable_group = false,
-					}
-				end
-				if #disabled_sections > 0 then
-					section_batches.disabled[#section_batches.disabled + 1] = {
-						name = group_name, sections = disabled_sections, enable_group = false,
-					}
-				end
-			end
-		end
-		table.sort(section_batches.enabled, function(left, right) return left.name < right.name end)
-		table.sort(section_batches.disabled, function(left, right) return left.name < right.name end)
-		if #section_batches.enabled > 0 and not call_feature(
-			"section enable batch", keymap.set_groups_sections_enabled, false,
-			section_batches.enabled, true) then return false end
-		if #section_batches.disabled > 0 and not call_feature(
-			"section disable batch", keymap.set_groups_sections_enabled, false,
-			section_batches.disabled, false) then return false end
-		local group_names = {}
-		for group_name in pairs(snapshot.hotstrings or {}) do
-			group_names[#group_names + 1] = group_name
-		end
-		table.sort(group_names)
-		for _, group_name in ipairs(group_names) do
-			local enabled = snapshot.hotstrings[group_name] == true
-			local method = enabled and keymap.enable_group or keymap.disable_group
-			if not call_feature(
-				"hotstring group '" .. tostring(group_name) .. "'",
-				method,
-				false,
-				group_name
-			) then return false end
-		end
-
-		for terminator, enabled in pairs(snapshot.terminator_states or {}) do
-			if not call_feature(
-				"terminator '" .. tostring(terminator) .. "'",
-				keymap.set_terminator_enabled,
-				true,
-				terminator,
-				enabled
-			) then return false end
-		end
-		for _, item in ipairs({
-			{ key = "preview_star_enabled", fn = "set_preview_star_enabled" },
-			{ key = "preview_autocorrect_enabled", fn = "set_preview_autocorrect_enabled" },
-			{ key = "preview_ai_enabled", fn = "set_preview_ai_enabled" },
-		}) do
-			if snapshot[item.key] ~= nil and not call_feature(
-				item.fn, keymap[item.fn], false, snapshot[item.key]) then return false end
-		end
-		return true
-	end
-
 	local global_actions_owner = GlobalActionsTransaction.create({
 		state = state,
 		capture_preferences = function()
@@ -708,27 +675,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		sync_runtime = function(snapshot, restoring)
 			return sync_state_to_modules(snapshot, false, restoring == true) == true
 		end,
-		save_preferences = save_prefs,
 		restore_state = PreferencesTransaction.restore_table,
-		ensure_enable_ready = function()
-			return KeymapLifecycle.ensure_started({ state = state, keymap = keymap },
-				"enable all features")
-		end,
-		apply_enable_features = apply_enable_feature_snapshot,
-		restore_enable_features = apply_enable_feature_snapshot,
-		list_enable_terminators = function()
-			local keys = {}
-			local defs = type(keymap) == "table"
-				and type(keymap.get_terminator_defs) == "function"
-				and keymap.get_terminator_defs() or nil
-			if type(defs) ~= "table" then return keys end
-			for _, def in ipairs(defs) do
-				if type(def) == "table" and type(def.key) == "string" then
-					keys[#keys + 1] = def.key
-				end
-			end
-			return keys
-		end,
 		settings = {
 			get = Storage.get,
 			set = Storage.set,
@@ -753,41 +700,16 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		terminal_pending = function()
 			return TerminationCoordinator.is_pending()
 		end,
-		notify_success = function(kind)
-			if kind == "enable" then
-				return notifications.notify(
-					i18n.get("notify.all_features_enabled"), nil, "success")
-			end
-			if kind == "disable" then
-				return notifications.notify(
-					i18n.get("notify.all_features_disabled"), nil, "error")
-			end
-			return notifications.notify(i18n.get("notify.defaults_reset"), nil, "info")
-		end,
-		update_menu = function()
-			if type(updateMenu) == "function" then updateMenu() end
-			return true
-		end,
 	})
 
-	run_global_exclusive = function(action_label, callback)
+	run_global_exclusive = function(action_label, callback, retained_owner)
 		if not global_actions_owner
 			or type(global_actions_owner.run_exclusive) ~= "function" then
 			Logger.error(LOG, "%s refused because the global action owner is unavailable.",
 				tostring(action_label))
 			return false
 		end
-		return global_actions_owner.run_exclusive(action_label, callback)
-	end
-
-	local function set_all_enabled(enabled)
-		if not global_actions_owner then
-			Logger.error(LOG, "%s transaction owner is unavailable.",
-				enabled == true and "Enable All" or "Disable All")
-			return false
-		end
-		if enabled == true then return global_actions_owner.enable_all() end
-		return global_actions_owner.disable_all()
+		return global_actions_owner.run_exclusive(action_label, callback, retained_owner)
 	end
 
 	local function reset_all_defaults()
@@ -807,8 +729,19 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	pcall(update_icon)
 
 	-- Expose a refresh hook so submenus can re-render the menubar icon after
-	-- toggling persisted preferences (e.g. logo variant)
+	-- changing a persisted preference (e.g. the menubar icon variant)
 	M.refresh_icon = function() pcall(update_icon) end
+
+	-- Quitting applies the pause layout (one input-source setting for pause and
+	-- quit). The root teardown awaits it through ui.menu.quit_layout.
+	M.apply_quit_layout = function(on_done)
+		local kbd_layout_mod = menu_mods.keyboard_layout
+		if not kbd_layout_mod or type(kbd_layout_mod.apply_quit_layout) ~= "function" then
+			Logger.error(LOG, "Quit layout unavailable: the keyboard-layout menu module is not loaded.")
+			return "none"
+		end
+		return kbd_layout_mod.apply_quit_layout(state, on_done)
+	end
 
 	local saved, load_status = Preferences.load(MenuPaths.get("ConfigTomlPath"))
 	-- A CORRUPT file must never be treated as absent. Both yield an empty table,
@@ -818,6 +751,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- therefore treated as present-but-unusable - defaults in memory for this
 	-- session, and nothing written back.
 	local config_absent = (load_status == "absent") and (next(saved) == nil)
+	if load_status == "corrupt" then
+		read_only_reason = "config.toml could not be read or decoded at startup"
+		Logger.error(LOG, "Preference saves are read-only for this session: %s.", read_only_reason)
+	end
 
 	if config_absent then
 		for _, f in ipairs(type(hotfiles) == "table" and hotfiles or {}) do
@@ -859,10 +796,34 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- Do not ask MenuState to seed config.toml yet: the transaction must first be
 	-- initialized from the fully hydrated runtime. This is crucial for the first
 	-- user click after boot, before any successful save has occurred.
-	local initial_sync_ok = sync_state_to_modules(saved, false)
-	if initial_sync_ok ~= true then
+	local initial_call_ok, initial_sync_ok, initial_report = xpcall(function()
+		return sync_state_to_modules(saved, false)
+	end, debug.traceback)
+	-- A refused owner demotes only its own feature, in memory, and the rest of the
+	-- saved configuration stays applied. Restoring every pre-load default for one
+	-- refusal showed Gestures, Metrics and AI OFF and let the next toggle write
+	-- those defaults over config.toml. Only a refusal whose runtime posture is
+	-- unknown, or a sync that raised, still forces the whole rollback below.
+	local unisolated_failure = nil
+	if not initial_call_ok then
+		unisolated_failure = "the synchronization raised: " .. tostring(initial_sync_ok)
+	elseif initial_sync_ok ~= true then
+		if type(initial_report) ~= "table" or type(initial_report.unsettled) ~= "table"
+			or type(initial_report.demotions) ~= "table"
+			or type(initial_report.failures) ~= "table" then
+			unisolated_failure = "the synchronization returned no feature report"
+		elseif #initial_report.unsettled > 0 then
+			local features = {}
+			for _, entry in ipairs(initial_report.unsettled) do
+				features[#features + 1] = tostring(entry.feature)
+			end
+			unisolated_failure = "unknown runtime posture for " .. table.concat(features, ", ")
+		end
+	end
+	if unisolated_failure then
 		Logger.error(LOG,
-			"Initial preference synchronization did not complete; restoring pre-load runtime state.")
+			"Initial preference synchronization did not complete (%s); restoring pre-load runtime state.",
+			unisolated_failure)
 		local state_restored = PreferencesTransaction.restore_table(state, pre_load_state)
 		local rollback_ok = false
 		local rollback_result
@@ -882,6 +843,15 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end
 		Logger.warn(LOG,
 			"Persisted preferences were rejected; the pre-load runtime state was restored.")
+		if not config_absent then
+			read_only_reason = "the saved preferences could not be applied at startup"
+			Logger.error(LOG, "Preference saves are read-only for this session: %s.", read_only_reason)
+		end
+	elseif initial_sync_ok ~= true then
+		for _, record in ipairs(initial_report.demotions) do session_demotions.record(record) end
+		Logger.warn(LOG,
+			"Saved preferences applied except %d refused step(s), isolated to their feature.",
+			#initial_report.failures)
 	end
 	local snapshot_ok, initial_preferences = pcall(Preferences.snapshot, state, hotfiles, core_mods)
 	if not snapshot_ok or type(initial_preferences) ~= "table" then
@@ -889,7 +859,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		Logger.error(LOG, "Could not capture the initial runtime preference snapshot: %s.",
 			tostring(initial_preferences))
 	end
-	transactional_save_prefs = PreferencesTransaction.bind(Preferences, {
+	transactional_save_prefs, preference_checkpoint = PreferencesTransaction.bind(Preferences, {
 		path                = MenuPaths.get("ConfigTomlPath"),
 		state               = state,
 		hotfiles            = hotfiles,
@@ -898,6 +868,8 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		hot_counter         = HotCounter,
 		initial_state       = state,
 		initial_preferences = initial_preferences,
+		snapshot_view       = session_demotions.persisted_view,
+		read_only_reason    = function() return read_only_reason end,
 		restore_runtime     = function(snapshot)
 			if sync_state_to_modules(snapshot, false, true) ~= true then return false end
 			if type(llm_handler) == "table"
@@ -906,8 +878,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			end
 			return true
 		end,
-		on_commit           = function()
+		on_commit           = function(_, runtime_snapshot)
 			_menu_dirty = true
+			-- Only a written change ends a demotion; a refused write rolls it back.
+			session_demotions.settle(runtime_snapshot)
 		end,
 		on_rollback         = function()
 			_menu_dirty = true
@@ -917,9 +891,69 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	if config_absent and save_prefs() ~= true then
 		Logger.error(LOG, "Could not seed the initial preference file.")
 	end
+	-- Repairs the sync made in memory (quarantined custom terminators) are only
+	-- persisted now: the sync itself runs before this transaction exists.
+	if not config_absent and not unisolated_failure and type(initial_report) == "table"
+		and type(initial_report.repairs) == "table" and #initial_report.repairs > 0
+		and save_prefs() ~= true then
+		Logger.error(LOG, "Repaired preferences (%s) could not be saved.",
+			table.concat(initial_report.repairs, ", "))
+	end
+
+	-- The update channel's one owner for this session writes through the same
+	-- preferences transaction and tells the launcher's Sparkle feed; the menu
+	-- follows its durable changes. The About menu reads it from ctx.channel_owner.
+	local channel_owner = nil
+	local ok_owner, owner_or_err = pcall(function()
+		return require("modules.updater.channel").new({ state = state, save = save_prefs })
+	end)
+	if ok_owner then
+		channel_owner = owner_or_err
+		channel_owner.subscribe("menu", function()
+			if type(updateMenu) == "function" then updateMenu() end
+		end)
+	else
+		Logger.error(LOG, "The update channel owner could not start: %s.", tostring(owner_or_err))
+	end
+
+	-- The automatic update checks are this driver's: the launcher's Sparkle has
+	-- no scheduled checks and installs only when the About row is clicked. A
+	-- source run has no release to update from.
+	local update_checks = nil
+	if channel_owner then
+		local ok_checks, checks_or_err = pcall(function()
+			if require("modules.updater").is_local_source() then return nil end
+			local AutoCheck = require("modules.updater.auto_check")
+			return AutoCheck.start_session({
+				state = state,
+				save = save_prefs,
+				channel = channel_owner.get,
+				is_paused = function()
+					local shortcuts_mod = core_mods.shortcuts_mod
+					return type(shortcuts_mod) == "table" and type(shortcuts_mod.is_paused) == "function"
+						and shortcuts_mod.is_paused() == true
+				end,
+				on_available = function(release)
+					local accepted = AutoCheck.announce(release)
+					if type(updateMenu) == "function" then updateMenu() end
+					return accepted
+				end,
+			})
+		end)
+		if not ok_checks then
+			Logger.error(LOG, "The automatic update checks could not start: %s.", tostring(checks_or_err))
+		elseif checks_or_err ~= nil then
+			update_checks = checks_or_err
+			M._update_checks = update_checks
+			channel_owner.subscribe("automatic_checks", update_checks.on_channel_changed)
+		end
+	end
 
 	if menu_mods.llm and type(menu_mods.llm.create) == "function" then
 		local ok_h, res = pcall(menu_mods.llm.create, {
+			apply_preference_scope = function(scope, mode)
+				return type(apply_preference_scope) == "function" and apply_preference_scope(scope, mode) == true
+			end,
 			state          = state,
 			active_tasks   = M._active_tasks,
 			update_icon    = update_icon,
@@ -1024,7 +1058,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 					pcall(hs.execute, "open " .. text_utils.shell_quote(personal_path))
 				end, "menu.open_personal_toml")
 			end,
-			trigger_prediction = function() if keymap and type(keymap.trigger_prediction) == "function" then pcall(keymap.trigger_prediction) end end,
 			add_hotstring = function()
 				-- Toggle: close if already open, otherwise open
 				if hotstring_editor then
@@ -1056,9 +1089,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				end, "menu.open_config")
 			end,
 			open_logs = function()
-				return DeferredWork.after(0,
-					function() pcall(hs.execute, "open " .. text_utils.shell_quote(base_dir .. "logs")) end,
-					"menu.open_logs")
+				return LogOpeners.open_logs_folder(function(target) return (ShellRunner.open(target)) end)
 			end,
 		})
 
@@ -1093,11 +1124,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- ctx and actions are built once and reused across menu opens.
 	-- Fields that must reflect live state (paused) are read inside Builder.generate()
 	-- from upvalues (state, core_mods) which are always current.
-	local function logs_dir()
-		local d = MenuPaths.get_config_dir() or ""
-		if not d:match("[/\\]$") then d = d .. "/" end
-		return d .. "hammerspoon/logs/"
-	end
+	-- The Debug log rows open through one owner, shared with the gesture
+	-- actions, with the asynchronous Launch Services opener: never a blocking
+	-- hs.execute on the run loop that also services the typing event tap.
+	local function open_async(target) return (ShellRunner.open(target)) end
 
 	local function open_path_via_menu(key)
 		local p = MenuPaths.get(key)
@@ -1117,8 +1147,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				return require("ui.menu.uninstall").run()
 			end)
 		end,
-		enable_all                = function() return set_all_enabled(true) end,
-		disable_all               = function() return set_all_enabled(false) end,
 		reset_defaults            = function() return reset_all_defaults() end,
 		clean_unused_keys         = function()
 			return require("ui.menu.unused_keys_cleanup").run_from_menu()
@@ -1145,12 +1173,8 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			end
 			return accepted
 		end,
-		open_logs                 = function()
-			local dir = logs_dir()
-			pcall(hs.execute, "mkdir -p " .. text_utils.shell_quote(dir)
-				.. " && open " .. text_utils.shell_quote(dir))
-		end,
-		open_console              = function() pcall(hs.openConsole) end,
+		open_logs                 = function() return LogOpeners.open_logs_folder(open_async) end,
+		open_console              = function() return require("ui.console_window").open() end,
 		open_paths_editor         = function()
 			return DeferredWork.after(0.05, MenuPaths.open_editor, "menu.open_paths_editor")
 		end,
@@ -1176,25 +1200,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		open_personal_hotstrings  = function() open_path_via_menu("PersonalTomlPath") end,
 		open_personal_info        = function() open_path_via_menu("PersonalInfoTomlPath") end,
 		open_config               = function() open_path_via_menu("ConfigTomlPath") end,
-		open_logs_folder          = function()
-			local dir = logs_dir()
-			pcall(hs.execute, "mkdir -p " .. text_utils.shell_quote(dir)
-				.. " && open " .. text_utils.shell_quote(dir))
-		end,
-		open_today_log            = function()
-			local path = require("infra.logger").UNIFIED_LOG_FILE
-			if type(path) ~= "string" or path == "" then
-				path = logs_dir() .. "ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log"
-			end
-			pcall(hs.execute, "open " .. text_utils.shell_quote(path))
-		end,
-		open_error_log            = function()
-			local path = require("infra.logger").ERRORS_LOG_FILE
-			if type(path) ~= "string" or path == "" then
-				path = logs_dir() .. "ErgoptiPlus_errors_" .. os.date("%Y-%m-%d") .. ".log"
-			end
-			pcall(hs.execute, "open " .. text_utils.shell_quote(path))
-		end,
+		open_logs_folder          = function() return LogOpeners.open_logs_folder(open_async) end,
+		open_today_log            = function() return LogOpeners.open_today_log(open_async) end,
+		open_error_log            = function() return LogOpeners.open_today_errors(open_async) end,
 		show_setup_wizard         = function()
 			local ok, ob = pcall(require, "ui.onboarding")
 			if ok and type(ob.run_from_menu) == "function" then
@@ -1213,6 +1221,13 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			_menu_dirty = true
 			if type(schedule_menu_refresh) == "function" then schedule_menu_refresh() end
 		end,
+		toggle_error_dialog       = function()
+			local ErrorDialog = require("ui.error_dialog")
+			if not ErrorDialog.set_enabled(not ErrorDialog.is_enabled()) then return end
+			-- The tick is part of the cached tree, like the log level's
+			_menu_dirty = true
+			if type(schedule_menu_refresh) == "function" then schedule_menu_refresh() end
+		end,
 	}
 
 	if type(core_mods.shortcuts_mod) == "table"
@@ -1223,7 +1238,204 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- ctx is a stable table of upvalue references — fields that are mutable at
 	-- runtime (state, keymap, …) are already live pointers so the menu always
 	-- reads current values without rebuilding the table on every click.
+	local gesture_scope = nil
+	local scope_generation = 0
+	local function apply_gesture_scope(mode)
+		if read_only_reason ~= nil then return false end
+		if not gesture_scope then
+			gesture_scope = require("ui.menu.gesture_scope").new({
+				path = MenuPaths.get("ConfigTomlPath"), files = require("adapters.file_system"),
+				state = state, gestures = gestures, preferences = Preferences, checkpoint = preference_checkpoint,
+				demotions = session_demotions,
+				capture_preferences = function() return Preferences.snapshot(state, hotfiles, core_mods) end,
+				admission = run_global_exclusive,
+				paused = function()
+					if type(core_mods.shortcuts_mod) ~= "table"
+						or type(core_mods.shortcuts_mod.is_paused) ~= "function" then return nil end
+					return core_mods.shortcuts_mod.is_paused()
+				end,
+				backup_path = function()
+					scope_generation = scope_generation + 1
+					return MenuPaths.get("ConfigTomlPath") .. ".gestures-"
+						.. tostring(hs.timer.absoluteTime()) .. "-" .. scope_generation .. ".bak"
+				end,
+				confirm = function(selected_mode)
+					local label = i18n.get(selected_mode == "clear" and "common.clear_to_system" or "common.restore_recommended")
+					local yes, no = i18n.get("onboarding.btn.yes"), i18n.get("onboarding.btn.no")
+					return require("infra.dialog_util").block_alert(i18n.get("menu.gestures.title"), label, no, yes, "warning") == yes
+				end,
+			})
+		end
+		local committed = gesture_scope.apply(mode)
+		if committed == true then
+			Builder.invalidate_cache()
+			updateMenu()
+		end
+		return committed
+	end
+	local metrics_scope = nil
+	local layout_scope = nil
+	local llm_scope = nil
+	local shortcuts_scope = nil
+	apply_preference_scope = function(scope, mode)
+		if scope == "shortcuts" then
+			if read_only_reason ~= nil or type(core_mods.shortcuts_mod) ~= "table"
+				or type(menu_mods.shortcuts) ~= "table"
+				or type(menu_mods.shortcuts.scope_idle) ~= "function" then return false end
+			if not shortcuts_scope then
+				shortcuts_scope = require("ui.menu.shortcuts_scope").new({
+					path = MenuPaths.get("ConfigTomlPath"), files = require("adapters.file_system"),
+					state = state, preferences = Preferences, checkpoint = preference_checkpoint,
+					demotions = session_demotions, shortcuts = core_mods.shortcuts_mod, gestures = gestures,
+					bindings = require("modules.shortcuts.bindings"),
+					keyboard = require("modules.shortcuts.keyboard_shortcuts"),
+					tap_keys = require("modules.shortcuts.tap_keys"),
+					script_control = require("modules.shortcuts.script_control"),
+					idle = menu_mods.shortcuts.scope_idle,
+					start_script_control = function()
+						return core_mods.shortcuts_mod.start_script_control(keymap, core_mods.shortcuts_mod, gestures, karabiner)
+					end,
+					capture_preferences = function() return Preferences.snapshot(state, hotfiles, core_mods) end,
+					admission = run_global_exclusive,
+					paused = function()
+						if type(core_mods.shortcuts_mod.is_paused) ~= "function" then return nil end
+						return core_mods.shortcuts_mod.is_paused()
+					end,
+					backup_path = function()
+						scope_generation = scope_generation + 1
+						return MenuPaths.get("ConfigTomlPath") .. ".shortcuts-"
+							.. tostring(hs.timer.absoluteTime()) .. "-" .. scope_generation .. ".bak"
+					end,
+					confirm = function(selected_mode)
+						local label = i18n.get(selected_mode == "clear" and "common.clear_to_system" or "common.restore_recommended")
+						local yes, no = i18n.get("onboarding.btn.yes"), i18n.get("onboarding.btn.no")
+						return require("infra.dialog_util").block_alert(i18n.get("menu.shortcuts.title"), label, no, yes, "warning") == yes
+					end,
+				})
+			end
+			local committed = shortcuts_scope.apply(mode)
+			if committed == true then Builder.invalidate_cache(); updateMenu() end
+			return committed
+		end
+		if scope == "llm" then
+			if read_only_reason ~= nil or type(llm_handler) ~= "table" or type(llm_handler.scope_runtime) ~= "table" then return false end
+			if not llm_scope then
+				llm_scope = require("ui.menu.llm_scope").new({
+					path = MenuPaths.get("ConfigTomlPath"), files = require("adapters.file_system"),
+					state = state, preferences = Preferences, checkpoint = preference_checkpoint,
+					demotions = session_demotions, runtime = llm_handler.scope_runtime, profiles = llm_handler.scope_profiles,
+					capture_preferences = function() return Preferences.snapshot(state, hotfiles, core_mods) end,
+					admission = run_global_exclusive,
+					paused = function()
+						if type(core_mods.shortcuts_mod) ~= "table" or type(core_mods.shortcuts_mod.is_paused) ~= "function" then return nil end
+						return core_mods.shortcuts_mod.is_paused()
+					end,
+					backup_path = function()
+						scope_generation = scope_generation + 1
+						return MenuPaths.get("ConfigTomlPath") .. ".llm-" .. tostring(hs.timer.absoluteTime()) .. "-" .. scope_generation .. ".bak"
+					end,
+					confirm = function(selected_mode)
+						local label = i18n.get(selected_mode == "clear" and "common.clear_to_system" or "common.restore_recommended")
+						local yes, no = i18n.get("onboarding.btn.yes"), i18n.get("onboarding.btn.no")
+						return require("infra.dialog_util").block_alert(i18n.get("menu.llm.title"), label, no, yes, "warning") == yes
+					end,
+				})
+			end
+			local committed = llm_scope.apply(mode)
+			if committed == true then Builder.invalidate_cache(); updateMenu() end
+			return committed
+		end
+		if scope == "metrics" then
+			if read_only_reason ~= nil then return false end
+			if not metrics_scope then
+				metrics_scope = require("ui.menu.metrics_scope").new({
+					path = MenuPaths.get("ConfigTomlPath"), files = require("adapters.file_system"),
+					state = state, preferences = Preferences, checkpoint = preference_checkpoint,
+					demotions = session_demotions, core = core_mods.keylogger,
+					menubar = require("ui.wpm.wpm_menubar"), widget = require("ui.wpm.wpm_widget"),
+					script_control = core_mods.shortcuts_mod,
+					activation_pending = MenuState.metrics_start_pending,
+					capture_shortcuts = function()
+						if #_retired_menu_hotkeys > 0 then return nil end
+						local captured = {}
+						for name, box in pairs({ metrics_shortcut = _metrics_hk_box, apps_time_shortcut = _apps_time_hk_box }) do
+							if box[1] then
+								captured[name] = box[1].snapshot()
+								if captured[name] == nil then return nil end
+							else captured[name] = false end
+						end
+						return captured
+					end,
+					apply_shortcut = function(name, mods, key, enabled)
+						local callback = name == "metrics_shortcut" and apply_metrics_shortcut or apply_apps_time_shortcut
+						if callback(mods, key, false) ~= true then return false end
+						local box = name == "metrics_shortcut" and _metrics_hk_box or _apps_time_hk_box
+						if enabled == false and box[1] then return box[1]:disable() == true end
+						return true
+					end,
+					capture_preferences = function() return Preferences.snapshot(state, hotfiles, core_mods) end,
+					admission = run_global_exclusive,
+					paused = function()
+						if type(core_mods.shortcuts_mod) ~= "table"
+							or type(core_mods.shortcuts_mod.is_paused) ~= "function" then return nil end
+						return core_mods.shortcuts_mod.is_paused()
+					end,
+					backup_path = function()
+						scope_generation = scope_generation + 1
+						return MenuPaths.get("ConfigTomlPath") .. ".metrics-"
+							.. tostring(hs.timer.absoluteTime()) .. "-" .. scope_generation .. ".bak"
+					end,
+					confirm = function(selected_mode)
+						local label = i18n.get(selected_mode == "clear" and "common.clear_to_system" or "common.restore_recommended")
+						local yes, no = i18n.get("onboarding.btn.yes"), i18n.get("onboarding.btn.no")
+						return require("infra.dialog_util").block_alert(i18n.get("menu.metrics.title"), label, no, yes, "warning") == yes
+					end,
+				})
+			end
+			local committed = metrics_scope.apply(mode)
+			if committed == true then Builder.invalidate_cache(); updateMenu() end
+			return committed
+		end
+		if scope ~= "keyboard_layout" then return false end
+		if read_only_reason ~= nil then return false end
+		if not layout_scope then
+			layout_scope = require("ui.menu.scoped_preferences").new({
+				path = MenuPaths.get("ConfigTomlPath"), files = require("adapters.file_system"),
+				scope = scope, state = state, preferences = Preferences, checkpoint = preference_checkpoint,
+				runtime = {
+					capture = function() return menu_mods.keyboard_layout.capture_scope(state) end,
+					apply = function(_, rows) return menu_mods.keyboard_layout.apply_scope(state, rows) end,
+					restore = function(snapshot) return menu_mods.keyboard_layout.restore_scope(state, snapshot) end,
+				},
+				capture_preferences = function() return Preferences.snapshot(state, hotfiles, core_mods) end,
+				admission = run_global_exclusive,
+				paused = function()
+					if type(core_mods.shortcuts_mod) ~= "table"
+						or type(core_mods.shortcuts_mod.is_paused) ~= "function" then return nil end
+					return core_mods.shortcuts_mod.is_paused()
+				end,
+				backup_path = function()
+					scope_generation = scope_generation + 1
+					return MenuPaths.get("ConfigTomlPath") .. ".layout-"
+						.. tostring(hs.timer.absoluteTime()) .. "-" .. scope_generation .. ".bak"
+				end,
+				confirm = function(selected_mode)
+					local label = i18n.get(selected_mode == "clear" and "common.clear_to_system" or "common.restore_recommended")
+					local yes, no = i18n.get("onboarding.btn.yes"), i18n.get("onboarding.btn.no")
+					return require("infra.dialog_util").block_alert(i18n.get("menu.layout.title"), label, no, yes, "warning") == yes
+				end,
+			})
+		end
+		local committed = layout_scope.apply(mode)
+		if committed == true then
+			Builder.invalidate_cache()
+			updateMenu()
+		end
+		return committed
+	end
 	local ctx = {
+		apply_gesture_scope = apply_gesture_scope,
+		apply_preference_scope = apply_preference_scope,
 		base_dir                 = base_dir,
 		state                    = state,
 		save_prefs               = save_prefs,
@@ -1244,6 +1456,8 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		apply_apps_time_shortcut = apply_apps_time_shortcut,
 		llm_handler              = llm_handler,
 		karabiner                = karabiner,
+		channel_owner            = channel_owner,
+		update_checks            = update_checks,
 	}
 
 	-- updateMenu refreshes the menubar icon and re-wires script_control extras,

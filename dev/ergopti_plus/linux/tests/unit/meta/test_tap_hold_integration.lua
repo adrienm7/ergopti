@@ -21,10 +21,16 @@ local KEY_A, KEY_J, KEY_K, KEY_U = 30, 36, 37, 22
 
 --- Starts a hook + manager + writer session on a user file holding `user_text`.
 local function session(user_text)
+	user_text = require("tests.support.tap_hold_fixture").with_preset(user_text)
 	local Hook = helpers.load_module("adapters.keyboard_hook")
 	local Manager = helpers.load_module("platform.remap.tap_hold_manager")
 	local Writer = helpers.load_module("platform.remap.tap_hold_writer")
-	local path = os.tmpname()
+	local dir = os.tmpname()
+	os.remove(dir)
+	local made = os.execute('mkdir "' .. dir .. '"')
+	assert(made == true or made == 0, "the isolated configuration folder must exist")
+	local path = dir .. "/tap_hold.toml"
+	require("tests.support.nav_layer_fixture").write(dir)
 	if user_text then
 		local fh = assert(io.open(path, "w"))
 		fh:write(user_text)
@@ -75,6 +81,8 @@ local function session(user_text)
 		Manager._reset_for_test()
 		Writer._reset_for_test()
 		os.remove(path)
+		os.remove(dir .. "/layers.toml")
+		os.execute('rmdir "' .. dir .. '"')
 	end
 	return s
 end
@@ -371,10 +379,10 @@ helpers.describe("tap-holds end to end: a tray change is live", function()
 		end)
 	end)
 
-	helpers.it("keeps running the defaults when the user's file is broken", function()
+	helpers.it("keeps the native key when the user's file is broken", function()
 		with_session("[tap_hold.keys.left_shift\n", function(s)
-			s.drive({ tap(LSHIFT, 0) })
-			helpers.assert_eq(s.actions[1], "copy")
+			helpers.assert_eq(s.drive({ tap(LSHIFT, 0) }), "42:1 42:0")
+			helpers.assert_nil(s.actions[1])
 			helpers.assert_true(not s.writer.set_tap("left_shift", "paste"), "and the tray refuses to overwrite it")
 		end)
 	end)

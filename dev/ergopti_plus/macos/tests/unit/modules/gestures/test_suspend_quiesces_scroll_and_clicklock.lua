@@ -33,6 +33,9 @@ helpers.describe("gestures suspend releases scroll-block and click-lock", functi
 		})
 
 		local Gestures = helpers.load_with_stubs("modules.gestures")
+		-- A loaded module is OFF until the saved preference applies; pause an ON one.
+		helpers.assert_eq(Gestures.enable_all(), true)
+		calls.resume = 0
 		Gestures.suspend()
 		helpers.assert_eq(calls.cancel, 1,
 			"suspend must discard gesture state even when the physical lift is gated")

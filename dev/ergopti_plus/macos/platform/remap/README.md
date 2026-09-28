@@ -79,6 +79,12 @@ Karabiner-Elements is macOS-specific, so its action definitions live beside the 
 - `platform/remap/data/tap_hold_keys.json` — tap/hold key definitions
 - `platform/remap/data/mod_combos.json` — two-modifier tap, hold, and chord slots
 
+The navigation layer is not static data: `platform/remap/nav_layer.lua` builds
+its rule from the user's `layers.toml` on every regeneration (no file, no rule).
+`platform/remap/data/legacy_layer_keys.json` is the hand-written layer every
+release before that appended verbatim; it is never deployed, only compared, to
+prove and remove an older unleased ErgoptiPlus block.
+
 The module optionally supplies its live managed output keycodes to `modules.keylogger.kc_bridge`; that set remains empty unless an exact lease has acknowledged `READY`.
 
 ## Lifecycle API

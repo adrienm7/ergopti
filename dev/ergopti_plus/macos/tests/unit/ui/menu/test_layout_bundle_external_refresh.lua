@@ -132,9 +132,6 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 
 				local install = require("modules.keymap.layout_install")
 				package.loaded["modules.keymap.input_sources"] = {
-					-- Keep the fixture non-empty: the production catalogue always has
-					-- variants, while an empty set makes "all active" true by vacuity.
-					ERGOPTI_VARIANTS = { { id = "fixture.layout" } },
 					list_active_keyboard_layouts = function() return {} end,
 					build_kl_name_to_tis_id = function() return {} end,
 					resolve_installed_ergopti_version = function() return nil end,

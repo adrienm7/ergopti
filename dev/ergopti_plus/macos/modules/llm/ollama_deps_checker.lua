@@ -802,7 +802,7 @@ function M.check_and_install_deps(on_complete, replay_token)
 		if exit_code ~= 0 then
 			local tail = tail_for_error(combined)
 			if tail == "" then
-				tail = "Cause inconnue. Consultez " .. Logger.UNIFIED_LOG_FILE .. "."
+				tail = "Cause inconnue. Consultez " .. Logger.today_log_path() .. "."
 			end
 			return publish_failure(tail, exit_code)
 		end

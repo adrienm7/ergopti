@@ -8,12 +8,12 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fakes = helpers.load_module("tests.fakes")
+local PreferencesFixture = require("tests.support.llm_preferences_fixture")
 
 helpers.describe("LLM navigation settings", function()
 	helpers.it("reads the manifest default and matches the exact held chord", function()
-		local previous = package.loaded["adapters.storage"]
-		package.loaded["adapters.storage"] = Fakes.storage()
+		local previous = package.loaded["infra.llm_preferences"]
+		package.loaded["infra.llm_preferences"] = PreferencesFixture.new()
 		local settings = helpers.load_module("modules.llm.navigation_settings")
 		settings._reset()
 		helpers.assert_eq(settings.get(), {}, "a bare digit accepts by default")
@@ -23,20 +23,20 @@ helpers.describe("LLM navigation settings", function()
 		helpers.assert_true(settings.set({ "alt" }))
 		helpers.assert_true(settings.matches({ alt = true }), "the menu can require Alt")
 		helpers.assert_eq(settings.matches({}), false, "and then a bare digit types")
-		package.loaded["adapters.storage"] = previous
+		package.loaded["infra.llm_preferences"] = previous
 	end)
 
 	helpers.it("persists a canonical chord before publishing it", function()
-		local previous = package.loaded["adapters.storage"]
-		local storage = Fakes.storage()
-		package.loaded["adapters.storage"] = storage
+		local previous = package.loaded["infra.llm_preferences"]
+		local storage = PreferencesFixture.new()
+		package.loaded["infra.llm_preferences"] = storage
 		local settings = helpers.load_module("modules.llm.navigation_settings")
 		settings._reset()
 		helpers.assert_true(settings.set({ "shift", "ctrl" }))
 		helpers.assert_eq(settings.get(), { "ctrl", "shift" })
 		helpers.assert_eq(storage.get("llm.navigation.val_modifiers"), { "ctrl", "shift" })
 		helpers.assert_eq(settings.set({ "alt", "alt" }), false)
-		package.loaded["adapters.storage"] = previous
+		package.loaded["infra.llm_preferences"] = previous
 	end)
 end)
 

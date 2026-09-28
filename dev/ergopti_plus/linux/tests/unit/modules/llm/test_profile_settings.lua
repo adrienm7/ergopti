@@ -8,7 +8,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Fakes = helpers.load_module("tests.fakes")
+local PreferencesFixture = require("tests.support.llm_preferences_fixture")
+local RegistryCodec = require("modules.llm.profile_registry_codec")
 
 local held = {}
 
@@ -60,8 +61,12 @@ end)
 
 helpers.describe("LLM profile settings: durable effective profile", function()
 	local function load_settings(initial, writes_fail)
-		local storage = Fakes.storage({ initial = initial, writes_fail = writes_fail })
-		replace("adapters.storage", storage)
+		local encoded = {}
+		for key, value in pairs(initial or {}) do
+			encoded[key] = key == "llm.user_profiles" and RegistryCodec.encode(value) or value
+		end
+		local storage = PreferencesFixture.new({ initial = encoded, writes_fail = writes_fail })
+		replace("infra.llm_preferences", storage)
 		replace("modules.llm.model_profile", {
 			recommend = function(model) return model == "large" and "batch_advanced" or "basic" end,
 			_reset = function() end,
@@ -106,12 +111,12 @@ helpers.describe("LLM profile settings: durable effective profile", function()
 		local good_a = { id = "user_a", label = "A", system_single = "Style A {context}", batch = false }
 		local broken = { id = "user_broken", label = "", system_single = "", batch = "yes" }
 		local good_b = { id = "user_b", label = "B", system_single = "Style B {context}", batch = false }
-		local settings, storage = load_settings({ ["llm.profiles.user_profiles"] = { good_a, broken, good_b } })
+		local settings, storage = load_settings({ ["llm.user_profiles"] = { good_a, broken, good_b } })
 		local offered = settings.list_user()
 		helpers.assert_eq(#offered, 2, "the readable prompts are still offered")
 		helpers.assert_true(settings.save_user_profile(
 			{ id = "user_c", label = "C", system_single = "Style C {context}", batch = false }, false, false))
-		local stored = storage.get("llm.profiles.user_profiles")
+		local stored = RegistryCodec.decode(storage.get("llm.user_profiles") or "")
 		helpers.assert_eq(#stored, 4, "A, B, the new C, and the unreadable entry, untouched")
 		local ids = {}
 		for _, entry in ipairs(stored) do ids[#ids + 1] = entry.id end
@@ -133,8 +138,8 @@ helpers.describe("LLM profile settings: durable effective profile", function()
 		helpers.assert_eq(#settings.list_user(), 1)
 		helpers.assert_eq(settings.resolve("small").system_single, "Continue {context}")
 		helpers.assert_true(
-			type(storage.get("llm.profiles.user_profiles")[1].system_multi_template) == "string"
-				and storage.get("llm.profiles.user_profiles")[1].system_multi_template ~= "",
+			type(RegistryCodec.decode(storage.get("llm.user_profiles") or "")[1].system_multi_template) == "string"
+				and RegistryCodec.decode(storage.get("llm.user_profiles") or "")[1].system_multi_template ~= "",
 			"batch profiles must inherit the shared batch footer, or one request cannot yield several candidates")
 		local collision = {
 			id = profile.id,
@@ -154,7 +159,7 @@ helpers.describe("LLM profile settings: durable effective profile", function()
 		helpers.assert_eq(settings.delete_user_profile(profile.id), true)
 		helpers.assert_eq(#settings.list_user(), 0)
 		helpers.assert_eq(settings.get("active"), "basic")
-		helpers.assert_eq(storage.get("llm.profiles.active"), "basic")
+		helpers.assert_nil(storage.get("llm.profiles.active"), "the neutral active profile remains sparse")
 		helpers.assert_eq(settings.save_user_profile(profile, false, true), false,
 			"an editor opened before deletion must not silently recreate its stale target")
 		restore()
@@ -162,7 +167,7 @@ helpers.describe("LLM profile settings: durable effective profile", function()
 
 	helpers.it("publishes no candidate registry when its atomic write fails", function()
 		local initial = {
-			["llm.profiles.user_profiles"] = {
+			["llm.user_profiles"] = {
 				{
 					id = "user_retained",
 					label = "Retained",
@@ -187,8 +192,8 @@ end)
 helpers.describe("LLM user profiles: tray reachability", function()
 	helpers.it("opens the shared editor from production rows and commits its callback", function()
 		local settings, storage = (function()
-			local fake = Fakes.storage()
-			replace("adapters.storage", fake)
+			local fake = PreferencesFixture.new()
+			replace("infra.llm_preferences", fake)
 			replace("modules.llm.model_profile", {
 				recommend = function() return "basic" end,
 				_reset = function() end,

@@ -938,7 +938,7 @@ function M.install(ctx)
 			-- the user has a single tail target. Each line is prefixed
 			-- [MLX-SERVER] downstream so it stands out from Hammerspoon's own
 			-- log entries.
-			local unified_log_file = Logger.UNIFIED_LOG_FILE
+			local unified_log_file = Logger.today_log_path()
 			Logger.info(LOG, "Starting MLX server process for model %s — output prefixed [MLX-SERVER] in %s",
 				tostring(target_model), unified_log_file)
 			local startup_confirmed = false

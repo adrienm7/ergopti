@@ -11,11 +11,12 @@
 
 import Sparkle
 
-/// The two Sparkle settings that decide whether a check may download.
+/// Live Sparkle settings that could bypass Lua's cadence or install consent.
 @MainActor
 protocol AutomaticUpdateSettings: AnyObject {
 	var allowsAutomaticUpdates: Bool { get }
 	var automaticallyDownloadsUpdates: Bool { get }
+	var automaticallyChecksForUpdates: Bool { get }
 }
 
 extension SPUUpdater: AutomaticUpdateSettings {}
@@ -25,6 +26,9 @@ enum UpdateConsentPolicy {
 	/// download will wait for the user's explicit install choice.
 	@MainActor
 	static func refusal(for settings: AutomaticUpdateSettings) -> String? {
+		if settings.automaticallyChecksForUpdates {
+			return "automatic checks are enabled: Sparkle would bypass the driver's cadence and pause"
+		}
 		if settings.allowsAutomaticUpdates {
 			return "SUAllowsAutomaticUpdates is true: Sparkle may download updates without asking"
 		}

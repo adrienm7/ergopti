@@ -31,14 +31,19 @@
 --- 1. ONE policy for a missing HOME, applied everywhere: fall back to TMPDIR (or
 ---    /tmp). A temp path is honest — it is obviously not the user's home, it is
 ---    writable, and nothing there is mistaken for durable state.
---- 2. XDG-aware: XDG_CONFIG_HOME and XDG_DATA_HOME are honoured where the spec
----    says they should be, so containerised and sandboxed installs work.
+--- 2. XDG-aware: XDG_CONFIG_HOME, XDG_DATA_HOME and XDG_STATE_HOME (the logs)
+---    are honoured where the spec says they should be, so containerised and
+---    sandboxed installs work.
 --- 3. No tilde, ever. Every path returned is absolute.
 --- ==============================================================================
 
 local M = {}
 
+local AppDirs = require("app_dirs")
+
 local CONFIG_DIR_STORAGE_KEY = "paths.config_dir"
+-- Bootstrap storage key of the LogsDirPath override, from the shared registry.
+local LOGS_DIR_STORAGE_KEY = AppDirs.linux_storage_key
 
 
 
@@ -163,6 +168,83 @@ end
 --- @return string Absolute path of metrics.sqlite.
 function M.metrics_path()
 	return M.data("metrics.sqlite")
+end
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 3/ Logs directory ===============
+-- =========================================
+-- =========================================
+
+--- The XDG state root ($XDG_STATE_HOME, or ~/.local/state): logs are state.
+--- @return string Absolute path, no trailing slash.
+function M.state_home()
+	local xdg = os.getenv(AppDirs.linux.base_env)
+	if type(xdg) == "string" and xdg ~= "" then
+		return (xdg:gsub("/+$", ""))
+	end
+	return M.home() .. "/" .. AppDirs.linux.base_fallback
+end
+
+--- The default logs folder, ${XDG_STATE_HOME:-~/.local/state}/ergopti_plus/logs.
+--- @return string Absolute path, no trailing slash.
+function M.default_logs_dir()
+	return M.state_home() .. "/" .. AppDirs.linux.relative
+end
+
+--- Validates a logs-folder override and makes it a folder the application
+--- owns: the default folder, or one whose last component is the application
+--- folder name. Anything else gets that subfolder appended, so retention never
+--- deletes in a folder the user merely picked.
+--- @param path any Candidate override.
+--- @return string|nil normalized Absolute path without trailing slash, or "".
+--- @return string|nil error_message
+function M.normalize_logs_dir(path)
+	if type(path) ~= "string" then return nil, "the logs folder must be a string" end
+	local normalized = path:gsub("/+$", "")
+	if normalized == "" then return "" end
+	if normalized:sub(1, 1) ~= "/" then
+		return nil, "the logs folder must be an absolute path"
+	end
+	if normalized ~= M.default_logs_dir() and normalized:match("([^/]+)$") ~= AppDirs.folder_name then
+		normalized = normalized .. "/" .. AppDirs.folder_name
+	end
+	return normalized
+end
+
+--- The effective logs folder: the LogsDirPath override from bootstrap storage,
+--- or the default. Resolved per call, like the configuration folder, so a
+--- reload after the path editor saved a new folder needs no other hand-off.
+--- @return string Absolute path, no trailing slash.
+function M.get_logs_dir()
+	local ok, Storage = pcall(require, "adapters.storage")
+	if not ok or type(Storage) ~= "table" or type(Storage.get) ~= "function" then
+		return M.default_logs_dir()
+	end
+	local configured = Storage.get(LOGS_DIR_STORAGE_KEY, nil)
+	local normalized = type(configured) == "string" and M.normalize_logs_dir(configured) or nil
+	if type(normalized) ~= "string" or normalized == "" then return M.default_logs_dir() end
+	return normalized
+end
+
+--- Persists a logs-folder override.
+--- @param path string Empty/default resets the override; a custom folder must be absolute.
+--- @return boolean True only when bootstrap storage confirms the mutation.
+--- @return string|nil error_message Why a folder was refused.
+function M.set_logs_dir(path)
+	local normalized, err = M.normalize_logs_dir(path)
+	if normalized == nil then return false, err end
+	local ok, Storage = pcall(require, "adapters.storage")
+	if not ok or type(Storage) ~= "table" then return false, "bootstrap storage is unavailable" end
+	if normalized == "" or normalized == M.default_logs_dir() then
+		return type(Storage.delete) == "function"
+			and Storage.delete(LOGS_DIR_STORAGE_KEY) == true
+	end
+	return type(Storage.set) == "function"
+		and Storage.set(LOGS_DIR_STORAGE_KEY, normalized) == true
 end
 
 return M

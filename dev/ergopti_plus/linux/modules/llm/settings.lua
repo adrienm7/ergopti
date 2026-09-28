@@ -124,7 +124,7 @@ function M.get(name)
 	local default = shipped()[name]
 	if default == nil then return nil end
 
-	local ok, Storage = pcall(require, "adapters.storage")
+	local ok, Storage = pcall(require, "infra.llm_preferences")
 	if ok and Storage then
 		local stored = Storage.get(PREF_PREFIX .. name, nil)
 		-- A stored value outside the range is REFUSED, not clipped. It can only
@@ -174,7 +174,7 @@ function M.set(name, value)
 		end
 	end
 
-	local ok, Storage = pcall(require, "adapters.storage")
+	local ok, Storage = pcall(require, "infra.llm_preferences")
 	if not ok or not Storage then
 		Logger.error(LOG, "No storage — '%s' was not changed.", name)
 		return false
@@ -224,6 +224,40 @@ end
 function M._reset()
 	_values = {}
 	_shipped = nil
+end
+
+--- Marks only generation leaves consumed by this owner.
+--- @param document table Parsed canonical configuration.
+--- @param mark function Consumed-key collector.
+function M.mark_config_reads(document, mark)
+	local preferences = require("infra.llm_preferences")
+	for _, path in pairs(FEATURE_PATH) do preferences.mark_config_read(document, path, mark) end
+end
+
+--- Captures the current cache without reading or publishing preferences.
+--- @return table snapshot
+function M.configuration_snapshot()
+	return { values = _values, shipped = _shipped }
+end
+
+--- Restores the exact cache after a refused configuration transaction.
+--- @param snapshot table Owner-issued snapshot.
+--- @return boolean restored
+function M.restore_configuration(snapshot)
+	_values = snapshot.values
+	_shipped = snapshot.shipped
+	return true
+end
+
+--- Resolves the detached configuration through this owner's validation rules.
+--- @return boolean applied
+function M.reload_configuration()
+	_values = {}
+	for name in pairs(FEATURE_PATH) do
+		local value = M.get(name)
+		if not in_bounds(name, value) then return false end
+	end
+	return true
 end
 
 return M

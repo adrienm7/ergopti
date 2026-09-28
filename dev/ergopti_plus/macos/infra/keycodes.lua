@@ -50,4 +50,21 @@ function M.to_name(numeric_code)
 	error(string.format("Keycodes.to_name: unknown keycode %d", numeric_code))
 end
 
+--- Returns the character the current input source puts on a keycode at its
+--- base level, or nil when the key types nothing printable there.
+---
+--- hs.keycodes.map follows the input source live (Hammerspoon rebuilds it on
+--- every switch) and names non-printing keys by word ("f1", "space",
+--- "return"), so anything longer than one character is a key name, not what
+--- the key types.
+--- @param numeric_code integer The macOS keycode.
+--- @return string|nil
+function M.character_for(numeric_code)
+	local name = hs.keycodes.map[numeric_code]
+	if type(name) ~= "string" or name == "" then return nil end
+	local _, characters = name:gsub("[^\128-\191]", "")
+	if characters ~= 1 then return nil end
+	return name
+end
+
 return M

@@ -10,9 +10,11 @@
 local helpers = require("tests.helpers")
 local M = {}
 local OWNERS = {
+	"_generated.action_catalogue",
 	"_generated.gesture_emit_actions",
 	"adapters.file_system",
 	"adapters.hotkey_registrar",
+	"adapters.json_codec",
 	"adapters.key_state",
 	"adapters.synthetic_input",
 	"adapters.timer_scheduler",
@@ -34,16 +36,20 @@ local OWNERS = {
 	"modules.gestures.engine",
 	"modules.gestures.sticky_modifiers",
 	"modules.shortcuts",
+	"modules.shortcuts.actions.apps",
 	"modules.shortcuts.actions.screenshot_save",
 	"modules.shortcuts.actions.system_mouse",
+	"modules.shortcuts.actions.system_pixel",
 	"modules.shortcuts.actions.text",
 	"modules.shortcuts.bindings",
 	"modules.shortcuts.keyboard_shortcuts",
 	"modules.shortcuts.script_control",
+	"send_input",
 	"text_utils",
 	"toml_codec.basic_string",
 	"toml_codec.bom",
 	"toml_codec.reader",
+	"wrap_pair",
 }
 
 local function fresh_actions(options)
@@ -58,6 +64,8 @@ local function fresh_actions(options)
 		"modules.shortcuts.actions.screenshot_save",
 		"modules.shortcuts.actions.text",
 		"modules.shortcuts.actions.system_mouse",
+		"modules.shortcuts.actions.apps",
+		"modules.shortcuts.actions.system_pixel",
 		"adapters.file_system",
 		"adapters.key_state",
 		"adapters.synthetic_input",
@@ -90,6 +98,10 @@ local function fresh_actions(options)
 		action_parents = {},
 		text_actions = {},
 		mouse_actions = {},
+		apps_actions = {},
+		pixel_actions = {},
+		apps_lifecycle = {},
+		pixel_lifecycle = {},
 		text_lifecycle = {},
 		mouse_lifecycle = {},
 		text_queries = {},
@@ -104,6 +116,7 @@ local function fresh_actions(options)
 		clipboard_restore_calls = 0,
 		lookup_cleanup_results = {},
 		errors = {},
+		typed = {},
 	}
 	calls.controls = controls
 	local clipboard_data = { ["public.utf8-plain-text"] = "original" }
@@ -384,11 +397,28 @@ local function fresh_actions(options)
 			end,
 		}
 		if kind == "text" then
-			child.select_line = function(parent)
+			-- Every text-layer function a gesture action delegates to records its
+			-- name and the parent it ran under.
+			for _, name in ipairs({ "select_line", "select_word", "paste_as_plain_text",
+				"toggle_uppercase", "toggle_titlecase", "selection_uppercase",
+				"selection_lowercase", "selection_titlecase", "surround_with_parens" }) do
+				child[name] = function(parent)
+					parent = parent or "shortcut_bindings"
+					if paused[parent] == true then return false end
+					calls.text_actions[#calls.text_actions + 1] = {
+						name = name, parent = parent,
+					}
+					return true
+				end
+			end
+			child.wrap_pair_list = function()
+				return { { left = "(", right = ")" }, { left = "« ", right = " »" } }
+			end
+			child.wrap_copied_selection = function(left, right, parent)
 				parent = parent or "shortcut_bindings"
 				if paused[parent] == true then return false end
 				calls.text_actions[#calls.text_actions + 1] = {
-					name = "select_line", parent = parent,
+					name = "wrap_copied_selection", left = left, right = right, parent = parent,
 				}
 				return true
 			end
@@ -400,6 +430,16 @@ local function fresh_actions(options)
 					name = "teleport_mouse", parent = parent,
 				}
 				return true
+			end
+			for _, name in ipairs({ "open_emoji_picker", "toggle_display_mirror" }) do
+				child[name] = function(parent)
+					parent = parent or "shortcut_bindings"
+					if paused[parent] == true then return false end
+					calls.mouse_actions[#calls.mouse_actions + 1] = {
+						name = name, parent = parent,
+					}
+					return true
+				end
 			end
 			child.lock_screen = function(parent)
 				parent = parent or "shortcut_bindings"
@@ -422,6 +462,39 @@ local function fresh_actions(options)
 	end
 	package.loaded["modules.shortcuts.actions.text"] = scoped_child(text_paused, "text")
 	package.loaded["modules.shortcuts.actions.system_mouse"] = scoped_child(mouse_paused, "mouse")
+	--- A parent-scoped owner of the shortcut layer: its lifecycle edges and the
+	--- functions a gesture action delegates to, each recording its parent.
+	local function scoped_owner(kind, actions_list)
+		local paused = {}
+		local lifecycle_calls = calls[kind .. "_lifecycle"]
+		local owner = {}
+		owner["pause_" .. kind .. "_actions"] = function(parent)
+			lifecycle_calls[#lifecycle_calls + 1] = { edge = "pause", parent = parent }
+			paused[parent] = true
+			return true
+		end
+		owner["resume_" .. kind .. "_actions"] = function(parent)
+			lifecycle_calls[#lifecycle_calls + 1] = { edge = "resume", parent = parent }
+			paused[parent] = false
+			return true
+		end
+		owner["is_" .. kind .. "_actions_paused"] = function(parent) return paused[parent] == true end
+		owner["has_pending_" .. kind .. "_action"] = function() return false end
+		for _, name in ipairs(actions_list) do
+			owner[name] = function(parent)
+				parent = parent or "shortcut_bindings"
+				if paused[parent] == true then return false end
+				local recorded = calls[kind .. "_actions"]
+				recorded[#recorded + 1] = { name = name, parent = parent }
+				return true
+			end
+		end
+		return owner
+	end
+	package.loaded["modules.shortcuts.actions.apps"] = scoped_owner("apps",
+		{ "open_downloads", "open_finder", "open_settings", "copy_or_open_path" })
+	package.loaded["modules.shortcuts.actions.system_pixel"] = scoped_owner("pixel",
+		{ "copy_pixel_color" })
 	package.loaded["modules.gestures.actions_click"] = setmetatable({
 		force_cleanup = function(parent)
 			calls.click_force_parents[#calls.click_force_parents + 1] = parent
@@ -446,7 +519,17 @@ local function fresh_actions(options)
 		end,
 	}, { __index = function() return function() return true end end })
 	package.loaded["adapters.file_system"] = {
-		read = function() return nil end,
+		-- Only the send-input vocabulary is real: the send_* actions cannot parse
+		-- a value without it, and every other shared file stays missing.
+		read = function(path)
+			if type(path) ~= "string" or not path:find("modules/actions/send_keys.json", 1, true) then
+				return nil
+			end
+			local handle = assert(io.open(helpers.shared("modules/actions/send_keys.json"), "r"))
+			local body = handle:read("*a")
+			handle:close()
+			return body
+		end,
 		read_file = function() return nil end,
 	}
 	package.loaded["adapters.key_state"] = setmetatable({}, {
@@ -491,6 +574,10 @@ local function fresh_actions(options)
 			for _, owner in ipairs(handoff.owners) do owner.active = false end
 			return handoff.events
 		end,
+		emit_key_strokes = function(value)
+			calls.typed[#calls.typed + 1] = value
+			return true
+		end,
 		emit_key_stroke = function(mods, key)
 			if controls.search_reenter == "emit" and key == "c" then
 				controls.search_reenter = nil
@@ -514,7 +601,7 @@ local function fresh_actions(options)
 		end,
 	}, { __index = function() return function() return true end end })
 	package.loaded["infra.termination_coordinator"] = { request_exit = function() return true end }
-	package.loaded["infra.paths"] = { shared = function() return "Z:/missing" end }
+	package.loaded["infra.paths"] = { shared = function(rel) return "Z:/missing/" .. tostring(rel) end }
 	package.loaded["infra.timings"] = { sec = function() return 0.2 end }
 	local logger = helpers.make_logger_stub()
 	logger.error = function(module_name, message, ...)
@@ -755,6 +842,7 @@ local function with_feature_lifecycles(actions, calls, body)
 	})
 	package.loaded["infra.manifest_reader"] = {
 		default_for = function() return true end,
+		recommended_for = function() return "none" end,
 	}
 	package.loaded["modules.gestures.actions"] = actions
 	package.loaded["modules.shortcuts"] = nil

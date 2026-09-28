@@ -146,7 +146,7 @@ helpers.describe("MLX server: a duplicate start joins the startup in flight", fu
 
 		package.loaded["infra.notifications"] = { notify = noop }
 		package.loaded["infra.logger"] = {
-			UNIFIED_LOG_FILE = "/tmp/ergopti-test.log",
+			today_log_path = function() return "/tmp/ergopti-test.log" end,
 			debug = noop, info = noop, warn = noop,
 			error = function(...) table.insert(logged_errors, { ... }) end,
 			callback = function(_, _, callback, ...)

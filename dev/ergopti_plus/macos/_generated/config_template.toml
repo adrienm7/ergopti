@@ -7,15 +7,42 @@
 [script]
 locale = "fr"
 log_level = "INFO"
+show_error_dialog = true
 
 [hotstrings]
+enabled = false
 trigger_char = "★"
-repeat_key_enabled = true
+repeat_key_enabled = false
 expansion_delay = 0.75
-preview_ai_enabled = true
-preview_autocorrect_enabled = true
-preview_colored_tooltips = true
-preview_star_enabled = true
+preview_ai_enabled = false
+preview_autocorrect_enabled = false
+preview_colored_tooltips = false
+preview_star_enabled = false
+
+[hotstrings.dynamic]
+enabled = false
+
+[hotstrings.dynamic.date]
+enabled = false
+
+[hotstrings.dynamic.date_fr]
+enabled = false
+
+[hotstrings.dynamic.date_long_fr]
+enabled = false
+
+[hotstrings.dynamic.iban_prefixes]
+enabled = false
+
+[hotstrings.dynamic.phone_prefixes]
+enabled = false
+
+[hotstrings.dynamic.ssn_prefixes]
+enabled = false
+
+[hotstrings.dynamic.text_expansion_personal_information]
+enabled = false
+pattern_max_length = 1
 
 [hotstrings.autocorrection.caps]
 enabled = false
@@ -149,7 +176,7 @@ enabled = false
 enabled = false
 
 [hotstrings.magic_key.replace]
-enabled = true
+enabled = false
 
 [hotstrings.magic_key.repeat_corrections]
 enabled = false
@@ -215,51 +242,28 @@ time_activation_seconds = 2
 enabled = false
 time_activation_seconds = 2
 
-[hotstrings.dynamic.date]
-enabled = false
-
-[hotstrings.dynamic.date_fr]
-enabled = false
-
-[hotstrings.dynamic.date_long_fr]
-enabled = false
-
-[hotstrings.dynamic.iban_prefixes]
-enabled = false
-
-[hotstrings.dynamic.phone_prefixes]
-enabled = false
-
-[hotstrings.dynamic.ssn_prefixes]
-enabled = false
-
-[hotstrings.dynamic.text_expansion_personal_information]
-enabled = false
-pattern_max_length = 1
-
 [hotstrings.personal.autocorrection]
-enabled = true
+enabled = false
 time_activation_seconds = 0.75
 
 [hotstrings.personal.code]
-enabled = true
+enabled = false
 time_activation_seconds = 0.75
 
 [hotstrings.personal.email_shortcuts]
-enabled = true
+enabled = false
 time_activation_seconds = 0.75
 
 [hotstrings.personal.professional_vocabulary]
-enabled = true
+enabled = false
 time_activation_seconds = 0.75
 
 [hotstrings.personal.test]
-enabled = true
+enabled = false
 time_activation_seconds = 0.75
 
 [llm]
 enabled = false
-user_profiles = ""
 
 [llm.display]
 pred_indent = 0
@@ -277,16 +281,18 @@ reset_on_nav = true
 sequential_mode = false
 
 [llm.models]
+user_models = []
 selected = "mlx"
 ollama = "gemma-4-E2B-it"
 mlx = "Qwen3.5-2B"
 
 [llm.profiles]
+user_profiles = []
 active = "basic"
 num_predictions = 3
-auto_profile_for_model = true
 
 [llm.trigger]
+disabled_apps = []
 debounce_ms = 200
 instant_on_word_end = true
 after_hotstring = true
@@ -295,34 +301,51 @@ url_bar_filter_enabled = false
 shortcut = false
 
 [llm.navigation]
+nav_modifiers = []
 val_modifiers = []
 arrow_nav_enabled = false
 
 [metrics]
-enabled = true
+enabled = false
 private_filter_enabled = true
 secure_filter_enabled = true
 system_auth_filter_enabled = true
 encrypt = false
+disabled_apps = []
+menubar_wpm = false
+menubar_colors = true
+float_wpm = true
+float_graph = true
+float_colors = true
+shortcut = false
+apps_shortcut = false
 
 [shortcuts]
-enabled = true
+enabled = false
 chatgpt_url = "https://chat.openai.com"
 
+[shortcuts.keyboard]
+hs_ctrl_space = "none"
+
+[shortcuts.tap_keys]
+number_row_left = "none"
+number_row_right_1 = "none"
+number_row_right_2 = "none"
+
 [gestures]
-enabled = true
-swipe_3_down = "tab_next"
-swipe_3_left = "sel_word_prev"
-swipe_3_right = "sel_word_next"
-swipe_3_up = "tab_prev"
+enabled = false
+swipe_3_down = "none"
+swipe_3_left = "none"
+swipe_3_right = "none"
+swipe_3_up = "none"
 swipe_4_down = "none"
 swipe_4_left = "none"
 swipe_4_right = "none"
 swipe_4_up = "none"
-tap_3 = "left_click_toggle"
-tap_4 = "app_window_previous"
+tap_3 = "none"
+tap_4 = "none"
 space_wrap = true
-swipe_2_left = "arrow_up"
+swipe_2_left = "none"
 swipe_5_up = "none"
 swipe_5_down = "none"
 swipe_5_left = "none"
@@ -340,19 +363,19 @@ swipe_3_left_up = "none"
 swipe_3_right_down = "none"
 swipe_3_right_up = "none"
 swipe_3_diag = "none"
-swipe_3_horiz = "words"
+swipe_3_horiz = "none"
 swipe_4_left_down = "none"
 swipe_4_left_up = "none"
 swipe_4_right_down = "none"
 swipe_4_right_up = "none"
 swipe_4_diag = "none"
-swipe_4_horiz = "spaces"
+swipe_4_horiz = "none"
 swipe_5_left_down = "none"
 swipe_5_left_up = "none"
 swipe_5_right_down = "none"
 swipe_5_right_up = "none"
 swipe_5_diag = "none"
-swipe_5_horiz = "windows"
+swipe_5_horiz = "none"
 tap_2 = "none"
 tap_5 = "none"
 
@@ -389,6 +412,9 @@ swipe_5_left_down = "incremental"
 swipe_5_left_up = "incremental"
 swipe_5_right_down = "incremental"
 swipe_5_right_up = "incremental"
+swipe_3_horiz = "x1"
+swipe_4_horiz = "x1"
+swipe_5_horiz = "x1"
 
 [gestures.sensitivities]
 swipe_2_left = 3.5
@@ -423,3 +449,47 @@ swipe_5_left_down = 3.5
 swipe_5_left_up = 3.5
 swipe_5_right_down = 3.5
 swipe_5_right_up = 3.5
+swipe_3_horiz = 3.5
+swipe_4_horiz = 3.5
+swipe_5_horiz = 3.5
+
+[ui]
+menubar_icon = "v1"
+
+[tap_holds]
+enabled = false
+
+[shortcuts.script_control]
+enabled = false
+return_key = "none"
+backspace = "none"
+escape = "none"
+
+[shortcuts.keys]
+layer_scroll = false
+wrap_text_if_selected = false
+ctrl_a = false
+ctrl_d = false
+ctrl_e = false
+ctrl_g = false
+ctrl_h = false
+ctrl_i = false
+ctrl_m = false
+ctrl_o = false
+ctrl_p = false
+ctrl_s = false
+ctrl_t = false
+ctrl_u = false
+ctrl_w = false
+ctrl_x = false
+ctrl_capslock = false
+ctrl_l = false
+ctrl_period = false
+ctrl_quote = false
+cmd_shift_v = false
+cmd_star = false
+
+[layout]
+pause_switch_enabled = false
+on_pause = false
+on_resume = false

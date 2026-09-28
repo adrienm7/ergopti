@@ -126,6 +126,7 @@ helpers.describe("karabiner bulk settings use one exact reversible transaction",
 			helpers.assert_true(reset.outcome == true)
 			helpers.assert_eq(reset_calls.save, 1)
 			helpers.assert_eq(reset.regenerations, 1)
+			helpers.assert_eq(reset_calls.saved_payloads[1].tap_holds_enabled, true)
 			helpers.assert_eq(reset_remap.get_tap_action("left_shift"), "none")
 			helpers.assert_eq(reset_remap.get_tap_hold_timeout(), 200)
 

@@ -153,10 +153,17 @@ helpers.describe("LLM menu persistence — disk round-trip", function()
 
 		local label = entry.id
 		helpers.it("round-trips " .. label .. " through preferences.save/load", function()
+			local manifest = require("infra.manifest_reader")
+			local path = hs.section .. "." .. (hs.nested_key or (hs.path and hs.path .. "." .. hs.key or hs.key))
+			local expected = hs.sample
+			local expected_disk = hs.disk_sample ~= nil and hs.disk_sample or hs.sample
+			if manifest.has_default(path) and deep_equal(expected_disk, manifest.default_for(path)) then
+				expected, expected_disk = nil, nil
+			end
 			fixture.with_roundtrip({ [hs.flat_key] = hs.sample }, function(flat, _, tmp)
 				local codec = helpers.load_with_stubs("infra.toml.codec")
 				local got = flat[hs.flat_key]
-				local flat_ok = values_equal(hs.sample, got, hs)
+				local flat_ok = values_equal(expected, got, hs)
 				helpers.assert_true(
 					flat_ok,
 					label .. " flat load mismatch (got "
@@ -178,7 +185,7 @@ helpers.describe("LLM menu persistence — disk round-trip", function()
 					on_disk = sc
 				end
 				helpers.assert_true(
-					values_equal(hs.sample, on_disk, hs),
+					values_equal(expected_disk, on_disk, hs),
 					label .. " grouped TOML mismatch"
 				)
 			end)

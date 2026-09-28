@@ -15,11 +15,11 @@ _THPPP_CandidateCommitsOnlyAfterWrite() {
 	WriterBody := _DriverFuncBody("_TH_WriteTapHoldToml")
 	WritePos := InStr(WriterBody, "FSWriteDurable(StagePath, Content)")
 	ReplacePos := InStr(WriterBody, "FSAtomicMoveReplace(StagePath, BoundPath)")
-	PublishPos := InStr(WriterBody, "_TH_PublishTapHoldCandidate(Data, OwnerToken")
+	PublishPos := InStr(WriterBody, "_TH_PublishTapHoldCandidate(Data, RuntimeCandidate, EmptyKeys, OwnerToken")
 	Assert(WritePos > 0 && ReplacePos > WritePos && PublishPos > ReplacePos,
 		"the shared writer must durably stage and atomically replace before publishing TapHold")
 	Publisher := _DriverFuncBody("_TH_PublishTapHoldCandidate")
-	Assert(Publisher != "" && InStr(Publisher, "TapHold := Candidate") > 0,
+	Assert(Publisher != "" && InStr(Publisher, "TapHold := RuntimeCandidate") > 0,
 		"one memory-only helper must own live TapHold publication")
 	MenuSource := _DriverDirConcat("ui/menu")
 	Assert(InStr(MenuSource, "WriteTapHoldNative(this.KeyId)") > 0,

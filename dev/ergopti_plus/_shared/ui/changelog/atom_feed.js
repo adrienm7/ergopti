@@ -15,7 +15,10 @@
  *    handed to a document parser, a markup sink or an evaluator.
  * 2. Markdown output: release notes arrive as rendered HTML; they are converted
  *    to the Markdown subset of ../markdown.js, whose DOM-only renderer remains
- *    the single boundary between remote text and the document.
+ *    the single boundary between remote text and the document. A <details>
+ *    fold becomes the exact structural lines that renderer and the section
+ *    splitter (./release_body.js) recognise, so a feed body folds and splits
+ *    like an API body.
  * 3. Repository-bound entries: an entry whose link is not a release tag of the
  *    expected repository is discarded instead of being trusted.
  * ==============================================================================
@@ -211,10 +214,17 @@
 		return node.children.map(textOf).join('');
 	}
 
-	/** Returns an absolute http(s) link destination safe to embed in Markdown. */
+	/**
+	 * Returns a link destination safe to embed in Markdown: an absolute http(s)
+	 * URL, or an in-page fragment kept verbatim so the feed body carries the same
+	 * "[…](#downloads)" jump link as the API body and the section splitter drops
+	 * it alike (the renderer never makes a fragment clickable).
+	 */
 	function linkDestination(attrs) {
 		var href = readAttribute(attrs, 'href');
-		if (!href || !/^https?:\/\//i.test(href.trim())) return null;
+		if (!href) return null;
+		if (/^#[A-Za-z0-9_-]+$/.test(href.trim())) return href.trim();
+		if (!/^https?:\/\//i.test(href.trim())) return null;
 		return href.trim().replace(/[\s()<>\\]/g, function (ch) {
 			return '%' + ch.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0');
 		});
@@ -356,6 +366,25 @@
 	}
 
 	/**
+	 * Renders a fold as the exact structural lines the Markdown renderer and the
+	 * release-body splitter recognise. Its attributes are not carried over, and
+	 * the summary text is escaped like any other text, so no tag can leak in.
+	 */
+	function detailsLines(node) {
+		var summary = null;
+		var rest = [];
+		node.children.forEach(function (child) {
+			if (!summary && child.tag === 'summary') summary = child;
+			else rest.push(child);
+		});
+		var lines = [readAttribute(node.attrs, 'open') !== null ? '<details open>' : '<details>'];
+		if (summary) lines.push('<summary>' + inlineLines(summary.children).join(' ') + '</summary>');
+		var inner = blockLines(rest, false);
+		if (inner.length > 0) lines = lines.concat([''], inner);
+		return lines.concat(['', '</details>']);
+	}
+
+	/**
 	 * Renders a node list as Markdown block lines.
 	 * @param {Array} nodes
 	 * @param {boolean} tight - Inside a list item: no blank line between blocks.
@@ -417,6 +446,9 @@
 				case 'table':
 					lines = tableLines(node);
 					break;
+				case 'details':
+					lines = detailsLines(node);
+					break;
 				default:
 					lines = blockLines(node.children, tight);
 			}
@@ -474,7 +506,9 @@
 	 * @param {string} xml - Feed document text.
 	 * @param {string} owner - Expected repository owner.
 	 * @param {string} repo - Expected repository name.
-	 * @return {Array<{tag_name: string, body: string, html_url: string, published_at: string, prerelease: boolean}>}
+	 * GitHub does not publish the pre-release flag in the feed, so the records
+	 * carry none; the page reads it from the update-channel registry.
+	 * @return {Array<{tag_name: string, body: string, html_url: string, published_at: string}>}
 	 * @throws {Error} When the text is not an Atom feed.
 	 */
 	function parseReleasesAtom(xml, owner, repo) {
@@ -500,10 +534,7 @@
 				tag_name: tag,
 				body: releaseNotesHtmlToMarkdown(content || ''),
 				html_url: prefix + encodedTag,
-				published_at: (elementText(entry, 'updated') || '').trim(),
-				// GitHub does not publish the pre-release flag in the feed; the CI tag
-				// families encode it (stable = plain semver, dev = semver pre-release).
-				prerelease: /^v?\d+\.\d+\.\d+-/.test(tag)
+				published_at: (elementText(entry, 'updated') || '').trim()
 			});
 		});
 		return releases;

@@ -882,9 +882,8 @@ KLPF_BuildAndWrite(which, metrics_dir, dbg := "", mode := "full") {
 ; "full_required" outcome when a supplied checkpoint cannot admit this delta.
 KLPF_BuildAndWriteToPath(which, metrics_dir, path, dbg := "", mode := "full", HistorySeed := unset) {
 		if (dbg = "") {
-				global _ConfigDir, _AhkSubDir
-				try DirCreate(_ConfigDir . _AhkSubDir . "logs")
-				dbg := _ConfigDir . _AhkSubDir . "logs\prefetch_debug.log"
+				try DirCreate(LoggerLogsDir())
+				dbg := LoggerLogsDir() . "prefetch_debug.log"
 		}
 		KLPF_DbgWrite(dbg, "=== " . A_Now . " — which=" . which . " mode=" . mode)
 		t0 := A_TickCount

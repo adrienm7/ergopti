@@ -28,7 +28,7 @@ end
 
 local function write(path, text)
 	local fh = assert(io.open(path, "w"))
-	fh:write(text)
+	fh:write(require("tests.support.tap_hold_fixture").with_preset(text))
 	fh:close()
 end
 
@@ -36,7 +36,7 @@ end
 local function manager(user_text)
 	local Manager = helpers.load_module("platform.remap.tap_hold_manager")
 	local user_path = os.tmpname()
-	if user_text then write(user_path, user_text) else os.remove(user_path) end
+	write(user_path, user_text)
 	local hook, actions, resets = fake_hook(), {}, {}
 	Manager.init({
 		keyboard_hook = hook,

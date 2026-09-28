@@ -197,8 +197,8 @@ end
 --- The bundled root is a SIBLING of _shared and of this driver, not a child of
 --- either: extensions are shipped to all three drivers from one place, which is
 --- why the Windows driver's `_ExtensionsDir` points at the same directory. The
---- user root comes second so an extension installed by the user overrides a
---- bundled one of the same id — the overlay rule the hotstring packs already use.
+--- committed layout generations come next. The user root comes last, preserving
+--- its precedence over bundled and layout-installed packs with the same id.
 --- @return table Array of absolute paths; may be empty when neither exists.
 function M.extension_roots()
 	local roots = {}
@@ -209,6 +209,10 @@ function M.extension_roots()
 		roots[#roots + 1] = shared .. "/../extensions"
 	end
 	local ok_cfg, ConfigPaths = pcall(require, "infra.config_paths")
+	-- Resolve lazily: the layout registry itself imports Paths at module load.
+	for _, root in ipairs(require("modules.keymap.layout_registry").extension_roots()) do
+		roots[#roots + 1] = root
+	end
 	if ok_cfg and type(ConfigPaths.home) == "function" then
 		roots[#roots + 1] = ConfigPaths.home() .. "/.config/ergopti/extensions"
 	end

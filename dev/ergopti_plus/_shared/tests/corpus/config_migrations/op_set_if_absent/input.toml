@@ -1,0 +1,4 @@
+# _shared/tests/corpus/config_migrations/op_set_if_absent/input.toml
+
+[gestures]
+enabled = false

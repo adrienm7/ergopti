@@ -1,0 +1,81 @@
+--- tests/unit/infra/test_llm_preferences.lua
+
+local helpers = require("tests.helpers")
+local Sandbox = require("test.config_unused_keys_contract").sandbox
+local Codec = require("toml_codec")
+local SETTINGS = { "settings", "trigger_settings", "display_settings", "navigation_settings" }
+
+local function with_config(source, body)
+	Sandbox.with_config(source, function(path)
+		local names = { "infra.config_paths", "infra.llm_preferences", "adapters.storage" }
+		for _, name in ipairs(SETTINGS) do names[#names + 1] = "modules.llm." .. name end
+		local previous = {}
+		for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
+		local ok, err = pcall(function()
+			package.loaded["infra.config_paths"] = { config = function() return path end }
+			package.loaded["adapters.storage"] = require("tests.fakes").storage({ initial = {
+				["llm.generation.temperature"] = 0.2, ["llm.trigger.debounce_ms"] = 300,
+				["llm.display.show_info_bar"] = true,
+			} })
+			body(path)
+		end)
+		for _, name in ipairs(names) do package.loaded[name] = previous[name] end
+		if not ok then error(err, 0) end
+	end)
+end
+
+helpers.describe("canonical Linux AI settings", function()
+	helpers.it("cleanup retains consumed AI leaves and lists unknown neighbors", function()
+		with_config('[llm.generation]\ntemperature = 0.9\nfuture = 42\n[llm.trigger]\nafter_hotstring = false\n'
+			.. '[llm.display]\nshow_info_bar = false\n[llm.navigation]\nval_modifiers = ["ctrl"]\n', function(path)
+			local scan = require("ui.menu.unused_keys_cleanup").find(path)
+			helpers.assert_eq(scan.status, "ok")
+			helpers.assert_eq(#scan.keys, 1)
+			helpers.assert_eq(scan.keys[1].key, "future")
+		end)
+	end)
+
+	helpers.it("reads canonical generation and trigger values instead of legacy storage", function()
+		with_config('[llm.generation]\ntemperature = 0.9\n[llm.trigger]\ndebounce_ms = 750\n', function()
+			helpers.assert_eq(require("modules.llm.settings").get("temperature"), 0.9)
+			helpers.assert_eq(require("modules.llm.trigger_settings").get("debounce_ms"), 750)
+		end)
+	end)
+
+	helpers.it("writes sparse settings and reloads from disk while preserving unknown neighbors", function()
+		with_config('[llm.generation]\nfuture = "keep"\n[other]\nvalue = 42\n', function(path)
+			local settings = require("modules.llm.settings")
+			helpers.assert_true(settings.set("temperature", 0.9))
+			local document = Codec.decode(Sandbox.read_bytes(path))
+			helpers.assert_eq(document.llm.generation.temperature, 0.9)
+			helpers.assert_eq(document.llm.generation.future, "keep")
+			helpers.assert_eq(document.other.value, 42)
+			package.loaded["modules.llm.settings"] = nil
+			settings = require("modules.llm.settings")
+			helpers.assert_eq(settings.get("temperature"), 0.9)
+			helpers.assert_true(settings.set("temperature", require("infra.manifest_reader").default_for("llm.generation.temperature")))
+			helpers.assert_nil(Codec.decode(Sandbox.read_bytes(path)).llm.generation.temperature)
+		end)
+	end)
+
+	helpers.it("keeps false display values and modifier arrays across a fresh reader", function()
+		with_config('[llm.display]\nshow_info_bar = false\n[llm.navigation]\nval_modifiers = ["ctrl", "shift"]\n', function(path)
+			helpers.assert_eq(require("modules.llm.display_settings").get("show_info_bar"), false)
+			local navigation = require("modules.llm.navigation_settings")
+			helpers.assert_eq(table.concat(navigation.get(), "+"), "ctrl+shift")
+			helpers.assert_true(navigation.set({ "cmd" }))
+			package.loaded["modules.llm.navigation_settings"] = nil
+			helpers.assert_eq(require("modules.llm.navigation_settings").get()[1], "cmd")
+			helpers.assert_eq(Codec.decode(Sandbox.read_bytes(path)).llm.navigation.val_modifiers[1], "cmd")
+		end)
+	end)
+
+	helpers.it("rejects malformed canonical values without a legacy fallback or overwrite", function()
+		with_config('[llm.generation]\ntemperature = "bad"\n', function(path)
+			local before = Sandbox.read_bytes(path)
+			local ok = pcall(function() return require("modules.llm.settings").get("temperature") end)
+			helpers.assert_eq(ok, false)
+			helpers.assert_eq(Sandbox.read_bytes(path), before)
+		end)
+	end)
+end)

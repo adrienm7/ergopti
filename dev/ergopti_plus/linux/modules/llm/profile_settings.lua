@@ -13,10 +13,12 @@ local Logger = require("logger.shim")
 local Manifest = require("infra.manifest_reader")
 local Selector = require("llm.profile_selector")
 local ModelProfile = require("modules.llm.model_profile")
+local RegistryCodec = require("modules.llm.profile_registry_codec")
+local Json = require("json")
 
 local LOG = "modules.llm.profile_settings"
 local PREF_PREFIX = "llm.profiles."
-local USER_PROFILES_KEY = PREF_PREFIX .. "user_profiles"
+local USER_PROFILES_KEY = "llm.user_profiles"
 
 local DEFINITIONS = {
 	active = { path = "llm.profiles.active", type = "string" },
@@ -36,11 +38,19 @@ local _defaults = {}
 local _values = {}
 local _profiles = nil
 local _user_profiles = nil
+local _registry_source = nil
 -- Stored entries this version cannot read, kept verbatim and written back on
 -- every save: one bad entry used to empty the registry in memory, and the next
 -- save then erased every other prompt the user had written.
 local _unreadable_profiles = {}
 local _profile_serial = 0
+
+local function forget_registry(refresh_values)
+	_user_profiles = nil
+	_registry_source = nil
+	_unreadable_profiles = {}
+	if refresh_values then _values = {} end
+end
 
 local function profiles()
 	if _profiles then return _profiles end
@@ -69,8 +79,11 @@ local function batch_template()
 	return nil
 end
 
-local function normalize_user_profile(profile)
+local function normalize_user_profile(profile, from_registry)
 	if type(profile) ~= "table" then return nil end
+	local allowed = { id = true, label = true, system_single = true, system_multi = true,
+		system_multi_template = true, raw_prompt = true, batch = true, stop_sequences = true }
+	for key in pairs(profile) do if not allowed[key] then return nil end end
 	local id = trimmed(profile.id)
 	local label = trimmed(profile.label)
 	local prompt = trimmed(profile.system_single)
@@ -78,41 +91,67 @@ local function normalize_user_profile(profile)
 			or not prompt or prompt == "" or type(profile.batch) ~= "boolean" then
 		return nil
 	end
-	local multi = type(profile.system_multi_template) == "string"
-		and profile.system_multi_template or ""
+	if profile.system_multi_template ~= nil and type(profile.system_multi_template) ~= "string" then return nil end
+	if profile.system_multi ~= nil and type(profile.system_multi) ~= "string" then return nil end
+	local multi = profile.system_multi_template or ""
 	if profile.batch == true and multi == "" then
 		multi = batch_template()
 		if not multi then return nil end
 	end
-	return {
+	local normalized = {
 		id = id,
 		label = label,
 		system_single = prompt,
+		system_multi = profile.system_multi or "",
 		system_multi_template = multi,
 		batch = profile.batch == true,
 	}
+	if type(normalized.system_multi) ~= "string" then return nil end
+	if profile.raw_prompt ~= nil then
+		if type(profile.raw_prompt) ~= "string" then return nil end
+		normalized.raw_prompt = profile.raw_prompt
+	end
+	if profile.stop_sequences ~= nil then
+		if type(profile.stop_sequences) ~= "table" or Json.is_null(profile.stop_sequences)
+				or (from_registry and not Json.is_array(profile.stop_sequences)) then return nil end
+		normalized.stop_sequences = Json.array({})
+		for index, value in pairs(profile.stop_sequences) do
+			if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > #profile.stop_sequences
+				or type(value) ~= "string" or value == "" then return nil end
+			normalized.stop_sequences[index] = value
+		end
+		for index = 1, #profile.stop_sequences do
+			if profile.stop_sequences[index] == nil then return nil end
+		end
+	end
+	return normalized
 end
 
 local function copy_profile(profile)
 	local copy = {}
-	for key, value in pairs(profile) do copy[key] = value end
+	for key, value in pairs(profile) do
+		if type(value) == "table" then
+			copy[key] = key == "stop_sequences" and Json.array({}) or {}
+			for index, child in pairs(value) do copy[key][index] = child end
+		else
+			copy[key] = value
+		end
+	end
 	return copy
 end
 
 local function load_user_profiles()
 	if _user_profiles then return _user_profiles end
+	local Storage = require("infra.llm_preferences")
+	local values, source = Storage.get_many({ USER_PROFILES_KEY })
+	assert(type(source) == "table", "user profiles require an exact source snapshot")
+	local stored = RegistryCodec.decode(values[USER_PROFILES_KEY])
 	_user_profiles = {}
-	local ok, Storage = pcall(require, "adapters.storage")
-	if not ok or not Storage then return _user_profiles end
-	local stored = Storage.get(USER_PROFILES_KEY, {})
-	if type(stored) ~= "table" then
-		Logger.error(LOG, "Stored user-profile registry is not an array; ignoring it.")
-		return _user_profiles
-	end
+	_registry_source = source
 	_unreadable_profiles = {}
 	local seen = {}
 	for index, candidate in ipairs(stored) do
-		local profile = normalize_user_profile(candidate)
+		local profile = normalize_user_profile(candidate, true)
 		if not profile or seen[profile.id] or built_in_exists(profile.id) then
 			Logger.error(LOG, "Stored user profile at index %d is invalid; it is kept but not offered.", index)
 			_unreadable_profiles[#_unreadable_profiles + 1] = candidate
@@ -179,7 +218,7 @@ function M.get(name)
 	if _values[name] ~= nil then return _values[name] end
 	local shipped = default_for(name)
 	if shipped == nil then return nil end
-	local ok, Storage = pcall(require, "adapters.storage")
+	local ok, Storage = pcall(require, "infra.llm_preferences")
 	if ok and Storage then
 		local stored = Storage.get(PREF_PREFIX .. name, nil)
 		if valid(name, stored) then
@@ -196,11 +235,9 @@ end
 local function persist_one(name, value)
 	local shipped = default_for(name)
 	if shipped == nil or not valid(name, value) then return false end
-	local ok, Storage = pcall(require, "adapters.storage")
+	local ok, Storage = pcall(require, "infra.llm_preferences")
 	if not ok or not Storage then return false end
-	local persisted = value == shipped
-		and Storage.delete(PREF_PREFIX .. name)
-		or Storage.set(PREF_PREFIX .. name, value)
+	local persisted = Storage.set(PREF_PREFIX .. name, value)
 	if persisted ~= true then return false end
 	_values[name] = value
 	return true
@@ -220,7 +257,7 @@ function M.set(name, value, current_model)
 	end
 	if name == "active" and M.get("auto_profile_for_model") == true
 			and value ~= ModelProfile.recommend(current_model) then
-		local ok, Storage = pcall(require, "adapters.storage")
+		local ok, Storage = pcall(require, "infra.llm_preferences")
 		if not ok or not Storage or type(Storage.set_many) ~= "function"
 				or Storage.set_many({
 					[PREF_PREFIX .. "active"] = value,
@@ -336,20 +373,21 @@ function M.save_user_profile(candidate, activate, expected_existing)
 		return false
 	end
 
-	local ok, Storage = pcall(require, "adapters.storage")
+	local ok, Storage = pcall(require, "infra.llm_preferences")
 	if not ok or not Storage or type(Storage.set_many) ~= "function" then return false end
-	local writes = { [USER_PROFILES_KEY] = stored_registry(next_profiles) }
+	local writes = { [USER_PROFILES_KEY] = RegistryCodec.encode(stored_registry(next_profiles)) }
 	if activate == true then
 		writes[PREF_PREFIX .. "active"] = profile.id
 		writes[PREF_PREFIX .. "auto_profile_for_model"] = false
 	end
-	if Storage.set_many(writes) ~= true then
+	if Storage.set_many(writes, _registry_source) ~= true then
+		forget_registry(true)
 		Logger.error(LOG, "User profile '%s' could not be persisted; live registry is unchanged.",
 			profile.id)
 		return false
 	end
 
-	_user_profiles = next_profiles
+	forget_registry(false)
 	if activate == true then
 		_values.active = profile.id
 		_values.auto_profile_for_model = false
@@ -375,17 +413,18 @@ function M.delete_user_profile(profile_id)
 	if not found then return false end
 
 	local active = M.get("active")
-	local ok, Storage = pcall(require, "adapters.storage")
+	local ok, Storage = pcall(require, "infra.llm_preferences")
 	if not ok or not Storage or type(Storage.set_many) ~= "function" then return false end
-	local writes = { [USER_PROFILES_KEY] = stored_registry(next_profiles) }
+	local writes = { [USER_PROFILES_KEY] = RegistryCodec.encode(stored_registry(next_profiles)) }
 	if active == profile_id then writes[PREF_PREFIX .. "active"] = "basic" end
-	if Storage.set_many(writes) ~= true then
+	if Storage.set_many(writes, _registry_source) ~= true then
+		forget_registry(true)
 		Logger.error(LOG, "User profile '%s' could not be deleted; live registry is unchanged.",
 			profile_id)
 		return false
 	end
 
-	_user_profiles = next_profiles
+	forget_registry(false)
 	if active == profile_id then _values.active = "basic" end
 	Logger.info(LOG, "User profile '%s' deleted.", profile_id)
 	return true
@@ -397,9 +436,45 @@ function M._reset()
 	_values = {}
 	_profiles = nil
 	_user_profiles = nil
+	_registry_source = nil
 	_unreadable_profiles = {}
 	_profile_serial = 0
 	ModelProfile._reset()
+end
+
+--- Marks exactly the profile leaves consumed by this owner.
+--- @param document table Parsed canonical configuration.
+--- @param mark function Consumed-key collector.
+function M.mark_config_reads(document, mark)
+	local preferences = require("infra.llm_preferences")
+	preferences.mark_config_read(document, USER_PROFILES_KEY, mark)
+	for _, definition in pairs(DEFINITIONS) do preferences.mark_config_read(document, definition.path, mark) end
+end
+
+--- Captures registry identity as well as its exact-source cache.
+--- Opaque JSON identities remain owned by the codec and are never cloned here.
+--- @return table snapshot
+function M.configuration_snapshot()
+	return { values = _values, users = _user_profiles, source = _registry_source,
+		unreadable = _unreadable_profiles }
+end
+
+--- Restores an owner-issued registry/cache snapshot without serialization.
+--- @param snapshot table Owner-issued snapshot.
+--- @return boolean restored
+function M.restore_configuration(snapshot)
+	_values, _user_profiles = snapshot.values, snapshot.users
+	_registry_source, _unreadable_profiles = snapshot.source, snapshot.unreadable
+	return true
+end
+
+--- Reloads profile choices from the transaction's detached candidate.
+--- @return boolean applied
+function M.reload_configuration()
+	forget_registry(true)
+	load_user_profiles()
+	for name in pairs(DEFINITIONS) do if not valid(name, M.get(name)) then return false end end
+	return true
 end
 
 return M

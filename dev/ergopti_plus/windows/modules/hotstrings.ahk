@@ -47,6 +47,7 @@
 RegisterAllHotstrings(DeferHeavy := false) {
 	global Features, ScriptInformation, PersonalInformation, PersonalInformationLetters
 	global DeadkeyMappingCircumflex, SpaceAroundSymbols, PersonalInformationHotstrings
+	global _HotstringExtensionPacks
 
 	if (!DeferHeavy) {
 		try SetTimer(RegisterEmojisSymbolsDeferred, 0)
@@ -68,4 +69,5 @@ RegisterAllHotstrings(DeferHeavy := false) {
 	_HS_RegisterAutocorrection()
 	_HS_RegisterTextExpansionAndDynamic(DeferHeavy)
 	_HS_RegisterPersonal()
+	HotstringExtensions_Register(Features, _HotstringExtensionPacks, IsCategoryGated("Hotstrings"))
 }

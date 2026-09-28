@@ -209,6 +209,9 @@ helpers.describe("Preferences.save: exact atomic publication result", function()
 		helpers.assert_eq(preferences.save(path, {}, {}, {}), false)
 		helpers.assert_eq(disk, malformed)
 		helpers.assert_eq(expected_sources[1], { status = "ok", content = initial })
+		helpers.assert_eq(attempts, 1, "a stale or malformed source must stop before publication")
+		disk = initial
+		helpers.assert_eq(preferences.save(path, {}, {}, {}), false)
 		helpers.assert_eq(expected_sources[2], { status = "ok", content = initial },
 			"invalid external bytes must never become an overwrite authorization")
 	end)
@@ -260,10 +263,10 @@ end)
 
 helpers.describe("menu preferences: first-click rollback", function()
 	helpers.it("returns false only when a synchronous runtime setter raises", function()
-		local warnings = {}
+		local errors = {}
 		local logger = helpers.make_logger_stub()
-		logger.warn = function(_, fmt, ...)
-			warnings[#warnings + 1] = string.format(fmt, ...)
+		logger.error = function(_, fmt, ...)
+			errors[#errors + 1] = string.format(fmt, ...)
 		end
 		package.loaded["infra.logger"] = logger
 		local MenuState = helpers.load_with_stubs("ui.menu.menu_state")
@@ -296,17 +299,15 @@ helpers.describe("menu preferences: first-click rollback", function()
 			"a successful setter's nil return must not be confused with failure")
 		helpers.assert_eq(throw_result, false,
 			"a contained setter exception must make runtime synchronization fail")
-		helpers.assert_eq(#warnings, 1)
-		helpers.assert_contains(warnings[1], "keymap.set_preview_star_enabled failed")
-		helpers.assert_contains(warnings[1], "runtime setter failure")
+		helpers.assert_eq(#errors, 1, "the raised setter must be reported once, as an ERROR")
+		helpers.assert_contains(errors[1], "feature 'hotstrings'")
+		helpers.assert_contains(errors[1], "keymap.set_preview_star_enabled")
+		helpers.assert_contains(errors[1], "runtime setter failure")
 	end)
 
 	helpers.it("does not report rollback success when runtime restoration raises", function()
-		local warnings, errors = {}, {}
+		local errors = {}
 		local logger = helpers.make_logger_stub()
-		logger.warn = function(_, fmt, ...)
-			warnings[#warnings + 1] = string.format(fmt, ...)
-		end
 		logger.error = function(_, fmt, ...)
 			errors[#errors + 1] = string.format(fmt, ...)
 		end
@@ -355,10 +356,10 @@ helpers.describe("menu preferences: first-click rollback", function()
 		helpers.assert_eq(state.preview_star_enabled, false)
 		helpers.assert_eq(rollback_successes, 0,
 			"on_rollback must run only after every runtime setter completes")
-		helpers.assert_eq(#warnings, 1)
-		helpers.assert_contains(warnings[1], "rollback setter failure")
-		helpers.assert_eq(#errors, 2)
-		helpers.assert_contains(errors[2], "Preference rollback did not commit: false.")
+		helpers.assert_eq(#errors, 3)
+		helpers.assert_contains(errors[2], "keymap.set_preview_star_enabled")
+		helpers.assert_contains(errors[2], "rollback setter failure")
+		helpers.assert_contains(errors[3], "Preference rollback did not commit: false.")
 	end)
 
 	helpers.it("preserves retained nested table identities during rollback", function()

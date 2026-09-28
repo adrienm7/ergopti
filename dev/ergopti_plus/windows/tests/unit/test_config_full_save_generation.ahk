@@ -784,12 +784,15 @@ Test("config full save: inherited Critical cannot wrap collection IO timers or f
 
 _CFGFS_LlmCollectionDoesNotMutateLiveFeatures() {
 	global Features, _LLM_Menu, _LLM_Menu_Loaded
+	SavedFeatures := Features
 	SavedEnabled := Features["llm"]["enabled"]
 	SavedMenu := _LLM_Menu
 	HadLoaded := IsSet(_LLM_Menu_Loaded)
 	if HadLoaded
 		SavedLoaded := _LLM_Menu_Loaded
 	try {
+		Features := ManifestBuildFeaturesMap()
+		Features["llm"]["enabled"] := SavedEnabled
 		_LLM_Menu := _HSDeepCloneMap(SavedMenu)
 		_LLM_Menu_Loaded := true
 		_LLM_Menu["enabled"] := !SavedEnabled
@@ -802,7 +805,7 @@ _CFGFS_LlmCollectionDoesNotMutateLiveFeatures() {
 		AssertEqual(SavedEnabled, Features["llm"]["enabled"],
 			"speculative LLM reconciliation must target only the detached snapshot")
 	} finally {
-		Features["llm"]["enabled"] := SavedEnabled
+		Features := SavedFeatures
 		_LLM_Menu := SavedMenu
 		if HadLoaded
 			_LLM_Menu_Loaded := SavedLoaded

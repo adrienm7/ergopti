@@ -18,6 +18,7 @@ local owned_key_down = fixture.owned_key_down
 local physical_key_down = fixture.physical_key_down
 local physical_scroll = fixture.physical_scroll
 local owned_scroll = fixture.owned_scroll
+local capture_on_keycode_10 = fixture.capture_on_keycode_10
 
 helpers.describe("shortcuts.actions.system: exact provenance and ordered fences (HS-H-01)", function()
 	helpers.it("an owned @ event cannot trigger the screenshot tap (HS-H-01)", function()
@@ -28,7 +29,7 @@ helpers.describe("shortcuts.actions.system: exact provenance and ordered fences 
 				window_reads = window_reads + 1
 				return { id = function() return 42 end }
 			end
-			fixture.system.bind_instant_screenshot()
+			fixture.system.bind_tap_keys(nil, capture_on_keycode_10(fixture.system))
 			local tap = fixture.hs.eventtap.__taps[#fixture.hs.eventtap.__taps]
 			local event = owned_key_down(fixture, "@", 10, "@", {})
 			local timers_before = #fixture.hs.timer.__timers
@@ -322,7 +323,7 @@ helpers.describe("shortcuts.actions.system: exact provenance and ordered fences 
 					terminate = function() end,
 				})
 			end
-			fixture.system.bind_instant_screenshot()
+			fixture.system.bind_tap_keys(nil, capture_on_keycode_10(fixture.system))
 			local tap = fixture.hs.eventtap.__taps[#fixture.hs.eventtap.__taps]
 
 			fixture.synthetic.emit_key_stroke({ "cmd" }, "tab", 0)
@@ -470,7 +471,7 @@ helpers.describe("shortcuts.actions.system: exact provenance and ordered fences 
 							effects.count = effects.count + 1
 							return { id = function() return 42 end }
 						end
-						fixture.system.bind_instant_screenshot()
+						fixture.system.bind_tap_keys(nil, capture_on_keycode_10(fixture.system))
 					end,
 					keycode = 10, characters = "@", flags = {},
 				},

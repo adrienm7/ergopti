@@ -23,6 +23,7 @@ local NavigationSettings = require("modules.llm.navigation_settings")
 local TimerScheduler = require("adapters.timer_scheduler")
 local Inference = require("modules.llm.inference")
 local Monotonic = require("infra.monotonic")
+local i18n = require("infra.i18n")
 
 local LOG = "modules.llm.prediction_engine"
 
@@ -41,7 +42,26 @@ local _pending_trigger = nil
 local _scheduler = TimerScheduler
 local _triggers = { "//", ";;", "--" }
 local _max_tokens = nil
+local _scope_owner = nil
 local _request_epoch = 0
+
+-- Injected by init(): whether the daemon is paused, and how a manual request
+-- tells the user it was refused (a desktop notification in the daemon).
+local function NEVER_PAUSED() return false end
+local _is_paused = NEVER_PAUSED
+local _notify = nil
+
+-- The reasons a manual request is refused, each with the locale key of the
+-- notice that tells the user. manual_refusal checks them in this order: a pause
+-- outranks everything, then the AI switch, then the backend, then the typed
+-- context. Windows and macOS declare the same four
+-- (tools/test/test-manual-prediction-refusals-single-source.cjs).
+local MANUAL_REFUSAL_KEYS = {
+	paused            = "llm.manual_prediction.paused",
+	disabled          = "llm.manual_prediction.disabled",
+	backend_not_ready = "llm.manual_prediction.backend_not_ready",
+	empty_context     = "llm.manual_prediction.empty_context",
+}
 
 local function get_ollama()
 	local ok, module = pcall(require, "modules.llm.api_ollama")
@@ -174,6 +194,7 @@ local function schedule(context, output_context, delay_ms, reason)
 		input_chars = type(output_context) == "table" and output_context.input_chars or 0,
 	}
 	local handle = _scheduler.after(math.max(0, tonumber(delay_ms) or 0) / 1000, function()
+		if _scope_owner then return end
 		_pending_trigger = nil
 		M.predict(context, captured)
 	end)
@@ -190,6 +211,7 @@ end
 --- Initialises the engine and its explicit side-effect seams.
 --- @param opts table|nil
 function M.init(opts)
+	if _scope_owner then return false end
 	local options = type(opts) == "table" and opts or {}
 	_engine = options.engine
 	_keyboard_hook = options.keyboard_hook
@@ -197,6 +219,8 @@ function M.init(opts)
 	_apply_prediction = type(options.apply_prediction) == "function" and options.apply_prediction or nil
 	_on_output = type(options.on_output) == "function" and options.on_output or nil
 	_on_offer = type(options.on_offer) == "function" and options.on_offer or nil
+	_is_paused = type(options.is_paused) == "function" and options.is_paused or NEVER_PAUSED
+	_notify = type(options.notify) == "function" and options.notify or nil
 	_offer_notified = false
 	if type(options.triggers) == "table" then _triggers = options.triggers end
 	if _pending_trigger then _scheduler.cancel(_pending_trigger) end
@@ -221,6 +245,7 @@ end
 
 --- Processes one physical character after the hotstring buffer recorded it.
 function M.on_char(ch, buffer, output_context)
+	if _scope_owner then return false end
 	if not _enabled then return end
 	if type(ch) ~= "string" or type(buffer) ~= "string" then return end
 	if _predicting or #_suggestions > 0 then M.dismiss() end
@@ -247,6 +272,7 @@ end
 --- @param output_context table|nil
 --- @return boolean
 function M.on_hotstring_expired(context, output_context)
+	if _scope_owner then return false end
 	if not _enabled or TriggerSettings.get("after_hotstring") ~= true then return false end
 	if _predicting or #_suggestions > 0 then M.dismiss() end
 	return schedule(context, output_context, 0, "Hotstring-expiry")
@@ -304,6 +330,7 @@ end
 --- @param context string
 --- @param output_context table|nil
 function M.predict(context, output_context)
+	if _scope_owner then return false end
 	if _predicting or type(context) ~= "string" or context == "" then return end
 	if _is_secure_context() then
 		Logger.debug(LOG, "Prediction suppressed: secure field or excluded context.")
@@ -382,12 +409,13 @@ function M.predict(context, output_context)
 
 	local dispatch
 	dispatch = function()
-		if epoch ~= _request_epoch then return end
+		if _scope_owner or epoch ~= _request_epoch then return end
 		local kind = M.get_backend()
 		local now = _clock_ms()
 		local wait_ms = (_last_request_ms[kind] or -math.huge) + Inference.min_interval_ms(kind) - now
 		if wait_ms > 0 then
 			_rate_timer = _scheduler.after(wait_ms / 1000, function()
+				if _scope_owner then return end
 				_rate_timer = nil
 				dispatch()
 			end)
@@ -422,14 +450,14 @@ function M.predict(context, output_context)
 			-- user's copy of "basic" never got the single-line stops.
 			line_mode = not is_batch and not system_prompt:find("TAIL_CORRECTED", 1, true),
 		}, function(delta)
-			if epoch ~= _request_epoch then return end
+			if _scope_owner or epoch ~= _request_epoch then return end
 			streamed = streamed .. think_filter:feed(delta)
 			if DisplaySettings.get("streaming") ~= true then return end
 			if requested > 1 and DisplaySettings.get("streaming_multi") ~= true then return end
 			local partials = parse_response(streamed, is_batch, trigger_chars)
 			publish(partials[#partials])
 		end, function(full_text, err)
-			if epoch ~= _request_epoch then return end
+			if _scope_owner or epoch ~= _request_epoch then return end
 			if err then
 				_predicting = false
 				meta.loading = false
@@ -456,22 +484,74 @@ function M.predict(context, output_context)
 	dispatch()
 end
 
+--- Decides why a manual prediction request cannot run, if it cannot.
+--- @return string|nil reason A key of MANUAL_REFUSAL_KEYS, or nil when ready.
+--- @return string context The typing buffer the prediction would complete.
+local function manual_refusal()
+	if _is_paused() then return "paused", "" end
+	if not _enabled then return "disabled", "" end
+	if not M.get_prediction_model() then
+		return "backend_not_ready", ""
+	end
+	local buffer = _engine and type(_engine.current_buffer) == "function" and _engine:current_buffer() or ""
+	if type(buffer) ~= "string" or buffer == "" then return "empty_context", "" end
+	return nil, buffer
+end
+
+--- Runs a prediction now from the whole typing buffer: the llm_generate_prediction
+--- action. Automatic triggers wait for typing; this one is a chord pressed on
+--- purpose, so every refusal is logged at INFO and shown as a notification, as
+--- the other two drivers do.
+--- @param output_context table|nil { app_id } for the metrics; nil lets the
+---   daemon's observers fall back to the focused application.
+--- @return boolean requested True when predict() was started.
+function M.trigger_now(output_context)
+	if _scope_owner then return false end
+	local reason, context = manual_refusal()
+	if reason then
+		Logger.info(LOG, "Manual prediction refused (%s).", reason)
+		if not _notify then
+			Logger.error(LOG, "No notice surface injected — the '%s' refusal is only logged.", reason)
+		elseif _notify(i18n.get(MANUAL_REFUSAL_KEYS[reason])) ~= true then
+			Logger.warn(LOG, "The '%s' refusal notice was not shown.", reason)
+		end
+		return false
+	end
+	if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
+	if _predicting or #_suggestions > 0 then M.dismiss() end
+	Logger.info(LOG, "Manual prediction requested (%d context byte(s)).", #context)
+	M.predict(context, output_context)
+	return true
+end
+
+--- The catalogue actions this engine answers, for the gesture executor's
+--- daemon-injected handlers (modules/shortcuts/action_handlers.lua).
+--- @return table { [action_id] = function(binding, parameter) }
+function M.action_handlers()
+	return {
+		llm_generate_prediction = function() return M.trigger_now() end,
+	}
+end
+
 --- Cancels pending and in-flight work and shows nothing, leaving the hotstring
 --- buffer alone. For edits the caller has already applied to that buffer:
 --- Backspace and Escape update it precisely, and a reset here undid the edit.
 function M.withdraw()
+	if _scope_owner then return false end
 	if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
 	M.dismiss()
 end
 
 --- Cancels pending/in-flight work and discards the current engine buffer.
 function M.cancel()
+	if _scope_owner then return false end
 	M.withdraw()
 	if _engine and type(_engine.reset) == "function" then _engine:reset() end
 end
 
 --- Dismisses in-flight and visible suggestions without changing the buffer.
 function M.dismiss()
+	if _scope_owner then return false end
 	_request_epoch = _request_epoch + 1
 	if _rate_timer then _scheduler.cancel(_rate_timer); _rate_timer = nil end
 	if _predicting and _inflight_backend then _inflight_backend.cancel() end
@@ -484,6 +564,7 @@ end
 --- @param index integer
 --- @return boolean
 function M.accept(index)
+	if _scope_owner then return false end
 	local candidate = _suggestions[tonumber(index)]
 	if not candidate or type(_apply_prediction) ~= "function" then return false end
 	local ok, committed = pcall(_apply_prediction, candidate, _suggestion_context)
@@ -501,6 +582,7 @@ function M.accept(index)
 end
 
 function M.select(index)
+	if _scope_owner then return false end
 	if not _suggestions[tonumber(index)] then return false end
 	if _overlay and type(_overlay.select) == "function" then return _overlay.select(tonumber(index)) == true end
 	return true
@@ -526,6 +608,7 @@ end
 --- @param detail table { key, mods }
 --- @return boolean True when the key was the chord and must not reach the app.
 function M.handle_shortcut(detail)
+	if _scope_owner then return false end
 	if type(detail) ~= "table" or not offer_visible() then return false end
 	if not NavigationSettings.matches(detail.mods) then return false end
 	local key = tostring(detail.key or detail.char or "")
@@ -550,6 +633,7 @@ end
 function M.is_enabled() return _enabled end
 
 function M.enable()
+	if _scope_owner then return false end
 	local profiles = get_profiles()
 	if not profiles or type(profiles.enable) ~= "function" or profiles.enable() ~= true then
 		Logger.error(LOG, "Prediction engine enable was not persisted - keeping the current state.")
@@ -561,6 +645,7 @@ function M.enable()
 end
 
 function M.disable()
+	if _scope_owner then return false end
 	local profiles = get_profiles()
 	if not profiles or type(profiles.disable) ~= "function" or profiles.disable() ~= true then
 		Logger.error(LOG, "Prediction engine disable was not persisted - keeping the current state.")
@@ -583,6 +668,7 @@ function M.set_trigger_setting(name, value) return TriggerSettings.set(name, val
 function M.get_triggers() return _triggers end
 
 function M.set_triggers(triggers)
+	if _scope_owner then return false end
 	if type(triggers) ~= "table" then return false end
 	local accepted = {}
 	for _, trigger in ipairs(triggers) do
@@ -597,21 +683,20 @@ end
 --- The selected backend: "ollama" or "api".
 --- @return string
 function M.get_backend()
-	local ok, Storage = pcall(require, "adapters.storage")
-	local value = ok and Storage.get(BACKEND_KEY, nil) or nil
-	if BACKENDS[value] then return value end
-	return require("infra.manifest_reader").default_for(BACKEND_KEY)
+	local value = require("infra.llm_preferences").get(BACKEND_KEY)
+	if value == nil then value = require("infra.manifest_reader").default_for(BACKEND_KEY) end
+	assert(BACKENDS[value], "invalid configured prediction backend")
+	return value
 end
 
 --- Selects the backend.
 --- @param kind string "ollama" or "api"
 --- @return boolean
 function M.set_backend(kind)
+	if _scope_owner then return false end
 	if not BACKENDS[kind] then return false end
 	M.dismiss()
-	local ok, Storage = pcall(require, "adapters.storage")
-	if not ok then return false end
-	Storage.set(BACKEND_KEY, kind)
+	if require("infra.llm_preferences").set(BACKEND_KEY, kind) ~= true then return false end
 	Logger.info(LOG, "Prediction backend set to '%s'.", kind)
 	return true
 end
@@ -733,5 +818,70 @@ function M.get_stop_sequences() return {} end
 
 --- Compatibility query retained for UI bridges: Linux suggestions are explicit.
 function M.is_auto_inject() return false end
+
+--- Acquires the prediction gate before scope cancellation or publication.
+--- @param owner table Transaction identity.
+--- @return boolean acquired
+function M.acquire_configuration(owner)
+	if _scope_owner or type(owner) ~= "table" then return false end
+	_scope_owner = owner
+	return true
+end
+
+--- Releases only the settled transaction's prediction admission.
+--- @param owner table Transaction identity.
+--- @return boolean released
+function M.release_configuration(owner)
+	if _scope_owner ~= owner or owner.pending() then return false end
+	_scope_owner = nil
+	return true
+end
+
+--- Cancels native work before taking a reversible preference snapshot.
+--- Completed cancellations are intentionally not replayed: a remote prompt may
+--- already have been billed. Refusals retain ownership for an explicit retry.
+--- @param owner table Admission identity.
+--- @return boolean quiescent
+function M.quiesce_configuration(owner)
+	if _scope_owner ~= owner then return false end
+	if _pending_trigger then
+		if _scheduler.cancel(_pending_trigger) ~= true then return false end
+		_pending_trigger = nil
+	end
+	if _rate_timer then
+		if _scheduler.cancel(_rate_timer) ~= true then return false end
+		_rate_timer = nil
+	end
+	-- Backend connectivity probes share these owners, even when the prediction
+	-- engine did not start them. Model downloads have a separate HTTP owner.
+	local backends = { get_ollama(), get_remote() }
+	if #backends ~= 2 then return false end
+	for _, backend in ipairs(backends) do if backend.cancel() ~= true then return false end end
+	_inflight_backend = nil
+	_request_epoch = _request_epoch + 1
+	_predicting = false
+	if _overlay and _overlay.hide() ~= true then return false end
+	_suggestions, _suggestion_context, _offer_notified = {}, nil, false
+	return true
+end
+
+--- Captures only a quiescent gate; cancelled external work is not reversible.
+--- @param owner table Admission identity.
+--- @return table|nil snapshot
+function M.configuration_snapshot(owner)
+	if _scope_owner ~= owner or _predicting or _pending_trigger or _rate_timer or _inflight_backend then return nil end
+	return { enabled = _enabled }
+end
+
+--- Applies the desired prediction gate without inference or buffer edits.
+--- @param owner table Admission identity.
+--- @param snapshot table Desired enabled state.
+--- @return boolean applied
+function M.apply_configuration(owner, snapshot)
+	if _scope_owner ~= owner or type(snapshot.enabled) ~= "boolean" then return false end
+	if not M.quiesce_configuration(owner) then return false end
+	_enabled = snapshot.enabled
+	return _enabled == snapshot.enabled
+end
 
 return M

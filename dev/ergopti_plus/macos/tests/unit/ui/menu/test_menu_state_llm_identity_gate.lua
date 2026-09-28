@@ -122,13 +122,13 @@ helpers.describe("menu_state: strict LLM identity restore gates downstream keyma
 
 	for _, mode in ipairs({ "false", "nil", "throw" }) do
 		helpers.it("stops keymap publication after enabled identity " .. mode, function()
-			local runtime_enabled
+			local enabled_values = {}
 			local downstream_calls = 0
 			local llm = {}
 			for _, name in ipairs(identity_order) do
 				llm[name] = function() return true end
 			end
-			local committed = MenuState.sync_state_to_modules(
+			local committed, report = MenuState.sync_state_to_modules(
 				make_state(), {}, false, {
 					keymap = {
 						set_llm_model = function() return true end,
@@ -137,7 +137,7 @@ helpers.describe("menu_state: strict LLM identity restore gates downstream keyma
 						end,
 					},
 					apply_llm_enabled = function(value)
-						runtime_enabled = value
+						enabled_values[#enabled_values + 1] = value
 						return refusal(mode)
 					end,
 					hotstring_editor = {},
@@ -146,10 +146,48 @@ helpers.describe("menu_state: strict LLM identity restore gates downstream keyma
 				})
 
 			helpers.assert_eq(committed, false)
-			helpers.assert_eq(runtime_enabled, true)
+			helpers.assert_eq(enabled_values, { true, false },
+				"the refused ON must be followed by an attempt to keep the AI off")
 			helpers.assert_eq(downstream_calls, 0)
+			helpers.assert_eq(#report.unsettled, 1,
+				"an AI whose OFF is refused too has an unknown runtime posture")
+			helpers.assert_eq(report.unsettled[1].feature, "ai")
 		end)
 	end
+
+	helpers.it("demotes only the AI when its ON switch is refused (R5)", function()
+		local llm = {}
+		for _, name in ipairs(identity_order) do
+			llm[name] = function() return true end
+		end
+		local preview_star_values = {}
+		local downstream_calls = 0
+		local state = make_state()
+		state.preview_star_enabled = true
+		local committed, report = MenuState.sync_state_to_modules(state, {}, false, {
+			keymap = {
+				set_llm_model = function() return true end,
+				set_llm_backend_name = function() downstream_calls = downstream_calls + 1 end,
+				set_preview_star_enabled = function(value)
+					preview_star_values[#preview_star_values + 1] = value
+				end,
+			},
+			apply_llm_enabled = function(value) return value == false end,
+			hotstring_editor = {},
+			core_mods = {llm = llm},
+		})
+
+		helpers.assert_eq(committed, false)
+		helpers.assert_eq(state.llm_enabled, false, "the refused AI must show OFF in memory")
+		helpers.assert_eq(#report.demotions, 1)
+		helpers.assert_eq(report.demotions[1].key, "llm_enabled")
+		helpers.assert_eq(report.demotions[1].persisted, true,
+			"the saved AI ON must stay available for config.toml")
+		helpers.assert_eq(#report.unsettled, 0)
+		helpers.assert_eq(downstream_calls, 0, "no AI option may apply over a refused switch")
+		helpers.assert_eq(preview_star_values, { true },
+			"hotstring previews must not depend on the AI switch")
+	end)
 
 	helpers.it("keeps non-identity nil-returning display setters permissive", function()
 		local llm = {set_llm_streaming = function() return nil end}

@@ -22,7 +22,7 @@
 ; ``path`` (canonical v2), ``id``, ``description_key``, etc. The toggle, state
 ; read and label are all driven by that v2 path through infra/feature_io.ahk.
 ; ``V1CategoryPath`` is the PascalCase top-level category (``Layout``,
-; ``Shortcuts``, ``Autocorrection``, …) used only for the master-gate greying.
+; ``Shortcuts``, ``Autocorrection``, …) carried by category builders.
 MenuAddItemFromManifest(MenuParent, ManifestEntry, V1CategoryPath) {
 	Row := MenuRowFromManifest(ManifestEntry, V1CategoryPath)
 	if (Row == "") {
@@ -44,7 +44,7 @@ MenuAddItemFromManifest(MenuParent, ManifestEntry, V1CategoryPath) {
 ;
 ; ``ManifestEntry`` is a Map from ``ManifestFeaturesForSection`` carrying
 ; ``path`` (canonical v2), ``id``, ``description_key``, etc.
-; ``V1CategoryPath`` is the PascalCase top-level category used for the greying.
+; ``V1CategoryPath`` identifies the owning PascalCase top-level category.
 MenuRowFromManifest(ManifestEntry, V1CategoryPath) {
 	global Features
 	V2Path := ManifestEntry["path"]
@@ -67,25 +67,15 @@ MenuRowFromManifest(ManifestEntry, V1CategoryPath) {
 		"action",  (*) => ToggleFeatureV2(V2Path),
 		"checked", (State.Has("enabled") and State["enabled"]) ? true : false)
 
-	; Greying — off when the master category gate is off OR the per-file
-	; sub-category gate is off. The sub-category gate lets a single hotstring
-	; TOML file be switched off while the rest stay live; greying its sections
-	; keeps them from being live-toggled back on while the file is off.
-	; _MasterCategoryFor maps hotstring sub-categories to the Hotstrings master;
-	; the first path segment is the sub-category itself (a no-op extra check for
-	; non-hotstring categories, whose first segment IS their master gate).
-	;
-	; DynamicHotstrings is excluded from that second check: unlike its five
-	; siblings (Autocorrection/DistancesReduction/SFBsReduction/Rolls/MagicKey),
-	; it has no independent per-file CategoryEnabled entry -- it follows the
-	; Hotstrings master directly (see menu_hotstrings.ahk's _HS_CategoriesDynamic
-	; comment). IsCategoryGated("DynamicHotstrings") would log a spurious
-	; "unknown category" warning on every menu build for no behavioral gain --
-	; the first check above already covers it via _MasterCategoryFor.
-	SubCategory := StrSplit(V1CategoryPath, ".")[1]
-	if !IsCategoryGated(_MasterCategoryFor(V1CategoryPath))
-		or (SubCategory != "DynamicHotstrings" and !IsCategoryGated(SubCategory)) {
+	; The master controls activation; its children remain configurable. Pause
+	; greying remains owned by the shared menu renderer.
+	; A feature an emulated registry layout replaces is off while one is emulated
+	; (infra/master_gates.ahk): grey its row and say why, so the unticked box does
+	; not read as a setting the user can turn back on.
+	SupersededReason := LayoutSupersededReason(ManifestEntry)
+	if (SupersededReason != "") {
 		Row["disabled"] := true
+		Row["label"] := MenuTitle . " (" . t(SupersededReason) . ")"
 	}
 	return Row
 }
@@ -99,7 +89,7 @@ MenuRowFromManifest(ManifestEntry, V1CategoryPath) {
 ; ``V2Path`` is the canonical v2 path of the feature (e.g.
 ; "hotstrings.personal.<id>", "shortcuts.personal.<name>"); toggles and state
 ; reads go through infra/feature_io.ahk. ``MasterCategory`` is the v1 PascalCase
-; top-level category whose master-gate state controls greying (``Hotstrings``,
+; top-level category carried by the caller (``Hotstrings``,
 ; ``Shortcuts``).
 MenuAddItemWithLabel(MenuParent, V2Path, MenuTitle, MasterCategory) {
 	Row := MenuRowWithLabel(V2Path, MenuTitle, MasterCategory)
@@ -132,9 +122,6 @@ MenuRowWithLabel(V2Path, MenuTitle, MasterCategory) {
 		"label",   MenuTitle,
 		"action",  (*) => ToggleFeatureV2(V2Path),
 		"checked", (State.Has("enabled") and State["enabled"]) ? true : false)
-	if !IsCategoryGated(MasterCategory) {
-		Row["disabled"] := true
-	}
 	return Row
 }
 
@@ -249,10 +236,6 @@ MenuAddLetterPicker(MenuParent, V2Path, MasterCategory) {
 		MenuParent.Check(MenuTitle)
 	}
 
-	; Grey out the picker when its master category gate is off (UX affordance).
-	if !IsCategoryGated(MasterCategory) {
-		try MenuParent.Disable(MenuTitle)
-	}
 }
 
 ; Sets the remap target letter on a feature and enables it. Persists both the

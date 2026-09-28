@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 
 local LOCALISED_NAME = "Ergopti+"
 local KL_NAME = "Ergopti_v2_2_2_plus"
-local RAW_ID = "com.apple.keyboardlayout.ergopti.plus"
+local KEYLAYOUT_PATH = "/tmp/Ergopti.bundle/Contents/Resources/Ergopti_v2_2_2_plus.keylayout"
 
 
 --- Clears every stateful module owned by this test fixture.
@@ -230,15 +230,26 @@ helpers.describe("input-source mutations: deadline owns the subprocess", functio
 				label = "enable",
 				executable = "/usr/bin/python3",
 				invoke = function(IS, done)
-					return IS.enable_and_select_source_async(
-						RAW_ID, "Ergopti+", "/tmp/Ergopti.bundle", "Ergopti", done)
+					return IS.enable_keylayout_source_async(KEYLAYOUT_PATH, "Ergopti+", done)
 				end,
 				assert_args = function(args)
 					helpers.assert_eq(args[1], "-c")
-					helpers.assert_eq(args[3], "/tmp/Ergopti.bundle")
-					helpers.assert_eq(args[4], "Ergopti")
+					helpers.assert_eq(args[3], "enable")
+					helpers.assert_eq(args[4], KEYLAYOUT_PATH)
 					helpers.assert_eq(tonumber(args[5]), 9,
 						"the nested supervisor must finish before the outer owned deadline")
+				end,
+			},
+			{
+				label = "disable",
+				executable = "/usr/bin/python3",
+				invoke = function(IS, done)
+					return IS.disable_keylayout_source_async(KL_NAME, "Ergopti+", done)
+				end,
+				assert_args = function(args)
+					helpers.assert_eq(args[1], "-c")
+					helpers.assert_eq(args[3], "disable")
+					helpers.assert_eq(args[4], KL_NAME)
 				end,
 			},
 			{
@@ -289,8 +300,14 @@ helpers.describe("input-source mutations: deadline owns the subprocess", functio
 				label = "enable",
 				stdout = "ALREADY_PRESENT\n",
 				invoke = function(IS, done)
-					return IS.enable_and_select_source_async(
-						RAW_ID, "Ergopti+", "/tmp/Ergopti.bundle", "Ergopti", done)
+					return IS.enable_keylayout_source_async(KEYLAYOUT_PATH, "Ergopti+", done)
+				end,
+			},
+			{
+				label = "disable",
+				stdout = "ABSENT\n",
+				invoke = function(IS, done)
+					return IS.disable_keylayout_source_async(KL_NAME, "Ergopti+", done)
 				end,
 			},
 			{
@@ -328,8 +345,7 @@ helpers.describe("input-source mutations: deadline owns the subprocess", functio
 			{
 				stdout = "OKAY\n",
 				invoke = function(IS, done)
-					return IS.enable_and_select_source_async(
-						RAW_ID, "Ergopti+", "/tmp/Ergopti.bundle", "Ergopti", done)
+					return IS.enable_keylayout_source_async(KEYLAYOUT_PATH, "Ergopti+", done)
 				end,
 			},
 			{

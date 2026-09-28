@@ -52,6 +52,7 @@ local function new_context(config)
 		delivered = {},
 		failures = {},
 		rejected = {},
+		recoveries = {},
 		route_calls = 0,
 		activation_order = {},
 	}
@@ -260,6 +261,9 @@ local function new_context(config)
 		on_rejected = function(record)
 			state.rejected[#state.rejected + 1] = record
 			return true
+		end,
+		on_stall_recovered = function(stalled_ms, shed)
+			state.recoveries[#state.recoveries + 1] = { stalled_ms = stalled_ms, shed = shed }
 		end,
 		on_failed = function(message)
 			state.failures[#state.failures + 1] = message

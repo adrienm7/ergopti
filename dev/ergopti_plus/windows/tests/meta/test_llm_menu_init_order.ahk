@@ -36,26 +36,27 @@
 ; =====================================
 
 _MetaCheckLlmTrayInitOrder() {
-	; Scope the check to initMenu()'s body (now in ui/menu/menu_init.ahk) via the
-	; location-independent driver-source helper, so the order assertion survives
-	; the menu decomposition. The reset must come before the LLM_Menu_Init() call.
-	Body := _DriverFuncBody("initMenu")
-	Assert(Body != "", "initMenu() must exist in the driver source")
+	; Scope the check to the IA row's tray-root builder, the one initMenu
+	; dispatches the `llm` id to (ui/menu/menu_init.ahk), via the
+	; location-independent driver-source helper. The reset must come before the
+	; LLM_Menu_Init() call.
+	Body := _DriverFuncBody("_MI_StageLlm")
+	Assert(Body != "", "_MI_StageLlm() must exist in the driver source")
 
 	ResetPos := InStr(Body, "_LLM_Menu_InTray := false")
 	InitPos  := InStr(Body, "LLM_Menu_Init(")
 
 	Assert(ResetPos > 0,
-		"initMenu() must set _LLM_Menu_InTray := false before LLM_Menu_Init() "
+		"_MI_StageLlm() must set _LLM_Menu_InTray := false before LLM_Menu_Init() "
 		. "to prevent the boot-time race condition that hides the IA menu entry")
 
 	Assert(InitPos > 0,
-		"initMenu() must call LLM_Menu_Init() — entry point not found")
+		"_MI_StageLlm() must call LLM_Menu_Init() — entry point not found")
 
 	Assert(ResetPos < InitPos,
-		"_LLM_Menu_InTray := false must appear before LLM_Menu_Init() in initMenu() "
+		"_LLM_Menu_InTray := false must appear before LLM_Menu_Init() in _MI_StageLlm() "
 		. "(found reset at offset " . ResetPos . ", LLM_Menu_Init at offset " . InitPos . ")")
 }
 
-Test("meta llm: _LLM_Menu_InTray reset before LLM_Menu_Init in initMenu()",
+Test("meta llm: _LLM_Menu_InTray reset before LLM_Menu_Init in the IA root builder",
 	_MetaCheckLlmTrayInitOrder)

@@ -67,6 +67,15 @@ Test("nav layer: the scanner flags a layer hotkey without the wildcard (nav-laye
 _NLHM_EveryLayerHotkeyFiresUnderAHeldModifier() {
 	Src := _StripFullLineComments(_DriverDirConcat("platform/remap"))
 	Assert(Src != "", "the tap-hold sources must be readable")
+	; Scan both the remaining static special cases and the dynamic labels the
+	; recommended file actually registers. The source alone now has only two.
+	SharedDir := A_ScriptDir . "\..\..\_shared"
+	Ctx := KeymapLayers_LoadContext(SharedDir)
+	Result := KeymapLayers_Load("windows", Ctx, FileRead(SharedDir . "\keymap\layers.recommended.toml", "UTF-8"))
+	Assert(Result["ok"], "the recommended navigation layer must resolve")
+	Src .= "`n#HotIf LayerEnabled`n"
+	for Row in NavLayer_BuildTable(Result["layers"][NAV_LAYER_ID], Ctx)
+		Src .= Row["hotkey"] . ":: return`n"
 	Offenders := _NLHM_Offenders(Src, &Subjects)
 	AssertEqual("", Offenders,
 		"under a held modifier these layer keys run their native function instead of their layer mapping")

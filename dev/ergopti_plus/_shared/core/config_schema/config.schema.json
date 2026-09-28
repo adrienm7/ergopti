@@ -8,6 +8,7 @@
 	"_comment_required": "Deliberately absent. Which top-level sections a config.toml must carry is per-driver, and the feature manifest's `platforms` list already says so — [sections.script] is [\"ahk\", \"hs\"] because Linux keeps its locale in its own XDG store. A hardcoded `required` here restated that in a second place, disagreed with the first, and the disagreement had to be pinned as a known gap. test-config-schema.cjs derives the presence rule from the manifest instead, per driver.",
 
 	"properties": {
+		"_meta": { "$ref": "#/$defs/meta" },
 		"script": { "$ref": "#/$defs/script" },
 		"hotstrings": { "$ref": "#/$defs/hotstrings" },
 		"llm": { "$ref": "#/$defs/llm" },
@@ -15,10 +16,25 @@
 		"shortcuts": { "$ref": "#/$defs/shortcuts" },
 		"gestures": { "$ref": "#/$defs/gestures" },
 		"layout": { "$ref": "#/$defs/layout" },
-		"category_enabled": { "$ref": "#/$defs/category_enabled" }
+		"tap_holds": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": { "enabled": { "type": "boolean" } }
+		},
+		"category_enabled": { "$ref": "#/$defs/category_enabled" },
+		"ui": { "$ref": "#/$defs/ui" }
 	},
 
 	"$defs": {
+		"meta": {
+			"description": "File metadata. schema_version is the config version the drivers migrate from at boot (_shared/core/config_schema/migrations.toml; docs/adr/009-config-versioning.md). A file without it is the registry's unstamped_version.",
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"schema_version": { "type": "integer", "minimum": 1 }
+			}
+		},
+
 		"feature_toggle": {
 			"description": "Universal feature toggle. ``enabled`` is required; ``time_activation_seconds`` is optional (omission = instant activation).",
 			"type": "object",
@@ -49,6 +65,10 @@
 				"log_level": {
 					"enum": ["DEBUG", "TRACE", "DONE", "INFO", "START", "SUCCESS", "WARNING", "ERROR"]
 				},
+				"show_error_dialog": {
+					"type": "boolean",
+					"description": "Whether a logged error may open the error window (Debug menu)."
+				},
 				"alt_gr_is_kana_remap": {
 					"oneOf": [{ "type": "boolean" }, { "const": "auto" }]
 				}
@@ -63,6 +83,7 @@
 				"^[a-z]+_(distancesreduction|sfbsreduction|rolls|autocorrection|magickey)$": { "$ref": "#/$defs/feature_group" }
 			},
 			"properties": {
+				"enabled": { "type": "boolean" },
 				"trigger_char": { "type": "string", "minLength": 1, "maxLength": 1 },
 				"magic_key_source_scan": { "type": "string", "pattern": "^[Ss][Cc](?!000$)[0-9A-Fa-f]{3}$" },
 				"magic_key_source_char": { "type": "string", "minLength": 1, "maxLength": 1 },
@@ -84,6 +105,7 @@
 					"type": "object",
 					"additionalProperties": false,
 					"properties": {
+						"enabled": { "type": "boolean" },
 						"date": { "$ref": "#/$defs/feature_toggle" },
 						"date_fr": { "$ref": "#/$defs/feature_toggle" },
 						"date_long_fr": { "$ref": "#/$defs/feature_toggle" },
@@ -146,7 +168,7 @@
 						"selected": { "type": "string", "minLength": 1 },
 						"ollama": { "type": "string" },
 						"mlx": { "type": "string" },
-						"user_models": { "type": "object" }
+						"user_models": { "type": "array", "items": { "type": "object" } }
 					}
 				},
 				"profiles": {
@@ -157,7 +179,7 @@
 						"num_predictions": { "type": "integer", "minimum": 1, "maximum": 32 },
 						"auto_profile_for_model": { "type": "boolean" },
 						"shortcuts": { "type": "object" },
-						"user_profiles": { "type": "object" }
+						"user_profiles": { "type": "array", "items": { "type": "object" } }
 					}
 				},
 				"trigger": {
@@ -171,7 +193,7 @@
 						"secure_filter_enabled": { "type": "boolean" },
 						"url_bar_filter_enabled": { "type": "boolean" },
 						"shortcut": { "type": "boolean" },
-						"disabled_apps": { "type": "object" }
+						"disabled_apps": { "type": "array", "items": { "type": "string" } }
 					}
 				},
 				"navigation": {
@@ -183,7 +205,10 @@
 							"type": "array",
 							"items": { "enum": ["alt", "ctrl", "shift", "cmd"] }
 						},
-						"nav_modifiers": { "type": "object" }
+						"nav_modifiers": {
+							"type": "array",
+							"items": { "enum": ["alt", "ctrl", "shift", "cmd"] }
+						}
 					}
 				}
 			}
@@ -213,7 +238,8 @@
 					}
 				},
 				"disabled_apps": {
-					"type": "object",
+					"type": ["object", "array"],
+					"items": { "type": "string" },
 					"properties": {
 						"list": { "type": "array", "items": { "type": "string" } }
 					}
@@ -256,17 +282,30 @@
 			"type": "object",
 			"additionalProperties": false,
 			"properties": {
+				"pause_switch_enabled": { "type": "boolean" },
+				"on_pause": { "type": ["boolean", "string"] },
+				"on_resume": { "type": ["boolean", "string"] },
 				"ergopti_base": { "type": "boolean" },
 				"direct_access_digits": { "type": "boolean" },
 				"ergopti_alt_gr": { "type": "boolean" },
 				"ergopti_plus": { "type": "boolean" },
-				"ctrl_magic_save": { "type": "boolean" }
+				"ctrl_magic_save": { "type": "boolean" },
+				"emulated_layout": { "type": "string", "pattern": "^([a-z][a-z0-9_]*)?$" }
 			}
 		},
 
 		"category_enabled": {
 			"type": "object",
 			"additionalProperties": { "type": "boolean" }
+		},
+
+		"ui": {
+			"description": "The tray's own appearance. menubar_icon is the macOS menubar icon variant; its values are the manifest's ui.menubar_icon enum.",
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"menubar_icon": { "type": "string", "enum": ["v1", "v2"] }
+			}
 		}
 	}
 }

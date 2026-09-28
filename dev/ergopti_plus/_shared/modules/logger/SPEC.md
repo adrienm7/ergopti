@@ -7,10 +7,11 @@ Divergences are listed explicitly in
 [§ Driver-specific extensions](#driver-specific-extensions) and are intentional.
 
 > Note on the third implementation: `_shared/lua/logger/init.lua` is the
-> platform-neutral core (levels, formatter, ring buffer, level filter) and is
-> designed to be extended by injecting an output sink via `M.set_sink()`. It is
-> consumed today by the **Linux** driver only, via `logger/shim.lua`; macOS and
-> Windows each re-implement the same contract independently.
+> platform-neutral core (levels, formatter, ring buffer, level filter,
+> suppression) and is designed to be extended by injecting an output sink via
+> `M.set_sink()`. The **Linux** driver runs it via `logger/shim.lua` and the
+> **macOS** driver via `infra/logger.lua`; Windows mirrors the same contract in
+> `windows/infra/logger.ahk`.
 
 ---
 
@@ -173,6 +174,76 @@ String aliases accepted by `set_level()`:
 
 Default level: **10** (all variants active).
 
+A line that passes the filter can still be withheld by one of the two
+suppression layers below. Both are implemented once in the shared Lua core
+(macOS and Linux) and mirrored in `windows/infra/logger.ahk`, and both are
+pinned by `_shared/tests/corpus/logger/behaviour_vectors.json`, whose `dedup`
+and `repeat` sections all three driver suites replay.
+
+### 4.1 Consecutive-line deduplication
+
+- Always on. The key is everything after the timestamp:
+  `[LEVEL] [MODULE] body`.
+- A line whose key equals the previous accepted line's, within
+  `dedup_window_ms` (5000, `_shared/modules/timings/constants.toml [logger]`)
+  of that line, is not emitted; it is counted.
+- The next accepted line first emits
+  `[LEVEL] [logger] ↑ N identical line(s) suppressed` at the suppressed variant.
+- A terminal flush (exit, reload) emits that summary for a streak still open.
+
+### 4.2 Repeat collapsing
+
+The consecutive dedup cannot see a line that recurs every 30 s with other lines
+in between, or one whose arguments change. Repeat collapsing does.
+
+- **Arming.** Disarmed until the driver's logger boot arms it, exactly once; a
+  second arming is refused. A test process that never boots a driver therefore
+  sees no collapsing. The owners are listed at the end of this section.
+- **Key.** Variant + module + text. The text is the **unformatted template** for
+  `debug` and `info`, so a counter in the arguments cannot defeat the key, and
+  the **formatted body** for `warn` and `error`, so every distinct failure is
+  still recorded once. `trace`, `done`, `start` and `success` are never
+  collapsed: both halves of a lifecycle pair (§ 1.2) always stay visible.
+- **Transitions.** Lines sharing a template share one streak whatever their
+  arguments. A `debug` or `info` line whose arguments are the news (a state
+  change, a recovery) is therefore passed already formatted, so its text is its
+  key and each distinct change is written when it happens.
+- **Order.** Only lines that § 4.1 let through reach this layer, so a burst is
+  reported once, by the dedup summary.
+- **Streaks.** The first occurrence is emitted and opens a streak. Later
+  occurrences within `repeat_window_ms` (600000) of that first one are withheld:
+  counted, with the first and last withheld timestamps and the last formatted
+  body recorded. A withheld line reaches no sink and no ring buffer.
+- **Closing.** A streak closes when its window has elapsed (checked on every
+  emission and on the driver's periodic flush tick), when the calendar date of
+  the current timestamp differs from the streak's (every streak closes), when it
+  is the least recently used of `repeat_streak_capacity` (64) live streaks and a
+  new one needs room, or on a terminal flush, which closes the § 4.1 streak
+  first. The next occurrence after a close is emitted and opens a new streak.
+- **Summary.** A closed streak that withheld at least one line emits one line at
+  its own variant and under its own module, so a collapsed warning still reaches
+  the errors-only file and a topical file still receives it:
+
+  ```
+  TIMESTAMP [LEVEL] [module] ↑ "<text>" repeated N more time(s) between <first> and <last>[ (last: <body>)].
+  ```
+
+  The `(last: …)` clause appears only when the last formatted body differs from
+  the key text. Streaks closed together are summarised in the order they opened.
+- **Owners.** Each driver arms the layer once, runs the periodic flush on a
+  timer that is never the input path, and runs the terminal flush at exit and
+  reload:
+  - AHK: armed in `LoggerInit`'s one-time block; periodic flush in
+    `_LoggerFlush` on its `LOGGER_FLUSH_INTERVAL_MS` timer; terminal flush in
+    `_LoggerOnExitFlush`.
+  - macOS: armed by `Logger.enable_repeat_collapsing(TimerScheduler)` in
+    `init.lua` once the native sink is committed, with a TimerScheduler tick at
+    `[logger] flush_interval_ms`; terminal flush in
+    `Logger.begin_async_sink_shutdown()`.
+  - Linux: armed by `infra/logger_sink.install()`; periodic flush in the
+    daemon's periodic callback; terminal flush on the daemon's exit and crash
+    paths.
+
 ---
 
 ## 5. Ring Buffer
@@ -183,6 +254,30 @@ Default level: **10** (all variants active).
 - On overflow, the oldest entry is silently overwritten.
 - A `ring_buffer_snapshot()` / `LoggerRingBufferSnapshot()` function returns
   the entries in chronological order as a flat list.
+
+### 5.1 Session issue counters
+
+Every driver counts the `WARNING` and `ERROR` lines it emits for the whole
+session and keeps the last `ERROR` line (the complete formatted line), apart
+from the ring: DEBUG output evicts the ring within minutes, and the diagnostic
+window's counters and "Last recorded error" must not forget a problem that
+early. A line swallowed by the dedup window is not counted. The Lua core
+exposes `session_issues()` → `{ warn_count, err_count, last_error }`; the AHK
+logger feeds `HealthCheck_RecordWarn()` / `HealthCheck_RecordError(Line)`.
+
+### 5.2 Error window hook
+
+Every emitted `ERROR` line is also handed to the driver's error window with its
+module, its formatted message and its **unformatted template** (the message
+before its arguments): the window keys an error by module and template, so
+arguments cannot make one fault look like many
+(`_shared/modules/diagnostics/error_policy.json`). A line swallowed by the dedup
+window is not handed over. The hook may run inside the keyboard hook, so it
+only decides and arms a timer; it never logs. AHK: `_LoggerEmit` calls
+`ErrorDialog_OnError(Tag, Template, Body, Stamp)`. Hammerspoon: the handler of
+`set_error_notification_handler()` receives `(module, message, template)`
+after the line's native ACK. Linux: the daemon installs the shared core's
+`set_error_observer(fn(module, template, body))`.
 
 ---
 
@@ -199,8 +294,33 @@ Default level: **10** (all variants active).
 | Retention      | Files older than **14 days** are deleted on the next rotation |
 | Purge strategy | Based on date in filename, not file modification time         |
 
-AHK path: `<ConfigDir>/autohotkey/logs/ErgoptiPlus_YYYY-MM-DD.log`
-HS path: `<ConfigDir>/hammerspoon/logs/ErgoptiPlus_YYYY-MM-DD.log`
+The logs folder, the file-name prefixes and the crash-reports subfolder are
+declared once in [`paths/app_dirs.toml`](../paths/app_dirs.toml) and generated
+for every driver; each driver has one resolver that consumers ask at call time
+(`Logger.logs_dir()` / `today_log_path()` / `today_errors_path()` /
+`crash_reports_dir()` on macOS, `LoggerLogsDir()` and its siblings on Windows,
+`logger_sink.log_dir()` and its siblings on Linux).
+
+Default logs folder:
+
+- macOS: `~/Library/Logs/ergopti_plus/` (also holds the launcher's `launcher.log`)
+- Windows: `%LOCALAPPDATA%\ergopti_plus\logs\`
+- Linux: `${XDG_STATE_HOME:-~/.local/state}/ergopti_plus/logs/`
+
+`LogsDirPath` (paths.toml on macOS and Windows, bootstrap storage on Linux)
+moves the folder; a folder that is neither the default nor named
+`ergopti_plus` gets an `ergopti_plus` subfolder, so retention never deletes in
+a folder the user merely picked. Every resolver names the folder the lines
+actually reach, never a saved override the sink has not moved to yet: a new
+`LogsDirPath` takes effect with the next session on macOS (the native worker
+refuses a folder change inside a session) and on Windows (the paths editor
+reloads), and at once on Linux, whose paths editor moves the running sink
+because its reload does not restart the daemon. Crash reports go to
+`<logs>/crash_reports/`; metrics stay in the configuration folder. What is
+written before paths.toml is read stays in the default folder whatever
+`LogsDirPath` says: the macOS boot fallback log, `launcher.log` and the fatal
+report, and on Windows `bootstrap.log` (a yielding second instance, a refused
+configuration transition).
 
 ### 6.2 Fan-out sub-files
 
@@ -266,7 +386,7 @@ global path variables, sets up the flush timer, and purges old log files.
 ```lua
 Logger.init_log_path(config_dir, max_age_days)
 Logger.set_level(level)                         -- optional, default = 10
-Logger.set_error_notification_handler(fn)       -- optional
+Logger.set_error_notification_handler(fn)       -- optional, fn(module, message, template)
 ```
 
 Called during the `init.lua` boot sequence.
@@ -282,8 +402,9 @@ contract. Both drivers are free to keep or remove them independently.
 | ------------------------------ | --- | --- | ------------------------------------------------------------------- |
 | Coloured console output        | ✗   | ✓   | `hs.console.printStyledText()` with per-variant RGB colour          |
 | DEBUG-axis indentation         | ✗   | ✓   | 10-space prefix on DEBUG / TRACE / DONE lines in console            |
-| Consecutive-line deduplication | ✓   | ✓   | Suppresses repeated identical lines; prints count summary. AHK: `_LOGGER_DEDUP_KEY/_LEVEL/_COUNT` + `_LoggerEmitDedupSummary`, guarded by `tests/meta/test_logger_dedup_tick.ahk` and `test_logger_dedup_exit_flush.ahk` |
 | Error notification callback    | ✗   | ✓   | Optional handler passed to `set_error_notification_handler()`       |
+| Stall-tolerant ACK transport   | ✗   | ✓   | Fatal after `stall_fatal_ms` without ACK; sheds DEBUG while stalled |
+| Error window hook              | ✓   | ✓   | Every emitted ERROR reaches the error window (§ 5.2)                |
 | `pcall` wrapper                | ✗   | ✓   | `Logger.pcall(module, fn, ...)` — wraps pcall with error logging    |
 | `build` wrapper                | ✗   | ✓   | `Logger.build(module, label, fn, ctx)` — builder with error logging |
 

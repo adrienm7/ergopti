@@ -47,15 +47,39 @@ function M.restore_table(target, snapshot)
 end
 
 --- Creates a save wrapper with rollback snapshots already seeded from boot.
+--- `opts.snapshot_view(snapshot)`, when given, transforms the complete runtime
+--- snapshot after module-owned preferences have been collected. Session-only
+--- refusals stay out of the disk view; rollback retains the actual runtime.
+--- `opts.read_only_reason()`, when it returns a string, makes
+--- every save refuse to write and roll the unsaved change back.
 --- @param preferences table Preferences module or test double.
 --- @param opts table Transaction dependencies and initial snapshots.
 --- @return function save Transactional save function.
+--- @return table checkpoint Revision-checked snapshots for scoped publication.
 function M.bind(preferences, opts)
 	if type(opts) ~= "table" then error("preferences transaction options are required", 2) end
+	if opts.snapshot_view ~= nil and type(opts.snapshot_view) ~= "function" then
+		error("snapshot_view must be a function", 2)
+	end
+	if opts.read_only_reason ~= nil and type(opts.read_only_reason) ~= "function" then
+		error("read_only_reason must be a function", 2)
+	end
 	local state = opts.state
 	local committed_state = clone_value(opts.initial_state)
 	local committed_preferences = clone_value(opts.initial_preferences)
 	local rolling_back = false
+	local revision = 0
+	local checkpoint = {}
+	function checkpoint.capture()
+		return { state = clone_value(committed_state), preferences = clone_value(committed_preferences), revision = revision }
+	end
+	function checkpoint.replace(expected, next_state, next_preferences)
+		if rolling_back or type(expected) ~= "table" or expected.revision ~= revision
+			or type(next_state) ~= "table" or type(next_preferences) ~= "table" then return false end
+		committed_state, committed_preferences = clone_value(next_state), clone_value(next_preferences)
+		revision = revision + 1
+		return true, checkpoint.capture()
+	end
 
 	local function rollback()
 		if type(committed_state) ~= "table" or type(committed_preferences) ~= "table" then
@@ -72,8 +96,23 @@ function M.bind(preferences, opts)
 		return true
 	end
 
-	return function()
+	local function save()
 		if rolling_back then return false end
+		local read_only = nil
+		if opts.read_only_reason then read_only = opts.read_only_reason() end
+		if read_only ~= nil then
+			if type(read_only) ~= "string" then
+				error("read_only_reason must return nil or a reason string", 2)
+			end
+			Logger.error(LOG, "Preferences are read-only for this session (%s); config.toml was "
+				.. "not written and the change was rolled back. Reload once the cause is fixed.",
+				tostring(read_only))
+			local rollback_ok, rollback_result = xpcall(rollback, debug.traceback)
+			if not rollback_ok or rollback_result ~= true then
+				Logger.error(LOG, "Preference rollback did not commit: %s.", tostring(rollback_result))
+			end
+			return false
+		end
 		local committed, snapshot = M.commit(
 			preferences,
 			opts.path,
@@ -82,15 +121,25 @@ function M.bind(preferences, opts)
 			opts.core_modules,
 			opts.builder,
 			opts.hot_counter,
-			function(saved_snapshot)
+			function(saved_snapshot, runtime_snapshot)
+				revision = revision + 1
 				committed_state = clone_value(state)
-				committed_preferences = clone_value(saved_snapshot)
-				if type(opts.on_commit) == "function" then opts.on_commit(saved_snapshot) end
+				if opts.snapshot_view then
+					if type(runtime_snapshot) ~= "table" then
+						error("a transformed save must acknowledge its runtime snapshot", 2)
+					end
+					committed_preferences = clone_value(runtime_snapshot)
+				else
+					committed_preferences = clone_value(saved_snapshot)
+				end
+				if type(opts.on_commit) == "function" then opts.on_commit(saved_snapshot, runtime_snapshot) end
 			end,
-			rollback
+			rollback,
+			opts.snapshot_view
 		)
 		return committed, snapshot
 	end
+	return save, checkpoint
 end
 
 --- Commits preferences and performs success-only cache side effects.
@@ -103,6 +152,7 @@ end
 --- @param hot_counter table Hotstring-count cache owner.
 --- @param on_commit function|nil Callback receiving the committed preference snapshot.
 --- @param on_rollback function|nil Callback restoring the last committed state.
+--- @param snapshot_view function|nil Transforms the complete snapshot for disk.
 --- @return boolean committed
 --- @return table|nil snapshot Complete preference snapshot acknowledged by save().
 function M.commit(
@@ -114,15 +164,17 @@ function M.commit(
 	builder,
 	hot_counter,
 	on_commit,
-	on_rollback
+	on_rollback,
+	snapshot_view
 )
 	if type(preferences) ~= "table" or type(preferences.save) ~= "function" then return false end
-	local call_ok, committed, snapshot = pcall(
+	local call_ok, committed, snapshot, runtime_snapshot = pcall(
 		preferences.save,
 		path,
 		state,
 		hotfiles,
-		core_modules
+		core_modules,
+		snapshot_view
 	)
 	if not call_ok or committed ~= true then
 		Logger.error(LOG, "Preference save did not commit; success-only cache updates were skipped.")
@@ -140,7 +192,7 @@ function M.commit(
 	if type(hot_counter) == "table" and type(hot_counter.invalidate_cache) == "function" then
 		hot_counter.invalidate_cache()
 	end
-	if type(on_commit) == "function" then on_commit(snapshot) end
+	if type(on_commit) == "function" then on_commit(snapshot, runtime_snapshot) end
 	return true, snapshot
 end
 

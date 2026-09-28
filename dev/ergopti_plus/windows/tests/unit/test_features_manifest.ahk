@@ -96,7 +96,7 @@ Test("manifest_v2: version is 2.0.0", TestFMv2_ManifestVersion)
 TestFMv2_SectionOrder() {
 	Order := ManifestSectionOrder()
 	AssertEqual("Array", Type(Order))
-	AssertEqual(8, Order.Length)
+	AssertEqual(9, Order.Length)
 	AssertEqual("script", Order[1])
 	AssertEqual("hotstrings", Order[2])
 	AssertEqual("llm", Order[3])
@@ -105,6 +105,7 @@ TestFMv2_SectionOrder() {
 	AssertEqual("gestures", Order[6])
 	AssertEqual("layout", Order[7])
 	AssertEqual("category_enabled", Order[8])
+	AssertEqual("ui", Order[9])
 	for Name in Order {
 		AssertTrue(Name != "ahk" and Name != "hs" and Name != "linux",
 			"section_order must not name a driver — it orders what is configured, not who implements it")
@@ -156,7 +157,7 @@ TestFMv2_BuildHasSectionOrder() {
 	Built := ManifestBuildFeaturesMap()
 	AssertTrue(Built.Has("section_order"))
 	AssertEqual("Array", Type(Built["section_order"]))
-	AssertEqual(8, Built["section_order"].Length)
+	AssertEqual(9, Built["section_order"].Length)
 }
 Test("ManifestBuildFeaturesMap: exposes section_order from the manifest",
 	TestFMv2_BuildHasSectionOrder)
@@ -186,8 +187,8 @@ TestFMv2_LayoutDefaults() {
 	AssertTrue(Built["layout"].Has("direct_access_digits"))
 	AssertTrue(Built["layout"].Has("ergopti_alt_gr"))
 	AssertTrue(Built["layout"].Has("ergopti_plus"))
-	AssertEqual(true, Built["layout"]["ergopti_base"])
-	AssertEqual(true, Built["layout"]["ergopti_plus"])
+	AssertEqual(false, Built["layout"]["ergopti_base"])
+	AssertEqual(false, Built["layout"]["ergopti_plus"])
 }
 Test("ManifestBuildFeaturesMap: layout features are plain booleans (no .enabled wrapper)",
 	TestFMv2_LayoutDefaults)
@@ -314,7 +315,7 @@ TestFMv2_ShortcutsAccentedAGrave() {
 	AssertTrue(Built["shortcuts"].Has("a_grave"))
 	Entry := Built["shortcuts"]["a_grave"]
 	AssertEqual("Map", Type(Entry))
-	AssertEqual(true, Entry["enabled"])
+	AssertEqual(false, Entry["enabled"])
 	AssertEqual("v", Entry["letter"])
 }
 Test("ManifestBuildFeaturesMap: accented shortcuts carry enabled + letter sub-keys",
@@ -324,7 +325,7 @@ TestFMv2_ShortcutsTakeNote() {
 	Built := ManifestBuildFeaturesMap()
 	Entry := Built["shortcuts"]["take_note"]
 	AssertEqual("Map", Type(Entry))
-	AssertEqual(true, Entry["enabled"])
+	AssertEqual(false, Entry["enabled"])
 	AssertEqual(false, Entry["dated_notes"])
 	AssertEqual("D:\Bureau", Entry["destination_folder"])
 }
@@ -335,7 +336,7 @@ TestFMv2_AhkShortcutsSubsections() {
 	Built := ManifestBuildFeaturesMap()
 	AssertTrue(Built["shortcuts"].Has("alt_gr_caps_lock"))
 	AssertTrue(Built["shortcuts"]["alt_gr_caps_lock"].Has("ctrl_delete"))
-	AssertEqual(true, Built["shortcuts"]["alt_gr_caps_lock"]["ctrl_delete"])
+	AssertEqual(false, Built["shortcuts"]["alt_gr_caps_lock"]["ctrl_delete"])
 	AssertEqual(false, Built["shortcuts"]["alt_gr_caps_lock"]["backspace"])
 	AssertEqual(false, Built["shortcuts"]["alt_gr_caps_lock"]["caps_lock"])
 }
@@ -345,9 +346,9 @@ Test("ManifestBuildFeaturesMap: nested ahk.shortcuts.* sub-Maps preserve their d
 TestFMv2_GesturesStrippedFromAhk() {
 	Built := ManifestBuildFeaturesMap()
 	AssertTrue(Built.Has("gestures"))
-	AssertEqual(true, Built["gestures"]["enabled"])
-	AssertEqual("tab_close", Built["gestures"]["swipe_3_down"])
-	AssertEqual("left_click_toggle", Built["gestures"]["tap_3"])
+	AssertEqual(false, Built["gestures"]["enabled"])
+	AssertEqual("none", Built["gestures"]["swipe_3_down"])
+	AssertEqual("none", Built["gestures"]["tap_3"])
 }
 Test("ManifestBuildFeaturesMap: ahk.gestures lands at Features[gestures] with action defaults",
 	TestFMv2_GesturesStrippedFromAhk)
@@ -422,7 +423,7 @@ TestFMv2_RejectsScalarTypeConfusion() {
 		Applied := ApplyConfigToml(Features, Path)
 		AssertEqual(0, Applied,
 			"wrongly typed scalars must never replace manifest-owned values")
-		AssertEqual(true, Features["layout"]["ergopti_base"],
+		AssertEqual(false, Features["layout"]["ergopti_base"],
 			"the string 'false' must not become a truthy boolean feature")
 		AssertEqual("fr", Features["script"]["locale"])
 		AssertEqual("INFO", Features["script"]["log_level"])
@@ -464,7 +465,7 @@ TestFMv2_RejectsBooleanIntegerTypeAliasing() {
 		AssertEqual(0, Applied,
 			"TOML booleans and integers must retain their source types")
 		AssertEqual(LayoutDefault, Features["layout"]["ergopti_base"])
-		AssertEqual("auto", Features["script"]["alt_gr_is_kana_remap"])
+		AssertEqual(false, Features["script"]["alt_gr_is_kana_remap"])
 		AssertEqual(ContextDefault,
 			Features["llm"]["generation"]["context_length"])
 		AssertEqual(DelayDefault,
@@ -620,11 +621,11 @@ TestFMv2_DriverNamespacedSectionIsRejected() {
 	Captured := []
 	try {
 		Path := _FM_WriteFixture("ahk_layout",
-			"[ahk.layout]`r`nergopti_base = false`r`n")
+			"[ahk.layout]`r`nergopti_base = true`r`n")
 		LoggerSetTestSink((Line) => Captured.Push(Line))
 		Applied := ApplyConfigToml(Features, Path)
 		AssertEqual(0, Applied, "a driver-namespaced section must apply nothing")
-		AssertEqual(true, Features["layout"]["ergopti_base"],
+		AssertEqual(false, Features["layout"]["ergopti_base"],
 			"the manifest default must survive an [ahk.layout] section")
 		Joined := ""
 		for Line in Captured
@@ -663,7 +664,31 @@ TestFMv2_ApplyNestedSubSection() {
 Test("ApplyConfigToml: applies a nested sub-section (modelisation alpha)",
 	TestFMv2_ApplyNestedSubSection)
 
-TestFMv2_ApplyHsSectionIsLoudlyRejected() {
+; Unused entries are maintenance: one summary warning, with exact identities
+; available to the cleanup workflow rather than one runtime error per key.
+_FM_AssertUnusedWarning(Captured, Path, ExpectedKeys) {
+	Warnings := []
+	Errors := 0
+	for Line in Captured {
+		if InStr(Line, "[ERROR]", true)
+			Errors += 1
+		if InStr(Line, "[WARNING]", true) && InStr(Line, "[TomlConfigLoader]", true)
+			Warnings.Push(Line)
+	}
+	AssertEqual(0, Errors, "unused entries must not trigger runtime errors")
+	AssertEqual(1, Warnings.Length, "one warning must summarize every unused entry")
+	AssertContains(Warnings[1], "Ignored " . ExpectedKeys.Length . " unused configuration key(s) in '" . Path . "'")
+	Scan := ConfigUnusedKeysFind(Path)
+	AssertEqual("ok", Scan["status"], "the cleanup must be able to inspect the fixture")
+	AssertEqual(ExpectedKeys.Length, Scan["keys"].Length, "only the unused entries may be proposed for cleanup")
+	Actual := Map()
+	for Entry in Scan["keys"]
+		Actual[Entry["section"] . "." . Entry["key"]] := true
+	for Key in ExpectedKeys
+		AssertTrue(Actual.Has(Key), "the cleanup must name the exact unused entry: " . Key)
+}
+
+TestFMv2_ApplyHsSectionOffersCleanup() {
 	OldFeatures := _FM_BeginIsolated()
 	Captured := []
 	LoggerSetTestSink((Line) => Captured.Push(Line))
@@ -674,14 +699,8 @@ TestFMv2_ApplyHsSectionIsLoudlyRejected() {
 		Applied := ApplyConfigToml(Features, Path)
 		AssertEqual(1, Applied)
 		AssertEqual("es", Features["script"]["locale"],
-			"a foreign namespace error must not abort following valid configuration")
-		Errors := []
-		for Line in Captured
-			if InStr(Line, "[ERROR]", true)
-				Errors.Push(Line)
-		AssertEqual(1, Errors.Length, "[hs.*] must emit exactly one ERROR")
-		AssertTrue(InStr(Errors[1], "[hs.gestures]", true) > 0,
-			"the loud error must name the rejected foreign section")
+			"a foreign namespace must not abort following valid configuration")
+		_FM_AssertUnusedWarning(Captured, Path, ["hs.gestures.swipe_2_left"])
 		FileDelete(Path)
 	} finally {
 		LoggerClearTestSink()
@@ -690,7 +709,7 @@ TestFMv2_ApplyHsSectionIsLoudlyRejected() {
 		_FM_EndIsolated(OldFeatures)
 	}
 }
-Test("ApplyConfigToml: [hs.*] sections are loudly rejected", TestFMv2_ApplyHsSectionIsLoudlyRejected)
+Test("ApplyConfigToml: unused [hs.*] sections are offered for cleanup", TestFMv2_ApplyHsSectionOffersCleanup)
 
 TestFMv2_ApplyUnknownSectionWarnsButDoesNotCrash() {
 	OldFeatures := _FM_BeginIsolated()
@@ -705,13 +724,7 @@ TestFMv2_ApplyUnknownSectionWarnsButDoesNotCrash() {
 		Applied := ApplyConfigToml(Features, Path)
 		AssertEqual(1, Applied)
 		AssertEqual("es", Features["script"]["locale"])
-		Errors := []
-		for Line in Captured
-			if InStr(Line, "[ERROR]", true)
-				Errors.Push(Line)
-		AssertEqual(1, Errors.Length, "an unknown section must emit exactly one ERROR")
-		AssertTrue(InStr(Errors[1], "hotstrings.no_such_group", true) > 0,
-			"the error must name the unknown section")
+		_FM_AssertUnusedWarning(Captured, Path, ["hotstrings.no_such_group.foo"])
 		FileDelete(Path)
 	} finally {
 		LoggerClearTestSink()
@@ -739,14 +752,7 @@ TestFMv2_ApplyUnknownStaticLeafIsRejected() {
 			"a typo must not create a parasite key in a static section")
 		AssertEqual("es", Features["script"]["locale"],
 			"rejecting a typo must not abort the following valid override")
-		Errors := []
-		for Line in Captured
-			if InStr(Line, "[ERROR]", true)
-				Errors.Push(Line)
-		AssertEqual(1, Errors.Length,
-			"an unknown static leaf must emit exactly one ERROR")
-		AssertTrue(InStr(Errors[1], "[script].locael", true) > 0,
-			"the error must name the rejected leaf")
+		_FM_AssertUnusedWarning(Captured, Path, ["script.locael"])
 	} finally {
 		LoggerClearTestSink()
 		if IsSet(Path) && FileExist(Path)
@@ -754,7 +760,7 @@ TestFMv2_ApplyUnknownStaticLeafIsRejected() {
 		_FM_EndIsolated(OldFeatures)
 	}
 }
-Test("ApplyConfigToml: unknown static leaf keys are loudly rejected",
+Test("ApplyConfigToml: unused static leaf keys are offered for cleanup",
 	TestFMv2_ApplyUnknownStaticLeafIsRejected)
 
 TestFMv2_ForeignOwnedKeysAreExactAndQuiet() {
@@ -789,25 +795,11 @@ TestFMv2_ForeignOwnedKeysAreExactAndQuiet() {
 		AssertEqual(0, Applied,
 			"foreign owners, not the Features loader, must apply these keys")
 
-		Errors := []
 		Joined := ""
-		for Line in Captured {
+		for Line in Captured
 			Joined .= Line . "`n"
-			if InStr(Line, "[ERROR]", true)
-				Errors.Push(Line)
-		}
-		AssertEqual(3, Errors.Length,
-			"only the three typo fixtures must be reported as errors")
-		for Expected in ["autocorrectoin", "trigger_shortcut_typo", "win_cc"] {
-			Found := false
-			for Line in Errors {
-				if InStr(Line, Expected, true) {
-					Found := true
-					break
-				}
-			}
-			AssertTrue(Found, "the rejected typo must be named: " . Expected)
-		}
+		_FM_AssertUnusedWarning(Captured, Path,
+			["category_enabled.autocorrectoin", "llm.trigger_shortcut_typo", "shortcuts.keyboard.win_cc"])
 		AssertEqual("ConfigIO",
 			TomlConfigForeignOwner("shortcuts.keyboard", "win_b"),
 			"a picker-created keyboard slot must name its real config owner")

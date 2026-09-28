@@ -332,6 +332,8 @@ function M.load_with_stubs(module_name, hs_overrides)
 	loaded["modules.keymap.layout_install"] = nil
 	loaded["modules.keymap.input_sources"]  = nil
 	loaded["adapters.one_shot_shift"] = nil
+	-- The console owner captures the native API and must follow the current stub.
+	loaded["ui.console_window"] = nil
 
 	-- Drop every cached modules.keymap.registry* sub-module (registry.lua was split
 	-- into registry_groups.lua + registry_index.lua). All three capture `local hs = hs`
@@ -685,11 +687,21 @@ function M.make_logger_stub()
 		warn    = noop, error   = noop,
 		set_level = noop, set_sink = noop, is_enabled = function() return false end,
 		ring_buffer_snapshot = function() return {} end,
+		session_issues = function() return { warn_count = 0, err_count = 0, last_error = nil } end,
 		pcall   = function(_, fn, ...) return pcall(fn, ...) end,
 		callback = function(_, _, fn, ...) return xpcall(fn, debug.traceback, ...) end,
 		build   = function() return noop end,
 		install_runtime_error_capture = noop,
 		init_log_path = noop,
+		-- The logs-folder resolver every consumer asks; a stub without it would
+		-- turn a production call into a nil-call the test never meant to probe.
+		FALLBACK_LOG_DIR = "/tmp/ergopti_plus_test_logs/",
+		logs_dir = function() return "/tmp/ergopti_plus_test_logs/" end,
+		today_log_path = function() return "/tmp/ergopti_plus_test_logs/ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log" end,
+		today_errors_path = function()
+			return "/tmp/ergopti_plus_test_logs/ErgoptiPlus_errors_" .. os.date("%Y-%m-%d") .. ".log"
+		end,
+		crash_reports_dir = function() return "/tmp/ergopti_plus_test_logs/crash_reports/" end,
 		start_async_sink = function() return true end,
 		classify_async_sink_boot_environment = function() return "standalone" end,
 		set_async_sink_failure_handler = function() return true end,

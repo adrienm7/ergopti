@@ -152,6 +152,7 @@ local function load_real_search_capture(stop_mode, click_mode, compose_gestures)
 		package.loaded["infra.notifications"] = { notify = function() end }
 		package.loaded["infra.manifest_reader"] = {
 			default_for = function() return false end,
+			recommended_for = function() return "none" end,
 		}
 		package.loaded["adapters.timer_scheduler"] = permissive({
 			cancel = function() return true end,

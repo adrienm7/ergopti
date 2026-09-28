@@ -25,26 +25,3 @@ hold_modifier = "ctrl"
 [tap_hold.keys.space]
 time_activation_seconds = 0.12
 hold_layer = "nav"
-
-
-
-
-
-# =======================================
-# =======================================
-# ======= 2. HS-specific bindings =======
-# =======================================
-# =======================================
-
-# The nav_secondary layer on HS adds Mission Control on ``;``.
-
-[tap_hold.layers.nav_secondary]
-description_key = "tap_hold.layer.nav_secondary"
-
-[tap_hold.layers.nav_secondary.mappings]
-h = "word_prev"
-l = "word_next"
-j = "line_down"
-k = "line_up"
-";" = "mission_control"
-"'" = "app_expose"

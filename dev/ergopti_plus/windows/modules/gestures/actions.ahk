@@ -5,9 +5,10 @@
 ; DESCRIPTION:
 ; Mirrors macos/modules/gestures/actions.lua. Contains the complete gesture
 ; action registry (GESTURE_ACTIONS Map), all action implementation functions
-; (GestureScreenshotInstant, GestureOpenConfiguredURL, etc.), the deferred
-; catalogue loader (_GestureLoadActionCatalog), and the shared state used by
-; the dispatcher (GestureAssignments, window-cycle tracker).
+; (GestureScreenshotInstant, GestureOpenConfiguredURL, etc.), the picker walk
+; over the generated catalogue (GestureActionPickerItems, from
+; _generated/action_catalogue.ahk), and the shared state used by the
+; dispatcher (GestureAssignments, window-cycle tracker).
 ;
 ; Included by modules/gestures/init.ahk after the constants block.
 ; ==============================================================================
@@ -161,10 +162,10 @@ global GESTURE_ACTIONS := Map(
 				Fn: (*) => WindowSpy(),
 		},
 		"open_list_vars", {
-				Fn: (*) => ListVars(),
+				Fn: (*) => ConsoleWindow_Open("list_vars"),
 		},
 		"open_key_history", {
-				Fn: (*) => KeyHistory(),
+				Fn: (*) => ConsoleWindow_Open("key_history"),
 		},
 		; --- Advanced system actions ---
 		"screen_capture_instant", {
@@ -187,14 +188,34 @@ global GESTURE_ACTIONS := Map(
 		"search_web", {
 				Fn: (BindingId := "") => GestureSearchWeb(BindingId),
 		},
+		"wrap_selection", {
+				Fn: (BindingId := "") => GestureWrapSelection(BindingId),
+		},
+		"send_text", {
+				Fn: (BindingId := "") => GestureSendInput("send_text", BindingId),
+		},
+		"send_key", {
+				Fn: (BindingId := "") => GestureSendInput("send_key", BindingId),
+		},
+		"send_shortcut", {
+				Fn: (BindingId := "") => GestureSendInput("send_shortcut", BindingId),
+		},
+		; The Win+D and Win+S shortcuts' own functions (modules/shortcuts/win.ahk),
+		; so a gesture and the fixed shortcut cannot drift apart.
+		"open_downloads", {
+				Fn: (*) => OpenDownloads(),
+		},
+		"copy_selected_path", {
+				Fn: (*) => Search(),
+		},
+		"open_file_manager", {
+				Fn: (*) => GestureRunShellTarget("explorer.exe", "open_file_manager"),
+		},
+		"open_system_settings", {
+				Fn: (*) => GestureRunShellTarget("ms-settings:", "open_system_settings"),
+		},
 		"teleport_mouse", {
 				Fn: (*) => GestureTeleportMouse(),
-		},
-		"uppercase_selection", {
-				Fn: (*) => GestureToggleUppercase(),
-		},
-		"titlecase_selection", {
-				Fn: (*) => GestureToggleTitleCase(),
 		},
 		"spotlight_mouse", {
 				Fn: (*) => (MouseGetPos(&_Mx, &_My), SpotlightMouseAt(_Mx, _My, 5000)),
@@ -207,6 +228,12 @@ global GESTURE_ACTIONS := Map(
 		},
 		"paste_plain", {
 				Fn: (*) => GesturePastePlain(),
+		},
+		; --- AI ---
+		; The manual prediction trigger; it logs and shows every refusal itself.
+		; The binding id is not forwarded: its only parameter is a test seam.
+		"llm_generate_prediction", {
+				Fn: (*) => LLM_Menu_TriggerPrediction(),
 		},
 		; --- Tap-hold tap actions (exposed here so the tap picker can list them) ---
 		; These are dispatched by the tap-hold runtime directly; the Fn below fires
@@ -237,10 +264,9 @@ global GESTURE_ACTIONS := Map(
 ; not a crash and not a failing test.
 ;
 ; They now come from _shared/modules/actions/actions.toml through
-; _generated/gesture_emit_actions.ahk. Registered HERE, at static-init, and not
-; in _GestureLoadActionCatalog(): that loader is deliberately deferred off the
-; boot path, so building handlers there would open a window in which a gesture
-; fires and finds nothing registered.
+; _generated/gesture_emit_actions.ahk. Registered HERE, at static-init: a
+; handler built by anything deferred off the boot path would open a window in
+; which a gesture fires and finds nothing registered.
 for _EmitId, _Emit in GestureEmitActionsData() {
 		if _Emit.HasOwnProp("Seq") {
 				; Raw send sequence — no portable key/modifier form exists for it.
@@ -275,15 +301,18 @@ _GestureMakeSeqEmitter(Seq) {
 }
 
 
-; Returns the translated label for a gesture action.
-; Uses t("sg_actions.X") from the active locale JSON as the canonical source.
-; Falls back to the raw action name when the key is absent — labels are no
-; longer hardcoded in GESTURE_ACTIONS, so the locale is the single source of truth.
+; Returns the translated label for a gesture action, through the label key the
+; generated catalogue declares for it. Returns the raw action name when the key
+; is absent — labels are not hardcoded in GESTURE_ACTIONS, so the locale is the
+; single source of truth, and test-action-catalogue-codegen.cjs fails on a
+; catalogue label key missing from any locale.
 _GestureActionLabel(Name) {
-	global GESTURE_MODIFIER_ACTION_LABELS
+	global GESTURE_MODIFIER_ACTION_LABELS, GESTURE_ACTION_CATALOGUE
 	if GESTURE_MODIFIER_ACTION_LABELS.Has(Name)
 		return GESTURE_MODIFIER_ACTION_LABELS[Name]
-	Key := "sg_actions." . Name
+	Key := (IsSet(GESTURE_ACTION_CATALOGUE) && GESTURE_ACTION_CATALOGUE.Actions.Has(Name))
+		? GESTURE_ACTION_CATALOGUE.Actions[Name].LabelKey
+		: "sg_actions." . Name
 	Translated := t(Key)
 	; t() returns the raw key when no translation is found — treat that as a miss
 	if (Translated != Key)
@@ -334,6 +363,17 @@ GestureOpenConfiguredURL(BindingId := "") {
 				LoggerError("gestures", "open_url launch failed for binding '{1}': {2}", BindingId, Err.Message)
 				try TrayTip("Could not open the configured URL.", "ErgoptiPlus", "Iconx Mute")
 		}
+}
+
+; Opens a shell target (an executable or a URI such as ms-settings:). A refusal
+; stays inside the gesture callback and is logged, never escalated to the
+; driver's global error handler.
+; @param {String} Target
+; @param {String} ActionName For the log line.
+GestureRunShellTarget(Target, ActionName) {
+		try Run(Target)
+		catch as Err
+				LoggerError("gestures", "{1} could not open '{2}': {3}", ActionName, Target, Err.Message)
 }
 
 GesturePickColor() {
@@ -407,11 +447,30 @@ GestureTeleportMouse() {
 		SpotlightMouseAt(TargetX, TargetY, 3000)
 }
 
-GestureToggleUppercase() {
-		GetSelectionAsync(_GestureToggleUppercaseSelection)
+; Case action id -> the pure transform it applies to the selection
+; (infra/text_case.ahk). The registry below and the shared-corpus replay
+; (tests/unit/test_text_case_vectors.ahk) both read this map, so an id cannot be
+; tested against one transform and run another.
+; @returns {Map}
+GestureCaseTransforms() {
+		static Transforms := Map(
+				"selection_uppercase", TextCaseUpper,
+				"selection_lowercase", TextCaseLower,
+				"selection_titlecase", TextCaseTitle,
+				"uppercase_selection", TextCaseToggleUpper,
+				"titlecase_selection", TextCaseToggleTitle,
+		)
+		return Transforms
 }
 
-_GestureToggleUppercaseSelection(Text) {
+; Captures the selection, applies Transform and pastes the result over it. The
+; Win+U / Win+W shortcuts go through here too.
+; @param {Func} Transform String -> String.
+GestureTransformSelection(Transform) {
+		GetSelectionAsync((Text) => _GestureSendTransformedSelection(Text, Transform))
+}
+
+_GestureSendTransformedSelection(Text, Transform) {
 		; No-op on an empty/failed capture: async cancellation must never turn into
 		; a stale SendInstant paste.
 		if (Text = "")
@@ -419,10 +478,7 @@ _GestureToggleUppercaseSelection(Text) {
 		SyntheticOwner := 0
 		try SyntheticOwner := KL_MarkSynthetic("case-transform")
 		try {
-				if RegExMatch(Text, "[a-zà-ÿ]")
-						SendInstant(Format("{:U}", Text))
-				else
-						SendInstant(Format("{:L}", Text))
+				SendInstant(Transform.Call(Text))
 				SetTimer((*) => KL_ClearSynthetic(SyntheticOwner), -300)
 		} catch {
 				KL_ClearSynthetic(SyntheticOwner)
@@ -430,29 +486,73 @@ _GestureToggleUppercaseSelection(Text) {
 		}
 }
 
-GestureToggleTitleCase() {
-		GetSelectionAsync(_GestureToggleTitleCaseSelection)
+; Built in a helper rather than inline, so each registered closure captures its
+; own transform instead of the loop variable.
+_GestureMakeCaseAction(Transform) {
+		return (*) => GestureTransformSelection(Transform)
 }
 
-_GestureToggleTitleCaseSelection(Text) {
-		; No-op on an empty/failed capture (see GestureToggleUppercase).
-		if (Text = "")
+for _CaseActionId, _CaseTransform in GestureCaseTransforms()
+		GESTURE_ACTIONS[_CaseActionId] := { Fn: _GestureMakeCaseAction(_CaseTransform) }
+
+; The pair a wrap_selection parameter names, resolved against the built-in
+; catalogue (_WS_BUILTIN_PAIRS, loaded from _shared/modules/wrap_symbols/wrap_symbols.json).
+; @param {String} Value The stored parameter.
+; @returns {Map|String} Map("left", ..., "right", ...), or "" when it names none.
+GestureWrapPairFor(Value) {
+		global _WS_BUILTIN_PAIRS
+		return WrapPairParse(Value, _WS_BUILTIN_PAIRS)
+}
+
+; The transform wrap_selection applies for one binding: its own stored pair
+; around the selection. "" when the binding stores no valid pair.
+; @param {String} BindingId
+; @returns {Func|String}
+GestureWrapSelectionTransform(BindingId) {
+		Pair := GestureWrapPairFor(GestureGetActionParameter(BindingId, "wrap_selection"))
+		if !(Pair is Map)
+				return ""
+		return _GestureMakeWrapTransform(Pair["left"], Pair["right"])
+}
+
+_GestureMakeWrapTransform(Left, Right) {
+		return (Text) => Left . Text . Right
+}
+
+; Wraps the selection with the binding's pair. Nothing selected: nothing is
+; typed (the capture returns "" and the paste is skipped).
+GestureWrapSelection(BindingId := "") {
+		Transform := GestureWrapSelectionTransform(BindingId)
+		if !(Transform is Func) {
+				LoggerWarn("gestures", "wrap_selection ignored for binding '{1}': no valid pair is stored.", BindingId)
 				return
-		TitleCasePattern :=
-				"^(?:[A-ZÉÈÀÙÂÊÎÔÛÇ][a-zéèàùâêîôûç0-9''\(\),.\-:;!?\-]*[ \t\r\n]+)*[A-ZÉÈÀÙÂÊÎÔÛÇ][a-zéèàùâêîôûç0-9''\(\),.\-:;!?\-]*$"
-		UpperCasePattern := "^[A-ZÉÈÀÙÂÊÎÔÛÇ0-9''\(\),.\-:;!?\s]+$"
-		SyntheticOwner := 0
-		try SyntheticOwner := KL_MarkSynthetic("case-transform")
-		try {
-				if RegExMatch(Text, TitleCasePattern)
-						SendInstant(Format("{:L}", Text))
-				else
-						SendInstant(Format("{:T}", Text))
-				SetTimer((*) => KL_ClearSynthetic(SyntheticOwner), -300)
-		} catch {
-				KL_ClearSynthetic(SyntheticOwner)
-				throw
 		}
+		GestureTransformSelection(Transform)
+}
+
+; Types the binding's text, or presses its key or shortcut (send_text, send_key,
+; send_shortcut). The gesture's own Ctrl+Win+Shift carrier is released first, as
+; for every shortcut a gesture sends, so it cannot join the chord.
+; @param {String} ActionName send_text, send_key or send_shortcut.
+; @param {String} BindingId The binding whose parameter holds the value.
+; @returns {Boolean} True when the input was sent.
+GestureSendInput(ActionName, BindingId := "") {
+		Kind := GestureActionParameterSpec(ActionName)
+		Parsed := SendInputParse(Kind, GestureGetActionParameter(BindingId, ActionName))
+		if !(Parsed is Map) {
+				LoggerWarn("gestures", "{1} ignored for binding '{2}': no valid value is stored.", ActionName, BindingId)
+				return false
+		}
+		if !GestureReleaseOwnedCarrierModifiers()
+				return false
+		if !SendInputEmit(Kind, Parsed) {
+				LoggerError("gestures", "{1} for binding '{2}' was not sent.", ActionName, BindingId)
+				return false
+		}
+		; The length of a text, never the text: it is the user's own and may be private.
+		LoggerDebug("gestures", "{1} for binding '{2}' sent {3}.", ActionName, BindingId,
+				(Kind == "text") ? StrLen(Parsed["text"]) . " character(s)" : Parsed["canonical"])
+		return true
 }
 
 ; Deferred clipboard restore for GesturePastePlain. Runs on a negative-delay
@@ -725,120 +825,87 @@ GestureEditPersonalShortcuts() {
 		}
 }
 
-; Ordered list of action names for the menu — built from the shared TOML so
-; Hammerspoon and AHK always show the same picker order, filtering each side
-; to its own platform entries. "--" entries become visual separators;
-; "#Titre" entries become non-selectable section headers.
-global GESTURE_ACTION_NAMES := []
-global GESTURE_AX_NAMES := []
-global GESTURE_ACTION_PARAMETER_SPECS := Map()
+; The Windows action catalogue, generated from _shared/modules/actions/actions.toml
+; by tools/codegen/codegen-action-catalogue.cjs and already filtered to this
+; platform. It used to be built by parsing the TOML with ParseTomlFile inside a
+; loader deferred off the boot path (a SetTimer worth ~100 ms); the generated
+; file is plain data, so there is nothing left to defer and no window in which
+; the picker is empty.
+global GESTURE_ACTION_CATALOGUE := GestureActionCatalogueData()
 global GestureActionParameters := Map()
 
-; True when a catalogue `platform` field claims this driver.
-;
-; The field is "all", one driver key, or a comma-separated list of them. The
-; list form exists because the field could not previously say "two drivers out
-; of three": the two window cyclers ship on Windows and macOS and not on Linux,
-; and both single-value answers were false — "all" put dead rows in the Linux
-; picker, "ahk" or "hs" hid half the feature.
-_GestureActionClaimsThisPlatform(Platform) {
-		if (Platform = "" || Platform = "all")
-				return true
-		for _, Key in StrSplit(Platform, ",", " `t")
-				if (Key = "ahk")
-						return true
-		return false
+; Ordered action ids the picker lists, modifier-chord block expanded, "none"
+; included. The single list every picker and the parity test walk.
+; @returns {Array}
+GestureActionPickerIds() {
+		global GESTURE_ACTION_CATALOGUE, GESTURE_MODIFIER_ACTION_GROUPS
+		Ids := []
+		for _, Item in GESTURE_ACTION_CATALOGUE.SgItems {
+				switch Item.Kind {
+						case "action":
+								Ids.Push(Item.Id)
+						case "modifier_chords":
+								for _, Group in GESTURE_MODIFIER_ACTION_GROUPS
+										for _, ActionId in Group.Actions
+												Ids.Push(ActionId)
+						case "heading":
+								continue
+						default:
+								throw ValueError("Unknown action catalogue item kind '" . Item.Kind . "'.")
+				}
+		}
+		return Ids
 }
 
-; Populate GESTURE_ACTION_NAMES / GESTURE_AX_NAMES by parsing the shared
-; cross-platform action registry (actions.toml). These lists are only needed
-; when the gesture-picker menu is built — which happens in the deferred
-; initMenu phase (~250 ms after boot). Deferring the TOML parse off the
-; critical boot path removes ~100 ms from the gestures module init time.
-; A run-once SetTimer(-1) fires ~1 ms after the auto-execute section finishes,
-; well before initMenu runs, so the lists are always ready for the menu.
-_GestureLoadActionCatalog(*) {
-		global GESTURE_ACTION_NAMES, GESTURE_AX_NAMES, GESTURE_ACTIONS, GESTURE_MODIFIER_ACTION_GROUPS, GESTURE_ACTION_PARAMETER_SPECS, _SharedDir
-
-		GESTURE_ACTION_NAMES := []
-		GESTURE_AX_NAMES := []
-		GESTURE_ACTION_PARAMETER_SPECS := Map()
-
-		_SharedToml := _SharedDir . "\modules\actions\actions.toml"
-		_Toml       := ParseTomlFile(_SharedToml)
-
-		; Build GESTURE_ACTION_NAMES from [sg_order].items, keeping only entries
-		; that are sentinels ("--", "#…") or actions whose platform is "all"/"ahk".
-		if _Toml.Has("sg_order") && _Toml["sg_order"].Has("items") {
-				for _, _Item in _Toml["sg_order"]["items"] {
-						; Sentinels and headers pass through unconditionally
-						if (_Item = "--" || SubStr(_Item, 1, 1) = "#") {
-								GESTURE_ACTION_NAMES.Push(_Item)
-								continue
-						}
-						; The shared modifier-chord placeholder expands to the complete
-						; platform-native matrix registered from modifier_chords.json.
-						if (SubStr(_Item, 1, 1) = "_") {
-								if (_Item = "_modifier_chords_placeholder") {
-										for _, _Group in GESTURE_MODIFIER_ACTION_GROUPS {
-												GESTURE_ACTION_NAMES.Push("##Raccourcis " . _Group.Label)
-												for _, _ActionId in _Group.Actions
-														GESTURE_ACTION_NAMES.Push(_ActionId)
-										}
+; Ordered picker items for the active language: headings carry their level and
+; translated text, actions their id and label. "none" is left out because both
+; pickers add their own translated "nothing" row.
+; @returns {Array} of { Type: "heading", Level, Text } / { Type: "action", Id, Label }
+GestureActionPickerItems() {
+		global GESTURE_ACTION_CATALOGUE, GESTURE_MODIFIER_ACTION_GROUPS
+		Items := []
+		for _, Item in GESTURE_ACTION_CATALOGUE.SgItems {
+				switch Item.Kind {
+						case "heading":
+								Items.Push({ Type: "heading", Level: Item.Level, Text: _GestureHeadingText(Item.Key) })
+						case "action":
+								if (Item.Id != "none")
+										Items.Push({ Type: "action", Id: Item.Id, Label: _GestureActionLabel(Item.Id) })
+						case "modifier_chords":
+								; One sub-heading per modifier combination. The combination label
+								; ("Ctrl + Shift") is language-neutral; the words around it are not,
+								; which is why this used to read "Raccourcis Ctrl" in every locale.
+								Template := t(Item.GroupKey)
+								for _, Group in GESTURE_MODIFIER_ACTION_GROUPS {
+										Items.Push({ Type: "heading", Level: Item.Level,
+												Text: StrReplace(Template, "{1}", Group.Label) })
+										for _, ActionId in Group.Actions
+												Items.Push({ Type: "action", Id: ActionId, Label: _GestureActionLabel(ActionId) })
 								}
-								continue
-						}
-						; Regular action — keep if platform is "all" or "ahk"
-						_SecKey := "sg_actions." . _Item
-						if _Toml.Has(_SecKey) {
-								if _Toml[_SecKey].Has("parameter")
-										GESTURE_ACTION_PARAMETER_SPECS[_Item] := _Toml[_SecKey]["parameter"]
-								_Plat := _Toml[_SecKey].Has("platform") ? _Toml[_SecKey]["platform"] : "all"
-								if _GestureActionClaimsThisPlatform(_Plat)
-										GESTURE_ACTION_NAMES.Push(_Item)
-						} else if GESTURE_ACTIONS.Has(_Item) {
-								; Action exists in registry but not in shared TOML — include it
-								GESTURE_ACTION_NAMES.Push(_Item)
-						}
+						default:
+								throw ValueError("Unknown action catalogue item kind '" . Item.Kind . "'.")
 				}
 		}
-
-		; Build GESTURE_AX_NAMES from [ax_order].items, same filtering logic.
-		if _Toml.Has("ax_order") && _Toml["ax_order"].Has("items") {
-				for _, _Item in _Toml["ax_order"]["items"] {
-						_SecKey := "ax_actions." . _Item
-						if _Toml.Has(_SecKey) {
-								_Plat := _Toml[_SecKey].Has("platform") ? _Toml[_SecKey]["platform"] : "all"
-								if _GestureActionClaimsThisPlatform(_Plat)
-										GESTURE_AX_NAMES.Push(_Item)
-						}
-				}
-		}
+		return Items
 }
-; Run-once, deferred off the boot path. MUST be a negative NON-ZERO period:
-; AHK v2 treats -0 as 0, and SetTimer(fn, 0) DISABLES the timer (the callback
-; never fires), which left GESTURE_ACTION_NAMES empty and the action picker
-; blank. -1 fires once ~1 ms after the auto-execute section finishes.
-SetTimer(_GestureLoadActionCatalog, -1)
 
-; Factory gesture slot actions — mirrors features_manifest.ahk defaults.
-global GESTURE_FACTORY_DEFAULTS := Map(
-		"tap_3", "left_click_toggle",
-		"swipe_3_up", "tab_new",
-		"swipe_3_down", "tab_close",
-		"swipe_3_left", "tab_prev",
-		"swipe_3_right", "tab_next",
-		"tap_4", "screenshot_window_clipboard",
-		"swipe_4_up", "win_app_next",
-		"swipe_4_down", "win_app_prev",
-		"swipe_4_left", "desktop_prev",
-		"swipe_4_right", "desktop_next",
-)
+; The translated text of one picker heading. Older header values carry a
+; leading "#" from when the level was spelled inside the text; the level now
+; comes only from the catalogue, so the marker is stripped.
+_GestureHeadingText(Key) {
+		Text := t(Key)
+		while (SubStr(Text, 1, 1) = "#")
+				Text := SubStr(Text, 2)
+		return Text
+}
 
-; Current action assignments — read from config.toml or factory defaults.
+; Explicit restore actions from the manifest recommendation (constants.ahk).
+global GESTURE_FACTORY_DEFAULTS := GestureRecommendedActions()
+
+; Current assignments start neutral; explicit config overrides them later.
 global GestureAssignments := Map()
-for _GestureAssignmentSlot, _GestureAssignmentAction in GESTURE_FACTORY_DEFAULTS
-		GestureAssignments[_GestureAssignmentSlot] := _GestureAssignmentAction
+for _GestureAssignmentSlot in GestureSlotIds()
+		GestureAssignments[_GestureAssignmentSlot] := ManifestDefaultFor("gestures." . _GestureAssignmentSlot)
 
 ; Window cycle tracker — ordered by manual user activation (most-recent first).
 ; _GestureCycling is set True while our own WinActivate runs so the WinEvent

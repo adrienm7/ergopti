@@ -47,7 +47,7 @@ local function load_subject()
 
 	package.loaded["modules.shortcuts.actions.system"] = {
 		stop_awake = function() counters.stop_awake = counters.stop_awake + 1; return true end,
-		bind_instant_screenshot = special_factory,
+		bind_tap_keys = special_factory,
 		bind_layer_scroll = special_factory,
 		bind_wrap_text_if_selected = special_factory,
 		bind_cmd_star = special_factory,
@@ -94,6 +94,7 @@ local function load_subject()
 	local subject = helpers.load_with_stubs("modules.shortcuts.bindings", {
 		hotkey = {bind = function() return handle() end},
 	})
+	require("tests.support.shortcut_bindings_fixture").prefer_all(subject)
 	return subject, controls, counters
 end
 
@@ -119,8 +120,10 @@ helpers.describe("shortcut bindings: startup transaction", function()
 		helpers.assert_eq(counters.deleted, counters.created,
 			"every handle acquired before the refusal must be released")
 		for _, entry in ipairs(subject.list_shortcuts()) do
-			helpers.assert_eq(entry.enabled, false,
+			helpers.assert_eq(entry.bound, false,
 				"failed startup must roll back every published binding: " .. entry.id)
+			helpers.assert_eq(entry.enabled, true,
+				"a refused startup must not rewrite the preference: " .. entry.id)
 		end
 
 		controls.refuse_special = false

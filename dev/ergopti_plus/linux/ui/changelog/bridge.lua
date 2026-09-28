@@ -10,6 +10,11 @@
 --- honoured by curl), trying the GitHub API first and the public Atom feed
 --- second (_shared/lua/updater/release_sources.lua), then pushes the result or
 --- a translated error key back through window.__hostBridgeResponse.
+---
+--- The page's subscription banner posts set_channel; the updater manager, the
+--- one channel owner, persists it, and the answer (channel_changed) carries
+--- the subscription that holds afterwards. A change made from the menu is
+--- pushed to an open page the same way.
 --- ==============================================================================
 
 local M = {}
@@ -25,7 +30,10 @@ local Json = require("json")
 local Base64 = require("compat.base64")
 local ReleaseSources = require("updater.release_sources")
 
-local REPOSITORY_URL = "https://github.com/adrienm7/ergopti"
+-- The owner and the repository come from the shared updater defaults, their
+-- single source (tools/test/test-repo-url-single-source.cjs). The loader is
+-- defined with the native fetch below.
+local load_sources
 local APP_NAME = "changelog"
 local HTTP_OWNER = "changelog"
 -- Feeds carry the rendered notes of ten releases (about 0.5 MB today).
@@ -34,20 +42,37 @@ local MAX_SOURCE_BYTES = 4 * 1024 * 1024
 local _fetch_generation = 0
 local _sources = nil
 
---- Returns whether a URL belongs to the repository's HTTPS surface.
+--- The repository's web root, from the shared updater defaults.
+--- @return string|nil url
+--- @return string|nil error Why the defaults are unusable.
+local function repository_url()
+	local sources, err = load_sources()
+	if not sources then return nil, err end
+	return "https://github.com/" .. sources.owner .. "/" .. sources.repo, nil
+end
+
+--- Returns whether a URL belongs to the repository's HTTPS surface: the root
+--- itself, or a path, query or fragment below it, never a longer name.
 --- @param value any
 --- @return boolean
 local function is_allowed_repository_url(value)
-	return type(value) == "string"
-		and value:match("^https://github%.com/adrienm7/ergopti/?[A-Za-z0-9._~/%?=&+#-]*$") ~= nil
+	local root, err = repository_url()
+	if not root then
+		Logger.error(LOG, "Repository unknown, no URL is allowed: %s.", tostring(err))
+		return false
+	end
+	if type(value) ~= "string" or value:sub(1, #root) ~= root then return false end
+	local rest = value:sub(#root + 1)
+	return rest == "" or rest:match("^[/%?#][A-Za-z0-9._~/%?=&+#-]*$") ~= nil
 end
 
 --- Converts the updater's cached record to the page's release schema.
 --- @param cached table
+--- @param releases_url string The repository's releases page.
 --- @return table
-local function page_release(cached)
+local function page_release(cached, releases_url)
 	local tag = type(cached.tag) == "string" and cached.tag or ""
-	local release_url = REPOSITORY_URL .. "/releases"
+	local release_url = releases_url
 	if tag:match("^[A-Za-z0-9._+-]+$") then release_url = release_url .. "/tag/" .. tag end
 	return {
 		tag_name = tag,
@@ -58,27 +83,54 @@ local function page_release(cached)
 	}
 end
 
+--- Returns the updater manager, the owner of the subscribed channel and of the
+--- shared channel registry, or nil with the reason logged.
+--- @return table|nil
+local function updater()
+	local ok, manager = pcall(require, "modules.updater.manager")
+	if not ok or type(manager) ~= "table" then
+		Logger.error(LOG, "The updater is unavailable: %s.", tostring(manager))
+		return nil
+	end
+	return manager
+end
+
+--- Returns a channel id of the shared registry, or nil for anything else.
+--- @param channel any
+--- @return string|nil
+local function registry_channel(channel)
+	local manager = updater()
+	if not manager or type(channel) ~= "string" then return nil end
+	return manager.CHANNELS.channel(channel) and channel or nil
+end
+
 --- Builds the initial changelog data payload.
 --- @param state table Daemon state.
+--- @param channel string Registry channel the page shows.
 --- @return table
 local function _build_initial_payload(state, channel)
 	state = type(state) == "table" and state or {}
-	channel = channel == "dev" and "dev" or "main"
 	local releases = {}
+	local sources, sources_err = load_sources()
+	if not sources then
+		Logger.error(LOG, "Release sources unavailable, no cached release is shown: %s.", tostring(sources_err))
+	end
 
-	-- Try to get releases from the updater if loaded.
-	local ok_up, updater = pcall(require, "modules.updater.manager")
-	if ok_up and updater then
-		-- The updater may have cached release data.
+	-- The updater's cached release belongs to the channel it checked, which is
+	-- the subscribed one: it is a valid first entry only on that channel's view.
+	local manager = updater()
+	local subscribed = nil
+	if sources and manager then
+		local ok_subscribed, id = pcall(manager.get_channel)
+		subscribed = ok_subscribed and registry_channel(id) or nil
 		local ok_cached, cached = pcall(function()
-			return type(updater.get_cached_release) == "function" and updater.get_cached_release() or nil
+			return type(manager.get_cached_release) == "function" and manager.get_cached_release() or nil
 		end)
 		local ok_channel, cached_channel = pcall(function()
-			return type(updater.get_channel) == "function" and updater.get_channel() or nil
+			return type(manager.get_channel) == "function" and manager.get_channel() or nil
 		end)
-		local expected_channel = channel == "dev" and "dev" or "stable"
-		if ok_cached and cached and ok_channel and cached_channel == expected_channel then
-			releases[#releases + 1] = page_release(cached)
+		if ok_cached and cached and ok_channel and cached_channel == channel then
+			releases[#releases + 1] = page_release(cached, sources.page_url)
 		end
 	end
 
@@ -86,8 +138,10 @@ local function _build_initial_payload(state, channel)
 		action = "releases",
 		releases = releases,
 		channel = channel,
+		-- The channel the user receives updates from, for the page's banner.
+		subscribed_channel = subscribed,
 		cache_miss = #releases == 0,
-		repo_url = REPOSITORY_URL .. "/releases",
+		repo_url = sources and sources.page_url or nil,
 		version = state._version or Version.VERSION,
 	}
 end
@@ -105,7 +159,7 @@ end
 --- Loads and validates the release sources once from the shared defaults.
 --- @return table|nil sources
 --- @return string|nil error
-local function load_sources()
+load_sources = function()
 	if _sources then return _sources, nil end
 	local ok_paths, Paths = pcall(require, "infra.paths")
 	local path = ok_paths and Paths.shared("modules/updater/defaults.json") or nil
@@ -162,12 +216,18 @@ M._http_get = default_http_get
 M._push = default_push
 
 --- Starts one native fetch; a newer request supersedes every older result.
---- @param channel string "main" or "dev".
+--- The page filters the list for the channel it shows; the host fetches the
+--- same list for every channel and only checks the id.
+--- @param channel string Registry channel id.
 --- @return number generation
 function M.start_fetch(channel)
-	channel = channel == "dev" and "dev" or "main"
 	_fetch_generation = _fetch_generation + 1
 	local generation = _fetch_generation
+	if not registry_channel(channel) then
+		Logger.error(LOG, "Refused a release fetch for a channel outside the registry.")
+		M._push({ action = "releases_error", error_key = "changelog_window.error_network" })
+		return generation
+	end
 	local sources, err = load_sources()
 	if not sources then
 		Logger.error(LOG, "Release sources unavailable: %s.", tostring(err))
@@ -193,6 +253,48 @@ function M.start_fetch(channel)
 	return generation
 end
 
+--- Subscribes to the channel the page asked for through the updater manager,
+--- the one channel owner, and has the tray menu rebuilt so its tick follows.
+--- @param channel any Channel id posted by the page.
+--- @param state table|nil Daemon state (on_config_changed rebuilds the menu).
+--- @return table answer { action = "channel_changed", channel, ok }
+function M.subscribe(channel, state)
+	local manager = updater()
+	local id = registry_channel(channel)
+	local committed = false
+	if manager and not id then
+		Logger.error(LOG, "Refused a subscription to a channel outside the registry.")
+	elseif manager then
+		local ok, result = pcall(manager.set_channel, id)
+		if not ok then Logger.error(LOG, "The updater raised while changing the channel: %s.", tostring(result)) end
+		committed = ok and result == true
+		if committed and type(state) == "table" and type(state.on_config_changed) == "function" then
+			local notified, err = pcall(state.on_config_changed)
+			if not notified then Logger.error(LOG, "The menu could not follow the new channel: %s.", tostring(err)) end
+		end
+	end
+	local held = nil
+	if manager then
+		local ok_held, current = pcall(manager.get_channel)
+		held = ok_held and registry_channel(current) or nil
+	end
+	Logger.info(LOG, "Subscription to '%s' %s (subscribed=%s).", tostring(channel),
+		committed and "committed" or "refused", tostring(held))
+	return { action = "channel_changed", channel = held, ok = committed }
+end
+
+--- Tells an open Versions page which channel the user now receives updates
+--- from; the menu calls it after its channel rows change the subscription.
+--- @param channel string Registry channel id.
+--- @return boolean pushed Whether a live page received it.
+function M.push_subscribed_channel(channel)
+	if not registry_channel(channel) then
+		Logger.error(LOG, "Refused to push a subscription outside the registry.")
+		return false
+	end
+	return M._push({ action = "channel_changed", channel = channel, ok = true }) == true
+end
+
 --- Clears cached state; used by tests.
 function M._reset()
 	_fetch_generation = 0
@@ -215,24 +317,18 @@ end
 --- @param payload any  String or table from host_bridge.js.
 --- @param state  table Daemon state.
 --- @return any|nil  Response to send back to JS.
---- The page channel of the release feed the installation follows: "dev" for
---- prereleases, "main" for stable. It opened on "main" always, which hides
---- prereleases, and every release is one: the window opened on an empty list.
---- @return string "main" | "dev"
-local function followed_channel()
-	local ok, updater = pcall(require, "modules.updater.manager")
-	if ok and type(updater) == "table" and type(updater.get_channel) == "function"
-		and updater.get_channel() == "dev" then
-		return "dev"
-	end
-	return "main"
-end
-
 function M.on_message(payload, state)
 	if type(payload) == "string" then
 		if payload == "ready" or payload == "refresh" then
-			if payload == "ready" then Logger.info(LOG, "Changelog UI ready.") end
-			local channel = followed_channel()
+			-- The window opens on the subscribed channel, as on the other drivers:
+			-- this used to fetch "main" whatever the user followed.
+			local manager = updater()
+			local channel = manager and manager.get_channel() or nil
+			if not registry_channel(channel) then
+				M._push({ action = "releases_error", error_key = "changelog_window.error_network" })
+				return nil
+			end
+			Logger.info(LOG, "Changelog UI %s (channel=%s).", payload, channel)
 			M.start_fetch(channel)
 			return _build_initial_payload(state, channel)
 		end
@@ -248,8 +344,16 @@ function M.on_message(payload, state)
 	local action = payload.action
 
 	if action == "fetch" then
+		if not registry_channel(payload.channel) then
+			Logger.error(LOG, "Refused a release fetch for a channel outside the registry.")
+			return { action = "releases_error", error_key = "changelog_window.error_network" }
+		end
 		M.start_fetch(payload.channel)
 		return _build_initial_payload(state, payload.channel)
+	end
+
+	if action == "set_channel" then
+		return M.subscribe(payload.channel, state)
 	end
 
 	if action == "open_url" then

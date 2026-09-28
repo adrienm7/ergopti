@@ -8,6 +8,7 @@
 
 local helpers = require("tests.helpers")
 local Fixture = require("tests.support.log_transport_fixture")
+local Timings = require("infra.timings")
 local new_context, configure = Fixture.new_context, Fixture.configure
 local TOKEN, SESSION, LOOPBACK = Fixture.TOKEN, Fixture.SESSION, Fixture.LOOPBACK
 
@@ -307,7 +308,7 @@ helpers.describe("LogTransport authenticated ACK handling", function()
 				context.state.clock = context.state.clock + 0.51
 				context.state.pump()
 			end
-			helpers.assert_eq(#context.state.failures, 0, "five sends over 2 s are a stall, not a dead logger")
+			helpers.assert_eq(#context.state.failures, 0, "two seconds of silence are within the stall budget")
 			context:ack(1)
 			helpers.assert_eq(context.transport.status().queued, 0, "the late ACK still delivers")
 		end)
@@ -319,10 +320,16 @@ helpers.describe("LogTransport authenticated ACK handling", function()
 			configure(context)
 			context.transport.enqueue("unanswered", "info")
 			context.state.pump()
-			for _ = 1, 10 do
-				context.state.clock = context.state.clock + 0.51
+			local started = context.state.clock
+			local budget = Timings.sec("logger", "stall_fatal_ms")
+			local step = 0.05
+			for tick = 1, math.ceil(budget / step) - 1 do
+				context.state.clock = started + tick * step
 				context.state.pump()
 			end
+			helpers.assert_eq(#context.state.failures, 0, "the whole stall budget must elapse")
+			context.state.clock = started + budget
+			context.state.pump()
 			helpers.assert_eq(#context.state.failures, 1)
 			helpers.assert_contains(context.state.failures[1], "did not ACK retained sequence 1")
 			helpers.assert_eq(context.transport.status().queued, 1, "silence never dequeues the head")

@@ -112,7 +112,7 @@ helpers.describe("modules/gestures/manager.lua", function()
   helpers.it("set_action updates a slot", function()
     M.set_action("swipe_3_left", "vol_up")
     helpers.assert_eq(M.get_action("swipe_3_left"), "vol_up")
-    M.set_action("swipe_3_left", "ws_prev")  -- restore
+    M.set_action("swipe_3_left", "none")  -- restore
   end)
 
   helpers.it("set_action works for tap slots too", function()
@@ -228,18 +228,19 @@ helpers.describe("modules/gestures/manager.lua", function()
       "i18n.get echoes the raw key back on a miss — an echoed key means the catalogue was never reached")
   end)
 
-  helpers.it("the workspace ids resolve through their desktop_* catalogue entries", function()
+  helpers.it("the workspace actions are the catalogue's desktop_* ids", function()
     local i18n = require("infra.i18n")
-    -- This driver says "workspace", the shared catalogue says "desktop". The
-    -- alias is what lets an existing user's config.toml keep resolving, so it
-    -- has to be exercised rather than assumed.
-    for id, suffix in pairs({ ws_prev = "desktop_prev", ws_next = "desktop_next" }) do
+    -- This driver used private ws_prev / ws_next ids labelled through the
+    -- catalogue's desktop_* keys, so no other driver's binding and no picker
+    -- entry could name them. They are the shared ids now.
+    for _, id in ipairs({ "desktop_prev", "desktop_next" }) do
       local label = M.get_action_label(id)
-      helpers.assert_eq(label, i18n.get("sg_actions." .. suffix),
-        id .. " must resolve through sg_actions." .. suffix)
-      helpers.assert_true(label ~= id and label ~= "sg_actions." .. suffix,
+      helpers.assert_eq(label, i18n.get("sg_actions." .. id), id .. " must resolve through sg_actions." .. id)
+      helpers.assert_true(label ~= id and label ~= "sg_actions." .. id,
         id .. " resolved to a raw identifier — the catalogue entry was not found")
+      helpers.assert_true(M.is_runnable(id), id .. " must reach the workspace switcher")
     end
+    helpers.assert_true(not M.is_assignable("ws_prev"), "the private id is gone")
   end)
 
   helpers.it("get_action_label returns fallback for unknown action", function()
@@ -252,11 +253,18 @@ helpers.describe("modules/gestures/manager.lua", function()
     helpers.assert_eq(M.get_action_label("ctrl_alt_super_enter"), "Ctrl + Alt + Super + Enter")
   end)
 
-  helpers.it("get_action_names returns sorted list", function()
+  helpers.it("get_action_names follows the catalogue order", function()
+    -- It used to sort a hard-coded table alphabetically; the order is now the
+    -- catalogue's, the one the other two drivers show.
     local names = M.get_action_names()
     helpers.assert_true(type(names) == "table")
     helpers.assert_true(#names > 10, "should have many actions")
-    helpers.assert_true(names[1] ~= nil)
+    helpers.assert_eq(names[1], "none", "the catalogue opens with the empty binding")
+    local position = {}
+    for index, name in ipairs(names) do position[name] = index end
+    helpers.assert_true(position.left_click_toggle < position.tab_new
+      and position.tab_new < position.lock_screen,
+      "mouse, then windows, then system — the catalogue's grouping, not the alphabet")
   end)
 
   -- ==========================================================================
@@ -450,14 +458,14 @@ helpers.describe("modules/gestures/manager.lua", function()
     end
   end)
 
-  helpers.it("does not hardcode the slot arrays (they are derived at load)", function()
+  helpers.it("does not hardcode the slot arrays (they come from the generated catalogue)", function()
     local fh = io.open(helpers.driver_root() .. "/modules/gestures/manager.lua", "r")
     helpers.assert_true(fh ~= nil, "manager source must be readable")
     local src = fh:read("*a"); fh:close()
-    helpers.assert_true(src:find("load_slot_space(", 1, true) ~= nil,
-      "manager must derive the slot-space via load_slot_space()")
-    helpers.assert_true(src:find("_shared/modules/actions/actions.toml", 1, true) ~= nil,
-      "manager must read the shared actions.toml")
+    helpers.assert_true(src:find('require, "_generated.action_catalogue"', 1, true) ~= nil,
+      "manager must load the generated action catalogue")
+    helpers.assert_true(src:find("M.SINGLE_SLOTS = copy_list(Catalogue.slots.single)", 1, true) ~= nil,
+      "SINGLE_SLOTS must come from the catalogue's slot-space")
     helpers.assert_true(src:find("M.SINGLE_SLOTS = {", 1, true) == nil,
       "SINGLE_SLOTS must be derived, not re-hardcoded as a literal array")
   end)

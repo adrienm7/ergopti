@@ -78,7 +78,10 @@ local function fresh_runtime(effects)
 	package.loaded["modules.hotstrings.hotstrings_config"] = { resolve = function() return nil end }
 	package.loaded["adapters.tooltip_renderer"] = { hide = function() return true end }
 
-	return helpers.load_with_stubs("modules.keymap")
+	local keymap = helpers.load_with_stubs("modules.keymap")
+	keymap.set_preview_enabled(true)
+	keymap.set_preview_star_enabled(true)
+	return keymap
 end
 
 helpers.describe("keymap semantic mutations wait for native preview revocation", function()
@@ -194,7 +197,14 @@ helpers.describe("keymap semantic mutations wait for native preview revocation",
 		helpers.assert_eq(effects.reset_calls, resets_before_mutation,
 			"logical reset must not run before native revocation commits")
 
+		local publications = 0
+		local function publish_delays() publications = publications + 1; return true end
+		helpers.assert_eq(Keymap.with_hotstring_delays(function() return 2 end, publish_delays), false)
+		helpers.assert_eq(publications, 0, "delay source cannot publish behind a live native preview")
+
 		effects.allow_hide = true
+		helpers.assert_true(Keymap.with_hotstring_delays(function() return 2 end, publish_delays))
+		helpers.assert_eq(publications, 1)
 		helpers.assert_true(Keymap.set_trigger_char("b"))
 		helpers.assert_eq(Keymap.get_trigger_char(), "b")
 		helpers.assert_eq(Keymap.owns_visible_magic_action(mapping, "old"), false)
@@ -209,7 +219,7 @@ helpers.describe("keymap semantic mutations wait for native preview revocation",
 			"set_sections_enabled", "disable_group", "register_lua_group", "enable_group",
 			"sort_mappings", "set_repeat_feature_enabled", "set_terminator_enabled",
 			"set_terminators_enabled",
-			"remove_custom_terminator",
+			"remove_custom_terminator", "with_hotstring_delays",
 		}
 		for _, name in ipairs(writers) do
 			local escaped = name:gsub("_", "_")

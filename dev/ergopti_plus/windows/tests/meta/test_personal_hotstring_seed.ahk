@@ -30,8 +30,13 @@ _PHS_AssertSeedingWired() {
 	pf := _DriverSourceConcat()
 	Assert(InStr(pf, "EnsurePersonalHotstringFeature(SecName)") > 0,
 		"EnsurePersonalHotstringFeature must exist to seed custom personal hotstring sections (personal-hotstring-seed)")
-	Assert(InStr(pf, '["hotstrings"]["personal"][SecName] := Map(') > 0,
-		"EnsurePersonalHotstringFeature must seed a Map node (not a bool) mirroring the manifest shape (personal-hotstring-seed)")
+	Seed := _DriverFuncBody("EnsurePersonalHotstringFeature")
+	CandidateSeed := _DriverFuncBody("_ConfigSeedPersonalHotstring")
+	Assert(Seed != "" && CandidateSeed != "", "both personal seeding phases must exist")
+	Assert(InStr(Seed, "_ConfigSeedPersonalHotstring(Features, SecName)") > 0
+		&& InStr(CandidateSeed, '["hotstrings"]["personal"][SectionName] := Map(') > 0
+		&& InStr(CandidateSeed, 'ManifestDefaultFor(Path . ".enabled")') > 0,
+		"personal sections must use the manifest's neutral Map shape before applying saved overrides")
 
 	ep := FileRead(Root . "/ErgoptiPlus.ahk")
 	seedPos  := InStr(ep, "EnsurePersonalHotstringFeature")

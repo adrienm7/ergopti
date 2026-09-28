@@ -109,9 +109,10 @@ local function exercise_bundle_action(operation, business_ok)
 			return true
 		end }
 
-		input_sources.ERGOPTI_VARIANTS = {
-			{ id = "com.apple.keyboardlayout.ergopti.plus", label = "Ergopti+", suffix = "_plus" },
-		}
+		install.bundle_variants = function()
+			return { { name = "Ergopti_v2_2_2_plus", tis_id = "com.apple.keyboardlayout.ergopti.plus",
+				keylayout = "/Library/Keyboard Layouts/Ergopti_v2.2.2.bundle/Contents/Resources/Ergopti_v2_2_2_plus.keylayout" } }
+		end
 		input_sources.list_active_keyboard_layouts = function()
 			if operation == "upgrade" then
 				return {
@@ -127,8 +128,9 @@ local function exercise_bundle_action(operation, business_ok)
 			business_done = on_done
 			return true
 		end
-		input_sources.enable_and_select_source_async = function(
-				_id, _label, _bundle, _internal, on_done)
+		input_sources.enable_keylayout_source_async = function(keylayout, label, on_done)
+			helpers.assert_contains(keylayout, "/Contents/Resources/Ergopti_v2_2_2_plus.keylayout")
+			helpers.assert_eq(label, "Ergopti+")
 			dispatches = dispatches + 1
 			business_done = on_done
 			return true
@@ -216,9 +218,10 @@ helpers.describe("menu_keyboard_layout: mixed stable and legacy state", function
 			local input_sources = helpers.load_with_stubs("modules.keymap.input_sources")
 			local install = require("modules.keymap.layout_install")
 			local stable_id = "com.apple.keyboardlayout.ergopti.plus"
-			input_sources.ERGOPTI_VARIANTS = {
-				{ id = stable_id, label = "Ergopti+", suffix = "_plus" },
-			}
+			install.bundle_variants = function()
+				return { { name = "Ergopti_v2_2_2_plus", tis_id = stable_id,
+					keylayout = "/b/Ergopti_v2_2_2_plus.keylayout" } }
+			end
 			input_sources.list_active_keyboard_layouts = function()
 				return {
 					{ id = "Ergopti_v2_2_2_plus", name = "Ergopti+ v2.2.2", selected = true },

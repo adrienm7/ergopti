@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Provides the "Disposition clavier" submenu in the Hammerspoon menu bar.
 --- Lets the user install the bundled Ergopti keyboard layout (user or system),
---- open the macOS input-source preferences, switch the menubar logo variant,
+--- open the macOS input-source preferences, pick the menubar icon variant,
 --- and inspect / activate any of the input sources currently enabled in macOS.
 ---
 --- FEATURES & RATIONALE:
@@ -23,20 +23,23 @@ local M = {}
 
 local hs            = hs
 local Logger        = require("infra.logger")
-local Storage       = require("adapters.storage")
+local Manifest      = require("infra.manifest_reader")
 local DeferredWork  = require("infra.deferred_work")
 local Timings       = require("infra.timings")
 local notifications = require("infra.notifications")
 local i18n          = require("infra.i18n")
 local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
+local LayoutManagerWindow = require("ui.layout_manager")
 local install       = require("modules.keymap.layout_install")
 local input_sources = require("modules.keymap.input_sources")
 local LOG           = "menu.keyboard_layout"
 
 M.DEFAULT_STATE = {
-	layout_pause_switch_enabled = false,
-	layout_on_pause             = false,
-	layout_on_resume            = false,
+	layout_pause_switch_enabled = Manifest.default_for("layout.pause_switch_enabled"),
+	layout_on_pause             = Manifest.default_for("layout.on_pause"),
+	layout_on_resume            = Manifest.default_for("layout.on_resume"),
+	-- config.toml [ui] menubar_icon; its values and default are the manifest's.
+	menubar_icon                = Manifest.default_for("ui.menubar_icon"),
 }
 
 
@@ -52,10 +55,6 @@ M.DEFAULT_STATE = {
 -- Path of the bundles directory relative to the Hammerspoon driver root.
 -- Resolved at runtime against base_dir (which already ends with "/")
 local BUNDLES_RELDIR = "../../ergopti/macos/bundles/"
-
--- Persisted preference key for the menubar logo variant
-local LOGO_VARIANT_KEY     = "menubar_logo_variant"
-local LOGO_VARIANT_DEFAULT = "simple"
 
 -- macOS URL that opens System Settings → Keyboard → Input Sources directly
 local KEYBOARD_PREFS_URL = "x-apple.systempreferences:com.apple.preference.keyboard?InputSources"
@@ -99,7 +98,6 @@ local invalidate_bundle_caches = install.invalidate_bundle_caches
 local USER_LAYOUTS_DIR     = install.USER_LAYOUTS_DIR
 local SYSTEM_LAYOUTS_DIR   = install.SYSTEM_LAYOUTS_DIR
 
-local ERGOPTI_VARIANTS              = input_sources.ERGOPTI_VARIANTS
 local extract_ergopti_version       = input_sources.extract_ergopti_version
 local format_ergopti_display        = input_sources.format_ergopti_display
 local parse_active_layouts          = input_sources.parse_active_layouts
@@ -107,7 +105,7 @@ local compute_active_layouts_fast   = input_sources.compute_active_layouts_fast
 local refresh_active_layouts_async  = input_sources.refresh_active_layouts_async
 local list_active_keyboard_layouts  = input_sources.list_active_keyboard_layouts
 local set_input_source_async        = input_sources.set_input_source_async
-local enable_and_select_source_async = input_sources.enable_and_select_source_async
+local enable_keylayout_source_async = input_sources.enable_keylayout_source_async
 local is_legacy_ergopti_id          = input_sources.is_legacy_ergopti_id
 local migrate_legacy_id             = input_sources.migrate_legacy_id
 local upgrade_active_list_async     = input_sources.upgrade_active_list_async
@@ -180,6 +178,53 @@ local function run_install_and_chain(install_fn, legacy_active, update_menu)
 	schedule_menu_refresh(update_menu)
 end
 
+--- Display label of a layout an installed bundle declares: its KeyboardLayout
+--- Name without the version its row already shows (Ergopti_v2_2_2_plus is
+--- "Ergopti+"), or the name itself for a layout that is not Ergopti.
+--- @param name string KeyboardLayout Name from the bundle's Info.plist.
+--- @return string
+local function variant_label(name)
+	local unversioned = (name:gsub("_v%d+[_.]%d+[_.]%d+", ""))
+	return format_ergopti_display(unversioned) or name
+end
+
+--- The custom layout picker: the registry layouts the layout manager
+--- installed, the one of the current input source checked; choosing one
+--- makes it the current input source.
+--- @param update_menu function|nil Menu rebuild callback.
+--- @return table Rows for the `custom_layouts` provider.
+local function custom_layout_rows(update_menu)
+	local rows = {}
+	local ok, LayoutRegistry = pcall(require, "modules.keymap.layout_registry")
+	local picked_ok, picker = false, nil
+	if ok then picked_ok, picker = pcall(LayoutRegistry.picker) end
+	if not picked_ok or type(picker) ~= "table" then
+		Logger.error(LOG, "The installed layouts could not be listed: %s.", tostring(picker))
+		picker = { layouts = {}, active = "" }
+	end
+	for _, entry in ipairs(picker.layouts) do
+		local id = entry.id
+		rows[#rows + 1] = {
+			label   = type(entry.name) == "string" and entry.name or id,
+			checked = picker.active == id or nil,
+			action  = function()
+				defer_tis_call(function()
+					LayoutRegistry.select(id, function(selected)
+						if not selected then
+							pcall(notifications.notify, i18n.get("layout_manager.failure_other"), nil, "error")
+						end
+						schedule_menu_refresh(update_menu)
+					end)
+				end)
+			end,
+		}
+	end
+	if #rows == 0 then
+		rows[1] = { label = i18n.get("menu.layout.none_installed"), disabled = true }
+	end
+	return rows
+end
+
 --- Builds an install/update menu item for one scope (user or system).
 --- The label and click handler are derived from the relationship between the
 --- highest installed version and the latest available bundle:
@@ -222,12 +267,11 @@ function M.build(ctx)
 	local base_dir     = ctx and ctx.base_dir or ""
 	local bundles_dir  = base_dir .. BUNDLES_RELDIR
 
-	-- The two blocks this driver alone has — installing the .bundle layout macOS
-	-- needs, and choosing the menubar logo — are collected for the manifest slots
-	-- that declare them rather than appended here. They were eight and two rows
-	-- of a shared menu that nothing described.
+	-- The block this driver alone has — installing the .bundle layout macOS
+	-- needs — is collected for the manifest slot that declares it rather than
+	-- appended here. The menubar icon is the manifest's `choice` row: this
+	-- driver supplies only its current value and what choosing one does.
 	local bundle_rows    = {}
-	local logo_rows      = {}
 	-- Which layout to switch to when the driver pauses and when it resumes. Three
 	-- more rows this driver alone has, for the same reason as the two above: they
 	-- name macOS input sources.
@@ -323,10 +367,23 @@ function M.build(ctx)
 	--   5. absent, latest NOT installed    → greyed: install latest first
 	local latest_ver = latest and parse_version(latest) or nil
 	local latest_str = latest_ver and version_str(latest_ver)
-	local all_variants_active = true
+	-- The layouts the installed bundle declares in its Info.plist (system scope
+	-- first, like the input-source map): the bundle says what it installs.
+	local installed_dir, installed_name
+	if system_best then
+		installed_dir  = SYSTEM_LAYOUTS_DIR
+		installed_name = system_best.name
+	elseif user_best then
+		installed_dir  = USER_LAYOUTS_DIR
+		installed_name = user_best.name
+	end
+	local bundle_full_path = (installed_dir and installed_name) and
+		(installed_dir:gsub("[/\\]$", "") .. "/" .. installed_name) or ""
+	local variants = bundle_full_path ~= "" and install.bundle_variants(bundle_full_path) or {}
+	local all_variants_active = #variants > 0
 	local active_variant_count = 0
-	for _, var in ipairs(ERGOPTI_VARIANTS) do
-		if active_id_set_pre[var.id] then
+	for _, var in ipairs(variants) do
+		if active_id_set_pre[var.tis_id] then
 			active_variant_count = active_variant_count + 1
 		else
 			all_variants_active = false
@@ -337,7 +394,7 @@ function M.build(ctx)
 	local installed_ver = (system_best and system_best.version) or (user_best and user_best.version)
 	Logger.debug(LOG,
 		"Active layout state — stable=%d/%d legacy=%d installed=%s latest_installed=%s.",
-		active_variant_count, #ERGOPTI_VARIANTS, #legacy_active,
+		active_variant_count, #variants, #legacy_active,
 		installed_ver and version_str(installed_ver) or "none",
 		tostring(latest_installed_anywhere))
 	if all_variants_active and #legacy_active == 0 and installed_ver then
@@ -381,40 +438,23 @@ function M.build(ctx)
 		-- variant. Already-added variants are greyed individually with ✅.
 		local active_id_set = active_id_set_pre
 
-		-- Resolve the installed bundle path (system preferred over user).
-		-- The keylayout internal name base is the bundle basename without ".bundle",
-		-- with dots replaced by underscores (e.g. "Ergopti_v2.2.2.bundle" → "Ergopti_v2_2_2").
-		local installed_dir, installed_name
-		if system_best then
-			installed_dir  = SYSTEM_LAYOUTS_DIR
-			installed_name = system_best.name
-		elseif user_best then
-			installed_dir  = USER_LAYOUTS_DIR
-			installed_name = user_best.name
-		end
-		local bundle_base = installed_name and installed_name:gsub("%.bundle$", ""):gsub("%.", "_") or ""
-		local bundle_full_path = (installed_dir and installed_name) and
-			(installed_dir:gsub("[/\\]$", "") .. "/" .. installed_name) or ""
-
 		local add_sub = {}
-		for _, var in ipairs(ERGOPTI_VARIANTS) do
-			local id            = var.id
-			local suffix        = var.suffix or ""
-			local internal_name = bundle_base .. suffix
-			local already_added = active_id_set[id] == true
+		for _, var in ipairs(variants) do
+			local label         = variant_label(var.name)
+			local already_added = active_id_set[var.tis_id] == true
 			if already_added then
 				add_sub[#add_sub + 1] = {
-					label    = string.format(i18n.get("menu.layout.already_added"), var.label, latest_str),
+					label    = string.format(i18n.get("menu.layout.already_added"), label, latest_str),
 					disabled = true,
 				}
 			else
 				add_sub[#add_sub + 1] = {
-					label = string.format("%s v%s", var.label, latest_str),
+					label = string.format("%s v%s", label, latest_str),
 					action    = function()
 						defer_tis_call(function()
-							enable_and_select_source_async(id, var.label, bundle_full_path, internal_name,
+							enable_keylayout_source_async(var.keylayout, label,
 								function(ok)
-									if ok then pcall(notifications.notify, string.format(i18n.get("menu.layout.add_ok"), var.label), nil, "success") end
+									if ok then pcall(notifications.notify, string.format(i18n.get("menu.layout.add_ok"), label), nil, "success") end
 									if not ok then pcall(notifications.notify, i18n.get("menu.layout.add_fail"), nil, "error") end
 									schedule_menu_refresh(update_menu)
 								end)
@@ -434,32 +474,6 @@ function M.build(ctx)
 			disabled = true,
 		}
 	end
-
-	-- The separator that stood here is a `---` row in the manifest now.
-
-	-- Logo variant toggle (persisted via hs.settings)
-	local current_variant = Storage.get(LOGO_VARIANT_KEY) or LOGO_VARIANT_DEFAULT
-	local function set_variant(v)
-		Storage.set(LOGO_VARIANT_KEY, v)
-		Logger.debug(LOG, "Logo variant: %s.", tostring(v))
-		-- Re-render the menubar icon and rebuild the submenu so the checkmarks
-		-- reflect the new state. refresh_icon is provided directly by ui.menu.init
-		-- via ctx, avoiding a require() round-trip that previously could re-enter
-		-- a partially-initialized module
-		if type(refresh_icon) == "function" then pcall(refresh_icon) end
-		-- pcall guards a hard crash from any rebuild path
-		if type(update_menu) == "function" then pcall(update_menu) end
-	end
-	logo_rows[#logo_rows + 1] = {
-		label   = i18n.get("menu.layout.logo_default"),
-		checked = current_variant == "simple",
-		action      = function() set_variant("simple") end,
-	}
-	logo_rows[#logo_rows + 1] = {
-		label   = i18n.get("menu.layout.logo_custom"),
-		checked = current_variant == "complex",
-		action      = function() set_variant("complex") end,
-	}
 
 	-- The separator that stood here is a `---` row in the manifest now.
 
@@ -681,10 +695,42 @@ function M.build(ctx)
 		Logger.error(LOG, "Manifest renderer unavailable — the layout list is not rendered.")
 		return nil
 	end
-	local submenu = ManifestMenu.build("layout_menu", "Layout", nil, nil, ctx, {
+	-- Layout management and the menubar icon remain manifest commands; other
+	-- commands of the context stay available to the renderer.
+	local render_ctx = {}
+	for key, value in pairs(type(ctx) == "table" and ctx or {}) do render_ctx[key] = value end
+	render_ctx.commands = {}
+	for key, value in pairs(type(ctx) == "table" and type(ctx.commands) == "table" and ctx.commands or {}) do
+		render_ctx.commands[key] = value
+	end
+	render_ctx.state_getters = {}
+	for key, value in pairs(type(ctx) == "table" and type(ctx.state_getters) == "table" and ctx.state_getters or {}) do
+		render_ctx.state_getters[key] = value
+	end
+	render_ctx.state_getters["ui.menubar_icon"] = function() return state and state.menubar_icon end
+	render_ctx.commands["menubar_icon"] = function(variant)
+		if not state then return false end
+		state.menubar_icon = variant
+		if type(save_prefs) ~= "function" or save_prefs() ~= true then return false end
+		Logger.info(LOG, "Menubar icon set to %s.", tostring(variant))
+		-- refresh_icon comes from ui.menu.init through ctx: a require() round-trip
+		-- could re-enter that module while it is still initialising.
+		if type(refresh_icon) == "function" then pcall(refresh_icon) end
+		if type(update_menu) == "function" then pcall(update_menu) end
+		return true
+	end
+	render_ctx.commands["layout_manager"] = LayoutManagerWindow.menu_command()
+	for command, mode in pairs({ scope_restore = "recommended", scope_clear = "clear" }) do
+		render_ctx.commands[command] = function()
+			if ctx.paused == true or type(ctx.apply_preference_scope) ~= "function" then return false end
+			return ctx.apply_preference_scope("keyboard_layout", mode)
+		end
+	end
+	local custom_rows = custom_layout_rows(update_menu)
+	local submenu = ManifestMenu.build("layout_menu", "Layout", nil, nil, render_ctx, {
+		["custom_layouts"]   = function() return custom_rows end,
 		["active_layouts"]   = active_layout_rows,
 		["layout_bundle"]    = function() return bundle_rows end,
-		["layout_logo"]      = function() return logo_rows end,
 		["layout_switching"] = function() return switching_rows end,
 	})
 
@@ -752,6 +798,87 @@ function M.set_layout_by_kl_name_async(kl_name, on_done)
 	return set_input_source_async(localised, kl_name, on_done)
 end
 
+--- The layout a pause (or a resume) switches to, or nil when switching is off
+--- or set to « no change ». Pause, resume and quit all read it here.
+--- @param state table|nil Menu state (layout_pause_switch_enabled, layout_on_pause, layout_on_resume).
+--- @param is_paused boolean True for the pause target, false for the resume one.
+--- @return string|nil kl_name
+local function switch_target(state, is_paused)
+	if type(state) ~= "table" or not state.layout_pause_switch_enabled then return nil end
+	local target = is_paused and state.layout_on_pause or state.layout_on_resume
+	-- Nil / false / "auto" / "" all mean « do nothing » (the dropdowns default to false).
+	if type(target) ~= "string" or target == "" then return nil end
+	return target
+end
+
+--- Switches to the pause layout before ErgoptiPlus quits: quitting leaves the
+--- keyboard on the input source a pause selects, and has no setting of its own.
+--- @param state table|nil Menu state.
+--- @param on_done function|nil fn(ok, output, reason), called exactly once when a
+---   switch was started (set_input_source_async answers on every path).
+--- @return string "none" when nothing is configured, "pending" once on_done is owed.
+function M.apply_quit_layout(state, on_done)
+	local target = switch_target(state, true)
+	if target == nil then return "none" end
+	Logger.info(LOG, "Quit: applying the pause keyboard layout.")
+	-- Looked up on M at call time so a test stub on the module is honoured.
+	M.set_layout_by_kl_name_async(target, on_done)
+	return "pending"
+end
+
+local pending_switches = {}
+
+--- Reports automatic input-source transitions without terminal acknowledgement.
+--- @return boolean pending True until every scheduled/native transition settles.
+function M.scope_pending() return next(pending_switches) ~= nil end
+
+--- Captures the exact future automatic-switching policy.
+--- @param state table Live menu state.
+--- @return table|nil snapshot Detached policy, absent while native work is pending.
+function M.capture_scope(state)
+	if M.scope_pending() then return nil end
+	local result = {}
+	local Preferences = require("infra.preferences")
+	for _, row in ipairs(Manifest.scope_operations("keyboard_layout", "clear")) do
+		local key = assert(Preferences.flat_key_for(row.section .. "." .. row.key), "layout preference owner missing")
+		result[#result + 1] = { key = key, value = state[key] }
+	end
+	return result
+end
+
+--- Applies a planned layout policy without changing the current manual selection.
+--- @param state table Live menu state.
+--- @param rows table Canonical scope operations.
+--- @return boolean applied Terminal policy acknowledgement.
+function M.apply_scope(state, rows)
+	if M.scope_pending() then return false end
+	local Preferences, values = require("infra.preferences"), {}
+	local allowed = {}
+	for _, row in ipairs(Manifest.scope_operations("keyboard_layout", "clear")) do
+		allowed[row.section .. "." .. row.key] = true
+	end
+	for _, row in ipairs(rows) do
+		local path = row.section .. "." .. row.key
+		assert(allowed[path], "unexpected layout scope field: " .. path)
+		local key = assert(Preferences.flat_key_for(path), "layout preference owner missing")
+		local value = row.value
+		if row.delete then value = Manifest.default_for(path) end
+		values[#values + 1] = { key = key, value = value }
+	end
+	for _, item in ipairs(values) do state[item.key] = item.value end
+	return true
+end
+
+--- Restores a captured policy after a refused publication.
+--- @param state table Live menu state.
+--- @param snapshot table Exact policy snapshot.
+--- @return boolean restored Terminal policy acknowledgement.
+function M.restore_scope(state, snapshot)
+	if M.scope_pending() then return false end
+	for _, item in ipairs(snapshot) do state[item.key] = item.value end
+	return true
+end
+
 --- Schedules the pause / resume keyboard-layout switch on a DEFERRED run-loop
 --- cycle instead of running it inline.
 ---
@@ -763,10 +890,8 @@ end
 --- @param schedule function|nil Injectable scheduler(fn) for tests.
 --- @return string|nil The target layout that was scheduled, or nil when no switch is needed.
 function M.schedule_pause_layout_switch(is_paused, state, schedule)
-	if type(state) ~= "table" or not state.layout_pause_switch_enabled then return nil end
-	local target = is_paused and state.layout_on_pause or state.layout_on_resume
-	-- Nil / false / "auto" / "" all mean « do nothing » (the dropdowns default to false).
-	if type(target) ~= "string" or target == "" then return nil end
+	local target = switch_target(state, is_paused)
+	if target == nil then return nil end
 	-- Resolve hs.timer lazily so the module stays loadable in the cross-platform
 	-- test harness where hs is absent and the scheduler is injected.
 	if type(schedule) ~= "function" then
@@ -774,16 +899,27 @@ function M.schedule_pause_layout_switch(is_paused, state, schedule)
 			return DeferredWork.after(0, fn, "menu_keyboard_layout.pause_switch")
 		end
 	end
-	local scheduled = schedule(function()
-		-- Look the setter up on M at call time so a test stub on the module is honoured.
-		if type(M.set_layout_by_kl_name_async) == "function" then
-			pcall(M.set_layout_by_kl_name_async, target, nil)
+	local token = { scheduling = true }
+	pending_switches[token] = true
+	local function dispatch()
+		if not pending_switches[token] or token.dispatched then return end
+		if token.scheduling then token.fired = true; return end
+		token.dispatched = true
+		local called, accepted = pcall(M.set_layout_by_kl_name_async, target, function(ok)
+			if type(ok) == "boolean" then pending_switches[token] = nil end
+		end)
+		if not called or accepted ~= true then
+			Logger.error(LOG, "Pause layout dispatch refused; terminal acknowledgement is required.")
 		end
-	end)
-	if scheduled ~= true then
+	end
+	local called, scheduled = pcall(schedule, dispatch)
+	token.scheduling = false
+	if not called or scheduled ~= true then
+		pending_switches[token] = nil
 		Logger.error(LOG, "Pause layout switch could not be scheduled.")
 		return nil
 	end
+	if token.fired then dispatch() end
 	return target
 end
 

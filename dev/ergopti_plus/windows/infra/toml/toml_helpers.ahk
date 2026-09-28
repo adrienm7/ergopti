@@ -635,6 +635,34 @@ TOML_Write(Value, Path, Section, Key) {
 ; ===============================
 ; ===============================
 
+; Paths this session must not write, with the reason. The config migration
+; registers a config.toml it could not version (a newer schema, a failed
+; migration): the batch writer then refuses it in both modes, so neither a
+; targeted save, a full save nor a transactional candidate can replace a file
+; this build does not understand. Deliberately never lifted: a restart
+; re-evaluates the file.
+_TOML_WriteRefusals() {
+	static Refusals := Map()
+	return Refusals
+}
+
+_TOML_WriteRefusalKey(Path) {
+	return StrLower(StrReplace(String(Path), "/", "\"))
+}
+
+TOML_RefuseWrites(Path, Reason) {
+	if !(Path is String) || Path == "" || !(Reason is String) || Reason == ""
+		throw ValueError("TOML_RefuseWrites needs a path and a reason")
+	_TOML_WriteRefusals()[_TOML_WriteRefusalKey(Path)] := Reason
+}
+
+; Why writes to Path are refused this session, or "".
+TOML_WriteRefusal(Path) {
+	Refusals := _TOML_WriteRefusals()
+	Key := _TOML_WriteRefusalKey(Path)
+	return Refusals.Has(Key) ? Refusals[Key] : ""
+}
+
 ; Apply every (Section, Key, Value) update in one read-modify-write cycle.
 ; Preserves keys we did not touch and renders the complete result canonically
 ; (sorted sections/keys and stable spacing) before the one atomic replace.
@@ -715,6 +743,12 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 		if !(Mode is String) || (Mode != "write" && Mode != "build")
 				throw ValueError("TOML_BatchWrite mode must be 'write' or 'build'")
 		BuildOnly := Mode == "build"
+		Refusal := TOML_WriteRefusal(Path)
+		if (Refusal != "") {
+				try LoggerError("TomlWrite", "Refusing TOML {1} for '{2}': writes to it are refused for this session ({3}). No file was changed.",
+					Mode, Path, Refusal)
+				return false
+		}
 		if !(ExactSectionPrefixes is Array)
 				throw TypeError("ExactSectionPrefixes must be an Array")
 		for _, Prefix in ExactSectionPrefixes {

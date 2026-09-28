@@ -5,6 +5,7 @@
 --- JSON export, file flush, session lifecycle, edge cases.
 
 local helpers   = require("tests.helpers")
+local it = require("tests.support.metrics_preferences_fixture").it
 local Fakes     = helpers.load_module("tests.fakes")
 local keylogger = helpers.load_module("modules.keylogger.keylogger")
 
@@ -25,32 +26,32 @@ helpers.describe("keylogger", function()
   -- ==========================================================================
 
   helpers.describe("module structure", function()
-    helpers.it("exports init", function()
+    it("exports init", function()
       helpers.assert_true(type(keylogger.init) == "function")
     end)
-    helpers.it("exports on_keydown", function()
+    it("exports on_keydown", function()
       helpers.assert_true(type(keylogger.on_keydown) == "function")
     end)
-    helpers.it("exports get_wpm", function()
+    it("exports get_wpm", function()
       helpers.assert_true(type(keylogger.get_wpm) == "function")
     end)
-    helpers.it("exports export_session", function()
+    it("exports export_session", function()
       helpers.assert_true(type(keylogger.export_session) == "function")
     end)
-    helpers.it("exports export_json", function()
+    it("exports export_json", function()
       helpers.assert_true(type(keylogger.export_json) == "function")
     end)
-    helpers.it("exports flush", function()
+    it("exports flush", function()
       helpers.assert_true(type(keylogger.flush) == "function")
     end)
-    helpers.it("exports suppress/unsuppress", function()
+    it("exports suppress/unsuppress", function()
       helpers.assert_true(type(keylogger.suppress) == "function")
       helpers.assert_true(type(keylogger.unsuppress) == "function")
     end)
-    helpers.it("exports is_password_app", function()
+    it("exports is_password_app", function()
       helpers.assert_true(type(keylogger.is_password_app) == "function")
     end)
-    helpers.it("exports reset_session + app metrics helpers", function()
+    it("exports reset_session + app metrics helpers", function()
       helpers.assert_true(type(keylogger.reset_session) == "function")
       helpers.assert_true(type(keylogger.get_app_stats) == "function")
       helpers.assert_true(type(keylogger.record_app_key) == "function")
@@ -77,23 +78,27 @@ helpers.describe("keylogger", function()
       return stats and stats.keystrokes or 0
     end
 
-    helpers.it("init with no opts leaves the collector usable", function()
+    it("init with no opts leaves the collector usable", function()
       keylogger.init({ sqlite_path = fresh_db() })
+      require("tests.support.metrics_consent_fixture").enable(keylogger)
       helpers.assert_true(keystrokes_for("probe-empty-opts") > 0,
         "after init({}) a keystroke must be counted — init leaving the collector dead is the failure this covers")
     end)
-    helpers.it("init with nil leaves the collector usable", function()
+    it("init with nil leaves the collector usable", function()
       keylogger.init(nil)
+      require("tests.support.metrics_consent_fixture").enable(keylogger)
       helpers.assert_true(keystrokes_for("probe-nil-opts") > 0,
         "init(nil) must behave like init({}), not disable collection")
     end)
-    helpers.it("init with a custom log_dir leaves the collector usable", function()
+    it("init with a custom log_dir leaves the collector usable", function()
       keylogger.init({ sqlite_path = fresh_db(), log_dir = "/tmp/ergopti_test_logs" })
+      require("tests.support.metrics_consent_fixture").enable(keylogger)
       helpers.assert_true(keystrokes_for("probe-log-dir") > 0,
         "a custom log_dir must not stop keystrokes being counted")
     end)
-    helpers.it("init with custom password_apps applies them", function()
+    it("init with custom password_apps applies them", function()
       keylogger.init({ sqlite_path = fresh_db(), password_apps = { "custom-vault" } })
+      require("tests.support.metrics_consent_fixture").enable(keylogger)
       helpers.assert_true(keylogger.is_password_app("custom-vault"),
         "a password app passed to init must be recognised — accepting the option and dropping it is the failure this covers")
     end)
@@ -106,16 +111,18 @@ helpers.describe("keylogger", function()
   -- Same treatment: these three fed the collector and asserted nothing about
   -- what it recorded, so a no-op on_keydown passed all three.
   helpers.describe("on_keydown()", function()
-    helpers.it("a keystroke is counted against its app", function()
+    it("a keystroke is counted against its app", function()
       keylogger.init({ sqlite_path = fresh_db() })
+      require("tests.support.metrics_consent_fixture").enable(keylogger)
       local before = (keylogger.get_app_stats()["kd-firefox"] or {}).keystrokes or 0
       keylogger.on_keydown("a", 1000, "kd-firefox")
       local after = (keylogger.get_app_stats()["kd-firefox"] or {}).keystrokes or 0
       helpers.assert_eq(after, before + 1, "on_keydown must increment the app's keystroke count by exactly one")
     end)
 
-    helpers.it("a keystroke with no app_id is still counted somewhere", function()
+    it("a keystroke with no app_id is still counted somewhere", function()
       keylogger.init({ sqlite_path = fresh_db() })
+      require("tests.support.metrics_consent_fixture").enable(keylogger)
       local function total()
         local n = 0
         for _, s in pairs(keylogger.get_app_stats()) do n = n + (s.keystrokes or 0) end
@@ -127,8 +134,9 @@ helpers.describe("keylogger", function()
         "a keystroke with no app id must be attributed to a fallback bucket, not dropped")
     end)
 
-    helpers.it("500 keystrokes across five apps are all counted", function()
+    it("500 keystrokes across five apps are all counted", function()
       keylogger.init({ sqlite_path = fresh_db() })
+      require("tests.support.metrics_consent_fixture").enable(keylogger)
       local before = {}
       for i = 0, 4 do
         before["vol-app" .. i] = (keylogger.get_app_stats()["vol-app" .. i] or {}).keystrokes or 0
@@ -151,13 +159,14 @@ helpers.describe("keylogger", function()
   -- ==========================================================================
 
   helpers.describe("password detection", function()
-    helpers.it("detects known password apps", function()
+    it("detects known password apps", function()
       keylogger.init({ sqlite_path = fresh_db() })
+      require("tests.support.metrics_consent_fixture").enable(keylogger)
       helpers.assert_true(keylogger.is_password_app("1password"))
       helpers.assert_true(keylogger.is_password_app("Bitwarden"))
       helpers.assert_true(keylogger.is_password_app("org.keepass.KeePass"))
     end)
-    helpers.it("covers every privacy-critical app via substring match (coverage must never narrow)", function()
+    it("covers every privacy-critical app via substring match (coverage must never narrow)", function()
       -- Privacy invariant: each of these MUST suppress keystroke logging. The
       -- match is a broad, case-insensitive substring so credential managers,
       -- their variants (keepass -> keepassxc/keepass2) and auth helpers all
@@ -165,6 +174,7 @@ helpers.describe("keylogger", function()
       -- secure_field_detector would silently stop matching these and leak
       -- keystrokes — this guard makes that regression a hard test failure.
       keylogger.init({ sqlite_path = fresh_db() })
+      require("tests.support.metrics_consent_fixture").enable(keylogger)
       local must_match = {
         "1password", "1Password.exe", "bitwarden", "Bitwarden",
         "keepass", "keepassxc", "keepass2", "org.keepassxc.KeePassXC",
@@ -176,27 +186,31 @@ helpers.describe("keylogger", function()
           "keystroke logging MUST be suppressed for the secure app: " .. app)
       end
     end)
-    helpers.it("matches case-insensitively so casing cannot leak keystrokes", function()
+    it("matches case-insensitively so casing cannot leak keystrokes", function()
       keylogger.init({ sqlite_path = fresh_db() })
+      require("tests.support.metrics_consent_fixture").enable(keylogger)
       helpers.assert_true(keylogger.is_password_app("KEEPASSXC"), "upper-case must still match")
       helpers.assert_true(keylogger.is_password_app("KeePassXC"), "mixed-case must still match")
     end)
-    helpers.it("returns false for normal apps", function()
+    it("returns false for normal apps", function()
       keylogger.init({ sqlite_path = fresh_db() })
+      require("tests.support.metrics_consent_fixture").enable(keylogger)
       helpers.assert_eq(keylogger.is_password_app("firefox"), false)
       helpers.assert_eq(keylogger.is_password_app("code"), false)
       helpers.assert_eq(keylogger.is_password_app(""), false)
       helpers.assert_eq(keylogger.is_password_app(nil), false)
     end)
-    helpers.it("suppress/unsuppress cycle works", function()
+    it("suppress/unsuppress cycle works", function()
       keylogger.init({ sqlite_path = fresh_db() })
+      require("tests.support.metrics_consent_fixture").enable(keylogger)
       keylogger.suppress()
       helpers.assert_true(keylogger.is_suppressed())
       keylogger.unsuppress()
       helpers.assert_eq(keylogger.is_suppressed(), false)
     end)
-    helpers.it("on_keydown is suppressed when password mode active", function()
+    it("on_keydown is suppressed when password mode active", function()
       keylogger.init({ sqlite_path = fresh_db() })
+      require("tests.support.metrics_consent_fixture").enable(keylogger)
       keylogger.on_keydown("x", 5000, "firefox")
       local before = keylogger.get_session_stats().keystrokes
       keylogger.suppress()
@@ -212,8 +226,9 @@ helpers.describe("keylogger", function()
   -- ==========================================================================
 
   helpers.describe("export", function()
-    helpers.it("export_session returns expected fields", function()
+    it("export_session returns expected fields", function()
       keylogger.init({ sqlite_path = fresh_db() })
+      require("tests.support.metrics_consent_fixture").enable(keylogger)
       keylogger.on_keydown("t", 100, "test-app")
       local data = keylogger.export_session()
       helpers.assert_true(type(data) == "table")
@@ -222,8 +237,9 @@ helpers.describe("keylogger", function()
       helpers.assert_true(type(data.apps) == "table")
       helpers.assert_true(data.session_started_ms ~= nil)
     end)
-    helpers.it("export_json returns valid JSON string", function()
+    it("export_json returns valid JSON string", function()
       keylogger.init({ sqlite_path = fresh_db() })
+      require("tests.support.metrics_consent_fixture").enable(keylogger)
       local json = keylogger.export_json()
       helpers.assert_true(type(json) == "string")
       helpers.assert_true(#json > 10)
@@ -236,8 +252,9 @@ helpers.describe("keylogger", function()
   -- ==========================================================================
 
   helpers.describe("flush()", function()
-    helpers.it("flush with configured log_dir does not crash", function()
+    it("flush with configured log_dir does not crash", function()
       keylogger.init({ sqlite_path = fresh_db(), log_dir = os.getenv("TEMP") or "/tmp" })
+      require("tests.support.metrics_consent_fixture").enable(keylogger)
       keylogger.on_keydown("f", 1234, "flush-test")
       -- Called directly. flush answers what it wrote, and the caller advances on it.
       local flushed = keylogger.flush()
@@ -245,7 +262,7 @@ helpers.describe("keylogger", function()
         "flush must answer something the caller can act on")
     end)
 
-    helpers.it("flushes one canonical raw batch and never replays it", function()
+    it("flushes one canonical raw batch and never replays it", function()
       local calls = { typing = {}, hotstrings = {}, switches = {}, app_days = {}, ngrams = {} }
       local fake_writer = {
         open_db = function() return true end,
@@ -293,6 +310,7 @@ helpers.describe("keylogger", function()
       local ok, err = pcall(function()
         local isolated = require(logger_name)
         isolated.init({ sqlite_path = "/tmp/ergopti_keylogger_mock.sqlite" })
+        require("tests.support.metrics_consent_fixture").enable(isolated)
         isolated.reset_session()
         isolated.on_app_focus("org.mozilla.firefox", 1000)
 		isolated.record_physical_key("org.mozilla.firefox", 30, 1100)
@@ -339,14 +357,16 @@ helpers.describe("keylogger", function()
   -- ==========================================================================
 
   helpers.describe("session lifecycle", function()
-    helpers.it("reset_session clears data", function()
+    it("reset_session clears data", function()
       keylogger.init({ sqlite_path = fresh_db() })
+      require("tests.support.metrics_consent_fixture").enable(keylogger)
       keylogger.on_keydown("r", 100, "test")
       keylogger.reset_session()
       helpers.assert_eq(keylogger.get_session_stats().keystrokes, 0)
     end)
-    helpers.it("full lifecycle does not crash", function()
+    it("full lifecycle does not crash", function()
       keylogger.init({ sqlite_path = fresh_db(), log_dir = os.getenv("TEMP") or "/tmp" })
+      require("tests.support.metrics_consent_fixture").enable(keylogger)
       keylogger.on_keydown("a", 100, "app1")
       keylogger.on_keydown("b", 200, "app2")
       keylogger.suppress()
@@ -364,8 +384,9 @@ helpers.describe("keylogger", function()
   -- ==========================================================================
 
   helpers.describe("per-app tracking", function()
-    helpers.it("record_app_key accumulates per-app counts", function()
+    it("record_app_key accumulates per-app counts", function()
       keylogger.init({ sqlite_path = fresh_db() })
+      require("tests.support.metrics_consent_fixture").enable(keylogger)
       keylogger.record_app_key("firefox", "a", 100)
       keylogger.record_app_key("firefox", "b", 200)
       keylogger.record_app_key("vscode", "c", 300)
@@ -375,14 +396,16 @@ helpers.describe("keylogger", function()
       helpers.assert_eq(apps["firefox"].keystrokes, 2)
       helpers.assert_eq(apps["vscode"].keystrokes, 1)
     end)
-    helpers.it("get_app_stats returns table when empty", function()
+    it("get_app_stats returns table when empty", function()
       keylogger.init({ sqlite_path = fresh_db() })
+      require("tests.support.metrics_consent_fixture").enable(keylogger)
       keylogger.reset_session()
       helpers.assert_true(type(keylogger.get_app_stats()) == "table")
     end)
 
-    helpers.it("credits a completed foreground interval without requiring a keystroke", function()
+    it("credits a completed foreground interval without requiring a keystroke", function()
       keylogger.init({ sqlite_path = fresh_db() })
+      require("tests.support.metrics_consent_fixture").enable(keylogger)
       keylogger.reset_session()
       keylogger.on_app_focus("firefox", 1000)
       keylogger.on_app_focus("code", 5000)
@@ -392,8 +415,9 @@ helpers.describe("keylogger", function()
         "foreground time must be measured from focus transitions, not typing activity")
     end)
 
-    helpers.it("projects per-app foreground and typing time in the shared dashboard contract", function()
+    it("projects per-app foreground and typing time in the shared dashboard contract", function()
       keylogger.init({ sqlite_path = fresh_db() })
+      require("tests.support.metrics_consent_fixture").enable(keylogger)
       keylogger.reset_session()
       keylogger.on_app_focus("firefox", 1000)
       keylogger.record_app_key("firefox", "a", 1100)
@@ -409,8 +433,9 @@ helpers.describe("keylogger", function()
       helpers.assert_true(type(payload.app_icons) == "table")
     end)
 
-    helpers.it("records hotstring output and its physical trigger separately", function()
+    it("records hotstring output and its physical trigger separately", function()
       keylogger.init({ sqlite_path = fresh_db() })
+      require("tests.support.metrics_consent_fixture").enable(keylogger)
       keylogger.reset_session()
       keylogger.record_hotstring("firefox", "btw", "by the way", 1000)
 
@@ -420,8 +445,9 @@ helpers.describe("keylogger", function()
       helpers.assert_eq(app.hs_triggers, 1)
     end)
 
-	helpers.it("projects physical scancodes and generated output into separate UI fields", function()
+	it("projects physical scancodes and generated output into separate UI fields", function()
 		keylogger.init({ sqlite_path = fresh_db() })
+		require("tests.support.metrics_consent_fixture").enable(keylogger)
 		keylogger.reset_session()
 		keylogger.record_physical_key("firefox", 30, 1000)
 		keylogger.on_keydown("a", 1000, "firefox", 30)
@@ -436,8 +462,9 @@ helpers.describe("keylogger", function()
 			"manual output must not be misclassified as synthetic")
 	end)
 
-    helpers.it("counts Unicode hotstrings by character rather than UTF-8 byte", function()
+    it("counts Unicode hotstrings by character rather than UTF-8 byte", function()
       keylogger.init({ sqlite_path = fresh_db() })
+      require("tests.support.metrics_consent_fixture").enable(keylogger)
       keylogger.reset_session()
       keylogger.record_hotstring("firefox", "é", "éclair", 1000)
 
@@ -447,8 +474,9 @@ helpers.describe("keylogger", function()
       helpers.assert_eq(app.hs_triggers, 1)
     end)
 
-    helpers.it("does not retain hotstring contents while password suppression is active", function()
+    it("does not retain hotstring contents while password suppression is active", function()
       keylogger.init({ sqlite_path = fresh_db() })
+      require("tests.support.metrics_consent_fixture").enable(keylogger)
       keylogger.reset_session()
       keylogger.suppress()
       keylogger.record_hotstring("firefox", "secret", "sensitive replacement", 1000)
@@ -458,7 +486,7 @@ helpers.describe("keylogger", function()
         "suppressed expansions must leave no per-app metric record")
     end)
 
-    helpers.it("keeps raw hotstring and foreground transitions pending for canonical persistence", function()
+    it("keeps raw hotstring and foreground transitions pending for canonical persistence", function()
       local path = helpers.driver_root() .. "/modules/keylogger/keylogger.lua"
       local fh = assert(io.open(path, "r"))
       local src = fh:read("*a"); fh:close()
@@ -474,8 +502,9 @@ helpers.describe("keylogger", function()
   -- ==========================================================================
 
   helpers.describe("edge cases", function()
-    helpers.it("on_keydown with nil app_id still records the keystroke", function()
+    it("on_keydown with nil app_id still records the keystroke", function()
       keylogger.init({ sqlite_path = fresh_db() })
+      require("tests.support.metrics_consent_fixture").enable(keylogger)
       local function total()
         local n = 0
         for _, s in pairs(keylogger.get_app_stats()) do n = n + (s.keystrokes or 0) end
@@ -490,8 +519,9 @@ helpers.describe("keylogger", function()
     -- suppress()/unsuppress() are a COUNTER in every driver, not a boolean: a
     -- pair that leaves the module suppressed silently stops all collection,
     -- which is exactly what "does not crash" could never notice.
-    helpers.it("balanced suppress/unsuppress leaves collection on", function()
+    it("balanced suppress/unsuppress leaves collection on", function()
       keylogger.init({ sqlite_path = fresh_db() })
+      require("tests.support.metrics_consent_fixture").enable(keylogger)
       for _ = 1, 20 do keylogger.suppress(); keylogger.unsuppress() end
       helpers.assert_true(not keylogger.is_suppressed(),
         "20 balanced suppress/unsuppress pairs must leave the keylogger collecting")
@@ -502,8 +532,9 @@ helpers.describe("keylogger", function()
         "and a keystroke after them must still be counted")
     end)
 
-    helpers.it("suppress actually stops collection until unsuppressed", function()
+    it("suppress actually stops collection until unsuppressed", function()
       keylogger.init({ sqlite_path = fresh_db() })
+      require("tests.support.metrics_consent_fixture").enable(keylogger)
       keylogger.suppress()
       local before = (keylogger.get_app_stats()["suppressed-probe"] or {}).keystrokes or 0
       keylogger.on_keydown("z", 5252, "suppressed-probe")
@@ -516,7 +547,7 @@ helpers.describe("keylogger", function()
 end)
 
 helpers.describe("keylogger events_json controls are escaped (json-controls)", function()
-  helpers.it("json-controls: tab and CR travel escaped, never raw", function()
+  it("json-controls: tab and CR travel escaped, never raw", function()
     -- Regression: the minimal encoder escaped only backslash, quote and
     -- newline, so a tab or carriage return typed or pasted into any app
     -- landed RAW inside the events_json string the flush persists — and a
@@ -534,6 +565,7 @@ helpers.describe("keylogger events_json controls are escaped (json-controls)", f
       package.loaded["modules.keylogger.keylogger"] = nil
       local kl = require("modules.keylogger.keylogger")
       kl.init({})
+      require("tests.support.metrics_consent_fixture").enable(kl)
       kl.on_keydown("\t", 1000, "code")
       kl.on_keydown("a\rb", 1100, "code")
       kl.flush()

@@ -142,7 +142,7 @@ local function with_server_fixture(options, assertions)
 		}
 		package.loaded["infra.notifications"] = { notify = noop }
 		package.loaded["infra.logger"] = {
-			UNIFIED_LOG_FILE = "/tmp/ergopti-test.log",
+			today_log_path = function() return "/tmp/ergopti-test.log" end,
 			debug = noop,
 			info = noop,
 			warn = noop,

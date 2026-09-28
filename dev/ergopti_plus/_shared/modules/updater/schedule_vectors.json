@@ -1,0 +1,348 @@
+{
+	"_comment": "Automatic update-check schedule vectors. The canonical JavaScript (_shared/modules/updater/schedule.js), the shared Lua port (_shared/lua/updater/schedule.lua, macOS and Linux) and the AHK port (windows/modules/updater/schedule.ahk) replay this file with the timing of defaults.json, so the three drivers cannot disagree on when a check is due. Times are wall-clock epoch seconds. started_at is when the driver started or the system last woke. A state field that is absent is omitted (the shared Lua decoder turns a JSON null into a non-nil sentinel), and an expected result without due_at means no check is ever due. The jitter expectations were computed outside the three ports: h = fold of (h * 31 + byte) mod 2147483647 over the UTF-8 bytes of '<seed>:<anchor>', span = min(floor(interval * jitter_percent / 100), jitter_max_sec), jitter = h mod (span + 1).",
+	"due": [
+		{
+			"id": "fresh_install_waits_for_the_boot_delay",
+			"now": 1700000000,
+			"started_at": 1700000000,
+			"interval": 86400,
+			"state": { "seed": "7f3a9c21e5b04d68" },
+			"expect": { "reason": "first_check", "due_at": 1700000030 }
+		},
+		{
+			"id": "fresh_install_evaluated_after_the_boot_delay",
+			"now": 1700000100,
+			"started_at": 1700000000,
+			"interval": 86400,
+			"state": { "seed": "7f3a9c21e5b04d68" },
+			"expect": { "reason": "first_check", "due_at": 1700000030 }
+		},
+		{
+			"id": "overdue_after_power_off_catches_up_after_the_boot_delay",
+			"now": 1700000005,
+			"started_at": 1700000000,
+			"interval": 86400,
+			"state": {
+				"seed": "7f3a9c21e5b04d68",
+				"last_check_at": 1699900000,
+				"last_success_at": 1699900000
+			},
+			"expect": { "reason": "catch_up", "due_at": 1700000030 }
+		},
+		{
+			"id": "overdue_weekly_check_after_ten_days_off",
+			"now": 1700864000,
+			"started_at": 1700864000,
+			"interval": 604800,
+			"state": { "seed": "7f3a9c21e5b04d68", "last_check_at": 1700000000 },
+			"expect": { "reason": "catch_up", "due_at": 1700864030 }
+		},
+		{
+			"id": "mid_interval_waits_for_interval_plus_jitter",
+			"now": 1700040000,
+			"started_at": 1699999000,
+			"interval": 86400,
+			"state": {
+				"seed": "7f3a9c21e5b04d68",
+				"last_check_at": 1700000000,
+				"last_success_at": 1700000000
+			},
+			"expect": { "reason": "scheduled", "due_at": 1700086605 }
+		},
+		{
+			"id": "restart_mid_interval_does_not_check_at_boot",
+			"now": 1700050000,
+			"started_at": 1700050000,
+			"interval": 86400,
+			"state": { "seed": "7f3a9c21e5b04d68", "last_check_at": 1700000000 },
+			"expect": { "reason": "scheduled", "due_at": 1700086605 }
+		},
+		{
+			"id": "short_interval_jitter_is_a_tenth_of_it",
+			"now": 1700000100,
+			"started_at": 1699990000,
+			"interval": 300,
+			"state": { "seed": "7f3a9c21e5b04d68", "last_check_at": 1700000000 },
+			"expect": { "reason": "scheduled", "due_at": 1700000302 }
+		},
+		{
+			"id": "monthly_jitter_is_capped",
+			"now": 1700000100,
+			"started_at": 1699990000,
+			"interval": 2592000,
+			"state": { "seed": "7f3a9c21e5b04d68", "last_check_at": 1700000000 },
+			"expect": { "reason": "scheduled", "due_at": 1702592205 }
+		},
+		{
+			"id": "clock_moved_back_checks_after_the_boot_delay",
+			"now": 1700000000,
+			"started_at": 1699999990,
+			"interval": 86400,
+			"state": { "seed": "7f3a9c21e5b04d68", "last_check_at": 1800000000 },
+			"expect": { "reason": "clock_moved_back", "due_at": 1700000020 }
+		},
+		{
+			"id": "never_is_never_due",
+			"now": 1700000000,
+			"started_at": 1700000000,
+			"interval": 0,
+			"state": { "seed": "7f3a9c21e5b04d68" },
+			"expect": { "reason": "never" }
+		},
+		{
+			"id": "never_ignores_an_overdue_state",
+			"now": 1700000000,
+			"started_at": 1690000000,
+			"interval": 0,
+			"state": { "seed": "7f3a9c21e5b04d68", "last_check_at": 1600000000, "failures": 3 },
+			"expect": { "reason": "never" }
+		},
+		{
+			"id": "first_failure_retries_after_five_minutes",
+			"now": 1700000100,
+			"started_at": 1699000000,
+			"interval": 86400,
+			"state": {
+				"seed": "7f3a9c21e5b04d68",
+				"last_check_at": 1700000000,
+				"last_success_at": 1699913600,
+				"failures": 1
+			},
+			"expect": { "reason": "retry_after_failure", "due_at": 1700000300 }
+		},
+		{
+			"id": "second_failure_retries_after_fifteen_minutes",
+			"now": 1700000100,
+			"started_at": 1699000000,
+			"interval": 86400,
+			"state": { "seed": "7f3a9c21e5b04d68", "last_check_at": 1700000000, "failures": 2 },
+			"expect": { "reason": "retry_after_failure", "due_at": 1700000900 }
+		},
+		{
+			"id": "repeated_failures_keep_the_last_backoff",
+			"now": 1700000100,
+			"started_at": 1699000000,
+			"interval": 86400,
+			"state": { "seed": "7f3a9c21e5b04d68", "last_check_at": 1700000000, "failures": 7 },
+			"expect": { "reason": "retry_after_failure", "due_at": 1700003600 }
+		},
+		{
+			"id": "backoff_never_exceeds_the_interval",
+			"now": 1700000100,
+			"started_at": 1699000000,
+			"interval": 300,
+			"state": { "seed": "7f3a9c21e5b04d68", "last_check_at": 1700000000, "failures": 3 },
+			"expect": { "reason": "retry_after_failure", "due_at": 1700000300 }
+		},
+		{
+			"id": "failure_before_power_off_catches_up",
+			"now": 1700000000,
+			"started_at": 1700000000,
+			"interval": 86400,
+			"state": { "seed": "7f3a9c21e5b04d68", "last_check_at": 1690000000, "failures": 2 },
+			"expect": { "reason": "catch_up", "due_at": 1700000030 }
+		},
+		{
+			"id": "wake_after_sleep_waits_for_the_boot_delay",
+			"now": 1700200000,
+			"started_at": 1700200000,
+			"interval": 3600,
+			"state": { "seed": "c0ffee", "last_check_at": 1700000000 },
+			"expect": { "reason": "catch_up", "due_at": 1700200030 }
+		}
+	],
+	"jitter": [
+		{
+			"id": "daily",
+			"seed": "7f3a9c21e5b04d68",
+			"anchor": 1700000000,
+			"interval": 86400,
+			"expect": 205
+		},
+		{
+			"id": "next_anchor_moves",
+			"seed": "7f3a9c21e5b04d68",
+			"anchor": 1700000001,
+			"interval": 86400,
+			"expect": 206
+		},
+		{
+			"id": "five_minutes",
+			"seed": "7f3a9c21e5b04d68",
+			"anchor": 1700000000,
+			"interval": 300,
+			"expect": 2
+		},
+		{
+			"id": "monthly_capped",
+			"seed": "7f3a9c21e5b04d68",
+			"anchor": 1700000000,
+			"interval": 2592000,
+			"expect": 205
+		},
+		{ "id": "empty_seed", "seed": "", "anchor": 0, "interval": 86400, "expect": 1846 },
+		{ "id": "half_hour", "seed": "0", "anchor": 1, "interval": 1800, "expect": 10 },
+		{
+			"id": "no_span_no_jitter",
+			"seed": "7f3a9c21e5b04d68",
+			"anchor": 1700000000,
+			"interval": 5,
+			"expect": 0
+		},
+		{ "id": "weekly", "seed": "c0ffee", "anchor": 1735689600, "interval": 604800, "expect": 951 },
+		{ "id": "hourly", "seed": "c0ffee", "anchor": 1735689600, "interval": 3600, "expect": 152 }
+	],
+	"snap": [
+		{ "id": "preset_is_kept", "seconds": 300, "expect": 300, "code": "5m", "snapped": false },
+		{
+			"id": "daily_default_is_kept",
+			"seconds": 86400,
+			"expect": 86400,
+			"code": "1d",
+			"snapped": false
+		},
+		{ "id": "never_is_kept", "seconds": 0, "expect": 0, "code": "never", "snapped": false },
+		{ "id": "retired_one_minute", "seconds": 60, "expect": 300, "code": "5m", "snapped": true },
+		{ "id": "retired_ten_minutes", "seconds": 600, "expect": 300, "code": "5m", "snapped": true },
+		{ "id": "retired_two_hours", "seconds": 7200, "expect": 3600, "code": "1h", "snapped": true },
+		{
+			"id": "retired_three_hours_is_nearer_six_by_ratio",
+			"seconds": 10800,
+			"expect": 21600,
+			"code": "6h",
+			"snapped": true
+		},
+		{
+			"id": "retired_two_days_is_nearer_three_by_ratio",
+			"seconds": 172800,
+			"expect": 259200,
+			"code": "3d",
+			"snapped": true
+		},
+		{
+			"id": "retired_seven_days",
+			"seconds": 604800,
+			"expect": 604800,
+			"code": "1w",
+			"snapped": false
+		},
+		{ "id": "one_second", "seconds": 1, "expect": 300, "code": "5m", "snapped": true },
+		{ "id": "a_year", "seconds": 31536000, "expect": 2592000, "code": "1mo", "snapped": true },
+		{ "id": "forty_minutes", "seconds": 2400, "expect": 1800, "code": "30m", "snapped": true }
+	],
+	"sanitize": [
+		{
+			"id": "valid_state_is_kept",
+			"raw": {
+				"last_check_at": 1700000000,
+				"last_success_at": 1699990000,
+				"failures": 2,
+				"seed": "ab12",
+				"last_notified_tag": "v1.2.3"
+			},
+			"expect": {
+				"last_check_at": 1700000000,
+				"last_success_at": 1699990000,
+				"failures": 2,
+				"seed": "ab12",
+				"last_notified_tag": "v1.2.3"
+			},
+			"dropped": []
+		},
+		{
+			"id": "empty_state",
+			"raw": {},
+			"expect": {},
+			"dropped": []
+		},
+		{
+			"id": "unknown_fields_are_not_state",
+			"raw": { "seed": "ab12", "interval": 60 },
+			"expect": { "seed": "ab12" },
+			"dropped": []
+		},
+		{
+			"id": "text_time_is_dropped",
+			"raw": { "last_check_at": "1700000000", "seed": "ab12" },
+			"expect": { "seed": "ab12" },
+			"dropped": ["last_check_at"]
+		},
+		{
+			"id": "negative_and_fractional_values_are_dropped",
+			"raw": { "last_check_at": -5, "last_success_at": 1.5, "failures": -1, "seed": "ab12" },
+			"expect": { "seed": "ab12" },
+			"dropped": ["last_check_at", "last_success_at", "failures"]
+		},
+		{
+			"id": "non_text_seed_and_tag_are_dropped",
+			"raw": { "seed": 42, "last_notified_tag": 7, "failures": 0 },
+			"expect": { "failures": 0 },
+			"dropped": ["seed", "last_notified_tag"]
+		},
+		{
+			"id": "empty_seed_is_dropped",
+			"raw": { "seed": "", "last_notified_tag": "" },
+			"expect": { "last_notified_tag": "" },
+			"dropped": ["seed"]
+		},
+		{
+			"id": "a_record_that_is_not_an_object",
+			"raw": "garbage",
+			"expect": {},
+			"dropped": ["check_state"]
+		}
+	],
+	"record": [
+		{
+			"id": "success_resets_failures",
+			"state": {
+				"seed": "ab12",
+				"last_check_at": 400,
+				"last_success_at": 100,
+				"failures": 2,
+				"last_notified_tag": "v1.0.0"
+			},
+			"now": 500,
+			"ok": true,
+			"expect": {
+				"seed": "ab12",
+				"last_check_at": 500,
+				"last_success_at": 500,
+				"failures": 0,
+				"last_notified_tag": "v1.0.0"
+			}
+		},
+		{
+			"id": "failure_counts_and_keeps_the_last_success",
+			"state": { "seed": "ab12", "last_check_at": 400, "last_success_at": 100, "failures": 2 },
+			"now": 500,
+			"ok": false,
+			"expect": { "seed": "ab12", "last_check_at": 500, "last_success_at": 100, "failures": 3 }
+		},
+		{
+			"id": "first_failure_on_a_fresh_state",
+			"state": { "seed": "ab12" },
+			"now": 500,
+			"ok": false,
+			"expect": { "seed": "ab12", "last_check_at": 500, "failures": 1 }
+		},
+		{
+			"id": "first_success_on_a_fresh_state",
+			"state": { "seed": "ab12" },
+			"now": 500,
+			"ok": true,
+			"expect": { "seed": "ab12", "last_check_at": 500, "last_success_at": 500, "failures": 0 }
+		}
+	],
+	"delay": [
+		{ "id": "due_in_the_past_runs_now", "due_at": 1700000000, "now": 1700000100, "expect": 0 },
+		{ "id": "due_soon_waits_until_then", "due_at": 1700000100, "now": 1700000000, "expect": 100 },
+		{ "id": "far_due_re_evaluates_first", "due_at": 1700086605, "now": 1700000000, "expect": 300 },
+		{
+			"id": "due_exactly_at_the_re_evaluation",
+			"due_at": 1700000300,
+			"now": 1700000000,
+			"expect": 300
+		}
+	]
+}

@@ -28,7 +28,7 @@
 ; tray.
 ;
 ; WHAT THIS PINS:
-;   1. Every list provider registered in menu_init.ahk follows the *Rows naming
+;   1. Every list provider registered by a tray-root builder follows the *Rows naming
 ;      convention, so the rule below cannot be escaped by renaming a function.
 ;   2. No such provider mutates a menu — no .Add(, .Check(, .Disable( on a
 ;      parameter it does not receive, and no RegisterMenuItem.
@@ -46,11 +46,12 @@
 ; ======= 1/ The providers, taken from the source ==
 ; ==================================================
 
-; Provider function names, read from initMenu's registration rather than listed
-; here: a list written in this file would go stale the moment one is added, and
-; the bug this test exists for arrived with exactly such an addition.
+; Provider function names, read from the tray-root builders' registrations
+; rather than listed here: a list written in this file would go stale the moment
+; one is added, and the bug this test exists for arrived with exactly such an
+; addition.
 _LPTM_ProviderNames() {
-	Body := _DriverFuncBodyOrEmpty("initMenu")
+	Body := _TrayRootBuilderBodies()
 	Names := []
 	Pos := 1
 	while (Pos := RegExMatch(Body, "\(\*\)\s*=>\s*(_\w+)\(\)", &M, Pos)) {
@@ -70,7 +71,7 @@ _LPTM_ProviderNames() {
 _LPTM_ProvidersAreNamedRows() {
 	Names := _LPTM_ProviderNames()
 	Assert(Names.Length >= 5,
-		"initMenu must register list providers as `(*) => _Name()` — found " . Names.Length
+		"the tray-root builders must register list providers as `(*) => _Name()` — found " . Names.Length
 		. ", so this test is reading the wrong thing and would pass while measuring nothing")
 	for Name in Names {
 		Assert(InStr(Name, "Rows") > 0,

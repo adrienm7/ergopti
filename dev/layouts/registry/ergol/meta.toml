@@ -1,0 +1,21 @@
+# static/layouts/registry/ergol/meta.toml
+# Ergo-L by Léo Cazenave (NuclearSquid), vendored unmodified from its upstream
+# release: ergol.keylayout is byte-identical to the ergol-v1.0.2 release asset
+# (source_sha256 below is the digest GitHub publishes for that asset).
+# Licence: WTFPL v2, see LICENSE next to this file.
+
+name = "Ergo-L"
+family = "ergol"
+version = "1.0.2"
+author = "Léo Cazenave (NuclearSquid)"
+licence = "WTFPL"
+licence_file = "LICENSE"
+homepage = "https://ergol.org"
+languages = ["fr", "en"]
+variants = []
+source_url = "https://github.com/Nuclear-Squid/ergol/releases/download/ergol-v1.0.2/ergol.keylayout"
+source_sha256 = "b19d38f7e11ef58983cf2185d8b2097dffeda387d1c4ed8ed0e45ab022e4c189"
+platforms = ["linux", "macos", "windows"]
+# Kalamine numbers the key left of 1 as macOS code 50 and the ISO key left of
+# Z as code 10 (the ANSI reading of those two codes).
+keycode_convention = "ansi"

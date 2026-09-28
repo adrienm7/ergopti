@@ -7,7 +7,7 @@
 ; "Install this version" button handler, defined inside
 ; _Updater_BuildChangelogGui) was the sole close path in
 ; modules/updater/changelog.ahk that bypassed the _Updater_CloseGui helper --
-; every other close path (BtnSwitch, G's Close/Escape events) routes through
+; every other close path (the channel picker, G's Close/Escape events) routes through
 ; it. _Updater_CloseGui closes the WebView2 Controller before destroying the
 ; Gui; a bare G.Destroy() skips that step.
 ;
@@ -32,10 +32,10 @@ _UCIG_CheckInstallSelectedUsesCloseGui() {
 	IdxAssign := InStr(Body, "InstallSelected := ")
 	Assert(IdxAssign > 0, "_Updater_BuildChangelogGui must still define InstallSelected")
 
-	; Bound the InstallSelected closure by the next statement (BtnSwitch.OnEvent)
+	; Bound the InstallSelected closure by the next statement (Picker.OnEvent)
 	; so a coincidental _Updater_CloseGui/G.Destroy() elsewhere in the
 	; surrounding Gui-builder cannot produce a false pass/fail.
-	IdxNext := InStr(Body, "BtnSwitch.OnEvent(", , IdxAssign)
+	IdxNext := InStr(Body, "Picker.OnEvent(", , IdxAssign)
 	Assert(IdxNext > IdxAssign, "could not bound the InstallSelected closure for inspection")
 	InstallSelectedBody := SubStr(Body, IdxAssign, IdxNext - IdxAssign)
 

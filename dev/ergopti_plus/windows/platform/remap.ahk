@@ -46,4 +46,8 @@
 #Include remap/escape.ahk
 #Include remap/delete.ahk
 #Include remap/win.ahk
+; The navigation layer is data: layers_loader reads layers.toml, nav_layer_table
+; turns it into hotkeys, and nav_layer registers them at its include position.
+#Include remap/layers_loader.ahk
+#Include remap/nav_layer_table.ahk
 #Include remap/nav_layer.ahk

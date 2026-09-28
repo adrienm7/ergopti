@@ -14,6 +14,34 @@
 
 
 
+; List provider: the custom layout picker. The built-in Ergopti emulation and
+; the registry layouts the layout manager installed, the one typing uses
+; checked; choosing another writes the selection and reloads, the only moment
+; the emulation registers its hotkeys (ui/layout_manager/init.ahk).
+_LAY_CustomLayoutRows() {
+	global _ConfigDir
+	Active := LayoutManager_ActiveId()
+	Builtin := LayoutManager_BuiltinIds()
+	Rows := [Map(
+		"label",   t("menu.layout.builtin_ergopti"),
+		"checked", Builtin.Has(Active),
+		"action",  (*) => LayoutManager_SelectBuiltin())]
+	try Installed := LayoutCatalogue_ReadInstalled(LayoutRegistry_LocalDir(_ConfigDir))
+	catch as Err {
+		LoggerError("TrayMenu", "The installed layouts could not be listed: {1}", Err.Message)
+		return Rows
+	}
+	for Id, Entry in Installed {
+		if Builtin.Has(Id)
+			continue
+		Rows.Push(Map(
+			"label",   Entry.Get("name", Id),
+			"checked", Active == Id,
+			"action",  ((Selected) => (*) => LayoutManager_Select(Selected))(Id)))
+	}
+	return Rows
+}
+
 ; List provider: Ergopti base-layer feature only (ergopti_base).
 ;
 ; A `list` since 2026-08-07, where both blocks were `dynamic` handlers handed the
@@ -36,10 +64,11 @@ _LAY_LayoutFeatureBaseRows() {
 ; List provider: the Ergopti AltGr features (ergopti_alt_gr, ergopti_plus).
 ; The rows that work on any layout are declared on their own in the manifest's
 ; « any layout » section: direct_access_digits, and ctrl_magic_save after the
-; magic-key replace option it depends on.
+; magic-key replace option it depends on. emulated_layout names a registry
+; layout: a choice, not a switch, so no toggle row lists it.
 _LAY_LayoutFeatureAltGrRows() {
 	static STANDALONE_IDS := Map("ergopti_base", true, "ctrl_magic_save", true,
-		"direct_access_digits", true)
+		"direct_access_digits", true, "emulated_layout", true)
 	Rows := []
 	for _, LayoutEntry in ManifestFeaturesForSection("layout") {
 		if !STANDALONE_IDS.Has(LayoutEntry["id"]) {

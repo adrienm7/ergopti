@@ -206,3 +206,62 @@ helpers.describe("script control: eventtap and watchdog acquisition is transacti
 	end)
 
 end)
+
+helpers.describe("script-control terminal native readback", function()
+	helpers.it("retains a tap whose successful stop call leaves native delivery enabled", function()
+		local scheduler = scheduler_spy({})
+		local tap = { enabled = false, refuse_stop = true, stops = 0 }
+		function tap:start() self.enabled = true; return self end
+		function tap:isEnabled() return self.enabled end
+		function tap:stop()
+			self.stops = self.stops + 1
+			if not self.refuse_stop then self.enabled = false end
+			return self
+		end
+		local subject = fresh_script_control(scheduler, function() return tap end)
+		helpers.assert_eq(subject.start({}, {}, {}), true)
+		helpers.assert_eq(subject.stop(), false)
+		helpers.assert_eq(tap.enabled, true)
+		tap.refuse_stop = false
+		helpers.assert_eq(subject.stop(), true)
+		helpers.assert_eq(tap.stops, 2)
+		helpers.assert_eq(tap.enabled, false)
+	end)
+
+	helpers.it("reports detached actions and exact native posture including retained ambiguity", function()
+		local scheduler = scheduler_spy({})
+		local tap = { enabled = false }
+		function tap:start() self.enabled = true; return self end
+		function tap:isEnabled() return self.enabled end
+		function tap:stop() self.enabled = false; return self end
+		local subject = fresh_script_control(scheduler, function() return tap end)
+		helpers.assert_eq(subject.is_started(), false)
+		helpers.assert_eq(subject.set_shortcut_action("return_key", "none"), true)
+		local captured = subject.get_shortcut_actions()
+		helpers.assert_eq(captured.return_key, "none")
+		captured.return_key = "forged"
+		helpers.assert_eq(subject.get_shortcut_actions().return_key, "none")
+		helpers.assert_eq(subject.start({}, {}, {}), true)
+		helpers.assert_eq(subject.is_started(), true)
+		tap.enabled = false
+		helpers.assert_nil(subject.is_started())
+		helpers.assert_eq(subject.stop(), true)
+		helpers.assert_eq(subject.is_started(), false)
+	end)
+
+	helpers.it("retains unreadable native teardown instead of claiming a stopped tap", function()
+		local scheduler = scheduler_spy({})
+		local tap = { enabled = false, unreadable = false, stops = 0 }
+		function tap:start() self.enabled = true; return self end
+		function tap:isEnabled() if self.unreadable then return nil end; return self.enabled end
+		function tap:stop() self.enabled = false; self.stops = self.stops + 1; return self end
+		local subject = fresh_script_control(scheduler, function() return tap end)
+		helpers.assert_eq(subject.start({}, {}, {}), true)
+		tap.unreadable = true
+		helpers.assert_eq(subject.stop(), false)
+		helpers.assert_nil(subject.is_started())
+		tap.unreadable = false
+		helpers.assert_eq(subject.stop(), true)
+		helpers.assert_eq(tap.stops, 2)
+	end)
+end)

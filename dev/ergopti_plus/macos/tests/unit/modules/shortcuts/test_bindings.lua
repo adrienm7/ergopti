@@ -37,6 +37,8 @@ package.loaded["infra.i18n"] = {
 
 local Bindings = helpers.load_with_stubs("modules.shortcuts.bindings")
 
+require("tests.support.shortcut_bindings_fixture").prefer_all(Bindings)
+
 -- ULTIMATE encore plus: pause on bindings registry + volume + bad input.
 -- Bindings are declarative; real hotkey dispatch must be gated by script_control.
 
@@ -102,6 +104,7 @@ end)
 helpers.describe("bindings: pause-owner lifecycle (project_suspend_pause_invariant)", function()
 	helpers.it("settles start, pause, resume-after-pause, and stop literally", function()
 		local B = helpers.load_with_stubs("modules.shortcuts.bindings")
+		require("tests.support.shortcut_bindings_fixture").prefer_all(B)
 		helpers.assert_eq(B.is_started(), false)
 		helpers.assert_eq(B.start(), true,
 			"positive control must acquire the real hotkey registry")
@@ -122,27 +125,31 @@ helpers.describe("bindings: pause-owner lifecycle (project_suspend_pause_invaria
 		-- volume is worth keeping — repeated toggling is what a paused/resumed
 		-- session actually does to this registry — but only if the state is read
 		-- back afterwards.
+		-- A private instance: each enable on a never-started registry acquires a
+		-- native hotkey, and the public API cannot release it without also
+		-- rewriting the preference, so the shared `Bindings` must stay untouched.
+		local B = helpers.load_with_stubs("modules.shortcuts.bindings")
+		require("tests.support.shortcut_bindings_fixture").prefer_all(B)
 		local names = {}
-		for _, s in ipairs(Bindings.list_shortcuts()) do names[#names + 1] = s.name or s.id end
+		for _, s in ipairs(B.list_shortcuts()) do names[#names + 1] = s.name or s.id end
 		helpers.assert_true(#names > 0, "the registry must list something, or this proves nothing")
 
 		local first = names[1]
-		local was_enabled = Bindings.list_shortcuts()[1].enabled
+		local was_enabled = B.list_shortcuts()[1].enabled
 		for _ = 1, 150 do
-			Bindings.disable(first)
-			Bindings.enable(first)
+			B.disable(first)
+			B.enable(first)
 		end
-		-- list_shortcuts hands back live state, so leaving `first` enabled here
-		-- made a later case in this same file fail. Restore what was found.
-		if not was_enabled then Bindings.disable(first) end
 
-		local after = Bindings.list_shortcuts()
+		local after = B.list_shortcuts()
 		helpers.assert_eq(#after, #names,
 			"150 disable/enable cycles must leave the registry the same size — a leak here is a "
 				.. "shortcut that silently stops being listed in the menu")
 		helpers.assert_eq(after[1].name or after[1].id, first, "and in the same order")
 		helpers.assert_eq(after[1].enabled, was_enabled,
-			"and in the state it started in — 150 round trips must cancel out exactly")
+			"and in the preference it started in — 150 round trips must cancel out exactly")
+		helpers.assert_eq(after[1].bound, true,
+			"and owning exactly the native hotkey the final enable acquired")
 	end)
 
 	helpers.it("an unknown or non-string id is refused rather than registered", function()
@@ -211,12 +218,16 @@ helpers.describe("shortcuts.bindings: list_shortcuts shape", function()
 			helpers.assert_eq(type(entry.id),    "string")
 			helpers.assert_eq(type(entry.label), "string")
 			helpers.assert_true(entry.enabled == true or entry.enabled == false)
+			helpers.assert_true(entry.bound == true or entry.bound == false)
 		end
 	end)
 
-	helpers.it("reports every shortcut as disabled before start()", function()
+	-- `enabled` is the user's preference and `bound` the native hotkey; before
+	-- start() nothing is bound, yet nothing has been switched off either.
+	helpers.it("reports every shortcut as unbound but preferred before start()", function()
 		for _, entry in ipairs(list) do
-			helpers.assert_eq(entry.enabled, false, "expected disabled: " .. entry.id)
+			helpers.assert_eq(entry.bound, false, "expected unbound: " .. entry.id)
+			helpers.assert_eq(entry.enabled, true, "expected preferred: " .. entry.id)
 		end
 	end)
 
@@ -235,10 +246,11 @@ helpers.describe("shortcuts.bindings: list_shortcuts shape", function()
 		helpers.assert_true(seen.cmd_shift_v)
 	end)
 
-	helpers.it("includes the standalone at_hash and layer_scroll entries", function()
+	helpers.it("includes the standalone tap_keys and layer_scroll entries", function()
 		local seen = {}
 		for _, entry in ipairs(list) do seen[entry.id] = true end
-		helpers.assert_true(seen.at_hash)
+		helpers.assert_true(seen.tap_keys)
+		helpers.assert_nil(seen.at_hash, "the key left of 1 is a tap key now, not a fixed screenshot")
 		helpers.assert_true(seen.layer_scroll)
 	end)
 
@@ -260,7 +272,7 @@ helpers.describe("shortcuts.bindings: list_shortcuts shape", function()
 	helpers.it("orders cmd_* entries before the catch-all bucket", function()
 		local idx = {}
 		for i, entry in ipairs(list) do idx[entry.id] = i end
-		helpers.assert_true(idx.cmd_star < idx.at_hash)
+		helpers.assert_true(idx.cmd_star < idx.tap_keys)
 		helpers.assert_true(idx.cmd_star < idx.layer_scroll)
 	end)
 end)
@@ -278,30 +290,36 @@ end)
 helpers.describe("shortcuts.bindings: enable/disable", function()
 	-- Reload the module so the per-test bookkeeping starts fresh.
 	local B = helpers.load_with_stubs("modules.shortcuts.bindings")
+	require("tests.support.shortcut_bindings_fixture").prefer_all(B)
 
-	helpers.it("is_enabled is false before enable()", function()
-		helpers.assert_eq(B.is_enabled("ctrl_a"), false)
+	helpers.it("is_bound is false before enable(), while the preference is on", function()
+		helpers.assert_eq(B.is_bound("ctrl_a"), false)
+		helpers.assert_eq(B.is_enabled("ctrl_a"), true)
 	end)
 
-	helpers.it("enable() flips is_enabled to true", function()
-		B.enable("ctrl_a")
+	helpers.it("enable() binds the hotkey and keeps the preference on", function()
+		helpers.assert_eq(B.enable("ctrl_a"), true)
 		helpers.assert_eq(B.is_enabled("ctrl_a"), true)
+		helpers.assert_eq(B.is_bound("ctrl_a"), true)
 	end)
 
 	helpers.it("enable() is idempotent — re-enabling does not crash", function()
 		B.enable("ctrl_a")
 		B.enable("ctrl_a")
 		helpers.assert_eq(B.is_enabled("ctrl_a"), true)
+		helpers.assert_eq(B.is_bound("ctrl_a"), true)
 	end)
 
-	helpers.it("disable() flips is_enabled back to false", function()
-		B.disable("ctrl_a")
+	helpers.it("disable() unbinds the hotkey and switches the preference off", function()
+		helpers.assert_eq(B.disable("ctrl_a"), true)
 		helpers.assert_eq(B.is_enabled("ctrl_a"), false)
+		helpers.assert_eq(B.is_bound("ctrl_a"), false)
 	end)
 
 	helpers.it("disable() is idempotent — disabling an inactive id does nothing", function()
 		B.disable("ctrl_a")
 		helpers.assert_eq(B.is_enabled("ctrl_a"), false)
+		helpers.assert_eq(B.is_bound("ctrl_a"), false)
 	end)
 end)
 
@@ -316,6 +334,7 @@ end)
 
 helpers.describe("shortcuts.bindings: argument validation", function()
 	local B = helpers.load_with_stubs("modules.shortcuts.bindings")
+	require("tests.support.shortcut_bindings_fixture").prefer_all(B)
 
 	helpers.it("enable() rejects a non-string name without crashing", function()
 		B.enable(nil)
@@ -399,12 +418,14 @@ helpers.describe("shortcuts.bindings: set_chatgpt_url (shortcuts-ctrl-g-ignores-
 			},
 		})
 
+		require("tests.support.shortcut_bindings_fixture").prefer_all(B)
 		B.start()
 		return B, captured_ctrl_g, opened_urls
 	end
 
 	helpers.it("exposes set_chatgpt_url as a function", function()
 		local B = helpers.load_with_stubs("modules.shortcuts.bindings")
+		require("tests.support.shortcut_bindings_fixture").prefer_all(B)
 		helpers.assert_eq(type(B.set_chatgpt_url), "function")
 	end)
 
@@ -451,12 +472,14 @@ end)
 
 helpers.describe("shortcuts.bindings: start/stop lifecycle", function()
 	local B = helpers.load_with_stubs("modules.shortcuts.bindings")
+	require("tests.support.shortcut_bindings_fixture").prefer_all(B)
 
 	helpers.it("start() activates every defined shortcut", function()
 		B.start()
 		local list = B.list_shortcuts()
 		for _, entry in ipairs(list) do
 			helpers.assert_eq(entry.enabled, true, "expected enabled after start: " .. entry.id)
+			helpers.assert_eq(entry.bound, true, "expected bound after start: " .. entry.id)
 		end
 	end)
 
@@ -467,11 +490,13 @@ helpers.describe("shortcuts.bindings: start/stop lifecycle", function()
 		helpers.assert_true(#list > 0)
 	end)
 
-	helpers.it("stop() flips every shortcut back to disabled", function()
+	helpers.it("stop() releases every binding and keeps every preference", function()
 		B.stop()
 		local list = B.list_shortcuts()
+		helpers.assert_true(#list > 0)
 		for _, entry in ipairs(list) do
-			helpers.assert_eq(entry.enabled, false, "expected disabled after stop: " .. entry.id)
+			helpers.assert_eq(entry.bound, false, "expected unbound after stop: " .. entry.id)
+			helpers.assert_eq(entry.enabled, true, "expected preferred after stop: " .. entry.id)
 		end
 	end)
 
@@ -603,6 +628,7 @@ local function load_bindings_with_pixel_owner(options)
 	package.loaded["modules.shortcuts.actions.text"] = text
 	package.loaded["modules.shortcuts.actions.apps"] = apps
 	local subject = helpers.load_with_stubs("modules.shortcuts.bindings")
+	require("tests.support.shortcut_bindings_fixture").prefer_all(subject)
 	package.loaded["modules.shortcuts.actions.system"] = old_system
 	package.loaded["modules.shortcuts.actions.text"] = old_text
 	package.loaded["modules.shortcuts.actions.apps"] = old_apps
@@ -661,4 +687,15 @@ helpers.describe("shortcuts.bindings: exact system-pixel child composition", fun
 			helpers.assert_eq(ctx.resume_calls, 1)
 		end)
 	end
+end)
+
+helpers.describe("bindings effective URL snapshot", function()
+	helpers.it("reads the exact URL consumed by dispatch and settles its setter", function()
+		local subject = helpers.load_with_stubs("modules.shortcuts.bindings")
+		helpers.assert_eq(subject.get_chatgpt_url(), subject.DEFAULT_CHATGPT_URL)
+		helpers.assert_eq(subject.set_chatgpt_url("https://example.test/?a=1&b=2"), true)
+		helpers.assert_eq(subject.get_chatgpt_url(), "https://example.test/?a=1&b=2")
+		helpers.assert_eq(subject.set_chatgpt_url(nil), true)
+		helpers.assert_eq(subject.get_chatgpt_url(), subject.DEFAULT_CHATGPT_URL)
+	end)
 end)

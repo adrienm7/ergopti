@@ -55,7 +55,7 @@ helpers.describe("HS-019 malformed TOML keeps the real Clear All command inert",
 				end
 				return nil
 			end
-			local row = find_row(built, "tap_hold.disable_all")
+			local row = find_row(built, "common.clear_to_system")
 			helpers.assert_not_nil(row,
 				"the real manifest must expose the Clear All command")
 			local action = row and (row.action or row.fn)

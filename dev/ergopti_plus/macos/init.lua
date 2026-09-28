@@ -287,12 +287,13 @@ boot_note("Config dir resolved: %s (%s).", tostring(config_paths.get_config_dir(
 Boot.mark("Path: config dir + paths.toml (config_paths.init)")
 Boot.stage("Path: log file open (retention purge deferred)")
 
--- Re-point the logger to <config_dir>/logs/ErgoptiPlus_YYYY-MM-DD.log now that
--- the user config dir is known. Earlier boot lines went to the fallback file.
+-- Re-point the logger to the logs folder (LogsDirPath, or
+-- ~/Library/Logs/ergopti_plus/) now that paths.toml is read. Earlier boot lines
+-- went to the fallback file in the default folder.
 -- (The old-log retention purge is scheduled off the boot path inside this call.)
 do
-	local log_folder_usable, log_folder_err = Logger.init_log_path(config_paths.get_config_dir(), 14)
-	local log_folder = config_paths.get_config_dir():gsub("/*$", "/") .. "hammerspoon/logs"
+	local log_folder = config_paths.get_logs_dir()
+	local log_folder_usable, log_folder_err = Logger.init_log_path(log_folder, 14)
 	boot_note("Log folder chosen: %s (%s; usable: %s%s).", log_folder, BootJournal.describe_path(log_folder),
 		tostring(log_folder_usable == true), log_folder_err and (", " .. tostring(log_folder_err)) or "")
 end
@@ -334,7 +335,19 @@ end
 -- The native worker accepted the configured folder: the daily log there is now
 -- the readable trail, so launcher.log keeps only fatal lines from here on.
 BootJournal.set_user_log_ready(true)
-boot_note("Native logger handshake committed: the launcher worker owns %s.", tostring(Logger.UNIFIED_LOG_FILE))
+boot_note("Native logger handshake committed: the launcher worker owns %s.", Logger.logs_dir())
+
+-- Arm repeat collapsing (logger SPEC § 4.2) now that its summaries have a
+-- durable destination, and before any periodic source starts. Its flush tick is
+-- a TimerScheduler timer, so teardown cancels it with every other one; a refusal
+-- only costs collapsing, so it is reported and boot continues.
+do
+	local repeat_armed, repeat_err = Logger.enable_repeat_collapsing(TimerScheduler)
+	if repeat_armed ~= true then
+		Logger.error(LOG, "Repeat collapsing could not be armed; periodic lines stay uncollapsed: %s.",
+			tostring(repeat_err))
+	end
+end
 Boot.mark("Path: native asynchronous logger transport committed")
 Boot.stage("Path: runtime error capture installed")
 
@@ -516,6 +529,12 @@ local function request_exact_lease_revoke(reason, on_done)
 	return true
 end
 
+-- The once-only quit step that applies the pause layout (ui.menu.quit_layout).
+local quit_layout_step = require("ui.menu.quit_layout").create({
+	resolve_menu = function() return package.loaded["ui.menu"] end,
+	logger = Logger,
+})
+
 --- Releases every Lua-owned resource. This function never owns Karabiner's
 --- shared processes; controlled callers invoke it only after the exact token
 --- fence. The native shutdown callback intentionally does not call it because
@@ -529,6 +548,12 @@ local function teardown_all_resources(termination_kind, on_teardown_ready)
 		_local_teardown_started = true
 		Logger.info(LOG, "Hammerspoon local teardown started (%s).", tostring(termination_kind or "shutdown"))
 	end
+
+	-- Quitting leaves the keyboard on the pause layout. Applied first, while every
+	-- owner is still live, and awaited: an asynchronous switch would otherwise be
+	-- collected with the process before it selects the input source.
+	local layout_accepted, layout_state = quit_layout_step.run(termination_kind, on_teardown_ready)
+	if layout_state == "pending" then return layout_accepted, layout_state end
 
 	-- The MLX task completion is asynchronous after terminate() accepts SIGTERM
 	-- Keep every remaining local owner alive until its exact callback proves the
@@ -801,11 +826,19 @@ local function emergency_exit_after_runtime_failure(owner, reason, message_key)
 	-- the cause durable and hand it to the launcher's modal alert first. No
 	-- local modal here: input owners may be armed, and a blocking dialog would
 	-- delay the bounded exit that lets the guardian revoke the exact lease.
-	-- The generic post-onboarding owner names the boot stage that was running.
-	local report_stage = exact_owner
-	if exact_owner == "boot" and not Boot.is_complete() then report_stage = Boot.current_stage() end
-	BootFatal.report(report_stage, exact_reason,
-		i18n.get(message_key or "dialog.fatal_error.cannot_start"))
+	-- A failure after boot completed stopped a running app: it is reported as a
+	-- runtime stop naming the component and today's logs, never as "could not
+	-- start". Before that, the generic post-onboarding owner names the boot
+	-- stage that was running.
+	local report_kind, report_stage, default_message_key = BootFatal.presentation(
+		exact_owner, Boot.is_complete(), Boot.current_stage())
+	local report_message = i18n.get(message_key or default_message_key)
+	if report_kind == BootFatal.KIND_RUNTIME then
+		BootFatal.report_runtime(report_stage, exact_reason, report_message,
+			{ Logger.today_log_path(), Logger.today_errors_path() })
+	else
+		BootFatal.report(report_stage, exact_reason, report_message)
+	end
 
 	-- Arm the deadline BEFORE starting a request that may never settle. If exact
 	-- STOPPED arrives in time, the normal coordinator fences, tears down, and exits.
@@ -878,7 +911,7 @@ local menu               = require("ui.menu")
 local mlx_deps_checker    = require("modules.llm.mlx_deps_checker")
 local ollama_deps_checker = require("modules.llm.ollama_deps_checker")
 local backend_detector    = require("modules.llm.backend_detector")
-local notifications       = require("infra.notifications")
+local ErrorDialog         = require("ui.error_dialog")
 local ui_restore         = require("infra.ui_restore")
 
 do
@@ -935,17 +968,36 @@ do
 	end
 end
 
--- Wire Logger.error → system notification so every ERROR surfaces to the user
--- without any module needing to call notifications.notify() directly.
--- Registered here (after notifications is loaded) to keep logger dependency-free.
-Logger.set_error_notification_handler(function(module_name, message)
-	return notifications.notify(
-		i18n.get("common.error_prefix") .. tostring(module_name),
-		message,
-		"error"
-	)
+-- Wire Logger.error → the error window (ui/error_dialog), so an ERROR reaches
+-- the user without any module calling it directly: the shared policy decides
+-- which ERROR opens it, and it opens later, on a timer, without the keyboard.
+-- It replaces the system notification every ERROR used to raise. Registered
+-- here, once the modules it reads are loaded, to keep the logger dependency-free.
+ErrorDialog.init()
+Logger.set_error_notification_handler(function(module_name, message, template)
+	return ErrorDialog.on_error(module_name, template, message)
 end)
 Boot.mark("Config-dependent module requires")
+Boot.stage("Config schema migration")
+
+-- Version config.toml before anything reads or writes it: the first-run
+-- wizard, config_overrides, Preferences.load and every menu save below see the
+-- migrated file, and a file the wizard creates carries this build's version. A
+-- file this build cannot version (a newer schema, a failed migration) stays
+-- untouched and every write to it is refused for the session
+-- (_shared/lua/config_migrate.lua, docs/adr/009-config-versioning.md).
+do
+	local ConfigMigrate = require("config_migrate")
+	require("toml_codec.writer").set_sparse_defaults(
+		config_paths.get("ConfigTomlPath"), require("infra.manifest_reader"))
+	ConfigMigrate.boot({
+		path          = config_paths.get("ConfigTomlPath"),
+		driver        = "hs",
+		registry_path = require("infra.paths").shared(ConfigMigrate.REGISTRY_PATH),
+		file_adapter  = file_system,
+	})
+end
+Boot.mark("Config schema migration")
 Boot.stage("First-launch guard (onboarding check)")
 
 -- Global uncaught-error handler: offer the user an opt-in crash report.
@@ -1002,20 +1054,23 @@ Boot.mark("First-launch guard (onboarding check)")
 -- ====================================
 -- ===================================
 
--- Pre-start modules so they are active before menu.lua reads saved prefs.
--- Menu.lua will honor saved state and stop/start them as needed. All three
--- input owners share one transaction because continuing after a refused start
--- leaves a half-functional keyboard while the boot log still claims success.
+-- Pre-start the keyboard input owners so they are active before menu.lua reads
+-- saved prefs. Menu.lua will honor saved state and pause/resume them as needed.
+-- Both share one transaction because continuing after a refused start leaves a
+-- half-functional keyboard while the boot log still claims success. Gestures is
+-- deliberately absent: its native runtime (touch watchers, primer tap, health
+-- check) exists only while the feature is ON, so the menu's preference sync
+-- acquires it through gestures.enable_all() and a saved OFF never arms it.
 -- Script control (the AltGr+Enter/Backspace/Escape panic-button eventtap) is
 -- armed as early as its real dependencies allow. M.start() only stores the
 -- keymap/shortcuts/gestures/karabiner module TABLES for later pause/resume
 -- dispatch and creates its own eventtap — it does not call into any of their
 -- own start-up entry points, so it has no technical dependency on the keymap
 -- engine, the Karabiner bridge, or the LLM/TOML boot steps below. Moved here
--- (right after the gestures/shortcuts pre-start) so the user's one boot-time
--- recourse exists for the entire remainder of a slow boot, instead of only
--- after MLX cleanup, LLM bootstrap, TOML loading and the keymap engine startup
--- have all completed (F-MED-19).
+-- (right after the shortcuts pre-start) so the user's one boot-time recourse
+-- exists for the entire remainder of a slow boot, instead of only after MLX
+-- cleanup, LLM bootstrap, TOML loading and the keymap engine startup have all
+-- completed (F-MED-19).
 local function finish_boot_after_onboarding()
 Boot.stage("Accessibility permission")
 -- Every input owner below is an eventtap, and an untrusted process gets taps
@@ -1038,18 +1093,9 @@ if accessibility_trusted ~= true then
 end
 Logger.info(LOG, "Accessibility permission is granted; arming input owners.")
 Boot.mark("Accessibility permission")
-Boot.stage("Gestures + shortcuts pre-start")
+Boot.stage("Shortcuts pre-start")
 
 local prestart_committed = StartupTransaction.run({
-	{
-		name = "gestures",
-		allow_unavailable = true,
-		start = function()
-			Logger.debug(LOG, "Starting gestures module…")
-			return gestures.start()
-		end,
-		stop = gestures.stop,
-	},
 	{
 		name = "shortcuts",
 		start = function()
@@ -1061,7 +1107,7 @@ local prestart_committed = StartupTransaction.run({
 	{
 		name = "script_control",
 		start = function()
-			Boot.mark("Gestures + shortcuts pre-start")
+			Boot.mark("Shortcuts pre-start")
 			Boot.stage("Script control engine started (panic-button eventtap)")
 			Logger.debug(LOG, "Starting script control engine…")
 			return shortcuts.start_script_control(keymap, shortcuts, gestures, karabiner)
@@ -1311,8 +1357,9 @@ do
 	local override_path = config_paths.get_config_dir()
 	if not override_path:match("[/\\]$") then override_path = override_path .. "/" end
 	override_path = override_path .. "hotstrings_config.toml"
-	hotstrings_config.init({
+	local hotstring_config_ready = hotstrings_config.init({
 		override_path = override_path,
+		delay_transaction = keymap.with_hotstring_delays,
 		toml_resolver = function(category)
 			if category == "personal" then
 				return config_paths.get("PersonalTomlPath")
@@ -1333,6 +1380,8 @@ do
 			return hotstrings_dir .. category .. ".toml"
 		end,
 	})
+
+	if hotstring_config_ready ~= true then error("hotstring override owner did not initialize") end
 
 	-- Wire the config window so it can discover personal + extension files.
 	local ok_cw, cw = pcall(require, "ui.hotstrings_config_window")
@@ -1506,6 +1555,12 @@ local dynamic_hotstrings_started = dynamic_hotstrings.start(base_dir, keymap, pe
 if dynamic_hotstrings_started ~= true then
 	error("dynamic_hotstrings.start did not commit")
 end
+local boot_personal_info = boot_saved_prefs.personal_info
+if boot_personal_info == nil then boot_personal_info = dynamic_hotstrings.DEFAULT_STATE.personal_info end
+if dynamic_hotstrings.set_enabled(boot_personal_info) ~= true
+	or dynamic_hotstrings.is_enabled() ~= boot_personal_info then
+	error("canonical personal-info preference did not commit before eventtap startup")
+end
 table.insert(hotfiles, "dynamichotstrings")
 
 -- Common TOML hotstring files — lowest priority among user-visible groups.
@@ -1564,6 +1619,9 @@ Boot.stage("Keymap engine started")
 -- Start the keymap eventtap engine after all TOML groups are loaded and sorted.
 -- This call was previously auto-invoked at the end of modules/keymap/init.lua
 -- (M-13 fix), which started the taps before Karabiner and hotstrings were ready.
+if keymap.apply_hotstring_preferences(boot_saved_prefs) ~= true then
+	error("canonical hotstring preferences did not commit before eventtap startup")
+end
 local keymap_started = keymap.start()
 if keymap_started ~= true then
 	error("keymap.start did not commit")
@@ -1593,11 +1651,17 @@ Boot.mark("UI: karabiner.init")
 Boot.stage("UI: menu.start (menubar + state sync + engines + LLM handler)")
 
 Logger.debug(LOG, "Starting user interface components…")
-menu.start(
+local menubar = menu.start(
 	base_dir, hotfiles, gestures,
 	keymap, dynamic_hotstrings, module_sections,
 	karabiner, hotfile_paths
 )
+-- nil means no tray: the menubar, its native menu or the preference rollback
+-- could not settle. Ignoring it still logged "boot SUCCESSFUL" with no menu.
+if menubar == nil then
+	Logger.error(LOG, "Menubar startup did not commit; no tray menu is available.")
+	error("menu.start did not commit")
+end
 Boot.mark("UI: menu.start (menubar + state sync + engines + LLM handler)")
 Boot.stage("UI: menu + vscode bridge ready")
 

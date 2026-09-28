@@ -21,6 +21,7 @@ local Languages = require("hotstrings.languages")
 local LOG    = "keymap.registry"
 
 local _state = nil
+local _repeat_enabled = ManifestReader.default_for("hotstrings.repeat_key_enabled")
 
 --- Guard: verifies that M.setup() was called before any state-dependent public
 --- function. Mirrors registry_groups.lua's require_state verbatim (section 5.8).
@@ -144,6 +145,14 @@ function M.registry_transaction(label, mutation)
 	return Groups.transaction(label, mutation)
 end
 
+--- Commits the canonical delay projection and its conditional source publication.
+--- @param resolve function Pure resolver using the candidate override source.
+--- @param publish function Exact conditional publication callback.
+--- @return boolean committed
+function M.with_hotstring_delays(resolve, publish)
+	return Groups.with_hotstring_delays(resolve, publish)
+end
+
 --- Enables a previously disabled group by reloading its file (or re-running its hook).
 --- No-op when the group is already enabled.
 --- @param name string Group identifier.
@@ -183,21 +192,22 @@ end
 --- when the setting has never been written (opt-out, not opt-in).
 --- @return boolean
 function M.is_repeat_feature_enabled()
-	return Storage.get("magickey_repeat_enabled") ~= false
+	return _repeat_enabled
 end
 
 --- Enable or disable the magic-key repeat engine and persist the choice.
 --- @param enabled boolean
 function M.set_repeat_feature_enabled(enabled)
-	if enabled then
-		Storage.delete("magickey_repeat_enabled")
-	else
-		Storage.set("magickey_repeat_enabled", false)
+	if type(enabled) ~= "boolean" then
+		Logger.error(LOG, "Magic-key repeat state must be a boolean.")
+		return false
 	end
+	_repeat_enabled = enabled
 	-- A user-facing feature toggle with no log line leaves the repeat engine's
 	-- state unrecoverable from the logs, which is where every other setting's
 	-- applied value can be read back.
 	Logger.debug(LOG, "Magic-key repeat engine: %s.", enabled and "on" or "off")
+	return true
 end
 
 --- Builds the persistent settings key for one section.
@@ -309,6 +319,57 @@ function M.set_groups_sections_enabled(changes, enabled)
 	end
 	return true
 end
+
+--- Replaces the derived section cache and group posture from canonical preferences.
+--- Loading or clearing a sparse file may never recover choices from the derived cache.
+--- @param saved table Flat preferences from config.toml, or an ordinary-save snapshot.
+--- @return boolean committed Every selected setting and registry group acknowledged.
+function M.apply_hotstring_preferences(saved)
+	if not require_state("apply_hotstring_preferences") then return false end
+	local projected, desired = pcall(require("infra.preferences").project_hotstring_preferences,
+		saved, Groups.list_groups(), M.get_sections)
+	if not projected then
+		Logger.error(LOG, "Canonical hotstring projection was refused: %s.", tostring(desired))
+		return false
+	end
+	local previous, selected, names, changed = {}, {}, {}, {}
+	for group, sections in pairs(desired.section_states) do
+		names[#names + 1] = group
+		for section, enabled in pairs(sections) do
+			local key = section_setting_key(group, section)
+			local read_ok, value = Storage.read_exact(key)
+			if not read_ok then return false end
+			assert(selected[key] == nil, "hotstring cache identities are ambiguous")
+			previous[key], selected[key] = { value = value }, { enabled = enabled }
+			if value ~= enabled then changed[group] = true end
+		end
+	end
+	table.sort(names)
+	local ok, committed = xpcall(function()
+		return Groups.transaction("canonical hotstring preferences", function()
+			for key, record in pairs(selected) do
+				if previous[key].value ~= record.enabled
+					and write_section_setting(key, record.enabled) ~= true then return false end
+			end
+			for _, name in ipairs(names) do
+				-- Rebuild changed groups once; a later menu sync must retain a settled corpus.
+				if M.is_group_enabled(name) and (changed[name] or not desired.hotstrings[name])
+					and M.disable_group(name) ~= true then return false end
+				if desired.hotstrings[name] and not M.is_group_enabled(name)
+					and M.enable_group(name) ~= true then return false end
+				if M.is_group_enabled(name) ~= desired.hotstrings[name] then return false end
+			end
+			return true
+		end)
+	end, debug.traceback)
+	if not ok or committed ~= true then
+		restore_section_settings(previous)
+		Logger.error(LOG, "Canonical hotstring preferences did not commit: %s.", tostring(committed))
+		return false
+	end
+	return true
+end
+
 
 --- Persists the enabled state of ONE OR MORE sections and rebuilds their group
 --- exactly once.

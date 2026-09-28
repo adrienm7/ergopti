@@ -64,9 +64,10 @@ Test("SQLite chunks: incomplete and invalid tails differ (reader-sql-fail-loud)"
 	_KLRSQL_CarryDistinguishesIncompleteFromInvalid)
 
 _KLRSQL_DebugDoesNotExposeLedgerText() {
-	global _ConfigDir, _AhkSubDir, _LOGGER_DEBUG_ENABLED
+	global _ConfigDir, _AhkSubDir, _LogsDir, _LOGGER_DEBUG_ENABLED
 	SavedConfig := _ConfigDir
 	SavedSubDir := _AhkSubDir
+	SavedLogsDir := _LogsDir
 	SavedDebug := _LOGGER_DEBUG_ENABLED
 	Root := _FSWL_Path() . ".reader-debug"
 	Db := _KLRSQL_OpenMemory()
@@ -74,6 +75,8 @@ _KLRSQL_DebugDoesNotExposeLedgerText() {
 		DirCreate(Root . "\logs")
 		_ConfigDir := Root . "\"
 		_AhkSubDir := ""
+		; The prefetch trace goes to the logs folder the logger resolves.
+		_LogsDir := Root . "\logs\"
 		_LOGGER_DEBUG_ENABLED := true
 		Marker := "SYNTHETIC_PRIVATE_SQL_TOKEN"
 		Sql := Marker . ";"
@@ -97,6 +100,7 @@ _KLRSQL_DebugDoesNotExposeLedgerText() {
 		SQLite_Close(Db)
 		_ConfigDir := SavedConfig
 		_AhkSubDir := SavedSubDir
+		_LogsDir := SavedLogsDir
 		_LOGGER_DEBUG_ENABLED := SavedDebug
 		if DirExist(Root)
 			DirDelete(Root, true)

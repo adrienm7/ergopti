@@ -56,7 +56,9 @@ local function one_shot_result(char) return RESULTS[char] end
 --- An engine on `keys` (the defaults) reading the layout through `key_text`
 --- and `plan_text`.
 local function engine(keys, key_text, plan_text)
+	local nav = require("tests.support.nav_layer_fixture").recommended()
 	return Engine.new({ keys = keys or DEFAULTS, tap_min_ms = 50, one_shot_timeout_ms = 2000,
+		nav_layer = nav,
 		key_text = key_text or us_text, plan_text = plan_text or us_plan, one_shot_result = one_shot_result })
 end
 

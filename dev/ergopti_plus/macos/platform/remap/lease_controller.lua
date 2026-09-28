@@ -973,6 +973,25 @@ local function schedule_heartbeat_retry(generation)
 	return true
 end
 
+--- Reports, once, that task input is clean again after failed heartbeat
+--- transports: each failure was a warning, and without this line nothing in the
+--- log says whether they ever cleared. Silent when nothing had failed.
+--- @param generation table Generation whose transport just succeeded.
+--- @param via string What proved the transport clean (heartbeat, mode command).
+local function report_heartbeat_recovery(generation, via)
+	local failures = generation.heartbeat_transport_failures or 0
+	if failures > 0 then
+		-- Formatted here, not by the logger: repeat collapsing keys an info line on
+		-- its template, so every later recovery would fold into the first one's
+		-- streak while each numbered failure warning stays visible. Naming the
+		-- last failed heartbeat gives each episode its own line and ties it to
+		-- the warning it clears.
+		Logger.info(LOG, string.format(
+			"Karabiner lease %s heartbeat recovered by a clean %s after %d failed transport(s) (last failed: heartbeat %s).",
+			generation.token, via, failures, tostring(generation.last_failed_heartbeat)))
+	end
+end
+
 --- Completes the currently pending pause or resume command.
 --- @param generation table Generation receiving the ACK.
 --- @param ack string PAUSED or RESUMED.
@@ -986,6 +1005,7 @@ local function complete_command(generation, ack)
 	generation.awaiting = nil
 	generation.command = nil
 	cancel_heartbeat_retry_timer(generation)
+	report_heartbeat_recovery(generation, "mode command")
 	generation.heartbeat_transport_failures = 0
 	generation.recovery_phase = nil
 	-- Detach before set_phase(): both the phase listener and the completed
@@ -1065,6 +1085,7 @@ local function process_line(generation, line)
 		if ping_result == "failed" then
 			generation.heartbeat_transport_failures =
 				(generation.heartbeat_transport_failures or 0) + 1
+			generation.last_failed_heartbeat = ping_sequence
 			Logger.warn(LOG, "Karabiner lease %s heartbeat %d had no clean local CLI transport.",
 				generation.token, ping_sequence)
 			if generation.heartbeat_transport_failures
@@ -1083,6 +1104,7 @@ local function process_line(generation, line)
 			dispatch_after_ping(generation)
 			return
 		end
+		report_heartbeat_recovery(generation, "heartbeat")
 		generation.heartbeat_transport_failures = 0
 		cancel_heartbeat_retry_timer(generation)
 		dispatch_after_ping(generation)
@@ -1201,11 +1223,12 @@ send_ping = function(generation, origin)
 	local wire = "PING " .. tostring(sequence)
 	local write_ok, wrote = pcall(generation.handle.set_input, wire .. "\n")
 	if not write_ok or not wrote then
-		fail_generation(generation, "could not send " .. wire)
+		fail_generation(generation, "could not send " .. wire .. " (origin: " .. tostring(origin) .. ")")
 		return false
 	end
-	Logger.debug(LOG, "Karabiner lease %s heartbeat %d sent by %s.",
-		generation.token, sequence, tostring(origin))
+	-- A sent heartbeat is not logged: it runs every few seconds for the whole
+	-- session, and only its failure (warn) and recovery (info) are news. The
+	-- origin therefore only names which source failed to write.
 	if generation.awaiting == expected and not generation.failed then
 		arm_ack_timer(generation, expected)
 	end

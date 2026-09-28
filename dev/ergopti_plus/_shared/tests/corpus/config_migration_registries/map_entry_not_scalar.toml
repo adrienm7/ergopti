@@ -1,0 +1,16 @@
+# _shared/tests/corpus/config_migration_registries/map_entry_not_scalar.toml
+#
+# A map_value entry compares an array.
+
+[registry]
+current_version = 2
+unstamped_version = 1
+
+[steps.v1_to_v2]
+from = 1
+to = 2
+drivers = ["ahk", "hs", "linux"]
+reason = "Corpus: one delete."
+ops = [
+	{ op = "map_value", section = "metrics", key = "encrypt", map = [{ from = [0], to = false }] },
+]

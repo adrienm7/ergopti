@@ -84,12 +84,21 @@ helpers.describe("script lifecycle actions", function()
 		local storage_before = package.loaded["adapters.storage"]
 		local module_before = package.loaded["modules.shortcuts.keyboard_shortcuts"]
 		local gestures_before = package.loaded["modules.gestures.manager"]
+		local paths_before = package.loaded["infra.config_paths"]
+		local path = os.tmpname()
+		require("test.config_unused_keys_contract").sandbox.write_bytes(path,
+			'[shortcuts.keyboard]\nctrl_j = "select_line"\nctrl_k = "script_pause_toggle"\n')
+		package.loaded["infra.config_paths"] = { config = function() return path end }
 		local executed = {}
 		package.loaded["adapters.storage"] = require("tests.fakes").storage({ initial = {
 			["shortcuts.keyboard.ctrl_j"] = "select_line",
 			["shortcuts.keyboard.ctrl_k"] = "script_pause_toggle",
 		} })
 		package.loaded["modules.gestures.manager"] = {
+			-- The loader keeps only the ids the catalogue offers; both stored ones are.
+			is_assignable = function(action)
+				return action == "select_line" or action == "script_pause_toggle"
+			end,
 			execute_action = function(action) executed[#executed + 1] = action return true end,
 		}
 		package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
@@ -101,6 +110,8 @@ helpers.describe("script lifecycle actions", function()
 		package.loaded["adapters.storage"] = storage_before
 		package.loaded["modules.shortcuts.keyboard_shortcuts"] = module_before
 		package.loaded["modules.gestures.manager"] = gestures_before
+		package.loaded["infra.config_paths"] = paths_before
+		os.remove(path)
 		helpers.assert_true(not held_back, "Ctrl+J fired select_line while the script was paused")
 		helpers.assert_true(resumed, "the resume shortcut must fire while paused")
 		helpers.assert_true(not chatgpt, "the default Ctrl+G must wait for resume too")

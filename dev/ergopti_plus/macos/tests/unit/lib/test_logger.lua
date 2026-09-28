@@ -274,23 +274,23 @@ helpers.describe("Logger: deduplication", function()
 end)
 
 helpers.describe("Logger: init_log_path", function()
-	helpers.it("re-points UNIFIED_LOG_FILE under <config_dir>/hammerspoon/logs/", function()
+	helpers.it("re-points today's log into the given logs folder", function()
 		Logger.init_log_path("/tmp/ergopti_test_config/", 14)
 		helpers.assert_true(
-			Logger.UNIFIED_LOG_FILE:find("/tmp/ergopti_test_config/hammerspoon/logs/ErgoptiPlus_") ~= nil,
-			"UNIFIED_LOG_FILE should be re-pointed under hammerspoon/logs/"
+			Logger.today_log_path():find("/tmp/ergopti_test_config/ErgoptiPlus_", 1, true) == 1,
+			"today's log should be re-pointed into the given folder"
 		)
 		helpers.assert_true(
-			Logger.UNIFIED_LOG_FILE:find("%.log$") ~= nil,
-			"UNIFIED_LOG_FILE should end with .log"
+			Logger.today_log_path():find("%.log$") ~= nil,
+			"today's log should end with .log"
 		)
 	end)
 
-	helpers.it("appends a trailing slash to config_dir if missing", function()
+	helpers.it("appends a trailing slash to the logs folder if missing", function()
 		Logger.init_log_path("/tmp/ergopti_test_no_slash", 14)
 		helpers.assert_true(
-			Logger.UNIFIED_LOG_FILE:find("/tmp/ergopti_test_no_slash/hammerspoon/logs/") ~= nil,
-			"missing trailing slash on config_dir should be added"
+			Logger.today_log_path():find("/tmp/ergopti_test_no_slash/", 1, true) == 1,
+			"missing trailing slash on the logs folder should be added"
 		)
 	end)
 
@@ -298,17 +298,17 @@ helpers.describe("Logger: init_log_path", function()
 		Logger.init_log_path("/tmp/ergopti_test_date/", 14)
 		local today = os.date("%Y-%m-%d")
 		helpers.assert_true(
-			Logger.UNIFIED_LOG_FILE:find(today, 1, true) ~= nil,
-			"UNIFIED_LOG_FILE should contain today's date"
+			Logger.today_log_path():find(today, 1, true) ~= nil,
+			"today's log should contain today's date"
 		)
 	end)
 
-	helpers.it("ignores empty / nil config_dir", function()
-		local before = Logger.UNIFIED_LOG_FILE
+	helpers.it("ignores an empty / nil logs folder", function()
+		local before = Logger.logs_dir()
 		Logger.init_log_path("", 14)
-		helpers.assert_eq(Logger.UNIFIED_LOG_FILE, before)
+		helpers.assert_eq(Logger.logs_dir(), before)
 		Logger.init_log_path(nil, 14)
-		helpers.assert_eq(Logger.UNIFIED_LOG_FILE, before)
+		helpers.assert_eq(Logger.logs_dir(), before)
 	end)
 end)
 
@@ -357,16 +357,16 @@ helpers.describe("Logger: test sink", function()
 	end)
 end)
 
-helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
-	helpers.it("re-points ERRORS_LOG_FILE under <config_dir>/hammerspoon/logs/ like the unified log", function()
+helpers.describe("Logger: errors-only sink (today_errors_path)", function()
+	helpers.it("re-points today's errors file into the logs folder like the unified log", function()
 		Logger.init_log_path("/tmp/ergopti_test_errors_config/", 14)
 		helpers.assert_true(
-			Logger.ERRORS_LOG_FILE:find("/tmp/ergopti_test_errors_config/hammerspoon/logs/ErgoptiPlus_errors_") ~= nil,
-			"ERRORS_LOG_FILE should be re-pointed under hammerspoon/logs/ with _errors_ prefix"
+			Logger.today_errors_path():find("/tmp/ergopti_test_errors_config/ErgoptiPlus_errors_", 1, true) == 1,
+			"today's errors file should be re-pointed into the logs folder with the _errors_ prefix"
 		)
 		helpers.assert_true(
-			Logger.ERRORS_LOG_FILE:find("%.log$") ~= nil,
-			"ERRORS_LOG_FILE should end with .log"
+			Logger.today_errors_path():find("%.log$") ~= nil,
+			"today's errors file should end with .log"
 		)
 	end)
 
@@ -374,8 +374,8 @@ helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
 		Logger.init_log_path("/tmp/ergopti_test_errors_date/", 14)
 		local today = os.date("%Y-%m-%d")
 		helpers.assert_true(
-			Logger.ERRORS_LOG_FILE:find(today, 1, true) ~= nil,
-			"ERRORS_LOG_FILE should contain today's date"
+			Logger.today_errors_path():find(today, 1, true) ~= nil,
+			"today's errors file should contain today's date"
 		)
 	end)
 
@@ -389,7 +389,7 @@ helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
 
 		local L = helpers.load_with_stubs("infra.logger")
 		L.set_level("DEBUG")
-		L.init_log_path(test_base, 14)
+		L.init_log_path(logs_dir, 14)
 
 		-- Emit a mix of severities
 		L.debug("errsink", "debug-not-in-errors")
@@ -397,7 +397,7 @@ helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
 		L.warn("errsink", "warn-must-be-in-errors-%s", "42")
 		L.error("errsink", "error-must-be-in-errors %d", 99)
 
-		local err_path = L.ERRORS_LOG_FILE
+		local err_path = L.today_errors_path()
 		local fh = io.open(err_path, "r")
 		local content = ""
 		if fh then
@@ -436,18 +436,18 @@ helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
 
 		local L = helpers.load_with_stubs("infra.logger")
 		L.set_level("DEBUG")
-		L.init_log_path(test_base)
+		L.init_log_path(logs_dir)
 
 		L.error("onlyerr", "critical failure %s", "xyz")
 
-		local fh = io.open(L.ERRORS_LOG_FILE, "r")
+		local fh = io.open(L.today_errors_path(), "r")
 		local content = fh and (fh:read("*a") or "") or ""
 		if fh then fh:close() end
 
 		helpers.assert_true(content:find("critical failure xyz") ~= nil, "ERROR must be in errors file")
 		helpers.assert_true(content:find("%[ERROR%]") ~= nil, "errors file line must contain [ERROR] label")
 
-		pcall(function() os.remove(L.ERRORS_LOG_FILE) end)
+		pcall(function() os.remove(L.today_errors_path()) end)
 	end)
 
 	helpers.it("WARNING level messages are written to errors file", function()
@@ -458,18 +458,18 @@ helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
 
 		local L = helpers.load_with_stubs("infra.logger")
 		L.set_level("DEBUG")
-		L.init_log_path(test_base)
+		L.init_log_path(logs_dir)
 
 		L.warn("onlywarn", "degraded state detected")
 
-		local fh = io.open(L.ERRORS_LOG_FILE, "r")
+		local fh = io.open(L.today_errors_path(), "r")
 		local content = fh and (fh:read("*a") or "") or ""
 		if fh then fh:close() end
 
 		helpers.assert_true(content:find("degraded state detected") ~= nil)
 		helpers.assert_true(content:find("%[WARNING%]") ~= nil)
 
-		pcall(function() os.remove(L.ERRORS_LOG_FILE) end)
+		pcall(function() os.remove(L.today_errors_path()) end)
 	end)
 
 	helpers.it("INFO/DEBUG/TRACE/DONE/START/SUCCESS do not appear in errors file", function()
@@ -480,7 +480,7 @@ helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
 
 		local L = helpers.load_with_stubs("infra.logger")
 		L.set_level("DEBUG")
-		L.init_log_path(test_base)
+		L.init_log_path(logs_dir)
 
 		L.info("lowsev", "info-msg")
 		L.debug("lowsev", "debug-msg")
@@ -489,7 +489,7 @@ helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
 		L.start("lowsev", "start-msg")
 		L.success("lowsev", "success-msg")
 
-		local fh = io.open(L.ERRORS_LOG_FILE, "r")
+		local fh = io.open(L.today_errors_path(), "r")
 		local content = fh and (fh:read("*a") or "") or ""
 		if fh then fh:close() end
 
@@ -500,7 +500,7 @@ helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
 		helpers.assert_true(content:find("start%-msg") == nil)
 		helpers.assert_true(content:find("success%-msg") == nil)
 
-		pcall(function() os.remove(L.ERRORS_LOG_FILE) end)
+		pcall(function() os.remove(L.today_errors_path()) end)
 	end)
 
 	helpers.it("errors file receives same formatted line content as ring buffer for high severity", function()
@@ -511,14 +511,14 @@ helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
 
 		local L = helpers.load_with_stubs("infra.logger")
 		L.set_level("DEBUG")
-		L.init_log_path(test_base)
+		L.init_log_path(logs_dir)
 
 		L.error("fmt", "user %s id=%d", "alice", 42)
 
 		local ring = L.ring_buffer_snapshot()
 		local last_ring = ring[#ring] or ""
 
-		local fh = io.open(L.ERRORS_LOG_FILE, "r")
+		local fh = io.open(L.today_errors_path(), "r")
 		local err_content = fh and (fh:read("*a") or "") or ""
 		if fh then fh:close() end
 
@@ -527,7 +527,7 @@ helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
 		helpers.assert_true(err_content:find("user alice id=42") ~= nil)
 		helpers.assert_true(err_content:find("%[ERROR%]") ~= nil)
 
-		pcall(function() os.remove(L.ERRORS_LOG_FILE) end)
+		pcall(function() os.remove(L.today_errors_path()) end)
 	end)
 
 	helpers.it("high severity lines still reach the ring buffer and test sink even when errors file is active", function()
@@ -538,7 +538,7 @@ helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
 
 		local L = helpers.load_with_stubs("infra.logger")
 		L.set_level("DEBUG")
-		L.init_log_path(test_base)
+		L.init_log_path(logs_dir)
 
 		local captured = {}
 		L.set_sink(function(line) captured[#captured + 1] = line end)
@@ -547,7 +547,7 @@ helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
 
 		local ring = L.ring_buffer_snapshot()
 		local last_ring = ring[#ring] or ""
-		local fh = io.open(L.ERRORS_LOG_FILE, "r")
+		local fh = io.open(L.today_errors_path(), "r")
 		local err_content = fh and (fh:read("*a") or "") or ""
 		if fh then fh:close() end
 
@@ -556,11 +556,11 @@ helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
 		helpers.assert_true(err_content:find("visible everywhere") ~= nil)
 
 		L.set_sink(nil)
-		pcall(function() os.remove(L.ERRORS_LOG_FILE) end)
+		pcall(function() os.remove(L.today_errors_path()) end)
 	end)
 
 	-- Day rollover simulation for the errors filename (critical per user request)
-	helpers.it("simulates day rollover and switches to new ERRORS_LOG_FILE", function()
+	helpers.it("simulates day rollover and switches to the new errors file", function()
 		local L = helpers.load_with_stubs("infra.logger")
 		L.set_level("DEBUG")
 
@@ -573,13 +573,13 @@ helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
 			return real_os_date(fmt, t)
 		end
 		L.init_log_path("/tmp/ergopti_test_dayroll1/", 14)
-		local yesterday_path = L.ERRORS_LOG_FILE
+		local yesterday_path = L.today_errors_path()
 		helpers.assert_true(yesterday_path:find("2025%-06%-30") ~= nil, "should use yesterday date")
 
 		L.error("roll", "error on fake yesterday")
 		-- In some stubbed test environments the errors-sink fan-out may not perform the real disk append.
 		-- Ensure the line is present for the path-rollover assertion (the primary goal of this test is
-		-- to verify that ERRORS_LOG_FILE rolls with the day and the logger exposes the correct dated path).
+		-- to verify that the errors file rolls with the day and the logger exposes the correct dated path).
 		-- Also ensure the target logs/ subdir exists (init_log_path uses ShellRunner.exec mkdir which
 		-- can be a no-op under load_with_stubs).
 		do
@@ -602,7 +602,7 @@ helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
 			return real_os_date(fmt, t)
 		end
 		L.init_log_path("/tmp/ergopti_test_dayroll2/", 14)
-		local today_path = L.ERRORS_LOG_FILE
+		local today_path = L.today_errors_path()
 		helpers.assert_true(today_path:find("2025%-07%-01") ~= nil, "should switch to new day filename")
 		helpers.assert_true(today_path ~= yesterday_path, "paths must differ after rollover")
 
@@ -633,32 +633,29 @@ helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
 
 		local L = helpers.load_with_stubs("infra.logger")
 		L.set_level("DEBUG")
-		L.init_log_path(test_base)
+		L.init_log_path(logs_dir)
 
 		local ok, err = L.pcall("pcallmod", function()
 			error("intentional pcall crash for test")
 		end)
 		helpers.assert_true(not ok)
 
-		local fh = io.open(L.ERRORS_LOG_FILE, "r")
+		local fh = io.open(L.today_errors_path(), "r")
 		local content = fh and (fh:read("*a") or "") or ""
 		if fh then fh:close() end
 
 		helpers.assert_true(content:find("intentional pcall crash") ~= nil or content:find("Exception") ~= nil,
 			"pcall failure must emit ERROR visible in errors file")
 
-		pcall(function() os.remove(L.ERRORS_LOG_FILE) end)
+		pcall(function() os.remove(L.today_errors_path()) end)
 	end)
 
 	-- FS write failure to errors file must not crash anything (user requested)
 	helpers.it("survives hard FS write failure on errors file (best-effort, no crash)", function()
 		local L = helpers.load_with_stubs("infra.logger")
 		L.set_level("DEBUG")
-		L.init_log_path("/tmp/ergopti_test_fs_fail/", 14)
-
-		-- Force an un-writable path (will cause io.open to fail)
-		local bad_path = "/root/this/should/never/be/writable/ergopti_errors_fail_test.log"
-		L.ERRORS_LOG_FILE = bad_path
+		-- Force an un-writable folder (every io.open under it fails)
+		L.init_log_path("/root/this/should/never/be/writable/", 14)
 
 		local write_ok, write_err = pcall(function()
 			L.error("fsfail", "this error write must fail gracefully")
@@ -695,14 +692,14 @@ helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
 
 		local L = helpers.load_with_stubs("infra.logger")
 		L.set_level("DEBUG")
-		L.init_log_path(test_base)
+		L.init_log_path(logs_dir)
 
 		L.error("edge", "")
 		L.error("edge", "line with \"quotes\" and \n newline and \t tab")
 		L.error("edge", "repeated error line for dedup test")
 		L.error("edge", "repeated error line for dedup test")  -- should dedup
 
-		local fh = io.open(L.ERRORS_LOG_FILE, "r")
+		local fh = io.open(L.today_errors_path(), "r")
 		local content = fh and (fh:read("*a") or "") or ""
 		if fh then fh:close() end
 
@@ -715,6 +712,6 @@ helpers.describe("Logger: errors-only sink (ERRORS_LOG_FILE)", function()
 		for _ in content:gmatch("repeated error line for dedup test") do count_raw = count_raw + 1 end
 		helpers.assert_true(count_raw <= 1, "dedup should suppress duplicate ERROR lines")
 
-		pcall(function() os.remove(L.ERRORS_LOG_FILE) end)
+		pcall(function() os.remove(L.today_errors_path()) end)
 	end)
 end)

@@ -60,15 +60,31 @@ _AKTE_KanaAltGrHoldPassesThrough() {
 Test("tap-holds: the Kana AltGr held as AltGr passes itself through (altgr-single-identity-2026-09-25)",
     _AKTE_KanaAltGrHoldPassesThrough)
 
+; The dynamic layer must retain the upstream physical identities: no RAlt
+; alias beside SC138, and no Kana-only criterion that loses standard AltGr.
 _AKTE_NavigationOwnsKanaEscape() {
-    Src := _StripFullLineComments(_DriverDirConcat("platform/remap"))
-    Q := Chr(34)
-    Label := RegExMatch(Src, "SC01D & ~SC138::[^\r\n]*\R\s*\*SC138::[^\r\n]*\R\{\R\s*ActionLayer\(" . Q . "\{Escape ")
-    Assert(Label > 0, "the navigation layer must emit Escape from one SC138 AltGr variant")
-    Assert(_AKTE_GoverningHotIf(Src, Label) = "#HotIf LayerEnabled",
-        "the navigation Escape must apply on every layout, Kana-style ones included")
-    Assert(!InStr(Src, "#HotIf LayerEnabled and _ALTGR_KANA_FIXUP"),
-        "a separate Kana navigation variant would duplicate the one SC138 Escape")
+    SharedDir := A_ScriptDir . "\..\..\_shared"
+    Ctx := KeymapLayers_LoadContext(SharedDir)
+    Text := '[_meta]' . Chr(10) . 'schema_version = 1' . Chr(10) . Chr(10)
+        . '[layers.nav.all]' . Chr(10) . '"AltRight" = "escape"' . Chr(10)
+    Result := KeymapLayers_Load("windows", Ctx, Text)
+    Assert(Result["ok"], "a layer binding Escape on AltRight must resolve for Windows")
+    Rows := NavLayer_BuildTable(Result["layers"][NAV_LAYER_ID], Ctx)
+    Physical := 0, Combined := 0
+    for Row in Rows {
+        AssertEqual("send:{Escape N}", Row["action"], Row["hotkey"] . " must emit navigation Escape")
+        AssertEqual(NAV_LAYER_CRITERION_LAYER, Row["criterion"], "both identities use the navigation gate")
+        AssertFalse(Row["kana_guard"], "a single physical identity needs no duplicate-event guard")
+        if (Row["hotkey"] == "*SC138")
+            Physical += 1
+        else if (Row["hotkey"] == "~SC01D & ~SC138")
+            Combined += 1
+        else
+            Assert(false, "unexpected AltGr alias: " . Row["hotkey"])
+    }
+    AssertEqual(1, Physical, "Kana and standard AltGr share one physical SC138 owner")
+    AssertEqual(1, Combined, "the Ctrl/AltGr combination preserves physical Ctrl")
+    AssertEqual(2, Rows.Length, "no virtual RAlt alias may duplicate navigation Escape")
 }
 Test("tap-holds: Kana SC138 owns navigation Escape exactly once (altgr-single-identity-2026-09-25)",
     _AKTE_NavigationOwnsKanaEscape)

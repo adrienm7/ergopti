@@ -20,18 +20,112 @@
 
 TestGestures_DefaultAssignments() {
     AssertTrue(GestureAssignments.Has("tap_3"), "tap_3 should exist")
-    AssertEqual("left_click_toggle", GestureAssignments["tap_3"], "tap_3 default")
-    AssertEqual("tab_new", GestureAssignments["swipe_3_up"], "swipe_3_up default")
-    AssertEqual("tab_close", GestureAssignments["swipe_3_down"], "swipe_3_down default")
-    AssertEqual("tab_prev", GestureAssignments["swipe_3_left"], "swipe_3_left default")
-    AssertEqual("tab_next", GestureAssignments["swipe_3_right"], "swipe_3_right default")
-    AssertEqual("screenshot_window_clipboard", GestureAssignments["tap_4"], "tap_4 default")
-    AssertEqual("win_app_next", GestureAssignments["swipe_4_up"], "swipe_4_up default")
-    AssertEqual("win_app_prev", GestureAssignments["swipe_4_down"], "swipe_4_down default")
-    AssertEqual("desktop_prev", GestureAssignments["swipe_4_left"], "swipe_4_left default")
-    AssertEqual("desktop_next", GestureAssignments["swipe_4_right"], "swipe_4_right default")
+    for Slot in GESTURE_SLOTS {
+        AssertTrue(GestureAssignments.Has(Slot), "every declared gesture must have a default")
+        AssertEqual("none", GestureAssignments[Slot], Slot . " starts neutral")
+    }
 }
 Test("Gestures: default assignments are populated", TestGestures_DefaultAssignments)
+
+; Every registry field participates in recognition; a missing modifier or native
+; family setting must not masquerade as a correctly configured touchpad.
+TestGestures_SystemConfigurationContract() {
+	global GESTURE_REG_ACTIONS, GESTURE_REG_KEY_PARAMS_NAMES, GESTURE_REG_KEY_PARAMS
+	global GESTURE_REG_ENABLE_NAMES, GESTURE_REG_CUSTOM_TAP_NAMES
+	global GESTURE_REG_CUSTOM_VALUE, GESTURE_REG_CUSTOM_TAP_VALUE
+	for Slot in GESTURE_SLOTS {
+		Family := InStr(Slot, "_3") ? "ThreeFinger" : "FourFinger"
+		Family .= SubStr(Slot, 1, 3) == "tap" ? "TapEnabled" : "SlideEnabled"
+		Values := Map(Family, GESTURE_REG_CUSTOM_VALUE,
+			GESTURE_REG_ACTIONS[Slot], GESTURE_REG_CUSTOM_VALUE,
+			GESTURE_REG_KEY_PARAMS_NAMES[Slot], GESTURE_REG_KEY_PARAMS[Slot])
+		if GESTURE_REG_ENABLE_NAMES.Has(Slot)
+			Values[GESTURE_REG_ENABLE_NAMES[Slot]] := GESTURE_REG_CUSTOM_VALUE
+		if GESTURE_REG_CUSTOM_TAP_NAMES.Has(Slot)
+			Values[GESTURE_REG_CUSTOM_TAP_NAMES[Slot]] := GESTURE_REG_CUSTOM_TAP_VALUE
+		Read := (Name) => Values.Get(Name, "")
+		AssertTrue(GestureSystemSlotConfigured(Slot, Read), Slot . " configured")
+		for Name, Expected in Values.Clone() {
+			Values.Delete(Name)
+			AssertFalse(GestureSystemSlotConfigured(Slot, Read), Slot . " requires " . Name)
+			Values[Name] := Expected + 1
+			AssertFalse(GestureSystemSlotConfigured(Slot, Read), Slot . " rejects wrong " . Name)
+			Values[Name] := Expected
+		}
+	}
+	AssertEqual("swipe_3", GestureSystemGroup("swipe_3_left"), "group shares dismissal")
+	AssertEqual("swipe_3", GestureSystemGroup("swipe_3_right"), "opposite direction shares dismissal")
+	AssertEqual("tap_3", GestureSystemGroup("tap_3"), "tap dismissal remains separate")
+}
+Test("Gestures: system configuration requires every native registry field", TestGestures_SystemConfigurationContract)
+
+; A failed read invalidates the snapshot and must never publish partial success.
+TestGestures_SystemSnapshotRefusal() {
+	State := GestureSystemState()
+	PreviousSlots := State["slots"]
+	PreviousReady := State["ready"]
+	try {
+		AssertTrue(GestureSystemRefresh(false, (Name) => ""), "absent settings are a complete unconfigured snapshot")
+		AssertTrue(State["ready"], "completed snapshot is available")
+		for Slot in GESTURE_SLOTS
+			AssertFalse(State["slots"][Slot], Slot . " absent is not configured")
+		Snapshot := State["slots"]
+		AssertFalse(GestureSystemRefresh(false, TestGestures_RefuseSystemRead), "read refusal propagates")
+		AssertFalse(State["ready"], "refusal exposes unknown status")
+		AssertTrue(State["slots"] == Snapshot, "partial replacement was not published")
+	} finally {
+		State["slots"] := PreviousSlots
+		State["ready"] := PreviousReady
+	}
+}
+
+TestGestures_RefuseSystemRead(Name) {
+	throw Error("native registry read refused")
+}
+Test("Gestures: system snapshot refusal cannot publish partial success", TestGestures_SystemSnapshotRefusal)
+
+; Close callbacks cannot retire another notice or run a reload callback twice.
+TestGestures_SystemNoticeOwnership() {
+	State := GestureSystemState()
+	Windows := State["windows"]
+	Callbacks := State["callbacks"]
+	Observed := Map("destroyed", 0, "done", 0)
+	Notice := { Destroy: (*) => Observed["destroyed"] += 1 }
+	try {
+		State["windows"] := Map("swipe_3", Notice)
+		State["callbacks"] := Map("swipe_3", [(*) => Observed["done"] += 1])
+		AssertFalse(GestureSystemFinishNotice("swipe_3", {}, "close"), "stale owner refused")
+		AssertEqual(0, Observed["done"], "stale notice cannot reload")
+		AssertTrue(GestureSystemFinishNotice("swipe_3", Notice, "close"), "owned close accepted")
+		AssertEqual(1, Observed["destroyed"], "notice destroyed once")
+		AssertEqual(1, Observed["done"], "completion delivered once")
+		AssertFalse(GestureSystemFinishNotice("swipe_3", Notice, "close"), "duplicate close refused")
+		AssertEqual(1, Observed["done"], "duplicate close cannot reload twice")
+	} finally {
+		State["windows"] := Windows
+		State["callbacks"] := Callbacks
+	}
+}
+Test("Gestures: system notices retain exact group ownership", TestGestures_SystemNoticeOwnership)
+
+; A previous good value cannot suppress a warning after its refresh was refused.
+TestGestures_SystemAssignmentReadiness() {
+	State := GestureSystemState()
+	PreviousSlots := State["slots"]
+	PreviousReady := State["ready"]
+	try {
+		State["slots"] := Map("tap_3", true)
+		State["ready"] := false
+		AssertTrue(GestureSystemAssignmentNeedsWarning("tap_3"), "unverified old cache cannot suppress warning")
+		State["ready"] := true
+		AssertFalse(GestureSystemAssignmentNeedsWarning("tap_3"), "confirmed native mapping needs no warning")
+		AssertTrue(GestureSystemAssignmentNeedsWarning("tap_4"), "unconfigured sibling still needs warning")
+	} finally {
+		State["slots"] := PreviousSlots
+		State["ready"] := PreviousReady
+	}
+}
+Test("Gestures: system assignment warning requires a current snapshot", TestGestures_SystemAssignmentReadiness)
 
 TestGestures_AllSlotsHaveLabels() {
     for Slot in GESTURE_SLOTS {
@@ -86,29 +180,21 @@ Test("Gestures: reversal-relevant 4-finger slots are configured", TestGestures_R
 ; ==================================
 ; ==================================
 
-; Helper � separators (``--``) and section headers (``#�``) are visual-only
-; entries in GESTURE_ACTION_NAMES; they intentionally have no matching record
-; in the GESTURE_ACTIONS registry and must be filtered out before assertions
-; that walk the registry.
-_GestureIsRealAction(name) {
-    return name != "--" and SubStr(name, 1, 1) != "#"
-}
-
+; The ordered ids the picker lists come from the generated catalogue
+; (_generated/action_catalogue.ahk) with the modifier-chord block expanded, so
+; every assertion below walks exactly what a user can pick.
 TestGestures_AllActionNamesInRegistry() {
-    for ActionName in GESTURE_ACTION_NAMES {
-        if !_GestureIsRealAction(ActionName)
-            continue
+    Ids := GestureActionPickerIds()
+    Assert(Ids.Length >= 500, "the picker lists only " . Ids.Length . " action(s) — the catalogue walk collapsed")
+    for ActionName in Ids
         AssertTrue(GESTURE_ACTIONS.Has(ActionName), "missing action in registry: " . ActionName)
-    }
 }
 Test("Gestures: all action names exist in registry", TestGestures_AllActionNamesInRegistry)
 
 TestGestures_ActionsHaveProperties() {
-    for ActionName in GESTURE_ACTION_NAMES {
-        if !_GestureIsRealAction(ActionName)
-            continue
+    for ActionName in GestureActionPickerIds() {
         Action := GESTURE_ACTIONS[ActionName]
-        ; Labels are no longer stored on the action object � they come from
+        ; Labels are not stored on the action object — they come from
         ; _GestureActionLabel() (i18n), which falls back to the raw key name
         AssertTrue(StrLen(_GestureActionLabel(ActionName)) > 0, "missing Label for: " . ActionName)
         AssertTrue(Action.HasOwnProp("Fn"), "missing Fn for: " . ActionName)
@@ -116,23 +202,38 @@ TestGestures_ActionsHaveProperties() {
 }
 Test("Gestures: every action has Label and Fn properties", TestGestures_ActionsHaveProperties)
 
+; The picker headings used to be the literal "#Raccourcis" and
+; "##Raccourcis <mods>", French in every locale. They are now locale keys, and
+; the group heading places the language-neutral modifier label through {1}.
 TestGestures_SharedModifierChordsAreRegisteredAndLabelled() {
-    global GESTURE_ACTION_NAMES
-    if (GESTURE_ACTION_NAMES.Length = 0)
-        _GestureLoadActionCatalog()
     for Name in ["ctrl_a", "ctrl_alt_a", "ctrl_shift_alt_win_enter"]
         AssertTrue(GESTURE_ACTIONS.Has(Name), "missing shared modifier action: " . Name)
     AssertEqual("Ctrl + A", _GestureActionLabel("ctrl_a"), "Ctrl+A label must never expose the internal id")
     AssertEqual("Ctrl + Alt + A", _GestureActionLabel("ctrl_alt_a"), "multi-modifier label must use the shared format")
     AssertEqual("Ctrl + Shift + Alt + Win + Enter", _GestureActionLabel("ctrl_shift_alt_win_enter"), "full modifier matrix must include special keys")
+    ChordsTitle := t("sg_actions.sg_order.header.modifier_chords")
+    GroupTemplate := t("sg_actions.sg_order.header.modifier_chord_group")
+    AssertTrue(ChordsTitle != "sg_actions.sg_order.header.modifier_chords", "the chord heading key must resolve")
+    AssertTrue(InStr(GroupTemplate, "{1}") > 0, "the chord group heading must place the modifier label")
+    CtrlTitle := StrReplace(GroupTemplate, "{1}", "Ctrl")
     HasShortcutsH1 := false
     HasCtrlH2 := false
-    for Name in GESTURE_ACTION_NAMES {
-        HasShortcutsH1 := HasShortcutsH1 || (Name = "#Raccourcis")
-        HasCtrlH2 := HasCtrlH2 || (Name = "##Raccourcis Ctrl")
+    CtrlH2FollowedByCtrlA := false
+    Items := GestureActionPickerItems()
+    for Index, Item in Items {
+        if (Item.Type != "heading")
+            continue
+        AssertFalse(InStr(Item.Text, "sg_actions.") = 1, "a heading shows its raw key: " . Item.Text)
+        HasShortcutsH1 := HasShortcutsH1 || (Item.Level = 1 && Item.Text == ChordsTitle)
+        if (Item.Level = 2 && Item.Text == CtrlTitle) {
+            HasCtrlH2 := true
+            CtrlH2FollowedByCtrlA := Items.Length > Index && Items[Index + 1].Type = "action"
+                && Items[Index + 1].Id = "ctrl_a"
+        }
     }
-    AssertTrue(HasShortcutsH1, "modifier actions must be under the Raccourcis H1")
-    AssertTrue(HasCtrlH2, "Ctrl actions must be under the Raccourcis Ctrl H2")
+    AssertTrue(HasShortcutsH1, "modifier actions must be under the localized shortcuts H1")
+    AssertTrue(HasCtrlH2, "Ctrl actions must be under the localized Ctrl H2")
+    AssertTrue(CtrlH2FollowedByCtrlA, "the Ctrl H2 must head its own chords")
 }
 Test("Gestures: shared modifier chords are registered and labelled", TestGestures_SharedModifierChordsAreRegisteredAndLabelled)
 
@@ -202,23 +303,27 @@ TestGestures_ToggleUIRejectsLiveActivationRefusal() {
 Test("Gestures: toggle surfaces a live activation refusal (gesture-toggle-activation-race)",
 	TestGestures_ToggleUIRejectsLiveActivationRefusal)
 
+; Catalogue <-> registry parity, both directions. A listed id with no handler
+; is a binding that does nothing when it fires; a registered handler the
+; catalogue does not list is a feature nobody can bind. The generated catalogue
+; is filtered to this platform by the codegen, so the two sets must be equal.
 TestGestures_RegistrySizeMatchesNames() {
-    ; Ensure GESTURE_ACTION_NAMES is populated — SetTimer(-0) defers the
-    ; catalog load past the synchronous test phase in headless CI runners.
-    if (GESTURE_ACTION_NAMES.Length = 0)
-        _GestureLoadActionCatalog()
-    ; Filter the visual sentinels from GESTURE_ACTION_NAMES before comparing
-    ; with GESTURE_ACTIONS.Count � every real action must have exactly one
-    ; entry in both lists, but separators and headers live only on the menu
-    ; (NAMES) side and never bubble up into the registry (ACTIONS).
-    ExpectedCount := 0
-    for ActionName in GESTURE_ACTION_NAMES {
-        if _GestureIsRealAction(ActionName)
-            ExpectedCount += 1
+    Listed := Map()
+    for ActionName in GestureActionPickerIds() {
+        AssertFalse(Listed.Has(ActionName), "the picker lists '" . ActionName . "' twice")
+        Listed[ActionName] := true
     }
-    AssertEqual(ExpectedCount, GESTURE_ACTIONS.Count, "registry size mismatch (real actions only)")
+    Hidden := []
+    for ActionName in GESTURE_ACTIONS {
+        if !Listed.Has(ActionName)
+            Hidden.Push(ActionName)
+    }
+    AssertEqual(0, Hidden.Length, "registered but never listed: " . (Hidden.Length ? Hidden[1] : ""))
+    AssertEqual(Listed.Count, GESTURE_ACTIONS.Count, "catalogue and registry must be the same set")
+    AssertEqual(0, GESTURE_ACTION_CATALOGUE.AxItems.Length,
+        "Windows has no axis dispatcher, so its catalogue must offer no axis action")
 }
-Test("Gestures: action count matches GESTURE_ACTION_NAMES length", TestGestures_RegistrySizeMatchesNames)
+Test("Gestures: the generated catalogue and the registry are the same set (action-catalogue-parity)", TestGestures_RegistrySizeMatchesNames)
 
 
 
@@ -267,8 +372,6 @@ Test("Gestures: GestureSaveAssignment updates map", TestGestures_SaveAssignmentU
 TestGestures_ParameterizedActionValuesAreBindingScoped() {
     global GestureActionParameters
 
-    if (GESTURE_ACTION_PARAMETER_SPECS.Count = 0)
-        _GestureLoadActionCatalog()
     AssertEqual("url", GestureActionParameterSpec("open_url"), "open_url parameter metadata")
     AssertEqual("search_url", GestureActionParameterSpec("search_web"), "search_web parameter metadata")
 

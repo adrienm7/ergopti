@@ -93,6 +93,9 @@ _TDL_EmitCarriesEveryField() {
 	Assert(InStr(Found[1], "driver=windows"), Found[1])
 	Assert(InStr(Found[1], "boot_ms=812"), Found[1])
 	Assert(InStr(Found[1], "runtime=" . Chr(34) . "AutoHotkey " . A_AhkVersion . Chr(34)), Found[1])
+	; The logs folder comes from the logger's resolver, redacted like the config.
+	Assert(InStr(Found[1], "logs_dir=" . DiagSnapshot_RedactHome(LoggerLogsDir(), EnvGet("USERPROFILE"))),
+		"logs_dir must name the resolved logs folder: " . Found[1])
 	Profile := EnvGet("USERPROFILE")
 	SplitPath(Profile, &Account)
 	if (Account != "")

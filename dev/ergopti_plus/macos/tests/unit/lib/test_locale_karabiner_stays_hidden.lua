@@ -64,7 +64,7 @@ local function tray_keys()
 					end
 				end
 				if for_hs then
-					for _, field in ipairs({ "i18n", "i18n_on", "i18n_off" }) do
+					for _, field in ipairs({ "i18n" }) do
 						if type(row[field]) == "string" then seen[row[field]] = true end
 					end
 				end

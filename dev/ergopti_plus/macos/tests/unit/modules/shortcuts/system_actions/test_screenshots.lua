@@ -15,14 +15,14 @@ local run_screenshot_deferred = fixture.run_screenshot_deferred
 local spawn_of = fixture.spawn_of
 local argv_of = fixture.argv_of
 
-helpers.describe("shortcuts.actions.system: bind_instant_screenshot defers exec (shortcuts-actions-1 regression)", function()
+helpers.describe("shortcuts.actions.system: the tap-key capture defers exec (shortcuts-actions-1 regression)", function()
 
 	helpers.it("invoking the eventtap callback does NOT call hs.execute inline", function()
 		with_fixture(function()
 			local _sys, spy = make_sys_screenshot_spies()
-			_sys.bind_instant_screenshot()
+			_sys.bind_tap_keys(nil, fixture.capture_on_keycode_10(_sys))
 
-			helpers.assert_true(spy.captured_cb ~= nil, "bind_instant_screenshot must register an eventtap callback")
+			helpers.assert_true(spy.captured_cb ~= nil, "bind_tap_keys must register an eventtap callback")
 
 			-- Simulate the @ key with no modifiers
 			local fake_event = as_physical({
@@ -39,7 +39,7 @@ helpers.describe("shortcuts.actions.system: bind_instant_screenshot defers exec 
 	helpers.it("invoking the eventtap callback launches the capture work as a subprocess", function()
 		with_fixture(function()
 			local _sys, spy = make_sys_screenshot_spies()
-			_sys.bind_instant_screenshot()
+			_sys.bind_tap_keys(nil, fixture.capture_on_keycode_10(_sys))
 
 			local fake_event = as_physical({
 				getKeyCode = function() return 10 end,
@@ -69,7 +69,7 @@ helpers.describe("shortcuts.actions.system: bind_instant_screenshot defers exec 
 	helpers.it("the capture runs only after the directory has been created", function()
 		with_fixture(function()
 			local _sys, spy = make_sys_screenshot_spies()
-			_sys.bind_instant_screenshot()
+			_sys.bind_tap_keys(nil, fixture.capture_on_keycode_10(_sys))
 
 			local fake_event = as_physical({
 				getKeyCode = function() return 10 end,
@@ -108,7 +108,7 @@ helpers.describe("shortcuts.actions.system: bind_instant_screenshot defers exec 
 end)
 
 
-helpers.describe("shortcuts.actions.system: bind_instant_screenshot guards nil window ID (shortcuts-actions-2 regression)", function()
+helpers.describe("shortcuts.actions.system: the tap-key capture guards nil window ID (shortcuts-actions-2 regression)", function()
 
 	helpers.it("does NOT run screencapture when window id is nil", function()
 		with_fixture(function()
@@ -118,7 +118,7 @@ helpers.describe("shortcuts.actions.system: bind_instant_screenshot guards nil w
 				end,
 			}
 			local _sys, spy = make_sys_screenshot_spies(nil_id_window)
-			_sys.bind_instant_screenshot()
+			_sys.bind_tap_keys(nil, fixture.capture_on_keycode_10(_sys))
 
 			local fake_event = as_physical({
 				getKeyCode = function() return 10 end,
@@ -151,7 +151,7 @@ helpers.describe("shortcuts.actions.system: bind_instant_screenshot guards nil w
 			local _sys, spy = make_sys_screenshot_spies({
 				frontmostWindow = function() return { id = function() return nil end } end,
 			})
-			_sys.bind_instant_screenshot()
+			_sys.bind_tap_keys(nil, fixture.capture_on_keycode_10(_sys))
 
 			spy.captured_cb(as_physical({
 				getKeyCode = function() return 10 end,

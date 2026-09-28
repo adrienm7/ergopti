@@ -106,7 +106,20 @@
 	function apply(strings) {
 		// Store globally so page scripts can call _t(key) for dynamic content
 		window._i18n_strings = strings;
+		apply_to_dom(strings);
+		announce_applied();
+	}
 
+	// A page that builds text from data rather than from data-i18n attributes
+	// (the layer editor's keys and actions) cannot know when the strings have
+	// landed; it redraws on this event. Every host's engine has CustomEvent; the
+	// Node test stubs of this file may not, and then there is no page to tell.
+	function announce_applied() {
+		if (typeof document.dispatchEvent !== 'function' || typeof CustomEvent !== 'function') return;
+		document.dispatchEvent(new CustomEvent('i18n:applied'));
+	}
+
+	function apply_to_dom(strings) {
 		// data-i18n → textContent
 		document.querySelectorAll('[data-i18n]').forEach(function (el) {
 			var key = el.getAttribute('data-i18n');
@@ -191,7 +204,8 @@
 		}
 
 		function finish(strings) {
-			apply(strings);
+			// Pages extend this public hook to translate their dynamic content too.
+			window.i18n_apply(strings);
 			var missing = unresolved_keys(strings);
 			if (missing.length > 0) {
 				// Named, not counted: a key no locale in the chain resolves is a

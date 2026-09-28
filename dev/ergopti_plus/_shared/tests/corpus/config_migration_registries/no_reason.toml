@@ -1,0 +1,16 @@
+# _shared/tests/corpus/config_migration_registries/no_reason.toml
+#
+# A step gives no reason.
+
+[registry]
+current_version = 2
+unstamped_version = 1
+
+[steps.v1_to_v2]
+from = 1
+to = 2
+drivers = ["ahk", "hs", "linux"]
+reason = ""
+ops = [
+	{ op = "delete", section = "gestures", key = "space_wrap" },
+]

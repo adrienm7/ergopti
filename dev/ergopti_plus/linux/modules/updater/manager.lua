@@ -5,23 +5,36 @@
 --- DESCRIPTION:
 --- Self-update engine for the Linux driver. Checks the GitHub Releases API,
 --- compares versions via the shared semver module, downloads the latest asset,
---- verifies integrity, and performs self-replacement. Supports channel switching
---- (stable → dev, dev → stable) and background polling at a configurable interval.
+--- verifies integrity, and performs self-replacement. Owns the subscribed update
+--- channel (any channel of the shared registry) and background polling at a
+--- configurable interval.
 ---
---- Persists user preferences (channel, interval, last notified tag) via the
---- storage adapter so settings survive daemon restarts.
+--- The channel and the check interval are config.toml [updater] channel and
+--- check_interval_seconds, like on the other drivers; the check record (last
+--- check, failures, seed, last notified tag) is runtime state in the Storage
+--- port under the shared key.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Event-loop-owned transport: the shared Linux HTTP adapter spawns curl
 ---    through libuv. Release checks therefore never block keyboard processing.
 --- 2. ETag caching: stores the GitHub ETag header per channel in a temp file
 ---    so background checks that return 304 Not Modified do not count against
----    the API rate limit.
+---    the API rate limit. A 304 has no body: it reuses the list this process
+---    read, and a request is conditional only while that list is held, so the
+---    first request after a start is a full one.
 --- 3. Shared parser: delegates JSON parsing to _shared/lua/updater/release_parser.lua
 ---    which requires no full JSON decoder.
---- 4. Version compare: delegates to _shared/lua/updater/version.lua (semver).
---- 5. Background poller: uses the timer_scheduler adapter (luv-based when
----    available) with a graceful fallback message when luv is absent.
+--- 4. Shared channels: every channel reads the same release list and keeps its
+---    latest release through _shared/lua/updater/channels.lua (the registry in
+---    _shared/modules/updater/channels.json); version order comes from
+---    _shared/lua/updater/version.lua.
+--- 5. Background schedule: _shared/lua/updater/schedule.lua decides from the
+---    wall clock and the persisted record, so a restart mid-interval does not
+---    check at boot and a machine off past its due time catches up after the
+---    boot delay. luv timers are monotonic and stop during a suspend, so every
+---    timer is bounded by reevaluate_sec and each evaluation re-reads the wall
+---    clock; a gap longer than the timer is a wake, which restarts the boot
+---    delay. Paused: nothing is dispatched and the record is left as it is.
 --- 6. Self-replace: downloads the latest archive, extracts it, and replaces
 ---    the running binary. A .old backup is kept so the user can revert.
 --- ==============================================================================
@@ -32,8 +45,12 @@ local Logger    = require("logger.shim")
 local Paths     = require("infra.paths")
 local Version   = require("updater.version")
 local Parser    = require("updater.release_parser")
+local Channels  = require("updater.channels")
+local Schedule  = require("updater.schedule")
 local Installer = require("modules.updater.installer")
 local Json      = require("json")
+local TomlCodec = require("toml_codec")
+local TomlWriter = require("toml_codec.writer")
 local Fs        = require("adapters.file_system")
 local HttpClient = require("adapters.http_client")
 local FileDigest = require("adapters.file_digest")
@@ -99,8 +116,44 @@ local _defs = load_updater_defaults()
 local GH_OWNER = (_defs.github and _defs.github.owner) or _DEFAULTS_FALLBACK.github.owner
 local GH_REPO  = (_defs.github and _defs.github.repo)  or _DEFAULTS_FALLBACK.github.repo
 
--- How many prerelease pages to fetch for the dev channel.
-local DEV_PAGE_SIZE = 10
+--- Resolves the release list every channel reads. No fallback: /releases/latest
+--- ignores prereleases and answers 404 while a channel has no release, which is
+--- the failure this list replaced.
+--- @param defs table Parsed updater defaults.
+--- @return string url
+local function require_check_releases_url(defs)
+	local check = type(defs) == "table" and defs.update_check or nil
+	local template = type(check) == "table" and check.releases_url or nil
+	if type(template) ~= "string" or not template:find("{owner}/{repo}", 1, true)
+		or not template:match("^https://api%.github%.com/") then
+		error("updater defaults do not declare update_check.releases_url", 0)
+	end
+	return (template:gsub("{owner}", function() return GH_OWNER end)
+		:gsub("{repo}", function() return GH_REPO end))
+end
+
+local CHECK_RELEASES_URL = require_check_releases_url(_defs)
+
+--- Loads the shared update-channel registry. Unlike the timing defaults it has
+--- no fallback: a guessed channel list could offer another channel's artifacts.
+--- @return table registry updater.channels interpreter.
+local function load_channel_registry()
+	local path = Paths.shared("modules/updater/channels.json")
+	local raw = path and Fs.read(path) or nil
+	if type(raw) ~= "string" then error("the shared update channel registry is unreadable", 0) end
+	local registry, err = Channels.load(Json.decode(raw))
+	if not registry then error("the shared update channel registry is invalid: " .. tostring(err), 0) end
+	return registry
+end
+
+local CHANNELS = load_channel_registry()
+M.CHANNELS = CHANNELS
+
+-- The config.toml section and keys of the subscribed channel and the check
+-- interval, as on the other drivers.
+local CONFIG_SECTION = "updater"
+local CONFIG_CHANNEL_KEY = "channel"
+local CONFIG_INTERVAL_KEY = "check_interval_seconds"
 
 -- User-Agent header required by GitHub API.
 local USER_AGENT = "ErgoptiPlus-Updater-Linux/1.0"
@@ -111,21 +164,41 @@ local DOWNLOAD_TIMEOUT_MS = 5 * 60 * 1000
 local MAX_DOWNLOAD_BYTES = 256 * 1024 * 1024
 local MAX_CHECKSUM_BODY_BYTES = 4096
 
--- Interval presets (same as macOS).
-M.INTERVAL_PRESETS = {
-	{ code = "1m",    seconds = 60 },
-	{ code = "5m",    seconds = 300 },
-	{ code = "10m",   seconds = 600 },
-	{ code = "1h",    seconds = 3600 },
-	{ code = "2h",    seconds = 7200 },
-	{ code = "3h",    seconds = 10800 },
-	{ code = "6h",    seconds = 21600 },
-	{ code = "12h",   seconds = 43200 },
-	{ code = "24h",   seconds = 86400 },
-	{ code = "2d",    seconds = 172800 },
-	{ code = "7d",    seconds = 604800 },
-	{ code = "never", seconds = 0 },
-}
+--- Resolves the automatic-check timing (presets, backoff, jitter). No fallback:
+--- a guessed preset list would tick a row that does not match the cadence.
+--- @param defs table Parsed updater defaults.
+--- @return table timing defaults.json timing, validated by updater.schedule.
+local function require_timing(defs)
+	local timing = type(defs) == "table" and defs.timing or nil
+	local ok, err = Schedule.validate_timing(timing)
+	if not ok then error("updater defaults declare an invalid timing: " .. tostring(err), 0) end
+	return timing
+end
+
+local TIMING = require_timing(_defs)
+M.TIMING = TIMING
+
+--- Resolves the Storage key of the check record. No fallback: two keys would
+--- split the record and re-announce a release after every restart.
+--- @param defs table Parsed updater defaults.
+--- @return string key
+local function require_state_key(defs)
+	local section = type(defs) == "table" and defs.check_state or nil
+	local key = type(section) == "table" and section.storage_key or nil
+	if type(key) ~= "string" or key == "" then
+		error("updater defaults do not declare check_state.storage_key", 0)
+	end
+	return key
+end
+
+local CHECK_STATE_KEY = require_state_key(_defs)
+M.CHECK_STATE_KEY = CHECK_STATE_KEY
+
+-- Wall clock in epoch seconds; a test seam.
+M._now = os.time
+
+-- The shared frequency presets in display order, never last (defaults.json).
+M.INTERVAL_PRESETS = TIMING.check_interval_presets
 
 --- Resolves the exact self-update asset emitted by release CI. Unlike timing
 --- defaults, this value has no fallback: guessing an asset can install a .deb,
@@ -166,7 +239,7 @@ M.LINUX_CHECKSUM_ASSET_NAME = LINUX_CHECKSUM_ASSET_NAME
 -- Path for the ETag cache (one per channel).
 local function etag_cache_path(channel)
 	local home = require("infra.config_paths").home()
-	return home .. "/.cache/ergopti_updater_etag_" .. (channel or "stable") .. ".txt"
+	return home .. "/.cache/ergopti_updater_etag_" .. channel .. ".txt"
 end
 
 -- =========================================
@@ -177,12 +250,18 @@ end
 
 local _state           = "idle"    -- "idle" | "checking" | "available" | "downloading" | "installing"
 local _cached_release  = nil       -- { tag, notes, download_url, published_at, prerelease }
-local _last_notified   = ""        -- last tag we showed a tray notification for
-local _session_notified = ""       -- throttles repeats when persistence is unavailable
-local _bg_timer_handle = nil       -- timer_scheduler handle for background polling
-local _boot_timer_handle = nil     -- one-shot boot-check handle
+local _list_cache      = {}        -- channel -> the last release list a 200 returned
+local _bg_timer_handle = nil       -- the one armed schedule timer (timer_scheduler handle)
+local _check_state     = nil       -- persisted check record (updater.schedule); loaded on first use
+local _started_at      = nil       -- wall clock of the schedule start or of the last detected wake
+local _armed_at        = nil       -- wall clock when the schedule timer was last armed
+local _armed_for       = nil       -- its delay in seconds
+local _is_paused       = nil       -- pause predicate injected by init()
+local _on_available    = nil       -- "a new release was found" callback injected by init()
 local _check_interval  = DEFAULT_INTERVAL_SEC
-local _channel         = nil -- "stable" | "dev"; resolved below, then by init()
+local _channel         = nil       -- registry channel id; resolved at the end of this file
+local _config_path     = nil       -- config.toml holding [updater] channel; set by init()
+local _channel_persisted = false   -- whether config.toml names the channel (else it is the default)
 local _installed_launcher = nil  -- wrapper of the installation an update replaced
 local _download_part   = nil
 local _download_dest   = nil
@@ -208,25 +287,144 @@ local function _storage_set(key, value)
 	return false
 end
 
---- The channel an installation follows until the user picks one: the one its
---- own version was published on, as on macOS. A prerelease build ("-dev.N")
---- follows prereleases; on "stable" it asked /releases/latest, which never
---- lists a prerelease, and so found no update at all (HTTP 404).
---- @return string "stable" | "dev"
-function M.default_channel()
-	local version = tostring(M.current_version())
-	if version == "local" or version:match("%-dev%.") then return "dev" end
-	return "stable"
+--- Resolves the subscribed channel of a decoded config.toml through the
+--- registry (a hand-written alias such as "stable" reads as its channel).
+--- @param config table Decoded config.toml.
+--- @param mark function|nil mark(...segments), called for the key it takes.
+--- @return string|nil id Channel id, or nil when the key is absent or unknown.
+--- @return any raw The persisted value, for the caller's log line.
+local function _channel_from_config(config, mark)
+	local section = config[CONFIG_SECTION]
+	local raw = type(section) == "table" and section[CONFIG_CHANNEL_KEY] or nil
+	if raw == nil then return nil, nil end
+	local id = CHANNELS.resolve(raw)
+	if id and mark then mark(CONFIG_SECTION, CONFIG_CHANNEL_KEY) end
+	return id, raw
 end
 
-local function _load_persisted()
-	local stored = _storage_get("updater.channel", nil)
-	_channel = (stored == "stable" or stored == "dev") and stored or M.default_channel()
-	local interval = _storage_get("updater.interval_sec", nil)
-	if type(interval) == "number" and interval >= 0 then
-		_check_interval = interval
+--- Reads the subscribed channel from config.toml [updater] channel. An absent
+--- file or key yields nil; an unreadable file or an unknown value is logged and
+--- yields nil, so the installed build's channel is followed.
+--- @param path string|nil config.toml path.
+--- @return string|nil id
+local function _read_persisted_channel(path)
+	if type(path) ~= "string" or path == "" then return nil end
+	local content = Fs.read(path)
+	if content == nil then return nil end
+	local ok, config = pcall(TomlCodec.decode, content)
+	if not ok or type(config) ~= "table" then
+		Logger.error(LOG, "config.toml could not be parsed; the update channel follows the installed build.")
+		return nil
 	end
-	_last_notified = _storage_get("updater.last_notified", "")
+	local id, raw = _channel_from_config(config)
+	if raw ~= nil and not id then
+		Logger.warn(LOG, "config.toml names an unknown update channel '%s'; following the installed build.",
+			tostring(raw))
+	end
+	return id
+end
+
+--- Marks the config.toml paths the updater takes, through the walk init() uses,
+--- so the unused-key cleanup never offers the subscribed channel.
+--- @param config table Decoded config.toml.
+--- @param mark function mark(...segments) from config_unused_keys.
+function M.mark_config_reads(config, mark)
+	if type(mark) ~= "function" or type(config) ~= "table" then
+		error("updater.mark_config_reads needs a decoded config and a mark function", 2)
+	end
+	_channel_from_config(config, mark)
+	local section = config[CONFIG_SECTION]
+	if type(section) == "table" and section[CONFIG_INTERVAL_KEY] ~= nil then
+		mark(CONFIG_SECTION, CONFIG_INTERVAL_KEY)
+	end
+end
+
+--- Reads config.toml [updater] check_interval_seconds, snapped to the nearest
+--- shared preset. An absent file or key yields the shared default; a value that
+--- is not a whole number of seconds is logged and yields the default.
+--- @param path string|nil config.toml path.
+--- @return number seconds
+local function _read_persisted_interval(path)
+	if type(path) ~= "string" or path == "" then return DEFAULT_INTERVAL_SEC end
+	local content = Fs.read(path)
+	if content == nil then return DEFAULT_INTERVAL_SEC end
+	local ok, config = pcall(TomlCodec.decode, content)
+	if not ok or type(config) ~= "table" then return DEFAULT_INTERVAL_SEC end
+	local section = config[CONFIG_SECTION]
+	local raw = type(section) == "table" and section[CONFIG_INTERVAL_KEY] or nil
+	if raw == nil then return DEFAULT_INTERVAL_SEC end
+	if type(raw) ~= "number" or raw < 0 or raw ~= math.floor(raw) then
+		Logger.warn(LOG, "config.toml check_interval_seconds '%s' is not a whole number of seconds; using %ds.",
+			tostring(raw), DEFAULT_INTERVAL_SEC)
+		return DEFAULT_INTERVAL_SEC
+	end
+	local seconds, code, snapped = Schedule.snap_interval(raw, TIMING)
+	if snapped then
+		Logger.warn(LOG, "config.toml check_interval_seconds %ds is not a frequency preset — using the nearest one, %ds (%s).",
+			raw, seconds, code)
+	end
+	return seconds
+end
+
+--- Saves the check record. A refused write still advances this session's
+--- copy, so a failing Storage port cannot turn every evaluation into a check.
+--- @param state table Sanitized record.
+--- @return boolean saved
+local function _save_check_state(state)
+	_check_state = state
+	if _storage_set(CHECK_STATE_KEY, state) then return true end
+	Logger.error(LOG, "The update-check record could not be saved; this session keeps its copy.")
+	return false
+end
+
+--- Returns the check record, loading it once. Invalid fields are dropped with a
+--- warning; a missing install seed (for the per-install jitter) is created.
+--- @return table state
+local function _load_check_state()
+	if _check_state then return _check_state end
+	local state, dropped = Schedule.sanitize_state(_storage_get(CHECK_STATE_KEY, nil))
+	for _, field in ipairs(dropped) do
+		Logger.warn(LOG, "Dropped the invalid '%s' of the stored update-check record.", field)
+	end
+	_check_state = state
+	if state.seed == nil then
+		-- Spread, not secrecy: installs first run at different times.
+		state.seed = string.format("%08x%08x", M._now() % 4294967296, math.floor(os.clock() * 1000000) % 4294967296)
+		_save_check_state(state)
+	end
+	Logger.debug(LOG, "Update-check record loaded (last check %s, failures %d).",
+		tostring(state.last_check_at or "never"), state.failures or 0)
+	return state
+end
+
+M._load_check_state = _load_check_state
+
+local function _load_persisted()
+	local persisted = _read_persisted_channel(_config_path)
+	_channel_persisted = persisted ~= nil
+	_channel = persisted or M.installed_channel()
+	_check_interval = _read_persisted_interval(_config_path)
+	_check_state = nil
+	_load_check_state()
+end
+
+--- Writes the subscribed channel to config.toml through the shared TOML writer.
+--- @param id string Registry channel id.
+--- @return boolean committed
+local function _persist_channel(id)
+	if type(_config_path) ~= "string" or _config_path == "" then
+		Logger.error(LOG, "Update channel '%s' cannot be saved: the updater has no config path (init not run).", id)
+		return false
+	end
+	local call_ok, committed, err = pcall(TomlWriter.batch_write, _config_path, {
+		{ section = CONFIG_SECTION, key = CONFIG_CHANNEL_KEY, value = id },
+	})
+	if not call_ok or committed ~= true then
+		Logger.error(LOG, "Update channel '%s' could not be written to config.toml: %s.", id,
+			tostring(call_ok and err or committed))
+		return false
+	end
+	return true
 end
 
 -- =========================================
@@ -235,17 +433,12 @@ end
 -- =========================================
 -- =========================================
 
---- Builds the GitHub Releases API URL for a given channel.
---- Stable → /releases/latest (single object)
---- Dev    → /releases?per_page=N (sorted array, newest first)
---- @param channel string "stable" | "dev"
+--- Returns the GitHub Releases list every channel reads (defaults.json
+--- update_check.releases_url). Each channel keeps its own latest release from
+--- it through the shared registry.
 --- @return string URL
-function M.release_api_url(channel)
-	local base = "https://api.github.com/repos/" .. GH_OWNER .. "/" .. GH_REPO .. "/releases"
-	if channel == "dev" then
-		return base .. "?per_page=" .. tostring(DEV_PAGE_SIZE)
-	end
-	return base .. "/latest"
+function M.release_api_url()
+	return CHECK_RELEASES_URL
 end
 
 --- Returns the public releases page URL shown to the user.
@@ -254,7 +447,7 @@ function M.releases_page_url()
 end
 
 --- Builds one shell-free conditional GitHub Releases request.
---- @param channel string "stable" | "dev".
+--- @param channel string Registry channel id (keys the ETag cache).
 --- @return string url
 --- @return table headers
 --- @return table options
@@ -270,12 +463,13 @@ local function _build_fetch_request(channel)
 	}
 	-- curl cannot create an ETag cache parent. Use conditional requests only
 	-- when the standard cache directory already exists; never shell out to make
-	-- it from the event-loop thread.
+	-- it from the event-loop thread. A 304 carries no body, so the request is
+	-- conditional only while this process holds the list the saved ETag names.
 	if parent and Fs.exists(parent) then
 		options.etag_save = etag_file
-		if Fs.exists(etag_file) then options.etag_compare = etag_file end
+		if _list_cache[channel] and Fs.exists(etag_file) then options.etag_compare = etag_file end
 	end
-	return M.release_api_url(channel), {
+	return M.release_api_url(), {
 		Accept = "application/vnd.github+json",
 		["User-Agent"] = USER_AGENT,
 	}, options
@@ -292,8 +486,14 @@ local function _fetch_releases(channel, callback)
 	return M._http_client.get(url, headers, options, function(result)
 		local status = tonumber(result and result.status) or 0
 		if status == 304 then
-			Logger.debug(LOG, "GitHub releases unchanged (304) for channel %s.", channel)
-			callback(nil, status, nil)
+			local cached = _list_cache[channel]
+			if not cached then
+				Logger.warn(LOG, "GitHub answered 304 for channel %s without a cached release list.", channel)
+				callback(nil, status, "not modified, and no release list is cached")
+				return
+			end
+			Logger.debug(LOG, "GitHub releases unchanged (304) for channel %s; reusing the cached list.", channel)
+			callback(cached, status, nil)
 			return
 		end
 		if not result or result.ok ~= true then
@@ -307,24 +507,29 @@ local function _fetch_releases(channel, callback)
 			callback(nil, status, "empty response body")
 			return
 		end
+		_list_cache[channel] = result.body
 		callback(result.body, status, nil)
 	end)
 end
 
 M._fetch_releases = _fetch_releases
 
---- Normalises the raw release JSON based on channel.
---- Stable: the response IS the release object.
---- Dev: the response is an array — picks the latest prerelease (or first item).
---- @param body string Raw JSON response.
---- @param channel string
---- @return string Normalised release object JSON.
-local function _normalize_release_json(body, channel)
-	if channel == "dev" and body:match("^%s*%[") then
-		return Parser.pick_latest_prerelease(body, Version.compare_versions)
-	end
-	return body
+--- Returns the JSON object of a channel's latest release in the release list,
+--- chosen by the registry's tag rule and semver order (GitHub lists by publish
+--- date, so a later stable must not hide a higher dev build or the reverse).
+--- @param body string Raw releases array JSON.
+--- @param channel string Registry channel id.
+--- @return string|nil release Release object JSON, or nil when the list holds none.
+local function _select_channel_release(body, channel)
+	if not body:match("^%s*%[") then return nil end
+	local chunks = Parser.split_releases_array(body)
+	local tags = {}
+	for index, chunk in ipairs(chunks) do tags[index] = Parser.parse_tag(chunk) end
+	local best = CHANNELS.pick_latest(tags, channel)
+	return best and chunks[best] or nil
 end
+
+M._select_channel_release = _select_channel_release
 
 --- Selects only the canonical Linux self-update archive from one release.
 --- The shared parser binds name and URL from the same asset object and returns
@@ -362,16 +567,31 @@ function M.repo_info()
 	return { owner = GH_OWNER, repo = GH_REPO }
 end
 
---- Applies one validated release response to updater state.
---- @param body string Raw GitHub response body.
---- @param channel string "stable" | "dev".
+--- Returns the channel of the running build: the registry channel that owns its
+--- version, or the unreleased-build channel for a source checkout.
+--- @return string id
+function M.installed_channel()
+	return CHANNELS.channel_for_tag(M.current_version()) or CHANNELS.unreleased_build_channel
+end
+
+--- Applies one validated release list to updater state.
+--- @param body string Raw GitHub response body (the release list).
+--- @param channel string Registry channel id.
 --- @return boolean Whether a newer canonical Linux release is available.
 local function _process_release_response(body, channel)
-	body = _normalize_release_json(body, channel)
+	local release = _select_channel_release(body, channel)
+	if not release then
+		Logger.info(LOG, "Update check result: no release on channel '%s' yet.", channel)
+		_cached_release = nil
+		_state = "idle"
+		return false
+	end
+	body = release
 	local latest_tag = Parser.parse_tag(body)
 
 	if latest_tag == "" then
 		Logger.warn(LOG, "Could not parse tag from GitHub response.")
+		_cached_release = nil
 		_state = "idle"
 		return false
 	end
@@ -393,10 +613,14 @@ local function _process_release_response(body, channel)
 		return true
 	end
 
-	if not Version.is_newer_version(latest_tag, current) then
+	-- A deliberate switch to another channel offers that channel's latest release
+	-- even when semver orders it below the installed build (the same rule as the
+	-- other drivers, pinned by channel_vectors.json).
+	if not CHANNELS.should_offer(latest_tag, current, channel, M.installed_channel()) then
 		-- Info, not debug: "the check ran and found nothing" is the answer a user
 		-- asking "why did it not update" needs, and it happens a few times a day.
 		Logger.info(LOG, "Update check result: up to date (current %s, latest %s).", current, latest_tag)
+		_cached_release = nil
 		_state = "idle"
 		return false
 	end
@@ -406,6 +630,7 @@ local function _process_release_response(body, channel)
 	if asset_url == "" or checksum_url == "" then
 		Logger.error(LOG, "Release %s lacks the canonical Linux bundle or checksum (%s, %s).",
 			latest_tag, LINUX_ASSET_NAME, LINUX_CHECKSUM_ASSET_NAME)
+		_cached_release = nil
 		_state = "idle"
 		return false
 	end
@@ -439,7 +664,7 @@ local function publish_check(callback, available, release, err)
 end
 
 --- Checks the GitHub API for a newer release without blocking the event loop.
---- @param channel string|nil "stable" or "dev"; defaults to active channel.
+--- @param channel string|nil Registry channel id; defaults to the active channel.
 --- @param callback function|nil Receives available, release, error.
 --- @return boolean Whether the asynchronous request was dispatched.
 function M.check_for_updates(channel, callback)
@@ -462,11 +687,9 @@ function M.check_for_updates(channel, callback)
 			if not body then
 				_cached_release = known
 				_state = known and "available" or "idle"
-				if status ~= 304 then
-					Logger.warn(LOG, "Check failed (HTTP %d): %s.", status or 0,
-						tostring(fetch_error or "empty body"))
-				end
-				publish_check(callback, known ~= nil, known, status ~= 304 and fetch_error or nil)
+				Logger.warn(LOG, "Check failed (HTTP %d): %s.", status or 0,
+					tostring(fetch_error or "empty body"))
+				publish_check(callback, known ~= nil, known, fetch_error or "empty body")
 				return
 			end
 			_cached_release = nil
@@ -493,34 +716,123 @@ end
 -- =========================================
 -- =========================================
 
---- Stops any in-flight background polling timers.
+--- Stops the schedule timer.
+--- @return boolean stopped False when the timer could not be released.
 function M.stop_background_checks()
-	local stopped = true
 	if _bg_timer_handle and Timer then
-		if Timer.cancel(_bg_timer_handle) == true then
-			_bg_timer_handle = nil
-		else
-			stopped = false
-		end
+		if Timer.cancel(_bg_timer_handle) ~= true then return false end
+		_bg_timer_handle = nil
 	end
-	if _boot_timer_handle and Timer then
-		if Timer.cancel(_boot_timer_handle) == true then
-			_boot_timer_handle = nil
-		else
-			stopped = false
-		end
-	end
-	return stopped
+	return true
 end
 
---- Starts periodic update checks.
---- The first check fires after boot_check_delay_sec; subsequent checks run
---- every interval_sec seconds.
---- @param channel string|nil "stable" or "dev"; defaults to persisted channel.
+--- Records one completed background check and announces a new release once.
+--- @param ok boolean Whether GitHub answered with a usable release list.
+--- @param available boolean
+--- @param release table|nil
+local function _complete_background_check(ok, available, release)
+	local state = Schedule.record_check(_load_check_state(), M._now(), ok)
+	_save_check_state(state)
+	Logger.info(LOG, "Background check recorded: %s (consecutive failures: %d).",
+		ok and "success" or "failure", state.failures)
+	if not available or not release then return end
+	if Version.normalize_tag(release.tag) == Version.normalize_tag(state.last_notified_tag or "") then
+		Logger.info(LOG, "Background check result: %s available, already notified.", release.tag)
+		return
+	end
+	local notified = {}
+	for field, value in pairs(state) do notified[field] = value end
+	Logger.info(LOG, "New release available: %s.", release.tag)
+	if type(_on_available) ~= "function" then
+		Logger.error(LOG, "Update notification has no registered handler.")
+		return
+	end
+	local ok_notify, accepted = pcall(_on_available, release)
+	if not ok_notify then
+		Logger.error(LOG, "Update-available handler raised: %s.", tostring(accepted))
+		return
+	end
+	if accepted ~= true then
+		Logger.error(LOG, "Update notification was not accepted: %s.", tostring(accepted))
+		return
+	end
+	notified.last_notified_tag = release.tag
+	_save_check_state(notified)
+end
+
+local _arm_schedule
+
+--- One evaluation of the schedule: re-reads the wall clock, re-arms the one
+--- timer, and dispatches a check only when one is due and the driver runs.
+local function _evaluate_schedule()
+	_bg_timer_handle = nil
+	local now = M._now()
+	-- A luv timer does not advance during a suspend: a wall-clock gap longer
+	-- than the delay it was armed for is a wake, after which the network needs
+	-- the boot delay before a catch-up check.
+	if _armed_at and _armed_for and now - _armed_at > _armed_for + TIMING.reevaluate_sec then
+		Logger.info(LOG, "Wake detected (%ds since the schedule timer was armed for %ds).",
+			now - _armed_at, _armed_for)
+		_started_at = now
+	end
+	local due_at, reason = Schedule.next_due({
+		now = now, started_at = _started_at or now, interval = _check_interval,
+		state = _load_check_state(), timing = TIMING,
+	})
+	if due_at == nil then
+		Logger.debug(LOG, "Automatic update checks are off (%s).", reason)
+		return
+	end
+	if due_at > now then
+		_arm_schedule(Schedule.delay_until(due_at, now, TIMING))
+		return
+	end
+	-- Re-evaluate after the bounded period whatever happens below: the check's
+	-- completion records it, and the next due time follows from that record.
+	_arm_schedule(TIMING.reevaluate_sec)
+	if type(_is_paused) == "function" and _is_paused() == true then
+		Logger.debug(LOG, "Update check due (%s) but the driver is paused; the record is left as it is.", reason)
+		return
+	end
+	if _state == "checking" or _state == "downloading" or _state == "installing" then
+		Logger.info(LOG, "Update check due (%s) but the updater is busy (%s).", reason, _state)
+		return
+	end
+	Logger.info(LOG, "Background update check due (%s).", reason)
+	M.check_for_updates(nil, function(available, release, err)
+		_complete_background_check(err == nil, available, release)
+	end)
+end
+
+M._evaluate_schedule = _evaluate_schedule
+
+--- Arms the one schedule timer.
+--- @param delay_sec number
+--- @return boolean armed
+_arm_schedule = function(delay_sec)
+	local handle = Timer.after(delay_sec, _evaluate_schedule)
+	if type(handle) ~= "table" or handle.armed ~= true then
+		Logger.error(LOG, "The update-check schedule timer could not be armed.")
+		return false
+	end
+	_bg_timer_handle = handle
+	_armed_at = M._now()
+	_armed_for = delay_sec
+	return true
+end
+
+--- Starts the automatic-check schedule from the persisted record: the boot
+--- delay for a fresh install or an overdue check, the remaining wait otherwise.
+--- @param channel string|nil Registry channel id; defaults to the persisted channel.
 --- @param interval_sec number|nil Seconds between checks; defaults to persisted interval.
---- @param on_available function|nil Callback invoked when a new version is found.
+--- @param on_available function|nil Replaces the "new release" callback.
+--- @return boolean started False when the timer capability is missing or refused.
 function M.start_background_checks(channel, interval_sec, on_available)
-	M.stop_background_checks()
+	if not M.stop_background_checks() then
+		Logger.error(LOG, "The previous update-check timer could not be released; the schedule is not restarted.")
+		return false
+	end
+	if type(on_available) == "function" then _on_available = on_available end
 
 	if channel then
 		M.set_channel(channel)
@@ -545,48 +857,20 @@ function M.start_background_checks(channel, interval_sec, on_available)
 		return true
 	end
 
-	local function tick()
-		if _state == "checking" or _state == "downloading" or _state == "installing" then return end
-		M.check_for_updates(nil, function(available, release)
-			if not available or not release then return end
-			local tag = release.tag
-			if Version.normalize_tag(tag) ~= Version.normalize_tag(_last_notified)
-				and Version.normalize_tag(tag) ~= Version.normalize_tag(_session_notified) then
-				_session_notified = tag
-				if _storage_set("updater.last_notified", tag) then
-					_last_notified = tag
-				else
-					Logger.error(LOG, "The notified release tag could not be persisted; this session is still throttled.")
-				end
-				Logger.info(LOG, "New release available: %s.", tag)
-				if type(on_available) == "function" then
-					local ok_notify, notify_error = pcall(on_available, release)
-					if not ok_notify then
-						Logger.error(LOG, "Update-available handler raised: %s.", tostring(notify_error))
-					end
-				end
-			end
-		end)
-	end
-
-	local first_delay = math.min(BOOT_CHECK_DELAY_SEC, _check_interval)
-	Logger.start(LOG, "Background checks every %ds (first in %ds) on channel '%s'.",
-		_check_interval, first_delay, _channel)
-
-	_boot_timer_handle = Timer.after(first_delay, function()
-		_boot_timer_handle = nil
-		tick()
-	end)
-
-	_bg_timer_handle = Timer.every(_check_interval, tick)
-	if type(_boot_timer_handle) ~= "table" or _boot_timer_handle.armed ~= true
-		or type(_bg_timer_handle) ~= "table" or _bg_timer_handle.armed ~= true then
-		if not M.stop_background_checks() then
-			Logger.error(LOG, "Failed to roll back partially armed background update timers.")
-		end
-		Logger.error(LOG, "Background update timers could not be armed.")
+	_started_at = _started_at or M._now()
+	local now = M._now()
+	local due_at, reason = Schedule.next_due({
+		now = now, started_at = _started_at, interval = _check_interval,
+		state = _load_check_state(), timing = TIMING,
+	})
+	local first_delay = due_at and Schedule.delay_until(due_at, now, TIMING) or TIMING.reevaluate_sec
+	Logger.start(LOG, "Background checks every %ds on channel '%s' (next evaluation in %ds, %s).",
+		_check_interval, _channel, first_delay, reason)
+	if not _arm_schedule(first_delay) then
+		Logger.error(LOG, "Background update checks could not start.")
 		return false
 	end
+	Logger.success(LOG, "Background update checks scheduled.")
 	return true
 end
 
@@ -823,26 +1107,30 @@ function M.get_channel()
 	return _channel
 end
 
---- Switches the update channel and persists the choice.
+--- Switches the update channel and persists it to config.toml [updater] channel.
 --- Clears cached release data when switching channels.
---- @param new_channel string "stable" | "dev"
+--- @param new_channel string Registry channel id (exact; aliases are resolved
+---   only where config.toml is read).
 --- @return boolean Whether the active channel matches the request.
 function M.set_channel(new_channel)
-	if new_channel ~= "stable" and new_channel ~= "dev" then
+	if type(new_channel) ~= "string" or CHANNELS.channel(new_channel) == nil then
 		Logger.warn(LOG, "Unknown channel '%s' — keeping '%s'.", tostring(new_channel), _channel)
 		return false
 	end
-	if new_channel == _channel then return true end
+	-- A choice equal to the default is still written: the user picked it, and
+	-- a later build of another channel must not move them off it.
+	if new_channel == _channel and _channel_persisted then return true end
 	if (_state == "checking" or _state == "downloading") and not M.cancel_update() then
 		Logger.error(LOG, "Update channel cannot change while updater ownership is live.")
 		return false
 	end
 
-	if not _storage_set("updater.channel", new_channel) then
+	if not _persist_channel(new_channel) then
 		Logger.error(LOG, "Update channel '%s' could not be persisted — keeping '%s'.", new_channel, _channel)
 		return false
 	end
 	_channel = new_channel
+	_channel_persisted = true
 	if _verified_archive then Fs.delete(_verified_archive); _verified_archive = nil end
 	_state = "idle"
 	_cached_release = nil
@@ -855,7 +1143,8 @@ function M.get_check_interval()
 	return _check_interval
 end
 
---- Sets the check interval and persists it.
+--- Sets the check interval and persists it to config.toml [updater]
+--- check_interval_seconds.
 --- @param seconds number
 --- @return boolean Whether the active interval matches the request.
 function M.set_check_interval(seconds)
@@ -863,8 +1152,16 @@ function M.set_check_interval(seconds)
 	if not s or s < 0 then return false end
 	local wanted = math.floor(s)
 	if wanted == _check_interval then return true end
-	if not _storage_set("updater.interval_sec", wanted) then
-		Logger.error(LOG, "Check interval %ds could not be persisted — keeping %ds.", wanted, _check_interval)
+	if type(_config_path) ~= "string" or _config_path == "" then
+		Logger.error(LOG, "Check interval %ds cannot be saved: the updater has no config path (init not run).", wanted)
+		return false
+	end
+	local call_ok, committed, err = pcall(TomlWriter.batch_write, _config_path, {
+		{ section = CONFIG_SECTION, key = CONFIG_INTERVAL_KEY, value = wanted },
+	})
+	if not call_ok or committed ~= true then
+		Logger.error(LOG, "Check interval %ds could not be written to config.toml — keeping %ds: %s.", wanted,
+			_check_interval, tostring(call_ok and err or committed))
 		return false
 	end
 	_check_interval = wanted
@@ -940,11 +1237,7 @@ function M.get_menu_label()
 	if _state == "installing" then
 		return i18n.get("menu.about.update_installing")
 	end
-	-- "(dev)" is the channel's own name, the same token in every locale — see
-	-- changelog_window.channel_dev, which is "Dev" in English and in French.
-	if _channel == "dev" then
-		return i18n.get("menu.about.check_for_updates") .. " (dev)"
-	end
+	-- The channel has its own row; checking never grants install consent.
 	return i18n.get("menu.about.check_for_updates")
 end
 
@@ -955,10 +1248,17 @@ end
 -- =========================================
 
 --- Initialises the updater: loads persisted settings, starts background checks.
---- @param opts table|nil { channel, interval_sec, on_available }
+--- @param opts table|nil { config_path, channel, interval_sec, on_available,
+---   is_paused }: is_paused() returning true skips a due check (the pause).
 function M.init(opts)
 	opts = type(opts) == "table" and opts or {}
+	if opts.is_paused ~= nil and type(opts.is_paused) ~= "function" then
+		error("updater.init: is_paused must be a function", 2)
+	end
+	_is_paused = opts.is_paused
+	_on_available = opts.on_available
 
+	_config_path = opts.config_path or require("infra.config_paths").config("config.toml")
 	_load_persisted()
 
 	if opts.channel then
@@ -971,11 +1271,10 @@ function M.init(opts)
 	Logger.info(LOG, "Updater initialised (channel=%s, interval=%ds, version=%s).",
 		_channel, _check_interval, M.current_version())
 
-	local on_available = opts.on_available
-	M.start_background_checks(nil, nil, on_available)
+	M.start_background_checks()
 end
 
--- The channel before init() reads the user's choice: the one the build follows.
-_channel = M.default_channel()
+-- Until init() reads config.toml, the running build's channel is followed.
+_channel = M.installed_channel()
 
 return M

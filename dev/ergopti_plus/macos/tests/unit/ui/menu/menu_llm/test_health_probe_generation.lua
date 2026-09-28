@@ -53,6 +53,7 @@ local function with_fixture(callback)
 		local pending_stop_kind
 		local stop_kinds = {}
 		local current_port = 3460
+		local last_render_ctx = nil
 		local port_commits = 0
 		local mlx_restarts = {}
 		local state = {
@@ -224,7 +225,8 @@ local function with_fixture(callback)
 		}
 		package.loaded["infra.manifest_menu"] = {
 			render_rows = function(rows) return rows end,
-			build = function(_, _, handlers)
+			build = function(_, _, handlers, _, render_ctx)
+				last_render_ctx = render_ctx
 				local items = {}
 				handlers.llm_backend(items)
 				handlers.llm_model(items)
@@ -276,6 +278,11 @@ local function with_fixture(callback)
 				handler = handler,
 				state = state,
 				probes = probes,
+				-- The IA switch: the command the menu registers for llm_toggle.
+				toggle = function()
+					return last_render_ctx and last_render_ctx.commands
+						and last_render_ctx.commands["llm_toggle"]
+				end,
 				updates = function() return updates end,
 				set_stop_mode = function(mode) stop_mode = mode end,
 				settle_stop = function()
@@ -361,10 +368,11 @@ helpers.describe("LLM health probe ownership", function()
 		end
 
 		with_fixture(function(fixture)
-			local item = fixture.handler.build_item()
+			fixture.handler.build_item()
 			local stale_probe = fixture.probes[1]
-			helpers.assert_type(item.action, "function")
-			item.action()
+			local toggle = fixture.toggle()
+			helpers.assert_type(toggle, "function")
+			toggle()
 			local updates_before_stale = fixture.updates()
 			stale_probe.completion(200)
 			helpers.assert_eq(fixture.updates(), updates_before_stale,

@@ -1,101 +1,242 @@
 /* _shared/ui/healthcheck/style.css */
 
 /* ===========================================================================
- * MODULE: Healthcheck Shared Styles
+ * MODULE: Diagnostics Page Styles
  * DESCRIPTION:
- * Single-source styles for the healthcheck diagnostic report, consumed by
- * all three hosts (Windows WebView2, macOS WKWebView, Linux WebKit2GTK).
- * Uses a system-font stack that resolves correctly on every platform.
+ * Single-source styles for the diagnostics window, consumed by all three
+ * hosts (Windows WebView2, macOS WKWebView, Linux WebKit2GTK): a fixed
+ * toolbar, the scrolling sections and the preview of what is shared. Colours
+ * are variables so the page follows the system's light or dark appearance.
  * =========================================================================== */
 
-html, body {
+:root {
+	--text: #1a1a1a;
+	--muted: #666;
+	--label: #555;
+	--background: #fff;
+	--panel: #f6f6f6;
+	--border: #e0e0e0;
+	--code: #f3f3f3;
+	--pre-background: #1e1e1e;
+	--pre-text: #d4d4d4;
+	--accent: #0a66c2;
+	--accent-text: #fff;
+	--ok: #1a7f37;
+	--fail: #cf222e;
+	--pending: #9a6700;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--text: #e6e6e6;
+		--muted: #9a9a9a;
+		--label: #b0b0b0;
+		--background: #1f1f1f;
+		--panel: #2a2a2a;
+		--border: #3a3a3a;
+		--code: #2d2d2d;
+		--pre-background: #111;
+		--pre-text: #d4d4d4;
+		--accent: #4a9eff;
+		--accent-text: #0b0b0b;
+		--ok: #3fb950;
+		--fail: #ff7b72;
+		--pending: #d29922;
+	}
+}
+
+html,
+body {
 	margin: 0;
 	padding: 0;
 	height: 100%;
 	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
 	font-size: 13px;
-	color: #1a1a1a;
-	background: #fff;
+	color: var(--text);
+	background: var(--background);
 }
+
+body {
+	display: flex;
+	flex-direction: column;
+}
+
+/* ── Toolbar ─────────────────────────────────────────────────────────────── */
+
+.toolbar {
+	flex: none;
+	padding: 10px 16px 6px;
+	border-bottom: 1px solid var(--border);
+	background: var(--panel);
+}
+
+.toolbar .buttons {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+button {
+	font: inherit;
+	padding: 4px 12px;
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	background: var(--background);
+	color: var(--text);
+	cursor: pointer;
+}
+
+button:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+button.primary {
+	background: var(--accent);
+	border-color: var(--accent);
+	color: var(--accent-text);
+}
+
+#btn-close {
+	margin-left: auto;
+}
+
+.toolbar .details {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	margin-top: 8px;
+}
+
+.status {
+	min-height: 1.2em;
+	margin: 6px 0 0;
+}
+
+.status.ok { color: var(--ok); }
+.status.fail { color: var(--fail); }
+.status.info { color: var(--muted); }
+
+/* ── Sections ────────────────────────────────────────────────────────────── */
 
 #content {
-	padding: 16px 20px 70px;
-	overflow-x: hidden;
+	flex: 1 1 auto;
 	overflow-y: auto;
-	height: 100%;
-	box-sizing: border-box;
+	overflow-x: hidden;
+	padding: 4px 16px 16px;
 	word-break: break-word;
-}
-
-h1 {
-	font-size: 1.25em;
-	margin: 0 0 .6em;
 }
 
 h2 {
 	font-size: 1.05em;
-	margin: 1.2em 0 .3em;
-	border-bottom: 1px solid #e0e0e0;
-	padding-bottom: .2em;
-	color: #333;
+	margin: 1.1em 0 0.3em;
+	border-bottom: 1px solid var(--border);
+	padding-bottom: 0.2em;
+}
+
+h3 {
+	font-size: 0.95em;
+	margin: 0.8em 0 0.3em;
+}
+
+details.section > summary {
+	cursor: pointer;
+	list-style-position: inside;
+}
+
+details.section > summary h2 {
+	display: inline;
+	border-bottom: none;
 }
 
 table {
 	border-collapse: collapse;
 	width: 100%;
-	margin: .4em 0 .8em;
+	margin: 0.3em 0 0.6em;
 }
 
-th, td {
-	border: 1px solid #e0e0e0;
-	padding: .3em .65em;
+th,
+td {
+	border: 1px solid var(--border);
+	padding: 0.3em 0.65em;
 	text-align: left;
+	vertical-align: top;
 }
 
-th {
-	background: #f6f6f6;
+table.fields th {
+	width: 38%;
+	font-weight: 500;
+	color: var(--label);
+}
+
+table.items thead th {
+	background: var(--panel);
 	font-weight: 600;
 }
 
-td:first-child {
-	white-space: nowrap;
-	color: #555;
-	font-weight: 500;
+.row-action {
+	margin-left: 6px;
+	padding: 1px 8px;
+	font-size: 0.9em;
 }
 
-ul {
-	margin: .3em 0 .3em 1.2em;
+.fix {
+	margin-top: 4px;
+	color: var(--muted);
+}
+
+ul.problems {
+	margin: 0.3em 0 0.6em 1.2em;
 	padding: 0;
 }
 
-li {
-	margin: .2em 0;
-}
-
-code {
-	background: #f3f3f3;
-	border-radius: 3px;
-	padding: .1em .35em;
-	font-family: 'SF Mono', 'Cascadia Code', Consolas, 'Courier New', monospace;
-	font-size: .88em;
+ul.problems li {
+	margin: 0.3em 0;
 }
 
 pre {
-	background: #1e1e1e;
-	color: #d4d4d4;
+	background: var(--pre-background);
+	color: var(--pre-text);
 	border-radius: 4px;
-	padding: .7em 1em;
-	overflow-x: hidden;
+	padding: 0.7em 1em;
 	white-space: pre-wrap;
 	word-break: break-all;
 	font-family: 'SF Mono', 'Cascadia Code', Consolas, 'Courier New', monospace;
-	font-size: .82em;
+	font-size: 0.82em;
 	line-height: 1.45;
 }
 
-em {
+.loading,
+.empty {
+	color: var(--muted);
 	font-style: italic;
-	color: #666;
 }
 
-.ok{color:#1a7f37;font-weight:600;}.fail{color:#cf222e;font-weight:600;}.unwired{color:#9a6700;font-weight:600;}
+.ok { color: var(--ok); }
+.fail { color: var(--fail); }
+.pending { color: var(--pending); font-style: italic; }
+.muted { color: var(--muted); }
+tr.ok td:first-child { color: var(--ok); }
+tr.fail td:first-child { color: var(--fail); }
+tr.muted td { color: var(--muted); }
+
+/* ── Preview ─────────────────────────────────────────────────────────────── */
+
+#preview {
+	flex: none;
+	max-height: 40%;
+	overflow-y: auto;
+	padding: 6px 16px 10px;
+	border-top: 1px solid var(--border);
+	background: var(--panel);
+}
+
+#preview > summary {
+	cursor: pointer;
+	font-weight: 600;
+}
+
+#preview .hint {
+	color: var(--muted);
+	margin: 0.4em 0;
+}

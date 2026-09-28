@@ -33,11 +33,15 @@
 ---    LuaJIT FFI; tests bind a recorder. Without it, "the grab is taken before
 ---    the first read" could only ever be verified on hardware, and "the keyboard
 ---    still works" is not an assertion.
---- 3. The grab needs no unwind handler. EVIOCGRAB is bound to the open file
----    descriptor, and the kernel drops it when that descriptor closes — including
----    when the process dies, however it dies. So a crashed daemon cannot leave a
----    dead keyboard behind, and this module deliberately does not carry a
----    signal-handler or __gc mechanism that would only pretend to add safety.
+--- 3. The grab needs no unwind handler. EVIOCGRAB is bound to the open file,
+---    and the kernel drops it when the last descriptor on that file closes —
+---    including when the process dies, however it dies. That holds only while
+---    the daemon is the file's sole holder, so the device is opened O_CLOEXEC:
+---    otherwise every child the daemon starts (`xdg-open … &`, a gesture's
+---    application, the update relay) inherits a copy, and a daemon that dies
+---    while one runs leaves the keyboard grabbed by a process that never reads
+---    it. This module deliberately does not carry a signal-handler or __gc
+---    mechanism that would only pretend to add safety.
 --- 4. Decoding is not here. infra/input_event.lua owns the struct in both
 ---    directions, so the size comes from ffi.sizeof rather than from a comment
 ---    asserting 24 bytes.
@@ -59,8 +63,10 @@ local LOG = "adapters.evdev_reader"
 -- ===========================================
 -- ===========================================
 
--- open(2) flags. O_RDONLY is 0, so the value is the non-blocking bit alone.
+-- open(2) flags, asm-generic values (x86_64 and arm64). O_RDONLY is 0.
 local O_NONBLOCK = 0x0800
+-- Closes the descriptor in every child at exec, so no child can keep the grab.
+local O_CLOEXEC  = 0x80000
 
 -- EVIOCGRAB = _IOW('E', 0x90, int)
 --   (1 << 30) | (sizeof(int) << 16) | ('E' << 8) | 0x90
@@ -122,7 +128,7 @@ local _slots = {}
 
 --- The state for a slot, created on first use.
 --- @param slot string|nil Defaults to the keyboard.
---- @return table { fd, grabbed, path }
+--- @return table { fd, grabbed, path, close_error }
 local function state(slot)
 	local key = slot or M.KEYBOARD
 	local entry = _slots[key]
@@ -140,7 +146,10 @@ end
 ---   ioctl(handle, req, arg)  → boolean
 ---   read(handle, count)      → string|nil, "would_block"|"fatal"|nil, reason
 ---   poll(handle, timeout_ms) → boolean      (true when readable)
----   close(handle)
+---   close(handle)            → true|nil on completion, false, reason on failure
+--- A normally returning void backend acknowledges completion. Exceptions and
+--- explicit failures retire the handle and fence its slot until process restart;
+--- close(2) may have released it already, so retrying could close a reused fd.
 --- @param backend table|nil
 function M._set_backend(backend)
 	_backend = backend
@@ -231,7 +240,8 @@ local function build_ffi_backend()
 			return rc ~= nil and rc > 0
 		end,
 		close = function(fd)
-			ffi.C.close(fd)
+			if ffi.C.close(fd) == 0 then return true end
+			return false, "close failed (errno=" .. tostring(ffi.errno()) .. ")"
 		end,
 	}
 end
@@ -283,6 +293,10 @@ end
 --- @return boolean True when the descriptor is live.
 function M.open(path, slot)
 	local st = state(slot)
+	if st.close_error then
+		Logger.error(LOG, "open(): previous close is not acknowledged: %s.", st.close_error)
+		return false, st.close_error
+	end
 	if st.fd then
 		Logger.debug(LOG, "open(): already open on %s.", tostring(st.path))
 		return true
@@ -296,7 +310,7 @@ function M.open(path, slot)
 		return false
 	end
 
-	local fd, err = _backend.open(path, O_NONBLOCK)
+	local fd, err = _backend.open(path, O_NONBLOCK + O_CLOEXEC)
 	if not fd then
 		Logger.error(LOG, "open(): cannot open %s — %s.", path, tostring(err))
 		return false
@@ -347,15 +361,28 @@ function M.ungrab(slot)
 end
 
 --- Closes the device, releasing the grab on the way out.
+--- @return boolean acknowledged
+--- @return string|nil reason
 function M.close(slot)
 	local st = state(slot)
-	if not st.fd then return end
-	M.ungrab(slot)
-	pcall(_backend.close, st.fd)
-	Logger.info(LOG, "Closed %s.", tostring(st.path))
+	if st.close_error then return false, st.close_error end
+	if not st.fd then return true end
+	-- An ioctl failure must not prevent the final close attempt.
+	pcall(M.ungrab, slot)
+	local fd, path = st.fd, st.path
+	-- Retire before calling the backend: even an exception cannot justify retrying
+	-- a descriptor number that the kernel may already have assigned elsewhere.
 	st.fd = nil
 	st.path = nil
 	st.grabbed = false
+	local called, acknowledged, detail = pcall(_backend.close, fd)
+	if not called or (acknowledged ~= nil and acknowledged ~= true) then
+		st.close_error = tostring(not called and acknowledged or detail or "backend did not acknowledge close")
+		Logger.error(LOG, "Close of %s is not acknowledged: %s; restart is required.", tostring(path), st.close_error)
+		return false, st.close_error
+	end
+	Logger.info(LOG, "Closed %s.", tostring(path))
+	return true
 end
 
 --- @return boolean True when a device is open.

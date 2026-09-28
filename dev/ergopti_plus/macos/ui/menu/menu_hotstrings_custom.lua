@@ -127,6 +127,47 @@ local function setGroupSectionsFn(ctx, group_name, enable)
 	end
 end
 
+--- Whether every group of `group_names` is on and every one of its real sections
+--- is on: the tick of an « all sections » checkbox. menu_hotstrings reads it too,
+--- for the category, language and whole-tree checkboxes, so there is one answer
+--- to « is all of this on ». A set with no group is not « all on »: there is
+--- nothing the checkbox could have switched on.
+--- @param ctx table Context.
+--- @param group_names table Array of group names.
+--- @return boolean
+function M.all_sections_on(ctx, group_names)
+	if #group_names == 0 then return false end
+	local km = ctx.keymap
+	local section_on = km and type(km.is_section_enabled) == "function" and km.is_section_enabled or nil
+	for _, name in ipairs(group_names) do
+		if not groupEnabled(ctx, name) then return false end
+		for _, section in ipairs(section_names_for(km, name)) do
+			if not (section_on and section_on(name, section)) then return false end
+		end
+	end
+	return true
+end
+
+--- One checkbox for every section of `group_names`, where a « tout activer » /
+--- « tout désactiver » pair used to be: two rows and two keys for one control,
+--- whose state the user could only guess. Ticked when all of them are on; a click
+--- switches them all to the other side through `set_fn(enable)`, the scope's
+--- batched writer. Greyed and inert while the script is paused, like every
+--- hotstring row.
+--- @param ctx table Context.
+--- @param group_names table Array of group names.
+--- @param set_fn function Returns the writer for one target state.
+--- @return table Provider row.
+function M.all_sections_row(ctx, group_names, set_fn)
+	local all_on = M.all_sections_on(ctx, group_names)
+	return {
+		label    = i18n.get("menu.hotstrings.enable_all_sections"),
+		checked  = all_on,
+		disabled = ctx.paused or nil,
+		action   = not ctx.paused and set_fn(not all_on) or nil,
+	}
+end
+
 local function open_toml_path(path)
 	if type(path) ~= "string" or path == "" then return end
 	DeferredWork.after(0, function()
@@ -384,17 +425,10 @@ function M.build_custom(ctx, counts)
 		end
 		if not has_real then return end
 
-		-- Section-level bulk actions for this personal subgroup.
-		target[#target + 1] = {
-			label    = i18n.get("menu.hotstrings.enable_all"),
-			disabled = paused or nil,
-			action       = not paused and setGroupSectionsFn(ctx, group_name, true) or nil,
-		}
-		target[#target + 1] = {
-			label    = i18n.get("menu.hotstrings.disable_all"),
-			disabled = paused or nil,
-			action       = not paused and setGroupSectionsFn(ctx, group_name, false) or nil,
-		}
+		-- One checkbox for every section of this personal subgroup.
+		target[#target + 1] = M.all_sections_row(ctx, { group_name }, function(enable)
+			return setGroupSectionsFn(ctx, group_name, enable)
+		end)
 		target[#target + 1] = { separator = true }
 
 		for _, sec in ipairs(secs) do
@@ -583,40 +617,50 @@ function M.build_custom(ctx, counts)
 		for _, row in ipairs(custom_rows) do table.insert(menu_items, row) end
 	end
 
-	-- All groups toggle together when the user clicks the top-level item
+	-- The personal groups and the custom group switch together, from the gate
+	-- row that opens the submenu. It was the parent row's action, which AppKit
+	-- never sends for an item that opens a submenu, so it could not be reached.
 	local all_personal_enabled = true
 	for _, gname in ipairs(personal_group_names) do
 		if not groupEnabled(ctx, gname) then all_personal_enabled = false; break end
 	end
 	local both_enabled = all_personal_enabled and custom_enabled
+	local function toggle_personal()
+		local will_enable = not both_enabled
+		if will_enable and not KeymapLifecycle.ensure_started(ctx,
+			"enable personal and custom hotstrings") then return end
+		-- Toggle all personal groups
+		for _, gname in ipairs(personal_group_names) do
+			state.hotstrings[gname] = will_enable
+			if will_enable then
+				if ctx.keymap and type(ctx.keymap.enable_group) == "function" then pcall(ctx.keymap.enable_group, gname) end
+			else
+				if ctx.keymap and type(ctx.keymap.disable_group) == "function" then pcall(ctx.keymap.disable_group, gname) end
+			end
+		end
+		-- Toggle custom group
+		state.hotstrings["custom"] = will_enable
+		if will_enable then
+			if ctx.keymap and type(ctx.keymap.enable_group) == "function" then pcall(ctx.keymap.enable_group, "custom") end
+		else
+			if ctx.keymap and type(ctx.keymap.disable_group) == "function" then pcall(ctx.keymap.disable_group, "custom") end
+		end
+		if ctx.save_prefs() ~= true then return false end
+		ctx.notify_feature(base_title, will_enable)
+		ctx.updateMenu()
+	end
+	-- A checkbox with one label: the state is the tick, not the words.
+	table.insert(menu_items, 1, {
+		label    = i18n.get("menu.hotstrings.category_enable"),
+		checked  = both_enabled,
+		disabled = paused or nil,
+		action   = not paused and toggle_personal or nil,
+	})
+	table.insert(menu_items, 2, { separator = true })
 	return {
 		label   = title_str,
 		checked = both_enabled or nil,
-		action      = function()
-			local will_enable = not both_enabled
-			if will_enable and not KeymapLifecycle.ensure_started(ctx,
-				"enable personal and custom hotstrings") then return end
-			-- Toggle all personal groups
-			for _, gname in ipairs(personal_group_names) do
-				state.hotstrings[gname] = will_enable
-				if will_enable then
-					if ctx.keymap and type(ctx.keymap.enable_group) == "function" then pcall(ctx.keymap.enable_group, gname) end
-				else
-					if ctx.keymap and type(ctx.keymap.disable_group) == "function" then pcall(ctx.keymap.disable_group, gname) end
-				end
-			end
-			-- Toggle custom group
-			state.hotstrings["custom"] = will_enable
-			if will_enable then
-				if ctx.keymap and type(ctx.keymap.enable_group) == "function" then pcall(ctx.keymap.enable_group, "custom") end
-			else
-				if ctx.keymap and type(ctx.keymap.disable_group) == "function" then pcall(ctx.keymap.disable_group, "custom") end
-			end
-			if ctx.save_prefs() ~= true then return false end
-			ctx.notify_feature(base_title, will_enable)
-			ctx.updateMenu()
-		end,
-		items = menu_items,
+		items   = menu_items,
 	}
 end
 

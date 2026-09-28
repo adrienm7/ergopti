@@ -129,6 +129,19 @@ input[type='text'].is-default {
 	color: #999;
 }
 
+/* The default folder shown under each field, and the logs field's note. */
+.row-default,
+.row-hint {
+	color: #888;
+	font-size: 10.5px;
+	margin: 5px 0 0;
+}
+
+.row-default code {
+	font-family: 'SF Mono', 'Monaco', monospace;
+	word-break: break-all;
+}
+
 /* ======================================= */
 /* ======================================= */
 /* ======= 4/ Browse Button & Tags ======= */

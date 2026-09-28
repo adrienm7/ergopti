@@ -9,18 +9,19 @@
 ; No network calls are ever made.
 ;
 ; FEATURES & RATIONALE:
-; 1. Privacy-first: keystrokes, file contents, SSID, and raw usernames are
-;    never included. The username is hashed (FNV-1a fold) so incidents from
-;    the same user can be correlated without revealing the identity.
+; 1. Nothing is collected about the user: keystrokes, file contents, network
+;    names and the account name are never included, not even hashed.
 ; 2. No confirmation: the old opt-in prompt added friction with zero privacy
-;    benefit — the report is local-only and contains no PII. The user sees a
-;    single dialog showing the path of the saved file.
-; 3. Privacy-bounded diagnostics: the report keeps structured system, adapter,
-;    and session state while replacing free-form error text, paths, window
-;    context, and log bodies with explicit redaction markers.
-; 4. Driver-scoped directory: reports live under <config_dir>/autohotkey/crash_reports/
-;    so they are co-located with the AHK logs and config under the autohotkey/
-;    subfolder, separate from any Hammerspoon reports.
+;    benefit — the report is local-only. The user is told the path of the
+;    saved file.
+; 3. Full detail locally: the error, its stack, the log tail and the window
+;    context are kept whole, since a report stripped of them cannot be
+;    triaged. The file never leaves the machine by itself; whatever is copied,
+;    saved for GitHub or sent is redacted at that boundary (Redact_Apply in the
+;    error and diagnostics windows).
+; 4. Logs-scoped directory: reports live in <logs>\crash_reports\
+;    (LoggerCrashReportsDir), beside the daily log that explains them, and
+;    follow a LogsDirPath override.
 ; 5. Structured output: reports are written as JSON for easy machine and human
 ;    readability, one file per incident.
 ; ==============================================================================
@@ -36,11 +37,6 @@
 ; ======= 1/ Constants =======
 ; ============================
 ; ============================
-
-; Subdirectory under the config dir that receives all AHK crash report files.
-; Nested under autohotkey/ to mirror the driver folder layout and stay separate
-; from any Hammerspoon reports under hammerspoon/.
-global _CrashReporter_Subdir := "autohotkey\crash_reports"
 
 ; Modifier keys to inspect for stuck state at crash time.
 global _CrashReporter_Modifiers := [
@@ -61,8 +57,8 @@ global _CrashReporter_Modifiers := [
 ; =============================
 
 ; Builds a rich crash report Map from an AHK Error object.
-; Captures structured system, adapter, and session state, then replaces every
-; free-form privacy source with an explicit marker before returning.
+; Captures the error in full with the structured system, adapter and session
+; state; nothing is redacted here, the report stays on this machine.
 ; @param ErrorObj {Error} The AHK v2 Error object caught by the global handler.
 ; @return {Map} Report with all diagnostic fields documented below.
 CrashReport_Build(ErrorObj) {
@@ -99,37 +95,28 @@ CrashReport_Build(ErrorObj) {
 	; already degraded, so a second redundant run only widens the input-dead window.
 	HC := ""
 	try HC := HealthCheck_Run()
-	; ── Full system info (mirrors healthcheck _HealthCheck_SysInfo + enriched fields) ──────────
-	; HC["sys"] already ran the exact same WMI ConnectServer / RegRead / git-subprocess
-	; probes above via HealthCheck_Run — recomputing them here would double that
-	; blocking work on the crash handler's deferred timer (crash-report-sysinfo-dedup).
-	; Only fall back to a fresh probe if the healthcheck itself failed to produce one.
-	; .Count > 0, not just .Has(). _HealthCheck_Collect substitutes an EMPTY Map
-	; when a collector throws, and the healthcheck result always carries the "sys"
-	; key — so testing presence alone made this fallback unreachable dead code,
-	; and every Sys[...] read below would then throw on the missing key. That
-	; would abort CrashReport_Build inside the error net's catch: logged, never
-	; reported. Which is precisely the failure the healthcheck's own degradation
-	; was added to prevent.
-	Sys := (HC != "" and HC.Has("sys") and HC["sys"].Count > 0) ? HC["sys"] : _CrashReport_SysInfo()
-	; Pull a few safe enriched fields from the live healthcheck for even richer crash reports (pause state, key logs paths, etc.)
-	; Each field is enriched independently and read with .Get. The outer keys
-	; were guarded but the INNER ones were not, and both lived in one try — so a
-	; degraded pause_state Map threw and silently took errors_log_path with it,
-	; into a bare catch that recorded nothing.
-	if (HC != "") {
-		try {
-			if (HC.Has("pause_state") and HC["pause_state"].Count > 0)
-				Sys["pause_at_crash"] := HC["pause_state"].Get("is_paused", false) ? "paused" : "running"
-		} catch as Err {
-			try LoggerDebug("CrashReporter", "Crash report enrichment 'pause_state' degraded: {1}.", Err.Message)
-		}
-		try {
-			if (HC.Has("logs") and HC["logs"].Count > 0)
-				Sys["errors_log_path"] := HC["logs"].Get("errors_today", "")
-		} catch as Err {
-			try LoggerDebug("CrashReporter", "Crash report enrichment 'logs' degraded: {1}.", Err.Message)
-		}
+	; The version 2 snapshot's sections (_shared/modules/diagnostics/schema.json).
+	; _HealthCheck_Collect substitutes an EMPTY Map when a collector throws, so
+	; every read below goes through .Get.
+	Sections := (HC is Map && HC.Has("sections")) ? HC["sections"] : Map()
+	; ── Full system info ───────────────────────────────────────────────────────
+	; The healthcheck already read the processor from the registry: reusing it
+	; keeps the WMI query of _CrashReport_SysInfo off the crash handler's deferred
+	; timer, which shares the keyboard hook's thread (crash-report-sysinfo-dedup).
+	Sys := _CrashReport_SysInfo(Sections.Get("hardware", Map()))
+	; Each field is enriched independently and read with .Get: a degraded
+	; section must not take the next one with it.
+	try {
+		Input := Sections.Get("input", Map())
+		if Input.Has("paused")
+			Sys["pause_at_crash"] := Input["paused"] ? "paused" : "running"
+	} catch as Err {
+		try LoggerDebug("CrashReporter", "Crash report enrichment 'input' degraded: {1}.", Err.Message)
+	}
+	try {
+		Sys["errors_log_path"] := Sections.Get("paths", Map()).Get("errors_today", "")
+	} catch as Err {
+		try LoggerDebug("CrashReporter", "Crash report enrichment 'paths' degraded: {1}.", Err.Message)
 	}
 
 	; ── Uptime ────────────────────────────────────────────────────────────────
@@ -166,10 +153,12 @@ CrashReport_Build(ErrorObj) {
 			; failed collector to an empty Map. A raw read threw into a catch-less
 			; try, leaving ErrCount at "0" — indistinguishable from a genuine
 			; clean session, on a report written because something crashed.
-			AdaptersOk     := _CrashReport_JoinArr(HC.Get("ports_validated", []))
-			AdaptersFailed := _CrashReport_JoinArr(HC.Get("failed_adapters", []))
-			WarnCount      := String(HC.Get("warn_count", "unknown"))
-			ErrCount       := String(HC.Get("err_count", "unknown"))
+			Developer      := Sections.Get("developer", Map())
+			Issues         := Sections.Get("issues", Map())
+			AdaptersOk     := _CrashReport_JoinArr(Developer.Get("modules_ok", []))
+			AdaptersFailed := _CrashReport_JoinArr(Developer.Get("modules_failed", []))
+			WarnCount      := String(Issues.Get("warn_count", "unknown"))
+			ErrCount       := String(Issues.Get("err_count", "unknown"))
 		}
 	}
 
@@ -183,8 +172,7 @@ CrashReport_Build(ErrorObj) {
 	}
 
 	; ── In-memory log ring buffer (all 200 lines, most recent last) ───────────
-	; Capture once so the redaction boundary can retain the line count. The raw
-	; bodies never leave CrashReport_Build or reach the artifact.
+	; Captured once, whole: the lines leading to a crash are what explains it.
 	LogLines := ""
 	try {
 		Snapshot := LoggerRingBufferSnapshot()
@@ -223,7 +211,6 @@ CrashReport_Build(ErrorObj) {
 		"locale",               Sys.Get("locale", ""),
 		"script_dir",           A_ScriptDir,
 		"git_hash",             Sys.Get("git_hash", ""),
-		"username_hash",        _CrashReport_FoldHash(A_UserName),
 		; ── Runtime context ──
 		"uptime_sec",           String(UptimeSec),
 		"active_window_title",  ActiveWindowTitle,
@@ -237,31 +224,30 @@ CrashReport_Build(ErrorObj) {
 		; ── Module state ──
 		"keylogger_initialized", KeyloggerInit,
 		"config_dir",           ConfigDir,
-		; ── Log line-count source; bodies are redacted before publication ──
+		; ── The log tail, whole; redacted only where a report is shared ──
 		"log_tail",             LogLines,
 	)
 
 	try LoggerDone("CrashReporter", "Crash report built (ts={1}, type={2}).", Ts, ErrorType)
-	return _CrashReport_RedactCanonical(Report)
+	return Report
 }
 
-; Writes a crash report Map to disk as a JSON file under autohotkey/crash_reports/.
+; The crash folder resolved by the logger, exposed to the diagnostics page.
+; @return {String} Absolute path without a trailing separator.
+CrashReport_Dir() {
+	return RTrim(LoggerCrashReportsDir(), "\/")
+}
+
+; Writes a crash report Map beside the logger-owned daily log.
 ; Creates the directory on demand. Returns the file path on success, or "" on failure.
 ; @param Report {Map} The report Map returned by CrashReport_Build().
 ; @param WriterFn {Func|Integer} Optional durable-writer seam for regression coverage.
 ; @return {String} Absolute path to the written file, or "" on failure.
 CrashReport_Save(Report, WriterFn := 0) {
-	global _ConfigDir, _CrashReporter_Subdir
-
 	try LoggerStart("CrashReporter", "Saving crash report to disk…")
 
-	BaseDir := ""
-	try BaseDir := _ConfigDir
-	if (BaseDir == "")
-		try BaseDir := EnvGet("USERPROFILE") . "\.config\ergopti_plus\"
-	if !(BaseDir ~= "[/\\]$")
-		BaseDir .= "\"
-	ReportDir := BaseDir . _CrashReporter_Subdir . "\"
+	; The logger is the one resolver of the crash-reports folder.
+	ReportDir := LoggerCrashReportsDir()
 
 	try DirCreate(ReportDir)
 
@@ -326,33 +312,31 @@ CrashReport_PromptUser(Report) {
 ; ==========================
 
 ; Returns a Map with full OS, CPU, RAM, screen, AHK, and git fields.
-; Mirrors _HealthCheck_SysInfo() so the crash report is a superset of the
-; healthcheck diagnostic without duplicating the collection logic.
-_CrashReport_SysInfo() {
+; @param Hardware {Map} The diagnostics snapshot's hardware section: its
+;   processor is reused, and WMI is asked only when it has none.
+_CrashReport_SysInfo(Hardware := 0) {
 	Info := Map()
 
-	OsName  := A_OSVersion
-	OsBuild := ""
-	OsArch  := A_Is64bitOS ? "64 bits" : "32 bits"
-	try {
-		OsName  := RegRead("HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion", "ProductName")
-		OsBuild := RegRead("HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion", "CurrentBuildNumber")
-		UBR     := RegRead("HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion", "UBR")
-		OsBuild := OsBuild . "." . UBR
-	}
-	Info["os_name"]  := OsName
-	Info["os_build"] := OsBuild
-	Info["os_arch"]  := OsArch
+	; The boot snapshot's probe, so a crash on Windows 11 is not filed as Windows 10
+	OsInfo := DiagSnapshot_OsInfo()
+	Info["os_name"]  := OsInfo["os"]
+	Info["os_build"] := OsInfo["os_version"]
+	Info["os_arch"]  := A_Is64bitOS ? "64 bits" : "32 bits"
 
 	CpuName  := "unknown"
 	CpuCores := ""
-	try {
-		WMI  := ComObject("WbemScripting.SWbemLocator").ConnectServer()
-		Qry  := WMI.ExecQuery("SELECT Name, NumberOfLogicalProcessors FROM Win32_Processor")
-		Enum := Qry._NewEnum()
-		if Enum.Next(&Item) {
-			CpuName  := Trim(Item.Name)
-			CpuCores := Item.NumberOfLogicalProcessors
+	if (Hardware is Map) && Hardware.Has("cpu") {
+		CpuName  := Hardware["cpu"]
+		CpuCores := Hardware.Get("cpu_cores", "")
+	} else {
+		try {
+			WMI  := ComObject("WbemScripting.SWbemLocator").ConnectServer()
+			Qry  := WMI.ExecQuery("SELECT Name, NumberOfLogicalProcessors FROM Win32_Processor")
+			Enum := Qry._NewEnum()
+			if Enum.Next(&Item) {
+				CpuName  := Trim(Item.Name)
+				CpuCores := Item.NumberOfLogicalProcessors
+			}
 		}
 	}
 	Info["cpu_name"]  := CpuName
@@ -397,53 +381,6 @@ _CrashReport_IsoTimestamp() {
 	return FormatTime(A_NowUTC, "yyyy-MM-ddTHH:mm:ss") . "Z"
 }
 
-; FNV-1a 32-bit fold: stable, non-reversible hex digest of a string.
-; @param Str {String}
-; @return {String} Eight-character lowercase hex string.
-_CrashReport_FoldHash(Str) {
-	Acc := 0x811C9DC5
-	Loop StrLen(Str) {
-		Acc := ((Acc ^ Ord(SubStr(Str, A_Index, 1))) * 0x01000193) & 0xFFFFFFFF
-		Acc := ((Acc >> 3) | (Acc << 29)) & 0xFFFFFFFF
-	}
-	return Format("{:08x}", Acc)
-}
-
-; Replaces every free-form source that can carry user data while preserving the
-; canonical schema. The function clones its input so a caller retaining the
-; diagnostic Map never observes a half-redacted mutation.
-_CrashReport_RedactCanonical(Report) {
-	if !(Report is Map)
-		return Map()
-	Redacted := Report.Clone()
-	Fixed := Map(
-		"error_msg", "[redacted error message]",
-		"error_extra", "[redacted error context]",
-		"error_what", "[redacted error context]",
-		"error_file", "[redacted source path]",
-		"script_dir", "[redacted path]",
-		"active_window_title", "[redacted window title]",
-		"active_window_process", "[redacted process]",
-		"config_dir", "[redacted path]")
-	for Key, Marker in Fixed {
-		if Redacted.Has(Key) && String(Redacted[Key]) != ""
-			Redacted[Key] := Marker
-	}
-	for Key, Label in Map("stack_trace", "stack", "log_tail", "log") {
-		if !Redacted.Has(Key)
-			continue
-		Value := String(Redacted[Key])
-		if (Value == "")
-			continue
-		if RegExMatch(Value, "^\[redacted \d+ " . Label . " lines?\]$")
-			continue
-		LineCount := StrLen(Value) - StrLen(StrReplace(Value, "`n")) + 1
-		Redacted[Key] := "[redacted " . LineCount . " " . Label
-			. (LineCount == 1 ? " line]" : " lines]")
-	}
-	return Redacted
-}
-
 _CrashReport_CanonicalFields() {
 	return [
 		"version", "driver", "timestamp",
@@ -454,7 +391,7 @@ _CrashReport_CanonicalFields() {
 		"cpu_name", "cpu_cores",
 		"ram_total_gb", "ram_free_gb",
 		"screen_resolution", "dpi", "dpi_scale",
-		"locale", "script_dir", "git_hash", "username_hash",
+		"locale", "script_dir", "git_hash",
 		"uptime_sec", "active_window_title", "active_window_process",
 		"stuck_modifiers",
 		"adapters_ok", "adapters_failed",
@@ -468,22 +405,20 @@ _CrashReport_CanonicalFields() {
 ; @param Report {Map}
 ; @return {String} Pretty-printed JSON string.
 _CrashReport_ToJson(Report) {
-	return _CrashReport_EncodeFields(
-		_CrashReport_RedactCanonical(Report), _CrashReport_CanonicalFields())
+	return _CrashReport_EncodeFields(Report, _CrashReport_CanonicalFields())
 }
 
 ; The isolated worker needs two raw paths to perform its local git probe and
 ; choose the destination directory. They live in pagefile-backed IPC only and
 ; are removed by both worker implementations before the canonical artifact is
-; written. Every report field in the same envelope is already redacted.
+; written; the report fields travel whole, as the local report keeps them.
 _CrashReport_ToWorkerJson(Report) {
-	SafeReport := _CrashReport_RedactCanonical(Report)
 	Fields := _CrashReport_CanonicalFields()
-	for Key in ["_transport_script_dir", "_transport_config_dir"] {
-		if SafeReport.Has(Key)
+	for Key in ["_transport_script_dir", "_transport_reports_dir"] {
+		if Report.Has(Key)
 			Fields.Push(Key)
 	}
-	return _CrashReport_EncodeFields(SafeReport, Fields)
+	return _CrashReport_EncodeFields(Report, Fields)
 }
 
 _CrashReport_EncodeFields(Report, Fields) {

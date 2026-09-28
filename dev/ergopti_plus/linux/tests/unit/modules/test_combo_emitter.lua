@@ -92,21 +92,25 @@ helpers.describe("combo emitter: every catalogue combo resolves", function()
 	helpers.it("maps every key name the generated action table uses", function()
 		-- The table covers what the catalogue uses rather than all of X11, and
 		-- that is only defensible while something checks it. This is that check.
+		-- Loaded as the data it is rather than scanned as text. The scan used to
+		-- keep only strings holding a "+" or a name the table already knew, so a
+		-- bare key the table lacked (screen_capture's "Print") was skipped by the
+		-- very filter meant to find it.
 		local path = helpers.driver_root() .. "/_generated/gesture_emit_actions.lua"
-		local fh = io.open(path, "r")
-		helpers.assert_true(fh ~= nil, "the generated emit table must be readable")
-		local source = fh:read("*a")
-		fh:close()
+		local ok_load, rows = pcall(dofile, path)
+		helpers.assert_true(ok_load and type(rows) == "table",
+			"the generated emit table must load: " .. tostring(rows))
 
 		local seen, unresolved = 0, {}
-		for combo in source:gmatch('=%s*"([^"]+)"') do
-			-- Only strings that look like a chord; the file also carries ids.
-			if combo:find("+", 1, true) or Emitter.KEYSYM_TO_CODE[combo] then
-				seen = seen + 1
-				local parsed, unknown = Emitter.parse(combo)
-				if not parsed then unresolved[#unresolved + 1] = combo .. " (" .. tostring(unknown) .. ")" end
+		for id, combo in pairs(rows) do
+			seen = seen + 1
+			local parsed, unknown = Emitter.parse(combo)
+			if not parsed then
+				unresolved[#unresolved + 1] = tostring(id) .. "=" .. tostring(combo)
+					.. " (" .. tostring(unknown) .. ")"
 			end
 		end
+		table.sort(unresolved)
 
 		helpers.assert_true(seen >= 10, string.format(
 			"only %d combo(s) found in the generated table — the pattern has stopped "

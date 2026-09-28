@@ -1,0 +1,21 @@
+{
+	"_comment": "What is removed from diagnostics before they leave the machine (clipboard, saved report, GitHub issue). Only three things: token-like secrets, the home folder (any spelling of it becomes the home placeholder), and the account name as a whole word of at least min_account_name_length characters, so a one- or two-letter name cannot shred the report. IP and MAC addresses, serial numbers, Wi-Fi names and host names are never collected, so no rule exists for them. A token is its prefix plus at least min_length characters of its charset, not preceded by a letter, digit or underscore. Charsets: alnum = A-Z a-z 0-9, word = alnum plus _, word_dash = word plus -. A key=value secret keeps its key and separator. Implemented by _shared/lua/diagnostics/redact.lua, windows/infra/redact.ahk and _shared/ui/redact.js (the diagnostics page, which redacts what it previews), all three replaying _shared/tests/corpus/diagnostics/redaction_vectors.json.",
+	"home_placeholder": "~",
+	"account_placeholder": "<user>",
+	"secret_placeholder": "<secret>",
+	"min_account_name_length": 3,
+	"token_prefixes": [
+		{ "prefix": "sk-", "charset": "word_dash", "min_length": 16 },
+		{ "prefix": "ghp_", "charset": "alnum", "min_length": 20 },
+		{ "prefix": "gho_", "charset": "alnum", "min_length": 20 },
+		{ "prefix": "ghu_", "charset": "alnum", "min_length": 20 },
+		{ "prefix": "ghs_", "charset": "alnum", "min_length": 20 },
+		{ "prefix": "ghr_", "charset": "alnum", "min_length": 20 },
+		{ "prefix": "github_pat_", "charset": "word", "min_length": 20 },
+		{ "prefix": "hf_", "charset": "alnum", "min_length": 20 },
+		{ "prefix": "AIza", "charset": "word_dash", "min_length": 30 }
+	],
+	"bearer_min_length": 8,
+	"secret_keys": ["api_key", "apikey", "api-key", "access_token", "token", "secret", "password"],
+	"secret_value_min_length": 6
+}

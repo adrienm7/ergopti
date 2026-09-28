@@ -1,13 +1,25 @@
 ﻿; ui/healthcheck/core.ahk
 
 ; ==============================================================================
-; MODULE: Healthcheck / Probe + Public API + Window
+; MODULE: Healthcheck / Snapshot + Window
 ; DESCRIPTION:
-; Module-level counters, the adapter/port registry probe, the public API
-; (HealthCheck_Run / RecordError / RecordWarn / FormatMarkdown / FormatPlain /
-; Format) and the WebView2 report window. The report HTML is rendered by the
-; shared frontend _shared/ui/healthcheck/ (loaded via virtual host); the
-; snapshot is injected as JSON after navigation completes.
+; Session counters, the module contract check, the version 2 snapshot
+; (_shared/modules/diagnostics/schema.json) and the diagnostics window. The
+; window loads the shared page (_shared/ui/healthcheck/) through a virtual
+; host; the page renders the snapshot, keeps the preview of what is shared and
+; asks for every action by message.
+;
+; FEATURES & RATIONALE:
+; 1. One WebMessageReceived subscription per window, bound to the window's
+;    epoch. A message is read inside the COM callback and handled on a fresh
+;    stack (SetTimer -1): handling it inside the callback re-enters the STA
+;    apartment and can wedge WebView2's message delivery.
+; 2. Every message is validated by HealthCheck_ValidateAction against the
+;    schema's allowlist: the host opens only the paths it collected, by id.
+; 3. The page asks for the first snapshot with "ready"; the probes start then
+;    and push their answers into the same window only.
+; 4. Without WebView2 the window shows the snapshot as plain text in a
+;    read-only field: the report stays readable and copyable by hand.
 ;
 ; Split out of the former infra/healthcheck.ahk (the module split); see
 ; ui/healthcheck/init.ahk for the module overview. Functions and globals are
@@ -27,11 +39,12 @@ global _HealthCheckErrCount  := 0
 
 
 
-; ===================================================
-; ===================================================
-; ======= 1/ Adapter & Port Registry ================
-; ===================================================
-; ===================================================
+
+; ========================================
+; ========================================
+; ======= 1/ Module Contract Check =======
+; ========================================
+; ========================================
 
 ; Each entry maps an adapter id to its required public function names.
 ; The id is the bare filename stem under adapters/ (no path, no extension).
@@ -58,18 +71,41 @@ _HealthCheck_AdapterSpecs() {
 	return Specs
 }
 
+; Checks every adapter's contract: each listed function is defined.
+; @returns {Map} { ok: Array of ids, failed: Array of "id (reason)" }
+_HealthCheck_ModuleCheck() {
+	Ok := []
+	Failed := []
+	for AdapterId, RequiredFns in _HealthCheck_AdapterSpecs() {
+		AllPresent := true
+		for _, FnName in RequiredFns {
+			if !IsSet(%FnName%) or !((%FnName%) is Func) {
+				AllPresent := false
+				LoggerWarn("Healthcheck", "Adapter '{1}' missing function '{2}'.", AdapterId, FnName)
+			}
+		}
+		if AllPresent
+			Ok.Push(AdapterId)
+		else
+			Failed.Push(AdapterId . " (contract incomplete)")
+	}
+	return Map("ok", Ok, "failed", Failed)
+}
 
 
 
-; ===================================================
-; ===================================================
-; ======= 2/ Public API =============================
-; ===================================================
-; ===================================================
 
-; Stores an error message for later retrieval by HealthCheck_Run().
-; Call from any error handler that wants healthcheck visibility.
-; @param Msg {String} Human-readable error description.
+
+; ===================================
+; ===================================
+; ======= 2/ Session Counters =======
+; ===================================
+; ===================================
+
+; Stores the last ERROR line for later retrieval by HealthCheck_Run(). The
+; logger calls it on every emitted ERROR with the whole formatted line, which
+; is what the macOS and Linux logger cores keep as their session last error.
+; @param Msg {String} The formatted log line.
 HealthCheck_RecordError(Msg) {
 	global _HealthCheckLastError, _HealthCheckErrCount
 	if !IsSet(_HealthCheckLastError)
@@ -89,25 +125,42 @@ HealthCheck_RecordWarn() {
 	_HealthCheckWarnCount := (IsSet(_HealthCheckWarnCount) ? _HealthCheckWarnCount : 0) + 1
 }
 
-; Probes all registered adapters and returns a Map snapshot with:
-;   "version"         -> String  driver version (from Updater_CurrentVersion or "local")
-;   "loaded_adapters" -> Array   adapter ids that loaded cleanly
-;   "ports_validated" -> Array   adapter ids whose full contract was satisfied
-;   "failed_adapters" -> Array   adapter ids that failed load or contract check
-;   "last_error"      -> String  most recent error (empty string if none)
-;   "uptime_sec"      -> Integer seconds since module load (_HealthCheckStartMs)
-;   "warn_count"      -> Integer number of WARNING-level lines emitted this session
-;   "err_count"       -> Integer number of errors recorded via HealthCheck_RecordError
-;   "sys"             -> Map     OS/runtime/hardware snapshot (see _HealthCheck_SysInfo)
-;   "recent_issues"   -> Array   last 50 WARNING/ERROR lines from the ring buffer
-;   "pause_state"     -> Map     {is_paused, source} — project_suspend_pause_invariant friendly (read-only)
-;   "keylogger"       -> Map     safe summary (events, wpm, privacy counts, log paths incl. errors sink)
-;   "llm"             -> Map     backend, profile, model, basic settings (no prompts)
-;   "layout"          -> Map     base/AltGr/Shift/Caps + prefix latch status (sanitized)
-;   "hotstrings"      -> Map     terminators, personal/dyn counts, delays (no secrets)
-;   "logs"            -> Map     unified + errors sink paths, ring info
-;   "config"          -> Map     overrides count, high-level enabled counts, key paths
-; @return {Map}
+
+
+
+
+; ===============================
+; ===============================
+; ======= 3/ The Snapshot =======
+; ===============================
+; ===============================
+
+; The documents of the diagnostics window, parsed once: they are files of the
+; shared tree, not settings.
+global _HC_Config := 0
+
+; The schema, the issue forms, the redaction rules and the repository, with
+; the raw schema and rules the page receives as they are.
+; @returns {Map} { schema, raw_schema, templates, redaction, raw_redaction, repository }
+HealthCheck_Config() {
+	global _HC_Config, _SharedDir
+	if (_HC_Config is Map)
+		return _HC_Config
+	RawSchema := FileRead(_SharedDir . "\modules\diagnostics\schema.json", "UTF-8")
+	RawRedaction := FileRead(_SharedDir . "\modules\diagnostics\redaction.json", "UTF-8")
+	Schema := JsonParse(RawSchema)
+	if !(Schema is Map) || (Schema.Get("schema_version", 0) != 2)
+		throw ValueError("The diagnostics schema is not a version 2 schema.")
+	_HC_Config := Map(
+		"schema",        Schema,
+		"raw_schema",    RawSchema,
+		"redaction",     JsonParse(RawRedaction),
+		"raw_redaction", RawRedaction,
+		"templates",     JsonParse(FileRead(_SharedDir . "\modules\diagnostics\issue_templates.json", "UTF-8")),
+		"repository",    JsonParse(FileRead(_SharedDir . "\modules\updater\defaults.json", "UTF-8"))["github"])
+	return _HC_Config
+}
+
 ; Run one collector defensively and return its value, or ``Fallback`` if it
 ; throws.
 ;
@@ -137,201 +190,262 @@ _HealthCheck_Collect(Name, Collector, Fallback) {
 	return Value
 }
 
-HealthCheck_Run() {
-	global _HealthCheckStartMs, _HealthCheckLastError, _HealthCheckWarnCount, _HealthCheckErrCount
+; The warnings and errors: the session counters, the last error and the
+; newest entries of today's errors file (the ring before it exists).
+; @returns {Map}
+_HealthCheck_Issues() {
+	global _HealthCheckLastError, _HealthCheckWarnCount, _HealthCheckErrCount
+	Recent := _HealthCheck_Collect("recent_issues",
+		() => _HealthCheck_RecentIssues(_HealthCheck_ErrorsLogPath()),
+		Map("entries", [], "source", "unavailable"))
+	Issues := Map(
+		"warn_count",    _HealthCheckWarnCount,
+		"err_count",     _HealthCheckErrCount,
+		"recent_source", Recent["source"],
+		"recent",        Recent["entries"])
+	if (_HealthCheckLastError != "")
+		Issues["last_error"] := _HealthCheckLastError
+	return Issues
+}
 
-	try LoggerStart("Healthcheck", "Running healthcheck...")
+; The developer section: the module check, the log level and the ring.
+; @returns {Map}
+_HealthCheck_Developer() {
+	global LOGGER_MIN_LEVEL
+	Check := _HealthCheck_ModuleCheck()
+	Developer := Map(
+		"modules_ok",       Check["ok"],
+		"modules_failed",   Check["failed"],
+		"modules_disabled", [],
+		"ring_lines",       LoggerRingBufferSnapshot().Length)
+	if IsSet(LOGGER_MIN_LEVEL)
+		Developer["log_level"] := String(LOGGER_MIN_LEVEL)
+	return Developer
+}
 
-	; Resolve driver version
-	Version := "local"
-	try Version := Updater_CurrentVersion()
+; The pending state of every probe this driver runs.
+; @param Schema {Map}
+; @returns {Map}
+_HealthCheck_PendingProbes(Schema) {
+	Probes := Map()
+	for Id, Probe in Schema["probes"]
+		if _HealthCheck_Applies(Probe)
+			Probes[Id] := Map("state", "pending")
+	return Probes
+}
 
-	Specs          := _HealthCheck_Collect("adapter_specs", _HealthCheck_AdapterSpecs, Map())
-	LoadedAdapters := []
-	PortsValidated := []
-	FailedAdapters := []
+; A monotonic millisecond clock finer than A_TickCount, whose 15.6 ms steps
+; cannot measure a 5 ms budget.
+; @returns {Float}
+_HealthCheck_NowMs() {
+	static Frequency := 0
+	if !Frequency
+		DllCall("QueryPerformanceFrequency", "Int64*", &Frequency)
+	Counter := 0
+	DllCall("QueryPerformanceCounter", "Int64*", &Counter)
+	return Counter * 1000 / Frequency
+}
 
-	for AdapterId, RequiredFns in Specs {
-		AllPresent := true
-		for _, FnName in RequiredFns {
-			if !IsSet(%FnName%) or !((%FnName%) is Func) {
-				AllPresent := false
-				try LoggerWarn("Healthcheck", "Adapter '{1}' missing function '{2}'.", AdapterId, FnName)
-			}
-		}
-		if AllPresent {
-			LoadedAdapters.Push(AdapterId)
-			PortsValidated.Push(AdapterId)
-		} else {
-			FailedAdapters.Push(AdapterId . " (contract incomplete)")
-		}
-	}
-
+; Collects the synchronous (phase A) snapshot of version 2 of the schema:
+; in-process reads only, the probes fill the rest.
+; @param Detailed {Boolean} Whether the user ticked "Include details".
+; @returns {Map} { schema_version, driver, generated_at, detailed, sections, probes }
+HealthCheck_Run(Detailed := false) {
+	global _HealthCheckStartMs
+	try LoggerStart("Healthcheck", "Collecting the diagnostics…")
+	; The budget is the collection's: the shared documents are parsed once per
+	; session (about 30 ms on the first opening), before the clock starts
+	Schema := HealthCheck_Config()["schema"]
+	Started := _HealthCheck_NowMs()
 	UptimeSec := (A_TickCount - (_HealthCheckStartMs) & 0xFFFFFFFF) // 1000
+	ReportSubdir := Schema["report"]["subdir"]
 
-	; Every collector below is hoisted out of the Map(...) constructor and run
-	; through _HealthCheck_Collect. Inside the constructor they were bare calls,
-	; so the first one to throw took the entire healthcheck — and with it the
-	; crash report it was being run to produce — down with it. _HealthCheck_SysInfo
-	; is the most exposed: it does a WMI ConnectServer, three RegRead calls and a
-	; git subprocess poll.
-	RecentIssues := _HealthCheck_Collect("recent_issues", () => _HealthCheck_RecentIssues(100), [])
-	Sys          := _HealthCheck_Collect("sys", _HealthCheck_SysInfo, Map())
-	PauseState   := _HealthCheck_Collect("pause_state", _HealthCheck_PauseState, Map())
-	KeyloggerSum := _HealthCheck_Collect("keylogger", _HealthCheck_KeyloggerSummary, Map())
-	LLMState     := _HealthCheck_Collect("llm", _HealthCheck_LLMState, Map())
-	LayoutState  := _HealthCheck_Collect("layout", _HealthCheck_LayoutState, Map())
-	HotstrState  := _HealthCheck_Collect("hotstrings", _HealthCheck_HotstringsState, Map())
-	LogsInfo     := _HealthCheck_Collect("logs", _HealthCheck_LogsInfo, Map())
-	ConfigSum    := _HealthCheck_Collect("config", _HealthCheck_ConfigSummary, Map())
+	; Every collector is hoisted out of the Map(...) constructor and run through
+	; _HealthCheck_Collect: inside the constructor a bare call could not be
+	; guarded, and the first one to throw took the whole snapshot — and the
+	; crash report it was run for — down with it.
+	Paths       := _HealthCheck_Collect("paths", () => _HealthCheck_Paths(ReportSubdir), Map())
+	Versions    := _HealthCheck_Collect("versions", _HealthCheck_Versions, Map())
+	Hardware    := _HealthCheck_Collect("hardware", _HealthCheck_Hardware, Map())
+	System      := _HealthCheck_Collect("system", () => _HealthCheck_System(Detailed, UptimeSec), Map())
+	Input       := _HealthCheck_Collect("input", _HealthCheck_Input, Map())
+	Features    := _HealthCheck_Collect("features", _HealthCheck_Features, Map("items", []))
+	Ai          := _HealthCheck_Collect("ai", _HealthCheck_Ai, Map())
+	Peripherals := _HealthCheck_Collect("peripherals", () => _HealthCheck_Peripherals(Detailed), Map("items", []))
+	Issues      := _HealthCheck_Collect("issues", _HealthCheck_Issues, Map())
+	Developer   := _HealthCheck_Collect("developer", _HealthCheck_Developer, Map())
+	Probes      := _HealthCheck_PendingProbes(Schema)
 
-	Result := Map(
-		"version",         Version,
-		"loaded_adapters", LoadedAdapters,
-		"ports_validated", PortsValidated,
-		"failed_adapters", FailedAdapters,
-		"last_error",      _HealthCheckLastError,
-		"uptime_sec",      UptimeSec,
-		"warn_count",      _HealthCheckWarnCount,
-		"err_count",       _HealthCheckErrCount,
-		"sys",             Sys,
-		"recent_issues",   RecentIssues,
-		; Enriched (maximum completeness)
-		"pause_state",     PauseState,
-		"keylogger",       KeyloggerSum,
-		"llm",             LLMState,
-		"layout",          LayoutState,
-		"hotstrings",      HotstrState,
-		"logs",            LogsInfo,
-		"config",          ConfigSum
-	)
+	Sections := Map(
+		"paths",       Paths,
+		"versions",    Versions,
+		"hardware",    Hardware,
+		"system",      System,
+		"input",       Input,
+		"features",    Features,
+		"ai",          Ai,
+		"network",     Map(),
+		"peripherals", Peripherals,
+		"issues",      Issues,
+		"developer",   Developer)
+	Snapshot := Map(
+		"schema_version", Schema["schema_version"],
+		"driver",         "windows",
+		"generated_at",   FormatTime(A_NowUTC, "yyyy-MM-dd'T'HH:mm:ss'Z'"),
+		"detailed",       Detailed ? true : false,
+		"sections",       Sections,
+		"probes",         Probes)
 
-	try LoggerSuccess("Healthcheck", "Healthcheck complete — {1} adapter(s) OK, {2} failed, uptime {3}s.",
-		PortsValidated.Length, FailedAdapters.Length, UptimeSec)
-
-	return Result
+	; A Float: Round(x, 1) returns a String in AHK v2
+	Elapsed := Round((_HealthCheck_NowMs() - Started) * 10) / 10
+	Developer["phase_a_ms"] := Elapsed
+	; Not a warning: the next snapshot would count it among the session's
+	; problems. The report's developer section carries the duration.
+	if (Elapsed > Schema["phase_a_budget_ms"])
+		try LoggerInfo("Healthcheck", "The synchronous diagnostics took {1} ms, over the {2} ms budget.",
+			Elapsed, Schema["phase_a_budget_ms"])
+	Undeclared := HealthCheck_CheckFields(Snapshot, Schema)["undeclared"]
+	if (Undeclared.Length > 0)
+		try LoggerError("Healthcheck", "The diagnostics snapshot carries fields the schema does not declare: {1}.",
+			_HC_Join(Undeclared, ", "))
+	try LoggerSuccess("Healthcheck", "Diagnostics collected in {1} ms.", Elapsed)
+	return Snapshot
 }
 
-; The "Last git commit" value shared by every copy format, matching the HTML
-; view: the commit id, then where it came from (a build stamp or a checkout) so
-; a release and a source run of the same commit are told apart.
-; @param Sys {Map} The snapshot's "sys" section.
-; @return {String}
-_HealthCheck_CommitText(Sys) {
-	Commit := Sys.Get("git_hash", "")
-	Text := (Commit != "") ? Commit : "unknown"
-	Source := Sys.Get("commit_source", "")
-	return (Source != "") ? Text . " (" . Source . ")" : Text
-}
-
-; Formats a healthcheck snapshot as a Markdown string suitable for WebView2 rendering.
-; @param Snapshot {Map|0} Result from HealthCheck_Run(), or 0 to run fresh.
-; @return {String}
-HealthCheck_FormatMarkdown(Snapshot := 0) {
-	if !(Snapshot is Map)
-		Snapshot := HealthCheck_Run()
-
-	Sys := Snapshot["sys"]
-
-	Lines := []
-	Lines.Push("# System diagnostic")
-	Lines.Push("")
-
-	; ── System info ───────────────────────────────────────────────────────────
-	Lines.Push("## System")
-	Lines.Push("")
-	Lines.Push("| Field | Value |")
-	Lines.Push("|---|---|")
-	Lines.Push("| ErgoptiPlus version | " . '``' . Snapshot["version"] . '``' . " |")
-	Lines.Push("| Last git commit | " . _HealthCheck_CommitText(Sys) . " |")
-	Lines.Push("| Uptime | " . _HealthCheck_FormatUptime(Snapshot["uptime_sec"]) . " |")
-	Lines.Push("| AutoHotkey | " . Sys["ahk_version"] . " " . Sys["ahk_bitness"] . " |")
-	Lines.Push("| Windows | " . Sys["os_name"] . " |")
-	Lines.Push("| Windows build | " . Sys["os_build"] . " |")
-	Lines.Push("| Architecture | " . Sys["os_arch"] . " |")
-	Lines.Push("| CPU | " . Sys["cpu_name"] . " |")
-	Lines.Push("| Logical cores | " . Sys["cpu_cores"] . " |")
-	Lines.Push("| Total RAM | " . Sys["ram_total_gb"] . " GB |")
-	Lines.Push("| Available RAM | " . Sys["ram_free_gb"] . " GB |")
-	Lines.Push("| Screen resolution | " . Sys["screen_res"] . " |")
-	Lines.Push("| DPI | " . Sys["dpi"] . " (" . Sys["dpi_scale"] . "%) |")
-	Lines.Push("| Locale | " . Sys["locale"] . " |")
-	if Sys["config_dir"] != ""
-		Lines.Push("| Config dir | " . '``' . Sys["config_dir"] . '``' . " |")
-	if Sys.Get("script_dir", "") != ""
-		Lines.Push("| App dir | " . '``' . Sys["script_dir"] . '``' . " |")
-	Lines.Push("")
-
-	; ── Session counters ──────────────────────────────────────────────────────
-	WarnCount := Snapshot["warn_count"]
-	ErrCount  := Snapshot["err_count"]
-	Lines.Push("## Session counters")
-	Lines.Push("")
-	Lines.Push("| Type | Count |")
-	Lines.Push("|---|---|")
-	Lines.Push("| ⚠️ Warnings | " . (WarnCount = 0 ? "✅ " : "❌ ") . WarnCount . " |")
-	Lines.Push("| 🔴 Errors   | " . (ErrCount  = 0 ? "✅ " : "❌ ") . ErrCount  . " |")
-	Lines.Push("")
-
-	; ── Adapters ──────────────────────────────────────────────────────────────
-	OkList   := Snapshot["ports_validated"]
-	FailList := Snapshot["failed_adapters"]
-	Total    := OkList.Length + FailList.Length
-
-	Lines.Push("## Adapters (" . OkList.Length . "/" . Total . " OK)")
-	Lines.Push("")
-	for _, Name in OkList
-		Lines.Push("- ✓ " . '``' . Name . '``')
-	for _, Name in FailList
-		Lines.Push("- ✗ " . '``' . Name . '``')
-	Lines.Push("")
-
-	; ── Last recorded error ───────────────────────────────────────────────────
-	Lines.Push("## Last recorded error")
-	Lines.Push("")
-	LastErr := Snapshot["last_error"]
-	Fence   := Chr(96) . Chr(96) . Chr(96)
-	if LastErr != ""
-		Lines.Push(Fence . "`n" . LastErr . "`n" . Fence)
-	else
-		Lines.Push("_No error recorded._")
-	Lines.Push("")
-
-	; ── Recent warnings / errors ──────────────────────────────────────────────
-	RecentIssues := Snapshot["recent_issues"]
-	Lines.Push("## Recent warnings / errors (" . RecentIssues.Length . "/100)")
-	Lines.Push("")
-	if RecentIssues.Length = 0 {
-		Lines.Push("_No warnings or errors since startup._")
-	} else {
-		Lines.Push(Fence)
-		for _, L in RecentIssues
-			Lines.Push(L)
-		Lines.Push(Fence)
+; Formats a snapshot as plain text, one "section.field: value" line per value,
+; for the read-only field shown when WebView2 is unavailable.
+; @param Snapshot {Map} From HealthCheck_Run().
+; @returns {String}
+HealthCheck_FormatPlain(Snapshot) {
+	Out := "ErgoptiPlus — " . Snapshot["driver"] . " — " . Snapshot["generated_at"]
+	for SectionId, Section in Snapshot["sections"] {
+		if !(Section is Map)
+			continue
+		for Key, Value in Section
+			Out .= "`r`n" . SectionId . "." . Key . ": " . _HealthCheck_PlainValue(Value)
 	}
-
-	Out := ""
-	for i, L in Lines
-		Out .= (i > 1 ? "`n" : "") . L
 	return Out
 }
 
-; Exact dimensions for the diagnostic window — mirrors the updater layout approach.
-global _HC_WIN_W    := 740
-global _HC_MARGIN   := 12
-global _HC_BTN_H    := 32
-global _HC_BTN_PAD  := 8    ; vertical gap above and below the button row
+; One value of the plain-text report.
+; @param Value {Any}
+; @returns {String}
+_HealthCheck_PlainValue(Value) {
+	if (Value is Array) {
+		Parts := ""
+		for Index, Item in Value
+			Parts .= (Index > 1 ? " | " : "") . _HealthCheck_PlainValue(Item)
+		return Parts
+	}
+	if (Value is Map) {
+		Parts := ""
+		for Key, Item in Value
+			Parts .= (Parts == "" ? "" : ", ") . Key . "=" . _HealthCheck_PlainValue(Item)
+		return Parts
+	}
+	return StrReplace(StrReplace(String(Value), "`r", " "), "`n", " ")
+}
 
-; Virtual host for the shared healthcheck frontend — maps _SharedDir so
-; relative assets (style.css, script.js, ../dom_utils.js) resolve over https.
+; True when a schema entry (a section, a field or a probe) applies to a driver.
+; @param Entry {Map}
+; @param Driver {String}
+; @returns {Boolean}
+_HealthCheck_Applies(Entry, Driver := "windows") {
+	if !Entry.Has("platforms")
+		return true
+	for Platform in Entry["platforms"]
+		if (Platform == Driver)
+			return true
+	return false
+}
+
+; True when a probe fills the field on a driver.
+; @param Field {Map}
+; @param Driver {String}
+; @returns {Boolean}
+_HealthCheck_HasProbe(Field, Driver) {
+	if !Field.Has("probe")
+		return false
+	Probe := Field["probe"]
+	return (Probe is String) || ((Probe is Map) && Probe.Has(Driver))
+}
+
+; Compares a snapshot with the schema, as healthcheck.snapshot.check_fields
+; does for the Lua drivers: the fields produced that the schema does not
+; declare for its driver (drift: the page would never show them), and the declared
+; synchronous fields that are absent (shown as unknown). The driver is the
+; snapshot's own, so the shared vectors replay every driver's rules.
+; @param Snapshot {Map}
+; @param Schema {Map}
+; @returns {Map} { undeclared: Array, missing: Array } of "section" or "section.field", sorted.
+HealthCheck_CheckFields(Snapshot, Schema) {
+	Driver := Snapshot["driver"]
+	Declared := Map()
+	for Section in Schema["sections"]
+		if _HealthCheck_Applies(Section, Driver)
+			Declared[Section["id"]] := Section
+	Undeclared := ""
+	Missing := ""
+	Sections := Snapshot.Get("sections", Map())
+	for Id, Data in Sections {
+		if !Declared.Has(Id) {
+			Undeclared .= Id . "`n"
+			continue
+		}
+		Section := Declared[Id]
+		if (Section.Get("kind", "fields") != "fields") || !(Data is Map)
+			continue
+		Fields := Map()
+		for Field in Section.Get("fields", [])
+			if _HealthCheck_Applies(Field, Driver)
+				Fields[Field["id"]] := Field
+		for FieldId in Data
+			if !Fields.Has(FieldId)
+				Undeclared .= Id . "." . FieldId . "`n"
+		for FieldId, Field in Fields {
+			Optional := Field.Get("opt_in", false) || _HealthCheck_HasProbe(Field, Driver)
+			if !Data.Has(FieldId) && !Optional
+				Missing .= Id . "." . FieldId . "`n"
+		}
+	}
+	for Id, Section in Declared
+		if (Section.Get("kind", "fields") != "summary") && !Sections.Has(Id)
+			Missing .= Id . "`n"
+	return Map("undeclared", _HealthCheck_SortedLines(Undeclared), "missing", _HealthCheck_SortedLines(Missing))
+}
+
+; The non-empty lines of a text, sorted, as an Array.
+; @param Text {String}
+; @returns {Array}
+_HealthCheck_SortedLines(Text) {
+	Text := Trim(Text, "`n")
+	return (Text == "") ? [] : StrSplit(Sort(Text, "C"), "`n")
+}
+
+
+
+
+
+; =============================
+; =============================
+; ======= 4/ The Window =======
+; =============================
+; =============================
+
+; The window's size: the manifest's healthcheck entry
+; (_shared/ui/apps.manifest.json), pinned by test-webview-geometry-single-source.
+global HC_WIDTH  := 860
+global HC_HEIGHT := 720
+
+; Virtual host for the shared page — maps _SharedDir so relative assets
+; (style.css, script.js, ../dom_utils.js) and the locale files resolve over https.
 global HC_VHOST             := "ergopti.healthcheck"
 global HC_HOST_ACCESS_ALLOW := 1
 
-; WebView2 plumbing — subscription handles + snapshot JSON captured at open time.
+; WebView2 plumbing — subscription handles of the open window.
 global _HC_Controller := unset
 global _HC_WebView    := unset
-global _HC_NavSub     := unset
-global _HC_SnapshotJs := ""
+global _HC_MsgSub     := unset
 global _HC_WindowEpoch := 0
 
 ; The host window itself. Without it the singleton bookkeeping was split in half:
@@ -344,70 +458,57 @@ global _HC_Gui := unset
 ; double-close (same SEH access-violation pattern as action_picker_webview.ahk).
 global _HC_ResetDone := false
 
-; Opens a dedicated window displaying the healthcheck report.
-; Loads the shared _shared/ui/healthcheck/ frontend via virtual host, injects
-; the snapshot as JSON after navigation, and renders client-side. The button
-; is a native AHK control placed below the WebView pane.
-; Falls back to a selectable Edit + native button when WebView2 is unavailable.
-HealthCheck_ShowWindow() {
-	global _VendorDir, _SharedDir, _HC_WIN_W, _HC_MARGIN, _HC_BTN_H, _HC_BTN_PAD
-	global HC_VHOST, HC_HOST_ACCESS_ALLOW
-	global _HC_Controller, _HC_WebView, _HC_NavSub, _HC_SnapshotJs, _HC_ResetDone, _HC_Gui
-	global _HC_WindowEpoch
+; The page session of the open window: its epoch, its snapshot, whether
+; details are included and the mode it opened in (0 when closed).
+global _HC_Session := 0
 
-	Snapshot  := HealthCheck_Run()
-	PlainText := HealthCheck_FormatPlain(Snapshot)
+; Keep native title construction with the GUI owner, independent of diagnostics collection.
+_HC_NewWindow() {
+	return Gui_Create("+Resize +MinSize640x480", t("menu.debug.healthcheck"))
+}
 
+; Opens the diagnostics window, replacing any previous one.
+; @param Mode {String} "report" opens it at the preview and the report button.
+HealthCheck_ShowWindow(Mode := "") {
+	global _VendorDir, _SharedDir, _I18nLocale, HC_WIDTH, HC_HEIGHT, HC_VHOST, HC_HOST_ACCESS_ALLOW
+	global _HC_Controller, _HC_WebView, _HC_MsgSub, _HC_ResetDone, _HC_Gui
+	global _HC_WindowEpoch, _HC_Session
+
+	LoggerStart("Healthcheck", "Opening the diagnostics window…")
 	; Close any previous singleton before opening a new one.
 	_HC_Close()
+	Snapshot := HealthCheck_Run()
 
-	WinTitle := "ErgoptiPlus — " . t("menu.debug.healthcheck")
-	BtnLabel := t("healthcheck.copy_and_close")
-
-	InnerW   := _HC_WIN_W - _HC_MARGIN * 2
-	ContentH := 560
-
-	G := Gui_Create("+Resize +MinSize540x420", WinTitle)
-	G.SetFont("s10", "Segoe UI")
-	G.MarginX := _HC_MARGIN
-	G.MarginY := _HC_MARGIN
-
-	; Content pane — same Text control pattern as updater's RightPane.
-	ContentCtl := G.Add("Text", "xm ym w" . InnerW . " h" . ContentH, "")
-
-	BtnCopy := G.Add("Button",
-		"xm y+" . _HC_BTN_PAD . " w" . InnerW . " h" . _HC_BTN_H . " Default",
-		BtnLabel)
-
+	G := _HC_NewWindow()
+	G.MarginX := 0
+	G.MarginY := 0
+	ContentCtl := G.Add("Text", "x0 y0 w" . HC_WIDTH . " h" . HC_HEIGHT, "")
 	G.WVC := 0
-	CloseAndCopy := (*) => _HealthCheck_CopyAndClose(PlainText, G,
-		CB_Write, _HealthCheck_CloseGui)
 	G.OnEvent("Close",  (*) => _HealthCheck_CloseGui(G))
 	G.OnEvent("Escape", (*) => _HealthCheck_CloseGui(G))
-	BtnCopy.OnEvent("Click", CloseAndCopy)
-
-	G.Show("w" . _HC_WIN_W . " AutoSize")
+	G.OnEvent("Size",   _HC_OnSize.Bind(ContentCtl))
+	G.Show("w" . HC_WIDTH . " h" . HC_HEIGHT)
 	; Publish the host window so the next open can actually destroy this one.
 	_HC_Gui := G
 
 	UseWV := IsSet(WebView2) && IsSet(_VendorDir) && FileExist(_VendorDir . "\64bit\WebView2Loader.dll") && !WebView_ShouldUseNativeFallback()
 	if UseWV {
 		loader := _VendorDir . "\64bit\WebView2Loader.dll"
-
 		WVC := 0
 		try {
 			WVC := WebView2.create(ContentCtl.Hwnd, , WebView_SharedEnvironment(loader))
 			G.WVC := WVC
 		} catch as Err {
-			try LoggerWarn("Healthcheck", "WebView2 create failed: {1} — falling back.", Err.Message)
+			LoggerWarn("Healthcheck", "WebView2 create failed: {1} — showing the plain-text report.", Err.Message)
 		}
 
 		if WVC {
-			global _HC_Controller := WVC
-			global _HC_WebView    := WVC.CoreWebView2
-			global _HC_ResetDone  := false
+			_HC_Controller := WVC
+			_HC_WebView    := WVC.CoreWebView2
+			_HC_ResetDone  := false
 			_HC_WindowEpoch += 1
 			WindowEpoch := _HC_WindowEpoch
+			_HC_Session := Map("epoch", WindowEpoch, "snapshot", Snapshot, "detailed", false, "mode", Mode)
 
 			try {
 				s := _HC_WebView.Settings
@@ -417,50 +518,43 @@ HealthCheck_ShowWindow() {
 				s.AreBrowserAcceleratorKeysEnabled := false
 			}
 
-			; Build the renderHealthcheck(snapshot) call for injection after navigation.
-			_HC_SnapshotJs := "if(window.renderHealthcheck)window.renderHealthcheck(" . _HC_SnapshotToJson(Snapshot) . ")"
+			; The locale base and code before the page scripts run: i18n.js fetches
+			; the strings through the virtual host
+			Locale := IsSet(_I18nLocale) ? _I18nLocale : "en"
+			try _HC_WebView.AddScriptToExecuteOnDocumentCreated(
+				"window.__i18n_base='https://" . HC_VHOST . "/data/locales/';window._i18n_locale='" . Locale . "';")
 
-			; Store the navigation subscription handle.
-			global _HC_NavSub := _HC_WebView.NavigationCompleted(
-				_HC_OnNavigationCompleted.Bind(WindowEpoch))
+			; The subscription is bound to this window's epoch, so a late message of
+			; a closed window cannot reach its replacement through the globals.
+			_HC_MsgSub := _HC_WebView.WebMessageReceived(_HC_OnWebMessage.Bind(WindowEpoch))
 
 			; Map the virtual host BEFORE navigating.
 			try _HC_WebView.SetVirtualHostNameToFolderMapping(HC_VHOST, _SharedDir, HC_HOST_ACCESS_ALLOW)
 			try _HC_WebView.Navigate("https://" . HC_VHOST . "/ui/healthcheck/index.html?cb=" . A_TickCount)
 			try _HC_Controller.Fill()
 
-			try LoggerDone("Healthcheck", "Shared healthcheck frontend loaded via vhost.")
+			LoggerSuccess("Healthcheck", "Diagnostics window opened with the shared page.")
 			return
 		}
-		try LoggerWarn("Healthcheck", "WVC is falsy after create — falling back to Edit.")
 	}
 
-	; Fallback — overlay a selectable Edit over the Text placeholder.
-	_HealthCheck_AddFallbackEdit(G, ContentCtl, PlainText)
-}
-
-; Overlays a selectable read-only Edit on the same slot as the given placeholder control.
-_HealthCheck_AddFallbackEdit(G, HostCtl, Text) {
-	HostCtl.GetPos(&X, &Y, &W, &H)
-	EditCtl := G.Add("Edit", "x" . X . " y" . Y . " w" . W . " h" . H
-		. " ReadOnly Multi -Wrap +VScroll", Text)
+	; Without WebView2: the snapshot as plain text in a read-only field
+	ContentCtl.GetPos(&X, &Y, &W, &H)
+	EditCtl := G.Add("Edit", "x" . X . " y" . Y . " w" . W . " h" . H . " ReadOnly Multi -Wrap +VScroll",
+		HealthCheck_FormatPlain(Snapshot))
 	EditCtl.SetFont("s9", "Consolas")
+	LoggerSuccess("Healthcheck", "Diagnostics window opened as plain text (no WebView2).")
 }
 
-_HealthCheck_CopyAndClose(PlainText, G, WriteFn, CloseFn) {
-	if !WriteFn.Call(PlainText) {
-		try LoggerWarn("Healthcheck",
-			"Copy-and-Close kept the report open because the clipboard write was refused.")
-		return false
-	}
-	try CloseFn.Call(G)
-	catch as Err {
-		try LoggerError("Healthcheck",
-			"Copy-and-Close copied the report but could not close the window: {1}.",
-			Err.Message)
-		return false
-	}
-	return true
+; Keeps the page filling the window when it is resized.
+; @param ContentCtl {Gui.Text} The WebView2 host control.
+_HC_OnSize(ContentCtl, GuiObj, MinMax, Width, Height) {
+	global _HC_Controller, _HC_ResetDone
+	if (MinMax == -1)
+		return
+	ContentCtl.Move(0, 0, Width, Height)
+	if !_HC_ResetDone && IsSet(_HC_Controller)
+		try _HC_Controller.Fill()
 }
 
 _HealthCheck_CloseGui(G) {
@@ -474,34 +568,149 @@ _HealthCheck_CloseGui(G) {
 	_HC_Gui := unset
 }
 
-; ── WebView2 navigation + teardown helpers ──────────────────────────────────
+; ── WebView2 messages ───────────────────────────────────────────────────────
 
-; Injects the snapshot JSON once the shared frontend has finished loading.
-; NavigationCompleted can arrive after the singleton was closed and reopened.
-; Bind the session so a late event cannot schedule work against the replacement
-; controller through the mutable module globals.
-_HC_OnNavigationCompleted(WindowEpoch, Handler, Args) {
+; Receives the page's messages. WebMessageReceived is a COM callback: the
+; message is read here and handled on a fresh stack, bound to the window that
+; received it. The callback bypasses native Suspend, and deliberately: the
+; diagnostics page changes nothing ErgoptiPlus does, and the pause is often why
+; the user opened it, so every action stays available while suspended.
+_HC_OnWebMessage(WindowEpoch, Handler, Args) {
 	global _HC_WindowEpoch, _HC_ResetDone
 	if _HC_ResetDone || (WindowEpoch != _HC_WindowEpoch)
 		return
-	SetTimer(_HC_PushSnapshot.Bind(WindowEpoch), -1)
+	try Raw := Args.TryGetWebMessageAsString()
+	catch as Err {
+		LoggerWarn("Healthcheck", "A diagnostics page message could not be read: {1}.", Err.Message)
+		return
+	}
+	if A_IsSuspended
+		LoggerDebug("Healthcheck", "A diagnostics page message arrived while suspended; the page stays usable.")
+	SetTimer(_HC_HandleMessage.Bind(WindowEpoch, Raw), -1)
 }
 
-_HC_PushSnapshot(WindowEpoch) {
-	global _HC_WebView, _HC_SnapshotJs, _HC_WindowEpoch, _HC_ResetDone
+; Handles one message of the page, on its own stack.
+; @param WindowEpoch {Integer} The window that received it.
+; @param Raw {String} The message as the page posted it.
+_HC_HandleMessage(WindowEpoch, Raw) {
+	global _HC_WindowEpoch, _HC_ResetDone, _HC_Session
+	if _HC_ResetDone || (WindowEpoch != _HC_WindowEpoch) || !(_HC_Session is Map)
+		return
+	if (Raw == "ready") {
+		LoggerInfo("Healthcheck", "Diagnostics page ready.")
+		try {
+			_HC_Send(WindowEpoch, _HC_InitJson(_HC_Session))
+			_HC_RestartProbes(WindowEpoch)
+		} catch as Err {
+			LoggerError("Healthcheck", "The diagnostics page could not be initialised: {1}", Err.Message)
+		}
+		return
+	}
+	try Message := JsonParse(Raw)
+	catch as Err {
+		LoggerWarn("Healthcheck", "Refused a diagnostics page message that is not JSON: {1}.", Err.Message)
+		return
+	}
+	Config := HealthCheck_Config()
+	Result := HealthCheck_ValidateAction(Message, Map("schema", Config["schema"], "templates", Config["templates"],
+		"driver", "windows"))
+	if Result.Has("reason") {
+		LoggerWarn("Healthcheck", "Refused a diagnostics page action ({1}).", Result["reason"])
+		return
+	}
+	Action := Result["action"]
+	LoggerInfo("Healthcheck", "Diagnostics page action: {1}.", Action["action"])
+	; An exception on a timer thread would reach the global error handler as a
+	; crash: it is logged here and the page is told its button did nothing
+	try {
+		_HC_PerformPageAction(WindowEpoch, Action, Config)
+	} catch as Err {
+		LoggerError("Healthcheck", "The diagnostics action '{1}' failed: {2}", Action["action"], Err.Message)
+		_HC_Send(WindowEpoch, '{"type":"action","action":' . _HC_JsStr(Action["action"]) . ',"ok":false}')
+	}
+}
+
+; Performs one validated action of the page and answers it.
+; @param WindowEpoch {Integer}
+; @param Action {Map} From HealthCheck_ValidateAction.
+; @param Config {Map} From HealthCheck_Config().
+_HC_PerformPageAction(WindowEpoch, Action, Config) {
+	global _HC_Session
+	switch Action["action"] {
+		case "close":
+			_HC_Close()
+		case "refresh":
+			_HC_Session["detailed"] := Action["detailed"]
+			_HC_Session["snapshot"] := HealthCheck_Run(Action["detailed"])
+			_HC_Send(WindowEpoch, '{"type":"snapshot","snapshot":' . _HC_ValueToJson(_HC_Session["snapshot"]) . '}')
+			_HC_RestartProbes(WindowEpoch)
+		default:
+			Outcome := HealthCheck_PerformAction(Action, _HC_Session["snapshot"]["sections"]["paths"], Config)
+			Json := '{"type":"action","action":' . _HC_JsStr(Action["action"])
+				. ',"ok":' . (Outcome["ok"] ? "true" : "false")
+			if Outcome.Has("path")
+				Json .= ',"path":' . _HC_JsStr(Outcome["path"])
+			if Outcome.Get("missing", false)
+				Json .= ',"missing":true'
+			_HC_Send(WindowEpoch, Json . '}')
+	}
+}
+
+; The page's first message: its configuration and the first snapshot. The
+; schema and the redaction rules go as their files are; the redaction context
+; is written by hand so its flag is a JSON true, not the 1 AHK stores.
+; @param Session {Map}
+; @returns {String}
+_HC_InitJson(Session) {
+	Config := HealthCheck_Config()
+	Context := HealthCheck_RedactionContext()
+	return '{"type":"init","config":{"schema":' . Config["raw_schema"]
+		. ',"redaction":' . Config["raw_redaction"]
+		. ',"context":{"home":' . _HC_JsStr(Context["home"]) . ',"user":' . _HC_JsStr(Context["user"])
+		. ',"case_insensitive":true},"mode":' . _HC_JsStr(Session["mode"])
+		. '},"snapshot":' . _HC_ValueToJson(Session["snapshot"]) . '}'
+}
+
+; Sends one message into the window's page.
+; @param WindowEpoch {Integer}
+; @param Json {String} The message, as JSON.
+_HC_Send(WindowEpoch, Json) {
+	global _HC_WebView, _HC_WindowEpoch, _HC_ResetDone
 	if _HC_ResetDone || (WindowEpoch != _HC_WindowEpoch) || !IsSet(_HC_WebView)
 		return
-	WebView_RunScriptAsync(_HC_WebView, _HC_SnapshotJs, "HealthCheck")
+	WebView_RunScriptAsync(_HC_WebView, "if(window.receiveDiagnostics)window.receiveDiagnostics(" . Json . ")",
+		"HealthCheck")
 }
 
-; Converts the AHK snapshot Map to a safe JSON string for JS injection.
-; Uses the same escaping as action_picker_webview.ahk's _ActPickWeb_JsStr.
-_HC_SnapshotToJson(Snapshot) {
-	; Walk the Map recursively and build a JSON string.
-	; We build manually to avoid depending on a JSON library.
-	return _HC_ValueToJson(Snapshot)
+; Restarts the probes of the window's snapshot; each answer is kept in the
+; snapshot and pushed into the same window only.
+; @param WindowEpoch {Integer}
+_HC_RestartProbes(WindowEpoch) {
+	global _HC_Session
+	HealthCheck_StartProbes(WindowEpoch, HealthCheck_Config()["schema"], _HC_PublishProbe)
 }
 
+; Publishes one probe's answer into its window.
+; @param WindowEpoch {Integer}
+; @param Id {String}
+; @param Result {Map} { state, ms, detail? }
+; @param Sections {Map} Values the probe filled, by section.
+_HC_PublishProbe(WindowEpoch, Id, Result, Sections) {
+	global _HC_WindowEpoch, _HC_Session
+	if (WindowEpoch != _HC_WindowEpoch) || !(_HC_Session is Map)
+		return
+	Snapshot := _HC_Session["snapshot"]
+	Snapshot["probes"][Id] := Result
+	for SectionId, Values in Sections {
+		for Key, Value in Values
+			Snapshot["sections"][SectionId][Key] := Value
+	}
+	_HC_Send(WindowEpoch, '{"type":"probe","id":' . _HC_JsStr(Id) . ',"result":' . _HC_ValueToJson(Result)
+		. ',"sections":' . _HC_ValueToJson(Sections) . '}')
+}
+
+; Converts an AHK value to JSON: Maps become objects, Arrays arrays, numbers
+; stay numbers (true and false are the 1 and 0 AHK stores).
 _HC_ValueToJson(Val) {
 	if !IsSet(Val)
 		return "null"
@@ -560,115 +769,21 @@ _HC_Close() {
 }
 
 _HC_Reset() {
-	global _HC_Controller, _HC_WebView, _HC_NavSub, _HC_SnapshotJs, _HC_ResetDone
-	global _HC_WindowEpoch
+	global _HC_Controller, _HC_WebView, _HC_MsgSub, _HC_ResetDone
+	global _HC_WindowEpoch, _HC_Session
 
 	if _HC_ResetDone
 		return
 	_HC_ResetDone := true
 	_HC_WindowEpoch += 1
+	_HC_Session := 0
+	HealthCheck_CancelProbes()
 
 	try {
-		_HC_NavSub := unset
+		_HC_MsgSub := unset
 		if IsSet(_HC_Controller)
 			_HC_Controller.Close()
 	}
 	_HC_Controller := unset
 	_HC_WebView    := unset
-	_HC_SnapshotJs := ""
-}
-
-; Formats the snapshot as a plain-text string (fallback when WebView2 is absent).
-; @param Snapshot {Map} Result from HealthCheck_Run().
-; @return {String}
-HealthCheck_FormatPlain(Snapshot) {
-	Sys   := Snapshot["sys"]
-	Lines := []
-	Lines.Push("=== System diagnostic ===")
-	Lines.Push("")
-	Lines.Push("Version         : " . Snapshot["version"])
-	Lines.Push("Last git commit : " . _HealthCheck_CommitText(Sys))
-	Lines.Push("Uptime          : " . _HealthCheck_FormatUptime(Snapshot["uptime_sec"]))
-	Lines.Push("AutoHotkey      : " . Sys["ahk_version"] . " " . Sys["ahk_bitness"])
-	Lines.Push("Windows         : " . Sys["os_name"])
-	Lines.Push("Build           : " . Sys["os_build"])
-	Lines.Push("Architecture    : " . Sys["os_arch"])
-	Lines.Push("CPU             : " . Sys["cpu_name"])
-	Lines.Push("Logical cores   : " . Sys["cpu_cores"])
-	Lines.Push("Total RAM       : " . Sys["ram_total_gb"] . " GB")
-	Lines.Push("Available RAM   : " . Sys["ram_free_gb"] . " GB")
-	Lines.Push("Resolution      : " . Sys["screen_res"])
-	Lines.Push("DPI             : " . Sys["dpi"] . " (" . Sys["dpi_scale"] . "%)")
-	Lines.Push("Locale          : " . Sys["locale"])
-	if Sys["config_dir"] != ""
-		Lines.Push("Config dir      : " . Sys["config_dir"])
-	if Sys.Get("script_dir", "") != ""
-		Lines.Push("App dir         : " . Sys["script_dir"])
-	Lines.Push("")
-	Lines.Push("Warnings        : " . Snapshot["warn_count"])
-	Lines.Push("Errors          : " . Snapshot["err_count"])
-	Lines.Push("")
-
-	; --- Enriched sections ---
-	if Snapshot.Has("pause_state") {
-		ps := Snapshot["pause_state"]
-		Lines.Push("Pause / Suspend : " . (ps["is_paused"] ? "PAUSED (" . ps["source"] . ")" : "running"))
-	}
-
-	if Snapshot.Has("logs") {
-		lg := Snapshot["logs"]
-		Lines.Push("Logs (unified)  : " . (lg["unified_today"] != "" ? lg["unified_today"] : "n/a"))
-		Lines.Push("Errors sink     : " . (lg["errors_today"] != "" ? lg["errors_today"] : "n/a") . "  (WARNING/ERROR only — keeps main log clean)")
-	}
-
-	if Snapshot.Has("keylogger") {
-		kl := Snapshot["keylogger"]
-		Lines.Push("Keylogger       : events=" . kl["events_session"] . " wpm=" . kl["wpm"] . " privacy_hits=" . kl["privacy_hits"])
-	}
-
-	if Snapshot.Has("llm") {
-		ll := Snapshot["llm"]
-		Lines.Push("LLM             : enabled=" . ll["enabled"] . " backend=" . ll["backend"] . " profile=" . ll["active_profile"])
-	}
-
-	if Snapshot.Has("layout") {
-		ly := Snapshot["layout"]
-		Lines.Push("Layout          : base=" . ly["ergopti_base"] . " altgr=" . ly["altgr"] . " shift=" . ly["shift"] . " caps=" . ly["caps"] . " prefix_latch=" . ly["prefix_latch"])
-	}
-
-	if Snapshot.Has("hotstrings") {
-		hs := Snapshot["hotstrings"]
-		Lines.Push("Hotstrings      : terminators=" . hs["terminators"] . " personal=" . hs["personal_count"] . " dyn=" . hs["dynamic_count"] . " magic=" . hs["magic_key"])
-	}
-
-	OkList := Snapshot["ports_validated"]
-	Lines.Push("Adapters OK (" . OkList.Length . ") :")
-	for _, Name in OkList
-		Lines.Push("  + " . Name)
-
-	FailList := Snapshot["failed_adapters"]
-	if FailList.Length > 0 {
-		Lines.Push("Failed (" . FailList.Length . ") :")
-		for _, Name in FailList
-			Lines.Push("  x " . Name)
-	} else {
-		Lines.Push("Failed : none")
-	}
-
-	Lines.Push("")
-	LastErr := Snapshot["last_error"]
-	Lines.Push("Last error      : " . (LastErr != "" ? LastErr : "none"))
-
-	RecentIssues := Snapshot["recent_issues"]
-	if RecentIssues.Length > 0 {
-		Lines.Push("")
-		Lines.Push("--- Recent warnings / errors (" . RecentIssues.Length . ") ---")
-		for _, L in RecentIssues
-			Lines.Push(L)
-	}
-
-	Out := ""
-	for i, L in Lines
-		Out .= (i > 1 ? "`r`n" : "") . L
-	return Out
 }

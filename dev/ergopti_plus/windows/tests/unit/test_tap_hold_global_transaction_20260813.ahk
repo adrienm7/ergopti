@@ -126,8 +126,6 @@ _THGT_FreshState() {
 			"caps_lock", Map(
 				"tap_action", "escape",
 				"hold_modifier", "ctrl")),
-		"layers", Map(
-			"nav", Map("description_key", "tap_hold.layer.nav")),
 		"inherit_defaults", true)
 }
 
@@ -233,7 +231,7 @@ _THGT_AllWritersStageAuthorizeReplaceThenPublishOwned(TargetPath) {
 			AssertFalse(TapHold["keys"]["caps_lock"].Has("hold_modifier"))
 		case "disabled":
 			AssertEqual(0, TapHold["keys"].Count)
-			AssertEqual(0, TapHold["layers"].Count)
+			AssertFalse(TapHold.Has("layers"), "layer bindings are not tap-hold state")
 			AssertFalse(TapHold["inherit_defaults"])
 		}
 	}

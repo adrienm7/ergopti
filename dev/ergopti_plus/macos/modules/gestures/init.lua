@@ -54,52 +54,34 @@ local Conflicts = require("modules.gestures.conflicts")
 -- =======================================
 -- =======================================
 
-M.DEFAULT_GESTURES = {
-	tap_2                = "none",
-	tap_3                = "left_click_toggle",
-	tap_4                = "app_window_previous",
-	tap_5                = "none",
-
-	swipe_3_horiz        = "none",
-	swipe_4_horiz        = "none",
-	swipe_5_horiz        = "none",
-
-	swipe_2_left         = "none",
-	swipe_2_right        = "none",
-	swipe_2_up           = "none",
-	swipe_2_down         = "none",
-	swipe_2_left_up      = "none",
-	swipe_2_right_up     = "none",
-	swipe_2_left_down    = "none",
-	swipe_2_right_down   = "none",
-
-	swipe_3_left         = "sel_word_prev",
-	swipe_3_right        = "sel_word_next",
-	swipe_3_up           = "tab_prev",
-	swipe_3_down         = "tab_next",
-	swipe_3_left_up      = "none",
-	swipe_3_right_up     = "none",
-	swipe_3_left_down    = "none",
-	swipe_3_right_down   = "none",
-
-	swipe_4_left         = "none",
-	swipe_4_right        = "none",
-	swipe_4_up           = "none",
-	swipe_4_down         = "none",
-	swipe_4_left_up      = "none",
-	swipe_4_right_up     = "none",
-	swipe_4_left_down    = "none",
-	swipe_4_right_down   = "none",
-
-	swipe_5_left         = "none",
-	swipe_5_right        = "none",
-	swipe_5_up           = "none",
-	swipe_5_down         = "none",
-	swipe_5_left_up      = "none",
-	swipe_5_right_up     = "none",
-	swipe_5_left_down    = "none",
-	swipe_5_right_down   = "none",
+M.SINGLE_SLOTS = {
+	"tap_2", "tap_3", "tap_4", "tap_5",
+	"swipe_2_left", "swipe_2_right", "swipe_2_up", "swipe_2_down",
+	"swipe_2_left_up", "swipe_2_right_up", "swipe_2_left_down", "swipe_2_right_down",
+	"swipe_3_left", "swipe_3_right", "swipe_3_up", "swipe_3_down",
+	"swipe_3_left_up", "swipe_3_right_up", "swipe_3_left_down", "swipe_3_right_down",
+	"swipe_4_left", "swipe_4_right", "swipe_4_up", "swipe_4_down",
+	"swipe_4_left_up", "swipe_4_right_up", "swipe_4_left_down", "swipe_4_right_down",
+	"swipe_5_left", "swipe_5_right", "swipe_5_up", "swipe_5_down",
+	"swipe_5_left_up", "swipe_5_right_up", "swipe_5_left_down", "swipe_5_right_down",
 }
+
+M.AXIS_SLOTS = {
+	"swipe_3_horiz",
+	"swipe_4_horiz",
+	"swipe_5_horiz",
+}
+
+-- Neutral bindings come from the shared manifest; recommendations are applied
+-- only by an explicit scoped restore.
+M.DEFAULT_GESTURES = {}
+M.RECOMMENDED_GESTURES = {}
+for _, slots in ipairs({ M.SINGLE_SLOTS, M.AXIS_SLOTS }) do
+	for _, slot in ipairs(slots) do
+		M.DEFAULT_GESTURES[slot] = Manifest.default_for("gestures." .. slot)
+		M.RECOMMENDED_GESTURES[slot] = Manifest.recommended_for("gestures." .. slot)
+	end
+end
 
 M.DEFAULT_MODES = {
 }
@@ -107,14 +89,8 @@ M.DEFAULT_MODES = {
 -- Default sensitivity (step) for incremental mode
 M.DEFAULT_SENSITIVITY = 3.5
 
--- Raw touch frames are high-frequency, so diagnostics sample about every 2 s
-local FRAME_HEARTBEAT_EVERY = 120
-
--- space_wrap is the one cross-driver gesture default in the shared manifest, so
--- it is sourced from there; the `gestures` enabled flag has no manifest path,
--- modes are computed per swipe slot below and sensitivities read per slot.
 M.DEFAULT_STATE = {
-	gestures = false,
+	gestures = Manifest.default_for("gestures.enabled"),
 	modes = {},
 	sensitivities = {},
 	space_wrap = Manifest.default_for("gestures.space_wrap"),
@@ -137,23 +113,6 @@ for k, v in pairs(M.DEFAULT_GESTURES) do
 	end
 end
 
-M.SINGLE_SLOTS = {
-	"tap_2", "tap_3", "tap_4", "tap_5",
-	"swipe_2_left", "swipe_2_right", "swipe_2_up", "swipe_2_down",
-	"swipe_2_left_up", "swipe_2_right_up", "swipe_2_left_down", "swipe_2_right_down",
-	"swipe_3_left", "swipe_3_right", "swipe_3_up", "swipe_3_down",
-	"swipe_3_left_up", "swipe_3_right_up", "swipe_3_left_down", "swipe_3_right_down",
-	"swipe_4_left", "swipe_4_right", "swipe_4_up", "swipe_4_down",
-	"swipe_4_left_up", "swipe_4_right_up", "swipe_4_left_down", "swipe_4_right_down",
-	"swipe_5_left", "swipe_5_right", "swipe_5_up", "swipe_5_down",
-	"swipe_5_left_up", "swipe_5_right_up", "swipe_5_left_down", "swipe_5_right_down",
-}
-
-M.AXIS_SLOTS = {
-	"swipe_3_horiz",
-	"swipe_4_horiz",
-	"swipe_5_horiz",
-}
 
 
 
@@ -165,8 +124,10 @@ M.AXIS_SLOTS = {
 -- ====================================
 -- ====================================
 
+-- `enabled` starts OFF: the native runtime is acquired only by enable_all() or
+-- start(), so a loaded module never claims ON before the saved preference applies.
 local CoreState = {
-	enabled        = true,
+	enabled        = false,
 	suspended      = false,  -- set by pause/resume (separate from the user feature flag)
 	ga             = {},
 	modes          = {},
@@ -222,6 +183,22 @@ local gesture_lifecycle_epoch = 0
 local gesture_start_attempt = nil
 local gesture_resume_start_required = false
 local teardown_gesture_runtime
+local release_native_runtime
+
+-- True only between a committed start() and the next native release. The runtime
+-- follows the feature switch: enable_all() acquires it, disable_all() releases it.
+local runtime_live = false
+
+--- Returns whether any native gesture owner is live or retained as cleanup debt.
+--- @return boolean owned
+local function native_runtime_owned()
+	return runtime_live == true
+		or gesture_primer ~= nil
+		or sleep_watcher ~= nil
+		or discovery_timer ~= nil
+		or next(discovery_cleanup_debt) ~= nil
+		or next(touch_watchers) ~= nil
+end
 
 -- Debounce for primer-triggered emergency recycles
 local last_emergency_recycle = 0
@@ -274,6 +251,16 @@ end
 -- Frame counters per device (for diagnostic heartbeat logging).
 -- Reset whenever a device gets a fresh watcher via create_watcher.
 local frame_counters = {}
+
+-- Devices whose current touch session already logged its heartbeat. A session
+-- runs from the first frame with a finger down to the first frame with none:
+-- frames arrive about a hundred times a second while touching, so one line per
+-- session is the most the log can usefully carry.
+local touch_session_logged = {}
+
+-- Watcher count the health check last reported, nil before its first report. A
+-- stable 30 s tick is not news; only a changed count is logged.
+local health_reported_watchers = nil
 
 --- Counts currently-registered watchers (diagnostic helper).
 --- @return number Watcher count.
@@ -437,9 +424,13 @@ local function create_watcher(deviceID)
 					tostring(deviceID), fc, #touches,
 					tonumber(pos.x) or -1, tonumber(pos.y) or -1)
 			end
-			if fc == 1 or fc % FRAME_HEARTBEAT_EVERY == 0 then
-				Logger.debug(LOG, "frame#%d device=%s touches=%d", fc, tostring(deviceID),
-					type(touches) == "table" and #touches or 0)
+			local finger_count = type(touches) == "table" and #touches or 0
+			if finger_count == 0 then
+				touch_session_logged[deviceID] = nil
+			elseif not touch_session_logged[deviceID] then
+				touch_session_logged[deviceID] = true
+				Logger.debug(LOG, "Touch session started on device=%s (frame %d, touches=%d).",
+					tostring(deviceID), fc, finger_count)
 			end
 			if not Logger.pcall(LOG, Engine.process_frame, touches) then
 				-- A failed frame may leave the native scroll blocker engaged
@@ -573,18 +564,28 @@ M.SG_NAMES           = Actions.SG_NAMES
 M.get_sg_names       = Actions.get_sg_names
 M.get_action_label   = Actions.get_label
 M.get_action_parameter_spec = Actions.get_action_parameter_spec
+M.is_assignable     = Actions.is_assignable
 M.validate_action_parameter = Actions.validate_action_parameter
+M.parameter_prompt   = Actions.parameter_prompt
+M.parameter_error    = Actions.parameter_error
 M.get_action_parameter = Actions.get_action_parameter
 M.set_action_parameter = Actions.set_action_parameter
+M.send_vocabulary    = Actions.send_vocabulary
 M.get_all_action_parameters = Actions.get_all_action_parameters
+M.split_action_parameter_key = Actions.split_action_parameter_key
+M.replace_action_parameters = Actions.replace_action_parameters
 M.forceCleanup       = Actions.force_cleanup
 M.toggleRightClick   = Actions.toggle_right_click
 M.triggerLookup      = Actions.trigger_lookup
 M.isRightClickHeld   = Actions.is_right_click_held
 M.on_action_changed  = Conflicts.on_action_changed
 
-function M.apply_all_overrides()    Conflicts.apply_all_overrides(CoreState.ga) end
+function M.apply_all_overrides()    return Conflicts.apply_all_overrides(CoreState.ga, function() return CoreState.enabled end) end
 function M.restore_all_overrides()  Conflicts.restore_all_overrides()           end
+function M.refresh_system_gestures(callback) return Conflicts.refresh(callback) end
+function M.system_gesture_conflicts() return Conflicts.active_conflicts(CoreState.enabled and CoreState.ga or {}) end
+function M.open_system_gestures() return Conflicts.open_settings() end
+function M.system_pinch_enabled() return Conflicts.native_pinch_enabled() end
 function M.get_action(slot)         return CoreState.ga[slot]                   end
 
 --- Stores one gesture action through an exact project-level setter contract.
@@ -594,6 +595,14 @@ function M.get_action(slot)         return CoreState.ga[slot]                   
 function M.set_action(slot, action)
 	if type(slot) ~= "string" or type(action) ~= "string" then
 		Logger.error(LOG, "set_action(): slot and action must be strings.")
+		return false
+	end
+	-- Refused like Windows refuses it: an id the catalogue does not offer here
+	-- (renamed, another OS's, or a typo in config.toml) used to be stored and
+	-- then dispatched as a silent no-op, indistinguishable from a gesture that
+	-- was never recognised.
+	if not Actions.is_assignable(action) then
+		Logger.warn(LOG, "set_action(): refusing unknown action '%s' for slot '%s'.", action, slot)
 		return false
 	end
 	CoreState.ga[slot] = action
@@ -649,7 +658,11 @@ function M.set_sensitivity(slot, s)
 	return true
 end
 function M.get_space_wrap()         return CoreState.space_wrap                 end
-function M.set_space_wrap(wrap)     CoreState.space_wrap = wrap                 end
+function M.set_space_wrap(wrap)
+	if type(wrap) ~= "boolean" then return false end
+	CoreState.space_wrap = wrap
+	return true
+end
 
 function M.get_all_actions()
 	local t = {}
@@ -683,7 +696,10 @@ function M.enable_all()
 		end
 		return false
 	end
-	if gesture_resume_start_required == true then
+	-- The native runtime exists only while Gestures is ON, so ON acquires it
+	-- unless it is already live. Without a touchdevice API only the feature flag
+	-- is published; start() logs that degraded runtime.
+	if gesture_resume_start_required == true or (touchdevice and runtime_live ~= true) then
 		if teardown_gesture_runtime(true) ~= true then
 			Logger.error(LOG,
 				"Gesture enable cannot rebuild while native rollback debt remains.")
@@ -735,12 +751,18 @@ function M.disable_all()
 			Actions.force_cleanup, debug.traceback, GESTURE_ACTION_PARENT)
 		cleanup_settled = ok_cancel and cancel_result == true
 			and ok_cleanup and cleanup_result == true
+		-- OFF releases the native runtime too: otherwise the touch watchers, the
+		-- primer tap and the health-check timer keep polling with Gestures off.
+		if cleanup_settled and native_runtime_owned() then
+			cleanup_settled = release_native_runtime()
+		end
 	end
 	if cleanup_settled ~= true then
 		Logger.error(LOG, "Gesture disable cleanup refused; feature state preserved.")
 		return false
 	end
 	CoreState.enabled = false
+	Logger.info(LOG, "Gestures disabled; no native gesture owner remains.")
 	return true
 end
 function M.enable(name)
@@ -1015,6 +1037,9 @@ end
 --- aggressive startup probe so recovery is fast.
 start_health_check_loop = function()
 	Logger.info(LOG, "ENTER slow health-check loop (cadence=%.0fs)", HEALTH_CHECK_INTERVAL_SEC)
+	-- Each entry reports its own settled count once: after a lost frame stream
+	-- or a restart, the count the recovery reached is exactly the news.
+	health_reported_watchers = nil
 	return start_discovery_timer(HEALTH_CHECK_INTERVAL_SEC, "health check", function()
 		if not _G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME then
 			-- Defensive: should not happen, but if we lost the stream entirely,
@@ -1023,7 +1048,6 @@ start_health_check_loop = function()
 			start_startup_probe_loop()
 			return
 		end
-		Logger.debug(LOG, "Health-check tick (watchers=%d)", count_watchers())
 		-- Reattach any watcher that stopped (device sleep, USB disconnect…)
 		for id, w in pairs(touch_watchers) do
 			local ok, r = pcall(function() return w:running() end)
@@ -1036,6 +1060,17 @@ start_health_check_loop = function()
 			end
 		end
 		ensure_watchers()
+		-- The settled count, reported only when it changed: logging every tick
+		-- wrote thousands of identical lines a day and said nothing new.
+		local watchers = count_watchers()
+		if watchers ~= health_reported_watchers then
+			-- Formatted here, not by the logger: repeat collapsing keys an info
+			-- line on its template, which would fold every later change into the
+			-- first report's streak; the formatted text keys each change apart.
+			Logger.info(LOG, string.format("Health-check: %d watcher(s) attached (previously %s).", watchers,
+				health_reported_watchers == nil and "unreported" or tostring(health_reported_watchers)))
+			health_reported_watchers = watchers
+		end
 	end)
 end
 
@@ -1120,16 +1155,12 @@ local function stop_sleep_watcher()
 	return true
 end
 
---- Settles every native gesture runtime owner without necessarily changing the
---- user feature snapshot. Startup rollback under ScriptControl PAUSE uses the
---- preserving form so RESUME can reconstruct the exact previously-ON posture.
---- @param preserve_feature_state boolean
---- @return boolean settled
-teardown_gesture_runtime = function(preserve_feature_state)
-	local cleanup_ok, cleanup_result = xpcall(
-		Actions.force_cleanup, debug.traceback, GESTURE_ACTION_PARENT)
-	if preserve_feature_state ~= true then CoreState.enabled = false end
-
+--- Releases every native gesture owner: touch watchers, the primer tap, the
+--- discovery or health-check timer, the wake watcher and the engine. The feature
+--- flag and the action scope stay with the caller.
+--- @return boolean settled True only when no native owner remains.
+release_native_runtime = function()
+	runtime_live = false
 	local watchers_stopped = recycle_watchers(false)
 	local primer_stopped = stop_gesture_primer()
 	local timer_stopped = cancel_discovery_timer("module stop")
@@ -1141,10 +1172,27 @@ teardown_gesture_runtime = function(preserve_feature_state)
 		Logger.error(LOG, "Gesture engine stop failed: %s.", tostring(engine_stop_result))
 	end
 
-	if not cleanup_ok or cleanup_result ~= true
-		or watchers_stopped ~= true or timer_stopped ~= true
+	if watchers_stopped ~= true or timer_stopped ~= true
 		or primer_stopped ~= true or wake_watcher_stopped ~= true
 		or not engine_stopped or engine_stop_result ~= true then
+		Logger.error(LOG, "Gesture native runtime release incomplete; cleanup is retryable.")
+		return false
+	end
+	return true
+end
+
+--- Settles every native gesture runtime owner without necessarily changing the
+--- user feature snapshot. Startup rollback under ScriptControl PAUSE uses the
+--- preserving form so RESUME can reconstruct the exact previously-ON posture.
+--- @param preserve_feature_state boolean
+--- @return boolean settled
+teardown_gesture_runtime = function(preserve_feature_state)
+	local cleanup_ok, cleanup_result = xpcall(
+		Actions.force_cleanup, debug.traceback, GESTURE_ACTION_PARENT)
+	if preserve_feature_state ~= true then CoreState.enabled = false end
+
+	local native_released = release_native_runtime()
+	if not cleanup_ok or cleanup_result ~= true or native_released ~= true then
 		Logger.error(LOG, "Gestures runtime teardown incomplete; native cleanup is retryable.")
 		return false
 	end
@@ -1197,7 +1245,6 @@ function M.start()
 	end
 	-- A reload, duplicate start, or earlier failed rollback can leave exact native
 	-- owners published. Settle them before creating any successor capability.
-	local entry_enabled = CoreState.enabled == true
 	if gesture_primer or sleep_watcher or discovery_timer
 		or next(discovery_cleanup_debt) ~= nil or next(touch_watchers) ~= nil then
 		if teardown_gesture_runtime(true) ~= true then
@@ -1214,11 +1261,11 @@ function M.start()
 		end
 		return false
 	end
+	-- start() is the ON transition: from here the feature flag carries the user's
+	-- intent, and a PAUSE-interrupted attempt keeps it so RESUME rebuilds the runtime.
+	CoreState.enabled = true
 	gesture_lifecycle_epoch = gesture_lifecycle_epoch + 1
-	local start_attempt = {
-		epoch = gesture_lifecycle_epoch,
-		previous_enabled = entry_enabled,
-	}
+	local start_attempt = { epoch = gesture_lifecycle_epoch }
 	gesture_start_attempt = start_attempt
 	local function reject_attempt(reason)
 		local paused_during_start = CoreState.suspended == true
@@ -1227,9 +1274,9 @@ function M.start()
 			gesture_lifecycle_epoch = gesture_lifecycle_epoch + 1
 			gesture_start_attempt = nil
 			local rollback_settled = teardown_gesture_runtime(true)
-			CoreState.enabled = start_attempt.previous_enabled
+			CoreState.enabled = true
 			CoreState.suspended = true
-			gesture_resume_start_required = start_attempt.previous_enabled == true
+			gesture_resume_start_required = true
 			if rollback_settled ~= true then
 				Logger.error(LOG,
 					"Gesture PAUSE startup rollback remains incomplete and retryable.")
@@ -1239,10 +1286,8 @@ function M.start()
 		end
 		return false
 	end
-	local action_lifecycle = CoreState.enabled == true
-		and Actions.resume_after_cleanup or Actions.force_cleanup
 	local actions_ok, actions_result = xpcall(
-		action_lifecycle, debug.traceback, GESTURE_ACTION_PARENT)
+		Actions.resume_after_cleanup, debug.traceback, GESTURE_ACTION_PARENT)
 	if not actions_ok or actions_result ~= true then
 		Logger.error(LOG, "Gesture startup refused while action cleanup remains pending: %s.",
 			tostring(actions_result))
@@ -1280,7 +1325,6 @@ function M.start()
 		Logger.info(LOG, "  pre-init device #%d: id=%s", i, tostring(id))
 	end
 
-	CoreState.enabled = true
 	_G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME = false
 	last_emergency_recycle = 0
 	primer_event_count = 0
@@ -1323,19 +1367,18 @@ function M.start()
 			end
 			local t = event:getType()
 			primer_event_count = primer_event_count + 1
-			-- Throttled visibility: 5 events/sec max, so we see something is happening
-			-- without flooding the log during normal use.
-			local now = hs.timer.secondsSinceEpoch()
-			if (now - primer_last_log_time) > 0.2 then
-				primer_last_log_time = now
-				Logger.debug(LOG, "PRIMER event#%d type=%d first_frame=%s",
-					primer_event_count, t, tostring(_G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME))
-			end
 			-- Wakeup signal: gesture-class event reached us but the touchdevice
 			-- callback has not fired yet → the subscription is dormant. Recycle.
+			-- That dormancy is the only thing this line diagnoses, so it is logged
+			-- only then, throttled to 5 per second; once frames flow, every scroll
+			-- passes through here and a line per event said nothing new.
 			if not _G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME then
-				Logger.debug(LOG, "PRIMER caught event#%d type=%d BEFORE any touchdevice frame — calling schedule_emergency_recycle()",
-					primer_event_count, t)
+				local now = hs.timer.secondsSinceEpoch()
+				if (now - primer_last_log_time) > 0.2 then
+					primer_last_log_time = now
+					Logger.debug(LOG, "PRIMER caught event#%d type=%d BEFORE any touchdevice frame — calling schedule_emergency_recycle()",
+						primer_event_count, t)
+				end
 				schedule_emergency_recycle()
 			end
 			return false
@@ -1445,6 +1488,7 @@ function M.start()
 	end
 	gesture_start_attempt = nil
 	gesture_resume_start_required = false
+	runtime_live = true
 	Logger.success(LOG, "============== gestures module startup COMPLETE — primer events so far: %d ==============", primer_event_count)
 	return true
 end

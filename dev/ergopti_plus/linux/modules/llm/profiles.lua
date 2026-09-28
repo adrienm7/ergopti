@@ -58,7 +58,7 @@ local _base_url = nil
 --- @param value any
 --- @return boolean
 local function persist(key, value)
-	local ok, storage = pcall(require, "adapters.storage")
+	local ok, storage = pcall(require, "infra.llm_preferences")
 	if not ok or not storage or type(storage.set) ~= "function" then
 		Logger.error(LOG, "No storage adapter — '%s' was not changed.", key)
 		return false
@@ -90,16 +90,11 @@ function M.init(opts)
 	local port = type(options.port) == "number" and options.port or default_port
 	_base_url = HttpBridge and HttpBridge.resolve_base_url(port, default_host) or nil
 
-	-- Load persisted model and enabled state from storage.
-	local ok_st, storage = pcall(require, "adapters.storage")
-	if ok_st and storage then
-		_current_model = type(options.model) == "string" and options.model
-			or storage.get("llm.model", nil)
-		_enabled = storage.get("llm.enabled", false)
-	else
-		_current_model = type(options.model) == "string" and options.model or nil
-		_enabled = false
-	end
+	local values = require("infra.llm_preferences").get_many({ "llm.models.ollama", "llm.enabled" })
+	local model = options.model ~= nil and options.model or values["llm.models.ollama"]
+	assert(type(model) == "string" and model ~= "", "the configured Ollama model must be nonempty")
+	assert(type(values["llm.enabled"]) == "boolean", "AI consent must be boolean")
+	_current_model, _enabled = model, values["llm.enabled"]
 
 	Logger.info(LOG, "LLM profiles initialised (base_url=%s, model=%s, enabled=%s).",
 		_base_url or "(unavailable)", _current_model or "(auto-detect)", tostring(_enabled))
@@ -191,7 +186,7 @@ end
 --- @return boolean
 function M.set_model(model_name)
 	if type(model_name) ~= "string" or model_name == "" then return false end
-	if not persist("llm.model", model_name) then return false end
+	if not persist("llm.models.ollama", model_name) then return false end
 	_current_model = model_name
 	Logger.info(LOG, "Model set to: %s", model_name)
 	return true
@@ -236,6 +231,36 @@ end
 --- @return string|nil
 function M.get_base_url()
 	return _base_url
+end
+
+--- Marks the exact model and consent consumed by the canonical owner.
+--- @param document table Parsed canonical configuration.
+--- @param mark function Consumed-key collector.
+function M.mark_config_reads(document, mark)
+	local preferences = require("infra.llm_preferences")
+	preferences.mark_config_read(document, "llm.models.ollama", mark)
+	preferences.mark_config_read(document, "llm.enabled", mark)
+end
+
+--- Captures dormant model identity and the existing consent gate.
+--- @return table snapshot
+function M.configuration_snapshot() return { model = _current_model, enabled = _enabled } end
+
+--- Restores or publishes model identity without starting downloads or inference.
+--- @param snapshot table Owner-issued desired state.
+--- @return boolean applied
+function M.restore_configuration(snapshot)
+	if type(snapshot.enabled) ~= "boolean" then return false end
+	_current_model, _enabled = snapshot.model, snapshot.enabled
+	return true
+end
+
+--- Reads the detached canonical candidate without changing available models.
+--- @return boolean applied
+function M.reload_configuration()
+	local values = require("infra.llm_preferences").get_many({ "llm.models.ollama", "llm.enabled" })
+	if type(values["llm.models.ollama"]) ~= "string" or values["llm.models.ollama"] == "" then return false end
+	return M.restore_configuration({ model = values["llm.models.ollama"], enabled = values["llm.enabled"] })
 end
 
 return M

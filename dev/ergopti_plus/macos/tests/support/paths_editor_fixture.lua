@@ -38,7 +38,16 @@ local function load_fixture(show_result)
 		get = function(key) return "/tmp/ergopti/" .. tostring(key) end,
 		get_config_dir = function() return "/tmp/ergopti/" end,
 		get_default_config_dir = function() return "/Users/test/.config/ergopti_plus/" end,
-		set_config_dir = function() return true end,
+		get_logs_dir = function() return "/tmp/ergopti-logs/ergopti_plus/" end,
+		get_default_logs_dir = function() return "/Users/test/Library/Logs/ergopti_plus/" end,
+		set_config_dir = function(dir)
+			calls.saved = { config = dir }
+			return true
+		end,
+		set_paths = function(dir, logs_dir)
+			calls.saved = { config = dir, logs = logs_dir }
+			return true
+		end,
 	}
 	local default_webview = {
 		id = "paths-editor",

@@ -45,21 +45,17 @@ local function load_subject()
 	}
 	package.loaded["infra.paths"] = {shared = function() return "catalogue.json" end}
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["modules.gestures.actions"] = {execute_single = function() end}
+	-- The start transaction is independent of which ids exist; the load-time
+	-- catalogue check has its own test (test_keyboard_shortcuts_unknown_action.lua).
+	package.loaded["modules.gestures.actions"] = {
+		is_assignable = function(action_id) return type(action_id) == "string" end,
+		execute_single = function() end,
+	}
 	package.loaded["adapters.storage"] = nil
 	package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
 
+	require("tests.support.keyboard_config_fixture").install({ cmd_a = "script_pause_toggle", cmd_b = "script_pause_toggle" })
 	local subject = helpers.load_with_stubs("modules.shortcuts.keyboard_shortcuts", {
-		settings = {
-			getKeys = function()
-				return {
-					"ergopti.keyboard_shortcut_cmd_a",
-					"ergopti.keyboard_shortcut_cmd_b",
-				}
-			end,
-			get = function() return "script_pause_toggle" end,
-			set = function() end,
-		},
 		json = {
 			decode = function()
 				return {keys = {{id = "a", label = "A"}, {id = "b", label = "B"}}}

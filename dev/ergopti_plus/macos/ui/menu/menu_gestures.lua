@@ -13,7 +13,6 @@
 --- ==============================================================================
 
 local M = {}
-local hs = hs
 
 local gestures_mod  = require("modules.gestures")
 local MenuUtils = require("ui.menu.menu_utils")
@@ -24,6 +23,7 @@ local ActionPicker  = require("ui.action_picker")
 local shortcut_utils = require("ui.menu.shortcut_utils")
 local Logger         = require("infra.logger")
 local DeferredWork   = require("infra.deferred_work")
+local ParameterLabel = require("action_parameter_label")
 
 local LOG = "menu.gestures"
 local gesture_toggle_debt = nil
@@ -60,7 +60,6 @@ local function slot_label(slot)
 	return i18n.get("gesture.slots." .. slot)
 end
 
-local DISABLED_GESTURE_ACTION = "none"
 
 --- Builds the gestures sub-menu.
 --- @param ctx table Context containing state, updateMenu, save_prefs, etc.
@@ -159,43 +158,53 @@ function M.build(ctx)
 		return true
 	end
 
+	--- The category switch: the gestures submenu's first row (the manifest's
+	--- gestures_toggle). It used to be the parent row's action, which AppKit
+	--- never sends for an item that opens a submenu, so Gestures could not be
+	--- switched on from the menu bar at all.
+	---
+	--- Refused while the script is paused. The gesture engine's only gate is the
+	--- shared CoreState.enabled flag, which pause_all() drives via disable_all().
+	--- Toggling the feature during pause would write that SAME flag: enabling it
+	--- makes gestures fire while « tout est éteint », and disabling it desyncs the
+	--- pre-pause snapshot so resume_all() re-enables against the user's intent.
+	--- Pause owns the gesture state until resume restores it.
+	--- @return boolean|nil committed
+	local function toggle_gestures()
+		if paused then
+			Logger.warn(LOG, "Gestures switch refused: the script is paused.")
+			return false
+		end
+		if settle_gesture_toggle_debt() ~= true then return false end
+		local previous = state.gestures == true
+		local desired = not previous
+		if desired then
+			-- Show warning when activating gestures
+			local warnMsg = i18n.get("dialog.gestures.warning_msg")
+			local res = dialog.block_alert(i18n.get("dialog.gestures.warning_title"), warnMsg, i18n.get("button.activate"), i18n.get("button.cancel"), "warning")
+			if res ~= i18n.get("button.activate") then return end
+		end
+		if commit_gestures_runtime(desired, previous) ~= true then return false end
+		state.gestures = desired
+		local save_ok, save_result = xpcall(ctx.save_prefs, debug.traceback)
+		if not save_ok or save_result ~= true then
+			state.gestures = previous
+			if apply_gesture_posture(previous, "preference rollback") ~= true then
+				gesture_toggle_debt = { restore_enabled = previous }
+			end
+			Logger.error(LOG, "Gesture preference publication did not commit: %s.",
+				tostring(save_result))
+			return false
+		end
+		ctx.notify_feature(i18n.get("menu.gestures.notify_title"), state.gestures)
+		ctx.updateMenu()
+		return true
+	end
+
 	local item = {
-		label   = i18n.get("menu.gestures.title"),
-		checked = state.gestures or nil,
-		-- Disabled while the script is paused. The gesture engine's only gate is the
-		-- shared CoreState.enabled flag, which pause_all() drives via disable_all().
-		-- Toggling the feature during pause would write that SAME flag: enabling it
-		-- makes gestures fire while « tout est éteint », and disabling it desyncs the
-		-- pre-pause snapshot so resume_all() re-enables against the user's intent.
-		-- Pause owns the gesture state until resume restores it — mirror the
-		-- hotstrings master toggle, which is likewise pause-gated.
+		label    = i18n.get("menu.gestures.title"),
+		checked  = state.gestures or nil,
 		disabled = paused or nil,
-		action  = (not paused) and function()
-			if settle_gesture_toggle_debt() ~= true then return false end
-			local previous = state.gestures == true
-			local desired = not previous
-			if desired then
-				-- Show warning when activating gestures
-				local warnMsg = i18n.get("dialog.gestures.warning_msg")
-				local res = dialog.block_alert(i18n.get("dialog.gestures.warning_title"), warnMsg, i18n.get("button.activate"), i18n.get("button.cancel"), "warning")
-				if res ~= i18n.get("button.activate") then return end
-			end
-			if commit_gestures_runtime(desired, previous) ~= true then return false end
-			state.gestures = desired
-			local save_ok, save_result = xpcall(ctx.save_prefs, debug.traceback)
-			if not save_ok or save_result ~= true then
-				state.gestures = previous
-				if apply_gesture_posture(previous, "preference rollback") ~= true then
-					gesture_toggle_debt = { restore_enabled = previous }
-				end
-				Logger.error(LOG, "Gesture preference publication did not commit: %s.",
-					tostring(save_result))
-				return false
-			end
-			ctx.notify_feature(i18n.get("menu.gestures.notify_title"), state.gestures)
-			ctx.updateMenu()
-			return true
-		end or nil,
 	}
 
 
@@ -237,16 +246,23 @@ function M.build(ctx)
 	--- @param names table Ordered names list from get_sg_names().
 	--- @param current string|nil Currently assigned action name.
 	local function open_action_chooser(slot, names, current)
+		local items = build_items(names)
+		local editor = shortcut_utils.picker_parameter_fields(gestures, items, slot)
+		local function show_conflict(conflict)
+			if type(conflict) ~= "table" then return end
+			return require("ui.gesture_conflict_notice").show(conflict)
+		end
 		ActionPicker.open({
 			title   = slot_label(slot),
 			label   = i18n.get("dialog.action_picker.label"),
 			current = current or "none",
-			items   = build_items(names),
-		}, function(a)
+			items   = items,
+			send_vocabulary   = editor.send_vocabulary,
+			parameter_strings = editor.parameter_strings,
+		}, function(a, picked)
 			local function apply_action()
-				if type(gestures.set_action) == "function" then pcall(gestures.set_action, slot, a) end
+				if not commit_gesture_row_value("get_action", "set_action", slot, a, "action") then return false end
 				local conflict = type(gestures.on_action_changed) == "function" and gestures.on_action_changed(slot, a) or nil
-				if ctx.save_prefs() ~= true then return false end
 				ctx.updateMenu()
 				return conflict
 			end
@@ -254,48 +270,34 @@ function M.build(ctx)
 			if spec then
 				DeferredWork.after(0.05, function()
 					local prior = type(gestures.get_action_parameter) == "function" and gestures.get_action_parameter(slot, a) or ""
-					-- The %s inside the search-URL prompt is LITERAL — it is the
-					-- placeholder the user has to type — so this string is never run
-					-- through string.format. The title uses {1} so the two cannot be
-					-- confused.
-					local prompt = i18n.get(spec == "search_url"
-						and "dialog.gestures.param_search_url"
-						or  "dialog.gestures.param_link")
+					-- The prompt and its refusal text belong to the parameter kind.
+					local prompt = gestures.parameter_prompt(a)
 					local title    = shortcut_utils.action_parameter_title(gestures.get_action_label(a) or a)
 					local save_btn = i18n.get("button.save")
+					-- A value the picker's editor collected is stored without asking.
+					local value = type(picked) == "string" and picked or nil
 					while true do
-						local button, value = dialog.text_prompt(title, prompt, prior, save_btn, i18n.get("button.cancel"))
-						if button ~= save_btn then return end
+						if value == nil then
+							local button, typed = dialog.text_prompt(title, prompt, prior, save_btn, i18n.get("button.cancel"))
+							if button ~= save_btn then return end
+							value = typed
+						end
 						if type(gestures.validate_action_parameter) == "function" and gestures.validate_action_parameter(a, value) then
 							pcall(gestures.set_action_parameter, slot, a, value)
 							local conflict = apply_action()
-							if type(conflict) == "table" then
-								DeferredWork.after(0.3, function()
-									pcall(dialog.block_alert, i18n.get("menu.gestures.conflict_title"), conflict.msg or "", i18n.get("menu.gestures.open_settings"), "OK", "warning")
-								end, "menu_gestures.parameter_conflict")
-							end
+							show_conflict(conflict)
 							return
 						end
 						pcall(dialog.block_alert, i18n.get("dialog.gestures.param_error_title"),
-							i18n.get("dialog.gestures.param_err_url")
-							.. (spec == "search_url" and (" " .. i18n.get("dialog.gestures.param_err_many_placeholders")) or ""),
-							"OK", nil, "warning")
+							gestures.parameter_error(a), "OK", nil, "warning")
 						prior = value or prior
+						value = nil
 					end
 				end, "menu_gestures.action_parameter")
 				return
 			end
 			local conflict = apply_action()
-			if type(conflict) == "table" then
-				DeferredWork.after(0.3, function()
-					local ok_c, clicked = pcall(dialog.block_alert,
-						i18n.get("menu.gestures.conflict_title"), conflict.msg or "",
-						i18n.get("menu.gestures.open_settings"), "OK", "warning")
-					if ok_c and clicked == i18n.get("menu.gestures.open_settings") then
-						pcall(hs.execute, "open " .. text_utils.shell_quote(conflict.url or ""))
-					end
-				end, "menu_gestures.action_conflict")
-			end
+			show_conflict(conflict)
 		end)
 	end
 
@@ -311,7 +313,7 @@ function M.build(ctx)
 		local actionLbl = type(gestures.get_action_label) == "function" and gestures.get_action_label(current)
 			or (current or "none")
 		local parameter = type(gestures.get_action_parameter) == "function" and gestures.get_action_parameter(slot, current) or ""
-		if parameter ~= "" then actionLbl = actionLbl .. " (" .. parameter .. ")" end
+		actionLbl = ParameterLabel.format(actionLbl, parameter)
 
 		local names = type(gestures.get_sg_names) == "function" and gestures.get_sg_names() or gestures.SG_NAMES
 
@@ -397,30 +399,16 @@ function M.build(ctx)
 
 	-- `command` since 2026-08-07: the renderer builds the row and its label from
 	-- the declaration, so this supplies only what the click does.
-	local function cmd_disable_all()
-		local gestures_enabled = state.gestures == true
-		local all_slots = gestures_mod.SINGLE_SLOTS or {}
-		for _, slot in ipairs(all_slots) do
-			if type(gestures.set_action) == "function" then pcall(gestures.set_action, slot, DISABLED_GESTURE_ACTION) end
+	local function apply_scope(mode)
+		if ctx.paused or type(ctx.apply_gesture_scope) ~= "function" then return false end
+		if gesture_toggle_debt ~= nil then
+			Logger.warn(LOG, "Gesture scope refused while the previous toggle rollback remains pending.")
+			return false
 		end
-		state.gestures = gestures_enabled
-		if gestures_enabled then
-			if type(gestures.enable_all) == "function" then pcall(gestures.enable_all) end
-		else
-			if type(gestures.disable_all) == "function" then pcall(gestures.disable_all) end
-		end
-		if ctx.save_prefs() ~= true then return false end
-		ctx.updateMenu()
+		return ctx.apply_gesture_scope(mode) == true
 	end
-
-	local function cmd_restore_defaults()
-		local defaults = gestures_mod.DEFAULT_GESTURES or {}
-		for slot, action in pairs(defaults) do
-			if type(gestures.set_action) == "function" then pcall(gestures.set_action, slot, action) end
-		end
-		if ctx.save_prefs() ~= true then return false end
-		ctx.updateMenu()
-	end
+	local function cmd_disable_all() return apply_scope("clear") end
+	local function cmd_restore_defaults() return apply_scope("recommended") end
 
 	-- The row itself is `type = "check"` in the manifest now: the label, the tick
 	-- predicate and the greying predicate are declared, and this is only what the
@@ -455,6 +443,25 @@ function M.build(ctx)
 	}
 
 	local providers = {
+		["system_gesture_status"] = function()
+			local conflicts = gestures.system_gesture_conflicts()
+			local rows = {}
+			for _, conflict in ipairs(conflicts) do
+				rows[#rows + 1] = { label = conflict.label, action = gestures.open_system_gestures }
+			end
+			local pinch = gestures.system_pinch_enabled()
+			rows[#rows + 1] = {
+				label = i18n.get("gestures.system.pinch") .. " : "
+					.. i18n.get(pinch == nil and "gestures.system.unknown"
+						or (pinch and "menu.common.enabled" or "common.disabled")),
+				action = gestures.open_system_gestures,
+			}
+			rows[#rows + 1] = { label = i18n.get("ui_apps.btn_refresh"), action = function()
+				return gestures.refresh_system_gestures(ctx.updateMenu)
+			end }
+			return { { label = #conflicts == 0 and i18n.get("gestures.system.clear")
+				or i18n.get("gestures.system.conflicts"):gsub("{1}", function() return tostring(#conflicts) end), items = rows } }
+		end,
 		["gesture_slots_2"] = slots_provider(2),
 		["gesture_slots_3"] = slots_provider(3),
 		["gesture_slots_4"] = slots_provider(4),
@@ -468,16 +475,19 @@ function M.build(ctx)
 		gesture_space_wrap = function()
 			return type(gestures.get_space_wrap) == "function" and gestures.get_space_wrap() or false
 		end,
-		-- disabled_when is an AND of things that must be TRUE for the row to be
-		-- live, so this answers "are gestures usable", not "are they off".
-		gestures_enabled = function() return (state.gestures and not paused) and true or false end,
+		-- The switch's tick and the circular-Spaces greying read the same key, so
+		-- it answers the stored preference. The pause greys the whole submenu
+		-- from its parent row, and the switch refuses while paused.
+		gestures_enabled = function() return state.gestures == true end,
 	}
 
 	-- The two whole-tree actions are `command` rows: the renderer builds them from
 	-- the declaration and this driver registers only the behaviour.
 	render_ctx.commands = render_ctx.commands or {}
+	render_ctx.commands["gestures_toggle"] = toggle_gestures
 	render_ctx.commands["disable_all"] = cmd_disable_all
 	render_ctx.commands["restore_defaults"] = cmd_restore_defaults
+	render_ctx.commands["system_gesture_settings"] = gestures.open_system_gestures
 
 	local gm = ManifestMenu.build("gestures_menu", "Gestures", dyn_handlers, nil, render_ctx, providers)
 	item.submenu = gm

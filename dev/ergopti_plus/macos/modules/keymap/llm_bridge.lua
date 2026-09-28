@@ -571,6 +571,7 @@ end
 
 function M.set_llm_enabled(v)               return engine.set_llm_enabled(v)               end
 function M.get_llm_enabled()                return engine.get_llm_enabled()          end
+function M.set_llm_configuration_model(name) return engine.set_llm_configuration_model(name) end
 function M.set_llm_model(name)              return engine.set_llm_model(name)              end
 function M.set_llm_display_model_name(name) return engine.set_llm_display_model_name(name) end
 function M.set_llm_backend_name(label)      return engine.set_llm_backend_name(label)      end
@@ -1847,6 +1848,18 @@ end
 function M._perform_llm_check(force_trigger, profile_name)
 	if not M.is_runtime_available() then return end
 	engine.perform_check(force_trigger, profile_name)
+end
+
+--- Runs a prediction now on the user's request (the llm_generate_prediction
+--- action). The engine logs and shows every refusal; the one left here is a
+--- synthetic action still in flight, which clears within the same keystroke.
+--- @return boolean requested True when the engine accepted the request.
+function M.request_manual_prediction()
+	if not M.is_runtime_available() then
+		Logger.info(LOG, "Manual prediction skipped: a synthetic action is still in flight.")
+		return false
+	end
+	return engine.request_manual_prediction()
 end
 
 --- Re-arms the LLM inactivity timer.

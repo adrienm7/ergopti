@@ -34,10 +34,11 @@ global _MET_STATE_GETTERS := Map(
 
 ; Build the « 📊 Métriques » submenu. The caller publishes the completed tree
 ; to the tray, so expensive renderer work never runs after the live root has
-; been cleared. The parent
-; entry doubles as an ON/OFF toggle for the global keylogger feature: the
-; checkmark reflects MetricsShortcuts.enabled, and clicking it triggers
-; ToggleMetricsEnabled() with a confirmation dialog before turning ON.
+; been cleared. Its first row is the category switch for the global keylogger
+; feature: ticked from MetricsShortcuts.enabled, and clicking it runs
+; ToggleMetricsEnabled() with a confirmation dialog before turning ON. The
+; parent entry carries the same tick but cannot be clicked: a Win32 item that
+; opens a submenu sends no command.
 ;
 ; When the feature is OFF, the sub-items remain visible (so the user can
 ; still see what the menu looks like) but are disabled — no dashboard can
@@ -61,7 +62,12 @@ BuildMetricsMenu() {
 	; show_typing and show_apps left DynHandlers on 2026-08-07: their manifest
 	; rows are `command` now, so the renderer builds the label and applies the
 	; greying from the declaration and this driver supplies only the click.
-	Commands := Map(
+	; The category switch is the manifest's `metrics_toggle` row. Its command is
+	; the dedicated writer (security warning + MetricsShortcuts.enabled + save)
+	; rather than the generic CategoryEnabled flip.
+	Commands := _MET_ScopeCommands()
+	for Id, Handler in Map(
+		"metrics_toggle",  (*) => ToggleMetricsEnabled(),
 		"filter_private",  ToggleFilterPrivate,
 		"filter_secure",   ToggleFilterSecureField,
 		"filter_sysauth",  ToggleFilterSystemAuth,
@@ -70,6 +76,7 @@ BuildMetricsMenu() {
 		"show_typing",     KLUI_ToggleTyping,
 		"show_apps",       KLUI_ToggleApps,
 	)
+		Commands[Id] := Handler
 
 	; The two shortcut pickers and the app-exclusion row left DynHandlers on
 	; 2026-08-07: their labels are computed, so no static declaration can carry
@@ -82,17 +89,7 @@ BuildMetricsMenu() {
 		"exclude_apps",    (*) => _MET_ExcludeAppsRows(_MET_STATE_GETTERS)
 	)
 
-	MetricsMenu := MenuRenderer_Build("metrics_menu", "Metrics", DynHandlers, "", ListProviders, Commands, _MET_STATE_GETTERS)
-	; Metrics toggle uses a dedicated fn (confirm/security-warning dialogs +
-	; MetricsShortcuts.enabled + MS_SaveToIni) rather than the generic
-	; ToggleCategoryAllFeatures used by manifest-only menus — same pattern
-	; Gestures uses (see BuildGesturesMenu / AddCategoryToggleItem). The
-	; manifest's metrics_menu toggle entry carries platforms:["hs"] so the
-	; generic renderer never double-renders this row on AHK.
-	AddCategoryToggleItem(MetricsMenu,
-		t("menu.metrics.on"), t("menu.metrics.off"),
-		MetricsShortcuts.enabled, (*) => ToggleMetricsEnabled())
-	return MetricsMenu
+	return MenuRenderer_Build("metrics_menu", "Metrics", DynHandlers, "", ListProviders, Commands, _MET_STATE_GETTERS)
 }
 
 ; List provider: Typing shortcut picker (label with ZWS to avoid duplicate key clash).
@@ -176,3 +173,8 @@ _MET_WpmWidgetGraph(M, _Cat, Getters) {
 }
 
 ; ── Layout dynamic handlers ────────────────────────────────────────────────────
+
+; Consent is excluded from recommendations by the shared scope declaration.
+_MET_ScopeCommands(Options := unset) {
+	return ConfigScopeMenuCommands("metrics", Map(), IsSet(Options) ? Options : Map())
+}

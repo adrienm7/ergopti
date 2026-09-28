@@ -121,7 +121,7 @@ function M.with_configurable(callback)
 	local names = {
 		"infra.logger", "infra.paths", "adapters.file_system",
 		"adapters.hotkey_registrar", "adapters.storage", "modules.gestures.actions",
-		"modules.shortcuts.keyboard_shortcuts", "chord",
+		"modules.shortcuts.keyboard_shortcuts", "chord", "infra.config_paths", "infra.preferences",
 	}
 	return helpers.with_stub_scope(names, function()
 		local logger, failures = callback_logger()
@@ -130,6 +130,8 @@ function M.with_configurable(callback)
 		package.loaded["infra.paths"] = {shared = function() return "catalogue.json" end}
 		package.loaded["adapters.file_system"] = {
 			read = function() return '{"keys":[{"id":"a","label":"A"}]}' end,
+			read_with_status = function() return '[shortcuts.keyboard]\ncmd_a = "throwing_action"\n', "ok" end,
+			write = function() error("callback dispatch must not publish preferences") end,
 		}
 		package.loaded["adapters.hotkey_registrar"] = {
 			bind = function(_, callback)
@@ -139,17 +141,17 @@ function M.with_configurable(callback)
 			unbind = function() return true end,
 		}
 		package.loaded["modules.gestures.actions"] = {
+			-- The stored action must be one the catalogue offers, or the loader
+			-- leaves the slot unbound and no callback exists to throw.
+			is_assignable = function(action_id) return action_id == "throwing_action" end,
 			execute_single = function() error("gesture exploded") end,
 		}
 		package.loaded["adapters.storage"] = nil
+		package.loaded["infra.config_paths"] = { get = function() return "callback-fixture-config" end }
+		package.loaded["infra.preferences"] = nil
 		package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
 
 		local subject = helpers.load_with_stubs("modules.shortcuts.keyboard_shortcuts", {
-			settings = {
-				getKeys = function() return {"ergopti.keyboard_shortcut_cmd_a"} end,
-				get = function() return "throwing_action" end,
-				set = function() return true end,
-			},
 			json = {decode = function() return {keys = {{id = "a", label = "A"}}} end},
 		})
 		return callback({

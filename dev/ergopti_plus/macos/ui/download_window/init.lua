@@ -164,7 +164,7 @@ local function handle_bridge(owner, msg)
 
 		elseif body.action == "terminal" then
 				-- In bootstrap mode, show the live Hammerspoon log; in download mode, use the model-specific cmd
-				local cmd = _mode == "bootstrap" and ("tail -f " .. text_utils.shell_quote(Logger.UNIFIED_LOG_FILE)) or (M._terminal_cmd or ("ollama pull " .. text_utils.shell_quote(M._current_model or "")))
+				local cmd = _mode == "bootstrap" and ("tail -f " .. text_utils.shell_quote(Logger.today_log_path())) or (M._terminal_cmd or ("ollama pull " .. text_utils.shell_quote(M._current_model or "")))
 				-- ShellRunner passes this source directly to osascript as argv, so only
 				-- the AppleScript string literal needs escaping and the WebView callback
 				-- returns immediately while Terminal launches (HS-196).

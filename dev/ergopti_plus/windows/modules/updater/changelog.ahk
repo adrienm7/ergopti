@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Updater / Menu Actions + Changelog UI
 ; DESCRIPTION:
-; The dynamic update menu state and label, one-click update flow, version dialog, and the changelog window (HTML/markdown rendering) shown to the user.
+; The dynamic update menu state and label, one-click update flow, version dialog, the native changelog window, and the release notes shown by the update prompt (the shared release-notes page, or the plain-text changelog section when WebView2 is off).
 ;
 ; Split out of modules/updater.ahk (the module split); see modules/updater.ahk for the module
 ; overview. Functions and globals are hoisted, so load order across the
@@ -54,33 +54,6 @@ Updater_GetUpdateMenuLabel() {
 			return StrReplace(t("menu.about.update_now"), "{tag}", Tag)
 	}
 	return t("menu.about.check_for_updates")
-}
-
-; Displays the current version in a MsgBox and offers to open the releases page.
-Updater_ShowVersion(*) {
-	global UPDATER_REQUEST_ORIGIN_MANUAL
-	if A_IsSuspended
-		return _Updater_RefuseManualWhileSuspended()
-	Request := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
-	if Request.BornSuspended
-		return _Updater_RefuseManualWhileSuspended()
-	if !_Updater_RequestMayPublish(Request)
-		return
-	Ver := Updater_CurrentVersion()
-	global UPDATER_CHANNEL
-	if Updater_IsLocalSource()
-		ChannelSuffix := t("updater.channel_local_source_suffix")
-	else
-		ChannelSuffix := (UPDATER_CHANNEL == "dev")
-			? t("updater.channel_dev_suffix")
-			: t("updater.channel_main_suffix")
-	Res := MsgBox(
-		Format(t("updater.version_message"), Ver, ChannelSuffix),
-		t("updater.title_version"),
-		"YesNo Iconi"
-	)
-	if (Res == "Yes")
-		_Updater_OpenManualUrl(Updater_ReleasesPageUrl, Request)
 }
 
 ; One-click update entry point wired to the dynamic tray menu item.
@@ -153,7 +126,17 @@ _Updater_OneClickUpdateCallback(Json, Current, Request, Terminal := 0) {
 		_Updater_ScheduleMenuRebuildForRequest(Request)
 		if !_Updater_RequestMayPublish(Request)
 			return
+		_Updater_ReleaseBalloon()
 		TrayTip(t("updater.no_connection"), t("updater.title_update"))
+		return
+	}
+	if _Updater_JsonIsNoChannelRelease(Json) {
+		try LoggerDone("Updater", "One-click update check: no release on channel {1} yet.", Request.Channel)
+		_Updater_ScheduleMenuRebuildForRequest(Request)
+		if !_Updater_RequestMayPublish(Request)
+			return
+		_Updater_ReleaseBalloon()
+		TrayTip(_Updater_NoChannelReleaseMessage(Request.Channel), t("updater.title_update"))
 		return
 	}
 	Latest := Updater_ParseTagName(Json)
@@ -163,15 +146,17 @@ _Updater_OneClickUpdateCallback(Json, Current, Request, Terminal := 0) {
 		_Updater_ScheduleMenuRebuildForRequest(Request)
 		if !_Updater_RequestMayPublish(Request)
 			return
+		_Updater_ReleaseBalloon()
 		TrayTip(t("updater.parse_failed"), t("updater.title_update"))
 		return
 	}
-	if !_Updater_ShouldOfferCandidate(
+	if !UpdateChannels_ShouldOffer(
 		Latest, Current, Request.Channel, _Updater_InstalledChannel()) {
 		try LoggerSuccess("Updater", "One-click check: already up to date ({1}).", Current)
 		_Updater_ScheduleMenuRebuildForRequest(Request)
 		if !_Updater_RequestMayPublish(Request)
 			return
+		_Updater_ReleaseBalloon()
 		TrayTip(Format(t("updater.up_to_date"), Current), t("updater.title_update"))
 		return
 	}
@@ -315,8 +300,14 @@ _Updater_OpenSelectedReleaseUrl(ListBox, Releases, IsSuspended := unset, NotifyF
 	return true
 }
 
-_Updater_SwitchChangelogChannel(G, IsLocal, OtherChannel, IsSuspended := unset, NotifyFn := 0, CloseFn := 0, OpenFn := 0, SetChannelFn := 0) {
+; Shows another channel's releases in the native Versions window. Viewing a
+; channel never changes the subscription; _Updater_SubscribeChangelogChannel does.
+_Updater_ViewChangelogChannel(G, Channel, IsSuspended := unset, NotifyFn := 0, CloseFn := 0, OpenFn := 0) {
 	global UPDATER_REQUEST_ORIGIN_MANUAL
+	if !UpdateChannels_IsKnown(Channel) {
+		try LoggerError("Updater", "The Versions window refused an unknown channel to view.")
+		return false
+	}
 	HasSuspendOverride := IsSet(IsSuspended)
 	if (HasSuspendOverride ? IsSuspended : A_IsSuspended)
 		return _Updater_RefuseManualWhileSuspended(NotifyFn)
@@ -335,22 +326,48 @@ _Updater_SwitchChangelogChannel(G, IsLocal, OtherChannel, IsSuspended := unset, 
 		CloseFn.Call(G)
 	else
 		_Updater_CloseGui(G)
+	if IsObject(OpenFn)
+		return OpenFn.Call(Channel, Request)
+	return _Updater_OpenChangelogWindow(Channel, Request)
+}
+
+; Subscribes to the channel the native Versions window shows. Updater_SetChannel
+; reloads the app, which closes this window, so the user confirms first.
+_Updater_SubscribeChangelogChannel(G, Channel, IsSuspended := unset, NotifyFn := 0, CloseFn := 0, ConfirmFn := 0, SetChannelFn := 0) {
+	global UPDATER_REQUEST_ORIGIN_MANUAL
+	if !UpdateChannels_IsKnown(Channel) {
+		try LoggerError("Updater", "The Versions window refused an unknown channel to subscribe to.")
+		return false
+	}
+	HasSuspendOverride := IsSet(IsSuspended)
+	if (HasSuspendOverride ? IsSuspended : A_IsSuspended)
+		return _Updater_RefuseManualWhileSuspended(NotifyFn)
+	Request := HasSuspendOverride
+		? _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL, IsSuspended)
+		: _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
+	if Request.BornSuspended
+		return _Updater_RefuseManualWhileSuspended(NotifyFn)
+	Question := StrReplace(t("changelog_window.subscribe_restart"), "{channel}", _Updater_ChannelLabel(Channel))
+	Answer := IsObject(ConfirmFn)
+		? ConfirmFn.Call(Question)
+		: MsgBox(Question, t("updater.title_changelog"), "YesNo Icon?")
+	if (Answer !== "Yes") {
+		try LoggerInfo("Updater", "Subscription to channel {1} cancelled from the Versions window.", Channel)
+		return false
+	}
 	if HasSuspendOverride {
 		if !_Updater_RequestMayPublish(Request, IsSuspended)
 			return false
 	} else if !_Updater_RequestMayPublish(Request) {
 		return false
 	}
-	if IsLocal {
-		if IsObject(OpenFn)
-			return OpenFn.Call(OtherChannel, Request)
-		return _Updater_OpenChangelogWindow(OtherChannel, Request)
-	}
-	if IsObject(SetChannelFn)
-		SetChannelFn.Call(OtherChannel)
+	if IsObject(CloseFn)
+		CloseFn.Call(G)
 	else
-		Updater_SetChannel(OtherChannel, Request)
-	return true
+		_Updater_CloseGui(G)
+	if IsObject(SetChannelFn)
+		return SetChannelFn.Call(Channel, Request)
+	return Updater_SetChannel(Channel, Request)
 }
 
 _Updater_RefreshChangelogSelection(ListBox, Releases, BtnInstall, IsLocal, ShowBodyFn, IsSuspended := unset, NotifyFn := 0, RefreshInstallFn := 0) {
@@ -418,10 +435,9 @@ _Updater_OpenChangelogWindow(Channel, Request := unset) {
 
 ; Constructs the changelog Gui from the already-fetched releases JSON.
 ; Separated from _Updater_OpenChangelogWindow so the WinHTTP call runs async.
-; The notes pane uses WebView2 (NavigateToString) for Markdown rendering and
-; falls back to a plain-text Edit when WebView2 is unavailable.
+; It is the native fallback of the shared Versions page, so its notes pane is a
+; plain-text Edit showing the changelog section of the selected release.
 _Updater_BuildChangelogGui(Json, Channel, Request, Terminal := 0) {
-	global _VendorDir
 	if !_Updater_RequestMayPublish(Request)
 		return
 	if _Updater_AsyncTerminalIsCancelled(Terminal) {
@@ -434,18 +450,17 @@ _Updater_BuildChangelogGui(Json, Channel, Request, Terminal := 0) {
 		return
 	}
 
-	; Dev channel shows everything; main channel shows stable releases only.
-	; When there are no releases we still open the window: the empty-state is
-	; shown inside the notes pane so the user can switch channel without a popup.
-	MainOnly := (Channel != "dev")
-	Releases := Updater_ParseReleasesList(Json, MainOnly)
+	; A channel's view lists its own releases and those of every more stable
+	; channel (the shared registry decides). When there are none we still open
+	; the window: the empty-state is shown inside the notes pane so the user can
+	; view another channel without a popup.
+	Releases := Updater_ParseReleasesList(Json, Channel)
 
 	HasReleases := (Releases.Length > 0)
 	Labels := []
 	for _, R in Releases {
 		Date   := SubStr(R.PublishedAt, 1, 10)
-		Marker := R.Prerelease ? "  [dev]" : ""
-		Label  := (Date != "") ? (R.Tag . "  —  " . Date . Marker) : (R.Tag . Marker)
+		Label  := (Date != "") ? (R.Tag . "  —  " . Date) : R.Tag
 		Labels.Push(Label)
 	}
 	if !_Updater_RequestMayPublish(Request)
@@ -466,27 +481,30 @@ _Updater_BuildChangelogGui(Json, Channel, Request, Terminal := 0) {
 	RightColW := InnerW - LeftColW - ColGap   ; 640
 
 	; ── Header bar ────────────────────────────────────────────────────────────
+	; The picker changes only which channel is shown, like the page's tabs; the
+	; button subscribes to the shown channel and is inactive for the current one.
+	global UPDATER_CHANNEL
 	IsLocal := Updater_IsLocalSource()
-	BadgeText := IsLocal
-		? (t("menu.about.channel_local_source") . "  |  " . t("updater.changelog_channel_label") . "  " . Channel)
-		: (t("updater.changelog_channel_label") . "  " . Channel)
-	OtherChannel := (Channel == "dev") ? "main" : "dev"
-	SwitchLabel  := (Channel == "dev")
-		? t("updater.changelog_switch_to_main")
-		: t("updater.changelog_switch_to_dev")
+	ChannelIds := UpdateChannels_Ids()
+	ChannelLabels := []
+	ShownIndex := 0
+	for Index, Id in ChannelIds {
+		ChannelLabels.Push(_Updater_ChannelLabel(Id))
+		if (Id == Channel)
+			ShownIndex := Index
+	}
+	SubscribeLabel := StrReplace(t("changelog_window.subscribe"), "{channel}", _Updater_ChannelLabel(Channel))
 
-	BadgeW    := InnerW - ColGap - (InnerW - LeftColW - ColGap)   ; 260 = LeftColW
-	BtnSwitchW := InnerW - BadgeW - ColGap                         ; 640
-	G.Add("Text", "xm yp+4 w" . BadgeW . " +0x200", BadgeText)
-	BtnSwitch := G.Add("Button", "x+10 yp w" . BtnSwitchW, SwitchLabel)
-
-	if (IsLocal)
-		G.Add("Text", "xm y+4 w" . InnerW . " cGray", t("updater.changelog_local_source_note"))
+	PickerW       := LeftColW                                     ; 260
+	BtnSubscribeW := InnerW - PickerW - ColGap                    ; 640
+	Picker := G.Add("DropDownList", "xm yp+4 w" . PickerW . " Choose" . ShownIndex, ChannelLabels)
+	BtnSubscribe := G.Add("Button", "x+10 yp w" . BtnSubscribeW, SubscribeLabel)
+	BtnSubscribe.Enabled := (Channel !== UPDATER_CHANNEL)
 
 	G.Add("Text", "xm y+8 w" . LeftColW, t("updater.changelog_select_release"))
 
 	; ── Two-pane area ─────────────────────────────────────────────────────────
-	ListHeight := IsLocal ? 460 : 480
+	ListHeight := 480
 
 	Lb := G.Add("ListBox", "xm y+4 w" . LeftColW . " h" . ListHeight . " vRelLb", Labels)
 
@@ -503,37 +521,21 @@ _Updater_BuildChangelogGui(Json, Channel, Request, Terminal := 0) {
 	}
 
 	; RightPane spans from the top of Lb down to the bottom of BtnOpen so the
-	; WebView2 child fills exactly that column, flush with the button baseline.
+	; notes Edit fills exactly that column, flush with the button baseline.
 	Lb.GetPos(&lbx, &lby, , )
 	BtnOpen.GetPos(, &btny, , &btnh)
 	RightPaneH := (btny + btnh) - lby
 
-	; Decide whether to use WebView2 for Markdown rendering. Skip it (and use the
-	; native Edit fallback below) when free RAM is too low to absorb the cold start.
-	UseWV := IsSet(WebView2) && FileExist(_VendorDir . "\64bit\WebView2Loader.dll") && !WebView_ShouldUseNativeFallback()
-
-	; Placeholder control that occupies the right-pane slot; the WebView2
-	; control will be positioned on top of it after Gui.Show().
+	; Placeholder control that occupies the right-pane slot; the notes Edit is
+	; laid over it once the window is shown.
 	RightPane := G.Add("Text", "x+10 y" . lby . " w" . RightColW . " h" . RightPaneH, "")
 
-	; ── WebView2 controller (created after Show so the Hwnd is valid) ─────────
-	WVC := unset           ; controller reference, kept in closure scope
-	RightPaneEdit := unset ; native fallback Edit, populated when WebView2 is off
+	; This window is the native fallback of the shared Versions page (WebView2
+	; missing or failed, or too little free RAM), so its notes pane is native
+	; too: a read-only Edit showing the release's changelog section as text.
+	RightPaneEdit := unset
 
-	; Builds a self-contained HTML page that renders the given Markdown string.
-	; The JS renderer covers the Markdown subset used in GitHub release notes:
-	; ATX headings (#/##/###), **bold**, *italic*, `code`, [links](url),
-	; unordered/ordered lists, blockquotes, horizontal rules, tables, and
-	; fenced code blocks. No external dependencies — everything is inline.
-	MakeHtml := (md) => _Updater_MakeMarkdownHtml(md)
-
-	; Navigates the WebView2 pane to a rendered Markdown page.
-	; Falls back to a plain string assignment when WebView2 is not used.
-	ShowBody := (md) => (
-		UseWV && IsSet(WVC)
-			? WVC.CoreWebView2.NavigateToString(MakeHtml(md))
-			: (IsSet(RightPaneEdit) ? (RightPaneEdit.Value := _Updater_MarkdownToPlain(md)) : 0)
-	)
+	ShowBody := (md) => (IsSet(RightPaneEdit) ? (RightPaneEdit.Value := _Updater_ReleaseNotesToPlain(md)) : 0)
 
 	OpenSelected := (*) => _Updater_OpenSelectedReleaseUrl(Lb, Releases)
 
@@ -547,8 +549,10 @@ _Updater_BuildChangelogGui(Json, Channel, Request, Terminal := 0) {
 			: ""
 	)
 
-	BtnSwitch.OnEvent("Click", (*) => _Updater_SwitchChangelogChannel(
-		G, IsLocal, OtherChannel))
+	Picker.OnEvent("Change", (*) => (Picker.Value >= 1 && ChannelIds[Picker.Value] !== Channel)
+		? _Updater_ViewChangelogChannel(G, ChannelIds[Picker.Value])
+		: "")
+	BtnSubscribe.OnEvent("Click", (*) => _Updater_SubscribeChangelogChannel(G, Channel))
 
 	Lb.OnEvent("Change", RefreshBody)
 	Lb.OnEvent("DoubleClick", OpenSelected)
@@ -568,70 +572,17 @@ _Updater_BuildChangelogGui(Json, Channel, Request, Terminal := 0) {
 		return
 	}
 
-	; Spin up the WebView2 controller now that the window Hwnd is valid.
-	if (UseWV) {
-		loader := _VendorDir . "\64bit\WebView2Loader.dll"
-		try {
-			; Parent the WebView2 to the RightPane control directly so Fill()
-			; covers exactly that control's client area — no manual coordinate
-			; arithmetic needed, and resize is handled automatically by the OS.
-			; Reuse the shared session environment (infra/webview_utils.ahk) so no
-			; second Chromium process boots and reopens are near-instant.
-			WVC := WebView2.create(RightPane.Hwnd, , WebView_SharedEnvironment(loader))
-			if !_Updater_RequestMayPublish(Request) {
-				try WVC.Close()
-				_Updater_CloseGui(G)
-				return
-			}
-			G.WVC := WVC
-		} catch as Err {
-			try LoggerWarn("Updater", "WebView2 create failed: {1} — falling back.", Err.Message)
-			UseWV := false
-		}
-		if (UseWV) {
-			try {
-				s := WVC.CoreWebView2.Settings
-				s.AreDevToolsEnabled              := false
-				s.AreDefaultContextMenusEnabled   := false
-				s.IsStatusBarEnabled              := false
-				s.AreBrowserAcceleratorKeysEnabled := false
-				s.IsSwipeNavigationEnabled         := false
-			}
-			WVC.Fill()
-			if !_Updater_RequestMayPublish(Request) {
-				_Updater_CloseGui(G)
-				return
-			}
-			; NavigateToString is synchronous enough here — no "ready" handshake needed.
-			if (HasReleases) {
-				Lb.Choose(1)
-				ShowBody(Releases[1].Body)
-				_Updater_RefreshInstallBtn(BtnInstall, Releases, 1, IsLocal)
-			} else {
-				; Empty-state: pass an empty string so the JS renderer shows the centred message.
-				ShowBody("")
-			}
-		}
-	}
-
-	; Native fallback: a selectable read-only Edit over the right-pane slot, showing
-	; the raw Markdown. Used when WebView2 is unavailable or free RAM is too low.
-	if (!UseWV) {
-		if !_Updater_RequestMayPublish(Request) {
-			_Updater_CloseGui(G)
-			return
-		}
-		RightPane.GetPos(&rpx, &rpy, &rpw, &rph)
-		RightPaneEdit := G.Add("Edit", "x" . rpx . " y" . rpy . " w" . rpw . " h" . rph
-			. " ReadOnly +Multi -Wrap +VScroll", "")
-		RightPaneEdit.SetFont("s9", "Consolas")
-		if (HasReleases) {
-			Lb.Choose(1)
-			ShowBody(Releases[1].Body)
-			_Updater_RefreshInstallBtn(BtnInstall, Releases, 1, IsLocal)
-		} else {
-			ShowBody(t("updater.changelog_empty"))
-		}
+	RightPane.GetPos(&rpx, &rpy, &rpw, &rph)
+	RightPaneEdit := G.Add("Edit", "x" . rpx . " y" . rpy . " w" . rpw . " h" . rph
+		. " ReadOnly +Multi -Wrap +VScroll", "")
+	RightPaneEdit.SetFont("s9", "Consolas")
+	if (HasReleases) {
+		Lb.Choose(1)
+		ShowBody(Releases[1].Body)
+		_Updater_RefreshInstallBtn(BtnInstall, Releases, 1, IsLocal)
+	} else {
+		; An empty body shows the localized empty-notes message.
+		ShowBody("")
 	}
 }
 
@@ -651,87 +602,408 @@ _Updater_OpenSelectedReleasePrompt(G, Release) {
 	return true
 }
 
-; Escapes a string for safe embedding inside this page's inline script. The
-; HTML-safe mode is essential: JavaScript quoting alone does not stop the HTML
-; parser from terminating a script element at a release-body </script> token.
-_Updater_JsStr(s) {
-	return JsonStringLiteral(s, true)
+; ==================================================
+; ===== 1.6) Release notes pane (update prompt) ====
+; ==================================================
+
+; Virtual host mapped to _SharedDir for the update prompt's notes pane, so the
+; shared page, its scripts and the locale fetch resolve over https:// (file://
+; is an opaque origin the WebView2 bridge does not serve reliably).
+global RELEASE_NOTES_VHOST := "ergopti.releasenotes"
+
+; Returns the pane document URL. A per-open cache-buster forces a fresh
+; document instead of a WebView2-cached copy, and makes the exact URL the
+; provenance the bridge accepts messages from.
+_Updater_ReleaseNotesUrl() {
+	global RELEASE_NOTES_VHOST
+	return "https://" . RELEASE_NOTES_VHOST . "/ui/release_notes/index.html?cb=" . A_TickCount
 }
 
-; Builds a self-contained HTML page that renders the given Markdown string.
-; The JS renderer covers the Markdown subset used in GitHub release notes:
-; ATX headings, **bold**, *italic*, `code`, [links](url), lists, blockquotes,
-; horizontal rules, tables, and fenced code blocks. No external dependencies.
-; Used by both _Updater_OpenChangelogWindow and Updater_ShowUpdatePrompt.
-_Updater_MakeMarkdownHtml(md) {
-	return (
-		"<!DOCTYPE html><html><head><meta charset='utf-8'>"
-		. "<style>"
-		. "html,body{margin:0;padding:0;height:100%;font-family:'Segoe UI',sans-serif;font-size:13px;color:#1a1a1a;background:#fff;}"
-		. "body{padding:14px 18px;box-sizing:border-box;overflow-y:auto;overflow-x:hidden;}"
-		. "h1{font-size:1.35em;margin:.6em 0 .3em;}h2{font-size:1.2em;margin:.6em 0 .25em;border-bottom:1px solid #ddd;padding-bottom:.2em;}"
-		. "h3{font-size:1.05em;margin:.5em 0 .2em;}h4,h5,h6{font-size:1em;margin:.4em 0 .15em;}"
-		. "p{margin:.35em 0;}ul,ol{margin:.3em 0 .3em 1.4em;padding:0;}li{margin:.15em 0;}"
-		. "code{background:#f3f3f3;border-radius:3px;padding:.1em .35em;font-family:Consolas,monospace;font-size:.92em;}"
-		. "pre{background:#f3f3f3;border-radius:4px;padding:.7em 1em;overflow-x:auto;}"
-		. "pre code{background:none;padding:0;}"
-		. "blockquote{border-left:3px solid #ccc;margin:.4em 0 .4em 0;padding:.2em .8em;color:#555;}"
-		. "hr{border:none;border-top:1px solid #ddd;margin:.6em 0;}"
-		. "a{color:#0969da;}a:hover{text-decoration:underline;}"
-		. "table{border-collapse:collapse;margin:.4em 0;}th,td{border:1px solid #ddd;padding:.25em .6em;text-align:left;}"
-		. "th{background:#f5f5f5;font-weight:600;}"
-		. ".empty{display:flex;align-items:center;justify-content:center;height:100%;color:#888;font-size:1.05em;}"
-		. "</style></head><body>"
-		. "<script>"
-		. "function mdToHtml(s){"
-		. "if(!s)return '<div class=empty>' + emptyMsg + '</div>';"
-		. "var lines=s.split('\n'),out=[],inPre=false,inUl=false,inOl=false,inBq=false,inTbl=false;"
-		. "function closeBlocks(){if(inUl){out.push('</ul>');inUl=false;}if(inOl){out.push('</ol>');inOl=false;}if(inBq){out.push('</blockquote>');inBq=false;}if(inTbl){out.push('</table>');inTbl=false;}}"
-		. "function safeUrl(u){return /^https:\/\/[^\s]+$/i.test(u)?u:'';}"
-		. "function inline(t){t=t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\x22/g,'&quot;').replace(/'/g,'&#39;');"
-		. "t=t.replace(/``([^``]+)``/g,'<code>$1</code>');"
-		. "t=t.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');"
-		. "t=t.replace(/__(.+?)__/g,'<strong>$1</strong>');"
-		. "t=t.replace(/\*(.+?)\*/g,'<em>$1</em>');"
-		. "t=t.replace(/_(.+?)_/g,'<em>$1</em>');"
-		. "t=t.replace(/!\[([^\]]*)\]\(([^)]+)\)/g,function(_,a,u){u=safeUrl(u);return u?'<img alt=\''+a+'\' src=\''+u+'\' style=\'max-width:100%\'>':a;});"
-		. "t=t.replace(/\[([^\]]+)\]\(([^)]+)\)/g,function(_,label,u){u=safeUrl(u);return u?'<a href=\''+u+'\' target=\'_blank\' rel=\'noopener noreferrer\'>'+label+'</a>':label;});"
-		. "return t;}"
-		. "for(var i=0;i<lines.length;i++){"
-		. "var l=lines[i];"
-		. "if(/^``````/.test(l)){if(inPre){out.push('</code></pre>');inPre=false;}else{closeBlocks();out.push('<pre><code>');inPre=true;}continue;}"
-		. "if(inPre){out.push(l.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'));continue;}"
-		. "if(/^\s*$/.test(l)){closeBlocks();continue;}"
-		. "var hm=l.match(/^(#{1,6})\s+(.*)/);if(hm){closeBlocks();var n=hm[1].length;out.push('<h'+n+'>'+inline(hm[2])+'</h'+n+'>');continue;}"
-		. "if(/^---+$/.test(l.trim())||/^\*\*\*+$/.test(l.trim())){closeBlocks();out.push('<hr>');continue;}"
-		. "if(/^\|/.test(l)&&/\|/.test(l)){if(!inTbl){closeBlocks();out.push('<table>');inTbl=true;}"
-		. "if(/^[\s|:-]+$/.test(l))continue;"
-		. "var cells=l.replace(/^\||\|$/g,'').split('|');"
-		. "var tag=(!inTbl||out[out.length-1]==='<table>')?'th':'td';"
-		. "out.push('<tr>'+cells.map(function(c){return'<'+tag+'>'+inline(c.trim())+'</'+tag+'>';}).join('')+'</tr>');continue;}"
-		. "var bq=l.match(/^>\s?(.*)/);if(bq){if(!inBq){closeBlocks();out.push('<blockquote>');inBq=true;}out.push('<p>'+inline(bq[1])+'</p>');continue;}"
-		. "var ul=l.match(/^[-*+]\s+(.*)/);if(ul){if(!inUl){closeBlocks();out.push('<ul>');inUl=true;}out.push('<li>'+inline(ul[1])+'</li>');continue;}"
-		. "var ol=l.match(/^\d+\.\s+(.*)/);if(ol){if(!inOl){closeBlocks();out.push('<ol>');inOl=true;}out.push('<li>'+inline(ol[1])+'</li>');continue;}"
-		. "closeBlocks();out.push('<p>'+inline(l)+'</p>');}"
-		. "if(inPre)out.push('</code></pre>');closeBlocks();"
-		. "return out.join('\n');}"
-		. "var emptyMsg=" . _Updater_JsStr(t("updater.changelog_empty")) . ";"
-		. "var md=" . _Updater_JsStr(md) . ";"
-		. "document.body.innerHTML=mdToHtml(md);"
-		. "</script></body></html>"
-	)
+; Loads the shared release-notes page (_shared/ui/release_notes/) into a
+; WebView2 controller: the same section splitter and DOM-only Markdown renderer
+; as the Versions window, showing the release's changelog only. Returns the
+; link bridge subscription, which the caller keeps with the controller and
+; releases before closing it. Throws when the WebView2 calls fail.
+_Updater_NavigateReleaseNotes(WVC, Release) {
+	global _SharedDir, CHANGELOG_HOST_ACCESS_ALLOW, RELEASE_NOTES_VHOST
+	Tag := Release.HasProp("Tag") ? Release.Tag : ""
+	Body := Release.HasProp("Body") ? Release.Body : ""
+	Url := _Updater_ReleaseNotesUrl()
+	Session := _CLW_NewBridgeSessionToken()
+	try LoggerStart("Updater", "Loading the release notes pane for {1}…", Tag)
+	try {
+		WebView := WVC.CoreWebView2
+		WebView.SetVirtualHostNameToFolderMapping(RELEASE_NOTES_VHOST, _SharedDir, CHANGELOG_HOST_ACCESS_ALLOW)
+		WebView.AddScriptToExecuteOnDocumentCreated(_Updater_ReleaseNotesSeed(Body, Session))
+		Subscription := WebView.WebMessageReceived(_Updater_OnReleaseNotesMessage.Bind(Url, Session))
+		WebView.Navigate(Url)
+	} catch as Err {
+		try LoggerError("Updater", "The release notes pane for {1} could not load: {2}.", Tag, Err.Message)
+		throw Err
+	}
+	try LoggerSuccess("Updater", "Release notes pane navigation issued for {1}.", Tag)
+	return Subscription
 }
+
+; The pane's boot data as one script run before the page: the locale for
+; i18n.js, the repository for the link policy, the bridge session, and the body
+; as an HTML-safe JSON string literal, so release text is only ever data.
+_Updater_ReleaseNotesSeed(Body, Session) {
+	global _I18nLocale, UPDATER_GH_OWNER, UPDATER_GH_REPO, RELEASE_NOTES_VHOST
+	return "window.__i18n_base=" . JsonStringLiteral("https://" . RELEASE_NOTES_VHOST . "/data/locales/", true) . ";"
+		. "window._i18n_locale=" . JsonStringLiteral(_I18nLocale, true) . ";"
+		. "window.__release_notes={body:" . JsonStringLiteral(Body, true)
+		. ",owner:" . JsonStringLiteral(UPDATER_GH_OWNER, true)
+		. ",repo:" . JsonStringLiteral(UPDATER_GH_REPO, true)
+		. ",session:" . JsonStringLiteral(Session, true) . "};"
+}
+
+; Receives the pane's link clicks. Only the exact document this prompt loaded,
+; carrying its session token, may ask for anything, and open_url is the only
+; action; _Updater_OpenManualUrl then applies the repository allowlist.
+; WebMessageReceived bypasses native Suspend, so the pause state is captured
+; before the COM read can pump messages and revalidated before opening.
+; OpenFn is a test seam replacing that opener.
+_Updater_OnReleaseNotesMessage(ExpectedSource, ExpectedSession, Handler, Args, OpenFn := 0) {
+	if !_CLW_BridgeSourceMatches(Args, ExpectedSource) {
+		try LoggerWarn("Updater", "Release notes pane: rejected a message from another document.")
+		return false
+	}
+	Envelope := _Updater_ReadManualBridgeMessage(() => Args.TryGetWebMessageAsString())
+	if (!IsObject(Envelope) or !Envelope.Ok)
+		return false
+	try {
+		Payload := JsonParse(Envelope.Message)
+	} catch as Err {
+		try LoggerWarn("Updater", "Release notes pane: rejected an unreadable message ({1}).", Err.Message)
+		return false
+	}
+	if (!(Payload is Map)
+			|| Payload.Get("session", "") !== ExpectedSession
+			|| Payload.Get("action", "") !== "open_url") {
+		try LoggerWarn("Updater", "Release notes pane: rejected a message without the session or with another action.")
+		return false
+	}
+	Request := Envelope.Request
+	if Request.BornSuspended
+		return _Updater_RefuseManualWhileSuspended()
+	if !_Updater_RequestMayPublish(Request)
+		return false
+	Url := Payload.Get("url", "")
+	if IsObject(OpenFn)
+		return OpenFn.Call(Url, Request)
+	return _Updater_OpenManualUrl(() => Url, Request)
+}
+
+
+
+; ======================================================
+; ===== 1.7) Release notes: changelog section ==========
+; ======================================================
+
+; Section names the release CI emits between invisible HTML comment markers.
+; Mirrors RELEASE_BODY_SECTIONS in _shared/ui/changelog/release_body.js; both
+; extractions are pinned by _shared/tests/corpus/updater/release_body_vectors.json.
+global UPDATER_RELEASE_BODY_SECTIONS := ["intro", "downloads", "changelog", "footer"]
+
+; Returns the changelog section of a release body as Markdown, the way the
+; shared splitter (_shared/ui/changelog/release_body.js) extracts it: from the CI
+; section markers, else from the headings and changelog fold every earlier CI
+; format used, else the whole body. The native notes views show only this part;
+; the downloads stay one click away on GitHub.
+_Updater_ReleaseNotesChangelog(Body) {
+	Lines := StrSplit(RegExReplace(Body, "\r\n?", "`n"), "`n")
+	Mask := _Updater_ReleaseBodyFenceMask(Lines)
+	Sections := _Updater_ReleaseBodyParseMarked(Lines, Mask)
+	if !IsObject(Sections)
+		Sections := _Updater_ReleaseBodyParseHeuristic(Lines, Mask)
+	if !IsObject(Sections)
+		return _Updater_ReleaseBodyJoin(_Updater_ReleaseBodyTrim(Lines))
+
+	Changelog := Sections.Has("changelog") ? Sections["changelog"] : []
+	Changelog := _Updater_ReleaseBodyUnwrapFold(_Updater_ReleaseBodyDropChrome(Changelog))
+	Changelog := _Updater_ReleaseBodyTrim(Changelog)
+	if (Changelog.Length > 0 && RegExMatch(Changelog[1], "^ {0,3}## +Changelog(?: +#+)? *$"))
+		Changelog.RemoveAt(1)
+	Changelog := _Updater_ReleaseBodyTrim(Changelog)
+
+	; The timestamp note explains the changelog; legacy bodies put it in the intro.
+	Intro := _Updater_ReleaseBodyTrim(_Updater_ReleaseBodyDropChrome(Sections.Has("intro") ? Sections["intro"] : []))
+	if (Intro.Length > 0 && RegExMatch(Intro[1], "^ {0,3}## +Ergopti\b"))
+		Intro.RemoveAt(1)
+	IntroMask := _Updater_ReleaseBodyFenceMask(Intro)
+	for LineNo, Line in Intro {
+		if (!IntroMask[LineNo] && RegExMatch(Line, "^ {0,3}> ?Timestamps are in\b")) {
+			if (Changelog.Length > 0)
+				Changelog.InsertAt(1, Line, "")
+			break
+		}
+	}
+	return _Updater_ReleaseBodyJoin(_Updater_ReleaseBodyTrim(Changelog))
+}
+
+; Plain-text projection of the changelog section for the native (no-WebView2)
+; notes views; the localized empty-notes message when there is none.
+_Updater_ReleaseNotesToPlain(Body) {
+	Changelog := _Updater_ReleaseNotesChangelog(Body)
+	if (Changelog == "")
+		return t("updater.changelog_empty")
+	return _Updater_MarkdownToPlain(Changelog)
+}
+
+; Flags every line of a fenced code block, fences included, with the Markdown
+; renderer's opening and closing rule.
+_Updater_ReleaseBodyFenceMask(Lines) {
+	Mask := []
+	Mask.Length := Lines.Length
+	LineNo := 1
+	while (LineNo <= Lines.Length) {
+		Mask[LineNo] := false
+		if !RegExMatch(Lines[LineNo], "^ {0,3}(``{3,}|~{3,})", &Fence) {
+			LineNo += 1
+			continue
+		}
+		Mask[LineNo] := true
+		LineNo += 1
+		while (LineNo <= Lines.Length && InStr(Trim(Lines[LineNo], " `t"), Fence[1]) != 1) {
+			Mask[LineNo] := true
+			LineNo += 1
+		}
+		if (LineNo <= Lines.Length)
+			Mask[LineNo] := true
+		LineNo += 1
+	}
+	return Mask
+}
+
+; Reads the CI section markers. Returns a Map of section lines, or "" when the
+; body has no valid marker structure.
+_Updater_ReleaseBodyParseMarked(Lines, Mask) {
+	global UPDATER_RELEASE_BODY_SECTIONS
+	Sections := Map()
+	Current := ""
+	Start := 0
+	SawMarker := false
+	for LineNo, Line in Lines {
+		if (!Mask[LineNo] && RegExMatch(Line, "^<!-- ergopti:section=([a-z]+) -->[ \t]*$", &Open)) {
+			SawMarker := true
+			Known := false
+			for _, SectionName in UPDATER_RELEASE_BODY_SECTIONS
+				Known := Known || (SectionName == Open[1])
+			if (Current != "" || !Known || Sections.Has(Open[1]))
+				return ""
+			Current := Open[1]
+			Start := LineNo + 1
+			continue
+		}
+		if (!Mask[LineNo] && RegExMatch(Line, "^<!-- /ergopti:section -->[ \t]*$")) {
+			SawMarker := true
+			if (Current == "")
+				return ""
+			Sections[Current] := _Updater_ReleaseBodySlice(Lines, Start, LineNo - 1)
+			Current := ""
+			continue
+		}
+		if (Current == "" && !RegExMatch(Line, "^\s*$"))
+			return ""
+	}
+	if (!SawMarker || Current != "")
+		return ""
+	return Sections
+}
+
+; Splits an unmarked body on the headings and the changelog fold. Returns a Map
+; of section lines, or "" when neither a changelog nor downloads is recognisable.
+_Updater_ReleaseBodyParseHeuristic(Lines, Mask) {
+	Anchors := Map()
+	FoldEnd := 0
+	for LineNo, Line in Lines {
+		if Mask[LineNo]
+			continue
+		if (!Anchors.Has("intro") && RegExMatch(Line, "^ {0,3}## +Ergopti\b"))
+			Anchors["intro"] := LineNo
+		if (!Anchors.Has("downloads") && RegExMatch(Line, "^ {0,3}## +Downloads(?: +#+)? *$"))
+			Anchors["downloads"] := LineNo
+		if !Anchors.Has("changelog") {
+			if RegExMatch(Line, "^ {0,3}## +Changelog(?: +#+)? *$") {
+				Anchors["changelog"] := LineNo
+			} else if _Updater_ReleaseBodyIsChangelogFold(Lines, Mask, LineNo) {
+				Anchors["changelog"] := LineNo
+				FoldEnd := _Updater_ReleaseBodyFoldEnd(Lines, Mask, LineNo)
+			}
+		}
+	}
+	if (!Anchors.Has("changelog") && !Anchors.Has("downloads"))
+		return ""
+
+	Last := _Updater_ReleaseBodyPrevContent(Lines, Lines.Length)
+	if (Last > 0 && !Mask[Last] && RegExMatch(Lines[Last], "^ {0,3}[_*]Generated by\b.*[_*][ \t]*$")) {
+		Rule := _Updater_ReleaseBodyPrevContent(Lines, Last - 1)
+		Anchors["footer"] := (Rule > 0 && !Mask[Rule]
+			&& RegExMatch(Lines[Rule], "^ {0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$")) ? Rule : Last
+	}
+
+	; Order the anchors by position (at most four, so an insertion sort).
+	Order := []
+	for SectionName, Position in Anchors {
+		Slot := Order.Length + 1
+		while (Slot > 1 && Anchors[Order[Slot - 1]] > Position)
+			Slot -= 1
+		Order.InsertAt(Slot, SectionName)
+	}
+	Sections := Map("intro", _Updater_ReleaseBodySlice(Lines, 1, Anchors[Order[1]] - 1))
+	Leftover := []
+	for Position, SectionName in Order {
+		End := (Position < Order.Length) ? Anchors[Order[Position + 1]] - 1 : Lines.Length
+		Span := _Updater_ReleaseBodySlice(Lines, Anchors[SectionName], End)
+		if (SectionName == "changelog" && FoldEnd > 0 && FoldEnd < End) {
+			Leftover := _Updater_ReleaseBodySlice(Lines, FoldEnd + 1, End)
+			Span := _Updater_ReleaseBodySlice(Lines, Anchors[SectionName], FoldEnd)
+		}
+		Collected := Sections.Has(SectionName) ? Sections[SectionName] : []
+		for _, Line in Span
+			Collected.Push(Line)
+		Sections[SectionName] := Collected
+	}
+	if (_Updater_ReleaseBodyNextContent(Leftover, 1) > 0) {
+		Footer := Sections.Has("footer") ? Sections["footer"] : []
+		for _, Line in Footer
+			Leftover.Push(Line)
+		Sections["footer"] := Leftover
+	}
+	return Sections
+}
+
+; True when the fold opened at LineNo has a summary starting with "Changelog".
+_Updater_ReleaseBodyIsChangelogFold(Lines, Mask, LineNo) {
+	if (Mask[LineNo] || !RegExMatch(Lines[LineNo], "^ {0,3}<details( open)?>[ \t]*$"))
+		return false
+	Next := _Updater_ReleaseBodyNextContent(Lines, LineNo + 1)
+	if (Next == 0 || !RegExMatch(Lines[Next], "^ {0,3}<summary>(.*)</summary>[ \t]*$", &Summary))
+		return false
+	Text := Trim(RegExReplace(RegExReplace(Summary[1], "<[^>]*>"), "[*_\\]"))
+	return RegExMatch(Text, "i)^changelog\b") > 0
+}
+
+; LineNo of the </details> closing the fold opened at Start (the last line when
+; unclosed), skipping fenced code.
+_Updater_ReleaseBodyFoldEnd(Lines, Mask, Start) {
+	Depth := 0
+	LineNo := Start
+	while (LineNo <= Lines.Length) {
+		if !Mask[LineNo] {
+			if RegExMatch(Lines[LineNo], "^ {0,3}<details( open)?>[ \t]*$") {
+				Depth += 1
+			} else if RegExMatch(Lines[LineNo], "^ {0,3}</details>[ \t]*$") {
+				Depth -= 1
+				if (Depth == 0)
+					return LineNo
+			}
+		}
+		LineNo += 1
+	}
+	return Lines.Length
+}
+
+; Removes a whole-section fold: the <details> line, its summary and </details>.
+_Updater_ReleaseBodyUnwrapFold(Lines) {
+	Trimmed := _Updater_ReleaseBodyTrim(Lines)
+	if (Trimmed.Length < 3 || !RegExMatch(Trimmed[1], "^ {0,3}<details( open)?>[ \t]*$"))
+		return Trimmed
+	if (_Updater_ReleaseBodyFoldEnd(Trimmed, _Updater_ReleaseBodyFenceMask(Trimmed), 1) != Trimmed.Length)
+		return Trimmed
+	if !RegExMatch(Trimmed[Trimmed.Length], "^ {0,3}</details>[ \t]*$")
+		return Trimmed
+	Summary := _Updater_ReleaseBodyNextContent(Trimmed, 2)
+	if (Summary == 0 || !RegExMatch(Trimmed[Summary], "^ {0,3}<summary>(.*)</summary>[ \t]*$"))
+		return Trimmed
+	return _Updater_ReleaseBodySlice(Trimmed, Summary + 1, Trimmed.Length - 1)
+}
+
+; Removes the github.com-only lines: the downloads jump link and empty anchors.
+_Updater_ReleaseBodyDropChrome(Lines) {
+	Mask := _Updater_ReleaseBodyFenceMask(Lines)
+	Kept := []
+	for LineNo, Line in Lines {
+		if (!Mask[LineNo]
+				&& (RegExMatch(Line, "^ {0,3}\*\*\[[^\]]*\]\([^)\s]*#(?:user-content-)?downloads[A-Za-z0-9_-]*\)\*\*[ \t]*$")
+				|| RegExMatch(Line, '^ {0,3}<a (?:id|name)="[A-Za-z0-9_-]*"></a>[ \t]*$')))
+			continue
+		Kept.Push(Line)
+	}
+	return Kept
+}
+
+; Drops leading and trailing blank lines and thematic breaks.
+_Updater_ReleaseBodyTrim(Lines) {
+	First := 1
+	Last := Lines.Length
+	while (First <= Last && _Updater_ReleaseBodyIsEdge(Lines[First]))
+		First += 1
+	while (Last >= First && _Updater_ReleaseBodyIsEdge(Lines[Last]))
+		Last -= 1
+	return _Updater_ReleaseBodySlice(Lines, First, Last)
+}
+
+_Updater_ReleaseBodyIsEdge(Line) {
+	return RegExMatch(Line, "^\s*$") || RegExMatch(Line, "^ {0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$")
+}
+
+; Lines[First..Last] as a new array (empty when Last < First).
+_Updater_ReleaseBodySlice(Lines, First, Last) {
+	Out := []
+	LineNo := First
+	while (LineNo <= Last) {
+		Out.Push(Lines[LineNo])
+		LineNo += 1
+	}
+	return Out
+}
+
+; LineNo of the first non-blank line at or after Start, or 0.
+_Updater_ReleaseBodyNextContent(Lines, Start) {
+	LineNo := Start
+	while (LineNo <= Lines.Length) {
+		if !RegExMatch(Lines[LineNo], "^\s*$")
+			return LineNo
+		LineNo += 1
+	}
+	return 0
+}
+
+; LineNo of the last non-blank line at or before Start, or 0.
+_Updater_ReleaseBodyPrevContent(Lines, Start) {
+	LineNo := Start
+	while (LineNo >= 1) {
+		if !RegExMatch(Lines[LineNo], "^\s*$")
+			return LineNo
+		LineNo -= 1
+	}
+	return 0
+}
+
+_Updater_ReleaseBodyJoin(Lines) {
+	Out := ""
+	for LineNo, Line in Lines
+		Out .= (LineNo > 1 ? "`n" : "") . Line
+	return Out
+}
+
 
 ; Converts the GitHub-release Markdown subset to clean, readable plain text for the
-; native (no-WebView2) fallback. Mirrors the subset rendered by
-; _Updater_MakeMarkdownHtml so the low-RAM view stays faithful: headings, bold,
-; italic, inline code, links, lists, blockquotes and horizontal rules. It cannot
-; reproduce fonts or colours, but it strips the raw markup so the notes read as
-; prose instead of "## ... **...**".
+; native (no-WebView2) fallback. Mirrors the subset of the shared renderer
+; (_shared/ui/markdown.js) so the low-RAM view stays faithful: headings, bold,
+; italic, inline code, links, lists, blockquotes, horizontal rules and folds. It
+; cannot reproduce fonts or colours, but it strips the raw markup so the notes
+; read as prose instead of "## ... **...**".
 _Updater_MarkdownToPlain(md) {
 	if (md = "")
 		return md
 	s := md
+	; Invisible comments and fold lines carry no prose; a fold keeps its summary.
+	s := RegExReplace(s, "s)<!--.*?-->", "")
+	s := RegExReplace(s, "m)^ {0,3}</?details(?: open)?>[ \t]*$", "")
+	s := RegExReplace(s, "m)^ {0,3}<summary>(?:<(?:b|strong)>)?(.*?)(?:</(?:b|strong)>)?(.*)</summary>[ \t]*$", "$1$2")
 	; Drop fenced-code fences (keep their contents as plain lines).
 	s := RegExReplace(s, "m)^\s*``````.*$", "")
 	; ATX headings -> bare text.
