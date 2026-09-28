@@ -27,12 +27,22 @@ local LOG         = "gestures.conflicts"
 -- The current-host preferences capture the Trackpad pane's hardware-specific
 -- values while the two domains cover the built-in and Bluetooth trackpads
 local MACOS_PREFERENCE_COMMANDS = {
-	"/usr/bin/defaults read com.apple.AppleMultitouchTrackpad 2>/dev/null",
-	"/usr/bin/defaults read com.apple.driver.AppleBluetoothMultitouch.trackpad 2>/dev/null",
-	"/usr/bin/defaults -currentHost read -globalDomain 2>/dev/null",
+	{ "read", "com.apple.AppleMultitouchTrackpad" },
+	{ "read", "com.apple.driver.AppleBluetoothMultitouch.trackpad" },
+	{ "-currentHost", "read", "-globalDomain" },
 }
 
+local cached_preferences = {}
+local pending_probe = nil
+local boot_notified = false
+local SETTINGS_URL = "x-apple.systempreferences:com.apple.Trackpad-Settings.extension"
+local THREE_FINGER_DRAG_KEYS = { "TrackpadThreeFingerDrag", "com.apple.trackpad.threeFingerDragGesture" }
+
 local MACOS_PREFERENCE_KEYS = {
+	"TrackpadRightClick",
+	"TrackpadThreeFingerDrag",
+	"com.apple.trackpad.threeFingerDragGesture",
+	"TrackpadPinch",
 	"TrackpadScroll",
 	"AppleEnableSwipeNavigateWithScrolls",
 	"TrackpadTwoFingerFromRightEdgeSwipeGesture",
@@ -53,6 +63,13 @@ local MACOS_PREFERENCE_KEYS = {
 -- a built-in macOS gesture, plus the exact preferences that disable it
 local MACOS_GESTURE_GROUPS = {
 	{
+		key = "tap_2_conflict", slots = { "tap_2" },
+		description = i18n.get("gesture.slots.tap_2"),
+		hint = i18n.get("menu.gestures.open_settings"),
+		settings_url = SETTINGS_URL,
+		preferences = { "TrackpadRightClick" },
+	},
+	{
 		key          = "swipe_2_conflict",
 		slots        = { 
 			"swipe_2_left", "swipe_2_right", "swipe_2_up", "swipe_2_down",
@@ -60,7 +77,7 @@ local MACOS_GESTURE_GROUPS = {
 		},
 		description  = i18n.get("gestures.conflict_desc_swipe_2"),
 		hint         = i18n.get("gestures.conflict_hint_swipe_2"),
-		settings_url = "x-apple.systempreferences:com.apple.Trackpad-Settings.extension",
+		settings_url = SETTINGS_URL,
 		preferences  = {
 			"TrackpadScroll",
 			"AppleEnableSwipeNavigateWithScrolls",
@@ -73,7 +90,7 @@ local MACOS_GESTURE_GROUPS = {
 		slots        = { "tap_3" },
 		description  = i18n.get("gestures.conflict_desc_tap_3"),
 		hint         = i18n.get("gestures.conflict_hint_tap_3"),
-		settings_url = "x-apple.systempreferences:com.apple.Trackpad-Settings.extension",
+		settings_url = SETTINGS_URL,
 		preferences  = { "TrackpadThreeFingerTapGesture", "com.apple.trackpad.threeFingerTapGesture" },
 	},
 	{
@@ -81,23 +98,25 @@ local MACOS_GESTURE_GROUPS = {
 		slots        = { "swipe_3_horiz", "swipe_3_left", "swipe_3_right" },
 		description  = i18n.get("gestures.conflict_desc_swipe_3_horiz"),
 		hint         = i18n.get("gestures.conflict_hint_swipe_3_horiz"),
-		settings_url = "x-apple.systempreferences:com.apple.Trackpad-Settings.extension",
+		settings_url = SETTINGS_URL,
 		preferences  = { "TrackpadThreeFingerHorizSwipeGesture", "com.apple.trackpad.threeFingerHorizSwipeGesture" },
+		drag_preferences = THREE_FINGER_DRAG_KEYS,
 	},
 	{
 		key          = "swipe_3_vert_conflict",
-		slots        = { "swipe_3_up", "swipe_3_down" },
+		slots        = { "swipe_3_up", "swipe_3_down", "swipe_3_left_up", "swipe_3_right_up", "swipe_3_left_down", "swipe_3_right_down" },
 		description  = i18n.get("gestures.conflict_desc_swipe_3_vert"),
 		hint         = i18n.get("gestures.conflict_hint_swipe_3_vert"),
-		settings_url = "x-apple.systempreferences:com.apple.Trackpad-Settings.extension",
+		settings_url = SETTINGS_URL,
 		preferences  = { "TrackpadThreeFingerVertSwipeGesture", "com.apple.trackpad.threeFingerVertSwipeGesture" },
+		drag_preferences = THREE_FINGER_DRAG_KEYS,
 	},
 	{
 		key          = "swipe_4_horiz_conflict",
 		slots        = { "swipe_4_horiz", "swipe_5_horiz", "swipe_4_left", "swipe_4_right", "swipe_5_left", "swipe_5_right" },
 		description  = i18n.get("gestures.conflict_desc_swipe_4_horiz"),
 		hint         = i18n.get("gestures.conflict_hint_swipe_4_horiz"),
-		settings_url = "x-apple.systempreferences:com.apple.Trackpad-Settings.extension",
+		settings_url = SETTINGS_URL,
 		preferences  = { "TrackpadFourFingerHorizSwipeGesture", "com.apple.trackpad.fourFingerHorizSwipeGesture" },
 	},
 	{
@@ -109,7 +128,7 @@ local MACOS_GESTURE_GROUPS = {
 		},
 		description  = i18n.get("gestures.conflict_desc_swipe_4_vert"),
 		hint         = i18n.get("gestures.conflict_hint_swipe_4_vert"),
-		settings_url = "x-apple.systempreferences:com.apple.Trackpad-Settings.extension",
+		settings_url = SETTINGS_URL,
 		preferences  = { "TrackpadFourFingerVertSwipeGesture", "com.apple.trackpad.fourFingerVertSwipeGesture" },
 	},
 }
@@ -167,41 +186,83 @@ local function parse_preference_value(raw)
 	return tonumber(value)
 end
 
---- Reads the current macOS Trackpad preferences from every relevant source.
---- @return table<string, table<number>> Values grouped by preference key.
-local function read_macos_preferences()
-	local values = {}
-	for _, command in ipairs(MACOS_PREFERENCE_COMMANDS) do
-		local output = ShellRunner.exec(command)
-		if type(output) == "string" and output ~= "" then
-			for _, key in ipairs(MACOS_PREFERENCE_KEYS) do
-				local escaped = escape_lua_pattern(key)
-				local raw = output:match('"' .. escaped .. '"%s*=%s*([^;\n]+)')
-					or output:match(escaped .. "%s*=%s*([^;\n]+)")
-				local value = parse_preference_value(raw)
-				if value ~= nil then
-					values[key] = values[key] or {}
-					table.insert(values[key], value)
-				end
-			end
+--- Accumulates one completed defaults output without publishing a partial read.
+--- @param values table Candidate snapshot.
+--- @param output string Native output.
+local function parse_output(values, output)
+	for _, key in ipairs(MACOS_PREFERENCE_KEYS) do
+		local escaped = escape_lua_pattern(key)
+		local raw = output:match('"' .. escaped .. '"%s*=%s*([^;\n]+)')
+			or output:match("%f[%w]" .. escaped .. "%s*=%s*([^;\n]+)")
+		local value = parse_preference_value(raw)
+		if value ~= nil then
+			values[key] = values[key] or {}
+			table.insert(values[key], value)
 		end
 	end
-	return values
 end
 
---- Returns true only when macOS explicitly reports every relevant setting off.
---- @param grp table The gesture group.
+--- Refreshes the cache asynchronously; simultaneous requests share one probe.
+--- @param on_done function|nil Called after the complete snapshot is published.
+--- @return boolean accepted
+function M.refresh(on_done)
+	if pending_probe then
+		if on_done then pending_probe.waiters[#pending_probe.waiters + 1] = on_done end
+		return true
+	end
+	local probe = { values = {}, remaining = #MACOS_PREFERENCE_COMMANDS, waiters = {}, handles = {} }
+	if on_done then probe.waiters[1] = on_done end
+	pending_probe = probe
+	Logger.start(LOG, "Reading system gesture settings asynchronously…")
+	for _, args in ipairs(MACOS_PREFERENCE_COMMANDS) do
+		local settled = false
+		local function complete(code, output)
+			if settled or pending_probe ~= probe then return end
+			settled = true
+			if code == 0 and type(output) == "string" then parse_output(probe.values, output) end
+			probe.remaining = probe.remaining - 1
+			if probe.remaining ~= 0 then return end
+			cached_preferences = probe.values
+			pending_probe = nil
+			if next(cached_preferences) == nil then
+				Logger.warn(LOG, "System gesture preferences are unavailable; conflicts remain unverified.")
+			else
+				Logger.success(LOG, "System gesture settings cached.")
+			end
+			for _, callback in ipairs(probe.waiters) do
+				local ok, err = xpcall(callback, debug.traceback)
+				if not ok then Logger.error(LOG, "Gesture status callback failed: %s.", tostring(err)) end
+			end
+		end
+		local ok, handle = pcall(ShellRunner.spawn, "/usr/bin/defaults", args, complete)
+		if ok and type(handle) == "table" then probe.handles[#probe.handles + 1] = handle end
+		if not ok or type(handle) ~= "table" or handle.isSettled() then complete(-1, "") end
+	end
+	return true
+end
+
+--- Returns true when at least one native alias is known and every observed value is off.
+--- @param keys table Native aliases for one policy.
 --- @param preferences table<string, table<number>> Current macOS values.
---- @return boolean True when the matching native gesture is disabled.
-local function macos_gesture_is_disabled(grp, preferences)
+--- @return boolean disabled
+local function preference_is_disabled(keys, preferences)
 	local found = false
-	for _, key in ipairs(grp.preferences) do
+	for _, key in ipairs(keys) do
 		for _, value in ipairs(preferences[key] or {}) do
 			found = true
 			if value ~= 0 then return false end
 		end
 	end
 	return found
+end
+
+--- Native dragging and swiping are independent policies, not aliases of each other.
+--- @param grp table Gesture conflict group.
+--- @param preferences table Cached native values.
+--- @return boolean disabled
+local function macos_gesture_is_disabled(grp, preferences)
+	return preference_is_disabled(grp.preferences, preferences)
+		and (not grp.drag_preferences or preference_is_disabled(grp.drag_preferences, preferences))
 end
 
 
@@ -222,7 +283,7 @@ function M.on_action_changed(slot, new_action)
 	if not action_is_active(new_action) then return nil end
 	local grp = SLOT_TO_GROUP[slot]
 	if not grp then return nil end
-	if macos_gesture_is_disabled(grp, read_macos_preferences()) then
+	if macos_gesture_is_disabled(grp, cached_preferences) then
 		Logger.debug(LOG, "Native macOS gesture '%s' is disabled — conflict warning suppressed.", grp.key)
 		return nil
 	end
@@ -232,6 +293,7 @@ function M.on_action_changed(slot, new_action)
 	-- A line of dashes forces the blockAlert dialog to be wide enough in UI
 	local sep = string.rep("─", 26)
 	return {
+		key = grp.key,
 		msg = string.format(
 			"%s\n"
 			.. i18n.get("gestures.conflict_dialog_line1") .. "\n"
@@ -247,25 +309,65 @@ end
 
 --- Logs active conflicts at startup (no automatic preference changes).
 --- @param active_actions table The currently configured user actions.
-function M.apply_all_overrides(active_actions)
+--- @param is_enabled function|nil Reads the committed posture after asynchronous probing.
+function M.apply_all_overrides(active_actions, is_enabled)
 	if type(active_actions) ~= "table" then
 		Logger.error(LOG, "apply_all_overrides(): active_actions must be a table.")
 		return
 	end
-	Logger.debug(LOG, "Evaluating all overrides for conflicts…")
-	local preferences = read_macos_preferences()
-	for _, grp in ipairs(MACOS_GESTURE_GROUPS) do
-		if group_has_active_slot(grp, active_actions) then
-			if not macos_gesture_is_disabled(grp, preferences) then
-				Logger.warn(LOG, string.format("Active conflict: \"%s\" — please disable it in System Settings.", grp.description))
+	return M.refresh(function()
+		if boot_notified or not is_enabled or is_enabled() ~= true then return end
+		boot_notified = true
+		for _, warning in ipairs(M.active_conflicts(active_actions)) do
+			require("ui.gesture_conflict_notice").show(warning)
+		end
+	end)
+end
+
+--- Returns cached conflicts for active bindings, once per system group.
+--- @param actions table Gesture assignments.
+--- @return table warnings
+function M.active_conflicts(actions)
+	local warnings = {}
+	for _, group in ipairs(MACOS_GESTURE_GROUPS) do
+		if group_has_active_slot(group, actions) then
+			for _, slot in ipairs(group.slots) do
+				if action_is_active(actions[slot]) then
+					local warning = M.on_action_changed(slot, actions[slot])
+					if warning then warning.label = group.description; warnings[#warnings + 1] = warning end
+					break
+				end
 			end
 		end
 	end
-	Logger.info(LOG, "Overrides conflict evaluation completed.")
+	return warnings
 end
 
---- No-op function (we never modify system prefs automatically).
+--- Reports native pinch configuration without inventing an Ergopti pinch slot.
+--- @return boolean|nil enabled Nil means the native setting was not readable.
+function M.native_pinch_enabled()
+	local values = cached_preferences.TrackpadPinch
+	if not values or #values == 0 then return nil end
+	for _, value in ipairs(values) do if value ~= 0 then return true end end
+	return false
+end
+
+--- Opens Trackpad Settings and refreshes the snapshot after the next explicit request.
+--- @return boolean started
+function M.open_settings()
+	return ShellRunner.open(SETTINGS_URL)
+end
+
+--- Cancels owned probes during shutdown; system preferences are never modified.
 function M.restore_all_overrides()
+	local probe = pending_probe
+	pending_probe = nil
+	if probe then
+		Logger.warn(LOG, "System gesture settings read cancelled during shutdown.")
+		for _, handle in ipairs(probe.handles) do
+			if not handle.isSettled() then handle.terminate() end
+		end
+	end
 end
 
 return M

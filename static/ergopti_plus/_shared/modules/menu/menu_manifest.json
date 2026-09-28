@@ -1146,6 +1146,15 @@
 			"type": "---"
 		},
 		{
+			"type": "list",
+			"id": "system_gesture_status"
+		},
+		{
+			"type": "command",
+			"id": "system_gesture_settings",
+			"i18n": "menu.gestures.system_settings"
+		},
+		{
 			"type": "command",
 			"id": "auto_configure",
 			"i18n": "menu.gestures.auto_configure",

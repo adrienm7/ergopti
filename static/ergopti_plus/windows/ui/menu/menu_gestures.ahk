@@ -11,6 +11,7 @@
 ; menu/*.ahk files is irrelevant.
 ; ==============================================================================
 
+#Include ../gesture_conflicts.ahk
 
 
 
@@ -33,13 +34,15 @@ BuildGesturesMenu() {
 	; CategoryEnabled flip the master-gated menus register.
 	Commands := Map(
 		"gestures_toggle",  (*) => ToggleGesturesEnabled(),
+		"system_gesture_settings", (*) => GestureOpenTouchpadSettings(),
 		"disable_all",      (*) => _GES_SetEverySlot("none"),
 		"restore_defaults", (*) => _GES_RestoreFactoryDefaults(),
 		"auto_configure",   (*) => GestureAutoConfigureAction(),
 		"manual_tutorial",  (*) => GestureShowManualTutorialDialog(),
 	)
 	Getters := Map("gestures_enabled", _GES_IsEnabled)
-	ListProviders := Map("gesture_slots_ahk", (*) => _GES_SlotRows())
+	ListProviders := Map("gesture_slots_ahk", (*) => _GES_SlotRows(),
+		"system_gesture_status", (*) => GestureSystemRows())
 	return MenuRenderer_Build("gestures_menu", "Gestures", DynHandlers, "", ListProviders, Commands, Getters)
 }
 
@@ -120,7 +123,9 @@ SetGestureSlotAction(Slot, ActionName) {
 	if !GestureAssignConfiguredAction(&GestureAssignments,
 			"gesture", "gestures", Slot, ActionName)
 		return false
-	return ReloadPreservingSuspend()
+	if ActionName == "none"
+		return ReloadPreservingSuspend()
+	return GestureSystemAfterAssignment(Slot)
 }
 
 ; Toggles the Gestures enabled state and reloads.

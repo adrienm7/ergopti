@@ -1603,6 +1603,7 @@ function M.init(opts)
 	if enabled then M.enable() end
 
 	Logger.info(LOG, "Gestures manager initialised (enabled=%s).", tostring(_enabled))
+	require("ui.gesture_conflicts").notify_boot(M)
 end
 
 return M

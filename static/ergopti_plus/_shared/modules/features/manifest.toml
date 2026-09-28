@@ -4882,6 +4882,15 @@ type = "---"
 # `command` since 2026-08-07: the handler's whole body was one row with a static
 # label, which is what a declaration already expresses.
 [[menu.gestures_menu]]
+type = "list"
+id = "system_gesture_status"
+
+[[menu.gestures_menu]]
+type = "command"
+id = "system_gesture_settings"
+i18n = "menu.gestures.system_settings"
+
+[[menu.gestures_menu]]
 type = "command"
 id = "auto_configure"
 i18n = "menu.gestures.auto_configure"

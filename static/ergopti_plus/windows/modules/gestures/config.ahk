@@ -688,7 +688,13 @@ GestureShowManualTutorialDialog() {
 ; Opens Windows Settings to the touchpad page. Used both by the tutorial
 ; dialog's "Open settings" button and by the onboarding wizard.
 GestureOpenTouchpadSettings() {
-		try Run("ms-settings:devices-touchpad")
+		try {
+			Run("ms-settings:devices-touchpad")
+			return true
+		} catch as Err {
+			LoggerError("gestures", "Touchpad settings could not open: {1}.", Err.Message)
+			return false
+		}
 }
 
 ; One-shot SetTimer target used by the post-Reload AutoConfigureOnNextStart

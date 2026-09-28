@@ -27,6 +27,106 @@ TestGestures_DefaultAssignments() {
 }
 Test("Gestures: default assignments are populated", TestGestures_DefaultAssignments)
 
+; Every registry field participates in recognition; a missing modifier or native
+; family setting must not masquerade as a correctly configured touchpad.
+TestGestures_SystemConfigurationContract() {
+	global GESTURE_REG_ACTIONS, GESTURE_REG_KEY_PARAMS_NAMES, GESTURE_REG_KEY_PARAMS
+	global GESTURE_REG_ENABLE_NAMES, GESTURE_REG_CUSTOM_TAP_NAMES
+	global GESTURE_REG_CUSTOM_VALUE, GESTURE_REG_CUSTOM_TAP_VALUE
+	for Slot in GESTURE_SLOTS {
+		Family := InStr(Slot, "_3") ? "ThreeFinger" : "FourFinger"
+		Family .= SubStr(Slot, 1, 3) == "tap" ? "TapEnabled" : "SlideEnabled"
+		Values := Map(Family, GESTURE_REG_CUSTOM_VALUE,
+			GESTURE_REG_ACTIONS[Slot], GESTURE_REG_CUSTOM_VALUE,
+			GESTURE_REG_KEY_PARAMS_NAMES[Slot], GESTURE_REG_KEY_PARAMS[Slot])
+		if GESTURE_REG_ENABLE_NAMES.Has(Slot)
+			Values[GESTURE_REG_ENABLE_NAMES[Slot]] := GESTURE_REG_CUSTOM_VALUE
+		if GESTURE_REG_CUSTOM_TAP_NAMES.Has(Slot)
+			Values[GESTURE_REG_CUSTOM_TAP_NAMES[Slot]] := GESTURE_REG_CUSTOM_TAP_VALUE
+		Read := (Name) => Values.Get(Name, "")
+		AssertTrue(GestureSystemSlotConfigured(Slot, Read), Slot . " configured")
+		for Name, Expected in Values.Clone() {
+			Values.Delete(Name)
+			AssertFalse(GestureSystemSlotConfigured(Slot, Read), Slot . " requires " . Name)
+			Values[Name] := Expected + 1
+			AssertFalse(GestureSystemSlotConfigured(Slot, Read), Slot . " rejects wrong " . Name)
+			Values[Name] := Expected
+		}
+	}
+	AssertEqual("swipe_3", GestureSystemGroup("swipe_3_left"), "group shares dismissal")
+	AssertEqual("swipe_3", GestureSystemGroup("swipe_3_right"), "opposite direction shares dismissal")
+	AssertEqual("tap_3", GestureSystemGroup("tap_3"), "tap dismissal remains separate")
+}
+Test("Gestures: system configuration requires every native registry field", TestGestures_SystemConfigurationContract)
+
+; A failed read invalidates the snapshot and must never publish partial success.
+TestGestures_SystemSnapshotRefusal() {
+	State := GestureSystemState()
+	PreviousSlots := State["slots"]
+	PreviousReady := State["ready"]
+	try {
+		AssertTrue(GestureSystemRefresh(false, (Name) => ""), "absent settings are a complete unconfigured snapshot")
+		AssertTrue(State["ready"], "completed snapshot is available")
+		for Slot in GESTURE_SLOTS
+			AssertFalse(State["slots"][Slot], Slot . " absent is not configured")
+		Snapshot := State["slots"]
+		AssertFalse(GestureSystemRefresh(false, TestGestures_RefuseSystemRead), "read refusal propagates")
+		AssertFalse(State["ready"], "refusal exposes unknown status")
+		AssertTrue(State["slots"] == Snapshot, "partial replacement was not published")
+	} finally {
+		State["slots"] := PreviousSlots
+		State["ready"] := PreviousReady
+	}
+}
+
+TestGestures_RefuseSystemRead(Name) {
+	throw Error("native registry read refused")
+}
+Test("Gestures: system snapshot refusal cannot publish partial success", TestGestures_SystemSnapshotRefusal)
+
+; Close callbacks cannot retire another notice or run a reload callback twice.
+TestGestures_SystemNoticeOwnership() {
+	State := GestureSystemState()
+	Windows := State["windows"]
+	Callbacks := State["callbacks"]
+	Observed := Map("destroyed", 0, "done", 0)
+	Notice := { Destroy: (*) => Observed["destroyed"] += 1 }
+	try {
+		State["windows"] := Map("swipe_3", Notice)
+		State["callbacks"] := Map("swipe_3", [(*) => Observed["done"] += 1])
+		AssertFalse(GestureSystemFinishNotice("swipe_3", {}, "close"), "stale owner refused")
+		AssertEqual(0, Observed["done"], "stale notice cannot reload")
+		AssertTrue(GestureSystemFinishNotice("swipe_3", Notice, "close"), "owned close accepted")
+		AssertEqual(1, Observed["destroyed"], "notice destroyed once")
+		AssertEqual(1, Observed["done"], "completion delivered once")
+		AssertFalse(GestureSystemFinishNotice("swipe_3", Notice, "close"), "duplicate close refused")
+		AssertEqual(1, Observed["done"], "duplicate close cannot reload twice")
+	} finally {
+		State["windows"] := Windows
+		State["callbacks"] := Callbacks
+	}
+}
+Test("Gestures: system notices retain exact group ownership", TestGestures_SystemNoticeOwnership)
+
+; A previous good value cannot suppress a warning after its refresh was refused.
+TestGestures_SystemAssignmentReadiness() {
+	State := GestureSystemState()
+	PreviousSlots := State["slots"]
+	PreviousReady := State["ready"]
+	try {
+		State["slots"] := Map("tap_3", true)
+		State["ready"] := false
+		AssertTrue(GestureSystemAssignmentNeedsWarning("tap_3"), "unverified old cache cannot suppress warning")
+		State["ready"] := true
+		AssertFalse(GestureSystemAssignmentNeedsWarning("tap_3"), "confirmed native mapping needs no warning")
+		AssertTrue(GestureSystemAssignmentNeedsWarning("tap_4"), "unconfigured sibling still needs warning")
+	} finally {
+		State["slots"] := PreviousSlots
+		State["ready"] := PreviousReady
+	}
+}
+Test("Gestures: system assignment warning requires a current snapshot", TestGestures_SystemAssignmentReadiness)
+
 TestGestures_AllSlotsHaveLabels() {
     for Slot in GESTURE_SLOTS {
         AssertTrue(GESTURE_SLOT_LABELS.Has(Slot), "missing label for slot: " . Slot)

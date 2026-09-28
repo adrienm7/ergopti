@@ -578,8 +578,12 @@ M.triggerLookup      = Actions.trigger_lookup
 M.isRightClickHeld   = Actions.is_right_click_held
 M.on_action_changed  = Conflicts.on_action_changed
 
-function M.apply_all_overrides()    Conflicts.apply_all_overrides(CoreState.ga) end
+function M.apply_all_overrides()    return Conflicts.apply_all_overrides(CoreState.ga, function() return CoreState.enabled end) end
 function M.restore_all_overrides()  Conflicts.restore_all_overrides()           end
+function M.refresh_system_gestures(callback) return Conflicts.refresh(callback) end
+function M.system_gesture_conflicts() return Conflicts.active_conflicts(CoreState.enabled and CoreState.ga or {}) end
+function M.open_system_gestures() return Conflicts.open_settings() end
+function M.system_pinch_enabled() return Conflicts.native_pinch_enabled() end
 function M.get_action(slot)         return CoreState.ga[slot]                   end
 
 --- Stores one gesture action through an exact project-level setter contract.
