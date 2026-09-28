@@ -345,14 +345,20 @@ ConfigCommitBorrowedUpdates(OwnerToken, Path, Updates, Context,
 ; BuildFn returns { updates, publish?, finalize?, compensate?, cleanup?,
 ; rollback_updates?, retain? }. A rollback batch is written through the same
 ; writer while this exact lease is still held when primary finalization fails.
-ConfigCommitBuilt(Path, Context, BuildFn, WriterFn := 0, NotifyFn := 0) {
+; ExistingOwner may borrow an exact live lease or terminal bundle. Its caller
+; retains release responsibility through a subsequent WAL/reload handoff.
+ConfigCommitBuilt(Path, Context, BuildFn, WriterFn := 0, NotifyFn := 0, ExistingOwner := 0) {
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
-		try return ConfigCommitBuilt(Path, Context, BuildFn, WriterFn, NotifyFn)
+		try return ConfigCommitBuilt(Path, Context, BuildFn, WriterFn, NotifyFn, ExistingOwner)
 		finally Critical(InheritedCritical)
 	}
-	OwnerToken := _ConfigWriteLeaseTryAcquire(Path, "built")
+	Borrowed := ExistingOwner is Object
+	if !Borrowed && (!(ExistingOwner is Integer) || ExistingOwner != 0)
+		return ConfigReportPersistenceFailure(Context, NotifyFn, "invalid borrowed configuration owner")
+	OwnerToken := Borrowed ? _ConfigWriteLeaseSelectOwner(ExistingOwner, Path)
+		: _ConfigWriteLeaseTryAcquire(Path, "built")
 	if !(OwnerToken is Object)
 		return ConfigReportPersistenceFailure(Context, NotifyFn,
 				"another configuration transaction is already in progress")
@@ -395,7 +401,7 @@ ConfigCommitBuilt(Path, Context, BuildFn, WriterFn := 0, NotifyFn := 0) {
 			Transferred := true
 			return _ConfigCommitOwned(OwnerToken, Path, Updates, Context, WriterFn,
 					NotifyFn, PublishFn, FinalizeFn, CompensateFn,
-					PublishOnFinalizeFailure, RollbackUpdates, CleanupFn, RetainFn)
+					PublishOnFinalizeFailure, RollbackUpdates, CleanupFn, RetainFn, !Borrowed)
 		}
 	} catch as Err {
 		FailureDetail := "candidate plan inspection failed: " . Err.Message
@@ -408,7 +414,8 @@ ConfigCommitBuilt(Path, Context, BuildFn, WriterFn := 0, NotifyFn := 0) {
 					_ConfigRunRecoveryRetention(RetainFn, "compensation_failed",
 						&FailureDetail, &StateUnchanged)
 			}
-			_ConfigWriteLeaseRelease(OwnerToken)
+			if !Borrowed
+				_ConfigWriteLeaseRelease(OwnerToken)
 		}
 	}
 	if NoOp
@@ -425,7 +432,7 @@ _ConfigPlanGet(Plan, Key, Default := 0) {
 
 _ConfigCommitOwned(OwnerToken, Path, Updates, Context, WriterFn, NotifyFn,
 		PublishFn, FinalizeFn, CompensateFn, PublishOnFinalizeFailure := false,
-		RollbackUpdates := 0, CleanupFn := 0, RetainFn := 0) {
+		RollbackUpdates := 0, CleanupFn := 0, RetainFn := 0, ReleaseOwner := true) {
 	Failed := false
 	FailureDetail := ""
 	StateUnchanged := true
@@ -531,7 +538,8 @@ _ConfigCommitOwned(OwnerToken, Path, Updates, Context, WriterFn, NotifyFn,
 			}
 		}
 	} finally {
-		_ConfigWriteLeaseRelease(OwnerToken)
+		if ReleaseOwner
+			_ConfigWriteLeaseRelease(OwnerToken)
 	}
 	if Failed
 		return ConfigReportPersistenceFailure(Context, NotifyFn, FailureDetail, StateUnchanged)

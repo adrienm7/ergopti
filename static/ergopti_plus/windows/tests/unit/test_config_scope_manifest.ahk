@@ -79,3 +79,28 @@ _ScopeManifestQuotedRoundTrip() {
 	}
 }
 Test("config-scope: quoted extension paths round trip through the real owner", _ScopeManifestQuotedRoundTrip)
+
+; A lifecycle owner must keep exclusive authority after every borrowed outcome.
+_ScopeBuiltBorrowedOwner() {
+	Path := A_Temp . "\ergopti-scope-owner.toml"
+	Bundle := _ConfigWriteTerminalTryAcquire([Path])
+	Assert(Bundle is Object)
+	Calls := 0
+	Build() {
+		Calls += 1
+		return { updates: [{ Section: "gestures", Key: "enabled", Delete: 1 }] }
+	}
+	try {
+		Assert(ConfigCommitBuilt(Path, "borrowed scope test", Build, (*) => 1, (*) => 0, Bundle))
+		AssertEqual(Calls, 1)
+		Assert(_ConfigWriteLeaseSelectOwner(Bundle, Path) is Object, "success must not release borrowed authority")
+		Assert(!_ConfigWriteLeaseTryAcquire(Path, "intruder"), "no sibling may enter before reload")
+		Assert(!ConfigCommitBuilt(Path, "borrowed refusal", Build, (*) => 0, (*) => 0, Bundle))
+		Assert(_ConfigWriteLeaseSelectOwner(Bundle, Path) is Object, "writer refusal must not release borrowed authority")
+		Assert(!ConfigCommitBuilt(Path . ".other", "wrong path", Build, (*) => 1, (*) => 0, Bundle))
+		AssertEqual(Calls, 2, "wrong-path ownership is rejected before the builder")
+	} finally _ConfigWriteTerminalRelease(Bundle)
+	Assert(!ConfigCommitBuilt(Path, "stale scope", Build, (*) => 1, (*) => 0, Bundle))
+	AssertEqual(Calls, 2, "stale ownership is rejected before the builder")
+}
+Test("config-scope: borrowed candidate admission retains exact lifecycle ownership", _ScopeBuiltBorrowedOwner)
