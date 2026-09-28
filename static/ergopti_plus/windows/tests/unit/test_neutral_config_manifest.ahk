@@ -75,7 +75,7 @@ _NeutralConfigMissingTapHold() {
 	Assert(FileExist(Preset), "exercise the actual shipped recommendations")
 	Loaded := LoadTapHoldToml(A_Temp . "\ergopti-no-neutral-config-" . A_TickCount . ".toml", Preset)
 	AssertEqual(Loaded["keys"].Count, 0, "absence must never import the recommendation")
-	AssertEqual(Loaded["layers"].Count, 0)
+	AssertFalse(Loaded.Has("layers"), "navigation mappings belong only to layers.toml")
 }
 Test("neutral-config: an absent tap-hold file imports no recommended bindings", _NeutralConfigMissingTapHold)
 
