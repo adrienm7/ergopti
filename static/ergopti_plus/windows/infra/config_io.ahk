@@ -572,13 +572,19 @@ _ConfigPrepareTypedUpdates(Updates) {
 		Copy := Update.Clone()
 		if !(Copy.HasOwnProp("Delete") && (Copy.Delete is Integer) && Copy.Delete == 1) {
 			ExpectedType := TomlConfigExpectedType(Copy.Section, Copy.Key, &Entry)
+			Dynamic := ManifestDynamicEntry(TomlConfigManifestPath(Copy.Section) . "." . Copy.Key)
+			if Dynamic is Map && !Dynamic.Has("type")
+				throw TypeError("Dynamic configuration metadata has no generated type.")
+			DynamicBoolean := Dynamic is Map && Dynamic["type"] == "boolean"
 			BooleanDomain := ExpectedType == "boolean"
-				|| (ExpectedType == "enum" && TomlConfigEnumUsesBooleanLiterals(Entry))
+				|| (ExpectedType == "enum" && TomlConfigEnumUsesBooleanLiterals(Entry)) || DynamicBoolean
 			if BooleanDomain {
 				if Copy.Value is TOML_Bool && (!(Copy.Value.Value is Integer)
 						|| (Copy.Value.Value != 0 && Copy.Value.Value != 1))
 					throw TypeError("Invalid Boolean serialization sentinel")
 				Value := Copy.Value is TOML_Bool ? Copy.Value.Value : Copy.Value
+				if DynamicBoolean && (!(Value is Integer) || (Value != 0 && Value != 1))
+					throw TypeError("Invalid dynamic Boolean configuration value.")
 				if !TomlConfigValueMatchesManifest(Copy.Section, Copy.Key, Value, &ExpectedType)
 					throw TypeError("Invalid " . ExpectedType . " configuration value at "
 						. Copy.Section . "." . Copy.Key)
