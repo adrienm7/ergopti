@@ -22,10 +22,8 @@
 ;    the manifest declares with superseded_reason_key are turned off the same
 ;    way: here, on every path that rebuilds Features, and never in the saved
 ;    configuration. The menu greys their rows with that reason.
-; 4. The hotstring groups the menu manifest files as Ergopti-only
-;    (hotstring_groups.ergopti: the SFB reduction and the rolls) are written
-;    for the Ergopti key positions, so they are turned off the same way while
-;    the emulated registry layout belongs to another family.
+; 4. Geometry hotstrings remain an explicit user choice on every layout.
+;    Selecting a registry layout never changes their enabled state.
 ; ============================================================================== 
 
 
@@ -128,9 +126,6 @@ ApplyMasterGatesToFeatures(FeaturesTarget, TapHoldTarget, CategoryGateFn, LogDeb
 				}
 		}
 
-		; The Ergopti-only hotstring groups under a layout of another family.
-		_MG_SupersedeErgoptiHotstrings(FeaturesTarget)
-
 		; TapHolds master — handled by tap_hold.toml loading; gating drops the
 		; TapHold["keys"] entries entirely so TapHoldIsConfigured returns false.
 		if !CategoryGateFn.Call("TapHolds") {
@@ -167,82 +162,6 @@ LayoutSupersededReason(ManifestEntry, FeaturesSource := unset) {
 				return ""
 		Selected := IsSet(FeaturesSource) ? KeylayoutEmulation_SelectedId(FeaturesSource) : KeylayoutEmulation_SelectedId()
 		return (Selected != "") ? Reason : ""
-}
-
-; The reason the menu gives for the Ergopti-only hotstring groups.
-global LAYOUT_ERGOPTI_HOTSTRINGS_REASON := "menu.layout.superseded_ergopti_only"
-
-; Why the Ergopti-only hotstring groups are off: the emulated registry layout
-; belongs to another family than Ergopti. "" while no registry layout is
-; emulated (the built-in Ergopti emulation or the system layout types) or
-; while the emulated one is an Ergopti layout.
-; @param {Map} FeaturesSource - Features Map to read; the live one by default.
-; @param {Func} EntryFn - (Id) => the installed entry of Id, or 0; reads the
-;   installed record by default.
-; @returns {string} Locale key of the reason, or "".
-LayoutErgoptiHotstringsReason(FeaturesSource := unset, EntryFn := 0) {
-		global LAYOUT_ERGOPTI_HOTSTRINGS_REASON
-		Selected := IsSet(FeaturesSource) ? KeylayoutEmulation_SelectedId(FeaturesSource) : KeylayoutEmulation_SelectedId()
-		if (Selected == "")
-				return ""
-		Entry := HasMethod(EntryFn, "Call") ? EntryFn.Call(Selected) : _MG_InstalledLayoutEntry(Selected)
-		return LayoutCatalogue_IsErgopti(Entry) ? "" : LAYOUT_ERGOPTI_HOTSTRINGS_REASON
-}
-
-; The installed-record entry of the emulated layout, 0 when the record does
-; not list it. An unreadable record is logged and reads as no entry: the
-; emulation cannot verify its copy either, so no Ergopti layout types.
-_MG_InstalledLayoutEntry(Id) {
-		global _ConfigDir
-		try Installed := LayoutCatalogue_ReadInstalled(LayoutRegistry_LocalDir(_ConfigDir))
-		catch as Err {
-				LoggerError("MasterGates", "The installed-layouts record is unreadable, so '{1}' is not an Ergopti layout: {2}",
-						Id, Err.Message)
-				return 0
-		}
-		return Installed.Get(Id, 0)
-}
-
-; The hotstring feature groups the menu manifest files as Ergopti-only
-; (hotstring_groups.ergopti, resolved through hotstring_category_keys).
-; @returns {Array} Their Features["hotstrings"] keys.
-_MG_ErgoptiHotstringGroups() {
-		SubGates := _MG_LoadSubCategories()
-		Groups := []
-		for Category in MenuManifest_LoadHotstringGroups().ergopti {
-				if !SubGates.Has(Category)
-						throw Error("The Ergopti hotstring category '" . Category . "' has no feature group in the menu manifest.")
-				Groups.Push(SubGates[Category])
-		}
-		return Groups
-}
-
-; Turns the Ergopti-only hotstring groups off in ``FeaturesTarget`` while the
-; emulated registry layout belongs to another family; never in the saved
-; configuration.
-; @param {Map} FeaturesTarget - The Features Map to update.
-; @param {Array} Groups - Hotstring groups (_MG_ErgoptiHotstringGroups by default).
-; @param {Func} EntryFn - See LayoutErgoptiHotstringsReason.
-; @returns {Integer} Number of hotstring features turned off.
-_MG_SupersedeErgoptiHotstrings(FeaturesTarget, Groups := unset, EntryFn := 0) {
-		if (LayoutErgoptiHotstringsReason(FeaturesTarget, EntryFn) == "") or !FeaturesTarget.Has("hotstrings")
-				return 0
-		if !IsSet(Groups)
-				Groups := _MG_ErgoptiHotstringGroups()
-		Count := 0
-		for Group in Groups {
-				if !FeaturesTarget["hotstrings"].Has(Group)
-						continue
-				for Id, Value in FeaturesTarget["hotstrings"][Group] {
-						if (Value is Map) and Value.Get("enabled", false) {
-								Value["enabled"] := false
-								Count += 1
-						}
-				}
-		}
-		if (Count > 0)
-				LoggerInfo("MasterGates", "{1} Ergopti-only hotstring(s) are off: the emulated layout is not an Ergopti layout.", Count)
-		return Count
 }
 
 ; Turns the superseded features off in ``FeaturesTarget`` when a registry layout

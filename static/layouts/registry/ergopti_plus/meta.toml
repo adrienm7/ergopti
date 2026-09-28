@@ -5,8 +5,8 @@
 # test fails when the two drift apart.
 
 name = "Ergopti+"
-# The Ergopti-only features and hotstrings apply to this family alone
-# (registry.ergopti_family in _shared/modules/layouts/defaults.json).
+# Catalogue family metadata; geometry hotstrings remain an independent
+# opt-in choice on every layout.
 family = "ergopti"
 version = "2.2.2"
 author = "Adrien Moyaux"
