@@ -276,6 +276,11 @@ hotkey_defs.tap_keys   = function()
 	return sys_acts.bind_tap_keys(delivery_admitted, decide_tap_key)
 end
 
+local function has_tap_key_assignments()
+	TapKeys.ensure_loaded(require("modules.gestures.actions").is_assignable)
+	return TapKeys.has_assignments()
+end
+
 hotkey_labels.layer_scroll = i18n.get("shortcuts.label_layer_scroll")
 hotkey_defs.layer_scroll   = function()
 	return sys_acts.bind_layer_scroll(delivery_admitted)
@@ -396,7 +401,9 @@ end
 -- A master enable is not a preset import. Each child starts from its own
 -- neutral desired value and may later be enabled explicitly behind any fence.
 for name in pairs(hotkey_defs) do
-	_disabled_set[name] = not Manifest.default_for("shortcuts.keys." .. name)
+	-- Dispatcher ownership is derived from assignments when the layer starts;
+	-- there is deliberately no shortcuts.keys.tap_keys preference.
+	_disabled_set[name] = name == "tap_keys" or not Manifest.default_for("shortcuts.keys." .. name)
 end
 
 
@@ -717,6 +724,7 @@ local function start_bindings(preserve_pause_intent, hotkeys_only)
 		end
 	end
 
+	_disabled_set.tap_keys = not has_tap_key_assignments()
 	for name, def in pairs(hotkey_defs) do
 		-- Skip hotkeys that are already active OR that were explicitly disabled
 		-- via M.disable() — the _disabled_set persists across stop/start cycles
@@ -1012,6 +1020,7 @@ function M.enable(name)
 		Logger.error(LOG, "M.enable(): unknown hotkey '%s'.", name)
 		return false
 	end
+	if name == "tap_keys" and not has_tap_key_assignments() then return M.disable(name) end
 	if not admission_open() then
 		_disabled_set[name] = nil
 		Logger.debug(LOG, "Hotkey '%s' enabled while the layer is paused — it binds on resume.", name)
@@ -1084,6 +1093,19 @@ function M.disable(name)
 	_disabled_set[name] = true
 	Logger.debug(LOG, "Hotkey '%s' disabled.", name)
 	return true
+end
+
+--- Reconciles the shared tap-key owner after an assignment was persisted.
+--- A stopped or paused layer retains intent without acquiring native input.
+--- @return boolean committed
+function M.reconcile_tap_keys()
+	if start_attempt ~= nil then return false end
+	if not has_tap_key_assignments() then return M.disable("tap_keys") end
+	if not started or not admission_open() then
+		_disabled_set.tap_keys = nil
+		return true
+	end
+	return M.enable("tap_keys")
 end
 
 --- Returns the user's preference for a named hotkey, whatever the layer's

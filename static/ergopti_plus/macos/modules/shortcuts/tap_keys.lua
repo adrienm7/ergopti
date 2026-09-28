@@ -17,8 +17,8 @@
 ---    keyboard slots, and are cached by load(): the shortcut layer's eventtap
 ---    asks decide() on every press of these keys, and an eventtap callback may
 ---    only do bounded in-memory work. A key never stored takes the manifest
----    default (shortcuts.tap_keys.<id>), so the key left of 1 opens the capture
----    tool out of the box.
+---    neutral default (shortcuts.tap_keys.<id>), leaving native keys untouched
+---    until the user explicitly assigns an action.
 --- 3. This module decides; the raw eventtap (actions/system.lua bind_tap_keys)
 ---    consumes the event and runs the action behind the callback.
 --- 4. The menu names each key by the character the current input source puts on
@@ -120,6 +120,16 @@ end
 function M.get_action(id)
 	if not _assignments then error("tap_keys.get_action() before load()") end
 	return _assignments[id] or "none"
+end
+
+--- Whether a loaded explicit assignment requires the shared native dispatcher.
+--- @return boolean assigned
+function M.has_assignments()
+	if not _assignments then error("tap_keys.has_assignments() before load()") end
+	for _, action in pairs(_assignments) do
+		if action ~= "none" then return true end
+	end
+	return false
 end
 
 --- Assigns an action to a tap key ("none" gives the key back to the layout).
