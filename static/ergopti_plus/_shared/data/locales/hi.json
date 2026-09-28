@@ -438,7 +438,7 @@
 	"editor.hotstrings.err_trigger_empty": "The trigger is required.",
 	"editor.hotstrings.sec_modal_title_rename": "Rename section",
 	"editor.hotstrings.trig_hint_text": "shown, stored as",
-	"editor.personal_info.window_title": "ErgoptiPlus — व्यक्तिगत जानकारी",
+	"editor.personal_info.window_title": "व्यक्तिगत जानकारी",
 	"ergopti.windowspy_not_found": "WindowSpy.ahk निम्न स्थान पर नहीं मिला: {1}",
 	"error_dialog.heading": "ErgoptiPlus में एक त्रुटि आई",
 	"error_dialog.heading_crash": "ErgoptiPlus अप्रत्याशित रूप से बंद हो गया",

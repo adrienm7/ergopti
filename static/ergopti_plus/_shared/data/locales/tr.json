@@ -438,7 +438,7 @@
 	"editor.hotstrings.err_trigger_empty": "The trigger is required.",
 	"editor.hotstrings.sec_modal_title_rename": "Rename section",
 	"editor.hotstrings.trig_hint_text": "shown, stored as",
-	"editor.personal_info.window_title": "ErgoptiPlus — Kişisel bilgiler",
+	"editor.personal_info.window_title": "Kişisel bilgiler",
 	"ergopti.windowspy_not_found": "WindowSpy.ahk aşağıdaki konumda bulunamadı : {1}",
 	"error_dialog.heading": "ErgoptiPlus bir hatayla karşılaştı",
 	"error_dialog.heading_crash": "ErgoptiPlus beklenmedik şekilde durdu",

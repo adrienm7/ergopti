@@ -253,6 +253,7 @@ return {
 	"tests.unit.ui.test_about_menu_channel_rows",
 	"tests.unit.ui.test_asset_inlining_is_loud",
 	"tests.unit.ui.test_error_dialog_bridge",
+	"tests.unit.ui.test_diagnostics_window_title",
 	"tests.unit.ui.test_healthcheck_last_error_wired",
 	"tests.unit.ui.test_healthcheck_linux_rows",
 	"tests.unit.ui.test_hotstring_bulk_checkboxes",
