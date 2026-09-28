@@ -658,7 +658,11 @@ function M.set_sensitivity(slot, s)
 	return true
 end
 function M.get_space_wrap()         return CoreState.space_wrap                 end
-function M.set_space_wrap(wrap)     CoreState.space_wrap = wrap                 end
+function M.set_space_wrap(wrap)
+	if type(wrap) ~= "boolean" then return false end
+	CoreState.space_wrap = wrap
+	return true
+end
 
 function M.get_all_actions()
 	local t = {}

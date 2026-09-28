@@ -1040,6 +1040,24 @@ M.unavailable = {
 		path = "gestures.sensitivities.swipe_5_right_up", section = "gestures.sensitivities", reason_key = "", platforms = { "hs" },
 	},
 	{
+		path = "gestures.modes.swipe_3_horiz", section = "gestures.modes", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.modes.swipe_4_horiz", section = "gestures.modes", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.modes.swipe_5_horiz", section = "gestures.modes", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.sensitivities.swipe_3_horiz", section = "gestures.sensitivities", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.sensitivities.swipe_4_horiz", section = "gestures.sensitivities", reason_key = "", platforms = { "hs" },
+	},
+	{
+		path = "gestures.sensitivities.swipe_5_horiz", section = "gestures.sensitivities", reason_key = "", platforms = { "hs" },
+	},
+	{
 		path = "layout.ergopti_base", section = "layout", reason_key = "", platforms = { "ahk" },
 	},
 	{

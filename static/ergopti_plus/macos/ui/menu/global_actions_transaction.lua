@@ -707,16 +707,29 @@ function M.create(deps)
 
 	local owner = {}
 
-	--- Runs one non-transactional global writer under the same admission fence as
-	--- the factory reset. The token is published before any opaque preflight and
-	--- released by identity after the callback returns or throws.
+	--- Runs a writer under the factory reset admission fence. A scoped owner may
+	--- retain its token after the callback while exact compensation is pending;
+	--- only that owner can retry its inverse before another writer is admitted.
 	--- @param label string Diagnostic action label.
 	--- @param callback function Entire external writer body.
+	--- @param retained_owner table|nil Scope pending and retry_restore ports.
 	--- @return any result Exact callback result, or false on refusal/throw.
-	function owner.run_exclusive(label, callback)
+	function owner.run_exclusive(label, callback, retained_owner)
 		if type(callback) ~= "function" then
 			Logger.error(LOG, "Global external writer '%s' has no callback.", tostring(label))
 			return false
+		end
+		if retained_owner ~= nil and (type(retained_owner) ~= "table"
+			or type(retained_owner.pending) ~= "function" or type(retained_owner.retry_restore) ~= "function") then return false end
+		if external_writer and external_writer.retained == true
+			and external_writer.owner == retained_owner then
+			external_writer.retained = false
+			local checked, terminal_pending = pcall(deps.terminal_pending)
+			if not checked or terminal_pending ~= false then external_writer.retained = true; return false end
+			local restored = call_exact("Scoped compensation", retained_owner.retry_restore)
+			local inspected, pending = pcall(retained_owner.pending)
+			if not restored or not inspected or pending ~= false then external_writer.retained = true; return false end
+			external_writer = nil
 		end
 		if active_transaction ~= nil or external_writer ~= nil then
 			Logger.warn(LOG, "Global external writer '%s' refused while another owner is active.",
@@ -727,6 +740,7 @@ function M.create(deps)
 		local token = {
 			generation = external_writer_generation,
 			label = label,
+			owner = retained_owner,
 		}
 		external_writer = token
 		local pending_ok, terminal_pending = xpcall(
@@ -739,7 +753,15 @@ function M.create(deps)
 			return false
 		end
 		local ok, result = xpcall(callback, debug.traceback)
-		if external_writer == token then external_writer = nil end
+		local settled = true
+		if retained_owner then
+			local checked, pending = pcall(retained_owner.pending)
+			settled = checked and pending == false
+		end
+		if external_writer == token then
+			if settled then external_writer = nil else token.retained = true end
+		end
+		if not settled then return false end
 		if not ok then
 			Logger.error(LOG, "Global external writer '%s' raised: %s.",
 				tostring(label), tostring(result))

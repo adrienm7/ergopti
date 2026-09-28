@@ -55,6 +55,7 @@ end
 --- @param preferences table Preferences module or test double.
 --- @param opts table Transaction dependencies and initial snapshots.
 --- @return function save Transactional save function.
+--- @return table checkpoint Revision-checked snapshots for scoped publication.
 function M.bind(preferences, opts)
 	if type(opts) ~= "table" then error("preferences transaction options are required", 2) end
 	if opts.snapshot_view ~= nil and type(opts.snapshot_view) ~= "function" then
@@ -67,6 +68,18 @@ function M.bind(preferences, opts)
 	local committed_state = clone_value(opts.initial_state)
 	local committed_preferences = clone_value(opts.initial_preferences)
 	local rolling_back = false
+	local revision = 0
+	local checkpoint = {}
+	function checkpoint.capture()
+		return { state = clone_value(committed_state), preferences = clone_value(committed_preferences), revision = revision }
+	end
+	function checkpoint.replace(expected, next_state, next_preferences)
+		if rolling_back or type(expected) ~= "table" or expected.revision ~= revision
+			or type(next_state) ~= "table" or type(next_preferences) ~= "table" then return false end
+		committed_state, committed_preferences = clone_value(next_state), clone_value(next_preferences)
+		revision = revision + 1
+		return true, checkpoint.capture()
+	end
 
 	local function rollback()
 		if type(committed_state) ~= "table" or type(committed_preferences) ~= "table" then
@@ -83,7 +96,7 @@ function M.bind(preferences, opts)
 		return true
 	end
 
-	return function()
+	local function save()
 		if rolling_back then return false end
 		local read_only = nil
 		if opts.read_only_reason then read_only = opts.read_only_reason() end
@@ -109,6 +122,7 @@ function M.bind(preferences, opts)
 			opts.builder,
 			opts.hot_counter,
 			function(saved_snapshot, runtime_snapshot)
+				revision = revision + 1
 				committed_state = clone_value(state)
 				if opts.snapshot_view then
 					if type(runtime_snapshot) ~= "table" then
@@ -125,6 +139,7 @@ function M.bind(preferences, opts)
 		)
 		return committed, snapshot
 	end
+	return save, checkpoint
 end
 
 --- Commits preferences and performs success-only cache side effects.

@@ -54,7 +54,7 @@ function M.new(options)
 			end
 			local decoded = Codec.decode(candidate)
 			if type(decoded) ~= "table" then return false, "scope candidate is not valid TOML" end
-			local snapshot = options.capture()
+			local snapshot = options.capture(source, candidate, updates)
 			if type(snapshot) ~= "table" then return false, "runtime snapshot was not acknowledged" end
 			if source.status == "ok" then
 				local backed, backup_error = Writer.publish_if_unchanged(options.backup_path,
@@ -65,7 +65,7 @@ function M.new(options)
 			end
 			-- Capture before invocation because a native callback can mutate and throw.
 			debt = snapshot
-			if options.apply(decoded, updates) ~= true then return false, "runtime application refused" end
+			if options.apply(decoded, updates, source, candidate) ~= true then return false, "runtime application refused" end
 			local published, publish_error = Writer.publish_if_unchanged(options.path,
 				candidate, options.files, source)
 			if published ~= true then return false, publish_error end

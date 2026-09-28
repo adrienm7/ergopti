@@ -737,6 +737,24 @@ M.features = {
 		path = "gestures.sensitivities.swipe_5_right_up", id = "swipe_5_right_up", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities.swipe_5_right_up", platforms = { "hs" }, recommended = 3.5, input_altering = false,
 	},
 	{
+		path = "gestures.modes.swipe_3_horiz", id = "swipe_3_horiz", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes", platforms = { "hs" }, recommended = "x1", input_altering = false, enum_values = { "x1", "incremental" },
+	},
+	{
+		path = "gestures.modes.swipe_4_horiz", id = "swipe_4_horiz", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes", platforms = { "hs" }, recommended = "x1", input_altering = false, enum_values = { "x1", "incremental" },
+	},
+	{
+		path = "gestures.modes.swipe_5_horiz", id = "swipe_5_horiz", section = "gestures.modes", default = "x1", type = "enum", description_key = "menu.gestures.modes", platforms = { "hs" }, recommended = "x1", input_altering = false, enum_values = { "x1", "incremental" },
+	},
+	{
+		path = "gestures.sensitivities.swipe_3_horiz", id = "swipe_3_horiz", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities", platforms = { "hs" }, recommended = 3.5, input_altering = false,
+	},
+	{
+		path = "gestures.sensitivities.swipe_4_horiz", id = "swipe_4_horiz", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities", platforms = { "hs" }, recommended = 3.5, input_altering = false,
+	},
+	{
+		path = "gestures.sensitivities.swipe_5_horiz", id = "swipe_5_horiz", section = "gestures.sensitivities", default = 3.5, type = "number", description_key = "menu.gestures.sensitivities", platforms = { "hs" }, recommended = 3.5, input_altering = false,
+	},
+	{
 		path = "ui.menubar_icon", id = "menubar_icon", section = "ui", default = "v1", type = "enum", description_key = "menu.layout.menubar_icon", platforms = { "hs" }, recommended = "v1", input_altering = false, enum_values = { "v1", "v2" },
 	},
 	{
