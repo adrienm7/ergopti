@@ -126,13 +126,6 @@
 			"id": "language"
 		},
 		{
-			"id": "updates",
-			"platforms": [
-				"linux"
-			],
-			"reason_key": "platform_reason.tray_top_level_rows_are_each_drivers"
-		},
-		{
 			"id": "about"
 		},
 		{
