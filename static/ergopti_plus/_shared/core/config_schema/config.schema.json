@@ -168,7 +168,7 @@
 						"selected": { "type": "string", "minLength": 1 },
 						"ollama": { "type": "string" },
 						"mlx": { "type": "string" },
-						"user_models": { "type": "object" }
+						"user_models": { "type": "array", "items": { "type": "object" } }
 					}
 				},
 				"profiles": {
@@ -179,7 +179,7 @@
 						"num_predictions": { "type": "integer", "minimum": 1, "maximum": 32 },
 						"auto_profile_for_model": { "type": "boolean" },
 						"shortcuts": { "type": "object" },
-						"user_profiles": { "type": "object" }
+						"user_profiles": { "type": "array", "items": { "type": "object" } }
 					}
 				},
 				"trigger": {
@@ -193,7 +193,7 @@
 						"secure_filter_enabled": { "type": "boolean" },
 						"url_bar_filter_enabled": { "type": "boolean" },
 						"shortcut": { "type": "boolean" },
-						"disabled_apps": { "type": "object" }
+						"disabled_apps": { "type": "array", "items": { "type": "string" } }
 					}
 				},
 				"navigation": {
@@ -205,7 +205,10 @@
 							"type": "array",
 							"items": { "enum": ["alt", "ctrl", "shift", "cmd"] }
 						},
-						"nav_modifiers": { "type": "object" }
+						"nav_modifiers": {
+							"type": "array",
+							"items": { "enum": ["alt", "ctrl", "shift", "cmd"] }
+						}
 					}
 				}
 			}
