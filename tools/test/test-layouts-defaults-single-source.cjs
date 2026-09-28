@@ -27,6 +27,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { spawnSync } = require('child_process');
+const { bashExecutable } = require('../lib/git-bash.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
@@ -234,7 +235,7 @@ check('the packaged macOS app ships the registry folder the layout manager reads
 		fs.mkdirSync(staticRoot, { recursive: true });
 		const bash = ['set -euo pipefail', 'log() { :; }', 'fail() { printf "FAIL: %s\\n" "$*" >&2; exit 1; }',
 			fn[0], 'bundle_layout_registry "$1"'].join('\n');
-		const result = spawnSync('bash', ['-c', bash, 'fixture', staticRoot.replace(/\\/g, '/')], {
+		const result = spawnSync(bashExecutable(), ['-c', bash, 'fixture', staticRoot.replace(/\\/g, '/')], {
 			encoding: 'utf8',
 			env: { ...process.env, REPO_ROOT: path.join(fixture, 'repo').replace(/\\/g, '/') }
 		});
