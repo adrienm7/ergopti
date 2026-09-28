@@ -184,7 +184,7 @@ helpers.describe("hotstring priority overrides", function()
 			end
 			helpers.assert_eq(winner(restarted_engine), "SECOND")
 			helpers.assert_contains(persisted, "[second.main]")
-			helpers.assert_contains(persisted, "[" .. extension_category .. ".main]")
+			helpers.assert_contains(persisted, '["' .. extension_category .. '".main]')
 
 			package.loaded["modules.hotstrings.hotstrings_config"] = nil
 			restarted = require("modules.hotstrings.hotstrings_config")
