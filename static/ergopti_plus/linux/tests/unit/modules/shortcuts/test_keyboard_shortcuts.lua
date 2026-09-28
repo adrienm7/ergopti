@@ -473,3 +473,59 @@ helpers.describe("keyboard shortcuts: the chord's identity", function()
 	end)
 
 end)
+
+helpers.describe("Keyboard configuration admission", function()
+	for _, scenario in ipairs({ "ordinary rebind", "owned dispatch", "released generation", "new generation" }) do
+		helpers.it("keeps " .. scenario .. " bounded by the actual dispatcher", function()
+			local shortcuts, config = load_over_config({ ["shortcuts.keyboard.ctrl_j"] = "select_line" })
+			local gestures = require("modules.gestures.manager")
+			local execute = gestures.execute_action
+			local queue, fired = {}, {}
+			gestures.execute_action = function(action) fired[#fired + 1] = action end
+			local ok, err = pcall(function()
+				local detail = chord("j", { ctrl = true })
+				local options = { defer = function(callback) queue[#queue + 1] = callback; return true end }
+				helpers.assert_true(shortcuts.consume(detail, options))
+				queue[1]()
+				helpers.assert_eq(table.concat(fired), "select_line", "ordinary positive control must execute")
+				fired = {}
+				helpers.assert_true(shortcuts.consume(detail, options))
+				if scenario == "ordinary rebind" then
+					helpers.assert_true(shortcuts.set_action("ctrl_j", "enter"))
+					queue[2]()
+					helpers.assert_eq(#fired, 0, "an already queued old assignment must not fire")
+					helpers.assert_true(shortcuts.consume(detail, options))
+					queue[3]()
+					helpers.assert_eq(table.concat(fired), "enter")
+					return
+				end
+				local token = {}
+				local before = Sandbox.read_bytes(config.path)
+				helpers.assert_true(shortcuts.acquire_configuration(token))
+				helpers.assert_eq(shortcuts.acquire_configuration({}), false)
+				helpers.assert_eq(shortcuts.acquire_configuration(token), false)
+				helpers.assert_eq(shortcuts.release_configuration({}), false)
+				helpers.assert_eq(shortcuts.set_action("ctrl_j", "enter"), false)
+				helpers.assert_eq(Sandbox.read_bytes(config.path), before)
+				helpers.assert_eq(shortcuts.get_action("ctrl_j"), "select_line")
+				helpers.assert_eq(shortcuts.consume(detail, options), false)
+				helpers.assert_eq(shortcuts.dispatch(detail), false)
+				helpers.assert_eq(#queue, 2)
+				if scenario == "owned dispatch" then queue[2]() end
+				helpers.assert_eq(#fired, 0)
+				helpers.assert_true(shortcuts.release_configuration(token))
+				helpers.assert_eq(shortcuts.release_configuration(token), false)
+				queue[2]()
+				helpers.assert_eq(#fired, 0, "release must not revive canceled actions")
+				if scenario == "new generation" then
+					helpers.assert_true(shortcuts.consume(detail, options))
+					queue[3]()
+					helpers.assert_eq(table.concat(fired), "select_line")
+				end
+			end)
+			gestures.execute_action = execute
+			drop_config()
+			if not ok then error(err, 0) end
+		end)
+	end
+end)
